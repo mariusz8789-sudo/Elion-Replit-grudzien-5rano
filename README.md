@@ -278,3 +278,4 @@ W przypadku pytań lub problemów, skontaktuj się z zespołem deweloperskim.
 
 **Wersja:** 1.0.0 (Production-Ready)
 **Data:** 2025-01-04
+test

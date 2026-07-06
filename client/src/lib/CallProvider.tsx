@@ -46,9 +46,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const qualityIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const localStreamRef = useRef<MediaStream | null>(null);
+  localStreamRef.current = localStream;
 
+  // Stable identity ([]) is required here: this is a dependency of the persistent signaling
+  // socket effect below, and previously depended on `localStream` (read via closure), which
+  // changes every time a call starts/ends — tearing down and recreating the signaling socket
+  // on every single call and breaking the separate invite_sent listener bound to the old one.
   const cleanupMedia = useCallback(() => {
-    localStream?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
     pcRef.current?.close();
     pcRef.current = null;
     setLocalStream(null);
@@ -58,7 +64,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       clearInterval(qualityIntervalRef.current);
       qualityIntervalRef.current = null;
     }
-  }, [localStream]);
+  }, []);
 
   const send = useCallback((payload: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -195,6 +201,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
 
       switch (data.type) {
+        case "call:invite_sent":
+          setState((prev) => (prev.phase === "outgoing-ringing" && !prev.callId ? { ...prev, callId: data.callId } : prev));
+          break;
+
         case "call:invite":
           setState({
             phase: "incoming-ringing",
@@ -269,24 +279,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase, state.callId]);
-
-  // Capture the server-assigned callId for outgoing calls.
-  useEffect(() => {
-    if (!wsRef.current) return;
-    const socket = wsRef.current;
-    const handler = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "call:invite_sent") {
-          setState((prev) => (prev.phase === "outgoing-ringing" && !prev.callId ? { ...prev, callId: data.callId } : prev));
-        }
-      } catch {
-        // ignore
-      }
-    };
-    socket.addEventListener("message", handler);
-    return () => socket.removeEventListener("message", handler);
-  }, []);
 
   return (
     <CallContext.Provider value={{ ...state, startCall, acceptCall, rejectCall, endCall, localStream, remoteStream }}>

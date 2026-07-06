@@ -214,6 +214,23 @@ adding a provider means implementing the interface, not rewriting call sites. Th
     reload on unmount, and `POST /api/messages` now pushes through the pub/sub broadcaster from batch 10.
   - Also removed a substantial amount of dead code surfaced by the lint pass (unused imports/state/params across
     ~25 files) and converted two CJS `require()` calls in `tailwind.config.ts` to static imports.
+- **Fixed a serious WebRTC calling bug**: `CallProvider`'s persistent signaling WebSocket effect depended on
+  `cleanupMedia`, which was itself keyed on `localStream` — a value that changes every time a call starts or
+  ends. That silently tore down and recreated the signaling socket on every single call, and a separate effect
+  that captured the server-assigned `callId` for outgoing calls was bound to the *old* (now-closed) socket with
+  an empty dependency array, so it never re-attached. Net effect: outgoing calls stopped working after the first
+  call of a session. Fixed by making `cleanupMedia` read the current stream from a ref (stable identity) and
+  merging the `callId`-capture logic into the main socket's message handler instead of a separate effect.
+- **Two more race conditions closed**: `assignCompanyToBooking` (the admin manual-assign path) now uses a
+  conditional update that only succeeds if the booking hasn't already been assigned (previously a bare
+  unconditional `UPDATE`, so two concurrent assignment attempts — or a race with the offer-acceptance flow —
+  could silently overwrite each other); `awardBadgeIfMissing` now uses `INSERT ... ON CONFLICT DO NOTHING`
+  backed by a new unique `(holderType, holderId, badgeId)` constraint instead of a check-then-insert, closing a
+  duplicate-badge race between concurrent milestone checks for the same holder.
+- **Known tech debt (not fixed this round)**: `BookingChat.tsx` and `CallProvider.tsx` each open their own
+  independent WebSocket connection to `/ws`, so a user viewing a booking's chat has two simultaneous connections
+  open. Consolidating into one shared WS client is a larger change deferred to a future batch rather than risked
+  without live end-to-end testing.
 
 ## Deployment
 

@@ -364,6 +364,7 @@ export const badgeAwards = pgTable("badge_awards", {
   awardedAt: timestamp("awarded_at").notNull().default(sql`now()`),
 }, (t) => ({
   holderIdx: index("badge_awards_holder_idx").on(t.holderType, t.holderId),
+  holderBadgeUnique: unique().on(t.holderType, t.holderId, t.badgeId),
 }));
 
 // === COUPONS / PROMOTIONS ===

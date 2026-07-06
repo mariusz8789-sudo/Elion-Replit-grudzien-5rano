@@ -609,21 +609,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/bookings/:id/assign", requireAuth, async (req, res) => {
-    const { companyId, driverId, vehicleId } = req.body;
-    if (!companyId || !driverId || !vehicleId) {
-      return res.status(400).json({ message: "Company ID, Driver ID, and Vehicle ID are required" });
-    }
+    try {
+      const { companyId, driverId, vehicleId } = req.body;
+      if (!companyId || !driverId || !vehicleId) {
+        return res.status(400).json({ message: "Company ID, Driver ID, and Vehicle ID are required" });
+      }
 
-    const user = req.user as User;
-    if (user.companyId !== companyId && user.role !== "admin") {
-      return res.status(403).json({ message: "Not authorized to assign this company to a booking" });
-    }
+      const user = req.user as User;
+      if (user.companyId !== companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to assign this company to a booking" });
+      }
 
-    const booking = await storage.assignCompanyToBooking(req.params.id, companyId, driverId, vehicleId);
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
+      const existing = await storage.getBooking(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const booking = await storage.assignCompanyToBooking(req.params.id, companyId, driverId, vehicleId);
+      if (!booking) {
+        return res.status(409).json({ message: "This booking has already been assigned to a company" });
+      }
+      res.json(booking);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
     }
-    res.json(booking);
   });
 
   // Payment status is normally driven exclusively by the Stripe webhook

@@ -437,9 +437,12 @@ export class DbStorage implements IStorage {
       throw new Error("Vehicle not found or does not belong to this company");
     }
 
+    // Conditional update guards against a race between concurrent assignment attempts (or
+    // against the offer-acceptance flow assigning the same booking first): only succeeds if
+    // the booking hasn't already been assigned to a company.
     const result = await db.update(bookings)
       .set({ companyId, driverId, vehicleId, status: "accepted", updatedAt: new Date() })
-      .where(eq(bookings.id, bookingId))
+      .where(and(eq(bookings.id, bookingId), inArray(bookings.status, ["draft", "posted"])))
       .returning();
     return result[0];
   }
@@ -830,15 +833,22 @@ export class DbStorage implements IStorage {
     const badge = badgeResult[0];
     if (!badge) return undefined;
 
+    // ON CONFLICT DO NOTHING (backed by the unique (holderType, holderId, badgeId)
+    // constraint) closes a check-then-insert race where two concurrent milestone checks for
+    // the same holder could otherwise both pass the "not yet awarded" check and insert a
+    // duplicate award.
+    const inserted = await db.insert(badgeAwards)
+      .values({ holderType, holderId, badgeId: badge.id })
+      .onConflictDoNothing()
+      .returning();
+    if (inserted.length > 0) return inserted[0];
+
     const existing = await db.select().from(badgeAwards).where(and(
       eq(badgeAwards.holderType, holderType),
       eq(badgeAwards.holderId, holderId),
       eq(badgeAwards.badgeId, badge.id),
     ));
-    if (existing.length > 0) return existing[0];
-
-    const result = await db.insert(badgeAwards).values({ holderType, holderId, badgeId: badge.id }).returning();
-    return result[0];
+    return existing[0];
   }
 
   async checkAndAwardMilestoneBadges(holderType: "company" | "driver", holderId: string): Promise<void> {

@@ -11,6 +11,8 @@ import { Truck, Plus, Package, Ruler } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ImageUpload from "./ImageUpload";
+import VerificationUpload from "./VerificationUpload";
+import ApiKeysPanel from "./ApiKeysPanel";
 
 interface Vehicle {
   id: string;
@@ -301,6 +303,17 @@ export default function VehicleManager({ companyId }: { companyId: string }) {
           ))}
         </div>
       )}
+
+      <VerificationUpload
+        holderType="company"
+        holderId={companyId}
+        docTypes={[
+          { value: "company_registration", label: "Company Registration" },
+          { value: "insurance_certificate", label: "Insurance Certificate" },
+        ]}
+      />
+
+      <ApiKeysPanel companyId={companyId} />
     </div>
   );
 }

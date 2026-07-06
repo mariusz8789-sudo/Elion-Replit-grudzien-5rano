@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { CallProvider } from "./lib/CallProvider";
 import PointToPointLanding from "@/components/PointToPointLanding";
 import BookingFlow from "@/components/BookingFlow";
 import TrackingPage from "@/components/TrackingPage";
@@ -26,6 +27,7 @@ import CarbonLedger from "@/pages/CarbonLedger";
 import QRDispatch from "@/pages/QRDispatch";
 import Plans from "@/pages/Plans";
 import Leaderboard from "@/pages/Leaderboard";
+import DriverCalendar from "@/pages/DriverCalendar";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
@@ -213,6 +215,7 @@ function Router() {
       <Route path="/qr-dispatch" component={QRDispatch} />
       <Route path="/plans" component={Plans} />
       <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/drivers/:driverId/calendar" component={DriverCalendar} />
 
       <Route component={LandingPage} />
     </Switch>
@@ -224,10 +227,12 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+          <CallProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </CallProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

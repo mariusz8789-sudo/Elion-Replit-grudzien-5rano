@@ -10,6 +10,7 @@ import { Bell, Eye, MessageSquare, Trash2, Shield, User, Gift, Copy } from "luci
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import type { ReferralReward } from "@shared/schema";
+import VerificationUpload from "./VerificationUpload";
 
 interface ReferralData {
   referralCode: string;
@@ -198,6 +199,17 @@ export default function SettingsPanel() {
           </Button>
         </div>
       </Card>
+
+      {user && (
+        <VerificationUpload
+          holderType="user"
+          holderId={user.id}
+          docTypes={[
+            { value: "id_card", label: "Government ID" },
+            { value: "selfie", label: "Selfie" },
+          ]}
+        />
+      )}
     </div>
   );
 }

@@ -1,0 +1,154 @@
+openapi: 3.0.3
+info:
+  title: Point to Point Partner API
+  version: "1.0.0"
+  description: >
+    Public integration API for ERP/CRM/logistics partners. Authenticate with an API key
+    (issued in the company settings console) either directly via the `x-api-key` header,
+    or by exchanging it for a short-lived Bearer JWT via POST /partner/v1/oauth/token.
+servers:
+  - url: /partner/v1
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Booking:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string }
+        pickupAddress: { type: string }
+        deliveryAddress: { type: string }
+        totalPrice: { type: string }
+        createdAt: { type: string, format: date-time }
+    WebhookSubscription:
+      type: object
+      properties:
+        id: { type: string }
+        url: { type: string }
+        events:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+paths:
+  /oauth/token:
+    post:
+      summary: Exchange an API key for a short-lived JWT (client-credentials style)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [api_key]
+              properties:
+                api_key: { type: string }
+      responses:
+        "200":
+          description: Access token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string }
+                  expires_in: { type: integer }
+  /bookings:
+    get:
+      summary: List bookings for the authenticated company
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Booking" }
+  /bookings/{id}:
+    get:
+      summary: Get a single booking
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not found
+  /bookings/{id}/status:
+    patch:
+      summary: Update a booking's status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string }
+      responses:
+        "200":
+          description: Updated
+  /company:
+    get:
+      summary: Get the authenticated company's profile
+      responses:
+        "200":
+          description: OK
+  /webhooks:
+    get:
+      summary: List webhook subscriptions
+      responses:
+        "200":
+          description: OK
+    post:
+      summary: Create a webhook subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, events]
+              properties:
+                url: { type: string }
+                events:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201":
+          description: Created
+  /webhooks/{id}:
+    delete:
+      summary: Delete a webhook subscription
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted

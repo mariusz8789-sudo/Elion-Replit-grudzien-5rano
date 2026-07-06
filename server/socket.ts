@@ -12,9 +12,23 @@ interface WebSocketWithAuth extends WebSocket {
 }
 
 interface WSMessage {
-  type: "subscribe" | "unsubscribe";
+  type: "subscribe" | "unsubscribe" | "call:invite" | "call:offer" | "call:answer" | "call:ice-candidate" | "call:reject" | "call:end";
   bookingId?: string;
+  callId?: string;
+  targetUserId?: string;
+  callType?: "voice" | "video";
+  sdp?: unknown;
+  candidate?: unknown;
 }
+
+const CALL_MESSAGE_TYPES = new Set([
+  "call:invite",
+  "call:offer",
+  "call:answer",
+  "call:ice-candidate",
+  "call:reject",
+  "call:end",
+]);
 
 const MAX_MESSAGE_SIZE = 100 * 1024; // 100KB
 const MESSAGE_RATE_LIMIT = 10; // messages per second
@@ -121,15 +135,20 @@ export function setupWebSocket(app: Express, httpServer: HTTPServer, storageInst
         }
 
         const message: WSMessage = JSON.parse(data.toString());
-        
-        if (!message.type || !["subscribe", "unsubscribe"].includes(message.type)) {
-          wsAuth.send(JSON.stringify({ 
-            type: "error", 
-            message: "Invalid message type" 
+
+        if (!message.type || !["subscribe", "unsubscribe", ...Array.from(CALL_MESSAGE_TYPES)].includes(message.type)) {
+          wsAuth.send(JSON.stringify({
+            type: "error",
+            message: "Invalid message type"
           }));
           return;
         }
-        
+
+        if (CALL_MESSAGE_TYPES.has(message.type)) {
+          await handleCallSignal(wsAuth, message);
+          return;
+        }
+
         switch (message.type) {
           case "subscribe":
             if (!message.bookingId) {
@@ -272,6 +291,58 @@ export function setupWebSocket(app: Express, httpServer: HTTPServer, storageInst
       });
       log(`Broadcasted to ${connections.size} connections for user ${userId}`);
     }
+  }
+
+  async function handleCallSignal(sender: WebSocketWithAuth, message: WSMessage) {
+    if (message.type === "call:invite") {
+      if (!message.targetUserId || !message.callType) {
+        sender.send(JSON.stringify({ type: "error", message: "targetUserId and callType are required" }));
+        return;
+      }
+      const call = await storageInstance.createCall({
+        bookingId: message.bookingId,
+        callerId: sender.userId,
+        calleeId: message.targetUserId,
+        type: message.callType,
+      });
+      await storageInstance.createNotification({
+        userId: message.targetUserId,
+        title: message.callType === "video" ? "Incoming video call" : "Incoming voice call",
+        message: "Tap to answer",
+        type: "info",
+        link: `/calls/${call.id}`,
+      });
+      broadcastToUser(message.targetUserId, {
+        type: "call:invite",
+        callId: call.id,
+        fromUserId: sender.userId,
+        callType: message.callType,
+        bookingId: message.bookingId,
+      });
+      sender.send(JSON.stringify({ type: "call:invite_sent", callId: call.id }));
+      return;
+    }
+
+    if (!message.callId || !message.targetUserId) {
+      sender.send(JSON.stringify({ type: "error", message: "callId and targetUserId are required" }));
+      return;
+    }
+
+    if (message.type === "call:answer") {
+      await storageInstance.updateCallStatus(message.callId, "accepted");
+    } else if (message.type === "call:reject") {
+      await storageInstance.updateCallStatus(message.callId, "rejected");
+    } else if (message.type === "call:end") {
+      await storageInstance.updateCallStatus(message.callId, "completed");
+    }
+
+    broadcastToUser(message.targetUserId, {
+      type: message.type,
+      callId: message.callId,
+      fromUserId: sender.userId,
+      sdp: message.sdp,
+      candidate: message.candidate,
+    });
   }
 
   return {

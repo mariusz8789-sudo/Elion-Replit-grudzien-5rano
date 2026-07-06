@@ -10,6 +10,7 @@ import { env } from "./env";
 import { passport } from "./auth";
 import { setupWebSocket } from "./socket";
 import { storage } from "./storage";
+import { partnerApi } from "./partnerApi";
 
 const app = express();
 const MemSession = MemoryStore(session);
@@ -100,6 +101,8 @@ app.use((req, res, next) => {
 
   next();
 });
+
+app.use("/partner/v1", partnerApi);
 
 (async () => {
   const server = await registerRoutes(app);

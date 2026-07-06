@@ -5,23 +5,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, MessageSquare, Loader2 } from "lucide-react";
+import { Send, MessageSquare, Loader2, Languages, Phone, Video } from "lucide-react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import type { Message } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { useCall } from "@/lib/CallProvider";
 
 interface BookingChatProps {
   bookingId: string;
+  otherUserId?: string;
 }
 
-export default function BookingChat({ bookingId }: BookingChatProps) {
+interface MessageTranslation {
+  translatedContent: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+
+export default function BookingChat({ bookingId, otherUserId }: BookingChatProps) {
   const [message, setMessage] = useState("");
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [translations, setTranslations] = useState<Record<string, MessageTranslation>>({});
+  const [translatingId, setTranslatingId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
+  const { i18n } = useTranslation();
+  const { startCall } = useCall();
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/bookings", bookingId, "messages"],
@@ -123,6 +136,36 @@ export default function BookingChat({ bookingId }: BookingChatProps) {
     sendMessageMutation.mutate(message.trim());
   };
 
+  const handleTranslate = async (msg: Message) => {
+    if (translations[msg.id]) {
+      setTranslations((prev) => {
+        const next = { ...prev };
+        delete next[msg.id];
+        return next;
+      });
+      return;
+    }
+    setTranslatingId(msg.id);
+    try {
+      const res = await apiRequest("POST", `/api/messages/${msg.id}/translate`, {
+        targetLanguage: i18n.language.split("-")[0],
+      });
+      const data = await res.json();
+      setTranslations((prev) => ({
+        ...prev,
+        [msg.id]: {
+          translatedContent: data.translatedContent,
+          sourceLanguage: data.sourceLanguage,
+          targetLanguage: data.targetLanguage,
+        },
+      }));
+    } catch (error: any) {
+      toast({ title: "Translation failed", description: error.message, variant: "destructive" });
+    } finally {
+      setTranslatingId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -143,11 +186,33 @@ export default function BookingChat({ bookingId }: BookingChatProps) {
 
   return (
     <Card className="flex flex-col h-[500px]">
-      <CardHeader className="border-b">
+      <CardHeader className="border-b flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5" />
           Chat
         </CardTitle>
+        {otherUserId && (
+          <div className="flex gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => startCall(otherUserId, "voice", bookingId)}
+              data-testid="button-voice-call"
+            >
+              <Phone className="w-4 h-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => startCall(otherUserId, "video", bookingId)}
+              data-testid="button-video-call"
+            >
+              <Video className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="flex-1 flex flex-col p-0">
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
@@ -183,10 +248,33 @@ export default function BookingChat({ bookingId }: BookingChatProps) {
                         }`}
                       >
                         <p className="text-sm break-words">{msg.content}</p>
+                        {translations[msg.id] && (
+                          <p className="text-sm break-words mt-2 pt-2 border-t border-current/20 italic">
+                            {translations[msg.id].translatedContent}
+                          </p>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(msg.createdAt), "p")}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1 justify-end">
+                        {!isOwnMessage && (
+                          <button
+                            type="button"
+                            onClick={() => handleTranslate(msg)}
+                            disabled={translatingId === msg.id}
+                            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                            data-testid={`button-translate-${msg.id}`}
+                          >
+                            {translatingId === msg.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Languages className="w-3 h-3" />
+                            )}
+                            {translations[msg.id] ? "Hide translation" : "Translate"}
+                          </button>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(msg.createdAt), "p")}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 );

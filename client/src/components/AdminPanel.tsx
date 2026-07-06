@@ -13,9 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, TrendingUp, AlertCircle, User, DollarSign } from "lucide-react";
+import { Package, TrendingUp, AlertCircle, User, DollarSign, ShieldCheck, Check, X } from "lucide-react";
 import { format } from "date-fns";
-import type { Booking, Service } from "@shared/schema";
+import type { Booking, Service, VerificationDocument } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -51,6 +51,22 @@ export default function AdminPanel() {
       if (!response.ok) return [];
       return response.json();
     },
+  });
+
+  const { data: pendingDocuments = [] } = useQuery<VerificationDocument[]>({
+    queryKey: ["/api/admin/verification-documents/pending"],
+  });
+
+  const reviewDocumentMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
+      const res = await apiRequest("PATCH", `/api/admin/verification-documents/${id}/review`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/verification-documents/pending"] });
+      toast({ title: "Document reviewed" });
+    },
+    onError: (error: any) => toast({ title: "Review failed", description: error.message, variant: "destructive" }),
   });
 
   const drivers = users.filter(u => u.role === "driver" || u.role === "admin");
@@ -196,6 +212,9 @@ export default function AdminPanel() {
           <TabsTrigger value="bookings" data-testid="tab-bookings">Bookings</TabsTrigger>
           <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
           <TabsTrigger value="drivers" data-testid="tab-drivers">Drivers</TabsTrigger>
+          <TabsTrigger value="verification" data-testid="tab-verification">
+            Verification {pendingDocuments.length > 0 && <Badge className="ml-1">{pendingDocuments.length}</Badge>}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="bookings" className="space-y-4">
@@ -412,6 +431,52 @@ export default function AdminPanel() {
               );
             })}
           </div>
+        </TabsContent>
+
+        <TabsContent value="verification" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5" />
+                Pending identity & document verification
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {pendingDocuments.length === 0 && (
+                <p className="text-sm text-muted-foreground">No documents awaiting review.</p>
+              )}
+              {pendingDocuments.map((doc) => (
+                <div key={doc.id} className="flex items-center gap-4 p-3 border rounded-md" data-testid={`row-verification-${doc.id}`}>
+                  <img src={doc.fileUrl} alt={doc.docType} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium capitalize">{doc.docType.replace(/_/g, " ")}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {doc.holderType} · submitted {format(new Date(doc.submittedAt), "PPp")}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: "approved" })}
+                      disabled={reviewDocumentMutation.isPending}
+                      data-testid={`button-approve-${doc.id}`}
+                    >
+                      <Check className="w-4 h-4 mr-1" /> Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => reviewDocumentMutation.mutate({ id: doc.id, status: "rejected" })}
+                      disabled={reviewDocumentMutation.isPending}
+                      data-testid={`button-reject-${doc.id}`}
+                    >
+                      <X className="w-4 h-4 mr-1" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

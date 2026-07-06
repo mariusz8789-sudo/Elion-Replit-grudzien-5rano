@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, decimal, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, decimal, boolean, jsonb, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -374,6 +374,171 @@ export const bookingTransfers = pgTable("booking_transfers", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+// === DRIVER AVAILABILITY CALENDAR ===
+export const driverAvailability = pgTable("driver_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull().references(() => drivers.id),
+  dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday .. 6 = Saturday
+  startTime: text("start_time").notNull(), // "HH:MM" 24h
+  endTime: text("end_time").notNull(), // "HH:MM" 24h
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const driverTimeOff = pgTable("driver_time_off", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull().references(() => drivers.id),
+  type: text("type").notNull().default("vacation"), // vacation, sick_leave, other
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const calendarConnections = pgTable("calendar_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull().references(() => drivers.id),
+  provider: text("provider").notNull(), // google, outlook
+  accessTokenEncrypted: text("access_token_encrypted").notNull(),
+  refreshTokenEncrypted: text("refresh_token_encrypted"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  externalCalendarId: text("external_calendar_id"),
+  syncEnabled: boolean("sync_enabled").default(true),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  driverProviderUnique: unique().on(t.driverId, t.provider),
+}));
+
+// === AI CARGO RECOGNITION ===
+export const cargoItems = pgTable("cargo_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull().references(() => bookings.id),
+  imageUrl: text("image_url").notNull(),
+  detectedLabel: text("detected_label"),
+  category: text("category"), // furniture, appliance, box, fragile_item, other
+  estimatedLengthCm: decimal("estimated_length_cm", { precision: 8, scale: 1 }),
+  estimatedWidthCm: decimal("estimated_width_cm", { precision: 8, scale: 1 }),
+  estimatedHeightCm: decimal("estimated_height_cm", { precision: 8, scale: 1 }),
+  estimatedVolumeM3: decimal("estimated_volume_m3", { precision: 10, scale: 3 }),
+  estimatedWeightKg: decimal("estimated_weight_kg", { precision: 10, scale: 1 }),
+  fragile: boolean("fragile").default(false),
+  suggestedVehicleType: text("suggested_vehicle_type"),
+  confidence: decimal("confidence", { precision: 4, scale: 3 }), // 0..1
+  manuallyCorrected: boolean("manually_corrected").default(false),
+  aiProvider: text("ai_provider"), // which recognition provider produced this result
+  rawResponse: jsonb("raw_response"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// === AI MULTILINGUAL CHAT TRANSLATION ===
+export const messageTranslations = pgTable("message_translations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").notNull().references(() => messages.id),
+  sourceLanguage: text("source_language"),
+  targetLanguage: text("target_language").notNull(),
+  translatedContent: text("translated_content").notNull(),
+  aiProvider: text("ai_provider"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// === VOICE / VIDEO CALLS ===
+export const calls = pgTable("calls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").references(() => bookings.id),
+  callerId: varchar("caller_id").notNull().references(() => users.id),
+  calleeId: varchar("callee_id").notNull().references(() => users.id),
+  type: text("type").notNull().default("voice"), // voice, video
+  status: text("status").notNull().default("ringing"), // ringing, accepted, rejected, missed, completed, failed
+  startedAt: timestamp("started_at").notNull().default(sql`now()`),
+  connectedAt: timestamp("connected_at"),
+  endedAt: timestamp("ended_at"),
+  durationSeconds: integer("duration_seconds"),
+  quality: jsonb("quality"), // { avgBitrateKbps, packetLossPercent, avgJitterMs, samples }
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// === IDENTITY VERIFICATION ===
+export const verificationDocuments = pgTable("verification_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  holderType: text("holder_type").notNull(), // user, driver, company
+  holderId: varchar("holder_id").notNull(),
+  docType: text("doc_type").notNull(), // id_card, selfie, drivers_license, company_registration, insurance_certificate, vehicle_registration
+  fileUrl: text("file_url").notNull(),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected, expired
+  submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  rejectionReason: text("rejection_reason"),
+  expiresAt: timestamp("expires_at"),
+});
+
+// === FRAUD PREVENTION ===
+export const deviceFingerprints = pgTable("device_fingerprints", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  fingerprintHash: text("fingerprint_hash").notNull(),
+  userAgent: text("user_agent"),
+  ipAddress: text("ip_address"),
+  firstSeenAt: timestamp("first_seen_at").notNull().default(sql`now()`),
+  lastSeenAt: timestamp("last_seen_at").notNull().default(sql`now()`),
+});
+
+export const riskScores = pgTable("risk_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subjectType: text("subject_type").notNull(), // user, booking, payment
+  subjectId: varchar("subject_id").notNull(),
+  score: integer("score").notNull(), // 0 (low risk) .. 100 (high risk)
+  reasons: text("reasons").array(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actorUserId: varchar("actor_user_id").references(() => users.id),
+  action: text("action").notNull(),
+  targetType: text("target_type"),
+  targetId: varchar("target_id"),
+  metadata: jsonb("metadata"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// === PUBLIC PARTNER API ===
+export const apiKeys = pgTable("api_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  keyPrefix: text("key_prefix").notNull(),
+  keyHash: text("key_hash").notNull(),
+  scopes: text("scopes").array().default(sql`ARRAY['bookings:read']::text[]`),
+  active: boolean("active").default(true),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  revokedAt: timestamp("revoked_at"),
+});
+
+export const webhookSubscriptions = pgTable("webhook_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  url: text("url").notNull(),
+  secret: text("secret").notNull(),
+  events: text("events").array().notNull(),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull().references(() => webhookSubscriptions.id),
+  event: text("event").notNull(),
+  payload: jsonb("payload").notNull(),
+  responseStatus: integer("response_status"),
+  success: boolean("success").notNull().default(false),
+  error: text("error"),
+  attemptedAt: timestamp("attempted_at").notNull().default(sql`now()`),
+});
+
 // === INSERT SCHEMAS ===
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -581,6 +746,74 @@ export const insertBookingTransferSchema = createInsertSchema(bookingTransfers).
   createdAt: true,
 });
 
+export const insertDriverAvailabilitySchema = createInsertSchema(driverAvailability).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  dayOfWeek: z.number().min(0).max(6),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24h format"),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24h format"),
+});
+
+export const insertDriverTimeOffSchema = createInsertSchema(driverTimeOff).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  type: z.enum(["vacation", "sick_leave", "other"]),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+});
+
+export const insertCargoItemSchema = createInsertSchema(cargoItems).omit({
+  id: true,
+  createdAt: true,
+  manuallyCorrected: true,
+});
+
+export const insertCallSchema = createInsertSchema(calls).omit({
+  id: true,
+  createdAt: true,
+  startedAt: true,
+  connectedAt: true,
+  endedAt: true,
+  durationSeconds: true,
+  quality: true,
+  status: true,
+}).extend({
+  type: z.enum(["voice", "video"]),
+});
+
+export const insertVerificationDocumentSchema = createInsertSchema(verificationDocuments).omit({
+  id: true,
+  submittedAt: true,
+  reviewedAt: true,
+  reviewedBy: true,
+  status: true,
+}).extend({
+  holderType: z.enum(["user", "driver", "company"]),
+  docType: z.enum(["id_card", "selfie", "drivers_license", "company_registration", "insurance_certificate", "vehicle_registration"]),
+  expiresAt: z.coerce.date().optional(),
+});
+
+export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
+  id: true,
+  createdAt: true,
+  keyPrefix: true,
+  keyHash: true,
+  lastUsedAt: true,
+  active: true,
+  revokedAt: true,
+});
+
+export const insertWebhookSubscriptionSchema = createInsertSchema(webhookSubscriptions).omit({
+  id: true,
+  createdAt: true,
+  secret: true,
+  active: true,
+}).extend({
+  events: z.array(z.string()).min(1),
+});
+
 // === TYPES ===
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -655,3 +888,34 @@ export type ReferralReward = typeof referralRewards.$inferSelect;
 
 export type InsertBookingTransfer = z.infer<typeof insertBookingTransferSchema>;
 export type BookingTransfer = typeof bookingTransfers.$inferSelect;
+
+export type InsertDriverAvailability = z.infer<typeof insertDriverAvailabilitySchema>;
+export type DriverAvailability = typeof driverAvailability.$inferSelect;
+
+export type InsertDriverTimeOff = z.infer<typeof insertDriverTimeOffSchema>;
+export type DriverTimeOff = typeof driverTimeOff.$inferSelect;
+
+export type CalendarConnection = typeof calendarConnections.$inferSelect;
+
+export type InsertCargoItem = z.infer<typeof insertCargoItemSchema>;
+export type CargoItem = typeof cargoItems.$inferSelect;
+
+export type MessageTranslation = typeof messageTranslations.$inferSelect;
+
+export type InsertCall = z.infer<typeof insertCallSchema>;
+export type Call = typeof calls.$inferSelect;
+
+export type InsertVerificationDocument = z.infer<typeof insertVerificationDocumentSchema>;
+export type VerificationDocument = typeof verificationDocuments.$inferSelect;
+
+export type DeviceFingerprint = typeof deviceFingerprints.$inferSelect;
+export type RiskScore = typeof riskScores.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+
+export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
+export type ApiKey = typeof apiKeys.$inferSelect;
+
+export type InsertWebhookSubscription = z.infer<typeof insertWebhookSubscriptionSchema>;
+export type WebhookSubscription = typeof webhookSubscriptions.$inferSelect;
+
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;

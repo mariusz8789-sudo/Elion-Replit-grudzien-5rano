@@ -20,14 +20,31 @@ import {
   type Coupon, type InsertCoupon, type CouponRedemption,
   type ReferralReward, type InsertReferralReward,
   type BookingTransfer, type InsertBookingTransfer,
+  type DriverAvailability, type InsertDriverAvailability,
+  type DriverTimeOff, type InsertDriverTimeOff,
+  type CalendarConnection,
+  type CargoItem, type InsertCargoItem,
+  type MessageTranslation,
+  type Call, type InsertCall,
+  type VerificationDocument, type InsertVerificationDocument,
+  type DeviceFingerprint,
+  type RiskScore,
+  type AuditLog,
+  type ApiKey, type InsertApiKey,
+  type WebhookSubscription, type InsertWebhookSubscription,
+  type WebhookDelivery,
   users, companies, drivers, vehicles, services, bookings, quotes, offers,
   messages, attachments, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
-  badges, badgeAwards, coupons, couponRedemptions, referralRewards, bookingTransfers
+  badges, badgeAwards, coupons, couponRedemptions, referralRewards, bookingTransfers,
+  driverAvailability, driverTimeOff, calendarConnections, cargoItems, messageTranslations,
+  calls, verificationDocuments, deviceFingerprints, riskScores, auditLogs,
+  apiKeys, webhookSubscriptions, webhookDeliveries
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, or, gte, lte } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { encryptSecret, decryptSecret } from "./lib/crypto";
 
 export interface IStorage {
   // User operations
@@ -155,6 +172,64 @@ export interface IStorage {
   // Booking transfer operations
   transferBooking(transfer: InsertBookingTransfer): Promise<BookingTransfer>;
   getBookingTransfers(bookingId: string): Promise<BookingTransfer[]>;
+
+  // Driver availability calendar operations
+  getDriverAvailability(driverId: string): Promise<DriverAvailability[]>;
+  setDriverAvailability(driverId: string, slots: InsertDriverAvailability[]): Promise<DriverAvailability[]>;
+  getDriverTimeOff(driverId: string): Promise<DriverTimeOff[]>;
+  createDriverTimeOff(timeOff: InsertDriverTimeOff): Promise<DriverTimeOff>;
+  deleteDriverTimeOff(id: string, driverId: string): Promise<boolean>;
+  isDriverAvailableAt(driverId: string, when: Date): Promise<boolean>;
+  findAvailableDrivers(companyId: string, when: Date): Promise<Driver[]>;
+
+  // Calendar sync connections (Google/Outlook)
+  getCalendarConnection(driverId: string, provider: string): Promise<CalendarConnection | undefined>;
+  getDriverCalendarConnections(driverId: string): Promise<CalendarConnection[]>;
+  upsertCalendarConnection(driverId: string, provider: string, accessToken: string, refreshToken: string | undefined, tokenExpiresAt: Date | undefined): Promise<CalendarConnection>;
+  deleteCalendarConnection(driverId: string, provider: string): Promise<boolean>;
+  decryptCalendarTokens(connection: CalendarConnection): { accessToken: string; refreshToken?: string };
+  touchCalendarSync(id: string): Promise<void>;
+
+  // AI cargo recognition operations
+  getBookingCargoItems(bookingId: string): Promise<CargoItem[]>;
+  createCargoItem(item: InsertCargoItem): Promise<CargoItem>;
+  correctCargoItem(id: string, updates: Partial<InsertCargoItem>): Promise<CargoItem | undefined>;
+
+  // AI chat translation operations
+  getMessageTranslation(messageId: string, targetLanguage: string): Promise<MessageTranslation | undefined>;
+  createMessageTranslation(messageId: string, sourceLanguage: string | undefined, targetLanguage: string, translatedContent: string, aiProvider: string): Promise<MessageTranslation>;
+
+  // Voice/video call operations
+  createCall(call: InsertCall): Promise<Call>;
+  getCall(id: string): Promise<Call | undefined>;
+  updateCallStatus(id: string, status: string, quality?: unknown): Promise<Call | undefined>;
+  getUserCallHistory(userId: string): Promise<Call[]>;
+
+  // Identity verification operations
+  createVerificationDocument(doc: InsertVerificationDocument): Promise<VerificationDocument>;
+  getHolderVerificationDocuments(holderType: string, holderId: string): Promise<VerificationDocument[]>;
+  getPendingVerificationDocuments(): Promise<VerificationDocument[]>;
+  reviewVerificationDocument(id: string, status: "approved" | "rejected", reviewedBy: string, rejectionReason?: string): Promise<VerificationDocument | undefined>;
+
+  // Fraud prevention operations
+  recordDeviceFingerprint(userId: string, fingerprintHash: string, userAgent: string | undefined, ipAddress: string | undefined): Promise<DeviceFingerprint>;
+  findUsersBySharedFingerprint(fingerprintHash: string): Promise<DeviceFingerprint[]>;
+  recordRiskScore(subjectType: string, subjectId: string, score: number, reasons: string[]): Promise<RiskScore>;
+  getLatestRiskScore(subjectType: string, subjectId: string): Promise<RiskScore | undefined>;
+  writeAuditLog(actorUserId: string | undefined, action: string, targetType: string | undefined, targetId: string | undefined, metadata: unknown, ipAddress: string | undefined): Promise<AuditLog>;
+  getAuditLogs(targetType?: string, targetId?: string, limit?: number): Promise<AuditLog[]>;
+
+  // Partner API operations
+  createApiKey(key: InsertApiKey, keyHash: string, keyPrefix: string): Promise<ApiKey>;
+  getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined>;
+  getCompanyApiKeys(companyId: string): Promise<ApiKey[]>;
+  revokeApiKey(id: string, companyId: string): Promise<boolean>;
+  touchApiKeyUsage(id: string): Promise<void>;
+  createWebhookSubscription(sub: InsertWebhookSubscription, secret: string): Promise<WebhookSubscription>;
+  getCompanyWebhookSubscriptions(companyId: string): Promise<WebhookSubscription[]>;
+  getActiveWebhookSubscriptionsForEvent(companyId: string, event: string): Promise<WebhookSubscription[]>;
+  deleteWebhookSubscription(id: string, companyId: string): Promise<boolean>;
+  recordWebhookDelivery(subscriptionId: string, event: string, payload: unknown, responseStatus: number | undefined, success: boolean, error?: string): Promise<WebhookDelivery>;
 }
 
 export class DbStorage implements IStorage {
@@ -784,6 +859,363 @@ export class DbStorage implements IStorage {
       .where(eq(bookingTransfers.bookingId, bookingId))
       .orderBy(desc(bookingTransfers.createdAt));
   }
+
+  // === DRIVER AVAILABILITY CALENDAR ===
+  async getDriverAvailability(driverId: string): Promise<DriverAvailability[]> {
+    return await db.select().from(driverAvailability)
+      .where(eq(driverAvailability.driverId, driverId))
+      .orderBy(driverAvailability.dayOfWeek);
+  }
+
+  async setDriverAvailability(driverId: string, slots: InsertDriverAvailability[]): Promise<DriverAvailability[]> {
+    await db.delete(driverAvailability).where(eq(driverAvailability.driverId, driverId));
+    if (slots.length === 0) return [];
+    const result = await db.insert(driverAvailability)
+      .values(slots.map((s) => ({ ...s, driverId })))
+      .returning();
+    return result;
+  }
+
+  async getDriverTimeOff(driverId: string): Promise<DriverTimeOff[]> {
+    return await db.select().from(driverTimeOff)
+      .where(eq(driverTimeOff.driverId, driverId))
+      .orderBy(desc(driverTimeOff.startDate));
+  }
+
+  async createDriverTimeOff(timeOff: InsertDriverTimeOff): Promise<DriverTimeOff> {
+    const result = await db.insert(driverTimeOff).values(timeOff).returning();
+    return result[0];
+  }
+
+  async deleteDriverTimeOff(id: string, driverId: string): Promise<boolean> {
+    const result = await db.delete(driverTimeOff)
+      .where(and(eq(driverTimeOff.id, id), eq(driverTimeOff.driverId, driverId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async isDriverAvailableAt(driverId: string, when: Date): Promise<boolean> {
+    const timeOffRows = await db.select().from(driverTimeOff)
+      .where(and(
+        eq(driverTimeOff.driverId, driverId),
+        lte(driverTimeOff.startDate, when),
+        gte(driverTimeOff.endDate, when),
+      ));
+    if (timeOffRows.length > 0) return false;
+
+    const dayOfWeek = when.getDay();
+    const hhmm = `${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}`;
+    const slots = await db.select().from(driverAvailability)
+      .where(and(
+        eq(driverAvailability.driverId, driverId),
+        eq(driverAvailability.dayOfWeek, dayOfWeek),
+        eq(driverAvailability.active, true),
+      ));
+
+    if (slots.length === 0) return true; // no configured schedule = assume available
+    return slots.some((s) => hhmm >= s.startTime && hhmm <= s.endTime);
+  }
+
+  async findAvailableDrivers(companyId: string, when: Date): Promise<Driver[]> {
+    const companyDrivers = await db.select().from(drivers)
+      .where(and(eq(drivers.companyId, companyId), eq(drivers.available, true)));
+    const results: Driver[] = [];
+    for (const driver of companyDrivers) {
+      if (await this.isDriverAvailableAt(driver.id, when)) {
+        results.push(driver);
+      }
+    }
+    return results;
+  }
+
+  // === CALENDAR SYNC CONNECTIONS ===
+  async getCalendarConnection(driverId: string, provider: string): Promise<CalendarConnection | undefined> {
+    const result = await db.select().from(calendarConnections)
+      .where(and(eq(calendarConnections.driverId, driverId), eq(calendarConnections.provider, provider)));
+    return result[0];
+  }
+
+  async getDriverCalendarConnections(driverId: string): Promise<CalendarConnection[]> {
+    return await db.select().from(calendarConnections).where(eq(calendarConnections.driverId, driverId));
+  }
+
+  async upsertCalendarConnection(
+    driverId: string,
+    provider: string,
+    accessToken: string,
+    refreshToken: string | undefined,
+    tokenExpiresAt: Date | undefined,
+  ): Promise<CalendarConnection> {
+    const existing = await this.getCalendarConnection(driverId, provider);
+    const accessTokenEncrypted = encryptSecret(accessToken);
+    const refreshTokenEncrypted = refreshToken ? encryptSecret(refreshToken) : undefined;
+
+    if (existing) {
+      const result = await db.update(calendarConnections)
+        .set({ accessTokenEncrypted, refreshTokenEncrypted, tokenExpiresAt, syncEnabled: true })
+        .where(eq(calendarConnections.id, existing.id))
+        .returning();
+      return result[0];
+    }
+
+    const result = await db.insert(calendarConnections)
+      .values({ driverId, provider, accessTokenEncrypted, refreshTokenEncrypted, tokenExpiresAt })
+      .returning();
+    return result[0];
+  }
+
+  async deleteCalendarConnection(driverId: string, provider: string): Promise<boolean> {
+    const result = await db.delete(calendarConnections)
+      .where(and(eq(calendarConnections.driverId, driverId), eq(calendarConnections.provider, provider)))
+      .returning();
+    return result.length > 0;
+  }
+
+  decryptCalendarTokens(connection: CalendarConnection): { accessToken: string; refreshToken?: string } {
+    return {
+      accessToken: decryptSecret(connection.accessTokenEncrypted),
+      refreshToken: connection.refreshTokenEncrypted ? decryptSecret(connection.refreshTokenEncrypted) : undefined,
+    };
+  }
+
+  async touchCalendarSync(id: string): Promise<void> {
+    await db.update(calendarConnections).set({ lastSyncedAt: new Date() }).where(eq(calendarConnections.id, id));
+  }
+
+  // === AI CARGO RECOGNITION ===
+  async getBookingCargoItems(bookingId: string): Promise<CargoItem[]> {
+    return await db.select().from(cargoItems)
+      .where(eq(cargoItems.bookingId, bookingId))
+      .orderBy(desc(cargoItems.createdAt));
+  }
+
+  async createCargoItem(item: InsertCargoItem): Promise<CargoItem> {
+    const result = await db.insert(cargoItems).values(item).returning();
+    return result[0];
+  }
+
+  async correctCargoItem(id: string, updates: Partial<InsertCargoItem>): Promise<CargoItem | undefined> {
+    const result = await db.update(cargoItems)
+      .set({ ...updates, manuallyCorrected: true })
+      .where(eq(cargoItems.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // === AI CHAT TRANSLATION ===
+  async getMessageTranslation(messageId: string, targetLanguage: string): Promise<MessageTranslation | undefined> {
+    const result = await db.select().from(messageTranslations)
+      .where(and(eq(messageTranslations.messageId, messageId), eq(messageTranslations.targetLanguage, targetLanguage)));
+    return result[0];
+  }
+
+  async createMessageTranslation(
+    messageId: string,
+    sourceLanguage: string | undefined,
+    targetLanguage: string,
+    translatedContent: string,
+    aiProvider: string,
+  ): Promise<MessageTranslation> {
+    const result = await db.insert(messageTranslations)
+      .values({ messageId, sourceLanguage, targetLanguage, translatedContent, aiProvider })
+      .returning();
+    return result[0];
+  }
+
+  // === VOICE / VIDEO CALLS ===
+  async createCall(call: InsertCall): Promise<Call> {
+    const result = await db.insert(calls).values(call).returning();
+    return result[0];
+  }
+
+  async getCall(id: string): Promise<Call | undefined> {
+    const result = await db.select().from(calls).where(eq(calls.id, id));
+    return result[0];
+  }
+
+  async updateCallStatus(id: string, status: string, quality?: unknown): Promise<Call | undefined> {
+    const updates: Record<string, unknown> = { status };
+    if (status === "accepted") updates.connectedAt = new Date();
+    if (status === "completed" || status === "rejected" || status === "missed" || status === "failed") {
+      updates.endedAt = new Date();
+      const call = await this.getCall(id);
+      if (call?.connectedAt) {
+        updates.durationSeconds = Math.max(0, Math.round((Date.now() - new Date(call.connectedAt).getTime()) / 1000));
+      }
+    }
+    if (quality) updates.quality = quality;
+
+    const result = await db.update(calls).set(updates).where(eq(calls.id, id)).returning();
+    return result[0];
+  }
+
+  async getUserCallHistory(userId: string): Promise<Call[]> {
+    return await db.select().from(calls)
+      .where(or(eq(calls.callerId, userId), eq(calls.calleeId, userId)))
+      .orderBy(desc(calls.createdAt));
+  }
+
+  // === IDENTITY VERIFICATION ===
+  async createVerificationDocument(doc: InsertVerificationDocument): Promise<VerificationDocument> {
+    const result = await db.insert(verificationDocuments).values(doc).returning();
+    return result[0];
+  }
+
+  async getHolderVerificationDocuments(holderType: string, holderId: string): Promise<VerificationDocument[]> {
+    return await db.select().from(verificationDocuments)
+      .where(and(eq(verificationDocuments.holderType, holderType), eq(verificationDocuments.holderId, holderId)))
+      .orderBy(desc(verificationDocuments.submittedAt));
+  }
+
+  async getPendingVerificationDocuments(): Promise<VerificationDocument[]> {
+    return await db.select().from(verificationDocuments)
+      .where(eq(verificationDocuments.status, "pending"))
+      .orderBy(verificationDocuments.submittedAt);
+  }
+
+  async reviewVerificationDocument(
+    id: string,
+    status: "approved" | "rejected",
+    reviewedBy: string,
+    rejectionReason?: string,
+  ): Promise<VerificationDocument | undefined> {
+    const result = await db.update(verificationDocuments)
+      .set({ status, reviewedBy, reviewedAt: new Date(), rejectionReason })
+      .where(eq(verificationDocuments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // === FRAUD PREVENTION ===
+  async recordDeviceFingerprint(
+    userId: string,
+    fingerprintHash: string,
+    userAgent: string | undefined,
+    ipAddress: string | undefined,
+  ): Promise<DeviceFingerprint> {
+    const existing = await db.select().from(deviceFingerprints)
+      .where(and(eq(deviceFingerprints.userId, userId), eq(deviceFingerprints.fingerprintHash, fingerprintHash)));
+    if (existing.length > 0) {
+      const result = await db.update(deviceFingerprints)
+        .set({ lastSeenAt: new Date(), userAgent, ipAddress })
+        .where(eq(deviceFingerprints.id, existing[0].id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(deviceFingerprints)
+      .values({ userId, fingerprintHash, userAgent, ipAddress })
+      .returning();
+    return result[0];
+  }
+
+  async findUsersBySharedFingerprint(fingerprintHash: string): Promise<DeviceFingerprint[]> {
+    return await db.select().from(deviceFingerprints).where(eq(deviceFingerprints.fingerprintHash, fingerprintHash));
+  }
+
+  async recordRiskScore(subjectType: string, subjectId: string, score: number, reasons: string[]): Promise<RiskScore> {
+    const result = await db.insert(riskScores).values({ subjectType, subjectId, score, reasons }).returning();
+    return result[0];
+  }
+
+  async getLatestRiskScore(subjectType: string, subjectId: string): Promise<RiskScore | undefined> {
+    const result = await db.select().from(riskScores)
+      .where(and(eq(riskScores.subjectType, subjectType), eq(riskScores.subjectId, subjectId)))
+      .orderBy(desc(riskScores.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async writeAuditLog(
+    actorUserId: string | undefined,
+    action: string,
+    targetType: string | undefined,
+    targetId: string | undefined,
+    metadata: unknown,
+    ipAddress: string | undefined,
+  ): Promise<AuditLog> {
+    const result = await db.insert(auditLogs)
+      .values({ actorUserId, action, targetType, targetId, metadata, ipAddress })
+      .returning();
+    return result[0];
+  }
+
+  async getAuditLogs(targetType?: string, targetId?: string, limit = 100): Promise<AuditLog[]> {
+    const conditions = [];
+    if (targetType) conditions.push(eq(auditLogs.targetType, targetType));
+    if (targetId) conditions.push(eq(auditLogs.targetId, targetId));
+
+    const query = db.select().from(auditLogs);
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions)).orderBy(desc(auditLogs.createdAt)).limit(limit);
+    }
+    return await query.orderBy(desc(auditLogs.createdAt)).limit(limit);
+  }
+
+  // === PUBLIC PARTNER API ===
+  async createApiKey(key: InsertApiKey, keyHash: string, keyPrefix: string): Promise<ApiKey> {
+    const result = await db.insert(apiKeys).values({ ...key, keyHash, keyPrefix }).returning();
+    return result[0];
+  }
+
+  async getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined> {
+    const result = await db.select().from(apiKeys)
+      .where(and(eq(apiKeys.keyHash, keyHash), eq(apiKeys.active, true)));
+    return result[0];
+  }
+
+  async getCompanyApiKeys(companyId: string): Promise<ApiKey[]> {
+    return await db.select().from(apiKeys)
+      .where(eq(apiKeys.companyId, companyId))
+      .orderBy(desc(apiKeys.createdAt));
+  }
+
+  async revokeApiKey(id: string, companyId: string): Promise<boolean> {
+    const result = await db.update(apiKeys)
+      .set({ active: false, revokedAt: new Date() })
+      .where(and(eq(apiKeys.id, id), eq(apiKeys.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async touchApiKeyUsage(id: string): Promise<void> {
+    await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, id));
+  }
+
+  async createWebhookSubscription(sub: InsertWebhookSubscription, secret: string): Promise<WebhookSubscription> {
+    const result = await db.insert(webhookSubscriptions).values({ ...sub, secret }).returning();
+    return result[0];
+  }
+
+  async getCompanyWebhookSubscriptions(companyId: string): Promise<WebhookSubscription[]> {
+    return await db.select().from(webhookSubscriptions).where(eq(webhookSubscriptions.companyId, companyId));
+  }
+
+  async getActiveWebhookSubscriptionsForEvent(companyId: string, event: string): Promise<WebhookSubscription[]> {
+    const subs = await db.select().from(webhookSubscriptions)
+      .where(and(eq(webhookSubscriptions.companyId, companyId), eq(webhookSubscriptions.active, true)));
+    return subs.filter((s) => s.events.includes(event));
+  }
+
+  async deleteWebhookSubscription(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(webhookSubscriptions)
+      .where(and(eq(webhookSubscriptions.id, id), eq(webhookSubscriptions.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async recordWebhookDelivery(
+    subscriptionId: string,
+    event: string,
+    payload: unknown,
+    responseStatus: number | undefined,
+    success: boolean,
+    error?: string,
+  ): Promise<WebhookDelivery> {
+    const result = await db.insert(webhookDeliveries)
+      .values({ subscriptionId, event, payload, responseStatus, success, error })
+      .returning();
+    return result[0];
+  }
 }
 
 // Seed initial services
@@ -845,7 +1277,7 @@ async function seedBadges(storage: DbStorage) {
 }
 
 const storage = new DbStorage();
-seedServices(storage);
-seedBadges(storage);
+seedServices(storage).catch((err) => console.error("Failed to seed services:", err.message));
+seedBadges(storage).catch((err) => console.error("Failed to seed badges:", err.message));
 
 export { storage };

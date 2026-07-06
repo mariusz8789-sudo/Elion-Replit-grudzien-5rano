@@ -8,17 +8,25 @@ import { passport } from "./auth";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { 
+import {
   insertServiceSchema, insertBookingSchema, insertQuoteSchema, insertUserSchema,
   insertCompanySchema, insertDriverSchema, insertVehicleSchema, insertOfferSchema,
   insertMessageSchema, insertAttachmentSchema, insertReviewSchema,
   insertTrackingUpdateSchema, insertNotificationSchema, insertMarketplaceListingSchema,
   insertSharedRideSchema, insertRideBookingSchema, insertStaffSharingSchema,
   insertResourceSharingSchema, insertAnnouncementSchema, insertCouponSchema,
+  insertDriverAvailabilitySchema, insertDriverTimeOffSchema, insertCargoItemSchema,
+  insertVerificationDocumentSchema, insertApiKeySchema,
   offers, marketplaceListings, sharedRides, rideBookings, companies, bookings, drivers, vehicles,
-  staffSharing, resourceSharing, announcements, users
+  staffSharing, resourceSharing, announcements, users, trackingUpdates, messages
 } from "@shared/schema";
 import type { User } from "@shared/schema";
+import { getCalendarSyncProvider, type CalendarProvider } from "./services/calendarSync";
+import { getCargoRecognitionProvider } from "./services/cargoRecognition";
+import { getTranslationProvider } from "./services/translation";
+import { checkGpsAnomaly, checkDuplicateAccount, scoreAndRecordUserRisk } from "./services/fraud";
+import { dispatchWebhookEvent } from "./services/webhooks";
+import { generateApiKey, hashApiKey } from "./lib/crypto";
 
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   if (req.isAuthenticated()) {
@@ -445,6 +453,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
+    }
+
+    if (booking.companyId) {
+      dispatchWebhookEvent(booking.companyId, "booking.status_changed", {
+        bookingId: booking.id,
+        status: booking.status,
+      }).catch(() => undefined);
     }
 
     res.json(booking);
@@ -1428,6 +1443,376 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(500).json({ message: "Route calculation failed: " + error.message });
     }
+  });
+
+  // === DRIVER AVAILABILITY CALENDAR ===
+  app.get("/api/drivers/:driverId/availability", async (req, res) => {
+    res.json(await storage.getDriverAvailability(req.params.driverId));
+  });
+
+  app.put("/api/drivers/:driverId/availability", requireAuth, async (req, res) => {
+    try {
+      const driver = await storage.getDriver(req.params.driverId);
+      if (!driver) return res.status(404).json({ message: "Driver not found" });
+      const user = req.user as User;
+      if (driver.userId !== user.id && user.companyId !== driver.companyId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const slots = (req.body.slots || []).map((s: any) => insertDriverAvailabilitySchema.parse(s));
+      const saved = await storage.setDriverAvailability(req.params.driverId, slots);
+      res.json(saved);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/drivers/:driverId/time-off", async (req, res) => {
+    res.json(await storage.getDriverTimeOff(req.params.driverId));
+  });
+
+  app.post("/api/drivers/:driverId/time-off", requireAuth, async (req, res) => {
+    try {
+      const data = insertDriverTimeOffSchema.parse({ ...req.body, driverId: req.params.driverId });
+      const created = await storage.createDriverTimeOff(data);
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/drivers/:driverId/time-off/:id", requireAuth, async (req, res) => {
+    const deleted = await storage.deleteDriverTimeOff(req.params.id, req.params.driverId);
+    if (!deleted) return res.status(404).json({ message: "Time off entry not found" });
+    res.status(204).send();
+  });
+
+  app.get("/api/companies/:companyId/available-drivers", requireAuth, async (req, res) => {
+    const when = req.query.at ? new Date(String(req.query.at)) : new Date();
+    res.json(await storage.findAvailableDrivers(req.params.companyId, when));
+  });
+
+  // === CALENDAR SYNC (Google / Outlook) ===
+  app.get("/api/drivers/:driverId/calendar/:provider/auth-url", requireAuth, async (req, res) => {
+    const provider = req.params.provider as CalendarProvider;
+    if (provider !== "google" && provider !== "outlook") {
+      return res.status(400).json({ message: "provider must be 'google' or 'outlook'" });
+    }
+    const syncProvider = getCalendarSyncProvider(provider);
+    if (!syncProvider.isConfigured()) {
+      return res.status(503).json({ message: `${provider} calendar sync is not configured on this server` });
+    }
+    const state = Buffer.from(JSON.stringify({ driverId: req.params.driverId, provider })).toString("base64url");
+    res.json({ url: syncProvider.getAuthorizationUrl(state) });
+  });
+
+  app.get("/api/calendar/:provider/callback", async (req, res) => {
+    try {
+      const provider = req.params.provider as CalendarProvider;
+      const { code, state } = req.query;
+      if (!code || !state) return res.status(400).json({ message: "Missing code or state" });
+
+      const { driverId } = JSON.parse(Buffer.from(String(state), "base64url").toString());
+      const syncProvider = getCalendarSyncProvider(provider);
+      const tokens = await syncProvider.exchangeCodeForTokens(String(code));
+      await storage.upsertCalendarConnection(driverId, provider, tokens.accessToken, tokens.refreshToken, tokens.expiresAt);
+      res.redirect("/settings?calendar_connected=" + provider);
+    } catch (error: any) {
+      res.status(400).json({ message: "Calendar connection failed: " + error.message });
+    }
+  });
+
+  app.get("/api/drivers/:driverId/calendar/connections", requireAuth, async (req, res) => {
+    const connections = await storage.getDriverCalendarConnections(req.params.driverId);
+    res.json(connections.map(({ accessTokenEncrypted, refreshTokenEncrypted, ...rest }) => rest));
+  });
+
+  app.delete("/api/drivers/:driverId/calendar/:provider", requireAuth, async (req, res) => {
+    const deleted = await storage.deleteCalendarConnection(req.params.driverId, req.params.provider);
+    if (!deleted) return res.status(404).json({ message: "Connection not found" });
+    res.status(204).send();
+  });
+
+  app.post("/api/bookings/:bookingId/sync-to-calendar", requireAuth, async (req, res) => {
+    try {
+      const booking = await storage.getBooking(req.params.bookingId);
+      if (!booking || !booking.driverId) {
+        return res.status(404).json({ message: "Booking or assigned driver not found" });
+      }
+      const connections = await storage.getDriverCalendarConnections(booking.driverId);
+      const results: Record<string, string> = {};
+      for (const connection of connections) {
+        if (!connection.syncEnabled) continue;
+        const syncProvider = getCalendarSyncProvider(connection.provider as CalendarProvider);
+        const { accessToken } = storage.decryptCalendarTokens(connection);
+        const start = new Date(booking.pickupDate);
+        const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+        const event = await syncProvider.createEvent(accessToken, {
+          title: `Point to Point job: ${booking.pickupAddress} -> ${booking.deliveryAddress}`,
+          description: booking.notes || undefined,
+          startIso: start.toISOString(),
+          endIso: end.toISOString(),
+          location: booking.pickupAddress,
+        });
+        await storage.touchCalendarSync(connection.id);
+        results[connection.provider] = event.externalEventId;
+      }
+      res.json({ synced: results });
+    } catch (error: any) {
+      res.status(400).json({ message: "Calendar sync failed: " + error.message });
+    }
+  });
+
+  // === AI CARGO RECOGNITION ===
+  app.post("/api/bookings/:bookingId/cargo-items/analyze", requireAuth, async (req, res) => {
+    try {
+      const { imageUrl } = req.body;
+      if (!imageUrl) return res.status(400).json({ message: "imageUrl is required" });
+
+      const booking = await storage.getBooking(req.params.bookingId);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const recognitionProvider = getCargoRecognitionProvider();
+      if (!recognitionProvider.isConfigured()) {
+        return res.status(503).json({ message: "AI cargo recognition is not configured (ANTHROPIC_API_KEY missing)" });
+      }
+
+      const result = await recognitionProvider.analyzeImage(imageUrl);
+      const cargoItem = await storage.createCargoItem({
+        bookingId: req.params.bookingId,
+        imageUrl,
+        detectedLabel: result.detectedLabel,
+        category: result.category,
+        estimatedLengthCm: result.estimatedLengthCm.toString(),
+        estimatedWidthCm: result.estimatedWidthCm.toString(),
+        estimatedHeightCm: result.estimatedHeightCm.toString(),
+        estimatedVolumeM3: result.estimatedVolumeM3.toString(),
+        estimatedWeightKg: result.estimatedWeightKg.toString(),
+        fragile: result.fragile,
+        suggestedVehicleType: result.suggestedVehicleType,
+        confidence: result.confidence.toString(),
+        aiProvider: result.provider,
+        rawResponse: result.raw as Record<string, unknown>,
+      });
+      res.status(201).json(cargoItem);
+    } catch (error: any) {
+      res.status(500).json({ message: "Cargo analysis failed: " + error.message });
+    }
+  });
+
+  app.get("/api/bookings/:bookingId/cargo-items", requireAuth, async (req, res) => {
+    res.json(await storage.getBookingCargoItems(req.params.bookingId));
+  });
+
+  app.post("/api/cargo-items", requireAuth, async (req, res) => {
+    try {
+      const data = insertCargoItemSchema.parse(req.body);
+      const created = await storage.createCargoItem(data);
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/cargo-items/:id/correct", requireAuth, async (req, res) => {
+    const updated = await storage.correctCargoItem(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ message: "Cargo item not found" });
+    res.json(updated);
+  });
+
+  // === AI MULTILINGUAL CHAT TRANSLATION ===
+  app.post("/api/messages/:messageId/translate", requireAuth, async (req, res) => {
+    try {
+      const { targetLanguage } = req.body;
+      if (!targetLanguage) return res.status(400).json({ message: "targetLanguage is required" });
+
+      const existing = await storage.getMessageTranslation(req.params.messageId, targetLanguage);
+      if (existing) return res.json(existing);
+
+      const messageResult = await db.select().from(messages)
+        .where(eq(messages.id, req.params.messageId));
+      const message = messageResult[0];
+      if (!message) return res.status(404).json({ message: "Message not found" });
+
+      const translationProvider = getTranslationProvider();
+      if (!translationProvider.isConfigured()) {
+        return res.status(503).json({ message: "AI translation is not configured (ANTHROPIC_API_KEY missing)" });
+      }
+
+      const result = await translationProvider.translate(message.content, targetLanguage);
+      const translation = await storage.createMessageTranslation(
+        req.params.messageId,
+        result.detectedSourceLanguage,
+        targetLanguage,
+        result.translatedText,
+        result.provider,
+      );
+      res.status(201).json(translation);
+    } catch (error: any) {
+      res.status(500).json({ message: "Translation failed: " + error.message });
+    }
+  });
+
+  // === VOICE / VIDEO CALLS ===
+  app.get("/api/webrtc/ice-config", requireAuth, (_req, res) => {
+    const iceServers: Array<{ urls: string | string[]; username?: string; credential?: string }> = [
+      { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+    ];
+    if (process.env.TURN_SERVER_URL) {
+      iceServers.push({
+        urls: process.env.TURN_SERVER_URL,
+        username: process.env.TURN_SERVER_USERNAME,
+        credential: process.env.TURN_SERVER_CREDENTIAL,
+      });
+    }
+    res.json({ iceServers });
+  });
+
+  app.get("/api/users/:userId/calls", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.id !== req.params.userId) return res.status(403).json({ message: "Not authorized" });
+    res.json(await storage.getUserCallHistory(req.params.userId));
+  });
+
+  app.get("/api/calls/:id", requireAuth, async (req, res) => {
+    const call = await storage.getCall(req.params.id);
+    if (!call) return res.status(404).json({ message: "Call not found" });
+    const user = req.user as User;
+    if (call.callerId !== user.id && call.calleeId !== user.id) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    res.json(call);
+  });
+
+  app.patch("/api/calls/:id/quality", requireAuth, async (req, res) => {
+    const updated = await storage.updateCallStatus(req.params.id, req.body.status || "completed", req.body.quality);
+    if (!updated) return res.status(404).json({ message: "Call not found" });
+    res.json(updated);
+  });
+
+  // === IDENTITY VERIFICATION ===
+  app.post("/api/verification-documents", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const data = insertVerificationDocumentSchema.parse(req.body);
+      if (data.holderType === "user" && data.holderId !== user.id) {
+        return res.status(403).json({ message: "Cannot submit documents for another user" });
+      }
+      const doc = await storage.createVerificationDocument(data);
+      res.status(201).json(doc);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/verification-documents/:holderType/:holderId", requireAuth, async (req, res) => {
+    res.json(await storage.getHolderVerificationDocuments(req.params.holderType, req.params.holderId));
+  });
+
+  app.get("/api/admin/verification-documents/pending", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    res.json(await storage.getPendingVerificationDocuments());
+  });
+
+  app.patch("/api/admin/verification-documents/:id/review", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const { status, rejectionReason } = req.body;
+    if (status !== "approved" && status !== "rejected") {
+      return res.status(400).json({ message: "status must be 'approved' or 'rejected'" });
+    }
+    const updated = await storage.reviewVerificationDocument(req.params.id, status, user.id, rejectionReason);
+    if (!updated) return res.status(404).json({ message: "Document not found" });
+
+    if (status === "approved" && updated.holderType === "company") {
+      await storage.verifyCompany(updated.holderId, true);
+    }
+    res.json(updated);
+  });
+
+  // === FRAUD PREVENTION ===
+  app.post("/api/fraud/device-fingerprint", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const { fingerprintHash } = req.body;
+    if (!fingerprintHash) return res.status(400).json({ message: "fingerprintHash is required" });
+
+    await storage.recordDeviceFingerprint(user.id, fingerprintHash, req.headers["user-agent"], req.ip);
+    const duplicateCheck = await checkDuplicateAccount(user.id, user.phone, fingerprintHash);
+
+    if (duplicateCheck.isDuplicate) {
+      await storage.recordRiskScore("user", user.id, 60, duplicateCheck.reasons);
+      await storage.writeAuditLog(user.id, "duplicate_account_flagged", "user", user.id, duplicateCheck, req.ip);
+    }
+    res.json({ ok: true, duplicateCheck });
+  });
+
+  app.get("/api/admin/risk-scores/:subjectType/:subjectId", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const score = await storage.getLatestRiskScore(req.params.subjectType, req.params.subjectId);
+    res.json(score || { subjectType: req.params.subjectType, subjectId: req.params.subjectId, score: 0, reasons: [] });
+  });
+
+  app.get("/api/admin/audit-logs", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const targetType = req.query.targetType ? String(req.query.targetType) : undefined;
+    const targetId = req.query.targetId ? String(req.query.targetId) : undefined;
+    res.json(await storage.getAuditLogs(targetType, targetId));
+  });
+
+  // GPS anomaly detection: called whenever a new tracking update is created
+  app.post("/api/tracking/:bookingId/check-anomaly", requireAuth, async (req, res) => {
+    const updates = await storage.getBookingTracking(req.params.bookingId);
+    if (updates.length < 2) return res.json({ anomalous: false });
+
+    const [latest, previous] = [updates[updates.length - 1], updates[updates.length - 2]];
+    const result = checkGpsAnomaly(
+      { lat: Number(previous.lat), lng: Number(previous.lng), createdAt: new Date(previous.createdAt) },
+      { lat: Number(latest.lat), lng: Number(latest.lng), createdAt: new Date(latest.createdAt) },
+    );
+
+    if (result.anomalous) {
+      await storage.recordRiskScore("booking", req.params.bookingId, 50, [result.reason!]);
+      await storage.writeAuditLog(undefined, "gps_anomaly_detected", "booking", req.params.bookingId, result, req.ip);
+    }
+    res.json(result);
+  });
+
+  // === PARTNER API: API KEY MANAGEMENT (company-owner facing) ===
+  app.post("/api/companies/:companyId/api-keys", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.companyId !== req.params.companyId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const data = insertApiKeySchema.parse({ ...req.body, companyId: req.params.companyId });
+      const { rawKey, prefix } = generateApiKey();
+      const created = await storage.createApiKey(data, hashApiKey(rawKey), prefix);
+      // Return the raw key only once, at creation time
+      res.status(201).json({ ...created, rawKey });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/companies/:companyId/api-keys", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const keys = await storage.getCompanyApiKeys(req.params.companyId);
+    res.json(keys.map(({ keyHash, ...rest }) => rest));
+  });
+
+  app.delete("/api/companies/:companyId/api-keys/:id", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const revoked = await storage.revokeApiKey(req.params.id, req.params.companyId);
+    if (!revoked) return res.status(404).json({ message: "API key not found" });
+    res.status(204).send();
   });
 
   // === DOWNLOAD CODE EXPORT ===

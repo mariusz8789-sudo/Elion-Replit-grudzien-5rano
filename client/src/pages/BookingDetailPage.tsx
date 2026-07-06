@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Package, MapPin, Calendar, DollarSign, Truck } from "lucide-react";
 import { format } from "date-fns";
 import LiveTrackingMap from "@/components/LiveTrackingMap";
+import CargoAnalyzer from "@/components/CargoAnalyzer";
 import type { Booking, TrackingUpdate } from "@shared/schema";
 
 export default function BookingDetailPage() {
@@ -193,6 +194,8 @@ export default function BookingDetailPage() {
             deliveryCoords={deliveryCoords}
           />
         )}
+
+        <CargoAnalyzer bookingId={booking.id} />
       </div>
     </div>
   );

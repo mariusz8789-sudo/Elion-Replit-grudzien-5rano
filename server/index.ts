@@ -3,7 +3,7 @@ import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import session from "express-session";
-import MemoryStore from "memorystore";
+import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { env } from "./env";
@@ -13,13 +13,34 @@ import { storage } from "./storage";
 import { partnerApi } from "./partnerApi";
 
 const app = express();
-const MemSession = MemoryStore(session);
+const PgSession = connectPgSimple(session);
 
 // Trust proxy for proper rate limiting behind reverse proxy
 app.set('trust proxy', 1);
 
 app.use(helmet({
-  contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
+  contentSecurityPolicy: env.NODE_ENV === "production" ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'", "https://js.stripe.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://api.mapbox.com"],
+      fontSrc: ["'self'", "data:"],
+      imgSrc: ["'self'", "data:", "blob:", "https://api.mapbox.com", "https://*.tiles.mapbox.com", "https://events.mapbox.com"],
+      workerSrc: ["'self'", "blob:"],
+      connectSrc: [
+        "'self'",
+        "wss:",
+        "https://api.stripe.com",
+        "https://api.mapbox.com",
+        "https://events.mapbox.com",
+        "https://*.tiles.mapbox.com",
+      ],
+      frameSrc: ["https://js.stripe.com", "https://hooks.stripe.com"],
+      upgradeInsecureRequests: [],
+    },
+  } : false,
   crossOriginEmbedderPolicy: false,
 }));
 
@@ -51,10 +72,18 @@ app.use("/api", apiLimiter);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
+const pgSessionStore = new PgSession({
+  conString: env.DATABASE_URL,
+  tableName: "session",
+  createTableIfMissing: true,
+  pruneSessionInterval: 86400, // seconds; prune expired sessions once a day
+});
+pgSessionStore.on("error", (err) => {
+  console.error("Session store error:", err.message);
+});
+
 const sessionMiddleware = session({
-  store: new MemSession({
-    checkPeriod: 86400000, // 24 hours
-  }),
+  store: pgSessionStore,
   secret: env.SESSION_SECRET || "point2point-secret-key",
   resave: false,
   saveUninitialized: false,

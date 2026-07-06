@@ -89,6 +89,12 @@ adding a provider means implementing the interface, not rewriting call sites. Th
   `169.254.169.254`) before a subscription is created.
 - **Auth rate limiting**: `/api/auth/login` and `/api/auth/register` have a dedicated 10-attempts/15-minute limiter
   keyed by IP + email/phone, tighter than the general API rate limit, to slow credential stuffing.
+- **Postgres-backed sessions**: sessions are stored via `connect-pg-simple` (same `DATABASE_URL`, auto-creates its
+  `session` table) instead of in-memory storage, so logins survive a server restart and sessions are shared across
+  horizontally-scaled instances.
+- **Production CSP**: helmet's Content-Security-Policy is explicitly scoped in production (script/style/img/connect/
+  frame allowlists for Stripe.js, Mapbox, and `wss:` WebSocket traffic) rather than left at helmet's restrictive
+  default, which would otherwise silently block Stripe Elements, map tiles, and live tracking/chat.
 
 ## Deployment
 

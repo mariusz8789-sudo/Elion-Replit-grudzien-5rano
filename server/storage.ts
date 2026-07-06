@@ -369,13 +369,15 @@ export class DbStorage implements IStorage {
   async getUserBookings(userId: string): Promise<Booking[]> {
     return await db.select().from(bookings)
       .where(eq(bookings.userId, userId))
-      .orderBy(desc(bookings.createdAt));
+      .orderBy(desc(bookings.createdAt))
+      .limit(500);
   }
 
   async getCompanyBookings(companyId: string): Promise<Booking[]> {
     return await db.select().from(bookings)
       .where(eq(bookings.companyId, companyId))
-      .orderBy(desc(bookings.createdAt));
+      .orderBy(desc(bookings.createdAt))
+      .limit(500);
   }
 
   async getCompanyMonthlyBookingCount(companyId: string): Promise<number> {
@@ -543,9 +545,13 @@ export class DbStorage implements IStorage {
 
   // === MESSAGE OPERATIONS ===
   async getBookingMessages(bookingId: string): Promise<Message[]> {
-    return await db.select().from(messages)
+    // Cap to the most recent 500 messages (fetched newest-first so the cap doesn't strand
+    // the conversation on its oldest messages), then restore ascending order for display.
+    const recent = await db.select().from(messages)
       .where(eq(messages.bookingId, bookingId))
-      .orderBy(messages.createdAt);
+      .orderBy(desc(messages.createdAt))
+      .limit(500);
+    return recent.reverse();
   }
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
@@ -610,29 +616,38 @@ export class DbStorage implements IStorage {
 
   async createReview(insertReview: InsertReview): Promise<Review> {
     const result = await db.insert(reviews).values(insertReview).returning();
-    
-    // Update company rating
+
+    // Update company rating using a SQL aggregate instead of pulling every review row for
+    // this company into memory on each write — that read only gets slower as reviews grow.
     if (insertReview.companyId) {
-      const companyReviews = await this.getCompanyReviews(insertReview.companyId);
-      const totalRating = companyReviews.reduce((sum, r) => sum + r.rating, 0);
-      const avgRating = totalRating / companyReviews.length;
-      
+      const [stats] = await db
+        .select({
+          avgRating: sql<string>`avg(${reviews.rating})`,
+          reviewCount: sql<number>`count(*)::int`,
+        })
+        .from(reviews)
+        .where(eq(reviews.companyId, insertReview.companyId));
+
       await db.update(companies)
-        .set({ 
-          rating: avgRating.toFixed(2),
-          totalReviews: companyReviews.length 
+        .set({
+          rating: Number(stats.avgRating).toFixed(2),
+          totalReviews: stats.reviewCount,
         })
         .where(eq(companies.id, insertReview.companyId));
     }
-    
+
     return result[0];
   }
 
   // === TRACKING OPERATIONS ===
   async getBookingTracking(bookingId: string): Promise<TrackingUpdate[]> {
-    return await db.select().from(trackingUpdates)
+    // Cap to the most recent 500 pings (newest-first), then restore chronological order so
+    // the map still draws the route correctly.
+    const recent = await db.select().from(trackingUpdates)
       .where(eq(trackingUpdates.bookingId, bookingId))
-      .orderBy(trackingUpdates.createdAt);
+      .orderBy(desc(trackingUpdates.createdAt))
+      .limit(500);
+    return recent.reverse();
   }
 
   async createTrackingUpdate(insertUpdate: InsertTrackingUpdate): Promise<TrackingUpdate> {
@@ -644,7 +659,8 @@ export class DbStorage implements IStorage {
   async getUserNotifications(userId: string): Promise<Notification[]> {
     return await db.select().from(notifications)
       .where(eq(notifications.userId, userId))
-      .orderBy(desc(notifications.createdAt));
+      .orderBy(desc(notifications.createdAt))
+      .limit(500);
   }
 
   async createNotification(insertNotification: InsertNotification): Promise<Notification> {

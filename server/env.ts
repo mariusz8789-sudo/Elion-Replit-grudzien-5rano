@@ -35,4 +35,9 @@ export const env = cleanEnv(process.env, {
 
   // Public Partner API
   PARTNER_JWT_SECRET: optionalStr({ default: "" }),
+
+  // Cross-instance WebSocket broadcast fanout (server/services/pubsub.ts) - optional,
+  // required only once running more than one server instance/worker; falls back to a
+  // same-process-only no-op when unset.
+  REDIS_URL: optionalStr({ default: "" }),
 });

@@ -11,5 +11,10 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Explicit pool cap: once running multiple instances (see server/services/pubsub.ts for the
+// matching WebSocket-fanout change), each instance opens its own pool, and Neon's connection
+// limit is shared across all of them — an unbounded default per-instance pool risks
+// exhausting it. If DATABASE_URL isn't already a Neon pooled ("-pooler") endpoint, prefer
+// switching to one in production so pool connections are multiplexed server-side too.
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 20 });
 export const db = drizzle({ client: pool, schema });

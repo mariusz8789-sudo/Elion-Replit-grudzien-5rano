@@ -75,8 +75,14 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Vite's build output is content-hashed (e.g. index-CYACA6Ua.js), so those files can be
+  // cached indefinitely; index.html is not hashed and references the current build's hashed
+  // filenames, so it must never be cached or a stale visitor would request assets that no
+  // longer exist after the next deploy. `index: false` stops static from auto-serving
+  // index.html so every such request falls through to the explicit no-cache handler below.
+  app.use(express.static(distPath, { maxAge: "1y", immutable: true, index: false }));
   app.use("*", (_req, res) => {
+    res.set("Cache-Control", "no-cache");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

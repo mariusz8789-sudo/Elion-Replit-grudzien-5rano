@@ -29,8 +29,10 @@ npm run dev             # http://localhost:5000
 
 See `.env.example`. At minimum you need `DATABASE_URL` (PostgreSQL/Neon) to boot the server; Stripe and Mapbox keys
 are required for payments and maps features respectively. `ANTHROPIC_API_KEY`, the Google/Microsoft calendar OAuth
-vars, `TURN_SERVER_*`, and `PARTNER_JWT_SECRET` are all optional — each feature they gate returns a clear `503` (or,
-for calendar sync, simply hides its "Connect" button) rather than crashing the server when unset.
+vars, `TURN_SERVER_*`, `PARTNER_JWT_SECRET`, and `REDIS_URL` are all optional — each feature they gate returns a
+clear `503` (or, for calendar sync, simply hides its "Connect" button) rather than crashing the server when
+unset. `REDIS_URL` specifically is only needed once you run more than one server instance/worker — see the
+WebSocket note below.
 
 ## Scripts
 
@@ -184,6 +186,20 @@ adding a provider means implementing the interface, not rewriting call sites. Th
   `data:` URLs in the JSON body; a new shared `validateDataUrl` helper (`server/lib/dataUrl.ts`) now rejects
   malformed data URLs, MIME types outside an allowlist, and files over 8MB before they're ever stored, on top of
   the existing 10MB global request-body cap.
+- **WebSocket broadcasts are now horizontally-scalable**: chat/live-tracking/call-signaling broadcasts previously
+  wrote directly to in-memory `Map`s of locally-connected sockets, so they'd silently vanish for a recipient
+  connected to a different server instance or worker — a hard ceiling on scaling past one process. Broadcasts now
+  go through a pluggable `PubSubProvider` (`server/services/pubsub.ts`): a zero-dependency local provider
+  preserves today's exact single-instance behavior, and setting `REDIS_URL` switches to a Redis-backed provider
+  that fans a broadcast out to every instance.
+- **More scalability fixes**: `createReview` no longer re-scans a company's entire review history on every write
+  (now a single SQL `AVG`/`COUNT`); `getBookingMessages`/`getBookingTracking`/`getUserNotifications`/
+  `getUserBookings`/`getCompanyBookings` are capped at the most recent 500 rows like the other list endpoints;
+  added a missing index on `coupon_redemptions.userId`; the DB pool now sets an explicit `max` connection count
+  (important once running multiple instances against Neon's shared connection limit); built static assets are
+  served with a 1-year immutable cache header (`index.html` itself stays `no-cache` so a stale visitor never
+  requests a hashed bundle from a previous deploy); and the general API rate limiter is now keyed by authenticated
+  user instead of IP alone, so legitimate users behind a shared corporate/carrier NAT don't share one budget.
 
 ## Deployment
 

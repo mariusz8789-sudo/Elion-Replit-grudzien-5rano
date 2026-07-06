@@ -388,7 +388,10 @@ export const couponRedemptions = pgTable("coupon_redemptions", {
   bookingId: varchar("booking_id").references(() => bookings.id),
   discountApplied: decimal("discount_applied", { precision: 10, scale: 2 }).notNull(),
   redeemedAt: timestamp("redeemed_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  userIdIdx: index("coupon_redemptions_user_id_idx").on(t.userId),
+  couponIdIdx: index("coupon_redemptions_coupon_id_idx").on(t.couponId),
+}));
 
 // === REFERRAL PROGRAM ===
 export const referralRewards = pgTable("referral_rewards", {

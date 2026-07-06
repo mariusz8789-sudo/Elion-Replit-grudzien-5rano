@@ -5,6 +5,7 @@ import { parse as parseCookie } from "cookie";
 import type { RequestHandler } from "express";
 import { log } from "./vite";
 import type { IStorage } from "./storage";
+import { getPubSubProvider } from "./services/pubsub";
 
 interface WebSocketWithAuth extends WebSocket {
   id: string;
@@ -84,6 +85,44 @@ export function setupWebSocket(app: Express, httpServer: HTTPServer, storageInst
   const clients = new Map<string, WebSocketWithAuth>();
   const bookingSubscriptions = new Map<string, Set<WebSocketWithAuth>>();
   const userConnections = new Map<string, Set<WebSocketWithAuth>>();
+
+  // Broadcasts are published through this instead of writing straight to the local
+  // *Connections maps so they still reach the right sockets once this process is one of
+  // several instances/workers (see server/services/pubsub.ts for why that matters).
+  const pubsub = getPubSubProvider();
+  pubsub.onMessage((message) => {
+    if (message.scope === "user") {
+      deliverToLocalUserConnections(message.id, message.payload);
+    } else if (message.scope === "booking") {
+      deliverToLocalBookingSubscribers(message.id, message.payload);
+    }
+  });
+
+  function deliverToLocalUserConnections(userId: string, message: unknown) {
+    const connections = userConnections.get(userId);
+    if (connections) {
+      const messageStr = JSON.stringify(message);
+      connections.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(messageStr);
+        }
+      });
+      log(`Delivered to ${connections.size} local connection(s) for user ${userId}`);
+    }
+  }
+
+  function deliverToLocalBookingSubscribers(bookingId: string, message: unknown) {
+    const subscribers = bookingSubscriptions.get(bookingId);
+    if (subscribers) {
+      const messageStr = JSON.stringify(message);
+      subscribers.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(messageStr);
+        }
+      });
+      log(`Delivered to ${subscribers.size} local subscriber(s) of booking ${bookingId}`);
+    }
+  }
 
   wss.on("connection", (ws: WebSocket, req: any) => {
     // Session was already verified in verifyClient
@@ -268,29 +307,15 @@ export function setupWebSocket(app: Express, httpServer: HTTPServer, storageInst
   });
 
   function broadcastToBooking(bookingId: string, message: any) {
-    const subscribers = bookingSubscriptions.get(bookingId);
-    if (subscribers) {
-      const messageStr = JSON.stringify(message);
-      subscribers.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(messageStr);
-        }
-      });
-      log(`Broadcasted to ${subscribers.size} subscribers of booking ${bookingId}`);
-    }
+    pubsub.publish({ scope: "booking", id: bookingId, payload: message }).catch((err) => {
+      log(`Failed to publish booking broadcast: ${err}`);
+    });
   }
 
   function broadcastToUser(userId: string, message: any) {
-    const connections = userConnections.get(userId);
-    if (connections) {
-      const messageStr = JSON.stringify(message);
-      connections.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(messageStr);
-        }
-      });
-      log(`Broadcasted to ${connections.size} connections for user ${userId}`);
-    }
+    pubsub.publish({ scope: "user", id: userId, payload: message }).catch((err) => {
+      log(`Failed to publish user broadcast: ${err}`);
+    });
   }
 
   async function handleCallSignal(sender: WebSocketWithAuth, message: WSMessage) {

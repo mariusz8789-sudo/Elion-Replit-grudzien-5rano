@@ -66,16 +66,6 @@ app.use(cors({
   credentials: true,
 }));
 
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: "Too many requests from this IP, please try again later.",
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use("/api", apiLimiter);
-
 app.use(express.json({
   limit: "10mb",
   verify: (req, _res, buf) => {
@@ -114,6 +104,20 @@ app.set('sessionMiddleware', sessionMiddleware);
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Keyed by authenticated user (falling back to IP for anonymous requests) so legitimate
+// concurrent users behind a shared corporate/carrier-grade NAT don't share one IP-wide
+// budget; this must run after passport.session() so req.user is populated.
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: "Too many requests, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.user as { id?: string } | undefined)?.id || req.ip || "unknown",
+});
+
+app.use("/api", apiLimiter);
 
 app.use((req, res, next) => {
   const start = Date.now();

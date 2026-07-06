@@ -59,6 +59,18 @@ const authLimiter = rateLimit({
   message: { message: "Too many login attempts. Please try again later." },
 });
 
+// AI endpoints (cargo recognition, translation) call the paid Anthropic API per request;
+// keep this tighter than and independent of the general API limiter, keyed per user so one
+// account can't exhaust the shared IP allowance and starve everyone else on the same NAT/office.
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.user as User | undefined)?.id || req.ip || "unknown",
+  message: { message: "Too many AI requests. Please try again in a minute." },
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // === AUTHENTICATION ROUTES ===
   app.post("/api/auth/register", authLimiter, async (req, res) => {
@@ -1353,6 +1365,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!company) {
         return res.status(404).json({ message: "Company not found" });
       }
+      const user = req.user as User;
+      if (user.companyId !== company.id && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to manage this company's subscription" });
+      }
 
       const plan = String(req.body.plan || "");
       const planConfig = PLAN_CONFIG[plan];
@@ -1386,6 +1402,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const company = await storage.getCompany(req.params.id);
       if (!company) {
         return res.status(404).json({ message: "Company not found" });
+      }
+      const user = req.user as User;
+      if (user.companyId !== company.id && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to view this company's usage" });
       }
       const used = await storage.getCompanyMonthlyBookingCount(company.id);
       const limit = company.monthlyBookingLimit ?? 0;
@@ -1668,6 +1688,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/drivers/:driverId/time-off", requireAuth, async (req, res) => {
     try {
+      const driver = await storage.getDriver(req.params.driverId);
+      if (!driver) return res.status(404).json({ message: "Driver not found" });
+      const user = req.user as User;
+      if (driver.userId !== user.id && user.companyId !== driver.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
       const data = insertDriverTimeOffSchema.parse({ ...req.body, driverId: req.params.driverId });
       const created = await storage.createDriverTimeOff(data);
       res.status(201).json(created);
@@ -1677,6 +1703,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/drivers/:driverId/time-off/:id", requireAuth, async (req, res) => {
+    const driver = await storage.getDriver(req.params.driverId);
+    if (!driver) return res.status(404).json({ message: "Driver not found" });
+    const user = req.user as User;
+    if (driver.userId !== user.id && user.companyId !== driver.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
     const deleted = await storage.deleteDriverTimeOff(req.params.id, req.params.driverId);
     if (!deleted) return res.status(404).json({ message: "Time off entry not found" });
     res.status(204).send();
@@ -1689,6 +1721,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === CALENDAR SYNC (Google / Outlook) ===
   app.get("/api/drivers/:driverId/calendar/:provider/auth-url", requireAuth, async (req, res) => {
+    const driver = await storage.getDriver(req.params.driverId);
+    if (!driver) return res.status(404).json({ message: "Driver not found" });
+    const user = req.user as User;
+    if (driver.userId !== user.id && user.companyId !== driver.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
     const provider = req.params.provider as CalendarProvider;
     if (provider !== "google" && provider !== "outlook") {
       return res.status(400).json({ message: "provider must be 'google' or 'outlook'" });
@@ -1718,11 +1756,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/drivers/:driverId/calendar/connections", requireAuth, async (req, res) => {
+    const driver = await storage.getDriver(req.params.driverId);
+    if (!driver) return res.status(404).json({ message: "Driver not found" });
+    const user = req.user as User;
+    if (driver.userId !== user.id && user.companyId !== driver.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
     const connections = await storage.getDriverCalendarConnections(req.params.driverId);
     res.json(connections.map(({ accessTokenEncrypted, refreshTokenEncrypted, ...rest }) => rest));
   });
 
   app.delete("/api/drivers/:driverId/calendar/:provider", requireAuth, async (req, res) => {
+    const driver = await storage.getDriver(req.params.driverId);
+    if (!driver) return res.status(404).json({ message: "Driver not found" });
+    const user = req.user as User;
+    if (driver.userId !== user.id && user.companyId !== driver.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
     const deleted = await storage.deleteCalendarConnection(req.params.driverId, req.params.provider);
     if (!deleted) return res.status(404).json({ message: "Connection not found" });
     res.status(204).send();
@@ -1733,6 +1783,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(req.params.bookingId);
       if (!booking || !booking.driverId) {
         return res.status(404).json({ message: "Booking or assigned driver not found" });
+      }
+      if (!(await userCanAccessBooking(req.user as User, booking))) {
+        return res.status(403).json({ message: "Not authorized to sync this booking" });
       }
       const connections = await storage.getDriverCalendarConnections(booking.driverId);
       const results: Record<string, string> = {};
@@ -1759,13 +1812,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // === AI CARGO RECOGNITION ===
-  app.post("/api/bookings/:bookingId/cargo-items/analyze", requireAuth, async (req, res) => {
+  app.post("/api/bookings/:bookingId/cargo-items/analyze", requireAuth, aiLimiter, async (req, res) => {
     try {
       const { imageUrl } = req.body;
       if (!imageUrl) return res.status(400).json({ message: "imageUrl is required" });
 
       const booking = await storage.getBooking(req.params.bookingId);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
+      if (!(await userCanAccessBooking(req.user as User, booking))) {
+        return res.status(403).json({ message: "Not authorized to analyze cargo for this booking" });
+      }
 
       const recognitionProvider = getCargoRecognitionProvider();
       if (!recognitionProvider.isConfigured()) {
@@ -1796,12 +1852,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/bookings/:bookingId/cargo-items", requireAuth, async (req, res) => {
+    const booking = await storage.getBooking(req.params.bookingId);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (!(await userCanAccessBooking(req.user as User, booking))) {
+      return res.status(403).json({ message: "Not authorized to view this booking's cargo items" });
+    }
     res.json(await storage.getBookingCargoItems(req.params.bookingId));
   });
 
   app.post("/api/cargo-items", requireAuth, async (req, res) => {
     try {
       const data = insertCargoItemSchema.parse(req.body);
+      const booking = await storage.getBooking(data.bookingId);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      if (!(await userCanAccessBooking(req.user as User, booking))) {
+        return res.status(403).json({ message: "Not authorized to add cargo items to this booking" });
+      }
       const created = await storage.createCargoItem(data);
       res.status(201).json(created);
     } catch (error: any) {
@@ -1810,13 +1876,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/cargo-items/:id/correct", requireAuth, async (req, res) => {
+    const existingItem = await storage.getCargoItem(req.params.id);
+    if (!existingItem) return res.status(404).json({ message: "Cargo item not found" });
+    const itemBooking = await storage.getBooking(existingItem.bookingId);
+    if (!itemBooking || !(await userCanAccessBooking(req.user as User, itemBooking))) {
+      return res.status(403).json({ message: "Not authorized to correct this cargo item" });
+    }
     const updated = await storage.correctCargoItem(req.params.id, req.body);
     if (!updated) return res.status(404).json({ message: "Cargo item not found" });
     res.json(updated);
   });
 
   // === AI MULTILINGUAL CHAT TRANSLATION ===
-  app.post("/api/messages/:messageId/translate", requireAuth, async (req, res) => {
+  app.post("/api/messages/:messageId/translate", requireAuth, aiLimiter, async (req, res) => {
     try {
       const { targetLanguage } = req.body;
       if (!targetLanguage) return res.status(400).json({ message: "targetLanguage is required" });
@@ -1828,6 +1900,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(messages.id, req.params.messageId));
       const message = messageResult[0];
       if (!message) return res.status(404).json({ message: "Message not found" });
+
+      const messageBooking = await storage.getBooking(message.bookingId);
+      if (!messageBooking || !(await userCanAccessBooking(req.user as User, messageBooking))) {
+        return res.status(403).json({ message: "Not authorized to translate this message" });
+      }
 
       const translationProvider = getTranslationProvider();
       if (!translationProvider.isConfigured()) {
@@ -1959,6 +2036,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GPS anomaly detection: called whenever a new tracking update is created
   app.post("/api/tracking/:bookingId/check-anomaly", requireAuth, async (req, res) => {
+    const anomalyBooking = await storage.getBooking(req.params.bookingId);
+    if (!anomalyBooking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    if (!(await userCanAccessBooking(req.user as User, anomalyBooking))) {
+      return res.status(403).json({ message: "Not authorized to check this booking's tracking" });
+    }
     const updates = await storage.getBookingTracking(req.params.bookingId);
     if (updates.length < 2) return res.json({ anomalous: false });
 

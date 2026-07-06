@@ -69,5 +69,68 @@
     "filter": "Filtruj",
     "sort": "Sortuj",
     "viewDetails": "Zobacz Szczegóły"
+  },
+  "admin": {
+    "adminPanel": "Panel Administratora",
+    "companyDashboard": "Panel Firmy",
+    "availableBookings": "Dostępne Rezerwacje",
+    "myOffers": "Moje Oferty",
+    "makeOffer": "Złóż Ofertę",
+    "offerPrice": "Cena Oferty",
+    "offerMessage": "Wiadomość do Klienta",
+    "submitOffer": "Wyślij Ofertę"
+  },
+  "dashboard": {
+    "myBookings": "Moje Rezerwacje",
+    "activeBookings": "Aktywne Rezerwacje",
+    "completedBookings": "Zakończone Rezerwacje",
+    "status": {
+      "draft": "Szkic",
+      "posted": "Opublikowana",
+      "accepted": "Zaakceptowana",
+      "in_transit": "W Transporcie",
+      "delivered": "Dostarczona",
+      "cancelled": "Anulowana"
+    }
+  },
+  "eco": {
+    "co2Emission": "Emisja CO₂",
+    "ecoRoute": "Trasa Eko",
+    "carbonFootprint": "Ślad Węglowy",
+    "ecoFriendly": "Opcja Ekologiczna",
+    "sharedRide": "Dostępny Wspólny Przejazd"
+  },
+  "marketplace": {
+    "title": "Rynek",
+    "promotions": "Specjalne Promocje",
+    "materials": "Materiały do Przeprowadzki",
+    "boxes": "Kartony i Opakowania",
+    "equipment": "Wynajem Sprzętu"
+  },
+  "offers": {
+    "viewOffers": "Zobacz Oferty",
+    "noOffers": "Brak ofert",
+    "acceptOffer": "Zaakceptuj Ofertę",
+    "rejectOffer": "Odrzuć Ofertę",
+    "from": "od",
+    "message": "Wiadomość"
+  },
+  "payment": {
+    "payNow": "Zapłać Teraz",
+    "paymentSuccess": "Płatność Zakończona Sukcesem",
+    "paymentFailed": "Płatność Nieudana",
+    "total": "Suma",
+    "cardNumber": "Numer Karty",
+    "expiryDate": "Data Ważności",
+    "cvv": "CVV"
+  },
+  "tracking": {
+    "liveTracking": "Śledzenie GPS na Żywo",
+    "centerOnTruck": "Wyśrodkuj na Ciężarówce",
+    "pickup": "Odbiór",
+    "delivery": "Dostawa",
+    "liveLocation": "Lokalizacja na Żywo",
+    "status": "Status",
+    "timeline": "Oś Czasu"
   }
 }

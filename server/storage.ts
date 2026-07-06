@@ -193,6 +193,7 @@ export interface IStorage {
   touchCalendarSync(id: string): Promise<void>;
 
   // AI cargo recognition operations
+  getCargoItem(id: string): Promise<CargoItem | undefined>;
   getBookingCargoItems(bookingId: string): Promise<CargoItem[]>;
   createCargoItem(item: InsertCargoItem): Promise<CargoItem>;
   correctCargoItem(id: string, updates: Partial<InsertCargoItem>): Promise<CargoItem | undefined>;
@@ -1036,6 +1037,11 @@ export class DbStorage implements IStorage {
   }
 
   // === AI CARGO RECOGNITION ===
+  async getCargoItem(id: string): Promise<CargoItem | undefined> {
+    const result = await db.select().from(cargoItems).where(eq(cargoItems.id, id));
+    return result[0];
+  }
+
   async getBookingCargoItems(bookingId: string): Promise<CargoItem[]> {
     return await db.select().from(cargoItems)
       .where(eq(cargoItems.bookingId, bookingId))

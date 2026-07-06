@@ -137,6 +137,24 @@ adding a provider means implementing the interface, not rewriting call sites. Th
   `PATCH /api/{staff,resource}-sharing/:id/status` now checks that the caller is the listing's own company, the
   already-matched counterparty, or an admin before changing status, and records the requesting company as the
   borrower/requester the first time a listing is requested.
+- **Company subscription IDOR closed**: `POST /api/companies/:id/subscribe` and `GET /api/companies/:id/usage` now
+  require the caller belong to that company (or be an admin) — previously any authenticated user could view
+  another company's booking usage or kick off a Stripe checkout that upgrades a company they have no relationship
+  with.
+- **More booking sub-resources authorized**: GPS anomaly checks, AI cargo-item analysis/creation/correction, and
+  chat message translation now all verify the caller can access the underlying booking via
+  `userCanAccessBooking`, matching the pattern applied to messages/attachments/tracking in earlier batches.
+- **AI endpoints rate-limited separately**: cargo-photo analysis and chat translation call the paid Anthropic API
+  per request, so they now sit behind a dedicated 10-requests/minute-per-user limiter instead of sharing the
+  general 100-requests/15-minute API limiter, which could otherwise let one client burn most of that budget on
+  cheap routes and still fire dozens of paid AI calls.
+- **Driver time-off/calendar-sync ownership checks**: creating/deleting a driver's time-off entries, requesting a
+  calendar OAuth URL, and viewing/disconnecting calendar connections now require the caller be that driver, their
+  company, or an admin — previously any authenticated user could manage another driver's time off or calendar
+  sync.
+- **Polish (`pl.json`) translation completed**: the locale was missing 7 of 14 top-level sections (`admin`,
+  `dashboard`, `eco`, `marketplace`, `offers`, `payment`, `tracking` — 47 keys) and silently fell back to English
+  mid-screen for checkout, tracking, offers, and admin UI; it now has full key parity with `en.json`.
 
 ## Deployment
 

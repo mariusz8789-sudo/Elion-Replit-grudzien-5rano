@@ -31,7 +31,7 @@ export default function AdminPanel() {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const { toast } = useToast();
 
-  const { data: bookings = [], isLoading: loadingBookings } = useQuery<Booking[]>({
+  const { data: bookings = [], isLoading: loadingBookings, isError: bookingsError, refetch: refetchBookings } = useQuery<Booking[]>({
     queryKey: ["/api/bookings"],
     queryFn: async () => {
       const response = await fetch("/api/bookings");
@@ -40,20 +40,20 @@ export default function AdminPanel() {
     },
   });
 
-  const { data: services = [], isLoading: loadingServices } = useQuery<Service[]>({
+  const { data: services = [], isLoading: loadingServices, isError: servicesError } = useQuery<Service[]>({
     queryKey: ["/api/services"],
   });
 
-  const { data: users = [] } = useQuery<any[]>({
+  const { data: users = [], isError: usersError } = useQuery<any[]>({
     queryKey: ["/api/users"],
     queryFn: async () => {
       const response = await fetch("/api/users");
-      if (!response.ok) return [];
+      if (!response.ok) throw new Error("Failed to fetch users");
       return response.json();
     },
   });
 
-  const { data: pendingDocuments = [] } = useQuery<VerificationDocument[]>({
+  const { data: pendingDocuments = [], isError: pendingDocumentsError } = useQuery<VerificationDocument[]>({
     queryKey: ["/api/admin/verification-documents/pending"],
   });
 
@@ -140,6 +140,25 @@ export default function AdminPanel() {
     );
   }
 
+  if (bookingsError || servicesError) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center space-y-4">
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto" />
+            <div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Unable to load admin data</h3>
+              <p className="text-muted-foreground mb-4">Something went wrong. Please try again.</p>
+              <Button onClick={() => refetchBookings()} data-testid="button-retry-admin">
+                Try Again
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -148,6 +167,17 @@ export default function AdminPanel() {
           Manage bookings, services, and operations
         </p>
       </div>
+
+      {(usersError || pendingDocumentsError) && (
+        <Card className="border-destructive/50">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              Some admin data (drivers list or pending verifications) failed to load. Other sections below are unaffected.
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid md:grid-cols-5 gap-4">
         <Card>

@@ -10,6 +10,7 @@ import { Check, Phone, User } from "lucide-react";
 import type { Service } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 type BookingStep = "service" | "quote" | "details" | "confirmation";
 
@@ -31,6 +32,7 @@ export default function BookingFlow() {
   const [couponCode, setCouponCode] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const createBookingMutation = useMutation({
     mutationFn: async (bookingData: any) => {
@@ -70,44 +72,48 @@ export default function BookingFlow() {
     
     if (!selectedService || !quoteData) return;
 
-    // Try to get or create user by phone number
-    let userId: string | null = null;
-    
-    try {
-      const checkResponse = await fetch(`/api/users/phone/${encodeURIComponent(userDetails.phone)}`);
-      
-      if (checkResponse.ok) {
-        const existingUser = await checkResponse.json();
-        userId = existingUser.id;
-        
-        await apiRequest("POST", "/api/auth/login", {
-          email: "",
-          phone: userDetails.phone,
-          password: "temp123",
+    // If the visitor is already signed in, book under their own account. Otherwise create a
+    // brand-new guest account and let the server log it in immediately (POST /api/users
+    // generates and hashes a random password server-side — no password ever passes through
+    // this form). If that phone number is already registered, we can't safely guess a
+    // password on their behalf, so we ask them to log in instead of proceeding.
+    let userId: string | null = user?.id ?? null;
+
+    if (!userId) {
+      try {
+        const createResponse = await fetch("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            name: userDetails.name,
+            phone: userDetails.phone,
+            email: userDetails.email || undefined,
+          }),
         });
-      } else {
-        const createResponse = await apiRequest("POST", "/api/users", {
-          name: userDetails.name,
-          phone: userDetails.phone,
-          email: userDetails.email || undefined,
-          password: "temp123",
-        });
+
+        if (createResponse.status === 409) {
+          toast({
+            title: "Account already exists",
+            description: "This phone number is already registered. Please log in to continue with your booking.",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (!createResponse.ok) {
+          throw new Error("Failed to create account");
+        }
+
         const newUser = await createResponse.json();
         userId = newUser.id;
-        
-        await apiRequest("POST", "/api/auth/login", {
-          email: "",
-          phone: userDetails.phone,
-          password: "temp123",
+      } catch (error) {
+        toast({
+          title: "User creation failed",
+          description: "Please try again",
+          variant: "destructive",
         });
+        return;
       }
-    } catch (error) {
-      toast({
-        title: "User creation failed",
-        description: "Please try again",
-        variant: "destructive",
-      });
-      return;
     }
 
     if (!userId) {

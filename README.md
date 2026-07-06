@@ -155,6 +155,31 @@ adding a provider means implementing the interface, not rewriting call sites. Th
 - **Polish (`pl.json`) translation completed**: the locale was missing 7 of 14 top-level sections (`admin`,
   `dashboard`, `eco`, `marketplace`, `offers`, `payment`, `tracking` — 47 keys) and silently fell back to English
   mid-screen for checkout, tracking, offers, and admin UI; it now has full key parity with `en.json`.
+- **Verification-document IDOR closed**: `GET /api/verification-documents/:holderType/:holderId` had no
+  ownership/admin check at all (leaking uploaded ID cards/selfies/licenses to any authenticated user), and the
+  create route only checked ownership for `holderType: "user"`, not `driver`/`company`. Both now go through a
+  shared `userCanAccessVerificationHolder` check.
+- **Guest checkout no longer shares one password across every account**: every guest-created account previously
+  got the literal password `"temp123"`, and an unauthenticated `GET /api/users/phone/:phone` endpoint let anyone
+  confirm a phone was registered — together this meant anyone who knew a customer's phone number could log into
+  their account. `POST /api/users` now always generates a random per-account password server-side (never sent to
+  the client) and refuses (409) if the phone is already registered instead of attempting a password guess; the
+  phone-lookup endpoint has been removed and `BookingFlow` no longer sends or relies on any shared password.
+- **Referral reward double-payout bug fixed**: the "already credited" check queried
+  `getReferralRewards(customer.id)` (rewards where the customer *is the referrer*) and then compared
+  `referredUserId` against the same id — a mismatched query that essentially never matched, so every delivered
+  booking for a referred customer could mint another $25 reward. Fixed to check for an existing reward by
+  `referredUserId` directly, backed by a new unique constraint on `referral_rewards.referred_user_id`.
+- **Coupon redemption race fixed**: `maxRedemptions` was checked and incremented in separate non-atomic steps,
+  letting concurrent bookings redeem a coupon past its limit. `redeemCoupon` now does a single conditional
+  `UPDATE ... WHERE timesRedeemed < maxRedemptions` inside a transaction, and the booking route claims the
+  redemption slot *before* creating the booking so a lost race never leaves a booking with an unearned discount.
+- **CI added**: a GitHub Actions workflow (`.github/workflows/ci.yml`) now runs type-checking, the test suite, and
+  a production build on every push/PR — previously verification was entirely manual.
+- **Fixed two more broken admin features**: `AdminPanel`'s "Drivers" tab called a `GET /api/users` endpoint that
+  never existed (silently rendering an always-empty list), and its "Assign Driver" action called a
+  `PATCH /api/bookings/:id/driver` endpoint that also never existed. Both routes now exist (admin-only), and
+  `AdminPanel` surfaces a retry banner instead of a silent blank screen when any of its admin queries fail.
 
 ## Deployment
 

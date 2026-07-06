@@ -47,6 +47,24 @@ const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
 const userCanAccessBooking = (user: User, booking: Booking) =>
   userCanAccessBookingImpl(user, booking, (id) => storage.getDriver(id));
 
+// Verification documents (ID cards, selfies, licenses, insurance certs) are sensitive PII;
+// only the document's own holder (or the company a driver/company doc belongs to) or an
+// admin may create or read them.
+async function userCanAccessVerificationHolder(
+  user: User,
+  holderType: string,
+  holderId: string,
+): Promise<boolean> {
+  if (user.role === "admin") return true;
+  if (holderType === "user") return user.id === holderId;
+  if (holderType === "driver") {
+    const driver = await storage.getDriver(holderId);
+    return driver?.userId === user.id || (!!driver && user.companyId === driver.companyId);
+  }
+  if (holderType === "company") return user.companyId === holderId;
+  return false;
+}
+
 // Credential-stuffing / brute-force guard: tighter than the general /api limiter,
 // keyed by IP + email/phone so a single attacker can't burn through many accounts
 // under one IP allowance, and legitimate users on a shared IP aren't blocked.
@@ -150,16 +168,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // === USER ROUTES ===
-  app.get("/api/users/phone/:phone", async (req, res) => {
-    const user = await storage.getUserByPhone(req.params.phone);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    const { password: _, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
+  app.get("/api/users", requireAdmin, async (_req, res) => {
+    const allUsers = await storage.getAllUsers();
+    res.json(allUsers.map(({ password: _, ...rest }) => rest));
   });
 
-  app.get("/api/users/:id", async (req, res) => {
+  app.get("/api/users/:id", requireAuth, async (req, res) => {
     const user = await storage.getUser(req.params.id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -168,47 +182,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(userWithoutPassword);
   });
 
+  // Guest checkout: creates a brand-new account and logs it in immediately. Never accepts
+  // a caller-supplied password — this endpoint is unauthenticated, so honoring a
+  // client-provided password here would make it an unthrottled alternative to the rate
+  // limited /api/auth/login and, worse, would mean every guest account shared whatever
+  // fixed placeholder password a client happened to send. Instead each guest account gets
+  // its own cryptographically random password that is never returned to the client; if the
+  // phone number is already registered we simply refuse and point the caller at the real
+  // login flow instead of attempting any password comparison here.
   app.post("/api/users", async (req, res) => {
     try {
-      const userData = insertUserSchema.parse(req.body);
-      
-      // Check if user with phone already exists
+      const { password: _ignored, ...rest } = req.body;
+      const userData = insertUserSchema.parse({ ...rest, password: nanoid(32) });
+
       const existing = await storage.getUserByPhone(userData.phone);
       if (existing) {
-        // Verify password for existing user
-        if (!userData.password || !existing.password) {
-          return res.status(401).json({ message: "Invalid credentials" });
-        }
-        
-        const passwordMatch = await bcrypt.compare(userData.password, existing.password);
-        if (!passwordMatch) {
-          return res.status(401).json({ message: "Invalid credentials" });
-        }
-        
-        // Sanitize user object before login (remove password hash)
-        const { password: _, ...sanitizedUser } = existing;
-        
-        // Auto-login existing user with valid password
-        await new Promise<void>((resolve, reject) => {
-          req.login(sanitizedUser as any, (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-        
-        return res.json(sanitizedUser);
+        return res.status(409).json({ message: "An account with this phone number already exists. Please log in." });
       }
-      
-      // Hash password before storing
-      if (userData.password) {
-        userData.password = await bcrypt.hash(userData.password, 10);
-      }
-      
+
+      userData.password = await bcrypt.hash(userData.password, 10);
       const user = await storage.createUser(userData);
-      
+
       // Sanitize user object before login (remove password hash)
       const { password: _, ...sanitizedUser } = user;
-      
+
       // Automatically log in newly created user
       await new Promise<void>((resolve, reject) => {
         req.login(sanitizedUser as any, (err) => {
@@ -216,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           else resolve();
         });
       });
-      
+
       res.status(201).json(sanitizedUser);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -416,6 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let finalPrice = bookingData.totalPrice;
       let discountAmount: string | undefined;
+      let couponRedemptionId: string | undefined;
 
       if (bookingData.couponCode) {
         const coupon = await storage.getCouponByCode(bookingData.couponCode);
@@ -440,6 +438,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : Number(coupon.discountValue);
         discountAmount = Math.min(discount, amount).toFixed(2);
         finalPrice = (amount - Number(discountAmount)).toFixed(2);
+
+        // Atomically claim a redemption slot before creating the booking (redeemCoupon's
+        // conditional update enforces maxRedemptions) so concurrent bookings can never push
+        // a coupon past its limit; the booking is only created once the slot is secured.
+        const redemption = await storage.redeemCoupon(coupon.id, user.id, undefined, discountAmount);
+        if (!redemption) {
+          return res.status(400).json({ message: "This coupon has reached its redemption limit" });
+        }
+        couponRedemptionId = redemption.id;
       }
 
       const booking = await storage.createBooking({
@@ -448,11 +455,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountAmount,
       });
 
-      if (bookingData.couponCode && discountAmount) {
-        const coupon = await storage.getCouponByCode(bookingData.couponCode);
-        if (coupon) {
-          await storage.redeemCoupon(coupon.id, user.id, booking.id, discountAmount);
-        }
+      if (couponRedemptionId) {
+        await storage.linkCouponRedemptionToBooking(couponRedemptionId, booking.id);
       }
 
       res.status(201).json(booking);
@@ -508,18 +512,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Credit the referrer on the customer's first delivered booking
       const bookingCustomer = await storage.getUser(booking.userId);
       if (bookingCustomer?.referredByCode) {
-        const existingRewards = await storage.getReferralRewards(bookingCustomer.id);
-        const alreadyCredited = existingRewards.some((r) => r.referredUserId === bookingCustomer.id);
+        const alreadyCredited = await storage.hasReferralRewardForReferredUser(bookingCustomer.id);
         if (!alreadyCredited) {
           const referrerResult = await db.select().from(users).where(eq(users.referralCode, bookingCustomer.referredByCode));
           const referrer = referrerResult[0];
           if (referrer) {
-            await storage.createReferralReward({
-              referrerUserId: referrer.id,
-              referredUserId: bookingCustomer.id,
-              bookingId: booking.id,
-              amount: "25",
-            });
+            try {
+              await storage.createReferralReward({
+                referrerUserId: referrer.id,
+                referredUserId: bookingCustomer.id,
+                bookingId: booking.id,
+                amount: "25",
+              });
+            } catch (error: any) {
+              // Unique constraint on referredUserId: a concurrent request already
+              // credited this referral first — not an error, just a lost race.
+              if (error.code !== "23505") throw error;
+            }
           }
         }
       }
@@ -571,6 +580,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/bookings/:id/transfers", requireAuth, async (req, res) => {
     const transfers = await storage.getBookingTransfers(req.params.id);
     res.json(transfers);
+  });
+
+  // Admin override to (re)assign a booking's driver directly, independent of the normal
+  // offer-acceptance flow.
+  app.patch("/api/bookings/:id/driver", requireAdmin, async (req, res) => {
+    const { driverId } = req.body;
+    if (!driverId) {
+      return res.status(400).json({ message: "driverId is required" });
+    }
+    const driver = await storage.getDriver(driverId);
+    if (!driver) {
+      return res.status(404).json({ message: "Driver not found" });
+    }
+    const booking = await storage.updateBookingDriver(req.params.id, driverId);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    res.json(booking);
   });
 
   app.patch("/api/bookings/:id/assign", requireAuth, async (req, res) => {
@@ -1984,8 +2011,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user as User;
       const data = insertVerificationDocumentSchema.parse(req.body);
-      if (data.holderType === "user" && data.holderId !== user.id) {
-        return res.status(403).json({ message: "Cannot submit documents for another user" });
+      if (!(await userCanAccessVerificationHolder(user, data.holderType, data.holderId))) {
+        return res.status(403).json({ message: "Cannot submit documents for this holder" });
       }
       const doc = await storage.createVerificationDocument(data);
       res.status(201).json(doc);
@@ -1995,6 +2022,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/verification-documents/:holderType/:holderId", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!(await userCanAccessVerificationHolder(user, req.params.holderType, req.params.holderId))) {
+      return res.status(403).json({ message: "Not authorized to view these documents" });
+    }
     res.json(await storage.getHolderVerificationDocuments(req.params.holderType, req.params.holderId));
   });
 

@@ -402,6 +402,7 @@ export const referralRewards = pgTable("referral_rewards", {
   creditedAt: timestamp("credited_at"),
 }, (t) => ({
   referrerIdx: index("referral_rewards_referrer_idx").on(t.referrerUserId),
+  referredUserUnique: unique().on(t.referredUserId),
 }));
 
 // === BOOKING TRANSFERS (resell/hand off a job to another company) ===

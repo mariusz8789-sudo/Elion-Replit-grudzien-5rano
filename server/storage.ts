@@ -42,12 +42,13 @@ import {
   apiKeys, webhookSubscriptions, webhookDeliveries
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, or, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, or, gte, lte, lt, isNull, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { encryptSecret, decryptSecret } from "./lib/crypto";
 
 export interface IStorage {
   // User operations
+  getAllUsers(): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
   getUserByPhone(phone: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -86,6 +87,7 @@ export interface IStorage {
   getPublicBookings(): Promise<Booking[]>;
   createBooking(booking: InsertBooking & { discountAmount?: string }): Promise<Booking>;
   updateBookingStatus(id: string, status: string): Promise<Booking | undefined>;
+  updateBookingDriver(id: string, driverId: string): Promise<Booking | undefined>;
   cancelBooking(id: string): Promise<Booking | undefined>;
   assignCompanyToBooking(bookingId: string, companyId: string, driverId: string, vehicleId: string): Promise<Booking | undefined>;
   updateBookingPayment(bookingId: string, paymentIntentId: string, paymentStatus: string): Promise<Booking | undefined>;
@@ -165,10 +167,12 @@ export interface IStorage {
   // Coupon operations
   getCouponByCode(code: string): Promise<Coupon | undefined>;
   createCoupon(coupon: InsertCoupon): Promise<Coupon>;
-  redeemCoupon(couponId: string, userId: string, bookingId: string | undefined, discountApplied: string): Promise<CouponRedemption>;
+  redeemCoupon(couponId: string, userId: string, bookingId: string | undefined, discountApplied: string): Promise<CouponRedemption | undefined>;
+  linkCouponRedemptionToBooking(redemptionId: string, bookingId: string): Promise<void>;
 
   // Referral operations
   getReferralRewards(userId: string): Promise<ReferralReward[]>;
+  hasReferralRewardForReferredUser(referredUserId: string): Promise<boolean>;
   createReferralReward(reward: InsertReferralReward): Promise<ReferralReward>;
 
   // Booking transfer operations
@@ -237,6 +241,10 @@ export interface IStorage {
 
 export class DbStorage implements IStorage {
   // === USER OPERATIONS ===
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt)).limit(500);
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.id, id));
     return result[0];
@@ -401,6 +409,14 @@ export class DbStorage implements IStorage {
   async updateBookingStatus(id: string, status: string): Promise<Booking | undefined> {
     const result = await db.update(bookings)
       .set({ status, updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateBookingDriver(id: string, driverId: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ driverId, updatedAt: new Date() })
       .where(eq(bookings.id, id))
       .returning();
     return result[0];
@@ -854,12 +870,26 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async redeemCoupon(couponId: string, userId: string, bookingId: string | undefined, discountApplied: string): Promise<CouponRedemption> {
-    const result = await db.insert(couponRedemptions).values({ couponId, userId, bookingId, discountApplied }).returning();
-    await db.update(coupons)
-      .set({ timesRedeemed: sql`${coupons.timesRedeemed} + 1` })
-      .where(eq(coupons.id, couponId));
-    return result[0];
+  async redeemCoupon(couponId: string, userId: string, bookingId: string | undefined, discountApplied: string): Promise<CouponRedemption | undefined> {
+    return await db.transaction(async (tx) => {
+      // Conditional update guards against a redemption-count race between concurrent
+      // bookings: the WHERE clause only succeeds if the coupon still had room left.
+      const updated = await tx.update(coupons)
+        .set({ timesRedeemed: sql`${coupons.timesRedeemed} + 1` })
+        .where(and(
+          eq(coupons.id, couponId),
+          or(isNull(coupons.maxRedemptions), lt(coupons.timesRedeemed, coupons.maxRedemptions)),
+        ))
+        .returning();
+      if (updated.length === 0) return undefined;
+
+      const result = await tx.insert(couponRedemptions).values({ couponId, userId, bookingId, discountApplied }).returning();
+      return result[0];
+    });
+  }
+
+  async linkCouponRedemptionToBooking(redemptionId: string, bookingId: string): Promise<void> {
+    await db.update(couponRedemptions).set({ bookingId }).where(eq(couponRedemptions.id, redemptionId));
   }
 
   // === REFERRAL OPERATIONS ===
@@ -867,6 +897,13 @@ export class DbStorage implements IStorage {
     return await db.select().from(referralRewards)
       .where(eq(referralRewards.referrerUserId, userId))
       .orderBy(desc(referralRewards.createdAt));
+  }
+
+  async hasReferralRewardForReferredUser(referredUserId: string): Promise<boolean> {
+    const result = await db.select().from(referralRewards)
+      .where(eq(referralRewards.referredUserId, referredUserId))
+      .limit(1);
+    return result.length > 0;
   }
 
   async createReferralReward(reward: InsertReferralReward): Promise<ReferralReward> {

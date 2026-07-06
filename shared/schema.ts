@@ -285,15 +285,22 @@ export const rideBookings = pgTable("ride_bookings", {
 export const staffSharing = pgTable("staff_sharing", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   lenderCompanyId: varchar("lender_company_id").notNull().references(() => companies.id),
-  borrowerCompanyId: varchar("borrower_company_id").notNull().references(() => companies.id),
-  driverId: varchar("driver_id").notNull().references(() => drivers.id),
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date").notNull(),
+  borrowerCompanyId: varchar("borrower_company_id").references(() => companies.id), // set once a request is accepted
+  driverId: varchar("driver_id").references(() => drivers.id), // a specific driver, if the listing is for one
+  staffType: text("staff_type").notNull(), // driver, loader, warehouse, dispatcher, admin
+  availability: text("availability").notNull(), // free-text availability window, e.g. "Mon-Fri 9am-5pm"
+  minHours: integer("min_hours"),
+  maxHours: integer("max_hours"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
   hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }),
-  status: text("status").default("pending"), // pending, approved, active, completed, cancelled
+  status: text("status").default("available"), // available, requested, booked, completed, cancelled
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  lenderCompanyIdIdx: index("staff_sharing_lender_company_id_idx").on(t.lenderCompanyId),
+  borrowerCompanyIdIdx: index("staff_sharing_borrower_company_id_idx").on(t.borrowerCompanyId),
+}));
 
 // === RESOURCE SHARING (Vehicles, Warehouses, Equipment) ===
 export const resourceSharing = pgTable("resource_sharing", {
@@ -303,7 +310,8 @@ export const resourceSharing = pgTable("resource_sharing", {
   resourceType: text("resource_type").notNull(), // vehicle, warehouse, equipment
   resourceId: varchar("resource_id"), // references vehicles.id or other resource tables
   title: text("title").notNull(),
-  description: text("description").notNull(),
+  description: text("description"),
+  availability: text("availability"), // free-text availability window, e.g. "Weekends only"
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   pricePerDay: decimal("price_per_day", { precision: 10, scale: 2 }),
@@ -311,9 +319,11 @@ export const resourceSharing = pgTable("resource_sharing", {
   capacity: text("capacity"),
   images: text("images").array(),
   available: boolean("available").default(true),
-  status: text("status").default("pending"), // pending, approved, active, completed, cancelled
+  status: text("status").default("available"), // available, requested, booked, completed, cancelled
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  providerCompanyIdIdx: index("resource_sharing_provider_company_id_idx").on(t.providerCompanyId),
+}));
 
 // === PROMO BOARD / ANNOUNCEMENTS ===
 export const announcements = pgTable("announcements", {
@@ -747,10 +757,14 @@ export const insertStaffSharingSchema = createInsertSchema(staffSharing).omit({
   id: true,
   createdAt: true,
   status: true,
+  borrowerCompanyId: true,
 }).extend({
-  startDate: z.coerce.date(),
-  endDate: z.coerce.date(),
+  driverId: z.string().optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
   hourlyRate: z.coerce.string().optional(),
+  minHours: z.coerce.number().int().positive().optional(),
+  maxHours: z.coerce.number().int().positive().optional(),
 });
 
 export const insertResourceSharingSchema = createInsertSchema(resourceSharing).omit({

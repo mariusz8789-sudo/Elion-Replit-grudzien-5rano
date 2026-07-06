@@ -5,6 +5,8 @@ import {
   insertCargoItemSchema,
   insertCouponSchema,
   insertBookingSchema,
+  insertStaffSharingSchema,
+  insertResourceSharingSchema,
 } from "./schema";
 
 describe("insertDriverAvailabilitySchema", () => {
@@ -70,6 +72,43 @@ describe("insertCouponSchema", () => {
       discountValue: 10,
     });
     expect(parsed.discountValue).toBe("10");
+  });
+});
+
+describe("insertStaffSharingSchema", () => {
+  it("accepts a listing with no borrower/driver/dates yet (an open marketplace post)", () => {
+    const parsed = insertStaffSharingSchema.parse({
+      lenderCompanyId: "c1",
+      staffType: "driver",
+      availability: "Mon-Fri 9am-5pm",
+      hourlyRate: 25,
+      minHours: "4",
+      maxHours: "40",
+    });
+    expect(parsed.minHours).toBe(4);
+    expect(parsed.maxHours).toBe(40);
+    expect(parsed.borrowerCompanyId).toBeUndefined();
+  });
+
+  it("requires staffType and availability", () => {
+    expect(() => insertStaffSharingSchema.parse({ lenderCompanyId: "c1" })).toThrow();
+  });
+});
+
+describe("insertResourceSharingSchema", () => {
+  it("accepts a minimal resource listing without dates", () => {
+    const parsed = insertResourceSharingSchema.parse({
+      providerCompanyId: "c1",
+      resourceType: "vehicle",
+      title: "Mercedes Sprinter",
+      availability: "Weekends only",
+      pricePerDay: 80,
+    });
+    expect(parsed.pricePerDay).toBe("80");
+  });
+
+  it("requires resourceType and title", () => {
+    expect(() => insertResourceSharingSchema.parse({ providerCompanyId: "c1" })).toThrow();
   });
 });
 

@@ -17,13 +17,15 @@ import { useAuth } from "@/lib/auth";
 
 interface StaffSharing {
   id: string;
-  providerCompanyId: string;
+  lenderCompanyId: string;
+  borrowerCompanyId: string | null;
+  driverId: string | null;
   staffType: string;
   availability: string;
-  hourlyRate: string;
-  minHours: number;
+  hourlyRate: string | null;
+  minHours: number | null;
   maxHours: number | null;
-  description: string | null;
+  notes: string | null;
   status: string;
   createdAt: string;
 }
@@ -31,10 +33,11 @@ interface StaffSharing {
 interface ResourceSharing {
   id: string;
   providerCompanyId: string;
+  requesterCompanyId: string | null;
   resourceType: string;
-  resourceName: string;
-  availability: string;
-  dailyRate: string;
+  title: string;
+  availability: string | null;
+  pricePerDay: string | null;
   description: string | null;
   status: string;
   createdAt: string;
@@ -224,8 +227,7 @@ export default function WorkShareHub() {
       hourlyRate,
       minHours: parsedMinHours,
       maxHours: parsedMaxHours,
-      description: staffDescription || null,
-      status: "available",
+      notes: staffDescription || null,
     });
   };
 
@@ -243,11 +245,10 @@ export default function WorkShareHub() {
 
     createResourceMutation.mutate({
       resourceType,
-      resourceName,
+      title: resourceName,
       availability: resourceAvailability,
-      dailyRate,
+      pricePerDay: dailyRate,
       description: resourceDescription || null,
-      status: "available",
     });
   };
 
@@ -559,9 +560,9 @@ export default function WorkShareHub() {
                         </div>
                       </div>
                       
-                      {staff.description && (
+                      {staff.notes && (
                         <p className="text-sm text-muted-foreground line-clamp-2">
-                          {staff.description}
+                          {staff.notes}
                         </p>
                       )}
 
@@ -588,7 +589,7 @@ export default function WorkShareHub() {
                           <CardTitle className="text-lg flex items-center gap-2">
                             {resource.resourceType === "vehicle" && <Truck className="w-5 h-5" />}
                             {resource.resourceType === "warehouse" && <Building2 className="w-5 h-5" />}
-                            {resource.resourceName}
+                            {resource.title}
                           </CardTitle>
                           <CardDescription>{t(resource.resourceType)} - {resource.availability}</CardDescription>
                         </div>
@@ -600,7 +601,7 @@ export default function WorkShareHub() {
                     <CardContent className="space-y-4">
                       <div className="flex items-center gap-2 text-sm">
                         <DollarSign className="w-4 h-4 text-muted-foreground" />
-                        <span>${resource.dailyRate}/day</span>
+                        <span>${resource.pricePerDay}/day</span>
                       </div>
                       
                       {resource.description && (

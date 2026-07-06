@@ -133,15 +133,17 @@ export interface IStorage {
   
   // Staff sharing operations
   getAllStaffSharing(): Promise<StaffSharing[]>;
+  getStaffSharing(id: string): Promise<StaffSharing | undefined>;
   getCompanyStaffSharing(companyId: string): Promise<StaffSharing[]>;
   createStaffSharing(staffSharing: InsertStaffSharing): Promise<StaffSharing>;
-  updateStaffSharingStatus(id: string, status: string): Promise<StaffSharing | undefined>;
-  
+  updateStaffSharingStatus(id: string, status: string, borrowerCompanyId?: string): Promise<StaffSharing | undefined>;
+
   // Resource sharing operations
   getAllResourceSharing(): Promise<ResourceSharing[]>;
+  getResourceSharing(id: string): Promise<ResourceSharing | undefined>;
   getAvailableResourceSharing(resourceType?: string): Promise<ResourceSharing[]>;
   createResourceSharing(resourceSharing: InsertResourceSharing): Promise<ResourceSharing>;
-  updateResourceSharingStatus(id: string, status: string): Promise<ResourceSharing | undefined>;
+  updateResourceSharingStatus(id: string, status: string, requesterCompanyId?: string): Promise<ResourceSharing | undefined>;
   
   // Announcements operations
   getActiveAnnouncements(): Promise<Announcement[]>;
@@ -673,6 +675,11 @@ export class DbStorage implements IStorage {
       .orderBy(desc(staffSharing.createdAt));
   }
 
+  async getStaffSharing(id: string): Promise<StaffSharing | undefined> {
+    const result = await db.select().from(staffSharing).where(eq(staffSharing.id, id));
+    return result[0];
+  }
+
   async getCompanyStaffSharing(companyId: string): Promise<StaffSharing[]> {
     return await db.select().from(staffSharing)
       .where(
@@ -686,9 +693,9 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async updateStaffSharingStatus(id: string, status: string): Promise<StaffSharing | undefined> {
+  async updateStaffSharingStatus(id: string, status: string, borrowerCompanyId?: string): Promise<StaffSharing | undefined> {
     const result = await db.update(staffSharing)
-      .set({ status })
+      .set({ status, ...(borrowerCompanyId ? { borrowerCompanyId } : {}) })
       .where(eq(staffSharing.id, id))
       .returning();
     return result[0];
@@ -698,6 +705,11 @@ export class DbStorage implements IStorage {
   async getAllResourceSharing(): Promise<ResourceSharing[]> {
     return await db.select().from(resourceSharing)
       .orderBy(desc(resourceSharing.createdAt));
+  }
+
+  async getResourceSharing(id: string): Promise<ResourceSharing | undefined> {
+    const result = await db.select().from(resourceSharing).where(eq(resourceSharing.id, id));
+    return result[0];
   }
 
   async getAvailableResourceSharing(resourceType?: string): Promise<ResourceSharing[]> {
@@ -719,9 +731,9 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async updateResourceSharingStatus(id: string, status: string): Promise<ResourceSharing | undefined> {
+  async updateResourceSharingStatus(id: string, status: string, requesterCompanyId?: string): Promise<ResourceSharing | undefined> {
     const result = await db.update(resourceSharing)
-      .set({ status })
+      .set({ status, ...(requesterCompanyId ? { requesterCompanyId } : {}) })
       .where(eq(resourceSharing.id, id))
       .returning();
     return result[0];

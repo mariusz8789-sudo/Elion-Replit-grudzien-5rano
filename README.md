@@ -127,6 +127,16 @@ adding a provider means implementing the interface, not rewriting call sites. Th
   multiple reviews for the same booking; carpool ride booking (`POST /api/carpool/:id/book`) computes price
   server-side from the ride's own rate (never trusts a client-supplied total) and uses a transactional
   conditional seat-count update to close a seat-oversell race between concurrent bookings.
+- **Fixed WorkShare HUB (staff/resource sharing)**: the feature was broken end-to-end — the frontend form posted
+  fields (`staffType`, `availability`, `minHours`/`maxHours`) that didn't exist on the `staff_sharing` table, and
+  the create route tried to override a `providerCompanyId` field that table doesn't have (the real column is
+  `lenderCompanyId`), so every submission failed validation. `staff_sharing` gained the missing columns
+  (`staffType`, `availability`, `minHours`, `maxHours`) and relaxed `borrowerCompanyId`/`driverId`/`startDate`/
+  `endDate` to nullable (a freshly-posted listing has no borrower or dates yet — those are set once another
+  company requests it); `resource_sharing` gained a matching `availability` column and a nullable `description`.
+  `PATCH /api/{staff,resource}-sharing/:id/status` now checks that the caller is the listing's own company, the
+  already-matched counterparty, or an admin before changing status, and records the requesting company as the
+  borrower/requester the first time a listing is requested.
 
 ## Deployment
 

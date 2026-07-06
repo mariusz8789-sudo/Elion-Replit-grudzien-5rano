@@ -1170,10 +1170,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Company access required" });
       }
 
-      const { providerCompanyId, ...rest } = req.body;
+      const { lenderCompanyId, borrowerCompanyId, ...rest } = req.body;
       const staffSharingData = insertStaffSharingSchema.parse({
         ...rest,
-        providerCompanyId: user.companyId,
+        lenderCompanyId: user.companyId,
       });
       const staffSharing = await storage.createStaffSharing(staffSharingData);
       res.status(201).json(staffSharing);
@@ -1188,7 +1188,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!status) {
         return res.status(400).json({ message: "Status is required" });
       }
-      const staffSharing = await storage.updateStaffSharingStatus(req.params.id, status);
+      const user = req.user as User;
+      const existing = await storage.getStaffSharing(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ message: "Staff sharing not found" });
+      }
+      // Any company can request an "available" listing; only the lender or the
+      // already-matched borrower (or an admin) may change its status afterwards.
+      const isRequesting = status === "requested" && existing.status === "available";
+      const isParty = user.companyId === existing.lenderCompanyId || user.companyId === existing.borrowerCompanyId;
+      if (!isRequesting && !isParty && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to update this listing" });
+      }
+      const staffSharing = await storage.updateStaffSharingStatus(
+        req.params.id,
+        status,
+        isRequesting ? user.companyId! : undefined,
+      );
       if (!staffSharing) {
         return res.status(404).json({ message: "Staff sharing not found" });
       }
@@ -1214,7 +1230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Company access required" });
       }
 
-      const { providerCompanyId, ...rest } = req.body;
+      const { providerCompanyId, requesterCompanyId, ...rest } = req.body;
       const resourceData = insertResourceSharingSchema.parse({
         ...rest,
         providerCompanyId: user.companyId,
@@ -1232,7 +1248,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!status) {
         return res.status(400).json({ message: "Status is required" });
       }
-      const resource = await storage.updateResourceSharingStatus(req.params.id, status);
+      const user = req.user as User;
+      const existing = await storage.getResourceSharing(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      // Any company can request an "available" listing; only the provider or the
+      // already-matched requester (or an admin) may change its status afterwards.
+      const isRequesting = status === "requested" && existing.status === "available";
+      const isParty = user.companyId === existing.providerCompanyId || user.companyId === existing.requesterCompanyId;
+      if (!isRequesting && !isParty && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to update this listing" });
+      }
+      const resource = await storage.updateResourceSharingStatus(
+        req.params.id,
+        status,
+        isRequesting ? user.companyId! : undefined,
+      );
       if (!resource) {
         return res.status(404).json({ message: "Resource not found" });
       }

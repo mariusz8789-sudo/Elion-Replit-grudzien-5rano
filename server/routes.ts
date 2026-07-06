@@ -27,6 +27,7 @@ import { getTranslationProvider } from "./services/translation";
 import { checkGpsAnomaly, checkDuplicateAccount, scoreAndRecordUserRisk } from "./services/fraud";
 import { dispatchWebhookEvent } from "./services/webhooks";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
+import rateLimit from "express-rate-limit";
 
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   if (req.isAuthenticated()) {
@@ -35,9 +36,21 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   res.status(401).json({ message: "Unauthorized" });
 };
 
+// Credential-stuffing / brute-force guard: tighter than the general /api limiter,
+// keyed by IP + email/phone so a single attacker can't burn through many accounts
+// under one IP allowance, and legitimate users on a shared IP aren't blocked.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${req.body?.email || req.body?.phone || ""}`,
+  message: { message: "Too many login attempts. Please try again later." },
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // === AUTHENTICATION ROUTES ===
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", authLimiter, async (req, res) => {
     try {
       const { email, phone, password, name, referralCode } = req.body;
 
@@ -77,7 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", (req, res, next) => {
+  app.post("/api/auth/login", authLimiter, (req, res, next) => {
     passport.authenticate("local", (err: any, user: User | false, info: any) => {
       if (err) {
         return res.status(500).json({ message: "Authentication error" });

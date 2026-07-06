@@ -77,6 +77,19 @@ Every AI/calendar/TURN integration above is built as a real provider implementat
 adding a provider means implementing the interface, not rewriting call sites. The Partner API is fully interactive at
 `/partner/v1/docs` (Swagger UI) once the server is running.
 
+### Performance & security notes
+
+- **Indexes**: every foreign-key/lookup column added in the schema (bookings, offers, messages, notifications, the
+  Batch 2 tables, etc.) has an explicit Drizzle `index()` — run `npm run db:push` after pulling to apply them.
+- **Code splitting**: every route in `client/src/App.tsx` is `React.lazy`-loaded, and `LiveTrackingMap` (Mapbox GL,
+  the single largest dependency) is lazy-loaded inside `BookingDetailPage` so it only downloads for bookings that
+  actually have GPS coordinates to show. This cut the initial JS bundle from ~3.2MB to ~485KB.
+- **SSRF guard**: partner webhook URLs are validated (`server/lib/urlSafety.ts`) to reject non-http(s) schemes and
+  any hostname resolving to a loopback/private/link-local address (including the cloud metadata IP
+  `169.254.169.254`) before a subscription is created.
+- **Auth rate limiting**: `/api/auth/login` and `/api/auth/register` have a dedicated 10-attempts/15-minute limiter
+  keyed by IP + email/phone, tighter than the general API rate limit, to slow credential stuffing.
+
 ## Deployment
 
 ### Replit

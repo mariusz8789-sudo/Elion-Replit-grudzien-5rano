@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, decimal, boolean, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, decimal, boolean, jsonb, unique, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -18,7 +18,10 @@ export const users = pgTable("users", {
   referralCode: text("referral_code").unique(),
   referredByCode: text("referred_by_code"), // referral code of the user who invited them
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  phoneIdx: index("users_phone_idx").on(t.phone),
+  companyIdIdx: index("users_company_id_idx").on(t.companyId),
+}));
 
 export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -49,7 +52,10 @@ export const drivers = pgTable("drivers", {
   rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
   totalDeliveries: integer("total_deliveries").default(0),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  companyIdIdx: index("drivers_company_id_idx").on(t.companyId),
+  userIdIdx: index("drivers_user_id_idx").on(t.userId),
+}));
 
 export const vehicles = pgTable("vehicles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -63,7 +69,9 @@ export const vehicles = pgTable("vehicles", {
   dimensions: text("dimensions"), // e.g., "L: 4.5m x W: 2.1m x H: 2.3m"
   available: boolean("available").default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  companyIdIdx: index("vehicles_company_id_idx").on(t.companyId),
+}));
 
 // === SERVICES & BOOKINGS ===
 export const services = pgTable("services", {
@@ -108,7 +116,12 @@ export const bookings = pgTable("bookings", {
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  userIdIdx: index("bookings_user_id_idx").on(t.userId),
+  companyIdIdx: index("bookings_company_id_idx").on(t.companyId),
+  driverIdIdx: index("bookings_driver_id_idx").on(t.driverId),
+  statusIdx: index("bookings_status_idx").on(t.status),
+}));
 
 export const quotes = pgTable("quotes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -134,7 +147,10 @@ export const offers = pgTable("offers", {
   message: text("message"),
   status: text("status").default("pending"), // pending, accepted, rejected
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  bookingIdIdx: index("offers_booking_id_idx").on(t.bookingId),
+  companyIdIdx: index("offers_company_id_idx").on(t.companyId),
+}));
 
 // === CHAT & ATTACHMENTS ===
 export const messages = pgTable("messages", {
@@ -144,7 +160,9 @@ export const messages = pgTable("messages", {
   content: text("content").notNull(),
   type: text("type").default("text"), // text, image, file
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  bookingIdIdx: index("messages_booking_id_idx").on(t.bookingId),
+}));
 
 export const attachments = pgTable("attachments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -157,7 +175,9 @@ export const attachments = pgTable("attachments", {
   fileSize: integer("file_size"), // in bytes
   category: text("category").default("general"), // general, proof_of_delivery, signature
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  bookingIdIdx: index("attachments_booking_id_idx").on(t.bookingId),
+}));
 
 // === REVIEWS ===
 export const reviews = pgTable("reviews", {
@@ -176,7 +196,9 @@ export const reviews = pgTable("reviews", {
   careHandling: integer("care_handling"),
   priceRating: integer("price_rating"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  companyIdIdx: index("reviews_company_id_idx").on(t.companyId),
+}));
 
 // === TRACKING ===
 export const trackingUpdates = pgTable("tracking_updates", {
@@ -187,7 +209,9 @@ export const trackingUpdates = pgTable("tracking_updates", {
   status: text("status"),
   note: text("note"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  bookingIdIdx: index("tracking_updates_booking_id_idx").on(t.bookingId),
+}));
 
 // === NOTIFICATIONS ===
 export const notifications = pgTable("notifications", {
@@ -199,7 +223,9 @@ export const notifications = pgTable("notifications", {
   read: boolean("read").default(false),
   link: text("link"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  userIdIdx: index("notifications_user_id_idx").on(t.userId),
+}));
 
 // === MARKETPLACE ===
 export const marketplaceListings = pgTable("marketplace_listings", {
@@ -325,7 +351,9 @@ export const badgeAwards = pgTable("badge_awards", {
   holderType: text("holder_type").notNull(), // company, driver
   holderId: varchar("holder_id").notNull(),
   awardedAt: timestamp("awarded_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  holderIdx: index("badge_awards_holder_idx").on(t.holderType, t.holderId),
+}));
 
 // === COUPONS / PROMOTIONS ===
 export const coupons = pgTable("coupons", {
@@ -361,7 +389,9 @@ export const referralRewards = pgTable("referral_rewards", {
   status: text("status").notNull().default("pending"), // pending, credited, cancelled
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   creditedAt: timestamp("credited_at"),
-});
+}, (t) => ({
+  referrerIdx: index("referral_rewards_referrer_idx").on(t.referrerUserId),
+}));
 
 // === BOOKING TRANSFERS (resell/hand off a job to another company) ===
 export const bookingTransfers = pgTable("booking_transfers", {
@@ -372,7 +402,9 @@ export const bookingTransfers = pgTable("booking_transfers", {
   transferredBy: varchar("transferred_by").notNull().references(() => users.id),
   reason: text("reason"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  bookingIdIdx: index("booking_transfers_booking_id_idx").on(t.bookingId),
+}));
 
 // === DRIVER AVAILABILITY CALENDAR ===
 export const driverAvailability = pgTable("driver_availability", {
@@ -383,7 +415,9 @@ export const driverAvailability = pgTable("driver_availability", {
   endTime: text("end_time").notNull(), // "HH:MM" 24h
   active: boolean("active").default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  driverIdIdx: index("driver_availability_driver_id_idx").on(t.driverId),
+}));
 
 export const driverTimeOff = pgTable("driver_time_off", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -393,7 +427,9 @@ export const driverTimeOff = pgTable("driver_time_off", {
   endDate: timestamp("end_date").notNull(),
   note: text("note"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  driverIdIdx: index("driver_time_off_driver_id_idx").on(t.driverId),
+}));
 
 export const calendarConnections = pgTable("calendar_connections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -429,7 +465,9 @@ export const cargoItems = pgTable("cargo_items", {
   aiProvider: text("ai_provider"), // which recognition provider produced this result
   rawResponse: jsonb("raw_response"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  bookingIdIdx: index("cargo_items_booking_id_idx").on(t.bookingId),
+}));
 
 // === AI MULTILINGUAL CHAT TRANSLATION ===
 export const messageTranslations = pgTable("message_translations", {
@@ -440,7 +478,9 @@ export const messageTranslations = pgTable("message_translations", {
   translatedContent: text("translated_content").notNull(),
   aiProvider: text("ai_provider"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  messageIdIdx: index("message_translations_message_id_idx").on(t.messageId, t.targetLanguage),
+}));
 
 // === VOICE / VIDEO CALLS ===
 export const calls = pgTable("calls", {
@@ -456,7 +496,10 @@ export const calls = pgTable("calls", {
   durationSeconds: integer("duration_seconds"),
   quality: jsonb("quality"), // { avgBitrateKbps, packetLossPercent, avgJitterMs, samples }
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  callerIdx: index("calls_caller_id_idx").on(t.callerId),
+  calleeIdx: index("calls_callee_id_idx").on(t.calleeId),
+}));
 
 // === IDENTITY VERIFICATION ===
 export const verificationDocuments = pgTable("verification_documents", {
@@ -471,7 +514,10 @@ export const verificationDocuments = pgTable("verification_documents", {
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   rejectionReason: text("rejection_reason"),
   expiresAt: timestamp("expires_at"),
-});
+}, (t) => ({
+  holderIdx: index("verification_documents_holder_idx").on(t.holderType, t.holderId),
+  statusIdx: index("verification_documents_status_idx").on(t.status),
+}));
 
 // === FRAUD PREVENTION ===
 export const deviceFingerprints = pgTable("device_fingerprints", {
@@ -482,7 +528,10 @@ export const deviceFingerprints = pgTable("device_fingerprints", {
   ipAddress: text("ip_address"),
   firstSeenAt: timestamp("first_seen_at").notNull().default(sql`now()`),
   lastSeenAt: timestamp("last_seen_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  userIdIdx: index("device_fingerprints_user_id_idx").on(t.userId),
+  hashIdx: index("device_fingerprints_hash_idx").on(t.fingerprintHash),
+}));
 
 export const riskScores = pgTable("risk_scores", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -491,7 +540,9 @@ export const riskScores = pgTable("risk_scores", {
   score: integer("score").notNull(), // 0 (low risk) .. 100 (high risk)
   reasons: text("reasons").array(),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  subjectIdx: index("risk_scores_subject_idx").on(t.subjectType, t.subjectId),
+}));
 
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -502,7 +553,9 @@ export const auditLogs = pgTable("audit_logs", {
   metadata: jsonb("metadata"),
   ipAddress: text("ip_address"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  targetIdx: index("audit_logs_target_idx").on(t.targetType, t.targetId),
+}));
 
 // === PUBLIC PARTNER API ===
 export const apiKeys = pgTable("api_keys", {
@@ -516,7 +569,10 @@ export const apiKeys = pgTable("api_keys", {
   lastUsedAt: timestamp("last_used_at"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   revokedAt: timestamp("revoked_at"),
-});
+}, (t) => ({
+  keyHashIdx: index("api_keys_key_hash_idx").on(t.keyHash),
+  companyIdIdx: index("api_keys_company_id_idx").on(t.companyId),
+}));
 
 export const webhookSubscriptions = pgTable("webhook_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -526,7 +582,9 @@ export const webhookSubscriptions = pgTable("webhook_subscriptions", {
   events: text("events").array().notNull(),
   active: boolean("active").default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  companyIdIdx: index("webhook_subscriptions_company_id_idx").on(t.companyId),
+}));
 
 export const webhookDeliveries = pgTable("webhook_deliveries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -537,7 +595,9 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   success: boolean("success").notNull().default(false),
   error: text("error"),
   attemptedAt: timestamp("attempted_at").notNull().default(sql`now()`),
-});
+}, (t) => ({
+  subscriptionIdIdx: index("webhook_deliveries_subscription_id_idx").on(t.subscriptionId),
+}));
 
 // === INSERT SCHEMAS ===
 export const insertUserSchema = createInsertSchema(users).omit({

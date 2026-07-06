@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -7,33 +8,45 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { CallProvider } from "./lib/CallProvider";
 import PointToPointLanding from "@/components/PointToPointLanding";
-import BookingFlow from "@/components/BookingFlow";
-import TrackingPage from "@/components/TrackingPage";
-import CustomerDashboard from "@/components/CustomerDashboard";
-import AdminPanel from "@/components/AdminPanel";
-import AuthPage from "@/pages/AuthPage";
-import BookingDetailPage from "@/pages/BookingDetailPage";
-import MarketplacePage from "@/pages/MarketplacePage";
-import EcoPage from "@/pages/EcoPage";
-import CarpoolPage from "@/pages/CarpoolPage";
-import AnalyticsPage from "@/pages/AnalyticsPage";
-import GreenRouteAI from "@/pages/GreenRouteAI";
-import EcoRewardPage from "@/pages/EcoRewardPage";
-import SmartLoad3D from "@/pages/SmartLoad3D";
-import WorkShareHub from "@/pages/WorkShareHub";
-import FleetPredictor from "@/pages/FleetPredictor";
-import InsurancePage from "@/pages/InsurancePage";
-import CarbonLedger from "@/pages/CarbonLedger";
-import QRDispatch from "@/pages/QRDispatch";
-import Plans from "@/pages/Plans";
-import Leaderboard from "@/pages/Leaderboard";
-import DriverCalendar from "@/pages/DriverCalendar";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { LogOut, User } from "lucide-react";
+import { Loader2, LogOut, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import LanguageSelector from "@/components/LanguageSelector";
 import logoPath from "@assets/file_0000000037a86243bd21599fc142fdaa_1760057642535.png";
+
+// Route-level code splitting: each page (and the heavy libraries it pulls in —
+// mapbox-gl, recharts, stripe-js, etc.) loads on demand instead of shipping in
+// the initial bundle.
+const BookingFlow = lazy(() => import("@/components/BookingFlow"));
+const TrackingPage = lazy(() => import("@/components/TrackingPage"));
+const CustomerDashboard = lazy(() => import("@/components/CustomerDashboard"));
+const AdminPanel = lazy(() => import("@/components/AdminPanel"));
+const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const BookingDetailPage = lazy(() => import("@/pages/BookingDetailPage"));
+const MarketplacePage = lazy(() => import("@/pages/MarketplacePage"));
+const EcoPage = lazy(() => import("@/pages/EcoPage"));
+const CarpoolPage = lazy(() => import("@/pages/CarpoolPage"));
+const AnalyticsPage = lazy(() => import("@/pages/AnalyticsPage"));
+const GreenRouteAI = lazy(() => import("@/pages/GreenRouteAI"));
+const EcoRewardPage = lazy(() => import("@/pages/EcoRewardPage"));
+const SmartLoad3D = lazy(() => import("@/pages/SmartLoad3D"));
+const WorkShareHub = lazy(() => import("@/pages/WorkShareHub"));
+const FleetPredictor = lazy(() => import("@/pages/FleetPredictor"));
+const InsurancePage = lazy(() => import("@/pages/InsurancePage"));
+const CarbonLedger = lazy(() => import("@/pages/CarbonLedger"));
+const QRDispatch = lazy(() => import("@/pages/QRDispatch"));
+const Plans = lazy(() => import("@/pages/Plans"));
+const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
+const DriverCalendar = lazy(() => import("@/pages/DriverCalendar"));
+
+function RouteLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
 
 function LandingPage() {
   const [, setLocation] = useLocation();
@@ -191,34 +204,36 @@ function AdminPage() {
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={LandingPage} />
-      <Route path="/auth" component={AuthPage} />
-      <Route path="/book" component={BookPage} />
-      <Route path="/track/:id" component={TrackPage} />
-      <Route path="/bookings/:bookingId" component={BookingDetailPage} />
-      <Route path="/bookings" component={BookingsPage} />
-      <Route path="/marketplace" component={MarketplacePage} />
-      <Route path="/eco" component={EcoPage} />
-      <Route path="/carpool" component={CarpoolPage} />
-      <Route path="/analytics" component={AnalyticsPage} />
-      <Route path="/admin" component={AdminPage} />
-      
-      {/* New features - 31-38 */}
-      <Route path="/greenroute" component={GreenRouteAI} />
-      <Route path="/ecorewards" component={EcoRewardPage} />
-      <Route path="/smartload" component={SmartLoad3D} />
-      <Route path="/workshare" component={WorkShareHub} />
-      <Route path="/fleetpredict" component={FleetPredictor} />
-      <Route path="/insurance" component={InsurancePage} />
-      <Route path="/carbon-ledger" component={CarbonLedger} />
-      <Route path="/qr-dispatch" component={QRDispatch} />
-      <Route path="/plans" component={Plans} />
-      <Route path="/leaderboard" component={Leaderboard} />
-      <Route path="/drivers/:driverId/calendar" component={DriverCalendar} />
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Switch>
+        <Route path="/" component={LandingPage} />
+        <Route path="/auth" component={AuthPage} />
+        <Route path="/book" component={BookPage} />
+        <Route path="/track/:id" component={TrackPage} />
+        <Route path="/bookings/:bookingId" component={BookingDetailPage} />
+        <Route path="/bookings" component={BookingsPage} />
+        <Route path="/marketplace" component={MarketplacePage} />
+        <Route path="/eco" component={EcoPage} />
+        <Route path="/carpool" component={CarpoolPage} />
+        <Route path="/analytics" component={AnalyticsPage} />
+        <Route path="/admin" component={AdminPage} />
 
-      <Route component={LandingPage} />
-    </Switch>
+        {/* New features - 31-38 */}
+        <Route path="/greenroute" component={GreenRouteAI} />
+        <Route path="/ecorewards" component={EcoRewardPage} />
+        <Route path="/smartload" component={SmartLoad3D} />
+        <Route path="/workshare" component={WorkShareHub} />
+        <Route path="/fleetpredict" component={FleetPredictor} />
+        <Route path="/insurance" component={InsurancePage} />
+        <Route path="/carbon-ledger" component={CarbonLedger} />
+        <Route path="/qr-dispatch" component={QRDispatch} />
+        <Route path="/plans" component={Plans} />
+        <Route path="/leaderboard" component={Leaderboard} />
+        <Route path="/drivers/:driverId/calendar" component={DriverCalendar} />
+
+        <Route component={LandingPage} />
+      </Switch>
+    </Suspense>
   );
 }
 

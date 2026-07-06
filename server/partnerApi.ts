@@ -7,6 +7,7 @@ import fs from "fs";
 import path from "path";
 import { storage } from "./storage";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
+import { assertPublicHttpUrl } from "./lib/urlSafety";
 import { env } from "./env";
 
 export const partnerApi = Router();
@@ -138,6 +139,7 @@ partnerApi.post("/webhooks", requireApiKey, requireScope("webhooks:manage"), asy
     if (!url || !Array.isArray(events) || events.length === 0) {
       return res.status(400).json({ message: "url and a non-empty events array are required" });
     }
+    await assertPublicHttpUrl(url);
     const secret = generateApiKey().rawKey;
     const sub = await storage.createWebhookSubscription(
       { companyId: req.partnerCompanyId!, url, events },

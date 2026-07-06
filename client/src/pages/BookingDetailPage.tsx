@@ -1,13 +1,18 @@
+import { lazy, Suspense } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Package, MapPin, Calendar, DollarSign, Truck } from "lucide-react";
+import { ArrowLeft, Package, MapPin, Calendar, DollarSign, Truck, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import LiveTrackingMap from "@/components/LiveTrackingMap";
 import CargoAnalyzer from "@/components/CargoAnalyzer";
 import type { Booking, TrackingUpdate } from "@shared/schema";
+
+// Mapbox GL is large (~1.8MB) and only needed when a booking has live GPS
+// coordinates to render, so it's loaded on demand rather than bundled with
+// this already-lazy-loaded page.
+const LiveTrackingMap = lazy(() => import("@/components/LiveTrackingMap"));
 
 export default function BookingDetailPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -187,12 +192,14 @@ export default function BookingDetailPage() {
 
         {/* Live GPS Map */}
         {booking.pickupLat && booking.pickupLng && booking.deliveryLat && booking.deliveryLng && (
-          <LiveTrackingMap
-            bookingId={booking.id}
-            trackingUpdates={tracking}
-            pickupCoords={pickupCoords}
-            deliveryCoords={deliveryCoords}
-          />
+          <Suspense fallback={<div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
+            <LiveTrackingMap
+              bookingId={booking.id}
+              trackingUpdates={tracking}
+              pickupCoords={pickupCoords}
+              deliveryCoords={deliveryCoords}
+            />
+          </Suspense>
         )}
 
         <CargoAnalyzer bookingId={booking.id} />

@@ -28,6 +28,7 @@ import { checkGpsAnomaly, checkDuplicateAccount, scoreAndRecordUserRisk } from "
 import { dispatchWebhookEvent } from "./services/webhooks";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
+import { validateDataUrl } from "./lib/dataUrl";
 import rateLimit from "express-rate-limit";
 
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {
@@ -46,6 +47,12 @@ const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
 
 const userCanAccessBooking = (user: User, booking: Booking) =>
   userCanAccessBookingImpl(user, booking, (id) => storage.getDriver(id));
+
+// Base64 data-URL upload limits, shared by cargo photos, chat attachments, and
+// verification documents.
+const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"] as const;
+const DOCUMENT_MIME_TYPES = [...IMAGE_MIME_TYPES, "application/pdf"] as const;
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB per file
 
 // Verification documents (ID cards, selfies, licenses, insurance certs) are sensitive PII;
 // only the document's own holder (or the company a driver/company doc belongs to) or an
@@ -835,6 +842,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user as User;
       const attachmentData = insertAttachmentSchema.parse({ ...req.body, uploaderId: user.id });
+      if (attachmentData.fileUrl.startsWith("data:")) {
+        validateDataUrl(attachmentData.fileUrl, { allowedMimeTypes: DOCUMENT_MIME_TYPES, maxBytes: MAX_UPLOAD_BYTES });
+      }
       const booking = await storage.getBooking(attachmentData.bookingId);
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
@@ -1860,6 +1870,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { imageUrl } = req.body;
       if (!imageUrl) return res.status(400).json({ message: "imageUrl is required" });
+      if (typeof imageUrl === "string" && imageUrl.startsWith("data:")) {
+        validateDataUrl(imageUrl, { allowedMimeTypes: IMAGE_MIME_TYPES, maxBytes: MAX_UPLOAD_BYTES });
+      }
 
       const booking = await storage.getBooking(req.params.bookingId);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -1907,6 +1920,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/cargo-items", requireAuth, async (req, res) => {
     try {
       const data = insertCargoItemSchema.parse(req.body);
+      if (data.imageUrl.startsWith("data:")) {
+        validateDataUrl(data.imageUrl, { allowedMimeTypes: IMAGE_MIME_TYPES, maxBytes: MAX_UPLOAD_BYTES });
+      }
       const booking = await storage.getBooking(data.bookingId);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
       if (!(await userCanAccessBooking(req.user as User, booking))) {
@@ -2011,6 +2027,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user as User;
       const data = insertVerificationDocumentSchema.parse(req.body);
+      if (data.fileUrl.startsWith("data:")) {
+        validateDataUrl(data.fileUrl, { allowedMimeTypes: DOCUMENT_MIME_TYPES, maxBytes: MAX_UPLOAD_BYTES });
+      }
       if (!(await userCanAccessVerificationHolder(user, data.holderType, data.holderId))) {
         return res.status(403).json({ message: "Cannot submit documents for this holder" });
       }

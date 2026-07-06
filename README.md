@@ -180,6 +180,10 @@ adding a provider means implementing the interface, not rewriting call sites. Th
   never existed (silently rendering an always-empty list), and its "Assign Driver" action called a
   `PATCH /api/bookings/:id/driver` endpoint that also never existed. Both routes now exist (admin-only), and
   `AdminPanel` surfaces a retry banner instead of a silent blank screen when any of its admin queries fail.
+- **Base64 upload validation**: cargo photos, chat attachments, and verification documents are uploaded as
+  `data:` URLs in the JSON body; a new shared `validateDataUrl` helper (`server/lib/dataUrl.ts`) now rejects
+  malformed data URLs, MIME types outside an allowlist, and files over 8MB before they're ever stored, on top of
+  the existing 10MB global request-body cap.
 
 ## Deployment
 

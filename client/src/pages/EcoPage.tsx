@@ -1,0 +1,138 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import EcoCalculator from "@/components/EcoCalculator";
+import EcoRouting from "@/components/EcoRouting";
+import { Leaf, TrendingDown, Award, Building2 } from "lucide-react";
+
+interface CompanyEcoStats {
+  id: string;
+  name: string;
+  totalTrips: number;
+  totalCO2kg: number;
+  avgCO2PerTrip: number;
+  electricVehiclePercent: number;
+  ecoRating: number;
+}
+
+export default function EcoPage() {
+  const [routeFrom, setRouteFrom] = useState("New York");
+  const [routeTo, setRouteTo] = useState("Boston");
+
+  const { data: ecoCompanies = [] } = useQuery<CompanyEcoStats[]>({
+    queryKey: ["/api/eco/companies"],
+  });
+
+  const getRatingColor = (rating: number): string => {
+    if (rating >= 9) return "bg-green-600";
+    if (rating >= 7) return "bg-yellow-600";
+    return "bg-orange-600";
+  };
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold font-[Outfit] flex items-center gap-2">
+            <Leaf className="w-8 h-8 text-green-600" />
+            Eco-Friendly Transport
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Calculate emissions, choose eco routes, and find green companies
+          </p>
+        </div>
+
+        <Tabs defaultValue="calculator" className="space-y-6">
+          <TabsList className="grid w-full md:w-auto md:inline-grid grid-cols-3">
+            <TabsTrigger value="calculator">Calculator</TabsTrigger>
+            <TabsTrigger value="routing">Eco Routing</TabsTrigger>
+            <TabsTrigger value="companies">Green Companies</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="calculator" className="space-y-6">
+            <EcoCalculator distance={150} />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Why Track CO₂ Emissions?</CardTitle>
+                <CardDescription>Understanding environmental impact</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <TrendingDown className="w-5 h-5 text-green-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium">Reduce Your Carbon Footprint</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Make informed decisions about transport methods and contribute to a cleaner environment
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Award className="w-5 h-5 text-green-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium">Support Sustainable Companies</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Choose logistics partners committed to eco-friendly practices and electric vehicles
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="routing" className="space-y-6">
+            <EcoRouting from={routeFrom} to={routeTo} />
+          </TabsContent>
+
+          <TabsContent value="companies" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5" />
+                  Eco-Friendly Companies
+                </CardTitle>
+                <CardDescription>
+                  Companies ranked by environmental performance
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {ecoCompanies
+                    .sort((a, b) => b.ecoRating - a.ecoRating)
+                    .map((company, index) => (
+                      <Card key={company.id} className="hover-elevate">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted font-bold">
+                                {index + 1}
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-semibold">{company.name}</h4>
+                                <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                                  <span>{company.totalTrips.toLocaleString()} trips</span>
+                                  <span>Avg {company.avgCO2PerTrip.toFixed(1)} kg CO₂/trip</span>
+                                  <span className="text-green-600">
+                                    {company.electricVehiclePercent}% EV fleet
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <Badge className={`${getRatingColor(company.ecoRating)} text-white text-base px-3 py-1`}>
+                              {company.ecoRating}/10
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}

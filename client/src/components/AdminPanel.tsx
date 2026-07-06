@@ -1,0 +1,419 @@
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Package, TrendingUp, AlertCircle, User, DollarSign } from "lucide-react";
+import { format } from "date-fns";
+import type { Booking, Service } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
+  pending: "secondary",
+  assigned: "default",
+  "in-transit": "default",
+  delivered: "default",
+  cancelled: "destructive",
+};
+
+export default function AdminPanel() {
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const { toast } = useToast();
+
+  const { data: bookings = [], isLoading: loadingBookings } = useQuery<Booking[]>({
+    queryKey: ["/api/bookings"],
+    queryFn: async () => {
+      const response = await fetch("/api/bookings");
+      if (!response.ok) throw new Error("Failed to fetch bookings");
+      return response.json();
+    },
+  });
+
+  const { data: services = [], isLoading: loadingServices } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+
+  const { data: users = [] } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+    queryFn: async () => {
+      const response = await fetch("/api/users");
+      if (!response.ok) return [];
+      return response.json();
+    },
+  });
+
+  const drivers = users.filter(u => u.role === "driver" || u.role === "admin");
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ bookingId, status }: { bookingId: string; status: string }) => {
+      const response = await apiRequest("PATCH", `/api/bookings/${bookingId}/status`, { status });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      toast({
+        title: "Status updated",
+        description: "Booking status has been updated successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Update failed",
+        description: "Unable to update status. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const assignDriverMutation = useMutation({
+    mutationFn: async ({ bookingId, driverId }: { bookingId: string; driverId: string }) => {
+      const response = await apiRequest("PATCH", `/api/bookings/${bookingId}/driver`, { driverId });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      toast({
+        title: "Driver assigned",
+        description: "Driver has been assigned to the booking successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Assignment failed",
+        description: "Unable to assign driver. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredBookings = selectedStatus === "all"
+    ? bookings
+    : bookings.filter((b) => b.status === selectedStatus);
+
+  const stats = {
+    total: bookings.length,
+    pending: bookings.filter((b) => b.status === "pending").length,
+    inTransit: bookings.filter((b) => b.status === "in-transit").length,
+    delivered: bookings.filter((b) => b.status === "delivered").length,
+    revenue: bookings
+      .filter((b) => b.status === "delivered")
+      .reduce((sum, b) => sum + parseFloat(b.totalPrice), 0),
+  };
+
+  if (loadingBookings || loadingServices) {
+    return (
+      <div className="space-y-4">
+        <div className="h-10 bg-muted rounded w-64 animate-pulse" />
+        <div className="grid gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-48 bg-muted rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground font-[Outfit]">Admin Panel</h1>
+        <p className="text-muted-foreground mt-1">
+          Manage bookings, services, and operations
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Package className="w-8 h-8 text-primary" />
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">Total Bookings</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-8 h-8 text-yellow-500" />
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
+                <p className="text-xs text-muted-foreground">Pending</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <TrendingUp className="w-8 h-8 text-primary" />
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats.inTransit}</p>
+                <p className="text-xs text-muted-foreground">In Transit</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Package className="w-8 h-8 text-green-500" />
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats.delivered}</p>
+                <p className="text-xs text-muted-foreground">Delivered</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <DollarSign className="w-8 h-8 text-green-500" />
+              <div>
+                <p className="text-2xl font-bold text-foreground">${stats.revenue.toFixed(0)}</p>
+                <p className="text-xs text-muted-foreground">Revenue</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="bookings" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="bookings" data-testid="tab-bookings">Bookings</TabsTrigger>
+          <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
+          <TabsTrigger value="drivers" data-testid="tab-drivers">Drivers</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="bookings" className="space-y-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex-1">
+              <Label htmlFor="status-filter">Filter by Status</Label>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger id="status-filter" data-testid="select-status-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Bookings</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="assigned">Assigned</SelectItem>
+                  <SelectItem value="in-transit">In Transit</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {filteredBookings.length === 0 && (
+              <Card>
+                <CardContent className="pt-6 text-center text-muted-foreground">
+                  No bookings found
+                </CardContent>
+              </Card>
+            )}
+
+            {filteredBookings.map((booking) => (
+              <Card key={booking.id} data-testid={`admin-card-booking-${booking.id}`}>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <CardTitle className="text-lg">
+                          #{booking.id.substring(0, 8)}
+                        </CardTitle>
+                        <Badge variant={statusColors[booking.status]} className="capitalize">
+                          {booking.status.replace("-", " ")}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Created {format(new Date(booking.createdAt), "PPP")}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-accent">${booking.totalPrice}</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground mb-1">Pickup</p>
+                      <p className="font-medium">{booking.pickupAddress}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-1">Delivery</p>
+                      <p className="font-medium">{booking.deliveryAddress}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-1">Pickup Date</p>
+                      <p className="font-medium">
+                        {format(new Date(booking.pickupDate), "MMM d, yyyy")}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-1">Distance</p>
+                      <p className="font-medium">{booking.estimatedDistance} miles</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2 border-t flex-wrap">
+                    <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                      <Label htmlFor={`status-${booking.id}`} className="text-sm">
+                        Status:
+                      </Label>
+                      <Select
+                        value={booking.status}
+                        onValueChange={(status) =>
+                          updateStatusMutation.mutate({ bookingId: booking.id, status })
+                        }
+                      >
+                        <SelectTrigger
+                          id={`status-${booking.id}`}
+                          className="w-[140px]"
+                          data-testid={`select-status-${booking.id}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="assigned">Assigned</SelectItem>
+                          <SelectItem value="in-transit">In Transit</SelectItem>
+                          <SelectItem value="delivered">Delivered</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                      <Label htmlFor={`driver-${booking.id}`} className="text-sm">
+                        Driver:
+                      </Label>
+                      <Select
+                        value={booking.driverId || "unassigned"}
+                        onValueChange={(driverId) => {
+                          if (driverId !== "unassigned") {
+                            assignDriverMutation.mutate({ bookingId: booking.id, driverId });
+                          }
+                        }}
+                      >
+                        <SelectTrigger
+                          id={`driver-${booking.id}`}
+                          className="w-[140px]"
+                          data-testid={`select-driver-${booking.id}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {drivers.map((driver) => (
+                            <SelectItem key={driver.id} value={driver.id}>
+                              {driver.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="services" className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            {services.map((service) => (
+              <Card key={service.id} data-testid={`admin-card-service-${service.id}`}>
+                <CardHeader>
+                  <CardTitle className="text-lg">{service.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">{service.description}</p>
+                  <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Base Price</p>
+                      <p className="text-lg font-bold text-foreground">${service.basePrice}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Per Mile</p>
+                      <p className="text-lg font-bold text-foreground">${service.pricePerMile}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="drivers" className="space-y-4">
+          {drivers.length === 0 && (
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No drivers available</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Create driver accounts to assign them to bookings
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid md:grid-cols-3 gap-4">
+            {drivers.map((driver) => {
+              const assignedBookings = bookings.filter(b => b.driverId === driver.id);
+              const activeBookings = assignedBookings.filter(
+                b => b.status === "assigned" || b.status === "in-transit"
+              );
+              
+              return (
+                <Card key={driver.id} data-testid={`admin-card-driver-${driver.id}`}>
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="w-6 h-6 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{driver.name}</CardTitle>
+                        <p className="text-sm text-muted-foreground">{driver.email || driver.phone}</p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Total Jobs</p>
+                        <p className="text-2xl font-bold text-foreground">{assignedBookings.length}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Active</p>
+                        <p className="text-2xl font-bold text-primary">{activeBookings.length}</p>
+                      </div>
+                    </div>
+                    <Badge variant={activeBookings.length > 0 ? "default" : "secondary"}>
+                      {activeBookings.length > 0 ? "Busy" : "Available"}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

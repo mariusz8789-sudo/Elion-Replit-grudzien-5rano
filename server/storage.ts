@@ -42,7 +42,7 @@ import {
   apiKeys, webhookSubscriptions, webhookDeliveries
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, or, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, or, gte, lte, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { encryptSecret, decryptSecret } from "./lib/crypto";
 
@@ -257,7 +257,7 @@ export class DbStorage implements IStorage {
 
   // === COMPANY OPERATIONS ===
   async getAllCompanies(): Promise<Company[]> {
-    return await db.select().from(companies);
+    return await db.select().from(companies).limit(500);
   }
 
   async getCompany(id: string): Promise<Company | undefined> {
@@ -290,7 +290,7 @@ export class DbStorage implements IStorage {
 
   // === DRIVER OPERATIONS ===
   async getAllDrivers(): Promise<Driver[]> {
-    return await db.select().from(drivers);
+    return await db.select().from(drivers).limit(500);
   }
 
   async getDriver(id: string): Promise<Driver | undefined> {
@@ -347,7 +347,7 @@ export class DbStorage implements IStorage {
 
   // === BOOKING OPERATIONS ===
   async getAllBookings(): Promise<Booking[]> {
-    return await db.select().from(bookings).orderBy(desc(bookings.createdAt));
+    return await db.select().from(bookings).orderBy(desc(bookings.createdAt)).limit(500);
   }
 
   async getBooking(id: string): Promise<Booking | undefined> {
@@ -463,39 +463,55 @@ export class DbStorage implements IStorage {
   }
 
   async acceptOffer(offerId: string): Promise<Offer | undefined> {
-    // Get the offer to be accepted
-    const offerResult = await db.select().from(offers).where(eq(offers.id, offerId));
-    const offer = offerResult[0];
-    
-    if (!offer) {
-      return undefined;
-    }
+    return await db.transaction(async (tx) => {
+      // Get the offer to be accepted
+      const offerResult = await tx.select().from(offers).where(eq(offers.id, offerId));
+      const offer = offerResult[0];
 
-    // Update the offer status to accepted
-    const updatedOffer = await db.update(offers)
-      .set({ status: "accepted" })
-      .where(eq(offers.id, offerId))
-      .returning();
+      if (!offer) {
+        return undefined;
+      }
 
-    // Reject all other offers for the same booking
-    await db.update(offers)
-      .set({ status: "rejected" })
-      .where(and(
-        eq(offers.bookingId, offer.bookingId),
-        sql`${offers.id} != ${offerId}`
-      ));
+      // Update the offer status to accepted
+      const updatedOffer = await tx.update(offers)
+        .set({ status: "accepted" })
+        .where(eq(offers.id, offerId))
+        .returning();
 
-    // Update the booking with the accepted offer details
-    if (offer.companyId && offer.driverId && offer.vehicleId) {
-      await this.assignCompanyToBooking(
-        offer.bookingId,
-        offer.companyId,
-        offer.driverId,
-        offer.vehicleId
-      );
-    }
+      // Reject all other offers for the same booking
+      await tx.update(offers)
+        .set({ status: "rejected" })
+        .where(and(
+          eq(offers.bookingId, offer.bookingId),
+          sql`${offers.id} != ${offerId}`
+        ));
 
-    return updatedOffer[0];
+      // Update the booking with the accepted offer details, in the same transaction so a
+      // failed assignment (bad driver/vehicle) rolls back the offer status changes too.
+      if (offer.companyId && offer.driverId && offer.vehicleId) {
+        const driverResult = await tx.select().from(drivers).where(eq(drivers.id, offer.driverId));
+        const driver = driverResult[0];
+        if (!driver || driver.companyId !== offer.companyId) {
+          throw new Error("Driver not found or does not belong to this company");
+        }
+        const vehicleResult = await tx.select().from(vehicles).where(eq(vehicles.id, offer.vehicleId));
+        const vehicle = vehicleResult[0];
+        if (!vehicle || vehicle.companyId !== offer.companyId) {
+          throw new Error("Vehicle not found or does not belong to this company");
+        }
+        await tx.update(bookings)
+          .set({
+            companyId: offer.companyId,
+            driverId: offer.driverId,
+            vehicleId: offer.vehicleId,
+            status: "accepted",
+            updatedAt: new Date(),
+          })
+          .where(eq(bookings.id, offer.bookingId));
+      }
+
+      return updatedOffer[0];
+    });
   }
 
   async rejectOffer(offerId: string): Promise<Offer | undefined> {
@@ -919,13 +935,38 @@ export class DbStorage implements IStorage {
   async findAvailableDrivers(companyId: string, when: Date): Promise<Driver[]> {
     const companyDrivers = await db.select().from(drivers)
       .where(and(eq(drivers.companyId, companyId), eq(drivers.available, true)));
-    const results: Driver[] = [];
-    for (const driver of companyDrivers) {
-      if (await this.isDriverAvailableAt(driver.id, when)) {
-        results.push(driver);
-      }
+    if (companyDrivers.length === 0) return [];
+
+    const driverIds = companyDrivers.map((d) => d.id);
+    const dayOfWeek = when.getDay();
+    const hhmm = `${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}`;
+
+    const [timeOffRows, availabilityRows] = await Promise.all([
+      db.select().from(driverTimeOff).where(and(
+        inArray(driverTimeOff.driverId, driverIds),
+        lte(driverTimeOff.startDate, when),
+        gte(driverTimeOff.endDate, when),
+      )),
+      db.select().from(driverAvailability).where(and(
+        inArray(driverAvailability.driverId, driverIds),
+        eq(driverAvailability.dayOfWeek, dayOfWeek),
+        eq(driverAvailability.active, true),
+      )),
+    ]);
+
+    const onTimeOff = new Set(timeOffRows.map((r) => r.driverId));
+    const slotsByDriver = new Map<string, typeof availabilityRows>();
+    for (const slot of availabilityRows) {
+      if (!slotsByDriver.has(slot.driverId)) slotsByDriver.set(slot.driverId, []);
+      slotsByDriver.get(slot.driverId)!.push(slot);
     }
-    return results;
+
+    return companyDrivers.filter((driver) => {
+      if (onTimeOff.has(driver.id)) return false;
+      const slots = slotsByDriver.get(driver.id);
+      if (!slots || slots.length === 0) return true; // no configured schedule = assume available
+      return slots.some((s) => hhmm >= s.startTime && hhmm <= s.endTime);
+    });
   }
 
   // === CALENDAR SYNC CONNECTIONS ===

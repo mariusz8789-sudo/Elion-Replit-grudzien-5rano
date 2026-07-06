@@ -299,6 +299,30 @@ export function setupWebSocket(app: Express, httpServer: HTTPServer, storageInst
         sender.send(JSON.stringify({ type: "error", message: "targetUserId and callType are required" }));
         return;
       }
+
+      // Calls are always placed from a booking's chat; require the sender and callee to both
+      // be a party to that booking (customer, assigned driver, or admin) before ringing anyone.
+      if (!message.bookingId) {
+        sender.send(JSON.stringify({ type: "error", message: "bookingId is required" }));
+        return;
+      }
+      const callBooking = await storageInstance.getBooking(message.bookingId);
+      if (!callBooking) {
+        sender.send(JSON.stringify({ type: "error", message: "Booking not found" }));
+        return;
+      }
+      const bookingUserIds = new Set([callBooking.userId]);
+      if (callBooking.driverId) {
+        const bookingDriver = await storageInstance.getDriver(callBooking.driverId);
+        if (bookingDriver) bookingUserIds.add(bookingDriver.userId);
+      }
+      const senderIsParty = bookingUserIds.has(sender.userId);
+      const targetIsParty = bookingUserIds.has(message.targetUserId);
+      if (!senderIsParty || !targetIsParty) {
+        sender.send(JSON.stringify({ type: "error", message: "Not authorized to call this user for this booking" }));
+        return;
+      }
+
       const call = await storageInstance.createCall({
         bookingId: message.bookingId,
         callerId: sender.userId,

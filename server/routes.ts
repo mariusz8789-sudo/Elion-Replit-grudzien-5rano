@@ -20,13 +20,14 @@ import {
   offers, marketplaceListings, sharedRides, rideBookings, companies, bookings, drivers, vehicles,
   staffSharing, resourceSharing, announcements, users, trackingUpdates, messages
 } from "@shared/schema";
-import type { User } from "@shared/schema";
+import type { User, Booking } from "@shared/schema";
 import { getCalendarSyncProvider, type CalendarProvider } from "./services/calendarSync";
 import { getCargoRecognitionProvider } from "./services/cargoRecognition";
 import { getTranslationProvider } from "./services/translation";
 import { checkGpsAnomaly, checkDuplicateAccount, scoreAndRecordUserRisk } from "./services/fraud";
 import { dispatchWebhookEvent } from "./services/webhooks";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
+import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
 import rateLimit from "express-rate-limit";
 
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {
@@ -35,6 +36,16 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   }
   res.status(401).json({ message: "Unauthorized" });
 };
+
+const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (req.isAuthenticated() && (req.user as User).role === "admin") {
+    return next();
+  }
+  res.status((req.user as User | undefined) ? 403 : 401).json({ message: (req.user as User | undefined) ? "Admin access required" : "Unauthorized" });
+};
+
+const userCanAccessBooking = (user: User, booking: Booking) =>
+  userCanAccessBookingImpl(user, booking, (id) => storage.getDriver(id));
 
 // Credential-stuffing / brute-force guard: tighter than the general /api limiter,
 // keyed by IP + email/phone so a single attacker can't burn through many accounts
@@ -224,7 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/companies/:id/verify", async (req, res) => {
+  app.patch("/api/companies/:id/verify", requireAdmin, async (req, res) => {
     const { verified } = req.body;
     const company = await storage.verifyCompany(req.params.id, verified);
     if (!company) {
@@ -335,8 +346,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === BOOKING ROUTES ===
   app.get("/api/bookings", requireAuth, async (req, res) => {
-    const bookings = await storage.getAllBookings();
-    res.json(bookings);
+    const user = req.user as User;
+    if (user.role === "admin") {
+      return res.json(await storage.getAllBookings());
+    }
+    if (user.companyId) {
+      return res.json(await storage.getCompanyBookings(user.companyId));
+    }
+    res.json(await storage.getUserBookings(user.id));
   });
 
   app.get("/api/bookings/public", async (req, res) => {
@@ -349,15 +366,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
+    const user = req.user as User;
+    if (!(await userCanAccessBooking(user, booking))) {
+      return res.status(403).json({ message: "Not authorized to view this booking" });
+    }
     res.json(booking);
   });
 
   app.get("/api/users/:userId/bookings", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.id !== req.params.userId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
     const bookings = await storage.getUserBookings(req.params.userId);
     res.json(bookings);
   });
 
   app.get("/api/companies/:companyId/bookings", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
     const bookings = await storage.getCompanyBookings(req.params.companyId);
     res.json(bookings);
   });
@@ -423,6 +452,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const existing = await storage.getBooking(req.params.id);
     if (!existing) {
       return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // Only the assigned company/driver or an admin may drive status transitions
+    // (the customer who placed the booking can view it, but not advance its status).
+    const user = req.user as User;
+    const isAssignedDriver = existing.driverId
+      ? (await storage.getDriver(existing.driverId))?.userId === user.id
+      : false;
+    if (user.role !== "admin" && user.companyId !== existing.companyId && !isAssignedDriver) {
+      return res.status(403).json({ message: "Not authorized to update this booking" });
     }
 
     const booking = await storage.updateBookingStatus(req.params.id, status);
@@ -563,8 +602,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === OFFER ROUTES ===
   app.get("/api/bookings/:bookingId/offers", requireAuth, async (req, res) => {
-    const offers = await storage.getBookingOffers(req.params.bookingId);
-    res.json(offers);
+    const booking = await storage.getBooking(req.params.bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    const user = req.user as User;
+    const bookingOffers = await storage.getBookingOffers(req.params.bookingId);
+    // The customer deciding on bids (or an admin) sees every offer; a bidding company
+    // only sees its own offer(s), keeping competitors' bid prices private.
+    if (user.role === "admin" || user.id === booking.userId) {
+      return res.json(bookingOffers);
+    }
+    if (user.companyId) {
+      return res.json(bookingOffers.filter((o) => o.companyId === user.companyId));
+    }
+    res.status(403).json({ message: "Not authorized to view these offers" });
   });
 
   app.post("/api/offers", requireAuth, async (req, res) => {
@@ -654,6 +706,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === MESSAGE ROUTES ===
   app.get("/api/bookings/:bookingId/messages", requireAuth, async (req, res) => {
+    const booking = await storage.getBooking(req.params.bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    if (!(await userCanAccessBooking(req.user as User, booking))) {
+      return res.status(403).json({ message: "Not authorized to view these messages" });
+    }
     const messages = await storage.getBookingMessages(req.params.bookingId);
     res.json(messages);
   });
@@ -701,6 +760,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === ATTACHMENT ROUTES ===
   app.get("/api/bookings/:bookingId/attachments", requireAuth, async (req, res) => {
+    const booking = await storage.getBooking(req.params.bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    if (!(await userCanAccessBooking(req.user as User, booking))) {
+      return res.status(403).json({ message: "Not authorized to view these attachments" });
+    }
     const attachments = await storage.getBookingAttachments(req.params.bookingId);
     res.json(attachments);
   });
@@ -967,6 +1033,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === TRACKING ROUTES ===
   app.get("/api/bookings/:bookingId/tracking", requireAuth, async (req, res) => {
+    const booking = await storage.getBooking(req.params.bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    if (!(await userCanAccessBooking(req.user as User, booking))) {
+      return res.status(403).json({ message: "Not authorized to view this booking's tracking" });
+    }
     const tracking = await storage.getBookingTracking(req.params.bookingId);
     res.json(tracking);
   });
@@ -983,6 +1056,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === NOTIFICATION ROUTES ===
   app.get("/api/users/:userId/notifications", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.id !== req.params.userId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
     const notifications = await storage.getUserNotifications(req.params.userId);
     res.json(notifications);
   });
@@ -1305,9 +1382,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).send("No signature");
     }
 
+    if (!req.rawBody) {
+      return res.status(400).send("Missing raw request body");
+    }
+
     try {
       const event = stripe.webhooks.constructEvent(
-        req.body,
+        req.rawBody,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET || ""
       );
@@ -1826,16 +1907,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const revoked = await storage.revokeApiKey(req.params.id, req.params.companyId);
     if (!revoked) return res.status(404).json({ message: "API key not found" });
     res.status(204).send();
-  });
-
-  // === DOWNLOAD CODE EXPORT ===
-  app.get("/download-code", (req, res) => {
-    const filePath = "/home/runner/workspace/code-export.txt";
-    res.download(filePath, "point-to-point-code.txt", (err) => {
-      if (err) {
-        res.status(500).json({ message: "File download failed" });
-      }
-    });
   });
 
   const httpServer = createServer(app);

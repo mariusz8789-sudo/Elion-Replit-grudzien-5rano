@@ -95,6 +95,23 @@ adding a provider means implementing the interface, not rewriting call sites. Th
 - **Production CSP**: helmet's Content-Security-Policy is explicitly scoped in production (script/style/img/connect/
   frame allowlists for Stripe.js, Mapbox, and `wss:` WebSocket traffic) rather than left at helmet's restrictive
   default, which would otherwise silently block Stripe Elements, map tiles, and live tracking/chat.
+- **Stripe webhook signature verification**: the JSON body parser now preserves the raw request bytes
+  (`req.rawBody`) via a `verify` callback so `/api/stripe-webhook` can pass the exact payload Stripe signed to
+  `stripe.webhooks.constructEvent` — verifying against the re-serialized JSON object would always fail the
+  signature check.
+- **Booking authorization (IDOR hardening)**: booking reads and sub-resources (details, messages, attachments,
+  tracking, offers, status updates) now check that the caller is the customer who placed the booking, the
+  assigned company/driver, or an admin (`server/lib/authz.ts`) before returning data — previously any
+  authenticated user could read or mutate any other user's bookings by ID. `GET /api/bookings` now scopes to the
+  caller's own bookings (or their company's) instead of returning every booking in the system, and
+  `PATCH /api/companies/:id/verify` now requires an admin.
+- **Removed a leftover unauthenticated debug endpoint** (`GET /download-code`) that served a source-export file
+  with no auth check.
+- **Transactional offer acceptance**: `acceptOffer` now runs the offer-accept, reject-competing-offers, and
+  booking-assignment writes in a single DB transaction so a failed assignment can't leave the offer table and
+  the booking in an inconsistent state.
+- **Graceful shutdown & health check**: the server now exposes `GET /health` for liveness/readiness probes and
+  handles `SIGTERM`/`SIGINT` by draining in-flight requests and closing the DB pool before exiting.
 
 ## Deployment
 

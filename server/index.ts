@@ -11,12 +11,19 @@ import { passport } from "./auth";
 import { setupWebSocket } from "./socket";
 import { storage } from "./storage";
 import { partnerApi } from "./partnerApi";
+import { pool } from "./db";
 
 const app = express();
 const PgSession = connectPgSimple(session);
 
 // Trust proxy for proper rate limiting behind reverse proxy
 app.set('trust proxy', 1);
+
+// Liveness/readiness probe: cheap, unauthenticated, ahead of rate limiting and session
+// middleware so orchestrators (k8s, Render, etc.) can poll it without side effects.
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok", uptime: process.uptime() });
+});
 
 app.use(helmet({
   contentSecurityPolicy: env.NODE_ENV === "production" ? {
@@ -69,7 +76,14 @@ const apiLimiter = rateLimit({
 
 app.use("/api", apiLimiter);
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({
+  limit: "10mb",
+  verify: (req, _res, buf) => {
+    // Preserve the raw body so the Stripe webhook route can verify its signature;
+    // Stripe's constructEvent requires the exact bytes, not the re-serialized JSON.
+    (req as express.Request).rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
 const pgSessionStore = new PgSession({
@@ -180,4 +194,32 @@ app.use("/partner/v1", partnerApi);
   }, () => {
     log(`serving on port ${port}`);
   });
+
+  let shuttingDown = false;
+  const shutdown = (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log(`${signal} received: draining connections and shutting down`);
+
+    // Force-exit if graceful drain hangs (e.g. a stuck WebSocket connection).
+    const forceExitTimer = setTimeout(() => {
+      console.error("Graceful shutdown timed out; forcing exit");
+      process.exit(1);
+    }, 10_000);
+    forceExitTimer.unref();
+
+    server.close(async (err) => {
+      if (err) console.error("Error while closing HTTP server:", err);
+      try {
+        await pool.end();
+      } catch (poolErr) {
+        console.error("Error closing DB pool:", poolErr);
+      }
+      clearTimeout(forceExitTimer);
+      process.exit(err ? 1 : 0);
+    });
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 })();

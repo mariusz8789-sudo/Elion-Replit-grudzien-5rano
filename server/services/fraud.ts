@@ -1,6 +1,6 @@
 import { storage } from "../storage";
 import { db } from "../db";
-import { users, bookings } from "@shared/schema";
+import { users } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 const MAX_PLAUSIBLE_SPEED_KMH = 180; // fastest plausible ground-transport speed

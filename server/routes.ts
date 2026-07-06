@@ -13,22 +13,23 @@ import {
   insertCompanySchema, insertDriverSchema, insertVehicleSchema, insertOfferSchema,
   insertMessageSchema, insertAttachmentSchema, insertReviewSchema,
   insertTrackingUpdateSchema, insertNotificationSchema, insertMarketplaceListingSchema,
-  insertSharedRideSchema, insertRideBookingSchema, insertStaffSharingSchema,
+  insertSharedRideSchema, insertStaffSharingSchema,
   insertResourceSharingSchema, insertAnnouncementSchema, insertCouponSchema,
   insertDriverAvailabilitySchema, insertDriverTimeOffSchema, insertCargoItemSchema,
   insertVerificationDocumentSchema, insertApiKeySchema,
   offers, marketplaceListings, sharedRides, rideBookings, companies, bookings, drivers, vehicles,
-  staffSharing, resourceSharing, announcements, users, trackingUpdates, messages
+  users, messages
 } from "@shared/schema";
 import type { User, Booking } from "@shared/schema";
 import { getCalendarSyncProvider, type CalendarProvider } from "./services/calendarSync";
 import { getCargoRecognitionProvider } from "./services/cargoRecognition";
 import { getTranslationProvider } from "./services/translation";
-import { checkGpsAnomaly, checkDuplicateAccount, scoreAndRecordUserRisk } from "./services/fraud";
+import { checkGpsAnomaly, checkDuplicateAccount } from "./services/fraud";
 import { dispatchWebhookEvent } from "./services/webhooks";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
 import { validateDataUrl } from "./lib/dataUrl";
+import { getBroadcaster } from "./socket";
 import rateLimit from "express-rate-limit";
 
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {
@@ -788,6 +789,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized to message on this booking" });
       }
       const message = await storage.createMessage(messageData);
+      // Push to the booking's WebSocket subscribers (e.g. the other chat participant) so
+      // BookingChat.tsx's live-update listener actually has something to react to.
+      getBroadcaster()?.broadcastToBooking(messageData.bookingId, {
+        type: "message",
+        bookingId: messageData.bookingId,
+      });
       res.status(201).json(message);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -1219,7 +1226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Company access required" });
       }
 
-      const { lenderCompanyId, borrowerCompanyId, ...rest } = req.body;
+      const { lenderCompanyId: _lenderCompanyId, borrowerCompanyId: _borrowerCompanyId, ...rest } = req.body;
       const staffSharingData = insertStaffSharingSchema.parse({
         ...rest,
         lenderCompanyId: user.companyId,
@@ -1279,7 +1286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Company access required" });
       }
 
-      const { providerCompanyId, requesterCompanyId, ...rest } = req.body;
+      const { providerCompanyId: _providerCompanyId, requesterCompanyId: _requesterCompanyId, ...rest } = req.body;
       const resourceData = insertResourceSharingSchema.parse({
         ...rest,
         providerCompanyId: user.companyId,
@@ -1595,7 +1602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           break;
         }
 
-        case "payment_intent.succeeded":
+        case "payment_intent.succeeded": {
           const paymentIntent = event.data.object;
           const bookingId = paymentIntent.metadata.bookingId;
 
@@ -1607,11 +1614,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
           break;
+        }
 
-        case "payment_intent.payment_failed":
+        case "payment_intent.payment_failed": {
           const failedIntent = event.data.object;
           const failedBookingId = failedIntent.metadata.bookingId;
-          
+
           if (failedBookingId) {
             await storage.updateBookingPayment(
               failedBookingId,
@@ -1620,6 +1628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
           break;
+        }
       }
 
       res.json({ received: true });
@@ -1817,7 +1826,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Not authorized" });
     }
     const connections = await storage.getDriverCalendarConnections(req.params.driverId);
-    res.json(connections.map(({ accessTokenEncrypted, refreshTokenEncrypted, ...rest }) => rest));
+    res.json(connections.map(({ accessTokenEncrypted: _at, refreshTokenEncrypted: _rt, ...rest }) => rest));
   });
 
   app.delete("/api/drivers/:driverId/calendar/:provider", requireAuth, async (req, res) => {
@@ -2149,7 +2158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Not authorized" });
     }
     const keys = await storage.getCompanyApiKeys(req.params.companyId);
-    res.json(keys.map(({ keyHash, ...rest }) => rest));
+    res.json(keys.map(({ keyHash: _keyHash, ...rest }) => rest));
   });
 
   app.delete("/api/companies/:companyId/api-keys/:id", requireAuth, async (req, res) => {

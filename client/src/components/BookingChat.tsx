@@ -27,7 +27,6 @@ interface MessageTranslation {
 
 export default function BookingChat({ bookingId, otherUserId }: BookingChatProps) {
   const [message, setMessage] = useState("");
-  const [ws, setWs] = useState<WebSocket | null>(null);
   const [translations, setTranslations] = useState<Record<string, MessageTranslation>>({});
   const [translatingId, setTranslatingId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -67,14 +66,15 @@ export default function BookingChat({ bookingId, otherUserId }: BookingChatProps
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
-    
+    let closedIntentionally = false;
+
     try {
       const websocket = new WebSocket(wsUrl);
-      
+
       websocket.onopen = () => {
-        websocket.send(JSON.stringify({ 
-          type: "subscribe", 
-          bookingId 
+        websocket.send(JSON.stringify({
+          type: "subscribe",
+          bookingId
         }));
       };
 
@@ -102,6 +102,10 @@ export default function BookingChat({ bookingId, otherUserId }: BookingChatProps
       };
 
       websocket.onclose = () => {
+        // Skip the reload if this component is unmounting/navigating away — otherwise a
+        // routine unmount (leaving the chat) would still fire a full page reload up to 3s
+        // later, potentially hijacking whatever page the user has since navigated to.
+        if (closedIntentionally) return;
         setTimeout(() => {
           if (bookingId) {
             window.location.reload();
@@ -109,9 +113,8 @@ export default function BookingChat({ bookingId, otherUserId }: BookingChatProps
         }, 3000);
       };
 
-      setWs(websocket);
-
       return () => {
+        closedIntentionally = true;
         websocket.close();
       };
     } catch {
@@ -121,7 +124,7 @@ export default function BookingChat({ bookingId, otherUserId }: BookingChatProps
         variant: "destructive",
       });
     }
-  }, [bookingId]);
+  }, [bookingId, toast]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {

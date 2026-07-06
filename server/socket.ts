@@ -1,7 +1,6 @@
 import { Server as HTTPServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import type { Express } from "express";
-import { parse as parseCookie } from "cookie";
 import type { RequestHandler } from "express";
 import { log } from "./vite";
 import type { IStorage } from "./storage";
@@ -30,6 +29,24 @@ const CALL_MESSAGE_TYPES = new Set([
   "call:reject",
   "call:end",
 ]);
+
+interface Broadcaster {
+  broadcastToBooking(bookingId: string, message: any): void;
+  broadcastToUser(userId: string, message: any): void;
+}
+
+let activeBroadcaster: Broadcaster | null = null;
+
+/**
+ * Lets route handlers (server/routes.ts) push a WebSocket broadcast without a circular
+ * import: setupWebSocket() only runs after registerRoutes() in server/index.ts (it needs the
+ * httpServer that registerRoutes creates), so routes.ts can't receive the broadcaster
+ * directly as a constructor argument. This getter is only ever called at request-handling
+ * time, well after setupWebSocket() has already populated it.
+ */
+export function getBroadcaster(): Broadcaster | null {
+  return activeBroadcaster;
+}
 
 const MAX_MESSAGE_SIZE = 100 * 1024; // 100KB
 const MESSAGE_RATE_LIMIT = 10; // messages per second
@@ -220,7 +237,7 @@ export function setupWebSocket(app: Express, httpServer: HTTPServer, storageInst
                     if (driver && driver.userId === wsAuth.userId) {
                       isAuthorized = true;
                     }
-                  } catch (e) {
+                  } catch {
                     // Driver check failed, continue
                   }
                 }
@@ -393,6 +410,8 @@ export function setupWebSocket(app: Express, httpServer: HTTPServer, storageInst
       candidate: message.candidate,
     });
   }
+
+  activeBroadcaster = { broadcastToBooking, broadcastToUser };
 
   return {
     wss,

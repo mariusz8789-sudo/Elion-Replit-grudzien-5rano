@@ -36,8 +36,6 @@ export default function QuoteForm({ service, onNext, onBack }: QuoteFormProps) {
   const [date, setDate] = useState<Date>();
   const [distance, setDistance] = useState<number>(0);
   const [isCalculating, setIsCalculating] = useState(false);
-  const [pickupCoords, setPickupCoords] = useState<[number, number] | null>(null);
-  const [deliveryCoords, setDeliveryCoords] = useState<[number, number] | null>(null);
   const { toast } = useToast();
   
   const form = useForm<QuoteFormData>({
@@ -76,8 +74,6 @@ export default function QuoteForm({ service, onNext, onBack }: QuoteFormProps) {
           return;
         }
 
-        setPickupCoords(pickupData.coordinates);
-
         // Geocode delivery address
         const deliveryRes = await apiRequest("POST", "/api/geocode", { address: deliveryAddress });
         const deliveryData = await deliveryRes.json();
@@ -91,8 +87,6 @@ export default function QuoteForm({ service, onNext, onBack }: QuoteFormProps) {
           setIsCalculating(false);
           return;
         }
-
-        setDeliveryCoords(deliveryData.coordinates);
 
         // Calculate route distance
         const routeRes = await apiRequest("POST", "/api/calculate-route", {
@@ -108,7 +102,7 @@ export default function QuoteForm({ service, onNext, onBack }: QuoteFormProps) {
           setDistance(Number(routeData.distance.toFixed(1)));
           form.setValue("distance", Number(routeData.distance.toFixed(1)));
         }
-      } catch (error) {
+      } catch {
         toast({
           title: "Error calculating route",
           description: "Please check your addresses and try again.",

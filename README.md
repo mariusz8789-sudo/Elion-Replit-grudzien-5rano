@@ -40,6 +40,7 @@ WebSocket note below.
 - `npm run build` — build the client (Vite) and bundle the server (esbuild) into `dist/`
 - `npm start` — run the production build
 - `npm run check` — TypeScript type-check
+- `npm run lint` — ESLint (flat config, `eslint.config.js`) across the whole repo
 - `npm run test` — run the Vitest unit test suite
 - `npm run db:push` — push the Drizzle schema to the configured database
 
@@ -200,6 +201,19 @@ adding a provider means implementing the interface, not rewriting call sites. Th
   served with a 1-year immutable cache header (`index.html` itself stays `no-cache` so a stale visitor never
   requests a hashed bundle from a previous deploy); and the general API rate limiter is now keyed by authenticated
   user instead of IP alone, so legitimate users behind a shared corporate/carrier NAT don't share one budget.
+- **ESLint added** (`eslint.config.js`, `npm run lint`, wired into CI) — the codebase had no lint tooling at all
+  until this pass. Fixing the errors and dead-code warnings it immediately surfaced found two real bugs:
+  - `LiveTrackingMap` created a brand-new `mapboxgl.Marker` on every tracking update without ever removing the
+    previous one — a memory leak that also visibly stacked multiple truck icons on the map during a long-running
+    delivery. Fixed by storing the marker in a ref and moving it in place instead of recreating it.
+  - `BookingChat`'s "real-time" WebSocket path was dead in both directions: its `onclose` handler scheduled a
+    `window.location.reload()` after 3 seconds unconditionally, including on a normal component unmount (e.g. the
+    user navigating away), which could reload whatever page they'd since navigated to; and nothing on the server
+    ever called `broadcastToBooking` for a new chat message, so the other participant never actually received a
+    live update — messages only appeared for whoever sent them. Both fixed: an intentional-close flag skips the
+    reload on unmount, and `POST /api/messages` now pushes through the pub/sub broadcaster from batch 10.
+  - Also removed a substantial amount of dead code surfaced by the lint pass (unused imports/state/params across
+    ~25 files) and converted two CJS `require()` calls in `tailwind.config.ts` to static imports.
 
 ## Deployment
 

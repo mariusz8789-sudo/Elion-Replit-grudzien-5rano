@@ -11,11 +11,10 @@ interface ImageUploadProps {
   category?: string;
 }
 
-export default function ImageUpload({ 
-  images, 
-  onImagesChange, 
+export default function ImageUpload({
+  images,
+  onImagesChange,
   maxImages = 5,
-  category = "general" 
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

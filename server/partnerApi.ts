@@ -153,7 +153,7 @@ partnerApi.post("/webhooks", requireApiKey, requireScope("webhooks:manage"), asy
 
 partnerApi.get("/webhooks", requireApiKey, requireScope("webhooks:manage"), async (req: PartnerRequest, res) => {
   const subs = await storage.getCompanyWebhookSubscriptions(req.partnerCompanyId!);
-  res.json({ data: subs.map(({ secret, ...rest }) => rest) });
+  res.json({ data: subs.map(({ secret: _secret, ...rest }) => rest) });
 });
 
 partnerApi.delete("/webhooks/:id", requireApiKey, requireScope("webhooks:manage"), async (req: PartnerRequest, res) => {

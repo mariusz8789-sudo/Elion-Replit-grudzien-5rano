@@ -10,7 +10,7 @@ import { CallProvider } from "./lib/CallProvider";
 import PointToPointLanding from "@/components/PointToPointLanding";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { Loader2, LogOut, User } from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import LanguageSelector from "@/components/LanguageSelector";
 import logoPath from "@assets/file_0000000037a86243bd21599fc142fdaa_1760057642535.png";

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,7 +63,7 @@ export default function TrackPage() {
       refetchMessages();
       queryClient.invalidateQueries({ queryKey: ["/api/support", bookingId, "messages"] });
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({
         title: "Failed to send message",
         description: "Please try again.",
@@ -78,10 +78,6 @@ export default function TrackPage() {
     sendMessageMutation.mutate(message);
   };
 
-  const latestLocation = tracking && tracking.length > 0 
-    ? tracking[tracking.length - 1] 
-    : null;
-
   const pickupCoords: [number, number] = booking
     ? [parseFloat(booking.pickupLng as string), parseFloat(booking.pickupLat as string)]
     : [0, 0];
@@ -89,10 +85,6 @@ export default function TrackPage() {
   const deliveryCoords: [number, number] = booking
     ? [parseFloat(booking.deliveryLng as string), parseFloat(booking.deliveryLat as string)]
     : [0, 0];
-
-  const driverCoords: [number, number] = latestLocation
-    ? [parseFloat(latestLocation.lng as string), parseFloat(latestLocation.lat as string)]
-    : pickupCoords;
 
   if (!booking) {
     return (
@@ -169,7 +161,7 @@ export default function TrackPage() {
                     </div>
                   </div>
 
-                  {tracking.map((update, index) => (
+                  {tracking.map((update) => (
                     <div key={update.id} className="flex items-start gap-3">
                       <div className="w-2 h-2 rounded-full bg-blue-500 mt-2" />
                       <div className="flex-1">

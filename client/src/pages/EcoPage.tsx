@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,8 +17,8 @@ interface CompanyEcoStats {
 }
 
 export default function EcoPage() {
-  const [routeFrom, setRouteFrom] = useState("New York");
-  const [routeTo, setRouteTo] = useState("Boston");
+  const routeFrom = "New York";
+  const routeTo = "Boston";
 
   const { data: ecoCompanies = [] } = useQuery<CompanyEcoStats[]>({
     queryKey: ["/api/eco/companies"],

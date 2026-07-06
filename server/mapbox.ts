@@ -1,6 +1,6 @@
-// @ts-ignore
+// @ts-expect-error - @mapbox/mapbox-sdk ships no type declarations for this subpath
 import mbxGeocoding from "@mapbox/mapbox-sdk/services/geocoding";
-// @ts-ignore
+// @ts-expect-error - @mapbox/mapbox-sdk ships no type declarations for this subpath
 import mbxDirections from "@mapbox/mapbox-sdk/services/directions";
 import { env } from "./env";
 

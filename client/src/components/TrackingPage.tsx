@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Package, MapPin, Clock, CheckCircle2, Truck, User } from "lucide-react";
 import { format } from "date-fns";
 import type { Booking } from "@shared/schema";

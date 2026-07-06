@@ -174,7 +174,7 @@ app.use("/partner/v1", partnerApi);
   });
 
   // Setup WebSocket server for real-time messaging and tracking
-  const wsServer = setupWebSocket(app, server, storage);
+  setupWebSocket(app, server, storage);
   log("WebSocket server initialized at /ws");
 
   // importantly only setup vite in development and after

@@ -16,7 +16,7 @@ import {
   type StaffSharing, type InsertStaffSharing,
   type ResourceSharing, type InsertResourceSharing,
   type Announcement, type InsertAnnouncement,
-  type Badge, type InsertBadge, type BadgeAward, type InsertBadgeAward,
+  type Badge, type BadgeAward,
   type Coupon, type InsertCoupon, type CouponRedemption,
   type ReferralReward, type InsertReferralReward,
   type BookingTransfer, type InsertBookingTransfer,

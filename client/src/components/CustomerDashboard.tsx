@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Package, MapPin, Calendar, DollarSign, Search, Truck, AlertCircle, Navigation } from "lucide-react";
+import { Package, MapPin, Calendar, Search, Truck, AlertCircle, Navigation } from "lucide-react";
 import { format } from "date-fns";
 import type { Booking } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";

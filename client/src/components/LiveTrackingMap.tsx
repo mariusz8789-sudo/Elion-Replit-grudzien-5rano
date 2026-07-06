@@ -3,7 +3,7 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation, Truck } from "lucide-react";
+import { Navigation, Truck } from "lucide-react";
 import type { TrackingUpdate } from "@shared/schema";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -16,13 +16,13 @@ interface LiveTrackingMapProps {
 }
 
 export default function LiveTrackingMap({
-  bookingId,
   trackingUpdates,
   pickupCoords,
   deliveryCoords,
 }: LiveTrackingMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const truckMarker = useRef<mapboxgl.Marker | null>(null);
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
 
   useEffect(() => {
@@ -89,6 +89,7 @@ export default function LiveTrackingMap({
 
     return () => {
       map.current?.remove();
+      truckMarker.current = null;
     };
   }, [pickupCoords, deliveryCoords]);
 
@@ -102,15 +103,24 @@ export default function LiveTrackingMap({
       ];
       setCurrentLocation(coords);
 
-      // Add/update truck marker
-      const truckMarker = new mapboxgl.Marker({ color: "#0ea5e9" })
-        .setLngLat(coords)
-        .setPopup(
-          new mapboxgl.Popup().setHTML(
-            `<strong>Current Location</strong><br/>${latest.note || "In transit"}`
+      // Move the existing truck marker instead of creating a new one each update — creating
+      // a fresh marker per tracking update (without ever removing the previous one) leaked a
+      // marker/popup per update and left multiple stacked truck icons on the map.
+      if (truckMarker.current) {
+        truckMarker.current.setLngLat(coords);
+        truckMarker.current.getPopup()?.setHTML(
+          `<strong>Current Location</strong><br/>${latest.note || "In transit"}`
+        );
+      } else {
+        truckMarker.current = new mapboxgl.Marker({ color: "#0ea5e9" })
+          .setLngLat(coords)
+          .setPopup(
+            new mapboxgl.Popup().setHTML(
+              `<strong>Current Location</strong><br/>${latest.note || "In transit"}`
+            )
           )
-        )
-        .addTo(map.current);
+          .addTo(map.current);
+      }
 
       // Pan to current location
       map.current.flyTo({ center: coords, zoom: 13 });

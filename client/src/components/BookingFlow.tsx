@@ -106,7 +106,7 @@ export default function BookingFlow() {
 
         const newUser = await createResponse.json();
         userId = newUser.id;
-      } catch (error) {
+      } catch {
         toast({
           title: "User creation failed",
           description: "Please try again",

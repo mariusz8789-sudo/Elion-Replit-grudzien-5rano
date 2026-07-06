@@ -16,9 +16,14 @@ import {
   type StaffSharing, type InsertStaffSharing,
   type ResourceSharing, type InsertResourceSharing,
   type Announcement, type InsertAnnouncement,
-  users, companies, drivers, vehicles, services, bookings, quotes, offers, 
+  type Badge, type InsertBadge, type BadgeAward, type InsertBadgeAward,
+  type Coupon, type InsertCoupon, type CouponRedemption,
+  type ReferralReward, type InsertReferralReward,
+  type BookingTransfer, type InsertBookingTransfer,
+  users, companies, drivers, vehicles, services, bookings, quotes, offers,
   messages, attachments, reviews, trackingUpdates, notifications,
-  marketplaceListings, staffSharing, resourceSharing, announcements
+  marketplaceListings, staffSharing, resourceSharing, announcements,
+  badges, badgeAwards, coupons, couponRedemptions, referralRewards, bookingTransfers
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -62,7 +67,7 @@ export interface IStorage {
   getCompanyBookings(companyId: string): Promise<Booking[]>;
   getCompanyMonthlyBookingCount(companyId: string): Promise<number>;
   getPublicBookings(): Promise<Booking[]>;
-  createBooking(booking: InsertBooking): Promise<Booking>;
+  createBooking(booking: InsertBooking & { discountAmount?: string }): Promise<Booking>;
   updateBookingStatus(id: string, status: string): Promise<Booking | undefined>;
   cancelBooking(id: string): Promise<Booking | undefined>;
   assignCompanyToBooking(bookingId: string, companyId: string, driverId: string, vehicleId: string): Promise<Booking | undefined>;
@@ -127,6 +132,29 @@ export interface IStorage {
   createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
   incrementAnnouncementViews(id: string): Promise<Announcement | undefined>;
   incrementAnnouncementClicks(id: string): Promise<Announcement | undefined>;
+
+  // Badge / gamification operations
+  getAllBadges(): Promise<Badge[]>;
+  getHolderBadges(holderType: string, holderId: string): Promise<(BadgeAward & { badge: Badge })[]>;
+  awardBadgeIfMissing(holderType: string, holderId: string, badgeCode: string): Promise<BadgeAward | undefined>;
+  checkAndAwardMilestoneBadges(holderType: "company" | "driver", holderId: string): Promise<void>;
+
+  // Leaderboard operations
+  getCompanyLeaderboard(limit?: number): Promise<Company[]>;
+  getDriverLeaderboard(limit?: number): Promise<Driver[]>;
+
+  // Coupon operations
+  getCouponByCode(code: string): Promise<Coupon | undefined>;
+  createCoupon(coupon: InsertCoupon): Promise<Coupon>;
+  redeemCoupon(couponId: string, userId: string, bookingId: string | undefined, discountApplied: string): Promise<CouponRedemption>;
+
+  // Referral operations
+  getReferralRewards(userId: string): Promise<ReferralReward[]>;
+  createReferralReward(reward: InsertReferralReward): Promise<ReferralReward>;
+
+  // Booking transfer operations
+  transferBooking(transfer: InsertBookingTransfer): Promise<BookingTransfer>;
+  getBookingTransfers(bookingId: string): Promise<BookingTransfer[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -283,7 +311,7 @@ export class DbStorage implements IStorage {
       .orderBy(desc(bookings.createdAt));
   }
 
-  async createBooking(insertBooking: InsertBooking): Promise<Booking> {
+  async createBooking(insertBooking: InsertBooking & { discountAmount?: string }): Promise<Booking> {
     const publicLink = randomUUID();
     const result = await db.insert(bookings).values({
       ...insertBooking,
@@ -646,6 +674,116 @@ export class DbStorage implements IStorage {
       .returning();
     return result[0];
   }
+
+  // === BADGE / GAMIFICATION OPERATIONS ===
+  async getAllBadges(): Promise<Badge[]> {
+    return await db.select().from(badges);
+  }
+
+  async getHolderBadges(holderType: string, holderId: string): Promise<(BadgeAward & { badge: Badge })[]> {
+    const rows = await db.select({ award: badgeAwards, badge: badges })
+      .from(badgeAwards)
+      .innerJoin(badges, eq(badgeAwards.badgeId, badges.id))
+      .where(and(eq(badgeAwards.holderType, holderType), eq(badgeAwards.holderId, holderId)))
+      .orderBy(desc(badgeAwards.awardedAt));
+    return rows.map((r) => ({ ...r.award, badge: r.badge }));
+  }
+
+  async awardBadgeIfMissing(holderType: string, holderId: string, badgeCode: string): Promise<BadgeAward | undefined> {
+    const badgeResult = await db.select().from(badges).where(eq(badges.code, badgeCode));
+    const badge = badgeResult[0];
+    if (!badge) return undefined;
+
+    const existing = await db.select().from(badgeAwards).where(and(
+      eq(badgeAwards.holderType, holderType),
+      eq(badgeAwards.holderId, holderId),
+      eq(badgeAwards.badgeId, badge.id),
+    ));
+    if (existing.length > 0) return existing[0];
+
+    const result = await db.insert(badgeAwards).values({ holderType, holderId, badgeId: badge.id }).returning();
+    return result[0];
+  }
+
+  async checkAndAwardMilestoneBadges(holderType: "company" | "driver", holderId: string): Promise<void> {
+    const column = holderType === "company" ? bookings.companyId : bookings.driverId;
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*)::int AS count FROM bookings
+      WHERE ${column} = ${holderId} AND status = 'delivered'
+    `);
+    const completed = Number((countResult.rows[0] as any)?.count ?? 0);
+
+    if (completed >= 100) await this.awardBadgeIfMissing(holderType, holderId, "completed_100");
+    if (completed >= 500) await this.awardBadgeIfMissing(holderType, holderId, "completed_500");
+    if (completed >= 1000) await this.awardBadgeIfMissing(holderType, holderId, "completed_1000");
+
+    if (holderType === "company") {
+      const company = await this.getCompany(holderId);
+      if (company && Number(company.rating) >= 4.8 && (company.totalReviews ?? 0) >= 20) {
+        await this.awardBadgeIfMissing("company", holderId, "super_carrier");
+      }
+    }
+  }
+
+  // === LEADERBOARD OPERATIONS ===
+  async getCompanyLeaderboard(limit = 20): Promise<Company[]> {
+    return await db.select().from(companies)
+      .where(eq(companies.verified, true))
+      .orderBy(desc(companies.rating), desc(companies.totalReviews))
+      .limit(limit);
+  }
+
+  async getDriverLeaderboard(limit = 20): Promise<Driver[]> {
+    return await db.select().from(drivers)
+      .orderBy(desc(drivers.rating), desc(drivers.totalDeliveries))
+      .limit(limit);
+  }
+
+  // === COUPON OPERATIONS ===
+  async getCouponByCode(code: string): Promise<Coupon | undefined> {
+    const result = await db.select().from(coupons).where(eq(coupons.code, code.toUpperCase()));
+    return result[0];
+  }
+
+  async createCoupon(insertCoupon: InsertCoupon): Promise<Coupon> {
+    const result = await db.insert(coupons).values({ ...insertCoupon, code: insertCoupon.code.toUpperCase() }).returning();
+    return result[0];
+  }
+
+  async redeemCoupon(couponId: string, userId: string, bookingId: string | undefined, discountApplied: string): Promise<CouponRedemption> {
+    const result = await db.insert(couponRedemptions).values({ couponId, userId, bookingId, discountApplied }).returning();
+    await db.update(coupons)
+      .set({ timesRedeemed: sql`${coupons.timesRedeemed} + 1` })
+      .where(eq(coupons.id, couponId));
+    return result[0];
+  }
+
+  // === REFERRAL OPERATIONS ===
+  async getReferralRewards(userId: string): Promise<ReferralReward[]> {
+    return await db.select().from(referralRewards)
+      .where(eq(referralRewards.referrerUserId, userId))
+      .orderBy(desc(referralRewards.createdAt));
+  }
+
+  async createReferralReward(reward: InsertReferralReward): Promise<ReferralReward> {
+    const result = await db.insert(referralRewards).values(reward).returning();
+    return result[0];
+  }
+
+  // === BOOKING TRANSFER OPERATIONS ===
+  async transferBooking(transfer: InsertBookingTransfer): Promise<BookingTransfer> {
+    const result = await db.insert(bookingTransfers).values(transfer).returning();
+    await db.update(bookings)
+      .set({ companyId: transfer.toCompanyId, driverId: null, vehicleId: null, updatedAt: new Date() })
+      .where(eq(bookings.id, transfer.bookingId));
+    return result[0];
+  }
+
+  async getBookingTransfers(bookingId: string): Promise<BookingTransfer[]> {
+    return await db.select().from(bookingTransfers)
+      .where(eq(bookingTransfers.bookingId, bookingId))
+      .orderBy(desc(bookingTransfers.createdAt));
+  }
 }
 
 // Seed initial services
@@ -689,7 +827,25 @@ async function seedServices(storage: DbStorage) {
   }
 }
 
+async function seedBadges(storage: DbStorage) {
+  const existingBadges = await storage.getAllBadges();
+  if (existingBadges.length === 0) {
+    const defaultBadges = [
+      { code: "super_carrier", name: "Super Przewoźnik", description: "Rating 4.8+ with at least 20 reviews", icon: "shield-check" },
+      { code: "premium", name: "Premium", description: "Active Premium plan subscriber", icon: "star" },
+      { code: "elite", name: "Elite", description: "Active Enterprise plan subscriber", icon: "crown" },
+      { code: "completed_100", name: "100 Zleceń", description: "Completed 100 bookings", icon: "medal" },
+      { code: "completed_500", name: "500 Zleceń", description: "Completed 500 bookings", icon: "medal" },
+      { code: "completed_1000", name: "1000 Zleceń", description: "Completed 1000 bookings", icon: "trophy" },
+    ];
+    for (const badge of defaultBadges) {
+      await db.insert(badges).values(badge);
+    }
+  }
+}
+
 const storage = new DbStorage();
 seedServices(storage);
+seedBadges(storage);
 
 export { storage };

@@ -7,15 +7,16 @@ import { geocodingClient, directionsClient } from "./mapbox";
 import { passport } from "./auth";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { 
   insertServiceSchema, insertBookingSchema, insertQuoteSchema, insertUserSchema,
   insertCompanySchema, insertDriverSchema, insertVehicleSchema, insertOfferSchema,
   insertMessageSchema, insertAttachmentSchema, insertReviewSchema,
   insertTrackingUpdateSchema, insertNotificationSchema, insertMarketplaceListingSchema,
   insertSharedRideSchema, insertRideBookingSchema, insertStaffSharingSchema,
-  insertResourceSharingSchema, insertAnnouncementSchema,
+  insertResourceSharingSchema, insertAnnouncementSchema, insertCouponSchema,
   offers, marketplaceListings, sharedRides, rideBookings, companies, bookings, drivers, vehicles,
-  staffSharing, resourceSharing, announcements
+  staffSharing, resourceSharing, announcements, users
 } from "@shared/schema";
 import type { User } from "@shared/schema";
 
@@ -30,8 +31,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // === AUTHENTICATION ROUTES ===
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email, phone, password, name } = req.body;
-      
+      const { email, phone, password, name, referralCode } = req.body;
+
       if (!email || !phone || !password || !name) {
         return res.status(400).json({ message: "All fields are required" });
       }
@@ -52,6 +53,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         phone,
         password: hashedPassword,
         name,
+        referralCode: nanoid(8).toUpperCase(),
+        referredByCode: referralCode || undefined,
       });
 
       req.login(user, (err) => {
@@ -341,7 +344,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/bookings", requireAuth, async (req, res) => {
     try {
       const bookingData = insertBookingSchema.parse(req.body);
-      const booking = await storage.createBooking(bookingData);
+      const user = req.user as User;
+
+      let finalPrice = bookingData.totalPrice;
+      let discountAmount: string | undefined;
+
+      if (bookingData.couponCode) {
+        const coupon = await storage.getCouponByCode(bookingData.couponCode);
+        const now = new Date();
+        const amount = Number(bookingData.totalPrice);
+
+        if (!coupon || !coupon.active) {
+          return res.status(400).json({ message: "Invalid coupon code" });
+        }
+        if (coupon.validUntil && new Date(coupon.validUntil) < now) {
+          return res.status(400).json({ message: "This coupon has expired" });
+        }
+        if (coupon.maxRedemptions !== null && (coupon.timesRedeemed ?? 0) >= coupon.maxRedemptions) {
+          return res.status(400).json({ message: "This coupon has reached its redemption limit" });
+        }
+        if (amount < Number(coupon.minBookingAmount ?? 0)) {
+          return res.status(400).json({ message: `Coupon requires a minimum booking amount of ${coupon.minBookingAmount}` });
+        }
+
+        const discount = coupon.discountType === "percent"
+          ? (amount * Number(coupon.discountValue)) / 100
+          : Number(coupon.discountValue);
+        discountAmount = Math.min(discount, amount).toFixed(2);
+        finalPrice = (amount - Number(discountAmount)).toFixed(2);
+      }
+
+      const booking = await storage.createBooking({
+        ...bookingData,
+        totalPrice: finalPrice,
+        discountAmount,
+      });
+
+      if (bookingData.couponCode && discountAmount) {
+        const coupon = await storage.getCouponByCode(bookingData.couponCode);
+        if (coupon) {
+          await storage.redeemCoupon(coupon.id, user.id, booking.id, discountAmount);
+        }
+      }
+
       res.status(201).json(booking);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -353,12 +398,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!status) {
       return res.status(400).json({ message: "Status is required" });
     }
-    
+
+    const existing = await storage.getBooking(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
     const booking = await storage.updateBookingStatus(req.params.id, status);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
+
+    if (status === "delivered") {
+      // Capture the escrowed payment now that the delivery is confirmed
+      if (booking.paymentIntentId && booking.paymentStatus === "authorized") {
+        try {
+          await stripe.paymentIntents.capture(booking.paymentIntentId);
+          await storage.updateBookingPayment(booking.id, booking.paymentIntentId, "captured");
+        } catch (error: any) {
+          console.error("Failed to capture escrowed payment:", error.message);
+        }
+      }
+
+      if (booking.companyId) {
+        await storage.checkAndAwardMilestoneBadges("company", booking.companyId);
+      }
+      if (booking.driverId) {
+        await storage.checkAndAwardMilestoneBadges("driver", booking.driverId);
+      }
+
+      // Credit the referrer on the customer's first delivered booking
+      const bookingCustomer = await storage.getUser(booking.userId);
+      if (bookingCustomer?.referredByCode) {
+        const existingRewards = await storage.getReferralRewards(bookingCustomer.id);
+        const alreadyCredited = existingRewards.some((r) => r.referredUserId === bookingCustomer.id);
+        if (!alreadyCredited) {
+          const referrerResult = await db.select().from(users).where(eq(users.referralCode, bookingCustomer.referredByCode));
+          const referrer = referrerResult[0];
+          if (referrer) {
+            await storage.createReferralReward({
+              referrerUserId: referrer.id,
+              referredUserId: bookingCustomer.id,
+              bookingId: booking.id,
+              amount: "25",
+            });
+          }
+        }
+      }
+    }
+
     res.json(booking);
+  });
+
+  app.post("/api/bookings/:id/transfer", requireAuth, async (req, res) => {
+    try {
+      const { toCompanyId, reason } = req.body;
+      if (!toCompanyId) {
+        return res.status(400).json({ message: "toCompanyId is required" });
+      }
+
+      const booking = await storage.getBooking(req.params.id);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      if (!booking.companyId) {
+        return res.status(400).json({ message: "Booking has no assigned company to transfer from" });
+      }
+
+      const user = req.user as User;
+      if (user.companyId !== booking.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to transfer this booking" });
+      }
+
+      const transfer = await storage.transferBooking({
+        bookingId: booking.id,
+        fromCompanyId: booking.companyId,
+        toCompanyId,
+        transferredBy: user.id,
+        reason,
+      });
+      res.status(201).json(transfer);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/bookings/:id/transfers", requireAuth, async (req, res) => {
+    const transfers = await storage.getBookingTransfers(req.params.id);
+    res.json(transfers);
   });
 
   app.patch("/api/bookings/:id/assign", requireAuth, async (req, res) => {
@@ -991,6 +1118,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: Math.round(amount * 100),
         currency: "usd",
         automatic_payment_methods: { enabled: true },
+        // Escrow: hold the funds on the customer's card and only capture them
+        // once delivery is confirmed (see the "delivered" branch of the booking
+        // status route), or release them automatically if Stripe's hold expires.
+        capture_method: "manual",
         metadata: { bookingId: bookingId || "" },
       });
 
@@ -1062,6 +1193,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === BADGES & LEADERBOARD ROUTES ===
+  app.get("/api/badges", async (_req, res) => {
+    res.json(await storage.getAllBadges());
+  });
+
+  app.get("/api/badges/:holderType/:holderId", async (req, res) => {
+    const { holderType, holderId } = req.params;
+    if (holderType !== "company" && holderType !== "driver") {
+      return res.status(400).json({ message: "holderType must be 'company' or 'driver'" });
+    }
+    res.json(await storage.getHolderBadges(holderType, holderId));
+  });
+
+  app.get("/api/leaderboard/companies", async (req, res) => {
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    res.json(await storage.getCompanyLeaderboard(limit));
+  });
+
+  app.get("/api/leaderboard/drivers", async (req, res) => {
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    res.json(await storage.getDriverLeaderboard(limit));
+  });
+
+  // === COUPON ROUTES ===
+  app.post("/api/coupons", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can create coupons" });
+      }
+      const couponData = insertCouponSchema.parse(req.body);
+      const coupon = await storage.createCoupon(couponData);
+      res.status(201).json(coupon);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/coupons/validate", requireAuth, async (req, res) => {
+    const { code, amount } = req.body;
+    const coupon = await storage.getCouponByCode(String(code || ""));
+    const now = new Date();
+
+    if (!coupon || !coupon.active) {
+      return res.status(404).json({ message: "Invalid coupon code" });
+    }
+    if (coupon.validUntil && new Date(coupon.validUntil) < now) {
+      return res.status(400).json({ message: "This coupon has expired" });
+    }
+    if (coupon.maxRedemptions !== null && (coupon.timesRedeemed ?? 0) >= coupon.maxRedemptions) {
+      return res.status(400).json({ message: "This coupon has reached its redemption limit" });
+    }
+    if (amount !== undefined && Number(amount) < Number(coupon.minBookingAmount ?? 0)) {
+      return res.status(400).json({ message: `Requires a minimum booking amount of ${coupon.minBookingAmount}` });
+    }
+
+    const discount = amount !== undefined
+      ? (coupon.discountType === "percent" ? (Number(amount) * Number(coupon.discountValue)) / 100 : Number(coupon.discountValue))
+      : undefined;
+
+    res.json({ valid: true, coupon, estimatedDiscount: discount });
+  });
+
+  // === REFERRAL ROUTES ===
+  app.get("/api/users/:id/referrals", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.id !== req.params.id && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const target = await storage.getUser(req.params.id);
+    if (!target) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const rewards = await storage.getReferralRewards(req.params.id);
+    res.json({ referralCode: target.referralCode, rewards });
+  });
+
   app.post("/api/stripe-webhook", async (req, res) => {
     const sig = req.headers["stripe-signature"];
     
@@ -1085,6 +1293,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (companyId && plan && planConfig) {
             await storage.upgradeCompanyPlan(companyId, plan, planConfig.monthlyBookingLimit);
+            if (plan === "premium" || plan === "enterprise") {
+              await storage.awardBadgeIfMissing("company", companyId, plan === "enterprise" ? "elite" : "premium");
+            }
+          }
+          break;
+        }
+
+        case "payment_intent.amount_capturable_updated": {
+          // The customer's card has been authorized (escrow hold placed).
+          const authorizedIntent = event.data.object;
+          const authorizedBookingId = authorizedIntent.metadata.bookingId;
+          if (authorizedBookingId) {
+            await storage.updateBookingPayment(authorizedBookingId, authorizedIntent.id, "authorized");
           }
           break;
         }
@@ -1092,7 +1313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         case "payment_intent.succeeded":
           const paymentIntent = event.data.object;
           const bookingId = paymentIntent.metadata.bookingId;
-          
+
           if (bookingId) {
             await storage.updateBookingPayment(
               bookingId,
@@ -1101,7 +1322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
           break;
-        
+
         case "payment_intent.payment_failed":
           const failedIntent = event.data.object;
           const failedBookingId = failedIntent.metadata.bookingId;

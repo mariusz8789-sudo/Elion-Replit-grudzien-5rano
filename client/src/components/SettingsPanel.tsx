@@ -1,10 +1,20 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Eye, MessageSquare, Trash2, Shield, User } from "lucide-react";
+import { Bell, Eye, MessageSquare, Trash2, Shield, User, Gift, Copy } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
+import type { ReferralReward } from "@shared/schema";
+
+interface ReferralData {
+  referralCode: string;
+  rewards: ReferralReward[];
+}
 
 export default function SettingsPanel() {
   const [settings, setSettings] = useState({
@@ -13,9 +23,22 @@ export default function SettingsPanel() {
     webPushEnabled: true,
     autoDelete: "30"
   });
-  
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const { data: referralData } = useQuery<ReferralData>({
+    queryKey: [`/api/users/${user?.id}/referrals`],
+    enabled: !!user?.id,
+  });
+
   const updateSetting = (key: string, value: boolean | string) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const copyReferralCode = () => {
+    if (!referralData?.referralCode) return;
+    navigator.clipboard.writeText(referralData.referralCode);
+    toast({ title: "Copied!", description: "Referral code copied to clipboard." });
   };
   
   return (
@@ -127,6 +150,34 @@ export default function SettingsPanel() {
         </div>
       </Card>
       
+      <Card className="p-6 space-y-4 border-card-border">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <Gift className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-foreground">Refer a Friend</h2>
+            <p className="text-sm text-muted-foreground">
+              Share your code — you earn a reward when they complete their first booking
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Input value={referralData?.referralCode ?? "..."} readOnly className="font-mono" data-testid="input-referral-code" />
+          <Button variant="outline" size="icon" onClick={copyReferralCode} data-testid="button-copy-referral">
+            <Copy className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {referralData && referralData.rewards.length > 0 && (
+          <div className="text-sm text-muted-foreground">
+            {referralData.rewards.filter(r => r.status === "credited").length} credited reward(s) ·{" "}
+            {referralData.rewards.filter(r => r.status === "pending").length} pending
+          </div>
+        )}
+      </Card>
+
       <Card className="p-6 space-y-4 border-card-border">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">

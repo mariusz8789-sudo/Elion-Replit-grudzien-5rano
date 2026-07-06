@@ -25,6 +25,7 @@ import InsurancePage from "@/pages/InsurancePage";
 import CarbonLedger from "@/pages/CarbonLedger";
 import QRDispatch from "@/pages/QRDispatch";
 import Plans from "@/pages/Plans";
+import Leaderboard from "@/pages/Leaderboard";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
@@ -211,6 +212,7 @@ function Router() {
       <Route path="/carbon-ledger" component={CarbonLedger} />
       <Route path="/qr-dispatch" component={QRDispatch} />
       <Route path="/plans" component={Plans} />
+      <Route path="/leaderboard" component={Leaderboard} />
 
       <Route component={LandingPage} />
     </Switch>

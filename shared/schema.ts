@@ -15,6 +15,8 @@ export const users = pgTable("users", {
   accountType: text("account_type").default("b2c"), // b2c (individual), b2b (company)
   avatar: text("avatar"),
   verified: boolean("verified").default(false),
+  referralCode: text("referral_code").unique(),
+  referredByCode: text("referred_by_code"), // referral code of the user who invited them
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -96,8 +98,14 @@ export const bookings = pgTable("bookings", {
   isPublic: boolean("is_public").default(true), // public listing or private link
   publicLink: text("public_link"),
   paymentIntentId: text("payment_intent_id"),
-  paymentStatus: text("payment_status").default("pending"), // pending, authorized, captured, failed
+  paymentStatus: text("payment_status").default("pending"), // pending, authorized, captured, failed, refunded
   co2Emission: decimal("co2_emission", { precision: 10, scale: 2 }), // kg of CO2
+  stops: jsonb("stops").$type<Array<{ type: "pickup" | "dropoff"; address: string; lat?: number; lng?: number; order: number; note?: string }>>(),
+  volumeM3: decimal("volume_m3", { precision: 10, scale: 2 }), // estimated cargo volume in cubic meters
+  contractSignedAt: timestamp("contract_signed_at"),
+  signatureUrl: text("signature_url"), // stored e-signature image
+  couponCode: text("coupon_code"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
@@ -158,8 +166,15 @@ export const reviews = pgTable("reviews", {
   reviewerId: varchar("reviewer_id").notNull().references(() => users.id),
   companyId: varchar("company_id").references(() => companies.id),
   driverId: varchar("driver_id").references(() => drivers.id),
-  rating: integer("rating").notNull(), // 1-5
+  rating: integer("rating").notNull(), // 1-5 overall
   comment: text("comment"),
+  images: text("images").array(), // photos attached to the review
+  punctuality: integer("punctuality"), // 1-5 detailed criteria
+  communication: integer("communication"),
+  safety: integer("safety"),
+  quality: integer("quality"),
+  careHandling: integer("care_handling"),
+  priceRating: integer("price_rating"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -294,6 +309,71 @@ export const announcements = pgTable("announcements", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+// === BADGES / GAMIFICATION ===
+export const badges = pgTable("badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // super_carrier, premium, elite, completed_100, completed_500, completed_1000
+  name: text("name").notNull(),
+  description: text("description"),
+  icon: text("icon").default("award"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const badgeAwards = pgTable("badge_awards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  badgeId: varchar("badge_id").notNull().references(() => badges.id),
+  holderType: text("holder_type").notNull(), // company, driver
+  holderId: varchar("holder_id").notNull(),
+  awardedAt: timestamp("awarded_at").notNull().default(sql`now()`),
+});
+
+// === COUPONS / PROMOTIONS ===
+export const coupons = pgTable("coupons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  discountType: text("discount_type").notNull().default("percent"), // percent, fixed
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  minBookingAmount: decimal("min_booking_amount", { precision: 10, scale: 2 }).default("0"),
+  maxRedemptions: integer("max_redemptions"), // null = unlimited
+  timesRedeemed: integer("times_redeemed").default(0),
+  validFrom: timestamp("valid_from").default(sql`now()`),
+  validUntil: timestamp("valid_until"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const couponRedemptions = pgTable("coupon_redemptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  couponId: varchar("coupon_id").notNull().references(() => coupons.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  bookingId: varchar("booking_id").references(() => bookings.id),
+  discountApplied: decimal("discount_applied", { precision: 10, scale: 2 }).notNull(),
+  redeemedAt: timestamp("redeemed_at").notNull().default(sql`now()`),
+});
+
+// === REFERRAL PROGRAM ===
+export const referralRewards = pgTable("referral_rewards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referrerUserId: varchar("referrer_user_id").notNull().references(() => users.id),
+  referredUserId: varchar("referred_user_id").notNull().references(() => users.id),
+  bookingId: varchar("booking_id").references(() => bookings.id), // qualifying booking that triggered the reward
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull().default("25"),
+  status: text("status").notNull().default("pending"), // pending, credited, cancelled
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  creditedAt: timestamp("credited_at"),
+});
+
+// === BOOKING TRANSFERS (resell/hand off a job to another company) ===
+export const bookingTransfers = pgTable("booking_transfers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull().references(() => bookings.id),
+  fromCompanyId: varchar("from_company_id").notNull().references(() => companies.id),
+  toCompanyId: varchar("to_company_id").notNull().references(() => companies.id),
+  transferredBy: varchar("transferred_by").notNull().references(() => users.id),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 // === INSERT SCHEMAS ===
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -341,10 +421,23 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({
   paymentIntentId: true,
   paymentStatus: true,
   publicLink: true,
+  contractSignedAt: true,
+  signatureUrl: true,
+  discountAmount: true,
 }).extend({
   pickupDate: z.coerce.date(),
   estimatedDistance: z.coerce.string(),
   totalPrice: z.coerce.string(),
+  volumeM3: z.coerce.string().optional(),
+  couponCode: z.string().optional(),
+  stops: z.array(z.object({
+    type: z.enum(["pickup", "dropoff"]),
+    address: z.string(),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+    order: z.number(),
+    note: z.string().optional(),
+  })).optional(),
 });
 
 export const insertQuoteSchema = createInsertSchema(quotes).omit({
@@ -376,6 +469,13 @@ export const insertReviewSchema = createInsertSchema(reviews).omit({
   createdAt: true,
 }).extend({
   rating: z.number().min(1).max(5),
+  punctuality: z.number().min(1).max(5).optional(),
+  communication: z.number().min(1).max(5).optional(),
+  safety: z.number().min(1).max(5).optional(),
+  quality: z.number().min(1).max(5).optional(),
+  careHandling: z.number().min(1).max(5).optional(),
+  priceRating: z.number().min(1).max(5).optional(),
+  images: z.array(z.string()).optional(),
 });
 
 export const insertTrackingUpdateSchema = createInsertSchema(trackingUpdates).omit({
@@ -449,6 +549,38 @@ export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
   endDate: z.coerce.date(),
 });
 
+export const insertBadgeSchema = createInsertSchema(badges).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertBadgeAwardSchema = createInsertSchema(badgeAwards).omit({
+  id: true,
+  awardedAt: true,
+});
+
+export const insertCouponSchema = createInsertSchema(coupons).omit({
+  id: true,
+  createdAt: true,
+  timesRedeemed: true,
+}).extend({
+  discountValue: z.coerce.string(),
+  minBookingAmount: z.coerce.string().optional(),
+  validUntil: z.coerce.date().optional(),
+});
+
+export const insertReferralRewardSchema = createInsertSchema(referralRewards).omit({
+  id: true,
+  createdAt: true,
+  creditedAt: true,
+  status: true,
+});
+
+export const insertBookingTransferSchema = createInsertSchema(bookingTransfers).omit({
+  id: true,
+  createdAt: true,
+});
+
 // === TYPES ===
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -506,3 +638,20 @@ export type ResourceSharing = typeof resourceSharing.$inferSelect;
 
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Announcement = typeof announcements.$inferSelect;
+
+export type InsertBadge = z.infer<typeof insertBadgeSchema>;
+export type Badge = typeof badges.$inferSelect;
+
+export type InsertBadgeAward = z.infer<typeof insertBadgeAwardSchema>;
+export type BadgeAward = typeof badgeAwards.$inferSelect;
+
+export type InsertCoupon = z.infer<typeof insertCouponSchema>;
+export type Coupon = typeof coupons.$inferSelect;
+
+export type CouponRedemption = typeof couponRedemptions.$inferSelect;
+
+export type InsertReferralReward = z.infer<typeof insertReferralRewardSchema>;
+export type ReferralReward = typeof referralRewards.$inferSelect;
+
+export type InsertBookingTransfer = z.infer<typeof insertBookingTransferSchema>;
+export type BookingTransfer = typeof bookingTransfers.$inferSelect;

@@ -28,6 +28,7 @@ export default function BookingFlow() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [quoteData, setQuoteData] = useState<QuoteData | null>(null);
   const [userDetails, setUserDetails] = useState({ name: "", phone: "", email: "" });
+  const [couponCode, setCouponCode] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -142,6 +143,7 @@ export default function BookingFlow() {
       estimatedDistance: quoteData.distance.toString(),
       totalPrice: quoteData.estimatedPrice.toFixed(2),
       co2Emission: co2Emission.toFixed(2),
+      couponCode: couponCode.trim() || undefined,
     });
   };
 
@@ -215,6 +217,17 @@ export default function BookingFlow() {
                 value={userDetails.email}
                 onChange={(e) => setUserDetails({ ...userDetails, email: e.target.value })}
                 data-testid="input-email"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="coupon">Coupon Code (Optional)</Label>
+              <Input
+                id="coupon"
+                placeholder="SAVE10"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                data-testid="input-coupon-code"
               />
             </div>
           </Card>

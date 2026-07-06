@@ -1376,6 +1376,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid plan. Choose basic, premium, or enterprise." });
       }
 
+      // Only redirect back to this same app after checkout, never to an attacker-supplied
+      // external domain: reject any successUrl/cancelUrl that doesn't resolve to our own host.
+      const appOrigin = `${req.protocol}://${req.get("host")}`;
+      const resolveOwnUrl = (raw: unknown, fallbackPath: string): string => {
+        if (typeof raw === "string") {
+          try {
+            const parsed = new URL(raw, appOrigin);
+            if (parsed.host === req.get("host")) {
+              return parsed.toString();
+            }
+          } catch {
+            // fall through to default
+          }
+        }
+        return `${appOrigin}${fallbackPath}`;
+      };
+
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         line_items: [{
@@ -1386,8 +1403,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             unit_amount: planConfig.priceUsd * 100,
           },
         }],
-        success_url: req.body.successUrl || "/console",
-        cancel_url: req.body.cancelUrl || "/plans",
+        success_url: resolveOwnUrl(req.body.successUrl, "/console"),
+        cancel_url: resolveOwnUrl(req.body.cancelUrl, "/plans"),
         metadata: { companyId: company.id, plan },
       });
 

@@ -123,7 +123,7 @@ export interface IStorage {
   // Notification operations
   getUserNotifications(userId: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
-  markNotificationRead(id: string): Promise<Notification | undefined>;
+  markNotificationRead(id: string, userId: string): Promise<Notification | undefined>;
   
   // Marketplace operations
   getAllMarketplaceListings(): Promise<MarketplaceListing[]>;
@@ -633,10 +633,10 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async markNotificationRead(id: string): Promise<Notification | undefined> {
+  async markNotificationRead(id: string, userId: string): Promise<Notification | undefined> {
     const result = await db.update(notifications)
       .set({ read: true })
-      .where(eq(notifications.id, id))
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
       .returning();
     return result[0];
   }

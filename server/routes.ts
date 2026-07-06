@@ -6,7 +6,7 @@ import { stripe } from "./stripe";
 import { geocodingClient, directionsClient } from "./mapbox";
 import { passport } from "./auth";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and, gte, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
   insertServiceSchema, insertBookingSchema, insertQuoteSchema, insertUserSchema,
@@ -263,9 +263,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(drivers);
   });
 
-  app.post("/api/drivers", async (req, res) => {
+  app.post("/api/drivers", requireAuth, async (req, res) => {
     try {
       const driverData = insertDriverSchema.parse(req.body);
+      const user = req.user as User;
+      if (user.companyId !== driverData.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to add a driver for this company" });
+      }
       const driver = await storage.createDriver(driverData);
       res.status(201).json(driver);
     } catch (error: any) {
@@ -273,10 +277,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/drivers/:id/availability", async (req, res) => {
+  app.patch("/api/drivers/:id/availability", requireAuth, async (req, res) => {
     const { available } = req.body;
     if (typeof available !== 'boolean') {
       return res.status(400).json({ message: "Available must be a boolean" });
+    }
+    const existingDriver = await storage.getDriver(req.params.id);
+    if (!existingDriver) {
+      return res.status(404).json({ message: "Driver not found" });
+    }
+    const user = req.user as User;
+    if (
+      user.id !== existingDriver.userId &&
+      user.companyId !== existingDriver.companyId &&
+      user.role !== "admin"
+    ) {
+      return res.status(403).json({ message: "Not authorized to update this driver" });
     }
     const driver = await storage.updateDriverAvailability(req.params.id, available);
     if (!driver) {
@@ -289,16 +305,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/companies/:companyId/vehicles", async (req, res) => {
     const vehicles = await storage.getCompanyVehicles(req.params.companyId);
     res.json(vehicles);
-  });
-
-  app.post("/api/vehicles", async (req, res) => {
-    try {
-      const vehicleData = insertVehicleSchema.parse(req.body);
-      const vehicle = await storage.createVehicle(vehicleData);
-      res.status(201).json(vehicle);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
-    }
   });
 
   // === SERVICE ROUTES ===
@@ -560,7 +566,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!companyId || !driverId || !vehicleId) {
       return res.status(400).json({ message: "Company ID, Driver ID, and Vehicle ID are required" });
     }
-    
+
+    const user = req.user as User;
+    if (user.companyId !== companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized to assign this company to a booking" });
+    }
+
     const booking = await storage.assignCompanyToBooking(req.params.id, companyId, driverId, vehicleId);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -568,12 +579,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(booking);
   });
 
-  app.patch("/api/bookings/:id/payment", requireAuth, async (req, res) => {
+  // Payment status is normally driven exclusively by the Stripe webhook
+  // (/api/stripe-webhook); this manual override exists only for admin reconciliation.
+  app.patch("/api/bookings/:id/payment", requireAdmin, async (req, res) => {
     const { paymentIntentId, paymentStatus } = req.body;
     if (!paymentIntentId || !paymentStatus) {
       return res.status(400).json({ message: "Payment Intent ID and status are required" });
     }
-    
+
     const booking = await storage.updateBookingPayment(req.params.id, paymentIntentId, paymentStatus);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -719,7 +732,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/messages", requireAuth, async (req, res) => {
     try {
-      const messageData = insertMessageSchema.parse(req.body);
+      const user = req.user as User;
+      const messageData = insertMessageSchema.parse({ ...req.body, senderId: user.id });
+      const booking = await storage.getBooking(messageData.bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      if (!(await userCanAccessBooking(user, booking))) {
+        return res.status(403).json({ message: "Not authorized to message on this booking" });
+      }
       const message = await storage.createMessage(messageData);
       res.status(201).json(message);
     } catch (error: any) {
@@ -773,7 +794,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/attachments", requireAuth, async (req, res) => {
     try {
-      const attachmentData = insertAttachmentSchema.parse(req.body);
+      const user = req.user as User;
+      const attachmentData = insertAttachmentSchema.parse({ ...req.body, uploaderId: user.id });
+      const booking = await storage.getBooking(attachmentData.bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      if (!(await userCanAccessBooking(user, booking))) {
+        return res.status(403).json({ message: "Not authorized to upload to this booking" });
+      }
       const attachment = await storage.createAttachment(attachmentData);
       res.status(201).json(attachment);
     } catch (error: any) {
@@ -793,6 +822,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const review = await storage.createReview(reviewData);
       res.status(201).json(review);
     } catch (error: any) {
+      if (error.code === "23505") {
+        return res.status(409).json({ message: "You have already reviewed this booking" });
+      }
       res.status(400).json({ message: error.message });
     }
   });
@@ -964,6 +996,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/vehicles", requireAuth, async (req, res) => {
     try {
       const vehicleData = insertVehicleSchema.parse(req.body);
+      const user = req.user as User;
+      if (user.companyId !== vehicleData.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to add a vehicle for this company" });
+      }
       const result = await db.insert(vehicles).values(vehicleData).returning();
       res.status(201).json(result[0]);
     } catch (error: any) {
@@ -1000,32 +1036,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/carpool/:id/book", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
-      const { seatsBooked, totalPrice } = req.body;
-      
-      const ride = await db.select().from(sharedRides)
-        .where(eq(sharedRides.id, req.params.id))
-        .limit(1);
-      
-      if (!ride[0]) {
-        return res.status(404).json({ message: "Ride not found" });
-      }
-      
-      if (ride[0].availableSeats < seatsBooked) {
-        return res.status(400).json({ message: "Not enough seats available" });
+      const seatsBooked = Number(req.body?.seatsBooked);
+      if (!Number.isInteger(seatsBooked) || seatsBooked < 1) {
+        return res.status(400).json({ message: "seatsBooked must be a positive integer" });
       }
 
-      const booking = await db.insert(rideBookings).values({
-        rideId: req.params.id,
-        passengerId: user.id,
-        seatsBooked,
-        totalPrice,
-      }).returning();
+      const result = await db.transaction(async (tx) => {
+        const ride = await tx.select().from(sharedRides)
+          .where(eq(sharedRides.id, req.params.id))
+          .limit(1);
 
-      await db.update(sharedRides)
-        .set({ availableSeats: ride[0].availableSeats - seatsBooked })
-        .where(eq(sharedRides.id, req.params.id));
+        if (!ride[0]) {
+          return { error: { status: 404, message: "Ride not found" } };
+        }
 
-      res.status(201).json(booking[0]);
+        // Compute the price server-side from the ride's own rate; never trust a
+        // client-supplied totalPrice.
+        const totalPrice = (Number(ride[0].pricePerSeat) * seatsBooked).toFixed(2);
+
+        // Conditional update guards against a seat-count race between concurrent bookings:
+        // the WHERE clause only succeeds if enough seats were still available at write time.
+        const updated = await tx.update(sharedRides)
+          .set({ availableSeats: sql`${sharedRides.availableSeats} - ${seatsBooked}` })
+          .where(and(eq(sharedRides.id, req.params.id), gte(sharedRides.availableSeats, seatsBooked)))
+          .returning();
+
+        if (updated.length === 0) {
+          return { error: { status: 400, message: "Not enough seats available" } };
+        }
+
+        const booking = await tx.insert(rideBookings).values({
+          rideId: req.params.id,
+          passengerId: user.id,
+          seatsBooked,
+          totalPrice,
+        }).returning();
+
+        return { booking: booking[0] };
+      });
+
+      if (result.error) {
+        return res.status(result.error.status).json({ message: result.error.message });
+      }
+      res.status(201).json(result.booking);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -1047,6 +1100,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tracking", requireAuth, async (req, res) => {
     try {
       const trackingData = insertTrackingUpdateSchema.parse(req.body);
+      const booking = await storage.getBooking(trackingData.bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      // Only the assigned company/driver (or an admin) can report GPS updates for a booking;
+      // the customer can view tracking but must not be able to post fabricated locations.
+      const user = req.user as User;
+      const isAssignedDriver = booking.driverId
+        ? (await storage.getDriver(booking.driverId))?.userId === user.id
+        : false;
+      if (user.role !== "admin" && user.companyId !== booking.companyId && !isAssignedDriver) {
+        return res.status(403).json({ message: "Not authorized to report tracking for this booking" });
+      }
       const tracking = await storage.createTrackingUpdate(trackingData);
       res.status(201).json(tracking);
     } catch (error: any) {
@@ -1064,7 +1130,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(notifications);
   });
 
-  app.post("/api/notifications", requireAuth, async (req, res) => {
+  // Not used by the client app: notifications are created server-side (offer received,
+  // status changed, etc.) via storage.createNotification() directly. Admin-only to prevent
+  // an authenticated user from spoofing arbitrary notifications to other users.
+  app.post("/api/notifications", requireAdmin, async (req, res) => {
     try {
       const notificationData = insertNotificationSchema.parse(req.body);
       const notification = await storage.createNotification(notificationData);
@@ -1075,7 +1144,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
-    const notification = await storage.markNotificationRead(req.params.id);
+    const user = req.user as User;
+    const notification = await storage.markNotificationRead(req.params.id, user.id);
     if (!notification) {
       return res.status(404).json({ message: "Notification not found" });
     }

@@ -198,6 +198,7 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 }, (t) => ({
   companyIdIdx: index("reviews_company_id_idx").on(t.companyId),
+  bookingReviewerUnique: unique().on(t.bookingId, t.reviewerId),
 }));
 
 // === TRACKING ===

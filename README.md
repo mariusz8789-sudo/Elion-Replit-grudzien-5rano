@@ -112,6 +112,21 @@ adding a provider means implementing the interface, not rewriting call sites. Th
   the booking in an inconsistent state.
 - **Graceful shutdown & health check**: the server now exposes `GET /health` for liveness/readiness probes and
   handles `SIGTERM`/`SIGINT` by draining in-flight requests and closing the DB pool before exiting.
+- **Real Stripe payment collection**: `PaymentDialog` previously had a hard-coded "demo payment" path that marked
+  a booking as paid without ever charging a card. It's now a real `@stripe/react-stripe-js` `Elements`/
+  `PaymentElement` checkout (`client/src/lib/stripe.ts`) that confirms the manual-capture PaymentIntent created by
+  `/api/create-payment-intent`; payment status is now updated exclusively by the Stripe webhook, and the manual
+  `PATCH /api/bookings/:id/payment` override is admin-only reconciliation, not a client-facing endpoint.
+- **More authorization gaps closed**: removed a duplicate unauthenticated `POST /api/vehicles` route that
+  shadowed the authenticated one; added company/driver ownership checks to `POST /api/drivers`,
+  `PATCH /api/drivers/:id/availability`, `POST /api/vehicles`, `PATCH /api/bookings/:id/assign`, and
+  `POST /api/messages` / `/api/attachments` / `/api/tracking` (which also now force the sender/uploader identity
+  from the session instead of trusting the request body); `POST /api/notifications` and
+  `PATCH /api/notifications/:id/read` no longer let one user spoof or silence another user's notifications.
+- **Data integrity**: `reviews` now has a unique `(bookingId, reviewerId)` constraint so a customer can't submit
+  multiple reviews for the same booking; carpool ride booking (`POST /api/carpool/:id/book`) computes price
+  server-side from the ride's own rate (never trusts a client-supplied total) and uses a transactional
+  conditional seat-count update to close a seat-oversell race between concurrent bookings.
 
 ## Deployment
 

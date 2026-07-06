@@ -10,10 +10,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { CreditCard, Lock, CheckCircle, Loader2, DollarSign } from "lucide-react";
+import { CreditCard, Lock, CheckCircle, Loader2, DollarSign, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { getStripe } from "@/lib/stripe";
 
 interface PaymentDialogProps {
   bookingId: string;
@@ -21,56 +22,122 @@ interface PaymentDialogProps {
   paymentStatus?: string;
 }
 
+function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const { toast } = useToast();
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements) return;
+    setSubmitting(true);
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      redirect: "if_required",
+    });
+    setSubmitting(false);
+
+    if (error) {
+      toast({
+        title: "Payment failed",
+        description: error.message || "Please check your card details and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (paymentIntent && (paymentIntent.status === "succeeded" || paymentIntent.status === "requires_capture")) {
+      onSuccess();
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <PaymentElement />
+      <Button
+        className="w-full"
+        onClick={handleSubmit}
+        disabled={!stripe || submitting}
+        data-testid="button-confirm-payment"
+      >
+        {submitting ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Processing Payment...
+          </>
+        ) : (
+          <>
+            <CreditCard className="w-4 h-4 mr-2" />
+            Complete Payment
+          </>
+        )}
+      </Button>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center">
+        <Lock className="w-4 h-4" />
+        <span>Secured by Stripe</span>
+      </div>
+    </div>
+  );
+}
+
 export default function PaymentDialog({ bookingId, amount, paymentStatus }: PaymentDialogProps) {
   const [open, setOpen] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const createPaymentMutation = useMutation({
+  const createIntentMutation = useMutation({
     mutationFn: async () => {
-      // Create payment intent
       const response = await apiRequest("POST", "/api/create-payment-intent", {
         amount: parseFloat(amount),
         bookingId,
       });
-      const data = await response.json();
-      
-      // Simulate payment success (in real app, would use Stripe Elements)
-      // For demo purposes, we'll mark as paid immediately
-      await apiRequest("PATCH", `/api/bookings/${bookingId}/payment`, {
-        paymentIntentId: data.paymentIntentId,
-        paymentStatus: "captured",
-      });
-
-      return data;
+      return response.json();
     },
-    onSuccess: () => {
-      setPaymentSuccess(true);
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings", bookingId] });
-      toast({
-        title: "Payment successful!",
-        description: "Your booking has been paid for successfully.",
-      });
-      
-      setTimeout(() => {
-        setOpen(false);
-        setPaymentSuccess(false);
-      }, 2000);
+    onSuccess: (data) => {
+      setClientSecret(data.clientSecret);
     },
     onError: (error: any) => {
       toast({
-        title: "Payment failed",
-        description: error.message || "Please try again or contact support.",
+        title: "Could not start payment",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  const isPaid = paymentStatus === "captured" || paymentStatus === "succeeded";
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next && !clientSecret && !createIntentMutation.isPending) {
+      createIntentMutation.mutate();
+    }
+    if (!next) {
+      setClientSecret(null);
+      setPaymentSuccess(false);
+    }
+  };
+
+  const handlePaymentSuccess = () => {
+    setPaymentSuccess(true);
+    // Stripe's webhook (server/routes.ts /api/stripe-webhook) is the source of truth for
+    // payment status; just refresh the booking so the UI reflects it once the webhook lands.
+    queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/bookings", bookingId] });
+    toast({
+      title: "Payment submitted",
+      description: "Your payment is being confirmed.",
+    });
+    setTimeout(() => {
+      setOpen(false);
+      setPaymentSuccess(false);
+      setClientSecret(null);
+    }, 2000);
+  };
+
+  const isPaid = paymentStatus === "captured" || paymentStatus === "succeeded" || paymentStatus === "authorized";
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {isPaid ? (
           <Button variant="outline" size="sm" disabled data-testid={`button-payment-${bookingId}`}>
@@ -101,9 +168,9 @@ export default function PaymentDialog({ bookingId, amount, paymentStatus }: Paym
               <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-500" />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-foreground mb-2">Payment Successful!</h3>
+              <h3 className="text-xl font-semibold text-foreground mb-2">Payment Submitted</h3>
               <p className="text-muted-foreground">
-                Your booking has been confirmed and paid
+                Your booking payment is being confirmed
               </p>
             </div>
           </div>
@@ -122,43 +189,25 @@ export default function PaymentDialog({ bookingId, amount, paymentStatus }: Paym
               </div>
             </Card>
 
-            <div className="space-y-3">
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-2">Demo Payment</h4>
-                <p className="text-sm text-muted-foreground">
-                  This is a demo implementation. In production, Stripe Elements would be integrated here
-                  for secure card input.
-                </p>
+            {createIntentMutation.isPending && (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                Preparing secure payment form...
               </div>
+            )}
 
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lock className="w-4 h-4" />
-                <span>Secured by Stripe</span>
+            {createIntentMutation.isError && (
+              <div className="flex items-center gap-2 p-4 bg-destructive/10 text-destructive rounded-lg text-sm">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                Could not start payment. Please close this dialog and try again.
               </div>
-            </div>
+            )}
 
-            <Button
-              className="w-full"
-              onClick={() => createPaymentMutation.mutate()}
-              disabled={createPaymentMutation.isPending}
-              data-testid="button-confirm-payment"
-            >
-              {createPaymentMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Processing Payment...
-                </>
-              ) : (
-                <>
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Complete Payment ${amount}
-                </>
-              )}
-            </Button>
-
-            <p className="text-xs text-center text-muted-foreground">
-              Your payment information is encrypted and secure
-            </p>
+            {clientSecret && (
+              <Elements stripe={getStripe()} options={{ clientSecret }}>
+                <CheckoutForm onSuccess={handlePaymentSuccess} />
+              </Elements>
+            )}
           </div>
         )}
       </DialogContent>

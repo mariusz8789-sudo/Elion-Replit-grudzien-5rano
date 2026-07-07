@@ -1,35 +1,22 @@
 {
-  "name": "elion-omega-monorepo",
-  "version": "1.0.0",
-  "description": "ELION OMEGA System - AI-powered development and operations platform.",
-  "main": "index.js",
+  "name": "genesis-os-monorepo",
+  "version": "0.1.0",
+  "description": "Genesis OS — mobilna platforma do eksploracji fizyki, kosmologii i nauki poprzez interaktywne symulacje oraz AI.",
+  "private": true,
   "scripts": {
-    "install:all": "npm install --workspaces",
-    "dev:backend": "npm run dev --workspace=packages/backend",
-    "dev:frontend": "npm run dev --workspace=packages/frontend",
-    "dev": "npm-run-all -p dev:backend dev:frontend",
-    "build:backend": "npm run build --workspace=packages/backend",
-    "build:frontend": "npm run build --workspace=packages/frontend",
-    "build": "npm-run-all build:backend build:frontend",
-    "start": "npm run start --workspace=packages/backend"
+    "dev": "npm run dev --workspace=packages/frontend",
+    "build": "npm run build --workspace=packages/frontend",
+    "preview": "npm run preview --workspace=packages/frontend"
   },
   "keywords": [
-    "elion",
-    "ai",
-    "autodev",
-    "daveops",
-    "monorepo"
+    "genesis-os",
+    "physics",
+    "simulation",
+    "education",
+    "ai"
   ],
-  "author": "",
   "license": "ISC",
   "workspaces": [
-    "packages/backend",
     "packages/frontend"
-  ],
-  "devDependencies": {
-    "npm-run-all": "^4.1.5"
-  },
-  "dependencies": {
-    "openai": "^6.10.0"
-  }
+  ]
 }

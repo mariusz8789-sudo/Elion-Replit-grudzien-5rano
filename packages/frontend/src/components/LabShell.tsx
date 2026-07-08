@@ -5,6 +5,7 @@ import { useSimLoop } from '../core/useSimLoop';
 import { Controls, defaultParams } from './Controls';
 import { NarratorPanel } from './NarratorPanel';
 import { narrate } from '../narrator/engine';
+import { buildContext } from '../narrator/askAI';
 
 /**
  * Standardowy ekran laboratorium. Od Etapu 1 laboratorium to kolekcja
@@ -71,11 +72,18 @@ function ExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }
   const statsRef = useRef(stats);
 
   const sim = useMemo(() => exp.createSim(), [exp]);
+  const lastStatsAt = useRef(0);
   const onStats = useMemo(
     () => (s: Record<string, number>) => {
+      // Narracja odświeża się najwyżej raz na sekundę — bez tego szybko
+      // zmieniające się statystyki (np. licznik par w CHSH) powodują ciągłe
+      // przerysowania panelu i "uciekające" przyciski pod palcem.
+      const now = performance.now();
+      if (now - lastStatsAt.current < 1000) return;
       const prev = statsRef.current;
       const keys = Object.keys(s);
       if (keys.length !== Object.keys(prev).length || keys.some((k) => prev[k] !== s[k])) {
+        lastStatsAt.current = now;
         statsRef.current = s;
         setStats(s);
       }
@@ -109,7 +117,16 @@ function ExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }
 
       <Controls defs={exp.params} params={params} onChange={(k, v) => setParams((p) => ({ ...p, [k]: v }))} />
 
-      <NarratorPanel blocks={blocks} />
+      <NarratorPanel
+        blocks={blocks}
+        askContext={buildContext(
+          { name: lab.name, honesty: exp.honesty, honestyNote: exp.honestyNote },
+          exp.id === '__base' ? lab.name : exp.name,
+          params,
+          stats,
+          blocks,
+        )}
+      />
     </>
   );
 }

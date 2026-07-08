@@ -248,6 +248,23 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .nblock.hypothesis .ntitle { color: var(--violet); }
 .nblock.warning .ntitle { color: var(--gold); }
 
+/* ---------- Zapytaj AI ---------- */
+.ask-ai { border-top: 1px solid var(--border); padding-top: 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.ask-row { display: flex; gap: 0.5rem; }
+.ask-row input {
+  flex: 1; min-width: 0;
+  font: inherit; font-size: 0.85rem;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+}
+.ask-row input::placeholder { color: var(--text-dim); }
+.ask-row .chip-btn:disabled { opacity: 0.45; }
+.ask-answer .ntitle { color: var(--cyan); }
+.ask-error { font-size: 0.78rem; color: var(--text-dim); line-height: 1.45; }
+
 /* ---------- Atom Lab: układ okresowy ---------- */
 .ptable-wrap { overflow-x: auto; padding: 0.8rem 1rem; }
 .ptable {

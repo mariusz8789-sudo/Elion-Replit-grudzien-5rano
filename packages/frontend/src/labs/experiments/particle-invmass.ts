@@ -22,19 +22,45 @@ const M_MIN = Math.log(2);
 const M_MAX = Math.log(130);
 const BINS = 130;
 
+/**
+ * Punkt podpięcia realnych danych CERN Open Data (CC0).
+ * Środowisko budowania może nie mieć dostępu do opendata.cern.ch — wtedy
+ * używamy generatora syntetycznego (masy rezonansów wg PDG). Aby użyć
+ * realnych danych: pobierz CSV dimionowy (np. rekord 545, Dimuon_DoubleMu.csv),
+ * wyekstrahuj kolumnę M i zapisz jako tablicę w src/data/dimuon-real.ts:
+ *   export const REAL_DIMUON_MASSES: number[] = [3.09, 91.2, ...];
+ * Sim automatycznie przełączy się na odtwarzanie realnych zdarzeń.
+ */
+let REAL_MASSES: number[] | null = null;
+const realModules = import.meta.glob<{ REAL_DIMUON_MASSES: number[] }>('../../data/dimuon-real.ts', { eager: true });
+for (const mod of Object.values(realModules)) {
+  if (mod.REAL_DIMUON_MASSES?.length) REAL_MASSES = mod.REAL_DIMUON_MASSES;
+}
+
 class InvMassSim implements Sim {
   private hist = new Float64Array(BINS);
   private total = 0;
   private acc = 0;
+  private realIdx = 0;
 
   init() {}
 
   reset = () => {
     this.hist.fill(0);
     this.total = 0;
+    this.realIdx = 0;
   };
 
   private sampleMass(): number {
+    if (REAL_MASSES) {
+      const m = REAL_MASSES[this.realIdx % REAL_MASSES.length];
+      this.realIdx++;
+      return m;
+    }
+    return this.sampleSynthetic();
+  }
+
+  private sampleSynthetic(): number {
     const u = Math.random();
     let cum = 0;
     for (const r of RESONANCES) {

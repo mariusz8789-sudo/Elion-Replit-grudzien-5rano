@@ -10,8 +10,8 @@ const N = 512; // siatka (potęga 2 dla FFT)
 const L = 100; // długość domeny (j.n.)
 const DX = L / N;
 
-/** FFT radix-2 (in-place, iteracyjna). re/im długości N. */
-function fft(re: Float64Array, im: Float64Array, inverse: boolean) {
+/** FFT radix-2 (in-place, iteracyjna). re/im długości N. Eksport dla testów. */
+export function fft(re: Float64Array, im: Float64Array, inverse: boolean) {
   const n = re.length;
   for (let i = 1, j = 0; i < n; i++) {
     let bit = n >> 1;

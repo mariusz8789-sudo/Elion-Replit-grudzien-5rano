@@ -6,8 +6,10 @@ interaktywne symulacje + warstwa AI. Monorepo z jednym workspace
 (packages/frontend); backend dojdzie w Etapie 1 (proxy LLM).
 
 ## Running
-- `npm run dev` — Vite dev server na porcie 5000
-- `npm run build` — build produkcyjny
+- `npm run dev` — Vite dev server na porcie 5000 (proxy /api → 8080)
+- `npm run dev:backend` — backend AI (wymaga ANTHROPIC_API_KEY)
+- `npm test` — testy fizyki (vitest)
+- `npm run build` — build produkcyjny (PWA offline)
 
 ## Architecture
 - **Frontend**: React 18 + Vite + TypeScript, canvas 2D, zero dodatkowych

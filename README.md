@@ -19,12 +19,16 @@ Wszechświata (8,8×10²⁶ m).
 
 ```bash
 npm install
-npm run dev        # http://localhost:5000
-npm run build      # produkcyjny build do packages/frontend/dist
+npm run dev        # frontend: http://localhost:5000
+npm test           # 37 testów fizyki (vitest)
+npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
+
+# Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):
+ANTHROPIC_API_KEY=sk-ant-... npm run dev:backend   # port 8080
 ```
 
-Wymagania: Node.js ≥ 18. Zero backendu i zero kluczy API w Etapie 0 —
-wszystko liczy się na urządzeniu.
+Wymagania: Node.js ≥ 18. Bez backendu wszystko poza pytaniami otwartymi do AI
+liczy się na urządzeniu i działa w pełni offline (PWA).
 
 ## Architektura pluginowa
 

@@ -62,7 +62,9 @@ class UniverseSim implements Sim {
     ctx.fillRect(0, 0, w, h);
     const cx = w / 2;
     const cy = h / 2;
-    const K = Math.min(w, h) * 0.48;
+    // Kamera oddala się częściowo, gdy ekspansja przerasta ekran — ekspansja
+    // pozostaje widoczna, ale galaktyki nie znikają (audyt Etapu 0, pkt 2)
+    const K = (Math.min(w, h) * 0.48) / Math.max(1, Math.pow(this.a / 1.1, 0.7));
     for (const g of this.galaxies) {
       const px = cx + g.x * this.a * K;
       const py = cy + g.y * this.a * K;

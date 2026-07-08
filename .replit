@@ -1,7 +1,6 @@
 modules = ["nodejs-20", "web"]
 [agent]
 expertMode = true
-integrations = ["javascript_openai:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
@@ -44,5 +43,5 @@ externalPort = 8080
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["node", "packages/backend/dist/index.js"]
+run = ["node", "packages/backend/src/server.mjs"]
 build = ["npm", "run", "build"]

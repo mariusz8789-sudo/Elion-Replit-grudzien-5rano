@@ -1,4 +1,6 @@
 import type { LabDefinition, Sim, SimParams } from '../core/types';
+import { nuclearChain } from './experiments/nuclear-chain';
+import { nuclearTokamak } from './experiments/nuclear-tokamak';
 
 /**
  * Nuclear Lab — rozpad promieniotwórczy.
@@ -148,6 +150,7 @@ export const nuclearLab: LabDefinition = {
     },
   ],
   createSim: () => new DecaySim(),
+  experiments: [nuclearChain, nuclearTokamak],
   narrate(p, stats) {
     const iso = ISOTOPES[String(p.isotope)] ?? ISOTOPES.c14;
     const rem = Number(stats.remaining ?? 308);

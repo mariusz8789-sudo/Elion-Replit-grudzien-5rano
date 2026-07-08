@@ -13,6 +13,8 @@ tutaj, nie od kodu.
    Nie rozstrzygamy sporów, których nie rozstrzygnęła nauka.
 3. **Aktualizacja w tym samym commicie co kod** — nowa funkcja laboratorium
    dopisuje swoje źródła, modele i ograniczenia do odpowiedniego pliku.
+4. Status implementacji poszczególnych modeli śledzą raporty etapów
+   (`../RAPORT-ETAP-*.md`); baza wiedzy opisuje naukę, nie stan kodu.
 
 ## Skala potwierdzenia naukowego
 

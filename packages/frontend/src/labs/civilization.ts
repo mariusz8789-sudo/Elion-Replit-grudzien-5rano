@@ -1,5 +1,6 @@
 import type { LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
 import { sci } from '../core/useSimLoop';
+import { civilizationColonization } from './experiments/civilization-colonization';
 
 /**
  * Civilization Lab — skala Kardaszewa.
@@ -131,6 +132,7 @@ export const civilizationLab: LabDefinition = {
     },
   ],
   createSim: () => new KardashevSim(),
+  experiments: [civilizationColonization],
   narrate(p) {
     const K = Number(p.k);
     const P = Math.pow(10, 10 * K + 6);

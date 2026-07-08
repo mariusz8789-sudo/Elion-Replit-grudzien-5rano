@@ -61,6 +61,21 @@ export interface NarrationBlock {
 /** Funkcja narracyjna laboratorium: parametry + statystyki → bloki tekstu. */
 export type NarrateFn = (params: SimParams, stats: Record<string, number>) => NarrationBlock[];
 
+/**
+ * Eksperyment — pojedyncza symulacja wewnątrz laboratorium (Etap 1).
+ * Laboratorium = kolekcja eksperymentów; każdy ma własną fizykę, parametry,
+ * etykietę uczciwości i narrację.
+ */
+export interface ExperimentDef {
+  id: string;
+  name: string;
+  honesty: HonestyLevel;
+  honestyNote: string;
+  params: ParamDef[];
+  createSim: () => Sim;
+  narrate: NarrateFn;
+}
+
 export interface LabDefinition {
   id: string;
   name: string;
@@ -75,6 +90,12 @@ export interface LabDefinition {
   params: ParamDef[];
   createSim?: () => Sim;
   narrate: NarrateFn;
+  /**
+   * Dodatkowe eksperymenty laboratorium (Etap 1+). Pola params/createSim/
+   * narrate/honesty laboratorium opisują eksperyment pierwszy (bazowy);
+   * ta lista dodaje kolejne.
+   */
+  experiments?: ExperimentDef[];
   /** Laboratorium z własnym ekranem (np. Atom Lab z układem okresowym). */
   CustomView?: React.ComponentType<{ lab: LabDefinition }>;
   /** Zjawiska zaplanowane w tym laboratorium na kolejne etapy. */

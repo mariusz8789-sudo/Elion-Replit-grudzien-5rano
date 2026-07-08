@@ -1,4 +1,5 @@
 import type { LabDefinition, Sim, SimParams } from '../core/types';
+import { spacetimeMinkowski } from './experiments/spacetime-minkowski';
 
 /**
  * Space-Time Lab — dylatacja czasu na zegarach świetlnych.
@@ -117,6 +118,7 @@ export const spacetimeLab: LabDefinition = {
     { key: 'tripYears', label: 'Podróż bliźniaka (czas Ziemi)', type: 'slider', min: 2, max: 60, step: 1, default: 20, unit: 'lat' },
   ],
   createSim: () => new LightClockSim(),
+  experiments: [spacetimeMinkowski],
   narrate(p, stats) {
     const v = Number(p.v);
     const gamma = 1 / Math.sqrt(1 - v * v);

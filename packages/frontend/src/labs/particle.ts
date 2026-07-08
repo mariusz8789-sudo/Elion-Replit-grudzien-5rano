@@ -1,4 +1,5 @@
 import type { LabDefinition, Sim, SimParams } from '../core/types';
+import { particleInvMass } from './experiments/particle-invmass';
 
 /**
  * Particle Lab — wizualizacja zderzeń w detektorze.
@@ -150,6 +151,7 @@ export const particleLab: LabDefinition = {
     { key: 'auto', label: 'Zderzaj automatycznie', type: 'toggle', default: true },
   ],
   createSim: () => new CollisionSim(),
+  experiments: [particleInvMass],
   narrate(p, stats) {
     const n = Number(stats.tracks ?? 0);
     return [

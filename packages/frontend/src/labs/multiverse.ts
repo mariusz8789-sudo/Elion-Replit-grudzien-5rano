@@ -10,6 +10,44 @@ import type { LabDefinition, Sim, SimParams } from '../core/types';
  * i α (±kilka %) — za literaturą fine-tuningu.
  */
 
+/** Presety scenariuszy: nadpisują suwaki, gdy wybrano scenariusz ≠ własny. */
+function effectiveConstants(p: SimParams): {
+  g: number;
+  alpha: number;
+  strong: number;
+  presetNote: { title: string; body: string } | null;
+} {
+  const preset = String(p.preset ?? 'custom');
+  if (preset === 'carbonless') {
+    return {
+      g: 1, alpha: 1, strong: 0.86,
+      presetNote: {
+        title: 'Scenariusz: wszechświat bez węgla',
+        body: 'Oddziaływanie silne osłabione do 0,86× — deuter przestaje być związany, pierwsze ogniwo syntezy pęka. Gwiazdy świecą (kontrakcja grawitacyjna), ale nigdy nie powstaje węgiel, tlen ani chemia organiczna. Wieczny wszechświat wodoru.',
+      },
+    };
+  }
+  if (preset === 'explosive') {
+    return {
+      g: 1, alpha: 1, strong: 1.14,
+      presetNote: {
+        title: 'Scenariusz: wybuchowe gwiazdy',
+        body: 'Oddziaływanie silne wzmocnione do 1,14× — diproton (²He) staje się związany i spalanie wodoru przestaje być powolnym wąskim gardłem. Gwiazdy przelatują przez paliwo w mgnieniu oka; brak miliardów lat stabilnego świecenia, których wymagała ewolucja na Ziemi.',
+      },
+    };
+  }
+  if (preset === 'crushing') {
+    return {
+      g: Math.pow(10, 0.7), alpha: 1, strong: 1,
+      presetNote: {
+        title: 'Scenariusz: ciężka grawitacja (5×G)',
+        body: 'Gwiazdy są mniejsze, gorętsze i żyją ~25× krócej (t ~ G⁻²); planety krążą ciasno i szybko, a góry i organizmy większe niż owady załamują się pod własnym ciężarem. Okno czasowe na ewolucję złożonego życia niemal się zamyka.',
+      },
+    };
+  }
+  return { g: Math.pow(10, Number(p.g)), alpha: Number(p.alpha), strong: Number(p.strong), presetNote: null };
+}
+
 class AltStarSim implements Sim {
   private t = 0;
   private planetAng = 0;
@@ -94,6 +132,15 @@ export const multiverseLab: LabDefinition = {
     'Wszystko tutaj to modele teoretyczne. Skalowania (czas życia gwiazd, progi stabilności jąder) są szacunkami rzędów wielkości z literatury fine-tuningu. Istnienie innych wszechświatów oraz interpretacja wielu światów to hipotezy bez potwierdzenia obserwacyjnego.',
   params: [
     {
+      key: 'preset', label: 'Scenariusz', type: 'select', default: 'custom',
+      options: [
+        { value: 'custom', label: 'Własny' },
+        { value: 'carbonless', label: 'Bez węgla' },
+        { value: 'explosive', label: 'Wybuchowe gwiazdy' },
+        { value: 'crushing', label: 'Ciężka grawitacja' },
+      ],
+    },
+    {
       key: 'g', label: 'Grawitacja (×G)', type: 'slider', min: -1, max: 1, step: 0.05, default: 0,
       format: (v) => `${Math.pow(10, v).toFixed(2)}×`,
     },
@@ -108,17 +155,22 @@ export const multiverseLab: LabDefinition = {
   ],
   createSim: () => {
     const sim = new AltStarSim();
-    // Suwak G jest logarytmiczny: param przechowuje wykładnik.
+    // Suwak G jest logarytmiczny (param = wykładnik); presety nadpisują suwaki.
     const upd = sim.update.bind(sim);
-    sim.update = (dt, p) => upd(dt, { ...p, g: Math.pow(10, Number(p.g)) });
+    sim.update = (dt, p) => {
+      const eff = effectiveConstants(p);
+      upd(dt, { ...p, g: eff.g, alpha: eff.alpha, strong: eff.strong });
+    };
     return sim;
   },
   narrate(p) {
-    const g = Math.pow(10, Number(p.g));
-    const alpha = Number(p.alpha);
-    const strong = Number(p.strong);
+    const { g, alpha, strong, presetNote } = effectiveConstants(p);
     const starLife = 10 / (g * g); // Słońce ~10 mld lat, t ~ G⁻²
     const blocks = [];
+
+    if (presetNote) {
+      blocks.push({ title: presetNote.title, kind: 'hypothesis' as const, body: presetNote.body });
+    }
 
     blocks.push({
       title: `Gwiazdy: żyją ~${starLife < 0.01 ? starLife.toExponential(1) : starLife.toFixed(starLife < 1 ? 2 : 1)} mld lat`,

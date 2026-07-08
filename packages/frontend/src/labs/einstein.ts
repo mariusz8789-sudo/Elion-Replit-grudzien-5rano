@@ -1,5 +1,7 @@
 import type { LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
 import { sci } from '../core/useSimLoop';
+import { einsteinGeodesics } from './experiments/einstein-geodesics';
+import { einsteinLensing } from './experiments/einstein-lensing';
 
 /**
  * Einstein Lab — zakrzywienie biegu światła przy masie.
@@ -212,6 +214,7 @@ export const einsteinLab: LabDefinition = {
     },
   ],
   createSim: () => new GravityLightSim(),
+  experiments: [einsteinGeodesics, einsteinLensing],
   narrate(p) {
     const M = 10 ** Number(p.mass) * MSUN;
     const rs = (2 * G * M) / (C * C);

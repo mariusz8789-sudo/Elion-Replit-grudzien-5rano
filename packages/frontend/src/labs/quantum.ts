@@ -1,4 +1,6 @@
 import type { LabDefinition, Sim, SimParams } from '../core/types';
+import { quantumTunneling } from './experiments/quantum-tunneling';
+import { quantumBloch } from './experiments/quantum-bloch';
 
 /**
  * Quantum Lab — doświadczenie z dwiema szczelinami.
@@ -138,6 +140,7 @@ export const quantumLab: LabDefinition = {
     { key: 'rate', label: 'Cząstek na sekundę', type: 'slider', min: 5, max: 200, step: 5, default: 60 },
   ],
   createSim: () => new DoubleSlitSim(),
+  experiments: [quantumTunneling, quantumBloch],
   narrate(p, stats) {
     const measured = Boolean(p.measured);
     const lambda = Number(p.lambda);

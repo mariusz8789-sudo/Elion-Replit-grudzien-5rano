@@ -24,3 +24,5 @@ interaktywne symulacje + warstwa AI. Monorepo z jednym workspace
   udają faktów; to twarda zasada produktu
 - Język UI: polski
 - Nowe laboratorium: plik w `src/labs/` + `registerLab()` w manifeście
+- Każdy nowy moduł projektuje się w oparciu o `knowledge/<lab>.md`
+  (Genesis Knowledge Base) i aktualizuje ją w tym samym commicie

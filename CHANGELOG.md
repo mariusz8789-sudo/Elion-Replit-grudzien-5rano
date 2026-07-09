@@ -4,7 +4,31 @@ Format luźno wzorowany na [Keep a Changelog](https://keepachangelog.com/).
 Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 `RAPORT-ETAP-1.md` · `RAPORT-ETAP-2.md` · `RAPORT-AUDYT.md`.
 
-## [Unreleased] — utwardzanie produkcyjne i funkcje lokalne
+## [Unreleased]
+
+### Dodano (Genesis Knowledge Engine + laboratoria, od RAPORT-AUDYT-2)
+- Genesis Knowledge Base (`knowledge/*.md`): sześciostopniowa skala
+  potwierdzenia naukowego, nowe pliki (mechanika klasyczna, elektrodynamika,
+  termodynamika, dossier 13 naukowców), Narrator LLM ugruntowany wyłącznie
+  w tej bazie (`buildKnowledgeIndex`/`knowledgeExcerptFor` w backendzie).
+- `core/dataSource.ts` + `core/citation.ts` — jeden rejestr źródeł danych i
+  wspólna skala pewności dla całej platformy (Narrator, DataSource, UI).
+- Universe Lab: prawdziwy Układ Słoneczny (dane NASA Planetary Fact Sheet,
+  równanie Keplera) jako flagowy eksperyment.
+- "Stwórz eksperyment" na każdym laboratorium: własne presety parametrów +
+  deterministyczna analiza trendu (bez LLM) w kształcie identycznym z
+  resztą Narratora — zero równoległej infrastruktury AI.
+- Nuclear Lab: Mapa nuklidów — ciągła "dolina stabilności" z wzoru SEMF
+  (`core/physics.ts`) + ~55 realnie zmierzonych izotopów (NNDC,
+  `data/nuclides.ts`) jako klikalna nakładka; kierunek rozpadu beta liczony
+  z porównania energii wiązania sąsiednich izobarów.
+- `core/i18n.ts` — architektura wielojęzyczna (polski kompletny, angielski
+  jako świadomie pusty seam, bez „martwego" UI).
+- `scripts/fetch-real-data.mjs` — gotowy fetcher JPL Horizons/Gaia/CERN
+  (nieuruchomiony end-to-end — sieć sandboxa blokuje te hosty, patrz
+  README „Znane ograniczenia").
+
+## Etap Audytu 2 — utwardzanie produkcyjne i funkcje lokalne
 
 Pełny raport z uzasadnieniem każdej zmiany: [`RAPORT-AUDYT-2.md`](RAPORT-AUDYT-2.md).
 

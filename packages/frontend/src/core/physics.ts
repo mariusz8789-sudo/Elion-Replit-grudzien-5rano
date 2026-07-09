@@ -107,3 +107,50 @@ export function keplerPosition(semiMajorAxisAu: number, eccentricity: number, me
     y: semiMajorAxisAu * Math.sqrt(1 - eccentricity ** 2) * Math.sin(E),
   };
 }
+
+/**
+ * Półempiryczny wzór na masę (SEMF / Weizsäcker) — energia wiązania jądra
+ * o Z protonach i N neutronach [MeV]. Współczynniki i postać wzoru dokładnie
+ * jak w knowledge/nuclear.md: B = a_V·A − a_S·A^⅔ − a_C·Z(Z−1)/A^⅓
+ * − a_A·(A−2Z)²/A ± δ·A^(−½). Model (★★★★), nie zmierzone dane per jądro —
+ * wyjaśnia kształt doliny stabilności, ale pomija efekty powłokowe (dlatego
+ * realne maksimum B/A leży przy Ni-62/Fe-58, nie dokładnie tam, gdzie
+ * przewiduje ten wzór).
+ */
+const SEMF_A_V = 15.8;
+const SEMF_A_S = 17.8;
+const SEMF_A_C = 0.711;
+const SEMF_A_A = 23.7;
+const SEMF_DELTA = 11.18;
+
+export function semfBindingEnergy(z: number, n: number): number {
+  const a = z + n;
+  if (a <= 0 || z < 0 || n < 0) return 0;
+  const volume = SEMF_A_V * a;
+  const surface = SEMF_A_S * Math.pow(a, 2 / 3);
+  const coulomb = (SEMF_A_C * z * (z - 1)) / Math.pow(a, 1 / 3);
+  const asymmetry = (SEMF_A_A * (a - 2 * z) ** 2) / a;
+  const evenZ = z % 2 === 0;
+  const evenN = n % 2 === 0;
+  const pairing = evenZ && evenN ? SEMF_DELTA / Math.sqrt(a) : !evenZ && !evenN ? -SEMF_DELTA / Math.sqrt(a) : 0;
+  return volume - surface - coulomb - asymmetry + pairing;
+}
+
+/** Energia wiązania na nukleon [MeV] — miara "jak mocno związane" jest jądro. */
+export function semfBindingPerNucleon(z: number, n: number): number {
+  const a = z + n;
+  return a > 0 ? semfBindingEnergy(z, n) / a : 0;
+}
+
+/**
+ * Kierunek przewidywany przez SEMF dla rozpadu beta przy stałym A: porównuje
+ * energię wiązania sąsiednich izobarów (Z−1,N+1) i (Z+1,N−1). Dodatnia
+ * wartość → sąsiad o wyższym Z jest silniej związany (favoryzuje β⁻,
+ * n→p); ujemna → favoryzuje β⁺/EC (p→n). Zero w minimum (dolina stabilności).
+ */
+export function semfStabilityGradient(z: number, n: number): number {
+  const up = z + 1 >= 1 && n - 1 >= 0 ? semfBindingEnergy(z + 1, n - 1) : -Infinity;
+  const down = z - 1 >= 0 && n + 1 >= 0 ? semfBindingEnergy(z - 1, n + 1) : -Infinity;
+  const here = semfBindingEnergy(z, n);
+  return Math.max(up - here, 0) - Math.max(down - here, 0);
+}

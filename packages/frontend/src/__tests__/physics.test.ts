@@ -11,10 +11,14 @@ import {
   sampleLocalHiddenPair,
   sampleSingletPair,
   schwarzschildRadius,
+  semfBindingEnergy,
+  semfBindingPerNucleon,
+  semfStabilityGradient,
   singletCorrelation,
   solveKepler,
 } from '../core/physics';
 import { PLANETS } from '../data/solarSystem';
+import { KNOWN_NUCLIDES } from '../data/nuclides';
 
 /** Deterministyczny PRNG (mulberry32) — testy statystyczne bez flakiness. */
 function mulberry32(seed: number) {
@@ -210,5 +214,74 @@ describe('równanie Keplera (Prawdziwy Układ Słoneczny, Universe Lab)', () => 
       const relativeError = Math.abs(years - predicted) / predicted;
       expect(relativeError, `${p.name}: ${years} vs przewidywane ${predicted}`).toBeLessThan(0.01);
     }
+  });
+});
+
+describe('wzór SEMF / Weizsäcker (Mapa nuklidów, Nuclear Lab)', () => {
+  it('brak nukleonów → zerowa energia wiązania', () => {
+    expect(semfBindingEnergy(0, 0)).toBe(0);
+    expect(semfBindingEnergy(-1, 5)).toBe(0);
+  });
+
+  it('B/A jest po prostu B podzielone przez A (spójność funkcji)', () => {
+    for (const [z, n] of [[6, 6], [26, 30], [92, 146]] as const) {
+      expect(semfBindingPerNucleon(z, n)).toBeCloseTo(semfBindingEnergy(z, n) / (z + n), 9);
+    }
+  });
+
+  it('środek tablicy Mendelejewa (Fe-56) jest mocniej związany na nukleon niż bardzo lekkie i bardzo ciężkie jądra', () => {
+    const deuteron = semfBindingPerNucleon(1, 1); // A=2
+    const fe56 = semfBindingPerNucleon(26, 30); // A=56
+    const u238 = semfBindingPerNucleon(92, 146); // A=238
+    expect(fe56).toBeGreaterThan(deuteron);
+    expect(fe56).toBeGreaterThan(u238);
+  });
+
+  it('dlatego rozszczepienie ciężkich jąder i fuzja lekkich jąder uwalniają energię (B/A rośnie w obu kierunkach ku środkowi)', () => {
+    const light = semfBindingPerNucleon(1, 1); // A=2, fuzja startuje stąd
+    const mid = semfBindingPerNucleon(26, 30); // A=56
+    const heavy = semfBindingPerNucleon(92, 146); // A=238, rozszczepienie startuje stąd
+    expect(mid).toBeGreaterThan(light);
+    expect(mid).toBeGreaterThan(heavy);
+  });
+
+  it('gradient stabilności wskazuje β⁻ dla jąder bogatych w neutrony i β⁺/EC dla bogatych w protony przy tym samym A', () => {
+    // A=120: realny stabilny izobar to Sn-120 (Z=50). Sprawdzamy tylko KIERUNEK.
+    const protonRich = semfStabilityGradient(65, 55); // Z dużo powyżej 50
+    const neutronRich = semfStabilityGradient(35, 85); // Z dużo poniżej 50
+    expect(protonRich).toBeLessThan(0); // faworyzuje β⁺/EC (Z maleje)
+    expect(neutronRich).toBeGreaterThan(0); // faworyzuje β⁻ (Z rośnie)
+  });
+
+  it('gradient stabilności jest bliski zeru blisko realnej doliny stabilności (Sn-120, Z=50)', () => {
+    expect(Math.abs(semfStabilityGradient(50, 70))).toBeLessThan(1);
+  });
+});
+
+describe('KNOWN_NUCLIDES — kluczowe zmierzone izotopy (Mapa nuklidów, NNDC)', () => {
+  it('zawiera sensowny, zweryfikowany podzbiór (nie fabrykowaną pełną tablicę)', () => {
+    expect(KNOWN_NUCLIDES.length).toBeGreaterThan(40);
+    expect(KNOWN_NUCLIDES.length).toBeLessThan(200);
+  });
+
+  it('każdy wpis ma poprawne, dodatnie liczby kwantowe i okres półtrwania', () => {
+    for (const k of KNOWN_NUCLIDES) {
+      expect(k.z).toBeGreaterThanOrEqual(1);
+      expect(k.n).toBeGreaterThanOrEqual(0);
+      expect(k.halfLifeSec).toBeGreaterThan(0);
+      expect(k.symbol.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('izotopy oznaczone "stabilny" mają nieskończony okres półtrwania i odwrotnie', () => {
+    for (const k of KNOWN_NUCLIDES) {
+      if (k.decayMode === 'stabilny') expect(k.halfLifeSec).toBe(Infinity);
+      else expect(k.halfLifeSec).toBeLessThan(Infinity);
+    }
+  });
+
+  it('U-238 i C-14 (już używane w podstawowym eksperymencie rozpadu) są też w mapie nuklidów', () => {
+    expect(KNOWN_NUCLIDES.find((k) => k.symbol === 'U-238')?.halfLifeLabel).toContain('4,468 mld');
+    expect(KNOWN_NUCLIDES.find((k) => k.symbol === 'C-14')?.halfLifeLabel).toContain('5 730');
   });
 });

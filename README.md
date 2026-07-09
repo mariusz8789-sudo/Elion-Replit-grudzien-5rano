@@ -16,6 +16,11 @@ Wszechświata (8,8×10²⁶ m).
   symulacji widocznym na ekranie
 - **Etykiety uczciwości naukowej** na każdym module: dokładne wzory / model
   uproszczony / model edukacyjny / hipoteza
+- **Mapa nuklidów** (Nuclear Lab): ciągła "dolina stabilności" liczona z
+  półempirycznego wzoru na masę (SEMF/Weizsäcker), z nałożonymi ~55 realnie
+  zmierzonymi izotopami (NNDC) — dotknij dowolnego (Z,N), by zobaczyć
+  przewidywanie modelu albo, jeśli trafisz w kropkę, prawdziwy okres
+  półtrwania i tryb rozpadu z cytowaniem źródła
 - **Laboratorium cząstek**: masy i szerokości rezonansów prawdziwe (PDG), metoda
   identyczna z tą, którą odkryto J/ψ i Z⁰ (histogram masy niezmienniczej par
   mionów) — ale sam zbiór zderzeń jest dziś syntetyczny, wzorowany na widmach
@@ -35,7 +40,7 @@ Wszechświata (8,8×10²⁶ m).
   (rośnie/maleje/płasko, skoki, korelacje) bez LLM, zapytaj AI o wyniki z
   tym samym groundingiem w bazie wiedzy co reszta platformy. Bezpieczne
   przez konstrukcję — zero wykonywania kodu użytkownika
-- **154 testy** (126 vitest frontend + 28 node:test backend)
+- **165 testów** (137 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 

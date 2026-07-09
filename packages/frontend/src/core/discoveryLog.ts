@@ -104,6 +104,14 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Po 5 T½ zostaje mniej niż 3,2% pierwotnych jąder — zobaczyłeś to na żywo.',
     check: (s) => (s.halfLives ?? 0) >= 5,
   },
+  {
+    id: 'earth-year-completed',
+    labId: 'universe',
+    expId: 'solar-system',
+    title: 'Minął prawdziwy rok ziemski',
+    description: 'Ziemia zamknęła pełny obieg wokół Słońca w 365,256 dnia — dokładnie tyle, ile trwa prawdziwy rok zwrotnikowy (dane NASA).',
+    check: (s) => (s.earthOrbits ?? 0) >= 1,
+  },
 ];
 
 interface LogState {

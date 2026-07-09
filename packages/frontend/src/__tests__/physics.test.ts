@@ -3,6 +3,7 @@ import {
   chshS,
   decayRemaining,
   kardashevPower,
+  keplerPosition,
   lensAmplification,
   lensImagePositions,
   lorentzGamma,
@@ -11,7 +12,9 @@ import {
   sampleSingletPair,
   schwarzschildRadius,
   singletCorrelation,
+  solveKepler,
 } from '../core/physics';
+import { PLANETS } from '../data/solarSystem';
 
 /** Deterministyczny PRNG (mulberry32) — testy statystyczne bez flakiness. */
 function mulberry32(seed: number) {
@@ -154,5 +157,58 @@ describe('splątanie i CHSH', () => {
     });
     const S = Math.abs(E[0] - E[1] + E[2] + E[3]);
     expect(S).toBeLessThan(2.1); // 2 + margines statystyczny
+  });
+});
+
+describe('równanie Keplera (Prawdziwy Układ Słoneczny, Universe Lab)', () => {
+  it('dla orbity kołowej (e=0) anomalia mimośrodowa E = M dokładnie', () => {
+    for (const M of [0, 0.5, Math.PI / 2, Math.PI, 4, 2 * Math.PI - 0.01]) {
+      expect(solveKepler(M, 0)).toBeCloseTo(M, 10);
+    }
+  });
+
+  it('rozwiązanie spełnia definiujące równanie E − e·sinE = M dla dowolnych e i M', () => {
+    const eccentricities = [0.01, 0.2056, 0.5, 0.9]; // Merkury=0.2056, plus skrajne przypadki
+    const meanAnomalies = [0, 0.3, 1.5, Math.PI, 4.2, 6.0];
+    for (const e of eccentricities) {
+      for (const M of meanAnomalies) {
+        const E = solveKepler(M, e);
+        expect(E - e * Math.sin(E)).toBeCloseTo(M, 9);
+      }
+    }
+  });
+
+  it('w peryhelium (M=0) odległość od ogniska wynosi dokładnie a·(1−e)', () => {
+    for (const p of PLANETS) {
+      const pos = keplerPosition(p.semiMajorAxisAu, p.eccentricity, 0);
+      const r = Math.hypot(pos.x, pos.y);
+      expect(r).toBeCloseTo(p.semiMajorAxisAu * (1 - p.eccentricity), 9);
+    }
+  });
+
+  it('w aphelium (M=π) odległość od ogniska wynosi dokładnie a·(1+e)', () => {
+    for (const p of PLANETS) {
+      const pos = keplerPosition(p.semiMajorAxisAu, p.eccentricity, Math.PI);
+      const r = Math.hypot(pos.x, pos.y);
+      expect(r).toBeCloseTo(p.semiMajorAxisAu * (1 + p.eccentricity), 9);
+    }
+  });
+
+  it('Merkury ma najbardziej wydłużoną orbitę spośród 8 planet (największy mimośród)', () => {
+    const maxEcc = Math.max(...PLANETS.map((p) => p.eccentricity));
+    expect(PLANETS.find((p) => p.id === 'mercury')?.eccentricity).toBe(maxEcc);
+  });
+
+  it('trzecie prawo Keplera: T²∝a³ w granicach 1% dla realnych danych NASA (Słońce dominuje masą)', () => {
+    // T[lata] ≈ a[AU]^1.5 dla obiektu okrążającego gwiazdę o masie Słońca —
+    // planety mają znikomy wpływ na tę relację mimo różnych mas. Porównanie
+    // względne (nie bezwzględne), bo okresy rozpięte są na 3 rzędy wielkości
+    // (Merkury 0,24 roku vs Neptun 165 lat).
+    for (const p of PLANETS) {
+      const years = p.periodDays / 365.25;
+      const predicted = Math.pow(p.semiMajorAxisAu, 1.5);
+      const relativeError = Math.abs(years - predicted) / predicted;
+      expect(relativeError, `${p.name}: ${years} vs przewidywane ${predicted}`).toBeLessThan(0.01);
+    }
   });
 });

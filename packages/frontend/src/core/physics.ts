@@ -85,3 +85,25 @@ export function sampleLocalHiddenPair(a: number, b: number, rnd: () => number = 
   const sign = (x: number) => (Math.cos(x) >= 0 ? 1 : -1);
   return [sign(a - lambda), -sign(b - lambda)];
 }
+
+/**
+ * Anomalia mimośrodowa E z równania Keplera M = E − e·sinE, metodą Newtona
+ * (8 iteracji — zbiega kwadratowo, błąd <1e-10 rad dla e<0.99, czyli dla
+ * wszystkich planet Układu Słonecznego z dużym zapasem).
+ */
+export function solveKepler(meanAnomaly: number, e: number): number {
+  let E = meanAnomaly;
+  for (let i = 0; i < 8; i++) {
+    E -= (E - e * Math.sin(E) - meanAnomaly) / (1 - e * Math.cos(E));
+  }
+  return E;
+}
+
+/** Pozycja heliocentryczna [AU] na orbicie eliptycznej o półosi a i mimośrodzie e. */
+export function keplerPosition(semiMajorAxisAu: number, eccentricity: number, meanAnomaly: number): { x: number; y: number } {
+  const E = solveKepler(meanAnomaly, eccentricity);
+  return {
+    x: semiMajorAxisAu * (Math.cos(E) - eccentricity),
+    y: semiMajorAxisAu * Math.sqrt(1 - eccentricity ** 2) * Math.sin(E),
+  };
+}

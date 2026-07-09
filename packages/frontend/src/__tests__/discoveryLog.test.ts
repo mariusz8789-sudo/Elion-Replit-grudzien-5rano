@@ -75,6 +75,12 @@ describe('ACHIEVEMENTS: check() thresholds', () => {
     expect(a.check({ frac: 95 })).toBe(true);
     expect(a.check({ frac: 40 })).toBe(false);
   });
+
+  it('earth-year-completed fires once Earth has closed one full real orbit', () => {
+    const a = ACHIEVEMENTS.find((x) => x.id === 'earth-year-completed')!;
+    expect(a.check({ earthOrbits: 1.02 })).toBe(true);
+    expect(a.check({ earthOrbits: 0.5 })).toBe(false);
+  });
 });
 
 // Statyczny `import '../labs/index'` na górze pliku wciąga NarratorPanel ->

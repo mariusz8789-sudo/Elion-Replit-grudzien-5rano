@@ -26,6 +26,16 @@ jest jakościowo odporny na małe N.
 Chirp: f rośnie do złączenia; amplituda i faza z masy ćwierkowej
 ℳ = (m₁m₂)^⅗/(m₁+m₂)^⅕. GW150914 zgodny z OTW; dane surowe otwarte (GWOSC).
 
+**Prawdziwy Układ Słoneczny (zaimplementowane)** ★★★★★
+Elementy orbitalne 8 planet (półoś wielka, mimośród, okres) z NASA
+Planetary Fact Sheet — publiczne, stabilne stałe. Pozycja liczona
+dokładnym rozwiązaniem równania Keplera M = E − e·sinE (Newton, 8
+iteracji). Zweryfikowane testami: odległość peryhelium/aphelium
+a·(1∓e) dokładna dla wszystkich 8 planet, trzecie prawo Keplera
+T²∝a³ zgodne z rzeczywistymi okresami NASA w granicach 1%. Świadome
+uproszczenie: kąty startowe dowolne (nie żywa efemeryda — to wymaga
+NASA JPL Horizons, patrz niżej), skala odległości skompresowana (√a).
+
 ## Sprzeczne teorie / otwarte spory
 
 **Napięcie Hubble'a** ★★★ (spór realny, nierozstrzygnięty)
@@ -59,9 +69,15 @@ rozstrzygająco na moment zapisu. Obserwować przed Etapem 2.
   darmowe: Carroll arXiv:astro-ph/0004075
 
 ## Dane i inspiracje
-- JPL Horizons (domena publiczna, bez klucza) — ephemerydy Układu Słonecznego
+- JPL Horizons (domena publiczna, bez klucza) — statyczne elementy orbitalne
+  już wpięte (`data/solarSystem.ts`); ŻYWA efemeryda (prawdziwe pozycje
+  planet "dzisiaj", nie tylko kształt orbit) czeka na `scripts/fetch-real-data.mjs
+  jpl` z sieci bez blokady — patrz README „Znane ograniczenia"
 - GWOSC (gwosc.org) — surowe dane fal grawitacyjnych
-- ESA Gaia — pozycje 2 mld gwiazd (CC BY-SA 3.0 IGO dla materiałów)
+- ESA Gaia — pozycje 2 mld gwiazd (CC BY-SA 3.0 IGO dla materiałów);
+  fetcher gotowy (`scripts/fetch-real-data.mjs gaia`), brak jeszcze
+  konsumenta w UI — naturalne miejsce: panel "najbliższe gwiazdy" w tym
+  labie, tym samym wzorcem co Prawdziwy Układ Słoneczny
 - Inspiracje formy (nie kopiować): Universe Sandbox (dramaturgia katastrof),
   NASA Eyes (nawigacja czasem), Space Engine (skala)
 
@@ -74,7 +90,17 @@ rozstrzygająco na moment zapisu. Obserwować przed Etapem 2.
 - Era promieniowania pominięta w Etapie 0 (błąd istotny tylko dla t < 50 tys. lat)
 
 ## Wnioski projektowe dla Genesis OS
+
+**Universe Lab jako laboratorium flagowe (decyzja produktowa).** Kolejność
+eksperymentów zaczyna się dziś od Prawdziwego Układu Słonecznego — to
+jedyny eksperyment w całej aplikacji oparty w 100% na realnych, cytowanych
+stałych NASA zamiast modelu poglądowego. Naturalny kierunek rozwoju:
 1. Zderzenia galaktyk Barnes–Hut = najlepszy stosunek WOW/koszt w tym labie
 2. Chirp GW z dźwiękiem z realnych danych GWOSC — unikalne na mobile
 3. Napięcie Hubble'a i spór o DM to gotowe, uczciwe narracje "nauka żywa,
    nie zamknięta" — wyróżnik wobec konkurencji, która udaje pewność
+4. Żywa efemeryda JPL Horizons (gdy sieć dostępna) zamieniłaby dowolne
+   kąty startowe na realne "gdzie jest Mars dzisiaj" — najwyższy priorytet
+   następnego kroku danych w tym labie
+5. Panel najbliższych gwiazd z ESA Gaia — drugi krok, ten sam wzorzec
+   (`core/dataSource.ts`) co Układ Słoneczny, gdy dane będą pobrane

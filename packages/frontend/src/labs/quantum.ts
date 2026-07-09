@@ -169,10 +169,4 @@ export const quantumLab: LabDefinition = {
     });
     return blocks;
   },
-  roadmap: [
-    'Splątanie i nierówności Bella (Etap 1)',
-    'Bramki kwantowe i kubity na sferze Blocha (Etap 1)',
-    'Tunelowanie przez barierę — pakiet falowy 1D (Etap 1)',
-    'Teleportacja kwantowa krok po kroku (Etap 2)',
-  ],
 };

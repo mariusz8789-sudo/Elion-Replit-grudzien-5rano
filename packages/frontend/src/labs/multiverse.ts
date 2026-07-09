@@ -207,9 +207,4 @@ export const multiverseLab: LabDefinition = {
 
     return blocks;
   },
-  roadmap: [
-    'Rezonans Hoyle\'a i synteza węgla — pełny model progów (Etap 1)',
-    'Galeria nazwanych scenariuszy ("wszechświat bez chemii", "wszechświat wiecznych gwiazd") (Etap 1)',
-    'Porównywarka dwóch wszechświatów obok siebie (Etap 2)',
-  ],
 };

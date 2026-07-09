@@ -170,9 +170,4 @@ export const particleLab: LabDefinition = {
       },
     ];
   },
-  roadmap: [
-    'Dżety kwarkowo-gluonowe i histogram mas (Etap 1)',
-    'Model Standardowy — interaktywna mapa cząstek (Etap 1)',
-    'Rekonstrukcja rozpadu Higgsa H→γγ (Etap 2)',
-  ],
 };

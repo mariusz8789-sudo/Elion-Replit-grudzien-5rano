@@ -164,9 +164,4 @@ export const civilizationLab: LabDefinition = {
     }
     return blocks;
   },
-  roadmap: [
-    'Symulator ekspansji międzygwiezdnej na mapie Galaktyki (Etap 1)',
-    'Katalog megastruktur (pierścień Nivena, powłoki Matrioszki) z bilansami energii (Etap 1)',
-    'Model wielkiego filtra z regulowanymi założeniami (Etap 2)',
-  ],
 };

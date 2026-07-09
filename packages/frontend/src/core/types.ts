@@ -98,6 +98,4 @@ export interface LabDefinition {
   experiments?: ExperimentDef[];
   /** Laboratorium z własnym ekranem (np. Atom Lab z układem okresowym). */
   CustomView?: React.ComponentType<{ lab: LabDefinition }>;
-  /** Zjawiska zaplanowane w tym laboratorium na kolejne etapy. */
-  roadmap: string[];
 }

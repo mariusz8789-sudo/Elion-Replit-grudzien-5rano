@@ -3,15 +3,17 @@ import type { LabDefinition, NarrationBlock, SimParams } from '../core/types';
 /**
  * Warstwa Narratora AI — serce AI Discovery.
  *
- * Architektura providerów:
- *  - LocalNarrator (Etap 0, aktywny): deterministyczny silnik narracji.
- *    Każde laboratorium dostarcza funkcję narrate(params, stats), która
- *    liczy realne wielkości fizyczne z żywych parametrów symulacji i układa
- *    z nich tekst. To nie jest LLM — i celowo: działa offline, natychmiast,
- *    bez kosztów i bez halucynacji.
- *  - LLMNarrator (Etap 1, interfejs gotowy): ten sam kontrakt, ale bloki
- *    przechodzą przez model językowy (backend proxy z kluczem API), który
- *    rozwija narrację, odpowiada na pytania otwarte i proponuje eksperymenty.
+ * Dwie warstwy:
+ *  - Deterministyczna (ten plik, zawsze aktywna): każde laboratorium
+ *    dostarcza funkcję narrate(params, stats), która liczy realne wielkości
+ *    fizyczne z żywych parametrów symulacji i układa z nich tekst. To nie
+ *    jest LLM — i celowo: działa offline, natychmiast, bez kosztów i bez
+ *    halucynacji.
+ *  - LLM opcjonalna (narrator/askAI.ts → backend POST /api/ask): pytania
+ *    otwarte użytkownika, ugruntowane wyłącznie w stanie symulacji, który
+ *    i tak widzi na ekranie. Wymaga ANTHROPIC_API_KEY po stronie backendu;
+ *    bez klucza backend odpowiada uczciwym 503, a warstwa deterministyczna
+ *    działa dalej bez zmian.
  *
  * Komponenty UI znają wyłącznie funkcję narrate() — podmiana providera
  * nie dotyka żadnego laboratorium.

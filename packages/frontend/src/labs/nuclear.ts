@@ -169,9 +169,4 @@ export const nuclearLab: LabDefinition = {
       },
     ];
   },
-  roadmap: [
-    'Rozszczepienie U-235 z reakcją łańcuchową i masą krytyczną (Etap 1)',
-    'Fuzja D-T i warunki tokamaka (Etap 1)',
-    'Pełne łańcuchy rozpadu z produktami pośrednimi (Etap 2)',
-  ],
 };

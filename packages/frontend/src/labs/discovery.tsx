@@ -128,9 +128,4 @@ export const discoveryLab: LabDefinition = {
   params: [],
   narrate: () => [],
   CustomView: DiscoveryView,
-  roadmap: [
-    'LLM w kontekście bieżącej symulacji — pytania otwarte (Etap 1)',
-    'Raporty z eksperymentów i porównywanie scenariuszy (Etap 2)',
-    'Sugestie kierunków badań z szacowaną niepewnością (Etap 3)',
-  ],
 };

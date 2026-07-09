@@ -292,9 +292,4 @@ export const atomLab: LabDefinition = {
   params: [],
   narrate: () => [],
   CustomView: AtomView,
-  roadmap: [
-    'Orbitale s/p/d/f jako chmury prawdopodobieństwa 3D (Etap 1)',
-    'Izotopy i mapa nuklidów (Etap 1)',
-    'Widma emisyjne pierwiastków (Etap 2)',
-  ],
 };

@@ -5,3 +5,6 @@ node_modules
 .env
 *.log
 *.tsbuildinfo
+**/*.test.ts
+**/*.test.mjs
+**/__tests__

@@ -144,9 +144,4 @@ export const spacetimeLab: LabDefinition = {
       },
     ];
   },
-  roadmap: [
-    'Geodezyjne w zakrzywionej czasoprzestrzeni (Etap 1)',
-    'Horyzont zdarzeń i spadek na czarną dziurę z dwóch perspektyw (Etap 1)',
-    'Diagramy czasoprzestrzenne Minkowskiego (Etap 2)',
-  ],
 };

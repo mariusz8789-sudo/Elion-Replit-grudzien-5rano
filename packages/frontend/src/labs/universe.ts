@@ -139,10 +139,4 @@ export const universeLab: LabDefinition = {
     }
     return blocks;
   },
-  roadmap: [
-    'Mgławice i narodziny gwiazd (Etap 1)',
-    'Zderzenia galaktyk N-ciał (Etap 1)',
-    'Soczewkowanie grawitacyjne i fale grawitacyjne (Etap 2)',
-    'Mapa ciemnej materii (Etap 2)',
-  ],
 };

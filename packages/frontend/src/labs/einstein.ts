@@ -247,9 +247,4 @@ export const einsteinLab: LabDefinition = {
     }
     return blocks;
   },
-  roadmap: [
-    'Pełne geodezyjne Schwarzschilda i Kerra (Etap 1)',
-    'Dysk akrecyjny z poprawnym soczewkowaniem (Etap 1)',
-    'Most Einsteina–Rosena jako oznaczony model teoretyczny (Etap 2)',
-  ],
 };

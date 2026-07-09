@@ -11,6 +11,7 @@ import { SearchOverlay } from './components/SearchOverlay';
 import { HelpOverlay } from './components/HelpOverlay';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
 import { track } from './core/analytics';
+import { t } from './core/i18n';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -135,7 +136,7 @@ export default function App() {
   if (route.kind === 'settings') {
     return (
       <div className="app">
-        <TopBar title="⚙ Ustawienia" onSearch={() => setSearchOpen(true)} />
+        <TopBar title={`⚙ ${t('nav.settings')}`} onSearch={() => setSearchOpen(true)} />
         <SettingsScreen />
         {overlays}
       </div>
@@ -145,7 +146,7 @@ export default function App() {
   if (route.kind === 'discovery-log') {
     return (
       <div className="app">
-        <TopBar title="🏆 Dziennik odkryć" onSearch={() => setSearchOpen(true)} />
+        <TopBar title={`🏆 ${t('nav.discoveryLog')}`} onSearch={() => setSearchOpen(true)} />
         <DiscoveryLogScreen />
         {overlays}
       </div>
@@ -155,7 +156,7 @@ export default function App() {
   if (route.kind === 'glossary') {
     return (
       <div className="app">
-        <TopBar title="📚 Słowniczek" onSearch={() => setSearchOpen(true)} />
+        <TopBar title={`📚 ${t('nav.glossary')}`} onSearch={() => setSearchOpen(true)} />
         <GlossaryScreen />
         {overlays}
       </div>
@@ -168,16 +169,16 @@ export default function App() {
         <ScaleJourney />
         <nav className="home-nav" aria-label="Nawigacja Genesis OS">
           <button onClick={() => setSearchOpen(true)}>
-            <span aria-hidden="true">🔍</span> Szukaj
+            <span aria-hidden="true">🔍</span> {t('nav.search')}
           </button>
           <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
-            <span aria-hidden="true">🏆</span> Dziennik odkryć
+            <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}
           </button>
           <button onClick={() => { window.location.hash = '#/glossary'; }}>
-            <span aria-hidden="true">📚</span> Słowniczek
+            <span aria-hidden="true">📚</span> {t('nav.glossary')}
           </button>
           <button onClick={() => { window.location.hash = '#/settings'; }}>
-            <span aria-hidden="true">⚙</span> Ustawienia
+            <span aria-hidden="true">⚙</span> {t('nav.settings')}
           </button>
         </nav>
         <div className="section-label">Laboratoria · {getLabs().length} modułów</div>
@@ -214,7 +215,7 @@ function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {
       <div className="titles">
         <h1>{title}</h1>
       </div>
-      <button className="back" aria-label="Szukaj" onClick={onSearch} style={{ marginLeft: 'auto' }}>
+      <button className="back" aria-label={t('nav.search')} onClick={onSearch} style={{ marginLeft: 'auto' }}>
         🔍
       </button>
     </header>

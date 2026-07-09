@@ -44,6 +44,24 @@ odczycie → hook `useXxx()` dla komponentów React. Zobacz
 fizycznych, tylko obserwacja wartości, które sim już liczy i tak
 (`getStats()`).
 
+## Dodawanie języka (i18n)
+
+`core/i18n.ts` to gotowy szkielet: `t(key)`, `setLocale()`/`getLocale()`,
+subskrypcja zmian. Dziś aktywny jest wyłącznie `pl` — słownik `en` jest
+świadomie pusty, nie automatycznie "przetłumaczony", bo:
+
+1. **Treść naukowa labów (formuły, narracja, nazwy eksperymentów) NIE jest
+   dziś objęta `t()`** — to setki stringów rozsianych po `src/labs/`,
+   wymagających przeglądu native speakera/fizyka pod kątem terminologii,
+   nie mechanicznego tłumaczenia. Migrować lab po labie, nie hurtowo.
+2. **Chrom aplikacji JEST już objęty** (`App.tsx` nawigacja, skip link w
+   `main.tsx`) jako dowód, że mechanizm działa — nowe klucze UI dodawaj
+   tym samym wzorcem: klucz w `pl` w `core/i18n.ts`, `t('klucz')` w JSX.
+3. Żeby dodać nowy język: wypełnij słownik w `core/i18n.ts`, dodaj go do
+   `Locale` i `DICTIONARIES`. Selektor języka w UI (Ustawienia) celowo NIE
+   istnieje, dopóki jest tylko jeden kompletny język — pusty przełącznik
+   byłby swoim własnym martwym kodem.
+
 ## Przed commitem
 
 ```bash

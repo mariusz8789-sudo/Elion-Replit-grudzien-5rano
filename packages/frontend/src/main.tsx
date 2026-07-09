@@ -2,11 +2,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { t } from './core/i18n';
 import './styles.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <a href="#main-content" className="skip-link">Przejdź do treści</a>
+    <a href="#main-content" className="skip-link">{t('skipLink')}</a>
     <ErrorBoundary>
       <App />
     </ErrorBoundary>

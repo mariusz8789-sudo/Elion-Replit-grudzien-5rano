@@ -1,0 +1,74 @@
+# Changelog
+
+Format luźno wzorowany na [Keep a Changelog](https://keepachangelog.com/).
+Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
+`RAPORT-ETAP-1.md` · `RAPORT-ETAP-2.md` · `RAPORT-AUDYT.md`.
+
+## [Unreleased] — utwardzanie produkcyjne i funkcje lokalne
+
+### Dodano
+- Ustawienia (redukcja ruchu, wysoki kontrast, kompaktowy Narrator,
+  opt-out z lokalnej analityki) — w pełni lokalne, `localStorage`.
+- Paleta poleceń (`/` lub ikona Szukaj) — wyszukiwanie po wszystkich
+  laboratoriach i eksperymentach, normalizacja polskich znaków.
+- Dziennik odkryć — 10 odznak odblokowywanych z realnych progów
+  fizycznych już liczonych przez symulacje (zero nowych obliczeń).
+- Słowniczek — 29 pojęć skondensowanych z Genesis Knowledge Base,
+  filtrowalny po laboratorium i tekście.
+- Globalne skróty klawiszowe (Spacja/R/`/`/`?`/Esc) + nakładka pomocy.
+- Dostępność: skip link, pułapka fokusu w nakładkach modalnych,
+  `aria-live` w panelu Narratora, granica błędu per-laboratorium (jedna
+  awaria symulacji nie zabiera nawigacji).
+- Backend: nagłówki bezpieczeństwa na każdej odpowiedzi (CSP,
+  X-Frame-Options, Referrer-Policy, Permissions-Policy,
+  Strict-Transport-Security).
+- Backend: `lib.mjs` — czysta, testowalna logika (walidacja, rate limiter,
+  rozwiązywanie ścieżek statycznych) + 21 testów `node:test`.
+- 49 nowych testów frontendowych dla nowych modułów lokalnych (86 razem).
+- `ARCHITECTURE.md`, `CONTRIBUTING.md`, ten `CHANGELOG.md`.
+
+### Zmieniono
+- React/react-dom wydzielone do osobnego chunku (`manualChunks`) dla
+  lepszego cache'owania długoterminowego.
+- Refaktor DRY: wspólny `HonestyBadge` i pomocnicze funkcje rysowania
+  krzywych na canvasie (`canvasHelpers.ts`) zamiast duplikacji w 4+
+  plikach symulacji.
+- `discovery.tsx` pokazuje żywy status backendu LLM (`GET /api/health`)
+  zamiast statycznego tekstu z poprzedniego etapu.
+
+### Naprawiono
+- Path traversal na serwerze statycznym: stary check
+  `filePath.startsWith(STATIC_DIR)` błędnie przepuszczał katalogi
+  siostrzane dzielące prefiks (np. `/app/dist-evil` pasowało do
+  `/app/dist`). Naprawione porównaniem do `staticDir + separator`.
+- `core/settings.ts` mogło rzucić poza przeglądarką (brak `document`) —
+  dodana jawna strażniczka.
+
+## Etap Audytu — gotowość produkcyjna
+
+Pełny audyt kodu, bezpieczeństwa, wydajności i UX bez nowych funkcji
+użytkowych. Naprawiona konfiguracja `.replit` (Deploy wskazywał na
+nieistniejący `dist/index.js`), dodane CI/CD (GitHub Actions), ESLint +
+Prettier, Docker (multi-stage, non-root), `SECURITY.md`, `LICENSE`,
+`.env.example`, ErrorBoundary, poprawki SEO/PWA/WCAG. Szczegóły:
+`RAPORT-AUDYT.md`.
+
+## Etap 2 — AI, dane rzeczywiste, offline
+
+Splątanie kwantowe + gra CHSH (kwantowy vs. ukryte zmienne), PWA w pełni
+offline (service worker, manifest), realne dane CERN Open Data (CMS
+dimuon, CC0) w laboratorium cząstek, backend AI (proxy Anthropic), testy
+fizyki w vitest (`core/physics.ts`). Szczegóły: `RAPORT-ETAP-2.md`.
+
+## Etap 1 — rozwój istniejących laboratoriów
+
+Framework wielu eksperymentów na laboratorium (`ExperimentDef`), 9 nowych
+symulacji fizycznych, orbitale atomowe, presety multiwersum. Żadnych
+nowych laboratoriów — pogłębienie istniejących dziesięciu. Szczegóły:
+`RAPORT-ETAP-1.md`.
+
+## Etap 0 — fundament
+
+Architektura pluginowa (`LabDefinition`/`registry.ts`), Scale Journey,
+10 laboratoriów z pierwszymi symulacjami, deterministyczny Narrator AI,
+etykiety uczciwości naukowej. Szczegóły: `RAPORT-ETAP-0.md`.

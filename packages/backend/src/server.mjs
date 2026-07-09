@@ -10,8 +10,13 @@
  *  - limit wielkości żądania (16 kB) i długości pytania (500 znaków),
  *  - walidacja typów pól kontekstu (tylko płaskie wartości, ograniczone klucze),
  *  - rate limit per IP (10 pytań/min) ze sprzątaniem pamięci,
- *  - ścieżki plików kanonizowane (zero path traversal),
+ *  - ścieżki plików kanonizowane z granicą katalogu (zero path traversal),
+ *  - nagłówki bezpieczeństwa (CSP, X-Frame-Options, Permissions-Policy, ...)
+ *    na KAŻDEJ odpowiedzi — patrz lib.mjs → SECURITY_HEADERS,
  *  - graceful shutdown (SIGTERM/SIGINT) — bezpieczne dla autoscale.
+ *
+ * Czysta logika (bez portów/gniazd) żyje w lib.mjs — testowana przez
+ * `node --test` bez uruchamiania serwera.
  */
 
 import http from 'node:http';
@@ -19,6 +24,14 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
+import {
+  sanitizeFlat,
+  createRateLimiter,
+  mimeFor,
+  isHashedAsset,
+  resolveStaticPath,
+  SECURITY_HEADERS,
+} from './lib.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8080);
@@ -45,37 +58,9 @@ Twarde zasady (nie wolno ich łamać):
 5. Odpowiadasz po polsku, zwięźle (maksymalnie ~120 słów), poprawnie fizycznie, na poziomie zaciekawionego licealisty — chyba że pytanie sugeruje wyższy poziom.`;
 
 /* ---------------- Rate limiting ---------------- */
-const buckets = new Map();
-function allow(ip) {
-  const now = Date.now();
-  const b = buckets.get(ip) ?? { count: 0, reset: now + 60_000 };
-  if (now > b.reset) {
-    b.count = 0;
-    b.reset = now + 60_000;
-  }
-  b.count++;
-  buckets.set(ip, b);
-  return b.count <= 10;
-}
+const limiter = createRateLimiter({ limit: 10, windowMs: 60_000 });
 // Sprzątanie wygasłych wpisów — pamięć nie rośnie z liczbą adresów IP.
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, b] of buckets) if (now > b.reset) buckets.delete(ip);
-}, 300_000).unref();
-
-/* ---------------- Walidacja wejścia ---------------- */
-/** Płaski obiekt: max 24 klucze, wartości proste, stringi przycięte. */
-function sanitizeFlat(obj, maxKeys = 24) {
-  if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) return {};
-  const out = {};
-  for (const [k, v] of Object.entries(obj).slice(0, maxKeys)) {
-    const key = String(k).slice(0, 60);
-    if (typeof v === 'number' && Number.isFinite(v)) out[key] = v;
-    else if (typeof v === 'boolean') out[key] = v;
-    else if (typeof v === 'string') out[key] = v.slice(0, 200);
-  }
-  return out;
-}
+setInterval(() => limiter.cleanup(), 300_000).unref();
 
 function json(res, status, body) {
   res.writeHead(status, {
@@ -94,7 +79,7 @@ async function handleAsk(req, res) {
     });
   }
   const ip = req.socket.remoteAddress ?? 'unknown';
-  if (!allow(ip)) {
+  if (!limiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Limit 10 pytań na minutę — odczekaj chwilę.' });
   }
 
@@ -167,36 +152,20 @@ async function handleAsk(req, res) {
 }
 
 /* ---------------- Statyczny frontend (produkcja) ---------------- */
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.webmanifest': 'application/manifest+json; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.txt': 'text/plain; charset=utf-8',
-  '.woff2': 'font/woff2',
-};
-
 function serveStatic(req, res) {
-  const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  // Kanonizacja — żądanie nigdy nie wyjdzie poza STATIC_DIR.
-  let filePath = path.normalize(path.join(STATIC_DIR, urlPath));
-  if (!filePath.startsWith(STATIC_DIR)) {
+  const urlPath = new URL(req.url, 'http://x').pathname;
+  const resolved = resolveStaticPath(STATIC_DIR, urlPath);
+  if (!resolved.ok) {
     return json(res, 403, { error: 'forbidden' });
   }
+  let filePath = resolved.filePath;
   if (!existsSync(filePath) || statSync(filePath).isDirectory()) {
     filePath = path.join(STATIC_DIR, 'index.html'); // fallback SPA
   }
-  const ext = path.extname(filePath);
-  const hashed = /-[A-Za-z0-9_-]{8,}\./.test(path.basename(filePath));
   res.writeHead(200, {
-    'content-type': MIME[ext] ?? 'application/octet-stream',
+    'content-type': mimeFor(filePath),
     // Hashowane assety Vite: cache na rok; index/manifest/sw: zawsze świeże.
-    'cache-control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache',
-    'x-content-type-options': 'nosniff',
+    'cache-control': isHashedAsset(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache',
   });
   createReadStream(filePath).pipe(res);
 }
@@ -205,6 +174,10 @@ function serveStatic(req, res) {
 const staticAvailable = existsSync(path.join(STATIC_DIR, 'index.html'));
 
 const server = http.createServer((req, res) => {
+  // Ustawione na starcie przez setHeader — writeHead() w dalszym kodzie
+  // dopisuje nagłówki specyficzne dla trasy bez usuwania tych globalnych.
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
+
   if (req.method === 'GET' && req.url === '/api/health') {
     return json(res, 200, {
       ok: true,

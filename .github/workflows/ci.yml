@@ -23,7 +23,7 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Testy fizyki (regresje naukowe)
+      - name: Testy (fizyka, funkcje lokalne, backend)
         run: npm test
 
       - name: Typecheck + build produkcyjny

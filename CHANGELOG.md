@@ -6,6 +6,8 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased] — utwardzanie produkcyjne i funkcje lokalne
 
+Pełny raport z uzasadnieniem każdej zmiany: [`RAPORT-AUDYT-2.md`](RAPORT-AUDYT-2.md).
+
 ### Dodano
 - Ustawienia (redukcja ruchu, wysoki kontrast, kompaktowy Narrator,
   opt-out z lokalnej analityki) — w pełni lokalne, `localStorage`.

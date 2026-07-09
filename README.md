@@ -84,6 +84,7 @@ jako fakty.
 - [`SECURITY.md`](SECURITY.md) — model zagrożeń
 - [`RESEARCH.md`](RESEARCH.md) i [`knowledge/`](knowledge/) — Genesis Knowledge Base (źródła naukowe per laboratorium)
 - Raporty etapów: [`RAPORT-ETAP-0.md`](RAPORT-ETAP-0.md) · [`RAPORT-ETAP-1.md`](RAPORT-ETAP-1.md) ·
-  [`RAPORT-ETAP-2.md`](RAPORT-ETAP-2.md) · [`RAPORT-AUDYT.md`](RAPORT-AUDYT.md)
+  [`RAPORT-ETAP-2.md`](RAPORT-ETAP-2.md) · [`RAPORT-AUDYT.md`](RAPORT-AUDYT.md) ·
+  [`RAPORT-AUDYT-2.md`](RAPORT-AUDYT-2.md)
 
 Wdrożenie: Replit (Run/Deploy) albo `docker compose up --build`.

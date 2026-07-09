@@ -145,10 +145,14 @@ Ręczna weryfikacja w przeglądarce (Playwright, `vite preview`):
 ## Wniosek
 
 Repozytorium jest dziś w stanie, w którym każda widoczna funkcja jest
-albo w pełni działająca (10 laboratoriów, PWA offline, dane CERN,
-funkcje lokalne, dostępność), albo jawnie i uczciwie oznaczona jako
-wymagająca zewnętrznej decyzji (klucz API). Nie ma miejsc z atrapami,
-danymi demo ani "TODO" udającymi gotową funkcję. Kolejny sensowny krok to
-Twoja decyzja: import do Replit i/lub ustawienie klucza AI — obie ścieżki
+albo w pełni działająca (10 laboratoriów, PWA offline, funkcje lokalne,
+dostępność), albo jawnie i uczciwie oznaczona jako niepełna wprost w UI —
+najbardziej znaczący przykład to laboratorium cząstek: metoda i masy
+rezonansów są prawdziwe, ale zbiór zderzeń jest syntetyczny, a UI mówi to
+wprost w notatce uczciwości zamiast udawać realne dane (poprzednia wersja
+tego zdania w tym raporcie błędnie twierdziła, że dane CERN są już
+załadowane — poprawione po ponownej weryfikacji kodu, patrz `README.md` →
+"Znane ograniczenia"). Kolejny sensowny krok to Twoja decyzja: import do
+Replit i/lub ustawienie klucza AI — obie ścieżki
 są przetestowane i udokumentowane (`README.md` → Uruchomienie, `replit.md`
 → Deployment).

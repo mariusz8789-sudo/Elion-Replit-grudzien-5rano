@@ -16,7 +16,12 @@ Wszechświata (8,8×10²⁶ m).
   symulacji widocznym na ekranie
 - **Etykiety uczciwości naukowej** na każdym module: dokładne wzory / model
   uproszczony / model edukacyjny / hipoteza
-- **Realne dane CERN Open Data** (CC0) w laboratorium cząstek
+- **Laboratorium cząstek**: masy i szerokości rezonansów prawdziwe (PDG), metoda
+  identyczna z tą, którą odkryto J/ψ i Z⁰ (histogram masy niezmienniczej par
+  mionów) — ale sam zbiór zderzeń jest dziś syntetyczny, wzorowany na widmach
+  CMS. Realne CERN Open Data (CC0) mają udokumentowany punkt podpięcia
+  (`src/data/dimuon-real.ts`), ale nie są jeszcze załadowane — patrz
+  "Znane ograniczenia" niżej
 - **PWA w pełni offline** — service worker, manifest, zweryfikowane działanie
   bez sieci
 - **Funkcje lokalne, bez konta i bez backendu**: Ustawienia (redukcja ruchu,
@@ -75,6 +80,23 @@ Jeżeli czegoś nie da się wiernie zasymulować na telefonie, nie udajemy:
 każdy moduł nosi widoczną etykietę poziomu wierności, a hipotezy
 (multiwersum, napęd Alcubierre'a, rój Dysona) nigdy nie są przedstawiane
 jako fakty.
+
+## Znane ograniczenia
+
+Uczciwość naukowa dotyczy też tego dokumentu, nie tylko UI:
+
+- **Dane w laboratorium cząstek są syntetyczne**, nie realnymi zderzeniami CERN
+  Open Data — mimo że masy rezonansów (PDG) i metoda (histogram masy
+  niezmienniczej) są prawdziwe. Sieć w środowisku, w którym rozwijana jest ta
+  aplikacja, blokuje `opendata.cern.ch` (HTTP 403 na próbę pobrania), więc
+  rzeczywisty zbiór CMS dimuon nigdy nie został ściągnięty i podpięty. Punkt
+  wymiany istnieje (`packages/frontend/src/data/dimuon-real.ts` — dodaj ten
+  plik z prawdziwymi masami, `particle-invmass.ts` przełączy się na niego
+  automatycznie), ale to Ty musisz go wypełnić z sieci, która ma dostęp.
+- **"Zapytaj AI" wymaga `ANTHROPIC_API_KEY`** — bez klucza backend zwraca
+  uczciwy błąd 503 zamiast fałszywej odpowiedzi.
+- **Brak kont, bazy danych i płatności** — świadomie poza zakresem; wzorzec
+  rozszerzenia opisany w `ARCHITECTURE.md`.
 
 ## Dokumentacja
 

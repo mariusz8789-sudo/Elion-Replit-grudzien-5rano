@@ -55,12 +55,16 @@ Prettier, Docker (multi-stage, non-root), `SECURITY.md`, `LICENSE`,
 `.env.example`, ErrorBoundary, poprawki SEO/PWA/WCAG. Szczegóły:
 `RAPORT-AUDYT.md`.
 
-## Etap 2 — AI, dane rzeczywiste, offline
+## Etap 2 — AI, offline, przygotowanie pod dane rzeczywiste
 
 Splątanie kwantowe + gra CHSH (kwantowy vs. ukryte zmienne), PWA w pełni
-offline (service worker, manifest), realne dane CERN Open Data (CMS
-dimuon, CC0) w laboratorium cząstek, backend AI (proxy Anthropic), testy
-fizyki w vitest (`core/physics.ts`). Szczegóły: `RAPORT-ETAP-2.md`.
+offline (service worker, manifest), backend AI (proxy Anthropic), testy
+fizyki w vitest (`core/physics.ts`). Laboratorium cząstek: masy rezonansów
+(PDG) i metoda histogramu masy niezmienniczej są prawdziwe, ale zbiór
+zderzeń pozostał syntetyczny — `opendata.cern.ch` był niedostępny z
+ówczesnej sieci deweloperskiej (HTTP 403); punkt podpięcia realnych danych
+CMS (CC0) istnieje (`data/dimuon-real.ts`), ale nikt jeszcze go nie
+wypełnił. Szczegóły: `RAPORT-ETAP-2.md`.
 
 ## Etap 1 — rozwój istniejących laboratoriów
 

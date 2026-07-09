@@ -88,11 +88,17 @@ Uczciwość naukowa dotyczy też tego dokumentu, nie tylko UI:
 - **Dane w laboratorium cząstek są syntetyczne**, nie realnymi zderzeniami CERN
   Open Data — mimo że masy rezonansów (PDG) i metoda (histogram masy
   niezmienniczej) są prawdziwe. Sieć w środowisku, w którym rozwijana jest ta
-  aplikacja, blokuje `opendata.cern.ch` (HTTP 403 na próbę pobrania), więc
-  rzeczywisty zbiór CMS dimuon nigdy nie został ściągnięty i podpięty. Punkt
-  wymiany istnieje (`packages/frontend/src/data/dimuon-real.ts` — dodaj ten
-  plik z prawdziwymi masami, `particle-invmass.ts` przełączy się na niego
-  automatycznie), ale to Ty musisz go wypełnić z sieci, która ma dostęp.
+  aplikacja, blokuje `opendata.cern.ch`, `ssd.jpl.nasa.gov` i
+  `gea.esac.esa.int` na poziomie polityki bramki (403, nie chwilowa awaria —
+  zweryfikowane przez `curl "$HTTPS_PROXY/__agentproxy/status"`), więc żadne
+  z tych źródeł nigdy nie zostało realnie pobrane z tej sesji. Uruchom z
+  sieci bez tej blokady: `node scripts/fetch-real-data.mjs cern` (analogicznie
+  `jpl`, `gaia`, `all`) — skrypt zapisuje dane w `packages/frontend/src/data/`,
+  a `core/dataSource.ts` (rejestr źródeł danych) i istniejący mechanizm
+  podpięcia w `particle-invmass.ts` wykrywają je automatycznie, bez zmian w
+  kodzie aplikacji. Skrypt jest napisany, ale nieprzetestowany end-to-end
+  z tego samego powodu — dokładne pola API do zweryfikowania przy pierwszym
+  uruchomieniu, patrz komentarze „DO ZWERYFIKOWANIA" w jego kodzie.
 - **"Zapytaj AI" wymaga `ANTHROPIC_API_KEY`** — bez klucza backend zwraca
   uczciwy błąd 503 zamiast fałszywej odpowiedzi.
 - **Brak kont, bazy danych i płatności** — świadomie poza zakresem; wzorzec

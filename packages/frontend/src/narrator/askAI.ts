@@ -7,6 +7,8 @@ import type { NarrationBlock, SimParams } from '../core/types';
  */
 
 export interface AskContext {
+  /** Id laboratorium (np. "quantum") — backend mapuje je na knowledge/*.md do groundingu. */
+  labId: string;
   lab: string;
   experiment: string;
   honesty: string;
@@ -21,13 +23,14 @@ export type AskResult =
   | { ok: false; reason: 'offline' | 'no-key' | 'rate-limited' | 'error'; message: string };
 
 export function buildContext(
-  lab: { name: string; honesty: string; honestyNote: string },
+  lab: { id: string; name: string; honesty: string; honestyNote: string },
   experimentName: string,
   params: SimParams,
   stats: Record<string, number>,
   blocks: NarrationBlock[],
 ): AskContext {
   return {
+    labId: lab.id,
     lab: lab.name,
     experiment: experimentName,
     honesty: lab.honesty,

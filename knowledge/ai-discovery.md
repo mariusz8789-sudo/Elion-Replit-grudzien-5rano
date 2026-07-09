@@ -12,14 +12,23 @@ k) i składa tekst. Zero halucynacji, offline, zerowy koszt. To warstwa
 odpowiedzialna za wszystkie LICZBY pokazywane użytkownikowi — LLM nigdy nie
 liczy fizyki.
 
-**Warstwa 1 — LLM (Etap 1/2): zasady projektowe**
+**Warstwa 1 — LLM: zasady projektowe (zaimplementowane)**
 - Backend proxy trzyma klucz; frontend nigdy go nie widzi
 - Prompt = stan symulacji (parametry+statystyki+etykieta uczciwości) +
-  pytanie użytkownika; model odpowiada TYLKO w kontekście widocznej symulacji
+  **wyciąg z knowledge/<lab>.md dla laboratorium, którego dotyczy pytanie**
+  (`buildKnowledgeIndex`/`knowledgeExcerptFor` w `packages/backend/src/lib.mjs`,
+  ładowane raz przy starcie serwera, mapowanie lab→plik jak w tabeli
+  „Katalogi" wyżej w README) + pytanie użytkownika
 - Grounding liczbowy: wartości wstrzykuje warstwa 0; LLM je opisuje, nie oblicza
+- Grounding faktograficzny: SYSTEM_PROMPT zabrania modelowi sięgać po wiedzę
+  ogólną dla twierdzeń wykraczających poza stan symulacji — jedyne dozwolone
+  źródło to przekazany wyciąg bazy wiedzy; brak odpowiedzi w wyciągu = model
+  ma powiedzieć to wprost zamiast zgadywać
 - Zakazy twarde: ogłaszanie „odkryć", przedstawianie hipotez jako faktów,
   odpowiadanie poza kontekstem naukowym platformy
-- Każda odpowiedź LLM oznaczona jako AI + poziom pewności
+- Każda odpowiedź LLM oznaczona poziomem pewności z sześciostopniowej skali
+  (identycznej jak w tym pliku) — wymuszone instrukcją w SYSTEM_PROMPT, nie
+  weryfikowane automatycznie (LLM może się pomylić — patrz Ryzyka niżej)
 
 **Warstwa 2 — zależności między laboratoriami (Etap 1)**
 Graf powiązań utrzymywany ręcznie (jakość > automatyka), np.:
@@ -38,6 +47,12 @@ synteza węgla (Nuclear/Universe).
 ## Ryzyka i mitygacje
 - Halucynacje → grounding + warstwa 0 liczy wszystko + testy regresyjne
   odpowiedzi na złotym zestawie pytań
+- **Oznaczenie poziomu pewności jest wymuszone instrukcją w prompcie, nie
+  zweryfikowane programowo** — model teoretycznie może przypisać złą gwiazdkę
+  albo pominąć oznaczenie. Nie ma dziś automatycznego testu sprawdzającego
+  TREŚĆ prawdziwej odpowiedzi LLM (wymagałby klucza API + oceny jakościowej,
+  nie tylko strukturalnej). Uczciwie: to słabszy poziom gwarancji niż warstwa
+  0 (tam liczby są matematycznie wymuszone, nie tylko wyinstruowane)
 - Koszty → cache odpowiedzi na pytania powtarzalne; limity per user; model
   tani do parafraz, droższy tylko do pytań otwartych
 - Prywatność dzieci (EDU) → tryb bez wysyłania czegokolwiek: warstwa 0

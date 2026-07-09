@@ -28,4 +28,13 @@ export default tseslint.config(
       'no-console': 'off', // backend loguje przez console (strukturalny JSON)
     },
   },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: { console: 'readonly', process: 'readonly', fetch: 'readonly' },
+    },
+    rules: {
+      'no-console': 'off', // skrypty CLI raportują postęp przez console
+    },
+  },
 );

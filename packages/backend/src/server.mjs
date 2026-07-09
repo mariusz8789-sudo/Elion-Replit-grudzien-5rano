@@ -20,7 +20,7 @@
  */
 
 import http from 'node:http';
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
@@ -31,6 +31,8 @@ import {
   isHashedAsset,
   resolveStaticPath,
   SECURITY_HEADERS,
+  buildKnowledgeIndex,
+  knowledgeExcerptFor,
 } from './lib.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -39,11 +41,18 @@ const MODEL = process.env.GENESIS_AI_MODEL ?? 'claude-opus-4-8';
 const STATIC_DIR = path.resolve(
   process.env.GENESIS_STATIC_DIR ?? path.join(__dirname, '../../frontend/dist'),
 );
+const KNOWLEDGE_DIR = path.resolve(
+  process.env.GENESIS_KNOWLEDGE_DIR ?? path.join(__dirname, '../../../knowledge'),
+);
 const VERSION = process.env.npm_package_version ?? '0.2.0';
 const startedAt = Date.now();
 
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 const client = hasKey ? new Anthropic() : null;
+
+// Wczytane raz przy starcie — pliki knowledge/*.md rzadko się zmieniają,
+// a to grounding dla KAŻDEGO zapytania do /api/ask (patrz handleAsk niżej).
+const knowledgeIndex = buildKnowledgeIndex(KNOWLEDGE_DIR, (p) => readFileSync(p, 'utf8'));
 
 const log = (level, msg, extra = {}) =>
   console.log(JSON.stringify({ t: new Date().toISOString(), level, msg, ...extra }));
@@ -55,7 +64,9 @@ Twarde zasady (nie wolno ich łamać):
 2. Wszystkie wartości liczbowe pochodzą z przekazanego stanu symulacji — NIE obliczasz własnych wyników symulacji ani ich nie zgadujesz. Wolno Ci przytaczać znane stałe i wyniki fizyki (np. masę elektronu, rok odkrycia).
 3. Hipotezy (multiwersum, rój Dysona, metryka Alcubierre'a) zawsze oznaczasz jako hipotezy. Nigdy nie ogłaszasz "odkryć".
 4. Szanujesz etykietę uczciwości modelu — jeśli symulacja jest uproszczona, mówisz o tym, gdy to istotne.
-5. Odpowiadasz po polsku, zwięźle (maksymalnie ~120 słów), poprawnie fizycznie, na poziomie zaciekawionego licealisty — chyba że pytanie sugeruje wyższy poziom.`;
+5. Odpowiadasz po polsku, zwięźle (maksymalnie ~120 słów), poprawnie fizycznie, na poziomie zaciekawionego licealisty — chyba że pytanie sugeruje wyższy poziom.
+6. Gdy w wiadomości otrzymasz sekcję "Baza wiedzy Genesis OS" — to Twoje JEDYNE dozwolone źródło dla twierdzeń wykraczających poza sam stan symulacji (definicje, historia, spory naukowe). Jeśli baza nie zawiera odpowiedzi na pytanie, powiedz to wprost zamiast zgadywać z ogólnej wiedzy.
+7. Każde twierdzenie wykraczające poza odczyt bieżącej symulacji oznacz jednym z poziomów: ★★★★★ potwierdzona eksperymentalnie / ★★★★ silny konsensus / ★★★ częściowo potwierdzona / ★★ hipoteza / ★ spekulacja / ☆ science fiction — dokładnie tą samą skalą, którą baza wiedzy już stosuje. Nie musisz oznaczać każdego zdania osobno — jedno oznaczenie na twierdzenie wystarczy.`;
 
 /* ---------------- Rate limiting ---------------- */
 const limiter = createRateLimiter({ limit: 10, windowMs: 60_000 });
@@ -107,6 +118,7 @@ async function handleAsk(req, res) {
     if (!question) return json(res, 400, { error: 'empty_question' });
 
     // Kontekst: wyłącznie dane, które użytkownik i tak widzi — po walidacji.
+    const labId = String(body.labId ?? '').slice(0, 40);
     const ctx = {
       lab: String(body.lab ?? '').slice(0, 80),
       experiment: String(body.experiment ?? '').slice(0, 80),
@@ -121,25 +133,27 @@ async function handleAsk(req, res) {
           }))
         : [],
     };
+    const knowledge = knowledgeExcerptFor(knowledgeIndex, labId);
 
     const t0 = Date.now();
     try {
+      const promptParts = [`Stan symulacji (JSON):\n${JSON.stringify(ctx, null, 1).slice(0, 6000)}`];
+      if (knowledge) {
+        promptParts.push(`Baza wiedzy Genesis OS dla tego laboratorium (jedyne dozwolone źródło poza stanem symulacji):\n${knowledge}`);
+      }
+      promptParts.push(`Pytanie użytkownika: ${question}`);
+
       const response = await client.messages.create({
         model: MODEL,
         max_tokens: 600,
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-        messages: [
-          {
-            role: 'user',
-            content: `Stan symulacji (JSON):\n${JSON.stringify(ctx, null, 1).slice(0, 6000)}\n\nPytanie użytkownika: ${question}`,
-          },
-        ],
+        messages: [{ role: 'user', content: promptParts.join('\n\n') }],
       });
       const text = response.content
         .filter((b) => b.type === 'text')
         .map((b) => b.text)
         .join('\n');
-      log('info', 'ask', { lab: ctx.lab, ms: Date.now() - t0, stop: response.stop_reason });
+      log('info', 'ask', { lab: ctx.lab, labId, grounded: Boolean(knowledge), ms: Date.now() - t0, stop: response.stop_reason });
       if (response.stop_reason === 'refusal' || !text) {
         return json(res, 200, { answer: 'Nie mogę odpowiedzieć na to pytanie — wróćmy do fizyki symulacji.' });
       }
@@ -186,6 +200,7 @@ const server = http.createServer((req, res) => {
       ai: hasKey ? 'ready' : 'no-key',
       model: hasKey ? MODEL : null,
       static: staticAvailable,
+      knowledgeLabs: knowledgeIndex.size,
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);

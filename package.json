@@ -13,7 +13,8 @@
     "test": "npm run test --workspace=packages/frontend && npm run test --workspace=packages/backend",
     "lint": "eslint .",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,mjs,css}\" \"*.md\" \"knowledge/*.md\"",
-    "preview": "npm run preview --workspace=packages/frontend"
+    "preview": "npm run preview --workspace=packages/frontend",
+    "fetch-real-data": "node scripts/fetch-real-data.mjs"
   },
   "keywords": [
     "genesis-os",

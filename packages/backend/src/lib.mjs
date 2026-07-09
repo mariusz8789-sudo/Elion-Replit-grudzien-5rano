@@ -8,6 +8,52 @@
 
 import path from 'node:path';
 
+/* ---------------- Grounding: baza wiedzy Genesis ---------------- */
+
+/**
+ * Mapowanie id laboratorium → plik w knowledge/ — dokładnie ta sama tabela,
+ * co w knowledge/README.md „Katalogi" (jedno miejsce prawdy, dwa formaty:
+ * ludzki markdown i to mapowanie kodowe).
+ */
+export const LAB_KNOWLEDGE_FILES = {
+  universe: 'universe.md',
+  spacetime: 'spacetime-einstein.md',
+  einstein: 'spacetime-einstein.md',
+  quantum: 'quantum.md',
+  atom: 'atom.md',
+  nuclear: 'nuclear.md',
+  particle: 'particle.md',
+  multiverse: 'multiverse.md',
+  civilization: 'civilization.md',
+  discovery: 'ai-discovery.md',
+};
+
+/**
+ * Wczytuje wszystkie pliki bazy wiedzy do pamięci RAZ (przy starcie serwera).
+ * `readFileFn` jest wstrzykiwane, żeby dało się to przetestować bez
+ * dotykania prawdziwego systemu plików. Brakujący plik nie wywala reszty —
+ * grounding po prostu nie zadziała dla TEGO jednego laboratorium (patrz
+ * server.mjs: pytanie dostanie wtedy tylko stan symulacji, tak jak dotąd).
+ */
+export function buildKnowledgeIndex(knowledgeDir, readFileFn) {
+  const index = new Map();
+  for (const [labId, filename] of Object.entries(LAB_KNOWLEDGE_FILES)) {
+    try {
+      index.set(labId, readFileFn(path.join(knowledgeDir, filename)));
+    } catch {
+      // plik nieobecny w tym środowisku (np. Docker bez COPY knowledge/) — pomijamy
+    }
+  }
+  return index;
+}
+
+/** Wycinek bazy wiedzy do wstrzyknięcia w prompt — przycięty, żeby nie zdmuchnąć budżetu tokenów. */
+export function knowledgeExcerptFor(knowledgeIndex, labId, maxChars = 4000) {
+  const content = knowledgeIndex.get(labId);
+  if (!content) return null;
+  return content.length > maxChars ? content.slice(0, maxChars) + '\n…(przycięte)' : content;
+}
+
 /* ---------------- Walidacja wejścia ---------------- */
 
 /** Płaski obiekt: max maxKeys kluczy, wartości proste, stringi przycięte. */

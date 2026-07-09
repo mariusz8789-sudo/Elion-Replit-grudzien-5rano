@@ -17,6 +17,7 @@ COPY package.json package-lock.json ./
 COPY packages/backend/package.json packages/backend/
 RUN npm ci --omit=dev --workspace=packages/backend && npm cache clean --force
 COPY packages/backend/src packages/backend/src
+COPY knowledge knowledge
 COPY --from=build /app/packages/frontend/dist packages/frontend/dist
 
 # Proces bez roota

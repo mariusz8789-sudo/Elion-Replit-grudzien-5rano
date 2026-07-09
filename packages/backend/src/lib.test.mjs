@@ -8,6 +8,9 @@ import {
   isHashedAsset,
   resolveStaticPath,
   SECURITY_HEADERS,
+  LAB_KNOWLEDGE_FILES,
+  buildKnowledgeIndex,
+  knowledgeExcerptFor,
 } from './lib.mjs';
 
 describe('sanitizeFlat', () => {
@@ -161,5 +164,56 @@ describe('SECURITY_HEADERS', () => {
     assert.ok(SECURITY_HEADERS['content-security-policy'].includes("frame-ancestors 'none'"));
     assert.ok(SECURITY_HEADERS['referrer-policy']);
     assert.ok(SECURITY_HEADERS['permissions-policy']);
+  });
+});
+
+describe('buildKnowledgeIndex / knowledgeExcerptFor (Narrator grounding)', () => {
+  function fakeReader(files) {
+    return (filePath) => {
+      const name = path.basename(filePath);
+      if (!(name in files)) throw new Error(`ENOENT: ${filePath}`);
+      return files[name];
+    };
+  }
+
+  test('loads a file for every lab id that has one available', () => {
+    const files = { 'quantum.md': '# Quantum content', 'nuclear.md': '# Nuclear content' };
+    const index = buildKnowledgeIndex('/fake/knowledge', fakeReader(files));
+    assert.equal(index.get('quantum'), '# Quantum content');
+    assert.equal(index.get('nuclear'), '# Nuclear content');
+  });
+
+  test('missing files are skipped silently, not thrown', () => {
+    const index = buildKnowledgeIndex('/fake/knowledge', fakeReader({}));
+    assert.equal(index.size, 0);
+    assert.equal(index.get('quantum'), undefined);
+  });
+
+  test('spacetime and einstein share the same knowledge file, per LAB_KNOWLEDGE_FILES', () => {
+    assert.equal(LAB_KNOWLEDGE_FILES.spacetime, LAB_KNOWLEDGE_FILES.einstein);
+  });
+
+  test('every registered lab id maps to a .md filename', () => {
+    for (const [labId, filename] of Object.entries(LAB_KNOWLEDGE_FILES)) {
+      assert.match(filename, /\.md$/, `${labId} -> ${filename}`);
+    }
+  });
+
+  test('knowledgeExcerptFor returns null when no file was loaded for that lab', () => {
+    const index = buildKnowledgeIndex('/fake/knowledge', fakeReader({}));
+    assert.equal(knowledgeExcerptFor(index, 'quantum'), null);
+  });
+
+  test('knowledgeExcerptFor returns the full content when under the limit', () => {
+    const index = buildKnowledgeIndex('/fake/knowledge', fakeReader({ 'quantum.md': 'short content' }));
+    assert.equal(knowledgeExcerptFor(index, 'quantum', 4000), 'short content');
+  });
+
+  test('knowledgeExcerptFor truncates content over the character limit', () => {
+    const long = 'x'.repeat(5000);
+    const index = buildKnowledgeIndex('/fake/knowledge', fakeReader({ 'quantum.md': long }));
+    const excerpt = knowledgeExcerptFor(index, 'quantum', 100);
+    assert.equal(excerpt.length, 100 + '\n…(przycięte)'.length);
+    assert.ok(excerpt.endsWith('…(przycięte)'));
   });
 });

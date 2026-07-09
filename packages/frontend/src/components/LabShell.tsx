@@ -145,7 +145,7 @@ function ExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }
       <NarratorPanel
         blocks={blocks}
         askContext={buildContext(
-          { name: lab.name, honesty: exp.honesty, honestyNote: exp.honestyNote },
+          { id: lab.id, name: lab.name, honesty: exp.honesty, honestyNote: exp.honestyNote },
           expLabel,
           params,
           stats,

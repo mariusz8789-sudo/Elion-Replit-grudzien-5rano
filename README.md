@@ -30,14 +30,19 @@ Wszechświata (8,8×10²⁶ m).
   Słowniczek — wszystko w `localStorage`, zero transmisji sieciowej
 - **Dostępność**: skip link, pułapka fokusu w nakładkach, `aria-live` w
   Narratorze, granica błędu per-laboratorium
-- **107 testów** (86 vitest frontend + 21 node:test backend)
+- **Stwórz eksperyment** — na każdym laboratorium: swobodnie dobierz
+  parametry, nagraj przebieg, dostań deterministyczną analizę trendu
+  (rośnie/maleje/płasko, skoki, korelacje) bez LLM, zapytaj AI o wyniki z
+  tym samym groundingiem w bazie wiedzy co reszta platformy. Bezpieczne
+  przez konstrukcję — zero wykonywania kodu użytkownika
+- **154 testy** (126 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 107 testów (fizyka + funkcje lokalne + backend)
+npm test           # 154 testy (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

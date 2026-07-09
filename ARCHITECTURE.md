@@ -55,18 +55,47 @@ cała logika fizyczna, parametry i statystyki przenoszą się bez zmian.
 `core/dataSource.ts` to rejestr źródeł danych, świadomie skopiowany z
 kształtu `core/registry.ts` (labów) zamiast nowego wzorca — każde źródło
 deklaruje `id`, `citation` (skąd, jaki poziom pewności), `isSynthetic` i
-`load()`. Dziś jeden realny konsument: `particle-invmass.ts` rejestruje
-`particle.dimuon-masses`, które automatycznie przełącza się z generatora
-syntetycznego na plik `data/dimuon-real.ts`, jeśli ten istnieje —
-`scripts/fetch-real-data.mjs` wie, jak go wygenerować z CERN Open Data,
-JPL Horizons czy ESA Gaia (wymaga sieci bez blokady na te hosty, patrz
-README „Znane ograniczenia").
+`load()`. Dwóch realnych konsumentów dziś: `particle-invmass.ts`
+(`particle.dimuon-masses`, syntetyczne dopóki `data/dimuon-real.ts` nie
+istnieje) i `universe-solar-system.ts` (`universe.solar-system-elements`,
+realne stałe NASA od razu, `isSynthetic: false`) —
+`scripts/fetch-real-data.mjs` wie, jak wygenerować dane dla pierwszego z
+CERN Open Data, JPL Horizons czy ESA Gaia (wymaga sieci bez blokady na te
+hosty, patrz README „Znane ograniczenia").
 
 `core/citation.ts` eksportuje ten sam sześciopoziomowy `ConfirmationLevel`
 co baza wiedzy i `NarrationBlock.citation?` — opcjonalne pole źródła,
 renderowane przez `NarratorPanel` jako link. Nie każdy blok ma cytowanie
 (byłoby to szumem informacyjnym); wpięte tam, gdzie twierdzenie odwołuje
 się do konkretnego wyniku eksperymentalnego (masy PDG, testy Bella).
+
+### Stwórz eksperyment — bezpieczne przez konstrukcję
+
+Dostępne jako dodatkowa zakładka na KAŻDYM laboratorium
+(`components/CustomExperimentTab.tsx`, dopięte w `LabShell.tsx`).
+Świadomie NIE pozwala użytkownikowi pisać ani wykonywać kodu — wybiera się
+wyłącznie wartości `lab.params`, tego samego kontraktu `Sim`/`ParamDef` co
+reszta platformy. Zero nowej powierzchni ataku, zero sandboxingu do
+budowania.
+
+Dwa nowe moduły, oba czyste i przetestowane bez zależności od UI:
+- `core/experimentRun.ts` — bufor kołowy nagranych próbek statystyk
+  (300 próbek ≈ 5 minut przy kadencji 1/s)
+- `core/experimentAnalysis.ts` — deterministyczna analiza przebiegu:
+  trend (regresja liniowa najmniejszych kwadratów), wykrywanie płaskich
+  przebiegów, skoków między próbkami, korelacji Pearsona między dwiema
+  najbardziej dynamicznymi wielkościami. To jest właściwa „warstwa 0" dla
+  tego trybu — ta sama filozofia co `narrator/engine.ts`: liczy prawdziwe
+  dane, zero LLM, zero halucynacji.
+
+Kluczowa decyzja architektoniczna: wynik analizy ma dokładnie kształt
+`NarrationBlock[]`, więc trafia do TEGO SAMEGO `NarratorPanel` i
+`askAI()`/backendu z groundingiem w `knowledge/<lab>.md`, którego już
+używa reszta platformy. Zero nowego endpointu, zero równoległego systemu
+promptów — to jest odpowiedź na wyraźne polecenie „nie twórz równoległych
+systemów, wykorzystuj istniejącą architekturę wszędzie, gdzie to możliwe".
+Presety parametrów zapisywane lokalnie (`core/customExperiment.ts`),
+wzorzec identyczny z `discoveryLog.ts`.
 
 ## Funkcje lokalne (bez backendu, bez konta)
 
@@ -102,7 +131,7 @@ w `lib.mjs` — testowana przez `node --test` bez uruchamiania portu
 
 ## Testy
 
-94 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 122.
+126 testów frontendowych (vitest) + 28 backendowych (`node --test`) = 154.
 
 - **Fizyka i symulacje** (`__tests__/physics.test.ts`, `sims.test.ts`):
   twarde asercje naukowe (złamanie nierówności Bella |S|>2, twierdzenie

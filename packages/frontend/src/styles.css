@@ -177,6 +177,43 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   backdrop-filter: blur(6px);
 }
 
+/* ---------- Stwórz eksperyment ---------- */
+.record-actions {
+  position: absolute; left: 0.7rem; top: 0.7rem;
+  display: flex; gap: 0.5rem;
+}
+.record-btn.active {
+  background: rgba(244, 124, 124, 0.25); border-color: rgba(244, 124, 124, 0.5); color: var(--red);
+}
+.custom-exp-save {
+  padding: 0 1rem; display: flex; gap: 0.5rem;
+}
+.custom-exp-save input {
+  flex: 1; min-width: 0;
+  font: inherit; font-size: 0.85rem; color: var(--text);
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 999px; padding: 0.45rem 0.9rem;
+}
+.custom-exp-save input::placeholder { color: var(--text-dim); }
+.custom-exp-save .chip-btn:disabled { opacity: 0.45; }
+.custom-exp-list {
+  padding: 0.6rem 1rem 0; display: flex; flex-wrap: wrap; gap: 0.45rem;
+}
+.custom-exp-item {
+  display: flex; align-items: stretch; border-radius: 999px;
+  border: 1px solid var(--border); overflow: hidden;
+}
+.custom-exp-load {
+  font-size: 0.76rem; font-weight: 600; color: var(--text-dim);
+  padding: 0.35rem 0.7rem;
+}
+.custom-exp-load:hover { color: var(--text); }
+.custom-exp-delete {
+  font-size: 0.7rem; color: var(--text-dim); padding: 0.35rem 0.55rem;
+  border-left: 1px solid var(--border);
+}
+.custom-exp-delete:hover { color: var(--red); }
+
 .honesty {
   display: inline-flex; align-items: center; gap: 0.4rem;
   font-family: var(--font-mono); font-size: 0.64rem;

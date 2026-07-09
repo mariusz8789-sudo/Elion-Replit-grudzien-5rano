@@ -11,6 +11,8 @@ const EVENT_LABELS: Record<AnalyticsEvent, string> = {
   shortcut_used: 'Użycia skrótów klawiszowych',
   discovery_log_viewed: 'Wizyty w dzienniku odkryć',
   glossary_viewed: 'Wizyty w słowniczku',
+  custom_experiment_run: 'Uruchomione własne eksperymenty',
+  custom_experiment_saved: 'Zapisane własne eksperymenty',
 };
 
 /**

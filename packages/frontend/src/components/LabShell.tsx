@@ -4,16 +4,20 @@ import { useSimLoop } from '../core/useSimLoop';
 import { Controls, defaultParams } from './Controls';
 import { NarratorPanel } from './NarratorPanel';
 import { HonestyBadge } from './HonestyBadge';
+import { CustomExperimentTab } from './CustomExperimentTab';
 import { narrate } from '../narrator/engine';
 import { buildContext } from '../narrator/askAI';
 import { registerActiveSimControls } from '../core/activeSimControls';
 import { recordVisit, recordStats } from '../core/discoveryLog';
 import { track } from '../core/analytics';
 
+const CREATE_TAB_ID = '__create';
+
 /**
  * Standardowy ekran laboratorium. Od Etapu 1 laboratorium to kolekcja
  * eksperymentów: pola bazowe LabDefinition opisują eksperyment pierwszy,
- * lista lab.experiments dodaje kolejne (przełącznik nad sceną).
+ * lista lab.experiments dodaje kolejne (przełącznik nad sceną). Ostatnia
+ * zakładka, zawsze obecna: "Stwórz eksperyment" — patrz CustomExperimentTab.
  */
 export function LabShell({ lab }: { lab: LabDefinition }) {
   const experiments = useMemo<ExperimentDef[]>(() => {
@@ -30,25 +34,25 @@ export function LabShell({ lab }: { lab: LabDefinition }) {
   }, [lab]);
 
   const [expIdx, setExpIdx] = useState(0);
-  const exp = experiments[expIdx];
+  const isCreateTab = expIdx === experiments.length;
 
   return (
     <div className="lab-view" style={{ ['--accent' as string]: lab.accent }}>
-      {experiments.length > 1 && (
-        <div className="exp-tabs" role="tablist" aria-label="Eksperymenty">
-          {experiments.map((e, i) => (
-            <button
-              key={e.id}
-              role="tab"
-              aria-selected={i === expIdx}
-              onClick={() => setExpIdx(i)}
-            >
-              {i === 0 ? experimentBaseName(lab) : e.name}
-            </button>
-          ))}
-        </div>
+      <div className="exp-tabs" role="tablist" aria-label="Eksperymenty">
+        {experiments.map((e, i) => (
+          <button key={e.id} role="tab" aria-selected={i === expIdx} onClick={() => setExpIdx(i)}>
+            {i === 0 ? experimentBaseName(lab) : e.name}
+          </button>
+        ))}
+        <button role="tab" aria-selected={isCreateTab} onClick={() => setExpIdx(experiments.length)}>
+          🧪 Stwórz eksperyment
+        </button>
+      </div>
+      {isCreateTab ? (
+        <CustomExperimentTab key={`${lab.id}:${CREATE_TAB_ID}`} lab={lab} />
+      ) : (
+        <ExperimentView key={`${lab.id}:${experiments[expIdx].id}`} exp={experiments[expIdx]} lab={lab} />
       )}
-      <ExperimentView key={`${lab.id}:${exp.id}`} exp={exp} lab={lab} />
     </div>
   );
 }

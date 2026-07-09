@@ -20,7 +20,9 @@ export type AnalyticsEvent =
   | 'search_used'
   | 'shortcut_used'
   | 'discovery_log_viewed'
-  | 'glossary_viewed';
+  | 'glossary_viewed'
+  | 'custom_experiment_run'
+  | 'custom_experiment_saved';
 
 interface Counters {
   [event: string]: number;

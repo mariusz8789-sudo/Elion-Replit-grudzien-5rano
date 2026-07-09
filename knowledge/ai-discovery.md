@@ -36,6 +36,20 @@ SEMF (Nuclear) ↔ skąd pierwiastki (Universe: supernowe) ↔ Atom (izotopy);
 dylatacja (Space-Time) ↔ miony (Particle); rezonans Hoyle'a (Multiverse) ↔
 synteza węgla (Nuclear/Universe).
 
+**Warstwa 3 — analiza przebiegu użytkownika ("Stwórz eksperyment", zaimplementowana)**
+Dostępna na każdym laboratorium. Bezpieczna przez konstrukcję: użytkownik
+dobiera WYŁĄCZNIE wartości `lab.params` już zdefiniowanych przez laboratorium
+— zero wykonywania własnego kodu, zero nowej powierzchni ataku. Nagrywa się
+`RunSample[]` (`core/experimentRun.ts`, bufor kołowy 300 próbek ≈ 5 minut),
+a `core/experimentAnalysis.ts` liczy trend (regresja liniowa), płaskość,
+skoki i korelację Pearsona między dwiema najbardziej dynamicznymi
+wielkościami — CZYSTA analiza danych, nie zgadywanie modelu. Wynik ma
+dokładnie kształt `NarrationBlock[]`, więc trafia do TEGO SAMEGO
+`NarratorPanel` i `askAI()`/backendu z groundingiem w `knowledge/<lab>.md`,
+co reszta platformy — zero równoległej infrastruktury AI, jedna spójna
+architektura. Presety parametrów zapisywane lokalnie
+(`core/customExperiment.ts`, wzorzec identyczny z `discoveryLog.ts`).
+
 ## Korpus wiedzy pod RAG — ranking wg legalności
 1. **OpenStax University Physics t. 1–3 — CC BY 4.0** — wolno komercyjnie
    z atrybucją; podstawowy korpus tekstowy

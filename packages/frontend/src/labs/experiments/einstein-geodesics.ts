@@ -124,7 +124,8 @@ class GeodesicSim implements Sim {
       ph.trail.forEach((pt, i) => {
         const x = cx + pt.x;
         const y = cy + pt.y;
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       });
       ctx.stroke();
     }

@@ -56,4 +56,6 @@ każdy moduł nosi widoczną etykietę poziomu wierności, a hipotezy
 (multiwersum, napęd Alcubierre'a, rój Dysona) nigdy nie są przedstawiane
 jako fakty.
 
-Szczegółowy raport Etapu 0 i propozycja Etapu 1: [`RAPORT-ETAP-0.md`](RAPORT-ETAP-0.md).
+Raporty rozwoju: [`RAPORT-ETAP-0.md`](RAPORT-ETAP-0.md) · [`RAPORT-ETAP-1.md`](RAPORT-ETAP-1.md) ·
+[`RAPORT-ETAP-2.md`](RAPORT-ETAP-2.md) · [`RAPORT-AUDYT.md`](RAPORT-AUDYT.md) (gotowość produkcyjna).
+Bezpieczeństwo: [`SECURITY.md`](SECURITY.md). Wdrożenie: Replit (Run/Deploy) albo `docker compose up --build`.

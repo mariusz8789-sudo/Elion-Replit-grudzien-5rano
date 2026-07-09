@@ -1,13 +1,18 @@
 {
   "name": "genesis-os-monorepo",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Genesis OS — mobilna platforma do eksploracji fizyki, kosmologii i nauki poprzez interaktywne symulacje oraz AI.",
   "private": true,
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "npm run dev --workspace=packages/frontend",
     "dev:backend": "npm run dev --workspace=packages/backend",
     "build": "npm run build --workspace=packages/frontend",
     "test": "npm run test --workspace=packages/frontend",
+    "lint": "eslint .",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,mjs,css}\" \"*.md\" \"knowledge/*.md\"",
     "preview": "npm run preview --workspace=packages/frontend"
   },
   "keywords": [
@@ -17,9 +22,15 @@
     "education",
     "ai"
   ],
-  "license": "ISC",
+  "license": "UNLICENSED",
   "workspaces": [
     "packages/frontend",
     "packages/backend"
-  ]
+  ],
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.6.0",
+    "prettier": "^3.9.4",
+    "typescript-eslint": "^8.63.0"
+  }
 }

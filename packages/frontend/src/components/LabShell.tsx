@@ -97,7 +97,11 @@ function ExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }
   return (
     <>
       <div className="sim-stage">
-        <canvas ref={canvasRef} />
+        <canvas
+          ref={canvasRef}
+          role="img"
+          aria-label={`Symulacja: ${exp.id === '__base' ? lab.name : exp.name}. Wartości i wnioski opisuje panel Narrator AI poniżej.`}
+        />
         <div className="sim-actions">
           {sim.reset && (
             <button className="chip-btn" onClick={() => sim.reset!()}>

@@ -58,7 +58,8 @@ class DecaySim implements Sim {
     });
     for (const [k, v] of this.flash) {
       const nv = v - dt;
-      nv <= 0 ? this.flash.delete(k) : this.flash.set(k, nv);
+      if (nv <= 0) this.flash.delete(k);
+      else this.flash.set(k, nv);
     }
     if (this.history.length === 0 || this.tHl - this.history.length * 0.05 > 0) {
       this.history.push(this.remaining());
@@ -107,7 +108,8 @@ class DecaySim implements Sim {
     for (let px = 0; px <= cell * GRID; px += 4) {
       const t = (px / (cell * GRID)) * tMax;
       const y = cy0 + ch * (1 - Math.pow(0.5, t));
-      px === 0 ? ctx.moveTo(ox + px, y) : ctx.lineTo(ox + px, y);
+      if (px === 0) ctx.moveTo(ox + px, y);
+      else ctx.lineTo(ox + px, y);
     }
     ctx.stroke();
     ctx.setLineDash([]);
@@ -119,7 +121,8 @@ class DecaySim implements Sim {
       const t = i * 0.05;
       const x = ox + (t / tMax) * cell * GRID;
       const y = cy0 + ch * (1 - n / total);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     });
     ctx.stroke();
     ctx.lineWidth = 1;

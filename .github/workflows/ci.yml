@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalacja zależności
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testy fizyki (regresje naukowe)
+        run: npm test
+
+      - name: Typecheck + build produkcyjny
+        run: npm run build
+
+      - name: Artefakt buildu (podgląd PR)
+        uses: actions/upload-artifact@v4
+        with:
+          name: genesis-os-dist
+          path: packages/frontend/dist
+          retention-days: 7

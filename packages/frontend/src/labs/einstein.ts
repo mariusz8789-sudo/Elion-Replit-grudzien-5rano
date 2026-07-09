@@ -118,7 +118,8 @@ class GravityLightSim implements Sim {
       ctx.beginPath();
       for (let gy = 0; gy <= h; gy += 8) {
         const p = warp(gx, gy);
-        gy === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+        if (gy === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
     }
@@ -126,7 +127,8 @@ class GravityLightSim implements Sim {
       ctx.beginPath();
       for (let gx = 0; gx <= w; gx += 8) {
         const p = warp(gx, gy);
-        gx === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+        if (gx === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
     }

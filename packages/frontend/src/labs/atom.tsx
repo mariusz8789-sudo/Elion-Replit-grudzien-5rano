@@ -178,7 +178,16 @@ function AtomView({ lab }: { lab: LabDefinition }) {
       </div>
 
       <div className="sim-stage" style={{ height: '36vh', minHeight: 240 }}>
-        <canvas ref={canvasRef} key={mode} />
+        <canvas
+          ref={canvasRef}
+          key={mode}
+          role="img"
+          aria-label={
+            mode === 'shells'
+              ? `Model powłokowy atomu: ${el.name}. Dane liczbowe w panelu poniżej.`
+              : `Gęstość prawdopodobieństwa orbitalu ${ORBITALS[orbital].label} atomu wodoru.`
+          }
+        />
       </div>
 
       <div className="honesty-row">

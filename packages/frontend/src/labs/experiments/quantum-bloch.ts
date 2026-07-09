@@ -74,7 +74,7 @@ class BlochSim implements Sim {
   }
 
   update(dt: number, p: SimParams) {
-    if (Boolean(p.decoherence)) {
+    if (p.decoherence) {
       this.shrink = Math.max(0.02, this.shrink - dt * 0.12);
     } else if (this.shrink < 1) {
       this.shrink = Math.min(1, this.shrink + dt * 0.3);
@@ -211,7 +211,7 @@ export const quantumBloch: ExperimentDef = {
         body: 'Przycisk 📏 losuje wynik zgodnie z amplitudami i NISZCZY superpozycję: wektor skacze na biegun. Dlatego komputer kwantowy mierzy się raz, na końcu obwodu — każdy wcześniejszy pomiar kasuje przewagę kwantową.',
       },
     ];
-    if (Boolean(p.decoherence)) {
+    if (p.decoherence) {
       blocks.push({
         title: `Dekoherencja: |r⃗| = ${shrink.toFixed(2)}`,
         body: 'Otoczenie „podgląda" kubit i wektor Blocha kurczy się do środka sfery — stan czysty staje się mieszaniną statystyczną. To główny wróg komputerów kwantowych: czasy koherencji dzisiejszych kubitów to mikrosekundy–milisekundy, stąd kriostaty i korekcja błędów.',

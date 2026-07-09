@@ -199,7 +199,8 @@ class TunnelingSim implements Sim {
     for (let i = 0; i < N; i++) {
       const x = (i / N) * w;
       const y = base - (this.re[i] ** 2 + this.im[i] ** 2) * scale;
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
     ctx.strokeStyle = '#5cd6e8';
     ctx.lineWidth = 2;
@@ -215,8 +216,9 @@ class TunnelingSim implements Sim {
     ctx.beginPath();
     for (let i = 0; i < N; i++) {
       const x = (i / N) * w;
-      const y = base - this.re[i] * h * 0.35 - h * 0.0;
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      const y = base - this.re[i] * h * 0.35;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
     ctx.strokeStyle = 'rgba(167,139,250,0.35)';
     ctx.stroke();

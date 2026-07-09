@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { LabDefinition, Sim, SimParams } from '../core/types';
-import { HONESTY_LABELS } from '../core/types';
 import { useSimLoop } from '../core/useSimLoop';
 import { NarratorPanel } from '../components/NarratorPanel';
+import { HonestyBadge } from '../components/HonestyBadge';
 import { ELEMENTS, type ElementInfo } from '../data/elements';
 
 /**
@@ -190,12 +190,10 @@ function AtomView({ lab }: { lab: LabDefinition }) {
         />
       </div>
 
-      <div className="honesty-row">
-        <span className={`honesty ${mode === 'orbitals' ? 'exact' : lab.honesty}`}>
-          {mode === 'orbitals' ? HONESTY_LABELS.exact : HONESTY_LABELS[lab.honesty]}
-        </span>
-        <span className="honesty-note">{mode === 'orbitals' ? orbitalHonestyNote : lab.honestyNote}</span>
-      </div>
+      <HonestyBadge
+        level={mode === 'orbitals' ? 'exact' : lab.honesty}
+        note={mode === 'orbitals' ? orbitalHonestyNote : lab.honestyNote}
+      />
 
       {mode === 'orbitals' && (
         <div className="controls">

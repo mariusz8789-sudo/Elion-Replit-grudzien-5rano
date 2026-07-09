@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import type { NarrationBlock } from '../core/types';
 import { askAI, type AskContext } from '../narrator/askAI';
+import { useSettings } from '../core/useSettings';
+import { track } from '../core/analytics';
 
 /**
  * Panel Narratora AI.
@@ -14,6 +16,7 @@ export function NarratorPanel({ blocks, askContext }: { blocks: NarrationBlock[]
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
+  const [settings] = useSettings();
 
   const submit = async () => {
     const q = question.trim();
@@ -22,6 +25,7 @@ export function NarratorPanel({ blocks, askContext }: { blocks: NarrationBlock[]
     setBusy(true);
     setError(null);
     setAnswer(null);
+    track('ask_ai_used');
     const result = await askAI(askContext, q);
     if (result.ok) setAnswer(result.answer);
     else setError(result.message);
@@ -30,12 +34,12 @@ export function NarratorPanel({ blocks, askContext }: { blocks: NarrationBlock[]
   };
 
   return (
-    <section className="narrator" aria-label="Narrator AI">
+    <section className={`narrator ${settings.compactNarrator ? 'compact' : ''}`} aria-label="Narrator AI">
       <div className="narrator-head">
         <span className="dot" aria-hidden="true" />
         <span className="label">Narrator AI · na żywo</span>
       </div>
-      <div className="narrator-blocks">
+      <div className="narrator-blocks" aria-live="polite">
         {blocks.map((b, i) => (
           <div className={`nblock ${b.kind ?? 'insight'}`} key={i}>
             <div className="ntitle">{b.title}</div>

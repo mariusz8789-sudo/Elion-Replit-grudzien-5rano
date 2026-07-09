@@ -1,4 +1,5 @@
 import type { ExperimentDef, Sim, SimParams } from '../../core/types';
+import { tracePolylineBy } from '../../core/canvasHelpers';
 
 /**
  * Soczewkowanie grawitacyjne — soczewka punktowa.
@@ -121,13 +122,10 @@ class LensingSim implements Sim {
     ctx.strokeRect(w * 0.08, gy, w * 0.84, gh);
     ctx.strokeStyle = '#f0b35c';
     ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    this.history.forEach((A, i) => {
-      const x = w * 0.08 + (i / 320) * w * 0.84;
-      const y = gy + gh - Math.min((A - 1) / 6, 1) * gh;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
+    tracePolylineBy(ctx, this.history.length, (i) => ({
+      x: w * 0.08 + (i / 320) * w * 0.84,
+      y: gy + gh - Math.min((this.history[i] - 1) / 6, 1) * gh,
+    }));
     ctx.stroke();
     ctx.lineWidth = 1;
     ctx.fillStyle = 'rgba(230,234,245,0.6)';

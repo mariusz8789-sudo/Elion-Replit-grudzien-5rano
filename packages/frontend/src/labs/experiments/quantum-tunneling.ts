@@ -1,4 +1,5 @@
 import type { ExperimentDef, Sim, SimParams } from '../../core/types';
+import { tracePolylineBy } from '../../core/canvasHelpers';
 
 /**
  * Tunelowanie kwantowe — pakiet falowy 1D liczony NA ŻYWO metodą split-step
@@ -194,14 +195,11 @@ class TunnelingSim implements Sim {
     ctx.fillText('E pakietu', 8, eH - 5);
 
     // |ψ|²
-    ctx.beginPath();
     const scale = h * 2.4;
-    for (let i = 0; i < N; i++) {
-      const x = (i / N) * w;
-      const y = base - (this.re[i] ** 2 + this.im[i] ** 2) * scale;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
+    tracePolylineBy(ctx, N, (i) => ({
+      x: (i / N) * w,
+      y: base - (this.re[i] ** 2 + this.im[i] ** 2) * scale,
+    }));
     ctx.strokeStyle = '#5cd6e8';
     ctx.lineWidth = 2;
     ctx.stroke();
@@ -213,13 +211,7 @@ class TunnelingSim implements Sim {
     ctx.lineWidth = 1;
 
     // Re ψ (delikatnie) — pokazuje oscylacje fazy
-    ctx.beginPath();
-    for (let i = 0; i < N; i++) {
-      const x = (i / N) * w;
-      const y = base - this.re[i] * h * 0.35;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
+    tracePolylineBy(ctx, N, (i) => ({ x: (i / N) * w, y: base - this.re[i] * h * 0.35 }));
     ctx.strokeStyle = 'rgba(167,139,250,0.35)';
     ctx.stroke();
 

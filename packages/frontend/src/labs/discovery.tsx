@@ -1,14 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { LabDefinition } from '../core/types';
-import { HONESTY_LABELS } from '../core/types';
 import { getLabs } from '../core/registry';
+import { HonestyBadge } from '../components/HonestyBadge';
 
 /**
  * AI Discovery Lab — centrum warstwy AI platformy.
- * Etap 0: pokazuje architekturę Narratora, proponuje eksperymenty do
- * wykonania w innych laboratoriach i odpowiada na pytania z kuratorowanej
- * bazy. Etap 1: podpięcie LLM przez backend proxy (interfejs providera już
- * istnieje w narrator/engine.ts).
+ * Pokazuje architekturę Narratora, proponuje eksperymenty do wykonania
+ * w innych laboratoriach, odpowiada na pytania z kuratorowanej bazy i
+ * raportuje żywy status backendu LLM (GET /api/health) — bez zgadywania.
  */
 
 const EXPERIMENTS = [
@@ -23,7 +22,7 @@ const EXPERIMENTS = [
 const QA = [
   {
     q: 'Czym różni się Narrator AI od chatbota?',
-    a: 'Narrator nie czeka na pytania — czyta na żywo parametry i statystyki symulacji, liczy z nich realne wielkości fizyczne (γ, promień Schwarzschilda, aktywność izotopu) i układa z nich wyjaśnienie tego, co masz przed oczami. W Etapie 0 robi to deterministyczny silnik — szybki, offline i bez halucynacji. W Etapie 1 dojdzie warstwa LLM do pytań otwartych.',
+    a: 'Narrator nie czeka na pytania — czyta na żywo parametry i statystyki symulacji, liczy z nich realne wielkości fizyczne (γ, promień Schwarzschilda, aktywność izotopu) i układa z nich wyjaśnienie tego, co masz przed oczami. Ten silnik jest deterministyczny — szybki, offline i bez halucynacji — i działa zawsze. Osobno, w polu „Zapytaj AI" każdego laboratorium, możesz zadać pytanie otwarte — trafia ono do modelu językowego przez backend, wyłącznie w kontekście tego, co widzisz.',
   },
   {
     q: 'Skąd wiadomo, co jest nauką, a co hipotezą?',
@@ -31,27 +30,40 @@ const QA = [
   },
   {
     q: 'Czy symulacje są naukowo dokładne?',
-    a: 'Tam, gdzie to możliwe na telefonie — tak (prawo rozpadu, wzory STW, rozkład interferencyjny). Tam, gdzie pełna fizyka wymaga superkomputera (ewolucja galaktyk, chromodynamika), pokazujemy uczciwie oznaczone uproszczenia i piszemy w nocie, co dokładnie pominęliśmy.',
+    a: 'Tam, gdzie to możliwe na telefonie — tak (prawo rozpadu, wzory STW, rozkład interferencyjny, korelacje splątania). Tam, gdzie pełna fizyka wymaga superkomputera (ewolucja galaktyk, chromodynamika), pokazujemy uczciwie oznaczone uproszczenia i piszemy w nocie, co dokładnie pominęliśmy.',
   },
   {
-    q: 'Co będzie umiał AI Scientist w kolejnych etapach?',
-    a: 'Etap 1: odpowiedzi na pytania otwarte w kontekście bieżącej symulacji (LLM przez backend). Etap 2: porównywanie scenariuszy zapisanych przez użytkownika i raporty z eksperymentów. Dalej: proponowanie kierunków badań — zawsze jako sugestie z niepewnością, nigdy jako "odkrycia".',
+    q: 'Dlaczego "Zapytaj AI" czasem nie odpowiada?',
+    a: 'Backend wymaga klucza API modelu językowego (ustawianego przez operatora wdrożenia, nie przez Ciebie). Bez niego pole grzecznie informuje, że AI jest niedostępne — reszta aplikacji, łącznie z Narratorem, działa dalej bez zmian. Nic nigdy nie udaje odpowiedzi, której nie ma.',
   },
 ];
 
 function DiscoveryView({ lab }: { lab: LabDefinition }) {
   const [open, setOpen] = useState<number | null>(0);
   const [expIdx, setExpIdx] = useState(() => Math.floor(Math.random() * EXPERIMENTS.length));
+  const [aiStatus, setAiStatus] = useState<'checking' | 'ready' | 'no-key' | 'offline'>('checking');
   const labs = getLabs();
   const exp = EXPERIMENTS[expIdx];
   const expLab = labs.find((l) => l.id === exp.lab);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((d: { ai?: string }) => {
+        if (!cancelled) setAiStatus(d.ai === 'ready' ? 'ready' : 'no-key');
+      })
+      .catch(() => {
+        if (!cancelled) setAiStatus('offline');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="lab-view" style={{ ['--accent' as string]: lab.accent }}>
-      <div className="honesty-row">
-        <span className={`honesty ${lab.honesty}`}>{HONESTY_LABELS[lab.honesty]}</span>
-        <span className="honesty-note">{lab.honestyNote}</span>
-      </div>
+      <HonestyBadge level={lab.honesty} note={lab.honestyNote} />
 
       <section className="narrator" aria-label="Propozycja eksperymentu">
         <div className="narrator-head">
@@ -86,11 +98,17 @@ function DiscoveryView({ lab }: { lab: LabDefinition }) {
       <div className="section-label">Status warstwy AI</div>
       <div className="qa-list">
         <div className="qa-item" role="status">
-          <div className="q">Provider: lokalny silnik narracji v0 — aktywny</div>
+          <div className="q">
+            Narrator deterministyczny: zawsze aktywny · Model językowy:{' '}
+            {aiStatus === 'checking' && 'sprawdzanie…'}
+            {aiStatus === 'ready' && '✓ połączony'}
+            {aiStatus === 'no-key' && 'brak klucza API (operator nie skonfigurował)'}
+            {aiStatus === 'offline' && 'backend nieosiągalny'}
+          </div>
           <div className="a">
-            Interfejs LLM (backend proxy z kluczem API) jest zaprojektowany i czeka na Etap 1 — podmiana providera
-            nie wymaga zmian w żadnym laboratorium. Narracja we wszystkich laboratoriach liczy się na Twoim
-            urządzeniu, działa offline i nie wysyła żadnych danych.
+            Narracja we wszystkich laboratoriach liczy się na Twoim urządzeniu, działa offline i nie wysyła
+            żadnych danych. Pole „Zapytaj AI" wymaga backendu z kluczem modelu — jeśli go nie widzisz aktywnego
+            powyżej, reszta platformy działa bez żadnych ograniczeń.
           </div>
         </div>
       </div>
@@ -106,7 +124,7 @@ export const discoveryLab: LabDefinition = {
   accent: '#5cd6e8',
   honesty: 'exact',
   honestyNote:
-    'Narracja w Etapie 0 pochodzi z deterministycznego silnika liczącego realne wielkości fizyczne z parametrów symulacji — bez modelu językowego, więc bez halucynacji. Warstwa LLM dojdzie w Etapie 1 i będzie wyraźnie oznaczana.',
+    'Narracja bazowa pochodzi z deterministycznego silnika liczącego realne wielkości fizyczne z parametrów symulacji — bez modelu językowego, więc bez halucynacji. Odpowiedzi modelu językowego (pole „Zapytaj AI") są wyraźnie oznaczone osobno i widoczne tylko, gdy backend ma skonfigurowany klucz.',
   params: [],
   narrate: () => [],
   CustomView: DiscoveryView,

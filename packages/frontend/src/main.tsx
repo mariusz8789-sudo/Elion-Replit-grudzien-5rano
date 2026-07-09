@@ -6,6 +6,7 @@ import './styles.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
+    <a href="#main-content" className="skip-link">Przejdź do treści</a>
     <ErrorBoundary>
       <App />
     </ErrorBoundary>

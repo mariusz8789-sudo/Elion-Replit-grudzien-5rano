@@ -1,4 +1,5 @@
 import type { ExperimentDef, Sim, SimParams } from '../../core/types';
+import { tracePolylineBy } from '../../core/canvasHelpers';
 
 /**
  * Geodezyjne fotonów wokół czarnej dziury Schwarzschilda + dysk akrecyjny.
@@ -120,13 +121,7 @@ class GeodesicSim implements Sim {
     // tory fotonów
     for (const ph of this.photons) {
       ctx.strokeStyle = ph.captured ? 'rgba(244,124,124,0.7)' : 'rgba(92,214,232,0.65)';
-      ctx.beginPath();
-      ph.trail.forEach((pt, i) => {
-        const x = cx + pt.x;
-        const y = cy + pt.y;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
+      tracePolylineBy(ctx, ph.trail.length, (i) => ({ x: cx + ph.trail[i].x, y: cy + ph.trail[i].y }));
       ctx.stroke();
     }
 

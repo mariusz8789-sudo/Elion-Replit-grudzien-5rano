@@ -1,11 +1,14 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ExperimentDef, LabDefinition, SimParams } from '../core/types';
-import { HONESTY_LABELS } from '../core/types';
 import { useSimLoop } from '../core/useSimLoop';
 import { Controls, defaultParams } from './Controls';
 import { NarratorPanel } from './NarratorPanel';
+import { HonestyBadge } from './HonestyBadge';
 import { narrate } from '../narrator/engine';
 import { buildContext } from '../narrator/askAI';
+import { registerActiveSimControls } from '../core/activeSimControls';
+import { recordVisit, recordStats } from '../core/discoveryLog';
+import { track } from '../core/analytics';
 
 /**
  * Standardowy ekran laboratorium. Od Etapu 1 laboratorium to kolekcja
@@ -91,6 +94,27 @@ function ExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }
     [],
   );
   const canvasRef = useSimLoop(sim, params, running, onStats);
+  const expLabel = exp.id === '__base' ? lab.name : exp.name;
+
+  // Skróty klawiszowe (Space/R) sterują AKTYWNYM eksperymentem — rejestracja
+  // przy montażu, wyrejestrowanie przy zmianie/opuszczeniu (patrz activeSimControls.ts).
+  useEffect(() => {
+    return registerActiveSimControls({
+      toggleRunning: () => setRunning((r) => !r),
+      reset: sim.reset ? () => sim.reset!() : undefined,
+    });
+  }, [sim]);
+
+  // Dziennik odkryć: wizyta odnotowana raz na eksperyment; progi osiągnięć
+  // liczone z tych samych statystyk, które i tak widzi Narrator (zero nowych
+  // obliczeń fizycznych — czysto lokalna obserwacja istniejących danych).
+  useEffect(() => {
+    recordVisit(lab.id, exp.id === '__base' ? '__base' : exp.id);
+    track('experiment_open', { lab: lab.id, experiment: exp.id });
+  }, [lab.id, exp.id]);
+  useEffect(() => {
+    recordStats(lab.id, exp.id === '__base' ? '__base' : exp.id, stats);
+  }, [lab.id, exp.id, stats]);
 
   const blocks = narrate({ ...lab, honesty: exp.honesty, narrate: exp.narrate }, params, stats);
 
@@ -100,24 +124,21 @@ function ExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }
         <canvas
           ref={canvasRef}
           role="img"
-          aria-label={`Symulacja: ${exp.id === '__base' ? lab.name : exp.name}. Wartości i wnioski opisuje panel Narrator AI poniżej.`}
+          aria-label={`Symulacja: ${expLabel}. Wartości i wnioski opisuje panel Narrator AI poniżej.`}
         />
         <div className="sim-actions">
           {sim.reset && (
-            <button className="chip-btn" onClick={() => sim.reset!()}>
+            <button className="chip-btn" onClick={() => sim.reset!()} title="Skrót: R">
               ↺ Od nowa
             </button>
           )}
-          <button className="chip-btn" onClick={() => setRunning((r) => !r)}>
+          <button className="chip-btn" onClick={() => setRunning((r) => !r)} title="Skrót: Spacja">
             {running ? '❚❚ Pauza' : '▶ Start'}
           </button>
         </div>
       </div>
 
-      <div className="honesty-row">
-        <span className={`honesty ${exp.honesty}`}>{HONESTY_LABELS[exp.honesty]}</span>
-        <span className="honesty-note">{exp.honestyNote}</span>
-      </div>
+      <HonestyBadge level={exp.honesty} note={exp.honestyNote} />
 
       <Controls defs={exp.params} params={params} onChange={(k, v) => setParams((p) => ({ ...p, [k]: v }))} />
 
@@ -125,7 +146,7 @@ function ExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }
         blocks={blocks}
         askContext={buildContext(
           { name: lab.name, honesty: exp.honesty, honestyNote: exp.honestyNote },
-          exp.id === '__base' ? lab.name : exp.name,
+          expLabel,
           params,
           stats,
           blocks,

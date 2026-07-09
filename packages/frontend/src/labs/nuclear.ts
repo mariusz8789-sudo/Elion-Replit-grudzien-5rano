@@ -1,4 +1,5 @@
 import type { LabDefinition, Sim, SimParams } from '../core/types';
+import { tracePolylineBy } from '../core/canvasHelpers';
 import { nuclearChain } from './experiments/nuclear-chain';
 import { nuclearTokamak } from './experiments/nuclear-tokamak';
 
@@ -104,25 +105,20 @@ class DecaySim implements Sim {
     // teoria
     ctx.strokeStyle = 'rgba(230,234,245,0.5)';
     ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    for (let px = 0; px <= cell * GRID; px += 4) {
+    const theorySteps = Math.floor((cell * GRID) / 4) + 1;
+    tracePolylineBy(ctx, theorySteps, (i) => {
+      const px = i * 4;
       const t = (px / (cell * GRID)) * tMax;
-      const y = cy0 + ch * (1 - Math.pow(0.5, t));
-      if (px === 0) ctx.moveTo(ox + px, y);
-      else ctx.lineTo(ox + px, y);
-    }
+      return { x: ox + px, y: cy0 + ch * (1 - Math.pow(0.5, t)) };
+    });
     ctx.stroke();
     ctx.setLineDash([]);
     // symulacja
     ctx.strokeStyle = '#6ee7a0';
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    this.history.forEach((n, i) => {
+    tracePolylineBy(ctx, this.history.length, (i) => {
       const t = i * 0.05;
-      const x = ox + (t / tMax) * cell * GRID;
-      const y = cy0 + ch * (1 - n / total);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+      return { x: ox + (t / tMax) * cell * GRID, y: cy0 + ch * (1 - this.history[i] / total) };
     });
     ctx.stroke();
     ctx.lineWidth = 1;

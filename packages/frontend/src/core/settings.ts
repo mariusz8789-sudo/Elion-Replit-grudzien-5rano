@@ -58,6 +58,7 @@ export function subscribeSettings(fn: (s: Settings) => void): () => void {
 
 /** Odzwierciedla ustawienia jako klasy na <html>, żeby CSS mógł na nie reagować globalnie. */
 export function applyDocumentFlags(s: Settings): void {
+  if (typeof document === 'undefined') return; // np. testy jednostkowe bez DOM
   const root = document.documentElement;
   root.classList.toggle('force-reduced-motion', s.reducedMotion);
   root.classList.toggle('high-contrast', s.highContrast);

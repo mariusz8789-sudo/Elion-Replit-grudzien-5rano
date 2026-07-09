@@ -1,4 +1,5 @@
 import type { ExperimentDef, Sim, SimParams } from '../../core/types';
+import { registerDataSource, getDataSource } from '../../core/dataSource';
 
 /**
  * Masa niezmiennicza — jak NAPRAWDĘ odkrywa się cząstki.
@@ -23,19 +24,30 @@ const M_MAX = Math.log(130);
 const BINS = 130;
 
 /**
- * Punkt podpięcia realnych danych CERN Open Data (CC0).
- * Środowisko budowania może nie mieć dostępu do opendata.cern.ch — wtedy
- * używamy generatora syntetycznego (masy rezonansów wg PDG). Aby użyć
- * realnych danych: pobierz CSV dimionowy (np. rekord 545, Dimuon_DoubleMu.csv),
- * wyekstrahuj kolumnę M i zapisz jako tablicę w src/data/dimuon-real.ts:
- *   export const REAL_DIMUON_MASSES: number[] = [3.09, 91.2, ...];
- * Sim automatycznie przełączy się na odtwarzanie realnych zdarzeń.
+ * Punkt podpięcia realnych danych CERN Open Data (CC0), zarejestrowany
+ * przez core/dataSource.ts zamiast chowany w lokalnym module-level stanie —
+ * `scripts/fetch-real-data.mjs` wie, gdzie zapisać plik, bez znajomości
+ * wnętrza tego pliku. Środowisko budowania może nie mieć dostępu do
+ * opendata.cern.ch (patrz README.md „Znane ograniczenia") — wtedy
+ * automatycznie używamy generatora syntetycznego (masy rezonansów wg PDG).
  */
-let REAL_MASSES: number[] | null = null;
 const realModules = import.meta.glob<{ REAL_DIMUON_MASSES: number[] }>('../../data/dimuon-real.ts', { eager: true });
+let realMasses: number[] | null = null;
 for (const mod of Object.values(realModules)) {
-  if (mod.REAL_DIMUON_MASSES?.length) REAL_MASSES = mod.REAL_DIMUON_MASSES;
+  if (mod.REAL_DIMUON_MASSES?.length) realMasses = mod.REAL_DIMUON_MASSES;
 }
+
+registerDataSource<number[] | null>({
+  id: 'particle.dimuon-masses',
+  label: 'Masy niezmiennicze par mionów (histogram rezonansów)',
+  citation: {
+    label: 'CERN Open Data — CMS DoubleMu (rekord 545)',
+    url: 'https://opendata.cern.ch',
+    confirmation: realMasses ? 'confirmed' : 'partial',
+  },
+  isSynthetic: realMasses === null,
+  load: () => realMasses,
+});
 
 class InvMassSim implements Sim {
   private hist = new Float64Array(BINS);
@@ -52,8 +64,9 @@ class InvMassSim implements Sim {
   };
 
   private sampleMass(): number {
-    if (REAL_MASSES) {
-      const m = REAL_MASSES[this.realIdx % REAL_MASSES.length];
+    const real = getDataSource<number[] | null>('particle.dimuon-masses')?.load();
+    if (real) {
+      const m = real[this.realIdx % real.length];
       this.realIdx++;
       return m;
     }
@@ -175,6 +188,12 @@ export const particleInvMass: ExperimentDef = {
           n < 800
             ? 'Dla każdej pary mionów detektor mierzy energie i pędy, a fizyk liczy masę niezmienniczą M² = (ΣE)² − (Σp)². Jeśli miony pochodzą z rozpadu jednej cząstki, M trafia zawsze w jej masę — zbieraj statystykę i patrz na oś ~3, ~9,5 i ~91 GeV.'
             : 'Każdy pik to cząstka: J/ψ przy 3,1 GeV (odkryta w 1974 — „rewolucja listopadowa", potwierdziła istnienie kwarka powabnego), Υ przy 9,5 GeV (kwark denny, 1977) i szeroki Z⁰ przy 91 GeV (1983, Nobel dla Rubbii). Szerokość piku Z (2,5 GeV) to nie błąd pomiaru — to zasada nieoznaczoności: czas życia 3×10⁻²⁵ s daje rozmycie energii.',
+        citation: {
+          source: 'Particle Data Group (PDG)',
+          confirmation: 'confirmed' as const,
+          url: 'https://pdg.lbl.gov',
+          note: 'Masy i szerokości rezonansów (J/ψ, Υ, Z⁰) — wartość referencyjna światowa',
+        },
       },
       {
         title: 'Dokładnie tak znaleziono Higgsa',

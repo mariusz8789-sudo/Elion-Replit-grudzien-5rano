@@ -18,18 +18,23 @@ tutaj, nie od kodu.
 
 ## Skala potwierdzenia naukowego
 
-Używana we wszystkich plikach bazy:
+Sześć poziomów, używanych we wszystkich plikach bazy. Poziomy 1–2 to
+„potwierdzona eksperymentalnie" w dwóch odcieniach (pełna vs z otwartymi
+szczegółami inżynieryjnymi); rest to opadająca drabina pewności aż do
+poziomu, na którym teoria przestaje być nauką i staje się fikcją narracyjną.
 
 | Symbol | Poziom | Znaczenie |
 |---|---|---|
-| ★★★★★ | ugruntowane | wielokrotnie potwierdzone eksperymentalnie; podstawa inżynierii |
-| ★★★★ | silny konsensus | zgoda środowiska, otwarte szczegóły |
-| ★★★ | aktywna debata | konkurujące modele, rozstrzygną dane |
-| ★★ | hipoteza umotywowana | matematycznie spójna, brak potwierdzenia |
-| ★ | spekulacja | idea badawcza / inżynieryjna fantazja |
+| ★★★★★ | potwierdzona eksperymentalnie (ugruntowana) | wielokrotnie zmierzona; podstawa inżynierii; nie ma sensownej alternatywy |
+| ★★★★ | potwierdzona eksperymentalnie (silny konsensus) | zgoda środowiska co do rdzenia teorii, otwarte szczegóły techniczne |
+| ★★★ | częściowo potwierdzona | konkurujące modele zgodne z dzisiejszymi danymi; rozstrzygną przyszłe pomiary |
+| ★★ | hipoteza | matematycznie spójna, wyprowadzona z ugruntowanej teorii, ale bez potwierdzenia eksperymentalnego |
+| ★ | spekulacja | aktywny program badawczy lub inżynieryjny, lecz bez spójnej teorii ani testu — idea, nie przewidywanie |
+| ☆ | science fiction | fizycznie niesprzeczna jako myślowy eksperyment, ale bez żadnego realnego programu badawczego czy ścieżki inżynieryjnej (np. praktyczny napęd warp, podróże w czasie dla ludzi) — oznaczana wprost, żeby nie mylić z ★ |
 
 Mapowanie na etykiety w aplikacji: ★★★★–★★★★★ → `exact`/`simplified`;
-★★★ → `simplified` z notą o sporze; ★–★★ → `theoretical` (fiolet).
+★★★ → `simplified` z notą o sporze; ★★–★ → `theoretical` (fiolet);
+☆ → `theoretical` z jawną notą „scenariusz fabularny, nie hipoteza badawcza".
 
 ## Katalogi
 
@@ -45,3 +50,18 @@ Mapowanie na etykiety w aplikacji: ★★★★–★★★★★ → `exact`/`s
 | [civilization.md](civilization.md) | Civilization Lab — Kardaszew, SETI |
 | [ai-discovery.md](ai-discovery.md) | Warstwa AI — korpus, grounding, architektura |
 | [scale-journey.md](scale-journey.md) | Scale Journey — dane rozmiarów, narracja skal |
+| [classical-mechanics.md](classical-mechanics.md) | Fundament pod Universe/Civilization (bez własnego laba) |
+| [electrodynamics.md](electrodynamics.md) | Fundament pod Atom/Particle (bez własnego laba) |
+| [thermodynamics.md](thermodynamics.md) | Fundament pod Nuclear/Einstein (bez własnego laba) |
+| [scientists.md](scientists.md) | Dossier 13 naukowców — jeden plik, nie rozproszone po katalogach domenowych |
+
+## Poza zakresem dzisiejszej bazy (uczciwie, nie ukrywamy braków)
+
+Brief poprosił o 14 działów. Osiem ma dziś katalogi (bezpośrednio powyżej
++ trzy nowe fundamentowe). Świadomie NIE rozwinięte jeszcze, żeby nie
+tworzyć płytkich, niesprawdzonych 20-liniowych zaślepek pod hasłem
+„gotowe": **chemia, chemia kwantowa, matematyka (jako odrębny dział, nie
+tylko narzędzie fizyki), astronomia obserwacyjna (odrębnie od kosmologii w
+`universe.md`), inżynieria kosmiczna.** Każdy z nich zasługuje na ten sam
+poziom rzetelności (realne cytowania, oznaczone spory) co pliki istniejące
+— to praca na kolejne sesje, nie akapit doklejony na siłę do tej.

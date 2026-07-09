@@ -264,6 +264,12 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .nblock .nbody { font-size: 0.84rem; color: var(--text-dim); }
 .nblock.hypothesis .ntitle { color: var(--violet); }
 .nblock.warning .ntitle { color: var(--gold); }
+.ncitation {
+  margin: 0.5rem 0 0; padding-top: 0.4rem; border-top: 1px dashed var(--border);
+  font-size: 0.7rem; color: var(--text-dim); display: flex; align-items: center; gap: 0.35rem;
+}
+.ncitation-icon { font-size: 0.8rem; }
+.ncitation a { color: var(--cyan); }
 
 /* ---------- Zapytaj AI ---------- */
 .ask-ai { border-top: 1px solid var(--border); padding-top: 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; }

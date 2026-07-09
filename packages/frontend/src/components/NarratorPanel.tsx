@@ -3,6 +3,27 @@ import type { NarrationBlock } from '../core/types';
 import { askAI, type AskContext } from '../narrator/askAI';
 import { useSettings } from '../core/useSettings';
 import { track } from '../core/analytics';
+import { CONFIRMATION_LABELS, type Citation } from '../core/citation';
+
+/** Źródło twierdzenia z bloku Narratora — obecne tylko tam, gdzie faktycznie mamy cytowanie. */
+function CitationTag({ citation }: { citation: Citation }) {
+  const href = citation.url ?? (citation.doi ? `https://doi.org/${citation.doi}` : undefined);
+  const label = `${citation.source} — ${CONFIRMATION_LABELS[citation.confirmation]}`;
+  return (
+    <p className="ncitation" title={citation.note}>
+      <span className="ncitation-icon" aria-hidden="true">
+        📖
+      </span>
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer">
+          {label}
+        </a>
+      ) : (
+        <span>{label}</span>
+      )}
+    </p>
+  );
+}
 
 /**
  * Panel Narratora AI.
@@ -44,6 +65,7 @@ export function NarratorPanel({ blocks, askContext }: { blocks: NarrationBlock[]
           <div className={`nblock ${b.kind ?? 'insight'}`} key={i}>
             <div className="ntitle">{b.title}</div>
             <div className="nbody">{b.body}</div>
+            {b.citation && <CitationTag citation={b.citation} />}
           </div>
         ))}
 

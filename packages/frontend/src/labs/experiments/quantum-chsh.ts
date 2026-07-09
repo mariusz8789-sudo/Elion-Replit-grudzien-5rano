@@ -208,6 +208,12 @@ export const quantumChsh: ExperimentDef = {
       {
         title: 'Nobel 2022 i żadnych furtek',
         body: 'Aspect (1982) zamknął lukę komunikacji zmieniając kąty w locie fotonów; testy z 2015 r. (Delft, Wiedeń, NIST) zamknęły jednocześnie luki detekcji i lokalności. Splątanie nie przesyła informacji (wyniki Alicji są lokalnie czystym szumem) — łamie tylko wyobrażenie, że własności istnieją przed pomiarem.',
+        citation: {
+          source: 'Hensen et al. 2015, Nature 526',
+          confirmation: 'confirmed' as const,
+          doi: '10.1038/nature15759',
+          note: 'Pierwszy test Bella bez luk (detekcji i lokalności jednocześnie); Nobel z fizyki 2022 dla Aspecta, Clausera i Zeilingera',
+        },
       },
     ];
     return blocks;

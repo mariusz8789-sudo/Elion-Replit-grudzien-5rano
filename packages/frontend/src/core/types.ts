@@ -56,6 +56,8 @@ export interface NarrationBlock {
   title: string;
   body: string;
   kind?: 'insight' | 'warning' | 'hypothesis';
+  /** Skąd pochodzi twierdzenie w tym bloku — opcjonalne, patrz core/citation.ts. */
+  citation?: import('./citation').Citation;
 }
 
 /** Funkcja narracyjna laboratorium: parametry + statystyki → bloki tekstu. */

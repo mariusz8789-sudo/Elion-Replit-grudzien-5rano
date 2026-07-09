@@ -38,11 +38,35 @@ cała logika fizyczna, parametry i statystyki przenoszą się bez zmian.
    realne wielkości fizyczne bezpośrednio z parametrów i statystyk
    symulacji. Zero zależności sieciowej, zero LLM.
 2. **LLM opcjonalny** (`narrator/askAI.ts` → backend `/api/ask`) — pytania
-   otwarte użytkownika. Model dostaje WYŁĄCZNIE stan symulacji, który
-   użytkownik i tak widzi na ekranie (parametry, statystyki, już policzone
-   bloki narracji) — nigdy nie oblicza własnych wyników fizyki. Bez klucza
-   `ANTHROPIC_API_KEY` backend odpowiada uczciwym `503`, warstwa 1 działa
-   dalej bez zmian.
+   otwarte użytkownika. Model dostaje stan symulacji, który użytkownik i
+   tak widzi na ekranie (parametry, statystyki, już policzone bloki
+   narracji) ORAZ wyciąg z `knowledge/<lab>.md` dopasowany po `labId` —
+   jedyne dozwolone źródło dla twierdzeń wykraczających poza samą
+   symulację (`buildKnowledgeIndex`/`knowledgeExcerptFor` w
+   `packages/backend/src/lib.mjs`). System prompt wymaga oznaczenia
+   każdego takiego twierdzenia jedną z sześciu gwiazdek pewności ze
+   skali w `knowledge/README.md` — to wymuszenie promptem, nie
+   programowa weryfikacja treści (patrz `knowledge/ai-discovery.md` §
+   Ryzyka). Bez klucza `ANTHROPIC_API_KEY` backend odpowiada uczciwym
+   `503`, warstwa 1 działa dalej bez zmian.
+
+### Źródła danych i cytowania
+
+`core/dataSource.ts` to rejestr źródeł danych, świadomie skopiowany z
+kształtu `core/registry.ts` (labów) zamiast nowego wzorca — każde źródło
+deklaruje `id`, `citation` (skąd, jaki poziom pewności), `isSynthetic` i
+`load()`. Dziś jeden realny konsument: `particle-invmass.ts` rejestruje
+`particle.dimuon-masses`, które automatycznie przełącza się z generatora
+syntetycznego na plik `data/dimuon-real.ts`, jeśli ten istnieje —
+`scripts/fetch-real-data.mjs` wie, jak go wygenerować z CERN Open Data,
+JPL Horizons czy ESA Gaia (wymaga sieci bez blokady na te hosty, patrz
+README „Znane ograniczenia").
+
+`core/citation.ts` eksportuje ten sam sześciopoziomowy `ConfirmationLevel`
+co baza wiedzy i `NarrationBlock.citation?` — opcjonalne pole źródła,
+renderowane przez `NarratorPanel` jako link. Nie każdy blok ma cytowanie
+(byłoby to szumem informacyjnym); wpięte tam, gdzie twierdzenie odwołuje
+się do konkretnego wyniku eksperymentalnego (masy PDG, testy Bella).
 
 ## Funkcje lokalne (bez backendu, bez konta)
 
@@ -78,16 +102,66 @@ w `lib.mjs` — testowana przez `node --test` bez uruchamiania portu
 
 ## Testy
 
+94 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 122.
+
 - **Fizyka i symulacje** (`__tests__/physics.test.ts`, `sims.test.ts`):
   twarde asercje naukowe (złamanie nierówności Bella |S|>2, twierdzenie
   Parsevala dla FFT, odwrócenie porządku czasowego w transformacji
   Lorentza) — nie tylko „nie rzuca wyjątku".
 - **Funkcje lokalne** (`storage`, `settings`, `analytics`, `discoveryLog`,
-  `search`, `registry`, `elements`, `glossary`): każdy moduł osobno,
-  włącznie ze ścieżkami degradacji (localStorage niedostępny, dane
-  skorumpowane).
+  `search`, `registry`, `elements`, `glossary`, `dataSource`, `i18n`):
+  każdy moduł osobno, włącznie ze ścieżkami degradacji (localStorage
+  niedostępny, dane skorumpowane).
 - **Backend** (`lib.test.mjs`): sanityzacja wejścia, rate limiting, oba
-  wektory path traversal, obecność nagłówków bezpieczeństwa.
+  wektory path traversal, obecność nagłówków bezpieczeństwa, ładowanie i
+  przycinanie wyciągów z bazy wiedzy (z wstrzykniętym fake'owym czytnikiem
+  plików — zero realnego dostępu do dysku w testach).
+
+## Przyszły backend — punkty rozszerzenia (projekt, NIE zbudowane)
+
+MVP celowo zostaje bez kont/bazy danych/płatności. Ten rozdział istnieje,
+żeby dodanie tych rzeczy było decyzją o TYM, jak je dodać, a nie
+przepisywaniem architektury od zera. Nic poniżej nie jest zaimplementowane.
+
+**Dlaczego to w ogóle będzie potrzebne.** Funkcje lokalne (`storage.ts` i
+moduły na nim, patrz wyżej) świetnie służą pojedynczemu użytkownikowi na
+jednym urządzeniu. Nie obsłużą: postępu ucznia widocznego dla nauczyciela,
+tego samego konta na telefonie i komputerze, wspólnego eksperymentu wielu
+osób, ani danych do badania skuteczności edukacyjnej w skali większej niż
+jedno urządzenie. To jest realny sufit obecnej architektury, nie hipoteza
+— i to jest zamierzone: prostota MVP miała priorytet nad tą funkcją.
+
+**Gdzie wpiąć konto/sesję.** `packages/backend/src/server.mjs` już ma
+dokładnie ten kształt, w który wpina się REST API bez przepisywania: nowe
+trasy obok istniejących `/api/health` i `/api/ask` (np. `/api/session`,
+`/api/sync`), ten sam wzorzec `json()`/walidacji co `handleAsk`. Sesja =
+nowa, osobna warstwa — NIE zamiennik `storage.ts`. Model docelowy: dane
+lokalne zostają lokalnym cache'em/trybem offline (jak dziś), a warstwa
+synchronizacji nakłada się na te same moduły (`settings.ts`,
+`discoveryLog.ts`) przez ten sam kształt funkcji (`readJSON`/`writeJSON`),
+tyle że zapisujące też do backendu, gdy zalogowany. Użytkownik bez konta
+= dokładnie dzisiejsze zachowanie, bez regresji.
+
+**Gdzie wpiąć bazę danych.** Backend dziś nie ma stanu poza limiterem
+w pamięci (`createRateLimiter`, per-proces — już udokumentowane jako
+ograniczenie do adresowania przy autoscale, patrz `SECURITY.md`). Baza
+(Postgres/SQLite, do decyzji przy realnej potrzebie) wpinałaby się jako
+kolejny moduł importowany przez `server.mjs`, analogicznie do `lib.mjs` —
+czysta logika zapytań testowalna bez portu, `server.mjs` tylko łączy z
+`http.createServer`. Minimalny schemat do zaprojektowania wtedy, nie
+teraz: `users`, `sessions`, `progress` (odpowiednik dzisiejszego
+`discovery-log/v1` per-user zamiast per-przeglądarka).
+
+**Klasy/kohorty (funkcja edukacyjna z realną wartością komercyjną).**
+Naturalne rozszerzenie modelu sesji: `classroom_id` grupujący `users`,
+nauczyciel widzi zagregowany (nie per-uczniowski, RODO/COPPA) postęp.
+Świadomie NIE projektuane szczegółowo tutaj — wymaga decyzji prawnej o
+danych dzieci (patrz `SECURITY.md` „świadome ograniczenia") przed
+jakimkolwiek kodem, nie tylko architektury.
+
+**Co NIE zmienia się, gdy to wszystko powstanie:** kontrakt `LabDefinition`
+i `Sim`, warstwa 0 Narratora, PWA offline, `core/dataSource.ts`. Backend z
+kontem to dodatkowa warstwa nad dzisiejszą aplikacją, nie jej zastąpienie.
 
 ## Świadome decyzje architektoniczne
 

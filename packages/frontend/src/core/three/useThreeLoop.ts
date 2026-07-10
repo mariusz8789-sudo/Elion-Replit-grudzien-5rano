@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SimParams } from '../types';
-import type { Sim3D } from './types';
+import type { PostProcessor, Sim3D } from './types';
 
 /**
  * Pętla symulacji 3D — lustro core/useSimLoop.ts (DPR, resize, rAF, pauza w
@@ -12,6 +12,13 @@ import type { Sim3D } from './types';
  * dopiero po pierwszym wejściu do sceny 3D (patrz public/sw.js: cache-first
  * dla zasobów tej samej domeny) — pierwsza wizyta w takim eksperymencie
  * wymaga więc sieci, kolejne działają offline jak reszta PWA.
+ *
+ * Moduły postprocessingu (EffectComposer/RenderPass/UnrealBloomPass/
+ * OutputPass) są ładowane RAZEM z `three` dla KAŻDEJ sceny 3D (nie tylko
+ * tych, które go używają) — świadomy kompromis: jeden wspólny cykl
+ * ładowania jest prostszy niż per-Sim dynamiczny import, a moduły są małe
+ * względem samego `three`. Faktycznie używa ich tylko Sim3D, który
+ * implementuje `setupPostProcessing`.
  */
 export function useThreeLoop(
   sim: Sim3D | null,
@@ -34,12 +41,20 @@ export function useThreeLoop(
     let raf = 0;
     let renderer: import('three').WebGLRenderer | undefined;
     let controls: { update: () => void; dispose: () => void } | undefined;
+    let post: PostProcessor | undefined;
 
     setLoading(true);
     setFailed(false);
 
-    Promise.all([import('three'), import('three/examples/jsm/controls/OrbitControls.js')])
-      .then(([THREE, { OrbitControls }]) => {
+    Promise.all([
+      import('three'),
+      import('three/examples/jsm/controls/OrbitControls.js'),
+      import('three/examples/jsm/postprocessing/EffectComposer.js'),
+      import('three/examples/jsm/postprocessing/RenderPass.js'),
+      import('three/examples/jsm/postprocessing/UnrealBloomPass.js'),
+      import('three/examples/jsm/postprocessing/OutputPass.js'),
+    ])
+      .then(([THREE, { OrbitControls }, { EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }]) => {
         if (disposed) return;
         setLoading(false);
 
@@ -64,10 +79,19 @@ export function useThreeLoop(
           renderer!.setSize(w, h, false);
           camera.aspect = w / h;
           camera.updateProjectionMatrix();
+          post?.setSize(w, h);
           sim.onResize?.(w, h);
         };
 
         sim.init(THREE, scene, camera, canvas.clientWidth || 300, canvas.clientHeight || 300);
+        post = sim.setupPostProcessing?.(
+          { EffectComposer, RenderPass, UnrealBloomPass, OutputPass },
+          renderer,
+          scene,
+          camera,
+          canvas.clientWidth || 300,
+          canvas.clientHeight || 300,
+        );
         fit();
         const ro = new ResizeObserver(fit);
         ro.observe(canvas);
@@ -91,7 +115,8 @@ export function useThreeLoop(
           if (runningRef.current) sim.update(dt, paramsRef.current);
           sim.syncScene(scene, camera);
           controls?.update();
-          renderer!.render(scene, camera);
+          if (post) post.render();
+          else renderer!.render(scene, camera);
           if (onStats && sim.getStats && now - statsAt > 250) {
             statsAt = now;
             onStats(sim.getStats());
@@ -131,6 +156,7 @@ export function useThreeLoop(
       disposed = true;
       (canvas as HTMLCanvasElement & { __disposeThree?: () => void }).__disposeThree?.();
       sim.dispose?.();
+      post?.dispose?.();
       controls?.dispose();
       renderer?.dispose();
     };

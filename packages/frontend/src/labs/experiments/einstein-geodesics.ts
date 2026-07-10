@@ -1,13 +1,15 @@
 import type { ExperimentDef, Sim, SimParams } from '../../core/types';
 import { tracePolylineBy } from '../../core/canvasHelpers';
+import { stepSchwarzschildGeodesic } from '../../core/physics';
 
 /**
  * Geodezyjne fotonów wokół czarnej dziury Schwarzschilda + dysk akrecyjny.
  * Fizyka: dokładne równanie orbity zerowej d²u/dφ² = −u + (3/2)r_s u²
- * (u = 1/r), całkowane RK4 — to pełna OTW dla fotonu, nie przybliżenie.
- * Krytyczny parametr zderzenia: b_c = (3√3/2)·r_s ≈ 2,598 r_s.
- * Widok z góry (płaszczyzna równikowa); słynny obraz "Interstellar"
- * to widok z boku z soczewkowaniem — plan Etapu 2.
+ * (u = 1/r), całkowane RK4 (core/physics.ts: stepSchwarzschildGeodesic) —
+ * to pełna OTW dla fotonu, nie przybliżenie. Krytyczny parametr zderzenia:
+ * b_c = (3√3/2)·r_s ≈ 2,598 r_s. Widok z góry (płaszczyzna równikowa) —
+ * pełna scena 3D z soczewkowaniem "jak Interstellar": Einstein Lab →
+ * „Czarna dziura 3D" (ta sama fizyka, druga warstwa renderująca).
  */
 
 const RS = 26; // promień Schwarzschilda w px ekranu
@@ -58,7 +60,6 @@ class GeodesicSim implements Sim {
       this.spawn(Number(p.impact));
     }
     const dphi = 0.02;
-    const f = (u: number) => -u + 1.5 * RS * u * u;
     for (const ph of this.photons) {
       if (ph.dead) {
         ph.trail.shift();
@@ -66,18 +67,15 @@ class GeodesicSim implements Sim {
       }
       const steps = Math.round(dt * 220);
       for (let s = 0; s < steps; s++) {
-        // RK4 dla u(φ)
-        const k1u = ph.du;
-        const k1d = f(ph.u);
-        const k2u = ph.du + 0.5 * dphi * k1d;
-        const k2d = f(ph.u + 0.5 * dphi * k1u);
-        const k3u = ph.du + 0.5 * dphi * k2d;
-        const k3d = f(ph.u + 0.5 * dphi * k2u);
-        const k4u = ph.du + dphi * k3d;
-        const k4d = f(ph.u + dphi * k3u);
-        ph.u += (dphi / 6) * (k1u + 2 * k2u + 2 * k3u + k4u);
-        ph.du += (dphi / 6) * (k1d + 2 * k2d + 2 * k3d + k4d);
-        ph.phi -= dphi; // foton leci w stronę malejącego φ (z lewej)
+        // Foton leci w stronę malejącego φ — krok fizyki musi iść w TĘ SAMĄ
+        // stronę (-dphi), inaczej du0 (pochodna wyprowadzona dla malejącego
+        // φ) i kierunek całkowania są niespójne i tor "eksploduje" w
+        // pierwszym kroku niezależnie od parametru zderzenia (błąd znaleziony
+        // testem fizycznym — patrz physics.test.ts).
+        const next = stepSchwarzschildGeodesic(ph.u, ph.du, -dphi, RS);
+        ph.u = next.u;
+        ph.du = next.du;
+        ph.phi -= dphi;
         if (ph.u > 1 / (RS * 1.01)) {
           ph.dead = true;
           ph.captured = true;

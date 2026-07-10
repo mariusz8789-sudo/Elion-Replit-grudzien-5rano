@@ -105,10 +105,12 @@ laboratoriów). Tam, gdzie głębia 3D realnie pomaga zrozumieć fizykę — dzi
 Universe Lab → „Układ Słoneczny 3D" (kamera pokazuje pod kątem, że orbity
 leżą blisko jednej płaszczyzny, co samo tłumaczy powstanie z dysku
 protoplanetarnego), Multiverse Lab → „Tesserakt (4D)" (obrót hipersześcianu)
-i „Multiverse Nexus" (sala portali — drugi i trzeci niezależny konsument
-tego samego kontraktu, potwierdzenie że się generalizuje, nie jednorazowy
-kod) — jest opcjonalny drugi tor renderowania, ŚWIADOMIE zaprojektowany
-jako lustro istniejącego kontraktu `Sim`, nie równoległy system:
+i „Multiverse Nexus" (sala portali), Einstein Lab → „Czarna dziura 3D"
+(geodezyjne fotonów w losowo zorientowanych płaszczyznach 3D + poświata
+bloom) — czwarty niezależny konsument tego samego kontraktu, potwierdzenie
+że się generalizuje, nie jednorazowy kod — jest opcjonalny drugi tor
+renderowania, ŚWIADOMIE zaprojektowany jako lustro istniejącego kontraktu
+`Sim`, nie równoległy system:
 
 ```ts
 // core/three/types.ts — ten sam cykl życia co Sim, inny adapter renderujący
@@ -138,6 +140,19 @@ zostaje ~187 kB niezależnie od tego). Chunk trafia do cache Service Workera
 dopiero po pierwszym wejściu do takiej sceny (cache-first w `public/sw.js`)
 — pierwsza wizyta wymaga sieci, kolejne działają offline jak reszta PWA.
 Kamera: `OrbitControls` z `three/examples/jsm` (przeciągnij/scrolluj).
+
+**Postprocessing (bloom) — opcjonalny, per-scena.** `Sim3D.setupPostProcessing?()`
+dostaje gotowe klasy (`EffectComposer`/`RenderPass`/`UnrealBloomPass`/`OutputPass`,
+ładowane przez `useThreeLoop.ts` razem z `three` dla KAŻDEJ sceny 3D — moduły
+są małe, jeden wspólny cykl ładowania jest prostszy niż per-Sim dynamiczny
+import) i zwraca cienki `PostProcessor { render(), setSize(), dispose?() }`;
+jeśli obecny, pętla renderuje przez niego zamiast gołego `renderer.render()`.
+Pierwszy konsument: „Czarna dziura 3D" (Einstein Lab) — poświata dysku
+akrecyjnego i horyzontu. WAŻNE zastrzeżenie uczciwości: to prawdziwa technika
+postprocessingu (nie ozdoba), ale WebGL w przeglądarce mobilnej nie osiąga
+jakości renderingu offline z produkcji filmowej (Interstellar, no.) —
+honestyNote każdej sceny z bloomem mówi to wprost, żeby nie sugerować
+fałszywego poziomu realizmu.
 
 **Interakcja przez raycasting** (`multiverse-nexus.ts`): `Sim3D.pointer(x,y,type)`
 dostaje współrzędne CSS px identycznie jak 2D `Sim.pointer`; sama sima
@@ -207,12 +222,18 @@ w `lib.mjs` — testowana przez `node --test` bez uruchamiania portu
 
 ## Testy
 
-158 testów frontendowych (vitest) + 28 backendowych (`node --test`) = 186.
+163 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 191.
 
 - **Fizyka i symulacje** (`__tests__/physics.test.ts`, `sims.test.ts`):
   twarde asercje naukowe (złamanie nierówności Bella |S|>2, twierdzenie
   Parsevala dla FFT, odwrócenie porządku czasowego w transformacji
-  Lorentza) — nie tylko „nie rzuca wyjątku".
+  Lorentza) — nie tylko „nie rzuca wyjątku". Konkretny przykład wartości
+  tej dyscypliny: test progu krytycznego b_c dla geodezyjnej Schwarzschilda
+  (`stepSchwarzschildGeodesic`) wykrył realny, wcześniej niewidoczny błąd
+  znaku w kroku całkowania (`+dphi` zamiast `-dphi`, niespójny z kierunkiem
+  ruchu fotonu) — w praktyce KAŻDY foton w „Geodezyjne + dysk" był
+  klasyfikowany jako „uciekł" niezależnie od parametru zderzenia. Naprawione
+  w obu wersjach (2D i 3D), bo dzielą teraz jedną funkcję fizyki.
 - **Funkcje lokalne** (`storage`, `settings`, `analytics`, `discoveryLog`,
   `search`, `registry`, `elements`, `glossary`, `dataSource`, `i18n`):
   każdy moduł osobno, włącznie ze ścieżkami degradacji (localStorage
@@ -365,3 +386,11 @@ tylko najbliższą sesję.
   `<html>`) używają lekkich ręcznych fake'ów zamiast ciężkiej zależności;
   prawdziwe zachowanie przeglądarki weryfikują smoke-testy Playwright
   (nie w CI — ręcznie przy większych zmianach UI).
+- **Sufit realizmu grafiki: stylizowany-realistyczny, nie fotorealistyczny**
+  — świadome ograniczenie, nie brak ambicji. WebGL w przeglądarce mobilnej
+  przy 60 FPS nie odtworzy jakości renderingu offline z produkcji filmowej
+  (godziny na klatkę na farmie renderującej) — żaden framework tego nie
+  zmienia. Realne, uczciwe wzmocnienia: bloom (`UnrealBloomPass`, patrz
+  „Sceny 3D"), bogatsze pola cząstek, lepsze materiały. Każda scena z
+  takim efektem mówi to wprost w `honestyNote`, żeby nie sugerować
+  poziomu realizmu, którego platforma nie dostarcza.

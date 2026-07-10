@@ -20,6 +20,74 @@ Legenda pewności: ★★★★★ potwierdzona · ★★★★ potwierdzona (ko
 
 ---
 
+## Flagowe pomysły — najwyższy potencjał, wymagają wielu sesji
+
+Dwie pozycje wyróżnione z reszty listy: nie są "kolejną funkcją do
+dorzucenia", tylko wieloetapowymi projektami, które same w sobie mogłyby
+stać się rozpoznawalnym elementem Genesis OS. Rozpisane szerzej niż reszta
+backlogu celowo — żeby następna sesja, która się za nie weźmie, miała
+gotowy plan fazowania, a nie tylko hasło.
+
+### Discovery Timeline Engine (★★★★ dla epok potwierdzonych, ★★/★ dla przyszłości)
+
+Jedna, płynna oś czasu od Ery Plancka (10⁻⁴³ s) do scenariuszy dalekiej
+przyszłości Wszechświata, połączona z nieskończonym zoomem skali
+(Wszechświat → galaktyka → Układ Słoneczny → planeta → komórka → DNA →
+atom → kwark) — bez przeładowań ekranu. To NIE jest nowa funkcja jednego
+laboratorium: to potencjalnie NOWY, drugi tryb wejścia do całego Genesis OS,
+obok dzisiejszej siatki kart. Duża decyzja produktowa, nie tylko techniczna.
+
+Uczciwość naukowa: każda epoka na osi MUSI mieć jawną etykietę — obserwacja
+(nukleosynteza pierwotna, CMB, formowanie gwiazd — ★★★★★/★★★★) vs model
+ekstrapolowany (śmierć cieplna, rozpad protonu — ★★/★) vs czysta hipoteza
+(Big Rip, Big Crunch, wszechświat odbijający — ★/☆). Dokładnie ta sama
+dyscyplina co już wymuszona w reszcie platformy — tu tylko na dłuższej osi.
+
+**Realistyczne fazowanie** (nie "zrób to wszystko naraz"):
+1. Sama oś czasu 2D (suwak + Narrator per epoka) — reużywa DOKŁADNIE wzorca
+   `ScaleJourney.tsx` (już mamy działającą, przetestowaną koncepcję "suwak
+   → renderowanie proporcjonalne do wartości logarytmicznej"), tylko oś to
+   czas, nie skala odległości. Realistyczny 1-sesyjny kawałek.
+2. "Kliknij obiekt → przejdź do laboratorium" (gwiazda → Universe Lab,
+   atom → Atom Lab, czarna dziura → Einstein Lab) — reużywa
+   `core/scenarioBridge.ts`, DOKŁADNIE ten sam mechanizm co „Co by było,
+   gdyby?" i portale Multiverse Nexus. Trzeci niezależny konsument tego
+   samego mostu.
+3. Płynny zoom międzyskalowy (Wszechświat→kwark) jako osobna, znacznie
+   trudniejsza faza — wymaga spójnego systemu jednostek/kamery LOD w całej
+   aplikacji, nie tylko jednego laboratorium. NIE zaczynać od tego.
+4. Scena 3D dla wybranych epok (np. formowanie pierwszych gwiazd) — dopiero
+   gdy fazy 1–2 są solidne; kolejny konsument `Sim3D`.
+
+Ryzyko do świadomego zarządzania: to największy, najbardziej ambitny punkt
+całego backlogu — łatwo zacząć i nie skończyć. Faza 1 musi być kompletna,
+przetestowana i wydana sama w sobie, zanim zacznie się faza 2.
+
+### Trzy Ciała — od wykresu do laboratorium (★★★★★ chaos deterministyczny)
+
+Rozszerzenie prostego "pokaż orbity trzech ciał" w pełne, interaktywne
+laboratorium dynamiki chaotycznej:
+- Tysiące cząstek / świecące trajektorie — wydajnościowo wymaga
+  `THREE.Points` z GPU instancingiem, nie osobnych obiektów per cząstka
+  (patrz „Performance" niżej).
+- Użytkownik komponuje własny układ (masy, prędkości początkowe) —
+  reużywa dokładnie wzorca `core/customExperiment.ts` (zapis presetu
+  parametrów), nie nowego systemu.
+- Zapisywanie i udostępnianie innym — wymaga backendu z kontem (patrz
+  `ARCHITECTURE.md` „Przyszły backend"), świadomie odłożone do tego czasu.
+- AI analizuje stabilność i wskazuje punkty chaosu — naturalne rozszerzenie
+  `core/experimentAnalysis.ts` (już wykrywa skoki/korelacje w przebiegu;
+  "wykładniczy rozjazd dwóch niemal identycznych startów" to kolejna,
+  policzalna metryka w tym samym module, nie nowy silnik AI).
+
+Realistyczny pierwszy krok (osiągalny w jednej sesji): 2D silnik N-ciał z
+integracją symplektyczną (zachowuje energię długoterminowo, w
+przeciwieństwie do zwykłego Eulera) + tryb "dwa niemal identyczne starty"
+pokazujący dywergencję na żywo — to samo dydaktyczne jądro, bez czekania na
+tysiące cząstek czy współdzielenie.
+
+---
+
 ## Quantum Reality
 
 - ✅ Superpozycja i interferencja — Quantum Lab, dwie szczeliny (★★★★★)

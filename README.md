@@ -59,14 +59,17 @@ Wszechświata (8,8×10²⁶ m).
   Genesis OS (nie kopia żadnego filmu/serialu): portale „lokalne" pokazują
   inne stałe fizyczne, portale-tunele NAPRAWDĘ przenoszą do innego
   laboratorium przez ten sam most co "Co by było, gdyby?"
-- **186 testów** (158 vitest frontend + 28 node:test backend)
+- **Czarna dziura 3D** (Einstein Lab) — dokładna geodezyjna zerowa
+  Schwarzschilda w 3D (fotony w losowo zorientowanych płaszczyznach),
+  dysk akrecyjny z poświatą (prawdziwy bloom, `UnrealBloomPass`)
+- **191 testów** (163 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 186 testów (fizyka + funkcje lokalne + backend)
+npm test           # 191 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

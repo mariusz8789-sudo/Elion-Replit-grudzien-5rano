@@ -6,6 +6,30 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Czarna dziura 3D + bloom) / Naprawiono (błąd znaku w geodezyjnej)
+- Einstein Lab: „Czarna dziura 3D" — ta sama dokładna fizyka geodezyjnej
+  zerowej Schwarzschilda co wersja 2D (`core/physics.ts`:
+  `stepSchwarzschildGeodesic`, teraz współdzielona), rozszerzona na 3D:
+  każdy foton dostaje losowo zorientowaną płaszczyznę orbity (fizycznie
+  ścisłe — geodezyjne wokół masy sferycznie symetrycznej zawsze leżą w
+  jednej płaszczyźnie). Dysk akrecyjny (700 cząstek, jasność koduje
+  wzmocnienie Dopplera) z prawdziwym postprocessingiem bloom.
+- `core/three/types.ts`/`useThreeLoop.ts`: nowy, opcjonalny
+  `Sim3D.setupPostProcessing()` — pierwsza reużywalna infrastruktura
+  postprocessingu (`EffectComposer`/`RenderPass`/`UnrealBloomPass`/
+  `OutputPass`) dostępna dla KAŻDEJ przyszłej sceny 3D, nie tylko tej jednej.
+- **Znaleziony i naprawiony realny błąd fizyczny** w już wdrożonym
+  eksperymencie „Geodezyjne + dysk" (2D): krok całkowania RK4 używał
+  niespójnego znaku względem kierunku ruchu fotonu (`+dφ` zamiast `-dφ`) —
+  w praktyce KAŻDY foton był klasyfikowany jako „uciekł", niezależnie od
+  parametru zderzenia b. Wykryty przez napisanie twardego testu progu
+  krytycznego b_c (nie przez ręczną obserwację) — dokładnie ten rodzaj
+  błędu, przed którym miały chronić testy fizyczne zamiast "nie rzuca
+  wyjątku". Naprawiony w jednym miejscu (`stepSchwarzschildGeodesic`),
+  współdzielonym teraz przez 2D i 3D.
+- 5 nowych testów fizyki (próg b_c, brak siły w nieskończoności, znak siły
+  na horyzoncie) — 163 testy frontendowe razem (191 z backendem).
+
 ### Dodano (Multiverse Nexus — sala portali 3D)
 - Multiverse Lab: „Multiverse Nexus" (`multiverse-nexus.ts`) — oryginalna
   metafora nawigacyjna (świadomie NIE kopiująca żadnego filmu/serialu):

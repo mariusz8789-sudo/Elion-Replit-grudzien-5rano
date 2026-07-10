@@ -156,6 +156,37 @@ export function semfStabilityGradient(z: number, n: number): number {
 }
 
 /**
+ * Równanie geodezyjnej zerowej Schwarzschilda (tor fotonu wokół czarnej
+ * dziury) — d²u/dφ² = −u + (3/2)r_s·u², u=1/r. Wydzielone z
+ * einstein-geodesics.ts (2D), żeby einstein-blackhole-3d.ts (3D) używały
+ * DOKŁADNIE tej samej, raz przetestowanej fizyki — różni się tylko to, jak
+ * (r,φ) mapuje się na piksele/scenę.
+ */
+export function schwarzschildGeodesicRHS(u: number, rsUnits: number): number {
+  return -u + 1.5 * rsUnits * u * u;
+}
+
+/** Krytyczny parametr zderzenia b_c/r_s = 3√3/2 ≈ 2,598 — granica wychwytu fotonu. */
+export const SCHWARZSCHILD_CRITICAL_IMPACT = (3 * Math.sqrt(3)) / 2;
+
+/** Jeden krok RK4 całkowania geodezyjnej zerowej po kącie φ. */
+export function stepSchwarzschildGeodesic(u: number, du: number, dphi: number, rsUnits: number): { u: number; du: number } {
+  const f = (uu: number) => schwarzschildGeodesicRHS(uu, rsUnits);
+  const k1u = du;
+  const k1d = f(u);
+  const k2u = du + 0.5 * dphi * k1d;
+  const k2d = f(u + 0.5 * dphi * k1u);
+  const k3u = du + 0.5 * dphi * k2d;
+  const k3d = f(u + 0.5 * dphi * k2u);
+  const k4u = du + dphi * k3d;
+  const k4d = f(u + dphi * k3u);
+  return {
+    u: u + (dphi / 6) * (k1u + 2 * k2u + 2 * k3u + k4u),
+    du: du + (dphi / 6) * (k1d + 2 * k2d + 2 * k3d + k4d),
+  };
+}
+
+/**
  * Geometria 4D (hipersześcian/tesserakt) — CZYSTA algebra liniowa, dokładna
  * (nie model, nie przybliżenie). Nie jest to twierdzenie o istnieniu
  * fizycznych dodatkowych wymiarów przestrzennych (to osobna, spekulacyjna

@@ -2,6 +2,7 @@ import type { LabDefinition, NarrationBlock, Sim, SimParams } from '../core/type
 import { sci } from '../core/useSimLoop';
 import { einsteinGeodesics } from './experiments/einstein-geodesics';
 import { einsteinLensing } from './experiments/einstein-lensing';
+import { einsteinBlackHole3D } from './experiments/einstein-blackhole-3d';
 
 /**
  * Einstein Lab — zakrzywienie biegu światła przy masie.
@@ -216,7 +217,7 @@ export const einsteinLab: LabDefinition = {
     },
   ],
   createSim: () => new GravityLightSim(),
-  experiments: [einsteinGeodesics, einsteinLensing],
+  experiments: [einsteinGeodesics, einsteinBlackHole3D, einsteinLensing],
   narrate(p) {
     const M = 10 ** Number(p.mass) * MSUN;
     const rs = (2 * G * M) / (C * C);

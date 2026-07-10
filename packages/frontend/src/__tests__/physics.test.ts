@@ -13,11 +13,14 @@ import {
   schwarzschildRadius,
   project4Dto3D,
   rotate4D,
+  SCHWARZSCHILD_CRITICAL_IMPACT,
+  schwarzschildGeodesicRHS,
   semfBindingEnergy,
   semfBindingPerNucleon,
   semfStabilityGradient,
   singletCorrelation,
   solveKepler,
+  stepSchwarzschildGeodesic,
   TESSERACT_EDGES,
   TESSERACT_VERTICES,
 } from '../core/physics';
@@ -287,6 +290,53 @@ describe('KNOWN_NUCLIDES — kluczowe zmierzone izotopy (Mapa nuklidów, NNDC)',
   it('U-238 i C-14 (już używane w podstawowym eksperymencie rozpadu) są też w mapie nuklidów', () => {
     expect(KNOWN_NUCLIDES.find((k) => k.symbol === 'U-238')?.halfLifeLabel).toContain('4,468 mld');
     expect(KNOWN_NUCLIDES.find((k) => k.symbol === 'C-14')?.halfLifeLabel).toContain('5 730');
+  });
+});
+
+describe('geodezyjna zerowa Schwarzschilda (Einstein Lab, 2D i 3D)', () => {
+  it('brak siły w nieskończoności (u=0)', () => {
+    expect(schwarzschildGeodesicRHS(0, 1)).toBe(0);
+  });
+
+  it('na horyzoncie (u=1/rs) siła jest dodatnia (przyciąga do środka)', () => {
+    const rs = 1;
+    expect(schwarzschildGeodesicRHS(1 / rs, rs)).toBeGreaterThan(0);
+  });
+
+  /**
+   * Symuluje ten sam sposób startu co GeodesicSim.spawn() w
+   * einstein-geodesics.ts. Krok fizyki celowo -dphi (foton leci w stronę
+   * malejącego φ — patrz komentarz przy wywołaniu w einstein-geodesics.ts).
+   */
+  function simulateCapture(bScale: number, rs = 1): boolean {
+    const bc = SCHWARZSCHILD_CRITICAL_IMPACT * rs;
+    const b = bc * bScale;
+    const r0 = rs * 4000;
+    const phi0 = Math.PI - Math.asin(Math.min(1, b / r0));
+    let u = Math.sin(phi0) / b;
+    let du = Math.cos(phi0) / b;
+    const dphi = 0.001;
+    for (let i = 0; i < 400000; i++) {
+      const next = stepSchwarzschildGeodesic(u, du, -dphi, rs);
+      u = next.u;
+      du = next.du;
+      if (u > 1 / (rs * 1.01)) return true; // pochłonięty
+      if (u <= 1 / r0) return false; // uciekł z powrotem do startowej odległości
+    }
+    throw new Error('symulacja nie rozstrzygnęła się w limicie kroków');
+  }
+
+  it('foton z b < b_c zostaje pochłonięty', () => {
+    expect(simulateCapture(0.9)).toBe(true);
+  });
+
+  it('foton z b > b_c ucieka (tylko ugięty)', () => {
+    expect(simulateCapture(1.5)).toBe(false);
+  });
+
+  it('im bliżej b_c, tym trudniej rozstrzygnąć — ale 0,999× i 1,001× dają różne wyniki', () => {
+    expect(simulateCapture(0.999)).toBe(true);
+    expect(simulateCapture(1.001)).toBe(false);
   });
 });
 

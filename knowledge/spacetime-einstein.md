@@ -23,10 +23,18 @@ Kerr: ergosfera, frame-dragging (Gravity Probe B 2011; jety AGN).
 Dowody bezpośrednie: fale grawitacyjne (2015), obraz EHT M87* (2019)
 i Sgr A* (2022), gwiazda S2 wokół Sgr A* (Nobel 2020).
 
-**Geodezyjne fotonów Schwarzschilda (plan Etapu 1)**
-Potencjał efektywny: (dr/dφ)² = r⁴/b² − r²(1−r_s/r); całkowanie RK4;
-render dysku akrecyjnego wg podejścia Luminet 1979 → James et al. 2015
-(metoda "Interstellar", artykuł open access CQG 32, 065001).
+**Geodezyjne fotonów Schwarzschilda (zaimplementowane, 2D i 3D)**
+Równanie geodezyjnej zerowej d²u/dφ² = −u + (3/2)r_s·u² (u=1/r), całkowanie
+RK4 (`core/physics.ts`: `stepSchwarzschildGeodesic`, jedna funkcja
+współdzielona przez obie wersje). Krytyczny parametr zderzenia
+b_c = (3√3/2)·r_s. Wersja 3D (Einstein Lab → „Czarna dziura 3D") losuje
+orientację płaszczyzny orbity per foton — fizycznie ścisłe, bo geodezyjne
+wokół masy sferycznie symetrycznej ZAWSZE leżą w jednej płaszczyźnie przez
+środek. Dysk akrecyjny: poglądowy w obu wersjach (jasność ~ wzmocnienie
+Dopplera, nie precyzyjny transfer promieniowania). Render w pełnej metodzie
+Luminet 1979 → James et al. 2015 ("Interstellar", CQG 32, 065001, open
+access) — z prawdziwym soczewkowaniem obrazu dysku zza horyzontu — pozostaje
+w `VISION-BACKLOG.md` jako możliwe dalsze rozszerzenie tej samej fizyki.
 
 ## Sprzeczne teorie / otwarte spory
 

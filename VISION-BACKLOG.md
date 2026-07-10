@@ -28,40 +28,44 @@ stać się rozpoznawalnym elementem Genesis OS. Rozpisane szerzej niż reszta
 backlogu celowo — żeby następna sesja, która się za nie weźmie, miała
 gotowy plan fazowania, a nie tylko hasło.
 
-### Discovery Timeline Engine (★★★★ dla epok potwierdzonych, ★★/★ dla przyszłości)
+### Discovery Timeline Engine — ✅ ZBUDOWANE (Fazy 1+2+3; Faza 4 w backlogu)
 
-Jedna, płynna oś czasu od Ery Plancka (10⁻⁴³ s) do scenariuszy dalekiej
-przyszłości Wszechświata, połączona z nieskończonym zoomem skali
-(Wszechświat → galaktyka → Układ Słoneczny → planeta → komórka → DNA →
-atom → kwark) — bez przeładowań ekranu. To NIE jest nowa funkcja jednego
-laboratorium: to potencjalnie NOWY, drugi tryb wejścia do całego Genesis OS,
-obok dzisiejszej siatki kart. Duża decyzja produktowa, nie tylko techniczna.
+Jedna, ciągła podróż przez 15 epok od Wielkiego Wybuchu do dalekiej
+przyszłości Wszechświata (`data/timeline.ts`), z niezależną soczewką skali
+(kwark → obserwowalny Wszechświat), bez przeładowań ekranu — drugi, obok
+siatki kart, tryb wejścia do Genesis OS, pod `#/timeline`. Zbudowane w
+całości w jednej sesji, po tym jak wszystkie 9 istniejących laboratoriów
+osiągnęło poziom "world-class" (governing rule tej sesji).
 
-Uczciwość naukowa: każda epoka na osi MUSI mieć jawną etykietę — obserwacja
-(nukleosynteza pierwotna, CMB, formowanie gwiazd — ★★★★★/★★★★) vs model
-ekstrapolowany (śmierć cieplna, rozpad protonu — ★★/★) vs czysta hipoteza
-(Big Rip, Big Crunch, wszechświat odbijający — ★/☆). Dokładnie ta sama
-dyscyplina co już wymuszona w reszcie platformy — tu tylko na dłuższej osi.
+Uczciwość naukowa: każda epoka niesie jawny `ConfirmationLevel` (ta sama
+6-stopniowa skala co cytowania wszędzie indziej) — rekombinacja/CMB
+★★★★★, daleka przyszłość ★★ (hipoteza). Zero nowej taksonomii.
 
-**Realistyczne fazowanie** (nie "zrób to wszystko naraz"):
-1. Sama oś czasu 2D (suwak + Narrator per epoka) — reużywa DOKŁADNIE wzorca
-   `ScaleJourney.tsx` (już mamy działającą, przetestowaną koncepcję "suwak
-   → renderowanie proporcjonalne do wartości logarytmicznej"), tylko oś to
-   czas, nie skala odległości. Realistyczny 1-sesyjny kawałek.
-2. "Kliknij obiekt → przejdź do laboratorium" (gwiazda → Universe Lab,
-   atom → Atom Lab, czarna dziura → Einstein Lab) — reużywa
-   `core/scenarioBridge.ts`, DOKŁADNIE ten sam mechanizm co „Co by było,
-   gdyby?" i portale Multiverse Nexus. Trzeci niezależny konsument tego
-   samego mostu.
-3. Płynny zoom międzyskalowy (Wszechświat→kwark) jako osobna, znacznie
-   trudniejsza faza — wymaga spójnego systemu jednostek/kamery LOD w całej
-   aplikacji, nie tylko jednego laboratorium. NIE zaczynać od tego.
-4. Scena 3D dla wybranych epok (np. formowanie pierwszych gwiazd) — dopiero
-   gdy fazy 1–2 są solidne; kolejny konsument `Sim3D`.
+**Co zbudowano** (okazało się szybsze niż pierwotne fazowanie zakładało):
+1. ✅ Oś czasu (suwak logarytmiczny + Narrator per epoka, pełne sterowanie:
+   pauza/przewijanie/przyspieszanie/skok do dowolnej z 15 epok) —
+   `core/logSlider.ts` (wydzielone ze ScaleJourney), `core/timelineMath.ts`
+   (cross-fade między sąsiednimi epokami, zero ekranów ładowania).
+2. ✅ Most do laboratoriów — `core/scenarioBridge.ts` ROZSZERZONY o
+   opcjonalny `experimentId` (trzeci konsument po „Co by było, gdyby?" i
+   Multiverse Nexus), trafia teraz w KONKRETNY eksperyment (np. epoka
+   „Układ Słoneczny" → zakładka „Prawdziwy Układ Słoneczny", nie bazowa).
+3. ✅ Płynny zoom międzyskalowy — okazał się BEZPOŚREDNIO reużywalny z
+   istniejącego mechanizmu Scale Journey (`data/scaleMilestones.ts`,
+   wydzielone i współdzielone), nie wymagał osobnego systemu LOD/kamery
+   jak pierwotnie zakładano. Niezależna oś, zawsze dostępna, punkt
+   startowy ustawiany przez charakterystyczną skalę bieżącej epoki.
+4. **Backlog (NIE zbudowane)**: sceny 3D dla wybranych epok (dziś: 15
+   ręcznie zaprojektowanych scen Canvas 2D w
+   `components/discoveryTimelineScenes.ts`) — kolejny konsument `Sim3D`,
+   analogicznie do Układu Słonecznego 3D czy Czarnej dziury 3D. Zapisywanie
+   /udostępnianie własnej „podróży" przez oś czasu.
 
-Ryzyko do świadomego zarządzania: to największy, najbardziej ambitny punkt
-całego backlogu — łatwo zacząć i nie skończyć. Faza 1 musi być kompletna,
-przetestowana i wydana sama w sobie, zanim zacznie się faza 2.
+Zweryfikowane: typecheck, lint, 219 testów (19 nowych: `logSlider.test.ts`,
+`timelineMath.test.ts` — w tym integralność 15 epok, i 2 nowe testy
+`scenarioBridge.test.ts` dla `experimentId`), build, Playwright (skoki
+między 7 epokami, autoodtwarzanie, ręczny zoom, pełny most do laboratorium
+z potwierdzeniem właściwej zakładki) — zero błędów konsoli.
 
 ### Frontier Science Lab (nowa kategoria — zagadki i granice wiedzy)
 

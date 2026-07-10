@@ -188,6 +188,59 @@ woła `setPendingScenario`/zmienia hash bezpośrednio z WNĘTRZA klasy `Sim3D`
 w pamięci, nie kontekst Reacta. Dwa różne wejścia UI (karta na osobnym
 ekranie vs portal w scenie 3D), jeden mechanizm nawigacji.
 
+Trzeci konsument: Discovery Timeline Engine (`DiscoveryTimeline.tsx`).
+Wymagał rozszerzenia mostu: dotychczas `setPendingScenario` trafiało
+WYŁĄCZNIE w eksperyment bazowy laboratorium (`exp.id === '__base'` w
+`LabShell.tsx`), bo „Co by było, gdyby?" i Multiverse Nexus zawsze celowały
+w bazowy widok. Discovery Timeline chce trafiać w KONKRETNY eksperyment
+(np. epoka „Układ Słoneczny" → dokładnie zakładka „Prawdziwy Układ
+Słoneczny" w Universe Lab, nie bazowa „Ekspansja"). `setPendingScenario`
+przyjmuje teraz opcjonalny trzeci argument `experimentId`;
+`consumePendingScenario` zwraca `{ params, experimentId? }` zamiast gołych
+parametrów. `LabShell.tsx` konsumuje scenariusz RAZ na całe życie
+komponentu (przez leniwy inicjalizator `useState`, nie przy każdym
+przełączeniu zakładki) i ustawia startowy indeks zakładki na podstawie
+`experimentId`, jeśli obecny — w pełni kompatybilne wstecznie z dwoma
+istniejącymi wywołującymi, które nigdy nie podają trzeciego argumentu.
+
+### Discovery Timeline Engine — drugi tryb wejścia
+
+Flagowa funkcja: jedna, ciągła podróż przez 15 epok historii Wszechświata
+(`data/timeline.ts`), dostępna pod `#/timeline` obok siatki laboratoriów.
+Architektura celowo reużywa TRZY już istniejące, przetestowane mechanizmy
+zamiast budować nowy system:
+
+1. **Suwak logarytmiczny** (`core/logSlider.ts`) — czysta matematyka
+   wydzielona ze Scale Journey (`logSliderValue`/`logSliderPosition`),
+   teraz współdzielona przez DWIE niezależne osie tego samego ekranu: czas
+   (Wielki Wybuch → daleka przyszłość, ~150 rzędów wielkości w sekundach) i
+   skalę przestrzenną (kwark → obserwowalny Wszechświat, kamienie milowe
+   wydzielone do `data/scaleMilestones.ts`, współdzielone dosłownie ze
+   Scale Journey — jedna aktualizacja rozmiaru trafia do obu miejsc).
+2. **Cross-fade bez ekranów ładowania** (`core/timelineMath.ts::epochBlend`)
+   — w każdej klatce renderer znajduje DWIE sąsiednie epoki otaczające
+   bieżący wiek i miesza je (`ctx.globalAlpha`) proporcjonalnie do
+   odległości w log-czasie. Ekran nigdy nie jest pusty ani nie czeka —
+   to rozwiązanie UX „bez przeładowań", nie symulacja fizyczna ciągłej
+   ewolucji Wszechświata.
+3. **Scenario bridge** (patrz wyżej) — trzeci konsument, teraz z obsługą
+   `experimentId`.
+
+Nowy element: 15 odrębnych scen Canvas 2D
+(`components/discoveryTimelineScenes.ts`), po jednej na epokę, każda
+czysta funkcja `(ctx,w,h,t)→rysunek` gdzie `t` to niezależny zegar animacji
+(NIE pozycja na osi czasu) — sceny żyją własnym echem niezależnie od tego,
+gdzie stoi suwak, więc autoodtwarzanie i ręczne przewijanie wyglądają
+identycznie płynnie. Rejestr `EPOCH_SCENES: Record<string, SceneFn>`
+mapuje `TimelineEpoch.id` na renderer; test integralności danych
+(`timelineMath.test.ts`) pilnuje, że każda epoka w `data/timeline.ts` ma
+odpowiadający wpis.
+
+Uczciwość naukowa: każda epoka niesie własny `ConfirmationLevel` (ta sama
+6-stopniowa skala co cytowania wszędzie indziej — core/citation.ts), NIE
+nowa taksonomia. Rekombinacja/CMB są ★★★★★, daleka przyszłość jest ★★
+(hipoteza) — widoczne na żywo jako kolorowa plakietka w panelu epoki.
+
 ## Funkcje lokalne (bez backendu, bez konta)
 
 `src/core/storage.ts` to jedyny punkt dostępu do `localStorage` w całej
@@ -222,7 +275,7 @@ w `lib.mjs` — testowana przez `node --test` bez uruchamiania portu
 
 ## Testy
 
-170 testów frontendowych (vitest) + 28 backendowych (`node --test`) = 198.
+191 testów frontendowych (vitest) + 28 backendowych (`node --test`) = 219.
 
 - **Fizyka i symulacje** (`__tests__/physics.test.ts`, `sims.test.ts`):
   twarde asercje naukowe (złamanie nierówności Bella |S|>2, twierdzenie

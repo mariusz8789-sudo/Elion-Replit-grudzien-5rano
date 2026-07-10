@@ -8,6 +8,7 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
 import { GlossaryScreen } from './components/GlossaryScreen';
 import { WhatIfScreen } from './components/WhatIfScreen';
+import { DiscoveryTimeline } from './components/DiscoveryTimeline';
 import { SearchOverlay } from './components/SearchOverlay';
 import { HelpOverlay } from './components/HelpOverlay';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
@@ -28,7 +29,8 @@ type Route =
   | { kind: 'settings' }
   | { kind: 'discovery-log' }
   | { kind: 'glossary' }
-  | { kind: 'what-if' };
+  | { kind: 'what-if' }
+  | { kind: 'timeline' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -38,6 +40,7 @@ function parseHash(): Route {
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
   if (h === '#/what-if') return { kind: 'what-if' };
+  if (h === '#/timeline') return { kind: 'timeline' };
   return { kind: 'home' };
 }
 
@@ -177,6 +180,16 @@ export default function App() {
     );
   }
 
+  if (route.kind === 'timeline') {
+    return (
+      <div className="app">
+        <TopBar title="🌌 Discovery Timeline" onSearch={() => setSearchOpen(true)} />
+        <DiscoveryTimeline />
+        {overlays}
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <main className="home" id="main-content" tabIndex={-1}>
@@ -187,6 +200,14 @@ export default function App() {
           <span className="hud-corner hud-bl" aria-hidden="true" />
           <span className="hud-corner hud-br" aria-hidden="true" />
         </div>
+        <button className="timeline-cta" onClick={() => { window.location.hash = '#/timeline'; }}>
+          <span className="timeline-cta-icon" aria-hidden="true">🌌</span>
+          <span className="timeline-cta-text">
+            <span className="timeline-cta-title">Discovery Timeline</span>
+            <span className="timeline-cta-sub">Wielki Wybuch → daleka przyszłość. Jedna ciągła podróż, bez ekranów ładowania.</span>
+          </span>
+          <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+        </button>
         <nav className="home-nav" aria-label="Nawigacja Genesis OS">
           <button className="whatif-nav-btn" onClick={() => { window.location.hash = '#/what-if'; }}>
             <span aria-hidden="true">🌀</span> {t('nav.whatIf')}

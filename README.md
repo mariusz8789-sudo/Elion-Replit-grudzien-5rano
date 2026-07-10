@@ -6,6 +6,13 @@ Wszechświata (8,8×10²⁶ m).
 
 ## Obecny stan
 
+- **Discovery Timeline Engine** — flagowe doświadczenie: jedna, ciągła
+  podróż przez 15 epok historii Wszechświata (Wielki Wybuch → daleka
+  przyszłość), zero ekranów ładowania (ciągły cross-fade między sąsiednimi
+  epokami), pełne sterowanie czasem (pauza/przewijanie/przyspieszanie/skok
+  w dowolne miejsce) i niezależna soczewka skali (kwark → obserwowalny
+  Wszechświat, ta sama technika co Scale Journey). Drugi, obok siatki
+  laboratoriów, tryb wejścia do Genesis OS — patrz `#/timeline`
 - **Scale Journey** — płynna podróż przez 45 rzędów wielkości (ekran główny)
 - **11 laboratoriów-pluginów**, każde z wieloma eksperymentami i Narratorem AI:
   Universe, Space-Time, Einstein, Quantum, Atom, Nuclear, Particle, Chemistry,
@@ -66,14 +73,14 @@ Wszechświata (8,8×10²⁶ m).
   elektroujemności Paulinga (dane tabelaryczne, CRC Handbook) steruje CIĄGŁĄ
   wizualizacją chmury elektronowej od kowalencyjnej po jonową (wzór
   Hanney–Smitha), nie przełącznikiem trzech stanów
-- **198 testów** (170 vitest frontend + 28 node:test backend)
+- **219 testów** (191 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 198 testów (fizyka + funkcje lokalne + backend)
+npm test           # 219 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

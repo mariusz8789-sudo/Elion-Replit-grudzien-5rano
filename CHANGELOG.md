@@ -6,6 +6,80 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Discovery Timeline Engine — nowy, drugi tryb wejścia do Genesis OS)
+- Flagowa funkcja sesji: jedna, ciągła podróż przez 15 epok historii
+  Wszechświata (Wielki Wybuch → Inflacja → Pierwsze atomy → Pierwsze
+  gwiazdy → Pierwsze galaktyki → Droga Mleczna → Układ Słoneczny → Ziemia
+  → Pierwsze życie → Eksplozja kambryjska → Dinozaury → Ludzie → Teraz →
+  Bliska przyszłość → Daleka przyszłość), bez ekranów ładowania —
+  `core/timelineMath.ts::epochBlend` renderuje w każdej klatce CIĄGŁY mix
+  dwóch sąsiednich epok (cross-fade sterowany odległością w log-czasie),
+  nigdy pusty stan pośredni.
+- Pełne sterowanie czasem: pauza, przewijanie (◀1000×/◀10×), przyspieszanie
+  (▶10×/▶1000×), skok w dowolne miejsce (15 kafelków epok + suwak
+  logarytmiczny). Każda epoka ma jawną etykietę potwierdzenia naukowego
+  (`ConfirmationLevel`, core/citation.ts — ta sama 6-stopniowa skala co
+  reszta platformy): rekombinacja/CMB i wymieranie dinozaurów są
+  ★★★★★ potwierdzone, daleka przyszłość jest jawnie oznaczona jako ★★
+  hipoteza — hipotezy nigdy nie udają faktów, dokładnie jak wszędzie
+  indziej w Genesis OS.
+- Druga, niezależna oś: soczewka skali przestrzennej (kwark →
+  obserwowalny Wszechświat), reużywająca DOKŁADNIE tę samą technikę
+  renderowania co Scale Journey (promień pierścienia = rozmiar/skala ×
+  baza) — kamienie milowe wydzielone do współdzielonego
+  `data/scaleMilestones.ts` (Scale Journey i Discovery Timeline czytają
+  teraz z jednego miejsca prawdy, zero duplikacji). Każda epoka ustawia
+  PUNKT STARTOWY zoomu (jej charakterystyczną skalę — od długości Plancka
+  po obserwowalny Wszechświat), ale użytkownik może swobodnie zoomować w
+  dowolnym momencie osi czasu — potwierdzone Playwrightem: ręczne
+  przesunięcie suwaka skali podczas epoki "Pierwsze atomy" do poziomu
+  kwarku działa niezależnie od suwaka czasu.
+- 15 odrębnych, ręcznie zaprojektowanych scen Canvas 2D
+  (`components/discoveryTimelineScenes.ts`) — błysk Wielkiego Wybuchu,
+  rozdymająca się siatka inflacji, mgławica CMB z atomem wodoru, zapalające
+  się gwiazdy Populacji III, gromady pierwszych galaktyk, spirala Drogi
+  Mlecznej, Układ Słoneczny z orbitującymi planetami, obracająca się
+  Ziemia, pulsujące mikroorganizmy, drzewo życia eksplozji kambryjskiej,
+  sylwetka zauropoda, ognisko z ludzkimi sylwetkami, "jesteś tutaj" na
+  Ziemi, czerwony olbrzym Słońca, gasnące gwiazdy dalekiej przyszłości.
+- Most do laboratoriów (`core/scenarioBridge.ts`, ROZSZERZONY o opcjonalny
+  `experimentId` — trzeci niezależny konsument po "Co by było, gdyby?" i
+  portalach Multiverse Nexus): przycisk "Otwórz w [Lab]" na epokach z
+  naturalnym dopasowaniem (Wielki Wybuch/Teraz → Ekspansja, Pierwsze
+  gwiazdy/Bliska przyszłość → Życie gwiazdy, Układ Słoneczny/Ziemia →
+  Prawdziwy Układ Słoneczny) trafia teraz w KONKRETNY eksperyment, nie
+  tylko zakładkę bazową — potwierdzone Playwrightem: kliknięcie z epoki
+  "Układ Słoneczny" ląduje dokładnie na zakładce „Prawdziwy Układ
+  Słoneczny", z prawdziwą fizyką Keplera. `LabShell.tsx` skonsumuje
+  scenariusz raz na całe życie komponentu (nie przy każdym przełączeniu
+  zakładki), zachowując 100% kompatybilności wstecznej z istniejącymi
+  wywołaniami bez `experimentId`.
+- Nowy plik wiedzy `knowledge/discovery-timeline.md` grunduje Narratora AI
+  (`labId: 'discovery-timeline'`, zarejestrowany w `LAB_KNOWLEDGE_FILES`
+  backendu) — "Zapytaj AI" działa na tym ekranie tak samo jak w każdym
+  laboratorium.
+- Prominentne wejście na ekranie głównym (duży, wyróżniony przycisk CTA
+  nad siatką laboratoriów) — zgodnie z życzeniem, żeby to było
+  najbardziej imponujące doświadczenie w Genesis OS, nie ukryta funkcja.
+- 19 nowych testów: `core/logSlider.ts` (matematyka suwaka log — 5 testów,
+  współdzielona teraz przez ScaleJourney i DiscoveryTimeline),
+  `core/timelineMath.ts` (wyszukiwanie epoki, cross-fade, integralność
+  15 epok — 14 testów; **znaleziony i naprawiony realny błąd**: warunek
+  brzegowy `>=` zamiast `>` w `epochBlend` powodował, że wiek DOKŁADNIE
+  równy wiekowi ostatniej epoki fałszywie cofał mix do 0 zamiast dać 1 —
+  wykryty przez test monotoniczności, nie przez oglądanie ekranu) +
+  2 nowe testy `scenarioBridge.test.ts` dla `experimentId`. 191 testów
+  frontendowych razem (219 z 28 backendowymi).
+- Pełna weryfikacja: typecheck, lint, 219 testów, build produkcyjny,
+  Playwright (skoki między 7 epokami, autoodtwarzanie @1000× przez 3
+  epoki, ręczny zoom skali, pełny most do laboratorium z potwierdzeniem
+  właściwej zakładki) — zero błędów konsoli w każdym scenariuszu.
+- Zgodnie z fazowaniem z VISION-BACKLOG.md: to Fazy 1+2 (oś czasu +
+  most do laboratoriów) PLUS działająca soczewka skali (backlog zakładał
+  to jako osobną, trudniejszą Fazę 3 — okazała się bezpośrednio
+  reużywalna z istniejącego mechanizmu Scale Journey). Sceny 3D dla
+  wybranych epok (Faza 4) pozostają w backlogu na przyszłość.
+
 ### Dodano (Chemistry Lab — nowe laboratorium, pierwszy eksperyment: Wiązania chemiczne)
 - Po dopracowaniu wszystkich 9 istniejących laboratoriów (patrz wpisy
   niżej) i zgodnie z pierwotną listą priorytetów użytkownika (pozycja 6:

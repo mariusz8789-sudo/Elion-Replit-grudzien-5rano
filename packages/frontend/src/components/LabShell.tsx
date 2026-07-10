@@ -35,9 +35,20 @@ export function LabShell({ lab }: { lab: LabDefinition }) {
     return [base, ...(lab.experiments ?? [])];
   }, [lab]);
 
-  const [expIdx, setExpIdx] = useState(0);
+  // Skonsumowany dokładnie raz na całe życie tego LabShell (nie przy każdym
+  // przełączeniu zakładki) — most z "Co by było, gdyby?"/Multiverse Nexus/
+  // Discovery Timeline może wskazać KONKRETNY eksperyment, nie tylko bazowy.
+  const [pendingScenario] = useState(() => consumePendingScenario(lab.id));
+  const targetExperimentId = pendingScenario?.experimentId ?? '__base';
+
+  const [expIdx, setExpIdx] = useState(() => {
+    if (!pendingScenario) return 0;
+    const idx = experiments.findIndex((e) => e.id === targetExperimentId);
+    return idx >= 0 ? idx : 0;
+  });
   const isCreateTab = expIdx === experiments.length;
   const activeExp = experiments[expIdx];
+  const initialParams = activeExp?.id === targetExperimentId ? pendingScenario?.params : undefined;
 
   return (
     <div className="lab-view" style={{ ['--accent' as string]: lab.accent }}>
@@ -54,9 +65,9 @@ export function LabShell({ lab }: { lab: LabDefinition }) {
       {isCreateTab ? (
         <CustomExperimentTab key={`${lab.id}:${CREATE_TAB_ID}`} lab={lab} />
       ) : activeExp.createSim3D ? (
-        <ExperimentView3D key={`${lab.id}:${activeExp.id}`} exp={activeExp} lab={lab} />
+        <ExperimentView3D key={`${lab.id}:${activeExp.id}`} exp={activeExp} lab={lab} initialParams={initialParams} />
       ) : (
-        <ExperimentView key={`${lab.id}:${activeExp.id}`} exp={activeExp} lab={lab} />
+        <ExperimentView key={`${lab.id}:${activeExp.id}`} exp={activeExp} lab={lab} initialParams={initialParams} />
       )}
     </div>
   );
@@ -71,6 +82,7 @@ function experimentBaseName(lab: LabDefinition): string {
     quantum: 'Dwie szczeliny',
     nuclear: 'Rozpad',
     particle: 'Detektor',
+    chemistry: 'Wiązania chemiczne',
     multiverse: 'Inne stałe',
     civilization: 'Skala Kardaszewa',
   };
@@ -83,16 +95,13 @@ function experimentBaseName(lab: LabDefinition): string {
  * (useSimLoop vs useThreeLoop) różni się między ExperimentView i
  * ExperimentView3D poniżej.
  */
-function useExperimentShell(exp: ExperimentDef, lab: LabDefinition) {
+function useExperimentShell(exp: ExperimentDef, lab: LabDefinition, initialParams?: Partial<SimParams>) {
   const [params, setParams] = useState<SimParams>(() => {
     const base = defaultParams(exp.params);
-    // "Co by było, gdyby?" (WhatIfScreen) celuje wyłącznie w eksperyment
-    // bazowy — patrz core/scenarioBridge.ts. Jednorazowa konsumpcja: drugi
-    // render (np. powrót do zakładki) już niczego nie nadpisze.
-    if (exp.id === '__base') {
-      const pending = consumePendingScenario(lab.id);
-      if (pending) return { ...base, ...pending } as SimParams;
-    }
+    // Nadpisanie z mostu scenariusza (LabShell konsumuje go raz, wyżej) —
+    // "Co by było, gdyby?"/Multiverse Nexus/Discovery Timeline. Jednorazowe:
+    // przełączenie zakładki i powrót już niczego nie nadpisze (nowy mount).
+    if (initialParams) return { ...base, ...initialParams } as SimParams;
     return base;
   });
   const [running, setRunning] = useState(true);
@@ -171,8 +180,8 @@ function BelowStage({
   );
 }
 
-function ExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }) {
-  const { params, setParams, running, setRunning, stats, onStats, expLabel, blocks } = useExperimentShell(exp, lab);
+function ExperimentView({ exp, lab, initialParams }: { exp: ExperimentDef; lab: LabDefinition; initialParams?: Partial<SimParams> }) {
+  const { params, setParams, running, setRunning, stats, onStats, expLabel, blocks } = useExperimentShell(exp, lab, initialParams);
   const sim = useMemo(() => exp.createSim!(), [exp]);
   const canvasRef = useSimLoop(sim, params, running, onStats);
 
@@ -199,8 +208,8 @@ function ExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }
 }
 
 /** Wariant sceny 3D (Three.js) — patrz core/three/useThreeLoop.ts i core/three/types.ts. */
-function ExperimentView3D({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }) {
-  const { params, setParams, running, setRunning, stats, onStats, expLabel, blocks } = useExperimentShell(exp, lab);
+function ExperimentView3D({ exp, lab, initialParams }: { exp: ExperimentDef; lab: LabDefinition; initialParams?: Partial<SimParams> }) {
+  const { params, setParams, running, setRunning, stats, onStats, expLabel, blocks } = useExperimentShell(exp, lab, initialParams);
   const sim = useMemo(() => exp.createSim3D!(), [exp]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, running, onStats);
 

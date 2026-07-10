@@ -27,6 +27,7 @@ export const LAB_KNOWLEDGE_FILES = {
   multiverse: 'multiverse.md',
   civilization: 'civilization.md',
   discovery: 'ai-discovery.md',
+  'discovery-timeline': 'discovery-timeline.md',
 };
 
 /**

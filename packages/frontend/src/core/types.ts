@@ -49,6 +49,8 @@ export interface Sim {
   reset?(): void;
   /** Interakcja dotykiem/myszą (współrzędne CSS px). */
   pointer?(x: number, y: number, type: 'down' | 'move' | 'up'): void;
+  /** Sprzątanie zasobów spoza Canvasu (np. AudioContext) przy odmontowaniu. */
+  dispose?(): void;
 }
 
 /** Jeden blok narracji AI — tytuł + treść generowana z żywych parametrów. */

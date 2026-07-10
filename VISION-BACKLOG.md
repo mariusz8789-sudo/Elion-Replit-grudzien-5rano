@@ -316,10 +316,14 @@ Backlog na przyszłość (NIE zbudowane): spersonalizowany film/zwiastun 4K
   (★★★★★ fizyka, ★★★★ dokładność renderowania) — rozszerzenie istniejącego
   `einstein-geodesics.ts` na `Sim3D`, ten sam wzorzec co Układ Słoneczny 3D.
   **Rekomendacja: to naturalny kandydat na następną sesję 3D.**
-- **Chirp fali grawitacyjnej (dźwięk + wykres)** (★★★★★, dane GWOSC domena
-  publiczna) — osobny eksperyment w Einstein/Universe Lab, wizualizacja
-  amplitudy/częstotliwości rosnącej do złączenia, z prawdziwym plikiem
-  audio GW150914 jeśli dostępny offline.
+- ✅ **Chirp fali grawitacyjnej (dźwięk + wykres)** — `einstein-chirp.ts`,
+  Einstein Lab. Formuła kwadrupolowa wiodącego rzędu (masa ćwierkowa,
+  czas do połączenia, granica ISCO), dźwięk syntezowany Web Audio API z
+  PRAWDZIWEJ, żywo liczonej częstotliwości fali (nie plik audio GW150914 —
+  to zostaje w backlogu jako wzbogacenie). 7 nowych testów fizyki: masa
+  ćwierkowa dla równych mas (relacja dokładna ℳ=m/2^0,2), odwracalność
+  chirpFrequency/timeToMerger, separacja orbitalna przy ISCO = dokładnie
+  6GM/c² (ten sam promień co geodezyjne Schwarzschilda).
 
 ## Cosmology
 

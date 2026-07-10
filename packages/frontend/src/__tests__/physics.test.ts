@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  binarySeparationMeters,
   bondPolarity,
+  chirpFrequency,
+  chirpMassSolar,
   chshS,
   circularVelocity,
   decayRemaining,
   exponentialDiskMass,
   G_ASTRO,
+  iscoFrequency,
   isothermalHaloMass,
   kardashevPower,
   keplerPosition,
@@ -30,6 +34,7 @@ import {
   stepSchwarzschildGeodesic,
   TESSERACT_EDGES,
   TESSERACT_VERTICES,
+  timeToMerger,
 } from '../core/physics';
 import { PLANETS } from '../data/solarSystem';
 import { KNOWN_NUCLIDES } from '../data/nuclides';
@@ -513,5 +518,65 @@ describe('krzywa rotacji galaktyki: dysk + halo ciemnej materii + MOND', () => {
     // jest już blisko, ale jeszcze nie dokładnie na granicy (zbieżność wolna)
     const vInfPredicted = Math.pow(G_ASTRO * DISK_MASS * MOND_A0_ASTRO, 0.25);
     expect(Math.abs(v40 - vInfPredicted) / vInfPredicted).toBeLessThan(0.1);
+  });
+});
+
+describe('chirp fali grawitacyjnej (inspiral podwójnego układu zwartego)', () => {
+  it('masa ćwierkowa dla równych mas: ℳ = m/2^0.2 (relacja dokładna)', () => {
+    const m = 30;
+    const expected = m / Math.pow(2, 0.2);
+    expect(chirpMassSolar(m, m)).toBeCloseTo(expected, 6);
+  });
+
+  it('masa ćwierkowa jest symetryczna i mniejsza niż masa całkowita', () => {
+    expect(chirpMassSolar(36, 29)).toBeCloseTo(chirpMassSolar(29, 36), 6);
+    expect(chirpMassSolar(36, 29)).toBeLessThan(36 + 29);
+  });
+
+  it('masa ćwierkowa GW150914-podobnego układu (36+29 M☉) mieści się w oczekiwanym rzędzie wielkości (~28 M☉)', () => {
+    const mc = chirpMassSolar(36, 29);
+    expect(mc).toBeGreaterThan(25);
+    expect(mc).toBeLessThan(31);
+  });
+
+  it('chirpFrequency i timeToMerger są wzajemnie odwrotne', () => {
+    const mc = chirpMassSolar(36, 29);
+    for (const f of [20, 50, 100]) {
+      const tau = timeToMerger(mc, f);
+      const fBack = chirpFrequency(mc, tau);
+      expect(fBack).toBeCloseTo(f, 3);
+    }
+  });
+
+  it('częstotliwość rośnie w miarę zbliżania się do połączenia (τ maleje)', () => {
+    const mc = chirpMassSolar(36, 29);
+    let prev = 0;
+    for (const tau of [1, 0.5, 0.2, 0.05, 0.01]) {
+      const f = chirpFrequency(mc, tau);
+      expect(f).toBeGreaterThan(prev);
+      prev = f;
+    }
+  });
+
+  it('separacja orbitalna przy częstotliwości ISCO równa się dokładnie 6GM/c² (promień ISCO Schwarzschilda)', () => {
+    const totalMass = 65; // M☉, GW150914-podobny
+    const fIsco = iscoFrequency(totalMass);
+    const sepAtIsco = binarySeparationMeters(totalMass, fIsco);
+    const G_SI = 6.674e-11;
+    const C_SI = 2.998e8;
+    const M_SUN_KG = 1.989e30;
+    const rIsco = (6 * G_SI * totalMass * M_SUN_KG) / (C_SI * C_SI);
+    expect(sepAtIsco / rIsco).toBeCloseTo(1, 2);
+  });
+
+  it('separacja orbitalna maleje w miarę rosnącej częstotliwości (inspiral)', () => {
+    const totalMass = 65;
+    const sep20 = binarySeparationMeters(totalMass, 20);
+    const sepIsco = binarySeparationMeters(totalMass, iscoFrequency(totalMass));
+    expect(sepIsco).toBeLessThan(sep20);
+  });
+
+  it('cięższy układ ma niższą częstotliwość ISCO (większe czarne dziury = niższa częstotliwość połączenia)', () => {
+    expect(iscoFrequency(120)).toBeLessThan(iscoFrequency(20));
   });
 });

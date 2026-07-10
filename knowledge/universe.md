@@ -22,9 +22,11 @@ międzygwiezdne ~10⁷ średnic gwiazd). Ogony pływowe odtworzone już przez
 Toomre & Toomre 1972 na 120 cząstkach — dobra wiadomość dla mobile: efekt
 jest jakościowo odporny na małe N.
 
-**Fale grawitacyjne** ★★★★★
+**Fale grawitacyjne — chirp (zaimplementowane, patrz Einstein Lab)** ★★★★★
 Chirp: f rośnie do złączenia; amplituda i faza z masy ćwierkowej
 ℳ = (m₁m₂)^⅗/(m₁+m₂)^⅕. GW150914 zgodny z OTW; dane surowe otwarte (GWOSC).
+Dedykowany eksperyment (`einstein-chirp.ts`, dźwięk+wykres) opisany w
+`knowledge/spacetime-einstein.md`, żeby nie duplikować treści między labami.
 
 **Problem trzech ciał (zaimplementowane)** ★★★★★
 Grawitacja Newtona bez przybliżeń, jednostki bezwymiarowe (G=1), integracja
@@ -134,7 +136,10 @@ eksperymentów zaczyna się dziś od Prawdziwego Układu Słonecznego — to
 jedyny eksperyment w całej aplikacji oparty w 100% na realnych, cytowanych
 stałych NASA zamiast modelu poglądowego. Naturalny kierunek rozwoju:
 1. Zderzenia galaktyk Barnes–Hut = najlepszy stosunek WOW/koszt w tym labie
-2. Chirp GW z dźwiękiem z realnych danych GWOSC — unikalne na mobile
+2. ✅ Chirp GW z dźwiękiem — zbudowany w Einstein Lab (`einstein-chirp.ts`),
+   dźwięk syntezowany z formuły kwadrupolowej (Web Audio API), nie z
+   surowych danych GWOSC (te pozostają w backlogu jako opcjonalne
+   wzbogacenie realnym przebiegiem zamiast modelu analitycznego)
 3. Napięcie Hubble'a i spór o DM to gotowe, uczciwe narracje "nauka żywa,
    nie zamknięta" — wyróżnik wobec konkurencji, która udaje pewność
 4. Żywa efemeryda JPL Horizons (gdy sieć dostępna) zamieniłaby dowolne

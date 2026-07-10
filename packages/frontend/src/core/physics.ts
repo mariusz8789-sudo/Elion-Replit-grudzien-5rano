@@ -321,3 +321,48 @@ export function mondAcceleration(newtonianAccel: number, a0: number = MOND_A0_AS
   if (newtonianAccel <= 0) return 0;
   return (newtonianAccel + Math.sqrt(newtonianAccel * newtonianAccel + 4 * newtonianAccel * a0)) / 2;
 }
+
+/**
+ * Fala grawitacyjna z inspiralu podwójnego układu zwartego — formuła
+ * kwadrupolowa wiodącego rzędu (ta sama metoda, którą LIGO użyło do
+ * potwierdzenia GW150914: Abbott i in. 2016, Phys. Rev. Lett. 116, 061102,
+ * Nagroda Nobla 2017 dla Weissa, Thorne'a i Barisha). Model jest ważny
+ * TYLKO we wczesnym inspiralu (separacja ≫ promień Schwarzschilda) —
+ * blisko połączenia potrzebna jest pełna relatywistyka numeryczna (NR),
+ * dlatego funkcje poniżej kończą swój zakres na promieniu ISCO i NIE
+ * próbują modelować samego połączenia ani "ringdown".
+ */
+const G_SI = 6.674e-11; // m³ kg⁻¹ s⁻²
+const C_SI = 2.998e8; // m/s
+const M_SUN_KG = 1.989e30;
+
+/** Masa ćwierkowa (chirp mass) w masach Słońca: ℳ = (m₁m₂)^⅗/(m₁+m₂)^⅕. */
+export function chirpMassSolar(m1Solar: number, m2Solar: number): number {
+  return Math.pow(m1Solar * m2Solar, 3 / 5) / Math.pow(m1Solar + m2Solar, 1 / 5);
+}
+
+/** Czas do połączenia [s] przy danej częstotliwości fali f [Hz] (formuła kwadrupolowa). */
+export function timeToMerger(chirpMassSolarVal: number, freqHz: number): number {
+  const GMc3 = (G_SI * chirpMassSolarVal * M_SUN_KG) / Math.pow(C_SI, 3);
+  return (5 / 256) * Math.pow(GMc3, -5 / 3) * Math.pow(Math.PI * freqHz, -8 / 3);
+}
+
+/** Częstotliwość fali grawitacyjnej [Hz] τ sekund przed połączeniem (odwrotność timeToMerger). */
+export function chirpFrequency(chirpMassSolarVal: number, tauSeconds: number): number {
+  if (tauSeconds <= 0) return Infinity;
+  const GMc3 = (G_SI * chirpMassSolarVal * M_SUN_KG) / Math.pow(C_SI, 3);
+  return (1 / Math.PI) * Math.pow(5 / (256 * tauSeconds), 3 / 8) * Math.pow(GMc3, -5 / 8);
+}
+
+/** Częstotliwość ISCO (innermost stable circular orbit, Schwarzschild r=6GM/c²) — granica ważności modelu inspiralu. */
+export function iscoFrequency(totalMassSolar: number): number {
+  const M_kg = totalMassSolar * M_SUN_KG;
+  return Math.pow(C_SI, 3) / (Math.pow(6, 1.5) * Math.PI * G_SI * M_kg);
+}
+
+/** Separacja orbitalna [m] przy danej częstotliwości fali (relacja Keplera, f_GW = 2·f_orb, ω_orb = π·f_GW). */
+export function binarySeparationMeters(totalMassSolar: number, freqHz: number): number {
+  const M_kg = totalMassSolar * M_SUN_KG;
+  const omega = Math.PI * freqHz;
+  return Math.cbrt((G_SI * M_kg) / (omega * omega));
+}

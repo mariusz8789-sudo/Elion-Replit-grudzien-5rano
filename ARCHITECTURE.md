@@ -23,6 +23,7 @@ interface Sim {
   render(ctx: CanvasRenderingContext2D, width: number, height: number): void;
   getStats?(): Record<string, number>;
   reset?(): void;
+  dispose?(): void; // sprzątanie zasobów spoza Canvasu (np. AudioContext), patrz Einstein Lab „Chirp"
 }
 ```
 
@@ -301,7 +302,7 @@ w `lib.mjs` — testowana przez `node --test` bez uruchamiania portu
 
 ## Testy
 
-244 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 272.
+253 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 281.
 
 - **Fizyka i symulacje** (`__tests__/physics.test.ts`, `sims.test.ts`):
   twarde asercje naukowe (złamanie nierówności Bella |S|>2, twierdzenie

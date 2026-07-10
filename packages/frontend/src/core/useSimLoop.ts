@@ -93,6 +93,7 @@ export function useSimLoop(
       canvas.removeEventListener('pointerdown', down);
       canvas.removeEventListener('pointermove', move);
       canvas.removeEventListener('pointerup', up);
+      sim.dispose?.();
     };
   }, [sim, onStats]);
 

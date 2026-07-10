@@ -103,14 +103,20 @@ Wszechświata (8,8×10²⁶ m).
   Lagrange'a, integrator RK4 (celowo nie symplektyczny — dryf energii
   jawnie pokazany), suwak kąta pokazuje przejście od ruchu regularnego
   do chaotycznego na żywo
-- **272 testy** (244 vitest frontend + 28 node:test backend)
+- **Chirp fali grawitacyjnej z dźwiękiem** (Einstein Lab) — pierwszy
+  dźwięk w Genesis OS: formuła kwadrupolowa wiodącego rzędu (ta sama
+  metoda co pierwsza detekcja LIGO, GW150914), opcjonalny toggle 🔊
+  syntezuje realną, żywo liczoną częstotliwość fali (Web Audio API) —
+  częstotliwości z łączących się czarnych dziur leżą w ludzkim zakresie
+  słyszalności bez potrzeby przesuwania wysokości dźwięku
+- **281 testów** (253 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 272 testy (fizyka + funkcje lokalne + backend)
+npm test           # 281 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

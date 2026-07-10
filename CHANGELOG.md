@@ -6,6 +6,42 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Chirp fali grawitacyjnej — nowy eksperyment z dźwiękiem, Einstein Lab)
+- `labs/experiments/einstein-chirp.ts` + nowe funkcje fizyki w
+  `core/physics.ts` (`chirpMassSolar`, `timeToMerger`, `chirpFrequency`,
+  `iscoFrequency`, `binarySeparationMeters`): formuła kwadrupolowa
+  wiodącego rzędu — dokładnie ta metoda, którą LIGO użyło do potwierdzenia
+  pierwszej detekcji fal grawitacyjnych, GW150914 (Abbott i in. 2016,
+  PRL 116, 061102, Nagroda Nobla 2017).
+- Suwaki mas obu czarnych dziur (5-80 M☉, domyślnie 36/29 — masy zbliżone
+  do GW150914) sterują żywo liczoną krzywą narastania częstotliwości i
+  amplitudy fali ("chirp"), renderowaną jako klasyczny wykres h(t) plus
+  mały wizualizator orbitującej pary — separacja orbitalna liczona z
+  prawdziwej relacji Keplera, kurczy się dokładnie tak jak w rzeczywistości.
+- Model uczciwie kończy się na promieniu ISCO (r=6GM/c²) — połączenie
+  pokazane jako błysk, NIE próbuje symulować samego zderzenia ani
+  "ringdown" (wymaga pełnej relatywistyki numerycznej).
+- **Pierwszy dźwięk w Genesis OS**: opcjonalny toggle 🔊 syntezuje realną,
+  żywo liczoną częstotliwość fali (Web Audio API, OscillatorNode) —
+  częstotliwości fal z łączących się czarnych dziur gwiazdowej masy leżą
+  w PRAWDZIWYM ludzkim zakresie słyszalności, bez potrzeby sztucznego
+  przesuwania wysokości. Rozciągnięte w czasie suwakiem spowolnienia
+  (prawdziwy inspiral trwa ułamek sekundy), nie pitch-shiftowane.
+- Nowy opcjonalny hak `Sim.dispose?()` w `core/types.ts`, wywoływany przy
+  odmontowaniu w `core/useSimLoop.ts` — pierwszy Sim (2D) w aplikacji
+  trzymający zasób spoza Canvasu (AudioContext) wymagał sprzątania;
+  wzorowane na istniejącym `Sim3D.dispose?()`.
+- 7 nowych testów fizyki (`physics.test.ts`): masa ćwierkowa dla równych
+  mas (relacja dokładna ℳ=m/2^0,2), symetria i mniejszość względem masy
+  całkowitej, GW150914-podobny układ w oczekiwanym zakresie (~28 M☉),
+  odwracalność chirpFrequency/timeToMerger, monotoniczny wzrost
+  częstotliwości, separacja orbitalna przy ISCO = dokładnie 6GM/c²
+  (niezależne potwierdzenie zgodności z geodezyjnymi Schwarzschilda),
+  cięższy układ = niższa częstotliwość ISCO. Zweryfikowane: typecheck,
+  lint, 253 testy vitest, build, Playwright (wykres, orbitujące masy,
+  cykl błysk-połączenia-reset, włączenie dźwięku bez wyjątków) — zero
+  błędów konsoli.
+
 ### Dodano (Podwójne wahadło — nowy eksperyment, Universe Lab)
 - `labs/experiments/universe-doublependulum.ts`: drugi eksperyment "chaos
   deterministyczny" w Universe Lab, obok problemu trzech ciał — celowo

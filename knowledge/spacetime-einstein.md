@@ -36,6 +36,20 @@ Luminet 1979 → James et al. 2015 ("Interstellar", CQG 32, 065001, open
 access) — z prawdziwym soczewkowaniem obrazu dysku zza horyzontu — pozostaje
 w `VISION-BACKLOG.md` jako możliwe dalsze rozszerzenie tej samej fizyki.
 
+**Chirp fali grawitacyjnej (zaimplementowane)** ★★★★★
+Formuła kwadrupolowa wiodącego rzędu (Abbott i in. 2016, PRL 116, 061102 —
+GW150914, Nagroda Nobla 2017 dla Weissa, Thorne'a i Barisha):
+ℳ=(m₁m₂)^⅗/(m₁+m₂)^⅕ (masa ćwierkowa); τ(f)=(5/256)(GℳM_sun/c³)^(-5/3)(πf)^(-8/3)
+(czas do połączenia); model kończy się na promieniu ISCO r=6GM/c² (ten sam
+promień co „Geodezyjne fotonów" wyżej) — samo połączenie i „ringdown"
+wymagają pełnej relatywistyki numerycznej, tu POKAZANEJ jako błysk, NIE
+symulowanej. Separacja orbitalna liczona z relacji Keplera (ω_orb=πf_GW) —
+zweryfikowana testem: separacja przy f_ISCO = dokładnie 6GM/c². Częstotliwości
+fal z łączących się czarnych dziur gwiazdowej masy (dziesiątki-setki Hz) leżą
+w PRAWDZIWYM ludzkim zakresie słyszalności — opcjonalny dźwięk syntezowany
+Web Audio API gra rzeczywistą częstotliwość (Hz), rozciągniętą w czasie
+suwakiem spowolnienia, nie przesuniętą wysokością.
+
 ## Sprzeczne teorie / otwarte spory
 
 **Osobliwość: rzeczywistość czy granica teorii?** ★★★

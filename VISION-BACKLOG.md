@@ -146,6 +146,62 @@ przeciwieństwie do zwykłego Eulera) + tryb "dwa niemal identyczne starty"
 pokazujący dywergencję na żywo — to samo dydaktyczne jądro, bez czekania na
 tysiące cząstek czy współdzielenie.
 
+### Quantum Decision Explorer (dawniej: "osobisty multiwersum decyzji") — narzędzie narracyjne, NIE fizyka
+
+Pomysł oceniony (przez użytkownika, po przejrzeniu pierwotnej koncepcji):
+warstwa wizualna jest bardzo mocna, ale pierwotne sformułowania ("portal do
+Akaszy", "świat optymalny, gdyby zawsze słuchał intuicji", liczby 111/444
+jako podstawa działania) przedstawiają nauko-podobne twierdzenia bez
+pokrycia — dokładnie to, przed czym cała reszta Genesis OS się broni. Jeśli
+platforma ma budować wiarygodność na poziomie NASA/uczelni, ten moduł NIE
+może brzmieć jak przepowiadanie przyszłości ani ezoteryka.
+
+**Co zostaje (świetne, zachować):**
+- Galaktyka zbudowana z decyzji użytkownika — każda gwiazda to jeden ważny
+  wybór życiowy, wizualnie spektakularne, naturalny konsument techniki
+  cząstek/gwiazd już dopracowanej w tej sesji (universe.ts, civilization.ts)
+- Suwak "zmień decyzję → obserwuj, jak zmienia się cała struktura" — świetna
+  interakcja, koncepcyjnie bliska suwakowi Discovery Timeline (zmiana jednej
+  zmiennej przegenerowuje całą wizualizację na żywo)
+- Spersonalizowany film/zwiastun 4K jako element marketingowy — osobny
+  temat produkcyjny (rendering offline, nie runtime), do rozważenia niezależnie
+
+**Co się zmienia (wymagane PRZED jakąkolwiek implementacją):**
+- Nazwa: "Quantum Decision Explorer" (albo podobna, jawnie neutralna) —
+  nie "multiwersum" bez przymiotnika, żeby nie sugerować związku z
+  interpretacją wielu światów Everetta (Multiverse Lab już to poprawnie
+  odróżnia — ten moduł musi trzymać tę samą granicę)
+- Zero numerologii (111, 444 itp.) jako "mechanizmu działania" — to nie ma
+  żadnego pokrycia naukowego, w Genesis OS nie ma dla tego miejsca
+  jako rzekomej podstawy jakiegokolwiek algorytmu
+- Zero języka duchowego/ezoterycznego ("Akasza", "intuicja jako źródło
+  optymalnej ścieżki") przedstawianego jako mechanizm, nie metafora
+- Obowiązkowy, stały komunikat AI/UI (wzorem `honestyNote` każdego innego
+  modułu): *"To interaktywna symulacja alternatywnych scenariuszy oparta na
+  modelowaniu decyzji i wizualnych inspiracjach z fizyki. Nie przewiduje
+  przyszłości ani nie odtwarza rzeczywistości."* — analogicznie do
+  `honesty: 'theoretical'` używanego już w Multiverse/Civilization Lab,
+  tylko tu jeszcze wyraźniej: to narzędzie narracyjne/refleksyjne, nie
+  model fizyczny nawet w przybliżeniu
+
+**Architektura (reużywalna, zero nowego systemu):**
+- Struktura danych "decyzja → gałąź" to ten sam wzorzec co
+  `core/customExperiment.ts` (zapis presetu parametrów użytkownika) +
+  drzewo/graf, nie nowy silnik
+- Wizualizacja gwiazd/galaktyki: `Sim` (Canvas 2D) z technikami już
+  sprawdzonymi w tej sesji (starfield, gradient, glow sterowany realnymi
+  danymi — tu: "waga" decyzji, nie ozdoba)
+- Suwak zmiany decyzji: dokładnie `core/logSlider.ts`-owy wzorzec
+  target/current lerp, tylko oś to indeks/waga decyzji, nie skala czy czas
+- `HonestyBadge`/nowy jawny disclaimer zamiast `ConfirmationLevel` — to
+  jedyny moduł w Genesis OS, który nie twierdzi NIC naukowego, więc
+  potrzebuje własnej, jeszcze prostszej etykiety ("narzędzie refleksyjne",
+  nie punkt na skali potwierdzenia)
+
+Status: zalogowane, NIE budowane teraz — sesja właśnie skończyła Discovery
+Timeline Engine (flagowa funkcja); zgodnie z zasadą "jedno wielkie na raz"
+to czeka na osobną decyzję o starcie.
+
 ---
 
 ## Quantum Reality

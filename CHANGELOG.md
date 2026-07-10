@@ -6,6 +6,29 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Trendy okresowe — nowa zakładka, Atom Lab)
+- `data/periodicTrends.ts`: promień atomowy (Slater 1964) i pierwsza
+  energia jonizacji (NIST Atomic Spectra Database, CRC Handbook) dla
+  okresów 1–4 (Z=1–36) — świadomie ograniczony zakres zamiast podawania
+  niepewnych wartości dla cięższych pierwiastków.
+- Nowa zakładka „Trendy okresowe" w Atom Lab: reużywa DOKŁADNIE tę samą
+  siatkę `.ptable` co widok „Powłoki" (118 pierwiastków), ale renderuje ją
+  jako mapę cieplną (kolor komórki = wartość, cyjan→bursztyn) zamiast
+  listy klikalnych przycisków — jeden wspólny komponent, dwa zastosowania.
+  Przełącznik promień/energia jonizacji, klik w komórkę pokazuje realną
+  wartość i wyjaśnienie w Narratorze.
+- Narracja tłumaczy oba prawdziwe mechanizmy: promień maleje wzdłuż okresu
+  (rosnący efektywny ładunek jądra przy tej samej powłoce), rośnie w dół
+  grupy (nowa powłoka); energia jonizacji jest niemal lustrzanym odbiciem
+  promienia (gazy szlachetne najwyższe, metale alkaliczne najniższe).
+- 10 nowych testów (`periodicTrends.test.ts`): spójność Z z `data/elements.ts`,
+  zakresy wartości, promień malejący wzdłuż okresu 2, promień rosnący w dół
+  grupy 1, energia jonizacji rosnąca wzdłuż okresu (Ne>Li, F>Li), malejąca
+  w dół grupy 1 (Li>Na>K), anomalia gazów szlachetnych (najwyższa IE w
+  okresie). Zweryfikowane: typecheck, lint, 227 testów vitest, build,
+  Playwright (obie właściwości, wybór pierwiastka z mapy) — zero błędów
+  konsoli.
+
 ### Dodano (Krzywa rotacji galaktyki — nowy eksperyment, Universe Lab)
 - `labs/experiments/universe-rotationcurve.ts` + nowe funkcje fizyki w
   `core/physics.ts` (`exponentialDiskMass`, `isothermalHaloMass`,

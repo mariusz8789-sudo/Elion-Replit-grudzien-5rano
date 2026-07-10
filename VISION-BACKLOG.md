@@ -369,10 +369,12 @@ Backlog na przyszłość (NIE zbudowane): spersonalizowany film/zwiastun 4K
   Lab; wymaga danych o kątach/długościach wiązań (PubChem/CCCBDB).
 - **Krzywe miareczkowania kwas–zasada (pH)** (★★★★★ chemia analityczna) —
   ilościowo bogaty temat, dobry materiał na Narratora.
-- **Trendy okresowe** (promień atomowy, energia jonizacji) (★★★★★
-  zmierzone) — wykorzystuje istniejący układ okresowy z Atom Lab, mógłby
-  żyć w Chemistry LUB Atom Lab (decyzja architektoniczna do podjęcia
-  później, nie teraz).
+- ✅ **Trendy okresowe** (promień atomowy, energia jonizacji) — zbudowane
+  w Atom Lab (`data/periodicTrends.ts`, nowa zakładka „Trendy okresowe"),
+  jako mapa cieplna na reużytej siatce `.ptable` — nie osobny wykres.
+  Okresy 1–4 (Z=1–36), CRC Handbook / NIST ASD / Slater (1964). 10 nowych
+  testów: spójność danych, trend Z_eff wzdłuż okresu 2, trend w dół grupy 1,
+  anomalie IE (gazy szlachetne > sąsiedzi).
 
 ## Biology & Molecular Science
 

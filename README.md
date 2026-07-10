@@ -91,14 +91,17 @@ Wszechświata (8,8×10²⁶ m).
   krzywą do zgodności z realnymi pomiarami; przełącznik MOND (Milgrom
   1983) pokazuje konkurencyjną hipotezę — ta sama płaska krzywa bez żadnej
   ciemnej materii, tylko zmodyfikowanym prawem grawitacji
-- **245 testów** (217 vitest frontend + 28 node:test backend)
+- **Trendy okresowe** (Atom Lab) — mapa cieplna promienia atomowego i
+  energii jonizacji na siatce 118 pierwiastków (okresy 1–4, dane CRC
+  Handbook / NIST / Slater 1964), reużywa tę samą siatkę co widok Powłoki
+- **255 testów** (227 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 245 testów (fizyka + funkcje lokalne + backend)
+npm test           # 255 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

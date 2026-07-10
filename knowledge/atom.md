@@ -23,6 +23,16 @@ Etap 0 używa czystego Aufbau z notą — do poprawienia.
 **Model Bohra** — historyczny; poprawny dla poziomów energii wodoru,
 błędny jako obraz ruchu. Zawsze z etykietą „model edukacyjny".
 
+**Trendy okresowe: promień atomowy i energia jonizacji (zaimplementowane)** ★★★★★
+Dane tabelaryczne (CRC Handbook; NIST Atomic Spectra Database; promień —
+Slater 1964, J. Chem. Phys. 41, 3199), ograniczone świadomie do okresów
+1–4 (Z=1–36) — dobrze ugruntowane wartości; gazy szlachetne bez promienia
+empirycznego (nie tworzą wiązań) pominięte zamiast zmyślane. Mapa cieplna
+na siatce układu okresowego (reużywa `.ptable` z widoku Powłoki) zamiast
+osobnego wykresu — dwa mechanizmy widać naraz: promień maleje wzdłuż
+okresu (rosnący Z_eff przy tej samej powłoce), rośnie w dół grupy (nowa
+powłoka); energia jonizacji jest niemal lustrzanym odbiciem promienia.
+
 ## Sprzeczne teorie / otwarte spory
 Struktura atomowa to fizyka zamknięta (QED przetestowana do 10⁻¹²).
 Jedyny dydaktyczny „spór" to wybór wizualizacji: orbitale jako chmury |ψ|²

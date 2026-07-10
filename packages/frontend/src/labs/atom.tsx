@@ -4,6 +4,7 @@ import { useSimLoop } from '../core/useSimLoop';
 import { NarratorPanel } from '../components/NarratorPanel';
 import { HonestyBadge } from '../components/HonestyBadge';
 import { ELEMENTS, type ElementInfo } from '../data/elements';
+import { PERIODIC_TRENDS, type PeriodicTrendPoint } from '../data/periodicTrends';
 
 /**
  * Orbitale atomu wodoru — dokładne |ψ|² z rozwiązań analitycznych równania
@@ -18,6 +19,34 @@ const ORBITALS: Record<string, { label: string; extent: number; R: (r: number) =
   '3dz2': { label: '3d z²', extent: 34, R: (r) => r * r * Math.exp(-r / 3), Y: (ct) => 3 * ct * ct - 1 },
   '3dxz': { label: '3d xz', extent: 34, R: (r) => r * r * Math.exp(-r / 3), Y: (ct, st) => ct * st * 2 },
 };
+
+type TrendProp = 'radiusPm' | 'ionizationKJ';
+
+const TREND_LABELS: Record<TrendProp, { label: string; unit: string }> = {
+  radiusPm: { label: 'Promień atomowy', unit: 'pm' },
+  ionizationKJ: { label: 'Pierwsza energia jonizacji', unit: 'kJ/mol' },
+};
+
+function trendRange(prop: TrendProp): { min: number; max: number } {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const p of Object.values(PERIODIC_TRENDS)) {
+    const v = p[prop];
+    if (v == null) continue;
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  return { min, max };
+}
+
+/** Kolor komórki heatmapy: niski→chłodny cyjan, wysoki→ciepły bursztyn (te same akcenty co reszta Genesis OS). */
+function trendCellColor(value: number | null, min: number, max: number): string {
+  if (value == null) return 'rgba(230,234,245,0.06)';
+  const t = max > min ? (value - min) / (max - min) : 0;
+  const hue = 190 - t * 155; // 190 (cyjan) → 35 (bursztyn)
+  const alpha = 0.22 + t * 0.5;
+  return `hsla(${hue}, 75%, 60%, ${alpha})`;
+}
 
 class OrbitalSim implements Sim {
   private img: ImageData | null = null;
@@ -163,18 +192,24 @@ class BohrSim implements Sim {
 
 function AtomView({ lab }: { lab: LabDefinition }) {
   const [z, setZ] = useState(6);
-  const [mode, setMode] = useState<'shells' | 'orbitals'>('shells');
+  const [mode, setMode] = useState<'shells' | 'orbitals' | 'trends'>('shells');
   const [orbital, setOrbital] = useState('2pz');
+  const [trendProp, setTrendProp] = useState<TrendProp>('radiusPm');
   const bohrSim = useMemo(() => new BohrSim(), []);
   const orbSim = useMemo(() => new OrbitalSim(), []);
   const el = ELEMENTS[z - 1];
   bohrSim.element = el;
-  const sim = mode === 'shells' ? bohrSim : orbSim;
+  const sim = mode === 'orbitals' ? orbSim : bohrSim;
   const canvasRef = useSimLoop(sim, { orbital }, true);
   const neutrons = Math.round(el.mass) - el.z;
 
   const orbitalHonestyNote =
     'Gęstość |ψ|² liczona z dokładnych rozwiązań analitycznych równania Schrödingera dla atomu wodoru (przekrój w płaszczyźnie, jednostki: promień Bohra). Jasność skompresowana, by uwidocznić węzły.';
+  const trendsHonestyNote =
+    'Wartości tabelaryczne (CRC Handbook of Chemistry and Physics; NIST Atomic Spectra Database; promień atomowy — Slater 1964). Ograniczone do okresów 1–4 (Z=1–36) — te wartości są dobrze ugruntowane; gazy szlachetne nie mają dobrze zdefiniowanego promienia empirycznego (nie tworzą wiązań), pominięte zamiast zmyślać liczbę.';
+
+  const trendPoint: PeriodicTrendPoint | undefined = PERIODIC_TRENDS[z];
+  const trendRangeVal = useMemo(() => trendRange(trendProp), [trendProp]);
 
   return (
     <div className="lab-view" style={{ ['--accent' as string]: lab.accent }}>
@@ -185,25 +220,104 @@ function AtomView({ lab }: { lab: LabDefinition }) {
         <button role="tab" aria-selected={mode === 'orbitals'} onClick={() => setMode('orbitals')}>
           Orbitale |ψ|²
         </button>
+        <button role="tab" aria-selected={mode === 'trends'} onClick={() => setMode('trends')}>
+          Trendy okresowe
+        </button>
       </div>
 
-      <div className="sim-stage" style={{ height: '36vh', minHeight: 240 }}>
-        <canvas
-          ref={canvasRef}
-          key={mode}
-          role="img"
-          aria-label={
-            mode === 'shells'
-              ? `Model powłokowy atomu: ${el.name}. Dane liczbowe w panelu poniżej.`
-              : `Gęstość prawdopodobieństwa orbitalu ${ORBITALS[orbital].label} atomu wodoru.`
-          }
-        />
-      </div>
+      {mode !== 'trends' && (
+        <div className="sim-stage" style={{ height: '36vh', minHeight: 240 }}>
+          <canvas
+            ref={canvasRef}
+            key={mode}
+            role="img"
+            aria-label={
+              mode === 'shells'
+                ? `Model powłokowy atomu: ${el.name}. Dane liczbowe w panelu poniżej.`
+                : `Gęstość prawdopodobieństwa orbitalu ${ORBITALS[orbital].label} atomu wodoru.`
+            }
+          />
+        </div>
+      )}
 
       <HonestyBadge
-        level={mode === 'orbitals' ? 'exact' : lab.honesty}
-        note={mode === 'orbitals' ? orbitalHonestyNote : lab.honestyNote}
+        level={mode === 'orbitals' ? 'exact' : mode === 'trends' ? 'exact' : lab.honesty}
+        note={mode === 'orbitals' ? orbitalHonestyNote : mode === 'trends' ? trendsHonestyNote : lab.honestyNote}
       />
+
+      {mode === 'trends' && (
+        <>
+          <div className="controls">
+            <div className="control">
+              <label>Właściwość</label>
+              <div className="seg" role="group" aria-label="Trend okresowy">
+                {(Object.keys(TREND_LABELS) as TrendProp[]).map((key) => (
+                  <button key={key} aria-pressed={trendProp === key} onClick={() => setTrendProp(key)}>
+                    {TREND_LABELS[key].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="ptable-wrap" aria-label="Trendy okresowe — mapa cieplna">
+            <div className="ptable">
+              {ELEMENTS.map((e) => {
+                const point = PERIODIC_TRENDS[e.z];
+                const val = point ? point[trendProp] : null;
+                return (
+                  <button
+                    key={e.z}
+                    className="pt-el"
+                    style={{ gridColumn: e.col, gridRow: e.row, background: trendCellColor(val, trendRangeVal.min, trendRangeVal.max) }}
+                    aria-pressed={e.z === z}
+                    title={e.name}
+                    onClick={() => setZ(e.z)}
+                  >
+                    <span className="z">{e.z}</span>
+                    {e.symbol}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="el-info">
+            <div className="stat"><span className="k">Pierwiastek</span><span className="v">{el.name} ({el.symbol}, Z={el.z})</span></div>
+            <div className="stat">
+              <span className="k">{TREND_LABELS[trendProp].label}</span>
+              <span className="v">
+                {trendPoint && trendPoint[trendProp] != null ? `${trendPoint[trendProp]} ${TREND_LABELS[trendProp].unit}` : 'brak ustalonej wartości'}
+              </span>
+            </div>
+          </div>
+
+          <NarratorPanel
+            blocks={[
+              trendProp === 'radiusPm'
+                ? {
+                    title: 'Promień atomowy: dwie przeciwstawne tendencje',
+                    body:
+                      'WZDŁUŻ OKRESU (w prawo) promień MALEJE — kolejne elektrony trafiają na tę samą powłokę, ale ładunek jądra rośnie o cały proton, więc silniej ściąga elektrony. W DÓŁ GRUPY promień ROŚNIE — pojawia się cała nowa powłoka, dalej od jądra niż wszystkie poprzednie. Efekt tych dwóch reguł widać na mapie: najmniejsze atomy (bursztyn) w prawym górnym rogu, największe (cyjan) w lewym dolnym.',
+                    citation: { source: 'Slater (1964), Journal of Chemical Physics 41, 3199', confirmation: 'confirmed' as const, note: 'Empiryczne promienie atomowe' },
+                  }
+                : {
+                    title: 'Energia jonizacji: odwrotność promienia',
+                    body:
+                      'Im ciaśniej elektron jest związany (mały promień, duży efektywny ładunek jądra), tym więcej energii trzeba, by go usunąć. Dlatego mapa energii jonizacji jest niemal LUSTRZANYM ODBICIEM mapy promienia: gazy szlachetne (pełna powłoka, bardzo trudne do zjonizowania) świecą najjaśniej, metale alkaliczne (Li, Na, K — jeden słabo związany elektron na zewnętrznej powłoce) najciemniej.',
+                    citation: { source: 'NIST Atomic Spectra Database', confirmation: 'confirmed' as const, note: 'Pierwsze energie jonizacji' },
+                  },
+              {
+                title: `${el.name}: ${trendPoint && trendPoint[trendProp] != null ? 'w kontekście trendu' : 'brak danych w tym zakresie'}`,
+                body:
+                  trendPoint && trendPoint[trendProp] != null
+                    ? `Z=${el.z}, okres ${el.row}, kolumna ${el.col}. Porównaj z sąsiadami w tym samym okresie (ta sama powłoka walencyjna) i tej samej grupie (ta sama liczba elektronów walencyjnych) — dotknij innej komórki mapy.`
+                    : 'Ten pierwiastek jest poza zakresem danych w tej wersji (okresy 1–4, Z=1–36) albo jest gazem szlachetnym bez dobrze zdefiniowanego promienia empirycznego. Dotknij innej komórki, by zobaczyć realną wartość.',
+              },
+            ]}
+          />
+        </>
+      )}
 
       {mode === 'orbitals' && (
         <div className="controls">

@@ -6,6 +6,21 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Poprawiono (Atom Lab ukończone — laboratorium 4 z 9 w kolejności dopracowania)
+- Powłoki (model Bohra): tło zmienione na gradient radialny; jądro
+  dostało poświatę skalowaną PRAWDZIWYM Z pierwiastka (log₂Z — więcej
+  protonów, jaśniejsze jądro; porównaj węgiel Z=6 vs złoto Z=79 na
+  zrzutach ekranu), elektrony na wszystkich powłokach dostały spójną
+  poświatę. Zero zmian w regule Aufbau ani w danych 118 pierwiastków.
+- Orbitale |ψ|²: zweryfikowane ponownie, uznane za już świetnie wykonane
+  — gęstość prawdopodobieństwa renderowana jako świecąca chmura to
+  bezpośrednio dane z rozwiązania Schrödingera, nie ozdoba. Bez zmian.
+- Pełna weryfikacja przed przejściem dalej: typecheck, lint, 163 testy
+  frontendowe + 28 backendowych (191 razem) — wszystkie zielone, build
+  produkcyjny bez ostrzeżeń, wizualna weryfikacja Playwrightem obu widoków
+  (w tym porównanie jasności jądra dla różnych Z) bez błędów konsoli.
+- Particle Lab (5 z 9) jest następny w kolejności.
+
 ### Poprawiono (Universe Lab ukończone — laboratorium 3 z 9 w kolejności dopracowania)
 - Ekspansja (bazowy eksperyment): tło zmienione z płaskiej czerni na
   gradient radialny; galaktyki dostały poświatę skalowaną PRAWDZIWĄ

@@ -101,15 +101,21 @@ class BohrSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
-    ctx.fillRect(0, 0, w, h);
     const cx = w / 2;
     const cy = h / 2;
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.7);
+    bgGrad.addColorStop(0, '#080a16');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
     const el = this.element;
     const neutrons = Math.round(el.mass) - el.z;
 
-    // Jądro
+    // Jądro — poświata skalowana prawdziwym Z (więcej protonów → więcej
+    // ładunku → jaśniejsze jądro), nie stała ozdoba.
     const nucR = Math.min(10 + Math.log2(el.z) * 2.2, 26);
+    ctx.shadowColor = 'rgba(248,217,160,0.75)';
+    ctx.shadowBlur = 6 + Math.log2(el.z) * 2;
     const grad = ctx.createRadialGradient(cx, cy, 1, cx, cy, nucR);
     grad.addColorStop(0, '#f8d9a0');
     grad.addColorStop(1, '#c76b3f');
@@ -117,6 +123,7 @@ class BohrSim implements Sim {
     ctx.beginPath();
     ctx.arc(cx, cy, nucR, 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(230,234,245,0.9)';
     ctx.font = '10px ui-monospace, monospace';
     ctx.textAlign = 'center';
@@ -134,13 +141,16 @@ class BohrSim implements Sim {
       ctx.stroke();
       const speed = 0.9 / (i + 1);
       const shown = Math.min(count, 18); // czytelność na małym ekranie
+      ctx.fillStyle = '#5cd6e8';
+      ctx.shadowColor = '#5cd6e8';
+      ctx.shadowBlur = 6;
       for (let e = 0; e < shown; e++) {
         const ang = this.t * speed + (e / shown) * Math.PI * 2 + i;
-        ctx.fillStyle = '#5cd6e8';
         ctx.beginPath();
         ctx.arc(cx + r * Math.cos(ang), cy + r * Math.sin(ang), 2.4, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.shadowBlur = 0;
       if (count > shown) {
         ctx.fillStyle = 'rgba(92,214,232,0.8)';
         ctx.font = '9px ui-monospace, monospace';

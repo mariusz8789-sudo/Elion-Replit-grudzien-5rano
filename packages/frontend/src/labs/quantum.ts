@@ -18,6 +18,18 @@ class DoubleSlitSim implements Sim {
   private histogram = new Array(96).fill(0);
   private acc = 0;
   private flash: { x: number; t: number }[] = [];
+  private t = 0;
+  // Płótno akumulacji poświaty trafień — tworzone leniwie w render() (nie
+  // init()/w polu klasy), bo sims.test.ts uruchamia createSim()/init() bez
+  // DOM (ten sam, udokumentowany powód co nuclear-chart.ts). Każde trafienie
+  // dorysowuje się TU raz (additive blending) zamiast być redraw'owane co
+  // klatkę — jasność narasta dokładnie tak, jak fizycznie narasta pomiar,
+  // nie jako dekoracja.
+  private glowCanvas: HTMLCanvasElement | null = null;
+  private glowCtx: CanvasRenderingContext2D | null = null;
+  private glowW = 0;
+  private glowH = 0;
+  private drawnHits = 0;
 
   init() {}
 
@@ -25,6 +37,8 @@ class DoubleSlitSim implements Sim {
     this.hits = [];
     this.histogram.fill(0);
     this.flash = [];
+    this.drawnHits = 0;
+    this.glowCtx?.clearRect(0, 0, this.glowW, this.glowH);
   };
 
   /** |ψ|² na ekranie: pozycja u ∈ (-1, 1). */
@@ -56,6 +70,7 @@ class DoubleSlitSim implements Sim {
   }
 
   update(dt: number, p: SimParams) {
+    this.t += dt;
     this.acc += dt * Number(p.rate);
     while (this.acc >= 1) {
       this.acc -= 1;
@@ -64,40 +79,97 @@ class DoubleSlitSim implements Sim {
       const bin = Math.min(this.histogram.length - 1, Math.max(0, Math.floor(((u + 1) / 2) * this.histogram.length)));
       this.histogram[bin]++;
       this.flash.push({ x: u, t: 0.6 });
-      if (this.hits.length > 4000) this.hits.shift();
+      if (this.hits.length > 4000) {
+        this.hits.shift();
+        this.drawnHits = Math.max(0, this.drawnHits - 1);
+      }
     }
     for (const f of this.flash) f.t -= dt;
     this.flash = this.flash.filter((f) => f.t > 0);
   }
 
+  private hitScreenPos(u: number, w: number, h: number, screenX: number): { x: number; y: number } {
+    const y = h / 2 + (u * h) / 2.15;
+    const x = screenX + (((u * 7919) % 1) + 1) % 1 * (w * 0.06);
+    return { x, y };
+  }
+
+  private ensureGlowCanvas(w: number, h: number) {
+    const iw = Math.max(1, Math.round(w));
+    const ih = Math.max(1, Math.round(h));
+    if (!this.glowCanvas) {
+      this.glowCanvas = document.createElement('canvas');
+      this.glowCtx = this.glowCanvas.getContext('2d');
+    }
+    if (this.glowW !== iw || this.glowH !== ih) {
+      this.glowCanvas.width = iw;
+      this.glowCanvas.height = ih;
+      this.glowW = iw;
+      this.glowH = ih;
+      this.drawnHits = 0; // rozmiar się zmienił — pozycje trzeba przeliczyć i dorysować od nowa
+    }
+  }
+
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
+    this.ensureGlowCanvas(w, h);
+    const screenX = w * 0.6;
+    const toY = (u: number) => h / 2 + (u * h) / 2.15;
+
+    // Trafienia dorysowują się na trwałe płótno TYLKO RAZ, gdy się zdarzą —
+    // jasność wzoru interferencyjnego to prawdziwa akumulacja pomiaru, nie
+    // ozdobny efekt malowany co klatkę.
+    if (this.glowCtx) {
+      this.glowCtx.globalCompositeOperation = 'lighter';
+      for (let i = this.drawnHits; i < this.hits.length; i++) {
+        const { x, y } = this.hitScreenPos(this.hits[i], w, h, screenX);
+        const grad = this.glowCtx.createRadialGradient(x, y, 0, x, y, 5);
+        grad.addColorStop(0, 'rgba(120,225,240,0.55)');
+        grad.addColorStop(1, 'rgba(120,225,240,0)');
+        this.glowCtx.fillStyle = grad;
+        this.glowCtx.beginPath();
+        this.glowCtx.arc(x, y, 5, 0, Math.PI * 2);
+        this.glowCtx.fill();
+      }
+      this.glowCtx.globalCompositeOperation = 'source-over';
+      this.drawnHits = this.hits.length;
+    }
+
+    // Tło: subtelna winieta zamiast płaskiej czerni
+    const bgGrad = ctx.createRadialGradient(w * 0.35, h * 0.5, 0, w * 0.35, h * 0.5, Math.max(w, h) * 0.75);
+    bgGrad.addColorStop(0, '#070b16');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 
-    // Źródło i bariera ze szczelinami (schemat po lewej)
+    // Źródło: pulsujące światło (emituje żywe cząstki, nie martwa kropka)
+    const pulse = 0.6 + 0.4 * Math.sin(this.t * 3);
+    const srcGrad = ctx.createRadialGradient(w * 0.08, h / 2, 0, w * 0.08, h / 2, 14);
+    srcGrad.addColorStop(0, `rgba(150,235,250,${0.9 * pulse})`);
+    srcGrad.addColorStop(1, 'rgba(92,214,232,0)');
+    ctx.fillStyle = srcGrad;
+    ctx.beginPath();
+    ctx.arc(w * 0.08, h / 2, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#5cd6e8';
+    ctx.beginPath();
+    ctx.arc(w * 0.08, h / 2, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bariera ze szczelinami
     const barX = w * 0.22;
     ctx.fillStyle = '#8d97b4';
     ctx.fillRect(barX, 0, 3, h * 0.42);
     ctx.fillRect(barX, h * 0.47, 3, h * 0.06);
     ctx.fillRect(barX, h * 0.58, 3, h * 0.42);
-    ctx.fillStyle = '#5cd6e8';
-    ctx.beginPath();
-    ctx.arc(w * 0.08, h / 2, 5, 0, Math.PI * 2);
-    ctx.fill();
     ctx.fillStyle = 'rgba(230,234,245,0.55)';
     ctx.font = '10px system-ui';
-    ctx.fillText('źródło', w * 0.05, h / 2 + 18);
+    ctx.fillText('źródło', w * 0.05, h / 2 + 22);
     ctx.fillText('2 szczeliny', barX - 24, h * 0.44);
 
-    // Ekran detekcyjny: punkty trafień
-    const screenX = w * 0.6;
-    const toY = (u: number) => h / 2 + (u * h) / 2.15;
-    ctx.fillStyle = 'rgba(92,214,232,0.65)';
-    for (const u of this.hits) {
-      const y = toY(u);
-      const x = screenX + ((u * 7919) % 1 + 1) % 1 * (w * 0.06); // stały rozrzut poziomy
-      ctx.fillRect(x, y, 1.6, 1.6);
-    }
+    // Ekran detekcyjny: świecący, akumulowany wzór interferencyjny
+    if (this.glowCanvas) ctx.drawImage(this.glowCanvas, 0, 0);
+
+    // Chwilowy błysk cząstki przechodzącej przez barierę teraz
     for (const f of this.flash) {
       ctx.fillStyle = `rgba(255,255,255,${f.t})`;
       ctx.beginPath();
@@ -105,18 +177,23 @@ class DoubleSlitSim implements Sim {
       ctx.fill();
     }
 
-    // Histogram po prawej
+    // Histogram po prawej — słupki ze świecącą krawędzią
     const maxBin = Math.max(1, ...this.histogram);
-    ctx.fillStyle = 'rgba(240,179,92,0.85)';
     const hw = w * 0.24;
     this.histogram.forEach((v, i) => {
       const u = (i / this.histogram.length) * 2 - 1;
       const y = toY(u);
       const bw = (v / maxBin) * hw;
+      if (bw < 0.5) return;
+      const barGrad = ctx.createLinearGradient(w * 0.72, 0, w * 0.72 + bw, 0);
+      barGrad.addColorStop(0, 'rgba(240,179,92,0.5)');
+      barGrad.addColorStop(1, 'rgba(255,214,150,0.95)');
+      ctx.fillStyle = barGrad;
       ctx.fillRect(w * 0.72, y, bw, h / this.histogram.length + 0.5);
     });
 
     ctx.fillStyle = 'rgba(230,234,245,0.6)';
+    ctx.font = '10px system-ui';
     ctx.fillText(`cząstek: ${this.hits.length}`, 10, h - 12);
   }
 

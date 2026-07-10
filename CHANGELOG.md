@@ -6,6 +6,18 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Poprawiono (dopracowanie istniejącego laboratorium — dwie szczeliny)
+- Quantum Lab: ekran detekcyjny renderuje teraz prawdziwie AKUMULOWANĄ
+  poświatę trafień (płótno offscreen, additive blending, każde trafienie
+  dorysowuje się raz w momencie zajścia) zamiast martwych, statycznych
+  kropek 1,6 px odmalowywanych co klatkę. Efekt emerguje wprost z fizyki:
+  jasność wzoru interferencyjnego TO dosłownie akumulacja pomiaru, nie
+  ozdoba nałożona na wynik. Zero zmian w `prob()`/`sample()`/histogramie —
+  czysta poprawa warstwy renderującej, zweryfikowana Playwrightem
+  (kontrast: prążki przy interferencji vs dwie plamy przy włączonym
+  pomiarze drogi — teraz wyraźnie czytelne, wcześniej ledwo widoczne).
+  Dodatkowo: pulsujące źródło, winieta tła, świecące słupki histogramu.
+
 ### Dodano (Czarna dziura 3D + bloom) / Naprawiono (błąd znaku w geodezyjnej)
 - Einstein Lab: „Czarna dziura 3D" — ta sama dokładna fizyka geodezyjnej
   zerowej Schwarzschilda co wersja 2D (`core/physics.ts`:

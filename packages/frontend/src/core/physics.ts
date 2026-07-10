@@ -187,6 +187,110 @@ export function stepSchwarzschildGeodesic(u: number, du: number, dphi: number, r
 }
 
 /**
+ * Geodezyjna zerowa Kerra w PŁASZCZYŹNIE RÓWNIKOWEJ (θ=π/2, stała Cartera
+ * Q=0) — dokładne równania Boyer–Lindquist (Carter 1968), M=1 (r, a w
+ * jednostkach masy czarnej dziury), u=1/r, b=L/E parametr zderzenia.
+ * Wyprowadzenie: standardowe równania Cartera dla dφ/dλ i dr/dλ,
+ * zredukowane do równika, przekształcone (jak Binet w mechanice orbitalnej)
+ * do (du/dφ)² = F(u), żeby uniknąć jawnego pierwiastka przy punkcie
+ * zawrotnym (ten sam trik co d²u/dφ²=−u+1,5r_su² dla Schwarzschilda —
+ * przypadek szczególny a=0 poniżej).
+ *
+ * Weryfikacja (patrz kerr.test.ts):
+ * - przy a=0, F(u) redukuje się DOKŁADNIE do 1/b²−u²+2Mu³ (Schwarzschild),
+ *   a stepKerrEquatorialGeodesic daje identyczne tory co
+ *   stepSchwarzschildGeodesic (ta sama fizyka, inna parametryzacja)
+ * - promień fotosfery r̂_±=2M[1+cos((2/3)arccos(∓a/M))] i krytyczny
+ *   parametr zderzenia b_±=±3√(Mr̂_±)−a (Bardeen 1972; Teo 2003) odtwarzają
+ *   znane granice ekstremalnej Kerra: r̂_pro=M, r̂_retro=4M przy a=M
+ */
+function kerrQ(u: number, a: number, b: number, mass: number): number {
+  return 1 + (a * a - b * b) * u * u + 2 * mass * (b - a) ** 2 * u ** 3;
+}
+
+function kerrDeltaTilde(u: number, a: number, mass: number): number {
+  return 1 - 2 * mass * u + a * a * u * u;
+}
+
+/** F(u) = (du/dφ)² — nieujemna z konstrukcji, więc bez niejednoznaczności znaku przy zawrocie. */
+export function kerrEquatorialF(u: number, a: number, b: number, mass: number): number {
+  const deltaTilde = kerrDeltaTilde(u, a, mass);
+  const n = b - 2 * mass * u * (b - a);
+  if (n === 0) return 0;
+  return (kerrQ(u, a, b, mass) * deltaTilde * deltaTilde) / (n * n);
+}
+
+/**
+ * d²u/dφ² = F'(u)/2, wyznaczone różnicą centralną 4. rzędu zamiast ręcznej
+ * pochodnej symbolicznej ilorazu wielomianów — świadomy wybór inżynierski,
+ * bo F(u) jest gładka i dobrze uwarunkowana, a unika ryzyka błędu w długim
+ * wyprowadzeniu reguły ilorazu (błąd algebraiczny byłby trudniejszy do
+ * wykrycia niż błąd numeryczny rzędu ~1e-9, nieistotny dla wizualizacji).
+ */
+function kerrFPrime(u: number, a: number, b: number, mass: number): number {
+  const h = 1e-6;
+  const fm2 = kerrEquatorialF(u - 2 * h, a, b, mass);
+  const fm1 = kerrEquatorialF(u - h, a, b, mass);
+  const fp1 = kerrEquatorialF(u + h, a, b, mass);
+  const fp2 = kerrEquatorialF(u + 2 * h, a, b, mass);
+  return (fm2 - 8 * fm1 + 8 * fp1 - fp2) / (12 * h);
+}
+
+function kerrEquatorialRHS(u: number, a: number, b: number, mass: number): number {
+  return kerrFPrime(u, a, b, mass) / 2;
+}
+
+/** Jeden krok RK4 całkowania geodezyjnej równikowej Kerra po kącie φ. */
+export function stepKerrEquatorialGeodesic(
+  u: number,
+  du: number,
+  dphi: number,
+  a: number,
+  b: number,
+  mass: number,
+): { u: number; du: number } {
+  const f = (uu: number) => kerrEquatorialRHS(uu, a, b, mass);
+  const k1u = du;
+  const k1d = f(u);
+  const k2u = du + 0.5 * dphi * k1d;
+  const k2d = f(u + 0.5 * dphi * k1u);
+  const k3u = du + 0.5 * dphi * k2d;
+  const k3d = f(u + 0.5 * dphi * k2u);
+  const k4u = du + dphi * k3d;
+  const k4d = f(u + dphi * k3u);
+  return {
+    u: u + (dphi / 6) * (k1u + 2 * k2u + 2 * k3u + k4u),
+    du: du + (dphi / 6) * (k1d + 2 * k2d + 2 * k3d + k4d),
+  };
+}
+
+/** Promień horyzontu zewnętrznego: r+ = M + √(M²−a²) (a≤M). */
+export function kerrHorizonRadius(a: number, mass: number): number {
+  return mass + Math.sqrt(Math.max(0, mass * mass - a * a));
+}
+
+/** Ergosfera na równiku: r_ergo(θ=π/2) = 2M, niezależnie od spinu. */
+export function kerrErgosphereEquatorRadius(mass: number): number {
+  return 2 * mass;
+}
+
+/**
+ * Promień sferycznej orbity fotonowej w płaszczyźnie równikowej (Bardeen
+ * 1972; Teo 2003): r̂_± = 2M[1+cos((2/3)arccos(∓a/M))]. sign=+1: prograde
+ * (współbieżna ze spinem, r̂∈[M,3M]); sign=−1: retrograde (r̂∈[3M,4M]).
+ */
+export function kerrPhotonOrbitRadius(a: number, mass: number, sign: 1 | -1): number {
+  const arg = sign === 1 ? -a / mass : a / mass;
+  return 2 * mass * (1 + Math.cos((2 / 3) * Math.acos(Math.max(-1, Math.min(1, arg)))));
+}
+
+/** Krytyczny parametr zderzenia dla danej orbity fotonowej: b_± = ±3√(M r̂_±) − a. */
+export function kerrCriticalImpactParameter(a: number, mass: number, sign: 1 | -1): number {
+  const rHat = kerrPhotonOrbitRadius(a, mass, sign);
+  return sign * 3 * Math.sqrt(mass * rHat) - a;
+}
+
+/**
  * Geometria 4D (hipersześcian/tesserakt) — CZYSTA algebra liniowa, dokładna
  * (nie model, nie przybliżenie). Nie jest to twierdzenie o istnieniu
  * fizycznych dodatkowych wymiarów przestrzennych (to osobna, spekulacyjna

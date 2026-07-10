@@ -15,6 +15,11 @@ import {
   isothermalHaloMass,
   kardashevPower,
   keplerPosition,
+  kerrCriticalImpactParameter,
+  kerrEquatorialF,
+  kerrErgosphereEquatorRadius,
+  kerrHorizonRadius,
+  kerrPhotonOrbitRadius,
   lensAmplification,
   lensImagePositions,
   lorentzGamma,
@@ -34,6 +39,7 @@ import {
   semfStabilityGradient,
   singletCorrelation,
   solveKepler,
+  stepKerrEquatorialGeodesic,
   stepSchwarzschildGeodesic,
   TESSERACT_EDGES,
   TESSERACT_VERTICES,
@@ -353,6 +359,107 @@ describe('geodezyjna zerowa Schwarzschilda (Einstein Lab, 2D i 3D)', () => {
   it('im bliżej b_c, tym trudniej rozstrzygnąć — ale 0,999× i 1,001× dają różne wyniki', () => {
     expect(simulateCapture(0.999)).toBe(true);
     expect(simulateCapture(1.001)).toBe(false);
+  });
+});
+
+describe('geodezyjna równikowa Kerra (Einstein Lab 3D — wirująca czarna dziura)', () => {
+  const M = 1;
+
+  it('przy spinie a=0 daje DOKŁADNIE ten sam tor co geodezyjna Schwarzschilda (ten sam wzór, inna parametryzacja)', () => {
+    const b = 6;
+    let uK = 0.001;
+    let duK = 0.02 * 0.001;
+    let uS = 0.001;
+    let duS = 0.02 * 0.001;
+    const dphi = 0.001;
+    let maxDiff = 0;
+    for (let i = 0; i < 3000; i++) {
+      const rK = stepKerrEquatorialGeodesic(uK, duK, dphi, 0, b, M);
+      const rS = stepSchwarzschildGeodesic(uS, duS, dphi, 2 * M);
+      uK = rK.u;
+      duK = rK.du;
+      uS = rS.u;
+      duS = rS.du;
+      maxDiff = Math.max(maxDiff, Math.abs(uK - uS), Math.abs(duK - duS));
+    }
+    expect(maxDiff).toBeLessThan(1e-6);
+  });
+
+  it('przy a=0 promień sferycznej orbity fotonowej wynosi dokładnie 3M dla obu kierunków (granica Schwarzschilda)', () => {
+    expect(kerrPhotonOrbitRadius(0, M, 1)).toBeCloseTo(3 * M, 9);
+    expect(kerrPhotonOrbitRadius(0, M, -1)).toBeCloseTo(3 * M, 9);
+  });
+
+  it('przy a=0 krytyczny parametr zderzenia wynosi dokładnie 3√3·M (granica Schwarzschilda)', () => {
+    expect(kerrCriticalImpactParameter(0, M, 1)).toBeCloseTo(3 * Math.sqrt(3) * M, 9);
+    expect(kerrCriticalImpactParameter(0, M, -1)).toBeCloseTo(-3 * Math.sqrt(3) * M, 9);
+  });
+
+  it('przy ekstremalnym spinie (a→M) orbita prograde → r=M, orbita retrograde → r=4M (znany wynik dla ekstremalnej Kerra)', () => {
+    const a = 0.999999 * M;
+    expect(kerrPhotonOrbitRadius(a, M, 1)).toBeCloseTo(M, 2);
+    expect(kerrPhotonOrbitRadius(a, M, -1)).toBeCloseTo(4 * M, 3);
+  });
+
+  it('promień horyzontu r+ = M+√(M²−a²) maleje ze spinem i osiąga M przy ekstremalnym a=M', () => {
+    expect(kerrHorizonRadius(0, M)).toBeCloseTo(2 * M, 9);
+    expect(kerrHorizonRadius(0.6 * M, M)).toBeLessThan(2 * M);
+    expect(kerrHorizonRadius(0.999999 * M, M)).toBeCloseTo(M, 2);
+  });
+
+  it('ergosfera na równiku ma promień dokładnie 2M, niezależnie od spinu (definicja r_ergo(π/2)=2M)', () => {
+    expect(kerrErgosphereEquatorRadius(M)).toBeCloseTo(2 * M, 9);
+    expect(kerrErgosphereEquatorRadius(5)).toBeCloseTo(10, 9);
+  });
+
+  it('efekt wleczenia układów inercjalnych: przy dużym spinie orbita prograde jest bliżej horyzontu niż retrograde', () => {
+    const a = 0.9 * M;
+    const rPro = kerrPhotonOrbitRadius(a, M, 1);
+    const rRetro = kerrPhotonOrbitRadius(a, M, -1);
+    expect(rPro).toBeLessThan(rRetro);
+    expect(rPro).toBeGreaterThan(kerrHorizonRadius(a, M));
+  });
+
+  /** Ten sam schemat startu co simulateCapture() dla Schwarzschilda wyżej, uogólniony na Kerra. */
+  function simulateKerrCapture(bSigned: number, a: number, mass = M): boolean {
+    const r0 = mass * 4000;
+    const phi0 = Math.PI - Math.asin(Math.min(1, Math.abs(bSigned) / r0));
+    let u = Math.sin(phi0) / Math.abs(bSigned);
+    let du = Math.cos(phi0) / Math.abs(bSigned);
+    const dphi = 0.001;
+    const rPlus = kerrHorizonRadius(a, mass);
+    for (let i = 0; i < 400000; i++) {
+      const next = stepKerrEquatorialGeodesic(u, du, -dphi, a, bSigned, mass);
+      u = next.u;
+      du = next.du;
+      if (u <= 0) return false;
+      const r = 1 / u;
+      if (r <= rPlus * 1.002) return true;
+      if (r > r0) return false;
+    }
+    throw new Error('symulacja nie rozstrzygnęła się w limicie kroków');
+  }
+
+  it('foton prograde z |b| poniżej krytycznego zostaje pochłonięty, powyżej ucieka', () => {
+    const a = 0.9 * M;
+    const bc = kerrCriticalImpactParameter(a, M, 1);
+    expect(simulateKerrCapture(bc * 0.8, a)).toBe(true);
+    expect(simulateKerrCapture(bc * 1.3, a)).toBe(false);
+  });
+
+  it('foton retrograde z |b| poniżej krytycznego zostaje pochłonięty, powyżej ucieka (b ujemne)', () => {
+    const a = 0.9 * M;
+    const bc = kerrCriticalImpactParameter(a, M, -1);
+    expect(simulateKerrCapture(bc * 0.8, a)).toBe(true);
+    expect(simulateKerrCapture(bc * 1.3, a)).toBe(false);
+  });
+
+  it('kerrEquatorialF jest zawsze nieujemna (to kwadrat du/dφ z konstrukcji)', () => {
+    for (const a of [0, 0.3, 0.7, 0.9]) {
+      for (const u of [0.01, 0.05, 0.1, 0.2]) {
+        expect(kerrEquatorialF(u, a, 6, M)).toBeGreaterThanOrEqual(0);
+      }
+    }
   });
 });
 

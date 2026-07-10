@@ -6,6 +6,50 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Wirująca czarna dziura Kerra 3D — nowy eksperyment, Einstein Lab)
+- `labs/experiments/einstein-kerr3d.ts` (nowy `Sim3D`) + nowe funkcje w
+  `core/physics.ts`: `stepKerrEquatorialGeodesic`, `kerrEquatorialF`,
+  `kerrHorizonRadius`, `kerrErgosphereEquatorRadius`,
+  `kerrPhotonOrbitRadius`, `kerrCriticalImpactParameter`. Fotony
+  poruszają się w PŁASZCZYŹNIE RÓWNIKOWEJ (θ=π/2, stała Cartera Q=0)
+  wirującej czarnej dziury — dokładne równania Boyer–Lindquist (Carter
+  1968), zredukowane do postaci Bineta (du/dφ)²=F(u) i całkowane RK4;
+  pochodna F'(u) liczona różnicą centralną 4. rzędu zamiast ręcznej
+  reguły ilorazu, żeby uniknąć ryzyka błędu algebraicznego w długim
+  wyprowadzeniu (świadomy wybór inżynierski, udokumentowany w kodzie).
+- Fizyka zweryfikowana niezależnie od trzech stron: (1) przy spinie a=0
+  równanie redukuje się do geodezyjnej Schwarzschilda — tor identyczny co
+  do 13 cyfry; (2) promienie sferycznych orbit fotonowych prograde/
+  retrograde r̂_±=2M[1+cos((2/3)arccos(∓a/M))] (Bardeen 1972; Teo 2003,
+  arXiv:0906.4650) odtwarzają znane granice ekstremalne r̂→M i r̂→4M przy
+  spinie a→M; (3) krytyczny parametr zderzenia b_±=±3√(Mr̂_±)−a redukuje
+  się dokładnie do 3√3·M Schwarzschilda przy a=0, a symulacja przechwytu/
+  ucieczki fotonu poprawnie rozstrzyga po obu stronach tej granicy dla
+  obu kierunków (prograde i retrograde, ze znakiem).
+- Efekt wleczenia układów inercjalnych (frame-dragging, zmierzony przez
+  Gravity Probe B, 2011) widoczny WPROST, nie ilustracyjnie: orbita
+  fotonowa prograde leży bliżej horyzontu niż retrograde — asymetria,
+  której nie ma w statycznej czarnej dziurze Schwarzschilda. Horyzont
+  (r+=M+√(M²−a²), kurczy się ze spinem) i ergosfera (r_ergo(θ)=M+
+  √(M²−a²cos²θ), prawdziwa oblata powierzchnia, nie sfera) renderowane
+  jako dokładne geometrie 3D, nie placeholdery.
+- `honestyNote` jawnie nazywa granicę zakresu: geodezyjne POZA równikiem
+  (precesja w θ, wymaga pełnych równań Cartera z Q≠0 — całki eliptyczne)
+  pozostają w `VISION-BACKLOG.md`; dysk akrecyjny jest poglądowy
+  (prawdziwe ISCO Kerra zależne od spinu i kierunku to osobne, bardziej
+  złożone obliczenie, celowo pominięte).
+- 20 nowych testów fizycznych (`physics.test.ts`): zgodność ze
+  Schwarzschildem przy a=0, granice ekstremalne prograde/retrograde,
+  monotoniczność horyzontu ze spinem, promień ergosfery na równiku,
+  asymetria prograde<retrograde, przechwyt/ucieczka fotonu po obu
+  stronach krytycznego b dla obu kierunków, nieujemność F(u) z
+  konstrukcji. Zweryfikowane: typecheck, lint, 302 testy vitest
+  frontendowe (330 z backendem), build, Playwright w prawdziwej
+  Chromium (suwak spinu 0,70→0,95 wyraźnie kurczy horyzont na
+  zrzucie ekranu, Narrator pokazuje r_prograde=2,01M/r_retrograde=3,73M
+  przy a=0,70 — dokładnie zgodne z testami fizycznymi) — zero błędów
+  konsoli.
+
 ### Dodano (Diagram obwodu kwantowego — rozszerzenie Sfery Blocha, Quantum Lab)
 - `labs/experiments/quantum-bloch.ts` rozszerzony o prawdziwy diagram
   obwodu: sekwencja WSZYSTKICH zastosowanych bramek (do 10 ostatnich)

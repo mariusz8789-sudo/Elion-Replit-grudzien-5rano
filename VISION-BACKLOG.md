@@ -359,10 +359,21 @@ nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
   naturalne rozszerzenie Einstein Lab, reużywa `Sim3D` z Układu Słonecznego
   3D (osadzenie Fleminga: powierzchnia w 3D reprezentująca zakrzywienie 2D
   przestrzeni — klasyczna, uczciwie oznaczona wizualizacja podręcznikowa).
-- **Geodezyjne Kerra w 3D + soczewkowanie w stylu „Interstellar"**
-  (★★★★★ fizyka, ★★★★ dokładność renderowania) — rozszerzenie istniejącego
-  `einstein-geodesics.ts` na `Sim3D`, ten sam wzorzec co Układ Słoneczny 3D.
-  **Rekomendacja: to naturalny kandydat na następną sesję 3D.**
+- ✅ **Geodezyjne równikowe Kerra w 3D** — `einstein-kerr3d.ts`, Einstein
+  Lab. Dokładne równania Boyer–Lindquist (Carter 1968) w płaszczyźnie
+  równikowej (θ=π/2, Q=0), przekształcone do postaci Bineta i całkowane
+  RK4 (`stepKerrEquatorialGeodesic`). Zweryfikowane 20 testami: zgodność
+  z geodezyjną Schwarzschilda przy a=0 co do 13 cyfry, promienie orbit
+  fotonowych prograde/retrograde odtwarzają znane granice ekstremalne
+  (r̂→M i r̂→4M przy a→M, Bardeen 1972/Teo 2003), krytyczny parametr
+  zderzenia redukuje się dokładnie do 3√3·M Schwarzschilda przy a=0.
+  Efekt wleczenia układów inercjalnych (frame-dragging) widoczny wprost:
+  orbita prograde bliżej horyzontu niż retrograde, horyzont i ergosfera
+  renderowane jako dokładne powierzchnie 3D (nie placeholdery). **Świadomie
+  NIE zbudowane**: geodezyjne poza równikiem (precesja, stała Cartera Q≠0
+  — całki eliptyczne, backlog), prawdziwe ISCO Kerra zależne od spinu
+  (dysk pozostaje poglądowy), pełne soczewkowanie obrazu dysku zza
+  horyzontu metodą Jamesa i in. 2015 (nadal backlog, patrz Space-Time niżej).
 - ✅ **Chirp fali grawitacyjnej (dźwięk + wykres)** — `einstein-chirp.ts`,
   Einstein Lab. Formuła kwadrupolowa wiodącego rzędu (masa ćwierkowa,
   czas do połączenia, granica ISCO), dźwięk syntezowany Web Audio API z

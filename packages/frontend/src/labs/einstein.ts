@@ -4,6 +4,7 @@ import { einsteinGeodesics } from './experiments/einstein-geodesics';
 import { einsteinLensing } from './experiments/einstein-lensing';
 import { einsteinBlackHole3D } from './experiments/einstein-blackhole-3d';
 import { einsteinChirp } from './experiments/einstein-chirp';
+import { einsteinKerr3D } from './experiments/einstein-kerr3d';
 
 /**
  * Einstein Lab — zakrzywienie biegu światła przy masie.
@@ -240,7 +241,7 @@ export const einsteinLab: LabDefinition = {
     },
   ],
   createSim: () => new GravityLightSim(),
-  experiments: [einsteinGeodesics, einsteinBlackHole3D, einsteinLensing, einsteinChirp],
+  experiments: [einsteinGeodesics, einsteinBlackHole3D, einsteinKerr3D, einsteinLensing, einsteinChirp],
   narrate(p) {
     const M = 10 ** Number(p.mass) * MSUN;
     const rs = (2 * G * M) / (C * C);
@@ -254,7 +255,7 @@ export const einsteinLab: LabDefinition = {
     if (metric === 'kerr') {
       blocks.push({
         title: 'Metryka Kerra — wirująca czarna dziura',
-        body: 'Rotująca masa "ciągnie" za sobą czasoprzestrzeń (frame-dragging) — fotony są odchylane stycznie, co widać w zawijaniu torów. Efekt zmierzyła sonda Gravity Probe B (2011). Wizualizacja jest poglądowa: pełna geodezyjna Kerra trafi do Etapu 1.',
+        body: 'Rotująca masa "ciągnie" za sobą czasoprzestrzeń (frame-dragging) — fotony są odchylane stycznie, co widać w zawijaniu torów. Efekt zmierzyła sonda Gravity Probe B (2011). Ten widok jest poglądowy — pełna, dokładna geodezyjna Kerra (płaszczyzna równikowa) jest policzona w osobnym eksperymencie 3D tego laboratorium: "Wirująca czarna dziura Kerra 3D".',
       });
     }
     if (metric === 'alcubierre') {

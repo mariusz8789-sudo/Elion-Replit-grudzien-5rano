@@ -132,14 +132,21 @@ Wszechświata (8,8×10²⁶ m).
   unitarności dla każdej bramki oraz jawny dowód nieprzemienności (X∘Z ≠
   Z∘X); CNOT i splątanie świadomie pozostają w backlogu (wymagają
   4-wymiarowego wektora stanu, nie pojedynczej sfery Blocha)
-- **320 testów** (292 vitest frontend + 28 node:test backend)
+- **Wirująca czarna dziura Kerra w 3D** (Einstein Lab) — dokładne
+  geodezyjne równikowe (Boyer–Lindquist, Carter 1968), zweryfikowane
+  zgodnością ze Schwarzschildem przy zerowym spinie i znanymi granicami
+  ekstremalnymi orbit fotonowych (Bardeen 1972; Teo 2003); efekt
+  wleczenia układów inercjalnych (frame-dragging, Gravity Probe B 2011)
+  widoczny wprost — orbita prograde bliżej horyzontu niż retrograde;
+  horyzont i ergosfera renderowane jako dokładne powierzchnie 3D
+- **330 testów** (302 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 320 testów (fizyka + funkcje lokalne + backend)
+npm test           # 330 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

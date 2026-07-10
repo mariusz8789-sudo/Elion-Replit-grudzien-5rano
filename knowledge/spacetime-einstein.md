@@ -19,7 +19,8 @@ Shapiro; dylatacja grawitacyjna √(1−r_s/r); GPS: bilans +45,9 −7,2 ≈ +38
 
 **OTW — pole silne / czarne dziury** ★★★★★ (po 2015 r.)
 Metryka Schwarzschilda: r_s = 2GM/c²; sfera fotonowa 1,5 r_s; ISCO 6GM/c².
-Kerr: ergosfera, frame-dragging (Gravity Probe B 2011; jety AGN).
+Kerr: ergosfera, frame-dragging (Gravity Probe B 2011; jety AGN) —
+geodezyjne równikowe zaimplementowane (patrz niżej), NIE tylko poglądowo.
 Dowody bezpośrednie: fale grawitacyjne (2015), obraz EHT M87* (2019)
 i Sgr A* (2022), gwiazda S2 wokół Sgr A* (Nobel 2020).
 
@@ -35,6 +36,25 @@ Dopplera, nie precyzyjny transfer promieniowania). Render w pełnej metodzie
 Luminet 1979 → James et al. 2015 ("Interstellar", CQG 32, 065001, open
 access) — z prawdziwym soczewkowaniem obrazu dysku zza horyzontu — pozostaje
 w `VISION-BACKLOG.md` jako możliwe dalsze rozszerzenie tej samej fizyki.
+
+**Geodezyjne równikowe Kerra 3D (zaimplementowane)** ★★★★★
+Wirująca czarna dziura, płaszczyzna równikowa (θ=π/2, stała Cartera Q=0):
+dokładne równania Boyer–Lindquist (Carter 1968), przekształcone do postaci
+Bineta (du/dφ)²=F(u) i całkowane RK4 (`core/physics.ts`:
+`stepKerrEquatorialGeodesic`). Zweryfikowane: przy spinie a=0 daje
+identyczny tor co geodezyjna Schwarzschilda (zgodność do 13 cyfry);
+promienie orbit fotonowych prograde/retrograde r̂_±=2M[1+cos((2/3)
+arccos(∓a/M))] (Bardeen 1972; Teo 2003, arXiv:0906.4650) odtwarzają znane
+granice ekstremalne (r̂_pro→M, r̂_retro→4M przy a→M); krytyczny parametr
+zderzenia b_±=±3√(Mr̂_±)−a redukuje się dokładnie do 3√3·M Schwarzschilda
+przy a=0. Efekt wleczenia układów inercjalnych (frame-dragging) widoczny
+wprost: orbita prograde leży bliżej horyzontu niż retrograde — to
+policzalny skutek metryki, nie ilustracja. Horyzont r+=M+√(M²−a²) i
+ergosfera r_ergo(θ)=M+√(M²−a²cos²θ) — dokładne wzory, renderowane jako
+prawdziwe powierzchnie 3D (nie placeholder). ŚWIADOMIE POZA zakresem:
+geodezyjne poza równikiem (Q≠0, precesja w θ — wymaga pełnych równań
+Cartera / całek eliptycznych, backlog); prawdziwe ISCO Kerra (zależne od
+spinu i kierunku, osobne obliczenie — dysk akrecyjny pozostaje poglądowy).
 
 **Chirp fali grawitacyjnej (zaimplementowane)** ★★★★★
 Formuła kwadrupolowa wiodącego rzędu (Abbott i in. 2016, PRL 116, 061102 —
@@ -90,7 +110,9 @@ moduł "otwarte problemy fizyki" (Etap 2+).
   strategia: prekomputowane tablice ugięć + shader WebGL (tak robił zespół
   Interstellar, tylko w wyższej rozdzielczości)
 - Zegar świetlny: c przeskalowane do pikseli — fizyka dokładna, skala umowna
-- Frame-dragging w Etapie 0 poglądowy; pełne geodezyjne Kerra → Etap 1/2
+- Geodezyjne Kerra zaimplementowane TYLKO w płaszczyźnie równikowej;
+  pełne geodezyjne 3D (poza równikiem, precesja) wymagają stałej Cartera
+  Q≠0 i pozostają w `VISION-BACKLOG.md`
 
 ## Wnioski projektowe dla Genesis OS
 1. "Czarna dziura z Interstellar w kieszeni" (geodezyjne + dysk, WebGL) —

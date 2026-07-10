@@ -284,11 +284,18 @@ nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
 - ✅ Sfera Blocha (stan kubitu) — Quantum Lab → `quantum-bloch.ts` (★★★★★)
 - ✅ Tunelowanie kwantowe — Quantum Lab, silnik FFT równania Schrödingera (★★★★★)
 - ✅ Dekoherencja — narracja w double-slit (pomiar niszczy interferencję) (★★★★★)
-- **Bramki kwantowe / mini-komputer kwantowy** (★★★★★, model dydaktyczny) —
-  wizualny „obwód" (Hadamard, CNOT, Pauli-X/Y/Z) działający na sferze
-  Blocha, którą już mamy; naturalne rozszerzenie `quantum-bloch.ts`, nie
-  nowy eksperyment od zera. Wysoka wartość edukacyjna (IBM Quantum
-  Composer to najbliższy odpowiednik, ale bez Narratora tłumaczącego).
+- ✅ **Bramki kwantowe (jednokubitowe) / diagram obwodu** — rozszerzenie
+  `quantum-bloch.ts`: prawdziwa sekwencja zastosowanych bramek (H, X, Y, Z,
+  S, T, pomiar) renderowana jako diagram obwodu (konwencja IBM Quantum
+  Composer), eksportowane czyste funkcje `applyGate`/`applyCircuit` do
+  testów. Narrator tłumaczy nieprzemienność bramek (kolejność X,Z ≠ Z,X)
+  jako realną własność matematyczną, nie ciekawostkę. 9 nowych testów:
+  unitarność każdej bramki (zachowanie normy), H∘H=X∘X=tożsamość,
+  nieprzemienność X,Z vs Z,X na stanie w superpozycji.
+  **Wciąż w backlogu**: bramki DWUKUBITOWE (CNOT) i splątanie — wymagają
+  reprezentacji stanu, której pojedyncza sfera Blocha nie potrafi pokazać
+  (dwie sfery nie wystarczą przy splątaniu, potrzebny pełny wektor stanu
+  4-wymiarowy) — jawnie nazwane ograniczenie w honestyNote, nie ukryte.
 - **Teleportacja kwantowa** (★★★★★, protokół potwierdzony eksperymentalnie
   od 1997) — wymaga symulacji 2-kubitowego stanu splątanego + pomiaru w
   bazie Bella; wyraźnie oznaczyć, że TRANSMITOWANA jest informacja o

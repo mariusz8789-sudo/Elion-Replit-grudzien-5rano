@@ -15,10 +15,14 @@ cząsteczki >25 kDa: Fein 2019. Etap 0 losuje trafienia z dokładnego |ψ|².
 działa w 60 fps na telefonie (FFT w JS/WASM). Odblokowuje: tunelowanie,
 rozpraszanie na barierze, stany związane.
 
-**Kubity i bramki** ★★★★★
+**Kubity i bramki (jednokubitowe zaimplementowane)** ★★★★★
 |ψ⟩ = cos(θ/2)|0⟩ + e^{iφ}sin(θ/2)|1⟩ (sfera Blocha). Macierze H, X, Y, Z,
-S, T, CNOT. Symulacja pełnego stanu do ~10 kubitów trywialna (wektor 2ⁿ);
-teleportacja = 3 kubity.
+S, T — dokładne, zaimplementowane w `quantum-bloch.ts` z prawdziwym
+diagramem obwodu (sekwencja zastosowanych bramek, konwencja IBM Quantum
+Composer) i testami unitarności. CNOT: bramka DWUKUBITOWA, wymaga wektora
+stanu 4-wymiarowego (nie pojedynczej sfery Blocha) — NIE zaimplementowana,
+świadomie w backlogu. Symulacja pełnego stanu do ~10 kubitów trywialna
+(wektor 2ⁿ); teleportacja = 3 kubity — oba pozostają backlogiem.
 
 **Nierówności Bella / CHSH** ★★★★★
 Lokalny realizm: S ≤ 2; MK: S ≤ 2√2 ≈ 2,83; korelacja E(a,b) = −cos(a−b).

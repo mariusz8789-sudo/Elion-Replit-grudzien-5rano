@@ -6,9 +6,9 @@ import type { ExperimentDef, Sim, SimParams } from '../../core/types';
  * Blocha (model dephasing/depolaryzacji — fenomenologiczny).
  */
 
-type C = [number, number]; // [re, im]
+export type C = [number, number]; // [re, im]
 
-const GATES: Record<string, [C, C, C, C]> = {
+export const GATES: Record<string, [C, C, C, C]> = {
   // [a b; c d] jako [a, b, c, d]
   H: [[1 / Math.SQRT2, 0], [1 / Math.SQRT2, 0], [1 / Math.SQRT2, 0], [-1 / Math.SQRT2, 0]],
   X: [[0, 0], [1, 0], [1, 0], [0, 0]],
@@ -21,6 +21,21 @@ const GATES: Record<string, [C, C, C, C]> = {
 const mul = (a: C, b: C): C => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
 const add = (a: C, b: C): C => [a[0] + b[0], a[1] + b[1]];
 
+/** Zastosowanie bramki (macierzy unitarnej) do stanu [amplituda|0⟩, amplituda|1⟩] — czysta funkcja, eksportowana dla testów. */
+export function applyGate(state: [C, C], gate: string): [C, C] {
+  const m = GATES[gate];
+  if (!m) return state;
+  const [a, b] = state;
+  return [add(mul(m[0], a), mul(m[1], b)), add(mul(m[2], a), mul(m[3], b))];
+}
+
+/** Zastosowanie sekwencji bramek w podanej kolejności — czysta funkcja, eksportowana dla testów. */
+export function applyCircuit(state: [C, C], gates: string[]): [C, C] {
+  return gates.reduce((s, g) => applyGate(s, g), state);
+}
+
+const MAX_HISTORY = 10;
+
 class BlochSim implements Sim {
   private a: C = [1, 0]; // amplituda |0⟩
   private b: C = [0, 0]; // amplituda |1⟩
@@ -30,6 +45,8 @@ class BlochSim implements Sim {
   private measured: string | null = null;
   private measureTimer = 0;
   private gateCount = 0;
+  /** Sekwencja zastosowanych bramek (obwód) — do MAX_HISTORY, starsze odpadają z przodu. */
+  private history: string[] = [];
 
   init() {}
 
@@ -40,6 +57,7 @@ class BlochSim implements Sim {
     this.lastGate = '—';
     this.measured = null;
     this.gateCount = 0;
+    this.history = [];
   };
 
   private apply(g: string) {
@@ -52,16 +70,16 @@ class BlochSim implements Sim {
       this.measured = zero ? '|0⟩' : '|1⟩';
       this.measureTimer = 1.6;
       this.lastGate = 'pomiar';
+      this.history.push('📏');
+      if (this.history.length > MAX_HISTORY) this.history.shift();
       return;
     }
-    const m = GATES[g];
-    if (!m) return;
-    const na = add(mul(m[0], this.a), mul(m[1], this.b));
-    const nb = add(mul(m[2], this.a), mul(m[3], this.b));
-    this.a = na;
-    this.b = nb;
+    if (!GATES[g]) return;
+    [this.a, this.b] = applyGate([this.a, this.b], g);
     this.lastGate = g;
     this.gateCount++;
+    this.history.push(g);
+    if (this.history.length > MAX_HISTORY) this.history.shift();
   }
 
   pointer(x: number, y: number, type: 'down' | 'move' | 'up') {
@@ -149,6 +167,43 @@ class BlochSim implements Sim {
       ctx.fillText(`pomiar → ${this.measured}`, cx + R * 0.4, cy - R * 0.7);
     }
 
+    // obwód: prawdziwa sekwencja zastosowanych bramek jako diagram kwantowy
+    // (ta sama konwencja co IBM Quantum Composer — jedna "linia" = jeden kubit)
+    const circuitY = Math.min(cy + R + 30, h - 90);
+    const wireX0 = 14;
+    const wireX1 = w - 14;
+    ctx.strokeStyle = 'rgba(141,151,180,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(wireX0, circuitY);
+    ctx.lineTo(wireX1, circuitY);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.fillStyle = 'rgba(141,151,180,0.6)';
+    ctx.font = '9px ui-monospace, monospace';
+    ctx.fillText('q₀ |0⟩', wireX0 - 2, circuitY - 8);
+    const chipSize = 22;
+    const chipGap = 6;
+    let chipX = wireX0 + 30;
+    for (const g of this.history) {
+      if (chipX > wireX1 - chipSize) break;
+      ctx.fillStyle = g === '📏' ? 'rgba(240,179,92,0.9)' : 'rgba(92,214,232,0.9)';
+      ctx.beginPath();
+      ctx.roundRect(chipX, circuitY - chipSize / 2, chipSize, chipSize, 5);
+      ctx.fill();
+      ctx.fillStyle = '#02030a';
+      ctx.font = '600 10px ui-monospace, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(g, chipX + chipSize / 2, circuitY + 4);
+      ctx.textAlign = 'left';
+      chipX += chipSize + chipGap;
+    }
+    if (this.history.length === 0) {
+      ctx.fillStyle = 'rgba(141,151,180,0.5)';
+      ctx.font = '9px system-ui';
+      ctx.fillText('obwód pusty — dotknij bramkę poniżej', wireX0 + 34, circuitY + 4);
+    }
+
     // przyciski bramek na kanwie
     const labels = ['H', 'X', 'Y', 'Z', 'S', 'T', '📏'];
     const bw = Math.min((w - 24 - 6 * 8) / 7, 52);
@@ -181,7 +236,12 @@ class BlochSim implements Sim {
 
   getStats() {
     const p0 = this.a[0] ** 2 + this.a[1] ** 2;
-    return { p0: Math.round(p0 * 100), shrink: Math.round(this.shrink * 100) / 100, gates: this.gateCount };
+    return {
+      p0: Math.round(p0 * 100),
+      shrink: Math.round(this.shrink * 100) / 100,
+      gates: this.gateCount,
+      historyLen: this.history.length,
+    };
   }
 }
 
@@ -190,7 +250,7 @@ export const quantumBloch: ExperimentDef = {
   name: 'Sfera Blocha',
   honesty: 'exact',
   honestyNote:
-    'Kubit jest reprezentowany pełnym stanem kwantowym, a bramki to dokładne macierze unitarne — identyczne z używanymi w komputerach kwantowych. Dekoherencja jest modelem fenomenologicznym (kurczenie wektora Blocha).',
+    'Kubit jest reprezentowany pełnym stanem kwantowym, a bramki to dokładne macierze unitarne — identyczne z używanymi w komputerach kwantowych (obwód na diagramie to prawdziwa, wykonana sekwencja operacji, nie ilustracja). Dekoherencja jest modelem fenomenologicznym (kurczenie wektora Blocha). Ograniczenie: to obwód JEDNOKUBITOWY — bramki dwukubitowe (np. CNOT) i splątanie wymagają reprezentacji stanu, której pojedyncza sfera Blocha nie potrafi pokazać (dwie sfery nie wystarczą przy splątaniu), i pozostają w backlogu.',
   params: [
     { key: 'decoherence', label: 'Dekoherencja (sprzężenie z otoczeniem)', type: 'toggle', default: false },
   ],
@@ -211,6 +271,13 @@ export const quantumBloch: ExperimentDef = {
         body: 'Przycisk 📏 losuje wynik zgodnie z amplitudami i NISZCZY superpozycję: wektor skacze na biegun. Dlatego komputer kwantowy mierzy się raz, na końcu obwodu — każdy wcześniejszy pomiar kasuje przewagę kwantową.',
       },
     ];
+    const historyLen = Number(stats.historyLen ?? 0);
+    if (historyLen >= 2) {
+      blocks.push({
+        title: 'Obwód powyżej to prawdziwa sekwencja macierzy',
+        body: 'Każda bramka na diagramie to osobna macierz unitarna, a cały obwód to ich iloczyn w kolejności zastosowania (macierze mnoży się od PRAWEJ do LEWEJ względem kolejności działania). Bramki kwantowe w OGÓLNOŚCI nie przemieniają — spróbuj X, potem Z, a potem wyczyść i zrób Z, potem X: to różne obwody, mimo tych samych dwóch bramek, bo mnożenie macierzy nie jest przemienne. To realna własność matematyczna, nie ciekawostka — na niej opierają się wszystkie algorytmy kwantowe.',
+      });
+    }
     if (p.decoherence) {
       blocks.push({
         title: `Dekoherencja: |r⃗| = ${shrink.toFixed(2)}`,

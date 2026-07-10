@@ -6,6 +6,29 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Diagram obwodu kwantowego — rozszerzenie Sfery Blocha, Quantum Lab)
+- `labs/experiments/quantum-bloch.ts` rozszerzony o prawdziwy diagram
+  obwodu: sekwencja WSZYSTKICH zastosowanych bramek (do 10 ostatnich)
+  renderowana jako linia kubitu z chipami bramek, konwencja identyczna z
+  IBM Quantum Composer — to prawdziwa, wykonana sekwencja operacji
+  unitarnych, nie ilustracja.
+- Czyste funkcje `applyGate`/`applyCircuit` wyekstrahowane i wyeksportowane
+  z klasy symulacji — ta sama macierzowa logika co wcześniej, teraz
+  bezpośrednio testowalna.
+- Narrator tłumaczy NIEPRZEMIENNOŚĆ bramek kwantowych (kolejność X,Z ≠
+  Z,X) jako realną własność matematyczną leżącą u podstaw wszystkich
+  algorytmów kwantowych, gdy obwód ma ≥2 bramki.
+- honestyNote jawnie nazywa ograniczenie: to obwód JEDNOKUBITOWY — CNOT i
+  splątanie wymagają reprezentacji stanu, której pojedyncza sfera Blocha
+  nie może pokazać, i pozostają w `VISION-BACKLOG.md`.
+- 9 nowych testów (`quantumBloch.test.ts`): każda bramka jest unitarna
+  (zachowuje normę stanu), H daje dokładnie 50/50, X∘X i H∘H = tożsamość,
+  **nieprzemienność potwierdzona wprost** (X,Z na stanie w superpozycji
+  daje inny stan niż Z,X), obwód pusty i nieznana bramka są bezpieczne.
+  Zweryfikowane: typecheck, lint, 292 testy vitest, build, Playwright
+  (kliknięcia bramek na canvasie, diagram obwodu pokazuje poprawną
+  sekwencję H→X→Z) — zero błędów konsoli.
+
 ### Dodano (Napięcie Hubble'a — nowy eksperyment, Universe Lab)
 - `labs/experiments/universe-hubbletension.ts` + nowe funkcje fizyki w
   `core/physics.ts` (`gaussianPdf`, `measurementTensionSigma`): realny,

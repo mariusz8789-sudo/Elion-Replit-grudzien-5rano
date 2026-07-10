@@ -65,12 +65,15 @@ class AltStarSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
+    const cx = w / 2;
+    const cy = h / 2;
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.75);
+    bgGrad.addColorStop(0, '#0a0810');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
     const g = Number(this.params.g);
     const strong = Number(this.params.strong);
-    const cx = w / 2;
-    const cy = h / 2;
 
     // Gwiazda: przy większym G gwiazdy są gęstsze, gorętsze, krótkowieczne.
     const starR = Math.min(w, h) * 0.13 / Math.pow(g, 0.25);
@@ -113,9 +116,14 @@ class AltStarSim implements Sim {
     const py = cy + orbR * Math.sin(this.planetAng);
     const inHz = Math.abs(orbR - hz) < Math.min(w, h) * 0.06;
     ctx.fillStyle = inHz ? '#5cd6e8' : '#8d97b4';
+    if (inHz) {
+      ctx.shadowColor = '#5cd6e8';
+      ctx.shadowBlur = 10;
+    }
     ctx.beginPath();
     ctx.arc(px, py, 5, 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
 
     ctx.fillStyle = 'rgba(167,139,250,0.85)';
     ctx.font = '10px ui-monospace, monospace';

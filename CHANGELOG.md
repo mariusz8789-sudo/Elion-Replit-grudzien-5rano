@@ -6,6 +6,29 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Poprawiono (Multiverse Lab ukończone — laboratorium 7 z 9 w kolejności dopracowania — WSZYSTKIE ISTNIEJĄCE LABORATORIA DOPRACOWANE)
+- Inne stałe (bazowy eksperyment budowy scenariuszy): tło zmienione na
+  gradient radialny; planeta w ekosferze (`inHz` — prawdziwy warunek
+  geometryczny już sterujący jej kolorem) dostała poświatę. Zero zmian w
+  skalowaniach fine-tuningu (t~G⁻², progi diproton/deuter).
+  Multiverse Nexus i Tesserakt 4D zweryfikowane ponownie — obie sceny
+  WebGL już mają własną, dobrze wykonaną poświatę (sprite'y portali,
+  kolorowanie krawędzi wg 4. wymiaru) — bez zmian.
+- Pełna weryfikacja przed przejściem dalej: typecheck, lint, 163 testy
+  frontendowe + 28 backendowych (191 razem) — wszystkie zielone, build
+  produkcyjny bez ostrzeżeń, wizualna weryfikacja Playwrightem wszystkich
+  3 eksperymentów bez błędów konsoli.
+- **Kamień milowy**: to zamyka pierwotną listę priorytetów użytkownika
+  wśród laboratoriów, które faktycznie istnieją (Quantum → Einstein →
+  Universe → Atom → Particle → Civilization → Multiverse). Chemistry Lab
+  i Biology Lab z tej listy (pozycje 6–7) nigdy nie zostały zbudowane —
+  zgodnie z zasadą „nie dodawaj nowych laboratoriów w tej fazie" zostały
+  celowo pominięte i czekają w VISION-BACKLOG.md. Kolejny krok wymaga
+  decyzji: zbudować Chemistry/Biology Lab jako nowe laboratoria, czy
+  przejść do dużych modułów z backlogu (Discovery Timeline, Three-Body,
+  Frontier Science Lab) — obie ścieżki wykraczają poza „polerowanie
+  istniejących laboratoriów" i wymagają jawnej zgody.
+
 ### Poprawiono (Civilization Lab ukończone — laboratorium 6 z 9 w kolejności dopracowania)
 - Skala Kardaszewa: tło zmienione na gradient radialny; węzły sieci
   energetycznej Typu 0→I dostały poświatę pulsującą z ich rzeczywistą

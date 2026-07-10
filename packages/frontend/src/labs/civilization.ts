@@ -21,10 +21,13 @@ class KardashevSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
-    ctx.fillRect(0, 0, w, h);
     const cx = w / 2;
     const cy = h * 0.44;
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.75);
+    bgGrad.addColorStop(0, '#080a16');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
     const K = this.K;
 
     if (K < 2) {
@@ -43,8 +46,12 @@ class KardashevSim implements Sim {
         const rr = R * Math.sqrt(((i * 7919) % 100) / 100);
         const x = cx + rr * Math.cos(a1);
         const y = cy + rr * Math.sin(a1);
-        ctx.fillStyle = `rgba(240,179,92,${0.5 + 0.5 * Math.sin(this.t * 2 + i)})`;
+        const pulse = 0.5 + 0.5 * Math.sin(this.t * 2 + i);
+        ctx.fillStyle = `rgba(240,179,92,${pulse})`;
+        ctx.shadowColor = '#f0b35c';
+        ctx.shadowBlur = 2 + pulse * 3;
         ctx.fillRect(x, y, 2, 2);
+        ctx.shadowBlur = 0;
       }
       ctx.fillStyle = 'rgba(230,234,245,0.7)';
       ctx.font = '11px system-ui';
@@ -89,7 +96,12 @@ class KardashevSim implements Sim {
         const jy = Math.cos(i * 78.233) * 6;
         const harvested = (i / 700) < (K - 3) * 2;
         ctx.fillStyle = harvested ? 'rgba(240,179,92,0.9)' : 'rgba(200,215,255,0.55)';
+        if (harvested) {
+          ctx.shadowColor = '#f0b35c';
+          ctx.shadowBlur = 4;
+        }
         ctx.fillRect(rr * Math.cos(ang) + jx, rr * Math.sin(ang) * 0.6 + jy, 1.6, 1.6);
+        ctx.shadowBlur = 0;
       }
       ctx.restore();
       ctx.fillStyle = 'rgba(230,234,245,0.7)';

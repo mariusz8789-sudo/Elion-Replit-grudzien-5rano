@@ -6,6 +6,29 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Poprawiono (Civilization Lab ukończone — laboratorium 6 z 9 w kolejności dopracowania)
+- Skala Kardaszewa: tło zmienione na gradient radialny; węzły sieci
+  energetycznej Typu 0→I dostały poświatę pulsującą z ich rzeczywistą
+  fazą (ta sama wartość `pulse`, która już sterowała przezroczystością),
+  gwiazdy "zebrane" w galaktyce Typu III (harvested = i/700 < (K−3)×2 —
+  prawdziwy warunek z pętli renderującej, nie ozdoba) dostały poświatę
+  odróżniającą je od niezebranych. Rój Dysona (Typ II) zweryfikowany —
+  już dobrze wykonany, bez zmian. Zero zmian we wzorze Sagana.
+- Kolonizacja: tło zmienione na gradient radialny dla spójności z resztą
+  laboratorium; świecące skolonizowane gwiazdy (już wcześniej dobrze
+  wykonane) bez zmian. Zero zmian w modelu perkolacyjnym.
+- Pełna weryfikacja przed przejściem dalej: typecheck, lint, 163 testy
+  frontendowe + 28 backendowych (191 razem) — wszystkie zielone, build
+  produkcyjny bez ostrzeżeń, wizualna weryfikacja Playwrightem wszystkich
+  3 stanów skali Kardaszewa (Typ 0→I, II, III) i Kolonizacji bez błędów
+  konsoli.
+- Multiverse Lab (7 z 9, ostatnie z pierwotnej listy priorytetów wśród
+  istniejących laboratoriów — celowo na końcu, bo mocniej spekulatywne
+  niż reszta) jest następny. Chemistry Lab i Biology Lab z pierwotnej
+  listy priorytetów (6 i 7) nadal nie istnieją jako laboratoria —
+  zostają w VISION-BACKLOG.md do rozważenia po ukończeniu polerowania
+  wszystkich istniejących laboratoriów.
+
 ### Poprawiono (Particle Lab ukończone — laboratorium 5 z 9 w kolejności dopracowania)
 - Detektor: tło zmienione na gradient radialny; tory cząstek dostały
   poświatę skalowaną PRAWDZIWYM pt toru (wyższy pęd poprzeczny = bardziej

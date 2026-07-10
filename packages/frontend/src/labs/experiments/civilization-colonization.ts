@@ -105,7 +105,10 @@ class ColonizationSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
+    const bgGrad = ctx.createRadialGradient(w / 2, h * 0.47, 0, w / 2, h * 0.47, Math.max(w, h) * 0.75);
+    bgGrad.addColorStop(0, '#080a16');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
     for (const l of this.links) {
       const a = this.stars[l.a];

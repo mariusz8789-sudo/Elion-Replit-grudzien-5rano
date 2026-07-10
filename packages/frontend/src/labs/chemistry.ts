@@ -2,6 +2,7 @@ import type { LabDefinition, Sim, SimParams } from '../core/types';
 import { bondPolarity, type BondType } from '../core/physics';
 import { PAULING_ELECTRONEGATIVITY } from '../data/electronegativity';
 import { ELEMENTS } from '../data/elements';
+import { chemistryVsepr } from './experiments/chemistry-vsepr';
 
 /**
  * Chemistry Lab — wiązania chemiczne i elektroujemność.
@@ -182,6 +183,7 @@ export const chemistryLab: LabDefinition = {
     },
   ],
   createSim: () => new BondSim(),
+  experiments: [chemistryVsepr],
   narrate(p, stats) {
     const symbolA = String(p.elementA ?? 'Na');
     const symbolB = String(p.elementB ?? 'Cl');

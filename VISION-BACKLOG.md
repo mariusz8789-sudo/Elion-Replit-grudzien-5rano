@@ -364,9 +364,13 @@ Backlog na przyszłość (NIE zbudowane): spersonalizowany film/zwiastun 4K
   tabelaryczne, CRC Handbook) steruje CIĄGŁĄ wizualizacją chmury
   elektronowej od kowalencyjnej po jonową (wzór Hanney–Smitha) — nie
   przełącznikiem trzech stanów. Domyślna para Na–Cl.
-- **Geometria molekularna VSEPR w 3D** (★★★★★ teoria dobrze potwierdzona)
-  — model kulki-i-pałeczki przez `Sim3D`, ładny most do orbitali z Atom
-  Lab; wymaga danych o kątach/długościach wiązań (PubChem/CCCBDB).
+- ✅ **Geometria molekularna VSEPR w 3D** — `chemistry-vsepr.ts`, Chemistry
+  Lab. Model kulki-i-pałeczki (`Sim3D`), 13 standardowych geometrii AX₂
+  do AX₆E₂. Geometrie bez wolnych par: dokładna geometria bryły
+  (np. tetraedr 109,47°). NH₃/H₂O: kąty PRAWDZIWE zmierzone (106,8°/104,5°,
+  NIST/CCCBDB), geometria dopasowana wstecz do pomiaru. 10 nowych testów:
+  spójność liczby wektorów, wektory jednostkowe, dokładne kąty (tetraedr,
+  oktaedr 90°/180°, NH₃, H₂O<NH₃), funkcja `bentCone` dla dowolnego kąta.
 - **Krzywe miareczkowania kwas–zasada (pH)** (★★★★★ chemia analityczna) —
   ilościowo bogaty temat, dobry materiał na Narratora.
 - ✅ **Trendy okresowe** (promień atomowy, energia jonizacji) — zbudowane

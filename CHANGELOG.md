@@ -6,6 +6,35 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Geometria molekularna VSEPR — nowy eksperyment 3D, Chemistry Lab)
+- `labs/experiments/chemistry-vsepr.ts`: pierwsza scena `Sim3D` (Three.js)
+  w Chemistry Lab — model kulki-i-pałeczki, 13 standardowych geometrii
+  VSEPR (Gillespie & Nyholm, 1957) od liniowej (AX₂) po kwadratową płaską
+  (AX₄E₂), pełne pokrycie klasycznego zbioru z każdego kursu chemii ogólnej.
+- Geometrie BEZ wolnych par (liniowa, trygonalna, tetraedryczna, bipiramida
+  trygonalna, oktaedryczna): dokładna geometria bryły platońskiej/rozkładu
+  na okręgu — zweryfikowane testem (tetraedr 109,47° między każdą parą
+  wiązań, oktaedr dokładnie 12 kątów 90° i 3 kąty 180°).
+- Dla NH₃ i H₂O — dwóch najczęściej cytowanych podręcznikowych przykładów
+  odkształcenia przez wolną parę — kąty wiązań są PRAWDZIWYMI zmierzonymi
+  wartościami (106,8° i 104,5°, NIST/CCCBDB), nie idealizacją: nowa funkcja
+  `bentCone()` konstruuje geometrię WSTECZ od zadanego rzeczywistego kąta.
+  Pozostałe geometrie z wolnymi parami (SF₄, ClF₃, XeF₂, BrF₅, XeF₄) pokazują
+  pozycje idealne bryły-rodzica z jawnym zastrzeżeniem w honestyNote, że
+  realne kąty odbiegają o kilka stopni — uczciwość zamiast fałszywej
+  precyzji.
+- Wolne pary renderowane jako półprzezroczyste, "oddychające" (pulsująca
+  skala napędzana czasem symulacji) chmury bez atomu na końcu — wizualnie
+  odróżnione od par wiążących, ten sam motyw "chmura prawdopodobieństwa"
+  co orbitale w Atom Lab.
+- 10 nowych testów (`chemistryVsepr.test.ts`): spójność liczby wektorów z
+  deklarowaną liczbą domen, wektory jednostkowe, unikalne id, dokładne kąty
+  dla tetraedru/oktaedru/NH₃/H₂O/liniowej, `bentCone()` dla dowolnego kąta,
+  narracja dla wszystkich 13 kształtów. Zweryfikowane: typecheck, lint,
+  237 testów vitest, build, Playwright w prawdziwej przeglądarce (WebGL) —
+  oktaedryczny SF₆ i kątowy H₂O (z widocznymi chmurami wolnych par) render
+  się poprawnie, zero błędów konsoli.
+
 ### Dodano (Trendy okresowe — nowa zakładka, Atom Lab)
 - `data/periodicTrends.ts`: promień atomowy (Slater 1964) i pierwsza
   energia jonizacji (NIST Atomic Spectra Database, CRC Handbook) dla

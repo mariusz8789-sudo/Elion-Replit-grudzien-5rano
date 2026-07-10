@@ -1,10 +1,9 @@
 # Chemistry Lab — katalog wiedzy
 
 ## Zakres
-Elektroujemność, polarność wiązań chemicznych. Pierwszy eksperyment tego
-laboratorium (Wiązania chemiczne); reakcje, kinetyka, geometria molekularna
-i trendy okresowe poza elektroujemnością — poza obecnym zakresem, patrz
-VISION-BACKLOG.md.
+Elektroujemność, polarność wiązań chemicznych, geometria molekularna
+(VSEPR). Reakcje, kinetyka, stechiometria, krzywe miareczkowania —
+poza obecnym zakresem, patrz VISION-BACKLOG.md.
 
 ## Modele i wzory
 
@@ -25,6 +24,20 @@ Procent charakteru jonowego: f ≈ 1 − exp(−Δχ²/4). Wciąż cytowane w
 podręcznikach jako orientacyjne oszacowanie; nie jest zmierzoną wielkością
 fizyczną i nie zgadza się dokładnie z bardziej wyrafinowanymi metodami
 (np. analiza NBO/AIM daje inne liczby dla tego samego wiązania).
+
+**VSEPR — geometria molekularna (zaimplementowane)** ★★★★★
+Teoria Gillespiego i Nyholma (1957): domeny elektronowe (wiążące i wolne
+pary) wokół atomu centralnego maksymalizują wzajemne odległości na sferze.
+13 standardowych geometrii (AX₂ do AX₆E₂) zaimplementowanych w
+`labs/experiments/chemistry-vsepr.ts` jako model 3D (Sim3D, Three.js).
+Geometrie BEZ wolnych par to dokładna geometria bryły/rozkładu na okręgu
+(np. tetraedr: 109,47° dokładnie). Dla NH₃ i H₂O kąty wiązań są PRAWDZIWYMI
+zmierzonymi wartościami (106,8° i 104,5° — NIST/CCCBDB), nie idealizacją —
+geometria jest dopasowana WSTECZ do zmierzonego kąta (funkcja `bentCone`).
+Pozostałe geometrie z wolnymi parami (SF₄, ClF₃, XeF₂, BrF₅, XeF₄) pokazują
+pozycje idealne bryły-rodzica (bipiramida trygonalna / oktaedr); realne
+kąty odbiegają o kilka stopni z tego samego powodu (wolna para odpycha
+silniej niż para wiążąca) — jawnie zaznaczone w honestyNote, nie ukryte.
 
 ## Sprzeczne teorie / otwarte spory
 - Skale elektroujemności różnią się metodą (Pauling z energii wiązań,
@@ -51,18 +64,22 @@ liczby, nie synteza. Gazy szlachetne i superciężkie pierwiastki świadomie
 pominięte zamiast zmyślone.
 
 ## Ograniczenia implementacyjne
-- Rozmiary atomów na wizualizacji są symboliczne (log Z), nie do skali
-  promienia atomowego/kowalencyjnego (brak jeszcze danych o promieniach)
-- Brak geometrii molekularnej (VSEPR), reakcji, kinetyki, stechiometrii —
-  to osobne, większe moduły do rozważenia po tym pierwszym eksperymencie
+- Rozmiary atomów na wizualizacji wiązań (2D) są symboliczne (log Z), nie
+  do skali promienia atomowego/kowalencyjnego
+- Kolory atomów w modelu VSEPR (3D) są schematyczne (niebieski=wiążący,
+  bursztyn=centralny, fiolet=wolna para), nie prawdziwymi kolorami CPK
+- Brak reakcji, kinetyki, stechiometrii, krzywych miareczkowania —
+  osobne, większe moduły do rozważenia później
 
 ## Wnioski projektowe dla Genesis OS
 1. Wiązania chemiczne jako pierwszy eksperyment: continuum kowalencyjne
    → jonowe sterowane jedną realną liczbą (Δχ) najlepiej oddaje "emergent,
    not decorative" — chmura elektronowa dosłownie przesuwa się według wzoru
-2. Kolejne kandydaty (nie budować teraz): geometria molekularna VSEPR
-   (ładny most do orbitali z Atom Lab), krzywe miareczkowania pH, trendy
-   okresowe (promień atomowy, energia jonizacji) wykorzystujące już
-   istniejący układ okresowy z Atom Lab
-3. Domyślna para Na–Cl (sól kuchenna) jako natychmiast rozpoznawalny,
+2. VSEPR jako drugi eksperyment: kompletny, zamknięty zbiór (13 geometrii
+   AX₂…AX₆E₂) — dobry kandydat na pełne pokrycie w jednej sesji, bo liczba
+   przypadków jest skończona i znana z góry, nie otwarta jak np. reakcje.
+3. Kolejne kandydaty (nie budować teraz): krzywe miareczkowania pH, trendy
+   okresowe promienia/elektroujemności w Chemistry zamiast Atom Lab
+   (decyzja architektoniczna, dziś żyją w Atom Lab)
+4. Domyślna para Na–Cl (sól kuchenna) jako natychmiast rozpoznawalny,
    podręcznikowy przykład wiązania jonowego

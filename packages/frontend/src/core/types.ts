@@ -74,8 +74,19 @@ export interface ExperimentDef {
   honesty: HonestyLevel;
   honestyNote: string;
   params: ParamDef[];
-  createSim: () => Sim;
   narrate: NarrateFn;
+  /**
+   * Dokładnie jedno z createSim/createSim3D musi być obecne (egzekwowane
+   * przez komentarz, nie typy — jak createSim?/CustomView w LabDefinition).
+   * createSim: scena Canvas 2D (domyślna, zdecydowana większość eksperymentów).
+   */
+  createSim?: () => Sim;
+  /**
+   * Opcjonalna scena 3D (Three.js) — patrz core/three/types.ts::Sim3D i
+   * ARCHITECTURE.md „Sceny 3D". Fizyka (narrate, params) jest tym samym
+   * kontraktem co dla 2D; różni się tylko warstwa renderująca.
+   */
+  createSim3D?: () => import('./three/types').Sim3D;
 }
 
 export interface LabDefinition {

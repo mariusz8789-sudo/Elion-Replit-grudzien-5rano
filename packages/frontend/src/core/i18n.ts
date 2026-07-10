@@ -20,6 +20,7 @@ const pl: Dictionary = {
   'nav.discoveryLog': 'Dziennik odkryć',
   'nav.glossary': 'Słowniczek',
   'nav.settings': 'Ustawienia',
+  'nav.whatIf': 'Co by było, gdyby?',
   'skipLink': 'Przejdź do treści',
 };
 

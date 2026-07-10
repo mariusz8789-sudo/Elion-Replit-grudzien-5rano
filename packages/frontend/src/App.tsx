@@ -7,11 +7,13 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsScreen } from './components/SettingsScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
 import { GlossaryScreen } from './components/GlossaryScreen';
+import { WhatIfScreen } from './components/WhatIfScreen';
 import { SearchOverlay } from './components/SearchOverlay';
 import { HelpOverlay } from './components/HelpOverlay';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
 import { track } from './core/analytics';
 import { t } from './core/i18n';
+import { getVisitedCount } from './core/discoveryLog';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -25,7 +27,8 @@ type Route =
   | { kind: 'lab'; id: string }
   | { kind: 'settings' }
   | { kind: 'discovery-log' }
-  | { kind: 'glossary' };
+  | { kind: 'glossary' }
+  | { kind: 'what-if' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -34,6 +37,7 @@ function parseHash(): Route {
   if (h === '#/settings') return { kind: 'settings' };
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
+  if (h === '#/what-if') return { kind: 'what-if' };
   return { kind: 'home' };
 }
 
@@ -163,11 +167,30 @@ export default function App() {
     );
   }
 
+  if (route.kind === 'what-if') {
+    return (
+      <div className="app">
+        <TopBar title={`🌀 ${t('nav.whatIf')}`} onSearch={() => setSearchOpen(true)} />
+        <WhatIfScreen />
+        {overlays}
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <main className="home" id="main-content" tabIndex={-1}>
-        <ScaleJourney />
+        <div style={{ position: 'relative' }}>
+          <ScaleJourney />
+          <span className="hud-corner hud-tl" aria-hidden="true" />
+          <span className="hud-corner hud-tr" aria-hidden="true" />
+          <span className="hud-corner hud-bl" aria-hidden="true" />
+          <span className="hud-corner hud-br" aria-hidden="true" />
+        </div>
         <nav className="home-nav" aria-label="Nawigacja Genesis OS">
+          <button className="whatif-nav-btn" onClick={() => { window.location.hash = '#/what-if'; }}>
+            <span aria-hidden="true">🌀</span> {t('nav.whatIf')}
+          </button>
           <button onClick={() => setSearchOpen(true)}>
             <span aria-hidden="true">🔍</span> {t('nav.search')}
           </button>
@@ -181,6 +204,7 @@ export default function App() {
             <span aria-hidden="true">⚙</span> {t('nav.settings')}
           </button>
         </nav>
+        <MissionStatusBar />
         <div className="section-label">Laboratoria · {getLabs().length} modułów</div>
         <div className="labs-grid">
           {getLabs().map((l) => (
@@ -190,7 +214,7 @@ export default function App() {
               style={{ ['--accent' as string]: l.accent }}
               onClick={() => { window.location.hash = `#/lab/${l.id}`; }}
             >
-              <span className="icon" aria-hidden="true">{l.icon}</span>
+              <span className="badge" aria-hidden="true">{l.icon}</span>
               <span className="name">{l.name}</span>
               <span className="desc">{l.tagline}</span>
             </button>
@@ -202,6 +226,49 @@ export default function App() {
         </p>
       </main>
       {overlays}
+    </div>
+  );
+}
+
+/**
+ * Pasek statusu misji — estetyka centrum kontroli, ale WYŁĄCZNIE realne
+ * dane: liczba laboratoriów z rejestru, żywy status backendu AI
+ * (GET /api/health, ten sam endpoint co w discovery.tsx), postęp
+ * eksploracji z Dziennika Odkryć. Zero wymyślonych liczb.
+ */
+function MissionStatusBar() {
+  const [aiStatus, setAiStatus] = useState<'checking' | 'ready' | 'no-key' | 'offline'>('checking');
+  const { visited, totalLabs } = getVisitedCount();
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((d: { ai?: string }) => {
+        if (!cancelled) setAiStatus(d.ai === 'ready' ? 'ready' : 'no-key');
+      })
+      .catch(() => {
+        if (!cancelled) setAiStatus('offline');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const aiLabel =
+    aiStatus === 'checking' ? 'sprawdzanie…' : aiStatus === 'ready' ? 'online' : aiStatus === 'no-key' ? 'brak klucza' : 'offline';
+
+  return (
+    <div className="mission-bar" role="status" aria-label="Status systemu Genesis OS">
+      <span className={`mdot on`} aria-hidden="true" />
+      <span>NARRATOR: <strong>zawsze aktywny</strong></span>
+      <span className="msep">·</span>
+      <span className={`mdot ${aiStatus === 'ready' ? 'on' : aiStatus === 'checking' ? '' : 'warn'}`} aria-hidden="true" />
+      <span>AI: <strong>{aiLabel}</strong></span>
+      <span className="msep">·</span>
+      <span>LABORATORIA: <strong>{getLabs().length}</strong></span>
+      <span className="msep">·</span>
+      <span>ODWIEDZONE: <strong>{visited}/{totalLabs}</strong></span>
     </div>
   );
 }

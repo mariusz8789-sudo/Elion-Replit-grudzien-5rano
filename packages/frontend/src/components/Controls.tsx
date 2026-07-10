@@ -50,6 +50,9 @@ export function Controls({
         }
         const v = Number(params[d.key]);
         const shown = d.format ? d.format(v) : `${v.toLocaleString('pl-PL')}${d.unit ? ` ${d.unit}` : ''}`;
+        const min = d.min ?? 0;
+        const max = d.max ?? 100;
+        const pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
         return (
           <div className="control" key={d.key}>
             <label>
@@ -63,6 +66,7 @@ export function Controls({
               step={d.step ?? 1}
               value={v}
               aria-label={d.label}
+              style={{ ['--fill-pct' as string]: `${pct}%` }}
               onChange={(e) => onChange(d.key, Number(e.target.value))}
             />
           </div>

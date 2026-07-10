@@ -13,6 +13,7 @@ const EVENT_LABELS: Record<AnalyticsEvent, string> = {
   glossary_viewed: 'Wizyty w słowniczku',
   custom_experiment_run: 'Uruchomione własne eksperymenty',
   custom_experiment_saved: 'Zapisane własne eksperymenty',
+  what_if_opened: 'Otwarte scenariusze „Co by było, gdyby?"',
 };
 
 /**

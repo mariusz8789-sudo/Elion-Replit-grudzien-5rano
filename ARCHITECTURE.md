@@ -97,6 +97,61 @@ systemów, wykorzystuj istniejącą architekturę wszędzie, gdzie to możliwe".
 Presety parametrów zapisywane lokalnie (`core/customExperiment.ts`),
 wzorzec identyczny z `discoveryLog.ts`.
 
+### Sceny 3D (Three.js) — kiedy i jak
+
+Domyślny silnik renderujący zostaje Canvas 2D (patrz „Świadome decyzje
+architektoniczne" niżej — ta decyzja się NIE zmieniła dla większości
+laboratoriów). Tam, gdzie głębia 3D realnie pomaga zrozumieć fizykę — dziś:
+Universe Lab → „Układ Słoneczny 3D", kamera pokazuje pod kątem, że orbity
+leżą blisko jednej płaszczyzny, co samo tłumaczy powstanie z dysku
+protoplanetarnego — jest opcjonalny drugi tor renderowania, ŚWIADOMIE
+zaprojektowany jako lustro istniejącego kontraktu `Sim`, nie równoległy system:
+
+```ts
+// core/three/types.ts — ten sam cykl życia co Sim, inny adapter renderujący
+interface Sim3D {
+  init(three, scene, camera, w, h): void;
+  update(dt, params): void;       // CZYSTA fizyka — bez GPU, testowalna bez DOM
+  syncScene(scene, camera): void; // jedyne miejsce dotykające THREE.Object3D
+  getStats?(): Record<string, number>;
+  reset?(): void;
+  dispose?(): void;               // zwalnia geometrie/materiały/tekstury
+}
+```
+
+`ExperimentDef.createSim3D?: () => Sim3D` obok istniejącego (teraz
+opcjonalnego) `createSim?: () => Sim` — `LabShell.tsx` renderuje
+`ExperimentView3D` zamiast `ExperimentView`, gdy `createSim3D` jest obecne;
+`Controls`/`HonestyBadge`/`NarratorPanel`/`narrate()` są DOKŁADNIE te same
+komponenty co dla 2D (`BelowStage` w `LabShell.tsx`) — różni się wyłącznie
+silnik pod canvasem. Fizyka nie jest duplikowana: `universe-solar-system-3d.ts`
+woła te same `keplerPosition()`/`PLANETS` co wersja 2D.
+
+`core/three/useThreeLoop.ts` (lustro `useSimLoop.ts`: DPR, resize, rAF,
+pauza w tle, wskaźnik) ładuje `three` przez DYNAMICZNY `import('three')` —
+Vite tworzy osobny chunk (dziś ~688 kB, gzip ~177 kB), więc laboratoria bez
+scen 3D nie płacą ani bajta w głównym bundlu (zmierzone: `dist/assets/index-*.js`
+zostaje ~187 kB niezależnie od tego). Chunk trafia do cache Service Workera
+dopiero po pierwszym wejściu do takiej sceny (cache-first w `public/sw.js`)
+— pierwsza wizyta wymaga sieci, kolejne działają offline jak reszta PWA.
+Kamera: `OrbitControls` z `three/examples/jsm` (przeciągnij/scrolluj).
+
+### „Co by było, gdyby?" — scenario bridge
+
+`data/whatIfScenarios.ts` to katalog pytań, każde mapowane WYŁĄCZNIE na
+`Partial<SimParams>` istniejącego eksperymentu bazowego jednego
+laboratorium — zero nowej fizyki, zero nowego silnika symulacji.
+`core/scenarioBridge.ts` to jednorazowy, trzymany w pamięci (nie
+`localStorage`, to nawigacyjna podpowiedź, nie trwałe ustawienie) most:
+`WhatIfScreen.tsx` woła `setPendingScenario(labId, params)` i zmienia
+`window.location.hash`; `LabShell.tsx` konsumuje go raz przy montowaniu
+eksperymentu bazowego. Etykieta wiarygodności każdej karty (klasa `.honesty`)
+jest czytana NA ŻYWO z `HonestyLevel` docelowego laboratorium — nie jest
+wpisywana drugi raz ręcznie w danych scenariusza, więc nie może się z nią
+rozjechać. `whatIfScenarios.test.ts` sprawdza w czasie budowania, że każdy
+klucz parametru i każda wartość select/slider istnieje naprawdę w rejestrze
+laboratoriów (żaden scenariusz nie może cicho nadpisać nieistniejącego pola).
+
 ## Funkcje lokalne (bez backendu, bez konta)
 
 `src/core/storage.ts` to jedyny punkt dostępu do `localStorage` w całej
@@ -192,11 +247,82 @@ jakimkolwiek kodem, nie tylko architektury.
 i `Sim`, warstwa 0 Narratora, PWA offline, `core/dataSource.ts`. Backend z
 kontem to dodatkowa warstwa nad dzisiejszą aplikacją, nie jej zastąpienie.
 
+## Wizja platformy — kierunek, nie zaimplementowana lista (projekt)
+
+Ambicją Genesis OS jest stać się jedną z najbardziej zaawansowanych
+interaktywnych platform naukowych na świecie — to cel, do którego się
+dąży, nie stwierdzenie stanu obecnego. Poniższe punkty NIE są zbudowane;
+każdy dostaje tu miejsce podpięcia w istniejącej architekturze, żeby
+przyszła implementacja nie wymagała przepisywania rdzenia — zgodnie z
+zasadą „nie twórz atrap, projektuj architekturę pod przyszłość".
+
+- **Więcej scen 3D** — `Sim3D`/`useThreeLoop.ts` (patrz wyżej) jest już
+  ogólnym wzorcem, nie kodem jednorazowym dla Universe Lab. Naturalni
+  kolejni kandydaci: Einstein Lab (geodezyjne fotonów w 3D — dziś
+  `einstein-geodesics.ts` liczy dokładne równanie geodezyjnej Schwarzschilda
+  w 2D, widok z góry; 3D + soczewkowanie w stylu Interstellar to zmiana
+  WYŁĄCZNIE warstwy `render`/`syncScene`, fizyka już istnieje), Nuclear Lab
+  (Mapa nuklidów jako powierzchnia 3D energii wiązania zamiast płaskiej
+  mapy ciepła — `semfBindingPerNucleon` już to liczy), Quantum Lab
+  (orbitale atomowe jako bryły 3D zamiast przekroju 2D w Atom Lab).
+- **Chemistry Lab** — nie istnieje dziś. Wymagałby własnej bazy wiedzy
+  (`knowledge/chemistry.md`, świadomie wskazanej jako brakująca w
+  `knowledge/README.md`), realnych danych (np. długości/kąty wiązań z
+  PubChem czy CCCBDB — domena publiczna, do zweryfikowania przy realnym
+  dostępie do sieci) i modelu 3D cząsteczek (kulki-i-pałeczki przez
+  `Sim3D`, analogicznie do Układu Słonecznego 3D). To nowe laboratorium
+  fizyki/chemii, nie zmiana wizualna — świadomie POZA zakresem sesji
+  poświęconej redesignowi UI istniejących labów.
+- **AI Professor** — rozszerzenie WARSTWY 1 Narratora (patrz
+  `knowledge/ai-discovery.md`), nie nowy system: dziś `askAI()` odpowiada
+  na pytanie w kontekście stanu symulacji; „profesor" różniłby się tym, że
+  SAM inicjowałby uwagę przy wykryciu ciekawego stanu (np. duży skok w
+  `core/experimentAnalysis.ts` — mechanizm detekcji już istnieje w
+  „Stwórz eksperyment"). Wymaga decyzji o koszcie (częstsze wywołania LLM)
+  przed implementacją, nie tylko kodu.
+- **Challenge Mode** — deklaratywne cele nad ISTNIEJĄCYMI statystykami
+  symulacji (`Sim.getStats()`), analogicznie do `ACHIEVEMENTS` w
+  `core/discoveryLog.ts` (`check: (stats) => boolean`), tylko z
+  prowadzeniem użytkownika krok po kroku zamiast biernego odznaczania.
+  Zero nowej infrastruktury fizycznej — czysto warstwa UI + treści nad
+  tym, co już się liczy.
+- **Community (współdzielenie eksperymentów/laboratoriów)** — naturalne
+  rozszerzenie `core/customExperiment.ts` (dziś: zapis presetu parametrów
+  lokalnie) o publikację do backendu z kontem (patrz „Przyszły backend"
+  wyżej: `/api/session`, `/api/sync`). Publikowany obiekt to dokładnie
+  `{ labId, params }` — ten sam kształt co dziś w `localStorage`, tylko
+  ze zdalnym storage zamiast lokalnego. Ocenianie/ranking eksperymentów i
+  „publikowanie własnych światów/laboratoriów" (kod użytkownika) to
+  zupełnie inna, znacznie poważniejsza decyzja bezpieczeństwa (sandboxing
+  wykonania) — świadomie nierozwiązana tutaj, wymaga osobnej analizy
+  zagrożeń zanim padnie jakikolwiek kod.
+- **Founder Mode (panel administracyjny)** — osobna rola/trasa w tym
+  samym backendzie z kontem (`/api/admin/*`, chronione osobnym
+  middleware autoryzacji, nie hasłem w kodzie), dająca: edycję
+  `knowledge/*.md` bez redeployu, podgląd `core/analytics.ts` zagregowany
+  po wszystkich użytkownikach (dziś: wyłącznie per-przeglądarka), włącznik
+  eksperymentów w fazie beta (feature flag nad `registerLab()`/
+  `registerExperiment` — dziś rejestr jest statyczny, flaga wymagałaby
+  warunku przy rejestracji, nie przebudowy). Wymaga kont i bazy danych
+  jako fundamentu — kolejność zależności, nie wybór.
+
+Wspólny mianownik wszystkich punktów: żaden nie wymaga zastąpienia
+`LabDefinition`/`Sim`/`Sim3D`/`NarrationBlock`/`ConfirmationLevel` — to są
+kontrakty, na których cała reszta ma się opierać przez najbliższe lata, nie
+tylko najbliższą sesję.
+
 ## Świadome decyzje architektoniczne
 
-- **Canvas 2D, nie WebGL** — prostota i przenośność ważniejsze niż
-  wydajność renderowania przy tej skali symulacji (setki, nie miliony,
-  obiektów na ekranie).
+- **Canvas 2D jako domyślny silnik, WebGL (Three.js) tylko selektywnie**
+  (zmieniona decyzja — pierwotnie było „Canvas 2D, nie WebGL"). Dla
+  zdecydowanej większości laboratoriów prostota i przenośność Canvas 2D
+  wciąż wygrywają przy tej skali symulacji (setki, nie miliony, obiektów).
+  Ale tam, gdzie trzeci wymiar sam tłumaczy fizykę (np. spłaszczenie
+  Układu Słonecznego widoczne dopiero pod kątem kamery) — WebGL przez
+  opcjonalny `Sim3D` (patrz „Sceny 3D" wyżej), leniwie ładowany, żeby nie
+  psuć budżetu wydajności/rozmiaru dla labów, które go nie potrzebują.
+  Uzasadnienie zmiany: portowalność „granicy `render()`" pozostaje —
+  zamieniamy JEDEN adapter renderujący na DRUGI, nie przepisujemy fizyki.
 - **Brak route-based code splitting** — rejestr laboratoriów
   (`labs/index.ts`) jest synchroniczny; od tego zależy zweryfikowane
   działanie offline PWA i `sims.test.ts`. Zamiast tego: bezpieczny

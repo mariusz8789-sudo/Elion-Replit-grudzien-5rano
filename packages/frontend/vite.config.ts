@@ -4,6 +4,11 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   build: {
+    // three.js (dynamically imported only by 3D eksperymenty, patrz
+    // core/three/useThreeLoop.ts) tworzy własny, świadomie duży, LENIWY
+    // chunk — podnosimy próg ostrzeżenia zamiast go sztucznie dzielić;
+    // główny bundle (index+vendor) pozostaje ~187 kB niezależnie od tego.
+    chunkSizeWarningLimit: 750,
     rollupOptions: {
       output: {
         // React/react-dom change far less often than app code — a separate

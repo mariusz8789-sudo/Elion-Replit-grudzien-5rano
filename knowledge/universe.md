@@ -35,6 +35,10 @@ a·(1∓e) dokładna dla wszystkich 8 planet, trzecie prawo Keplera
 T²∝a³ zgodne z rzeczywistymi okresami NASA w granicach 1%. Świadome
 uproszczenie: kąty startowe dowolne (nie żywa efemeryda — to wymaga
 NASA JPL Horizons, patrz niżej), skala odległości skompresowana (√a).
+Od redesignu wizualnego: druga, 3D wersja tego samego eksperymentu
+(Three.js/WebGL, `core/three/`) — DOKŁADNIE ta sama fizyka, dodatkowe
+uproszczenie względem 2D: orbity współpłaszczyznowe (brak inklinacji w
+źródle danych, patrz honestyNote eksperymentu).
 
 ## Sprzeczne teorie / otwarte spory
 

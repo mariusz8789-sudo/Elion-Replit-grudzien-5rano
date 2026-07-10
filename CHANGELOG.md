@@ -6,6 +6,33 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Redesign wizualny + "Co by było, gdyby?" + Układ Słoneczny 3D)
+- Design system v2 (`styles.css`): tokeny ruchu (`--ease-out`/`--ease-spring`),
+  elewacja/blask kodujący stan (nie ozdoba), szklane panele, przeprojektowane
+  karty laboratoriów/suwaki (naprawiony błąd wypełnienia suwaka niezgodnego
+  z realną wartością)/przyciski/Narrator, siatka tła i róg-HUD na ekranie
+  głównym, pasek statusu misji z WYŁĄCZNIE realnymi danymi (liczba
+  laboratoriów, status backendu AI z `/api/health`, postęp z Dziennika Odkryć).
+- `core/three/` — `Sim3D` (świadome lustro kontraktu `Sim` dla WebGL) +
+  `useThreeLoop.ts` (lustro `useSimLoop.ts`); `three` ładowany dynamicznie,
+  osobny leniwy chunk, zero wpływu na główny bundle dla labów bez 3D.
+- Universe Lab: „Układ Słoneczny 3D" — ta sama fizyka Keplera co wersja 2D
+  (zero duplikacji), kamera do obracania/przybliżania (OrbitControls),
+  gwiazdy, poświata Słońca, orbity jako linie 3D.
+- „Co by było, gdyby?" — nowy ekran z katalogiem pytań fizycznych
+  (`data/whatIfScenarios.ts`), most `core/scenarioBridge.ts` nadpisuje
+  parametry ISTNIEJĄCEGO eksperymentu bazowego docelowego laboratorium (zero
+  nowej symulacji); etykieta wiarygodności karty czytana na żywo z
+  `HonestyLevel` laboratorium, nie duplikowana ręcznie.
+- `ExperimentDef.createSim` stało się opcjonalne (obok nowego `createSim3D`)
+  — `LabShell.tsx` renderuje odpowiedni widok (2D/3D) na podstawie tego,
+  które pole jest obecne; `sims.test.ts` pomija eksperymenty tylko-3D z tego
+  samego, udokumentowanego powodu co Atom Lab CustomView (brak WebGL w
+  środowisku testowym bez DOM).
+- 9 nowych testów (`scenarioBridge.test.ts`, `whatIfScenarios.test.ts`,
+  w tym sprawdzenie, że każdy scenariusz wskazuje realne pole parametru
+  realnego laboratorium) — 146 testów frontendowych razem.
+
 ### Dodano (Genesis Knowledge Engine + laboratoria, od RAPORT-AUDYT-2)
 - Genesis Knowledge Base (`knowledge/*.md`): sześciostopniowa skala
   potwierdzenia naukowego, nowe pliki (mechanika klasyczna, elektrodynamika,

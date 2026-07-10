@@ -40,14 +40,26 @@ Wszechświata (8,8×10²⁶ m).
   (rośnie/maleje/płasko, skoki, korelacje) bez LLM, zapytaj AI o wyniki z
   tym samym groundingiem w bazie wiedzy co reszta platformy. Bezpieczne
   przez konstrukcję — zero wykonywania kodu użytkownika
-- **165 testów** (137 vitest frontend + 28 node:test backend)
+- **"Co by było, gdyby?"** — katalog dramatycznych pytań fizycznych (np.
+  "gdyby zniknęła ciemna energia", "gdyby czarna dziura wirowała"), każde
+  to nadpisanie parametrów ISTNIEJĄCEGO eksperymentu, nie nowa symulacja;
+  etykieta wiarygodności karty pochodzi na żywo z tego samego systemu
+  uczciwości naukowej co reszta platformy
+- **Układ Słoneczny w 3D** (Three.js/WebGL, Universe Lab) — ta sama
+  dokładna fizyka Keplera co wersja 2D, tylko z kamerą do obracania i
+  przybliżania; ładowany leniwie (dynamiczny import), więc laboratoria bez
+  scen 3D nie płacą za tę zależność w głównym bundlu
+- **Zredesignowany design system** — spójna, "instrumentowa" estetyka
+  (szkło, świecące akcenty kodujące stan, nie ozdoba) w całej aplikacji,
+  każde laboratorium zachowuje własny kolor akcentu
+- **174 testy** (146 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 154 testy (fizyka + funkcje lokalne + backend)
+npm test           # 174 testy (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):
@@ -81,8 +93,10 @@ Więcej: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 **Granica przenośności** (Unity / Unreal / natywnie): logika fizyki
 (`update`, `getStats`, parametry) to czysty TypeScript bez zależności od
-DOM/Reacta. Web-specyficzny jest tylko cienki adapter renderujący (Canvas 2D)
-i UI — patrz komentarz w `src/core/registry.ts`.
+DOM/Reacta. Web-specyficzny jest tylko cienki adapter renderujący — Canvas 2D
+dla większości laboratoriów, opcjonalnie WebGL (Three.js) przez ten sam
+kontrakt (`Sim3D`) tam, gdzie 3D realnie pomaga zrozumieć fizykę (patrz
+`ARCHITECTURE.md` „Sceny 3D") — i UI. Komentarz w `src/core/registry.ts`.
 
 ## Zasada uczciwości naukowej
 

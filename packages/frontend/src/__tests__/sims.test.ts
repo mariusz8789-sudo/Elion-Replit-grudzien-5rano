@@ -9,15 +9,23 @@ import type { ExperimentDef, LabDefinition } from '../core/types';
  * Testy integracyjne symulacji: każdy eksperyment musi dać się utworzyć,
  * zainicjalizować i policzyć wiele kroków bez wyjątków, z sensownymi
  * statystykami. Render (Canvas 2D) testują smoke-testy przeglądarkowe.
+ *
+ * Eksperymenty 3D (createSim3D, np. universe/solar-system-3d) są celowo
+ * pominięte w tej pętli — WebGLRenderer wymaga prawdziwego <canvas> z
+ * kontekstem GPU, którego nie ma w środowisku node:test/vitest bez DOM
+ * (ten sam, udokumentowany powód co pominięcie Atom Lab CustomView).
+ * Ich fizyka (keplerPosition) jest już pokryta w physics.test.ts; render
+ * weryfikują smoke-testy Playwright.
  */
 
-function experimentsOf(lab: LabDefinition): { name: string; exp: Pick<ExperimentDef, 'params' | 'createSim' | 'narrate'> }[] {
-  const list: { name: string; exp: Pick<ExperimentDef, 'params' | 'createSim' | 'narrate'> }[] = [];
+function experimentsOf(lab: LabDefinition): { name: string; exp: Pick<ExperimentDef, 'params' | 'createSim' | 'narrate'> & { createSim: () => ReturnType<NonNullable<ExperimentDef['createSim']>> } }[] {
+  const list: { name: string; exp: Pick<ExperimentDef, 'params' | 'createSim' | 'narrate'> & { createSim: () => ReturnType<NonNullable<ExperimentDef['createSim']>> } }[] = [];
   if (lab.createSim) {
     list.push({ name: `${lab.id}/base`, exp: { params: lab.params, createSim: lab.createSim, narrate: lab.narrate } });
   }
   for (const e of lab.experiments ?? []) {
-    list.push({ name: `${lab.id}/${e.id}`, exp: e });
+    if (!e.createSim) continue; // eksperyment tylko-3D — patrz komentarz wyżej
+    list.push({ name: `${lab.id}/${e.id}`, exp: { ...e, createSim: e.createSim } });
   }
   return list;
 }
@@ -76,7 +84,7 @@ describe('FFT (silnik równania Schrödingera)', () => {
 
 describe('tunelowanie: fizyka jakościowa', () => {
   function transmissionAfter(energyFrac: number, seconds: number): number {
-    const sim = quantumTunneling.createSim();
+    const sim = quantumTunneling.createSim!();
     sim.init(390, 400);
     const params = { ...defaultParams(quantumTunneling.params), energy: energyFrac };
     for (let i = 0; i < seconds * 60; i++) sim.update(1 / 60, params);
@@ -84,7 +92,7 @@ describe('tunelowanie: fizyka jakościowa', () => {
   }
 
   it('prawdopodobieństwo jest zachowane (trans+refl ≤ 100%)', () => {
-    const sim = quantumTunneling.createSim();
+    const sim = quantumTunneling.createSim!();
     sim.init(390, 400);
     const params = defaultParams(quantumTunneling.params);
     for (let i = 0; i < 300; i++) sim.update(1 / 60, params);

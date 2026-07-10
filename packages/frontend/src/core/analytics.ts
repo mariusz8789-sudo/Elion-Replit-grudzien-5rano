@@ -22,7 +22,8 @@ export type AnalyticsEvent =
   | 'discovery_log_viewed'
   | 'glossary_viewed'
   | 'custom_experiment_run'
-  | 'custom_experiment_saved';
+  | 'custom_experiment_saved'
+  | 'what_if_opened';
 
 interface Counters {
   [event: string]: number;

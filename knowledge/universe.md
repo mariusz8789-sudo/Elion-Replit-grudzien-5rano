@@ -77,12 +77,19 @@ uproszczenie względem 2D: orbity współpłaszczyznowe (brak inklinacji w
 
 ## Sprzeczne teorie / otwarte spory
 
-**Napięcie Hubble'a** ★★★ (spór realny, nierozstrzygnięty)
-Pomiar lokalny (cefeidy+SN, zespół SH0ES): H₀ ≈ 73 km/s/Mpc. Pomiar z CMB
-(Planck, przy założeniu ΛCDM): 67,4. Rozbieżność ~5σ. Interpretacje:
-(a) nieznana systematyka pomiarowa; (b) nowa fizyka (wczesna ciemna energia,
-dodatkowe neutrina). W aplikacji: suwak H₀ 50–100 celowo obejmuje obie
-wartości — do dodania nota "dwa obozy pomiarowe".
+**Napięcie Hubble'a (zaimplementowane)** ★★★ (spór realny, nierozstrzygnięty)
+Pomiar lokalny (cefeidy+SN, zespół SH0ES, Riess i in. 2022): H₀ = 73,04 ±
+1,04 km/s/Mpc. Pomiar z CMB (Planck, przy założeniu ΛCDM, Planck
+Collaboration 2020): 67,4 ± 0,5. Rozbieżność ~4,9σ (dokładna formuła:
+różnica podzielona przez niepewności złożone w kwadraturze,
+`core/physics.ts::measurementTensionSigma`). Trzecia, niezależna metoda
+(TRGB, Freedman i in. 2021): 69,8 ± 1,7 — ląduje POMIĘDZY, pokazując że to
+nie prosty spór dwustronny. Interpretacje: (a) nieznana systematyka
+pomiarowa; (b) nowa fizyka (wczesna ciemna energia, dodatkowe neutrina).
+Dedykowany eksperyment `universe-hubbletension.ts` (Universe Lab): trzy
+gęstości prawdopodobieństwa (rozkłady normalne) obok siebie, suwak
+hipotetycznej dodatkowej systematyki pokazujący na żywo, ile "ukrytej"
+niepewności wystarczyłoby, by napięcie spadło poniżej progu istotności.
 
 **Ciemna materia: cząstki vs zmodyfikowana grawitacja** — asymetryczny spór
 - Zimna ciemna materia (CDM): ★★★★ — krzywe rotacji, soczewkowanie, gromada
@@ -140,8 +147,9 @@ stałych NASA zamiast modelu poglądowego. Naturalny kierunek rozwoju:
    dźwięk syntezowany z formuły kwadrupolowej (Web Audio API), nie z
    surowych danych GWOSC (te pozostają w backlogu jako opcjonalne
    wzbogacenie realnym przebiegiem zamiast modelu analitycznego)
-3. Napięcie Hubble'a i spór o DM to gotowe, uczciwe narracje "nauka żywa,
-   nie zamknięta" — wyróżnik wobec konkurencji, która udaje pewność
+3. ✅ Napięcie Hubble'a — zbudowane (`universe-hubbletension.ts`), gotowa
+   uczciwa narracja "nauka żywa, nie zamknięta"; spór o ciemną materię
+   (DM) wciąż w backlogu jako osobny eksperyment
 4. Żywa efemeryda JPL Horizons (gdy sieć dostępna) zamieniłaby dowolne
    kąty startowe na realne "gdzie jest Mars dzisiaj" — najwyższy priorytet
    następnego kroku danych w tym labie

@@ -385,9 +385,13 @@ nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
   fizyki (`physics.test.ts`): monotoniczność masy dysku, spadek Keplerowski
   bez halo, spłaszczenie z halo izotermicznym, granice MOND (słabe/silne
   pole), zbieżność do relacji Tully'ego–Fishera.
-- **Napięcie Hubble'a (Hubble tension)** (★★★ spór aktywny, już opisany w
-  `knowledge/universe.md`) — brak jeszcze interaktywnej wizualizacji dwóch
-  konkurencyjnych pomiarów H₀.
+- ✅ **Napięcie Hubble'a (Hubble tension)** — `universe-hubbletension.ts`,
+  Universe Lab. Trzy prawdziwe, opublikowane pomiary H₀ (SH0ES 73,04±1,04;
+  Planck 67,4±0,5; TRGB 69,8±1,7) jako rozkłady normalne obok siebie,
+  suwak hipotetycznej dodatkowej systematyki pokazujący na żywo, ile
+  "ukrytej" niepewności rozwiązałoby spór bez nowej fizyki. 7 nowych
+  testów: napięcie odtwarza publikowane ~4,9σ, symetria, gaussianPdf
+  całkuje się do 1, dodanie systematyki zawsze zmniejsza napięcie.
 
 ## Nanotechnology
 

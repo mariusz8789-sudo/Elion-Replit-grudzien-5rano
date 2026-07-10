@@ -403,3 +403,19 @@ export function titrationPH(
 export function equivalenceVolumeMl(acidConcM: number, acidVolMl: number, baseConcM: number): number {
   return (acidConcM * acidVolMl) / baseConcM;
 }
+
+/** Gęstość prawdopodobieństwa rozkładu normalnego N(mean, sigma²) — standardowy wzór statystyczny. */
+export function gaussianPdf(x: number, mean: number, sigma: number): number {
+  return (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * ((x - mean) / sigma) ** 2);
+}
+
+/**
+ * "Napięcie" między dwoma niezależnymi pomiarami tej samej wielkości, w
+ * jednostkach łącznego odchylenia standardowego (niepewności kombinowane w
+ * kwadraturze — standardowa metoda w fizyce doświadczalnej). Używane m.in.
+ * do oceny "napięcia Hubble'a" (SH0ES vs Planck CMB) — realny, aktywny spór
+ * kosmologiczny, patrz `knowledge/universe.md`.
+ */
+export function measurementTensionSigma(mean1: number, sigma1: number, mean2: number, sigma2: number): number {
+  return Math.abs(mean1 - mean2) / Math.sqrt(sigma1 * sigma1 + sigma2 * sigma2);
+}

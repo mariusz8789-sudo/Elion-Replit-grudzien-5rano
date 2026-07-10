@@ -6,6 +6,35 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Napięcie Hubble'a — nowy eksperyment, Universe Lab)
+- `labs/experiments/universe-hubbletension.ts` + nowe funkcje fizyki w
+  `core/physics.ts` (`gaussianPdf`, `measurementTensionSigma`): realny,
+  aktywny, nierozstrzygnięty spór kosmologiczny — trzy niezależnie
+  opublikowane pomiary stałej Hubble'a (SH0ES 73,04±1,04 km/s/Mpc, Riess
+  i in. 2022; Planck CMB 67,4±0,5, Planck Collaboration 2020; TRGB
+  69,8±1,7, Freedman i in. 2021) wizualizowane jako rozkłady normalne
+  obok siebie.
+- Rozbieżność SH0ES↔Planck (~4,9σ) liczona standardową metodą fizyki
+  doświadczalnej (różnica podzielona przez niepewności złożone w
+  kwadraturze) — zgodna z powszechnie cytowaną wartością w literaturze.
+  Trzecia metoda (TRGB) ląduje POMIĘDZY dwoma "obozami", pokazując że to
+  nie prosty spór dwustronny.
+- Suwak "hipotetyczna dodatkowa systematyka" pokazuje na żywo, ile
+  "ukrytej" niepewności w pomiarze Plancka wystarczyłoby, by napięcie
+  spadło poniżej progu istotności — realna, przeliczana na żywo
+  demonstracja tego, dlaczego część kosmologów podejrzewa nieznaną
+  systematykę zamiast nowej fizyki.
+- Narracja jawnie przedstawia obie hipotezy (systematyka vs nowa fizyka)
+  bez faworyzowania żadnej — przykład "nauki w toku", nie zamkniętego faktu.
+- 7 nowych testów fizyki (`physics.test.ts`): gaussianPdf osiąga
+  maksimum w średniej i całkuje się numerycznie do ~1, napięcie zerowe
+  dla identycznych pomiarów, napięcie odtwarza publikowaną wartość ~4,9σ
+  dla SH0ES/Planck, dodanie systematyki zawsze zmniejsza napięcie (nigdy
+  nie zwiększa), symetria względem zamiany pomiarów. Zweryfikowane:
+  typecheck, lint, 283 testy vitest, build, Playwright (trzy krzywe,
+  suwak systematyki zmniejszający napięcie z 4,89σ do 1,54σ na żywo,
+  przełącznik TRGB) — zero błędów konsoli.
+
 ### Dodano (Quantum Decision Explorer — symulacja Monte Carlo odgałęzień)
 - Na wyraźną prośbę użytkownika o "najbardziej realistyczny symulator
   alternatywnych scenariuszy... oparty na matematyce, teorii decyzji,

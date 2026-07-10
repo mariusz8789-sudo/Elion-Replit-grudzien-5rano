@@ -10,6 +10,7 @@ import {
   equivalenceVolumeMl,
   exponentialDiskMass,
   G_ASTRO,
+  gaussianPdf,
   iscoFrequency,
   isothermalHaloMass,
   kardashevPower,
@@ -18,6 +19,7 @@ import {
   lensImagePositions,
   lorentzGamma,
   lorentzTime,
+  measurementTensionSigma,
   mondAcceleration,
   MOND_A0_ASTRO,
   sampleLocalHiddenPair,
@@ -624,5 +626,47 @@ describe('miareczkowanie kwasowo-zasadowe (bilans ładunku)', () => {
     const approx = 0.5 * (pKa - Math.log10(0.1));
     const exact = titrationPH(0.1, 25, 0.1, 1e-6, KA_ACETIC);
     expect(Math.abs(exact - approx)).toBeLessThan(0.05);
+  });
+});
+
+describe('napięcie Hubble\'a (porównanie niezależnych pomiarów)', () => {
+  it('gaussianPdf osiąga maksimum dokładnie w x=mean', () => {
+    const mean = 70;
+    const sigma = 2;
+    const atMean = gaussianPdf(mean, mean, sigma);
+    const nearby = gaussianPdf(mean + 0.5, mean, sigma);
+    expect(atMean).toBeGreaterThan(nearby);
+    expect(gaussianPdf(mean - 0.5, mean, sigma)).toBeCloseTo(nearby, 9); // symetria
+  });
+
+  it('gaussianPdf całkuje się (numerycznie) do ~1 na szerokim zakresie', () => {
+    const mean = 0;
+    const sigma = 1;
+    let sum = 0;
+    const dx = 0.01;
+    for (let x = -8; x <= 8; x += dx) sum += gaussianPdf(x, mean, sigma) * dx;
+    expect(sum).toBeCloseTo(1, 2);
+  });
+
+  it('measurementTensionSigma jest zerowe dla identycznych pomiarów', () => {
+    expect(measurementTensionSigma(70, 1, 70, 1)).toBe(0);
+  });
+
+  it('measurementTensionSigma odtwarza publikowaną wartość ~5σ dla SH0ES vs Planck (Riess 2022 / Planck 2020)', () => {
+    const tension = measurementTensionSigma(73.04, 1.04, 67.4, 0.5);
+    expect(tension).toBeGreaterThan(4);
+    expect(tension).toBeLessThan(5.5);
+  });
+
+  it('dodanie systematyki do jednej niepewności ZMNIEJSZA napięcie (nigdy nie zwiększa)', () => {
+    const base = measurementTensionSigma(73.04, 1.04, 67.4, 0.5);
+    const withExtra = measurementTensionSigma(73.04, 1.04, 67.4, 0.5 + 2);
+    expect(withExtra).toBeLessThan(base);
+  });
+
+  it('measurementTensionSigma jest symetryczne względem zamiany pomiarów', () => {
+    const a = measurementTensionSigma(73, 1, 67, 0.5);
+    const b = measurementTensionSigma(67, 0.5, 73, 1);
+    expect(a).toBeCloseTo(b, 9);
   });
 });

@@ -6,6 +6,7 @@ import { universeSolarSystem3D } from './experiments/universe-solar-system-3d';
 import { universeThreeBody } from './experiments/universe-threebody';
 import { universeRotationCurve } from './experiments/universe-rotationcurve';
 import { universeDoublePendulum } from './experiments/universe-doublependulum';
+import { universeHubbleTension } from './experiments/universe-hubbletension';
 
 /**
  * Universe Lab — ekspansja Wszechświata.
@@ -126,7 +127,7 @@ export const universeLab: LabDefinition = {
     { key: 'speed', label: 'Tempo czasu', type: 'slider', min: 0.2, max: 5, step: 0.1, default: 1, unit: 'mld lat/s' },
   ],
   createSim: () => new UniverseSim(),
-  experiments: [universeSolarSystem, universeSolarSystem3D, universeCollision, universeStarLife, universeThreeBody, universeRotationCurve, universeDoublePendulum],
+  experiments: [universeSolarSystem, universeSolarSystem3D, universeCollision, universeStarLife, universeThreeBody, universeRotationCurve, universeDoublePendulum, universeHubbleTension],
   narrate(p, stats) {
     const h0 = Number(p.h0);
     const oL = Number(p.omegaLambda);

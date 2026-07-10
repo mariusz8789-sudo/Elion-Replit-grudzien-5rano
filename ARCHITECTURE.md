@@ -222,7 +222,7 @@ w `lib.mjs` — testowana przez `node --test` bez uruchamiania portu
 
 ## Testy
 
-163 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 191.
+170 testów frontendowych (vitest) + 28 backendowych (`node --test`) = 198.
 
 - **Fizyka i symulacje** (`__tests__/physics.test.ts`, `sims.test.ts`):
   twarde asercje naukowe (złamanie nierówności Bella |S|>2, twierdzenie
@@ -313,14 +313,18 @@ zasadą „nie twórz atrap, projektuj architekturę pod przyszłość".
   (Mapa nuklidów jako powierzchnia 3D energii wiązania zamiast płaskiej
   mapy ciepła — `semfBindingPerNucleon` już to liczy), Quantum Lab
   (orbitale atomowe jako bryły 3D zamiast przekroju 2D w Atom Lab).
-- **Chemistry Lab** — nie istnieje dziś. Wymagałby własnej bazy wiedzy
-  (`knowledge/chemistry.md`, świadomie wskazanej jako brakująca w
-  `knowledge/README.md`), realnych danych (np. długości/kąty wiązań z
-  PubChem czy CCCBDB — domena publiczna, do zweryfikowania przy realnym
-  dostępie do sieci) i modelu 3D cząsteczek (kulki-i-pałeczki przez
-  `Sim3D`, analogicznie do Układu Słonecznego 3D). To nowe laboratorium
-  fizyki/chemii, nie zmiana wizualna — świadomie POZA zakresem sesji
-  poświęconej redesignowi UI istniejących labów.
+- **Chemistry Lab** — ✅ zbudowane (pierwszy eksperyment: Wiązania chemiczne,
+  `labs/chemistry.ts` + `core/physics.ts::bondPolarity` +
+  `data/electronegativity.ts` + `knowledge/chemistry.md`). Elektroujemność
+  Paulinga (dane tabelaryczne CRC Handbook) steruje CIĄGŁĄ wizualizacją
+  chmury elektronowej od kowalencyjnej po jonową, nie przełącznikiem trzech
+  stanów — ta sama „emergent, not decorative" zasada co reszta platformy.
+  Backlog na przyszłość (NIE zbudowane): geometria molekularna VSEPR jako
+  model 3D cząsteczek (kulki-i-pałeczki przez `Sim3D`, analogicznie do
+  Układu Słonecznego 3D), krzywe miareczkowania pH, trendy okresowe
+  (promień atomowy, energia jonizacji) wykorzystujące istniejący układ
+  okresowy z Atom Lab, realne dane geometrii cząsteczek (PubChem/CCCBDB —
+  domena publiczna, do zweryfikowania przy realnym dostępie do sieci).
 - **AI Professor** — rozszerzenie WARSTWY 1 Narratora (patrz
   `knowledge/ai-discovery.md`), nie nowy system: dziś `askAI()` odpowiada
   na pytanie w kontekście stanu symulacji; „profesor" różniłby się tym, że

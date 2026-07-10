@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bondPolarity,
   chshS,
   decayRemaining,
   kardashevPower,
@@ -394,5 +395,55 @@ describe('geometria 4D — obrót i rzut tesseraktu (Multiverse Lab)', () => {
       degree[b]++;
     }
     for (const d of degree) expect(d).toBe(4);
+  });
+});
+
+describe('polarność wiązania chemicznego (Chemistry Lab)', () => {
+  it('identyczna elektroujemność → Δχ=0, kowalencyjne niespolaryzowane, chmura wyśrodkowana', () => {
+    const b = bondPolarity(2.55, 2.55);
+    expect(b.deltaChi).toBe(0);
+    expect(b.type).toBe('covalent-nonpolar');
+    expect(b.skewFraction).toBe(0);
+  });
+
+  it('C–H (Δχ≈0,35) klasyfikowane jako kowalencyjne niespolaryzowane — klasyczny przykład z podręczników', () => {
+    const b = bondPolarity(2.55, 2.2);
+    expect(b.deltaChi).toBeCloseTo(0.35, 5);
+    expect(b.type).toBe('covalent-nonpolar');
+  });
+
+  it('H–Cl (Δχ≈0,96) klasyfikowane jako kowalencyjne spolaryzowane', () => {
+    const b = bondPolarity(2.2, 3.16);
+    expect(b.deltaChi).toBeCloseTo(0.96, 5);
+    expect(b.type).toBe('covalent-polar');
+  });
+
+  it('Na–Cl (Δχ≈2,23) klasyfikowane jako jonowe — podręcznikowy przykład soli kuchennej', () => {
+    const b = bondPolarity(0.93, 3.16);
+    expect(b.deltaChi).toBeCloseTo(2.23, 5);
+    expect(b.type).toBe('ionic');
+    // Wzór Hanney–Smitha daje dla NaCl ~71% charakteru jonowego — zgodne z
+    // literaturą (cząsteczka w fazie gazowej ma istotny udział kowalencyjny;
+    // to sieć krystaliczna ciała stałego jest w pełni jonowa).
+    expect(b.skewFraction).toBeGreaterThan(0.65);
+    expect(b.skewFraction).toBeLessThan(0.8);
+  });
+
+  it('skewFraction rośnie monotonicznie z Δχ i mieści się w [0,1)', () => {
+    let prev = -1;
+    for (const dchi of [0, 0.2, 0.5, 1, 1.7, 2.5, 3.5]) {
+      const b = bondPolarity(1, 1 + dchi);
+      expect(b.skewFraction).toBeGreaterThan(prev);
+      expect(b.skewFraction).toBeLessThan(1);
+      prev = b.skewFraction;
+    }
+  });
+
+  it('funkcja jest symetryczna względem zamiany A i B (wiązanie nie ma kierunku)', () => {
+    const b1 = bondPolarity(0.93, 3.16);
+    const b2 = bondPolarity(3.16, 0.93);
+    expect(b1.deltaChi).toBe(b2.deltaChi);
+    expect(b1.type).toBe(b2.type);
+    expect(b1.skewFraction).toBe(b2.skewFraction);
   });
 });

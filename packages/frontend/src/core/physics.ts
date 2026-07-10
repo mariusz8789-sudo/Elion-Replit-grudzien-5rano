@@ -239,3 +239,28 @@ export const TESSERACT_EDGES: [number, number][] = (() => {
   }
   return edges;
 })();
+
+/**
+ * Polarność wiązania chemicznego z różnicy elektroujemności Paulinga
+ * Δχ = |χA − χB|. Progi klasyfikacji (Δχ<0,4 kowalencyjne niespolaryzowane,
+ * 0,4≤Δχ<1,7 kowalencyjne spolaryzowane, Δχ≥1,7 jonowe) to standardowa
+ * konwencja dydaktyki chemii — orientacyjna, nie ostra granica fizyczna
+ * (dlatego skewFraction jest funkcją CIĄGŁĄ Δχ, nie skokiem). Przybliżony
+ * "procent charakteru jonowego" liczony wzorem Hanney–Smitha (1946):
+ * f ≈ 1 − exp(−Δχ²/4) — klasyczne, wciąż cytowane oszacowanie.
+ */
+export type BondType = 'covalent-nonpolar' | 'covalent-polar' | 'ionic';
+
+export interface BondPolarity {
+  deltaChi: number;
+  type: BondType;
+  /** 0 = chmura elektronowa wyśrodkowana między atomami, 1 = elektron w pełni przeniesiony do bardziej elektroujemnego atomu. */
+  skewFraction: number;
+}
+
+export function bondPolarity(chiA: number, chiB: number): BondPolarity {
+  const deltaChi = Math.abs(chiA - chiB);
+  const type: BondType = deltaChi < 0.4 ? 'covalent-nonpolar' : deltaChi < 1.7 ? 'covalent-polar' : 'ionic';
+  const skewFraction = 1 - Math.exp(-(deltaChi * deltaChi) / 4);
+  return { deltaChi, type, skewFraction };
+}

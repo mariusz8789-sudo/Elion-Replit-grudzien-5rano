@@ -23,6 +23,7 @@ export const LAB_KNOWLEDGE_FILES = {
   atom: 'atom.md',
   nuclear: 'nuclear.md',
   particle: 'particle.md',
+  chemistry: 'chemistry.md',
   multiverse: 'multiverse.md',
   civilization: 'civilization.md',
   discovery: 'ai-discovery.md',

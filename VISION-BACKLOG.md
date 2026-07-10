@@ -258,6 +258,23 @@ tysiące cząstek czy współdzielenie.
   przewodzi (struktura pasmowa uproszczona) — bardziej treść Narratora niż
   nowa symulacja.
 
+## Chemistry (nowe laboratorium — pierwszy eksperyment zbudowany)
+
+- ✅ **Wiązania chemiczne** — Chemistry Lab → `labs/chemistry.ts` +
+  `core/physics.ts::bondPolarity`. Elektroujemność Paulinga (dane
+  tabelaryczne, CRC Handbook) steruje CIĄGŁĄ wizualizacją chmury
+  elektronowej od kowalencyjnej po jonową (wzór Hanney–Smitha) — nie
+  przełącznikiem trzech stanów. Domyślna para Na–Cl.
+- **Geometria molekularna VSEPR w 3D** (★★★★★ teoria dobrze potwierdzona)
+  — model kulki-i-pałeczki przez `Sim3D`, ładny most do orbitali z Atom
+  Lab; wymaga danych o kątach/długościach wiązań (PubChem/CCCBDB).
+- **Krzywe miareczkowania kwas–zasada (pH)** (★★★★★ chemia analityczna) —
+  ilościowo bogaty temat, dobry materiał na Narratora.
+- **Trendy okresowe** (promień atomowy, energia jonizacji) (★★★★★
+  zmierzone) — wykorzystuje istniejący układ okresowy z Atom Lab, mógłby
+  żyć w Chemistry LUB Atom Lab (decyzja architektoniczna do podjęcia
+  później, nie teraz).
+
 ## Biology & Molecular Science
 
 - **DNA — podwójna helisa 3D** (★★★★★, struktura Watson-Crick 1953) —

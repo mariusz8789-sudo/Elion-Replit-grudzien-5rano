@@ -46,6 +46,7 @@ Mapowanie na etykiety w aplikacji: ★★★★–★★★★★ → `exact`/`s
 | [atom.md](atom.md) | Atom Lab — struktura atomowa, widma |
 | [nuclear.md](nuclear.md) | Nuclear Lab — jądra, rozpady, energia |
 | [particle.md](particle.md) | Particle Lab — Model Standardowy, dane LHC |
+| [chemistry.md](chemistry.md) | Chemistry Lab — elektroujemność, wiązania chemiczne |
 | [multiverse.md](multiverse.md) | Multiverse Lab — fine-tuning, hipotezy |
 | [civilization.md](civilization.md) | Civilization Lab — Kardaszew, SETI |
 | [ai-discovery.md](ai-discovery.md) | Warstwa AI — korpus, grounding, architektura |

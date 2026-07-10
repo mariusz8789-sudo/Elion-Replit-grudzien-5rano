@@ -1,0 +1,68 @@
+# Chemistry Lab — katalog wiedzy
+
+## Zakres
+Elektroujemność, polarność wiązań chemicznych. Pierwszy eksperyment tego
+laboratorium (Wiązania chemiczne); reakcje, kinetyka, geometria molekularna
+i trendy okresowe poza elektroujemnością — poza obecnym zakresem, patrz
+VISION-BACKLOG.md.
+
+## Modele i wzory
+
+**Elektroujemność Paulinga (χ)** ★★★★★
+Tabelaryczna wielkość (CRC Handbook of Chemistry and Physics), zdefiniowana
+przez Linusa Paulinga w 1932 r. z energii wiązań: wiązanie A–B silniejsze
+niż średnia geometryczna energii A–A i B–B zdradza nierówny podział pary
+elektronowej. Skala 0,7 (Fr) – 3,98 (F); gazy szlachetne i większość
+pierwiastków superciężkich bez ustalonej wartości.
+
+**Klasyfikacja polarności wiązania** ★★★ (konwencja dydaktyczna)
+Δχ = |χA − χB|: <0,4 kowalencyjne niespolaryzowane, 0,4–1,7 kowalencyjne
+spolaryzowane, ≥1,7 jonowe. To orientacyjna, powszechnie uczona konwencja —
+NIE ostra granica fizyczna. Rzeczywiste wiązania tworzą continuum.
+
+**Wzór Hanney–Smitha (1946)** ★★★ (klasyczne przybliżenie)
+Procent charakteru jonowego: f ≈ 1 − exp(−Δχ²/4). Wciąż cytowane w
+podręcznikach jako orientacyjne oszacowanie; nie jest zmierzoną wielkością
+fizyczną i nie zgadza się dokładnie z bardziej wyrafinowanymi metodami
+(np. analiza NBO/AIM daje inne liczby dla tego samego wiązania).
+
+## Sprzeczne teorie / otwarte spory
+- Skale elektroujemności różnią się metodą (Pauling z energii wiązań,
+  Mulliken ze średniej energii jonizacji i powinowactwa elektronowego,
+  Allred–Rochow z ładunku efektywnego) — dają zbliżone, ale nie identyczne
+  liczby. Genesis OS używa wyłącznie skali Paulinga (najbardziej
+  rozpowszechnionej w dydaktyce) i jasno to nazywa.
+- "Procent charakteru jonowego" nie ma jednej uzgodnionej definicji
+  kwantowo-chemicznej — różne metody (Hanney–Smith, analiza populacji
+  Mullikena, NBO) dają różne liczby dla tego samego wiązania. Traktować
+  jako poglądowe, nie jako zmierzoną obserwablę.
+
+## Publikacje i książki
+- Pauling, L. *The Nature of the Chemical Bond* (1932/1960) — definicja
+  oryginalnej skali
+- Hannay, N. B.; Smith, C. P. *J. Am. Chem. Soc.* 68, 171 (1946) —
+  wzór na charakter jonowy
+- CRC Handbook of Chemistry and Physics — tablice χ (źródło danych w tym labie)
+
+## Dane — strategiczne dla tego laba
+Elektroujemności Paulinga dla ~70 pierwiastków głównych grup i pierwszych
+dwóch serii przejściowych (`data/electronegativity.ts`) — realne, tabelaryczne
+liczby, nie synteza. Gazy szlachetne i superciężkie pierwiastki świadomie
+pominięte zamiast zmyślone.
+
+## Ograniczenia implementacyjne
+- Rozmiary atomów na wizualizacji są symboliczne (log Z), nie do skali
+  promienia atomowego/kowalencyjnego (brak jeszcze danych o promieniach)
+- Brak geometrii molekularnej (VSEPR), reakcji, kinetyki, stechiometrii —
+  to osobne, większe moduły do rozważenia po tym pierwszym eksperymencie
+
+## Wnioski projektowe dla Genesis OS
+1. Wiązania chemiczne jako pierwszy eksperyment: continuum kowalencyjne
+   → jonowe sterowane jedną realną liczbą (Δχ) najlepiej oddaje "emergent,
+   not decorative" — chmura elektronowa dosłownie przesuwa się według wzoru
+2. Kolejne kandydaty (nie budować teraz): geometria molekularna VSEPR
+   (ładny most do orbitali z Atom Lab), krzywe miareczkowania pH, trendy
+   okresowe (promień atomowy, energia jonizacji) wykorzystujące już
+   istniejący układ okresowy z Atom Lab
+3. Domyślna para Na–Cl (sól kuchenna) jako natychmiast rozpoznawalny,
+   podręcznikowy przykład wiązania jonowego

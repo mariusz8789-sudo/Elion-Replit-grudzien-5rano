@@ -6,6 +6,38 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Chemistry Lab — nowe laboratorium, pierwszy eksperyment: Wiązania chemiczne)
+- Po dopracowaniu wszystkich 9 istniejących laboratoriów (patrz wpisy
+  niżej) i zgodnie z pierwotną listą priorytetów użytkownika (pozycja 6:
+  Chemistry Lab), zbudowano nowe laboratorium z jednym w pełni
+  wykończonym, dobrze przetestowanym eksperymentem — zamiast wielu
+  płytkich, zgodnie z zasadą sesji "jedna naprawdę skończona funkcja >
+  wiele powierzchownych".
+- **Wiązania chemiczne**: różnica elektroujemności Paulinga Δχ = |χA−χB|
+  (dane tabelaryczne CRC Handbook, `data/electronegativity.ts`, ~70
+  pierwiastków głównych grup i pierwszych dwóch serii przejściowych)
+  steruje CIĄGŁĄ wizualizacją chmury elektronowej — środek i promień
+  chmury przesuwają się i kurczą płynnie od kowalencyjnej (wyśrodkowana,
+  szeroka) po jonową (ciasna, na jednym atomie, z etykietami ładunku), nie
+  przełącznikiem trzech dyskretnych stanów. To ta sama "emergent, not
+  decorative" zasada, którą stosowano przy każdym polerowaniu tej sesji.
+- Nowa czysta funkcja `core/physics.ts::bondPolarity` (Δχ, klasyfikacja
+  typu wiązania, wzór Hanney–Smitha na przybliżony % charakteru jonowego)
+  + 7 nowych testów (symetria, monotoniczność, podręcznikowe przykłady
+  C–H/H–Cl/Na–Cl) — 170 testów frontendowych razem (198 z backendem).
+- Nowy plik wiedzy `knowledge/chemistry.md` (zarejestrowany w
+  `LAB_KNOWLEDGE_FILES` backendu) grunduje Narratora AI dla tego
+  laboratorium, tak jak dla pozostałych 10.
+- Domyślna para Na–Cl (sól kuchenna) — natychmiast rozpoznawalny,
+  podręcznikowy przykład wiązania jonowego.
+- Zaktualizowano `registry.test.ts`/`discoveryLog.test.ts` (11 laboratoriów
+  zamiast 10), README/ARCHITECTURE/VISION-BACKLOG.
+- Pełna weryfikacja: typecheck, lint, 198 testów, build produkcyjny,
+  Playwright (3 stany wiązania: kowalencyjne niespolaryzowane C–H,
+  spolaryzowane H–Cl, jonowe Na–Cl) bez błędów konsoli.
+- Biology Lab z pierwotnej listy priorytetów nadal nie istnieje —
+  pozostaje w VISION-BACKLOG.md do decyzji.
+
 ### Poprawiono (Space-Time Lab i Nuclear Lab dopracowane — dwa laboratoria pominięte w pierwotnej liście priorytetów)
 - Odkryto, że pierwotna lista priorytetów użytkownika (Quantum → Einstein
   → Universe → Atom → Particle → Chemistry → Biology → Civilization →

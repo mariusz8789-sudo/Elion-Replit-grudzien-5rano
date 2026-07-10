@@ -47,6 +47,18 @@ integracji jest ADAPTACYJNY (maleje przy bliskich przejściach ciał, kryterium
 zbliżone do Aarsetha) — bez tego stałokrokowy integrator traci energię przy
 zbliżeniu w problemie pitagorejskim, mimo że sam schemat jest symplektyczny.
 
+**Podwójne wahadło (zaimplementowane)** ★★★★★
+Drugi eksperyment "chaos deterministyczny" w Universe Lab, obok problemu
+trzech ciał — celowo najprostszy fizycznie możliwy układ z chaosem (2
+stopnie swobody). Dokładne równania Lagrange'a dla dwóch sztywnych prętów
+bez tarcia (standardowy wynik podręcznikowy), integrowane RK4 — CELOWO NIE
+symplektycznie, w kontraście z problemem trzech ciał: energia powoli
+dryfuje w czasie, co jest jawnie pokazane w odczycie liczbowym, nie ukryte.
+Przy małym kącie startowym (<~35°) ruch jest niemal okresowy; powyżej tego
+progu (empirycznie) staje się chaotyczny — suwak kąta pozwala przejść
+między obydwoma reżimami na żywo. Ten sam tryb "dwa niemal identyczne
+starty" (10⁻⁶ rad) co w problemie trzech ciał.
+
 **Prawdziwy Układ Słoneczny (zaimplementowane)** ★★★★★
 Elementy orbitalne 8 planet (półoś wielka, mimośród, okres) z NASA
 Planetary Fact Sheet — publiczne, stabilne stałe. Pozycja liczona

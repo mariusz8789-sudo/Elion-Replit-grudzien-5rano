@@ -418,10 +418,14 @@ Backlog na przyszłość (NIE zbudowane): spersonalizowany film/zwiastun 4K
 - **Stabilność układów planetarnych** (★★★★★) — rozszerzenie Układu
   Słonecznego (2D i 3D): usuń/dodaj planetę, obserwuj rezonanse orbitalne
   i niestabilności w długim czasie — reużywa `keplerPosition`.
-- **Chaos deterministyczny (atraktor Lorenza, podwójne wahadło)**
-  (★★★★★, matematyka dokładna) — klasyczne, wizualnie efektowne, tanie
-  obliczeniowo (kilka równań różniczkowych, RK4 już używane w
-  `einstein-geodesics.ts`).
+- ✅ **Chaos deterministyczny: podwójne wahadło** — `universe-doublependulum.ts`,
+  Universe Lab. Dokładne równania Lagrange'a, integracja RK4 (celowo NIE
+  symplektyczna — kontrast uczciwie nazwany wobec problemu trzech ciał).
+  Suwak kąta startowego pokazuje przejście z ruchu regularnego (<~35°) do
+  chaotycznego; tryb dywergencji (10⁻⁶ rad) jak w problemie trzech ciał.
+  6 nowych testów: energia w spoczynku, zachowanie energii przy małym
+  kącie, determinizm RK4, szybszy rozjazd przy dużym kącie niż małym.
+  Backlog na przyszłość (NIE zbudowane): atraktor Lorenza.
 - **Przejścia fazowe i łamanie symetrii** (★★★★★ zjawisko, model Isinga
   ★★★★ dydaktyczny) — siatka spinów zmieniająca stan przy krytycznej
   temperaturze; ten sam silnik cząsteczkowy co reakcja łańcuchowa.

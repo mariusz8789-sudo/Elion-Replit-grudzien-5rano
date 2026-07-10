@@ -6,6 +6,28 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Podwójne wahadło — nowy eksperyment, Universe Lab)
+- `labs/experiments/universe-doublependulum.ts`: drugi eksperyment "chaos
+  deterministyczny" w Universe Lab, obok problemu trzech ciał — celowo
+  najprostszy fizycznie możliwy układ wykazujący chaos (2 stopnie swobody).
+  Dokładne równania Lagrange'a dla dwóch sztywnych prętów bez tarcia,
+  integracja RK4 (rząd 4) — CELOWO NIE symplektyczna, w jawnym kontraście
+  z integratorem problemu trzech ciał: energia powoli dryfuje w czasie,
+  co jest pokazane w odczycie liczbowym na żywo, nie ukryte.
+- Suwak kąta startowego (5°–179°) pokazuje na żywo przejście od ruchu
+  niemal okresowego (pojedyncze wahadło NIGDY nie jest chaotyczne;
+  poniżej ~35° podwójne wahadło zachowuje się podobnie) do w pełni
+  chaotycznego (powyżej ~35-40°, klasyczny, nieregularny ślad drugiego
+  odważnika widoczny na ekranie).
+- Ten sam tryb „dwa niemal identyczne starty" (przesunięcie 10⁻⁶ rad) co
+  w problemie trzech ciał — spójny wzorzec UX dla obu eksperymentów chaosu.
+- 6 nowych testów (`universeDoublePendulum.test.ts`): energia minimalna w
+  spoczynku, zachowanie energii przy małym kącie, ograniczoność ruchu przy
+  małym kącie, determinizm RK4, szybszy rozjazd przy dużym kącie niż
+  małym (sygnatura chaosu). Zweryfikowane: typecheck, lint, 244 testy
+  vitest, build, Playwright (chaotyczny ślad, tryb dywergencji z rosnącym
+  odczytem) — zero błędów konsoli.
+
 ### Dodano (Geometria molekularna VSEPR — nowy eksperyment 3D, Chemistry Lab)
 - `labs/experiments/chemistry-vsepr.ts`: pierwsza scena `Sim3D` (Three.js)
   w Chemistry Lab — model kulki-i-pałeczki, 13 standardowych geometrii

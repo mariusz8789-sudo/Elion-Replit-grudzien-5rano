@@ -6,6 +6,28 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Poprawiono (Space-Time Lab i Nuclear Lab dopracowane — dwa laboratoria pominięte w pierwotnej liście priorytetów)
+- Odkryto, że pierwotna lista priorytetów użytkownika (Quantum → Einstein
+  → Universe → Atom → Particle → Chemistry → Biology → Civilization →
+  Multiverse) nie obejmowała dwóch laboratoriów, które faktycznie istnieją
+  w rejestrze (`labs/index.ts`): Space-Time Lab (dylatacja czasu, stożki
+  świetlne) i Nuclear Lab (rozpad, mapa nuklidów, reakcja łańcuchowa,
+  tokamak). Skoro cel to „każde laboratorium na poziomie world-class",
+  dopracowano oba tym samym zabiegiem, zamiast pominąć je milcząco.
+- Space-Time Lab: gradient tła w obu eksperymentach (Zegary świetlne już
+  miały świecące fotony — bez zmian tam), zdarzenia A/B w diagramie
+  Minkowskiego dostały poświatę w swoich rzeczywistych kolorach.
+- Nuclear Lab: gradient tła we wszystkich 4 eksperymentach; żywe jądra w
+  Rozpadzie i krzywa symulacji dostały poświatę; neutrony w Reakcji
+  łańcuchowej dostały poświatę; zaznaczony nuklid w Mapie nuklidów dostał
+  poświatę. Tokamak (plazma) już miał dobrą poświatę — tylko tło.
+- Zero zmian fizyki w żadnym z 6 eksperymentów. Pełna weryfikacja:
+  typecheck, lint, 163 testy frontendowe + 28 backendowych (191 razem),
+  build produkcyjny, Playwright na wszystkich 6 eksperymentach bez
+  błędów konsoli i bez regresji.
+- Chemistry Lab i Biology Lab nadal nie istnieją — pozostają w
+  VISION-BACKLOG.md do decyzji.
+
 ### Poprawiono (Multiverse Lab ukończone — laboratorium 7 z 9 w kolejności dopracowania — WSZYSTKIE ISTNIEJĄCE LABORATORIA DOPRACOWANE)
 - Inne stałe (bazowy eksperyment budowy scenariuszy): tło zmienione na
   gradient radialny; planeta w ekosferze (`inHz` — prawdziwy warunek

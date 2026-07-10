@@ -136,7 +136,10 @@ class ChainReactionSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
+    const bgGrad = ctx.createRadialGradient(w / 2, h * 0.45, 0, w / 2, h * 0.45, Math.max(w, h) * 0.8);
+    bgGrad.addColorStop(0, '#080e0a');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
     for (const nc of this.nuclei) {
       if (!nc.alive) {
@@ -155,9 +158,12 @@ class ChainReactionSim implements Sim {
       ctx.fill();
     }
     ctx.fillStyle = '#5cd6e8';
+    ctx.shadowColor = '#5cd6e8';
+    ctx.shadowBlur = 4;
     for (const n of this.neutrons) {
       ctx.fillRect(n.x - 1, n.y - 1, 2.4, 2.4);
     }
+    ctx.shadowBlur = 0;
     // pręty
     const rodDepth = this.lastRodDepth;
     for (const rx of this.rodXs(4)) {

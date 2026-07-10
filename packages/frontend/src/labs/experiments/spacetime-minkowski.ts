@@ -18,7 +18,10 @@ class MinkowskiSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
+    const bgGrad = ctx.createRadialGradient(w / 2, h * 0.5, 0, w / 2, h * 0.5, Math.max(w, h) * 0.8);
+    bgGrad.addColorStop(0, '#080a16');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
     const cx = w / 2;
     const cy = h * 0.56;
@@ -97,9 +100,12 @@ class MinkowskiSim implements Sim {
       const px = cx + e.x * S;
       const py = cy - e.ct * S;
       ctx.fillStyle = e.color;
+      ctx.shadowColor = e.color;
+      ctx.shadowBlur = 10;
       ctx.beginPath();
       ctx.arc(px, py, 6, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
       ctx.font = '600 12px ui-monospace, monospace';
       ctx.fillText(e.name, px + 9, py + 4);
     }

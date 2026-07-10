@@ -73,7 +73,10 @@ class DecaySim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
+    const bgGrad = ctx.createRadialGradient(w / 2, h * 0.3, 0, w / 2, h * 0.3, Math.max(w, h) * 0.8);
+    bgGrad.addColorStop(0, '#080e0a');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 
     // Siatka jąder (górne ~60%)
@@ -91,9 +94,14 @@ class DecaySim implements Sim {
         ctx.fill();
       }
       ctx.fillStyle = this.alive[i] ? '#6ee7a0' : 'rgba(141,151,180,0.25)';
+      if (this.alive[i]) {
+        ctx.shadowColor = '#6ee7a0';
+        ctx.shadowBlur = 3;
+      }
       ctx.beginPath();
       ctx.arc(x, y, cell * 0.3, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
     }
 
     // Wykres N(t): symulacja vs teoria
@@ -117,11 +125,14 @@ class DecaySim implements Sim {
     // symulacja
     ctx.strokeStyle = '#6ee7a0';
     ctx.lineWidth = 2;
+    ctx.shadowColor = '#6ee7a0';
+    ctx.shadowBlur = 6;
     tracePolylineBy(ctx, this.history.length, (i) => {
       const t = i * 0.05;
       return { x: ox + (t / tMax) * cell * GRID, y: cy0 + ch * (1 - this.history[i] / total) };
     });
     ctx.stroke();
+    ctx.shadowBlur = 0;
     ctx.lineWidth = 1;
 
     ctx.fillStyle = 'rgba(230,234,245,0.7)';

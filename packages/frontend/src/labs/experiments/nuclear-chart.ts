@@ -124,7 +124,10 @@ class NuclideChartSim implements Sim {
       this.h = h;
       this.computeLayout();
     }
-    ctx.fillStyle = '#02030a';
+    const bgGrad = ctx.createRadialGradient(w / 2, h * 0.4, 0, w / 2, h * 0.4, Math.max(w, h) * 0.8);
+    bgGrad.addColorStop(0, '#080e0f');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
     const { ox, oy, cw, ch } = this.layout;
 
@@ -173,9 +176,12 @@ class NuclideChartSim implements Sim {
       const { x, y } = this.toXY(this.selected.z, this.selected.n);
       ctx.strokeStyle = '#f0b35c';
       ctx.lineWidth = 1.6;
+      ctx.shadowColor = '#f0b35c';
+      ctx.shadowBlur = 8;
       ctx.beginPath();
       ctx.arc(x, y, 7, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.shadowBlur = 0;
       ctx.lineWidth = 1;
     }
 

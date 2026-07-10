@@ -6,6 +6,35 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Miareczkowanie kwas–zasada — nowy eksperyment, Chemistry Lab)
+- `labs/experiments/chemistry-titration.ts` + nowe funkcje fizyki w
+  `core/physics.ts` (`titrationPH`, `equivalenceVolumeMl`): krzywa
+  miareczkowania słabego kwasu mocną zasadą (NaOH) liczona DOKŁADNYM
+  równaniem bilansu ładunku ([Na⁺]+[H⁺]=[A⁻]+[OH⁻], z uwzględnieniem
+  autodysocjacji wody), rozwiązywanym numerycznie bisekcją w skali
+  logarytmicznej stężenia [H⁺] — nie tylko przybliżeniem Hendersona–
+  Hasselbalcha, które (widoczne na tym samym wykresie) jest dokładne
+  TYLKO w punkcie półrównoważnikowym.
+- 4 realne słabe kwasy z tabelarycznym Ka (CRC Handbook): octowy, mrówkowy,
+  benzoesowy, cyjanowodorowy (świadomie bardzo słaby — pokazuje skrajny
+  przypadek). Suwak objętości dodanego NaOH (0–60 mL, jak prawdziwa
+  biureta) przesuwa marker po żywo przeliczanej krzywej; punkt
+  równoważnikowy i półrównoważnikowy oznaczone na wykresie.
+- Narracja naprawia częsty błąd popularnonaukowy: punkt równoważnikowy
+  miareczkowania słabego kwasu mocną zasadą jest ZASADOWY (pH>7, hydroliza
+  sprzężonej zasady), nie obojętny — "pH=7" jest prawdziwe tylko dla
+  mocny kwas + mocna zasada, którego ten eksperyment nie modeluje.
+- 7 nowych testów fizyki (`physics.test.ts`): objętość równoważnikowa
+  (C_a·V_a=C_b·V_eq), pH=pKa dokładnie w punkcie półrównoważnikowym,
+  monotoniczność krzywej, zasadowość punktu równoważnikowego, słabszy
+  kwas → bardziej zasadowy punkt równoważnikowy, zgodność ze starym
+  przybliżeniem pH≈½(pKa−log₁₀Ca) na starcie. Zweryfikowane: typecheck,
+  lint, 261 testów vitest, build, backend (28/28), Playwright w prawdziwej
+  przeglądarce (suwak objętości, przełączanie kwasów — wartości na ekranie
+  dokładnie zgodne z ręcznie zweryfikowanymi obliczeniami: pH=4,75 w
+  półrównoważniku kwasu octowego, pH=10,95 w równoważniku HCN) — zero
+  błędów konsoli.
+
 ### Dodano (Chirp fali grawitacyjnej — nowy eksperyment z dźwiękiem, Einstein Lab)
 - `labs/experiments/einstein-chirp.ts` + nowe funkcje fizyki w
   `core/physics.ts` (`chirpMassSolar`, `timeToMerger`, `chirpFrequency`,

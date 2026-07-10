@@ -366,3 +366,40 @@ export function binarySeparationMeters(totalMassSolar: number, freqHz: number): 
   const omega = Math.PI * freqHz;
   return Math.cbrt((G_SI * M_kg) / (omega * omega));
 }
+
+/**
+ * Miareczkowanie słabego kwasu mocną zasadą — DOKŁADNE równanie bilansu
+ * ładunku (nie tylko przybliżenie Hendersona–Hasselbalcha, które zawodzi
+ * blisko początku i punktu równoważnikowego). Bilans ładunku:
+ * [Na⁺] + [H⁺] = [A⁻] + [OH⁻], z [A⁻] = C_a·Ka/(Ka+[H⁺]) (bilans masy +
+ * stała dysocjacji) i [OH⁻] = Kw/[H⁺] (autodysocjacja wody — bez tego
+ * krzywa byłaby błędna blisko pH=7). Rozwiązywane bisekcją w skali
+ * logarytmicznej stężenia [H⁺] (funkcja bilansu jest ściśle monotoniczna
+ * w [H⁺], więc bisekcja ZAWSZE zbiega do jedynego pierwiastka).
+ */
+export function titrationPH(
+  acidConcM: number,
+  acidVolMl: number,
+  baseConcM: number,
+  baseVolMl: number,
+  ka: number,
+  kw = 1e-14,
+): number {
+  const vTotal = acidVolMl + baseVolMl;
+  const caTotal = (acidConcM * acidVolMl) / vTotal;
+  const cbTotal = (baseConcM * baseVolMl) / vTotal;
+  const balance = (h: number) => cbTotal + h - (caTotal * ka) / (ka + h) - kw / h;
+  let lo = 1e-14;
+  let hi = 1;
+  for (let i = 0; i < 200; i++) {
+    const mid = Math.sqrt(lo * hi);
+    if (balance(mid) < 0) lo = mid;
+    else hi = mid;
+  }
+  return -Math.log10(Math.sqrt(lo * hi));
+}
+
+/** Objętość zasady [mL] w punkcie równoważnikowym miareczkowania: C_a·V_a = C_b·V_eq. */
+export function equivalenceVolumeMl(acidConcM: number, acidVolMl: number, baseConcM: number): number {
+  return (acidConcM * acidVolMl) / baseConcM;
+}

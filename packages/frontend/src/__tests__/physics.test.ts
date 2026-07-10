@@ -7,6 +7,7 @@ import {
   chshS,
   circularVelocity,
   decayRemaining,
+  equivalenceVolumeMl,
   exponentialDiskMass,
   G_ASTRO,
   iscoFrequency,
@@ -35,6 +36,7 @@ import {
   TESSERACT_EDGES,
   TESSERACT_VERTICES,
   timeToMerger,
+  titrationPH,
 } from '../core/physics';
 import { PLANETS } from '../data/solarSystem';
 import { KNOWN_NUCLIDES } from '../data/nuclides';
@@ -578,5 +580,49 @@ describe('chirp fali grawitacyjnej (inspiral podwójnego układu zwartego)', () 
 
   it('cięższy układ ma niższą częstotliwość ISCO (większe czarne dziury = niższa częstotliwość połączenia)', () => {
     expect(iscoFrequency(120)).toBeLessThan(iscoFrequency(20));
+  });
+});
+
+describe('miareczkowanie kwasowo-zasadowe (bilans ładunku)', () => {
+  const KA_ACETIC = 1.8e-5;
+
+  it('objętość równoważnikowa: C_a·V_a = C_b·V_eq', () => {
+    expect(equivalenceVolumeMl(0.1, 25, 0.1)).toBeCloseTo(25, 9);
+    expect(equivalenceVolumeMl(0.2, 25, 0.1)).toBeCloseTo(50, 9);
+  });
+
+  it('w punkcie półrównoważnikowym pH = pKa (dokładnie, z dokładnością do autodysocjacji wody)', () => {
+    const pKa = -Math.log10(KA_ACETIC);
+    const ph = titrationPH(0.1, 25, 0.1, 12.5, KA_ACETIC);
+    expect(ph).toBeCloseTo(pKa, 2);
+  });
+
+  it('pH rośnie monotonicznie w miarę dodawania zasady', () => {
+    let prev = -1;
+    for (const vb of [0.001, 5, 12.5, 20, 24, 25, 26, 30, 40, 60]) {
+      const ph = titrationPH(0.1, 25, 0.1, vb, KA_ACETIC);
+      expect(ph).toBeGreaterThan(prev);
+      prev = ph;
+    }
+  });
+
+  it('punkt równoważnikowy słabego kwasu jest ZASADOWY (pH>7), nie obojętny', () => {
+    const veq = equivalenceVolumeMl(0.1, 25, 0.1);
+    const ph = titrationPH(0.1, 25, 0.1, veq, KA_ACETIC);
+    expect(ph).toBeGreaterThan(7);
+  });
+
+  it('słabszy kwas (mniejsze Ka) ma BARDZIEJ zasadowy punkt równoważnikowy (mocniejsza sprzężona zasada)', () => {
+    const veq = 25;
+    const phAcetic = titrationPH(0.1, 25, 0.1, veq, 1.8e-5); // kwas octowy
+    const phHcn = titrationPH(0.1, 25, 0.1, veq, 6.2e-10); // kwas cyjanowodorowy, dużo słabszy
+    expect(phHcn).toBeGreaterThan(phAcetic);
+  });
+
+  it('na starcie (czysty słaby kwas) pH jest bliskie klasycznemu przybliżeniu pH≈½(pKa−log₁₀Ca)', () => {
+    const pKa = -Math.log10(KA_ACETIC);
+    const approx = 0.5 * (pKa - Math.log10(0.1));
+    const exact = titrationPH(0.1, 25, 0.1, 1e-6, KA_ACETIC);
+    expect(Math.abs(exact - approx)).toBeLessThan(0.05);
   });
 });

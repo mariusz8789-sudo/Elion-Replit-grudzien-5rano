@@ -109,14 +109,19 @@ Wszechświata (8,8×10²⁶ m).
   syntezuje realną, żywo liczoną częstotliwość fali (Web Audio API) —
   częstotliwości z łączących się czarnych dziur leżą w ludzkim zakresie
   słyszalności bez potrzeby przesuwania wysokości dźwięku
-- **281 testów** (253 vitest frontend + 28 node:test backend)
+- **Miareczkowanie kwas–zasada** (Chemistry Lab) — krzywa liczona
+  dokładnym równaniem bilansu ładunku (nie tylko przybliżeniem
+  Hendersona–Hasselbalcha), 4 realne słabe kwasy z tabelarycznym Ka;
+  punkt równoważnikowy słabego kwasu pokazany jako zasadowy (pH>7),
+  naprawiając częsty błąd popularnonaukowy
+- **289 testów** (261 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 281 testów (fizyka + funkcje lokalne + backend)
+npm test           # 289 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

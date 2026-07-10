@@ -375,8 +375,14 @@ Backlog na przyszłość (NIE zbudowane): spersonalizowany film/zwiastun 4K
   NIST/CCCBDB), geometria dopasowana wstecz do pomiaru. 10 nowych testów:
   spójność liczby wektorów, wektory jednostkowe, dokładne kąty (tetraedr,
   oktaedr 90°/180°, NH₃, H₂O<NH₃), funkcja `bentCone` dla dowolnego kąta.
-- **Krzywe miareczkowania kwas–zasada (pH)** (★★★★★ chemia analityczna) —
-  ilościowo bogaty temat, dobry materiał na Narratora.
+- ✅ **Krzywe miareczkowania kwas–zasada (pH)** — `chemistry-titration.ts`,
+  Chemistry Lab. Krzywa liczona DOKŁADNYM równaniem bilansu ładunku
+  (bisekcja, nie tylko przybliżeniem Hendersona–Hasselbalcha), 4 realne
+  słabe kwasy (CRC Handbook: octowy, mrówkowy, benzoesowy, cyjanowodorowy).
+  Punkt równoważnikowy oznaczony jako zasadowy (pH>7), nie pH=7 — częsty
+  błąd popularnonaukowy naprawiony. 7 nowych testów fizyki: pH=pKa dokładnie
+  w punkcie półrównoważnikowym, monotoniczność, zasadowość równoważnika,
+  słabszy kwas → bardziej zasadowy równoważnik.
 - ✅ **Trendy okresowe** (promień atomowy, energia jonizacji) — zbudowane
   w Atom Lab (`data/periodicTrends.ts`, nowa zakładka „Trendy okresowe"),
   jako mapa cieplna na reużytej siatce `.ptable` — nie osobny wykres.

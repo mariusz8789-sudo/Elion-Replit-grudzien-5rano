@@ -2,8 +2,8 @@
 
 ## Zakres
 Elektroujemność, polarność wiązań chemicznych, geometria molekularna
-(VSEPR). Reakcje, kinetyka, stechiometria, krzywe miareczkowania —
-poza obecnym zakresem, patrz VISION-BACKLOG.md.
+(VSEPR), miareczkowanie kwasowo-zasadowe. Reakcje, kinetyka, stechiometria
+— poza obecnym zakresem, patrz VISION-BACKLOG.md.
 
 ## Modele i wzory
 
@@ -39,6 +39,20 @@ pozycje idealne bryły-rodzica (bipiramida trygonalna / oktaedr); realne
 kąty odbiegają o kilka stopni z tego samego powodu (wolna para odpycha
 silniej niż para wiążąca) — jawnie zaznaczone w honestyNote, nie ukryte.
 
+**Miareczkowanie kwasowo-zasadowe (zaimplementowane)** ★★★★★
+Słaby kwas + mocna zasada (NaOH), krzywa liczona DOKŁADNYM równaniem
+bilansu ładunku [Na⁺]+[H⁺]=[A⁻]+[OH⁻] (z uwzględnieniem autodysocjacji
+wody, Kw=10⁻¹⁴), rozwiązywanym numerycznie bisekcją w skali logarytmicznej
+[H⁺] — NIE tylko przybliżeniem Hendersona–Hasselbalcha, które jest dokładne
+tylko w jednym punkcie (półrównoważnikowym). 4 realne słabe kwasy z Ka
+tabelarycznym (CRC Handbook): octowy (1,8×10⁻⁵), mrówkowy (1,8×10⁻⁴),
+benzoesowy (6,3×10⁻⁵), cyjanowodorowy (6,2×10⁻¹⁰ — świadomie bardzo słaby,
+pokazuje skrajny przypadek). Punkt równoważnikowy słabego kwasu jest
+ZASADOWY (pH>7, hydroliza sprzężonej zasady A⁻) — jawnie wyjaśnione jako
+naprawienie częstego błędu popularnonaukowego "punkt równoważnikowy = pH 7"
+(prawdziwe tylko dla mocny kwas + mocna zasada, którego ten eksperyment
+nie modeluje).
+
 ## Sprzeczne teorie / otwarte spory
 - Skale elektroujemności różnią się metodą (Pauling z energii wiązań,
   Mulliken ze średniej energii jonizacji i powinowactwa elektronowego,
@@ -68,8 +82,11 @@ pominięte zamiast zmyślone.
   do skali promienia atomowego/kowalencyjnego
 - Kolory atomów w modelu VSEPR (3D) są schematyczne (niebieski=wiążący,
   bursztyn=centralny, fiolet=wolna para), nie prawdziwymi kolorami CPK
-- Brak reakcji, kinetyki, stechiometrii, krzywych miareczkowania —
+- Brak reakcji, kinetyki, stechiometrii (poza miareczkowaniem) —
   osobne, większe moduły do rozważenia później
+- Miareczkowanie modeluje TYLKO słaby kwas + mocna zasada (najczęstszy
+  przypadek dydaktyczny) — mocny kwas, słaba zasada i kwasy wieloprotonowe
+  wymagałyby osobnych równań bilansu, świadomie poza zakresem tej wersji
 
 ## Wnioski projektowe dla Genesis OS
 1. Wiązania chemiczne jako pierwszy eksperyment: continuum kowalencyjne
@@ -78,8 +95,8 @@ pominięte zamiast zmyślone.
 2. VSEPR jako drugi eksperyment: kompletny, zamknięty zbiór (13 geometrii
    AX₂…AX₆E₂) — dobry kandydat na pełne pokrycie w jednej sesji, bo liczba
    przypadków jest skończona i znana z góry, nie otwarta jak np. reakcje.
-3. Kolejne kandydaty (nie budować teraz): krzywe miareczkowania pH, trendy
-   okresowe promienia/elektroujemności w Chemistry zamiast Atom Lab
-   (decyzja architektoniczna, dziś żyją w Atom Lab)
+3. Miareczkowanie jako trzeci eksperyment: dokładne równanie bilansu ładunku
+   zamiast tylko Hendersona–Hasselbalcha — ten sam standard "prawdziwy wzór,
+   nie przybliżenie tam gdzie się da" co reszta platformy (Kepler, geodezyjne)
 4. Domyślna para Na–Cl (sól kuchenna) jako natychmiast rozpoznawalny,
    podręcznikowy przykład wiązania jonowego

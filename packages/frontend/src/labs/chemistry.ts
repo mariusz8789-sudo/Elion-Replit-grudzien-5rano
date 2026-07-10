@@ -3,6 +3,7 @@ import { bondPolarity, type BondType } from '../core/physics';
 import { PAULING_ELECTRONEGATIVITY } from '../data/electronegativity';
 import { ELEMENTS } from '../data/elements';
 import { chemistryVsepr } from './experiments/chemistry-vsepr';
+import { chemistryTitration } from './experiments/chemistry-titration';
 
 /**
  * Chemistry Lab — wiązania chemiczne i elektroujemność.
@@ -183,7 +184,7 @@ export const chemistryLab: LabDefinition = {
     },
   ],
   createSim: () => new BondSim(),
-  experiments: [chemistryVsepr],
+  experiments: [chemistryVsepr, chemistryTitration],
   narrate(p, stats) {
     const symbolA = String(p.elementA ?? 'Na');
     const symbolB = String(p.elementB ?? 'Cl');

@@ -100,10 +100,15 @@ class SolarSystemSim implements Sim {
       const px = cx + pos.x * planet.scale;
       const py = cy + pos.y * planet.scale;
       const dotR = 2.2 + Math.log10(planet.radiusKm) * 0.9; // symboliczny, nie do skali odległości
+      // Poświata skalowana prawdziwym promieniem planety (radiusKm z NASA) —
+      // większe planety świecą wyraźniej, nie ozdoba losowa.
       ctx.fillStyle = planet.color;
+      ctx.shadowColor = planet.color;
+      ctx.shadowBlur = dotR * 1.3;
       ctx.beginPath();
       ctx.arc(px, py, dotR, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
       ctx.fillStyle = 'rgba(230,234,245,0.6)';
       ctx.font = '9px system-ui';
       ctx.fillText(planet.name, px + dotR + 3, py + 3);

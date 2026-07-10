@@ -6,6 +6,25 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Poprawiono (Universe Lab ukończone — laboratorium 3 z 9 w kolejności dopracowania)
+- Ekspansja (bazowy eksperyment): tło zmienione z płaskiej czerni na
+  gradient radialny; galaktyki dostały poświatę skalowaną PRAWDZIWĄ
+  jasnością pozorną liczoną z prawa odwrotnych kwadratów (1/d² — ta sama
+  odległość d, która już sterowała przesunięciem ku czerwieni) — bliższe
+  galaktyki świecą wyraźnie, dalekie/przesunięte gasną bez poświaty. Zero
+  zmian w równaniu Friedmanna ani w update().
+- Prawdziwy Układ Słoneczny (2D): planety dostały poświatę skalowaną ich
+  promieniem `dotR` (pochodzącym z prawdziwego `radiusKm` NASA) — większe
+  planety świecą wyraźniej. Zero zmian w rozwiązaniu równania Keplera.
+- Układ Słoneczny 3D, Zderzenie galaktyk, Życie gwiazdy: zweryfikowane
+  ponownie, uznane za już dobrze wykonane (świecące jądra, gradienty
+  supernowej/mgławicy/dysku akrecyjnego, starfield) — bez zmian.
+- Pełna weryfikacja przed przejściem dalej: typecheck, lint, 163 testy
+  frontendowe + 28 backendowych (191 razem) — wszystkie zielone, build
+  produkcyjny bez ostrzeżeń, wizualna weryfikacja Playwrightem wszystkich
+  5 eksperymentów bez błędów konsoli i bez regresji.
+- Atom Lab (4 z 9) jest następny w kolejności.
+
 ### Poprawiono (Einstein Lab ukończone — laboratorium 2 z 9 w kolejności dopracowania)
 - Ugięcie światła (Schwarzschild/Kerr/Alcubierre): tło zmienione z płaskiej
   czerni na gradient radialny; ślady fotonów dostały poświatę sterowaną

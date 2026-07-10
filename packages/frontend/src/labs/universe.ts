@@ -60,10 +60,13 @@ class UniverseSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#000005';
-    ctx.fillRect(0, 0, w, h);
     const cx = w / 2;
     const cy = h / 2;
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.75);
+    bgGrad.addColorStop(0, '#05060f');
+    bgGrad.addColorStop(1, '#000004');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
     // Kamera oddala się częściowo, gdy ekspansja przerasta ekran — ekspansja
     // pozostaje widoczna, ale galaktyki nie znikają (audyt Etapu 0, pkt 2)
     const K = (Math.min(w, h) * 0.48) / Math.max(1, Math.pow(this.a / 1.1, 0.7));
@@ -74,10 +77,18 @@ class UniverseSim implements Sim {
       // Poglądowe "przesunięcie ku czerwieni": im dalej, tym bardziej czerwono.
       const d = Math.hypot(g.x, g.y) * this.a;
       const hue = Math.max(0, g.hue - d * 160);
+      // Jasność pozorna ∝ 1/d² (prawo odwrotnych kwadratów) — bliższe
+      // galaktyki świecą mocniej, dalekie/przesunięte ku czerwieni gasną.
+      const brightness = Math.min(1, 0.35 / (d * d + 0.12));
       ctx.fillStyle = `hsla(${hue}, 80%, 70%, 0.9)`;
+      if (brightness > 0.3) {
+        ctx.shadowColor = `hsla(${hue}, 85%, 65%, ${Math.min(0.9, brightness)})`;
+        ctx.shadowBlur = 6 * brightness;
+      }
       ctx.beginPath();
       ctx.arc(px, py, g.size, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
     }
     // Obserwator
     ctx.fillStyle = '#f0b35c';

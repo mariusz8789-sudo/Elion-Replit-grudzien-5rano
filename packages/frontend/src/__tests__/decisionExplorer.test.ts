@@ -47,22 +47,44 @@ describe('listDecisions / persistence', () => {
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });
     resetToExamples();
     const before = listDecisions().length;
-    addDecision({ label: 'Testowa decyzja', description: 'opis', year: 2024, weight: 6, branches: ['A', 'B'] });
+    addDecision({
+      label: 'Testowa decyzja', description: 'opis', year: 2024, weight: 6,
+      branches: [{ text: 'A', tone: 2 }, { text: 'B', tone: -1 }],
+    });
     const after = listDecisions();
     expect(after.length).toBe(before + 1);
     const added = after.find((d) => d.label === 'Testowa decyzja');
     expect(added?.weight).toBe(6);
-    expect(added?.branches).toEqual(['A', 'B']);
+    expect(added?.branches).toEqual([{ text: 'A', tone: 2 }, { text: 'B', tone: -1 }]);
   });
 
   it('updateDecision modyfikuje istniejącą decyzję zachowując id', () => {
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });
     resetToExamples();
     const d = addDecision({ label: 'Do edycji', description: '', year: 2020, weight: 3, branches: [] });
-    updateDecision(d.id, { label: 'Po edycji', description: 'nowy opis', year: 2021, weight: 9, branches: ['X'] });
+    updateDecision(d.id, { label: 'Po edycji', description: 'nowy opis', year: 2021, weight: 9, branches: [{ text: 'X', tone: 0 }] });
     const found = listDecisions().find((x) => x.id === d.id);
     expect(found?.label).toBe('Po edycji');
     expect(found?.weight).toBe(9);
+  });
+
+  it('ton odgałęzienia jest przycinany do zakresu [-5,5]', () => {
+    vi.stubGlobal('window', { localStorage: makeFakeStorage() });
+    resetToExamples();
+    addDecision({ label: 'Ekstremalny ton', description: '', year: 2020, weight: 5, branches: [{ text: 'X', tone: 999 }] });
+    const found = listDecisions().find((d) => d.label === 'Ekstremalny ton');
+    expect(found?.branches[0].tone).toBe(5);
+  });
+
+  it('migruje stary format odgałęzień (goły string) do {text, tone:0} przy odczycie z localStorage', () => {
+    const storage = makeFakeStorage();
+    storage.setItem(
+      'genesis-os:decision-explorer/v1',
+      JSON.stringify([{ id: 'old-1', label: 'Stara decyzja', description: '', year: 2018, weight: 5, branches: ['Stary format A', 'Stary format B'] }]),
+    );
+    vi.stubGlobal('window', { localStorage: storage });
+    const list = listDecisions();
+    expect(list[0].branches).toEqual([{ text: 'Stary format A', tone: 0 }, { text: 'Stary format B', tone: 0 }]);
   });
 
   it('deleteDecision usuwa dokładnie jedną decyzję', () => {

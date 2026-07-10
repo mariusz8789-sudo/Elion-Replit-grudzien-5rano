@@ -6,6 +6,50 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Quantum Decision Explorer — symulacja Monte Carlo odgałęzień)
+- Na wyraźną prośbę użytkownika o "najbardziej realistyczny symulator
+  alternatywnych scenariuszy... oparty na matematyce, teorii decyzji,
+  symulacjach Monte Carlo" — `core/decisionMonteCarlo.ts`: dyskretny
+  proces Wienera z dryfem (schemat Eulera–Maruyamy), transformacja
+  Boxa–Mullera do generowania N(0,1) — dokładnie ten sam model matematyczny
+  co dyfuzja/ruchy Browna w fizyce, tu zastosowany do wizualizacji
+  "rozrzutu konsekwencji" ścieżki decyzyjnej.
+- `Branch` (core/decisionExplorer.ts) rozszerzony o pole `tone` (-5..+5,
+  subiektywna ocena UŻYTKOWNIKA) sterujące dryfem symulacji; `weight`
+  decyzji steruje zmiennością. Migracja starego formatu (goły string)
+  wbudowana w `sanitizeBranch` — dane sprzed tej zmiany nadal się wczytują
+  bez utraty treści.
+- Nowy suwak horyzontu czasowego (1/3/5/10/20/50/100 lat): każde
+  odgałęzienie renderuje wachlarz ~20 niezależnie zasymulowanych
+  trajektorii jako świecące linie rozchodzące się z gwiazdy-decyzji —
+  rozrzut wachlarza WIDOCZNIE rośnie jak √czas (zweryfikowane wizualnie w
+  przeglądarce), bo tak działa prawdziwa matematyka procesu Wienera, nie
+  bo aplikacja "wie" coś o przyszłości.
+- Formularz edycji decyzji zyskał strukturalne wiersze odgałęzień (tekst +
+  suwak "tonu" na wiersz, do 4 ścieżek) zamiast pojedynczego pola tekstowego.
+- Narrator raportuje realny wynik statystyczny z próby Monte Carlo
+  (`significantFraction`) z jawnym zastrzeżeniem, że to demonstracja
+  własności matematycznej (niepewność rośnie jak √t), nie prognoza
+  konkretnej ścieżki — oraz osobny blok "Skąd biorą się te liczby"
+  tłumaczący, że dryf/zmienność pochodzą wyłącznie z ocen użytkownika.
+- Świadomie NIE zbudowano (z pierwotnej, znacznie szerszej prośby
+  użytkownika): generowania "dziesiątek/setek ścieżek" przez AI (brak
+  wiarygodnej podstawy), symulacji finansów/zdrowia/relacji jako osobnych
+  "przewidywanych" wymiarów (wymagałoby modelu, którego nie mamy), sieci
+  Bayesa / Markov Decision Process / Reinforcement Learning (brak dziś
+  zdefiniowanego, uczciwego zastosowania), trybu filmowego 4K (osobny
+  temat produkcyjny) — wszystkie odnotowane w `VISION-BACKLOG.md`.
+- 12 nowych testów (`decisionMonteCarlo.test.ts`): Box–Muller daje N(0,1)
+  na dużej próbie (|mean|<0.05, |std−1|<0.05), czysty dryf bez szumu daje
+  v(T)=drift·T dokładnie, std(4 lata)/std(1 rok)≈2=√4 (zweryfikowane
+  empirycznie na 4000 ścieżkach), zgodność empirycznego std z formułą
+  teoretyczną volatility·√T w granicach 10%, znak dryfu zgodny ze znakiem
+  tonu, `branchToSimParams` monotoniczne w wadze. Zaktualizowane testy
+  migracji w `decisionExplorer.test.ts`. Zweryfikowane: typecheck, lint,
+  275 testów vitest, build, Playwright (wachlarz przy horyzoncie 1/10/100
+  lat, edycja odgałęzień z suwakiem tonu, dodawanie nowej ścieżki) — zero
+  błędów konsoli.
+
 ### Dodano (Miareczkowanie kwas–zasada — nowy eksperyment, Chemistry Lab)
 - `labs/experiments/chemistry-titration.ts` + nowe funkcje fizyki w
   `core/physics.ts` (`titrationPH`, `equivalenceVolumeMl`): krzywa

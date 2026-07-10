@@ -808,3 +808,17 @@ kbd {
 .qde-textarea { min-height: 4.2rem; resize: vertical; line-height: 1.4; }
 .qde-form-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .qde-form-actions .chip-btn:disabled { opacity: 0.45; }
+
+.qde-horizon { padding: 0 1rem; }
+.qde-horizon .seg { flex-wrap: wrap; }
+
+.qde-branches { display: flex; flex-direction: column; gap: 0.5rem; }
+.qde-branches > label { font-size: 0.78rem; color: var(--text-dim); }
+.qde-branch-row {
+  display: grid; grid-template-columns: 1fr auto auto; align-items: center;
+  gap: 0.5rem;
+}
+.qde-branch-tone { display: flex; align-items: center; gap: 0.4rem; }
+.qde-branch-tone input[type='range'] { width: 5.5rem; accent-color: var(--violet); }
+.qde-branch-tone-val { font: inherit; font-size: 0.72rem; color: var(--text-dim); min-width: 1.6rem; text-align: right; }
+.qde-branch-remove { padding: 0.3rem 0.55rem; font-size: 0.78rem; }

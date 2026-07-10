@@ -11,6 +11,20 @@ import { readJSON, writeJSON } from './storage';
  * notatnik użytkownika, nie telemetria ani konto.
  */
 
+export interface Branch {
+  /** Krótki opis alternatywnej ścieżki, np. "Gdyby zostać na starym stanowisku". */
+  text: string;
+  /**
+   * -5..+5: subiektywna ocena UŻYTKOWNIKA (nie AI, nie model) kierunku tej
+   * ścieżki. Steruje WYŁĄCZNIE kierunkiem (dryfem) symulacji Monte Carlo w
+   * `core/decisionMonteCarlo.ts` — to wejście, nie wyjście: użytkownik mówi
+   * systemowi, co sam sądzi o tej ścieżce, a wizualizacja pokazuje
+   * konsekwencję matematyczną tego założenia (rosnący rozrzut w czasie),
+   * nie prognozę.
+   */
+  tone: number;
+}
+
 export interface Decision {
   id: string;
   /** Krótki tytuł, np. "Zmiana kierunku studiów". */
@@ -19,10 +33,10 @@ export interface Decision {
   description: string;
   /** Rok (opcjonalny porządek chronologiczny na osi). */
   year: number;
-  /** 1-10: subiektywna "waga" decyzji — steruje jasnością gwiazdy, nic więcej. */
+  /** 1-10: subiektywna "waga" decyzji — steruje jasnością gwiazdy ORAZ zmiennością (volatility) symulacji Monte Carlo. */
   weight: number;
   /** Alternatywne ścieżki ("gdyby..."), 1-4 pozycje. */
-  branches: string[];
+  branches: Branch[];
 }
 
 const KEY = 'decision-explorer/v1';
@@ -41,8 +55,8 @@ export const EXAMPLE_DECISIONS: Decision[] = [
     year: 2015,
     weight: 8,
     branches: [
-      'Gdyby wybrał(a) zupełnie inny kierunek',
-      'Gdyby zamiast studiów wybrał(a) pracę od razu',
+      { text: 'Gdyby wybrał(a) zupełnie inny kierunek', tone: -1 },
+      { text: 'Gdyby zamiast studiów wybrał(a) pracę od razu', tone: 1 },
     ],
   },
   {
@@ -52,8 +66,8 @@ export const EXAMPLE_DECISIONS: Decision[] = [
     year: 2019,
     weight: 7,
     branches: [
-      'Gdyby zostać w rodzinnym mieście',
-      'Gdyby wybrać zupełnie inne miasto',
+      { text: 'Gdyby zostać w rodzinnym mieście', tone: 0 },
+      { text: 'Gdyby wybrać zupełnie inne miasto', tone: 2 },
     ],
   },
   {
@@ -63,19 +77,42 @@ export const EXAMPLE_DECISIONS: Decision[] = [
     year: 2022,
     weight: 9,
     branches: [
-      'Gdyby zostać na starym stanowisku',
-      'Gdyby poczekać jeszcze rok',
-      'Gdyby wybrać jeszcze inną ofertę',
+      { text: 'Gdyby zostać na starym stanowisku', tone: -2 },
+      { text: 'Gdyby poczekać jeszcze rok', tone: 0 },
+      { text: 'Gdyby wybrać jeszcze inną ofertę', tone: 3 },
     ],
   },
 ];
 
-function isStringArray(v: unknown, max: number): v is string[] {
-  return Array.isArray(v) && v.every((x) => typeof x === 'string') && v.length <= max;
-}
-
 function isFiniteNumber(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v);
+}
+
+/**
+ * Akceptuje ZARÓWNO nowy format (`{text, tone}`) JAK I stary zapis sprzed
+ * wprowadzenia symulacji Monte Carlo (goły string) — realne dane w
+ * localStorage użytkowników sprzed tej zmiany muszą dalej wczytywać się
+ * bez utraty treści; brakujący `tone` dostaje neutralną wartość 0.
+ */
+function sanitizeBranch(raw: unknown): Branch | null {
+  if (typeof raw === 'string') {
+    const text = raw.slice(0, MAX_BRANCH).trim();
+    return text ? { text, tone: 0 } : null;
+  }
+  if (raw && typeof raw === 'object') {
+    const r = raw as Partial<Branch>;
+    if (typeof r.text !== 'string' || !r.text.trim()) return null;
+    return {
+      text: r.text.slice(0, MAX_BRANCH),
+      tone: isFiniteNumber(r.tone) ? Math.min(5, Math.max(-5, r.tone)) : 0,
+    };
+  }
+  return null;
+}
+
+function sanitizeBranches(raw: unknown): Branch[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(sanitizeBranch).filter((b): b is Branch => b !== null).slice(0, MAX_BRANCHES);
 }
 
 /** Jak w discoveryLog.ts/settings.ts: localStorage może zawierać cokolwiek — każde pole walidowane osobno. */
@@ -90,9 +127,7 @@ function sanitizeDecision(raw: unknown): Decision | null {
     description: typeof r.description === 'string' ? r.description.slice(0, MAX_DESCRIPTION) : '',
     year: isFiniteNumber(r.year) ? r.year : new Date().getFullYear(),
     weight: isFiniteNumber(r.weight) ? Math.min(10, Math.max(1, r.weight)) : 5,
-    branches: isStringArray(r.branches, MAX_BRANCHES)
-      ? r.branches.map((b) => b.slice(0, MAX_BRANCH)).filter(Boolean)
-      : [],
+    branches: sanitizeBranches(r.branches),
   };
 }
 

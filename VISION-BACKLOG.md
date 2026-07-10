@@ -232,8 +232,48 @@ geometria `galaxyPosition`). Zweryfikowane Playwrightem: dodawanie,
 edycja, usuwanie decyzji i przewijanie osi czasu — struktura galaktyki i
 widoczne odgałęzienia zmieniają się na żywo, zero błędów konsoli.
 
+**Rozszerzenie: symulacja Monte Carlo odgałęzień — ✅ ZBUDOWANE.** Na
+wyraźną prośbę użytkownika ("Zbuduj najbardziej realistyczny... symulator
+alternatywnych scenariuszy... oparty na AI, matematyce, teorii decyzji,
+symulacjach Monte Carlo") rozbudowano moduł o PRAWDZIWĄ matematykę:
+- `core/decisionMonteCarlo.ts` — dyskretny proces Wienera z dryfem
+  (schemat Eulera–Maruyamy, transformacja Boxa–Mullera dla N(0,1)),
+  dokładnie ten sam model co dyfuzja/ruchy Browna w fizyce
+- `Branch` rozszerzony o pole `tone` (-5..+5, ocena użytkownika) —
+  steruje dryfem symulacji; `Decision.weight` steruje zmiennością
+  (`branchToSimParams`). Migracja starego formatu (goły string) wbudowana
+  w `sanitizeBranch`, więc dane sprzed tej zmiany nadal się wczytują
+- Suwak horyzontu czasowego (1/3/5/10/20/50/100 lat) — każde odgałęzienie
+  renderuje wachlarz ~20 niezależnie zasymulowanych trajektorii, których
+  rozrzut WIDOCZNIE rośnie jak √czas (zweryfikowane Playwrightem: fan przy
+  100 latach wyraźnie szerszy niż przy 1 roku) — realna własność procesu
+  Wienera, nie ozdoba
+- Narrator raportuje `significantFraction` (realny wynik statystyczny z
+  próby Monte Carlo) z jawnym zastrzeżeniem "to NIE prognoza tej
+  konkretnej ścieżki — demonstracja własności matematycznej"
+- Ze spisu życzeń użytkownika ŚWIADOMIE NIE zbudowano (bo wymagałoby
+  fabrykowania fałszywej precyzji albo osobnej, dużej infrastruktury):
+  AI generujące "dziesiątki/setki ścieżek" (brak podstawy do twierdzenia,
+  że LLM potrafi to zrobić wiarygodnie), symulacja finansów/zdrowia/relacji
+  jako osobnych, "przewidywanych" wymiarów (patrz honestyNote — to
+  wymagałoby modelu ekonomicznego/medycznego, którego nie mamy i nie
+  udajemy że mamy), sieci Bayesa / Markov Decision Process / Reinforcement
+  Learning (żadne z nich nie ma tu jeszcze zdefiniowanego, uczciwego
+  zastosowania — dodanie by było cargo-cultem nazw, nie realną wartością),
+  tryb filmowy 4K (osobny temat produkcyjny, rendering offline)
+- 12 nowych testów (`decisionMonteCarlo.test.ts`): Box-Muller daje
+  N(0,1) na dużej próbie, czysty dryf bez szumu daje v(T)=drift·T
+  dokładnie, std(4 lata)/std(1 rok)≈√4=2 (zweryfikowane empirycznie),
+  zgodność std z formułą teoretyczną volatility·√T w granicach 10%,
+  znak dryfu zgodny ze znakiem tonu. Plus zaktualizowane testy migracji
+  danych w `decisionExplorer.test.ts`. Zweryfikowane: typecheck, lint,
+  275 testów vitest, build, Playwright (wachlarz Monte Carlo, edycja
+  odgałęzień z suwakiem tonu, przełączanie horyzontu) — zero błędów
+  konsoli.
+
 Backlog na przyszłość (NIE zbudowane): spersonalizowany film/zwiastun 4K
-(osobny temat produkcyjny, rendering offline).
+(osobny temat produkcyjny, rendering offline); ewentualne AI sugerujące
+nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
 
 ---
 

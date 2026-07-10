@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   listDecisions,
   addDecision,
@@ -7,18 +7,23 @@ import {
   resetToExamples,
   galaxyPosition,
   type Decision,
+  type Branch,
 } from '../core/decisionExplorer';
+import { runMonteCarlo, branchToSimParams, type MonteCarloBundle } from '../core/decisionMonteCarlo';
 import { NarratorPanel } from './NarratorPanel';
 import { track } from '../core/analytics';
 
 /**
  * Quantum Decision Explorer — galaktyka złożona z decyzji użytkownika.
  * Każda gwiazda to jedna decyzja; suwak osi czasu przesuwa, która decyzja
- * jest aktywna, a jej alternatywne ścieżki ("gdyby...") rozchodzą się jako
- * świecące odgałęzienia — struktura całej galaktyki zmienia się razem z
- * wyborem. WAŻNE: to narzędzie narracyjne/refleksyjne inspirowane
- * wizualnie fizyką, NIE model fizyczny ani przewidywanie przyszłości —
- * patrz stały baner niżej i knowledge/quantum-decision-explorer.md.
+ * jest aktywna. Każde odgałęzienie ("gdyby...") niesie teraz PRAWDZIWĄ
+ * symulację Monte Carlo (dyskretny proces Wienera z dryfem,
+ * `core/decisionMonteCarlo.ts`) rozchodzącą się jako wachlarz świecących
+ * torów — rozrzut rośnie z czasem jak √t, dokładnie tak jak w prawdziwej
+ * fizyce dyfuzji. WAŻNE: to narzędzie narracyjne/refleksyjne inspirowane
+ * wizualnie fizyką i matematyką niepewności, NIE model predykcyjny ani
+ * przewidywanie przyszłości — patrz stały baner niżej i
+ * knowledge/quantum-decision-explorer.md.
  */
 
 const DISCLAIMER =
@@ -27,10 +32,12 @@ const DISCLAIMER =
 const BRANCH_COLOR = '#a78bfa';
 const STAR_COLOR = '#5cd6e8';
 const ACTIVE_COLOR = '#f0b35c';
+const HORIZONS = [1, 3, 5, 10, 20, 50, 100];
+const MC_PATHS = 22;
 
-function emptyForm(): { label: string; description: string; year: string; weight: number; branches: string } {
+function emptyForm(): { label: string; description: string; year: string; weight: number; branches: Branch[] } {
   const y = new Date().getFullYear();
-  return { label: '', description: '', year: String(y), weight: 5, branches: '' };
+  return { label: '', description: '', year: String(y), weight: 5, branches: [] };
 }
 
 function formFromDecision(d: Decision): ReturnType<typeof emptyForm> {
@@ -39,21 +46,32 @@ function formFromDecision(d: Decision): ReturnType<typeof emptyForm> {
     description: d.description,
     year: String(d.year),
     weight: d.weight,
-    branches: d.branches.join('\n'),
+    branches: d.branches.map((b) => ({ ...b })),
   };
+}
+
+/** Cache symulacji Monte Carlo per (decyzja, horyzont) — nieprzeliczane co klatkę, tylko przy zmianie. */
+function computeBundles(decision: Decision, years: number): MonteCarloBundle[] {
+  return decision.branches.map((b) => {
+    const { drift, volatility } = branchToSimParams(decision.weight, b.tone);
+    return runMonteCarlo(years, drift, volatility, { paths: MC_PATHS, steps: Math.max(10, Math.round(years * 4)) });
+  });
 }
 
 export function QuantumDecisionExplorer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [decisions, setDecisions] = useState<Decision[]>(() => listDecisions());
   const [activeIdx, setActiveIdx] = useState(() => Math.max(0, decisions.length - 1));
+  const [horizon, setHorizon] = useState(10);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const activeIdxRef = useRef(activeIdx);
   const decisionsRef = useRef(decisions);
+  const horizonRef = useRef(horizon);
   activeIdxRef.current = Math.min(activeIdx, Math.max(0, decisions.length - 1));
   decisionsRef.current = decisions;
+  horizonRef.current = horizon;
 
   useEffect(() => {
     track('experiment_open', { lab: 'quantum-decision-explorer', experiment: '__base' });
@@ -70,6 +88,18 @@ export function QuantumDecisionExplorer() {
       setEditingId(null);
     }
   }, [active?.id]);
+
+  // Wiązki Monte Carlo dla AKTYWNEJ decyzji — przeliczane tylko przy zmianie decyzji/horyzontu, nie co klatkę.
+  const bundlesRef = useRef<MonteCarloBundle[]>([]);
+  const bundlesKeyRef = useRef('');
+  const activeBundles = useMemo(() => {
+    if (!active) return [];
+    return computeBundles(active, horizon);
+  }, [active, horizon]);
+  useEffect(() => {
+    bundlesRef.current = activeBundles;
+    bundlesKeyRef.current = `${active?.id ?? ''}-${horizon}`;
+  }, [activeBundles, active?.id, horizon]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -135,6 +165,9 @@ export function QuantumDecisionExplorer() {
         ctx.stroke();
       }
 
+      const yearsNow = horizonRef.current;
+      const bundles = bundlesRef.current;
+
       positions.forEach((p, i) => {
         const isActive = i === curActive;
         const glowR = 3 + p.d.weight * 0.7;
@@ -156,18 +189,48 @@ export function QuantumDecisionExplorer() {
           ctx.stroke();
           ctx.lineWidth = 1;
 
-          // Odgałęzienia: alternatywne ścieżki rozchodzące się z aktywnej gwiazdy.
+          // Odgałęzienia: alternatywne ścieżki + wachlarz Monte Carlo (prawdziwa symulacja, nie ozdoba).
           p.d.branches.forEach((branch, bi) => {
-            const bAngle = (bi / Math.max(1, p.d.branches.length)) * Math.PI * 2 + clock * 0.08;
-            const blen = base * 0.22;
-            const ex = p.x + Math.cos(bAngle) * blen;
-            const ey = p.y + Math.sin(bAngle) * blen * 0.6;
-            ctx.strokeStyle = 'rgba(167,139,250,0.45)';
+            const bAngle = (bi / Math.max(1, p.d.branches.length)) * Math.PI * 2 + clock * 0.05;
+            const stemLen = base * 0.2;
+            const ex = p.x + Math.cos(bAngle) * stemLen;
+            const ey = p.y + Math.sin(bAngle) * stemLen * 0.6;
+            ctx.strokeStyle = 'rgba(167,139,250,0.4)';
             ctx.lineWidth = 1.2;
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
-            ctx.quadraticCurveTo(p.x + Math.cos(bAngle) * blen * 0.5, p.y + Math.sin(bAngle) * blen * 0.5 - 12, ex, ey);
+            ctx.quadraticCurveTo(p.x + Math.cos(bAngle) * stemLen * 0.5, p.y + Math.sin(bAngle) * stemLen * 0.5 - 12, ex, ey);
             ctx.stroke();
+
+            // Wachlarz Monte Carlo: każda linia to jedna prawdziwie zasymulowana trajektoria.
+            const bundle = bundles[bi];
+            if (bundle) {
+              const dirX = Math.cos(bAngle);
+              const dirY = Math.sin(bAngle) * 0.6;
+              const perpX = -Math.sin(bAngle);
+              const perpY = Math.cos(bAngle) * 0.6;
+              const fanLen = base * (0.14 + Math.log10(1 + yearsNow) * 0.12);
+              const refScale = Math.max(1e-6, branchToSimParams(p.d.weight, branch.tone).volatility * Math.sqrt(yearsNow) * 2.2);
+              const fanSpread = base * 0.16;
+              ctx.lineWidth = 1;
+              bundle.trajectories.forEach((traj, ti) => {
+                ctx.beginPath();
+                ctx.strokeStyle = `rgba(167,139,250,${ti === 0 ? 0.9 : 0.16})`;
+                if (ti === 0) ctx.lineWidth = 1.8;
+                for (let pi = 0; pi < traj.length; pi++) {
+                  const pt = traj[pi];
+                  const tFrac = pt.t / Math.max(1e-9, yearsNow);
+                  const normV = Math.max(-1.4, Math.min(1.4, pt.v / refScale));
+                  const px = ex + dirX * tFrac * fanLen + perpX * normV * fanSpread;
+                  const py = ey + dirY * tFrac * fanLen + perpY * normV * fanSpread;
+                  if (pi === 0) ctx.moveTo(px, py);
+                  else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                if (ti === 0) ctx.lineWidth = 1;
+              });
+            }
+
             ctx.fillStyle = BRANCH_COLOR;
             ctx.shadowColor = BRANCH_COLOR;
             ctx.shadowBlur = 5;
@@ -179,8 +242,8 @@ export function QuantumDecisionExplorer() {
             ctx.fillStyle = 'rgba(230,234,245,0.7)';
             ctx.font = '9px system-ui';
             ctx.textAlign = Math.cos(bAngle) >= 0 ? 'left' : 'right';
-            const label = branch.length > 34 ? `${branch.slice(0, 34)}…` : branch;
-            ctx.fillText(label, ex + (Math.cos(bAngle) >= 0 ? 5 : -5), ey);
+            const label = branch.text.length > 30 ? `${branch.text.slice(0, 30)}…` : branch.text;
+            ctx.fillText(label, ex + (Math.cos(bAngle) >= 0 ? 5 : -5), ey - 6);
           });
           ctx.textAlign = 'left';
         }
@@ -205,12 +268,13 @@ export function QuantumDecisionExplorer() {
 
   const saveForm = () => {
     const year = Number(form.year) || new Date().getFullYear();
-    const branches = form.branches
-      .split('\n')
-      .map((b) => b.trim())
-      .filter(Boolean)
-      .slice(0, 4);
-    const payload = { label: form.label.trim(), description: form.description.trim(), year, weight: form.weight, branches };
+    const payload = {
+      label: form.label.trim(),
+      description: form.description.trim(),
+      year,
+      weight: form.weight,
+      branches: form.branches.filter((b) => b.text.trim()).slice(0, 4),
+    };
     if (!payload.label) return;
     if (editingId && decisions.some((d) => d.id === editingId)) {
       updateDecision(editingId, payload);
@@ -236,6 +300,38 @@ export function QuantumDecisionExplorer() {
     setActiveIdx(Math.max(0, fresh.length - 1));
   };
 
+  const addBranchRow = () => {
+    if (form.branches.length >= 4) return;
+    setForm((f) => ({ ...f, branches: [...f.branches, { text: '', tone: 0 }] }));
+  };
+  const updateBranchRow = (idx: number, patch: Partial<Branch>) => {
+    setForm((f) => ({ ...f, branches: f.branches.map((b, i) => (i === idx ? { ...b, ...patch } : b)) }));
+  };
+  const removeBranchRow = (idx: number) => {
+    setForm((f) => ({ ...f, branches: f.branches.filter((_, i) => i !== idx) }));
+  };
+
+  const narrationBlocks = active
+    ? [
+        {
+          title: active.label,
+          body: `${active.description || 'Brak dodatkowego opisu.'} Waga subiektywna: ${active.weight}/10.`,
+        },
+        ...activeBundles.map((bundle, i) => {
+          const branch = active.branches[i];
+          const pct = Math.round(bundle.significantFraction * 100);
+          return {
+            title: `„${branch.text}" — rozrzut po ${horizon} ${horizon === 1 ? 'roku' : 'latach'}`,
+            body: `Symulacja Monte Carlo (${MC_PATHS} niezależnych torów, proces Wienera z dryfem) pokazuje, że przy horyzoncie ${horizon} lat w ${pct}% zasymulowanych wariantów tej ścieżki skumulowane odchylenie przekracza jedno teoretyczne odchylenie standardowe od status quo. To NIE prognoza tej konkretnej ścieżki — to demonstracja realnej własności matematycznej: niepewność rośnie jak √czas, więc nawet mały początkowy „ton" (${branch.tone > 0 ? '+' : ''}${branch.tone}) prowadzi do coraz szerszego wachlarza możliwych wyników w miarę oddalania się w czasie.`,
+          };
+        }),
+        {
+          title: 'Skąd biorą się te liczby',
+          body: 'Kierunek (dryf) i szerokość wachlarza (zmienność) pochodzą WYŁĄCZNIE z Twoich własnych ocen — "ton" każdej ścieżki i "waga" decyzji, które sam(a) ustawiasz. System nie zgaduje niczego o Twoim realnym życiu; przelicza tylko konsekwencję matematyczną Twoich założeń.',
+        },
+      ]
+    : [];
+
   return (
     <main className="qde-view" id="main-content" tabIndex={-1}>
       <div className="qde-disclaimer" role="note">
@@ -243,7 +339,7 @@ export function QuantumDecisionExplorer() {
       </div>
 
       <div className="hero-canvas-wrap qde-canvas-wrap">
-        <canvas ref={canvasRef} aria-label="Galaktyka decyzji: każda gwiazda to jedna decyzja, odgałęzienia to alternatywne ścieżki" />
+        <canvas ref={canvasRef} aria-label="Galaktyka decyzji: każda gwiazda to jedna decyzja, odgałęzienia to alternatywne ścieżki z wachlarzem symulacji Monte Carlo" />
         <div className="hero-overlay">
           <span className="brand">Quantum Decision Explorer</span>
           <h2>{active ? active.label : 'Dodaj swoją pierwszą decyzję'}</h2>
@@ -268,30 +364,32 @@ export function QuantumDecisionExplorer() {
         </div>
       )}
 
-      {active && (
-        <NarratorPanel
-          blocks={[
-            {
-              title: active.label,
-              body: `${active.description || 'Brak dodatkowego opisu.'} Waga subiektywna: ${active.weight}/10.${
-                active.branches.length > 0
-                  ? ` Alternatywne ścieżki rozważone w tej eksploracji: ${active.branches.join(' · ')}.`
-                  : ''
-              }`,
-            },
-          ]}
-          askContext={{
-            labId: 'quantum-decision-explorer',
-            lab: 'Quantum Decision Explorer',
-            experiment: active.label,
-            honesty: 'narzędzie narracyjne, nie model fizyczny',
-            honestyNote: DISCLAIMER,
-            params: { year: active.year, weight: active.weight },
-            stats: {},
-            narration: [{ title: active.label, body: active.description }],
-          }}
-        />
+      {active && active.branches.length > 0 && (
+        <div className="control qde-horizon">
+          <label>Horyzont symulacji Monte Carlo</label>
+          <div className="seg" role="group" aria-label="Horyzont czasowy">
+            {HORIZONS.map((y) => (
+              <button key={y} aria-pressed={horizon === y} onClick={() => setHorizon(y)}>
+                {y} {y === 1 ? 'rok' : y < 5 ? 'lata' : 'lat'}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
+
+      {active && <NarratorPanel
+        blocks={narrationBlocks}
+        askContext={{
+          labId: 'quantum-decision-explorer',
+          lab: 'Quantum Decision Explorer',
+          experiment: active.label,
+          honesty: 'narzędzie narracyjne, nie model fizyczny',
+          honestyNote: DISCLAIMER,
+          params: { year: active.year, weight: active.weight, horizon },
+          stats: {},
+          narration: [{ title: active.label, body: active.description }],
+        }}
+      />}
 
       <div className="qde-form">
         <div className="section-label">{editingId ? 'Edytuj decyzję' : 'Nowa decyzja'}</div>
@@ -326,7 +424,7 @@ export function QuantumDecisionExplorer() {
           />
         </div>
         <div className="control">
-          <label><span>Waga (subiektywna)</span><span className="val">{form.weight}/10</span></label>
+          <label><span>Waga (subiektywna) — steruje też zmiennością symulacji</span><span className="val">{form.weight}/10</span></label>
           <input
             type="range"
             min={1}
@@ -336,15 +434,43 @@ export function QuantumDecisionExplorer() {
             onChange={(e) => setForm((f) => ({ ...f, weight: Number(e.target.value) }))}
           />
         </div>
-        <div className="control">
-          <label>Alternatywne ścieżki (jedna na linię, max 4)</label>
-          <textarea
-            className="qde-input qde-textarea"
-            value={form.branches}
-            placeholder={'Gdyby wybrać inaczej…\nGdyby poczekać…'}
-            onChange={(e) => setForm((f) => ({ ...f, branches: e.target.value }))}
-          />
+
+        <div className="qde-branches">
+          <label>Alternatywne ścieżki (max 4) — „ton" steruje kierunkiem symulacji Monte Carlo</label>
+          {form.branches.map((b, i) => (
+            <div className="qde-branch-row" key={i}>
+              <input
+                type="text"
+                className="qde-input"
+                value={b.text}
+                maxLength={160}
+                placeholder="Gdyby…"
+                onChange={(e) => updateBranchRow(i, { text: e.target.value })}
+              />
+              <div className="qde-branch-tone">
+                <input
+                  type="range"
+                  min={-5}
+                  max={5}
+                  step={1}
+                  value={b.tone}
+                  aria-label={`Ton ścieżki ${i + 1}`}
+                  onChange={(e) => updateBranchRow(i, { tone: Number(e.target.value) })}
+                />
+                <span className="qde-branch-tone-val">{b.tone > 0 ? `+${b.tone}` : b.tone}</span>
+              </div>
+              <button className="chip-btn danger qde-branch-remove" onClick={() => removeBranchRow(i)} aria-label="Usuń ścieżkę">
+                ✕
+              </button>
+            </div>
+          ))}
+          {form.branches.length < 4 && (
+            <button className="chip-btn" onClick={addBranchRow}>
+              ➕ Dodaj ścieżkę
+            </button>
+          )}
         </div>
+
         <div className="qde-form-actions">
           <button className="chip-btn" onClick={saveForm} disabled={!form.label.trim()}>
             {editingId ? '💾 Zapisz zmiany' : '➕ Dodaj decyzję'}

@@ -6,6 +6,21 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Poprawiono (Quantum Lab ukończone — laboratorium 1 z 9 w kolejności dopracowania)
+- Tunelowanie: krzywa |ψ|² dostała poświatę (glow), a lokalna FAZA fali
+  (atan2(Im,Re) w każdym punkcie siatki — prawdziwa dana z solvera FFT, nie
+  ozdoba) koduje kolor punktów wzdłuż obwiedni. Efekt: widać teraz na żywo
+  interferencję fali padającej z odbitą jako falującą barwę przed barierą —
+  wcześniej ta informacja istniała w symulacji, ale nigdzie się nie
+  renderowała. Zero zmian w solverze split-step Fourier.
+- Sfera Blocha i Splątanie (CHSH): zweryfikowane, uznane za już dobrze
+  wykonane (świecący wektor stanu, pulsujące źródło par, brak zmian).
+- Quantum Lab jest pierwszym w kolejności ustalonej wspólnie z użytkownikiem
+  (Quantum → Einstein → Universe → Atom → Particle → Civilization →
+  Multiverse) — każde kolejne laboratorium dostaje ten sam zabieg: zero
+  zmian w silniku fizycznym, poprawa wyłącznie warstwy renderującej, z
+  pełną weryfikacją (lint/typecheck/testy/build/Playwright) przed przejściem dalej.
+
 ### Poprawiono (dopracowanie istniejącego laboratorium — dwie szczeliny)
 - Quantum Lab: ekran detekcyjny renderuje teraz prawdziwie AKUMULOWANĄ
   poświatę trafień (płótno offscreen, additive blending, każde trafienie

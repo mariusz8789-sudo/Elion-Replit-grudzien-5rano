@@ -169,16 +169,25 @@ class TunnelingSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+    bgGrad.addColorStop(0, '#070b16');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
     const base = h * 0.78;
     const bw = (this.lastW / L) * w;
     const bh = h * 0.42 * Math.min(this.lastV0 / 2, 1.2);
 
-    // bariera
-    ctx.fillStyle = 'rgba(240,179,92,0.25)';
-    ctx.strokeStyle = 'rgba(240,179,92,0.8)';
+    // bariera — poświata koduje jej wysokość (V0), nie jest ozdobą
+    const barGrad = ctx.createLinearGradient(0, base - bh, 0, base);
+    barGrad.addColorStop(0, 'rgba(255,214,150,0.4)');
+    barGrad.addColorStop(1, 'rgba(240,179,92,0.12)');
+    ctx.fillStyle = barGrad;
+    ctx.shadowColor = 'rgba(240,179,92,0.6)';
+    ctx.shadowBlur = 14;
     ctx.fillRect(w / 2 - bw / 2, base - bh, bw, bh);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(240,179,92,0.8)';
     ctx.strokeRect(w / 2 - bw / 2, base - bh, bw, bh);
 
     // poziom energii pakietu
@@ -194,15 +203,18 @@ class TunnelingSim implements Sim {
     ctx.font = '10px ui-monospace, monospace';
     ctx.fillText('E pakietu', 8, eH - 5);
 
-    // |ψ|²
+    // |ψ|² — świecąca obwiednia amplitudy
     const scale = h * 2.4;
+    ctx.shadowColor = '#5cd6e8';
+    ctx.shadowBlur = 8;
     tracePolylineBy(ctx, N, (i) => ({
       x: (i / N) * w,
       y: base - (this.re[i] ** 2 + this.im[i] ** 2) * scale,
     }));
-    ctx.strokeStyle = '#5cd6e8';
+    ctx.strokeStyle = '#8de8f5';
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.shadowBlur = 0;
     ctx.lineTo(w, base);
     ctx.lineTo(0, base);
     ctx.closePath();
@@ -210,15 +222,32 @@ class TunnelingSim implements Sim {
     ctx.fill();
     ctx.lineWidth = 1;
 
-    // Re ψ (delikatnie) — pokazuje oscylacje fazy
-    tracePolylineBy(ctx, N, (i) => ({ x: (i / N) * w, y: base - this.re[i] * h * 0.35 }));
-    ctx.strokeStyle = 'rgba(167,139,250,0.35)';
-    ctx.stroke();
+    // Faza lokalna ψ = |ψ|·e^{iθ} — koloruje falę tam, gdzie ma amplitudę.
+    // To PRAWDZIWA dana z symulacji (atan2(Im,Re) w każdym punkcie siatki),
+    // nie ozdoba: pokazuje kierunek i prędkość fazową fali, w tym interferencję
+    // fali padającej z odbitą (widoczną jako "falująca" barwa przed barierą).
+    const maxAmp = Math.max(...Array.from({ length: N }, (_, i) => this.re[i] ** 2 + this.im[i] ** 2));
+    for (let i = 0; i < N; i += 4) {
+      const amp2 = this.re[i] ** 2 + this.im[i] ** 2;
+      if (amp2 < maxAmp * 0.02) continue;
+      const phase = Math.atan2(this.im[i], this.re[i]);
+      const hue = ((phase / (2 * Math.PI)) * 360 + 360) % 360;
+      const x = (i / N) * w;
+      const y = base - amp2 * scale;
+      const r = 1.4 + (amp2 / maxAmp) * 2.2;
+      ctx.fillStyle = `hsla(${hue}, 85%, 68%, 0.9)`;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.fillStyle = 'rgba(230,234,245,0.75)';
     ctx.font = '11px ui-monospace, monospace';
     ctx.fillText(`przeszło: ${(this.trans * 100).toFixed(1)}%`, w - 130, 18);
     ctx.fillText(`odbite:  ${(this.refl * 100).toFixed(1)}%`, w - 130, 33);
+    ctx.fillStyle = 'rgba(141,151,180,0.7)';
+    ctx.font = '9px system-ui';
+    ctx.fillText('kolor = faza ψ (realna dana symulacji)', 8, h - 8);
   }
 
   getStats() {

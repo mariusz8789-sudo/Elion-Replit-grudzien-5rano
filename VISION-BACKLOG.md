@@ -63,6 +63,62 @@ Ryzyko do świadomego zarządzania: to największy, najbardziej ambitny punkt
 całego backlogu — łatwo zacząć i nie skończyć. Faza 1 musi być kompletna,
 przetestowana i wydana sama w sobie, zanim zacznie się faza 2.
 
+### Frontier Science Lab (nowa kategoria — zagadki i granice wiedzy)
+
+Jedenaste laboratorium (dziś: Universe, Space-Time, Einstein, Quantum, Atom,
+Nuclear, Particle, Multiverse, Civilization, AI Discovery), celowo
+zaplanowane na PO osiągnięciu przez istniejące laby światowego poziomu
+wykonania — nie teraz. Silniejsza koncepcja niż pojedynczy kontrowersyjny
+temat: całe laboratorium poświęcone granicy między nauką ugruntowaną,
+aktywnymi badaniami, historycznymi zagadkami i inspiracją fikcyjną,
+eksplorowane przez dowody i konkurujące hipotezy — NIE przez przekonywanie.
+
+Scenariusze (każdy jako osobny eksperyment w tym labie, ten sam wzorzec co
+`ExperimentDef` wszędzie indziej): Eksperyment Filadelfia (legenda i jej
+udokumentowane pochodzenie — USS Eldridge, badania Townsenda Browna nad
+efektem Biefelda-Browna, brak jakichkolwiek akt marynarki potwierdzających
+wydarzenie), Paradoks Fermiego, sygnał WOW!, ciemna materia, ciemna energia
+(obie już częściowo pokryte w Universe/Multiverse Lab — tu: pogłębione,
+zestawienie konkurencyjnych modeli), mosty Einsteina-Rosena, napęd
+Alcubierre'a (oba już wspomniane w Einstein Lab jako hipotezy — tu:
+rozwinięte studium przypadku), rój Dysona (już w Civilization Lab —
+tu: historia pomysłu Dysona 1960 + przegląd wyników poszukiwań),
+Oumuamua, Zdarzenie Tunguskie, kwantowy eksperyment z opóźnionym wyborem
+(rozszerzenie Quantum Lab), nierówności Bella (już zaimplementowane jako
+CHSH w Quantum Lab — tu: kontekst historyczny/filozoficzny), kot
+Schrödingera (eksperyment myślowy, nie symulacja fizyczna), problem trzech
+ciał (patrz osobna pozycja niżej — może żyć w obu miejscach: fizyka w
+laboratorium fizyki, kontekst "dlaczego to fascynuje ludzi" tutaj),
+hipoteza symulacji (jako filozofia, jawnie NIE jako twierdzenie fizyczne).
+
+**Kluczowa decyzja projektowa do rozstrzygnięcia PRZED implementacją:**
+użytkownik poprosił o pięć kategorii scenariusza (Established Science /
+Active Scientific Research / Theoretical Physics / Historical Mystery /
+Fictional Inspiration) — to inna oś niż istniejący sześciostopniowy
+`ConfirmationLevel` (core/citation.ts), który mierzy STOPIEŃ potwierdzenia,
+nie RODZAJ twierdzenia. Rekomendacja: nie budować równoległej taksonomii.
+Dodać jedno nowe, opcjonalne pole `ScenarioKind` obok istniejącego
+`ConfirmationLevel` (scenariusz może być jednocześnie np. "Historical
+Mystery" I "★★ hipoteza" — te dwie osie się nie wykluczają, opisują różne
+rzeczy). Prościej niż wygląda: to dokładnie ten sam wzorzec co dodanie
+`HonestyLevel` obok `ConfirmationLevel` wcześniej w projekcie — dwie
+uzupełniające się skale, nie konkurencyjne.
+
+Reużywalna architektura (zero nowego systemu): `ExperimentDef.narrate()` z
+`citation` na każdym bloku (już wspiera "link do prawdziwej publikacji, gdy
+dostępny" — dokładnie to, o co poproszono), `HonestyBadge`/`ConfirmationLevel`
+dla wskaźnika pewności, `askAI()` ugruntowany w nowym
+`knowledge/frontier-science.md` dla „AI Mentor wyjaśniającego wiele punktów
+widzenia" (to już jest dokładnie to, do czego służy warstwa 1 Narratora —
+żaden nowy mechanizm AI). Wizualizacja: `Sim` (2D) domyślnie, `Sim3D` tam,
+gdzie uzasadnione (np. Oumuamua — prawdziwa, ekscentryczna trajektoria
+hiperboliczna, dokładna fizyka orbitalna już mamy w `core/physics.ts`).
+
+Ryzyko do zarządzania: to lab, w którym najłatwiej o utratę wiarygodności
+całej platformy, jeśli granica model/hipoteza/legenda się zatrze choćby raz.
+Każdy pojedynczy scenariusz wymaga tego samego poziomu researchu co
+`knowledge/*.md` dla istniejących labów — nie da się tego zrobić płytko.
+
 ### Trzy Ciała — od wykresu do laboratorium (★★★★★ chaos deterministyczny)
 
 Rozszerzenie prostego "pokaż orbity trzech ciał" w pełne, interaktywne

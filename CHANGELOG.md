@@ -6,6 +6,25 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Multiverse Nexus — sala portali 3D)
+- Multiverse Lab: „Multiverse Nexus" (`multiverse-nexus.ts`) — oryginalna
+  metafora nawigacyjna (świadomie NIE kopiująca żadnego filmu/serialu):
+  sześć świecących portali w scenie 3D, klikalnych przez raycasting
+  (`THREE.Raycaster`, nowa technika interakcji w `core/three/`). Cztery
+  portale „lokalne" (inne stałe fizyczne) podświetlają się i zmieniają
+  narrację bez opuszczania laboratorium; dwa portale-tunele NAPRAWDĘ
+  przenoszą do Universe Lab z obliczonymi wartościami Ω_Λ — przez
+  `core/scenarioBridge.ts`, ten sam most co ekran „Co by było, gdyby?"
+  (parametry importowane wprost z `data/whatIfScenarios.ts`, zero
+  duplikowania liczb).
+- Naprawiony podczas budowy błąd kamery 3D: `OrbitControls` orbituje wokół
+  `(0,0,0)`, więc kamera bliska temu punktowi degeneruje się po pierwszym
+  `controls.update()` (widok "uciekał" w przypadkowy kierunek) — kamera
+  Nexusa (i już wcześniej Układu Słonecznego 3D) zawsze patrzy na środek
+  sceny z realnej odległości.
+- 5 nowych testów (`multiverseNexus.test.ts`) — portale-tunele wskazują
+  realne laby i realne, w zakresie parametry — 158 testów frontendowych.
+
 ### Dodano (Vision Backlog + Tesserakt 4D)
 - `VISION-BACKLOG.md` — katalog ~60 pomysłów na przyszłość (Quantum Reality,
   wyższe wymiary, nanotechnologia, biologia molekularna, Grand Challenges,

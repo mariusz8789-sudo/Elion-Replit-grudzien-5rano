@@ -51,7 +51,17 @@ w aplikacji rozdzielić wyraźnie).
 ## Wnioski projektowe dla Genesis OS
 1. Rozdzielać twardo: obliczone konsekwencje zmian (★★★★) od wyjaśnień
    przez multiwersum (★★) — to serce uczciwości tego laba
-2. Galeria nazwanych wszechświatów z audytem konsekwencji (Etap 1 — presety)
+2. Galeria nazwanych wszechświatów z audytem konsekwencji (zaimplementowane
+   dwukrotnie: jako presety suwaków w eksperymencie bazowym, i jako
+   „Multiverse Nexus" — 3D sala portali (Three.js, `Sim3D`), oryginalna
+   metafora Genesis OS, NIE odwzorowanie żadnego filmu/serialu. Portale
+   „lokalne" pokazują te same modele teoretyczne co suwaki; portale-tunele
+   NAPRAWDĘ przenoszą do Universe Lab z obliczonymi wartościami Ω_Λ przez
+   `core/scenarioBridge.ts` — ten sam most co ekran „Co by było, gdyby?")
 3. Porównywarka A/B dwóch wszechświatów (Etap 2)
 4. Poziomy Tegmarka jako interaktywna mapa pojęciowa — porządkuje myślenie
    użytkownika lepiej niż jakikolwiek tekst
+5. Tesserakt (4D, zaimplementowane) — geometria, nie fizyka: obrót
+   hipersześcianu w płaszczyźnie 4D i rzut do 3D, dokładna algebra liniowa,
+   jawnie odróżniona od spekulacji o fizycznych dodatkowych wymiarach
+   (teoria strun) — patrz `core/physics.ts` (`rotate4D`/`project4Dto3D`).

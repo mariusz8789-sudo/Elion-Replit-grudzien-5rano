@@ -102,10 +102,13 @@ wzorzec identyczny z `discoveryLog.ts`.
 Domyślny silnik renderujący zostaje Canvas 2D (patrz „Świadome decyzje
 architektoniczne" niżej — ta decyzja się NIE zmieniła dla większości
 laboratoriów). Tam, gdzie głębia 3D realnie pomaga zrozumieć fizykę — dziś:
-Universe Lab → „Układ Słoneczny 3D", kamera pokazuje pod kątem, że orbity
+Universe Lab → „Układ Słoneczny 3D" (kamera pokazuje pod kątem, że orbity
 leżą blisko jednej płaszczyzny, co samo tłumaczy powstanie z dysku
-protoplanetarnego — jest opcjonalny drugi tor renderowania, ŚWIADOMIE
-zaprojektowany jako lustro istniejącego kontraktu `Sim`, nie równoległy system:
+protoplanetarnego), Multiverse Lab → „Tesserakt (4D)" (obrót hipersześcianu)
+i „Multiverse Nexus" (sala portali — drugi i trzeci niezależny konsument
+tego samego kontraktu, potwierdzenie że się generalizuje, nie jednorazowy
+kod) — jest opcjonalny drugi tor renderowania, ŚWIADOMIE zaprojektowany
+jako lustro istniejącego kontraktu `Sim`, nie równoległy system:
 
 ```ts
 // core/three/types.ts — ten sam cykl życia co Sim, inny adapter renderujący
@@ -136,6 +139,18 @@ dopiero po pierwszym wejściu do takiej sceny (cache-first w `public/sw.js`)
 — pierwsza wizyta wymaga sieci, kolejne działają offline jak reszta PWA.
 Kamera: `OrbitControls` z `three/examples/jsm` (przeciągnij/scrolluj).
 
+**Interakcja przez raycasting** (`multiverse-nexus.ts`): `Sim3D.pointer(x,y,type)`
+dostaje współrzędne CSS px identycznie jak 2D `Sim.pointer`; sama sima
+przechowuje referencję do `camera` zapisaną w `init()` i tworzy
+`THREE.Raycaster`, żeby zamienić dotknięcie ekranu na trafienie w konkretny
+obiekt sceny (`raycaster.intersectObjects(...)`) — bez tego 3D jest tylko
+oglądalne, nie klikalne. Ważna pułapka odkryta przy budowie: `OrbitControls`
+orbituje wokół `target` domyślnie `(0,0,0)`, więc `camera.position` musi być
+REALNIE oddalone od tego punktu w `init()` — kamera blisko `(0,0,0)`
+degeneruje się po pierwszym `controls.update()` i widok "ucieka" w
+przypadkowym kierunku (naprawione w obu scenach 3D: kamera zawsze patrzy
+na `(0,0,0)` z realnej odległości, nigdy nie stoi w tym punkcie).
+
 ### „Co by było, gdyby?" — scenario bridge
 
 `data/whatIfScenarios.ts` to katalog pytań, każde mapowane WYŁĄCZNIE na
@@ -151,6 +166,12 @@ wpisywana drugi raz ręcznie w danych scenariusza, więc nie może się z nią
 rozjechać. `whatIfScenarios.test.ts` sprawdza w czasie budowania, że każdy
 klucz parametru i każda wartość select/slider istnieje naprawdę w rejestrze
 laboratoriów (żaden scenariusz nie może cicho nadpisać nieistniejącego pola).
+
+Drugi konsument tego samego mostu: „Multiverse Nexus" (`multiverse-nexus.ts`)
+woła `setPendingScenario`/zmienia hash bezpośrednio z WNĘTRZA klasy `Sim3D`
+(nie z komponentu Reacta) — działa, bo `scenarioBridge.ts` to zwykły moduł
+w pamięci, nie kontekst Reacta. Dwa różne wejścia UI (karta na osobnym
+ekranie vs portal w scenie 3D), jeden mechanizm nawigacji.
 
 ## Funkcje lokalne (bez backendu, bez konta)
 
@@ -186,7 +207,7 @@ w `lib.mjs` — testowana przez `node --test` bez uruchamiania portu
 
 ## Testy
 
-153 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 181.
+158 testów frontendowych (vitest) + 28 backendowych (`node --test`) = 186.
 
 - **Fizyka i symulacje** (`__tests__/physics.test.ts`, `sims.test.ts`):
   twarde asercje naukowe (złamanie nierówności Bella |S|>2, twierdzenie

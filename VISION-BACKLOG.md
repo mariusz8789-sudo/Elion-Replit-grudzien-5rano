@@ -44,6 +44,24 @@ Legenda pewności: ★★★★★ potwierdzona · ★★★★ potwierdzona (ko
   `quantum-tunneling.ts` już istnieje; rozszerzenie do 2D (cząstka w studni
   potencjału, oscylator harmoniczny) to głównie koszt UI, nie nowej fizyki.
 
+## Multiverse / nawigacja (nowa kategoria, poza pierwotną listą)
+
+- ✅ **Multiverse Nexus** — Multiverse Lab → `multiverse-nexus.ts`, sala
+  portali w 3D (oryginalna metafora, nie kopia żadnego filmu/serialu):
+  portale „lokalne" (inne stałe fizyczne) i portale-tunele, które NAPRAWDĘ
+  przenoszą do innego laboratorium przez `core/scenarioBridge.ts` — ten sam
+  most co „Co by było, gdyby?" (dwa wejścia UI, jeden mechanizm).
+- **Więcej tuneli w Nexusie** (tani przyrost) — każdy nowy wpis w
+  `WHAT_IF_SCENARIOS` może natychmiast stać się kolejnym portalem-tunelem
+  bez nowego kodu silnika, tylko nowy obiekt `WormholePortal`.
+- **Nexus jako uniwersalny hub startowy** (większa decyzja produktowa) —
+  dziś portal-hub istnieje wyłącznie wewnątrz Multiverse Lab; docelowo
+  mógłby zastąpić/uzupełnić siatkę kart na ekranie głównym jako
+  alternatywny, przestrzenny sposób nawigacji po WSZYSTKICH laboratoriach.
+  Świadomie nie robić tego pochopnie — siatka kart jest dziś dostępna i
+  szybka (SEO, dostępność, czas ładowania); hub 3D jako JEDYNA nawigacja
+  byłby regresją dla części użytkowników.
+
 ## Higher Dimensions
 
 - ✅ **Tesserakt 4D** — Multiverse Lab → `multiverse-tesseract.ts`,

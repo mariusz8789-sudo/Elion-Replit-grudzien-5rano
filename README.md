@@ -55,14 +55,18 @@ Wszechświata (8,8×10²⁶ m).
 - **Tesserakt 4D** (Multiverse Lab) — obrót w płaszczyźnie 4D i rzut do 3D,
   dokładna algebra liniowa (nie spekulacja o fizycznych dodatkowych
   wymiarach — to osobna, jasno odróżniona kwestia)
-- **181 testów** (153 vitest frontend + 28 node:test backend)
+- **Multiverse Nexus** — 3D sala portali (Three.js), oryginalna metafora
+  Genesis OS (nie kopia żadnego filmu/serialu): portale „lokalne" pokazują
+  inne stałe fizyczne, portale-tunele NAPRAWDĘ przenoszą do innego
+  laboratorium przez ten sam most co "Co by było, gdyby?"
+- **186 testów** (158 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 181 testów (fizyka + funkcje lokalne + backend)
+npm test           # 186 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

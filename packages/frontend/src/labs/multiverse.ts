@@ -1,5 +1,6 @@
 import type { LabDefinition, Sim, SimParams } from '../core/types';
 import { multiverseTesseract } from './experiments/multiverse-tesseract';
+import { multiverseNexus } from './experiments/multiverse-nexus';
 
 /**
  * Multiverse Lab — alternatywne stałe fizyczne. MODEL TEORETYCZNY.
@@ -208,5 +209,5 @@ export const multiverseLab: LabDefinition = {
 
     return blocks;
   },
-  experiments: [multiverseTesseract],
+  experiments: [multiverseNexus, multiverseTesseract],
 };

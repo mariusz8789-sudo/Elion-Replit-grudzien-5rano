@@ -73,10 +73,13 @@ class CollisionSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
-    ctx.fillRect(0, 0, w, h);
     const cx = w / 2;
     const cy = h / 2;
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.7);
+    bgGrad.addColorStop(0, '#080a16');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
     const R = Math.min(w, h) * 0.44;
 
     // Warstwy detektora
@@ -91,12 +94,16 @@ class CollisionSim implements Sim {
     ctx.fillText('tracker', cx + R * 0.2, cy - 4);
     ctx.fillText('kalorymetr', cx + R * 0.5, cy + 12);
 
-    // Tory: łuki o krzywiźnie ∝ B/pt, znak wg ładunku
+    // Tory: łuki o krzywiźnie ∝ B/pt, znak wg ładunku. Poświata skalowana
+    // prawdziwym pt toru (wyższy pęd poprzeczny = bardziej energetyczna
+    // cząstka, jaśniejszy tor) — nie ozdoba stała.
     for (const t of this.tracks) {
       const len = R * t.progress;
       const curv = t.charge === 0 ? 0 : (t.charge * 1.4) / (t.pt * 4); // 1/r w jedn. ekranu
       ctx.strokeStyle = t.color;
       ctx.lineWidth = 1.6;
+      ctx.shadowColor = t.color;
+      ctx.shadowBlur = 2 + t.pt * 6;
       if (t.charge === 0) ctx.setLineDash([5, 5]);
       ctx.beginPath();
       let x = cx;
@@ -114,6 +121,7 @@ class CollisionSim implements Sim {
       }
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
       if (t.progress >= 1) {
         ctx.fillStyle = t.color;
         ctx.font = '9px ui-monospace, monospace';
@@ -123,9 +131,12 @@ class CollisionSim implements Sim {
 
     // Punkt zderzenia
     ctx.fillStyle = '#fff';
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.arc(cx, cy, 3, 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
 
     ctx.fillStyle = 'rgba(230,234,245,0.6)';
     ctx.font = '10px system-ui';

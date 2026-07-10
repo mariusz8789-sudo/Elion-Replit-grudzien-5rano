@@ -101,7 +101,10 @@ class InvMassSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
+    const bgGrad = ctx.createRadialGradient(w / 2, h * 0.4, 0, w / 2, h * 0.4, Math.max(w, h) * 0.75);
+    bgGrad.addColorStop(0, '#080a16');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
     const bx = w * 0.09;
     const bw = w * 0.86;
@@ -125,14 +128,23 @@ class InvMassSim implements Sim {
     }
     ctx.fillText('M(μ⁺μ⁻) [GeV]', bx + bw / 2 - 40, by + bh + 28);
 
-    // histogram (log-y)
+    // histogram (log-y). Poświata TYLKO na binach, które faktycznie
+    // przekroczyły próg odkrycia piku (ta sama reguła co w getStats/narrate)
+    // — jasność sygnalizuje realne wyłonienie się rezonansu z szumu.
     const maxBin = Math.max(4, ...this.hist);
-    ctx.fillStyle = 'rgba(92,214,232,0.85)';
+    const peakThreshold = 8 + this.total * 0.002;
     const binW = bw / BINS;
     for (let i = 0; i < BINS; i++) {
       if (this.hist[i] === 0) continue;
       const y = (Math.log(this.hist[i] + 1) / Math.log(maxBin + 1)) * bh;
+      const isPeak = this.hist[i] > peakThreshold;
+      ctx.fillStyle = isPeak ? 'rgba(240,179,92,0.95)' : 'rgba(92,214,232,0.85)';
+      if (isPeak) {
+        ctx.shadowColor = 'rgba(240,179,92,0.9)';
+        ctx.shadowBlur = 6;
+      }
       ctx.fillRect(bx + i * binW, by + bh - y, Math.max(binW - 0.5, 1), y);
+      ctx.shadowBlur = 0;
     }
 
     // etykiety rezonansów, gdy pik urósł

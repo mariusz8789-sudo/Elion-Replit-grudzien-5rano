@@ -6,6 +6,28 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Poprawiono (Particle Lab ukończone — laboratorium 5 z 9 w kolejności dopracowania)
+- Detektor: tło zmienione na gradient radialny; tory cząstek dostały
+  poświatę skalowaną PRAWDZIWYM pt toru (wyższy pęd poprzeczny = bardziej
+  energetyczna cząstka, jaśniejszy tor — dokładnie ta sama liczba, która
+  już sterowała krzywizną toru r = p/qB), punkt zderzenia dostał białą
+  poświatę. Zero zmian w fizyce krzywizny ani w losowaniu zdarzeń.
+- Odkryj cząstkę (histogram masy niezmienniczej): słupki, które faktycznie
+  przekroczyły próg odkrycia piku (ta sama reguła co w narrate()/getStats,
+  8 + total×0,002), dostają ciepłą bursztynową poświatę — rezonanse J/ψ,
+  ψ(2S), Υ i Z⁰ wizualnie wyłaniają się z szumu w momencie odkrycia, a nie
+  wcześniej. Zero zmian w próbkowaniu Breit–Wignera ani w danych PDG.
+- Pełna weryfikacja przed przejściem dalej: typecheck, lint, 163 testy
+  frontendowe + 28 backendowych (191 razem) — wszystkie zielone, build
+  produkcyjny bez ostrzeżeń, wizualna weryfikacja Playwrightem obu
+  eksperymentów (w tym pełne odkrycie wszystkich 4 rezonansów) bez błędów
+  konsoli.
+- Civilization Lab (6 z 9) jest następny w kolejności — Chemistry Lab i
+  Biology Lab z pierwotnej listy priorytetów nie istnieją jeszcze jako
+  laboratoria, więc zgodnie z zasadą „nie dodawaj nowych laboratoriów w
+  tej fazie" pomijamy je na razie i wracamy do nich po ukończeniu
+  wszystkich istniejących.
+
 ### Poprawiono (Atom Lab ukończone — laboratorium 4 z 9 w kolejności dopracowania)
 - Powłoki (model Bohra): tło zmienione na gradient radialny; jądro
   dostało poświatę skalowaną PRAWDZIWYM Z pierwiastka (log₂Z — więcej

@@ -6,6 +6,25 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Poprawiono (Einstein Lab ukończone — laboratorium 2 z 9 w kolejności dopracowania)
+- Ugięcie światła (Schwarzschild/Kerr/Alcubierre): tło zmienione z płaskiej
+  czerni na gradient radialny; ślady fotonów dostały poświatę sterowaną
+  PRAWDZIWĄ minimalną odległością każdego śladu od centrum masy
+  (`closeness` liczone z rzeczywistych współrzędnych trajektorii, nie
+  ozdoba) — im bliżej horyzontu przeleciał foton, tym cieplejszy i
+  jaśniejszy jest jego ślad. Pierścień fotonowy dostał dopasowaną poświatę.
+  Zero zmian w `update()`, całkowaniu Kerra ani w renderze bańki Alcubierre'a.
+- Soczewkowanie: tło zmienione na gradient radialny, soczewka (masa)
+  dostała poświatę — bez zmian we wzorach θ±/μ±/krzywej mikrosoczewkowania.
+- Czarna dziura 3D: zweryfikowana ponownie po zmianach w pozostałych
+  eksperymentach — bez regresji (bloom, dysk akrecyjny, ślady fotonów
+  renderują się poprawnie, zero błędów konsoli).
+- Pełna weryfikacja przed przejściem dalej: typecheck, lint, 163 testy
+  frontendowe + 28 backendowych (191 razem) — wszystkie zielone, build
+  produkcyjny bez ostrzeżeń, wizualna weryfikacja Playwrightem wszystkich
+  3 eksperymentów (w tym trzech trybów metryki) bez błędów konsoli.
+- Universe Lab (3 z 9) jest następny w kolejności.
+
 ### Poprawiono (Quantum Lab ukończone — laboratorium 1 z 9 w kolejności dopracowania)
 - Tunelowanie: krzywa |ψ|² dostała poświatę (glow), a lokalna FAZA fali
   (atan2(Im,Re) w każdym punkcie siatki — prawdziwa dana z solvera FFT, nie

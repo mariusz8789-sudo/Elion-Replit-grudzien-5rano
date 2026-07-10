@@ -43,14 +43,17 @@ class LensingSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
+    const cx = w / 2;
+    const cy = h * 0.38;
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.8);
+    bgGrad.addColorStop(0, '#080c18');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
     for (const s of this.stars) {
       ctx.fillStyle = `rgba(200,215,255,${s.a})`;
       ctx.fillRect(s.x, s.y, 1.2, 1.2);
     }
-    const cx = w / 2;
-    const cy = h * 0.38;
     const thetaE = Math.min(w, h) * 0.14; // promień Einsteina w px
 
     const beta = this.beta;
@@ -64,11 +67,14 @@ class LensingSim implements Sim {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // soczewka (masa)
+    // soczewka (masa) — świecąca, bo to ONA zakrzywia obraz w tle
     ctx.fillStyle = '#f0b35c';
+    ctx.shadowColor = 'rgba(240,179,92,0.8)';
+    ctx.shadowBlur = 12;
     ctx.beginPath();
     ctx.arc(cx, cy, 5, 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(240,179,92,0.7)';
     ctx.font = '9px system-ui';
     ctx.fillText('soczewka', cx + 8, cy + 3);

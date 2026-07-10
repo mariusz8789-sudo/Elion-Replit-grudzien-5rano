@@ -93,11 +93,15 @@ class GravityLightSim implements Sim {
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    ctx.fillStyle = '#02030a';
-    ctx.fillRect(0, 0, w, h);
     const cx = w / 2;
     const cy = h / 2;
     const rsPx = 14;
+
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.7);
+    bgGrad.addColorStop(0, '#0a0e1c');
+    bgGrad.addColorStop(1, '#02030a');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
 
     if (this.mode === 'alcubierre') {
       this.renderAlcubierre(ctx, w, h);
@@ -134,20 +138,38 @@ class GravityLightSim implements Sim {
       ctx.stroke();
     }
 
-    // Fotony
+    // Fotony — jasność krawędzi rośnie im bliżej horyzontu przeszedł tor
+    // (prawdziwa odległość każdego punktu od środka, nie ozdoba): mocniej
+    // ugięte tory świecą mocniej, dokładnie tam, gdzie krzywizna jest
+    // największa.
     for (const ph of this.photons) {
-      ctx.strokeStyle = 'rgba(240,179,92,0.8)';
-      ctx.lineWidth = 1.4;
+      let minR = Infinity;
+      for (const t of ph.trail) {
+        const r = Math.hypot(t.x - cx, t.y - cy);
+        if (r < minR) minR = r;
+      }
+      const closeness = Math.max(0, Math.min(1, 1 - (minR - rsPx * 1.5) / (rsPx * 10)));
+      ctx.strokeStyle = `rgba(255,${196 - closeness * 40},${120 + closeness * 40},${0.55 + closeness * 0.4})`;
+      ctx.lineWidth = 1.3 + closeness * 1.2;
+      if (closeness > 0.4) {
+        ctx.shadowColor = 'rgba(240,179,92,0.8)';
+        ctx.shadowBlur = 6 * closeness;
+      }
       ctx.beginPath();
       ph.trail.forEach((t, i) => (i === 0 ? ctx.moveTo(t.x, t.y) : ctx.lineTo(t.x, t.y)));
       ctx.stroke();
+      ctx.shadowBlur = 0;
     }
+    ctx.lineWidth = 1;
 
-    // Czarna dziura: horyzont + pierścień fotonowy
+    // Czarna dziura: horyzont + pierścień fotonowy, ze świecącą krawędzią
     ctx.beginPath();
     ctx.arc(cx, cy, rsPx * 1.5, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(240,179,92,0.5)';
+    ctx.strokeStyle = 'rgba(240,179,92,0.55)';
+    ctx.shadowColor = 'rgba(240,179,92,0.7)';
+    ctx.shadowBlur = 10;
     ctx.stroke();
+    ctx.shadowBlur = 0;
     ctx.beginPath();
     ctx.arc(cx, cy, rsPx, 0, Math.PI * 2);
     ctx.fillStyle = '#000';

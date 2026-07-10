@@ -154,3 +154,57 @@ export function semfStabilityGradient(z: number, n: number): number {
   const here = semfBindingEnergy(z, n);
   return Math.max(up - here, 0) - Math.max(down - here, 0);
 }
+
+/**
+ * Geometria 4D (hipersześcian/tesserakt) — CZYSTA algebra liniowa, dokładna
+ * (nie model, nie przybliżenie). Nie jest to twierdzenie o istnieniu
+ * fizycznych dodatkowych wymiarów przestrzennych (to osobna, spekulacyjna
+ * kwestia teorii strun — patrz honestyNote eksperymentu, który z tego
+ * korzysta) — wyłącznie standardowa matematyczna technika wizualizacji
+ * obiektu 4D przez obrót w płaszczyźnie 4D i rzut perspektywiczny do 3D
+ * (https://en.wikipedia.org/wiki/Tesseract, „Construction" i „Projections").
+ */
+export type Vec4 = [number, number, number, number];
+export type Plane4D = 'xy' | 'xz' | 'xw' | 'yz' | 'yw' | 'zw';
+
+/** Obrót o `angle` radianów w jednej z sześciu płaszczyzn 4D; pozostałe dwie współrzędne bez zmian. */
+export function rotate4D(v: Vec4, plane: Plane4D, angle: number): Vec4 {
+  const [x, y, z, w] = v;
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  switch (plane) {
+    case 'xy': return [x * c - y * s, x * s + y * c, z, w];
+    case 'xz': return [x * c - z * s, y, x * s + z * c, w];
+    case 'xw': return [x * c - w * s, y, z, x * s + w * c];
+    case 'yz': return [x, y * c - z * s, y * s + z * c, w];
+    case 'yw': return [x, y * c - w * s, z, y * s + w * c];
+    case 'zw': return [x, y, z * c - w * s, z * s + w * c];
+  }
+}
+
+/** Rzut perspektywiczny 4D→3D: dzielenie przez odległość wzdłuż osi w (ta sama technika co rzut 3D→2D w grafice komputerowej, o wymiar wyżej). */
+export function project4Dto3D(v: Vec4, viewerDistance = 3): [number, number, number] {
+  const [x, y, z, w] = v;
+  const factor = viewerDistance / (viewerDistance - w);
+  return [x * factor, y * factor, z * factor];
+}
+
+/** 16 wierzchołków tesseraktu: wszystkie kombinacje (±1,±1,±1,±1). */
+export const TESSERACT_VERTICES: Vec4[] = Array.from({ length: 16 }, (_, i) => [
+  i & 1 ? 1 : -1,
+  i & 2 ? 1 : -1,
+  i & 4 ? 1 : -1,
+  i & 8 ? 1 : -1,
+]);
+
+/** 32 krawędzie: pary wierzchołków różniące się dokładnie jedną współrzędną (odległość Hamminga 1). */
+export const TESSERACT_EDGES: [number, number][] = (() => {
+  const edges: [number, number][] = [];
+  for (let i = 0; i < 16; i++) {
+    for (let bit = 0; bit < 4; bit++) {
+      const j = i ^ (1 << bit);
+      if (j > i) edges.push([i, j]);
+    }
+  }
+  return edges;
+})();

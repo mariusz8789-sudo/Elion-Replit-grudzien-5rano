@@ -6,6 +6,23 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Vision Backlog + Tesserakt 4D)
+- `VISION-BACKLOG.md` — katalog ~60 pomysłów na przyszłość (Quantum Reality,
+  wyższe wymiary, nanotechnologia, biologia molekularna, Grand Challenges,
+  Creator Platform/Marketplace, Founder Mode, XR), każdy z tagiem pewności
+  naukowej i priorytetem — celowo NIE lista zadań: zasada „1–2 pozycje na
+  sesję", żeby duża wizja nie rozmyła rozwoju.
+- Multiverse Lab: „Tesserakt (4D)" — obrót hipersześcianu w płaszczyźnie 4D
+  (`core/physics.ts`: `rotate4D`/`project4Dto3D`/`TESSERACT_VERTICES`/
+  `TESSERACT_EDGES`, dokładna algebra liniowa) + rzut perspektywiczny do 3D
+  renderowany przez `Sim3D` (drugi konsument tej architektury po Układzie
+  Słonecznym 3D — potwierdza, że wzorzec generalizuje się poza jeden lab).
+  Kolor krawędzi koduje 4. współrzędną. Jasno odróżnione od spekulacji o
+  fizycznych dodatkowych wymiarach (teoria strun) w honestyNote.
+- 7 nowych testów fizyki/geometrii (zachowanie normy przy obrocie, znane
+  wartości przy 0°/90°, liczba wierzchołków/krawędzi/stopień grafu) — 153
+  testy frontendowe razem.
+
 ### Dodano (Redesign wizualny + "Co by było, gdyby?" + Układ Słoneczny 3D)
 - Design system v2 (`styles.css`): tokeny ruchu (`--ease-out`/`--ease-spring`),
   elewacja/blask kodujący stan (nie ozdoba), szklane panele, przeprojektowane

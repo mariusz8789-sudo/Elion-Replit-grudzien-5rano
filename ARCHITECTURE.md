@@ -186,7 +186,7 @@ w `lib.mjs` — testowana przez `node --test` bez uruchamiania portu
 
 ## Testy
 
-137 testów frontendowych (vitest) + 28 backendowych (`node --test`) = 165.
+153 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 181.
 
 - **Fizyka i symulacje** (`__tests__/physics.test.ts`, `sims.test.ts`):
   twarde asercje naukowe (złamanie nierówności Bella |S|>2, twierdzenie
@@ -251,7 +251,13 @@ kontem to dodatkowa warstwa nad dzisiejszą aplikacją, nie jej zastąpienie.
 
 Ambicją Genesis OS jest stać się jedną z najbardziej zaawansowanych
 interaktywnych platform naukowych na świecie — to cel, do którego się
-dąży, nie stwierdzenie stanu obecnego. Poniższe punkty NIE są zbudowane;
+dąży, nie stwierdzenie stanu obecnego. Pełny, żywy katalog pomysłów
+(Quantum Reality, wyższe wymiary, nanotechnologia, biologia molekularna,
+Grand Challenges, Creator Platform/Marketplace, Founder Mode, XR…) jest w
+[`VISION-BACKLOG.md`](VISION-BACKLOG.md) — świadomie osobny dokument,
+żeby duża lista pomysłów nie zaśmiecała opisu architektury. Zasada tego
+samego dokumentu: wdraża się 1–2 pozycje na sesję, nie wszystko naraz.
+Poniższe punkty NIE są zbudowane;
 każdy dostaje tu miejsce podpięcia w istniejącej architekturze, żeby
 przyszła implementacja nie wymagała przepisywania rdzenia — zgodnie z
 zasadą „nie twórz atrap, projektuj architekturę pod przyszłość".

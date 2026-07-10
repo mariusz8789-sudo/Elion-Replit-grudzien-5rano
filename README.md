@@ -52,14 +52,17 @@ Wszechświata (8,8×10²⁶ m).
 - **Zredesignowany design system** — spójna, "instrumentowa" estetyka
   (szkło, świecące akcenty kodujące stan, nie ozdoba) w całej aplikacji,
   każde laboratorium zachowuje własny kolor akcentu
-- **174 testy** (146 vitest frontend + 28 node:test backend)
+- **Tesserakt 4D** (Multiverse Lab) — obrót w płaszczyźnie 4D i rzut do 3D,
+  dokładna algebra liniowa (nie spekulacja o fizycznych dodatkowych
+  wymiarach — to osobna, jasno odróżniona kwestia)
+- **181 testów** (153 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 174 testy (fizyka + funkcje lokalne + backend)
+npm test           # 181 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):
@@ -135,6 +138,7 @@ Uczciwość naukowa dotyczy też tego dokumentu, nie tylko UI:
 - [`CHANGELOG.md`](CHANGELOG.md) — historia zmian
 - [`SECURITY.md`](SECURITY.md) — model zagrożeń
 - [`RESEARCH.md`](RESEARCH.md) i [`knowledge/`](knowledge/) — Genesis Knowledge Base (źródła naukowe per laboratorium)
+- [`VISION-BACKLOG.md`](VISION-BACKLOG.md) — katalog pomysłów na przyszłość (nie lista zadań — wdraża się 1–2 na raz)
 - Raporty etapów: [`RAPORT-ETAP-0.md`](RAPORT-ETAP-0.md) · [`RAPORT-ETAP-1.md`](RAPORT-ETAP-1.md) ·
   [`RAPORT-ETAP-2.md`](RAPORT-ETAP-2.md) · [`RAPORT-AUDYT.md`](RAPORT-AUDYT.md) ·
   [`RAPORT-AUDYT-2.md`](RAPORT-AUDYT-2.md)

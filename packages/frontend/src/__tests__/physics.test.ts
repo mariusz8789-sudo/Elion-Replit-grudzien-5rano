@@ -11,11 +11,15 @@ import {
   sampleLocalHiddenPair,
   sampleSingletPair,
   schwarzschildRadius,
+  project4Dto3D,
+  rotate4D,
   semfBindingEnergy,
   semfBindingPerNucleon,
   semfStabilityGradient,
   singletCorrelation,
   solveKepler,
+  TESSERACT_EDGES,
+  TESSERACT_VERTICES,
 } from '../core/physics';
 import { PLANETS } from '../data/solarSystem';
 import { KNOWN_NUCLIDES } from '../data/nuclides';
@@ -283,5 +287,62 @@ describe('KNOWN_NUCLIDES — kluczowe zmierzone izotopy (Mapa nuklidów, NNDC)',
   it('U-238 i C-14 (już używane w podstawowym eksperymencie rozpadu) są też w mapie nuklidów', () => {
     expect(KNOWN_NUCLIDES.find((k) => k.symbol === 'U-238')?.halfLifeLabel).toContain('4,468 mld');
     expect(KNOWN_NUCLIDES.find((k) => k.symbol === 'C-14')?.halfLifeLabel).toContain('5 730');
+  });
+});
+
+describe('geometria 4D — obrót i rzut tesseraktu (Multiverse Lab)', () => {
+  it('obrót o 0 radianów to identyczność', () => {
+    const v: [number, number, number, number] = [1, 2, 3, 4];
+    expect(rotate4D(v, 'xw', 0)).toEqual(v);
+  });
+
+  it('obrót o 90° w płaszczyźnie xy: (1,0,0,0) → (0,1,0,0)', () => {
+    const [x, y, z, w] = rotate4D([1, 0, 0, 0], 'xy', Math.PI / 2);
+    expect(x).toBeCloseTo(0, 9);
+    expect(y).toBeCloseTo(1, 9);
+    expect(z).toBeCloseTo(0, 9);
+    expect(w).toBeCloseTo(0, 9);
+  });
+
+  it('obrót zachowuje długość wektora (przekształcenie ortogonalne)', () => {
+    const v: [number, number, number, number] = [1, -2, 0.5, 3];
+    const normBefore = Math.hypot(...v);
+    for (const plane of ['xy', 'xz', 'xw', 'yz', 'yw', 'zw'] as const) {
+      const r = rotate4D(v, plane, 1.234);
+      expect(Math.hypot(...r), `płaszczyzna ${plane}`).toBeCloseTo(normBefore, 9);
+    }
+  });
+
+  it('rzut 4D→3D przy w=0 nie zmienia x,y,z (dzielnik = 1)', () => {
+    const [x, y, z] = project4Dto3D([2, -1, 0.5, 0], 3);
+    expect(x).toBeCloseTo(2, 9);
+    expect(y).toBeCloseTo(-1, 9);
+    expect(z).toBeCloseTo(0.5, 9);
+  });
+
+  it('rzut oddala punkty z dodatnim w (bliżej widza w 4D → większe na rzucie)', () => {
+    const far = project4Dto3D([1, 0, 0, -1], 3);
+    const near = project4Dto3D([1, 0, 0, 1], 3);
+    expect(Math.abs(near[0])).toBeGreaterThan(Math.abs(far[0]));
+  });
+
+  it('tesserakt ma dokładnie 16 wierzchołków, wszystkie współrzędne ±1', () => {
+    expect(TESSERACT_VERTICES.length).toBe(16);
+    for (const v of TESSERACT_VERTICES) {
+      for (const c of v) expect(Math.abs(c)).toBe(1);
+    }
+    // wszystkie 16 kombinacji unikalne
+    const unique = new Set(TESSERACT_VERTICES.map((v) => v.join(',')));
+    expect(unique.size).toBe(16);
+  });
+
+  it('tesserakt ma dokładnie 32 krawędzie, każdy wierzchołek ma stopień 4', () => {
+    expect(TESSERACT_EDGES.length).toBe(32);
+    const degree = new Array(16).fill(0);
+    for (const [a, b] of TESSERACT_EDGES) {
+      degree[a]++;
+      degree[b]++;
+    }
+    for (const d of degree) expect(d).toBe(4);
   });
 });

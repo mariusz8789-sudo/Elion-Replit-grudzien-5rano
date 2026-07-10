@@ -330,11 +330,17 @@ Backlog na przyszłość (NIE zbudowane): spersonalizowany film/zwiastun 4K
 - **Wielki Wybuch i inflacja kosmiczna jako oś czasu** (★★★★ model standardowy,
   ★★★ szczegóły inflacji) — interaktywna oś czasu Wszechświata (10⁻⁴³s →
   dziś) z Narratorem tłumaczącym każdą epokę; dane/skale z Planck 2018.
-- **Ciemna materia — krzywa rotacji galaktyki** (★★★★★, dowód obserwacyjny
-  najsilniejszy z całej ciemnej materii) — suwak „ile ciemnej materii" vs
-  krzywa rotacji gwiazd, porównanie z przewidywaniem Newtona bez niej.
-  Wysoka wartość: to NAJLEPSZY pojedynczy dowód na ciemną materię, a dziś
-  nie mamy dla niego dedykowanego eksperymentu.
+- ✅ **Ciemna materia — krzywa rotacji galaktyki** — `universe-rotationcurve.ts`,
+  Universe Lab. Suwak masy halo (model pseudo-izotermiczny, Begeman 1989)
+  vs krzywa Newtona z samej widocznej masy (dysk wykładniczy, Freeman 1970).
+  BONUS ponad pierwotny zakres: przełącznik MOND (Milgrom 1983) — ta sama
+  płaska krzywa bez żadnej ciemnej materii, tylko modyfikacją prawa
+  grawitacji przy małych przyspieszeniach (relacja Tully'ego–Fishera,
+  v∞=(GMa0)^¼). Obie strony realnego, nierozstrzygniętego sporu
+  kosmologicznego pokazane uczciwie w jednym eksperymencie. 6 nowych testów
+  fizyki (`physics.test.ts`): monotoniczność masy dysku, spadek Keplerowski
+  bez halo, spłaszczenie z halo izotermicznym, granice MOND (słabe/silne
+  pole), zbieżność do relacji Tully'ego–Fishera.
 - **Napięcie Hubble'a (Hubble tension)** (★★★ spór aktywny, już opisany w
   `knowledge/universe.md`) — brak jeszcze interaktywnej wizualizacji dwóch
   konkurencyjnych pomiarów H₀.

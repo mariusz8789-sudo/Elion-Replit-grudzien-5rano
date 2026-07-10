@@ -76,9 +76,10 @@ wartości — do dodania nota "dwa obozy pomiarowe".
   bezpośrednio (LZ/XENON — wyniki negatywne).
 - MOND/zmodyfikowana dynamika: ★★ — dobrze dopasowuje krzywe rotacji
   pojedynczych galaktyk, zawodzi na gromadach i CMB bez dodatkowej materii.
-W aplikacji: pokazujemy CDM jako konsensus, MOND jako uczciwie opisaną
-alternatywę mniejszościową (przyszła funkcja: przełącznik CDM/MOND na
-krzywej rotacji — świetna dydaktyka sporu).
+W aplikacji: dedykowany eksperyment „Krzywa rotacji galaktyki" (Universe
+Lab, `universe-rotationcurve.ts`) pokazuje CDM jako domyślny model (suwak
+masy halo) z przełącznikiem na MOND — obie strony tego samego zjawiska
+(płaska krzywa) osiągnięte zupełnie inną drogą, obie uczciwie oznaczone.
 
 **Natura ciemnej energii** ★★★ 
 Stała kosmologiczna (w = −1) vs kwintesencja (w zmienne). Wyniki DESI

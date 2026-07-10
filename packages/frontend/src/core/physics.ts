@@ -264,3 +264,60 @@ export function bondPolarity(chiA: number, chiB: number): BondPolarity {
   const skewFraction = 1 - Math.exp(-(deltaChi * deltaChi) / 4);
   return { deltaChi, type, skewFraction };
 }
+
+/**
+ * Krzywa rotacji galaktyki — najsilniejszy pojedynczy dowód obserwacyjny na
+ * ciemną materię (Rubin, Ford & Thonnard 1978, 1980, ApJ). G w jednostkach
+ * galaktycznych: kpc·(km/s)²/M_słońca (standardowa stała dynamiki galaktyk).
+ */
+export const G_ASTRO = 4.30091e-6; // kpc·(km/s)²/M_sun
+
+/**
+ * Masa zamknięta w promieniu r dla dysku wykładniczego (Freeman 1970):
+ * Σ(r) = Σ0·exp(−r/rd). Uproszczenie: krążąca prędkość liczona jako gdyby
+ * masa była rozłożona sferycznie symetrycznie (v=√(GM(<r)/r)) — NIE dokładne
+ * rozwiązanie cienkiego dysku (które wymaga funkcji Bessela I0,I1,K0,K1),
+ * ale standardowe przybliżenie dydaktyczne rzędu wielkości.
+ */
+export function exponentialDiskMass(r: number, diskMassTotal: number, scaleLength: number): number {
+  if (r <= 0) return 0;
+  const x = r / scaleLength;
+  return diskMassTotal * (1 - (1 + x) * Math.exp(-x));
+}
+
+/**
+ * Masa zamknięta w promieniu r dla pseudo-izotermicznej sfery ciemnej
+ * materii, ρ(r) = ρ0/(1+(r/rc)²) — model Begemana (1989, A&A 223, 47,
+ * "The rotation curve of NGC 6503") użyty do pierwszych ilościowych
+ * dopasowań halo ciemnej materii. Przy r≫rc: M(r)∝r, więc v(r)→stała —
+ * to właśnie ten mechanizm spłaszcza krzywą rotacji.
+ */
+export function isothermalHaloMass(r: number, rho0: number, coreRadius: number): number {
+  if (r <= 0) return 0;
+  return 4 * Math.PI * rho0 * coreRadius * coreRadius * (r - coreRadius * Math.atan(r / coreRadius));
+}
+
+/** Prędkość kołowa z masy zamkniętej w promieniu r (v²=GM(<r)/r). */
+export function circularVelocity(enclosedMass: number, r: number): number {
+  if (r <= 0) return 0;
+  return Math.sqrt((G_ASTRO * enclosedMass) / r);
+}
+
+/**
+ * MOND (Modified Newtonian Dynamics, Milgrom 1983, ApJ 270, 365) —
+ * konkurencyjna hipoteza wobec ciemnej materii: przy bardzo małych
+ * przyspieszeniach (a≪a0) efektywna grawitacja jest silniejsza niż
+ * przewiduje Newton, bez dodawania nowej masy. "Prosta" funkcja
+ * interpolująca μ(x)=x/(1+x) (Famaey & Binney 2005) daje zamknięty wzór:
+ * g = [g_N + √(g_N² + 4·g_N·a0)] / 2. W granicy g_N≪a0 (daleki reżim MOND)
+ * upraszcza się do g≈√(g_N·a0), co dla dysku o stałej masie M daje
+ * ASYMPTOTYCZNIE PŁASKĄ prędkość v∞=(G·M·a0)^¼ — to relacja
+ * Tully'ego–Fishera, dobrze potwierdzona empirycznie (★★★★), choć jej
+ * interpretacja (nowa fizyka vs ciemna materia) pozostaje sporna.
+ */
+export const MOND_A0_ASTRO = 3703; // (km/s)²/kpc ≈ 1,2×10⁻¹⁰ m/s² (stała Milgroma)
+
+export function mondAcceleration(newtonianAccel: number, a0: number = MOND_A0_ASTRO): number {
+  if (newtonianAccel <= 0) return 0;
+  return (newtonianAccel + Math.sqrt(newtonianAccel * newtonianAccel + 4 * newtonianAccel * a0)) / 2;
+}

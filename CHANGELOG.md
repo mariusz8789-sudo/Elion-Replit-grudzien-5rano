@@ -6,6 +6,36 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Krzywa rotacji galaktyki — nowy eksperyment, Universe Lab)
+- `labs/experiments/universe-rotationcurve.ts` + nowe funkcje fizyki w
+  `core/physics.ts` (`exponentialDiskMass`, `isothermalHaloMass`,
+  `circularVelocity`, `mondAcceleration`, `MOND_A0_ASTRO`): najsilniejszy
+  pojedynczy dowód obserwacyjny na ciemną materię (Rubin, Ford & Thonnard
+  1978, 1980), zaimplementowany jako dedykowany, interaktywny eksperyment
+  zamiast tylko opisu w bazie wiedzy.
+- Dwie prawdziwe krzywe na wykresie: prędkość z samej widocznej masy
+  (dysk wykładniczy, Freeman 1970 — spada na dużych promieniach, tak jak
+  planety w Układzie Słonecznym) vs prędkość z dodanym halo ciemnej materii
+  (model pseudo-izotermiczny, Begeman 1989 — spłaszcza się, dokładnie jak
+  w realnie zmierzonych galaktykach spiralnych). Suwak steruje masą halo.
+- **Ponad pierwotny zakres backlogu**: przełącznik MOND (Milgrom 1983) —
+  konkurencyjna hipoteza wobec ciemnej materii. Ta sama płaska krzywa
+  osiągana WYŁĄCZNIE modyfikacją prawa grawitacji przy małych
+  przyspieszeniach, bez żadnej dodatkowej masy — odtwarza relację
+  Tully'ego–Fishera (v∞=(G·M·a0)^¼), jeden z najmocniejszych argumentów za
+  MOND. Narracja tłumaczy uczciwie obie strony realnego, nierozstrzygniętego
+  sporu kosmologicznego (CDM: konsensus większości, ale cząstki nigdy nie
+  wykryte bezpośrednio; MOND: dobrze tłumaczy pojedyncze galaktyki, zawodzi
+  na gromadach i CMB).
+- Nowa sekcja w `knowledge/universe.md`; zaktualizowana wcześniejsza notatka
+  „przyszła funkcja: przełącznik CDM/MOND" — już zbudowana.
+- 6 nowych testów fizyki (`physics.test.ts`): monotoniczność masy dysku
+  wykładniczego, Keplerowski spadek prędkości bez halo, spłaszczenie z halo
+  izotermicznym (M(r)∝r przy r≫rc), granice MOND (g→g_N przy silnym polu,
+  g>g_N przy słabym), zbieżność do relacji Tully'ego–Fishera. Zweryfikowane:
+  typecheck, lint, 217 testów vitest, build, Playwright (oba tryby, suwak,
+  przełącznik MOND) — zero błędów konsoli.
+
 ### Dodano (Problem trzech ciał — nowy eksperyment, Universe Lab)
 - `labs/experiments/universe-threebody.ts`: grawitacja Newtona w jednostkach
   bezwymiarowych (G=1), integrator velocity-Verlet symplektyczny z

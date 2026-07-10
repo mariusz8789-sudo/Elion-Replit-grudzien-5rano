@@ -2,13 +2,19 @@ import { describe, expect, it } from 'vitest';
 import {
   bondPolarity,
   chshS,
+  circularVelocity,
   decayRemaining,
+  exponentialDiskMass,
+  G_ASTRO,
+  isothermalHaloMass,
   kardashevPower,
   keplerPosition,
   lensAmplification,
   lensImagePositions,
   lorentzGamma,
   lorentzTime,
+  mondAcceleration,
+  MOND_A0_ASTRO,
   sampleLocalHiddenPair,
   sampleSingletPair,
   schwarzschildRadius,
@@ -445,5 +451,67 @@ describe('polarność wiązania chemicznego (Chemistry Lab)', () => {
     expect(b1.deltaChi).toBe(b2.deltaChi);
     expect(b1.type).toBe(b2.type);
     expect(b1.skewFraction).toBe(b2.skewFraction);
+  });
+});
+
+describe('krzywa rotacji galaktyki: dysk + halo ciemnej materii + MOND', () => {
+  const DISK_MASS = 5e10;
+  const SCALE_LENGTH = 3;
+  const CORE_RADIUS = 3;
+
+  it('masa dysku wykładniczego rośnie monotonicznie i dąży do masy całkowitej', () => {
+    let prev = -1;
+    for (const r of [0.5, 1, 3, 6, 12, 25, 60]) {
+      const m = exponentialDiskMass(r, DISK_MASS, SCALE_LENGTH);
+      expect(m).toBeGreaterThan(prev);
+      expect(m).toBeLessThanOrEqual(DISK_MASS);
+      prev = m;
+    }
+    expect(exponentialDiskMass(60, DISK_MASS, SCALE_LENGTH) / DISK_MASS).toBeGreaterThan(0.999);
+  });
+
+  it('bez halo (v∞=0) prędkość maleje na dużych promieniach jak w Układzie Słonecznym (Keplerowsko)', () => {
+    const mDiskFar = exponentialDiskMass(30, DISK_MASS, SCALE_LENGTH);
+    const v20 = circularVelocity(exponentialDiskMass(20, DISK_MASS, SCALE_LENGTH), 20);
+    const v30 = circularVelocity(mDiskFar, 30);
+    expect(v30).toBeLessThan(v20); // spada, bo M(r) już prawie stałe, a r rośnie
+  });
+
+  it('halo pseudo-izotermiczne: M(r)∝r przy r≫rc, więc v(r)→stała (spłaszczenie krzywej)', () => {
+    const rho0 = 1e7;
+    const v10 = circularVelocity(isothermalHaloMass(10, rho0, CORE_RADIUS), 10);
+    const v20 = circularVelocity(isothermalHaloMass(20, rho0, CORE_RADIUS), 20);
+    const v40 = circularVelocity(isothermalHaloMass(40, rho0, CORE_RADIUS), 40);
+    // przy dużych r/rc krzywa jest niemal płaska — różnica v40 vs v20 dużo mniejsza niż v20 vs v10
+    expect(Math.abs(v40 - v20)).toBeLessThan(Math.abs(v20 - v10));
+  });
+
+  it('MOND: w reżimie słabego pola g_MOND > g_Newton (silniejsza efektywna grawitacja)', () => {
+    const gN = 1; // (km/s)²/kpc, dużo mniejsze niż MOND_A0_ASTRO — reżim głęboki
+    const gMond = mondAcceleration(gN, MOND_A0_ASTRO);
+    expect(gMond).toBeGreaterThan(gN);
+  });
+
+  it('MOND: przy g_N≫a0 (silne pole) g_MOND→g_N (odtwarza Newtona)', () => {
+    const gN = MOND_A0_ASTRO * 1e6;
+    const gMond = mondAcceleration(gN, MOND_A0_ASTRO);
+    expect(gMond / gN).toBeCloseTo(1, 2);
+  });
+
+  it('MOND daje asymptotycznie płaską krzywą bez ciemnej materii (relacja Tully’ego–Fishera)', () => {
+    const vAt = (r: number) => {
+      const mDisk = exponentialDiskMass(r, DISK_MASS, SCALE_LENGTH);
+      const gN = (G_ASTRO * mDisk) / (r * r);
+      const g = mondAcceleration(gN);
+      return Math.sqrt(g * r);
+    };
+    const v20 = vAt(20);
+    const v40 = vAt(40);
+    // płaska krzywa: różnica względna mała na dużych promieniach
+    expect(Math.abs(v40 - v20) / v20).toBeLessThan(0.05);
+    // przewidywana wartość asymptotyczna v∞=(G·M·a0)^¼ — przy r=40 kpc krzywa
+    // jest już blisko, ale jeszcze nie dokładnie na granicy (zbieżność wolna)
+    const vInfPredicted = Math.pow(G_ASTRO * DISK_MASS * MOND_A0_ASTRO, 0.25);
+    expect(Math.abs(v40 - vInfPredicted) / vInfPredicted).toBeLessThan(0.1);
   });
 });

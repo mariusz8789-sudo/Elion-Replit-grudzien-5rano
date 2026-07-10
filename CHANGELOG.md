@@ -6,6 +6,35 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Problem trzech ciał — nowy eksperyment, Universe Lab)
+- `labs/experiments/universe-threebody.ts`: grawitacja Newtona w jednostkach
+  bezwymiarowych (G=1), integrator velocity-Verlet symplektyczny z
+  ADAPTACYJNYM krokiem (maleje przy bliskich przejściach ciał, kryterium
+  zbliżone do Aarsetha — bez tego integrator traci energię przy zbliżeniu w
+  problemie pitagorejskim, mimo że sam schemat jest symplektyczny dla
+  ustalonego kroku).
+- Dwa realne, udokumentowane układy startowe: ósemka (figure-eight, Moore
+  1993 / dowód istnienia Chenciner–Montgomery 2000) — stabilna, okresowa
+  orbita trzech równych mas; problem pitagorejski (Burrau 1913, masy 3:4:5)
+  — chaotyczna ewolucja z bliskimi przejściami.
+- Tryb „Pokaż drugi, niemal identyczny start" (przesunięcie 10⁻⁶ jednostki):
+  druga kopia symulacji renderowana równolegle, z liczbowym odczytem na
+  żywo odległości między kopiami — namacalna demonstracja czułości na
+  warunki początkowe (efekt motyla), zgodnie z historycznym odkryciem
+  Poincarégo (1887) że problem trzech ciał nie ma ogólnego rozwiązania
+  analitycznego — to ta praca zapoczątkowała teorię chaosu.
+- Nowa sekcja w `knowledge/universe.md`, rozszerzony `narrate()` z osobną
+  narracją dla każdego presetu i trybu dywergencji, cytowania (Burrau 1913,
+  Chenciner & Montgomery 2000).
+- 10 nowych testów (`universeThreeBody.test.ts`): zachowanie energii
+  długoterminowo dla obu układów (w tym przez bliskie przejście w problemie
+  pitagorejskim), powrót ósemki do startu po jednym okresie T≈6.326,
+  wykładniczy wzrost separacji >1000× po mikroskopijnym przesunięciu,
+  zbalansowany pęd całkowity, narracja dla wszystkich kombinacji
+  preset×dywergencja. Zweryfikowane: typecheck, lint, 210 testów vitest,
+  build, Playwright (oba presety, przełączanie, tryb dywergencji z rosnącym
+  odczytem separacji) — zero błędów konsoli.
+
 ### Dodano (Quantum Decision Explorer — nowy, trzeci tryb wejścia do Genesis OS)
 - Galaktyka złożona z decyzji użytkownika: każda gwiazda to jedna decyzja
   życiowa (tytuł, opis, rok, subiektywna waga 1–10, do 4 alternatywnych

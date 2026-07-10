@@ -79,14 +79,20 @@ Wszechświata (8,8×10²⁶ m).
   elektroujemności Paulinga (dane tabelaryczne, CRC Handbook) steruje CIĄGŁĄ
   wizualizacją chmury elektronowej od kowalencyjnej po jonową (wzór
   Hanney–Smitha), nie przełącznikiem trzech stanów
-- **231 testów** (203 vitest frontend + 28 node:test backend)
+- **Problem trzech ciał** (Universe Lab) — integrator symplektyczny
+  (velocity-Verlet) z adaptacyjnym krokiem, dwa realne układy startowe
+  (ósemka Moore/Chenciner–Montgomery, problem pitagorejski Burrau 1913),
+  tryb "dwa niemal identyczne starty" pokazujący na żywo wykładniczy
+  rozjazd trajektorii (efekt motyla) — problem, który zapoczątkował
+  teorię chaosu (Poincaré 1887)
+- **238 testów** (210 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 231 testów (fizyka + funkcje lokalne + backend)
+npm test           # 238 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

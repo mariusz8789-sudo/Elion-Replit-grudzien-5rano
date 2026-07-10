@@ -123,10 +123,28 @@ całej platformy, jeśli granica model/hipoteza/legenda się zatrze choćby raz.
 Każdy pojedynczy scenariusz wymaga tego samego poziomu researchu co
 `knowledge/*.md` dla istniejących labów — nie da się tego zrobić płytko.
 
-### Trzy Ciała — od wykresu do laboratorium (★★★★★ chaos deterministyczny)
+### Trzy Ciała — od wykresu do laboratorium (★★★★★ chaos deterministyczny) — ✅ ZBUDOWANY PIERWSZY KROK
 
-Rozszerzenie prostego "pokaż orbity trzech ciał" w pełne, interaktywne
-laboratorium dynamiki chaotycznej:
+**Status: zbudowany "realistyczny pierwszy krok" opisany niżej** —
+`labs/experiments/universe-threebody.ts`, Universe Lab. Integrator
+velocity-Verlet symplektyczny z ADAPTACYJNYM krokiem (maleje przy bliskich
+przejściach — bez tego stałokrokowy integrator traci energię w problemie
+pitagorejskim), dwa realne układy startowe (ósemka Moore/Chenciner–Montgomery,
+problem pitagorejski Burrau 1913), tryb "dwa niemal identyczne starty" (10⁻⁶
+przesunięcia) pokazujący dywergencję na żywo z liczbowym odczytem odległości.
+10 nowych testów (`universeThreeBody.test.ts`): zachowanie energii
+długoterminowo dla obu układów (w tym przez bliskie przejście w problemie
+pitagorejskim), powrót ósemki do startu po jednym okresie T≈6.326, wykładniczy
+wzrost separacji >1000× po mikroskopijnym przesunięciu. Zweryfikowane
+Playwrightem: oba presety, przełączanie, tryb dywergencji z rosnącym
+odczytem — zero błędów konsoli.
+
+Backlog na przyszłość (NIE zbudowane, patrz punkty niżej): tysiące cząstek
+z GPU instancingiem, zapis/udostępnianie własnego układu, AI analizujące
+punkty chaosu (rozszerzenie `core/experimentAnalysis.ts`).
+
+Pełny oryginalny opis (rozszerzenie prostego "pokaż orbity trzech ciał" w
+pełne, interaktywne laboratorium dynamiki chaotycznej z tysiącami cząstek):
 - Tysiące cząstek / świecące trajektorie — wydajnościowo wymaga
   `THREE.Points` z GPU instancingiem, nie osobnych obiektów per cząstka
   (patrz „Performance" niżej).
@@ -382,13 +400,9 @@ Backlog na przyszłość (NIE zbudowane): spersonalizowany film/zwiastun 4K
 
 ## Grand Challenges
 
-- **Problem trzech ciał** (★★★★★ chaos deterministyczny matematycznie
-  potwierdzony, brak ogólnego rozwiązania analitycznego od Poincarégo) —
-  silnik N-ciał (już częściowo w `universe-collision.ts`) + tryb
-  „3 ciała": pokazuje czułość na warunki początkowe (dwa niemal identyczne
-  starty rozjeżdżają się wykładniczo) — potężna, namacalna lekcja o chaosie.
-  **Wysoki priorytet: fizyka jest tania (Euler/RK4, już mamy wzorce), a
-  efekt „wow" (widoczny chaos) jest natychmiastowy.**
+- ✅ **Problem trzech ciał** — patrz sekcja „Flagowe pomysły" wyżej,
+  `universe-threebody.ts`. Zbudowany realistyczny pierwszy krok (symplektyczny
+  integrator + tryb dywergencji); tysiące cząstek/GPU/zapis nadal w backlogu.
 - **Stabilność układów planetarnych** (★★★★★) — rozszerzenie Układu
   Słonecznego (2D i 3D): usuń/dodaj planetę, obserwuj rezonanse orbitalne
   i niestabilności w długim czasie — reużywa `keplerPosition`.

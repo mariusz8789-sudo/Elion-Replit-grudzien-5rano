@@ -26,6 +26,27 @@ jest jakościowo odporny na małe N.
 Chirp: f rośnie do złączenia; amplituda i faza z masy ćwierkowej
 ℳ = (m₁m₂)^⅗/(m₁+m₂)^⅕. GW150914 zgodny z OTW; dane surowe otwarte (GWOSC).
 
+**Problem trzech ciał (zaimplementowane)** ★★★★★
+Grawitacja Newtona bez przybliżeń, jednostki bezwymiarowe (G=1), integracja
+velocity-Verlet (symplektyczna — zachowuje energię długoterminowo, w
+przeciwieństwie do zwykłego Eulera). Poincaré (1887, praca dla nagrody króla
+Oskara II Szwecji) udowodnił brak ogólnego rozwiązania analitycznego dla N≥3
+ciał — to właśnie ta praca zapoczątkowała współczesną teorię chaosu. Dwa
+realne, udokumentowane układy startowe: ósemka (figure-eight choreography,
+odkryta numerycznie przez C. Moore'a 1993, dowód istnienia Chenciner &
+Montgomery 2000, Annals of Mathematics 152) — rzadki przykład STABILNEJ,
+okresowej orbity trzech równych mas; problem pitagorejski (Burrau 1913,
+masy 3:4:5 z wierzchołków trójkąta 3-4-5, start z spoczynku) — klasyczny
+przykład chaotycznej ewolucji z bliskimi przejściami. Tryb "dwa niemal
+identyczne starty" (różnica 10⁻⁶ jednostki w jednym ciele) demonstruje
+czułość na warunki początkowe: w problemie pitagorejskim odległość między
+kopiami rośnie wykładniczo po pierwszym bliskim przejściu (dodatni
+wykładnik Lapunowa) — namacalny „efekt motyla"; w ósemce rośnie znacznie
+wolniej (orbita jest strukturalnie stabilna). Implementacja: krok
+integracji jest ADAPTACYJNY (maleje przy bliskich przejściach ciał, kryterium
+zbliżone do Aarsetha) — bez tego stałokrokowy integrator traci energię przy
+zbliżeniu w problemie pitagorejskim, mimo że sam schemat jest symplektyczny.
+
 **Prawdziwy Układ Słoneczny (zaimplementowane)** ★★★★★
 Elementy orbitalne 8 planet (półoś wielka, mimośród, okres) z NASA
 Planetary Fact Sheet — publiczne, stabilne stałe. Pozycja liczona

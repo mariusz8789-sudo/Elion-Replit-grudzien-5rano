@@ -778,3 +778,33 @@ kbd {
 .timeline-cta-title { font-weight: 700; font-size: 0.95rem; color: var(--text); }
 .timeline-cta-sub { font-size: 0.74rem; color: var(--text-dim); line-height: 1.4; }
 .timeline-cta-arrow { color: var(--violet); font-size: 1.1rem; }
+.qde-cta {
+  background: linear-gradient(135deg, rgba(240, 179, 92, 0.14), rgba(167, 139, 250, 0.1));
+  border-color: rgba(240, 179, 92, 0.4);
+}
+.qde-cta:hover { border-color: var(--gold); }
+.qde-cta .timeline-cta-arrow { color: var(--gold); }
+
+/* ---------- Quantum Decision Explorer ---------- */
+.qde-view { display: flex; flex-direction: column; }
+.qde-disclaimer {
+  margin: 0.8rem 1rem 0; padding: 0.7rem 0.9rem;
+  font-size: 0.76rem; line-height: 1.45; color: var(--text-dim);
+  background: rgba(167, 139, 250, 0.07); border: 1px solid rgba(167, 139, 250, 0.35);
+  border-radius: 0.7rem;
+}
+.qde-disclaimer span[aria-hidden] { color: var(--violet); margin-right: 0.3rem; }
+.qde-canvas-wrap { height: 42vh; min-height: 260px; margin-top: 0.6rem; }
+.qde-scrubber { padding: 0.6rem 1rem 0; }
+.qde-scrubber input { width: 100%; accent-color: var(--gold); height: 1.8rem; }
+.qde-scrubber-labels { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-dim); margin-top: -0.2rem; }
+.qde-form { padding: 0.4rem 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.qde-input {
+  width: 100%; font: inherit; font-size: 0.85rem; color: var(--text);
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 0.6rem; padding: 0.5rem 0.75rem;
+}
+.qde-input::placeholder { color: var(--text-dim); }
+.qde-textarea { min-height: 4.2rem; resize: vertical; line-height: 1.4; }
+.qde-form-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.qde-form-actions .chip-btn:disabled { opacity: 0.45; }

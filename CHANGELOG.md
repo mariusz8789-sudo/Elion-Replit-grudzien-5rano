@@ -6,6 +6,44 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Quantum Decision Explorer — nowy, trzeci tryb wejścia do Genesis OS)
+- Galaktyka złożona z decyzji użytkownika: każda gwiazda to jedna decyzja
+  życiowa (tytuł, opis, rok, subiektywna waga 1–10, do 4 alternatywnych
+  ścieżek), rozłożona w spirali kątem złotym (phyllotaxis — ta sama
+  technika co węzły sieci energetycznej w `civilization.ts`). Suwak osi
+  czasu przesuwa, która decyzja jest aktywna — jej odgałęzienia
+  ("gdyby...") pojawiają się jako świecące, podpisane ścieżki rozchodzące
+  się z gwiazdy, a cała struktura galaktyki widocznie się zmienia przy
+  każdym przesunięciu.
+- **Jawny, stały, niedomykalny baner ostrzegawczy** (nie tylko wzmianka w
+  bazie wiedzy) z dokładnie tym tekstem: *"To interaktywna symulacja
+  alternatywnych scenariuszy oparta na modelowaniu decyzji i wizualnych
+  inspiracjach z fizyki. Nie przewiduje przyszłości ani nie odtwarza
+  rzeczywistości."* Zero numerologii, zero języka duchowego/ezoterycznego —
+  to była wyraźna korekta użytkownika po przejrzeniu pierwotnej koncepcji
+  ("osobisty multiwersum decyzji"), zalogowana i zaimplementowana w tej
+  samej sesji.
+- 100% lokalne dane (`core/decisionExplorer.ts`, `localStorage` przez
+  `core/storage.ts`, ten sam bezpieczny wzorzec co Ustawienia/Dziennik
+  odkryć) — zero backendu, zero konta. Przykładowe decyzje przy pierwszym
+  uruchomieniu, jawnie do edycji lub usunięcia.
+- Formularz dodaj/edytuj/usuń decyzję wbudowany w ekran (bez modali) —
+  zapisuje się natychmiast i staje się nową aktywną gwiazdą.
+- Nowy plik wiedzy `knowledge/quantum-decision-explorer.md` — jawnie
+  instruuje Narratora AI, by NIGDY nie sugerował przewidywania ani analizy
+  "co by było" jako wyniku obliczeń, tylko jako własne przemyślenia
+  użytkownika. `labId: 'quantum-decision-explorer'` zarejestrowany w
+  `LAB_KNOWLEDGE_FILES` backendu.
+- Prominentne wejście na ekranie głównym (obok CTA Discovery Timeline).
+- 12 nowych testów (`decisionExplorer.test.ts`: sanityzacja i odporność na
+  uszkodzony zapis w localStorage, CRUD, sortowanie chronologiczne,
+  przycinanie wagi do [1,10], geometria `galaxyPosition` — promień rośnie
+  monotonicznie z indeksem, stały krok kąta złotego). 203 testy
+  frontendowe razem (231 z 28 backendowymi).
+- Pełna weryfikacja: typecheck, lint, 231 testów, build produkcyjny,
+  Playwright (dodawanie/edycja/usuwanie decyzji, przewijanie osi czasu z
+  potwierdzeniem zmiany aktywnej gwiazdy) — zero błędów konsoli.
+
 ### Dodano (Discovery Timeline Engine — nowy, drugi tryb wejścia do Genesis OS)
 - Flagowa funkcja sesji: jedna, ciągła podróż przez 15 epok historii
   Wszechświata (Wielki Wybuch → Inflacja → Pierwsze atomy → Pierwsze

@@ -52,6 +52,7 @@ Mapowanie na etykiety w aplikacji: ★★★★–★★★★★ → `exact`/`s
 | [ai-discovery.md](ai-discovery.md) | Warstwa AI — korpus, grounding, architektura |
 | [scale-journey.md](scale-journey.md) | Scale Journey — dane rozmiarów, narracja skal |
 | [discovery-timeline.md](discovery-timeline.md) | Discovery Timeline Engine — 15 epok, Wielki Wybuch → daleka przyszłość |
+| [quantum-decision-explorer.md](quantum-decision-explorer.md) | Quantum Decision Explorer — narzędzie narracyjne (NIE fizyka) |
 | [classical-mechanics.md](classical-mechanics.md) | Fundament pod Universe/Civilization (bez własnego laba) |
 | [electrodynamics.md](electrodynamics.md) | Fundament pod Atom/Particle (bez własnego laba) |
 | [thermodynamics.md](thermodynamics.md) | Fundament pod Nuclear/Einstein (bez własnego laba) |

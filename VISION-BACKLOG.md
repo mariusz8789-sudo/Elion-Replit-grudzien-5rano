@@ -146,7 +146,7 @@ przeciwieństwie do zwykłego Eulera) + tryb "dwa niemal identyczne starty"
 pokazujący dywergencję na żywo — to samo dydaktyczne jądro, bez czekania na
 tysiące cząstek czy współdzielenie.
 
-### Quantum Decision Explorer (dawniej: "osobisty multiwersum decyzji") — narzędzie narracyjne, NIE fizyka
+### Quantum Decision Explorer — ✅ ZBUDOWANE (dawniej: "osobisty multiwersum decyzji") — narzędzie narracyjne, NIE fizyka
 
 Pomysł oceniony (przez użytkownika, po przejrzeniu pierwotnej koncepcji):
 warstwa wizualna jest bardzo mocna, ale pierwotne sformułowania ("portal do
@@ -198,9 +198,24 @@ może brzmieć jak przepowiadanie przyszłości ani ezoteryka.
   potrzebuje własnej, jeszcze prostszej etykiety ("narzędzie refleksyjne",
   nie punkt na skali potwierdzenia)
 
-Status: zalogowane, NIE budowane teraz — sesja właśnie skończyła Discovery
-Timeline Engine (flagowa funkcja); zgodnie z zasadą "jedno wielkie na raz"
-to czeka na osobną decyzję o starcie.
+**Status: zbudowane** (`components/QuantumDecisionExplorer.tsx`,
+`core/decisionExplorer.ts`, `#/decision-explorer`). Wszystkie punkty z
+"co się zmienia" zrealizowane dosłownie: nazwa neutralna, zero numerologii,
+zero języka duchowego, stały niedomykalny baner z dokładnie tym tekstem,
+jaki użytkownik podał. Architektura zgodna z powyższym planem: dane w
+localStorage (`core/storage.ts`), geometria spirali oparta na kącie złotym
+(phyllotaxis — ta sama technika co węzły sieci energetycznej w
+`civilization.ts`), suwak liniowy po indeksie decyzji z płynnym
+podświetleniem aktywnej gwiazdy, `NarratorPanel`/`askAI` ugruntowany w
+nowym `knowledge/quantum-decision-explorer.md` (jawnie instruuje AI, by
+nigdy nie sugerowało przewidywania). 12 nowych testów
+(`decisionExplorer.test.ts`: sanityzacja, CRUD, sortowanie chronologiczne,
+geometria `galaxyPosition`). Zweryfikowane Playwrightem: dodawanie,
+edycja, usuwanie decyzji i przewijanie osi czasu — struktura galaktyki i
+widoczne odgałęzienia zmieniają się na żywo, zero błędów konsoli.
+
+Backlog na przyszłość (NIE zbudowane): spersonalizowany film/zwiastun 4K
+(osobny temat produkcyjny, rendering offline).
 
 ---
 

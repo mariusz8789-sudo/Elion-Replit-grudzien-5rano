@@ -9,6 +9,7 @@ import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
 import { GlossaryScreen } from './components/GlossaryScreen';
 import { WhatIfScreen } from './components/WhatIfScreen';
 import { DiscoveryTimeline } from './components/DiscoveryTimeline';
+import { QuantumDecisionExplorer } from './components/QuantumDecisionExplorer';
 import { SearchOverlay } from './components/SearchOverlay';
 import { HelpOverlay } from './components/HelpOverlay';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
@@ -30,7 +31,8 @@ type Route =
   | { kind: 'discovery-log' }
   | { kind: 'glossary' }
   | { kind: 'what-if' }
-  | { kind: 'timeline' };
+  | { kind: 'timeline' }
+  | { kind: 'decision-explorer' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -41,6 +43,7 @@ function parseHash(): Route {
   if (h === '#/glossary') return { kind: 'glossary' };
   if (h === '#/what-if') return { kind: 'what-if' };
   if (h === '#/timeline') return { kind: 'timeline' };
+  if (h === '#/decision-explorer') return { kind: 'decision-explorer' };
   return { kind: 'home' };
 }
 
@@ -190,6 +193,16 @@ export default function App() {
     );
   }
 
+  if (route.kind === 'decision-explorer') {
+    return (
+      <div className="app">
+        <TopBar title="🌠 Quantum Decision Explorer" onSearch={() => setSearchOpen(true)} />
+        <QuantumDecisionExplorer />
+        {overlays}
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <main className="home" id="main-content" tabIndex={-1}>
@@ -205,6 +218,14 @@ export default function App() {
           <span className="timeline-cta-text">
             <span className="timeline-cta-title">Discovery Timeline</span>
             <span className="timeline-cta-sub">Wielki Wybuch → daleka przyszłość. Jedna ciągła podróż, bez ekranów ładowania.</span>
+          </span>
+          <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+        </button>
+        <button className="timeline-cta qde-cta" onClick={() => { window.location.hash = '#/decision-explorer'; }}>
+          <span className="timeline-cta-icon" aria-hidden="true">🌠</span>
+          <span className="timeline-cta-text">
+            <span className="timeline-cta-title">Quantum Decision Explorer</span>
+            <span className="timeline-cta-sub">Twoje decyzje jako galaktyka gwiazd. Narzędzie refleksyjne, nie przewidywanie przyszłości.</span>
           </span>
           <span className="timeline-cta-arrow" aria-hidden="true">→</span>
         </button>

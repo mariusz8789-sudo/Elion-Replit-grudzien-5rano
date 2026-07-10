@@ -6,6 +6,12 @@ Wszechświata (8,8×10²⁶ m).
 
 ## Obecny stan
 
+- **Quantum Decision Explorer** — galaktyka złożona z decyzji użytkownika:
+  każda gwiazda to jedna decyzja życiowa, suwak osi czasu przesuwa aktywną
+  gwiazdę i pokazuje jej alternatywne ścieżki jako świecące odgałęzienia.
+  Jawny, stały baner: to narzędzie narracyjne inspirowane wizualnie fizyką,
+  NIE model fizyczny ani przewidywanie przyszłości. 100% lokalne dane
+  (localStorage). Trzeci tryb wejścia do Genesis OS — patrz `#/decision-explorer`
 - **Discovery Timeline Engine** — flagowe doświadczenie: jedna, ciągła
   podróż przez 15 epok historii Wszechświata (Wielki Wybuch → daleka
   przyszłość), zero ekranów ładowania (ciągły cross-fade między sąsiednimi
@@ -73,14 +79,14 @@ Wszechświata (8,8×10²⁶ m).
   elektroujemności Paulinga (dane tabelaryczne, CRC Handbook) steruje CIĄGŁĄ
   wizualizacją chmury elektronowej od kowalencyjnej po jonową (wzór
   Hanney–Smitha), nie przełącznikiem trzech stanów
-- **219 testów** (191 vitest frontend + 28 node:test backend)
+- **231 testów** (203 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 219 testów (fizyka + funkcje lokalne + backend)
+npm test           # 231 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

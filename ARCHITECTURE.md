@@ -241,6 +241,32 @@ Uczciwość naukowa: każda epoka niesie własny `ConfirmationLevel` (ta sama
 nowa taksonomia. Rekombinacja/CMB są ★★★★★, daleka przyszłość jest ★★
 (hipoteza) — widoczne na żywo jako kolorowa plakietka w panelu epoki.
 
+### Quantum Decision Explorer — narzędzie narracyjne, świadomie POZA skalą naukową
+
+Trzeci tryb wejścia (`#/decision-explorer`), architektonicznie inny niż
+Discovery Timeline: to NIE model fizyczny, więc świadomie NIE dostaje
+`ConfirmationLevel` ani `HonestyLevel` — te skale mierzą stopień
+naukowego poparcia twierdzenia, a tu nie ma żadnego twierdzenia
+naukowego do ocenienia. Zamiast etykiety wiarygodności: stały,
+niedomykalny baner ostrzegawczy w `QuantumDecisionExplorer.tsx`
+(`.qde-disclaimer`), widoczny na każdym ekranie tego trybu, nie tylko
+przy pierwszym wejściu.
+
+Dane (`core/decisionExplorer.ts`) są w 100% osobiste i lokalne —
+`localStorage` przez `core/storage.ts`, dokładnie ten sam bezpieczny
+wzorzec walidacji pole-po-polu co `discoveryLog.ts`/`settings.ts`
+(uszkodzony zapis nigdy nie wywala ekranu, po prostu degraduje się do
+przykładowych danych). Geometria rozkładu gwiazd w spirali
+(`galaxyPosition`) używa kąta złotego (phyllotaxis) — jedyny faktycznie
+"naukowy" element tego modułu to czysta geometria rozkładu punktów, ta
+sama technika co węzły sieci energetycznej w `civilization.ts`, NIE
+twierdzenie o naturze decyzji czy rzeczywistości.
+
+`knowledge/quantum-decision-explorer.md` jawnie instruuje warstwę AI
+(`askAI()`), by nigdy nie sugerowała przewidywania przyszłości ani
+analizy "co by było" jako wyniku obliczeń — to zapisane przez
+użytkownika przemyślenia, nie wynik silnika.
+
 ## Funkcje lokalne (bez backendu, bez konta)
 
 `src/core/storage.ts` to jedyny punkt dostępu do `localStorage` w całej
@@ -275,7 +301,7 @@ w `lib.mjs` — testowana przez `node --test` bez uruchamiania portu
 
 ## Testy
 
-191 testów frontendowych (vitest) + 28 backendowych (`node --test`) = 219.
+203 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 231.
 
 - **Fizyka i symulacje** (`__tests__/physics.test.ts`, `sims.test.ts`):
   twarde asercje naukowe (złamanie nierówności Bella |S|>2, twierdzenie

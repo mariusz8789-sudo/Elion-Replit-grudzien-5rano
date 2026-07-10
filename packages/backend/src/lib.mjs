@@ -28,6 +28,7 @@ export const LAB_KNOWLEDGE_FILES = {
   civilization: 'civilization.md',
   discovery: 'ai-discovery.md',
   'discovery-timeline': 'discovery-timeline.md',
+  'quantum-decision-explorer': 'quantum-decision-explorer.md',
 };
 
 /**

@@ -11,6 +11,8 @@ import { passport } from "./auth";
 import { setupWebSocket } from "./socket";
 import { storage } from "./storage";
 import { partnerApi } from "./partnerApi";
+import { roadServicesRouter } from "./roadServices/router";
+import { roadServicesPartnerApi } from "./roadServices/partnerApi";
 import { pool } from "./db";
 
 const app = express();
@@ -150,6 +152,8 @@ app.use((req, res, next) => {
 });
 
 app.use("/partner/v1", partnerApi);
+app.use("/api/road-services", roadServicesRouter);
+app.use("/road-services/partner/v1", roadServicesPartnerApi);
 
 (async () => {
   const server = await registerRoutes(app);

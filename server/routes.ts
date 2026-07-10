@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express } from "express";
 import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
@@ -31,20 +31,8 @@ import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
 import { validateDataUrl } from "./lib/dataUrl";
 import { getBroadcaster } from "./socket";
 import rateLimit from "express-rate-limit";
-
-const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).json({ message: "Unauthorized" });
-};
-
-const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
-  if (req.isAuthenticated() && (req.user as User).role === "admin") {
-    return next();
-  }
-  res.status((req.user as User | undefined) ? 403 : 401).json({ message: (req.user as User | undefined) ? "Admin access required" : "Unauthorized" });
-};
+import { requireAuth, requireAdmin } from "./lib/authMiddleware";
+import { handleRoadServiceOrderPayment } from "./roadServices/router";
 
 const userCanAccessBooking = (user: User, booking: Booking) =>
   userCanAccessBookingImpl(user, booking, (id) => storage.getDriver(id));
@@ -1614,6 +1602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         case "payment_intent.succeeded": {
           const paymentIntent = event.data.object;
           const bookingId = paymentIntent.metadata.bookingId;
+          const roadServiceOrderId = paymentIntent.metadata.roadServiceOrderId;
 
           if (bookingId) {
             await storage.updateBookingPayment(
@@ -1622,12 +1611,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               "captured"
             );
           }
+          if (roadServiceOrderId) {
+            await handleRoadServiceOrderPayment(roadServiceOrderId, paymentIntent.id, true);
+          }
           break;
         }
 
         case "payment_intent.payment_failed": {
           const failedIntent = event.data.object;
           const failedBookingId = failedIntent.metadata.bookingId;
+          const failedRoadServiceOrderId = failedIntent.metadata.roadServiceOrderId;
 
           if (failedBookingId) {
             await storage.updateBookingPayment(
@@ -1635,6 +1628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               failedIntent.id,
               "failed"
             );
+          }
+          if (failedRoadServiceOrderId) {
+            await handleRoadServiceOrderPayment(failedRoadServiceOrderId, failedIntent.id, false);
           }
           break;
         }

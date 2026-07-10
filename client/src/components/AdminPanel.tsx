@@ -12,9 +12,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, TrendingUp, AlertCircle, User, DollarSign, ShieldCheck, Check, X } from "lucide-react";
+import { Package, TrendingUp, AlertCircle, User, DollarSign, ShieldCheck, Check, X, Route, Euro } from "lucide-react";
 import { format } from "date-fns";
-import type { Booking, Service, VerificationDocument } from "@shared/schema";
+import type { Booking, Service, VerificationDocument, RoadServicePartnerProfile } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -69,6 +69,31 @@ export default function AdminPanel() {
   });
 
   const drivers = users.filter(u => u.role === "driver" || u.role === "admin");
+
+  const { data: roadServicesRevenue } = useQuery<{
+    totalRevenueEur: number;
+    totalCommissionEur: number;
+    totalOrders: number;
+    byCategory: Array<{ category: string; revenueEur: number; commissionEur: number; orders: number }>;
+  }>({
+    queryKey: ["/api/road-services/admin/revenue"],
+  });
+
+  const { data: roadServicePartners = [] } = useQuery<RoadServicePartnerProfile[]>({
+    queryKey: ["/api/road-services/admin/partners"],
+  });
+
+  const updatePartnerStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: "pending" | "active" | "suspended" }) => {
+      const res = await apiRequest("PATCH", `/api/road-services/admin/partners/${id}/status`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/road-services/admin/partners"] });
+      toast({ title: "Partner status updated" });
+    },
+    onError: (error: any) => toast({ title: "Update failed", description: error.message, variant: "destructive" }),
+  });
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ bookingId, status }: { bookingId: string; status: string }) => {
@@ -241,6 +266,7 @@ export default function AdminPanel() {
           <TabsTrigger value="bookings" data-testid="tab-bookings">Bookings</TabsTrigger>
           <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
           <TabsTrigger value="drivers" data-testid="tab-drivers">Drivers</TabsTrigger>
+          <TabsTrigger value="road-services" data-testid="tab-road-services">Road Services</TabsTrigger>
           <TabsTrigger value="verification" data-testid="tab-verification">
             Verification {pendingDocuments.length > 0 && <Badge className="ml-1">{pendingDocuments.length}</Badge>}
           </TabsTrigger>
@@ -502,6 +528,101 @@ export default function AdminPanel() {
                       <X className="w-4 h-4 mr-1" /> Reject
                     </Button>
                   </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="road-services" className="space-y-4">
+          <div className="grid md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Euro className="w-4 h-4" /> Total Revenue
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold" data-testid="text-rs-total-revenue">
+                  EUR {(roadServicesRevenue?.totalRevenueEur ?? 0).toFixed(2)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" /> Commission Earned
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold" data-testid="text-rs-total-commission">
+                  EUR {(roadServicesRevenue?.totalCommissionEur ?? 0).toFixed(2)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Package className="w-4 h-4" /> Confirmed Orders
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold" data-testid="text-rs-total-orders">
+                  {roadServicesRevenue?.totalOrders ?? 0}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {roadServicesRevenue && roadServicesRevenue.byCategory.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Revenue by Category</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {roadServicesRevenue.byCategory.map((c) => (
+                  <div key={c.category} className="flex items-center justify-between text-sm p-2 border rounded-md">
+                    <span className="capitalize">{c.category.replace(/_/g, " ")}</span>
+                    <span className="text-muted-foreground">{c.orders} orders</span>
+                    <span className="font-medium">EUR {c.revenueEur.toFixed(2)}</span>
+                    <span className="text-green-600">+EUR {c.commissionEur.toFixed(2)}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Route className="w-5 h-5" /> Road Services Partners
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {roadServicePartners.length === 0 && (
+                <p className="text-sm text-muted-foreground">No partner applications yet.</p>
+              )}
+              {roadServicePartners.map((partner) => (
+                <div key={partner.id} className="flex items-center gap-4 p-3 border rounded-md" data-testid={`row-rs-partner-${partner.id}`}>
+                  <div className="flex-1">
+                    <p className="font-medium">{partner.categories.join(", ")}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {partner.countryCodes.join(", ") || "All countries"} · {partner.commissionType === "percent" ? `${partner.commissionValue}%` : `EUR ${partner.commissionValue}`} commission
+                    </p>
+                  </div>
+                  <Badge variant={partner.status === "active" ? "default" : partner.status === "suspended" ? "destructive" : "secondary"}>
+                    {partner.status}
+                  </Badge>
+                  {partner.status !== "active" && (
+                    <Button size="sm" onClick={() => updatePartnerStatusMutation.mutate({ id: partner.id, status: "active" })} disabled={updatePartnerStatusMutation.isPending} data-testid={`button-rs-approve-${partner.id}`}>
+                      <Check className="w-4 h-4 mr-1" /> Activate
+                    </Button>
+                  )}
+                  {partner.status !== "suspended" && (
+                    <Button size="sm" variant="destructive" onClick={() => updatePartnerStatusMutation.mutate({ id: partner.id, status: "suspended" })} disabled={updatePartnerStatusMutation.isPending} data-testid={`button-rs-suspend-${partner.id}`}>
+                      <X className="w-4 h-4 mr-1" /> Suspend
+                    </Button>
+                  )}
                 </div>
               ))}
             </CardContent>

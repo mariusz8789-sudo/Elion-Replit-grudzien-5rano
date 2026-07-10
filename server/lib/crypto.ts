@@ -32,9 +32,10 @@ export function hashApiKey(rawKey: string): string {
   return crypto.createHash("sha256").update(rawKey).digest("hex");
 }
 
-export function generateApiKey(): { rawKey: string; prefix: string } {
-  const rawKey = `p2p_live_${crypto.randomBytes(24).toString("base64url")}`;
-  return { rawKey, prefix: rawKey.slice(0, 12) };
+export function generateApiKey(namespace: string = "p2p"): { rawKey: string; prefix: string } {
+  const fixedPart = `${namespace}_live_`;
+  const rawKey = `${fixedPart}${crypto.randomBytes(24).toString("base64url")}`;
+  return { rawKey, prefix: rawKey.slice(0, fixedPart.length + 3) };
 }
 
 export function signWebhookPayload(secret: string, payload: string): string {

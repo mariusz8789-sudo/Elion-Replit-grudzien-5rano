@@ -615,6 +615,120 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   subscriptionIdIdx: index("webhook_deliveries_subscription_id_idx").on(t.subscriptionId),
 }));
 
+// === MOVEX ROAD SERVICES ===
+// Partner companies (vignette/toll/ferry/parking/fuel/insurance/driver-service providers)
+// extend the existing `companies` table 1:1 rather than duplicating name/email/contact
+// fields - a Road Services partner is a `companies` row with a profile attached.
+export const roadServicePartnerProfiles = pgTable("road_service_partner_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().unique().references(() => companies.id),
+  categories: text("categories").array().notNull().default(sql`ARRAY[]::text[]`), // vignette, toll, ferry, parking, fuel, insurance, driver_service
+  countryCodes: text("country_codes").array().notNull().default(sql`ARRAY[]::text[]`),
+  commissionType: text("commission_type").notNull().default("percent"), // percent, fixed
+  commissionValue: decimal("commission_value", { precision: 10, scale: 4 }).notNull().default("10"),
+  status: text("status").notNull().default("pending"), // pending, active, suspended
+  payoutDetails: jsonb("payout_details"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("road_service_partner_profiles_company_id_idx").on(t.companyId),
+  statusIdx: index("road_service_partner_profiles_status_idx").on(t.status),
+}));
+
+export const roadServiceProducts = pgTable("road_service_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  partnerId: varchar("partner_id").notNull().references(() => roadServicePartnerProfiles.id),
+  category: text("category").notNull(), // vignette, toll, ferry, parking, fuel, insurance, driver_service
+  countryCode: text("country_code"),
+  name: text("name").notNull(),
+  description: text("description"),
+  vehicleTypes: text("vehicle_types").array().default(sql`ARRAY[]::text[]`),
+  priceEur: decimal("price_eur", { precision: 10, scale: 2 }).notNull(),
+  durationDays: integer("duration_days"),
+  active: boolean("active").notNull().default(true),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  partnerIdIdx: index("road_service_products_partner_id_idx").on(t.partnerId),
+  categoryCountryIdx: index("road_service_products_category_country_idx").on(t.category, t.countryCode),
+}));
+
+export const roadRoutes = pgTable("road_routes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  bookingId: varchar("booking_id").references(() => bookings.id),
+  originAddress: text("origin_address").notNull(),
+  destinationAddress: text("destination_address").notNull(),
+  waypoints: jsonb("waypoints").$type<Array<{ address: string; lat: number; lng: number }>>().notNull(),
+  countryCodes: text("country_codes").array().notNull().default(sql`ARRAY[]::text[]`),
+  distanceKm: decimal("distance_km", { precision: 10, scale: 2 }),
+  durationMinutes: integer("duration_minutes"),
+  vehicleType: text("vehicle_type").notNull().default("van"), // van, truck_7_5t, truck_12t, truck_40t
+  vehicleWeightKg: integer("vehicle_weight_kg"),
+  vehicleHeightCm: integer("vehicle_height_cm"),
+  vehicleAxles: integer("vehicle_axles"),
+  isAdr: boolean("is_adr").notNull().default(false), // carrying ADR-classified dangerous goods
+  routeGeometry: jsonb("route_geometry"),
+  analysisStatus: text("analysis_status").notNull().default("pending"), // pending, completed, failed
+  analyzedAt: timestamp("analyzed_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  userIdIdx: index("road_routes_user_id_idx").on(t.userId),
+  bookingIdIdx: index("road_routes_booking_id_idx").on(t.bookingId),
+}));
+
+export const routeRequirements = pgTable("route_requirements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routeId: varchar("route_id").notNull().references(() => roadRoutes.id),
+  category: text("category").notNull(), // vignette, toll, ferry, parking, fuel, insurance, lez, environmental_fee, truck_restriction, adr_restriction, dimension_restriction, weather_warning, road_closure, strike, border_delay, driver_service
+  countryCode: text("country_code"),
+  title: text("title").notNull(),
+  description: text("description"),
+  severity: text("severity").notNull().default("info"), // info, warning, critical
+  isMandatory: boolean("is_mandatory").notNull().default(false),
+  estimatedCostEur: decimal("estimated_cost_eur", { precision: 10, scale: 2 }),
+  recommendedProductId: varchar("recommended_product_id").references(() => roadServiceProducts.id),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  routeIdIdx: index("route_requirements_route_id_idx").on(t.routeId),
+  categoryIdx: index("route_requirements_category_idx").on(t.category),
+}));
+
+export const roadServiceOrders = pgTable("road_service_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  routeId: varchar("route_id").references(() => roadRoutes.id),
+  productId: varchar("product_id").notNull().references(() => roadServiceProducts.id),
+  partnerId: varchar("partner_id").notNull().references(() => roadServicePartnerProfiles.id),
+  quantity: integer("quantity").notNull().default(1),
+  unitPriceEur: decimal("unit_price_eur", { precision: 10, scale: 2 }).notNull(),
+  totalPriceEur: decimal("total_price_eur", { precision: 10, scale: 2 }).notNull(),
+  commissionEur: decimal("commission_eur", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"), // pending, confirmed, failed, refunded
+  externalReference: text("external_reference"),
+  purchasedAt: timestamp("purchased_at").notNull().default(sql`now()`),
+}, (t) => ({
+  userIdIdx: index("road_service_orders_user_id_idx").on(t.userId),
+  partnerIdIdx: index("road_service_orders_partner_id_idx").on(t.partnerId),
+  routeIdIdx: index("road_service_orders_route_id_idx").on(t.routeId),
+  statusIdx: index("road_service_orders_status_idx").on(t.status),
+}));
+
+export const roadServiceAffiliateClicks = pgTable("road_service_affiliate_clicks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  productId: varchar("product_id").notNull().references(() => roadServiceProducts.id),
+  partnerId: varchar("partner_id").notNull().references(() => roadServicePartnerProfiles.id),
+  routeId: varchar("route_id").references(() => roadRoutes.id),
+  converted: boolean("converted").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  partnerIdIdx: index("road_service_affiliate_clicks_partner_id_idx").on(t.partnerId),
+  productIdIdx: index("road_service_affiliate_clicks_product_id_idx").on(t.productId),
+}));
+
 // === INSERT SCHEMAS ===
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -894,6 +1008,46 @@ export const insertWebhookSubscriptionSchema = createInsertSchema(webhookSubscri
   events: z.array(z.string()).min(1),
 });
 
+export const insertRoadServicePartnerProfileSchema = createInsertSchema(roadServicePartnerProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+}).extend({
+  categories: z.array(z.enum(["vignette", "toll", "ferry", "parking", "fuel", "insurance", "driver_service"])).min(1),
+  commissionType: z.enum(["percent", "fixed"]),
+});
+
+export const insertRoadServiceProductSchema = createInsertSchema(roadServiceProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  category: z.enum(["vignette", "toll", "ferry", "parking", "fuel", "insurance", "driver_service"]),
+});
+
+export const insertRoadRouteSchema = createInsertSchema(roadRoutes).omit({
+  id: true,
+  createdAt: true,
+  countryCodes: true,
+  routeGeometry: true,
+  analysisStatus: true,
+  analyzedAt: true,
+  distanceKm: true,
+  durationMinutes: true,
+}).extend({
+  waypoints: z.array(z.object({ address: z.string(), lat: z.number(), lng: z.number() })).min(2),
+});
+
+export const insertRoadServiceOrderSchema = createInsertSchema(roadServiceOrders).omit({
+  id: true,
+  purchasedAt: true,
+  status: true,
+  commissionEur: true,
+  totalPriceEur: true,
+  unitPriceEur: true,
+});
+
 // === TYPES ===
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -997,5 +1151,31 @@ export type ApiKey = typeof apiKeys.$inferSelect;
 
 export type InsertWebhookSubscription = z.infer<typeof insertWebhookSubscriptionSchema>;
 export type WebhookSubscription = typeof webhookSubscriptions.$inferSelect;
+
+export type InsertRoadServicePartnerProfile = z.infer<typeof insertRoadServicePartnerProfileSchema>;
+export type RoadServicePartnerProfile = typeof roadServicePartnerProfiles.$inferSelect;
+
+export type InsertRoadServiceProduct = z.infer<typeof insertRoadServiceProductSchema>;
+export type RoadServiceProduct = typeof roadServiceProducts.$inferSelect;
+
+export type InsertRoadRoute = z.infer<typeof insertRoadRouteSchema>;
+export type RoadRoute = typeof roadRoutes.$inferSelect;
+
+export type RouteRequirement = typeof routeRequirements.$inferSelect;
+
+export type InsertRoadServiceOrder = z.infer<typeof insertRoadServiceOrderSchema>;
+export type RoadServiceOrder = typeof roadServiceOrders.$inferSelect;
+
+export type RoadServiceAffiliateClick = typeof roadServiceAffiliateClicks.$inferSelect;
+
+export const ROAD_SERVICE_CATEGORIES = ["vignette", "toll", "ferry", "parking", "fuel", "insurance", "driver_service"] as const;
+export type RoadServiceCategory = typeof ROAD_SERVICE_CATEGORIES[number];
+
+export const ROUTE_REQUIREMENT_CATEGORIES = [
+  "vignette", "toll", "ferry", "parking", "fuel", "insurance",
+  "lez", "environmental_fee", "truck_restriction", "adr_restriction",
+  "dimension_restriction", "weather_warning", "road_closure", "strike", "border_delay", "driver_service",
+] as const;
+export type RouteRequirementCategory = typeof ROUTE_REQUIREMENT_CATEGORIES[number];
 
 export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;

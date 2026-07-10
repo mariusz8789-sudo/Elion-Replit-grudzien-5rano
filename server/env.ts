@@ -40,4 +40,25 @@ export const env = cleanEnv(process.env, {
   // required only once running more than one server instance/worker; falls back to a
   // same-process-only no-op when unset.
   REDIS_URL: optionalStr({ default: "" }),
+
+  // MoveX Road Services - external commercial provider integrations, all optional.
+  // Each category degrades to the internal partner marketplace catalog (real DB-backed
+  // products listed by onboarded partners) when its base URL/key are unset - never fake data.
+  VIGNETTE_PROVIDER_API_URL: optionalStr({ default: "" }),
+  VIGNETTE_PROVIDER_API_KEY: optionalStr({ default: "" }),
+  TOLL_PROVIDER_API_URL: optionalStr({ default: "" }),
+  TOLL_PROVIDER_API_KEY: optionalStr({ default: "" }),
+  FERRY_PROVIDER_API_URL: optionalStr({ default: "" }),
+  FERRY_PROVIDER_API_KEY: optionalStr({ default: "" }),
+  PARKING_PROVIDER_API_URL: optionalStr({ default: "" }),
+  PARKING_PROVIDER_API_KEY: optionalStr({ default: "" }),
+  FUEL_PROVIDER_API_URL: optionalStr({ default: "" }),
+  FUEL_PROVIDER_API_KEY: optionalStr({ default: "" }),
+  INSURANCE_PROVIDER_API_URL: optionalStr({ default: "" }),
+  INSURANCE_PROVIDER_API_KEY: optionalStr({ default: "" }),
+  DRIVER_SERVICE_PROVIDER_API_URL: optionalStr({ default: "" }),
+  DRIVER_SERVICE_PROVIDER_API_KEY: optionalStr({ default: "" }),
+
+  // Road Services AI engine model overrides - optional, fall back to ANTHROPIC_API_KEY-gated defaults
+  ROAD_SERVICES_MODEL: optionalStr({ default: "" }),
 });

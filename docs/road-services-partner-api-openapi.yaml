@@ -1,0 +1,157 @@
+openapi: 3.0.3
+info:
+  title: MoveX Road Services Partner API
+  version: "1.0.0"
+  description: >
+    Public integration API for MoveX Road Services partners (vignette, toll, ferry,
+    parking, fuel, insurance and driver-service providers). Authenticate with the same
+    company API key used for the core Point to Point Partner API, issued in the company
+    settings console, sent via the `x-api-key` header. A company must first apply for a
+    Road Services partner profile (in-app) and be approved before creating products.
+servers:
+  - url: /road-services/partner/v1
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+  schemas:
+    RoadServiceProduct:
+      type: object
+      properties:
+        id: { type: string }
+        category:
+          type: string
+          enum: [vignette, toll, ferry, parking, fuel, insurance, driver_service]
+        countryCode: { type: string, nullable: true }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        vehicleTypes:
+          type: array
+          items: { type: string }
+        priceEur: { type: string }
+        durationDays: { type: integer, nullable: true }
+        active: { type: boolean }
+    RoadServiceOrder:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        productId: { type: string }
+        quantity: { type: integer }
+        totalPriceEur: { type: string }
+        commissionEur: { type: string }
+        status:
+          type: string
+          enum: [pending, confirmed, failed, refunded]
+        purchasedAt: { type: string, format: date-time }
+    RoadServicePartnerProfile:
+      type: object
+      properties:
+        id: { type: string }
+        companyId: { type: string }
+        categories:
+          type: array
+          items: { type: string }
+        countryCodes:
+          type: array
+          items: { type: string }
+        commissionType: { type: string, enum: [percent, fixed] }
+        commissionValue: { type: string }
+        status: { type: string, enum: [pending, active, suspended] }
+security:
+  - ApiKeyAuth: []
+paths:
+  /profile:
+    get:
+      summary: Get the authenticated company's Road Services partner profile
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/RoadServicePartnerProfile" }
+        "404":
+          description: No partner profile for this company
+  /products:
+    get:
+      summary: List the authenticated partner's products
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/RoadServiceProduct" }
+    post:
+      summary: Create a sellable product (vignette, toll pass, ferry ticket, parking spot, fuel card, insurance policy, driver service)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category, name, priceEur]
+              properties:
+                category:
+                  type: string
+                  enum: [vignette, toll, ferry, parking, fuel, insurance, driver_service]
+                countryCode: { type: string }
+                name: { type: string }
+                description: { type: string }
+                vehicleTypes:
+                  type: array
+                  items: { type: string }
+                priceEur: { type: number }
+                durationDays: { type: integer }
+      responses:
+        "201":
+          description: Created
+        "403":
+          description: Partner profile is not yet active
+  /products/{id}:
+    patch:
+      summary: Update a product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                priceEur: { type: number }
+                active: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+        "404":
+          description: Not found
+  /orders:
+    get:
+      summary: List orders for the authenticated partner's products
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/RoadServiceOrder" }

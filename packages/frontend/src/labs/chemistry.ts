@@ -4,6 +4,7 @@ import { PAULING_ELECTRONEGATIVITY } from '../data/electronegativity';
 import { ELEMENTS } from '../data/elements';
 import { chemistryVsepr } from './experiments/chemistry-vsepr';
 import { chemistryTitration } from './experiments/chemistry-titration';
+import { chemistryIsing } from './experiments/chemistry-ising';
 
 /**
  * Chemistry Lab — wiązania chemiczne i elektroujemność.
@@ -184,7 +185,7 @@ export const chemistryLab: LabDefinition = {
     },
   ],
   createSim: () => new BondSim(),
-  experiments: [chemistryVsepr, chemistryTitration],
+  experiments: [chemistryVsepr, chemistryTitration, chemistryIsing],
   narrate(p, stats) {
     const symbolA = String(p.elementA ?? 'Na');
     const symbolB = String(p.elementB ?? 'Cl');

@@ -2,8 +2,9 @@
 
 ## Zakres
 Elektroujemność, polarność wiązań chemicznych, geometria molekularna
-(VSEPR), miareczkowanie kwasowo-zasadowe. Reakcje, kinetyka, stechiometria
-— poza obecnym zakresem, patrz VISION-BACKLOG.md.
+(VSEPR), miareczkowanie kwasowo-zasadowe, przejście fazowe porządek/
+nieporządek (model Isinga). Reakcje, kinetyka, stechiometria — poza
+obecnym zakresem, patrz VISION-BACKLOG.md.
 
 ## Modele i wzory
 
@@ -52,6 +53,24 @@ ZASADOWY (pH>7, hydroliza sprzężonej zasady A⁻) — jawnie wyjaśnione jako
 naprawienie częstego błędu popularnonaukowego "punkt równoważnikowy = pH 7"
 (prawdziwe tylko dla mocny kwas + mocna zasada, którego ten eksperyment
 nie modeluje).
+
+**Model Isinga 2D — przejście fazowe (zaimplementowane)** ★★★★★
+Jedyny nietrywialny model przejścia fazowego z pełnym rozwiązaniem
+analitycznym w 2D (Onsager 1944, Phys. Rev. 65, 117). Siatka kwadratowa
+42×42, periodyczne warunki brzegowe, J=1, brak pola zewnętrznego,
+algorytm Metropolisa (Metropolis i in. 1953). Dokładna temperatura
+krytyczna T_c=2/ln(1+√2)≈2,269; dokładna spontaniczna magnetyzacja
+poniżej T_c: M(T)=[1−sinh⁻⁴(2/T)]^(1/8) (Yang 1952, Phys. Rev. 85, 808).
+Spójność wewnętrzna zweryfikowana algebraicznie: sinh(2/T_c)=1 DOKŁADNIE,
+co daje ciągłe (nie skokowe) dojście magnetyzacji do zera — definicja
+przejścia fazowego drugiego rodzaju. Implementacja w
+`core/isingModel.ts` (14 testów statystycznych z ziarnem RNG), Sim w
+`labs/experiments/chemistry-ising.ts`. Głęboko poniżej T_c dynamika
+pojedynczego przerzutu spinu jest naprawdę wolna (dyfuzja ścian domen,
+"critical slowing down") — symulacja robi ~40 zamachów/s i dodatkowy
+"wybuch" relaksacji przy skokowej zmianie temperatury (jak hartowanie
+próbki), a Narrator jawnie tłumaczy różnicę między bieżącą a docelową
+(Onsagera) magnetyzacją zamiast ją ukrywać.
 
 ## Sprzeczne teorie / otwarte spory
 - Skale elektroujemności różnią się metodą (Pauling z energii wiązań,

@@ -498,9 +498,18 @@ nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
   6 nowych testów: energia w spoczynku, zachowanie energii przy małym
   kącie, determinizm RK4, szybszy rozjazd przy dużym kącie niż małym.
   Backlog na przyszłość (NIE zbudowane): atraktor Lorenza.
-- **Przejścia fazowe i łamanie symetrii** (★★★★★ zjawisko, model Isinga
-  ★★★★ dydaktyczny) — siatka spinów zmieniająca stan przy krytycznej
-  temperaturze; ten sam silnik cząsteczkowy co reakcja łańcuchowa.
+- ✅ **Przejścia fazowe i łamanie symetrii — model Isinga 2D** —
+  `core/isingModel.ts` + `chemistry-ising.ts`, Chemistry Lab. Jedyny
+  nietrywialny model przejścia fazowego z pełnym rozwiązaniem
+  analitycznym w 2D (Onsager 1944): siatka 42×42, periodyczne warunki
+  brzegowe, algorytm Metropolisa. Dokładna T_c=2/ln(1+√2)≈2,269 i
+  dokładna spontaniczna magnetyzacja Onsagera/Yanga poniżej T_c —
+  zweryfikowane algebraicznie (sinh(2/T_c)=1 dokładnie) i 14 testami
+  statystycznymi z ziarnem RNG (porządkowanie w niskiej T, rozpad
+  porządku w wysokiej T, energia stanu podstawowego = −2/spin dokładnie).
+  Świadomie nazwane w Narratorze zjawisko "critical slowing down" —
+  głęboko poniżej T_c symulowana magnetyzacja realnie potrzebuje czasu,
+  żeby dogonić wartość Onsagera (dyfuzja ścian domen), nie jest to ukryte.
 - ✅ (częściowo) Ewolucja Wszechświata — Universe Lab; kosmiczna oś czasu
   (patrz Cosmology wyżej) dopełniłaby to od strony chronologicznej.
 

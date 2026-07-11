@@ -6,6 +6,40 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Model Isinga 2D — przejście fazowe, nowy eksperyment, Chemistry Lab)
+- `core/isingModel.ts` (nowy moduł, w pełni testowalny niezależnie od
+  renderingu) + `labs/experiments/chemistry-ising.ts`: siatka spinów
+  ±1 42×42 z periodycznymi warunkami brzegowymi, algorytm Metropolisa
+  (Metropolis, Rosenbluth, Rosenbluth, Teller, Teller 1953) — jedyny
+  nietrywialny model przejścia fazowego z pełnym rozwiązaniem
+  analitycznym w 2D (Onsager 1944, Phys. Rev. 65, 117).
+- Dokładna temperatura krytyczna `ISING_TC = 2/ln(1+√2) ≈ 2,269` i
+  dokładna spontaniczna magnetyzacja poniżej niej (`isingExactMagnetization`,
+  wzór Yanga 1952, Phys. Rev. 85, 808) — spójność wewnętrzna
+  zweryfikowana ALGEBRAICZNIE przed napisaniem jakiegokolwiek kodu
+  symulacji: sinh(2/T_c) = 1 dokładnie, co gwarantuje ciągłe (nie
+  skokowe) dojście magnetyzacji do zera dokładnie w T_c — definicja
+  przejścia fazowego drugiego rodzaju.
+- Symulowana dynamika Metropolisa jest naprawdę wolna głęboko poniżej
+  T_c (dyfuzja ścian domen, "critical slowing down" — realne zjawisko,
+  nie błąd implementacji, potwierdzone wizualnie w Playwright: losowa
+  siatka startowa tworzy duże, powoli zlewające się domeny zamiast
+  natychmiast osiągać pełny porządek). Zaadresowane uczciwie zamiast
+  ukryte: podniesione tempo prób Metropolisa (~40 zamachów/s), "wybuch"
+  relaksacji przy skokowej zmianie temperatury (analogia do hartowania
+  próbki), i Narrator, który jawnie nazywa różnicę między bieżącą a
+  docelową (Onsagera) magnetyzacją zamiast milczeć o niej.
+- 14 nowych testów statystycznych (`isingModel.test.ts`, generator
+  liniowy kongruentny z ziarnem dla powtarzalności): wartość i spójność
+  T_c, monotoniczność i granice magnetyzacji Onsagera, periodyczne
+  warunki brzegowe, porządkowanie w niskiej T / rozpad porządku w
+  wysokiej T, energia stanu podstawowego dokładnie −2/spin, wzrost
+  energii po termalizacji w wysokiej T.
+- Zweryfikowane: typecheck, lint, 317 testów vitest frontendowych (345
+  z backendem), build, Playwright w prawdziwej Chromium — niska
+  temperatura pokazuje duże kolorowe domeny (fazę uporządkowaną), wysoka
+  temperatura czysty szum (fazę nieuporządkowaną), zero błędów konsoli.
+
 ### Dodano (Wirująca czarna dziura Kerra 3D — nowy eksperyment, Einstein Lab)
 - `labs/experiments/einstein-kerr3d.ts` (nowy `Sim3D`) + nowe funkcje w
   `core/physics.ts`: `stepKerrEquatorialGeodesic`, `kerrEquatorialF`,

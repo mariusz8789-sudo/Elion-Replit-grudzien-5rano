@@ -139,14 +139,21 @@ Wszechświata (8,8×10²⁶ m).
   wleczenia układów inercjalnych (frame-dragging, Gravity Probe B 2011)
   widoczny wprost — orbita prograde bliżej horyzontu niż retrograde;
   horyzont i ergosfera renderowane jako dokładne powierzchnie 3D
-- **330 testów** (302 vitest frontend + 28 node:test backend)
+- **Model Isinga — przejście fazowe** (Chemistry Lab) — jedyny
+  nietrywialny model przejścia fazowego z pełnym rozwiązaniem
+  analitycznym w 2D (Onsager 1944); dokładna temperatura krytyczna
+  T_c=2/ln(1+√2)≈2,269 i dokładna spontaniczna magnetyzacja Onsagera/
+  Yanga poniżej T_c, algorytm Metropolisa na siatce 42×42; "critical
+  slowing down" głęboko poniżej T_c uczciwie nazwane przez Narratora,
+  nie ukryte
+- **345 testów** (317 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 330 testów (fizyka + funkcje lokalne + backend)
+npm test           # 345 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

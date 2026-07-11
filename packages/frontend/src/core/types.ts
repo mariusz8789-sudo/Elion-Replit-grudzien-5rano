@@ -103,7 +103,10 @@ export interface LabDefinition {
   /** Jedno zdanie: co ten model upraszcza / czego nie twierdzi. */
   honestyNote: string;
   params: ParamDef[];
+  /** Dokładnie jedno z createSim/createSim3D opisuje eksperyment bazowy — patrz ExperimentDef. */
   createSim?: () => Sim;
+  /** Scena 3D (Three.js) dla eksperymentu bazowego — patrz ExperimentDef.createSim3D. */
+  createSim3D?: () => import('./three/types').Sim3D;
   narrate: NarrateFn;
   /**
    * Dodatkowe eksperymenty laboratorium (Etap 1+). Pola params/createSim/

@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import type { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import type { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import type { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import type { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { SimParams } from '../types';
@@ -9,11 +10,15 @@ import type { SimParams } from '../types';
  * Klasy postprocessingu wstrzykiwane przez useThreeLoop.ts (załadowane
  * dynamicznie razem z `three`) — Sim3D dostaje gotowe konstruktory zamiast
  * samo importować, żeby jeden hook zarządzał JEDNYM cyklem ładowania
- * WebGL dla całej platformy.
+ * WebGL dla całej platformy. ShaderPass to ogólny, mały wrapper na
+ * własny fragment shader (fullscreen quad) — reużywalny przez każdą
+ * przyszłą scenę 3D potrzebującą customowego efektu post-processingu,
+ * nie tylko soczewkowanie grawitacyjne Einstein Lab.
  */
 export interface PostProcessingModules {
   EffectComposer: typeof EffectComposer;
   RenderPass: typeof RenderPass;
+  ShaderPass: typeof ShaderPass;
   UnrealBloomPass: typeof UnrealBloomPass;
   OutputPass: typeof OutputPass;
 }
@@ -36,6 +41,13 @@ export interface PostProcessor {
  * „Sceny 3D (Three.js)").
  */
 export interface Sim3D {
+  /**
+   * Kinowa prędkość auto-obrotu kamery wokół celu (stopnie/s), aktywna
+   * dopóki użytkownik nie zacznie przeciągać — patrz useThreeLoop.ts.
+   * Po puszczeniu wraca po ~2,5 s bezczynności. Reużywalna cecha kamery,
+   * nie efekt specyficzny dla jednej sceny.
+   */
+  cameraAutoRotateSpeed?: number;
   /** Budowa sceny — wywoływane raz przy montażu (i przy zmianie eksperymentu). */
   init(three: typeof THREE, scene: THREE.Scene, camera: THREE.PerspectiveCamera, w: number, h: number): void;
   /** Krok fizyki/animacji — CZYSTE dane, bez efektów ubocznych na WebGL (testowalne bez GPU). */

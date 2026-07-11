@@ -37,7 +37,7 @@ export function WhatIfScreen() {
               className="whatif-card"
               style={{ ['--accent' as string]: lab.accent }}
               onClick={() => {
-                setPendingScenario(s.labId, s.params);
+                setPendingScenario(s.labId, s.params, s.experimentId);
                 track('what_if_opened');
                 window.location.hash = `#/lab/${s.labId}`;
               }}

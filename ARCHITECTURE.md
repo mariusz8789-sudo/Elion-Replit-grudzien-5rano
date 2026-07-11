@@ -384,6 +384,153 @@ każdy dostaje tu miejsce podpięcia w istniejącej architekturze, żeby
 przyszła implementacja nie wymagała przepisywania rdzenia — zgodnie z
 zasadą „nie twórz atrap, projektuj architekturę pod przyszłość".
 
+### Wizja założycielska: od stanu kwantowego do Wszechświata (projekt, NIE zbudowane)
+
+**Ten rozdział koduje CEL, nie stan obecny i nie zadanie do wykonania
+teraz.** Genesis OS docelowo NIE jest zbiorem 13 niezależnych symulacji
+edukacyjnych ani „Universe Sandbox z większą liczbą laboratoriów" —
+docelowo jest jednym połączonym środowiskiem obliczeniowym do
+eksploracji, modelowania, łączenia i testowania hipotez naukowych w skali
+od stanu kwantowego po Wszechświat: stan kwantowy → cząstki → struktura
+atomowa → cząsteczki → reakcje chemiczne → białka → DNA i systemy
+biologiczne → komórki → tkanki i mechanizmy biologiczne → kandydaci
+terapeutyczni i hipotezy lecznicze → organizmy → ekosystemy → miasta i
+cywilizacje → planety → układy planetarne → gwiazdy i czarne dziury →
+galaktyki → kosmologia. Docelowe pytanie, jakie zadaje platforma, to nie
+„które laboratorium chcesz otworzyć?", tylko „co chcesz zrozumieć,
+przetestować, stworzyć albo odkryć?" — laboratoria są dzisiejszym
+interfejsem do tego celu, nie jego trwałym sufitem koncepcyjnym.
+
+**To NIE jest nowa wizja — to jest istniejąca wizja, teraz nazwana z
+poziomu założycielskiego.** Prawie cała architektura potrzebna do tego
+celu jest już opisana szczegółowo w `VISION-BACKLOG.md` §„Genesis OS
+2.x/3.0 — Dynamic Scientific Simulation Generator": Scientific Intent
+Engine, Model Composer, Simulation IR, Scientific Primitive Registry,
+automatyczny wybór solvera, AI Scientific Collaborator (nazwa dosłownie
+już tam użyta), Hypothesis Engine, pipeline walidacji, symulacje
+międzydziedzinowe, Discovery Loop, 11-fazowa mapa drogowa. **„Scientific
+Model Graph"** z wizji założycielskiej to ten sam docelowy byt co
+połączenie **Scientific Primitive Registry** (węzły: zarejestrowane
+zdolności naukowe z metadanymi — dziedzina, wejścia, wyjścia, jednostki,
+założenia, ograniczenia, metoda numeryczna, testy walidacyjne,
+kompatybilne prymitywy) i **Model Composera** (krawędzie: reguły
+kompozycji między zgodnymi prymitywami) — to nie trzeci, konkurencyjny
+system do zbudowania, tylko jedna nazwa parasolowa dla czegoś, co
+`VISION-BACKLOG.md` już projektuje w szczególe. Warunek wstępny pozostaje
+identyczny i twardy: **Genesis OS v1.0 musi być najpierw w pełni
+ukończony, dopracowany i gotowy produkcyjnie** — nic w tym rozdziale nie
+zmienia tego priorytetu ani nie usprawiedliwia odłożenia bieżącej pracy
+nad jakością wizualną i stabilnością v1.0.
+
+**Gdzie dzisiejszy roadmap już wspiera tę wizję:**
+- Zasada „pluginy fizyki, cienka powłoka UI" (góra tego dokumentu) to
+  dokładnie warunek konieczny Scientific Model Graph — modele muszą dać
+  się wyciągnąć z `core/*`/`labs/*` jako reużywalne prymitywy bez
+  przepisywania, bo NIGDY nie były sprzężone z Reactem.
+- `core/dataSource.ts` (`isSynthetic`, `citation`, podmiana syntetyczne↔realne
+  bez przebudowy) to już dokładnie infrastruktura uczciwości potrzebna
+  „computational candidate" vs. dane realne w przyszłym pipeline'ie
+  odkrywania leków.
+- `HonestyLevel` + `ConfirmationLevel` jako dwie uzupełniające się,
+  nierównoległe skale (jedna: co model upraszcza; druga: jak pewne jest
+  twierdzenie) to już wzorzec, w który wpina się „confidence level"
+  każdego węzła Scientific Model Graph — nie trzeba nowej taksonomii.
+- Scale Journey (kwark → obserwowalny Wszechświat) i Discovery Timeline
+  Engine (15 epok, wspólna soczewka skali) to już DZIAŁAJĄCY, sprawdzony
+  w praktyce zalążek „poczucia połączonej skali" — nie trzeba wymyślać
+  nowego mechanizmu zoomu międzyskalowego, trzeba go docelowo rozszerzyć.
+- Wzorzec bezpieczeństwa domeny wysokiego ryzyka już istnieje
+  (`VISION-BACKLOG.md` §„Przykład wysokiego ryzyka: epidemiologia") i
+  ustanawia dokładnie ten sam standard, jakiego wymaga odkrywanie leków:
+  wolno symulować konsekwencje i układy matematyczne, nigdy nie wolno
+  dostarczać operacyjnych instrukcji powodowania realnej krzywdy.
+
+**Gdzie dzisiejszy roadmap wizualny (modernizacja symulacji 2040) jest za
+wąski:** plan modernizacji wizualnej traktuje każde laboratorium jako
+niezależny cel wizualny z własną, osobno dobraną paletą (dziś:
+`LabDefinition.accent` per lab — fiolet Einstein, bursztyn Universe, itd.)
+— to wystarcza dla jakości pojedynczej sceny, ale nie ustanawia JEDNEGO
+języka wizualnego „obliczeniowej rzeczywistości" łączącego laboratoria w
+jeden system (patrz „Język wizualny" niżej). Żadna dzisiejsza scena 3D nie
+ma pojęcia „sąsiedniej skali" (np. przejścia z Atom Lab w reprezentację
+kwantową tego samego elektronu w Quantum Lab) — to jest dokładnie
+ryzyko „13 rozłącznych symulacji zamiast jednego systemu naukowego",
+przed którym ten rozdział ostrzega. Rekomendacja: NIE budować teraz
+mechanizmu przejść międzyskalowych ani grafu modeli — pilnować tylko,
+żeby bieżąca praca (patrz niżej) nie zamykała do tego drzwi.
+
+**Minimalne zasady architektoniczne do zachowania JUŻ TERAZ** (żeby
+przyszła praca nad odkrywaniem leków, symulacją międzydziedzinową i
+Scientific Model Graph nie wymagała przebudowy Genesis OS od zera):
+1. Fizyka/logika naukowa zostaje w `core/*`/`labs/*`, zero zależności od
+   Reacta — `Sim`/`Sim3D` pozostaje JEDYNĄ granicą renderowania (bez
+   wyjątków, także dla nowych shaderów/efektów WebGL).
+2. Żadna nowa etykieta pewności/uczciwości nie powstaje równolegle do
+   `HonestyLevel`/`ConfirmationLevel` — przyszłe „computational candidate",
+   „predicted interaction", „requires experimental validation" to nowe
+   WARTOŚCI tego samego systemu etykietowania, nie nowy system.
+3. `core/dataSource.ts` pozostaje jedynym miejscem deklarowania
+   syntetyczne/realne — żaden przyszły moduł (docking, MD, ADMET) nie
+   wymyśla własnej flagi.
+4. Rejestr laboratoriów (`core/registry.ts`, `registerLab()`) pozostaje
+   statyczny i synchroniczny — Scientific Primitive Registry, gdy
+   powstanie, jest NOWYM, osobnym rejestrem (inna domena: prymitywy
+   naukowe, nie laboratoria UI), nie przebudową tego istniejącego.
+5. Żadna domena wysokiego ryzyka (epidemiologia, odkrywanie leków,
+   przyszłe inne) nie dostarcza operacyjnych instrukcji powodowania
+   krzywdy — twarde ograniczenie architektoniczne, nie treściowa sugestia
+   do przypomnienia przy każdej implementacji.
+6. Odkrywanie leków, gdy kiedyś zacznie powstawać, NIGDY nie twierdzi
+   więcej niż model wykazał: dozwolony słownik to „kandydat
+   obliczeniowy", „przewidywana interakcja", „hipoteza wywiedziona z
+   modelu", „wymaga walidacji eksperymentalnej", „pewność ograniczona
+   przez model X" — zakazane jest „stworzyliśmy lek"/„to leczy"/
+   „wyleczyliśmy X" bez realnego dowodu klinicznego. Ten sam pipeline
+   (cel biologiczny → hipoteza mechanizmu → kandydat molekularny →
+   docking/interakcja → dynamika molekularna tam, gdzie uzasadniona →
+   stabilność wiązania → przewidywanie właściwości/ADMET → analiza
+   niepewności → ranking kandydatów → raport → walidacja zewnętrzna) to
+   docelowy przykład domeny wysokiego ryzyka w `VISION-BACKLOG.md`, nie
+   coś budowanego dziś.
+
+### Język wizualny: Dark Computational Reality (projekt, NIE zbudowane, NIE wymaga retrofitu v1.0)
+
+Docelowy, WSPÓLNY język wizualny dla przyszłych scen obliczeniowych w
+całym Genesis OS — cel, do którego mają dążyć KOLEJNE sceny 3D/WebGL, nie
+wymóg przemalowania istniejących laboratoriów dzisiaj. Emocjonalny wzorzec:
+premium wizualizacja dynamiki molekularnej, wizualizacja docking
+białko–ligand, naukowy renderer pól GPU, zaawansowane planetarium — NIE
+cyberpunk, NIE Tron, NIE gamingowy HUD, NIE dekoracyjne cząstki bez
+znaczenia naukowego.
+
+- **Tło**: głęboka czerń/prawie-czarny granat, z realną głębią
+  przestrzenną tam, gdzie naukowo uzasadnione — nie płaska pusta czerń
+  (dokładnie ten sam wniosek co w audycie modernizacji symulacji: „mała
+  wyspa symulacji w pustce" jest błędem, nie stylem).
+- **Podstawowa struktura obliczeniowa** (pola, struktury prawdopodobieństwa,
+  strefy interakcji molekularnych, aktywna geometria obliczeniowa):
+  elektryczny błękit i świecący cyjan.
+- **Wtórna energia/stan** (przejścia stanu, prawdopodobieństwo kwantowe,
+  regiony wysokiej energii, granice modelu, niepewność): fiolet i
+  kontrolowane, ultrafioletowo-podobne światło.
+- **Energia krytyczna**: selektywna biel/prawie-biel, używana RZADKO —
+  komunikuje ekstremalną gęstość/energię/skupienie obliczeniowe tam,
+  gdzie naukowo uzasadnione.
+- **Wyjątek zachowany explicite**: gdzie zróżnicowanie kolorem niesie
+  informację naukową (temperatura, pierwiastek chemiczny, gatunek
+  biologiczny, zbiór danych), kolor NIE jest wymuszany do
+  błękitu/cyjanu/fioletu — dokładnie to już dzieje się w Einstein Lab
+  (gradient bieli→czerwieni dysku akrecyjnego to prawdziwa fizyka
+  T(r)∝r^-3/4, nie naruszenie tej doktryny) i w Atom/Chemistry/Nuclear Lab
+  (kolor pierwiastka/trybu rozpadu musi pozostać czytelny). Ta doktryna
+  opisuje ton pól/energii/struktury obliczeniowej, nie zastępuje
+  zróżnicowania naukowego.
+
+Nie retrofitować istniejących 13 laboratoriów pod tę paletę teraz —
+kolejne sceny (w tym trwająca praca nad Einstein Lab) powinny dryfować w
+tym kierunku tam, gdzie nie koliduje to z uczciwością naukową kolorów, nie
+zatrzymywać bieżącej pracy na przemalowanie.
+
 - **Więcej scen 3D** — `Sim3D`/`useThreeLoop.ts` (patrz wyżej) jest już
   ogólnym wzorcem, nie kodem jednorazowym dla Universe Lab. Naturalni
   kolejni kandydaci: Einstein Lab (geodezyjne fotonów w 3D — dziś

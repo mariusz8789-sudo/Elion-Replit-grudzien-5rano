@@ -248,6 +248,41 @@ konsekwencje i układy matematyczne, ale nigdy nie dostarcza operacyjnych
 instrukcji powodowania realnej krzywdy. To twarde ograniczenie
 architektoniczne, nie sugestia.
 
+### Przykład wysokiego ryzyka: obliczeniowe odkrywanie leków
+
+Druga, równie ważna przyszła dziedzina wysokiego ryzyka (obok
+epidemiologii wyżej, ten sam twardy standard bezpieczeństwa). Genesis OS
+NIE twierdzi dziś i nie będzie docelowo twierdzić „stworzyliśmy lek" —
+wynik obliczeniowy nie jest dowodem klinicznym. Docelowy, uczciwy
+pipeline (kompozycja przyszłych prymitywów naukowych, ten sam wzorzec co
+Model Composer wyżej): cel biologiczny → hipoteza mechanizmu → generowanie
+lub import kandydata molekularnego → reprezentacja molekularna →
+eksploracja miejsca wiązania → przewidywanie dokowania/interakcji →
+dynamika molekularna tam, gdzie technicznie uzasadniona → analiza
+stabilności wiązania → przewidywanie właściwości → przewidywanie
+obliczeniowe związane z ADMET → analiza niepewności → porównanie
+kandydatów → hipoteza AI Scientific Collaboratora → ranking kandydatów
+obliczeniowych → raport badawczy → walidacja w zewnętrznym laboratorium.
+
+Dozwolony słownik produktowy: „kandydat obliczeniowy", „przewidywana
+interakcja", „hipoteza wywiedziona z modelu", „wymaga walidacji
+eksperymentalnej", „pewność ograniczona przez model X", „wynik nie został
+zwalidowany klinicznie". Zakazany słownik (bez realnego, przywołanego
+dowodu naukowego/klinicznego): „wyleczyliśmy X", „stworzyliśmy lek", „to
+działa jako terapia". Celem NIE jest fałszywe odkrycie AI, tylko
+infrastruktura mogąca pomóc ludziom szybciej eksplorować kandydujące
+hipotezy — dokładnie ta sama różnica co między Hypothesis Engine
+(„wspierane w ramach tego modelu i tych założeń", nigdy „udowodnione")
+a fałszywym twierdzeniem o świecie rzeczywistym, opisana wyżej.
+
+**Nie budować teraz.** Zero generowania molekuł, zero dokowania, zero
+funkcjonalności klinicznej, zero automatyzacji laboratoryjnej, zero
+instrukcji syntezy w Genesis OS dzisiaj — ten podrozdział istnieje
+wyłącznie po to, żeby przyszła implementacja (jeśli i kiedy do niej
+dojdzie) miała już rozstrzygnięty słownik uczciwości i miejsce w
+architekturze (patrz `ARCHITECTURE.md` §„Wizja założycielska"), zamiast
+improwizować go pod presją.
+
 ### Symulacje międzydziedzinowe (cross-domain)
 
 Jeden z najambitniejszych celów: kompozycja wielu dziedzin naraz, np.

@@ -1,4 +1,4 @@
-import type { LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
+import type { ExperimentDef, LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
 import { sci } from '../core/useSimLoop';
 import { einsteinGeodesics } from './experiments/einstein-geodesics';
 import { einsteinLensing } from './experiments/einstein-lensing';
@@ -7,11 +7,13 @@ import { einsteinChirp } from './experiments/einstein-chirp';
 import { einsteinKerr3D } from './experiments/einstein-kerr3d';
 
 /**
- * Einstein Lab — zakrzywienie biegu światła przy masie.
- * Fizyka: przybliżenie słabego pola OTW — ugięcie α = 4GM/(c²b), realizowane
- * przez całkowanie fotonów z "siłą" 2GM/r² (współczynnik 2 względem Newtona
- * odtwarza wynik Einsteina z 1915 r.). Metryka Kerra: poglądowa wizualizacja
- * frame-draggingu. Alcubierre: czysto hipotetyczny model, oznaczony.
+ * Einstein Lab — flagowe laboratorium Genesis OS. Domyślny (bazowy)
+ * eksperyment to teraz scena 3D „Czarna dziura 3D" (patrz
+ * einstein-blackhole-3d.ts) — dokładna geodezyjna Schwarzschilda,
+ * promowana z zakładki pobocznej na wejście do laboratorium. Dawny
+ * bazowy eksperyment 2D (ugięcie światła / siatka czasoprzestrzeni /
+ * metryki) NIE został usunięty — jest teraz pierwszą pozycją w
+ * `experiments` jako „Ugięcie światła (2D)".
  */
 
 const G = 6.674e-11;
@@ -217,12 +219,10 @@ class GravityLightSim implements Sim {
   }
 }
 
-export const einsteinLab: LabDefinition = {
-  id: 'einstein',
-  name: 'Einstein Lab',
-  tagline: 'OTW: zakrzywienie światła, metryki, czarne dziury',
-  icon: '🕳️',
-  accent: '#a78bfa',
+/** Dawny bazowy eksperyment 2D — teraz zakładka poboczna, nieusunięta. */
+const einsteinWeakField2D: ExperimentDef = {
+  id: 'weak-field-2d',
+  name: 'Ugięcie światła (2D)',
   honesty: 'simplified',
   honestyNote:
     'Ugięcie światła: przybliżenie słabego pola OTW (α = 4GM/c²b) — poprawne z dala od horyzontu. Siatka i frame-dragging Kerra są poglądowe. Metryka Alcubierre\'a to model hipotetyczny: matematycznie spójny, wymaga egzotycznej materii, której istnienia nie potwierdzono.',
@@ -241,7 +241,6 @@ export const einsteinLab: LabDefinition = {
     },
   ],
   createSim: () => new GravityLightSim(),
-  experiments: [einsteinGeodesics, einsteinBlackHole3D, einsteinKerr3D, einsteinLensing, einsteinChirp],
   narrate(p) {
     const M = 10 ** Number(p.mass) * MSUN;
     const rs = (2 * G * M) / (C * C);
@@ -272,4 +271,18 @@ export const einsteinLab: LabDefinition = {
     }
     return blocks;
   },
+};
+
+export const einsteinLab: LabDefinition = {
+  id: 'einstein',
+  name: 'Einstein Lab',
+  tagline: 'OTW: zakrzywienie światła, metryki, czarne dziury',
+  icon: '🕳️',
+  accent: '#a78bfa',
+  honesty: einsteinBlackHole3D.honesty,
+  honestyNote: einsteinBlackHole3D.honestyNote,
+  params: einsteinBlackHole3D.params,
+  createSim3D: einsteinBlackHole3D.createSim3D,
+  experiments: [einsteinWeakField2D, einsteinGeodesics, einsteinKerr3D, einsteinLensing, einsteinChirp],
+  narrate: einsteinBlackHole3D.narrate,
 };

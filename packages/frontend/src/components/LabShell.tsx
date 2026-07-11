@@ -31,7 +31,8 @@ export function LabShell({ lab }: { lab: LabDefinition }) {
       honesty: lab.honesty,
       honestyNote: lab.honestyNote,
       params: lab.params,
-      createSim: lab.createSim!,
+      createSim: lab.createSim,
+      createSim3D: lab.createSim3D,
       narrate: lab.narrate,
     };
     return [base, ...(lab.experiments ?? [])];
@@ -85,7 +86,7 @@ function experimentBaseName(lab: LabDefinition): string {
   const names: Record<string, string> = {
     universe: 'Ekspansja',
     spacetime: 'Zegary świetlne',
-    einstein: 'Ugięcie światła',
+    einstein: 'Czarna dziura 3D',
     quantum: 'Dwie szczeliny',
     nuclear: 'Rozpad',
     particle: 'Detektor',

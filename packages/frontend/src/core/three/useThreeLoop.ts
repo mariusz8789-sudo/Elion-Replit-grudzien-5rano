@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SimParams } from '../types';
 import type { PostProcessor, Sim3D } from './types';
+import { detectRenderTier, tierDpr } from './quality';
+import { getSettings } from '../settings';
 
 /**
  * Pętla symulacji 3D — lustro core/useSimLoop.ts (DPR, resize, rAF, pauza w
@@ -51,10 +53,11 @@ export function useThreeLoop(
       import('three/examples/jsm/controls/OrbitControls.js'),
       import('three/examples/jsm/postprocessing/EffectComposer.js'),
       import('three/examples/jsm/postprocessing/RenderPass.js'),
+      import('three/examples/jsm/postprocessing/ShaderPass.js'),
       import('three/examples/jsm/postprocessing/UnrealBloomPass.js'),
       import('three/examples/jsm/postprocessing/OutputPass.js'),
     ])
-      .then(([THREE, { OrbitControls }, { EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }]) => {
+      .then(([THREE, { OrbitControls }, { EffectComposer }, { RenderPass }, { ShaderPass }, { UnrealBloomPass }, { OutputPass }]) => {
         if (disposed) return;
         setLoading(false);
 
@@ -63,15 +66,35 @@ export function useThreeLoop(
         renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
         renderer.setClearColor(0x02030a, 1);
 
-        controls = new OrbitControls(camera, canvas);
-        (controls as import('three/examples/jsm/controls/OrbitControls.js').OrbitControls).enableDamping = true;
-        (controls as import('three/examples/jsm/controls/OrbitControls.js').OrbitControls).dampingFactor = 0.08;
+        const orbitControls = new OrbitControls(camera, canvas);
+        controls = orbitControls;
+        orbitControls.enableDamping = true;
+        orbitControls.dampingFactor = 0.08;
+
+        // Kinowy auto-obrót wokół celu, dopóki użytkownik nie zacznie
+        // przeciągać — wbudowana funkcja OrbitControls, więc nie "walczy"
+        // z jej własną obsługą gestów (patrz Sim3D.cameraAutoRotateSpeed).
+        const tier = detectRenderTier();
+        let idleResume: ReturnType<typeof setTimeout> | undefined;
+        if (sim.cameraAutoRotateSpeed && !getSettings().reducedMotion) {
+          orbitControls.autoRotate = true;
+          orbitControls.autoRotateSpeed = sim.cameraAutoRotateSpeed;
+          orbitControls.addEventListener('start', () => {
+            orbitControls.autoRotate = false;
+            if (idleResume) clearTimeout(idleResume);
+          });
+          orbitControls.addEventListener('end', () => {
+            idleResume = setTimeout(() => {
+              orbitControls.autoRotate = true;
+            }, 2500);
+          });
+        }
 
         let w = 0;
         let h = 0;
         const fit = () => {
           const rect = canvas.getBoundingClientRect();
-          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          const dpr = tierDpr(tier);
           w = rect.width;
           h = rect.height;
           if (w === 0 || h === 0) return;
@@ -85,7 +108,7 @@ export function useThreeLoop(
 
         sim.init(THREE, scene, camera, canvas.clientWidth || 300, canvas.clientHeight || 300);
         post = sim.setupPostProcessing?.(
-          { EffectComposer, RenderPass, UnrealBloomPass, OutputPass },
+          { EffectComposer, RenderPass, ShaderPass, UnrealBloomPass, OutputPass },
           renderer,
           scene,
           camera,

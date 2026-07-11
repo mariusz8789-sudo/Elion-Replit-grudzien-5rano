@@ -15,6 +15,8 @@ export interface WhatIfScenario {
   teaser: string;
   labId: string;
   params: Partial<SimParams>;
+  /** Eksperyment docelowy w laboratorium, jeśli inny niż bazowy — patrz core/scenarioBridge.ts. */
+  experimentId?: string;
 }
 
 export const WHAT_IF_SCENARIOS: WhatIfScenario[] = [
@@ -58,7 +60,8 @@ export const WHAT_IF_SCENARIOS: WhatIfScenario[] = [
     question: 'Co by było, gdyby czarna dziura wirowała?',
     teaser: 'Metryka Kerra: frame-dragging zawija tory fotonów wokół obracającej się masy.',
     labId: 'einstein',
-    params: { metric: 'kerr', mass: 6 },
+    experimentId: 'kerr-3d',
+    params: { spin: 0.9 },
   },
   {
     id: 'near-light-speed',

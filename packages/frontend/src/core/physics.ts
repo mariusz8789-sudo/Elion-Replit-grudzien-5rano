@@ -291,6 +291,47 @@ export function kerrCriticalImpactParameter(a: number, mass: number, sign: 1 | -
 }
 
 /**
+ * Atraktor Lorenza (Lorenz 1963, J. Atmos. Sci. 20, 130) — uproszczony
+ * model konwekcji atmosferycznej (3 zmienne zamiast pełnych równań
+ * Naviera–Stokesa), pierwszy jawnie skonstruowany przykład chaosu
+ * deterministycznego w układzie ciągłym. Równania:
+ * dx/dt=σ(y−x), dy/dt=x(ρ−z)−y, dz/dt=xy−βz. Klasyczne parametry
+ * σ=10, β=8/3 (Lorenz 1963); ρ steruje przejściem do chaosu.
+ */
+export interface LorenzState { x: number; y: number; z: number }
+
+export function lorenzDerivative(s: LorenzState, sigma: number, rho: number, beta: number): LorenzState {
+  return { x: sigma * (s.y - s.x), y: s.x * (rho - s.z) - s.y, z: s.x * s.y - beta * s.z };
+}
+
+/** Jeden krok RK4 (jak reszta całkowań w tym pliku — spójna metoda numeryczna w całym Genesis OS). */
+export function stepLorenzRK4(s: LorenzState, dt: number, sigma: number, rho: number, beta: number): LorenzState {
+  const add = (a: LorenzState, b: LorenzState, f: number): LorenzState => ({
+    x: a.x + b.x * f, y: a.y + b.y * f, z: a.z + b.z * f,
+  });
+  const k1 = lorenzDerivative(s, sigma, rho, beta);
+  const k2 = lorenzDerivative(add(s, k1, dt / 2), sigma, rho, beta);
+  const k3 = lorenzDerivative(add(s, k2, dt / 2), sigma, rho, beta);
+  const k4 = lorenzDerivative(add(s, k3, dt), sigma, rho, beta);
+  return {
+    x: s.x + (dt / 6) * (k1.x + 2 * k2.x + 2 * k3.x + k4.x),
+    y: s.y + (dt / 6) * (k1.y + 2 * k2.y + 2 * k3.y + k4.y),
+    z: s.z + (dt / 6) * (k1.z + 2 * k2.z + 2 * k3.z + k4.z),
+  };
+}
+
+/**
+ * Próg homoklinicznego "wybuchu" chaosu (Sparrow 1982, "The Lorenz
+ * Equations"): dla ρ poniżej tego progu dwa symetryczne punkty stałe
+ * (poza początkiem układu) są stabilne; powyżej — powstaje chaotyczny
+ * atraktor. Dla klasycznych σ=10, β=8/3 wynosi ≈24,74 (Lorenz użył ρ=28,
+ * tuż powyżej progu).
+ */
+export function lorenzChaosThreshold(sigma: number, beta: number): number {
+  return (sigma * (sigma + beta + 3)) / (sigma - beta - 1);
+}
+
+/**
  * Geometria 4D (hipersześcian/tesserakt) — CZYSTA algebra liniowa, dokładna
  * (nie model, nie przybliżenie). Nie jest to twierdzenie o istnieniu
  * fizycznych dodatkowych wymiarów przestrzennych (to osobna, spekulacyjna

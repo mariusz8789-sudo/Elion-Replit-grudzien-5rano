@@ -20,6 +20,9 @@ import {
   kerrErgosphereEquatorRadius,
   kerrHorizonRadius,
   kerrPhotonOrbitRadius,
+  lorenzChaosThreshold,
+  lorenzDerivative,
+  type LorenzState,
   lensAmplification,
   lensImagePositions,
   lorentzGamma,
@@ -40,6 +43,7 @@ import {
   singletCorrelation,
   solveKepler,
   stepKerrEquatorialGeodesic,
+  stepLorenzRK4,
   stepSchwarzschildGeodesic,
   TESSERACT_EDGES,
   TESSERACT_VERTICES,
@@ -460,6 +464,59 @@ describe('geodezyjna równikowa Kerra (Einstein Lab 3D — wirująca czarna dziu
         expect(kerrEquatorialF(u, a, 6, M)).toBeGreaterThanOrEqual(0);
       }
     }
+  });
+});
+
+describe('atraktor Lorenza (Lorenz 1963, Universe Lab)', () => {
+  const SIGMA = 10;
+  const BETA = 8 / 3;
+
+  it('próg chaosu ρ_h dla klasycznych σ=10, β=8/3 wynosi dokładnie σ(σ+β+3)/(σ−β−1) ≈ 24,74', () => {
+    expect(lorenzChaosThreshold(SIGMA, BETA)).toBeCloseTo(24.7368421, 6);
+  });
+
+  it('symetria równań: f(−x,−y,z) = (−f_x, −f_y, f_z) — jeśli (x,y,z) jest rozwiązaniem, (−x,−y,z) też jest', () => {
+    const s = { x: 3.2, y: -1.7, z: 15.4 };
+    const f1 = lorenzDerivative(s, SIGMA, 28, BETA);
+    const f2 = lorenzDerivative({ x: -s.x, y: -s.y, z: s.z }, SIGMA, 28, BETA);
+    expect(f2.x).toBeCloseTo(-f1.x, 9);
+    expect(f2.y).toBeCloseTo(-f1.y, 9);
+    expect(f2.z).toBeCloseTo(f1.z, 9);
+  });
+
+  it('poniżej progu chaosu (ρ mały) trajektoria zbiega do początku układu (jedyny stabilny punkt stały dla ρ<1)', () => {
+    let s = { x: 5, y: 5, z: 5 };
+    const dt = 0.005;
+    for (let i = 0; i < 20000; i++) s = stepLorenzRK4(s, dt, SIGMA, 0.5, BETA);
+    const norm = Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z);
+    expect(norm).toBeLessThan(0.01);
+  });
+
+  it('w reżimie chaotycznym (ρ=28, klasyczny Lorenz) trajektoria pozostaje ograniczona (atraktor, nie ucieczka do nieskończoności)', () => {
+    let s = { x: 1, y: 1, z: 1 };
+    const dt = 0.005;
+    let maxNorm = 0;
+    for (let i = 0; i < 40000; i++) {
+      s = stepLorenzRK4(s, dt, SIGMA, 28, BETA);
+      maxNorm = Math.max(maxNorm, Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z));
+    }
+    expect(maxNorm).toBeLessThan(100); // znany atraktor mieści się dobrze poniżej tej granicy
+    expect(Number.isFinite(s.x) && Number.isFinite(s.y) && Number.isFinite(s.z)).toBe(true);
+  });
+
+  it('efekt motyla: dwie trajektorie startujące 1e-6 od siebie przy ρ=28 rozjeżdżają się wykładniczo (czułość na warunki początkowe)', () => {
+    const dt = 0.005;
+    let a = { x: 1, y: 1, z: 1 };
+    let b = { x: 1 + 1e-6, y: 1, z: 1 };
+    const dist = (p: LorenzState, q: LorenzState) =>
+      Math.sqrt((p.x - q.x) ** 2 + (p.y - q.y) ** 2 + (p.z - q.z) ** 2);
+    const d0 = dist(a, b);
+    for (let i = 0; i < 4000; i++) {
+      a = stepLorenzRK4(a, dt, SIGMA, 28, BETA);
+      b = stepLorenzRK4(b, dt, SIGMA, 28, BETA);
+    }
+    const d1 = dist(a, b);
+    expect(d1).toBeGreaterThan(d0 * 100);
   });
 });
 

@@ -6,6 +6,43 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Atraktor Lorenza — trzeci eksperyment chaosu deterministycznego, Universe Lab)
+- Nowe funkcje w `core/physics.ts`: `lorenzDerivative`, `stepLorenzRK4`
+  (RK4 — ta sama metoda numeryczna co reszta platformy),
+  `lorenzChaosThreshold`. Klasyczne równania Lorenza (1963, J. Atmos.
+  Sci. 20, 130): dx/dt=σ(y−x), dy/dt=x(ρ−z)−y, dz/dt=xy−βz, σ=10 i
+  β=8/3 (oryginalne stałe), suwak ρ steruje przejściem od dwóch
+  stabilnych punktów stałych do chaotycznego atraktora.
+- Dokładny próg homoklinicznego "wybuchu" chaosu ρ_h=σ(σ+β+3)/(σ−β−1)
+  (Sparrow 1982) — dla σ=10, β=8/3 daje ≈24,74; klasyczne ρ=28 Lorenza
+  leży tuż powyżej tego progu.
+- Fizyka zweryfikowana algebraicznie PRZED implementacją: symetria
+  równań f(−x,−y,z)=(−f_x,−f_y,f_z) — jeśli (x,y,z) jest rozwiązaniem,
+  (−x,−y,z) też jest, co tłumaczy dwa symetryczne "skrzydła" atraktora
+  — potwierdzona numerycznie (`node -e`) przed napisaniem testów.
+- Nowy `Sim3D` (`universe-lorenz3d.ts`, Universe Lab): tor renderowany
+  jako narastająca linia w WebGL; tryb "dwa niemal identyczne starty"
+  (10⁻⁴ jednostki, jak w problemie trzech ciał i podwójnym wahadle)
+  koloruje drugą trajektorię na pomarańczowo, żeby rozjazd był widoczny
+  gołym okiem. Kamera ustawiona wzdłuż osi dającej klasyczny,
+  rozpoznawalny "kształt motyla" (widok z boku dawał nierozróżnialny,
+  wąski profil obu skrzydeł nałożonych na siebie — poprawione po
+  pierwszym Playwrightowym zrzucie ekranu, nie zostawione).
+- honestyNote nazywa wprost: to uproszczony (3 zmienne) model konwekcji
+  atmosferycznej, NIE symulacja prawdziwej pogody; błąd numeryczny
+  RK4 w układzie chaotycznym rośnie wykładniczo, dokładnie tak jak
+  realny błąd pomiaru — cały eksperyment o tym właśnie traktuje.
+- 5 nowych testów fizycznych (`physics.test.ts`): wartość i wewnętrzna
+  spójność progu chaosu, symetria równań (zweryfikowana wprost),
+  zbieganie do początku układu poniżej ρ=1, ograniczoność atraktora
+  przy klasycznym ρ=28, wykładniczy rozjazd dwóch trajektorii startujących
+  10⁻⁶ jednostki od siebie (efekt motyla).
+- Zweryfikowane: typecheck, lint, 322 testy vitest frontendowe (350 z
+  backendem), build, Playwright w prawdziwej Chromium — niski suwak ρ
+  pokazuje zbieganie do jednego punktu, ρ=28 pokazuje klasyczny kształt
+  motyla narastający na żywo, tryb dywergencji pokazuje dwie trajektorie
+  rozjeżdżające się po wspólnym starcie — zero błędów konsoli.
+
 ### Dodano (Model Isinga 2D — przejście fazowe, nowy eksperyment, Chemistry Lab)
 - `core/isingModel.ts` (nowy moduł, w pełni testowalny niezależnie od
   renderingu) + `labs/experiments/chemistry-ising.ts`: siatka spinów

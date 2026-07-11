@@ -61,6 +61,23 @@ progu (empirycznie) staje się chaotyczny — suwak kąta pozwala przejść
 między obydwoma reżimami na żywo. Ten sam tryb "dwa niemal identyczne
 starty" (10⁻⁶ rad) co w problemie trzech ciał.
 
+**Atraktor Lorenza (zaimplementowane)** ★★★★★
+Trzeci eksperyment "chaos deterministyczny" w Universe Lab (3D, WebGL) —
+klasyczne równania Lorenza (1963, J. Atmos. Sci. 20, 130): uproszczony
+(3 zmienne zamiast pełnych równań Naviera–Stokesa) model konwekcji
+atmosferycznej, pierwszy jawnie skonstruowany przykład chaosu w układzie
+ciągłym. dx/dt=σ(y−x), dy/dt=x(ρ−z)−y, dz/dt=xy−βz, całkowanie RK4;
+σ=10, β=8/3 (oryginalne stałe Lorenza), suwak ρ steruje przejściem od
+dwóch stabilnych punktów stałych do chaotycznego "atraktora dziwnego"
+(motyla) — próg homoklinicznego wybuchu ρ_h=σ(σ+β+3)/(σ−β−1)≈24,74
+(Sparrow 1982), dokładny wzór, zweryfikowany algebraicznie (symetria
+równań f(−x,−y,z)=(−f_x,−f_y,f_z) — jeśli (x,y,z) jest rozwiązaniem,
+(−x,−y,z) też jest, stąd dwa symetryczne "skrzydła" atraktora). Ten sam
+tryb "dwa niemal identyczne starty" (10⁻⁴ jednostki) co w problemie
+trzech ciał i podwójnym wahadle — trzeci, niezależny przykład tego
+samego zjawiska (dodatni wykładnik Lapunowa) w trzeciej, jakościowo
+innej klasie układu (ciągły przepływ 3D, nie układ punktów masowych).
+
 **Prawdziwy Układ Słoneczny (zaimplementowane)** ★★★★★
 Elementy orbitalne 8 planet (półoś wielka, mimośród, okres) z NASA
 Planetary Fact Sheet — publiczne, stabilne stałe. Pozycja liczona

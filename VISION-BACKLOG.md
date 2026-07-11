@@ -497,7 +497,17 @@ nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
   chaotycznego; tryb dywergencji (10⁻⁶ rad) jak w problemie trzech ciał.
   6 nowych testów: energia w spoczynku, zachowanie energii przy małym
   kącie, determinizm RK4, szybszy rozjazd przy dużym kącie niż małym.
-  Backlog na przyszłość (NIE zbudowane): atraktor Lorenza.
+- ✅ **Atraktor Lorenza** — `universe-lorenz3d.ts` (Sim3D), Universe Lab.
+  Trzeci przykład chaosu deterministycznego, obok problemu trzech ciał i
+  podwójnego wahadła — klasyczne równania Lorenza (1963), σ=10, β=8/3
+  stałe, suwak ρ pokazuje przejście od stabilnych punktów stałych do
+  chaotycznego atraktora przez dokładny próg homokliniczny
+  ρ_h=σ(σ+β+3)/(σ−β−1)≈24,74 (Sparrow 1982). Ten sam tryb "dwa niemal
+  identyczne starty" co w pozostałych dwóch eksperymentach chaosu — 5
+  nowych testów: wartość i wewnętrzna spójność progu chaosu, symetria
+  równań f(−x,−y,z)=(−f_x,−f_y,f_z), zbieganie do początku układu poniżej
+  ρ=1, ograniczoność atraktora przy ρ=28, wykładniczy rozjazd dwóch
+  bliskich trajektorii (efekt motyla).
 - ✅ **Przejścia fazowe i łamanie symetrii — model Isinga 2D** —
   `core/isingModel.ts` + `chemistry-ising.ts`, Chemistry Lab. Jedyny
   nietrywialny model przejścia fazowego z pełnym rozwiązaniem

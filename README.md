@@ -146,14 +146,20 @@ Wszechświata (8,8×10²⁶ m).
   Yanga poniżej T_c, algorytm Metropolisa na siatce 42×42; "critical
   slowing down" głęboko poniżej T_c uczciwie nazwane przez Narratora,
   nie ukryte
-- **345 testów** (317 vitest frontend + 28 node:test backend)
+- **Atraktor Lorenza** (Universe Lab, 3D) — trzeci eksperyment chaosu
+  deterministycznego obok problemu trzech ciał i podwójnego wahadła;
+  klasyczne równania Lorenza (1963), dokładny próg homoklinicznego
+  wybuchu chaosu ρ_h≈24,74 (Sparrow 1982), tryb "dwa niemal identyczne
+  starty" pokazujący efekt motyla w trzeciej, jakościowo innej klasie
+  układu chaotycznego
+- **350 testów** (322 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 345 testów (fizyka + funkcje lokalne + backend)
+npm test           # 350 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

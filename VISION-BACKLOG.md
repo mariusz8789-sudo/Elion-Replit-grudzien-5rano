@@ -454,16 +454,29 @@ nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
 
 ## Biology & Molecular Science
 
-- **DNA — podwójna helisa 3D** (★★★★★, struktura Watson-Crick 1953) —
-  `Sim3D`, parametry rzeczywiste (skok helisy 3,4 nm, 10,5 pary zasad/skręt).
-  Bardzo wysoki potencjał WOW dla widzów spoza fizyki (biologia/medycyna).
+✅ **Biology Lab — pierwsze laboratorium spoza fizyki, ZBUDOWANE**
+(`labs/biology.ts` + `labs/experiments/biology-dnahelix.ts`). Dwa
+eksperymenty:
+- Baza (2D): transport błonowy — model płynnej mozaiki (Singer &
+  Nicolson 1972), trzy jakościowo poprawne mechanizmy (dyfuzja prosta,
+  dyfuzja wspomagana nasycalna, transport aktywny — pompa Na⁺/K⁺-ATPaza
+  ze zmierzoną stechiometrią 3:2:1 ATP, Skou/Nagroda Nobla 1997).
+- ✅ **DNA — podwójna helisa 3D** (struktura Watson-Crick 1953,
+  parametry rzeczywiste: promień 1,0 nm, wzniesienie 0,34 nm/parę zasad,
+  10,5 pary zasad/skręt, asymetria rowka większego/mniejszego z
+  przesunięcia nici ~120°). Temperatura topnienia liczona regułą
+  Wallace'a (1979); krzywa rozdzielania nici logistyczna wokół Tm
+  (kooperatywne przejście, koncepcyjny most do modelu Isinga w
+  Chemistry Lab). Pierwsza wersja renderowana z 20-parową sekwencją
+  (~2 skręty) — dłuższa (32 pz) próbowana najpierw, ale wyszła poza
+  udokumentowany zakres ważności reguły Wallace'a, świadomie skrócona.
+  3 testy fizyczne reguły Wallace'a w `physics.test.ts`.
+
+Backlog na przyszłość:
 - **Fałdowanie białka (uproszczone)** (★★★ aktywny obszar badań —
   AlphaFold to real ML, nie fizyka analityczna; NASZ model musiałby być
   jawnie dydaktyczny, np. energetyczny model sieciowy HP, nie prawdziwe
   fałdowanie) — wymaga bardzo starannego oznaczenia granic modelu.
-- **Membrana komórkowa i transport** (★★★★, model płynnej mozaiki) —
-  cząsteczki przechodzące przez kanały białkowe, dobry temat dla `Sim`
-  (cząsteczkowy silnik podobny do `nuclear-chain.ts`).
 - **Pochodzenie życia (abiogeneza)** (★★ aktywny obszar badań, wysoka
   niepewność) — NIE symulacja „jak powstało życie" (nikt tego nie wie), ale
   uczciwy przegląd konkurencyjnych hipotez (świat RNA, kominy hydrotermalne,

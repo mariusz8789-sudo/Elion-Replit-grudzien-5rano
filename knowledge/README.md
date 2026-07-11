@@ -49,6 +49,7 @@ Mapowanie na etykiety w aplikacji: ★★★★–★★★★★ → `exact`/`s
 | [chemistry.md](chemistry.md) | Chemistry Lab — elektroujemność, wiązania chemiczne |
 | [multiverse.md](multiverse.md) | Multiverse Lab — fine-tuning, hipotezy |
 | [civilization.md](civilization.md) | Civilization Lab — Kardaszew, SETI |
+| [biology.md](biology.md) | Biology Lab — błona komórkowa, DNA |
 | [ai-discovery.md](ai-discovery.md) | Warstwa AI — korpus, grounding, architektura |
 | [scale-journey.md](scale-journey.md) | Scale Journey — dane rozmiarów, narracja skal |
 | [discovery-timeline.md](discovery-timeline.md) | Discovery Timeline Engine — 15 epok, Wielki Wybuch → daleka przyszłość |

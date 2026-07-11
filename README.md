@@ -27,9 +27,9 @@ Wszechświata (8,8×10²⁶ m).
   Wszechświat, ta sama technika co Scale Journey). Drugi, obok siatki
   laboratoriów, tryb wejścia do Genesis OS — patrz `#/timeline`
 - **Scale Journey** — płynna podróż przez 45 rzędów wielkości (ekran główny)
-- **11 laboratoriów-pluginów**, każde z wieloma eksperymentami i Narratorem AI:
+- **12 laboratoriów-pluginów**, każde z wieloma eksperymentami i Narratorem AI:
   Universe, Space-Time, Einstein, Quantum, Atom, Nuclear, Particle, Chemistry,
-  Multiverse, Civilization, AI Discovery
+  Multiverse, Civilization, Biology, AI Discovery
 - **Narrator AI, dwie warstwy**: deterministyczny silnik liczący realne wielkości
   fizyczne z żywych parametrów symulacji (zawsze aktywny) + opcjonalne pytania
   otwarte przez backend LLM ("Zapytaj AI"), ugruntowane wyłącznie w stanie
@@ -158,14 +158,20 @@ Wszechświata (8,8×10²⁶ m).
   Keplera; wyłączenie gigantów mierzalnie zmniejsza dryf mimośrodu Marsa
   (~15× po 12 latach symulacji) — namacalny, zmierzony skutek
   grawitacyjnego zaburzenia, nie deklarowany efekt
-- **357 testów** (329 vitest frontend + 28 node:test backend)
+- **Biology Lab (nowe, 12. laboratorium)** — transport przez błonę
+  komórkową (model płynnej mozaiki, pompa Na⁺/K⁺-ATPaza ze zmierzoną
+  stechiometrią 3 Na⁺:2 K⁺:1 ATP, Nagroda Nobla 1997) i podwójna helisa
+  DNA w 3D (dokładna geometria B-DNA Watson-Crick 1953, temperatura
+  topnienia z reguły Wallace'a — helisa widocznie się rozdziela powyżej
+  obliczonej Tm)
+- **361 testów** (333 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 357 testów (fizyka + funkcje lokalne + backend)
+npm test           # 361 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

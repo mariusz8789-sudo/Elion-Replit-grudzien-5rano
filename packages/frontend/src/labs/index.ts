@@ -9,6 +9,7 @@ import { particleLab } from './particle';
 import { chemistryLab } from './chemistry';
 import { multiverseLab } from './multiverse';
 import { civilizationLab } from './civilization';
+import { biologyLab } from './biology';
 import { discoveryLab } from './discovery';
 
 /**
@@ -25,4 +26,5 @@ registerLab(particleLab);
 registerLab(chemistryLab);
 registerLab(multiverseLab);
 registerLab(civilizationLab);
+registerLab(biologyLab);
 registerLab(discoveryLab);

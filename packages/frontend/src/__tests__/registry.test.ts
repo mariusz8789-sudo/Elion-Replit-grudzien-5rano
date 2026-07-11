@@ -4,11 +4,12 @@ import { getLab, getLabs, registerLab } from '../core/registry';
 import type { LabDefinition } from '../core/types';
 
 describe('plugin registry', () => {
-  it('registers exactly the 11 shipped labs', () => {
-    expect(getLabs().length).toBe(11);
+  it('registers exactly the 12 shipped labs', () => {
+    expect(getLabs().length).toBe(12);
     const ids = getLabs().map((l) => l.id).sort();
     expect(ids).toEqual([
       'atom',
+      'biology',
       'chemistry',
       'civilization',
       'discovery',

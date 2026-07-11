@@ -7,6 +7,7 @@ import {
   chshS,
   circularVelocity,
   decayRemaining,
+  dnaMeltingTempWallace,
   equivalenceVolumeMl,
   exponentialDiskMass,
   G_ASTRO,
@@ -885,5 +886,24 @@ describe('jednostki wygodne mechaniki nieba (AU, rok, masa Słońca) — Stabiln
     const el = orbitalElementsFromState(a, 0, 0, v, mu);
     expect(el.eccentricity).toBeCloseTo(0, 9);
     expect(el.semiMajorAxisAu).toBeCloseTo(a, 9);
+  });
+});
+
+describe('reguła Wallace\'a — temperatura topnienia DNA (Biology Lab)', () => {
+  it('liczy dokładnie 2°C na parę A/T i 4°C na parę G/C', () => {
+    expect(dnaMeltingTempWallace('ATGC')).toBe(12);
+    expect(dnaMeltingTempWallace('AAAA')).toBe(8);
+    expect(dnaMeltingTempWallace('GCGC')).toBe(16);
+    expect(dnaMeltingTempWallace('')).toBe(0);
+  });
+
+  it('jest niewrażliwa na wielkość liter', () => {
+    expect(dnaMeltingTempWallace('atgc')).toBe(dnaMeltingTempWallace('ATGC'));
+  });
+
+  it('sekwencja bogata w G/C ma wyższą Tm niż ta sama długość bogata w A/T (silniejsze parowanie G≡C, 3 wiązania wodorowe vs 2)', () => {
+    const gcRich = dnaMeltingTempWallace('GCGCGCGC');
+    const atRich = dnaMeltingTempWallace('ATATATAT');
+    expect(gcRich).toBeGreaterThan(atRich);
   });
 });

@@ -6,6 +6,54 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Biology Lab — pierwsze laboratorium spoza fizyki: transport błonowy + podwójna helisa DNA 3D)
+- Nowe, dwunaste laboratorium (`labs/biology.ts`, zarejestrowane w
+  `labs/index.ts` — jedna linia, jak dokumentuje komentarz w tym pliku)
+  i nowy plik wiedzy `knowledge/biology.md`, wpisany do
+  `LAB_KNOWLEDGE_FILES` w backendzie i `knowledge/README.md`, żeby
+  Narrator AI mógł się w nim gruntować dokładnie tak samo jak w
+  pozostałych 11 laboratoriach.
+- Eksperyment bazowy (2D): transport przez błonę komórkową (model
+  płynnej mozaiki, Singer & Nicolson 1972). Trzy jakościowo poprawne
+  mechanizmy: dyfuzja prosta (zawsze z gradientem), dyfuzja wspomagana
+  (z gradientem, ale NASYCALNA liczbą kanałów), transport aktywny
+  (pompa Na⁺/K⁺-ATPaza, jedyny mechanizm PRZECIW gradientowi, kosztem
+  ATP). Stechiometria pompy — 3 Na⁺ na zewnątrz : 2 K⁺ do wewnątrz na
+  1 ATP — to zmierzony fakt biochemiczny (odkrycie: Jens Skou, Nagroda
+  Nobla 1997), nie liczba dobrana dla wygody symulacji.
+- Drugi eksperyment (3D, WebGL): podwójna helisa DNA — dokładna
+  geometria B-DNA (Watson & Crick 1953; parametry krystalograficzne:
+  promień 1,0 nm, wzniesienie 0,34 nm/parę zasad, ~10,5 pary zasad/skręt,
+  Wang 1979), dwie nici przesunięte o ~120° (nie 180°) dając realną
+  asymetrię rowka większego/mniejszego. Temperatura topnienia liczona
+  regułą Wallace'a Tm=2°C(A+T)+4°C(G+C) (Wallace i in. 1979) — nowa
+  funkcja `dnaMeltingTempWallace` w `core/physics.ts`. Krzywa
+  rozdzielania nici jest logistyczna wokół Tm (kooperatywne przejście —
+  koncepcyjny most do modelu Isinga w Chemistry Lab, zbudowanego
+  wcześniej w tej samej sesji).
+- Pierwsza wersja helisy użyła 32-parowej sekwencji, ale Playwright
+  ujawnił dwa problemy naprawione przed zamknięciem zadania: (1)
+  centrowanie geometrii było na sztywno przybite do n≈10, więc dłuższe
+  sekwencje renderowały się poza środkiem — naprawione przez
+  przekazanie rzeczywistej długości do funkcji geometrii; (2) reguła
+  Wallace'a ekstrapolowana na 32 zasady dawała nierealistycznie wysoką
+  Tm (96°C) — reguła jest udokumentowana tylko dla krótkich
+  oligonukleotydów, więc sekwencje skrócono do 20 par zasad (wciąż ~2
+  pełne skręty, wystarczające do rozpoznawalnego kształtu helisy).
+- 3 nowe testy fizyczne reguły Wallace'a w `physics.test.ts` (dokładna
+  wartość dla znanych sekwencji, niewrażliwość na wielkość liter,
+  sekwencje bogate w G≡C mają wyższą Tm niż te same długości bogate w
+  A=T — silniejsze parowanie G≡C, 3 wiązania wodorowe vs 2).
+- Zaktualizowano dwa istniejące testy regresyjne, które na sztywno
+  zakładały 11 laboratoriów (`registry.test.ts`, `discoveryLog.test.ts`)
+  — teraz poprawnie liczą 12.
+- Zweryfikowane: typecheck, lint, 333 testy vitest frontendowe (361 z
+  backendem), build, Playwright w prawdziwej Chromium na obu
+  eksperymentach — pompa Na⁺/K⁺ mierzalnie tworzy gradient Na⁺/K⁺
+  wbrew biernemu przeciekowi, a helisa DNA przy 85°C (powyżej Tm=58°C
+  mieszanej sekwencji) widocznie się rozdziela (nici rozchodzą się,
+  wiązania wodorowe zanikają) — zero błędów konsoli.
+
 ### Dodano (Stabilność układu planetarnego — prawdziwa grawitacja N-ciał, nowy eksperyment, Universe Lab)
 - Nowe funkcje w `core/physics.ts`: `G_ASTRO_YEAR` (=4π² dokładnie —
   konsekwencja III prawa Keplera dla Ziemi w jednostkach AU/rok/M_słońca,

@@ -600,3 +600,20 @@ export function gaussianPdf(x: number, mean: number, sigma: number): number {
 export function measurementTensionSigma(mean1: number, sigma1: number, mean2: number, sigma2: number): number {
   return Math.abs(mean1 - mean2) / Math.sqrt(sigma1 * sigma1 + sigma2 * sigma2);
 }
+
+/**
+ * Temperatura topnienia krótkiego DNA — reguła Wallace'a ("2+4"): Tm =
+ * 2°C·(liczba A+T) + 4°C·(liczba G+C) (Wallace i in. 1979, Nucleic Acids
+ * Res. 6, 3543). Empiryczna, ale powszechnie używana przybliżenie dla
+ * krótkich oligonukleotydów (<14 zasad) — dokładniejsze metody (najbliższy
+ * sąsiad) wymagają tablic termodynamicznych, świadomie pominiętych tutaj.
+ */
+export function dnaMeltingTempWallace(sequence: string): number {
+  let atCount = 0;
+  let gcCount = 0;
+  for (const base of sequence.toUpperCase()) {
+    if (base === 'A' || base === 'T') atCount++;
+    else if (base === 'G' || base === 'C') gcCount++;
+  }
+  return 2 * atCount + 4 * gcCount;
+}

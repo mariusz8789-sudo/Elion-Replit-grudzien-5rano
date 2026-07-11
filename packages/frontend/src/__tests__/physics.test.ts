@@ -56,6 +56,7 @@ import {
   titrationPH,
 } from '../core/physics';
 import { PLANETS } from '../data/solarSystem';
+import { MOONS } from '../data/moons';
 import { KNOWN_NUCLIDES } from '../data/nuclides';
 
 /** Deterministyczny PRNG (mulberry32) — testy statystyczne bez flakiness. */
@@ -905,5 +906,67 @@ describe('reguła Wallace\'a — temperatura topnienia DNA (Biology Lab)', () =>
     const gcRich = dnaMeltingTempWallace('GCGCGCGC');
     const atRich = dnaMeltingTempWallace('ATATATAT');
     expect(gcRich).toBeGreaterThan(atRich);
+  });
+});
+
+describe('nachylenie osi obrotu i pierścienie planet (Universe Lab 3D — przybliżenie kamery)', () => {
+  it('każda planeta ma nachylenie osi w prawidłowym zakresie [0°,180°]', () => {
+    for (const p of PLANETS) {
+      expect(p.axialTiltDeg).toBeGreaterThanOrEqual(0);
+      expect(p.axialTiltDeg).toBeLessThanOrEqual(180);
+    }
+  });
+
+  it('Uran ma ekstremalne nachylenie osi (>90°, "toczy się na boku") — realny, znany fakt NASA', () => {
+    const uranus = PLANETS.find((p) => p.id === 'uranus');
+    expect(uranus?.axialTiltDeg).toBeGreaterThan(90);
+  });
+
+  it('Wenus ma nachylenie >90° — kodowanie prawdziwej retrogradacji, nie błąd danych', () => {
+    const venus = PLANETS.find((p) => p.id === 'venus');
+    expect(venus?.axialTiltDeg).toBeGreaterThan(90);
+  });
+
+  it('tylko Saturn i Uran mają zdefiniowany pierścień, oba z dodatnim, uporządkowanym zasięgiem', () => {
+    for (const p of PLANETS) {
+      if (!p.ring) continue;
+      expect(['saturn', 'uranus']).toContain(p.id);
+      expect(p.ring.outerFactor).toBeGreaterThan(p.ring.innerFactor);
+      expect(p.ring.innerFactor).toBeGreaterThan(1); // pierścień zaczyna się POZA powierzchnią planety
+      expect(p.ring.opacity).toBeGreaterThan(0);
+      expect(p.ring.opacity).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe('MOONS — dane księżyców (Universe Lab 3D, widoczne po przybliżeniu kamery)', () => {
+  it('każdy księżyc wskazuje istniejącą planetę', () => {
+    for (const m of MOONS) {
+      expect(PLANETS.find((p) => p.id === m.parentId), `księżyc "${m.id}" → nieznana planeta "${m.parentId}"`).toBeDefined();
+    }
+  });
+
+  it('każdy księżyc ma dodatnią odległość, okres i promień', () => {
+    for (const m of MOONS) {
+      expect(m.distanceKm).toBeGreaterThan(0);
+      expect(m.periodDays).toBeGreaterThan(0);
+      expect(m.radiusKm).toBeGreaterThan(0);
+    }
+  });
+
+  it('księżyce galileuszowe Jowisza są uporządkowane rosnąco wg prawdziwej odległości (Io < Europa < Ganimedes < Callisto)', () => {
+    const jupiterMoons = MOONS.filter((m) => m.parentId === 'jupiter');
+    const order = ['io', 'europa', 'ganymede', 'callisto'];
+    const sorted = [...jupiterMoons].sort((a, b) => a.distanceKm - b.distanceKm).map((m) => m.id);
+    expect(sorted).toEqual(order);
+  });
+
+  it('Io (najbliższy księżyc galileuszowy) ma najkrótszy okres orbitalny — zgodne z trzecim prawem Keplera', () => {
+    const jupiterMoons = MOONS.filter((m) => m.parentId === 'jupiter');
+    const io = jupiterMoons.find((m) => m.id === 'io')!;
+    for (const m of jupiterMoons) {
+      if (m.id === 'io') continue;
+      expect(io.periodDays).toBeLessThan(m.periodDays);
+    }
   });
 });

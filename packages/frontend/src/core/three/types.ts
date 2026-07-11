@@ -48,6 +48,15 @@ export interface Sim3D {
    * nie efekt specyficzny dla jednej sceny.
    */
   cameraAutoRotateSpeed?: number;
+  /**
+   * Punkt, wokół którego OrbitControls ma aktualnie orbitować — wywoływane
+   * co klatkę PRZED controls.update(); zwrócenie `null` zostawia bieżący
+   * cel OrbitControls bez zmian (domyślne zachowanie większości scen: stały
+   * cel w (0,0,0)). Pozwala Sim3D przenieść "pivot" kamery na ruchomy obiekt
+   * (np. przelot kamery do wybranej planety w Universe Lab) bez własnej,
+   * równoległej implementacji sterowania kamerą — patrz useThreeLoop.ts.
+   */
+  getOrbitTarget?(): THREE.Vector3 | null;
   /** Budowa sceny — wywoływane raz przy montażu (i przy zmianie eksperymentu). */
   init(three: typeof THREE, scene: THREE.Scene, camera: THREE.PerspectiveCamera, w: number, h: number): void;
   /** Krok fizyki/animacji — CZYSTE dane, bez efektów ubocznych na WebGL (testowalne bez GPU). */

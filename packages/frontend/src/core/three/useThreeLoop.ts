@@ -137,6 +137,10 @@ export function useThreeLoop(
           last = now;
           if (runningRef.current) sim.update(dt, paramsRef.current);
           sim.syncScene(scene, camera);
+          if (sim.getOrbitTarget) {
+            const target = sim.getOrbitTarget();
+            if (target) orbitControls.target.copy(target);
+          }
           controls?.update();
           if (post) post.render();
           else renderer!.render(scene, camera);

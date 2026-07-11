@@ -292,14 +292,23 @@ nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
   jako realną własność matematyczną, nie ciekawostkę. 9 nowych testów:
   unitarność każdej bramki (zachowanie normy), H∘H=X∘X=tożsamość,
   nieprzemienność X,Z vs Z,X na stanie w superpozycji.
-  **Wciąż w backlogu**: bramki DWUKUBITOWE (CNOT) i splątanie — wymagają
-  reprezentacji stanu, której pojedyncza sfera Blocha nie potrafi pokazać
-  (dwie sfery nie wystarczą przy splątaniu, potrzebny pełny wektor stanu
-  4-wymiarowy) — jawnie nazwane ograniczenie w honestyNote, nie ukryte.
-- **Teleportacja kwantowa** (★★★★★, protokół potwierdzony eksperymentalnie
-  od 1997) — wymaga symulacji 2-kubitowego stanu splątanego + pomiaru w
-  bazie Bella; wyraźnie oznaczyć, że TRANSMITOWANA jest informacja o
-  stanie, nie materia (częsty błąd popularnonaukowy do naprawienia).
+  **Wciąż w backlogu przy pojedynczej sferze Blocha**: nie dotyczy —
+  patrz niżej, pełny wektor stanu wielu kubitów już zaimplementowany.
+- ✅ **Wektor stanu wielu kubitów + CNOT + teleportacja kwantowa** —
+  `core/quantumState.ts` + `quantum-teleport.ts`, Quantum Lab. Pełny
+  wektor stanu 2ⁿ amplitud, bramki jednokubitowe i CNOT na dowolnym
+  kubicie n-kubitowego rejestru. Protokół teleportacji (Bennett i in.
+  1993; pierwsza realizacja: Bouwmeester i in. 1997) na 3 kubitach:
+  wierność odtworzonego stanu = 1 DOKŁADNIE w każdej z 4 gałęzi pomiaru,
+  dla dowolnego zespolonego stanu wejściowego — zweryfikowane numerycznie
+  poza aplikacją PRZED napisaniem testów, mapowanie (m₀,m₁)→korekta
+  (I/X/Z/XZ) wyprowadzone algebraicznie krok po kroku. Jawnie wyjaśnione:
+  to NIE transmisja informacji szybszej niż światło (Bob potrzebuje 2
+  bitów klasycznych) i NIE kopiowanie (oryginalny stan niszczony
+  pomiarem — zakaz klonowania). 12 nowych testów (`quantumState.test.ts`):
+  unitarność bramek, dokładna para Bell, korelacja pomiaru pary Bell,
+  fidelity=1 dla stanów rzeczywistych i zespolonych, wszystkie 4 gałęzie
+  korekty realnie występują, rozkład wyników pomiaru ~25%/gałąź.
 - **Eksperyment myślowy Schrödingera (kot)** (★★★★★ jako ilustracja
   problemu pomiaru, ☆ jeśli przedstawiony dosłownie) — NIE symulacja
   fizyczna kota, tylko interaktywne wyjaśnienie problemu pomiaru/interpretacji

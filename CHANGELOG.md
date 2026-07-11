@@ -6,6 +6,49 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Teleportacja kwantowa — pełny wektor stanu wielu kubitów, nowy eksperyment, Quantum Lab)
+- Nowy moduł `core/quantumState.ts`: pełny wektor stanu 2ⁿ amplitud
+  zespolonych (nie przybliżenie), bramki jednokubitowe (dowolna macierz
+  2×2) i CNOT działające na dowolnym kubicie n-kubitowego rejestru,
+  pomiar rzutowy (reguła Borna + kolaps + renormalizacja). Pierwsze
+  rozszerzenie Quantum Lab poza pojedynczą sferę Blocha, która z
+  definicji nie może pokazać splątania.
+- Zaimplementowany protokół teleportacji kwantowej (Bennett, Brassard,
+  Crépeau, Jozsa, Peres, Wootters 1993, PRL 70, 1895; pierwsza
+  eksperymentalna realizacja: Bouwmeester i in. 1997, Nature 390, 575)
+  na 3 kubitach: Alicja i Bob dzielą parę Bell, Alicja splata swój
+  nieznany kubit z połową pary i mierzy oba swoje kubity, przesyła 2
+  bity klasyczne, Bob stosuje jedną z 4 korekt (I/X/Z/XZ).
+- Mapowanie wyników pomiaru (m₀,m₁) na korektę WYPROWADZONE
+  algebraicznie krok po kroku (nie zgadnięte) i zweryfikowane numerycznie
+  (`node -e`, ręczna symulacja poza aplikacją) dla dowolnego zespolonego
+  stanu wejściowego PRZED napisaniem jakichkolwiek testów: wierność
+  (fidelity) odtworzonego stanu wynosi dokładnie 1 w każdej z 4 gałęzi.
+- honestyNote i narracja jawnie naprawiają częsty błąd
+  popularnonaukowy: to NIE transmisja informacji szybszej niż światło
+  (Bob potrzebuje 2 bitów klasycznych, ograniczonych prędkością światła,
+  żeby wiedzieć którą korektę zastosować) i NIE kopiowanie materii/
+  informacji (oryginalny stan jest NISZCZONY na kubicie Alicji przez
+  pomiar — to przeniesienie, nie klonowanie, co byłoby złamaniem
+  twierdzenia o zakazie klonowania).
+- Nowy eksperyment `quantum-teleport.ts`: wybór jednego z 6 stanów
+  startowych (|0⟩,|1⟩,|+⟩,|−⟩,|+i⟩,|−i⟩ — sześć kardynalnych punktów
+  sfery Blocha), żywa wizualizacja trzech kubitów, licznik prób,
+  histogram częstości czterech korekt (każda ~25%, potwierdzone w
+  przeglądarce), i skumulowana średnia wierność (zawsze ~100,000%).
+- 12 nowych testów (`quantumState.test.ts`, generator liniowy
+  kongruentny z ziarnem dla powtarzalności): unitarność bramek na
+  wielu kubitach, dokładna para Bell z H+CNOT, korelacja wyników
+  pomiaru pary Bell, fidelity=1 dla stanów |0⟩/|1⟩/|+⟩ i dla dowolnego
+  stanu zespolonego (12 różnych ziaren), wszystkie 4 gałęzie korekty
+  realnie występują, rozkład czterech wyników pomiaru zbliżony do 25%
+  każdy dla stanu symetrycznego.
+- Zweryfikowane: typecheck, lint, 346 testów vitest frontendowych (374
+  z backendem), build, Playwright w prawdziwej Chromium — żywa
+  wizualizacja pokazuje losowe m₀/m₁, poprawną korektę i wierność
+  100,000% po wielu próbach, histogram korekt zbliżony do równych
+  25%/gałąź, zero błędów konsoli.
+
 ### Dodano (Biology Lab — pierwsze laboratorium spoza fizyki: transport błonowy + podwójna helisa DNA 3D)
 - Nowe, dwunaste laboratorium (`labs/biology.ts`, zarejestrowane w
   `labs/index.ts` — jedna linia, jak dokumentuje komentarz w tym pliku)

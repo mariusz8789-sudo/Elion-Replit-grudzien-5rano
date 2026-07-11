@@ -19,10 +19,24 @@ rozpraszanie na barierze, stany związane.
 |ψ⟩ = cos(θ/2)|0⟩ + e^{iφ}sin(θ/2)|1⟩ (sfera Blocha). Macierze H, X, Y, Z,
 S, T — dokładne, zaimplementowane w `quantum-bloch.ts` z prawdziwym
 diagramem obwodu (sekwencja zastosowanych bramek, konwencja IBM Quantum
-Composer) i testami unitarności. CNOT: bramka DWUKUBITOWA, wymaga wektora
-stanu 4-wymiarowego (nie pojedynczej sfery Blocha) — NIE zaimplementowana,
-świadomie w backlogu. Symulacja pełnego stanu do ~10 kubitów trywialna
-(wektor 2ⁿ); teleportacja = 3 kubity — oba pozostają backlogiem.
+Composer) i testami unitarności.
+
+**Wektor stanu wielu kubitów, CNOT, teleportacja (zaimplementowane)** ★★★★★
+`core/quantumState.ts`: pełny wektor stanu 2ⁿ amplitud zespolonych,
+bramki jednokubitowe (dowolna macierz 2×2) i CNOT działające na dowolnym
+kubicie w n-kubitowym rejestrze — dokładna mechanika kwantowa, nie
+przybliżenie. Zaimplementowana **teleportacja kwantowa** (Bennett i in.
+1993, PRL 70, 1895; pierwsza realizacja: Bouwmeester i in. 1997, Nature
+390, 575) na 3 kubitach w `quantum-teleport.ts`: Alicja i Bob dzielą parę
+Bell, Alicja splata swój nieznany kubit z połową pary i mierzy oba swoje
+kubity, przesyła 2 bity klasyczne, Bob stosuje jedną z 4 korekt (I/X/Z/XZ).
+Wierność (fidelity) odtworzonego stanu = 1 DOKŁADNIE w każdej z 4 gałęzi
+pomiaru, dla dowolnego zespolonego stanu wejściowego — zweryfikowane
+numerycznie (ręczna symulacja poza aplikacją) PRZED napisaniem testów, a
+mapowanie wyników pomiaru na korektę wyprowadzone algebraicznie krok po
+kroku, nie zgadnięte. Symulacja pełnego stanu do ~10 kubitów trywialna
+(wektor 2ⁿ) — większe rejestry (algorytmy Shora/Grovera na realnych
+rozmiarach) pozostają backlogiem jako osobny, znacznie większy temat.
 
 **Nierówności Bella / CHSH** ★★★★★
 Lokalny realizm: S ≤ 2; MK: S ≤ 2√2 ≈ 2,83; korelacja E(a,b) = −cos(a−b).
@@ -73,5 +87,6 @@ projekt MAQRO) testują, czy nie ma nowej fizyki. Otwarte.
 1. Tunelujący pakiet falowy 1D na żywo — realna fizyka obliczana na
    urządzeniu, unikat na mobile; priorytet nr 1 Etapu 1
 2. Gra CHSH („pokonaj lokalny realizm") — dydaktyka Bella przez porażkę gracza
-3. Teleportacja krok po kroku na 3 kubitach — pełna, dokładna symulacja
+3. ✅ Teleportacja krok po kroku na 3 kubitach — pełna, dokładna symulacja
+   (zaimplementowane: `quantum-teleport.ts`, patrz wyżej)
 4. Mapa interpretacji MK jako pierwszy moduł „nauka się spiera"

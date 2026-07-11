@@ -41,6 +41,7 @@ export interface WormholePortal {
   kind: 'wormhole';
   color: number;
   targetLabId: string;
+  targetExperimentId?: string;
   targetParams: Record<string, number | boolean | string>;
   status: string;
   narrative: string;
@@ -48,10 +49,11 @@ export interface WormholePortal {
 
 export type Portal = LocalPortal | WormholePortal;
 
-function whatIf(id: string) {
+/** Zwraca parametry I (jeśli podany) docelowy eksperyment scenariusza — patrz core/scenarioBridge.ts::experimentId. */
+function whatIf(id: string): { params: Record<string, number | boolean | string>; experimentId?: string } {
   const s = WHAT_IF_SCENARIOS.find((x) => x.id === id);
   if (!s) throw new Error(`Brak scenariusza „${id}" w WHAT_IF_SCENARIOS`);
-  return s.params as Record<string, number | boolean | string>;
+  return { params: s.params as Record<string, number | boolean | string>, experimentId: s.experimentId };
 }
 
 export const PORTALS: Portal[] = [
@@ -81,13 +83,13 @@ export const PORTALS: Portal[] = [
   },
   {
     id: 'no-dark-energy', label: 'Świat bez ciemnej energii', kind: 'wormhole', color: 0x8d97b4,
-    targetLabId: 'universe', targetParams: whatIf('no-dark-energy'),
+    targetLabId: 'universe', targetExperimentId: whatIf('no-dark-energy').experimentId, targetParams: whatIf('no-dark-energy').params,
     status: 'Model potwierdzony (równanie Friedmanna); wartość Ω_Λ=0 to kontrfaktyczny scenariusz, nie pomiar.',
     narrative: 'Prawdziwe równania Universe Lab, ale z wyzerowaną ciemną energią — ekspansja zwalnia zamiast przyspieszać.',
   },
   {
     id: 'runaway-expansion', label: 'Wieczna, przyspieszająca ekspansja', kind: 'wormhole', color: 0x6ee7a0,
-    targetLabId: 'universe', targetParams: whatIf('runaway-expansion'),
+    targetLabId: 'universe', targetExperimentId: whatIf('runaway-expansion').experimentId, targetParams: whatIf('runaway-expansion').params,
     status: 'Model potwierdzony (równanie Friedmanna); Ω_Λ=0,99 to skrajny, ale policzalny scenariusz.',
     narrative: 'Ciemna energia zdominowana niemal całkowicie — galaktyki rozbiegają się gwałtowniej niż w naszym Wszechświecie.',
   },
@@ -222,7 +224,7 @@ class NexusSim implements Sim3D {
     const portal = PORTALS[idx];
     if (portal.kind === 'wormhole') {
       this.lastWormhole = portal;
-      setPendingScenario(portal.targetLabId, portal.targetParams);
+      setPendingScenario(portal.targetLabId, portal.targetParams, portal.targetExperimentId);
       window.location.hash = `#/lab/${portal.targetLabId}`;
       return;
     }

@@ -48,7 +48,7 @@ export const TIMELINE_EPOCHS: TimelineEpoch[] = [
       confirmation: 'confirmed-consensus',
       url: 'https://arxiv.org/abs/1807.06209',
     },
-    linkedLab: { labId: 'universe', params: { omegaLambda: 0.69, speed: 0.3 } },
+    linkedLab: { labId: 'universe', experimentId: 'expansion-2d', params: { omegaLambda: 0.69, speed: 0.3 } },
   },
   {
     id: 'inflation',
@@ -214,7 +214,7 @@ export const TIMELINE_EPOCHS: TimelineEpoch[] = [
       confirmation: 'confirmed',
       url: 'https://arxiv.org/abs/1807.06209',
     },
-    linkedLab: { labId: 'universe', params: { omegaLambda: 0.69, speed: 1 } },
+    linkedLab: { labId: 'universe', experimentId: 'expansion-2d', params: { omegaLambda: 0.69, speed: 1 } },
   },
   {
     id: 'near-future',

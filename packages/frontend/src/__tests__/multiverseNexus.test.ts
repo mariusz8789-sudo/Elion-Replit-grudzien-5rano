@@ -22,13 +22,19 @@ describe('Multiverse Nexus — portale', () => {
     }
   });
 
-  it('każdy nadpisany klucz parametru portalu-tunelu istnieje w docelowym laboratorium', () => {
+  it('każdy nadpisany klucz parametru portalu-tunelu istnieje w docelowym eksperymencie (bazowym lub wskazanym)', () => {
     for (const p of PORTALS) {
       if (p.kind !== 'wormhole') continue;
       const lab = getLab(p.targetLabId)!;
-      const validKeys = new Set(lab.params.map((d) => d.key));
+      let params = lab.params;
+      if (p.targetExperimentId) {
+        const exp = lab.experiments?.find((e) => e.id === p.targetExperimentId);
+        expect(exp, `portal "${p.id}": eksperyment "${p.targetExperimentId}" nie istnieje w ${p.targetLabId}`).toBeDefined();
+        params = exp!.params;
+      }
+      const validKeys = new Set(params.map((d) => d.key));
       for (const key of Object.keys(p.targetParams)) {
-        expect(validKeys.has(key), `portal "${p.id}": klucz "${key}" nie istnieje w ${p.targetLabId}.params`).toBe(true);
+        expect(validKeys.has(key), `portal "${p.id}": klucz "${key}" nie istnieje w params["${p.targetLabId}"${p.targetExperimentId ? `/${p.targetExperimentId}` : ''}]`).toBe(true);
       }
     }
   });

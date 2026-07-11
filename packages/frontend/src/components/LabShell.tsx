@@ -84,7 +84,7 @@ export function LabShell({ lab }: { lab: LabDefinition }) {
 /** Nazwa bazowego eksperymentu — z pierwszego członu tagline laboratorium. */
 function experimentBaseName(lab: LabDefinition): string {
   const names: Record<string, string> = {
-    universe: 'Ekspansja',
+    universe: 'Układ Słoneczny 3D',
     spacetime: 'Zegary świetlne',
     einstein: 'Czarna dziura 3D',
     quantum: 'Dwie szczeliny',

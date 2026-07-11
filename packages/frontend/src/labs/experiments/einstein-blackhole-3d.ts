@@ -4,6 +4,7 @@ import type { PostProcessingModules, PostProcessor, Sim3D } from '../../core/thr
 import { SCHWARZSCHILD_CRITICAL_IMPACT, stepSchwarzschildGeodesic } from '../../core/physics';
 import { createStarfield, makeSoftDotTexture, type Starfield } from '../../core/three/starfield';
 import { detectRenderTier, scaleCount, tierAllowsBloom } from '../../core/three/quality';
+import { createFadePass, FULLSCREEN_VERTEX } from '../../core/three/postfx';
 import { getSettings } from '../../core/settings';
 
 /**
@@ -157,14 +158,6 @@ void main() {
   gl_FragColor = vec4(uColor * glow, glow);
 }`;
 
-/** Boilerplate fullscreen-quad vertex shader — identyczny wzorzec co three.js CopyShader/wszystkie ShaderPass. */
-const FULLSCREEN_VERTEX = `
-varying vec2 vUv;
-void main() {
-  vUv = uv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
-
 /**
  * Shader soczewki grawitacyjnej (post-processing, pełny ekran) — dla
  * każdego piksela odwraca równanie soczewki punktowej słabego pola
@@ -203,15 +196,6 @@ void main() {
   vec2 samplePx = centerPx + dir * (beta * uPxPerRS);
   vec2 sampleUv = clamp(samplePx / uResolution, vec2(0.001), vec2(0.999));
   gl_FragColor = texture2D(tDiffuse, sampleUv);
-}`;
-
-/** Kinowe rozjaśnienie wejścia — jeden mnożnik na cały skomponowany obraz zamiast osobnej animacji opacity per-materiał. */
-const FADE_FRAGMENT = `
-uniform sampler2D tDiffuse;
-uniform float uFade;
-varying vec2 vUv;
-void main() {
-  gl_FragColor = vec4(texture2D(tDiffuse, vUv).rgb * uFade, 1.0);
 }`;
 
 class BlackHole3DSim implements Sim3D {
@@ -413,11 +397,7 @@ class BlackHole3DSim implements Sim3D {
     composer.addPass(this.bloom);
 
     // 4) Kinowe rozjaśnienie wejścia — jeden mnożnik nad całym obrazem.
-    this.fadePass = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, uFade: { value: getSettings().reducedMotion ? 1 : 0 } },
-      vertexShader: FULLSCREEN_VERTEX,
-      fragmentShader: FADE_FRAGMENT,
-    });
+    this.fadePass = createFadePass(ShaderPass, getSettings().reducedMotion ? 1 : 0);
     composer.addPass(this.fadePass);
 
     composer.addPass(new OutputPass());

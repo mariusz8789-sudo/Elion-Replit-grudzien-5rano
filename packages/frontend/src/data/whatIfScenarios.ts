@@ -25,6 +25,7 @@ export const WHAT_IF_SCENARIOS: WhatIfScenario[] = [
     question: 'Co by było, gdyby zniknęła ciemna energia?',
     teaser: 'Ω_Λ = 0 — ekspansja zwalnia zamiast przyspieszać. Zobacz różnicę na żywo.',
     labId: 'universe',
+    experimentId: 'expansion-2d',
     params: { omegaLambda: 0 },
   },
   {
@@ -32,6 +33,7 @@ export const WHAT_IF_SCENARIOS: WhatIfScenario[] = [
     question: 'Co by było, gdyby ciemna energia zdominowała niemal całkowicie?',
     teaser: 'Ω_Λ = 0,99 — galaktyki rozbiegają się gwałtowniej niż w naszym Wszechświecie.',
     labId: 'universe',
+    experimentId: 'expansion-2d',
     params: { omegaLambda: 0.99 },
   },
   {

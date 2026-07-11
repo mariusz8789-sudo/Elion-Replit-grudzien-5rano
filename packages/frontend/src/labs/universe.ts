@@ -1,4 +1,4 @@
-import type { LabDefinition, Sim, SimParams } from '../core/types';
+import type { ExperimentDef, LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
 import { universeCollision } from './experiments/universe-collision';
 import { universeStarLife } from './experiments/universe-starlife';
 import { universeSolarSystem } from './experiments/universe-solar-system';
@@ -11,11 +11,16 @@ import { universeLorenz3D } from './experiments/universe-lorenz3d';
 import { universePlanetStability } from './experiments/universe-planetstability';
 
 /**
- * Universe Lab — ekspansja Wszechświata.
- * Fizyka: równanie Friedmanna w płaskim wszechświecie (Ωm + ΩΛ = 1),
- * H(a) = H0·√(Ωm/a³ + ΩΛ). Galaktyki mają stałe współrzędne współporuszające;
- * rośnie czynnik skali a(t). Uproszczenia: brak promieniowania, struktury
- * lokalne nie odrywają się od ekspansji.
+ * Universe Lab — flagowe laboratorium obok Einstein Lab. Domyślny
+ * (bazowy) eksperyment to teraz „Układ Słoneczny 3D" (patrz
+ * universe-solar-system-3d.ts) — promowany z zakładki pobocznej, żeby
+ * pierwszym widokiem NIE była mała chmura kropek ekspansji w pustce.
+ * Dawny bazowy eksperyment 2D (ekspansja Friedmanna) NIE został usunięty —
+ * jest teraz pierwszą pozycją w `experiments` jako „Ekspansja Wszechświata
+ * (2D)". Fizyka ekspansji: równanie Friedmanna w płaskim wszechświecie
+ * (Ωm + ΩΛ = 1), H(a) = H0·√(Ωm/a³ + ΩΛ). Galaktyki mają stałe współrzędne
+ * współporuszające; rośnie czynnik skali a(t). Uproszczenia: brak
+ * promieniowania, struktury lokalne nie odrywają się od ekspansji.
  */
 
 interface Galaxy {
@@ -121,12 +126,10 @@ class UniverseSim implements Sim {
   }
 }
 
-export const universeLab: LabDefinition = {
-  id: 'universe',
-  name: 'Universe Lab',
-  tagline: 'Ekspansja Wszechświata, galaktyki, ciemna energia',
-  icon: '🌌',
-  accent: '#f0b35c',
+/** Dawny bazowy eksperyment 2D (ekspansja Friedmanna) — teraz zakładka poboczna, nieusunięta. */
+const universeExpansion2D: ExperimentDef = {
+  id: 'expansion-2d',
+  name: 'Ekspansja Wszechświata (2D)',
   honesty: 'simplified',
   honestyNote:
     'Równanie Friedmanna dla płaskiego wszechświata (materia + ciemna energia). Pominięte: promieniowanie, powstawanie struktur, lokalna grawitacja. Kolory galaktyk poglądowo ilustrują redshift.',
@@ -136,7 +139,6 @@ export const universeLab: LabDefinition = {
     { key: 'speed', label: 'Tempo czasu', type: 'slider', min: 0.2, max: 5, step: 0.1, default: 1, unit: 'mld lat/s' },
   ],
   createSim: () => new UniverseSim(),
-  experiments: [universeSolarSystem, universeSolarSystem3D, universeCollision, universeStarLife, universeThreeBody, universeRotationCurve, universeDoublePendulum, universeLorenz3D, universePlanetStability, universeHubbleTension],
   narrate(p, stats) {
     const h0 = Number(p.h0);
     const oL = Number(p.omegaLambda);
@@ -144,7 +146,7 @@ export const universeLab: LabDefinition = {
     const q0 = om / 2 - oL;
     const hubbleTime = 978 / h0;
     const v100 = h0 * 100;
-    const blocks = [
+    const blocks: NarrationBlock[] = [
       {
         title: `Prawo Hubble'a przy H₀ = ${h0} km/s/Mpc`,
         body: `Galaktyka odległa o 100 megaparseków ucieka od nas z prędkością ~${v100.toLocaleString('pl-PL')} km/s — to ${(v100 / 299792 * 100).toFixed(1)}% prędkości światła. Czas Hubble'a (odwrotność H₀) wynosi ~${hubbleTime.toFixed(1)} mld lat i wyznacza rząd wielkości wieku Wszechświata.`,
@@ -165,4 +167,18 @@ export const universeLab: LabDefinition = {
     }
     return blocks;
   },
+};
+
+export const universeLab: LabDefinition = {
+  id: 'universe',
+  name: 'Universe Lab',
+  tagline: 'Ekspansja Wszechświata, galaktyki, ciemna energia',
+  icon: '🌌',
+  accent: '#f0b35c',
+  honesty: universeSolarSystem3D.honesty,
+  honestyNote: universeSolarSystem3D.honestyNote,
+  params: universeSolarSystem3D.params,
+  createSim3D: universeSolarSystem3D.createSim3D,
+  experiments: [universeExpansion2D, universeSolarSystem, universeCollision, universeStarLife, universeThreeBody, universeRotationCurve, universeDoublePendulum, universeLorenz3D, universePlanetStability, universeHubbleTension],
+  narrate: universeSolarSystem3D.narrate,
 };

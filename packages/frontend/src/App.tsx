@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './labs/index';
 import { getLab, getLabs } from './core/registry';
 import { LabShell } from './components/LabShell';
@@ -12,10 +12,13 @@ import { DiscoveryTimeline } from './components/DiscoveryTimeline';
 import { QuantumDecisionExplorer } from './components/QuantumDecisionExplorer';
 import { SearchOverlay } from './components/SearchOverlay';
 import { HelpOverlay } from './components/HelpOverlay';
+import { OnboardingOverlay } from './components/OnboardingOverlay';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
 import { track } from './core/analytics';
 import { t } from './core/i18n';
 import { getVisitedCount } from './core/discoveryLog';
+import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
+import { playEnterLab } from './core/sound';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -56,12 +59,28 @@ export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(() => !hasCompletedOnboarding());
+  const lastLabId = useRef<string | null>(null);
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+
+  // Dźwięk "wejścia do laboratorium" — tylko przy faktycznej zmianie route
+  // na NOWE laboratorium, nie przy przełączaniu zakładek eksperymentu
+  // wewnątrz LabShell (to lokalny stan, nie zmiana hash/route).
+  useEffect(() => {
+    if (route.kind === 'lab') {
+      if (route.id !== lastLabId.current) {
+        lastLabId.current = route.id;
+        playEnterLab();
+      }
+    } else {
+      lastLabId.current = null;
+    }
+  }, [route]);
 
   // Globalne skróty klawiszowe: działają wszędzie poza polami tekstowymi,
   // sterują AKTYWNYM eksperymentem przez most activeSimControls.ts.
@@ -106,6 +125,18 @@ export default function App() {
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
     </>
   );
+
+  if (onboardingOpen) {
+    return (
+      <OnboardingOverlay
+        onFinish={(destination) => {
+          markOnboardingComplete();
+          setOnboardingOpen(false);
+          if (destination === 'timeline') window.location.hash = '#/timeline';
+        }}
+      />
+    );
+  }
 
   if (route.kind === 'lab') {
     const lab = getLab(route.id);

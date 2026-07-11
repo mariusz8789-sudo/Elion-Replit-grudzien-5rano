@@ -12,6 +12,8 @@ import { registerActiveSimControls } from '../core/activeSimControls';
 import { recordVisit, recordStats } from '../core/discoveryLog';
 import { track } from '../core/analytics';
 import { consumePendingScenario } from '../core/scenarioBridge';
+import { useScrollEdges } from '../core/useScrollEdges';
+import { playSimStart, playSimPause } from '../core/sound';
 
 const CREATE_TAB_ID = '__create';
 
@@ -50,17 +52,22 @@ export function LabShell({ lab }: { lab: LabDefinition }) {
   const activeExp = experiments[expIdx];
   const initialParams = activeExp?.id === targetExperimentId ? pendingScenario?.params : undefined;
 
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const { atStart, atEnd } = useScrollEdges(tabsRef);
+
   return (
     <div className="lab-view" style={{ ['--accent' as string]: lab.accent }}>
-      <div className="exp-tabs" role="tablist" aria-label="Eksperymenty">
-        {experiments.map((e, i) => (
-          <button key={e.id} role="tab" aria-selected={i === expIdx} onClick={() => setExpIdx(i)}>
-            {i === 0 ? experimentBaseName(lab) : e.name}
+      <div className={`exp-tabs-wrap ${atStart ? '' : 'has-more-start'} ${atEnd ? '' : 'has-more-end'}`}>
+        <div className="exp-tabs" role="tablist" aria-label="Eksperymenty" ref={tabsRef}>
+          {experiments.map((e, i) => (
+            <button key={e.id} role="tab" aria-selected={i === expIdx} onClick={() => setExpIdx(i)}>
+              {i === 0 ? experimentBaseName(lab) : e.name}
+            </button>
+          ))}
+          <button role="tab" aria-selected={isCreateTab} onClick={() => setExpIdx(experiments.length)}>
+            🧪 Stwórz eksperyment
           </button>
-        ))}
-        <button role="tab" aria-selected={isCreateTab} onClick={() => setExpIdx(experiments.length)}>
-          🧪 Stwórz eksperyment
-        </button>
+        </div>
       </div>
       {isCreateTab ? (
         <CustomExperimentTab key={`${lab.id}:${CREATE_TAB_ID}`} lab={lab} />
@@ -184,10 +191,11 @@ function ExperimentView({ exp, lab, initialParams }: { exp: ExperimentDef; lab: 
   const { params, setParams, running, setRunning, stats, onStats, expLabel, blocks } = useExperimentShell(exp, lab, initialParams);
   const sim = useMemo(() => exp.createSim!(), [exp]);
   const canvasRef = useSimLoop(sim, params, running, onStats);
+  const toggleRunning = () => setRunning((r) => { const next = !r; (next ? playSimStart : playSimPause)(); return next; });
 
   useEffect(() => {
     return registerActiveSimControls({
-      toggleRunning: () => setRunning((r) => !r),
+      toggleRunning,
       reset: sim.reset ? () => sim.reset!() : undefined,
     });
   }, [sim, setRunning]);
@@ -200,7 +208,7 @@ function ExperimentView({ exp, lab, initialParams }: { exp: ExperimentDef; lab: 
           role="img"
           aria-label={`Symulacja: ${expLabel}. Wartości i wnioski opisuje panel Narrator AI poniżej.`}
         />
-        <StageActions running={running} onToggle={() => setRunning((r) => !r)} onReset={sim.reset ? () => sim.reset!() : undefined} />
+        <StageActions running={running} onToggle={toggleRunning} onReset={sim.reset ? () => sim.reset!() : undefined} />
       </div>
       <BelowStage exp={exp} lab={lab} params={params} setParams={setParams} blocks={blocks} expLabel={expLabel} stats={stats} />
     </>
@@ -212,10 +220,11 @@ function ExperimentView3D({ exp, lab, initialParams }: { exp: ExperimentDef; lab
   const { params, setParams, running, setRunning, stats, onStats, expLabel, blocks } = useExperimentShell(exp, lab, initialParams);
   const sim = useMemo(() => exp.createSim3D!(), [exp]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, running, onStats);
+  const toggleRunning = () => setRunning((r) => { const next = !r; (next ? playSimStart : playSimPause)(); return next; });
 
   useEffect(() => {
     return registerActiveSimControls({
-      toggleRunning: () => setRunning((r) => !r),
+      toggleRunning,
       reset: sim.reset ? () => sim.reset!() : undefined,
     });
   }, [sim, setRunning]);
@@ -240,7 +249,7 @@ function ExperimentView3D({ exp, lab, initialParams }: { exp: ExperimentDef; lab
             część platformy, łącznie z płaską wersją tego eksperymentu, działa bez zmian.
           </div>
         )}
-        <StageActions running={running} onToggle={() => setRunning((r) => !r)} onReset={sim.reset ? () => sim.reset!() : undefined} />
+        <StageActions running={running} onToggle={toggleRunning} onReset={sim.reset ? () => sim.reset!() : undefined} />
       </div>
       <BelowStage exp={exp} lab={lab} params={params} setParams={setParams} blocks={blocks} expLabel={expLabel} stats={stats} />
     </>

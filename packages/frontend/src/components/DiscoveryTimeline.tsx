@@ -10,6 +10,7 @@ import { sci } from '../core/useSimLoop';
 import { NarratorPanel } from './NarratorPanel';
 import { getLab } from '../core/registry';
 import { track } from '../core/analytics';
+import { playTimelineTransition } from '../core/sound';
 
 /**
  * Discovery Timeline Engine — flagowe doświadczenie Genesis OS: jedna,
@@ -162,6 +163,9 @@ export function DiscoveryTimeline() {
 
       const nearest = blend.mix < 0.5 ? blend.prev : blend.next;
       if (nearest.id !== lastEpochId) {
+        // Bez dźwięku przy pierwszym renderze (lastEpochId==='') — to nie
+        // jest "przejście", tylko epoka startowa.
+        if (lastEpochId !== '') playTimelineTransition();
         lastEpochId = nearest.id;
         setDisplayEpoch(nearest);
       }

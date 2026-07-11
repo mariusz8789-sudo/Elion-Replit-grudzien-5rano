@@ -15,6 +15,8 @@ export interface Settings {
   compactNarrator: boolean;
   /** Lokalne, anonimowe liczniki użycia (patrz core/analytics.ts) — możliwe do wyłączenia. */
   analyticsEnabled: boolean;
+  /** Krótkie, subtelne dźwięki UI (patrz core/sound.ts) — jeden przełącznik globalny. */
+  soundEnabled: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -22,6 +24,7 @@ const DEFAULTS: Settings = {
   highContrast: false,
   compactNarrator: false,
   analyticsEnabled: true,
+  soundEnabled: true,
 };
 
 const KEY = 'settings/v1';
@@ -34,6 +37,7 @@ function sanitize(raw: Partial<Settings> | null | undefined): Settings {
     highContrast: typeof raw?.highContrast === 'boolean' ? raw.highContrast : DEFAULTS.highContrast,
     compactNarrator: typeof raw?.compactNarrator === 'boolean' ? raw.compactNarrator : DEFAULTS.compactNarrator,
     analyticsEnabled: typeof raw?.analyticsEnabled === 'boolean' ? raw.analyticsEnabled : DEFAULTS.analyticsEnabled,
+    soundEnabled: typeof raw?.soundEnabled === 'boolean' ? raw.soundEnabled : DEFAULTS.soundEnabled,
   };
 }
 

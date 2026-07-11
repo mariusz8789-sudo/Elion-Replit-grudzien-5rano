@@ -14,6 +14,7 @@ const EVENT_LABELS: Record<AnalyticsEvent, string> = {
   custom_experiment_run: 'Uruchomione własne eksperymenty',
   custom_experiment_saved: 'Zapisane własne eksperymenty',
   what_if_opened: 'Otwarte scenariusze „Co by było, gdyby?"',
+  onboarding_finished: 'Ukończone wprowadzenie',
 };
 
 /**
@@ -82,6 +83,24 @@ export function SettingsScreen() {
             onClick={() => updateSettings({ compactNarrator: !settings.compactNarrator })}
           />
         </div>
+      </section>
+
+      <section className="settings-section">
+        <h2>Dźwięk</h2>
+        <div className="control toggle-row">
+          <span>Dźwięki interfejsu</span>
+          <button
+            className="switch"
+            role="switch"
+            aria-checked={settings.soundEnabled}
+            aria-label="Dźwięki interfejsu"
+            onClick={() => updateSettings({ soundEnabled: !settings.soundEnabled })}
+          />
+        </div>
+        <p className="settings-hint">
+          Krótkie, ciche dźwięki potwierdzające: wejście do laboratorium, start/pauza symulacji, odblokowana
+          odznaka, przejście epoki w Discovery Timeline, odpowiedź Narratora AI. Zero muzyki, zero pętli.
+        </p>
       </section>
 
       <section className="settings-section">

@@ -48,6 +48,7 @@ describe('settings: defaults and persistence', () => {
       highContrast: false,
       compactNarrator: false,
       analyticsEnabled: true,
+      soundEnabled: true,
     });
   });
 
@@ -93,7 +94,13 @@ describe('settings: defensive validation of corrupted storage', () => {
     const fake = makeFakeStorage();
     fake.setItem(
       'genesis-os:settings/v1',
-      JSON.stringify({ reducedMotion: 'yes', highContrast: true, compactNarrator: null, analyticsEnabled: 1 }),
+      JSON.stringify({
+        reducedMotion: 'yes',
+        highContrast: true,
+        compactNarrator: null,
+        analyticsEnabled: 1,
+        soundEnabled: 'no',
+      }),
     );
     vi.stubGlobal('window', { localStorage: fake });
     const { getSettings } = await import('../core/settings');
@@ -102,6 +109,7 @@ describe('settings: defensive validation of corrupted storage', () => {
       highContrast: true, // valid boolean -> kept
       compactNarrator: false, // invalid type -> default
       analyticsEnabled: true, // invalid type -> default
+      soundEnabled: true, // invalid type -> default
     });
   });
 
@@ -119,7 +127,13 @@ describe('applyDocumentFlags', () => {
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });
     const { applyDocumentFlags } = await import('../core/settings');
     expect(() =>
-      applyDocumentFlags({ reducedMotion: true, highContrast: true, compactNarrator: false, analyticsEnabled: true }),
+      applyDocumentFlags({
+        reducedMotion: true,
+        highContrast: true,
+        compactNarrator: false,
+        analyticsEnabled: true,
+        soundEnabled: true,
+      }),
     ).not.toThrow();
   });
 
@@ -128,7 +142,13 @@ describe('applyDocumentFlags', () => {
     const fakeDoc = makeFakeDocument();
     vi.stubGlobal('document', fakeDoc);
     const { applyDocumentFlags } = await import('../core/settings');
-    applyDocumentFlags({ reducedMotion: true, highContrast: false, compactNarrator: false, analyticsEnabled: true });
+    applyDocumentFlags({
+      reducedMotion: true,
+      highContrast: false,
+      compactNarrator: false,
+      analyticsEnabled: true,
+      soundEnabled: true,
+    });
     expect(fakeDoc.classes.has('force-reduced-motion')).toBe(true);
     expect(fakeDoc.classes.has('high-contrast')).toBe(false);
   });

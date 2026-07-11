@@ -6,6 +6,55 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Wprowadzenie przy pierwszym uruchomieniu + dźwięk UI + podpowiedź przewijania zakładek)
+- `OnboardingOverlay` (`components/OnboardingOverlay.tsx` + `core/onboarding.ts`):
+  4-krokowe, interaktywne wprowadzenie — WITAJ (czym jest Genesis OS) →
+  DEMO (prawdziwy przeciągalny suwak sterujący wizualizacją na żywo, żeby
+  "parametry są interaktywne" było odczuwalne, nie tylko przeczytane) →
+  NARRATOR (przykładowy blok narracji w tym samym stylu co prawdziwy
+  panel) → START (CTA prowadzące wprost do Discovery Timeline). Pomijalne
+  w każdej chwili (przycisk „Pomiń →", widoczny na każdym kroku);
+  pominięcie i ukończenie liczą się identycznie — jedna flaga
+  `onboarding/v1` w localStorage, pokazywana WYŁĄCZNIE przy pierwszym
+  uruchomieniu. Pułapka fokusu (`useFocusTrap`, ten sam mechanizm co
+  Szukaj/Skróty), tło współdzieli siatkę i narożniki HUD ze stroną główną
+  (spójność wizualna, nie osobny styl).
+- `core/sound.ts`: krótkie, syntezowane dźwięki UI (Web Audio API,
+  oscylator + obwiednia gain — zero plików audio, zero wagi w bundlu).
+  Sześć zdarzeń: wejście do laboratorium, start/pauza symulacji, odkrycie
+  (odblokowana odznaka w Dzienniku Odkryć — `discoveryLog.ts`), przejście
+  epoki w Discovery Timeline (tylko na faktycznej granicy epoki, nie co
+  klatkę; pominięte przy pierwszym renderze), odpowiedź Narratora AI
+  (`NarratorPanel.tsx`, tylko przy udanej odpowiedzi). Każdy dźwięk <250ms,
+  cicha amplituda (≤0,06) — potwierdzenie, nie muzyka. Jeden globalny
+  przełącznik w Ustawieniach → „Dźwięk" (`settings.soundEnabled`,
+  domyślnie włączony); brak/zablokowany `AudioContext` (private mode,
+  polityka przeglądarki) degraduje się cicho, bez wyjątków i bez
+  ponawiania próby przy każdym wywołaniu.
+- Delikatny gradient na krawędzi `.exp-tabs` (rząd zakładek eksperymentów)
+  podpowiada, że jest więcej zakładek poza widokiem — widoczny WYŁĄCZNIE
+  gdy faktycznie jest co przewinąć (`core/useScrollEdges.ts`, pomiar
+  `scrollWidth`/`clientWidth` na żywo + `ResizeObserver`), nie jako stała
+  ozdoba na labach, gdzie wszystkie zakładki już się mieszczą.
+- 12 nowych testów (`onboarding.test.ts`, `sound.test.ts`) — trwałość
+  flagi onboardingu (w tym walidacja skorumpowanego magazynu), oraz
+  dźwięk: liczba oscylatorów per zdarzenie (fałszywy `AudioContext`),
+  pełne wygaszenie przy `soundEnabled=false`, żywy toggle w trakcie
+  sesji, i trzy ścieżki brak-audio (brak `AudioContext` na `window`,
+  konstruktor rzuca wyjątek — bez ponawiania, `window` w ogóle
+  niezdefiniowany) — żadna nie rzuca wyjątku. 408 testów frontendowych
+  razem (436 z backendem).
+- Zweryfikowane: typecheck, lint, pełny pakiet testów, build, oraz
+  wizualnie przez Playwright — cały przepływ pierwszego uruchomienia
+  (WITAJ → przeciągnięcie suwaka demo → NARRATOR → START → lądowanie na
+  Discovery Timeline), pominięcie + trwałość po odświeżeniu strony,
+  podpowiedź przewijania zakładek (Universe Lab, Multiverse Lab — pojawia
+  się/znika poprawnie przy przewijaniu), przełącznik dźwięku w
+  Ustawieniach, oraz seria realnych interakcji generujących dźwięk
+  (start/pauza symulacji, szybkie przeskoki i autoodtwarzanie 1000× w
+  Discovery Timeline) — zero błędów konsoli w prawdziwej Chromium, zero
+  regresji na 13 laboratoriach i 7 ekranach pomocniczych.
+
 ### Poprawiono (Pierwsze 2 minuty — hierarchia ekranu głównego + audyt UX 13 laboratoriów)
 - Ekran główny miał dwie równorzędne wizualnie karty CTA (Discovery Timeline
   i Quantum Decision Explorer) — nowy użytkownik musiał wybierać między

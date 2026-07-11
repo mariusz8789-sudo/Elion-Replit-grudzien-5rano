@@ -1,5 +1,6 @@
 import { readJSON, writeJSON } from './storage';
 import { getLabs } from './registry';
+import { playAchievement } from './sound';
 
 /**
  * Dziennik odkryć — lokalna gamifikacja bez żadnego backendu.
@@ -166,6 +167,7 @@ export function recordStats(labId: string, expId: string, stats: Record<string, 
       state.unlocked = [...state.unlocked, a.id];
       state.unlockedAt = { ...state.unlockedAt, [a.id]: new Date().toISOString() };
       changed = true;
+      playAchievement();
     }
   }
   if (changed) writeJSON(KEY, state);

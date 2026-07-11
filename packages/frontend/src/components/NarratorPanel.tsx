@@ -4,6 +4,7 @@ import { askAI, type AskContext } from '../narrator/askAI';
 import { useSettings } from '../core/useSettings';
 import { track } from '../core/analytics';
 import { CONFIRMATION_LABELS, type Citation } from '../core/citation';
+import { playNarratorEvent } from '../core/sound';
 
 /** Źródło twierdzenia z bloku Narratora — obecne tylko tam, gdzie faktycznie mamy cytowanie. */
 function CitationTag({ citation }: { citation: Citation }) {
@@ -48,8 +49,12 @@ export function NarratorPanel({ blocks, askContext }: { blocks: NarrationBlock[]
     setAnswer(null);
     track('ask_ai_used');
     const result = await askAI(askContext, q);
-    if (result.ok) setAnswer(result.answer);
-    else setError(result.message);
+    if (result.ok) {
+      setAnswer(result.answer);
+      playNarratorEvent();
+    } else {
+      setError(result.message);
+    }
     setBusy(false);
     inFlight.current = false;
   };

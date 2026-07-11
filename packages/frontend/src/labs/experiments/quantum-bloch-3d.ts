@@ -235,7 +235,7 @@ class BlochSim3D implements Sim3D {
 
     this.readoutCanvas = document.createElement('canvas');
     this.readoutCanvas.width = 512;
-    this.readoutCanvas.height = 128;
+    this.readoutCanvas.height = 160;
     this.readoutCtx = this.readoutCanvas.getContext('2d')!;
     this.readoutTexture = new three.CanvasTexture(this.readoutCanvas);
     const readoutMat = new three.SpriteMaterial({ map: this.readoutTexture, transparent: true, depthTest: false, depthWrite: false });
@@ -263,7 +263,7 @@ class BlochSim3D implements Sim3D {
 
     // Odczyt liczbowy: mały, blisko górnej krawędzi z zapasem (nie może
     // wystawać poza stożek widzenia, inaczej jest ucinany przez viewport).
-    const readoutW = Math.min(halfW * 1.3, 1.1);
+    const readoutW = Math.min(halfW * 1.35, 1.15);
     this.readoutSprite.position.set(0, halfH * 0.6, -HUD_DIST);
     this.readoutSprite.scale.set(readoutW, readoutW * 0.22, 1);
 
@@ -296,8 +296,21 @@ class BlochSim3D implements Sim3D {
   }
 
   private updateReadout() {
-    const p0 = Math.round((this.a[0] ** 2 + this.a[1] ** 2) * 100);
-    const key = `${p0}|${this.lastGate}|${this.measured ?? ''}|${this.measureTimer > 0}|${this.shrink.toFixed(2)}`;
+    // Podczas animacji obrotu odczyt liczy się z BIEŻĄCEGO (interpolowanego)
+    // wektora, nie z docelowego stanu — składowa z wektora Blocha to
+    // dokładnie P(|0⟩)-P(|1⟩) dla stanu czystego, więc odczyt w trakcie
+    // obrotu pokazuje PRAWDZIWE, fizycznie sensowne prawdopodobieństwo
+    // "częściowo zastosowanej" bramki (ten sam obrót, zatrzymany w
+    // połowie), nie tylko wizualną ciekawostkę — to bezpośrednia realizacja
+    // wymogu czasowej/przestrzennej czytelności ewolucji stanu.
+    const p0 = Math.round(Math.max(0, Math.min(100, ((1 + this.displayVec[2]) / 2) * 100)));
+    // Faza względna φ = arg(b)-arg(a): na sferze Blocha to KĄT AZYMUTALNY
+    // wektora w płaszczyźnie równika (atan2 składowych x,y) — już zawsze
+    // widoczny geometrycznie jako kierunek wektora, ale liczbowy odczyt
+    // czyni tę informację czytelną bez konieczności oceniania kąta okiem
+    // (wymóg: faza musi być "przestrzennie i czasowo czytelna").
+    const phiDeg = Math.round(((Math.atan2(this.displayVec[1], this.displayVec[0]) * 180) / Math.PI + 360) % 360);
+    const key = `${p0}|${phiDeg}|${this.lastGate}|${this.measured ?? ''}|${this.measureTimer > 0}|${this.shrink.toFixed(2)}`;
     if (key === this.lastReadoutKey) return;
     this.lastReadoutKey = key;
     const ctx = this.readoutCtx;
@@ -306,15 +319,16 @@ class BlochSim3D implements Sim3D {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(230,234,245,0.95)';
-    ctx.font = '600 36px ui-monospace, monospace';
-    ctx.fillText(`P(|0⟩)=${p0}%  P(|1⟩)=${100 - p0}%`, width / 2, 34);
-    ctx.font = '400 26px ui-monospace, monospace';
+    ctx.font = '600 34px ui-monospace, monospace';
+    ctx.fillText(`P(|0⟩)=${p0}%  P(|1⟩)=${100 - p0}%`, width / 2, 28);
+    ctx.font = '400 24px ui-monospace, monospace';
     ctx.fillStyle = 'rgba(141,151,180,0.9)';
-    ctx.fillText(`ostatnia operacja: ${this.lastGate} · |r⃗|=${this.shrink.toFixed(2)}`, width / 2, 76);
+    ctx.fillText(`faza φ=${phiDeg}° · |r⃗|=${this.shrink.toFixed(2)}`, width / 2, 64);
+    ctx.fillText(`ostatnia operacja: ${this.lastGate}`, width / 2, 96);
     if (this.measured && this.measureTimer > 0) {
       ctx.fillStyle = '#f0b35c';
-      ctx.font = '700 30px ui-monospace, monospace';
-      ctx.fillText(`pomiar → ${this.measured}`, width / 2, 112);
+      ctx.font = '700 28px ui-monospace, monospace';
+      ctx.fillText(`pomiar → ${this.measured}`, width / 2, 134);
     }
     this.readoutTexture.needsUpdate = true;
   }
@@ -504,7 +518,7 @@ export const quantumBloch: ExperimentDef = {
   name: 'Sfera Blocha',
   honesty: 'exact',
   honestyNote:
-    'Kubit jest reprezentowany pełnym stanem kwantowym, a bramki to dokładne macierze unitarne — identyczne z używanymi w komputerach kwantowych. NOWOŚĆ: wektor Blocha obraca się CIĄGŁE, a nie skacze — to DOKŁADNE, nie ozdobne, bo z homomorfizmu SU(2)→SO(3) każda bramka jednokubitowa JEST obrotem o konkretny kąt wokół konkretnej osi (matematycznie zweryfikowane w testach). Wyjątek: kolaps przy pomiarze NIE jest animowany obrotem, bo projekcja pomiarowa jest fizycznie nieciągła (nieunitarna) — wektor skacze na biegun, tak jak w rzeczywistości. Dekoherencja jest modelem fenomenologicznym (kurczenie wektora Blocha). Panel przycisków bramek i odczyt liczbowy to interfejs (HUD), nie dane fizyczne. Ograniczenie: to obwód JEDNOKUBITOWY — bramki dwukubitowe (np. CNOT) i splątanie wymagają reprezentacji stanu, której pojedyncza sfera Blocha nie potrafi pokazać, i pozostają w backlogu.',
+    'Kubit jest reprezentowany pełnym stanem kwantowym, a bramki to dokładne macierze unitarne — identyczne z używanymi w komputerach kwantowych. Wektor Blocha obraca się CIĄGŁE, a nie skacze — to DOKŁADNE, nie ozdobne, bo z homomorfizmu SU(2)→SO(3) każda bramka jednokubitowa JEST obrotem o konkretny kąt wokół konkretnej osi (matematycznie zweryfikowane w testach). Odczyt P(|0⟩)/P(|1⟩) w trakcie animacji liczy się z BIEŻĄCEGO, częściowo obróconego wektora, nie z wyniku końcowego — to prawdziwe prawdopodobieństwo "zatrzymanej w połowie" bramki (ten sam, dokładny obrót), nie tylko interpolacja liczby dla płynności. Odczyt fazy φ to kąt azymutalny wektora na równiku — geometrycznie widoczny jako kierunek strzałki, liczbowo tylko dopisany dla czytelności. Wyjątek: kolaps przy pomiarze NIE jest animowany obrotem, bo projekcja pomiarowa jest fizycznie nieciągła (nieunitarna) — wektor skacze na biegun, tak jak w rzeczywistości. Dekoherencja jest modelem fenomenologicznym (kurczenie wektora Blocha). Panel przycisków bramek to interfejs (HUD), nie dane fizyczne. Ograniczenie: to obwód JEDNOKUBITOWY — bramki dwukubitowe (np. CNOT) i splątanie wymagają reprezentacji stanu, której pojedyncza sfera Blocha nie potrafi pokazać, i pozostają w backlogu.',
   params: [
     { key: 'decoherence', label: 'Dekoherencja (sprzężenie z otoczeniem)', type: 'toggle', default: false },
   ],

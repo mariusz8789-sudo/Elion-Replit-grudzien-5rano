@@ -78,6 +78,25 @@ trzech ciał i podwójnym wahadle — trzeci, niezależny przykład tego
 samego zjawiska (dodatni wykładnik Lapunowa) w trzeciej, jakościowo
 innej klasie układu (ciągły przepływ 3D, nie układ punktów masowych).
 
+**Stabilność układu planetarnego (zaimplementowane)** ★★★★★
+Rozszerza "Prawdziwy Układ Słoneczny" o PRAWDZIWĄ grawitację N-ciał
+(zamiast niezależnych elips Keplera): Słońce + Jowisz + Saturn + Ziemia
++ Mars, integracja velocity-Verlet (symplektyczna, ta sama metoda co
+problem trzech ciał), jednostki AU/rok/M_słońca (G=4π² dokładnie z III
+prawa Keplera dla Ziemi — `core/physics.ts::G_ASTRO_YEAR`). Każda
+planeta startuje w peryhelium z dokładną prędkością z równania
+vis-viva. Elementy orbitalne (mimośród) pokazywane na żywo liczone są
+metodą energia+moment pędu z chwilowego wektora stanu (nie zakładane) —
+zweryfikowane testem odwracalności (dokładny round-trip a,e → stan →
+a,e). Wyłączenie Jowisza/Saturna usuwa ich grawitację; Playwright
+potwierdził realny efekt: po 12 latach symulacji dryf mimośrodu Marsa
+jest ~15× mniejszy bez gigantów (0,00002) niż z nimi (0,00031) —
+namacalny, zmierzony (nie deklarowany) skutek zaburzenia grawitacyjnego.
+Rezonans Jowisz–Saturn ~5:2 (Wielka Nierówność, Laplace) i chaotyczność
+wewnętrznego Układu Słonecznego w długim czasie (Laskar 1989, czas
+Lapunowa ~5 mln lat) cytowane jako kontekst — czwarty, niezależny
+przykład czułości na warunki początkowe w tym laboratorium.
+
 **Prawdziwy Układ Słoneczny (zaimplementowane)** ★★★★★
 Elementy orbitalne 8 planet (półoś wielka, mimośród, okres) z NASA
 Planetary Fact Sheet — publiczne, stabilne stałe. Pozycja liczona

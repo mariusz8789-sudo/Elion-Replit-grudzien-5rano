@@ -10,6 +10,10 @@ import {
   equivalenceVolumeMl,
   exponentialDiskMass,
   G_ASTRO,
+  G_ASTRO_YEAR,
+  EARTH_MASSES_PER_SOLAR,
+  orbitalElementsFromState,
+  visVivaSpeed,
   gaussianPdf,
   iscoFrequency,
   isothermalHaloMass,
@@ -832,5 +836,54 @@ describe('napięcie Hubble\'a (porównanie niezależnych pomiarów)', () => {
     const a = measurementTensionSigma(73, 1, 67, 0.5);
     const b = measurementTensionSigma(67, 0.5, 73, 1);
     expect(a).toBeCloseTo(b, 9);
+  });
+});
+
+describe('jednostki wygodne mechaniki nieba (AU, rok, masa Słońca) — Stabilność planetarna, Universe Lab', () => {
+  it('G_ASTRO_YEAR = 4π² dokładnie (konsekwencja III prawa Keplera dla Ziemi: a=1 AU, T=1 rok)', () => {
+    expect(G_ASTRO_YEAR).toBeCloseTo(39.4784176, 6);
+  });
+
+  it('EARTH_MASSES_PER_SOLAR odpowiada znanemu stosunkowi mas (IAU) ~332 946', () => {
+    expect(EARTH_MASSES_PER_SOLAR).toBeCloseTo(332946, 0);
+  });
+
+  it('visVivaSpeed na orbicie kołowej (r=a) daje dokładnie v=√(μ/a)', () => {
+    const mu = G_ASTRO_YEAR;
+    const a = 1;
+    expect(visVivaSpeed(mu, a, a)).toBeCloseTo(Math.sqrt(mu / a), 9);
+  });
+
+  it('okres orbity kołowej a=1 AU wokół 1 M_słońca wynosi dokładnie 1 rok (T=2πa/v)', () => {
+    const mu = G_ASTRO_YEAR;
+    const a = 1;
+    const v = visVivaSpeed(mu, a, a);
+    const period = (2 * Math.PI * a) / v;
+    expect(period).toBeCloseTo(1, 9);
+  });
+
+  it('orbitalElementsFromState odzyskuje DOKŁADNIE (a,e) ze stanu (x,y,vx,vy) startu w peryhelium (odwracalność)', () => {
+    const mu = G_ASTRO_YEAR;
+    const a = 5.203; // Jowisz
+    const e = 0.0489;
+    const rPeri = a * (1 - e);
+    const vPeri = visVivaSpeed(mu, rPeri, a);
+    const angle = 1.1; // dowolny obrót — elementy orbitalne nie zależą od orientacji
+    const x = rPeri * Math.cos(angle);
+    const y = rPeri * Math.sin(angle);
+    const vx = -vPeri * Math.sin(angle);
+    const vy = vPeri * Math.cos(angle);
+    const el = orbitalElementsFromState(x, y, vx, vy, mu);
+    expect(el.semiMajorAxisAu).toBeCloseTo(a, 9);
+    expect(el.eccentricity).toBeCloseTo(e, 9);
+  });
+
+  it('orbitalElementsFromState dla orbity kołowej daje e=0 dokładnie', () => {
+    const mu = G_ASTRO_YEAR;
+    const a = 2.5;
+    const v = visVivaSpeed(mu, a, a);
+    const el = orbitalElementsFromState(a, 0, 0, v, mu);
+    expect(el.eccentricity).toBeCloseTo(0, 9);
+    expect(el.semiMajorAxisAu).toBeCloseTo(a, 9);
   });
 });

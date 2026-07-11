@@ -321,6 +321,42 @@ export function stepLorenzRK4(s: LorenzState, dt: number, sigma: number, rho: nu
 }
 
 /**
+ * Jednostki wygodne mechaniki nieba: odległość w AU, czas w latach, masa
+ * w masach Słońca. Z trzeciego prawa Keplera dla Ziemi (a=1 AU, T=1 rok,
+ * M=M_słońca) wynika DOKŁADNIE G=4π² w tych jednostkach — nie przybliżenie,
+ * konsekwencja definicji jednostek (ten sam trik co gaussowska stała
+ * grawitacji k, tylko w latach zamiast dniach).
+ */
+export const G_ASTRO_YEAR = 4 * Math.PI * Math.PI;
+/** M_słońca / M_ziemi — stosunek mas (IAU). */
+export const EARTH_MASSES_PER_SOLAR = 332946.0;
+
+/** Prędkość z równania vis-viva: v²=μ(2/r−1/a), μ=G·M_centralna. */
+export function visVivaSpeed(mu: number, r: number, semiMajorAxisAu: number): number {
+  return Math.sqrt(mu * (2 / r - 1 / semiMajorAxisAu));
+}
+
+/**
+ * Elementy oskulacyjne (a, e) z chwilowego wektora stanu (x,y,vx,vy) —
+ * standardowa metoda energia+moment pędu z mechaniki nieba: ε=v²/2−μ/r
+ * (energia właściwa) daje a=−μ/(2ε); h=x·vy−y·vx (moment pędu właściwy,
+ * 2D) daje e=√(1−h²/(μa)). Używane do śledzenia dryfu orbity planety pod
+ * wpływem prawdziwych zaburzeń grawitacyjnych innych ciał (nie z
+ * wyidealizowanej, niezależnej elipsy Keplera).
+ */
+export function orbitalElementsFromState(
+  x: number, y: number, vx: number, vy: number, mu: number,
+): { semiMajorAxisAu: number; eccentricity: number } {
+  const r = Math.sqrt(x * x + y * y);
+  const v2 = vx * vx + vy * vy;
+  const eps = v2 / 2 - mu / r;
+  const a = -mu / (2 * eps);
+  const h = x * vy - y * vx;
+  const e = Math.sqrt(Math.max(0, 1 - (h * h) / (mu * a)));
+  return { semiMajorAxisAu: a, eccentricity: e };
+}
+
+/**
  * Próg homoklinicznego "wybuchu" chaosu (Sparrow 1982, "The Lorenz
  * Equations"): dla ρ poniżej tego progu dwa symetryczne punkty stałe
  * (poza początkiem układu) są stabilne; powyżej — powstaje chaotyczny

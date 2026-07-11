@@ -302,7 +302,7 @@ w `lib.mjs` — testowana przez `node --test` bez uruchamiania portu
 
 ## Testy
 
-322 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 350.
+329 testy frontendowe (vitest) + 28 backendowych (`node --test`) = 357.
 
 - **Fizyka i symulacje** (`__tests__/physics.test.ts`, `sims.test.ts`):
   twarde asercje naukowe (złamanie nierówności Bella |S|>2, twierdzenie

@@ -152,14 +152,20 @@ Wszechświata (8,8×10²⁶ m).
   wybuchu chaosu ρ_h≈24,74 (Sparrow 1982), tryb "dwa niemal identyczne
   starty" pokazujący efekt motyla w trzeciej, jakościowo innej klasie
   układu chaotycznego
-- **350 testów** (322 vitest frontend + 28 node:test backend)
+- **Stabilność układu planetarnego** (Universe Lab) — prawdziwa
+  grawitacja N-ciał (Słońce+Jowisz+Saturn+Ziemia+Mars, velocity-Verlet,
+  G=4π² dokładnie w jednostkach AU/rok/M_słońca), NIE niezależne elipsy
+  Keplera; wyłączenie gigantów mierzalnie zmniejsza dryf mimośrodu Marsa
+  (~15× po 12 latach symulacji) — namacalny, zmierzony skutek
+  grawitacyjnego zaburzenia, nie deklarowany efekt
+- **357 testów** (329 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 350 testów (fizyka + funkcje lokalne + backend)
+npm test           # 357 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

@@ -487,9 +487,17 @@ nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
 - ✅ **Problem trzech ciał** — patrz sekcja „Flagowe pomysły" wyżej,
   `universe-threebody.ts`. Zbudowany realistyczny pierwszy krok (symplektyczny
   integrator + tryb dywergencji); tysiące cząstek/GPU/zapis nadal w backlogu.
-- **Stabilność układów planetarnych** (★★★★★) — rozszerzenie Układu
-  Słonecznego (2D i 3D): usuń/dodaj planetę, obserwuj rezonanse orbitalne
-  i niestabilności w długim czasie — reużywa `keplerPosition`.
+- ✅ **Stabilność układów planetarnych** — `universe-planetstability.ts`,
+  Universe Lab. Prawdziwa grawitacja N-ciał (Słońce+Jowisz+Saturn+Ziemia+
+  Mars, velocity-Verlet, jednostki AU/rok/M_słońca, G=4π² dokładnie) —
+  NIE niezależne elipsy Keplera jak "Prawdziwy Układ Słoneczny". Toggle
+  Jowisz/Saturn usuwa ich grawitację; mimośród Ziemi/Marsa liczony na
+  żywo z chwilowego stanu (energia+moment pędu, zweryfikowane testem
+  odwracalności) pokazuje PRAWDZIWY dryf orbitalny. Playwright
+  potwierdził: dryf mimośrodu Marsa ~15× mniejszy bez gigantów niż z
+  nimi po 12 latach symulacji. Świadome uproszczenie: 4 planety zamiast
+  8, start w peryhelium (nie efemeryda na datę). 6 nowych testów fizyki
+  (vis-viva, elementy oskulacyjne, jednostki G=4π²).
 - ✅ **Chaos deterministyczny: podwójne wahadło** — `universe-doublependulum.ts`,
   Universe Lab. Dokładne równania Lagrange'a, integracja RK4 (celowo NIE
   symplektyczna — kontrast uczciwie nazwany wobec problemu trzech ciał).

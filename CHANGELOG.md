@@ -6,6 +6,44 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Stabilność układu planetarnego — prawdziwa grawitacja N-ciał, nowy eksperyment, Universe Lab)
+- Nowe funkcje w `core/physics.ts`: `G_ASTRO_YEAR` (=4π² dokładnie —
+  konsekwencja III prawa Keplera dla Ziemi w jednostkach AU/rok/M_słońca,
+  nie przybliżenie), `EARTH_MASSES_PER_SOLAR`, `visVivaSpeed` (równanie
+  vis-viva), `orbitalElementsFromState` (elementy oskulacyjne a,e z
+  chwilowego wektora stanu, metoda energia+moment pędu).
+- Nowy eksperyment `universe-planetstability.ts`: Słońce + Jowisz +
+  Saturn + Ziemia + Mars, integracja velocity-Verlet (symplektyczna, ta
+  sama metoda co problem trzech ciał), każda planeta startuje w
+  peryhelium z dokładną prędkością z vis-viva. To PRAWDZIWA grawitacja
+  N-ciał — celowo inne podejście niż "Prawdziwy Układ Słoneczny" (który
+  używa niezależnych elips Keplera, dobrych do pokazania pozycji planet,
+  złych do pokazania zaburzeń grawitacyjnych między nimi).
+- Toggle Jowisz/Saturn usuwa ich grawitację z symulacji; mimośród Ziemi
+  i Marsa liczony NA ŻYWO z chwilowego stanu (nie zakładany) pokazuje
+  prawdziwy dryf orbitalny. Formuły zweryfikowane numerycznie przed
+  implementacją (`node -e`): dokładny round-trip (a,e)→stan→(a,e).
+  Playwright potwierdził realny efekt fizyczny: po 12 latach symulacji
+  dryf mimośrodu Marsa jest ~15× mniejszy bez gigantów (0,00002) niż z
+  nimi (0,00031) — zmierzony, nie deklarowany skutek.
+- honestyNote nazywa świadome uproszczenia: 4 planety zamiast 8, start
+  w peryhelium (nie prawdziwa efemeryda na konkretną datę) z rozłożonymi
+  kątowo kierunkami dla czytelności.
+- Narracja cytuje rezonans Jowisz–Saturn ~5:2 (Wielka Nierówność,
+  Laplace) i wynik Laskara (1989, Nature 338, 237) o chaotyczności
+  wewnętrznego Układu Słonecznego w długim czasie (czas Lapunowa ~5 mln
+  lat) — czwarty, niezależny przykład czułości na warunki początkowe w
+  Universe Lab, obok problemu trzech ciał, podwójnego wahadła i atraktora
+  Lorenza.
+- 6 nowych testów fizycznych (`physics.test.ts`): wartość G_ASTRO_YEAR,
+  stosunek mas Ziemia/Słońce, prędkość i okres orbity kołowej, dokładny
+  round-trip elementów orbitalnych dla orbity Jowisza, elementy orbity
+  kołowej (e=0 dokładnie).
+- Zweryfikowane: typecheck, lint, 329 testów vitest frontendowych (357 z
+  backendem), build, Playwright w prawdziwej Chromium — wyłączenie
+  gigantów widocznie usuwa ich orbity z canvasu i mierzalnie zmniejsza
+  tempo dryfu mimośrodu pozostałych planet, zero błędów konsoli.
+
 ### Dodano (Atraktor Lorenza — trzeci eksperyment chaosu deterministycznego, Universe Lab)
 - Nowe funkcje w `core/physics.ts`: `lorenzDerivative`, `stepLorenzRK4`
   (RK4 — ta sama metoda numeryczna co reszta platformy),

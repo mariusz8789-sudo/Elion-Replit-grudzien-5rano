@@ -20,6 +20,368 @@ Legenda pewności: ★★★★★ potwierdzona · ★★★★ potwierdzona (ko
 
 ---
 
+## Genesis OS 2.x / 3.0 — Dynamic Scientific Simulation Generator (wielka wizja architektoniczna)
+
+**NIE BUDOWAĆ TERAZ.** Warunek wstępny jest twardy i identyczny jak dla
+Collaborative Science niżej: Genesis OS v1.0 musi być najpierw w pełni
+ukończony, dopracowany, przetestowany, wizualnie dopieszczony i gotowy
+produkcyjnie. Ten rozdział istnieje wyłącznie po to, żeby udokumentować
+wizję w poważnym architektonicznym szczególe, na wypadek gdyby stała się
+głównym kierunkiem technologicznym Genesis OS — nie po to, żeby cokolwiek
+z niego zacząć budować dzisiaj. 13 istniejących laboratoriów to fundament,
+środowisko walidacyjne i naukowe cegiełki tej wizji, nie coś, co ona
+zastępuje.
+
+### Wizja główna
+
+Genesis OS ma docelowo wyjść poza stały zestaw ręcznie zaprogramowanych
+laboratoriów. Użytkownik powinien móc opisać pytanie naukowe, hipotezę,
+scenariusz teoretyczny lub system w języku naturalnym — bez wybierania
+laboratorium i bez wiedzy, jaka metoda numeryczna, układ równań czy
+architektura symulacji jest potrzebna. Genesis analizuje żądanie i
+próbuje zbudować odpowiednią interaktywną symulację naukową.
+
+Przykłady docelowych zapytań: „Zasymuluj hipotetyczną epidemię dróg
+oddechowych rozprzestrzeniającą się w Madrycie przez 180 dni", „Pokaż co
+się stanie z układem planetarnym, gdyby Jowisz miał dwukrotnie większą
+masę", „Zbuduj model jeziora tracącego tlen podczas długiej fali upałów",
+„Zasymuluj hipotetyczną zamkniętą kolonię marsjańską na 10 000 osób przez
+20 lat", „Pokaż jak mutacja mogłaby zmienić uproszczony model fałdowania
+białka", „Stwórz model natężenia ruchu w mieście po zamknięciu trzech
+głównych dróg", „Porównaj dwa konkurujące matematyczne modele wzrostu
+populacji", „Stwórz uproszczony ekosystem i sprawdź, co się stanie, gdy
+zniknie jeden gatunek".
+
+Docelowy przepływ: PYTANIE → ANALIZA INTENCJI NAUKOWEJ → IDENTYFIKACJA
+DZIEDZINY → WYBÓR LUB KOMPOZYCJA MODELU → GENEROWANIE ZAŁOŻEŃ → UKŁAD
+RÓWNAŃ/REGUŁ → WYBÓR METODY NUMERYCZNEJ → DEFINICJA PARAMETRÓW → BUDOWA
+SYMULACJI → WALIDACJA → INTERAKTYWNA WIZUALIZACJA → NAUKOWA INTERPRETACJA
+AI → NOWE HIPOTEZY I EKSPERYMENTY POCHODNE. Użytkownik zadaje pytanie,
+Genesis buduje eksperyment — to jest fundamentalna wizja.
+
+### To NIE jest fałszywy „generator AI"
+
+Świadome ograniczenie architektoniczne: to nie ma być LLM generujący
+losowy JavaScript/HTML i natychmiast go wykonujący — taka architektura
+byłaby naukowo niewiarygodna, trudna do zwalidowania i potencjalnie
+niebezpieczna. System ma używać kontrolowanej architektury symulacji
+naukowej: AI pełni rolę orkiestratora i warstwy rozumowania naukowego,
+składając symulacje z zaufanych, typowanych i zwalidowanych prymitywów
+naukowych (przykładowe rodziny: układy ODE/PDE, N-body, Monte Carlo,
+automaty komórkowe, modele agentowe, modele przedziałowe/reakcyjne,
+dyfuzja/transport, optymalizacja, modele grafowe i stochastyczne, układy
+dynamiczne, modele populacyjne/ekosystemowe, termodynamika, mechanika
+orbitalna, modele pól, uproszczone modele molekularne).
+
+Istniejące laboratoria Genesis OS mają stopniowo stać się reużywalnymi
+silnikami i prymitywami: `labs/universe.ts` mógłby udostępniać prymitywy
+grawitacji i mechaniki orbitalnej, `labs/mathematics.tsx` — parsowanie
+równań, różniczkowanie, całkowanie, szukanie miejsc zerowych i solver
+ODE, `labs/biology.ts` — modele populacyjne, transport błonowy i
+uproszczone prymitywy biologiczne, `labs/chemistry.ts` — reakcje, energię
+i modele fazowe, `labs/quantum.ts` — kontrolowane wektory stanu i obwody
+kwantowe. Dynamic Simulation Generator docelowo komponuje te zaufane
+silniki zamiast programować ręcznie kolejne pojedyncze eksperymenty.
+
+### Scientific Intent Engine
+
+Przyszły komponent odpowiedzialny za zrozumienie, o co naprawdę pyta
+użytkownik: dziedzina naukowa, badany system, istotne obiekty, zmienne,
+warunki początkowe i brzegowe, żądana skala czasowa i przestrzenna, znane
+stałe, nieznane parametry, żądane wyniki, scenariusze porównawcze,
+niepewność, wymagana wierność symulacji.
+
+Przykład: „Zasymuluj utratę tlenu w jeziorze podczas 14-dniowej fali
+upałów" → dziedzina: nauka o środowisku wodnym; system: jezioro; zmienne:
+temperatura wody, tlen rozpuszczony, zużycie tlenu, wymiana atmosferyczna,
+mieszanie, biochemiczne zapotrzebowanie na tlen; skala czasowa: 14 dni;
+możliwy model: sprzężony układ ODE lub uproszczony model warstwowy
+jeziora; wyniki: tlen rozpuszczony w czasie, próg hipoksji, porównanie
+scenariusza bazowego z falą upałów.
+
+System musi jawnie rozróżniać: FAKTY PODANE PRZEZ UŻYTKOWNIKA · ZNANE
+STAŁE NAUKOWE · ZAŁOŻENIA MODELU · PARAMETRY SZACOWANE · PARAMETRY
+NIEZNANE — to rozróżnienie musi być widoczne dla użytkownika. Genesis OS
+nigdy nie wolno cicho wymyślać naukowej pewności (to samo DNA co dzisiejsza
+zasada „nie buduje się atrap" i taksonomia `ConfirmationLevel`).
+
+### Model Composer
+
+Przyszły komponent budujący symulacje z reużywalnych modułów naukowych
+zamiast ręcznego programowania każdego możliwego eksperymentu. Przykłady
+kompozycji: symulacja pandemii = model populacji + sieć kontaktów + model
+przedziałowy + założenia mobilności + stochastyczna transmisja +
+scenariusze interwencji; kolonia marsjańska = dynamika populacji + zużycie
+tlenu + recykling wody + produkcja energii i żywności + prawdopodobieństwa
+awarii sprzętu + magazynowanie zasobów; jezioro = temperatura + transport
+tlenu + biochemiczne zapotrzebowanie na tlen + mieszanie + wymiana
+atmosferyczna. Celem NIE jest stworzenie milionów zakodowanych na sztywno
+laboratoriów, tylko reużywalnych cegiełek naukowych zdolnych generować
+miliony konfiguracji symulacji.
+
+### Simulation IR (reprezentacja pośrednia)
+
+Przyszła typowana, inspekcjonowalna reprezentacja pośrednia eksperymentu
+naukowego. Język naturalny NIGDY nie staje się bezpośrednio wykonywalnym
+kodem: język naturalny → intencja naukowa → Simulation IR → walidacja →
+runtime symulacji. Simulation IR opisuje: obiekty, zmienne, jednostki,
+parametry, równania, interakcje, ograniczenia, warunki początkowe i
+brzegowe, wymagania solvera, wymagania wizualizacji, zakresy niepewności,
+proweniencję, założenia — konceptualnie zbliżone do deklaratywnego
+schematu (nazwa systemu, zmienne z jednostkami, parametry, przedział
+czasu, typ solvera, lista wyjść). Musi być walidowane przed wykonaniem, a
+docelowa architektura ma pozwalać je zapisywać, inspekcjonować, klonować,
+wersjonować, porównywać, publikować, odtwarzać i remiksować — naturalne
+połączenie z roadmapą Collaborative Science powyżej.
+
+### Scientific Primitive Registry
+
+Przyszły rejestr, w którym każda zaufana zdolność symulacyjna jest
+zarejestrowana z metadanymi: dziedzina naukowa, wejścia, wyjścia,
+obsługiwane jednostki, założenia, ograniczenia, metoda numeryczna, testy
+walidacyjne, znane przypadki referencyjne, koszt obliczeniowy, kompatybilne
+prymitywy. Przykładowe nazwy prymitywów w stylu przestrzeni nazw:
+`gravity.nbody`, `orbit.kepler`, `math.ode.rk4`, `math.root.bisection`,
+`math.integral.simpson`, `biology.population.logistic`,
+`epidemiology.seir`, `environment.oxygen.balance`, `physics.diffusion`,
+`chemistry.reaction.network`, `stochastic.monte_carlo`. AI musi wybierać
+z zarejestrowanych prymitywów zawsze, gdy to możliwe — zweryfikowane
+komponenty naukowe mają pierwszeństwo przed generowanymi algorytmami.
+
+### Automatyczny wybór metody numerycznej (solver)
+
+Genesis docelowo analizuje Simulation IR i rekomenduje odpowiednią metodę
+numeryczną (układ ODE → RK4 lub przyszły solver adaptacyjny; układ
+stochastyczny → Monte Carlo; populacja agentów → symulacja agentowa;
+dyfuzja przestrzenna → różnice skończone; układ orbitalny → całkowanie
+N-body; optymalizacja → odpowiedni silnik optymalizacyjny). Wybrana
+metoda musi być widoczna, a Genesis ma wyjaśniać DLACZEGO ją wybrano, JAKIE
+ma ograniczenia, JAKIE błędy numeryczne mogą wystąpić i CZY istnieje
+metoda o wyższej wierności. Użytkownicy powinni docelowo móc porównywać
+solvery („uruchom z RK4", „porównaj z całkowaniem adaptacyjnym", „zwiększ
+precyzję", „pokaż rozbieżność numeryczną") — potencjalna funkcja
+edukacyjna i badawcza jednocześnie.
+
+### Automatyczne generowanie interfejsu symulacji
+
+Generator ma tworzyć nie tylko model matematyczny, ale też interaktywny
+interfejs eksperymentu na podstawie Simulation IR: suwaki, pola liczbowe,
+przełączniki, selektory scenariuszy, osie czasu, wykresy, wizualizacje 2D
+i 3D, mapy cieplne, pola wektorowe, widoki sieciowe, widoki cząstek,
+panele porównawcze — dobierane wg reguł (parametr z zakresem liczbowym →
+suwak; wiele scenariuszy → zakładki porównawcze; współrzędne przestrzenne
+→ wizualizacja 2D/3D; wynik jako szereg czasowy → wykres i oś czasu;
+obecna niepewność → widoczne zakresy niepewności). Wygenerowany interfejs
+musi trzymać się języka wizualnego Genesis OS i wyglądać jak natywne
+laboratorium Genesis, nie jak losowo wygenerowany HTML.
+
+### AI Scientific Collaborator
+
+Dzisiejszy AI Narrator ma docelowo ewoluować w aktywnego naukowego
+współpracownika, który podczas wygenerowanych symulacji: wyjaśnia
+zaobserwowane zachowanie, identyfikuje przejścia fazowe, wykrywa
+nieoczekiwane wyniki i niestabilne regiony parametrów, porównuje
+scenariusze, proponuje zmiany parametrów i eksperymenty kontrolne,
+identyfikuje możliwe artefakty numeryczne, odróżnia zachowanie modelu od
+twierdzeń o świecie rzeczywistym, sugeruje powiązane symulacje i generuje
+nowe hipotezy. Przykład: „Zauważyłem, że tlen rozpuszczony zapada się po
+9. dniu tylko wtedy, gdy temperatura przekracza 28°C, a mieszanie
+pozostaje poniżej obecnego progu" → propozycja: „Uruchom ten sam
+eksperyment ze zwiększoną o 20% wymianą atmosferyczną." AI ma rozumować o
+eksperymencie, nie tylko opisywać wykresy.
+
+### Hypothesis Engine
+
+Przyszły komponent zamieniający zdanie użytkownika w rodzaju „Moja
+hipoteza: zwiększenie mieszania w jeziorze opóźni hipoksję" w
+przetestowalną strukturę: hipoteza, zmienna niezależna (tempo mieszania),
+zmienna zależna (czas do progu hipoksji), kontrola (mieszanie bazowe),
+eksperyment (seria symulacji w wybranym zakresie parametru), wynik
+(wspiera / nie wspiera / nierozstrzygające w ramach modelu). Kluczowa
+zasada uczciwości naukowej: Genesis nigdy nie może twierdzić, że symulacja
+„dowodzi" prawdziwej teorii naukowej — wolno mu powiedzieć wyłącznie
+„wspierane w ramach tego modelu i tych założeń" albo „niewspierane przez tę
+konfigurację symulacji". Ma integrować się z historią eksperymentów i
+Collaborative Science.
+
+### Pipeline walidacji
+
+Wygenerowane symulacje muszą przejść pipeline walidacyjny, zanim zostaną
+zaprezentowane jako naukowo znaczące — możliwe etapy: walidacja składni,
+spójność jednostek, walidacja zakresów parametrów, sprawdzenie stabilności
+numerycznej, sprawdzenia zachowania wielkości zachowanych (tam gdzie
+dotyczy), porównanie ze znanym przypadkiem referencyjnym, sanity-check
+solvera, walidacja warunków brzegowych, przegląd założeń, klasyfikacja
+uczciwości naukowej. Każda symulacja ma otrzymywać widoczny status
+walidacji, np.: ZWERYFIKOWANE WZGLĘDEM PRZYPADKU REFERENCYJNEGO ·
+ZWALIDOWANE NUMERYCZNIE · MODEL EDUKACYJNY · MODEL EKSPLORACYJNY · MODEL
+HIPOTETYCZNY · NIEWYSTARCZAJĄCE DANE · WALIDACJA NIEUDANA. Dzisiejsza
+filozofia uczciwości naukowej Genesis OS pozostaje fundamentalnym
+wymaganiem architektonicznym tego systemu, nie dodatkiem.
+
+### Proweniencja i źródła naukowe
+
+Przyszłe symulacje mają śledzić proweniencję: użyte równania, użyte
+prymitywy naukowe, stałe, źródła parametrów, założenia, metody
+numeryczne, publikacje referencyjne (tam gdzie dotyczy), wprowadzone
+modyfikacje. Użytkownik powinien móc zapytać „Skąd wzięło się to
+równanie?", „Dlaczego użyto tego parametru?", „Która część jest
+hipotetyczna?", „Co poprawiłoby dokładność modelu?" — a Genesis ma
+odpowiadać transparentnie.
+
+### Przykład wysokiego ryzyka: epidemiologia i granice bezpieczeństwa
+
+Jedną z możliwych dziedzin jest epidemiologia: np. „Stwórz hipotetyczną
+symulację epidemii dla miasta 3 milionów mieszkańców" mogłaby użyć
+zaufanych prymitywów typu SIR/SEIR z parametrami (populacja, początkowo
+zakażeni, tempo transmisji, okres inkubacji, tempo zdrowienia, założenia
+mobilności, scenariusze interwencji) i wynikami (podatni/eksponowani/
+zakażeni/ozdrowieńcy, szczyt epidemii, czas do szczytu, porównanie
+scenariuszy). System musi jawnie stwierdzać, że to model, i odróżniać
+hipotetyczne patogeny od prawdziwych czynników biologicznych. Cel to
+edukacja epidemiologiczna, zdrowie publiczne, przygotowanie i symulacja
+matematyczna — **NIE WOLNO** to stać się generatorem protokołów
+biologicznych ani dostarczać instrukcji tworzenia, modyfikowania czy
+optymalizowania patogenów. Ta sama zasada bezpieczeństwa dotyczy KAŻDEJ
+dziedziny wysokiego ryzyka w całym systemie: Genesis może symulować
+konsekwencje i układy matematyczne, ale nigdy nie dostarcza operacyjnych
+instrukcji powodowania realnej krzywdy. To twarde ograniczenie
+architektoniczne, nie sugestia.
+
+### Symulacje międzydziedzinowe (cross-domain)
+
+Jeden z najambitniejszych celów: kompozycja wielu dziedzin naraz, np.
+„Co się stanie z kolonią marsjańską, gdy burza pyłowa zredukuje energię
+słoneczną o 70% przez 90 dni?" (astronomia + energia + środowisko +
+inżynieria + zarządzanie zasobami + przetrwanie populacji) albo „Zasymuluj
+falę upałów wpływającą na miasto, jego zapotrzebowanie na energię i
+zużycie wody" (klimat + termodynamika + energia + populacja +
+infrastruktura). To punkt, w którym Genesis OS mógłby stać się
+fundamentalnie czymś innym niż zbiorem edukacyjnych symulacji — platformą
+łączącą dziedziny naukowe.
+
+### Discovery Loop
+
+Docelowe doświadczenie użytkownika jako pętla: PYTANIE → SYMULACJA →
+OBSERWACJA → PYTANIE → MODYFIKACJA → PORÓWNANIE → SFORMUŁOWANIE HIPOTEZY →
+TEST → ZAPISANIE ODKRYCIA → UDOSTĘPNIENIE LUB REMIKS. Koniec jednej
+symulacji ma naturalnie tworzyć początek następnej — AI Scientific
+Collaborator ciągle sugeruje sensowne naukowe odgałęzienia (np. po zmianie
+masy Jowisza i destabilizacji pasa asteroid: „Co jeśli masa Saturna też
+się zmieni?", „Które populacje asteroid destabilizują się pierwsze?",
+„Porównaj 10 milionów lat ewolucji", „Przetestuj ten sam układ bez
+Jowisza") — tworząc pętle naukowej ciekawości.
+
+### Integracja z Collaborative Science i grafem publicznych eksperymentów
+
+Dynamic Scientific Simulation Generator i Collaborative Science (sekcja
+niżej) mają się docelowo wzajemnie wzmacniać: użytkownik tworzy
+wygenerowany eksperyment, zaprasza innych, grupa zmienia parametry i
+tworzy konkurujące hipotezy, uruchamia scenariusze, AI Scientific
+Collaborator obserwuje, historia eksperymentu jest zapisywana, wynik
+zostaje opublikowany, inna grupa klonuje eksperyment, modyfikuje model,
+tworzy nową wersję. Docelowo eksperymenty mają tworzyć graf (eksperyment A
+→ sklonowany jako B → zmodyfikowany w C; hipoteza X testowana przez
+eksperymenty A, D, F) z możliwością eksploracji „eksperymenty wywiedzione
+z tego modelu", „alternatywne hipotezy", „najczęściej remiksowane
+symulacje", „sprzeczne wyniki", „powiązane odkrycia" — docelowo unikalna
+sieć eksploracji naukowej. Całość ma się poczuć jak: silnik symulacji
+naukowej + AI-naukowiec + wersjonowanie eksperymentów w stylu Git +
+przestrzeń współpracy w czasie rzeczywistym + publiczna sieć odkryć.
+
+### Fazowa mapa drogowa
+
+**Faza 0 — Genesis OS v1.0.** NIE BUDOWAĆ generatora. Dokończyć istniejący
+produkt: dokończyć bieżącą roadmapę, usunąć tarcie UX, dopracować
+pierwsze dwie minuty doświadczenia, zweryfikować każde laboratorium,
+dopieścić UI mobilne, ustabilizować AI Narratora, dokończyć wdrożenie
+produkcyjne, poprawić onboarding, zapewnić natychmiastowy efekt WOW.
+Istniejące laboratoria to naukowy fundament.
+
+**Faza 1 — Ekstrakcja prymitywów.** Analiza istniejących laboratoriów,
+identyfikacja reużywalnych silników symulacji, ekstrakcja zaufanych
+prymitywów naukowych z istniejącego kodu, pierwszy Scientific Primitive
+Registry. Jeszcze bez generowania symulacji — cel: Genesis rozumie
+wewnętrznie, jakie zdolności naukowe już posiada.
+
+**Faza 2 — Simulation IR.** Projekt typowanej reprezentacji pośredniej:
+schemat, walidatory, jednostki, parametry, równania, założenia, wyjścia,
+definicje solvera. Ręcznie napisane przykładowe Simulation IR, weryfikacja
+że istniejące eksperymenty Genesis dają się nią wyrazić.
+
+**Faza 3 — Prototyp Model Composera.** Kontrolowany composer wspierający
+początkowo tylko kilka dziedzin (proponowane pierwsze: matematyczne układy
+dynamiczne, układy orbitalne, modele populacyjne, modele bilansu
+środowiskowego). Composer może używać WYŁĄCZNIE zarejestrowanych
+prymitywów — zero dowolnie generowanego wykonywalnego kodu.
+
+**Faza 4 — Scientific Intent Engine.** Zapytania w języku naturalnym
+zamieniane w ustrukturyzowaną intencję naukową. System ma dopytywać, gdy
+brakuje krytycznej informacji (np. „Jaka jest przybliżona głębokość
+jeziora?", „Jaki okres czasu zasymulować?") zamiast cicho wymyślać
+krytyczne parametry — dopytywanie ma pierwszeństwo przed zgadywaniem.
+
+**Faza 5 — Automatyczne UI symulacji.** Generowanie natywnych interfejsów
+eksperymentów Genesis z Simulation IR (kontrolki, wykresy, osie czasu,
+porównania, dobrane wizualizacje) — wszystkie wygenerowane eksperymenty
+muszą wizualnie pasować do Genesis OS.
+
+**Faza 6 — Silnik walidacji.** Budowa pipeline'u walidacji naukowej,
+wprowadzenie widocznych klasyfikacji modelu i statusów walidacji.
+Wygenerowane symulacje muszą wyjaśniać własne ograniczenia.
+
+**Faza 7 — AI Scientific Collaborator.** Rozbudowa AI Narratora tak, żeby
+rozumował na podstawie intencji, Simulation IR, parametrów, wyników i
+historii, proponując naukowo sensowne eksperymenty pochodne.
+
+**Faza 8 — Hypothesis Engine.** Możliwość definiowania hipotez przez
+użytkownika, automatyczna budowa kontrolowanych porównań eksperymentów
+tam, gdzie technicznie możliwe, śledzenie wyników — nigdy bez mylenia
+dowodu symulacyjnego z dowodem na temat świata rzeczywistego.
+
+**Faza 9 — Współpracujące wygenerowane eksperymenty.** Integracja z
+Collaborative Science: wspólne operowanie wygenerowanymi symulacjami,
+historia eksperymentu, wersjonowanie, klonowanie, remiksowanie.
+
+**Faza 10 — Kompozycja międzydziedzinowa.** Umożliwienie działania
+wielu rodzin prymitywów naukowych wewnątrz jednej symulacji — poważny
+kamień milowy badawczo-architektoniczny. Nie obiecywać uniwersalnej
+symulacji naukowej — zacząć od jawnie wspieranych kombinacji.
+
+**Faza 11 — Sieć odkryć.** Publiczna linia rodowodowa eksperymentów:
+odkrywanie publicznych eksperymentów, remiksów, odgałęzień hipotez,
+powiązanych modeli, alternatywnych założeń.
+
+### Wymaganie architektoniczne na przyszłość
+
+Gdy implementacja faktycznie się kiedyś zacznie (nie wcześniej), system
+ma być projektowany pod długoterminową skalowalność: modularne silniki
+naukowe, niezależnie wersjonowane prymitywy, skalowanie horyzontalne,
+izolowani workerzy symulacji, kolejki zadań obliczeniowych, cache'owanie
+symulacji, deterministyczne odtwarzanie tam, gdzie możliwe, kontrola
+wersji eksperymentów, śledzenie proweniencji, w przyszłości rozproszone
+wykonanie oraz workery GPU/specjalizowanego obliczania. Wygenerowana
+logika symulacji NIE MOŻE być ciasno sprzężona z UI React — modele
+naukowe, runtime symulacji, wizualizacja i rozumowanie AI mają być
+osobnymi warstwami architektonicznymi. System ma docelowo obsłużyć
+tysiące wygenerowanych eksperymentów i pokoi kolaboracyjnych bez
+konieczności całkowitego przeprojektowania architektury — dokładnie ta
+sama zasada skalowalności co w sekcji Collaborative Science powyżej/niżej.
+
+### Zasada końcowa produktu
+
+Genesis OS nie ma dążyć do ręcznego zbudowania laboratorium dla każdego
+możliwego pytania naukowego — to się nie skaluje. Istniejące laboratoria
+to fundament. Docelowy cel: zbudować prymitywy naukowe, zbudować
+kompozytor naukowy, zbudować system walidacji, pozwolić użytkownikom
+zadawać pytania, pozwolić Genesis budować kontrolowane eksperymenty.
+Docelowe doświadczenie: „Mam pytanie naukowe." → Genesis OS: „Zbudujmy
+symulację i sprawdźmy to."
+
+Nie implementować tej funkcji teraz. To udokumentowany, poważny,
+przyszły kierunek platformy — warunkiem jest wcześniejsze dokończenie
+Genesis OS v1.0.
+
 ## Flagowe pomysły — najwyższy potencjał, wymagają wielu sesji
 
 Dwie pozycje wyróżnione z reszty listy: nie są "kolejną funkcją do

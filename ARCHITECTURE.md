@@ -438,6 +438,21 @@ zasadą „nie twórz atrap, projektuj architekturę pod przyszłość".
   warunku przy rejestracji, nie przebudowy). Wymaga kont i bazy danych
   jako fundamentu — kolejność zależności, nie wybór.
 
+- **Dynamic Scientific Simulation Generator** (Genesis OS 2.x/3.0, pełna
+  wizja w `VISION-BACKLOG.md` „Genesis OS 2.x / 3.0 — Dynamic Scientific
+  Simulation Generator") — NIE budować przed v1.0. Jedyna dziś istotna
+  konsekwencja architektoniczna: ta wizja zakłada, że dzisiejsze
+  laboratoria staną się kiedyś zaufanymi, reużywalnymi "prymitywami
+  naukowymi" (np. `core/physics.ts`, `core/proteinFolding.ts`,
+  parser/solver w `labs/mathematics.tsx`), a nie że zostaną zastąpione.
+  To działa TYLKO jeśli fizyka/matematyka w `core/*` i `labs/*` zostaje
+  oddzielona od warstwy renderowania i UI — czyli dokładnie zasada
+  „pluginy fizyki, cienka powłoka UI" opisana na początku tego dokumentu.
+  Wniosek dla v1.0: nie robić nic specjalnego teraz, tylko pilnować, żeby
+  nowy kod naukowy nadal trzymał się tego podziału (logika w `core`/`labs`
+  bez zależności od React, `Sim`/`Sim3D` jako jedyna granica renderowania)
+  — dokładnie ta sama dyscyplina, która już obowiązuje w projekcie.
+
 Wspólny mianownik wszystkich punktów: żaden nie wymaga zastąpienia
 `LabDefinition`/`Sim`/`Sim3D`/`NarrationBlock`/`ConfirmationLevel` — to są
 kontrakty, na których cała reszta ma się opierać przez najbliższe lata, nie

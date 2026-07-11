@@ -1,6 +1,6 @@
 {
   "name": "genesis-os-monorepo",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Genesis OS — mobilna platforma do eksploracji fizyki, kosmologii i nauki poprzez interaktywne symulacje oraz AI.",
   "private": true,
   "engines": {

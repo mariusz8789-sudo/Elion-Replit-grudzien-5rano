@@ -175,9 +175,9 @@ export const particleLab: LabDefinition = {
         body: `Bozon Higgsa (2012) znaleziono dokładnie tak: miliardy zdarzeń, w nich pary fotonów i czwórki leptonów, a w statystyce — garb przy 125 GeV. Przy energii ${p.energy} j.u. zwiększ suwak i zobacz, jak rośnie krotność cząstek — tak samo działa podnoszenie energii akceleratora.`,
       },
       {
-        title: 'Czego tu jeszcze nie ma',
+        title: 'Czego ta wizualizacja nie odtwarza',
         kind: 'warning' as const,
-        body: 'Kwarki i gluony nie występują swobodnie (uwięzienie koloru) — w detektorze widać tylko ich "dżety". Symulacja dżetów, rzeczywistych kanałów rozpadu i histogramu mas niezmienniczych — Etap 1.',
+        body: 'Kwarki i gluony nie występują swobodnie (uwięzienie koloru) — w prawdziwym detektorze widać tylko ich "dżety", których ten widok nie symuluje; rodzaje i liczba cząstek są tu losowane, nie liczone z rzeczywistej kinematyki zderzenia. Histogram masy niezmienniczej — metoda, którą NAPRAWDĘ odkryto J/ψ i Z⁰ — zobacz w zakładce „Odkryj cząstkę" obok.',
       },
     ];
   },

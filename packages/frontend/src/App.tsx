@@ -178,7 +178,7 @@ export default function App() {
     return (
       <div className="app">
         <TopBar title={`⚙ ${t('nav.settings')}`} onSearch={() => setSearchOpen(true)} />
-        <SettingsScreen />
+        <SettingsScreen onReplayOnboarding={() => setOnboardingOpen(true)} />
         {overlays}
       </div>
     );

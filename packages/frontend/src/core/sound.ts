@@ -8,9 +8,17 @@ import { getSettings } from './settings';
  * potwierdzeniem, nie muzyką ani alarmem. Jeden globalny przełącznik w
  * Ustawieniach (`settings.soundEnabled`) wyłącza WSZYSTKO naraz.
  *
- * AudioContext wymaga gestu użytkownika w większości przeglądarek — pierwsze
- * wywołanie zwykle następuje po kliknięciu (np. wejście do laboratorium),
- * więc nie potrzeba osobnej logiki "odblokowania" dźwięku.
+ * Zgodność z Safari/iOS i politykami autoplay (Chromium ma tę samą zasadę):
+ * `AudioContext` utworzony poza wywołaniem zainicjowanym gestem użytkownika
+ * startuje w stanie 'suspended' i NIGDY nie wznawia się sam. Wszystkie
+ * funkcje `play*()` poniżej są dziś wywoływane wyłącznie z handlerów
+ * kliknięcia/klawiatury (wejście do laboratorium, start/pauza, itd.), więc
+ * warunek "gest użytkownika" jest spełniony — ale samo utworzenie kontekstu
+ * to za mało: dopóki `resume()` faktycznie się nie rozstrzygnie, `currentTime`
+ * stoi w miejscu, więc zaplanowanie dźwięku PRZED rozstrzygnięciem `resume()`
+ * planuje go względem zamrożonego zegara i dźwięk cicho przepada. `tone()`
+ * niżej czeka na `resume()` przed odczytaniem `currentTime` z tego właśnie
+ * powodu.
  */
 
 type AudioContextLike = {
@@ -25,12 +33,10 @@ type AudioContextLike = {
 let ctx: AudioContextLike | null = null;
 let ctxAttempted = false;
 
+/** Tworzy (raz) i zwraca dzielony AudioContext, bez dotykania jego stanu suspended/running — patrz `tone()`. */
 function getCtx(): AudioContextLike | null {
   if (typeof window === 'undefined') return null;
-  if (ctx) {
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-    return ctx;
-  }
+  if (ctx) return ctx;
   if (ctxAttempted) return null; // już próbowaliśmy stworzyć i się nie udało — nie próbuj przy każdym dźwięku
   ctxAttempted = true;
   const AC = (window as unknown as { AudioContext?: new () => AudioContextLike; webkitAudioContext?: new () => AudioContextLike })
@@ -41,6 +47,8 @@ function getCtx(): AudioContextLike | null {
     ctx = new AC();
     return ctx;
   } catch {
+    // Konstruktor rzuca np. gdy przeglądarka wyczerpała limit jednoczesnych
+    // kontekstów audio — rzadkie, ale realne w długiej sesji.
     return null;
   }
 }
@@ -53,10 +61,8 @@ function enabled(): boolean {
   }
 }
 
-/** Pojedynczy krótki ton z płynną obwiednią (bez trzasku na starcie/końcu). */
-function tone(freq: number, startOffset: number, duration: number, gainPeak: number, type: OscillatorType = 'sine'): void {
-  const c = getCtx();
-  if (!c) return;
+/** Faktyczne zaplanowanie dźwięku na kontekście, który jest już (albo właśnie stał się) 'running'. */
+function scheduleTone(c: AudioContextLike, freq: number, startOffset: number, duration: number, gainPeak: number, type: OscillatorType): void {
   try {
     const osc = c.createOscillator();
     const gain = c.createGain();
@@ -73,6 +79,27 @@ function tone(freq: number, startOffset: number, duration: number, gainPeak: num
   } catch {
     /* silnik audio niedostępny/zablokowany w tej przeglądarce — cicho pomiń */
   }
+}
+
+/**
+ * Pojedynczy krótki ton z płynną obwiednią (bez trzasku na starcie/końcu).
+ * Safari/Chromium: jeśli kontekst jest 'suspended' (typowe dla iOS/autoplay
+ * policy), CZEKA na rozstrzygnięcie `resume()` przed odczytaniem
+ * `currentTime` — inaczej dźwięk planuje się względem zamrożonego zegara i
+ * cicho przepada (patrz komentarz na górze pliku).
+ */
+function tone(freq: number, startOffset: number, duration: number, gainPeak: number, type: OscillatorType = 'sine'): void {
+  const c = getCtx();
+  if (!c) return;
+  if (c.state === 'suspended') {
+    c.resume()
+      .then(() => scheduleTone(c, freq, startOffset, duration, gainPeak, type))
+      .catch(() => {
+        /* przeglądarka odmówiła wznowienia (np. brak gestu użytkownika) — cicho pomiń */
+      });
+    return;
+  }
+  scheduleTone(c, freq, startOffset, duration, gainPeak, type);
 }
 
 /** Wejście do laboratorium — miękkie dwa tony wznoszące. */

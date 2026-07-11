@@ -140,6 +140,19 @@ export function resolveStaticPath(staticDir, urlPath) {
   return { ok: true, filePath: resolved };
 }
 
+/* ---------------- Narrator AI: konfiguracja produkcyjna ---------------- */
+
+/**
+ * Komunikat zwracany, gdy backend nie ma skonfigurowanego klucza API (brak
+ * ANTHROPIC_API_KEY w środowisku). Trafia do KAŻDEGO klienta HTTP, nie
+ * tylko operatora wdrożenia — celowo NIE wymienia nazwy zmiennej
+ * środowiskowej ani żadnych innych szczegółów konfiguracji serwera.
+ * Dokładny wymagany klucz jest udokumentowany dla operatorów w
+ * `.env.example` i `README.md`, nie w odpowiedzi API.
+ */
+export const AI_UNAVAILABLE_MESSAGE =
+  'Funkcja „Zapytaj AI" nie jest skonfigurowana w tym wdrożeniu. Deterministyczny Narrator (opis symulacji powyżej) działa bez zmian, w pełni offline.';
+
 /* ---------------- Nagłówki bezpieczeństwa ---------------- */
 
 /**

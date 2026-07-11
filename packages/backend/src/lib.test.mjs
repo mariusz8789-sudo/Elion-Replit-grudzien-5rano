@@ -11,6 +11,7 @@ import {
   LAB_KNOWLEDGE_FILES,
   buildKnowledgeIndex,
   knowledgeExcerptFor,
+  AI_UNAVAILABLE_MESSAGE,
 } from './lib.mjs';
 
 describe('sanitizeFlat', () => {
@@ -164,6 +165,20 @@ describe('SECURITY_HEADERS', () => {
     assert.ok(SECURITY_HEADERS['content-security-policy'].includes("frame-ancestors 'none'"));
     assert.ok(SECURITY_HEADERS['referrer-policy']);
     assert.ok(SECURITY_HEADERS['permissions-policy']);
+  });
+});
+
+describe('AI_UNAVAILABLE_MESSAGE (production hardening: no secrets/config leaked to clients)', () => {
+  test('is a non-empty, Polish, user-facing message', () => {
+    assert.ok(AI_UNAVAILABLE_MESSAGE.length > 0);
+    assert.match(AI_UNAVAILABLE_MESSAGE, /Narrator/);
+  });
+
+  test('never names the environment variable or other server configuration details', () => {
+    assert.doesNotMatch(AI_UNAVAILABLE_MESSAGE, /ANTHROPIC_API_KEY/i);
+    assert.doesNotMatch(AI_UNAVAILABLE_MESSAGE, /process\.env/i);
+    assert.doesNotMatch(AI_UNAVAILABLE_MESSAGE, /\.env\b/i);
+    assert.doesNotMatch(AI_UNAVAILABLE_MESSAGE, /restart|zrestartuj/i);
   });
 });
 

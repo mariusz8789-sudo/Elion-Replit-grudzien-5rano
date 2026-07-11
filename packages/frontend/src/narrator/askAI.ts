@@ -52,10 +52,15 @@ export async function askAI(ctx: AskContext, question: string): Promise<AskResul
       return { ok: false, reason: 'rate-limited', message: 'Limit pytań na minutę — odczekaj chwilę.' };
     }
     if (res.status === 503) {
+      // Treść wiadomości pochodzi z backendu (server.mjs handleAsk) — jedno
+      // źródło prawdy, celowo bez nazw zmiennych środowiskowych ani innych
+      // szczegółów konfiguracji serwera, bo trafia do każdego użytkownika,
+      // nie tylko operatora wdrożenia.
+      const data = await res.json().catch(() => null) as { message?: string } | null;
       return {
         ok: false,
         reason: 'no-key',
-        message: 'Backend AI działa, ale nie ma klucza API (ustaw ANTHROPIC_API_KEY i zrestartuj backend).',
+        message: data?.message ?? 'Funkcja „Zapytaj AI" nie jest skonfigurowana w tym wdrożeniu.',
       };
     }
     if (!res.ok) {

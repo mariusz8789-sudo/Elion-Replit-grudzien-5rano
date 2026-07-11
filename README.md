@@ -250,8 +250,13 @@ Uczciwość naukowa dotyczy też tego dokumentu, nie tylko UI:
   kodzie aplikacji. Skrypt jest napisany, ale nieprzetestowany end-to-end
   z tego samego powodu — dokładne pola API do zweryfikowania przy pierwszym
   uruchomieniu, patrz komentarze „DO ZWERYFIKOWANIA" w jego kodzie.
-- **"Zapytaj AI" wymaga `ANTHROPIC_API_KEY`** — bez klucza backend zwraca
-  uczciwy błąd 503 zamiast fałszywej odpowiedzi.
+- **"Zapytaj AI" wymaga `ANTHROPIC_API_KEY`** (patrz `.env.example`) — bez
+  klucza backend zwraca uczciwy błąd 503 zamiast fałszywej odpowiedzi.
+  Komunikat widoczny dla UŻYTKOWNIKA jest celowo ogólny
+  (`packages/backend/src/lib.mjs` → `AI_UNAVAILABLE_MESSAGE`), bez nazwy
+  zmiennej środowiskowej ani innych szczegółów konfiguracji serwera —
+  reszta platformy, w tym Narrator deterministyczny (warstwa 0), działa
+  bez zmian, w pełni offline.
 - **Brak kont, bazy danych i płatności** — świadomie poza zakresem; wzorzec
   rozszerzenia opisany w `ARCHITECTURE.md`.
 

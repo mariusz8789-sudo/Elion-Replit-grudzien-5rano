@@ -49,6 +49,15 @@ registerDataSource<number[] | null>({
   load: () => realMasses,
 });
 
+// Nota uczciwości ODZWIERCIEDLA rzeczywisty stan `realMasses` powyżej — nie
+// jest to hardkodowane "docelowo będzie" tylko opis TEGO, co dzieje się
+// TERAZ w tym wdrożeniu. Jeśli `scripts/fetch-real-data.mjs` kiedyś wczyta
+// prawdziwe dane (plik data/dimuon-real.ts zacznie istnieć), ten sam kod
+// automatycznie przełączy się na drugie zdanie, bez dalszych zmian.
+const dimuonHonestyNote = realMasses
+  ? 'Masy i szerokości rezonansów są prawdziwe (PDG); metoda — histogram masy niezmienniczej par mionów — jest dokładnie tą, którą odkryto J/ψ i Z⁰. Dane zdarzeń w tym wdrożeniu to prawdziwe pomiary CERN Open Data (CMS DoubleMu, licencja CC0), nie symulacja.'
+  : 'Masy i szerokości rezonansów są prawdziwe (PDG); metoda — histogram masy niezmienniczej par mionów — jest dokładnie tą, którą odkryto J/ψ i Z⁰. Dane ZDARZEŃ w tym wdrożeniu są SYNTETYCZNE: generator losuje masy wokół tych rezonansów (rozkład Breit–Wignera) plus tło kombinatoryczne, wzorowane na kształcie widm CMS — to NIE są prawdziwe zderzenia. Punkt podpięcia realnych danych CERN Open Data (CC0, domena publiczna) istnieje w kodzie (`core/dataSource.ts`, `scripts/fetch-real-data.mjs`), ale nie jest dziś aktywny w tym wdrożeniu — sieć budowania nie miała dostępu do opendata.cern.ch (patrz README „Znane ograniczenia").';
+
 class InvMassSim implements Sim {
   private hist = new Float64Array(BINS);
   private total = 0;
@@ -179,8 +188,7 @@ export const particleInvMass: ExperimentDef = {
   id: 'invmass',
   name: 'Odkryj cząstkę',
   honesty: 'educational',
-  honestyNote:
-    'Masy i szerokości rezonansów są prawdziwe (PDG); metoda — histogram masy niezmienniczej par mionów — jest dokładnie tą, którą odkryto J/ψ i Z⁰. Proporcje sygnału do tła są uproszczone; dane syntetyczne wzorowane na widmach CMS. Realne dane CERN Open Data (CC0) — plan Etapu 2.',
+  honestyNote: dimuonHonestyNote,
   params: [
     { key: 'rate', label: 'Zdarzeń na sekundę', type: 'slider', min: 20, max: 600, step: 20, default: 200 },
   ],

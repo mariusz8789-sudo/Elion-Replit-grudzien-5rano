@@ -6,6 +6,84 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-11
+
+Pierwsze wydanie oznaczone jako gotowe produkcyjnie. Wszystko poniżej i we
+wcześniejszych wpisach tego dokumentu składa się na tę wersję — 13
+laboratoriów, dwuwarstwowy Narrator AI, Discovery Timeline, Quantum
+Decision Explorer, pełna dostępność i PWA offline, oraz finalny przebieg
+domykający ("release-candidate gap closure"): replay wprowadzenia z
+Ustawień, utwardzenie konfiguracji Narratora AI w produkcji, jawniejsze
+rozróżnienie realnych wzorów od syntetycznych danych w Particle Lab,
+i utwardzenie inicjalizacji Web Audio pod Safari/iOS.
+
+### Poprawiono (Domknięcie luk v1.0 — replay wprowadzenia, wersjonowanie, utwardzenie AI/audio, przejrzystość Particle Lab)
+- **Replay wprowadzenia z Ustawień** — nowa sekcja „Wprowadzenie" w
+  `SettingsScreen` (przycisk „🔁 Pokaż wprowadzenie ponownie") woła
+  dokładnie ten sam `OnboardingOverlay` co pierwsze uruchomienie (`App.tsx`
+  przekazuje `onReplayOnboarding` do istniejącego stanu `onboardingOpen` —
+  zero duplikacji logiki). Ukończenie/pominięcie powtórki działa tak samo
+  jak za pierwszym razem i NIE narusza trwałości `onboarding/v1` — po
+  odświeżeniu strony nakładka nie wraca automatycznie.
+- **Formalne wersjonowanie 1.0.0** — `package.json` (root, backend,
+  frontend — ujednolicone; frontend miał wcześniej rozjazd 0.1.0 vs 0.2.0
+  reszty monorepo), fallback wersji w `server.mjs`, `package-lock.json`
+  przebudowany (`npm install --package-lock-only`). `CHANGELOG.md`:
+  `[Unreleased]` zamknięte jako `[1.0.0] - 2026-07-11`, nowa pusta sekcja
+  `[Unreleased]` otwarta nad nią. Historyczne raporty (`RAPORT-AUDYT.md`
+  i inne) celowo NIE zmienione — opisują stan w chwili ich powstania.
+- **Utwardzenie konfiguracji Narratora AI w produkcji** — komunikat 503
+  „brak klucza" (`handleAsk` w `server.mjs`) wcześniej wprost wymieniał
+  nazwę zmiennej środowiskowej (`ANTHROPIC_API_KEY`) w odpowiedzi HTTP
+  trafiającej do KAŻDEGO klienta. Wydzielony do jednego źródła prawdy —
+  `AI_UNAVAILABLE_MESSAGE` w `lib.mjs` — celowo bez nazw zmiennych
+  środowiskowych ani innych szczegółów konfiguracji serwera; frontend
+  (`narrator/askAI.ts`) teraz odczytuje ten komunikat z odpowiedzi
+  backendu zamiast trzymać własną, osobno dryfującą kopię. Dokładny
+  wymagany klucz pozostaje udokumentowany dla operatorów w
+  `.env.example`/`README.md` „Znane ograniczenia". Błąd górnego poziomu
+  (`catch` przy wywołaniu Anthropic SDK) już wcześniej nie ujawniał
+  `err.message`/`err.status` klientowi — bez zmian, zweryfikowane.
+- **Particle Lab — przejrzystość naukowa** — dwie nieaktualne/mylące
+  notatki naprawione: (1) `honestyNote` eksperymentu „Odkryj cząstkę"
+  była statycznym tekstem niezależnym od faktycznego stanu źródła danych
+  (`core/dataSource.ts` → `isSynthetic`) i obiecywała nieistniejący „plan
+  Etapu 2"; zamieniona na `dimuonHonestyNote`, obliczaną z TEGO SAMEGO
+  `realMasses`, które steruje `isSynthetic` — jeśli kiedyś pojawią się
+  prawdziwe dane CERN Open Data, nota automatycznie się zmieni, bez
+  ręcznej synchronizacji dwóch miejsc. (2) Blok narracji „Czego tu jeszcze
+  nie ma" w bazowym eksperymencie Detektor twierdził, że histogram masy
+  niezmienniczej to niezrealizowany „Etap 1" — mimo że dokładnie ta
+  funkcja istnieje od dawna jako sąsiednia zakładka „Odkryj cząstkę".
+  Poprawiony, żeby wskazywał na nią zamiast fałszywie sugerować brak.
+- **Utwardzenie Web Audio pod Safari/iOS** — `AudioContext` utworzony
+  poza wywołaniem zainicjowanym gestem użytkownika startuje w Safari (i
+  pod politykami autoplay Chromium) jako `'suspended'` i nigdy się sam nie
+  wznawia; `currentTime` stoi w miejscu, dopóki `resume()` się nie
+  rozstrzygnie. `core/sound.ts` wcześniej wywoływał `resume()` bez
+  czekania na jego rozstrzygnięcie i od razu planował dźwięk względem
+  zamrożonego zegara — na strefach z `suspended` dźwięk cicho przepadał.
+  `tone()` teraz czeka na rozstrzygnięcie `resume()` przed odczytaniem
+  `currentTime` i zaplanowaniem węzłów; przy odmowie wznowienia (brak
+  gestu) cicho nic nie robi, bez wyjątku. Nie zweryfikowano na prawdziwym
+  urządzeniu Safari/iOS — poprawka wynika z udokumentowanego zachowania
+  Web Audio API, nie z testu na realnym sprzęcie.
+- 26 nowych/rozszerzonych testów: `askAI.test.ts` (7 — kontrakt HTTP
+  klienta AI, w tym „nigdy nie pokazuje ANTHROPIC_API_KEY"),
+  `particleInvMass.test.ts` (4 — spójność `honestyNote` ↔ `isSynthetic`,
+  brak przestarzałych obietnic), `lib.test.mjs` (+2 —
+  `AI_UNAVAILABLE_MESSAGE` nie ujawnia nazwy zmiennej środowiskowej),
+  `sound.test.ts` (+3 — kontekst `suspended`: oczekiwanie na `resume()`,
+  cicha porażka bez gestu użytkownika, jeden kontekst reużywany między
+  wywołaniami). 422 testy frontendowe, 30 backendowe (452 razem).
+- Zweryfikowane: typecheck, lint, pełny pakiet testów (frontend+backend),
+  build, oraz Playwright — pełny przepływ pierwszego uruchomienia, replay
+  wprowadzenia z Ustawień (mobile i desktop), stan „AI niedostępne" w
+  prawdziwym UI Narratora (potwierdzone: komunikat nie zawiera
+  `ANTHROPIC_API_KEY`), zaktualizowana treść Particle Lab w obu
+  zakładkach, oraz pełny zamiatający przebieg 13 laboratoriów + 7 ekranów
+  pomocniczych na mobile i desktop — zero błędów konsoli, zero regresji.
+
 ### Dodano (Wprowadzenie przy pierwszym uruchomieniu + dźwięk UI + podpowiedź przewijania zakładek)
 - `OnboardingOverlay` (`components/OnboardingOverlay.tsx` + `core/onboarding.ts`):
   4-krokowe, interaktywne wprowadzenie — WITAJ (czym jest Genesis OS) →

@@ -23,7 +23,7 @@ const EVENT_LABELS: Record<AnalyticsEvent, string> = {
  * aktywność (podgląd analytics.ts — celowo przezroczysty, użytkownik widzi
  * dokładnie to, co jest zliczane) i skróty klawiszowe (dokumentacja).
  */
-export function SettingsScreen() {
+export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding?: () => void }) {
   const [settings, updateSettings] = useSettings();
   const [counters, setCounters] = useState(getCounters);
   const [logSummary, setLogSummary] = useState(() => ({
@@ -145,6 +145,17 @@ export function SettingsScreen() {
         </div>
         <button className="chip-btn" onClick={handleClearAnalytics}>Wyczyść statystykę aktywności</button>
       </section>
+
+      {onReplayOnboarding && (
+        <section className="settings-section">
+          <h2>Wprowadzenie</h2>
+          <p className="settings-hint">
+            Krótkie, interaktywne wprowadzenie pokazywane automatycznie przy pierwszym uruchomieniu. Możesz je
+            obejrzeć ponownie w każdej chwili — nie wpływa to na Twój zapisany postęp.
+          </p>
+          <button className="chip-btn" onClick={onReplayOnboarding}>🔁 Pokaż wprowadzenie ponownie</button>
+        </section>
+      )}
 
       <section className="settings-section">
         <h2>Skróty klawiszowe</h2>

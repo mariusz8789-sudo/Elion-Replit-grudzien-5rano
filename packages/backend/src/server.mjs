@@ -33,6 +33,7 @@ import {
   SECURITY_HEADERS,
   buildKnowledgeIndex,
   knowledgeExcerptFor,
+  AI_UNAVAILABLE_MESSAGE,
 } from './lib.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -44,7 +45,7 @@ const STATIC_DIR = path.resolve(
 const KNOWLEDGE_DIR = path.resolve(
   process.env.GENESIS_KNOWLEDGE_DIR ?? path.join(__dirname, '../../../knowledge'),
 );
-const VERSION = process.env.npm_package_version ?? '0.2.0';
+const VERSION = process.env.npm_package_version ?? '1.0.0';
 const startedAt = Date.now();
 
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
@@ -84,10 +85,7 @@ function json(res, status, body) {
 /* ---------------- API: /api/ask ---------------- */
 async function handleAsk(req, res) {
   if (!hasKey) {
-    return json(res, 503, {
-      error: 'ai_unavailable',
-      message: 'Backend działa, ale ANTHROPIC_API_KEY nie jest ustawiony.',
-    });
+    return json(res, 503, { error: 'ai_unavailable', message: AI_UNAVAILABLE_MESSAGE });
   }
   const ip = req.socket.remoteAddress ?? 'unknown';
   if (!limiter.allow(ip)) {

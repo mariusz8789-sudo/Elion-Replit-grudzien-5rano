@@ -579,6 +579,59 @@ zaplanowano). Dwa tryby:
 - ✅ (częściowo) Ewolucja Wszechświata — Universe Lab; kosmiczna oś czasu
   (patrz Cosmology wyżej) dopełniłaby to od strony chronologicznej.
 
+## Genesis OS 2.0 — Collaborative Science (flagowa funkcja przyszłości)
+
+**NIE BUDOWAĆ TERAZ.** Ten rozdział to świadomie odległy punkt na mapie
+drogowej, nie zadanie do podjęcia. Warunek wstępny jest twardy: Genesis OS
+v1.0 musi być najpierw w pełni ukończony, dopracowany, przetestowany,
+zoptymalizowany, udokumentowany i gotowy produkcyjnie na światowym
+poziomie. Dopóki v1.0 nie osiągnie tej jakości, cały wysiłek inżynierski
+zostaje przy dopracowywaniu, optymalizacji, stabilności, wydajności,
+użyteczności, testach, dokumentacji i ogólnym doświadczeniu użytkownika —
+**jakość światowej klasy jest warunkiem ekspansji platformy, nie
+odwrotnie.**
+
+Po spełnieniu tego warunku, Collaborative Science ma stać się jedną z
+definiujących, flagowych funkcji Genesis OS 2.0: wielu użytkowników
+wchodzi jednocześnie do tego samego laboratorium naukowego w czasie
+rzeczywistym. W pokoju mogą:
+- wspólnie uruchamiać symulacje,
+- wspólnie zmieniać parametry,
+- jednocześnie obserwować wyniki,
+- budować hipotezy,
+- porównywać teorie,
+- zapisywać historię eksperymentu,
+- odtwarzać eksperymenty,
+- publikować odkrycia,
+- klonować i ulepszać publiczne eksperymenty innych.
+
+AI Mentor w tym trybie przestaje być tylko narratorem i staje się aktywnym
+naukowym współpracownikiem: wyjaśnia obserwacje, wykrywa błędy, sugeruje
+nowe eksperymenty, rekomenduje powiązane laboratoria, proponuje nowe
+hipotezy i łączy odkrycia między różnymi dziedzinami nauki.
+
+Możliwe rozszerzenia w dalszej przyszłości (jeszcze dalej niż sama
+funkcja bazowa): współpraca głosowa, tablice naukowe (whiteboards),
+równania LaTeX, tryb klasowy (classroom mode), tryb badacza (researcher
+mode), publiczny marketplace eksperymentów, odkrycia społeczności,
+historia wersji eksperymentu.
+
+**Wymaganie architektoniczne na przyszłość** (obowiązuje dopiero w
+momencie, gdy implementacja faktycznie się zacznie — nie projektować
+szczegółowo wcześniej): fundament musi być od początku modularny,
+rozproszony i cloud-native, tak żeby docelowo — bez przeprojektowywania
+architektury — dało się obsłużyć tysiące jednoczesnych użytkowników i
+tysiące równoległych pokoi kolaboracyjnych, synchronizację w czasie
+rzeczywistym, kolaborację wspomaganą AI, trwałą historię eksperymentów,
+skalowanie horyzontalne, przyszłe klienty mobilne i desktopowe, publiczne
+API oraz wdrożenia enterprise, edukacyjne i badawcze — przy zachowaniu
+tej samej wydajności, responsywności i jakości doświadczenia użytkownika
+niezależnie od skali. Fundamentem, od którego to wszystko zależy, jest
+warstwa kont i bazy danych opisana w `ARCHITECTURE.md` „Przyszły backend
+— punkty rozszerzenia" — dziś świadomie nieistniejąca; warstwa
+realtime/WebSocket dla współdzielonych pokoi nadbudowuje się nad nią, nie
+odwrotnie.
+
 ## Creator Platform / Marketplace / Founder Mode
 
 Wszystko poniżej wymaga kont i bazy danych — fundamentu opisanego w
@@ -615,9 +668,10 @@ Wszystko poniżej wymaga kont i bazy danych — fundamentu opisanego w
   `WebGLRenderer`, nie wymaga nowej architektury symulacji) — ale realna
   implementacja wymaga sprzętu do weryfikacji, nie tylko kodu za biurkiem.
 - **AI Agents / AI Professor** — patrz `ARCHITECTURE.md` „Wizja platformy".
-- **Wielu użytkowników jednocześnie / wspólne laboratoria** — wymaga
-  WebSocket/realtime warstwy nad przyszłym backendem; nie projektować
-  szczegółowo, dopóki nie istnieje warstwa kont.
+- **Wielu użytkowników jednocześnie / wspólne laboratoria** — patrz
+  „Genesis OS 2.0 — Collaborative Science" wyżej: pełna specyfikacja
+  funkcji i wymagań architektonicznych, świadomie odłożona do czasu, gdy
+  v1.0 osiągnie jakość światowej klasy.
 - **Integracje z publicznymi bazami danych naukowych** — `core/dataSource.ts`
   już jest dokładnie tym punktem podpięcia (patrz `scripts/fetch-real-data.mjs`
   dla JPL/Gaia/CERN); rozszerzenie na PubChem/CCCBDB (chemia) czy GWOSC

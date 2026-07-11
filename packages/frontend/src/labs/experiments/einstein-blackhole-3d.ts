@@ -349,9 +349,13 @@ class BlackHole3DSim implements Sim3D {
     bg.add(new three.Points(this.coronaGeo, this.coronaMat));
     this.disposables.push(this.coronaGeo, this.coronaMat);
 
-    // Kamera bliżej niż poprzednia wersja — horyzont ma od razu dominować
-    // kadr, nie pływać w pustce (patrz audyt: "mała wyspa symulacji").
-    camera.position.set(this.RS * 9.5, this.RS * 5.6, this.RS * 12.4);
+    // Kamera znacznie bliżej niż poprzednia wersja (założycielski audyt:
+    // "framing" jako słabość — horyzont zajmował tylko ułamek kadru mimo
+    // wcześniejszego przybliżenia). Bez zmiany fizyki: r_s pozostaje
+    // jedyną skalą sceny, więc horyzont/dysk/pierścień fotonowy nadal
+    // skalują się jednorodnie z suwakiem masy — zmienia się tylko dystans
+    // obserwatora względem tej skali.
+    camera.position.set(this.RS * 5.2, this.RS * 3.1, this.RS * 6.8);
     camera.lookAt(0, 0, 0);
     if (!reduced) camera.fov = 86;
     camera.updateProjectionMatrix();

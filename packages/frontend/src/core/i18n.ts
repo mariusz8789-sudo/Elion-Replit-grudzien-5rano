@@ -21,6 +21,7 @@ const pl: Dictionary = {
   'nav.glossary': 'Słowniczek',
   'nav.settings': 'Ustawienia',
   'nav.whatIf': 'Co by było, gdyby?',
+  'nav.decisionExplorer': 'Decision Explorer',
   'skipLink': 'Przejdź do treści',
 };
 

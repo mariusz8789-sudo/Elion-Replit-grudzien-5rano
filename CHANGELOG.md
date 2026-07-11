@@ -6,6 +6,47 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Poprawiono (Pierwsze 2 minuty — hierarchia ekranu głównego + audyt UX 13 laboratoriów)
+- Ekran główny miał dwie równorzędne wizualnie karty CTA (Discovery Timeline
+  i Quantum Decision Explorer) — nowy użytkownik musiał wybierać między
+  "flagową podróżą naukową" a "narzędziem refleksyjnym nad własnymi
+  decyzjami życiowymi", co rozmywało pierwsze wrażenie "czym jest ta
+  aplikacja". Discovery Timeline zostaje jedynym, jednoznacznym CTA
+  (etykieta „ZACZNIJ TUTAJ", odrobinę większa karta), Quantum Decision
+  Explorer zjechał do rzędu nawigacji jako `.qde-nav-btn` — wciąż dostępny
+  o jedno kliknięcie dalej, ale nie konkuruje o pierwszą uwagę. Efekt
+  uboczny: na desktopie cały pierwszy ekran (podróż przez skale + CTA +
+  nawigacja + pasek statusu + siatka 13 laboratoriów) mieści się teraz bez
+  przewijania w jednym widoku 1280×900.
+- Playwright audyt wszystkich 13 laboratoriów (mobile 390×844 i wybrane
+  widoki desktop 1280×900) wykrył i naprawiono 4 konkretne usterki:
+  1. Quantum Decision Explorer: etykieta aktywnego węzła rysowana na
+     canvasie nakładała się na nagłówek `<h2>` tej samej treści — usunięto
+     zbędne powtórzenie (nazwa już jest w nagłówku), etykiety odgałęzień
+     dostały clamp do granic canvasu (długie teksty przy skrajnych kątach
+     wcześniej wychodziły poza prawą krawędź).
+  2. Quantum Lab → Tunelowanie: odczyt „przeszło/odbite %" rysowany w
+     górnym prawym rogu canvasu chował się częściowo pod przyciskami
+     „Od nowa"/„Pauza" (`.sim-actions`, ta sama pozycja). Przeniesiony do
+     dolnego prawego rogu, wyrównany do prawej.
+  3. Universe Lab → Ekspansja: chmura galaktyk skalowała się WYŁĄCZNIE
+     z `Math.min(w, h)`, a `.sim-stage` ma stałą wysokość (44vh) niezależną
+     od szerokości ekranu — na szerokim desktopie dawało to tę samą, małą
+     chmurę co na wąskim telefonie, otoczoną ogromnym pustym marginesem.
+     Baza skali liczona teraz z szerokości I wysokości osobno
+     (`Math.min(w * 0.42, h * 0.85)`), mobile bez zmian, desktop ~2×
+     większa, poprawnie wypełniona chmura.
+  4. Trzy laboratoria (Atom, Civilization, AI Discovery) miały tagline w
+     nagłówku ucinany w środku słowa przez jednoliniowy `text-overflow:
+     ellipsis` na wąskich telefonach. `.topbar .tagline` zawija się teraz
+     na 2 linie (`-webkit-line-clamp: 2`) zamiast tracić treść.
+- Naprawiono `user-scalable=no` w `index.html` (blokował pinch-zoom,
+  naruszenie WCAG 1.4.4 mimo istniejącego zaangażowania platformy w
+  dostępność) — zastąpione `maximum-scale=5`.
+- Zweryfikowane: typecheck, lint, 396 testów frontendowych (424 z
+  backendem), build, wizualnie przez Playwright (mobile + desktop, przed/po
+  każdej poprawce) — zero regresji, zero nowych błędów konsoli.
+
 ### Dodano (Mathematics Lab, 13. laboratorium — bezpieczna piaskownica równań)
 - Nowy moduł `core/mathExpr.ts`: parser wyrażeń matematycznych CELOWO
   bez `eval()`/`Function()` — tokenizer → parser rekurencyjnego

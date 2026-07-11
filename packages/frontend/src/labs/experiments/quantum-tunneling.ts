@@ -241,10 +241,15 @@ class TunnelingSim implements Sim {
       ctx.fill();
     }
 
+    // Odczyt w dolnym prawym rogu, nie górnym — górny prawy róg zajmuje
+    // nakładka HTML z przyciskami „Od nowa"/„Pauza" (.sim-actions), która
+    // wcześniej zasłaniała ten tekst.
     ctx.fillStyle = 'rgba(230,234,245,0.75)';
     ctx.font = '11px ui-monospace, monospace';
-    ctx.fillText(`przeszło: ${(this.trans * 100).toFixed(1)}%`, w - 130, 18);
-    ctx.fillText(`odbite:  ${(this.refl * 100).toFixed(1)}%`, w - 130, 33);
+    ctx.textAlign = 'right';
+    ctx.fillText(`przeszło: ${(this.trans * 100).toFixed(1)}%`, w - 8, h - 23);
+    ctx.fillText(`odbite:  ${(this.refl * 100).toFixed(1)}%`, w - 8, h - 8);
+    ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(141,151,180,0.7)';
     ctx.font = '9px system-ui';
     ctx.fillText('kolor = faza ψ (realna dana symulacji)', 8, h - 8);

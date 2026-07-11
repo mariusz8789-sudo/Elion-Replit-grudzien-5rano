@@ -213,25 +213,21 @@ export default function App() {
           <span className="hud-corner hud-bl" aria-hidden="true" />
           <span className="hud-corner hud-br" aria-hidden="true" />
         </div>
-        <button className="timeline-cta" onClick={() => { window.location.hash = '#/timeline'; }}>
+        <div className="section-label">Zacznij tutaj</div>
+        <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/timeline'; }}>
           <span className="timeline-cta-icon" aria-hidden="true">🌌</span>
           <span className="timeline-cta-text">
             <span className="timeline-cta-title">Discovery Timeline</span>
-            <span className="timeline-cta-sub">Wielki Wybuch → daleka przyszłość. Jedna ciągła podróż, bez ekranów ładowania.</span>
-          </span>
-          <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-        </button>
-        <button className="timeline-cta qde-cta" onClick={() => { window.location.hash = '#/decision-explorer'; }}>
-          <span className="timeline-cta-icon" aria-hidden="true">🌠</span>
-          <span className="timeline-cta-text">
-            <span className="timeline-cta-title">Quantum Decision Explorer</span>
-            <span className="timeline-cta-sub">Twoje decyzje jako galaktyka gwiazd. Narzędzie refleksyjne, nie przewidywanie przyszłości.</span>
+            <span className="timeline-cta-sub">Wielki Wybuch → daleka przyszłość. Jedna ciągła podróż z Narratorem AI, bez ekranów ładowania.</span>
           </span>
           <span className="timeline-cta-arrow" aria-hidden="true">→</span>
         </button>
         <nav className="home-nav" aria-label="Nawigacja Genesis OS">
           <button className="whatif-nav-btn" onClick={() => { window.location.hash = '#/what-if'; }}>
             <span aria-hidden="true">🌀</span> {t('nav.whatIf')}
+          </button>
+          <button className="qde-nav-btn" onClick={() => { window.location.hash = '#/decision-explorer'; }}>
+            <span aria-hidden="true">🌠</span> {t('nav.decisionExplorer')}
           </button>
           <button onClick={() => setSearchOpen(true)}>
             <span aria-hidden="true">🔍</span> {t('nav.search')}

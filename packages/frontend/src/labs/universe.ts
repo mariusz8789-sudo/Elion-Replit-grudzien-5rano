@@ -75,7 +75,14 @@ class UniverseSim implements Sim {
     ctx.fillRect(0, 0, w, h);
     // Kamera oddala się częściowo, gdy ekspansja przerasta ekran — ekspansja
     // pozostaje widoczna, ale galaktyki nie znikają (audyt Etapu 0, pkt 2)
-    const K = (Math.min(w, h) * 0.48) / Math.max(1, Math.pow(this.a / 1.1, 0.7));
+    // Baza skali liczona z szerokości I wysokości osobno (nie z samego
+    // min(w,h)) — .sim-stage ma stałą wysokość (44vh) niezależnie od
+    // szerokości ekranu, więc czysty min(w,h) dawał tę samą, małą chmurę
+    // galaktyk na szerokim desktopie co na wąskim telefonie. Galaktyki poza
+    // ramką i tak są pomijane (warunek px/py niżej), więc bezpiecznie można
+    // pozwolić chmurze wypełnić więcej dostępnej wysokości.
+    const base = Math.min(w * 0.42, h * 0.85);
+    const K = base / Math.max(1, Math.pow(this.a / 1.1, 0.7));
     for (const g of this.galaxies) {
       const px = cx + g.x * this.a * K;
       const py = cy + g.y * this.a * K;

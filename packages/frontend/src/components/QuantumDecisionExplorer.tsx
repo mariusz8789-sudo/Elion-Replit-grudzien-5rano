@@ -241,18 +241,28 @@ export function QuantumDecisionExplorer() {
 
             ctx.fillStyle = 'rgba(230,234,245,0.7)';
             ctx.font = '9px system-ui';
-            ctx.textAlign = Math.cos(bAngle) >= 0 ? 'left' : 'right';
+            const alignLeft = Math.cos(bAngle) >= 0;
+            ctx.textAlign = alignLeft ? 'left' : 'right';
             const label = branch.text.length > 30 ? `${branch.text.slice(0, 30)}…` : branch.text;
-            ctx.fillText(label, ex + (Math.cos(bAngle) >= 0 ? 5 : -5), ey - 6);
+            const labelWidth = ctx.measureText(label).width;
+            let tx = ex + (alignLeft ? 5 : -5);
+            // Trzyma etykietę odgałęzienia w granicach canvasu — bez tego długie
+            // teksty przy skrajnych kątach wypadają poza prawą/lewą krawędź.
+            tx = alignLeft ? Math.min(tx, w - 4 - labelWidth) : Math.max(tx, 4 + labelWidth);
+            ctx.fillText(label, tx, ey - 6);
           });
           ctx.textAlign = 'left';
         }
 
-        if (list.length <= 12 || isActive) {
-          ctx.fillStyle = isActive ? 'rgba(240,179,92,0.9)' : 'rgba(230,234,245,0.5)';
-          ctx.font = isActive ? '600 11px system-ui' : '9px system-ui';
+        // Etykieta aktywnej gwiazdy NIE jest tu rysowana — nazwa aktywnej
+        // decyzji jest już widoczna w <h2> nad canvasem (hero-overlay);
+        // powtórzenie jej na pozycji węzła nakładało się wizualnie na ten
+        // nagłówek, gdy węzeł wypadał blisko górnej krawędzi.
+        if (!isActive && list.length <= 12) {
+          ctx.fillStyle = 'rgba(230,234,245,0.5)';
+          ctx.font = '9px system-ui';
           ctx.textAlign = 'center';
-          ctx.fillText(p.d.label, p.x, p.y - glowR * (isActive ? 1.4 : 1) - 8);
+          ctx.fillText(p.d.label, p.x, p.y - glowR - 8);
           ctx.textAlign = 'left';
         }
       });

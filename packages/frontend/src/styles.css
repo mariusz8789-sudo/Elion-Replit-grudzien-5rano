@@ -107,7 +107,11 @@ button:disabled { cursor: default; }
 }
 .topbar .tagline {
   font-size: 0.72rem; color: var(--text-dim); margin: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* Zawija na 2. linię zamiast ucinać w środku słowa — kilka dłuższych
+     tagline'ów (np. Atom, Civilization, AI Discovery) nie mieściło się
+     w jednej linii na wąskich telefonach. */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .brand {
   font-family: var(--font-mono);
@@ -778,12 +782,23 @@ kbd {
 .timeline-cta-title { font-weight: 700; font-size: 0.95rem; color: var(--text); }
 .timeline-cta-sub { font-size: 0.74rem; color: var(--text-dim); line-height: 1.4; }
 .timeline-cta-arrow { color: var(--violet); font-size: 1.1rem; }
-.qde-cta {
-  background: linear-gradient(135deg, rgba(240, 179, 92, 0.14), rgba(167, 139, 250, 0.1));
-  border-color: rgba(240, 179, 92, 0.4);
+/* Jedyne, jednoznaczne CTA na stronie głównej (patrz "Zacznij tutaj" nad
+   nim) — odrobinę większe niż zwykły `.timeline-cta`, żeby nowy użytkownik
+   nie musiał wybierać między dwoma równorzędnymi kartami. Quantum Decision
+   Explorer (narzędzie refleksyjne, nie nauka) zjechał do `.qde-nav-btn`
+   w rzędzie nawigacji — dostępny, ale nie konkuruje o pierwszą uwagę. */
+.timeline-cta-primary {
+  padding: 1.1rem 1.15rem;
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.15), 0 16px 32px -20px rgba(167, 139, 250, 0.5);
 }
-.qde-cta:hover { border-color: var(--gold); }
-.qde-cta .timeline-cta-arrow { color: var(--gold); }
+.timeline-cta-primary .timeline-cta-icon { font-size: 1.9rem; }
+.timeline-cta-primary .timeline-cta-title { font-size: 1.05rem; }
+.qde-nav-btn {
+  color: var(--gold) !important;
+  border-color: rgba(240, 179, 92, 0.4) !important;
+  background: rgba(240, 179, 92, 0.08) !important;
+}
+.qde-nav-btn:hover { border-color: var(--gold) !important; }
 
 /* ---------- Quantum Decision Explorer ---------- */
 .qde-view { display: flex; flex-direction: column; }

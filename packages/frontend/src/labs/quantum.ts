@@ -1,6 +1,6 @@
 import type { LabDefinition, Sim, SimParams } from '../core/types';
 import { quantumTunneling } from './experiments/quantum-tunneling';
-import { quantumBloch } from './experiments/quantum-bloch';
+import { quantumBloch } from './experiments/quantum-bloch-3d';
 import { quantumChsh } from './experiments/quantum-chsh';
 import { quantumTeleport } from './experiments/quantum-teleport';
 

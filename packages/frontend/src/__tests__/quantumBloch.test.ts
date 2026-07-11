@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyCircuit, applyGate, GATES, quantumBloch, type C } from '../labs/experiments/quantum-bloch';
+import { applyCircuit, applyGate, blochVector, GATE_ROTATIONS, GATES, rotateVector, type C } from '../labs/experiments/quantum-bloch';
+import { quantumBloch } from '../labs/experiments/quantum-bloch-3d';
 
 const ZERO: [C, C] = [[1, 0], [0, 0]];
 
@@ -58,6 +59,48 @@ describe('bramki kwantowe (macierze unitarne dokładne)', () => {
   it('nieznana bramka jest ignorowana (stan bez zmian)', () => {
     const state = applyGate(ZERO, 'CNOT');
     expect(state).toEqual(ZERO);
+  });
+});
+
+describe('GATE_ROTATIONS ↔ applyGate (SU(2)→SO(3), sfera Blocha w 3D)', () => {
+  // Stany normalizowane |a|²+|b|²=1, nie tylko baza obliczeniowa — obrót
+  // musi zgadzać się z macierzą dla KAŻDEGO stanu, nie tylko |0⟩.
+  const testStates: [C, C][] = [
+    [[1, 0], [0, 0]],
+    [[0, 0], [1, 0]],
+    [[1 / Math.SQRT2, 0], [1 / Math.SQRT2, 0]],
+    [[0.6, 0.2], [Math.sqrt(0.6), 0]],
+    [[0.3, -0.4], [0.5, Math.sqrt(1 - 0.09 - 0.16 - 0.25)]],
+  ];
+
+  it('obrót wektora Blocha o tabelaryczną oś/kąt daje DOKŁADNIE ten sam stan co zastosowanie macierzy bramki', () => {
+    for (const gate of Object.keys(GATE_ROTATIONS)) {
+      const { axis, angleRad } = GATE_ROTATIONS[gate];
+      for (const state of testStates) {
+        const before = blochVector(state[0], state[1]);
+        const afterState = applyGate(state, gate);
+        const afterExpected = blochVector(afterState[0], afterState[1]);
+        const afterRotated = rotateVector(before, axis, angleRad);
+        expect(afterRotated[0]).toBeCloseTo(afterExpected[0], 6);
+        expect(afterRotated[1]).toBeCloseTo(afterExpected[1], 6);
+        expect(afterRotated[2]).toBeCloseTo(afterExpected[2], 6);
+      }
+    }
+  });
+
+  it('blochVector zwraca wektor jednostkowy dla stanu czystego', () => {
+    for (const state of testStates) {
+      const [x, y, z] = blochVector(state[0], state[1]);
+      expect(x * x + y * y + z * z).toBeCloseTo(1, 9);
+    }
+  });
+
+  it('rotateVector zachowuje długość wektora (obrót jest izometrią)', () => {
+    const v: [number, number, number] = [0.4, -0.3, Math.sqrt(1 - 0.16 - 0.09)];
+    const rotated = rotateVector(v, [0, 1, 0], 1.234);
+    const lenBefore = Math.hypot(...v);
+    const lenAfter = Math.hypot(...rotated);
+    expect(lenAfter).toBeCloseTo(lenBefore, 9);
   });
 });
 

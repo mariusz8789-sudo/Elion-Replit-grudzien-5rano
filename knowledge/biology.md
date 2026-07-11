@@ -2,8 +2,8 @@
 
 ## Zakres
 Pierwsze laboratorium Genesis OS spoza fizyki. Błona komórkowa i
-transport, struktura podwójnej helisy DNA. Fałdowanie białek, pochodzenie
-życia — poza obecnym zakresem, patrz VISION-BACKLOG.md.
+transport, struktura podwójnej helisy DNA, fałdowanie białek (model HP).
+Pochodzenie życia — poza obecnym zakresem, patrz VISION-BACKLOG.md.
 
 ## Modele i wzory
 
@@ -49,16 +49,29 @@ Dokładniejsza metoda (najbliższy sąsiad, nearest-neighbor) wymaga tablic
 termodynamicznych dla wszystkich 10 możliwych par sąsiadujących zasad —
 świadomie pominięta.
 
-## Sprzeczne teorie / otwarte spory
+**Fałdowanie białek — model HP (zaimplementowane)** ★★★ jako model dydaktyczny, ★★★★★ jako matematyka
+Model HP (Hydrophobic–Polar: Dill 1985, Biochemistry 24, 1501; Lau & Dill
+1989, Macromolecules 22, 3986) — JAWNIE uproszczony: 20 rodzajów
+aminokwasów zredukowane do dwóch (H/P), geometria 3D zredukowana do
+samounikającego spaceru na siatce kwadratowej 2D, energia = −1 za każdy
+kontakt H–H nienależący do szkieletu łańcucha (dokładny wzór Lau & Dill,
+nie przybliżenie). Symulacja Monte Carlo — algorytm Metropolisa (ta sama
+metoda co model Isinga w Chemistry Lab), ruchy końca łańcucha i
+narożnikowe (`core/proteinFolding.ts`). To NIE przewidywanie struktury
+prawdziwego białka (do tego służy AlphaFold — uczenie maszynowe na
+milionach zmierzonych struktur, nie fizyka analityczna) — model bada
+WYŁĄCZNIE zasadę zapadania hydrofobowego (hydrofobowe reszty chowają się
+przed wodą, tworząc zwarty rdzeń), jedną z wielu sił kształtujących
+prawdziwe struktury (brak wiązań wodorowych, mostków disiarczkowych,
+elektrostatyki, solwatacji). Znajdowanie GLOBALNEGO minimum energii w
+tym modelu jest udowodnione NP-trudne (Crescenzi i in. 1998, "On the
+complexity of protein folding") — symulacja może utknąć w minimum
+lokalnym, tak jak prawdziwe białka czasem błędnie się fałdują (choroby
+konformacyjne, np. prionowe). Zweryfikowane ręcznie przed testami:
+konformacja typu spinki do włosów (hairpin) na 6 resztach ma dokładnie 2
+geometryczne kontakty — energia zależy od tego, ile z nich to H–H.
 
-**Fałdowanie białek** ★★★ (aktywny obszar badań)
-AlphaFold (DeepMind) to uczenie maszynowe, nie fizyka analityczna z
-pierwszych zasad — problem fałdowania białek z samej sekwencji wciąż nie
-ma pełnego rozwiązania analitycznego (paradoks Levinthala: przestrzeń
-konformacyjna jest zbyt wielka na przeszukanie brute-force, a mimo to
-białka fałdują się w milisekundy–sekundy). Ewentualny przyszły model w
-Genesis OS musiałby być jawnie dydaktyczny (np. uproszczony model
-sieciowy HP — hydrofobowy/polarny), nie prawdziwą symulacją fałdowania.
+## Sprzeczne teorie / otwarte spory
 
 **Pochodzenie życia (abiogeneza)** ★★ (wysoka niepewność)
 Konkurencyjne hipotezy (świat RNA, kominy hydrotermalne, panspermia) —
@@ -73,6 +86,9 @@ symulacją "jak powstało życie" (nikt tego nie wie z pewnością).
 - Skou 1957, Biochim. Biophys. Acta 23, 394 (odkrycie Na⁺/K⁺-ATPazy);
   Nagroda Nobla w dziedzinie chemii 1997
 - Wallace i in. 1979, Nucleic Acids Res. 6, 3543 (reguła "2+4" Tm)
+- Dill 1985, Biochemistry 24, 1501; Lau & Dill 1989, Macromolecules 22,
+  3986 (model HP); Crescenzi i in. 1998 (NP-trudność modelu HP)
+- Metropolis i in. 1953, J. Chem. Phys. 21, 1087 (algorytm Metropolisa)
 - Podręcznik: Alberts i in., *Molecular Biology of the Cell* (standardowy
   podręcznik akademicki, rozdziały o błonie komórkowej i DNA)
 
@@ -83,6 +99,10 @@ symulacją "jak powstało życie" (nikt tego nie wie z pewnością).
   Z-DNA (rzadsze, inne warunki) świadomie pominięte
 - Sekwencje ograniczone do 20 par zasad — dłuższe wymagałyby metody
   najbliższego sąsiada zamiast reguły Wallace'a dla realistycznej Tm
+- Model HP: siatka 2D (nie 3D — realne białka fałdują się w przestrzeni
+  3D), tylko ruchy końca/narożnika (nie pełny, bardziej wydajny zestaw
+  ruchów "pull moves" używany w poważniejszych badaniach) — świadomie
+  prostszy, wciąż poprawnie ilustrujący zasadę zapadania hydrofobowego
 
 ## Wnioski projektowe dla Genesis OS
 1. DNA jako flagowy eksperyment 3D dla widzów spoza fizyki — bardzo

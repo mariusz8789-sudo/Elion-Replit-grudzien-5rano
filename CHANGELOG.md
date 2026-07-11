@@ -6,6 +6,81 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Mathematics Lab, 13. laboratorium — bezpieczna piaskownica równań)
+- Nowy moduł `core/mathExpr.ts`: parser wyrażeń matematycznych CELOWO
+  bez `eval()`/`Function()` — tokenizer → parser rekurencyjnego
+  zstępowania → AST → ewaluator z jawną białą listą dozwolonych funkcji
+  (`FUNCTIONS`) i stałych (`CONSTANTS`). Wejście użytkownika nigdy nie
+  jest wykonywane jako kod. Obsługuje niejawne mnożenie ("2x",
+  "2sin(x)", "(x+1)(x-1)") z poprawną kolejnością działań (potęgowanie
+  prawostronnie łączne, minus unarny słabszy niż potęgowanie: -2^2=-4).
+- Różniczkowanie symboliczne DOKŁADNE: standardowe reguły rachunku
+  różniczkowego (suma, iloczyn, iloraz, potęga, łańcuchowa dla funkcji
+  elementarnych, różniczkowanie logarytmiczne dla ogólnego f(x)^g(x)).
+  Zweryfikowane dwiema niezależnymi metodami przed napisaniem testów:
+  (1) przeciw znanym dokładnym pochodnym (x², iloczyn, iloraz, złożenie,
+  x^x), (2) niezależną kontrolą różnicy centralnej dla 5 różnych
+  wyrażeń w wielu punktach. `differentiateWithSteps` generuje listę
+  zastosowanych reguł krok po kroku z opisem słownym.
+- Całkowanie NUMERYCZNE (metoda Simpsona, zweryfikowana przeciw
+  ∫₀¹x²dx=1/3 i ∫₀^πsin(x)dx=2) i szukanie pierwiastków (próbkowanie +
+  bisekcja) — obie metody jawnie oznaczone jako numeryczne, nie
+  symboliczne (całkowanie symboliczne w ogólności nie ma rozwiązania w
+  postaci zamkniętej — świadomie nie próbowane).
+- Drugi tryb: równania różniczkowe dy/dx=f(x,y), pole kierunkowe (siatka
+  krótkich odcinków dy/dx) + rozwiązanie RK4 — TA SAMA metoda numeryczna
+  co atraktor Lorenza, problem trzech ciał i geodezyjne w reszcie
+  Genesis OS. Zweryfikowane przeciw 3 znanym rozwiązaniom analitycznym
+  (dy/dx=y→e^x, dy/dx=−y→e^−x, dy/dx=2x→x²) — potwierdzone też na żywo w
+  przeglądarce: dy/dx=y, y(0)=1 → y(3)≈20,0855 = e³ dokładnie.
+- Zbudowane jako `CustomView` (jak Atom Lab), nie rozszerzenie
+  `core/customExperiment.ts` — potrzebne pole tekstowe na dowolne
+  wyrażenie, którego istniejący `ParamDef` (slider/toggle/select) nie
+  obsługuje. AI Narrator: deterministyczne bloki tłumaczące każdą regułę
+  i wynik, plus pełna integracja „Zapytaj AI" (`buildContext`/`askAI`,
+  ten sam mechanizm co reszta platformy).
+- 41 nowych testów (`mathExpr.test.ts`): bezpieczeństwo parsera (rzuca
+  czytelne błędy zamiast wykonywać kod dla nieznanych funkcji/składni),
+  kolejność działań, różniczkowanie (10+ przypadków w tym niezależna
+  kontrola różnicą centralną), całkowanie, szukanie pierwiastków,
+  równania różniczkowe.
+- Zweryfikowane: typecheck, lint, 396 testów vitest frontendowych (424 z
+  backendem — patrz też wpis Fałdowanie białka niżej, zbudowane w tej
+  samej sesji), build, Playwright w prawdziwej Chromium na obu trybach —
+  zero błędów konsoli.
+
+### Dodano (Fałdowanie białka — model HP, trzeci eksperyment Biology Lab)
+- Nowy moduł `core/proteinFolding.ts`: model HP (Hydrophobic–Polar,
+  Dill 1985; Lau & Dill 1989) — sekwencja aminokwasów zredukowana do
+  dwóch typów, samounikający spacer na siatce kwadratowej 2D, energia
+  kontaktowa = −1 za każdy kontakt H–H nienależący do szkieletu
+  łańcucha (dokładny wzór Lau & Dill, nie przybliżenie).
+- Symulacja Monte Carlo — algorytm Metropolisa (Metropolis i in. 1953),
+  TA SAMA metoda co model Isinga w Chemistry Lab, tu zastosowana do
+  przestrzeni konformacyjnej łańcucha zamiast siatki spinów. Dwa typy
+  ruchów: koniec łańcucha (rotacja terminalnej reszty) i narożnik
+  (przeskok reszty wewnętrznej na drugi róg kwadratu) — oba zachowują
+  spójność i samounikanie łańcucha z konstrukcji.
+- Fizyka zweryfikowana ręcznie przed napisaniem testów: konformacja
+  typu spinki do włosów (hairpin, 6 reszt) ma dokładnie 2 geometryczne
+  kontakty (policzone bezpośrednio, nie zgadnięte) — energia zależy od
+  tego, ile z nich to faktycznie pary H–H.
+- honestyNote jawnie cytuje NP-trudność problemu (Crescenzi i in. 1998,
+  "On the complexity of protein folding") — symulacja Monte Carlo może
+  utknąć w minimum lokalnym, dokładnie tak jak prawdziwe białka czasem
+  błędnie się fałdują (choroby konformacyjne, np. prionowe). Jasno
+  odróżnione od AlphaFold (uczenie maszynowe, nie fizyka analityczna) —
+  model bada wyłącznie zasadę zapadania hydrofobowego.
+- 8 nowych testów (`proteinFolding.test.ts`): energia łańcucha prostego
+  = 0, dokładna energia konformacji hairpin dla 3 sekwencji, niezmienniki
+  samounikania i spójności zachowane po 5000 krokach MC, zachłanne
+  zejście przy T→0 (nigdy nie akceptuje ruchu podnoszącego energię),
+  symulacja realnie znajduje energię ujemną w 20000 krokach.
+- Zweryfikowane: typecheck, lint, 396 testów vitest frontendowe (424 z
+  backendem), build, Playwright w prawdziwej Chromium — przy niskiej
+  temperaturze łańcuch widocznie zwija się w zwartą strukturę (E=−4,
+  zamiast rozciągniętego łańcucha startowego E=0), zero błędów konsoli.
+
 ### Dodano (Teleportacja kwantowa — pełny wektor stanu wielu kubitów, nowy eksperyment, Quantum Lab)
 - Nowy moduł `core/quantumState.ts`: pełny wektor stanu 2ⁿ amplitud
   zespolonych (nie przybliżenie), bramki jednokubitowe (dowolna macierz

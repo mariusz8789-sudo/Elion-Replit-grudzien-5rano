@@ -27,9 +27,9 @@ Wszechświata (8,8×10²⁶ m).
   Wszechświat, ta sama technika co Scale Journey). Drugi, obok siatki
   laboratoriów, tryb wejścia do Genesis OS — patrz `#/timeline`
 - **Scale Journey** — płynna podróż przez 45 rzędów wielkości (ekran główny)
-- **12 laboratoriów-pluginów**, każde z wieloma eksperymentami i Narratorem AI:
+- **13 laboratoriów-pluginów**, każde z wieloma eksperymentami i Narratorem AI:
   Universe, Space-Time, Einstein, Quantum, Atom, Nuclear, Particle, Chemistry,
-  Multiverse, Civilization, Biology, AI Discovery
+  Multiverse, Civilization, Biology, Mathematics, AI Discovery
 - **Narrator AI, dwie warstwy**: deterministyczny silnik liczący realne wielkości
   fizyczne z żywych parametrów symulacji (zawsze aktywny) + opcjonalne pytania
   otwarte przez backend LLM ("Zapytaj AI"), ugruntowane wyłącznie w stanie
@@ -158,26 +158,35 @@ Wszechświata (8,8×10²⁶ m).
   Keplera; wyłączenie gigantów mierzalnie zmniejsza dryf mimośrodu Marsa
   (~15× po 12 latach symulacji) — namacalny, zmierzony skutek
   grawitacyjnego zaburzenia, nie deklarowany efekt
-- **Biology Lab (nowe, 12. laboratorium)** — transport przez błonę
-  komórkową (model płynnej mozaiki, pompa Na⁺/K⁺-ATPaza ze zmierzoną
-  stechiometrią 3 Na⁺:2 K⁺:1 ATP, Nagroda Nobla 1997) i podwójna helisa
-  DNA w 3D (dokładna geometria B-DNA Watson-Crick 1953, temperatura
-  topnienia z reguły Wallace'a — helisa widocznie się rozdziela powyżej
-  obliczonej Tm)
+- **Biology Lab (12. laboratorium)** — transport przez błonę komórkową
+  (model płynnej mozaiki, pompa Na⁺/K⁺-ATPaza ze zmierzoną stechiometrią
+  3 Na⁺:2 K⁺:1 ATP, Nagroda Nobla 1997), podwójna helisa DNA w 3D
+  (dokładna geometria B-DNA Watson-Crick 1953, temperatura topnienia z
+  reguły Wallace'a — helisa widocznie się rozdziela powyżej obliczonej
+  Tm) i fałdowanie białka modelem HP (Dill 1985; Lau & Dill 1989,
+  algorytm Metropolisa jak model Isinga — globalne minimum energii
+  udowodnione NP-trudne, Crescenzi i in. 1998)
 - **Teleportacja kwantowa** (Quantum Lab) — pełny wektor stanu 3 kubitów
   (nie przybliżenie), protokół Bennetta i in. (1993): wierność
   odtworzonego stanu = dokładnie 100% w każdej z 4 gałęzi pomiaru dla
   dowolnego stanu wejściowego; jawnie naprawiony częsty błąd
   popularnonaukowy — to NIE transmisja szybsza niż światło (potrzeba 2
   bitów klasycznych) i NIE kopiowanie (oryginał niszczony pomiarem)
-- **374 testów** (346 vitest frontend + 28 node:test backend)
+- **Mathematics Lab (nowe, 13. laboratorium)** — bezpieczna piaskownica
+  równań: parser wyrażeń bez `eval()`/`Function()` (tokenizer → AST →
+  ewaluator z białą listą funkcji), różniczkowanie symboliczne DOKŁADNE
+  (standardowe reguły rachunku różniczkowego, krok po kroku), całkowanie
+  numeryczne (metoda Simpsona) i równania różniczkowe (pole kierunkowe +
+  RK4 — ta sama metoda co atraktor Lorenza) — jawnie odróżnione
+  "dokładne" od "numeryczne" w interfejsie
+- **424 testów** (396 vitest frontend + 28 node:test backend)
 
 ## Uruchomienie
 
 ```bash
 npm install
 npm run dev        # frontend: http://localhost:5000
-npm test           # 374 testów (fizyka + funkcje lokalne + backend)
+npm test           # 424 testów (fizyka + funkcje lokalne + backend)
 npm run build      # produkcyjny build do packages/frontend/dist (PWA offline)
 
 # Opcjonalny backend AI ("Zapytaj AI" w laboratoriach):

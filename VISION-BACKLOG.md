@@ -464,8 +464,8 @@ nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
 ## Biology & Molecular Science
 
 ✅ **Biology Lab — pierwsze laboratorium spoza fizyki, ZBUDOWANE**
-(`labs/biology.ts` + `labs/experiments/biology-dnahelix.ts`). Dwa
-eksperymenty:
+(`labs/biology.ts` + `labs/experiments/biology-dnahelix.ts` +
+`labs/experiments/biology-proteinfolding.ts`). Trzy eksperymenty:
 - Baza (2D): transport błonowy — model płynnej mozaiki (Singer &
   Nicolson 1972), trzy jakościowo poprawne mechanizmy (dyfuzja prosta,
   dyfuzja wspomagana nasycalna, transport aktywny — pompa Na⁺/K⁺-ATPaza
@@ -476,31 +476,57 @@ eksperymenty:
   przesunięcia nici ~120°). Temperatura topnienia liczona regułą
   Wallace'a (1979); krzywa rozdzielania nici logistyczna wokół Tm
   (kooperatywne przejście, koncepcyjny most do modelu Isinga w
-  Chemistry Lab). Pierwsza wersja renderowana z 20-parową sekwencją
-  (~2 skręty) — dłuższa (32 pz) próbowana najpierw, ale wyszła poza
-  udokumentowany zakres ważności reguły Wallace'a, świadomie skrócona.
-  3 testy fizyczne reguły Wallace'a w `physics.test.ts`.
+  Chemistry Lab). Sekwencje 20 par zasad (~2 skręty) — 32 pz próbowane
+  najpierw, ale wyszło poza udokumentowany zakres ważności reguły
+  Wallace'a, świadomie skrócone. 3 testy reguły Wallace'a w
+  `physics.test.ts`.
+- ✅ **Fałdowanie białka — model HP** (`core/proteinFolding.ts`, Dill
+  1985; Lau & Dill 1989) — sekwencja H/P, samounikający spacer na
+  siatce 2D, energia = −1 za kontakt H–H poza szkieletem (dokładny wzór
+  Lau & Dill). Symulacja Monte Carlo (algorytm Metropolisa — ta sama
+  metoda co model Isinga), ruchy końca łańcucha i narożnikowe,
+  temperatura steruje eksploracją vs. zachłannością. Zweryfikowane
+  ręcznie: konformacja typu spinki (hairpin, 6 reszt) ma dokładnie 2
+  geometryczne kontakty. 8 testów: energia łańcucha prostego = 0,
+  dokładna energia hairpin dla 3 sekwencji, niezmienniki samounikania/
+  spójności po 5000 krokach MC, zachłanne zejście przy T→0, symulacja
+  znajduje energię ujemną (prawdziwy kontakt hydrofobowy) w 20000
+  krokach. honestyNote jawnie cytuje NP-trudność problemu (Crescenzi i
+  in. 1998) — symulacja może utknąć w minimum lokalnym, jak prawdziwe
+  błędne fałdowanie.
 
 Backlog na przyszłość:
-- **Fałdowanie białka (uproszczone)** (★★★ aktywny obszar badań —
-  AlphaFold to real ML, nie fizyka analityczna; NASZ model musiałby być
-  jawnie dydaktyczny, np. energetyczny model sieciowy HP, nie prawdziwe
-  fałdowanie) — wymaga bardzo starannego oznaczenia granic modelu.
 - **Pochodzenie życia (abiogeneza)** (★★ aktywny obszar badań, wysoka
   niepewność) — NIE symulacja „jak powstało życie" (nikt tego nie wie), ale
   uczciwy przegląd konkurencyjnych hipotez (świat RNA, kominy hydrotermalne,
   panspermia) z jasnym oznaczeniem statusu każdej.
 
-## Mathematics (sandbox równań użytkownika)
+## Mathematics (sandbox równań użytkownika) — ✅ ZBUDOWANE
 
-- **Edytor równań + AI sprawdzające spójność** (nowa architektura) —
-  naturalne rozszerzenie „Stwórz eksperyment" (`core/customExperiment.ts`):
-  zamiast tylko suwaków, użytkownik wpisuje wyrażenie matematyczne
-  (parser + bezpieczny evaluator, NIE `eval()` — biblioteka typu mathjs
-  w trybie sandboxed), aplikacja rysuje wykres/pole wektorowe, AI (przez
-  ISTNIEJĄCY `askAI()`) komentuje własności (ciągłość, symetrie,
-  osobliwości). Bezpieczne przez konstrukcję jak reszta platformy: parser
-  wyrażeń matematycznych, nie interpreter ogólnego kodu.
+✅ **Mathematics Lab, 13. laboratorium** (`labs/mathematics.tsx` +
+`core/mathExpr.ts`) — bezpieczny parser wyrażeń (tokenizer → AST →
+ewaluator z jawną białą listą funkcji, ZERO `eval()`/`Function()`, jak
+zaplanowano). Dwa tryby:
+- **Wykres, pochodna, całka**: użytkownik wpisuje f(x); różniczkowanie
+  symboliczne DOKŁADNE (standardowe reguły — suma, iloczyn, iloraz,
+  potęga, łańcuchowa, różniczkowanie logarytmiczne dla f(x)^g(x)),
+  zweryfikowane przeciw znanym pochodnym I niezależną kontrolą różnicy
+  centralnej dla 5 wyrażeń; krok po kroku (`differentiateWithSteps`)
+  pokazuje zastosowane reguły. Całka oznaczona NUMERYCZNIE (metoda
+  Simpsona, zweryfikowana przeciw ∫x²dx=1/3 i ∫sin(x)dx=2 na [0,π]) —
+  jawnie odróżniona od dokładnej pochodnej, nie ukryta. Szukanie
+  pierwiastków próbkowaniem+bisekcją.
+- **Równania różniczkowe**: dy/dx=f(x,y), pole kierunkowe + rozwiązanie
+  RK4 (ta sama metoda co atraktor Lorenza/problem trzech ciał/geodezyjne
+  w tym Genesis OS), zweryfikowane przeciw 3 znanym rozwiązaniom
+  analitycznym (e^x, e^−x, x²).
+- AI Narrator: deterministyczne bloki tłumaczące każdą regułę
+  różniczkowania i każdy wynik, plus integracja „Zapytaj AI" (ten sam
+  `buildContext`/`askAI` co reszta platformy).
+- 41 nowych testów fizyczno-matematycznych (`mathExpr.test.ts`).
+  Zbudowane jako `CustomView` (jak Atom Lab) zamiast rozszerzenia
+  `core/customExperiment.ts` — potrzebne pole tekstowe na wyrażenie,
+  którego `ParamDef` (slider/toggle/select) nie obsługuje.
 - **Współpraca wielu użytkowników nad modelem** — wymaga kont/backendu
   (patrz `ARCHITECTURE.md` „Przyszły backend"), świadomie odłożone.
 

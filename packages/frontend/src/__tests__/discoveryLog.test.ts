@@ -123,7 +123,7 @@ describe('discoveryLog: persistence', () => {
   it('getVisitedCount reports distinct labs out of the full registry size', async () => {
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });
     vi.resetModules();
-    await import('../labs/index'); // re-register the 12 labs in the fresh module graph
+    await import('../labs/index'); // re-register the 13 labs in the fresh module graph
     const { recordVisit: freshRecordVisit, getVisitedCount: freshGetVisitedCount } = await import('../core/discoveryLog');
     const { getLabs: freshGetLabs } = await import('../core/registry');
     freshRecordVisit('quantum', '__base');
@@ -132,7 +132,7 @@ describe('discoveryLog: persistence', () => {
     const summary = freshGetVisitedCount();
     expect(summary.visited).toBe(2);
     expect(summary.totalLabs).toBe(freshGetLabs().length);
-    expect(summary.totalLabs).toBe(12);
+    expect(summary.totalLabs).toBe(13);
   });
 
   it('recovers cleanly from a corrupted stored blob instead of throwing', async () => {

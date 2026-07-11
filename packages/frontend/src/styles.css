@@ -822,3 +822,14 @@ kbd {
 .qde-branch-tone input[type='range'] { width: 5.5rem; accent-color: var(--violet); }
 .qde-branch-tone-val { font: inherit; font-size: 0.72rem; color: var(--text-dim); min-width: 1.6rem; text-align: right; }
 .qde-branch-remove { padding: 0.3rem 0.55rem; font-size: 0.78rem; }
+
+.math-input {
+  width: 100%; font: inherit; font-size: 0.85rem; color: var(--text);
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 0.6rem; padding: 0.5rem 0.75rem; font-family: var(--font-mono);
+}
+.math-input::placeholder { color: var(--text-dim); }
+.math-preset-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.math-range-row { display: flex; gap: 0.6rem; }
+.math-range-row .control { flex: 1; min-width: 0; }
+.math-lab .nbody { white-space: pre-wrap; }

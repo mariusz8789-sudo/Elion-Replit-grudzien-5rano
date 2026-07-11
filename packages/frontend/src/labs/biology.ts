@@ -1,5 +1,6 @@
 import type { LabDefinition, Sim, SimParams } from '../core/types';
 import { biologyDnaHelix } from './experiments/biology-dnahelix';
+import { biologyProteinFolding } from './experiments/biology-proteinfolding';
 
 /**
  * Biology Lab — pierwsze laboratorium spoza fizyki w Genesis OS.
@@ -173,7 +174,7 @@ export const biologyLab: LabDefinition = {
     { key: 'pump', label: 'Pompa Na⁺/K⁺-ATPaza (transport aktywny)', type: 'toggle', default: false },
   ],
   createSim: () => new MembraneSim(),
-  experiments: [biologyDnaHelix],
+  experiments: [biologyDnaHelix, biologyProteinFolding],
   narrate(p, stats) {
     const channelsOpen = Boolean(p.channels);
     const pumpOn = Boolean(p.pump);

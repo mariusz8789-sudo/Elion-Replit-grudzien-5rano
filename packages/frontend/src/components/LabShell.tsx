@@ -90,7 +90,7 @@ function experimentBaseName(lab: LabDefinition): string {
     quantum: 'Dwie szczeliny',
     nuclear: 'Rozpad',
     particle: 'Detektor',
-    chemistry: 'Wiązania chemiczne',
+    chemistry: 'Geometria molekularna (VSEPR)',
     multiverse: 'Inne stałe',
     civilization: 'Skala Kardaszewa',
   };

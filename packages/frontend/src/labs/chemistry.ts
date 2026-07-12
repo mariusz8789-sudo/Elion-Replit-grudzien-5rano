@@ -1,4 +1,4 @@
-import type { LabDefinition, Sim, SimParams } from '../core/types';
+import type { ExperimentDef, LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
 import { bondPolarity, type BondType } from '../core/physics';
 import { PAULING_ELECTRONEGATIVITY } from '../data/electronegativity';
 import { ELEMENTS } from '../data/elements';
@@ -7,13 +7,23 @@ import { chemistryTitration } from './experiments/chemistry-titration';
 import { chemistryIsing } from './experiments/chemistry-ising';
 
 /**
- * Chemistry Lab — wiązania chemiczne i elektroujemność.
- * Fizyka: elektroujemność Paulinga χ to zmierzona/tabelaryczna wielkość
- * (CRC Handbook), różnica Δχ = |χA − χB| jest dokładna. Klasyfikacja typu
- * wiązania na progach (0,4 / 1,7) to standardowa konwencja dydaktyczna, nie
- * ostra granica fizyczna — dlatego wizualizacja (przesunięcie chmury
- * elektronowej) jest CIĄGŁA funkcją Δχ (wzór Hanney–Smitha), a nie
- * przełącznikiem trzech stanów. Patrz core/physics.ts::bondPolarity.
+ * Chemistry Lab — flagowy eksperyment to teraz prawdziwa geometria
+ * molekularna 3D (VSEPR, patrz chemistry-vsepr.ts) — promowana z zakładki
+ * pobocznej, żeby pierwszym widokiem NIE był płaski diagram dwóch kółek.
+ * Dawny bazowy eksperyment (skala elektroujemności/polarność wiązania) NIE
+ * został usunięty — jest teraz pierwszą pozycją w `experiments` jako
+ * „Polarność wiązania (2D)". Ten widok pozostaje CELOWO 2D: pokazuje
+ * pozycję na jednowymiarowej skali elektroujemności Paulinga — to typ
+ * danych, dla którego płaski wykres jest naukowo trafną formą (jak wykresy
+ * funkcji w Mathematics Lab), nie zaniedbaną dekoracją.
+ *
+ * Fizyka polarności: elektroujemność Paulinga χ to zmierzona/tabelaryczna
+ * wielkość (CRC Handbook), różnica Δχ = |χA − χB| jest dokładna.
+ * Klasyfikacja typu wiązania na progach (0,4 / 1,7) to standardowa
+ * konwencja dydaktyczna, nie ostra granica fizyczna — dlatego wizualizacja
+ * (przesunięcie chmury elektronowej) jest CIĄGŁA funkcją Δχ (wzór
+ * Hanney–Smitha), a nie przełącznikiem trzech stanów. Patrz
+ * core/physics.ts::bondPolarity.
  */
 
 const BOND_ELEMENTS = ELEMENTS.filter((e) => PAULING_ELECTRONEGATIVITY[e.symbol] !== undefined);
@@ -165,12 +175,10 @@ class BondSim implements Sim {
   }
 }
 
-export const chemistryLab: LabDefinition = {
-  id: 'chemistry',
-  name: 'Chemistry Lab',
-  tagline: 'Wiązania chemiczne, elektroujemność, polarność',
-  icon: '⚗️',
-  accent: '#e879f9',
+/** Dawny bazowy eksperyment (skala elektroujemności/polarność wiązania) — teraz zakładka poboczna, nieusunięta. */
+const chemistryBondPolarity2D: ExperimentDef = {
+  id: 'bond-polarity-2d',
+  name: 'Polarność wiązania (2D)',
   honesty: 'simplified',
   honestyNote:
     'Wartości elektroujemności Paulinga χ są tabelarycznymi danymi (CRC Handbook). Różnica Δχ jest dokładna. Progi klasyfikacji typu wiązania (0,4 / 1,7) to konwencja dydaktyczna, nie ostra granica fizyczna — realne wiązania tworzą continuum. "Procent charakteru jonowego" to klasyczne przybliżenie Hanney–Smitha (1946), nie zmierzona wielkość. Rozmiary atomów są symboliczne (log Z), nie do skali promienia atomowego.',
@@ -185,8 +193,7 @@ export const chemistryLab: LabDefinition = {
     },
   ],
   createSim: () => new BondSim(),
-  experiments: [chemistryVsepr, chemistryTitration, chemistryIsing],
-  narrate(p, stats) {
+  narrate(p, stats): NarrationBlock[] {
     const symbolA = String(p.elementA ?? 'Na');
     const symbolB = String(p.elementB ?? 'Cl');
     const elA = ELEMENTS.find((e) => e.symbol === symbolA);
@@ -219,6 +226,20 @@ export const chemistryLab: LabDefinition = {
       },
     ];
   },
+};
+
+export const chemistryLab: LabDefinition = {
+  id: 'chemistry',
+  name: 'Chemistry Lab',
+  tagline: 'Geometria molekularna, wiązania chemiczne, polarność',
+  icon: '⚗️',
+  accent: '#e879f9',
+  honesty: chemistryVsepr.honesty,
+  honestyNote: chemistryVsepr.honestyNote,
+  params: chemistryVsepr.params,
+  createSim3D: chemistryVsepr.createSim3D,
+  experiments: [chemistryBondPolarity2D, chemistryTitration, chemistryIsing],
+  narrate: chemistryVsepr.narrate,
 };
 
 function higherChiName(

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LabDefinition } from '../core/types';
 import { HonestyBadge } from '../components/HonestyBadge';
 import { NarratorPanel } from '../components/NarratorPanel';
 import { buildContext } from '../narrator/askAI';
+import { useThreeLoop } from '../core/three/useThreeLoop';
+import { FunctionSurface3DSim } from './experiments/mathematics-surface-3d';
 import {
   differentiateWithSteps,
   evaluate,
@@ -33,7 +35,7 @@ import {
  * wynikiem.
  */
 
-type Mode = 'graph' | 'ode';
+type Mode = 'graph' | 'ode' | 'surface';
 
 const F_COLOR = '#5cd6e8';
 const D_COLOR = '#f0b35c';
@@ -256,6 +258,7 @@ function drawOdeMode(canvas: HTMLCanvasElement, exprText: string, x0: number, y0
 
 const GRAPH_PRESETS = ['x^2 - 3x + 2', 'sin(x)*x', 'exp(-x^2)', '1/x', 'x^3 - x'];
 const ODE_PRESETS = ['y', '-y', '2x', 'y - y^2', 'sin(x) - y'];
+const SURFACE_PRESETS = ['sin(x)*cos(y)', 'x^2 - y^2', 'x^2 + y^2', 'sin(sqrt(x^2+y^2))', 'exp(-(x^2+y^2)/8)'];
 
 function MathLabView({ lab }: { lab: LabDefinition }) {
   const [mode, setMode] = useState<Mode>('graph');
@@ -275,6 +278,32 @@ function MathLabView({ lab }: { lab: LabDefinition }) {
   const [odeXEnd, setOdeXEnd] = useState(3);
   const [odeResult, setOdeResult] = useState<OdeResult | null>(null);
   const odeCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const [surfaceExpr, setSurfaceExpr] = useState('sin(x)*cos(y)');
+  const [surfXMin, setSurfXMin] = useState(-5);
+  const [surfXMax, setSurfXMax] = useState(5);
+  const [surfYMin, setSurfYMin] = useState(-5);
+  const [surfYMax, setSurfYMax] = useState(5);
+  const surfaceSim = useMemo(() => new FunctionSurface3DSim(), []);
+  const surfaceParams = useMemo(
+    () => ({ expr: surfaceExpr, xMin: surfXMin, xMax: surfXMax, yMin: surfYMin, yMax: surfYMax }),
+    [surfaceExpr, surfXMin, surfXMax, surfYMin, surfYMax],
+  );
+  const [surfaceStats, setSurfaceStats] = useState<{ zMin: number; zMax: number; valid: boolean }>({ zMin: 0, zMax: 0, valid: false });
+  const onSurfaceStats = useCallback((s: Record<string, number>) => {
+    setSurfaceStats({ zMin: s.zMin ?? 0, zMax: s.zMax ?? 0, valid: (s.valid ?? 0) > 0 });
+  }, []);
+  const { canvasRef: surfaceCanvasRef, loading: surfaceLoading, failed: surfaceFailed } = useThreeLoop(
+    mode === 'surface' ? surfaceSim : null,
+    surfaceParams,
+    true,
+    onSurfaceStats,
+  );
+  const surfaceParseError = useMemo(() => {
+    try { parseExpression(surfaceExpr); return null; } catch (err) {
+      return err instanceof MathParseError ? err.message : 'Błąd wyrażenia';
+    }
+  }, [surfaceExpr]);
 
   useEffect(() => {
     if (mode !== 'graph') return;
@@ -299,6 +328,7 @@ function MathLabView({ lab }: { lab: LabDefinition }) {
 
   const graphHonesty = 'Wykres i szukanie pierwiastków są numeryczne (próbkowanie + bisekcja) — nie znajdą pierwiastków parzystej krotności (styczne dotknięcie osi X). Pochodna jest DOKŁADNA symbolicznie (standardowe reguły rachunku różniczkowego, nie przybliżenie). Całka jest NUMERYCZNA (metoda Simpsona) — nie próbuje się całkowania symbolicznego, które w ogólności jest nierozwiązywalne w postaci zamkniętej.';
   const odeHonesty = 'Rozwiązanie równania różniczkowego liczone numerycznie metodą RK4 (ta sama metoda co atraktor Lorenza, problem trzech ciał i geodezyjne w tym Genesis OS) — nie symbolicznie. Pole kierunkowe pokazuje dy/dx w siatce punktów niezależnie od konkretnego rozwiązania — standardowa, podręcznikowa wizualizacja jakościowego zachowania równania.';
+  const surfaceHonesty = 'Każdy wierzchołek siatki to dosłownie f(x,y) policzone tym samym bezpiecznym parserem (zero eval()/Function()) co pozostałe tryby — nie ilustracja. Wysokość jest przeskalowana liniowo do stałego zakresu ekranowego wokół z=0 (dowolna funkcja użytkownika może mieć wysokość rzędu 10⁻³ albo 10⁶, a kamera musi mieć jeden stały kadr) — kształt lokalny jest dokładny, skala pionowa względem osi x/y nie jest 1:1, jak na mapie topograficznej.';
 
   const graphBlocks = useMemo(() => {
     if (!graphResult) return [];
@@ -339,14 +369,33 @@ function MathLabView({ lab }: { lab: LabDefinition }) {
     ];
   }, [odeResult, odeExpr, odeX0, odeY0, odeXEnd]);
 
-  const blocks = mode === 'graph' ? graphBlocks : odeBlocks;
+  const surfaceBlocks = useMemo(() => {
+    if (surfaceParseError) return [{ title: 'Błąd w wyrażeniu', body: surfaceParseError }];
+    if (!surfaceStats.valid) return [];
+    return [
+      {
+        title: `z = ${surfaceExpr}, zakres na siatce: [${surfaceStats.zMin.toFixed(3)}, ${surfaceStats.zMax.toFixed(3)}]`,
+        body: 'Każdy wierzchołek to f(x,y) policzone bezpośrednio z bezpiecznego parsera — nie interpolacja z rzadkiej siatki. Wysokość na ekranie jest przeskalowana do stałego zakresu (patrz etykieta uczciwości), więc porównuj KSZTAŁT powierzchni (siodła, doliny, grzbiety), nie bezwzględną wysokość w pikselach.',
+      },
+      {
+        title: 'Punkty siodłowe i ekstrema',
+        body: 'Miejsca, gdzie powierzchnia jest lokalnie najwyższa (grzbiet we wszystkich kierunkach) lub najniższa, to ekstrema — dokładny odpowiednik pierwiastków pochodnej w jednej zmiennej, tylko teraz gradient (∂f/∂x, ∂f/∂y) musi zerować się w OBU kierunkach naraz. Punkty siodłowe (jak przy z=x²−y²) są lokalnym maksimum w jednym kierunku i minimum w drugim — to zjawisko, które płaski wykres 1D nie ma jak pokazać.',
+      },
+    ];
+  }, [surfaceParseError, surfaceStats, surfaceExpr]);
+
+  const blocks = mode === 'graph' ? graphBlocks : mode === 'ode' ? odeBlocks : surfaceBlocks;
   const params: Record<string, string | number | boolean> = mode === 'graph'
     ? { expression: graphExpr, xMin, xMax, integralA: showIntegral ? integralA : 0, integralB: showIntegral ? integralB : 0 }
-    : { expression: odeExpr, x0: odeX0, y0: odeY0, xEnd: odeXEnd };
+    : mode === 'ode'
+      ? { expression: odeExpr, x0: odeX0, y0: odeY0, xEnd: odeXEnd }
+      : { expression: surfaceExpr, xMin: surfXMin, xMax: surfXMax, yMin: surfYMin, yMax: surfYMax };
   const stats: Record<string, number> = mode === 'graph'
     ? { roots: graphResult?.roots.length ?? 0, integral: graphResult?.integral ?? 0 }
-    : { finalY: odeResult?.finalY ?? 0 };
-  const expLabel = mode === 'graph' ? 'Wykres i pochodna' : 'Równanie różniczkowe';
+    : mode === 'ode'
+      ? { finalY: odeResult?.finalY ?? 0 }
+      : { zMin: surfaceStats.zMin, zMax: surfaceStats.zMax };
+  const expLabel = mode === 'graph' ? 'Wykres i pochodna' : mode === 'ode' ? 'Równanie różniczkowe' : 'Powierzchnia z=f(x,y)';
 
   return (
     <div className="lab-view math-lab" style={{ ['--accent' as string]: lab.accent }}>
@@ -356,6 +405,9 @@ function MathLabView({ lab }: { lab: LabDefinition }) {
         </button>
         <button role="tab" aria-selected={mode === 'ode'} onClick={() => setMode('ode')}>
           Równania różniczkowe
+        </button>
+        <button role="tab" aria-selected={mode === 'surface'} onClick={() => setMode('surface')}>
+          Powierzchnia z=f(x,y) (3D)
         </button>
       </div>
 
@@ -455,6 +507,70 @@ function MathLabView({ lab }: { lab: LabDefinition }) {
               <div className="control">
                 <label>x koniec</label>
                 <input type="number" className="math-input" value={odeXEnd} onChange={(e) => setOdeXEnd(Number(e.target.value))} />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {mode === 'surface' && (
+        <>
+          <div className="sim-stage stage-3d" style={{ height: '38vh', minHeight: 240 }}>
+            <canvas
+              ref={surfaceCanvasRef}
+              role="img"
+              aria-label={`Powierzchnia 3D funkcji z = ${surfaceExpr}. Przeciągnij, by obrócić kamerę.`}
+            />
+            {!surfaceFailed && (
+              <div className="stage-3d-badge">
+                <span className="mdot" aria-hidden="true" /> {surfaceLoading ? 'ŁADOWANIE SILNIKA 3D…' : '3D · WEBGL'}
+              </div>
+            )}
+            {!surfaceLoading && !surfaceFailed && <div className="stage-3d-hint">przeciągnij / scrolluj</div>}
+            {surfaceFailed && (
+              <div className="empty-state" style={{ position: 'absolute', inset: '1rem', margin: 0 }}>
+                Nie udało się uruchomić silnika 3D w tej przeglądarce (WebGL niedostępny lub zablokowany). Przełącz na
+                zakładkę „Wykres, pochodna, całka" dla wykresów jednej zmiennej.
+              </div>
+            )}
+          </div>
+          <HonestyBadge level="exact" note={surfaceHonesty} />
+          <div className="controls">
+            <div className="control">
+              <label>z(x, y) =</label>
+              <input
+                type="text"
+                className="math-input"
+                value={surfaceExpr}
+                maxLength={200}
+                spellCheck={false}
+                placeholder="np. sin(x)*cos(y)"
+                onChange={(e) => setSurfaceExpr(e.target.value)}
+              />
+            </div>
+            <div className="math-preset-row">
+              {SURFACE_PRESETS.map((p) => (
+                <button key={p} className="chip-btn" onClick={() => setSurfaceExpr(p)}>{p}</button>
+              ))}
+            </div>
+            <div className="math-range-row">
+              <div className="control">
+                <label>x min</label>
+                <input type="number" className="math-input" value={surfXMin} onChange={(e) => setSurfXMin(Number(e.target.value))} />
+              </div>
+              <div className="control">
+                <label>x max</label>
+                <input type="number" className="math-input" value={surfXMax} onChange={(e) => setSurfXMax(Number(e.target.value))} />
+              </div>
+            </div>
+            <div className="math-range-row">
+              <div className="control">
+                <label>y min</label>
+                <input type="number" className="math-input" value={surfYMin} onChange={(e) => setSurfYMin(Number(e.target.value))} />
+              </div>
+              <div className="control">
+                <label>y max</label>
+                <input type="number" className="math-input" value={surfYMax} onChange={(e) => setSurfYMax(Number(e.target.value))} />
               </div>
             </div>
           </div>

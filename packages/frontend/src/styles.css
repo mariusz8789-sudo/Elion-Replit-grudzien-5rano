@@ -161,6 +161,45 @@ button:disabled { cursor: default; }
 .hud-bl { bottom: 0.7rem; left: 0.7rem; transform: scaleY(-1); }
 .hud-br { bottom: 0.7rem; right: 0.7rem; transform: scale(-1); }
 
+/* Reality Navigator — canvas jest position:fixed i persystentny (core/reality/RealityEngine.ts,
+   components/RealityCanvas.tsx); reszta trasy musi zostawić przezroczystą "dziurę" (.reality-stage-spacer),
+   żeby canvas był widoczny POD chromem UI, nie za nim. */
+.reality-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+.reality-main { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; z-index: 1; }
+.reality-shell { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.reality-stage-spacer { flex: 1; min-height: 0; pointer-events: none; }
+.reality-hud { position: absolute; top: 0.8rem; left: 50%; transform: translateX(-50%); pointer-events: none; }
+.reality-flight-caption {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.35rem 0.8rem; border-radius: 999px;
+  background: rgba(10, 14, 28, 0.72); border: 1px solid var(--border-strong);
+  font-family: var(--font-mono); font-size: 0.72rem; color: var(--text);
+  backdrop-filter: blur(6px);
+}
+.reality-panel {
+  position: relative; z-index: 1;
+  background: linear-gradient(180deg, rgba(10, 14, 28, 0.94), var(--bg-panel) 40%);
+  border-top: 1px solid var(--border-strong);
+  padding: 0.9rem 1rem calc(0.9rem + var(--safe-bottom));
+  display: flex; flex-direction: column; gap: 0.7rem;
+  max-height: 62vh; overflow-y: auto;
+}
+.reality-stats { display: flex; flex-wrap: wrap; gap: 0.6rem 1.2rem; }
+.reality-stats .stat { display: flex; flex-direction: column; gap: 0.1rem; }
+.reality-stats .k { font-size: 0.66rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+.reality-stats .v { font-family: var(--font-mono); font-size: 0.9rem; color: var(--text); }
+.reality-log { display: flex; flex-direction: column; gap: 0.3rem; }
+.reality-log-row {
+  display: flex; justify-content: space-between; gap: 0.6rem;
+  font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim);
+  padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.reality-log-node { color: var(--cyan); }
+.reality-branches { display: flex; flex-direction: column; gap: 0.5rem; }
+.reality-branch-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.reality-branch-list .chip-btn[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
+
 /* Pasek statusu misji — realne dane (liczba laboratoriów, status AI), nie ozdoba */
 .mission-bar {
   display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;

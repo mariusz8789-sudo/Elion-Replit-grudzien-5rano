@@ -19,6 +19,8 @@ import { t } from './core/i18n';
 import { getVisitedCount } from './core/discoveryLog';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
 import { playEnterLab } from './core/sound';
+import { RealityCanvas } from './components/RealityCanvas';
+import { RealityNavigator } from './components/RealityNavigator';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -35,7 +37,8 @@ type Route =
   | { kind: 'glossary' }
   | { kind: 'what-if' }
   | { kind: 'timeline' }
-  | { kind: 'decision-explorer' };
+  | { kind: 'decision-explorer' }
+  | { kind: 'reality' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -47,6 +50,7 @@ function parseHash(): Route {
   if (h === '#/what-if') return { kind: 'what-if' };
   if (h === '#/timeline') return { kind: 'timeline' };
   if (h === '#/decision-explorer') return { kind: 'decision-explorer' };
+  if (h === '#/reality') return { kind: 'reality' };
   return { kind: 'home' };
 }
 
@@ -138,164 +142,200 @@ export default function App() {
     );
   }
 
-  if (route.kind === 'lab') {
-    const lab = getLab(route.id);
-    if (!lab) {
+  // Zawartość specyficzna dla trasy — WYDZIELONA z głównego return, żeby
+  // <RealityCanvas> mógł zostać zamontowany RAZ, POZA tym warunkowym
+  // drzewem (patrz komponent). Gdyby canvas był wewnątrz jednej z tych
+  // gałęzi, React odmontowywałby go przy każdej zmianie trasy — dokładnie
+  // to, czego "persystentne płótno" ma unikać.
+  const renderRoute = () => {
+    if (route.kind === 'lab') {
+      const lab = getLab(route.id);
+      if (!lab) {
+        return (
+          <div className="app">
+            <TopBar title="Nieznane laboratorium" onSearch={() => setSearchOpen(true)} />
+            <main className="home">
+              <p className="empty-state">Nie znaleziono laboratorium „{route.id}".</p>
+              <button className="chip-btn" onClick={() => { window.location.hash = ''; }}>← Wróć</button>
+            </main>
+            {overlays}
+          </div>
+        );
+      }
+      const View = lab.CustomView;
       return (
         <div className="app">
-          <TopBar title="Nieznane laboratorium" onSearch={() => setSearchOpen(true)} />
-          <main className="home">
-            <p className="empty-state">Nie znaleziono laboratorium „{route.id}".</p>
-            <button className="chip-btn" onClick={() => { window.location.hash = ''; }}>← Wróć</button>
+          <header className="topbar">
+            <button className="back" aria-label="Wróć do laboratoriów" onClick={() => { window.location.hash = ''; }}>
+              ←
+            </button>
+            <div className="titles">
+              <h1>{lab.icon} {lab.name}</h1>
+              <p className="tagline">{lab.tagline}</p>
+            </div>
+          </header>
+          <main id="main-content" tabIndex={-1} className="lab-main">
+            <ErrorBoundary key={lab.id}>
+              {View ? <View lab={lab} /> : <LabShell key={lab.id} lab={lab} />}
+            </ErrorBoundary>
           </main>
           {overlays}
         </div>
       );
     }
-    const View = lab.CustomView;
+
+    if (route.kind === 'settings') {
+      return (
+        <div className="app">
+          <TopBar title={`⚙ ${t('nav.settings')}`} onSearch={() => setSearchOpen(true)} />
+          <SettingsScreen onReplayOnboarding={() => setOnboardingOpen(true)} />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'discovery-log') {
+      return (
+        <div className="app">
+          <TopBar title={`🏆 ${t('nav.discoveryLog')}`} onSearch={() => setSearchOpen(true)} />
+          <DiscoveryLogScreen />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'glossary') {
+      return (
+        <div className="app">
+          <TopBar title={`📚 ${t('nav.glossary')}`} onSearch={() => setSearchOpen(true)} />
+          <GlossaryScreen />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'what-if') {
+      return (
+        <div className="app">
+          <TopBar title={`🌀 ${t('nav.whatIf')}`} onSearch={() => setSearchOpen(true)} />
+          <WhatIfScreen />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'timeline') {
+      return (
+        <div className="app">
+          <TopBar title="🌌 Discovery Timeline" onSearch={() => setSearchOpen(true)} />
+          <DiscoveryTimeline />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'decision-explorer') {
+      return (
+        <div className="app">
+          <TopBar title="🌠 Quantum Decision Explorer" onSearch={() => setSearchOpen(true)} />
+          <QuantumDecisionExplorer />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'reality') {
+      return (
+        <div className="app reality-app">
+          <TopBar title="🎬 Reality Navigator" onSearch={() => setSearchOpen(true)} />
+          <main id="main-content" tabIndex={-1} className="reality-main">
+            <ErrorBoundary>
+              <RealityNavigator />
+            </ErrorBoundary>
+          </main>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
-        <header className="topbar">
-          <button className="back" aria-label="Wróć do laboratoriów" onClick={() => { window.location.hash = ''; }}>
-            ←
-          </button>
-          <div className="titles">
-            <h1>{lab.icon} {lab.name}</h1>
-            <p className="tagline">{lab.tagline}</p>
+        <main className="home" id="main-content" tabIndex={-1}>
+          <div style={{ position: 'relative' }}>
+            <ScaleJourney />
+            <span className="hud-corner hud-tl" aria-hidden="true" />
+            <span className="hud-corner hud-tr" aria-hidden="true" />
+            <span className="hud-corner hud-bl" aria-hidden="true" />
+            <span className="hud-corner hud-br" aria-hidden="true" />
           </div>
-        </header>
-        <main id="main-content" tabIndex={-1} className="lab-main">
-          <ErrorBoundary key={lab.id}>
-            {View ? <View lab={lab} /> : <LabShell key={lab.id} lab={lab} />}
-          </ErrorBoundary>
+          <div className="section-label">Zacznij tutaj</div>
+          <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/timeline'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true">🌌</span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Discovery Timeline</span>
+              <span className="timeline-cta-sub">Wielki Wybuch → daleka przyszłość. Jedna ciągła podróż z Narratorem AI, bez ekranów ładowania.</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
+          <button className="timeline-cta" onClick={() => { window.location.hash = '#/reality'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true">🎬</span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Reality Navigator <em>(prototyp)</em></span>
+              <span className="timeline-cta-sub">Zmień masę gwiazdy centralnej i patrz, jak kamera odwiedza rzeczywiste konsekwencje w Scientific Model Graph — nie animację, obliczenia.</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
+          <nav className="home-nav" aria-label="Nawigacja Genesis OS">
+            <button className="whatif-nav-btn" onClick={() => { window.location.hash = '#/what-if'; }}>
+              <span aria-hidden="true">🌀</span> {t('nav.whatIf')}
+            </button>
+            <button className="qde-nav-btn" onClick={() => { window.location.hash = '#/decision-explorer'; }}>
+              <span aria-hidden="true">🌠</span> {t('nav.decisionExplorer')}
+            </button>
+            <button onClick={() => setSearchOpen(true)}>
+              <span aria-hidden="true">🔍</span> {t('nav.search')}
+            </button>
+            <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
+              <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}
+            </button>
+            <button onClick={() => { window.location.hash = '#/glossary'; }}>
+              <span aria-hidden="true">📚</span> {t('nav.glossary')}
+            </button>
+            <button onClick={() => { window.location.hash = '#/settings'; }}>
+              <span aria-hidden="true">⚙</span> {t('nav.settings')}
+            </button>
+          </nav>
+          <MissionStatusBar />
+          <div className="section-label">Laboratoria · {getLabs().length} modułów</div>
+          <div className="labs-grid">
+            {getLabs().map((l) => (
+              <button
+                key={l.id}
+                className="lab-card"
+                style={{ ['--accent' as string]: l.accent }}
+                onClick={() => { window.location.hash = `#/lab/${l.id}`; }}
+              >
+                <span className="badge" aria-hidden="true">{l.icon}</span>
+                <span className="name">{l.name}</span>
+                <span className="desc">{l.tagline}</span>
+              </button>
+            ))}
+          </div>
+          <p className="footer-note">
+            Genesis OS · Każda symulacja nosi etykietę uczciwości naukowej: hipotezy nigdy nie udają faktów.
+            Naciśnij <kbd>/</kbd>, aby szukać, albo <kbd>?</kbd> po listę skrótów.
+          </p>
         </main>
         {overlays}
       </div>
     );
-  }
-
-  if (route.kind === 'settings') {
-    return (
-      <div className="app">
-        <TopBar title={`⚙ ${t('nav.settings')}`} onSearch={() => setSearchOpen(true)} />
-        <SettingsScreen onReplayOnboarding={() => setOnboardingOpen(true)} />
-        {overlays}
-      </div>
-    );
-  }
-
-  if (route.kind === 'discovery-log') {
-    return (
-      <div className="app">
-        <TopBar title={`🏆 ${t('nav.discoveryLog')}`} onSearch={() => setSearchOpen(true)} />
-        <DiscoveryLogScreen />
-        {overlays}
-      </div>
-    );
-  }
-
-  if (route.kind === 'glossary') {
-    return (
-      <div className="app">
-        <TopBar title={`📚 ${t('nav.glossary')}`} onSearch={() => setSearchOpen(true)} />
-        <GlossaryScreen />
-        {overlays}
-      </div>
-    );
-  }
-
-  if (route.kind === 'what-if') {
-    return (
-      <div className="app">
-        <TopBar title={`🌀 ${t('nav.whatIf')}`} onSearch={() => setSearchOpen(true)} />
-        <WhatIfScreen />
-        {overlays}
-      </div>
-    );
-  }
-
-  if (route.kind === 'timeline') {
-    return (
-      <div className="app">
-        <TopBar title="🌌 Discovery Timeline" onSearch={() => setSearchOpen(true)} />
-        <DiscoveryTimeline />
-        {overlays}
-      </div>
-    );
-  }
-
-  if (route.kind === 'decision-explorer') {
-    return (
-      <div className="app">
-        <TopBar title="🌠 Quantum Decision Explorer" onSearch={() => setSearchOpen(true)} />
-        <QuantumDecisionExplorer />
-        {overlays}
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="app">
-      <main className="home" id="main-content" tabIndex={-1}>
-        <div style={{ position: 'relative' }}>
-          <ScaleJourney />
-          <span className="hud-corner hud-tl" aria-hidden="true" />
-          <span className="hud-corner hud-tr" aria-hidden="true" />
-          <span className="hud-corner hud-bl" aria-hidden="true" />
-          <span className="hud-corner hud-br" aria-hidden="true" />
-        </div>
-        <div className="section-label">Zacznij tutaj</div>
-        <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/timeline'; }}>
-          <span className="timeline-cta-icon" aria-hidden="true">🌌</span>
-          <span className="timeline-cta-text">
-            <span className="timeline-cta-title">Discovery Timeline</span>
-            <span className="timeline-cta-sub">Wielki Wybuch → daleka przyszłość. Jedna ciągła podróż z Narratorem AI, bez ekranów ładowania.</span>
-          </span>
-          <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-        </button>
-        <nav className="home-nav" aria-label="Nawigacja Genesis OS">
-          <button className="whatif-nav-btn" onClick={() => { window.location.hash = '#/what-if'; }}>
-            <span aria-hidden="true">🌀</span> {t('nav.whatIf')}
-          </button>
-          <button className="qde-nav-btn" onClick={() => { window.location.hash = '#/decision-explorer'; }}>
-            <span aria-hidden="true">🌠</span> {t('nav.decisionExplorer')}
-          </button>
-          <button onClick={() => setSearchOpen(true)}>
-            <span aria-hidden="true">🔍</span> {t('nav.search')}
-          </button>
-          <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
-            <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}
-          </button>
-          <button onClick={() => { window.location.hash = '#/glossary'; }}>
-            <span aria-hidden="true">📚</span> {t('nav.glossary')}
-          </button>
-          <button onClick={() => { window.location.hash = '#/settings'; }}>
-            <span aria-hidden="true">⚙</span> {t('nav.settings')}
-          </button>
-        </nav>
-        <MissionStatusBar />
-        <div className="section-label">Laboratoria · {getLabs().length} modułów</div>
-        <div className="labs-grid">
-          {getLabs().map((l) => (
-            <button
-              key={l.id}
-              className="lab-card"
-              style={{ ['--accent' as string]: l.accent }}
-              onClick={() => { window.location.hash = `#/lab/${l.id}`; }}
-            >
-              <span className="badge" aria-hidden="true">{l.icon}</span>
-              <span className="name">{l.name}</span>
-              <span className="desc">{l.tagline}</span>
-            </button>
-          ))}
-        </div>
-        <p className="footer-note">
-          Genesis OS · Każda symulacja nosi etykietę uczciwości naukowej: hipotezy nigdy nie udają faktów.
-          Naciśnij <kbd>/</kbd>, aby szukać, albo <kbd>?</kbd> po listę skrótów.
-        </p>
-      </main>
-      {overlays}
-    </div>
+    <>
+      <RealityCanvas active={route.kind === 'reality'} />
+      {renderRoute()}
+    </>
   );
 }
 

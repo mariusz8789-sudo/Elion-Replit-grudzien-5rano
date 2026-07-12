@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { LabDefinition } from '../core/types';
 import { getLabs } from '../core/registry';
 import { HonestyBadge } from '../components/HonestyBadge';
+import { useSimLoop } from '../core/useSimLoop';
+import { NarratorArchitectureSim } from './experiments/discovery-architecture';
 
 /**
  * AI Discovery Lab — centrum warstwy AI platformy.
@@ -45,6 +47,8 @@ function DiscoveryView({ lab }: { lab: LabDefinition }) {
   const labs = getLabs();
   const exp = EXPERIMENTS[expIdx];
   const expLab = labs.find((l) => l.id === exp.lab);
+  const archSim = useMemo(() => new NarratorArchitectureSim(), []);
+  const archCanvasRef = useSimLoop(archSim, { aiStatus }, true);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +67,17 @@ function DiscoveryView({ lab }: { lab: LabDefinition }) {
 
   return (
     <div className="lab-view" style={{ ['--accent' as string]: lab.accent }}>
-      <HonestyBadge level={lab.honesty} note={lab.honestyNote} />
+      <div className="sim-stage" style={{ height: '34vh', minHeight: 220 }}>
+        <canvas
+          ref={archCanvasRef}
+          role="img"
+          aria-label="Diagram architektury warstwy AI: silnik deterministyczny (zawsze aktywny) i ścieżka modelu językowego (aktywna tylko gdy backend jest gotowy)."
+        />
+      </div>
+      <HonestyBadge
+        level={lab.honesty}
+        note={`Diagram powyżej odzwierciedla prawdziwą architekturę kodu, nie ilustrację poglądową: ścieżka silnika deterministycznego pulsuje zawsze, bo dosłownie liczy się na Twoim urządzeniu co klatkę w każdym laboratorium; ścieżka modelu językowego jaśnieje i przesyła cząstki WYŁĄCZNIE gdy status pobrany z GET /api/health faktycznie mówi „ready”. ${lab.honestyNote}`}
+      />
 
       <section className="narrator" aria-label="Propozycja eksperymentu">
         <div className="narrator-head">

@@ -14,9 +14,9 @@ import { KNOWN_NUCLIDES, findKnownNuclide, type KnownNuclide } from '../../data/
  * zasadą uczciwości naukowej Genesis OS.
  */
 
-const ZMAX = 100;
-const NMAX = 160;
-const MAGIC = [2, 8, 20, 28, 50, 82, 126];
+export const ZMAX = 100;
+export const NMAX = 160;
+export const MAGIC = [2, 8, 20, 28, 50, 82, 126];
 
 registerDataSource<KnownNuclide[]>({
   id: 'nuclear.known-nuclides',
@@ -213,7 +213,7 @@ class NuclideChartSim implements Sim {
   }
 }
 
-function colorForMode(mode: KnownNuclide['decayMode']): string {
+export function colorForMode(mode: KnownNuclide['decayMode']): string {
   switch (mode) {
     case 'stabilny': return '#e6eaf5';
     case 'β⁻': return '#5cd6e8';

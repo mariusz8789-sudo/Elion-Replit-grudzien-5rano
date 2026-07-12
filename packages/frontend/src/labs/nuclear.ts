@@ -3,6 +3,7 @@ import { tracePolylineBy } from '../core/canvasHelpers';
 import { nuclearChain } from './experiments/nuclear-chain';
 import { nuclearTokamak } from './experiments/nuclear-tokamak';
 import { nuclearChart } from './experiments/nuclear-chart';
+import { nuclearChart3D } from './experiments/nuclear-chart-3d';
 
 /**
  * Nuclear Lab — rozpad promieniotwórczy.
@@ -161,7 +162,7 @@ export const nuclearLab: LabDefinition = {
     },
   ],
   createSim: () => new DecaySim(),
-  experiments: [nuclearChart, nuclearChain, nuclearTokamak],
+  experiments: [nuclearChart, nuclearChart3D, nuclearChain, nuclearTokamak],
   narrate(p, stats) {
     const iso = ISOTOPES[String(p.isotope)] ?? ISOTOPES.c14;
     const rem = Number(stats.remaining ?? 308);

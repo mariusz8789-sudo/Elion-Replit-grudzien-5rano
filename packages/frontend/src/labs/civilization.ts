@@ -1,6 +1,7 @@
-import type { LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
+import type { ExperimentDef, LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
 import { sci } from '../core/useSimLoop';
 import { civilizationColonization } from './experiments/civilization-colonization';
+import { civilizationKardashev3D } from './experiments/civilization-kardashev-3d';
 
 /**
  * Civilization Lab — skala Kardaszewa.
@@ -128,12 +129,9 @@ class KardashevSim implements Sim {
   }
 }
 
-export const civilizationLab: LabDefinition = {
-  id: 'civilization',
-  name: 'Civilization Lab',
-  tagline: 'Skala Kardaszewa, megastruktury, przyszłość cywilizacji',
-  icon: '🛰️',
-  accent: '#f0b35c',
+const civilizationKardashev2D: ExperimentDef = {
+  id: 'kardashev-2d',
+  name: 'Skala Kardaszewa (2D)',
   honesty: 'theoretical',
   honestyNote:
     'Skala Kardaszewa i wzór Sagana są realnymi narzędziami z literatury SETI, ale wszystko powyżej dzisiejszej ludzkości (K≈0,73) to spekulacja: rój Dysona, cywilizacje galaktyczne i ich technologie są hipotezami inżynieryjnymi.',
@@ -144,7 +142,6 @@ export const civilizationLab: LabDefinition = {
     },
   ],
   createSim: () => new KardashevSim(),
-  experiments: [civilizationColonization],
   narrate(p) {
     const K = Number(p.k);
     const P = Math.pow(10, 10 * K + 6);
@@ -176,4 +173,18 @@ export const civilizationLab: LabDefinition = {
     }
     return blocks;
   },
+};
+
+export const civilizationLab: LabDefinition = {
+  id: 'civilization',
+  name: 'Civilization Lab',
+  tagline: 'Skala Kardaszewa, megastruktury, przyszłość cywilizacji',
+  icon: '🛰️',
+  accent: '#f0b35c',
+  honesty: civilizationKardashev3D.honesty,
+  honestyNote: civilizationKardashev3D.honestyNote,
+  params: civilizationKardashev3D.params,
+  createSim3D: civilizationKardashev3D.createSim3D,
+  experiments: [civilizationKardashev2D, civilizationColonization],
+  narrate: civilizationKardashev3D.narrate,
 };

@@ -93,7 +93,7 @@ function experimentBaseName(lab: LabDefinition): string {
     chemistry: 'Geometria molekularna (VSEPR)',
     biology: 'Podwójna helisa DNA',
     multiverse: 'Inne stałe',
-    civilization: 'Skala Kardaszewa',
+    civilization: 'Skala Kardaszewa (3D)',
   };
   return names[lab.id] ?? 'Podstawowy';
 }

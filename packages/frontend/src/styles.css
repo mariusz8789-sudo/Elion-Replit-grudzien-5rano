@@ -335,6 +335,7 @@ button:disabled { cursor: default; }
 .honesty.simplified { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); background: rgba(240, 179, 92, 0.06); }
 .honesty.educational { color: var(--cyan); border-color: rgba(92, 214, 232, 0.4); background: rgba(92, 214, 232, 0.06); }
 .honesty.theoretical { color: var(--violet); border-color: rgba(167, 139, 250, 0.45); background: rgba(167, 139, 250, 0.06); }
+.honesty.cinematic { color: #f472b6; border-color: rgba(244, 114, 182, 0.4); background: rgba(244, 114, 182, 0.06); }
 .honesty.confirmation-confirmed { color: var(--green); border-color: rgba(110, 231, 160, 0.4); background: rgba(110, 231, 160, 0.06); }
 .honesty.confirmation-confirmed-consensus { color: var(--cyan); border-color: rgba(92, 214, 232, 0.4); background: rgba(92, 214, 232, 0.06); }
 .honesty.confirmation-partial { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); background: rgba(240, 179, 92, 0.06); }

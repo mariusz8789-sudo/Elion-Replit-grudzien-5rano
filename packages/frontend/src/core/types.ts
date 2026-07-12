@@ -9,14 +9,24 @@
 /** Wartości parametrów sterujących symulacją. */
 export type SimParams = Record<string, number | boolean | string>;
 
-/** Poziom uczciwości naukowej modelu — zawsze widoczny w UI. */
-export type HonestyLevel = 'exact' | 'simplified' | 'educational' | 'theoretical';
+/**
+ * Poziom uczciwości naukowej modelu — zawsze widoczny w UI.
+ * 'cinematic' jest odrębny od pozostałych czterech: nie opisuje PRAWDOPODOBIEŃSTWA
+ * czy dokładności twierdzenia fizycznego, tylko oznacza, że dany element
+ * (trasa lotu kamery, tempo przejścia, kadrowanie) jest reżyserską decyzją
+ * Reality Navigatora — patrz core/reality/cameraSequencer.ts. Węzeł/wartość,
+ * którą kamera POKAZUJE, nadal nosi WŁASNĄ, osobną etykietę (zwykle 'exact',
+ * jeśli pochodzi ze Scientific Model Graph) — 'cinematic' nigdy nie zastępuje
+ * etykiety fizyki, tylko oznacza dodatkowo warstwę reżyserii nad nią.
+ */
+export type HonestyLevel = 'exact' | 'simplified' | 'educational' | 'theoretical' | 'cinematic';
 
 export const HONESTY_LABELS: Record<HonestyLevel, string> = {
   exact: 'Dokładne wzory fizyczne',
   simplified: 'Model uproszczony',
   educational: 'Model edukacyjny',
   theoretical: 'Model teoretyczny / hipoteza',
+  cinematic: 'Interpretacja kinowa / reżyserska',
 };
 
 /** Deklaratywna definicja parametru — UI kontrolek generuje się z tego. */

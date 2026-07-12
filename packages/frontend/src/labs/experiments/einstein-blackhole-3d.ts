@@ -302,7 +302,11 @@ class BlackHole3DSim implements Sim3D {
     // Warstwa 1: dysk akrecyjny główny — cienki, gęsty, szybki. W bgScene:
     // shader soczewkujący sprawia, że jego dalsza (za horyzontem) strona
     // widocznie "opływa" sylwetkę zamiast być tylko zasłonięta.
-    this.diskCount = scaleCount(1400, tier);
+    // Gęstość dysku znacząco zwiększona (założycielski audyt: dysk czytał
+    // się jako rzadki rozsyp kropek, nie świecąca powierzchnia). Więcej i
+    // większych cząstek w blendingu addytywnym = ciągła, jasna materia z
+    // wyraźnym gradientem jasności, nie ziarno.
+    this.diskCount = scaleCount(2600, tier);
     this.diskBase = Array.from({ length: this.diskCount }, () => {
       // Koncentracja radialna ku ISCO (r ∝ u^1.7): wewnętrzna krawędź jest
       // najgęstsza i najgorętsza — tam, gdzie dysk realnie świeci najmocniej.
@@ -321,7 +325,7 @@ class BlackHole3DSim implements Sim3D {
     this.diskGeo.setAttribute('position', new three.BufferAttribute(new Float32Array(this.diskCount * 3), 3));
     this.diskGeo.setAttribute('color', new three.BufferAttribute(new Float32Array(this.diskCount * 3), 3));
     this.diskMat = new three.PointsMaterial({
-      size: 0.09, vertexColors: true, transparent: true, opacity: 0.92,
+      size: 0.17, vertexColors: true, transparent: true, opacity: 0.95,
       map: dotTex, blending: three.AdditiveBlending, depthWrite: false,
     });
     bg.add(new three.Points(this.diskGeo, this.diskMat));
@@ -349,13 +353,16 @@ class BlackHole3DSim implements Sim3D {
     bg.add(new three.Points(this.coronaGeo, this.coronaMat));
     this.disposables.push(this.coronaGeo, this.coronaMat);
 
-    // Kamera znacznie bliżej niż poprzednia wersja (założycielski audyt:
-    // "framing" jako słabość — horyzont zajmował tylko ułamek kadru mimo
-    // wcześniejszego przybliżenia). Bez zmiany fizyki: r_s pozostaje
-    // jedyną skalą sceny, więc horyzont/dysk/pierścień fotonowy nadal
-    // skalują się jednorodnie z suwakiem masy — zmienia się tylko dystans
-    // obserwatora względem tej skali.
-    camera.position.set(this.RS * 5.2, this.RS * 3.1, this.RS * 6.8);
+    // Kamera blisko I NISKO (założycielski audyt: "framing", "near/far
+    // depth hierarchy"). Niski kąt (mała składowa y) sprawia, że dysk jest
+    // widziany prawie krawędziowo — a wtedy shader soczewkujący "unosi"
+    // daleką połowę dysku NAD sylwetkę czarnej dziury, dając ikoniczny
+    // obraz (jak Gargantua z „Interstellar"): przód dysku na dole, wygięta
+    // grawitacyjnie tylna połowa nad górą horyzontu. To NIE ozdoba — to
+    // bezpośredni, widoczny skutek tego samego prawdziwego soczewkowania,
+    // które w innym kadrze jest ledwie czytelne. Bez zmiany fizyki: r_s
+    // pozostaje jedyną skalą sceny (skalowanie z masą bez zmian).
+    camera.position.set(this.RS * 4.6, this.RS * 1.35, this.RS * 6.0);
     camera.lookAt(0, 0, 0);
     if (!reduced) camera.fov = 86;
     camera.updateProjectionMatrix();
@@ -444,7 +451,7 @@ class BlackHole3DSim implements Sim3D {
     // horyzontu, przygaszony na "ogonie" toru — geodezyjne mają być
     // informacją naukową NAD sceną, nie dominować nad samą czarną dziurą
     // (patrz honestyNote: hierarchia wizualna).
-    const mat = new three.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5 });
+    const mat = new three.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.78, blending: three.AdditiveBlending, depthWrite: false });
     const line = new three.Line(geo, mat);
     this.scene!.add(line);
 

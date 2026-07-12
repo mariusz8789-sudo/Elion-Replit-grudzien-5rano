@@ -9,19 +9,21 @@ import { G_ASTRO_YEAR, visVivaSpeed } from '../physics';
  * Navigator NIE wymyśla nowej fizyki, tylko przestawia istniejącą na nową
  * warstwę wizualizacji.
  *
- * Łańcuch (1 parametr → 3 wielkości pochodne):
- *   centralMassSolar (parametr, jednostka: masy Słońca)
- *     → orbitalPeriodYears   (III prawo Keplera, dokładne w jednostkach AU/rok/M☉)
- *     → orbitalSpeedAuPerYear (równanie vis-viva, ta sama funkcja co Universe Lab)
- *     → relativeTidalStrength (∝ M/r³ przy stałym r — dokładna proporcjonalność
- *                               siły pływowej, nie oszacowanie)
+ * Łańcuch (2 parametry → 3 wielkości pochodne):
+ *   centralMassSolar  (parametr, masy Słońca) ┐
+ *   orbitalRadiusAu   (parametr, AU)          ┴→ orbitalPeriodYears
+ *                                              → orbitalSpeedAuPerYear
+ *                                              → relativeTidalStrength
  *
- * semiMajorAxisAu jest STAŁĄ sceny (1 AU = orbita Ziemi, "znajomy świat"),
- * nie węzłem — trzymamy graf minimalny i uczciwy: to, co user faktycznie
- * zmienia w prototypie, to masa gwiazdy centralnej.
+ * Wszystkie trzy pochodne zależą od OBU parametrów — to jest realny graf
+ * wieloparametrowy (III prawo Keplera z ZMIENNĄ półosią a, nie stałą sceny),
+ * a więc gałęzie rzeczywistości mogą się rozchodzić po dwóch niezależnych
+ * osiach (masa gwiazdy ORAZ promień orbity) i faktycznie różnić się
+ * przewidywaniami. To jest fizycznie dokładne (Kepler dopuszcza tylko
+ * założenie orbity kołowej, e=0), nie sztuczne rozszerzenie.
  */
-export const SEMI_MAJOR_AXIS_AU = 1;
 export const BASELINE_MASS_SOLAR = 1;
+export const BASELINE_RADIUS_AU = 1;
 
 export function buildOrbitalModelGraph(): ModelGraph {
   const graph = new ModelGraph();
@@ -42,6 +44,22 @@ export function buildOrbitalModelGraph(): ModelGraph {
     BASELINE_MASS_SOLAR,
   );
 
+  graph.addNode(
+    {
+      id: 'orbitalRadiusAu',
+      label: 'Promień orbity',
+      unit: 'AU',
+      domain: 'mechanika orbitalna',
+      honesty: 'exact',
+      honestyNote: 'Parametr wejściowy — półoś wielka orbity (kołowej, e=0). Ustawiany bezpośrednio.',
+      derivation: 'direct',
+      inputs: [],
+      compute: (inputs) => inputs.orbitalRadiusAu ?? BASELINE_RADIUS_AU,
+      formula: 'a (parametr)',
+    },
+    BASELINE_RADIUS_AU,
+  );
+
   graph.addNode({
     id: 'orbitalPeriodYears',
     label: 'Okres orbitalny',
@@ -49,12 +67,12 @@ export function buildOrbitalModelGraph(): ModelGraph {
     domain: 'mechanika orbitalna',
     honesty: 'exact',
     honestyNote:
-      'III prawo Keplera w jednostkach astronomicznych (AU, lata, masy Słońca): T = 2π√(a³/(G·M)), G=4π² w tych jednostkach — dokładny wynik, ta sama formuła co Universe Lab.',
+      'III prawo Keplera w jednostkach astronomicznych (AU, lata, masy Słońca): T = 2π√(a³/(G·M)), G=4π² w tych jednostkach — dokładny wynik, ta sama formuła co Universe Lab. Zależy od OBU parametrów (masa i promień).',
     derivation: 'direct',
-    inputs: ['centralMassSolar'],
+    inputs: ['centralMassSolar', 'orbitalRadiusAu'],
     compute: (inputs) => {
       const mu = G_ASTRO_YEAR * inputs.centralMassSolar;
-      return 2 * Math.PI * Math.sqrt(Math.pow(SEMI_MAJOR_AXIS_AU, 3) / mu);
+      return 2 * Math.PI * Math.sqrt(Math.pow(inputs.orbitalRadiusAu, 3) / mu);
     },
     formula: 'T = 2π√(a³ / (4π²·M))',
   });
@@ -66,12 +84,12 @@ export function buildOrbitalModelGraph(): ModelGraph {
     domain: 'mechanika orbitalna',
     honesty: 'exact',
     honestyNote:
-      'Równanie vis-viva dla orbity kołowej (r=a): v²=μ(2/r−1/a) — ta sama funkcja core/physics.ts::visVivaSpeed, którą Universe Lab liczy dla prawdziwych planet.',
+      'Równanie vis-viva dla orbity kołowej (r=a): v²=μ(2/r−1/a) — ta sama funkcja core/physics.ts::visVivaSpeed, którą Universe Lab liczy dla prawdziwych planet. Zależy od OBU parametrów.',
     derivation: 'direct',
-    inputs: ['centralMassSolar'],
+    inputs: ['centralMassSolar', 'orbitalRadiusAu'],
     compute: (inputs) => {
       const mu = G_ASTRO_YEAR * inputs.centralMassSolar;
-      return visVivaSpeed(mu, SEMI_MAJOR_AXIS_AU, SEMI_MAJOR_AXIS_AU);
+      return visVivaSpeed(mu, inputs.orbitalRadiusAu, inputs.orbitalRadiusAu);
     },
     formula: 'v = √(μ(2/r − 1/a)), r=a (orbita kołowa)',
   });
@@ -83,11 +101,12 @@ export function buildOrbitalModelGraph(): ModelGraph {
     domain: 'mechanika orbitalna',
     honesty: 'exact',
     honestyNote:
-      'Przyspieszenie pływowe jest dokładnie proporcjonalne do M/r³ (standardowy gradient siły pływowej). Przy stałym promieniu orbity (r=1 AU, stała sceny) upraszcza się to do dokładnego stosunku M/M_bazowe — nie oszacowanie, tylko ta sama proporcjonalność zwinięta do jednej zmiennej.',
+      'Przyspieszenie pływowe jest dokładnie proporcjonalne do M/r³ (standardowy gradient siły pływowej). Odniesione do stanu bazowego (1 M☉ przy 1 AU) — dokładna proporcja (M/M_bazowe)·(r_bazowe/r)³, nie oszacowanie. Zależy od OBU parametrów.',
     derivation: 'direct',
-    inputs: ['centralMassSolar'],
-    compute: (inputs) => inputs.centralMassSolar / BASELINE_MASS_SOLAR,
-    formula: 'pływy ∝ M/r³ → (przy stałym r) M/M_bazowe',
+    inputs: ['centralMassSolar', 'orbitalRadiusAu'],
+    compute: (inputs) =>
+      (inputs.centralMassSolar / BASELINE_MASS_SOLAR) * Math.pow(BASELINE_RADIUS_AU / inputs.orbitalRadiusAu, 3),
+    formula: 'pływy ∝ M/r³ → (M/M₀)·(r₀/r)³',
   });
 
   return graph;

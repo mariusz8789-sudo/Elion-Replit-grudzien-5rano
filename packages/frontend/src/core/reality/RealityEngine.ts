@@ -2,6 +2,8 @@ import type * as THREE from 'three';
 import type { CameraFraming, RealityScene } from './types';
 import { CameraFlight, flightBetween, type FlightState } from './cameraSequencer';
 import { detectRenderTier, tierDpr } from '../three/quality';
+import { TransitController, type TransitContext, type TransitState } from './transit';
+import { TransitVisual } from './transitVisual';
 
 /**
  * Silnik persystentnej sceny 3D Reality Navigatora.
@@ -33,6 +35,10 @@ class RealityEngineImpl {
   private activeScene: RealityScene | null = null;
   private flight: CameraFlight | null = null;
   private flightLabel: string | null = null;
+
+  private transit = new TransitController();
+  private transitVisual: TransitVisual | null = null;
+  private onTransitComplete: ((ctx: TransitContext) => void) | null = null;
 
   private listeners = new Set<() => void>();
 
@@ -88,6 +94,7 @@ class RealityEngineImpl {
     this.scene = scene;
     this.camera = camera;
     this.controls = controls;
+    this.transitVisual = new TransitVisual(THREE, scene);
     this.fit();
 
     this.resizeObserver = new ResizeObserver(() => this.fit());
@@ -136,9 +143,24 @@ class RealityEngineImpl {
       this.applyFlightState(s);
       if (s.done) {
         this.flight = null;
-        this.controls.enabled = true;
+        if (!this.transit.isActive) this.controls.enabled = true;
       }
     }
+
+    // Reality Transit: model stanu jest źródłem prawdy (patrz transit.ts).
+    // Silnik posuwa go co klatkę i przy 'complete' JEDNORAZOWO oddaje kontekst
+    // konsumentowi (RealityNavigator wykonuje wtedy faktyczną zamianę gałęzi).
+    if (this.transit.isActive) {
+      this.transit.advance(dt);
+      const completed = this.transit.consumeCompletion();
+      if (completed) {
+        this.onTransitComplete?.(completed);
+        if (!this.flight) this.controls.enabled = true;
+      }
+      this.emit();
+    }
+    // Warstwa wizualna przejścia — czyta stan (transit.ts) i maluje tunel.
+    this.transitVisual?.update(this.transit.getState(), dt, this.camera);
 
     this.activeScene?.update(dt);
     this.activeScene?.syncScene();
@@ -183,6 +205,35 @@ class RealityEngineImpl {
 
   get isFlying(): boolean {
     return this.flight !== null && !this.flight.isDone;
+  }
+
+  /**
+   * Rozpoczyna Reality Transit — najpierw STAN (transit.ts), niezależnie od
+   * jakiejkolwiek wizualizacji. Blokuje ręczne sterowanie kamerą na czas
+   * przejścia. `onTransitComplete` (ustawiony przez konsumenta) odpala się
+   * DOKŁADNIE RAZ, gdy przejście dobiegnie fazy 'complete' — to jest moment,
+   * w którym RealityNavigator faktycznie przełącza aktywną gałąź.
+   */
+  beginTransit(context: TransitContext): boolean {
+    if (!this.controls) return false;
+    const started = this.transit.begin(context);
+    if (started) {
+      this.controls.enabled = false;
+      this.emit();
+    }
+    return started;
+  }
+
+  setOnTransitComplete(fn: ((ctx: TransitContext) => void) | null): void {
+    this.onTransitComplete = fn;
+  }
+
+  get transitState(): TransitState {
+    return this.transit.getState();
+  }
+
+  get isTransiting(): boolean {
+    return this.transit.isActive;
   }
 
   getSceneStats(): Record<string, number> {

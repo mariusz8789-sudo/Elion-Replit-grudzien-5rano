@@ -28,6 +28,35 @@ describe('buildOrbitalModelGraph', () => {
     expect(g.getValue('relativeTidalStrength')).toBeCloseTo(2.5, 10);
   });
 
+  it('exposes TWO independent parameters (mass and radius) as the graph roots', () => {
+    const g = buildOrbitalModelGraph();
+    expect(new Set(g.getParameterNodeIds())).toEqual(new Set(['centralMassSolar', 'orbitalRadiusAu']));
+    expect(g.getParameterSnapshot()).toEqual({ centralMassSolar: 1, orbitalRadiusAu: 1 });
+  });
+
+  it('orbit radius affects period via Kepler III (T ~ a^3/2): 4x radius at fixed mass gives 8x period', () => {
+    const g = buildOrbitalModelGraph();
+    const t0 = g.getValue('orbitalPeriodYears');
+    g.setParameter('orbitalRadiusAu', 4);
+    expect(g.getValue('orbitalPeriodYears')).toBeCloseTo(t0 * 8, 6);
+  });
+
+  it('relativeTidalStrength falls as 1/r^3: doubling radius at fixed mass gives 1/8 tidal strength', () => {
+    const g = buildOrbitalModelGraph();
+    g.setParameter('orbitalRadiusAu', 2);
+    expect(g.getValue('relativeTidalStrength')).toBeCloseTo(1 / 8, 10);
+  });
+
+  it('applyParameterSnapshot changing BOTH mass and radius recomputes each derived node once, caused by both roots', () => {
+    const g = buildOrbitalModelGraph();
+    const steps = g.applyParameterSnapshot({ centralMassSolar: 4, orbitalRadiusAu: 4 });
+    const periodSteps = steps.filter((s) => s.nodeId === 'orbitalPeriodYears');
+    expect(periodSteps).toHaveLength(1);
+    expect(periodSteps[0].causedBy.sort()).toEqual(['centralMassSolar', 'orbitalRadiusAu']);
+    // Kepler III with M=4, a=4: T = 2*pi*sqrt(a^3/(4pi^2 M)) = sqrt(64/4) = 4 years
+    expect(g.getValue('orbitalPeriodYears')).toBeCloseTo(4, 6);
+  });
+
   it('setParameter returns a propagation order with the parameter first and all three derived nodes following', () => {
     const g = buildOrbitalModelGraph();
     const steps = g.setParameter('centralMassSolar', 3);

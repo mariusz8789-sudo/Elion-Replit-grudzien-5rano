@@ -196,9 +196,26 @@ button:disabled { cursor: default; }
   background: rgba(255, 255, 255, 0.02);
 }
 .reality-log-node { color: var(--cyan); }
+.reality-log-main { display: flex; justify-content: space-between; gap: 0.6rem; }
+.reality-log-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.2rem; font-size: 0.64rem; }
+.reality-deriv { padding: 0.05rem 0.35rem; border-radius: 4px; border: 1px solid var(--border); letter-spacing: 0.03em; }
+.reality-deriv.direct { color: var(--green); border-color: rgba(110, 231, 160, 0.4); }
+.reality-deriv.approximate { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); }
+.reality-deriv.interpretive { color: var(--violet); border-color: rgba(167, 139, 250, 0.45); }
+.reality-cause { color: var(--text-faint); }
+.reality-log-row.deriv-approximate { border-left: 2px solid rgba(240, 179, 92, 0.5); }
+.reality-log-row.deriv-interpretive { border-left: 2px solid rgba(167, 139, 250, 0.5); }
+.reality-log-row.deriv-direct { border-left: 2px solid rgba(110, 231, 160, 0.5); }
 .reality-branches { display: flex; flex-direction: column; gap: 0.5rem; }
-.reality-branch-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.reality-branch-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.reality-branch-item { display: flex; gap: 0.4rem; align-items: center; }
 .reality-branch-list .chip-btn[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
+.ghost-btn { font-size: 0.66rem; }
+.ghost-btn[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.reality-compare { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.4rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px; background: rgba(240, 179, 92, 0.04); }
+.reality-compare-row { display: flex; justify-content: space-between; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
+.reality-compare-hint { font-size: 0.66rem; color: var(--text-faint); }
+.reality-flight-caption.transit { border-color: #f472b6; color: #f9c8e0; }
 
 /* Pasek statusu misji — realne dane (liczba laboratoriów, status AI), nie ozdoba */
 .mission-bar {

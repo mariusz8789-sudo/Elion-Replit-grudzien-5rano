@@ -8,17 +8,34 @@ import type { HonestyLevel } from '../types';
  *
  * Każdy węzeł to funkcja czystych wielkości liczbowych z jawną etykietą
  * uczciwości (ten sam core/types.ts::HonestyLevel co reszta platformy —
- * jedna taksonomia, nie równoległy system). Krawędzie to DEKLAROWANE
- * zależności wejść węzła; propagacja zmiany parametru jest topologicznym
- * BFS/DFS po prawdziwym grafie, nie wyreżyserowaną animacją.
+ * jedna taksonomia, nie równoległy system) ORAZ jawną klasyfikacją
+ * wyprowadzenia (`derivation`) — HonestyLevel opisuje, jak wiarygodny jest
+ * CAŁY model węzła; `derivation` opisuje, jak wiąże się z WŁASNYMI
+ * wejściami: 'direct' — dokładna algebra/wzór zamknięty przy podanych
+ * założeniach (Kepler, Lorentz, arytmetyka A=Z+N); 'approximate' — model
+ * przybliżający realną fizykę (SEMF pomija efekty powłokowe, ISCO zakłada
+ * brak spinu); 'interpretive' — połączenie międzydziedzinowe lub analogia
+ * bez rygorystycznego wyprowadzenia. To DRUGA, niezależna oś klasyfikacji —
+ * węzeł może być 'exact' (HonestyLevel, bo wzór jest znanym standardem) a
+ * jednocześnie 'approximate' (derivation, bo ten wzór sam przybliża
+ * głębszą fizykę).
+ *
+ * Krawędzie to DEKLAROWANE zależności wejść węzła; propagacja zmiany
+ * parametru jest topologicznym BFS/DFS po prawdziwym grafie, nie
+ * wyreżyserowaną animacją. `PropagationStep.causedBy` zapisuje, KTÓRE
+ * bezpośrednie wejścia tego węzła naprawdę się zmieniły w tej samej partii
+ * — to jest odpowiedź na „dlaczego ten węzeł się zmienił", czytana wprost
+ * z grafu, nie zgadywana.
  *
  * To jest fundament pod „Causal Shockwave": zmiana węzła zwraca
  * `PropagationStep[]` w PRAWDZIWEJ kolejności obliczeń — Reality Navigator
- * (core/reality) używa tej listy, żeby kamera odwiedzała węzły w kolejności,
- * w jakiej FAKTYCZNIE zostały przeliczone, a nie w kolejności wybranej dla
- * efektu. Dopóki graf nie ma węzłów, nie ma fali — świadomie, zgodnie z
- * zasadą „nie udawaj fali przyczynowej, zanim graf istnieje".
+ * (core/reality) używa tej listy, żeby kamera/fala odwiedzały węzły w
+ * kolejności, w jakiej FAKTYCZNIE zostały przeliczone, a nie w kolejności
+ * wybranej dla efektu. Dopóki graf nie ma węzłów, nie ma fali — świadomie,
+ * zgodnie z zasadą „nie udawaj fali przyczynowej, zanim graf istnieje".
  */
+
+export type NodeDerivation = 'direct' | 'approximate' | 'interpretive';
 
 export interface ModelNodeDef {
   id: string;
@@ -29,6 +46,8 @@ export interface ModelNodeDef {
   domain: string;
   honesty: HonestyLevel;
   honestyNote: string;
+  /** Jak węzeł wiąże się z własnymi wejściami — patrz docstring modułu. */
+  derivation: NodeDerivation;
   /** Id węzłów, od których zależy compute() — [] dla węzła-parametru (korzenia). */
   inputs: string[];
   /** Czysta funkcja: wartości węzłów wejściowych (po id) → wartość tego węzła. Węzeł-parametr (inputs=[]) ignoruje argument i zwraca bieżącą wartość ustawioną przez setParameter(). */
@@ -41,6 +60,8 @@ export interface PropagationStep {
   nodeId: string;
   value: number;
   previousValue: number;
+  /** Bezpośrednie wejścia TEGO węzła, które faktycznie zmieniły się w tej samej partii propagacji — prawdziwa odpowiedź na „co spowodowało tę zmianę", nie domysł UI. Puste dla samego zmienionego parametru (nic go nie "spowodowało" w tej partii). */
+  causedBy: string[];
 }
 
 export class ModelGraph {
@@ -80,21 +101,33 @@ export class ModelGraph {
     return [...this.nodes.values()];
   }
 
+  /** Id wszystkich węzłów-parametrów (korzeni, inputs=[]) — to, co gałąź rzeczywistości może migawkować/nadpisywać. */
+  getParameterNodeIds(): string[] {
+    return [...this.nodes.values()].filter((n) => n.inputs.length === 0).map((n) => n.id);
+  }
+
+  /** Migawka BIEŻĄCYCH wartości wszystkich węzłów-parametrów — podstawa gałęzi rzeczywistości (patrz core/reality/branches.ts). */
+  getParameterSnapshot(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const id of this.getParameterNodeIds()) out[id] = this.values.get(id)!;
+    return out;
+  }
+
   getValue(id: string): number {
     const v = this.values.get(id);
     if (v === undefined) throw new Error(`Nieznany węzeł „${id}"`);
     return v;
   }
 
-  /** Wszyscy potomkowie (bezpośredni i pośredni) węzła — wyznacza, co w ogóle MOŻE zmienić się w wyniku edycji tego węzła. */
-  private descendantsOf(rootId: string): Set<string> {
+  /** Wszyscy potomkowie (bezpośredni i pośredni) węzłów z `rootIds` — wyznacza, co w ogóle MOŻE zmienić się w wyniku edycji tych parametrów. */
+  private descendantsOf(rootIds: string[]): Set<string> {
     const desc = new Set<string>();
     let changed = true;
     while (changed) {
       changed = false;
       for (const [id, def] of this.nodes) {
         if (desc.has(id)) continue;
-        if (def.inputs.includes(rootId) || def.inputs.some((i) => desc.has(i))) {
+        if (def.inputs.some((i) => rootIds.includes(i) || desc.has(i))) {
           desc.add(id);
           changed = true;
         }
@@ -103,7 +136,7 @@ export class ModelGraph {
     return desc;
   }
 
-  /** Zwraca id potomków rootId w PRAWDZIWEJ kolejności topologicznej obliczeń (nie w kolejności dodania do grafu). */
+  /** Zwraca id węzłów z `ids` w PRAWDZIWEJ kolejności topologicznej obliczeń (nie w kolejności dodania do grafu). */
   private topoOrderOf(ids: Set<string>): string[] {
     const inDegree = new Map<string, number>();
     for (const id of ids) {
@@ -127,6 +160,33 @@ export class ModelGraph {
   }
 
   /**
+   * Wspólny silnik propagacji dla setParameter() i applyParameterSnapshot():
+   * `changes` to już ZASTOSOWANE nowe wartości korzeni (this.values zaktualizowane
+   * przed wywołaniem). Liczy potomków WSZYSTKICH zmienionych korzeni RAZEM w
+   * jednej partii (jeden spójny porządek topologiczny), więc węzeł zależny od
+   * dwóch zmienionych parametrów przelicza się DOKŁADNIE RAZ, nie dwa razy z
+   * niespójnym stanem pośrednim.
+   */
+  private propagate(changedRootIds: string[], rootSteps: PropagationStep[]): PropagationStep[] {
+    const steps = [...rootSteps];
+    const changedThisBatch = new Set<string>(changedRootIds);
+    const descendants = this.descendantsOf(changedRootIds);
+    for (const nodeId of this.topoOrderOf(descendants)) {
+      const nodeDef = this.nodes.get(nodeId)!;
+      const prev = this.values.get(nodeId)!;
+      const next = nodeDef.compute(this.collectInputs(nodeDef));
+      this.values.set(nodeId, next);
+      if (next !== prev) {
+        const causedBy = nodeDef.inputs.filter((i) => changedThisBatch.has(i));
+        steps.push({ nodeId, value: next, previousValue: prev, causedBy });
+        changedThisBatch.add(nodeId);
+      }
+    }
+    if (steps.length > 0) for (const listener of this.listeners) listener(steps);
+    return steps;
+  }
+
+  /**
    * Ustawia wartość węzła-parametru (musi mieć inputs=[]) i propaguje zmianę
    * do wszystkich potomków w PRAWDZIWEJ kolejności zależności. Zwraca listę
    * kroków — to jest dokładnie to, co Reality Navigator odtwarza jako
@@ -137,24 +197,37 @@ export class ModelGraph {
     const def = this.nodes.get(id);
     if (!def) throw new Error(`Nieznany węzeł „${id}"`);
     if (def.inputs.length > 0) throw new Error(`Węzeł „${id}" nie jest parametrem (ma zależności) — nie można go ustawić bezpośrednio`);
-    const steps: PropagationStep[] = [];
     const previousValue = this.values.get(id)!;
     this.values.set(id, value);
-    if (value !== previousValue) steps.push({ nodeId: id, value, previousValue });
-
-    const descendants = this.descendantsOf(id);
-    for (const nodeId of this.topoOrderOf(descendants)) {
-      const nodeDef = this.nodes.get(nodeId)!;
-      const prev = this.values.get(nodeId)!;
-      const next = nodeDef.compute(this.collectInputs(nodeDef));
-      this.values.set(nodeId, next);
-      if (next !== prev) steps.push({ nodeId, value: next, previousValue: prev });
-    }
-    if (steps.length > 0) for (const listener of this.listeners) listener(steps);
-    return steps;
+    const rootSteps: PropagationStep[] = value !== previousValue ? [{ nodeId: id, value, previousValue, causedBy: [] }] : [];
+    if (rootSteps.length === 0) return [];
+    return this.propagate([id], rootSteps);
   }
 
-  /** Powiadamiane po każdym setParameter() z niepustą listą kroków — Reality Navigator używa tego do napędzania kamery/UI, nie do udawania fizyki. */
+  /**
+   * Ustawia WIELE parametrów naraz (np. przywrócenie gałęzi rzeczywistości z
+   * kilkoma zmienionymi wartościami) i propaguje w JEDNEJ spójnej partii —
+   * patrz propagate(). Nieznane/nie-parametrowe klucze w `values` są pomijane
+   * po cichu (branchStore może przechowywać klucze z grafów, których ten
+   * konkretny wywołujący nie zna).
+   */
+  applyParameterSnapshot(values: Record<string, number>): PropagationStep[] {
+    const changedRootIds: string[] = [];
+    const rootSteps: PropagationStep[] = [];
+    for (const [id, value] of Object.entries(values)) {
+      const def = this.nodes.get(id);
+      if (!def || def.inputs.length > 0) continue;
+      const previousValue = this.values.get(id)!;
+      if (value === previousValue) continue;
+      this.values.set(id, value);
+      changedRootIds.push(id);
+      rootSteps.push({ nodeId: id, value, previousValue, causedBy: [] });
+    }
+    if (changedRootIds.length === 0) return [];
+    return this.propagate(changedRootIds, rootSteps);
+  }
+
+  /** Powiadamiane po każdym setParameter()/applyParameterSnapshot() z niepustą listą kroków — Reality Navigator używa tego do napędzania kamery/UI, nie do udawania fizyki. */
   subscribe(fn: (steps: PropagationStep[]) => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);

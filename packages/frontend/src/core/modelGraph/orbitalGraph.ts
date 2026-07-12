@@ -34,6 +34,7 @@ export function buildOrbitalModelGraph(): ModelGraph {
       domain: 'mechanika orbitalna',
       honesty: 'exact',
       honestyNote: 'Parametr wejściowy — nie obliczony, ustawiany bezpośrednio przez użytkownika.',
+      derivation: 'direct',
       inputs: [],
       compute: (inputs) => inputs.centralMassSolar ?? BASELINE_MASS_SOLAR,
       formula: 'M (parametr)',
@@ -49,6 +50,7 @@ export function buildOrbitalModelGraph(): ModelGraph {
     honesty: 'exact',
     honestyNote:
       'III prawo Keplera w jednostkach astronomicznych (AU, lata, masy Słońca): T = 2π√(a³/(G·M)), G=4π² w tych jednostkach — dokładny wynik, ta sama formuła co Universe Lab.',
+    derivation: 'direct',
     inputs: ['centralMassSolar'],
     compute: (inputs) => {
       const mu = G_ASTRO_YEAR * inputs.centralMassSolar;
@@ -65,6 +67,7 @@ export function buildOrbitalModelGraph(): ModelGraph {
     honesty: 'exact',
     honestyNote:
       'Równanie vis-viva dla orbity kołowej (r=a): v²=μ(2/r−1/a) — ta sama funkcja core/physics.ts::visVivaSpeed, którą Universe Lab liczy dla prawdziwych planet.',
+    derivation: 'direct',
     inputs: ['centralMassSolar'],
     compute: (inputs) => {
       const mu = G_ASTRO_YEAR * inputs.centralMassSolar;
@@ -81,6 +84,7 @@ export function buildOrbitalModelGraph(): ModelGraph {
     honesty: 'exact',
     honestyNote:
       'Przyspieszenie pływowe jest dokładnie proporcjonalne do M/r³ (standardowy gradient siły pływowej). Przy stałym promieniu orbity (r=1 AU, stała sceny) upraszcza się to do dokładnego stosunku M/M_bazowe — nie oszacowanie, tylko ta sama proporcjonalność zwinięta do jednej zmiennej.',
+    derivation: 'direct',
     inputs: ['centralMassSolar'],
     compute: (inputs) => inputs.centralMassSolar / BASELINE_MASS_SOLAR,
     formula: 'pływy ∝ M/r³ → (przy stałym r) M/M_bazowe',

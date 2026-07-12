@@ -38,10 +38,11 @@ describe('buildOrbitalModelGraph', () => {
     );
   });
 
-  it('every node carries an honesty label and a non-empty honestyNote (no silent unlabeled claims)', () => {
+  it('every node carries an honesty label, a derivation class, and a non-empty honestyNote (no silent unlabeled claims)', () => {
     const g = buildOrbitalModelGraph();
     for (const node of g.getAllNodes()) {
       expect(node.honesty).toBeTruthy();
+      expect(['direct', 'approximate', 'interpretive']).toContain(node.derivation);
       expect(node.honestyNote.length).toBeGreaterThan(10);
     }
   });

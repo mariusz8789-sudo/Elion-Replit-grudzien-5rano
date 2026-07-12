@@ -1,12 +1,15 @@
-import type { LabDefinition, Sim, SimParams } from '../core/types';
+import type { ExperimentDef, LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
 import { biologyDnaHelix } from './experiments/biology-dnahelix';
 import { biologyProteinFolding } from './experiments/biology-proteinfolding';
 
 /**
- * Biology Lab — pierwsze laboratorium spoza fizyki w Genesis OS.
- * Eksperyment bazowy: transport przez błonę komórkową (model płynnej
- * mozaiki, Singer & Nicolson 1972). Trzy realne, jakościowo poprawne
- * mechanizmy transportu:
+ * Biology Lab — flagowy eksperyment to teraz prawdziwa podwójna helisa DNA
+ * 3D (geometria Watson-Crick, patrz biology-dnahelix.ts) — promowana z
+ * zakładki pobocznej, żeby pierwszym widokiem NIE był płaski 2D rozsyp
+ * jonów. Dawny bazowy eksperyment (transport przez błonę komórkową) NIE
+ * został usunięty — jest teraz pierwszą pozycją w `experiments` jako
+ * „Transport błonowy (2D)": model płynnej mozaiki (Singer & Nicolson 1972)
+ * z trzema realnymi, jakościowo poprawnymi mechanizmami transportu:
  * - dyfuzja prosta: małe, niepolarne cząsteczki (O2, CO2) przechodzą
  *   bezpośrednio przez dwuwarstwę lipidową, zawsze Z gradientem stężenia
  * - dyfuzja wspomagana: naładowane/polarne cząsteczki (glukoza, jony)
@@ -160,12 +163,10 @@ class MembraneSim implements Sim {
   }
 }
 
-export const biologyLab: LabDefinition = {
-  id: 'biology',
-  name: 'Biology Lab',
-  tagline: 'Błona komórkowa, transport, DNA',
-  icon: '🧬',
-  accent: '#6ee7a0',
+/** Dawny bazowy eksperyment (transport przez błonę komórkową) — teraz zakładka poboczna, nieusunięta. */
+const biologyMembraneTransport2D: ExperimentDef = {
+  id: 'membrane-transport-2d',
+  name: 'Transport błonowy (2D)',
   honesty: 'simplified',
   honestyNote:
     'Model płynnej mozaiki (Singer & Nicolson 1972): jakościowo poprawny kierunek i mechanizm transportu (dyfuzja prosta i wspomagana ZAWSZE z gradientem, transport aktywny MOŻE iść pod prąd kosztem ATP). Stechiometria pompy Na⁺/K⁺-ATPazy (3 Na⁺ na zewnątrz : 2 K⁺ do wewnątrz na 1 ATP) to zmierzony fakt biochemiczny (Skou, Nagroda Nobla 1997). Liczby cząstek, tempo dyfuzji i czas cyklu pompy są ILUSTRACYJNE — nie prawdziwe stężenia molowe ani zmierzone stałe kinetyczne.',
@@ -174,8 +175,7 @@ export const biologyLab: LabDefinition = {
     { key: 'pump', label: 'Pompa Na⁺/K⁺-ATPaza (transport aktywny)', type: 'toggle', default: false },
   ],
   createSim: () => new MembraneSim(),
-  experiments: [biologyDnaHelix, biologyProteinFolding],
-  narrate(p, stats) {
+  narrate(p, stats): NarrationBlock[] {
     const channelsOpen = Boolean(p.channels);
     const pumpOn = Boolean(p.pump);
     const naOut = Number(stats.naOut ?? 0);
@@ -203,4 +203,18 @@ export const biologyLab: LabDefinition = {
       },
     ];
   },
+};
+
+export const biologyLab: LabDefinition = {
+  id: 'biology',
+  name: 'Biology Lab',
+  tagline: 'DNA, białka, błona komórkowa, transport',
+  icon: '🧬',
+  accent: '#6ee7a0',
+  honesty: biologyDnaHelix.honesty,
+  honestyNote: biologyDnaHelix.honestyNote,
+  params: biologyDnaHelix.params,
+  createSim3D: biologyDnaHelix.createSim3D,
+  experiments: [biologyMembraneTransport2D, biologyProteinFolding],
+  narrate: biologyDnaHelix.narrate,
 };

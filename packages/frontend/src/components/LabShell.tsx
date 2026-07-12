@@ -91,6 +91,7 @@ function experimentBaseName(lab: LabDefinition): string {
     nuclear: 'Rozpad',
     particle: 'Detektor',
     chemistry: 'Geometria molekularna (VSEPR)',
+    biology: 'Podwójna helisa DNA',
     multiverse: 'Inne stałe',
     civilization: 'Skala Kardaszewa',
   };

@@ -46,6 +46,11 @@ class RealityEngineImpl {
     return this.renderer !== null;
   }
 
+  /** Aspekt (szerokość/wysokość) aktywnej kamery — sceny używają go do kadrowania szerokich układów na wąskich (portretowych) ekranach. */
+  get viewportAspect(): number {
+    return this.camera?.aspect ?? 1.6;
+  }
+
   get activeSceneLabel(): string | null {
     return this.activeScene?.label ?? null;
   }

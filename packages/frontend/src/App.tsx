@@ -21,6 +21,7 @@ import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboardin
 import { playEnterLab } from './core/sound';
 import { RealityCanvas } from './components/RealityCanvas';
 import { RealityNavigator } from './components/RealityNavigator';
+import { EngineeringNavigator } from './components/EngineeringNavigator';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -38,7 +39,8 @@ type Route =
   | { kind: 'what-if' }
   | { kind: 'timeline' }
   | { kind: 'decision-explorer' }
-  | { kind: 'reality' };
+  | { kind: 'reality' }
+  | { kind: 'prebuild' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -51,6 +53,7 @@ function parseHash(): Route {
   if (h === '#/timeline') return { kind: 'timeline' };
   if (h === '#/decision-explorer') return { kind: 'decision-explorer' };
   if (h === '#/reality') return { kind: 'reality' };
+  if (h === '#/prebuild') return { kind: 'prebuild' };
   return { kind: 'home' };
 }
 
@@ -258,6 +261,20 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'prebuild') {
+      return (
+        <div className="app reality-app">
+          <TopBar title="🏭 Machine Pre-Build" onSearch={() => setSearchOpen(true)} />
+          <main id="main-content" tabIndex={-1} className="reality-main">
+            <ErrorBoundary>
+              <EngineeringNavigator />
+            </ErrorBoundary>
+          </main>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -282,6 +299,14 @@ export default function App() {
             <span className="timeline-cta-text">
               <span className="timeline-cta-title">Reality Navigator <em>(prototyp)</em></span>
               <span className="timeline-cta-sub">Zmień masę gwiazdy centralnej i patrz, jak kamera odwiedza rzeczywiste konsekwencje w Scientific Model Graph — nie animację, obliczenia.</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
+          <button className="timeline-cta" onClick={() => { window.location.hash = '#/prebuild'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true">🏭</span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Machine Pre-Build <em>(prototyp)</em></span>
+              <span className="timeline-cta-sub">Zaprojektuj układ pompa–rurociąg, zobacz konsekwencje z prowieniencją (obliczone vs empiryczne vs oszacowane), ranking wrażliwości i CO ZMIERZYĆ przed budową. Symulacja koncepcyjna — nie CFD.</span>
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>
@@ -333,7 +358,7 @@ export default function App() {
 
   return (
     <>
-      <RealityCanvas active={route.kind === 'reality'} />
+      <RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} />
       {renderRoute()}
     </>
   );

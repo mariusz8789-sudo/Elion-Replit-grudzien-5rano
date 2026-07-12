@@ -76,6 +76,18 @@ export class EngineeringModel {
     return this.config.provenance.parameterProvenance[id] ?? 'user-provided';
   }
 
+  /**
+   * Zmienia prowieniencję parametru w czasie działania i PONOWNIE propaguje ją
+   * przez cały graf. Kluczowe dla uczciwości: gdy użytkownik zaznaczy „rura
+   * stara/skorodowana", chropowatość degraduje się do 'requires-validation', a
+   * ta degradacja rozlewa się (validationLimited) na wszystkie wielkości od
+   * niej zależne — bez tego wynik wyglądałby na pewniejszy niż jest.
+   */
+  setParameterProvenance(id: string, provenance: Provenance): void {
+    this.config.provenance.parameterProvenance[id] = provenance;
+    this.effProvenance = propagateProvenance(this.graph, this.config.provenance);
+  }
+
   /** Prowieniencja modelu węzła pochodnego (typ jego wzoru). */
   modelProvenance(id: string): Provenance {
     return this.config.provenance.modelProvenance[id] ?? 'calculated';

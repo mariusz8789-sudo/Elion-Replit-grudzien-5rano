@@ -92,7 +92,7 @@ function experimentBaseName(lab: LabDefinition): string {
     particle: 'Detektor cząstek 3D',
     chemistry: 'Geometria molekularna (VSEPR)',
     biology: 'Podwójna helisa DNA',
-    multiverse: 'Inne stałe',
+    multiverse: 'Gwiazda innego wszechświata (3D)',
     civilization: 'Skala Kardaszewa (3D)',
   };
   return names[lab.id] ?? 'Podstawowy';

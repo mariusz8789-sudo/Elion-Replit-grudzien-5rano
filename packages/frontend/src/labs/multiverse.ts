@@ -1,6 +1,7 @@
-import type { LabDefinition, Sim, SimParams } from '../core/types';
+import type { ExperimentDef, LabDefinition, Sim, SimParams } from '../core/types';
 import { multiverseTesseract } from './experiments/multiverse-tesseract';
 import { multiverseNexus } from './experiments/multiverse-nexus';
+import { multiverseAltStar3D } from './experiments/multiverse-altstar-3d';
 
 /**
  * Multiverse Lab — alternatywne stałe fizyczne. MODEL TEORETYCZNY.
@@ -131,12 +132,9 @@ class AltStarSim implements Sim {
   }
 }
 
-export const multiverseLab: LabDefinition = {
-  id: 'multiverse',
-  name: 'Multiverse Lab',
-  tagline: 'Co gdyby stałe fizyczne były inne? (hipotezy)',
-  icon: '🔮',
-  accent: '#a78bfa',
+const multiverseAltStar2D: ExperimentDef = {
+  id: 'altstar-2d',
+  name: 'Gwiazda innego wszechświata (2D)',
   honesty: 'theoretical',
   honestyNote:
     'Wszystko tutaj to modele teoretyczne. Skalowania (czas życia gwiazd, progi stabilności jąder) są szacunkami rzędów wielkości z literatury fine-tuningu. Istnienie innych wszechświatów oraz interpretacja wielu światów to hipotezy bez potwierdzenia obserwacyjnego.',
@@ -217,5 +215,18 @@ export const multiverseLab: LabDefinition = {
 
     return blocks;
   },
-  experiments: [multiverseNexus, multiverseTesseract],
+};
+
+export const multiverseLab: LabDefinition = {
+  id: 'multiverse',
+  name: 'Multiverse Lab',
+  tagline: 'Co gdyby stałe fizyczne były inne? (hipotezy)',
+  icon: '🔮',
+  accent: '#a78bfa',
+  honesty: multiverseAltStar3D.honesty,
+  honestyNote: multiverseAltStar3D.honestyNote,
+  params: multiverseAltStar3D.params,
+  createSim3D: multiverseAltStar3D.createSim3D,
+  experiments: [multiverseAltStar2D, multiverseNexus, multiverseTesseract],
+  narrate: multiverseAltStar3D.narrate,
 };

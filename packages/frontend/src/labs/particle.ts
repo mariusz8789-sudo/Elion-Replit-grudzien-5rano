@@ -1,8 +1,13 @@
-import type { LabDefinition, Sim, SimParams } from '../core/types';
+import type { ExperimentDef, LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
 import { particleInvMass } from './experiments/particle-invmass';
+import { particleDetector3D } from './experiments/particle-detector-3d';
 
 /**
- * Particle Lab — wizualizacja zderzeń w detektorze.
+ * Particle Lab — flagowy eksperyment to teraz prawdziwy detektor 3D
+ * (helisy w polu solenoidalnym, patrz particle-detector-3d.ts) — promowany
+ * z zakładki pobocznej, żeby pierwszym widokiem NIE był płaski 2D rozbłysk
+ * łuków. Dawny bazowy eksperyment (płaska wersja 2D) NIE został usunięty
+ * — jest teraz pierwszą pozycją w `experiments` jako „Detektor 2D".
  * Poglądowa (edukacyjna) rekonstrukcja zdarzeń w stylu detektorów CERN:
  * naładowane cząstki zakrzywiają tory w polu magnetycznym (r = p/qB — ta
  * zależność jest fizycznie poprawna), fotony lecą prosto. NIE odtwarzamy
@@ -148,12 +153,10 @@ class CollisionSim implements Sim {
   }
 }
 
-export const particleLab: LabDefinition = {
-  id: 'particle',
-  name: 'Particle Lab',
-  tagline: 'Kwarki, bozony, zderzenia — detektor cząstek',
-  icon: '💥',
-  accent: '#f47c7c',
+/** Dawny bazowy eksperyment (płaska wersja 2D) — teraz zakładka poboczna, nieusunięta. */
+const particleCollision2D: ExperimentDef = {
+  id: 'detector-2d',
+  name: 'Detektor 2D',
   honesty: 'educational',
   honestyNote:
     'Wizualizacja poglądowa inspirowana detektorami CERN. Fizycznie poprawna jest zależność krzywizny toru od pędu i ładunku (r = p/qB). Rodzaje i liczba cząstek są losowane — NIE odtwarzamy rzeczywistych przekrojów czynnych LHC.',
@@ -162,8 +165,7 @@ export const particleLab: LabDefinition = {
     { key: 'auto', label: 'Zderzaj automatycznie', type: 'toggle', default: true },
   ],
   createSim: () => new CollisionSim(),
-  experiments: [particleInvMass],
-  narrate(p, stats) {
+  narrate(p, stats): NarrationBlock[] {
     const n = Number(stats.tracks ?? 0);
     return [
       {
@@ -181,4 +183,18 @@ export const particleLab: LabDefinition = {
       },
     ];
   },
+};
+
+export const particleLab: LabDefinition = {
+  id: 'particle',
+  name: 'Particle Lab',
+  tagline: 'Kwarki, bozony, zderzenia — detektor cząstek',
+  icon: '💥',
+  accent: '#f47c7c',
+  honesty: particleDetector3D.honesty,
+  honestyNote: particleDetector3D.honestyNote,
+  params: particleDetector3D.params,
+  createSim3D: particleDetector3D.createSim3D,
+  experiments: [particleCollision2D, particleInvMass],
+  narrate: particleDetector3D.narrate,
 };

@@ -89,7 +89,7 @@ function experimentBaseName(lab: LabDefinition): string {
     einstein: 'Czarna dziura 3D',
     quantum: 'Dwie szczeliny',
     nuclear: 'Rozpad',
-    particle: 'Detektor',
+    particle: 'Detektor cząstek 3D',
     chemistry: 'Geometria molekularna (VSEPR)',
     biology: 'Podwójna helisa DNA',
     multiverse: 'Inne stałe',

@@ -148,6 +148,42 @@ prymitywy. Przykładowe nazwy prymitywów w stylu przestrzeni nazw:
 z zarejestrowanych prymitywów zawsze, gdy to możliwe — zweryfikowane
 komponenty naukowe mają pierwszeństwo przed generowanymi algorytmami.
 
+### Formalny schemat węzła (node schema) — konkretna specyfikacja pól
+
+Konkretyzacja Simulation IR/Scientific Primitive Registry wyżej — nie nowy
+system, tylko dokładna lista pól, które każdy węzeł MUSI deklarować, żeby
+walidator mógł faktycznie coś sprawdzić (nie tylko "mieć metadane" w
+teorii). Węzeł Scientific Model Graph = jeden zarejestrowany prymityw:
+
+`ID modelu`, `wersja modelu`, `dziedzina`, `wejścia` (z jednostkami),
+`wyjścia` (z jednostkami), `jednostki`, `wymiary fizyczne` (do sprawdzania
+spójności wymiarowej, nie tylko nazw jednostek), `stan` (co model
+pamięta między krokami), `parametry`, `założenia` (lista jawnych uproszczeń
+— to jest dokładnie treść dzisiejszych `honestyNote`, tylko ustrukturyzowana
+zamiast wolnego tekstu), `warunki brzegowe`, `skala czasowa`, `skala
+przestrzenna`, `typ solvera`, `precyzja numeryczna`, `niepewność`,
+`status epistemiczny` (mapowany na istniejący `ConfirmationLevel` —
+patrz zasada 2 niżej, żadnej równoległej skali), `proweniencja źródła`,
+`wymagania kompatybilności` (z jakimi innymi węzłami ten węzeł może się
+łączyć i na jakich warunkach — jednostki, skala czasowa, założenia muszą
+się zgadzać).
+
+Pipeline walidacji (konkretyzacja „Pipeline walidacji" niżej, w tej samej
+kolejności co dziś zaprojektowana): INTENCJA UŻYTKOWNIKA → PARSER
+INTENCJI (LLM) → ŚCISŁE SIMULATION IR → DETERMINISTYCZNY WALIDATOR GRAFU →
+WALIDACJA JEDNOSTEK/WYMIARÓW → SPRAWDZENIE KOMPATYBILNOŚCI MODELI →
+WYKONANIE SOLVERA → STAN RENDEROWANIA → OBSERWACJA → NAUKOWE WYJAŚNIENIE
+AI. Kluczowa zasada bezpieczeństwa architektonicznego: **LLM nigdy nie jest
+ostateczną instancją matematyczną.** LLM może PROPONOWAĆ kompozycję węzłów
+i parametry; wyłącznie deterministyczny walidator decyduje, czy skład jest
+fizycznie/numerycznie spójny (niezgodność jednostek, niezgodność wymiarów,
+nieprawidłowe sprzężenie stanu, niewspierane sprzężenie skali czasowej,
+brakujące warunki brzegowe, niekompatybilność solverów, ryzyko
+niestabilności numerycznej, konflikt epistemiczny, niewspierane założenia).
+AI nigdy nie wolno cicho nadpisać prawa zachowania ani błędu matematycznego
+— jeśli walidator odrzuci kompozycję, użytkownik dostaje wyjaśnienie
+DLACZEGO, nie ciche zaokrąglenie problemu.
+
 ### Automatyczny wybór metody numerycznej (solver)
 
 Genesis docelowo analizuje Simulation IR i rekomenduje odpowiednią metodę
@@ -294,6 +330,37 @@ zużycie wody" (klimat + termodynamika + energia + populacja +
 infrastruktura). To punkt, w którym Genesis OS mógłby stać się
 fundamentalnie czymś innym niż zbiorem edukacyjnych symulacji — platformą
 łączącą dziedziny naukowe.
+
+### Minimalny dowód międzydziedzinowy: ucieczka atmosfery
+
+Zanim zacznie się budować cokolwiek z Model Composera powyżej, potrzebny
+jest JEDEN mały, konkretny dowód, że kompozycja węzłów faktycznie działa —
+nie kolejny akapit wizji. Kandydat celowo wąski (zgodnie z zasadą „nie
+overbuildować dowodu, celem jest udowodnienie kompozycji, nie zbudowanie
+nowego laboratorium"):
+
+1. **Węzeł orbitalny** — reużywa `core/physics.ts::keplerPosition`
+   (dokładnie ten sam solver co dziś w Universe Lab) do policzenia R(t):
+   odległości planety od gwiazdy w czasie, z istniejących elementów
+   orbitalnych.
+2. **Węzeł energii gwiazdy** — z R(t) i jasności gwiazdy liczy natężenie
+   promieniowania I(t) na górnej granicy atmosfery (prawo odwrotnych
+   kwadratów — jeden nowy, mały, czysty wzór, nie nowy silnik).
+3. **Węzeł ucieczki atmosfery** — z I(t), grawitacji planety i masy
+   molekularnej gazu liczy przybliżone tempo ucieczki dM/dt (uproszczony
+   model energy-limited escape — jawnie oznaczony jako uproszczenie, nie
+   pełny model hydrodynamiczny egzosfery).
+
+**Kryterium sukcesu jest architektoniczne, nie naukowe**: zmiana
+parametru orbitalnego lub gwiezdnego w węźle 1 lub 2 musi w widoczny
+sposób zmienić wynik węzła 3 — WYŁĄCZNIE przez przepływ danych między
+węzłami (typowane wejścia/wyjścia z jednostkami), nigdy przez zakodowaną
+na sztywno zależność w jednym komponencie React. Jeśli to działa dla
+trzech węzłów, wzorzec jest gotowy do rozszerzenia na więcej dziedzin —
+jeśli nie działa, to sygnał, że Simulation IR/węzeł wymaga przeprojektowania,
+zanim powstanie cokolwiek większego. **Nie budować teraz** — to zadanie
+staje się aktualne dopiero, gdy Faza 2/3 fazowej mapy drogowej (Simulation
+IR + prototyp Model Composera) faktycznie się zaczyna.
 
 ### Discovery Loop
 
@@ -520,6 +587,79 @@ całej platformy, jeśli granica model/hipoteza/legenda się zatrze choćby raz.
 Każdy pojedynczy scenariusz wymaga tego samego poziomu researchu co
 `knowledge/*.md` dla istniejących labów — nie da się tego zrobić płytko.
 
+#### Rozszerzenie zakresu: modele kontestowane (Płaska Ziemia, Tartaria, Tesla, firmament, ukryte lądy) — NIE osobny lab, ta sama architektura
+
+**NIE BUDOWAĆ TERAZ.** To, co founder-level briefing nazywa „Reality Models
+/ Alternative Cosmologies / Contested World Models", „Flat Earth",
+„Firmament", „Tartaria", „ukryte kontynenty", „roszczenia Tesli o
+podziemnych sieciach" NIE jest nowym, konkurencyjnym systemem względem
+Frontier Science Lab powyżej — to dokładnie ta sama kategoria (granica
+między nauką ugruntowaną, aktywnymi badaniami, historycznymi zagadkami i
+twierdzeniami społecznościowymi), tylko z większym naciskiem na
+PROWENIENCJĘ TWIERDZENIA niż na pojedynczy fakt fizyczny. Rozszerza
+zakres tego laboratorium, nie zastępuje go.
+
+**Metodologia (ta sama dla każdego tematu w tej podkategorii)**:
+CLAIM → LOKALIZACJA → NAJWCZEŚNIEJSZE ODNALEZIONE ŹRÓDŁO → ŁAŃCUCH ŹRÓDEŁ
+→ DOWODY WSPIERAJĄCE → DOWODY SPRZECZNE → JAKOŚĆ ŹRÓDŁA → BIEŻĄCY STATUS.
+Reddit/YouTube/fora to WYŁĄCZNIE sygnały odkrywcze (gdzie szukać, jakie
+mapy/twierdzenia krążą) — nigdy dowód sam w sobie; popularność ≠ jakość
+źródła; post na Reddicie powtarzający inny post na Reddicie nie jest
+niezależnym potwierdzeniem. Każde twierdzenie musi być prześledzone
+wstecz do najwcześniejszego możliwego do zidentyfikowania źródła (mapa
+historyczna, dokument, publikacja, nazwany badacz) — to **Claim Mutation
+Graph**: ŹRÓDŁO ORYGINALNE → WCZESNA INTERPRETACJA → WERSJA
+SPOŁECZNOŚCIOWA → WERSJA WIRALNA → WSPÓŁCZESNE TWIERDZENIE, docelowo
+wizualizowalny jako ścieżka (np. XVI-wieczna mapa polarna → XX-wieczna
+reinterpretacja → przycięty skan → relabelowana wiralna mapa → dzisiejsze
+twierdzenie na TikToku) — samo w sobie potencjalnie sygnaturalna funkcja
+badawcza Genesis OS, uczciwsza niż jakikolwiek istniejący viral-debunking
+content, bo pokazuje PEŁNY łańcuch, nie tylko werdykt.
+
+**Reality Model Comparator** (pierwszy wąski dowód koncepcji, analogicznie
+do „Minimalnego dowodu międzydziedzinowego" wyżej): użytkownik wybiera
+STANDARDOWY MODEL NAUKOWY i JEDEN precyzyjnie zidentyfikowany model
+alternatywny (nie generyczny „model płaskiej Ziemi" — dokładna geometria
+źródłowa i jej parametry), potem wybiera obserwację (proponowany pierwszy
+dowód: zachód słońca). Genesis liczy przewidywanie KAŻDEGO modelu dla TEJ
+SAMEJ obserwacji i pokazuje: przewidywanie modelu, dane zaobserwowane,
+residuum/błąd, dopasowanie modelu, domenę modelu, założenia. Dopasowanie
+modelu jest WYLICZANE z eksperymentu, nigdy ręcznie ustawiane —
+architektura nie może zawierać zakodowanego na sztywno „model A wygrywa".
+Firmament, ukryte lądy za Antarktydą, roszczenia o sztucznym Księżycu i
+podziemne sieci Tesli/tunelowe to kolejne tematy tej samej maszynerii, nie
+osobne systemy — każdy dostaje: dokładną geometrię/model źródłowy, jego
+założenia fizyczne, przewidywane obserwacje, dostępne dowody, dowody
+sprzeczne, testowalność.
+
+**Rozstrzygnięcie taksonomii statusu epistemicznego (musi być ustalone
+PRZED implementacją, zgodnie z zasadą architektoniczną nr 2 w
+`ARCHITECTURE.md` §„Wizja założycielska": żadna nowa etykieta pewności
+równolegle do `HonestyLevel`/`ConfirmationLevel`)**: sam sześciostopniowy
+`ConfirmationLevel` (confirmed/confirmed-consensus/partial/hypothesis/
+speculation/fiction) nie wystarcza dla tej podkategorii — brakuje mu pojęć
+„aktywnie sprzeczne z dowodami" (różne od „niesprawdzona hipoteza") i
+„twierdzenie społecznościowe o niejasnej proweniencji" (oś JAKOŚCI ŹRÓDŁA,
+nie oś PEWNOŚCI). Rekomendacja zamiast trzeciego, równoległego systemu:
+(1) dodać do `ConfirmationLevel` dwie nowe wartości — `disputed` (aktywnie
+kontestowane, dowody po obu stronach) i `contradicted` (aktywnie
+sfalsyfikowane dostępnymi dowodami); (2) rozszerzyć już zaprojektowany
+(wyżej w tym pliku) `ScenarioKind` o dwie nowe wartości obok istniejących
+pięciu — „Community Claim" (proweniencja: internet/społeczność, nie
+recenzowana publikacja) i „Speculative Reconstruction" (wierna cyfrowa
+rekonstrukcja ŹRÓDŁOWEJ mapy/twierdzenia — NIE twierdzenie o
+rzeczywistości; w produktowym języku „wierna mapa" musi zawsze znaczyć
+„wierna rekonstrukcja twierdzonego źródła", nigdy „udowodniona mapa
+rzeczywistości"). Te dwie osie (`ConfirmationLevel` × `ScenarioKind`) się
+nie wykluczają — dokładnie ten sam wzorzec co istniejące `HonestyLevel` ×
+`ConfirmationLevel`.
+
+**3D dopiero dla najsilniej udokumentowanych modeli, wierne źródłu, nie
+composite z dwudziestu niekompatybilnych internetowych teorii.** Wysoka
+wierność renderowania i status epistemiczny to dwa NIEZALEŻNE systemy —
+model spekulacyjny wolno renderować z dużą starannością wizualną,
+pozostając jawnie oznaczonym `speculation`/`disputed`/`community-claim`.
+
 ### Trzy Ciała — od wykresu do laboratorium (★★★★★ chaos deterministyczny) — ✅ ZBUDOWANY PIERWSZY KROK
 
 **Status: zbudowany "realistyczny pierwszy krok" opisany niżej** —
@@ -672,6 +812,104 @@ Backlog na przyszłość (NIE zbudowane): spersonalizowany film/zwiastun 4K
 (osobny temat produkcyjny, rendering offline); ewentualne AI sugerujące
 nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
 
+### c-Slider — sygnaturalny eksperyment „co by było, gdyby c się zmieniło"
+
+**NIE BUDOWAĆ TERAZ.** Zachowywana tu jako specyfikacja sygnaturalnego,
+potencjalnie wirusowego eksperymentu — dokładność uczciwościowa jest
+warunkiem koniecznym, nie kosmetyką, bo to dokładnie ten rodzaj funkcji,
+która się rozchodzi i musi wytrzymać kontrolę fizyków.
+
+Punkt startowy: znajomy układ (Ziemia-Księżyc albo Układ Słoneczny — reużywa
+`universe-solar-system-3d.ts`). Panel „Stałe fundamentalne" z suwakiem `c`
+(domyślnie 299 792,458 km/s). Obniżenie `c` ma obliczać i wizualizować
+konsekwencje z JAWNIE wybranych modeli: relatywistyczne przesunięcie
+Dopplera, wzmocnienie relatywistyczne (beaming — dokładnie ten sam wzór
+`δ = 1/(γ(1−β·cosθ))` co dziś w dysku akrecyjnym Einstein Lab), czynnik
+Lorentza, aberracja, opóźnienie światła w czasie, efekt Terrella (pozorna
+rotacja) tam, gdzie technicznie wspierany.
+
+**Twarda zasada uczciwości naukowej (nienegocjowalna część specyfikacji)**:
+nie wolno łączyć newtonowskiej mechaniki orbitalnej ze zmodyfikowanym `c`
+tak, jakby to automatycznie dawało fizycznie kompletny wszechświat. Jeśli
+eksperyment zachowuje newtonowski stan orbitalny (pozycje/prędkości z
+`keplerPosition`) i nakłada na niego WYŁĄCZNIE relatywistyczne transformacje
+obserwacyjne (jak wygląda, nie jak się porusza), musi być jawnie oznaczony:
+**MODEL HYBRYDOWY · NIEPEŁNE SPRZĘŻENIE FIZYCZNE**, z wypisanym zdaniem,
+KTÓRE modele pozostają niezmienione (mechanika orbitalna) a KTÓRE są
+transformowane (obserwacja/wygląd). Jeśli `v ≥ c` w wybranym modelu, a
+model matematycznie nie obsługuje takiego stanu, symulacja NIE wolno
+wymyślać efektu hollywoodzkiego — musi się zatrzymać lub rozgałęzić i
+wyświetlić **NARUSZENIE PRZYCZYNOWOŚCI / GRANICY DOMENY MODELU** z
+wyjaśnieniem, które równanie stało się nieokreślone i dlaczego.
+
+Architektura (zero nowego systemu): nowy `ExperimentDef`/`Sim3D` w Universe
+lub Einstein Lab, reużywający istniejące wzory Dopplera/beamingu z
+`einstein-blackhole-3d.ts` zamiast duplikować je. `honesty: 'simplified'`
++ szczegółowy `honestyNote` opisujący dokładnie sprzężenie hybrydowe
+powyżej — to nie nowa etykieta, to bardzo szczegółowy przypadek istniejącej
+`HonestyLevel`. c-Slider jest jednym sygnaturalnym eksperymentem, NIE
+nowym paradygmatem interfejsu Genesis OS — nie zastępuje laboratoriów ani
+Epistemic Lens niżej.
+
+### Epistemic Lens — potencjalny nowy paradygmat interakcji (badanie architektoniczne)
+
+**NIE BUDOWAĆ TERAZ.** To może być ważniejsze niż pojedyncze laboratorium
+czy wirusowa funkcja — ale wymaga rozstrzygnięcia architektonicznego PRZED
+jakąkolwiek implementacją, bo źle zaprojektowany wprowadza ryzyko
+największe w całym Genesis OS: mieszanie reprezentacji, zbioru danych,
+modelu i lokalnej fizyki w jedną niejasną „magię".
+
+**Koncepcja**: użytkownik tworzy widoczną soczewkę 2D/3D i przesuwa ją
+przez obliczeniowy świat. Soczewka wykonuje DOKŁADNIE JEDEN z czterech
+ściśle rozdzielonych trybów — nie wolno ich koncepcyjnie zlewać:
+
+- **Tryb A — Soczewka reprezentacji**: zmienia SPOSÓB pokazania tego
+  samego stanu (np. klasyczny diagram atomu → gęstość prawdopodobieństwa
+  orbitalu, dokładnie ten sam stan co `OrbitalSim` w Atom Lab dziś, inna
+  projekcja).
+- **Tryb B — Soczewka danych**: odsłania inny zbiór danych/inną skalę w
+  tym samym miejscu przestrzennym (np. powierzchnia Ziemi → tomografia
+  sejsmiczna, patrz „Earth Deep Systems" niżej).
+- **Tryb C — Soczewka porównania modeli**: renderuje przewidywanie INNEGO
+  modelu naukowego dla tej samej obserwacji (np. standardowa geometria
+  Ziemi vs. konkretny, źródłowo zidentyfikowany model alternatywny — patrz
+  „Frontier Science Lab" niżej, Reality Model Comparator).
+- **Tryb D — Lokalny region fizyki (NAJNIEBEZPIECZNIEJSZY)**: stosuje inne
+  parametry/równania wewnątrz ograniczonego regionu przestrzennego. Wolno
+  włączyć WYŁĄCZNIE, gdy system potrafi jawnie zdefiniować warunki
+  brzegowe, transfer stanu, zachowanie wielkości zachowanych, sprzężenie
+  solverów i równania interfejsu na granicy regionu — dokładnie te same
+  wymagania co „walidacja kompatybilności modeli" w Scientific Model Graph
+  wyżej. Jeśli matematyka granicy nie jest zdefiniowana, soczewka MUSI
+  pokazać **NIEROZSTRZYGNIĘTY INTERFEJS MODELI**, zamiast udawać, że dwa
+  niekompatybilne modele spotykają się gładko na świecącej granicy.
+
+Każda soczewka musi zawsze wyświetlać: aktywny tryb, model źródłowy, wersję
+modelu, status epistemiczny, założenia, co się zmieniło, co się NIE
+zmieniło. Zrozumiałość w ~5 sekund: „przesuwasz soczewkę, widzisz inny
+model/skalę/zbiór danych/reprezentację" — nie migający filtr bez
+wyjaśnienia.
+
+**Prior art — NIE twierdzić nowości bez weryfikacji.** Koncepcja
+przesuwanej soczewki zmieniającej reprezentację danych pod nią ma
+dobrze udokumentowaną historię i NIE jest nowym pomysłem UI: „Toolglass
+and Magic Lenses" (Bier, Stone, Pier, Buxton, DeRose, SIGGRAPH 1993) to
+źródłowa praca badawcza nad tym dokładnie wzorcem interakcji. Współczesne
+zastosowania z tej samej rodziny: narzędzia „swipe"/porównania warstw w
+GIS (QGIS, ArcGIS — inna warstwa danych geograficznych pod tym samym
+miejscem), viewery fuzji obrazowania medycznego (PET/CT — inna modalność
+danych w tej samej przestrzeni anatomicznej), płaszczyzny przekroju w
+naukowym oprogramowaniu wizualizacyjnym (ParaView, VisIt — przekrój przez
+dane wolumetryczne), interpretacja sejsmiczna w geologii (przekroje przez
+dane odwiertów), oraz mechaniki „widzenia rentgenowskiego"/detektywistyczne
+w grach wideo (czysto kinowe, bez etykiety epistemicznej). Potencjalna,
+uczciwa nowość Epistemic Lens NIE leży w samym mechanizmie interakcji
+(ma ~30 lat), tylko w twardym wymogu, że KAŻDA soczewka wiąże się z
+formalnym kontraktem statusu epistemicznego/proweniencji z Scientific
+Model Graph — czego żadne z powyższych narzędzi nie robi. To jest
+konkretna, możliwa do zweryfikowania teza o różnicy, nie ogólne
+twierdzenie o nowości.
+
 ---
 
 ## Quantum Reality
@@ -816,6 +1054,81 @@ nowe gałęzie (jawnie jako kreatywna sugestia, nigdy jako predykcja).
   "ukrytej" niepewności rozwiązałoby spór bez nowej fizyki. 7 nowych
   testów: napięcie odtwarza publikowane ~4,9σ, symetria, gaussianPdf
   całkuje się do 1, dodanie systematyki zawsze zmniejsza napięcie.
+
+## Earth Deep Systems (nowa, duża przyszła domena planetarna)
+
+**NIE BUDOWAĆ TERAZ — poniżej wyłącznie mapa badawcza i architektura, nie
+implementacja.** Cel docelowy: nawigowalny, obliczeniowy model Ziemi —
+kamera przemieszczająca się ciągle ORBITA → KONTYNENT → KRAJ → REGION →
+POWIERZCHNIA → SKORUPA → PŁASZCZ → JĄDRO ZEWNĘTRZNE → JĄDRO WEWNĘTRZNE, ten
+sam rodzaj „planetarnego tomografu obliczeniowego", co Scale Journey robi
+dziś dla skali kwant→Wszechświat (`data/scaleMilestones.ts` — reużywalny
+wzorzec ciągłego zoomu międzyskalowego, nie nowy mechanizm kamery).
+
+**Domeny badawcze do zmapowania (kolejność wg priorytetu, nie do zbudowania
+naraz):**
+1. **Globalne płyty tektoniczne** — granice płyt, strefy subdukcji,
+   uskoki transformujące, granice rozbieżne, ridge'e ryftowe, wektory
+   prędkości płyt. System kontroli czasu geologicznego (do przodu i
+   wstecz, tam gdzie dane rekonstrukcyjne na to pozwalają) z JAWNIE
+   wypisaną niepewnością czasową każdej rekonstrukcji — to jest dokładnie
+   przypadek użycia analogiczny do `ConfirmationLevel` epoki w Discovery
+   Timeline (rekombinacja/CMB ★★★★★, daleka przyszłość ★★), tylko dla
+   rekonstrukcji paleogeograficznych zamiast kosmologicznych epok.
+2. **Wnętrze Ziemi** — uczciwy przekrój 3D: skorupa, litosfera,
+   astenosfera, płaszcz górny, strefa przejściowa, płaszcz dolny, jądro
+   zewnętrzne, jądro wewnętrzne. Temperatura/ciśnienie/gęstość/prędkości
+   fal sejsmicznych tam, gdzie modele/dane na to pozwalają. Modele pióropuszy
+   płaszcza i tomografii sejsmicznej — jawnie oznaczone jako modele, nie
+   bezpośrednie pomiary. **Twarde ograniczenie uczciwościowe**: jądro Ziemi
+   NIE produkuje ropy naftowej — standardowy model geologiczny (materiał
+   organiczny → diageneza → katageneza w basenach sedymentacyjnych) i
+   hipoteza ropy abiogenicznej muszą być jawnie rozdzielone, nigdy zmieszane.
+3. **Globalny system ropy, gazu i zasobów** — baseny sedymentacyjne, skały
+   macierzyste, drogi migracji, zbiorniki, pułapki węglowodorowe — z
+   wyjaśnieniem DLACZEGO warunki geologiczne pozwoliły powstać złożu, nie
+   tylko kropką na mapie. Polska szczegółowo (Karpaty, Niż Polski, Bałtyk)
+   z docelową integracją autorytatywnych polskich danych geologicznych
+   (PIG-PIB). Skalowalne przejście kamery: kontynent → basen → warstwa
+   geologiczna → struktura zbiornikowa.
+4. **Warstwy mineralne/surowców strategicznych** — lit, uran, miedź, złoto,
+   srebro, REE, kobalt, nikiel, żelazo, węgiel, diamenty, fosforany — z
+   typem złoża, pochodzeniem geologicznym i jawnym rozróżnieniem:
+   UDOKUMENTOWANE ZŁOŻE · ZASÓB SZACOWANY · PROSPEKTYWNOŚĆ GEOLOGICZNA ·
+   MOŻLIWOŚĆ WYWIEDZIONA Z MODELU · TWIERDZENIE SPEKULACYJNE. Nigdy nie
+   generować fikcyjnych złóż.
+5. **Udokumentowana infrastruktura podziemna** — kopalnie, metra, publicznie
+   udokumentowane obiekty wojskowe, systemy obrony cywilnej, laboratoria
+   naukowe, tunele — bez ujawniania niejawnych informacji operacyjnych i
+   bez wymyślania tras dostępu.
+6. **Roszczenia Tesli i sieci podziemnych/energetycznych** — Wardenclyffe,
+   Colorado Springs, bezprzewodowy przesył energii, prądy telluryczne,
+   rezonans Schumanna (jawnie odróżniony terminologicznie od twierdzeń z
+   epoki Tesli). Ta sekcja to WPROST kolejny temat metodologii Claim
+   Mutation Graph / statusu epistemicznego z rozszerzenia „Frontier Science
+   Lab" wyżej (§„modele kontestowane") — nie osobny system źródeł prawdy.
+7. **Antarktyda** — oddzielone: udokumentowana geologia, topografia
+   podlodowcowa, jeziora podlodowcowe, odkrycia radarowe, stacje badawcze
+   (fakty) vs. twierdzenia o strukturach podziemnych/cywilizacjach (Claim
+   Mutation Graph, jak wyżej).
+
+**Architektura renderowania**: reużywa `Sim3D`/`useThreeLoop.ts` (już
+ogólny wzorzec, nie kod jednorazowy) + adaptacyjne poziomy jakości
+(`core/three/quality.ts`) — przyszły sprzęt ma odblokowywać gęstsze
+siatki geologiczne, wolumetryczne pole tomografii sejsmicznej i głębsze
+systemy cząstek BEZ przebudowy architektury domenowej, dokładnie ta sama
+zasada co reszta platformy („buduj pod jutrzejsze GPU, zachowuj warstwy
+jakości"). Warstwa „Epistemic Lens" (wyżej) Tryb B jest naturalnym
+interfejsem do przełączania powierzchnia↔tomografia↔zasoby↔infrastruktura
+w tym samym miejscu przestrzennym — Earth Deep Systems jest pierwszym
+realnym przypadkiem użycia uzasadniającym budowę soczewki, nie odwrotnie.
+
+**Zasada bezpieczeństwa i uczciwości identyczna z resztą platformy**:
+żadna nowa etykieta pewności równolegle do `ConfirmationLevel`/
+`ScenarioKind` (patrz rozszerzenie taksonomii w „Frontier Science Lab"
+wyżej — ten sam mechanizm obsługuje UDOKUMENTOWANE ZŁOŻE vs. TWIERDZENIE
+SPEKULACYJNE tutaj). Zero generowania fałszywych złóż/infrastruktury. Zero
+instrukcji dostępu do niejawnych obiektów.
 
 ## Nanotechnology
 

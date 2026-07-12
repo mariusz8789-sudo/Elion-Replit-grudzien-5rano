@@ -1,23 +1,39 @@
 import { useMemo, useState } from 'react';
 import type { LabDefinition, Sim, SimParams } from '../core/types';
 import { useSimLoop } from '../core/useSimLoop';
+import { useThreeLoop } from '../core/three/useThreeLoop';
 import { NarratorPanel } from '../components/NarratorPanel';
 import { HonestyBadge } from '../components/HonestyBadge';
 import { ELEMENTS, type ElementInfo } from '../data/elements';
 import { PERIODIC_TRENDS, type PeriodicTrendPoint } from '../data/periodicTrends';
+import { OrbitalCloud3DSim } from './experiments/atom-orbital-3d';
 
 /**
  * Orbitale atomu wodoru — dokładne |ψ|² z rozwiązań analitycznych równania
- * Schrödingera (przekrój w płaszczyźnie x–z, φ=0; jednostki: promień Bohra).
+ * Schrödingera (jednostki: promień Bohra). `Y` to część kątowa jako funkcja
+ * SKŁADOWYCH WEKTORA JEDNOSTKOWEGO (dx,dy,dz) = (x,y,z)/r — nie kąta θ w
+ * jednej płaszczyźnie — dlatego ten sam wzór generalizuje się DOKŁADNIE do
+ * pełnego 3D (patrz atom-orbital-3d.ts, chmura punktów Monte Carlo w 3D),
+ * a przekrój 2D niżej (OrbitalSim) jest tylko szczególnym przypadkiem
+ * dy=0. Każdy z tych siedmiu orbitali ma m=0 lub jest rzeczywistą
+ * kombinacją ±m (dxz), więc żaden nie zależy od kąta azymutalnego poza
+ * tym, co już niesie (dx,dy,dz) — stąd brak przybliżenia przy przejściu 2D→3D.
  */
-const ORBITALS: Record<string, { label: string; extent: number; R: (r: number) => number; Y: (ct: number, st: number) => number }> = {
+export interface OrbitalDef {
+  label: string;
+  extent: number;
+  R: (r: number) => number;
+  Y: (dx: number, dy: number, dz: number) => number;
+}
+
+export const ORBITALS: Record<string, OrbitalDef> = {
   '1s': { label: '1s', extent: 6, R: (r) => 2 * Math.exp(-r), Y: () => 1 },
   '2s': { label: '2s', extent: 16, R: (r) => (2 - r) * Math.exp(-r / 2), Y: () => 1 },
-  '2pz': { label: '2p', extent: 16, R: (r) => r * Math.exp(-r / 2), Y: (ct) => ct },
+  '2pz': { label: '2p', extent: 16, R: (r) => r * Math.exp(-r / 2), Y: (_dx, _dy, dz) => dz },
   '3s': { label: '3s', extent: 30, R: (r) => (27 - 18 * r + 2 * r * r) * Math.exp(-r / 3), Y: () => 1 },
-  '3pz': { label: '3p', extent: 30, R: (r) => r * (6 - r) * Math.exp(-r / 3), Y: (ct) => ct },
-  '3dz2': { label: '3d z²', extent: 34, R: (r) => r * r * Math.exp(-r / 3), Y: (ct) => 3 * ct * ct - 1 },
-  '3dxz': { label: '3d xz', extent: 34, R: (r) => r * r * Math.exp(-r / 3), Y: (ct, st) => ct * st * 2 },
+  '3pz': { label: '3p', extent: 30, R: (r) => r * (6 - r) * Math.exp(-r / 3), Y: (_dx, _dy, dz) => dz },
+  '3dz2': { label: '3d z²', extent: 34, R: (r) => r * r * Math.exp(-r / 3), Y: (_dx, _dy, dz) => 3 * dz * dz - 1 },
+  '3dxz': { label: '3d xz', extent: 34, R: (r) => r * r * Math.exp(-r / 3), Y: (dx, _dy, dz) => dx * dz * 2 },
 };
 
 type TrendProp = 'radiusPm' | 'ionizationKJ';
@@ -69,9 +85,9 @@ class OrbitalSim implements Sim {
         const x = ((ix / N) * 2 - 1) * orb.extent;
         const z = ((iy / N) * 2 - 1) * orb.extent;
         const r = Math.hypot(x, z);
-        const ct = r === 0 ? 0 : z / r;
-        const st = r === 0 ? 0 : x / r;
-        const psi = orb.R(r) * orb.Y(ct, st);
+        const dx = r === 0 ? 0 : x / r;
+        const dz = r === 0 ? 0 : z / r;
+        const psi = orb.R(r) * orb.Y(dx, 0, dz);
         const d = psi * psi;
         dens[iy * N + ix] = d;
         if (d > max) max = d;
@@ -192,19 +208,23 @@ class BohrSim implements Sim {
 
 function AtomView({ lab }: { lab: LabDefinition }) {
   const [z, setZ] = useState(6);
-  const [mode, setMode] = useState<'shells' | 'orbitals' | 'trends'>('shells');
+  const [mode, setMode] = useState<'orbitals' | 'orbitals2d' | 'shells' | 'trends'>('orbitals');
   const [orbital, setOrbital] = useState('2pz');
   const [trendProp, setTrendProp] = useState<TrendProp>('radiusPm');
   const bohrSim = useMemo(() => new BohrSim(), []);
   const orbSim = useMemo(() => new OrbitalSim(), []);
+  const orb3DSim = useMemo(() => new OrbitalCloud3DSim(), []);
   const el = ELEMENTS[z - 1];
   bohrSim.element = el;
-  const sim = mode === 'orbitals' ? orbSim : bohrSim;
-  const canvasRef = useSimLoop(sim, { orbital }, true);
+  const sim2D = mode === 'shells' ? bohrSim : mode === 'orbitals2d' ? orbSim : null;
+  const canvasRef2D = useSimLoop(sim2D, { orbital }, true);
+  const { canvasRef: canvasRef3D, loading: loading3D, failed: failed3D } = useThreeLoop(mode === 'orbitals' ? orb3DSim : null, { orbital }, true);
   const neutrons = Math.round(el.mass) - el.z;
 
+  const orbital3DHonestyNote =
+    'Chmura punktów Monte Carlo (odrzucanie) z DOKŁADNYCH rozwiązań analitycznych równania Schrödingera dla atomu wodoru w pełnym 3D (nie przybliżenie przekroju) — gęstość punktów DOSŁOWNIE jest gęstością prawdopodobieństwa |ψ|², dokładnie ta interpretacja, której uczy się w podręcznikach. Barwa koduje znak rzeczywistej funkcji falowej (cyjan +, fiolet −) — fizycznie znaczące (ten znak decyduje o interferencji przy hybrydyzacji orbitali w wiązaniach chemicznych), nie ozdoba. Kamera i skala kadru — poglądowe.';
   const orbitalHonestyNote =
-    'Gęstość |ψ|² liczona z dokładnych rozwiązań analitycznych równania Schrödingera dla atomu wodoru (przekrój w płaszczyźnie, jednostki: promień Bohra). Jasność skompresowana, by uwidocznić węzły.';
+    'Gęstość |ψ|² liczona z dokładnych rozwiązań analitycznych równania Schrödingera dla atomu wodoru (przekrój w płaszczyźnie, jednostki: promień Bohra). Jasność skompresowana, by uwidocznić węzły. Ten sam wzór co widok 3D — przekrój jednej płaszczyzny przez tę samą chmurę.';
   const trendsHonestyNote =
     'Wartości tabelaryczne (CRC Handbook of Chemistry and Physics; NIST Atomic Spectra Database; promień atomowy — Slater 1964). Ograniczone do okresów 1–4 (Z=1–36) — te wartości są dobrze ugruntowane; gazy szlachetne nie mają dobrze zdefiniowanego promienia empirycznego (nie tworzą wiązań), pominięte zamiast zmyślać liczbę.';
 
@@ -214,35 +234,65 @@ function AtomView({ lab }: { lab: LabDefinition }) {
   return (
     <div className="lab-view" style={{ ['--accent' as string]: lab.accent }}>
       <div className="exp-tabs" role="tablist" aria-label="Widoki">
+        <button role="tab" aria-selected={mode === 'orbitals'} onClick={() => setMode('orbitals')}>
+          Chmura elektronowa 3D
+        </button>
+        <button role="tab" aria-selected={mode === 'orbitals2d'} onClick={() => setMode('orbitals2d')}>
+          Przekrój |ψ|² (2D)
+        </button>
         <button role="tab" aria-selected={mode === 'shells'} onClick={() => setMode('shells')}>
           Powłoki (118 pierwiastków)
-        </button>
-        <button role="tab" aria-selected={mode === 'orbitals'} onClick={() => setMode('orbitals')}>
-          Orbitale |ψ|²
         </button>
         <button role="tab" aria-selected={mode === 'trends'} onClick={() => setMode('trends')}>
           Trendy okresowe
         </button>
       </div>
 
-      {mode !== 'trends' && (
+      {mode === 'orbitals' && (
+        <div className="sim-stage stage-3d" style={{ height: '36vh', minHeight: 240 }}>
+          <canvas
+            ref={canvasRef3D}
+            role="img"
+            aria-label={`Chmura elektronowa 3D orbitalu ${ORBITALS[orbital].label} atomu wodoru. Przeciągnij, by obrócić kamerę.`}
+          />
+          {!failed3D && (
+            <div className="stage-3d-badge">
+              <span className="mdot" aria-hidden="true" /> {loading3D ? 'ŁADOWANIE SILNIKA 3D…' : '3D · WEBGL'}
+            </div>
+          )}
+          {!loading3D && !failed3D && <div className="stage-3d-hint">przeciągnij / scrolluj</div>}
+          {failed3D && (
+            <div className="empty-state" style={{ position: 'absolute', inset: '1rem', margin: 0 }}>
+              Nie udało się uruchomić silnika 3D w tej przeglądarce (WebGL niedostępny lub zablokowany). Przełącz na
+              zakładkę „Przekrój |ψ|² (2D)" — ta sama fizyka, bez WebGL.
+            </div>
+          )}
+        </div>
+      )}
+
+      {(mode === 'shells' || mode === 'orbitals2d') && (
         <div className="sim-stage" style={{ height: '36vh', minHeight: 240 }}>
           <canvas
-            ref={canvasRef}
+            ref={canvasRef2D}
             key={mode}
             role="img"
             aria-label={
               mode === 'shells'
                 ? `Model powłokowy atomu: ${el.name}. Dane liczbowe w panelu poniżej.`
-                : `Gęstość prawdopodobieństwa orbitalu ${ORBITALS[orbital].label} atomu wodoru.`
+                : `Przekrój gęstości prawdopodobieństwa orbitalu ${ORBITALS[orbital].label} atomu wodoru.`
             }
           />
         </div>
       )}
 
       <HonestyBadge
-        level={mode === 'orbitals' ? 'exact' : mode === 'trends' ? 'exact' : lab.honesty}
-        note={mode === 'orbitals' ? orbitalHonestyNote : mode === 'trends' ? trendsHonestyNote : lab.honestyNote}
+        level={mode === 'orbitals' || mode === 'orbitals2d' || mode === 'trends' ? 'exact' : lab.honesty}
+        note={
+          mode === 'orbitals' ? orbital3DHonestyNote
+            : mode === 'orbitals2d' ? orbitalHonestyNote
+              : mode === 'trends' ? trendsHonestyNote
+                : lab.honestyNote
+        }
       />
 
       {mode === 'trends' && (
@@ -319,7 +369,7 @@ function AtomView({ lab }: { lab: LabDefinition }) {
         </>
       )}
 
-      {mode === 'orbitals' && (
+      {(mode === 'orbitals' || mode === 'orbitals2d') && (
         <div className="controls">
           <div className="control">
             <label>Orbital atomu wodoru</label>
@@ -334,7 +384,7 @@ function AtomView({ lab }: { lab: LabDefinition }) {
         </div>
       )}
 
-      {mode === 'orbitals' && (
+      {(mode === 'orbitals' || mode === 'orbitals2d') && (
         <NarratorPanel
           blocks={[
             {
@@ -394,7 +444,7 @@ function AtomView({ lab }: { lab: LabDefinition }) {
           },
           {
             title: 'Od modelu Bohra do orbitali',
-            body: 'Elektrony nie krążą po orbitach jak planety — zajmują orbitale: chmury prawdopodobieństwa o kształtach s, p, d, f. Model powłokowy poprawnie oddaje liczbę elektronów na powłokach (reguła Aufbau; kilka pierwiastków, np. chrom i miedź, ma drobne odstępstwa). Przełącz na widok „Orbitale |ψ|²", by zobaczyć prawdziwe kształty.',
+            body: 'Elektrony nie krążą po orbitach jak planety — zajmują orbitale: chmury prawdopodobieństwa o kształtach s, p, d, f. Model powłokowy poprawnie oddaje liczbę elektronów na powłokach (reguła Aufbau; kilka pierwiastków, np. chrom i miedź, ma drobne odstępstwa). Przełącz na widok „Chmura elektronowa 3D", by zobaczyć prawdziwe kształty.',
           },
         ]}
       />

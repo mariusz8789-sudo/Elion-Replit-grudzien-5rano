@@ -14,7 +14,9 @@
     "lint": "eslint .",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,mjs,css}\" \"*.md\" \"knowledge/*.md\"",
     "preview": "npm run preview --workspace=packages/frontend",
-    "fetch-real-data": "node scripts/fetch-real-data.mjs"
+    "fetch-real-data": "node scripts/fetch-real-data.mjs",
+    "smoke:desktop": "node scripts/smoke-e2e.mjs desktop",
+    "smoke:mobile": "node scripts/smoke-e2e.mjs mobile"
   },
   "keywords": [
     "genesis-os",

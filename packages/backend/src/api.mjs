@@ -50,9 +50,18 @@ import {
   contributionGraph,
   saveRun,
   listRuns,
+  createTarget,
+  getTarget,
+  listTargets,
+  createCandidate,
+  getCandidate,
+  listCandidates,
 } from './store.mjs';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
 import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
+import { listCapabilities } from './compute/capabilities.mjs';
+import { buildCandidatePassport, rankCandidates } from './compute/drugDiscovery.mjs';
+import { parseFormula, molecularWeight } from './compute/core.bundle.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -97,6 +106,7 @@ export function handleApi(db, ctx) {
 
   // ---- Backend Compute Engine (modele publiczne; run opcjonalnie utrwalany) ----
   if (seg[0] === 'compute') {
+    if (seg[1] === 'capabilities' && seg.length === 2 && method === 'GET') return ok({ capabilities: listCapabilities() });
     if (seg[1] === 'models' && seg.length === 2 && method === 'GET') return ok({ models: listModels() });
     if (seg[1] === 'models' && seg.length === 3 && method === 'GET') {
       const m = getModel(seg[2]);
@@ -148,6 +158,37 @@ export function handleApi(db, ctx) {
     // /api/projects/:id/runs — audytowalne przebiegi obliczeń projektu (viewer+)
     if (seg[2] === 'runs' && seg.length === 3 && method === 'GET') {
       return ok({ runs: listRuns(db, projectId) });
+    }
+
+    // ---- Drug Discovery (P6): cele, kandydaci, paszporty, ranking ----
+    if (seg[2] === 'targets' && seg.length === 3) {
+      if (method === 'GET') return ok({ targets: listTargets(db, projectId) });
+      if (method === 'POST') return createTargetHandler(db, user, role, projectId, body);
+      return err(405, 'method_not_allowed');
+    }
+    if (seg[2] === 'candidates') {
+      if (seg.length === 3) {
+        if (method === 'GET') {
+          const targetId = typeof ctx.query?.targetId === 'string' ? ctx.query.targetId : null;
+          return ok({ candidates: listCandidates(db, projectId, targetId) });
+        }
+        if (method === 'POST') return createCandidateHandler(db, user, role, projectId, body);
+        return err(405, 'method_not_allowed');
+      }
+      // /api/projects/:id/candidates/ranking
+      if (seg.length === 4 && seg[3] === 'ranking' && method === 'GET') {
+        const targetId = typeof ctx.query?.targetId === 'string' ? ctx.query.targetId : null;
+        const passports = listCandidates(db, projectId, targetId).map((c) => buildCandidatePassport(c));
+        return ok({ ranking: rankCandidates(passports) });
+      }
+      // /api/projects/:id/candidates/:cid/passport
+      if (seg.length === 5 && seg[4] === 'passport' && method === 'GET') {
+        const cand = getCandidate(db, seg[3]);
+        if (!cand || cand.projectId !== projectId) return err(404, 'not_found');
+        const target = cand.targetId ? getTarget(db, cand.targetId) : null;
+        return ok({ passport: buildCandidatePassport(cand, target) });
+      }
+      return err(404, 'not_found');
     }
 
     // /api/projects/:id/merge-requests
@@ -387,4 +428,50 @@ function runComputeHandler(db, ctx, body) {
   }
 
   return { status: RUN_STATUS_TO_HTTP[run.status] ?? 200, body: { run, persisted } };
+}
+
+/* ---------------- Handlery Drug Discovery ---------------- */
+
+function createTargetHandler(db, user, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Definiowanie celu wymaga roli editor lub wyższej.');
+  const name = String(body.name ?? '').trim().slice(0, 160);
+  if (!name) return err(400, 'invalid_target', 'Podaj nazwę celu biologicznego.');
+  const s = (v, n = 400) => String(v ?? '').slice(0, n);
+  const target = createTarget(db, {
+    projectId, name,
+    targetType: s(body.targetType, 80), geneProtein: s(body.geneProtein, 120), organism: s(body.organism, 120),
+    indication: s(body.indication, 200), mechanism: s(body.mechanism, 400), constraints: s(body.constraints, 1000),
+    evidenceStatus: ['unverified', 'literature', 'experimental'].includes(body.evidenceStatus) ? body.evidenceStatus : 'unverified',
+    provenance: s(body.provenance, 400), createdBy: user.id,
+  });
+  return ok({ target }, 201);
+}
+
+function createCandidateHandler(db, user, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Dodanie kandydata wymaga roli editor lub wyższej.');
+  const label = String(body.label ?? '').trim().slice(0, 160) || 'Kandydat';
+  const formula = String(body.formula ?? '').trim().slice(0, 120);
+  // Realna cheminformatyka przy zapisie: skład + masa molowa (jeśli wzór poprawny).
+  let composition = {};
+  let mw = null;
+  if (formula) {
+    const parsed = parseFormula(formula);
+    if (!parsed.ok) return err(400, 'invalid_formula', parsed.error);
+    composition = parsed.counts;
+    mw = molecularWeight(composition);
+  }
+  const targetId = typeof body.targetId === 'string' ? body.targetId : null;
+  if (targetId) {
+    const t = getTarget(db, targetId);
+    if (!t || t.projectId !== projectId) return err(400, 'invalid_target', 'Cel nie należy do tego projektu.');
+  }
+  const candidate = createCandidate(db, {
+    projectId, targetId, label, formula, smiles: String(body.smiles ?? '').slice(0, 500),
+    composition, molecularWeight: mw,
+    charge: typeof body.charge === 'number' && Number.isFinite(body.charge) ? Math.trunc(body.charge) : 0,
+    parentId: typeof body.parentId === 'string' ? body.parentId.slice(0, 80) : null,
+    generationMethod: String(body.generationMethod ?? 'manual').slice(0, 80),
+    provenance: String(body.provenance ?? '').slice(0, 400), createdBy: user.id,
+  });
+  return ok({ candidate }, 201);
 }

@@ -150,8 +150,49 @@ CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_runs_model ON runs(model_id, created_at);
 `;
 
+/**
+ * Migracja do wersji 4 (Drug Discovery, P6): cele biologiczne i kandydaci
+ * molekularni. Reużywa projekty (kontener) i przebiegi obliczeń (paszporty).
+ */
+const SCHEMA_V4 = `
+CREATE TABLE IF NOT EXISTS targets (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name            TEXT NOT NULL,
+  target_type     TEXT NOT NULL DEFAULT '',
+  gene_protein    TEXT NOT NULL DEFAULT '',
+  organism        TEXT NOT NULL DEFAULT '',
+  indication      TEXT NOT NULL DEFAULT '',
+  mechanism       TEXT NOT NULL DEFAULT '',
+  constraints     TEXT NOT NULL DEFAULT '',
+  evidence_status TEXT NOT NULL DEFAULT 'unverified',
+  provenance      TEXT NOT NULL DEFAULT '',
+  created_by      TEXT REFERENCES users(id),
+  created_at      INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS candidates (
+  id                TEXT PRIMARY KEY,
+  project_id        TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  target_id         TEXT REFERENCES targets(id) ON DELETE SET NULL,
+  label             TEXT NOT NULL,
+  formula           TEXT NOT NULL DEFAULT '',
+  smiles            TEXT NOT NULL DEFAULT '',
+  composition_json  TEXT NOT NULL DEFAULT '{}',
+  molecular_weight  REAL,
+  charge            INTEGER NOT NULL DEFAULT 0,
+  parent_id         TEXT,
+  generation_method TEXT NOT NULL DEFAULT 'manual',
+  provenance        TEXT NOT NULL DEFAULT '',
+  created_by        TEXT REFERENCES users(id),
+  created_at        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_targets_project ON targets(project_id);
+CREATE INDEX IF NOT EXISTS idx_candidates_project ON candidates(project_id, target_id);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 4) db.exec(SCHEMA_V4);
   if (version < 3) db.exec(SCHEMA_V3);
   if (version < 2) {
     db.exec(SCHEMA_V2);
@@ -174,7 +215,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 3) db.exec('PRAGMA user_version = 3');
+  if (version < 4) db.exec('PRAGMA user_version = 4');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -674,4 +715,68 @@ export function getRun(db, id) {
 export function listRuns(db, projectId, limit = 100) {
   const rows = db.prepare('SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?').all(projectId, limit);
   return rows.map(toRun);
+}
+
+/* ---------------- Drug Discovery: cele biologiczne i kandydaci ---------------- */
+
+function toTarget(row) {
+  if (!row) return null;
+  return {
+    id: row.id, projectId: row.project_id, name: row.name, targetType: row.target_type,
+    geneProtein: row.gene_protein, organism: row.organism, indication: row.indication,
+    mechanism: row.mechanism, constraints: row.constraints, evidenceStatus: row.evidence_status,
+    provenance: row.provenance, createdBy: row.created_by ?? null, createdAt: row.created_at,
+  };
+}
+function toCandidate(row) {
+  if (!row) return null;
+  return {
+    id: row.id, projectId: row.project_id, targetId: row.target_id ?? null, label: row.label,
+    formula: row.formula, smiles: row.smiles, composition: JSON.parse(row.composition_json),
+    molecularWeight: row.molecular_weight ?? null, charge: row.charge, parentId: row.parent_id ?? null,
+    generationMethod: row.generation_method, provenance: row.provenance,
+    createdBy: row.created_by ?? null, createdAt: row.created_at,
+  };
+}
+
+export function createTarget(db, t) {
+  const id = newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO targets (id, project_id, name, target_type, gene_protein, organism, indication, mechanism, constraints, evidence_status, provenance, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, t.projectId, t.name, t.targetType ?? '', t.geneProtein ?? '', t.organism ?? '', t.indication ?? '',
+    t.mechanism ?? '', t.constraints ?? '', t.evidenceStatus ?? 'unverified', t.provenance ?? '', t.createdBy ?? null, now,
+  );
+  return getTarget(db, id);
+}
+export function getTarget(db, id) {
+  return toTarget(db.prepare('SELECT * FROM targets WHERE id = ?').get(id));
+}
+export function listTargets(db, projectId) {
+  return db.prepare('SELECT * FROM targets WHERE project_id = ? ORDER BY created_at DESC').all(projectId).map(toTarget);
+}
+
+export function createCandidate(db, c) {
+  const id = newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO candidates (id, project_id, target_id, label, formula, smiles, composition_json, molecular_weight, charge, parent_id, generation_method, provenance, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, c.projectId, c.targetId ?? null, c.label, c.formula ?? '', c.smiles ?? '',
+    JSON.stringify(c.composition ?? {}), c.molecularWeight ?? null, c.charge ?? 0,
+    c.parentId ?? null, c.generationMethod ?? 'manual', c.provenance ?? '', c.createdBy ?? null, now,
+  );
+  return getCandidate(db, id);
+}
+export function getCandidate(db, id) {
+  return toCandidate(db.prepare('SELECT * FROM candidates WHERE id = ?').get(id));
+}
+export function listCandidates(db, projectId, targetId = null) {
+  const rows = targetId
+    ? db.prepare('SELECT * FROM candidates WHERE project_id = ? AND target_id = ? ORDER BY created_at ASC').all(projectId, targetId)
+    : db.prepare('SELECT * FROM candidates WHERE project_id = ? ORDER BY created_at ASC').all(projectId);
+  return rows.map(toCandidate);
 }

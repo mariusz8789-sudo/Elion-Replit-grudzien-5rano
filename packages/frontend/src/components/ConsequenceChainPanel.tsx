@@ -10,6 +10,8 @@ import {
   listTrials, saveTrial, duplicateTrial, updateTrial, deleteTrial, diffTrials,
   TRIAL_STATUS_LABEL, type Trial, type TrialStatus,
 } from '../core/trials';
+import { useSession, getToken } from '../core/backend/session';
+import { listProjects, listCloudTrials, createCloudTrial, type Project } from '../core/backend/client';
 
 /**
  * Współdzielony panel „eksperyment = graf konsekwencji" (Priorytet 1 roadmapy).
@@ -265,6 +267,7 @@ export function ConsequenceChainPanel({
           To rdzeń pętli odkrycia: przemiataj parametry, oznaczaj obiecujące/nieudane, porównuj — zapisywane lokalnie.
         </div>
         <button className="chip-btn" onClick={handleSaveTrial}>✚ Zapisz bieżący stan jako próbę</button>
+        <TrialCloudSync experimentId={experimentId} honesty={honesty} capture={captureState} />
         {trials.length > 0 && (
           <div className="trial-list">
             {trials.map((t) => (
@@ -308,6 +311,109 @@ export function ConsequenceChainPanel({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Most do trwałych Serii Prób w chmurze (Milestone 1: Backend Persistence).
+ * Widoczny tylko po zalogowaniu — zapisuje BIEŻĄCY stan grafu (te same wejścia
+ * i policzone wyjścia co próba lokalna) jako TRWAŁĄ, reprodukowalną próbę w
+ * wybranym projekcie, z prowieniencją (experimentId + poziom uczciwości modelu).
+ * Bez logowania cała pętla lokalna działa jak dotąd — chmura to opcja
+ * współdzielenia, nie wymóg.
+ */
+function TrialCloudSync({
+  experimentId,
+  honesty,
+  capture,
+}: {
+  experimentId: string;
+  honesty: HonestyLevel;
+  capture: () => { params: Record<string, number>; outputs: Record<string, number> };
+}) {
+  const session = useSession();
+  const [projects, setProjects] = useState<Project[] | null>(null);
+  const [projectId, setProjectId] = useState<string>('');
+  const [cloudCount, setCloudCount] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session) { setProjects(null); return; }
+    const token = getToken();
+    if (!token) return;
+    let cancelled = false;
+    void listProjects(token).then((r) => {
+      if (cancelled) return;
+      if (r.ok) {
+        // Tylko projekty, w których użytkownik może zapisywać (editor+).
+        const writable = r.data.filter((p) => p.role === 'owner' || p.role === 'admin' || p.role === 'editor');
+        setProjects(writable);
+        if (writable.length > 0) setProjectId((cur) => cur || writable[0].id);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [session]);
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token || !projectId) { setCloudCount(null); return; }
+    let cancelled = false;
+    void listCloudTrials(token, projectId, experimentId).then((r) => {
+      if (!cancelled && r.ok) setCloudCount(r.data.length);
+    });
+    return () => { cancelled = true; };
+  }, [projectId, experimentId, busy]);
+
+  if (!session) {
+    return (
+      <div className="trial-cloud">
+        <span className="trial-cloud-hint">
+          ☁ Zaloguj się (Ustawienia → Konto), aby zapisywać próby do wspólnego, trwałego projektu w chmurze.
+        </span>
+      </div>
+    );
+  }
+
+  async function saveToCloud() {
+    const token = getToken();
+    if (!token || !projectId) return;
+    setBusy(true);
+    setMsg(null);
+    const s = capture();
+    const r = await createCloudTrial(token, projectId, {
+      experimentId,
+      params: s.params,
+      outputs: s.outputs,
+      status: 'draft',
+      modelVersion: `honesty:${honesty}`,
+    });
+    setBusy(false);
+    setMsg(r.ok ? `Zapisano jako próba #${String(r.data.index).padStart(3, '0')} w chmurze.` : r.message);
+  }
+
+  return (
+    <div className="trial-cloud">
+      {projects && projects.length === 0 ? (
+        <span className="trial-cloud-hint">
+          ☁ Nie masz projektu z prawem zapisu. Utwórz projekt w zakładce „Projekty", potem wróć tutaj.
+        </span>
+      ) : (
+        <div className="trial-cloud-controls">
+          <label className="trial-cloud-select">
+            <span>☁ Projekt w chmurze</span>
+            <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+              {(projects ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+          <button className="chip-btn" onClick={saveToCloud} disabled={busy || !projectId}>
+            {busy ? 'Zapisywanie…' : '☁ Zapisz próbę do chmury'}
+          </button>
+          {cloudCount !== null && <span className="trial-cloud-count">{cloudCount} prób w chmurze dla tego eksperymentu</span>}
+        </div>
+      )}
+      {msg && <div className="trial-cloud-msg" role="status">{msg}</div>}
     </div>
   );
 }

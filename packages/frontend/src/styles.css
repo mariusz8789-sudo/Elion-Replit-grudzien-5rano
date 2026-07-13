@@ -1172,3 +1172,70 @@ kbd {
   .onboarding-panel { animation: none; }
   .onboarding-demo-dot { transition: none; }
 }
+
+/* ---------- Konto i Projekty w chmurze (Milestone 1: Backend Persistence) ---------- */
+.chip-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.chip-btn.primary { border-color: var(--cyan); color: var(--cyan); }
+
+.account-panel { display: flex; flex-direction: column; gap: 0.75rem; }
+.account-tabs { display: flex; gap: 0.4rem; }
+.account-tab {
+  flex: 1; padding: 0.4rem 0.6rem; border-radius: 8px;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  color: var(--text-dim); font-size: 0.78rem; font-weight: 600;
+  transition: color var(--dur-fast), border-color var(--dur-fast);
+}
+.account-tab.active { color: var(--cyan); border-color: var(--cyan); }
+.account-form { display: flex; flex-direction: column; gap: 0.6rem; }
+.account-field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.74rem; color: var(--text-dim); }
+.account-field em { color: var(--text-faint); font-style: normal; }
+.account-field input, .account-field select {
+  padding: 0.5rem 0.6rem; border-radius: 8px;
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-size: 0.85rem; font-family: var(--font-body);
+}
+.account-field input:focus, .account-field select:focus { outline: none; border-color: var(--cyan); }
+.account-error { color: var(--red); font-size: 0.76rem; padding: 0.4rem 0.6rem; border: 1px solid rgba(244, 124, 124, 0.4); border-radius: 8px; }
+.account-current { display: flex; align-items: center; gap: 0.6rem; }
+.account-avatar { font-size: 1.6rem; }
+.account-current-info { display: flex; flex-direction: column; }
+.account-email { color: var(--text-faint); font-size: 0.72rem; }
+
+.project-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.project-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+  padding: 0.6rem 0.75rem; border-radius: 10px;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  color: var(--text); text-align: left;
+  transition: border-color var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
+}
+.project-row:hover { border-color: var(--border-strong); }
+.project-row:active { transform: scale(0.99); }
+.project-name { font-weight: 600; font-size: 0.9rem; }
+.project-role {
+  font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0.12rem 0.45rem; border-radius: 999px; border: 1px solid var(--border);
+  color: var(--text-dim); white-space: nowrap;
+}
+.project-role.role-owner { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); }
+.project-role.role-admin { color: var(--violet); border-color: rgba(167, 139, 250, 0.4); }
+.project-role.role-editor { color: var(--cyan); border-color: rgba(92, 214, 232, 0.4); }
+.project-role.role-viewer { color: var(--text-dim); }
+
+.member-list { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.6rem; }
+.member-row { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; font-size: 0.82rem; }
+.member-name { display: flex; flex-direction: column; }
+
+.cloud-experiment { margin-top: 0.6rem; }
+.cloud-modelver { font-family: var(--font-mono); font-size: 0.6rem; color: var(--text-faint); }
+
+.trial-cloud { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); }
+.trial-cloud-hint { font-size: 0.7rem; color: var(--text-faint); }
+.trial-cloud-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; }
+.trial-cloud-select { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.66rem; color: var(--text-dim); }
+.trial-cloud-select select {
+  padding: 0.3rem 0.5rem; border-radius: 8px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text); font-size: 0.78rem;
+}
+.trial-cloud-count { font-size: 0.66rem; color: var(--text-faint); }
+.trial-cloud-msg { margin-top: 0.4rem; font-size: 0.72rem; color: var(--green); }

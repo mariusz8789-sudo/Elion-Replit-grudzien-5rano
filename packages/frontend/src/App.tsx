@@ -23,6 +23,7 @@ import { RealityCanvas } from './components/RealityCanvas';
 import { RealityNavigator } from './components/RealityNavigator';
 import { EngineeringNavigator } from './components/EngineeringNavigator';
 import { ModelConflictPanel } from './components/ModelConflictPanel';
+import { CloudProjectsScreen } from './components/CloudProjectsScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -42,7 +43,8 @@ type Route =
   | { kind: 'decision-explorer' }
   | { kind: 'reality' }
   | { kind: 'prebuild' }
-  | { kind: 'conflict' };
+  | { kind: 'conflict' }
+  | { kind: 'projects' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -57,6 +59,7 @@ function parseHash(): Route {
   if (h === '#/reality') return { kind: 'reality' };
   if (h === '#/prebuild') return { kind: 'prebuild' };
   if (h === '#/conflict') return { kind: 'conflict' };
+  if (h === '#/projects') return { kind: 'projects' };
   return { kind: 'home' };
 }
 
@@ -292,6 +295,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'projects') {
+      return (
+        <div className="app">
+          <TopBar title="☁ Projekty (chmura)" onSearch={() => setSearchOpen(true)} />
+          <ErrorBoundary>
+            <CloudProjectsScreen />
+          </ErrorBoundary>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -344,6 +359,9 @@ export default function App() {
             </button>
             <button onClick={() => setSearchOpen(true)}>
               <span aria-hidden="true">🔍</span> {t('nav.search')}
+            </button>
+            <button onClick={() => { window.location.hash = '#/projects'; }}>
+              <span aria-hidden="true">☁</span> Projekty
             </button>
             <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
               <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}

@@ -3,6 +3,7 @@ import { useSettings } from '../core/useSettings';
 import { getCounters, clearAnalytics, type AnalyticsEvent } from '../core/analytics';
 import { getVisitedCount, getLogState, ACHIEVEMENTS } from '../core/discoveryLog';
 import { clearAll } from '../core/storage';
+import { AccountPanel } from './AccountPanel';
 
 const EVENT_LABELS: Record<AnalyticsEvent, string> = {
   experiment_open: 'Otwarte eksperymenty',
@@ -51,6 +52,15 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding?: ()
 
   return (
     <main className="settings-view" id="main-content" tabIndex={-1}>
+      <section className="settings-section">
+        <h2>Konto (chmura)</h2>
+        <p className="settings-hint">
+          Opcjonalne konto odblokowuje współdzielone Projekty i trwałe, reprodukowalne Serie Prób na serwerze —
+          zobacz zakładkę „Projekty" na ekranie głównym. Bez logowania Genesis OS działa w pełni lokalnie (offline).
+        </p>
+        <AccountPanel />
+      </section>
+
       <section className="settings-section">
         <h2>Dostępność</h2>
         <div className="control toggle-row">
@@ -165,8 +175,9 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding?: ()
       <section className="settings-section">
         <h2>Dane lokalne</h2>
         <p className="settings-hint">
-          Genesis OS nie ma konta ani serwera bazy danych — wszystko (ustawienia, dziennik odkryć, statystyka
-          aktywności) mieszka w localStorage tej przeglądarki.
+          Domyślnie wszystko (ustawienia, dziennik odkryć, statystyka aktywności, próby lokalne) mieszka w
+          localStorage tej przeglądarki — bez konta i bez serwera. Trwałe Projekty w chmurze (po zalogowaniu) to
+          osobna, opcjonalna warstwa; ten przycisk czyści tylko dane lokalne.
         </p>
         <button className="chip-btn danger" onClick={handleClearAll}>Wyczyść wszystkie dane lokalne</button>
       </section>

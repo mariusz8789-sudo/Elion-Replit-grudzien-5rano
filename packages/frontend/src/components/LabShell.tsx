@@ -6,6 +6,7 @@ import { Controls, defaultParams } from './Controls';
 import { NarratorPanel } from './NarratorPanel';
 import { HonestyBadge } from './HonestyBadge';
 import { CustomExperimentTab } from './CustomExperimentTab';
+import { ConsequenceChainPanel } from './ConsequenceChainPanel';
 import { narrate } from '../narrator/engine';
 import { buildContext } from '../narrator/askAI';
 import { registerActiveSimControls } from '../core/activeSimControls';
@@ -72,6 +73,8 @@ export function LabShell({ lab }: { lab: LabDefinition }) {
       </div>
       {isCreateTab ? (
         <CustomExperimentTab key={`${lab.id}:${CREATE_TAB_ID}`} lab={lab} />
+      ) : activeExp.createConsequenceModel ? (
+        <ConsequenceExperimentView key={`${lab.id}:${activeExp.id}`} exp={activeExp} lab={lab} />
       ) : activeExp.createSim3D ? (
         <ExperimentView3D key={`${lab.id}:${activeExp.id}`} exp={activeExp} lab={lab} initialParams={initialParams} />
       ) : (
@@ -214,6 +217,25 @@ function ExperimentView({ exp, lab, initialParams }: { exp: ExperimentDef; lab: 
       </div>
       <BelowStage exp={exp} lab={lab} params={params} setParams={setParams} blocks={blocks} expLabel={expLabel} stats={stats} />
     </>
+  );
+}
+
+/**
+ * Wariant „graf konsekwencji" (Priorytet 1: adopcja Grafu Modeli). Zamiast
+ * pętli renderującej scenę buduje JEDEN wykonywalny graf i oddaje go
+ * współdzielonemu ConsequenceChainPanel. Nie ma tu Canvasu, pętli klatek ani
+ * przycisków start/pauza — parametr → propagacja → konsekwencje są zdarzeniowe.
+ */
+function ConsequenceExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabDefinition }) {
+  const spec = useMemo(() => exp.createConsequenceModel!(), [exp]);
+  useEffect(() => {
+    recordVisit(lab.id, exp.id === '__base' ? '__base' : exp.id);
+    track('experiment_open', { lab: lab.id, experiment: exp.id });
+  }, [lab.id, exp.id]);
+  return (
+    <div className="consequence-stage">
+      <ConsequenceChainPanel spec={spec} honesty={exp.honesty} honestyNote={exp.honestyNote} />
+    </div>
   );
 }
 

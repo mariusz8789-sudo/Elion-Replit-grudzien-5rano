@@ -5,6 +5,7 @@ import { einsteinLensing } from './experiments/einstein-lensing';
 import { einsteinBlackHole3D } from './experiments/einstein-blackhole-3d';
 import { einsteinChirp } from './experiments/einstein-chirp';
 import { einsteinKerr3D } from './experiments/einstein-kerr3d';
+import { einsteinAstroConsequence } from './experiments/einstein-astro-consequence';
 
 /**
  * Einstein Lab — flagowe laboratorium Genesis OS. Domyślny (bazowy)
@@ -283,6 +284,6 @@ export const einsteinLab: LabDefinition = {
   honestyNote: einsteinBlackHole3D.honestyNote,
   params: einsteinBlackHole3D.params,
   createSim3D: einsteinBlackHole3D.createSim3D,
-  experiments: [einsteinWeakField2D, einsteinGeodesics, einsteinKerr3D, einsteinLensing, einsteinChirp],
+  experiments: [einsteinWeakField2D, einsteinGeodesics, einsteinKerr3D, einsteinLensing, einsteinChirp, einsteinAstroConsequence],
   narrate: einsteinBlackHole3D.narrate,
 };

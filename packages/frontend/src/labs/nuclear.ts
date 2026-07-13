@@ -4,6 +4,7 @@ import { nuclearChain } from './experiments/nuclear-chain';
 import { nuclearTokamak } from './experiments/nuclear-tokamak';
 import { nuclearChart } from './experiments/nuclear-chart';
 import { nuclearChart3D } from './experiments/nuclear-chart-3d';
+import { nuclearConsequence } from './experiments/nuclear-consequence';
 
 /**
  * Nuclear Lab — rozpad promieniotwórczy.
@@ -162,7 +163,7 @@ export const nuclearLab: LabDefinition = {
     },
   ],
   createSim: () => new DecaySim(),
-  experiments: [nuclearChart, nuclearChart3D, nuclearChain, nuclearTokamak],
+  experiments: [nuclearChart, nuclearChart3D, nuclearConsequence, nuclearChain, nuclearTokamak],
   narrate(p, stats) {
     const iso = ISOTOPES[String(p.isotope)] ?? ISOTOPES.c14;
     const rem = Number(stats.remaining ?? 308);

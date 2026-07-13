@@ -270,6 +270,30 @@ button:disabled { cursor: default; }
 }
 .measure-empty { font-size: 0.7rem; color: var(--text-faint); font-style: italic; }
 
+/* Adopcja Grafu Modeli przez laboratoria (ConsequenceChainPanel) — nadbudowa
+   nad istniejącymi klasami .reality-* / .output-row / .control. */
+.consequence-stage { display: flex; flex-direction: column; min-height: 0; }
+.consequence-panel { display: flex; flex-direction: column; gap: 0.7rem; padding: 0.2rem 0.1rem; }
+.consequence-headline {
+  font-size: 0.78rem; color: var(--text-dim); line-height: 1.4;
+  padding: 0.5rem 0.7rem; border: 1px solid var(--border); border-radius: 8px;
+  background: rgba(92, 214, 232, 0.05);
+}
+.consequence-outputs { display: flex; flex-direction: column; gap: 0.3rem; }
+.consequence-outputs .output-row { grid-template-columns: 1fr auto auto; }
+.consequence-outputs .output-row.cross-domain {
+  grid-template-columns: 1fr auto auto; grid-auto-flow: row;
+  border-color: rgba(167, 139, 250, 0.5); background: rgba(167, 139, 250, 0.06);
+}
+.output-row.deriv-approximate { border-left: 2px solid rgba(240, 179, 92, 0.55); }
+.output-row.deriv-interpretive { border-left: 2px solid rgba(167, 139, 250, 0.55); }
+.output-row.deriv-direct { border-left: 2px solid rgba(110, 231, 160, 0.55); }
+.cross-domain-chip {
+  grid-column: 1 / -1; font-size: 0.64rem; color: var(--violet);
+  padding: 0.15rem 0.4rem; border: 1px solid rgba(167, 139, 250, 0.45); border-radius: 5px;
+  background: rgba(167, 139, 250, 0.08); margin-top: 0.2rem; justify-self: start;
+}
+
 /* Pasek statusu misji — realne dane (liczba laboratoriów, status AI), nie ozdoba */
 .mission-bar {
   display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;

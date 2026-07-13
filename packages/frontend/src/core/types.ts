@@ -99,6 +99,14 @@ export interface ExperimentDef {
    * kontraktem co dla 2D; różni się tylko warstwa renderująca.
    */
   createSim3D?: () => import('./three/types').Sim3D;
+  /**
+   * Eksperyment „graf konsekwencji" (Priorytet 1: adopcja Grafu Modeli przez
+   * laboratoria). Zamiast sceny 2D/3D renderuje współdzielony
+   * ConsequenceChainPanel na wykonywalnym grafie (core/modelGraph). Wzajemnie
+   * wykluczające się z createSim/createSim3D. `params` może być puste
+   * (parametry pochodzą ze specyfikacji grafu), a `narrate` może zwracać [].
+   */
+  createConsequenceModel?: () => import('./modelGraph/labConsequence').LabConsequenceSpec;
 }
 
 export interface LabDefinition {

@@ -2,6 +2,7 @@ import type { ExperimentDef, LabDefinition, NarrationBlock, Sim, SimParams } fro
 import { sci } from '../core/useSimLoop';
 import { civilizationColonization } from './experiments/civilization-colonization';
 import { civilizationKardashev3D } from './experiments/civilization-kardashev-3d';
+import { civilizationDrakeConsequence } from './experiments/civilization-drake-consequence';
 
 /**
  * Civilization Lab — skala Kardaszewa.
@@ -185,6 +186,6 @@ export const civilizationLab: LabDefinition = {
   honestyNote: civilizationKardashev3D.honestyNote,
   params: civilizationKardashev3D.params,
   createSim3D: civilizationKardashev3D.createSim3D,
-  experiments: [civilizationKardashev2D, civilizationColonization],
+  experiments: [civilizationKardashev2D, civilizationColonization, civilizationDrakeConsequence],
   narrate: civilizationKardashev3D.narrate,
 };

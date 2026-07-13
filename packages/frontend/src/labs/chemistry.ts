@@ -5,6 +5,7 @@ import { ELEMENTS } from '../data/elements';
 import { chemistryVsepr } from './experiments/chemistry-vsepr';
 import { chemistryTitration } from './experiments/chemistry-titration';
 import { chemistryIsing } from './experiments/chemistry-ising';
+import { chemistryKineticsConsequence } from './experiments/chemistry-kinetics-consequence';
 
 /**
  * Chemistry Lab — flagowy eksperyment to teraz prawdziwa geometria
@@ -238,7 +239,7 @@ export const chemistryLab: LabDefinition = {
   honestyNote: chemistryVsepr.honestyNote,
   params: chemistryVsepr.params,
   createSim3D: chemistryVsepr.createSim3D,
-  experiments: [chemistryBondPolarity2D, chemistryTitration, chemistryIsing],
+  experiments: [chemistryBondPolarity2D, chemistryTitration, chemistryIsing, chemistryKineticsConsequence],
   narrate: chemistryVsepr.narrate,
 };
 

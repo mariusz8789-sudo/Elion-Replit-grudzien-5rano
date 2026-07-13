@@ -39,9 +39,10 @@ export function ConsequenceChainPanel({
   honesty: HonestyLevel;
   honestyNote: string;
 }) {
-  const { graph, params, outputs, headline } = spec;
+  const { graph, params, outputs, headline, domainGuard } = spec;
   const [, setVersion] = useState(0);
   const [lastSteps, setLastSteps] = useState<PropagationStep[]>([]);
+  const violation = domainGuard ? domainGuard(graph) : null;
 
   // Wykryj krawędzie międzydziedzinowe raz (struktura grafu jest niezmienna).
   const crossDomainIds = useMemo(() => {
@@ -65,6 +66,13 @@ export function ConsequenceChainPanel({
     <div className="consequence-panel">
       <HonestyBadge level={honesty} note={honestyNote} />
       <div className="consequence-headline">{headline}</div>
+
+      {violation && (
+        <div className="domain-violation" role="alert">
+          <strong>⚠ Poza granicą ważności modelu.</strong> {violation.message} Policzone wyniki
+          w tym zakresie NIE są fizycznie sensowne (mogą być nieoznaczone) — model tu nie obowiązuje.
+        </div>
+      )}
 
       <div className="section-label">Parametry — dotknij, konsekwencje policzą się same</div>
       {params.map((p) => {

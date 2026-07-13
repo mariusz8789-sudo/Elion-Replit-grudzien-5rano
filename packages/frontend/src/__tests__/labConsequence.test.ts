@@ -3,6 +3,10 @@ import { isCrossDomainNode, inputDomains } from '../core/modelGraph/labConsequen
 import { nuclearConsequence } from '../labs/experiments/nuclear-consequence';
 import { einsteinAstroConsequence } from '../labs/experiments/einstein-astro-consequence';
 import { universeOrbitalConsequence } from '../labs/experiments/universe-orbital-consequence';
+import { chemistryKineticsConsequence } from '../labs/experiments/chemistry-kinetics-consequence';
+import { spacetimeRelativityConsequence } from '../labs/experiments/spacetime-relativity-consequence';
+import { civilizationDrakeConsequence } from '../labs/experiments/civilization-drake-consequence';
+import { spacetimeCSlider } from '../labs/experiments/spacetime-cslider';
 import type { ExperimentDef } from '../core/types';
 
 /**
@@ -12,7 +16,11 @@ import type { ExperimentDef } from '../core/types';
  * prawdziwych polach `domain` — nie da się zadeklarować połączenia, którego
  * w grafie nie ma.
  */
-const EXPERIMENTS: ExperimentDef[] = [nuclearConsequence, einsteinAstroConsequence, universeOrbitalConsequence];
+const EXPERIMENTS: ExperimentDef[] = [
+  nuclearConsequence, einsteinAstroConsequence, universeOrbitalConsequence,
+  chemistryKineticsConsequence, spacetimeRelativityConsequence, civilizationDrakeConsequence,
+  spacetimeCSlider,
+];
 
 describe('adopcja Grafu Modeli — spójność specyfikacji', () => {
   for (const exp of EXPERIMENTS) {
@@ -48,6 +56,20 @@ describe('wykrywanie krawędzi międzydziedzinowej', () => {
     // Okres orbitalny zależy tylko od parametrów w tej samej dziedzinie.
     const node = spec.graph.getNode('orbitalPeriodYears')!;
     expect(isCrossDomainNode(spec.graph, node)).toBe(false);
+  });
+
+  it('c-Slider domainGuard sygnalizuje v ≥ c (β ≥ 1), a poniżej milczy', () => {
+    const spec = spacetimeCSlider.createConsequenceModel!();
+    expect(spec.domainGuard).toBeTruthy();
+    // Baseline v=1.5e8, c=2.998e8 → β<1 → brak naruszenia.
+    expect(spec.domainGuard!(spec.graph)).toBeNull();
+    // Ustaw v > c → naruszenie granicy modelu.
+    spec.graph.setParameter('velocityMs', 3.5e8);
+    const violation = spec.domainGuard!(spec.graph);
+    expect(violation).not.toBeNull();
+    expect(violation!.message.length).toBeGreaterThan(0);
+    // γ musi być nieoznaczone w tym zakresie (model nie obowiązuje).
+    expect(Number.isFinite(spec.graph.getValue('lorentzGammaFactor'))).toBe(false);
   });
 
   it('propagacja realnie przelicza wyjścia po zmianie parametru', () => {

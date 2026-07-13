@@ -33,6 +33,10 @@ export interface ConsequenceOutputSpec {
   format?: (v: number) => string;
 }
 
+export interface DomainViolation {
+  message: string;
+}
+
 export interface LabConsequenceSpec {
   /** Zbudowany, wykonywalny graf (świeża instancja na każdy mount eksperymentu). */
   graph: ModelGraph;
@@ -42,6 +46,14 @@ export interface LabConsequenceSpec {
   outputs: ConsequenceOutputSpec[];
   /** Krótki nagłówek: co ten graf łączy (pokazywany nad łańcuchem). */
   headline: string;
+  /**
+   * Opcjonalna straż granic ważności modelu. Gdy bieżący stan grafu wychodzi
+   * poza zakres, w którym model jest fizycznie sensowny (np. v ≥ c w STW),
+   * zwraca komunikat ostrzegawczy. Panel pokazuje wtedy WYRAŹNE ostrzeżenie i
+   * nie udaje, że policzone (często NaN/∞) wyniki są prawdziwe. To jest
+   * mechanizm uczciwości „model tu nie obowiązuje", nie ozdoba.
+   */
+  domainGuard?: (graph: ModelGraph) => DomainViolation | null;
 }
 
 /**

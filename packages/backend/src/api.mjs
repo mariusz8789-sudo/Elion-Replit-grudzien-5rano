@@ -48,8 +48,11 @@ import {
   listMergeRequests,
   decideMergeRequest,
   contributionGraph,
+  saveRun,
+  listRuns,
 } from './store.mjs';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
+import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -92,6 +95,17 @@ export function handleApi(db, ctx) {
     return err(404, 'not_found');
   }
 
+  // ---- Backend Compute Engine (modele publiczne; run opcjonalnie utrwalany) ----
+  if (seg[0] === 'compute') {
+    if (seg[1] === 'models' && seg.length === 2 && method === 'GET') return ok({ models: listModels() });
+    if (seg[1] === 'models' && seg.length === 3 && method === 'GET') {
+      const m = getModel(seg[2]);
+      return m ? ok({ model: modelMetadata(m) }) : err(404, 'not_found');
+    }
+    if (seg[1] === 'run' && seg.length === 2 && method === 'POST') return runComputeHandler(db, ctx, body);
+    return err(404, 'not_found');
+  }
+
   // ---- Od tego miejsca wymagany ważny token ----
   const user = getUserByToken(db, ctx.token);
   if (!user) return err(401, 'unauthorized', 'Zaloguj się, aby korzystać z trwałych projektów.');
@@ -129,6 +143,11 @@ export function handleApi(db, ctx) {
     // /api/projects/:id/contributions
     if (seg[2] === 'contributions' && seg.length === 3 && method === 'GET') {
       return ok({ contributions: contributionGraph(db, projectId) });
+    }
+
+    // /api/projects/:id/runs — audytowalne przebiegi obliczeń projektu (viewer+)
+    if (seg[2] === 'runs' && seg.length === 3 && method === 'GET') {
+      return ok({ runs: listRuns(db, projectId) });
     }
 
     // /api/projects/:id/merge-requests
@@ -336,4 +355,36 @@ function deleteTrialHandler(db, role, trialId) {
   if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Usunięcie próby wymaga roli editor lub wyższej.');
   deleteTrial(db, trialId);
   return ok({ ok: true });
+}
+
+/* ---------------- Handler backendowego silnika obliczeniowego ---------------- */
+
+const RUN_STATUS_TO_HTTP = { ok: 200, rejected: 400, error: 500 };
+
+/**
+ * POST /api/compute/run — wykonuje model na serwerze z pełną prowieniencją.
+ * Body: { modelId, inputs, seed?, projectId? }. Jeśli podano projectId ORAZ
+ * użytkownik jest zalogowany z rolą editor+ w tym projekcie, przebieg zostaje
+ * TRWALE zapisany (audytowalny, odtwarzalny). Bez kontekstu projektu run jest
+ * efemeryczny (persisted:false) — sam wynik i tak wraca.
+ */
+function runComputeHandler(db, ctx, body) {
+  const modelId = String(body.modelId ?? '');
+  const seed = typeof body.seed === 'number' && Number.isFinite(body.seed) ? body.seed : null;
+  const run = runModel(modelId, body.inputs, { seed });
+
+  let persisted = false;
+  const projectId = typeof body.projectId === 'string' ? body.projectId : null;
+  if (run.status === 'ok' && projectId) {
+    const user = getUserByToken(db, ctx.token);
+    if (!user) return err(401, 'unauthorized', 'Zaloguj się, aby zapisać przebieg w projekcie.');
+    const project = getProject(db, projectId);
+    const role = project ? getRole(db, projectId, user.id) : null;
+    if (!project || !role) return err(404, 'not_found');
+    if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Zapis przebiegu wymaga roli editor lub wyższej.');
+    saveRun(db, run, { userId: user.id, projectId });
+    persisted = true;
+  }
+
+  return { status: RUN_STATUS_TO_HTTP[run.status] ?? 200, body: { run, persisted } };
 }

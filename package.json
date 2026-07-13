@@ -16,7 +16,9 @@
     "preview": "npm run preview --workspace=packages/frontend",
     "fetch-real-data": "node scripts/fetch-real-data.mjs",
     "smoke:desktop": "node scripts/smoke-e2e.mjs desktop",
-    "smoke:mobile": "node scripts/smoke-e2e.mjs mobile"
+    "smoke:mobile": "node scripts/smoke-e2e.mjs mobile",
+    "compute:bundle": "esbuild packages/frontend/src/core/compute/serverEntry.ts --bundle --format=esm --platform=node --target=node22 --legal-comments=none --outfile=packages/backend/src/compute/core.bundle.mjs",
+    "compute:bundle:check": "node scripts/check-compute-bundle.mjs"
   },
   "keywords": [
     "genesis-os",

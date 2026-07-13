@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint';
  * - bez wojen stylistycznych (styl trzyma Prettier).
  */
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', 'packages/frontend/public/sw.js'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', 'packages/frontend/public/sw.js', 'packages/backend/src/compute/core.bundle.mjs'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -35,7 +35,7 @@ export default tseslint.config(
     files: ['scripts/**/*.mjs'],
     languageOptions: {
       globals: {
-        console: 'readonly', process: 'readonly', fetch: 'readonly',
+        console: 'readonly', process: 'readonly', fetch: 'readonly', URL: 'readonly',
         // Skrypty e2e (Playwright) używają globali przeglądarki wewnątrz page.evaluate().
         document: 'readonly', window: 'readonly', Event: 'readonly',
       },

@@ -122,8 +122,37 @@ CREATE INDEX IF NOT EXISTS idx_branches_project ON branches(project_id);
 CREATE INDEX IF NOT EXISTS idx_mr_project ON merge_requests(project_id, status);
 `;
 
+/**
+ * Migracja do wersji 3 (Backend Compute Engine): trwałe, audytowalne przebiegi
+ * obliczeń naukowych (Scientific Runs). Każdy wiersz to jeden odtwarzalny run z
+ * pełną prowieniencją. Opcjonalnie dowiązany do użytkownika i/lub projektu.
+ */
+const SCHEMA_V3 = `
+CREATE TABLE IF NOT EXISTS runs (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT REFERENCES users(id) ON DELETE SET NULL,
+  project_id     TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  model_id       TEXT NOT NULL,
+  model_version  TEXT NOT NULL,
+  domain         TEXT NOT NULL,
+  status         TEXT NOT NULL,
+  inputs_json    TEXT NOT NULL,
+  outputs_json   TEXT NOT NULL,
+  units_json     TEXT NOT NULL DEFAULT '{}',
+  warnings_json  TEXT NOT NULL DEFAULT '[]',
+  provenance_json TEXT NOT NULL DEFAULT '{}',
+  seed           INTEGER,
+  deterministic  INTEGER NOT NULL DEFAULT 1,
+  duration_ms    INTEGER NOT NULL DEFAULT 0,
+  created_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_runs_model ON runs(model_id, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 3) db.exec(SCHEMA_V3);
   if (version < 2) {
     db.exec(SCHEMA_V2);
     // Dodaj kolumnę branch_id do trials, jeśli jej nie ma (baza z M1).
@@ -144,8 +173,8 @@ function migrate(db) {
       }
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
-    db.exec('PRAGMA user_version = 2');
   }
+  if (version < 3) db.exec('PRAGMA user_version = 3');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -597,4 +626,52 @@ export function contributionGraph(db, projectId) {
     perDay,
     totalTrials: rows.length,
   };
+}
+
+/* ---------------- Przebiegi obliczeń (Scientific Runs, trwałe/audytowalne) ---------------- */
+
+function toRun(row) {
+  if (!row) return null;
+  return {
+    runId: row.id,
+    userId: row.user_id ?? null,
+    projectId: row.project_id ?? null,
+    modelId: row.model_id,
+    modelVersion: row.model_version,
+    domain: row.domain,
+    status: row.status,
+    inputs: JSON.parse(row.inputs_json),
+    outputs: JSON.parse(row.outputs_json),
+    units: JSON.parse(row.units_json),
+    warnings: JSON.parse(row.warnings_json),
+    provenance: JSON.parse(row.provenance_json),
+    seed: row.seed ?? null,
+    deterministic: row.deterministic === 1,
+    durationMs: row.duration_ms,
+    createdAt: row.created_at,
+  };
+}
+
+/** Zapisuje przebieg obliczeń (wynik engine.runModel) z pełną prowieniencją. */
+export function saveRun(db, run, { userId = null, projectId = null } = {}) {
+  db.prepare(
+    `INSERT INTO runs (id, user_id, project_id, model_id, model_version, domain, status, inputs_json, outputs_json, units_json, warnings_json, provenance_json, seed, deterministic, duration_ms, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    run.runId, userId, projectId, run.modelId, run.modelVersion ?? '', run.domain ?? '', run.status,
+    JSON.stringify(run.inputs ?? {}), JSON.stringify(run.outputs ?? {}), JSON.stringify(run.units ?? {}),
+    JSON.stringify(run.warnings ?? []), JSON.stringify(run.provenance ?? {}),
+    run.seed ?? null, run.deterministic === false ? 0 : 1, run.durationMs ?? 0, run.startedAt ?? Date.now(),
+  );
+  return getRun(db, run.runId);
+}
+
+export function getRun(db, id) {
+  return toRun(db.prepare('SELECT * FROM runs WHERE id = ?').get(id));
+}
+
+/** Przebiegi projektu (najnowsze pierwsze), do audytu i odtwarzalności. */
+export function listRuns(db, projectId, limit = 100) {
+  const rows = db.prepare('SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?').all(projectId, limit);
+  return rows.map(toRun);
 }

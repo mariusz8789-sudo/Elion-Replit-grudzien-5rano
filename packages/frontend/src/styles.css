@@ -378,6 +378,30 @@ button:disabled { cursor: default; }
 .sonify-mapping strong { color: var(--gold); }
 .sonify-note { color: var(--text-faint); }
 
+/* MCRE — Model Conflict Resolution Engine (components/ModelConflictPanel.tsx). */
+.mcre-panel { display: flex; flex-direction: column; gap: 0.7rem; max-width: 900px; margin: 0 auto; padding: 0.5rem; }
+.mcre-verdict { padding: 0.6rem 0.8rem; border-radius: 8px; font-size: 0.78rem; line-height: 1.45; }
+.mcre-verdict.conflict { border: 1px solid rgba(240,100,92,0.6); background: rgba(240,100,92,0.1); color: var(--text-dim); }
+.mcre-verdict.conflict strong { color: #ff8f86; }
+.mcre-verdict.agree { border: 1px solid rgba(110,231,160,0.5); background: rgba(110,231,160,0.07); color: var(--text-dim); }
+.mcre-verdict.agree strong { color: var(--green); }
+.mcre-table { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.mcre-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 0.7fr; gap: 0.4rem; padding: 0.35rem 0.6rem; font-size: 0.74rem; }
+.mcre-row.mcre-head { background: rgba(255,255,255,0.04); font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
+.mcre-row.divergent { background: rgba(240,100,92,0.06); }
+.mcre-row.first-divergent { border-left: 3px solid #f0645c; }
+.mcre-cell.mcre-val, .mcre-cell.mcre-spread { font-family: var(--font-mono); }
+.mcre-cell.mcre-spread { color: var(--gold); }
+.mcre-variant { padding: 0.5rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; gap: 0.25rem; }
+.mcre-variant.out-of-domain { border-color: rgba(240,179,92,0.5); background: rgba(240,179,92,0.05); }
+.mcre-variant-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.mcre-variant-name { font-weight: 600; color: var(--text); }
+.mcre-domain-badge { font-size: 0.6rem; padding: 0.05rem 0.4rem; border-radius: 4px; border: 1px solid var(--border); }
+.mcre-domain-badge.in { color: var(--green); border-color: rgba(110,231,160,0.4); }
+.mcre-domain-badge.out { color: var(--gold); border-color: rgba(240,179,92,0.5); }
+.mcre-variant-note { font-size: 0.7rem; color: var(--text-dim); line-height: 1.4; }
+.mcre-variant-note strong { color: var(--text); }
+
 /* Pasek statusu misji — realne dane (liczba laboratoriów, status AI), nie ozdoba */
 .mission-bar {
   display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;

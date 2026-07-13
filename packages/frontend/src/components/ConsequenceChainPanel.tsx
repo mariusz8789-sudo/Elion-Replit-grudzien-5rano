@@ -4,6 +4,7 @@ import { isCrossDomainNode, inputDomains } from '../core/modelGraph/labConsequen
 import type { NodeDerivation, PropagationStep } from '../core/modelGraph/graph';
 import type { HonestyLevel } from '../core/types';
 import { HonestyBadge } from './HonestyBadge';
+import { NodeLens } from './NodeLens';
 import {
   listTrials, saveTrial, duplicateTrial, updateTrial, deleteTrial, diffTrials,
   TRIAL_STATUS_LABEL, type Trial, type TrialStatus,
@@ -53,6 +54,7 @@ export function ConsequenceChainPanel({
   const [trials, setTrials] = useState<Trial[]>(() => listTrials(experimentId));
   const [compareA, setCompareA] = useState<string | null>(null);
   const [compareB, setCompareB] = useState<string | null>(null);
+  const [lensNodeId, setLensNodeId] = useState<string | null>(null);
   const violation = domainGuard ? domainGuard(graph) : null;
 
   function captureState() {
@@ -127,6 +129,10 @@ export function ConsequenceChainPanel({
         </div>
       )}
 
+      {lensNodeId && (
+        <NodeLens graph={graph} nodeId={lensNodeId} onSelect={setLensNodeId} onClose={() => setLensNodeId(null)} />
+      )}
+
       <div className="section-label">Parametry — dotknij, konsekwencje policzą się same</div>
       {params.map((p) => {
         const node = graph.getNode(p.id);
@@ -157,7 +163,9 @@ export function ConsequenceChainPanel({
           const isCross = crossDomainIds.has(o.id);
           return (
             <div key={o.id} className={`output-row deriv-${node.derivation}${isCross ? ' cross-domain' : ''}`}>
-              <span className="output-label" title={node.honestyNote}>{node.label}</span>
+              <button className="output-label lens-trigger" title="Otwórz soczewkę epistemiczną" onClick={() => setLensNodeId(o.id)}>
+                🔍 {node.label}
+              </button>
               <span className="output-val">{fmt(graph.getValue(o.id), o.format)} {node.unit}</span>
               <span className={`reality-deriv ${node.derivation}`}>{DERIVATION_LABEL[node.derivation]}</span>
               {isCross && (

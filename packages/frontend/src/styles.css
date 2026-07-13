@@ -330,6 +330,41 @@ button:disabled { cursor: default; }
 .trial-compare-row { display: flex; justify-content: space-between; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim); }
 .trial-compare-row.muted { color: var(--text-faint); font-style: italic; }
 
+/* Epistemic Lens (components/NodeLens.tsx) — mobile-first karta inspekcji prawdy. */
+.lens-trigger {
+  background: none; border: none; color: var(--cyan); cursor: pointer; text-align: left;
+  font-size: 0.74rem; padding: 0; font-family: inherit;
+}
+.lens-trigger:hover { text-decoration: underline; }
+.node-lens {
+  display: flex; flex-direction: column; gap: 0.55rem;
+  padding: 0.8rem; border: 1px solid var(--cyan); border-radius: 10px;
+  background: linear-gradient(180deg, rgba(92,214,232,0.08), rgba(10,14,28,0.9));
+}
+.node-lens-head { display: flex; align-items: center; gap: 0.5rem; }
+.node-lens-eye { font-size: 1rem; }
+.node-lens-title { flex: 1; font-weight: 600; color: var(--text); font-size: 0.9rem; }
+.node-lens-value { display: flex; align-items: baseline; gap: 0.4rem; }
+.node-lens-num { font-family: var(--font-mono); font-size: 1.6rem; color: var(--cyan); }
+.node-lens-unit { font-size: 0.8rem; color: var(--text-dim); }
+.node-lens-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.lens-domain-chip, .lens-param-chip {
+  font-size: 0.62rem; padding: 0.05rem 0.4rem; border-radius: 4px; border: 1px solid var(--border); color: var(--text-dim);
+}
+.lens-param-chip { color: var(--gold); border-color: rgba(240,179,92,0.4); }
+.cross-domain-chip.inline { grid-column: auto; margin-top: 0; }
+.node-lens-field { display: flex; flex-direction: column; gap: 0.2rem; }
+.node-lens-key { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
+.node-lens-formula { font-family: var(--font-mono); font-size: 0.82rem; color: var(--text); }
+.node-lens-note { font-size: 0.72rem; color: var(--text-dim); line-height: 1.45; }
+.node-lens-links { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.lens-link {
+  font-size: 0.68rem; padding: 0.2rem 0.5rem; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border-strong); background: rgba(255,255,255,0.03); color: var(--cyan);
+}
+.lens-link:hover { border-color: var(--cyan); }
+.lens-link-tag { color: var(--text-faint); }
+
 /* Pasek statusu misji — realne dane (liczba laboratoriów, status AI), nie ozdoba */
 .mission-bar {
   display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;

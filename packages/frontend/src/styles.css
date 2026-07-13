@@ -1275,3 +1275,30 @@ kbd {
 .contrib-bar { flex: 1; height: 8px; border-radius: 999px; background: var(--bg-elevated); overflow: hidden; }
 .contrib-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--violet)); }
 .contrib-count { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text); min-width: 2ch; text-align: right; }
+
+/* ---------- CDE — Silnik odkryć (Milestone 3) ---------- */
+.cde-criteria { display: flex; flex-direction: column; gap: 0.35rem; }
+.cde-criterion { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.82rem; padding: 0.4rem 0.6rem; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); }
+.cde-crit-bound { font-family: var(--font-mono); font-size: 0.74rem; color: var(--cyan); }
+.cde-tried { margin-top: 0.5rem; font-size: 0.74rem; color: var(--gold); padding: 0.4rem 0.6rem; border: 1px solid rgba(240, 179, 92, 0.4); border-radius: 8px; }
+.cde-verdict { padding: 0.6rem 0.75rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; border: 1px solid var(--border); }
+.cde-verdict.accepted { color: var(--green); border-color: rgba(110, 231, 160, 0.5); background: rgba(110, 231, 160, 0.06); }
+.cde-verdict.rejected { color: var(--red); border-color: rgba(244, 124, 124, 0.5); background: rgba(244, 124, 124, 0.06); }
+.cde-verdict-note { display: block; font-weight: 400; font-size: 0.7rem; color: var(--text-dim); margin-top: 0.15rem; }
+.cde-results { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.6rem; }
+.cde-result { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.8rem; padding: 0.35rem 0.5rem; border-radius: 8px; background: var(--bg-raised); }
+.cde-result.pass .cde-result-icon { color: var(--green); }
+.cde-result.fail .cde-result-icon { color: var(--red); }
+.cde-result-label { flex: 1; min-width: 0; }
+.cde-result-actual { font-family: var(--font-mono); color: var(--text); }
+.cde-result-bound { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-faint); }
+.cde-reasons { margin-top: 0.6rem; }
+.cde-reason { font-size: 0.74rem; color: var(--text-dim); margin-bottom: 0.2rem; }
+.cde-market { display: flex; flex-direction: column; gap: 0.4rem; }
+.cde-listing { display: flex; align-items: center; gap: 0.6rem; }
+.cde-listing-name { flex: 1; min-width: 0; font-size: 0.8rem; }
+.cde-listing-share { font-family: var(--font-mono); font-size: 0.76rem; color: var(--text); min-width: 3ch; text-align: right; }
+.cde-failures { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.5rem; }
+.cde-failure { display: flex; flex-direction: column; padding: 0.4rem 0.6rem; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); }
+.cde-failure-label { font-size: 0.8rem; font-weight: 600; }
+.cde-failure-reasons { font-size: 0.7rem; color: var(--text-faint); }

@@ -24,6 +24,7 @@ import { RealityNavigator } from './components/RealityNavigator';
 import { EngineeringNavigator } from './components/EngineeringNavigator';
 import { ModelConflictPanel } from './components/ModelConflictPanel';
 import { CloudProjectsScreen } from './components/CloudProjectsScreen';
+import { CandidateDiscoveryScreen } from './components/CandidateDiscoveryScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -44,7 +45,8 @@ type Route =
   | { kind: 'reality' }
   | { kind: 'prebuild' }
   | { kind: 'conflict' }
-  | { kind: 'projects' };
+  | { kind: 'projects' }
+  | { kind: 'cde' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -60,6 +62,7 @@ function parseHash(): Route {
   if (h === '#/prebuild') return { kind: 'prebuild' };
   if (h === '#/conflict') return { kind: 'conflict' };
   if (h === '#/projects') return { kind: 'projects' };
+  if (h === '#/cde') return { kind: 'cde' };
   return { kind: 'home' };
 }
 
@@ -307,6 +310,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'cde') {
+      return (
+        <div className="app">
+          <TopBar title="🧭 Silnik odkryć (CDE)" onSearch={() => setSearchOpen(true)} />
+          <ErrorBoundary>
+            <CandidateDiscoveryScreen />
+          </ErrorBoundary>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -347,6 +362,14 @@ export default function App() {
             <span className="timeline-cta-text">
               <span className="timeline-cta-title">Konflikt modeli <em>(MCRE)</em></span>
               <span className="timeline-cta-sub">Dwa uznane modele tej samej wielkości. Zobacz, gdzie i dlaczego się rozjeżdżają, które są poza dziedziną ważności, i JAKI POMIAR rozstrzygnie spór. Genesis OS potrafi powiedzieć „nie wiemy".</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
+          <button className="timeline-cta" onClick={() => { window.location.hash = '#/cde'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true">🧭</span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Silnik odkryć <em>(CDE)</em></span>
+              <span className="timeline-cta-sub">Zdefiniuj dziedzinę, przepuść kandydata przez wykonywalny Graf Modeli i dostań Paszport: które kryteria spełnia, co zmierzyć najpierw (Rynek Pomiarów), a które ślepe zaułki już znamy (Biblioteka Porażek). Bez ogłaszania „odkryć".</span>
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>

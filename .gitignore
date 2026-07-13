@@ -3,3 +3,6 @@ dist/
 .env
 *.log
 *.tsbuildinfo
+
+# Trwały magazyn backendu (SQLite) — dane runtime, nie do repo
+packages/backend/data/

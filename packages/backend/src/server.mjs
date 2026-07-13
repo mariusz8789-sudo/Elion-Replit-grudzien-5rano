@@ -20,7 +20,7 @@
  */
 
 import http from 'node:http';
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
@@ -35,6 +35,8 @@ import {
   knowledgeExcerptFor,
   AI_UNAVAILABLE_MESSAGE,
 } from './lib.mjs';
+import { openDatabase, purgeExpiredSessions } from './store.mjs';
+import { handleApi } from './api.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8080);
@@ -50,6 +52,24 @@ const startedAt = Date.now();
 
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 const client = hasKey ? new Anthropic() : null;
+
+// Trwały magazyn (Milestone 1: Backend Persistence). Domyślnie plik obok
+// serwera; :memory: dla testów/efemerycznych wdrożeń bez woluminu. node:sqlite
+// jest wbudowany — zero zewnętrznych zależności, schemat przenośny do Postgresa.
+const DB_PATH = process.env.GENESIS_DB_PATH ?? path.join(__dirname, '../data/genesis.db');
+let db = null;
+try {
+  if (DB_PATH !== ':memory:') {
+    const dir = path.dirname(DB_PATH);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  }
+  db = openDatabase(DB_PATH);
+} catch (err) {
+  // Bez trwałości aplikacja nadal działa (local-first frontend) — logujemy i lecimy dalej.
+  console.log(JSON.stringify({ t: new Date().toISOString(), level: 'error', msg: 'db_open_failed', message: String(err?.message) }));
+}
+// Okresowe sprzątanie wygasłych sesji — pamięć/plik nie puchną.
+if (db) setInterval(() => { try { purgeExpiredSessions(db); } catch { /* ignore */ } }, 3_600_000).unref();
 
 // Wczytane raz przy starcie — pliki knowledge/*.md rzadko się zmieniają,
 // a to grounding dla KAŻDEGO zapytania do /api/ask (patrz handleAsk niżej).
@@ -163,6 +183,45 @@ async function handleAsk(req, res) {
   });
 }
 
+/* ---------------- API trwałości (/api/auth, /api/projects) ---------------- */
+const persistLimiter = createRateLimiter({ limit: 60, windowMs: 60_000 });
+setInterval(() => persistLimiter.cleanup(), 300_000).unref();
+
+/** Odczytuje ciało JSON (limit 64 kB — próby to małe wektory liczb), token z nagłówka i woła router. */
+function handlePersistApi(req, res, url) {
+  if (!db) return json(res, 503, { error: 'persistence_unavailable', message: 'Trwały magazyn nie jest dostępny w tym wdrożeniu.' });
+  const ip = req.socket.remoteAddress ?? 'unknown';
+  if (!persistLimiter.allow(ip)) {
+    return json(res, 429, { error: 'rate_limited', message: 'Za dużo żądań — odczekaj chwilę.' });
+  }
+  const auth = req.headers['authorization'] ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
+  const query = Object.fromEntries(url.searchParams.entries());
+
+  let raw = '';
+  let size = 0;
+  let overflow = false;
+  req.on('data', (chunk) => {
+    size += chunk.length;
+    if (size > 65_536) { overflow = true; req.destroy(); return; }
+    raw += chunk;
+  });
+  req.on('end', () => {
+    if (overflow) return;
+    let body = {};
+    if (raw) {
+      try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad_json' }); }
+    }
+    try {
+      const result = handleApi(db, { method: req.method, pathname: url.pathname, token, body, query });
+      return json(res, result.status, result.body);
+    } catch (err) {
+      log('error', 'persist_api_failed', { path: url.pathname, message: String(err?.message) });
+      return json(res, 500, { error: 'internal' });
+    }
+  });
+}
+
 /* ---------------- Statyczny frontend (produkcja) ---------------- */
 function serveStatic(req, res) {
   const urlPath = new URL(req.url, 'http://x').pathname;
@@ -199,9 +258,13 @@ const server = http.createServer((req, res) => {
       model: hasKey ? MODEL : null,
       static: staticAvailable,
       knowledgeLabs: knowledgeIndex.size,
+      persistence: db ? 'ready' : 'unavailable',
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);
+  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects')) {
+    return handlePersistApi(req, res, new URL(req.url, 'http://x'));
+  }
   if (req.url?.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
   if (req.method === 'GET' && staticAvailable) return serveStatic(req, res);
   return json(res, 404, { error: 'not_found', hint: 'Brak buildu frontendu — uruchom npm run build.' });
@@ -209,10 +272,11 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   log('info', 'started', {
-    port: PORT,
+    port: server.address()?.port ?? PORT, // rzeczywisty port (PORT=0 → efemeryczny, przydatne w testach)
     version: VERSION,
     ai: hasKey ? MODEL : 'no-key',
     static: staticAvailable ? STATIC_DIR : 'none',
+    persistence: db ? DB_PATH : 'none',
   });
 });
 
@@ -220,7 +284,10 @@ server.listen(PORT, () => {
 for (const sig of ['SIGTERM', 'SIGINT']) {
   process.on(sig, () => {
     log('info', 'shutdown', { signal: sig });
-    server.close(() => process.exit(0));
+    server.close(() => {
+      try { db?.close(); } catch { /* ignore */ }
+      process.exit(0);
+    });
     setTimeout(() => process.exit(0), 5000).unref();
   });
 }

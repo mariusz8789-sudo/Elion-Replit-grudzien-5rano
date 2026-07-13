@@ -22,7 +22,10 @@ export default tseslint.config(
   {
     files: ['packages/backend/**/*.mjs'],
     languageOptions: {
-      globals: { console: 'readonly', process: 'readonly', setTimeout: 'readonly', setInterval: 'readonly', URL: 'readonly' },
+      globals: {
+        console: 'readonly', process: 'readonly', setTimeout: 'readonly', setInterval: 'readonly',
+        clearTimeout: 'readonly', URL: 'readonly', Buffer: 'readonly', fetch: 'readonly',
+      },
     },
     rules: {
       'no-console': 'off', // backend loguje przez console (strukturalny JSON)

@@ -365,6 +365,19 @@ button:disabled { cursor: default; }
 .lens-link:hover { border-color: var(--cyan); }
 .lens-link-tag { color: var(--text-faint); }
 
+/* Sonifikacja naukowa (core/sonification.ts) — zmienna → normalizacja → ton. */
+.sonify-btn {
+  background: none; border: 1px solid var(--border); border-radius: 5px; cursor: pointer;
+  font-size: 0.7rem; padding: 0.05rem 0.35rem; color: var(--text-dim);
+}
+.sonify-btn.on { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 6px rgba(240,179,92,0.35); }
+.sonify-mapping {
+  font-size: 0.7rem; color: var(--text-dim); line-height: 1.45;
+  padding: 0.45rem 0.6rem; border: 1px solid rgba(240,179,92,0.4); border-radius: 8px; background: rgba(240,179,92,0.06);
+}
+.sonify-mapping strong { color: var(--gold); }
+.sonify-note { color: var(--text-faint); }
+
 /* Pasek statusu misji — realne dane (liczba laboratoriów, status AI), nie ozdoba */
 .mission-bar {
   display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;

@@ -31,6 +31,8 @@ export interface ConsequenceOutputSpec {
   /** Id węzła pochodnego do pokazania jako wynik. */
   id: string;
   format?: (v: number) => string;
+  /** Opcjonalny zakres sonifikacji (wartość→ton). Bez tego wyjścia nie da się sonifikować. */
+  sonify?: { min: number; max: number };
 }
 
 export interface DomainViolation {

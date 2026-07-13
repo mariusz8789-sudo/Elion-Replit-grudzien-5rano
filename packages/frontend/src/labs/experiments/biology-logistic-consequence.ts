@@ -20,7 +20,7 @@ export const biologyLogisticConsequence: ExperimentDef = {
       { id: 'timeElapsed', min: 0, max: 40, step: 0.5 },
     ],
     outputs: [
-      { id: 'populationAtT', format: (v) => v.toFixed(0) },
+      { id: 'populationAtT', format: (v) => v.toFixed(0), sonify: { min: 0, max: 10000 } },
       { id: 'fractionOfCapacity', format: (v) => v.toFixed(1) },
     ],
   }),

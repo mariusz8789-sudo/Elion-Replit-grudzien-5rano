@@ -26,7 +26,7 @@ export const spacetimeCSlider: ExperimentDef = {
     ],
     outputs: [
       { id: 'betaFraction', format: (v) => v.toFixed(3) },
-      { id: 'lorentzGammaFactor', format: (v) => (Number.isFinite(v) ? v.toFixed(3) : '—') },
+      { id: 'lorentzGammaFactor', format: (v) => (Number.isFinite(v) ? v.toFixed(3) : '—'), sonify: { min: 1, max: 10 } },
       { id: 'secondsPerProperSecond', format: (v) => (Number.isFinite(v) ? v.toFixed(3) : '—') },
       { id: 'lengthContractionPercent', format: (v) => (Number.isFinite(v) ? v.toFixed(1) : '—') },
       { id: 'dopplerApproaching', format: (v) => (Number.isFinite(v) ? v.toFixed(3) : '—') },

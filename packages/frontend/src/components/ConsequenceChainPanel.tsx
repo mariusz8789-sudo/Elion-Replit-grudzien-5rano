@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { LabConsequenceSpec } from '../core/modelGraph/labConsequence';
 import { isCrossDomainNode, inputDomains } from '../core/modelGraph/labConsequence';
+import { Sonifier, normalizeToFrequency, DEFAULT_FREQ_MIN, DEFAULT_FREQ_MAX, type SonificationMapping } from '../core/sonification';
 import type { NodeDerivation, PropagationStep } from '../core/modelGraph/graph';
 import type { HonestyLevel } from '../core/types';
 import { HonestyBadge } from './HonestyBadge';
@@ -55,7 +56,45 @@ export function ConsequenceChainPanel({
   const [compareA, setCompareA] = useState<string | null>(null);
   const [compareB, setCompareB] = useState<string | null>(null);
   const [lensNodeId, setLensNodeId] = useState<string | null>(null);
+  const [sonifyId, setSonifyId] = useState<string | null>(null);
+  const sonifierRef = useRef<Sonifier | null>(null);
   const violation = domainGuard ? domainGuard(graph) : null;
+
+  // Sonifikacja: mapowanie wybranego wyjścia na ton, aktualizowane na żywo.
+  const sonifyOutput = sonifyId ? outputs.find((o) => o.id === sonifyId) : null;
+  const sonifyMapping: SonificationMapping | null = sonifyOutput?.sonify
+    ? {
+        sourceLabel: graph.getNode(sonifyOutput.id)?.label ?? sonifyOutput.id,
+        unit: graph.getNode(sonifyOutput.id)?.unit ?? '',
+        min: sonifyOutput.sonify.min,
+        max: sonifyOutput.sonify.max,
+        fMin: DEFAULT_FREQ_MIN,
+        fMax: DEFAULT_FREQ_MAX,
+      }
+    : null;
+  const sonifiedValue = sonifyId ? graph.getValue(sonifyId) : null;
+
+  useEffect(() => {
+    if (sonifiedValue !== null && sonifyMapping && sonifierRef.current?.running) {
+      sonifierRef.current.setValue(sonifiedValue, sonifyMapping);
+    }
+  });
+
+  useEffect(() => {
+    return () => { sonifierRef.current?.stop(); sonifierRef.current = null; };
+  }, []);
+
+  function toggleSonify(id: string) {
+    if (sonifyId === id) {
+      sonifierRef.current?.stop();
+      sonifierRef.current = null;
+      setSonifyId(null);
+      return;
+    }
+    if (!sonifierRef.current) sonifierRef.current = new Sonifier();
+    if (!sonifierRef.current.running) sonifierRef.current.start();
+    setSonifyId(id);
+  }
 
   function captureState() {
     return {
@@ -167,6 +206,14 @@ export function ConsequenceChainPanel({
                 🔍 {node.label}
               </button>
               <span className="output-val">{fmt(graph.getValue(o.id), o.format)} {node.unit}</span>
+              {o.sonify && (
+                <button
+                  className={`sonify-btn${sonifyId === o.id ? ' on' : ''}`}
+                  aria-pressed={sonifyId === o.id}
+                  title="Sonifikuj: zmienna → normalizacja → ton"
+                  onClick={() => toggleSonify(o.id)}
+                >{sonifyId === o.id ? '🔊' : '🔈'}</button>
+              )}
               <span className={`reality-deriv ${node.derivation}`}>{DERIVATION_LABEL[node.derivation]}</span>
               {isCross && (
                 <span className="cross-domain-chip" title={`Ten wynik łączy dziedziny: ${inputDomains(graph, node).join(' + ')}`}>
@@ -177,6 +224,15 @@ export function ConsequenceChainPanel({
           );
         })}
       </div>
+
+      {sonifyMapping && sonifiedValue !== null && (
+        <div className="sonify-mapping" aria-live="polite">
+          🔊 <strong>{sonifyMapping.sourceLabel}</strong>
+          {' → '}normalizacja [{sonifyMapping.min}–{sonifyMapping.max} {sonifyMapping.unit}]
+          {' → '}ton {Math.round(normalizeToFrequency(sonifiedValue, sonifyMapping))} Hz
+          <span className="sonify-note"> — wysokość = deterministyczna funkcja wartości; przesuń suwak, by usłyszeć zmianę.</span>
+        </div>
+      )}
 
       {lastSteps.length > 0 && (
         <div className="reality-log" aria-label="Łańcuch konsekwencji">

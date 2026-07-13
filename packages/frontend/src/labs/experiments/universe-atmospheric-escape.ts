@@ -29,7 +29,7 @@ export const universeAtmosphericEscape: ExperimentDef = {
       { id: 'moleculeMassAmu', min: 1, max: 50, step: 1 },
     ],
     outputs: [
-      { id: 'equilibriumTempK', format: (v) => v.toFixed(0) },
+      { id: 'equilibriumTempK', format: (v) => v.toFixed(0), sonify: { min: 50, max: 1500 } },
       { id: 'escapeVelocityMs', format: (v) => (v / 1000).toFixed(2) + ' km/s →' },
       { id: 'thermalVelocityMs', format: (v) => (v / 1000).toFixed(3) + ' km/s →' },
       { id: 'jeansParameter', format: (v) => (v >= 1e4 ? v.toExponential(2) : v.toFixed(1)) },

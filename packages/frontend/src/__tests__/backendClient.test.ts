@@ -8,6 +8,11 @@ import {
   createCloudTrial,
   listCloudTrials,
   addMember,
+  listBranches,
+  createBranch,
+  createMergeRequest,
+  decideMergeRequest,
+  getContributions,
 } from '../core/backend/client';
 
 /**
@@ -108,5 +113,57 @@ describe('projects and trials client', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse(403, { error: 'forbidden', message: 'Za mało uprawnień' })));
     const r = await addMember('tok', 'p1', 'x@y.co', 'viewer');
     expect(r).toEqual({ ok: false, status: 403, error: 'forbidden', message: 'Za mało uprawnień' });
+  });
+
+  it('listCloudTrials includes both experimentId and branchId query params', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(200, { trials: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    await listCloudTrials('tok', 'p1', 'e', 'branch-1');
+    const url = fetchMock.mock.calls[0][0];
+    expect(url).toContain('experimentId=e');
+    expect(url).toContain('branchId=branch-1');
+  });
+});
+
+describe('Scientific Git client', () => {
+  it('listBranches unwraps the array', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse(200, { branches: [{ id: 'b1', projectId: 'p', name: 'main', baseBranchId: null, createdBy: 'u', createdAt: 1 }] })));
+    const r = await listBranches('tok', 'p');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data[0].name).toBe('main');
+  });
+
+  it('createBranch posts name + fork flag', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(201, { branch: { id: 'b2', projectId: 'p', name: 'hipo', baseBranchId: 'b1', createdBy: 'u', createdAt: 1 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await createBranch('tok', 'p', 'hipo', { baseBranchId: 'b1', fork: true });
+    expect(r.ok).toBe(true);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body).toEqual({ name: 'hipo', baseBranchId: 'b1', fork: true });
+  });
+
+  it('createMergeRequest posts source/target/title', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(201, { mergeRequest: { id: 'mr1', projectId: 'p', sourceBranchId: 's', targetBranchId: 't', title: 'X', description: '', status: 'open', createdBy: 'u', createdAt: 1, decidedBy: null, decidedAt: null, reviewNote: '', mergedCount: 0 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await createMergeRequest('tok', 'p', 's', 't', 'X');
+    expect(r.ok).toBe(true);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/projects/p/merge-requests');
+  });
+
+  it('decideMergeRequest posts approve + note to the decide endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(200, { mergeRequest: { id: 'mr1', projectId: 'p', sourceBranchId: 's', targetBranchId: 't', title: 'X', description: '', status: 'merged', createdBy: 'u', createdAt: 1, decidedBy: 'u', decidedAt: 2, reviewNote: 'ok', mergedCount: 1 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await decideMergeRequest('tok', 'p', 'mr1', true, 'ok');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data.status).toBe('merged');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/projects/p/merge-requests/mr1/decide');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ approve: true, reviewNote: 'ok' });
+  });
+
+  it('getContributions unwraps the graph', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse(200, { contributions: { contributors: [], perDay: {}, totalTrials: 0 } })));
+    const r = await getContributions('tok', 'p');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data.totalTrials).toBe(0);
   });
 });

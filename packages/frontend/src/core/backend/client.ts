@@ -57,6 +57,7 @@ export interface CloudTrial {
   note: string;
   parentId: string | null;
   modelVersion: string;
+  branchId: string | null;
   createdAt: number;
 }
 
@@ -174,14 +175,19 @@ export interface NewCloudTrial {
   note?: string;
   parentId?: string | null;
   modelVersion?: string;
+  branchId?: string;
 }
 
 export async function listCloudTrials(
   token: string,
   projectId: string,
   experimentId?: string,
+  branchId?: string,
 ): Promise<ApiResult<CloudTrial[]>> {
-  const q = experimentId ? `?experimentId=${encodeURIComponent(experimentId)}` : '';
+  const params = new URLSearchParams();
+  if (experimentId) params.set('experimentId', experimentId);
+  if (branchId) params.set('branchId', branchId);
+  const q = params.toString() ? `?${params.toString()}` : '';
   const r = await request<{ trials: CloudTrial[] }>('GET', `/projects/${projectId}/trials${q}`, { token });
   return r.ok ? { ok: true, data: r.data.trials } : r;
 }
@@ -210,4 +216,105 @@ export async function updateCloudTrial(
 
 export function deleteCloudTrial(token: string, projectId: string, trialId: string): Promise<ApiResult<{ ok: true }>> {
   return request('DELETE', `/projects/${projectId}/trials/${trialId}`, { token });
+}
+
+/* ---------------- Scientific Git: gałęzie, scalanie, kontrybucje ---------------- */
+
+export interface Branch {
+  id: string;
+  projectId: string;
+  name: string;
+  baseBranchId: string | null;
+  createdBy: string;
+  createdAt: number;
+}
+
+export type MergeStatus = 'open' | 'approved' | 'rejected' | 'merged';
+
+export interface MergeRequest {
+  id: string;
+  projectId: string;
+  sourceBranchId: string;
+  targetBranchId: string;
+  title: string;
+  description: string;
+  status: MergeStatus;
+  createdBy: string;
+  createdAt: number;
+  decidedBy: string | null;
+  decidedAt: number | null;
+  reviewNote: string;
+  mergedCount: number;
+}
+
+export interface Contributor {
+  userId: string;
+  displayName: string;
+  email: string;
+  trials: number;
+  firstAt: number;
+  lastAt: number;
+}
+
+export interface ContributionGraph {
+  contributors: Contributor[];
+  perDay: Record<string, number>;
+  totalTrials: number;
+}
+
+export async function listBranches(token: string, projectId: string): Promise<ApiResult<Branch[]>> {
+  const r = await request<{ branches: Branch[] }>('GET', `/projects/${projectId}/branches`, { token });
+  return r.ok ? { ok: true, data: r.data.branches } : r;
+}
+
+export async function createBranch(
+  token: string,
+  projectId: string,
+  name: string,
+  opts: { baseBranchId?: string; fork?: boolean } = {},
+): Promise<ApiResult<Branch>> {
+  const r = await request<{ branch: Branch }>('POST', `/projects/${projectId}/branches`, {
+    token,
+    body: { name, baseBranchId: opts.baseBranchId, fork: opts.fork ?? false },
+  });
+  return r.ok ? { ok: true, data: r.data.branch } : r;
+}
+
+export async function listMergeRequests(token: string, projectId: string): Promise<ApiResult<MergeRequest[]>> {
+  const r = await request<{ mergeRequests: MergeRequest[] }>('GET', `/projects/${projectId}/merge-requests`, { token });
+  return r.ok ? { ok: true, data: r.data.mergeRequests } : r;
+}
+
+export async function createMergeRequest(
+  token: string,
+  projectId: string,
+  sourceBranchId: string,
+  targetBranchId: string,
+  title: string,
+  description = '',
+): Promise<ApiResult<MergeRequest>> {
+  const r = await request<{ mergeRequest: MergeRequest }>('POST', `/projects/${projectId}/merge-requests`, {
+    token,
+    body: { sourceBranchId, targetBranchId, title, description },
+  });
+  return r.ok ? { ok: true, data: r.data.mergeRequest } : r;
+}
+
+export async function decideMergeRequest(
+  token: string,
+  projectId: string,
+  mrId: string,
+  approve: boolean,
+  reviewNote = '',
+): Promise<ApiResult<MergeRequest>> {
+  const r = await request<{ mergeRequest: MergeRequest }>('POST', `/projects/${projectId}/merge-requests/${mrId}/decide`, {
+    token,
+    body: { approve, reviewNote },
+  });
+  return r.ok ? { ok: true, data: r.data.mergeRequest } : r;
+}
+
+export async function getContributions(token: string, projectId: string): Promise<ApiResult<ContributionGraph>> {
+  const r = await request<{ contributions: ContributionGraph }>('GET', `/projects/${projectId}/contributions`, { token });
+  return r.ok ? { ok: true, data: r.data.contributions } : r;
 }

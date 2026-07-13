@@ -1239,3 +1239,39 @@ kbd {
 }
 .trial-cloud-count { font-size: 0.66rem; color: var(--text-faint); }
 .trial-cloud-msg { margin-top: 0.4rem; font-size: 0.72rem; color: var(--green); }
+
+/* ---------- Scientific Git (Milestone 2: branches, merge, contributions) ---------- */
+.branch-bar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.branch-chip {
+  font-size: 0.74rem; padding: 0.3rem 0.6rem; border-radius: 8px;
+  background: var(--bg-raised); border: 1px solid var(--border); color: var(--text-dim);
+}
+.branch-chip.active { color: var(--gold); border-color: rgba(240, 179, 92, 0.5); }
+.toggle-inline { display: flex; align-items: center; gap: 0.4rem; font-size: 0.74rem; color: var(--text-dim); }
+.toggle-inline input { width: auto; }
+
+.mr-open { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.6rem; }
+.mr-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.mr-row {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  padding: 0.5rem 0.6rem; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border);
+}
+.mr-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.mr-title { font-size: 0.82rem; font-weight: 600; }
+.mr-branches { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-faint); }
+.mr-status {
+  font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0.1rem 0.4rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim);
+}
+.mr-status.status-merged { color: var(--green); border-color: rgba(110, 231, 160, 0.4); }
+.mr-status.status-rejected { color: var(--red); border-color: rgba(244, 124, 124, 0.4); }
+.mr-status.status-open { color: var(--cyan); border-color: rgba(92, 214, 232, 0.4); }
+.mr-actions { display: flex; gap: 0.3rem; }
+.mr-hint { font-size: 0.64rem; color: var(--text-faint); }
+
+.contrib-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.contrib-row { display: flex; align-items: center; gap: 0.6rem; }
+.contrib-name { flex: 1; min-width: 0; font-size: 0.8rem; }
+.contrib-bar { flex: 1; height: 8px; border-radius: 999px; background: var(--bg-elevated); overflow: hidden; }
+.contrib-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--violet)); }
+.contrib-count { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text); min-width: 2ch; text-align: right; }

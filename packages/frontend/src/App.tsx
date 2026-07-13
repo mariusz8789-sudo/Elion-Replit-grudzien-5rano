@@ -25,6 +25,7 @@ import { EngineeringNavigator } from './components/EngineeringNavigator';
 import { ModelConflictPanel } from './components/ModelConflictPanel';
 import { CloudProjectsScreen } from './components/CloudProjectsScreen';
 import { CandidateDiscoveryScreen } from './components/CandidateDiscoveryScreen';
+import { DrugDiscoveryScreen } from './components/DrugDiscoveryScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -46,7 +47,8 @@ type Route =
   | { kind: 'prebuild' }
   | { kind: 'conflict' }
   | { kind: 'projects' }
-  | { kind: 'cde' };
+  | { kind: 'cde' }
+  | { kind: 'drug' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -63,6 +65,7 @@ function parseHash(): Route {
   if (h === '#/conflict') return { kind: 'conflict' };
   if (h === '#/projects') return { kind: 'projects' };
   if (h === '#/cde') return { kind: 'cde' };
+  if (h === '#/drug') return { kind: 'drug' };
   return { kind: 'home' };
 }
 
@@ -322,6 +325,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'drug') {
+      return (
+        <div className="app">
+          <TopBar title="💊 Drug Discovery" onSearch={() => setSearchOpen(true)} />
+          <ErrorBoundary>
+            <DrugDiscoveryScreen />
+          </ErrorBoundary>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -385,6 +400,9 @@ export default function App() {
             </button>
             <button onClick={() => { window.location.hash = '#/projects'; }}>
               <span aria-hidden="true">☁</span> Projekty
+            </button>
+            <button onClick={() => { window.location.hash = '#/drug'; }}>
+              <span aria-hidden="true">💊</span> Drug Discovery
             </button>
             <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
               <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}

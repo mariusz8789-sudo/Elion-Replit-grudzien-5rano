@@ -24,7 +24,7 @@ const MODE = process.argv[2] === 'mobile' ? 'mobile' : 'desktop';
 const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 const LABS = ['universe', 'spacetime', 'einstein', 'quantum', 'atom', 'nuclear', 'particle', 'chemistry', 'multiverse', 'civilization', 'biology', 'mathematics', 'discovery'];
-const ROUTES = ['', '#/settings', '#/glossary', '#/discovery-log', '#/what-if', '#/timeline', '#/decision-explorer', '#/reality', '#/prebuild', '#/conflict', '#/projects', '#/cde'];
+const ROUTES = ['', '#/settings', '#/glossary', '#/discovery-log', '#/what-if', '#/timeline', '#/decision-explorer', '#/reality', '#/prebuild', '#/conflict', '#/projects', '#/cde', '#/drug'];
 
 // Przyciski, których NIE klikamy (destrukcyjne / zmieniające sesję / przeładowujące).
 const UNSAFE = /wyczyść|usuń|wyloguj|delete|reset|clear|✕|odrzuć|scal/i;

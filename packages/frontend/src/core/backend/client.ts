@@ -318,3 +318,82 @@ export async function getContributions(token: string, projectId: string): Promis
   const r = await request<{ contributions: ContributionGraph }>('GET', `/projects/${projectId}/contributions`, { token });
   return r.ok ? { ok: true, data: r.data.contributions } : r;
 }
+
+/* ---------------- Compute engine + Drug Discovery ---------------- */
+
+export interface Capability {
+  id: string;
+  label: string;
+  category: string;
+  status: 'AVAILABLE' | 'NOT_IMPLEMENTED' | 'EXTERNAL_ENGINE_REQUIRED' | 'MODEL_NOT_VALID_FOR_DOMAIN';
+  modelId?: string;
+  requires?: string;
+  adapter?: string;
+  note?: string;
+}
+
+export interface Target {
+  id: string; projectId: string; name: string; targetType: string; geneProtein: string;
+  organism: string; indication: string; mechanism: string; constraints: string;
+  evidenceStatus: string; provenance: string; createdAt: number;
+}
+
+export interface Candidate {
+  id: string; projectId: string; targetId: string | null; label: string; formula: string;
+  smiles: string; composition: Record<string, number>; molecularWeight: number | null;
+  charge: number; parentId: string | null; generationMethod: string; createdAt: number;
+}
+
+export interface ScoreComponent { id: string; label: string; kind: 'calculated' | 'heuristic'; value: number; unit?: string; note?: string; }
+export interface CapabilityGap { id: string; label: string; status: string; requires?: string | null; note?: string | null; }
+
+export interface CandidatePassport {
+  candidateId: string; targetId: string | null; label: string;
+  representation: { formula: string | null; smiles: string | null; charge: number };
+  calculatedProperties: Record<string, number>;
+  modelsExecuted: { modelId: string; version: string | null; status: string }[];
+  scoreComponents: ScoreComponent[];
+  uncertainty: string; modelDomainStatus: string;
+  conflicts: unknown[]; capabilityGaps: CapabilityGap[]; warnings: string[];
+  requiredLaboratoryValidation: string[];
+  measurementRecommendations: { capability: string; label: string; status: string; requires?: string }[];
+  runIds: string[]; verdict: string;
+}
+
+export interface RankedCandidate {
+  rank: number; candidateId: string; label: string;
+  rankBasis: { lipinskiMwPass: number; chemistryComputed: number; molarMassGmol: number | null };
+  capabilityGapCount: number; note: string;
+}
+
+export async function listCapabilities(): Promise<ApiResult<Capability[]>> {
+  const r = await request<{ capabilities: Capability[] }>('GET', '/compute/capabilities');
+  return r.ok ? { ok: true, data: r.data.capabilities } : r;
+}
+
+export async function listTargets(token: string, projectId: string): Promise<ApiResult<Target[]>> {
+  const r = await request<{ targets: Target[] }>('GET', `/projects/${projectId}/targets`, { token });
+  return r.ok ? { ok: true, data: r.data.targets } : r;
+}
+export async function createTarget(token: string, projectId: string, target: Partial<Target> & { name: string }): Promise<ApiResult<Target>> {
+  const r = await request<{ target: Target }>('POST', `/projects/${projectId}/targets`, { token, body: target });
+  return r.ok ? { ok: true, data: r.data.target } : r;
+}
+export async function listCandidates(token: string, projectId: string, targetId?: string): Promise<ApiResult<Candidate[]>> {
+  const q = targetId ? `?targetId=${encodeURIComponent(targetId)}` : '';
+  const r = await request<{ candidates: Candidate[] }>('GET', `/projects/${projectId}/candidates${q}`, { token });
+  return r.ok ? { ok: true, data: r.data.candidates } : r;
+}
+export async function createCandidate(token: string, projectId: string, candidate: { label: string; formula: string; targetId?: string; smiles?: string; generationMethod?: string }): Promise<ApiResult<Candidate>> {
+  const r = await request<{ candidate: Candidate }>('POST', `/projects/${projectId}/candidates`, { token, body: candidate });
+  return r.ok ? { ok: true, data: r.data.candidate } : r;
+}
+export async function getCandidatePassport(token: string, projectId: string, candidateId: string): Promise<ApiResult<CandidatePassport>> {
+  const r = await request<{ passport: CandidatePassport }>('GET', `/projects/${projectId}/candidates/${candidateId}/passport`, { token });
+  return r.ok ? { ok: true, data: r.data.passport } : r;
+}
+export async function getCandidateRanking(token: string, projectId: string, targetId?: string): Promise<ApiResult<RankedCandidate[]>> {
+  const q = targetId ? `?targetId=${encodeURIComponent(targetId)}` : '';
+  const r = await request<{ ranking: RankedCandidate[] }>('GET', `/projects/${projectId}/candidates/ranking${q}`, { token });
+  return r.ok ? { ok: true, data: r.data.ranking } : r;
+}

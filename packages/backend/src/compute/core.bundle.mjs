@@ -1408,7 +1408,96 @@ function buildPhotonGraph() {
   });
   return g;
 }
+
+// packages/frontend/src/core/compute/cheminformatics.ts
+var ATOMIC_WEIGHTS = {
+  H: 1.008,
+  He: 4.0026,
+  Li: 6.94,
+  Be: 9.0122,
+  B: 10.81,
+  C: 12.011,
+  N: 14.007,
+  O: 15.999,
+  F: 18.998,
+  Ne: 20.18,
+  Na: 22.99,
+  Mg: 24.305,
+  Al: 26.982,
+  Si: 28.085,
+  P: 30.974,
+  S: 32.06,
+  Cl: 35.45,
+  Ar: 39.948,
+  K: 39.098,
+  Ca: 40.078,
+  Fe: 55.845,
+  Co: 58.933,
+  Ni: 58.693,
+  Cu: 63.546,
+  Zn: 65.38,
+  Se: 78.971,
+  Br: 79.904,
+  Ag: 107.87,
+  I: 126.9,
+  Pt: 195.08,
+  Au: 196.97
+};
+function parseFormula(formula) {
+  const raw = String(formula ?? "").trim();
+  if (!raw) return { ok: false, error: "Pusty wz\xF3r.", counts: {} };
+  if (/[^A-Za-z0-9]/.test(raw)) return { ok: false, error: "Dozwolone tylko litery i cyfry (bez nawias\xF3w, kropek, \u0142adunk\xF3w) w v1.", counts: {} };
+  const counts = {};
+  const re = /([A-Z][a-z]?)(\d*)/g;
+  let consumed = 0;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    if (m.index !== consumed) break;
+    const el = m[1];
+    const n = m[2] === "" ? 1 : parseInt(m[2], 10);
+    if (!(el in ATOMIC_WEIGHTS)) return { ok: false, error: `Nieznany pierwiastek \u201E${el}".`, counts: {} };
+    counts[el] = (counts[el] ?? 0) + n;
+    consumed += m[0].length;
+  }
+  if (consumed !== raw.length) return { ok: false, error: "Nie uda\u0142o si\u0119 sparsowa\u0107 ca\u0142ego wzoru.", counts: {} };
+  if (Object.keys(counts).length === 0) return { ok: false, error: "Brak pierwiastk\xF3w.", counts: {} };
+  return { ok: true, counts };
+}
+function molecularWeight(counts) {
+  let mw = 0;
+  for (const [el, n] of Object.entries(counts)) mw += (ATOMIC_WEIGHTS[el] ?? 0) * n;
+  return mw;
+}
+function massFractions(counts) {
+  const mw = molecularWeight(counts) || 1;
+  const out = {};
+  for (const [el, n] of Object.entries(counts)) out[el] = (ATOMIC_WEIGHTS[el] ?? 0) * n / mw;
+  return out;
+}
+function atomCount(counts) {
+  return Object.values(counts).reduce((a, b) => a + b, 0);
+}
+function degreeOfUnsaturation(counts) {
+  const c = counts.C ?? 0;
+  const n = counts.N ?? 0;
+  const h = counts.H ?? 0;
+  const x = (counts.F ?? 0) + (counts.Cl ?? 0) + (counts.Br ?? 0) + (counts.I ?? 0);
+  return (2 * c + 2 + n - h - x) / 2;
+}
+function hillFormula(counts) {
+  const els = Object.keys(counts);
+  const ordered = [];
+  if (counts.C) {
+    ordered.push("C");
+    if (counts.H) ordered.push("H");
+    ordered.push(...els.filter((e) => e !== "C" && e !== "H").sort());
+  } else {
+    ordered.push(...els.sort());
+  }
+  return ordered.map((e) => counts[e] === 1 ? e : `${e}${counts[e]}`).join("");
+}
 export {
+  ATOMIC_WEIGHTS,
   EARTH_MASSES_PER_SOLAR,
   G_ASTRO,
   G_ASTRO_YEAR,
@@ -1417,6 +1506,7 @@ export {
   SCHWARZSCHILD_CRITICAL_IMPACT,
   TESSERACT_EDGES,
   TESSERACT_VERTICES,
+  atomCount,
   binarySeparationMeters,
   bondPolarity,
   buildAtmosphericEscapeGraph,
@@ -1434,10 +1524,12 @@ export {
   chshS,
   circularVelocity,
   decayRemaining,
+  degreeOfUnsaturation,
   dnaMeltingTempWallace,
   equivalenceVolumeMl,
   exponentialDiskMass,
   gaussianPdf,
+  hillFormula,
   iscoFrequency,
   isothermalHaloMass,
   kardashevPower,
@@ -1453,9 +1545,12 @@ export {
   lorentzTime,
   lorenzChaosThreshold,
   lorenzDerivative,
+  massFractions,
   measurementTensionSigma,
+  molecularWeight,
   mondAcceleration,
   orbitalElementsFromState,
+  parseFormula,
   project4Dto3D,
   rotate4D,
   sampleLocalHiddenPair,

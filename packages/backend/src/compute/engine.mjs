@@ -41,6 +41,18 @@ export function validateInputs(model, rawInputs) {
   for (const spec of model.inputs) {
     const provided = input[spec.id];
     const v = provided === undefined ? spec.default : provided;
+    if (spec.type === 'string') {
+      if (typeof v !== 'string') {
+        return { ok: false, error: 'invalid_value', message: `Parametr „${spec.id}" musi być tekstem.` };
+      }
+      const s = v.trim();
+      if (!s) return { ok: false, error: 'invalid_value', message: `Parametr „${spec.id}" nie może być pusty.` };
+      if (s.length > (spec.maxLength ?? 200)) {
+        return { ok: false, error: 'out_of_range', message: `„${spec.id}" przekracza ${spec.maxLength ?? 200} znaków.` };
+      }
+      values[spec.id] = s;
+      continue;
+    }
     if (typeof v !== 'number' || !Number.isFinite(v)) {
       return { ok: false, error: 'invalid_value', message: `Parametr „${spec.id}" musi być skończoną liczbą.` };
     }
@@ -84,6 +96,18 @@ export function runModel(modelId, rawInputs, opts = {}) {
       status: 'rejected', error: valid.error, message: valid.message,
       finishedAt: Date.now(), durationMs: Date.now() - startedAt,
     };
+  }
+
+  // Opcjonalna walidacja domenowa modelu (np. poprawność wzoru chemicznego).
+  if (typeof model.validate === 'function') {
+    const domainCheck = model.validate(valid.values);
+    if (domainCheck && domainCheck.ok === false) {
+      return {
+        ...base, modelVersion: model.version, domain: model.domain, inputs: valid.values,
+        status: 'rejected', error: domainCheck.error ?? 'invalid_input', message: domainCheck.message,
+        finishedAt: Date.now(), durationMs: Date.now() - startedAt,
+      };
+    }
   }
 
   let result;

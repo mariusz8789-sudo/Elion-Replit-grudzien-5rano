@@ -291,6 +291,40 @@ const MODELS = [
     }),
   ),
 
+  {
+    ...functionModel(
+      {
+        id: 'chem-molecular-weight', name: 'Masa molowa ze wzoru', domain: 'chemistry', version: '1.0.0',
+        description: 'Masa molowa, liczba atomów i stopień nienasycenia z prostego wzoru sumarycznego (CHNOPS + wybrane pierwiastki).',
+        inputs: [{ id: 'formula', label: 'Wzór sumaryczny', unit: '', type: 'string', maxLength: 120, default: 'C9H8O4' }],
+        outputs: [
+          { id: 'molarMassGmol', label: 'Masa molowa', unit: 'g/mol' },
+          { id: 'atomCount', label: 'Liczba atomów', unit: '' },
+          { id: 'degreeOfUnsaturation', label: 'Stopień nienasycenia', unit: '' },
+        ],
+        assumptions: 'Prosty wzór bez nawiasów, hydratów i izotopów. Standardowe masy atomowe (IUPAC 2021).',
+        validity: 'Wzory zbudowane z pierwiastków tablicy mas atomowych; DoU ścisły dla CHNOX.',
+        provenance: { source: 'core/compute/cheminformatics.ts', formula: 'MW=Σ nᵢ·Aᵢ; DoU=(2C+2+N−H−X)/2', honesty: 'exact' },
+      },
+      (v) => {
+        const p = core.parseFormula(v.formula);
+        return {
+          outputs: {
+            molarMassGmol: core.molecularWeight(p.counts),
+            atomCount: core.atomCount(p.counts),
+            degreeOfUnsaturation: core.degreeOfUnsaturation(p.counts),
+          },
+          warnings: [],
+        };
+      },
+    ),
+    // Walidacja domenowa: odrzuć niepoprawny wzór (status 'rejected', nie 'error').
+    validate: (v) => {
+      const p = core.parseFormula(v.formula);
+      return p.ok ? { ok: true } : { ok: false, error: 'invalid_formula', message: p.error };
+    },
+  },
+
   functionModel(
     {
       id: 'civilization-kardashev', name: 'Moc cywilizacji (skala Kardaszewa)', domain: 'civilization', version: '1.0.0',
@@ -311,7 +345,7 @@ const BY_ID = new Map(MODELS.map((m) => [m.id, m]));
 export function modelMetadata(m) {
   const meta = {};
   for (const k of Object.keys(m)) {
-    if (k === 'execute' || k === 'kind') continue;
+    if (k === 'execute' || k === 'kind' || k === 'validate') continue;
     meta[k] = m[k];
   }
   meta.deterministic = m.stochastic !== true;

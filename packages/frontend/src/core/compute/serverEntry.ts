@@ -26,3 +26,6 @@ export { buildChemistryKineticsGraph } from '../modelGraph/chemistryKineticsGrap
 export { buildGaussianGraph } from '../modelGraph/gaussianGraph';
 export { buildLogisticGrowthGraph } from '../modelGraph/logisticGrowthGraph';
 export { buildPhotonGraph } from '../modelGraph/photonGraph';
+
+// Cheminformatyka (deterministyczna) — fundament domeny drug-discovery.
+export * from './cheminformatics';

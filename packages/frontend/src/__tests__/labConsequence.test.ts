@@ -7,6 +7,7 @@ import { chemistryKineticsConsequence } from '../labs/experiments/chemistry-kine
 import { spacetimeRelativityConsequence } from '../labs/experiments/spacetime-relativity-consequence';
 import { civilizationDrakeConsequence } from '../labs/experiments/civilization-drake-consequence';
 import { spacetimeCSlider } from '../labs/experiments/spacetime-cslider';
+import { universeAtmosphericEscape } from '../labs/experiments/universe-atmospheric-escape';
 import type { ExperimentDef } from '../core/types';
 
 /**
@@ -19,7 +20,7 @@ import type { ExperimentDef } from '../core/types';
 const EXPERIMENTS: ExperimentDef[] = [
   nuclearConsequence, einsteinAstroConsequence, universeOrbitalConsequence,
   chemistryKineticsConsequence, spacetimeRelativityConsequence, civilizationDrakeConsequence,
-  spacetimeCSlider,
+  spacetimeCSlider, universeAtmosphericEscape,
 ];
 
 describe('adopcja Grafu Modeli — spójność specyfikacji', () => {
@@ -70,6 +71,24 @@ describe('wykrywanie krawędzi międzydziedzinowej', () => {
     expect(violation!.message.length).toBeGreaterThan(0);
     // γ musi być nieoznaczone w tym zakresie (model nie obowiązuje).
     expect(Number.isFinite(spec.graph.getValue('lorentzGammaFactor'))).toBe(false);
+  });
+
+  it('flagowy łańcuch ucieczki atmosfery: wiele krawędzi międzydziedzinowych + baseline Ziemi', () => {
+    const spec = universeAtmosphericEscape.createConsequenceModel!();
+    const g = spec.graph;
+    // Baseline Ziemi (L=1, a=1, A=0.3): T_eq ≈ 255 K, v_esc ≈ 11.2 km/s.
+    expect(g.getValue('equilibriumTempK')).toBeGreaterThan(240);
+    expect(g.getValue('equilibriumTempK')).toBeLessThan(270);
+    expect(g.getValue('escapeVelocityMs') / 1000).toBeGreaterThan(10.5);
+    expect(g.getValue('escapeVelocityMs') / 1000).toBeLessThan(11.9);
+    // Węzeł termiczny łączy klimat (T_eq) i chemię (masa cząsteczki) → międzydziedzinowy.
+    expect(isCrossDomainNode(g, g.getNode('thermalVelocityMs')!)).toBe(true);
+    // Węzeł Jeansa łączy mechanikę (v_esc) i termikę (v_th) → międzydziedzinowy.
+    expect(isCrossDomainNode(g, g.getNode('jeansParameter')!)).toBe(true);
+    // Zmiana jasności gwiazdy propaguje aż do parametru Jeansa (astronomia → ucieczka).
+    const before = g.getValue('jeansParameter');
+    g.setParameter('stellarLuminositySolar', 20);
+    expect(g.getValue('jeansParameter')).not.toBe(before);
   });
 
   it('propagacja realnie przelicza wyjścia po zmianie parametru', () => {

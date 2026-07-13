@@ -10,6 +10,7 @@ import { universeHubbleTension } from './experiments/universe-hubbletension';
 import { universeLorenz3D } from './experiments/universe-lorenz3d';
 import { universePlanetStability } from './experiments/universe-planetstability';
 import { universeOrbitalConsequence } from './experiments/universe-orbital-consequence';
+import { universeAtmosphericEscape } from './experiments/universe-atmospheric-escape';
 
 /**
  * Universe Lab — flagowe laboratorium obok Einstein Lab. Domyślny
@@ -180,6 +181,6 @@ export const universeLab: LabDefinition = {
   honestyNote: universeSolarSystem3D.honestyNote,
   params: universeSolarSystem3D.params,
   createSim3D: universeSolarSystem3D.createSim3D,
-  experiments: [universeExpansion2D, universeSolarSystem, universeCollision, universeStarLife, universeThreeBody, universeRotationCurve, universeDoublePendulum, universeLorenz3D, universePlanetStability, universeHubbleTension, universeOrbitalConsequence],
+  experiments: [universeExpansion2D, universeSolarSystem, universeCollision, universeStarLife, universeThreeBody, universeRotationCurve, universeDoublePendulum, universeLorenz3D, universePlanetStability, universeHubbleTension, universeOrbitalConsequence, universeAtmosphericEscape],
   narrate: universeSolarSystem3D.narrate,
 };

@@ -5,6 +5,8 @@ import { NarratorPanel } from '../components/NarratorPanel';
 import { buildContext } from '../narrator/askAI';
 import { useThreeLoop } from '../core/three/useThreeLoop';
 import { FunctionSurface3DSim } from './experiments/mathematics-surface-3d';
+import { ConsequenceChainPanel } from '../components/ConsequenceChainPanel';
+import { mathematicsGaussianConsequence } from './experiments/mathematics-gaussian-consequence';
 import {
   differentiateWithSteps,
   evaluate,
@@ -35,7 +37,7 @@ import {
  * wynikiem.
  */
 
-type Mode = 'graph' | 'ode' | 'surface';
+type Mode = 'graph' | 'ode' | 'surface' | 'gaussian';
 
 const F_COLOR = '#5cd6e8';
 const D_COLOR = '#f0b35c';
@@ -262,6 +264,7 @@ const SURFACE_PRESETS = ['sin(x)*cos(y)', 'x^2 - y^2', 'x^2 + y^2', 'sin(sqrt(x^
 
 function MathLabView({ lab }: { lab: LabDefinition }) {
   const [mode, setMode] = useState<Mode>('graph');
+  const gaussianSpec = useMemo(() => mathematicsGaussianConsequence.createConsequenceModel!(), []);
 
   const [graphExpr, setGraphExpr] = useState('sin(x)*x');
   const [xMin, setXMin] = useState(-10);
@@ -409,7 +412,21 @@ function MathLabView({ lab }: { lab: LabDefinition }) {
         <button role="tab" aria-selected={mode === 'surface'} onClick={() => setMode('surface')}>
           Powierzchnia z=f(x,y) (3D)
         </button>
+        <button role="tab" aria-selected={mode === 'gaussian'} onClick={() => setMode('gaussian')}>
+          Łańcuch konsekwencji: rozkład normalny
+        </button>
       </div>
+
+      {mode === 'gaussian' && (
+        <div className="consequence-stage">
+          <ConsequenceChainPanel
+            spec={gaussianSpec}
+            honesty={mathematicsGaussianConsequence.honesty}
+            honestyNote={mathematicsGaussianConsequence.honestyNote}
+            experimentId={mathematicsGaussianConsequence.id}
+          />
+        </div>
+      )}
 
       {mode === 'graph' && (
         <>

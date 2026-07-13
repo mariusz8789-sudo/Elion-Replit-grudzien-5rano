@@ -11,6 +11,8 @@ import { universeAtmosphericEscape } from '../labs/experiments/universe-atmosphe
 import { particleRelativisticEnergy } from '../labs/experiments/particle-relativistic-energy';
 import { atomBohrConsequence } from '../labs/experiments/atom-bohr-consequence';
 import { biologyLogisticConsequence } from '../labs/experiments/biology-logistic-consequence';
+import { quantumPhotonConsequence } from '../labs/experiments/quantum-photon-consequence';
+import { mathematicsGaussianConsequence } from '../labs/experiments/mathematics-gaussian-consequence';
 import type { ExperimentDef } from '../core/types';
 
 /**
@@ -25,6 +27,7 @@ const EXPERIMENTS: ExperimentDef[] = [
   chemistryKineticsConsequence, spacetimeRelativityConsequence, civilizationDrakeConsequence,
   spacetimeCSlider, universeAtmosphericEscape,
   particleRelativisticEnergy, atomBohrConsequence, biologyLogisticConsequence,
+  quantumPhotonConsequence, mathematicsGaussianConsequence,
 ];
 
 describe('adopcja Grafu Modeli — spójność specyfikacji', () => {
@@ -110,6 +113,17 @@ describe('wykrywanie krawędzi międzydziedzinowej', () => {
     const log = biologyLogisticConsequence.createConsequenceModel!();
     log.graph.setParameter('timeElapsed', 40);
     expect(log.graph.getValue('fractionOfCapacity')).toBeGreaterThan(99);
+    // Foton: 500 nm → ~2,48 eV, ~600 THz; krawędź do chemii ~239 kJ/mol.
+    const ph = quantumPhotonConsequence.createConsequenceModel!();
+    ph.graph.setParameter('wavelengthNm', 500);
+    expect(ph.graph.getValue('photonEnergyEV')).toBeCloseTo(2.48, 1);
+    expect(ph.graph.getValue('photonFrequencyTHz')).toBeCloseTo(599.6, 0);
+    expect(isCrossDomainNode(ph.graph, ph.graph.getNode('photonEnergyKJmol')!)).toBe(true);
+    // Gauss: z=1 → P(±1σ) ≈ 68,3%.
+    const gs = mathematicsGaussianConsequence.createConsequenceModel!();
+    gs.graph.setParameter('mean', 0); gs.graph.setParameter('sigma', 1); gs.graph.setParameter('xValue', 1);
+    expect(gs.graph.getValue('zScore')).toBeCloseTo(1, 6);
+    expect(gs.graph.getValue('probWithinZ')).toBeCloseTo(0.683, 2);
   });
 
   it('propagacja realnie przelicza wyjścia po zmianie parametru', () => {

@@ -299,6 +299,37 @@ button:disabled { cursor: default; }
 }
 .domain-violation strong { color: #ff8f86; }
 
+/* Trial Series — szkielet pętli odkrycia (core/trials.ts). */
+.trial-series { display: flex; flex-direction: column; gap: 0.45rem; }
+.trial-intro { font-size: 0.66rem; color: var(--text-faint); line-height: 1.4; }
+.trial-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.trial-row {
+  display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
+  padding: 0.3rem 0.45rem; border: 1px solid var(--border); border-radius: 6px;
+  background: rgba(255,255,255,0.02); border-left-width: 2px; font-size: 0.7rem;
+}
+.trial-row.comparing { border-color: var(--cyan); }
+.trial-row.status-baseline { border-left-color: var(--cyan); }
+.trial-row.status-promising { border-left-color: var(--green); }
+.trial-row.status-failed { border-left-color: #f0645c; }
+.trial-row.status-draft { border-left-color: var(--border-strong); }
+.trial-idx { font-family: var(--font-mono); color: var(--text-faint); }
+.trial-label { flex: 1; min-width: 6rem; color: var(--text); }
+.trial-fork { color: var(--gold); }
+.trial-status { font-size: 0.6rem; padding: 0.05rem 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: transparent; cursor: pointer; }
+.trial-status.status-baseline { color: var(--cyan); border-color: rgba(92,214,232,0.4); }
+.trial-status.status-promising { color: var(--green); border-color: rgba(110,231,160,0.4); }
+.trial-status.status-failed { color: #ff8f86; border-color: rgba(240,100,92,0.4); }
+.trial-status.status-draft { color: var(--text-dim); }
+.chip-btn.tiny { font-size: 0.6rem; padding: 0.1rem 0.4rem; }
+.chip-btn.tiny.danger { color: #ff8f86; }
+.chip-btn.tiny[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
+.trial-compare { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px; background: rgba(92,214,232,0.04); }
+.trial-compare-block { display: flex; flex-direction: column; gap: 0.2rem; }
+.trial-compare-head { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
+.trial-compare-row { display: flex; justify-content: space-between; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim); }
+.trial-compare-row.muted { color: var(--text-faint); font-style: italic; }
+
 /* Pasek statusu misji — realne dane (liczba laboratoriów, status AI), nie ozdoba */
 .mission-bar {
   display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;

@@ -4,6 +4,10 @@ import { isCrossDomainNode, inputDomains } from '../core/modelGraph/labConsequen
 import type { NodeDerivation, PropagationStep } from '../core/modelGraph/graph';
 import type { HonestyLevel } from '../core/types';
 import { HonestyBadge } from './HonestyBadge';
+import {
+  listTrials, saveTrial, duplicateTrial, updateTrial, deleteTrial, diffTrials,
+  TRIAL_STATUS_LABEL, type Trial, type TrialStatus,
+} from '../core/trials';
 
 /**
  * Współdzielony panel „eksperyment = graf konsekwencji" (Priorytet 1 roadmapy).
@@ -30,19 +34,68 @@ function fmt(v: number, format?: (v: number) => string): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
 
+const STATUS_CYCLE: TrialStatus[] = ['draft', 'promising', 'failed', 'baseline'];
+
 export function ConsequenceChainPanel({
   spec,
   honesty,
   honestyNote,
+  experimentId,
 }: {
   spec: LabConsequenceSpec;
   honesty: HonestyLevel;
   honestyNote: string;
+  experimentId: string;
 }) {
   const { graph, params, outputs, headline, domainGuard } = spec;
   const [, setVersion] = useState(0);
   const [lastSteps, setLastSteps] = useState<PropagationStep[]>([]);
+  const [trials, setTrials] = useState<Trial[]>(() => listTrials(experimentId));
+  const [compareA, setCompareA] = useState<string | null>(null);
+  const [compareB, setCompareB] = useState<string | null>(null);
   const violation = domainGuard ? domainGuard(graph) : null;
+
+  function captureState() {
+    return {
+      params: graph.getParameterSnapshot(),
+      outputs: Object.fromEntries(outputs.map((o) => [o.id, graph.getValue(o.id)])),
+    };
+  }
+  function refreshTrials() { setTrials(listTrials(experimentId)); }
+
+  function handleSaveTrial() {
+    const s = captureState();
+    saveTrial(experimentId, s);
+    refreshTrials();
+  }
+  function handleApplyTrial(t: Trial) {
+    const steps = graph.applyParameterSnapshot(t.params);
+    if (steps.length > 0) setLastSteps(steps);
+    setVersion((v) => v + 1);
+  }
+  function handleDuplicate(id: string) { duplicateTrial(experimentId, id); refreshTrials(); }
+  function handleDelete(id: string) {
+    deleteTrial(experimentId, id);
+    if (compareA === id) setCompareA(null);
+    if (compareB === id) setCompareB(null);
+    refreshTrials();
+  }
+  function cycleStatus(t: Trial) {
+    const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(t.status) + 1) % STATUS_CYCLE.length];
+    updateTrial(experimentId, t.id, { status: next });
+    refreshTrials();
+  }
+  function toggleCompare(id: string) {
+    if (compareA === id) { setCompareA(null); return; }
+    if (compareB === id) { setCompareB(null); return; }
+    if (!compareA) { setCompareA(id); return; }
+    if (!compareB) { setCompareB(id); return; }
+    setCompareA(id); setCompareB(null);
+  }
+
+  const trialA = compareA ? trials.find((t) => t.id === compareA) : null;
+  const trialB = compareB ? trials.find((t) => t.id === compareB) : null;
+  const trialDiff = trialA && trialB ? diffTrials(trialA, trialB) : null;
 
   // Wykryj krawędzie międzydziedzinowe raz (struktura grafu jest niezmienna).
   const crossDomainIds = useMemo(() => {
@@ -140,6 +193,57 @@ export function ConsequenceChainPanel({
           })}
         </div>
       )}
+
+      <div className="trial-series">
+        <div className="section-label">Seria prób — zapisz, porównaj, oznacz</div>
+        <div className="trial-intro">
+          Każda próba zamraża wejścia i policzone konsekwencje z prowieniencją (który model, jakie parametry).
+          To rdzeń pętli odkrycia: przemiataj parametry, oznaczaj obiecujące/nieudane, porównuj — zapisywane lokalnie.
+        </div>
+        <button className="chip-btn" onClick={handleSaveTrial}>✚ Zapisz bieżący stan jako próbę</button>
+        {trials.length > 0 && (
+          <div className="trial-list">
+            {trials.map((t) => (
+              <div key={t.id} className={`trial-row status-${t.status}${t.id === compareA || t.id === compareB ? ' comparing' : ''}`}>
+                <span className="trial-idx">#{String(t.index).padStart(3, '0')}</span>
+                <span className="trial-label">{t.label}{t.parentId && <span className="trial-fork" title="odbita z innej próby"> ⑂</span>}</span>
+                <button className={`trial-status status-${t.status}`} onClick={() => cycleStatus(t)} title="Kliknij, by zmienić status">
+                  {TRIAL_STATUS_LABEL[t.status]}
+                </button>
+                <button className="chip-btn tiny" onClick={() => handleApplyTrial(t)} title="Wczytaj parametry tej próby do modelu">wczytaj</button>
+                <button className="chip-btn tiny" aria-pressed={t.id === compareA || t.id === compareB} onClick={() => toggleCompare(t.id)} title="Wybierz do porównania (dwie próby)">⇄</button>
+                <button className="chip-btn tiny" onClick={() => handleDuplicate(t.id)} title="Odbij jako nową próbę">odbij</button>
+                <button className="chip-btn tiny danger" onClick={() => handleDelete(t.id)} title="Usuń próbę">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {trialA && trialB && trialDiff && (
+          <div className="trial-compare">
+            <div className="section-label">Porównanie: #{String(trialA.index).padStart(3, '0')} vs #{String(trialB.index).padStart(3, '0')}</div>
+            <div className="trial-compare-block">
+              <span className="trial-compare-head">Zmienione parametry</span>
+              {trialDiff.params.length === 0 && <div className="trial-compare-row muted">identyczne wejścia</div>}
+              {trialDiff.params.map((d) => (
+                <div key={d.key} className="trial-compare-row">
+                  <span className="reality-log-node">{labelOf(d.key)}</span>
+                  <span className="reality-log-val">{fmt(d.a)} → {fmt(d.b)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="trial-compare-block">
+              <span className="trial-compare-head">Konsekwencje, które się zmieniły</span>
+              {trialDiff.outputs.length === 0 && <div className="trial-compare-row muted">identyczne wyniki</div>}
+              {trialDiff.outputs.map((d) => (
+                <div key={d.key} className="trial-compare-row">
+                  <span className="reality-log-node">{labelOf(d.key)}</span>
+                  <span className="reality-log-val">{fmt(d.a)} → {fmt(d.b)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

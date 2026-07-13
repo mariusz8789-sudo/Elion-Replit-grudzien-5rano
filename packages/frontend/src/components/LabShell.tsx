@@ -234,7 +234,7 @@ function ConsequenceExperimentView({ exp, lab }: { exp: ExperimentDef; lab: LabD
   }, [lab.id, exp.id]);
   return (
     <div className="consequence-stage">
-      <ConsequenceChainPanel spec={spec} honesty={exp.honesty} honestyNote={exp.honestyNote} />
+      <ConsequenceChainPanel spec={spec} honesty={exp.honesty} honestyNote={exp.honestyNote} experimentId={exp.id} />
     </div>
   );
 }

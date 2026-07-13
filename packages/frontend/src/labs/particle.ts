@@ -1,6 +1,7 @@
 import type { ExperimentDef, LabDefinition, NarrationBlock, Sim, SimParams } from '../core/types';
 import { particleInvMass } from './experiments/particle-invmass';
 import { particleDetector3D } from './experiments/particle-detector-3d';
+import { particleRelativisticEnergy } from './experiments/particle-relativistic-energy';
 
 /**
  * Particle Lab — flagowy eksperyment to teraz prawdziwy detektor 3D
@@ -195,6 +196,6 @@ export const particleLab: LabDefinition = {
   honestyNote: particleDetector3D.honestyNote,
   params: particleDetector3D.params,
   createSim3D: particleDetector3D.createSim3D,
-  experiments: [particleCollision2D, particleInvMass],
+  experiments: [particleCollision2D, particleInvMass, particleRelativisticEnergy],
   narrate: particleDetector3D.narrate,
 };

@@ -7,6 +7,8 @@ import { HonestyBadge } from '../components/HonestyBadge';
 import { ELEMENTS, type ElementInfo } from '../data/elements';
 import { PERIODIC_TRENDS, type PeriodicTrendPoint } from '../data/periodicTrends';
 import { OrbitalCloud3DSim } from './experiments/atom-orbital-3d';
+import { ConsequenceChainPanel } from '../components/ConsequenceChainPanel';
+import { atomBohrConsequence } from './experiments/atom-bohr-consequence';
 
 /**
  * Orbitale atomu wodoru — dokładne |ψ|² z rozwiązań analitycznych równania
@@ -208,7 +210,8 @@ class BohrSim implements Sim {
 
 function AtomView({ lab }: { lab: LabDefinition }) {
   const [z, setZ] = useState(6);
-  const [mode, setMode] = useState<'orbitals' | 'orbitals2d' | 'shells' | 'trends'>('orbitals');
+  const [mode, setMode] = useState<'orbitals' | 'orbitals2d' | 'shells' | 'trends' | 'bohr'>('orbitals');
+  const bohrSpec = useMemo(() => atomBohrConsequence.createConsequenceModel!(), []);
   const [orbital, setOrbital] = useState('2pz');
   const [trendProp, setTrendProp] = useState<TrendProp>('radiusPm');
   const bohrSim = useMemo(() => new BohrSim(), []);
@@ -246,7 +249,21 @@ function AtomView({ lab }: { lab: LabDefinition }) {
         <button role="tab" aria-selected={mode === 'trends'} onClick={() => setMode('trends')}>
           Trendy okresowe
         </button>
+        <button role="tab" aria-selected={mode === 'bohr'} onClick={() => setMode('bohr')}>
+          Łańcuch konsekwencji: Bohr
+        </button>
       </div>
+
+      {mode === 'bohr' && (
+        <div className="consequence-stage">
+          <ConsequenceChainPanel
+            spec={bohrSpec}
+            honesty={atomBohrConsequence.honesty}
+            honestyNote={atomBohrConsequence.honestyNote}
+            experimentId={atomBohrConsequence.id}
+          />
+        </div>
+      )}
 
       {mode === 'orbitals' && (
         <div className="sim-stage stage-3d" style={{ height: '36vh', minHeight: 240 }}>

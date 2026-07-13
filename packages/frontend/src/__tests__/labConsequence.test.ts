@@ -8,6 +8,9 @@ import { spacetimeRelativityConsequence } from '../labs/experiments/spacetime-re
 import { civilizationDrakeConsequence } from '../labs/experiments/civilization-drake-consequence';
 import { spacetimeCSlider } from '../labs/experiments/spacetime-cslider';
 import { universeAtmosphericEscape } from '../labs/experiments/universe-atmospheric-escape';
+import { particleRelativisticEnergy } from '../labs/experiments/particle-relativistic-energy';
+import { atomBohrConsequence } from '../labs/experiments/atom-bohr-consequence';
+import { biologyLogisticConsequence } from '../labs/experiments/biology-logistic-consequence';
 import type { ExperimentDef } from '../core/types';
 
 /**
@@ -21,6 +24,7 @@ const EXPERIMENTS: ExperimentDef[] = [
   nuclearConsequence, einsteinAstroConsequence, universeOrbitalConsequence,
   chemistryKineticsConsequence, spacetimeRelativityConsequence, civilizationDrakeConsequence,
   spacetimeCSlider, universeAtmosphericEscape,
+  particleRelativisticEnergy, atomBohrConsequence, biologyLogisticConsequence,
 ];
 
 describe('adopcja Grafu Modeli — spójność specyfikacji', () => {
@@ -89,6 +93,23 @@ describe('wykrywanie krawędzi międzydziedzinowej', () => {
     const before = g.getValue('jeansParameter');
     g.setParameter('stellarLuminositySolar', 20);
     expect(g.getValue('jeansParameter')).not.toBe(before);
+  });
+
+  it('nowe grafy zgadzają się z podręcznikowymi wartościami (walidacja fizyki)', () => {
+    // Bohr: wodór (Z=1, n=1) → energia jonizacji 13,6 eV.
+    const bohr = atomBohrConsequence.createConsequenceModel!();
+    bohr.graph.setParameter('atomicNumber', 1);
+    bohr.graph.setParameter('principalN', 1);
+    expect(bohr.graph.getValue('ionizationPhotonEV')).toBeCloseTo(13.606, 1);
+    // Cząstka relatywistyczna: elektron (0,511 MeV) w spoczynku (β=0) → E = m, E_kin = 0.
+    const rel = particleRelativisticEnergy.createConsequenceModel!();
+    rel.graph.setParameter('velocityFraction', 0);
+    expect(rel.graph.getValue('totalEnergyMeV')).toBeCloseTo(0.511, 3);
+    expect(rel.graph.getValue('kineticEnergyMeV')).toBeCloseTo(0, 6);
+    // Logistyka: przy dużym t populacja dąży do pojemności K.
+    const log = biologyLogisticConsequence.createConsequenceModel!();
+    log.graph.setParameter('timeElapsed', 40);
+    expect(log.graph.getValue('fractionOfCapacity')).toBeGreaterThan(99);
   });
 
   it('propagacja realnie przelicza wyjścia po zmianie parametru', () => {

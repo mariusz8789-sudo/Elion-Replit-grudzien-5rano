@@ -38,6 +38,16 @@ import {
   getTrial,
   updateTrial,
   deleteTrial,
+  listBranches,
+  getBranch,
+  createBranch,
+  forkBranch,
+  getMainBranch,
+  createMergeRequest,
+  getMergeRequest,
+  listMergeRequests,
+  decideMergeRequest,
+  contributionGraph,
 } from './store.mjs';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
 
@@ -109,12 +119,44 @@ export function handleApi(db, ctx) {
       return err(405, 'method_not_allowed');
     }
 
+    // /api/projects/:id/branches
+    if (seg[2] === 'branches' && seg.length === 3) {
+      if (method === 'GET') return ok({ branches: listBranches(db, projectId) });
+      if (method === 'POST') return createBranchHandler(db, user, role, projectId, body);
+      return err(405, 'method_not_allowed');
+    }
+
+    // /api/projects/:id/contributions
+    if (seg[2] === 'contributions' && seg.length === 3 && method === 'GET') {
+      return ok({ contributions: contributionGraph(db, projectId) });
+    }
+
+    // /api/projects/:id/merge-requests
+    if (seg[2] === 'merge-requests') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ mergeRequests: listMergeRequests(db, projectId) });
+        if (method === 'POST') return createMergeRequestHandler(db, user, role, projectId, body);
+        return err(405, 'method_not_allowed');
+      }
+      // /api/projects/:id/merge-requests/:mrid/decide
+      if (seg.length === 4 && method === 'GET') {
+        const mr = getMergeRequest(db, seg[3]);
+        if (!mr || mr.projectId !== projectId) return err(404, 'not_found');
+        return ok({ mergeRequest: mr });
+      }
+      if (seg.length === 5 && seg[4] === 'decide' && method === 'POST') {
+        return decideMergeRequestHandler(db, user, role, projectId, seg[3], body);
+      }
+      return err(404, 'not_found');
+    }
+
     // /api/projects/:id/trials
     if (seg[2] === 'trials') {
       if (seg.length === 3) {
         if (method === 'GET') {
           const experimentId = typeof ctx.query?.experimentId === 'string' ? ctx.query.experimentId : null;
-          return ok({ trials: listTrials(db, projectId, experimentId) });
+          const branchId = typeof ctx.query?.branchId === 'string' ? ctx.query.branchId : null;
+          return ok({ trials: listTrials(db, projectId, experimentId, branchId) });
         }
         if (method === 'POST') return createTrialHandler(db, user, role, projectId, body);
         return err(405, 'method_not_allowed');
@@ -199,6 +241,13 @@ function createTrialHandler(db, user, role, projectId, body) {
   const count = listTrials(db, projectId, experimentId).length;
   if (count >= MAX_TRIALS_PER_EXPERIMENT) return err(409, 'trial_limit', 'Osiągnięto limit prób dla tego eksperymentu.');
   const status = TRIAL_STATUSES.has(body.status) ? body.status : 'draft';
+  // Gałąź docelowa: podana i należąca do projektu, inaczej 'main'.
+  let branchId = null;
+  if (typeof body.branchId === 'string') {
+    const b = getBranch(db, body.branchId);
+    if (!b || b.projectId !== projectId) return err(400, 'invalid_branch', 'Gałąź nie należy do tego projektu.');
+    branchId = b.id;
+  }
   const trial = createTrial(db, {
     projectId,
     experimentId,
@@ -210,8 +259,65 @@ function createTrialHandler(db, user, role, projectId, body) {
     note: String(body.note ?? '').slice(0, 2000),
     parentId: typeof body.parentId === 'string' ? body.parentId.slice(0, 80) : null,
     modelVersion: String(body.modelVersion ?? '').slice(0, 80),
+    branchId,
   });
   return ok({ trial }, 201);
+}
+
+/* ---------------- Handlery Scientific Git ---------------- */
+
+function createBranchHandler(db, user, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Tworzenie gałęzi wymaga roli editor lub wyższej.');
+  const name = String(body.name ?? '').trim().slice(0, 80);
+  if (!name || name === 'main') return err(400, 'invalid_branch', 'Podaj nazwę gałęzi (inną niż „main").');
+  // Baza odgałęzienia: podana i z tego projektu, inaczej 'main'.
+  let base = getMainBranch(db, projectId);
+  if (typeof body.baseBranchId === 'string') {
+    const b = getBranch(db, body.baseBranchId);
+    if (!b || b.projectId !== projectId) return err(400, 'invalid_branch', 'Gałąź bazowa nie należy do tego projektu.');
+    base = b;
+  }
+  try {
+    // fork=true kopiuje próby gałęzi bazowej (z rodowodem); inaczej pusta gałąź.
+    const branch = body.fork
+      ? forkBranch(db, { projectId, name, baseBranchId: base.id, createdBy: user.id })
+      : createBranch(db, { projectId, name, baseBranchId: base.id, createdBy: user.id });
+    return ok({ branch }, 201);
+  } catch (e) {
+    if (String(e?.message).includes('branch_exists')) return err(409, 'branch_exists', 'Gałąź o tej nazwie już istnieje.');
+    throw e;
+  }
+}
+
+function createMergeRequestHandler(db, user, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Zgłoszenie scalenia wymaga roli editor lub wyższej.');
+  const source = getBranch(db, String(body.sourceBranchId ?? ''));
+  const target = getBranch(db, String(body.targetBranchId ?? ''));
+  if (!source || source.projectId !== projectId || !target || target.projectId !== projectId) {
+    return err(400, 'invalid_branch', 'Obie gałęzie muszą należeć do tego projektu.');
+  }
+  if (source.id === target.id) return err(400, 'invalid_branch', 'Gałąź źródłowa i docelowa muszą się różnić.');
+  const title = String(body.title ?? '').trim().slice(0, 160) || `Scal ${source.name} → ${target.name}`;
+  const mr = createMergeRequest(db, {
+    projectId, sourceBranchId: source.id, targetBranchId: target.id,
+    title, description: String(body.description ?? '').slice(0, 4000), createdBy: user.id,
+  });
+  return ok({ mergeRequest: mr }, 201);
+}
+
+function decideMergeRequestHandler(db, user, role, projectId, mrId, body) {
+  // Recenzja i scalanie to decyzja o wpuszczeniu wyników do wspólnej linii —
+  // wymaga admin+ (nie sam autor może zatwierdzić swoje zmiany do main).
+  if (!atLeast(role, 'admin')) return err(403, 'forbidden', 'Zatwierdzanie/odrzucanie scaleń wymaga roli admin lub owner.');
+  const mr = getMergeRequest(db, mrId);
+  if (!mr || mr.projectId !== projectId) return err(404, 'not_found');
+  if (mr.status !== 'open') return err(409, 'already_decided', 'To zgłoszenie zostało już rozpatrzone.');
+  const decided = decideMergeRequest(db, mrId, {
+    approve: Boolean(body.approve),
+    deciderId: user.id,
+    reviewNote: String(body.reviewNote ?? '').slice(0, 2000),
+  });
+  return ok({ mergeRequest: decided });
 }
 
 function updateTrialHandler(db, role, trialId, body) {

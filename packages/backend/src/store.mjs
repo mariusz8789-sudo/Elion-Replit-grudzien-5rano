@@ -83,12 +83,78 @@ CREATE TABLE IF NOT EXISTS trials (
 CREATE INDEX IF NOT EXISTS idx_trials_project ON trials(project_id, experiment_id, idx);
 `;
 
+/**
+ * Migracje schematu do wersji 2 (Milestone 2: Scientific Git). Realny mechanizm
+ * migracji „w przód" oparty o PRAGMA user_version — potrzebny, gdy baza z
+ * Milestone 1 (bez gałęzi) ma już dane instytucji. Dodaje:
+ *  - branches: nazwane linie pracy w projekcie (git-style),
+ *  - trials.branch_id: przynależność próby do gałęzi,
+ *  - merge_requests: recenzja i scalanie gałęzi (RBAC),
+ * a każdemu istniejącemu projektowi zakłada gałąź 'main' i przypisuje do niej
+ * dotychczasowe próby (backfill), więc żadna próba nie zostaje osierocona.
+ */
+const SCHEMA_V2 = `
+CREATE TABLE IF NOT EXISTS branches (
+  id             TEXT PRIMARY KEY,
+  project_id     TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name           TEXT NOT NULL,
+  base_branch_id TEXT,
+  created_by     TEXT NOT NULL REFERENCES users(id),
+  created_at     INTEGER NOT NULL,
+  UNIQUE (project_id, name)
+);
+CREATE TABLE IF NOT EXISTS merge_requests (
+  id               TEXT PRIMARY KEY,
+  project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  source_branch_id TEXT NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+  target_branch_id TEXT NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+  title            TEXT NOT NULL,
+  description      TEXT NOT NULL DEFAULT '',
+  status           TEXT NOT NULL DEFAULT 'open',
+  created_by       TEXT NOT NULL REFERENCES users(id),
+  created_at       INTEGER NOT NULL,
+  decided_by       TEXT,
+  decided_at       INTEGER,
+  review_note      TEXT NOT NULL DEFAULT '',
+  merged_count     INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_branches_project ON branches(project_id);
+CREATE INDEX IF NOT EXISTS idx_mr_project ON merge_requests(project_id, status);
+`;
+
+function migrate(db) {
+  const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 2) {
+    db.exec(SCHEMA_V2);
+    // Dodaj kolumnę branch_id do trials, jeśli jej nie ma (baza z M1).
+    const cols = db.prepare('PRAGMA table_info(trials)').all();
+    if (!cols.some((c) => c.name === 'branch_id')) {
+      db.exec('ALTER TABLE trials ADD COLUMN branch_id TEXT');
+    }
+    // Backfill: każdemu projektowi gałąź 'main' + przypisz istniejące próby.
+    const projects = db.prepare('SELECT id, owner_id FROM projects').all();
+    for (const p of projects) {
+      let main = db.prepare('SELECT id FROM branches WHERE project_id = ? AND name = ?').get(p.id, 'main');
+      if (!main) {
+        const id = newId();
+        db.prepare('INSERT INTO branches (id, project_id, name, base_branch_id, created_by, created_at) VALUES (?, ?, ?, NULL, ?, ?)').run(
+          id, p.id, 'main', p.owner_id, Date.now(),
+        );
+        main = { id };
+      }
+      db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
+    }
+    db.exec('PRAGMA user_version = 2');
+  }
+}
+
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
 export function openDatabase(filename = ':memory:') {
   const db = new DatabaseSync(filename);
   db.exec('PRAGMA foreign_keys = ON;');
   if (filename !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
 }
 
@@ -125,7 +191,39 @@ function toTrial(row) {
     note: row.note,
     parentId: row.parent_id ?? null,
     modelVersion: row.model_version,
+    branchId: row.branch_id ?? null,
     createdAt: row.created_at,
+  };
+}
+
+function toBranch(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    baseBranchId: row.base_branch_id ?? null,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+function toMergeRequest(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    sourceBranchId: row.source_branch_id,
+    targetBranchId: row.target_branch_id,
+    title: row.title,
+    description: row.description,
+    status: row.status,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    decidedBy: row.decided_by ?? null,
+    decidedAt: row.decided_at ?? null,
+    reviewNote: row.review_note,
+    mergedCount: row.merged_count,
   };
 }
 
@@ -211,6 +309,10 @@ export function createProject(db, { name, description = '', ownerId, visibility 
       'owner',
       now,
     );
+    // Każdy projekt startuje z gałęzią 'main' (Scientific Git).
+    db.prepare('INSERT INTO branches (id, project_id, name, base_branch_id, created_by, created_at) VALUES (?, ?, ?, NULL, ?, ?)').run(
+      newId(), id, 'main', ownerId, now,
+    );
     db.prepare('COMMIT').run();
   } catch (err) {
     db.prepare('ROLLBACK').run();
@@ -277,16 +379,18 @@ export function listMembers(db, projectId) {
  * Zamrażamy: parametry wejściowe, policzone wyjścia, wersję modelu i autora —
  * to czyni próbę REPRODUKOWALNĄ (można odtworzyć dokładnie ten sam przebieg).
  */
-export function createTrial(db, { projectId, experimentId, authorId, label, params, outputs, status, note = '', parentId = null, modelVersion = '' }) {
+export function createTrial(db, { projectId, experimentId, authorId, label, params, outputs, status, note = '', parentId = null, modelVersion = '', branchId = null }) {
   const id = newId();
   const now = Date.now();
+  // Domyślnie gałąź 'main' projektu; numeracja jest per (gałąź, eksperyment).
+  const branch = branchId ?? getMainBranch(db, projectId)?.id ?? null;
   const row = db
-    .prepare('SELECT MAX(idx) AS maxIdx FROM trials WHERE project_id = ? AND experiment_id = ?')
-    .get(projectId, experimentId);
+    .prepare('SELECT MAX(idx) AS maxIdx FROM trials WHERE branch_id = ? AND experiment_id = ?')
+    .get(branch, experimentId);
   const index = (row?.maxIdx ?? 0) + 1;
   db.prepare(
-    `INSERT INTO trials (id, project_id, experiment_id, author_id, idx, label, params_json, outputs_json, status, note, parent_id, model_version, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO trials (id, project_id, experiment_id, author_id, idx, label, params_json, outputs_json, status, note, parent_id, model_version, branch_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     projectId,
@@ -300,6 +404,7 @@ export function createTrial(db, { projectId, experimentId, authorId, label, para
     note,
     parentId,
     modelVersion,
+    branch,
     now,
   );
   return getTrial(db, id);
@@ -309,11 +414,18 @@ export function getTrial(db, id) {
   return toTrial(db.prepare('SELECT * FROM trials WHERE id = ?').get(id));
 }
 
-/** Próby projektu; opcjonalnie zawężone do jednego eksperymentu. Rosnąco po numerze. */
-export function listTrials(db, projectId, experimentId = null) {
-  const rows = experimentId
-    ? db.prepare('SELECT * FROM trials WHERE project_id = ? AND experiment_id = ? ORDER BY idx ASC').all(projectId, experimentId)
-    : db.prepare('SELECT * FROM trials WHERE project_id = ? ORDER BY experiment_id ASC, idx ASC').all(projectId);
+/**
+ * Próby projektu; opcjonalnie zawężone do eksperymentu i/lub gałęzi. Rosnąco po
+ * numerze. Filtr gałęzi realizuje „historię wersji tej linii pracy" (Scientific Git).
+ */
+export function listTrials(db, projectId, experimentId = null, branchId = null) {
+  const clauses = ['project_id = ?'];
+  const args = [projectId];
+  if (experimentId) { clauses.push('experiment_id = ?'); args.push(experimentId); }
+  if (branchId) { clauses.push('branch_id = ?'); args.push(branchId); }
+  const rows = db
+    .prepare(`SELECT * FROM trials WHERE ${clauses.join(' AND ')} ORDER BY experiment_id ASC, idx ASC`)
+    .all(...args);
   return rows.map(toTrial);
 }
 
@@ -330,4 +442,159 @@ export function updateTrial(db, id, patch = {}) {
 
 export function deleteTrial(db, id) {
   return db.prepare('DELETE FROM trials WHERE id = ?').run(id).changes > 0;
+}
+
+/* ---------------- Scientific Git: gałęzie ---------------- */
+
+export function getMainBranch(db, projectId) {
+  return toBranch(db.prepare('SELECT * FROM branches WHERE project_id = ? AND name = ?').get(projectId, 'main'));
+}
+
+export function getBranch(db, id) {
+  return toBranch(db.prepare('SELECT * FROM branches WHERE id = ?').get(id));
+}
+
+export function listBranches(db, projectId) {
+  const rows = db.prepare('SELECT * FROM branches WHERE project_id = ? ORDER BY created_at ASC').all(projectId);
+  return rows.map(toBranch);
+}
+
+/** Tworzy nazwaną gałąź. Rzuca Error('branch_exists') przy duplikacie nazwy w projekcie. */
+export function createBranch(db, { projectId, name, baseBranchId = null, createdBy }) {
+  const id = newId();
+  const now = Date.now();
+  try {
+    db.prepare('INSERT INTO branches (id, project_id, name, base_branch_id, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+      id, projectId, name, baseBranchId, createdBy, now,
+    );
+  } catch (err) {
+    if (String(err?.message ?? '').includes('UNIQUE')) throw new Error('branch_exists', { cause: err });
+    throw err;
+  }
+  return toBranch({ id, project_id: projectId, name, base_branch_id: baseBranchId, created_by: createdBy, created_at: now });
+}
+
+/**
+ * Odgałęzienie: tworzy nową gałąź i KOPIUJE do niej bieżące próby gałęzi bazowej,
+ * zachowując prowieniencję (parametry, wyjścia, wersja modelu, autor) i wiążąc
+ * każdą kopię z oryginałem przez parent_id. To realny „fork" linii pracy — nowe
+ * próby są niezależne, ale ich rodowód pozostaje jawny.
+ */
+export function forkBranch(db, { projectId, name, baseBranchId, createdBy }) {
+  const tx = db.prepare('BEGIN');
+  tx.run();
+  try {
+    const branch = createBranch(db, { projectId, name, baseBranchId, createdBy });
+    const source = db.prepare('SELECT * FROM trials WHERE branch_id = ? ORDER BY experiment_id ASC, idx ASC').all(baseBranchId);
+    for (const t of source) {
+      db.prepare(
+        `INSERT INTO trials (id, project_id, experiment_id, author_id, idx, label, params_json, outputs_json, status, note, parent_id, model_version, branch_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        newId(), projectId, t.experiment_id, t.author_id, t.idx, t.label, t.params_json, t.outputs_json,
+        t.status, t.note, t.id, t.model_version, branch.id, Date.now(),
+      );
+    }
+    db.prepare('COMMIT').run();
+    return branch;
+  } catch (err) {
+    db.prepare('ROLLBACK').run();
+    throw err;
+  }
+}
+
+/* ---------------- Scientific Git: recenzja i scalanie (merge requests) ---------------- */
+
+export function createMergeRequest(db, { projectId, sourceBranchId, targetBranchId, title, description = '', createdBy }) {
+  const id = newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO merge_requests (id, project_id, source_branch_id, target_branch_id, title, description, status, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
+  ).run(id, projectId, sourceBranchId, targetBranchId, title, description, createdBy, now);
+  return getMergeRequest(db, id);
+}
+
+export function getMergeRequest(db, id) {
+  return toMergeRequest(db.prepare('SELECT * FROM merge_requests WHERE id = ?').get(id));
+}
+
+export function listMergeRequests(db, projectId) {
+  const rows = db.prepare('SELECT * FROM merge_requests WHERE project_id = ? ORDER BY created_at DESC').all(projectId);
+  return rows.map(toMergeRequest);
+}
+
+/**
+ * Recenzja: odrzuca albo zatwierdza+scala. Scalanie KOPIUJE próby gałęzi
+ * źródłowej do docelowej jako nowe próby (z parent_id → oryginał), zachowując
+ * pełną prowieniencję. Nic nie jest nadpisywane — historia obu gałęzi zostaje.
+ * Zwraca zaktualizowany merge request albo null, jeśli nie jest 'open'.
+ */
+export function decideMergeRequest(db, id, { approve, deciderId, reviewNote = '' }) {
+  const mr = db.prepare('SELECT * FROM merge_requests WHERE id = ?').get(id);
+  if (!mr || mr.status !== 'open') return null;
+  const now = Date.now();
+  if (!approve) {
+    db.prepare('UPDATE merge_requests SET status = ?, decided_by = ?, decided_at = ?, review_note = ? WHERE id = ?').run(
+      'rejected', deciderId, now, reviewNote, id,
+    );
+    return getMergeRequest(db, id);
+  }
+  const tx = db.prepare('BEGIN');
+  tx.run();
+  try {
+    const source = db.prepare('SELECT * FROM trials WHERE branch_id = ? ORDER BY experiment_id ASC, idx ASC').all(mr.source_branch_id);
+    let merged = 0;
+    for (const t of source) {
+      const maxRow = db.prepare('SELECT MAX(idx) AS m FROM trials WHERE branch_id = ? AND experiment_id = ?').get(mr.target_branch_id, t.experiment_id);
+      const idx = (maxRow?.m ?? 0) + 1;
+      db.prepare(
+        `INSERT INTO trials (id, project_id, experiment_id, author_id, idx, label, params_json, outputs_json, status, note, parent_id, model_version, branch_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        newId(), mr.project_id, t.experiment_id, t.author_id, idx, t.label, t.params_json, t.outputs_json,
+        t.status, t.note, t.id, t.model_version, mr.target_branch_id, now,
+      );
+      merged += 1;
+    }
+    db.prepare('UPDATE merge_requests SET status = ?, decided_by = ?, decided_at = ?, review_note = ?, merged_count = ? WHERE id = ?').run(
+      'merged', deciderId, now, reviewNote, merged, id,
+    );
+    db.prepare('COMMIT').run();
+  } catch (err) {
+    db.prepare('ROLLBACK').run();
+    throw err;
+  }
+  return getMergeRequest(db, id);
+}
+
+/* ---------------- Scientific Git: graf kontrybucji ---------------- */
+
+/**
+ * Graf kontrybucji: KTO i ILE prób wniósł oraz aktywność dzienna. Liczone z
+ * realnych wierszy trials (author_id, created_at) — zero wymyślonych metryk.
+ */
+export function contributionGraph(db, projectId) {
+  const perAuthor = db.prepare(
+    `SELECT t.author_id AS userId, u.display_name AS displayName, u.email AS email,
+            COUNT(*) AS trials, MIN(t.created_at) AS firstAt, MAX(t.created_at) AS lastAt
+     FROM trials t JOIN users u ON u.id = t.author_id
+     WHERE t.project_id = ? GROUP BY t.author_id ORDER BY trials DESC`,
+  ).all(projectId);
+
+  // Dzienne kubełki (UTC) — realna aktywność w czasie.
+  const rows = db.prepare('SELECT created_at FROM trials WHERE project_id = ?').all(projectId);
+  const perDay = {};
+  for (const r of rows) {
+    const day = new Date(r.created_at).toISOString().slice(0, 10);
+    perDay[day] = (perDay[day] ?? 0) + 1;
+  }
+  return {
+    contributors: perAuthor.map((r) => ({
+      userId: r.userId, displayName: r.displayName, email: r.email,
+      trials: r.trials, firstAt: r.firstAt, lastAt: r.lastAt,
+    })),
+    perDay,
+    totalTrials: rows.length,
+  };
 }

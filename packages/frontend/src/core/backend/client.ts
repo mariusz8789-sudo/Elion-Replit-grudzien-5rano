@@ -509,6 +509,48 @@ export async function getDiscoveryGraph(token: string, projectId: string, campai
   return r.ok ? { ok: true, data: r.data.graph } : r;
 }
 
+export interface ScienceRun {
+  id: string; campaignId: string | null; candidateId: string | null;
+  engine: string; engineVersion: string | null; capability: string; method: string | null;
+  status: string; evidenceClass: string; inputs: Record<string, unknown>; outputs: Record<string, unknown>;
+  units: Record<string, string>; warnings: string[]; provenance: Record<string, unknown>;
+  inputHash: string | null; outputHash: string | null;
+  artifacts: { kind: string; path: string; sha256_16?: string }[]; durationMs: number; createdAt: number;
+}
+
+export interface ModelConflict {
+  candidateId: string; smiles: string; classification: string;
+  resultA: { engine: string; value: number; verdict: string };
+  resultB: { engine: string; value: number; unit?: string; verdict: string };
+  applicability: string; recommendation: string;
+}
+
+export interface ScienceEnvironment {
+  runtime: { os: string; arch: string; python: string; cpuCount: number; memoryGb: number | null; diskFreeGb: number | null; gpu: boolean; cuda?: boolean };
+  engines: Record<string, { kind: string; status: string; version: string | null; reason?: string }>;
+}
+
+export async function getScienceEnvironment(): Promise<ApiResult<{ environment: ScienceEnvironment; auditId: string; auditedAt: number }>> {
+  return request('GET', '/compute/environment');
+}
+
+export async function listCampaignScienceRuns(token: string, projectId: string, campaignId: string): Promise<ApiResult<ScienceRun[]>> {
+  const r = await request<{ scienceRuns: ScienceRun[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/science-runs`, { token });
+  return r.ok ? { ok: true, data: r.data.scienceRuns } : r;
+}
+
+export async function listCampaignConflicts(token: string, projectId: string, campaignId: string): Promise<ApiResult<ModelConflict[]>> {
+  const r = await request<{ conflicts: ModelConflict[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/conflicts`, { token });
+  return r.ok ? { ok: true, data: r.data.conflicts } : r;
+}
+
+export async function runCampaignStage(
+  token: string, projectId: string, campaignId: string,
+  config: { docking?: { enabled: boolean; budget?: number }; quantum?: { enabled: boolean; budget?: number } },
+): Promise<ApiResult<{ jobId: string }>> {
+  return request('POST', `/projects/${projectId}/campaigns/${campaignId}/stage`, { token, body: config });
+}
+
 export async function askCampaignWhy(
   token: string, projectId: string, campaignId: string,
   query: { kind: string; candidate?: string; generation?: number },

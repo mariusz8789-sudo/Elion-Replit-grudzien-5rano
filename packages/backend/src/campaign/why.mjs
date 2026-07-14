@@ -61,6 +61,24 @@ export function whyStop(db, campaignId) {
   return { ok: true, answer: `Zatrzymana: ${camp.stopReason}${last ? ` — ${last.purpose}` : ''}.`, evidence: { stopReason: camp.stopReason, final: camp.final } };
 }
 
+/** Dlaczego kandydat został (nie)wybrany do etapu ciężkiego (docking/QM). Z utrwalonych zdarzeń. */
+export function whyStageSelection(db, campaignId, candidateId) {
+  const events = store.listEvents(db, campaignId).filter((e) => e.payload?.candidateId === candidateId && (e.type === 'STAGE_SELECTION' || e.type === 'STAGE_RESULT'));
+  if (events.length === 0) return { ok: false, reason: 'Brak zdarzeń etapowych dla tego kandydata.' };
+  return {
+    ok: true,
+    answer: events.map((e) => `${e.payload.stage}/${e.payload.reason}${e.payload.why ? ` (${e.payload.why})` : ''}${e.payload.bestAffinityKcalMol != null ? ` → ${e.payload.bestAffinityKcalMol} kcal/mol` : ''}`).join('; '),
+    evidence: events.map((e) => ({ type: e.type, ...e.payload })),
+  };
+}
+
+/** Dlaczego konflikt modeli dla kandydata (MCRE). Z utrwalonych zdarzeń MODEL_CONFLICT. */
+export function whyConflict(db, campaignId, candidateId) {
+  const c = store.listEvents(db, campaignId).filter((e) => e.type === 'MODEL_CONFLICT' && e.payload?.candidateId === candidateId).pop();
+  if (!c) return { ok: true, answer: 'Brak zarejestrowanego konfliktu modeli dla tego kandydata.', evidence: null };
+  return { ok: true, answer: `${c.payload.classification}: ${c.payload.resultA.engine} (${c.payload.resultA.verdict}) vs ${c.payload.resultB.engine} (${c.payload.resultB.verdict}). ${c.payload.recommendation}`, evidence: c.payload };
+}
+
 /** Który silnik/wersja/wejścia policzyły dany wynik (z tabeli runs). */
 export function whichEngine(db, candidateId) {
   const c = store.getCandidate(db, candidateId);

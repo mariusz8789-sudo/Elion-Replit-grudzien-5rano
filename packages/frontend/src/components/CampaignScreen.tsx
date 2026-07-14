@@ -3,8 +3,9 @@ import { useSession, getToken } from '../core/backend/session';
 import {
   listProjects, listToolchain, listCampaigns, createCampaign, getCampaign, startCampaign, cancelCampaign,
   listCampaignCandidates, listCampaignDecisions, getDiscoveryGraph, askCampaignWhy,
+  listCampaignScienceRuns, listCampaignConflicts, runCampaignStage,
   type Project, type ToolchainEntry, type Campaign, type CampaignCandidate, type CampaignDecision,
-  type DiscoveryGraph, type WhyAnswer,
+  type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict,
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
 
@@ -53,6 +54,8 @@ function CampaignWorkspace() {
   const [candidates, setCandidates] = useState<CampaignCandidate[]>([]);
   const [decisions, setDecisions] = useState<CampaignDecision[]>([]);
   const [graph, setGraph] = useState<DiscoveryGraph | null>(null);
+  const [scienceRuns, setScienceRuns] = useState<ScienceRun[]>([]);
+  const [conflicts, setConflicts] = useState<ModelConflict[]>([]);
   const [why, setWhy] = useState<{ label: string; a: WhyAnswer } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -88,16 +91,20 @@ function CampaignWorkspace() {
   const loadDetail = useCallback(async (campaignId: string) => {
     const token = getToken();
     if (!token || !projectId) return;
-    const [c, cands, decs, g] = await Promise.all([
+    const [c, cands, decs, g, sr, cf] = await Promise.all([
       getCampaign(token, projectId, campaignId),
       listCampaignCandidates(token, projectId, campaignId),
       listCampaignDecisions(token, projectId, campaignId),
       getDiscoveryGraph(token, projectId, campaignId),
+      listCampaignScienceRuns(token, projectId, campaignId),
+      listCampaignConflicts(token, projectId, campaignId),
     ]);
     if (c.ok) setSelected(c.data);
     if (cands.ok) setCandidates(cands.data);
     if (decs.ok) setDecisions(decs.data);
     if (g.ok) setGraph(g.data);
+    if (sr.ok) setScienceRuns(sr.data);
+    if (cf.ok) setConflicts(cf.data);
     return c.ok ? c.data : null;
   }, [projectId]);
 
@@ -144,6 +151,17 @@ function CampaignWorkspace() {
     if (!token || !projectId) return;
     await cancelCampaign(token, projectId, c.id);
     await loadDetail(c.id);
+  }
+
+  async function onRunStage(c: Campaign) {
+    const token = getToken();
+    if (!token || !projectId) return;
+    setError(null); setBusy(true);
+    const r = await runCampaignStage(token, projectId, c.id, { docking: { enabled: true, budget: 3 }, quantum: { enabled: true, budget: 2 } });
+    setBusy(false);
+    if (!r.ok) { setError(r.message); return; }
+    startPolling(c.id); // etapy ciężkie trwają; odświeżaj utrwalony stan
+    window.setTimeout(() => { void loadDetail(c.id); }, 3000);
   }
 
   async function onWhy(kind: string, label: string, candidate?: string, generation?: number) {
@@ -320,6 +338,57 @@ function CampaignWorkspace() {
                 {graph.stats.nodes} węzłów, {graph.stats.edges} krawędzi (z {graph.stats.candidates} kandydatów, {graph.stats.decisions} decyzji).
                 Zbudowany wyłącznie z utrwalonych zdarzeń — bez dekoracyjnych danych.
               </p>
+            </div>
+          )}
+
+          {/* Etapy multi-fidelity (ciężkie silniki) */}
+          {selected.status === 'completed' && (
+            <div className="settings-subsection">
+              <h4>Etapy multi-fidelity (ciężkie silniki)</h4>
+              <p className="muted small">
+                RDKit (tanie) → filtr Pareto → dokowanie (średnie) → chemia kwantowa (drogie). Uruchamiane tylko na
+                wyselekcjonowanych kandydatach z budżetem. Wyniki to MODEL_ESTIMATE — bez deklaracji powinowactwa/terapii.
+              </p>
+              <button className="primary-btn" disabled={busy} onClick={() => void onRunStage(selected)}>
+                ▶ Uruchom dokowanie + chemię kwantową
+              </button>
+            </div>
+          )}
+
+          {/* Ciężkie Scientific Runs (realne artefakty + prowieniencja) */}
+          {scienceRuns.length > 0 && (
+            <div className="settings-subsection">
+              <h4>Ciężkie przebiegi naukowe ({scienceRuns.length})</h4>
+              <ul className="plain-list small">
+                {scienceRuns.slice(0, 20).map((r) => (
+                  <li key={r.id}>
+                    <strong>{r.capability}</strong> · {r.engine} {r.engineVersion} · <span className="pill pill-warn">{r.evidenceClass}</span>
+                    <div className="muted">
+                      {r.capability === 'molecular-docking' && <>best {String((r.outputs as Record<string, unknown>).bestAffinityKcalMol)} {r.units.bestAffinityKcalMol}</>}
+                      {r.capability === 'quantum-chemistry' && <>E {String((r.outputs as Record<string, unknown>).energyHartree)} Ha, gap {String((r.outputs as Record<string, unknown>).homoLumoGapEv)} eV</>}
+                      {' · '}method {r.method} · inHash {r.inputHash?.slice(0, 8)} · outHash {r.outputHash?.slice(0, 8)} · {r.durationMs} ms
+                    </div>
+                    {r.artifacts.length > 0 && <div className="muted small">artefakty: {r.artifacts.map((a) => `${a.kind}(${a.sha256_16 ?? ''})`).join(', ')}</div>}
+                    {r.warnings.length > 0 && <div className="warn-banner small">{r.warnings.join('; ')}</div>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Konflikty międzysilnikowe (MCRE) */}
+          {conflicts.length > 0 && (
+            <div className="settings-subsection">
+              <h4>Konflikty modeli (MCRE) — {conflicts.length}</h4>
+              <ul className="plain-list small">
+                {conflicts.map((c, i) => (
+                  <li key={i}>
+                    <strong>{c.classification}</strong> <code>{c.smiles}</code>:{' '}
+                    {c.resultA.engine} = {c.resultA.value} ({c.resultA.verdict}) vs {c.resultB.engine} = {c.resultB.value} {c.resultB.unit ?? ''} ({c.resultB.verdict})
+                    <div className="muted">{c.applicability} → <strong>{c.recommendation}</strong></div>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

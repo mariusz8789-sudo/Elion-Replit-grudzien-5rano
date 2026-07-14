@@ -13,6 +13,7 @@
 import { getJob, updateJob, listCandidates, getTarget } from '../store.mjs';
 import { buildCandidatePassport, rankCandidates } from './drugDiscovery.mjs';
 import { runCampaign } from '../campaign/orchestrator.mjs';
+import { runMultiFidelityStage } from '../campaign/multiFidelity.mjs';
 
 const cancelRequested = new Set();
 
@@ -64,6 +65,18 @@ export const JOB_HANDLERS = {
     });
     if (summary.cancelled) return { cancelled: true, runIds: [] };
     return { result: summary, runIds: [] };
+  },
+
+  /**
+   * Etap multi-fidelity (docking/QM) na zakończonej kampanii. Uruchamia REALNE
+   * ciężkie silniki na wyselekcjonowanych kandydatach (budżety), utrwala
+   * Scientific Runs + artefakty + konflikty. Zero fałszywych wyników.
+   */
+  'campaign-stage': async ({ db, job }) => {
+    const { campaignId, config } = job.params ?? {};
+    if (!campaignId) throw new Error('missing_campaignId');
+    const report = runMultiFidelityStage(db, campaignId, config ?? {});
+    return { result: report, runIds: [] };
   },
 };
 

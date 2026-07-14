@@ -70,7 +70,7 @@ import { listToolchain, getTool } from './campaign/toolchain.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
-import { saveEnvAudit, latestEnvAudit } from './store.mjs';
+import { saveEnvAudit, latestEnvAudit, listScienceRuns } from './store.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -303,8 +303,16 @@ export function handleApi(db, ctx) {
           campaignStore.updateCampaign(db, campaignId, { status: 'cancelled', stopReason: 'CANCELLED_BY_USER' });
           return ok({ campaign: campaignStore.getCampaign(db, campaignId) });
         }
+        // /api/projects/:id/campaigns/:cid/stage (editor+) — uruchamia etap ciężki (docking/QM)
+        if (seg[4] === 'stage' && method === 'POST') {
+          if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          if (campaign.status !== 'completed') return err(409, 'campaign_not_completed', 'Etapy multi-fidelity wymagają zakończonej kampanii bazowej.');
+          const job = createJob(db, { projectId, type: 'campaign-stage', params: { campaignId, config: sanitizeStageConfig(body) }, createdBy: user.id });
+          void enqueueJob(db, job.id);
+          return ok({ jobId: job.id }, 202);
+        }
         if (method !== 'GET') return err(405, 'method_not_allowed');
-        // Odczyty (viewer+): kandydaci, decyzje, zdarzenia, graf, dlaczego
+        // Odczyty (viewer+): kandydaci, decyzje, zdarzenia, graf, dlaczego, ciężkie przebiegi, konflikty
         if (seg[4] === 'candidates') {
           const gen = ctx.query?.generation != null ? Number(ctx.query.generation) : null;
           return ok({ candidates: campaignStore.listCandidates(db, campaignId, Number.isFinite(gen) ? gen : null) });
@@ -313,6 +321,11 @@ export function handleApi(db, ctx) {
         if (seg[4] === 'events') return ok({ events: campaignStore.listEvents(db, campaignId) });
         if (seg[4] === 'graph') return ok({ graph: buildDiscoveryGraph(db, campaignId) });
         if (seg[4] === 'why') return whyHandler(db, campaignId, ctx.query ?? {});
+        if (seg[4] === 'science-runs') return ok({ scienceRuns: listScienceRuns(db, campaignId) });
+        if (seg[4] === 'conflicts') {
+          const conflicts = campaignStore.listEvents(db, campaignId).filter((e) => e.type === 'MODEL_CONFLICT').map((e) => e.payload);
+          return ok({ conflicts });
+        }
         return err(404, 'not_found');
       }
       return err(404, 'not_found');
@@ -521,6 +534,36 @@ function clampInt(v, lo, hi, dflt) {
   return Math.max(lo, Math.min(hi, Math.floor(n)));
 }
 
+/** Waliduje konfigurację etapu multi-fidelity z API (twarde limity zasobów, P14/P16). */
+function sanitizeStageConfig(body) {
+  const cfg = {};
+  if (body?.docking?.enabled) {
+    const r = body.docking.receptor ?? {};
+    cfg.docking = {
+      enabled: true,
+      budget: clampInt(body.docking.budget, 1, 8, 2),
+      mode: ['pareto', 'diverse', 'explicit'].includes(body.docking.mode) ? body.docking.mode : 'pareto',
+      receptor: {
+        // Tylko SMILES zastępnika lub gotowy PDBQT — brak wstrzykiwania dowolnych ścieżek.
+        receptorSmiles: typeof r.receptorSmiles === 'string' ? r.receptorSmiles.slice(0, 200) : 'c1ccc2[nH]ccc2c1',
+        center: Array.isArray(r.center) ? r.center.slice(0, 3).map(Number) : [0, 0, 0],
+        exhaustiveness: clampInt(r.exhaustiveness, 1, 16, 8),
+        nPoses: clampInt(r.nPoses, 1, 10, 5),
+      },
+    };
+  }
+  if (body?.quantum?.enabled) {
+    cfg.quantum = {
+      enabled: true,
+      budget: clampInt(body.quantum.budget, 1, 4, 1),
+      mode: ['pareto', 'diverse'].includes(body.quantum.mode) ? body.quantum.mode : 'pareto',
+      method: ['RHF', 'RKS'].includes(body.quantum.method) ? body.quantum.method : 'RHF',
+      basis: typeof body.quantum.basis === 'string' ? body.quantum.basis.slice(0, 20) : 'sto-3g',
+    };
+  }
+  return cfg;
+}
+
 /** Inspekcja kampanii: stan + policzalne z utrwalonych danych metryki. */
 function inspectCampaign(db, campaignId) {
   const campaign = campaignStore.getCampaign(db, campaignId);
@@ -564,7 +607,9 @@ function whyHandler(db, campaignId, query) {
     case 'strategy': return ok({ why: whyEngine.whyStrategyChange(db, campaignId, generation) });
     case 'next-experiment': return ok({ why: whyEngine.whyNextExperiment(db, campaignId, generation) });
     case 'stop': return ok({ why: whyEngine.whyStop(db, campaignId) });
-    default: return err(400, 'invalid_kind', 'kind ∈ {candidate,status,pareto,engine,strategy,next-experiment,stop}');
+    case 'stage-selection': return ok({ why: whyEngine.whyStageSelection(db, campaignId, candidateId) });
+    case 'conflict': return ok({ why: whyEngine.whyConflict(db, campaignId, candidateId) });
+    default: return err(400, 'invalid_kind', 'kind ∈ {candidate,status,pareto,engine,strategy,next-experiment,stop,stage-selection,conflict}');
   }
 }
 

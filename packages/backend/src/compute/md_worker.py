@@ -10,6 +10,29 @@ Commands:
   reference {steps?}     -> TIP3P water-box minimization + short NVT (integration
                             validation). Reports energy drop on minimization and a
                             controlled temperature — NOT biological stability.
+  energy_conservation {steps?}
+                          -> standard MD-engine QA: a true NVE run (Verlet
+                            integrator, NO thermostat) must conserve total
+                            energy (potential + kinetic) to good precision.
+                            This is a physical law (energy conservation in an
+                            isolated Hamiltonian system), not a recalled
+                            literature number — real drift is reported.
+  force_field_determinism {boxNm?}
+                          -> single-point potential-energy evaluation of an
+                            IDENTICAL, unminimized configuration, repeated.
+                            Measured (not assumed): PME's reciprocal-space
+                            FFT is not perfectly bit-exact run-to-run even
+                            single-threaded (~1e-8 relative, a known FFT/PME
+                            floating-point-reproducibility limitation) so
+                            the pass criterion is a tight RELATIVE tolerance
+                            (1e-6), not bitwise equality. NOTE: minimized
+                            configurations are NOT tested here for
+                            reproducibility, because minimizing a disordered
+                            water box is a rugged, near-degenerate landscape
+                            where floating-point-level rounding differences
+                            can steer convergence into a different local
+                            minimum — real physics/numerics, not an engine
+                            bug, so it is not asserted as reproducible.
 
 Units: energy kJ/mol, temperature K, time ps. A short software-validation
 trajectory says nothing about biological stability; that is stated explicitly.
@@ -33,7 +56,7 @@ def main():
 
     try:
         import openmm as mm
-        from openmm import app, unit, LangevinMiddleIntegrator
+        from openmm import app, unit, LangevinMiddleIntegrator, VerletIntegrator
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"ok": False, "error": "openmm_unavailable: %s" % e}))
         return
@@ -99,6 +122,109 @@ def main():
             }))
         except Exception as e:  # noqa: BLE001
             print(json.dumps({"ok": False, "error": "md_failed: %s" % str(e)[:180]}))
+        return
+
+    if cmd == "energy_conservation":
+        try:
+            steps = int(req.get("steps", 1000))
+            steps = max(200, min(steps, 5000))
+            box = float(req.get("boxNm", 2.2))
+            box = max(2.0, min(box, 2.6))
+            seed = int(req.get("seed", 7))
+            sample_every = max(1, steps // 50)
+
+            ff = app.ForceField("amber14/tip3p.xml")
+            modeller = app.Modeller(app.Topology(), [])
+            modeller.addSolvent(ff, boxSize=unit.Quantity((box, box, box), unit.nanometers), model="tip3p")
+            n_atoms = modeller.topology.getNumAtoms()
+
+            system = ff.createSystem(
+                modeller.topology, nonbondedMethod=app.PME,
+                nonbondedCutoff=0.9 * unit.nanometer, constraints=app.HBonds, rigidWater=True,
+            )
+            # Small, fixed timestep for a stable NVE trajectory (no thermostat -> energy must be conserved).
+            integrator = VerletIntegrator(0.0005 * unit.picoseconds)
+            platform = mm.Platform.getPlatformByName("CPU")
+            sim = app.Simulation(modeller.topology, system, integrator, platform)
+            sim.context.setPositions(modeller.positions)
+            sim.minimizeEnergy(maxIterations=200)
+            sim.context.setVelocitiesToTemperature(300 * unit.kelvin, seed)
+
+            def total_energy():
+                st = sim.context.getState(getEnergy=True)
+                return (st.getPotentialEnergy() + st.getKineticEnergy()).value_in_unit(unit.kilojoule_per_mole)
+
+            e0 = total_energy()
+            energies = [e0]
+            done = 0
+            while done < steps:
+                chunk = min(sample_every, steps - done)
+                sim.step(chunk)
+                done += chunk
+                energies.append(total_energy())
+
+            drift = [abs(e - e0) for e in energies]
+            max_drift = max(drift)
+            # Relative drift normalized by system size (larger systems have larger absolute kJ/mol scale).
+            relative_drift = max_drift / (abs(e0) if e0 != 0 else 1.0)
+            passed = relative_drift < 0.02  # <2% total-energy drift over the run: standard NVE sanity bound
+            print(json.dumps({
+                "ok": True, "version": mm.version.version, "platform": platform.getName(),
+                "case": "TIP3P water box NVE (Verlet, no thermostat): total-energy conservation",
+                "data": {
+                    "atoms": n_atoms, "steps": steps, "timestepPs": 0.0005,
+                    "initialTotalEnergyKjmol": round(e0, 3),
+                    "maxAbsDriftKjmol": round(max_drift, 3),
+                    "relativeDrift": relative_drift,
+                    "samples": len(energies),
+                },
+                "pass": bool(passed),
+                "law": "energy conservation: total energy of an isolated Hamiltonian system (NVE, no thermostat) must be constant",
+            }))
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "energy_conservation_failed: %s" % str(e)[:180]}))
+        return
+
+    if cmd == "force_field_determinism":
+        try:
+            box = float(req.get("boxNm", 2.2))
+            box = max(2.0, min(box, 2.6))
+
+            ff = app.ForceField("amber14/tip3p.xml")
+            modeller = app.Modeller(app.Topology(), [])
+            modeller.addSolvent(ff, boxSize=unit.Quantity((box, box, box), unit.nanometers), model="tip3p")
+            n_atoms = modeller.topology.getNumAtoms()
+            system = ff.createSystem(
+                modeller.topology, nonbondedMethod=app.PME,
+                nonbondedCutoff=0.9 * unit.nanometer, constraints=app.HBonds, rigidWater=True,
+            )
+
+            def single_point_energy():
+                integrator = VerletIntegrator(0.0005 * unit.picoseconds)
+                platform = mm.Platform.getPlatformByName("CPU")
+                # Multi-threaded floating-point summation is not associative, so force single-threaded
+                # evaluation here — this is testing force-field determinism, not throughput.
+                sim = app.Simulation(modeller.topology, system, integrator, platform, {"Threads": "1"})
+                sim.context.setPositions(modeller.positions)
+                return sim.context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+
+            e1 = single_point_energy()
+            e2 = single_point_energy()
+            rel_diff = abs(e1 - e2) / (abs(e1) if e1 != 0 else 1.0)
+            tol = 1e-6
+            print(json.dumps({
+                "ok": True, "version": mm.version.version,
+                "case": "unminimized TIP3P water box: repeated single-point potential-energy evaluation",
+                "data": {
+                    "atoms": n_atoms, "energy1Kjmol": e1, "energy2Kjmol": e2,
+                    "bitExactMatch": bool(e1 == e2), "relativeDifference": rel_diff, "tolerance": tol,
+                },
+                "pass": bool(rel_diff < tol),
+                "law": "force-field evaluation must be reproducible within tight relative tolerance for an identical input configuration "
+                       "(bit-exactness is not guaranteed by PME/FFT implementations even single-threaded)",
+            }))
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "force_field_determinism_failed: %s" % str(e)[:180]}))
         return
 
     print(json.dumps({"ok": False, "error": "unknown_cmd: %s" % cmd}))

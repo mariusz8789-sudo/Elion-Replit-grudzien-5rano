@@ -26,8 +26,8 @@ CPU-only; no GPU required. When a package is absent the capability is reported
 | molecular-dynamics | OpenMM | 8.5.2 | MIT/LGPL | AVAILABLE | TIP3P water box: min lowers energy, NVT holds 150–450 K |
 | molecular-docking | AutoDock Vina + Meeko | 1.2.7 / 0.7.1 | Apache-2.0 / LGPL | AVAILABLE | aspirin→rigid stand-in dock, ≥1 pose, finite favorable score, deterministic |
 | protein-structure-ingestion | Biopython | 1.87 | BSD | AVAILABLE | 2-residue ALA PDB parses to expected chains/residues |
-| admet-estimation | — | — | — | CAPABILITY_GAP | no validated executable per-endpoint model integrated |
-| toxicity-risk-estimation | — | — | — | CAPABILITY_GAP | no validated executable per-endpoint model integrated |
+| admet-estimation | ADMET-AI (Chemprop D-MPNN) | 2.0.1 | MIT | AVAILABLE | aspirin: execution + determinism + physicochemical cross-check vs RDKit; all 52 TDC endpoints present |
+| toxicity-risk-estimation | ADMET-AI (Chemprop D-MPNN) | 2.0.1 | MIT | AVAILABLE | shares the ADMET reference case; toxicity endpoints (hERG/AMES/DILI/ClinTox/…) never returned as SAFE/NON-TOXIC |
 
 Statuses are determined at **runtime** by executing the reference case (cached per
 process). Query live via `GET /api/compute/toolchain` and the runtime audit via
@@ -35,11 +35,13 @@ process). Query live via `GET /api/compute/toolchain` and the runtime audit via
 
 ## Evidence classes
 
-- **MODEL_ESTIMATE** — every docking score (kcal/mol), MD metric, and QM property.
-  Never experimental evidence, never a therapeutic/clinical claim.
+- **MODEL_ESTIMATE** — every docking score (kcal/mol), MD metric, QM property, and
+  ADMET/toxicity prediction. Never experimental evidence, never a
+  therapeutic/clinical claim.
 - **DETERMINISTIC** — protein-structure parsing/validation.
-- **CAPABILITY_GAP** — ADMET, toxicity: honestly absent, never filled by an LLM or
-  a heuristic presented as a validated model.
+- **CAPABILITY_GAP** — reported honestly whenever no validated executable model is
+  integrated for a requested capability; never filled by an LLM or a heuristic
+  presented as a validated model.
 
 ## Honesty constraints (persisted, enforced)
 

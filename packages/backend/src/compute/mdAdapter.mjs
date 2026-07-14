@@ -64,3 +64,39 @@ export function referenceCase({ steps = 300 } = {}) {
     return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
   }
 }
+
+/**
+ * NVE (Verlet, no thermostat) total-energy-conservation check — the standard
+ * MD-engine QA test. Ground truth is a physical law (energy conservation in
+ * an isolated Hamiltonian system), not a recalled literature number.
+ * Returns real drift; `pass` is true when relative drift < 2%.
+ */
+export function energyConservationCase({ steps = 1000 } = {}) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'energy_conservation', steps }, TIMEOUT_MS);
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, pass: r.pass, case: r.case, data: r.data, platform: r.platform, version: r.version, law: r.law };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/**
+ * Force-field evaluation determinism: identical input configuration must
+ * yield the same potential energy within a tight relative tolerance
+ * (bit-exactness is not guaranteed by PME/FFT implementations even
+ * single-threaded — a measured, documented limitation, not an engine bug).
+ */
+export function forceFieldDeterminismCase({ boxNm = 2.2 } = {}) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'force_field_determinism', boxNm }, 60_000);
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, pass: r.pass, case: r.case, data: r.data, version: r.version, law: r.law };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}

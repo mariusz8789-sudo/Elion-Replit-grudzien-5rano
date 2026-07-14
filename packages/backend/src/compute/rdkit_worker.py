@@ -25,14 +25,48 @@ def main():
 
     try:
         import rdkit
-        from rdkit import Chem
-        from rdkit.Chem import Descriptors, Lipinski, rdMolDescriptors, Crippen
+        from rdkit import Chem, DataStructs, RDLogger
+        from rdkit.Chem import Descriptors, Lipinski, rdMolDescriptors, Crippen, AllChem
+        RDLogger.DisableLog("rdApp.*")  # ostrzeżenia deprecacji na stderr są szumem; błędy i tak wracają jako JSON
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"ok": False, "error": "rdkit_unavailable: %s" % e}))
         return
 
     if cmd == "detect":
         print(json.dumps({"ok": True, "version": rdkit.__version__}))
+        return
+
+    # Deterministyczne transformacje oparte na REAKCJACH SMARTS (nie mutacja tekstu).
+    # Każda dodaje grupę funkcyjną w pozycji aromatycznej C-H; RDKit sanityzuje i
+    # kanonizuje produkty. To realna chemia, powtarzalna i walidowalna.
+    TRANSFORMATIONS = {
+        "add-methyl":   "[cH:1]>>[c:1]C",
+        "add-hydroxyl": "[cH:1]>>[c:1]O",
+        "add-fluoro":   "[cH:1]>>[c:1]F",
+        "add-chloro":   "[cH:1]>>[c:1]Cl",
+        "add-amino":    "[cH:1]>>[c:1]N",
+        "add-nitrile":  "[cH:1]>>[c:1]C#N",
+    }
+
+    if cmd == "transformations":
+        print(json.dumps({"ok": True, "transformations": sorted(TRANSFORMATIONS.keys())}))
+        return
+
+    if cmd == "diversity":
+        smiles_list = req.get("smiles", [])
+        mols = [Chem.MolFromSmiles(s) for s in smiles_list if isinstance(s, str)]
+        mols = [m for m in mols if m is not None]
+        if len(mols) < 2:
+            print(json.dumps({"ok": True, "meanPairwiseDistance": 0.0, "n": len(mols)}))
+            return
+        fps = [AllChem.GetMorganFingerprintAsBitVect(m, 2, nBits=2048) for m in mols]
+        total = 0.0
+        pairs = 0
+        for i in range(len(fps)):
+            for j in range(i + 1, len(fps)):
+                total += 1.0 - DataStructs.TanimotoSimilarity(fps[i], fps[j])
+                pairs += 1
+        print(json.dumps({"ok": True, "meanPairwiseDistance": round(total / pairs, 5), "n": len(mols)}))
         return
 
     smiles = req.get("smiles", "")
@@ -43,6 +77,30 @@ def main():
 
     if cmd == "validate":
         print(json.dumps({"ok": True, "valid": True, "canonicalSmiles": Chem.MolToSmiles(mol)}))
+        return
+
+    if cmd == "transform":
+        tname = req.get("transformation")
+        smarts = TRANSFORMATIONS.get(tname)
+        if smarts is None:
+            print(json.dumps({"ok": False, "error": "unknown_transformation: %s" % tname}))
+            return
+        rxn = AllChem.ReactionFromSmarts(smarts)
+        parent_canon = Chem.MolToSmiles(mol)
+        products = {}
+        for prodset in rxn.RunReactants((mol,)):
+            for p in prodset:
+                try:
+                    Chem.SanitizeMol(p)
+                    canon = Chem.MolToSmiles(p)
+                except Exception:  # noqa: BLE001
+                    continue
+                if canon and canon != parent_canon:
+                    products[canon] = True
+        print(json.dumps({
+            "ok": True, "parentCanonical": parent_canon,
+            "transformation": tname, "products": sorted(products.keys()),
+        }))
         return
 
     if cmd == "descriptors":

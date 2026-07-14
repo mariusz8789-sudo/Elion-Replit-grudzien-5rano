@@ -84,3 +84,44 @@ export function validate(smiles) {
     return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
   }
 }
+
+/**
+ * Deterministyczna transformacja molekuły REAKCJĄ SMARTS (nie mutacja tekstu).
+ * Zwraca kanoniczne SMILES produktów (unikalne, zwalidowane przez RDKit).
+ */
+export function transform(smiles, transformation) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'transform', smiles: String(smiles ?? ''), transformation });
+    return r.ok
+      ? { ok: true, parentCanonical: r.parentCanonical, products: r.products, transformation: r.transformation }
+      : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/** Lista dostępnych transformacji (id). */
+export function listTransformations() {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'transformations' });
+    return r.ok ? { ok: true, transformations: r.transformations } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/** Średni dystans Tanimoto (1−podobieństwo) na odciskach Morgana — miara różnorodności populacji. */
+export function diversity(smilesList) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'diversity', smiles: Array.isArray(smilesList) ? smilesList.map(String) : [] });
+    return r.ok ? { ok: true, meanPairwiseDistance: r.meanPairwiseDistance, n: r.n } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}

@@ -214,8 +214,79 @@ CREATE INDEX IF NOT EXISTS idx_jobs_project ON jobs(project_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 `;
 
+/**
+ * Migracja do wersji 6 (Scientific Acceleration Engine): trwałe kampanie
+ * naukowe. Historia decyzji/zdarzeń jest APPEND-ONLY. Reużywa projekty i
+ * Scientific Runs (prowieniencja).
+ */
+const SCHEMA_V6 = `
+CREATE TABLE IF NOT EXISTS campaigns (
+  id                TEXT PRIMARY KEY,
+  project_id        TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  objective         TEXT NOT NULL,
+  domain            TEXT NOT NULL,
+  objective_vector_json TEXT NOT NULL DEFAULT '[]',
+  constraints_json  TEXT NOT NULL DEFAULT '[]',
+  budget_json       TEXT NOT NULL DEFAULT '{}',
+  stopping_json     TEXT NOT NULL DEFAULT '{}',
+  strategy_json     TEXT NOT NULL DEFAULT '{}',
+  seed              INTEGER,
+  status            TEXT NOT NULL DEFAULT 'created',
+  current_generation INTEGER NOT NULL DEFAULT 0,
+  stop_reason       TEXT,
+  final_json        TEXT,
+  created_by        TEXT REFERENCES users(id),
+  created_at        INTEGER NOT NULL,
+  updated_at        INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS campaign_candidates (
+  id                 TEXT PRIMARY KEY,
+  campaign_id        TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  generation         INTEGER NOT NULL,
+  parent_id          TEXT,
+  parent_smiles      TEXT,
+  transformation     TEXT,
+  canonical_smiles   TEXT NOT NULL,
+  valid              INTEGER NOT NULL DEFAULT 1,
+  descriptors_json   TEXT NOT NULL DEFAULT '{}',
+  objective_vector_json TEXT NOT NULL DEFAULT '{}',
+  constraint_violations_json TEXT NOT NULL DEFAULT '[]',
+  pareto             INTEGER NOT NULL DEFAULT 0,
+  status             TEXT NOT NULL DEFAULT 'retained',
+  rejected_reason    TEXT,
+  run_ids_json       TEXT NOT NULL DEFAULT '[]',
+  created_at         INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS campaign_decisions (
+  id            TEXT PRIMARY KEY,
+  campaign_id   TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  generation    INTEGER NOT NULL,
+  state_hash    TEXT NOT NULL,
+  evidence_json TEXT NOT NULL DEFAULT '{}',
+  metrics_json  TEXT NOT NULL DEFAULT '{}',
+  algorithm     TEXT NOT NULL,
+  decision      TEXT NOT NULL,
+  params_json   TEXT NOT NULL DEFAULT '{}',
+  purpose       TEXT NOT NULL DEFAULT '',
+  created_at    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS campaign_events (
+  id          TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  generation  INTEGER NOT NULL DEFAULT 0,
+  type        TEXT NOT NULL,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_camp_project ON campaigns(project_id);
+CREATE INDEX IF NOT EXISTS idx_cand_campaign ON campaign_candidates(campaign_id, generation);
+CREATE INDEX IF NOT EXISTS idx_dec_campaign ON campaign_decisions(campaign_id, generation);
+CREATE INDEX IF NOT EXISTS idx_evt_campaign ON campaign_events(campaign_id, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 6) db.exec(SCHEMA_V6);
   if (version < 5) db.exec(SCHEMA_V5);
   if (version < 4) db.exec(SCHEMA_V4);
   if (version < 3) db.exec(SCHEMA_V3);
@@ -240,7 +311,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 5) db.exec('PRAGMA user_version = 5');
+  if (version < 6) db.exec('PRAGMA user_version = 6');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */

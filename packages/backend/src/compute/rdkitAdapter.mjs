@@ -102,6 +102,24 @@ export function transform(smiles, transformation) {
   }
 }
 
+/**
+ * Realna geometria 3D z SMILES (dodanie H, osadzenie ETKDG deterministyczne,
+ * optymalizacja MMFF/UFF). Zwraca atomy w Angstremach — wejście dla chemii
+ * kwantowej. `{ ok, atoms:[{element,x,y,z}], forceField, charge, nAtoms }`.
+ */
+export function embed3d(smiles, seed = 42) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'embed3d', smiles: String(smiles ?? ''), seed }, 20_000);
+    return r.ok
+      ? { ok: true, atoms: r.atoms, forceField: r.forceField, charge: r.charge, nAtoms: r.nAtoms, canonicalSmiles: r.canonicalSmiles }
+      : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
 /** Lista dostępnych transformacji (id). */
 export function listTransformations() {
   const d = detect();

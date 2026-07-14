@@ -13,12 +13,38 @@
  *  - MODEL_NOT_VALID_FOR_DOMAIN — model istnieje, ale nie obowiązuje w tym przypadku.
  */
 
+import { detect as rdkitDetect } from './rdkitAdapter.mjs';
+
 export const CAPABILITY_STATUS = {
   AVAILABLE: 'AVAILABLE',
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
   EXTERNAL_ENGINE_REQUIRED: 'EXTERNAL_ENGINE_REQUIRED',
   MODEL_NOT_VALID_FOR_DOMAIN: 'MODEL_NOT_VALID_FOR_DOMAIN',
+  BLOCKED_BY_RUNTIME: 'BLOCKED_BY_RUNTIME',
 };
+
+/**
+ * Zdolności zależne od RDKit: status USTALANY W RUNTIME. Jeśli RDKit jest
+ * zainstalowany (pip install rdkit) → AVAILABLE i realnie liczy; jeśli nie →
+ * BLOCKED_BY_RUNTIME z dokładną przyczyną. Nigdy nie udajemy wyniku.
+ */
+const RDKIT_CAPABILITIES = [
+  { id: 'molecular-descriptors', label: 'Deskryptory molekularne ze SMILES (RDKit)', category: 'cheminformatics', modelId: 'chem-rdkit-descriptors' },
+  { id: 'logp', label: 'Lipofilowość logP (Crippen, RDKit)', category: 'physicochemical', modelId: 'chem-rdkit-descriptors' },
+  { id: 'lipinski-ro5', label: 'Reguła 5 Lipińskiego (pełna, RDKit)', category: 'physicochemical', modelId: 'chem-rdkit-descriptors' },
+  { id: 'structure-validation', label: 'Walidacja struktury SMILES (RDKit)', category: 'cheminformatics', modelId: 'chem-rdkit-descriptors' },
+];
+
+function rdkitCapabilityEntries() {
+  const det = rdkitDetect();
+  return RDKIT_CAPABILITIES.map((c) => ({
+    ...c,
+    status: det.available ? CAPABILITY_STATUS.AVAILABLE : CAPABILITY_STATUS.BLOCKED_BY_RUNTIME,
+    engine: det.available ? det.engine : undefined,
+    requires: det.available ? undefined : `RDKit w runtime (pip install rdkit). Przyczyna: ${det.reason}`,
+    note: det.available ? 'Realne obliczenie przez RDKit.' : 'Zainstaluj RDKit, aby aktywować — bez niego wynik NIE jest zwracany.',
+  }));
+}
 
 /**
  * Rejestr zdolności. `AVAILABLE` wskazuje realny model w rejestrze obliczeń.
@@ -35,13 +61,6 @@ export const CAPABILITIES = [
     id: 'formula-validation', label: 'Walidacja wzoru sumarycznego', category: 'cheminformatics',
     status: CAPABILITY_STATUS.AVAILABLE, modelId: 'chem-molecular-weight',
     note: 'Parser prostych wzorów (bez nawiasów/hydratów/izotopów w v1).',
-  },
-  {
-    id: 'logp', label: 'Lipofilowość (logP)', category: 'physicochemical',
-    status: CAPABILITY_STATUS.NOT_IMPLEMENTED,
-    requires: 'Model wkładów atomowych (np. Crippen) lub zewnętrzny silnik cheminformatyczny.',
-    adapter: 'PhyschemAdapter.logP(structure) → { value, method }',
-    note: 'Nie liczymy logP zgadywanką — wymaga zwalidowanego modelu wkładów.',
   },
   {
     id: 'docking', label: 'Dokowanie molekularne', category: 'structural',
@@ -90,23 +109,22 @@ export const CAPABILITIES = [
   },
 ];
 
-const BY_ID = new Map(CAPABILITIES.map((c) => [c.id, c]));
-
+/** Pełna lista zdolności: statyczne + RDKit-owe z LIVE statusem runtime. */
 export function listCapabilities() {
-  return CAPABILITIES;
+  return [...CAPABILITIES, ...rdkitCapabilityEntries()];
 }
 
 export function getCapability(id) {
-  return BY_ID.get(id) ?? null;
+  return listCapabilities().find((c) => c.id === id) ?? null;
 }
 
 export function isAvailable(id) {
-  return BY_ID.get(id)?.status === CAPABILITY_STATUS.AVAILABLE;
+  return getCapability(id)?.status === CAPABILITY_STATUS.AVAILABLE;
 }
 
 /** Zwięzły znacznik luki zdolności do dołączania do paszportów kandydatów. */
 export function capabilityGap(id) {
-  const c = BY_ID.get(id);
+  const c = getCapability(id);
   if (!c) return { id, status: 'UNKNOWN', message: `Nieznana zdolność „${id}".` };
   if (c.status === CAPABILITY_STATUS.AVAILABLE) return null;
   return { id, label: c.label, status: c.status, requires: c.requires ?? null, note: c.note ?? null };

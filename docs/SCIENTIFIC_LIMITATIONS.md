@@ -37,11 +37,13 @@ tests, not by test count alone.
 ## Drug discovery capabilities
 | Capability | Class |
 |---|---|
-| Molecular weight / composition | REAL |
+| Molecular weight / composition (formula) | REAL |
 | Formula validation | REAL |
 | Degree of unsaturation | REAL |
-| Lipinski MW criterion | REAL (heuristic, explicitly labelled — not efficacy) |
-| logP | NOT IMPLEMENTED (needs atom-contribution model) |
+| Molecular descriptors from SMILES (RDKit) | REAL when RDKit installed, else BLOCKED_BY_RUNTIME |
+| logP (Crippen, RDKit) | REAL when RDKit installed, else BLOCKED_BY_RUNTIME |
+| Full Lipinski Ro5 (RDKit) | REAL when RDKit installed, else BLOCKED_BY_RUNTIME |
+| SMILES structure validation (RDKit) | REAL when RDKit installed, else BLOCKED_BY_RUNTIME |
 | Molecular docking | EXTERNAL ENGINE REQUIRED |
 | Molecular dynamics | EXTERNAL ENGINE REQUIRED |
 | Quantum chemistry (DFT/ab initio) | EXTERNAL ENGINE REQUIRED |

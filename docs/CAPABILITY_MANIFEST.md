@@ -12,11 +12,19 @@ what Genesis Lab can and cannot compute. `GET /api/compute/capabilities`.
 For anything other than `AVAILABLE`, the system returns **CAPABILITY GAP
 DETECTED** with the status and what it would take — never a fabricated number.
 
+Statuses for RDKit-backed capabilities are resolved **at runtime** by
+`compute/rdkitAdapter.mjs:detect()`. With `pip install rdkit` present they are
+`AVAILABLE` and compute for real; absent, they are `BLOCKED_BY_RUNTIME` with the
+exact missing dependency — never a fabricated number. See `requirements-compute.txt`.
+
 | Capability | Status | Needs |
 |---|---|---|
-| molecular-weight | AVAILABLE | — (chem-molecular-weight) |
+| molecular-weight | AVAILABLE | — (chem-molecular-weight, formula-based) |
 | formula-validation | AVAILABLE | — |
-| logp | NOT_IMPLEMENTED | atom-contribution model (e.g. Crippen) |
+| molecular-descriptors | AVAILABLE if RDKit present, else BLOCKED_BY_RUNTIME | `pip install rdkit` (chem-rdkit-descriptors) |
+| logp | AVAILABLE if RDKit present, else BLOCKED_BY_RUNTIME | RDKit Crippen logP |
+| lipinski-ro5 | AVAILABLE if RDKit present, else BLOCKED_BY_RUNTIME | RDKit (MW+logP+HBD+HBA) |
+| structure-validation | AVAILABLE if RDKit present, else BLOCKED_BY_RUNTIME | RDKit SMILES parser |
 | docking | EXTERNAL_ENGINE_REQUIRED | 3D target + AutoDock Vina + force field |
 | molecular-dynamics | EXTERNAL_ENGINE_REQUIRED | OpenMM/GROMACS + force field |
 | quantum-chemistry | EXTERNAL_ENGINE_REQUIRED | Psi4/ORCA + basis set |

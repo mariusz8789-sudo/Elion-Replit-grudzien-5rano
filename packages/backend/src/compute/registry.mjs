@@ -16,6 +16,7 @@
  */
 
 import * as core from './core.bundle.mjs';
+import { detect as rdkitDetect, descriptors as rdkitDescriptors, validate as rdkitValidate } from './rdkitAdapter.mjs';
 
 const SOLAR_MASS_KG = 1.989e30;
 
@@ -322,6 +323,57 @@ const MODELS = [
     validate: (v) => {
       const p = core.parseFormula(v.formula);
       return p.ok ? { ok: true } : { ok: false, error: 'invalid_formula', message: p.error };
+    },
+  },
+
+  {
+    ...functionModel(
+      {
+        id: 'chem-rdkit-descriptors', name: 'Deskryptory molekularne (RDKit)', domain: 'chemistry', version: '1.0.0',
+        description: 'Realne deskryptory ze SMILES przez RDKit: masa, logP (Crippen), HBD/HBA, wiązania obrotowe, pierścienie, TPSA, frakcja Csp3, liczba naruszeń reguły 5 Lipińskiego.',
+        inputs: [{ id: 'smiles', label: 'SMILES', unit: '', type: 'string', maxLength: 500, default: 'CC(=O)Oc1ccccc1C(=O)O' }],
+        outputs: [
+          { id: 'molWt', label: 'Masa molowa', unit: 'g/mol' },
+          { id: 'exactMolWt', label: 'Masa dokładna', unit: 'g/mol' },
+          { id: 'crippenLogP', label: 'logP (Crippen)', unit: '' },
+          { id: 'hbd', label: 'Donory wiązań wodorowych', unit: '' },
+          { id: 'hba', label: 'Akceptory wiązań wodorowych', unit: '' },
+          { id: 'rotatableBonds', label: 'Wiązania obrotowe', unit: '' },
+          { id: 'ringCount', label: 'Liczba pierścieni', unit: '' },
+          { id: 'aromaticRings', label: 'Pierścienie aromatyczne', unit: '' },
+          { id: 'fractionCsp3', label: 'Frakcja Csp3', unit: '' },
+          { id: 'tpsa', label: 'TPSA', unit: 'Å²' },
+          { id: 'heavyAtomCount', label: 'Atomy ciężkie', unit: '' },
+          { id: 'heteroatomCount', label: 'Heteroatomy', unit: '' },
+          { id: 'formalCharge', label: 'Ładunek formalny', unit: '' },
+          { id: 'lipinskiViolations', label: 'Naruszenia reguły 5 Lipińskiego', unit: '' },
+        ],
+        assumptions: 'RDKit (open-source, walidowany). logP metodą wkładów atomowych Crippena; deskryptory topologiczne 2D (bez konformacji 3D).',
+        validity: 'Poprawny SMILES ORAZ RDKit dostępny w środowisku uruchomieniowym (pip install rdkit).',
+        provenance: { source: 'RDKit via compute/rdkitAdapter.mjs', formula: 'RDKit Descriptors / Lipinski / Crippen', honesty: 'simplified' },
+      },
+      (v) => {
+        const r = rdkitDescriptors(v.smiles);
+        if (!r.ok) throw new Error(r.error + (r.reason ? `: ${r.reason}` : ''));
+        const d = r.data;
+        return {
+          outputs: {
+            molWt: d.molWt, exactMolWt: d.exactMolWt, crippenLogP: d.crippenLogP, hbd: d.hbd, hba: d.hba,
+            rotatableBonds: d.rotatableBonds, ringCount: d.ringCount, aromaticRings: d.aromaticRings,
+            fractionCsp3: d.fractionCsp3, tpsa: d.tpsa, heavyAtomCount: d.heavyAtomCount,
+            heteroatomCount: d.heteroatomCount, formalCharge: d.formalCharge, lipinskiViolations: d.lipinskiViolations,
+            canonicalSmiles: d.canonicalSmiles, molecularFormula: d.molecularFormula,
+          },
+          warnings: [],
+        };
+      },
+    ),
+    // Walidacja: RDKit obecny + poprawny SMILES. Bez RDKit → 'rejected' z jawną przyczyną (nie fałszywy wynik).
+    validate: (v) => {
+      const det = rdkitDetect();
+      if (!det.available) return { ok: false, error: 'capability_unavailable', message: `RDKit niedostępny (${det.reason}). Zainstaluj: pip install rdkit.` };
+      const val = rdkitValidate(v.smiles);
+      return val.ok ? { ok: true } : { ok: false, error: 'invalid_smiles', message: 'Nieprawidłowy SMILES.' };
     },
   },
 

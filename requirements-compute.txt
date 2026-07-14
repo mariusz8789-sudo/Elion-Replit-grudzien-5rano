@@ -1,0 +1,9 @@
+# Genesis Lab — optional scientific runtime dependencies (Priority D).
+# The core app runs without these; installing them ACTIVATES real capabilities
+# via the compute engine's capability detection (never faked when absent).
+#
+# RDKit — real cheminformatics (SMILES parsing, descriptors, logP, Lipinski,
+# structure validation). Activates: molecular-descriptors, logp, lipinski-ro5,
+# structure-validation, and the chem-rdkit-descriptors compute model.
+#   pip install -r requirements-compute.txt
+rdkit>=2023.9

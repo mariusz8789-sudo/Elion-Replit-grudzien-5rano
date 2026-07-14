@@ -46,8 +46,26 @@ export function buildCandidatePassport(candidate, target = null) {
       warnings.push(`Nie udało się policzyć masy molowej: ${run.message}`);
       modelsExecuted.push({ modelId: 'chem-molecular-weight', version: run.modelVersion ?? null, status: run.status });
     }
-  } else {
-    warnings.push('Brak wzoru sumarycznego — nie policzono właściwości chemicznych.');
+  } else if (!candidate.smiles) {
+    warnings.push('Brak wzoru sumarycznego i SMILES — nie policzono właściwości chemicznych.');
+  }
+
+  // Deskryptory strukturalne przez RDKit (realny silnik) — TYLKO gdy jest SMILES
+  // i RDKit dostępny w runtime. Bez RDKit: brak wyniku (widoczna luka), zero atrap.
+  let rdkit;
+  if (candidate.smiles) {
+    const run = runModel('chem-rdkit-descriptors', { smiles: candidate.smiles });
+    runIds.push(run.runId);
+    if (run.status === 'ok') {
+      rdkit = run.outputs;
+      modelsExecuted.push({ modelId: run.modelId, version: run.modelVersion, status: 'ok', engine: run.provenance?.source });
+      for (const k of ['crippenLogP', 'hbd', 'hba', 'rotatableBonds', 'ringCount', 'aromaticRings', 'tpsa', 'fractionCsp3', 'heavyAtomCount']) {
+        if (rdkit[k] !== undefined) calculated[k] = rdkit[k];
+      }
+      if (calculated.molarMassGmol === undefined && rdkit.molWt !== undefined) calculated.molarMassGmol = rdkit.molWt;
+    } else {
+      modelsExecuted.push({ modelId: 'chem-rdkit-descriptors', version: run.modelVersion ?? null, status: run.status, message: run.message });
+    }
   }
 
   // Składniki oceny — jawnie oznaczone: 'calculated' (realne) vs 'heuristic'.

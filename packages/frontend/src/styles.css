@@ -1307,3 +1307,54 @@ kbd {
 .server-verify { margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); }
 .server-verify-result { margin-top: 0.5rem; }
 .server-verify-meta { margin-top: 0.4rem; font-family: var(--font-mono); font-size: 0.64rem; color: var(--text-faint); }
+
+/* ---------- Silnik Przyspieszenia Naukowego (Scientific Acceleration Engine) ---------- */
+.settings-subsection { margin-top: 1rem; padding-top: 0.7rem; border-top: 1px dashed var(--border); }
+.settings-subsection h3, .settings-subsection h4 { margin: 0 0 0.4rem; font-size: 0.85rem; color: var(--text); }
+.plain-list { list-style: none; margin: 0.3rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.plain-list.small { font-size: 0.74rem; }
+.plain-list li { line-height: 1.5; }
+.muted { color: var(--text-dim); }
+.small { font-size: 0.74rem; }
+.status-line { font-size: 0.82rem; color: var(--text); margin: 0.4rem 0; }
+.warn-banner {
+  margin-top: 0.6rem; padding: 0.6rem 0.8rem; border-radius: 10px;
+  background: rgba(240, 179, 92, 0.1); border: 1px solid rgba(240, 179, 92, 0.35);
+  color: var(--gold); font-size: 0.78rem;
+}
+.form-grid { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.6rem; }
+.form-grid label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.76rem; color: var(--text-dim); }
+.form-grid input, .form-grid select {
+  padding: 0.5rem 0.6rem; border-radius: 8px; background: var(--bg-panel);
+  border: 1px solid var(--border); color: var(--text); font-size: 0.82rem;
+}
+.primary-btn, .link-btn {
+  font-weight: 600; cursor: pointer;
+}
+.primary-btn {
+  align-self: flex-start; padding: 0.5rem 1rem; border-radius: 999px;
+  background: var(--cyan); color: #04121a; border: none; font-size: 0.82rem;
+}
+.primary-btn:disabled { opacity: 0.55; cursor: default; }
+.link-btn { background: none; border: none; color: var(--cyan); padding: 0; font-size: inherit; text-align: left; }
+.error-text { color: var(--red); font-size: 0.78rem; margin-top: 0.5rem; }
+.metric-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 0.5rem; margin: 0.7rem 0;
+}
+.metric-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  padding: 0.55rem 0.4rem; border-radius: 10px;
+  background: var(--bg-panel); border: 1px solid var(--border);
+}
+.metric-value { font-family: var(--font-mono); font-size: 1.15rem; color: var(--cyan); font-weight: 700; }
+.metric-label { font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; text-align: center; }
+.pill { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; }
+.pill-ok { background: rgba(110, 231, 160, 0.14); color: var(--green); border: 1px solid rgba(110, 231, 160, 0.4); }
+.pill-warn { background: rgba(240, 179, 92, 0.14); color: var(--gold); border: 1px solid rgba(240, 179, 92, 0.4); }
+.why-panel { background: var(--bg-raised); border-radius: 10px; padding: 0.7rem 0.8rem; }
+.why-panel .evidence {
+  margin-top: 0.5rem; padding: 0.5rem; border-radius: 8px; background: var(--bg);
+  border: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.64rem;
+  color: var(--text-dim); overflow-x: auto; max-height: 240px;
+}

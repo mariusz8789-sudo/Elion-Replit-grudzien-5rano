@@ -409,3 +409,113 @@ export async function getCandidateRanking(token: string, projectId: string, targ
   const r = await request<{ ranking: RankedCandidate[] }>('GET', `/projects/${projectId}/candidates/ranking${q}`, { token });
   return r.ok ? { ok: true, data: r.data.ranking } : r;
 }
+
+/* ---------------- Scientific Acceleration Engine: kampanie naukowe ---------------- */
+
+export type ToolStatus =
+  | 'AVAILABLE' | 'UNVALIDATED' | 'CAPABILITY_GAP' | 'BLOCKED_BY_RUNTIME'
+  | 'BLOCKED_BY_LICENSE' | 'BLOCKED_BY_RESOURCES' | 'VALIDATION_FAILED';
+
+export interface ToolchainEntry {
+  toolId: string; engineName: string; domain: string; license: string;
+  status: ToolStatus; version: string | null; engine: string | null;
+  modelDomain: string; assumptions: string;
+  validation: { id: string; pass: boolean; expected?: number; actual?: number; expectProduct?: string; products?: string[] | null }[] | null;
+  reason?: string | null;
+}
+
+export interface CampaignStats {
+  candidatesGenerated: number; valid: number; invalid: number; duplicates: number;
+  rejected: number; retained: number; paretoFront: number; decisions: number;
+  diversity: number | null; hypervolume: number | null;
+}
+
+export interface Campaign {
+  id: string; projectId: string; objective: string; domain: string;
+  status: 'created' | 'running' | 'completed' | 'cancelled';
+  currentGeneration: number; stopReason: string | null;
+  budget: { maxGenerations?: number; maxGeneratedCandidates?: number };
+  strategy: { startingSmiles?: string[]; transformationWeights?: Record<string, number>; parentSelection?: string };
+  final?: { paretoFront?: { smiles: string; objectiveVector: Record<string, number> }[]; hypervolumeStart?: number; hypervolumeEnd?: number } | null;
+  stats?: CampaignStats;
+  lastDecision?: { generation: number; decision: string; purpose: string } | null;
+  createdAt: number; updatedAt: number;
+}
+
+export interface CampaignCandidate {
+  id: string; generation: number; parentSmiles: string | null; transformation: string | null;
+  canonicalSmiles: string; valid: boolean; descriptors: Record<string, number>;
+  objectiveVector: Record<string, number>; constraintViolations: unknown[];
+  pareto: boolean; status: string; rejectedReason: string | null; runIds: string[];
+}
+
+export interface CampaignDecision {
+  id: string; generation: number; decision: string; purpose: string;
+  algorithm: string; metrics: Record<string, unknown>; params: Record<string, unknown>;
+}
+
+export interface DiscoveryGraph {
+  campaignId: string;
+  stats: { nodes: number; edges: number; candidates: number; decisions: number };
+  nodes: { id: string; type: string; label: string; generation?: number; status?: string; pareto?: boolean }[];
+  edges: { from: string; to: string; type: string; label?: string }[];
+}
+
+export interface WhyAnswer { ok: boolean; answer?: string; reason?: string; evidence?: unknown; }
+
+export async function listToolchain(): Promise<ApiResult<ToolchainEntry[]>> {
+  const r = await request<{ toolchain: ToolchainEntry[] }>('GET', '/compute/toolchain');
+  return r.ok ? { ok: true, data: r.data.toolchain } : r;
+}
+
+export async function listCampaigns(token: string, projectId: string): Promise<ApiResult<Campaign[]>> {
+  const r = await request<{ campaigns: Campaign[] }>('GET', `/projects/${projectId}/campaigns`, { token });
+  return r.ok ? { ok: true, data: r.data.campaigns } : r;
+}
+
+export async function createCampaign(
+  token: string, projectId: string,
+  body: { objective: string; startingSmiles: string[]; budget?: { maxGenerations?: number; maxGeneratedCandidates?: number } },
+): Promise<ApiResult<Campaign>> {
+  const r = await request<{ campaign: Campaign }>('POST', `/projects/${projectId}/campaigns`, { token, body });
+  return r.ok ? { ok: true, data: r.data.campaign } : r;
+}
+
+export async function getCampaign(token: string, projectId: string, campaignId: string): Promise<ApiResult<Campaign>> {
+  const r = await request<{ campaign: Campaign }>('GET', `/projects/${projectId}/campaigns/${campaignId}`, { token });
+  return r.ok ? { ok: true, data: r.data.campaign } : r;
+}
+
+export async function startCampaign(token: string, projectId: string, campaignId: string): Promise<ApiResult<{ campaign: Campaign; jobId: string }>> {
+  return request('POST', `/projects/${projectId}/campaigns/${campaignId}/start`, { token });
+}
+
+export async function cancelCampaign(token: string, projectId: string, campaignId: string): Promise<ApiResult<{ campaign: Campaign }>> {
+  return request('POST', `/projects/${projectId}/campaigns/${campaignId}/cancel`, { token });
+}
+
+export async function listCampaignCandidates(token: string, projectId: string, campaignId: string): Promise<ApiResult<CampaignCandidate[]>> {
+  const r = await request<{ candidates: CampaignCandidate[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/candidates`, { token });
+  return r.ok ? { ok: true, data: r.data.candidates } : r;
+}
+
+export async function listCampaignDecisions(token: string, projectId: string, campaignId: string): Promise<ApiResult<CampaignDecision[]>> {
+  const r = await request<{ decisions: CampaignDecision[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/decisions`, { token });
+  return r.ok ? { ok: true, data: r.data.decisions } : r;
+}
+
+export async function getDiscoveryGraph(token: string, projectId: string, campaignId: string): Promise<ApiResult<DiscoveryGraph>> {
+  const r = await request<{ graph: DiscoveryGraph }>('GET', `/projects/${projectId}/campaigns/${campaignId}/graph`, { token });
+  return r.ok ? { ok: true, data: r.data.graph } : r;
+}
+
+export async function askCampaignWhy(
+  token: string, projectId: string, campaignId: string,
+  query: { kind: string; candidate?: string; generation?: number },
+): Promise<ApiResult<WhyAnswer>> {
+  const params = new URLSearchParams({ kind: query.kind });
+  if (query.candidate) params.set('candidate', query.candidate);
+  if (query.generation != null) params.set('generation', String(query.generation));
+  const r = await request<{ why: WhyAnswer }>('GET', `/projects/${projectId}/campaigns/${campaignId}/why?${params.toString()}`, { token });
+  return r.ok ? { ok: true, data: r.data.why } : r;
+}

@@ -24,7 +24,7 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         console: 'readonly', process: 'readonly', setTimeout: 'readonly', setInterval: 'readonly',
-        clearTimeout: 'readonly', URL: 'readonly', Buffer: 'readonly', fetch: 'readonly',
+        clearTimeout: 'readonly', setImmediate: 'readonly', URL: 'readonly', Buffer: 'readonly', fetch: 'readonly',
       },
     },
     rules: {

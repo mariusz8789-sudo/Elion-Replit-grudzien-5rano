@@ -62,6 +62,8 @@ import { listModels, getModel, modelMetadata, runModel } from './compute/engine.
 import { listCapabilities } from './compute/capabilities.mjs';
 import { buildCandidatePassport, rankCandidates } from './compute/drugDiscovery.mjs';
 import { parseFormula, molecularWeight } from './compute/core.bundle.mjs';
+import { runJob, requestCancel } from './compute/jobs.mjs';
+import { createJob, getJob, listJobs, updateJob } from './store.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -187,6 +189,30 @@ export function handleApi(db, ctx) {
         if (!cand || cand.projectId !== projectId) return err(404, 'not_found');
         const target = cand.targetId ? getTarget(db, cand.targetId) : null;
         return ok({ passport: buildCandidatePassport(cand, target) });
+      }
+      return err(404, 'not_found');
+    }
+
+    // ---- Compute Jobs (P5): asynchroniczne zadania, np. wsadowa ocena kandydatów ----
+    if (seg[2] === 'jobs') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ jobs: listJobs(db, projectId) });
+        if (method === 'POST') return createJobHandler(db, user, role, projectId, body);
+        return err(405, 'method_not_allowed');
+      }
+      if (seg.length === 4) {
+        const job = getJob(db, seg[3]);
+        if (!job || job.projectId !== projectId) return err(404, 'not_found');
+        if (method === 'GET') return ok({ job });
+        return err(405, 'method_not_allowed');
+      }
+      if (seg.length === 5 && seg[4] === 'cancel' && method === 'POST') {
+        const job = getJob(db, seg[3]);
+        if (!job || job.projectId !== projectId) return err(404, 'not_found');
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        if (['completed', 'failed', 'cancelled'].includes(job.status)) return err(409, 'already_finished');
+        requestCancel(job.id);
+        return ok({ job: updateJob(db, job.id, { status: 'cancelled' }) });
       }
       return err(404, 'not_found');
     }
@@ -428,6 +454,21 @@ function runComputeHandler(db, ctx, body) {
   }
 
   return { status: RUN_STATUS_TO_HTTP[run.status] ?? 200, body: { run, persisted } };
+}
+
+/* ---------------- Handler zadań obliczeniowych (P5) ---------------- */
+
+const JOB_TYPES = new Set(['batch-candidate-eval']);
+
+function createJobHandler(db, user, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Uruchomienie zadania wymaga roli editor lub wyższej.');
+  const type = String(body.type ?? '');
+  if (!JOB_TYPES.has(type)) return err(400, 'invalid_job_type', `Nieznany typ zadania „${type}".`);
+  const params = typeof body.params === 'object' && body.params ? body.params : {};
+  const job = createJob(db, { projectId, type, params, createdBy: user.id });
+  // Wykonanie asynchroniczne — odpowiedź wraca natychmiast z zadaniem 'queued'.
+  setImmediate(() => { void runJob(db, job.id); });
+  return ok({ job }, 201);
 }
 
 /* ---------------- Handlery Drug Discovery ---------------- */

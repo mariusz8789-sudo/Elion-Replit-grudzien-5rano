@@ -190,8 +190,33 @@ CREATE INDEX IF NOT EXISTS idx_targets_project ON targets(project_id);
 CREATE INDEX IF NOT EXISTS idx_candidates_project ON candidates(project_id, target_id);
 `;
 
+/**
+ * Migracja do wersji 5 (P5: system zadań obliczeniowych). Lekka abstrakcja
+ * zadań w procesie — bez Redis/Kubernetes. Rekord zadania jest gotowy pod
+ * przyszłych workerów (kolejka = wiersze 'queued').
+ */
+const SCHEMA_V5 = `
+CREATE TABLE IF NOT EXISTS jobs (
+  id           TEXT PRIMARY KEY,
+  project_id   TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  type         TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'queued',
+  progress     REAL NOT NULL DEFAULT 0,
+  params_json  TEXT NOT NULL DEFAULT '{}',
+  result_json  TEXT,
+  run_ids_json TEXT NOT NULL DEFAULT '[]',
+  error        TEXT,
+  created_by   TEXT REFERENCES users(id),
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_jobs_project ON jobs(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 5) db.exec(SCHEMA_V5);
   if (version < 4) db.exec(SCHEMA_V4);
   if (version < 3) db.exec(SCHEMA_V3);
   if (version < 2) {
@@ -215,7 +240,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 4) db.exec('PRAGMA user_version = 4');
+  if (version < 5) db.exec('PRAGMA user_version = 5');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -779,4 +804,45 @@ export function listCandidates(db, projectId, targetId = null) {
     ? db.prepare('SELECT * FROM candidates WHERE project_id = ? AND target_id = ? ORDER BY created_at ASC').all(projectId, targetId)
     : db.prepare('SELECT * FROM candidates WHERE project_id = ? ORDER BY created_at ASC').all(projectId);
   return rows.map(toCandidate);
+}
+
+/* ---------------- Zadania obliczeniowe (Compute Jobs, P5) ---------------- */
+
+function toJob(row) {
+  if (!row) return null;
+  return {
+    id: row.id, projectId: row.project_id ?? null, type: row.type, status: row.status,
+    progress: row.progress, params: JSON.parse(row.params_json),
+    result: row.result_json ? JSON.parse(row.result_json) : null,
+    runIds: JSON.parse(row.run_ids_json), error: row.error ?? null,
+    createdBy: row.created_by ?? null, createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+export function createJob(db, { projectId = null, type, params = {}, createdBy = null }) {
+  const id = newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO jobs (id, project_id, type, status, progress, params_json, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, 'queued', 0, ?, ?, ?, ?)`,
+  ).run(id, projectId, type, JSON.stringify(params), createdBy, now, now);
+  return getJob(db, id);
+}
+export function getJob(db, id) {
+  return toJob(db.prepare('SELECT * FROM jobs WHERE id = ?').get(id));
+}
+export function listJobs(db, projectId, limit = 50) {
+  return db.prepare('SELECT * FROM jobs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?').all(projectId, limit).map(toJob);
+}
+export function updateJob(db, id, patch = {}) {
+  const cur = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id);
+  if (!cur) return null;
+  const status = patch.status ?? cur.status;
+  const progress = patch.progress ?? cur.progress;
+  const result = patch.result !== undefined ? JSON.stringify(patch.result) : cur.result_json;
+  const runIds = patch.runIds !== undefined ? JSON.stringify(patch.runIds) : cur.run_ids_json;
+  const error = patch.error !== undefined ? patch.error : cur.error;
+  db.prepare('UPDATE jobs SET status = ?, progress = ?, result_json = ?, run_ids_json = ?, error = ?, updated_at = ? WHERE id = ?')
+    .run(status, progress, result, runIds, error, Date.now(), id);
+  return getJob(db, id);
 }

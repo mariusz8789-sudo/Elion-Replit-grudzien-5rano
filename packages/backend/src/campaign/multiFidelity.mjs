@@ -11,7 +11,6 @@
  * artifacts, hashes and provenance. Cross-engine disagreement (favorable
  * descriptors vs poor docking) becomes a MODEL_CONFLICT — never silently averaged.
  */
-import { createHash } from 'node:crypto';
 import * as store from './persistence.mjs';
 import { saveScienceRun } from '../store.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
@@ -19,9 +18,15 @@ import * as qm from '../compute/qmAdapter.mjs';
 import * as admet from '../compute/admetAdapter.mjs';
 import { embed3d } from '../compute/rdkitAdapter.mjs';
 import { capabilityAvailable } from './toolchain.mjs';
+import { sha256Hex16 as sha16, snapshotEnvironment } from '../provenance.mjs';
 
-const sha16 = (obj) => createHash('sha256').update(JSON.stringify(obj)).digest('hex').slice(0, 16);
 const scalar = (vec) => Object.values(vec).reduce((a, b) => a + (b ?? 0), 0);
+
+/** Environment fingerprint for the run being saved (Priority B). Null, honestly, if the probe fails. */
+function envHash() {
+  const s = snapshotEnvironment();
+  return s.ok ? s.hash : null;
+}
 
 export const STAGE_REASON = {
   SELECTED_FOR_DOCKING: 'SELECTED_FOR_DOCKING',
@@ -71,7 +76,7 @@ export function selectForStage(candidates, { budget = 3, mode = 'pareto', explic
 export function dockCandidate(db, ctx, cand, receptor) {
   if (!capabilityAvailable('molecular-docking')) return { ok: false, error: 'BLOCKED_BY_RUNTIME', capability: 'molecular-docking' };
   const t0 = Date.now();
-  const r = docking.dock({
+  const dockSpec = {
     ligandSmiles: cand.canonicalSmiles,
     receptorSmiles: receptor?.receptorSmiles,
     receptorPdbqt: receptor?.receptorPdbqt,
@@ -80,19 +85,22 @@ export function dockCandidate(db, ctx, cand, receptor) {
     exhaustiveness: receptor?.exhaustiveness ?? 8,
     nPoses: receptor?.nPoses ?? 5,
     seed: receptor?.seed ?? 42,
-  });
+  };
+  const r = docking.dock(dockSpec);
   if (!r.ok) return { ok: false, error: r.error, reason: r.reason };
   const run = saveScienceRun(db, {
     projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: cand.id,
     engine: 'AutoDock Vina', engineVersion: r.data.vinaVersion, capability: 'molecular-docking',
     method: `vina exhaustiveness=${r.data.exhaustiveness}`, status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
-    inputs: { ligandSmiles: cand.canonicalSmiles, receptorKind: r.data.receptorKind, center: r.data.center, boxSize: r.data.boxSize, seed: r.data.seed },
+    // Full dock spec (receptor included) is stored so this run can be REPLAYED exactly — a category
+    // label alone (receptorKind) is not enough to reproduce a dock issued against a custom receptor.
+    inputs: { ...dockSpec, receptorKind: r.data.receptorKind },
     outputs: { bestAffinityKcalMol: r.data.bestAffinityKcalMol, nPoses: r.data.nPoses, poses: r.data.poses },
     units: { bestAffinityKcalMol: 'kcal/mol' },
     warnings: r.data.receptorKind === 'small_molecule_standin' ? ['receptor is a small-molecule rigid stand-in (software-validation), not a protein target'] : [],
     provenance: { engine: `AutoDock Vina ${r.data.vinaVersion} + Meeko ${r.data.meekoVersion}`, receptorKind: r.data.receptorKind },
     inputHash: r.data.inputHash, outputHash: sha16(r.data.poses),
-    artifacts: r.data.artifacts, durationMs: Date.now() - t0,
+    artifacts: r.data.artifacts, durationMs: Date.now() - t0, environmentHash: envHash(),
   });
   return { ok: true, run, bestAffinityKcalMol: r.data.bestAffinityKcalMol };
 }
@@ -113,17 +121,36 @@ export function qmCandidate(db, ctx, cand, { method = 'RHF', basis = 'sto-3g' } 
     outputs: r.data, units: { energyHartree: 'Hartree', homoLumoGapEv: 'eV', dipoleDebye: 'Debye' },
     provenance: { engine: r.meta.engine, geometry: `RDKit 3D embed (${emb.forceField})` },
     inputHash: sha16({ s: cand.canonicalSmiles, method, basis }), outputHash: sha16(r.data),
-    artifacts: [], durationMs: Date.now() - t0,
+    artifacts: [], durationMs: Date.now() - t0, environmentHash: envHash(),
   });
   return { ok: true, run, data: r.data };
 }
 
 let endpointCategoryCache = null;
-function endpointCategories() {
+export function endpointCategories() {
   if (endpointCategoryCache) return endpointCategoryCache;
   const r = admet.listEndpoints();
   endpointCategoryCache = r.ok ? Object.fromEntries(r.endpoints.map((e) => [e.id, e])) : {};
   return endpointCategoryCache;
+}
+
+/**
+ * Splits a raw ADMET-AI prediction map into the two persisted-capability
+ * shapes (admet-estimation vs toxicity-risk-estimation). Exported so
+ * campaign/verify.mjs can reconstruct the EXACT same split when replaying a
+ * stored run — duplicating this filtering logic would risk divergence and a
+ * false DRIFT verdict that is actually just a bug in the replay code.
+ */
+export function splitAdmetPrediction(full, categories = endpointCategories()) {
+  const admetOut = {}; const toxOut = {}; const admetUnits = {}; const toxUnits = {};
+  for (const [key, value] of Object.entries(full)) {
+    if (key.endsWith('_drugbank_approved_percentile')) continue;
+    const meta = categories[key];
+    if (!meta) continue;
+    if (meta.category === 'Toxicity') { toxOut[key] = value; toxUnits[key] = meta.units; }
+    else { admetOut[key] = value; admetUnits[key] = meta.units; }
+  }
+  return { admetOut, toxOut, admetUnits, toxUnits };
 }
 
 /**
@@ -155,16 +182,10 @@ export function admetToxicityStage(db, ctx, candidates, { thresholds = null } = 
   const results = [];
   const passed = [];
   const rejected = [];
+  const environmentHash = envHash();
   for (const cand of candidates) {
     const full = r.predictions[cand.canonicalSmiles] ?? {};
-    const admetOut = {}; const toxOut = {}; const admetUnits = {}; const toxUnits = {};
-    for (const [key, value] of Object.entries(full)) {
-      if (key.endsWith('_drugbank_approved_percentile')) continue; // percentile context, not a raw prediction
-      const meta = categories[key];
-      if (!meta) continue;
-      if (meta.category === 'Toxicity') { toxOut[key] = value; toxUnits[key] = meta.units; }
-      else { admetOut[key] = value; admetUnits[key] = meta.units; }
-    }
+    const { admetOut, toxOut, admetUnits, toxUnits } = splitAdmetPrediction(full, categories);
     const runAdmet = saveScienceRun(db, {
       projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: cand.id,
       engine: 'ADMET-AI', engineVersion: r.version, capability: 'admet-estimation',
@@ -172,6 +193,7 @@ export function admetToxicityStage(db, ctx, candidates, { thresholds = null } = 
       inputs: { smiles: cand.canonicalSmiles }, outputs: admetOut, units: admetUnits,
       provenance: { engine: `ADMET-AI ${r.version}`, source: 'Swanson et al. 2024, Bioinformatics; TDC ADMET Benchmark Group' },
       inputHash: sha16({ s: cand.canonicalSmiles, kind: 'admet' }), outputHash: sha16(admetOut), artifacts: [],
+      environmentHash,
     });
     const runTox = saveScienceRun(db, {
       projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: cand.id,
@@ -180,6 +202,7 @@ export function admetToxicityStage(db, ctx, candidates, { thresholds = null } = 
       inputs: { smiles: cand.canonicalSmiles }, outputs: toxOut, units: toxUnits,
       provenance: { engine: `ADMET-AI ${r.version}`, source: 'Swanson et al. 2024, Bioinformatics; TDC + Tox21' },
       inputHash: sha16({ s: cand.canonicalSmiles, kind: 'toxicity' }), outputHash: sha16(toxOut), artifacts: [],
+      environmentHash,
     });
     store.addEvent(db, { campaignId: ctx.campaignId, generation: cand.generation, type: 'STAGE_RESULT', payload: { stage: 'admet', candidateId: cand.id, reason: STAGE_REASON.ADMET_COMPUTED, admetRunId: runAdmet.id, toxicityRunId: runTox.id } });
 

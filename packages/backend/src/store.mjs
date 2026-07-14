@@ -319,9 +319,34 @@ CREATE INDEX IF NOT EXISTS idx_science_runs_campaign ON science_runs(campaign_id
 CREATE INDEX IF NOT EXISTS idx_science_runs_candidate ON science_runs(candidate_id);
 `;
 
+// Scientific Reproducibility (Priority B): an environment fingerprint per run, plus an append-only
+// audit trail of replay-verification attempts (a run may be re-verified after an engine upgrade —
+// history is kept, never overwritten).
+const SCHEMA_V8 = `
+CREATE TABLE IF NOT EXISTS science_run_verifications (
+  id                       TEXT PRIMARY KEY,
+  science_run_id           TEXT NOT NULL REFERENCES science_runs(id) ON DELETE CASCADE,
+  verdict                  TEXT NOT NULL,
+  original_output_hash     TEXT,
+  replay_output_hash       TEXT,
+  original_engine_version  TEXT,
+  replay_engine_version    TEXT,
+  detail_json              TEXT NOT NULL DEFAULT '{}',
+  created_at               INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_science_run_verifications_run ON science_run_verifications(science_run_id);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
   if (version < 7) db.exec(SCHEMA_V7);
+  if (version < 8) {
+    db.exec(SCHEMA_V8);
+    const cols = db.prepare('PRAGMA table_info(science_runs)').all();
+    if (!cols.some((c) => c.name === 'environment_hash')) {
+      db.exec('ALTER TABLE science_runs ADD COLUMN environment_hash TEXT');
+    }
+  }
   if (version < 6) db.exec(SCHEMA_V6);
   if (version < 5) db.exec(SCHEMA_V5);
   if (version < 4) db.exec(SCHEMA_V4);
@@ -347,7 +372,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 7) db.exec('PRAGMA user_version = 7');
+  if (version < 8) db.exec('PRAGMA user_version = 8');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -978,12 +1003,17 @@ export function latestEnvAudit(db) {
 /**
  * Persists a heavy-engine Scientific Run (docking/MD/QM/...). Raw artifacts,
  * hashes and provenance are stored; results are MODEL_ESTIMATE unless stated.
+ * `environmentHash` (Priority B, Scientific Reproducibility) is captured
+ * automatically by the caller (see campaign/multiFidelity.mjs) via
+ * provenance.mjs#snapshotEnvironment — a fingerprint of the exact engine
+ * versions/runtime that produced this run, so a later replay can tell
+ * whether the environment changed.
  */
 export function saveScienceRun(db, run) {
   const id = run.id ?? newId();
   db.prepare(
-    `INSERT INTO science_runs (id, project_id, campaign_id, candidate_id, engine, engine_version, capability, method, status, evidence_class, inputs_json, outputs_json, units_json, warnings_json, provenance_json, input_hash, output_hash, artifacts_json, duration_ms, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO science_runs (id, project_id, campaign_id, candidate_id, engine, engine_version, capability, method, status, evidence_class, inputs_json, outputs_json, units_json, warnings_json, provenance_json, input_hash, output_hash, artifacts_json, duration_ms, created_at, environment_hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, run.projectId ?? null, run.campaignId ?? null, run.candidateId ?? null,
     run.engine, run.engineVersion ?? null, run.capability, run.method ?? null,
@@ -991,7 +1021,7 @@ export function saveScienceRun(db, run) {
     JSON.stringify(run.inputs ?? {}), JSON.stringify(run.outputs ?? {}), JSON.stringify(run.units ?? {}),
     JSON.stringify(run.warnings ?? []), JSON.stringify(run.provenance ?? {}),
     run.inputHash ?? null, run.outputHash ?? null, JSON.stringify(run.artifacts ?? []),
-    run.durationMs ?? 0, Date.now(),
+    run.durationMs ?? 0, Date.now(), run.environmentHash ?? null,
   );
   return getScienceRun(db, id);
 }
@@ -1004,7 +1034,7 @@ function toScienceRun(r) {
     status: r.status, evidenceClass: r.evidence_class, inputs: JSON.parse(r.inputs_json), outputs: JSON.parse(r.outputs_json),
     units: JSON.parse(r.units_json), warnings: JSON.parse(r.warnings_json), provenance: JSON.parse(r.provenance_json),
     inputHash: r.input_hash ?? null, outputHash: r.output_hash ?? null, artifacts: JSON.parse(r.artifacts_json),
-    durationMs: r.duration_ms, createdAt: r.created_at,
+    durationMs: r.duration_ms, createdAt: r.created_at, environmentHash: r.environment_hash ?? null,
   };
 }
 
@@ -1014,6 +1044,44 @@ export function getScienceRun(db, id) {
 
 export function listScienceRuns(db, campaignId) {
   return db.prepare('SELECT * FROM science_runs WHERE campaign_id = ? ORDER BY created_at ASC').all(campaignId).map(toScienceRun);
+}
+
+/**
+ * Append-only audit trail of replay-verification attempts (Priority B). A
+ * Scientific Run may be re-verified more than once (e.g. after an engine
+ * upgrade) — history is preserved, never overwritten, so credibility claims
+ * can point at a full record rather than a single mutable status flag.
+ */
+export function saveScienceRunVerification(db, v) {
+  const id = v.id ?? newId();
+  db.prepare(
+    `INSERT INTO science_run_verifications (id, science_run_id, verdict, original_output_hash, replay_output_hash, original_engine_version, replay_engine_version, detail_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, v.scienceRunId, v.verdict,
+    v.originalOutputHash ?? null, v.replayOutputHash ?? null,
+    v.originalEngineVersion ?? null, v.replayEngineVersion ?? null,
+    JSON.stringify(v.detail ?? {}), Date.now(),
+  );
+  return getScienceRunVerification(db, id);
+}
+
+function toScienceRunVerification(r) {
+  if (!r) return null;
+  return {
+    id: r.id, scienceRunId: r.science_run_id, verdict: r.verdict,
+    originalOutputHash: r.original_output_hash ?? null, replayOutputHash: r.replay_output_hash ?? null,
+    originalEngineVersion: r.original_engine_version ?? null, replayEngineVersion: r.replay_engine_version ?? null,
+    detail: JSON.parse(r.detail_json), createdAt: r.created_at,
+  };
+}
+
+export function getScienceRunVerification(db, id) {
+  return toScienceRunVerification(db.prepare('SELECT * FROM science_run_verifications WHERE id = ?').get(id));
+}
+
+export function listScienceRunVerifications(db, scienceRunId) {
+  return db.prepare('SELECT * FROM science_run_verifications WHERE science_run_id = ? ORDER BY created_at ASC').all(scienceRunId).map(toScienceRunVerification);
 }
 
 export function listScienceRunsForCandidate(db, candidateId) {

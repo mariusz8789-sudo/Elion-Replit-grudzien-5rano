@@ -184,3 +184,66 @@ describe('ADMET/toxicity multi-fidelity stage over the API', () => {
     assert.equal(call('POST', `/api/projects/${project.id}/campaigns/${c.id}/stage`, { token: viewer.token, body: { admet: { enabled: true } } }).status, 403);
   });
 });
+
+describe('Scientific Run replay verification over the API (Priority B)', () => {
+  test('editor+ can verify a real run; a fresh replay is compared and appended to history; viewer cannot verify but can read', async (t) => {
+    if (!RDKIT || !ADMET) return t.skip('RDKit/ADMET-AI niedostępne — BLOCKED_BY_RUNTIME (uczciwy stan).');
+    const owner = register('owner6@lab.org');
+    const viewer = register('viewer6@lab.org');
+    const project = makeProject(owner.token);
+    call('POST', `/api/projects/${project.id}/members`, { token: owner.token, body: { email: 'viewer6@lab.org', role: 'viewer' } });
+    const c = call('POST', `/api/projects/${project.id}/campaigns`, {
+      token: owner.token,
+      body: { objective: 'verify (software validation)', startingSmiles: ['c1ccccc1'], budget: { maxGenerations: 1, maxGeneratedCandidates: 4 } },
+    }).body.campaign;
+    const started = call('POST', `/api/projects/${project.id}/campaigns/${c.id}/start`, { token: owner.token });
+    await runJob(db, started.body.jobId);
+    const stageReq = call('POST', `/api/projects/${project.id}/campaigns/${c.id}/stage`, { token: owner.token, body: { admet: { enabled: true } } });
+    await runJob(db, stageReq.body.jobId);
+
+    const runs = call('GET', `/api/projects/${project.id}/campaigns/${c.id}/science-runs`, { token: owner.token }).body.scienceRuns;
+    const run = runs.find((r) => r.capability === 'admet-estimation');
+    assert.ok(run, 'expected a persisted admet-estimation run');
+
+    // Single-run GET (viewer+).
+    const single = call('GET', `/api/projects/${project.id}/campaigns/${c.id}/science-runs/${run.id}`, { token: viewer.token });
+    assert.equal(single.status, 200);
+    assert.equal(single.body.scienceRun.id, run.id);
+
+    // Viewer cannot trigger a verify (costs real compute).
+    assert.equal(call('POST', `/api/projects/${project.id}/campaigns/${c.id}/science-runs/${run.id}/verify`, { token: viewer.token }).status, 403);
+
+    // Owner (editor+) verifies; a real replay runs and is classified honestly.
+    const verified = call('POST', `/api/projects/${project.id}/campaigns/${c.id}/science-runs/${run.id}/verify`, { token: owner.token });
+    assert.equal(verified.status, 201);
+    assert.ok(['MATCH', 'DRIFT', 'ENGINE_VERSION_CHANGED', 'BLOCKED_BY_RUNTIME', 'REPLAY_UNSUPPORTED'].includes(verified.body.verification.verdict));
+    assert.equal(verified.body.verification.scienceRunId, run.id);
+
+    // History (viewer+) shows the append-only audit trail.
+    const history = call('GET', `/api/projects/${project.id}/campaigns/${c.id}/science-runs/${run.id}/verifications`, { token: viewer.token });
+    assert.equal(history.status, 200);
+    assert.equal(history.body.verifications.length, 1);
+    assert.equal(history.body.verifications[0].id, verified.body.verification.id);
+  });
+
+  test('a science-run id from a DIFFERENT campaign is a 404, not cross-campaign leakage', async (t) => {
+    if (!RDKIT || !ADMET) return t.skip('RDKit/ADMET-AI niedostępne — BLOCKED_BY_RUNTIME (uczciwy stan).');
+    const owner = register('owner7@lab.org');
+    const project = makeProject(owner.token);
+    const c1 = call('POST', `/api/projects/${project.id}/campaigns`, { token: owner.token, body: { objective: 'a', startingSmiles: ['c1ccccc1'], budget: { maxGenerations: 1, maxGeneratedCandidates: 4 } } }).body.campaign;
+    const c2 = call('POST', `/api/projects/${project.id}/campaigns`, { token: owner.token, body: { objective: 'b', startingSmiles: ['c1ccccc1'], budget: { maxGenerations: 1, maxGeneratedCandidates: 4 } } }).body.campaign;
+    await runJob(db, call('POST', `/api/projects/${project.id}/campaigns/${c1.id}/start`, { token: owner.token }).body.jobId);
+    await runJob(db, call('POST', `/api/projects/${project.id}/campaigns/${c1.id}/stage`, { token: owner.token, body: { admet: { enabled: true } } }).body.jobId);
+    const run = call('GET', `/api/projects/${project.id}/campaigns/${c1.id}/science-runs`, { token: owner.token }).body.scienceRuns[0];
+
+    assert.equal(call('GET', `/api/projects/${project.id}/campaigns/${c2.id}/science-runs/${run.id}`, { token: owner.token }).status, 404);
+    assert.equal(call('POST', `/api/projects/${project.id}/campaigns/${c2.id}/science-runs/${run.id}/verify`, { token: owner.token }).status, 404);
+  });
+
+  test('unknown science-run id is a 404, never fabricated', () => {
+    const owner = register('owner8@lab.org');
+    const project = makeProject(owner.token);
+    const c = call('POST', `/api/projects/${project.id}/campaigns`, { token: owner.token, body: { objective: 'x', startingSmiles: ['c1ccccc1'] } }).body.campaign;
+    assert.equal(call('GET', `/api/projects/${project.id}/campaigns/${c.id}/science-runs/does-not-exist`, { token: owner.token }).status, 404);
+  });
+});

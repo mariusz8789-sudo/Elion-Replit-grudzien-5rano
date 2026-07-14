@@ -71,7 +71,8 @@ import { listEndpoints } from './compute/admetAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
-import { saveEnvAudit, latestEnvAudit, listScienceRuns } from './store.mjs';
+import { saveEnvAudit, latestEnvAudit, listScienceRuns, getScienceRun } from './store.mjs';
+import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -331,6 +332,23 @@ export function handleApi(db, ctx) {
         if (seg[4] === 'conflicts') {
           const conflicts = campaignStore.listEvents(db, campaignId).filter((e) => e.type === 'MODEL_CONFLICT').map((e) => e.payload);
           return ok({ conflicts });
+        }
+        return err(404, 'not_found');
+      }
+      // /api/projects/:id/campaigns/:cid/science-runs/:runId[/verify|/verifications]
+      if (seg.length >= 6 && seg[4] === 'science-runs') {
+        const run = getScienceRun(db, seg[5]);
+        if (!run || run.campaignId !== campaignId) return err(404, 'not_found');
+        if (seg.length === 6 && method === 'GET') return ok({ scienceRun: run });
+        if (seg.length === 7 && seg[6] === 'verify' && method === 'POST') {
+          // Editor+: replays the real engine (costs real compute — e.g. an ADMET-AI model reload).
+          if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          const v = verifyScienceRun(db, run.id);
+          if (!v.ok) return err(404, 'not_found', v.error);
+          return ok({ verification: v.verification }, 201);
+        }
+        if (seg.length === 7 && seg[6] === 'verifications' && method === 'GET') {
+          return ok({ verifications: getVerificationHistory(db, run.id) });
         }
         return err(404, 'not_found');
       }

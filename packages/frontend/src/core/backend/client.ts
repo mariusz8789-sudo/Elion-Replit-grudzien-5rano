@@ -516,6 +516,16 @@ export interface ScienceRun {
   units: Record<string, string>; warnings: string[]; provenance: Record<string, unknown>;
   inputHash: string | null; outputHash: string | null;
   artifacts: { kind: string; path: string; sha256_16?: string }[]; durationMs: number; createdAt: number;
+  environmentHash: string | null;
+}
+
+/** Priority B (Scientific Reproducibility): a replay-verification attempt for one Scientific Run. */
+export interface ScienceRunVerification {
+  id: string; scienceRunId: string;
+  verdict: 'MATCH' | 'DRIFT' | 'ENGINE_VERSION_CHANGED' | 'BLOCKED_BY_RUNTIME' | 'REPLAY_UNSUPPORTED';
+  originalOutputHash: string | null; replayOutputHash: string | null;
+  originalEngineVersion: string | null; replayEngineVersion: string | null;
+  detail: Record<string, unknown>; createdAt: number;
 }
 
 export interface ModelConflict {
@@ -542,6 +552,26 @@ export async function listCampaignScienceRuns(token: string, projectId: string, 
 export async function listCampaignConflicts(token: string, projectId: string, campaignId: string): Promise<ApiResult<ModelConflict[]>> {
   const r = await request<{ conflicts: ModelConflict[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/conflicts`, { token });
   return r.ok ? { ok: true, data: r.data.conflicts } : r;
+}
+
+/**
+ * Priority B (Scientific Reproducibility): re-executes the real engine for a
+ * Scientific Run and compares against the stored result. Editor+ (costs real
+ * compute — e.g. reloading the ADMET-AI model). Appends to an audit history,
+ * never overwrites a prior verification.
+ */
+export async function verifyScienceRun(
+  token: string, projectId: string, campaignId: string, runId: string,
+): Promise<ApiResult<ScienceRunVerification>> {
+  const r = await request<{ verification: ScienceRunVerification }>('POST', `/projects/${projectId}/campaigns/${campaignId}/science-runs/${runId}/verify`, { token });
+  return r.ok ? { ok: true, data: r.data.verification } : r;
+}
+
+export async function listScienceRunVerifications(
+  token: string, projectId: string, campaignId: string, runId: string,
+): Promise<ApiResult<ScienceRunVerification[]>> {
+  const r = await request<{ verifications: ScienceRunVerification[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/science-runs/${runId}/verifications`, { token });
+  return r.ok ? { ok: true, data: r.data.verifications } : r;
 }
 
 export async function runCampaignStage(

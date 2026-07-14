@@ -3,9 +3,9 @@ import { useSession, getToken } from '../core/backend/session';
 import {
   listProjects, listToolchain, listCampaigns, createCampaign, getCampaign, startCampaign, cancelCampaign,
   listCampaignCandidates, listCampaignDecisions, getDiscoveryGraph, askCampaignWhy,
-  listCampaignScienceRuns, listCampaignConflicts, runCampaignStage, getAdmetEndpoints,
+  listCampaignScienceRuns, listCampaignConflicts, runCampaignStage, getAdmetEndpoints, verifyScienceRun,
   type Project, type ToolchainEntry, type Campaign, type CampaignCandidate, type CampaignDecision,
-  type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict,
+  type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict, type ScienceRunVerification,
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
 
@@ -55,6 +55,7 @@ function CampaignWorkspace() {
   const [decisions, setDecisions] = useState<CampaignDecision[]>([]);
   const [graph, setGraph] = useState<DiscoveryGraph | null>(null);
   const [scienceRuns, setScienceRuns] = useState<ScienceRun[]>([]);
+  const [verifications, setVerifications] = useState<Record<string, ScienceRunVerification | 'loading' | 'error'>>({});
   const [conflicts, setConflicts] = useState<ModelConflict[]>([]);
   const [admetEndpointCount, setAdmetEndpointCount] = useState<number | null>(null);
   const [why, setWhy] = useState<{ label: string; a: WhyAnswer } | null>(null);
@@ -168,6 +169,14 @@ function CampaignWorkspace() {
     if (!r.ok) { setError(r.message); return; }
     startPolling(c.id); // etapy ciężkie trwają; odświeżaj utrwalony stan
     window.setTimeout(() => { void loadDetail(c.id); }, 3000);
+  }
+
+  async function onVerifyRun(runId: string) {
+    const token = getToken();
+    if (!token || !projectId || !selected) return;
+    setVerifications((prev) => ({ ...prev, [runId]: 'loading' }));
+    const r = await verifyScienceRun(token, projectId, selected.id, runId);
+    setVerifications((prev) => ({ ...prev, [runId]: r.ok ? r.data : 'error' }));
   }
 
   async function onWhy(kind: string, label: string, candidate?: string, generation?: number) {
@@ -379,6 +388,12 @@ function CampaignWorkspace() {
                     </div>
                     {r.artifacts.length > 0 && <div className="muted small">artefakty: {r.artifacts.map((a) => `${a.kind}(${a.sha256_16 ?? ''})`).join(', ')}</div>}
                     {r.warnings.length > 0 && <div className="warn-banner small">{r.warnings.join('; ')}</div>}
+                    <div className="muted small">
+                      <button className="chip-btn" disabled={verifications[r.id] === 'loading'} onClick={() => void onVerifyRun(r.id)}>
+                        {verifications[r.id] === 'loading' ? 'Weryfikacja…' : 'Zweryfikuj (powtórz obliczenie)'}
+                      </button>
+                      {' '}<VerdictBadge v={verifications[r.id]} />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -438,4 +453,24 @@ function fmtNum(v: unknown): string {
 /** Prawdopodobieństwo klasyfikacyjne [0,1] z zespołu ADMET-AI (MODEL_ESTIMATE) — nigdy SAFE/NON-TOXIC. */
 function fmtProb(v: unknown): string {
   return typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : '—';
+}
+
+const VERDICT_LABEL: Record<ScienceRunVerification['verdict'], string> = {
+  MATCH: 'ZGODNE — powtórne obliczenie potwierdza wynik',
+  DRIFT: 'DRYF — realna rozbieżność liczbowa (patrz szczegóły)',
+  ENGINE_VERSION_CHANGED: 'ZMIANA WERSJI SILNIKA — porównanie niejednoznaczne',
+  BLOCKED_BY_RUNTIME: 'SILNIK NIEDOSTĘPNY — nie da się powtórzyć teraz',
+  REPLAY_UNSUPPORTED: 'BRAK ŚCIEŻKI WERYFIKACJI dla tej zdolności',
+};
+
+/** Priority B: wynik replay-weryfikacji jednego Scientific Run — nigdy binarne pass/fail. */
+function VerdictBadge({ v }: { v: ScienceRunVerification | 'loading' | 'error' | undefined }) {
+  if (v == null || v === 'loading') return null;
+  if (v === 'error') return <span className="pill pill-warn">błąd weryfikacji</span>;
+  const good = v.verdict === 'MATCH';
+  return (
+    <span className={good ? 'pill pill-ok' : 'pill pill-warn'} title={JSON.stringify(v.detail)}>
+      {VERDICT_LABEL[v.verdict]}
+    </span>
+  );
 }

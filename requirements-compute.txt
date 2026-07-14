@@ -7,3 +7,18 @@
 # structure-validation, and the chem-rdkit-descriptors compute model.
 #   pip install -r requirements-compute.txt
 rdkit>=2023.9
+
+# ---- Heavy scientific engines (Validated External Compute Integration) ----
+# Each ACTIVATES a capability only after a real reference case passes in the
+# Toolchain Registry (see docs/HEAVY_ENGINES.md). CPU-only; no GPU required.
+#
+# PySCF — quantum chemistry (single-point energy, HOMO/LUMO, dipole). Apache-2.0.
+pyscf>=2.9
+# OpenMM — molecular dynamics (AMBER/TIP3P, minimization, NVT/NPT). MIT/LGPL.
+openmm>=8.1
+# AutoDock Vina + Meeko — molecular docking (ligand prep + empirical scoring).
+vina>=1.2.5
+meeko>=0.6
+gemmi>=0.6
+# Biopython — protein structure (PDB) ingestion and validation. BSD.
+biopython>=1.81

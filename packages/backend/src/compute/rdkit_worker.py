@@ -103,6 +103,34 @@ def main():
         }))
         return
 
+    if cmd == "embed3d":
+        # Realna geometria 3D: dodaj wodory, osadź (ETKDG, seed deterministyczny),
+        # zoptymalizuj polem MMFF/UFF. Zwraca atomy w Angstremach — wejście dla QM.
+        seed = int(req.get("seed", 42))
+        mh = Chem.AddHs(mol)
+        params = AllChem.ETKDGv3()
+        params.randomSeed = seed
+        if AllChem.EmbedMolecule(mh, params) != 0:
+            print(json.dumps({"ok": False, "error": "embed_failed"}))
+            return
+        ff = "MMFF"
+        if AllChem.MMFFHasAllMoleculeParams(mh):
+            AllChem.MMFFOptimizeMolecule(mh, maxIters=500)
+        else:
+            AllChem.UFFOptimizeMolecule(mh, maxIters=500)
+            ff = "UFF"
+        conf = mh.GetConformer()
+        atoms = []
+        for i, at in enumerate(mh.GetAtoms()):
+            p = conf.GetAtomPosition(i)
+            atoms.append({"element": at.GetSymbol(), "x": round(p.x, 5), "y": round(p.y, 5), "z": round(p.z, 5)})
+        print(json.dumps({
+            "ok": True, "atoms": atoms, "forceField": ff, "seed": seed,
+            "charge": Chem.GetFormalCharge(mol), "nAtoms": len(atoms),
+            "canonicalSmiles": Chem.MolToSmiles(mol),
+        }))
+        return
+
     if cmd == "descriptors":
         mw = Descriptors.MolWt(mol)
         logp = Crippen.MolLogP(mol)

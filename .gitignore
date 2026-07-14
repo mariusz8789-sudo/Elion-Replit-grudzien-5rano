@@ -6,3 +6,7 @@ dist/
 
 # Trwały magazyn backendu (SQLite) — dane runtime, nie do repo
 packages/backend/data/
+
+# heavy-engine scientific artifacts (runtime, not source)
+_dock*/
+*.pdbqt

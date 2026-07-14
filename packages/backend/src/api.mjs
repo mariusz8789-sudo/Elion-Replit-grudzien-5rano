@@ -69,6 +69,8 @@ import { buildDiscoveryGraph } from './campaign/discoveryGraph.mjs';
 import { listToolchain, getTool } from './campaign/toolchain.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
+import { probeEnvironment } from './compute/scienceEnv.mjs';
+import { saveEnvAudit, latestEnvAudit } from './store.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -126,6 +128,8 @@ export function handleApi(db, ctx) {
       const t = getTool(seg[2]);
       return t ? ok({ tool: t }) : err(404, 'not_found');
     }
+    // Runtime scientific-environment audit (Priority 1): realna sonda + persystencja.
+    if (seg[1] === 'environment' && seg.length === 2 && method === 'GET') return environmentHandler(db);
     return err(404, 'not_found');
   }
 
@@ -562,6 +566,19 @@ function whyHandler(db, campaignId, query) {
     case 'stop': return ok({ why: whyEngine.whyStop(db, campaignId) });
     default: return err(400, 'invalid_kind', 'kind ∈ {candidate,status,pareto,engine,strategy,next-experiment,stop}');
   }
+}
+
+/**
+ * GET /api/compute/environment — realna sonda runtime (Priority 1). Persystuje
+ * audyt, jeśli brak lub starszy niż 1h (append-only). Zwraca środowisko + engines.
+ */
+function environmentHandler(db) {
+  const probe = probeEnvironment();
+  if (!probe.ok) return err(503, 'probe_failed', probe.error);
+  const last = latestEnvAudit(db);
+  const stale = !last || Date.now() - last.createdAt > 3_600_000;
+  const audit = stale ? saveEnvAudit(db, { runtime: probe.runtime, engines: probe.engines }) : last;
+  return ok({ environment: { runtime: probe.runtime, engines: probe.engines }, auditId: audit.id, auditedAt: audit.createdAt });
 }
 
 /* ---------------- Handler backendowego silnika obliczeniowego ---------------- */

@@ -284,8 +284,44 @@ CREATE INDEX IF NOT EXISTS idx_dec_campaign ON campaign_decisions(campaign_id, g
 CREATE INDEX IF NOT EXISTS idx_evt_campaign ON campaign_events(campaign_id, created_at);
 `;
 
+// Heavy scientific engines (docking/MD/QM/...): persisted runtime env audits and
+// external-engine scientific runs (raw artifacts, hashes, provenance).
+const SCHEMA_V7 = `
+CREATE TABLE IF NOT EXISTS env_audits (
+  id           TEXT PRIMARY KEY,
+  runtime_json TEXT NOT NULL DEFAULT '{}',
+  engines_json TEXT NOT NULL DEFAULT '{}',
+  created_at   INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS science_runs (
+  id             TEXT PRIMARY KEY,
+  project_id     TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  campaign_id    TEXT,
+  candidate_id   TEXT,
+  engine         TEXT NOT NULL,
+  engine_version TEXT,
+  capability     TEXT NOT NULL,
+  method         TEXT,
+  status         TEXT NOT NULL,
+  evidence_class TEXT NOT NULL DEFAULT 'MODEL_ESTIMATE',
+  inputs_json    TEXT NOT NULL DEFAULT '{}',
+  outputs_json   TEXT NOT NULL DEFAULT '{}',
+  units_json     TEXT NOT NULL DEFAULT '{}',
+  warnings_json  TEXT NOT NULL DEFAULT '[]',
+  provenance_json TEXT NOT NULL DEFAULT '{}',
+  input_hash     TEXT,
+  output_hash    TEXT,
+  artifacts_json TEXT NOT NULL DEFAULT '[]',
+  duration_ms    INTEGER NOT NULL DEFAULT 0,
+  created_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_science_runs_campaign ON science_runs(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_science_runs_candidate ON science_runs(candidate_id);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 7) db.exec(SCHEMA_V7);
   if (version < 6) db.exec(SCHEMA_V6);
   if (version < 5) db.exec(SCHEMA_V5);
   if (version < 4) db.exec(SCHEMA_V4);
@@ -311,7 +347,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 6) db.exec('PRAGMA user_version = 6');
+  if (version < 7) db.exec('PRAGMA user_version = 7');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -916,4 +952,70 @@ export function updateJob(db, id, patch = {}) {
   db.prepare('UPDATE jobs SET status = ?, progress = ?, result_json = ?, run_ids_json = ?, error = ?, updated_at = ? WHERE id = ?')
     .run(status, progress, result, runIds, error, Date.now(), id);
   return getJob(db, id);
+}
+
+/* ---------------- Heavy scientific engines: env audits + external Scientific Runs ---------------- */
+
+/** Persists a runtime scientific-environment audit (append-only). */
+export function saveEnvAudit(db, { runtime, engines }) {
+  const id = newId();
+  db.prepare('INSERT INTO env_audits (id, runtime_json, engines_json, created_at) VALUES (?, ?, ?, ?)')
+    .run(id, JSON.stringify(runtime ?? {}), JSON.stringify(engines ?? {}), Date.now());
+  return getEnvAudit(db, id);
+}
+
+export function getEnvAudit(db, id) {
+  const r = db.prepare('SELECT * FROM env_audits WHERE id = ?').get(id);
+  return r ? { id: r.id, runtime: JSON.parse(r.runtime_json), engines: JSON.parse(r.engines_json), createdAt: r.created_at } : null;
+}
+
+/** Latest persisted environment audit (or null). */
+export function latestEnvAudit(db) {
+  const r = db.prepare('SELECT id FROM env_audits ORDER BY created_at DESC LIMIT 1').get();
+  return r ? getEnvAudit(db, r.id) : null;
+}
+
+/**
+ * Persists a heavy-engine Scientific Run (docking/MD/QM/...). Raw artifacts,
+ * hashes and provenance are stored; results are MODEL_ESTIMATE unless stated.
+ */
+export function saveScienceRun(db, run) {
+  const id = run.id ?? newId();
+  db.prepare(
+    `INSERT INTO science_runs (id, project_id, campaign_id, candidate_id, engine, engine_version, capability, method, status, evidence_class, inputs_json, outputs_json, units_json, warnings_json, provenance_json, input_hash, output_hash, artifacts_json, duration_ms, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, run.projectId ?? null, run.campaignId ?? null, run.candidateId ?? null,
+    run.engine, run.engineVersion ?? null, run.capability, run.method ?? null,
+    run.status, run.evidenceClass ?? 'MODEL_ESTIMATE',
+    JSON.stringify(run.inputs ?? {}), JSON.stringify(run.outputs ?? {}), JSON.stringify(run.units ?? {}),
+    JSON.stringify(run.warnings ?? []), JSON.stringify(run.provenance ?? {}),
+    run.inputHash ?? null, run.outputHash ?? null, JSON.stringify(run.artifacts ?? []),
+    run.durationMs ?? 0, Date.now(),
+  );
+  return getScienceRun(db, id);
+}
+
+function toScienceRun(r) {
+  if (!r) return null;
+  return {
+    id: r.id, projectId: r.project_id ?? null, campaignId: r.campaign_id ?? null, candidateId: r.candidate_id ?? null,
+    engine: r.engine, engineVersion: r.engine_version ?? null, capability: r.capability, method: r.method ?? null,
+    status: r.status, evidenceClass: r.evidence_class, inputs: JSON.parse(r.inputs_json), outputs: JSON.parse(r.outputs_json),
+    units: JSON.parse(r.units_json), warnings: JSON.parse(r.warnings_json), provenance: JSON.parse(r.provenance_json),
+    inputHash: r.input_hash ?? null, outputHash: r.output_hash ?? null, artifacts: JSON.parse(r.artifacts_json),
+    durationMs: r.duration_ms, createdAt: r.created_at,
+  };
+}
+
+export function getScienceRun(db, id) {
+  return toScienceRun(db.prepare('SELECT * FROM science_runs WHERE id = ?').get(id));
+}
+
+export function listScienceRuns(db, campaignId) {
+  return db.prepare('SELECT * FROM science_runs WHERE campaign_id = ? ORDER BY created_at ASC').all(campaignId).map(toScienceRun);
+}
+
+export function listScienceRunsForCandidate(db, candidateId) {
+  return db.prepare('SELECT * FROM science_runs WHERE candidate_id = ? ORDER BY created_at ASC').all(candidateId).map(toScienceRun);
 }

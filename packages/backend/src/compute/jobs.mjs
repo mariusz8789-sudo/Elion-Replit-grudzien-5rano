@@ -12,6 +12,7 @@
 
 import { getJob, updateJob, listCandidates, getTarget } from '../store.mjs';
 import { buildCandidatePassport, rankCandidates } from './drugDiscovery.mjs';
+import { runCampaign } from '../campaign/orchestrator.mjs';
 
 const cancelRequested = new Set();
 
@@ -47,6 +48,22 @@ export const JOB_HANDLERS = {
       await Promise.resolve(); // punkt ustąpienia — pozwala anulować między kandydatami
     }
     return { result: { count: passports.length, ranking: rankCandidates(passports) }, runIds };
+  },
+
+  /**
+   * Wykonanie Kampanii Naukowej (Scientific Acceleration Engine). Uruchamia
+   * REALNY orchestrator (RDKit) na utrwalonej kampanii; anulowanie sprawdzane
+   * między generacjami. Zero fałszywego postępu — postęp = generacja/budżet.
+   */
+  'campaign-run': async ({ db, job, progress, cancelled }) => {
+    const campaignId = job.params?.campaignId;
+    if (!campaignId) throw new Error('missing_campaignId');
+    const summary = runCampaign(db, campaignId, {
+      shouldCancel: () => cancelled(),
+      onProgress: (frac) => progress(frac),
+    });
+    if (summary.cancelled) return { cancelled: true, runIds: [] };
+    return { result: summary, runIds: [] };
   },
 };
 

@@ -61,7 +61,7 @@ function selectParents(retained, strategy, k) {
  * Wykonuje kampanię. Zwraca podsumowanie. Wszystkie kandydaci, decyzje i
  * zdarzenia są utrwalane (append-only). `log` opcjonalny: (state, info)=>void.
  */
-export function runCampaign(db, campaignId, { log = () => {} } = {}) {
+export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () => false, onProgress = () => {} } = {}) {
   let campaign = store.getCampaign(db, campaignId);
   if (!campaign) throw new Error('campaign_not_found');
   const { projectId } = campaign;
@@ -108,7 +108,14 @@ export function runCampaign(db, campaignId, { log = () => {} } = {}) {
   const decisions = [];
 
   while (true) {
+    // Anulowanie „gdzie bezpiecznie" — między generacjami (real, nie pozorne).
+    if (shouldCancel()) {
+      store.addEvent(db, { campaignId, generation, type: 'STOPPING_CONDITION_REACHED', payload: { stopReason: 'CANCELLED_BY_USER' } });
+      store.updateCampaign(db, campaignId, { status: 'cancelled', stopReason: 'CANCELLED_BY_USER', currentGeneration: generation });
+      return { campaignId, stopReason: 'CANCELLED_BY_USER', generations: generation, retainedCount: retained.length, totalGenerated, cancelled: true, decisions };
+    }
     generation += 1;
+    onProgress(budget.maxGenerations ? generation / budget.maxGenerations : 0);
     store.updateCampaign(db, campaignId, { currentGeneration: generation, status: 'running' });
     log('SELECTING_NEXT_EXPERIMENT', { generation });
 

@@ -15,6 +15,7 @@
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,mjs,css}\" \"*.md\" \"knowledge/*.md\"",
     "preview": "npm run preview --workspace=packages/frontend",
     "fetch-real-data": "node scripts/fetch-real-data.mjs",
+    "campaign:demo": "node scripts/campaign-demo.mjs",
     "smoke:desktop": "node scripts/smoke-e2e.mjs desktop",
     "smoke:mobile": "node scripts/smoke-e2e.mjs mobile",
     "compute:bundle": "esbuild packages/frontend/src/core/compute/serverEntry.ts --bundle --format=esm --platform=node --target=node22 --legal-comments=none --outfile=packages/backend/src/compute/core.bundle.mjs",

@@ -62,8 +62,13 @@ import { listModels, getModel, modelMetadata, runModel } from './compute/engine.
 import { listCapabilities } from './compute/capabilities.mjs';
 import { buildCandidatePassport, rankCandidates } from './compute/drugDiscovery.mjs';
 import { parseFormula, molecularWeight } from './compute/core.bundle.mjs';
-import { runJob, requestCancel } from './compute/jobs.mjs';
+import { runJob, requestCancel, enqueueJob } from './compute/jobs.mjs';
 import { createJob, getJob, listJobs, updateJob } from './store.mjs';
+import * as campaignStore from './campaign/persistence.mjs';
+import { buildDiscoveryGraph } from './campaign/discoveryGraph.mjs';
+import { listToolchain, getTool } from './campaign/toolchain.mjs';
+import * as whyEngine from './campaign/why.mjs';
+import { availableTransformations } from './campaign/drugAdapter.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -115,6 +120,12 @@ export function handleApi(db, ctx) {
       return m ? ok({ model: modelMetadata(m) }) : err(404, 'not_found');
     }
     if (seg[1] === 'run' && seg.length === 2 && method === 'POST') return runComputeHandler(db, ctx, body);
+    // Rejestr Toolchain (P6): status silników ustalony w runtime realną walidacją.
+    if (seg[1] === 'toolchain' && seg.length === 2 && method === 'GET') return ok({ toolchain: listToolchain() });
+    if (seg[1] === 'toolchain' && seg.length === 3 && method === 'GET') {
+      const t = getTool(seg[2]);
+      return t ? ok({ tool: t }) : err(404, 'not_found');
+    }
     return err(404, 'not_found');
   }
 
@@ -256,6 +267,51 @@ export function handleApi(db, ctx) {
         if (method === 'DELETE') return deleteTrialHandler(db, role, trialId);
         return err(405, 'method_not_allowed');
       }
+    }
+
+    // ---- Scientific Acceleration Engine: kampanie naukowe (P1-P3, P10-P13) ----
+    if (seg[2] === 'campaigns') {
+      // /api/projects/:id/campaigns
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ campaigns: campaignStore.listCampaigns(db, projectId) });
+        if (method === 'POST') return createCampaignHandler(db, user, role, projectId, body);
+        return err(405, 'method_not_allowed');
+      }
+      const campaign = campaignStore.getCampaign(db, seg[3]);
+      if (!campaign || campaign.projectId !== projectId) return err(404, 'not_found');
+      const campaignId = campaign.id;
+
+      // /api/projects/:id/campaigns/:cid — inspekcja (viewer+)
+      if (seg.length === 4 && method === 'GET') return ok({ campaign: inspectCampaign(db, campaignId) });
+
+      if (seg.length === 5) {
+        // /api/projects/:id/campaigns/:cid/start (editor+) — uruchamia realny orchestrator w tle
+        if (seg[4] === 'start' && method === 'POST') {
+          if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          if (!['created', 'cancelled'].includes(campaign.status)) return err(409, 'already_started', `Kampania jest w stanie ${campaign.status}.`);
+          const job = createJob(db, { projectId, type: 'campaign-run', params: { campaignId }, createdBy: user.id });
+          void enqueueJob(db, job.id);
+          return ok({ campaign: campaignStore.getCampaign(db, campaignId), jobId: job.id }, 202);
+        }
+        // /api/projects/:id/campaigns/:cid/cancel (editor+)
+        if (seg[4] === 'cancel' && method === 'POST') {
+          if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          campaignStore.updateCampaign(db, campaignId, { status: 'cancelled', stopReason: 'CANCELLED_BY_USER' });
+          return ok({ campaign: campaignStore.getCampaign(db, campaignId) });
+        }
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        // Odczyty (viewer+): kandydaci, decyzje, zdarzenia, graf, dlaczego
+        if (seg[4] === 'candidates') {
+          const gen = ctx.query?.generation != null ? Number(ctx.query.generation) : null;
+          return ok({ candidates: campaignStore.listCandidates(db, campaignId, Number.isFinite(gen) ? gen : null) });
+        }
+        if (seg[4] === 'decisions') return ok({ decisions: campaignStore.listDecisions(db, campaignId) });
+        if (seg[4] === 'events') return ok({ events: campaignStore.listEvents(db, campaignId) });
+        if (seg[4] === 'graph') return ok({ graph: buildDiscoveryGraph(db, campaignId) });
+        if (seg[4] === 'why') return whyHandler(db, campaignId, ctx.query ?? {});
+        return err(404, 'not_found');
+      }
+      return err(404, 'not_found');
     }
     return err(404, 'not_found');
   }
@@ -422,6 +478,90 @@ function deleteTrialHandler(db, role, trialId) {
   if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Usunięcie próby wymaga roli editor lub wyższej.');
   deleteTrial(db, trialId);
   return ok({ ok: true });
+}
+
+/* ---------------- Handlery Kampanii Naukowej (Scientific Acceleration Engine) ---------------- */
+
+const CAMPAIGN_MAX_GENERATIONS = 8; // twardy limit zasobów API (P14): brak nieskończonych pętli
+const CAMPAIGN_MAX_CANDIDATES = 400;
+
+/** POST /api/projects/:id/campaigns — tworzy (utrwala) kampanię. Editor+. */
+function createCampaignHandler(db, user, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Tworzenie kampanii wymaga roli editor lub wyższej.');
+  const objective = String(body.objective ?? '').trim();
+  if (!objective) return err(400, 'invalid_objective', 'Podaj cel kampanii.');
+  const domain = String(body.domain ?? 'DRUG_DISCOVERY');
+  if (domain !== 'DRUG_DISCOVERY') return err(400, 'unsupported_domain', 'Jedyny zweryfikowany adapter to DRUG_DISCOVERY; inne domeny to jawne luki zdolności.');
+  const starting = Array.isArray(body.startingSmiles) ? body.startingSmiles.filter((s) => typeof s === 'string' && s.length).slice(0, 32) : [];
+  if (starting.length === 0) return err(400, 'invalid_starting', 'Podaj co najmniej jedną molekułę startową (SMILES).');
+
+  // Twarde limity zasobów — kampania nie może zażądać nieograniczonych obliczeń.
+  const maxGenerations = clampInt(body.budget?.maxGenerations, 1, CAMPAIGN_MAX_GENERATIONS, 4);
+  const maxGeneratedCandidates = clampInt(body.budget?.maxGeneratedCandidates, 1, CAMPAIGN_MAX_CANDIDATES, 120);
+  const tx = availableTransformations();
+  const weights = tx.map((t) => [t, 1]);
+
+  const campaign = campaignStore.createCampaign(db, {
+    projectId, objective, domain,
+    budget: { maxGenerations, maxGeneratedCandidates },
+    stopping: { patience: 2, minImprovement: 1e-3, diversityFloor: 0.12 },
+    strategy: { startingSmiles: starting, transformationWeights: Object.fromEntries(weights), parentSelection: 'pareto' },
+    createdBy: user.id,
+  });
+  return ok({ campaign }, 201);
+}
+
+function clampInt(v, lo, hi, dflt) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return dflt;
+  return Math.max(lo, Math.min(hi, Math.floor(n)));
+}
+
+/** Inspekcja kampanii: stan + policzalne z utrwalonych danych metryki. */
+function inspectCampaign(db, campaignId) {
+  const campaign = campaignStore.getCampaign(db, campaignId);
+  const cands = campaignStore.listCandidates(db, campaignId);
+  const decisions = campaignStore.listDecisions(db, campaignId);
+  const events = campaignStore.listEvents(db, campaignId);
+  const retained = cands.filter((c) => c.status === 'retained');
+  const rejected = cands.filter((c) => c.status === 'rejected');
+  const duplicates = cands.filter((c) => c.rejectedReason === 'duplicate');
+  const pareto = retained.filter((c) => c.pareto);
+  const lastGenEvent = [...events].reverse().find((e) => e.type === 'GENERATION_COMPLETED');
+  const lastDecision = decisions[decisions.length - 1] ?? null;
+  return {
+    ...campaign,
+    stats: {
+      candidatesGenerated: cands.length,
+      valid: cands.filter((c) => c.valid).length,
+      invalid: cands.filter((c) => !c.valid).length,
+      duplicates: duplicates.length,
+      rejected: rejected.length,
+      retained: retained.length,
+      paretoFront: pareto.length,
+      decisions: decisions.length,
+      diversity: lastGenEvent?.payload?.diversity ?? null,
+      hypervolume: lastGenEvent?.payload?.hypervolume ?? null,
+    },
+    lastDecision: lastDecision ? { generation: lastDecision.generation, decision: lastDecision.decision, purpose: lastDecision.purpose } : null,
+  };
+}
+
+/** GET /api/projects/:id/campaigns/:cid/why?kind=..&candidate=..&generation=.. */
+function whyHandler(db, campaignId, query) {
+  const kind = String(query.kind ?? '');
+  const candidateId = typeof query.candidate === 'string' ? query.candidate : null;
+  const generation = query.generation != null ? Number(query.generation) : null;
+  switch (kind) {
+    case 'candidate': return ok({ why: whyEngine.whyCandidate(db, candidateId) });
+    case 'status': return ok({ why: whyEngine.whyStatus(db, candidateId) });
+    case 'pareto': return ok({ why: whyEngine.whyPareto(db, candidateId) });
+    case 'engine': return ok({ why: whyEngine.whichEngine(db, candidateId) });
+    case 'strategy': return ok({ why: whyEngine.whyStrategyChange(db, campaignId, generation) });
+    case 'next-experiment': return ok({ why: whyEngine.whyNextExperiment(db, campaignId, generation) });
+    case 'stop': return ok({ why: whyEngine.whyStop(db, campaignId) });
+    default: return err(400, 'invalid_kind', 'kind ∈ {candidate,status,pareto,engine,strategy,next-experiment,stop}');
+  }
 }
 
 /* ---------------- Handler backendowego silnika obliczeniowego ---------------- */

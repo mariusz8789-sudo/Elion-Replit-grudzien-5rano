@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { LabConsequenceSpec } from '../core/modelGraph/labConsequence';
 import { isCrossDomainNode, inputDomains } from '../core/modelGraph/labConsequence';
 import { Sonifier, normalizeToFrequency, DEFAULT_FREQ_MIN, DEFAULT_FREQ_MAX, type SonificationMapping } from '../core/sonification';
-import type { NodeDerivation, PropagationStep } from '../core/modelGraph/graph';
+import type { NodeDerivation, PropagationStep, ModelGraph } from '../core/modelGraph/graph';
+import type { ConsequenceOutputSpec } from '../core/modelGraph/labConsequence';
 import type { HonestyLevel } from '../core/types';
 import { HonestyBadge } from './HonestyBadge';
 import { NodeLens } from './NodeLens';
@@ -11,7 +12,27 @@ import {
   TRIAL_STATUS_LABEL, type Trial, type TrialStatus,
 } from '../core/trials';
 import { useSession, getToken } from '../core/backend/session';
-import { listProjects, listCloudTrials, createCloudTrial, type Project } from '../core/backend/client';
+import { listProjects, listCloudTrials, createCloudTrial, runCompute, type Project, type ComputeRun } from '../core/backend/client';
+
+/**
+ * P4 — mapowanie eksperymentu-grafu na model backendowego silnika obliczeniowego.
+ * Wejścia = te same id węzłów-parametrów co w grafie (oba budowane z tych samych
+ * builderów), więc snapshot parametrów filtrujemy do tych kluczy. Dzięki temu
+ * „Zweryfikuj na serwerze" udowadnia równoważność frontend↔backend na identycznym
+ * silniku. Eksperymenty bez pojedynczego modelu backendowego (międzydziedzinowe,
+ * teoretyczne) świadomie pomijamy — nie udajemy mapowania, którego nie ma.
+ */
+const EXPERIMENT_TO_MODEL: Record<string, { modelId: string; inputs: string[] }> = {
+  'nuclear.semf-consequence': { modelId: 'nuclear-semf', inputs: ['protonNumber', 'neutronNumber'] },
+  'atom.bohr-consequence': { modelId: 'atom-bohr', inputs: ['atomicNumber', 'principalN'] },
+  'spacetime.sr-consequence': { modelId: 'sr-lorentz', inputs: ['velocityFraction', 'properTimeSeconds', 'restLengthMeters'] },
+  'universe.orbital-consequence': { modelId: 'universe-kepler', inputs: ['centralMassSolar', 'orbitalRadiusAu'] },
+  'universe.atmospheric-escape': { modelId: 'universe-atmospheric-escape', inputs: ['stellarLuminositySolar', 'orbitalDistanceAu', 'planetAlbedo', 'planetMassEarth', 'planetRadiusEarth', 'moleculeMassAmu'] },
+  'particle.relativistic-energy': { modelId: 'particle-relativistic-energy', inputs: ['restMassMeV', 'velocityFraction'] },
+  'chemistry.kinetics-consequence': { modelId: 'chemistry-arrhenius', inputs: ['temperatureK', 'activationEnergyKJ'] },
+  'mathematics.gaussian-consequence': { modelId: 'math-gaussian', inputs: ['mean', 'sigma', 'xValue'] },
+  'biology.logistic-consequence': { modelId: 'biology-logistic', inputs: ['growthRate', 'carryingCapacity', 'initialPopulation', 'timeElapsed'] },
+};
 
 /**
  * Współdzielony panel „eksperyment = graf konsekwencji" (Priorytet 1 roadmapy).
@@ -227,6 +248,8 @@ export function ConsequenceChainPanel({
         })}
       </div>
 
+      <ServerVerify experimentId={experimentId} graph={graph} outputs={outputs} />
+
       {sonifyMapping && sonifiedValue !== null && (
         <div className="sonify-mapping" aria-live="polite">
           🔊 <strong>{sonifyMapping.sourceLabel}</strong>
@@ -311,6 +334,77 @@ export function ConsequenceChainPanel({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * P4 — „Zweryfikuj na serwerze": wysyła bieżące parametry do backendowego silnika
+ * obliczeniowego (ten sam wzór, bo wspólny bundle) i porównuje wynik serwera z
+ * lokalnym. Udowadnia równoważność frontend↔backend i pokazuje runId + wersję
+ * modelu + proweniencję. Nie zmienia wizualnego zachowania eksperymentu.
+ */
+function ServerVerify({ experimentId, graph, outputs }: { experimentId: string; graph: ModelGraph; outputs: ConsequenceOutputSpec[] }) {
+  const mapping = EXPERIMENT_TO_MODEL[experimentId];
+  const [run, setRun] = useState<ComputeRun | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  if (!mapping) return null;
+
+  async function verify() {
+    setBusy(true);
+    setMsg(null);
+    setRun(null);
+    const inputs: Record<string, number> = {};
+    for (const id of mapping.inputs) inputs[id] = graph.getValue(id);
+    const r = await runCompute(mapping.modelId, inputs);
+    setBusy(false);
+    if (r.ok && r.data.status === 'ok') setRun(r.data);
+    else setMsg(r.ok ? (r.data.message ?? 'Serwer odrzucił żądanie.') : r.message);
+  }
+
+  const rows = run?.outputs
+    ? outputs
+        .filter((o) => run.outputs![o.id] !== undefined)
+        .map((o) => {
+          const local = graph.getValue(o.id);
+          const server = run.outputs![o.id];
+          const denom = Math.max(Math.abs(server), 1e-9);
+          const equal = Math.abs(local - server) / denom < 1e-6;
+          return { id: o.id, label: graph.getNode(o.id)?.label ?? o.id, local, server, equal, format: o.format };
+        })
+    : [];
+  const allEqual = rows.length > 0 && rows.every((r) => r.equal);
+
+  return (
+    <div className="server-verify">
+      <button className="chip-btn" onClick={verify} disabled={busy}>
+        {busy ? 'Liczę na serwerze…' : '☑ Zweryfikuj na serwerze'}
+      </button>
+      {msg && <div className="trial-cloud-msg" role="status">{msg}</div>}
+      {run && (
+        <div className="server-verify-result" aria-live="polite">
+          <div className={`mcre-verdict ${allEqual ? 'agree' : 'conflict'}`}>
+            {allEqual
+              ? '✓ Wynik serwera zgodny z lokalnym (identyczny silnik — ten sam wzór).'
+              : '⚠ Rozbieżność frontend↔backend — zgłoś, to nie powinno wystąpić.'}
+          </div>
+          <div className="mcre-table">
+            {rows.map((r) => (
+              <div key={r.id} className={`mcre-row${r.equal ? '' : ' divergent'}`}>
+                <span className="mcre-cell mcre-label">{r.label}</span>
+                <span className="mcre-cell mcre-val">lokalnie {fmt(r.local, r.format)}</span>
+                <span className="mcre-cell mcre-val">serwer {fmt(r.server, r.format)}</span>
+                <span className="mcre-cell">{r.equal ? '✓' : '✗'}</span>
+              </div>
+            ))}
+          </div>
+          <div className="server-verify-meta">
+            model <strong>{run.modelId}</strong> v{run.modelVersion} · runId {run.runId.slice(0, 8)}…
+            {run.provenance && <> · {run.provenance.formula}</>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

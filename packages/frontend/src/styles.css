@@ -1302,3 +1302,8 @@ kbd {
 .cde-failure { display: flex; flex-direction: column; padding: 0.4rem 0.6rem; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); }
 .cde-failure-label { font-size: 0.8rem; font-weight: 600; }
 .cde-failure-reasons { font-size: 0.7rem; color: var(--text-faint); }
+
+/* ---------- P4: weryfikacja na serwerze (frontend↔backend equivalence) ---------- */
+.server-verify { margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); }
+.server-verify-result { margin-top: 0.5rem; }
+.server-verify-meta { margin-top: 0.4rem; font-family: var(--font-mono); font-size: 0.64rem; color: var(--text-faint); }

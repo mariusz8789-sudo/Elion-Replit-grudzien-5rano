@@ -366,6 +366,18 @@ export interface RankedCandidate {
   capabilityGapCount: number; note: string;
 }
 
+export interface ComputeRun {
+  runId: string; modelId: string; modelName?: string; modelVersion: string; domain: string;
+  status: 'ok' | 'rejected' | 'error'; outputs?: Record<string, number>; units?: Record<string, string>;
+  warnings?: string[]; provenance?: { source: string; formula: string; honesty: string }; message?: string;
+}
+
+/** Uruchamia model na backendzie (publiczne, efemeryczne). Do weryfikacji „na serwerze" w labach (P4). */
+export async function runCompute(modelId: string, inputs: Record<string, number>): Promise<ApiResult<ComputeRun>> {
+  const r = await request<{ run: ComputeRun; persisted: boolean }>('POST', '/compute/run', { body: { modelId, inputs } });
+  return r.ok ? { ok: true, data: r.data.run } : r;
+}
+
 export async function listCapabilities(): Promise<ApiResult<Capability[]>> {
   const r = await request<{ capabilities: Capability[] }>('GET', '/compute/capabilities');
   return r.ok ? { ok: true, data: r.data.capabilities } : r;

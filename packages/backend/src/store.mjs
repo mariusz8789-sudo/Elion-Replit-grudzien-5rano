@@ -1551,3 +1551,12 @@ export function latestMissionCheckpoint(db, missionId) {
   const r = db.prepare('SELECT * FROM mission_checkpoints WHERE mission_id = ? ORDER BY created_at DESC LIMIT 1').get(missionId);
   return r ? { id: r.id, missionId: r.mission_id, label: r.label, frontier: j(r.frontier_json, []), summary: j(r.summary_json), stateHash: r.state_hash, createdAt: r.created_at } : null;
 }
+
+/* ---- task_dag_edges mutation (reversible structural edits for the Workflow Engine) ---- */
+export function deleteTaskEdge(db, id) {
+  db.prepare('DELETE FROM task_dag_edges WHERE id = ?').run(id);
+}
+export function findTaskEdge(db, missionId, fromTaskId, toTaskId, kind = 'depends-on') {
+  const r = db.prepare('SELECT * FROM task_dag_edges WHERE mission_id = ? AND from_task_id = ? AND to_task_id = ? AND kind = ?').get(missionId, fromTaskId, toTaskId, kind);
+  return r ? { id: r.id, missionId: r.mission_id, fromTaskId: r.from_task_id, toTaskId: r.to_task_id, kind: r.kind, createdAt: r.created_at } : null;
+}

@@ -100,6 +100,15 @@ export function addDependency(db, missionId, depTaskId, taskId) {
   return true;
 }
 
+/** Remove a dependency edge (reverses addDependency) and re-evaluate the dependent's readiness. */
+export function removeDependency(db, missionId, depTaskId, taskId) {
+  const edge = store.findTaskEdge(db, missionId, depTaskId, taskId, 'depends-on');
+  if (!edge) return false;
+  store.deleteTaskEdge(db, edge.id);
+  recomputeReadiness(db, taskId);
+  return true;
+}
+
 /** A task is READY iff all its dependencies are COMPLETED; else BLOCKED (with reason). */
 export function recomputeReadiness(db, taskId) {
   const task = store.getTaskNode(db, taskId);

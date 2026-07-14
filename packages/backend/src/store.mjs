@@ -337,8 +337,159 @@ CREATE TABLE IF NOT EXISTS science_run_verifications (
 CREATE INDEX IF NOT EXISTS idx_science_run_verifications_run ON science_run_verifications(science_run_id);
 `;
 
+// Cognitive ceiling (Priority 1): Evidence Store ontology + Scientific Task DAG
+// with an explicit lifecycle. ADDITIVE — no existing table is touched. Designed
+// for long-horizon continuation: mission/question/hypothesis/evidence/task/edge/
+// transition/mutation/checkpoint state all persist, so a restart reconstructs the
+// research frontier instead of resetting understanding. Reuses projects (FK) and
+// the provenance hash primitives (content_hash columns hold canonicalHash values
+// computed in the cognitive/* domain layer — store.mjs never fabricates a hash).
+// Epistemic status and task/mission lifecycle vocabularies are validated in the
+// domain layer (cognitive/evidenceStore.mjs, cognitive/taskGraph.mjs); columns are
+// permissive TEXT for forward-compatibility. History tables (evidence,
+// task_state_transitions, workflow_mutations, mission_checkpoints) are append-only.
+const SCHEMA_V9 = `
+CREATE TABLE IF NOT EXISTS research_missions (
+  id                  TEXT PRIMARY KEY,
+  project_id          TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  goal                TEXT NOT NULL,
+  status              TEXT NOT NULL DEFAULT 'active',
+  domain              TEXT,
+  spec_json           TEXT NOT NULL DEFAULT '{}',
+  compute_budget_json TEXT NOT NULL DEFAULT '{}',
+  model_budget_json   TEXT NOT NULL DEFAULT '{}',
+  content_hash        TEXT,
+  created_by          TEXT REFERENCES users(id),
+  created_at          INTEGER NOT NULL,
+  updated_at          INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS research_questions (
+  id           TEXT PRIMARY KEY,
+  mission_id   TEXT NOT NULL REFERENCES research_missions(id) ON DELETE CASCADE,
+  parent_id    TEXT,
+  text         TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'open',
+  answer_json  TEXT,
+  content_hash TEXT,
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS hypotheses (
+  id                              TEXT PRIMARY KEY,
+  mission_id                      TEXT NOT NULL REFERENCES research_missions(id) ON DELETE CASCADE,
+  question_id                     TEXT,
+  label                           TEXT,
+  claim                           TEXT NOT NULL,
+  assumptions_json                TEXT NOT NULL DEFAULT '[]',
+  predicted_observations_json     TEXT NOT NULL DEFAULT '[]',
+  disconfirming_observations_json TEXT NOT NULL DEFAULT '[]',
+  required_evidence_json          TEXT NOT NULL DEFAULT '[]',
+  epistemic_status                TEXT NOT NULL DEFAULT 'HYPOTHESIZED',
+  confidence                      REAL,
+  status                          TEXT NOT NULL DEFAULT 'open',
+  superseded_by                   TEXT,
+  content_hash                    TEXT,
+  created_at                      INTEGER NOT NULL,
+  updated_at                      INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS evidence (
+  id                  TEXT PRIMARY KEY,
+  mission_id          TEXT NOT NULL REFERENCES research_missions(id) ON DELETE CASCADE,
+  kind                TEXT NOT NULL,
+  epistemic_status    TEXT NOT NULL,
+  content_json        TEXT NOT NULL DEFAULT '{}',
+  content_hash        TEXT NOT NULL,
+  source              TEXT,
+  source_location     TEXT,
+  origin              TEXT,
+  science_run_id      TEXT,
+  hypothesis_id       TEXT,
+  question_id         TEXT,
+  task_id             TEXT,
+  parent_evidence_id  TEXT,
+  confidence          REAL,
+  verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
+  artifacts_json      TEXT NOT NULL DEFAULT '[]',
+  created_at          INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS task_dag_nodes (
+  id                    TEXT PRIMARY KEY,
+  mission_id            TEXT NOT NULL REFERENCES research_missions(id) ON DELETE CASCADE,
+  title                 TEXT NOT NULL,
+  task_type             TEXT NOT NULL,
+  spec_json             TEXT NOT NULL DEFAULT '{}',
+  state                 TEXT NOT NULL DEFAULT 'BLOCKED',
+  blocked_reason        TEXT,
+  question_id           TEXT,
+  hypothesis_id         TEXT,
+  engine                TEXT,
+  compute_estimate_json TEXT NOT NULL DEFAULT '{}',
+  compute_actual_json   TEXT NOT NULL DEFAULT '{}',
+  result_json           TEXT,
+  result_evidence_id    TEXT,
+  superseded_by         TEXT,
+  content_hash          TEXT,
+  created_at            INTEGER NOT NULL,
+  updated_at            INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS task_dag_edges (
+  id           TEXT PRIMARY KEY,
+  mission_id   TEXT NOT NULL REFERENCES research_missions(id) ON DELETE CASCADE,
+  from_task_id TEXT NOT NULL,
+  to_task_id   TEXT NOT NULL,
+  kind         TEXT NOT NULL DEFAULT 'depends-on',
+  created_at   INTEGER NOT NULL,
+  UNIQUE(from_task_id, to_task_id, kind)
+);
+CREATE TABLE IF NOT EXISTS task_state_transitions (
+  id         TEXT PRIMARY KEY,
+  task_id    TEXT NOT NULL,
+  mission_id TEXT NOT NULL,
+  from_state TEXT,
+  to_state   TEXT NOT NULL,
+  reason     TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS workflow_mutations (
+  id                       TEXT PRIMARY KEY,
+  mission_id               TEXT NOT NULL REFERENCES research_missions(id) ON DELETE CASCADE,
+  reason                   TEXT NOT NULL,
+  triggering_evidence_json TEXT NOT NULL DEFAULT '[]',
+  previous_workflow_hash   TEXT,
+  proposed_json            TEXT NOT NULL DEFAULT '{}',
+  expected_benefit_json    TEXT NOT NULL DEFAULT '{}',
+  actual_result_json       TEXT,
+  rollback_json            TEXT,
+  verification_status      TEXT NOT NULL DEFAULT 'UNVERIFIED',
+  content_hash             TEXT,
+  created_at               INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mission_checkpoints (
+  id            TEXT PRIMARY KEY,
+  mission_id    TEXT NOT NULL REFERENCES research_missions(id) ON DELETE CASCADE,
+  label         TEXT,
+  frontier_json TEXT NOT NULL DEFAULT '[]',
+  summary_json  TEXT NOT NULL DEFAULT '{}',
+  state_hash    TEXT,
+  created_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_missions_project ON research_missions(project_id);
+CREATE INDEX IF NOT EXISTS idx_questions_mission ON research_questions(mission_id);
+CREATE INDEX IF NOT EXISTS idx_hypotheses_mission ON hypotheses(mission_id);
+CREATE INDEX IF NOT EXISTS idx_evidence_mission ON evidence(mission_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_evidence_hypothesis ON evidence(hypothesis_id);
+CREATE INDEX IF NOT EXISTS idx_tasknodes_mission ON task_dag_nodes(mission_id, state);
+CREATE INDEX IF NOT EXISTS idx_taskedges_mission ON task_dag_edges(mission_id);
+CREATE INDEX IF NOT EXISTS idx_taskedges_to ON task_dag_edges(to_task_id);
+CREATE INDEX IF NOT EXISTS idx_taskedges_from ON task_dag_edges(from_task_id);
+CREATE INDEX IF NOT EXISTS idx_transitions_task ON task_state_transitions(task_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_mutations_mission ON workflow_mutations(mission_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_checkpoints_mission ON mission_checkpoints(mission_id, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 9) db.exec(SCHEMA_V9);
   if (version < 7) db.exec(SCHEMA_V7);
   if (version < 8) {
     db.exec(SCHEMA_V8);
@@ -372,7 +523,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 8) db.exec('PRAGMA user_version = 8');
+  if (version < 9) db.exec('PRAGMA user_version = 9');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1086,4 +1237,317 @@ export function listScienceRunVerifications(db, scienceRunId) {
 
 export function listScienceRunsForCandidate(db, candidateId) {
   return db.prepare('SELECT * FROM science_runs WHERE candidate_id = ? ORDER BY created_at ASC').all(candidateId).map(toScienceRun);
+}
+
+/* ================================================================
+ * Cognitive ceiling (Priority 1): Evidence Store + Scientific Task DAG.
+ * Low-level, side-effect-free row helpers. All hashing/validation lives in the
+ * cognitive/* domain layer; this layer only persists and reads back. History
+ * tables (evidence, task_state_transitions, workflow_mutations,
+ * mission_checkpoints) are written append-only by the domain layer.
+ * ================================================================ */
+
+const j = (v, d = {}) => (v === undefined || v === null ? d : JSON.parse(v));
+
+/* ---- research_missions ---- */
+function toMission(r) {
+  if (!r) return null;
+  return {
+    id: r.id, projectId: r.project_id, goal: r.goal, status: r.status, domain: r.domain,
+    spec: j(r.spec_json), computeBudget: j(r.compute_budget_json), modelBudget: j(r.model_budget_json),
+    contentHash: r.content_hash, createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at,
+  };
+}
+export function saveMission(db, m) {
+  const id = m.id ?? newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO research_missions (id, project_id, goal, status, domain, spec_json, compute_budget_json, model_budget_json, content_hash, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, m.projectId ?? null, m.goal, m.status ?? 'active', m.domain ?? null,
+    JSON.stringify(m.spec ?? {}), JSON.stringify(m.computeBudget ?? {}), JSON.stringify(m.modelBudget ?? {}),
+    m.contentHash ?? null, m.createdBy ?? null, now, now,
+  );
+  return getMission(db, id);
+}
+export function getMission(db, id) {
+  return toMission(db.prepare('SELECT * FROM research_missions WHERE id = ?').get(id));
+}
+export function listMissions(db, projectId) {
+  const rows = projectId
+    ? db.prepare('SELECT * FROM research_missions WHERE project_id = ? ORDER BY created_at DESC').all(projectId)
+    : db.prepare('SELECT * FROM research_missions ORDER BY created_at DESC').all();
+  return rows.map(toMission);
+}
+export function updateMission(db, id, patch) {
+  const cur = getMission(db, id);
+  if (!cur) return null;
+  const next = { ...cur, ...patch };
+  db.prepare(
+    `UPDATE research_missions SET status = ?, domain = ?, spec_json = ?, compute_budget_json = ?, model_budget_json = ?, content_hash = ?, updated_at = ? WHERE id = ?`,
+  ).run(
+    next.status, next.domain ?? null, JSON.stringify(next.spec ?? {}),
+    JSON.stringify(next.computeBudget ?? {}), JSON.stringify(next.modelBudget ?? {}),
+    next.contentHash ?? null, Date.now(), id,
+  );
+  return getMission(db, id);
+}
+
+/* ---- research_questions ---- */
+function toQuestion(r) {
+  if (!r) return null;
+  return {
+    id: r.id, missionId: r.mission_id, parentId: r.parent_id, text: r.text, status: r.status,
+    answer: r.answer_json ? JSON.parse(r.answer_json) : null, contentHash: r.content_hash,
+    createdAt: r.created_at, updatedAt: r.updated_at,
+  };
+}
+export function saveQuestion(db, q) {
+  const id = q.id ?? newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO research_questions (id, mission_id, parent_id, text, status, answer_json, content_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, q.missionId, q.parentId ?? null, q.text, q.status ?? 'open',
+    q.answer != null ? JSON.stringify(q.answer) : null, q.contentHash ?? null, now, now,
+  );
+  return getQuestion(db, id);
+}
+export function getQuestion(db, id) {
+  return toQuestion(db.prepare('SELECT * FROM research_questions WHERE id = ?').get(id));
+}
+export function listQuestions(db, missionId) {
+  return db.prepare('SELECT * FROM research_questions WHERE mission_id = ? ORDER BY created_at ASC').all(missionId).map(toQuestion);
+}
+export function updateQuestion(db, id, patch) {
+  const cur = getQuestion(db, id);
+  if (!cur) return null;
+  const next = { ...cur, ...patch };
+  db.prepare('UPDATE research_questions SET status = ?, answer_json = ?, content_hash = ?, updated_at = ? WHERE id = ?').run(
+    next.status, next.answer != null ? JSON.stringify(next.answer) : null, next.contentHash ?? null, Date.now(), id,
+  );
+  return getQuestion(db, id);
+}
+
+/* ---- hypotheses ---- */
+function toHypothesis(r) {
+  if (!r) return null;
+  return {
+    id: r.id, missionId: r.mission_id, questionId: r.question_id, label: r.label, claim: r.claim,
+    assumptions: j(r.assumptions_json, []), predictedObservations: j(r.predicted_observations_json, []),
+    disconfirmingObservations: j(r.disconfirming_observations_json, []), requiredEvidence: j(r.required_evidence_json, []),
+    epistemicStatus: r.epistemic_status, confidence: r.confidence, status: r.status, supersededBy: r.superseded_by,
+    contentHash: r.content_hash, createdAt: r.created_at, updatedAt: r.updated_at,
+  };
+}
+export function saveHypothesis(db, h) {
+  const id = h.id ?? newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO hypotheses (id, mission_id, question_id, label, claim, assumptions_json, predicted_observations_json, disconfirming_observations_json, required_evidence_json, epistemic_status, confidence, status, superseded_by, content_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, h.missionId, h.questionId ?? null, h.label ?? null, h.claim,
+    JSON.stringify(h.assumptions ?? []), JSON.stringify(h.predictedObservations ?? []),
+    JSON.stringify(h.disconfirmingObservations ?? []), JSON.stringify(h.requiredEvidence ?? []),
+    h.epistemicStatus ?? 'HYPOTHESIZED', h.confidence ?? null, h.status ?? 'open', h.supersededBy ?? null,
+    h.contentHash ?? null, now, now,
+  );
+  return getHypothesis(db, id);
+}
+export function getHypothesis(db, id) {
+  return toHypothesis(db.prepare('SELECT * FROM hypotheses WHERE id = ?').get(id));
+}
+export function listHypotheses(db, missionId) {
+  return db.prepare('SELECT * FROM hypotheses WHERE mission_id = ? ORDER BY created_at ASC').all(missionId).map(toHypothesis);
+}
+export function updateHypothesis(db, id, patch) {
+  const cur = getHypothesis(db, id);
+  if (!cur) return null;
+  const next = { ...cur, ...patch };
+  db.prepare('UPDATE hypotheses SET epistemic_status = ?, confidence = ?, status = ?, superseded_by = ?, content_hash = ?, updated_at = ? WHERE id = ?').run(
+    next.epistemicStatus, next.confidence ?? null, next.status, next.supersededBy ?? null, next.contentHash ?? null, Date.now(), id,
+  );
+  return getHypothesis(db, id);
+}
+
+/* ---- evidence (append-only) ---- */
+function toEvidence(r) {
+  if (!r) return null;
+  return {
+    id: r.id, missionId: r.mission_id, kind: r.kind, epistemicStatus: r.epistemic_status,
+    content: j(r.content_json), contentHash: r.content_hash, source: r.source, sourceLocation: r.source_location,
+    origin: r.origin, scienceRunId: r.science_run_id, hypothesisId: r.hypothesis_id, questionId: r.question_id,
+    taskId: r.task_id, parentEvidenceId: r.parent_evidence_id, confidence: r.confidence,
+    verificationStatus: r.verification_status, artifacts: j(r.artifacts_json, []), createdAt: r.created_at,
+  };
+}
+export function saveEvidence(db, e) {
+  const id = e.id ?? newId();
+  db.prepare(
+    `INSERT INTO evidence (id, mission_id, kind, epistemic_status, content_json, content_hash, source, source_location, origin, science_run_id, hypothesis_id, question_id, task_id, parent_evidence_id, confidence, verification_status, artifacts_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, e.missionId, e.kind, e.epistemicStatus, JSON.stringify(e.content ?? {}), e.contentHash,
+    e.source ?? null, e.sourceLocation ?? null, e.origin ?? null, e.scienceRunId ?? null,
+    e.hypothesisId ?? null, e.questionId ?? null, e.taskId ?? null, e.parentEvidenceId ?? null,
+    e.confidence ?? null, e.verificationStatus ?? 'UNVERIFIED', JSON.stringify(e.artifacts ?? []), Date.now(),
+  );
+  return getEvidence(db, id);
+}
+export function getEvidence(db, id) {
+  return toEvidence(db.prepare('SELECT * FROM evidence WHERE id = ?').get(id));
+}
+export function listEvidence(db, missionId, { hypothesisId = null } = {}) {
+  const rows = hypothesisId
+    ? db.prepare('SELECT * FROM evidence WHERE mission_id = ? AND hypothesis_id = ? ORDER BY created_at ASC').all(missionId, hypothesisId)
+    : db.prepare('SELECT * FROM evidence WHERE mission_id = ? ORDER BY created_at ASC').all(missionId);
+  return rows.map(toEvidence);
+}
+export function updateEvidenceVerification(db, id, verificationStatus) {
+  db.prepare('UPDATE evidence SET verification_status = ? WHERE id = ?').run(verificationStatus, id);
+  return getEvidence(db, id);
+}
+
+/* ---- task_dag_nodes + task_dag_edges ---- */
+function toTaskNode(r) {
+  if (!r) return null;
+  return {
+    id: r.id, missionId: r.mission_id, title: r.title, taskType: r.task_type, spec: j(r.spec_json),
+    state: r.state, blockedReason: r.blocked_reason, questionId: r.question_id, hypothesisId: r.hypothesis_id,
+    engine: r.engine, computeEstimate: j(r.compute_estimate_json), computeActual: j(r.compute_actual_json),
+    result: r.result_json ? JSON.parse(r.result_json) : null, resultEvidenceId: r.result_evidence_id,
+    supersededBy: r.superseded_by, contentHash: r.content_hash, createdAt: r.created_at, updatedAt: r.updated_at,
+  };
+}
+export function saveTaskNode(db, t) {
+  const id = t.id ?? newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO task_dag_nodes (id, mission_id, title, task_type, spec_json, state, blocked_reason, question_id, hypothesis_id, engine, compute_estimate_json, compute_actual_json, result_json, result_evidence_id, superseded_by, content_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, t.missionId, t.title, t.taskType, JSON.stringify(t.spec ?? {}), t.state ?? 'BLOCKED',
+    t.blockedReason ?? null, t.questionId ?? null, t.hypothesisId ?? null, t.engine ?? null,
+    JSON.stringify(t.computeEstimate ?? {}), JSON.stringify(t.computeActual ?? {}),
+    t.result != null ? JSON.stringify(t.result) : null, t.resultEvidenceId ?? null,
+    t.supersededBy ?? null, t.contentHash ?? null, now, now,
+  );
+  return getTaskNode(db, id);
+}
+export function getTaskNode(db, id) {
+  return toTaskNode(db.prepare('SELECT * FROM task_dag_nodes WHERE id = ?').get(id));
+}
+export function listTaskNodes(db, missionId, { state = null } = {}) {
+  const rows = state
+    ? db.prepare('SELECT * FROM task_dag_nodes WHERE mission_id = ? AND state = ? ORDER BY created_at ASC').all(missionId, state)
+    : db.prepare('SELECT * FROM task_dag_nodes WHERE mission_id = ? ORDER BY created_at ASC').all(missionId);
+  return rows.map(toTaskNode);
+}
+export function updateTaskNode(db, id, patch) {
+  const cur = getTaskNode(db, id);
+  if (!cur) return null;
+  const next = { ...cur, ...patch };
+  db.prepare(
+    `UPDATE task_dag_nodes SET state = ?, blocked_reason = ?, engine = ?, compute_estimate_json = ?, compute_actual_json = ?, result_json = ?, result_evidence_id = ?, superseded_by = ?, content_hash = ?, updated_at = ? WHERE id = ?`,
+  ).run(
+    next.state, next.blockedReason ?? null, next.engine ?? null,
+    JSON.stringify(next.computeEstimate ?? {}), JSON.stringify(next.computeActual ?? {}),
+    next.result != null ? JSON.stringify(next.result) : null, next.resultEvidenceId ?? null,
+    next.supersededBy ?? null, next.contentHash ?? null, Date.now(), id,
+  );
+  return getTaskNode(db, id);
+}
+function toEdge(r) {
+  if (!r) return null;
+  return { id: r.id, missionId: r.mission_id, fromTaskId: r.from_task_id, toTaskId: r.to_task_id, kind: r.kind, createdAt: r.created_at };
+}
+export function saveTaskEdge(db, e) {
+  const id = e.id ?? newId();
+  db.prepare(
+    `INSERT INTO task_dag_edges (id, mission_id, from_task_id, to_task_id, kind, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(id, e.missionId, e.fromTaskId, e.toTaskId, e.kind ?? 'depends-on', Date.now());
+  return toEdge(db.prepare('SELECT * FROM task_dag_edges WHERE id = ?').get(id));
+}
+export function listTaskEdges(db, missionId) {
+  return db.prepare('SELECT * FROM task_dag_edges WHERE mission_id = ? ORDER BY created_at ASC').all(missionId).map(toEdge);
+}
+/** Dependencies of a task = tasks that must complete before it (incoming edges). */
+export function listDependencies(db, taskId) {
+  return db.prepare('SELECT * FROM task_dag_edges WHERE to_task_id = ?').all(taskId).map(toEdge);
+}
+/** Dependents of a task = tasks waiting on it (outgoing edges). */
+export function listDependents(db, taskId) {
+  return db.prepare('SELECT * FROM task_dag_edges WHERE from_task_id = ?').all(taskId).map(toEdge);
+}
+
+/* ---- task_state_transitions (append-only) ---- */
+export function saveTaskTransition(db, t) {
+  const id = t.id ?? newId();
+  db.prepare(
+    `INSERT INTO task_state_transitions (id, task_id, mission_id, from_state, to_state, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, t.taskId, t.missionId, t.fromState ?? null, t.toState, t.reason ?? null, Date.now());
+  return id;
+}
+export function listTaskTransitions(db, taskId) {
+  return db.prepare('SELECT * FROM task_state_transitions WHERE task_id = ? ORDER BY created_at ASC').all(taskId)
+    .map((r) => ({ id: r.id, taskId: r.task_id, missionId: r.mission_id, fromState: r.from_state, toState: r.to_state, reason: r.reason, createdAt: r.created_at }));
+}
+
+/* ---- workflow_mutations (append-only) ---- */
+function toMutation(r) {
+  if (!r) return null;
+  return {
+    id: r.id, missionId: r.mission_id, reason: r.reason, triggeringEvidence: j(r.triggering_evidence_json, []),
+    previousWorkflowHash: r.previous_workflow_hash, proposed: j(r.proposed_json), expectedBenefit: j(r.expected_benefit_json),
+    actualResult: r.actual_result_json ? JSON.parse(r.actual_result_json) : null, rollback: j(r.rollback_json),
+    verificationStatus: r.verification_status, contentHash: r.content_hash, createdAt: r.created_at,
+  };
+}
+export function saveWorkflowMutation(db, m) {
+  const id = m.id ?? newId();
+  db.prepare(
+    `INSERT INTO workflow_mutations (id, mission_id, reason, triggering_evidence_json, previous_workflow_hash, proposed_json, expected_benefit_json, actual_result_json, rollback_json, verification_status, content_hash, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, m.missionId, m.reason, JSON.stringify(m.triggeringEvidence ?? []), m.previousWorkflowHash ?? null,
+    JSON.stringify(m.proposed ?? {}), JSON.stringify(m.expectedBenefit ?? {}),
+    m.actualResult != null ? JSON.stringify(m.actualResult) : null, JSON.stringify(m.rollback ?? {}),
+    m.verificationStatus ?? 'UNVERIFIED', m.contentHash ?? null, Date.now(),
+  );
+  return getWorkflowMutation(db, id);
+}
+export function getWorkflowMutation(db, id) {
+  return toMutation(db.prepare('SELECT * FROM workflow_mutations WHERE id = ?').get(id));
+}
+export function listWorkflowMutations(db, missionId) {
+  return db.prepare('SELECT * FROM workflow_mutations WHERE mission_id = ? ORDER BY created_at ASC').all(missionId).map(toMutation);
+}
+export function updateWorkflowMutationResult(db, id, { actualResult, verificationStatus }) {
+  const cur = getWorkflowMutation(db, id);
+  if (!cur) return null;
+  db.prepare('UPDATE workflow_mutations SET actual_result_json = ?, verification_status = ? WHERE id = ?').run(
+    actualResult != null ? JSON.stringify(actualResult) : (cur.actualResult != null ? JSON.stringify(cur.actualResult) : null),
+    verificationStatus ?? cur.verificationStatus, id,
+  );
+  return getWorkflowMutation(db, id);
+}
+
+/* ---- mission_checkpoints (append-only) ---- */
+export function saveMissionCheckpoint(db, c) {
+  const id = c.id ?? newId();
+  db.prepare(
+    `INSERT INTO mission_checkpoints (id, mission_id, label, frontier_json, summary_json, state_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, c.missionId, c.label ?? null, JSON.stringify(c.frontier ?? []), JSON.stringify(c.summary ?? {}), c.stateHash ?? null, Date.now());
+  return db.prepare('SELECT * FROM mission_checkpoints WHERE id = ?').get(id);
+}
+export function listMissionCheckpoints(db, missionId) {
+  return db.prepare('SELECT * FROM mission_checkpoints WHERE mission_id = ? ORDER BY created_at ASC').all(missionId)
+    .map((r) => ({ id: r.id, missionId: r.mission_id, label: r.label, frontier: j(r.frontier_json, []), summary: j(r.summary_json), stateHash: r.state_hash, createdAt: r.created_at }));
+}
+export function latestMissionCheckpoint(db, missionId) {
+  const r = db.prepare('SELECT * FROM mission_checkpoints WHERE mission_id = ? ORDER BY created_at DESC LIMIT 1').get(missionId);
+  return r ? { id: r.id, missionId: r.mission_id, label: r.label, frontier: j(r.frontier_json, []), summary: j(r.summary_json), stateHash: r.state_hash, createdAt: r.created_at } : null;
 }

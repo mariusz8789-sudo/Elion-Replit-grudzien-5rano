@@ -2,6 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDatabase, createUser, createProject, listScienceRuns, saveScienceRun } from './store.mjs';
 import { hashPassword } from './auth.mjs';
+import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
 import { detect as dockDetect } from './compute/dockingAdapter.mjs';
 import { detect as qmDetect } from './compute/qmAdapter.mjs';
 import { detect as admetDetect } from './compute/admetAdapter.mjs';
@@ -17,7 +18,13 @@ import { replayScienceRun, verifyScienceRun, getVerificationHistory, VERDICT } f
  * compared against the stored output; the verdict must reflect what was
  * actually measured (see campaign/verify.mjs for why docking/QM use a
  * tolerance of 0 while ADMET-AI does not — a real, measured finding).
+ *
+ * seedCampaign() runs a real campaign, which needs RDKit (candidate
+ * canonicalization via campaign/drugAdapter.mjs) regardless of which heavy
+ * engine a given test targets — so every gate below is RDKIT && <engine>,
+ * matching the pattern in campaignMultiFidelity.test.mjs.
  */
+const RDKIT = rdkitDetect().available;
 const DOCK = dockDetect().available;
 const QM = qmDetect().available;
 const ADMET = admetDetect().available;
@@ -38,7 +45,7 @@ function seedCampaign(db) {
 }
 
 describe('replay verification of real Scientific Runs', () => {
-  (DOCK ? test : test.skip)('molecular-docking replay matches exactly (deterministic seeded search)', () => {
+  (RDKIT && DOCK ? test : test.skip)('molecular-docking replay matches exactly (deterministic seeded search)', () => {
     const db = openDatabase(':memory:');
     const { campaignId } = seedCampaign(db);
     runMultiFidelityStage(db, campaignId, { docking: { enabled: true, budget: 1 } });
@@ -50,7 +57,7 @@ describe('replay verification of real Scientific Runs', () => {
     assert.equal(v.verification.detail.maxRelativeDiff, 0, 'docking must be bit-exact reproducible');
   });
 
-  (QM ? test : test.skip)('quantum-chemistry replay matches exactly (deterministic HF/fixed geometry)', () => {
+  (RDKIT && QM ? test : test.skip)('quantum-chemistry replay matches exactly (deterministic HF/fixed geometry)', () => {
     const db = openDatabase(':memory:');
     const { campaignId } = seedCampaign(db);
     runMultiFidelityStage(db, campaignId, { quantum: { enabled: true, budget: 1 } });
@@ -61,7 +68,7 @@ describe('replay verification of real Scientific Runs', () => {
     assert.equal(v.verification.verdict, VERDICT.MATCH);
   });
 
-  (ADMET ? test : test.skip)('admet-estimation replay matches within the documented batch-composition tolerance', () => {
+  (RDKIT && ADMET ? test : test.skip)('admet-estimation replay matches within the documented batch-composition tolerance', () => {
     const db = openDatabase(':memory:');
     const { campaignId } = seedCampaign(db);
     runMultiFidelityStage(db, campaignId, { admet: { enabled: true } });
@@ -73,7 +80,7 @@ describe('replay verification of real Scientific Runs', () => {
     assert.ok(v.verification.detail.maxRelativeDiff <= v.verification.detail.tolerance);
   });
 
-  (ADMET ? test : test.skip)('verification history is append-only, never overwritten', () => {
+  (RDKIT && ADMET ? test : test.skip)('verification history is append-only, never overwritten', () => {
     const db = openDatabase(':memory:');
     const { campaignId } = seedCampaign(db);
     runMultiFidelityStage(db, campaignId, { admet: { enabled: true } });

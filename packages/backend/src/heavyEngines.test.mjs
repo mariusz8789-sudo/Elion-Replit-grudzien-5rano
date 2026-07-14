@@ -4,6 +4,7 @@ import * as qm from './compute/qmAdapter.mjs';
 import * as md from './compute/mdAdapter.mjs';
 import * as docking from './compute/dockingAdapter.mjs';
 import * as protein from './compute/proteinAdapter.mjs';
+import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
 import { listToolchain, getTool, TOOL_STATUS, capabilityAvailable, _resetValidation } from './campaign/toolchain.mjs';
 
@@ -11,11 +12,17 @@ import { listToolchain, getTool, TOOL_STATUS, capabilityAvailable, _resetValidat
  * Ciężkie silniki naukowe (QM/MD/dokowanie/białka) na REALNYM runtime. Każdy test
  * pomijany, gdy silnik niedostępny (BLOCKED_BY_RUNTIME = uczciwy stan, nie porażka).
  * Zdolność jest DONE tylko, gdy realny przypadek referencyjny PRZECHODZI.
+ *
+ * RDKit jest OPCJONALNĄ zależnością Python (patrz rdkitAdapter.mjs) — CI tego
+ * repo (.github/workflows/ci.yml) nie instaluje `requirements-compute.txt`,
+ * więc `rdkitOn` bywa false tam i true tylko w środowiskach z zainstalowanym
+ * RDKit. Testy poniżej muszą to honorować, tak jak dla każdego innego silnika.
  */
 const qmOn = qm.detect().available;
 const mdOn = md.detect().available;
 const dockOn = docking.detect().available;
 const protOn = protein.detect().available;
+const rdkitOn = rdkitDetect().available;
 
 describe('runtime scientific-environment audit', () => {
   test('probe returns real runtime + honest per-engine statuses', () => {
@@ -115,11 +122,14 @@ describe('toolchain registry validates engines by real reference cases', () => {
     _resetValidation();
     const tc = listToolchain();
     const byId = Object.fromEntries(tc.map((t) => [t.toolId, t]));
-    // RDKit ma być AVAILABLE (jest w tym repo wymagane).
-    assert.equal(byId.rdkit.status, TOOL_STATUS.AVAILABLE);
-    assert.ok(byId.rdkit.validation.every((v) => v.pass));
     // Silniki dostępne w runtime muszą mieć dowód referencyjny; niedostępne to
     // uczciwy BLOCKED_BY_RUNTIME (ADMET/toksyczność mają własne testy w admetEngine.test.mjs).
+    if (rdkitOn) {
+      assert.equal(byId.rdkit.status, TOOL_STATUS.AVAILABLE);
+      assert.ok(byId.rdkit.validation.every((v) => v.pass));
+    } else {
+      assert.equal(byId.rdkit.status, TOOL_STATUS.BLOCKED_BY_RUNTIME);
+    }
     if (qmOn) assert.equal(byId.pyscf.status, TOOL_STATUS.AVAILABLE);
     if (mdOn) assert.equal(byId.openmm.status, TOOL_STATUS.AVAILABLE);
     if (dockOn) assert.equal(byId.vina.status, TOOL_STATUS.AVAILABLE);

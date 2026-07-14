@@ -13,6 +13,7 @@ import * as md from './compute/mdAdapter.mjs';
 import * as admet from './compute/admetAdapter.mjs';
 import * as docking from './compute/dockingAdapter.mjs';
 import * as protein from './compute/proteinAdapter.mjs';
+import * as rdkit from './compute/rdkitAdapter.mjs';
 
 /**
  * Benchmark & Reproducibility Suite (Priority A). Every ground truth is
@@ -20,13 +21,16 @@ import * as protein from './compute/proteinAdapter.mjs';
  * explicitly-labeled publisher-reported metric — never a fabricated
  * number. Engine-dependent suites are skipped (not failed) when the real
  * engine is BLOCKED_BY_RUNTIME in this environment, matching the pattern
- * in heavyEngines.test.mjs.
+ * in heavyEngines.test.mjs. RDKit is an OPTIONAL Python dependency here too
+ * (see rdkitAdapter.mjs) — this repo's CI does not install
+ * requirements-compute.txt, so rdkitOn is false there.
  */
 const qmOn = qm.detect().available;
 const mdOn = md.detect().available;
 const admetOn = admet.detect().available;
 const dockOn = docking.detect().available;
 const protOn = protein.detect().available;
+const rdkitOn = rdkit.detect().available;
 
 describe('benchmark statistics (pure functions)', () => {
   test('rmse/mae are zero for identical series', () => {
@@ -51,8 +55,8 @@ describe('benchmark statistics (pure functions)', () => {
   });
 });
 
-describe('RDKit benchmark (always available — bundled dependency)', () => {
-  test('every case passes and every case carries an explicit pass verdict', () => {
+describe('RDKit benchmark', () => {
+  (rdkitOn ? test : test.skip)('every case passes and every case carries an explicit pass verdict', () => {
     const r = runRdkitBenchmark();
     assert.equal(r.engine, 'RDKit');
     assert.ok(r.cases.length >= 20);
@@ -61,11 +65,17 @@ describe('RDKit benchmark (always available — bundled dependency)', () => {
       assert.equal(c.pass, true, `case ${c.id} failed`);
     }
   });
-  test('MW-consistency ground truth is independent atomic-weight arithmetic, not a recalled figure', () => {
+  (rdkitOn ? test : test.skip)('MW-consistency ground truth is independent atomic-weight arithmetic, not a recalled figure', () => {
     const r = runRdkitBenchmark();
     assert.ok(r.metrics.mwConsistency.rmse < 1e-6);
     assert.equal(r.metrics.canonicalizationStability.passRate, 1);
     assert.equal(r.metrics.equivalenceIsomorphism.passRate, 1);
+  });
+  test('unavailable engine reports BLOCKED_BY_RUNTIME, never a fabricated result', () => {
+    if (rdkitOn) return;
+    const r = runRdkitBenchmark();
+    assert.equal(r.blocker, 'BLOCKED_BY_RUNTIME');
+    assert.deepEqual(r.cases, []);
   });
 });
 
@@ -130,9 +140,13 @@ describe('benchmark suite runner', () => {
     const r1 = runBenchmarkSuite({ only: ['rdkit'] });
     const r2 = runBenchmarkSuite({ only: ['rdkit'] });
     assert.equal(r1.contentHash, r2.contentHash, 'identical inputs must hash identically (timing fields excluded)');
-    assert.ok(r1.summary.totalCases > 0);
-    assert.equal(r1.summary.overallPassRate, 1);
     assert.ok(r1.environment && (r1.environment.os || r1.environment.error));
+    if (rdkitOn) {
+      assert.ok(r1.summary.totalCases > 0);
+      assert.equal(r1.summary.overallPassRate, 1);
+    } else {
+      assert.deepEqual(r1.summary.enginesBlocked, [{ id: 'rdkit', blocker: 'BLOCKED_BY_RUNTIME', reason: r1.results.rdkit.reason }]);
+    }
   });
   test('a benchmark that throws is reported as EXECUTION_ERROR, never silently dropped', () => {
     const r = runBenchmarkSuite({ only: [] });

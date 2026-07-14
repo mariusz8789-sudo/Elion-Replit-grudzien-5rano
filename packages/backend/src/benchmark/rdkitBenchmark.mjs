@@ -6,7 +6,7 @@
  * isomorphism of equivalent SMILES). No external dataset required, so no
  * fabrication risk and no BLOCKED_BY_RESOURCES from unreachable hosts.
  */
-import { descriptors, validate } from '../compute/rdkitAdapter.mjs';
+import { detect, descriptors, validate } from '../compute/rdkitAdapter.mjs';
 import { rmse, mae } from './stats.mjs';
 
 // Standard atomic weights (IUPAC 2021, rounded to 3 decimals) — definitional, not recalled literature.
@@ -70,6 +70,11 @@ const EQUIVALENCE_PAIRS = [
 export function runRdkitBenchmark() {
   const t0 = Date.now();
   const cases = [];
+
+  const d = detect();
+  if (!d.available) {
+    return { engine: 'RDKit', cases: [], metrics: null, blocker: 'BLOCKED_BY_RUNTIME', reason: d.reason, runtimeMs: Date.now() - t0 };
+  }
 
   for (const { id, smiles } of MOLECULES) {
     const r = descriptors(smiles);

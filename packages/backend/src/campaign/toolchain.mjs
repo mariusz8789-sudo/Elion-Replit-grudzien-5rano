@@ -4,16 +4,17 @@
  * AVAILABLE tylko wtedy, gdy przechodzi realny przypadek referencyjny — samo
  * istnienie kodu/pakietu nie wystarcza (kontrakt zweryfikowanego adaptera).
  *
- * Ciężkie silniki zewnętrzne (dokowanie, MD, chemia kwantowa, ingestia białek)
- * są tu rejestrowane obok RDKit. ADMET i toksyczność pozostają jawnymi lukami
- * (CAPABILITY_GAP), dopóki nie zintegrujemy walidowanego, wykonywalnego modelu —
- * NIGDY nie wypełniamy luki LLM-em ani heurystyką udającą walidowany model.
+ * Ciężkie silniki zewnętrzne (dokowanie, MD, chemia kwantowa, ingestia białek,
+ * ADMET, toksyczność) są tu rejestrowane obok RDKit. Dopóki żaden walidowany,
+ * wykonywalny model nie istnieje dla danej zdolności — CAPABILITY_GAP. NIGDY
+ * nie wypełniamy luki LLM-em ani heurystyką udającą walidowany model.
  */
 import { detect as rdkitDetect, descriptors, transform } from '../compute/rdkitAdapter.mjs';
 import * as qm from '../compute/qmAdapter.mjs';
 import * as md from '../compute/mdAdapter.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
 import * as protein from '../compute/proteinAdapter.mjs';
+import * as admet from '../compute/admetAdapter.mjs';
 
 export const TOOL_STATUS = {
   AVAILABLE: 'AVAILABLE',
@@ -85,28 +86,27 @@ const TOOLS = [
     evidenceClass: 'DETERMINISTIC',
     validate: validateProtein,
   },
-  // ---- Jawne luki zdolności (P8/P9): brak walidowanego, wykonywalnego modelu. ----
   {
     toolId: 'admet',
     capabilityId: 'admet-estimation',
     domain: 'ADMET',
-    engineName: '(brak walidowanego modelu)',
-    license: 'n/a',
-    modelDomain: 'ADMET musi być ENDPOINT-SPECYFICZNE (solubility, permeability, klirens, BBB…).',
-    assumptions: 'Nie tworzymy jednego „uniwersalnego ADMET score". Bez walidowanego wykonywalnego modelu = CAPABILITY_GAP. Nigdy nie wypełniamy luki LLM-em/heurystyką.',
-    evidenceClass: 'CAPABILITY_GAP',
-    validate: () => ({ status: TOOL_STATUS.CAPABILITY_GAP, reason: 'Brak zintegrowanego, walidowanego, wykonywalnego modelu ADMET per-endpoint w tym runtime.' }),
+    engineName: 'ADMET-AI (Chemprop D-MPNN ensembles)',
+    license: 'MIT',
+    modelDomain: 'ADMET ENDPOINT-SPECYFICZNE: absorption/distribution/metabolism/excretion (42 endpointy: HIA, Bioavailability, Caco2, PAMPA, Pgp, BBB, PPBR, VDss, CYP450×8, klirens, half-life…) + 11 deskryptorów fizykochemicznych. Wytrenowane i benchmarkowane na TDC ADMET Benchmark Group (Huang i in. 2021); Swanson i in. 2024, Bioinformatics.',
+    assumptions: 'Zero „uniwersalnego ADMET score" — każdy endpoint ma własną opublikowaną metrykę TDC (AUROC/R²). Predykcje to MODEL_ESTIMATE probabilistyczne, nie dowód eksperymentalny. Wagi dołączone w pakiecie (bez sieci przy inferencji).',
+    evidenceClass: 'MODEL_ESTIMATE',
+    validate: validateAdmet,
   },
   {
     toolId: 'toxicity',
     capabilityId: 'toxicity-risk-estimation',
     domain: 'TOXICITY',
-    engineName: '(brak walidowanego modelu)',
-    license: 'n/a',
-    modelDomain: 'Toksyczność endpoint-specyficzna (mutagenność, hepatotoksyczność, kardio…).',
-    assumptions: 'Nigdy nie zwracamy SAFE/NON-TOXIC z predykcji. Bez walidowanego wykonywalnego modelu = CAPABILITY_GAP.',
-    evidenceClass: 'CAPABILITY_GAP',
-    validate: () => ({ status: TOOL_STATUS.CAPABILITY_GAP, reason: 'Brak zintegrowanego, walidowanego, wykonywalnego modelu toksyczności per-endpoint w tym runtime.' }),
+    engineName: 'ADMET-AI (Chemprop D-MPNN ensembles)',
+    license: 'MIT',
+    modelDomain: 'Toksyczność ENDPOINT-SPECYFICZNA (10 endpointów TDC: hERG, AMES, DILI, ClinTox, Carcinogens_Lagunin, LD50_Zhu, Skin_Reaction) + panel Tox21 (12 endpointów: NR/SR nuclear-receptor i stress-response).',
+    assumptions: 'Nigdy SAFE/NON-TOXIC/CLINICALLY SAFE — tylko MODEL_ESTIMATE + RISK_SIGNAL z opublikowaną metryką TDC per endpoint. Ten sam silnik co ADMET (jeden zespół, wiele głów zadań), rozdzielony tu wyłącznie po kategorii endpointu.',
+    evidenceClass: 'MODEL_ESTIMATE',
+    validate: validateToxicity,
   },
 ];
 
@@ -160,6 +160,27 @@ function validateProtein() {
   return { status: r.pass ? TOOL_STATUS.AVAILABLE : TOOL_STATUS.VALIDATION_FAILED, version: r.version, engine: `Biopython ${r.version}`, evidence };
 }
 
+// ADMET i toksyczność to JEDEN silnik (wiele głów zadań); dzielą ten sam realny
+// przypadek referencyjny, więc nie uruchamiamy go dwukrotnie (~9 s ładowania modelu).
+let admetReferenceCache = null;
+function admetReferenceOnce() {
+  if (!admetReferenceCache) admetReferenceCache = admet.referenceCase();
+  return admetReferenceCache;
+}
+
+function validateAdmet() {
+  const d = admet.detect();
+  if (!d.available) return { status: TOOL_STATUS.BLOCKED_BY_RUNTIME, reason: d.reason };
+  const r = admetReferenceOnce();
+  if (!r.ok) return { status: TOOL_STATUS.BLOCKED_BY_RUNTIME, reason: r.reason ?? r.error };
+  const evidence = [{ id: r.case, pass: r.pass, checks: r.checks, nEndpoints: r.nEndpoints }];
+  return { status: r.pass ? TOOL_STATUS.AVAILABLE : TOOL_STATUS.VALIDATION_FAILED, version: r.version, engine: `ADMET-AI ${r.version}`, evidence };
+}
+
+function validateToxicity() {
+  return validateAdmet();
+}
+
 /* ---------------- Cache walidacji (walidacja bywa kosztowna: MD/docking ~kilka s) ---------------- */
 
 const validationCache = new Map();
@@ -177,7 +198,7 @@ function runValidation(tool) {
 }
 
 /** Do testów / odświeżenia: czyści cache walidacji. */
-export function _resetValidation() { validationCache.clear(); }
+export function _resetValidation() { validationCache.clear(); admetReferenceCache = null; }
 
 function present(tool) {
   const v = runValidation(tool);

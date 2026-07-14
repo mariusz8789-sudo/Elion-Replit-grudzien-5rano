@@ -67,6 +67,7 @@ import { createJob, getJob, listJobs, updateJob } from './store.mjs';
 import * as campaignStore from './campaign/persistence.mjs';
 import { buildDiscoveryGraph } from './campaign/discoveryGraph.mjs';
 import { listToolchain, getTool } from './campaign/toolchain.mjs';
+import { listEndpoints } from './compute/admetAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
@@ -130,6 +131,11 @@ export function handleApi(db, ctx) {
     }
     // Runtime scientific-environment audit (Priority 1): realna sonda + persystencja.
     if (seg[1] === 'environment' && seg.length === 2 && method === 'GET') return environmentHandler(db);
+    // Katalog 52 endpointów ADMET-AI (kategoria, typ zadania, opublikowana metryka TDC).
+    if (seg[1] === 'admet' && seg[2] === 'endpoints' && seg.length === 3 && method === 'GET') {
+      const r = listEndpoints();
+      return r.ok ? ok({ endpoints: r.endpoints }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+    }
     return err(404, 'not_found');
   }
 
@@ -561,7 +567,28 @@ function sanitizeStageConfig(body) {
       basis: typeof body.quantum.basis === 'string' ? body.quantum.basis.slice(0, 20) : 'sto-3g',
     };
   }
+  if (body?.admet?.enabled) {
+    cfg.admet = { enabled: true, thresholds: sanitizeAdmetThresholds(body.admet.thresholds) };
+  }
   return cfg;
+}
+
+/** Waliduje progi ADMET/toksyczności: tylko realne endpointy z rejestru, liczby skończone. */
+function sanitizeAdmetThresholds(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = listEndpoints();
+  if (!r.ok) return null;
+  const validIds = new Set(r.endpoints.map((e) => e.id));
+  const out = {};
+  for (const [endpointId, rule] of Object.entries(raw)) {
+    if (!validIds.has(endpointId) || !rule || typeof rule !== 'object') continue;
+    const clean = {};
+    if (Number.isFinite(rule.max)) clean.max = Number(rule.max);
+    if (Number.isFinite(rule.min)) clean.min = Number(rule.min);
+    if (Object.keys(clean).length > 0) out[endpointId] = clean;
+    if (Object.keys(out).length >= 20) break; // twardy limit liczby progów na żądanie
+  }
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 /** Inspekcja kampanii: stan + policzalne z utrwalonych danych metryki. */

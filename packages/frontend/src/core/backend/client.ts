@@ -546,9 +546,18 @@ export async function listCampaignConflicts(token: string, projectId: string, ca
 
 export async function runCampaignStage(
   token: string, projectId: string, campaignId: string,
-  config: { docking?: { enabled: boolean; budget?: number }; quantum?: { enabled: boolean; budget?: number } },
+  config: {
+    docking?: { enabled: boolean; budget?: number };
+    quantum?: { enabled: boolean; budget?: number };
+    admet?: { enabled: boolean; thresholds?: Record<string, { max?: number; min?: number }> };
+  },
 ): Promise<ApiResult<{ jobId: string }>> {
   return request('POST', `/projects/${projectId}/campaigns/${campaignId}/stage`, { token, body: config });
+}
+
+export async function getAdmetEndpoints(): Promise<ApiResult<{ id: string; name: string; category: string; taskType: string; units: string; publishedMetric: string | null; publishedMetricValue: number | null; source: string }[]>> {
+  const r = await request<{ endpoints: { id: string; name: string; category: string; taskType: string; units: string; publishedMetric: string | null; publishedMetricValue: number | null; source: string }[] }>('GET', '/compute/admet/endpoints');
+  return r.ok ? { ok: true, data: r.data.endpoints } : r;
 }
 
 export async function askCampaignWhy(

@@ -103,6 +103,9 @@ def main():
         "xtb_py": "xtb",
         "psi4": "psi4",
         "vina_py": "vina",
+        "admet_ai": "admet_ai",
+        "torch": "torch",
+        "chemprop": "chemprop",
     }
     bin_engines = {
         "vina": ("vina", ("--version",)),

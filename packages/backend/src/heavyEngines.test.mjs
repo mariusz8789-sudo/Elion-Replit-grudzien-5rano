@@ -111,17 +111,15 @@ describe('protein structure ingestion (Biopython)', () => {
 });
 
 describe('toolchain registry validates engines by real reference cases', () => {
-  test('AVAILABLE requires a passing reference case; ADMET/toxicity are honest gaps', () => {
+  test('AVAILABLE requires a passing reference case; every AVAILABLE entry carries evidence', () => {
     _resetValidation();
     const tc = listToolchain();
     const byId = Object.fromEntries(tc.map((t) => [t.toolId, t]));
-    // ADMET/toksyczność: nigdy sfabrykowane — jawne luki zdolności.
-    assert.equal(byId.admet.status, TOOL_STATUS.CAPABILITY_GAP);
-    assert.equal(byId.toxicity.status, TOOL_STATUS.CAPABILITY_GAP);
     // RDKit ma być AVAILABLE (jest w tym repo wymagane).
     assert.equal(byId.rdkit.status, TOOL_STATUS.AVAILABLE);
     assert.ok(byId.rdkit.validation.every((v) => v.pass));
-    // Silniki dostępne w runtime muszą mieć dowód referencyjny.
+    // Silniki dostępne w runtime muszą mieć dowód referencyjny; niedostępne to
+    // uczciwy BLOCKED_BY_RUNTIME (ADMET/toksyczność mają własne testy w admetEngine.test.mjs).
     if (qmOn) assert.equal(byId.pyscf.status, TOOL_STATUS.AVAILABLE);
     if (mdOn) assert.equal(byId.openmm.status, TOOL_STATUS.AVAILABLE);
     if (dockOn) assert.equal(byId.vina.status, TOOL_STATUS.AVAILABLE);
@@ -134,6 +132,6 @@ describe('toolchain registry validates engines by real reference cases', () => {
   test('getTool + capabilityAvailable reflect validated state', () => {
     assert.ok(getTool('rdkit'));
     assert.equal(getTool('nonexistent'), null);
-    assert.equal(capabilityAvailable('admet-estimation'), false);
+    assert.equal(capabilityAvailable('nonexistent-capability'), false);
   });
 });

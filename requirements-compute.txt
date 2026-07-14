@@ -22,3 +22,8 @@ meeko>=0.6
 gemmi>=0.6
 # Biopython — protein structure (PDB) ingestion and validation. BSD.
 biopython>=1.81
+# ADMET-AI — real ADMET + toxicity prediction: 52 endpoints (Chemprop D-MPNN
+# ensembles), trained + benchmarked on the Therapeutics Data Commons (TDC)
+# ADMET Benchmark Group. Swanson et al. 2024, Bioinformatics. MIT. Pretrained
+# weights are bundled in the package (no network at inference).
+admet-ai>=2.0

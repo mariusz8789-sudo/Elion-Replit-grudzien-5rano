@@ -5,19 +5,21 @@ import { hashPassword } from './auth.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
 import { detect as dockDetect } from './compute/dockingAdapter.mjs';
 import { detect as qmDetect } from './compute/qmAdapter.mjs';
+import { detect as admetDetect } from './compute/admetAdapter.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { createCampaign, listCandidates, listEvents } from './campaign/persistence.mjs';
 import { runCampaign } from './campaign/orchestrator.mjs';
 import { selectForStage, runMultiFidelityStage } from './campaign/multiFidelity.mjs';
 
 /**
- * Multi-fidelity: RDKit (cheap) → Pareto filter → docking/QM (expensive) on
- * REAL engines. Every stage result is a persisted Scientific Run with artifacts,
- * hashes and provenance. Slow paths skipped when the engine is unavailable.
+ * Multi-fidelity: RDKit (cheap) → ADMET/toxicity filter → docking/QM (expensive)
+ * on REAL engines. Every stage result is a persisted Scientific Run with
+ * artifacts/hashes/provenance. Slow paths skipped when the engine is unavailable.
  */
 const RDKIT = rdkitDetect().available;
 const DOCK = dockDetect().available;
 const QM = qmDetect().available;
+const ADMET = admetDetect().available;
 
 function seedCampaign(db) {
   const u = createUser(db, { email: 'mf@lab.org', displayName: 'MF', passwordHash: hashPassword('password123') });
@@ -95,6 +97,74 @@ describe('quantum stage on a real campaign', () => {
     const runs = listScienceRuns(db, id).filter((r) => r.capability === 'quantum-chemistry');
     assert.ok(runs.length >= 1 && runs[0].evidenceClass === 'MODEL_ESTIMATE');
     assert.ok(runs[0].outputs.energyHartree < 0);
+  });
+});
+
+describe('ADMET + toxicity filter stage on a real campaign', () => {
+  (RDKIT && ADMET ? test : test.skip)('scores every retained candidate; unthresholded run computes but never rejects', () => {
+    const db = openDatabase();
+    const id = seedCampaign(db);
+    const retained = listCandidates(db, id).filter((c) => c.status === 'retained');
+    const report = runMultiFidelityStage(db, id, { admet: { enabled: true } });
+    assert.equal(report.admet.executed, true);
+    assert.equal(report.admet.results.length, retained.length, 'every retained candidate scored');
+    assert.equal(report.admet.filtered, null, 'no thresholds supplied -> no filtering invented');
+
+    // Two Scientific Runs per candidate (admet-estimation + toxicity-risk-estimation), both MODEL_ESTIMATE.
+    const runs = listScienceRuns(db, id);
+    const admetRuns = runs.filter((r) => r.capability === 'admet-estimation');
+    const toxRuns = runs.filter((r) => r.capability === 'toxicity-risk-estimation');
+    assert.equal(admetRuns.length, retained.length);
+    assert.equal(toxRuns.length, retained.length);
+    assert.ok(admetRuns.every((r) => r.evidenceClass === 'MODEL_ESTIMATE'));
+    assert.ok(toxRuns.some((r) => 'hERG' in r.outputs), 'toxicity run carries real endpoint predictions');
+    assert.ok(admetRuns.some((r) => 'molecular_weight' in r.outputs), 'admet run carries physchem endpoint');
+
+    const events = listEvents(db, id).filter((e) => e.type === 'STAGE_RESULT' && e.payload.stage === 'admet');
+    assert.equal(events.length, retained.length);
+  });
+
+  (RDKIT && ADMET ? test : test.skip)('explicit thresholds actually filter candidates, both directions proven', () => {
+    const db = openDatabase();
+    const id = seedCampaign(db);
+    const retained = listCandidates(db, id).filter((c) => c.status === 'retained');
+
+    // Impossible threshold -> everyone rejected (proves the reject path is real, not a safety claim).
+    const strict = runMultiFidelityStage(db, id, { admet: { enabled: true, thresholds: { molecular_weight: { max: 1 } } } });
+    assert.equal(strict.admet.filtered.rejected.length, retained.length);
+    assert.equal(strict.admet.filtered.passed.length, 0);
+    assert.equal(strict.admet.filtered.rejected[0].violates.endpointId, 'molecular_weight');
+
+    // Trivially satisfied threshold -> everyone passes (proves the pass path is real).
+    const lenient = runMultiFidelityStage(db, id, { admet: { enabled: true, thresholds: { molecular_weight: { max: 100000 } } } });
+    assert.equal(lenient.admet.filtered.passed.length, retained.length);
+    assert.equal(lenient.admet.filtered.rejected.length, 0);
+
+    const rejectionEvents = listEvents(db, id).filter((e) => e.type === 'STAGE_SELECTION' && e.payload.stage === 'admet' && e.payload.reason === 'ADMET_FILTER_REJECTED');
+    assert.ok(rejectionEvents.length >= retained.length, 'rejection reasons persisted for WHY');
+  });
+
+  (RDKIT && ADMET ? test : test.skip)('a filtered candidate pool actually changes downstream docking selection', () => {
+    if (!DOCK) return;
+    const db = openDatabase();
+    const id = seedCampaign(db);
+    const retained = listCandidates(db, id).filter((c) => c.status === 'retained');
+    // Reject everyone via ADMET, then request docking — nothing should be selected.
+    const report = runMultiFidelityStage(db, id, {
+      admet: { enabled: true, thresholds: { molecular_weight: { max: 1 } } },
+      docking: { enabled: true, budget: retained.length },
+    });
+    assert.equal(report.admet.filtered.passed.length, 0);
+    assert.equal(report.docking.selected, 0, 'ADMET rejection actually excludes candidates from docking, not just cosmetic');
+  });
+
+  test('unavailable ADMET engine is an honest BLOCKED_BY_RUNTIME, never faked', () => {
+    if (ADMET || !RDKIT) return; // this runtime has ADMET-AI — nothing to prove here
+    const db = openDatabase();
+    const id = seedCampaign(db);
+    const report = runMultiFidelityStage(db, id, { admet: { enabled: true } });
+    assert.equal(report.admet.executed, false);
+    assert.equal(report.admet.blocker, 'BLOCKED_BY_RUNTIME');
   });
 });
 

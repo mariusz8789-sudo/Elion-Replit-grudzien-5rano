@@ -61,13 +61,21 @@ export function whyStop(db, campaignId) {
   return { ok: true, answer: `Zatrzymana: ${camp.stopReason}${last ? ` — ${last.purpose}` : ''}.`, evidence: { stopReason: camp.stopReason, final: camp.final } };
 }
 
-/** Dlaczego kandydat został (nie)wybrany do etapu ciężkiego (docking/QM). Z utrwalonych zdarzeń. */
+/** Dlaczego kandydat został (nie)wybrany / jaki wynik uzyskał na etapie ciężkim (docking/QM/ADMET). Z utrwalonych zdarzeń. */
 export function whyStageSelection(db, campaignId, candidateId) {
   const events = store.listEvents(db, campaignId).filter((e) => e.payload?.candidateId === candidateId && (e.type === 'STAGE_SELECTION' || e.type === 'STAGE_RESULT'));
   if (events.length === 0) return { ok: false, reason: 'Brak zdarzeń etapowych dla tego kandydata.' };
+  const describe = (p) => {
+    const parts = [`${p.stage}/${p.reason}`];
+    if (p.why) parts.push(`(${p.why})`);
+    if (p.bestAffinityKcalMol != null) parts.push(`→ ${p.bestAffinityKcalMol} kcal/mol`);
+    if (p.homoLumoGapEv != null) parts.push(`→ gap ${p.homoLumoGapEv} eV`);
+    if (p.endpointId != null) parts.push(`(endpoint ${p.endpointId} = ${p.value}, próg ${JSON.stringify(p.rule)})`);
+    return parts.join(' ');
+  };
   return {
     ok: true,
-    answer: events.map((e) => `${e.payload.stage}/${e.payload.reason}${e.payload.why ? ` (${e.payload.why})` : ''}${e.payload.bestAffinityKcalMol != null ? ` → ${e.payload.bestAffinityKcalMol} kcal/mol` : ''}`).join('; '),
+    answer: events.map((e) => describe(e.payload)).join('; '),
     evidence: events.map((e) => ({ type: e.type, ...e.payload })),
   };
 }

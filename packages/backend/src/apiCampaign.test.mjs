@@ -4,6 +4,7 @@ import { openDatabase } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { runJob } from './compute/jobs.mjs';
 import { detect } from './compute/rdkitAdapter.mjs';
+import { detect as admetDetect } from './compute/admetAdapter.mjs';
 
 /**
  * Router API Kampanii Naukowej (Scientific Acceleration Engine). Dowodzi, że
@@ -11,6 +12,7 @@ import { detect } from './compute/rdkitAdapter.mjs';
  * limity zasobów — bez atrap. Bieg realnej kampanii pomijany bez RDKit.
  */
 const RDKIT = detect().available;
+const ADMET = admetDetect().available;
 
 let db;
 beforeEach(() => { db = openDatabase(); });
@@ -34,6 +36,21 @@ describe('toolchain registry route', () => {
     assert.equal(rdkit.license, 'BSD-3-Clause');
     // Status ustalony w runtime realną walidacją; nie jest zmyślony.
     assert.ok(['AVAILABLE', 'BLOCKED_BY_RUNTIME', 'VALIDATION_FAILED'].includes(rdkit.status));
+    // ADMET + toksyczność (jeden silnik, dwie zdolności) rejestrowane obok RDKit.
+    const admet = r.body.toolchain.find((t) => t.toolId === 'admet');
+    const tox = r.body.toolchain.find((t) => t.toolId === 'toxicity');
+    assert.ok(admet && tox);
+    assert.equal(admet.evidenceClass, 'MODEL_ESTIMATE');
+  });
+
+  test('GET /api/compute/admet/endpoints exposes the 52-endpoint catalog with published TDC metrics (public)', (t) => {
+    if (!ADMET) return t.skip('ADMET-AI niedostępny — BLOCKED_BY_RUNTIME (uczciwy stan).');
+    const r = call('GET', '/api/compute/admet/endpoints');
+    assert.equal(r.status, 200);
+    assert.equal(r.body.endpoints.length, 52);
+    const herg = r.body.endpoints.find((e) => e.id === 'hERG');
+    assert.equal(herg.category, 'Toxicity');
+    assert.ok(herg.publishedMetricValue > 0.5);
   });
 });
 
@@ -120,5 +137,50 @@ describe('campaign execution over the API (real RDKit)', () => {
     // WHY stop
     const whyStop = call('GET', `/api/projects/${project.id}/campaigns/${c.id}/why`, { token: owner.token, query: { kind: 'stop' } }).body.why;
     assert.equal(whyStop.ok, true);
+  });
+});
+
+describe('ADMET/toxicity multi-fidelity stage over the API', () => {
+  test('stage route runs real ADMET scoring; thresholds are validated against the real endpoint catalog', async (t) => {
+    if (!RDKIT || !ADMET) return t.skip('RDKit/ADMET-AI niedostępne — BLOCKED_BY_RUNTIME (uczciwy stan).');
+    const owner = register('owner4@lab.org');
+    const project = makeProject(owner.token);
+    const c = call('POST', `/api/projects/${project.id}/campaigns`, {
+      token: owner.token,
+      body: { objective: 'ADMET filter (software validation)', startingSmiles: ['c1ccccc1'], budget: { maxGenerations: 1, maxGeneratedCandidates: 4 } },
+    }).body.campaign;
+
+    const started = call('POST', `/api/projects/${project.id}/campaigns/${c.id}/start`, { token: owner.token });
+    await runJob(db, started.body.jobId);
+
+    // Junk endpoint id is dropped, not injected as-is; a real one with an impossible bound survives and rejects everyone.
+    const stageReq = call('POST', `/api/projects/${project.id}/campaigns/${c.id}/stage`, {
+      token: owner.token,
+      body: { admet: { enabled: true, thresholds: { not_a_real_endpoint: { max: 1 }, molecular_weight: { max: 1 } } } },
+    });
+    assert.equal(stageReq.status, 202);
+    await runJob(db, stageReq.body.jobId);
+
+    const runs = call('GET', `/api/projects/${project.id}/campaigns/${c.id}/science-runs`, { token: owner.token }).body.scienceRuns;
+    const admetRuns = runs.filter((r) => r.capability === 'admet-estimation');
+    const toxRuns = runs.filter((r) => r.capability === 'toxicity-risk-estimation');
+    assert.ok(admetRuns.length >= 1 && toxRuns.length >= 1, 'both capabilities persisted as real Scientific Runs');
+    assert.ok(admetRuns.every((r) => r.evidenceClass === 'MODEL_ESTIMATE'));
+
+    // WHY: stage-selection explains a real rejection with the real endpoint and threshold.
+    const cands = call('GET', `/api/projects/${project.id}/campaigns/${c.id}/candidates`, { token: owner.token }).body.candidates;
+    const rejected = cands.find((x) => x.status === 'retained');
+    const why = call('GET', `/api/projects/${project.id}/campaigns/${c.id}/why`, { token: owner.token, query: { kind: 'stage-selection', candidate: rejected.id } }).body.why;
+    assert.equal(why.ok, true);
+    assert.match(why.answer, /molecular_weight/);
+  });
+
+  test('viewer cannot trigger a stage run (RBAC)', () => {
+    const owner = register('owner5@lab.org');
+    const viewer = register('viewer5@lab.org');
+    const project = makeProject(owner.token);
+    call('POST', `/api/projects/${project.id}/members`, { token: owner.token, body: { email: 'viewer5@lab.org', role: 'viewer' } });
+    const c = call('POST', `/api/projects/${project.id}/campaigns`, { token: owner.token, body: { objective: 'x', startingSmiles: ['c1ccccc1'] } }).body.campaign;
+    assert.equal(call('POST', `/api/projects/${project.id}/campaigns/${c.id}/stage`, { token: viewer.token, body: { admet: { enabled: true } } }).status, 403);
   });
 });

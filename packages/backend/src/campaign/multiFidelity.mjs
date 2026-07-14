@@ -16,6 +16,7 @@ import * as store from './persistence.mjs';
 import { saveScienceRun } from '../store.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
 import * as qm from '../compute/qmAdapter.mjs';
+import * as admet from '../compute/admetAdapter.mjs';
 import { embed3d } from '../compute/rdkitAdapter.mjs';
 import { capabilityAvailable } from './toolchain.mjs';
 
@@ -30,6 +31,11 @@ export const STAGE_REASON = {
   SELECTED_FOR_QM: 'SELECTED_FOR_QM',
   QM_FAILED: 'QM_FAILED',
   QM_RESULT_RETAINED: 'QM_RESULT_RETAINED',
+  ADMET_COMPUTED: 'ADMET_COMPUTED',
+  ADMET_FAILED: 'ADMET_FAILED',
+  ADMET_FILTER_PASSED: 'ADMET_FILTER_PASSED',
+  ADMET_FILTER_REJECTED: 'ADMET_FILTER_REJECTED',
+  TOXICITY_FILTER_REJECTED: 'TOXICITY_FILTER_REJECTED',
 };
 
 /**
@@ -112,6 +118,96 @@ export function qmCandidate(db, ctx, cand, { method = 'RHF', basis = 'sto-3g' } 
   return { ok: true, run, data: r.data };
 }
 
+let endpointCategoryCache = null;
+function endpointCategories() {
+  if (endpointCategoryCache) return endpointCategoryCache;
+  const r = admet.listEndpoints();
+  endpointCategoryCache = r.ok ? Object.fromEntries(r.endpoints.map((e) => [e.id, e])) : {};
+  return endpointCategoryCache;
+}
+
+/**
+ * Real ADMET + toxicity prediction for a batch of candidates (ADMET-AI, one
+ * model call amortizes the ~9 s load across the whole batch). Persists TWO
+ * Scientific Runs per candidate — 'admet-estimation' (absorption/distribution/
+ * metabolism/excretion/physicochemical) and 'toxicity-risk-estimation'
+ * (Toxicity category incl. Tox21 panel) — mirroring the two roadmap
+ * capabilities, though both come from the same underlying ensemble.
+ *
+ * `thresholds` (optional, explicit opt-in): { endpointId: { max: n } | { min: n } }.
+ * Only applied when the caller supplies them — otherwise every candidate is
+ * scored and persisted but none is rejected by this stage (constraints are
+ * never silently invented). Returns { executed, results, filtered:{passed,rejected} }.
+ */
+export function admetToxicityStage(db, ctx, candidates, { thresholds = null } = {}) {
+  if (!capabilityAvailable('admet-estimation')) return { executed: false, blocker: 'BLOCKED_BY_RUNTIME', capability: 'admet-estimation' };
+  if (candidates.length === 0) return { executed: true, results: [], filtered: { passed: [], rejected: [] } };
+  const categories = endpointCategories();
+  const smilesList = candidates.map((c) => c.canonicalSmiles);
+  const r = admet.predict(smilesList);
+  if (!r.ok) {
+    for (const cand of candidates) {
+      store.addEvent(db, { campaignId: ctx.campaignId, generation: cand.generation, type: 'STAGE_RESULT', payload: { stage: 'admet', candidateId: cand.id, reason: STAGE_REASON.ADMET_FAILED, error: r.error } });
+    }
+    return { executed: false, blocker: r.error, reason: r.reason };
+  }
+
+  const results = [];
+  const passed = [];
+  const rejected = [];
+  for (const cand of candidates) {
+    const full = r.predictions[cand.canonicalSmiles] ?? {};
+    const admetOut = {}; const toxOut = {}; const admetUnits = {}; const toxUnits = {};
+    for (const [key, value] of Object.entries(full)) {
+      if (key.endsWith('_drugbank_approved_percentile')) continue; // percentile context, not a raw prediction
+      const meta = categories[key];
+      if (!meta) continue;
+      if (meta.category === 'Toxicity') { toxOut[key] = value; toxUnits[key] = meta.units; }
+      else { admetOut[key] = value; admetUnits[key] = meta.units; }
+    }
+    const runAdmet = saveScienceRun(db, {
+      projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: cand.id,
+      engine: 'ADMET-AI', engineVersion: r.version, capability: 'admet-estimation',
+      method: 'Chemprop D-MPNN ensemble (TDC ADMET Benchmark Group)', status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
+      inputs: { smiles: cand.canonicalSmiles }, outputs: admetOut, units: admetUnits,
+      provenance: { engine: `ADMET-AI ${r.version}`, source: 'Swanson et al. 2024, Bioinformatics; TDC ADMET Benchmark Group' },
+      inputHash: sha16({ s: cand.canonicalSmiles, kind: 'admet' }), outputHash: sha16(admetOut), artifacts: [],
+    });
+    const runTox = saveScienceRun(db, {
+      projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: cand.id,
+      engine: 'ADMET-AI', engineVersion: r.version, capability: 'toxicity-risk-estimation',
+      method: 'Chemprop D-MPNN ensemble (TDC + Tox21)', status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
+      inputs: { smiles: cand.canonicalSmiles }, outputs: toxOut, units: toxUnits,
+      provenance: { engine: `ADMET-AI ${r.version}`, source: 'Swanson et al. 2024, Bioinformatics; TDC + Tox21' },
+      inputHash: sha16({ s: cand.canonicalSmiles, kind: 'toxicity' }), outputHash: sha16(toxOut), artifacts: [],
+    });
+    store.addEvent(db, { campaignId: ctx.campaignId, generation: cand.generation, type: 'STAGE_RESULT', payload: { stage: 'admet', candidateId: cand.id, reason: STAGE_REASON.ADMET_COMPUTED, admetRunId: runAdmet.id, toxicityRunId: runTox.id } });
+
+    let violates = null;
+    if (thresholds) {
+      for (const [endpointId, rule] of Object.entries(thresholds)) {
+        const val = full[endpointId];
+        if (val == null) continue;
+        if (rule.max != null && val > rule.max) { violates = { endpointId, value: val, rule }; break; }
+        if (rule.min != null && val < rule.min) { violates = { endpointId, value: val, rule }; break; }
+      }
+    }
+    const entry = { candidateId: cand.id, smiles: cand.canonicalSmiles, admet: admetOut, toxicity: toxOut, admetRunId: runAdmet.id, toxicityRunId: runTox.id };
+    results.push(entry);
+    if (thresholds) {
+      if (violates) {
+        const isTox = categories[violates.endpointId]?.category === 'Toxicity';
+        store.addEvent(db, { campaignId: ctx.campaignId, generation: cand.generation, type: 'STAGE_SELECTION', payload: { stage: 'admet', candidateId: cand.id, reason: isTox ? STAGE_REASON.TOXICITY_FILTER_REJECTED : STAGE_REASON.ADMET_FILTER_REJECTED, endpointId: violates.endpointId, value: violates.value, rule: violates.rule } });
+        rejected.push({ ...entry, violates });
+      } else {
+        store.addEvent(db, { campaignId: ctx.campaignId, generation: cand.generation, type: 'STAGE_SELECTION', payload: { stage: 'admet', candidateId: cand.id, reason: STAGE_REASON.ADMET_FILTER_PASSED } });
+        passed.push(entry);
+      }
+    }
+  }
+  return { executed: true, results, filtered: thresholds ? { passed, rejected } : null };
+}
+
 /**
  * Cross-engine conflict (MCRE): a candidate with a favorable (low) descriptor MPO
  * scalar but a poor (weak/positive) docking affinity is a MODEL_CONFLICT — the two
@@ -146,8 +242,21 @@ export function runMultiFidelityStage(db, campaignId, config = {}, { log = () =>
   const campaign = store.getCampaign(db, campaignId);
   if (!campaign) throw new Error('campaign_not_found');
   const ctx = { campaignId, projectId: campaign.projectId };
-  const candidates = store.listCandidates(db, campaignId);
-  const report = { docking: null, quantum: null, conflicts: [] };
+  let candidates = store.listCandidates(db, campaignId);
+  const report = { admet: null, docking: null, quantum: null, conflicts: [] };
+
+  // ---- ADMET + toxicity stage (cheap-ish ML; runs on ALL retained candidates, before docking/QM) ----
+  if (config.admet?.enabled) {
+    const retained = candidates.filter((c) => c.status === 'retained');
+    log('ADMET', { candidates: retained.length });
+    const ar = admetToxicityStage(db, ctx, retained, { thresholds: config.admet.thresholds ?? null });
+    report.admet = ar;
+    if (ar.executed && ar.filtered) {
+      // Explicit thresholds were supplied: only candidates passing them proceed to docking/QM.
+      const passedIds = new Set(ar.filtered.passed.map((p) => p.candidateId));
+      candidates = candidates.filter((c) => c.status !== 'retained' || passedIds.has(c.id));
+    }
+  }
 
   // ---- Docking stage (medium cost) ----
   if (config.docking?.enabled) {

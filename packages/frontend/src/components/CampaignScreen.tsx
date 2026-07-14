@@ -3,7 +3,7 @@ import { useSession, getToken } from '../core/backend/session';
 import {
   listProjects, listToolchain, listCampaigns, createCampaign, getCampaign, startCampaign, cancelCampaign,
   listCampaignCandidates, listCampaignDecisions, getDiscoveryGraph, askCampaignWhy,
-  listCampaignScienceRuns, listCampaignConflicts, runCampaignStage,
+  listCampaignScienceRuns, listCampaignConflicts, runCampaignStage, getAdmetEndpoints,
   type Project, type ToolchainEntry, type Campaign, type CampaignCandidate, type CampaignDecision,
   type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict,
 } from '../core/backend/client';
@@ -56,6 +56,7 @@ function CampaignWorkspace() {
   const [graph, setGraph] = useState<DiscoveryGraph | null>(null);
   const [scienceRuns, setScienceRuns] = useState<ScienceRun[]>([]);
   const [conflicts, setConflicts] = useState<ModelConflict[]>([]);
+  const [admetEndpointCount, setAdmetEndpointCount] = useState<number | null>(null);
   const [why, setWhy] = useState<{ label: string; a: WhyAnswer } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,6 +71,7 @@ function CampaignWorkspace() {
     const token = getToken();
     if (!token) return;
     void listToolchain().then((r) => { if (r.ok) setToolchain(r.data); });
+    void getAdmetEndpoints().then((r) => { if (r.ok) setAdmetEndpointCount(r.data.length); });
     void listProjects(token).then((r) => {
       if (r.ok) {
         const writable = r.data.filter((p) => p.role === 'owner' || p.role === 'admin' || p.role === 'editor');
@@ -157,7 +159,11 @@ function CampaignWorkspace() {
     const token = getToken();
     if (!token || !projectId) return;
     setError(null); setBusy(true);
-    const r = await runCampaignStage(token, projectId, c.id, { docking: { enabled: true, budget: 3 }, quantum: { enabled: true, budget: 2 } });
+    const r = await runCampaignStage(token, projectId, c.id, {
+      admet: { enabled: true }, // wynik naukowy na WSZYSTKICH zachowanych kandydatach; bez progów = brak odrzuceń (jawne, nie ukryte)
+      docking: { enabled: true, budget: 3 },
+      quantum: { enabled: true, budget: 2 },
+    });
     setBusy(false);
     if (!r.ok) { setError(r.message); return; }
     startPolling(c.id); // etapy ciężkie trwają; odświeżaj utrwalony stan
@@ -346,11 +352,12 @@ function CampaignWorkspace() {
             <div className="settings-subsection">
               <h4>Etapy multi-fidelity (ciężkie silniki)</h4>
               <p className="muted small">
-                RDKit (tanie) → filtr Pareto → dokowanie (średnie) → chemia kwantowa (drogie). Uruchamiane tylko na
-                wyselekcjonowanych kandydatach z budżetem. Wyniki to MODEL_ESTIMATE — bez deklaracji powinowactwa/terapii.
+                RDKit (tanie) → ADMET/toksyczność ({admetEndpointCount ?? '…'} endpointów, wszyscy zachowani kandydaci) → dokowanie (średnie,
+                Pareto-wyselekcjonowani) → chemia kwantowa (drogie, budżetowana). Wyniki to MODEL_ESTIMATE — bez
+                deklaracji powinowactwa/bezpieczeństwa/terapii.
               </p>
               <button className="primary-btn" disabled={busy} onClick={() => void onRunStage(selected)}>
-                ▶ Uruchom dokowanie + chemię kwantową
+                ▶ Uruchom ADMET + toksyczność + dokowanie + chemię kwantową
               </button>
             </div>
           )}
@@ -366,6 +373,8 @@ function CampaignWorkspace() {
                     <div className="muted">
                       {r.capability === 'molecular-docking' && <>best {String((r.outputs as Record<string, unknown>).bestAffinityKcalMol)} {r.units.bestAffinityKcalMol}</>}
                       {r.capability === 'quantum-chemistry' && <>E {String((r.outputs as Record<string, unknown>).energyHartree)} Ha, gap {String((r.outputs as Record<string, unknown>).homoLumoGapEv)} eV</>}
+                      {r.capability === 'admet-estimation' && <>MW {fmtNum((r.outputs as Record<string, unknown>).molecular_weight)}, logP {fmtNum((r.outputs as Record<string, unknown>).logP)}, BBB {fmtProb((r.outputs as Record<string, unknown>).BBB_Martins)}, HIA {fmtProb((r.outputs as Record<string, unknown>).HIA_Hou)}</>}
+                      {r.capability === 'toxicity-risk-estimation' && <>hERG {fmtProb((r.outputs as Record<string, unknown>).hERG)}, AMES {fmtProb((r.outputs as Record<string, unknown>).AMES)}, DILI {fmtProb((r.outputs as Record<string, unknown>).DILI)}, ClinTox {fmtProb((r.outputs as Record<string, unknown>).ClinTox)}</>}
                       {' · '}method {r.method} · inHash {r.inputHash?.slice(0, 8)} · outHash {r.outputHash?.slice(0, 8)} · {r.durationMs} ms
                     </div>
                     {r.artifacts.length > 0 && <div className="muted small">artefakty: {r.artifacts.map((a) => `${a.kind}(${a.sha256_16 ?? ''})`).join(', ')}</div>}
@@ -419,4 +428,14 @@ function Metric({ label, value }: { label: string; value: number | string }) {
 function StatusPill({ status }: { status: string }) {
   const good = status === 'AVAILABLE';
   return <span className={good ? 'pill pill-ok' : 'pill pill-warn'}>{status}</span>;
+}
+
+/** Realna liczba fizykochemiczna (MW, logP…) — brak wartości oznacza brakujący endpoint, nigdy zmyśloną liczbę. */
+function fmtNum(v: unknown): string {
+  return typeof v === 'number' ? v.toFixed(2) : '—';
+}
+
+/** Prawdopodobieństwo klasyfikacyjne [0,1] z zespołu ADMET-AI (MODEL_ESTIMATE) — nigdy SAFE/NON-TOXIC. */
+function fmtProb(v: unknown): string {
+  return typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : '—';
 }

@@ -56,17 +56,32 @@ describe('docking pipeline — REAL AutoDock Vina end-to-end', () => {
     assert.ok(pipe.docking.bestAffinityKcalMol < 0, 'Vina favorable score');
     assert.ok(pipe.docking.nPoses >= 1);
     assert.equal(pipe.docking.receptorKind, 'prepared_receptor');
+    // binding-site identification: co-crystal ligand → REFERENCE_LIGAND method
+    assert.equal(pipe.bindingSite.method, 'REFERENCE_LIGAND');
     // provenance: input structure hashed
     assert.ok(pipe.preparedReceptor.inputStructureSha256 && pipe.preparedReceptor.inputStructureSha256.length === 64);
     assert.ok(pipe.preparedReceptor.artifacts.some((a) => a.kind === 'receptor_pdbqt'));
   });
 
-  (on ? test : test.skip)('prepareReceptor fails closed on a structure with no reference ligand', () => {
-    // protein-only complex: build one then strip the HETATM ligand lines
+  (on ? test : test.skip)('apo structure (no reference ligand) is docked via a BLIND_WHOLE_PROTEIN site, not failed', () => {
     const complex = docking.buildReferenceComplex({ sequence: 'ACDEFGHIKLMN', ligandSmiles: 'c1ccccc1', seed: 7 });
-    const proteinOnly = complex.structure.split('\n').filter((l) => !l.startsWith('HETATM')).join('\n');
-    const r = docking.prepareReceptor({ structure: proteinOnly, format: 'pdb' });
-    assert.equal(r.ok, false);
-    assert.equal(r.error, 'no_reference_ligand');
+    const apo = complex.structure.split('\n').filter((l) => !l.startsWith('HETATM')).join('\n');
+    const prep = docking.prepareReceptor({ structure: apo, format: 'pdb' });
+    assert.equal(prep.ok, true);
+    assert.equal(prep.bindingSite.method, 'BLIND_WHOLE_PROTEIN');
+    assert.ok(prep.referenceLigand === null || prep.referenceLigand === undefined);
+    // and it actually docks
+    const pipe = docking.dockPipeline({ structure: apo, ligandSmiles: 'CCO', seed: 42 });
+    assert.equal(pipe.ok, true);
+    assert.ok(pipe.docking.bestAffinityKcalMol < 0);
+  });
+
+  (on ? test : test.skip)('a caller-specified binding site is honoured (USER_SPECIFIED)', () => {
+    const complex = docking.buildReferenceComplex({ sequence: 'ACDEFGHIKLMN', ligandSmiles: 'c1ccccc1', seed: 7 });
+    const apo = complex.structure.split('\n').filter((l) => !l.startsWith('HETATM')).join('\n');
+    const prep = docking.prepareReceptor({ structure: apo, format: 'pdb', boxCenter: [0, 0, 0], boxSize: [20, 20, 20] });
+    assert.equal(prep.ok, true);
+    assert.equal(prep.bindingSite.method, 'USER_SPECIFIED');
+    assert.deepEqual(prep.boxSize, [20, 20, 20]);
   });
 });

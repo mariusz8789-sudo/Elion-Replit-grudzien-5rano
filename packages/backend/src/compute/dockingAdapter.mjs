@@ -136,12 +136,12 @@ export function prepareReceptor(spec) {
   if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
   if (!spec || !spec.structure) return { ok: false, error: 'invalid_input', reason: 'structure wymagana' };
   try {
-    const r = invoke({ cmd: 'prepare_receptor', structure: spec.structure, format: spec.format ?? 'pdb', padding: spec.padding ?? 5, seed: spec.seed ?? 42, outDir: artifactDir('recprep') }, TIMEOUT_MS);
+    const r = invoke({ cmd: 'prepare_receptor', structure: spec.structure, format: spec.format ?? 'pdb', padding: spec.padding ?? 5, seed: spec.seed ?? 42, boxCenter: spec.boxCenter, boxSize: spec.boxSize, outDir: artifactDir('recprep') }, TIMEOUT_MS);
     if (!r.ok) return { ok: false, error: r.error, reason: r.reason };
     return {
       ok: true, receptorPdbqtPath: r.receptorPdbqtPath, cleanReceptorPdb: r.cleanReceptorPdb,
       center: r.center, boxSize: r.boxSize, padding: r.padding,
-      referenceLigand: r.referenceLigand, nProteinAtoms: r.nProteinAtoms, nReceptorPdbqtAtoms: r.nReceptorPdbqtAtoms,
+      bindingSite: r.bindingSite, referenceLigand: r.referenceLigand, nProteinAtoms: r.nProteinAtoms, nReceptorPdbqtAtoms: r.nReceptorPdbqtAtoms,
       artifacts: r.artifacts, inputStructureSha256: r.inputStructureSha256,
     };
   } catch (err) {
@@ -173,9 +173,9 @@ export function dockPipeline(spec) {
   const d = detect();
   if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
   if (!spec || !spec.ligandSmiles || !spec.structure) return { ok: false, error: 'invalid_input', reason: 'structure + ligandSmiles wymagane' };
-  const prep = prepareReceptor({ structure: spec.structure, format: spec.format, padding: spec.padding, seed: spec.seed });
+  const prep = prepareReceptor({ structure: spec.structure, format: spec.format, padding: spec.padding, seed: spec.seed, boxCenter: spec.boxCenter, boxSize: spec.boxSize });
   if (!prep.ok) return { ok: false, error: prep.error, reason: prep.reason, stage: 'prepare_receptor' };
   const docked = dock({ ligandSmiles: spec.ligandSmiles, receptorPdbqtPath: prep.receptorPdbqtPath, center: prep.center, boxSize: prep.boxSize, exhaustiveness: spec.exhaustiveness, nPoses: spec.nPoses, seed: spec.seed });
   if (!docked.ok) return { ok: false, error: docked.error, reason: docked.reason, stage: 'dock', preparedReceptor: prep };
-  return { ok: true, preparedReceptor: prep, docking: docked.data, grid: { center: prep.center, boxSize: prep.boxSize }, referenceLigand: prep.referenceLigand };
+  return { ok: true, preparedReceptor: prep, docking: docked.data, grid: { center: prep.center, boxSize: prep.boxSize }, bindingSite: prep.bindingSite, referenceLigand: prep.referenceLigand };
 }

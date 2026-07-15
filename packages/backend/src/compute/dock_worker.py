@@ -96,6 +96,50 @@ def _grid_from_coords(coords, padding):
     return center, box
 
 
+def _protein_atom_coords(st):
+    """All protein (standard-residue) atom coordinates — used for a blind whole-protein box."""
+    coords = []
+    if len(st) == 0:
+        return coords
+    for chain in st[0]:
+        for res in chain:
+            if res.het_flag == "H" or res.name not in STANDARD_AA:
+                continue
+            coords.extend((a.pos.x, a.pos.y, a.pos.z) for a in res)
+    return coords
+
+
+MAX_BLIND_BOX = 40.0
+
+
+def _identify_binding_site(st, req, ref):
+    """Identify the docking binding site by an explicit method, deterministically:
+      USER_SPECIFIED    — caller supplied boxCenter + boxSize
+      REFERENCE_LIGAND  — grid centred on the extracted co-crystallised ligand (preferred)
+      BLIND_WHOLE_PROTEIN — apo structure: a coarse box at the protein centroid (honestly labelled)
+    Returns { method, center, boxSize, note } or None when there is no protein to dock into."""
+    padding = float(req.get("padding", 5.0))
+    uc, ub = req.get("boxCenter"), req.get("boxSize")
+    if uc and ub:
+        return {"method": "USER_SPECIFIED",
+                "center": [round(float(c), 3) for c in uc][:3],
+                "boxSize": [round(min(60.0, max(16.0, float(b))), 1) for b in ub][:3],
+                "note": "binding site supplied by the caller"}
+    if ref is not None:
+        center, box = _grid_from_coords(ref["coords"], padding)
+        return {"method": "REFERENCE_LIGAND", "center": center, "boxSize": box,
+                "note": "grid centred on the extracted co-crystallised ligand %s" % ref["name"]}
+    coords = _protein_atom_coords(st)
+    if not coords:
+        return None
+    center, full = _grid_from_coords(coords, 0.0)
+    box = [round(min(MAX_BLIND_BOX, max(16.0, e)), 1) for e in full]
+    envelops = all(f <= MAX_BLIND_BOX for f in full)
+    return {"method": "BLIND_WHOLE_PROTEIN", "center": center, "boxSize": box,
+            "note": "no co-crystal ligand; coarse blind box at the protein centroid%s"
+                    % ("" if envelops else " (does NOT envelop the whole protein — supply boxCenter/boxSize for focused docking)")}
+
+
 def _write_protein_pdb(st, path):
     """Write a receptor-only PDB (ligands + waters removed) for receptor preparation."""
     import copy
@@ -365,12 +409,13 @@ def main():
             os.makedirs(out_dir, exist_ok=True)
             st = _read_structure(req["structure"], req.get("format", "pdb"))
             ref = _extract_reference_ligand(st)
-            if ref is None:
-                print(json.dumps({"ok": False, "error": "no_reference_ligand",
-                                  "reason": "structure has no non-ion hetero ligand to define the binding site"}))
-                return
             padding = float(req.get("padding", 5.0))
-            center, box = _grid_from_coords(ref["coords"], padding)
+            site = _identify_binding_site(st, req, ref)
+            if site is None:
+                print(json.dumps({"ok": False, "error": "no_binding_site",
+                                  "reason": "no reference ligand, no supplied site, and no protein atoms to define a binding site"}))
+                return
+            center, box = site["center"], site["boxSize"]
             prot_pdb = os.path.join(out_dir, "receptor_clean.pdb")
             n_prot_atoms = _write_protein_pdb(st, prot_pdb)
             pdbqt_path = _prepare_receptor_pdbqt(prot_pdb, os.path.join(out_dir, "receptor"))
@@ -381,7 +426,8 @@ def main():
                 "cleanReceptorPdb": prot_pdb, "nProteinAtoms": n_prot_atoms,
                 "nReceptorPdbqtAtoms": n_rec_atoms,
                 "center": center, "boxSize": box, "padding": padding,
-                "referenceLigand": {k: v for k, v in ref.items() if k != "coords"},
+                "bindingSite": {"method": site["method"], "note": site["note"]},
+                "referenceLigand": {k: v for k, v in ref.items() if k != "coords"} if ref else None,
                 "artifacts": [
                     {"kind": "receptor_clean_pdb", "path": prot_pdb, "sha256_16": _sha(open(prot_pdb).read())},
                     {"kind": "receptor_pdbqt", "path": pdbqt_path, "sha256_16": _sha(rec_text)},

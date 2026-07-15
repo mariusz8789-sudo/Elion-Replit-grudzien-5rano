@@ -10,6 +10,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -37,6 +38,8 @@ const formSchema = insertSharedRideSchema.extend({
 export default function CarpoolPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [bookingRideId, setBookingRideId] = useState<string | null>(null);
+  const [seatsBooked, setSeatsBooked] = useState("1");
   const { toast } = useToast();
 
   const { data: rides = [], isLoading } = useQuery<SharedRide[]>({
@@ -91,6 +94,23 @@ export default function CarpoolPage() {
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     await createMutation.mutateAsync(data);
   };
+
+  const bookRideMutation = useMutation({
+    mutationFn: async ({ rideId, seats }: { rideId: string; seats: number }) => {
+      const response = await apiRequest("POST", `/api/carpool/${rideId}/book`, { seatsBooked: seats });
+      if (!response.ok) throw new Error((await response.json()).message || "Failed to book ride");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/carpool"] });
+      toast({ title: "Seat booked!", description: "Your carpool seat has been reserved." });
+      setBookingRideId(null);
+      setSeatsBooked("1");
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not book ride", description: error.message, variant: "destructive" });
+    },
+  });
 
   const filteredRides = rides.filter((ride) => 
     ride.fromAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -190,9 +210,37 @@ export default function CarpoolPage() {
                     </p>
                   )}
 
-                  <Button className="w-full" size="sm" data-testid={`button-book-${ride.id}`}>
-                    Book Ride
-                  </Button>
+                  <Dialog open={bookingRideId === ride.id} onOpenChange={(open) => { setBookingRideId(open ? ride.id : null); setSeatsBooked("1"); }}>
+                    <DialogTrigger asChild>
+                      <Button className="w-full" size="sm" disabled={ride.availableSeats < 1} data-testid={`button-book-${ride.id}`}>
+                        {ride.availableSeats < 1 ? "Fully booked" : "Book Ride"}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Book {ride.fromAddress} &rarr; {ride.toAddress}</DialogTitle>
+                        <DialogDescription>{ride.availableSeats} seat(s) available at ${ride.pricePerSeat}/seat</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-3">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={ride.availableSeats}
+                          value={seatsBooked}
+                          onChange={(e) => setSeatsBooked(e.target.value)}
+                          data-testid={`input-seats-${ride.id}`}
+                        />
+                        <Button
+                          className="w-full"
+                          onClick={() => bookRideMutation.mutate({ rideId: ride.id, seats: Number(seatsBooked) })}
+                          disabled={!seatsBooked || Number(seatsBooked) < 1 || bookRideMutation.isPending}
+                          data-testid={`button-confirm-book-${ride.id}`}
+                        >
+                          Confirm Booking (${(Number(seatsBooked || 0) * Number(ride.pricePerSeat)).toFixed(2)})
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             ))}

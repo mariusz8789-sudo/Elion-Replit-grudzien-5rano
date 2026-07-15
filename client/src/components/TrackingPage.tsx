@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, MapPin, Clock, CheckCircle2, Truck, User } from "lucide-react";
 import { format } from "date-fns";
-import type { Booking } from "@shared/schema";
+import type { Booking, Driver } from "@shared/schema";
 import BookingChat from "./BookingChat";
+import { useAuth } from "@/lib/auth";
 
 interface StatusStep {
   status: string;
@@ -97,6 +98,7 @@ function StatusTimeline({ currentStatus }: { currentStatus: string }) {
 export default function TrackingPage() {
   const [, params] = useRoute("/track/:id");
   const bookingId = params?.id;
+  const { user } = useAuth();
 
   const { data: booking, isLoading } = useQuery<Booking>({
     queryKey: ["/api/bookings", bookingId],
@@ -107,6 +109,21 @@ export default function TrackingPage() {
     },
     enabled: !!bookingId,
   });
+
+  // Chat/call is between the customer and the assigned driver; work out which one the
+  // current viewer is NOT, so BookingChat knows who to call/message.
+  const { data: assignedDriver } = useQuery<Driver>({
+    queryKey: ["/api/drivers", booking?.driverId],
+    queryFn: async () => {
+      const response = await fetch(`/api/drivers/${booking!.driverId}`);
+      if (!response.ok) throw new Error("Failed to fetch driver");
+      return response.json();
+    },
+    enabled: !!booking?.driverId,
+  });
+  const otherUserId = user && booking
+    ? (user.id === booking.userId ? assignedDriver?.userId : booking.userId)
+    : undefined;
 
   if (isLoading) {
     return (
@@ -231,7 +248,7 @@ export default function TrackingPage() {
       )}
 
       <div className="mt-6">
-        <BookingChat bookingId={bookingId!} />
+        <BookingChat bookingId={bookingId!} otherUserId={otherUserId} />
       </div>
 
       <div className="mt-6 p-4 bg-muted/50 rounded-lg">

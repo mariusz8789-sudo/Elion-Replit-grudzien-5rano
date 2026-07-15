@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, MessageSquare, Loader2, Languages, Phone, Video } from "lucide-react";
+import { Send, MessageSquare, Loader2, Languages, Phone, Video, Paperclip, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
-import type { Message } from "@shared/schema";
+import type { Message, Attachment } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -29,7 +29,9 @@ export default function BookingChat({ bookingId, otherUserId }: BookingChatProps
   const [message, setMessage] = useState("");
   const [translations, setTranslations] = useState<Record<string, MessageTranslation>>({});
   const [translatingId, setTranslatingId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const { i18n } = useTranslation();
@@ -38,6 +40,52 @@ export default function BookingChat({ bookingId, otherUserId }: BookingChatProps
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/bookings", bookingId, "messages"],
   });
+
+  const { data: attachments = [] } = useQuery<Attachment[]>({
+    queryKey: ["/api/bookings", bookingId, "attachments"],
+  });
+
+  const uploadAttachmentMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fileUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const response = await apiRequest("POST", "/api/attachments", {
+        bookingId,
+        fileName: file.name,
+        fileUrl,
+        fileType: file.type,
+        fileSize: file.size,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings", bookingId, "attachments"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum size is 8MB.", variant: "destructive" });
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      await uploadAttachmentMutation.mutateAsync(file);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -286,8 +334,43 @@ export default function BookingChat({ bookingId, otherUserId }: BookingChatProps
           </div>
         </ScrollArea>
 
+        {attachments.length > 0 && (
+          <div className="px-4 pt-2 flex flex-wrap gap-2 border-t">
+            {attachments.map((a) => (
+              <a
+                key={a.id}
+                href={a.fileUrl}
+                download={a.fileName}
+                className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-muted hover:bg-muted/80"
+                data-testid={`link-attachment-${a.id}`}
+              >
+                <FileText className="w-3 h-3" />
+                {a.fileName}
+              </a>
+            ))}
+          </div>
+        )}
+
         <form onSubmit={handleSend} className="p-4 border-t">
           <div className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
+              className="hidden"
+              onChange={handleFileSelect}
+              data-testid="input-attachment-file"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              data-testid="button-attach-file"
+            >
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+            </Button>
             <Input
               placeholder="Type a message..."
               value={message}

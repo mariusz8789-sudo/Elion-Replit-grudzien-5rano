@@ -1,7 +1,7 @@
 // @ts-expect-error - @mapbox/mapbox-sdk ships no type declarations for this subpath
-import mbxGeocoding from "@mapbox/mapbox-sdk/services/geocoding";
+import mbxGeocoding from "@mapbox/mapbox-sdk/services/geocoding.js";
 // @ts-expect-error - @mapbox/mapbox-sdk ships no type declarations for this subpath
-import mbxDirections from "@mapbox/mapbox-sdk/services/directions";
+import mbxDirections from "@mapbox/mapbox-sdk/services/directions.js";
 import { env } from "./env";
 
 // Constructed lazily so a deployment without a Mapbox token configured can still boot

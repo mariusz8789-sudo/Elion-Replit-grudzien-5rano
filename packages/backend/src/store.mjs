@@ -535,8 +535,27 @@ CREATE TABLE IF NOT EXISTS agent_invocations (
 CREATE INDEX IF NOT EXISTS idx_agent_invocations_mission ON agent_invocations(mission_id, created_at);
 `;
 
+// Meta-Orchestrator (Priority 10): append-only strategy outcome records enabling
+// cross-run, operational strategy scoring (measured history, not neural retraining).
+const SCHEMA_V12 = `
+CREATE TABLE IF NOT EXISTS strategy_records (
+  id            TEXT PRIMARY KEY,
+  mission_id    TEXT,
+  strategy_key  TEXT NOT NULL,
+  domain        TEXT,
+  outcome_class TEXT NOT NULL,
+  score         REAL,
+  metrics_json  TEXT NOT NULL DEFAULT '{}',
+  reasons_json  TEXT NOT NULL DEFAULT '[]',
+  created_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_strategy_records_key ON strategy_records(strategy_key, created_at);
+CREATE INDEX IF NOT EXISTS idx_strategy_records_domain ON strategy_records(domain, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 12) db.exec(SCHEMA_V12);
   if (version < 11) db.exec(SCHEMA_V11);
   if (version < 10) db.exec(SCHEMA_V10);
   if (version < 9) db.exec(SCHEMA_V9);
@@ -573,7 +592,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 11) db.exec('PRAGMA user_version = 11');
+  if (version < 12) db.exec('PRAGMA user_version = 12');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1681,4 +1700,32 @@ export function getAgentInvocation(db, id) {
 }
 export function listAgentInvocations(db, missionId) {
   return db.prepare('SELECT * FROM agent_invocations WHERE mission_id = ? ORDER BY created_at ASC').all(missionId).map(toAgentInvocation);
+}
+
+/* ---- strategy_records (Priority 10 — cross-run strategy scoring, append-only) ---- */
+function toStrategyRecord(r) {
+  if (!r) return null;
+  return {
+    id: r.id, missionId: r.mission_id, strategyKey: r.strategy_key, domain: r.domain,
+    outcomeClass: r.outcome_class, score: r.score, metrics: JSON.parse(r.metrics_json),
+    reasons: JSON.parse(r.reasons_json), createdAt: r.created_at,
+  };
+}
+export function saveStrategyRecord(db, s) {
+  const id = s.id ?? newId();
+  db.prepare(
+    `INSERT INTO strategy_records (id, mission_id, strategy_key, domain, outcome_class, score, metrics_json, reasons_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, s.missionId ?? null, s.strategyKey, s.domain ?? null, s.outcomeClass, s.score ?? null,
+    JSON.stringify(s.metrics ?? {}), JSON.stringify(s.reasons ?? []), Date.now(),
+  );
+  return toStrategyRecord(db.prepare('SELECT * FROM strategy_records WHERE id = ?').get(id));
+}
+export function listStrategyRecords(db, { strategyKey = null, domain = null } = {}) {
+  let rows;
+  if (strategyKey) rows = db.prepare('SELECT * FROM strategy_records WHERE strategy_key = ? ORDER BY created_at ASC').all(strategyKey);
+  else if (domain) rows = db.prepare('SELECT * FROM strategy_records WHERE domain = ? ORDER BY created_at ASC').all(domain);
+  else rows = db.prepare('SELECT * FROM strategy_records ORDER BY created_at ASC').all();
+  return rows.map(toStrategyRecord);
 }

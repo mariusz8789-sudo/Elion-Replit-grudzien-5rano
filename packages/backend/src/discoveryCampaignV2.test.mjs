@@ -40,6 +40,8 @@ function fakeDeps({ dockAvailable = true, gate = 'PROCEED' } = {}) {
       targetFunnel: () => ({ primaryGate: { gate }, primaryTarget: { targetName: 'T1' }, scoringPolicyVersion: 'v1', alternatives: [] }),
       requestReasoning: () => ({ capability: 'target_reasoning', status: 'CAPABILITY_BLOCKED', label: 'HUMAN_REVIEW_REQUIRED', requestHash: 'rh', routeStatus: 'CAPABILITY_GAP', output: null, note: 'no live provider (CAPABILITY_BLOCKED)' }),
       predictOffTarget: (preds) => (preds ? { status: 'COMPLETED', version: 'genesis-offtarget/1', epistemicStatus: 'MODEL_INFERRED', risk: 'LOW', confidence: 0.8, selectivity: 1, offTargetHits: { strong: 0, weak: 0, panelSize: 17 }, toxicityFlags: { strong: 0, severeStrong: 0, panelSize: 6 }, offTargets: [], toxicity: [], explanation: 'low', evidence: { source: 'ADMET-AI', epistemicStatus: 'MODEL_INFERRED' } } : { status: 'BLOCKED_BY_RESOURCES' }),
+      detectMdCapability: () => ({ version: 'genesis-md/1', openmm: { available: true }, ligandForceField: { available: false }, canRunComplexMd: false, reason: 'ligand force-field parameterisation unavailable' }),
+      runMdStage: (docked) => ({ version: 'genesis-md/1', status: 'BLOCKED_BY_RUNTIME', capability: { openmm: true, ligandForceField: false, canRunComplexMd: false, reason: 'no ligand FF' }, candidatesConsidered: docked.length, results: docked.map((c) => ({ candidateId: c.candidateId, dockingScoreKcalMol: c.docking?.bestAffinityKcalMol ?? null, md: { status: 'BLOCKED_BY_RUNTIME', reason: 'no ligand FF' }, mmgbsa: { status: 'BLOCKED_BY_RUNTIME', dockingScoreKcalMol: c.docking?.bestAffinityKcalMol ?? null, bindingFreeEnergyKcalMol: null } })), note: 'separate' }),
       runCandidateGenerationV2: () => ({ status: 'COMPLETED_RANKED', candidates, ranking, engineMatrix: { RDKit: { status: 'AVAILABLE' }, 'ADMET-AI': { status: 'AVAILABLE' } } }),
       truthFinalGate: () => ({ decision: 'GO_COMPUTATIONAL', rejections: [] }),
       detectConflicts: () => [],
@@ -81,6 +83,10 @@ describe('discoveryCampaignV2 — full chain (fake deps)', () => {
     assert.ok(r.dossier.knowledgeGraph.stats.nodes > 0);
     assert.equal(r.dossier.knowledgeGraph.stats.allEdgesHaveProvenance, true);
     assert.ok(stageNames.includes('KNOWLEDGE_GRAPH'));
+    // MD + MM-GBSA integrated + honestly blocked (no ligand FF), docking score kept separate
+    assert.ok(stageNames.includes('MD_STABILITY') && stageNames.includes('MM_GBSA'));
+    assert.equal(r.dossier.summaries.molecularDynamics.status, 'BLOCKED_BY_RUNTIME');
+    assert.equal(r.dossier.summaries.mmGbsa.separateFromDockingScore, true);
     // Reasoning Brain honestly blocked without a live model — never fabricated
     assert.equal(r.dossier.reasoningLedger.status, 'CAPABILITY_BLOCKED');
     // mandated campaign-level dossier sections

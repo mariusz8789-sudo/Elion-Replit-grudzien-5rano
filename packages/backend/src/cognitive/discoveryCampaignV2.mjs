@@ -23,6 +23,7 @@ import { ingestBundle } from '../corpus/corpusIngest.mjs';
 import { truthFinalGate, detectConflicts } from '../campaign/campaignRunner001.mjs';
 import { predictOffTarget, OFF_TARGET_PANEL } from './offTarget.mjs';
 import { buildKnowledgeGraph } from './knowledgeGraph.mjs';
+import { runMdStage, detectMdCapability } from './molecularDynamics.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
 
 export const CAMPAIGN_V2_VERSION = 'genesis-discovery-campaign/2';
@@ -42,6 +43,8 @@ export function defaultDeps() {
     targetFunnel: ti.targetFunnel,
     requestReasoning: reasoning.requestReasoning,
     predictOffTarget,
+    detectMdCapability,
+    runMdStage,
     runCandidateGenerationV2: candGen.runCandidateGenerationV2,
     truthFinalGate,
     detectConflicts,
@@ -91,7 +94,7 @@ export function runDiscoveryCampaignV2(opts = {}) {
     campaignId = 'discovery-campaign-v2', bundleRoot = null,
     structure = null, structureFormat = 'pdb',
     targetHypotheses = [], supplementalClaims = [],
-    seeds, minCandidates = 100, maxCandidates, dockTopN = 5,
+    seeds, minCandidates = 100, maxCandidates, dockTopN = 5, mdTopN = 3,
     triageConfig = {}, deps = defaultDeps(),
   } = opts;
 
@@ -171,6 +174,15 @@ export function runDiscoveryCampaignV2(opts = {}) {
     return { status: dockingStatus, note: dockingStatus === 'BLOCKED_BY_RESOURCES' ? 'no receptor structure' : 'Vina unavailable — never simulated' };
   };
 
+  // ── 6b) MOLECULAR DYNAMICS + MM-GBSA (Phases 2/3) — only on top-ranked docked candidates ────────
+  const mdCapability = deps.detectMdCapability();
+  const dockedForMd = toDock.filter((c) => dockedById.get(c.candidateId)?.status === 'DOCKED')
+    .map((c) => ({ candidateId: c.candidateId, canonicalSmiles: c.canonicalSmiles, docking: dockedById.get(c.candidateId) }));
+  const mdStage = deps.runMdStage(dockedForMd, { topN: mdTopN, capability: mdCapability });
+  const mdById = new Map(mdStage.results.map((r) => [r.candidateId, r]));
+  mark('MD_STABILITY', mdStage.status, mdStage.status === 'COMPLETED' ? `${mdStage.results.length} complex MD run(s)` : (mdCapability.reason ?? 'MD unavailable'));
+  mark('MM_GBSA', mdStage.status === 'COMPLETED' ? 'COMPLETED' : 'BLOCKED_BY_RUNTIME', mdStage.status === 'COMPLETED' ? 'rescored after MD' : 'requires an MD trajectory (MD blocked)');
+
   // ── 7) TRUTH ENGINE (final gate) ───────────────────────────────────────────────────────────────
   const truthGate = deps.truthFinalGate({ claimRegistry, rankingProduced: gen.ranking.length > 0, forbiddenClaimTexts: supplementalClaims.map((c) => c.text) });
   mark('TRUTH_ENGINE', truthGate.decision, `${truthGate.rejections.length} rejection(s)`);
@@ -221,6 +233,8 @@ export function runDiscoveryCampaignV2(opts = {}) {
           ? { risk: c.offTarget.risk, confidence: c.offTarget.confidence, selectivity: c.offTarget.selectivity, offTargetHits: c.offTarget.offTargetHits, toxicityFlags: c.offTarget.toxicityFlags, explanation: c.offTarget.explanation, epistemicStatus: c.offTarget.epistemicStatus, evidence: c.offTarget.evidence, topOffTargets: c.offTarget.offTargets.filter((o) => o.flag !== 'NONE').slice(0, 5) }
           : { status: c.offTarget?.status ?? 'UNAVAILABLE', reason: c.offTarget?.reason },
         docking: dockRes,                                    // (5) docking
+        molecularDynamics: mdById.get(c.candidateId)?.md ? { status: mdById.get(c.candidateId).md.status, reason: mdById.get(c.candidateId).md.reason ?? null } : { status: 'NOT_RUN', note: `outside top-${mdTopN} MD funnel or not docked` },
+        mmGbsa: mdById.get(c.candidateId)?.mmgbsa ? { status: mdById.get(c.candidateId).mmgbsa.status, dockingScoreKcalMol: mdById.get(c.candidateId).mmgbsa.dockingScoreKcalMol, bindingFreeEnergyKcalMol: mdById.get(c.candidateId).mmgbsa.bindingFreeEnergyKcalMol, reason: mdById.get(c.candidateId).mmgbsa.reason ?? null } : { status: 'NOT_RUN' },
         truthEngineDecision: truthGate.decision,             // (6) Truth Engine decision
         provenance: { candidateOrigin: 'RDKit SMARTS analogue enumeration (COMPUTED)', parentSmiles: c.parentSmiles, transformation: c.transformation, seed: c.seedName, evidenceProvenance: evProvenance, rankingPolicyVersion: c.ranking?.rankingPolicyVersion }, // (7) provenance
         computationalConfidence: computationalConfidence(c, { evidenceSupport, dockingRan }), // (8) confidence
@@ -258,6 +272,8 @@ export function runDiscoveryCampaignV2(opts = {}) {
     rdkit: { status: gen.engineMatrix.RDKit.status, evaluated: candidates.filter((c) => c.engineOutputs?.rdkit?.ok).length, withStructuralAlerts: candidates.filter((c) => (c.engineOutputs?.rdkit?.nAlerts ?? 0) > 0).length, epistemicStatus: 'COMPUTED' },
     admet: { status: gen.engineMatrix['ADMET-AI'].status, evaluated: candidates.filter((c) => c.engineOutputs?.admet?.ok).length, epistemicStatus: 'MODEL_INFERRED' },
     docking: { status: dockingStatus, bindingSiteMethod: dockedList[0]?.bindingSiteMethod ?? null, docked: dockedList.length, bestAffinityKcalMol: affinities.length ? Math.min(...affinities) : null, affinityRangeKcalMol: affinities.length ? [Math.min(...affinities), Math.max(...affinities)] : null, epistemicStatus: 'MODEL_ESTIMATE' },
+    molecularDynamics: { status: mdStage.status, capability: mdStage.capability, candidatesConsidered: mdStage.candidatesConsidered, note: mdStage.note },
+    mmGbsa: { status: mdStage.status === 'COMPLETED' ? 'COMPLETED' : 'BLOCKED_BY_RUNTIME', separateFromDockingScore: true, note: 'MM-GBSA binding free energy is reported separately from the empirical docking score; blocked without an MD trajectory.' },
     mcre: { conflicts: conflicts.length, unresolvedConflicts, policyPreserved: 'Ki/IC50/Kd/EC50 kept distinct' },
     truthEngine: { decision: truthGate.decision, rejections: truthGate.rejections.length, boundedClaim: truthGate.boundedClaim ?? null },
     offTarget: { status: otDone.length ? 'COMPLETED' : 'BLOCKED_BY_RESOURCES', scored: otDone.length, riskDistribution: riskDist, panelSize: OFF_TARGET_PANEL.length, epistemicStatus: 'MODEL_INFERRED' },

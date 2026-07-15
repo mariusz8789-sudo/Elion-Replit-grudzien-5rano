@@ -8,7 +8,7 @@
       "Vina": "1.2.7"
     },
     "node": "v22.22.2",
-    "resultHash": "6d5616535d2c86c3fb1f1a494799367dc87aa9cc3fe04833cc5dbc455692faf6"
+    "resultHash": "d81a4a77a5da7f8aa3386f74a9970ec04a0514676f0b16cbd118f6b24905319e"
   },
   "result": {
     "version": "genesis-scientific-validation-suite/1",
@@ -218,7 +218,7 @@
           "label": "campaign",
           "runs": 2,
           "reproducible": true,
-          "hash": "a7474406cc1d1b35318a7216d9323154da91e0a6e60325d1be17d7eaac4c2987"
+          "hash": "67d761ec7fbe95c5ced2c7fdf22768764f2993b3a8285ac7b5acd8eb29bbea79"
         }
       ],
       "truth": {
@@ -449,7 +449,7 @@
         "score": 1
       },
       "campaignReproducible": true,
-      "dossierHash": "a7474406cc1d1b35318a7216d9323154da91e0a6e60325d1be17d7eaac4c2987"
+      "dossierHash": "67d761ec7fbe95c5ced2c7fdf22768764f2993b3a8285ac7b5acd8eb29bbea79"
     }
   }
 }

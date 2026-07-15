@@ -171,6 +171,46 @@ export default function WorkShareHub() {
     },
   });
 
+  const staffStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const response = await fetch(`/api/staff-sharing/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) throw new Error((await response.json()).message);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff-sharing"] });
+      toast({ title: t("Updated") });
+    },
+    onError: (error: any) => {
+      toast({ title: t("Error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resourceStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const response = await fetch(`/api/resource-sharing/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) throw new Error((await response.json()).message);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/resource-sharing"] });
+      toast({ title: t("Updated") });
+    },
+    onError: (error: any) => {
+      toast({ title: t("Error"), description: error.message, variant: "destructive" });
+    },
+  });
+
   const resetStaffForm = () => {
     setStaffType("");
     setStaffAvailability("");
@@ -630,9 +670,78 @@ export default function WorkShareHub() {
         </TabsContent>
 
         <TabsContent value="shared" className="space-y-4">
-          <p className="text-muted-foreground text-center py-8">
-            {t("Your shared resources will appear here")}
-          </p>
+          {(() => {
+            const myStaff = staffSharing.filter((s) => user?.companyId && (s.lenderCompanyId === user.companyId || s.borrowerCompanyId === user.companyId));
+            const myResources = resourceSharing.filter((r) => user?.companyId && (r.providerCompanyId === user.companyId || r.requesterCompanyId === user.companyId));
+
+            if (!user?.companyId) {
+              return <p className="text-muted-foreground text-center py-8">{t("A company account is required.")}</p>;
+            }
+            if (myStaff.length === 0 && myResources.length === 0) {
+              return <p className="text-muted-foreground text-center py-8">{t("Your shared resources will appear here")}</p>;
+            }
+
+            return (
+              <div className="space-y-4">
+                {myStaff.map((s) => {
+                  const isLender = s.lenderCompanyId === user.companyId;
+                  return (
+                    <Card key={s.id} data-testid={`card-my-staff-${s.id}`}>
+                      <CardContent className="p-4 flex items-center justify-between gap-4">
+                        <div>
+                          <p className="font-medium">{s.staffType} &middot; {isLender ? t("You are lending") : t("You requested")}</p>
+                          <p className="text-sm text-muted-foreground">{s.availability}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge>{s.status}</Badge>
+                          {isLender && s.status === "requested" && (
+                            <>
+                              <Button size="sm" onClick={() => staffStatusMutation.mutate({ id: s.id, status: "booked" })} data-testid={`button-accept-staff-${s.id}`}>{t("Accept")}</Button>
+                              <Button size="sm" variant="outline" onClick={() => staffStatusMutation.mutate({ id: s.id, status: "available" })} data-testid={`button-reject-staff-${s.id}`}>{t("Reject")}</Button>
+                            </>
+                          )}
+                          {s.status === "booked" && (
+                            <Button size="sm" onClick={() => staffStatusMutation.mutate({ id: s.id, status: "completed" })} data-testid={`button-complete-staff-${s.id}`}>{t("Mark Complete")}</Button>
+                          )}
+                          {(s.status === "requested" || s.status === "booked") && (
+                            <Button size="sm" variant="destructive" onClick={() => staffStatusMutation.mutate({ id: s.id, status: "cancelled" })} data-testid={`button-cancel-staff-${s.id}`}>{t("Cancel")}</Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+                {myResources.map((r) => {
+                  const isProvider = r.providerCompanyId === user.companyId;
+                  return (
+                    <Card key={r.id} data-testid={`card-my-resource-${r.id}`}>
+                      <CardContent className="p-4 flex items-center justify-between gap-4">
+                        <div>
+                          <p className="font-medium">{r.title} &middot; {isProvider ? t("You are providing") : t("You requested")}</p>
+                          <p className="text-sm text-muted-foreground">{r.availability}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge>{r.status}</Badge>
+                          {isProvider && r.status === "requested" && (
+                            <>
+                              <Button size="sm" onClick={() => resourceStatusMutation.mutate({ id: r.id, status: "booked" })} data-testid={`button-accept-resource-${r.id}`}>{t("Accept")}</Button>
+                              <Button size="sm" variant="outline" onClick={() => resourceStatusMutation.mutate({ id: r.id, status: "available" })} data-testid={`button-reject-resource-${r.id}`}>{t("Reject")}</Button>
+                            </>
+                          )}
+                          {r.status === "booked" && (
+                            <Button size="sm" onClick={() => resourceStatusMutation.mutate({ id: r.id, status: "completed" })} data-testid={`button-complete-resource-${r.id}`}>{t("Mark Complete")}</Button>
+                          )}
+                          {(r.status === "requested" || r.status === "booked") && (
+                            <Button size="sm" variant="destructive" onClick={() => resourceStatusMutation.mutate({ id: r.id, status: "cancelled" })} data-testid={`button-cancel-resource-${r.id}`}>{t("Cancel")}</Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 

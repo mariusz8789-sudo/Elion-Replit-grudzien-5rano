@@ -1381,30 +1381,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/staff-sharing/:id/status", requireAuth, async (req, res) => {
     try {
       const { status } = req.body;
-      if (!status) {
-        return res.status(400).json({ message: "Status is required" });
-      }
       const user = req.user as User;
       const existing = await storage.getStaffSharing(req.params.id);
       if (!existing) {
         return res.status(404).json({ message: "Staff sharing not found" });
       }
-      // Any company can request an "available" listing; only the lender or the
-      // already-matched borrower (or an admin) may change its status afterwards.
-      const isRequesting = status === "requested" && existing.status === "available";
-      const isParty = user.companyId === existing.lenderCompanyId || user.companyId === existing.borrowerCompanyId;
-      if (!isRequesting && !isParty && user.role !== "admin") {
-        return res.status(403).json({ message: "Not authorized to update this listing" });
+
+      // A real state machine, not a free-for-all status field: only the lender may
+      // accept/reject a request, and neither party can skip straight to "booked"
+      // without the other's action. The conditional update in storage also guards
+      // against two concurrent transitions racing on the same row.
+      let result;
+      switch (status) {
+        case "requested": {
+          if (!user.companyId || user.companyId === existing.lenderCompanyId) {
+            return res.status(403).json({ message: "You cannot request your own listing" });
+          }
+          result = await storage.updateStaffSharingStatus(req.params.id, ["available"], "requested", user.companyId);
+          if (result) {
+            await storage.createNotification({
+              userId: (await storage.getCompanyUsers(existing.lenderCompanyId))[0]?.id ?? "",
+              title: "New request for your listing",
+              message: `A company requested your ${existing.staffType} listing.`,
+              type: "info",
+              link: "/workshare",
+            }).catch(() => undefined);
+          }
+          break;
+        }
+        case "booked": {
+          if (user.companyId !== existing.lenderCompanyId && user.role !== "admin") {
+            return res.status(403).json({ message: "Only the lender can accept a request" });
+          }
+          result = await storage.updateStaffSharingStatus(req.params.id, ["requested"], "booked");
+          break;
+        }
+        case "available": {
+          if (user.companyId !== existing.lenderCompanyId && user.role !== "admin") {
+            return res.status(403).json({ message: "Only the lender can reject a request" });
+          }
+          result = await storage.updateStaffSharingStatus(req.params.id, ["requested"], "available", null);
+          break;
+        }
+        case "completed": {
+          const isParty = user.companyId === existing.lenderCompanyId || user.companyId === existing.borrowerCompanyId;
+          if (!isParty && user.role !== "admin") {
+            return res.status(403).json({ message: "Not authorized to complete this listing" });
+          }
+          result = await storage.updateStaffSharingStatus(req.params.id, ["booked"], "completed");
+          break;
+        }
+        case "cancelled": {
+          const isParty = user.companyId === existing.lenderCompanyId || user.companyId === existing.borrowerCompanyId;
+          if (!isParty && user.role !== "admin") {
+            return res.status(403).json({ message: "Not authorized to cancel this listing" });
+          }
+          result = await storage.updateStaffSharingStatus(req.params.id, ["requested", "booked"], "cancelled");
+          break;
+        }
+        default:
+          return res.status(400).json({ message: "Invalid status" });
       }
-      const staffSharing = await storage.updateStaffSharingStatus(
-        req.params.id,
-        status,
-        isRequesting ? user.companyId! : undefined,
-      );
-      if (!staffSharing) {
-        return res.status(404).json({ message: "Staff sharing not found" });
+
+      if (!result) {
+        return res.status(409).json({ message: "This listing is no longer in the expected state - it may have already been updated." });
       }
-      res.json(staffSharing);
+      res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -1441,28 +1483,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/resource-sharing/:id/status", requireAuth, async (req, res) => {
     try {
       const { status } = req.body;
-      if (!status) {
-        return res.status(400).json({ message: "Status is required" });
-      }
       const user = req.user as User;
       const existing = await storage.getResourceSharing(req.params.id);
       if (!existing) {
         return res.status(404).json({ message: "Resource not found" });
       }
-      // Any company can request an "available" listing; only the provider or the
-      // already-matched requester (or an admin) may change its status afterwards.
-      const isRequesting = status === "requested" && existing.status === "available";
-      const isParty = user.companyId === existing.providerCompanyId || user.companyId === existing.requesterCompanyId;
-      if (!isRequesting && !isParty && user.role !== "admin") {
-        return res.status(403).json({ message: "Not authorized to update this listing" });
+
+      // Same state machine as staff-sharing: only the provider may accept/reject a
+      // request, and the conditional update guards against a race between two
+      // concurrent transitions on the same listing.
+      let resource;
+      switch (status) {
+        case "requested": {
+          if (!user.companyId || user.companyId === existing.providerCompanyId) {
+            return res.status(403).json({ message: "You cannot request your own listing" });
+          }
+          resource = await storage.updateResourceSharingStatus(req.params.id, ["available"], "requested", user.companyId);
+          if (resource) {
+            await storage.createNotification({
+              userId: (await storage.getCompanyUsers(existing.providerCompanyId))[0]?.id ?? "",
+              title: "New request for your listing",
+              message: `A company requested your "${existing.title}" listing.`,
+              type: "info",
+              link: "/workshare",
+            }).catch(() => undefined);
+          }
+          break;
+        }
+        case "booked": {
+          if (user.companyId !== existing.providerCompanyId && user.role !== "admin") {
+            return res.status(403).json({ message: "Only the provider can accept a request" });
+          }
+          resource = await storage.updateResourceSharingStatus(req.params.id, ["requested"], "booked");
+          break;
+        }
+        case "available": {
+          if (user.companyId !== existing.providerCompanyId && user.role !== "admin") {
+            return res.status(403).json({ message: "Only the provider can reject a request" });
+          }
+          resource = await storage.updateResourceSharingStatus(req.params.id, ["requested"], "available", null);
+          break;
+        }
+        case "completed": {
+          const isParty = user.companyId === existing.providerCompanyId || user.companyId === existing.requesterCompanyId;
+          if (!isParty && user.role !== "admin") {
+            return res.status(403).json({ message: "Not authorized to complete this listing" });
+          }
+          resource = await storage.updateResourceSharingStatus(req.params.id, ["booked"], "completed");
+          break;
+        }
+        case "cancelled": {
+          const isParty = user.companyId === existing.providerCompanyId || user.companyId === existing.requesterCompanyId;
+          if (!isParty && user.role !== "admin") {
+            return res.status(403).json({ message: "Not authorized to cancel this listing" });
+          }
+          resource = await storage.updateResourceSharingStatus(req.params.id, ["requested", "booked"], "cancelled");
+          break;
+        }
+        default:
+          return res.status(400).json({ message: "Invalid status" });
       }
-      const resource = await storage.updateResourceSharingStatus(
-        req.params.id,
-        status,
-        isRequesting ? user.companyId! : undefined,
-      );
+
       if (!resource) {
-        return res.status(404).json({ message: "Resource not found" });
+        return res.status(409).json({ message: "This listing is no longer in the expected state - it may have already been updated." });
       }
       res.json(resource);
     } catch (error: any) {

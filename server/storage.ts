@@ -140,14 +140,14 @@ export interface IStorage {
   getStaffSharing(id: string): Promise<StaffSharing | undefined>;
   getCompanyStaffSharing(companyId: string): Promise<StaffSharing[]>;
   createStaffSharing(staffSharing: InsertStaffSharing): Promise<StaffSharing>;
-  updateStaffSharingStatus(id: string, status: string, borrowerCompanyId?: string): Promise<StaffSharing | undefined>;
+  updateStaffSharingStatus(id: string, fromStatuses: string[], toStatus: string, borrowerCompanyId?: string | null): Promise<StaffSharing | undefined>;
 
   // Resource sharing operations
   getAllResourceSharing(): Promise<ResourceSharing[]>;
   getResourceSharing(id: string): Promise<ResourceSharing | undefined>;
   getAvailableResourceSharing(resourceType?: string): Promise<ResourceSharing[]>;
   createResourceSharing(resourceSharing: InsertResourceSharing): Promise<ResourceSharing>;
-  updateResourceSharingStatus(id: string, status: string, requesterCompanyId?: string): Promise<ResourceSharing | undefined>;
+  updateResourceSharingStatus(id: string, fromStatuses: string[], toStatus: string, requesterCompanyId?: string | null): Promise<ResourceSharing | undefined>;
   
   // Announcements operations
   getActiveAnnouncements(): Promise<Announcement[]>;
@@ -745,10 +745,19 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async updateStaffSharingStatus(id: string, status: string, borrowerCompanyId?: string): Promise<StaffSharing | undefined> {
+  // Conditional on the row's *current* status so two concurrent requests for the same
+  // "available" listing can't both win (last write wins would silently overwrite one
+  // borrower's request with another's), and so a party can't skip a state (e.g. a borrower
+  // self-accepting their own request straight to "booked" without the lender's action).
+  async updateStaffSharingStatus(
+    id: string,
+    fromStatuses: string[],
+    toStatus: string,
+    borrowerCompanyId?: string | null,
+  ): Promise<StaffSharing | undefined> {
     const result = await db.update(staffSharing)
-      .set({ status, ...(borrowerCompanyId ? { borrowerCompanyId } : {}) })
-      .where(eq(staffSharing.id, id))
+      .set({ status: toStatus, ...(borrowerCompanyId !== undefined ? { borrowerCompanyId } : {}) })
+      .where(and(eq(staffSharing.id, id), inArray(staffSharing.status, fromStatuses)))
       .returning();
     return result[0];
   }
@@ -783,10 +792,23 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async updateResourceSharingStatus(id: string, status: string, requesterCompanyId?: string): Promise<ResourceSharing | undefined> {
+  // Same conditional-on-current-status guard as updateStaffSharingStatus, for the same reason.
+  async updateResourceSharingStatus(
+    id: string,
+    fromStatuses: string[],
+    toStatus: string,
+    requesterCompanyId?: string | null,
+  ): Promise<ResourceSharing | undefined> {
     const result = await db.update(resourceSharing)
-      .set({ status, ...(requesterCompanyId ? { requesterCompanyId } : {}) })
-      .where(eq(resourceSharing.id, id))
+      // Keep the `available` boolean (used by the resourceType-filtered browse query) in
+      // lockstep with `status` - previously these could drift, leaving a requested/booked
+      // resource still showing as available to other browsers.
+      .set({
+        status: toStatus,
+        available: toStatus === "available",
+        ...(requesterCompanyId !== undefined ? { requesterCompanyId } : {}),
+      })
+      .where(and(eq(resourceSharing.id, id), inArray(resourceSharing.status, fromStatuses)))
       .returning();
     return result[0];
   }

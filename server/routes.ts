@@ -635,6 +635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (booking.driverId) {
         await storage.checkAndAwardMilestoneBadges("driver", booking.driverId);
       }
+      await storage.checkAndAwardGreenCustomerBadge(booking.userId);
 
       // Credit the referrer on the customer's first delivered booking
       const bookingCustomer = await storage.getUser(booking.userId);

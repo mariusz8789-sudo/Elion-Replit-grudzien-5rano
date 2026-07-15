@@ -13,6 +13,7 @@ import CreateListingDialog from "@/components/CreateListingDialog";
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [kindFilter, setKindFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const { data: listings = [], isLoading } = useQuery<MarketplaceListing[]>({
@@ -31,6 +32,25 @@ export default function MarketplacePage() {
     { value: "materials", label: "Moving Materials" },
     { value: "services", label: "Professional Services" },
     { value: "promotion", label: "Special Promotions" },
+    { value: "plastic_crates", label: "🌱 Reusable Plastic Crates" },
+    { value: "packing_paper", label: "🌱 Packing Paper" },
+    { value: "recycled_wrap", label: "🌱 Recycled Wrap" },
+    { value: "moving_blankets", label: "🌱 Moving Blankets" },
+    { value: "dollies", label: "🌱 Dollies" },
+    { value: "lifting_straps", label: "🌱 Lifting Straps" },
+    { value: "storage_containers", label: "🌱 Storage Containers" },
+    { value: "warehouse_rental", label: "🌱 Warehouse Rental" },
+    { value: "cleaning_services", label: "🌱 Cleaning Services" },
+    { value: "disposal_services", label: "🌱 Disposal Services" },
+    { value: "recycling_services", label: "🌱 Recycling Services" },
+    { value: "furniture_reuse", label: "🌱 Furniture Reuse" },
+  ];
+
+  const kinds = [
+    { value: "all", label: "All Listings" },
+    { value: "sale", label: "For Sale" },
+    { value: "rental", label: "For Rental" },
+    { value: "donation", label: "Donation" },
   ];
 
   const filteredListings = listings.filter((listing) => {
@@ -38,7 +58,8 @@ export default function MarketplacePage() {
       listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (listing.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
     const matchesCategory = categoryFilter === "all" || listing.category === categoryFilter;
-    return matchesSearch && matchesCategory && listing.available;
+    const matchesKind = kindFilter === "all" || listing.listingKind === kindFilter;
+    return matchesSearch && matchesCategory && matchesKind && listing.available;
   });
 
   return (
@@ -78,6 +99,18 @@ export default function MarketplacePage() {
               {categories.map((cat) => (
                 <SelectItem key={cat.value} value={cat.value}>
                   {cat.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={kindFilter} onValueChange={setKindFilter}>
+            <SelectTrigger className="w-[160px]" data-testid="select-kind">
+              <SelectValue placeholder="Listing kind" />
+            </SelectTrigger>
+            <SelectContent>
+              {kinds.map((kind) => (
+                <SelectItem key={kind.value} value={kind.value}>
+                  {kind.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -124,9 +157,17 @@ export default function MarketplacePage() {
                   <div>
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="font-semibold text-lg line-clamp-1">{listing.title}</h3>
-                      <Badge variant="outline" className="capitalize shrink-0">
-                        {listing.type}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <Badge variant="outline" className="capitalize">
+                          {listing.type}
+                        </Badge>
+                        {listing.listingKind === "rental" && (
+                          <Badge variant="secondary" className="capitalize">Rental</Badge>
+                        )}
+                        {listing.listingKind === "donation" && (
+                          <Badge className="capitalize bg-green-600 hover:bg-green-600">Donation</Badge>
+                        )}
+                      </div>
                     </div>
                     {listing.description && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">

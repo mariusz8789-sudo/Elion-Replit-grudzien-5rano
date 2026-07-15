@@ -220,6 +220,9 @@ export interface IStorage {
   getHolderBadges(holderType: string, holderId: string): Promise<(BadgeAward & { badge: Badge })[]>;
   awardBadgeIfMissing(holderType: string, holderId: string, badgeCode: string): Promise<BadgeAward | undefined>;
   checkAndAwardMilestoneBadges(holderType: "company" | "driver", holderId: string): Promise<void>;
+  getDriverEnvironmentalSummary(driverId: string): Promise<{ totalTrips: number; totalCo2SavedKg: number }>;
+  getUserEnvironmentalSummary(userId: string): Promise<{ totalTrips: number; totalCo2SavedKg: number }>;
+  checkAndAwardGreenCustomerBadge(userId: string): Promise<void>;
 
   // Leaderboard operations
   getCompanyLeaderboard(limit?: number): Promise<Company[]>;
@@ -1384,6 +1387,44 @@ export class DbStorage implements IStorage {
       if (company && Number(company.rating) >= 4.8 && (company.totalReviews ?? 0) >= 20) {
         await this.awardBadgeIfMissing("company", holderId, "super_carrier");
       }
+      const envSummary = await this.getCompanyEnvironmentalSummary(holderId);
+      if (envSummary.totalCo2SavedKg >= 100) {
+        await this.awardBadgeIfMissing("company", holderId, "green_company");
+      }
+    } else {
+      const envSummary = await this.getDriverEnvironmentalSummary(holderId);
+      if (envSummary.totalCo2SavedKg >= 50) {
+        await this.awardBadgeIfMissing("driver", holderId, "green_driver");
+      }
+    }
+  }
+
+  async getDriverEnvironmentalSummary(driverId: string): Promise<{ totalTrips: number; totalCo2SavedKg: number }> {
+    const result = await db.execute(sql`
+      SELECT COUNT(*)::int AS total_trips, COALESCE(SUM(ec.co2_saved_kg), 0)::float AS total_co2_saved_kg
+      FROM environmental_calculations ec
+      JOIN bookings b ON b.id = ec.booking_id
+      WHERE b.driver_id = ${driverId}
+    `);
+    const row = result.rows[0] as any;
+    return { totalTrips: Number(row?.total_trips ?? 0), totalCo2SavedKg: Number(row?.total_co2_saved_kg ?? 0) };
+  }
+
+  async getUserEnvironmentalSummary(userId: string): Promise<{ totalTrips: number; totalCo2SavedKg: number }> {
+    const result = await db.execute(sql`
+      SELECT COUNT(*)::int AS total_trips, COALESCE(SUM(ec.co2_saved_kg), 0)::float AS total_co2_saved_kg
+      FROM environmental_calculations ec
+      JOIN bookings b ON b.id = ec.booking_id
+      WHERE b.user_id = ${userId}
+    `);
+    const row = result.rows[0] as any;
+    return { totalTrips: Number(row?.total_trips ?? 0), totalCo2SavedKg: Number(row?.total_co2_saved_kg ?? 0) };
+  }
+
+  async checkAndAwardGreenCustomerBadge(userId: string): Promise<void> {
+    const summary = await this.getUserEnvironmentalSummary(userId);
+    if (summary.totalCo2SavedKg >= 20) {
+      await this.awardBadgeIfMissing("user", userId, "green_customer");
     }
   }
 

@@ -303,7 +303,8 @@ export const marketplaceListings = pgTable("marketplace_listings", {
   title: text("title").notNull(),
   description: text("description").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }),
-  category: text("category").notNull(), // boxes, equipment, materials, services, promotion
+  category: text("category").notNull(), // boxes, equipment, materials, services, promotion, plus Green MoveX eco categories: plastic_crates, packing_paper, recycled_wrap, moving_blankets, dollies, lifting_straps, storage_containers, warehouse_rental, cleaning_services, disposal_services, recycling_services, furniture_reuse
+  listingKind: text("listing_kind").notNull().default("sale"), // sale, rental, donation - a rental/donation listing is a genuinely different transaction, not just a "product" priced at zero
   images: text("images").array(),
   condition: text("condition"), // new, used, like-new
   location: text("location"),
@@ -981,6 +982,8 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 
 export const insertMarketplaceListingSchema = createInsertSchema(marketplaceListings).omit({
   id: true,
+  userId: true,
+  companyId: true,
   createdAt: true,
   updatedAt: true,
   views: true,

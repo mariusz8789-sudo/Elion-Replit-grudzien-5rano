@@ -16,6 +16,7 @@ import { roadServicesPartnerApi } from "./roadServices/partnerApi";
 import { pool } from "./db";
 import { runCertificationExpirySweep } from "./services/certExpirySweep";
 import { seedSkillsCatalog } from "./seedSkills";
+import { seedBadgesCatalog } from "./seedBadges";
 
 const app = express();
 const PgSession = connectPgSimple(session);
@@ -213,6 +214,7 @@ app.use("/road-services/partner/v1", roadServicesPartnerApi);
   });
 
   seedSkillsCatalog().catch((err) => console.error("Skills catalog seed failed:", err.message));
+  seedBadgesCatalog().catch((err) => console.error("Badges catalog seed failed:", err.message));
 
   // No external cron infra exists in this app - a daily in-process sweep is the pragmatic
   // real implementation for certification expiry reminders. Runs once shortly after boot,

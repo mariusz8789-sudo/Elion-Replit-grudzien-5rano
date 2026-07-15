@@ -55,6 +55,7 @@ export default function CreateListingDialog({ open, onOpenChange }: CreateListin
       title: "",
       description: "",
       category: "boxes",
+      listingKind: "sale",
       price: "",
       location: undefined,
       condition: "new",
@@ -109,7 +110,7 @@ export default function CreateListingDialog({ open, onOpenChange }: CreateListin
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="type"
@@ -152,6 +153,41 @@ export default function CreateListingDialog({ open, onOpenChange }: CreateListin
                         <SelectItem value="materials">Moving Materials</SelectItem>
                         <SelectItem value="services">Professional Services</SelectItem>
                         <SelectItem value="promotion">Special Promotions</SelectItem>
+                        <SelectItem value="plastic_crates">Reusable Plastic Crates</SelectItem>
+                        <SelectItem value="packing_paper">Packing Paper</SelectItem>
+                        <SelectItem value="recycled_wrap">Recycled Wrap</SelectItem>
+                        <SelectItem value="moving_blankets">Moving Blankets</SelectItem>
+                        <SelectItem value="dollies">Dollies</SelectItem>
+                        <SelectItem value="lifting_straps">Lifting Straps</SelectItem>
+                        <SelectItem value="storage_containers">Storage Containers</SelectItem>
+                        <SelectItem value="warehouse_rental">Warehouse Rental</SelectItem>
+                        <SelectItem value="cleaning_services">Cleaning Services</SelectItem>
+                        <SelectItem value="disposal_services">Disposal Services</SelectItem>
+                        <SelectItem value="recycling_services">Recycling Services</SelectItem>
+                        <SelectItem value="furniture_reuse">Furniture Reuse</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="listingKind"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Listing Kind</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value ?? "sale"}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-listing-kind">
+                          <SelectValue placeholder="Select kind" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="sale">For Sale</SelectItem>
+                        <SelectItem value="rental">For Rental</SelectItem>
+                        <SelectItem value="donation">Donation</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -15,21 +15,30 @@ const FIXTURE = path.resolve(__dirname, '../packages/backend/test-fixtures/genes
 const log = (...a) => console.log(...a);
 const hr = () => log('─'.repeat(72));
 
+// --bundle <dir> runs on a REAL VERIFIED_BUNDLE; default is the SYNTHETIC TEST_FIXTURE bundle.
+const bi = process.argv.indexOf('--bundle');
+const BUNDLE = bi >= 0 ? process.argv[bi + 1] : FIXTURE;
+const isFixture = BUNDLE === FIXTURE;
+
 log('=== REAL SCIENTIFIC CAMPAIGN #001 (real RDKit + ADMET-AI engines) ===');
-log('Evidence origin: TEST_FIXTURE (live external sources policy-blocked). NOT a discovery.');
+log(isFixture
+  ? 'Evidence origin: TEST_FIXTURE (no --bundle given; live external sources policy-blocked). NOT a discovery.'
+  : `Evidence bundle: ${BUNDLE} (VERIFIED_BUNDLE if genuinely acquired). Origin flows from the bundle.`);
 hr();
 
-// Build an evidence-backed target from the fixture bioactivity record.
-const ing = ingestBundle(FIXTURE, { campaignId: 'real-scientific-campaign-001' });
-const evId = ing.evidenceRecords.find((e) => e.entityType === 'BioactivityRecord').evidenceId;
-const claims = [{ text: 'fixture target shows fixture-assay activity', supportingEvidenceIds: [evId], claimType: 'BIOACTIVITY' }];
+// Build an evidence-backed target from the bundle's bioactivity record.
+const ing = ingestBundle(BUNDLE, { campaignId: 'real-scientific-campaign-001' });
+const bioRec = ing.evidenceRecords.find((e) => e.entityType === 'BioactivityRecord');
+if (!bioRec) { log('FAIL CLOSED: bundle has no bioactivity evidence — cannot form an evidence-backed BRAF target.'); process.exit(2); }
+const claims = [{ text: isFixture ? 'fixture target shows fixture-assay activity' : 'BRAF has reported small-molecule bioactivity in the acquired evidence', supportingEvidenceIds: [bioRec.evidenceId], claimType: 'BIOACTIVITY' }];
 const { registry } = ei.buildClaimRegistry(claims, ing.evidenceRecords);
-const target = { targetName: '[TEST FIXTURE] synthetic target', claimIds: [registry[0].claimId], structureAvailable: true, mechanismRationale: 'fixture', cheapestFalsification: 'assay', knownChemicalMatter: true };
+const target = { targetName: isFixture ? '[TEST FIXTURE] synthetic target' : 'BRAF (from acquired evidence)', claimIds: [registry[0].claimId], structureAvailable: ing.entities.some((e) => e.entity.entityType === 'ProteinStructure'), mechanismRationale: isFixture ? 'fixture' : 'oncogenic MAPK activation (claim requires the acquired literature evidence)', cheapestFalsification: 'assay', knownChemicalMatter: true };
 
 log('Running with REAL engines (this executes real ADMET-AI on candidates — a few seconds)…');
 const result = cr.runCampaign001(null, {
-  bundleRoot: FIXTURE, targetHypotheses: [target], supplementalClaims: claims,
-  seedCompounds: [{ name: 'aspirin', smiles: 'CC(=O)Oc1ccccc1C(=O)O' }],
+  bundleRoot: BUNDLE, targetHypotheses: [target], supplementalClaims: claims,
+  // For a real bundle, seeds are the ACQUIRED compounds (runner derives them); no hardcoded aspirin.
+  seedCompounds: isFixture ? [{ name: 'aspirin', smiles: 'CC(=O)Oc1ccccc1C(=O)O' }] : [],
 });
 
 log('Engine status matrix (runtime-detected):');

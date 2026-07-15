@@ -217,6 +217,21 @@ def main():
         print(json.dumps({"ok": True, "data": data, "engine": "RDKit " + rdkit.__version__}))
         return
 
+    if cmd == "inchi":
+        # Standard InChI + InChIKey (IUPAC) for a SMILES — deterministic identity string.
+        m = Chem.MolFromSmiles(req.get("smiles", ""))
+        if m is None:
+            print(json.dumps({"ok": False, "error": "invalid_smiles"}))
+            return
+        try:
+            from rdkit.Chem import inchi as _inchi
+            ik = _inchi.MolToInchi(m)
+            key = _inchi.InchiToInchiKey(ik) if ik else None
+            print(json.dumps({"ok": True, "inchi": ik, "inchiKey": key, "canonicalSmiles": Chem.MolToSmiles(m), "engine": "RDKit " + rdkit.__version__}))
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "inchi_failed: %s" % str(e)[:120]}))
+        return
+
     if cmd == "denovo":
         # REAL de novo design via RDKit BRICS (fragment decomposition + recombination) and Murcko
         # scaffolds. Generated molecules are genuine valid structures, deduplicated + validated;

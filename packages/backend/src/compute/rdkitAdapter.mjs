@@ -168,6 +168,18 @@ export function structuralAlerts(smiles) {
   }
 }
 
+/** Standard InChI + InChIKey for a SMILES (deterministic chemical identity). */
+export function inchi(smiles) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'inchi', smiles: String(smiles ?? '') });
+    return r.ok ? { ok: true, inchi: r.inchi, inchiKey: r.inchiKey, canonicalSmiles: r.canonicalSmiles } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
 /**
  * REAL de novo molecular design via RDKit BRICS (fragment decomposition + recombination) and Murcko
  * scaffolds. mode: 'brics_build' (fragment growing/linking), 'scaffold_hop' (novel scaffolds only),

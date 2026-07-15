@@ -766,8 +766,23 @@ CREATE INDEX IF NOT EXISTS idx_formal_relations_mission ON formal_relations(miss
 CREATE INDEX IF NOT EXISTS idx_formal_failures_mission ON formal_failure_regions(mission_id, failure_class);
 `;
 
+// ZEFIR Truth Engine / R&D Kill-Switch (Phase 4 product): persisted pre-flight
+// analyses with a reproducible decision hash (timestamp excluded from the hash).
+const SCHEMA_V19 = `
+CREATE TABLE IF NOT EXISTS truth_analyses (
+  id              TEXT PRIMARY KEY,
+  proposal_hash   TEXT NOT NULL,
+  decision        TEXT NOT NULL,
+  decision_hash   TEXT NOT NULL,
+  certificate_json TEXT NOT NULL DEFAULT '{}',
+  created_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_truth_analyses_proposal ON truth_analyses(proposal_hash, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 19) db.exec(SCHEMA_V19);
   if (version < 18) db.exec(SCHEMA_V18);
   if (version < 17) db.exec(SCHEMA_V17);
   if (version < 16) db.exec(SCHEMA_V16);
@@ -811,7 +826,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 18) db.exec('PRAGMA user_version = 18');
+  if (version < 19) db.exec('PRAGMA user_version = 19');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -2161,4 +2176,20 @@ export function saveFailureRegion(db, f) {
 export function listFailureRegions(db, missionId, { context = null } = {}) {
   const rows = context ? db.prepare('SELECT * FROM formal_failure_regions WHERE mission_id = ? AND context = ? ORDER BY created_at ASC').all(missionId, context) : db.prepare('SELECT * FROM formal_failure_regions WHERE mission_id = ? ORDER BY created_at ASC').all(missionId);
   return rows.map(toFailureRegion);
+}
+
+/* ---- ZEFIR Truth Engine / R&D Kill-Switch (Phase 4 product) ---- */
+export function saveTruthAnalysis(db, a) {
+  const id = a.id ?? newId();
+  db.prepare(`INSERT INTO truth_analyses (id, proposal_hash, decision, decision_hash, certificate_json, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(id, a.proposalHash, a.decision, a.decisionHash, JSON.stringify(a.certificate ?? {}), Date.now());
+  return getTruthAnalysis(db, id);
+}
+export function getTruthAnalysis(db, id) {
+  const r = db.prepare('SELECT * FROM truth_analyses WHERE id = ?').get(id);
+  return r ? { id: r.id, proposalHash: r.proposal_hash, decision: r.decision, decisionHash: r.decision_hash, certificate: JSON.parse(r.certificate_json), createdAt: r.created_at } : null;
+}
+export function listTruthAnalyses(db, { limit = 50 } = {}) {
+  return db.prepare('SELECT id, proposal_hash, decision, decision_hash, created_at FROM truth_analyses ORDER BY created_at DESC LIMIT ?').all(limit)
+    .map((r) => ({ id: r.id, proposalHash: r.proposal_hash, decision: r.decision, decisionHash: r.decision_hash, createdAt: r.created_at }));
 }

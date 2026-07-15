@@ -38,6 +38,7 @@ function fakeDeps({ dockAvailable = true, gate = 'PROCEED' } = {}) {
       ingestBundle: () => ({ ingestionMode: 'TEST_FIXTURE', evidenceRecords: [{ evidenceId: 'ev1', entityType: 'BioactivityRecord' }], entities: [{ entity: { entityType: 'BioactivityRecord' }, provenance: { sourceService: 'CHEMBL', sourceId: 'A', contentHash: 'h', license: 'CC-BY-SA', ingestionMode: 'TEST_FIXTURE' } }], summary: {} }),
       buildClaimRegistry: () => ({ registry: [{ claimId: 'c1', normalizedClaim: 'x', status: 'SUPPORTED', supportingEvidenceIds: ['ev1'] }] }),
       targetFunnel: () => ({ primaryGate: { gate }, primaryTarget: { targetName: 'T1' }, scoringPolicyVersion: 'v1', alternatives: [] }),
+      requestReasoning: () => ({ capability: 'target_reasoning', status: 'CAPABILITY_BLOCKED', label: 'HUMAN_REVIEW_REQUIRED', requestHash: 'rh', routeStatus: 'CAPABILITY_GAP', output: null, note: 'no live provider (CAPABILITY_BLOCKED)' }),
       runCandidateGenerationV2: () => ({ status: 'COMPLETED_RANKED', candidates, ranking, engineMatrix: { RDKit: { status: 'AVAILABLE' }, 'ADMET-AI': { status: 'AVAILABLE' } } }),
       truthFinalGate: () => ({ decision: 'GO_COMPUTATIONAL', rejections: [] }),
       detectConflicts: () => [],
@@ -63,11 +64,19 @@ describe('discoveryCampaignV2 — full chain (fake deps)', () => {
     assert.equal(b.dockedCount, Math.min(5, b.candidatesSurviving));
     assert.ok(b.realEnginesExecuted.includes('RDKit') && b.realEnginesExecuted.includes('ADMET-AI'));
     assert.ok(b.realEnginesExecuted.some((e) => e.includes('Vina')));
-    // stage ledger covers the whole pipeline
+    // stage ledger covers the whole pipeline incl. the Reasoning Brain step
     const stageNames = r.stages.map((s) => s.stage);
-    for (const s of ['EVIDENCE', 'TARGET_INTELLIGENCE', 'CANDIDATE_GEN_V2', 'RDKIT', 'ADMET', 'DOCKING', 'TRUTH_ENGINE', 'MCRE', 'NECROPOLIS', 'WORKFLOW_MUTATION']) {
+    for (const s of ['EVIDENCE', 'TARGET_INTELLIGENCE', 'REASONING_BRAIN', 'CANDIDATE_GEN_V2', 'RDKIT', 'ADMET', 'DOCKING', 'TRUTH_ENGINE', 'MCRE', 'NECROPOLIS', 'WORKFLOW_MUTATION']) {
       assert.ok(stageNames.includes(s), `missing stage ${s}`);
     }
+    // Reasoning Brain honestly blocked without a live model — never fabricated
+    assert.equal(r.dossier.reasoningLedger.status, 'CAPABILITY_BLOCKED');
+    // mandated campaign-level dossier sections
+    for (const k of ['rdkit', 'admet', 'docking', 'mcre', 'truthEngine']) assert.ok(k in r.dossier.summaries, `missing summary ${k}`);
+    assert.ok(Array.isArray(r.dossier.remainingUncertainty) && r.dossier.remainingUncertainty.length > 0);
+    assert.ok(Array.isArray(r.dossier.experimentalRecommendations) && r.dossier.experimentalRecommendations.length > 0);
+    assert.equal(r.dossier.summaries.docking.epistemicStatus, 'MODEL_ESTIMATE');
+    assert.equal(r.dossier.summaries.admet.epistemicStatus, 'MODEL_INFERRED');
     // per-candidate dossier fields (Phase 4)
     const c = r.dossier.candidates[0];
     for (const f of ['structure', 'rationale', 'descriptors', 'admet', 'docking', 'truthEngineDecision', 'provenance', 'computationalConfidence', 'rejectedAlternatives', 'nextExperiment']) {

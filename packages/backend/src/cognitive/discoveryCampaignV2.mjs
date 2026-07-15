@@ -18,6 +18,7 @@ import { canonicalHash } from '../provenance.mjs';
 import * as candGen from './candidateGenV2.mjs';
 import * as ei from './evidenceIntelligence.mjs';
 import * as ti from './targetIntelligence.mjs';
+import * as reasoning from './reasoningBrain.mjs';
 import { ingestBundle } from '../corpus/corpusIngest.mjs';
 import { truthFinalGate, detectConflicts } from '../campaign/campaignRunner001.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
@@ -37,6 +38,7 @@ export function defaultDeps() {
     ingestBundle,
     buildClaimRegistry: ei.buildClaimRegistry,
     targetFunnel: ti.targetFunnel,
+    requestReasoning: reasoning.requestReasoning,
     runCandidateGenerationV2: candGen.runCandidateGenerationV2,
     truthFinalGate,
     detectConflicts,
@@ -108,6 +110,17 @@ export function runDiscoveryCampaignV2(opts = {}) {
   }
   const evidenceSupport = funnel.primaryGate.gate === 'PROCEED' ? 1 : 0.5;
 
+  // ── 2b) REASONING BRAIN (advisory; honest CAPABILITY_BLOCKED without a live model) ─────────────
+  const evidenceContextIds = evidence.evidenceRecords.map((e) => e.evidenceId).filter(Boolean);
+  const reasoningStep = deps.requestReasoning({
+    capability: 'target_reasoning',
+    input: { primaryTarget: funnel.primaryTarget?.targetName ?? null, gate: funnel.primaryGate.gate, claimCount: claimRegistry.length },
+    evidenceContextIds,
+    requiredKeys: ['assessment'],
+  });
+  mark('REASONING_BRAIN', reasoningStep.status, reasoningStep.note ?? reasoningStep.label);
+  const reasoningLedger = { capability: reasoningStep.capability, status: reasoningStep.status, label: reasoningStep.label, requestHash: reasoningStep.requestHash, routeStatus: reasoningStep.routeStatus, output: reasoningStep.output ?? null, note: reasoningStep.note ?? null };
+
   // ── 3) CANDIDATE GENERATOR v2 → 4) RDKit → 5) ADMET → rank ────────────────────────────────────
   const gen = deps.runCandidateGenerationV2({ seeds, minCandidates, ...(maxCandidates ? { maxCandidates } : {}) });
   mark('CANDIDATE_GEN_V2', gen.status, `${gen.candidates.length} generated`);
@@ -136,7 +149,7 @@ export function runDiscoveryCampaignV2(opts = {}) {
     for (const c of toDock) {
       const r = deps.dockPipeline({ structure, format: structureFormat, ligandSmiles: c.canonicalSmiles, padding: 5, seed: 42 });
       dockedById.set(c.candidateId, r.ok
-        ? { status: 'DOCKED', bestAffinityKcalMol: r.docking.bestAffinityKcalMol, nPoses: r.docking.nPoses, grid: r.grid, referenceLigand: r.referenceLigand, engine: `AutoDock Vina ${dockDet.vinaVersion}`, epistemicStatus: 'MODEL_ESTIMATE', receptorProvenanceSha256: r.preparedReceptor?.inputStructureSha256 }
+        ? { status: 'DOCKED', bestAffinityKcalMol: r.docking.bestAffinityKcalMol, nPoses: r.docking.nPoses, grid: r.grid, bindingSiteMethod: r.bindingSite?.method ?? null, referenceLigand: r.referenceLigand, engine: `AutoDock Vina ${dockDet.vinaVersion}`, epistemicStatus: 'MODEL_ESTIMATE', receptorProvenanceSha256: r.preparedReceptor?.inputStructureSha256 }
         : { status: 'DOCK_FAILED', error: r.error, stage: r.stage });
     }
   }
@@ -224,6 +237,33 @@ export function runDiscoveryCampaignV2(opts = {}) {
     rankingTop10: gen.ranking.slice(0, 10).map((r) => ({ rank: r.rank, candidateId: r.candidateId, smiles: r.canonicalSmiles, finalScore: r.finalScore })),
   };
 
+  // ── Campaign-level scientific summaries + remaining uncertainty + experimental recommendations ──
+  const dockedList = [...dockedById.values()].filter((d) => d.status === 'DOCKED');
+  const affinities = dockedList.map((d) => d.bestAffinityKcalMol).filter((x) => typeof x === 'number');
+  const unresolvedConflicts = conflicts.filter((c) => /UNRESOLVED/.test(c.resolutionResult ?? '')).length;
+  const summaries = {
+    rdkit: { status: gen.engineMatrix.RDKit.status, evaluated: candidates.filter((c) => c.engineOutputs?.rdkit?.ok).length, withStructuralAlerts: candidates.filter((c) => (c.engineOutputs?.rdkit?.nAlerts ?? 0) > 0).length, epistemicStatus: 'COMPUTED' },
+    admet: { status: gen.engineMatrix['ADMET-AI'].status, evaluated: candidates.filter((c) => c.engineOutputs?.admet?.ok).length, epistemicStatus: 'MODEL_INFERRED' },
+    docking: { status: dockingStatus, bindingSiteMethod: dockedList[0]?.bindingSiteMethod ?? null, docked: dockedList.length, bestAffinityKcalMol: affinities.length ? Math.min(...affinities) : null, affinityRangeKcalMol: affinities.length ? [Math.min(...affinities), Math.max(...affinities)] : null, epistemicStatus: 'MODEL_ESTIMATE' },
+    mcre: { conflicts: conflicts.length, unresolvedConflicts, policyPreserved: 'Ki/IC50/Kd/EC50 kept distinct' },
+    truthEngine: { decision: truthGate.decision, rejections: truthGate.rejections.length, boundedClaim: truthGate.boundedClaim ?? null },
+    reasoning: { status: reasoningLedger.status, capability: reasoningLedger.capability },
+  };
+  const remainingUncertainty = [
+    'No measured binding affinity — docking scores are Vina MODEL_ESTIMATE, not experimental Kd/IC50.',
+    'ADMET endpoints are MODEL_INFERRED (ADMET-AI), not measured in vitro/in vivo.',
+    dockingStatus === 'EXECUTED' ? 'Docking used the identified binding site; pose plausibility is computational, not validated.' : `Docking is ${dockingStatus} — binding is unassessed for all candidates.`,
+    unresolvedConflicts > 0 ? `${unresolvedConflicts} unresolved MCRE conflict(s) remain between reported and predicted values.` : 'No unresolved MCRE conflicts detected in the docked set.',
+    reasoningLedger.status !== 'COMPLETED' ? `Reasoning Brain is ${reasoningLedger.status} (no live model) — mechanistic reasoning was not applied.` : null,
+    evidence.ingestionMode === 'TEST_FIXTURE' ? 'Evidence origin is TEST_FIXTURE (no live external sources) — not real acquired literature/structures.' : null,
+  ].filter(Boolean);
+  const experimentalRecommendations = [
+    `Wet-lab binding assay (SPR/ITC or a target biochemical assay) for the top ${Math.min(dockTopN, survivors.length)} survivor(s) to measure Kd/IC50 — computational ranking only.`,
+    dockingStatus !== 'EXECUTED' ? 'Acquire/prepare an experimental target structure to enable docking (currently blocked).' : 'Acquire a co-crystal or higher-resolution structure to replace the blind/derived box with a focused, validated binding site.',
+    'Experimentally measure key ADMET liabilities (e.g. hERG, microsomal stability, solubility) for prioritised survivors.',
+    survivors.length ? 'Synthesise and assay a small diverse subset spanning the ranking to calibrate the computational score against measured activity.' : null,
+  ].filter(Boolean);
+
   const dossier = {
     schema: 'genesis-discovery-campaign-dossier/2',
     campaign: { id: campaignId, version: CAMPAIGN_V2_VERSION, status: CAMPAIGN_V2_STATUS.COMPLETED },
@@ -231,12 +271,16 @@ export function runDiscoveryCampaignV2(opts = {}) {
     targetGate: funnel.primaryGate,
     evidence: { ingestionMode: evidence.ingestionMode, records: evidence.evidenceRecords.length, provenance: evProvenance },
     stages,
+    reasoningLedger,
     engineMatrix: { ...gen.engineMatrix, Docking: { status: dockingStatus, version: dockDet.available ? `Vina ${dockDet.vinaVersion} + Meeko ${dockDet.meekoVersion}` : undefined } },
+    summaries,
     truthEngineGate: truthGate,
     conflictRegistry: conflicts,
     necropolisDelta,
     workflowMutation,
     benchmark,
+    remainingUncertainty,
+    experimentalRecommendations,
     candidates: perCandidate,
     scientificLimitations: [
       'Candidates are RDKit-enumerated analogues — COMPUTATIONAL CANDIDATES, not drugs.',
@@ -248,5 +292,5 @@ export function runDiscoveryCampaignV2(opts = {}) {
   };
   dossier.dossierHash = canonicalHash({ ...dossier, dossierHash: undefined });
 
-  return { version: CAMPAIGN_V2_VERSION, campaignId, status: CAMPAIGN_V2_STATUS.COMPLETED, stages, engineMatrix: dossier.engineMatrix, targetFunnel: funnel, truthGate, conflicts, necropolisDelta, workflowMutation, benchmark, dossier };
+  return { version: CAMPAIGN_V2_VERSION, campaignId, status: CAMPAIGN_V2_STATUS.COMPLETED, stages, engineMatrix: dossier.engineMatrix, targetFunnel: funnel, reasoningLedger, truthGate, conflicts, necropolisDelta, workflowMutation, benchmark, dossier };
 }

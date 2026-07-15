@@ -71,8 +71,10 @@ writeFileSync(path.join(OUT, 'discovery-dossier.json'), JSON.stringify(dossier, 
 // Compact, commit-friendly benchmark: full detail for the docked candidates only.
 const compact = {
   schema: dossier.schema, campaign: dossier.campaign, primaryTarget: dossier.primaryTarget, targetGate: dossier.targetGate,
-  evidence: dossier.evidence, stages: dossier.stages, engineMatrix: dossier.engineMatrix, truthEngineGate: dossier.truthEngineGate,
+  evidence: dossier.evidence, stages: dossier.stages, reasoningLedger: dossier.reasoningLedger, engineMatrix: dossier.engineMatrix,
+  summaries: dossier.summaries, truthEngineGate: dossier.truthEngineGate,
   necropolisDelta: dossier.necropolisDelta, workflowMutation: dossier.workflowMutation, benchmark: dossier.benchmark,
+  remainingUncertainty: dossier.remainingUncertainty, experimentalRecommendations: dossier.experimentalRecommendations,
   dockedCandidates: dossier.candidates.filter((c) => c.docking.status === 'DOCKED'),
   scientificLimitations: dossier.scientificLimitations, didGenesisDiscoverADrug: dossier.didGenesisDiscoverADrug,
   didGenesisDiscoverADrugExplanation: dossier.didGenesisDiscoverADrugExplanation, dossierHash: dossier.dossierHash, benchmarkExecutionMs: durMs,

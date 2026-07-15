@@ -788,6 +788,33 @@ const SCHEMA_V20_INDEXES = `
 CREATE INDEX IF NOT EXISTS idx_formal_failures_project ON formal_failure_regions(project_id, context);
 CREATE INDEX IF NOT EXISTS idx_truth_analyses_project ON truth_analyses(project_id, created_at);
 `;
+
+// v21 — Autonomous Discovery Forge. A discovery campaign (tenant-owned) plus an
+// APPEND-ONLY event log giving full provenance + replay of every generation,
+// cohort, engine run, criticism, failure-memory event, and plan mutation.
+const SCHEMA_V21 = `
+CREATE TABLE IF NOT EXISTS discovery_campaigns (
+  id             TEXT PRIMARY KEY,
+  project_id     TEXT NOT NULL,
+  challenge_json TEXT NOT NULL DEFAULT '{}',
+  status         TEXT NOT NULL,
+  plan_hash      TEXT,
+  state_json     TEXT NOT NULL DEFAULT '{}',
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS discovery_events (
+  id           TEXT PRIMARY KEY,
+  campaign_id  TEXT NOT NULL,
+  generation   INTEGER NOT NULL DEFAULT 0,
+  type         TEXT NOT NULL,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  content_hash TEXT,
+  created_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_discovery_campaigns_project ON discovery_campaigns(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_discovery_events_campaign ON discovery_events(campaign_id, generation, created_at);
+`;
 function addColumnIfMissing(db, table, column, ddl) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
   if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
@@ -849,7 +876,8 @@ function migrate(db) {
     addColumnIfMissing(db, 'truth_analyses', 'project_id', 'project_id TEXT');
     db.exec(SCHEMA_V20_INDEXES);
   }
-  if (version < 20) db.exec('PRAGMA user_version = 20');
+  if (version < 21) db.exec(SCHEMA_V21);
+  if (version < 21) db.exec('PRAGMA user_version = 21');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -2221,6 +2249,39 @@ export function getTruthAnalysis(db, id) {
   const r = db.prepare('SELECT * FROM truth_analyses WHERE id = ?').get(id);
   return r ? { id: r.id, proposalHash: r.proposal_hash, projectId: r.project_id ?? null, decision: r.decision, decisionHash: r.decision_hash, certificate: JSON.parse(r.certificate_json), createdAt: r.created_at } : null;
 }
+/* ---- Autonomous Discovery Forge (v21) ---- */
+function toCampaign(r) {
+  if (!r) return null;
+  return { id: r.id, projectId: r.project_id, challenge: JSON.parse(r.challenge_json), status: r.status, planHash: r.plan_hash ?? null, state: JSON.parse(r.state_json), createdAt: r.created_at, updatedAt: r.updated_at };
+}
+export function createDiscoveryCampaign(db, { projectId, challenge = {}, status = 'CREATED', planHash = null, state = {} }) {
+  const id = newId(); const now = Date.now();
+  db.prepare(`INSERT INTO discovery_campaigns (id, project_id, challenge_json, status, plan_hash, state_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, projectId, JSON.stringify(challenge), status, planHash, JSON.stringify(state), now, now);
+  return toCampaign(db.prepare('SELECT * FROM discovery_campaigns WHERE id = ?').get(id));
+}
+export function getDiscoveryCampaign(db, id) { return toCampaign(db.prepare('SELECT * FROM discovery_campaigns WHERE id = ?').get(id)); }
+export function listDiscoveryCampaigns(db, projectId) { return db.prepare('SELECT * FROM discovery_campaigns WHERE project_id = ? ORDER BY created_at DESC').all(projectId).map(toCampaign); }
+export function updateDiscoveryCampaign(db, id, { status, planHash, state }) {
+  const cur = db.prepare('SELECT * FROM discovery_campaigns WHERE id = ?').get(id);
+  if (!cur) return null;
+  db.prepare('UPDATE discovery_campaigns SET status = ?, plan_hash = ?, state_json = ?, updated_at = ? WHERE id = ?')
+    .run(status ?? cur.status, planHash !== undefined ? planHash : cur.plan_hash, state !== undefined ? JSON.stringify(state) : cur.state_json, Date.now(), id);
+  return getDiscoveryCampaign(db, id);
+}
+export function appendDiscoveryEvent(db, { campaignId, generation = 0, type, payload = {}, contentHash = null }) {
+  const id = newId();
+  db.prepare(`INSERT INTO discovery_events (id, campaign_id, generation, type, payload_json, content_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, campaignId, generation, type, JSON.stringify(payload), contentHash, Date.now());
+  return { id, campaignId, generation, type, payload, contentHash };
+}
+export function listDiscoveryEvents(db, campaignId, { type = null } = {}) {
+  const rows = type
+    ? db.prepare('SELECT * FROM discovery_events WHERE campaign_id = ? AND type = ? ORDER BY created_at ASC').all(campaignId, type)
+    : db.prepare('SELECT * FROM discovery_events WHERE campaign_id = ? ORDER BY created_at ASC').all(campaignId);
+  return rows.map((r) => ({ id: r.id, campaignId: r.campaign_id, generation: r.generation, type: r.type, payload: JSON.parse(r.payload_json), contentHash: r.content_hash, createdAt: r.created_at }));
+}
+
 export function listTruthAnalyses(db, { limit = 50, projectId = undefined } = {}) {
   const rows = projectId !== undefined
     ? db.prepare('SELECT id, proposal_hash, project_id, decision, decision_hash, created_at FROM truth_analyses WHERE project_id IS ? ORDER BY created_at DESC LIMIT ?').all(projectId, limit)

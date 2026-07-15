@@ -76,7 +76,8 @@ import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs'
 import * as truthEngine from './cognitive/truthEngine.mjs';
 import * as necropolis from './cognitive/necropolis.mjs';
 import * as pilotReport from './cognitive/pilotReport.mjs';
-import { getTruthAnalysis, listTruthAnalyses } from './store.mjs';
+import * as discovery from './cognitive/discoveryController.mjs';
+import { getTruthAnalysis, listTruthAnalyses, listDiscoveryCampaigns, getDiscoveryCampaign } from './store.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -385,6 +386,20 @@ export function handleApi(db, ctx) {
       return err(404, 'not_found');
     }
 
+    // ---- Autonomous Discovery Forge (campaigns, tenant-scoped) ----
+    if (seg[2] === 'discovery-campaigns') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ campaigns: listDiscoveryCampaigns(db, projectId) });
+        if (method === 'POST') return runDiscoveryHandler(db, role, projectId, body);
+        return err(405, 'method_not_allowed');
+      }
+      const camp = getDiscoveryCampaign(db, seg[3]);
+      if (!camp || camp.projectId !== projectId) return err(404, 'not_found'); // tenant isolation
+      if (seg.length === 4 && method === 'GET') return ok({ campaign: camp });
+      if (seg.length === 5 && seg[4] === 'dossier' && method === 'GET') return ok({ dossier: discovery.buildDossier(db, camp.id) });
+      return err(404, 'not_found');
+    }
+
     // ---- Necropolis (tenant-isolated accumulating failure memory) ----
     if (seg[2] === 'necropolis') {
       if (seg.length === 3 && method === 'GET') return ok({ necropolis: necropolis.stats(db, projectId) });
@@ -456,6 +471,39 @@ function runTruthAnalysisHandler(db, role, projectId, body) {
   const result = truthEngine.analyze(v.value, { db, projectId, capabilityResolver: (c) => caps.has(c) });
   const saved = listTruthAnalyses(db, { projectId }).find((a) => a.decisionHash === result.certificate.decisionHash);
   return ok({ analysis: { id: saved?.id ?? null, proposalHash: result.proposalHash, decision: result.decision, stages: result.stages, certificate: result.certificate } }, 201);
+}
+
+/* ---------------- Handler Autonomous Discovery Forge ---------------- */
+
+const DISCOVERY_MAX_GENERATIONS = 4;
+const DISCOVERY_MAX_CANDIDATES = 24;
+const DISCOVERY_MAX_SEEDS = 6;
+
+/** POST /api/projects/:id/discovery-campaigns — uruchamia REALNĄ kampanię (real RDKit). Editor+. */
+function runDiscoveryHandler(db, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Uruchomienie kampanii wymaga roli editor lub wyższej.');
+  const seedsRaw = Array.isArray(body?.seeds) ? body.seeds.slice(0, DISCOVERY_MAX_SEEDS) : [];
+  const seeds = seedsRaw
+    .filter((s) => s && typeof s.smiles === 'string' && s.smiles.length)
+    .map((s) => ({ name: String(s.name ?? 'seed').slice(0, 60), smiles: String(s.smiles).slice(0, 300) }));
+  if (seeds.length === 0) return err(400, 'invalid_seeds', 'Podaj co najmniej jeden scaffold startowy (SMILES).');
+  const ch = body?.challenge && typeof body.challenge === 'object' ? body.challenge : {};
+  const challenge = {
+    grandChallenge: String(ch.grandChallenge ?? 'computational analogue campaign').slice(0, 400),
+    scope: String(ch.scope ?? 'small-molecule, computational-only').slice(0, 400),
+    maxMolWt: clampInt(ch.maxMolWt, 150, 900, 320),
+    maxAlerts: clampInt(ch.maxAlerts, 0, 5, 0),
+    maxLogP: Number.isFinite(ch.maxLogP) ? Math.max(-2, Math.min(8, Number(ch.maxLogP))) : 3.2,
+  };
+  const maxGenerations = clampInt(body?.maxGenerations, 1, DISCOVERY_MAX_GENERATIONS, 2);
+  const maxCandidatesPerGen = clampInt(body?.maxCandidatesPerGen, 1, DISCOVERY_MAX_CANDIDATES, 12);
+  try {
+    const result = discovery.runCampaign(db, { projectId, challenge, seeds, maxGenerations, maxCandidatesPerGen, referenceSet: seeds.map((s) => s.smiles) });
+    const dossier = discovery.buildDossier(db, result.campaignId);
+    return ok({ campaignId: result.campaignId, status: result.status, stopReason: result.stopReason, generations: result.generations, dossier }, 201);
+  } catch (e) {
+    return err(500, 'campaign_failed', String(e?.message ?? e));
+  }
 }
 
 /** POST /api/projects/:id/necropolis/failures — zapisuje region porażki tego najemcy. Editor+. */

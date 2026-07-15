@@ -731,3 +731,43 @@ export async function compareTruthAnalyses(token: string, projectId: string, a: 
   const r = await request<{ comparison: AnalysisComparison }>('GET', `/projects/${projectId}/truth-analyses/compare?${params.toString()}`, { token });
   return r.ok ? { ok: true, data: r.data.comparison } : r;
 }
+
+/* ---------------- Autonomous Discovery Forge ---------------- */
+
+export interface DiscoverySeed { name: string; smiles: string; }
+export interface DiscoveryChallenge { grandChallenge?: string; scope?: string; maxMolWt?: number; maxAlerts?: number; maxLogP?: number; }
+
+export interface DiscoveryDossier {
+  schema: string; campaignId: string; projectId: string; grandChallenge: string | null; campaignScope: string | null;
+  finalStatus: string; stopReason: string | null; initialPlanHash: string | null;
+  generationHistory: { generation: number; planHash: string; cohortSize: number; transformsUsed: string[] }[];
+  planMutations: { generation: number; trigger: string; mutationType: string; previousPlanHash: string; newPlanHash: string; rationale: string[] }[];
+  necropolisEntries: { generation: number; candidateId: string; reason: string }[];
+  failureRegionsAvoided: { generation: number; reason: string }[];
+  adversarialCriticisms: { generation: number; id: string; demoted: boolean; critiques: { concern: string; detail: string; severity: string }[] }[];
+  falsificationTasks: { generation: number; task: { testType: string; costClass: string; targetAssumption: string } }[];
+  enginesExecuted: string[]; enginesSkipped: { engine: string; decision: string; reason: string }[];
+  noveltyAssessments: { id: string; novelty: { status: string; reason: string } }[];
+  rankedComputationalCandidates: { id: string; canonical: string; rank: number; novelty: string }[];
+  provenance: { events: number; replayable: boolean };
+  limitationStatement: string; classification: string; dossierHash: string;
+}
+
+export interface DiscoveryRunResult {
+  campaignId: string; status: string; stopReason: string | null;
+  generations: { generation: number; planHash: string; cohortSize: number; survivors: number; rejected: number }[];
+  dossier: DiscoveryDossier;
+}
+export interface DiscoveryCampaignSummary { id: string; projectId: string; status: string; planHash: string | null; createdAt: number; }
+
+export async function runDiscoveryCampaign(token: string, projectId: string, body: { seeds: DiscoverySeed[]; challenge?: DiscoveryChallenge; maxGenerations?: number; maxCandidatesPerGen?: number }): Promise<ApiResult<DiscoveryRunResult>> {
+  return request<DiscoveryRunResult>('POST', `/projects/${projectId}/discovery-campaigns`, { token, body });
+}
+export async function listDiscoveryCampaigns(token: string, projectId: string): Promise<ApiResult<DiscoveryCampaignSummary[]>> {
+  const r = await request<{ campaigns: DiscoveryCampaignSummary[] }>('GET', `/projects/${projectId}/discovery-campaigns`, { token });
+  return r.ok ? { ok: true, data: r.data.campaigns } : r;
+}
+export async function getDiscoveryDossier(token: string, projectId: string, campaignId: string): Promise<ApiResult<DiscoveryDossier>> {
+  const r = await request<{ dossier: DiscoveryDossier }>('GET', `/projects/${projectId}/discovery-campaigns/${campaignId}/dossier`, { token });
+  return r.ok ? { ok: true, data: r.data.dossier } : r;
+}

@@ -28,6 +28,7 @@ import { CandidateDiscoveryScreen } from './components/CandidateDiscoveryScreen'
 import { DrugDiscoveryScreen } from './components/DrugDiscoveryScreen';
 import { CampaignScreen } from './components/CampaignScreen';
 import { TruthEngineScreen } from './components/TruthEngineScreen';
+import { DiscoveryForgeScreen } from './components/DiscoveryForgeScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -52,7 +53,8 @@ type Route =
   | { kind: 'cde' }
   | { kind: 'drug' }
   | { kind: 'campaign' }
-  | { kind: 'truth-engine' };
+  | { kind: 'truth-engine' }
+  | { kind: 'discovery-forge' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -72,6 +74,7 @@ function parseHash(): Route {
   if (h === '#/drug') return { kind: 'drug' };
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/truth-engine') return { kind: 'truth-engine' };
+  if (h === '#/discovery-forge') return { kind: 'discovery-forge' };
   return { kind: 'home' };
 }
 
@@ -367,6 +370,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'discovery-forge') {
+      return (
+        <div className="app">
+          <TopBar title="🧬 Autonomous Discovery Forge" onSearch={() => setSearchOpen(true)} />
+          <ErrorBoundary>
+            <DiscoveryForgeScreen />
+          </ErrorBoundary>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -439,6 +454,9 @@ export default function App() {
             </button>
             <button onClick={() => { window.location.hash = '#/truth-engine'; }}>
               <span aria-hidden="true">🛑</span> Truth Engine
+            </button>
+            <button onClick={() => { window.location.hash = '#/discovery-forge'; }}>
+              <span aria-hidden="true">🧬</span> Discovery Forge
             </button>
             <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
               <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}

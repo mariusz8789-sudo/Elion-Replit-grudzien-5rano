@@ -360,6 +360,11 @@ export class DbStorage implements IStorage {
     return await db.select().from(drivers).where(eq(drivers.companyId, companyId));
   }
 
+  async getDriverByUserId(userId: string): Promise<Driver | undefined> {
+    const result = await db.select().from(drivers).where(eq(drivers.userId, userId));
+    return result[0];
+  }
+
   async createDriver(insertDriver: InsertDriver): Promise<Driver> {
     const result = await db.insert(drivers).values(insertDriver).returning();
     return result[0];
@@ -425,6 +430,34 @@ export class DbStorage implements IStorage {
       .where(eq(bookings.companyId, companyId))
       .orderBy(desc(bookings.createdAt))
       .limit(500);
+  }
+
+  // Bookings the company has already committed to (status "accepted") but hasn't dispatched
+  // to a specific driver yet - the pool of jobs eligible for QR/NFC instant driver pairing.
+  async getCompanyUnassignedBookings(companyId: string): Promise<Booking[]> {
+    return await db.select().from(bookings)
+      .where(and(
+        eq(bookings.companyId, companyId),
+        isNull(bookings.driverId),
+        eq(bookings.status, "accepted"),
+      ))
+      .orderBy(desc(bookings.createdAt));
+  }
+
+  // Race-safe self-assignment: a driver scans/taps a job's QR/NFC code and claims it. The
+  // conditional WHERE re-validates company membership and that nobody else claimed it first,
+  // rather than trusting whatever the scanned code claims.
+  async claimBookingForDriver(bookingId: string, driverId: string, companyId: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ driverId, updatedAt: new Date() })
+      .where(and(
+        eq(bookings.id, bookingId),
+        eq(bookings.companyId, companyId),
+        isNull(bookings.driverId),
+        eq(bookings.status, "accepted"),
+      ))
+      .returning();
+    return result[0];
   }
 
   async getCompanyMonthlyBookingCount(companyId: string): Promise<number> {

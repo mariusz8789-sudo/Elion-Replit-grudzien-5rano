@@ -752,6 +752,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === QR/NFC DISPATCH ROUTES ===
+  // Jobs the company has already accepted but hasn't handed to a specific driver yet - these
+  // are what a dispatcher can generate a real QR code for.
+  app.get("/api/companies/:companyId/dispatch-jobs", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const jobs = await storage.getCompanyUnassignedBookings(req.params.companyId);
+    res.json(jobs);
+  });
+
+  // A driver scans (or NFC-taps) a job's QR code, which encodes nothing but the bookingId -
+  // all authorization is re-checked server-side against the scanning driver's own company
+  // membership, so the QR content itself doesn't need to be signed or trusted.
+  app.post("/api/bookings/:id/claim", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const driver = await storage.getDriverByUserId(user.id);
+      if (!driver) {
+        return res.status(403).json({ message: "Only drivers can claim jobs" });
+      }
+      const claimed = await storage.claimBookingForDriver(req.params.id, driver.id, driver.companyId);
+      if (!claimed) {
+        return res.status(409).json({ message: "This job is no longer available - it may already be claimed or not assigned to your company" });
+      }
+      await storage.createNotification({
+        userId: claimed.userId,
+        title: "Driver assigned",
+        message: `A driver has been dispatched to your booking.`,
+        link: `/bookings/${claimed.id}`,
+      });
+      res.json(claimed);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Payment status is normally driven exclusively by the Stripe webhook
   // (/api/stripe-webhook); this manual override exists only for admin reconciliation.
   app.patch("/api/bookings/:id/payment", requireAdmin, async (req, res) => {

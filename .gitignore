@@ -10,3 +10,7 @@ packages/backend/data/
 # heavy-engine scientific artifacts (runtime, not source)
 _dock*/
 *.pdbqt
+
+# Candidate Generation Engine v2 — bulky regenerable outputs (keep the dossier)
+campaigns/candidate-gen-v2/candidates.json
+campaigns/candidate-gen-v2/ranking.json

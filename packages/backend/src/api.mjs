@@ -75,6 +75,13 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns, getScienceRun } from './
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 import * as truthEngine from './cognitive/truthEngine.mjs';
 import * as necropolis from './cognitive/necropolis.mjs';
+import { OFF_TARGET_PANEL, TOX_PANEL } from './cognitive/offTarget.mjs';
+import { NODE_TYPE, EDGE_TYPE } from './cognitive/knowledgeGraph.mjs';
+import { detectMdCapability } from './cognitive/molecularDynamics.mjs';
+import { BIOLOGICAL_SOURCES, BIO_SERVICES } from './corpus/biologicalSources.mjs';
+import * as rdkitAdapter from './compute/rdkitAdapter.mjs';
+import * as admetAdapter from './compute/admetAdapter.mjs';
+import * as dockingAdapter from './compute/dockingAdapter.mjs';
 import * as pilotReport from './cognitive/pilotReport.mjs';
 import * as discovery from './cognitive/discoveryController.mjs';
 import { getTruthAnalysis, listTruthAnalyses, listDiscoveryCampaigns, getDiscoveryCampaign } from './store.mjs';
@@ -142,6 +149,12 @@ export function handleApi(db, ctx) {
       const r = listEndpoints();
       return r.ok ? ok({ endpoints: r.endpoints }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
     }
+    return err(404, 'not_found');
+  }
+
+  // ---- Discovery-science capabilities (V3) — real runtime status for the Discovery Workspace ----
+  if (seg[0] === 'science') {
+    if (seg[1] === 'capabilities' && seg.length === 2 && method === 'GET') return ok({ capabilities: scienceCapabilities() });
     return err(404, 'not_found');
   }
 
@@ -420,6 +433,32 @@ export function handleApi(db, ctx) {
   }
 
   return err(404, 'not_found');
+}
+
+/**
+ * Real runtime capability status for the Discovery Workspace (V3). Every field reflects a genuine
+ * runtime detect / static schema — never a fabricated availability. Off-target panel + KG schema +
+ * biological-source registry are real definitions; engine availability comes from live detects.
+ */
+function scienceCapabilities() {
+  const detect = (fn) => { try { const d = fn(); return { available: Boolean(d.available), version: d.version ?? d.vinaVersion ?? null, reason: d.available ? null : (d.reason ?? null) }; } catch (e) { return { available: false, reason: String(e?.message ?? e).slice(0, 120) }; } };
+  let md;
+  try { const c = detectMdCapability(); md = { openmm: c.openmm?.available ?? false, ligandForceField: c.ligandForceField?.available ?? false, canRunComplexMd: c.canRunComplexMd, reason: c.reason }; }
+  catch (e) { md = { openmm: false, ligandForceField: false, canRunComplexMd: false, reason: String(e?.message ?? e).slice(0, 120) }; }
+  return {
+    version: 'genesis-science-capabilities/1',
+    engines: {
+      rdkit: detect(() => rdkitAdapter.detect()),
+      admet: detect(() => admetAdapter.detect()),
+      docking: detect(() => dockingAdapter.detect()),
+      molecularDynamics: md,
+      mmGbsa: { available: md.canRunComplexMd, reason: md.canRunComplexMd ? null : 'requires a completed MD trajectory (MD blocked)' },
+    },
+    offTarget: { panel: OFF_TARGET_PANEL.map((t) => ({ gene: t.gene, protein: t.protein, category: t.category })), toxicityEndpoints: TOX_PANEL.map((t) => t.label), epistemicStatus: 'MODEL_INFERRED', source: 'ADMET-AI (Tox21 / TDC)' },
+    knowledgeGraph: { nodeTypes: Object.values(NODE_TYPE), edgeTypes: Object.values(EDGE_TYPE), provenanceRequired: true },
+    biologicalSources: BIO_SERVICES.map((s) => ({ service: s, kind: BIOLOGICAL_SOURCES[s].kind, license: BIOLOGICAL_SOURCES[s].license, liveRetrieval: 'BLOCKED_BY_RUNTIME (egress policy — supply offline bundle or run on a networked host)' })),
+    honesty: 'Availability reflects real runtime detects; unavailable engines/sources are honestly blocked, never simulated. Computational only — no drug discovered.',
+  };
 }
 
 /* ---------------- Handlery ZEFIR Truth Engine / R&D Kill-Switch ---------------- */

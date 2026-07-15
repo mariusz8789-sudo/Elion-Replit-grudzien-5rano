@@ -29,6 +29,7 @@ import { DrugDiscoveryScreen } from './components/DrugDiscoveryScreen';
 import { CampaignScreen } from './components/CampaignScreen';
 import { TruthEngineScreen } from './components/TruthEngineScreen';
 import { DiscoveryForgeScreen } from './components/DiscoveryForgeScreen';
+import { DiscoveryWorkspaceScreen } from './components/DiscoveryWorkspaceScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -54,7 +55,8 @@ type Route =
   | { kind: 'drug' }
   | { kind: 'campaign' }
   | { kind: 'truth-engine' }
-  | { kind: 'discovery-forge' };
+  | { kind: 'discovery-forge' }
+  | { kind: 'discovery-workspace' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -75,6 +77,7 @@ function parseHash(): Route {
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/truth-engine') return { kind: 'truth-engine' };
   if (h === '#/discovery-forge') return { kind: 'discovery-forge' };
+  if (h === '#/discovery-workspace') return { kind: 'discovery-workspace' };
   return { kind: 'home' };
 }
 
@@ -382,6 +385,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'discovery-workspace') {
+      return (
+        <div className="app">
+          <TopBar title="🔬 Discovery Workspace" onSearch={() => setSearchOpen(true)} />
+          <ErrorBoundary>
+            <DiscoveryWorkspaceScreen />
+          </ErrorBoundary>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -457,6 +472,9 @@ export default function App() {
             </button>
             <button onClick={() => { window.location.hash = '#/discovery-forge'; }}>
               <span aria-hidden="true">🧬</span> Discovery Forge
+            </button>
+            <button onClick={() => { window.location.hash = '#/discovery-workspace'; }}>
+              <span aria-hidden="true">🔬</span> Discovery Workspace
             </button>
             <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
               <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}

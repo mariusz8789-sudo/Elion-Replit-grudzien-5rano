@@ -383,6 +383,21 @@ export async function listCapabilities(): Promise<ApiResult<Capability[]>> {
   return r.ok ? { ok: true, data: r.data.capabilities } : r;
 }
 
+export interface ScienceCapabilities {
+  version: string;
+  engines: Record<string, { available: boolean; version?: string | null; reason?: string | null; canRunComplexMd?: boolean; openmm?: boolean; ligandForceField?: boolean }>;
+  offTarget: { panel: { gene: string; protein: string; category: string }[]; toxicityEndpoints: string[]; epistemicStatus: string; source: string };
+  knowledgeGraph: { nodeTypes: string[]; edgeTypes: string[]; provenanceRequired: boolean };
+  biologicalSources: { service: string; kind: string; license: string; liveRetrieval: string }[];
+  honesty: string;
+}
+
+/** Real runtime capability status for the Discovery Workspace (V3). Public; no fabricated data. */
+export async function fetchScienceCapabilities(): Promise<ApiResult<ScienceCapabilities>> {
+  const r = await request<{ capabilities: ScienceCapabilities }>('GET', '/science/capabilities');
+  return r.ok ? { ok: true, data: r.data.capabilities } : r;
+}
+
 export async function listTargets(token: string, projectId: string): Promise<ApiResult<Target[]>> {
   const r = await request<{ targets: Target[] }>('GET', `/projects/${projectId}/targets`, { token });
   return r.ok ? { ok: true, data: r.data.targets } : r;

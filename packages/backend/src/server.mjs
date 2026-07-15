@@ -262,7 +262,7 @@ const server = http.createServer((req, res) => {
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);
-  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute')) {
+  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute') || req.url?.startsWith('/api/science')) {
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
   }
   if (req.url?.startsWith('/api/')) return json(res, 404, { error: 'not_found' });

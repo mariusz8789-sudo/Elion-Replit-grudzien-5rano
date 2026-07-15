@@ -1401,3 +1401,12 @@ kbd {
   .pilot-report h1, .report-block h3, .pilot-report-footer h3 { color: #111; }
   .report-muted, .pilot-report-footer p, .pilot-report-meta span { color: #444; }
 }
+
+/* Discovery Workspace (V3 Phase 6) — real capability status panels */
+.sci-workspace { padding: 1rem; max-width: 980px; margin: 0 auto; }
+.sci-panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.sci-engine-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.sci-reason { opacity: 0.7; font-size: 0.85em; }
+.sci-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.4rem; }
+.sci-chip { background: rgba(255,255,255,0.04); border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.85em; }
+.sci-chip em { opacity: 0.6; }

@@ -1168,6 +1168,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fleet Predictor: real deterministic aggregates over this company's own booking history
+  // (day-of-week averages, hour-of-day distribution, top pickup locations, period-over-period
+  // trend). This replaces entirely hardcoded demand/hot-zone/peak-hour arrays and a fake "96%
+  // AI confidence" badge. There is no trained forecasting model behind this - it is honest
+  // historical statistics, with the actual ML/demand-forecasting model left as documented
+  // future work (MoveX AI Core) rather than being faked here.
+  app.get("/api/fleet-predictor", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (!user.companyId) {
+        return res.status(403).json({ message: "Company access required" });
+      }
+
+      const bookingsData = await db.select().from(bookings).where(eq(bookings.companyId, user.companyId));
+      const MIN_BOOKINGS_FOR_STATS = 5;
+      if (bookingsData.length < MIN_BOOKINGS_FOR_STATS) {
+        return res.json({ hasData: false, totalBookingsAnalyzed: bookingsData.length, methodology: "historical-aggregate-v1" });
+      }
+
+      const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const weekdayCounts = new Array(7).fill(0);
+      const weekdayRevenue = new Array(7).fill(0);
+      const hourCounts = new Array(24).fill(0);
+      const hourRevenue = new Array(24).fill(0);
+      const locationCounts = new Map<string, number>();
+      let earliestDate = new Date(bookingsData[0].pickupDate);
+      let latestDate = new Date(bookingsData[0].pickupDate);
+
+      for (const b of bookingsData) {
+        const date = new Date(b.pickupDate);
+        const price = parseFloat(b.totalPrice.toString());
+        const weekday = date.getDay();
+        const hour = date.getHours();
+        weekdayCounts[weekday]++;
+        weekdayRevenue[weekday] += price;
+        hourCounts[hour]++;
+        hourRevenue[hour] += price;
+        locationCounts.set(b.pickupAddress, (locationCounts.get(b.pickupAddress) || 0) + 1);
+        if (date < earliestDate) earliestDate = date;
+        if (date > latestDate) latestDate = date;
+      }
+
+      // How many times has each weekday actually occurred within the observed date range -
+      // used as the divisor so "average bookings on a Friday" is a genuine per-occurrence mean.
+      const weekdayOccurrences = new Array(7).fill(0);
+      const dayMs = 24 * 60 * 60 * 1000;
+      const spanDays = Math.max(1, Math.round((latestDate.getTime() - earliestDate.getTime()) / dayMs) + 1);
+      for (let i = 0; i < spanDays; i++) {
+        const d = new Date(earliestDate.getTime() + i * dayMs);
+        weekdayOccurrences[d.getDay()]++;
+      }
+
+      const weekdayStats = WEEKDAY_LABELS.map((label, idx) => {
+        const occurrences = weekdayOccurrences[idx] || 1;
+        return {
+          day: label,
+          avgBookings: Math.round((weekdayCounts[idx] / occurrences) * 10) / 10,
+          avgRevenue: weekdayCounts[idx] > 0 ? Math.round(weekdayRevenue[idx] / weekdayCounts[idx]) : 0,
+          totalBookings: weekdayCounts[idx],
+        };
+      });
+      const peakWeekday = weekdayStats.reduce((best, w) => (w.avgBookings > best.avgBookings ? w : best), weekdayStats[0]);
+
+      // Real period-over-period trend: bookings in the most recent 4 weeks vs. the 4 weeks
+      // before that, both measured from "now" - not a projection, an actual comparison.
+      const now = new Date();
+      const fourWeeksMs = 28 * dayMs;
+      const recentCount = bookingsData.filter((b) => {
+        const t = new Date(b.pickupDate).getTime();
+        return t > now.getTime() - fourWeeksMs && t <= now.getTime();
+      }).length;
+      const previousCount = bookingsData.filter((b) => {
+        const t = new Date(b.pickupDate).getTime();
+        return t > now.getTime() - 2 * fourWeeksMs && t <= now.getTime() - fourWeeksMs;
+      }).length;
+      const trendPercent = previousCount > 0
+        ? Math.round(((recentCount - previousCount) / previousCount) * 1000) / 10
+        : null;
+
+      const HOUR_BINS = [
+        { label: "0-4", hours: [0, 1, 2, 3] },
+        { label: "4-8", hours: [4, 5, 6, 7] },
+        { label: "8-12", hours: [8, 9, 10, 11] },
+        { label: "12-16", hours: [12, 13, 14, 15] },
+        { label: "16-20", hours: [16, 17, 18, 19] },
+        { label: "20-24", hours: [20, 21, 22, 23] },
+      ];
+      const totalBookingCount = bookingsData.length;
+      const hourlyStats = HOUR_BINS.map((bin) => {
+        const count = bin.hours.reduce((sum, h) => sum + hourCounts[h], 0);
+        const revenue = bin.hours.reduce((sum, h) => sum + hourRevenue[h], 0);
+        return {
+          hour: bin.label,
+          bookingCount: count,
+          sharePercent: totalBookingCount > 0 ? Math.round((count / totalBookingCount) * 1000) / 10 : 0,
+          avgRevenue: count > 0 ? Math.round(revenue / count) : 0,
+        };
+      }).sort((a, b) => b.bookingCount - a.bookingCount);
+
+      const topLocations = Array.from(locationCounts.entries())
+        .map(([address, count]) => ({ address, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      res.json({
+        hasData: true,
+        totalBookingsAnalyzed: totalBookingCount,
+        observedFrom: earliestDate.toISOString(),
+        observedTo: latestDate.toISOString(),
+        weekdayStats,
+        peakWeekday: peakWeekday.day,
+        trendPercent,
+        hourlyStats,
+        topLocations,
+        methodology: "historical-aggregate-v1",
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Real per-company CO2 aggregates from persisted environmental_calculations - previously
   // this endpoint returned entirely Math.random() numbers dressed up with real company
   // names. Companies with no completed bookings yet simply show zero, not a fabricated

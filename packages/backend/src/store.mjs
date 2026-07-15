@@ -553,8 +553,32 @@ CREATE INDEX IF NOT EXISTS idx_strategy_records_key ON strategy_records(strategy
 CREATE INDEX IF NOT EXISTS idx_strategy_records_domain ON strategy_records(domain, created_at);
 `;
 
+// Compute Orchestrator (Priority 11): traceable compute placement decisions +
+// budget/actual accounting. Append-only. Backends declare availability honestly;
+// unavailable hardware is never faked.
+const SCHEMA_V13 = `
+CREATE TABLE IF NOT EXISTS compute_placements (
+  id               TEXT PRIMARY KEY,
+  mission_id       TEXT,
+  task_id          TEXT,
+  backend_id       TEXT,
+  requirements_json TEXT NOT NULL DEFAULT '{}',
+  estimated_ms     INTEGER,
+  actual_ms        INTEGER,
+  status           TEXT NOT NULL,
+  failure_class    TEXT,
+  reason           TEXT,
+  retry_of         TEXT,
+  attempt          INTEGER NOT NULL DEFAULT 1,
+  created_at       INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_compute_placements_mission ON compute_placements(mission_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_compute_placements_task ON compute_placements(task_id, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 13) db.exec(SCHEMA_V13);
   if (version < 12) db.exec(SCHEMA_V12);
   if (version < 11) db.exec(SCHEMA_V11);
   if (version < 10) db.exec(SCHEMA_V10);
@@ -592,7 +616,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 12) db.exec('PRAGMA user_version = 12');
+  if (version < 13) db.exec('PRAGMA user_version = 13');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1728,4 +1752,46 @@ export function listStrategyRecords(db, { strategyKey = null, domain = null } = 
   else if (domain) rows = db.prepare('SELECT * FROM strategy_records WHERE domain = ? ORDER BY created_at ASC').all(domain);
   else rows = db.prepare('SELECT * FROM strategy_records ORDER BY created_at ASC').all();
   return rows.map(toStrategyRecord);
+}
+
+/* ---- compute_placements (Priority 11 — traceable placement + accounting, append-only) ---- */
+function toComputePlacement(r) {
+  if (!r) return null;
+  return {
+    id: r.id, missionId: r.mission_id, taskId: r.task_id, backendId: r.backend_id,
+    requirements: JSON.parse(r.requirements_json), estimatedMs: r.estimated_ms, actualMs: r.actual_ms,
+    status: r.status, failureClass: r.failure_class, reason: r.reason, retryOf: r.retry_of,
+    attempt: r.attempt, createdAt: r.created_at,
+  };
+}
+export function saveComputePlacement(db, p) {
+  const id = p.id ?? newId();
+  db.prepare(
+    `INSERT INTO compute_placements (id, mission_id, task_id, backend_id, requirements_json, estimated_ms, actual_ms, status, failure_class, reason, retry_of, attempt, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, p.missionId ?? null, p.taskId ?? null, p.backendId ?? null, JSON.stringify(p.requirements ?? {}),
+    p.estimatedMs ?? null, p.actualMs ?? null, p.status, p.failureClass ?? null, p.reason ?? null,
+    p.retryOf ?? null, p.attempt ?? 1, Date.now(),
+  );
+  return getComputePlacement(db, id);
+}
+export function getComputePlacement(db, id) {
+  return toComputePlacement(db.prepare('SELECT * FROM compute_placements WHERE id = ?').get(id));
+}
+export function updateComputePlacement(db, id, patch) {
+  const cur = getComputePlacement(db, id);
+  if (!cur) return null;
+  const next = { ...cur, ...patch };
+  db.prepare('UPDATE compute_placements SET actual_ms = ?, status = ?, failure_class = ?, reason = ? WHERE id = ?').run(
+    next.actualMs ?? null, next.status, next.failureClass ?? null, next.reason ?? null, id,
+  );
+  return getComputePlacement(db, id);
+}
+export function listComputePlacements(db, { missionId = null, taskId = null } = {}) {
+  let rows;
+  if (taskId) rows = db.prepare('SELECT * FROM compute_placements WHERE task_id = ? ORDER BY created_at ASC').all(taskId);
+  else if (missionId) rows = db.prepare('SELECT * FROM compute_placements WHERE mission_id = ? ORDER BY created_at ASC').all(missionId);
+  else rows = db.prepare('SELECT * FROM compute_placements ORDER BY created_at ASC').all();
+  return rows.map(toComputePlacement);
 }

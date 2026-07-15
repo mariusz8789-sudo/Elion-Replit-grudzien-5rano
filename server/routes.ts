@@ -169,6 +169,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(allUsers.map(({ password: _, ...rest }) => rest));
   });
 
+  // Lets a company look up an existing, not-yet-linked user by phone number before
+  // inviting them as a driver (POST /api/drivers requires an existing userId). Scoped to
+  // authenticated company users and returns only the minimal fields needed to confirm
+  // identity - never exposed as a general, unauthenticated phone-to-user lookup. Must be
+  // registered before /api/users/:id below, or that route's :id param would swallow this
+  // path first since Express matches by registration order, not specificity.
+  app.get("/api/users/lookup-for-driver-invite", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!user.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Only company accounts can look up drivers to invite" });
+    }
+    const phone = String(req.query.phone || "");
+    if (!phone) {
+      return res.status(400).json({ message: "phone is required" });
+    }
+    const found = await storage.getUserByPhone(phone);
+    if (!found) {
+      return res.status(404).json({ message: "No account found with that phone number" });
+    }
+    if (found.companyId) {
+      return res.status(409).json({ message: "This user is already linked to a company" });
+    }
+    res.json({ id: found.id, name: found.name, phone: found.phone });
+  });
+
   app.get("/api/users/:id", requireAuth, async (req, res) => {
     const user = await storage.getUser(req.params.id);
     if (!user) {
@@ -259,29 +284,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: "Company not found" });
     }
     res.json(company);
-  });
-
-  // Lets a company look up an existing, not-yet-linked user by phone number before
-  // inviting them as a driver (POST /api/drivers requires an existing userId). Scoped to
-  // authenticated company users and returns only the minimal fields needed to confirm
-  // identity - never exposed as a general, unauthenticated phone-to-user lookup.
-  app.get("/api/users/lookup-for-driver-invite", requireAuth, async (req, res) => {
-    const user = req.user as User;
-    if (!user.companyId && user.role !== "admin") {
-      return res.status(403).json({ message: "Only company accounts can look up drivers to invite" });
-    }
-    const phone = String(req.query.phone || "");
-    if (!phone) {
-      return res.status(400).json({ message: "phone is required" });
-    }
-    const found = await storage.getUserByPhone(phone);
-    if (!found) {
-      return res.status(404).json({ message: "No account found with that phone number" });
-    }
-    if (found.companyId) {
-      return res.status(409).json({ message: "This user is already linked to a company" });
-    }
-    res.json({ id: found.id, name: found.name, phone: found.phone });
   });
 
   // === DRIVER ROUTES ===

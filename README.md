@@ -273,3 +273,11 @@ Uczciwość naukowa dotyczy też tego dokumentu, nie tylko UI:
   [`RAPORT-AUDYT-2.md`](RAPORT-AUDYT-2.md)
 
 Wdrożenie: Replit (Run/Deploy) albo `docker compose up --build`.
+
+### Dokumentacja Genesis OS v1.0
+
+- [`docs/GENESIS_V1_COMPLETION_REPORT.md`](docs/GENESIS_V1_COMPLETION_REPORT.md) — raport zgodności z Definition of Done + gotowość i Top 20 ROI.
+- [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) — pełny opis HTTP API (auth, compute, projekty, kampanie, Truth Engine, Discovery Forge, Necropolis).
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — runbook produkcyjny (Docker/Replit/VPS, zmienne środowiskowe, health, trwałość, skalowanie).
+- [`docs/OPERATOR_GUIDE.md`](docs/OPERATOR_GUIDE.md) — obsługa platformy i uruchamianie realnych przepływów (w tym Kampania #001 na danych zewnętrznych).
+- [`docs/EXTERNAL_DEPENDENCIES.md`](docs/EXTERNAL_DEPENDENCIES.md) — uczciwy rejestr zależności zewnętrznych (dane/infrastruktura/laboratorium/prawo).

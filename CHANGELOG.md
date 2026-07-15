@@ -6,6 +6,17 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano (Domknięcie Genesis OS v1.0 — dokumentacja i kampania na danych zewnętrznych)
+- Ścieżka „externally supplied official payloads": `scripts/build-bundle-from-supplied.mjs`
+  (montaż zweryfikowanego pakietu offline z realnym SHA-256, walidacją parsera i fail-closed),
+  wpięta w `run-campaign-001.mjs --supplied`; szablon `SUPPLIED_INPUTS_TEMPLATE.json`.
+- Kompletna dokumentacja v1.0: `docs/API_REFERENCE.md`, `docs/DEPLOYMENT.md`,
+  `docs/OPERATOR_GUIDE.md`, `docs/EXTERNAL_DEPENDENCIES.md`,
+  `docs/GENESIS_V1_COMPLETION_REPORT.md` (raport zgodności z Definition of Done + gotowość
+  naukowa/produktowa/komercyjna/biotech/inwestorska + Top 20 ROI).
+- Pokrycie testowe portu źródeł korpusu i buildera offline (`corpusSourcePort.test.mjs`,
+  `campaignSuppliedBundle.test.mjs`). Bramki jakości: backend 599/599, frontend 610/610.
+
 ## [1.0.0] - 2026-07-11
 
 Pierwsze wydanie oznaczone jako gotowe produkcyjnie. Wszystko poniżej i we

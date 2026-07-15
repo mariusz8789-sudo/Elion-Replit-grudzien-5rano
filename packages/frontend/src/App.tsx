@@ -31,6 +31,13 @@ import { CampaignScreen } from './components/CampaignScreen';
 import { TruthEngineScreen } from './components/TruthEngineScreen';
 import { DiscoveryForgeScreen } from './components/DiscoveryForgeScreen';
 import { DiscoveryWorkspaceScreen } from './components/DiscoveryWorkspaceScreen';
+import { MissionControlScreen } from './components/discovery/MissionControlScreen';
+import { LaboratoryReadinessScreen } from './components/discovery/LaboratoryReadinessScreen';
+import { MultiAgentScreen } from './components/discovery/MultiAgentScreen';
+import { KnowledgeGraphScreen } from './components/discovery/KnowledgeGraphScreen';
+import { ComputeClusterScreen } from './components/discovery/ComputeClusterScreen';
+import { ScientificMemoryScreen } from './components/discovery/ScientificMemoryScreen';
+import { InvestorDashboardScreen } from './components/discovery/InvestorDashboardScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -57,7 +64,14 @@ type Route =
   | { kind: 'campaign' }
   | { kind: 'truth-engine' }
   | { kind: 'discovery-forge' }
-  | { kind: 'discovery-workspace' };
+  | { kind: 'discovery-workspace' }
+  | { kind: 'dashboard' }
+  | { kind: 'lab-readiness' }
+  | { kind: 'multi-agent' }
+  | { kind: 'knowledge-graph' }
+  | { kind: 'compute' }
+  | { kind: 'scientific-memory' }
+  | { kind: 'investor' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -79,6 +93,13 @@ function parseHash(): Route {
   if (h === '#/truth-engine') return { kind: 'truth-engine' };
   if (h === '#/discovery-forge') return { kind: 'discovery-forge' };
   if (h === '#/discovery-workspace') return { kind: 'discovery-workspace' };
+  if (h === '#/dashboard') return { kind: 'dashboard' };
+  if (h === '#/lab-readiness') return { kind: 'lab-readiness' };
+  if (h === '#/multi-agent') return { kind: 'multi-agent' };
+  if (h === '#/knowledge-graph') return { kind: 'knowledge-graph' };
+  if (h === '#/compute') return { kind: 'compute' };
+  if (h === '#/scientific-memory') return { kind: 'scientific-memory' };
+  if (h === '#/investor') return { kind: 'investor' };
   return { kind: 'home' };
 }
 
@@ -397,6 +418,15 @@ export default function App() {
         </div>
       );
     }
+
+    // V5 premium discovery-console screens — each renders its own DiscoveryShell.
+    if (route.kind === 'dashboard') return <div className="app"><ErrorBoundary><MissionControlScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'lab-readiness') return <div className="app"><ErrorBoundary><LaboratoryReadinessScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'multi-agent') return <div className="app"><ErrorBoundary><MultiAgentScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'knowledge-graph') return <div className="app"><ErrorBoundary><KnowledgeGraphScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'compute') return <div className="app"><ErrorBoundary><ComputeClusterScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'scientific-memory') return <div className="app"><ErrorBoundary><ScientificMemoryScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'investor') return <div className="app"><ErrorBoundary><InvestorDashboardScreen /></ErrorBoundary>{overlays}</div>;
 
     return (
       <div className="app">

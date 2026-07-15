@@ -402,14 +402,14 @@ export async function fetchScienceCapabilities(): Promise<ApiResult<ScienceCapab
 
 export interface ComputeResources {
   version: string;
-  cpu: { cores: number; model?: string; loadAvg?: number[] };
-  memory: { totalGb: number; freeGb: number };
-  gpu: { available: boolean; reason?: string; detail?: string };
+  cpu: { cores: number; totalMemGB: number };
+  gpu: { available: boolean; devices?: string[] | null; reason?: string };
   docker: { available: boolean; note?: string };
   kubernetes: { available: boolean; note?: string };
-  slurm: { available: boolean; note?: string };
-  jobQueue: { available: boolean; note?: string };
+  hpcScheduler: { slurm: boolean; note?: string };
+  jobQueue: { available: boolean; engine?: string; note?: string };
   distributedProcessing: { available: boolean; note?: string };
+  honesty: string;
 }
 export async function fetchComputeResources(): Promise<ApiResult<ComputeResources>> {
   const r = await request<{ resources: ComputeResources }>('GET', '/science/compute-resources');

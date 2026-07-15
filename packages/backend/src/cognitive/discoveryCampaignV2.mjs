@@ -22,6 +22,7 @@ import * as reasoning from './reasoningBrain.mjs';
 import { ingestBundle } from '../corpus/corpusIngest.mjs';
 import { truthFinalGate, detectConflicts } from '../campaign/campaignRunner001.mjs';
 import { predictOffTarget, OFF_TARGET_PANEL } from './offTarget.mjs';
+import { buildKnowledgeGraph } from './knowledgeGraph.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
 
 export const CAMPAIGN_V2_VERSION = 'genesis-discovery-campaign/2';
@@ -285,6 +286,10 @@ export function runDiscoveryCampaignV2(opts = {}) {
     survivors.length ? 'Synthesise and assay a small diverse subset spanning the ranking to calibrate the computational score against measured activity.' : null,
   ].filter(Boolean);
 
+  // ── Phase 4 — Knowledge Graph (real evidence + candidates + off-target proteins, provenance edges) ─
+  const knowledgeGraph = buildKnowledgeGraph({ ingest: evidence, dossier: { candidates: perCandidate }, target: { targetName: primaryTargetName } });
+  mark('KNOWLEDGE_GRAPH', 'BUILT', `${knowledgeGraph.stats.nodes} nodes, ${knowledgeGraph.stats.edges} edges`);
+
   const dossier = {
     schema: 'genesis-discovery-campaign-dossier/2',
     campaign: { id: campaignId, version: CAMPAIGN_V2_VERSION, status: CAMPAIGN_V2_STATUS.COMPLETED },
@@ -301,6 +306,7 @@ export function runDiscoveryCampaignV2(opts = {}) {
     workflowMutation,
     benchmark,
     riskAdjustedRanking,
+    knowledgeGraph: { version: knowledgeGraph.version, stats: knowledgeGraph.stats, blockedNodeTypes: knowledgeGraph.blockedNodeTypes, nodes: knowledgeGraph.nodes, edges: knowledgeGraph.edges },
     remainingUncertainty,
     experimentalRecommendations,
     candidates: perCandidate,

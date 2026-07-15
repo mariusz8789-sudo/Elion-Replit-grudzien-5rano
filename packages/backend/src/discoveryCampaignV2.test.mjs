@@ -77,6 +77,10 @@ describe('discoveryCampaignV2 — full chain (fake deps)', () => {
     assert.equal(r.dossier.candidates[0].offTarget.risk, 'LOW');
     assert.ok(Array.isArray(r.dossier.riskAdjustedRanking) && r.dossier.riskAdjustedRanking.length > 0);
     assert.ok(r.dossier.riskAdjustedRanking.every((x) => 'offTargetRisk' in x && 'riskAdjustedScore' in x));
+    // knowledge graph built with provenance on every edge
+    assert.ok(r.dossier.knowledgeGraph.stats.nodes > 0);
+    assert.equal(r.dossier.knowledgeGraph.stats.allEdgesHaveProvenance, true);
+    assert.ok(stageNames.includes('KNOWLEDGE_GRAPH'));
     // Reasoning Brain honestly blocked without a live model — never fabricated
     assert.equal(r.dossier.reasoningLedger.status, 'CAPABILITY_BLOCKED');
     // mandated campaign-level dossier sections

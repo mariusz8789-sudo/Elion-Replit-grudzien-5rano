@@ -1,0 +1,75 @@
+{
+  "campaignId": "real-scientific-campaign-001",
+  "schema": "genesis-real-campaign-input-requirements/1",
+  "scientificQuestion": "Computational triage of candidate small-molecule inhibitors for a validated oncology kinase target (human BRAF, V600E context).",
+  "note": "This file specifies WHAT genuine external payloads must be acquired (endpoints, formats, required fields) so a network-enabled operator can build the real bundle. It asserts NOTHING about the CONTENT of any record — content comes only from the real acquired payloads. Exact source IDs marked 'resolve' MUST be resolved by the operator via the documented query, not assumed.",
+  "sources": [
+    {
+      "sourceService": "UNIPROT",
+      "sourceId": "resolve: human BRAF primary accession (search UniProtKB gene=BRAF organism_id=9606, reviewed)",
+      "officialEndpoint": "https://rest.uniprot.org/uniprotkb/search?query=gene:BRAF+AND+organism_id:9606+AND+reviewed:true&format=json",
+      "requiredFormat": "application/json",
+      "expectedFilename": "payloads/proteins/UNIPROT_<accession>.json",
+      "requiredFields": ["primaryAccession", "proteinDescription", "organism", "sequence", "entryType", "comments"],
+      "licenceMetadataRequirement": "record UniProt distribution licence (CC-BY 4.0) explicitly; do not guess",
+      "provenanceMetadataRequirement": "sourceUrl, retrievedAt (ISO-8601 UTC), sourceVersion (UniProt release)",
+      "parserExpected": "corpus/parsers.mjs::parseUniprot",
+      "campaignRole": "target protein identity + sequence + function",
+      "mandatory": true
+    },
+    {
+      "sourceService": "RCSB_PDB",
+      "sourceId": "resolve: an experimental BRAF kinase-domain structure PDB ID (query RCSB by UniProt accession)",
+      "officialEndpoint": "https://data.rcsb.org/rest/v1/core/entry/<PDB_ID>",
+      "requiredFormat": "application/json (+ optional mmCIF from https://files.rcsb.org/download/<PDB_ID>.cif)",
+      "expectedFilename": "payloads/structures/PDB_<PDB_ID>.json",
+      "requiredFields": ["rcsb_id", "exptl", "rcsb_entry_info.resolution_combined", "rcsb_entry_info.polymer_entity_count"],
+      "licenceMetadataRequirement": "RCSB PDB data are public domain (CC0); record explicitly",
+      "provenanceMetadataRequirement": "sourceUrl, retrievedAt, structure deposition/revision date",
+      "parserExpected": "corpus/parsers.mjs::parseRcsbPdb",
+      "campaignRole": "structure availability (NOTE: existence is not docking validity)",
+      "mandatory": false
+    },
+    {
+      "sourceService": "CHEMBL",
+      "sourceId": "resolve: BRAF ChEMBL target id, then bioactivities (standard_type in {IC50,Ki,Kd,EC50})",
+      "officialEndpoint": "https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id=<TARGET>&standard_type__in=IC50,Ki,Kd,EC50&limit=100",
+      "requiredFormat": "application/json",
+      "expectedFilename": "payloads/bioactivity/CHEMBL_<activity_id>.json",
+      "requiredFields": ["activity_id", "assay_chembl_id", "molecule_chembl_id", "target_chembl_id", "standard_type", "standard_relation", "standard_value", "standard_units", "assay_description", "target_organism", "confidence_score"],
+      "licenceMetadataRequirement": "ChEMBL is CC-BY-SA 3.0; record explicitly. PRESERVE standard_type/relation/value/units (Ki != IC50).",
+      "provenanceMetadataRequirement": "sourceUrl, retrievedAt, ChEMBL release version",
+      "parserExpected": "corpus/parsers.mjs::parseChembl",
+      "campaignRole": "known bioactivity / seed compounds",
+      "mandatory": true
+    },
+    {
+      "sourceService": "PUBCHEM",
+      "sourceId": "resolve: CIDs for the ChEMBL seed molecules (map via InChIKey)",
+      "officialEndpoint": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/<CID>/property/CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+      "requiredFormat": "application/json",
+      "expectedFilename": "payloads/compounds/CID_<CID>.json",
+      "requiredFields": ["PropertyTable.Properties[].CID", "PropertyTable.Properties[].CanonicalSMILES", "PropertyTable.Properties[].InChIKey"],
+      "licenceMetadataRequirement": "PubChem data are public domain; record explicitly. Respect PUG usage policy (<=5 req/s).",
+      "provenanceMetadataRequirement": "sourceUrl, retrievedAt",
+      "parserExpected": "corpus/parsers.mjs::parsePubchem",
+      "campaignRole": "canonical compound identity + SMILES for RDKit/ADMET",
+      "mandatory": true
+    },
+    {
+      "sourceService": "EUROPE_PMC",
+      "sourceId": "resolve: literature (query 'BRAF V600E inhibitor melanoma')",
+      "officialEndpoint": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=BRAF%20V600E%20inhibitor%20melanoma&format=json&pageSize=25",
+      "requiredFormat": "application/json",
+      "expectedFilename": "payloads/articles/EPMC_<pmid|pmcid>.json",
+      "requiredFields": ["id", "pmid", "doi", "title", "authorString", "journalTitle", "firstPublicationDate", "pubType", "isOpenAccess"],
+      "licenceMetadataRequirement": "record per-record licence; open-access flag != reusable full text. Store UNKNOWN when unknown.",
+      "provenanceMetadataRequirement": "sourceUrl, retrievedAt",
+      "parserExpected": "corpus/parsers.mjs::parseEuropePmc",
+      "campaignRole": "literature evidence for target/mechanism claims",
+      "mandatory": true
+    }
+  ],
+  "mandatoryForRanking": ["CHEMBL", "PUBCHEM", "UNIPROT"],
+  "failClosedIf": "any mandatory source is missing, any content hash mismatches, or any provenance is absent"
+}

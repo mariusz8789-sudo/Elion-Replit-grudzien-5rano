@@ -11,6 +11,7 @@ import { WhatIfScreen } from './components/WhatIfScreen';
 import { DiscoveryTimeline } from './components/DiscoveryTimeline';
 import { QuantumDecisionExplorer } from './components/QuantumDecisionExplorer';
 import { SearchOverlay } from './components/SearchOverlay';
+import { Icon } from './components/Icon';
 import { HelpOverlay } from './components/HelpOverlay';
 import { OnboardingOverlay } from './components/OnboardingOverlay';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
@@ -567,13 +568,13 @@ function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {
   return (
     <header className="topbar">
       <button className="back" aria-label="Wróć do laboratoriów" onClick={() => { window.location.hash = ''; }}>
-        ←
+        <Icon name="back" size={22} />
       </button>
       <div className="titles">
         <h1>{title}</h1>
       </div>
       <button className="back" aria-label={t('nav.search')} onClick={onSearch} style={{ marginLeft: 'auto' }}>
-        🔍
+        <Icon name="search" size={20} />
       </button>
     </header>
   );

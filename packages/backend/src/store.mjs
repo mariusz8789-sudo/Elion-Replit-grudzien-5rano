@@ -487,8 +487,35 @@ CREATE INDEX IF NOT EXISTS idx_mutations_mission ON workflow_mutations(mission_i
 CREATE INDEX IF NOT EXISTS idx_checkpoints_mission ON mission_checkpoints(mission_id, created_at);
 `;
 
+// Model Abstraction & Routing (Priority 7): every model decision is traceable —
+// which provider/model served which role for which task, and its measured cost/
+// latency. Append-only. mission_id is a soft link (nullable, routing can be
+// mission-agnostic). No provider is hard-coded here; this only records decisions.
+const SCHEMA_V10 = `
+CREATE TABLE IF NOT EXISTS model_decisions (
+  id              TEXT PRIMARY KEY,
+  mission_id      TEXT,
+  role            TEXT NOT NULL,
+  task_class      TEXT,
+  provider_id     TEXT NOT NULL,
+  model_id        TEXT,
+  complexity      TEXT,
+  risk            TEXT,
+  selection_reason TEXT,
+  status          TEXT NOT NULL DEFAULT 'selected',
+  latency_ms      INTEGER,
+  tokens_in       INTEGER,
+  tokens_out      INTEGER,
+  cost            REAL,
+  created_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_model_decisions_mission ON model_decisions(mission_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_model_decisions_role ON model_decisions(role, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 10) db.exec(SCHEMA_V10);
   if (version < 9) db.exec(SCHEMA_V9);
   if (version < 7) db.exec(SCHEMA_V7);
   if (version < 8) {
@@ -523,7 +550,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 9) db.exec('PRAGMA user_version = 9');
+  if (version < 10) db.exec('PRAGMA user_version = 10');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1559,4 +1586,46 @@ export function deleteTaskEdge(db, id) {
 export function findTaskEdge(db, missionId, fromTaskId, toTaskId, kind = 'depends-on') {
   const r = db.prepare('SELECT * FROM task_dag_edges WHERE mission_id = ? AND from_task_id = ? AND to_task_id = ? AND kind = ?').get(missionId, fromTaskId, toTaskId, kind);
   return r ? { id: r.id, missionId: r.mission_id, fromTaskId: r.from_task_id, toTaskId: r.to_task_id, kind: r.kind, createdAt: r.created_at } : null;
+}
+
+/* ---- model_decisions (Priority 7 — traceable routing, append-only) ---- */
+function toModelDecision(r) {
+  if (!r) return null;
+  return {
+    id: r.id, missionId: r.mission_id, role: r.role, taskClass: r.task_class,
+    providerId: r.provider_id, modelId: r.model_id, complexity: r.complexity, risk: r.risk,
+    selectionReason: r.selection_reason, status: r.status, latencyMs: r.latency_ms,
+    tokensIn: r.tokens_in, tokensOut: r.tokens_out, cost: r.cost, createdAt: r.created_at,
+  };
+}
+export function saveModelDecision(db, d) {
+  const id = d.id ?? newId();
+  db.prepare(
+    `INSERT INTO model_decisions (id, mission_id, role, task_class, provider_id, model_id, complexity, risk, selection_reason, status, latency_ms, tokens_in, tokens_out, cost, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, d.missionId ?? null, d.role, d.taskClass ?? null, d.providerId, d.modelId ?? null,
+    d.complexity ?? null, d.risk ?? null, d.selectionReason ?? null, d.status ?? 'selected',
+    d.latencyMs ?? null, d.tokensIn ?? null, d.tokensOut ?? null, d.cost ?? null, Date.now(),
+  );
+  return getModelDecision(db, id);
+}
+export function getModelDecision(db, id) {
+  return toModelDecision(db.prepare('SELECT * FROM model_decisions WHERE id = ?').get(id));
+}
+export function updateModelDecision(db, id, patch) {
+  const cur = getModelDecision(db, id);
+  if (!cur) return null;
+  const next = { ...cur, ...patch };
+  db.prepare('UPDATE model_decisions SET status = ?, latency_ms = ?, tokens_in = ?, tokens_out = ?, cost = ? WHERE id = ?').run(
+    next.status, next.latencyMs ?? null, next.tokensIn ?? null, next.tokensOut ?? null, next.cost ?? null, id,
+  );
+  return getModelDecision(db, id);
+}
+export function listModelDecisions(db, { missionId = null, role = null } = {}) {
+  let rows;
+  if (missionId) rows = db.prepare('SELECT * FROM model_decisions WHERE mission_id = ? ORDER BY created_at ASC').all(missionId);
+  else if (role) rows = db.prepare('SELECT * FROM model_decisions WHERE role = ? ORDER BY created_at ASC').all(role);
+  else rows = db.prepare('SELECT * FROM model_decisions ORDER BY created_at ASC').all();
+  return rows.map(toModelDecision);
 }

@@ -14,10 +14,10 @@ import * as dag from './cognitive/taskGraph.mjs';
 import * as wf from './cognitive/workflowMutation.mjs';
 import { canonicalHash } from './provenance.mjs';
 
-test('v9 migration: tables exist and PRAGMA user_version is 9', () => {
+test('v9 migration: cognitive tables exist and schema is at least v9', () => {
   const db = openDatabase(':memory:');
   const { user_version } = db.prepare('PRAGMA user_version').get();
-  assert.equal(user_version, 9);
+  assert.ok(user_version >= 9, 'schema version is at least 9');
   const expected = ['research_missions', 'research_questions', 'hypotheses', 'evidence',
     'task_dag_nodes', 'task_dag_edges', 'task_state_transitions', 'workflow_mutations', 'mission_checkpoints'];
   for (const t of expected) {
@@ -168,7 +168,7 @@ test('Long-horizon: state survives a real DB restart; frontier reconstructs', ()
 
     // Session 2: reopen the same file — understanding must NOT reset.
     const db2 = openDatabase(file);
-    assert.equal(db2.prepare('PRAGMA user_version').get().user_version, 9);
+    assert.ok(db2.prepare('PRAGMA user_version').get().user_version >= 9);
     const frontier = dag.executionFrontier(db2, missionId).map((t) => t.title);
     assert.deepEqual(frontier, ['stage 2'], 'frontier continues at the unfinished stage');
     const state = ev.reconstructMissionState(db2, missionId, { frontier: dag.executionFrontier(db2, missionId).map((t) => t.id) });

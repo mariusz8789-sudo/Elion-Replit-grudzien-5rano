@@ -1822,7 +1822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/capacity-postings", async (req, res) => {
-    const { from, to, date, minVolumeM3, minWeightKg, minPalletSpaces } = req.query;
+    const { from, to, date, minVolumeM3, minWeightKg, minPalletSpaces, temperatureControlled, adrCapable, tailLift } = req.query;
     const postings = await storage.matchCapacityPostings({
       from: from ? String(from) : undefined,
       to: to ? String(to) : undefined,
@@ -1830,6 +1830,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       minVolumeM3: minVolumeM3 ? Number(minVolumeM3) : undefined,
       minWeightKg: minWeightKg ? Number(minWeightKg) : undefined,
       minPalletSpaces: minPalletSpaces ? Number(minPalletSpaces) : undefined,
+      temperatureControlled: temperatureControlled === "true",
+      adrCapable: adrCapable === "true",
+      tailLift: tailLift === "true",
     });
     res.json(postings);
   });

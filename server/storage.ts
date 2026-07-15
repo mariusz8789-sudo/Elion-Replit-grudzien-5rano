@@ -191,6 +191,7 @@ export interface IStorage {
   matchCapacityPostings(params: {
     from?: string; to?: string; date?: Date;
     minVolumeM3?: number; minWeightKg?: number; minPalletSpaces?: number;
+    temperatureControlled?: boolean; adrCapable?: boolean; tailLift?: boolean;
   }): Promise<CapacityPosting[]>;
   cancelCapacityPosting(id: string, companyId: string): Promise<CapacityPosting | undefined>;
   createCapacityBooking(booking: InsertCapacityBooking, priceEur: string): Promise<CapacityBooking>;
@@ -1138,6 +1139,7 @@ export class DbStorage implements IStorage {
   async matchCapacityPostings(params: {
     from?: string; to?: string; date?: Date;
     minVolumeM3?: number; minWeightKg?: number; minPalletSpaces?: number;
+    temperatureControlled?: boolean; adrCapable?: boolean; tailLift?: boolean;
   }): Promise<CapacityPosting[]> {
     const conditions = [eq(capacityPostings.status, "open")];
     if (params.from) conditions.push(ilike(capacityPostings.fromAddress, `%${params.from}%`));
@@ -1149,6 +1151,9 @@ export class DbStorage implements IStorage {
     if (params.minVolumeM3 !== undefined) conditions.push(gte(capacityPostings.freeVolumeM3, String(params.minVolumeM3)));
     if (params.minWeightKg !== undefined) conditions.push(gte(capacityPostings.freeWeightKg, String(params.minWeightKg)));
     if (params.minPalletSpaces !== undefined) conditions.push(gte(capacityPostings.freePalletSpaces, params.minPalletSpaces));
+    if (params.temperatureControlled) conditions.push(eq(capacityPostings.temperatureControlled, true));
+    if (params.adrCapable) conditions.push(eq(capacityPostings.adrCapable, true));
+    if (params.tailLift) conditions.push(eq(capacityPostings.tailLift, true));
 
     return await db.select().from(capacityPostings)
       .where(and(...conditions))

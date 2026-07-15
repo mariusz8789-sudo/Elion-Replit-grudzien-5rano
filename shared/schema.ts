@@ -415,6 +415,10 @@ export const capacityPostings = pgTable("capacity_postings", {
   pricePerM3Eur: decimal("price_per_m3_eur", { precision: 10, scale: 2 }),
   minimumPriceEur: decimal("minimum_price_eur", { precision: 10, scale: 2 }),
   isReturnLeg: boolean("is_return_leg").notNull().default(false), // e.g. an otherwise-empty return journey
+  temperatureControlled: boolean("temperature_controlled").notNull().default(false),
+  adrCapable: boolean("adr_capable").notNull().default(false), // vehicle/driver certified for dangerous-goods (ADR) cargo
+  tailLift: boolean("tail_lift").notNull().default(false),
+  truckDimensions: text("truck_dimensions"), // e.g. "L: 6m x W: 2.4m x H: 2.4m, door width 2.3m"
   notes: text("notes"),
   status: text("status").notNull().default("open"), // open, cancelled
   createdAt: timestamp("created_at").notNull().default(sql`now()`),

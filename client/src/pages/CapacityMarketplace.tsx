@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { Boxes, MapPin, Calendar, Package, Send, Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +22,9 @@ export default function CapacityMarketplace() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [date, setDate] = useState("");
+  const [temperatureControlled, setTemperatureControlled] = useState(false);
+  const [adrCapable, setAdrCapable] = useState(false);
+  const [tailLift, setTailLift] = useState(false);
   const [searched, setSearched] = useState(false);
 
   const [activePosting, setActivePosting] = useState<CapacityPosting | null>(null);
@@ -29,12 +33,15 @@ export default function CapacityMarketplace() {
   const [palletSpaces, setPalletSpaces] = useState("");
 
   const { data: results = [], isFetching, refetch } = useQuery<CapacityPosting[]>({
-    queryKey: ["/api/capacity-postings", from, to, date],
+    queryKey: ["/api/capacity-postings", from, to, date, temperatureControlled, adrCapable, tailLift],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (from) params.set("from", from);
       if (to) params.set("to", to);
       if (date) params.set("date", new Date(date).toISOString());
+      if (temperatureControlled) params.set("temperatureControlled", "true");
+      if (adrCapable) params.set("adrCapable", "true");
+      if (tailLift) params.set("tailLift", "true");
       const res = await fetch(`/api/capacity-postings?${params.toString()}`);
       return res.ok ? res.json() : [];
     },
@@ -108,6 +115,20 @@ export default function CapacityMarketplace() {
               {t("Search")}
             </Button>
           </div>
+          <div className="md:col-span-4 flex flex-wrap gap-6 pt-2">
+            <div className="flex items-center gap-2">
+              <Switch id="filter-temp" checked={temperatureControlled} onCheckedChange={setTemperatureControlled} data-testid="switch-filter-temperature" />
+              <Label htmlFor="filter-temp">{t("Temperature controlled")}</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="filter-adr" checked={adrCapable} onCheckedChange={setAdrCapable} data-testid="switch-filter-adr" />
+              <Label htmlFor="filter-adr">{t("ADR capable")}</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="filter-lift" checked={tailLift} onCheckedChange={setTailLift} data-testid="switch-filter-tail-lift" />
+              <Label htmlFor="filter-lift">{t("Tail lift")}</Label>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -126,6 +147,11 @@ export default function CapacityMarketplace() {
                       <span className="flex items-center gap-1"><Package className="w-3 h-3" />{p.freeVolumeM3} m&sup3; &middot; {p.freeWeightKg} kg &middot; {p.freePalletSpaces} pallets</span>
                       {p.pricePerM3Eur && <span>&euro;{p.pricePerM3Eur}/m&sup3;</span>}
                     </p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {p.temperatureControlled && <Badge variant="outline" className="text-xs">{t("Temp. controlled")}</Badge>}
+                      {p.adrCapable && <Badge variant="outline" className="text-xs">ADR</Badge>}
+                      {p.tailLift && <Badge variant="outline" className="text-xs">{t("Tail lift")}</Badge>}
+                    </div>
                   </div>
                   <Button size="sm" onClick={() => setActivePosting(p)} data-testid={`button-request-capacity-${p.id}`}>
                     <Send className="w-4 h-4 mr-2" />{t("Request")}

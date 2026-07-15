@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -317,6 +318,7 @@ function CapacityTab({ companyId }: { companyId: string }) {
   const [form, setForm] = useState({
     fromAddress: "", toAddress: "", departureWindowStart: "", departureWindowEnd: "",
     freeVolumeM3: "", freeWeightKg: "", freePalletSpaces: "", pricePerM3Eur: "", minimumPriceEur: "", isReturnLeg: false,
+    temperatureControlled: false, adrCapable: false, tailLift: false, truckDimensions: "",
   });
 
   const { data: postings = [], isLoading } = useQuery<CapacityPosting[]>({
@@ -336,6 +338,7 @@ function CapacityTab({ companyId }: { companyId: string }) {
         freePalletSpaces: form.freePalletSpaces ? Number(form.freePalletSpaces) : 0,
         pricePerM3Eur: form.pricePerM3Eur || undefined,
         minimumPriceEur: form.minimumPriceEur || undefined,
+        truckDimensions: form.truckDimensions || undefined,
       });
       if (!res.ok) throw new Error((await res.json()).message || "Failed to publish");
       return res.json();
@@ -408,6 +411,24 @@ function CapacityTab({ companyId }: { companyId: string }) {
                   <Input type="number" step="0.01" value={form.minimumPriceEur} onChange={(e) => setForm({ ...form, minimumPriceEur: e.target.value })} data-testid="input-capacity-min-price" />
                 </div>
               </div>
+              <div>
+                <Label>Truck dimensions (optional)</Label>
+                <Input value={form.truckDimensions} onChange={(e) => setForm({ ...form, truckDimensions: e.target.value })} placeholder='L: 6m x W: 2.4m x H: 2.4m' data-testid="input-capacity-dimensions" />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="capacity-temp">Temp. controlled</Label>
+                  <Switch id="capacity-temp" checked={form.temperatureControlled} onCheckedChange={(v) => setForm({ ...form, temperatureControlled: v })} data-testid="switch-capacity-temperature" />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="capacity-adr">ADR capable</Label>
+                  <Switch id="capacity-adr" checked={form.adrCapable} onCheckedChange={(v) => setForm({ ...form, adrCapable: v })} data-testid="switch-capacity-adr" />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="capacity-lift">Tail lift</Label>
+                  <Switch id="capacity-lift" checked={form.tailLift} onCheckedChange={(v) => setForm({ ...form, tailLift: v })} data-testid="switch-capacity-tail-lift" />
+                </div>
+              </div>
               <Button
                 className="w-full"
                 onClick={() => publishMutation.mutate()}
@@ -474,6 +495,12 @@ function CapacityPostingRow({ posting }: { posting: CapacityPosting }) {
             <p className="text-sm text-muted-foreground">
               {posting.freeVolumeM3} m&sup3; free &middot; {posting.freeWeightKg} kg &middot; {posting.freePalletSpaces} pallets
             </p>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {posting.temperatureControlled && <Badge variant="outline" className="text-xs">Temp. controlled</Badge>}
+              {posting.adrCapable && <Badge variant="outline" className="text-xs">ADR capable</Badge>}
+              {posting.tailLift && <Badge variant="outline" className="text-xs">Tail lift</Badge>}
+              {posting.truckDimensions && <Badge variant="outline" className="text-xs">{posting.truckDimensions}</Badge>}
+            </div>
           </div>
           <Badge variant={posting.status === "open" ? "default" : "secondary"}>{posting.status}</Badge>
         </div>

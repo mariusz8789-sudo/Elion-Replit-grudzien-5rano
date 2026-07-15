@@ -1,4 +1,5 @@
 import type { RouteRequirement } from "@shared/schema";
+import { calculateEmissionsKg } from "../services/environmentalCalculation";
 
 // Pure, deterministic cost aggregation over the requirements an AI Route Analysis
 // (or a partner catalog match) attached to a route. Kept side-effect free so it can
@@ -77,14 +78,6 @@ export interface TripCostSummary {
   co2EstimateKg: number;
 }
 
-const CO2_KG_PER_KM: Record<string, number> = {
-  van: 0.25,
-  truck_7_5t: 0.45,
-  truck_12t: 0.6,
-  truck_40t: 0.9,
-  electric: 0,
-};
-
 export function calculateTripCostSummary(
   requirements: Pick<RouteRequirement, "category" | "countryCode" | "title" | "isMandatory" | "estimatedCostEur">[],
   distanceKm: number,
@@ -93,7 +86,7 @@ export function calculateTripCostSummary(
 ): TripCostSummary {
   const breakdown = calculateCostBreakdown(requirements);
   const fuelEstimateEur = estimateFuelCostEur({ distanceKm, vehicleType, fuelPriceEurPerLiter });
-  const co2EstimateKg = round2(distanceKm * (CO2_KG_PER_KM[vehicleType] ?? CO2_KG_PER_KM.van));
+  const co2EstimateKg = calculateEmissionsKg(distanceKm, vehicleType);
 
   return {
     breakdown,

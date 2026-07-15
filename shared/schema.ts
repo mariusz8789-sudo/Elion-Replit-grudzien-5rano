@@ -214,6 +214,25 @@ export const trackingUpdates = pgTable("tracking_updates", {
   bookingIdIdx: index("tracking_updates_booking_id_idx").on(t.bookingId),
 }));
 
+// === ENVIRONMENTAL CALCULATIONS (CO2) ===
+// The single persisted record of every CO2 estimate the platform makes, always storing the
+// baseline alongside the estimate - "CO2 saved" is never derived or displayed without one.
+export const environmentalCalculations = pgTable("environmental_calculations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").references(() => bookings.id),
+  distanceKm: decimal("distance_km", { precision: 10, scale: 2 }).notNull(),
+  vehicleType: text("vehicle_type").notNull(),
+  estimatedCo2Kg: decimal("estimated_co2_kg", { precision: 10, scale: 2 }).notNull(),
+  baselineVehicleType: text("baseline_vehicle_type").notNull(),
+  baselineCo2Kg: decimal("baseline_co2_kg", { precision: 10, scale: 2 }).notNull(),
+  co2SavedKg: decimal("co2_saved_kg", { precision: 10, scale: 2 }).notNull(),
+  methodology: text("methodology").notNull(),
+  methodologyVersion: integer("methodology_version").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  bookingIdIdx: index("environmental_calculations_booking_id_idx").on(t.bookingId),
+}));
+
 // === NOTIFICATIONS ===
 export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1157,6 +1176,8 @@ export type Review = typeof reviews.$inferSelect;
 
 export type InsertTrackingUpdate = z.infer<typeof insertTrackingUpdateSchema>;
 export type TrackingUpdate = typeof trackingUpdates.$inferSelect;
+
+export type EnvironmentalCalculation = typeof environmentalCalculations.$inferSelect;
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;

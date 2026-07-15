@@ -11,9 +11,8 @@ interface CompanyEcoStats {
   name: string;
   totalTrips: number;
   totalCO2kg: number;
+  totalCO2SavedKg: number;
   avgCO2PerTrip: number;
-  electricVehiclePercent: number;
-  ecoRating: number;
 }
 
 export default function EcoPage() {
@@ -23,12 +22,6 @@ export default function EcoPage() {
   const { data: ecoCompanies = [] } = useQuery<CompanyEcoStats[]>({
     queryKey: ["/api/eco/companies"],
   });
-
-  const getRatingColor = (rating: number): string => {
-    if (rating >= 9) return "bg-green-600";
-    if (rating >= 7) return "bg-yellow-600";
-    return "bg-orange-600";
-  };
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -93,14 +86,17 @@ export default function EcoPage() {
                   Eco-Friendly Companies
                 </CardTitle>
                 <CardDescription>
-                  Companies ranked by environmental performance
+                  Ranked by real, persisted CO₂ savings across completed bookings (each booking's estimate is recomputed against a standard-van baseline once a vehicle is assigned)
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {ecoCompanies
-                    .sort((a, b) => b.ecoRating - a.ecoRating)
-                    .map((company, index) => (
+                {ecoCompanies.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No completed bookings with CO₂ data yet.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {ecoCompanies.map((company, index) => (
                       <Card key={company.id} className="hover-elevate">
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between gap-4">
@@ -113,20 +109,18 @@ export default function EcoPage() {
                                 <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                                   <span>{company.totalTrips.toLocaleString()} trips</span>
                                   <span>Avg {company.avgCO2PerTrip.toFixed(1)} kg CO₂/trip</span>
-                                  <span className="text-green-600">
-                                    {company.electricVehiclePercent}% EV fleet
-                                  </span>
                                 </div>
                               </div>
                             </div>
-                            <Badge className={`${getRatingColor(company.ecoRating)} text-white text-base px-3 py-1`}>
-                              {company.ecoRating}/10
+                            <Badge className="bg-green-600 text-white text-base px-3 py-1">
+                              {company.totalCO2SavedKg.toFixed(0)} kg saved
                             </Badge>
                           </div>
                         </CardContent>
                       </Card>
                     ))}
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

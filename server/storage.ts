@@ -35,6 +35,7 @@ import {
   type WebhookDelivery,
   type CapacityPosting, type InsertCapacityPosting,
   type CapacityBooking, type InsertCapacityBooking,
+  type EnvironmentalCalculation,
   users, companies, drivers, vehicles, services, bookings, quotes, offers,
   messages, attachments, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
@@ -42,7 +43,7 @@ import {
   driverAvailability, driverTimeOff, calendarConnections, cargoItems, messageTranslations,
   calls, verificationDocuments, deviceFingerprints, riskScores, auditLogs,
   apiKeys, webhookSubscriptions, webhookDeliveries,
-  capacityPostings, capacityBookings
+  capacityPostings, capacityBookings, environmentalCalculations
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, or, gte, lte, lt, isNull, inArray, ilike } from "drizzle-orm";
@@ -93,6 +94,7 @@ export interface IStorage {
   createBooking(booking: InsertBooking & { discountAmount?: string }): Promise<Booking>;
   updateBookingStatus(id: string, status: string): Promise<Booking | undefined>;
   updateBookingDriver(id: string, driverId: string): Promise<Booking | undefined>;
+  updateBookingCo2(id: string, co2Emission: string): Promise<Booking | undefined>;
   cancelBooking(id: string): Promise<Booking | undefined>;
   assignCompanyToBooking(bookingId: string, companyId: string, driverId: string, vehicleId: string): Promise<Booking | undefined>;
   updateBookingPayment(bookingId: string, paymentIntentId: string, paymentStatus: string): Promise<Booking | undefined>;
@@ -126,7 +128,17 @@ export interface IStorage {
   // Tracking operations
   getBookingTracking(bookingId: string): Promise<TrackingUpdate[]>;
   createTrackingUpdate(update: InsertTrackingUpdate): Promise<TrackingUpdate>;
-  
+
+  // Environmental calculation operations
+  createEnvironmentalCalculation(data: {
+    bookingId?: string | null; distanceKm: number; vehicleType: string; estimatedCo2Kg: number;
+    baselineVehicleType: string; baselineCo2Kg: number; co2SavedKg: number;
+    methodology: string; methodologyVersion: number;
+  }): Promise<EnvironmentalCalculation>;
+  getBookingEnvironmentalCalculation(bookingId: string): Promise<EnvironmentalCalculation | undefined>;
+  getCompanyEnvironmentalSummary(companyId: string): Promise<{ totalTrips: number; totalCo2Kg: number; totalCo2SavedKg: number; avgCo2PerTripKg: number }>;
+  getUserMonthlyEnvironmentalSummary(userId: string, months?: number): Promise<Array<{ month: string; co2Kg: number; co2SavedKg: number; trips: number }>>;
+
   // Notification operations
   getUserNotifications(userId: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
@@ -459,6 +471,14 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async updateBookingCo2(id: string, co2Emission: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ co2Emission, updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return result[0];
+  }
+
   async assignCompanyToBooking(bookingId: string, companyId: string, driverId: string, vehicleId: string): Promise<Booking | undefined> {
     // Validate driver belongs to company
     const driver = await this.getDriver(driverId);
@@ -547,27 +567,35 @@ export class DbStorage implements IStorage {
 
       // Update the booking with the accepted offer details, in the same transaction so a
       // failed assignment (bad driver/vehicle) rolls back the offer status changes too.
-      if (offer.companyId && offer.driverId && offer.vehicleId) {
+      // companyId is required on every offer, but driverId/vehicleId are optional - a
+      // company can submit a bid before deciding which specific driver/vehicle to assign
+      // (and do so later via the dedicated assign routes). Previously this whole block was
+      // gated on ALL THREE being present, so any offer submitted without a driverId - which
+      // is exactly what the Company Dashboard's offer form does - silently left the booking
+      // unassigned and still "posted" even though the offer itself showed "accepted".
+      if (offer.driverId) {
         const driverResult = await tx.select().from(drivers).where(eq(drivers.id, offer.driverId));
         const driver = driverResult[0];
         if (!driver || driver.companyId !== offer.companyId) {
           throw new Error("Driver not found or does not belong to this company");
         }
+      }
+      if (offer.vehicleId) {
         const vehicleResult = await tx.select().from(vehicles).where(eq(vehicles.id, offer.vehicleId));
         const vehicle = vehicleResult[0];
         if (!vehicle || vehicle.companyId !== offer.companyId) {
           throw new Error("Vehicle not found or does not belong to this company");
         }
-        await tx.update(bookings)
-          .set({
-            companyId: offer.companyId,
-            driverId: offer.driverId,
-            vehicleId: offer.vehicleId,
-            status: "accepted",
-            updatedAt: new Date(),
-          })
-          .where(eq(bookings.id, offer.bookingId));
       }
+      await tx.update(bookings)
+        .set({
+          companyId: offer.companyId,
+          ...(offer.driverId ? { driverId: offer.driverId } : {}),
+          ...(offer.vehicleId ? { vehicleId: offer.vehicleId } : {}),
+          status: "accepted",
+          updatedAt: new Date(),
+        })
+        .where(eq(bookings.id, offer.bookingId));
 
       return updatedOffer[0];
     });
@@ -691,6 +719,81 @@ export class DbStorage implements IStorage {
   async createTrackingUpdate(insertUpdate: InsertTrackingUpdate): Promise<TrackingUpdate> {
     const result = await db.insert(trackingUpdates).values(insertUpdate).returning();
     return result[0];
+  }
+
+  // === ENVIRONMENTAL CALCULATION OPERATIONS ===
+  async createEnvironmentalCalculation(data: {
+    bookingId?: string | null;
+    distanceKm: number;
+    vehicleType: string;
+    estimatedCo2Kg: number;
+    baselineVehicleType: string;
+    baselineCo2Kg: number;
+    co2SavedKg: number;
+    methodology: string;
+    methodologyVersion: number;
+  }): Promise<EnvironmentalCalculation> {
+    const result = await db.insert(environmentalCalculations).values({
+      bookingId: data.bookingId ?? null,
+      distanceKm: String(data.distanceKm),
+      vehicleType: data.vehicleType,
+      estimatedCo2Kg: String(data.estimatedCo2Kg),
+      baselineVehicleType: data.baselineVehicleType,
+      baselineCo2Kg: String(data.baselineCo2Kg),
+      co2SavedKg: String(data.co2SavedKg),
+      methodology: data.methodology,
+      methodologyVersion: data.methodologyVersion,
+    }).returning();
+    return result[0];
+  }
+
+  async getBookingEnvironmentalCalculation(bookingId: string): Promise<EnvironmentalCalculation | undefined> {
+    const result = await db.select().from(environmentalCalculations)
+      .where(eq(environmentalCalculations.bookingId, bookingId))
+      .orderBy(desc(environmentalCalculations.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async getCompanyEnvironmentalSummary(companyId: string): Promise<{ totalTrips: number; totalCo2Kg: number; totalCo2SavedKg: number; avgCo2PerTripKg: number }> {
+    const result = await db.execute(sql`
+      SELECT
+        COUNT(*)::int AS total_trips,
+        COALESCE(SUM(ec.estimated_co2_kg), 0)::float AS total_co2_kg,
+        COALESCE(SUM(ec.co2_saved_kg), 0)::float AS total_co2_saved_kg,
+        COALESCE(AVG(ec.estimated_co2_kg), 0)::float AS avg_co2_per_trip_kg
+      FROM environmental_calculations ec
+      JOIN bookings b ON b.id = ec.booking_id
+      WHERE b.company_id = ${companyId}
+    `);
+    const row = result.rows[0] as any;
+    return {
+      totalTrips: Number(row?.total_trips ?? 0),
+      totalCo2Kg: Number(row?.total_co2_kg ?? 0),
+      totalCo2SavedKg: Number(row?.total_co2_saved_kg ?? 0),
+      avgCo2PerTripKg: Number(row?.avg_co2_per_trip_kg ?? 0),
+    };
+  }
+
+  async getUserMonthlyEnvironmentalSummary(userId: string, months = 6): Promise<Array<{ month: string; co2Kg: number; co2SavedKg: number; trips: number }>> {
+    const result = await db.execute(sql`
+      SELECT
+        to_char(date_trunc('month', ec.created_at), 'YYYY-MM') AS month,
+        COALESCE(SUM(ec.estimated_co2_kg), 0)::float AS co2_kg,
+        COALESCE(SUM(ec.co2_saved_kg), 0)::float AS co2_saved_kg,
+        COUNT(*)::int AS trips
+      FROM environmental_calculations ec
+      JOIN bookings b ON b.id = ec.booking_id
+      WHERE b.user_id = ${userId} AND ec.created_at >= now() - (${months}::text || ' months')::interval
+      GROUP BY 1
+      ORDER BY 1
+    `);
+    return result.rows.map((r: any) => ({
+      month: r.month,
+      co2Kg: Number(r.co2_kg),
+      co2SavedKg: Number(r.co2_saved_kg),
+      trips: Number(r.trips),
+    }));
   }
 
   // === NOTIFICATION OPERATIONS ===

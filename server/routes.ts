@@ -27,6 +27,7 @@ import { getCargoRecognitionProvider } from "./services/cargoRecognition";
 import { getTranslationProvider } from "./services/translation";
 import { checkGpsAnomaly, checkDuplicateAccount } from "./services/fraud";
 import { calculateCapacityBookingPrice } from "./lib/capacityPricing";
+import { calculateTripEnvironmentalSummary, BASELINE_VEHICLE_CLASS, calculateEmissionsKg, normalizeVehicleType, EMISSION_FACTORS_KG_PER_KM } from "./services/environmentalCalculation";
 import { dispatchWebhookEvent } from "./services/webhooks";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
@@ -38,6 +39,30 @@ import { handleRoadServiceOrderPayment } from "./roadServices/router";
 
 const userCanAccessBooking = (user: User, booking: Booking) =>
   userCanAccessBookingImpl(user, booking, (id) => storage.getDriver(id));
+
+// Recomputes and persists the booking's CO2 estimate now that a real vehicle is assigned -
+// called from both the direct company-assignment route and offer acceptance, the two paths
+// that can attach a vehicleId to a booking after its initial (baseline-only) estimate.
+async function recomputeBookingEnvironmentalImpact(bookingId: string, vehicleId: string | null) {
+  const booking = await storage.getBooking(bookingId);
+  if (!booking) return;
+  const vehicle = vehicleId ? await storage.getVehicle(vehicleId) : undefined;
+  const distanceKm = Number(booking.estimatedDistance) * 1.60934;
+  const co2Summary = calculateTripEnvironmentalSummary(distanceKm, vehicle?.type);
+
+  await storage.updateBookingCo2(bookingId, String(co2Summary.estimatedCo2Kg));
+  await storage.createEnvironmentalCalculation({
+    bookingId,
+    distanceKm: co2Summary.distanceKm,
+    vehicleType: co2Summary.vehicleType,
+    estimatedCo2Kg: co2Summary.estimatedCo2Kg,
+    baselineVehicleType: co2Summary.baselineVehicleType,
+    baselineCo2Kg: co2Summary.baselineCo2Kg,
+    co2SavedKg: co2Summary.co2SavedKg,
+    methodology: co2Summary.methodology,
+    methodologyVersion: co2Summary.methodologyVersion,
+  });
+}
 
 // Shared by the tracking-creation route (runs automatically on every new GPS update) and
 // the standalone /check-anomaly endpoint (for an on-demand re-check), so the detection
@@ -518,10 +543,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         couponRedemptionId = redemption.id;
       }
 
+      // CO2 is always computed server-side from the shared, versioned methodology - never
+      // trusted from the client. No vehicle is assigned yet at creation time, so the estimate
+      // uses the baseline vehicle class itself (van), meaning zero "savings" are claimed
+      // until a real vehicle is assigned and the estimate is recomputed (see PATCH
+      // /api/bookings/:id/assign and the offer-acceptance flow).
+      const distanceKm = Number(bookingData.estimatedDistance) * 1.60934;
+      const co2Summary = calculateTripEnvironmentalSummary(distanceKm, BASELINE_VEHICLE_CLASS);
+
       const booking = await storage.createBooking({
         ...bookingData,
         totalPrice: finalPrice,
         discountAmount,
+        co2Emission: String(co2Summary.estimatedCo2Kg),
+      });
+
+      await storage.createEnvironmentalCalculation({
+        bookingId: booking.id,
+        distanceKm: co2Summary.distanceKm,
+        vehicleType: co2Summary.vehicleType,
+        estimatedCo2Kg: co2Summary.estimatedCo2Kg,
+        baselineVehicleType: co2Summary.baselineVehicleType,
+        baselineCo2Kg: co2Summary.baselineCo2Kg,
+        co2SavedKg: co2Summary.co2SavedKg,
+        methodology: co2Summary.methodology,
+        methodologyVersion: co2Summary.methodologyVersion,
       });
 
       if (couponRedemptionId) {
@@ -699,6 +745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!booking) {
         return res.status(409).json({ message: "This booking has already been assigned to a company" });
       }
+      await recomputeBookingEnvironmentalImpact(booking.id, vehicleId);
       res.json(booking);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -824,6 +871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const accepted = await storage.acceptOffer(req.params.id);
+      await recomputeBookingEnvironmentalImpact(offer.bookingId, offer.vehicleId ?? null);
       if (offer.companyId) {
         const companyUsers = await storage.getCompanyUsers(offer.companyId);
         await Promise.all(companyUsers.map((u) => storage.createNotification({
@@ -1120,19 +1168,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Real per-company CO2 aggregates from persisted environmental_calculations - previously
+  // this endpoint returned entirely Math.random() numbers dressed up with real company
+  // names. Companies with no completed bookings yet simply show zero, not a fabricated
+  // number, and the previously-invented electricVehiclePercent/ecoRating fields (there is
+  // no vehicle "electric" type or rating methodology backing them) have been removed rather
+  // than kept fake.
   app.get("/api/eco/companies", async (req, res) => {
     try {
-      const companiesList = await db.select().from(companies);
-      const ecoCompanies = companiesList.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        totalTrips: Math.floor(Math.random() * 2000) + 500,
-        totalCO2kg: Math.floor(Math.random() * 30000) + 5000,
-        avgCO2PerTrip: (Math.random() * 15) + 5,
-        electricVehiclePercent: Math.floor(Math.random() * 80) + 10,
-        ecoRating: parseFloat((Math.random() * 4 + 6).toFixed(1)),
+      const companiesList = await db.select().from(companies).where(eq(companies.verified, true)).limit(20);
+      const ecoCompanies = await Promise.all(companiesList.map(async (c) => {
+        const summary = await storage.getCompanyEnvironmentalSummary(c.id);
+        return {
+          id: c.id,
+          name: c.name,
+          totalTrips: summary.totalTrips,
+          totalCO2kg: summary.totalCo2Kg,
+          totalCO2SavedKg: summary.totalCo2SavedKg,
+          avgCO2PerTrip: summary.avgCo2PerTripKg,
+        };
       }));
-      res.json(ecoCompanies.slice(0, 5));
+      res.json(ecoCompanies.filter((c) => c.totalTrips > 0).sort((a, b) => b.totalCO2SavedKg - a.totalCO2SavedKg).slice(0, 5));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2114,30 +2170,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const route = response.body.routes[0];
       const distanceInMiles = (route.distance / 1609.34).toFixed(2);
+      const distanceInKm = route.distance / 1000;
       const durationInMinutes = Math.round(route.duration / 60);
-      
-      // Calculate CO2 based on vehicle type (kg CO2 per mile)
-      const emissionFactors: Record<string, number> = {
-        'electric': 0,           // Electric vehicles - zero emissions
-        'hybrid': 0.205,         // Hybrid vehicles - 50% of standard
-        'van': 0.411,            // Standard diesel van
-        'small-van': 0.32,       // Small van/car
-        'truck': 0.617,          // Medium truck
-        'large-truck': 0.823,    // Large truck/lorry
-        'motorcycle': 0.149,     // Motorcycle
-        'bicycle': 0,            // Bicycle - zero emissions
-      };
-      
-      const emissionFactor = emissionFactors[vehicleType || 'van'] || 0.411;
-      const co2EmissionKg = (parseFloat(distanceInMiles) * emissionFactor).toFixed(2);
+
+      // CO2 uses the same shared, versioned methodology as booking creation and Road
+      // Services - previously this endpoint kept its own separate, mile-based factor table.
+      const normalizedVehicleType = normalizeVehicleType(vehicleType);
+      const co2EmissionKg = calculateEmissionsKg(distanceInKm, normalizedVehicleType);
 
       res.json({
         distance: parseFloat(distanceInMiles),
         duration: durationInMinutes,
-        co2Emission: parseFloat(co2EmissionKg),
+        co2Emission: co2EmissionKg,
         geometry: route.geometry,
-        vehicleType: vehicleType || 'van',
-        emissionFactor,
+        vehicleType: normalizedVehicleType,
+        emissionFactor: EMISSION_FACTORS_KG_PER_KM[normalizedVehicleType],
       });
     } catch (error: any) {
       res.status(500).json({ message: "Route calculation failed: " + error.message });

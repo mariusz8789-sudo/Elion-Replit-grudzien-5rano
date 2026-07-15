@@ -600,3 +600,100 @@ export async function askCampaignWhy(
   const r = await request<{ why: WhyAnswer }>('GET', `/projects/${projectId}/campaigns/${campaignId}/why?${params.toString()}`, { token });
   return r.ok ? { ok: true, data: r.data.why } : r;
 }
+
+/* ---------------- ZEFIR Truth Engine / R&D Kill-Switch ---------------- */
+
+export type KillSwitchDecision = 'GO' | 'WARN' | 'BLOCK' | 'INSUFFICIENT_DATA';
+
+/** Structured proposal submitted to the pre-flight kill-switch. All fields optional;
+ *  the backend validates that at least some scientific content is present. */
+export interface TruthProposal {
+  problemStatement?: string;
+  proposedMechanism?: string;
+  claimedResult?: string;
+  equations?: unknown[];
+  variables?: unknown[];
+  assumptions?: string[];
+  physicalConstraints?: string[];
+  speculativeClaims?: string[];
+  requiredCapabilities?: string[];
+  requestedDomains?: string[];
+  energy?: { input?: number; output?: number; external?: number };
+  efficiency?: number;
+  efficiencyKind?: string;
+  mass?: { in?: number; out?: number; generation?: number };
+  operating?: { pressure?: { value?: number; min?: number; max?: number }; temperature?: { value?: number; min?: number; max?: number } };
+  flow?: { volumetricFlow?: number; volume?: number; time?: number };
+  power?: { power?: number; energy?: number; time?: number };
+  geometry?: Record<string, number>;
+  materials?: { name?: string; maxTemp?: number; maxPressure?: number }[];
+  expectedPerformance?: string;
+  estimatedCost?: string;
+  evidence?: string[];
+  context?: string;
+  parameterVector?: Record<string, number>;
+  scales?: Record<string, number>;
+}
+
+export interface TruthStage { stage: string; status: string; findings: unknown; missing: string[]; }
+
+export interface TruthDecision {
+  decision: KillSwitchDecision;
+  decisionStrength: number;
+  criticalFailures: string[];
+  unresolvedAssumptions: string[];
+  missingInformation: string[];
+  dimensionalInconsistencies: string[];
+  physicalConstraintViolations: string[];
+  knownDeadEndSimilarities: string[];
+  capabilityGaps: string[];
+  speculativeClaims: unknown[];
+  constraintViolations: { id: string; detail: string }[];
+  unsupportedDomains: { domain: string; reason: string }[];
+  cheapestFalsificationTest: {
+    targetAssumption: string; recommendedTestType: string; requiredInput: string;
+    relativeCostClass: string; priorityReason: string; expertReviewRequested?: boolean;
+  } | null;
+  reasonsToKill: string[];
+  reasonsNotToKill: string[];
+  boundedClaim: string;
+}
+
+export interface TruthCertificate {
+  schema: string; decision: KillSwitchDecision; decisionHash: string; proposalHash: string;
+  engineVersions: Record<string, string>;
+  enginesExecuted: string[];
+  enginesSkipped: { stage: string; reason: string }[];
+}
+
+export interface TruthAnalysis {
+  id: string | null;
+  proposalHash: string;
+  decision: TruthDecision;
+  stages: TruthStage[];
+  certificate: TruthCertificate;
+}
+
+export interface TruthAnalysisSummary { id: string; proposalHash: string; decision: KillSwitchDecision; decisionHash: string; createdAt: number; }
+
+export async function runTruthAnalysis(token: string, projectId: string, proposal: TruthProposal): Promise<ApiResult<TruthAnalysis>> {
+  const r = await request<{ analysis: TruthAnalysis }>('POST', `/projects/${projectId}/truth-analyses`, { token, body: proposal });
+  return r.ok ? { ok: true, data: r.data.analysis } : r;
+}
+
+export async function listTruthAnalyses(token: string, projectId: string): Promise<ApiResult<TruthAnalysisSummary[]>> {
+  const r = await request<{ analyses: TruthAnalysisSummary[] }>('GET', `/projects/${projectId}/truth-analyses`, { token });
+  return r.ok ? { ok: true, data: r.data.analyses } : r;
+}
+
+export async function getTruthAnalysis(token: string, projectId: string, id: string): Promise<ApiResult<TruthAnalysis & { decisionHash: string }>> {
+  const r = await request<{ analysis: TruthAnalysis & { decisionHash: string } }>('GET', `/projects/${projectId}/truth-analyses/${id}`, { token });
+  return r.ok ? { ok: true, data: r.data.analysis } : r;
+}
+
+export interface NecropolisStats { projectId: string; total: number; byDomain: Record<string, number>; byClass: Record<string, number>; }
+
+export async function getNecropolisStats(token: string, projectId: string): Promise<ApiResult<NecropolisStats>> {
+  const r = await request<{ necropolis: NecropolisStats }>('GET', `/projects/${projectId}/necropolis`, { token });
+  return r.ok ? { ok: true, data: r.data.necropolis } : r;
+}

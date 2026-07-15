@@ -27,6 +27,7 @@ import { CloudProjectsScreen } from './components/CloudProjectsScreen';
 import { CandidateDiscoveryScreen } from './components/CandidateDiscoveryScreen';
 import { DrugDiscoveryScreen } from './components/DrugDiscoveryScreen';
 import { CampaignScreen } from './components/CampaignScreen';
+import { TruthEngineScreen } from './components/TruthEngineScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -50,7 +51,8 @@ type Route =
   | { kind: 'projects' }
   | { kind: 'cde' }
   | { kind: 'drug' }
-  | { kind: 'campaign' };
+  | { kind: 'campaign' }
+  | { kind: 'truth-engine' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -69,6 +71,7 @@ function parseHash(): Route {
   if (h === '#/cde') return { kind: 'cde' };
   if (h === '#/drug') return { kind: 'drug' };
   if (h === '#/campaign') return { kind: 'campaign' };
+  if (h === '#/truth-engine') return { kind: 'truth-engine' };
   return { kind: 'home' };
 }
 
@@ -352,6 +355,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'truth-engine') {
+      return (
+        <div className="app">
+          <TopBar title="🛑 Truth Engine / R&D Kill-Switch" onSearch={() => setSearchOpen(true)} />
+          <ErrorBoundary>
+            <TruthEngineScreen />
+          </ErrorBoundary>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -421,6 +436,9 @@ export default function App() {
             </button>
             <button onClick={() => { window.location.hash = '#/campaign'; }}>
               <span aria-hidden="true">⚡</span> Kampania naukowa
+            </button>
+            <button onClick={() => { window.location.hash = '#/truth-engine'; }}>
+              <span aria-hidden="true">🛑</span> Truth Engine
             </button>
             <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
               <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}

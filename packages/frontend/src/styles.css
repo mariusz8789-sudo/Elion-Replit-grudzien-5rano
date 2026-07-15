@@ -1358,3 +1358,18 @@ kbd {
   border: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.64rem;
   color: var(--text-dim); overflow-x: auto; max-height: 240px;
 }
+
+/* ---- Truth Engine / R&D Kill-Switch product screen ---- */
+.pill-danger { background: rgba(244, 124, 124, 0.14); color: var(--red); border: 1px solid rgba(244, 124, 124, 0.4); }
+.pill-neutral { background: rgba(141, 151, 180, 0.14); color: var(--text-dim); border: 1px solid rgba(141, 151, 180, 0.4); }
+.ok-text { color: var(--green); }
+.truth-engine textarea { width: 100%; font-family: inherit; resize: vertical; }
+.truth-numeric label { font-size: 0.78rem; }
+.truth-result .truth-block { margin: 0.6rem 0; padding: 0.5rem 0.75rem; border-left: 2px solid var(--border-strong); background: var(--bg-raised); border-radius: 6px; }
+.truth-result .truth-block h4 { margin: 0 0 0.35rem; font-size: 0.8rem; }
+.truth-stages li { font-family: var(--font-mono); font-size: 0.74rem; padding: 0.1rem 0; }
+.truth-stages .stage-status { display: inline-block; min-width: 4.5rem; font-weight: 700; }
+.truth-stages .stage-executed .stage-status { color: var(--green); }
+.truth-stages .stage-block .stage-status { color: var(--red); }
+.truth-stages .stage-warn .stage-status { color: var(--gold); }
+.truth-stages .stage-skipped .stage-status { color: var(--text-faint); }

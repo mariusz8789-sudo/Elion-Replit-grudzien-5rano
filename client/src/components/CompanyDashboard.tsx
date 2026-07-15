@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X } from "lucide-react";
+import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X, BarChart3 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -782,6 +782,176 @@ function ServicesTab({ companyId }: { companyId: string }) {
   );
 }
 
+interface EnterpriseDashboardData {
+  crew: { totalWorkers: number; availableWorkers: number; utilizationRate: number; avgRating: number; avgCompletedJobs: number };
+  fleet: { totalVehicles: number; availableVehicles: number; vehiclesInActiveUse: number; utilizationRate: number };
+  environmental: { totalTrips: number; totalCo2Kg: number; totalCo2SavedKg: number; avgCo2PerTripKg: number };
+  bookingRevenueEur: number;
+  marketplace: { activeListings: number; totalListedValueEur: number };
+  workShare: { activeListings: number; acceptedExchanges: number };
+  driverProductivity: Array<{ driverId: string; name: string; totalDeliveries: number; rating: number }>;
+  customerLifetimeValue: { avgLifetimeValueEur: number; topCustomers: Array<{ userId: string; name: string; totalSpentEur: number; bookingsCount: number }> };
+  partnerApi: { activeKeys: number; lastUsedAt: string | null; webhookDeliveries30d: number; webhookSuccessRate30d: number | null };
+}
+
+interface RoadServicesRevenue { revenueEur: number; commissionEur: number; netEur: number; orders: number }
+
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="p-4 bg-muted rounded-lg">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-2xl font-bold">{value}</p>
+      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+function EnterpriseDashboardTab({ companyId }: { companyId: string }) {
+  const { data, isLoading } = useQuery<EnterpriseDashboardData>({
+    queryKey: [`/api/companies/${companyId}/enterprise-dashboard`],
+  });
+  const { data: roadRevenue } = useQuery<{ data: RoadServicesRevenue }>({
+    queryKey: ["/api/road-services/partners/me/revenue"],
+    throwOnError: false,
+  });
+
+  if (isLoading || !data) {
+    return <div className="h-64 bg-muted animate-pulse rounded-lg" />;
+  }
+
+  const insights: string[] = [];
+  if (data.crew.totalWorkers > 0 && data.crew.utilizationRate < 50) {
+    insights.push(`Only ${data.crew.utilizationRate}% of your crew is currently available - consider recruiting or rebalancing schedules.`);
+  }
+  if (data.fleet.totalVehicles > 0 && data.fleet.utilizationRate < 30) {
+    insights.push(`Fleet utilization is ${data.fleet.utilizationRate}% - idle vehicles could be listed on Spare Capacity or WorkShare.`);
+  }
+  if (data.environmental.totalCo2SavedKg >= 100) {
+    insights.push(`You've saved ${Math.round(data.environmental.totalCo2SavedKg)}kg of CO2 - you likely qualify for the Green Company badge.`);
+  }
+  if (data.partnerApi.webhookSuccessRate30d != null && data.partnerApi.webhookSuccessRate30d < 90) {
+    insights.push(`Partner API webhook success rate is ${data.partnerApi.webhookSuccessRate30d}% over the last 30 days - check your endpoint.`);
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Crew Utilization</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Total Crew" value={String(data.crew.totalWorkers)} />
+          <StatCard label="Available" value={String(data.crew.availableWorkers)} />
+          <StatCard label="Utilization" value={`${data.crew.utilizationRate}%`} />
+          <StatCard label="Avg Rating" value={data.crew.avgRating.toFixed(1)} sub={`${data.crew.avgCompletedJobs} avg jobs`} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Fleet Utilization</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Total Vehicles" value={String(data.fleet.totalVehicles)} />
+          <StatCard label="Available" value={String(data.fleet.availableVehicles)} />
+          <StatCard label="In Active Use" value={String(data.fleet.vehiclesInActiveUse)} />
+          <StatCard label="Utilization" value={`${data.fleet.utilizationRate}%`} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>CO2 / Green Dashboard</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Total Trips" value={String(data.environmental.totalTrips)} />
+          <StatCard label="CO2 Emitted" value={`${Math.round(data.environmental.totalCo2Kg)}kg`} />
+          <StatCard label="CO2 Saved" value={`${Math.round(data.environmental.totalCo2SavedKg)}kg`} />
+          <StatCard label="Avg / Trip" value={`${data.environmental.avgCo2PerTripKg.toFixed(1)}kg`} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Revenue</CardTitle>
+          <CardDescription>Booking revenue is gross booking value; marketplace and WorkShare figures are listed/agreed value, not confirmed platform revenue.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Booking Revenue" value={`€${data.bookingRevenueEur.toLocaleString()}`} />
+          {roadRevenue?.data && (
+            <StatCard label="Road Services Net" value={`€${Math.round(roadRevenue.data.netEur).toLocaleString()}`} sub={`${roadRevenue.data.orders} orders`} />
+          )}
+          <StatCard label="Marketplace Listed Value" value={`€${data.marketplace.totalListedValueEur.toLocaleString()}`} sub={`${data.marketplace.activeListings} active listings`} />
+          <StatCard label="WorkShare Exchanges" value={String(data.workShare.acceptedExchanges)} sub={`${data.workShare.activeListings} active listings`} />
+        </CardContent>
+      </Card>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Driver Productivity</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {data.driverProductivity.length === 0 && <p className="text-sm text-muted-foreground">No drivers yet.</p>}
+            {data.driverProductivity.map((d) => (
+              <div key={d.driverId} className="flex items-center justify-between text-sm p-2 bg-muted rounded" data-testid={`driver-productivity-${d.driverId}`}>
+                <span>{d.name}</span>
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  {d.totalDeliveries} deliveries · <Star className="w-3 h-3 text-yellow-500" />{d.rating.toFixed(1)}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Customer Lifetime Value</CardTitle>
+            <CardDescription>Avg top-customer value: €{data.customerLifetimeValue.avgLifetimeValueEur.toLocaleString()}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {data.customerLifetimeValue.topCustomers.length === 0 && <p className="text-sm text-muted-foreground">No customers yet.</p>}
+            {data.customerLifetimeValue.topCustomers.map((c) => (
+              <div key={c.userId} className="flex items-center justify-between text-sm p-2 bg-muted rounded" data-testid={`customer-clv-${c.userId}`}>
+                <span>{c.name}</span>
+                <span className="text-muted-foreground">€{c.totalSpentEur.toLocaleString()} · {c.bookingsCount} bookings</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Partner API Analytics</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <StatCard label="Active API Keys" value={String(data.partnerApi.activeKeys)} />
+          <StatCard label="Webhook Deliveries (30d)" value={String(data.partnerApi.webhookDeliveries30d)} />
+          <StatCard
+            label="Webhook Success Rate"
+            value={data.partnerApi.webhookSuccessRate30d != null ? `${data.partnerApi.webhookSuccessRate30d}%` : "N/A"}
+          />
+        </CardContent>
+      </Card>
+
+      {insights.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recommendations</CardTitle>
+            <CardDescription>Deterministic insights derived from the metrics above (methodology: movex-enterprise-insights-v1)</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {insights.map((insight, i) => (
+              <p key={i} className="text-sm p-2 bg-muted rounded" data-testid={`insight-${i}`}>{insight}</p>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function CompanyDashboardTabs({ companyId }: { companyId: string }) {
   const { data: company } = useQuery<Company>({ queryKey: ["/api/companies", companyId] });
 
@@ -806,6 +976,7 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
           <TabsTrigger value="capacity" data-testid="tab-capacity"><Boxes className="w-4 h-4 mr-2" />Spare Capacity</TabsTrigger>
           <TabsTrigger value="crew" data-testid="tab-crew"><Wrench className="w-4 h-4 mr-2" />Crew</TabsTrigger>
           <TabsTrigger value="services" data-testid="tab-services"><Briefcase className="w-4 h-4 mr-2" />Services</TabsTrigger>
+          <TabsTrigger value="enterprise" data-testid="tab-enterprise"><BarChart3 className="w-4 h-4 mr-2" />Enterprise</TabsTrigger>
           <TabsTrigger value="reviews" data-testid="tab-company-reviews"><Star className="w-4 h-4 mr-2" />Reviews</TabsTrigger>
         </TabsList>
         <TabsContent value="fleet" className="pt-4">
@@ -825,6 +996,9 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
         </TabsContent>
         <TabsContent value="services" className="pt-4">
           <ServicesTab companyId={companyId} />
+        </TabsContent>
+        <TabsContent value="enterprise" className="pt-4">
+          <EnterpriseDashboardTab companyId={companyId} />
         </TabsContent>
         <TabsContent value="reviews" className="pt-4">
           <ReviewsSection companyId={companyId} />

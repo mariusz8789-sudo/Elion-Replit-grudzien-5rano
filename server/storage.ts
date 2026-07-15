@@ -56,6 +56,18 @@ import { eq, and, desc, sql, or, gte, lte, lt, isNull, inArray, ilike } from "dr
 import { randomUUID } from "crypto";
 import { encryptSecret, decryptSecret } from "./lib/crypto";
 
+export interface EnterpriseDashboard {
+  crew: { totalWorkers: number; availableWorkers: number; utilizationRate: number; avgRating: number; avgCompletedJobs: number };
+  fleet: { totalVehicles: number; availableVehicles: number; vehiclesInActiveUse: number; utilizationRate: number };
+  environmental: { totalTrips: number; totalCo2Kg: number; totalCo2SavedKg: number; avgCo2PerTripKg: number };
+  bookingRevenueEur: number;
+  marketplace: { activeListings: number; totalListedValueEur: number };
+  workShare: { activeListings: number; acceptedExchanges: number };
+  driverProductivity: Array<{ driverId: string; name: string; totalDeliveries: number; rating: number }>;
+  customerLifetimeValue: { avgLifetimeValueEur: number; topCustomers: Array<{ userId: string; name: string; totalSpentEur: number; bookingsCount: number }> };
+  partnerApi: { activeKeys: number; lastUsedAt: string | null; webhookDeliveries30d: number; webhookSuccessRate30d: number | null };
+}
+
 export interface IStorage {
   // User operations
   getAllUsers(): Promise<User[]>;
@@ -166,6 +178,11 @@ export interface IStorage {
   setCompanyService(companyId: string, entry: InsertCompanyService): Promise<CompanyService>;
   removeCompanyService(id: string, companyId: string): Promise<boolean>;
   searchCompanyServices(filter: { skillId?: string; category?: string }): Promise<Array<CompanyService & { skill: Skill; company: Company }>>;
+
+  // Enterprise dashboard: composite real-data aggregate across crew, fleet, CO2, revenue,
+  // marketplace, WorkShare, driver productivity, customer lifetime value and Partner API usage -
+  // every number reuses an existing table/summary rather than introducing a parallel metrics store.
+  getCompanyEnterpriseDashboard(companyId: string): Promise<EnterpriseDashboard>;
 
   // Notification operations
   getUserNotifications(userId: string): Promise<Notification[]>;
@@ -1024,6 +1041,103 @@ export class DbStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(companies.rating));
     return rows.map((r) => ({ ...r.companyService, skill: r.skill, company: r.company }));
+  }
+
+  // === ENTERPRISE DASHBOARD ===
+  async getCompanyEnterpriseDashboard(companyId: string): Promise<EnterpriseDashboard> {
+    const crewRows = await db.select().from(workerProfiles).where(eq(workerProfiles.companyId, companyId));
+    const totalWorkers = crewRows.length;
+    const availableWorkers = crewRows.filter((w) => w.available).length;
+    const crew = {
+      totalWorkers,
+      availableWorkers,
+      utilizationRate: totalWorkers > 0 ? Math.round((availableWorkers / totalWorkers) * 1000) / 10 : 0,
+      avgRating: totalWorkers > 0 ? Math.round((crewRows.reduce((s, w) => s + Number(w.rating), 0) / totalWorkers) * 10) / 10 : 0,
+      avgCompletedJobs: totalWorkers > 0 ? Math.round(crewRows.reduce((s, w) => s + (w.completedJobs ?? 0), 0) / totalWorkers) : 0,
+    };
+
+    const fleetRows = await db.select().from(vehicles).where(eq(vehicles.companyId, companyId));
+    const activeVehicleResult = await db.execute(sql`
+      SELECT COUNT(DISTINCT vehicle_id)::int AS n FROM bookings
+      WHERE company_id = ${companyId} AND vehicle_id IS NOT NULL AND status IN ('accepted', 'in_transit')
+    `);
+    const vehiclesInActiveUse = Number((activeVehicleResult.rows[0] as any)?.n ?? 0);
+    const fleet = {
+      totalVehicles: fleetRows.length,
+      availableVehicles: fleetRows.filter((v) => v.available).length,
+      vehiclesInActiveUse,
+      utilizationRate: fleetRows.length > 0 ? Math.round((vehiclesInActiveUse / fleetRows.length) * 1000) / 10 : 0,
+    };
+
+    const environmental = await this.getCompanyEnvironmentalSummary(companyId);
+
+    const companyBookings = await db.select().from(bookings).where(eq(bookings.companyId, companyId));
+    const bookingRevenueEur = Math.round(companyBookings.reduce((s, b) => s + Number(b.totalPrice), 0));
+
+    const marketplaceRows = await db.select().from(marketplaceListings)
+      .where(and(eq(marketplaceListings.companyId, companyId), eq(marketplaceListings.available, true)));
+    const marketplace = {
+      activeListings: marketplaceRows.length,
+      totalListedValueEur: Math.round(marketplaceRows.reduce((s, l) => s + (l.price ? Number(l.price) : 0), 0)),
+    };
+
+    const staffRows = await db.select().from(staffSharing).where(eq(staffSharing.lenderCompanyId, companyId));
+    const resourceRows = await db.select().from(resourceSharing).where(eq(resourceSharing.providerCompanyId, companyId));
+    const workShare = {
+      activeListings: staffRows.filter((s) => s.status === "available").length + resourceRows.filter((r) => r.status === "available").length,
+      acceptedExchanges: staffRows.filter((s) => s.status === "booked" || s.status === "completed").length
+        + resourceRows.filter((r) => r.status === "booked" || r.status === "completed").length,
+    };
+
+    const driverRows = await db.select({ driver: drivers, user: users })
+      .from(drivers)
+      .innerJoin(users, eq(drivers.userId, users.id))
+      .where(eq(drivers.companyId, companyId))
+      .orderBy(desc(drivers.totalDeliveries))
+      .limit(10);
+    const driverProductivity = driverRows.map((r) => ({
+      driverId: r.driver.id,
+      name: r.user.name,
+      totalDeliveries: r.driver.totalDeliveries ?? 0,
+      rating: Number(r.driver.rating),
+    }));
+
+    const clvResult = await db.execute(sql`
+      SELECT b.user_id, u.name, SUM(b.total_price)::float AS total_spent, COUNT(*)::int AS bookings_count
+      FROM bookings b JOIN users u ON u.id = b.user_id
+      WHERE b.company_id = ${companyId}
+      GROUP BY b.user_id, u.name
+      ORDER BY total_spent DESC
+      LIMIT 5
+    `);
+    const topCustomers = clvResult.rows.map((r: any) => ({
+      userId: r.user_id, name: r.name, totalSpentEur: Math.round(Number(r.total_spent)), bookingsCount: Number(r.bookings_count),
+    }));
+    const avgLifetimeValueEur = topCustomers.length > 0
+      ? Math.round(topCustomers.reduce((s, c) => s + c.totalSpentEur, 0) / topCustomers.length)
+      : 0;
+
+    const activeKeysRows = await db.select().from(apiKeys).where(and(eq(apiKeys.companyId, companyId), eq(apiKeys.active, true)));
+    const lastUsedAt = activeKeysRows.reduce<Date | null>((latest, k) => {
+      if (!k.lastUsedAt) return latest;
+      return !latest || k.lastUsedAt > latest ? k.lastUsedAt : latest;
+    }, null);
+    const webhookResult = await db.execute(sql`
+      SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE wd.success)::int AS succeeded
+      FROM webhook_deliveries wd
+      JOIN webhook_subscriptions ws ON ws.id = wd.subscription_id
+      WHERE ws.company_id = ${companyId} AND wd.attempted_at >= NOW() - INTERVAL '30 days'
+    `);
+    const webhookRow = webhookResult.rows[0] as any;
+    const webhookDeliveries30d = Number(webhookRow?.total ?? 0);
+    const partnerApi = {
+      activeKeys: activeKeysRows.length,
+      lastUsedAt: lastUsedAt ? lastUsedAt.toISOString() : null,
+      webhookDeliveries30d,
+      webhookSuccessRate30d: webhookDeliveries30d > 0 ? Math.round((Number(webhookRow.succeeded) / webhookDeliveries30d) * 1000) / 10 : null,
+    };
+
+    return { crew, fleet, environmental, bookingRevenueEur, marketplace, workShare, driverProductivity, customerLifetimeValue: { avgLifetimeValueEur, topCustomers }, partnerApi };
   }
 
   // === NOTIFICATION OPERATIONS ===

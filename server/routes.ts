@@ -2721,6 +2721,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === ENTERPRISE DASHBOARD ===
+  app.get("/api/companies/:companyId/enterprise-dashboard", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.companyId !== req.params.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      res.json(await storage.getCompanyEnterpriseDashboard(req.params.companyId));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // === DRIVER AVAILABILITY CALENDAR ===
   app.get("/api/drivers/:driverId/availability", async (req, res) => {
     res.json(await storage.getDriverAvailability(req.params.driverId));

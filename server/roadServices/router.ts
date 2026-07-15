@@ -341,6 +341,16 @@ roadServicesRouter.get("/partners/me/orders", requireAuth, async (req: Request, 
   res.json({ data: orders });
 });
 
+// Used by the company Enterprise Dashboard's "Road Services revenue" panel - reuses the same
+// getRevenueSummary() aggregate the admin dashboard already calls, filtered to this partner.
+roadServicesRouter.get("/partners/me/revenue", requireAuth, async (req: Request, res: Response) => {
+  const profile = await requirePartnerProfile(req, res);
+  if (!profile) return;
+  const summary = await getRevenueSummary();
+  const mine = summary.byPartner.find((p) => p.partnerId === profile.id) ?? { partnerId: profile.id, revenueEur: 0, commissionEur: 0, orders: 0 };
+  res.json({ data: { revenueEur: mine.revenueEur, commissionEur: mine.commissionEur, netEur: mine.revenueEur - mine.commissionEur, orders: mine.orders } });
+});
+
 // === Admin dashboard ===
 roadServicesRouter.get("/admin/revenue", requireAdmin, async (_req: Request, res: Response) => {
   const summary = await getRevenueSummary();

@@ -7,12 +7,13 @@ import { TrendingUp, DollarSign, Users, Star, Package } from "lucide-react";
 interface AnalyticsData {
   revenue: { month: string; amount: number }[];
   bookings: { month: string; count: number }[];
-  ratings: { category: string; avg: number }[];
+  ratings: { category: string; count: number; percent: number }[];
   topServices: { name: string; count: number }[];
   stats: {
     totalRevenue: number;
     totalBookings: number;
     avgRating: number;
+    totalReviews: number;
     activeDrivers: number;
   };
 }
@@ -40,7 +41,7 @@ export default function AnalyticsPage() {
     );
   }
 
-  const stats = analytics?.stats || { totalRevenue: 0, totalBookings: 0, avgRating: 0, activeDrivers: 0 };
+  const stats = analytics?.stats || { totalRevenue: 0, totalBookings: 0, avgRating: 0, totalReviews: 0, activeDrivers: 0 };
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -89,7 +90,12 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Rating</p>
-                  <p className="text-2xl font-bold mt-1">{stats.avgRating.toFixed(1)} ★</p>
+                  <p className="text-2xl font-bold mt-1">
+                    {stats.totalReviews > 0 ? `${stats.avgRating.toFixed(1)} ★` : "No reviews yet"}
+                  </p>
+                  {stats.totalReviews > 0 && (
+                    <p className="text-xs text-muted-foreground">{stats.totalReviews} review{stats.totalReviews === 1 ? "" : "s"}</p>
+                  )}
                 </div>
                 <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-950 rounded-full flex items-center justify-center">
                   <Star className="w-6 h-6 text-yellow-600" />
@@ -183,10 +189,13 @@ export default function AnalyticsPage() {
                 <CardDescription>Most popular transport services</CardDescription>
               </CardHeader>
               <CardContent>
+                {!analytics?.topServices?.length ? (
+                  <p className="text-sm text-muted-foreground text-center py-12">No bookings yet.</p>
+                ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={analytics?.topServices}
+                      data={analytics.topServices}
                       dataKey="count"
                       nameKey="name"
                       cx="50%"
@@ -194,13 +203,14 @@ export default function AnalyticsPage() {
                       outerRadius={100}
                       label={(entry) => entry.name}
                     >
-                      {analytics?.topServices.map((_, index) => (
+                      {analytics.topServices.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -209,13 +219,16 @@ export default function AnalyticsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Rating Distribution</CardTitle>
-                <CardDescription>Customer satisfaction breakdown</CardDescription>
+                <CardDescription>Real customer review breakdown (% of reviews at each star rating)</CardDescription>
               </CardHeader>
               <CardContent>
+                {stats.totalReviews === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-12">No reviews yet for this company.</p>
+                ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={analytics?.ratings} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis type="number" className="text-xs" />
+                    <XAxis type="number" className="text-xs" unit="%" />
                     <YAxis dataKey="category" type="category" className="text-xs" width={100} />
                     <Tooltip
                       contentStyle={{
@@ -224,9 +237,10 @@ export default function AnalyticsPage() {
                         borderRadius: "8px",
                       }}
                     />
-                    <Bar dataKey="avg" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="percent" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

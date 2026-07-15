@@ -5,61 +5,34 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Leaf, AlertTriangle, Info } from "lucide-react";
+import { EMISSION_FACTORS_KG_PER_KM, type CanonicalVehicleClass } from "@shared/environmentalCalculation";
 
 interface EcoCalculatorProps {
   distance?: number;
   onCalculate?: (co2kg: number, vehicleType: string) => void;
 }
 
-const emissionFactors: Record<string, { factor: number; label: string; description: string }> = {
-  "electric": {
-    factor: 0,
-    label: "Electric Vehicle",
-    description: "Zero emissions - battery powered"
-  },
-  "hybrid": {
-    factor: 0.128,
-    label: "Hybrid Vehicle",
-    description: "Reduced emissions - 50% less than standard"
-  },
-  "small-van": {
-    factor: 0.2,
-    label: "Small Van/Car",
-    description: "Light delivery vehicle"
-  },
-  "van": {
-    factor: 0.256,
-    label: "Standard Van",
-    description: "Medium commercial van"
-  },
-  "truck": {
-    factor: 0.384,
-    label: "Medium Truck",
-    description: "Standard cargo truck"
-  },
-  "large-truck": {
-    factor: 0.513,
-    label: "Large Truck/Lorry",
-    description: "Heavy goods vehicle"
-  },
-  "motorcycle": {
-    factor: 0.093,
-    label: "Motorcycle",
-    description: "Two-wheel transport"
-  },
-  "bicycle": {
-    factor: 0,
-    label: "Bicycle",
-    description: "Zero emissions - pedal powered"
-  },
+// Same canonical factor table used by bookings, Road Services, and GreenRoute - no separate
+// client-only numbers, so a "0.256 kg/km van" here always means the same thing everywhere.
+const VEHICLE_LABELS: Record<CanonicalVehicleClass, { label: string; description: string }> = {
+  electric: { label: "Electric Vehicle", description: "Zero emissions - battery powered" },
+  hybrid: { label: "Hybrid Vehicle", description: "Reduced emissions vs. a standard van" },
+  car: { label: "Car", description: "Standard passenger car" },
+  van: { label: "Standard Van", description: "Medium commercial van" },
+  truck_light: { label: "Light Truck", description: "Light-duty cargo truck (~7.5t)" },
+  truck_medium: { label: "Medium Truck", description: "Standard cargo truck" },
+  truck_heavy: { label: "Heavy Truck/Lorry", description: "Heavy goods vehicle" },
+  motorcycle: { label: "Motorcycle", description: "Two-wheel transport" },
+  bicycle: { label: "Bicycle", description: "Zero emissions - pedal powered" },
 };
 
 export default function EcoCalculator({ distance: initialDistance, onCalculate }: EcoCalculatorProps) {
   const [distance, setDistance] = useState<number>(initialDistance || 0);
-  const [vehicleType, setVehicleType] = useState<string>("van");
+  const [vehicleType, setVehicleType] = useState<CanonicalVehicleClass>("van");
 
-  const selectedVehicle = emissionFactors[vehicleType];
-  const co2kg = Number((distance * selectedVehicle.factor).toFixed(2));
+  const factor = EMISSION_FACTORS_KG_PER_KM[vehicleType];
+  const selectedVehicle = { factor, ...VEHICLE_LABELS[vehicleType] };
+  const co2kg = Number((distance * factor).toFixed(2));
   
   const getImpactLevel = (co2: number): { level: string; color: string; icon: any } => {
     if (co2 < 5) return { level: "Low", color: "bg-green-500", icon: Leaf };
@@ -116,14 +89,14 @@ export default function EcoCalculator({ distance: initialDistance, onCalculate }
           <div className="space-y-2">
             <Label htmlFor="vehicle">Vehicle Type</Label>
             <Select value={vehicleType} onValueChange={(val) => {
-              setVehicleType(val);
+              setVehicleType(val as CanonicalVehicleClass);
               handleCalculate();
             }}>
               <SelectTrigger id="vehicle" data-testid="select-eco-vehicle">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(emissionFactors).map(([key, data]) => (
+                {Object.entries(VEHICLE_LABELS).map(([key, data]) => (
                   <SelectItem key={key} value={key}>
                     {data.label}
                   </SelectItem>

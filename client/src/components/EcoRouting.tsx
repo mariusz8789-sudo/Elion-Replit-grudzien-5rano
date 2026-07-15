@@ -1,166 +1,119 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Leaf, Route, Clock, TrendingDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Leaf, Route, Clock, AlertTriangle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
-interface RouteOption {
-  id: string;
-  name: string;
-  distance: number;
-  duration: number;
-  co2kg: number;
-  type: "fastest" | "eco" | "balanced";
+interface RouteLeg {
+  distanceKm: number;
+  durationMin: number;
+  co2Kg: number;
 }
 
-interface EcoRoutingProps {
-  from: string;
-  to: string;
-  onSelectRoute?: (route: RouteOption) => void;
+interface OptimizeRouteResult {
+  available: boolean;
+  alternativeRouteCount: number;
+  hasGreenerAlternative: boolean;
+  standard: RouteLeg;
+  optimized: RouteLeg;
+  co2SavedKg: number;
 }
 
-export default function EcoRouting({ from, to, onSelectRoute }: EcoRoutingProps) {
-  const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
-  const [routes, setRoutes] = useState<RouteOption[]>([]);
+export default function EcoRouting() {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [result, setResult] = useState<OptimizeRouteResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    const baseDistance = Math.random() * 50 + 20;
-    const baseDuration = baseDistance * 1.5;
-    
-    const routeOptions: RouteOption[] = [
-      {
-        id: "eco",
-        name: "Eco-Friendly Route",
-        distance: baseDistance * 1.08,
-        duration: baseDuration * 1.15,
-        co2kg: baseDistance * 0.15,
-        type: "eco",
-      },
-      {
-        id: "fastest",
-        name: "Fastest Route",
-        distance: baseDistance * 0.95,
-        duration: baseDuration * 0.85,
-        co2kg: baseDistance * 0.22,
-        type: "fastest",
-      },
-      {
-        id: "balanced",
-        name: "Balanced Route",
-        distance: baseDistance,
-        duration: baseDuration,
-        co2kg: baseDistance * 0.18,
-        type: "balanced",
-      },
-    ];
-
-    setRoutes(routeOptions);
-    setSelectedRoute(routeOptions[0].id);
-  }, [from, to]);
-
-  const handleSelectRoute = (route: RouteOption) => {
-    setSelectedRoute(route.id);
-    if (onSelectRoute) {
-      onSelectRoute(route);
-    }
-  };
-
-  const getRouteColor = (type: string) => {
-    switch (type) {
-      case "eco": return "border-green-500 bg-green-50 dark:bg-green-950/20";
-      case "fastest": return "border-blue-500 bg-blue-50 dark:bg-blue-950/20";
-      case "balanced": return "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20";
-      default: return "border-border";
-    }
-  };
-
-  const getRouteBadge = (type: string) => {
-    switch (type) {
-      case "eco": return { label: "Lowest CO₂", className: "bg-green-600 text-white" };
-      case "fastest": return { label: "Fastest", className: "bg-blue-600 text-white" };
-      case "balanced": return { label: "Recommended", className: "bg-yellow-600 text-white" };
-      default: return { label: "", className: "" };
-    }
-  };
-
-  if (routes.length === 0) {
-    return null;
-  }
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/eco/optimize-route", { origin: from, destination: to, vehicleType: "van" });
+      return res.json() as Promise<OptimizeRouteResult>;
+    },
+    onSuccess: (data) => {
+      setResult(data);
+      setErrorMessage(null);
+    },
+    onError: (error: any) => {
+      setResult(null);
+      setErrorMessage(error.message || "Route lookup failed");
+    },
+  });
 
   return (
     <Card data-testid="card-eco-routing">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Route className="w-5 h-5 text-accent" />
-          Route Options
+          Route Comparison
         </CardTitle>
         <CardDescription>
-          Choose the best route for your journey from {from} to {to}
+          Real Mapbox route data compared by CO₂ emissions - no route is shown unless Mapbox actually returns one
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {routes.map((route) => {
-          const isSelected = selectedRoute === route.id;
-          const badge = getRouteBadge(route.type);
-          
-          return (
-            <div
-              key={route.id}
-              className={`relative border-2 rounded-lg p-4 transition-all ${
-                isSelected ? getRouteColor(route.type) : "border-border hover-elevate"
-              }`}
-              data-testid={`route-option-${route.type}`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-semibold">{route.name}</h4>
-                    {badge.label && (
-                      <Badge className={badge.className}>{badge.label}</Badge>
-                    )}
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-3 text-sm">
-                    <div className="flex items-center gap-1.5">
-                      <Route className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">
-                        {route.distance.toFixed(1)} km
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">
-                        {Math.round(route.duration)} min
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Leaf className="w-4 h-4 text-green-600" />
-                      <span className="font-medium text-green-700 dark:text-green-400">
-                        {route.co2kg.toFixed(2)} kg CO₂
-                      </span>
-                    </div>
-                  </div>
+      <CardContent className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label htmlFor="eco-route-from">From</Label>
+            <Input id="eco-route-from" value={from} onChange={(e) => setFrom(e.target.value)} placeholder="Enter origin address" data-testid="input-eco-route-from" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="eco-route-to">To</Label>
+            <Input id="eco-route-to" value={to} onChange={(e) => setTo(e.target.value)} placeholder="Enter destination address" data-testid="input-eco-route-to" />
+          </div>
+        </div>
+        <Button
+          onClick={() => mutation.mutate()}
+          disabled={!from || !to || mutation.isPending}
+          data-testid="button-eco-route-search"
+        >
+          {mutation.isPending ? "Comparing routes..." : "Compare Routes"}
+        </Button>
 
-                  {route.type === "eco" && (
-                    <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400">
-                      <TrendingDown className="w-3 h-3" />
-                      <span>Reduces emissions by 30% compared to fastest route</span>
-                    </div>
-                  )}
+        {errorMessage && (
+          <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm" data-testid="text-eco-route-error">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {result && (
+          <div className="space-y-3">
+            {!result.hasGreenerAlternative && (
+              <p className="text-sm text-muted-foreground">
+                Mapbox found no lower-emission alternative for this trip - the standard route is already the best option.
+              </p>
+            )}
+            <div className="grid gap-3">
+              <div className="border-2 rounded-lg p-4 border-border" data-testid="route-option-standard">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold">Standard Route</h4>
                 </div>
+                <div className="grid grid-cols-3 gap-3 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5"><Route className="w-4 h-4" />{result.standard.distanceKm} km</span>
+                  <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" />{result.standard.durationMin} min</span>
+                  <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400 font-medium"><Leaf className="w-4 h-4" />{result.standard.co2Kg} kg CO₂</span>
+                </div>
+              </div>
 
-                <Button
-                  variant={isSelected ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleSelectRoute(route)}
-                  data-testid={`button-select-route-${route.type}`}
-                >
-                  {isSelected ? "Selected" : "Select"}
-                </Button>
+              <div className={`border-2 rounded-lg p-4 ${result.hasGreenerAlternative ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-border"}`} data-testid="route-option-eco">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold">Lowest-CO₂ Route</h4>
+                  {result.hasGreenerAlternative && <Badge className="bg-green-600 text-white">Lowest CO₂</Badge>}
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5"><Route className="w-4 h-4" />{result.optimized.distanceKm} km</span>
+                  <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" />{result.optimized.durationMin} min</span>
+                  <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400 font-medium"><Leaf className="w-4 h-4" />{result.optimized.co2Kg} kg CO₂</span>
+                </div>
               </div>
             </div>
-          );
-        })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

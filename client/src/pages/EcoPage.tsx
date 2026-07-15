@@ -16,9 +16,6 @@ interface CompanyEcoStats {
 }
 
 export default function EcoPage() {
-  const routeFrom = "New York";
-  const routeTo = "Boston";
-
   const { data: ecoCompanies = [] } = useQuery<CompanyEcoStats[]>({
     queryKey: ["/api/eco/companies"],
   });
@@ -75,7 +72,7 @@ export default function EcoPage() {
           </TabsContent>
 
           <TabsContent value="routing" className="space-y-6">
-            <EcoRouting from={routeFrom} to={routeTo} />
+            <EcoRouting />
           </TabsContent>
 
           <TabsContent value="companies" className="space-y-6">

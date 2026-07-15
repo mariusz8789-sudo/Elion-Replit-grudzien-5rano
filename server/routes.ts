@@ -6,7 +6,7 @@ import { getStripe, isStripeConfigured } from "./stripe";
 import { getGeocodingClient, getDirectionsClient, isMapboxConfigured } from "./mapbox";
 import { passport } from "./auth";
 import { db } from "./db";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { eq, and, gte, sql, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
   insertServiceSchema, insertBookingSchema, insertQuoteSchema, insertUserSchema,
@@ -19,7 +19,7 @@ import {
   insertDriverAvailabilitySchema, insertDriverTimeOffSchema, insertCargoItemSchema,
   insertVerificationDocumentSchema, insertApiKeySchema,
   offers, marketplaceListings, sharedRides, rideBookings, companies, bookings, drivers, vehicles,
-  users, messages
+  users, messages, reviews, services
 } from "@shared/schema";
 import type { User, Booking } from "@shared/schema";
 import { getCalendarSyncProvider, type CalendarProvider } from "./services/calendarSync";
@@ -27,7 +27,7 @@ import { getCargoRecognitionProvider } from "./services/cargoRecognition";
 import { getTranslationProvider } from "./services/translation";
 import { checkGpsAnomaly, checkDuplicateAccount } from "./services/fraud";
 import { calculateCapacityBookingPrice } from "./lib/capacityPricing";
-import { calculateTripEnvironmentalSummary, BASELINE_VEHICLE_CLASS, calculateEmissionsKg, normalizeVehicleType, EMISSION_FACTORS_KG_PER_KM, ECO_METHODOLOGY, ECO_METHODOLOGY_VERSION } from "./services/environmentalCalculation";
+import { calculateTripEnvironmentalSummary, BASELINE_VEHICLE_CLASS, calculateEmissionsKg, normalizeVehicleType, EMISSION_FACTORS_KG_PER_KM, ECO_METHODOLOGY, ECO_METHODOLOGY_VERSION } from "@shared/environmentalCalculation";
 import { dispatchWebhookEvent } from "./services/webhooks";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
@@ -1173,33 +1173,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalRevenue = bookingsData.reduce((sum, b) => sum + parseFloat(b.totalPrice.toString()), 0);
       const totalBookings = bookingsData.length;
 
+      // Real rating distribution and average from this company's actual reviews - previously
+      // both were fixed percentages/values shown for every company regardless of any real
+      // review data.
+      const companyReviews = await db.select().from(reviews).where(eq(reviews.companyId, user.companyId));
+      const RATING_LABELS: Record<number, string> = {
+        5: "Excellent (5★)", 4: "Good (4★)", 3: "Average (3★)", 2: "Poor (2★)", 1: "Bad (1★)",
+      };
+      const ratingCounts = [5, 4, 3, 2, 1].reduce((acc, star) => {
+        acc[star] = companyReviews.filter((r) => r.rating === star).length;
+        return acc;
+      }, {} as Record<number, number>);
+      const ratings = [5, 4, 3, 2, 1].map((star) => ({
+        category: RATING_LABELS[star],
+        count: ratingCounts[star],
+        percent: companyReviews.length > 0 ? Math.round((ratingCounts[star] / companyReviews.length) * 1000) / 10 : 0,
+      }));
+      const avgRating = companyReviews.length > 0
+        ? Math.round((companyReviews.reduce((sum, r) => sum + r.rating, 0) / companyReviews.length) * 10) / 10
+        : 0;
+
+      // Real top services by actual booking count for this company, not fixed percentages of
+      // totalBookings applied to fake service names.
+      const bookingCountByService = new Map<string, number>();
+      bookingsData.forEach((b) => {
+        bookingCountByService.set(b.serviceId, (bookingCountByService.get(b.serviceId) || 0) + 1);
+      });
+      const serviceIds = Array.from(bookingCountByService.keys());
+      const serviceRows = serviceIds.length > 0
+        ? await db.select().from(services).where(inArray(services.id, serviceIds))
+        : [];
+      const serviceNameById = new Map(serviceRows.map((s) => [s.id, s.name]));
+      const topServices = Array.from(bookingCountByService.entries())
+        .map(([serviceId, count]) => ({ name: serviceNameById.get(serviceId) || "Unknown Service", count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
       const analytics = {
         revenue,
         bookings: bookingsChart,
-        ratings: [
-          { category: "Excellent (5★)", avg: 45 },
-          { category: "Good (4★)", avg: 35 },
-          { category: "Average (3★)", avg: 15 },
-          { category: "Poor (2★)", avg: 3 },
-          { category: "Bad (1★)", avg: 2 },
-        ],
-        topServices: [
-          { name: "Home Moving", count: Math.round(totalBookings * 0.47) },
-          { name: "Office Relocation", count: Math.round(totalBookings * 0.34) },
-          { name: "Furniture Delivery", count: Math.round(totalBookings * 0.29) },
-          { name: "Small Items", count: Math.round(totalBookings * 0.22) },
-          { name: "Heavy Equipment", count: Math.round(totalBookings * 0.17) },
-        ],
+        ratings,
+        topServices,
         stats: {
           totalRevenue: Math.round(totalRevenue),
           totalBookings,
-          avgRating: 4.6,
+          avgRating,
+          totalReviews: companyReviews.length,
           activeDrivers: await db.select().from(drivers)
             .where(eq(drivers.companyId, user.companyId))
             .then(d => d.length),
         },
       };
-      
+
       res.json(analytics);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

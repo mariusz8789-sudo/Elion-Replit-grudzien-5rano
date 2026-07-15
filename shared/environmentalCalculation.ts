@@ -1,9 +1,7 @@
-// Single, versioned source of truth for CO2 estimation, replacing three previously
-// independent and mutually inconsistent emission-factor tables (server/routes.ts's
-// /api/calculate-route, client BookingFlow.tsx, server/roadServices/costCalculator.ts -
-// each keyed differently and none agreeing with the others). Every "CO2 saved" figure
-// this service produces is always paired with the baseline it was compared against - never
-// shown standalone.
+// Single, versioned source of truth for CO2 estimation, shared by both server and client so
+// no caller (backend routes, the Road Services cost calculator, or client-side calculator
+// widgets) ever invents its own emission-factor table. Every "CO2 saved" figure this service
+// produces is always paired with the baseline it was compared against - never shown standalone.
 
 export const ECO_METHODOLOGY = "movex-eco-v1";
 export const ECO_METHODOLOGY_VERSION = 1;
@@ -32,8 +30,9 @@ export const EMISSION_FACTORS_KG_PER_KM: Record<CanonicalVehicleClass, number> =
 export const BASELINE_VEHICLE_CLASS: CanonicalVehicleClass = "van";
 
 // Maps every vehicle-type string actually used elsewhere in the app (vehicles.type,
-// Road Services' truck_7_5t/12t/40t, the old ad-hoc electric_van/diesel_truck names, etc.)
-// onto the canonical set above, so there is exactly one factor table in the codebase.
+// Road Services' truck_7_5t/12t/40t, the old ad-hoc electric_van/diesel_truck names, the
+// standalone client-side eco calculator's small-van/large-truck names, etc.) onto the
+// canonical set above, so there is exactly one factor table in the codebase.
 const VEHICLE_TYPE_ALIASES: Record<string, CanonicalVehicleClass> = {
   bicycle: "bicycle",
   motorcycle: "motorcycle",

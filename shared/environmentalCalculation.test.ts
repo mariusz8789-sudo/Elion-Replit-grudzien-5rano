@@ -4,7 +4,7 @@ import {
   calculateTripEnvironmentalSummary,
   normalizeVehicleType,
   BASELINE_VEHICLE_CLASS,
-} from "../environmentalCalculation";
+} from "./environmentalCalculation";
 
 describe("normalizeVehicleType", () => {
   it("maps every known alias to a canonical class", () => {

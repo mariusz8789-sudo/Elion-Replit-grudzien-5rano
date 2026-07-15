@@ -1,5 +1,5 @@
 import type { RouteRequirement } from "@shared/schema";
-import { calculateEmissionsKg } from "../services/environmentalCalculation";
+import { calculateEmissionsKg } from "@shared/environmentalCalculation";
 
 // Pure, deterministic cost aggregation over the requirements an AI Route Analysis
 // (or a partner catalog match) attached to a route. Kept side-effect free so it can

@@ -15,6 +15,7 @@ import {
   insertTrackingUpdateSchema, insertNotificationSchema, insertMarketplaceListingSchema,
   insertSharedRideSchema, insertStaffSharingSchema,
   insertResourceSharingSchema, insertAnnouncementSchema, insertCouponSchema,
+  insertCapacityPostingSchema, insertCapacityBookingSchema,
   insertDriverAvailabilitySchema, insertDriverTimeOffSchema, insertCargoItemSchema,
   insertVerificationDocumentSchema, insertApiKeySchema,
   offers, marketplaceListings, sharedRides, rideBookings, companies, bookings, drivers, vehicles,
@@ -25,6 +26,7 @@ import { getCalendarSyncProvider, type CalendarProvider } from "./services/calen
 import { getCargoRecognitionProvider } from "./services/cargoRecognition";
 import { getTranslationProvider } from "./services/translation";
 import { checkGpsAnomaly, checkDuplicateAccount } from "./services/fraud";
+import { calculateCapacityBookingPrice } from "./lib/capacityPricing";
 import { dispatchWebhookEvent } from "./services/webhooks";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
@@ -1551,6 +1553,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
+  });
+
+  // === CAPACITY MATCHING ROUTES (route-connected spare capacity / empty-return) ===
+  // A company already driving a route (or about to) publishes leftover volume/weight/
+  // pallet space on that specific leg; customers with compatible cargo search and request
+  // it. Deterministic text + capacity matching now - MoveX AI Core can rank results later,
+  // but the matching itself must work correctly without it.
+  app.post("/api/capacity-postings", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (!user.companyId) {
+        return res.status(403).json({ message: "A company account is required to publish spare capacity" });
+      }
+      const { companyId: _companyId, ...rest } = req.body;
+      const postingData = insertCapacityPostingSchema.parse({ ...rest, companyId: user.companyId });
+      if (postingData.departureWindowEnd < postingData.departureWindowStart) {
+        return res.status(400).json({ message: "departureWindowEnd must be after departureWindowStart" });
+      }
+      const posting = await storage.createCapacityPosting(postingData);
+      res.status(201).json(posting);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/capacity-postings", async (req, res) => {
+    const { from, to, date, minVolumeM3, minWeightKg, minPalletSpaces } = req.query;
+    const postings = await storage.matchCapacityPostings({
+      from: from ? String(from) : undefined,
+      to: to ? String(to) : undefined,
+      date: date ? new Date(String(date)) : undefined,
+      minVolumeM3: minVolumeM3 ? Number(minVolumeM3) : undefined,
+      minWeightKg: minWeightKg ? Number(minWeightKg) : undefined,
+      minPalletSpaces: minPalletSpaces ? Number(minPalletSpaces) : undefined,
+    });
+    res.json(postings);
+  });
+
+  app.get("/api/companies/:companyId/capacity-postings", requireAuth, async (req, res) => {
+    const postings = await storage.getCompanyCapacityPostings(req.params.companyId);
+    res.json(postings);
+  });
+
+  app.patch("/api/capacity-postings/:id/cancel", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!user.companyId) {
+      return res.status(403).json({ message: "Company access required" });
+    }
+    const posting = await storage.cancelCapacityPosting(req.params.id, user.companyId);
+    if (!posting) {
+      return res.status(404).json({ message: "Posting not found, already cancelled, or not owned by your company" });
+    }
+    res.json(posting);
+  });
+
+  app.post("/api/capacity-postings/:id/requests", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const posting = await storage.getCapacityPosting(req.params.id);
+      if (!posting || posting.status !== "open") {
+        return res.status(400).json({ message: "This capacity posting is not open for requests" });
+      }
+      const { postingId: _postingId, customerId: _customerId, ...rest } = req.body;
+      const bookingData = insertCapacityBookingSchema.parse({ ...rest, postingId: posting.id, customerId: user.id });
+
+      // Soft pre-check for a fast, clear error message; the real, race-safe enforcement
+      // happens atomically in storage.acceptCapacityBooking at accept time.
+      if (
+        Number(bookingData.volumeM3) > Number(posting.freeVolumeM3) ||
+        Number(bookingData.weightKg) > Number(posting.freeWeightKg) ||
+        (bookingData.palletSpaces ?? 0) > posting.freePalletSpaces
+      ) {
+        return res.status(400).json({ message: "Requested capacity exceeds what's currently available on this posting" });
+      }
+
+      const priceEur = calculateCapacityBookingPrice(
+        Number(bookingData.volumeM3),
+        posting.pricePerM3Eur !== null ? Number(posting.pricePerM3Eur) : null,
+        posting.minimumPriceEur !== null ? Number(posting.minimumPriceEur) : null,
+      );
+      const booking = await storage.createCapacityBooking(bookingData, String(priceEur));
+
+      const companyUsers = await storage.getCompanyUsers(posting.companyId);
+      await Promise.all(companyUsers.map((u) => storage.createNotification({
+        userId: u.id,
+        title: "New capacity request",
+        message: `A customer requested ${bookingData.volumeM3} m³ on your ${posting.fromAddress} -> ${posting.toAddress} posting.`,
+        type: "info",
+        link: "/capacity",
+      })));
+
+      res.status(201).json(booking);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/capacity-postings/:id/requests", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const posting = await storage.getCapacityPosting(req.params.id);
+    if (!posting) {
+      return res.status(404).json({ message: "Posting not found" });
+    }
+    if (user.companyId !== posting.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized to view requests for this posting" });
+    }
+    res.json(await storage.getPostingCapacityBookings(req.params.id));
+  });
+
+  app.get("/api/users/:userId/capacity-bookings", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.id !== req.params.userId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    res.json(await storage.getCustomerCapacityBookings(req.params.userId));
+  });
+
+  app.patch("/api/capacity-bookings/:id/accept", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const booking = await storage.getCapacityBooking(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+    const posting = await storage.getCapacityPosting(booking.postingId);
+    if (!posting || (user.companyId !== posting.companyId && user.role !== "admin")) {
+      return res.status(403).json({ message: "Only the publishing company can accept this request" });
+    }
+    const result = await storage.acceptCapacityBooking(req.params.id);
+    if (result.error) {
+      return res.status(409).json({ message: result.error });
+    }
+    await storage.createNotification({
+      userId: booking.customerId,
+      title: "Capacity request accepted",
+      message: `Your request for ${booking.volumeM3} m³ was accepted.`,
+      type: "success",
+      link: "/capacity",
+    }).catch(() => undefined);
+    res.json(result.booking);
+  });
+
+  app.patch("/api/capacity-bookings/:id/reject", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const booking = await storage.getCapacityBooking(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+    const posting = await storage.getCapacityPosting(booking.postingId);
+    if (!posting || (user.companyId !== posting.companyId && user.role !== "admin")) {
+      return res.status(403).json({ message: "Only the publishing company can reject this request" });
+    }
+    const updated = await storage.updateCapacityBookingStatus(req.params.id, ["pending"], "rejected");
+    if (!updated) {
+      return res.status(409).json({ message: "This request is no longer pending" });
+    }
+    res.json(updated);
+  });
+
+  app.patch("/api/capacity-bookings/:id/cancel", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const booking = await storage.getCapacityBooking(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+    if (user.id !== booking.customerId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized to cancel this request" });
+    }
+    const updated = await storage.updateCapacityBookingStatus(req.params.id, ["pending", "accepted"], "cancelled");
+    if (!updated) {
+      return res.status(409).json({ message: "This request could not be cancelled" });
+    }
+    res.json(updated);
   });
 
   // === ANNOUNCEMENTS / PROMO BOARD ROUTES ===

@@ -33,16 +33,19 @@ import {
   type ApiKey, type InsertApiKey,
   type WebhookSubscription, type InsertWebhookSubscription,
   type WebhookDelivery,
+  type CapacityPosting, type InsertCapacityPosting,
+  type CapacityBooking, type InsertCapacityBooking,
   users, companies, drivers, vehicles, services, bookings, quotes, offers,
   messages, attachments, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
   badges, badgeAwards, coupons, couponRedemptions, referralRewards, bookingTransfers,
   driverAvailability, driverTimeOff, calendarConnections, cargoItems, messageTranslations,
   calls, verificationDocuments, deviceFingerprints, riskScores, auditLogs,
-  apiKeys, webhookSubscriptions, webhookDeliveries
+  apiKeys, webhookSubscriptions, webhookDeliveries,
+  capacityPostings, capacityBookings
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, or, gte, lte, lt, isNull, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, or, gte, lte, lt, isNull, inArray, ilike } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { encryptSecret, decryptSecret } from "./lib/crypto";
 
@@ -148,7 +151,23 @@ export interface IStorage {
   getAvailableResourceSharing(resourceType?: string): Promise<ResourceSharing[]>;
   createResourceSharing(resourceSharing: InsertResourceSharing): Promise<ResourceSharing>;
   updateResourceSharingStatus(id: string, fromStatuses: string[], toStatus: string, requesterCompanyId?: string | null): Promise<ResourceSharing | undefined>;
-  
+
+  // Capacity matching operations (route-connected spare capacity / empty-return matching)
+  createCapacityPosting(posting: InsertCapacityPosting): Promise<CapacityPosting>;
+  getCapacityPosting(id: string): Promise<CapacityPosting | undefined>;
+  getCompanyCapacityPostings(companyId: string): Promise<CapacityPosting[]>;
+  matchCapacityPostings(params: {
+    from?: string; to?: string; date?: Date;
+    minVolumeM3?: number; minWeightKg?: number; minPalletSpaces?: number;
+  }): Promise<CapacityPosting[]>;
+  cancelCapacityPosting(id: string, companyId: string): Promise<CapacityPosting | undefined>;
+  createCapacityBooking(booking: InsertCapacityBooking, priceEur: string): Promise<CapacityBooking>;
+  getCapacityBooking(id: string): Promise<CapacityBooking | undefined>;
+  getPostingCapacityBookings(postingId: string): Promise<CapacityBooking[]>;
+  getCustomerCapacityBookings(customerId: string): Promise<CapacityBooking[]>;
+  acceptCapacityBooking(id: string): Promise<{ booking?: CapacityBooking; error?: string }>;
+  updateCapacityBookingStatus(id: string, fromStatuses: string[], toStatus: "rejected" | "cancelled"): Promise<CapacityBooking | undefined>;
+
   // Announcements operations
   getActiveAnnouncements(): Promise<Announcement[]>;
   getAnnouncement(id: string): Promise<Announcement | undefined>;
@@ -809,6 +828,154 @@ export class DbStorage implements IStorage {
         ...(requesterCompanyId !== undefined ? { requesterCompanyId } : {}),
       })
       .where(and(eq(resourceSharing.id, id), inArray(resourceSharing.status, fromStatuses)))
+      .returning();
+    return result[0];
+  }
+
+  // === CAPACITY MATCHING OPERATIONS (route-connected spare capacity) ===
+  async createCapacityPosting(posting: InsertCapacityPosting): Promise<CapacityPosting> {
+    const result = await db.insert(capacityPostings).values(posting).returning();
+    return result[0];
+  }
+
+  async getCapacityPosting(id: string): Promise<CapacityPosting | undefined> {
+    const result = await db.select().from(capacityPostings).where(eq(capacityPostings.id, id));
+    return result[0];
+  }
+
+  async getCompanyCapacityPostings(companyId: string): Promise<CapacityPosting[]> {
+    return await db.select().from(capacityPostings)
+      .where(eq(capacityPostings.companyId, companyId))
+      .orderBy(desc(capacityPostings.createdAt));
+  }
+
+  async cancelCapacityPosting(id: string, companyId: string): Promise<CapacityPosting | undefined> {
+    const result = await db.update(capacityPostings)
+      .set({ status: "cancelled" })
+      .where(and(eq(capacityPostings.id, id), eq(capacityPostings.companyId, companyId), eq(capacityPostings.status, "open")))
+      .returning();
+    return result[0];
+  }
+
+  // Deterministic matching: substring match on the free-text route endpoints (works with
+  // zero external dependencies - no geocoding required), an optional departure-date overlap
+  // check, and a remaining-capacity floor. This is the engine MoveX AI Core can later
+  // layer smarter ranking on top of; it must already return correct, real matches without it.
+  async matchCapacityPostings(params: {
+    from?: string; to?: string; date?: Date;
+    minVolumeM3?: number; minWeightKg?: number; minPalletSpaces?: number;
+  }): Promise<CapacityPosting[]> {
+    const conditions = [eq(capacityPostings.status, "open")];
+    if (params.from) conditions.push(ilike(capacityPostings.fromAddress, `%${params.from}%`));
+    if (params.to) conditions.push(ilike(capacityPostings.toAddress, `%${params.to}%`));
+    if (params.date) {
+      conditions.push(lte(capacityPostings.departureWindowStart, params.date));
+      conditions.push(gte(capacityPostings.departureWindowEnd, params.date));
+    }
+    if (params.minVolumeM3 !== undefined) conditions.push(gte(capacityPostings.freeVolumeM3, String(params.minVolumeM3)));
+    if (params.minWeightKg !== undefined) conditions.push(gte(capacityPostings.freeWeightKg, String(params.minWeightKg)));
+    if (params.minPalletSpaces !== undefined) conditions.push(gte(capacityPostings.freePalletSpaces, params.minPalletSpaces));
+
+    return await db.select().from(capacityPostings)
+      .where(and(...conditions))
+      .orderBy(capacityPostings.departureWindowStart)
+      .limit(50);
+  }
+
+  async createCapacityBooking(booking: InsertCapacityBooking, priceEur: string): Promise<CapacityBooking> {
+    const result = await db.insert(capacityBookings).values({ ...booking, priceEur }).returning();
+    return result[0];
+  }
+
+  async getCapacityBooking(id: string): Promise<CapacityBooking | undefined> {
+    const result = await db.select().from(capacityBookings).where(eq(capacityBookings.id, id));
+    return result[0];
+  }
+
+  async getPostingCapacityBookings(postingId: string): Promise<CapacityBooking[]> {
+    return await db.select().from(capacityBookings)
+      .where(eq(capacityBookings.postingId, postingId))
+      .orderBy(desc(capacityBookings.createdAt));
+  }
+
+  async getCustomerCapacityBookings(customerId: string): Promise<CapacityBooking[]> {
+    return await db.select().from(capacityBookings)
+      .where(eq(capacityBookings.customerId, customerId))
+      .orderBy(desc(capacityBookings.createdAt));
+  }
+
+  // Atomic: the posting's remaining capacity is only decremented if it still has enough
+  // free volume/weight/pallets AND is still open, in the same conditional UPDATE as the
+  // booking's pending->accepted transition - so two carriers (or the same carrier
+  // double-clicking) can never both accept requests that together overbook the posting.
+  async acceptCapacityBooking(id: string): Promise<{ booking?: CapacityBooking; error?: string }> {
+    return await db.transaction(async (tx) => {
+      const bookingResult = await tx.select().from(capacityBookings).where(eq(capacityBookings.id, id));
+      const booking = bookingResult[0];
+      if (!booking) return { error: "Booking not found" };
+      if (booking.status !== "pending") return { error: "This request is no longer pending" };
+
+      const postingUpdate = await tx.update(capacityPostings)
+        .set({
+          freeVolumeM3: sql`${capacityPostings.freeVolumeM3} - ${booking.volumeM3}`,
+          freeWeightKg: sql`${capacityPostings.freeWeightKg} - ${booking.weightKg}`,
+          freePalletSpaces: sql`${capacityPostings.freePalletSpaces} - ${booking.palletSpaces}`,
+        })
+        .where(and(
+          eq(capacityPostings.id, booking.postingId),
+          eq(capacityPostings.status, "open"),
+          gte(capacityPostings.freeVolumeM3, booking.volumeM3),
+          gte(capacityPostings.freeWeightKg, booking.weightKg),
+          gte(capacityPostings.freePalletSpaces, booking.palletSpaces),
+        ))
+        .returning();
+
+      if (postingUpdate.length === 0) {
+        return { error: "Not enough capacity remaining on this posting" };
+      }
+
+      const updatedBooking = await tx.update(capacityBookings)
+        .set({ status: "accepted" })
+        .where(and(eq(capacityBookings.id, id), eq(capacityBookings.status, "pending")))
+        .returning();
+
+      return { booking: updatedBooking[0] };
+    });
+  }
+
+  async updateCapacityBookingStatus(id: string, fromStatuses: string[], toStatus: "rejected" | "cancelled"): Promise<CapacityBooking | undefined> {
+    // Cancelling a booking that was already "accepted" must give its reserved capacity back
+    // to the posting, or that space would be permanently lost even though nobody is using it.
+    if (toStatus === "cancelled" && fromStatuses.includes("accepted")) {
+      return await db.transaction(async (tx) => {
+        const before = await tx.select().from(capacityBookings).where(eq(capacityBookings.id, id));
+        const previousStatus = before[0]?.status;
+
+        const updated = await tx.update(capacityBookings)
+          .set({ status: toStatus })
+          .where(and(eq(capacityBookings.id, id), inArray(capacityBookings.status, fromStatuses)))
+          .returning();
+        const booking = updated[0];
+        if (!booking) return undefined;
+
+        // Only restore capacity if this cancellation moved it out of "accepted" - a
+        // pending->cancelled transition never reserved capacity in the first place.
+        if (previousStatus === "accepted") {
+          await tx.update(capacityPostings)
+            .set({
+              freeVolumeM3: sql`${capacityPostings.freeVolumeM3} + ${booking.volumeM3}`,
+              freeWeightKg: sql`${capacityPostings.freeWeightKg} + ${booking.weightKg}`,
+              freePalletSpaces: sql`${capacityPostings.freePalletSpaces} + ${booking.palletSpaces}`,
+            })
+            .where(eq(capacityPostings.id, booking.postingId));
+        }
+        return booking;
+      });
+    }
+
+    const result = await db.update(capacityBookings)
+      .set({ status: toStatus })
+      .where(and(eq(capacityBookings.id, id), inArray(capacityBookings.status, fromStatuses)))
       .returning();
     return result[0];
   }

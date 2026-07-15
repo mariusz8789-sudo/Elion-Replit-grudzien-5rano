@@ -42,6 +42,7 @@ const Plans = lazy(() => import("@/pages/Plans"));
 const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
 const DriverCalendar = lazy(() => import("@/pages/DriverCalendar"));
 const RoadServices = lazy(() => import("@/pages/RoadServices"));
+const CapacityMarketplace = lazy(() => import("@/pages/CapacityMarketplace"));
 
 function RouteLoadingFallback() {
   return (
@@ -269,6 +270,7 @@ function Router() {
         <Route path="/leaderboard" component={Leaderboard} />
         <Route path="/drivers/:driverId/calendar" component={DriverCalendar} />
         <Route path="/road-services" component={RoadServices} />
+        <Route path="/capacity" component={CapacityMarketplace} />
 
         <Route component={LandingPage} />
       </Switch>

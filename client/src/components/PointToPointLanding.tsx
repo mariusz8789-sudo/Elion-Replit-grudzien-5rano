@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, MapPin, DollarSign, Truck, Shield, Clock, Star, ShoppingBag, Leaf, Users, BarChart3, Brain, Award, Box, Share2, TrendingUp, FileText, QrCode, Route } from "lucide-react";
+import { ArrowRight, MapPin, DollarSign, Truck, Shield, Clock, Star, ShoppingBag, Leaf, Users, BarChart3, Brain, Award, Box, Share2, TrendingUp, FileText, QrCode, Route, Boxes } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import logoPath from "@assets/file_0000000037a86243bd21599fc142fdaa_1760057642535.png";
@@ -185,7 +185,7 @@ export default function PointToPointLanding({ onGetQuote }: PointToPointLandingP
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-foreground mb-4 font-[Outfit]">
-              All 39 Platform Features
+              All 40 Platform Features
             </h2>
             <p className="text-lg text-muted-foreground">
               Complete logistics marketplace with advanced innovations
@@ -281,6 +281,13 @@ export default function PointToPointLanding({ onGetQuote }: PointToPointLandingP
               <Card className="p-4 hover-elevate cursor-pointer">
                 <Route className="w-6 h-6 text-primary mb-2" />
                 <h3 className="font-semibold text-sm">Road Services</h3>
+              </Card>
+            </Link>
+
+            <Link href="/capacity">
+              <Card className="p-4 hover-elevate cursor-pointer">
+                <Boxes className="w-6 h-6 text-blue-600 mb-2" />
+                <h3 className="font-semibold text-sm">Spare Capacity</h3>
               </Card>
             </Link>
           </div>

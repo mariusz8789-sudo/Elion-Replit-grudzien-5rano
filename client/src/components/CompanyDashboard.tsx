@@ -8,11 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2 } from "lucide-react";
+import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import type { Company, Driver, Vehicle, Booking } from "@shared/schema";
+import type { Company, Driver, Vehicle, Booking, CapacityPosting, CapacityBooking } from "@shared/schema";
 import VehicleManager from "./VehicleManager";
 import ReviewsSection from "./ReviewsSection";
 
@@ -311,6 +311,190 @@ export default function CompanyDashboard() {
   return <CompanyDashboardTabs companyId={user.companyId} />;
 }
 
+function CapacityTab({ companyId }: { companyId: string }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    fromAddress: "", toAddress: "", departureWindowStart: "", departureWindowEnd: "",
+    freeVolumeM3: "", freeWeightKg: "", freePalletSpaces: "", pricePerM3Eur: "", minimumPriceEur: "", isReturnLeg: false,
+  });
+
+  const { data: postings = [], isLoading } = useQuery<CapacityPosting[]>({
+    queryKey: ["/api/companies", companyId, "capacity-postings"],
+    queryFn: async () => {
+      const res = await fetch(`/api/companies/${companyId}/capacity-postings`, { credentials: "include" });
+      return res.ok ? res.json() : [];
+    },
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/capacity-postings", {
+        ...form,
+        freeVolumeM3: form.freeVolumeM3,
+        freeWeightKg: form.freeWeightKg,
+        freePalletSpaces: form.freePalletSpaces ? Number(form.freePalletSpaces) : 0,
+        pricePerM3Eur: form.pricePerM3Eur || undefined,
+        minimumPriceEur: form.minimumPriceEur || undefined,
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to publish");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "capacity-postings"] });
+      setOpen(false);
+      toast({ title: "Spare capacity published" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not publish", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">Spare Capacity</h2>
+          <p className="text-sm text-muted-foreground">Publish leftover space on a route you're already driving - e.g. "Madrid to Paris, 8m3 free."</p>
+        </div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-publish-capacity"><Boxes className="w-4 h-4 mr-2" />Publish Capacity</Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Publish spare capacity</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>From</Label>
+                  <Input value={form.fromAddress} onChange={(e) => setForm({ ...form, fromAddress: e.target.value })} placeholder="Madrid" data-testid="input-capacity-from" />
+                </div>
+                <div>
+                  <Label>To</Label>
+                  <Input value={form.toAddress} onChange={(e) => setForm({ ...form, toAddress: e.target.value })} placeholder="Paris" data-testid="input-capacity-to" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Departure window start</Label>
+                  <Input type="datetime-local" value={form.departureWindowStart} onChange={(e) => setForm({ ...form, departureWindowStart: e.target.value })} data-testid="input-capacity-window-start" />
+                </div>
+                <div>
+                  <Label>Departure window end</Label>
+                  <Input type="datetime-local" value={form.departureWindowEnd} onChange={(e) => setForm({ ...form, departureWindowEnd: e.target.value })} data-testid="input-capacity-window-end" />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label>Free volume (m³)</Label>
+                  <Input type="number" step="0.1" value={form.freeVolumeM3} onChange={(e) => setForm({ ...form, freeVolumeM3: e.target.value })} data-testid="input-capacity-volume" />
+                </div>
+                <div>
+                  <Label>Free weight (kg)</Label>
+                  <Input type="number" value={form.freeWeightKg} onChange={(e) => setForm({ ...form, freeWeightKg: e.target.value })} data-testid="input-capacity-weight" />
+                </div>
+                <div>
+                  <Label>Pallet spaces</Label>
+                  <Input type="number" value={form.freePalletSpaces} onChange={(e) => setForm({ ...form, freePalletSpaces: e.target.value })} data-testid="input-capacity-pallets" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Price per m³ (EUR, optional)</Label>
+                  <Input type="number" step="0.01" value={form.pricePerM3Eur} onChange={(e) => setForm({ ...form, pricePerM3Eur: e.target.value })} data-testid="input-capacity-price-per-m3" />
+                </div>
+                <div>
+                  <Label>Minimum price (EUR, optional)</Label>
+                  <Input type="number" step="0.01" value={form.minimumPriceEur} onChange={(e) => setForm({ ...form, minimumPriceEur: e.target.value })} data-testid="input-capacity-min-price" />
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => publishMutation.mutate()}
+                disabled={!form.fromAddress || !form.toAddress || !form.departureWindowStart || !form.departureWindowEnd || !form.freeVolumeM3 || !form.freeWeightKg || publishMutation.isPending}
+                data-testid="button-confirm-publish-capacity"
+              >
+                Publish
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      ) : postings.length === 0 ? (
+        <Card><CardContent className="p-8 text-center text-muted-foreground">No spare capacity published yet.</CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {postings.map((p) => (
+            <CapacityPostingRow key={p.id} posting={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CapacityPostingRow({ posting }: { posting: CapacityPosting }) {
+  const { toast } = useToast();
+
+  const { data: requests = [] } = useQuery<CapacityBooking[]>({
+    queryKey: ["/api/capacity-postings", posting.id, "requests"],
+    queryFn: async () => {
+      const res = await fetch(`/api/capacity-postings/${posting.id}/requests`, { credentials: "include" });
+      return res.ok ? res.json() : [];
+    },
+  });
+
+  const respondMutation = useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: "accept" | "reject" }) => {
+      const res = await apiRequest("PATCH", `/api/capacity-bookings/${id}/${action}`, {});
+      if (!res.ok) throw new Error((await res.json()).message || "Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/capacity-postings", posting.id, "requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies", posting.companyId, "capacity-postings"] });
+      toast({ title: "Updated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not update", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const pendingRequests = requests.filter((r) => r.status === "pending");
+
+  return (
+    <Card data-testid={`card-capacity-posting-${posting.id}`}>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium flex items-center gap-1"><MapPin className="w-4 h-4" />{posting.fromAddress} &rarr; {posting.toAddress}</p>
+            <p className="text-sm text-muted-foreground">
+              {posting.freeVolumeM3} m&sup3; free &middot; {posting.freeWeightKg} kg &middot; {posting.freePalletSpaces} pallets
+            </p>
+          </div>
+          <Badge variant={posting.status === "open" ? "default" : "secondary"}>{posting.status}</Badge>
+        </div>
+        {pendingRequests.length > 0 && (
+          <div className="space-y-2 border-t pt-2">
+            {pendingRequests.map((r) => (
+              <div key={r.id} className="flex items-center justify-between text-sm" data-testid={`row-capacity-request-${r.id}`}>
+                <span>{r.volumeM3} m&sup3; / {r.weightKg} kg &middot; &euro;{r.priceEur}</span>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => respondMutation.mutate({ id: r.id, action: "accept" })} data-testid={`button-accept-capacity-${r.id}`}>Accept</Button>
+                  <Button size="sm" variant="outline" onClick={() => respondMutation.mutate({ id: r.id, action: "reject" })} data-testid={`button-reject-capacity-${r.id}`}>Reject</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function CompanyDashboardTabs({ companyId }: { companyId: string }) {
   const { data: company } = useQuery<Company>({ queryKey: ["/api/companies", companyId] });
 
@@ -332,6 +516,7 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
           <TabsTrigger value="fleet" data-testid="tab-fleet"><Truck className="w-4 h-4 mr-2" />Fleet</TabsTrigger>
           <TabsTrigger value="drivers" data-testid="tab-drivers"><Users className="w-4 h-4 mr-2" />Drivers</TabsTrigger>
           <TabsTrigger value="bookings" data-testid="tab-open-bookings"><Package className="w-4 h-4 mr-2" />Open Bookings</TabsTrigger>
+          <TabsTrigger value="capacity" data-testid="tab-capacity"><Boxes className="w-4 h-4 mr-2" />Spare Capacity</TabsTrigger>
           <TabsTrigger value="reviews" data-testid="tab-company-reviews"><Star className="w-4 h-4 mr-2" />Reviews</TabsTrigger>
         </TabsList>
         <TabsContent value="fleet" className="pt-4">
@@ -342,6 +527,9 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
         </TabsContent>
         <TabsContent value="bookings" className="pt-4">
           <OpenBookingsTab companyId={companyId} />
+        </TabsContent>
+        <TabsContent value="capacity" className="pt-4">
+          <CapacityTab companyId={companyId} />
         </TabsContent>
         <TabsContent value="reviews" className="pt-4">
           <ReviewsSection companyId={companyId} />

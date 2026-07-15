@@ -325,6 +325,54 @@ export const resourceSharing = pgTable("resource_sharing", {
   providerCompanyIdIdx: index("resource_sharing_provider_company_id_idx").on(t.providerCompanyId),
 }));
 
+// === SPARE CAPACITY / EMPTY-RETURN MATCHING (transport-capacity marketplace) ===
+// A company already driving a route publishes leftover space on that specific leg
+// ("Barcelona -> Warsaw Friday, 12 m3 free, 1800 kg, 6 pallets") rather than a generic
+// resource listing - this is the "route-connected" capacity domain, distinct from
+// resourceSharing (which has no concept of a route/direction/departure window at all).
+export const capacityPostings = pgTable("capacity_postings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  driverId: varchar("driver_id").references(() => drivers.id),
+  vehicleId: varchar("vehicle_id").references(() => vehicles.id),
+  fromAddress: text("from_address").notNull(),
+  fromLat: decimal("from_lat", { precision: 10, scale: 7 }),
+  fromLng: decimal("from_lng", { precision: 10, scale: 7 }),
+  toAddress: text("to_address").notNull(),
+  toLat: decimal("to_lat", { precision: 10, scale: 7 }),
+  toLng: decimal("to_lng", { precision: 10, scale: 7 }),
+  departureWindowStart: timestamp("departure_window_start").notNull(),
+  departureWindowEnd: timestamp("departure_window_end").notNull(),
+  freeVolumeM3: decimal("free_volume_m3", { precision: 10, scale: 2 }).notNull(),
+  freeWeightKg: decimal("free_weight_kg", { precision: 10, scale: 2 }).notNull(),
+  freePalletSpaces: integer("free_pallet_spaces").notNull().default(0),
+  pricePerM3Eur: decimal("price_per_m3_eur", { precision: 10, scale: 2 }),
+  minimumPriceEur: decimal("minimum_price_eur", { precision: 10, scale: 2 }),
+  isReturnLeg: boolean("is_return_leg").notNull().default(false), // e.g. an otherwise-empty return journey
+  notes: text("notes"),
+  status: text("status").notNull().default("open"), // open, cancelled
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("capacity_postings_company_id_idx").on(t.companyId),
+  routeIdx: index("capacity_postings_route_idx").on(t.fromAddress, t.toAddress),
+  departureIdx: index("capacity_postings_departure_idx").on(t.departureWindowStart, t.departureWindowEnd),
+}));
+
+export const capacityBookings = pgTable("capacity_bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postingId: varchar("posting_id").notNull().references(() => capacityPostings.id),
+  customerId: varchar("customer_id").notNull().references(() => users.id),
+  volumeM3: decimal("volume_m3", { precision: 10, scale: 2 }).notNull(),
+  weightKg: decimal("weight_kg", { precision: 10, scale: 2 }).notNull(),
+  palletSpaces: integer("pallet_spaces").notNull().default(0),
+  priceEur: decimal("price_eur", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"), // pending, accepted, rejected, cancelled
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  postingIdIdx: index("capacity_bookings_posting_id_idx").on(t.postingId),
+  customerIdIdx: index("capacity_bookings_customer_id_idx").on(t.customerId),
+}));
+
 // === PROMO BOARD / ANNOUNCEMENTS ===
 export const announcements = pgTable("announcements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -897,6 +945,31 @@ export const insertResourceSharingSchema = createInsertSchema(resourceSharing).o
   pricePerDay: z.coerce.string().optional(),
 });
 
+export const insertCapacityPostingSchema = createInsertSchema(capacityPostings).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+}).extend({
+  departureWindowStart: z.coerce.date(),
+  departureWindowEnd: z.coerce.date(),
+  freeVolumeM3: z.coerce.string(),
+  freeWeightKg: z.coerce.string(),
+  freePalletSpaces: z.coerce.number().int().nonnegative().optional(),
+  pricePerM3Eur: z.coerce.string().optional(),
+  minimumPriceEur: z.coerce.string().optional(),
+});
+
+export const insertCapacityBookingSchema = createInsertSchema(capacityBookings).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+  priceEur: true,
+}).extend({
+  volumeM3: z.coerce.string(),
+  weightKg: z.coerce.string(),
+  palletSpaces: z.coerce.number().int().nonnegative().optional(),
+});
+
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
   id: true,
   createdAt: true,
@@ -1102,6 +1175,12 @@ export type StaffSharing = typeof staffSharing.$inferSelect;
 
 export type InsertResourceSharing = z.infer<typeof insertResourceSharingSchema>;
 export type ResourceSharing = typeof resourceSharing.$inferSelect;
+
+export type InsertCapacityPosting = z.infer<typeof insertCapacityPostingSchema>;
+export type CapacityPosting = typeof capacityPostings.$inferSelect;
+
+export type InsertCapacityBooking = z.infer<typeof insertCapacityBookingSchema>;
+export type CapacityBooking = typeof capacityBookings.$inferSelect;
 
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Announcement = typeof announcements.$inferSelect;

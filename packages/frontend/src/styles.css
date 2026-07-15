@@ -1619,3 +1619,8 @@ kbd {
   .ds-content { padding: 1rem 0.9rem 3rem; }
   .ds-nav-item span { display: none; }
 }
+
+/* V5 — home entry point to the discovery console */
+.timeline-cta-console { border-color: rgba(92,214,232,0.4); background: linear-gradient(100deg, rgba(92,214,232,0.10), rgba(167,139,250,0.08)); }
+.timeline-cta-console:hover { border-color: var(--cyan); }
+.timeline-cta-console .timeline-cta-icon { color: var(--cyan); display: grid; place-items: center; }

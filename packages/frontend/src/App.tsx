@@ -439,6 +439,14 @@ export default function App() {
             <span className="hud-corner hud-br" aria-hidden="true" />
           </div>
           <div className="section-label">Zacznij tutaj</div>
+          <button className="timeline-cta timeline-cta-console" onClick={() => { window.location.hash = '#/dashboard'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true"><Icon name="rocket" size={26} /></span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Discovery Console — Mission Control</span>
+              <span className="timeline-cta-sub">Konsola odkryć leków: realny status silników, Multi-Agent AI, graf wiedzy, Laboratory Readiness, Compute Cluster i pakiet inwestorski — wszystko na realnych danych.</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
           <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/timeline'; }}>
             <span className="timeline-cta-icon" aria-hidden="true">🌌</span>
             <span className="timeline-cta-text">

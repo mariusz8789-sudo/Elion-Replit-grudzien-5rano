@@ -19,6 +19,7 @@ import {
   insertDriverAvailabilitySchema, insertDriverTimeOffSchema, insertCargoItemSchema,
   insertVerificationDocumentSchema, insertApiKeySchema,
   insertSkillSchema, insertWorkerProfileSchema, insertWorkerSkillSchema, insertRecurringRouteSubscriptionSchema,
+  insertCompanyServiceSchema,
   offers, marketplaceListings, sharedRides, rideBookings, companies, bookings, drivers, vehicles,
   users, messages, reviews, services
 } from "@shared/schema";
@@ -2672,6 +2673,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ methodology: CREW_MATCH_METHODOLOGY, results });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // === PROFESSIONAL SERVICES (company-level service offerings, reuses the skills catalog) ===
+  app.get("/api/companies/:companyId/services", async (req, res) => {
+    try {
+      res.json(await storage.getCompanyServices(req.params.companyId));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/companies/:companyId/services", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.companyId !== req.params.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const entry = insertCompanyServiceSchema.parse(req.body);
+      const result = await storage.setCompanyService(req.params.companyId, entry);
+      res.status(201).json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/company-services/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (!user.companyId) return res.status(403).json({ message: "Not authorized" });
+      const deleted = await storage.removeCompanyService(req.params.id, user.companyId);
+      if (!deleted) return res.status(404).json({ message: "Service offering not found" });
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/professional-services/search", async (req, res) => {
+    try {
+      const { skillId, category } = req.query as { skillId?: string; category?: string };
+      const results = await storage.searchCompanyServices({ skillId, category });
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

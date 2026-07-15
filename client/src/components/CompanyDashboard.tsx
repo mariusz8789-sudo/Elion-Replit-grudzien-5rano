@@ -10,11 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench } from "lucide-react";
+import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import type { Company, Driver, Vehicle, Booking, CapacityPosting, CapacityBooking, WorkerProfile, Skill, WorkerSkill } from "@shared/schema";
+import type { Company, Driver, Vehicle, Booking, CapacityPosting, CapacityBooking, WorkerProfile, Skill, WorkerSkill, CompanyService } from "@shared/schema";
 import VehicleManager from "./VehicleManager";
 import ReviewsSection from "./ReviewsSection";
 
@@ -682,6 +682,106 @@ function CrewTab({ companyId }: { companyId: string }) {
   );
 }
 
+function ServicesTab({ companyId }: { companyId: string }) {
+  const { toast } = useToast();
+  const { data: allSkills = [] } = useQuery<Skill[]>({ queryKey: ["/api/skills"] });
+  const { data: offered = [], isLoading } = useQuery<Array<CompanyService & { skill: Skill }>>({
+    queryKey: [`/api/companies/${companyId}/services`],
+  });
+  const [skillId, setSkillId] = useState("");
+  const [description, setDescription] = useState("");
+  const [priceFromEur, setPriceFromEur] = useState("");
+
+  const offeredSkillIds = new Set(offered.map((o) => o.skillId));
+  const availableSkills = allSkills.filter((s) => !offeredSkillIds.has(s.id));
+
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/companies/${companyId}/services`, {
+        skillId,
+        description: description || undefined,
+        priceFromEur: priceFromEur || undefined,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/services`] });
+      setSkillId("");
+      setDescription("");
+      setPriceFromEur("");
+      toast({ title: "Service added", description: "Customers can now find this offering." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not add service", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/company-services/${id}`, {});
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/services`] }),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Briefcase className="w-5 h-5" />Professional Services</CardTitle>
+        <CardDescription>Declare which professional services your company offers - customers can search and find you by service.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading && <div className="h-16 bg-muted animate-pulse rounded-lg" />}
+        <div className="flex flex-wrap gap-2">
+          {offered.map((o) => (
+            <Badge key={o.id} variant="secondary" className="flex items-center gap-1 pr-1" data-testid={`offered-service-${o.id}`}>
+              {o.skill.name}
+              {o.priceFromEur && <span className="text-xs opacity-75">from €{o.priceFromEur}</span>}
+              <button
+                type="button"
+                className="ml-1 rounded-full hover:bg-background/50 p-0.5"
+                onClick={() => removeMutation.mutate(o.id)}
+                data-testid={`button-remove-service-${o.id}`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+          {!isLoading && offered.length === 0 && (
+            <p className="text-sm text-muted-foreground" data-testid="text-no-services">No services listed yet.</p>
+          )}
+        </div>
+
+        <div className="grid md:grid-cols-4 gap-3 items-end pt-2 border-t">
+          <div className="md:col-span-2">
+            <Label htmlFor="service-skill">Service</Label>
+            <Select value={skillId} onValueChange={setSkillId}>
+              <SelectTrigger id="service-skill" data-testid="select-service-skill">
+                <SelectValue placeholder="Select a service" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableSkills.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="service-price">From price (€)</Label>
+            <Input id="service-price" type="number" step="0.01" value={priceFromEur} onChange={(e) => setPriceFromEur(e.target.value)} data-testid="input-service-price" />
+          </div>
+          <Button onClick={() => addMutation.mutate()} disabled={!skillId || addMutation.isPending} data-testid="button-add-service">
+            Add Service
+          </Button>
+          <div className="md:col-span-4">
+            <Label htmlFor="service-description">Description (optional)</Label>
+            <Textarea id="service-description" value={description} onChange={(e) => setDescription(e.target.value)} data-testid="input-service-description" rows={2} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CompanyDashboardTabs({ companyId }: { companyId: string }) {
   const { data: company } = useQuery<Company>({ queryKey: ["/api/companies", companyId] });
 
@@ -705,6 +805,7 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
           <TabsTrigger value="bookings" data-testid="tab-open-bookings"><Package className="w-4 h-4 mr-2" />Open Bookings</TabsTrigger>
           <TabsTrigger value="capacity" data-testid="tab-capacity"><Boxes className="w-4 h-4 mr-2" />Spare Capacity</TabsTrigger>
           <TabsTrigger value="crew" data-testid="tab-crew"><Wrench className="w-4 h-4 mr-2" />Crew</TabsTrigger>
+          <TabsTrigger value="services" data-testid="tab-services"><Briefcase className="w-4 h-4 mr-2" />Services</TabsTrigger>
           <TabsTrigger value="reviews" data-testid="tab-company-reviews"><Star className="w-4 h-4 mr-2" />Reviews</TabsTrigger>
         </TabsList>
         <TabsContent value="fleet" className="pt-4">
@@ -721,6 +822,9 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
         </TabsContent>
         <TabsContent value="crew" className="pt-4">
           <CrewTab companyId={companyId} />
+        </TabsContent>
+        <TabsContent value="services" className="pt-4">
+          <ServicesTab companyId={companyId} />
         </TabsContent>
         <TabsContent value="reviews" className="pt-4">
           <ReviewsSection companyId={companyId} />

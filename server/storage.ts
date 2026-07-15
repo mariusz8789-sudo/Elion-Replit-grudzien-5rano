@@ -40,6 +40,7 @@ import {
   type WorkerProfile, type InsertWorkerProfile,
   type WorkerSkill, type InsertWorkerSkill,
   type RecurringRouteSubscription, type InsertRecurringRouteSubscription,
+  type CompanyService, type InsertCompanyService,
   users, companies, drivers, vehicles, services, bookings, quotes, offers,
   messages, attachments, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
@@ -48,7 +49,7 @@ import {
   calls, verificationDocuments, deviceFingerprints, riskScores, auditLogs,
   apiKeys, webhookSubscriptions, webhookDeliveries,
   capacityPostings, capacityBookings, environmentalCalculations,
-  skills, workerProfiles, workerSkills, recurringRouteSubscriptions
+  skills, workerProfiles, workerSkills, recurringRouteSubscriptions, companyServices
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, or, gte, lte, lt, isNull, inArray, ilike } from "drizzle-orm";
@@ -160,6 +161,12 @@ export interface IStorage {
   getExpiringVerificationDocuments(withinDays: number): Promise<VerificationDocument[]>;
   markVerificationDocumentExpiryNotified(id: string): Promise<void>;
 
+  // Professional services operations (company-level service offerings, reusing the skills catalog)
+  getCompanyServices(companyId: string): Promise<Array<CompanyService & { skill: Skill }>>;
+  setCompanyService(companyId: string, entry: InsertCompanyService): Promise<CompanyService>;
+  removeCompanyService(id: string, companyId: string): Promise<boolean>;
+  searchCompanyServices(filter: { skillId?: string; category?: string }): Promise<Array<CompanyService & { skill: Skill; company: Company }>>;
+
   // Notification operations
   getUserNotifications(userId: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
@@ -168,7 +175,7 @@ export interface IStorage {
   // Marketplace operations
   getAllMarketplaceListings(): Promise<MarketplaceListing[]>;
   getMarketplaceListing(id: string): Promise<MarketplaceListing | undefined>;
-  createMarketplaceListing(listing: InsertMarketplaceListing): Promise<MarketplaceListing>;
+  createMarketplaceListing(listing: InsertMarketplaceListing, userId: string, companyId: string | null): Promise<MarketplaceListing>;
   updateMarketplaceListing(id: string, available: boolean): Promise<MarketplaceListing | undefined>;
   
   // Staff sharing operations
@@ -978,6 +985,47 @@ export class DbStorage implements IStorage {
     await db.update(verificationDocuments).set({ expiryNotifiedAt: new Date() }).where(eq(verificationDocuments.id, id));
   }
 
+  // === PROFESSIONAL SERVICES OPERATIONS ===
+  async getCompanyServices(companyId: string): Promise<Array<CompanyService & { skill: Skill }>> {
+    const rows = await db.select({ companyService: companyServices, skill: skills })
+      .from(companyServices)
+      .innerJoin(skills, eq(companyServices.skillId, skills.id))
+      .where(eq(companyServices.companyId, companyId));
+    return rows.map((r) => ({ ...r.companyService, skill: r.skill }));
+  }
+
+  async setCompanyService(companyId: string, entry: InsertCompanyService): Promise<CompanyService> {
+    const result = await db.insert(companyServices)
+      .values({ ...entry, companyId })
+      .onConflictDoUpdate({
+        target: [companyServices.companyId, companyServices.skillId],
+        set: { description: entry.description, priceFromEur: entry.priceFromEur, active: entry.active ?? true },
+      })
+      .returning();
+    return result[0];
+  }
+
+  async removeCompanyService(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(companyServices)
+      .where(and(eq(companyServices.id, id), eq(companyServices.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async searchCompanyServices(filter: { skillId?: string; category?: string }): Promise<Array<CompanyService & { skill: Skill; company: Company }>> {
+    const conditions = [eq(companyServices.active, true)];
+    if (filter.skillId) conditions.push(eq(companyServices.skillId, filter.skillId));
+    if (filter.category) conditions.push(eq(skills.category, filter.category));
+
+    const rows = await db.select({ companyService: companyServices, skill: skills, company: companies })
+      .from(companyServices)
+      .innerJoin(skills, eq(companyServices.skillId, skills.id))
+      .innerJoin(companies, eq(companyServices.companyId, companies.id))
+      .where(and(...conditions))
+      .orderBy(desc(companies.rating));
+    return rows.map((r) => ({ ...r.companyService, skill: r.skill, company: r.company }));
+  }
+
   // === NOTIFICATION OPERATIONS ===
   async getUserNotifications(userId: string): Promise<Notification[]> {
     return await db.select().from(notifications)
@@ -1012,8 +1060,8 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async createMarketplaceListing(insertListing: InsertMarketplaceListing): Promise<MarketplaceListing> {
-    const result = await db.insert(marketplaceListings).values(insertListing).returning();
+  async createMarketplaceListing(insertListing: InsertMarketplaceListing, userId: string, companyId: string | null): Promise<MarketplaceListing> {
+    const result = await db.insert(marketplaceListings).values({ ...insertListing, userId, companyId }).returning();
     return result[0];
   }
 

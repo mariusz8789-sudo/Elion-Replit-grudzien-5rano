@@ -120,6 +120,24 @@ export const workerSkills = pgTable("worker_skills", {
   profileSkillUnique: unique().on(t.profileId, t.skillId),
 }));
 
+// A company-level declaration "we offer this professional service" (Furniture assembly,
+// Kitchen installation, Electrical work, Office relocation, ...) - reuses the same skills
+// catalog as the Skills Engine/Team Matching rather than a parallel service-name list, so a
+// company's offerings and its workers' individual skills always refer to the same taxonomy.
+export const companyServices = pgTable("company_services", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  skillId: varchar("skill_id").notNull().references(() => skills.id),
+  description: text("description"),
+  priceFromEur: decimal("price_from_eur", { precision: 10, scale: 2 }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("company_services_company_id_idx").on(t.companyId),
+  skillIdIdx: index("company_services_skill_id_idx").on(t.skillId),
+  companySkillUnique: unique().on(t.companyId, t.skillId),
+}));
+
 // === SERVICES & BOOKINGS ===
 export const services = pgTable("services", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1098,6 +1116,14 @@ export const insertWorkerSkillSchema = createInsertSchema(workerSkills).omit({
   createdAt: true,
 });
 
+export const insertCompanyServiceSchema = createInsertSchema(companyServices).omit({
+  id: true,
+  companyId: true,
+  createdAt: true,
+}).extend({
+  priceFromEur: z.coerce.string().optional(),
+});
+
 export const insertBadgeSchema = createInsertSchema(badges).omit({
   id: true,
   createdAt: true,
@@ -1321,6 +1347,9 @@ export type WorkerProfile = typeof workerProfiles.$inferSelect;
 
 export type InsertWorkerSkill = z.infer<typeof insertWorkerSkillSchema>;
 export type WorkerSkill = typeof workerSkills.$inferSelect;
+
+export type InsertCompanyService = z.infer<typeof insertCompanyServiceSchema>;
+export type CompanyService = typeof companyServices.$inferSelect;
 
 export type InsertBadge = z.infer<typeof insertBadgeSchema>;
 export type Badge = typeof badges.$inferSelect;

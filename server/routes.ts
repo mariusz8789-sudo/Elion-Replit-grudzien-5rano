@@ -27,7 +27,7 @@ import { getCargoRecognitionProvider } from "./services/cargoRecognition";
 import { getTranslationProvider } from "./services/translation";
 import { checkGpsAnomaly, checkDuplicateAccount } from "./services/fraud";
 import { calculateCapacityBookingPrice } from "./lib/capacityPricing";
-import { calculateTripEnvironmentalSummary, BASELINE_VEHICLE_CLASS, calculateEmissionsKg, normalizeVehicleType, EMISSION_FACTORS_KG_PER_KM } from "./services/environmentalCalculation";
+import { calculateTripEnvironmentalSummary, BASELINE_VEHICLE_CLASS, calculateEmissionsKg, normalizeVehicleType, EMISSION_FACTORS_KG_PER_KM, ECO_METHODOLOGY, ECO_METHODOLOGY_VERSION } from "./services/environmentalCalculation";
 import { dispatchWebhookEvent } from "./services/webhooks";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
@@ -2188,6 +2188,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ message: "Route calculation failed: " + error.message });
+    }
+  });
+
+  // Real GreenRoute: geocodes both addresses and asks Mapbox for alternative routes, then
+  // picks the lowest-CO2 alternative using the same shared emission methodology as the rest
+  // of the app. Never fabricates a "greener" route - if Mapbox has no alternative for this
+  // pair, it honestly reports that the standard route is the only one available.
+  app.post("/api/eco/optimize-route", async (req, res) => {
+    try {
+      if (!isMapboxConfigured()) {
+        return res.status(503).json({ message: "Mapping is not configured", available: false });
+      }
+      const { origin, destination, vehicleType } = req.body;
+      if (!origin || !destination) {
+        return res.status(400).json({ message: "Origin and destination are required" });
+      }
+
+      const geocode = async (address: string) => {
+        const response = await getGeocodingClient().forwardGeocode({ query: address, limit: 1 }).send();
+        if (!response.body.features.length) return null;
+        return response.body.features[0].geometry.coordinates as [number, number];
+      };
+
+      const [originCoords, destCoords] = await Promise.all([geocode(origin), geocode(destination)]);
+      if (!originCoords) return res.status(404).json({ message: `Location not found: ${origin}` });
+      if (!destCoords) return res.status(404).json({ message: `Location not found: ${destination}` });
+
+      const directionsResponse = await getDirectionsClient()
+        .getDirections({
+          profile: "driving",
+          waypoints: [
+            { coordinates: originCoords },
+            { coordinates: destCoords },
+          ],
+          geometries: "geojson",
+          alternatives: true,
+        })
+        .send();
+
+      if (!directionsResponse.body.routes.length) {
+        return res.status(404).json({ message: "No route found between these locations", available: false });
+      }
+
+      const normalizedVehicleType = normalizeVehicleType(vehicleType);
+      interface RouteCandidate { distanceKm: number; durationMin: number; co2Kg: number; geometry: unknown }
+      const routes: RouteCandidate[] = directionsResponse.body.routes.map((route: any) => {
+        const distanceKm = route.distance / 1000;
+        return {
+          distanceKm,
+          durationMin: Math.round(route.duration / 60),
+          co2Kg: calculateEmissionsKg(distanceKm, normalizedVehicleType),
+          geometry: route.geometry,
+        };
+      });
+
+      const standard = routes[0];
+      const optimized = routes.reduce((best: RouteCandidate, r: RouteCandidate) => (r.co2Kg < best.co2Kg ? r : best), routes[0]);
+      const hasGreenerAlternative = optimized.co2Kg < standard.co2Kg;
+
+      // 1 litre of diesel combustion emits ~2.68 kg CO2 (standard published conversion factor)
+      // - used only to translate a real CO2 delta into a real fuel-volume delta, not invented.
+      const DIESEL_KG_CO2_PER_LITRE = 2.68;
+      const co2SavedKg = Math.round((standard.co2Kg - optimized.co2Kg) * 100) / 100;
+
+      res.json({
+        available: true,
+        alternativeRouteCount: routes.length,
+        hasGreenerAlternative,
+        vehicleType: normalizedVehicleType,
+        standard: { distanceKm: Math.round(standard.distanceKm * 100) / 100, durationMin: standard.durationMin, co2Kg: standard.co2Kg, geometry: standard.geometry },
+        optimized: { distanceKm: Math.round(optimized.distanceKm * 100) / 100, durationMin: optimized.durationMin, co2Kg: optimized.co2Kg, geometry: optimized.geometry },
+        distanceSavedKm: Math.round((standard.distanceKm - optimized.distanceKm) * 100) / 100,
+        timeSavedMin: standard.durationMin - optimized.durationMin,
+        co2SavedKg,
+        fuelSavedLiters: Math.round((co2SavedKg / DIESEL_KG_CO2_PER_LITRE) * 100) / 100,
+        methodology: ECO_METHODOLOGY,
+        methodologyVersion: ECO_METHODOLOGY_VERSION,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Route optimization failed: " + error.message });
     }
   });
 

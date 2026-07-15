@@ -652,8 +652,59 @@ CREATE INDEX IF NOT EXISTS idx_rejection_motifs_key ON rejection_motifs(mission_
 CREATE INDEX IF NOT EXISTS idx_candidate_dossiers_candidate ON candidate_dossiers(candidate_id, created_at);
 `;
 
+// Scientific Resource Layer (3E) + Reality Bridge (3K). Resources record source
+// identity/type/license/version/content-hash/parser/validation. Experimental results
+// import structured measurements with artifacts (never a typed sentence). Prediction
+// errors seed prediction-vs-reality performance. Append-only.
+const SCHEMA_V16 = `
+CREATE TABLE IF NOT EXISTS scientific_resources (
+  id             TEXT PRIMARY KEY,
+  resource_id    TEXT NOT NULL,
+  source_identity TEXT,
+  source_type    TEXT NOT NULL,
+  license        TEXT,
+  version        TEXT,
+  content_hash   TEXT NOT NULL,
+  parser_version TEXT,
+  validation_status TEXT NOT NULL,
+  meta_json      TEXT NOT NULL DEFAULT '{}',
+  imported_at    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS experimental_results (
+  id              TEXT PRIMARY KEY,
+  external_id     TEXT NOT NULL,
+  lab_identity    TEXT,
+  protocol_ref    TEXT,
+  candidate_id    TEXT,
+  measurement_type TEXT NOT NULL,
+  result_class    TEXT NOT NULL,
+  units           TEXT,
+  result_value    REAL,
+  uncertainty     REAL,
+  artifact_ref    TEXT,
+  artifact_hash   TEXT,
+  import_status   TEXT NOT NULL,
+  reviewer_status TEXT NOT NULL DEFAULT 'PENDING',
+  created_at      INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS prediction_errors (
+  id             TEXT PRIMARY KEY,
+  candidate_id   TEXT,
+  measurement_type TEXT,
+  predicted      REAL,
+  measured       REAL,
+  abs_error      REAL,
+  strategy_key   TEXT,
+  created_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_resources_rid ON scientific_resources(resource_id, imported_at);
+CREATE INDEX IF NOT EXISTS idx_experimental_candidate ON experimental_results(candidate_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_prediction_errors_strategy ON prediction_errors(strategy_key, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 16) db.exec(SCHEMA_V16);
   if (version < 15) db.exec(SCHEMA_V15);
   if (version < 14) db.exec(SCHEMA_V14);
   if (version < 13) db.exec(SCHEMA_V13);
@@ -694,7 +745,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 15) db.exec('PRAGMA user_version = 15');
+  if (version < 16) db.exec('PRAGMA user_version = 16');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1949,4 +2000,44 @@ export function saveCandidateDossier(db, d) {
 export function getCandidateDossier(db, candidateId) {
   const r = db.prepare('SELECT * FROM candidate_dossiers WHERE candidate_id = ? ORDER BY created_at DESC LIMIT 1').get(candidateId);
   return r ? { id: r.id, candidateId: r.candidate_id, missionId: r.mission_id, dossier: JSON.parse(r.dossier_json), contentHash: r.content_hash, croReadiness: r.cro_readiness, createdAt: r.created_at } : null;
+}
+
+/* ---- Scientific Resource Layer (3E) + Reality Bridge (3K) ---- */
+function toResource(r) {
+  if (!r) return null;
+  return { id: r.id, resourceId: r.resource_id, sourceIdentity: r.source_identity, sourceType: r.source_type, license: r.license, version: r.version, contentHash: r.content_hash, parserVersion: r.parser_version, validationStatus: r.validation_status, meta: JSON.parse(r.meta_json), importedAt: r.imported_at };
+}
+export function saveResource(db, r) {
+  const id = r.id ?? newId();
+  db.prepare(`INSERT INTO scientific_resources (id, resource_id, source_identity, source_type, license, version, content_hash, parser_version, validation_status, meta_json, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, r.resourceId, r.sourceIdentity ?? null, r.sourceType, r.license ?? null, r.version ?? null, r.contentHash, r.parserVersion ?? null, r.validationStatus, JSON.stringify(r.meta ?? {}), Date.now());
+  return toResource(db.prepare('SELECT * FROM scientific_resources WHERE id = ?').get(id));
+}
+export function getResource(db, resourceId) {
+  return toResource(db.prepare('SELECT * FROM scientific_resources WHERE resource_id = ? ORDER BY imported_at DESC LIMIT 1').get(resourceId));
+}
+export function listResources(db) { return db.prepare('SELECT * FROM scientific_resources ORDER BY imported_at ASC').all().map(toResource); }
+
+function toExperimentalResult(r) {
+  if (!r) return null;
+  return { id: r.id, externalId: r.external_id, labIdentity: r.lab_identity, protocolRef: r.protocol_ref, candidateId: r.candidate_id, measurementType: r.measurement_type, resultClass: r.result_class, units: r.units, resultValue: r.result_value, uncertainty: r.uncertainty, artifactRef: r.artifact_ref, artifactHash: r.artifact_hash, importStatus: r.import_status, reviewerStatus: r.reviewer_status, createdAt: r.created_at };
+}
+export function saveExperimentalResult(db, e) {
+  const id = e.id ?? newId();
+  db.prepare(`INSERT INTO experimental_results (id, external_id, lab_identity, protocol_ref, candidate_id, measurement_type, result_class, units, result_value, uncertainty, artifact_ref, artifact_hash, import_status, reviewer_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, e.externalId, e.labIdentity ?? null, e.protocolRef ?? null, e.candidateId ?? null, e.measurementType, e.resultClass, e.units ?? null, e.resultValue ?? null, e.uncertainty ?? null, e.artifactRef ?? null, e.artifactHash ?? null, e.importStatus, e.reviewerStatus ?? 'PENDING', Date.now());
+  return toExperimentalResult(db.prepare('SELECT * FROM experimental_results WHERE id = ?').get(id));
+}
+export function listExperimentalResults(db, candidateId) {
+  return db.prepare('SELECT * FROM experimental_results WHERE candidate_id = ? ORDER BY created_at ASC').all(candidateId).map(toExperimentalResult);
+}
+export function savePredictionError(db, p) {
+  const id = p.id ?? newId();
+  db.prepare(`INSERT INTO prediction_errors (id, candidate_id, measurement_type, predicted, measured, abs_error, strategy_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, p.candidateId ?? null, p.measurementType ?? null, p.predicted ?? null, p.measured ?? null, p.absError ?? null, p.strategyKey ?? null, Date.now());
+  return db.prepare('SELECT * FROM prediction_errors WHERE id = ?').get(id);
+}
+export function listPredictionErrors(db, strategyKey) {
+  const rows = strategyKey ? db.prepare('SELECT * FROM prediction_errors WHERE strategy_key = ? ORDER BY created_at ASC').all(strategyKey) : db.prepare('SELECT * FROM prediction_errors ORDER BY created_at ASC').all();
+  return rows.map((r) => ({ id: r.id, candidateId: r.candidate_id, measurementType: r.measurement_type, predicted: r.predicted, measured: r.measured, absError: r.abs_error, strategyKey: r.strategy_key, createdAt: r.created_at }));
 }

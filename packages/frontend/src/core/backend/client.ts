@@ -398,6 +398,87 @@ export async function fetchScienceCapabilities(): Promise<ApiResult<ScienceCapab
   return r.ok ? { ok: true, data: r.data.capabilities } : r;
 }
 
+/* ---------------- V5 premium screens — real V4 module wiring ---------------- */
+
+export interface ComputeResources {
+  version: string;
+  cpu: { cores: number; model?: string; loadAvg?: number[] };
+  memory: { totalGb: number; freeGb: number };
+  gpu: { available: boolean; reason?: string; detail?: string };
+  docker: { available: boolean; note?: string };
+  kubernetes: { available: boolean; note?: string };
+  slurm: { available: boolean; note?: string };
+  jobQueue: { available: boolean; note?: string };
+  distributedProcessing: { available: boolean; note?: string };
+}
+export async function fetchComputeResources(): Promise<ApiResult<ComputeResources>> {
+  const r = await request<{ resources: ComputeResources }>('GET', '/science/compute-resources');
+  return r.ok ? { ok: true, data: r.data.resources } : r;
+}
+
+export interface ScientificMemory {
+  version: string;
+  ownCampaigns: { status: string; campaignsLearnedFrom: number; samples: number; learnedPolicy: unknown };
+  externalSources: { source: string; kind: string; license: string; status: string; reason?: string | null; licenceCompliance: string }[];
+  externalLearningStatus: string;
+  honesty: string;
+}
+export async function fetchScientificMemory(): Promise<ApiResult<ScientificMemory>> {
+  const r = await request<{ memory: ScientificMemory }>('GET', '/science/memory');
+  return r.ok ? { ok: true, data: r.data.memory } : r;
+}
+
+export async function fetchAgentRoles(): Promise<ApiResult<{ roles: string[]; version: string }>> {
+  return request<{ roles: string[]; version: string }>('GET', '/science/agent-roles');
+}
+
+export interface AgentAssessment {
+  role: string; assessment: string; recommendation: string; concerns: string[];
+  reasoningStatus: string; reasoningNote?: string | null;
+}
+export interface AgentPanel {
+  status: string; version: string; reasoningLayer: string;
+  agents: AgentAssessment[];
+  consensus: { proceed: boolean; verdict: string; openConcerns: string[]; nextAction: string };
+  didGenesisDiscoverADrug: string; honesty: string; reason?: string;
+}
+export async function runMultiAgentPanel(dossier: unknown): Promise<ApiResult<AgentPanel>> {
+  const r = await request<{ panel: AgentPanel }>('POST', '/science/multi-agent', { body: { dossier } });
+  return r.ok ? { ok: true, data: r.data.panel } : r;
+}
+
+export interface LabReadiness {
+  status: string; version: string;
+  dossier?: {
+    identity: { smiles: string; inchi: string | null; inchiKey: string | null };
+    proposedStructure: { smiles: string; molecularFormula: string };
+    mass: { averageMolWt: number; exactMolWt: number };
+    properties: Record<string, number | boolean>;
+    structuralAlerts: { name: string }[] | null;
+    predictedTargets: { epistemicStatus?: string; offTargetProteins?: { protein: string; gene: string; probability: number; flag: string }[]; status?: string; reason?: string };
+    risks: { overallOffTargetRisk?: string; selectivity?: number; toxicityFlags?: { liability: string; probability: number }[]; status?: string };
+    rationale: string;
+    proposedInVitroTests: string[]; proposedInVivoTests: string[];
+    proposedClinicalPlan: { status: string; note: string; outline: string[] };
+    readinessHash: string; didGenesisDiscoverADrug: string; honesty: string;
+  };
+  reason?: string;
+}
+export async function buildLabReadiness(smiles: string, admetPredictions?: Record<string, number>, scientificQuestion?: string): Promise<ApiResult<LabReadiness>> {
+  const r = await request<{ readiness: LabReadiness }>('POST', '/science/laboratory-readiness', { body: { candidate: { smiles, admetPredictions }, scientificQuestion } });
+  return r.ok ? { ok: true, data: r.data.readiness } : r;
+}
+
+export interface InvestorPackage {
+  version: string;
+  documents: { investorReport: string; pharmaReport: string; grantReport: string; pitchDeck: string; ipPackage: string; patentDraft: string };
+  didGenesisDiscoverADrug: string; disclaimer: string;
+}
+export async function buildInvestorPackage(dossier: unknown, validation: unknown, meta?: Record<string, unknown>): Promise<ApiResult<InvestorPackage>> {
+  const r = await request<{ package: InvestorPackage }>('POST', '/science/investor-package', { body: { dossier, validation, meta } });
+  return r.ok ? { ok: true, data: r.data.package } : r;
+}
+
 export async function listTargets(token: string, projectId: string): Promise<ApiResult<Target[]>> {
   const r = await request<{ targets: Target[] }>('GET', `/projects/${projectId}/targets`, { token });
   return r.ok ? { ok: true, data: r.data.targets } : r;

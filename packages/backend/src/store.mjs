@@ -730,8 +730,45 @@ CREATE INDEX IF NOT EXISTS idx_bio_entities_mission ON bio_entities(mission_id, 
 CREATE INDEX IF NOT EXISTS idx_bio_relations_mission ON bio_relations(mission_id);
 `;
 
+// Formal Reality Kernel (Phase 4 G/L): persisted formal relations with dimensions +
+// derivation status, and formal failure regions (Necropolis 2). LLM-generated
+// equations are UNVERIFIED_FORMALIZATION until symbolically/computationally checked.
+const SCHEMA_V18 = `
+CREATE TABLE IF NOT EXISTS formal_relations (
+  id             TEXT PRIMARY KEY,
+  mission_id     TEXT,
+  kind           TEXT NOT NULL,
+  expression     TEXT,
+  symbols_json   TEXT NOT NULL DEFAULT '[]',
+  dimension_json TEXT NOT NULL DEFAULT '{}',
+  status         TEXT NOT NULL,
+  source         TEXT,
+  assumptions_json TEXT NOT NULL DEFAULT '[]',
+  validity_domain_json TEXT NOT NULL DEFAULT '{}',
+  evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+  content_hash   TEXT,
+  created_at     INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS formal_failure_regions (
+  id             TEXT PRIMARY KEY,
+  mission_id     TEXT,
+  failure_class  TEXT NOT NULL,
+  context        TEXT,
+  parameter_vector_json TEXT NOT NULL DEFAULT '{}',
+  normalized_json TEXT NOT NULL DEFAULT '{}',
+  assumptions_json TEXT NOT NULL DEFAULT '[]',
+  failure_mode   TEXT,
+  verification_state TEXT,
+  content_hash   TEXT,
+  created_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_formal_relations_mission ON formal_relations(mission_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_formal_failures_mission ON formal_failure_regions(mission_id, failure_class);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 18) db.exec(SCHEMA_V18);
   if (version < 17) db.exec(SCHEMA_V17);
   if (version < 16) db.exec(SCHEMA_V16);
   if (version < 15) db.exec(SCHEMA_V15);
@@ -774,7 +811,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 17) db.exec('PRAGMA user_version = 17');
+  if (version < 18) db.exec('PRAGMA user_version = 18');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -2096,4 +2133,32 @@ export function saveBioRelation(db, r) {
 export function listBioRelations(db, missionId) {
   return db.prepare('SELECT * FROM bio_relations WHERE mission_id = ? ORDER BY created_at ASC').all(missionId)
     .map((r) => ({ id: r.id, missionId: r.mission_id, fromEntity: r.from_entity, toEntity: r.to_entity, relationType: r.relation_type, evidenceClass: r.evidence_class, detail: JSON.parse(r.detail_json), createdAt: r.created_at }));
+}
+
+/* ---- Formal Reality Kernel (Phase 4 G/L) ---- */
+function toFormalRelation(r) {
+  if (!r) return null;
+  return { id: r.id, missionId: r.mission_id, kind: r.kind, expression: r.expression, symbols: JSON.parse(r.symbols_json), dimension: JSON.parse(r.dimension_json), status: r.status, source: r.source, assumptions: JSON.parse(r.assumptions_json), validityDomain: JSON.parse(r.validity_domain_json), evidenceRefs: JSON.parse(r.evidence_refs_json), contentHash: r.content_hash, createdAt: r.created_at };
+}
+export function saveFormalRelation(db, f) {
+  const id = f.id ?? newId();
+  db.prepare(`INSERT INTO formal_relations (id, mission_id, kind, expression, symbols_json, dimension_json, status, source, assumptions_json, validity_domain_json, evidence_refs_json, content_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, f.missionId ?? null, f.kind, f.expression ?? null, JSON.stringify(f.symbols ?? []), JSON.stringify(f.dimension ?? {}), f.status, f.source ?? null, JSON.stringify(f.assumptions ?? []), JSON.stringify(f.validityDomain ?? {}), JSON.stringify(f.evidenceRefs ?? []), f.contentHash ?? null, Date.now());
+  return toFormalRelation(db.prepare('SELECT * FROM formal_relations WHERE id = ?').get(id));
+}
+export function listFormalRelations(db, missionId) { return db.prepare('SELECT * FROM formal_relations WHERE mission_id = ? ORDER BY created_at ASC').all(missionId).map(toFormalRelation); }
+
+function toFailureRegion(r) {
+  if (!r) return null;
+  return { id: r.id, missionId: r.mission_id, failureClass: r.failure_class, context: r.context, parameterVector: JSON.parse(r.parameter_vector_json), normalized: JSON.parse(r.normalized_json), assumptions: JSON.parse(r.assumptions_json), failureMode: r.failure_mode, verificationState: r.verification_state, contentHash: r.content_hash, createdAt: r.created_at };
+}
+export function saveFailureRegion(db, f) {
+  const id = f.id ?? newId();
+  db.prepare(`INSERT INTO formal_failure_regions (id, mission_id, failure_class, context, parameter_vector_json, normalized_json, assumptions_json, failure_mode, verification_state, content_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, f.missionId ?? null, f.failureClass, f.context ?? null, JSON.stringify(f.parameterVector ?? {}), JSON.stringify(f.normalized ?? {}), JSON.stringify(f.assumptions ?? []), f.failureMode ?? null, f.verificationState ?? null, f.contentHash ?? null, Date.now());
+  return toFailureRegion(db.prepare('SELECT * FROM formal_failure_regions WHERE id = ?').get(id));
+}
+export function listFailureRegions(db, missionId, { context = null } = {}) {
+  const rows = context ? db.prepare('SELECT * FROM formal_failure_regions WHERE mission_id = ? AND context = ? ORDER BY created_at ASC').all(missionId, context) : db.prepare('SELECT * FROM formal_failure_regions WHERE mission_id = ? ORDER BY created_at ASC').all(missionId);
+  return rows.map(toFailureRegion);
 }

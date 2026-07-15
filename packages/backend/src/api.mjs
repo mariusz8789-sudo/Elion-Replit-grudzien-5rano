@@ -85,6 +85,12 @@ import * as dockingAdapter from './compute/dockingAdapter.mjs';
 import * as pilotReport from './cognitive/pilotReport.mjs';
 import * as discovery from './cognitive/discoveryController.mjs';
 import { getTruthAnalysis, listTruthAnalyses, listDiscoveryCampaigns, getDiscoveryCampaign } from './store.mjs';
+// V5 UI wiring — expose the existing V4 cognitive/validation modules over the API.
+import { detectComputeResources } from './cognitive/computeResources.mjs';
+import { accumulateMemory } from './cognitive/scientificMemory.mjs';
+import { runAgentPanel, AGENT_ROLES, MULTI_AGENT_VERSION } from './cognitive/multiAgent.mjs';
+import { buildLaboratoryReadiness } from './cognitive/laboratoryReadiness.mjs';
+import { generateInvestorPackage } from './validation/investorEdition.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -155,6 +161,23 @@ export function handleApi(db, ctx) {
   // ---- Discovery-science capabilities (V3) — real runtime status for the Discovery Workspace ----
   if (seg[0] === 'science') {
     if (seg[1] === 'capabilities' && seg.length === 2 && method === 'GET') return ok({ capabilities: scienceCapabilities() });
+
+    // V5 — real UI wiring for the V4 cognitive/validation modules. Public reads/computes
+    // (no persisted user data); each delegates to the existing, tested implementation.
+    // Compute Cluster (HPC/GPU) — real environment probe (CPU/RAM/GPU/Docker/K8s/Slurm/queue).
+    if (seg[1] === 'compute-resources' && seg.length === 2 && method === 'GET') return ok({ resources: detectComputeResources() });
+    // Scientific Memory — own-campaign learning status + licence-tagged external-source registry.
+    if (seg[1] === 'memory' && seg.length === 2 && method === 'GET') {
+      const dossiers = Array.isArray(body?.completedDossiers) ? body.completedDossiers : [];
+      return ok({ memory: accumulateMemory({ completedDossiers: dossiers }) });
+    }
+    // Multi-Agent panel — roster (GET) + live rule-based assessment of a supplied dossier (POST).
+    if (seg[1] === 'agent-roles' && seg.length === 2 && method === 'GET') return ok({ roles: AGENT_ROLES, version: MULTI_AGENT_VERSION });
+    if (seg[1] === 'multi-agent' && seg.length === 2 && method === 'POST') return ok({ panel: runAgentPanel(body?.dossier ?? null) });
+    // Laboratory Readiness — real RDKit-backed dossier for one candidate (SMILES [+ ADMET]).
+    if (seg[1] === 'laboratory-readiness' && seg.length === 2 && method === 'POST') return ok({ readiness: buildLaboratoryReadiness(body?.candidate ?? {}, { scientificQuestion: body?.scientificQuestion ?? null }) });
+    // Investor Edition — deterministic investor/pharma/grant/IP package from real campaign+validation data.
+    if (seg[1] === 'investor-package' && seg.length === 2 && method === 'POST') return ok({ package: generateInvestorPackage({ dossier: body?.dossier ?? null, validation: body?.validation ?? null, meta: body?.meta ?? {} }) });
     return err(404, 'not_found');
   }
 

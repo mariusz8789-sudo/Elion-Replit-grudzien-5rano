@@ -702,8 +702,37 @@ CREATE INDEX IF NOT EXISTS idx_experimental_candidate ON experimental_results(ca
 CREATE INDEX IF NOT EXISTS idx_prediction_errors_strategy ON prediction_errors(strategy_key, created_at);
 `;
 
+// Bio Foundation (3D): machine-readable biological entities + typed relations, with
+// an explicit biological evidence class. Chemistry alone does not explain disease.
+const SCHEMA_V17 = `
+CREATE TABLE IF NOT EXISTS bio_entities (
+  id             TEXT PRIMARY KEY,
+  mission_id     TEXT,
+  entity_type    TEXT NOT NULL,
+  name           TEXT NOT NULL,
+  identifier     TEXT,
+  evidence_class TEXT NOT NULL,
+  source         TEXT,
+  meta_json      TEXT NOT NULL DEFAULT '{}',
+  created_at     INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS bio_relations (
+  id            TEXT PRIMARY KEY,
+  mission_id    TEXT,
+  from_entity   TEXT NOT NULL,
+  to_entity     TEXT NOT NULL,
+  relation_type TEXT NOT NULL,
+  evidence_class TEXT NOT NULL,
+  detail_json   TEXT NOT NULL DEFAULT '{}',
+  created_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bio_entities_mission ON bio_entities(mission_id, entity_type);
+CREATE INDEX IF NOT EXISTS idx_bio_relations_mission ON bio_relations(mission_id);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 17) db.exec(SCHEMA_V17);
   if (version < 16) db.exec(SCHEMA_V16);
   if (version < 15) db.exec(SCHEMA_V15);
   if (version < 14) db.exec(SCHEMA_V14);
@@ -745,7 +774,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 16) db.exec('PRAGMA user_version = 16');
+  if (version < 17) db.exec('PRAGMA user_version = 17');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -2040,4 +2069,31 @@ export function savePredictionError(db, p) {
 export function listPredictionErrors(db, strategyKey) {
   const rows = strategyKey ? db.prepare('SELECT * FROM prediction_errors WHERE strategy_key = ? ORDER BY created_at ASC').all(strategyKey) : db.prepare('SELECT * FROM prediction_errors ORDER BY created_at ASC').all();
   return rows.map((r) => ({ id: r.id, candidateId: r.candidate_id, measurementType: r.measurement_type, predicted: r.predicted, measured: r.measured, absError: r.abs_error, strategyKey: r.strategy_key, createdAt: r.created_at }));
+}
+
+/* ---- Bio Foundation (3D) ---- */
+function toBioEntity(r) {
+  if (!r) return null;
+  return { id: r.id, missionId: r.mission_id, entityType: r.entity_type, name: r.name, identifier: r.identifier, evidenceClass: r.evidence_class, source: r.source, meta: JSON.parse(r.meta_json), createdAt: r.created_at };
+}
+export function saveBioEntity(db, e) {
+  const id = e.id ?? newId();
+  db.prepare(`INSERT INTO bio_entities (id, mission_id, entity_type, name, identifier, evidence_class, source, meta_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, e.missionId ?? null, e.entityType, e.name, e.identifier ?? null, e.evidenceClass, e.source ?? null, JSON.stringify(e.meta ?? {}), Date.now());
+  return toBioEntity(db.prepare('SELECT * FROM bio_entities WHERE id = ?').get(id));
+}
+export function getBioEntity(db, id) { return toBioEntity(db.prepare('SELECT * FROM bio_entities WHERE id = ?').get(id)); }
+export function listBioEntities(db, missionId, { entityType = null } = {}) {
+  const rows = entityType ? db.prepare('SELECT * FROM bio_entities WHERE mission_id = ? AND entity_type = ? ORDER BY created_at ASC').all(missionId, entityType) : db.prepare('SELECT * FROM bio_entities WHERE mission_id = ? ORDER BY created_at ASC').all(missionId);
+  return rows.map(toBioEntity);
+}
+export function saveBioRelation(db, r) {
+  const id = r.id ?? newId();
+  db.prepare(`INSERT INTO bio_relations (id, mission_id, from_entity, to_entity, relation_type, evidence_class, detail_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, r.missionId ?? null, r.fromEntity, r.toEntity, r.relationType, r.evidenceClass, JSON.stringify(r.detail ?? {}), Date.now());
+  return db.prepare('SELECT * FROM bio_relations WHERE id = ?').get(id);
+}
+export function listBioRelations(db, missionId) {
+  return db.prepare('SELECT * FROM bio_relations WHERE mission_id = ? ORDER BY created_at ASC').all(missionId)
+    .map((r) => ({ id: r.id, missionId: r.mission_id, fromEntity: r.from_entity, toEntity: r.to_entity, relationType: r.relation_type, evidenceClass: r.evidence_class, detail: JSON.parse(r.detail_json), createdAt: r.created_at }));
 }

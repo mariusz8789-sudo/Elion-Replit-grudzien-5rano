@@ -1,0 +1,128 @@
+{
+  "schema": "genesis-benchmark-report/1",
+  "suiteVersion": "genesis-scientific-validation-suite/1",
+  "generatedAt": "(run timestamp omitted for deterministic hashing)",
+  "engineVersions": {
+    "RDKit": "2026.03.3",
+    "ADMET-AI": "2.0.1",
+    "Vina": "1.2.7"
+  },
+  "metrics": {
+    "descriptorAccuracy": {
+      "status": "COMPLETED",
+      "n": 13,
+      "mae": 0,
+      "maxAbsError": 0,
+      "pearsonR": 1,
+      "pass": true,
+      "labelProvenance": "DETERMINISTIC_CHEMISTRY"
+    },
+    "reproducibility": [
+      {
+        "label": "descriptorAccuracy",
+        "reproducible": true,
+        "runs": 3,
+        "hash": "c738fd811e3407b6b121d42e10882aa6f540ec2c75deb33ce746e7c30dab9967"
+      },
+      {
+        "label": "rankingRecovery",
+        "reproducible": true,
+        "runs": 3,
+        "hash": "f0db7ef441c5b16588934d12b8dabd5f9fe11efb5f0a935edcc3d8f0dd1324b6"
+      },
+      {
+        "label": "truthDecisions",
+        "reproducible": true,
+        "runs": 3,
+        "hash": "a545081e724ee4580db31fe2bdc1969316a4ff67fa003ca889d9670d3d64b828"
+      },
+      {
+        "label": "campaign",
+        "reproducible": true,
+        "runs": 2,
+        "hash": "a7474406cc1d1b35318a7216d9323154da91e0a6e60325d1be17d7eaac4c2987"
+      }
+    ],
+    "rankingStability": {
+      "spearmanRho": 1,
+      "identicalOrder": true,
+      "stable": true
+    },
+    "rankingRecovery": {
+      "status": "COMPLETED",
+      "labelProvenance": "COMPUTATIONAL_CRITERION",
+      "n": 13,
+      "positives": 5,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "topK": {
+        "top1": {
+          "precisionAtK": 1,
+          "recallAtK": 0.2,
+          "hitAtK": 1
+        },
+        "top5": {
+          "precisionAtK": 1,
+          "recallAtK": 1,
+          "hitAtK": 1
+        },
+        "top10": {
+          "precisionAtK": 0.5,
+          "recallAtK": 1,
+          "hitAtK": 1
+        }
+      },
+      "enrichment": {
+        "ef10": 2.6,
+        "ef20": 2.6
+      },
+      "rocAuc": 1
+    },
+    "truth": {
+      "status": "COMPLETED",
+      "n": 5,
+      "accuracy": 1,
+      "consistency": 1
+    },
+    "mcre": {
+      "status": "COMPLETED",
+      "n": 3,
+      "accuracy": 1,
+      "consistency": 1
+    }
+  },
+  "researchQuality": {
+    "pass": true,
+    "score": 1,
+    "passedChecks": 8,
+    "totalChecks": 8
+  },
+  "readiness": {
+    "overall": 0.7493,
+    "overallBand": "MEDIUM",
+    "dimensions": {
+      "research": {
+        "score": 0.95,
+        "band": "HIGH"
+      },
+      "biotech": {
+        "score": 0.6183,
+        "band": "MEDIUM"
+      },
+      "pharma": {
+        "score": 0.55,
+        "band": "MEDIUM"
+      },
+      "grant": {
+        "score": 0.9,
+        "band": "HIGH"
+      },
+      "investor": {
+        "score": 0.728,
+        "band": "MEDIUM"
+      }
+    }
+  },
+  "didGenesisDiscoverADrug": "NO"
+}

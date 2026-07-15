@@ -15,6 +15,7 @@ import { runMdBenchmark } from './mdBenchmark.mjs';
 import { runAdmetBenchmark } from './admetBenchmark.mjs';
 import { runDockingBenchmark } from './dockingBenchmark.mjs';
 import { runProteinBenchmark } from './proteinBenchmark.mjs';
+import { runValidationBenchmark } from './validationBenchmark.mjs';
 
 const BENCHMARKS = [
   { id: 'rdkit', run: runRdkitBenchmark },
@@ -23,6 +24,7 @@ const BENCHMARKS = [
   { id: 'admet', run: runAdmetBenchmark },
   { id: 'docking', run: runDockingBenchmark },
   { id: 'protein', run: runProteinBenchmark },
+  { id: 'scientific-validation', run: runValidationBenchmark },
 ];
 
 /** Strips non-deterministic timing fields (wall-clock ms varies run-to-run) before hashing. */

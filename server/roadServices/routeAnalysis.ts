@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { geocodingClient, directionsClient } from "../mapbox";
+import { getGeocodingClient, getDirectionsClient, isMapboxConfigured } from "../mapbox";
 import { env } from "../env";
 import { ROUTE_REQUIREMENT_CATEGORIES, type RouteRequirementCategory } from "@shared/schema";
 
@@ -68,7 +68,7 @@ const ROUTE_ANALYSIS_JSON_SCHEMA = {
 };
 
 async function fetchRouteGeometry(waypoints: RouteWaypoint[]): Promise<{ distanceKm: number; durationMinutes: number; geometry: unknown; coordinates: [number, number][]; alternatives: RouteAlternative[] }> {
-  const response = await directionsClient
+  const response = await getDirectionsClient()
     .getDirections({
       profile: "driving",
       waypoints: waypoints.map((w) => ({ coordinates: [w.lng, w.lat] })),
@@ -116,7 +116,7 @@ async function detectCountrySequence(coordinates: [number, number][]): Promise<s
     orderedIndexes.map(async (idx) => {
       try {
         const [lng, lat] = coordinates[idx];
-        const res = await geocodingClient
+        const res = await getGeocodingClient()
           .reverseGeocode({ query: [lng, lat], types: ["country"], limit: 1 })
           .send();
         const feature = res.body.features?.[0];
@@ -218,6 +218,9 @@ async function detectRequirements(countryCodes: string[], vehicle: VehicleProfil
 }
 
 export async function analyzeRoute(waypoints: RouteWaypoint[], vehicle: VehicleProfile): Promise<RouteAnalysisResult> {
+  if (!isMapboxConfigured()) {
+    throw new Error("Route analysis is not configured: MAPBOX_TOKEN is not set");
+  }
   const { distanceKm, durationMinutes, geometry, coordinates, alternatives } = await fetchRouteGeometry(waypoints);
   const countryCodes = await detectCountrySequence(coordinates);
   const requirements = await detectRequirements(countryCodes, vehicle, distanceKm);

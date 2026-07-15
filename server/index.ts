@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
@@ -116,7 +116,7 @@ const apiLimiter = rateLimit({
   message: "Too many requests, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.user as { id?: string } | undefined)?.id || req.ip || "unknown",
+  keyGenerator: (req) => (req.user as { id?: string } | undefined)?.id || ipKeyGenerator(req.ip || "unknown"),
 });
 
 app.use("/api", apiLimiter);

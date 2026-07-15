@@ -2,8 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
-import { stripe } from "./stripe";
-import { geocodingClient, directionsClient } from "./mapbox";
+import { getStripe, isStripeConfigured } from "./stripe";
+import { getGeocodingClient, getDirectionsClient, isMapboxConfigured } from "./mapbox";
 import { passport } from "./auth";
 import { db } from "./db";
 import { eq, and, gte, sql } from "drizzle-orm";
@@ -30,7 +30,7 @@ import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
 import { validateDataUrl } from "./lib/dataUrl";
 import { getBroadcaster } from "./socket";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { requireAuth, requireAdmin } from "./lib/authMiddleware";
 import { handleRoadServiceOrderPayment } from "./roadServices/router";
 
@@ -69,7 +69,7 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `${req.ip}:${req.body?.email || req.body?.phone || ""}`,
+  keyGenerator: (req) => `${ipKeyGenerator(req.ip || "unknown")}:${req.body?.email || req.body?.phone || ""}`,
   message: { message: "Too many login attempts. Please try again later." },
 });
 
@@ -81,7 +81,7 @@ const aiLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.user as User | undefined)?.id || req.ip || "unknown",
+  keyGenerator: (req) => (req.user as User | undefined)?.id || ipKeyGenerator(req.ip || "unknown"),
   message: { message: "Too many AI requests. Please try again in a minute." },
 });
 
@@ -488,13 +488,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     if (status === "delivered") {
-      // Capture the escrowed payment now that the delivery is confirmed
+      // Capture the escrowed payment now that the delivery is confirmed. A capture
+      // failure must not be silently swallowed - it means the platform delivered a
+      // service without collecting payment, so we record it as "failed" (distinct from
+      // "authorized"/"captured") so ops can see and retry it instead of it looking paid.
       if (booking.paymentIntentId && booking.paymentStatus === "authorized") {
-        try {
-          await stripe.paymentIntents.capture(booking.paymentIntentId);
-          await storage.updateBookingPayment(booking.id, booking.paymentIntentId, "captured");
-        } catch (error: any) {
-          console.error("Failed to capture escrowed payment:", error.message);
+        if (!isStripeConfigured()) {
+          console.error(`Cannot capture payment for booking ${booking.id}: Stripe is not configured`);
+          await storage.updateBookingPayment(booking.id, booking.paymentIntentId, "failed");
+        } else {
+          try {
+            await getStripe().paymentIntents.capture(booking.paymentIntentId);
+            await storage.updateBookingPayment(booking.id, booking.paymentIntentId, "captured");
+          } catch (error: any) {
+            console.error(`Failed to capture escrowed payment for booking ${booking.id}:`, error.message);
+            await storage.updateBookingPayment(booking.id, booking.paymentIntentId, "failed");
+          }
         }
       }
 
@@ -1368,13 +1377,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // === STRIPE PAYMENT ROUTES ===
   app.post("/api/create-payment-intent", requireAuth, async (req, res) => {
     try {
+      if (!isStripeConfigured()) {
+        return res.status(503).json({ message: "Payments are not configured" });
+      }
       const { amount, bookingId } = req.body;
-      
+
       if (!amount || amount <= 0) {
         return res.status(400).json({ message: "Valid amount is required" });
       }
 
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await getStripe().paymentIntents.create({
         amount: Math.round(amount * 100),
         currency: "usd",
         automatic_payment_methods: { enabled: true },
@@ -1402,6 +1414,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/companies/:id/subscribe", requireAuth, async (req, res) => {
     try {
+      if (!isStripeConfigured()) {
+        return res.status(503).json({ message: "Payments are not configured" });
+      }
       const company = await storage.getCompany(req.params.id);
       if (!company) {
         return res.status(404).json({ message: "Company not found" });
@@ -1434,7 +1449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return `${appOrigin}${fallbackPath}`;
       };
 
-      const session = await stripe.checkout.sessions.create({
+      const session = await getStripe().checkout.sessions.create({
         mode: "payment",
         line_items: [{
           quantity: 1,
@@ -1556,8 +1571,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/stripe-webhook", async (req, res) => {
+    if (!isStripeConfigured()) {
+      return res.status(503).send("Payments are not configured");
+    }
     const sig = req.headers["stripe-signature"];
-    
+
     if (!sig) {
       return res.status(400).send("No signature");
     }
@@ -1567,7 +1585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const event = stripe.webhooks.constructEvent(
+      const event = getStripe().webhooks.constructEvent(
         req.rawBody,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET || ""
@@ -1645,13 +1663,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // === MAPBOX GEOCODING ROUTES ===
   app.post("/api/geocode", async (req, res) => {
     try {
+      if (!isMapboxConfigured()) {
+        return res.status(503).json({ message: "Mapping is not configured" });
+      }
       const { address } = req.body;
-      
+
       if (!address) {
         return res.status(400).json({ message: "Address is required" });
       }
 
-      const response = await geocodingClient
+      const response = await getGeocodingClient()
         .forwardGeocode({
           query: address,
           limit: 1,
@@ -1676,13 +1697,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/calculate-route", async (req, res) => {
     try {
+      if (!isMapboxConfigured()) {
+        return res.status(503).json({ message: "Mapping is not configured" });
+      }
       const { pickupLng, pickupLat, deliveryLng, deliveryLat, vehicleType } = req.body;
-      
+
       if (!pickupLng || !pickupLat || !deliveryLng || !deliveryLat) {
         return res.status(400).json({ message: "All coordinates are required" });
       }
 
-      const response = await directionsClient
+      const response = await getDirectionsClient()
         .getDirections({
           profile: "driving",
           waypoints: [

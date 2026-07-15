@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import type { User } from "@shared/schema";
 import { requireAuth, requireAdmin } from "../lib/authMiddleware";
-import { stripe } from "../stripe";
+import { getStripe, isStripeConfigured } from "../stripe";
 import * as roadStorage from "./storage";
 import { analyzeRoute, type RouteWaypoint } from "./routeAnalysis";
 import { calculateTripCostSummary, estimateFuelCostEur } from "./costCalculator";
@@ -21,7 +21,7 @@ const roadServicesAiLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.user as User | undefined)?.id || req.ip || "unknown",
+  keyGenerator: (req) => (req.user as User | undefined)?.id || ipKeyGenerator(req.ip || "unknown"),
   message: { message: "Too many Road Services AI requests. Please try again in a minute." },
 });
 
@@ -195,6 +195,9 @@ roadServicesRouter.post("/products/:id/click", async (req: Request, res: Respons
 // === Orders / purchases ===
 roadServicesRouter.post("/orders", requireAuth, async (req: Request, res: Response) => {
   try {
+    if (!isStripeConfigured()) {
+      return res.status(503).json({ message: "Payments are not configured" });
+    }
     const user = req.user as User;
     const { productId, routeId, quantity } = req.body as { productId: string; routeId?: string; quantity?: number };
 
@@ -221,7 +224,7 @@ roadServicesRouter.post("/orders", requireAuth, async (req: Request, res: Respon
       commissionEur: pricing.commissionEur,
     });
 
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await getStripe().paymentIntents.create({
       amount: Math.round(pricing.totalPriceEur * 100),
       currency: "eur",
       automatic_payment_methods: { enabled: true },

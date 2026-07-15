@@ -4,9 +4,32 @@ import mbxGeocoding from "@mapbox/mapbox-sdk/services/geocoding";
 import mbxDirections from "@mapbox/mapbox-sdk/services/directions";
 import { env } from "./env";
 
-if (!env.MAPBOX_TOKEN) {
-  throw new Error("MAPBOX_TOKEN is required");
+// Constructed lazily so a deployment without a Mapbox token configured can still boot
+// and serve every non-map feature; every call site must check isMapboxConfigured() first
+// and return a clear 503/error rather than calling these unconditionally.
+let geocodingClientInstance: ReturnType<typeof mbxGeocoding> | null = null;
+let directionsClientInstance: ReturnType<typeof mbxDirections> | null = null;
+
+export function isMapboxConfigured(): boolean {
+  return Boolean(env.MAPBOX_TOKEN);
 }
 
-export const geocodingClient = mbxGeocoding({ accessToken: env.MAPBOX_TOKEN });
-export const directionsClient = mbxDirections({ accessToken: env.MAPBOX_TOKEN });
+export function getGeocodingClient(): ReturnType<typeof mbxGeocoding> {
+  if (!geocodingClientInstance) {
+    if (!env.MAPBOX_TOKEN) {
+      throw new Error("Mapbox is not configured: MAPBOX_TOKEN is not set");
+    }
+    geocodingClientInstance = mbxGeocoding({ accessToken: env.MAPBOX_TOKEN });
+  }
+  return geocodingClientInstance;
+}
+
+export function getDirectionsClient(): ReturnType<typeof mbxDirections> {
+  if (!directionsClientInstance) {
+    if (!env.MAPBOX_TOKEN) {
+      throw new Error("Mapbox is not configured: MAPBOX_TOKEN is not set");
+    }
+    directionsClientInstance = mbxDirections({ accessToken: env.MAPBOX_TOKEN });
+  }
+  return directionsClientInstance;
+}

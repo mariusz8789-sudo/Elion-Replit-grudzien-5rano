@@ -1,8 +1,8 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import jwt from "jsonwebtoken";
 import swaggerUi from "swagger-ui-express";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 import fs from "fs";
 import path from "path";
 import { storage } from "./storage";
@@ -23,7 +23,7 @@ const partnerRateLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.header("x-api-key") || req.ip || "unknown").toString(),
+  keyGenerator: (req) => req.header("x-api-key")?.toString() || ipKeyGenerator(req.ip || "unknown"),
   message: { message: "Rate limit exceeded. Max 120 requests per minute per API key." },
 });
 

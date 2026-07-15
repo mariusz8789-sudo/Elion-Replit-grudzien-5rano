@@ -22,17 +22,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 const BUNDLE = path.resolve(opt('--out', path.resolve(__dirname, '../campaigns/real-scientific-campaign-001/bundle')));
+// PATH B — externally supplied official payloads (NO egress from this runner): the operator has
+// already downloaded the OFFICIAL payloads and placed them + SUPPLIED_INPUTS.json in --supplied.
+const SUPPLIED = opt('--supplied', null);
 const node = process.execPath;
 const run = (script, args = []) => spawnSync(node, [path.join(__dirname, script), ...args], { stdio: 'inherit' }).status ?? 1;
 
 console.log('╔══ GENESIS CAMPAIGN #001 — ONE-COMMAND EXTERNAL EXECUTION ══╗');
 
-// 1) Preflight — fail closed.
-if (run('preflight-campaign-001.mjs') !== 0) { console.error('ABORT: preflight failed (deps or mandatory network). Nothing acquired, nothing fabricated.'); process.exit(2); }
+if (SUPPLIED) {
+  // Offline assembly from operator-supplied official payloads — no preflight, no network.
+  console.log(`[mode] EXTERNALLY-SUPPLIED PAYLOADS (offline) from ${path.resolve(SUPPLIED)}`);
+  if (run('build-bundle-from-supplied.mjs', ['--supplied', path.resolve(SUPPLIED), '--out', BUNDLE]) !== 0) {
+    console.error('ABORT: offline bundle assembly failed closed — a supplied payload was missing/unusable/mislabelled. Nothing fabricated.');
+    process.exit(2);
+  }
+} else {
+  // 1) Preflight — fail closed.
+  if (run('preflight-campaign-001.mjs') !== 0) { console.error('ABORT: preflight failed (deps or mandatory network). Nothing acquired, nothing fabricated.'); process.exit(2); }
 
-// 2) Acquire — the builder fails closed (exit 2) if any mandatory source is missing.
-const buildArgs = ['--out', BUNDLE, ...(argv.includes('--with-structure') ? ['--with-structure'] : [])];
-if (run('build-real-campaign-001-bundle.mjs', buildArgs) !== 0) { console.error('ABORT: acquisition failed closed — mandatory real evidence unavailable. See acquisition-diagnostics.json.'); process.exit(2); }
+  // 2) Acquire — the builder fails closed (exit 2) if any mandatory source is missing.
+  const buildArgs = ['--out', BUNDLE, ...(argv.includes('--with-structure') ? ['--with-structure'] : [])];
+  if (run('build-real-campaign-001-bundle.mjs', buildArgs) !== 0) { console.error('ABORT: acquisition failed closed — mandatory real evidence unavailable. See acquisition-diagnostics.json.'); process.exit(2); }
+}
 
 // 3) Verify the bundle (SHA-256 / provenance / identity) — fail closed.
 try {
@@ -44,4 +56,6 @@ try {
 // 4) Execute the campaign on the REAL bundle → dossier.
 if (run('genesis-campaign-001.mjs', ['--bundle', BUNDLE]) !== 0) { console.error('ABORT: campaign execution failed.'); process.exit(1); }
 
-console.log('╚══ DONE — Campaign #001 executed on genuine evidence. DID GENESIS FIND A DRUG? NO. ══╝');
+// Provenance (genuine VERIFIED_BUNDLE vs a TEST_FIXTURE self-check) is stamped in the bundle
+// manifest and reflected verbatim in the dossier — the runner does not assert it.
+console.log('╚══ DONE — Campaign #001 executed. Provenance = bundle manifest ingestionMode. DID GENESIS FIND A DRUG? NO. ══╝');

@@ -63,6 +63,30 @@ GENESIS_PYTHON=python3 node scripts/run-campaign-001.mjs
 (Replit egress is open by default; if a proxy is configured, set standard `HTTPS_PROXY`. Omit
 `--with-structure` on constrained Replit plans — RCSB mmCIF download + docking prep are heavy.)
 
+## Path B — externally supplied official payloads (NO egress from the runner)
+
+If the Genesis machine cannot reach the official hosts (this agent sandbox, an air-gapped host),
+download the payloads on ANY networked machine and let Genesis assemble the bundle **offline**:
+
+```bash
+# 1. On a networked machine — download OFFICIAL payloads per REAL_CAMPAIGN_INPUT_REQUIREMENTS.json
+mkdir -p campaigns/real-scientific-campaign-001/supplied
+cp campaigns/real-scientific-campaign-001/SUPPLIED_INPUTS_TEMPLATE.json \
+   campaigns/real-scientific-campaign-001/supplied/SUPPLIED_INPUTS.json
+curl -s "https://rest.uniprot.org/uniprotkb/<ACC>.json"                 -o campaigns/real-scientific-campaign-001/supplied/uniprot_<ACC>.json
+curl -s "https://www.ebi.ac.uk/chembl/api/data/activity/<ACT>.json"     -o campaigns/real-scientific-campaign-001/supplied/chembl_activity_<ACT>.json
+curl -s "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/<CID>/property/CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON" \
+                                                                        -o campaigns/real-scientific-campaign-001/supplied/pubchem_cid_<CID>.json
+#   Edit SUPPLIED_INPUTS.json so each `file` names the saved payload; keep ingestionMode VERIFIED_BUNDLE.
+
+# 2. On the (possibly offline) Genesis machine — ONE command: assemble → verify → execute → dossier
+node scripts/run-campaign-001.mjs --supplied campaigns/real-scientific-campaign-001/supplied
+```
+
+The offline builder computes real SHA-256 from the supplied bytes, validates each payload parses to
+a usable entity of its claimed type, and **fails closed** on any stub / wrong-type / mislabelled /
+missing-mandatory input. CHEMBL + PUBCHEM + UNIPROT are mandatory.
+
 ## Docking (optional, real — never faked)
 
 `--with-structure` downloads the BRAF mmCIF from RCSB. mmCIF existence is **not** docking-ready.

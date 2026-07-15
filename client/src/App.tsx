@@ -35,7 +35,6 @@ const EcoRewardPage = lazy(() => import("@/pages/EcoRewardPage"));
 const SmartLoad3D = lazy(() => import("@/pages/SmartLoad3D"));
 const WorkShareHub = lazy(() => import("@/pages/WorkShareHub"));
 const FleetPredictor = lazy(() => import("@/pages/FleetPredictor"));
-const InsurancePage = lazy(() => import("@/pages/InsurancePage"));
 const CarbonLedger = lazy(() => import("@/pages/CarbonLedger"));
 const QRDispatch = lazy(() => import("@/pages/QRDispatch"));
 const Plans = lazy(() => import("@/pages/Plans"));
@@ -263,7 +262,10 @@ function Router() {
         <Route path="/smartload" component={SmartLoad3D} />
         <Route path="/workshare" component={WorkShareHub} />
         <Route path="/fleetpredict" component={FleetPredictor} />
-        <Route path="/insurance" component={InsurancePage} />
+        {/* Insurance is a real Road Services category (route-detected requirements with
+            a genuine Stripe checkout) - this used to be a separate page with a fully
+            client-side fake premium calculator and a non-functional "Buy" button. */}
+        <Route path="/insurance" component={RoadServices} />
         <Route path="/carbon-ledger" component={CarbonLedger} />
         <Route path="/qr-dispatch" component={QRDispatch} />
         <Route path="/plans" component={Plans} />

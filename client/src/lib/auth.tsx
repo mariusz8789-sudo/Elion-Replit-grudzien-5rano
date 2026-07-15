@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "./queryClient";
+import { getDeviceFingerprintHash } from "./deviceFingerprint";
 import type { User } from "@shared/schema";
 
 type AuthUser = Omit<User, "password">;
@@ -14,6 +15,15 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Reports this browser's fingerprint after a successful login/registration so the server's
+// duplicate-account heuristic (server/services/fraud.ts) has something to compare against.
+// Never blocks the auth flow - a failed report just means this one signal is missing.
+function reportDeviceFingerprint() {
+  getDeviceFingerprintHash()
+    .then((fingerprintHash) => apiRequest("POST", "/api/fraud/device-fingerprint", { fingerprintHash }))
+    .catch(() => undefined);
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -41,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (data: AuthUser) => {
       setUser(data);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      reportDeviceFingerprint();
     },
   });
 
@@ -52,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (data: AuthUser) => {
       setUser(data);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      reportDeviceFingerprint();
     },
   });
 

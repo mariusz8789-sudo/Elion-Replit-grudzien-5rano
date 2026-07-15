@@ -37,6 +37,26 @@ import { handleRoadServiceOrderPayment } from "./roadServices/router";
 const userCanAccessBooking = (user: User, booking: Booking) =>
   userCanAccessBookingImpl(user, booking, (id) => storage.getDriver(id));
 
+// Shared by the tracking-creation route (runs automatically on every new GPS update) and
+// the standalone /check-anomaly endpoint (for an on-demand re-check), so the detection
+// logic and its risk-score/audit-log side effects live in exactly one place.
+async function runGpsAnomalyCheck(bookingId: string, ip: string | undefined) {
+  const updates = await storage.getBookingTracking(bookingId);
+  if (updates.length < 2) return { anomalous: false as const };
+
+  const [latest, previous] = [updates[updates.length - 1], updates[updates.length - 2]];
+  const result = checkGpsAnomaly(
+    { lat: Number(previous.lat), lng: Number(previous.lng), createdAt: new Date(previous.createdAt) },
+    { lat: Number(latest.lat), lng: Number(latest.lng), createdAt: new Date(latest.createdAt) },
+  );
+
+  if (result.anomalous) {
+    await storage.recordRiskScore("booking", bookingId, 50, [result.reason!]);
+    await storage.writeAuditLog(undefined, "gps_anomaly_detected", "booking", bookingId, result, ip);
+  }
+  return result;
+}
+
 // Base64 data-URL upload limits, shared by cargo photos, chat attachments, and
 // verification documents.
 const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"] as const;
@@ -1265,6 +1285,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized to report tracking for this booking" });
       }
       const tracking = await storage.createTrackingUpdate(trackingData);
+      // Fire-and-forget: a slow/failed fraud check must never block a real-time GPS update
+      // from being recorded and broadcast.
+      runGpsAnomalyCheck(trackingData.bookingId, req.ip).catch((err) => {
+        console.error("GPS anomaly check failed:", err.message);
+      });
       res.status(201).json(tracking);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -2228,7 +2253,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(await storage.getAuditLogs(targetType, targetId));
   });
 
-  // GPS anomaly detection: called whenever a new tracking update is created
+  // On-demand re-check (e.g. an admin reviewing a flagged trip); the same check also runs
+  // automatically on every new tracking update - see runGpsAnomalyCheck's call site below.
   app.post("/api/tracking/:bookingId/check-anomaly", requireAuth, async (req, res) => {
     const anomalyBooking = await storage.getBooking(req.params.bookingId);
     if (!anomalyBooking) {
@@ -2237,20 +2263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!(await userCanAccessBooking(req.user as User, anomalyBooking))) {
       return res.status(403).json({ message: "Not authorized to check this booking's tracking" });
     }
-    const updates = await storage.getBookingTracking(req.params.bookingId);
-    if (updates.length < 2) return res.json({ anomalous: false });
-
-    const [latest, previous] = [updates[updates.length - 1], updates[updates.length - 2]];
-    const result = checkGpsAnomaly(
-      { lat: Number(previous.lat), lng: Number(previous.lng), createdAt: new Date(previous.createdAt) },
-      { lat: Number(latest.lat), lng: Number(latest.lng), createdAt: new Date(latest.createdAt) },
-    );
-
-    if (result.anomalous) {
-      await storage.recordRiskScore("booking", req.params.bookingId, 50, [result.reason!]);
-      await storage.writeAuditLog(undefined, "gps_anomaly_detected", "booking", req.params.bookingId, result, req.ip);
-    }
-    res.json(result);
+    res.json(await runGpsAnomalyCheck(req.params.bookingId, req.ip));
   });
 
   // === PARTNER API: API KEY MANAGEMENT (company-owner facing) ===

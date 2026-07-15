@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import LanguageSelector from "@/components/LanguageSelector";
+import NotificationBell from "@/components/NotificationBell";
 import logoPath from "@assets/file_0000000037a86243bd21599fc142fdaa_1760057642535.png";
 
 // Route-level code splitting: each page (and the heavy libraries it pulls in —
@@ -82,6 +83,7 @@ function LandingPage() {
                   >
                     {t('nav.company', 'Company')}
                   </Button>
+                  <NotificationBell />
                   <Button
                     variant="ghost"
                     size="icon"

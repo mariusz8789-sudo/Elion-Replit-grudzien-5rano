@@ -54,6 +54,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   linkUserToCompany(userId: string, companyId: string, role: "company" | "driver"): Promise<User | undefined>;
+  getCompanyUsers(companyId: string): Promise<User[]>;
 
   // Company operations
   getAllCompanies(): Promise<Company[]>;
@@ -275,6 +276,10 @@ export class DbStorage implements IStorage {
       .where(and(eq(users.id, userId), isNull(users.companyId)))
       .returning();
     return result[0];
+  }
+
+  async getCompanyUsers(companyId: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.companyId, companyId));
   }
 
   // === COMPANY OPERATIONS ===

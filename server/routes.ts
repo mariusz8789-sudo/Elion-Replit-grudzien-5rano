@@ -472,8 +472,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/bookings", requireAuth, async (req, res) => {
     try {
-      const bookingData = insertBookingSchema.parse(req.body);
       const user = req.user as User;
+      // The booking's owner is always the authenticated caller - a client-supplied userId
+      // in the body must never be trusted, or any user could create a booking (and its
+      // downstream payment/tracking/review obligations) under someone else's identity.
+      const bookingData = insertBookingSchema.parse({ ...req.body, userId: user.id });
 
       let finalPrice = bookingData.totalPrice;
       let discountAmount: string | undefined;
@@ -767,6 +770,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "This booking is not open for offers" });
       }
       const offer = await storage.createOffer(offerData);
+      await storage.createNotification({
+        userId: booking.userId,
+        title: "New offer received",
+        message: `You received a new offer of $${offer.price} on your booking.`,
+        type: "info",
+        link: `/bookings/${booking.id}`,
+      });
       res.status(201).json(offer);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -812,6 +822,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const accepted = await storage.acceptOffer(req.params.id);
+      if (offer.companyId) {
+        const companyUsers = await storage.getCompanyUsers(offer.companyId);
+        await Promise.all(companyUsers.map((u) => storage.createNotification({
+          userId: u.id,
+          title: "Your offer was accepted",
+          message: `Your offer of $${offer.price} was accepted. The job is now yours.`,
+          type: "success",
+          link: `/bookings/${offer.bookingId}`,
+        })));
+      }
       res.json(accepted);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

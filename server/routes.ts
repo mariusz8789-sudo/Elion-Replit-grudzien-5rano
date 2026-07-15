@@ -2490,7 +2490,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user as User;
       const existing = await storage.getWorkerProfileByUserId(user.id);
       if (existing) return res.status(409).json({ message: "You already have a worker profile" });
-      const data = insertWorkerProfileSchema.parse({ ...req.body, userId: user.id });
+      // companyId always comes from the authenticated user's own affiliation, never trusted
+      // from the request body, so a worker can't attach their profile to a company they
+      // don't belong to.
+      const data = insertWorkerProfileSchema.parse({ ...req.body, userId: user.id, companyId: user.companyId ?? null });
       res.status(201).json(await storage.createWorkerProfile(data));
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -2505,7 +2508,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (profile.userId !== user.id && user.role !== "admin") {
         return res.status(403).json({ message: "Not authorized to edit this profile" });
       }
-      const data = insertWorkerProfileSchema.partial().parse(req.body);
+      const { companyId: _companyId, userId: _userId, ...rest } = req.body;
+      const data = insertWorkerProfileSchema.partial().parse(rest);
       const updated = await storage.updateWorkerProfile(req.params.id, data);
       res.json(updated);
     } catch (error: any) {

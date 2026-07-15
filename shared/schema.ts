@@ -1147,7 +1147,13 @@ export const insertVerificationDocumentSchema = createInsertSchema(verificationD
   status: true,
 }).extend({
   holderType: z.enum(["user", "driver", "company"]),
-  docType: z.enum(["id_card", "selfie", "drivers_license", "company_registration", "insurance_certificate", "vehicle_registration"]),
+  // Identity-verification doc types, plus the Skills Engine certification names referenced by
+  // skills.requiresCertification (server/seedSkills.ts) - these must stay in sync, since a
+  // certification a skill requires has to actually be an uploadable docType.
+  docType: z.enum([
+    "id_card", "selfie", "drivers_license", "company_registration", "insurance_certificate", "vehicle_registration",
+    "SEP", "Gas", "Hydraulic", "UDT", "Forklift", "Crane", "HDS", "Construction", "ADR",
+  ]),
   expiresAt: z.coerce.date().optional(),
 });
 

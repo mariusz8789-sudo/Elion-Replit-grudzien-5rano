@@ -8,11 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes } from "lucide-react";
+import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import type { Company, Driver, Vehicle, Booking, CapacityPosting, CapacityBooking } from "@shared/schema";
+import type { Company, Driver, Vehicle, Booking, CapacityPosting, CapacityBooking, WorkerProfile, Skill, WorkerSkill } from "@shared/schema";
 import VehicleManager from "./VehicleManager";
 import ReviewsSection from "./ReviewsSection";
 
@@ -495,6 +495,57 @@ function CapacityPostingRow({ posting }: { posting: CapacityPosting }) {
   );
 }
 
+function CrewMemberCard({ profile }: { profile: WorkerProfile }) {
+  const { data: profileSkills = [] } = useQuery<Array<WorkerSkill & { skill: Skill }>>({
+    queryKey: [`/api/worker-profiles/${profile.id}/skills`],
+  });
+
+  return (
+    <div className="p-4 bg-muted rounded-lg space-y-2" data-testid={`crew-member-${profile.id}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Badge variant={profile.available ? "default" : "secondary"}>{profile.available ? "Available" : "Unavailable"}</Badge>
+          <span className="flex items-center gap-1 text-sm"><Star className="w-3 h-3 text-yellow-500" />{Number(profile.rating).toFixed(1)} · {profile.completedJobs} jobs</span>
+        </div>
+        {profile.hourlyRateEur && <span className="text-sm font-medium">€{profile.hourlyRateEur}/hr</span>}
+      </div>
+      {profile.bio && <p className="text-sm text-muted-foreground">{profile.bio}</p>}
+      <div className="flex flex-wrap gap-1">
+        {profileSkills.map((ps) => (
+          <Badge key={ps.id} variant="outline" className="text-xs">
+            {ps.skill.name} ({ps.experienceLevel})
+          </Badge>
+        ))}
+        {profileSkills.length === 0 && <span className="text-xs text-muted-foreground">No skills listed yet</span>}
+      </div>
+    </div>
+  );
+}
+
+function CrewTab({ companyId }: { companyId: string }) {
+  const { data: crew = [], isLoading } = useQuery<WorkerProfile[]>({
+    queryKey: [`/api/companies/${companyId}/worker-profiles`],
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Wrench className="w-5 h-5" />Crew Directory</CardTitle>
+        <CardDescription>Skilled workers affiliated with your company - drivers and staff build their Skills Profile from their own account</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading && <div className="h-24 bg-muted animate-pulse rounded-lg" />}
+        {!isLoading && crew.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-8" data-testid="text-no-crew">
+            No crew profiles yet. Ask your drivers and staff to set up their Skills Profile.
+          </p>
+        )}
+        {crew.map((profile) => <CrewMemberCard key={profile.id} profile={profile} />)}
+      </CardContent>
+    </Card>
+  );
+}
+
 function CompanyDashboardTabs({ companyId }: { companyId: string }) {
   const { data: company } = useQuery<Company>({ queryKey: ["/api/companies", companyId] });
 
@@ -517,6 +568,7 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
           <TabsTrigger value="drivers" data-testid="tab-drivers"><Users className="w-4 h-4 mr-2" />Drivers</TabsTrigger>
           <TabsTrigger value="bookings" data-testid="tab-open-bookings"><Package className="w-4 h-4 mr-2" />Open Bookings</TabsTrigger>
           <TabsTrigger value="capacity" data-testid="tab-capacity"><Boxes className="w-4 h-4 mr-2" />Spare Capacity</TabsTrigger>
+          <TabsTrigger value="crew" data-testid="tab-crew"><Wrench className="w-4 h-4 mr-2" />Crew</TabsTrigger>
           <TabsTrigger value="reviews" data-testid="tab-company-reviews"><Star className="w-4 h-4 mr-2" />Reviews</TabsTrigger>
         </TabsList>
         <TabsContent value="fleet" className="pt-4">
@@ -530,6 +582,9 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
         </TabsContent>
         <TabsContent value="capacity" className="pt-4">
           <CapacityTab companyId={companyId} />
+        </TabsContent>
+        <TabsContent value="crew" className="pt-4">
+          <CrewTab companyId={companyId} />
         </TabsContent>
         <TabsContent value="reviews" className="pt-4">
           <ReviewsSection companyId={companyId} />

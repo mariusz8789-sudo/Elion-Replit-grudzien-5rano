@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, MapPin, DollarSign, Truck, Shield, Clock, Star, ShoppingBag, Leaf, Users, BarChart3, Brain, Award, Box, Share2, TrendingUp, FileText, QrCode, Route, Boxes } from "lucide-react";
+import { ArrowRight, MapPin, DollarSign, Truck, Shield, Clock, Star, ShoppingBag, Leaf, Users, BarChart3, Brain, Award, Box, Share2, TrendingUp, FileText, QrCode, Route, Boxes, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import logoPath from "@assets/file_0000000037a86243bd21599fc142fdaa_1760057642535.png";
@@ -288,6 +288,13 @@ export default function PointToPointLanding({ onGetQuote }: PointToPointLandingP
               <Card className="p-4 hover-elevate cursor-pointer">
                 <Boxes className="w-6 h-6 text-blue-600 mb-2" />
                 <h3 className="font-semibold text-sm">Spare Capacity</h3>
+              </Card>
+            </Link>
+
+            <Link href="/skills-profile">
+              <Card className="p-4 hover-elevate cursor-pointer">
+                <Wrench className="w-6 h-6 text-orange-600 mb-2" />
+                <h3 className="font-semibold text-sm">Skills Profile</h3>
               </Card>
             </Link>
           </div>

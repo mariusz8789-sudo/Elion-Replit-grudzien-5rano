@@ -576,8 +576,26 @@ CREATE INDEX IF NOT EXISTS idx_compute_placements_mission ON compute_placements(
 CREATE INDEX IF NOT EXISTS idx_compute_placements_task ON compute_placements(task_id, created_at);
 `;
 
+// Sandbox Lab (Priority 12): append-only audit of sandbox→main promotions. A
+// sandbox result is NOT verified evidence; promotion requires explicit verification
+// status + provenance, recorded here.
+const SCHEMA_V14 = `
+CREATE TABLE IF NOT EXISTS sandbox_promotions (
+  id                 TEXT PRIMARY KEY,
+  sandbox_mission_id TEXT NOT NULL,
+  source_evidence_id TEXT NOT NULL,
+  target_mission_id  TEXT,
+  target_evidence_id TEXT,
+  decision           TEXT NOT NULL,
+  reason             TEXT,
+  created_at         INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sandbox_promotions_sandbox ON sandbox_promotions(sandbox_mission_id, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 14) db.exec(SCHEMA_V14);
   if (version < 13) db.exec(SCHEMA_V13);
   if (version < 12) db.exec(SCHEMA_V12);
   if (version < 11) db.exec(SCHEMA_V11);
@@ -616,7 +634,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 13) db.exec('PRAGMA user_version = 13');
+  if (version < 14) db.exec('PRAGMA user_version = 14');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1794,4 +1812,25 @@ export function listComputePlacements(db, { missionId = null, taskId = null } = 
   else if (missionId) rows = db.prepare('SELECT * FROM compute_placements WHERE mission_id = ? ORDER BY created_at ASC').all(missionId);
   else rows = db.prepare('SELECT * FROM compute_placements ORDER BY created_at ASC').all();
   return rows.map(toComputePlacement);
+}
+
+/* ---- sandbox_promotions (Priority 12 — sandbox→main audit, append-only) ---- */
+function toSandboxPromotion(r) {
+  if (!r) return null;
+  return {
+    id: r.id, sandboxMissionId: r.sandbox_mission_id, sourceEvidenceId: r.source_evidence_id,
+    targetMissionId: r.target_mission_id, targetEvidenceId: r.target_evidence_id,
+    decision: r.decision, reason: r.reason, createdAt: r.created_at,
+  };
+}
+export function saveSandboxPromotion(db, p) {
+  const id = p.id ?? newId();
+  db.prepare(
+    `INSERT INTO sandbox_promotions (id, sandbox_mission_id, source_evidence_id, target_mission_id, target_evidence_id, decision, reason, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, p.sandboxMissionId, p.sourceEvidenceId, p.targetMissionId ?? null, p.targetEvidenceId ?? null, p.decision, p.reason ?? null, Date.now());
+  return toSandboxPromotion(db.prepare('SELECT * FROM sandbox_promotions WHERE id = ?').get(id));
+}
+export function listSandboxPromotions(db, sandboxMissionId) {
+  return db.prepare('SELECT * FROM sandbox_promotions WHERE sandbox_mission_id = ? ORDER BY created_at ASC').all(sandboxMissionId).map(toSandboxPromotion);
 }

@@ -14,6 +14,7 @@ import { canonicalHash } from '../packages/backend/src/provenance.mjs';
 import { runValidationSuite } from '../packages/backend/src/validation/suite.mjs';
 import { scoreReadiness } from '../packages/backend/src/validation/readiness.mjs';
 import { generatePublicationPackage } from '../packages/backend/src/validation/publications.mjs';
+import { generateScientificReports } from '../packages/backend/src/validation/scientificReports.mjs';
 import { validateResearchQuality } from '../packages/backend/src/validation/researchQuality.mjs';
 import { runDiscoveryCampaignV2 } from '../packages/backend/src/cognitive/discoveryCampaignV2.mjs';
 import { ingestBundle } from '../packages/backend/src/corpus/corpusIngest.mjs';
@@ -82,6 +83,11 @@ writeFileSync(path.join(OUT, 'VALIDATION_REPORT.md'), pkg.validationReport);
 writeFileSync(path.join(OUT, 'benchmark-report.json'), JSON.stringify(pkg.benchmarkReport, null, 2));
 writeFileSync(path.join(OUT, 'reproducibility-package.json'), JSON.stringify(pkg.reproducibility, null, 2));
 writeFileSync(path.join(OUT, 'supplementary.json'), JSON.stringify(pkg.supplementary, null, 2));
+
+// Phase 7 — audience-specific scientific reports (Research/Biotech/Pharma/Grant) from real data.
+const reports = generateScientificReports({ dossier: d1.dossier, validation: suite, meta });
+mkdirSync(path.join(OUT, 'reports'), { recursive: true });
+for (const [name, md] of Object.entries(reports.reports)) writeFileSync(path.join(OUT, 'reports', `${name.toUpperCase()}_REPORT.md`), md);
 
 // ── Summary ───────────────────────────────────────────────────────────────────────────────────
 const m = suite.metrics;

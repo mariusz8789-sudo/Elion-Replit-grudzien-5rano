@@ -9,6 +9,7 @@
  */
 import * as store from '../store.mjs';
 import * as we from './workflowEngine.mjs';
+import * as funnel from './molecularFunnel.mjs';
 
 export const OUTCOME_CLASS = Object.freeze({
   SUCCESS: 'SUCCESS',
@@ -18,6 +19,10 @@ export const OUTCOME_CLASS = Object.freeze({
   MODEL_FAILURE: 'MODEL_FAILURE',
   INSUFFICIENT_EVIDENCE: 'INSUFFICIENT_EVIDENCE',
   CAPABILITY_GAP: 'CAPABILITY_GAP',
+  // A survival funnel that ran every candidate to a terminal adversarial decision
+  // but retained no survivor: a VALID, decisive negative result — neither a
+  // scientific discovery (SUCCESS) nor a mission failure. Honest third state.
+  FUNNEL_COMPLETE: 'FUNNEL_COMPLETE',
 });
 
 /** A stable signature of the approach a mission took (for cross-run comparison). */
@@ -92,6 +97,38 @@ export function classifyOutcome(db, missionId) {
     reasons.push(`strategy verdict ${strat.verdict} with ${metrics.workflowMutations} mutation(s) applied`);
     return { outcomeClass: OUTCOME_CLASS.STRATEGY_FAILURE, reasons, metrics };
   }
+
+  // Adversarial funnel campaigns are NOT hypothesis-driven — they KILL candidates.
+  // The generic ladder above (which keys off accepted hypotheses / verified evidence)
+  // is blind to funnel state, so a correctly-run funnel that rejects every candidate
+  // would wrongly fall through to MISSION_FAILURE. Judge a funnel by whether each
+  // candidate reached a TERMINAL adversarial decision (a CRITIC stage, or a terminal
+  // REJECTED validity stage for invalid SMILES). Decisive rejection is the funnel
+  // working as designed — a valid negative result, never a mission failure.
+  const funnelCandidates = store.listFunnelCandidates(db, missionId);
+  if (funnelCandidates.length > 0) {
+    const isDecided = (c) => {
+      const stages = store.listFunnelStages(db, c.id);
+      return stages.some((s) => s.stage === funnel.STAGE.CRITIC || s.status === funnel.STAGE_STATUS.REJECTED);
+    };
+    const decided = funnelCandidates.filter(isDecided);
+    const survivors = funnelCandidates.filter((c) => c.status === 'surviving').length;
+    const rejected = funnelCandidates.filter((c) => c.status === 'rejected').length;
+    if (decided.length === funnelCandidates.length) {
+      if (survivors >= 1) {
+        reasons.push(`adversarial funnel completed: ${survivors} candidate(s) survived every adversarial stage`);
+        return { outcomeClass: OUTCOME_CLASS.SUCCESS, reasons, metrics };
+      }
+      reasons.push(`adversarial funnel completed decisively: all ${funnelCandidates.length} candidate(s) reached a terminal decision and were adversarially rejected (${rejected} rejected) — a VALID negative result, not a mission failure`);
+      return { outcomeClass: OUTCOME_CLASS.FUNNEL_COMPLETE, reasons, metrics };
+    }
+    if (decided.length > 0) {
+      reasons.push(`adversarial funnel partially complete: ${decided.length}/${funnelCandidates.length} candidate(s) reached a terminal decision — honestly incomplete`);
+      return { outcomeClass: OUTCOME_CLASS.INSUFFICIENT_EVIDENCE, reasons, metrics };
+    }
+    // decided.length === 0: candidates exist but none reached any decision → genuine failure (fall through).
+  }
+
   reasons.push('mission incomplete without a more specific cause');
   return { outcomeClass: OUTCOME_CLASS.MISSION_FAILURE, reasons, metrics };
 }
@@ -102,6 +139,9 @@ export function scoreFromMetrics(outcomeClass, metrics) {
     const rate = metrics.verificationSuccessRate ?? 0;
     return Math.min(1, 0.6 + 0.4 * rate);
   }
+  // A decisive funnel completion with no survivor is a valid negative result: mid-range,
+  // not credited as a discovery (so it never inflates a generation strategy's success).
+  if (outcomeClass === OUTCOME_CLASS.FUNNEL_COMPLETE) return 0.5;
   if (outcomeClass === OUTCOME_CLASS.INSUFFICIENT_EVIDENCE) return 0.3;
   if (outcomeClass === OUTCOME_CLASS.STRATEGY_FAILURE) return 0.2;
   if (outcomeClass === OUTCOME_CLASS.CAPABILITY_GAP) return 0.1; // not the strategy's fault, but no result

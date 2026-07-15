@@ -73,6 +73,9 @@ import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
 import { saveEnvAudit, latestEnvAudit, listScienceRuns, getScienceRun } from './store.mjs';
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
+import * as truthEngine from './cognitive/truthEngine.mjs';
+import * as necropolis from './cognitive/necropolis.mjs';
+import { getTruthAnalysis, listTruthAnalyses } from './store.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -354,10 +357,111 @@ export function handleApi(db, ctx) {
       }
       return err(404, 'not_found');
     }
+
+    // ---- ZEFIR Truth Engine / R&D Kill-Switch (project = tenant boundary) ----
+    if (seg[2] === 'truth-analyses') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ analyses: listTruthAnalyses(db, { projectId }) });
+        if (method === 'POST') return runTruthAnalysisHandler(db, role, projectId, body);
+        return err(405, 'method_not_allowed');
+      }
+      if (seg.length === 4 || (seg.length === 5 && seg[4] === 'certificate')) {
+        const a = getTruthAnalysis(db, seg[3]);
+        if (!a || a.projectId !== projectId) return err(404, 'not_found'); // tenant isolation
+        if (method !== 'GET') return err(405, 'method_not_allowed');
+        return seg.length === 5 ? ok({ certificate: a.certificate }) : ok({ analysis: a });
+      }
+      return err(404, 'not_found');
+    }
+
+    // ---- Necropolis (tenant-isolated accumulating failure memory) ----
+    if (seg[2] === 'necropolis') {
+      if (seg.length === 3 && method === 'GET') return ok({ necropolis: necropolis.stats(db, projectId) });
+      if (seg.length === 4 && seg[3] === 'failures' && method === 'POST') return recordFailureHandler(db, role, projectId, body);
+      if (seg.length === 4 && seg[3] === 'export' && method === 'GET') {
+        if (!atLeast(role, 'admin')) return err(403, 'forbidden', 'Eksport pamięci porażek wymaga roli admin lub owner.');
+        return ok({ artifact: necropolis.exportArtifact(db, projectId) });
+      }
+      if (seg.length === 4 && seg[3] === 'import' && method === 'POST') {
+        if (!atLeast(role, 'admin')) return err(403, 'forbidden', 'Import pamięci porażek wymaga roli admin lub owner.');
+        const r = necropolis.importArtifact(db, projectId, body?.artifact ?? body);
+        return r.ok ? ok({ result: r }) : err(400, 'invalid_artifact', r.error);
+      }
+      return err(404, 'not_found');
+    }
+
     return err(404, 'not_found');
   }
 
   return err(404, 'not_found');
+}
+
+/* ---------------- Handlery ZEFIR Truth Engine / R&D Kill-Switch ---------------- */
+
+// Realny resolver zdolności: capability jest „dostępna" tylko jeśli platforma
+// faktycznie ma zweryfikowany silnik (status AVAILABLE). Nieznane → false → uczciwa
+// luka zdolności (WARN), nigdy zmyślone GO.
+function platformCapabilities() {
+  const set = new Set();
+  for (const c of listCapabilities()) if (c.status === 'AVAILABLE') set.add(c.id);
+  for (const t of listToolchain()) if (t.status === 'AVAILABLE' && t.capabilityId) set.add(t.capabilityId);
+  return set;
+}
+
+const TRUTH_MAX_ARRAY = 64;
+const TRUTH_MAX_STR = 4000;
+
+/** Waliduje i przycina propozycję z API do bezpiecznego, deterministycznego kształtu. */
+function sanitizeProposal(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { ok: false, error: 'Propozycja musi być obiektem JSON.' };
+  const s = (v, n = TRUTH_MAX_STR) => (typeof v === 'string' ? v.slice(0, n) : undefined);
+  const arr = (v) => (Array.isArray(v) ? v.slice(0, TRUTH_MAX_ARRAY) : undefined);
+  const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : undefined);
+  const p = {
+    problemStatement: s(body.problemStatement), proposedMechanism: s(body.proposedMechanism), claimedResult: s(body.claimedResult),
+    equations: arr(body.equations), variables: arr(body.variables), comparisons: arr(body.comparisons),
+    assumptions: arr(body.assumptions), physicalConstraints: arr(body.physicalConstraints), speculativeClaims: arr(body.speculativeClaims),
+    requiredCapabilities: arr(body.requiredCapabilities), requestedDomains: arr(body.requestedDomains),
+    energy: obj(body.energy), efficiency: numOrNull(body.efficiency), efficiencyKind: s(body.efficiencyKind, 40),
+    mass: obj(body.mass), operating: obj(body.operating), flow: obj(body.flow), power: obj(body.power),
+    geometry: obj(body.geometry), materials: arr(body.materials), accounting: obj(body.accounting),
+    expectedPerformance: s(body.expectedPerformance), estimatedCost: s(body.estimatedCost, 200),
+    parameterVector: obj(body.parameterVector), context: s(body.context, 200), scales: obj(body.scales),
+    target: s(body.target), requirements: arr(body.requirements), challengesModel: obj(body.challengesModel), evidence: arr(body.evidence),
+  };
+  // Musi być jakakolwiek treść naukowa — pusta propozycja to 400, nie ciche GO.
+  const hasContent = p.problemStatement || p.claimedResult || (p.equations && p.equations.length) || p.energy || p.flow || p.power || p.mass || Number.isFinite(p.efficiency) || p.operating || (p.materials && p.materials.length) || p.accounting;
+  if (!hasContent) return { ok: false, error: 'Propozycja jest pusta — podaj co najmniej problem, roszczenie lub dane strukturalne.' };
+  return { ok: true, value: p };
+}
+
+/** POST /api/projects/:id/truth-analyses — uruchamia REALNY Truth Engine. Editor+. */
+function runTruthAnalysisHandler(db, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Uruchomienie analizy wymaga roli editor lub wyższej.');
+  const v = sanitizeProposal(body);
+  if (!v.ok) return err(400, 'invalid_proposal', v.error);
+  const caps = platformCapabilities();
+  const result = truthEngine.analyze(v.value, { db, projectId, capabilityResolver: (c) => caps.has(c) });
+  const saved = listTruthAnalyses(db, { projectId }).find((a) => a.decisionHash === result.certificate.decisionHash);
+  return ok({ analysis: { id: saved?.id ?? null, proposalHash: result.proposalHash, decision: result.decision, stages: result.stages, certificate: result.certificate } }, 201);
+}
+
+/** POST /api/projects/:id/necropolis/failures — zapisuje region porażki tego najemcy. Editor+. */
+function recordFailureHandler(db, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Zapis pamięci porażek wymaga roli editor lub wyższej.');
+  const failureClass = String(body?.failureClass ?? '').trim().slice(0, 80);
+  if (!failureClass) return err(400, 'invalid_failure', 'Podaj failureClass.');
+  const pv = body?.parameterVector && typeof body.parameterVector === 'object' && !Array.isArray(body.parameterVector) ? sanitizeNumberMap(body.parameterVector) : {};
+  if (Object.keys(pv).length === 0) return err(400, 'invalid_failure', 'parameterVector musi być niepustą mapą liczb.');
+  const scales = body?.scales && typeof body.scales === 'object' ? sanitizeNumberMap(body.scales) : null;
+  const r = necropolis.recordFailure(db, {
+    projectId, failureClass, context: String(body?.context ?? '').slice(0, 200) || null,
+    domain: String(body?.domain ?? '').slice(0, 80) || null, parameterVector: pv, scales,
+    failureMode: String(body?.failureMode ?? '').slice(0, 200) || null,
+    provenance: body?.provenance && typeof body.provenance === 'object' ? body.provenance : {},
+  });
+  return ok({ region: r.region, duplicate: r.duplicate }, r.duplicate ? 200 : 201);
 }
 
 /* ---------------- Handlery uwierzytelniania ---------------- */

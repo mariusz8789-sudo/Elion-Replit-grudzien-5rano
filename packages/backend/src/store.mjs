@@ -780,6 +780,19 @@ CREATE TABLE IF NOT EXISTS truth_analyses (
 CREATE INDEX IF NOT EXISTS idx_truth_analyses_proposal ON truth_analyses(proposal_hash, created_at);
 `;
 
+// v20 — Necropolis product hardening + tenant isolation. Failure regions gain
+// EXPLICIT tenant ownership (project_id), domain + provenance metadata, and a
+// version. Truth analyses gain project_id so history is tenant-scoped. Columns
+// are added defensively (only if absent) so the migration is idempotent-safe.
+const SCHEMA_V20_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_formal_failures_project ON formal_failure_regions(project_id, context);
+CREATE INDEX IF NOT EXISTS idx_truth_analyses_project ON truth_analyses(project_id, created_at);
+`;
+function addColumnIfMissing(db, table, column, ddl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+}
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
   if (version < 19) db.exec(SCHEMA_V19);
@@ -826,7 +839,17 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 19) db.exec('PRAGMA user_version = 19');
+  // v20 runs AFTER the create-blocks above so the tables it ALTERs already exist
+  // (a fresh DB applies every block in sequence; ALTER must follow the CREATE).
+  if (version < 20) {
+    addColumnIfMissing(db, 'formal_failure_regions', 'project_id', 'project_id TEXT');
+    addColumnIfMissing(db, 'formal_failure_regions', 'domain', 'domain TEXT');
+    addColumnIfMissing(db, 'formal_failure_regions', 'provenance_json', "provenance_json TEXT NOT NULL DEFAULT '{}'");
+    addColumnIfMissing(db, 'formal_failure_regions', 'region_version', 'region_version INTEGER NOT NULL DEFAULT 1');
+    addColumnIfMissing(db, 'truth_analyses', 'project_id', 'project_id TEXT');
+    db.exec(SCHEMA_V20_INDEXES);
+  }
+  if (version < 20) db.exec('PRAGMA user_version = 20');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -2165,31 +2188,42 @@ export function listFormalRelations(db, missionId) { return db.prepare('SELECT *
 
 function toFailureRegion(r) {
   if (!r) return null;
-  return { id: r.id, missionId: r.mission_id, failureClass: r.failure_class, context: r.context, parameterVector: JSON.parse(r.parameter_vector_json), normalized: JSON.parse(r.normalized_json), assumptions: JSON.parse(r.assumptions_json), failureMode: r.failure_mode, verificationState: r.verification_state, contentHash: r.content_hash, createdAt: r.created_at };
+  return { id: r.id, missionId: r.mission_id, projectId: r.project_id ?? null, domain: r.domain ?? null, failureClass: r.failure_class, context: r.context, parameterVector: JSON.parse(r.parameter_vector_json), normalized: JSON.parse(r.normalized_json), assumptions: JSON.parse(r.assumptions_json), failureMode: r.failure_mode, verificationState: r.verification_state, provenance: JSON.parse(r.provenance_json ?? '{}'), version: r.region_version ?? 1, contentHash: r.content_hash, createdAt: r.created_at };
 }
 export function saveFailureRegion(db, f) {
   const id = f.id ?? newId();
-  db.prepare(`INSERT INTO formal_failure_regions (id, mission_id, failure_class, context, parameter_vector_json, normalized_json, assumptions_json, failure_mode, verification_state, content_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, f.missionId ?? null, f.failureClass, f.context ?? null, JSON.stringify(f.parameterVector ?? {}), JSON.stringify(f.normalized ?? {}), JSON.stringify(f.assumptions ?? []), f.failureMode ?? null, f.verificationState ?? null, f.contentHash ?? null, Date.now());
+  db.prepare(`INSERT INTO formal_failure_regions (id, mission_id, project_id, domain, failure_class, context, parameter_vector_json, normalized_json, assumptions_json, failure_mode, verification_state, provenance_json, region_version, content_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, f.missionId ?? null, f.projectId ?? null, f.domain ?? null, f.failureClass, f.context ?? null, JSON.stringify(f.parameterVector ?? {}), JSON.stringify(f.normalized ?? {}), JSON.stringify(f.assumptions ?? []), f.failureMode ?? null, f.verificationState ?? null, JSON.stringify(f.provenance ?? {}), Number.isFinite(f.version) ? f.version : 1, f.contentHash ?? null, f.createdAt ?? Date.now());
   return toFailureRegion(db.prepare('SELECT * FROM formal_failure_regions WHERE id = ?').get(id));
 }
 export function listFailureRegions(db, missionId, { context = null } = {}) {
   const rows = context ? db.prepare('SELECT * FROM formal_failure_regions WHERE mission_id = ? AND context = ? ORDER BY created_at ASC').all(missionId, context) : db.prepare('SELECT * FROM formal_failure_regions WHERE mission_id = ? ORDER BY created_at ASC').all(missionId);
   return rows.map(toFailureRegion);
 }
+/** STRICT tenant-scoped failure-region query — tenant A's rows are never visible to tenant B. */
+export function listFailureRegionsByProject(db, projectId, { context = null, domain = null } = {}) {
+  let sql = 'SELECT * FROM formal_failure_regions WHERE project_id = ?';
+  const args = [projectId];
+  if (context) { sql += ' AND context = ?'; args.push(context); }
+  if (domain) { sql += ' AND domain = ?'; args.push(domain); }
+  sql += ' ORDER BY created_at ASC';
+  return db.prepare(sql).all(...args).map(toFailureRegion);
+}
 
 /* ---- ZEFIR Truth Engine / R&D Kill-Switch (Phase 4 product) ---- */
 export function saveTruthAnalysis(db, a) {
   const id = a.id ?? newId();
-  db.prepare(`INSERT INTO truth_analyses (id, proposal_hash, decision, decision_hash, certificate_json, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(id, a.proposalHash, a.decision, a.decisionHash, JSON.stringify(a.certificate ?? {}), Date.now());
+  db.prepare(`INSERT INTO truth_analyses (id, proposal_hash, project_id, decision, decision_hash, certificate_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, a.proposalHash, a.projectId ?? null, a.decision, a.decisionHash, JSON.stringify(a.certificate ?? {}), a.createdAt ?? Date.now());
   return getTruthAnalysis(db, id);
 }
 export function getTruthAnalysis(db, id) {
   const r = db.prepare('SELECT * FROM truth_analyses WHERE id = ?').get(id);
-  return r ? { id: r.id, proposalHash: r.proposal_hash, decision: r.decision, decisionHash: r.decision_hash, certificate: JSON.parse(r.certificate_json), createdAt: r.created_at } : null;
+  return r ? { id: r.id, proposalHash: r.proposal_hash, projectId: r.project_id ?? null, decision: r.decision, decisionHash: r.decision_hash, certificate: JSON.parse(r.certificate_json), createdAt: r.created_at } : null;
 }
-export function listTruthAnalyses(db, { limit = 50 } = {}) {
-  return db.prepare('SELECT id, proposal_hash, decision, decision_hash, created_at FROM truth_analyses ORDER BY created_at DESC LIMIT ?').all(limit)
-    .map((r) => ({ id: r.id, proposalHash: r.proposal_hash, decision: r.decision, decisionHash: r.decision_hash, createdAt: r.created_at }));
+export function listTruthAnalyses(db, { limit = 50, projectId = undefined } = {}) {
+  const rows = projectId !== undefined
+    ? db.prepare('SELECT id, proposal_hash, project_id, decision, decision_hash, created_at FROM truth_analyses WHERE project_id IS ? ORDER BY created_at DESC LIMIT ?').all(projectId, limit)
+    : db.prepare('SELECT id, proposal_hash, project_id, decision, decision_hash, created_at FROM truth_analyses ORDER BY created_at DESC LIMIT ?').all(limit);
+  return rows.map((r) => ({ id: r.id, proposalHash: r.proposal_hash, projectId: r.project_id ?? null, decision: r.decision, decisionHash: r.decision_hash, createdAt: r.created_at }));
 }

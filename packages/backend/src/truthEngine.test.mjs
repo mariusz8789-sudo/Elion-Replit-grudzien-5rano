@@ -122,3 +122,55 @@ test('analysis persists to history when a db is provided', () => {
   assert.equal(store.listTruthAnalyses(db)[0].decisionHash, out.certificate.decisionHash);
   db.close();
 });
+
+/* ---- Constraint Registry integration (Phase 3) ---- */
+import * as necro from './cognitive/necropolis.mjs';
+
+test('structured over-unity energy claim → BLOCK via constraint registry', () => {
+  const out = te.analyze({ claimedResult: 'net power generator', assumptions: ['a'], energy: { input: 100, output: 140 } });
+  assert.equal(out.decision.decision, 'BLOCK');
+  assert.ok(out.decision.constraintViolations.some((c) => c.id === 'energy-balance'));
+});
+
+test('inconsistent flow (Q ≠ V/t) → BLOCK with exact numbers', () => {
+  const out = te.analyze({ claimedResult: 'aerator', assumptions: ['a'], flow: { volumetricFlow: 5, volume: 20, time: 10 } });
+  assert.equal(out.decision.decision, 'BLOCK');
+  assert.ok(out.decision.constraintViolations.some((c) => c.id === 'flow-volume-time'));
+});
+
+test('efficiency > 100% → BLOCK', () => {
+  const out = te.analyze({ claimedResult: 'x', assumptions: ['a'], efficiency: 1.3 });
+  assert.equal(out.decision.decision, 'BLOCK');
+});
+
+test('unencoded domain requested → capability gap + WARN, never fabricated GO', () => {
+  const out = te.analyze({ claimedResult: 'aeration system', assumptions: ['a'], flow: { volumetricFlow: 2, volume: 20, time: 10 }, requestedDomains: ['oxygen-transfer-efficiency'] });
+  assert.notEqual(out.decision.decision, 'GO');
+  assert.ok(out.decision.capabilityGaps.includes('oxygen-transfer-efficiency'));
+  assert.ok(out.decision.unsupportedDomains.length >= 1);
+});
+
+/* ---- Tenant Necropolis integration (Phase 4) — accumulation influences the SAME tenant ---- */
+test('tenant failure memory materially changes a later pre-flight decision (projectId path)', () => {
+  const db = openDatabase(':memory:');
+  necro.recordFailure(db, { projectId: 'acme', domain: 'reactor', failureClass: 'FAILED_PARAMETER_REGION', context: 'reactor', parameterVector: { T: 900 }, scales: { T: 900 } });
+  const out = te.analyze({ claimedResult: 'run at T=905', equations: [FMA], assumptions: ['a'], context: 'reactor', parameterVector: { T: 905 }, scales: { T: 900 } }, { db, projectId: 'acme' });
+  assert.equal(out.decision.decision, 'BLOCK');
+  db.close();
+});
+
+test('tenant isolation: tenant B is NOT blocked by tenant A\'s failure memory (projectId path)', () => {
+  const db = openDatabase(':memory:');
+  necro.recordFailure(db, { projectId: 'tenantA', domain: 'reactor', failureClass: 'FAILED_PARAMETER_REGION', context: 'reactor', parameterVector: { T: 900 }, scales: { T: 900 } });
+  const out = te.analyze({ claimedResult: 'run at T=905', equations: [FMA], assumptions: ['a'], context: 'reactor', parameterVector: { T: 905 }, scales: { T: 900 } }, { db, projectId: 'tenantB' });
+  assert.notEqual(out.decision.decision, 'BLOCK'); // B sees none of A's regions
+  db.close();
+});
+
+test('project-scoped history: analysis persists under its tenant', () => {
+  const db = openDatabase(':memory:');
+  te.analyze({ claimedResult: 'x', equations: [FMA], assumptions: ['a'] }, { db, projectId: 'acme' });
+  assert.equal(store.listTruthAnalyses(db, { projectId: 'acme' }).length, 1);
+  assert.equal(store.listTruthAnalyses(db, { projectId: 'other' }).length, 0);
+  db.close();
+});

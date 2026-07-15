@@ -18,12 +18,15 @@ import { canonicalHash } from '../provenance.mjs';
 import * as store from '../store.mjs';
 import * as fk from './formalKernel.mjs';
 import * as sp from './speculativePhysics.mjs';
+import * as cr from './constraintRegistry.mjs';
+import * as necro from './necropolis.mjs';
 
 export const KILL_SWITCH = Object.freeze({ GO: 'GO', WARN: 'WARN', BLOCK: 'BLOCK', INSUFFICIENT_DATA: 'INSUFFICIENT_DATA' });
-export const ENGINE_VERSIONS = Object.freeze({ formalKernel: '1.0', speculativePhysics: '1.0', preflightGate: '1.0', truthEngine: '1.0' });
+export const ENGINE_VERSIONS = Object.freeze({ formalKernel: '1.0', speculativePhysics: '1.0', preflightGate: '1.0', constraintRegistry: cr.REGISTRY_VERSION, necropolis: necro.NECROPOLIS_SCHEMA, truthEngine: '1.1' });
 export const CERT_SCHEMA = 'zefir-truth-cert/1';
 
-/** Canonicalize a proposal (stable key order) and hash it. */
+/** Canonicalize a proposal (stable key order) and hash it. Structured engineering
+ *  inputs are included so the proposalHash + decisionHash stay reproducible. */
 export function normalizeProposal(proposal = {}) {
   const norm = {
     problemStatement: proposal.problemStatement ?? null,
@@ -31,10 +34,25 @@ export function normalizeProposal(proposal = {}) {
     claimedResult: proposal.claimedResult ?? null,
     equations: proposal.equations ?? [],
     variables: proposal.variables ?? [],
+    comparisons: proposal.comparisons ?? [],
     assumptions: proposal.assumptions ?? [],
     physicalConstraints: proposal.physicalConstraints ?? [],
     speculativeClaims: proposal.speculativeClaims ?? [],
     requiredCapabilities: proposal.requiredCapabilities ?? [],
+    // Structured engineering inputs consumed by the deterministic Constraint Registry.
+    energy: proposal.energy ?? null,
+    efficiency: Number.isFinite(proposal.efficiency) ? proposal.efficiency : null,
+    efficiencyKind: proposal.efficiencyKind ?? null,
+    mass: proposal.mass ?? null,
+    operating: proposal.operating ?? null,
+    flow: proposal.flow ?? null,
+    power: proposal.power ?? null,
+    geometry: proposal.geometry ?? null,
+    materials: proposal.materials ?? [],
+    accounting: proposal.accounting ?? null,
+    requestedDomains: proposal.requestedDomains ?? [],
+    expectedPerformance: proposal.expectedPerformance ?? null,
+    estimatedCost: proposal.estimatedCost ?? null,
     parameterVector: proposal.parameterVector ?? null,
     context: proposal.context ?? null,
     scales: proposal.scales ?? null,
@@ -50,7 +68,7 @@ export function normalizeProposal(proposal = {}) {
  * Run the full ZEFIR truth pipeline. opts: { db?, capabilityResolver?, missionId? }.
  * Returns { proposalHash, stages, decision, certificate }.
  */
-export function analyze(proposal = {}, { db = null, capabilityResolver = () => false, missionId = null } = {}) {
+export function analyze(proposal = {}, { db = null, capabilityResolver = () => false, missionId = null, projectId = null } = {}) {
   const { normalized: P, proposalHash } = normalizeProposal(proposal);
   const stages = [];
   const S = (stage, status, findings = {}, missing = []) => { stages.push({ stage, status, findings, missing }); return stages[stages.length - 1]; };
@@ -58,6 +76,7 @@ export function analyze(proposal = {}, { db = null, capabilityResolver = () => f
   const critical = []; const warnings = []; const missingInfo = [];
   const dimensionalInconsistencies = []; const physicalViolations = []; const deadEnds = [];
   const capabilityGaps = []; const speculative = []; const unresolvedAssumptions = [];
+  const constraintViolations = []; const unsupportedDomains = [];
 
   // 1) NORMALIZATION
   S('NORMALIZATION', 'EXECUTED', { proposalHash });
@@ -99,6 +118,24 @@ export function analyze(proposal = {}, { db = null, capabilityResolver = () => f
     S('PHYSICAL_CONSTRAINT_CHECK', 'SKIPPED', {}, ['physical-constraints']);
   }
 
+  // 5b) CONSTRAINT_REGISTRY — deterministic engineering constraints over STRUCTURED inputs
+  //     (energy, efficiency, mass, operating bounds, flow=V/t, power=E/t, geometry,
+  //     material limits, conservation). Missing structured inputs → the constraint is
+  //     SKIPPED, never a silent pass. A CRITICAL violation is a BLOCK with exact numbers.
+  const registryInputs = { energy: P.energy, efficiency: P.efficiency, efficiencyKind: P.efficiencyKind, mass: P.mass, operating: P.operating, flow: P.flow, power: P.power, geometry: P.geometry, materials: P.materials, accounting: P.accounting };
+  const anyStructured = P.energy || Number.isFinite(P.efficiency) || P.mass || P.operating || P.flow || P.power || P.geometry || (P.materials && P.materials.length) || P.accounting;
+  if (anyStructured || (P.requestedDomains && P.requestedDomains.length)) {
+    const reg = cr.evaluateAll(registryInputs, { requestedDomains: P.requestedDomains ?? [] });
+    reg.violations.forEach((v) => { constraintViolations.push({ id: v.id, detail: v.detail }); critical.push(`constraint "${v.id}" violated: ${v.detail}`); });
+    reg.warnings.forEach((w) => warnings.push(`constraint-warning:${w.id}`));
+    reg.unsupported.forEach((u) => { unsupportedDomains.push(u); capabilityGaps.push(u.domain); warnings.push('constraint-domain-unsupported'); });
+    const evaluated = reg.violations.length + reg.warnings.length + reg.passed.length;
+    S('CONSTRAINT_REGISTRY', reg.violations.length ? 'BLOCK' : evaluated > 0 || reg.unsupported.length ? 'EXECUTED' : 'SKIPPED',
+      { registryVersion: reg.registryVersion, violations: reg.violations, warnings: reg.warnings, passed: reg.passed.map((p) => p.id), unsupported: reg.unsupported }, evaluated > 0 ? [] : ['structured-engineering-inputs']);
+  } else {
+    S('CONSTRAINT_REGISTRY', 'SKIPPED', {}, ['structured-engineering-inputs']);
+  }
+
   // 6) CAPABILITY_CHECK — a gap is a WARN (can't validate here), not a kill.
   if (P.requiredCapabilities.length > 0) {
     const missing = P.requiredCapabilities.filter((c) => !capabilityResolver(c));
@@ -109,14 +146,18 @@ export function analyze(proposal = {}, { db = null, capabilityResolver = () => f
     S('CAPABILITY_CHECK', 'SKIPPED', {}, ['required-capabilities']);
   }
 
-  // 7) NECROPOLIS_CHECK
-  if (db && missionId && P.parameterVector && P.context) {
-    const region = fk.assessRegion(db, missionId, { context: P.context, parameterVector: P.parameterVector, scales: P.scales });
-    if (region.verdict === 'KNOWN_DEAD_END') { deadEnds.push(region); critical.push('matches a known dead-end region'); }
+  // 7) NECROPOLIS_CHECK — tenant-scoped failure memory. In the product path a projectId
+  //    is supplied and ONLY that tenant's regions are consulted (strict isolation).
+  //    Mission-scoped lookup is kept for the internal cognitive path (backward compatible).
+  if (db && P.parameterVector && P.context && (projectId || missionId)) {
+    const region = projectId
+      ? necro.assess(db, projectId, { context: P.context, parameterVector: P.parameterVector, scales: P.scales })
+      : fk.assessRegion(db, missionId, { context: P.context, parameterVector: P.parameterVector, scales: P.scales });
+    if (region.verdict === 'KNOWN_DEAD_END') { deadEnds.push(region); critical.push('matches a known dead-end region in this tenant\'s failure memory'); }
     else if (region.verdict === 'HIGH_FAILURE_SIMILARITY') { deadEnds.push(region); warnings.push('high-failure-similarity'); }
-    S('NECROPOLIS_CHECK', region.verdict === 'KNOWN_DEAD_END' ? 'BLOCK' : region.verdict === 'HIGH_FAILURE_SIMILARITY' ? 'WARN' : 'EXECUTED', { region });
+    S('NECROPOLIS_CHECK', region.verdict === 'KNOWN_DEAD_END' ? 'BLOCK' : region.verdict === 'HIGH_FAILURE_SIMILARITY' ? 'WARN' : 'EXECUTED', { region, scope: projectId ? 'tenant' : 'mission' });
   } else {
-    S('NECROPOLIS_CHECK', 'SKIPPED', {}, ['parameter-vector+context']);
+    S('NECROPOLIS_CHECK', 'SKIPPED', {}, ['parameter-vector+context+tenant']);
   }
 
   // 8) SPECULATIVE_PHYSICS_ADVERSARY
@@ -141,7 +182,7 @@ export function analyze(proposal = {}, { db = null, capabilityResolver = () => f
   }
 
   // 10) EPISTEMIC_PRIORITY / CHEAPEST FALSIFICATION
-  const falsification = cheapestFalsification({ unresolvedAssumptions, missingInfo, dimensionalInconsistencies, physicalViolations, capabilityGaps });
+  const falsification = cheapestFalsification({ unresolvedAssumptions, missingInfo, dimensionalInconsistencies, physicalViolations: [...physicalViolations, ...constraintViolations.map((c) => c.detail)], capabilityGaps });
   S('EPISTEMIC_PRIORITY', 'EXECUTED', { falsification });
 
   // 11) KILL-SWITCH DECISION
@@ -164,6 +205,7 @@ export function analyze(proposal = {}, { db = null, capabilityResolver = () => f
     criticalFailures: critical, unresolvedAssumptions, missingInformation: missingInfo,
     dimensionalInconsistencies, physicalConstraintViolations: physicalViolations,
     knownDeadEndSimilarities: deadEnds.map((d) => d.verdict ?? d), capabilityGaps, speculativeClaims: speculative,
+    constraintViolations, unsupportedDomains,
     highestValueNextExperiment: falsification.recommendation ?? null,
     cheapestFalsificationTest: falsification.recommendation ?? null,
     recommendedEvidenceRequired: missingInfo,
@@ -183,8 +225,8 @@ export function analyze(proposal = {}, { db = null, capabilityResolver = () => f
   const decisionHash = canonicalHash(decisionCore);
   const certificate = { ...decisionCore, decisionHash, provenance: { hashAlgo: 'sha256', reproducible: 'decisionHash is stable for identical canonical input + engine versions' } };
 
-  if (db) store.saveTruthAnalysis(db, { proposalHash, decision, decisionHash, certificate });
-  return { proposalHash, stages, decision: explanation, certificate };
+  if (db) store.saveTruthAnalysis(db, { proposalHash, projectId, decision, decisionHash, certificate });
+  return { proposalHash, projectId, stages, decision: explanation, certificate };
 }
 
 /** Cheapest / highest-information next validation step (Phase D). Uses epistemic priority. */

@@ -87,3 +87,61 @@ test('recommendStrategy with no history → honest gap, no fabricated recommenda
   assert.match(rec.reason, /no prior strategy history|CAPABILITY_GAP/);
   db.close();
 });
+
+/* ---- Regression: funnel-campaign outcome mapping (Commercial Hardening Phase 5) ---- */
+import * as mf from './cognitive/molecularFunnel.mjs';
+
+// A candidate the real deterministic critic rejects (heavy + very lipophilic + 3 Lipinski violations).
+const REJECT_ENGINES = {
+  validate: (s) => ({ ok: true, canonicalSmiles: s }),
+  descriptors: () => ({ ok: true, data: { molWt: 900, crippenLogP: 8, lipinskiViolations: 3, canonicalSmiles: 'x' } }),
+  alerts: () => ({ ok: true, alerts: [], nAlerts: 0, engine: 'RDKit' }),
+  novelty: () => ({ ok: true, maxTanimoto: null, nReference: 0 }),
+  saScore: () => ({ ok: true, saScore: 2.5 }),
+  admet: () => ({ ok: true, predictions: [{ hERG_drugbank_approved_percentile: 20 }], version: '2.0.1' }),
+};
+
+test('regression: funnel that rejects EVERY candidate is a valid completion, NOT MISSION_FAILURE', () => {
+  const db = openDatabase(':memory:');
+  const m = ev.createMission(db, { goal: 'kill-them-all' });
+  mf.runFunnel(db, { missionId: m.id, smiles: 'BIGMOL1', engines: REJECT_ENGINES });
+  mf.runFunnel(db, { missionId: m.id, smiles: 'BIGMOL2', engines: REJECT_ENGINES });
+  const c = meta.classifyOutcome(db, m.id);
+  assert.notEqual(c.outcomeClass, 'MISSION_FAILURE'); // the defect: this used to be MISSION_FAILURE
+  assert.equal(c.outcomeClass, 'FUNNEL_COMPLETE');    // decisive rejection = valid negative result
+  assert.match(c.reasons.join(' '), /valid negative result|reached a terminal decision/);
+  db.close();
+});
+
+test('regression: a surviving candidate makes the funnel a SUCCESS', () => {
+  const db = openDatabase(':memory:');
+  const m = ev.createMission(db, { goal: 'find-one' });
+  mf.runFunnel(db, { missionId: m.id, smiles: 'CCO', engines: {
+    validate: (s) => ({ ok: true, canonicalSmiles: s }),
+    descriptors: () => ({ ok: true, data: { molWt: 250, crippenLogP: 2.1, lipinskiViolations: 0, canonicalSmiles: 'x' } }),
+    alerts: () => ({ ok: true, alerts: [], nAlerts: 0, engine: 'RDKit' }),
+    novelty: () => ({ ok: true, maxTanimoto: null, nReference: 0 }),
+    saScore: () => ({ ok: true, saScore: 2.5 }),
+    admet: () => ({ ok: true, predictions: [{ hERG_drugbank_approved_percentile: 20 }], version: '2.0.1' }),
+  } });
+  assert.equal(meta.classifyOutcome(db, m.id).outcomeClass, 'SUCCESS');
+  db.close();
+});
+
+test('regression: genuine failure path preserved — candidate with no decision stays MISSION_FAILURE', () => {
+  const db = openDatabase(':memory:');
+  const m = ev.createMission(db, { goal: 'broken-funnel' });
+  // Persist a candidate that never ran to any stage/decision (default surviving, no stages).
+  store.saveFunnelCandidate(db, { missionId: m.id, canonicalSmiles: 'CCO', molecularHash: 'deadbeef01' });
+  assert.equal(meta.classifyOutcome(db, m.id).outcomeClass, 'MISSION_FAILURE');
+  db.close();
+});
+
+test('regression: partially-run funnel is INSUFFICIENT_EVIDENCE, honestly incomplete', () => {
+  const db = openDatabase(':memory:');
+  const m = ev.createMission(db, { goal: 'half-run' });
+  mf.runFunnel(db, { missionId: m.id, smiles: 'BIGMOL1', engines: REJECT_ENGINES }); // decided (rejected)
+  store.saveFunnelCandidate(db, { missionId: m.id, canonicalSmiles: 'CCN', molecularHash: 'undecided99' }); // undecided
+  assert.equal(meta.classifyOutcome(db, m.id).outcomeClass, 'INSUFFICIENT_EVIDENCE');
+  db.close();
+});

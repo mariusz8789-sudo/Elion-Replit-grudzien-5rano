@@ -21,6 +21,7 @@ import * as ti from './targetIntelligence.mjs';
 import * as reasoning from './reasoningBrain.mjs';
 import { ingestBundle } from '../corpus/corpusIngest.mjs';
 import { truthFinalGate, detectConflicts } from '../campaign/campaignRunner001.mjs';
+import { predictOffTarget, OFF_TARGET_PANEL } from './offTarget.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
 
 export const CAMPAIGN_V2_VERSION = 'genesis-discovery-campaign/2';
@@ -39,6 +40,7 @@ export function defaultDeps() {
     buildClaimRegistry: ei.buildClaimRegistry,
     targetFunnel: ti.targetFunnel,
     requestReasoning: reasoning.requestReasoning,
+    predictOffTarget,
     runCandidateGenerationV2: candGen.runCandidateGenerationV2,
     truthFinalGate,
     detectConflicts,
@@ -132,6 +134,13 @@ export function runDiscoveryCampaignV2(opts = {}) {
   const rankByCand = new Map(gen.ranking.map((r) => [r.candidateId, r]));
   const candidates = gen.candidates.map((c) => ({ ...c, ranking: rankByCand.get(c.candidateId) ?? null }));
 
+  // ── 5b) OFF-TARGET PREDICTION (real ADMET-AI Tox21/liability panel per candidate) ──────────────
+  for (const c of candidates) c.offTarget = deps.predictOffTarget(c.engineOutputs?.admet?.predictions ?? null);
+  const otDone = candidates.filter((c) => c.offTarget?.status === 'COMPLETED');
+  const riskDist = { LOW: 0, MEDIUM: 0, HIGH: 0 };
+  for (const c of otDone) riskDist[c.offTarget.risk] = (riskDist[c.offTarget.risk] ?? 0) + 1;
+  mark('OFF_TARGET', otDone.length ? 'COMPLETED' : 'BLOCKED_BY_RESOURCES', otDone.length ? `${otDone.length} scored — HIGH:${riskDist.HIGH} MED:${riskDist.MEDIUM} LOW:${riskDist.LOW}` : 'no ADMET predictions');
+
   // funnel: survivors vs rejected
   for (const c of candidates) { const t = triage(c, triageConfig); c.survives = t.survives; c.rejectionReasons = t.rejectionReasons; }
   const survivors = candidates.filter((c) => c.survives).sort((a, b) => (b.ranking?.finalScore ?? 0) - (a.ranking?.finalScore ?? 0) || a.candidateId.localeCompare(b.candidateId));
@@ -207,6 +216,9 @@ export function runDiscoveryCampaignV2(opts = {}) {
         descriptors: c.engineOutputs?.rdkit?.descriptors ?? null,   // (3) descriptors (RDKit)
         structuralAlerts: c.engineOutputs?.rdkit?.structuralAlerts ?? null,
         admet: c.engineOutputs?.admet?.ok ? { epistemicStatus: 'MODEL_INFERRED', predictions: c.engineOutputs.admet.predictions } : { status: c.engineOutputs?.admet?.status ?? 'UNAVAILABLE' }, // (4) ADMET
+        offTarget: c.offTarget?.status === 'COMPLETED'
+          ? { risk: c.offTarget.risk, confidence: c.offTarget.confidence, selectivity: c.offTarget.selectivity, offTargetHits: c.offTarget.offTargetHits, toxicityFlags: c.offTarget.toxicityFlags, explanation: c.offTarget.explanation, epistemicStatus: c.offTarget.epistemicStatus, evidence: c.offTarget.evidence, topOffTargets: c.offTarget.offTargets.filter((o) => o.flag !== 'NONE').slice(0, 5) }
+          : { status: c.offTarget?.status ?? 'UNAVAILABLE', reason: c.offTarget?.reason },
         docking: dockRes,                                    // (5) docking
         truthEngineDecision: truthGate.decision,             // (6) Truth Engine decision
         provenance: { candidateOrigin: 'RDKit SMARTS analogue enumeration (COMPUTED)', parentSmiles: c.parentSmiles, transformation: c.transformation, seed: c.seedName, evidenceProvenance: evProvenance, rankingPolicyVersion: c.ranking?.rankingPolicyVersion }, // (7) provenance
@@ -247,8 +259,17 @@ export function runDiscoveryCampaignV2(opts = {}) {
     docking: { status: dockingStatus, bindingSiteMethod: dockedList[0]?.bindingSiteMethod ?? null, docked: dockedList.length, bestAffinityKcalMol: affinities.length ? Math.min(...affinities) : null, affinityRangeKcalMol: affinities.length ? [Math.min(...affinities), Math.max(...affinities)] : null, epistemicStatus: 'MODEL_ESTIMATE' },
     mcre: { conflicts: conflicts.length, unresolvedConflicts, policyPreserved: 'Ki/IC50/Kd/EC50 kept distinct' },
     truthEngine: { decision: truthGate.decision, rejections: truthGate.rejections.length, boundedClaim: truthGate.boundedClaim ?? null },
+    offTarget: { status: otDone.length ? 'COMPLETED' : 'BLOCKED_BY_RESOURCES', scored: otDone.length, riskDistribution: riskDist, panelSize: OFF_TARGET_PANEL.length, epistemicStatus: 'MODEL_INFERRED' },
     reasoning: { status: reasoningLedger.status, capability: reasoningLedger.capability },
   };
+  // Risk-adjusted ranking (uses off-target liability during ranking, without altering the base
+  // deterministic policy): base score minus a transparent off-target penalty (HIGH 0.15 / MED 0.06).
+  const otPenalty = { HIGH: 0.15, MEDIUM: 0.06, LOW: 0 };
+  const riskAdjustedRanking = candidates
+    .map((c) => ({ candidateId: c.candidateId, smiles: c.canonicalSmiles, baseScore: c.ranking?.finalScore ?? 0, offTargetRisk: c.offTarget?.risk ?? 'UNKNOWN', penalty: otPenalty[c.offTarget?.risk] ?? 0, riskAdjustedScore: +Math.max(0, (c.ranking?.finalScore ?? 0) - (otPenalty[c.offTarget?.risk] ?? 0)).toFixed(6) }))
+    .sort((a, b) => b.riskAdjustedScore - a.riskAdjustedScore || a.candidateId.localeCompare(b.candidateId))
+    .slice(0, 10)
+    .map((r, i) => ({ rank: i + 1, ...r }));
   const remainingUncertainty = [
     'No measured binding affinity — docking scores are Vina MODEL_ESTIMATE, not experimental Kd/IC50.',
     'ADMET endpoints are MODEL_INFERRED (ADMET-AI), not measured in vitro/in vivo.',
@@ -279,6 +300,7 @@ export function runDiscoveryCampaignV2(opts = {}) {
     necropolisDelta,
     workflowMutation,
     benchmark,
+    riskAdjustedRanking,
     remainingUncertainty,
     experimentalRecommendations,
     candidates: perCandidate,

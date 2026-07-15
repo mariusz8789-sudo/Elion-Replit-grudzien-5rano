@@ -39,6 +39,7 @@ function fakeDeps({ dockAvailable = true, gate = 'PROCEED' } = {}) {
       buildClaimRegistry: () => ({ registry: [{ claimId: 'c1', normalizedClaim: 'x', status: 'SUPPORTED', supportingEvidenceIds: ['ev1'] }] }),
       targetFunnel: () => ({ primaryGate: { gate }, primaryTarget: { targetName: 'T1' }, scoringPolicyVersion: 'v1', alternatives: [] }),
       requestReasoning: () => ({ capability: 'target_reasoning', status: 'CAPABILITY_BLOCKED', label: 'HUMAN_REVIEW_REQUIRED', requestHash: 'rh', routeStatus: 'CAPABILITY_GAP', output: null, note: 'no live provider (CAPABILITY_BLOCKED)' }),
+      predictOffTarget: (preds) => (preds ? { status: 'COMPLETED', version: 'genesis-offtarget/1', epistemicStatus: 'MODEL_INFERRED', risk: 'LOW', confidence: 0.8, selectivity: 1, offTargetHits: { strong: 0, weak: 0, panelSize: 17 }, toxicityFlags: { strong: 0, severeStrong: 0, panelSize: 6 }, offTargets: [], toxicity: [], explanation: 'low', evidence: { source: 'ADMET-AI', epistemicStatus: 'MODEL_INFERRED' } } : { status: 'BLOCKED_BY_RESOURCES' }),
       runCandidateGenerationV2: () => ({ status: 'COMPLETED_RANKED', candidates, ranking, engineMatrix: { RDKit: { status: 'AVAILABLE' }, 'ADMET-AI': { status: 'AVAILABLE' } } }),
       truthFinalGate: () => ({ decision: 'GO_COMPUTATIONAL', rejections: [] }),
       detectConflicts: () => [],
@@ -66,9 +67,16 @@ describe('discoveryCampaignV2 — full chain (fake deps)', () => {
     assert.ok(b.realEnginesExecuted.some((e) => e.includes('Vina')));
     // stage ledger covers the whole pipeline incl. the Reasoning Brain step
     const stageNames = r.stages.map((s) => s.stage);
-    for (const s of ['EVIDENCE', 'TARGET_INTELLIGENCE', 'REASONING_BRAIN', 'CANDIDATE_GEN_V2', 'RDKIT', 'ADMET', 'DOCKING', 'TRUTH_ENGINE', 'MCRE', 'NECROPOLIS', 'WORKFLOW_MUTATION']) {
+    for (const s of ['EVIDENCE', 'TARGET_INTELLIGENCE', 'REASONING_BRAIN', 'CANDIDATE_GEN_V2', 'RDKIT', 'ADMET', 'OFF_TARGET', 'DOCKING', 'TRUTH_ENGINE', 'MCRE', 'NECROPOLIS', 'WORKFLOW_MUTATION']) {
       assert.ok(stageNames.includes(s), `missing stage ${s}`);
     }
+    // off-target prediction integrated into summaries, per-candidate, and a risk-adjusted ranking
+    assert.equal(r.dossier.summaries.offTarget.status, 'COMPLETED');
+    assert.equal(r.dossier.summaries.offTarget.epistemicStatus, 'MODEL_INFERRED');
+    assert.ok('offTarget' in r.dossier.candidates[0]);
+    assert.equal(r.dossier.candidates[0].offTarget.risk, 'LOW');
+    assert.ok(Array.isArray(r.dossier.riskAdjustedRanking) && r.dossier.riskAdjustedRanking.length > 0);
+    assert.ok(r.dossier.riskAdjustedRanking.every((x) => 'offTargetRisk' in x && 'riskAdjustedScore' in x));
     // Reasoning Brain honestly blocked without a live model — never fabricated
     assert.equal(r.dossier.reasoningLedger.status, 'CAPABILITY_BLOCKED');
     // mandated campaign-level dossier sections

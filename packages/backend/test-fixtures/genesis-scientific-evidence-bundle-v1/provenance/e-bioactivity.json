@@ -1,0 +1,9 @@
+{
+  "provenanceId": "prov_e-bioactivity",
+  "sourceService": "CHEMBL",
+  "sourceId": "ACT_TESTFIX",
+  "sourceUrl": "https://www.ebi.ac.uk/chembl/",
+  "retrievedAt": null,
+  "sourceVersion": "TEST_FIXTURE",
+  "note": "SYNTHETIC TEST FIXTURE — not acquired from any live source; retrievedAt is null because there was no retrieval."
+}

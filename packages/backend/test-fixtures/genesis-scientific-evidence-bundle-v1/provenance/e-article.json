@@ -1,0 +1,9 @@
+{
+  "provenanceId": "prov_e-article",
+  "sourceService": "EUROPE_PMC",
+  "sourceId": "TESTFIX1",
+  "sourceUrl": "https://europepmc.org/abstract/MED/TESTFIX1",
+  "retrievedAt": null,
+  "sourceVersion": "TEST_FIXTURE",
+  "note": "SYNTHETIC TEST FIXTURE — not acquired from any live source; retrievedAt is null because there was no retrieval."
+}

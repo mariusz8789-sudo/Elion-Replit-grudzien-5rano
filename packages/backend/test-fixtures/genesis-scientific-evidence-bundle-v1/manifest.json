@@ -1,0 +1,79 @@
+{
+  "manifestVersion": "genesis-scientific-evidence-bundle-v1",
+  "bundleId": "genesis-testfix-bundle-1",
+  "ingestionMode": "TEST_FIXTURE",
+  "note": "SYNTHETIC TEST FIXTURE bundle. All payloads are fabricated for pipeline testing and are classified TEST_FIXTURE. NOT real scientific evidence.",
+  "builtBy": "build-fixture-bundle.mjs",
+  "entries": [
+    {
+      "entryId": "e-article",
+      "sourceService": "EUROPE_PMC",
+      "sourceType": "article",
+      "sourceId": "TESTFIX1",
+      "payloadRef": "payloads/articles/EPMC_TESTFIX1.json",
+      "sourceUrl": "https://europepmc.org/abstract/MED/TESTFIX1",
+      "license": "CC-BY",
+      "parserVersion": "v1",
+      "contentHash": "37f283b0bf51fc4434aa3859092e54003b0b4aadd8852421fe423943ab652009",
+      "hashAlgorithm": "sha256",
+      "provenanceRef": "provenance/e-article.json",
+      "retrievedAt": null
+    },
+    {
+      "entryId": "e-structure",
+      "sourceService": "RCSB_PDB",
+      "sourceType": "structure",
+      "sourceId": "TESTFIX",
+      "payloadRef": "payloads/structures/PDB_TESTFIX.json",
+      "sourceUrl": "https://www.rcsb.org/structure/TESTFIX",
+      "license": "CC0",
+      "parserVersion": "v1",
+      "contentHash": "d79748bae15e5aae30522269453ea79ff2df2c04467e8a0bcb6aed8249e74b77",
+      "hashAlgorithm": "sha256",
+      "provenanceRef": "provenance/e-structure.json",
+      "retrievedAt": null
+    },
+    {
+      "entryId": "e-compound",
+      "sourceService": "PUBCHEM",
+      "sourceType": "compound",
+      "sourceId": "999999999",
+      "payloadRef": "payloads/compounds/CID_TESTFIX.json",
+      "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/compound/999999999",
+      "license": "PUBLIC_DOMAIN",
+      "parserVersion": "v1",
+      "contentHash": "3824822ad1079b1b8ebb90763590c7e5cdd8c047467e452736ab363ff78b3379",
+      "hashAlgorithm": "sha256",
+      "provenanceRef": "provenance/e-compound.json",
+      "retrievedAt": null
+    },
+    {
+      "entryId": "e-protein",
+      "sourceService": "UNIPROT",
+      "sourceType": "protein",
+      "sourceId": "TESTFX",
+      "payloadRef": "payloads/proteins/UNIPROT_TESTFIX.json",
+      "sourceUrl": "https://www.uniprot.org/uniprotkb/TESTFX",
+      "license": "CC-BY",
+      "parserVersion": "v1",
+      "contentHash": "b2e7341d1931df68ff500bb2a3e499f97e161a6e708d3fbc35a0f2b5d7ecd7fc",
+      "hashAlgorithm": "sha256",
+      "provenanceRef": "provenance/e-protein.json",
+      "retrievedAt": null
+    },
+    {
+      "entryId": "e-bioactivity",
+      "sourceService": "CHEMBL",
+      "sourceType": "bioactivity",
+      "sourceId": "ACT_TESTFIX",
+      "payloadRef": "payloads/bioactivity/CHEMBL_TESTFIX.json",
+      "sourceUrl": "https://www.ebi.ac.uk/chembl/",
+      "license": "CC-BY-SA",
+      "parserVersion": "v1",
+      "contentHash": "9df0d5d5437da9eebee9151f9aa9d332d9494b390e25d78e2bd709d54f367eaf",
+      "hashAlgorithm": "sha256",
+      "provenanceRef": "provenance/e-bioactivity.json",
+      "retrievedAt": null
+    }
+  ]
+}

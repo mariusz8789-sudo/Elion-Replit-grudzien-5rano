@@ -103,6 +103,25 @@ def main():
 
     cmd = req.get("cmd")
 
+    # `detect` is CHEAP: check the package is installed + read its version WITHOUT the
+    # heavy `import admet_ai` (which loads torch/chemprop and takes many seconds). Doing the
+    # heavy import for detection caused concurrent test-worker subprocesses to saturate the
+    # machine and trip the detect timeout, producing spurious capability skips. Availability
+    # detection must never depend on loading the ML stack.
+    if cmd == "detect":
+        import importlib.util
+        if importlib.util.find_spec("admet_ai") is None:
+            print(json.dumps({"ok": False, "error": "admet_ai_unavailable: package not installed"}))
+            return
+        try:
+            import importlib.metadata
+            version = importlib.metadata.version("admet_ai")
+        except Exception:  # noqa: BLE001
+            version = "2.0.1"
+        print(json.dumps({"ok": True, "version": version}))
+        return
+
+    # Every OTHER command genuinely needs the model stack — pay the heavy import here only.
     try:
         import admet_ai
     except Exception as e:  # noqa: BLE001
@@ -110,10 +129,6 @@ def main():
         return
 
     version = getattr(admet_ai, "__version__", "2.0.1")
-
-    if cmd == "detect":
-        print(json.dumps({"ok": True, "version": version}))
-        return
 
     if cmd == "endpoints":
         try:

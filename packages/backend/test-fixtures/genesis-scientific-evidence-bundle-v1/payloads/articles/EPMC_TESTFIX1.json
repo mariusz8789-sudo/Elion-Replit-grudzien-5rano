@@ -1,0 +1,11 @@
+{
+  "pmid": "TESTFIX1",
+  "doi": "10.0000/genesis-test-fixture-1",
+  "title": "[TEST FIXTURE] Synthetic article on a synthetic target",
+  "authorString": "Fixture A, Fixture B",
+  "journalTitle": "Journal of Test Fixtures",
+  "firstPublicationDate": "2024-01-01",
+  "pubType": "research-article",
+  "isOpenAccess": "Y",
+  "abstractText": "SYNTHETIC abstract for pipeline testing only."
+}

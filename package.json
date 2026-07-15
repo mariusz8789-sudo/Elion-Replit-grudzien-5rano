@@ -23,7 +23,8 @@
     "campaign:validate": "node scripts/validation-campaign.mjs",
     "benchmark": "node scripts/benchmark-suite.mjs",
     "benchmark:cognitive": "node scripts/cognitive-benchmark.mjs",
-    "trial:discovery": "node scripts/genesis-discovery-trial.mjs"
+    "trial:discovery": "node scripts/genesis-discovery-trial.mjs",
+    "campaign:zefir": "node scripts/zefir-discovery-campaign.mjs"
   },
   "keywords": [
     "genesis-os",

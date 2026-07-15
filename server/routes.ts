@@ -230,10 +230,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(company);
   });
 
-  app.post("/api/companies", async (req, res) => {
+  // Registering a company both creates the company row and links the requesting user to
+  // it as its owner - previously this endpoint created an orphaned company with no way for
+  // any user to ever become associated with it, since nothing else in the app can set
+  // users.companyId/role.
+  app.post("/api/companies", requireAuth, async (req, res) => {
     try {
+      const user = req.user as User;
+      if (user.companyId) {
+        return res.status(409).json({ message: "You already belong to a company" });
+      }
       const companyData = insertCompanySchema.parse(req.body);
       const company = await storage.createCompany(companyData);
+      const linkedUser = await storage.linkUserToCompany(user.id, company.id, "company");
+      if (!linkedUser) {
+        return res.status(409).json({ message: "You already belong to a company" });
+      }
       res.status(201).json(company);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -247,6 +259,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: "Company not found" });
     }
     res.json(company);
+  });
+
+  // Lets a company look up an existing, not-yet-linked user by phone number before
+  // inviting them as a driver (POST /api/drivers requires an existing userId). Scoped to
+  // authenticated company users and returns only the minimal fields needed to confirm
+  // identity - never exposed as a general, unauthenticated phone-to-user lookup.
+  app.get("/api/users/lookup-for-driver-invite", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!user.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Only company accounts can look up drivers to invite" });
+    }
+    const phone = String(req.query.phone || "");
+    if (!phone) {
+      return res.status(400).json({ message: "phone is required" });
+    }
+    const found = await storage.getUserByPhone(phone);
+    if (!found) {
+      return res.status(404).json({ message: "No account found with that phone number" });
+    }
+    if (found.companyId) {
+      return res.status(409).json({ message: "This user is already linked to a company" });
+    }
+    res.json({ id: found.id, name: found.name, phone: found.phone });
   });
 
   // === DRIVER ROUTES ===
@@ -275,7 +310,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (user.companyId !== driverData.companyId && user.role !== "admin") {
         return res.status(403).json({ message: "Not authorized to add a driver for this company" });
       }
+      const targetUser = await storage.getUser(driverData.userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "No user account found for this driver" });
+      }
+      if (targetUser.companyId && targetUser.companyId !== driverData.companyId) {
+        return res.status(409).json({ message: "This user already belongs to a different company" });
+      }
       const driver = await storage.createDriver(driverData);
+      // Link the driver's own account too, not just the drivers row - otherwise the
+      // driver could never see driver-scoped views or pass company-ownership checks
+      // that key off users.companyId (e.g. assigning themselves to a booking).
+      await storage.linkUserToCompany(driverData.userId, driverData.companyId, "driver");
       res.status(201).json(driver);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -688,6 +734,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/offers", requireAuth, async (req, res) => {
     try {
       const offerData = insertOfferSchema.parse(req.body);
+      const user = req.user as User;
+      // Without this check any authenticated user could submit a bid claiming to be from
+      // any company by simply passing a different companyId in the body.
+      if (user.companyId !== offerData.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to submit an offer for this company" });
+      }
+      const booking = await storage.getBooking(offerData.bookingId);
+      if (!booking || !booking.isPublic || booking.status !== "posted") {
+        return res.status(400).json({ message: "This booking is not open for offers" });
+      }
       const offer = await storage.createOffer(offerData);
       res.status(201).json(offer);
     } catch (error: any) {
@@ -1067,6 +1123,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
+  });
+
+  app.patch("/api/vehicles/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = (await db.select().from(vehicles).where(eq(vehicles.id, req.params.id)))[0];
+      if (!existing) {
+        return res.status(404).json({ message: "Vehicle not found" });
+      }
+      const user = req.user as User;
+      if (user.companyId !== existing.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to update this vehicle" });
+      }
+      const patch = insertVehicleSchema.partial().omit({ companyId: true }).parse(req.body);
+      const result = await db.update(vehicles).set(patch).where(eq(vehicles.id, req.params.id)).returning();
+      res.json(result[0]);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/vehicles/:id", requireAuth, async (req, res) => {
+    const existing = (await db.select().from(vehicles).where(eq(vehicles.id, req.params.id)))[0];
+    if (!existing) {
+      return res.status(404).json({ message: "Vehicle not found" });
+    }
+    const user = req.user as User;
+    if (user.companyId !== existing.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized to delete this vehicle" });
+    }
+    await db.delete(vehicles).where(eq(vehicles.id, req.params.id));
+    res.status(204).send();
   });
 
   // === CARPOOLING ROUTES ===

@@ -53,7 +53,8 @@ export interface IStorage {
   getUserByPhone(phone: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+  linkUserToCompany(userId: string, companyId: string, role: "company" | "driver"): Promise<User | undefined>;
+
   // Company operations
   getAllCompanies(): Promise<Company[]>;
   getCompany(id: string): Promise<Company | undefined>;
@@ -263,6 +264,16 @@ export class DbStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  // Only links a user who isn't already linked to a company, so a company-onboarding
+  // request can't silently reassign an existing driver/company-owner to a different one.
+  async linkUserToCompany(userId: string, companyId: string, role: "company" | "driver"): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ companyId, role })
+      .where(and(eq(users.id, userId), isNull(users.companyId)))
+      .returning();
     return result[0];
   }
 

@@ -21,6 +21,7 @@ import logoPath from "@assets/file_0000000037a86243bd21599fc142fdaa_176005764253
 const BookingFlow = lazy(() => import("@/components/BookingFlow"));
 const TrackingPage = lazy(() => import("@/components/TrackingPage"));
 const CustomerDashboard = lazy(() => import("@/components/CustomerDashboard"));
+const CompanyDashboard = lazy(() => import("@/components/CompanyDashboard"));
 const AdminPanel = lazy(() => import("@/components/AdminPanel"));
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
 const BookingDetailPage = lazy(() => import("@/pages/BookingDetailPage"));
@@ -67,15 +68,22 @@ function LandingPage() {
               <ThemeToggle />
               {user ? (
                 <>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setLocation("/bookings")}
                     data-testid="button-view-bookings"
                   >
                     {t('nav.myBookings')}
                   </Button>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="outline"
+                    onClick={() => setLocation("/company")}
+                    data-testid="button-company-dashboard"
+                  >
+                    {t('nav.company', 'Company')}
+                  </Button>
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={() => logout()}
                     data-testid="button-logout"
@@ -177,6 +185,32 @@ function TrackPage() {
   );
 }
 
+function CompanyPage() {
+  const [, setLocation] = useLocation();
+
+  return (
+    <div className="min-h-screen bg-background">
+      <nav className="sticky top-0 z-50 bg-card border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <button
+              onClick={() => setLocation("/")}
+              className="flex items-center hover-elevate px-2 py-1 rounded"
+            >
+              <img src={logoPath} alt="Point to Point" className="h-12 w-auto" />
+            </button>
+            <ThemeToggle />
+          </div>
+        </div>
+      </nav>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <CompanyDashboard />
+      </div>
+    </div>
+  );
+}
+
 function AdminPage() {
   const [, setLocation] = useLocation();
   
@@ -213,6 +247,7 @@ function Router() {
         <Route path="/track/:id" component={TrackPage} />
         <Route path="/bookings/:bookingId" component={BookingDetailPage} />
         <Route path="/bookings" component={BookingsPage} />
+        <Route path="/company" component={CompanyPage} />
         <Route path="/marketplace" component={MarketplacePage} />
         <Route path="/eco" component={EcoPage} />
         <Route path="/carpool" component={CarpoolPage} />

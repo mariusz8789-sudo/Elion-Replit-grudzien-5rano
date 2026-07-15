@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Plus, Package, Ruler } from "lucide-react";
+import { Truck, Plus, Package, Ruler, Trash2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ImageUpload from "./ImageUpload";
@@ -77,6 +77,34 @@ export default function VehicleManager({ companyId }: { companyId: string }) {
         description: "Failed to add vehicle",
         variant: "destructive",
       });
+    },
+  });
+
+  const toggleAvailableMutation = useMutation({
+    mutationFn: async ({ id, available }: { id: string; available: boolean }) => {
+      const response = await apiRequest("PATCH", `/api/vehicles/${id}`, { available });
+      if (!response.ok) throw new Error("Failed to update vehicle");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles", companyId] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update vehicle", variant: "destructive" });
+    },
+  });
+
+  const deleteVehicleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/vehicles/${id}`);
+      if (!response.ok) throw new Error("Failed to remove vehicle");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles", companyId] });
+      toast({ title: "Vehicle removed" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove vehicle", variant: "destructive" });
     },
   });
 
@@ -298,6 +326,27 @@ export default function VehicleManager({ companyId }: { companyId: string }) {
                     <span className="text-muted-foreground">{vehicle.dimensions}</span>
                   </div>
                 )}
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => toggleAvailableMutation.mutate({ id: vehicle.id, available: !vehicle.available })}
+                    disabled={toggleAvailableMutation.isPending}
+                    data-testid={`button-toggle-vehicle-${vehicle.id}`}
+                  >
+                    Mark {vehicle.available ? "In Use" : "Available"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => deleteVehicleMutation.mutate(vehicle.id)}
+                    disabled={deleteVehicleMutation.isPending}
+                    data-testid={`button-delete-vehicle-${vehicle.id}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

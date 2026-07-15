@@ -15,9 +15,9 @@ function fakeProvider(id, roles, { available = true, priority = 100, text = 'ok'
   return { id, modelId: `${id}-v1`, roles, priority, available: () => available, complete: () => ({ text, usage: { tokensIn, tokensOut } }) };
 }
 
-test('v10 migration adds model_decisions and bumps user_version to 10', () => {
+test('v10 migration adds model_decisions and schema is at least v10', () => {
   const db = openDatabase(':memory:');
-  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 10);
+  assert.ok(db.prepare('PRAGMA user_version').get().user_version >= 10);
   assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='model_decisions'").get());
   db.close();
 });

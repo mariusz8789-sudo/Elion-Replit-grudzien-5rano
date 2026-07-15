@@ -513,8 +513,31 @@ CREATE INDEX IF NOT EXISTS idx_model_decisions_mission ON model_decisions(missio
 CREATE INDEX IF NOT EXISTS idx_model_decisions_role ON model_decisions(role, created_at);
 `;
 
+// Dynamic Agent Fabric (Priority 8): every agent invocation is traceable — role,
+// model decision, mission, input artifact hashes, output artifact hash, status,
+// failure reason. Append-only. Agents are role wrappers over real engines; this
+// records who did what, never chain-of-thought.
+const SCHEMA_V11 = `
+CREATE TABLE IF NOT EXISTS agent_invocations (
+  id                TEXT PRIMARY KEY,
+  mission_id        TEXT,
+  role              TEXT NOT NULL,
+  model_role        TEXT,
+  model_decision_id TEXT,
+  model_status      TEXT,
+  input_hashes_json TEXT NOT NULL DEFAULT '[]',
+  output_hash       TEXT,
+  output_json       TEXT,
+  status            TEXT NOT NULL,
+  failure_reason    TEXT,
+  created_at        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_agent_invocations_mission ON agent_invocations(mission_id, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 11) db.exec(SCHEMA_V11);
   if (version < 10) db.exec(SCHEMA_V10);
   if (version < 9) db.exec(SCHEMA_V9);
   if (version < 7) db.exec(SCHEMA_V7);
@@ -550,7 +573,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 10) db.exec('PRAGMA user_version = 10');
+  if (version < 11) db.exec('PRAGMA user_version = 11');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1628,4 +1651,34 @@ export function listModelDecisions(db, { missionId = null, role = null } = {}) {
   else if (role) rows = db.prepare('SELECT * FROM model_decisions WHERE role = ? ORDER BY created_at ASC').all(role);
   else rows = db.prepare('SELECT * FROM model_decisions ORDER BY created_at ASC').all();
   return rows.map(toModelDecision);
+}
+
+/* ---- agent_invocations (Priority 8 — traceable agent fabric, append-only) ---- */
+function toAgentInvocation(r) {
+  if (!r) return null;
+  return {
+    id: r.id, missionId: r.mission_id, role: r.role, modelRole: r.model_role,
+    modelDecisionId: r.model_decision_id, modelStatus: r.model_status,
+    inputHashes: JSON.parse(r.input_hashes_json), outputHash: r.output_hash,
+    output: r.output_json ? JSON.parse(r.output_json) : null, status: r.status,
+    failureReason: r.failure_reason, createdAt: r.created_at,
+  };
+}
+export function saveAgentInvocation(db, a) {
+  const id = a.id ?? newId();
+  db.prepare(
+    `INSERT INTO agent_invocations (id, mission_id, role, model_role, model_decision_id, model_status, input_hashes_json, output_hash, output_json, status, failure_reason, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, a.missionId ?? null, a.role, a.modelRole ?? null, a.modelDecisionId ?? null, a.modelStatus ?? null,
+    JSON.stringify(a.inputHashes ?? []), a.outputHash ?? null,
+    a.output != null ? JSON.stringify(a.output) : null, a.status, a.failureReason ?? null, Date.now(),
+  );
+  return getAgentInvocation(db, id);
+}
+export function getAgentInvocation(db, id) {
+  return toAgentInvocation(db.prepare('SELECT * FROM agent_invocations WHERE id = ?').get(id));
+}
+export function listAgentInvocations(db, missionId) {
+  return db.prepare('SELECT * FROM agent_invocations WHERE mission_id = ? ORDER BY created_at ASC').all(missionId).map(toAgentInvocation);
 }

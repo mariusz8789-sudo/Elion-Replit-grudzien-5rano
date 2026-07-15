@@ -697,3 +697,37 @@ export async function getNecropolisStats(token: string, projectId: string): Prom
   const r = await request<{ necropolis: NecropolisStats }>('GET', `/projects/${projectId}/necropolis`, { token });
   return r.ok ? { ok: true, data: r.data.necropolis } : r;
 }
+
+export interface PilotReport {
+  schema: string; projectId: string | null; analysisId: string | null; analysisDate: number | null;
+  proposalHash: string | null; finalDecision: KillSwitchDecision; decisionStrength: number | null; decisionHash: string | null;
+  criticalFailures: string[]; missingInformation: string[]; unresolvedAssumptions: string[];
+  constraintFindings: { id: string; detail: string }[]; dimensionalFindings: string[];
+  physicalConstraintViolations: string[]; capabilityGaps: string[]; unsupportedDomains: { domain: string; reason: string }[];
+  necropolisInfluence: { influenced: boolean; findings: string[] };
+  cheapestFalsification: { targetAssumption: string; recommendedTestType: string; requiredInput: string; relativeCostClass: string; priorityReason: string } | null;
+  highestValueNextAction: unknown;
+  reasonsToKill: string[]; reasonsNotToKill: string[];
+  enginesExecuted: string[]; enginesSkipped: { stage: string; reason: string }[];
+  certificate: { schema: string | null; engineVersions: Record<string, string> };
+  limitationStatement: string;
+}
+
+export interface AnalysisComparison {
+  earlier: { analysisId: string; decision: KillSwitchDecision; decisionHash: string; date: number };
+  later: { analysisId: string; decision: KillSwitchDecision; decisionHash: string; date: number };
+  decisionChanged: boolean; decisionHashChanged: boolean; from: KillSwitchDecision; to: KillSwitchDecision;
+  findingsChanged: Record<string, { added: string[]; removed: string[] }>;
+  necropolis: { earlierInfluenced: boolean; laterInfluenced: boolean; newlyInfluenced: boolean };
+}
+
+export async function getTruthReport(token: string, projectId: string, id: string): Promise<ApiResult<PilotReport>> {
+  const r = await request<{ report: PilotReport }>('GET', `/projects/${projectId}/truth-analyses/${id}/report`, { token });
+  return r.ok ? { ok: true, data: r.data.report } : r;
+}
+
+export async function compareTruthAnalyses(token: string, projectId: string, a: string, b: string): Promise<ApiResult<AnalysisComparison>> {
+  const params = new URLSearchParams({ a, b });
+  const r = await request<{ comparison: AnalysisComparison }>('GET', `/projects/${projectId}/truth-analyses/compare?${params.toString()}`, { token });
+  return r.ok ? { ok: true, data: r.data.comparison } : r;
+}

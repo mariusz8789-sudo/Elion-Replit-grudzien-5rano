@@ -122,8 +122,8 @@ export function analyze(proposal = {}, { db = null, capabilityResolver = () => f
   //     (energy, efficiency, mass, operating bounds, flow=V/t, power=E/t, geometry,
   //     material limits, conservation). Missing structured inputs → the constraint is
   //     SKIPPED, never a silent pass. A CRITICAL violation is a BLOCK with exact numbers.
-  const registryInputs = { energy: P.energy, efficiency: P.efficiency, efficiencyKind: P.efficiencyKind, mass: P.mass, operating: P.operating, flow: P.flow, power: P.power, geometry: P.geometry, materials: P.materials, accounting: P.accounting };
-  const anyStructured = P.energy || Number.isFinite(P.efficiency) || P.mass || P.operating || P.flow || P.power || P.geometry || (P.materials && P.materials.length) || P.accounting;
+  const registryInputs = { comparisons: P.comparisons, energy: P.energy, efficiency: P.efficiency, efficiencyKind: P.efficiencyKind, mass: P.mass, operating: P.operating, flow: P.flow, power: P.power, geometry: P.geometry, materials: P.materials, accounting: P.accounting };
+  const anyStructured = (P.comparisons && P.comparisons.length) || P.energy || Number.isFinite(P.efficiency) || P.mass || P.operating || P.flow || P.power || P.geometry || (P.materials && P.materials.length) || P.accounting;
   if (anyStructured || (P.requestedDomains && P.requestedDomains.length)) {
     const reg = cr.evaluateAll(registryInputs, { requestedDomains: P.requestedDomains ?? [] });
     reg.violations.forEach((v) => { constraintViolations.push({ id: v.id, detail: v.detail }); critical.push(`constraint "${v.id}" violated: ${v.detail}`); });

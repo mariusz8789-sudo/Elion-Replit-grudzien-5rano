@@ -4,7 +4,7 @@
  * and the ApiResult mapping. No React rendering (node test environment).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { runTruthAnalysis, listTruthAnalyses, getNecropolisStats } from '../core/backend/client';
+import { runTruthAnalysis, listTruthAnalyses, getNecropolisStats, getTruthReport, compareTruthAnalyses } from '../core/backend/client';
 
 function fakeResponse(status: number, body: unknown): Response {
   return { status, ok: status >= 200 && status < 300, json: () => Promise.resolve(body) } as unknown as Response;
@@ -49,5 +49,27 @@ describe('truth engine client', () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data.total).toBe(3);
     expect(fetchMock.mock.calls[0][0]).toBe('/api/projects/proj1/necropolis');
+  });
+});
+
+describe('truth engine report + compare client', () => {
+  it('getTruthReport GETs the stored-output report', async () => {
+    const report = { schema: 'zefir-pilot-report/1', finalDecision: 'BLOCK', limitationStatement: 'x' };
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(200, { report }));
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await getTruthReport('tok', 'proj1', 'a1');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data.finalDecision).toBe('BLOCK');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/projects/proj1/truth-analyses/a1/report');
+  });
+
+  it('compareTruthAnalyses GETs compare with a/b query params', async () => {
+    const comparison = { decisionChanged: true, from: 'GO', to: 'BLOCK', necropolis: { newlyInfluenced: true } };
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(200, { comparison }));
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await compareTruthAnalyses('tok', 'proj1', 'idA', 'idB');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data.to).toBe('BLOCK');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/projects/proj1/truth-analyses/compare?a=idA&b=idB');
   });
 });

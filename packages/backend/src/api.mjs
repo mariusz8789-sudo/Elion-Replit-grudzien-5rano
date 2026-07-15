@@ -75,6 +75,7 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns, getScienceRun } from './
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 import * as truthEngine from './cognitive/truthEngine.mjs';
 import * as necropolis from './cognitive/necropolis.mjs';
+import * as pilotReport from './cognitive/pilotReport.mjs';
 import { getTruthAnalysis, listTruthAnalyses } from './store.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
@@ -365,11 +366,21 @@ export function handleApi(db, ctx) {
         if (method === 'POST') return runTruthAnalysisHandler(db, role, projectId, body);
         return err(405, 'method_not_allowed');
       }
-      if (seg.length === 4 || (seg.length === 5 && seg[4] === 'certificate')) {
+      // /api/projects/:id/truth-analyses/compare?a=ID&b=ID — compare two stored analyses (viewer+).
+      if (seg.length === 4 && seg[3] === 'compare' && method === 'GET') {
+        const ia = typeof ctx.query?.a === 'string' ? ctx.query.a : null;
+        const ib = typeof ctx.query?.b === 'string' ? ctx.query.b : null;
+        const a = ia ? getTruthAnalysis(db, ia) : null; const b = ib ? getTruthAnalysis(db, ib) : null;
+        if (!a || a.projectId !== projectId || !b || b.projectId !== projectId) return err(404, 'not_found');
+        return ok({ comparison: pilotReport.compareReports(a, b) });
+      }
+      if (seg.length === 4 || (seg.length === 5 && (seg[4] === 'certificate' || seg[4] === 'report'))) {
         const a = getTruthAnalysis(db, seg[3]);
         if (!a || a.projectId !== projectId) return err(404, 'not_found'); // tenant isolation
         if (method !== 'GET') return err(405, 'method_not_allowed');
-        return seg.length === 5 ? ok({ certificate: a.certificate }) : ok({ analysis: a });
+        if (seg.length === 5 && seg[4] === 'certificate') return ok({ certificate: a.certificate });
+        if (seg.length === 5 && seg[4] === 'report') return ok({ report: pilotReport.buildReport(a) });
+        return ok({ analysis: a });
       }
       return err(404, 'not_found');
     }

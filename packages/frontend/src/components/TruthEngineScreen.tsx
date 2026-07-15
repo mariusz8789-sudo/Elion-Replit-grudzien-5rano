@@ -12,10 +12,12 @@ import { useEffect, useState } from 'react';
 import { useSession, getToken } from '../core/backend/session';
 import {
   listProjects, runTruthAnalysis, listTruthAnalyses, getTruthAnalysis, getNecropolisStats,
+  getTruthReport, compareTruthAnalyses,
   type Project, type TruthProposal, type TruthAnalysis, type TruthAnalysisSummary,
-  type KillSwitchDecision, type NecropolisStats,
+  type KillSwitchDecision, type NecropolisStats, type PilotReport, type AnalysisComparison,
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
+import { PilotReportView } from './PilotReportView';
 
 const DECISION_CLASS: Record<KillSwitchDecision, string> = {
   GO: 'pill-ok', WARN: 'pill-warn', BLOCK: 'pill-danger', INSUFFICIENT_DATA: 'pill-neutral',
@@ -40,6 +42,9 @@ export function TruthEngineScreen() {
   const [result, setResult] = useState<TruthAnalysis | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [compareSel, setCompareSel] = useState<string[]>([]);
+  const [comparison, setComparison] = useState<AnalysisComparison | null>(null);
+  const [report, setReport] = useState<PilotReport | null>(null);
 
   // Proposal fields
   const [problemStatement, setProblemStatement] = useState('');
@@ -143,6 +148,29 @@ export function TruthEngineScreen() {
     if (r.ok) setResult(r.data);
   }
 
+  function toggleCompare(id: string) {
+    setComparison(null);
+    setCompareSel((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id].slice(-2)));
+  }
+
+  async function doCompare() {
+    const token = getToken();
+    if (!token || !projectId || compareSel.length !== 2) return;
+    // Order by creation (history is newest-first): earlier = second selected, later = first.
+    const idxA = history.findIndex((h) => h.id === compareSel[0]);
+    const idxB = history.findIndex((h) => h.id === compareSel[1]);
+    const [earlier, later] = idxA > idxB ? [compareSel[0], compareSel[1]] : [compareSel[1], compareSel[0]];
+    const r = await compareTruthAnalyses(token, projectId, earlier, later);
+    if (r.ok) setComparison(r.data); else setError(r.message);
+  }
+
+  async function openReport(id: string) {
+    const token = getToken();
+    if (!token || !projectId) return;
+    const r = await getTruthReport(token, projectId, id);
+    if (r.ok) setReport(r.data); else setError(r.message);
+  }
+
   return (
     <div className="settings-view truth-engine">
       <h2>🛑 Truth Engine / R&amp;D Kill-Switch</h2>
@@ -243,22 +271,66 @@ export function TruthEngineScreen() {
       </div>
       {error && <p className="error-text" role="alert">{error}</p>}
 
-      {result && <TruthResult result={result} />}
+      {result && (
+        <TruthResult result={result} onReport={() => result.id && void openReport(result.id)} />
+      )}
 
       <section className="settings-section">
         <h3>Historia analiz (ten najemca)</h3>
+        <p className="settings-hint">Zaznacz dwie analizy, aby je porównać (co się zmieniło, czy Necropolis wpłynął na późniejszą).</p>
         {history.length === 0 && <p className="muted small">Brak analiz.</p>}
-        <ul className="plain-list">
+        <ul className="plain-list truth-history">
           {history.map((h) => (
             <li key={h.id}>
-              <button className="link-btn" onClick={() => void openHistory(h.id)}>
-                <span className={`pill ${DECISION_CLASS[h.decision]}`}>{h.decision}</span>{' '}
-                <code className="small">{h.decisionHash.slice(0, 16)}…</code>
-              </button>
+              <label className="truth-history-row">
+                <input type="checkbox" checked={compareSel.includes(h.id)} onChange={() => toggleCompare(h.id)} />
+                <button className="link-btn" onClick={() => void openHistory(h.id)}>
+                  <span className={`pill ${DECISION_CLASS[h.decision]}`}>{h.decision}</span>{' '}
+                  <code className="small">{h.decisionHash.slice(0, 16)}…</code>
+                </button>
+                <button className="chip-btn tiny" onClick={() => void openReport(h.id)}>Raport</button>
+              </label>
             </li>
           ))}
         </ul>
+        {compareSel.length === 2 && <button className="chip-btn primary" onClick={() => void doCompare()}>Porównaj wybrane</button>}
+        {comparison && <ComparisonView cmp={comparison} />}
       </section>
+
+      {report && (
+        <div className="truth-report-overlay" role="dialog" aria-label="Raport pilotażowy">
+          <div className="truth-report-actions no-print">
+            <button className="chip-btn primary" onClick={() => window.print()}>Drukuj / zapisz PDF</button>
+            <button className="chip-btn" onClick={() => setReport(null)}>Zamknij</button>
+          </div>
+          <PilotReportView report={report} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ComparisonView({ cmp }: { cmp: AnalysisComparison }) {
+  return (
+    <div className="truth-block truth-comparison">
+      <h4>Porównanie analiz</h4>
+      <p className="small">
+        Wcześniejsza <span className={`pill ${DECISION_CLASS[cmp.from]}`}>{cmp.from}</span>
+        {' → '}późniejsza <span className={`pill ${DECISION_CLASS[cmp.to]}`}>{cmp.to}</span>
+      </p>
+      <p className={`small ${cmp.decisionChanged ? 'ok-text' : 'muted'}`}>
+        Decyzja {cmp.decisionChanged ? 'ZMIENIŁA SIĘ' : 'bez zmian'} · hash {cmp.decisionHashChanged ? 'inny' : 'identyczny'}
+      </p>
+      {cmp.necropolis.newlyInfluenced && <p className="small error-text">Necropolis wpłynął na późniejszą decyzję (nowy martwy koniec dopasowany).</p>}
+      {Object.entries(cmp.findingsChanged).map(([k, v]) => (
+        (v.added.length > 0 || v.removed.length > 0) && (
+          <div key={k} className="small">
+            <strong>{k}:</strong>
+            {v.added.length > 0 && <span className="error-text"> +{v.added.join('; ')}</span>}
+            {v.removed.length > 0 && <span className="ok-text"> −{v.removed.join('; ')}</span>}
+          </div>
+        )
+      ))}
     </div>
   );
 }
@@ -274,12 +346,15 @@ function List({ title, items, kind }: { title: string; items: string[]; kind?: '
   );
 }
 
-function TruthResult({ result }: { result: TruthAnalysis }) {
+function TruthResult({ result, onReport }: { result: TruthAnalysis; onReport: () => void }) {
   const d = result.decision;
   const f = d.cheapestFalsificationTest;
   return (
     <section className="settings-section truth-result">
-      <h3>Decyzja R&amp;D Kill-Switch</h3>
+      <div className="truth-result-head">
+        <h3>Decyzja R&amp;D Kill-Switch</h3>
+        {result.id && <button className="chip-btn" onClick={onReport}>Raport pilotażowy</button>}
+      </div>
       <div className="metric-grid">
         <div className="metric-cell"><span className="metric-label">Decyzja</span><span className={`pill ${DECISION_CLASS[d.decision]} metric-value`}>{DECISION_LABEL[d.decision]}</span></div>
         <div className="metric-cell"><span className="metric-label">Siła decyzji</span><span className="metric-value">{d.decisionStrength}</span></div>

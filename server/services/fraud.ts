@@ -2,19 +2,9 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { users } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { haversineDistanceKm } from "@shared/geo";
 
 const MAX_PLAUSIBLE_SPEED_KMH = 180; // fastest plausible ground-transport speed
-const EARTH_RADIUS_KM = 6371;
-
-function haversineDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 export interface GpsAnomalyResult {
   anomalous: boolean;

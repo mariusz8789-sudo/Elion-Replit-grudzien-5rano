@@ -30,6 +30,8 @@ import { checkGpsAnomaly, checkDuplicateAccount } from "./services/fraud";
 import { calculateCapacityBookingPrice } from "./lib/capacityPricing";
 import { calculateTripEnvironmentalSummary, BASELINE_VEHICLE_CLASS, calculateEmissionsKg, normalizeVehicleType, EMISSION_FACTORS_KG_PER_KM, ECO_METHODOLOGY, ECO_METHODOLOGY_VERSION } from "@shared/environmentalCalculation";
 import { dispatchWebhookEvent } from "./services/webhooks";
+import { rankCrewCandidates, CREW_MATCH_METHODOLOGY, type CrewCandidate, type ScoredCrewCandidate } from "@shared/crewMatching";
+import { haversineDistanceKm } from "@shared/geo";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
 import { validateDataUrl } from "./lib/dataUrl";
@@ -2553,6 +2555,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/skills/:skillId/candidates", async (req, res) => {
     res.json(await storage.findCandidatesForSkill(req.params.skillId));
+  });
+
+  // MoveX Team Matching: given a job's required skills, rank real candidates for each one
+  // using the deterministic scoring engine in shared/crewMatching.ts. Distance is only scored
+  // when the caller supplies job coordinates and the worker has set a home location; the
+  // sustainability bonus reuses the same real CO2-savings data GreenRoute/Carbon Ledger show,
+  // never a separate invented "carbon score".
+  app.post("/api/skills/match-crew", requireAuth, async (req, res) => {
+    try {
+      const { requiredSkillIds, jobLat, jobLng, requiredLanguages } = req.body as {
+        requiredSkillIds: string[]; jobLat?: number; jobLng?: number; requiredLanguages?: string[];
+      };
+      if (!Array.isArray(requiredSkillIds) || requiredSkillIds.length === 0) {
+        return res.status(400).json({ message: "requiredSkillIds is required" });
+      }
+
+      const allSkills = await storage.getAllSkills();
+      const skillById = new Map(allSkills.map((s) => [s.id, s]));
+      const companyEnvCache = new Map<string, number | null>();
+
+      const results: Record<string, { skillName: string; candidates: ScoredCrewCandidate[] }> = {};
+
+      for (const skillId of requiredSkillIds) {
+        const skill = skillById.get(skillId);
+        if (!skill) continue;
+
+        const raw = await storage.findCandidatesForSkill(skillId);
+        const candidates: CrewCandidate[] = await Promise.all(raw.map(async (r) => {
+          let companyAvgCo2SavedKgPerTrip: number | null = null;
+          if (r.companyId) {
+            if (!companyEnvCache.has(r.companyId)) {
+              const summary = await storage.getCompanyEnvironmentalSummary(r.companyId);
+              companyEnvCache.set(r.companyId, summary.totalTrips > 0 ? summary.totalCo2SavedKg / summary.totalTrips : null);
+            }
+            companyAvgCo2SavedKgPerTrip = companyEnvCache.get(r.companyId) ?? null;
+          }
+
+          let distanceKm: number | null = null;
+          if (jobLat != null && jobLng != null && r.homeLat != null && r.homeLng != null) {
+            distanceKm = haversineDistanceKm(jobLat, jobLng, Number(r.homeLat), Number(r.homeLng));
+          }
+
+          return {
+            profileId: r.id,
+            experienceLevel: r.experienceLevel as CrewCandidate["experienceLevel"],
+            yearsExperience: r.yearsExperience,
+            rating: Number(r.rating),
+            completedJobs: r.completedJobs ?? 0,
+            hourlyRateEur: r.hourlyRateEur != null ? Number(r.hourlyRateEur) : null,
+            hasRequiredCertification: r.hasRequiredCertification,
+            languages: r.languages ?? [],
+            distanceKm,
+            serviceRadiusKm: r.serviceRadiusKm,
+            companyAvgCo2SavedKgPerTrip,
+          };
+        }));
+
+        const ranked = rankCrewCandidates(candidates, { requiredLanguages });
+        results[skillId] = { skillName: skill.name, candidates: ranked.slice(0, 5) };
+      }
+
+      res.json({ methodology: CREW_MATCH_METHODOLOGY, results });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
 
   // === DRIVER AVAILABILITY CALENDAR ===

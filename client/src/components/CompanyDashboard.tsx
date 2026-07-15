@@ -522,27 +522,119 @@ function CrewMemberCard({ profile }: { profile: WorkerProfile }) {
   );
 }
 
+interface MatchCrewCandidate {
+  profileId: string;
+  experienceLevel: string;
+  yearsExperience: number | null;
+  rating: number;
+  completedJobs: number;
+  hourlyRateEur: number | null;
+  hasRequiredCertification: boolean;
+  eligible: boolean;
+  ineligibleReason?: string;
+  score: number;
+}
+
+interface MatchCrewResponse {
+  methodology: string;
+  results: Record<string, { skillName: string; candidates: MatchCrewCandidate[] }>;
+}
+
+function TeamMatchingCard() {
+  const { data: allSkills = [] } = useQuery<Skill[]>({ queryKey: ["/api/skills"] });
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
+  const [result, setResult] = useState<MatchCrewResponse | null>(null);
+
+  const matchMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/skills/match-crew", { requiredSkillIds: selectedSkillIds });
+      return res.json() as Promise<MatchCrewResponse>;
+    },
+    onSuccess: (data) => setResult(data),
+  });
+
+  const toggleSkill = (id: string) => {
+    setSelectedSkillIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Team Matching</CardTitle>
+        <CardDescription>Pick the skills a job needs - a deterministic scoring engine ranks real, qualified workers (methodology: {result?.methodology ?? "movex-crew-match-v1"})</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border rounded-md">
+          {allSkills.map((s) => (
+            <Badge
+              key={s.id}
+              variant={selectedSkillIds.includes(s.id) ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => toggleSkill(s.id)}
+              data-testid={`skill-toggle-${s.id}`}
+            >
+              {s.name}
+            </Badge>
+          ))}
+        </div>
+        <Button onClick={() => matchMutation.mutate()} disabled={selectedSkillIds.length === 0 || matchMutation.isPending} data-testid="button-find-team">
+          Find Team
+        </Button>
+
+        {result && (
+          <div className="space-y-4 pt-2">
+            {Object.entries(result.results).map(([skillId, group]) => (
+              <div key={skillId} data-testid={`match-group-${skillId}`}>
+                <h4 className="font-semibold text-sm mb-2">{group.skillName}</h4>
+                {group.candidates.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No workers with this skill yet.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {group.candidates.map((c) => (
+                      <div key={c.profileId} className={`flex items-center justify-between p-2 rounded text-sm ${c.eligible ? "bg-muted" : "bg-destructive/10"}`} data-testid={`candidate-${c.profileId}`}>
+                        <span className="flex items-center gap-2">
+                          <Badge variant={c.eligible ? "default" : "destructive"} className="text-xs">{c.eligible ? "Eligible" : "Not eligible"}</Badge>
+                          {c.experienceLevel} · <Star className="w-3 h-3 text-yellow-500" />{c.rating.toFixed(1)} · {c.completedJobs} jobs
+                          {c.hourlyRateEur && ` · €${c.hourlyRateEur}/hr`}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{c.ineligibleReason || `score ${c.score}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function CrewTab({ companyId }: { companyId: string }) {
   const { data: crew = [], isLoading } = useQuery<WorkerProfile[]>({
     queryKey: [`/api/companies/${companyId}/worker-profiles`],
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Wrench className="w-5 h-5" />Crew Directory</CardTitle>
-        <CardDescription>Skilled workers affiliated with your company - drivers and staff build their Skills Profile from their own account</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {isLoading && <div className="h-24 bg-muted animate-pulse rounded-lg" />}
-        {!isLoading && crew.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-8" data-testid="text-no-crew">
-            No crew profiles yet. Ask your drivers and staff to set up their Skills Profile.
-          </p>
-        )}
-        {crew.map((profile) => <CrewMemberCard key={profile.id} profile={profile} />)}
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Wrench className="w-5 h-5" />Crew Directory</CardTitle>
+          <CardDescription>Skilled workers affiliated with your company - drivers and staff build their Skills Profile from their own account</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLoading && <div className="h-24 bg-muted animate-pulse rounded-lg" />}
+          {!isLoading && crew.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-8" data-testid="text-no-crew">
+              No crew profiles yet. Ask your drivers and staff to set up their Skills Profile.
+            </p>
+          )}
+          {crew.map((profile) => <CrewMemberCard key={profile.id} profile={profile} />)}
+        </CardContent>
+      </Card>
+      <TeamMatchingCard />
+    </div>
   );
 }
 

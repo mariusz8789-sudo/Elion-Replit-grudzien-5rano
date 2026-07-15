@@ -14,6 +14,8 @@ import { partnerApi } from "./partnerApi";
 import { roadServicesRouter } from "./roadServices/router";
 import { roadServicesPartnerApi } from "./roadServices/partnerApi";
 import { pool } from "./db";
+import { runCertificationExpirySweep } from "./services/certExpirySweep";
+import { seedSkillsCatalog } from "./seedSkills";
 
 const app = express();
 const PgSession = connectPgSimple(session);
@@ -209,6 +211,19 @@ app.use("/road-services/partner/v1", roadServicesPartnerApi);
   }, () => {
     log(`serving on port ${port}`);
   });
+
+  seedSkillsCatalog().catch((err) => console.error("Skills catalog seed failed:", err.message));
+
+  // No external cron infra exists in this app - a daily in-process sweep is the pragmatic
+  // real implementation for certification expiry reminders. Runs once shortly after boot,
+  // then every 24h; failures are logged, never crash the process.
+  const CERT_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+  setTimeout(() => {
+    runCertificationExpirySweep().catch((err) => console.error("Certification expiry sweep failed:", err.message));
+    setInterval(() => {
+      runCertificationExpirySweep().catch((err) => console.error("Certification expiry sweep failed:", err.message));
+    }, CERT_SWEEP_INTERVAL_MS);
+  }, 60_000);
 
   let shuttingDown = false;
   const shutdown = (signal: string) => {

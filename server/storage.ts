@@ -36,6 +36,9 @@ import {
   type CapacityPosting, type InsertCapacityPosting,
   type CapacityBooking, type InsertCapacityBooking,
   type EnvironmentalCalculation,
+  type Skill, type InsertSkill,
+  type WorkerProfile, type InsertWorkerProfile,
+  type WorkerSkill, type InsertWorkerSkill,
   users, companies, drivers, vehicles, services, bookings, quotes, offers,
   messages, attachments, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
@@ -43,7 +46,8 @@ import {
   driverAvailability, driverTimeOff, calendarConnections, cargoItems, messageTranslations,
   calls, verificationDocuments, deviceFingerprints, riskScores, auditLogs,
   apiKeys, webhookSubscriptions, webhookDeliveries,
-  capacityPostings, capacityBookings, environmentalCalculations
+  capacityPostings, capacityBookings, environmentalCalculations,
+  skills, workerProfiles, workerSkills
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, or, gte, lte, lt, isNull, inArray, ilike } from "drizzle-orm";
@@ -138,6 +142,22 @@ export interface IStorage {
   getBookingEnvironmentalCalculation(bookingId: string): Promise<EnvironmentalCalculation | undefined>;
   getCompanyEnvironmentalSummary(companyId: string): Promise<{ totalTrips: number; totalCo2Kg: number; totalCo2SavedKg: number; avgCo2PerTripKg: number }>;
   getUserMonthlyEnvironmentalSummary(userId: string, months?: number): Promise<Array<{ month: string; co2Kg: number; co2SavedKg: number; trips: number }>>;
+
+  // Skills engine operations
+  getAllSkills(): Promise<Skill[]>;
+  createSkill(skill: InsertSkill): Promise<Skill>;
+  getWorkerProfile(id: string): Promise<WorkerProfile | undefined>;
+  getWorkerProfileByUserId(userId: string): Promise<WorkerProfile | undefined>;
+  createWorkerProfile(profile: InsertWorkerProfile): Promise<WorkerProfile>;
+  updateWorkerProfile(id: string, updates: Partial<InsertWorkerProfile>): Promise<WorkerProfile | undefined>;
+  getCompanyWorkerProfiles(companyId: string): Promise<WorkerProfile[]>;
+  incrementWorkerCompletedJobs(profileId: string): Promise<void>;
+  getProfileSkills(profileId: string): Promise<Array<WorkerSkill & { skill: Skill }>>;
+  setWorkerSkill(entry: InsertWorkerSkill): Promise<WorkerSkill>;
+  removeWorkerSkill(profileId: string, skillId: string): Promise<void>;
+  findCandidatesForSkill(skillId: string): Promise<Array<WorkerProfile & { experienceLevel: string; yearsExperience: number | null; hasRequiredCertification: boolean }>>;
+  getExpiringVerificationDocuments(withinDays: number): Promise<VerificationDocument[]>;
+  markVerificationDocumentExpiryNotified(id: string): Promise<void>;
 
   // Notification operations
   getUserNotifications(userId: string): Promise<Notification[]>;
@@ -827,6 +847,124 @@ export class DbStorage implements IStorage {
       co2SavedKg: Number(r.co2_saved_kg),
       trips: Number(r.trips),
     }));
+  }
+
+  // === SKILLS ENGINE OPERATIONS ===
+  async getAllSkills(): Promise<Skill[]> {
+    return await db.select().from(skills).orderBy(skills.category, skills.name);
+  }
+
+  async createSkill(skill: InsertSkill): Promise<Skill> {
+    const result = await db.insert(skills).values(skill).returning();
+    return result[0];
+  }
+
+  async getWorkerProfile(id: string): Promise<WorkerProfile | undefined> {
+    const result = await db.select().from(workerProfiles).where(eq(workerProfiles.id, id));
+    return result[0];
+  }
+
+  async getWorkerProfileByUserId(userId: string): Promise<WorkerProfile | undefined> {
+    const result = await db.select().from(workerProfiles).where(eq(workerProfiles.userId, userId));
+    return result[0];
+  }
+
+  async createWorkerProfile(profile: InsertWorkerProfile): Promise<WorkerProfile> {
+    const result = await db.insert(workerProfiles).values(profile).returning();
+    return result[0];
+  }
+
+  async updateWorkerProfile(id: string, updates: Partial<InsertWorkerProfile>): Promise<WorkerProfile | undefined> {
+    const result = await db.update(workerProfiles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(workerProfiles.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getCompanyWorkerProfiles(companyId: string): Promise<WorkerProfile[]> {
+    return await db.select().from(workerProfiles).where(eq(workerProfiles.companyId, companyId));
+  }
+
+  async incrementWorkerCompletedJobs(profileId: string): Promise<void> {
+    await db.update(workerProfiles)
+      .set({ completedJobs: sql`${workerProfiles.completedJobs} + 1`, updatedAt: new Date() })
+      .where(eq(workerProfiles.id, profileId));
+  }
+
+  async getProfileSkills(profileId: string): Promise<Array<WorkerSkill & { skill: Skill }>> {
+    const rows = await db.select({ workerSkill: workerSkills, skill: skills })
+      .from(workerSkills)
+      .innerJoin(skills, eq(workerSkills.skillId, skills.id))
+      .where(eq(workerSkills.profileId, profileId));
+    return rows.map((r) => ({ ...r.workerSkill, skill: r.skill }));
+  }
+
+  async setWorkerSkill(entry: InsertWorkerSkill): Promise<WorkerSkill> {
+    const result = await db.insert(workerSkills)
+      .values(entry)
+      .onConflictDoUpdate({
+        target: [workerSkills.profileId, workerSkills.skillId],
+        set: { experienceLevel: entry.experienceLevel, yearsExperience: entry.yearsExperience },
+      })
+      .returning();
+    return result[0];
+  }
+
+  async removeWorkerSkill(profileId: string, skillId: string): Promise<void> {
+    await db.delete(workerSkills).where(and(eq(workerSkills.profileId, profileId), eq(workerSkills.skillId, skillId)));
+  }
+
+  // Candidates for a given skill, each annotated with whether they hold a currently-valid
+  // (approved, unexpired) certification if the skill requires one - used by Team Matching so
+  // licensed-only skills (electrical, gas, etc.) can be filtered to genuinely qualified workers
+  // rather than matching on the skill tag alone.
+  async findCandidatesForSkill(skillId: string): Promise<Array<WorkerProfile & { experienceLevel: string; yearsExperience: number | null; hasRequiredCertification: boolean }>> {
+    const skillResult = await db.select().from(skills).where(eq(skills.id, skillId));
+    const skill = skillResult[0];
+    if (!skill) return [];
+
+    const rows = await db.select({ profile: workerProfiles, workerSkill: workerSkills })
+      .from(workerSkills)
+      .innerJoin(workerProfiles, eq(workerSkills.profileId, workerProfiles.id))
+      .where(and(eq(workerSkills.skillId, skillId), eq(workerProfiles.available, true)));
+
+    const candidates = await Promise.all(rows.map(async (r) => {
+      let hasRequiredCertification = true;
+      if (skill.requiresCertification) {
+        const now = new Date();
+        const docs = await db.select().from(verificationDocuments).where(and(
+          eq(verificationDocuments.holderType, "user"),
+          eq(verificationDocuments.holderId, r.profile.userId),
+          eq(verificationDocuments.docType, skill.requiresCertification),
+          eq(verificationDocuments.status, "approved"),
+        ));
+        hasRequiredCertification = docs.some((d) => !d.expiresAt || d.expiresAt > now);
+      }
+      return {
+        ...r.profile,
+        experienceLevel: r.workerSkill.experienceLevel,
+        yearsExperience: r.workerSkill.yearsExperience,
+        hasRequiredCertification,
+      };
+    }));
+    return candidates;
+  }
+
+  async getExpiringVerificationDocuments(withinDays: number): Promise<VerificationDocument[]> {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + withinDays * 24 * 60 * 60 * 1000);
+    return await db.select().from(verificationDocuments).where(and(
+      eq(verificationDocuments.status, "approved"),
+      sql`${verificationDocuments.expiresAt} IS NOT NULL`,
+      sql`${verificationDocuments.expiryNotifiedAt} IS NULL`,
+      gte(verificationDocuments.expiresAt, now),
+      lte(verificationDocuments.expiresAt, cutoff),
+    ));
+  }
+
+  async markVerificationDocumentExpiryNotified(id: string): Promise<void> {
+    await db.update(verificationDocuments).set({ expiryNotifiedAt: new Date() }).where(eq(verificationDocuments.id, id));
   }
 
   // === NOTIFICATION OPERATIONS ===

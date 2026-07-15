@@ -18,6 +18,7 @@ import {
   insertCapacityPostingSchema, insertCapacityBookingSchema,
   insertDriverAvailabilitySchema, insertDriverTimeOffSchema, insertCargoItemSchema,
   insertVerificationDocumentSchema, insertApiKeySchema,
+  insertSkillSchema, insertWorkerProfileSchema, insertWorkerSkillSchema,
   offers, marketplaceListings, sharedRides, rideBookings, companies, bookings, drivers, vehicles,
   users, messages, reviews, services
 } from "@shared/schema";
@@ -2453,6 +2454,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(500).json({ message: "Route optimization failed: " + error.message });
     }
+  });
+
+  // === SKILLS ENGINE ===
+  // Certifications/licenses reuse the existing /api/verification-documents endpoints
+  // (holderType="user", docType=certification name) rather than a parallel upload system.
+  app.get("/api/skills", async (_req, res) => {
+    res.json(await storage.getAllSkills());
+  });
+
+  app.post("/api/skills", requireAdmin, async (req, res) => {
+    try {
+      const data = insertSkillSchema.parse(req.body);
+      res.status(201).json(await storage.createSkill(data));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/worker-profiles/me", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const profile = await storage.getWorkerProfileByUserId(user.id);
+    if (!profile) return res.status(404).json({ message: "No worker profile yet" });
+    res.json(profile);
+  });
+
+  app.get("/api/worker-profiles/:id", async (req, res) => {
+    const profile = await storage.getWorkerProfile(req.params.id);
+    if (!profile) return res.status(404).json({ message: "Worker profile not found" });
+    res.json(profile);
+  });
+
+  app.post("/api/worker-profiles", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const existing = await storage.getWorkerProfileByUserId(user.id);
+      if (existing) return res.status(409).json({ message: "You already have a worker profile" });
+      const data = insertWorkerProfileSchema.parse({ ...req.body, userId: user.id });
+      res.status(201).json(await storage.createWorkerProfile(data));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/worker-profiles/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const profile = await storage.getWorkerProfile(req.params.id);
+      if (!profile) return res.status(404).json({ message: "Worker profile not found" });
+      if (profile.userId !== user.id && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to edit this profile" });
+      }
+      const data = insertWorkerProfileSchema.partial().parse(req.body);
+      const updated = await storage.updateWorkerProfile(req.params.id, data);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/companies/:companyId/worker-profiles", async (req, res) => {
+    res.json(await storage.getCompanyWorkerProfiles(req.params.companyId));
+  });
+
+  app.get("/api/worker-profiles/:id/skills", async (req, res) => {
+    res.json(await storage.getProfileSkills(req.params.id));
+  });
+
+  app.post("/api/worker-profiles/:id/skills", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const profile = await storage.getWorkerProfile(req.params.id);
+      if (!profile) return res.status(404).json({ message: "Worker profile not found" });
+      if (profile.userId !== user.id && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized to edit this profile's skills" });
+      }
+      const data = insertWorkerSkillSchema.parse({ ...req.body, profileId: req.params.id });
+      res.status(201).json(await storage.setWorkerSkill(data));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/worker-profiles/:id/skills/:skillId", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const profile = await storage.getWorkerProfile(req.params.id);
+    if (!profile) return res.status(404).json({ message: "Worker profile not found" });
+    if (profile.userId !== user.id && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized to edit this profile's skills" });
+    }
+    await storage.removeWorkerSkill(req.params.id, req.params.skillId);
+    res.json({ message: "Skill removed" });
+  });
+
+  app.get("/api/skills/:skillId/candidates", async (req, res) => {
+    res.json(await storage.findCandidatesForSkill(req.params.skillId));
   });
 
   // === DRIVER AVAILABILITY CALENDAR ===

@@ -73,6 +73,53 @@ export const vehicles = pgTable("vehicles", {
   companyIdIdx: index("vehicles_company_id_idx").on(t.companyId),
 }));
 
+// === SKILLS ENGINE ===
+// Certifications/licenses (SEP, Gas, UDT, Forklift, Crane, etc.) deliberately reuse the
+// existing verificationDocuments table (holderType="user", docType=certification name,
+// expiresAt already present) rather than a new table - that table already has exactly the
+// upload/review/expiry shape this needs.
+export const skills = pgTable("skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // "Furniture assembly", "Kitchen installation", "Electrical work", ...
+  category: text("category").notNull(), // moving, installation, trades, specialty_transport, cleaning, relocation
+  // If set, a worker must hold a verified, unexpired verificationDocuments row with this
+  // docType to be matched for this skill by the Team Matching engine (e.g. "Electrical work"
+  // requires docType "Electrical"). Null = no license required.
+  requiresCertification: text("requires_certification"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const workerProfiles = pgTable("worker_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  companyId: varchar("company_id").references(() => companies.id), // optional company affiliation
+  bio: text("bio"),
+  hourlyRateEur: decimal("hourly_rate_eur", { precision: 10, scale: 2 }),
+  serviceRadiusKm: integer("service_radius_km"),
+  homeLat: decimal("home_lat", { precision: 10, scale: 7 }),
+  homeLng: decimal("home_lng", { precision: 10, scale: 7 }),
+  languages: text("languages").array().default(sql`ARRAY[]::text[]`),
+  available: boolean("available").default(true),
+  completedJobs: integer("completed_jobs").default(0),
+  rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("worker_profiles_company_id_idx").on(t.companyId),
+}));
+
+export const workerSkills = pgTable("worker_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  profileId: varchar("profile_id").notNull().references(() => workerProfiles.id),
+  skillId: varchar("skill_id").notNull().references(() => skills.id),
+  experienceLevel: text("experience_level").notNull().default("intermediate"), // beginner, intermediate, experienced, expert
+  yearsExperience: integer("years_experience"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  skillIdIdx: index("worker_skills_skill_id_idx").on(t.skillId),
+  profileSkillUnique: unique().on(t.profileId, t.skillId),
+}));
+
 // === SERVICES & BOOKINGS ===
 export const services = pgTable("services", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -589,7 +636,7 @@ export const verificationDocuments = pgTable("verification_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   holderType: text("holder_type").notNull(), // user, driver, company
   holderId: varchar("holder_id").notNull(),
-  docType: text("doc_type").notNull(), // id_card, selfie, drivers_license, company_registration, insurance_certificate, vehicle_registration
+  docType: text("doc_type").notNull(), // id_card, selfie, drivers_license, company_registration, insurance_certificate, vehicle_registration, or a Skills Engine certification name (SEP, Gas, UDT, Forklift, Crane, HDS, Electrical, Construction, ...)
   fileUrl: text("file_url").notNull(),
   status: text("status").notNull().default("pending"), // pending, approved, rejected, expired
   submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
@@ -597,6 +644,7 @@ export const verificationDocuments = pgTable("verification_documents", {
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   rejectionReason: text("rejection_reason"),
   expiresAt: timestamp("expires_at"),
+  expiryNotifiedAt: timestamp("expiry_notified_at"), // set once an expiring-soon notification has been sent, so the sweep doesn't re-notify every run
 }, (t) => ({
   holderIdx: index("verification_documents_holder_idx").on(t.holderType, t.holderId),
   statusIdx: index("verification_documents_status_idx").on(t.status),
@@ -1000,6 +1048,28 @@ export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
   endDate: z.coerce.date(),
 });
 
+export const insertSkillSchema = createInsertSchema(skills).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkerProfileSchema = createInsertSchema(workerProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  completedJobs: true,
+  rating: true,
+}).extend({
+  hourlyRateEur: z.coerce.string().optional(),
+  homeLat: z.coerce.string().optional(),
+  homeLng: z.coerce.string().optional(),
+});
+
+export const insertWorkerSkillSchema = createInsertSchema(workerSkills).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertBadgeSchema = createInsertSchema(badges).omit({
   id: true,
   createdAt: true,
@@ -1205,6 +1275,15 @@ export type CapacityBooking = typeof capacityBookings.$inferSelect;
 
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Announcement = typeof announcements.$inferSelect;
+
+export type InsertSkill = z.infer<typeof insertSkillSchema>;
+export type Skill = typeof skills.$inferSelect;
+
+export type InsertWorkerProfile = z.infer<typeof insertWorkerProfileSchema>;
+export type WorkerProfile = typeof workerProfiles.$inferSelect;
+
+export type InsertWorkerSkill = z.infer<typeof insertWorkerSkillSchema>;
+export type WorkerSkill = typeof workerSkills.$inferSelect;
 
 export type InsertBadge = z.infer<typeof insertBadgeSchema>;
 export type Badge = typeof badges.$inferSelect;

@@ -94,7 +94,14 @@ const sessionMiddleware = session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: env.NODE_ENV === "production",
+    // "auto" (not a static NODE_ENV check) sets the Secure flag per-request from req.secure,
+    // which respects `trust proxy` above. A static `NODE_ENV === "production"` check marks the
+    // cookie Secure unconditionally in production, which browsers/clients silently refuse to
+    // store or send back over any connection that isn't HTTPS at the app itself - breaking
+    // login completely behind a plain-HTTP health check, a TCP-passthrough load balancer, or
+    // any direct-HTTP access to the production build (confirmed: login previously returned 200
+    // but set no usable cookie at all when running `npm start` over plain HTTP).
+    secure: "auto",
     httpOnly: true,
     sameSite: "lax",
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days

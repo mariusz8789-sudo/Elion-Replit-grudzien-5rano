@@ -205,6 +205,7 @@ export interface IStorage {
   // Resource sharing operations
   getAllResourceSharing(): Promise<ResourceSharing[]>;
   getResourceSharing(id: string): Promise<ResourceSharing | undefined>;
+  getCompanyResourceSharing(companyId: string): Promise<ResourceSharing[]>;
   getAvailableResourceSharing(resourceType?: string): Promise<ResourceSharing[]>;
   createResourceSharing(resourceSharing: InsertResourceSharing): Promise<ResourceSharing>;
   updateResourceSharingStatus(id: string, fromStatuses: string[], toStatus: string, requesterCompanyId?: string | null): Promise<ResourceSharing | undefined>;
@@ -1082,7 +1083,7 @@ export class DbStorage implements IStorage {
     };
 
     const staffRows = await db.select().from(staffSharing).where(eq(staffSharing.lenderCompanyId, companyId));
-    const resourceRows = await db.select().from(resourceSharing).where(eq(resourceSharing.providerCompanyId, companyId));
+    const resourceRows = await this.getCompanyResourceSharing(companyId);
     const workShare = {
       activeListings: staffRows.filter((s) => s.status === "available").length + resourceRows.filter((r) => r.status === "available").length,
       acceptedExchanges: staffRows.filter((s) => s.status === "booked" || s.status === "completed").length
@@ -1237,6 +1238,10 @@ export class DbStorage implements IStorage {
   async getResourceSharing(id: string): Promise<ResourceSharing | undefined> {
     const result = await db.select().from(resourceSharing).where(eq(resourceSharing.id, id));
     return result[0];
+  }
+
+  async getCompanyResourceSharing(companyId: string): Promise<ResourceSharing[]> {
+    return await db.select().from(resourceSharing).where(eq(resourceSharing.providerCompanyId, companyId));
   }
 
   async getAvailableResourceSharing(resourceType?: string): Promise<ResourceSharing[]> {

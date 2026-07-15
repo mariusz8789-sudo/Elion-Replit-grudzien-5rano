@@ -33,6 +33,7 @@ import { calculateTripEnvironmentalSummary, BASELINE_VEHICLE_CLASS, calculateEmi
 import { dispatchWebhookEvent } from "./services/webhooks";
 import { rankCrewCandidates, CREW_MATCH_METHODOLOGY, type CrewCandidate, type ScoredCrewCandidate } from "@shared/crewMatching";
 import { haversineDistanceKm } from "@shared/geo";
+import { AI_OPERATIONS_ROLES, getAiOperationsReply } from "./services/aiOperations";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
 import { validateDataUrl } from "./lib/dataUrl";
@@ -2731,6 +2732,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(await storage.getCompanyEnterpriseDashboard(req.params.companyId));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // === AI OPERATIONS (generalized MoveX AI assistant, role-parameterized) ===
+  app.get("/api/ai-operations/roles", (_req, res) => {
+    res.json(AI_OPERATIONS_ROLES);
+  });
+
+  app.post("/api/companies/:companyId/ai-operations/:role", requireAuth, aiLimiter, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.companyId !== req.params.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const { message, history } = req.body as { message: string; history?: Array<{ role: "user" | "assistant"; content: string }> };
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ message: "message is required" });
+      }
+      const reply = await getAiOperationsReply({
+        role: req.params.role,
+        companyId: req.params.companyId,
+        userMessage: message,
+        history,
+      });
+      res.json(reply);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
     }
   });
 

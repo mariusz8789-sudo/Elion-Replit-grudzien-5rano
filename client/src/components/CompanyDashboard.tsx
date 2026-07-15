@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X, BarChart3 } from "lucide-react";
+import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X, BarChart3, Brain } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -952,6 +952,86 @@ function EnterpriseDashboardTab({ companyId }: { companyId: string }) {
   );
 }
 
+interface AiOperationsRoleInfo { id: string; label: string; description: string; external?: boolean }
+interface AiChatMessage { role: "user" | "assistant"; content: string }
+
+function AiOperationsTab({ companyId }: { companyId: string }) {
+  const { toast } = useToast();
+  const { data: roles = [] } = useQuery<AiOperationsRoleInfo[]>({ queryKey: ["/api/ai-operations/roles"] });
+  const [role, setRole] = useState<string>("dispatcher");
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<AiChatMessage[]>([]);
+
+  const selectedRole = roles.find((r) => r.id === role);
+
+  const chatMutation = useMutation({
+    mutationFn: async (message: string) => {
+      const res = await apiRequest("POST", `/api/companies/${companyId}/ai-operations/${role}`, {
+        message,
+        history: messages,
+      });
+      return res.json() as Promise<{ reply: string }>;
+    },
+    onSuccess: (data, message) => {
+      setMessages((prev) => [...prev, { role: "user", content: message }, { role: "assistant", content: data.reply }]);
+      setInput("");
+    },
+    onError: (error: any) => {
+      toast({ title: "Assistant unavailable", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    chatMutation.mutate(input.trim());
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Brain className="w-5 h-5" />MoveX AI Operations</CardTitle>
+        <CardDescription>Ask a role-specific assistant, grounded only in your company's real data - never fabricated.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Select value={role} onValueChange={(v) => { setRole(v); setMessages([]); }}>
+          <SelectTrigger data-testid="select-ai-role">
+            <SelectValue placeholder="Select an assistant" />
+          </SelectTrigger>
+          <SelectContent>
+            {roles.filter((r) => !r.external).map((r) => (
+              <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedRole && <p className="text-xs text-muted-foreground">{selectedRole.description}</p>}
+
+        <div className="space-y-2 max-h-72 overflow-y-auto p-2 border rounded-md min-h-[80px]">
+          {messages.length === 0 && <p className="text-sm text-muted-foreground">Ask a question to get started.</p>}
+          {messages.map((m, i) => (
+            <div key={i} className={`text-sm p-2 rounded ${m.role === "user" ? "bg-primary/10 ml-8" : "bg-muted mr-8"}`} data-testid={`ai-message-${i}`}>
+              {m.content}
+            </div>
+          ))}
+          {chatMutation.isPending && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+        </div>
+
+        <div className="flex gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            placeholder="Ask your assistant..."
+            data-testid="input-ai-operations"
+          />
+          <Button size="icon" onClick={handleSend} disabled={chatMutation.isPending || !input.trim()} data-testid="button-ai-operations-send">
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CompanyDashboardTabs({ companyId }: { companyId: string }) {
   const { data: company } = useQuery<Company>({ queryKey: ["/api/companies", companyId] });
 
@@ -977,6 +1057,7 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
           <TabsTrigger value="crew" data-testid="tab-crew"><Wrench className="w-4 h-4 mr-2" />Crew</TabsTrigger>
           <TabsTrigger value="services" data-testid="tab-services"><Briefcase className="w-4 h-4 mr-2" />Services</TabsTrigger>
           <TabsTrigger value="enterprise" data-testid="tab-enterprise"><BarChart3 className="w-4 h-4 mr-2" />Enterprise</TabsTrigger>
+          <TabsTrigger value="ai-operations" data-testid="tab-ai-operations"><Brain className="w-4 h-4 mr-2" />AI Operations</TabsTrigger>
           <TabsTrigger value="reviews" data-testid="tab-company-reviews"><Star className="w-4 h-4 mr-2" />Reviews</TabsTrigger>
         </TabsList>
         <TabsContent value="fleet" className="pt-4">
@@ -999,6 +1080,9 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
         </TabsContent>
         <TabsContent value="enterprise" className="pt-4">
           <EnterpriseDashboardTab companyId={companyId} />
+        </TabsContent>
+        <TabsContent value="ai-operations" className="pt-4">
+          <AiOperationsTab companyId={companyId} />
         </TabsContent>
         <TabsContent value="reviews" className="pt-4">
           <ReviewsSection companyId={companyId} />

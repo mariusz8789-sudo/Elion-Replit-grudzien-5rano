@@ -61,4 +61,5 @@ export const env = cleanEnv(process.env, {
 
   // Road Services AI engine model overrides - optional, fall back to ANTHROPIC_API_KEY-gated defaults
   ROAD_SERVICES_MODEL: optionalStr({ default: "" }),
+  AI_OPERATIONS_MODEL: optionalStr({ default: "" }),
 });

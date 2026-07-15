@@ -8,11 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Boxes, MapPin, Calendar, Package, Send, Loader2 } from "lucide-react";
+import { Boxes, MapPin, Calendar, Package, Send, Loader2, Bell, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import type { CapacityPosting, CapacityBooking } from "@shared/schema";
+import type { CapacityPosting, CapacityBooking, RecurringRouteSubscription } from "@shared/schema";
 
 export default function CapacityMarketplace() {
   const { t } = useTranslation();
@@ -46,6 +46,31 @@ export default function CapacityMarketplace() {
       return res.ok ? res.json() : [];
     },
     enabled: false,
+  });
+
+  const { data: mySubscriptions = [] } = useQuery<RecurringRouteSubscription[]>({
+    queryKey: [`/api/companies/${user?.companyId}/route-subscriptions`],
+    enabled: !!user?.companyId,
+  });
+
+  const subscribeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/route-subscriptions", { fromAddress: from, toAddress: to });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to subscribe");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${user?.companyId}/route-subscriptions`] });
+      toast({ title: t("Subscribed"), description: t("You'll be notified when a matching recurring route is published.") });
+    },
+    onError: (error: any) => toast({ title: t("Could not subscribe"), description: error.message, variant: "destructive" }),
+  });
+
+  const unsubscribeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/route-subscriptions/${id}`, {});
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${user?.companyId}/route-subscriptions`] }),
   });
 
   const { data: myRequests = [] } = useQuery<CapacityBooking[]>({
@@ -129,8 +154,37 @@ export default function CapacityMarketplace() {
               <Label htmlFor="filter-lift">{t("Tail lift")}</Label>
             </div>
           </div>
+          {user?.companyId && (
+            <div className="md:col-span-4 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => subscribeMutation.mutate()}
+                disabled={!from || !to || subscribeMutation.isPending}
+                data-testid="button-subscribe-route"
+              >
+                <Bell className="w-4 h-4 mr-2" />{t("Subscribe to this route")}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {user?.companyId && mySubscriptions.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>{t("My Route Subscriptions")}</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {mySubscriptions.map((s) => (
+              <div key={s.id} className="flex items-center justify-between text-sm p-2 border rounded-md" data-testid={`row-subscription-${s.id}`}>
+                <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{s.fromAddress} &rarr; {s.toAddress}</span>
+                <Button size="icon" variant="ghost" onClick={() => unsubscribeMutation.mutate(s.id)} data-testid={`button-unsubscribe-${s.id}`}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {searched && (
         <div className="space-y-3">
@@ -148,6 +202,7 @@ export default function CapacityMarketplace() {
                       {p.pricePerM3Eur && <span>&euro;{p.pricePerM3Eur}/m&sup3;</span>}
                     </p>
                     <div className="flex flex-wrap gap-1 mt-1">
+                      {p.isRecurring && <Badge variant="secondary" className="text-xs">{t("Recurring")} ({p.recurrencePattern})</Badge>}
                       {p.temperatureControlled && <Badge variant="outline" className="text-xs">{t("Temp. controlled")}</Badge>}
                       {p.adrCapable && <Badge variant="outline" className="text-xs">ADR</Badge>}
                       {p.tailLift && <Badge variant="outline" className="text-xs">{t("Tail lift")}</Badge>}

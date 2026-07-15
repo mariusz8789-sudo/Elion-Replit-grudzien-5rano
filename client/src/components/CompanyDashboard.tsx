@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -319,6 +320,7 @@ function CapacityTab({ companyId }: { companyId: string }) {
     fromAddress: "", toAddress: "", departureWindowStart: "", departureWindowEnd: "",
     freeVolumeM3: "", freeWeightKg: "", freePalletSpaces: "", pricePerM3Eur: "", minimumPriceEur: "", isReturnLeg: false,
     temperatureControlled: false, adrCapable: false, tailLift: false, truckDimensions: "",
+    isRecurring: false, recurrencePattern: "weekly",
   });
 
   const { data: postings = [], isLoading } = useQuery<CapacityPosting[]>({
@@ -428,6 +430,21 @@ function CapacityTab({ companyId }: { companyId: string }) {
                   <Label htmlFor="capacity-lift">Tail lift</Label>
                   <Switch id="capacity-lift" checked={form.tailLift} onCheckedChange={(v) => setForm({ ...form, tailLift: v })} data-testid="switch-capacity-tail-lift" />
                 </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch id="capacity-recurring" checked={form.isRecurring} onCheckedChange={(v) => setForm({ ...form, isRecurring: v })} data-testid="switch-capacity-recurring" />
+                  <Label htmlFor="capacity-recurring">Recurring route</Label>
+                </div>
+                {form.isRecurring && (
+                  <Select value={form.recurrencePattern} onValueChange={(v) => setForm({ ...form, recurrencePattern: v })}>
+                    <SelectTrigger className="w-32" data-testid="select-recurrence-pattern"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <Button
                 className="w-full"

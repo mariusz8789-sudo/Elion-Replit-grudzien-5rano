@@ -415,6 +415,8 @@ export const capacityPostings = pgTable("capacity_postings", {
   pricePerM3Eur: decimal("price_per_m3_eur", { precision: 10, scale: 2 }),
   minimumPriceEur: decimal("minimum_price_eur", { precision: 10, scale: 2 }),
   isReturnLeg: boolean("is_return_leg").notNull().default(false), // e.g. an otherwise-empty return journey
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurrencePattern: text("recurrence_pattern"), // weekly, monthly - only meaningful when isRecurring
   temperatureControlled: boolean("temperature_controlled").notNull().default(false),
   adrCapable: boolean("adr_capable").notNull().default(false), // vehicle/driver certified for dangerous-goods (ADR) cargo
   tailLift: boolean("tail_lift").notNull().default(false),
@@ -441,6 +443,20 @@ export const capacityBookings = pgTable("capacity_bookings", {
 }, (t) => ({
   postingIdIdx: index("capacity_bookings_posting_id_idx").on(t.postingId),
   customerIdIdx: index("capacity_bookings_customer_id_idx").on(t.customerId),
+}));
+
+// A company subscribes to a route pattern (e.g. "Madrid" -> "Paris") so it's notified whenever
+// a new recurring spare-capacity posting matching that route is published - real-time
+// discovery for companies that regularly need the same lane, rather than having to keep
+// re-searching.
+export const recurringRouteSubscriptions = pgTable("recurring_route_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  fromAddress: text("from_address").notNull(),
+  toAddress: text("to_address").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("recurring_route_subscriptions_company_id_idx").on(t.companyId),
 }));
 
 // === PROMO BOARD / ANNOUNCEMENTS ===
@@ -1041,6 +1057,11 @@ export const insertCapacityBookingSchema = createInsertSchema(capacityBookings).
   palletSpaces: z.coerce.number().int().nonnegative().optional(),
 });
 
+export const insertRecurringRouteSubscriptionSchema = createInsertSchema(recurringRouteSubscriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
   id: true,
   createdAt: true,
@@ -1282,6 +1303,9 @@ export type CapacityPosting = typeof capacityPostings.$inferSelect;
 
 export type InsertCapacityBooking = z.infer<typeof insertCapacityBookingSchema>;
 export type CapacityBooking = typeof capacityBookings.$inferSelect;
+
+export type InsertRecurringRouteSubscription = z.infer<typeof insertRecurringRouteSubscriptionSchema>;
+export type RecurringRouteSubscription = typeof recurringRouteSubscriptions.$inferSelect;
 
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Announcement = typeof announcements.$inferSelect;

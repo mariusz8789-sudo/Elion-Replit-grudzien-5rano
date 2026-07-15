@@ -39,6 +39,7 @@ import {
   type Skill, type InsertSkill,
   type WorkerProfile, type InsertWorkerProfile,
   type WorkerSkill, type InsertWorkerSkill,
+  type RecurringRouteSubscription, type InsertRecurringRouteSubscription,
   users, companies, drivers, vehicles, services, bookings, quotes, offers,
   messages, attachments, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
@@ -47,7 +48,7 @@ import {
   calls, verificationDocuments, deviceFingerprints, riskScores, auditLogs,
   apiKeys, webhookSubscriptions, webhookDeliveries,
   capacityPostings, capacityBookings, environmentalCalculations,
-  skills, workerProfiles, workerSkills
+  skills, workerProfiles, workerSkills, recurringRouteSubscriptions
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, or, gte, lte, lt, isNull, inArray, ilike } from "drizzle-orm";
@@ -200,6 +201,12 @@ export interface IStorage {
   getCustomerCapacityBookings(customerId: string): Promise<CapacityBooking[]>;
   acceptCapacityBooking(id: string): Promise<{ booking?: CapacityBooking; error?: string }>;
   updateCapacityBookingStatus(id: string, fromStatuses: string[], toStatus: "rejected" | "cancelled"): Promise<CapacityBooking | undefined>;
+
+  // Return Trip Marketplace: recurring-route subscriptions
+  createRouteSubscription(sub: InsertRecurringRouteSubscription): Promise<RecurringRouteSubscription>;
+  getCompanyRouteSubscriptions(companyId: string): Promise<RecurringRouteSubscription[]>;
+  deleteRouteSubscription(id: string, companyId: string): Promise<boolean>;
+  findMatchingRouteSubscriptions(fromAddress: string, toAddress: string): Promise<RecurringRouteSubscription[]>;
 
   // Announcements operations
   getActiveAnnouncements(): Promise<Announcement[]>;
@@ -1257,6 +1264,31 @@ export class DbStorage implements IStorage {
       .where(and(eq(capacityBookings.id, id), inArray(capacityBookings.status, fromStatuses)))
       .returning();
     return result[0];
+  }
+
+  async createRouteSubscription(sub: InsertRecurringRouteSubscription): Promise<RecurringRouteSubscription> {
+    const result = await db.insert(recurringRouteSubscriptions).values(sub).returning();
+    return result[0];
+  }
+
+  async getCompanyRouteSubscriptions(companyId: string): Promise<RecurringRouteSubscription[]> {
+    return await db.select().from(recurringRouteSubscriptions).where(eq(recurringRouteSubscriptions.companyId, companyId));
+  }
+
+  async deleteRouteSubscription(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(recurringRouteSubscriptions)
+      .where(and(eq(recurringRouteSubscriptions.id, id), eq(recurringRouteSubscriptions.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Same case-insensitive substring matching as the capacity search itself, so "subscribe to
+  // Madrid -> Paris" reliably fires for any posting whose addresses contain those substrings.
+  async findMatchingRouteSubscriptions(fromAddress: string, toAddress: string): Promise<RecurringRouteSubscription[]> {
+    return await db.select().from(recurringRouteSubscriptions).where(and(
+      sql`${fromAddress} ILIKE '%' || ${recurringRouteSubscriptions.fromAddress} || '%'`,
+      sql`${toAddress} ILIKE '%' || ${recurringRouteSubscriptions.toAddress} || '%'`,
+    ));
   }
 
   // === ANNOUNCEMENTS OPERATIONS ===

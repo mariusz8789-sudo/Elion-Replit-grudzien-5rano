@@ -18,7 +18,7 @@ import {
   insertCapacityPostingSchema, insertCapacityBookingSchema,
   insertDriverAvailabilitySchema, insertDriverTimeOffSchema, insertCargoItemSchema,
   insertVerificationDocumentSchema, insertApiKeySchema,
-  insertSkillSchema, insertWorkerProfileSchema, insertWorkerSkillSchema,
+  insertSkillSchema, insertWorkerProfileSchema, insertWorkerSkillSchema, insertRecurringRouteSubscriptionSchema,
   offers, marketplaceListings, sharedRides, rideBookings, companies, bookings, drivers, vehicles,
   users, messages, reviews, services
 } from "@shared/schema";
@@ -1815,10 +1815,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "departureWindowEnd must be after departureWindowStart" });
       }
       const posting = await storage.createCapacityPosting(postingData);
+
+      // Real-time discovery for the Return Trip Marketplace: notify every company subscribed
+      // to this route pattern, so they don't have to keep re-searching for a recurring lane.
+      if (posting.isRecurring) {
+        const matchingSubs = await storage.findMatchingRouteSubscriptions(posting.fromAddress, posting.toAddress);
+        for (const sub of matchingSubs) {
+          if (sub.companyId === posting.companyId) continue;
+          const subscriberUsers = await storage.getCompanyUsers(sub.companyId);
+          for (const su of subscriberUsers) {
+            await storage.createNotification({
+              userId: su.id,
+              title: "New recurring route matches your subscription",
+              message: `${posting.fromAddress} -> ${posting.toAddress}, ${posting.freeVolumeM3} m³ free`,
+              link: "/capacity",
+            });
+          }
+        }
+      }
+
       res.status(201).json(posting);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
+  });
+
+  app.post("/api/route-subscriptions", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (!user.companyId) {
+        return res.status(403).json({ message: "A company account is required to subscribe to a route" });
+      }
+      const { companyId: _companyId, ...rest } = req.body;
+      const data = insertRecurringRouteSubscriptionSchema.parse({ ...rest, companyId: user.companyId });
+      res.status(201).json(await storage.createRouteSubscription(data));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/companies/:companyId/route-subscriptions", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    res.json(await storage.getCompanyRouteSubscriptions(req.params.companyId));
+  });
+
+  app.delete("/api/route-subscriptions/:id", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!user.companyId) return res.status(403).json({ message: "Not authorized" });
+    const deleted = await storage.deleteRouteSubscription(req.params.id, user.companyId);
+    if (!deleted) return res.status(404).json({ message: "Subscription not found" });
+    res.json({ message: "Subscription removed" });
   });
 
   app.get("/api/capacity-postings", async (req, res) => {

@@ -1,0 +1,645 @@
+{
+  "schema": "genesis-discovery-campaign-dossier/2",
+  "campaign": {
+    "id": "discovery-campaign-v2",
+    "version": "genesis-discovery-campaign/2",
+    "status": "COMPLETED"
+  },
+  "primaryTarget": "[TEST FIXTURE] synthetic target",
+  "targetGate": {
+    "gate": "PROCEED",
+    "truthEngineDecision": "WARN",
+    "reason": "supported by real evidence, no contradiction found under supplied assumptions"
+  },
+  "evidence": {
+    "ingestionMode": "TEST_FIXTURE",
+    "records": 2,
+    "provenance": [
+      {
+        "sourceService": "EUROPE_PMC",
+        "sourceId": "TESTFIX1",
+        "contentHash": "37f283b0bf51fc4434aa3859092e54003b0b4aadd8852421fe423943ab652009",
+        "license": "CC-BY",
+        "ingestionMode": "TEST_FIXTURE"
+      },
+      {
+        "sourceService": "RCSB_PDB",
+        "sourceId": "TESTFIX",
+        "contentHash": "d79748bae15e5aae30522269453ea79ff2df2c04467e8a0bcb6aed8249e74b77",
+        "license": "CC0",
+        "ingestionMode": "TEST_FIXTURE"
+      },
+      {
+        "sourceService": "PUBCHEM",
+        "sourceId": "999999999",
+        "contentHash": "3824822ad1079b1b8ebb90763590c7e5cdd8c047467e452736ab363ff78b3379",
+        "license": "PUBLIC_DOMAIN",
+        "ingestionMode": "TEST_FIXTURE"
+      },
+      {
+        "sourceService": "UNIPROT",
+        "sourceId": "TESTFX",
+        "contentHash": "b2e7341d1931df68ff500bb2a3e499f97e161a6e708d3fbc35a0f2b5d7ecd7fc",
+        "license": "CC-BY",
+        "ingestionMode": "TEST_FIXTURE"
+      },
+      {
+        "sourceService": "CHEMBL",
+        "sourceId": "ACT_TESTFIX",
+        "contentHash": "9df0d5d5437da9eebee9151f9aa9d332d9494b390e25d78e2bd709d54f367eaf",
+        "license": "UNKNOWN",
+        "ingestionMode": "TEST_FIXTURE"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "stage": "EVIDENCE",
+      "status": "INGESTED",
+      "detail": "2 records (TEST_FIXTURE)"
+    },
+    {
+      "stage": "TARGET_INTELLIGENCE",
+      "status": "PROCEED"
+    },
+    {
+      "stage": "CANDIDATE_GEN_V2",
+      "status": "COMPLETED_RANKED",
+      "detail": "150 generated"
+    },
+    {
+      "stage": "RDKIT",
+      "status": "AVAILABLE"
+    },
+    {
+      "stage": "ADMET",
+      "status": "AVAILABLE"
+    },
+    {
+      "stage": "DOCKING",
+      "status": "EXECUTED",
+      "detail": "5 of top 5 survivors docked"
+    },
+    {
+      "stage": "TRUTH_ENGINE",
+      "status": "GO_COMPUTATIONAL",
+      "detail": "0 rejection(s)"
+    },
+    {
+      "stage": "MCRE",
+      "status": "DONE",
+      "detail": "0 conflict(s)"
+    },
+    {
+      "stage": "NECROPOLIS",
+      "status": "RECORDED",
+      "detail": "1 rejected across 1 region(s)"
+    },
+    {
+      "stage": "WORKFLOW_MUTATION",
+      "status": "UNCHANGED",
+      "detail": "survival rate 99% acceptable — plan unchanged"
+    }
+  ],
+  "engineMatrix": {
+    "RDKit": {
+      "status": "AVAILABLE"
+    },
+    "ADMET-AI": {
+      "status": "AVAILABLE"
+    },
+    "Docking": {
+      "status": "EXECUTED",
+      "version": "Vina 1.2.7 + Meeko 0.7.1"
+    }
+  },
+  "truthEngineGate": {
+    "decision": "GO_COMPUTATIONAL",
+    "rejections": [],
+    "boundedClaim": "GO_COMPUTATIONAL means a reproducible computational ranking was produced under cited evidence — NOT therapeutic efficacy and NOT a drug-discovery claim."
+  },
+  "necropolisDelta": {
+    "campaignId": "discovery-campaign-v2",
+    "rejectedCount": 1,
+    "failureRegions": [
+      {
+        "reason": "STRUCTURAL_ALERTS_3",
+        "count": 1
+      }
+    ]
+  },
+  "workflowMutation": {
+    "mutated": false,
+    "reason": "survival rate 99% acceptable — plan unchanged"
+  },
+  "benchmark": {
+    "candidatesGenerated": 150,
+    "candidatesRejected": 1,
+    "candidatesSurviving": 149,
+    "dockedCount": 5,
+    "realEnginesExecuted": [
+      "RDKit",
+      "ADMET-AI",
+      "AutoDock Vina 1.2.7"
+    ],
+    "blockedEngines": [],
+    "rankingTop10": [
+      {
+        "rank": 1,
+        "candidateId": "candv2_f0214ce9732c",
+        "smiles": "COc1ccc(Cl)cc1",
+        "finalScore": 0.869485
+      },
+      {
+        "rank": 2,
+        "candidateId": "candv2_8cc398ed5c51",
+        "smiles": "NC(=O)c1ccc(Cl)cc1",
+        "finalScore": 0.866998
+      },
+      {
+        "rank": 3,
+        "candidateId": "candv2_c21202da8eaa",
+        "smiles": "COc1ccccc1Cl",
+        "finalScore": 0.866659
+      },
+      {
+        "rank": 4,
+        "candidateId": "candv2_95884ab8f55a",
+        "smiles": "COc1cccc(Cl)c1",
+        "finalScore": 0.865625
+      },
+      {
+        "rank": 5,
+        "candidateId": "candv2_31dd3c0f1215",
+        "smiles": "NC(=O)c1ccccc1Cl",
+        "finalScore": 0.864796
+      },
+      {
+        "rank": 6,
+        "candidateId": "candv2_4d444a2ce83b",
+        "smiles": "NC(=O)c1cccc(Cl)c1",
+        "finalScore": 0.864036
+      },
+      {
+        "rank": 7,
+        "candidateId": "candv2_22d5aee619f9",
+        "smiles": "COc1ccc(O)cc1",
+        "finalScore": 0.862574
+      },
+      {
+        "rank": 8,
+        "candidateId": "candv2_7a57fe22a2ce",
+        "smiles": "COc1ccccc1O",
+        "finalScore": 0.860965
+      },
+      {
+        "rank": 9,
+        "candidateId": "candv2_4673ab99f8ed",
+        "smiles": "COc1ccc(F)cc1",
+        "finalScore": 0.860878
+      },
+      {
+        "rank": 10,
+        "candidateId": "candv2_f4719e8ff600",
+        "smiles": "COc1ccc(C)cc1",
+        "finalScore": 0.860805
+      }
+    ]
+  },
+  "dockedCandidates": [
+    {
+      "candidateId": "candv2_f0214ce9732c",
+      "structure": "COc1ccc(Cl)cc1",
+      "rationale": "Generation 1 analogue of seed 'anisole' via add-chloro; survived drug-likeness triage.",
+      "descriptors": {
+        "canonicalSmiles": "COc1ccc(Cl)cc1",
+        "molecularFormula": "C7H7ClO",
+        "molWt": 142.585,
+        "exactMolWt": 142.01854,
+        "heavyAtomCount": 9,
+        "hbd": 0,
+        "hba": 1,
+        "rotatableBonds": 1,
+        "ringCount": 1,
+        "aromaticRings": 1,
+        "fractionCsp3": 0.1429,
+        "tpsa": 9.23,
+        "crippenLogP": 2.3486,
+        "formalCharge": 0,
+        "heteroatomCount": 2,
+        "lipinskiViolations": 0,
+        "lipinskiPass": true
+      },
+      "admet": {
+        "epistemicStatus": "MODEL_INFERRED"
+      },
+      "docking": {
+        "status": "DOCKED",
+        "bestAffinityKcalMol": -3.181,
+        "nPoses": 5,
+        "grid": {
+          "center": [
+            0.136,
+            -0.23,
+            0.177
+          ],
+          "boxSize": [
+            16,
+            16,
+            16
+          ]
+        },
+        "referenceLigand": {
+          "name": "LIG",
+          "chain": "A",
+          "seq": 900,
+          "nAtoms": 10,
+          "isExcludedIonBuffer": false
+        },
+        "engine": "AutoDock Vina 1.2.7",
+        "epistemicStatus": "MODEL_ESTIMATE",
+        "receptorProvenanceSha256": "a0ba64c2e1b46d40a910746c88f52329bd44a97f347f25736deb2a469c80f6bf"
+      },
+      "truthEngineDecision": "GO_COMPUTATIONAL",
+      "computationalConfidence": 1,
+      "rejectedAlternatives": [
+        {
+          "candidateId": "candv2_c21202da8eaa",
+          "smiles": "COc1ccccc1Cl",
+          "finalScore": 0.866659,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_95884ab8f55a",
+          "smiles": "COc1cccc(Cl)c1",
+          "finalScore": 0.865625,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_22d5aee619f9",
+          "smiles": "COc1ccc(O)cc1",
+          "finalScore": 0.862574,
+          "rejected": false,
+          "reasons": []
+        }
+      ],
+      "nextExperiment": "Wet-lab binding assay (SPR/ITC or target biochemical assay) to test the predicted pose and measure Kd/IC50 — the docking score is a MODEL_ESTIMATE, not measured affinity.",
+      "provenance": {
+        "candidateOrigin": "RDKit SMARTS analogue enumeration (COMPUTED)",
+        "parentSmiles": "COc1ccccc1",
+        "transformation": "add-chloro"
+      }
+    },
+    {
+      "candidateId": "candv2_8cc398ed5c51",
+      "structure": "NC(=O)c1ccc(Cl)cc1",
+      "rationale": "Generation 1 analogue of seed 'benzamide' via add-chloro; survived drug-likeness triage.",
+      "descriptors": {
+        "canonicalSmiles": "NC(=O)c1ccc(Cl)cc1",
+        "molecularFormula": "C7H6ClNO",
+        "molWt": 155.584,
+        "exactMolWt": 155.01379,
+        "heavyAtomCount": 10,
+        "hbd": 1,
+        "hba": 1,
+        "rotatableBonds": 1,
+        "ringCount": 1,
+        "aromaticRings": 1,
+        "fractionCsp3": 0,
+        "tpsa": 43.09,
+        "crippenLogP": 1.4389,
+        "formalCharge": 0,
+        "heteroatomCount": 3,
+        "lipinskiViolations": 0,
+        "lipinskiPass": true
+      },
+      "admet": {
+        "epistemicStatus": "MODEL_INFERRED"
+      },
+      "docking": {
+        "status": "DOCKED",
+        "bestAffinityKcalMol": -3.616,
+        "nPoses": 5,
+        "grid": {
+          "center": [
+            0.136,
+            -0.23,
+            0.177
+          ],
+          "boxSize": [
+            16,
+            16,
+            16
+          ]
+        },
+        "referenceLigand": {
+          "name": "LIG",
+          "chain": "A",
+          "seq": 900,
+          "nAtoms": 10,
+          "isExcludedIonBuffer": false
+        },
+        "engine": "AutoDock Vina 1.2.7",
+        "epistemicStatus": "MODEL_ESTIMATE",
+        "receptorProvenanceSha256": "a0ba64c2e1b46d40a910746c88f52329bd44a97f347f25736deb2a469c80f6bf"
+      },
+      "truthEngineDecision": "GO_COMPUTATIONAL",
+      "computationalConfidence": 1,
+      "rejectedAlternatives": [
+        {
+          "candidateId": "candv2_31dd3c0f1215",
+          "smiles": "NC(=O)c1ccccc1Cl",
+          "finalScore": 0.864796,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_4d444a2ce83b",
+          "smiles": "NC(=O)c1cccc(Cl)c1",
+          "finalScore": 0.864036,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_3a441f7c3397",
+          "smiles": "Cc1ccc(C(N)=O)cc1",
+          "finalScore": 0.855709,
+          "rejected": false,
+          "reasons": []
+        }
+      ],
+      "nextExperiment": "Wet-lab binding assay (SPR/ITC or target biochemical assay) to test the predicted pose and measure Kd/IC50 — the docking score is a MODEL_ESTIMATE, not measured affinity.",
+      "provenance": {
+        "candidateOrigin": "RDKit SMARTS analogue enumeration (COMPUTED)",
+        "parentSmiles": "NC(=O)c1ccccc1",
+        "transformation": "add-chloro"
+      }
+    },
+    {
+      "candidateId": "candv2_c21202da8eaa",
+      "structure": "COc1ccccc1Cl",
+      "rationale": "Generation 1 analogue of seed 'anisole' via add-chloro; survived drug-likeness triage.",
+      "descriptors": {
+        "canonicalSmiles": "COc1ccccc1Cl",
+        "molecularFormula": "C7H7ClO",
+        "molWt": 142.585,
+        "exactMolWt": 142.01854,
+        "heavyAtomCount": 9,
+        "hbd": 0,
+        "hba": 1,
+        "rotatableBonds": 1,
+        "ringCount": 1,
+        "aromaticRings": 1,
+        "fractionCsp3": 0.1429,
+        "tpsa": 9.23,
+        "crippenLogP": 2.3486,
+        "formalCharge": 0,
+        "heteroatomCount": 2,
+        "lipinskiViolations": 0,
+        "lipinskiPass": true
+      },
+      "admet": {
+        "epistemicStatus": "MODEL_INFERRED"
+      },
+      "docking": {
+        "status": "DOCKED",
+        "bestAffinityKcalMol": -3.083,
+        "nPoses": 5,
+        "grid": {
+          "center": [
+            0.136,
+            -0.23,
+            0.177
+          ],
+          "boxSize": [
+            16,
+            16,
+            16
+          ]
+        },
+        "referenceLigand": {
+          "name": "LIG",
+          "chain": "A",
+          "seq": 900,
+          "nAtoms": 10,
+          "isExcludedIonBuffer": false
+        },
+        "engine": "AutoDock Vina 1.2.7",
+        "epistemicStatus": "MODEL_ESTIMATE",
+        "receptorProvenanceSha256": "a0ba64c2e1b46d40a910746c88f52329bd44a97f347f25736deb2a469c80f6bf"
+      },
+      "truthEngineDecision": "GO_COMPUTATIONAL",
+      "computationalConfidence": 1,
+      "rejectedAlternatives": [
+        {
+          "candidateId": "candv2_f0214ce9732c",
+          "smiles": "COc1ccc(Cl)cc1",
+          "finalScore": 0.869485,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_95884ab8f55a",
+          "smiles": "COc1cccc(Cl)c1",
+          "finalScore": 0.865625,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_22d5aee619f9",
+          "smiles": "COc1ccc(O)cc1",
+          "finalScore": 0.862574,
+          "rejected": false,
+          "reasons": []
+        }
+      ],
+      "nextExperiment": "Wet-lab binding assay (SPR/ITC or target biochemical assay) to test the predicted pose and measure Kd/IC50 — the docking score is a MODEL_ESTIMATE, not measured affinity.",
+      "provenance": {
+        "candidateOrigin": "RDKit SMARTS analogue enumeration (COMPUTED)",
+        "parentSmiles": "COc1ccccc1",
+        "transformation": "add-chloro"
+      }
+    },
+    {
+      "candidateId": "candv2_95884ab8f55a",
+      "structure": "COc1cccc(Cl)c1",
+      "rationale": "Generation 1 analogue of seed 'anisole' via add-chloro; survived drug-likeness triage.",
+      "descriptors": {
+        "canonicalSmiles": "COc1cccc(Cl)c1",
+        "molecularFormula": "C7H7ClO",
+        "molWt": 142.585,
+        "exactMolWt": 142.01854,
+        "heavyAtomCount": 9,
+        "hbd": 0,
+        "hba": 1,
+        "rotatableBonds": 1,
+        "ringCount": 1,
+        "aromaticRings": 1,
+        "fractionCsp3": 0.1429,
+        "tpsa": 9.23,
+        "crippenLogP": 2.3486,
+        "formalCharge": 0,
+        "heteroatomCount": 2,
+        "lipinskiViolations": 0,
+        "lipinskiPass": true
+      },
+      "admet": {
+        "epistemicStatus": "MODEL_INFERRED"
+      },
+      "docking": {
+        "status": "DOCKED",
+        "bestAffinityKcalMol": -2.992,
+        "nPoses": 5,
+        "grid": {
+          "center": [
+            0.136,
+            -0.23,
+            0.177
+          ],
+          "boxSize": [
+            16,
+            16,
+            16
+          ]
+        },
+        "referenceLigand": {
+          "name": "LIG",
+          "chain": "A",
+          "seq": 900,
+          "nAtoms": 10,
+          "isExcludedIonBuffer": false
+        },
+        "engine": "AutoDock Vina 1.2.7",
+        "epistemicStatus": "MODEL_ESTIMATE",
+        "receptorProvenanceSha256": "a0ba64c2e1b46d40a910746c88f52329bd44a97f347f25736deb2a469c80f6bf"
+      },
+      "truthEngineDecision": "GO_COMPUTATIONAL",
+      "computationalConfidence": 1,
+      "rejectedAlternatives": [
+        {
+          "candidateId": "candv2_f0214ce9732c",
+          "smiles": "COc1ccc(Cl)cc1",
+          "finalScore": 0.869485,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_c21202da8eaa",
+          "smiles": "COc1ccccc1Cl",
+          "finalScore": 0.866659,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_22d5aee619f9",
+          "smiles": "COc1ccc(O)cc1",
+          "finalScore": 0.862574,
+          "rejected": false,
+          "reasons": []
+        }
+      ],
+      "nextExperiment": "Wet-lab binding assay (SPR/ITC or target biochemical assay) to test the predicted pose and measure Kd/IC50 — the docking score is a MODEL_ESTIMATE, not measured affinity.",
+      "provenance": {
+        "candidateOrigin": "RDKit SMARTS analogue enumeration (COMPUTED)",
+        "parentSmiles": "COc1ccccc1",
+        "transformation": "add-chloro"
+      }
+    },
+    {
+      "candidateId": "candv2_31dd3c0f1215",
+      "structure": "NC(=O)c1ccccc1Cl",
+      "rationale": "Generation 1 analogue of seed 'benzamide' via add-chloro; survived drug-likeness triage.",
+      "descriptors": {
+        "canonicalSmiles": "NC(=O)c1ccccc1Cl",
+        "molecularFormula": "C7H6ClNO",
+        "molWt": 155.584,
+        "exactMolWt": 155.01379,
+        "heavyAtomCount": 10,
+        "hbd": 1,
+        "hba": 1,
+        "rotatableBonds": 1,
+        "ringCount": 1,
+        "aromaticRings": 1,
+        "fractionCsp3": 0,
+        "tpsa": 43.09,
+        "crippenLogP": 1.4389,
+        "formalCharge": 0,
+        "heteroatomCount": 3,
+        "lipinskiViolations": 0,
+        "lipinskiPass": true
+      },
+      "admet": {
+        "epistemicStatus": "MODEL_INFERRED"
+      },
+      "docking": {
+        "status": "DOCKED",
+        "bestAffinityKcalMol": -3.464,
+        "nPoses": 4,
+        "grid": {
+          "center": [
+            0.136,
+            -0.23,
+            0.177
+          ],
+          "boxSize": [
+            16,
+            16,
+            16
+          ]
+        },
+        "referenceLigand": {
+          "name": "LIG",
+          "chain": "A",
+          "seq": 900,
+          "nAtoms": 10,
+          "isExcludedIonBuffer": false
+        },
+        "engine": "AutoDock Vina 1.2.7",
+        "epistemicStatus": "MODEL_ESTIMATE",
+        "receptorProvenanceSha256": "a0ba64c2e1b46d40a910746c88f52329bd44a97f347f25736deb2a469c80f6bf"
+      },
+      "truthEngineDecision": "GO_COMPUTATIONAL",
+      "computationalConfidence": 1,
+      "rejectedAlternatives": [
+        {
+          "candidateId": "candv2_8cc398ed5c51",
+          "smiles": "NC(=O)c1ccc(Cl)cc1",
+          "finalScore": 0.866998,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_4d444a2ce83b",
+          "smiles": "NC(=O)c1cccc(Cl)c1",
+          "finalScore": 0.864036,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_3a441f7c3397",
+          "smiles": "Cc1ccc(C(N)=O)cc1",
+          "finalScore": 0.855709,
+          "rejected": false,
+          "reasons": []
+        }
+      ],
+      "nextExperiment": "Wet-lab binding assay (SPR/ITC or target biochemical assay) to test the predicted pose and measure Kd/IC50 — the docking score is a MODEL_ESTIMATE, not measured affinity.",
+      "provenance": {
+        "candidateOrigin": "RDKit SMARTS analogue enumeration (COMPUTED)",
+        "parentSmiles": "NC(=O)c1ccccc1",
+        "transformation": "add-chloro"
+      }
+    }
+  ],
+  "scientificLimitations": [
+    "Candidates are RDKit-enumerated analogues — COMPUTATIONAL CANDIDATES, not drugs.",
+    "ADMET is MODEL_INFERRED; docking scores are Vina MODEL_ESTIMATE, NOT measured binding affinity.",
+    "No biological activity is claimed. No experimental or clinical validation was performed."
+  ],
+  "didGenesisDiscoverADrug": "NO",
+  "didGenesisDiscoverADrugExplanation": "The campaign generated, evaluated (RDKit + ADMET), docked (real Vina, MODEL_ESTIMATE) and ranked computational candidates with provenance and a Truth-Engine gate. That is computational triage, not drug discovery.",
+  "dossierHash": "82c0ef927e6cb301261f73986aa3b410dd7934bd158c58b896d0223474113fdc",
+  "benchmarkExecutionMs": 281206
+}

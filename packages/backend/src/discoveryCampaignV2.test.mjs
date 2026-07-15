@@ -1,0 +1,112 @@
+/**
+ * Full Discovery Campaign v2 orchestrator — Evidence → Target Intelligence → Candidate Generator v2
+ * → RDKit → ADMET → Docking → Truth Engine → MCRE → Necropolis → Workflow Mutation → Dossier.
+ * Driven with fully injected FAKE deps (deterministic, no Python) so the chain + funnel + per-candidate
+ * dossier + benchmark are verified fast. Honest classification of blocked docking is asserted too.
+ */
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { runDiscoveryCampaignV2, CAMPAIGN_V2_STATUS } from './cognitive/discoveryCampaignV2.mjs';
+
+function fakeCandidates(n) {
+  const candidates = [];
+  const ranking = [];
+  for (let i = 0; i < n; i++) {
+    const lv = i % 5 < 3 ? 2 : 0; // ~60% fail Lipinski (survival < 0.5 → triggers mutation)
+    const na = i % 3;            // 0,1 ok; alerts present when >=1 but never > maxAlerts here
+    const id = `cand_${String(i).padStart(3, '0')}`;
+    const smi = `C${'C'.repeat(i % 5)}O`;
+    candidates.push({
+      candidateId: id, canonicalSmiles: smi, generation: i === 0 ? 0 : 1 + (i % 2),
+      parentSmiles: i === 0 ? null : `C${'C'.repeat((i - 1) % 5)}O`, transformation: i === 0 ? null : 'add-methyl', seedName: 'seedX',
+      engineOutputs: {
+        rdkit: { ok: true, descriptors: { molWt: 100 + i, lipinskiViolations: lv, tpsa: 50 }, structuralAlerts: na >= 1 ? ['x'] : [], nAlerts: na },
+        admet: { ok: true, predictions: { QED: (i % 10) / 10 } },
+      },
+      failureState: null,
+    });
+    ranking.push({ rank: i + 1, candidateId: id, canonicalSmiles: smi, finalScore: +(1 - i / n).toFixed(4), rankingPolicyVersion: 'genesis-candidate-ranking/2' });
+  }
+  return { candidates, ranking };
+}
+
+function fakeDeps({ dockAvailable = true, gate = 'PROCEED' } = {}) {
+  const { candidates, ranking } = fakeCandidates(120);
+  const dockCalls = [];
+  return {
+    deps: {
+      ingestBundle: () => ({ ingestionMode: 'TEST_FIXTURE', evidenceRecords: [{ evidenceId: 'ev1', entityType: 'BioactivityRecord' }], entities: [{ entity: { entityType: 'BioactivityRecord' }, provenance: { sourceService: 'CHEMBL', sourceId: 'A', contentHash: 'h', license: 'CC-BY-SA', ingestionMode: 'TEST_FIXTURE' } }], summary: {} }),
+      buildClaimRegistry: () => ({ registry: [{ claimId: 'c1', normalizedClaim: 'x', status: 'SUPPORTED', supportingEvidenceIds: ['ev1'] }] }),
+      targetFunnel: () => ({ primaryGate: { gate }, primaryTarget: { targetName: 'T1' }, scoringPolicyVersion: 'v1', alternatives: [] }),
+      runCandidateGenerationV2: () => ({ status: 'COMPLETED_RANKED', candidates, ranking, engineMatrix: { RDKit: { status: 'AVAILABLE' }, 'ADMET-AI': { status: 'AVAILABLE' } } }),
+      truthFinalGate: () => ({ decision: 'GO_COMPUTATIONAL', rejections: [] }),
+      detectConflicts: () => [],
+      dockDetect: () => (dockAvailable ? { available: true, vinaVersion: '1.2.7', meekoVersion: '0.7.1' } : { available: false, reason: 'vina missing' }),
+      dockPipeline: (spec) => { dockCalls.push(spec.ligandSmiles); return { ok: true, docking: { bestAffinityKcalMol: -5.1, nPoses: 5 }, grid: { center: [0, 0, 0], boxSize: [16, 16, 16] }, referenceLigand: { name: 'LIG' }, preparedReceptor: { inputStructureSha256: 'a'.repeat(64), artifacts: [] } }; },
+      dockPrepared: () => ({ ok: true }),
+      prepareReceptor: () => ({ ok: true }),
+    },
+    dockCalls,
+  };
+}
+
+describe('discoveryCampaignV2 — full chain (fake deps)', () => {
+  test('completes, produces benchmark + per-candidate dossier with all required fields', () => {
+    const { deps } = fakeDeps();
+    const r = runDiscoveryCampaignV2({ bundleRoot: '/x', structure: 'ATOM...', minCandidates: 100, dockTopN: 5, deps });
+    assert.equal(r.status, CAMPAIGN_V2_STATUS.COMPLETED);
+    // benchmark arithmetic
+    const b = r.benchmark;
+    assert.equal(b.candidatesGenerated, 120);
+    assert.equal(b.candidatesRejected + b.candidatesSurviving, 120);
+    assert.ok(b.candidatesRejected > 0 && b.candidatesSurviving > 0);
+    assert.equal(b.dockedCount, Math.min(5, b.candidatesSurviving));
+    assert.ok(b.realEnginesExecuted.includes('RDKit') && b.realEnginesExecuted.includes('ADMET-AI'));
+    assert.ok(b.realEnginesExecuted.some((e) => e.includes('Vina')));
+    // stage ledger covers the whole pipeline
+    const stageNames = r.stages.map((s) => s.stage);
+    for (const s of ['EVIDENCE', 'TARGET_INTELLIGENCE', 'CANDIDATE_GEN_V2', 'RDKIT', 'ADMET', 'DOCKING', 'TRUTH_ENGINE', 'MCRE', 'NECROPOLIS', 'WORKFLOW_MUTATION']) {
+      assert.ok(stageNames.includes(s), `missing stage ${s}`);
+    }
+    // per-candidate dossier fields (Phase 4)
+    const c = r.dossier.candidates[0];
+    for (const f of ['structure', 'rationale', 'descriptors', 'admet', 'docking', 'truthEngineDecision', 'provenance', 'computationalConfidence', 'rejectedAlternatives', 'nextExperiment']) {
+      assert.ok(f in c, `dossier candidate missing ${f}`);
+    }
+    assert.equal(r.dossier.didGenesisDiscoverADrug, 'NO');
+    assert.ok(r.dossier.dossierHash.length >= 32);
+  });
+
+  test('docking is BLOCKED_BY_RESOURCES with no structure (never simulated)', () => {
+    const { deps, dockCalls } = fakeDeps();
+    const r = runDiscoveryCampaignV2({ bundleRoot: '/x', structure: null, minCandidates: 100, dockTopN: 5, deps });
+    assert.equal(dockCalls.length, 0, 'no docking attempted without a structure');
+    const dockStage = r.stages.find((s) => s.stage === 'DOCKING');
+    assert.equal(dockStage.status, 'BLOCKED_BY_RESOURCES');
+    assert.ok(r.dossier.candidates.every((c) => c.docking.status !== 'DOCKED'));
+  });
+
+  test('docking is BLOCKED_BY_RUNTIME when Vina is unavailable (never simulated)', () => {
+    const { deps, dockCalls } = fakeDeps({ dockAvailable: false });
+    const r = runDiscoveryCampaignV2({ bundleRoot: '/x', structure: 'ATOM...', minCandidates: 100, dockTopN: 5, deps });
+    assert.equal(dockCalls.length, 0);
+    assert.equal(r.stages.find((s) => s.stage === 'DOCKING').status, 'BLOCKED_BY_RUNTIME');
+    assert.ok(r.benchmark.blockedEngines.some((e) => e.startsWith('Docking:BLOCKED_BY_RUNTIME')));
+  });
+
+  test('workflow mutation triggers when survival rate is low', () => {
+    const { deps } = fakeDeps();
+    const r = runDiscoveryCampaignV2({ bundleRoot: '/x', structure: 'ATOM...', minCandidates: 100, dockTopN: 5, deps });
+    // fakeCandidates: half fail Lipinski (lv 2,3) → survival < 0.5 → mutation
+    assert.equal(r.workflowMutation.mutated, true);
+    assert.ok(r.necropolisDelta.failureRegions.length > 0);
+    assert.equal(r.necropolisDelta.rejectedCount, r.benchmark.candidatesRejected);
+  });
+
+  test('fails closed at the target gate (BLOCK)', () => {
+    const { deps } = fakeDeps({ gate: 'BLOCK' });
+    const r = runDiscoveryCampaignV2({ bundleRoot: '/x', structure: 'ATOM...', minCandidates: 100, deps });
+    assert.equal(r.status, CAMPAIGN_V2_STATUS.FAIL_CLOSED_TARGET_GATE);
+    assert.equal(r.dossier, null);
+  });
+});

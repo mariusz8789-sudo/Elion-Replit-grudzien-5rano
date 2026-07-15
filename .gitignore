@@ -14,3 +14,6 @@ _dock*/
 # Candidate Generation Engine v2 — bulky regenerable outputs (keep the dossier)
 campaigns/candidate-gen-v2/candidates.json
 campaigns/candidate-gen-v2/ranking.json
+
+# Full Discovery Campaign v2 — bulky regenerable full dossier (keep compact benchmark.json)
+campaigns/discovery-campaign-v2/discovery-dossier.json

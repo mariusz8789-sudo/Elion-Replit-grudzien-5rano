@@ -24,7 +24,144 @@ IMPORTANT SCIENTIFIC HONESTY:
 import hashlib
 import json
 import os
+import subprocess
 import sys
+import tempfile
+
+# 20 standard amino acids — everything else in a chain is treated as a ligand/hetero group.
+STANDARD_AA = {
+    "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE",
+    "LEU", "LYS", "MET", "PHE", "PRO", "SER", "THR", "TRP", "TYR", "VAL",
+    "SEC", "PYL", "MSE",
+}
+# Ions / buffers / cryoprotectants that are NOT the biological ligand of interest.
+EXCLUDE_LIG = {
+    "HOH", "WAT", "DOD", "NA", "CL", "K", "MG", "ZN", "CA", "MN", "FE", "CU",
+    "NI", "CO", "CD", "SO4", "PO4", "GOL", "EDO", "PEG", "ACT", "DMS", "IOD",
+    "BR", "FMT", "MPD", "TRS", "EPE", "IMD", "NO3", "CO3", "NH4", "PG4",
+}
+
+
+def _read_structure(text, fmt):
+    """Parse a PDB or mmCIF structure from text via gemmi (format auto-handled by extension)."""
+    import gemmi
+    ext = ".cif" if str(fmt).lower() in ("mmcif", "cif") else ".pdb"
+    fd, path = tempfile.mkstemp(suffix=ext)
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    try:
+        st = gemmi.read_structure(path)
+        st.setup_entities()
+        return st
+    finally:
+        os.unlink(path)
+
+
+def _hetero_residues(st):
+    """Every non-standard, non-water residue with its atom count + coordinates (candidate ligands)."""
+    out = []
+    if len(st) == 0:
+        return out
+    for chain in st[0]:
+        for res in chain:
+            if res.is_water() or res.name in STANDARD_AA:
+                continue
+            coords = [(a.pos.x, a.pos.y, a.pos.z) for a in res]
+            out.append({
+                "name": res.name, "chain": chain.name, "seq": res.seqid.num,
+                "nAtoms": len(res), "isExcludedIonBuffer": res.name in EXCLUDE_LIG,
+                "coords": coords,
+            })
+    return out
+
+
+def _extract_reference_ligand(st):
+    """Pick the biological reference ligand: the largest hetero residue that is not an ion/buffer."""
+    hets = [h for h in _hetero_residues(st) if not h["isExcludedIonBuffer"] and h["nAtoms"] >= 6]
+    if not hets:
+        return None
+    # Deterministic: most atoms, then name, then chain/seq.
+    hets.sort(key=lambda h: (-h["nAtoms"], h["name"], h["chain"], h["seq"]))
+    return hets[0]
+
+
+def _grid_from_coords(coords, padding):
+    """Deterministic docking box: centre = ligand centroid, size = bbox extent + 2*padding, clamped."""
+    xs = [c[0] for c in coords]
+    ys = [c[1] for c in coords]
+    zs = [c[2] for c in coords]
+    center = [round(sum(xs) / len(xs), 3), round(sum(ys) / len(ys), 3), round(sum(zs) / len(zs), 3)]
+    box = [round(min(60.0, max(16.0, (mx - mn) + 2.0 * padding)), 1)
+           for mn, mx in ((min(xs), max(xs)), (min(ys), max(ys)), (min(zs), max(zs)))]
+    return center, box
+
+
+def _write_protein_pdb(st, path):
+    """Write a receptor-only PDB (ligands + waters removed) for receptor preparation."""
+    import copy
+    prot = copy.deepcopy(st)
+    prot.remove_ligands_and_waters()
+    prot.remove_empty_chains()
+    prot.write_pdb(path)
+    n = sum(1 for line in open(path) if line.startswith("ATOM"))
+    if n == 0:
+        raise ValueError("no_protein_atoms_after_cleaning")
+    return n
+
+
+def _prepare_receptor_pdbqt(protein_pdb_path, out_base):
+    """Real receptor preparation via Meeko's mk_prepare_receptor -> rigid receptor PDBQT."""
+    r = subprocess.run(
+        ["mk_prepare_receptor.py", "--read_pdb", protein_pdb_path, "-o", out_base, "-p", "-a"],
+        capture_output=True, text=True, timeout=240,
+    )
+    pdbqt = out_base + ".pdbqt"
+    if r.returncode != 0 or not os.path.exists(pdbqt):
+        raise ValueError("receptor_prep_failed: %s" % (r.stdout.strip()[-180:] or r.stderr.strip()[-180:]))
+    return pdbqt
+
+
+def _build_complex(seq, ligand_smiles, seed):
+    """Build a VALID synthetic protein-ligand complex (peptide + bound ligand) for pipeline
+    validation. The structure is synthetic (TEST_FIXTURE); any docking run on it is REAL Vina."""
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
+
+    def embed(mol):
+        m = Chem.AddHs(mol, addCoords=True)
+        p = AllChem.ETKDGv3()
+        p.randomSeed = seed
+        if AllChem.EmbedMolecule(m, p) != 0:
+            p2 = AllChem.ETKDGv3()
+            p2.randomSeed = seed
+            p2.useRandomCoords = True
+            p2.maxIterations = 2000
+            if AllChem.EmbedMolecule(m, p2) != 0:
+                raise ValueError("embed_failed")
+        try:
+            AllChem.MMFFOptimizeMolecule(m, maxIters=300)
+        except Exception:  # noqa: BLE001
+            pass
+        return Chem.RemoveHs(m)
+
+    prot = embed(Chem.MolFromSequence(seq))
+    prot_xyz = prot.GetConformer().GetPositions()
+    centroid = [sum(prot_xyz[:, i]) / len(prot_xyz) for i in range(3)]
+    prot_atoms = [ln for ln in Chem.MolToPDBBlock(prot).splitlines() if ln.startswith("ATOM")]
+
+    lig = embed(Chem.MolFromSmiles(ligand_smiles))
+    lig_xyz = lig.GetConformer().GetPositions()
+    lig_c = [sum(lig_xyz[:, i]) / len(lig_xyz) for i in range(3)]
+    het = []
+    for i, atom in enumerate(lig.GetAtoms(), 1):
+        x, y, z = lig_xyz[i - 1]
+        x = x - lig_c[0] + centroid[0]
+        y = y - lig_c[1] + centroid[1]
+        z = z - lig_c[2] + centroid[2]
+        el = atom.GetSymbol()
+        het.append("HETATM%5d %-4s LIG A 900    %8.3f%8.3f%8.3f  1.00  0.00          %2s"
+                    % (i, (el + str(i))[:4], x, y, z, el.rjust(2)))
+    return "\n".join(prot_atoms + het) + "\nEND\n"
 
 
 def _prep(smiles, seed):
@@ -63,7 +200,6 @@ def _sha(text):
 
 def _run_dock(req, out_dir):
     from vina import Vina
-    import numpy as np
     seed = int(req.get("seed", 42))
     exhaustiveness = max(1, min(int(req.get("exhaustiveness", 8)), 32))
     n_poses = max(1, min(int(req.get("nPoses", 5)), 20))
@@ -77,9 +213,14 @@ def _run_dock(req, out_dir):
         raise ValueError("ligandSmiles_required")
     lig_pdbqt, lig_xyz = _prep(str(lig_smiles), seed)
 
-    # Receptor: prepared rigid PDBQT provided, or a small-molecule stand-in from SMILES.
+    # Receptor: prepared receptor PDBQT (path or text), or a small-molecule stand-in from SMILES.
     receptor_kind = "provided_pdbqt"
-    if req.get("receptorPdbqt"):
+    if req.get("receptorPdbqtPath"):
+        with open(req["receptorPdbqtPath"]) as f:
+            rec_pdbqt = f.read()
+        rec_xyz = None
+        receptor_kind = "prepared_receptor"
+    elif req.get("receptorPdbqt"):
         rec_pdbqt = str(req["receptorPdbqt"])
         rec_xyz = None
     elif req.get("receptorSmiles"):
@@ -188,6 +329,67 @@ def main():
             print(json.dumps({"ok": True, **r}))
         except Exception as e:  # noqa: BLE001
             print(json.dumps({"ok": False, "error": "dock_failed: %s" % str(e)[:180]}))
+        return
+
+    if cmd == "build_reference_complex":
+        try:
+            seq = req.get("sequence") or "ACDEFGHIKLMNPQR"
+            ligand = req.get("ligandSmiles") or "c1ccccc1"
+            pdb = _build_complex(seq, ligand, int(req.get("seed", 42)))
+            print(json.dumps({"ok": True, "format": "pdb", "structure": pdb,
+                              "sha256": hashlib.sha256(pdb.encode()).hexdigest(),
+                              "note": "SYNTHETIC peptide+ligand complex (TEST_FIXTURE) for docking-pipeline validation"}))
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "build_complex_failed: %s" % str(e)[:180]}))
+        return
+
+    if cmd == "parse_structure":
+        try:
+            st = _read_structure(req["structure"], req.get("format", "pdb"))
+            model = st[0] if len(st) else None
+            chains = [c.name for c in model] if model else []
+            n_atoms = sum(len(res) for c in model for res in c) if model else 0
+            n_prot = sum(1 for c in model for res in c if res.name in STANDARD_AA) if model else 0
+            hets = [{k: v for k, v in h.items() if k != "coords"} for h in _hetero_residues(st)]
+            ref = _extract_reference_ligand(st)
+            print(json.dumps({"ok": True, "chains": chains, "nAtoms": n_atoms,
+                              "nProteinResidues": n_prot, "heteroResidues": hets,
+                              "referenceLigand": {k: v for k, v in ref.items() if k != "coords"} if ref else None}))
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "parse_failed: %s" % str(e)[:180]}))
+        return
+
+    if cmd == "prepare_receptor":
+        try:
+            out_dir = req.get("outDir") or tempfile.mkdtemp(prefix="recprep-")
+            os.makedirs(out_dir, exist_ok=True)
+            st = _read_structure(req["structure"], req.get("format", "pdb"))
+            ref = _extract_reference_ligand(st)
+            if ref is None:
+                print(json.dumps({"ok": False, "error": "no_reference_ligand",
+                                  "reason": "structure has no non-ion hetero ligand to define the binding site"}))
+                return
+            padding = float(req.get("padding", 5.0))
+            center, box = _grid_from_coords(ref["coords"], padding)
+            prot_pdb = os.path.join(out_dir, "receptor_clean.pdb")
+            n_prot_atoms = _write_protein_pdb(st, prot_pdb)
+            pdbqt_path = _prepare_receptor_pdbqt(prot_pdb, os.path.join(out_dir, "receptor"))
+            rec_text = open(pdbqt_path).read()
+            n_rec_atoms = sum(1 for ln in rec_text.splitlines() if ln.startswith(("ATOM", "HETATM")))
+            print(json.dumps({
+                "ok": True, "receptorPdbqtPath": pdbqt_path,
+                "cleanReceptorPdb": prot_pdb, "nProteinAtoms": n_prot_atoms,
+                "nReceptorPdbqtAtoms": n_rec_atoms,
+                "center": center, "boxSize": box, "padding": padding,
+                "referenceLigand": {k: v for k, v in ref.items() if k != "coords"},
+                "artifacts": [
+                    {"kind": "receptor_clean_pdb", "path": prot_pdb, "sha256_16": _sha(open(prot_pdb).read())},
+                    {"kind": "receptor_pdbqt", "path": pdbqt_path, "sha256_16": _sha(rec_text)},
+                ],
+                "inputStructureSha256": hashlib.sha256(req["structure"].encode()).hexdigest(),
+            }))
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "prepare_receptor_failed: %s" % str(e)[:180]}))
         return
 
     print(json.dumps({"ok": False, "error": "unknown_cmd: %s" % cmd}))

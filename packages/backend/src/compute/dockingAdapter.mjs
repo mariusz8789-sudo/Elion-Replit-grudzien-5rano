@@ -89,13 +89,14 @@ export function dock(spec) {
   const d = detect();
   if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
   if (!spec || !spec.ligandSmiles) return { ok: false, error: 'invalid_input', reason: 'ligandSmiles wymagane' };
-  if (!spec.receptorSmiles && !spec.receptorPdbqt) return { ok: false, error: 'invalid_input', reason: 'receptorSmiles lub receptorPdbqt wymagane' };
+  if (!spec.receptorSmiles && !spec.receptorPdbqt && !spec.receptorPdbqtPath) return { ok: false, error: 'invalid_input', reason: 'receptorSmiles, receptorPdbqt lub receptorPdbqtPath wymagane' };
   try {
     const r = invoke({
       cmd: 'dock',
       ligandSmiles: spec.ligandSmiles,
       receptorSmiles: spec.receptorSmiles,
       receptorPdbqt: spec.receptorPdbqt,
+      receptorPdbqtPath: spec.receptorPdbqtPath,
       center: spec.center,
       boxSize: spec.boxSize ?? [22, 22, 22],
       exhaustiveness: spec.exhaustiveness ?? 8,
@@ -107,4 +108,74 @@ export function dock(spec) {
   } catch (err) {
     return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
   }
+}
+
+/**
+ * Parse a PDB/mmCIF structure: chains, atom count, hetero residues, and the extracted reference
+ * (bound) ligand. Read-only structural analysis — never docks. `format`: 'pdb' | 'mmcif'.
+ */
+export function parseStructure(structure, format = 'pdb') {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  if (!structure || typeof structure !== 'string') return { ok: false, error: 'invalid_input', reason: 'structure text wymagany' };
+  try {
+    const r = invoke({ cmd: 'parse_structure', structure, format }, 60_000);
+    return r.ok ? { ok: true, chains: r.chains, nAtoms: r.nAtoms, nProteinResidues: r.nProteinResidues, heteroResidues: r.heteroResidues, referenceLigand: r.referenceLigand } : { ok: false, error: r.error, reason: r.reason };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/**
+ * Full receptor preparation from a raw structure: parse PDB/mmCIF → extract reference ligand →
+ * deterministic grid (centre = ligand centroid, box = bbox + 2·padding) → clean protein → real
+ * Meeko receptor PDBQT. Returns a prepared-receptor spec + provenance (SHA-256), or fails closed.
+ */
+export function prepareReceptor(spec) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  if (!spec || !spec.structure) return { ok: false, error: 'invalid_input', reason: 'structure wymagana' };
+  try {
+    const r = invoke({ cmd: 'prepare_receptor', structure: spec.structure, format: spec.format ?? 'pdb', padding: spec.padding ?? 5, seed: spec.seed ?? 42, outDir: artifactDir('recprep') }, TIMEOUT_MS);
+    if (!r.ok) return { ok: false, error: r.error, reason: r.reason };
+    return {
+      ok: true, receptorPdbqtPath: r.receptorPdbqtPath, cleanReceptorPdb: r.cleanReceptorPdb,
+      center: r.center, boxSize: r.boxSize, padding: r.padding,
+      referenceLigand: r.referenceLigand, nProteinAtoms: r.nProteinAtoms, nReceptorPdbqtAtoms: r.nReceptorPdbqtAtoms,
+      artifacts: r.artifacts, inputStructureSha256: r.inputStructureSha256,
+    };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/**
+ * Build a VALID synthetic peptide+ligand complex (TEST_FIXTURE) for validating the docking pipeline
+ * without an external RCSB structure. Any dock run on it is REAL Vina — only the structure is synthetic.
+ */
+export function buildReferenceComplex({ sequence, ligandSmiles, seed = 42 } = {}) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'build_reference_complex', sequence, ligandSmiles, seed }, 120_000);
+    return r.ok ? { ok: true, format: r.format, structure: r.structure, sha256: r.sha256, note: r.note } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/**
+ * End-to-end production pipeline: raw structure → prepared receptor + grid → real Vina dock of one
+ * ligand. Returns docking result carrying the prepared-receptor provenance. Fails closed at each
+ * stage (never simulates). `spec`: { structure, format?, ligandSmiles, padding?, exhaustiveness?, nPoses?, seed? }.
+ */
+export function dockPipeline(spec) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  if (!spec || !spec.ligandSmiles || !spec.structure) return { ok: false, error: 'invalid_input', reason: 'structure + ligandSmiles wymagane' };
+  const prep = prepareReceptor({ structure: spec.structure, format: spec.format, padding: spec.padding, seed: spec.seed });
+  if (!prep.ok) return { ok: false, error: prep.error, reason: prep.reason, stage: 'prepare_receptor' };
+  const docked = dock({ ligandSmiles: spec.ligandSmiles, receptorPdbqtPath: prep.receptorPdbqtPath, center: prep.center, boxSize: prep.boxSize, exhaustiveness: spec.exhaustiveness, nPoses: spec.nPoses, seed: spec.seed });
+  if (!docked.ok) return { ok: false, error: docked.error, reason: docked.reason, stage: 'dock', preparedReceptor: prep };
+  return { ok: true, preparedReceptor: prep, docking: docked.data, grid: { center: prep.center, boxSize: prep.boxSize }, referenceLigand: prep.referenceLigand };
 }

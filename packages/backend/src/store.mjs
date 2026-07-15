@@ -593,8 +593,68 @@ CREATE TABLE IF NOT EXISTS sandbox_promotions (
 CREATE INDEX IF NOT EXISTS idx_sandbox_promotions_sandbox ON sandbox_promotions(sandbox_mission_id, created_at);
 `;
 
+// ZEFIR Adversarial Molecular Funnel (Phase 3F/G/H/J): candidate survival stages
+// with full per-stage provenance, negative-result (rejection-motif) memory, and
+// Candidate Dossier V2. Append-only history. No fabricated science: statuses are
+// explicit (EXECUTED/VERIFIED/REJECTED/SKIPPED_BY_POLICY/CAPABILITY_GAP/
+// BLOCKED_BY_RUNTIME/BLOCKED_BY_RESOURCES/FAILED).
+const SCHEMA_V15 = `
+CREATE TABLE IF NOT EXISTS funnel_candidates (
+  id                  TEXT PRIMARY KEY,
+  mission_id          TEXT,
+  canonical_smiles    TEXT NOT NULL,
+  molecular_hash      TEXT NOT NULL,
+  parent_id           TEXT,
+  generation_strategy TEXT,
+  program_modality    TEXT,
+  status              TEXT NOT NULL DEFAULT 'surviving',
+  survival_rank       INTEGER,
+  created_at          INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS funnel_stages (
+  id             TEXT PRIMARY KEY,
+  candidate_id   TEXT NOT NULL,
+  mission_id     TEXT,
+  stage          TEXT NOT NULL,
+  engine         TEXT,
+  engine_version TEXT,
+  params_json    TEXT NOT NULL DEFAULT '{}',
+  input_hash     TEXT,
+  output_json    TEXT NOT NULL DEFAULT '{}',
+  output_hash    TEXT,
+  duration_ms    INTEGER NOT NULL DEFAULT 0,
+  epistemic_class TEXT,
+  status         TEXT NOT NULL,
+  failure_reason TEXT,
+  created_at     INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS rejection_motifs (
+  id           TEXT PRIMARY KEY,
+  mission_id   TEXT,
+  motif_key    TEXT NOT NULL,
+  motif_kind   TEXT NOT NULL,
+  candidate_id TEXT,
+  detail_json  TEXT NOT NULL DEFAULT '{}',
+  created_at   INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS candidate_dossiers (
+  id           TEXT PRIMARY KEY,
+  candidate_id TEXT NOT NULL,
+  mission_id   TEXT,
+  dossier_json TEXT NOT NULL DEFAULT '{}',
+  content_hash TEXT,
+  cro_readiness TEXT,
+  created_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_funnel_candidates_mission ON funnel_candidates(mission_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_funnel_stages_candidate ON funnel_stages(candidate_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_rejection_motifs_key ON rejection_motifs(mission_id, motif_key);
+CREATE INDEX IF NOT EXISTS idx_candidate_dossiers_candidate ON candidate_dossiers(candidate_id, created_at);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 15) db.exec(SCHEMA_V15);
   if (version < 14) db.exec(SCHEMA_V14);
   if (version < 13) db.exec(SCHEMA_V13);
   if (version < 12) db.exec(SCHEMA_V12);
@@ -634,7 +694,7 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
-  if (version < 14) db.exec('PRAGMA user_version = 14');
+  if (version < 15) db.exec('PRAGMA user_version = 15');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1833,4 +1893,60 @@ export function saveSandboxPromotion(db, p) {
 }
 export function listSandboxPromotions(db, sandboxMissionId) {
   return db.prepare('SELECT * FROM sandbox_promotions WHERE sandbox_mission_id = ? ORDER BY created_at ASC').all(sandboxMissionId).map(toSandboxPromotion);
+}
+
+/* ---- ZEFIR funnel (Phase 3F/G/H/J): candidates, stages, rejection memory, dossiers ---- */
+function toFunnelCandidate(r) {
+  if (!r) return null;
+  return { id: r.id, missionId: r.mission_id, canonicalSmiles: r.canonical_smiles, molecularHash: r.molecular_hash, parentId: r.parent_id, generationStrategy: r.generation_strategy, programModality: r.program_modality, status: r.status, survivalRank: r.survival_rank, createdAt: r.created_at };
+}
+export function saveFunnelCandidate(db, c) {
+  const id = c.id ?? newId();
+  db.prepare(`INSERT INTO funnel_candidates (id, mission_id, canonical_smiles, molecular_hash, parent_id, generation_strategy, program_modality, status, survival_rank, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, c.missionId ?? null, c.canonicalSmiles, c.molecularHash, c.parentId ?? null, c.generationStrategy ?? null, c.programModality ?? null, c.status ?? 'surviving', c.survivalRank ?? null, Date.now());
+  return getFunnelCandidate(db, id);
+}
+export function getFunnelCandidate(db, id) { return toFunnelCandidate(db.prepare('SELECT * FROM funnel_candidates WHERE id = ?').get(id)); }
+export function updateFunnelCandidate(db, id, patch) {
+  const cur = getFunnelCandidate(db, id); if (!cur) return null; const n = { ...cur, ...patch };
+  db.prepare('UPDATE funnel_candidates SET status = ?, survival_rank = ? WHERE id = ?').run(n.status, n.survivalRank ?? null, id);
+  return getFunnelCandidate(db, id);
+}
+export function listFunnelCandidates(db, missionId) { return db.prepare('SELECT * FROM funnel_candidates WHERE mission_id = ? ORDER BY created_at ASC').all(missionId).map(toFunnelCandidate); }
+
+function toFunnelStage(r) {
+  if (!r) return null;
+  return { id: r.id, candidateId: r.candidate_id, missionId: r.mission_id, stage: r.stage, engine: r.engine, engineVersion: r.engine_version, params: JSON.parse(r.params_json), inputHash: r.input_hash, output: JSON.parse(r.output_json), outputHash: r.output_hash, durationMs: r.duration_ms, epistemicClass: r.epistemic_class, status: r.status, failureReason: r.failure_reason, createdAt: r.created_at };
+}
+export function saveFunnelStage(db, s) {
+  const id = s.id ?? newId();
+  db.prepare(`INSERT INTO funnel_stages (id, candidate_id, mission_id, stage, engine, engine_version, params_json, input_hash, output_json, output_hash, duration_ms, epistemic_class, status, failure_reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, s.candidateId, s.missionId ?? null, s.stage, s.engine ?? null, s.engineVersion ?? null, JSON.stringify(s.params ?? {}), s.inputHash ?? null, JSON.stringify(s.output ?? {}), s.outputHash ?? null, s.durationMs ?? 0, s.epistemicClass ?? null, s.status, s.failureReason ?? null, Date.now());
+  return toFunnelStage(db.prepare('SELECT * FROM funnel_stages WHERE id = ?').get(id));
+}
+export function listFunnelStages(db, candidateId) { return db.prepare('SELECT * FROM funnel_stages WHERE candidate_id = ? ORDER BY created_at ASC').all(candidateId).map(toFunnelStage); }
+
+export function saveRejectionMotif(db, r) {
+  const id = r.id ?? newId();
+  db.prepare(`INSERT INTO rejection_motifs (id, mission_id, motif_key, motif_kind, candidate_id, detail_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, r.missionId ?? null, r.motifKey, r.motifKind, r.candidateId ?? null, JSON.stringify(r.detail ?? {}), Date.now());
+  return id;
+}
+export function listRejectionMotifs(db, missionId) {
+  return db.prepare('SELECT * FROM rejection_motifs WHERE mission_id = ? ORDER BY created_at ASC').all(missionId)
+    .map((r) => ({ id: r.id, missionId: r.mission_id, motifKey: r.motif_key, motifKind: r.motif_kind, candidateId: r.candidate_id, detail: JSON.parse(r.detail_json), createdAt: r.created_at }));
+}
+export function countRejectionMotif(db, missionId, motifKey) {
+  return db.prepare('SELECT COUNT(*) AS n FROM rejection_motifs WHERE mission_id = ? AND motif_key = ?').get(missionId, motifKey).n;
+}
+
+export function saveCandidateDossier(db, d) {
+  const id = d.id ?? newId();
+  db.prepare(`INSERT INTO candidate_dossiers (id, candidate_id, mission_id, dossier_json, content_hash, cro_readiness, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, d.candidateId, d.missionId ?? null, JSON.stringify(d.dossier ?? {}), d.contentHash ?? null, d.croReadiness ?? null, Date.now());
+  return db.prepare('SELECT * FROM candidate_dossiers WHERE id = ?').get(id);
+}
+export function getCandidateDossier(db, candidateId) {
+  const r = db.prepare('SELECT * FROM candidate_dossiers WHERE candidate_id = ? ORDER BY created_at DESC LIMIT 1').get(candidateId);
+  return r ? { id: r.id, candidateId: r.candidate_id, missionId: r.mission_id, dossier: JSON.parse(r.dossier_json), contentHash: r.content_hash, croReadiness: r.cro_readiness, createdAt: r.created_at } : null;
 }

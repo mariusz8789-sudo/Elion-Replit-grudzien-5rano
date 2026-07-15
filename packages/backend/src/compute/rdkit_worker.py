@@ -52,6 +52,64 @@ def main():
         print(json.dumps({"ok": True, "transformations": sorted(TRANSFORMATIONS.keys())}))
         return
 
+    if cmd == "sascore":
+        # Synthetic accessibility (Ertl & Schuffenhauer 2009) via RDKit Contrib.
+        smiles = req.get("smiles", "")
+        mol = Chem.MolFromSmiles(smiles) if isinstance(smiles, str) else None
+        if mol is None:
+            print(json.dumps({"ok": False, "error": "invalid_smiles"}))
+            return
+        try:
+            import os as _os
+            from rdkit.Chem import RDConfig
+            _sa_path = _os.path.join(RDConfig.RDContribDir, "SA_Score")
+            if _sa_path not in sys.path:
+                sys.path.append(_sa_path)
+            import sascorer  # noqa: E402
+            print(json.dumps({"ok": True, "saScore": round(sascorer.calculateScore(mol), 4), "engine": "RDKit " + rdkit.__version__ + " SA_Score"}))
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "sascore_unavailable: %s" % e}))
+        return
+
+    if cmd == "alerts":
+        # Structural alerts via RDKit FilterCatalog (PAINS + BRENK). Real, not a guess.
+        smiles = req.get("smiles", "")
+        mol = Chem.MolFromSmiles(smiles) if isinstance(smiles, str) else None
+        if mol is None:
+            print(json.dumps({"ok": False, "error": "invalid_smiles"}))
+            return
+        try:
+            from rdkit.Chem import FilterCatalog
+            params = FilterCatalog.FilterCatalogParams()
+            params.AddCatalog(FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS)
+            params.AddCatalog(FilterCatalog.FilterCatalogParams.FilterCatalogs.BRENK)
+            cat = FilterCatalog.FilterCatalog(params)
+            hits = [m.GetDescription() for m in cat.GetMatches(mol)]
+            print(json.dumps({"ok": True, "alerts": hits, "nAlerts": len(hits), "engine": "RDKit " + rdkit.__version__ + " FilterCatalog(PAINS,BRENK)"}))
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "alerts_unavailable: %s" % e}))
+        return
+
+    if cmd == "novelty":
+        # Max Tanimoto similarity of `smiles` against a provided reference set.
+        # No reference set -> caller must treat as NOT ASSESSED (this returns n=0).
+        smiles = req.get("smiles", "")
+        ref = req.get("reference", [])
+        mol = Chem.MolFromSmiles(smiles) if isinstance(smiles, str) else None
+        if mol is None:
+            print(json.dumps({"ok": False, "error": "invalid_smiles"}))
+            return
+        refmols = [Chem.MolFromSmiles(s) for s in ref if isinstance(s, str)]
+        refmols = [x for x in refmols if x is not None]
+        if not refmols:
+            print(json.dumps({"ok": True, "maxTanimoto": None, "nReference": 0}))
+            return
+        fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048)
+        reffps = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=2048) for x in refmols]
+        sims = [DataStructs.TanimotoSimilarity(fp, r) for r in reffps]
+        print(json.dumps({"ok": True, "maxTanimoto": round(max(sims), 5), "nReference": len(reffps)}))
+        return
+
     if cmd == "diversity":
         smiles_list = req.get("smiles", [])
         mols = [Chem.MolFromSmiles(s) for s in smiles_list if isinstance(s, str)]

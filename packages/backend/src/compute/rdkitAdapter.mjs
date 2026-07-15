@@ -143,3 +143,39 @@ export function diversity(smilesList) {
     return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
   }
 }
+
+/** Synthetic accessibility (Ertl & Schuffenhauer 2009, RDKit Contrib SA_Score). */
+export function saScore(smiles) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'sascore', smiles: String(smiles ?? '') });
+    return r.ok ? { ok: true, saScore: r.saScore, engine: r.engine } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/** Structural alerts via RDKit FilterCatalog (PAINS + BRENK). Real SMARTS matching. */
+export function structuralAlerts(smiles) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'alerts', smiles: String(smiles ?? '') });
+    return r.ok ? { ok: true, alerts: r.alerts, nAlerts: r.nAlerts, engine: r.engine } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/** Max Tanimoto vs a reference set. maxTanimoto=null / nReference=0 → NOT ASSESSED. */
+export function novelty(smiles, reference = []) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'novelty', smiles: String(smiles ?? ''), reference: Array.isArray(reference) ? reference.map(String) : [] });
+    return r.ok ? { ok: true, maxTanimoto: r.maxTanimoto, nReference: r.nReference } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}

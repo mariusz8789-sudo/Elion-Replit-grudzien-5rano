@@ -217,6 +217,69 @@ def main():
         print(json.dumps({"ok": True, "data": data, "engine": "RDKit " + rdkit.__version__}))
         return
 
+    if cmd == "denovo":
+        # REAL de novo design via RDKit BRICS (fragment decomposition + recombination) and Murcko
+        # scaffolds. Generated molecules are genuine valid structures, deduplicated + validated;
+        # nothing is fabricated. Deterministic output (fixed seed + sorted canonical SMILES).
+        from rdkit.Chem import BRICS
+        from rdkit.Chem.Scaffolds import MurckoScaffold
+        mode = req.get("mode", "brics_build")
+        seeds = req.get("smiles", []) or req.get("seeds", [])
+        count = int(req.get("count", 50))
+        seed_mols = [Chem.MolFromSmiles(s) for s in seeds]
+        seed_mols = [m for m in seed_mols if m is not None]
+        if not seed_mols:
+            print(json.dumps({"ok": False, "error": "no_valid_seeds"}))
+            return
+        seed_canon = set(Chem.MolToSmiles(m) for m in seed_mols)
+
+        def murcko(m):
+            try:
+                return Chem.MolToSmiles(MurckoScaffold.GetScaffoldForMol(m))
+            except Exception:  # noqa: BLE001
+                return None
+
+        if mode == "decompose":
+            frags = sorted(set(f for m in seed_mols for f in BRICS.BRICSDecompose(m)))
+            print(json.dumps({"ok": True, "mode": mode, "fragments": frags}))
+            return
+        if mode == "murcko":
+            print(json.dumps({"ok": True, "mode": mode, "scaffolds": sorted(set(filter(None, (murcko(m) for m in seed_mols))))}))
+            return
+
+        frag_mols = [Chem.MolFromSmiles(f) for m in seed_mols for f in BRICS.BRICSDecompose(m)]
+        frag_mols = [f for f in frag_mols if f is not None]
+        seed_scaffolds = set(filter(None, (murcko(m) for m in seed_mols)))
+        products = {}
+        # Exhaust the (deterministic, scrambleReagents=False) enumeration up to a safety cap, then
+        # sort canonical SMILES and trim — so the output is order-independent + reproducible.
+        max_build = int(req.get("maxBuild", 4000))
+        seen_iter = 0
+        try:
+            for prod in BRICS.BRICSBuild(frag_mols, onlyCompleteMols=True, uniquify=True, scrambleReagents=False, maxDepth=int(req.get("maxDepth", 3))):
+                seen_iter += 1
+                if seen_iter > max_build:
+                    break
+                try:
+                    smi = Chem.MolToSmiles(prod)
+                except Exception:  # noqa: BLE001
+                    continue
+                clean = Chem.MolFromSmiles(smi)
+                if smi in seed_canon or smi in products or clean is None:
+                    continue
+                sc = murcko(clean)  # scaffold from the clean re-parsed molecule
+                if mode == "scaffold_hop" and (sc is None or sc in seed_scaffolds):
+                    continue  # scaffold hopping keeps only NOVEL scaffolds
+                products[smi] = {"smiles": smi, "scaffold": sc, "designMethod": mode}
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "brics_build_failed: %s" % str(e)[:150]}))
+            return
+        out = [products[k] for k in sorted(products.keys())][:count]
+        print(json.dumps({"ok": True, "mode": mode, "generated": out, "nSeeds": len(seed_mols),
+                          "nScaffolds": len(set(p["scaffold"] for p in out if p["scaffold"])),
+                          "engine": "RDKit " + rdkit.__version__ + " BRICS"}))
+        return
+
     print(json.dumps({"ok": False, "error": "unknown_cmd: %s" % cmd}))
 
 

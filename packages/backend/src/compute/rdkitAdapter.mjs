@@ -168,6 +168,22 @@ export function structuralAlerts(smiles) {
   }
 }
 
+/**
+ * REAL de novo molecular design via RDKit BRICS (fragment decomposition + recombination) and Murcko
+ * scaffolds. mode: 'brics_build' (fragment growing/linking), 'scaffold_hop' (novel scaffolds only),
+ * 'decompose', 'murcko'. Deterministic. Returns generated valid canonical SMILES + scaffolds.
+ */
+export function denovo(spec) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'denovo', mode: spec?.mode ?? 'brics_build', seeds: Array.isArray(spec?.seeds) ? spec.seeds.map(String) : [], count: spec?.count ?? 50, maxDepth: spec?.maxDepth ?? 3 }, 60_000);
+    return r.ok ? { ok: true, mode: r.mode, generated: r.generated, fragments: r.fragments, scaffolds: r.scaffolds, nSeeds: r.nSeeds, nScaffolds: r.nScaffolds, engine: r.engine } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
 /** Max Tanimoto vs a reference set. maxTanimoto=null / nReference=0 → NOT ASSESSED. */
 export function novelty(smiles, reference = []) {
   const d = detect();

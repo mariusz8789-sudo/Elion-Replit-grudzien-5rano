@@ -1719,3 +1719,52 @@ kbd {
 .ds-brand:hover .ds-brand-mark { transform: rotate(-8deg) scale(1.05); }
 /* Refined focus ring on interactive console controls */
 .ds-btn:focus-visible, .ds-chip:focus-visible, .ds-tab:focus-visible, .ds-nav-item:focus-visible, .chat-item-main:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 9px; }
+
+/* ============================================================================
+   Stage 4 — Grounded Chemistry Assistant (focused product, not a dev dashboard)
+   ========================================================================== */
+.product { min-height: 100%; background: var(--bg); display: flex; flex-direction: column; }
+.product-top { display: flex; align-items: center; gap: 1rem; padding: 0.8rem 1.4rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); z-index: 10; flex-wrap: wrap; }
+.product-brand { display: flex; align-items: center; gap: 0.55rem; text-decoration: none; color: var(--text); }
+.product-brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg, rgba(92,214,232,0.22), rgba(167,139,250,0.2)); color: var(--cyan); }
+.product-brand-text { font-weight: 800; letter-spacing: -0.01em; }
+.product-brand-text em { font-style: normal; color: var(--text-dim); font-weight: 600; }
+.product-nav { display: flex; gap: 0.3rem; margin-left: 0.6rem; }
+.product-link { display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.7rem; border-radius: 9px; color: var(--text-dim); text-decoration: none; font-size: 0.84rem; font-weight: 600; transition: background var(--dur-fast), color var(--dur-fast); }
+.product-link:hover { background: var(--bg-elevated); color: var(--text); }
+.product-link.active { background: linear-gradient(90deg, rgba(92,214,232,0.16), rgba(167,139,250,0.1)); color: var(--text); }
+.product-account { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
+.product-email { font-size: 0.78rem; color: var(--text-dim); }
+.product-main { max-width: 1040px; width: 100%; margin: 0 auto; padding: 1.4rem 1.4rem 4rem; }
+.product-hero { text-align: center; padding: 1.4rem 0 1.8rem; }
+.product-hero h1 { margin: 0 0 0.5rem; font-size: 1.7rem; letter-spacing: -0.02em; }
+.product-lede { color: var(--text-dim); max-width: 52ch; margin: 0 auto; }
+
+.report-print-title { display: none; }
+.report-notes { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; font-size: 0.86rem; }
+.report-notes li { display: flex; align-items: baseline; gap: 0.5rem; line-height: 1.5; }
+.report-notes .ds-pill { flex: 0 0 auto; }
+.report-verify td:first-child { white-space: nowrap; }
+.report-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+
+@media (max-width: 620px) {
+  .product-nav { order: 3; width: 100%; margin-left: 0; }
+  .product-account { order: 2; }
+  .product-nav .product-link span { display: inline; }
+}
+
+/* PDF export = browser print of the report only. */
+@media print {
+  body { background: #fff; color: #000; }
+  .product-top, .report-actions, .mv-toolbar, .ds-tabs, .app > *:not(.product), .onboarding, .search-overlay, .help-overlay { display: none !important; }
+  /* Print the report only — hide the input panel, skeletons and empty states. */
+  .product-main > .ds-panel, .product-main > .skeleton, .product-main > .ds-empty { display: none !important; }
+  .product-main { max-width: 100%; padding: 0; }
+  .print-report { color: #000; }
+  .print-report .ds-panel { border: 1px solid #ccc; box-shadow: none; break-inside: avoid; background: #fff; page-break-inside: avoid; }
+  .print-report .ds-stat { border: 1px solid #ddd; background: #fff; }
+  .report-print-title { display: block; font-size: 1.1rem; font-weight: 800; margin-bottom: 0.6rem; color: #000; border-bottom: 2px solid #000; padding-bottom: 0.3rem; }
+  .print-report, .print-report * { color: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-report .ds-pill { border: 1px solid #999 !important; }
+  .mv-3d { display: none !important; } /* WebGL canvas doesn't print; the 2D depiction carries the structure */
+}

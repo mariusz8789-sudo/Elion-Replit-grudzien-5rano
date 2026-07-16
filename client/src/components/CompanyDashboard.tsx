@@ -10,11 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X, BarChart3, Brain, Calendar as CalendarIcon } from "lucide-react";
+import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X, BarChart3, Brain, Calendar as CalendarIcon, Zap, Check } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import type { Company, Driver, Vehicle, Booking, CapacityPosting, CapacityBooking, WorkerProfile, Skill, WorkerSkill, CompanyService, CrmLead, CrmTask } from "@shared/schema";
+import type { Company, Driver, Vehicle, Booking, CapacityPosting, CapacityBooking, WorkerProfile, Skill, WorkerSkill, CompanyService, CrmLead, CrmTask, AutomationRule, AutomationRun } from "@shared/schema";
 import VehicleManager from "./VehicleManager";
 import ReviewsSection from "./ReviewsSection";
 import EntityCalendarCard from "./EntityCalendarCard";
@@ -1450,6 +1450,273 @@ function CalendarTab({ companyId }: { companyId: string }) {
   );
 }
 
+interface AutomationDefinitions { triggerEvents: Array<{ id: string; label: string }>; actionTypes: Array<{ id: string; label: string }> }
+interface UiCondition { field: string; operator: string; value: string }
+interface UiAction { type: string; params: Record<string, any> }
+
+const RUN_STATUS_VARIANT: Record<string, "default" | "outline" | "destructive" | "secondary"> = {
+  success: "default",
+  failed: "destructive",
+  pending_approval: "secondary",
+  approved: "default",
+  rejected: "outline",
+};
+
+function ActionParamsEditor({ action, onChange }: { action: UiAction; onChange: (params: Record<string, any>) => void }) {
+  const p = action.params;
+  switch (action.type) {
+    case "send_notification":
+      return (
+        <div className="grid md:grid-cols-3 gap-2">
+          <Select value={p.target || "company_owner"} onValueChange={(target) => onChange({ ...p, target })}>
+            <SelectTrigger className="h-8" data-testid="select-action-target"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="company_owner">Company owner</SelectItem>
+              <SelectItem value="customer">Customer</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input placeholder="Title" className="h-8" value={p.title || ""} onChange={(e) => onChange({ ...p, title: e.target.value })} data-testid="input-action-title" />
+          <Input placeholder="Message" className="h-8" value={p.message || ""} onChange={(e) => onChange({ ...p, message: e.target.value })} data-testid="input-action-message" />
+        </div>
+      );
+    case "escalate":
+      return (
+        <div className="grid md:grid-cols-2 gap-2">
+          <Input placeholder="Title" className="h-8" value={p.title || ""} onChange={(e) => onChange({ ...p, title: e.target.value })} />
+          <Input placeholder="Message" className="h-8" value={p.message || ""} onChange={(e) => onChange({ ...p, message: e.target.value })} />
+        </div>
+      );
+    case "create_crm_task":
+      return (
+        <div className="grid md:grid-cols-3 gap-2">
+          <Input placeholder="Task title" className="h-8" value={p.title || ""} onChange={(e) => onChange({ ...p, title: e.target.value })} />
+          <Select value={p.taskType || "follow_up"} onValueChange={(taskType) => onChange({ ...p, taskType })}>
+            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="follow_up">Follow-up</SelectItem>
+              <SelectItem value="call">Call</SelectItem>
+              <SelectItem value="meeting">Meeting</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input type="number" placeholder="Due in days" className="h-8" value={p.dueInDays ?? ""} onChange={(e) => onChange({ ...p, dueInDays: e.target.value })} />
+        </div>
+      );
+    case "assign_driver":
+      return <Input placeholder="Driver ID" className="h-8" value={p.driverId || ""} onChange={(e) => onChange({ ...p, driverId: e.target.value })} />;
+    case "set_vehicle_availability":
+      return (
+        <div className="flex items-center gap-2">
+          <Switch checked={!!p.available} onCheckedChange={(available) => onChange({ ...p, available })} />
+          <Label className="text-sm">Mark the booking's vehicle available</Label>
+        </div>
+      );
+    case "webhook":
+      return <Input placeholder="Event name (e.g. automation.custom_event)" className="h-8" value={p.event || ""} onChange={(e) => onChange({ ...p, event: e.target.value })} />;
+    case "require_approval":
+      return (
+        <div className="space-y-2">
+          <Input placeholder="Approval message" className="h-8" value={p.message || ""} onChange={(e) => onChange({ ...p, message: e.target.value })} />
+          <Textarea
+            placeholder='Wrapped action JSON, e.g. {"type":"assign_driver","params":{"driverId":"..."}}'
+            className="text-xs font-mono"
+            rows={2}
+            defaultValue={p.action ? JSON.stringify(p.action) : ""}
+            onBlur={(e) => {
+              try { onChange({ ...p, action: e.target.value ? JSON.parse(e.target.value) : undefined }); } catch { /* leave as-is until valid JSON */ }
+            }}
+          />
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+
+function AutomationTab({ companyId }: { companyId: string }) {
+  const { toast } = useToast();
+  const { data: definitions } = useQuery<AutomationDefinitions>({ queryKey: ["/api/automation/definitions"] });
+  const { data: rules = [] } = useQuery<AutomationRule[]>({ queryKey: [`/api/companies/${companyId}/automation-rules`] });
+  const { data: runs = [] } = useQuery<AutomationRun[]>({ queryKey: [`/api/companies/${companyId}/automation-runs`] });
+
+  const [name, setName] = useState("");
+  const [triggerEvent, setTriggerEvent] = useState("");
+  const [conditions, setConditions] = useState<UiCondition[]>([]);
+  const [actions, setActions] = useState<UiAction[]>([{ type: "send_notification", params: { target: "company_owner" } }]);
+
+  const createRuleMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/companies/${companyId}/automation-rules`, {
+        name,
+        triggerEvent,
+        conditions: conditions.filter((c) => c.field.trim()).map((c) => ({ ...c, value: isNaN(Number(c.value)) ? c.value : Number(c.value) })),
+        actions: actions.map((a) => ({ type: a.type, params: a.params })),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/automation-rules`] });
+      setName(""); setTriggerEvent(""); setConditions([]); setActions([{ type: "send_notification", params: { target: "company_owner" } }]);
+      toast({ title: "Automation rule created" });
+    },
+    onError: (error: any) => toast({ title: "Failed to create rule", description: error.message, variant: "destructive" }),
+  });
+
+  const toggleRuleMutation = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => { await apiRequest("PATCH", `/api/automation-rules/${id}`, { enabled }); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/automation-rules`] }),
+  });
+
+  const deleteRuleMutation = useMutation({
+    mutationFn: async (id: string) => { await apiRequest("DELETE", `/api/automation-rules/${id}`, {}); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/automation-rules`] }),
+  });
+
+  const approveRunMutation = useMutation({
+    mutationFn: async (id: string) => { await apiRequest("POST", `/api/automation-runs/${id}/approve`, {}); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/automation-runs`] });
+      toast({ title: "Action approved and executed" });
+    },
+    onError: (error: any) => toast({ title: "Approval failed", description: error.message, variant: "destructive" }),
+  });
+
+  const rejectRunMutation = useMutation({
+    mutationFn: async (id: string) => { await apiRequest("POST", `/api/automation-runs/${id}/reject`, {}); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/automation-runs`] }),
+  });
+
+  const pendingApprovals = runs.filter((r) => r.status === "pending_approval");
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Zap className="w-5 h-5" />Automation Rules</CardTitle>
+          <CardDescription>When a trigger event happens and every condition matches, the listed actions run automatically (methodology: movex-automation-v1).</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-2">
+            <Input placeholder="Rule name" className="h-8" value={name} onChange={(e) => setName(e.target.value)} data-testid="input-rule-name" />
+            <Select value={triggerEvent} onValueChange={setTriggerEvent}>
+              <SelectTrigger className="h-8" data-testid="select-rule-trigger"><SelectValue placeholder="Trigger event" /></SelectTrigger>
+              <SelectContent>
+                {(definitions?.triggerEvents ?? []).map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Conditions (all must match; leave empty to always fire)</Label>
+            {conditions.map((c, i) => (
+              <div key={i} className="grid md:grid-cols-[2fr_1fr_2fr_auto] gap-2 items-center">
+                <Input placeholder="field, e.g. booking.totalPrice" className="h-8" value={c.field} onChange={(e) => setConditions((cs) => cs.map((x, j) => j === i ? { ...x, field: e.target.value } : x))} />
+                <Select value={c.operator} onValueChange={(operator) => setConditions((cs) => cs.map((x, j) => j === i ? { ...x, operator } : x))}>
+                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="equals">equals</SelectItem>
+                    <SelectItem value="not_equals">not equals</SelectItem>
+                    <SelectItem value="greater_than">greater than</SelectItem>
+                    <SelectItem value="less_than">less than</SelectItem>
+                    <SelectItem value="contains">contains</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input placeholder="value" className="h-8" value={c.value} onChange={(e) => setConditions((cs) => cs.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
+                <Button size="icon" variant="ghost" onClick={() => setConditions((cs) => cs.filter((_, j) => j !== i))}><X className="w-3 h-3" /></Button>
+              </div>
+            ))}
+            <Button size="sm" variant="outline" onClick={() => setConditions((cs) => [...cs, { field: "", operator: "equals", value: "" }])} data-testid="button-add-condition">
+              Add condition
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Actions</Label>
+            {actions.map((a, i) => (
+              <div key={i} className="p-2 border rounded space-y-2">
+                <div className="flex items-center gap-2">
+                  <Select value={a.type} onValueChange={(type) => setActions((as) => as.map((x, j) => j === i ? { type, params: {} } : x))}>
+                    <SelectTrigger className="h-8 w-64" data-testid={`select-action-type-${i}`}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(definitions?.actionTypes ?? []).map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {actions.length > 1 && (
+                    <Button size="icon" variant="ghost" onClick={() => setActions((as) => as.filter((_, j) => j !== i))}><X className="w-3 h-3" /></Button>
+                  )}
+                </div>
+                <ActionParamsEditor action={a} onChange={(params) => setActions((as) => as.map((x, j) => j === i ? { ...x, params } : x))} />
+              </div>
+            ))}
+            <Button size="sm" variant="outline" onClick={() => setActions((as) => [...as, { type: "send_notification", params: { target: "company_owner" } }])} data-testid="button-add-action">
+              Add action
+            </Button>
+          </div>
+
+          <Button onClick={() => createRuleMutation.mutate()} disabled={!name.trim() || !triggerEvent || createRuleMutation.isPending} data-testid="button-create-rule">
+            Create Rule
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Rules</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {rules.length === 0 && <p className="text-sm text-muted-foreground" data-testid="text-no-rules">No automation rules yet.</p>}
+          {rules.map((rule) => (
+            <div key={rule.id} className="flex items-center justify-between p-2 border rounded gap-2 flex-wrap" data-testid={`automation-rule-${rule.id}`}>
+              <div>
+                <span className="font-medium text-sm">{rule.name}</span>
+                <Badge variant="outline" className="ml-2 text-xs">{rule.triggerEvent}</Badge>
+                <span className="text-xs text-muted-foreground ml-2">{(rule.actions as any[]).length} action(s)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={rule.enabled} onCheckedChange={(enabled) => toggleRuleMutation.mutate({ id: rule.id, enabled })} data-testid={`switch-rule-enabled-${rule.id}`} />
+                <Button size="icon" variant="ghost" onClick={() => deleteRuleMutation.mutate(rule.id)} data-testid={`button-delete-rule-${rule.id}`}><X className="w-3 h-3" /></Button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {pendingApprovals.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Approvals</CardTitle>
+            <CardDescription>These automation actions are waiting for your explicit approval before they run.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pendingApprovals.map((run) => (
+              <div key={run.id} className="flex items-center justify-between p-2 border rounded gap-2 flex-wrap" data-testid={`pending-approval-${run.id}`}>
+                <span className="text-sm">{run.triggerEvent} · {new Date(run.createdAt).toLocaleString()}</span>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={() => approveRunMutation.mutate(run.id)} data-testid={`button-approve-${run.id}`}><Check className="w-3 h-3 mr-1" />Approve</Button>
+                  <Button size="sm" variant="outline" onClick={() => rejectRunMutation.mutate(run.id)} data-testid={`button-reject-${run.id}`}>Reject</Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Run History</CardTitle>
+          <CardDescription>Every rule firing is logged here - failed runs are retried automatically on a background sweep.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {runs.length === 0 && <p className="text-sm text-muted-foreground" data-testid="text-no-runs">No runs yet.</p>}
+          {runs.slice(0, 30).map((run) => (
+            <div key={run.id} className="flex items-center justify-between p-2 border rounded text-sm" data-testid={`automation-run-${run.id}`}>
+              <span>{run.triggerEvent} · {new Date(run.createdAt).toLocaleString()}{run.retryCount > 0 ? ` · retried ${run.retryCount}x` : ""}</span>
+              <Badge variant={RUN_STATUS_VARIANT[run.status] ?? "outline"}>{run.status}</Badge>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function CompanyDashboardTabs({ companyId }: { companyId: string }) {
   const { data: company } = useQuery<Company>({ queryKey: ["/api/companies", companyId] });
 
@@ -1478,6 +1745,7 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
           <TabsTrigger value="ai-operations" data-testid="tab-ai-operations"><Brain className="w-4 h-4 mr-2" />AI Operations</TabsTrigger>
           <TabsTrigger value="calendar" data-testid="tab-calendar"><CalendarIcon className="w-4 h-4 mr-2" />Calendar</TabsTrigger>
           <TabsTrigger value="crm" data-testid="tab-crm"><UserPlus className="w-4 h-4 mr-2" />CRM</TabsTrigger>
+          <TabsTrigger value="automation" data-testid="tab-automation"><Zap className="w-4 h-4 mr-2" />Automation</TabsTrigger>
           <TabsTrigger value="reviews" data-testid="tab-company-reviews"><Star className="w-4 h-4 mr-2" />Reviews</TabsTrigger>
         </TabsList>
         <TabsContent value="fleet" className="pt-4">
@@ -1509,6 +1777,9 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
         </TabsContent>
         <TabsContent value="crm" className="pt-4">
           <CrmTab companyId={companyId} />
+        </TabsContent>
+        <TabsContent value="automation" className="pt-4">
+          <AutomationTab companyId={companyId} />
         </TabsContent>
         <TabsContent value="reviews" className="pt-4">
           <ReviewsSection companyId={companyId} />

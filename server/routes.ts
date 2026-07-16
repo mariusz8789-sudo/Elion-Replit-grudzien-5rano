@@ -11,7 +11,7 @@ import { nanoid } from "nanoid";
 import {
   insertServiceSchema, insertBookingSchema, insertQuoteSchema, insertUserSchema,
   insertCompanySchema, insertDriverSchema, insertVehicleSchema, insertOfferSchema,
-  insertCrmLeadSchema, insertCrmTaskSchema,
+  insertCrmLeadSchema, insertCrmTaskSchema, insertAutomationRuleSchema,
   insertMessageSchema, insertAttachmentSchema, insertReviewSchema,
   insertConversationSchema, insertMessageTemplateSchema,
   insertTrackingUpdateSchema, insertNotificationSchema, insertMarketplaceListingSchema,
@@ -38,6 +38,7 @@ import { rankCrewCandidates, CREW_MATCH_METHODOLOGY, type CrewCandidate, type Sc
 import { haversineDistanceKm } from "@shared/geo";
 import { AI_OPERATIONS_ROLES, getAiOperationsReply } from "./services/aiOperations";
 import { executeAiAction } from "./services/aiActions";
+import { AUTOMATION_TRIGGER_EVENTS, AUTOMATION_ACTION_TYPES, runAutomationRules, approveAutomationRun, rejectAutomationRun } from "./services/automationEngine";
 import { customerHealth, suggestUpsells, CUSTOMER_HEALTH_METHODOLOGY } from "@shared/crm";
 import { extractDocumentFields } from "./services/documentOcr";
 import { buildIcsCalendar } from "@shared/ics";
@@ -586,6 +587,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.linkCouponRedemptionToBooking(couponRedemptionId, booking.id);
       }
 
+      if (booking.companyId) {
+        runAutomationRules(booking.companyId, "booking.created", { booking }).catch((err) => console.error("Automation rules failed:", err.message));
+      }
+
       res.status(201).json(booking);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -676,6 +681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bookingId: booking.id,
         status: booking.status,
       }).catch(() => undefined);
+      runAutomationRules(booking.companyId, "booking.status_changed", { booking }).catch((err) => console.error("Automation rules failed:", err.message));
     }
 
     res.json(booking);
@@ -2955,6 +2961,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === WORKFLOW AUTOMATION ===
+  app.get("/api/automation/definitions", (_req, res) => {
+    res.json({ triggerEvents: AUTOMATION_TRIGGER_EVENTS, actionTypes: AUTOMATION_ACTION_TYPES });
+  });
+
+  app.post("/api/companies/:companyId/automation-rules", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.companyId !== req.params.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const data = insertAutomationRuleSchema.parse(req.body);
+      const rule = await storage.createAutomationRule(data, req.params.companyId, user.id);
+      res.status(201).json(rule);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/companies/:companyId/automation-rules", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    res.json(await storage.getCompanyAutomationRules(req.params.companyId));
+  });
+
+  app.patch("/api/automation-rules/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const rule = await storage.getAutomationRule(req.params.id);
+      if (!rule) return res.status(404).json({ message: "Rule not found" });
+      if (user.companyId !== rule.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const updates = insertAutomationRuleSchema.partial().parse(req.body);
+      const updated = await storage.updateAutomationRule(req.params.id, rule.companyId, updates);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/automation-rules/:id", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const rule = await storage.getAutomationRule(req.params.id);
+    if (!rule) return res.status(404).json({ message: "Rule not found" });
+    if (user.companyId !== rule.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const deleted = await storage.deleteAutomationRule(req.params.id, rule.companyId);
+    if (!deleted) return res.status(404).json({ message: "Rule not found" });
+    res.status(204).send();
+  });
+
+  app.get("/api/companies/:companyId/automation-runs", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    res.json(await storage.getCompanyAutomationRuns(req.params.companyId));
+  });
+
+  app.post("/api/automation-runs/:id/approve", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const run = await storage.getAutomationRun(req.params.id);
+    if (!run) return res.status(404).json({ message: "Run not found" });
+    if (user.companyId !== run.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const result = await approveAutomationRun(req.params.id, run.companyId);
+    res.json(result);
+  });
+
+  app.post("/api/automation-runs/:id/reject", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const run = await storage.getAutomationRun(req.params.id);
+    if (!run) return res.status(404).json({ message: "Run not found" });
+    if (user.companyId !== run.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const result = await rejectAutomationRun(req.params.id, run.companyId);
+    res.json(result);
+  });
+
   // === CRM ===
   app.post("/api/companies/:companyId/crm/leads", requireAuth, async (req, res) => {
     try {
@@ -2988,6 +3079,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updates = insertCrmLeadSchema.partial().parse(req.body);
       const updated = await storage.updateCrmLead(req.params.id, lead.companyId, updates);
+      if (updated && updates.stage && updates.stage !== lead.stage) {
+        runAutomationRules(lead.companyId, "crm_lead.stage_changed", { lead: updated, previousStage: lead.stage })
+          .catch((err) => console.error("Automation rules failed:", err.message));
+      }
       res.json(updated);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

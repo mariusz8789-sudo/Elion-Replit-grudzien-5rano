@@ -258,6 +258,48 @@ export const crmTasks = pgTable("crm_tasks", {
   statusIdx: index("crm_tasks_status_idx").on(t.status),
 }));
 
+// === WORKFLOW AUTOMATION ===
+// A rule fires when `triggerEvent` occurs for the owning company (booking.created,
+// booking.status_changed, crm_lead.stage_changed - see server/services/automationEngine.ts),
+// and only runs its actions if every condition matches. Conditions/actions are small JSON
+// arrays evaluated by the pure, tested shared/automation.ts engine rather than a bespoke DSL.
+export const automationRules = pgTable("automation_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  triggerEvent: text("trigger_event").notNull(), // booking.created, booking.status_changed, crm_lead.stage_changed
+  conditions: jsonb("conditions").notNull().default(sql`'[]'::jsonb`), // AutomationCondition[]
+  actions: jsonb("actions").notNull().default(sql`'[]'::jsonb`), // AutomationAction[]
+  enabled: boolean("enabled").notNull().default(true),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("automation_rules_company_id_idx").on(t.companyId),
+  triggerEventIdx: index("automation_rules_trigger_event_idx").on(t.triggerEvent),
+}));
+
+// One row per rule firing - doubles as the execution log and the retry queue (failed runs are
+// picked back up by the same in-process sweep pattern as certExpirySweep.ts).
+export const automationRuns = pgTable("automation_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ruleId: varchar("rule_id").notNull().references(() => automationRules.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  triggerEvent: text("trigger_event").notNull(),
+  context: jsonb("context").notNull(),
+  status: text("status").notNull().default("success"), // success, failed, pending_approval, approved, rejected
+  actionResults: jsonb("action_results"), // [{ type, success, message }]
+  error: text("error"),
+  retryCount: integer("retry_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  ruleIdIdx: index("automation_runs_rule_id_idx").on(t.ruleId),
+  companyIdIdx: index("automation_runs_company_id_idx").on(t.companyId),
+  statusIdx: index("automation_runs_status_idx").on(t.status),
+}));
+
 // === CHAT & ATTACHMENTS ===
 // Internal Messaging: a "conversation" generalizes the booking chat thread into any mailbox
 // (company mailbox, support mailbox, direct message) without duplicating the messages table -
@@ -1138,6 +1180,28 @@ export const insertCrmTaskSchema = createInsertSchema(crmTasks).omit({
   dueDate: z.coerce.date().optional(),
 });
 
+const automationConditionSchema = z.object({
+  field: z.string().min(1),
+  operator: z.enum(["equals", "not_equals", "greater_than", "less_than", "contains"]),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+});
+
+const automationActionSchema = z.object({
+  type: z.string().min(1),
+  params: z.record(z.unknown()).default({}),
+});
+
+export const insertAutomationRuleSchema = createInsertSchema(automationRules).omit({
+  id: true,
+  companyId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  conditions: z.array(automationConditionSchema).default([]),
+  actions: z.array(automationActionSchema).min(1),
+});
+
 export const insertMessageSchema = createInsertSchema(messages).omit({
   id: true,
   createdAt: true,
@@ -1522,6 +1586,10 @@ export type CrmLead = typeof crmLeads.$inferSelect;
 
 export type InsertCrmTask = z.infer<typeof insertCrmTaskSchema>;
 export type CrmTask = typeof crmTasks.$inferSelect;
+
+export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
+export type AutomationRule = typeof automationRules.$inferSelect;
+export type AutomationRun = typeof automationRuns.$inferSelect;
 
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;

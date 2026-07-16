@@ -15,6 +15,7 @@ import { roadServicesRouter } from "./roadServices/router";
 import { roadServicesPartnerApi } from "./roadServices/partnerApi";
 import { pool } from "./db";
 import { runCertificationExpirySweep } from "./services/certExpirySweep";
+import { retryFailedAutomationRuns } from "./services/automationEngine";
 import { seedSkillsCatalog } from "./seedSkills";
 import { seedBadgesCatalog } from "./seedBadges";
 
@@ -226,6 +227,17 @@ app.use("/road-services/partner/v1", roadServicesPartnerApi);
       runCertificationExpirySweep().catch((err) => console.error("Certification expiry sweep failed:", err.message));
     }, CERT_SWEEP_INTERVAL_MS);
   }, 60_000);
+
+  // Retry queue for failed workflow-automation actions - same in-process sweep pattern as the
+  // certification sweep above, just on a shorter interval since a failed rule (e.g. a webhook
+  // endpoint that was briefly down) should recover sooner than once a day.
+  const AUTOMATION_RETRY_INTERVAL_MS = 15 * 60 * 1000;
+  setTimeout(() => {
+    retryFailedAutomationRuns().catch((err) => console.error("Automation retry sweep failed:", err.message));
+    setInterval(() => {
+      retryFailedAutomationRuns().catch((err) => console.error("Automation retry sweep failed:", err.message));
+    }, AUTOMATION_RETRY_INTERVAL_MS);
+  }, 90_000);
 
   let shuttingDown = false;
   const shutdown = (signal: string) => {

@@ -49,8 +49,9 @@ import {
   type WorkerSkill, type InsertWorkerSkill,
   type RecurringRouteSubscription, type InsertRecurringRouteSubscription,
   type CompanyService, type InsertCompanyService,
+  type AutomationRule, type InsertAutomationRule, type AutomationRun,
   users, companies, drivers, vehicles, services, bookings, quotes, offers,
-  crmLeads, crmTasks,
+  crmLeads, crmTasks, automationRules, automationRuns,
   messages, attachments, conversations, conversationParticipants, messageTemplates, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
   badges, badgeAwards, coupons, couponRedemptions, referralRewards, bookingTransfers,
@@ -175,6 +176,20 @@ export interface IStorage {
     userId: string; name: string; totalBookings: number; totalSpentEur: number;
     lastBookingDate: Date | null; usedServiceNames: string[];
   }>>;
+
+  // Workflow automation: rules fire on real platform events (server/services/automationEngine.ts)
+  // and runs double as both the execution log and the retry queue for failed action attempts.
+  createAutomationRule(data: InsertAutomationRule, companyId: string, createdBy: string): Promise<AutomationRule>;
+  getCompanyAutomationRules(companyId: string): Promise<AutomationRule[]>;
+  getCompanyAutomationRulesByTrigger(companyId: string, triggerEvent: string): Promise<AutomationRule[]>;
+  getAutomationRule(id: string): Promise<AutomationRule | undefined>;
+  updateAutomationRule(id: string, companyId: string, updates: Partial<InsertAutomationRule>): Promise<AutomationRule | undefined>;
+  deleteAutomationRule(id: string, companyId: string): Promise<boolean>;
+  createAutomationRun(data: { ruleId: string; companyId: string; triggerEvent: string; context: unknown; status: string; actionResults?: unknown; error?: string }): Promise<AutomationRun>;
+  getCompanyAutomationRuns(companyId: string, limit?: number): Promise<AutomationRun[]>;
+  getAutomationRun(id: string): Promise<AutomationRun | undefined>;
+  updateAutomationRunStatus(id: string, status: string, updates?: { actionResults?: unknown; error?: string; retryCount?: number }): Promise<AutomationRun | undefined>;
+  getFailedAutomationRunsForRetry(maxRetries: number, limit?: number): Promise<AutomationRun[]>;
 
   // Message operations
   getBookingMessages(bookingId: string): Promise<Message[]>;
@@ -888,6 +903,72 @@ export class DbStorage implements IStorage {
       lastBookingDate: r.last_booking_date ? new Date(r.last_booking_date) : null,
       usedServiceNames: r.used_service_names ?? [],
     }));
+  }
+
+  // === WORKFLOW AUTOMATION ===
+  async createAutomationRule(data: InsertAutomationRule, companyId: string, createdBy: string): Promise<AutomationRule> {
+    const result = await db.insert(automationRules).values({ ...data, companyId, createdBy }).returning();
+    return result[0];
+  }
+
+  async getCompanyAutomationRules(companyId: string): Promise<AutomationRule[]> {
+    return await db.select().from(automationRules).where(eq(automationRules.companyId, companyId)).orderBy(desc(automationRules.createdAt));
+  }
+
+  async getCompanyAutomationRulesByTrigger(companyId: string, triggerEvent: string): Promise<AutomationRule[]> {
+    return await db.select().from(automationRules).where(
+      and(eq(automationRules.companyId, companyId), eq(automationRules.triggerEvent, triggerEvent), eq(automationRules.enabled, true))
+    );
+  }
+
+  async getAutomationRule(id: string): Promise<AutomationRule | undefined> {
+    const result = await db.select().from(automationRules).where(eq(automationRules.id, id));
+    return result[0];
+  }
+
+  async updateAutomationRule(id: string, companyId: string, updates: Partial<InsertAutomationRule>): Promise<AutomationRule | undefined> {
+    const result = await db.update(automationRules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(automationRules.id, id), eq(automationRules.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAutomationRule(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(automationRules).where(and(eq(automationRules.id, id), eq(automationRules.companyId, companyId))).returning();
+    return result.length > 0;
+  }
+
+  async createAutomationRun(data: {
+    ruleId: string; companyId: string; triggerEvent: string; context: unknown;
+    status: string; actionResults?: unknown; error?: string;
+  }): Promise<AutomationRun> {
+    const result = await db.insert(automationRuns).values(data).returning();
+    return result[0];
+  }
+
+  async getCompanyAutomationRuns(companyId: string, limit = 100): Promise<AutomationRun[]> {
+    return await db.select().from(automationRuns).where(eq(automationRuns.companyId, companyId)).orderBy(desc(automationRuns.createdAt)).limit(limit);
+  }
+
+  async getAutomationRun(id: string): Promise<AutomationRun | undefined> {
+    const result = await db.select().from(automationRuns).where(eq(automationRuns.id, id));
+    return result[0];
+  }
+
+  async updateAutomationRunStatus(id: string, status: string, updates?: { actionResults?: unknown; error?: string; retryCount?: number }): Promise<AutomationRun | undefined> {
+    const result = await db.update(automationRuns)
+      .set({ status, ...updates, updatedAt: new Date() })
+      .where(eq(automationRuns.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getFailedAutomationRunsForRetry(maxRetries: number, limit = 50): Promise<AutomationRun[]> {
+    return await db.select().from(automationRuns)
+      .where(and(eq(automationRuns.status, "failed"), lt(automationRuns.retryCount, maxRetries)))
+      .orderBy(automationRuns.createdAt)
+      .limit(limit);
   }
 
   // === MESSAGE OPERATIONS ===

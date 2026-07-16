@@ -954,7 +954,8 @@ function EnterpriseDashboardTab({ companyId }: { companyId: string }) {
 }
 
 interface AiOperationsRoleInfo { id: string; label: string; description: string; external?: boolean }
-interface AiChatMessage { role: "user" | "assistant"; content: string }
+interface AiProposedAction { actionType: string; params: Record<string, unknown>; description: string }
+interface AiChatMessage { role: "user" | "assistant"; content: string; proposedAction?: AiProposedAction }
 
 function AiOperationsTab({ companyId }: { companyId: string }) {
   const { toast } = useToast();
@@ -962,6 +963,7 @@ function AiOperationsTab({ companyId }: { companyId: string }) {
   const [role, setRole] = useState<string>("dispatcher");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
+  const [resolvedActions, setResolvedActions] = useState<Set<number>>(new Set());
 
   const selectedRole = roles.find((r) => r.id === role);
 
@@ -969,17 +971,36 @@ function AiOperationsTab({ companyId }: { companyId: string }) {
     mutationFn: async (message: string) => {
       const res = await apiRequest("POST", `/api/companies/${companyId}/ai-operations/${role}`, {
         message,
-        history: messages,
+        history: messages.map((m) => ({ role: m.role, content: m.content })),
       });
-      return res.json() as Promise<{ reply: string }>;
+      return res.json() as Promise<{ reply: string; proposedAction?: AiProposedAction }>;
     },
     onSuccess: (data, message) => {
-      setMessages((prev) => [...prev, { role: "user", content: message }, { role: "assistant", content: data.reply }]);
+      setMessages((prev) => [...prev, { role: "user", content: message }, { role: "assistant", content: data.reply, proposedAction: data.proposedAction }]);
       setInput("");
     },
     onError: (error: any) => {
       toast({ title: "Assistant unavailable", description: error.message, variant: "destructive" });
     },
+  });
+
+  const executeActionMutation = useMutation({
+    mutationFn: async ({ action }: { action: AiProposedAction; index: number }) => {
+      const res = await apiRequest("POST", `/api/companies/${companyId}/ai-operations/actions/execute`, {
+        actionType: action.actionType,
+        params: action.params,
+      });
+      return res.json() as Promise<{ success: boolean; message: string }>;
+    },
+    onSuccess: (result, { index }) => {
+      setResolvedActions((prev) => new Set(prev).add(index));
+      toast({
+        title: result.success ? "Action completed" : "Action failed",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+    },
+    onError: (error: any) => toast({ title: "Action failed", description: error.message, variant: "destructive" }),
   });
 
   const handleSend = () => {
@@ -1011,6 +1032,24 @@ function AiOperationsTab({ companyId }: { companyId: string }) {
           {messages.map((m, i) => (
             <div key={i} className={`text-sm p-2 rounded ${m.role === "user" ? "bg-primary/10 ml-8" : "bg-muted mr-8"}`} data-testid={`ai-message-${i}`}>
               {m.content}
+              {m.proposedAction && (
+                <div className="mt-2 p-2 border rounded bg-background space-y-2" data-testid={`ai-proposed-action-${i}`}>
+                  <p className="text-xs text-muted-foreground">Proposed action: {m.proposedAction.description}</p>
+                  {resolvedActions.has(i) ? (
+                    <p className="text-xs font-medium">Done.</p>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => executeActionMutation.mutate({ action: m.proposedAction!, index: i })}
+                      disabled={executeActionMutation.isPending}
+                      data-testid={`button-confirm-action-${i}`}
+                    >
+                      Confirm & Execute
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
           {chatMutation.isPending && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}

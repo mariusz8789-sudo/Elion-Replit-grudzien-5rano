@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "../env";
 import { storage } from "../storage";
+import { AI_ACTIONS } from "./aiActions";
 
 // MoveX AI Operations: one generalized, role-parameterized assistant endpoint rather than eight
 // separate agent implementations. Each role gets its own system prompt grounded in this
@@ -40,14 +41,43 @@ export const AI_OPERATIONS_ROLES: AiOperationsRoleInfo[] = [
 
 export interface AiOperationsTurn { role: "user" | "assistant"; content: string }
 
-export interface AiOperationsReply { reply: string }
+export interface AiProposedAction {
+  actionType: string;
+  params: Record<string, unknown>;
+  description: string;
+}
+
+export interface AiOperationsReply {
+  reply: string;
+  proposedAction?: AiProposedAction;
+}
+
+// Only these roles get real, bounded write-actions (assign_driver, set_vehicle_availability) -
+// every other role stays advisory. The model is only ever offered the action types listed here,
+// and execution (see aiActions.ts) independently re-verifies ownership - the role gate here is
+// a prompt-shaping convenience, not the security boundary.
+const ROLE_ACTIONS: Partial<Record<AiOperationsRole, string[]>> = {
+  dispatcher: ["assign_driver"],
+  fleet_manager: ["set_vehicle_availability"],
+};
 
 const REPLY_JSON_SCHEMA = {
   type: "object",
   properties: {
     reply: { type: "string", description: "Concise, practical reply for the company operator" },
+    proposed_action: {
+      type: ["object", "null"],
+      description: "Set only when a concrete, user-confirmable action is warranted using real IDs from the data provided - otherwise null",
+      properties: {
+        action_type: { type: "string" },
+        params: { type: "object" },
+        description: { type: "string", description: "Plain-language summary of what this action will do, shown to the user before they confirm" },
+      },
+      required: ["action_type", "params", "description"],
+      additionalProperties: false,
+    },
   },
-  required: ["reply"],
+  required: ["reply", "proposed_action"],
   additionalProperties: false,
 };
 
@@ -157,11 +187,19 @@ export async function getAiOperationsReply(params: {
 
   const history: Anthropic.MessageParam[] = (params.history ?? []).map((turn) => ({ role: turn.role, content: turn.content }));
 
+  const availableActionTypes = ROLE_ACTIONS[params.role] ?? [];
+  const actionsBlock = availableActionTypes.length > 0
+    ? "\n\nYou may propose ONE of these actions when it directly helps, using only real IDs from the data above " +
+      "(never invent an ID) - leave proposed_action null otherwise:\n" +
+      availableActionTypes.map((type) => `- ${type}: ${AI_ACTIONS[type].description} (params: ${JSON.stringify(Object.keys((AI_ACTIONS[type].paramsSchema as any).shape ?? {}))})`).join("\n") +
+      "\nA proposed action is only ever shown to the operator for them to confirm - it is never executed automatically."
+    : "\n\nThis role has no available actions - always leave proposed_action null.";
+
   const response = await client.messages.create({
     model,
     max_tokens: 1024,
     system:
-      `${ROLE_PERSONAS[params.role]}\n\nReal, current data for this company:\n${context}\n\n` +
+      `${ROLE_PERSONAS[params.role]}\n\nReal, current data for this company:\n${context}${actionsBlock}\n\n` +
       "Only use the data above - never invent bookings, workers, vehicles or figures. Be concise and practical. Respond only via the provided JSON schema.",
     output_config: {
       format: { type: "json_schema", schema: REPLY_JSON_SCHEMA },
@@ -174,6 +212,15 @@ export async function getAiOperationsReply(params: {
     throw new Error("AI Operations assistant returned no text content");
   }
 
-  const parsed = JSON.parse(textBlock.text) as { reply: string };
-  return { reply: parsed.reply };
+  const parsed = JSON.parse(textBlock.text) as {
+    reply: string;
+    proposed_action: { action_type: string; params: Record<string, unknown>; description: string } | null;
+  };
+
+  return {
+    reply: parsed.reply,
+    proposedAction: parsed.proposed_action && availableActionTypes.includes(parsed.proposed_action.action_type)
+      ? { actionType: parsed.proposed_action.action_type, params: parsed.proposed_action.params, description: parsed.proposed_action.description }
+      : undefined,
+  };
 }

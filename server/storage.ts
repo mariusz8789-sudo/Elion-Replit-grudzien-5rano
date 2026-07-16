@@ -104,6 +104,7 @@ export interface IStorage {
   // Vehicle operations
   getCompanyVehicles(companyId: string): Promise<Vehicle[]>;
   getVehicle(id: string): Promise<Vehicle | undefined>;
+  setVehicleAvailability(id: string, available: boolean): Promise<Vehicle | undefined>;
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
   
   // Service operations
@@ -487,6 +488,11 @@ export class DbStorage implements IStorage {
 
   async getVehicle(id: string): Promise<Vehicle | undefined> {
     const result = await db.select().from(vehicles).where(eq(vehicles.id, id));
+    return result[0];
+  }
+
+  async setVehicleAvailability(id: string, available: boolean): Promise<Vehicle | undefined> {
+    const result = await db.update(vehicles).set({ available }).where(eq(vehicles.id, id)).returning();
     return result[0];
   }
 

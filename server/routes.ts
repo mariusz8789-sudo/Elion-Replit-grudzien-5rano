@@ -36,6 +36,7 @@ import { dispatchWebhookEvent } from "./services/webhooks";
 import { rankCrewCandidates, CREW_MATCH_METHODOLOGY, type CrewCandidate, type ScoredCrewCandidate } from "@shared/crewMatching";
 import { haversineDistanceKm } from "@shared/geo";
 import { AI_OPERATIONS_ROLES, getAiOperationsReply } from "./services/aiOperations";
+import { executeAiAction } from "./services/aiActions";
 import { extractDocumentFields } from "./services/documentOcr";
 import { buildIcsCalendar } from "@shared/ics";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
@@ -2915,6 +2916,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         history,
       });
       res.json(reply);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Executes a bounded action an AI Operations agent proposed - always requires this explicit,
+  // separate confirmation call; nothing in getAiOperationsReply ever executes on its own.
+  app.post("/api/companies/:companyId/ai-operations/actions/execute", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.companyId !== req.params.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const { actionType, params } = req.body as { actionType: string; params: Record<string, unknown> };
+      if (!actionType) return res.status(400).json({ message: "actionType is required" });
+      const result = await executeAiAction(actionType, params, req.params.companyId);
+      await storage.writeAuditLog(user.id, `ai_action.${actionType}`, "company", req.params.companyId, { params, result }, req.ip);
+      res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

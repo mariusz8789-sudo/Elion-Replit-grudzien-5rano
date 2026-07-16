@@ -829,6 +829,25 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 CREATE INDEX IF NOT EXISTS idx_api_keys_owner ON api_keys(owner_email);
 `;
+// v23 — Billing (Stripe). A customer's plan is keyed by owner_email (one plan per
+// account); billing_events gives webhook idempotency (Stripe retries the same event).
+const SCHEMA_V23 = `
+CREATE TABLE IF NOT EXISTS billing_customers (
+  owner_email            TEXT PRIMARY KEY,
+  stripe_customer_id     TEXT,
+  stripe_subscription_id TEXT,
+  tier                   TEXT NOT NULL DEFAULT 'free',
+  status                 TEXT NOT NULL DEFAULT 'inactive',
+  api_key                TEXT,
+  created_at             INTEGER NOT NULL,
+  updated_at             INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS billing_events (
+  event_id     TEXT PRIMARY KEY,
+  type         TEXT NOT NULL,
+  processed_at INTEGER NOT NULL
+);
+`;
 
 function addColumnIfMissing(db, table, column, ddl) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -893,7 +912,8 @@ function migrate(db) {
   }
   if (version < 21) db.exec(SCHEMA_V21);
   if (version < 22) db.exec(SCHEMA_V22);
-  if (version < 22) db.exec('PRAGMA user_version = 22');
+  if (version < 23) db.exec(SCHEMA_V23);
+  if (version < 23) db.exec('PRAGMA user_version = 23');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -2351,4 +2371,71 @@ export function incrementApiKeyUsage(db, key) {
   db.prepare('UPDATE api_keys SET usage_count = usage_count + 1 WHERE key = ?').run(key);
   const row = db.prepare('SELECT usage_count FROM api_keys WHERE key = ?').get(key);
   return row?.usage_count ?? null;
+}
+
+/**
+ * Zmienia tier istniejącego klucza i (domyślnie) zeruje okno zużycia — używane,
+ * gdy klient zmienia plan (upgrade/downgrade). Limit z API_TIERS dla nowego tieru.
+ */
+export function updateApiKeyTier(db, key, tier, { now = Date.now(), resetUsage = true } = {}) {
+  const t = API_TIERS[tier] !== undefined ? tier : 'free';
+  const limit = API_TIERS[t];
+  if (resetUsage) {
+    db.prepare('UPDATE api_keys SET tier = ?, monthly_limit = ?, usage_count = 0, reset_date = ? WHERE key = ?').run(t, limit, now + MONTH_MS, key);
+  } else {
+    db.prepare('UPDATE api_keys SET tier = ?, monthly_limit = ? WHERE key = ?').run(t, limit, key);
+  }
+  return getApiKey(db, key);
+}
+
+/* ---------------- Billing (Stripe) ---------------- */
+
+function toBillingCustomer(row) {
+  if (!row) return null;
+  return {
+    ownerEmail: row.owner_email, stripeCustomerId: row.stripe_customer_id,
+    stripeSubscriptionId: row.stripe_subscription_id, tier: row.tier,
+    status: row.status, apiKey: row.api_key, createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+/** Zwraca rekord billing dla adresu e-mail (lub null). */
+export function getBillingCustomer(db, ownerEmail) {
+  if (!ownerEmail) return null;
+  return toBillingCustomer(db.prepare('SELECT * FROM billing_customers WHERE owner_email = ?').get(String(ownerEmail)));
+}
+
+/**
+ * Tworzy lub aktualizuje plan klienta (upsert po owner_email). Pola undefined
+ * pozostają bez zmian przy aktualizacji. Zwraca zaktualizowany rekord.
+ */
+export function upsertBillingCustomer(db, { ownerEmail, stripeCustomerId, stripeSubscriptionId, tier, status, apiKey, now = Date.now() } = {}) {
+  const email = String(ownerEmail);
+  const existing = getBillingCustomer(db, email);
+  if (!existing) {
+    db.prepare('INSERT INTO billing_customers (owner_email, stripe_customer_id, stripe_subscription_id, tier, status, api_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(email, stripeCustomerId ?? null, stripeSubscriptionId ?? null, tier ?? 'free', status ?? 'inactive', apiKey ?? null, now, now);
+  } else {
+    db.prepare('UPDATE billing_customers SET stripe_customer_id = ?, stripe_subscription_id = ?, tier = ?, status = ?, api_key = ?, updated_at = ? WHERE owner_email = ?')
+      .run(
+        stripeCustomerId ?? existing.stripeCustomerId ?? null,
+        stripeSubscriptionId ?? existing.stripeSubscriptionId ?? null,
+        tier ?? existing.tier,
+        status ?? existing.status,
+        apiKey ?? existing.apiKey ?? null,
+        now, email,
+      );
+  }
+  return getBillingCustomer(db, email);
+}
+
+/** Idempotencja webhooków: czy dane zdarzenie Stripe już przetworzono. */
+export function wasBillingEventProcessed(db, eventId) {
+  if (!eventId) return false;
+  return Boolean(db.prepare('SELECT 1 FROM billing_events WHERE event_id = ?').get(String(eventId)));
+}
+
+/** Oznacza zdarzenie Stripe jako przetworzone (idempotencja). */
+export function markBillingEventProcessed(db, eventId, type, now = Date.now()) {
+  db.prepare('INSERT OR IGNORE INTO billing_events (event_id, type, processed_at) VALUES (?, ?, ?)').run(String(eventId), String(type ?? ''), now);
 }

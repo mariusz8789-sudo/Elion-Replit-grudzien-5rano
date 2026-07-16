@@ -38,6 +38,7 @@ import {
 import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { groundChatAnswer, groundingEnabled } from './aiGrounding.mjs';
+import { handleCheckout, handleWebhook, billingConfig } from './billing/handler.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8080);
@@ -194,6 +195,32 @@ async function handleAsk(req, res) {
   });
 }
 
+/* ---------------- Billing (Stripe): checkout + webhook (raw body) ---------------- */
+function handleBilling(req, res, kind) {
+  if (!db) return json(res, 503, { error: 'persistence_unavailable' });
+  let raw = ''; let size = 0; let overflow = false;
+  req.on('data', (chunk) => { size += chunk.length; if (size > 65_536) { overflow = true; req.destroy(); return; } raw += chunk; });
+  req.on('end', async () => {
+    if (overflow) return;
+    try {
+      if (kind === 'webhook') {
+        const result = handleWebhook(db, { rawBody: raw, sigHeader: req.headers['stripe-signature'], config: billingConfig() });
+        return json(res, result.status, result.body);
+      }
+      // checkout — authenticated JSON request; verify the token like the persist API.
+      const auth = req.headers['authorization'] ?? '';
+      const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
+      let body = {};
+      if (raw) { try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad_json' }); } }
+      const result = await handleCheckout(db, { token, body, config: billingConfig() });
+      return json(res, result.status, result.body);
+    } catch (err) {
+      log('error', 'billing_failed', { kind, message: String(err?.message).slice(0, 160) });
+      return json(res, 500, { error: 'internal' });
+    }
+  });
+}
+
 /* ---------------- API trwałości (/api/auth, /api/projects) ---------------- */
 const persistLimiter = createRateLimiter({ limit: 60, windowMs: 60_000 });
 setInterval(() => persistLimiter.cleanup(), 300_000).unref();
@@ -273,6 +300,10 @@ const server = http.createServer((req, res) => {
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);
+  // Billing (Stripe). The webhook MUST verify the signature over the RAW body, so
+  // both billing routes read the raw payload themselves (not the JSON router).
+  if (req.method === 'POST' && req.url === '/api/billing/webhook') return handleBilling(req, res, 'webhook');
+  if (req.method === 'POST' && req.url === '/api/billing/checkout') return handleBilling(req, res, 'checkout');
   // Public, versioned external API (v1) — independent of persistence (RDKit only).
   if (req.url?.startsWith('/api/v1/')) return handlePersistApi(req, res, new URL(req.url, 'http://x'));
   if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute') || req.url?.startsWith('/api/science')) {

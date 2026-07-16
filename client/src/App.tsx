@@ -10,7 +10,7 @@ import { CallProvider } from "./lib/CallProvider";
 import PointToPointLanding from "@/components/PointToPointLanding";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { Loader2, LogOut } from "lucide-react";
+import { Loader2, LogOut, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import LanguageSelector from "@/components/LanguageSelector";
 import NotificationBell from "@/components/NotificationBell";
@@ -45,6 +45,7 @@ const CapacityMarketplace = lazy(() => import("@/pages/CapacityMarketplace"));
 const SkillsProfilePage = lazy(() => import("@/pages/SkillsProfilePage"));
 const ProfessionalServicesPage = lazy(() => import("@/pages/ProfessionalServicesPage"));
 const MessagesPage = lazy(() => import("@/pages/MessagesPage"));
+const SettingsPanel = lazy(() => import("@/components/SettingsPanel"));
 
 function RouteLoadingFallback() {
   return (
@@ -87,6 +88,14 @@ function LandingPage() {
                     {t('nav.company', 'Company')}
                   </Button>
                   <NotificationBell />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setLocation("/settings")}
+                    data-testid="button-settings"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -279,6 +288,7 @@ function Router() {
         <Route path="/skills-profile" component={SkillsProfilePage} />
         <Route path="/professional-services" component={ProfessionalServicesPage} />
         <Route path="/messages" component={MessagesPage} />
+        <Route path="/settings" component={SettingsPanel} />
 
         <Route component={LandingPage} />
       </Switch>

@@ -6,10 +6,16 @@ import type { User } from "@shared/schema";
 
 type AuthUser = Omit<User, "password">;
 
+interface LoginResult {
+  mfaRequired: boolean;
+  challengeToken?: string;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  verifyMfa: (challengeToken: string, code: string) => Promise<void>;
   register: (name: string, email: string, phone: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -46,6 +52,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
       const response = await apiRequest("POST", "/api/auth/login", { email, password });
+      return await response.json() as (AuthUser & { mfaRequired?: false }) | { mfaRequired: true; challengeToken: string };
+    },
+    onSuccess: (data) => {
+      if (!data.mfaRequired) {
+        setUser(data);
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        reportDeviceFingerprint();
+      }
+    },
+  });
+
+  const mfaVerifyMutation = useMutation({
+    mutationFn: async ({ challengeToken, code }: { challengeToken: string; code: string }) => {
+      const response = await apiRequest("POST", "/api/auth/mfa/verify", { challengeToken, code });
       return await response.json() as AuthUser;
     },
     onSuccess: (data: AuthUser) => {
@@ -77,8 +97,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const login = async (email: string, password: string) => {
-    await loginMutation.mutateAsync({ email, password });
+  const login = async (email: string, password: string): Promise<LoginResult> => {
+    const result = await loginMutation.mutateAsync({ email, password });
+    return result.mfaRequired
+      ? { mfaRequired: true, challengeToken: result.challengeToken }
+      : { mfaRequired: false };
+  };
+
+  const verifyMfa = async (challengeToken: string, code: string) => {
+    await mfaVerifyMutation.mutateAsync({ challengeToken, code });
   };
 
   const register = async (name: string, email: string, phone: string, password: string) => {
@@ -90,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, verifyMfa, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -17,11 +17,32 @@ export const users = pgTable("users", {
   verified: boolean("verified").default(false),
   referralCode: text("referral_code").unique(),
   referredByCode: text("referred_by_code"), // referral code of the user who invited them
+  // TOTP MFA (RFC 6238, see shared/totp.ts) - secret is AES-256-GCM encrypted at rest via the
+  // same encryptSecret/decryptSecret used for OAuth tokens; backup codes are bcrypt-hashed like
+  // the account password, never stored or returned in plaintext after initial generation.
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+  mfaSecret: text("mfa_secret"),
+  mfaBackupCodes: text("mfa_backup_codes").array(),
+  // GDPR right-to-erasure: set on account deletion instead of a hard DELETE, since bookings,
+  // reviews and payment records referencing this user must survive for the other party's
+  // legitimate records and for legal/financial retention - see POST /api/users/me/delete-account.
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 }, (t) => ({
   phoneIdx: index("users_phone_idx").on(t.phone),
   companyIdIdx: index("users_company_id_idx").on(t.companyId),
 }));
+
+// Short-lived server-side token for the "second step" of MFA login - the password step (passport
+// LocalStrategy) never establishes a session by itself when mfaEnabled is true; this table bridges
+// to a follow-up POST /api/auth/mfa/verify call that actually calls req.login().
+export const mfaChallenges = pgTable("mfa_challenges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
 
 export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1559,6 +1580,7 @@ export const insertRoadServiceOrderSchema = createInsertSchema(roadServiceOrders
 // === TYPES ===
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type MfaChallenge = typeof mfaChallenges.$inferSelect;
 
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type Company = typeof companies.$inferSelect;

@@ -50,8 +50,9 @@ import {
   type RecurringRouteSubscription, type InsertRecurringRouteSubscription,
   type CompanyService, type InsertCompanyService,
   type AutomationRule, type InsertAutomationRule, type AutomationRun,
+  type MfaChallenge,
   users, companies, drivers, vehicles, services, bookings, quotes, offers,
-  crmLeads, crmTasks, automationRules, automationRuns,
+  crmLeads, crmTasks, automationRules, automationRuns, mfaChallenges,
   messages, attachments, conversations, conversationParticipants, messageTemplates, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
   badges, badgeAwards, coupons, couponRedemptions, referralRewards, bookingTransfers,
@@ -109,6 +110,18 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   linkUserToCompany(userId: string, companyId: string, role: "company" | "driver"): Promise<User | undefined>;
   getCompanyUsers(companyId: string): Promise<User[]>;
+
+  // Security hardening: TOTP MFA (shared/totp.ts) + GDPR account anonymization. The password
+  // step never establishes a session on its own once mfaEnabled is true - see
+  // POST /api/auth/login and POST /api/auth/mfa/verify in routes.ts.
+  setUserMfaSecret(userId: string, encryptedSecret: string): Promise<User | undefined>;
+  enableUserMfa(userId: string, hashedBackupCodes: string[]): Promise<User | undefined>;
+  disableUserMfa(userId: string): Promise<User | undefined>;
+  updateUserMfaBackupCodes(userId: string, hashedCodes: string[]): Promise<User | undefined>;
+  createMfaChallenge(userId: string): Promise<MfaChallenge>;
+  getMfaChallenge(token: string): Promise<MfaChallenge | undefined>;
+  deleteMfaChallenge(id: string): Promise<void>;
+  anonymizeUser(userId: string): Promise<User | undefined>;
 
   // Company operations
   getAllCompanies(): Promise<Company[]>;
@@ -223,6 +236,7 @@ export interface IStorage {
   
   // Review operations
   getCompanyReviews(companyId: string): Promise<Review[]>;
+  getUserReviews(userId: string): Promise<Review[]>;
   createReview(review: InsertReview): Promise<Review>;
   
   // Tracking operations
@@ -474,6 +488,78 @@ export class DbStorage implements IStorage {
 
   async getCompanyUsers(companyId: string): Promise<User[]> {
     return await db.select().from(users).where(eq(users.companyId, companyId));
+  }
+
+  async setUserMfaSecret(userId: string, encryptedSecret: string): Promise<User | undefined> {
+    const result = await db.update(users).set({ mfaSecret: encryptedSecret }).where(eq(users.id, userId)).returning();
+    return result[0];
+  }
+
+  async enableUserMfa(userId: string, hashedBackupCodes: string[]): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ mfaEnabled: true, mfaBackupCodes: hashedBackupCodes })
+      .where(eq(users.id, userId))
+      .returning();
+    return result[0];
+  }
+
+  async disableUserMfa(userId: string): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ mfaEnabled: false, mfaSecret: null, mfaBackupCodes: null })
+      .where(eq(users.id, userId))
+      .returning();
+    return result[0];
+  }
+
+  async updateUserMfaBackupCodes(userId: string, hashedCodes: string[]): Promise<User | undefined> {
+    const result = await db.update(users).set({ mfaBackupCodes: hashedCodes }).where(eq(users.id, userId)).returning();
+    return result[0];
+  }
+
+  async createMfaChallenge(userId: string): Promise<MfaChallenge> {
+    const MFA_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+    const result = await db.insert(mfaChallenges).values({
+      userId,
+      token: randomUUID(),
+      expiresAt: new Date(Date.now() + MFA_CHALLENGE_TTL_MS),
+    }).returning();
+    return result[0];
+  }
+
+  async getMfaChallenge(token: string): Promise<MfaChallenge | undefined> {
+    const result = await db.select().from(mfaChallenges).where(eq(mfaChallenges.token, token));
+    const challenge = result[0];
+    if (!challenge) return undefined;
+    if (challenge.expiresAt < new Date()) {
+      await this.deleteMfaChallenge(challenge.id);
+      return undefined;
+    }
+    return challenge;
+  }
+
+  async deleteMfaChallenge(id: string): Promise<void> {
+    await db.delete(mfaChallenges).where(eq(mfaChallenges.id, id));
+  }
+
+  // GDPR right-to-erasure: scrubs PII in place rather than a hard DELETE, since bookings,
+  // reviews, and payment records referencing this user must remain intact for the other
+  // party's legitimate records and for financial/legal retention obligations.
+  async anonymizeUser(userId: string): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({
+        name: "Deleted User",
+        email: `deleted-${userId}@deleted.local`,
+        phone: `deleted-${userId}`,
+        password: randomUUID(), // unusable - not a valid bcrypt hash, so login can never succeed
+        avatar: null,
+        mfaEnabled: false,
+        mfaSecret: null,
+        mfaBackupCodes: null,
+        deletedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return result[0];
   }
 
   // === COMPANY OPERATIONS ===
@@ -1165,6 +1251,12 @@ export class DbStorage implements IStorage {
   async getCompanyReviews(companyId: string): Promise<Review[]> {
     return await db.select().from(reviews)
       .where(eq(reviews.companyId, companyId))
+      .orderBy(desc(reviews.createdAt));
+  }
+
+  async getUserReviews(userId: string): Promise<Review[]> {
+    return await db.select().from(reviews)
+      .where(eq(reviews.reviewerId, userId))
       .orderBy(desc(reviews.createdAt));
   }
 

@@ -12,9 +12,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, TrendingUp, AlertCircle, User, DollarSign, ShieldCheck, Check, X, Route, Euro } from "lucide-react";
+import { Package, TrendingUp, AlertCircle, User, DollarSign, ShieldCheck, Check, X, Route, Euro, ScrollText } from "lucide-react";
 import { format } from "date-fns";
-import type { Booking, Service, VerificationDocument, RoadServicePartnerProfile } from "@shared/schema";
+import type { Booking, Service, VerificationDocument, RoadServicePartnerProfile, AuditLog } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -267,6 +267,7 @@ export default function AdminPanel() {
           <TabsTrigger value="services" data-testid="tab-services">Services</TabsTrigger>
           <TabsTrigger value="drivers" data-testid="tab-drivers">Drivers</TabsTrigger>
           <TabsTrigger value="road-services" data-testid="tab-road-services">Road Services</TabsTrigger>
+          <TabsTrigger value="audit-log" data-testid="tab-audit-log">Audit Log</TabsTrigger>
           <TabsTrigger value="verification" data-testid="tab-verification">
             Verification {pendingDocuments.length > 0 && <Badge className="ml-1">{pendingDocuments.length}</Badge>}
           </TabsTrigger>
@@ -534,6 +535,10 @@ export default function AdminPanel() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="audit-log" className="space-y-4">
+          <AuditLogTab />
+        </TabsContent>
+
         <TabsContent value="road-services" className="space-y-4">
           <div className="grid md:grid-cols-3 gap-4">
             <Card>
@@ -630,5 +635,57 @@ export default function AdminPanel() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function AuditLogTab() {
+  const [targetType, setTargetType] = useState("");
+  const { data: logs = [], isLoading } = useQuery<AuditLog[]>({
+    queryKey: ["/api/admin/audit-logs", targetType],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/audit-logs${targetType ? `?targetType=${encodeURIComponent(targetType)}` : ""}`, { credentials: "include" });
+      return res.ok ? res.json() : [];
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ScrollText className="w-5 h-5" />
+          Audit Log
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="audit-target-type" className="text-sm">Filter by target type</Label>
+          <input
+            id="audit-target-type"
+            className="h-8 px-2 border rounded text-sm bg-background"
+            placeholder="e.g. automation_rule, user, company"
+            value={targetType}
+            onChange={(e) => setTargetType(e.target.value)}
+            data-testid="input-audit-target-type"
+          />
+        </div>
+        {isLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
+        {!isLoading && logs.length === 0 && <p className="text-sm text-muted-foreground">No audit log entries.</p>}
+        {logs.map((log) => (
+          <div key={log.id} className="p-2 border rounded text-sm" data-testid={`audit-log-${log.id}`}>
+            <div className="flex items-center justify-between">
+              <span className="font-medium">{log.action}</span>
+              <span className="text-xs text-muted-foreground">{format(new Date(log.createdAt), "PPp")}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {log.targetType && `${log.targetType}${log.targetId ? ` · ${log.targetId.slice(0, 8)}` : ""}`}
+              {log.actorUserId && ` · actor ${log.actorUserId.slice(0, 8)}`}
+            </p>
+            {log.metadata != null && (
+              <pre className="text-xs bg-muted p-1.5 rounded mt-1 overflow-x-auto">{JSON.stringify(log.metadata)}</pre>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

@@ -42,7 +42,9 @@ import { AUTOMATION_TRIGGER_EVENTS, AUTOMATION_ACTION_TYPES, runAutomationRules,
 import { customerHealth, suggestUpsells, CUSTOMER_HEALTH_METHODOLOGY } from "@shared/crm";
 import { extractDocumentFields } from "./services/documentOcr";
 import { buildIcsCalendar } from "@shared/ics";
-import { generateApiKey, hashApiKey } from "./lib/crypto";
+import { generateApiKey, hashApiKey, encryptSecret, decryptSecret } from "./lib/crypto";
+import { generateTotpSecret, verifyTotp, buildOtpAuthUri, generateBackupCodes } from "@shared/totp";
+import QRCode from "qrcode";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
 import { validateDataUrl } from "./lib/dataUrl";
 import { getBroadcaster } from "./socket";
@@ -52,6 +54,15 @@ import { handleRoadServiceOrderPayment } from "./roadServices/router";
 
 const userCanAccessBooking = (user: User, booking: Booking) =>
   userCanAccessBookingImpl(user, booking, (id) => storage.getDriver(id));
+
+// Every response that ever includes a user object must strip not just the password hash but
+// also the MFA secret (AES-encrypted, but still no reason to ship ciphertext to the client) and
+// the backup-code hashes (bcrypt hashes are safe from direct reversal but still an unnecessary
+// offline-brute-force surface if leaked) - centralized here so no new call site can forget one.
+function sanitizeUser(user: User): Omit<User, "password" | "mfaSecret" | "mfaBackupCodes"> {
+  const { password: _password, mfaSecret: _mfaSecret, mfaBackupCodes: _mfaBackupCodes, ...safe } = user;
+  return safe;
+}
 
 // Recomputes and persists the booking's CO2 estimate now that a real vehicle is assigned -
 // called from both the direct company-assignment route and offer acceptance, the two paths
@@ -179,8 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (err) {
           return res.status(500).json({ message: "Login after registration failed" });
         }
-        const { password: _, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+        res.status(201).json(sanitizeUser(user));
       });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -188,21 +198,177 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/login", authLimiter, (req, res, next) => {
-    passport.authenticate("local", (err: any, user: User | false, info: any) => {
+    passport.authenticate("local", async (err: any, user: User | false, info: any) => {
       if (err) {
         return res.status(500).json({ message: "Authentication error" });
       }
       if (!user) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
+
+      // Password verified, but a session is never established for an MFA-enabled account until
+      // the second factor is confirmed via POST /api/auth/mfa/verify - the challenge token is
+      // the only thing this response carries, so the password alone can never grant access.
+      if (user.mfaEnabled) {
+        const challenge = await storage.createMfaChallenge(user.id);
+        return res.json({ mfaRequired: true, challengeToken: challenge.token });
+      }
+
       req.login(user, (err) => {
         if (err) {
           return res.status(500).json({ message: "Login failed" });
         }
-        const { password: _, ...userWithoutPassword } = user;
-        res.json(userWithoutPassword);
+        res.json(sanitizeUser(user));
       });
     })(req, res, next);
+  });
+
+  app.post("/api/auth/mfa/verify", authLimiter, async (req, res) => {
+    try {
+      const { challengeToken, code } = req.body as { challengeToken?: string; code?: string };
+      if (!challengeToken || !code) {
+        return res.status(400).json({ message: "challengeToken and code are required" });
+      }
+      const challenge = await storage.getMfaChallenge(challengeToken);
+      if (!challenge) {
+        return res.status(401).json({ message: "This login challenge has expired - please sign in again" });
+      }
+      const user = await storage.getUser(challenge.userId);
+      if (!user || !user.mfaEnabled || !user.mfaSecret) {
+        await storage.deleteMfaChallenge(challenge.id);
+        return res.status(401).json({ message: "MFA is not active for this account" });
+      }
+
+      const secret = decryptSecret(user.mfaSecret);
+      let verified = verifyTotp(code, secret);
+
+      if (!verified && user.mfaBackupCodes && user.mfaBackupCodes.length > 0) {
+        const cleanCode = code.replace(/\s/g, "");
+        for (const hashed of user.mfaBackupCodes) {
+          if (await bcrypt.compare(cleanCode, hashed)) {
+            verified = true;
+            await storage.updateUserMfaBackupCodes(user.id, user.mfaBackupCodes.filter((h) => h !== hashed));
+            break;
+          }
+        }
+      }
+
+      if (!verified) {
+        return res.status(401).json({ message: "Invalid verification code" });
+      }
+
+      await storage.deleteMfaChallenge(challenge.id);
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login failed" });
+        }
+        res.json(sanitizeUser(user));
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Step 1 of enabling MFA: generates and stores a secret but does NOT enable MFA yet - a user
+  // could otherwise lock themselves out by scanning a QR code that never gets confirmed to work.
+  app.post("/api/auth/mfa/setup", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const secret = generateTotpSecret();
+      await storage.setUserMfaSecret(user.id, encryptSecret(secret));
+      const otpauthUri = buildOtpAuthUri(secret, user.email || user.phone);
+      const qrCodeDataUrl = await QRCode.toDataURL(otpauthUri);
+      res.json({ secret, otpauthUri, qrCodeDataUrl });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Step 2: proves the authenticator app is actually working before flipping mfaEnabled on,
+  // and hands back one-time-viewable backup codes for when the phone is unavailable.
+  app.post("/api/auth/mfa/confirm", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { code } = req.body as { code?: string };
+      if (!code) return res.status(400).json({ message: "code is required" });
+      const fresh = await storage.getUser(user.id);
+      if (!fresh?.mfaSecret) return res.status(400).json({ message: "Call /api/auth/mfa/setup first" });
+
+      const secret = decryptSecret(fresh.mfaSecret);
+      if (!verifyTotp(code, secret)) {
+        return res.status(401).json({ message: "Invalid verification code" });
+      }
+
+      const backupCodes = generateBackupCodes();
+      const hashedCodes = await Promise.all(backupCodes.map((c) => bcrypt.hash(c, 10)));
+      await storage.enableUserMfa(user.id, hashedCodes);
+      await storage.writeAuditLog(user.id, "mfa.enabled", "user", user.id, {}, req.ip);
+      res.json({ success: true, backupCodes });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/auth/mfa/disable", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { password } = req.body as { password?: string };
+      if (!password) return res.status(400).json({ message: "password is required to disable MFA" });
+      const fresh = await storage.getUser(user.id);
+      if (!fresh || !(await bcrypt.compare(password, fresh.password))) {
+        return res.status(401).json({ message: "Incorrect password" });
+      }
+      await storage.disableUserMfa(user.id);
+      await storage.writeAuditLog(user.id, "mfa.disabled", "user", user.id, {}, req.ip);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // === GDPR: DATA EXPORT & ACCOUNT DELETION ===
+  app.get("/api/users/me/data-export", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const [profileRaw, bookings, reviews, notifications, verificationDocs] = await Promise.all([
+        storage.getUser(user.id),
+        storage.getUserBookings(user.id),
+        storage.getUserReviews(user.id),
+        storage.getUserNotifications(user.id),
+        storage.getHolderVerificationDocuments("user", user.id),
+      ]);
+      const { password: _pw, mfaSecret: _mfa, mfaBackupCodes: _codes, ...profile } = profileRaw as User;
+      res.json({
+        exportedAt: new Date().toISOString(),
+        profile,
+        bookings,
+        reviews,
+        notifications,
+        verificationDocuments: verificationDocs,
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/users/me/delete-account", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { password } = req.body as { password?: string };
+      if (!password) return res.status(400).json({ message: "password is required to delete your account" });
+      const fresh = await storage.getUser(user.id);
+      if (!fresh || !(await bcrypt.compare(password, fresh.password))) {
+        return res.status(401).json({ message: "Incorrect password" });
+      }
+      await storage.anonymizeUser(user.id);
+      await storage.writeAuditLog(user.id, "account.deleted", "user", user.id, {}, req.ip);
+      req.logout((err) => {
+        if (err) return res.status(500).json({ message: "Deleted but logout failed" });
+        res.json({ success: true });
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
 
   app.post("/api/auth/logout", (req, res) => {
@@ -219,14 +385,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(null);
     }
     const user = req.user as User;
-    const { password: _, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
+    res.json(sanitizeUser(user));
   });
 
   // === USER ROUTES ===
   app.get("/api/users", requireAdmin, async (_req, res) => {
     const allUsers = await storage.getAllUsers();
-    res.json(allUsers.map(({ password: _, ...rest }) => rest));
+    res.json(allUsers.map(sanitizeUser));
   });
 
   // Lets a company look up an existing, not-yet-linked user by phone number before
@@ -259,8 +424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    const { password: _, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
+    res.json(sanitizeUser(user));
   });
 
   // Guest checkout: creates a brand-new account and logs it in immediately. Never accepts
@@ -283,9 +447,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       userData.password = await bcrypt.hash(userData.password, 10);
       const user = await storage.createUser(userData);
-
-      // Sanitize user object before login (remove password hash)
-      const { password: _, ...sanitizedUser } = user;
+      const sanitizedUser = sanitizeUser(user);
 
       // Automatically log in newly created user
       await new Promise<void>((resolve, reject) => {

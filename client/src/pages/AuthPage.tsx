@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Truck, Mail, Phone, Lock, User } from "lucide-react";
+import { Truck, Mail, Phone, Lock, User, ShieldCheck } from "lucide-react";
 import logoPath from "@assets/file_0000000037a86243bd21599fc142fdaa_1760057642535.png";
 
 export default function AuthPage() {
@@ -16,8 +16,10 @@ export default function AuthPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [mfaChallengeToken, setMfaChallengeToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
   const [, setLocation] = useLocation();
-  const { login, register } = useAuth();
+  const { login, verifyMfa, register } = useAuth();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,7 +28,11 @@ export default function AuthPage() {
 
     try {
       if (mode === "login") {
-        await login(email, password);
+        const result = await login(email, password);
+        if (result.mfaRequired && result.challengeToken) {
+          setMfaChallengeToken(result.challengeToken);
+          return;
+        }
         toast({
           title: "Welcome back!",
           description: "You've successfully logged in.",
@@ -49,6 +55,62 @@ export default function AuthPage() {
       setIsLoading(false);
     }
   };
+
+  const handleMfaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaChallengeToken) return;
+    setIsLoading(true);
+    try {
+      await verifyMfa(mfaChallengeToken, mfaCode);
+      toast({ title: "Welcome back!", description: "You've successfully logged in." });
+      setLocation("/");
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Verification failed", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (mfaChallengeToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md p-8 space-y-6">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
+              <ShieldCheck className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold text-foreground">Two-Factor Verification</h1>
+            <p className="text-sm text-muted-foreground">Enter the 6-digit code from your authenticator app, or a backup code.</p>
+          </div>
+          <form onSubmit={handleMfaSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="mfa-code" className="text-sm font-medium">Verification code</Label>
+              <Input
+                id="mfa-code"
+                type="text"
+                placeholder="123456"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+                required
+                data-testid="input-mfa-code"
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading || !mfaCode.trim()} data-testid="button-mfa-submit">
+              {isLoading ? "Verifying..." : "Verify"}
+            </Button>
+          </form>
+          <button
+            type="button"
+            onClick={() => { setMfaChallengeToken(null); setMfaCode(""); }}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-center"
+            data-testid="button-mfa-back"
+          >
+            Back to sign in
+          </button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

@@ -44,6 +44,7 @@ const RoadServices = lazy(() => import("@/pages/RoadServices"));
 const CapacityMarketplace = lazy(() => import("@/pages/CapacityMarketplace"));
 const SkillsProfilePage = lazy(() => import("@/pages/SkillsProfilePage"));
 const ProfessionalServicesPage = lazy(() => import("@/pages/ProfessionalServicesPage"));
+const MessagesPage = lazy(() => import("@/pages/MessagesPage"));
 
 function RouteLoadingFallback() {
   return (
@@ -277,6 +278,7 @@ function Router() {
         <Route path="/capacity" component={CapacityMarketplace} />
         <Route path="/skills-profile" component={SkillsProfilePage} />
         <Route path="/professional-services" component={ProfessionalServicesPage} />
+        <Route path="/messages" component={MessagesPage} />
 
         <Route component={LandingPage} />
       </Switch>

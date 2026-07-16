@@ -218,20 +218,67 @@ export const offers = pgTable("offers", {
 }));
 
 // === CHAT & ATTACHMENTS ===
+// Internal Messaging: a "conversation" generalizes the booking chat thread into any mailbox
+// (company mailbox, support mailbox, direct message) without duplicating the messages table -
+// bookingId on a message keeps working exactly as before for booking chat; conversationId is
+// the new, optional home for everything else (company/support/direct threads).
+export const conversations = pgTable("conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull().default("direct"), // direct, support, company
+  subject: text("subject"),
+  companyId: varchar("company_id").references(() => companies.id), // set for a company mailbox thread
+  status: text("status").notNull().default("open"), // open, archived
+  labels: text("labels").array().default(sql`ARRAY[]::text[]`),
+  lastMessageAt: timestamp("last_message_at").notNull().default(sql`now()`),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("conversations_company_id_idx").on(t.companyId),
+  statusIdx: index("conversations_status_idx").on(t.status),
+}));
+
+export const conversationParticipants = pgTable("conversation_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => conversations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  lastReadAt: timestamp("last_read_at"), // thread-level read receipt
+  archivedAt: timestamp("archived_at"), // per-user archive, independent of the thread's own status
+}, (t) => ({
+  conversationIdIdx: index("conversation_participants_conversation_id_idx").on(t.conversationId),
+  userIdIdx: index("conversation_participants_user_id_idx").on(t.userId),
+  convoUserUnique: unique().on(t.conversationId, t.userId),
+}));
+
+export const messageTemplates = pgTable("message_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id), // null = personal template
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  subject: text("subject"),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("message_templates_company_id_idx").on(t.companyId),
+}));
+
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  bookingId: varchar("booking_id").notNull().references(() => bookings.id),
+  bookingId: varchar("booking_id").references(() => bookings.id), // booking chat (existing behavior, unchanged)
+  conversationId: varchar("conversation_id").references(() => conversations.id), // general mailbox/thread messages
   senderId: varchar("sender_id").notNull().references(() => users.id),
   content: text("content").notNull(),
   type: text("type").default("text"), // text, image, file
+  status: text("status").notNull().default("sent"), // sent, draft
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 }, (t) => ({
   bookingIdIdx: index("messages_booking_id_idx").on(t.bookingId),
+  conversationIdIdx: index("messages_conversation_id_idx").on(t.conversationId),
 }));
 
 export const attachments = pgTable("attachments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  bookingId: varchar("booking_id").notNull().references(() => bookings.id),
+  bookingId: varchar("booking_id").references(() => bookings.id),
+  conversationId: varchar("conversation_id").references(() => conversations.id),
   messageId: varchar("message_id").references(() => messages.id),
   uploaderId: varchar("uploader_id").notNull().references(() => users.id),
   fileName: text("file_name").notNull(),
@@ -242,6 +289,7 @@ export const attachments = pgTable("attachments", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 }, (t) => ({
   bookingIdIdx: index("attachments_booking_id_idx").on(t.bookingId),
+  conversationIdIdx: index("attachments_conversation_id_idx").on(t.conversationId),
 }));
 
 // === REVIEWS ===
@@ -675,7 +723,7 @@ export const verificationDocuments = pgTable("verification_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   holderType: text("holder_type").notNull(), // user, driver, company
   holderId: varchar("holder_id").notNull(),
-  docType: text("doc_type").notNull(), // id_card, selfie, drivers_license, company_registration, insurance_certificate, vehicle_registration, or a Skills Engine certification name (SEP, Gas, UDT, Forklift, Crane, HDS, Electrical, Construction, ...)
+  docType: text("doc_type").notNull(), // id_card, selfie, drivers_license, company_registration, insurance_certificate, vehicle_registration, passport, work_permit, residence_permit, medical_certificate, country_license, or a Skills Engine certification name (SEP, Gas, UDT, Forklift, Crane, HDS, Construction, ADR, Hydraulic)
   fileUrl: text("file_url").notNull(),
   status: text("status").notNull().default("pending"), // pending, approved, rejected, expired
   submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
@@ -684,9 +732,28 @@ export const verificationDocuments = pgTable("verification_documents", {
   rejectionReason: text("rejection_reason"),
   expiresAt: timestamp("expires_at"),
   expiryNotifiedAt: timestamp("expiry_notified_at"), // set once an expiring-soon notification has been sent, so the sweep doesn't re-notify every run
+  issueDate: timestamp("issue_date"),
+  docNumber: text("doc_number"),
+  country: text("country"), // ISO 3166-1 alpha-2, e.g. "PL", "DE" - the issuing/applicable country
+  authority: text("authority"), // issuing authority/agency name
+  verificationSource: text("verification_source").notNull().default("manual"), // manual, ocr - how the metadata on this document was populated
+  ocrExtractedData: jsonb("ocr_extracted_data"), // raw structured fields the OCR pass extracted, kept for audit even after a human edits the reviewed fields
 }, (t) => ({
   holderIdx: index("verification_documents_holder_idx").on(t.holderType, t.holderId),
   statusIdx: index("verification_documents_status_idx").on(t.status),
+}));
+
+// Every re-upload/renewal of a verificationDocuments row is preserved here rather than
+// overwritten, so a compliance reviewer can see the full history of a license/document.
+export const documentVersions = pgTable("document_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => verificationDocuments.id),
+  fileUrl: text("file_url").notNull(),
+  uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
+  note: text("note"), // e.g. "renewal", "corrected scan"
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  documentIdIdx: index("document_versions_document_id_idx").on(t.documentId),
 }));
 
 // === FRAUD PREVENTION ===
@@ -966,11 +1033,29 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
   id: true,
   createdAt: true,
   type: true,
+}).refine((m) => Boolean(m.bookingId) || Boolean(m.conversationId), {
+  message: "Either bookingId or conversationId is required",
 });
 
 export const insertAttachmentSchema = createInsertSchema(attachments).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({
+  id: true,
+  createdAt: true,
+  lastMessageAt: true,
+  createdBy: true,
+}).extend({
+  type: z.enum(["direct", "support", "company"]).default("direct"),
+  participantIds: z.array(z.string()).min(1),
+});
+
+export const insertMessageTemplateSchema = createInsertSchema(messageTemplates).omit({
+  id: true,
+  createdAt: true,
+  createdBy: true,
 });
 
 export const insertReviewSchema = createInsertSchema(reviews).omit({
@@ -1206,9 +1291,16 @@ export const insertVerificationDocumentSchema = createInsertSchema(verificationD
   // certification a skill requires has to actually be an uploadable docType.
   docType: z.enum([
     "id_card", "selfie", "drivers_license", "company_registration", "insurance_certificate", "vehicle_registration",
+    "passport", "work_permit", "residence_permit", "medical_certificate", "country_license",
     "SEP", "Gas", "Hydraulic", "UDT", "Forklift", "Crane", "HDS", "Construction", "ADR",
   ]),
   expiresAt: z.coerce.date().optional(),
+  issueDate: z.coerce.date().optional(),
+});
+
+export const insertDocumentVersionSchema = createInsertSchema(documentVersions).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
@@ -1301,6 +1393,13 @@ export type Message = typeof messages.$inferSelect;
 export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
 export type Attachment = typeof attachments.$inferSelect;
 
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+export type ConversationParticipant = typeof conversationParticipants.$inferSelect;
+
+export type InsertMessageTemplate = z.infer<typeof insertMessageTemplateSchema>;
+export type MessageTemplate = typeof messageTemplates.$inferSelect;
+
 export type InsertReview = z.infer<typeof insertReviewSchema>;
 export type Review = typeof reviews.$inferSelect;
 
@@ -1386,6 +1485,9 @@ export type Call = typeof calls.$inferSelect;
 
 export type InsertVerificationDocument = z.infer<typeof insertVerificationDocumentSchema>;
 export type VerificationDocument = typeof verificationDocuments.$inferSelect;
+
+export type InsertDocumentVersion = z.infer<typeof insertDocumentVersionSchema>;
+export type DocumentVersion = typeof documentVersions.$inferSelect;
 
 export type DeviceFingerprint = typeof deviceFingerprints.$inferSelect;
 export type RiskScore = typeof riskScores.$inferSelect;

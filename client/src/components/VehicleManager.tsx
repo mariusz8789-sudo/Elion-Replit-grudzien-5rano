@@ -359,7 +359,10 @@ export default function VehicleManager({ companyId }: { companyId: string }) {
         docTypes={[
           { value: "company_registration", label: "Company Registration" },
           { value: "insurance_certificate", label: "Insurance Certificate" },
+          { value: "vehicle_registration", label: "Vehicle Registration" },
+          { value: "country_license", label: "Country-Specific License" },
         ]}
+        collectExpiry
       />
 
       <ApiKeysPanel companyId={companyId} />

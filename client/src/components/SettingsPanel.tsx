@@ -207,7 +207,13 @@ export default function SettingsPanel() {
           docTypes={[
             { value: "id_card", label: "Government ID" },
             { value: "selfie", label: "Selfie" },
+            { value: "passport", label: "Passport" },
+            { value: "drivers_license", label: "Driving Licence" },
+            { value: "work_permit", label: "Work Permit" },
+            { value: "residence_permit", label: "Residence Permit" },
+            { value: "medical_certificate", label: "Medical Certificate" },
           ]}
+          collectExpiry
         />
       )}
     </div>

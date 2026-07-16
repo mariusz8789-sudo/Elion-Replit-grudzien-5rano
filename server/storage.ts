@@ -9,6 +9,8 @@ import {
   type Offer, type InsertOffer,
   type Message, type InsertMessage,
   type Attachment, type InsertAttachment,
+  type Conversation, type InsertConversation,
+  type MessageTemplate, type InsertMessageTemplate,
   type Review, type InsertReview,
   type TrackingUpdate, type InsertTrackingUpdate,
   type Notification, type InsertNotification,
@@ -27,6 +29,7 @@ import {
   type MessageTranslation,
   type Call, type InsertCall,
   type VerificationDocument, type InsertVerificationDocument,
+  type DocumentVersion,
   type DeviceFingerprint,
   type RiskScore,
   type AuditLog,
@@ -42,11 +45,11 @@ import {
   type RecurringRouteSubscription, type InsertRecurringRouteSubscription,
   type CompanyService, type InsertCompanyService,
   users, companies, drivers, vehicles, services, bookings, quotes, offers,
-  messages, attachments, reviews, trackingUpdates, notifications,
+  messages, attachments, conversations, conversationParticipants, messageTemplates, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
   badges, badgeAwards, coupons, couponRedemptions, referralRewards, bookingTransfers,
   driverAvailability, driverTimeOff, calendarConnections, cargoItems, messageTranslations,
-  calls, verificationDocuments, deviceFingerprints, riskScores, auditLogs,
+  calls, verificationDocuments, documentVersions, deviceFingerprints, riskScores, auditLogs,
   apiKeys, webhookSubscriptions, webhookDeliveries,
   capacityPostings, capacityBookings, environmentalCalculations,
   skills, workerProfiles, workerSkills, recurringRouteSubscriptions, companyServices
@@ -71,6 +74,7 @@ export interface EnterpriseDashboard {
 export interface IStorage {
   // User operations
   getAllUsers(): Promise<User[]>;
+  getUsersByRole(role: string): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
   getUserByPhone(phone: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -130,7 +134,25 @@ export interface IStorage {
   // Message operations
   getBookingMessages(bookingId: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
-  
+
+  // Internal Messaging: conversations generalize booking chat into company/support/direct
+  // mailboxes - reuses the same messages table (conversationId instead of bookingId).
+  createConversation(data: InsertConversation, createdBy: string): Promise<Conversation>;
+  getConversation(id: string): Promise<Conversation | undefined>;
+  getUserConversations(userId: string, includeArchived?: boolean): Promise<Array<Conversation & { unreadCount: number }>>;
+  isConversationParticipant(conversationId: string, userId: string): Promise<boolean>;
+  getConversationParticipantIds(conversationId: string): Promise<string[]>;
+  getConversationMessages(conversationId: string): Promise<Message[]>;
+  createConversationMessage(conversationId: string, senderId: string, content: string, status?: "sent" | "draft"): Promise<Message>;
+  markConversationRead(conversationId: string, userId: string): Promise<void>;
+  setConversationArchived(conversationId: string, userId: string, archived: boolean): Promise<void>;
+  setConversationStatus(conversationId: string, status: "open" | "archived"): Promise<Conversation | undefined>;
+  setConversationLabels(conversationId: string, labels: string[]): Promise<Conversation | undefined>;
+  searchUserMessages(userId: string, query: string): Promise<Array<Message & { conversationSubject: string | null }>>;
+  createMessageTemplate(data: InsertMessageTemplate, createdBy: string): Promise<MessageTemplate>;
+  getMessageTemplates(companyId: string | undefined, userId: string): Promise<MessageTemplate[]>;
+  deleteMessageTemplate(id: string, userId: string): Promise<boolean>;
+
   // Support chat operations
   getSupportMessages(bookingId: string): Promise<any[]>;
   createSupportMessage(data: any): Promise<any>;
@@ -306,6 +328,11 @@ export interface IStorage {
   getHolderVerificationDocuments(holderType: string, holderId: string): Promise<VerificationDocument[]>;
   getPendingVerificationDocuments(): Promise<VerificationDocument[]>;
   reviewVerificationDocument(id: string, status: "approved" | "rejected", reviewedBy: string, rejectionReason?: string): Promise<VerificationDocument | undefined>;
+  getVerificationDocument(id: string): Promise<VerificationDocument | undefined>;
+  createDocumentVersion(documentId: string, fileUrl: string, uploadedBy: string, note?: string): Promise<DocumentVersion>;
+  getDocumentVersions(documentId: string): Promise<DocumentVersion[]>;
+  renewVerificationDocument(id: string, uploadedBy: string, newFileUrl: string, note?: string): Promise<VerificationDocument | undefined>;
+  updateVerificationDocumentMetadata(id: string, updates: { issueDate?: Date; docNumber?: string; country?: string; authority?: string; verificationSource?: string; ocrExtractedData?: unknown; expiresAt?: Date }): Promise<VerificationDocument | undefined>;
 
   // Fraud prevention operations
   recordDeviceFingerprint(userId: string, fingerprintHash: string, userAgent: string | undefined, ipAddress: string | undefined): Promise<DeviceFingerprint>;
@@ -332,6 +359,10 @@ export class DbStorage implements IStorage {
   // === USER OPERATIONS ===
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(desc(users.createdAt)).limit(500);
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, role));
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -712,6 +743,132 @@ export class DbStorage implements IStorage {
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
     const result = await db.insert(messages).values(insertMessage).returning();
     return result[0];
+  }
+
+  // === INTERNAL MESSAGING (CONVERSATIONS) ===
+  async createConversation(data: InsertConversation, createdBy: string): Promise<Conversation> {
+    const { participantIds, ...rest } = data;
+    const result = await db.insert(conversations).values({ ...rest, createdBy }).returning();
+    const conversation = result[0];
+
+    const uniqueParticipantIds = Array.from(new Set([...participantIds, createdBy]));
+    await db.insert(conversationParticipants)
+      .values(uniqueParticipantIds.map((userId) => ({ conversationId: conversation.id, userId })))
+      .onConflictDoNothing({ target: [conversationParticipants.conversationId, conversationParticipants.userId] });
+
+    return conversation;
+  }
+
+  async getConversation(id: string): Promise<Conversation | undefined> {
+    const result = await db.select().from(conversations).where(eq(conversations.id, id));
+    return result[0];
+  }
+
+  async getUserConversations(userId: string, includeArchived = false): Promise<Array<Conversation & { unreadCount: number }>> {
+    const conditions = [eq(conversationParticipants.userId, userId)];
+    if (!includeArchived) conditions.push(isNull(conversationParticipants.archivedAt));
+
+    const rows = await db.select({ conversation: conversations, participant: conversationParticipants })
+      .from(conversationParticipants)
+      .innerJoin(conversations, eq(conversationParticipants.conversationId, conversations.id))
+      .where(and(...conditions))
+      .orderBy(desc(conversations.lastMessageAt));
+
+    return Promise.all(rows.map(async (r) => {
+      const unreadResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(messages)
+        .where(and(
+          eq(messages.conversationId, r.conversation.id),
+          eq(messages.status, "sent"),
+          r.participant.lastReadAt ? sql`${messages.createdAt} > ${r.participant.lastReadAt}` : sql`true`,
+          sql`${messages.senderId} != ${userId}`,
+        ));
+      return { ...r.conversation, unreadCount: Number(unreadResult[0]?.count ?? 0) };
+    }));
+  }
+
+  async isConversationParticipant(conversationId: string, userId: string): Promise<boolean> {
+    const result = await db.select().from(conversationParticipants)
+      .where(and(eq(conversationParticipants.conversationId, conversationId), eq(conversationParticipants.userId, userId)));
+    return result.length > 0;
+  }
+
+  async getConversationParticipantIds(conversationId: string): Promise<string[]> {
+    const rows = await db.select({ userId: conversationParticipants.userId }).from(conversationParticipants)
+      .where(eq(conversationParticipants.conversationId, conversationId));
+    return rows.map((r) => r.userId);
+  }
+
+  async getConversationMessages(conversationId: string): Promise<Message[]> {
+    const recent = await db.select().from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(desc(messages.createdAt))
+      .limit(500);
+    return recent.reverse();
+  }
+
+  async createConversationMessage(conversationId: string, senderId: string, content: string, status: "sent" | "draft" = "sent"): Promise<Message> {
+    const result = await db.insert(messages).values({ conversationId, senderId, content, status }).returning();
+    if (status === "sent") {
+      await db.update(conversations).set({ lastMessageAt: new Date() }).where(eq(conversations.id, conversationId));
+    }
+    return result[0];
+  }
+
+  async markConversationRead(conversationId: string, userId: string): Promise<void> {
+    await db.update(conversationParticipants)
+      .set({ lastReadAt: new Date() })
+      .where(and(eq(conversationParticipants.conversationId, conversationId), eq(conversationParticipants.userId, userId)));
+  }
+
+  async setConversationArchived(conversationId: string, userId: string, archived: boolean): Promise<void> {
+    await db.update(conversationParticipants)
+      .set({ archivedAt: archived ? new Date() : null })
+      .where(and(eq(conversationParticipants.conversationId, conversationId), eq(conversationParticipants.userId, userId)));
+  }
+
+  async setConversationStatus(conversationId: string, status: "open" | "archived"): Promise<Conversation | undefined> {
+    const result = await db.update(conversations).set({ status }).where(eq(conversations.id, conversationId)).returning();
+    return result[0];
+  }
+
+  async setConversationLabels(conversationId: string, labels: string[]): Promise<Conversation | undefined> {
+    const result = await db.update(conversations).set({ labels }).where(eq(conversations.id, conversationId)).returning();
+    return result[0];
+  }
+
+  async searchUserMessages(userId: string, query: string): Promise<Array<Message & { conversationSubject: string | null }>> {
+    const rows = await db.select({ message: messages, conversation: conversations })
+      .from(messages)
+      .innerJoin(conversationParticipants, eq(messages.conversationId, conversationParticipants.conversationId))
+      .leftJoin(conversations, eq(messages.conversationId, conversations.id))
+      .where(and(
+        eq(conversationParticipants.userId, userId),
+        eq(messages.status, "sent"),
+        ilike(messages.content, `%${query}%`),
+      ))
+      .orderBy(desc(messages.createdAt))
+      .limit(100);
+    return rows.map((r) => ({ ...r.message, conversationSubject: r.conversation?.subject ?? null }));
+  }
+
+  async createMessageTemplate(data: InsertMessageTemplate, createdBy: string): Promise<MessageTemplate> {
+    const result = await db.insert(messageTemplates).values({ ...data, createdBy }).returning();
+    return result[0];
+  }
+
+  async getMessageTemplates(companyId: string | undefined, userId: string): Promise<MessageTemplate[]> {
+    const conditions = companyId
+      ? sql`(${messageTemplates.companyId} = ${companyId} OR ${messageTemplates.createdBy} = ${userId})`
+      : eq(messageTemplates.createdBy, userId);
+    return await db.select().from(messageTemplates).where(conditions).orderBy(desc(messageTemplates.createdAt));
+  }
+
+  async deleteMessageTemplate(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(messageTemplates)
+      .where(and(eq(messageTemplates.id, id), eq(messageTemplates.createdBy, userId)))
+      .returning();
+    return result.length > 0;
   }
 
   // === SUPPORT CHAT OPERATIONS ===
@@ -1913,6 +2070,11 @@ export class DbStorage implements IStorage {
       .orderBy(desc(verificationDocuments.submittedAt));
   }
 
+  async getVerificationDocument(id: string): Promise<VerificationDocument | undefined> {
+    const result = await db.select().from(verificationDocuments).where(eq(verificationDocuments.id, id));
+    return result[0];
+  }
+
   async getPendingVerificationDocuments(): Promise<VerificationDocument[]> {
     return await db.select().from(verificationDocuments)
       .where(eq(verificationDocuments.status, "pending"))
@@ -1927,6 +2089,52 @@ export class DbStorage implements IStorage {
   ): Promise<VerificationDocument | undefined> {
     const result = await db.update(verificationDocuments)
       .set({ status, reviewedBy, reviewedAt: new Date(), rejectionReason })
+      .where(eq(verificationDocuments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createDocumentVersion(documentId: string, fileUrl: string, uploadedBy: string, note?: string): Promise<DocumentVersion> {
+    const result = await db.insert(documentVersions)
+      .values({ documentId, fileUrl, uploadedBy, note: note ?? null })
+      .returning();
+    return result[0];
+  }
+
+  async getDocumentVersions(documentId: string): Promise<DocumentVersion[]> {
+    return await db.select().from(documentVersions)
+      .where(eq(documentVersions.documentId, documentId))
+      .orderBy(desc(documentVersions.createdAt));
+  }
+
+  // Renewing a document (re-upload of an expiring/expired/rejected license) preserves the prior
+  // file as a version, then resets the document to a fresh pending review - the same document
+  // row keeps its holder/docType identity rather than creating a duplicate row per renewal.
+  async renewVerificationDocument(id: string, uploadedBy: string, newFileUrl: string, note?: string): Promise<VerificationDocument | undefined> {
+    const existing = await db.select().from(verificationDocuments).where(eq(verificationDocuments.id, id));
+    const doc = existing[0];
+    if (!doc) return undefined;
+
+    await this.createDocumentVersion(id, doc.fileUrl, uploadedBy, note ?? "renewal");
+
+    const result = await db.update(verificationDocuments)
+      .set({
+        fileUrl: newFileUrl,
+        status: "pending",
+        reviewedBy: null,
+        reviewedAt: null,
+        rejectionReason: null,
+        expiryNotifiedAt: null,
+        submittedAt: new Date(),
+      })
+      .where(eq(verificationDocuments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateVerificationDocumentMetadata(id: string, updates: { issueDate?: Date; docNumber?: string; country?: string; authority?: string; verificationSource?: string; ocrExtractedData?: unknown; expiresAt?: Date }): Promise<VerificationDocument | undefined> {
+    const result = await db.update(verificationDocuments)
+      .set(updates)
       .where(eq(verificationDocuments.id, id))
       .returning();
     return result[0];

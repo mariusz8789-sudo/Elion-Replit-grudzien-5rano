@@ -12,6 +12,7 @@ import {
   insertServiceSchema, insertBookingSchema, insertQuoteSchema, insertUserSchema,
   insertCompanySchema, insertDriverSchema, insertVehicleSchema, insertOfferSchema,
   insertMessageSchema, insertAttachmentSchema, insertReviewSchema,
+  insertConversationSchema, insertMessageTemplateSchema,
   insertTrackingUpdateSchema, insertNotificationSchema, insertMarketplaceListingSchema,
   insertSharedRideSchema, insertStaffSharingSchema,
   insertResourceSharingSchema, insertAnnouncementSchema, insertCouponSchema,
@@ -34,6 +35,7 @@ import { dispatchWebhookEvent } from "./services/webhooks";
 import { rankCrewCandidates, CREW_MATCH_METHODOLOGY, type CrewCandidate, type ScoredCrewCandidate } from "@shared/crewMatching";
 import { haversineDistanceKm } from "@shared/geo";
 import { AI_OPERATIONS_ROLES, getAiOperationsReply } from "./services/aiOperations";
+import { extractDocumentFields } from "./services/documentOcr";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
 import { validateDataUrl } from "./lib/dataUrl";
@@ -979,7 +981,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user as User;
       const messageData = insertMessageSchema.parse({ ...req.body, senderId: user.id });
-      const booking = await storage.getBooking(messageData.bookingId);
+      // This route is specifically for booking chat (general conversations use
+      // /api/conversations/:id/messages instead) - bookingId is required here even though the
+      // schema itself now allows either bookingId or conversationId.
+      if (!messageData.bookingId) {
+        return res.status(400).json({ message: "bookingId is required" });
+      }
+      const bookingId = messageData.bookingId;
+      const booking = await storage.getBooking(bookingId);
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
@@ -989,14 +998,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = await storage.createMessage(messageData);
       // Push to the booking's WebSocket subscribers (e.g. the other chat participant) so
       // BookingChat.tsx's live-update listener actually has something to react to.
-      getBroadcaster()?.broadcastToBooking(messageData.bookingId, {
+      getBroadcaster()?.broadcastToBooking(bookingId, {
         type: "message",
-        bookingId: messageData.bookingId,
+        bookingId,
       });
       res.status(201).json(message);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
+  });
+
+  // === INTERNAL MESSAGING (CONVERSATIONS: company/support/direct mailboxes) ===
+  app.post("/api/conversations", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const data = insertConversationSchema.parse(req.body);
+      const conversation = await storage.createConversation(data, user.id);
+      res.status(201).json(conversation);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Reuses (rather than duplicates) an existing open support thread for this user so repeated
+  // "Contact Support" clicks land in the same conversation instead of spawning a new one each time.
+  app.post("/api/conversations/support", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { subject } = req.body as { subject?: string };
+      const existing = await storage.getUserConversations(user.id, false);
+      const openSupport = existing.find((c) => c.type === "support" && c.status === "open");
+      if (openSupport) {
+        return res.json(openSupport);
+      }
+      const admins = await storage.getUsersByRole("admin");
+      const conversation = await storage.createConversation({
+        type: "support",
+        subject: subject || "Support request",
+        participantIds: admins.map((a) => a.id),
+      }, user.id);
+      res.status(201).json(conversation);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/conversations", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const includeArchived = req.query.includeArchived === "true";
+    res.json(await storage.getUserConversations(user.id, includeArchived));
+  });
+
+  app.get("/api/conversations/:id/messages", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!(await storage.isConversationParticipant(req.params.id, user.id))) {
+      return res.status(403).json({ message: "Not a participant in this conversation" });
+    }
+    res.json(await storage.getConversationMessages(req.params.id));
+  });
+
+  app.post("/api/conversations/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (!(await storage.isConversationParticipant(req.params.id, user.id))) {
+        return res.status(403).json({ message: "Not a participant in this conversation" });
+      }
+      const { content, status } = req.body as { content: string; status?: "sent" | "draft" };
+      if (!content) return res.status(400).json({ message: "content is required" });
+      const message = await storage.createConversationMessage(req.params.id, user.id, content, status);
+      if (message.status === "sent") {
+        const participantIds = await storage.getConversationParticipantIds(req.params.id);
+        for (const participantId of participantIds) {
+          getBroadcaster()?.broadcastToUser(participantId, { type: "conversation_message", conversationId: req.params.id });
+        }
+      }
+      res.status(201).json(message);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/conversations/:id/read", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!(await storage.isConversationParticipant(req.params.id, user.id))) {
+      return res.status(403).json({ message: "Not a participant in this conversation" });
+    }
+    await storage.markConversationRead(req.params.id, user.id);
+    res.json({ ok: true });
+  });
+
+  app.post("/api/conversations/:id/archive", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!(await storage.isConversationParticipant(req.params.id, user.id))) {
+      return res.status(403).json({ message: "Not a participant in this conversation" });
+    }
+    const { archived } = req.body as { archived: boolean };
+    await storage.setConversationArchived(req.params.id, user.id, Boolean(archived));
+    res.json({ ok: true });
+  });
+
+  app.patch("/api/conversations/:id/status", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!(await storage.isConversationParticipant(req.params.id, user.id))) {
+      return res.status(403).json({ message: "Not a participant in this conversation" });
+    }
+    const { status } = req.body as { status: "open" | "archived" };
+    if (status !== "open" && status !== "archived") {
+      return res.status(400).json({ message: "status must be 'open' or 'archived'" });
+    }
+    const updated = await storage.setConversationStatus(req.params.id, status);
+    res.json(updated);
+  });
+
+  app.patch("/api/conversations/:id/labels", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!(await storage.isConversationParticipant(req.params.id, user.id))) {
+      return res.status(403).json({ message: "Not a participant in this conversation" });
+    }
+    const { labels } = req.body as { labels: string[] };
+    if (!Array.isArray(labels)) return res.status(400).json({ message: "labels must be an array" });
+    const updated = await storage.setConversationLabels(req.params.id, labels);
+    res.json(updated);
+  });
+
+  app.get("/api/messages/search", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const { q } = req.query as { q?: string };
+    if (!q) return res.status(400).json({ message: "q is required" });
+    res.json(await storage.searchUserMessages(user.id, q));
+  });
+
+  app.post("/api/message-templates", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const data = insertMessageTemplateSchema.parse(req.body);
+      const template = await storage.createMessageTemplate(data, user.id);
+      res.status(201).json(template);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/message-templates", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const companyId = user.companyId ?? undefined;
+    res.json(await storage.getMessageTemplates(companyId, user.id));
+  });
+
+  app.delete("/api/message-templates/:id", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const deleted = await storage.deleteMessageTemplate(req.params.id, user.id);
+    if (!deleted) return res.status(404).json({ message: "Template not found" });
+    res.status(204).send();
   });
 
   // === SUPPORT CHAT ROUTES ===
@@ -1049,6 +1202,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const attachmentData = insertAttachmentSchema.parse({ ...req.body, uploaderId: user.id });
       if (attachmentData.fileUrl.startsWith("data:")) {
         validateDataUrl(attachmentData.fileUrl, { allowedMimeTypes: DOCUMENT_MIME_TYPES, maxBytes: MAX_UPLOAD_BYTES });
+      }
+      if (!attachmentData.bookingId) {
+        return res.status(400).json({ message: "bookingId is required" });
       }
       const booking = await storage.getBooking(attachmentData.bookingId);
       if (!booking) {
@@ -3007,6 +3163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(messages.id, req.params.messageId));
       const message = messageResult[0];
       if (!message) return res.status(404).json({ message: "Message not found" });
+      if (!message.bookingId) return res.status(400).json({ message: "Only booking chat messages can be translated" });
 
       const messageBooking = await storage.getBooking(message.bookingId);
       if (!messageBooking || !(await userCanAccessBooking(req.user as User, messageBooking))) {
@@ -3087,6 +3244,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Registered before the /:holderType/:holderId route below - both are 2-segment GET routes
+  // under the same base path, and Express matches in registration order, so this specific route
+  // must come first or "/verification-documents/<docId>/versions" would be misrouted with
+  // holderType=<docId> and holderId="versions".
+  app.get("/api/verification-documents/:id/versions", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const doc = await storage.getVerificationDocument(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+    if (!(await userCanAccessVerificationHolder(user, doc.holderType, doc.holderId))) {
+      return res.status(403).json({ message: "Not authorized to view this document's history" });
+    }
+    res.json(await storage.getDocumentVersions(req.params.id));
+  });
+
   app.get("/api/verification-documents/:holderType/:holderId", requireAuth, async (req, res) => {
     const user = req.user as User;
     if (!(await userCanAccessVerificationHolder(user, req.params.holderType, req.params.holderId))) {
@@ -3115,6 +3286,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.verifyCompany(updated.holderId, true);
     }
     res.json(updated);
+  });
+
+  // === DOCUMENT & LICENSE CENTER ===
+  // Renewal: re-uploading an expiring/expired/rejected document preserves the old file as a
+  // version and resets the same row to pending review, rather than creating a duplicate document.
+  app.post("/api/verification-documents/:id/renew", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const doc = await storage.getVerificationDocument(req.params.id);
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      if (!(await userCanAccessVerificationHolder(user, doc.holderType, doc.holderId))) {
+        return res.status(403).json({ message: "Not authorized to renew this document" });
+      }
+      const { fileUrl, note } = req.body as { fileUrl: string; note?: string };
+      if (!fileUrl) return res.status(400).json({ message: "fileUrl is required" });
+      if (fileUrl.startsWith("data:")) {
+        validateDataUrl(fileUrl, { allowedMimeTypes: DOCUMENT_MIME_TYPES, maxBytes: MAX_UPLOAD_BYTES });
+      }
+      const renewed = await storage.renewVerificationDocument(req.params.id, user.id, fileUrl, note);
+      await storage.writeAuditLog(user.id, "document.renew", "verification_document", req.params.id, { note }, req.ip);
+      res.json(renewed);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // AI OCR extraction: never auto-approves - only pre-fills metadata for the holder/reviewer to
+  // confirm, matching the existing manual review workflow.
+  app.post("/api/verification-documents/:id/ocr", requireAuth, aiLimiter, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const doc = await storage.getVerificationDocument(req.params.id);
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      if (!(await userCanAccessVerificationHolder(user, doc.holderType, doc.holderId))) {
+        return res.status(403).json({ message: "Not authorized to OCR this document" });
+      }
+      const extracted = await extractDocumentFields(doc.fileUrl);
+      const updated = await storage.updateVerificationDocumentMetadata(req.params.id, {
+        docNumber: extracted.docNumber ?? undefined,
+        issueDate: extracted.issueDate ? new Date(extracted.issueDate) : undefined,
+        expiresAt: extracted.expiryDate ? new Date(extracted.expiryDate) : undefined,
+        country: extracted.country ?? undefined,
+        authority: extracted.authority ?? undefined,
+        verificationSource: "ocr",
+        ocrExtractedData: extracted.raw,
+      });
+      await storage.writeAuditLog(user.id, "document.ocr", "verification_document", req.params.id, { confidence: extracted.confidence }, req.ip);
+      res.json({ document: updated, extracted });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/verification-documents/:id/metadata", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const doc = await storage.getVerificationDocument(req.params.id);
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      if (!(await userCanAccessVerificationHolder(user, doc.holderType, doc.holderId))) {
+        return res.status(403).json({ message: "Not authorized to edit this document" });
+      }
+      const { issueDate, expiresAt, docNumber, country, authority } = req.body as {
+        issueDate?: string; expiresAt?: string; docNumber?: string; country?: string; authority?: string;
+      };
+      const updated = await storage.updateVerificationDocumentMetadata(req.params.id, {
+        issueDate: issueDate ? new Date(issueDate) : undefined,
+        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+        docNumber,
+        country,
+        authority,
+        verificationSource: "manual",
+      });
+      await storage.writeAuditLog(user.id, "document.metadata_edit", "verification_document", req.params.id, req.body, req.ip);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
 
   // === FRAUD PREVENTION ===

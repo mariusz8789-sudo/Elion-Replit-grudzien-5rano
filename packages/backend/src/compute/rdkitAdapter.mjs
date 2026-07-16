@@ -113,7 +113,25 @@ export function embed3d(smiles, seed = 42) {
   try {
     const r = invoke({ cmd: 'embed3d', smiles: String(smiles ?? ''), seed }, 20_000);
     return r.ok
-      ? { ok: true, atoms: r.atoms, forceField: r.forceField, charge: r.charge, nAtoms: r.nAtoms, canonicalSmiles: r.canonicalSmiles }
+      ? { ok: true, atoms: r.atoms, bonds: r.bonds, forceField: r.forceField, charge: r.charge, nAtoms: r.nAtoms, canonicalSmiles: r.canonicalSmiles }
+      : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/**
+ * Real 2D depiction (publication-quality) from SMILES via RDKit's own renderer.
+ * Returns a self-contained, transparent-background SVG string for inline display.
+ * `{ ok, svg, width, height, canonicalSmiles, molecularFormula }`.
+ */
+export function depict2d(smiles, { width = 420, height = 320 } = {}) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'depict2d', smiles: String(smiles ?? ''), width, height }, 20_000);
+    return r.ok
+      ? { ok: true, svg: r.svg, width: r.width, height: r.height, canonicalSmiles: r.canonicalSmiles, molecularFormula: r.molecularFormula, engine: r.engine }
       : { ok: false, error: r.error };
   } catch (err) {
     return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };

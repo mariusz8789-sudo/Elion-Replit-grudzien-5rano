@@ -479,6 +479,18 @@ export async function buildInvestorPackage(dossier: unknown, validation: unknown
   return r.ok ? { ok: true, data: r.data.package } : r;
 }
 
+export interface MoleculeAtom { element: string; x: number; y: number; z: number }
+export interface MoleculeBond { a: number; b: number; order: number }
+export interface MoleculeRender {
+  smiles: string;
+  depiction2d: { ok: boolean; svg?: string; width?: number; height?: number; canonicalSmiles?: string; molecularFormula?: string; error?: string; reason?: string };
+  model3d: { ok: boolean; atoms?: MoleculeAtom[]; bonds?: MoleculeBond[]; forceField?: string; charge?: number; nAtoms?: number; canonicalSmiles?: string; error?: string; reason?: string } | null;
+}
+/** Real molecular rendering (Candidate Viewer): RDKit 2D SVG + 3D coords/bonds. */
+export async function renderMolecule(smiles: string, mode: '2d' | 'both' = 'both'): Promise<ApiResult<MoleculeRender>> {
+  return request<MoleculeRender>('POST', '/science/molecule/render', { body: { smiles, mode } });
+}
+
 export async function listTargets(token: string, projectId: string): Promise<ApiResult<Target[]>> {
   const r = await request<{ targets: Target[] }>('GET', `/projects/${projectId}/targets`, { token });
   return r.ok ? { ok: true, data: r.data.targets } : r;

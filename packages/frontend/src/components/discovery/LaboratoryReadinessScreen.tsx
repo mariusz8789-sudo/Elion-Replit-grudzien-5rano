@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { DiscoveryShell, Panel, StatusPill } from './DiscoveryShell';
 import { RadarChart } from '../charts/Charts';
 import { Icon } from '../Icon';
+import { MoleculeViewer } from './MoleculeViewer';
 import { buildLabReadiness, type LabReadiness } from '../../core/backend/client';
 
 const EXAMPLES: { name: string; smiles: string }[] = [
@@ -66,6 +67,10 @@ export function LaboratoryReadinessScreen() {
 
       {d ? (
         <>
+          <Panel title="Struktura molekularna (realny render RDKit)" icon="molecule" className="ds-mt" right={<StatusPill kind="info">2D / 3D</StatusPill>}>
+            <MoleculeViewer smiles={d.identity.smiles} title={d.proposedStructure.molecularFormula} />
+          </Panel>
+
           <div className="ds-grid ds-grid-2 ds-mt">
             <Panel title="Tożsamość i masa" icon="target">
               <dl className="ds-defs">

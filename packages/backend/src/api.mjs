@@ -178,6 +178,16 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'laboratory-readiness' && seg.length === 2 && method === 'POST') return ok({ readiness: buildLaboratoryReadiness(body?.candidate ?? {}, { scientificQuestion: body?.scientificQuestion ?? null }) });
     // Investor Edition — deterministic investor/pharma/grant/IP package from real campaign+validation data.
     if (seg[1] === 'investor-package' && seg.length === 2 && method === 'POST') return ok({ package: generateInvestorPackage({ dossier: body?.dossier ?? null, validation: body?.validation ?? null, meta: body?.meta ?? {} }) });
+    // Candidate Viewer — REAL molecular rendering from a SMILES: 2D depiction (RDKit SVG)
+    // and/or 3D coordinates + bonds (ETKDG embed + MMFF/UFF). Never fabricated; RDKit-gated.
+    if (seg[1] === 'molecule' && seg[2] === 'render' && seg.length === 3 && method === 'POST') {
+      const smiles = String(body?.smiles ?? '');
+      if (!smiles) return err(400, 'invalid_input', 'SMILES required');
+      const want3d = body?.mode !== '2d';
+      const two = rdkitAdapter.depict2d(smiles, { width: body?.width ?? 440, height: body?.height ?? 340 });
+      const three = want3d ? rdkitAdapter.embed3d(smiles) : null;
+      return ok({ smiles, depiction2d: two, model3d: three });
+    }
     return err(404, 'not_found');
   }
 

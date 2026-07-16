@@ -93,3 +93,29 @@ describe('science V5 — unknown route', () => {
     assert.equal(call('GET', '/api/science/nope').status, 404);
   });
 });
+
+describe('science V6 — molecule render (real RDKit depiction + 3D)', () => {
+  test('aspirin yields a real 2D SVG + 3D atoms/bonds', () => {
+    const r = call('POST', '/api/science/molecule/render', { body: { smiles: 'CC(=O)Oc1ccccc1C(=O)O' } });
+    assert.equal(r.status, 200);
+    if (r.body.depiction2d.ok) {
+      assert.match(r.body.depiction2d.svg, /<svg/);
+      assert.equal(r.body.depiction2d.molecularFormula, 'C9H8O4');
+    } else {
+      assert.equal(r.body.depiction2d.error, 'BLOCKED_BY_RUNTIME');
+    }
+    if (r.body.model3d && r.body.model3d.ok) {
+      assert.ok(r.body.model3d.atoms.length > 0);
+      assert.ok(r.body.model3d.bonds.length > 0);
+      assert.ok('element' in r.body.model3d.atoms[0]);
+    }
+  });
+  test('2d-only mode skips the 3D embed', () => {
+    const r = call('POST', '/api/science/molecule/render', { body: { smiles: 'CCO', mode: '2d' } });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.model3d, null);
+  });
+  test('missing SMILES is rejected', () => {
+    assert.equal(call('POST', '/api/science/molecule/render', { body: {} }).status, 400);
+  });
+});

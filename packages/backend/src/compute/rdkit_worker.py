@@ -182,10 +182,42 @@ def main():
         for i, at in enumerate(mh.GetAtoms()):
             p = conf.GetAtomPosition(i)
             atoms.append({"element": at.GetSymbol(), "x": round(p.x, 5), "y": round(p.y, 5), "z": round(p.z, 5)})
+        # Bonds (atom-index pairs + order) so a client can draw a ball-and-stick model.
+        bonds = []
+        for b in mh.GetBonds():
+            bonds.append({"a": b.GetBeginAtomIdx(), "b": b.GetEndAtomIdx(), "order": b.GetBondTypeAsDouble()})
         print(json.dumps({
-            "ok": True, "atoms": atoms, "forceField": ff, "seed": seed,
+            "ok": True, "atoms": atoms, "bonds": bonds, "forceField": ff, "seed": seed,
             "charge": Chem.GetFormalCharge(mol), "nAtoms": len(atoms),
             "canonicalSmiles": Chem.MolToSmiles(mol),
+        }))
+        return
+
+    if cmd == "depict2d":
+        # Publication-quality 2D depiction via RDKit's own renderer (MolDraw2DSVG).
+        # Returns a self-contained SVG string the client can inline directly.
+        from rdkit.Chem.Draw import rdMolDraw2D
+        m = Chem.MolFromSmiles(req.get("smiles", ""))
+        if m is None:
+            print(json.dumps({"ok": False, "error": "invalid_smiles"}))
+            return
+        AllChem.Compute2DCoords(m)
+        w = int(req.get("width", 420))
+        h = int(req.get("height", 320))
+        drawer = rdMolDraw2D.MolDraw2DSVG(w, h)
+        opts = drawer.drawOptions()
+        # Publication-standard black-on-white "molecule card" (readable on any theme);
+        # the client frames it on a white swatch, matching PubChem/ChemDraw conventions.
+        opts.setBackgroundColour((1, 1, 1, 1))
+        opts.bondLineWidth = 2
+        rdMolDraw2D.PrepareAndDrawMolecule(drawer, m)
+        drawer.FinishDrawing()
+        svg = drawer.GetDrawingText()
+        print(json.dumps({
+            "ok": True, "svg": svg, "width": w, "height": h,
+            "canonicalSmiles": Chem.MolToSmiles(m),
+            "molecularFormula": rdMolDescriptors.CalcMolFormula(m),
+            "engine": "RDKit " + rdkit.__version__,
         }))
         return
 

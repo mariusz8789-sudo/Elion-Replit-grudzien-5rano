@@ -42,6 +42,7 @@ import { InvestorDashboardScreen } from './components/discovery/InvestorDashboar
 import { BillingScreen } from './components/discovery/BillingScreen';
 import { ChemistryAssistantScreen } from './components/product/ChemistryAssistantScreen';
 import { MyAnalysesScreen } from './components/product/MyAnalysesScreen';
+import { ComparePlatformScreen } from './components/product/ComparePlatformScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -79,7 +80,8 @@ type Route =
   | { kind: 'investor' }
   | { kind: 'billing' }
   | { kind: 'assistant' }
-  | { kind: 'analyses' };
+  | { kind: 'analyses' }
+  | { kind: 'compare' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -112,6 +114,7 @@ function parseHash(): Route {
   if (h === '#/billing') return { kind: 'billing' };
   if (h === '#/assistant') return { kind: 'assistant' };
   if (h === '#/analyses') return { kind: 'analyses' };
+  if (h === '#/compare') return { kind: 'compare' };
   return { kind: 'home' };
 }
 
@@ -443,6 +446,7 @@ export default function App() {
     if (route.kind === 'billing') return <div className="app"><ErrorBoundary><BillingScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'assistant') return <div className="app"><ErrorBoundary><ChemistryAssistantScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'analyses') return <div className="app"><ErrorBoundary><MyAnalysesScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'compare') return <div className="app"><ErrorBoundary><ComparePlatformScreen /></ErrorBoundary>{overlays}</div>;
 
     return (
       <div className="app">

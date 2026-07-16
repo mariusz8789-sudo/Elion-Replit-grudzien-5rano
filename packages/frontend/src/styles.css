@@ -1773,6 +1773,47 @@ kbd {
 .repro-meta dd { word-break: break-word; }
 @media (max-width: 720px) { .decision-support { grid-template-columns: 1fr; } }
 
+/* Stage 6 — Molecule Selection Platform. */
+.compare-input { width: 100%; resize: vertical; background: var(--surface, rgba(255,255,255,0.03)); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem 0.8rem; font-size: 0.86rem; line-height: 1.5; }
+.compare-select { background: var(--surface, rgba(255,255,255,0.03)); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem 0.6rem; flex: 1; }
+.dash-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; }
+.dash-card { border: 1px solid var(--border); border-radius: 12px; padding: 0.7rem; background: var(--surface-2, rgba(255,255,255,0.02)); display: flex; flex-direction: column; gap: 0.5rem; }
+.dash-card header { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+.dash-card .dash-count { font-size: 1.15rem; font-weight: 800; }
+.dash-ok { border-color: color-mix(in srgb, var(--green, #4ade80) 45%, var(--border)); }
+.dash-blocked { border-color: color-mix(in srgb, var(--red, #f87171) 45%, var(--border)); }
+.dash-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.dash-card li { display: flex; flex-direction: column; gap: 0.1rem; font-size: 0.78rem; }
+.dash-name { font-weight: 700; }
+.dash-reason { color: var(--text-dim); line-height: 1.35; }
+.rank-table td { vertical-align: top; }
+.rank-smiles { font-size: 0.68rem; color: var(--text-dim); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ref-badge { display: inline-block; margin-left: 0.4rem; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--cyan); border: 1px solid var(--cyan); border-radius: 999px; padding: 0 0.35rem; }
+.score-bar { display: inline-block; width: 84px; height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; vertical-align: middle; }
+.score-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--green, #4ade80)); }
+.score-num { margin-left: 0.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rank-why { font-size: 0.76rem; line-height: 1.45; }
+.why-pos { color: var(--green, #4ade80); }
+.why-neg { color: var(--gold, #fbbf24); }
+.is-reference { background: color-mix(in srgb, var(--cyan) 8%, transparent); }
+.matrix-table td, .matrix-table th { text-align: center; }
+.matrix-table td:first-child, .matrix-table th:first-child { text-align: left; }
+.matrix-cell { color: #10241f !important; font-weight: 700; font-variant-numeric: tabular-nums; }
+.matrix-swot { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; margin-top: 0.9rem; }
+.swot-card { border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.7rem; }
+.swot-h { margin: 0 0 0.35rem; font-size: 0.85rem; }
+.swot-line { display: flex; gap: 0.45rem; align-items: baseline; font-size: 0.78rem; line-height: 1.4; margin-top: 0.25rem; }
+.swot-line .ds-pill { flex: 0 0 auto; }
+.diff-block { margin-top: 0.9rem; }
+.diff-h { margin: 0 0 0.4rem; font-size: 0.9rem; }
+.diff-table td { vertical-align: top; }
+.portfolio-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; }
+.portfolio-col { border: 1px solid var(--border); border-radius: 12px; padding: 0.7rem; }
+.portfolio-list { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.8rem; }
+.portfolio-list li { display: flex; justify-content: space-between; gap: 0.5rem; }
+@media (max-width: 860px) { .dash-grid, .portfolio-grid { grid-template-columns: repeat(2, 1fr); } .matrix-swot { grid-template-columns: 1fr; } }
+@media print { .matrix-cell { color: #10241f !important; } .dash-grid, .portfolio-grid { grid-template-columns: repeat(2, 1fr); } }
+
 @media (max-width: 620px) {
   .product-nav { order: 3; width: 100%; margin-left: 0; }
   .product-account { order: 2; }

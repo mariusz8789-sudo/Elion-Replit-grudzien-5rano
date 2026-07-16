@@ -59,6 +59,10 @@ export const companies = pgTable("companies", {
   subscriptionTier: text("subscription_tier").default("basic"), // basic, premium, enterprise
   subscriptionExpiresAt: timestamp("subscription_expires_at"),
   monthlyBookingLimit: integer("monthly_booking_limit").default(50), // limits per tier
+  // Stripe Connect (Express) payout account for company-to-company capacity claims - a company
+  // only receives split-payment payouts once this is set and Stripe reports payouts_enabled.
+  stripeConnectAccountId: text("stripe_connect_account_id"),
+  stripeConnectPayoutsEnabled: boolean("stripe_connect_payouts_enabled").notNull().default(false),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -604,16 +608,23 @@ export const capacityPostings = pgTable("capacity_postings", {
 export const capacityBookings = pgTable("capacity_bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   postingId: varchar("posting_id").notNull().references(() => capacityPostings.id),
-  customerId: varchar("customer_id").notNull().references(() => users.id),
+  // Exactly one of customerId/claimingCompanyId is set - an individual customer request
+  // (existing flow) vs. a company-to-company capacity claim (Return Trip Marketplace network,
+  // paid out via Stripe Connect) reuse the same row shape rather than a parallel table.
+  customerId: varchar("customer_id").references(() => users.id),
+  claimingCompanyId: varchar("claiming_company_id").references(() => companies.id),
   volumeM3: decimal("volume_m3", { precision: 10, scale: 2 }).notNull(),
   weightKg: decimal("weight_kg", { precision: 10, scale: 2 }).notNull(),
   palletSpaces: integer("pallet_spaces").notNull().default(0),
   priceEur: decimal("price_eur", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"), // pending, accepted, rejected, cancelled
+  paymentIntentId: text("payment_intent_id"),
+  paymentStatus: text("payment_status").default("pending"), // pending, authorized, captured, failed
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 }, (t) => ({
   postingIdIdx: index("capacity_bookings_posting_id_idx").on(t.postingId),
   customerIdIdx: index("capacity_bookings_customer_id_idx").on(t.customerId),
+  claimingCompanyIdIdx: index("capacity_bookings_claiming_company_id_idx").on(t.claimingCompanyId),
 }));
 
 // A company subscribes to a route pattern (e.g. "Madrid" -> "Paris") so it's notified whenever
@@ -872,7 +883,7 @@ export const verificationDocuments = pgTable("verification_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   holderType: text("holder_type").notNull(), // user, driver, company
   holderId: varchar("holder_id").notNull(),
-  docType: text("doc_type").notNull(), // id_card, selfie, drivers_license, company_registration, insurance_certificate, vehicle_registration, passport, work_permit, residence_permit, medical_certificate, country_license, or a Skills Engine certification name (SEP, Gas, UDT, Forklift, Crane, HDS, Construction, ADR, Hydraulic)
+  docType: text("doc_type").notNull(), // id_card, selfie, drivers_license, company_registration, insurance_certificate, vehicle_registration, passport, work_permit, residence_permit, medical_certificate, country_license, carrier_authority, or a Skills Engine certification name (SEP, Gas, UDT, Forklift, Crane, HDS, Construction, ADR, Hydraulic)
   fileUrl: text("file_url").notNull(),
   status: text("status").notNull().default("pending"), // pending, approved, rejected, expired
   submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
@@ -1351,10 +1362,14 @@ export const insertCapacityBookingSchema = createInsertSchema(capacityBookings).
   createdAt: true,
   status: true,
   priceEur: true,
+  paymentIntentId: true,
+  paymentStatus: true,
 }).extend({
   volumeM3: z.coerce.string(),
   weightKg: z.coerce.string(),
   palletSpaces: z.coerce.number().int().nonnegative().optional(),
+}).refine((b) => Boolean(b.customerId) !== Boolean(b.claimingCompanyId), {
+  message: "Exactly one of customerId or claimingCompanyId is required",
 });
 
 export const insertRecurringRouteSubscriptionSchema = createInsertSchema(recurringRouteSubscriptions).omit({
@@ -1507,6 +1522,10 @@ export const insertVerificationDocumentSchema = createInsertSchema(verificationD
   docType: z.enum([
     "id_card", "selfie", "drivers_license", "company_registration", "insurance_certificate", "vehicle_registration",
     "passport", "work_permit", "residence_permit", "medical_certificate", "country_license",
+    // Carrier authority number (DOT/MC in the US, or the equivalent national operator licence) -
+    // the trust-layer document a company must have approved before it can claim another
+    // company's spare-capacity posting in the Return Trip Marketplace.
+    "carrier_authority",
     "SEP", "Gas", "Hydraulic", "UDT", "Forklift", "Crane", "HDS", "Construction", "ADR",
   ]),
   expiresAt: z.coerce.date().optional(),

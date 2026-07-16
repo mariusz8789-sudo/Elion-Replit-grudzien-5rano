@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Boxes, MapPin, Calendar, Package, Send, Loader2, Bell, X } from "lucide-react";
+import { Boxes, MapPin, Calendar, Package, Send, Loader2, Bell, X, Handshake } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import type { CapacityPosting, CapacityBooking, RecurringRouteSubscription } from "@shared/schema";
+import PaymentDialog from "@/components/PaymentDialog";
 
 export default function CapacityMarketplace() {
   const { t } = useTranslation();
@@ -28,6 +29,7 @@ export default function CapacityMarketplace() {
   const [searched, setSearched] = useState(false);
 
   const [activePosting, setActivePosting] = useState<CapacityPosting | null>(null);
+  const [claimMode, setClaimMode] = useState(false);
   const [volumeM3, setVolumeM3] = useState("");
   const [weightKg, setWeightKg] = useState("");
   const [palletSpaces, setPalletSpaces] = useState("");
@@ -84,7 +86,10 @@ export default function CapacityMarketplace() {
 
   const requestMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/capacity-postings/${activePosting!.id}/requests`, {
+      const endpoint = claimMode
+        ? `/api/capacity-postings/${activePosting!.id}/claim`
+        : `/api/capacity-postings/${activePosting!.id}/requests`;
+      const res = await apiRequest("POST", endpoint, {
         volumeM3, weightKg, palletSpaces: palletSpaces ? Number(palletSpaces) : 0,
       });
       if (!res.ok) throw new Error((await res.json()).message || "Failed to request capacity");
@@ -92,13 +97,22 @@ export default function CapacityMarketplace() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", user?.id, "capacity-bookings"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${user?.companyId}/capacity-claims`] });
       setActivePosting(null);
       setVolumeM3(""); setWeightKg(""); setPalletSpaces("");
-      toast({ title: t("Request sent"), description: t("The carrier will confirm your request.") });
+      toast({
+        title: claimMode ? t("Claim sent") : t("Request sent"),
+        description: claimMode ? t("The publishing company will confirm your claim.") : t("The carrier will confirm your request."),
+      });
     },
     onError: (error: any) => {
-      toast({ title: t("Could not request capacity"), description: error.message, variant: "destructive" });
+      toast({ title: claimMode ? t("Could not claim capacity") : t("Could not request capacity"), description: error.message, variant: "destructive" });
     },
+  });
+
+  const { data: myClaims = [] } = useQuery<CapacityBooking[]>({
+    queryKey: [`/api/companies/${user?.companyId}/capacity-claims`],
+    enabled: !!user?.companyId,
   });
 
   const handleSearch = () => {
@@ -208,14 +222,48 @@ export default function CapacityMarketplace() {
                       {p.tailLift && <Badge variant="outline" className="text-xs">{t("Tail lift")}</Badge>}
                     </div>
                   </div>
-                  <Button size="sm" onClick={() => setActivePosting(p)} data-testid={`button-request-capacity-${p.id}`}>
-                    <Send className="w-4 h-4 mr-2" />{t("Request")}
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button size="sm" onClick={() => { setActivePosting(p); setClaimMode(false); }} data-testid={`button-request-capacity-${p.id}`}>
+                      <Send className="w-4 h-4 mr-2" />{t("Request")}
+                    </Button>
+                    {user?.companyId && user.companyId !== p.companyId && (
+                      <Button size="sm" variant="outline" onClick={() => { setActivePosting(p); setClaimMode(true); }} data-testid={`button-claim-capacity-${p.id}`}>
+                        <Handshake className="w-4 h-4 mr-2" />{t("Claim for my company")}
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))
           )}
         </div>
+      )}
+
+      {user?.companyId && myClaims.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("My Network Claims")}</CardTitle>
+            <CardDescription>{t("Return Trip Marketplace claims your company has made on other companies' spare capacity.")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {myClaims.map((c) => (
+              <div key={c.id} className="flex items-center justify-between text-sm p-2 border rounded-md gap-2 flex-wrap" data-testid={`row-my-capacity-claim-${c.id}`}>
+                <span>{c.volumeM3} m&sup3; / {c.weightKg} kg &middot; &euro;{c.priceEur}</span>
+                <div className="flex items-center gap-2">
+                  <Badge variant={c.status === "accepted" ? "default" : c.status === "pending" ? "secondary" : "destructive"}>{c.status}</Badge>
+                  {c.status === "accepted" && c.paymentStatus !== "captured" && (
+                    <PaymentDialog
+                      capacityBookingId={c.id}
+                      amount={c.priceEur}
+                      paymentStatus={c.paymentStatus ?? undefined}
+                      onPaid={() => queryClient.invalidateQueries({ queryKey: [`/api/companies/${user.companyId}/capacity-claims`] })}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       )}
 
       {user && myRequests.length > 0 && (
@@ -235,7 +283,7 @@ export default function CapacityMarketplace() {
       <Dialog open={!!activePosting} onOpenChange={(open) => !open && setActivePosting(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("Request capacity")}</DialogTitle>
+            <DialogTitle>{claimMode ? t("Claim capacity for my company") : t("Request capacity")}</DialogTitle>
             <DialogDescription>{activePosting?.fromAddress} &rarr; {activePosting?.toAddress}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -257,7 +305,7 @@ export default function CapacityMarketplace() {
               disabled={!volumeM3 || !weightKg || requestMutation.isPending}
               data-testid="button-confirm-request-capacity"
             >
-              {t("Send Request")}
+              {claimMode ? t("Send Claim") : t("Send Request")}
             </Button>
           </div>
         </DialogContent>

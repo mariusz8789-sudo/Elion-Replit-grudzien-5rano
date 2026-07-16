@@ -329,6 +329,15 @@ export interface IStorage {
   acceptCapacityBooking(id: string): Promise<{ booking?: CapacityBooking; error?: string }>;
   updateCapacityBookingStatus(id: string, fromStatuses: string[], toStatus: "rejected" | "cancelled"): Promise<CapacityBooking | undefined>;
 
+  // Return Trip Marketplace network: company-to-company capacity claims (as opposed to an
+  // individual customer's request) and the Stripe Connect payout wiring behind them.
+  getCompanyCapacityClaims(companyId: string): Promise<CapacityBooking[]>;
+  updateCapacityBookingPayment(id: string, paymentIntentId: string, paymentStatus: string): Promise<CapacityBooking | undefined>;
+  isCompanyTrustedForCapacityNetwork(companyId: string): Promise<boolean>;
+  setCompanyStripeConnectAccount(companyId: string, accountId: string): Promise<Company | undefined>;
+  getCompanyByStripeConnectAccountId(accountId: string): Promise<Company | undefined>;
+  setCompanyStripeConnectPayoutsEnabled(accountId: string, enabled: boolean): Promise<Company | undefined>;
+
   // Return Trip Marketplace: recurring-route subscriptions
   createRouteSubscription(sub: InsertRecurringRouteSubscription): Promise<RecurringRouteSubscription>;
   getCompanyRouteSubscriptions(companyId: string): Promise<RecurringRouteSubscription[]>;
@@ -2019,6 +2028,49 @@ export class DbStorage implements IStorage {
       .set({ status: toStatus })
       .where(and(eq(capacityBookings.id, id), inArray(capacityBookings.status, fromStatuses)))
       .returning();
+    return result[0];
+  }
+
+  async getCompanyCapacityClaims(companyId: string): Promise<CapacityBooking[]> {
+    return await db.select().from(capacityBookings)
+      .where(eq(capacityBookings.claimingCompanyId, companyId))
+      .orderBy(desc(capacityBookings.createdAt));
+  }
+
+  async updateCapacityBookingPayment(id: string, paymentIntentId: string, paymentStatus: string): Promise<CapacityBooking | undefined> {
+    const result = await db.update(capacityBookings)
+      .set({ paymentIntentId, paymentStatus })
+      .where(eq(capacityBookings.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Minimum trust bar for the Return Trip Marketplace network launch (Etap 1): an approved,
+  // unexpired carrier-authority (DOT/MC or national equivalent) or insurance document on file -
+  // reuses the existing Document Center review workflow rather than a parallel approval system.
+  async isCompanyTrustedForCapacityNetwork(companyId: string): Promise<boolean> {
+    const now = new Date();
+    const docs = await db.select().from(verificationDocuments).where(and(
+      eq(verificationDocuments.holderType, "company"),
+      eq(verificationDocuments.holderId, companyId),
+      eq(verificationDocuments.status, "approved"),
+      inArray(verificationDocuments.docType, ["carrier_authority", "insurance_certificate"]),
+    ));
+    return docs.some((d) => !d.expiresAt || d.expiresAt > now);
+  }
+
+  async setCompanyStripeConnectAccount(companyId: string, accountId: string): Promise<Company | undefined> {
+    const result = await db.update(companies).set({ stripeConnectAccountId: accountId }).where(eq(companies.id, companyId)).returning();
+    return result[0];
+  }
+
+  async getCompanyByStripeConnectAccountId(accountId: string): Promise<Company | undefined> {
+    const result = await db.select().from(companies).where(eq(companies.stripeConnectAccountId, accountId));
+    return result[0];
+  }
+
+  async setCompanyStripeConnectPayoutsEnabled(accountId: string, enabled: boolean): Promise<Company | undefined> {
+    const result = await db.update(companies).set({ stripeConnectPayoutsEnabled: enabled }).where(eq(companies.stripeConnectAccountId, accountId)).returning();
     return result[0];
   }
 

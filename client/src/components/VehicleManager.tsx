@@ -361,6 +361,7 @@ export default function VehicleManager({ companyId }: { companyId: string }) {
           { value: "insurance_certificate", label: "Insurance Certificate" },
           { value: "vehicle_registration", label: "Vehicle Registration" },
           { value: "country_license", label: "Country-Specific License" },
+          { value: "carrier_authority", label: "Carrier Authority (DOT/MC or national equivalent)" },
         ]}
         collectExpiry
       />

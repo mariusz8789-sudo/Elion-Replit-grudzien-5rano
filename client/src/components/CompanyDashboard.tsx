@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X, BarChart3, Brain, Calendar as CalendarIcon, Zap, Check } from "lucide-react";
+import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X, BarChart3, Brain, Calendar as CalendarIcon, Zap, Check, CreditCard } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -460,6 +460,8 @@ function CapacityTab({ companyId }: { companyId: string }) {
         </Dialog>
       </div>
 
+      <StripeConnectCard companyId={companyId} />
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading...</p>
       ) : postings.length === 0 ? (
@@ -472,6 +474,56 @@ function CapacityTab({ companyId }: { companyId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+function StripeConnectCard({ companyId }: { companyId: string }) {
+  const { toast } = useToast();
+  const { data: status, isLoading } = useQuery<{ connected: boolean; payoutsEnabled: boolean }>({
+    queryKey: [`/api/companies/${companyId}/stripe-connect/status`],
+  });
+
+  const onboardMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/companies/${companyId}/stripe-connect/onboard`, {
+        returnUrl: window.location.href,
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to start onboarding");
+      return res.json() as Promise<{ url: string }>;
+    },
+    onSuccess: (data) => {
+      window.location.href = data.url;
+    },
+    onError: (error: any) => toast({ title: "Could not start payout setup", description: error.message, variant: "destructive" }),
+  });
+
+  if (isLoading) return null;
+  if (status?.payoutsEnabled) {
+    return (
+      <Card>
+        <CardContent className="p-4 flex items-center gap-3">
+          <Check className="w-5 h-5 text-green-600" />
+          <p className="text-sm">Payouts are enabled - your company can receive payment when another company claims your spare capacity.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><CreditCard className="w-5 h-5" />Network Payouts</CardTitle>
+        <CardDescription>
+          Set up Stripe Connect so your company can get paid when another company claims your spare capacity
+          in the Return Trip Marketplace network. Required before you can receive claims.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button onClick={() => onboardMutation.mutate()} disabled={onboardMutation.isPending} data-testid="button-connect-stripe">
+          {status?.connected ? "Finish payout setup" : "Set up payouts"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -526,7 +578,10 @@ function CapacityPostingRow({ posting }: { posting: CapacityPosting }) {
           <div className="space-y-2 border-t pt-2">
             {pendingRequests.map((r) => (
               <div key={r.id} className="flex items-center justify-between text-sm" data-testid={`row-capacity-request-${r.id}`}>
-                <span>{r.volumeM3} m&sup3; / {r.weightKg} kg &middot; &euro;{r.priceEur}</span>
+                <span>
+                  {r.volumeM3} m&sup3; / {r.weightKg} kg &middot; &euro;{r.priceEur}
+                  {r.claimingCompanyId && <Badge variant="outline" className="ml-2 text-xs">Company claim</Badge>}
+                </span>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => respondMutation.mutate({ id: r.id, action: "accept" })} data-testid={`button-accept-capacity-${r.id}`}>Accept</Button>
                   <Button size="sm" variant="outline" onClick={() => respondMutation.mutate({ id: r.id, action: "reject" })} data-testid={`button-reject-capacity-${r.id}`}>Reject</Button>

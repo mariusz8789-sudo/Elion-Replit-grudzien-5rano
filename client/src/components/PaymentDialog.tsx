@@ -17,9 +17,11 @@ import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-
 import { getStripe } from "@/lib/stripe";
 
 interface PaymentDialogProps {
-  bookingId: string;
+  bookingId?: string;
+  capacityBookingId?: string;
   amount: string;
   paymentStatus?: string;
+  onPaid?: () => void;
 }
 
 function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
@@ -80,18 +82,18 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-export default function PaymentDialog({ bookingId, amount, paymentStatus }: PaymentDialogProps) {
+export default function PaymentDialog({ bookingId, capacityBookingId, amount, paymentStatus, onPaid }: PaymentDialogProps) {
   const [open, setOpen] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const { toast } = useToast();
+  const entityId = capacityBookingId || bookingId || "";
 
   const createIntentMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/create-payment-intent", {
-        amount: parseFloat(amount),
-        bookingId,
-      });
+      const response = capacityBookingId
+        ? await apiRequest("POST", `/api/capacity-bookings/${capacityBookingId}/create-payment-intent`, { amount: parseFloat(amount) })
+        : await apiRequest("POST", "/api/create-payment-intent", { amount: parseFloat(amount), bookingId });
       return response.json();
     },
     onSuccess: (data) => {
@@ -120,9 +122,13 @@ export default function PaymentDialog({ bookingId, amount, paymentStatus }: Paym
   const handlePaymentSuccess = () => {
     setPaymentSuccess(true);
     // Stripe's webhook (server/routes.ts /api/stripe-webhook) is the source of truth for
-    // payment status; just refresh the booking so the UI reflects it once the webhook lands.
-    queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/bookings", bookingId] });
+    // payment status; just refresh so the UI reflects it once the webhook lands.
+    if (capacityBookingId) {
+      onPaid?.();
+    } else {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings", bookingId] });
+    }
     toast({
       title: "Payment submitted",
       description: "Your payment is being confirmed.",
@@ -140,12 +146,12 @@ export default function PaymentDialog({ bookingId, amount, paymentStatus }: Paym
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {isPaid ? (
-          <Button variant="outline" size="sm" disabled data-testid={`button-payment-${bookingId}`}>
+          <Button variant="outline" size="sm" disabled data-testid={`button-payment-${entityId}`}>
             <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
             Paid
           </Button>
         ) : (
-          <Button size="sm" data-testid={`button-payment-${bookingId}`}>
+          <Button size="sm" data-testid={`button-payment-${entityId}`}>
             <CreditCard className="w-4 h-4 mr-2" />
             Pay Now
           </Button>
@@ -185,7 +191,7 @@ export default function PaymentDialog({ bookingId, amount, paymentStatus }: Paym
                 </div>
               </div>
               <div className="text-xs text-muted-foreground">
-                Booking ID: {bookingId.substring(0, 8)}
+                {capacityBookingId ? "Claim ID" : "Booking ID"}: {entityId.substring(0, 8)}
               </div>
             </Card>
 

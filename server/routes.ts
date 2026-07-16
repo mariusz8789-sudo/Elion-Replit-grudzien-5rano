@@ -31,7 +31,8 @@ import { getCalendarSyncProvider, type CalendarProvider } from "./services/calen
 import { getCargoRecognitionProvider } from "./services/cargoRecognition";
 import { getTranslationProvider } from "./services/translation";
 import { checkGpsAnomaly, checkDuplicateAccount } from "./services/fraud";
-import { calculateCapacityBookingPrice } from "./lib/capacityPricing";
+import { calculateCapacityBookingPrice, calculateCapacityClaimSplit } from "./lib/capacityPricing";
+import { getOrCreateConnectAccount, createOnboardingLink, createSplitPaymentIntent, isStripeConnectConfigured } from "./services/stripeConnect";
 import { calculateTripEnvironmentalSummary, BASELINE_VEHICLE_CLASS, calculateEmissionsKg, normalizeVehicleType, EMISSION_FACTORS_KG_PER_KM, ECO_METHODOLOGY, ECO_METHODOLOGY_VERSION } from "@shared/environmentalCalculation";
 import { dispatchWebhookEvent } from "./services/webhooks";
 import { rankCrewCandidates, CREW_MATCH_METHODOLOGY, type CrewCandidate, type ScoredCrewCandidate } from "@shared/crewMatching";
@@ -2277,6 +2278,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Return Trip Marketplace network: a company claims another company's spare-capacity
+  // posting (as opposed to an individual customer's request above). Requires an approved
+  // carrier-authority/insurance document on file - the minimum trust bar for the network
+  // launch (see storage.isCompanyTrustedForCapacityNetwork) - before any claim is allowed.
+  app.post("/api/capacity-postings/:id/claim", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (!user.companyId) {
+        return res.status(403).json({ message: "A company account is required to claim spare capacity" });
+      }
+      const posting = await storage.getCapacityPosting(req.params.id);
+      if (!posting || posting.status !== "open") {
+        return res.status(400).json({ message: "This capacity posting is not open for claims" });
+      }
+      if (posting.companyId === user.companyId) {
+        return res.status(400).json({ message: "You cannot claim your own posting" });
+      }
+      const trusted = await storage.isCompanyTrustedForCapacityNetwork(user.companyId);
+      if (!trusted) {
+        return res.status(403).json({
+          message: "Your company needs an approved carrier authority (DOT/MC) or insurance document on file before claiming network capacity - upload one in the Document Center.",
+        });
+      }
+
+      const { postingId: _postingId, customerId: _customerId, claimingCompanyId: _claimingCompanyId, ...rest } = req.body;
+      const bookingData = insertCapacityBookingSchema.parse({ ...rest, postingId: posting.id, claimingCompanyId: user.companyId });
+
+      // Soft pre-check for a fast, clear error message; the real, race-safe enforcement
+      // happens atomically in storage.acceptCapacityBooking at accept time.
+      if (
+        Number(bookingData.volumeM3) > Number(posting.freeVolumeM3) ||
+        Number(bookingData.weightKg) > Number(posting.freeWeightKg) ||
+        (bookingData.palletSpaces ?? 0) > posting.freePalletSpaces
+      ) {
+        return res.status(400).json({ message: "Requested capacity exceeds what's currently available on this posting" });
+      }
+
+      const priceEur = calculateCapacityBookingPrice(
+        Number(bookingData.volumeM3),
+        posting.pricePerM3Eur !== null ? Number(posting.pricePerM3Eur) : null,
+        posting.minimumPriceEur !== null ? Number(posting.minimumPriceEur) : null,
+      );
+      const booking = await storage.createCapacityBooking(bookingData, String(priceEur));
+
+      const companyUsers = await storage.getCompanyUsers(posting.companyId);
+      await Promise.all(companyUsers.map((u) => storage.createNotification({
+        userId: u.id,
+        title: "New network capacity claim",
+        message: `Another company claimed ${bookingData.volumeM3} m³ on your ${posting.fromAddress} -> ${posting.toAddress} posting.`,
+        type: "info",
+        link: "/capacity",
+      })));
+
+      res.status(201).json(booking);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Split-payment PaymentIntent for an accepted company-to-company claim - only creatable once
+  // the posting company has accepted (escrow model matches every other payment path in this
+  // app: money never moves before both sides have committed). Automatic capture (not manual,
+  // unlike the main booking flow) since there is no separate "delivery confirmation" step for
+  // a capacity claim - accept + pay is the whole transaction.
+  app.post("/api/capacity-bookings/:id/create-payment-intent", requireAuth, async (req, res) => {
+    try {
+      if (!isStripeConnectConfigured()) {
+        return res.status(503).json({ message: "Payments are not configured" });
+      }
+      const user = req.user as User;
+      const booking = await storage.getCapacityBooking(req.params.id);
+      if (!booking || !booking.claimingCompanyId) {
+        return res.status(404).json({ message: "Network claim not found" });
+      }
+      if (user.companyId !== booking.claimingCompanyId) {
+        return res.status(403).json({ message: "Only the claiming company can pay for this claim" });
+      }
+      if (booking.status !== "accepted") {
+        return res.status(400).json({ message: "This claim must be accepted by the publishing company before it can be paid" });
+      }
+      const posting = await storage.getCapacityPosting(booking.postingId);
+      const postingCompany = posting ? await storage.getCompany(posting.companyId) : undefined;
+      if (!postingCompany?.stripeConnectAccountId || !postingCompany.stripeConnectPayoutsEnabled) {
+        return res.status(400).json({ message: "The publishing company hasn't finished setting up payouts yet" });
+      }
+
+      const { platformFeeEur } = calculateCapacityClaimSplit(Number(booking.priceEur));
+      const paymentIntent = await createSplitPaymentIntent({
+        amountEur: Number(booking.priceEur),
+        applicationFeeEur: platformFeeEur,
+        destinationAccountId: postingCompany.stripeConnectAccountId,
+        metadata: { capacityBookingId: booking.id },
+      });
+      await storage.updateCapacityBookingPayment(booking.id, paymentIntent.id, "pending");
+
+      res.json({ clientSecret: paymentIntent.client_secret, paymentIntentId: paymentIntent.id });
+    } catch (error: any) {
+      res.status(500).json({ message: "Payment intent creation failed: " + error.message });
+    }
+  });
+
+  app.get("/api/companies/:companyId/capacity-claims", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    res.json(await storage.getCompanyCapacityClaims(req.params.companyId));
+  });
+
+  // === STRIPE CONNECT (Return Trip Marketplace network payouts) ===
+  app.post("/api/companies/:companyId/stripe-connect/onboard", requireAuth, async (req, res) => {
+    try {
+      if (!isStripeConnectConfigured()) {
+        return res.status(503).json({ message: "Payments are not configured" });
+      }
+      const user = req.user as User;
+      if (user.companyId !== req.params.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const company = await storage.getCompany(req.params.companyId);
+      if (!company) return res.status(404).json({ message: "Company not found" });
+
+      const accountId = await getOrCreateConnectAccount(company);
+      const origin = `${req.protocol}://${req.get("host")}`;
+      const { returnUrl, refreshUrl } = req.body as { returnUrl?: string; refreshUrl?: string };
+      const url = await createOnboardingLink(
+        accountId,
+        refreshUrl || returnUrl || `${origin}/company`,
+        returnUrl || `${origin}/company`,
+      );
+      res.json({ url });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/companies/:companyId/stripe-connect/status", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const company = await storage.getCompany(req.params.companyId);
+    if (!company) return res.status(404).json({ message: "Company not found" });
+    res.json({
+      connected: Boolean(company.stripeConnectAccountId),
+      payoutsEnabled: company.stripeConnectPayoutsEnabled,
+    });
+  });
+
   app.get("/api/capacity-postings/:id/requests", requireAuth, async (req, res) => {
     const user = req.user as User;
     const posting = await storage.getCapacityPosting(req.params.id);
@@ -2311,13 +2461,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (result.error) {
       return res.status(409).json({ message: result.error });
     }
-    await storage.createNotification({
-      userId: booking.customerId,
-      title: "Capacity request accepted",
-      message: `Your request for ${booking.volumeM3} m³ was accepted.`,
-      type: "success",
-      link: "/capacity",
-    }).catch(() => undefined);
+    // A booking is either an individual customer's request (customerId) or a company-to-company
+    // network claim (claimingCompanyId) - never both (enforced by insertCapacityBookingSchema).
+    if (booking.customerId) {
+      await storage.createNotification({
+        userId: booking.customerId,
+        title: "Capacity request accepted",
+        message: `Your request for ${booking.volumeM3} m³ was accepted.`,
+        type: "success",
+        link: "/capacity",
+      }).catch(() => undefined);
+    } else if (booking.claimingCompanyId) {
+      const claimingUsers = await storage.getCompanyUsers(booking.claimingCompanyId);
+      await Promise.all(claimingUsers.map((u) => storage.createNotification({
+        userId: u.id,
+        title: "Network capacity claim accepted",
+        message: `Your claim for ${booking.volumeM3} m³ was accepted - you can now pay to confirm it.`,
+        type: "success",
+        link: "/capacity",
+      }).catch(() => undefined)));
+    }
     res.json(result.booking);
   });
 
@@ -2344,7 +2507,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!booking) {
       return res.status(404).json({ message: "Request not found" });
     }
-    if (user.id !== booking.customerId && user.role !== "admin") {
+    const isOwningCustomer = booking.customerId ? user.id === booking.customerId : false;
+    const isClaimingCompany = booking.claimingCompanyId ? user.companyId === booking.claimingCompanyId : false;
+    if (!isOwningCustomer && !isClaimingCompany && user.role !== "admin") {
       return res.status(403).json({ message: "Not authorized to cancel this request" });
     }
     const updated = await storage.updateCapacityBookingStatus(req.params.id, ["pending", "accepted"], "cancelled");
@@ -2639,6 +2804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const paymentIntent = event.data.object;
           const bookingId = paymentIntent.metadata.bookingId;
           const roadServiceOrderId = paymentIntent.metadata.roadServiceOrderId;
+          const capacityBookingId = paymentIntent.metadata.capacityBookingId;
 
           if (bookingId) {
             await storage.updateBookingPayment(
@@ -2650,6 +2816,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (roadServiceOrderId) {
             await handleRoadServiceOrderPayment(roadServiceOrderId, paymentIntent.id, true);
           }
+          if (capacityBookingId) {
+            await storage.updateCapacityBookingPayment(capacityBookingId, paymentIntent.id, "captured");
+          }
           break;
         }
 
@@ -2657,6 +2826,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const failedIntent = event.data.object;
           const failedBookingId = failedIntent.metadata.bookingId;
           const failedRoadServiceOrderId = failedIntent.metadata.roadServiceOrderId;
+          const failedCapacityBookingId = failedIntent.metadata.capacityBookingId;
 
           if (failedBookingId) {
             await storage.updateBookingPayment(
@@ -2668,6 +2838,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (failedRoadServiceOrderId) {
             await handleRoadServiceOrderPayment(failedRoadServiceOrderId, failedIntent.id, false);
           }
+          if (failedCapacityBookingId) {
+            await storage.updateCapacityBookingPayment(failedCapacityBookingId, failedIntent.id, "failed");
+          }
+          break;
+        }
+
+        // Stripe Connect onboarding status for a company's payout account - drives
+        // companies.stripeConnectPayoutsEnabled, which gates whether other companies can pay
+        // out to them for an accepted capacity claim.
+        case "account.updated": {
+          const account = event.data.object;
+          await storage.setCompanyStripeConnectPayoutsEnabled(account.id, Boolean(account.payouts_enabled));
           break;
         }
       }

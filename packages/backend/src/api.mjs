@@ -91,6 +91,8 @@ import { accumulateMemory } from './cognitive/scientificMemory.mjs';
 import { runAgentPanel, AGENT_ROLES, MULTI_AGENT_VERSION } from './cognitive/multiAgent.mjs';
 import { buildLaboratoryReadiness } from './cognitive/laboratoryReadiness.mjs';
 import { generateInvestorPackage } from './validation/investorEdition.mjs';
+// Public, versioned external API (v1) — self-contained, reuses the RDKit adapter.
+import { handleV1 } from './apiV1.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -117,6 +119,9 @@ export function handleApi(db, ctx) {
   const { method, pathname } = ctx;
   const body = ctx.body ?? {};
   const seg = pathname.replace(/^\/api\//, '').replace(/\/+$/, '').split('/'); // np. ['projects','ID','trials']
+
+  // ---- Publiczne, wersjonowane API v1 (niezależne od reszty aplikacji) ----
+  if (seg[0] === 'v1') return handleV1(seg, method, body);
 
   // ---- Uwierzytelnianie (bez tokenu) ----
   if (seg[0] === 'auth') {

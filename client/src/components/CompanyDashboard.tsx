@@ -797,6 +797,22 @@ interface EnterpriseDashboardData {
 
 interface RoadServicesRevenue { revenueEur: number; commissionEur: number; netEur: number; orders: number }
 
+interface ForecastAnalyticsData {
+  hasData: boolean;
+  methodology: string;
+  totalBookingsAnalyzed: number;
+  monthsAnalyzed?: number;
+  revenue?: { history: Array<{ month: string; valueEur: number }>; forecastEur: number[] };
+  demand?: { history: Array<{ month: string; bookings: number }>; forecastBookings: number[] };
+  seasonalityIndex?: Record<number, number>;
+  vehicleMargins?: Array<{ vehicleId: string; type: string; licensePlate: string; tripsAnalyzed: number; revenueEur: number; estFuelCostEur: number; estMarginEur: number }>;
+  driverRevenue?: Array<{ driverId: string; name: string; tripsAnalyzed: number; revenueEur: number }>;
+  warehouseRevenue?: Array<{ resourceId: string; title: string; bookedDays: number; revenueEur: number }>;
+  pickupHeatmap?: Array<{ address: string; bookingCount: number; avgRevenueEur: number }>;
+}
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="p-4 bg-muted rounded-lg">
@@ -949,7 +965,128 @@ function EnterpriseDashboardTab({ companyId }: { companyId: string }) {
           </CardContent>
         </Card>
       )}
+
+      <ForecastingCard companyId={companyId} />
     </div>
+  );
+}
+
+function ForecastingCard({ companyId }: { companyId: string }) {
+  const { data, isLoading } = useQuery<ForecastAnalyticsData>({
+    queryKey: [`/api/companies/${companyId}/analytics/forecast`],
+  });
+
+  if (isLoading || !data) {
+    return <div className="h-48 bg-muted animate-pulse rounded-lg" />;
+  }
+
+  if (!data.hasData) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Forecasting</CardTitle>
+          <CardDescription>Not enough history yet - forecasting needs at least 3 months of bookings ({data.monthsAnalyzed ?? 0} so far, {data.totalBookingsAnalyzed} bookings total).</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Forecasting</CardTitle>
+        <CardDescription>Least-squares trend + seasonal index over {data.monthsAnalyzed} months of real booking history (methodology: {data.methodology}). Not an AI prediction.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-3 bg-muted rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">Revenue forecast (next {data.revenue?.forecastEur.length ?? 0} months)</p>
+            <p className="text-lg font-bold" data-testid="forecast-revenue">
+              {data.revenue?.forecastEur.map((v) => `€${v.toLocaleString()}`).join(" · ") || "N/A"}
+            </p>
+          </div>
+          <div className="p-3 bg-muted rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">Demand forecast (bookings/mo)</p>
+            <p className="text-lg font-bold" data-testid="forecast-demand">
+              {data.demand?.forecastBookings.join(" · ") || "N/A"}
+            </p>
+          </div>
+        </div>
+
+        {data.seasonalityIndex && Object.keys(data.seasonalityIndex).length > 0 && (
+          <div>
+            <p className="text-sm font-medium mb-2">Seasonality index (1.0 = average month)</p>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(data.seasonalityIndex).map(([month, idx]) => (
+                <span
+                  key={month}
+                  className={`text-xs px-2 py-1 rounded ${idx > 1 ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" : idx < 1 ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100" : "bg-muted"}`}
+                  data-testid={`seasonality-${month}`}
+                >
+                  {MONTH_LABELS[Number(month)]}: {idx.toFixed(2)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!!data.vehicleMargins?.length && (
+          <div>
+            <p className="text-sm font-medium mb-2">Vehicle margins (revenue minus estimated fuel cost only)</p>
+            <div className="space-y-1">
+              {data.vehicleMargins.map((v) => (
+                <div key={v.vehicleId} className="flex items-center justify-between text-sm p-2 bg-muted rounded" data-testid={`vehicle-margin-${v.vehicleId}`}>
+                  <span>{v.licensePlate} ({v.type})</span>
+                  <span className="text-muted-foreground">€{v.revenueEur.toLocaleString()} - €{v.estFuelCostEur.toLocaleString()} fuel = €{v.estMarginEur.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!!data.driverRevenue?.length && (
+          <div>
+            <p className="text-sm font-medium mb-2">Driver revenue</p>
+            <div className="space-y-1">
+              {data.driverRevenue.map((d) => (
+                <div key={d.driverId} className="flex items-center justify-between text-sm p-2 bg-muted rounded" data-testid={`driver-revenue-${d.driverId}`}>
+                  <span>{d.name}</span>
+                  <span className="text-muted-foreground">€{d.revenueEur.toLocaleString()} · {d.tripsAnalyzed} trips</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!!data.warehouseRevenue?.length && (
+          <div>
+            <p className="text-sm font-medium mb-2">Warehouse revenue</p>
+            <div className="space-y-1">
+              {data.warehouseRevenue.map((w) => (
+                <div key={w.resourceId} className="flex items-center justify-between text-sm p-2 bg-muted rounded" data-testid={`warehouse-revenue-${w.resourceId}`}>
+                  <span>{w.title}</span>
+                  <span className="text-muted-foreground">€{w.revenueEur.toLocaleString()} · {w.bookedDays} days</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!!data.pickupHeatmap?.length && (
+          <div>
+            <p className="text-sm font-medium mb-2">Top pickup locations</p>
+            <div className="space-y-1">
+              {data.pickupHeatmap.map((h, i) => (
+                <div key={i} className="flex items-center justify-between text-sm p-2 bg-muted rounded" data-testid={`pickup-heatmap-${i}`}>
+                  <span className="truncate max-w-[60%]">{h.address}</span>
+                  <span className="text-muted-foreground">{h.bookingCount}x · avg €{h.avgRevenueEur.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

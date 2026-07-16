@@ -66,6 +66,11 @@ import { db } from "./db";
 import { eq, and, desc, sql, or, gte, lte, lt, isNull, inArray, ilike } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { encryptSecret, decryptSecret } from "./lib/crypto";
+import { linearTrendForecast, computeSeasonalityIndex, FORECAST_METHODOLOGY, MIN_MONTHS_FOR_FORECAST, type MonthlyValue } from "@shared/forecasting";
+import { estimateFuelCostEur } from "./roadServices/costCalculator";
+
+// EUR/liter diesel fallback for margin estimates, matching server/roadServices/router.ts's own default.
+const DEFAULT_FUEL_PRICE_EUR = 1.65;
 
 export interface EnterpriseDashboard {
   crew: { totalWorkers: number; availableWorkers: number; utilizationRate: number; avgRating: number; avgCompletedJobs: number };
@@ -77,6 +82,20 @@ export interface EnterpriseDashboard {
   driverProductivity: Array<{ driverId: string; name: string; totalDeliveries: number; rating: number }>;
   customerLifetimeValue: { avgLifetimeValueEur: number; topCustomers: Array<{ userId: string; name: string; totalSpentEur: number; bookingsCount: number }> };
   partnerApi: { activeKeys: number; lastUsedAt: string | null; webhookDeliveries30d: number; webhookSuccessRate30d: number | null };
+}
+
+export interface ForecastAnalytics {
+  hasData: boolean;
+  methodology: string;
+  totalBookingsAnalyzed: number;
+  monthsAnalyzed?: number;
+  revenue?: { history: Array<{ month: string; valueEur: number }>; forecastEur: number[] };
+  demand?: { history: Array<{ month: string; bookings: number }>; forecastBookings: number[] };
+  seasonalityIndex?: Record<number, number>; // 0-11, 1.0 = average month
+  vehicleMargins?: Array<{ vehicleId: string; type: string; licensePlate: string; tripsAnalyzed: number; revenueEur: number; estFuelCostEur: number; estMarginEur: number }>;
+  driverRevenue?: Array<{ driverId: string; name: string; tripsAnalyzed: number; revenueEur: number }>;
+  warehouseRevenue?: Array<{ resourceId: string; title: string; bookedDays: number; revenueEur: number }>;
+  pickupHeatmap?: Array<{ address: string; bookingCount: number; avgRevenueEur: number }>;
 }
 
 export interface IStorage {
@@ -231,6 +250,12 @@ export interface IStorage {
   // marketplace, WorkShare, driver productivity, customer lifetime value and Partner API usage -
   // every number reuses an existing table/summary rather than introducing a parallel metrics store.
   getCompanyEnterpriseDashboard(companyId: string): Promise<EnterpriseDashboard>;
+
+  // Enterprise analytics forecasting: real least-squares trend + seasonal index over the
+  // company's own monthly booking history (shared/forecasting.ts), plus fuel-cost-adjusted
+  // vehicle margins, driver/warehouse revenue and a pickup-location heatmap - all derived from
+  // existing tables, never a fabricated projection. Honest "not enough data" when history is thin.
+  getCompanyForecastAnalytics(companyId: string): Promise<ForecastAnalytics>;
 
   // Notification operations
   getUserNotifications(userId: string): Promise<Notification[]>;
@@ -1432,6 +1457,101 @@ export class DbStorage implements IStorage {
     };
 
     return { crew, fleet, environmental, bookingRevenueEur, marketplace, workShare, driverProductivity, customerLifetimeValue: { avgLifetimeValueEur, topCustomers }, partnerApi };
+  }
+
+  async getCompanyForecastAnalytics(companyId: string): Promise<ForecastAnalytics> {
+    const companyBookings = await db.select().from(bookings).where(eq(bookings.companyId, companyId));
+    if (companyBookings.length === 0) {
+      return { hasData: false, methodology: FORECAST_METHODOLOGY, totalBookingsAnalyzed: 0 };
+    }
+
+    // Group bookings by calendar month (YYYY-MM) to build the monthly revenue/demand series.
+    const byMonth = new Map<string, { revenue: number; count: number; calendarMonth: number }>();
+    for (const b of companyBookings) {
+      const d = new Date(b.pickupDate);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const entry = byMonth.get(key) ?? { revenue: 0, count: 0, calendarMonth: d.getMonth() };
+      entry.revenue += Number(b.totalPrice);
+      entry.count += 1;
+      byMonth.set(key, entry);
+    }
+    const sortedMonths = Array.from(byMonth.keys()).sort();
+
+    if (sortedMonths.length < MIN_MONTHS_FOR_FORECAST) {
+      return { hasData: false, methodology: FORECAST_METHODOLOGY, totalBookingsAnalyzed: companyBookings.length, monthsAnalyzed: sortedMonths.length };
+    }
+
+    const revenueSeries: MonthlyValue[] = sortedMonths.map((key, i) => ({
+      monthIndex: i, calendarMonth: byMonth.get(key)!.calendarMonth, value: Math.round(byMonth.get(key)!.revenue),
+    }));
+    const demandSeries: MonthlyValue[] = sortedMonths.map((key, i) => ({
+      monthIndex: i, calendarMonth: byMonth.get(key)!.calendarMonth, value: byMonth.get(key)!.count,
+    }));
+
+    const FORECAST_MONTHS_AHEAD = 3;
+    const revenueForecast = linearTrendForecast(revenueSeries, FORECAST_MONTHS_AHEAD);
+    const demandForecast = linearTrendForecast(demandSeries, FORECAST_MONTHS_AHEAD).map((v) => Math.round(v));
+    const seasonalityIndex = computeSeasonalityIndex(revenueSeries);
+
+    // Fuel-cost-adjusted vehicle margins: revenue minus estimated fuel cost only (not full
+    // operating profit - no per-vehicle maintenance/insurance cost exists in the schema).
+    const fleetRows = await db.select().from(vehicles).where(eq(vehicles.companyId, companyId));
+    const vehicleMargins = fleetRows.map((v) => {
+      const trips = companyBookings.filter((b) => b.vehicleId === v.id);
+      const revenueEur = Math.round(trips.reduce((s, b) => s + Number(b.totalPrice), 0));
+      const estFuelCostEur = Math.round(trips.reduce((s, b) => {
+        const distanceKm = Number(b.estimatedDistance) * 1.60934;
+        return s + estimateFuelCostEur({ distanceKm, vehicleType: v.type, fuelPriceEurPerLiter: DEFAULT_FUEL_PRICE_EUR });
+      }, 0));
+      return { vehicleId: v.id, type: v.type, licensePlate: v.licensePlate, tripsAnalyzed: trips.length, revenueEur, estFuelCostEur, estMarginEur: revenueEur - estFuelCostEur };
+    }).filter((v) => v.tripsAnalyzed > 0);
+
+    // Driver revenue (not profit - no per-driver cost data exists in the schema).
+    const driverRows = await db.select({ driver: drivers, user: users })
+      .from(drivers).innerJoin(users, eq(drivers.userId, users.id)).where(eq(drivers.companyId, companyId));
+    const driverRevenue = driverRows.map((r) => {
+      const trips = companyBookings.filter((b) => b.driverId === r.driver.id);
+      return { driverId: r.driver.id, name: r.user.name, tripsAnalyzed: trips.length, revenueEur: Math.round(trips.reduce((s, b) => s + Number(b.totalPrice), 0)) };
+    }).filter((d) => d.tripsAnalyzed > 0);
+
+    // Warehouse revenue: pricePerDay x booked days, for booked/completed warehouse listings.
+    const warehouseRows = await db.select().from(resourceSharing).where(
+      and(eq(resourceSharing.providerCompanyId, companyId), eq(resourceSharing.resourceType, "warehouse"), inArray(resourceSharing.status, ["booked", "completed"]))
+    );
+    const dayMs = 24 * 60 * 60 * 1000;
+    const warehouseRevenue = warehouseRows
+      .filter((w) => w.startDate && w.endDate && w.pricePerDay)
+      .map((w) => {
+        const days = Math.max(1, Math.round((w.endDate!.getTime() - w.startDate!.getTime()) / dayMs));
+        return { resourceId: w.id, title: w.title, bookedDays: days, revenueEur: Math.round(days * Number(w.pricePerDay)) };
+      });
+
+    // Pickup-location heatmap: top 10 pickup addresses by frequency, with avg revenue per address.
+    const heatmapMap = new Map<string, { count: number; revenue: number }>();
+    for (const b of companyBookings) {
+      const entry = heatmapMap.get(b.pickupAddress) ?? { count: 0, revenue: 0 };
+      entry.count += 1;
+      entry.revenue += Number(b.totalPrice);
+      heatmapMap.set(b.pickupAddress, entry);
+    }
+    const pickupHeatmap = Array.from(heatmapMap.entries())
+      .map(([address, e]) => ({ address, bookingCount: e.count, avgRevenueEur: Math.round(e.revenue / e.count) }))
+      .sort((a, b) => b.bookingCount - a.bookingCount)
+      .slice(0, 10);
+
+    return {
+      hasData: true,
+      methodology: FORECAST_METHODOLOGY,
+      totalBookingsAnalyzed: companyBookings.length,
+      monthsAnalyzed: sortedMonths.length,
+      revenue: { history: sortedMonths.map((key) => ({ month: key, valueEur: Math.round(byMonth.get(key)!.revenue) })), forecastEur: revenueForecast },
+      demand: { history: sortedMonths.map((key) => ({ month: key, bookings: byMonth.get(key)!.count })), forecastBookings: demandForecast },
+      seasonalityIndex,
+      vehicleMargins,
+      driverRevenue,
+      warehouseRevenue,
+      pickupHeatmap,
+    };
   }
 
   // === NOTIFICATION OPERATIONS ===

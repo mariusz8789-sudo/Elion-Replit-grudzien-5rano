@@ -2896,6 +2896,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Real least-squares trend + seasonal index over the company's own monthly booking history -
+  // see shared/forecasting.ts. Honest "hasData: false" instead of guessing when history is thin.
+  app.get("/api/companies/:companyId/analytics/forecast", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.companyId !== req.params.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      res.json(await storage.getCompanyForecastAnalytics(req.params.companyId));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // === AI OPERATIONS (generalized MoveX AI assistant, role-parameterized) ===
   app.get("/api/ai-operations/roles", (_req, res) => {
     res.json(AI_OPERATIONS_ROLES);

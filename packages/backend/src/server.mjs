@@ -37,6 +37,7 @@ import {
 } from './lib.mjs';
 import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { handleApi } from './api.mjs';
+import { groundChatAnswer, groundingEnabled } from './aiGrounding.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8080);
@@ -175,7 +176,17 @@ async function handleAsk(req, res) {
       if (response.stop_reason === 'refusal' || !text) {
         return json(res, 200, { answer: 'Nie mogę odpowiedzieć na to pytanie — wróćmy do fizyki symulacji.' });
       }
-      return json(res, 200, { answer: text, model: response.model });
+      // Grounding Layer — OFF by default (GROUNDING_ENABLED != 'true') → identical
+      // pass-through. When enabled, only the answer TEXT is grounded; response
+      // shape (answer + model) is unchanged. Fail-open: a grounding error must
+      // never break a working AI reply.
+      let answer = text;
+      try {
+        answer = groundChatAnswer(text).text;
+      } catch (gErr) {
+        log('error', 'grounding_failed', { message: String(gErr?.message).slice(0, 160) });
+      }
+      return json(res, 200, { answer, model: response.model });
     } catch (err) {
       log('error', 'ask_failed', { status: err?.status, message: err?.message, ms: Date.now() - t0 });
       return json(res, 502, { error: 'upstream', message: 'Serwis AI chwilowo niedostępny — spróbuj ponownie.' });
@@ -277,6 +288,7 @@ server.listen(PORT, () => {
     port: server.address()?.port ?? PORT, // rzeczywisty port (PORT=0 → efemeryczny, przydatne w testach)
     version: VERSION,
     ai: hasKey ? MODEL : 'no-key',
+    grounding: groundingEnabled() ? 'on' : 'off',
     static: staticAvailable ? STATIC_DIR : 'none',
     persistence: db ? DB_PATH : 'none',
   });

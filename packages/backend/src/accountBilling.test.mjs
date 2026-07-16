@@ -1,6 +1,6 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDatabase, createUser, getApiKey } from './store.mjs';
+import { openDatabase, createUser, createSession, getApiKey } from './store.mjs';
 import { hashPassword, generateToken } from './auth.mjs';
 import { handleApi } from './api.mjs';
 import { provisionFromEvent } from './billing/provisioning.mjs';
@@ -17,7 +17,7 @@ afterEach(() => { delete process.env.STRIPE_SECRET_KEY; delete process.env.STRIP
 function seedUser(email = 'me@lab.io') {
   const user = createUser(db, { email, displayName: 'Me', passwordHash: hashPassword('pw123456') });
   const token = generateToken();
-  db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(token, user.id, Date.now(), Date.now() + 1e9);
+  createSession(db, { userId: user.id, token, ttlMs: 1e9 }); // Stage 8: stores the hashed token
   return { user, token };
 }
 const call = (method, pathname, opts = {}) => handleApi(db, { method, pathname, ...opts });
@@ -79,8 +79,14 @@ describe('POST /api/account/api-key/regenerate', () => {
     const r = call('POST', '/api/account/api-key/regenerate', { token });
     assert.equal(r.body.apiKey.tier, 'starter');
     assert.equal(r.body.apiKey.monthlyLimit, 10_000);
+    // Stage 8: regenerate reveals the FULL key exactly once (masked:false)...
+    assert.equal(r.body.apiKey.masked, false);
+    assert.match(r.body.apiKey.key, /^gk_/);
+    const full = r.body.apiKey.key;
+    // ...and the dashboard afterwards shows only the masked hint (never the full key again).
     const view = call('GET', '/api/account/billing', { token });
-    assert.equal(view.body.apiKey.key, r.body.apiKey.key); // billing now points at the regenerated key
+    assert.equal(view.body.apiKey.masked, true);
+    assert.equal(view.body.apiKey.key, `${full.slice(0, 7)}…${full.slice(-4)}`);
   });
   test('regenerate requires auth', () => {
     assert.equal(call('POST', '/api/account/api-key/regenerate').status, 401);

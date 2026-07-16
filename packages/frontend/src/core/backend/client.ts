@@ -15,6 +15,8 @@
  *    go nie zwraca.
  */
 
+import { getToken } from './session';
+
 export interface User {
   id: string;
   email: string;
@@ -487,7 +489,8 @@ export interface LabReadiness {
   reason?: string;
 }
 export async function buildLabReadiness(smiles: string, admetPredictions?: Record<string, number>, scientificQuestion?: string): Promise<ApiResult<LabReadiness>> {
-  const r = await request<{ readiness: LabReadiness }>('POST', '/science/laboratory-readiness', { body: { candidate: { smiles, admetPredictions }, scientificQuestion } });
+  // Stage 8, PART 2: compute endpoints require auth — send the session token.
+  const r = await request<{ readiness: LabReadiness }>('POST', '/science/laboratory-readiness', { token: getToken(), body: { candidate: { smiles, admetPredictions }, scientificQuestion } });
   return r.ok ? { ok: true, data: r.data.readiness } : r;
 }
 
@@ -510,7 +513,8 @@ export interface MoleculeRender {
 }
 /** Real molecular rendering (Candidate Viewer): RDKit 2D SVG + 3D coords/bonds. */
 export async function renderMolecule(smiles: string, mode: '2d' | 'both' = 'both'): Promise<ApiResult<MoleculeRender>> {
-  return request<MoleculeRender>('POST', '/science/molecule/render', { body: { smiles, mode } });
+  // Stage 8, PART 2: compute endpoint requires auth — send the session token.
+  return request<MoleculeRender>('POST', '/science/molecule/render', { token: getToken(), body: { smiles, mode } });
 }
 
 export async function listTargets(token: string, projectId: string): Promise<ApiResult<Target[]>> {

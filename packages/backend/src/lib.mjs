@@ -99,6 +99,29 @@ export function createRateLimiter({ limit = 10, windowMs = 60_000 } = {}) {
   return { allow, cleanup, size: () => buckets.size };
 }
 
+/**
+ * Rzeczywisty adres klienta dla rate-limitingu (Stage 8, PART 4).
+ *
+ * `req.socket.remoteAddress` sam w sobie jest bezużyteczny za reverse-proxy /
+ * load-balancerem (wszyscy klienci mają IP proxy → jeden wspólny kubełek). Gdy
+ * `trustProxy` jest włączone (env GENESIS_TRUST_PROXY=true — ustawiane TYLKO gdy
+ * naprawdę stoimy za zaufanym proxy), bierzemy PIERWSZY (najbardziej zewnętrzny,
+ * czyli realny klient) wpis z `X-Forwarded-For`. Bez zaufanego proxy nagłówka NIE
+ * czytamy (klient mógłby go sfałszować, by ominąć limit) — używamy adresu gniazda.
+ *
+ * Czysta funkcja — testowana bez serwera.
+ */
+export function clientIp(headers, socketAddr, trustProxy) {
+  if (trustProxy) {
+    const xff = headers?.['x-forwarded-for'];
+    if (typeof xff === 'string' && xff.length) {
+      const first = xff.split(',')[0].trim();
+      if (first) return first;
+    }
+  }
+  return socketAddr || 'unknown';
+}
+
 /* ---------------- Statyczny frontend ---------------- */
 
 export const MIME = {

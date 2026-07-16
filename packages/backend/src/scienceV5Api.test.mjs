@@ -1,6 +1,7 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDatabase } from './store.mjs';
+import { openDatabase, createUser, createSession } from './store.mjs';
+import { hashPassword, generateToken } from './auth.mjs';
 import { handleApi } from './api.mjs';
 
 /**
@@ -9,8 +10,14 @@ import { handleApi } from './api.mjs';
  * (env probe), scientific-memory registry, multi-agent roster + live panel,
  * laboratory-readiness (real RDKit InChIKey), and the investor package.
  */
-let db;
-beforeEach(() => { db = openDatabase(); });
+let db, TOKEN;
+beforeEach(() => {
+  db = openDatabase();
+  // Stage 8: compute endpoints (laboratory-readiness, molecule/render) now require auth.
+  const u = createUser(db, { email: 'sci@lab.io', displayName: 'Sci', passwordHash: hashPassword('pw123456') });
+  TOKEN = generateToken();
+  createSession(db, { userId: u.id, token: TOKEN, ttlMs: 1e9 });
+});
 const call = (method, pathname, opts = {}) => handleApi(db, { method, pathname, ...opts });
 
 describe('science V5 — compute resources', () => {
@@ -58,7 +65,7 @@ describe('science V5 — multi-agent', () => {
 
 describe('science V5 — laboratory readiness (real RDKit)', () => {
   test('aspirin yields the real InChIKey + proposed assays (PROPOSAL_ONLY)', () => {
-    const r = call('POST', '/api/science/laboratory-readiness', { body: { candidate: { smiles: 'CC(=O)Oc1ccccc1C(=O)O' } } });
+    const r = call('POST', '/api/science/laboratory-readiness', { token: TOKEN, body: { candidate: { smiles: 'CC(=O)Oc1ccccc1C(=O)O' } } });
     assert.equal(r.status, 200);
     // RDKit is available in this environment; if not, the module fails closed.
     if (r.body.readiness.status === 'COMPLETED') {
@@ -70,7 +77,7 @@ describe('science V5 — laboratory readiness (real RDKit)', () => {
     }
   });
   test('missing SMILES is INVALID_INPUT, not fabricated', () => {
-    const r = call('POST', '/api/science/laboratory-readiness', { body: { candidate: {} } });
+    const r = call('POST', '/api/science/laboratory-readiness', { token: TOKEN, body: { candidate: {} } });
     assert.equal(r.status, 200);
     assert.ok(['INVALID_INPUT', 'BLOCKED_BY_RUNTIME'].includes(r.body.readiness.status));
   });
@@ -94,9 +101,18 @@ describe('science V5 — unknown route', () => {
   });
 });
 
+describe('Stage 8 — compute endpoints require authentication (C1 closed)', () => {
+  test('laboratory-readiness without a token → 401', () => {
+    assert.equal(call('POST', '/api/science/laboratory-readiness', { body: { candidate: { smiles: 'CCO' } } }).status, 401);
+  });
+  test('molecule/render without a token → 401', () => {
+    assert.equal(call('POST', '/api/science/molecule/render', { body: { smiles: 'CCO' } }).status, 401);
+  });
+});
+
 describe('science V6 — molecule render (real RDKit depiction + 3D)', () => {
   test('aspirin yields a real 2D SVG + 3D atoms/bonds', () => {
-    const r = call('POST', '/api/science/molecule/render', { body: { smiles: 'CC(=O)Oc1ccccc1C(=O)O' } });
+    const r = call('POST', '/api/science/molecule/render', { token: TOKEN, body: { smiles: 'CC(=O)Oc1ccccc1C(=O)O' } });
     assert.equal(r.status, 200);
     if (r.body.depiction2d.ok) {
       assert.match(r.body.depiction2d.svg, /<svg/);
@@ -111,11 +127,11 @@ describe('science V6 — molecule render (real RDKit depiction + 3D)', () => {
     }
   });
   test('2d-only mode skips the 3D embed', () => {
-    const r = call('POST', '/api/science/molecule/render', { body: { smiles: 'CCO', mode: '2d' } });
+    const r = call('POST', '/api/science/molecule/render', { token: TOKEN, body: { smiles: 'CCO', mode: '2d' } });
     assert.equal(r.status, 200);
     assert.equal(r.body.model3d, null);
   });
   test('missing SMILES is rejected', () => {
-    assert.equal(call('POST', '/api/science/molecule/render', { body: {} }).status, 400);
+    assert.equal(call('POST', '/api/science/molecule/render', { token: TOKEN, body: {} }).status, 400);
   });
 });

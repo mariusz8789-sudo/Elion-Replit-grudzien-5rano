@@ -1,6 +1,6 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDatabase, createUser, getBillingCustomer, getApiKey, API_TIERS } from './store.mjs';
+import { openDatabase, createUser, createSession, getBillingCustomer, getApiKey, API_TIERS } from './store.mjs';
 import { hashPassword, generateToken } from './auth.mjs';
 import { verifyWebhookSignature, signPayload, createCheckoutSession, parseSignatureHeader } from './billing/stripe.mjs';
 import { provisionFromEvent } from './billing/provisioning.mjs';
@@ -22,7 +22,7 @@ beforeEach(() => { db = openDatabase(); });
 function seedUser(email = 'buyer@lab.io') {
   const user = createUser(db, { email, displayName: 'Buyer', passwordHash: hashPassword('pw123456') });
   const token = generateToken();
-  db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(token, user.id, Date.now(), Date.now() + 1e9);
+  createSession(db, { userId: user.id, token, ttlMs: 1e9 }); // Stage 8: stores the hashed token
   return { user, token };
 }
 function checkoutEvent({ id = 'evt_1', email = 'buyer@lab.io', tier = 'pro', customer = 'cus_1', subscription = 'sub_1' } = {}) {
@@ -93,7 +93,8 @@ describe('provisioning — checkout.session.completed', () => {
     assert.equal(key.monthlyLimit, API_TIERS.pro); // 100000
     const cust = getBillingCustomer(db, 'buyer@lab.io');
     assert.equal(cust.status, 'active');
-    assert.equal(cust.apiKey, r.apiKey);
+    // Stage 8: keys are hashed at rest — billing stores the non-secret hint, not the raw key.
+    assert.equal(cust.apiKey, r.apiKeyHint);
     assert.equal(cust.stripeSubscriptionId, 'sub_1');
   });
   test('starter tier assigns the starter limit', () => {
@@ -109,11 +110,11 @@ describe('provisioning — checkout.session.completed', () => {
     assert.equal(keys.c, 1);
   });
   test('plan change (new event, different tier, same email) → updates existing key, no new key', () => {
-    const k1 = provisionFromEvent(db, checkoutEvent({ id: 'e1', tier: 'starter' }), {}).apiKey;
+    const k1 = provisionFromEvent(db, checkoutEvent({ id: 'e1', tier: 'starter' }), {}).apiKey; // raw, minted once
     const r2 = provisionFromEvent(db, checkoutEvent({ id: 'e2', tier: 'pro' }), {});
     assert.equal(r2.action, 'plan_updated');
-    assert.equal(r2.apiKey, k1); // same key, upgraded
-    assert.equal(getApiKey(db, k1).tier, 'pro');
+    assert.equal(r2.apiKey, null); // Stage 8: raw key NOT re-derivable on a plan change (hashed)
+    assert.equal(getApiKey(db, k1).tier, 'pro'); // the original raw key still authenticates, now at the new tier
     assert.equal(db.prepare('SELECT COUNT(*) c FROM api_keys WHERE owner_email = ?').get('buyer@lab.io').c, 1);
   });
   test('no email → skipped, no key minted', () => {

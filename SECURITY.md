@@ -46,16 +46,21 @@ audited (2026-07) state of that backend.
 - **Transport hardening:** CSP / X-Frame-Options / nosniff / Referrer-Policy on every
   response; path-traversal-safe static server; graceful SIGTERM/SIGINT shutdown.
 
-## Open blockers (MUST fix before public multi-tenant production)
-| # | Severity | Issue |
-|---|----------|-------|
-| C1 | Critical | `/api/science/*` and `/api/compute/*` run **before** the auth gate and spawn Python subprocesses → unauthenticated compute DoS. |
-| C2 | Critical | Rate limiting keyed on raw socket IP, no `X-Forwarded-For` → collapses to one bucket behind a proxy. The `/api/v1` monthly quota is the only reliable per-client limit (and its usage increment is non-atomic). |
-| H3 | High | Session tokens and API keys stored **in plaintext** in SQLite (strong CSPRNG values, but a DB/backup leak is directly usable). Store SHA-256 of the secret. |
-| M1 | Medium | No `uncaughtException` / `unhandledRejection` handler. |
-| M2 | Medium | No per-account login throttle / lockout (only the broken IP limiter). |
-| M4 | Medium | No CORS headers → public API unusable from browsers. |
-| M5 | Medium | `regenerateAccountKey` deletes-then-creates non-transactionally. |
+## Blockers — status after Stage 8 (Security & Production Hardening)
+| # | Severity | Issue | Status |
+|---|----------|-------|--------|
+| C1 | Critical | Subprocess-spawning compute (`/api/science/laboratory-readiness`, `/api/science/molecule/render`) reachable unauthenticated → DoS. | **FIXED** — both now require a valid session token (`api.mjs`); `/api/compute/run` runs only bounded in-process physics models (no subprocess), left public by design. |
+| C2 | Critical | Rate limiting keyed on raw socket IP, no `X-Forwarded-For`. | **FIXED** — `clientIp()` honours `X-Forwarded-For` only when `GENESIS_TRUST_PROXY=true` (spoof-safe otherwise); wired into both limiters (`server.mjs`). |
+| H3 | High | Session tokens and API keys stored in plaintext. | **FIXED** — tokens/keys stored as SHA-256 (`secrets.mjs`, schema v24 in-place migration). Raw value shown once at creation; dashboard shows a masked hint. Existing users keep working (raw presented → hashed → matches). |
+| M1 | Medium | No global crash handlers. | **FIXED** — `unhandledRejection` logged (process survives); `uncaughtException` logged + controlled shutdown (`server.mjs`). |
+| M5 | Medium | `regenerateAccountKey` non-transactional. | **FIXED** — wrapped in a BEGIN/COMMIT/ROLLBACK transaction (`api.mjs`). |
+| H1 | High | Blocking event loop (sync SQLite + `execFileSync` compute). | **DEFERRED** — a true non-blocking worker queue requires an async router refactor, which is a redesign (explicitly out of scope for this hardening stage). Documented in FUTURE_WORK.md. |
+| H2 | High | In-process jobs, no orphan recovery. | **DEFERRED** — depends on the same execution refactor (H1). |
+| M2 | Medium | No per-account login throttle/lockout. | Open. |
+| M4 | Medium | No CORS headers → public API unusable from browsers. | Open. |
+
+The `/api/v1` monthly quota remains the reliable per-client limit; its usage increment is
+still a non-atomic read-modify-write (acceptable single-instance; revisit for multi-instance).
 
 Full detail and remediation notes: **KNOWN_LIMITATIONS.md §2**.
 

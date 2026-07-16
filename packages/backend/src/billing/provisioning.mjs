@@ -11,7 +11,7 @@
  *   customer.subscription.deleted   → cancel plan, downgrade the key to free.
  * Anything else → ignored (acknowledged, not an error).
  */
-import { API_TIERS, createApiKey, updateApiKeyTier, getApiKey, upsertBillingCustomer, getBillingCustomer, wasBillingEventProcessed, markBillingEventProcessed } from '../store.mjs';
+import { API_TIERS, createApiKey, updateApiKeyTier, listApiKeysByOwner, upsertBillingCustomer, getBillingCustomer, wasBillingEventProcessed, markBillingEventProcessed } from '../store.mjs';
 
 /** A paid tier the billing layer may assign (never provisions 'free' as a purchase). */
 export function isPaidTier(tier) { return tier === 'starter' || tier === 'pro'; }
@@ -45,17 +45,23 @@ export function provisionFromEvent(db, event, { priceMap = {}, now = Date.now() 
     if (!ownerEmail) { markBillingEventProcessed(db, eventId, type, now); return { status: 'skipped', action: 'no_email' }; }
     if (!isPaidTier(tier)) { markBillingEventProcessed(db, eventId, type, now); return { status: 'skipped', action: 'no_paid_tier' }; }
 
-    const existing = getBillingCustomer(db, ownerEmail);
-    let apiKey = existing?.apiKey && getApiKey(db, existing.apiKey) ? existing.apiKey : null;
-    if (apiKey) updateApiKeyTier(db, apiKey, tier, { now });         // reuse existing key → change plan
-    else apiKey = createApiKey(db, { ownerEmail, tier, now }).key;   // first purchase → mint a key
+    // Stage 8: klucze są haszowane w spoczynku — identyfikujemy je po WŁAŚCICIELU
+    // (jeden klucz na konto), nie po jawnej wartości. `apiKeyHint` to nietajna
+    // wskazówka do wyświetlania; surowego klucza NIE przechowujemy w billing.
+    const ownerKeys = listApiKeysByOwner(db, ownerEmail);
+    // Keys are hashed at rest → the RAW key can only be surfaced when freshly minted
+    // (first purchase); on a plan change we keep the same hashed key and can only
+    // expose its non-secret hint. `apiKey` (raw) is present only on create.
+    let apiKey = null, apiKeyHint;
+    if (ownerKeys.length) { updateApiKeyTier(db, ownerKeys[0].key, tier, { now }); apiKeyHint = ownerKeys[0].keyHint; } // reuse → change plan
+    else { const fresh = createApiKey(db, { ownerEmail, tier, now }); apiKey = fresh.key; apiKeyHint = fresh.keyHint; } // first purchase → mint
 
     upsertBillingCustomer(db, {
-      ownerEmail, tier, status: 'active', apiKey,
+      ownerEmail, tier, status: 'active', apiKey: apiKeyHint,
       stripeCustomerId: obj.customer, stripeSubscriptionId: obj.subscription, now,
     });
     markBillingEventProcessed(db, eventId, type, now);
-    return { status: 'provisioned', action: existing?.apiKey ? 'plan_updated' : 'plan_created', tier, apiKey, ownerEmail };
+    return { status: 'provisioned', action: ownerKeys.length ? 'plan_updated' : 'plan_created', tier, apiKey, apiKeyHint, ownerEmail };
   }
 
   if (type === 'customer.subscription.deleted') {
@@ -65,8 +71,8 @@ export function provisionFromEvent(db, event, { priceMap = {}, now = Date.now() 
       : db.prepare('SELECT * FROM billing_customers WHERE stripe_subscription_id = ?').get(subId);
     const ownerEmail = record?.ownerEmail ?? record?.owner_email ?? obj.metadata?.owner_email ?? null;
     if (!ownerEmail) { markBillingEventProcessed(db, eventId, type, now); return { status: 'skipped', action: 'unknown_subscription' }; }
-    const cust = getBillingCustomer(db, ownerEmail);
-    if (cust?.apiKey && getApiKey(db, cust.apiKey)) updateApiKeyTier(db, cust.apiKey, 'free', { now });
+    const ownerKeys = listApiKeysByOwner(db, ownerEmail);
+    if (ownerKeys.length) updateApiKeyTier(db, ownerKeys[0].key, 'free', { now }); // downgrade by owner (keys are hashed)
     upsertBillingCustomer(db, { ownerEmail, tier: 'free', status: 'canceled', now });
     markBillingEventProcessed(db, eventId, type, now);
     return { status: 'canceled', action: 'plan_downgraded', tier: 'free', ownerEmail };

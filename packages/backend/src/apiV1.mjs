@@ -112,7 +112,8 @@ function authenticate(db, token, now = Date.now()) {
   if (!token) return { error: fail(401, 'missing_api_key', 'Wymagany nagłówek Authorization: Bearer <klucz API>.') };
   let key = getApiKey(db, token);
   if (!key) return { error: fail(401, 'invalid_api_key', 'Nieznany klucz API.') };
-  if (now >= key.resetDate) { resetApiKeyUsage(db, token, now); key = getApiKey(db, token); }
+  // Stage 8: mutatory operują na PRZECHOWYWANEJ wartości (hash = key.key), nie na surowym tokenie.
+  if (now >= key.resetDate) { resetApiKeyUsage(db, key.key, now); key = getApiKey(db, token); }
   if (key.usageCount >= key.monthlyLimit) {
     return { error: fail(429, 'rate_limit_exceeded', `Przekroczono miesięczny limit ${key.monthlyLimit} zapytań dla tieru "${key.tier}".`) };
   }

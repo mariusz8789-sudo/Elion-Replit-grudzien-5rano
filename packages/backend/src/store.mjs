@@ -21,6 +21,7 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { newId, generateApiKey } from './auth.mjs';
+import { hashSecret, keyHint, looksHashed } from './secrets.mjs';
 
 /* ---------------- Role i uprawnienia (RBAC) ---------------- */
 
@@ -913,7 +914,31 @@ function migrate(db) {
   if (version < 21) db.exec(SCHEMA_V21);
   if (version < 22) db.exec(SCHEMA_V22);
   if (version < 23) db.exec(SCHEMA_V23);
-  if (version < 23) db.exec('PRAGMA user_version = 23');
+  // v24 — Stage 8, PART 3: sekrety uwierzytelniające NIE mogą leżeć w bazie w
+  // postaci jawnej. Haszujemy tokeny sesji i klucze API w miejscu (SHA-256),
+  // dodajemy nietajną wskazówkę `key_hint` do wyświetlania, a jawny klucz w
+  // billing zamieniamy na wskazówkę. Migracja idempotentna (looksHashed) i
+  // NIE psuje istniejących użytkowników: przedstawiony surowy token/klucz jest
+  // haszowany przy odczycie, więc nadal pasuje.
+  if (version < 24) {
+    addColumnIfMissing(db, 'api_keys', 'key_hint', 'key_hint TEXT');
+    const tx = db.prepare('BEGIN'); tx.run();
+    try {
+      for (const row of db.prepare('SELECT token FROM sessions').all()) {
+        if (!looksHashed(row.token)) db.prepare('UPDATE sessions SET token = ? WHERE token = ?').run(hashSecret(row.token), row.token);
+      }
+      for (const row of db.prepare('SELECT key FROM api_keys').all()) {
+        if (!looksHashed(row.key)) db.prepare('UPDATE api_keys SET key_hint = ?, key = ? WHERE key = ?').run(keyHint(row.key), hashSecret(row.key), row.key);
+      }
+      for (const row of db.prepare('SELECT owner_email, api_key FROM billing_customers WHERE api_key IS NOT NULL').all()) {
+        if (row.api_key && !looksHashed(row.api_key) && !String(row.api_key).includes('…')) {
+          db.prepare('UPDATE billing_customers SET api_key = ? WHERE owner_email = ?').run(keyHint(row.api_key), row.owner_email);
+        }
+      }
+      db.prepare('COMMIT').run();
+    } catch (e) { db.prepare('ROLLBACK').run(); throw e; }
+    db.exec('PRAGMA user_version = 24');
+  }
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1029,8 +1054,9 @@ export function getPasswordHash(db, userId) {
 export function createSession(db, { userId, token, ttlMs }) {
   const now = Date.now();
   const expiresAt = now + ttlMs;
+  // Stage 8: przechowujemy WYŁĄCZNIE SHA-256 tokenu; klientowi zwracamy surowy token.
   db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(
-    token,
+    hashSecret(token),
     userId,
     now,
     expiresAt,
@@ -1041,17 +1067,18 @@ export function createSession(db, { userId, token, ttlMs }) {
 /** Zwraca użytkownika powiązanego z ważnym tokenem (albo null). Wygasłą sesję kasuje. */
 export function getUserByToken(db, token) {
   if (!token) return null;
-  const s = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+  const h = hashSecret(token);
+  const s = db.prepare('SELECT * FROM sessions WHERE token = ?').get(h);
   if (!s) return null;
   if (Date.now() > s.expires_at) {
-    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(h);
     return null;
   }
   return getUserById(db, s.user_id);
 }
 
 export function deleteSession(db, token) {
-  db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  db.prepare('DELETE FROM sessions WHERE token = ?').run(hashSecret(token));
 }
 
 /** Sprząta wygasłe sesje (wołane okresowo przez serwer). Zwraca liczbę usuniętych. */
@@ -2334,7 +2361,7 @@ const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 function toApiKey(row) {
   if (!row) return null;
   return {
-    key: row.key, ownerEmail: row.owner_email, tier: row.tier,
+    key: row.key, keyHint: row.key_hint ?? null, ownerEmail: row.owner_email, tier: row.tier,
     monthlyLimit: row.monthly_limit, usageCount: row.usage_count,
     resetDate: row.reset_date, createdAt: row.created_at,
   };
@@ -2348,17 +2375,28 @@ function toApiKey(row) {
 export function createApiKey(db, { ownerEmail, tier = 'free', monthlyLimit, now = Date.now() } = {}) {
   const t = API_TIERS[tier] !== undefined ? tier : 'free';
   const limit = Number.isFinite(monthlyLimit) ? Math.max(0, Math.floor(monthlyLimit)) : API_TIERS[t];
-  const key = generateApiKey();
+  const rawKey = generateApiKey();
+  const hint = keyHint(rawKey);
   const resetDate = now + MONTH_MS;
-  db.prepare('INSERT INTO api_keys (key, owner_email, tier, monthly_limit, usage_count, reset_date, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)')
-    .run(key, String(ownerEmail), t, limit, resetDate, now);
-  return toApiKey(db.prepare('SELECT * FROM api_keys WHERE key = ?').get(key));
+  // Stage 8: przechowujemy hash klucza + nietajną wskazówkę; surowy klucz zwracamy
+  // wołającemu JEDEN RAZ (potem nie da się go odtworzyć — jak w GitHub/Stripe).
+  db.prepare('INSERT INTO api_keys (key, key_hint, owner_email, tier, monthly_limit, usage_count, reset_date, created_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)')
+    .run(hashSecret(rawKey), hint, String(ownerEmail), t, limit, resetDate, now);
+  const stored = toApiKey(db.prepare('SELECT * FROM api_keys WHERE key = ?').get(hashSecret(rawKey)));
+  return { ...stored, key: rawKey, keyHash: stored.key, keyHint: hint };
 }
 
-/** Zwraca klucz API (lub null). */
-export function getApiKey(db, key) {
-  if (typeof key !== 'string' || !key) return null;
-  return toApiKey(db.prepare('SELECT * FROM api_keys WHERE key = ?').get(key));
+/** Zwraca klucz API po SUROWYM kluczu przedstawionym przez klienta (haszuje). */
+export function getApiKey(db, rawKey) {
+  const h = hashSecret(rawKey);
+  if (!h) return null;
+  return toApiKey(db.prepare('SELECT * FROM api_keys WHERE key = ?').get(h));
+}
+
+/** Zwraca klucz API po jego PRZECHOWYWANYM hashu (użycie wewnętrzne, gdy mamy już hash). */
+export function getApiKeyByHash(db, keyHash) {
+  if (typeof keyHash !== 'string' || !keyHash) return null;
+  return toApiKey(db.prepare('SELECT * FROM api_keys WHERE key = ?').get(keyHash));
 }
 
 /** Klucze API danego właściciela (najnowsze pierwsze) — do panelu konta. */

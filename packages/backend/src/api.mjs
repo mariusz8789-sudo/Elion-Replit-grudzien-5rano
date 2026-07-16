@@ -149,6 +149,10 @@ export function handleApi(db, ctx) {
       const m = getModel(seg[2]);
       return m ? ok({ model: modelMetadata(m) }) : err(404, 'not_found');
     }
+    // compute/run wykonuje WYŁĄCZNIE ograniczone modele w procesie (fizyka: SEMF,
+    // Lorentz, …) z walidacją wejścia — NIE spawn'uje podprocesów, więc nie jest
+    // wektorem C1. Zapis w projekcie i tak wymaga uwierzytelnienia (patrz niżej).
+    // Wektory subprocesowe (RDKit: laboratory-readiness, molecule/render) są bramkowane.
     if (seg[1] === 'run' && seg.length === 2 && method === 'POST') return runComputeHandler(db, ctx, body);
     // Rejestr Toolchain (P6): status silników ustalony w runtime realną walidacją.
     if (seg[1] === 'toolchain' && seg.length === 2 && method === 'GET') return ok({ toolchain: listToolchain() });
@@ -183,12 +187,16 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'agent-roles' && seg.length === 2 && method === 'GET') return ok({ roles: AGENT_ROLES, version: MULTI_AGENT_VERSION });
     if (seg[1] === 'multi-agent' && seg.length === 2 && method === 'POST') return ok({ panel: runAgentPanel(body?.dossier ?? null) });
     // Laboratory Readiness — real RDKit-backed dossier for one candidate (SMILES [+ ADMET]).
-    if (seg[1] === 'laboratory-readiness' && seg.length === 2 && method === 'POST') return ok({ readiness: buildLaboratoryReadiness(body?.candidate ?? {}, { scientificQuestion: body?.scientificQuestion ?? null }) });
+    if (seg[1] === 'laboratory-readiness' && seg.length === 2 && method === 'POST') {
+      if (!getUserByToken(db, ctx.token)) return err(401, 'unauthorized', 'Zaloguj się, aby uruchomić analizę RDKit.');
+      return ok({ readiness: buildLaboratoryReadiness(body?.candidate ?? {}, { scientificQuestion: body?.scientificQuestion ?? null }) });
+    }
     // Investor Edition — deterministic investor/pharma/grant/IP package from real campaign+validation data.
     if (seg[1] === 'investor-package' && seg.length === 2 && method === 'POST') return ok({ package: generateInvestorPackage({ dossier: body?.dossier ?? null, validation: body?.validation ?? null, meta: body?.meta ?? {} }) });
     // Candidate Viewer — REAL molecular rendering from a SMILES: 2D depiction (RDKit SVG)
     // and/or 3D coordinates + bonds (ETKDG embed + MMFF/UFF). Never fabricated; RDKit-gated.
     if (seg[1] === 'molecule' && seg[2] === 'render' && seg.length === 3 && method === 'POST') {
+      if (!getUserByToken(db, ctx.token)) return err(401, 'unauthorized', 'Zaloguj się, aby renderować cząsteczkę.');
       const smiles = String(body?.smiles ?? '');
       if (!smiles) return err(400, 'invalid_input', 'SMILES required');
       const want3d = body?.mode !== '2d';
@@ -620,18 +628,26 @@ function issueSession(db, user) {
 
 /* ---------------- Self-service billing dashboard (Stage 2) ---------------- */
 
-/** The user's primary API key: the billing-linked one if it still exists, else newest. */
+/** The user's primary API key (one key per owner; keys are hashed, so pick by owner). */
 function primaryKeyFor(db, user) {
   const billing = getBillingCustomer(db, user.email);
   const keys = listApiKeysByOwner(db, user.email);
-  if (billing?.apiKey) { const k = keys.find((x) => x.key === billing.apiKey); if (k) return { key: k, billing }; }
   return { key: keys[0] ?? null, billing };
 }
 
-/** Full key view for the authenticated owner (own credential — safe to reveal). */
-function keyView(k) {
+/**
+ * Masked key view (Stage 8). Keys are hashed at rest, so the dashboard shows only the
+ * non-secret hint (e.g. `gk_AbCd…WxYz`). The full key is returned exactly once — at
+ * creation / regeneration — via keyView(k, { reveal: true }).
+ */
+function keyView(k, { reveal = false } = {}) {
   if (!k) return null;
-  return { key: k.key, tier: k.tier, usageCount: k.usageCount, monthlyLimit: k.monthlyLimit, remaining: Math.max(0, k.monthlyLimit - k.usageCount), resetDate: k.resetDate };
+  return {
+    key: reveal ? k.key : (k.keyHint ?? '••••'),
+    masked: !reveal,
+    tier: k.tier, usageCount: k.usageCount, monthlyLimit: k.monthlyLimit,
+    remaining: Math.max(0, k.monthlyLimit - k.usageCount), resetDate: k.resetDate,
+  };
 }
 
 /** GET /api/account/billing — plan, status, renewal, usage/quota, key, Stripe availability. */
@@ -649,14 +665,26 @@ function accountBillingView(db, user) {
   };
 }
 
-/** POST /api/account/api-key/regenerate — revoke old key(s), mint a fresh one at the current tier. */
+/**
+ * POST /api/account/api-key/regenerate — revoke old key(s), mint a fresh one at the
+ * current tier, and reveal it ONCE. Stage 8: wrapped in a transaction (PART 8) so a
+ * crash can never leave the user with zero keys, and billing stores only the hint.
+ */
 function regenerateAccountKey(db, user) {
   const billing = getBillingCustomer(db, user.email);
   const tier = billing?.tier ?? 'free';
-  for (const k of listApiKeysByOwner(db, user.email)) deleteApiKey(db, k.key); // old keys stop working
-  const fresh = createApiKey(db, { ownerEmail: user.email, tier });
-  if (billing) upsertBillingCustomer(db, { ownerEmail: user.email, apiKey: fresh.key });
-  return ok({ apiKey: keyView(fresh) });
+  db.prepare('BEGIN').run();
+  let fresh;
+  try {
+    for (const k of listApiKeysByOwner(db, user.email)) deleteApiKey(db, k.key); // old keys stop working
+    fresh = createApiKey(db, { ownerEmail: user.email, tier });
+    if (billing) upsertBillingCustomer(db, { ownerEmail: user.email, apiKey: fresh.keyHint });
+    db.prepare('COMMIT').run();
+  } catch (e) {
+    db.prepare('ROLLBACK').run();
+    throw e;
+  }
+  return ok({ apiKey: keyView(fresh, { reveal: true }) }); // full key shown exactly once
 }
 
 function register(db, body) {

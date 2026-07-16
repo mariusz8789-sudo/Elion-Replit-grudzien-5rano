@@ -74,6 +74,14 @@ multifactorial). It is hedged, but treat it as a hypothesis, not a fact.
 
 These are **real and must be addressed before a production, multi-tenant deployment.**
 
+> **Stage 8 (Security & Production Hardening) status — see SECURITY.md for details:**
+> **FIXED** — C1 (compute now auth-gated), C2 (proxy-aware rate limiting), H3 (session
+> tokens + API keys hashed at rest, non-breaking migration), M1 (crash handlers), M5
+> (transactional key regen). **STILL OPEN** — H1 & H2 (deferred: require an async-execution
+> redesign, out of scope for a hardening pass), M2 (login lockout), M3 (dispatch coupling),
+> M4 (CORS). The descriptions below are the original audit findings; strike-through them
+> mentally where marked FIXED above.
+
 ### Critical
 - **C1 — Unauthenticated subprocess spawning.** `/api/science/*` and `/api/compute/*`
   execute *before* the auth gate in `api.mjs`, and each spawns a Python RDKit subprocess.

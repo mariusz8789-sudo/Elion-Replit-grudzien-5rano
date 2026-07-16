@@ -27,6 +27,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import {
   sanitizeFlat,
   createRateLimiter,
+  clientIp,
   mimeFor,
   isHashedAsset,
   resolveStaticPath,
@@ -54,6 +55,10 @@ const startedAt = Date.now();
 
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 const client = hasKey ? new Anthropic() : null;
+
+// Stage 8, PART 4: honoruj X-Forwarded-For TYLKO za zaufanym proxy (opt-in).
+const TRUST_PROXY = process.env.GENESIS_TRUST_PROXY === 'true';
+const ipOf = (req) => clientIp(req.headers, req.socket.remoteAddress, TRUST_PROXY);
 
 // Trwały magazyn (Milestone 1: Backend Persistence). Domyślnie plik obok
 // serwera; :memory: dla testów/efemerycznych wdrożeń bez woluminu. node:sqlite
@@ -109,7 +114,7 @@ async function handleAsk(req, res) {
   if (!hasKey) {
     return json(res, 503, { error: 'ai_unavailable', message: AI_UNAVAILABLE_MESSAGE });
   }
-  const ip = req.socket.remoteAddress ?? 'unknown';
+  const ip = ipOf(req);
   if (!limiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Limit 10 pytań na minutę — odczekaj chwilę.' });
   }
@@ -228,7 +233,7 @@ setInterval(() => persistLimiter.cleanup(), 300_000).unref();
 /** Odczytuje ciało JSON (limit 64 kB — próby to małe wektory liczb), token z nagłówka i woła router. */
 function handlePersistApi(req, res, url) {
   if (!db) return json(res, 503, { error: 'persistence_unavailable', message: 'Trwały magazyn nie jest dostępny w tym wdrożeniu.' });
-  const ip = req.socket.remoteAddress ?? 'unknown';
+  const ip = ipOf(req);
   if (!persistLimiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Za dużo żądań — odczekaj chwilę.' });
   }
@@ -323,6 +328,22 @@ server.listen(PORT, () => {
     static: staticAvailable ? STATIC_DIR : 'none',
     persistence: db ? DB_PATH : 'none',
   });
+});
+
+// Stage 8, PART 7: globalna siatka bezpieczeństwa. Bez tych handlerów wyjątek,
+// który wymknie się ze ścieżki asynchronicznej (np. zadania w tle), ubija cały
+// proces bez śladu. Logujemy zawsze. `unhandledRejection` traktujemy jako błąd
+// do naprawy, ale NIE ubijamy procesu (jedno zgubione `await` nie może położyć
+// serwera). `uncaughtException` jest poważniejszy — logujemy i pozwalamy procesowi
+// zakończyć się kontrolowanie (menedżer/kontener zrestartuje) zamiast działać w
+// nieokreślonym stanie.
+process.on('unhandledRejection', (reason) => {
+  log('error', 'unhandled_rejection', { message: String(reason?.message ?? reason).slice(0, 300) });
+});
+process.on('uncaughtException', (err) => {
+  log('error', 'uncaught_exception', { message: String(err?.message ?? err).slice(0, 300), stack: String(err?.stack ?? '').slice(0, 500) });
+  try { server.close(() => { try { db?.close(); } catch { /* ignore */ } process.exit(1); }); } catch { process.exit(1); }
+  setTimeout(() => process.exit(1), 3000).unref();
 });
 
 // Graceful shutdown — autoscale/kontenery wysyłają SIGTERM przy skalowaniu.

@@ -56,6 +56,14 @@ export function newId() {
   return randomUUID();
 }
 
+/**
+ * Publiczny klucz API (v1) — prefiks `gk_` + 192 bity z CSPRNG w base64url
+ * (~32 znaki treści). Prefiks ułatwia rozpoznanie i wykrywanie wycieków.
+ */
+export function generateApiKey() {
+  return 'gk_' + randomBytes(24).toString('base64url');
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**

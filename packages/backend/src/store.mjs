@@ -20,7 +20,7 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { newId } from './auth.mjs';
+import { newId, generateApiKey } from './auth.mjs';
 
 /* ---------------- Role i uprawnienia (RBAC) ---------------- */
 
@@ -815,6 +815,21 @@ CREATE TABLE IF NOT EXISTS discovery_events (
 CREATE INDEX IF NOT EXISTS idx_discovery_campaigns_project ON discovery_campaigns(project_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_discovery_events_campaign ON discovery_events(campaign_id, generation, created_at);
 `;
+// v22 — Public API keys (external developers). Independent of user sessions:
+// its own table, its own auth path (/api/v1/*), a monthly usage quota per tier.
+const SCHEMA_V22 = `
+CREATE TABLE IF NOT EXISTS api_keys (
+  key           TEXT PRIMARY KEY,
+  owner_email   TEXT NOT NULL,
+  tier          TEXT NOT NULL DEFAULT 'free',
+  monthly_limit INTEGER NOT NULL,
+  usage_count   INTEGER NOT NULL DEFAULT 0,
+  reset_date    INTEGER NOT NULL,
+  created_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_api_keys_owner ON api_keys(owner_email);
+`;
+
 function addColumnIfMissing(db, table, column, ddl) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
   if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
@@ -877,7 +892,8 @@ function migrate(db) {
     db.exec(SCHEMA_V20_INDEXES);
   }
   if (version < 21) db.exec(SCHEMA_V21);
-  if (version < 21) db.exec('PRAGMA user_version = 21');
+  if (version < 22) db.exec(SCHEMA_V22);
+  if (version < 22) db.exec('PRAGMA user_version = 22');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -2287,4 +2303,52 @@ export function listTruthAnalyses(db, { limit = 50, projectId = undefined } = {}
     ? db.prepare('SELECT id, proposal_hash, project_id, decision, decision_hash, created_at FROM truth_analyses WHERE project_id IS ? ORDER BY created_at DESC LIMIT ?').all(projectId, limit)
     : db.prepare('SELECT id, proposal_hash, project_id, decision, decision_hash, created_at FROM truth_analyses ORDER BY created_at DESC LIMIT ?').all(limit);
   return rows.map((r) => ({ id: r.id, proposalHash: r.proposal_hash, projectId: r.project_id ?? null, decision: r.decision, decisionHash: r.decision_hash, createdAt: r.created_at }));
+}
+
+/* ---------------- Publiczne klucze API v1 (zewnętrzni programiści) ---------------- */
+
+/** Domyślne miesięczne limity per tier (nadpisywalne przy tworzeniu klucza). */
+export const API_TIERS = { free: 100, starter: 10_000, pro: 100_000 };
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+function toApiKey(row) {
+  if (!row) return null;
+  return {
+    key: row.key, ownerEmail: row.owner_email, tier: row.tier,
+    monthlyLimit: row.monthly_limit, usageCount: row.usage_count,
+    resetDate: row.reset_date, createdAt: row.created_at,
+  };
+}
+
+/**
+ * Tworzy nowy klucz API. `tier` ustala domyślny limit (nadpisywalny przez
+ * `monthlyLimit`). Zwraca pełny obiekt klucza (jedyny moment, gdy pełny klucz
+ * jest widoczny). `now` wstrzykiwalne dla testów.
+ */
+export function createApiKey(db, { ownerEmail, tier = 'free', monthlyLimit, now = Date.now() } = {}) {
+  const t = API_TIERS[tier] !== undefined ? tier : 'free';
+  const limit = Number.isFinite(monthlyLimit) ? Math.max(0, Math.floor(monthlyLimit)) : API_TIERS[t];
+  const key = generateApiKey();
+  const resetDate = now + MONTH_MS;
+  db.prepare('INSERT INTO api_keys (key, owner_email, tier, monthly_limit, usage_count, reset_date, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)')
+    .run(key, String(ownerEmail), t, limit, resetDate, now);
+  return toApiKey(db.prepare('SELECT * FROM api_keys WHERE key = ?').get(key));
+}
+
+/** Zwraca klucz API (lub null). */
+export function getApiKey(db, key) {
+  if (typeof key !== 'string' || !key) return null;
+  return toApiKey(db.prepare('SELECT * FROM api_keys WHERE key = ?').get(key));
+}
+
+/** Zeruje licznik i ustawia nową datę resetu (rolujące okno 30-dniowe). */
+export function resetApiKeyUsage(db, key, now = Date.now()) {
+  db.prepare('UPDATE api_keys SET usage_count = 0, reset_date = ? WHERE key = ?').run(now + MONTH_MS, key);
+}
+
+/** Zwiększa licznik zużycia o 1 (po udanej odpowiedzi). Zwraca nowy licznik. */
+export function incrementApiKeyUsage(db, key) {
+  db.prepare('UPDATE api_keys SET usage_count = usage_count + 1 WHERE key = ?').run(key);
+  const row = db.prepare('SELECT usage_count FROM api_keys WHERE key = ?').get(key);
+  return row?.usage_count ?? null;
 }

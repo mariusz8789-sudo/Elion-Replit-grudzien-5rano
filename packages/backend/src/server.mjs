@@ -189,9 +189,7 @@ setInterval(() => persistLimiter.cleanup(), 300_000).unref();
 
 /** Odczytuje ciało JSON (limit 64 kB — próby to małe wektory liczb), token z nagłówka i woła router. */
 function handlePersistApi(req, res, url) {
-  // The public v1 API is RDKit-only and must work even without persistence.
-  const isPublicV1 = url.pathname.startsWith('/api/v1/');
-  if (!db && !isPublicV1) return json(res, 503, { error: 'persistence_unavailable', message: 'Trwały magazyn nie jest dostępny w tym wdrożeniu.' });
+  if (!db) return json(res, 503, { error: 'persistence_unavailable', message: 'Trwały magazyn nie jest dostępny w tym wdrożeniu.' });
   const ip = req.socket.remoteAddress ?? 'unknown';
   if (!persistLimiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Za dużo żądań — odczekaj chwilę.' });

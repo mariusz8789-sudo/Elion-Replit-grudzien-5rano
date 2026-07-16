@@ -120,8 +120,8 @@ export function handleApi(db, ctx) {
   const body = ctx.body ?? {};
   const seg = pathname.replace(/^\/api\//, '').replace(/\/+$/, '').split('/'); // np. ['projects','ID','trials']
 
-  // ---- Publiczne, wersjonowane API v1 (niezależne od reszty aplikacji) ----
-  if (seg[0] === 'v1') return handleV1(seg, method, body);
+  // ---- Publiczne, wersjonowane API v1 (własne uwierzytelnianie kluczem API) ----
+  if (seg[0] === 'v1') return handleV1(seg, method, body, { db, token: ctx.token });
 
   // ---- Uwierzytelnianie (bez tokenu) ----
   if (seg[0] === 'auth') {

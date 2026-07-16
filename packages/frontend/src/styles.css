@@ -1747,6 +1747,32 @@ kbd {
 .report-verify td:first-child { white-space: nowrap; }
 .report-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
 
+/* Stage 5 — Scientific Decision Engine UI. */
+.tag-legend { white-space: nowrap; }
+.decision-group { margin-top: 0.9rem; }
+.decision-group-h { display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); margin: 0 0 0.4rem; }
+.decision-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.decision-item { border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.7rem; background: var(--surface-2, rgba(255,255,255,0.02)); }
+.decision-item-head { display: flex; align-items: baseline; gap: 0.55rem; flex-wrap: wrap; }
+.decision-item-text { flex: 1 1 320px; line-height: 1.5; font-size: 0.9rem; }
+.decision-explain-btn { flex: 0 0 auto; background: none; border: 1px solid var(--border); color: var(--cyan); border-radius: 999px; font-size: 0.72rem; padding: 0.1rem 0.6rem; cursor: pointer; }
+.decision-explain-btn:hover { border-color: var(--cyan); }
+.decision-explain { display: none; margin: 0.55rem 0 0; padding: 0.55rem 0.7rem; border-top: 1px dashed var(--border); grid-template-columns: max-content 1fr; gap: 0.25rem 0.9rem; font-size: 0.8rem; }
+.decision-explain.is-open { display: grid; }
+.decision-explain dt { color: var(--text-dim); }
+.decision-explain dd { margin: 0; }
+.decision-support { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.decision-col-h { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; margin: 0 0 0.4rem; color: var(--text); }
+.decision-col-h.ok { color: var(--green, #4ade80); }
+.decision-col-h.warn { color: var(--gold, #fbbf24); }
+.decision-col ul, .decision-removed { margin: 0; padding-left: 1.05rem; font-size: 0.84rem; display: flex; flex-direction: column; gap: 0.3rem; line-height: 1.45; }
+.decision-removed { list-style: none; padding-left: 0; }
+.decision-removed li::before { content: '✕ '; color: var(--text-dim); }
+.provenance-table td { vertical-align: top; }
+.provenance-note { font-size: 0.72rem; color: var(--text-dim); margin-top: 0.2rem; }
+.repro-meta dd { word-break: break-word; }
+@media (max-width: 720px) { .decision-support { grid-template-columns: 1fr; } }
+
 @media (max-width: 620px) {
   .product-nav { order: 3; width: 100%; margin-left: 0; }
   .product-account { order: 2; }
@@ -1767,4 +1793,8 @@ kbd {
   .print-report, .print-report * { color: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-report .ds-pill { border: 1px solid #999 !important; }
   .mv-3d { display: none !important; } /* WebGL canvas doesn't print; the 2D depiction carries the structure */
+  /* Publication-quality PDF: expand every explanation, drop interactive affordances. */
+  .decision-explain { display: grid !important; border-top: 1px dashed #bbb; }
+  .decision-explain-btn { display: none !important; }
+  .decision-item { border: 1px solid #ddd; break-inside: avoid; page-break-inside: avoid; }
 }

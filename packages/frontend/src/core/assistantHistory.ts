@@ -22,6 +22,7 @@ export interface SavedAnalysis {
     molecularFormula: string;
     props: MoleculeProps;
     notes: InterpretationNote[];
+    alerts?: string[]; // RDKit structural-alert names (Stage 5 decision input)
   } | null;
 }
 

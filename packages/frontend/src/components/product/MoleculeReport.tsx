@@ -13,6 +13,9 @@ import { Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { StatCard } from '../charts/Charts';
 import { Icon } from '../Icon';
 import { verificationRows, type MoleculeProps, type InterpretationNote, type VerificationStatus } from '../../core/moleculeInterpretation';
+import { buildDecisionReport } from '../../core/scientificDecision';
+import { PROVENANCE_KEYS, type ReproMeta } from '../../core/provenance';
+import { ScientificDecisionPanel, ResearchSupportPanel, TransparencyPanel, ReproducibilityPanel, ProvenancePanel } from './DecisionReport';
 
 export interface ReportData {
   name: string;
@@ -21,8 +24,11 @@ export interface ReportData {
   molecularFormula: string;
   props: MoleculeProps;
   notes: InterpretationNote[];
+  alerts?: string[]; // RDKit structural-alert names (Stage 5 decision input)
 }
 export interface AiInterpretation { available: boolean; text?: string; unavailableReason?: string }
+/** Reproducibility + provenance context (Stage 5). Optional so pre-Stage-5 saved reports still render. */
+export interface ReportMeta { rdkitVersion: string; repro: ReproMeta }
 
 const STATUS_PILL: Record<VerificationStatus, { kind: 'ok' | 'warn' | 'blocked'; label: string; icon: 'check' | 'alert' | 'block' }> = {
   RDKIT: { kind: 'ok', label: 'Verified by RDKit', icon: 'check' },
@@ -31,9 +37,10 @@ const STATUS_PILL: Record<VerificationStatus, { kind: 'ok' | 'warn' | 'blocked';
 };
 const f = (n: number, d = 2) => (Number.isFinite(n) ? Number(n.toFixed(d)) : n);
 
-export function MoleculeReport({ data, ai, onExport }: { data: ReportData; ai: AiInterpretation; onExport?: () => void }) {
+export function MoleculeReport({ data, ai, meta, onExport }: { data: ReportData; ai: AiInterpretation; meta?: ReportMeta; onExport?: () => void }) {
   const p = data.props;
   const rows = verificationRows({ inchiKey: data.inchiKey, molecularFormula: data.molecularFormula, props: p, notes: data.notes });
+  const decision = buildDecisionReport(p, data.alerts ?? []);
 
   return (
     <div className="print-report">
@@ -65,6 +72,10 @@ export function MoleculeReport({ data, ai, onExport }: { data: ReportData; ai: A
           <StatCard label="HBA" value={p.hba} sub="akceptory H" accent="var(--cyan)" />
         </div>
       </Panel>
+
+      {/* Scientific Decision Engine (Stage 5) — what is verified / promising / unknown / needs validation. */}
+      <ScientificDecisionPanel decision={decision} />
+      <ResearchSupportPanel decision={decision} />
 
       {/* AI Interpretation */}
       <Panel title="AI Interpretation" icon="brain" className="ds-mt"
@@ -103,6 +114,11 @@ export function MoleculeReport({ data, ai, onExport }: { data: ReportData; ai: A
         </div>
         <p className="ds-note ds-mt">✅ Verified by RDKit — obliczone realnym silnikiem. ⚠ Verified by Grounding Layer — wyprowadzone deterministycznie z faktów RDKit. ❌ Not Verified — niepotwierdzone (nie pokazujemy takich wartości jako faktów).</p>
       </Panel>
+
+      {/* Provenance + Transparency + Reproducibility (Stage 5). */}
+      {meta ? <ProvenancePanel keys={PROVENANCE_KEYS} engineVersion={meta.rdkitVersion} timestamp={meta.repro.generatedAt} /> : null}
+      <TransparencyPanel decision={decision} />
+      {meta ? <ReproducibilityPanel repro={meta.repro} /> : null}
 
       {onExport ? (
         <div className="report-actions">

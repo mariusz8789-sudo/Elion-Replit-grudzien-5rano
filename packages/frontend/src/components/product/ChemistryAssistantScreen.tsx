@@ -9,14 +9,15 @@
  */
 import { useEffect, useState } from 'react';
 import { ProductChrome } from './ProductChrome';
-import { MoleculeReport, type ReportData, type AiInterpretation } from './MoleculeReport';
+import { MoleculeReport, type ReportData, type AiInterpretation, type ReportMeta } from './MoleculeReport';
 import { Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { Icon } from '../Icon';
 import { AccountPanel } from '../AccountPanel';
 import { useSession } from '../../core/backend/session';
-import { buildLabReadiness, type LabReadiness } from '../../core/backend/client';
+import { buildLabReadiness, fetchScienceCapabilities, type LabReadiness } from '../../core/backend/client';
 import { askDiscovery } from '../../core/aiChat';
 import { interpretMolecule, type MoleculeProps } from '../../core/moleculeInterpretation';
+import { analysisHash, newReportId, GROUNDING_VERSION } from '../../core/provenance';
 import { saveAnalysis, getAnalysis, type AnalysisStatus } from '../../core/assistantHistory';
 
 const EXAMPLES = [
@@ -45,6 +46,7 @@ export function ChemistryAssistantScreen() {
   const [statusMsg, setStatusMsg] = useState<{ status: AnalysisStatus; text: string } | null>(null);
   const [report, setReport] = useState<ReportData | null>(null);
   const [ai, setAi] = useState<AiInterpretation>({ available: false });
+  const [meta, setMeta] = useState<ReportMeta | null>(null);
 
   // Reopen from "My Analyses" (id passed via sessionStorage).
   useEffect(() => {
@@ -55,7 +57,8 @@ export function ChemistryAssistantScreen() {
     const saved = getAnalysis(session.user.id, rid);
     if (saved?.report) {
       setSmiles(saved.smiles); setName(saved.name);
-      setReport({ name: saved.name, smiles: saved.smiles, inchiKey: saved.report.inchiKey, molecularFormula: saved.report.molecularFormula, props: saved.report.props, notes: saved.report.notes });
+      setReport({ name: saved.name, smiles: saved.smiles, inchiKey: saved.report.inchiKey, molecularFormula: saved.report.molecularFormula, props: saved.report.props, notes: saved.report.notes, alerts: saved.report.alerts ?? [] });
+      setMeta(null); // reproducibility hash is per-run; a reopened report shows the decision layer without a fresh hash
       setAi({ available: false, unavailableReason: 'zapisana analiza' });
     }
   }, [session]);
@@ -75,7 +78,7 @@ export function ChemistryAssistantScreen() {
   const analyze = async (s: string) => {
     const q = s.trim();
     if (!q || busy) return;
-    setBusy(true); setError(null); setStatusMsg(null); setReport(null);
+    setBusy(true); setError(null); setStatusMsg(null); setReport(null); setMeta(null);
     const r = await buildLabReadiness(q);
     if (!r.ok) { setBusy(false); setError(r.message); return; }
     const readiness = r.data;
@@ -89,15 +92,27 @@ export function ChemistryAssistantScreen() {
     const d = readiness.dossier;
     const props = propsFromDossier(d);
     const notes = interpretMolecule(props);
+    const alerts = (d.structuralAlerts ?? []).map((a) => a.name).filter(Boolean);
     const data: ReportData = {
       name: name || d.proposedStructure.molecularFormula, smiles: d.identity.smiles,
-      inchiKey: d.identity.inchiKey, molecularFormula: d.proposedStructure.molecularFormula, props, notes,
+      inchiKey: d.identity.inchiKey, molecularFormula: d.proposedStructure.molecularFormula, props, notes, alerts,
     };
+    setReport(data);
+    // Reproducibility + provenance metadata (Stage 5): real RDKit version + deterministic hash.
+    const caps = await fetchScienceCapabilities();
+    const rdkitVersion = caps.ok ? (caps.data.engines.rdkit?.version ?? 'nieznana') : 'nieznana';
+    const genesisVersion = caps.ok ? caps.data.version : 'nieznana';
+    const generatedAt = Date.now();
+    const hash = await analysisHash({
+      canonicalSmiles: d.identity.smiles, inchiKey: d.identity.inchiKey,
+      properties: { molWt: props.molWt, logP: props.logP, tpsa: props.tpsa, hbd: props.hbd, hba: props.hba, lipinskiViolations: props.lipinskiViolations, lipinskiPass: props.lipinskiPass },
+      rdkitVersion,
+    });
+    setMeta({ rdkitVersion, repro: { reportId: newReportId(), analysisHash: hash, genesisVersion, rdkitVersion, groundingVersion: GROUNDING_VERSION, generatedAt } });
     // AI interpretation via the existing /api/ask (grounded server-side). Honest if unavailable.
     const aiReply = await askDiscovery(`Podaj krótką, praktyczną interpretację tej cząsteczki WYŁĄCZNIE na podstawie faktów: MW ${props.molWt}, LogP ${props.logP}, TPSA ${props.tpsa}, HBD ${props.hbd}, HBA ${props.hba}, Lipinski ${props.lipinskiPass ? 'pass' : props.lipinskiViolations + ' viol'}. SMILES ${d.identity.smiles}.`);
     setAi(aiReply.ok ? { available: true, text: aiReply.answer } : { available: false, unavailableReason: aiReply.message });
-    setReport(data);
-    saveAnalysis({ ownerId: session.user.id, name: data.name, smiles: data.smiles, status: 'VERIFIED', report: { inchiKey: data.inchiKey, molecularFormula: data.molecularFormula, props, notes } });
+    saveAnalysis({ ownerId: session.user.id, name: data.name, smiles: data.smiles, status: 'VERIFIED', report: { inchiKey: data.inchiKey, molecularFormula: data.molecularFormula, props, notes, alerts } });
     setBusy(false);
   };
 
@@ -123,7 +138,7 @@ export function ChemistryAssistantScreen() {
         <div className="ds-empty ds-mt"><Icon name={statusMsg.status === 'BLOCKED' ? 'block' : 'alert'} size={24} className="ds-empty-icon" /><h4>{statusMsg.status}</h4><p>{statusMsg.text}</p></div>
       ) : null}
 
-      {report ? <div className="ds-mt"><MoleculeReport data={report} ai={ai} onExport={() => window.print()} /></div> : null}
+      {report ? <div className="ds-mt"><MoleculeReport data={report} ai={ai} meta={meta ?? undefined} onExport={() => window.print()} /></div> : null}
     </ProductChrome>
   );
 }

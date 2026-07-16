@@ -130,6 +130,28 @@ export async function me(token: string): Promise<ApiResult<User>> {
   return r.ok ? { ok: true, data: r.data.user } : r;
 }
 
+/* ---------------- Self-service billing dashboard (Stage 2) ---------------- */
+
+export interface AccountApiKey { key: string; tier: string; usageCount: number; monthlyLimit: number; remaining: number; resetDate: number }
+export interface AccountBilling {
+  email: string;
+  plan: { tier: string; status: string; renewalState: 'RENEWING' | 'CANCELED' | 'NONE' };
+  apiKey: AccountApiKey | null;
+  stripeConfigured: boolean;
+  availableTiers: string[];
+}
+export function fetchAccountBilling(token: string): Promise<ApiResult<AccountBilling>> {
+  return request<AccountBilling>('GET', '/account/billing', { token });
+}
+export async function regenerateApiKey(token: string): Promise<ApiResult<AccountApiKey>> {
+  const r = await request<{ apiKey: AccountApiKey }>('POST', '/account/api-key/regenerate', { token });
+  return r.ok ? { ok: true, data: r.data.apiKey } : r;
+}
+/** Opens Stripe Checkout for an upgrade; returns the hosted-payment URL to redirect to. */
+export async function startCheckout(token: string, tier: 'starter' | 'pro'): Promise<ApiResult<{ url: string; sessionId: string; tier: string }>> {
+  return request<{ url: string; sessionId: string; tier: string }>('POST', '/billing/checkout', { token, body: { tier } });
+}
+
 /* ---------------- Projekty i członkostwa (RBAC) ---------------- */
 
 export async function listProjects(token: string): Promise<ApiResult<Project[]>> {

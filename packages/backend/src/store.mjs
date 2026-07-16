@@ -2361,6 +2361,17 @@ export function getApiKey(db, key) {
   return toApiKey(db.prepare('SELECT * FROM api_keys WHERE key = ?').get(key));
 }
 
+/** Klucze API danego właściciela (najnowsze pierwsze) — do panelu konta. */
+export function listApiKeysByOwner(db, ownerEmail) {
+  if (!ownerEmail) return [];
+  return db.prepare('SELECT * FROM api_keys WHERE owner_email = ? ORDER BY created_at DESC').all(String(ownerEmail)).map(toApiKey);
+}
+
+/** Usuwa klucz API (używane przy regeneracji — stary klucz przestaje działać). */
+export function deleteApiKey(db, key) {
+  db.prepare('DELETE FROM api_keys WHERE key = ?').run(String(key));
+}
+
 /** Zeruje licznik i ustawia nową datę resetu (rolujące okno 30-dniowe). */
 export function resetApiKeyUsage(db, key, now = Date.now()) {
   db.prepare('UPDATE api_keys SET usage_count = 0, reset_date = ? WHERE key = ?').run(now + MONTH_MS, key);

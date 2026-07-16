@@ -306,7 +306,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/api/billing/checkout') return handleBilling(req, res, 'checkout');
   // Public, versioned external API (v1) — independent of persistence (RDKit only).
   if (req.url?.startsWith('/api/v1/')) return handlePersistApi(req, res, new URL(req.url, 'http://x'));
-  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute') || req.url?.startsWith('/api/science')) {
+  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute') || req.url?.startsWith('/api/science') || req.url?.startsWith('/api/account/')) {
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
   }
   if (req.url?.startsWith('/api/')) return json(res, 404, { error: 'not_found' });

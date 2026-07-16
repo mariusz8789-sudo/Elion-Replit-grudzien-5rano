@@ -39,6 +39,7 @@ import { KnowledgeGraphScreen } from './components/discovery/KnowledgeGraphScree
 import { ComputeClusterScreen } from './components/discovery/ComputeClusterScreen';
 import { ScientificMemoryScreen } from './components/discovery/ScientificMemoryScreen';
 import { InvestorDashboardScreen } from './components/discovery/InvestorDashboardScreen';
+import { BillingScreen } from './components/discovery/BillingScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -73,7 +74,8 @@ type Route =
   | { kind: 'knowledge-graph' }
   | { kind: 'compute' }
   | { kind: 'scientific-memory' }
-  | { kind: 'investor' };
+  | { kind: 'investor' }
+  | { kind: 'billing' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -103,6 +105,7 @@ function parseHash(): Route {
   if (h === '#/compute') return { kind: 'compute' };
   if (h === '#/scientific-memory') return { kind: 'scientific-memory' };
   if (h === '#/investor') return { kind: 'investor' };
+  if (h === '#/billing') return { kind: 'billing' };
   return { kind: 'home' };
 }
 
@@ -431,6 +434,7 @@ export default function App() {
     if (route.kind === 'compute') return <div className="app"><ErrorBoundary><ComputeClusterScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'scientific-memory') return <div className="app"><ErrorBoundary><ScientificMemoryScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'investor') return <div className="app"><ErrorBoundary><InvestorDashboardScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'billing') return <div className="app"><ErrorBoundary><BillingScreen /></ErrorBoundary>{overlays}</div>;
 
     return (
       <div className="app">

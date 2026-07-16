@@ -85,6 +85,9 @@ import * as dockingAdapter from './compute/dockingAdapter.mjs';
 import * as pilotReport from './cognitive/pilotReport.mjs';
 import * as discovery from './cognitive/discoveryController.mjs';
 import { getTruthAnalysis, listTruthAnalyses, listDiscoveryCampaigns, getDiscoveryCampaign } from './store.mjs';
+// Stage 2 — self-service billing dashboard (reuses Stage 1 helpers; no duplicated logic).
+import { getBillingCustomer, upsertBillingCustomer, listApiKeysByOwner, deleteApiKey, createApiKey, API_TIERS } from './store.mjs';
+import { billingConfig, billingConfigured } from './billing/handler.mjs';
 // V5 UI wiring — expose the existing V4 cognitive/validation modules over the API.
 import { detectComputeResources } from './cognitive/computeResources.mjs';
 import { accumulateMemory } from './cognitive/scientificMemory.mjs';
@@ -199,6 +202,13 @@ export function handleApi(db, ctx) {
   // ---- Od tego miejsca wymagany ważny token ----
   const user = getUserByToken(db, ctx.token);
   if (!user) return err(401, 'unauthorized', 'Zaloguj się, aby korzystać z trwałych projektów.');
+
+  // ---- Self-service billing dashboard (Stage 2). Read plan/usage/key + regenerate. ----
+  if (seg[0] === 'account') {
+    if (seg[1] === 'billing' && seg.length === 2 && method === 'GET') return ok(accountBillingView(db, user));
+    if (seg[1] === 'api-key' && seg[2] === 'regenerate' && seg.length === 3 && method === 'POST') return regenerateAccountKey(db, user);
+    return err(404, 'not_found');
+  }
 
   if (seg[0] === 'projects') {
     // /api/projects
@@ -606,6 +616,47 @@ function issueSession(db, user) {
   const token = generateToken();
   createSession(db, { userId: user.id, token, ttlMs: SESSION_TTL_MS });
   return ok({ token, user, expiresInMs: SESSION_TTL_MS }, 201);
+}
+
+/* ---------------- Self-service billing dashboard (Stage 2) ---------------- */
+
+/** The user's primary API key: the billing-linked one if it still exists, else newest. */
+function primaryKeyFor(db, user) {
+  const billing = getBillingCustomer(db, user.email);
+  const keys = listApiKeysByOwner(db, user.email);
+  if (billing?.apiKey) { const k = keys.find((x) => x.key === billing.apiKey); if (k) return { key: k, billing }; }
+  return { key: keys[0] ?? null, billing };
+}
+
+/** Full key view for the authenticated owner (own credential — safe to reveal). */
+function keyView(k) {
+  if (!k) return null;
+  return { key: k.key, tier: k.tier, usageCount: k.usageCount, monthlyLimit: k.monthlyLimit, remaining: Math.max(0, k.monthlyLimit - k.usageCount), resetDate: k.resetDate };
+}
+
+/** GET /api/account/billing — plan, status, renewal, usage/quota, key, Stripe availability. */
+function accountBillingView(db, user) {
+  const { key, billing } = primaryKeyFor(db, user);
+  const tier = billing?.tier ?? key?.tier ?? 'free';
+  const status = billing?.status ?? (key ? 'active' : 'inactive');
+  const renewalState = status === 'active' ? 'RENEWING' : status === 'canceled' ? 'CANCELED' : 'NONE';
+  return {
+    email: user.email,
+    plan: { tier, status, renewalState },
+    apiKey: keyView(key),
+    stripeConfigured: billingConfigured(billingConfig()),
+    availableTiers: Object.keys(API_TIERS),
+  };
+}
+
+/** POST /api/account/api-key/regenerate — revoke old key(s), mint a fresh one at the current tier. */
+function regenerateAccountKey(db, user) {
+  const billing = getBillingCustomer(db, user.email);
+  const tier = billing?.tier ?? 'free';
+  for (const k of listApiKeysByOwner(db, user.email)) deleteApiKey(db, k.key); // old keys stop working
+  const fresh = createApiKey(db, { ownerEmail: user.email, tier });
+  if (billing) upsertBillingCustomer(db, { ownerEmail: user.email, apiKey: fresh.key });
+  return ok({ apiKey: keyView(fresh) });
 }
 
 function register(db, body) {

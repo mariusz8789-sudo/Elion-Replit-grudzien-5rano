@@ -23,6 +23,7 @@ export const DISCOVERY_NAV: NavItem[] = [
   { hash: '#/compute', label: 'Compute Cluster', icon: 'cpu' },
   { hash: '#/scientific-memory', label: 'Scientific Memory', icon: 'memory' },
   { hash: '#/investor', label: 'Investor Dashboard', icon: 'briefcase' },
+  { hash: '#/billing', label: 'Rozliczenia', icon: 'lock' },
   { hash: '#/truth-engine', label: 'Truth Engine', icon: 'shield' },
   { hash: '#/discovery-workspace', label: 'Workspace', icon: 'chart' },
 ];

@@ -6,6 +6,34 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
 
 ## [Unreleased]
 
+### Dodano — Etapy 5–7 (produkt „Grounded Chemistry") + audyt końcowy
+- **Etap 5 — Scientific Decision Engine + Provenance:** raport decyzyjny z tagami
+  ✓ Verified / ⚠ Grounded / ⓘ General, „Explain every statement", proweniencja per deskryptor,
+  reprodukowalny hash SHA-256, publikacyjny PDF (`core/scientificDecision.ts`,
+  `core/provenance.ts`, `components/product/DecisionReport.tsx`).
+- **Etap 6 — Molecule Selection Platform:** porównanie 2–50 cząsteczek, ranking rozwojowy
+  0–100 z uzasadnieniem, macierz-heatmapa, porównanie do referencji, portfolio, panel
+  decyzyjny, batch PDF (`core/moleculeComparison.ts`, `components/product/Comparison*`).
+- **Etap 7 — Research Campaigns & Decision Trace:** kampanie badawcze (2–2000 cząsteczek),
+  współdzielony pipeline (4 workery, odporny na błędy, cancel/resume/partial), cykl życia +
+  timeline cząsteczek, ślad decyzyjny (projekcja rankingu — jedno źródło prawdy), dashboard,
+  eksport CSV/JSON/PDF (`core/campaigns.ts`, `core/batchRunner.ts`, `core/campaignExport.ts`,
+  `components/product/Campaign*`). Deskryptory liczone raz, nigdy nie przeliczane.
+
+### Naprawiono — audyt inżynieryjny 2026-07
+- `compute/rdkitAdapter.mjs`: `invoke()` ignorował drugi argument (timeout), więc ciężkie
+  `embed3d`/`denovo` działały pod 10 s zamiast 20–60 s — mogły fałszywie przekraczać limit.
+- `package.json`: `engines.node` `>=18` → `>=22` (wymagane przez `node:sqlite`).
+- `vite.config.ts`: komentarz twierdził ~187 kB głównego bundla; realny chunk `index` to
+  ~858 kB — komentarz poprawiony i nazwany dług (statyczny import 13 laboratoriów).
+
+### Dokumentacja — audyt końcowy
+- Nowe, uczciwe dokumenty produktu: `KNOWN_LIMITATIONS.md` (pełny audyt bez upiększeń),
+  `SCIENTIFIC_ENGINE.md`, `GROUNDING.md`, `PROVENANCE.md`, `CAMPAIGNS.md`, `API.md`,
+  `DEPLOYMENT.md`, `ROADMAP.md`, `COMMERCIALIZATION.md`, `GRANTS.md`, `FUTURE_WORK.md`.
+- `README.md` + `SECURITY.md` zaktualizowane o realny, trójwarstwowy stan platformy i
+  otwarte blokery produkcyjne/bezpieczeństwa (C1/C2/H1/H2/H3).
+
 ### Dodano (Domknięcie Genesis OS v1.0 — dokumentacja i kampania na danych zewnętrznych)
 - Ścieżka „externally supplied official payloads": `scripts/build-bundle-from-supplied.mjs`
   (montaż zweryfikowanego pakietu offline z realnym SHA-256, walidacją parsera i fail-closed),

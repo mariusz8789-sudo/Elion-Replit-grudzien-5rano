@@ -23,10 +23,15 @@ const TIMEOUT_MS = 10_000;
 
 let detectCache = null;
 
-/** Wywołuje worker z jednym poleceniem JSON; zwraca sparsowany wynik lub rzuca. */
-function invoke(request) {
+/**
+ * Wywołuje worker z jednym poleceniem JSON; zwraca sparsowany wynik lub rzuca.
+ * `timeoutMs` pozwala wydłużyć limit dla kosztownych operacji (embed3d/denovo);
+ * domyślnie TIMEOUT_MS. (Audyt: wcześniej drugi argument był ignorowany, więc
+ * ciężkie polecenia działały pod 10 s i mogły fałszywie przekraczać limit.)
+ */
+function invoke(request, timeoutMs = TIMEOUT_MS) {
   const out = execFileSync(PYTHON, [WORKER, JSON.stringify(request)], {
-    timeout: TIMEOUT_MS,
+    timeout: timeoutMs,
     maxBuffer: 4 * 1024 * 1024,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],

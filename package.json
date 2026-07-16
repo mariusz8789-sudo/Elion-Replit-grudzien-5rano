@@ -4,7 +4,7 @@
   "description": "Genesis OS — mobilna platforma do eksploracji fizyki, kosmologii i nauki poprzez interaktywne symulacje oraz AI.",
   "private": true,
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "npm run dev --workspace=packages/frontend",

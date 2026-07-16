@@ -6,9 +6,13 @@ export default defineConfig({
   build: {
     // three.js (dynamically imported only by 3D eksperymenty, patrz
     // core/three/useThreeLoop.ts) tworzy własny, świadomie duży, LENIWY
-    // chunk — podnosimy próg ostrzeżenia zamiast go sztucznie dzielić;
-    // główny bundle (index+vendor) pozostaje ~187 kB niezależnie od tego.
-    chunkSizeWarningLimit: 750,
+    // chunk (~688 kB) — ładowany dopiero przy wejściu do laboratoriów 3D.
+    // UWAGA (audyt): główny chunk `index` to ~858 kB, bo `labs/index.ts`
+    // importuje statycznie wszystkie 13 laboratoriów (świadomy wybór na
+    // rzecz gwarancji offline PWA — patrz komentarz niżej). Produktowy
+    // użytkownik (Asystent/Porównaj/Kampanie) i tak pobiera cały ten chunk;
+    // rozbicie per-trasa to główny dług wydajnościowy do rozważenia.
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
         // React/react-dom change far less often than app code — a separate

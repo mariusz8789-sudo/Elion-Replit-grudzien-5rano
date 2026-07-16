@@ -4,6 +4,47 @@
 interaktywne symulacje oraz warstwę AI. Od kwarku (10⁻¹⁸ m) do obserwowalnego
 Wszechświata (8,8×10²⁶ m).
 
+---
+
+## What Genesis actually is (read this first — 2026-07 audit)
+
+This repository contains **three layers**. Be clear about which one you are evaluating:
+
+1. **Science-education / simulation platform** (the historical core, described below) —
+   physics/astronomy/chemistry simulations and a cosmology timeline.
+2. **A "cognitive" scientific-reasoning backend** (`packages/backend/src/cognitive`, ~6.5k
+   LOC, real + tested) — deterministic orchestration whose real-world scientific *utility*
+   is unproven.
+3. **A commercial "Grounded Chemistry" product** (Stages 4–7) — the honest, well-tested
+   molecule-analysis → comparison → **research-campaign** workflow. **This is the part with
+   a defensible commercial and scientific thesis.**
+
+The product's promise is narrow and real: *trustworthy molecule triage an AI cannot
+fabricate.* Real RDKit descriptors, a transparent self-explaining ranking, provenance on
+every value, and an explicit refusal to predict biology/efficacy/toxicity. Every displayed
+value is tagged ✓ Verified / ⚠ Grounded / ⓘ General, and nothing is shown without a tag.
+
+### Product documentation
+| Doc | What it covers |
+|-----|----------------|
+| [SCIENTIFIC_ENGINE.md](SCIENTIFIC_ENGINE.md) | Real RDKit core, developability score, what is never computed |
+| [GROUNDING.md](GROUNDING.md) | The anti-hallucination guardrail for AI answers |
+| [PROVENANCE.md](PROVENANCE.md) | Per-descriptor provenance + reproducible analysis hash |
+| [CAMPAIGNS.md](CAMPAIGNS.md) | Research Campaigns: batch analysis, ranking, decision trace, export |
+| [API.md](API.md) | Public `/api/v1` (analyze / render) + tiers |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Build, container, config, production blockers |
+| [SECURITY.md](SECURITY.md) | Backend security posture + open blockers |
+| [ROADMAP.md](ROADMAP.md) · [COMMERCIALIZATION.md](COMMERCIALIZATION.md) · [GRANTS.md](GRANTS.md) | Product-validation phase, business, funding |
+| **[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)** | **The unflinching audit — read before trusting anything** |
+| [FUTURE_WORK.md](FUTURE_WORK.md) | Backlog, ordered by anticipated impact (to be re-ranked by real users) |
+
+> **Honesty note:** Genesis is a credible early-stage computational tool with exceptional
+> scientific transparency — **not** a validated discovery platform. It computes descriptors
+> correctly; it has not yet been shown to improve a real research decision, and it has real
+> production/security blockers (KNOWN_LIMITATIONS.md §2). Do not overestimate its readiness.
+
+---
+
 ## Obecny stan
 
 - **Quantum Decision Explorer** — galaktyka złożona z decyzji użytkownika:

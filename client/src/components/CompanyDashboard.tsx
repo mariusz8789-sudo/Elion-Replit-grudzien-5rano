@@ -14,7 +14,7 @@ import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import type { Company, Driver, Vehicle, Booking, CapacityPosting, CapacityBooking, WorkerProfile, Skill, WorkerSkill, CompanyService } from "@shared/schema";
+import type { Company, Driver, Vehicle, Booking, CapacityPosting, CapacityBooking, WorkerProfile, Skill, WorkerSkill, CompanyService, CrmLead, CrmTask } from "@shared/schema";
 import VehicleManager from "./VehicleManager";
 import ReviewsSection from "./ReviewsSection";
 import EntityCalendarCard from "./EntityCalendarCard";
@@ -1072,6 +1072,194 @@ function AiOperationsTab({ companyId }: { companyId: string }) {
   );
 }
 
+const LEAD_STAGES = ["new", "contacted", "qualified", "proposal", "won", "lost"] as const;
+const HEALTH_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  new: "outline",
+  healthy: "default",
+  at_risk: "secondary",
+  churned: "destructive",
+};
+
+interface CustomerInsight {
+  userId: string; name: string; totalBookings: number; totalSpentEur: number;
+  lastBookingDate: string | null; usedServiceNames: string[]; health: string; upsellSuggestions: string[];
+}
+
+function CrmTab({ companyId }: { companyId: string }) {
+  const { toast } = useToast();
+  const { data: leads = [] } = useQuery<CrmLead[]>({ queryKey: [`/api/companies/${companyId}/crm/leads`] });
+  const { data: tasks = [] } = useQuery<CrmTask[]>({ queryKey: [`/api/companies/${companyId}/crm/tasks`] });
+  const { data: insightsData } = useQuery<{ methodology: string; customers: CustomerInsight[] }>({
+    queryKey: [`/api/companies/${companyId}/crm/customer-insights`],
+  });
+
+  const [leadForm, setLeadForm] = useState({ name: "", email: "", phone: "", source: "manual", estimatedValueEur: "" });
+  const [taskForm, setTaskForm] = useState({ title: "", type: "follow_up", dueDate: "" });
+
+  const createLeadMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/companies/${companyId}/crm/leads`, leadForm);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/crm/leads`] });
+      setLeadForm({ name: "", email: "", phone: "", source: "manual", estimatedValueEur: "" });
+      toast({ title: "Lead added" });
+    },
+    onError: (error: any) => toast({ title: "Failed to add lead", description: error.message, variant: "destructive" }),
+  });
+
+  const updateLeadStageMutation = useMutation({
+    mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
+      await apiRequest("PATCH", `/api/crm/leads/${id}`, { stage });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/crm/leads`] }),
+  });
+
+  const deleteLeadMutation = useMutation({
+    mutationFn: async (id: string) => { await apiRequest("DELETE", `/api/crm/leads/${id}`, {}); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/crm/leads`] }),
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/companies/${companyId}/crm/tasks`, taskForm);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/crm/tasks`] });
+      setTaskForm({ title: "", type: "follow_up", dueDate: "" });
+      toast({ title: "Task added" });
+    },
+    onError: (error: any) => toast({ title: "Failed to add task", description: error.message, variant: "destructive" }),
+  });
+
+  const completeTaskMutation = useMutation({
+    mutationFn: async (id: string) => { await apiRequest("PATCH", `/api/crm/tasks/${id}/complete`, {}); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/crm/tasks`] }),
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (id: string) => { await apiRequest("DELETE", `/api/crm/tasks/${id}`, {}); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/crm/tasks`] }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5" />Leads Pipeline</CardTitle>
+          <CardDescription>Track prospects from first contact to a won booking.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-5 gap-2 items-end">
+            <Input placeholder="Name" className="h-8" value={leadForm.name} onChange={(e) => setLeadForm((f) => ({ ...f, name: e.target.value }))} data-testid="input-lead-name" />
+            <Input placeholder="Email" className="h-8" value={leadForm.email} onChange={(e) => setLeadForm((f) => ({ ...f, email: e.target.value }))} data-testid="input-lead-email" />
+            <Input placeholder="Phone" className="h-8" value={leadForm.phone} onChange={(e) => setLeadForm((f) => ({ ...f, phone: e.target.value }))} data-testid="input-lead-phone" />
+            <Input type="number" placeholder="Est. value (EUR)" className="h-8" value={leadForm.estimatedValueEur} onChange={(e) => setLeadForm((f) => ({ ...f, estimatedValueEur: e.target.value }))} data-testid="input-lead-value" />
+            <Button size="sm" onClick={() => createLeadMutation.mutate()} disabled={!leadForm.name.trim() || createLeadMutation.isPending} data-testid="button-add-lead">
+              Add Lead
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            {leads.length === 0 && <p className="text-sm text-muted-foreground" data-testid="text-no-leads">No leads yet.</p>}
+            {leads.map((lead) => (
+              <div key={lead.id} className="flex items-center justify-between p-2 border rounded gap-2 flex-wrap" data-testid={`lead-${lead.id}`}>
+                <div>
+                  <span className="font-medium text-sm">{lead.name}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{lead.email || lead.phone || "no contact info"}</span>
+                  {lead.estimatedValueEur && <Badge variant="outline" className="ml-2 text-xs">€{lead.estimatedValueEur}</Badge>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={lead.stage} onValueChange={(stage) => updateLeadStageMutation.mutate({ id: lead.id, stage })}>
+                    <SelectTrigger className="h-7 w-32" data-testid={`select-lead-stage-${lead.id}`}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {LEAD_STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button size="icon" variant="ghost" onClick={() => deleteLeadMutation.mutate(lead.id)} data-testid={`button-delete-lead-${lead.id}`}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tasks</CardTitle>
+          <CardDescription>Follow-ups, calls, meetings.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-4 gap-2 items-end">
+            <Input placeholder="Task title" className="h-8" value={taskForm.title} onChange={(e) => setTaskForm((f) => ({ ...f, title: e.target.value }))} data-testid="input-task-title" />
+            <Select value={taskForm.type} onValueChange={(type) => setTaskForm((f) => ({ ...f, type }))}>
+              <SelectTrigger className="h-8" data-testid="select-task-type"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="follow_up">Follow-up</SelectItem>
+                <SelectItem value="call">Call</SelectItem>
+                <SelectItem value="meeting">Meeting</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input type="date" className="h-8" value={taskForm.dueDate} onChange={(e) => setTaskForm((f) => ({ ...f, dueDate: e.target.value }))} data-testid="input-task-due" />
+            <Button size="sm" onClick={() => createTaskMutation.mutate()} disabled={!taskForm.title.trim() || createTaskMutation.isPending} data-testid="button-add-task">
+              Add Task
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {tasks.length === 0 && <p className="text-sm text-muted-foreground" data-testid="text-no-tasks">No tasks yet.</p>}
+            {tasks.map((task) => (
+              <div key={task.id} className={`flex items-center justify-between p-2 border rounded text-sm ${task.status === "done" ? "opacity-50" : ""}`} data-testid={`task-${task.id}`}>
+                <span>
+                  <Badge variant="outline" className="text-xs mr-2">{task.type}</Badge>
+                  {task.title}
+                  {task.dueDate && <span className="text-xs text-muted-foreground ml-2">due {new Date(task.dueDate).toLocaleDateString()}</span>}
+                </span>
+                <div className="flex items-center gap-1">
+                  {task.status !== "done" && (
+                    <Button size="sm" variant="ghost" onClick={() => completeTaskMutation.mutate(task.id)} data-testid={`button-complete-task-${task.id}`}>
+                      Complete
+                    </Button>
+                  )}
+                  <Button size="icon" variant="ghost" onClick={() => deleteTaskMutation.mutate(task.id)} data-testid={`button-delete-task-${task.id}`}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Customer Health & Upsell</CardTitle>
+          <CardDescription>Deterministic health status and unused-service suggestions (methodology: {insightsData?.methodology ?? "movex-customer-health-v1"}).</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(insightsData?.customers.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">No customer history yet.</p>}
+          {insightsData?.customers.map((c) => (
+            <div key={c.userId} className="p-2 border rounded text-sm space-y-1" data-testid={`customer-insight-${c.userId}`}>
+              <div className="flex items-center justify-between">
+                <span className="font-medium">{c.name}</span>
+                <Badge variant={HEALTH_VARIANT[c.health] ?? "outline"}>{c.health}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {c.totalBookings} bookings · €{c.totalSpentEur} lifetime · last {c.lastBookingDate ? new Date(c.lastBookingDate).toLocaleDateString() : "never"}
+              </p>
+              {c.upsellSuggestions.length > 0 && (
+                <p className="text-xs">Hasn't tried: {c.upsellSuggestions.join(", ")}</p>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function CalendarTab({ companyId }: { companyId: string }) {
   const { data: vehicles = [] } = useQuery<Vehicle[]>({
     queryKey: ["/api/vehicles", companyId],
@@ -1152,6 +1340,7 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
           <TabsTrigger value="enterprise" data-testid="tab-enterprise"><BarChart3 className="w-4 h-4 mr-2" />Enterprise</TabsTrigger>
           <TabsTrigger value="ai-operations" data-testid="tab-ai-operations"><Brain className="w-4 h-4 mr-2" />AI Operations</TabsTrigger>
           <TabsTrigger value="calendar" data-testid="tab-calendar"><CalendarIcon className="w-4 h-4 mr-2" />Calendar</TabsTrigger>
+          <TabsTrigger value="crm" data-testid="tab-crm"><UserPlus className="w-4 h-4 mr-2" />CRM</TabsTrigger>
           <TabsTrigger value="reviews" data-testid="tab-company-reviews"><Star className="w-4 h-4 mr-2" />Reviews</TabsTrigger>
         </TabsList>
         <TabsContent value="fleet" className="pt-4">
@@ -1180,6 +1369,9 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
         </TabsContent>
         <TabsContent value="calendar" className="pt-4">
           <CalendarTab companyId={companyId} />
+        </TabsContent>
+        <TabsContent value="crm" className="pt-4">
+          <CrmTab companyId={companyId} />
         </TabsContent>
         <TabsContent value="reviews" className="pt-4">
           <ReviewsSection companyId={companyId} />

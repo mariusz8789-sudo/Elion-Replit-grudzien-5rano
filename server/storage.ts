@@ -7,6 +7,8 @@ import {
   type Booking, type InsertBooking,
   type Quote, type InsertQuote,
   type Offer, type InsertOffer,
+  type CrmLead, type InsertCrmLead,
+  type CrmTask, type InsertCrmTask,
   type Message, type InsertMessage,
   type Attachment, type InsertAttachment,
   type Conversation, type InsertConversation,
@@ -48,6 +50,7 @@ import {
   type RecurringRouteSubscription, type InsertRecurringRouteSubscription,
   type CompanyService, type InsertCompanyService,
   users, companies, drivers, vehicles, services, bookings, quotes, offers,
+  crmLeads, crmTasks,
   messages, attachments, conversations, conversationParticipants, messageTemplates, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
   badges, badgeAwards, coupons, couponRedemptions, referralRewards, bookingTransfers,
@@ -136,7 +139,24 @@ export interface IStorage {
   createOffer(offer: InsertOffer): Promise<Offer>;
   acceptOffer(offerId: string): Promise<Offer | undefined>;
   rejectOffer(offerId: string): Promise<Offer | undefined>;
-  
+
+  // CRM operations
+  createCrmLead(data: InsertCrmLead, companyId: string, createdBy: string): Promise<CrmLead>;
+  getCompanyCrmLeads(companyId: string): Promise<CrmLead[]>;
+  getCrmLead(id: string): Promise<CrmLead | undefined>;
+  updateCrmLead(id: string, companyId: string, updates: Partial<InsertCrmLead>): Promise<CrmLead | undefined>;
+  convertCrmLead(id: string, companyId: string, bookingId: string): Promise<CrmLead | undefined>;
+  deleteCrmLead(id: string, companyId: string): Promise<boolean>;
+  createCrmTask(data: InsertCrmTask, companyId: string, createdBy: string): Promise<CrmTask>;
+  getCompanyCrmTasks(companyId: string): Promise<CrmTask[]>;
+  getCrmTask(id: string): Promise<CrmTask | undefined>;
+  completeCrmTask(id: string, companyId: string): Promise<CrmTask | undefined>;
+  deleteCrmTask(id: string, companyId: string): Promise<boolean>;
+  getCompanyCustomerInsights(companyId: string): Promise<Array<{
+    userId: string; name: string; totalBookings: number; totalSpentEur: number;
+    lastBookingDate: Date | null; usedServiceNames: string[];
+  }>>;
+
   // Message operations
   getBookingMessages(bookingId: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
@@ -748,6 +768,101 @@ export class DbStorage implements IStorage {
       .where(eq(offers.id, offerId))
       .returning();
     return result[0];
+  }
+
+  // === CRM ===
+  async createCrmLead(data: InsertCrmLead, companyId: string, createdBy: string): Promise<CrmLead> {
+    const result = await db.insert(crmLeads).values({ ...data, companyId, createdBy }).returning();
+    return result[0];
+  }
+
+  async getCompanyCrmLeads(companyId: string): Promise<CrmLead[]> {
+    return await db.select().from(crmLeads).where(eq(crmLeads.companyId, companyId)).orderBy(desc(crmLeads.updatedAt));
+  }
+
+  async getCrmLead(id: string): Promise<CrmLead | undefined> {
+    const result = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
+    return result[0];
+  }
+
+  async updateCrmLead(id: string, companyId: string, updates: Partial<InsertCrmLead>): Promise<CrmLead | undefined> {
+    const result = await db.update(crmLeads)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(crmLeads.id, id), eq(crmLeads.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async convertCrmLead(id: string, companyId: string, bookingId: string): Promise<CrmLead | undefined> {
+    const result = await db.update(crmLeads)
+      .set({ stage: "won", convertedBookingId: bookingId, updatedAt: new Date() })
+      .where(and(eq(crmLeads.id, id), eq(crmLeads.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCrmLead(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(crmLeads)
+      .where(and(eq(crmLeads.id, id), eq(crmLeads.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async createCrmTask(data: InsertCrmTask, companyId: string, createdBy: string): Promise<CrmTask> {
+    const result = await db.insert(crmTasks).values({ ...data, companyId, createdBy }).returning();
+    return result[0];
+  }
+
+  async getCompanyCrmTasks(companyId: string): Promise<CrmTask[]> {
+    return await db.select().from(crmTasks).where(eq(crmTasks.companyId, companyId)).orderBy(crmTasks.dueDate);
+  }
+
+  async getCrmTask(id: string): Promise<CrmTask | undefined> {
+    const result = await db.select().from(crmTasks).where(eq(crmTasks.id, id));
+    return result[0];
+  }
+
+  async completeCrmTask(id: string, companyId: string): Promise<CrmTask | undefined> {
+    const result = await db.update(crmTasks)
+      .set({ status: "done" })
+      .where(and(eq(crmTasks.id, id), eq(crmTasks.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCrmTask(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(crmTasks)
+      .where(and(eq(crmTasks.id, id), eq(crmTasks.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getCompanyCustomerInsights(companyId: string): Promise<Array<{
+    userId: string; name: string; totalBookings: number; totalSpentEur: number;
+    lastBookingDate: Date | null; usedServiceNames: string[];
+  }>> {
+    const result = await db.execute(sql`
+      SELECT b.user_id, u.name,
+        COUNT(*)::int AS total_bookings,
+        SUM(b.total_price)::float AS total_spent,
+        MAX(b.pickup_date) AS last_booking_date,
+        ARRAY_AGG(DISTINCT s.name) AS used_service_names
+      FROM bookings b
+      JOIN users u ON u.id = b.user_id
+      JOIN services s ON s.id = b.service_id
+      WHERE b.company_id = ${companyId}
+      GROUP BY b.user_id, u.name
+      ORDER BY total_spent DESC
+      LIMIT 50
+    `);
+    return result.rows.map((r: any) => ({
+      userId: r.user_id,
+      name: r.name,
+      totalBookings: Number(r.total_bookings),
+      totalSpentEur: Math.round(Number(r.total_spent)),
+      lastBookingDate: r.last_booking_date ? new Date(r.last_booking_date) : null,
+      usedServiceNames: r.used_service_names ?? [],
+    }));
   }
 
   // === MESSAGE OPERATIONS ===

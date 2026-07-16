@@ -217,6 +217,47 @@ export const offers = pgTable("offers", {
   companyIdIdx: index("offers_company_id_idx").on(t.companyId),
 }));
 
+// === CRM ===
+// A lead is a prospect before they become a real customer (a booking). It can originate from a
+// public quote request, a referral, or manual entry - convertedBookingId links it to the real
+// booking once won, rather than duplicating booking data into the lead itself.
+export const crmLeads = pgTable("crm_leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  source: text("source").notNull().default("manual"), // quote, referral, manual, website
+  stage: text("stage").notNull().default("new"), // new, contacted, qualified, proposal, won, lost
+  estimatedValueEur: decimal("estimated_value_eur", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  convertedBookingId: varchar("converted_booking_id").references(() => bookings.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("crm_leads_company_id_idx").on(t.companyId),
+  stageIdx: index("crm_leads_stage_idx").on(t.stage),
+}));
+
+export const crmTasks = pgTable("crm_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  leadId: varchar("lead_id").references(() => crmLeads.id),
+  customerId: varchar("customer_id").references(() => users.id), // set instead of leadId for an existing customer
+  title: text("title").notNull(),
+  type: text("type").notNull().default("follow_up"), // follow_up, call, meeting, email
+  dueDate: timestamp("due_date"),
+  status: text("status").notNull().default("pending"), // pending, done
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("crm_tasks_company_id_idx").on(t.companyId),
+  statusIdx: index("crm_tasks_status_idx").on(t.status),
+}));
+
 // === CHAT & ATTACHMENTS ===
 // Internal Messaging: a "conversation" generalizes the booking chat thread into any mailbox
 // (company mailbox, support mailbox, direct message) without duplicating the messages table -
@@ -1074,6 +1115,29 @@ export const insertOfferSchema = createInsertSchema(offers).omit({
   price: z.coerce.string(),
 });
 
+export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({
+  id: true,
+  companyId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  source: z.enum(["quote", "referral", "manual", "website"]).default("manual"),
+  stage: z.enum(["new", "contacted", "qualified", "proposal", "won", "lost"]).default("new"),
+  estimatedValueEur: z.coerce.string().optional(),
+});
+
+export const insertCrmTaskSchema = createInsertSchema(crmTasks).omit({
+  id: true,
+  companyId: true,
+  createdBy: true,
+  createdAt: true,
+  status: true,
+}).extend({
+  type: z.enum(["follow_up", "call", "meeting", "email"]).default("follow_up"),
+  dueDate: z.coerce.date().optional(),
+});
+
 export const insertMessageSchema = createInsertSchema(messages).omit({
   id: true,
   createdAt: true,
@@ -1452,6 +1516,12 @@ export type Quote = typeof quotes.$inferSelect;
 
 export type InsertOffer = z.infer<typeof insertOfferSchema>;
 export type Offer = typeof offers.$inferSelect;
+
+export type InsertCrmLead = z.infer<typeof insertCrmLeadSchema>;
+export type CrmLead = typeof crmLeads.$inferSelect;
+
+export type InsertCrmTask = z.infer<typeof insertCrmTaskSchema>;
+export type CrmTask = typeof crmTasks.$inferSelect;
 
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;

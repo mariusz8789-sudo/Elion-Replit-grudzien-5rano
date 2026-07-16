@@ -11,6 +11,7 @@ import { nanoid } from "nanoid";
 import {
   insertServiceSchema, insertBookingSchema, insertQuoteSchema, insertUserSchema,
   insertCompanySchema, insertDriverSchema, insertVehicleSchema, insertOfferSchema,
+  insertCrmLeadSchema, insertCrmTaskSchema,
   insertMessageSchema, insertAttachmentSchema, insertReviewSchema,
   insertConversationSchema, insertMessageTemplateSchema,
   insertTrackingUpdateSchema, insertNotificationSchema, insertMarketplaceListingSchema,
@@ -37,6 +38,7 @@ import { rankCrewCandidates, CREW_MATCH_METHODOLOGY, type CrewCandidate, type Sc
 import { haversineDistanceKm } from "@shared/geo";
 import { AI_OPERATIONS_ROLES, getAiOperationsReply } from "./services/aiOperations";
 import { executeAiAction } from "./services/aiActions";
+import { customerHealth, suggestUpsells, CUSTOMER_HEALTH_METHODOLOGY } from "@shared/crm";
 import { extractDocumentFields } from "./services/documentOcr";
 import { buildIcsCalendar } from "@shared/ics";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
@@ -2937,6 +2939,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
+  });
+
+  // === CRM ===
+  app.post("/api/companies/:companyId/crm/leads", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.companyId !== req.params.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const data = insertCrmLeadSchema.parse(req.body);
+      const lead = await storage.createCrmLead(data, req.params.companyId, user.id);
+      res.status(201).json(lead);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/companies/:companyId/crm/leads", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    res.json(await storage.getCompanyCrmLeads(req.params.companyId));
+  });
+
+  app.patch("/api/crm/leads/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const lead = await storage.getCrmLead(req.params.id);
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      if (user.companyId !== lead.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const updates = insertCrmLeadSchema.partial().parse(req.body);
+      const updated = await storage.updateCrmLead(req.params.id, lead.companyId, updates);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/crm/leads/:id/convert", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const lead = await storage.getCrmLead(req.params.id);
+    if (!lead) return res.status(404).json({ message: "Lead not found" });
+    if (user.companyId !== lead.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const { bookingId } = req.body as { bookingId: string };
+    if (!bookingId) return res.status(400).json({ message: "bookingId is required" });
+    const booking = await storage.getBooking(bookingId);
+    if (!booking || booking.companyId !== lead.companyId) {
+      return res.status(400).json({ message: "Booking not found for this company" });
+    }
+    const updated = await storage.convertCrmLead(req.params.id, lead.companyId, bookingId);
+    res.json(updated);
+  });
+
+  app.delete("/api/crm/leads/:id", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const lead = await storage.getCrmLead(req.params.id);
+    if (!lead) return res.status(404).json({ message: "Lead not found" });
+    if (user.companyId !== lead.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    await storage.deleteCrmLead(req.params.id, lead.companyId);
+    res.status(204).send();
+  });
+
+  app.post("/api/companies/:companyId/crm/tasks", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.companyId !== req.params.companyId && user.role !== "admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const data = insertCrmTaskSchema.parse(req.body);
+      const task = await storage.createCrmTask(data, req.params.companyId, user.id);
+      res.status(201).json(task);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/companies/:companyId/crm/tasks", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    res.json(await storage.getCompanyCrmTasks(req.params.companyId));
+  });
+
+  app.patch("/api/crm/tasks/:id/complete", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const task = await storage.getCrmTask(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+    if (user.companyId !== task.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const updated = await storage.completeCrmTask(req.params.id, task.companyId);
+    res.json(updated);
+  });
+
+  app.delete("/api/crm/tasks/:id", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    const task = await storage.getCrmTask(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+    if (user.companyId !== task.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    await storage.deleteCrmTask(req.params.id, task.companyId);
+    res.status(204).send();
+  });
+
+  app.get("/api/companies/:companyId/crm/customer-insights", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (user.companyId !== req.params.companyId && user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const insights = await storage.getCompanyCustomerInsights(req.params.companyId);
+    const allServiceNames = (await storage.getAllServices()).map((s) => s.name);
+    const now = new Date();
+    const enriched = insights.map((c) => {
+      const daysSinceLastBooking = c.lastBookingDate ? Math.floor((now.getTime() - c.lastBookingDate.getTime()) / 86400000) : null;
+      return {
+        ...c,
+        health: customerHealth({ totalBookings: c.totalBookings, daysSinceLastBooking }),
+        upsellSuggestions: suggestUpsells(c.usedServiceNames, allServiceNames, c.totalBookings),
+      };
+    });
+    res.json({ methodology: CUSTOMER_HEALTH_METHODOLOGY, customers: enriched });
   });
 
   // === DRIVER AVAILABILITY CALENDAR ===

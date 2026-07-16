@@ -14,9 +14,10 @@ import { Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { Icon } from '../Icon';
 import { AccountPanel } from '../AccountPanel';
 import { useSession } from '../../core/backend/session';
-import { buildLabReadiness, fetchScienceCapabilities, type LabReadiness } from '../../core/backend/client';
+import { buildLabReadiness, fetchScienceCapabilities } from '../../core/backend/client';
+import { propsFromDossier } from '../../core/dossierProps';
 import { askDiscovery } from '../../core/aiChat';
-import { interpretMolecule, type MoleculeProps } from '../../core/moleculeInterpretation';
+import { interpretMolecule } from '../../core/moleculeInterpretation';
 import { analysisHash, newReportId, GROUNDING_VERSION } from '../../core/provenance';
 import { saveAnalysis, getAnalysis, type AnalysisStatus } from '../../core/assistantHistory';
 
@@ -27,15 +28,6 @@ const EXAMPLES = [
   { name: 'Kofeina', smiles: 'Cn1cnc2c1c(=O)n(C)c(=O)n2C' },
 ];
 const REOPEN_KEY = 'genesis-assistant-reopen';
-
-function propsFromDossier(d: NonNullable<LabReadiness['dossier']>): MoleculeProps {
-  const pr = d.properties;
-  return {
-    molWt: Number(d.mass.averageMolWt), logP: Number(pr.logP), tpsa: Number(pr.tpsa),
-    hbd: Number(pr.hbd), hba: Number(pr.hba),
-    lipinskiViolations: Number(pr.lipinskiViolations), lipinskiPass: Boolean(pr.lipinskiPass),
-  };
-}
 
 export function ChemistryAssistantScreen() {
   const session = useSession();

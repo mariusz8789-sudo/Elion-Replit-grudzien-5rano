@@ -22,16 +22,14 @@ function heat(fav: number): string {
   return `hsl(${hue}, 70%, ${72 - fav * 8}%)`;
 }
 
-export function ComparisonReport({ ranked, referenceId }: { ranked: RankedCandidate[]; referenceId: string | null }) {
+export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: RankedCandidate[]; referenceId: string | null; embedded?: boolean }) {
   if (!ranked.length) return null;
   const reference = ranked.find((c) => c.id === referenceId) ?? null;
   const portfolio = portfolioBuckets(ranked);
   const matrix = buildMatrix(ranked);
 
-  return (
-    <div className="print-report">
-      <div className="report-print-title" aria-hidden="true">Molecule Selection Report — Genesis ({ranked.length} cząsteczek)</div>
-
+  const body = (
+    <>
       {/* Decision Dashboard */}
       <Panel title="Panel decyzyjny" icon="target" right={<StatusPill kind="info">{ranked.length} kandydatów</StatusPill>}>
         <div className="dash-grid">
@@ -156,6 +154,14 @@ export function ComparisonReport({ ranked, referenceId }: { ranked: RankedCandid
           <PortfolioCol title="Najsłabsi (ogon rankingu)" kind="info" icon="chart" items={portfolio.worst} empty="—" />
         </div>
       </Panel>
+    </>
+  );
+
+  if (embedded) return body;
+  return (
+    <div className="print-report">
+      <div className="report-print-title" aria-hidden="true">Molecule Selection Report — Genesis ({ranked.length} cząsteczek)</div>
+      {body}
     </div>
   );
 }

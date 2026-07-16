@@ -14,8 +14,7 @@ import { Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { Icon } from '../Icon';
 import { AccountPanel } from '../AccountPanel';
 import { useSession } from '../../core/backend/session';
-import { buildLabReadiness, type LabReadiness } from '../../core/backend/client';
-import type { MoleculeProps } from '../../core/moleculeInterpretation';
+import { runBatch } from '../../core/batchRunner';
 import { rankCandidates, type Candidate, type RankedCandidate } from '../../core/moleculeComparison';
 
 const MAX = 50;
@@ -28,32 +27,13 @@ Atorwastatyna = CC(C)c1c(C(=O)Nc2ccccc2)c(-c2ccccc2)c(-c2ccc(F)cc2)n1CCC(O)CC(O)
 interface ParsedEntry { name: string; smiles: string }
 interface FailedEntry { name: string; smiles: string; reason: string }
 
-function parseInput(raw: string): ParsedEntry[] {
+/** Shared with Campaigns via parseMoleculeLines — one parser, one pipeline. */
+export function parseMoleculeLines(raw: string, max = MAX): ParsedEntry[] {
   return raw.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
     const m = line.match(/^(.*?)\s*[=|]\s*(.+)$/);
     if (m) return { name: m[1].trim() || m[2].trim(), smiles: m[2].trim() };
     return { name: line, smiles: line };
-  }).slice(0, MAX);
-}
-
-function propsFromDossier(d: NonNullable<LabReadiness['dossier']>): MoleculeProps {
-  const pr = d.properties;
-  return {
-    molWt: Number(d.mass.averageMolWt), logP: Number(pr.logP), tpsa: Number(pr.tpsa),
-    hbd: Number(pr.hbd), hba: Number(pr.hba),
-    lipinskiViolations: Number(pr.lipinskiViolations), lipinskiPass: Boolean(pr.lipinskiPass),
-  };
-}
-
-/** Limited-concurrency map so 50 molecules don't fire 50 subprocess calls at once. */
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    while (next < items.length) { const i = next++; out[i] = await fn(items[i], i); }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return out;
+  }).slice(0, max);
 }
 
 export function ComparePlatformScreen() {
@@ -81,31 +61,20 @@ export function ComparePlatformScreen() {
   }
 
   const run = async () => {
-    const entries = parseInput(raw);
+    const entries = parseMoleculeLines(raw);
     if (entries.length < 2) { setError('Podaj co najmniej 2 cząsteczki (po jednej w wierszu).'); return; }
     setBusy(true); setError(null); setCandidates([]); setFailed([]); setReferenceId(null);
     setProgress({ done: 0, total: entries.length });
-    let done = 0;
-    const results = await mapLimit(entries, 4, async (e) => {
-      const r = await buildLabReadiness(e.smiles);
-      done += 1; setProgress({ done, total: entries.length });
-      if (!r.ok) return { ok: false as const, entry: e, reason: r.message };
-      const rd = r.data;
-      if (rd.status !== 'COMPLETED' || !rd.dossier) {
-        return { ok: false as const, entry: e, reason: rd.status === 'BLOCKED_BY_RUNTIME' ? 'Silnik RDKit niedostępny (BLOCKED_BY_RUNTIME)' : 'Nie udało się sparsować SMILES' };
-      }
-      const d = rd.dossier;
-      const c: Candidate = { id: `c${done}-${e.smiles}`, name: e.name, smiles: d.identity.smiles, props: propsFromDossier(d), alerts: (d.structuralAlerts ?? []).map((a) => a.name).filter(Boolean) };
-      return { ok: true as const, candidate: c };
-    });
-    const ok = results.filter((r) => r.ok).map((r) => (r as { candidate: Candidate }).candidate);
-    const bad = results.filter((r) => !r.ok).map((r) => { const x = r as { entry: ParsedEntry; reason: string }; return { name: x.entry.name, smiles: x.entry.smiles, reason: x.reason }; });
-    setCandidates(ok); setFailed(bad);
+    const { candidates: ok, failed: bad } = await runBatch(
+      entries.map((e, i) => ({ id: `c${i}-${e.smiles}`, name: e.name, smiles: e.smiles })),
+      { concurrency: 4, onProgress: (p) => setProgress({ done: p.done, total: p.total }) },
+    );
+    setCandidates(ok); setFailed(bad.map((b) => ({ name: b.name, smiles: b.smiles, reason: b.reason })));
     if (ok.length) setReferenceId(ok[0].id);
     setBusy(false); setProgress(null);
   };
 
-  const count = parseInput(raw).length;
+  const count = parseMoleculeLines(raw).length;
 
   return (
     <ProductChrome active="#/compare">

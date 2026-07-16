@@ -14,6 +14,7 @@
  */
 import type { MoleculeProps } from './moleculeInterpretation';
 import type { IconName } from '../components/Icon';
+import { GROUNDING_VERSION } from './provenance';
 
 export interface Candidate {
   id: string;
@@ -247,6 +248,42 @@ export function buildMatrix(ranked: RankedCandidate[]): MatrixRow[] {
       return { key: col.key, label: col.label, value, display, favorability: descriptorFavorability(col.key, value) };
     }),
   }));
+}
+
+/* ---------------- Decision Trace (Stage 7) ---------------- */
+
+export interface DecisionTrace {
+  rank: number;
+  score: number;
+  verdict: Verdict;
+  descriptorsUsed: string[];                              // every score part's descriptor
+  rulesTriggered: { label: string; reason: string; points: number }[]; // parts that added points
+  positives: string[];                                   // the "+" lines of the WHY column
+  negatives: string[];                                   // the "−" lines of the WHY column
+  rejectedRules: { label: string; reason: string }[];    // parts that scored poorly / penalised
+  verdictReasons: string[];
+  groundingStatus: string;
+}
+
+/**
+ * Decision Trace — a PROJECTION of data already produced by rankCandidates/rankingWhy.
+ * It recomputes NOTHING: positives/negatives are exactly the Stage 6 "WHY (+/−)" lines,
+ * descriptors/rules come straight from the score parts. One source of truth.
+ */
+export function decisionTrace(c: RankedCandidate): DecisionTrace {
+  const why = rankingWhy(c); // the SAME explanation used by the ranking table
+  return {
+    rank: c.rank,
+    score: c.scored.score,
+    verdict: c.decision.verdict,
+    descriptorsUsed: c.scored.parts.map((p) => p.label),
+    rulesTriggered: c.scored.parts.filter((p) => p.points > 0).map((p) => ({ label: p.label, reason: p.reason, points: p.points })),
+    positives: why.filter((w) => w.startsWith('+')),
+    negatives: why.filter((w) => w.startsWith('−')),
+    rejectedRules: c.scored.parts.filter((p) => p.points < 0 || (p.max > 0 && p.points <= p.max * 0.4)).map((p) => ({ label: p.label, reason: p.reason })),
+    verdictReasons: c.decision.reasons,
+    groundingStatus: `Wartości zweryfikowane przez RDKit; interpretacja ugruntowana regułami (${GROUNDING_VERSION}). Bez predykcji biologicznych.`,
+  };
 }
 
 export const VERDICT_META: Record<Verdict, { label: string; kind: 'ok' | 'warn' | 'info' | 'blocked'; icon: IconName }> = {

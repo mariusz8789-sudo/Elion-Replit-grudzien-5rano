@@ -1814,6 +1814,41 @@ kbd {
 @media (max-width: 860px) { .dash-grid, .portfolio-grid { grid-template-columns: repeat(2, 1fr); } .matrix-swot { grid-template-columns: 1fr; } }
 @media print { .matrix-cell { color: #10241f !important; } .dash-grid, .portfolio-grid { grid-template-columns: repeat(2, 1fr); } }
 
+/* Stage 7 — Research Campaigns. */
+.campaign-form { display: flex; flex-direction: column; gap: 0.7rem; margin-bottom: 0.5rem; }
+.campaign-form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem; color: var(--text-dim); }
+.campaign-form input, .campaign-form textarea { background: var(--surface, rgba(255,255,255,0.03)); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.65rem; font-size: 0.9rem; }
+.campaign-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.8rem; }
+.campaign-card { display: flex; flex-direction: column; gap: 0.5rem; border: 1px solid var(--border); border-radius: 12px; padding: 0.85rem; text-decoration: none; color: inherit; transition: border-color 0.15s, transform 0.15s; }
+.campaign-card:hover { border-color: var(--cyan); transform: translateY(-2px); }
+.campaign-card header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.campaign-goal { font-size: 0.82rem; color: var(--text-dim); line-height: 1.4; margin: 0; min-height: 2.3em; }
+.campaign-card footer { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem; }
+.run-status { border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; }
+.run-bar { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.run-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--green, #4ade80)); transition: width 0.3s; }
+.run-stats { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-top: 0.5rem; font-size: 0.78rem; color: var(--text-dim); }
+.run-stats .ok { color: var(--green, #4ade80); }
+.run-stats .bad { color: var(--red, #f87171); }
+.invalid-reason { font-size: 0.7rem; margin-top: 0.2rem; }
+.timeline-cell { font-size: 0.72rem; color: var(--text-dim); }
+.tl-step { white-space: nowrap; margin-right: 0.2rem; }
+.stage-actions { white-space: nowrap; }
+.stage-actions .ds-chip { margin-right: 0.25rem; }
+.trace { border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem 0.8rem; background: var(--surface-2, rgba(255,255,255,0.02)); }
+.trace-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; font-size: 0.85rem; }
+.trace-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; }
+.trace-h { display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; margin: 0 0 0.35rem; }
+.trace-h.ok { color: var(--green, #4ade80); }
+.trace-h.warn { color: var(--gold, #fbbf24); }
+.trace-grid ul { margin: 0; padding-left: 1rem; font-size: 0.78rem; line-height: 1.4; display: flex; flex-direction: column; gap: 0.25rem; }
+.trace-meta { margin-top: 0.7rem; border-top: 1px dashed var(--border); padding-top: 0.55rem; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.78rem; line-height: 1.4; }
+.trace-grounding { display: flex; gap: 0.45rem; align-items: baseline; }
+.report-top-list { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; }
+.report-trace-block { margin-top: 0.8rem; }
+@media (max-width: 720px) { .trace-grid { grid-template-columns: 1fr; } }
+@media print { .trace-grid { grid-template-columns: repeat(3, 1fr); } .campaign-cards { grid-template-columns: 1fr; } }
+
 @media (max-width: 620px) {
   .product-nav { order: 3; width: 100%; margin-left: 0; }
   .product-account { order: 2; }

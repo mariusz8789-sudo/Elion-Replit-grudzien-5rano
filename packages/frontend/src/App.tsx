@@ -43,6 +43,8 @@ import { BillingScreen } from './components/discovery/BillingScreen';
 import { ChemistryAssistantScreen } from './components/product/ChemistryAssistantScreen';
 import { MyAnalysesScreen } from './components/product/MyAnalysesScreen';
 import { ComparePlatformScreen } from './components/product/ComparePlatformScreen';
+import { CampaignsScreen } from './components/product/CampaignsScreen';
+import { CampaignScreen as ResearchCampaignScreen } from './components/product/CampaignScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -81,7 +83,9 @@ type Route =
   | { kind: 'billing' }
   | { kind: 'assistant' }
   | { kind: 'analyses' }
-  | { kind: 'compare' };
+  | { kind: 'compare' }
+  | { kind: 'research-campaigns' }
+  | { kind: 'research-campaign'; id: string };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -115,6 +119,9 @@ function parseHash(): Route {
   if (h === '#/assistant') return { kind: 'assistant' };
   if (h === '#/analyses') return { kind: 'analyses' };
   if (h === '#/compare') return { kind: 'compare' };
+  const camp = h.match(/^#\/campaigns\/([\w-]+)/);
+  if (camp) return { kind: 'research-campaign', id: camp[1] };
+  if (h === '#/campaigns') return { kind: 'research-campaigns' };
   return { kind: 'home' };
 }
 
@@ -447,6 +454,8 @@ export default function App() {
     if (route.kind === 'assistant') return <div className="app"><ErrorBoundary><ChemistryAssistantScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'analyses') return <div className="app"><ErrorBoundary><MyAnalysesScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'compare') return <div className="app"><ErrorBoundary><ComparePlatformScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'research-campaigns') return <div className="app"><ErrorBoundary><CampaignsScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'research-campaign') return <div className="app"><ErrorBoundary><ResearchCampaignScreen id={route.id} /></ErrorBoundary>{overlays}</div>;
 
     return (
       <div className="app">

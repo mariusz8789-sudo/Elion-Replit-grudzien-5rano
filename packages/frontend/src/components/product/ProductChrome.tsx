@@ -11,6 +11,7 @@ import { logout } from '../../core/backend/client';
 const LINKS: { hash: string; label: string; icon: IconName }[] = [
   { hash: '#/assistant', label: 'Asystent', icon: 'flask' },
   { hash: '#/compare', label: 'Porównaj', icon: 'graph' },
+  { hash: '#/campaigns', label: 'Kampanie', icon: 'briefcase' },
   { hash: '#/analyses', label: 'Moje analizy', icon: 'book' },
   { hash: '#/billing', label: 'Rozliczenia', icon: 'lock' },
 ];

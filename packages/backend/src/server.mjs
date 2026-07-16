@@ -28,6 +28,7 @@ import {
   sanitizeFlat,
   createRateLimiter,
   clientIp,
+  corsHeaders,
   mimeFor,
   isHashedAsset,
   resolveStaticPath,
@@ -59,6 +60,13 @@ const client = hasKey ? new Anthropic() : null;
 // Stage 8, PART 4: honoruj X-Forwarded-For TYLKO za zaufanym proxy (opt-in).
 const TRUST_PROXY = process.env.GENESIS_TRUST_PROXY === 'true';
 const ipOf = (req) => clientIp(req.headers, req.socket.remoteAddress, TRUST_PROXY);
+
+// Genesis 2.0 (M4): CORS dla publicznego /api/v1 — domyślnie wyłączone (pusty allowlist).
+const CORS_ORIGINS = (process.env.GENESIS_CORS_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+
+// Genesis 2.0 (M3): jedno źródło prefiksów tras trafiających do handleApi (persist API).
+// Musi pozostać zgodne z routingiem seg[0] w api.mjs — patrz test serverRouting.test.mjs.
+const PERSIST_API_PREFIXES = ['/api/auth/', '/api/projects', '/api/compute', '/api/science', '/api/account/'];
 
 // Trwały magazyn (Milestone 1: Backend Persistence). Domyślnie plik obok
 // serwera; :memory: dla testów/efemerycznych wdrożeń bez woluminu. node:sqlite
@@ -310,8 +318,13 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/api/billing/webhook') return handleBilling(req, res, 'webhook');
   if (req.method === 'POST' && req.url === '/api/billing/checkout') return handleBilling(req, res, 'checkout');
   // Public, versioned external API (v1) — independent of persistence (RDKit only).
-  if (req.url?.startsWith('/api/v1/')) return handlePersistApi(req, res, new URL(req.url, 'http://x'));
-  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute') || req.url?.startsWith('/api/science') || req.url?.startsWith('/api/account/')) {
+  if (req.url?.startsWith('/api/v1/')) {
+    // M4: CORS dla publicznego API (config-gated). Bez allowlisty → brak nagłówków.
+    for (const [name, value] of Object.entries(corsHeaders(req.headers.origin, CORS_ORIGINS))) res.setHeader(name, value);
+    if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); } // preflight
+    return handlePersistApi(req, res, new URL(req.url, 'http://x'));
+  }
+  if (PERSIST_API_PREFIXES.some((p) => req.url?.startsWith(p))) {
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
   }
   if (req.url?.startsWith('/api/')) return json(res, 404, { error: 'not_found' });

@@ -54,13 +54,17 @@ audited (2026-07) state of that backend.
 | H3 | High | Session tokens and API keys stored in plaintext. | **FIXED** — tokens/keys stored as SHA-256 (`secrets.mjs`, schema v24 in-place migration). Raw value shown once at creation; dashboard shows a masked hint. Existing users keep working (raw presented → hashed → matches). |
 | M1 | Medium | No global crash handlers. | **FIXED** — `unhandledRejection` logged (process survives); `uncaughtException` logged + controlled shutdown (`server.mjs`). |
 | M5 | Medium | `regenerateAccountKey` non-transactional. | **FIXED** — wrapped in a BEGIN/COMMIT/ROLLBACK transaction (`api.mjs`). |
-| H1 | High | Blocking event loop (sync SQLite + `execFileSync` compute). | **DEFERRED** — a true non-blocking worker queue requires an async router refactor, which is a redesign (explicitly out of scope for this hardening stage). Documented in FUTURE_WORK.md. |
+| M2 | Medium | No per-account login throttle/lockout. | **FIXED (Genesis 2.0)** — persistent per-account lockout (`login_attempts`, schema v25): 8 failed attempts → 15-min lock, checked before password verification; a success clears the counter (`store.mjs`, `api.mjs`). Survives restart. |
+| M4 | Medium | No CORS headers → public API unusable from browsers. | **FIXED (Genesis 2.0)** — config-gated CORS for `/api/v1` via `GENESIS_CORS_ORIGINS` (allowlist or `*`; empty = off). Origin echoed only when explicitly allowed; OPTIONS preflight handled (`lib.mjs`, `server.mjs`). |
+| M3 | Medium | `server.mjs` dispatch allow-list hand-synced with `api.mjs`. | **MITIGATED** — the prefixes are now a single named constant (`PERSIST_API_PREFIXES`) instead of scattered `startsWith` checks. |
+| H1 | High | Blocking event loop (sync SQLite + `execFileSync` compute). | **DEFERRED** — a true non-blocking worker queue requires an async router refactor (a redesign, out of scope). See FUTURE_WORK.md. |
 | H2 | High | In-process jobs, no orphan recovery. | **DEFERRED** — depends on the same execution refactor (H1). |
-| M2 | Medium | No per-account login throttle/lockout. | Open. |
-| M4 | Medium | No CORS headers → public API unusable from browsers. | Open. |
+| — | Ops | Single-file SQLite, no backup/DR. | **OPEN (ops task, not code)** — put `genesis.db` on a durable volume + scheduled WAL-aware backups. See DEPLOYMENT.md. |
 
 The `/api/v1` monthly quota remains the reliable per-client limit; its usage increment is
-still a non-atomic read-modify-write (acceptable single-instance; revisit for multi-instance).
+still a non-atomic read-modify-write (safe single-instance — `node:sqlite` is synchronous and
+JS is single-threaded, so the read-modify-write cannot interleave within one process; revisit
+only for multi-instance).
 
 Full detail and remediation notes: **KNOWN_LIMITATIONS.md §2**.
 

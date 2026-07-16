@@ -122,6 +122,25 @@ export function clientIp(headers, socketAddr, trustProxy) {
   return socketAddr || 'unknown';
 }
 
+/**
+ * Nagłówki CORS dla PUBLICZNEGO API v1 (Genesis 2.0, M4). Domyślnie CORS jest
+ * WYŁĄCZONE (pusty allowlist → brak nagłówków → same-origin only, jak dotąd).
+ * Włącza się przez env GENESIS_CORS_ORIGINS (lista origin po przecinku, albo '*').
+ * Echo'ujemy origin tylko jeśli jest na białej liście (nie odbijamy dowolnego).
+ * Czysta funkcja — testowana bez serwera.
+ */
+export function corsHeaders(origin, allowed = []) {
+  if (!Array.isArray(allowed) || allowed.length === 0) return {};
+  const base = {
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'authorization, content-type',
+    'access-control-max-age': '600',
+  };
+  if (allowed.includes('*')) return { 'access-control-allow-origin': '*', ...base };
+  if (origin && allowed.includes(origin)) return { 'access-control-allow-origin': origin, vary: 'Origin', ...base };
+  return {};
+}
+
 /* ---------------- Statyczny frontend ---------------- */
 
 export const MIME = {

@@ -6,8 +6,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { hashSecret, keyHint, looksHashed } from './secrets.mjs';
-import { clientIp } from './lib.mjs';
-import { openDatabase, createUser, createSession, getUserByToken, deleteSession, createApiKey, getApiKey } from './store.mjs';
+import { clientIp, corsHeaders } from './lib.mjs';
+import { openDatabase, createUser, createSession, getUserByToken, deleteSession, createApiKey, getApiKey, loginLockState, recordLoginFailure, clearLoginAttempts, LOGIN_MAX_FAILS } from './store.mjs';
+import { handleApi } from './api.mjs';
 import { hashPassword, generateToken } from './auth.mjs';
 
 describe('secrets helpers', () => {
@@ -59,6 +60,52 @@ describe('API keys: hashed at rest, raw key authenticates, hint for display', ()
     assert.equal(resolved.tier, 'starter');
     assert.equal(resolved.key, hashSecret(created.key));
     assert.equal(getApiKey(db, 'gk_wrongkey'), null);
+  });
+});
+
+describe('login brute-force lockout (Genesis 2.0, M2)', () => {
+  test('store: N failures locks the account; success clears it; window resets', () => {
+    const db = openDatabase(':memory:');
+    for (let i = 0; i < LOGIN_MAX_FAILS - 1; i++) recordLoginFailure(db, 'x@y.io');
+    assert.equal(loginLockState(db, 'x@y.io').locked, false);   // not yet
+    recordLoginFailure(db, 'x@y.io');                           // the Nth failure locks
+    assert.equal(loginLockState(db, 'x@y.io').locked, true);
+    assert.ok(loginLockState(db, 'x@y.io').retryAfterMs > 0);
+    clearLoginAttempts(db, 'x@y.io');
+    assert.equal(loginLockState(db, 'x@y.io').locked, false);
+  });
+  test('handler: repeated wrong passwords → 429 account_locked, even with the right one after', () => {
+    const db = openDatabase(':memory:');
+    createUser(db, { email: 'lock@lab.io', displayName: 'L', passwordHash: hashPassword('correct-horse') });
+    const login = (pw) => handleApi(db, { method: 'POST', pathname: '/api/auth/login', body: { email: 'lock@lab.io', password: pw } });
+    let last;
+    for (let i = 0; i < LOGIN_MAX_FAILS; i++) last = login('wrong');
+    assert.equal(last.status, 401);                    // the Nth wrong attempt still 401 (now locked)
+    const after = login('correct-horse');              // correct password, but account is locked
+    assert.equal(after.status, 429);
+    assert.equal(after.body.error, 'account_locked');
+  });
+  test('handler: a correct login before the limit resets the counter', () => {
+    const db = openDatabase(':memory:');
+    createUser(db, { email: 'ok@lab.io', displayName: 'O', passwordHash: hashPassword('correct-horse') });
+    const login = (pw) => handleApi(db, { method: 'POST', pathname: '/api/auth/login', body: { email: 'ok@lab.io', password: pw } });
+    login('wrong'); login('wrong');
+    assert.equal(login('correct-horse').status, 201);  // success (session created) resets the counter
+    for (let i = 0; i < LOGIN_MAX_FAILS - 1; i++) login('wrong');
+    assert.equal(loginLockState(db, 'ok@lab.io').locked, false); // counter was reset, still under limit
+  });
+});
+
+describe('CORS for public API (Genesis 2.0, M4)', () => {
+  test('empty allowlist → no CORS headers (same-origin only, default)', () => {
+    assert.deepEqual(corsHeaders('https://x.io', []), {});
+  });
+  test('wildcard allowlist → Access-Control-Allow-Origin: *', () => {
+    assert.equal(corsHeaders('https://x.io', ['*'])['access-control-allow-origin'], '*');
+  });
+  test('origin echoed only when explicitly allowed (never reflects arbitrary origins)', () => {
+    assert.equal(corsHeaders('https://good.io', ['https://good.io'])['access-control-allow-origin'], 'https://good.io');
+    assert.deepEqual(corsHeaders('https://evil.io', ['https://good.io']), {});
   });
 });
 

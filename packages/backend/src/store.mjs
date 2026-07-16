@@ -939,6 +939,17 @@ function migrate(db) {
     } catch (e) { db.prepare('ROLLBACK').run(); throw e; }
     db.exec('PRAGMA user_version = 24');
   }
+  // v25 — Genesis 2.0: ochrona przed brute-force logowania (M2). Trwały licznik
+  // nieudanych prób per konto (przetrwa restart — nie da się ominąć restartem).
+  if (version < 25) {
+    db.exec(`CREATE TABLE IF NOT EXISTS login_attempts (
+      email        TEXT PRIMARY KEY,
+      fail_count   INTEGER NOT NULL DEFAULT 0,
+      locked_until INTEGER NOT NULL DEFAULT 0,
+      updated_at   INTEGER NOT NULL DEFAULT 0
+    );`);
+    db.exec('PRAGMA user_version = 25');
+  }
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1084,6 +1095,42 @@ export function deleteSession(db, token) {
 /** Sprząta wygasłe sesje (wołane okresowo przez serwer). Zwraca liczbę usuniętych. */
 export function purgeExpiredSessions(db, now = Date.now()) {
   return db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now).changes;
+}
+
+/* ---------------- Ochrona przed brute-force logowania (Genesis 2.0, M2) ---------------- */
+
+export const LOGIN_MAX_FAILS = 8;            // dozwolone nieudane próby zanim blokada
+export const LOGIN_LOCK_MS = 15 * 60_000;    // czas blokady po przekroczeniu
+const LOGIN_WINDOW_MS = 15 * 60_000;         // po tym oknie bez prób licznik się zeruje
+
+/** Czy konto jest tymczasowo zablokowane. Zwraca { locked, retryAfterMs }. */
+export function loginLockState(db, email, now = Date.now()) {
+  const e = String(email ?? '').trim().toLowerCase();
+  if (!e) return { locked: false, retryAfterMs: 0 };
+  const row = db.prepare('SELECT locked_until FROM login_attempts WHERE email = ?').get(e);
+  if (row && row.locked_until > now) return { locked: true, retryAfterMs: row.locked_until - now };
+  return { locked: false, retryAfterMs: 0 };
+}
+
+/** Rejestruje nieudaną próbę logowania; ustawia blokadę po LOGIN_MAX_FAILS. Zwraca stan. */
+export function recordLoginFailure(db, email, now = Date.now()) {
+  const e = String(email ?? '').trim().toLowerCase();
+  if (!e) return { locked: false, retryAfterMs: 0 };
+  const row = db.prepare('SELECT fail_count, updated_at FROM login_attempts WHERE email = ?').get(e);
+  // Poza oknem → zaczynamy liczyć od nowa.
+  const base = row && now - row.updated_at <= LOGIN_WINDOW_MS ? row.fail_count : 0;
+  const failCount = base + 1;
+  const lockedUntil = failCount >= LOGIN_MAX_FAILS ? now + LOGIN_LOCK_MS : 0;
+  db.prepare(`INSERT INTO login_attempts (email, fail_count, locked_until, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(email) DO UPDATE SET fail_count = excluded.fail_count, locked_until = excluded.locked_until, updated_at = excluded.updated_at`)
+    .run(e, failCount, lockedUntil, now);
+  return { locked: lockedUntil > now, retryAfterMs: lockedUntil > now ? lockedUntil - now : 0, failCount };
+}
+
+/** Zeruje licznik po udanym logowaniu. */
+export function clearLoginAttempts(db, email) {
+  const e = String(email ?? '').trim().toLowerCase();
+  if (e) db.prepare('DELETE FROM login_attempts WHERE email = ?').run(e);
 }
 
 /* ---------------- Projekty i członkostwa (RBAC) ---------------- */

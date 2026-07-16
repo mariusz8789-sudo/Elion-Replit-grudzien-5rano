@@ -23,6 +23,9 @@ import {
   ROLES,
   createUser,
   getUserByEmail,
+  loginLockState,
+  recordLoginFailure,
+  clearLoginAttempts,
   getPasswordHash,
   createSession,
   getUserByToken,
@@ -702,11 +705,18 @@ function register(db, body) {
 function login(db, body) {
   const email = String(body.email ?? '').trim().toLowerCase();
   const password = String(body.password ?? '');
+  // Genesis 2.0 (M2): brute-force lockout per konto. Sprawdzamy PRZED weryfikacją hasła.
+  const lock = loginLockState(db, email);
+  if (lock.locked) {
+    return err(429, 'account_locked', `Zbyt wiele nieudanych prób. Spróbuj ponownie za ${Math.ceil(lock.retryAfterMs / 60_000)} min.`);
+  }
   const user = getUserByEmail(db, email);
   // Ten sam komunikat dla „brak konta" i „złe hasło" — brak wycieku, kto ma konto.
   if (!user || !verifyPassword(password, getPasswordHash(db, user.id))) {
+    recordLoginFailure(db, email);
     return err(401, 'invalid_credentials', 'Nieprawidłowy e-mail lub hasło.');
   }
+  clearLoginAttempts(db, email); // udane logowanie zeruje licznik
   return issueSession(db, user);
 }
 

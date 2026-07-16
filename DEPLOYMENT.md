@@ -30,6 +30,8 @@ Health check: `GET /api/health` → `{ ok, version, static, persistence, ... }`.
 | `ANTHROPIC_API_KEY` | Optional — enables "Ask AI"; without it the app runs fully with an honest "AI unavailable" message |
 | `GENESIS_AI_MODEL` | AI model (default `claude-opus-4-8`) |
 | `GROUNDING_ENABLED` | `false` (default) → AI pass-through; `true` → grounded (see GROUNDING.md) |
+| `GENESIS_TRUST_PROXY` | `true` only behind a trusted reverse proxy — then the rate limiter reads the real client IP from `X-Forwarded-For` (spoof-safe otherwise). Default `false`. |
+| `GENESIS_CORS_ORIGINS` | Comma-separated allowlist (or `*`) enabling CORS on the public `/api/v1`. Empty (default) = CORS off, same-origin only. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, `BILLING_SUCCESS_URL`, `BILLING_CANCEL_URL` | Stripe billing; without them `/api/billing/*` returns `503 billing_not_configured` and the rest of the app is unaffected |
 
 ## CI/CD
@@ -53,19 +55,21 @@ RDKit (and optionally ADMET-AI, AutoDock Vina) must be installed in the runtime
 ---
 
 ## Production readiness — remaining blockers (be honest with yourself)
-Before a public, multi-tenant production launch, address (details in KNOWN_LIMITATIONS.md §2
-and SECURITY.md):
+**Resolved (Stage 8 + Genesis 2.0):** unauthenticated compute (now auth-gated), proxy-aware
+rate limiting, hashed credential storage, crash handlers, per-account login lockout, CORS for
+the public API, transactional key regeneration. See SECURITY.md.
 
-1. **Unauthenticated compute routes** (`/api/science`, `/api/compute` run before the auth
-   gate and spawn subprocesses). — **Blocker.**
-2. **Rate limiting is IP-based and breaks behind a proxy.** Add trusted `X-Forwarded-For`
-   handling; keep the `/api/v1` monthly quota as the real limit. — **Blocker for public API.**
-3. **Blocking event loop** (sync SQLite + sync compute). Fine for a pilot / low concurrency;
-   a hard ceiling for scale — needs a worker pool / async queue (major redesign).
-4. **In-process jobs, no orphan recovery**; **plaintext session/API-key storage**; **no
-   uncaughtException handler**; **no CORS**; **no per-account login lockout**.
-5. **No metrics/tracing/request-IDs** — logging is ad-hoc JSON to stdout.
-6. **No DB backup/disaster-recovery plan.**
+**Still blocking a public, multi-tenant launch:**
+
+1. **Blocking event loop** (sync SQLite + sync compute). Fine for a pilot / low concurrency;
+   a hard ceiling for scale — needs a worker pool / async queue (major redesign — deferred).
+2. **In-process jobs, no orphan recovery** (same execution refactor).
+3. **No DB backup/disaster-recovery plan** — the single `genesis.db` (WAL) is a SPOF. Ops
+   task: durable volume + scheduled WAL-aware file backups (e.g. checkpoint then copy), or
+   migrate the `store.mjs` boundary to a networked DB.
+4. **No metrics/tracing/request-IDs** — logging is ad-hoc JSON to stdout.
+5. **Server-side campaign persistence** — campaigns are still browser-local (a new subsystem,
+   deliberately deferred; not a security blocker but a commercial one). See FUTURE_WORK.md.
 
 **Recommended posture today:** single-tenant or trusted-pilot deployment behind your own
 auth/proxy, with the DB on a backed-up volume. Not yet a hardened public SaaS.

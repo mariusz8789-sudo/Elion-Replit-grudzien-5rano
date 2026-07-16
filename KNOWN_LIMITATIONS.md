@@ -74,13 +74,14 @@ multifactorial). It is hedged, but treat it as a hypothesis, not a fact.
 
 These are **real and must be addressed before a production, multi-tenant deployment.**
 
-> **Stage 8 (Security & Production Hardening) status — see SECURITY.md for details:**
-> **FIXED** — C1 (compute now auth-gated), C2 (proxy-aware rate limiting), H3 (session
-> tokens + API keys hashed at rest, non-breaking migration), M1 (crash handlers), M5
-> (transactional key regen). **STILL OPEN** — H1 & H2 (deferred: require an async-execution
-> redesign, out of scope for a hardening pass), M2 (login lockout), M3 (dispatch coupling),
-> M4 (CORS). The descriptions below are the original audit findings; strike-through them
-> mentally where marked FIXED above.
+> **Security-hardening status (Stage 8 + Genesis 2.0) — see SECURITY.md for details:**
+> **FIXED** — C1 (compute auth-gated), C2 (proxy-aware rate limiting), H3 (tokens + API keys
+> hashed at rest, non-breaking migration), M1 (crash handlers), M2 (persistent login
+> lockout), M4 (config-gated CORS for `/api/v1`), M5 (transactional key regen). **MITIGATED**
+> — M3 (dispatch allow-list is now a single named constant). **STILL DEFERRED** — H1 & H2
+> (require an async-execution redesign, out of scope for hardening). **OPEN (ops)** —
+> single-file SQLite has no backup/DR (put it on a durable volume + scheduled backups).
+> The descriptions below are the original audit findings; treat the FIXED items as resolved.
 
 ### Critical
 - **C1 — Unauthenticated subprocess spawning.** `/api/science/*` and `/api/compute/*`

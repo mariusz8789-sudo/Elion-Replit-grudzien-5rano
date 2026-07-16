@@ -20,6 +20,23 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
   eksport CSV/JSON/PDF (`core/campaigns.ts`, `core/batchRunner.ts`, `core/campaignExport.ts`,
   `components/product/Campaign*`). Deskryptory liczone raz, nigdy nie przeliczane.
 
+### Bezpieczeństwo — Genesis 2.0 (dokończenie hardeningu)
+- **M2 — blokada brute-force logowania:** trwały licznik nieudanych prób per konto
+  (`login_attempts`, schemat v25); 8 prób → blokada 15 min, sprawdzana przed weryfikacją
+  hasła; udane logowanie zeruje licznik (`store.mjs`, `api.mjs`). Przetrwa restart.
+- **M4 — CORS dla publicznego `/api/v1`:** konfigurowalny przez `GENESIS_CORS_ORIGINS`
+  (biała lista albo `*`; puste = wyłączone). Origin odbijany tylko jeśli na liście; obsługa
+  preflight OPTIONS (`lib.mjs`, `server.mjs`).
+- **M3 — złagodzone:** prefiksy tras persist-API to jedna nazwana stała `PERSIST_API_PREFIXES`.
+- Testy: `hardening.test.mjs` rozszerzony (lockout + CORS). Wszystkie bramki zielone.
+
+### Bezpieczeństwo — Stage 8 (Security & Production Hardening)
+- **C1** auth-before-compute (RDKit subprocess endpoints wymagają tokenu), **C2** rate-limit
+  świadomy proxy (`X-Forwarded-For` tylko za `GENESIS_TRUST_PROXY`), **H3** hashowanie tokenów
+  sesji i kluczy API w spoczynku (SHA-256, migracja v24, klucz pokazany raz + maska), **M1**
+  globalne handlery `uncaughtException`/`unhandledRejection`, **M5** transakcyjna regeneracja
+  klucza. Nowe: `secrets.mjs`, `hardening.test.mjs`.
+
 ### Naprawiono — audyt inżynieryjny 2026-07
 - `compute/rdkitAdapter.mjs`: `invoke()` ignorował drugi argument (timeout), więc ciężkie
   `embed3d`/`denovo` działały pod 10 s zamiast 20–60 s — mogły fałszywie przekraczać limit.

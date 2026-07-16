@@ -43,7 +43,19 @@ const NON_GROUNDABLE = ['toxicity', 'toksyczność', 'toksyczny', 'reactivity', 
 
 const INCHIKEY_RE = /\b[A-Z]{14}-[A-Z]{10}-[A-Z]\b/g;
 const NUM = '[-+]?\\d+(?:[.,]\\d+)?';
-const CONNECT = '(?:\\s*(?:to|wynosi|równa się|=|:|≈|~|about|około|ok\\.?|is|of|around)?\\s*(?:~|≈)?\\s*)';
+// Bounded window between a property keyword and its number: up to 28 chars with NO
+// digit in between (so we capture the FIRST number after the keyword), stopping at a
+// sentence/clause boundary. Tolerates a few intervening words ("LogP tej cząsteczki wynosi 8.5").
+const GAP = '[^.\\n;:]{0,28}?';
+// Unicode-aware word boundaries (ASCII \b breaks on Polish letters like ć/ą/ż).
+const LB = '(?<![\\p{L}\\p{N}])';
+const RB = '(?![\\p{L}\\p{N}])';
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Units that pin a number to a property regardless of any keyword (strong signal). */
+const UNIT_TO_PROP = [
+  { re: `(${NUM})\\s*g\\s*\\/\\s*mol`, property: 'molWt' },
+  { re: `(${NUM})\\s*(?:Å²|Å2|A\\^2|angstrem[óo]w kwadratowych)`, property: 'tpsa' },
+];
 
 const parseNum = (s) => Number(String(s).replace(',', '.'));
 
@@ -155,29 +167,35 @@ export function extractClaims(text) {
  */
 function scanProse(text) {
   const hits = [];
+  const push = (h) => { h.numIndex = h.index + h.match.lastIndexOf(h.numStr); hits.push(h); };
+  // 1) property keyword → nearby number (word-boundaried, bounded no-digit gap).
   for (const [property, spec] of Object.entries(PROPERTIES)) {
     if (spec.kind !== 'number') continue;
     for (const alias of spec.aliases) {
-      const re = new RegExp(`(${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})${CONNECT}(${NUM})`, 'gi');
+      const re = new RegExp(`${LB}(${esc(alias)})${RB}${GAP}(${NUM})${RB}`, 'giu');
       let m;
-      while ((m = re.exec(text)) !== null) {
-        hits.push({ kind: 'property', property, value: parseNum(m[2]), match: m[0], numStr: m[2], index: m.index });
-      }
+      while ((m = re.exec(text)) !== null) push({ kind: 'property', property, value: parseNum(m[2]), match: m[0], numStr: m[2], index: m.index });
     }
   }
-  // Non-groundable property words followed by a number → always unverifiable by RDKit.
-  for (const word of NON_GROUNDABLE) {
-    const re = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})${CONNECT}(${NUM})`, 'gi');
+  // 2) number → chemical unit (g/mol → molWt, Å² → tpsa) — keyword-independent.
+  for (const u of UNIT_TO_PROP) {
+    const re = new RegExp(u.re, 'giu');
     let m;
-    while ((m = re.exec(text)) !== null) {
-      hits.push({ kind: 'non_groundable', property: word, value: parseNum(m[2]), match: m[0], numStr: m[2], index: m.index });
-    }
+    while ((m = re.exec(text)) !== null) push({ kind: 'property', property: u.property, value: parseNum(m[1]), match: m[0], numStr: m[1], index: m.index });
   }
-  // InChIKey-shaped tokens.
+  // 3) non-groundable property words followed by a number → unverifiable by RDKit.
+  for (const word of NON_GROUNDABLE) {
+    const re = new RegExp(`${LB}(${esc(word)})${RB}${GAP}(${NUM})${RB}`, 'giu');
+    let m;
+    while ((m = re.exec(text)) !== null) push({ kind: 'non_groundable', property: word, value: parseNum(m[2]), match: m[0], numStr: m[2], index: m.index });
+  }
+  // 4) InChIKey-shaped tokens.
   let mk;
   const ikRe = new RegExp(INCHIKEY_RE.source, 'g');
-  while ((mk = ikRe.exec(text)) !== null) hits.push({ kind: 'inchikey', property: 'inchiKey', value: mk[0], match: mk[0], numStr: mk[0], index: mk.index });
-  return hits;
+  while ((mk = ikRe.exec(text)) !== null) hits.push({ kind: 'inchikey', property: 'inchiKey', value: mk[0], match: mk[0], numStr: mk[0], index: mk.index, numIndex: mk.index });
+  // De-duplicate numbers matched by several patterns (same number position).
+  const seen = new Set();
+  return hits.filter((h) => { const k = `${h.property}@${h.numIndex}`; if (seen.has(k)) return false; seen.add(k); return true; });
 }
 
 /** Decide a prose hit's verdict against verified claims + the active molecule's facts. */
@@ -203,16 +221,37 @@ function verifyProseHit(hit, registry, verifiedByProp, ctx) {
 const MARK = { unverified: '⚠︎[niepotwierdzone]', contradicted: '⚠︎[BŁĄD: niezgodne z obliczeniem]' };
 
 function applyRedactions(text, hits, policy) {
-  // Redact from the end so earlier indices stay valid.
+  // Redact from the end so earlier absolute indices stay valid.
   const toEdit = hits.filter((h) => h.verdict === 'unverified' || h.verdict === 'contradicted')
-    .sort((a, b) => b.index - a.index);
+    .sort((a, b) => (b.numIndex ?? b.index) - (a.numIndex ?? a.index));
   let out = text;
   for (const h of toEdit) {
-    const numAt = out.indexOf(h.numStr, h.index >= 0 ? Math.max(0, h.index) : 0);
-    const at = numAt >= 0 ? numAt : out.indexOf(h.numStr);
-    if (at < 0) continue;
+    const at = h.numIndex ?? out.indexOf(h.numStr);
+    if (at < 0 || out.slice(at, at + h.numStr.length) !== h.numStr) continue;
     const replacement = policy === 'annotate' ? `${h.numStr} ${MARK[h.verdict]}` : MARK[h.verdict];
     out = out.slice(0, at) + replacement + out.slice(at + h.numStr.length);
+  }
+  return out;
+}
+
+/**
+ * Redact, from prose, exact numeric values that a STRUCTURED claim flagged as
+ * bad (ties the primary mechanism to redaction when the model both declares a
+ * claim AND writes the number in prose with phrasing the lexicon doesn't catch).
+ */
+function redactClaimValuesFromProse(text, badClaims, policy) {
+  let out = text;
+  for (const c of badClaims) {
+    if (typeof c.stated !== 'number' && typeof c.stated !== 'string') continue;
+    const spec = PROPERTIES[c.property];
+    if (spec && spec.kind === 'string') { // e.g. InChIKey / formula string
+      if (out.includes(String(c.stated))) out = out.split(String(c.stated)).join(policy === 'annotate' ? `${c.stated} ${MARK[c.verdict]}` : MARK[c.verdict]);
+      continue;
+    }
+    const n = typeof c.stated === 'number' ? c.stated : parseNum(c.stated);
+    if (!Number.isFinite(n)) continue;
+    const re = new RegExp(`\\b(${esc(String(c.stated))}|${esc(String(n))})\\b`, 'g');
+    out = out.replace(re, (m) => (policy === 'annotate' ? `${m} ${MARK[c.verdict]}` : MARK[c.verdict]));
   }
   return out;
 }
@@ -269,11 +308,14 @@ export function groundAnswer(answerText, opts = {}) {
     return { version: GROUNDING_VERSION, status: 'grounded', text: cleanText, verifications, redactions: [] };
   }
   if (policy === 'block') {
-    const items = [...badClaims.map((c) => `${c.property} (${c.verdict})`), ...badProse.map((h) => `${h.property}=${h.numStr} (${h.verdict})`)];
+    // List property names + verdicts only — never surface the hallucinated value itself.
+    const items = [...badClaims.map((c) => `${c.property} (${c.verdict})`), ...badProse.map((h) => `${h.property} (${h.verdict})`)];
     const text = `⚠︎ Nie mogę potwierdzić części tej odpowiedzi realnym obliczeniem RDKit, więc jej nie pokazuję. Niepotwierdzone/niezgodne: ${[...new Set(items)].join(', ')}. Poproś o policzenie tych właściwości, aby je ugruntować.`;
     return { version: GROUNDING_VERSION, status: 'blocked', text, verifications, redactions: [...badClaims, ...badProse] };
   }
-  // redact (default) / annotate
-  const text = applyRedactions(cleanText, proseHits, policy);
-  return { version: GROUNDING_VERSION, status: 'redacted', text, verifications, redactions: [...badClaims, ...badProse.map((h) => ({ property: h.property, numStr: h.numStr, verdict: h.verdict }))] };
+  // redact (default) / annotate: strip prose-scanned numbers AND any structured-claim
+  // values that leaked into prose with phrasing the lexicon didn't catch.
+  let text = applyRedactions(cleanText, proseHits, policy);
+  text = redactClaimValuesFromProse(text, badClaims, policy);
+  return { version: GROUNDING_VERSION, status: 'redacted', text, verifications, redactions: [...badClaims.map((c) => ({ property: c.property, stated: c.stated, verdict: c.verdict })), ...badProse.map((h) => ({ property: h.property, numStr: h.numStr, verdict: h.verdict }))] };
 }

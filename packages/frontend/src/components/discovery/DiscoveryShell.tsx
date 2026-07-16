@@ -13,6 +13,7 @@ export interface NavItem { hash: string; label: string; icon: IconName }
 /** The discovery console's navigation model. Hashes map to App.tsx routes. */
 export const DISCOVERY_NAV: NavItem[] = [
   { hash: '#/dashboard', label: 'Mission Control', icon: 'rocket' },
+  { hash: '#/ai-chat', label: 'AI Chat', icon: 'brain' },
   { hash: '#/drug', label: 'Drug Discovery', icon: 'flask' },
   { hash: '#/discovery-forge', label: 'Discovery Forge', icon: 'dna' },
   { hash: '#/campaign', label: 'Kampanie', icon: 'spark' },

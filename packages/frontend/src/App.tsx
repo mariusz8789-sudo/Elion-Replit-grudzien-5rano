@@ -32,6 +32,7 @@ import { TruthEngineScreen } from './components/TruthEngineScreen';
 import { DiscoveryForgeScreen } from './components/DiscoveryForgeScreen';
 import { DiscoveryWorkspaceScreen } from './components/DiscoveryWorkspaceScreen';
 import { MissionControlScreen } from './components/discovery/MissionControlScreen';
+import { AIChatScreen } from './components/discovery/AIChatScreen';
 import { LaboratoryReadinessScreen } from './components/discovery/LaboratoryReadinessScreen';
 import { MultiAgentScreen } from './components/discovery/MultiAgentScreen';
 import { KnowledgeGraphScreen } from './components/discovery/KnowledgeGraphScreen';
@@ -66,6 +67,7 @@ type Route =
   | { kind: 'discovery-forge' }
   | { kind: 'discovery-workspace' }
   | { kind: 'dashboard' }
+  | { kind: 'ai-chat' }
   | { kind: 'lab-readiness' }
   | { kind: 'multi-agent' }
   | { kind: 'knowledge-graph' }
@@ -94,6 +96,7 @@ function parseHash(): Route {
   if (h === '#/discovery-forge') return { kind: 'discovery-forge' };
   if (h === '#/discovery-workspace') return { kind: 'discovery-workspace' };
   if (h === '#/dashboard') return { kind: 'dashboard' };
+  if (h === '#/ai-chat') return { kind: 'ai-chat' };
   if (h === '#/lab-readiness') return { kind: 'lab-readiness' };
   if (h === '#/multi-agent') return { kind: 'multi-agent' };
   if (h === '#/knowledge-graph') return { kind: 'knowledge-graph' };
@@ -421,6 +424,7 @@ export default function App() {
 
     // V5 premium discovery-console screens — each renders its own DiscoveryShell.
     if (route.kind === 'dashboard') return <div className="app"><ErrorBoundary><MissionControlScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'ai-chat') return <div className="app"><ErrorBoundary><AIChatScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'lab-readiness') return <div className="app"><ErrorBoundary><LaboratoryReadinessScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'multi-agent') return <div className="app"><ErrorBoundary><MultiAgentScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'knowledge-graph') return <div className="app"><ErrorBoundary><KnowledgeGraphScreen /></ErrorBoundary>{overlays}</div>;

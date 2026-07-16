@@ -26,6 +26,10 @@ import {
   loginLockState,
   recordLoginFailure,
   clearLoginAttempts,
+  listCampaignsForOwner,
+  getCampaignRow,
+  upsertCampaign,
+  deleteCampaignRow,
   getPasswordHash,
   createSession,
   getUserByToken,
@@ -218,6 +222,30 @@ export function handleApi(db, ctx) {
   if (seg[0] === 'account') {
     if (seg[1] === 'billing' && seg.length === 2 && method === 'GET') return ok(accountBillingView(db, user));
     if (seg[1] === 'api-key' && seg[2] === 'regenerate' && seg.length === 3 && method === 'POST') return regenerateAccountKey(db, user);
+    return err(404, 'not_found');
+  }
+
+  // ---- Trwałość kampanii badawczych (Genesis 2.1, Part 2) — scoped per właściciel ----
+  if (seg[0] === 'campaigns') {
+    if (seg.length === 1 && method === 'GET') {
+      // Lista: metadane (bez pełnych blobów) — do synchronizacji i widoku listy.
+      const rows = listCampaignsForOwner(db, user.id).map((c) => ({
+        id: c.id, name: c.data?.name ?? '', status: c.data?.status ?? 'ACTIVE',
+        molecules: Array.isArray(c.data?.molecules) ? c.data.molecules.length : 0,
+        createdAt: c.createdAt, updatedAt: c.updatedAt,
+      }));
+      return ok({ campaigns: rows });
+    }
+    if (seg.length === 2) {
+      const id = seg[1];
+      if (method === 'GET') { const c = getCampaignRow(db, user.id, id); return c ? ok({ campaign: c }) : err(404, 'not_found'); }
+      if (method === 'PUT') {
+        const data = body && 'campaign' in body ? body.campaign : body; // {campaign:...} lub samo ciało
+        if (!data || typeof data !== 'object' || Array.isArray(data)) return err(400, 'invalid_input', 'Brak danych kampanii.');
+        return ok({ campaign: upsertCampaign(db, user.id, id, data) });
+      }
+      if (method === 'DELETE') { deleteCampaignRow(db, user.id, id); return ok({ ok: true }); }
+    }
     return err(404, 'not_found');
   }
 

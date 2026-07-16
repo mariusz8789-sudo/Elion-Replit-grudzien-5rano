@@ -22,6 +22,7 @@
 import http from 'node:http';
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import {
@@ -29,6 +30,8 @@ import {
   createRateLimiter,
   clientIp,
   corsHeaders,
+  createMetrics,
+  systemMetrics,
   mimeFor,
   isHashedAsset,
   resolveStaticPath,
@@ -37,7 +40,9 @@ import {
   knowledgeExcerptFor,
   AI_UNAVAILABLE_MESSAGE,
 } from './lib.mjs';
-import { openDatabase, purgeExpiredSessions } from './store.mjs';
+import { openDatabase, purgeExpiredSessions, backupDatabase, getUserByToken } from './store.mjs';
+import { backupName, rotateBackups, ensureDir } from './backup.mjs';
+import { createComputePool } from './compute/computePool.mjs';
 import { handleApi } from './api.mjs';
 import { groundChatAnswer, groundingEnabled } from './aiGrounding.mjs';
 import { handleCheckout, handleWebhook, billingConfig } from './billing/handler.mjs';
@@ -66,7 +71,45 @@ const CORS_ORIGINS = (process.env.GENESIS_CORS_ORIGINS ?? '').split(',').map((s)
 
 // Genesis 2.0 (M3): jedno źródło prefiksów tras trafiających do handleApi (persist API).
 // Musi pozostać zgodne z routingiem seg[0] w api.mjs — patrz test serverRouting.test.mjs.
-const PERSIST_API_PREFIXES = ['/api/auth/', '/api/projects', '/api/compute', '/api/science', '/api/account/'];
+const PERSIST_API_PREFIXES = ['/api/auth/', '/api/projects', '/api/compute', '/api/science', '/api/account/', '/api/campaigns'];
+
+// Genesis 2.1 (Part 1): asynchroniczny worker pool dla RDKit — ZA FLAGĄ, domyślnie OFF.
+// OFF → nietknięty, synchroniczny tor (execFileSync). ON → nieblokujący pool wątków.
+const ASYNC_EXECUTION = process.env.ASYNC_EXECUTION === 'true';
+const computePool = ASYNC_EXECUTION
+  ? createComputePool(process.env.GENESIS_WORKER_POOL_SIZE ? { size: Number(process.env.GENESIS_WORKER_POOL_SIZE) } : {})
+  : null;
+const ASYNC_COMPUTE_ROUTES = new Set(['/api/science/laboratory-readiness', '/api/science/molecule/render']);
+
+/**
+ * Nieblokujący tor obliczeń (flaga ON). Auth + rate-limit + walidacja w wątku głównym;
+ * ciężki RDKit leci do puli wątków. Kształt odpowiedzi IDENTYCZNY jak tor synchroniczny.
+ */
+function handleAsyncCompute(req, res, pathname) {
+  if (!db) return json(res, 503, { error: 'persistence_unavailable' });
+  if (!persistLimiter.allow(ipOf(req))) return json(res, 429, { error: 'rate_limited', message: 'Za dużo żądań — odczekaj chwilę.' });
+  const auth = req.headers['authorization'] ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
+  let raw = '', size = 0, overflow = false;
+  req.on('data', (chunk) => { size += chunk.length; if (size > 65_536) { overflow = true; req.destroy(); return; } raw += chunk; });
+  req.on('end', async () => {
+    if (overflow) return;
+    let body = {};
+    if (raw) { try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad_json' }); } }
+    if (!getUserByToken(db, token)) return json(res, 401, { error: 'unauthorized', message: 'Zaloguj się, aby uruchomić obliczenia.' });
+    try {
+      if (pathname === '/api/science/molecule/render') {
+        const smiles = String(body?.smiles ?? '');
+        if (!smiles) return json(res, 400, { error: 'invalid_input', message: 'SMILES required' });
+        return json(res, 200, await computePool.run('molecule-render', { smiles, mode: body?.mode, width: body?.width, height: body?.height }));
+      }
+      return json(res, 200, await computePool.run('laboratory-readiness', { candidate: body?.candidate ?? {}, scientificQuestion: body?.scientificQuestion ?? null }));
+    } catch (err) {
+      log('error', 'async_compute_failed', { reqId: req.reqId, path: pathname, message: String(err?.message).slice(0, 200) });
+      return json(res, 503, { error: 'compute_unavailable', message: 'Silnik obliczeniowy chwilowo niedostępny — spróbuj ponownie.' });
+    }
+  });
+}
 
 // Trwały magazyn (Milestone 1: Backend Persistence). Domyślnie plik obok
 // serwera; :memory: dla testów/efemerycznych wdrożeń bez woluminu. node:sqlite
@@ -86,12 +129,34 @@ try {
 // Okresowe sprzątanie wygasłych sesji — pamięć/plik nie puchną.
 if (db) setInterval(() => { try { purgeExpiredSessions(db); } catch { /* ignore */ } }, 3_600_000).unref();
 
+// Genesis 2.1 (Part 3): automatyczne backupy — WŁĄCZANE przez GENESIS_BACKUP_DIR.
+// VACUUM INTO tworzy spójną kopię bez blokowania; rotacja trzyma ostatnie N.
+const BACKUP_DIR = process.env.GENESIS_BACKUP_DIR ?? null;
+const BACKUP_INTERVAL_MS = Math.max(60_000, Number(process.env.GENESIS_BACKUP_INTERVAL_MS ?? 21_600_000)); // domyślnie 6 h
+const BACKUP_KEEP = Number(process.env.GENESIS_BACKUP_KEEP ?? 7);
+if (db && BACKUP_DIR && DB_PATH !== ':memory:') {
+  try { ensureDir(BACKUP_DIR); } catch { /* ignore */ }
+  setInterval(() => {
+    try {
+      const dest = path.join(BACKUP_DIR, backupName());
+      backupDatabase(db, dest);
+      const removed = rotateBackups(BACKUP_DIR, BACKUP_KEEP);
+      log('info', 'backup', { dest, rotatedOut: removed });
+    } catch (err) {
+      log('error', 'backup_failed', { message: String(err?.message).slice(0, 200) });
+    }
+  }, BACKUP_INTERVAL_MS).unref();
+}
+
 // Wczytane raz przy starcie — pliki knowledge/*.md rzadko się zmieniają,
 // a to grounding dla KAŻDEGO zapytania do /api/ask (patrz handleAsk niżej).
 const knowledgeIndex = buildKnowledgeIndex(KNOWLEDGE_DIR, (p) => readFileSync(p, 'utf8'));
 
 const log = (level, msg, extra = {}) =>
   console.log(JSON.stringify({ t: new Date().toISOString(), level, msg, ...extra }));
+
+// Genesis 2.1 (Part 4): metryki ruchu/błędów/czasu odpowiedzi (w pamięci procesu).
+const metrics = createMetrics();
 
 const SYSTEM_PROMPT = `Jesteś Narratorem AI platformy edukacyjnej Genesis OS — naukowym przewodnikiem po interaktywnych symulacjach fizycznych.
 
@@ -249,12 +314,14 @@ function handlePersistApi(req, res, url) {
   const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
   const query = Object.fromEntries(url.searchParams.entries());
 
+  // Kampanie (2.1) mogą mieć do ~2000 cząsteczek z deskryptorami → większy limit ciała.
+  const maxBody = url.pathname.startsWith('/api/campaigns') ? 4 * 1024 * 1024 : 65_536;
   let raw = '';
   let size = 0;
   let overflow = false;
   req.on('data', (chunk) => {
     size += chunk.length;
-    if (size > 65_536) { overflow = true; req.destroy(); return; }
+    if (size > maxBody) { overflow = true; req.destroy(); return; }
     raw += chunk;
   });
   req.on('end', () => {
@@ -300,17 +367,39 @@ const server = http.createServer((req, res) => {
   // dopisuje nagłówki specyficzne dla trasy bez usuwania tych globalnych.
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
 
+  // Genesis 2.1 (Part 4): request-id + pomiar czasu + metryki. Jeden identyfikator
+  // na żądanie (nagłówek + logi) ułatwia korelację błędów; log przy 'finish'.
+  const reqId = (typeof req.headers['x-request-id'] === 'string' && req.headers['x-request-id'].slice(0, 64)) || randomUUID();
+  res.setHeader('x-request-id', reqId);
+  req.reqId = reqId;
+  const t0 = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - t0;
+    metrics.record(res.statusCode, ms);
+    if (req.url?.startsWith('/api/') && req.url !== '/api/health' && req.url !== '/api/metrics') {
+      log(res.statusCode >= 500 ? 'error' : 'info', 'req', { reqId, method: req.method, path: (req.url || '').split('?')[0], status: res.statusCode, ms });
+    }
+  });
+
   if (req.method === 'GET' && req.url === '/api/health') {
+    const sys = systemMetrics(metrics.snapshot(), { startedAt });
     return json(res, 200, {
       ok: true,
       version: VERSION,
-      uptimeSec: Math.round((Date.now() - startedAt) / 1000),
+      uptimeSec: sys.uptimeSec,
       ai: hasKey ? 'ready' : 'no-key',
       model: hasKey ? MODEL : null,
       static: staticAvailable,
       knowledgeLabs: knowledgeIndex.size,
       persistence: db ? 'ready' : 'unavailable',
+      asyncExecution: ASYNC_EXECUTION,
+      cpu: sys.cpu,
+      memory: sys.memory,
     });
+  }
+  // Genesis 2.1 (Part 4): pełne metryki operacyjne (CPU/RAM/ruch/błędy/czas odpowiedzi).
+  if (req.method === 'GET' && req.url === '/api/metrics') {
+    return json(res, 200, { version: VERSION, ...systemMetrics(metrics.snapshot(), { startedAt }) });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);
   // Billing (Stripe). The webhook MUST verify the signature over the RAW body, so
@@ -323,6 +412,11 @@ const server = http.createServer((req, res) => {
     for (const [name, value] of Object.entries(corsHeaders(req.headers.origin, CORS_ORIGINS))) res.setHeader(name, value);
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); } // preflight
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
+  }
+  // Genesis 2.1 (Part 1): nieblokujący tor dla ciężkich obliczeń — TYLKO gdy flaga ON.
+  // Gdy OFF, żądania spadają do zwykłego, synchronicznego handlePersistApi poniżej.
+  if (computePool && req.method === 'POST' && ASYNC_COMPUTE_ROUTES.has((req.url || '').split('?')[0])) {
+    return handleAsyncCompute(req, res, (req.url || '').split('?')[0]);
   }
   if (PERSIST_API_PREFIXES.some((p) => req.url?.startsWith(p))) {
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
@@ -338,6 +432,8 @@ server.listen(PORT, () => {
     version: VERSION,
     ai: hasKey ? MODEL : 'no-key',
     grounding: groundingEnabled() ? 'on' : 'off',
+    asyncExecution: computePool ? `pool(${computePool.stats().size})` : 'off',
+    backups: BACKUP_DIR ? BACKUP_DIR : 'off',
     static: staticAvailable ? STATIC_DIR : 'none',
     persistence: db ? DB_PATH : 'none',
   });
@@ -364,6 +460,7 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
   process.on(sig, () => {
     log('info', 'shutdown', { signal: sig });
     server.close(() => {
+      try { computePool?.close(); } catch { /* ignore */ }
       try { db?.close(); } catch { /* ignore */ }
       process.exit(0);
     });

@@ -20,6 +20,27 @@ Pełne raporty z uzasadnieniami decyzji: `RAPORT-ETAP-0.md` ·
   eksport CSV/JSON/PDF (`core/campaigns.ts`, `core/batchRunner.ts`, `core/campaignExport.ts`,
   `components/product/Campaign*`). Deskryptory liczone raz, nigdy nie przeliczane.
 
+### Genesis 2.1 (Foundation) — infrastruktura produkcyjna (bez nowych funkcji/UI)
+- **Part 1 — asynchroniczny worker pool RDKit (za flagą `ASYNC_EXECUTION`, domyślnie off):**
+  trwała pula wątków (`compute/computePool.mjs` + `computeWorker.mjs`) wykonuje istniejący,
+  synchroniczny kod RDKit POZA główną pętlą zdarzeń. Tor synchroniczny nietknięty przy
+  fladze off. Zweryfikowano live: przy 6 ciężkich analizach `/api/health` odpowiadał ~1 ms.
+  Zero zmian w logice RDKit. Kolejka FIFO, ograniczona współbieżność, limit czasu + samonaprawa.
+- **Part 2 — trwałość kampanii po stronie serwera:** tabela `user_campaigns` (per właściciel,
+  schemat v26) + endpointy `GET/PUT/DELETE /api/campaigns[/:id]`; frontendowa warstwa
+  `campaignSync.ts` (offline-first, migracja localStorage→serwer, hydracja na nowym
+  urządzeniu). Zweryfikowano live: kampania przeżywa restart serwera i świeże logowanie;
+  izolacja właściciela. Konta zespołowe: zapisane jako otwarte pytanie (wymaga modelu uprawnień).
+- **Part 3 — backup i disaster recovery:** `store.backupDatabase` (VACUUM INTO — spójna,
+  nieblokująca kopia), automatyczne backupy z rotacją (`GENESIS_BACKUP_DIR`), skrypty
+  `npm run backup` / `npm run restore`. Zweryfikowano live PEŁNY cykl: dane → backup →
+  zniszczenie bazy → restore → odzyskane. Procedura DR w DEPLOYMENT.md.
+- **Part 4 — monitoring:** `GET /api/metrics` (CPU/RAM/ruch/błędy/średni czas odpowiedzi),
+  wzbogacony `/api/health`, nagłówek `X-Request-Id` na każdej odpowiedzi + strukturalny log
+  `{reqId,method,path,status,ms}`.
+- Testy: `hardening.test.mjs` (metryki), `computePool.test.mjs`, `backup.test.mjs`,
+  `campaignPersistence.test.mjs`, `campaignSync.test.ts`. Wszystkie bramki zielone.
+
 ### Bezpieczeństwo — Genesis 2.0 (dokończenie hardeningu)
 - **M2 — blokada brute-force logowania:** trwały licznik nieudanych prób per konto
   (`login_attempts`, schemat v25); 8 prób → blokada 15 min, sprawdzana przed weryfikacją

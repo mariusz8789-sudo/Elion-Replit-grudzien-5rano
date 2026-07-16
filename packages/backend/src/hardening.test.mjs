@@ -6,7 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { hashSecret, keyHint, looksHashed } from './secrets.mjs';
-import { clientIp, corsHeaders } from './lib.mjs';
+import { clientIp, corsHeaders, createMetrics, systemMetrics } from './lib.mjs';
 import { openDatabase, createUser, createSession, getUserByToken, deleteSession, createApiKey, getApiKey, loginLockState, recordLoginFailure, clearLoginAttempts, LOGIN_MAX_FAILS } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { hashPassword, generateToken } from './auth.mjs';
@@ -106,6 +106,29 @@ describe('CORS for public API (Genesis 2.0, M4)', () => {
   test('origin echoed only when explicitly allowed (never reflects arbitrary origins)', () => {
     assert.equal(corsHeaders('https://good.io', ['https://good.io'])['access-control-allow-origin'], 'https://good.io');
     assert.deepEqual(corsHeaders('https://evil.io', ['https://good.io']), {});
+  });
+});
+
+describe('monitoring metrics (Genesis 2.1, Part 4)', () => {
+  test('createMetrics counts requests, errors (5xx), status buckets, avg response time', () => {
+    const m = createMetrics();
+    m.record(200, 10); m.record(200, 30); m.record(500, 5); m.record(404, 20);
+    const s = m.snapshot();
+    assert.equal(s.requests, 4);
+    assert.equal(s.errors, 1);            // only the 500
+    assert.equal(s.byStatus[200], 2);
+    assert.equal(s.totalMs, 65);
+    assert.equal(s.timed, 4);
+  });
+  test('systemMetrics exposes CPU/RAM + app counters with a computed avg', () => {
+    const m = createMetrics();
+    m.record(200, 100); m.record(200, 200);
+    const sm = systemMetrics(m.snapshot(), { now: 5000, startedAt: 0 });
+    assert.equal(sm.uptimeSec, 5);
+    assert.ok(sm.cpu.cores >= 1);
+    assert.ok(sm.memory.rssMB > 0);
+    assert.equal(sm.requests.total, 2);
+    assert.equal(sm.requests.avgResponseMs, 150);
   });
 });
 

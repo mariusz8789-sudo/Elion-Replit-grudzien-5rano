@@ -8,8 +8,9 @@ import { ProductChrome } from './ProductChrome';
 import { Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { Icon } from '../Icon';
 import { AccountPanel } from '../AccountPanel';
-import { useSession } from '../../core/backend/session';
+import { useSession, getToken } from '../../core/backend/session';
 import { listCampaigns, createCampaign, deleteCampaign, type Campaign } from '../../core/campaigns';
+import { syncCampaigns, removeCampaignRemote } from '../../core/campaignSync';
 
 export function CampaignsScreen() {
   const session = useSession();
@@ -18,6 +19,13 @@ export function CampaignsScreen() {
   const [form, setForm] = useState({ name: '', goal: '', description: '' });
   const refresh = () => { if (session) setItems(listCampaigns(session.user.id)); };
   useEffect(refresh, [session]);
+  // Genesis 2.1 (Part 2): dwukierunkowa synchronizacja z serwerem przy logowaniu
+  // (offline-first — localStorage pozostaje natychmiastowe; to lustro w chmurze).
+  useEffect(() => {
+    const t = getToken();
+    if (!session || !t) return;
+    syncCampaigns(t, session.user.id).then(() => refresh()).catch(() => { /* offline → zostaje lokalne */ });
+  }, [session]);
 
   if (!session) {
     return (
@@ -37,7 +45,12 @@ export function CampaignsScreen() {
     setForm({ name: '', goal: '', description: '' }); setCreating(false); refresh();
     window.location.hash = `#/campaigns/${c.id}`;
   };
-  const remove = (c: Campaign) => { deleteCampaign(session.user.id, c.id); refresh(); };
+  const remove = (c: Campaign) => {
+    deleteCampaign(session.user.id, c.id);
+    const t = getToken();
+    if (t) removeCampaignRemote(t, c.id).catch(() => { /* best-effort */ });
+    refresh();
+  };
 
   return (
     <ProductChrome active="#/campaigns">

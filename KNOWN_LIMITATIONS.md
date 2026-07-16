@@ -74,6 +74,14 @@ multifactorial). It is hedged, but treat it as a hypothesis, not a fact.
 
 These are **real and must be addressed before a production, multi-tenant deployment.**
 
+> **Genesis 2.1 (Foundation) update:** **H1 (blocking event loop)** now has a flag-gated
+> async worker-thread pool (`ASYNC_EXECUTION`, default off) — verified live to keep the event
+> loop responsive under heavy compute. **DB backup & disaster recovery** are implemented and
+> the restore path is tested live. **Research campaigns persist server-side** (survive
+> restart/new device). **Monitoring** (health/metrics/request-IDs) added. Still open: turning
+> async on by default (needs production load-testing), single-node SQLite (HA needs a
+> networked DB), cognitive-job orphan recovery (H2), and team accounts (open question).
+>
 > **Security-hardening status (Stage 8 + Genesis 2.0) — see SECURITY.md for details:**
 > **FIXED** — C1 (compute auth-gated), C2 (proxy-aware rate limiting), H3 (tokens + API keys
 > hashed at rest, non-breaking migration), M1 (crash handlers), M2 (persistent login
@@ -134,11 +142,14 @@ graceful SIGTERM/SIGINT shutdown.
   code-splitting is deliberately disabled (to preserve an offline-PWA guarantee for the
   education product). A user who only wants the Chemistry Assistant still downloads all
   physics/astronomy/lab code. (three.js *is* correctly lazy-loaded.)
-- **Client-side only persistence.** Campaigns and analysis history live in `localStorage`
-  (per browser, no server sync, no team sharing). Quota-exceeded writes **fail silently** —
-  `storage.ts` returns `false` but callers (`saveAnalysis`, campaign writes) ignore it, so a
-  full quota loses data with no user feedback. Campaign molecule lists are uncapped, so a
-  2,000-molecule campaign storing full descriptors per molecule is a real quota risk.
+- **Persistence (updated in Genesis 2.1).** Research **Campaigns now persist server-side**
+  (`user_campaigns`, per-owner) with offline-first localStorage mirroring — they survive
+  logout / restart / new device (verified live). **Open question — team accounts:** the
+  persistence layer is scoped by a single owner id; sharing a campaign across a team needs a
+  membership/permission model (like the existing project RBAC) and is **not** built — doing it
+  right is an architecture decision, so it is recorded here rather than guessed. The Assistant
+  **analysis history is still `localStorage`-only** (per-browser cache); quota-exceeded local
+  writes still fail silently (callers ignore `storage.ts`'s `false`).
 - **Zero UI/component tests.** All 72 frontend test files are pure-logic (engines,
   parsers). No test renders a React component; every screen, error state, and the
   quota-failure path are untested. (Type safety is otherwise excellent: `strict: true`,

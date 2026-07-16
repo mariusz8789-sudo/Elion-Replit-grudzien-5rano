@@ -14,9 +14,10 @@ import { parseMoleculeLines } from './ComparePlatformScreen';
 import { Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { Icon } from '../Icon';
 import { AccountPanel } from '../AccountPanel';
-import { useSession } from '../../core/backend/session';
-import { fetchScienceCapabilities } from '../../core/backend/client';
+import { useSession, getToken } from '../../core/backend/session';
+import { fetchScienceCapabilities, fetchCampaignRemote } from '../../core/backend/client';
 import { runBatch } from '../../core/batchRunner';
+import { pushCampaign } from '../../core/campaignSync';
 import {
   getCampaign, saveCampaign, addMolecules, markAnalysed, markInvalid, markCompared,
   transitionMolecule, pendingMolecules, campaignCandidates, STAGE_LABEL,
@@ -54,7 +55,17 @@ export function CampaignScreen({ id }: { id: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => { if (session) setCampaign(getCampaign(session.user.id, id)); }, [session, id]);
+  useEffect(() => {
+    if (!session) return;
+    const local = getCampaign(session.user.id, id);
+    if (local) { setCampaign(local); return; }
+    // Nowe urządzenie / brak lokalnie → spróbuj pobrać z serwera i zapisz lokalnie.
+    const t = getToken();
+    if (!t) { setCampaign(null); return; }
+    fetchCampaignRemote(t, id)
+      .then((r) => { if (r.ok && r.data?.data && typeof r.data.data === 'object') { const c = r.data.data as Campaign; saveCampaign(c); setCampaign(c); } else setCampaign(null); })
+      .catch(() => setCampaign(null));
+  }, [session, id]);
   useEffect(() => { fetchScienceCapabilities().then((r) => { if (r.ok) setRdkitVersion(r.data.engines.rdkit?.version ?? 'nieznana'); }); }, []);
 
   const ranked = useMemo(() => (campaign ? rankCandidates(campaignCandidates(campaign)) : []), [campaign]);
@@ -72,7 +83,12 @@ export function CampaignScreen({ id }: { id: string }) {
     );
   }
 
-  const persist = (c: Campaign) => { setCampaign(c); saveCampaign(c); };
+  // Zapis lokalny (natychmiastowy) + write-through na serwer (best-effort, offline-first).
+  const persist = (c: Campaign) => {
+    setCampaign(c); saveCampaign(c);
+    const t = getToken();
+    if (t) pushCampaign(t, c).catch(() => { /* offline → zostaje lokalne, zsynchronizuje się później */ });
+  };
 
   const doAdd = () => {
     const entries = parseMoleculeLines(addRaw, 2000);

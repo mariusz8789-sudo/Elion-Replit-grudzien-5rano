@@ -950,6 +950,23 @@ function migrate(db) {
     );`);
     db.exec('PRAGMA user_version = 25');
   }
+  // v26 — Genesis 2.1 (Part 2): trwałość kampanii po stronie serwera. Kampania
+  // przechowywana jako blob JSON per właściciel (przeżywa wylogowanie/restart/nowe
+  // urządzenie). Klient pozostaje offline-first; to warstwa synchronizacji w chmurze.
+  if (version < 26) {
+    // Nazwa `user_campaigns` — kampanie produktu (Research Campaigns) NIE mylić z
+    // istniejącą tabelą `campaigns` silnika cognitive (inny podsystem).
+    db.exec(`CREATE TABLE IF NOT EXISTS user_campaigns (
+      id         TEXT NOT NULL,
+      owner_id   TEXT NOT NULL,
+      data       TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (owner_id, id)
+    );`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_user_campaigns_owner ON user_campaigns(owner_id, updated_at DESC);');
+    db.exec('PRAGMA user_version = 26');
+  }
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -960,6 +977,18 @@ export function openDatabase(filename = ':memory:') {
   db.exec(SCHEMA);
   migrate(db);
   return db;
+}
+
+/**
+ * Backup bazy (Genesis 2.1, Part 3). `VACUUM INTO` tworzy SPÓJNĄ, samodzielną kopię
+ * (pojedynczy plik, bez -wal/-shm) BEZPIECZNIE nawet przy równoczesnym zapisie — to
+ * właściwa metoda dla live SQLite (nie surowe kopiowanie pliku). Zwraca ścieżkę docelową.
+ * Restore = zatrzymać serwer i podmienić plik bazy tą kopią (patrz DEPLOYMENT.md).
+ */
+export function backupDatabase(db, destPath) {
+  // Ścieżka jest sterowana przez operatora/serwer (nie przez użytkownika); cytujemy '' → ''.
+  db.exec(`VACUUM INTO '${String(destPath).replace(/'/g, "''")}'`);
+  return destPath;
 }
 
 /* ---------------- Mapowanie wierszy → obiekty (camelCase, bez pól wrażliwych) ---------------- */
@@ -1132,6 +1161,37 @@ export function clearLoginAttempts(db, email) {
   const e = String(email ?? '').trim().toLowerCase();
   if (e) db.prepare('DELETE FROM login_attempts WHERE email = ?').run(e);
 }
+
+/* ---------------- Trwałość kampanii (Genesis 2.1, Part 2) ---------------- */
+
+/** Lista kampanii właściciela (metadane + updated_at), najnowsze pierwsze. */
+export function listCampaignsForOwner(db, ownerId) {
+  if (!ownerId) return [];
+  return db.prepare('SELECT id, data, created_at, updated_at FROM user_campaigns WHERE owner_id = ? ORDER BY updated_at DESC').all(String(ownerId))
+    .map((r) => ({ id: r.id, data: safeParse(r.data), createdAt: r.created_at, updatedAt: r.updated_at }));
+}
+
+/** Jedna kampania właściciela (pełny blob) lub null. */
+export function getCampaignRow(db, ownerId, id) {
+  if (!ownerId || !id) return null;
+  const r = db.prepare('SELECT id, data, created_at, updated_at FROM user_campaigns WHERE owner_id = ? AND id = ?').get(String(ownerId), String(id));
+  return r ? { id: r.id, data: safeParse(r.data), createdAt: r.created_at, updatedAt: r.updated_at } : null;
+}
+
+/** Zapis/aktualizacja kampanii (upsert). `data` to dowolny obiekt JSON kampanii. */
+export function upsertCampaign(db, ownerId, id, data, now = Date.now()) {
+  const json = JSON.stringify(data ?? {});
+  db.prepare(`INSERT INTO user_campaigns (id, owner_id, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(owner_id, id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`)
+    .run(String(id), String(ownerId), json, now, now);
+  return getCampaignRow(db, ownerId, id);
+}
+
+export function deleteCampaignRow(db, ownerId, id) {
+  if (ownerId && id) db.prepare('DELETE FROM user_campaigns WHERE owner_id = ? AND id = ?').run(String(ownerId), String(id));
+}
+
+function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 
 /* ---------------- Projekty i członkostwa (RBAC) ---------------- */
 

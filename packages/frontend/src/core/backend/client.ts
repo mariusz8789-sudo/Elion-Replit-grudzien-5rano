@@ -154,6 +154,27 @@ export async function startCheckout(token: string, tier: 'starter' | 'pro'): Pro
   return request<{ url: string; sessionId: string; tier: string }>('POST', '/billing/checkout', { token, body: { tier } });
 }
 
+/* ---------------- Trwałość kampanii po stronie serwera (Genesis 2.1, Part 2) ---------------- */
+
+export interface RemoteCampaignMeta { id: string; name: string; status: string; molecules: number; createdAt: number; updatedAt: number }
+export interface RemoteCampaign { id: string; data: unknown; createdAt: number; updatedAt: number }
+
+export async function fetchCampaignsRemote(token: string): Promise<ApiResult<RemoteCampaignMeta[]>> {
+  const r = await request<{ campaigns: RemoteCampaignMeta[] }>('GET', '/campaigns', { token });
+  return r.ok ? { ok: true, data: r.data.campaigns } : r;
+}
+export async function fetchCampaignRemote(token: string, id: string): Promise<ApiResult<RemoteCampaign>> {
+  const r = await request<{ campaign: RemoteCampaign }>('GET', `/campaigns/${encodeURIComponent(id)}`, { token });
+  return r.ok ? { ok: true, data: r.data.campaign } : r;
+}
+export async function saveCampaignRemote(token: string, id: string, data: unknown): Promise<ApiResult<RemoteCampaign>> {
+  const r = await request<{ campaign: RemoteCampaign }>('PUT', `/campaigns/${encodeURIComponent(id)}`, { token, body: { campaign: data } });
+  return r.ok ? { ok: true, data: r.data.campaign } : r;
+}
+export async function deleteCampaignRemote(token: string, id: string): Promise<ApiResult<{ ok: boolean }>> {
+  return request<{ ok: boolean }>('DELETE', `/campaigns/${encodeURIComponent(id)}`, { token });
+}
+
 /* ---------------- Projekty i członkostwa (RBAC) ---------------- */
 
 export async function listProjects(token: string): Promise<ApiResult<Project[]>> {

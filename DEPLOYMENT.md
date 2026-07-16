@@ -38,14 +38,42 @@ Health check: `GET /api/health` → `{ ok, version, static, persistence, ... }`.
 `.github/workflows/ci.yml` (single `verify` job, Node 22): `npm ci` → lint → test → build →
 uploads `dist` artifact. **No separate deploy workflow** — deployment is manual/container.
 
-## Persistence & backups
-- Storage is a **single SQLite file** with WAL enabled (`node:sqlite`).
-- **There is no backup, replication, or checkpoint-tuning strategy** — the `genesis.db`
-  file is a single point of failure. For any real deployment: put it on a durable volume and
-  add scheduled file-level backups (WAL-aware) or migrate to a networked DB.
-- Product data for Assistant/Compare/Campaigns is **client-side `localStorage`**, not in the
-  server DB — it does not survive a browser/device change and is not backed up. See
-  KNOWN_LIMITATIONS.md §3.
+## Persistence & backups (Genesis 2.1)
+- Storage is a **single SQLite file** with WAL enabled (`node:sqlite`). Put it on a **durable
+  volume** in production (`GENESIS_DB_PATH`).
+- **Automatic backups** (Part 3): set `GENESIS_BACKUP_DIR` to enable periodic `VACUUM INTO`
+  snapshots (consistent, non-blocking) with rotation (`GENESIS_BACKUP_KEEP`, default 7;
+  `GENESIS_BACKUP_INTERVAL_MS`, default 6 h). Manual: `npm run backup`.
+- **Research Campaigns now persist server-side** (Part 2, `user_campaigns` table, per-owner)
+  — they survive logout, restart, and a new device. The Assistant analysis history remains
+  client-side `localStorage` (a per-browser convenience cache). See KNOWN_LIMITATIONS.md §3.
+
+### Disaster recovery procedure (tested)
+Verified live: create data → backup → destroy DB → restore → all rows recovered.
+1. **Backups** run automatically (if `GENESIS_BACKUP_DIR` set) or on demand:
+   `GENESIS_DB_PATH=… GENESIS_BACKUP_DIR=… npm run backup` → writes `genesis-<ts>.db`.
+2. **Restore:** stop the server, then
+   `GENESIS_DB_PATH=… GENESIS_BACKUP_DIR=… npm run restore [backup-file]`
+   (defaults to the newest snapshot). It backs up the current DB to `*.pre-restore`, removes
+   stale `-wal`/`-shm`, copies the snapshot into place, and validates it opens + reports the
+   user count. Restart the server.
+3. **RPO/RTO:** RPO = backup interval (default 6 h — lower `GENESIS_BACKUP_INTERVAL_MS` for
+   tighter). RTO = seconds (a file copy + restart). For near-zero RPO, migrate the `store.mjs`
+   boundary to a replicated/networked DB (future work).
+
+## Async execution (Part 1)
+`ASYNC_EXECUTION=false` (default) keeps the original synchronous compute path untouched.
+`ASYNC_EXECUTION=true` routes heavy RDKit work (`laboratory-readiness`, `molecule/render`)
+to a persistent worker-thread pool (`GENESIS_WORKER_POOL_SIZE`, default `min(4, cores-1)`),
+so the event loop stays responsive under load. Verified live: with the flag on, `/api/health`
+answered in ~1 ms while 6 heavy analyses ran concurrently. RDKit logic is unchanged.
+
+## Monitoring (Part 4)
+- `GET /api/health` — liveness + version + `asyncExecution` + CPU load + memory.
+- `GET /api/metrics` — CPU (cores/load), memory (rss/heap/host), and request counters
+  (total, errors, by-status, **average response time**).
+- Every response carries an `X-Request-Id` (echoed from the client's if provided); each
+  `/api/*` request logs `{reqId, method, path, status, ms}` as structured JSON to stdout.
 
 ## RDKit / compute engines
 RDKit (and optionally ADMET-AI, AutoDock Vina) must be installed in the runtime
@@ -59,17 +87,22 @@ RDKit (and optionally ADMET-AI, AutoDock Vina) must be installed in the runtime
 rate limiting, hashed credential storage, crash handlers, per-account login lockout, CORS for
 the public API, transactional key regeneration. See SECURITY.md.
 
-**Still blocking a public, multi-tenant launch:**
+**Resolved in Genesis 2.1:** blocking event loop (flag-gated async worker pool, verified
+non-blocking), DB backup/disaster-recovery (automatic + tested restore), server-side campaign
+persistence (survives restart/new device), monitoring (health/metrics/request-IDs).
 
-1. **Blocking event loop** (sync SQLite + sync compute). Fine for a pilot / low concurrency;
-   a hard ceiling for scale — needs a worker pool / async queue (major redesign — deferred).
-2. **In-process jobs, no orphan recovery** (same execution refactor).
-3. **No DB backup/disaster-recovery plan** — the single `genesis.db` (WAL) is a SPOF. Ops
-   task: durable volume + scheduled WAL-aware file backups (e.g. checkpoint then copy), or
-   migrate the `store.mjs` boundary to a networked DB.
-4. **No metrics/tracing/request-IDs** — logging is ad-hoc JSON to stdout.
-5. **Server-side campaign persistence** — campaigns are still browser-local (a new subsystem,
-   deliberately deferred; not a security blocker but a commercial one). See FUTURE_WORK.md.
+**Still open before a public, multi-tenant launch:**
+
+1. **Async execution is flag-gated (`ASYNC_EXECUTION`), off by default.** Turn it on in
+   production and load-test it; the sync path remains the default until then.
+2. **SQLite is still single-node.** Backups + DR are in place, but true HA needs a
+   replicated/networked DB (migrate the `store.mjs` boundary — future work).
+3. **In-process background jobs** (the cognitive campaign runner) still lack orphan recovery
+   after a crash (separate from the RDKit pool).
+4. **Team accounts** for shared campaigns are an **open question** (see KNOWN_LIMITATIONS.md)
+   — the persistence layer is per-owner; sharing needs a membership/permission model.
+5. **Metrics are in-process counters** (reset on restart, per-instance) — wire to an external
+   metrics system for multi-instance/history.
 
 **Recommended posture today:** single-tenant or trusted-pilot deployment behind your own
 auth/proxy, with the DB on a backed-up volume. Not yet a hardened public SaaS.

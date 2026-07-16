@@ -7,6 +7,49 @@
  */
 
 import path from 'node:path';
+import os from 'node:os';
+
+/* ---------------- Monitoring (Genesis 2.1, Part 4) ---------------- */
+
+/**
+ * Lekki, mutowalny licznik ruchu i błędów + akumulator czasu odpowiedzi.
+ * Trzymany w pamięci procesu (jak rate-limiter) — zerowe zależności.
+ */
+export function createMetrics() {
+  const c = { requests: 0, errors: 0, byStatus: {}, totalMs: 0, timed: 0, startedAt: null };
+  return {
+    record(status, ms) {
+      c.requests += 1;
+      c.byStatus[status] = (c.byStatus[status] ?? 0) + 1;
+      if (status >= 500) c.errors += 1;
+      if (Number.isFinite(ms)) { c.totalMs += ms; c.timed += 1; }
+    },
+    snapshot: () => ({ ...c, byStatus: { ...c.byStatus } }),
+  };
+}
+
+/**
+ * Migawka metryk systemowych + aplikacyjnych. Czysta względem wstrzykniętych
+ * `counters` i `now` (testowalna). CPU: średnie obciążenie z os.loadavg (1 min)
+ * znormalizowane liczbą rdzeni; RAM: proces + host; plus średni czas odpowiedzi.
+ */
+export function systemMetrics(counters, { now = Date.now(), startedAt = now } = {}) {
+  const cores = os.cpus()?.length || 1;
+  const load1 = os.loadavg?.()[0] ?? 0;
+  const mem = process.memoryUsage();
+  const avgMs = counters.timed > 0 ? Math.round((counters.totalMs / counters.timed) * 100) / 100 : 0;
+  return {
+    uptimeSec: Math.round((now - startedAt) / 1000),
+    cpu: { cores, load1: Math.round(load1 * 100) / 100, loadPerCore: Math.round((load1 / cores) * 100) / 100 },
+    memory: {
+      rssMB: Math.round(mem.rss / 1048576),
+      heapUsedMB: Math.round(mem.heapUsed / 1048576),
+      hostFreeMB: Math.round(os.freemem() / 1048576),
+      hostTotalMB: Math.round(os.totalmem() / 1048576),
+    },
+    requests: { total: counters.requests, errors: counters.errors, byStatus: counters.byStatus, avgResponseMs: avgMs },
+  };
+}
 
 /* ---------------- Grounding: baza wiedzy Genesis ---------------- */
 

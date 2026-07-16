@@ -25,6 +25,9 @@ import {
   type DriverAvailability, type InsertDriverAvailability,
   type DriverTimeOff, type InsertDriverTimeOff,
   type CalendarConnection,
+  type ResourceAvailability, type InsertResourceAvailability,
+  type ResourceTimeOff, type InsertResourceTimeOff,
+  type CalendarShareToken,
   type CargoItem, type InsertCargoItem,
   type MessageTranslation,
   type Call, type InsertCall,
@@ -48,7 +51,9 @@ import {
   messages, attachments, conversations, conversationParticipants, messageTemplates, reviews, trackingUpdates, notifications,
   marketplaceListings, staffSharing, resourceSharing, announcements,
   badges, badgeAwards, coupons, couponRedemptions, referralRewards, bookingTransfers,
-  driverAvailability, driverTimeOff, calendarConnections, cargoItems, messageTranslations,
+  driverAvailability, driverTimeOff, calendarConnections,
+  resourceAvailability, resourceTimeOff, calendarShareTokens,
+  cargoItems, messageTranslations,
   calls, verificationDocuments, documentVersions, deviceFingerprints, riskScores, auditLogs,
   apiKeys, webhookSubscriptions, webhookDeliveries,
   capacityPostings, capacityBookings, environmentalCalculations,
@@ -306,6 +311,16 @@ export interface IStorage {
   deleteCalendarConnection(driverId: string, provider: string): Promise<boolean>;
   decryptCalendarTokens(connection: CalendarConnection): { accessToken: string; refreshToken?: string };
   touchCalendarSync(id: string): Promise<void>;
+
+  // Calendar & Scheduling for crew/vehicle/warehouse/company - the same polymorphic
+  // entityType/entityId shape as the driver-only tables above, generalized to other resources.
+  getEntityAvailability(entityType: string, entityId: string): Promise<ResourceAvailability[]>;
+  setEntityAvailability(entityType: string, entityId: string, slots: InsertResourceAvailability[]): Promise<ResourceAvailability[]>;
+  getEntityTimeOff(entityType: string, entityId: string): Promise<ResourceTimeOff[]>;
+  createEntityTimeOff(timeOff: InsertResourceTimeOff, createdBy: string): Promise<ResourceTimeOff>;
+  deleteEntityTimeOff(id: string, entityType: string, entityId: string): Promise<boolean>;
+  getOrCreateCalendarShareToken(entityType: string, entityId: string, createdBy: string): Promise<CalendarShareToken>;
+  getCalendarShareToken(token: string): Promise<CalendarShareToken | undefined>;
 
   // AI cargo recognition operations
   getCargoItem(id: string): Promise<CargoItem | undefined>;
@@ -1978,6 +1993,54 @@ export class DbStorage implements IStorage {
 
   async touchCalendarSync(id: string): Promise<void> {
     await db.update(calendarConnections).set({ lastSyncedAt: new Date() }).where(eq(calendarConnections.id, id));
+  }
+
+  // === CALENDAR & SCHEDULING (crew/vehicle/warehouse/company) ===
+  async getEntityAvailability(entityType: string, entityId: string): Promise<ResourceAvailability[]> {
+    return await db.select().from(resourceAvailability)
+      .where(and(eq(resourceAvailability.entityType, entityType), eq(resourceAvailability.entityId, entityId)))
+      .orderBy(resourceAvailability.dayOfWeek);
+  }
+
+  async setEntityAvailability(entityType: string, entityId: string, slots: InsertResourceAvailability[]): Promise<ResourceAvailability[]> {
+    await db.delete(resourceAvailability)
+      .where(and(eq(resourceAvailability.entityType, entityType), eq(resourceAvailability.entityId, entityId)));
+    if (slots.length === 0) return [];
+    return await db.insert(resourceAvailability)
+      .values(slots.map((s) => ({ ...s, entityType, entityId })))
+      .returning();
+  }
+
+  async getEntityTimeOff(entityType: string, entityId: string): Promise<ResourceTimeOff[]> {
+    return await db.select().from(resourceTimeOff)
+      .where(and(eq(resourceTimeOff.entityType, entityType), eq(resourceTimeOff.entityId, entityId)))
+      .orderBy(desc(resourceTimeOff.startDate));
+  }
+
+  async createEntityTimeOff(timeOff: InsertResourceTimeOff, createdBy: string): Promise<ResourceTimeOff> {
+    const result = await db.insert(resourceTimeOff).values({ ...timeOff, createdBy }).returning();
+    return result[0];
+  }
+
+  async deleteEntityTimeOff(id: string, entityType: string, entityId: string): Promise<boolean> {
+    const result = await db.delete(resourceTimeOff)
+      .where(and(eq(resourceTimeOff.id, id), eq(resourceTimeOff.entityType, entityType), eq(resourceTimeOff.entityId, entityId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getOrCreateCalendarShareToken(entityType: string, entityId: string, createdBy: string): Promise<CalendarShareToken> {
+    const existing = await db.select().from(calendarShareTokens)
+      .where(and(eq(calendarShareTokens.entityType, entityType), eq(calendarShareTokens.entityId, entityId)));
+    if (existing[0]) return existing[0];
+    const token = randomUUID().replace(/-/g, "");
+    const result = await db.insert(calendarShareTokens).values({ entityType, entityId, token, createdBy }).returning();
+    return result[0];
+  }
+
+  async getCalendarShareToken(token: string): Promise<CalendarShareToken | undefined> {
+    const result = await db.select().from(calendarShareTokens).where(eq(calendarShareTokens.token, token));
+    return result[0];
   }
 
   // === AI CARGO RECOGNITION ===

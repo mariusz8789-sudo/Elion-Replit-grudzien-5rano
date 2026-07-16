@@ -663,6 +663,51 @@ export const calendarConnections = pgTable("calendar_connections", {
   driverProviderUnique: unique().on(t.driverId, t.provider),
 }));
 
+// Calendar & Scheduling for crew/vehicle/warehouse/company - the same polymorphic
+// entityType/entityId pattern already used by badges and verificationDocuments, generalizing
+// the driver-only availability/time-off tables above to every other resource type rather than
+// duplicating a parallel driver-shaped table per entity kind.
+export const resourceAvailability = pgTable("resource_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // worker, vehicle, warehouse, company
+  entityId: varchar("entity_id").notNull(),
+  dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday .. 6 = Saturday
+  startTime: text("start_time").notNull(), // "HH:MM" 24h
+  endTime: text("end_time").notNull(), // "HH:MM" 24h
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  entityIdx: index("resource_availability_entity_idx").on(t.entityType, t.entityId),
+}));
+
+export const resourceTimeOff = pgTable("resource_time_off", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // worker, vehicle, warehouse, company
+  entityId: varchar("entity_id").notNull(),
+  type: text("type").notNull().default("other"), // vacation, sick_leave, maintenance, reservation, blackout, other
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  note: text("note"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  entityIdx: index("resource_time_off_entity_idx").on(t.entityType, t.entityId),
+}));
+
+// An opaque, per-entity token embedded in a public .ics URL - this is how Google
+// Calendar/Outlook/Apple Calendar all support "subscribe by URL" without needing an OAuth app
+// registration (which would need real client credentials this environment doesn't have).
+export const calendarShareTokens = pgTable("calendar_share_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // driver, worker, vehicle, warehouse, company
+  entityId: varchar("entity_id").notNull(),
+  token: text("token").notNull().unique(),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  entityIdx: index("calendar_share_tokens_entity_idx").on(t.entityType, t.entityId),
+}));
+
 // === AI CARGO RECOGNITION ===
 export const cargoItems = pgTable("cargo_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1259,6 +1304,27 @@ export const insertDriverTimeOffSchema = createInsertSchema(driverTimeOff).omit(
   endDate: z.coerce.date(),
 });
 
+export const insertResourceAvailabilitySchema = createInsertSchema(resourceAvailability).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  entityType: z.enum(["worker", "vehicle", "warehouse", "company"]),
+  dayOfWeek: z.number().min(0).max(6),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24h format"),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24h format"),
+});
+
+export const insertResourceTimeOffSchema = createInsertSchema(resourceTimeOff).omit({
+  id: true,
+  createdAt: true,
+  createdBy: true,
+}).extend({
+  entityType: z.enum(["worker", "vehicle", "warehouse", "company"]),
+  type: z.enum(["vacation", "sick_leave", "maintenance", "reservation", "blackout", "other"]),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+});
+
 export const insertCargoItemSchema = createInsertSchema(cargoItems).omit({
   id: true,
   createdAt: true,
@@ -1474,6 +1540,14 @@ export type InsertDriverTimeOff = z.infer<typeof insertDriverTimeOffSchema>;
 export type DriverTimeOff = typeof driverTimeOff.$inferSelect;
 
 export type CalendarConnection = typeof calendarConnections.$inferSelect;
+
+export type InsertResourceAvailability = z.infer<typeof insertResourceAvailabilitySchema>;
+export type ResourceAvailability = typeof resourceAvailability.$inferSelect;
+
+export type InsertResourceTimeOff = z.infer<typeof insertResourceTimeOffSchema>;
+export type ResourceTimeOff = typeof resourceTimeOff.$inferSelect;
+
+export type CalendarShareToken = typeof calendarShareTokens.$inferSelect;
 
 export type InsertCargoItem = z.infer<typeof insertCargoItemSchema>;
 export type CargoItem = typeof cargoItems.$inferSelect;

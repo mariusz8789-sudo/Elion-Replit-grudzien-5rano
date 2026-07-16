@@ -18,6 +18,7 @@ import {
   insertResourceSharingSchema, insertAnnouncementSchema, insertCouponSchema,
   insertCapacityPostingSchema, insertCapacityBookingSchema,
   insertDriverAvailabilitySchema, insertDriverTimeOffSchema, insertCargoItemSchema,
+  insertResourceAvailabilitySchema, insertResourceTimeOffSchema,
   insertVerificationDocumentSchema, insertApiKeySchema,
   insertSkillSchema, insertWorkerProfileSchema, insertWorkerSkillSchema, insertRecurringRouteSubscriptionSchema,
   insertCompanyServiceSchema,
@@ -36,6 +37,7 @@ import { rankCrewCandidates, CREW_MATCH_METHODOLOGY, type CrewCandidate, type Sc
 import { haversineDistanceKm } from "@shared/geo";
 import { AI_OPERATIONS_ROLES, getAiOperationsReply } from "./services/aiOperations";
 import { extractDocumentFields } from "./services/documentOcr";
+import { buildIcsCalendar } from "@shared/ics";
 import { generateApiKey, hashApiKey } from "./lib/crypto";
 import { userCanAccessBooking as userCanAccessBookingImpl } from "./lib/authz";
 import { validateDataUrl } from "./lib/dataUrl";
@@ -3066,6 +3068,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(400).json({ message: "Calendar sync failed: " + error.message });
     }
+  });
+
+  // === CALENDAR & SCHEDULING (crew/vehicle/warehouse/company) ===
+  const CALENDAR_ENTITY_TYPES = ["worker", "vehicle", "warehouse", "company"] as const;
+
+  async function userCanManageCalendarEntity(user: User, entityType: string, entityId: string): Promise<boolean> {
+    if (user.role === "admin") return true;
+    switch (entityType) {
+      case "worker": {
+        const profile = await storage.getWorkerProfile(entityId);
+        if (!profile) return false;
+        return profile.userId === user.id || (!!profile.companyId && profile.companyId === user.companyId);
+      }
+      case "vehicle": {
+        const vehicle = await storage.getVehicle(entityId);
+        return !!vehicle && vehicle.companyId === user.companyId;
+      }
+      case "warehouse": {
+        const listing = await storage.getResourceSharing(entityId);
+        return !!listing && listing.providerCompanyId === user.companyId;
+      }
+      case "company":
+        return entityId === user.companyId;
+      default:
+        return false;
+    }
+  }
+
+  app.get("/api/calendar/:entityType/:entityId/availability", async (req, res) => {
+    if (!CALENDAR_ENTITY_TYPES.includes(req.params.entityType as any)) {
+      return res.status(400).json({ message: "Invalid entityType" });
+    }
+    res.json(await storage.getEntityAvailability(req.params.entityType, req.params.entityId));
+  });
+
+  app.post("/api/calendar/:entityType/:entityId/availability", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (!CALENDAR_ENTITY_TYPES.includes(req.params.entityType as any)) {
+        return res.status(400).json({ message: "Invalid entityType" });
+      }
+      if (!(await userCanManageCalendarEntity(user, req.params.entityType, req.params.entityId))) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const slots = (req.body.slots as unknown[]).map((s) =>
+        insertResourceAvailabilitySchema.parse({ ...(s as object), entityType: req.params.entityType, entityId: req.params.entityId })
+      );
+      const saved = await storage.setEntityAvailability(req.params.entityType, req.params.entityId, slots);
+      res.json(saved);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/calendar/:entityType/:entityId/time-off", async (req, res) => {
+    if (!CALENDAR_ENTITY_TYPES.includes(req.params.entityType as any)) {
+      return res.status(400).json({ message: "Invalid entityType" });
+    }
+    res.json(await storage.getEntityTimeOff(req.params.entityType, req.params.entityId));
+  });
+
+  app.post("/api/calendar/:entityType/:entityId/time-off", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (!CALENDAR_ENTITY_TYPES.includes(req.params.entityType as any)) {
+        return res.status(400).json({ message: "Invalid entityType" });
+      }
+      if (!(await userCanManageCalendarEntity(user, req.params.entityType, req.params.entityId))) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const data = insertResourceTimeOffSchema.parse({ ...req.body, entityType: req.params.entityType, entityId: req.params.entityId });
+      const created = await storage.createEntityTimeOff(data, user.id);
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/calendar/:entityType/:entityId/time-off/:id", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!(await userCanManageCalendarEntity(user, req.params.entityType, req.params.entityId))) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const deleted = await storage.deleteEntityTimeOff(req.params.id, req.params.entityType, req.params.entityId);
+    if (!deleted) return res.status(404).json({ message: "Time off entry not found" });
+    res.status(204).send();
+  });
+
+  // Returns a stable, opaque .ics subscribe URL for Google Calendar / Outlook / Apple Calendar -
+  // all three support "Add calendar by URL", which needs nothing more than this feed.
+  app.post("/api/calendar/:entityType/:entityId/share-token", requireAuth, async (req, res) => {
+    const user = req.user as User;
+    if (!CALENDAR_ENTITY_TYPES.includes(req.params.entityType as any) && req.params.entityType !== "driver") {
+      return res.status(400).json({ message: "Invalid entityType" });
+    }
+    const authorized = req.params.entityType === "driver"
+      ? (await storage.getDriver(req.params.entityId))?.userId === user.id
+        || (await storage.getDriver(req.params.entityId))?.companyId === user.companyId
+        || user.role === "admin"
+      : await userCanManageCalendarEntity(user, req.params.entityType, req.params.entityId);
+    if (!authorized) return res.status(403).json({ message: "Not authorized" });
+    const share = await storage.getOrCreateCalendarShareToken(req.params.entityType, req.params.entityId, user.id);
+    res.json({ token: share.token, url: `/api/calendar/ics/${share.token}` });
+  });
+
+  app.get("/api/calendar/ics/:token", async (req, res) => {
+    const share = await storage.getCalendarShareToken(req.params.token);
+    if (!share) return res.status(404).send("Calendar not found");
+
+    const calendarName = `MoveX ${share.entityType} calendar`;
+    let timeOffEvents: Array<{ uid: string; title: string; description?: string; startDate: Date; endDate: Date }> = [];
+    let availabilityBlocks: Array<{ uid: string; dayOfWeek: number; startTime: string; endTime: string }> = [];
+
+    if (share.entityType === "driver") {
+      const [availability, timeOff] = await Promise.all([
+        storage.getDriverAvailability(share.entityId),
+        storage.getDriverTimeOff(share.entityId),
+      ]);
+      availabilityBlocks = availability.filter((a) => a.active).map((a) => ({ uid: `avail-${a.id}`, dayOfWeek: a.dayOfWeek, startTime: a.startTime, endTime: a.endTime }));
+      timeOffEvents = timeOff.map((t) => ({ uid: `timeoff-${t.id}`, title: `${t.type} (driver)`, startDate: t.startDate, endDate: t.endDate }));
+    } else {
+      const [availability, timeOff] = await Promise.all([
+        storage.getEntityAvailability(share.entityType, share.entityId),
+        storage.getEntityTimeOff(share.entityType, share.entityId),
+      ]);
+      availabilityBlocks = availability.filter((a) => a.active).map((a) => ({ uid: `avail-${a.id}`, dayOfWeek: a.dayOfWeek, startTime: a.startTime, endTime: a.endTime }));
+      timeOffEvents = timeOff.map((t) => ({ uid: `timeoff-${t.id}`, title: t.type, description: t.note ?? undefined, startDate: t.startDate, endDate: t.endDate }));
+    }
+
+    const ics = buildIcsCalendar({
+      calendarName,
+      timeOffEvents,
+      availabilityBlocks: availabilityBlocks.map((b) => ({ ...b, seedDate: new Date() })),
+    });
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Content-Disposition", `inline; filename="${share.entityType}-calendar.ics"`);
+    res.send(ics);
   });
 
   // === AI CARGO RECOGNITION ===

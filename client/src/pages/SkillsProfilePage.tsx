@@ -13,6 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import VerificationUpload from "@/components/VerificationUpload";
+import EntityCalendarCard from "@/components/EntityCalendarCard";
 import type { Skill, WorkerProfile, WorkerSkill } from "@shared/schema";
 
 const CERTIFICATION_DOC_TYPES = [
@@ -225,6 +226,8 @@ export default function SkillsProfilePage() {
           {user && (
             <VerificationUpload holderType="user" holderId={user.id} docTypes={CERTIFICATION_DOC_TYPES} collectExpiry />
           )}
+
+          {profile && <EntityCalendarCard entityType="worker" entityId={profile.id} title="My Availability Calendar" />}
         </>
       )}
     </div>

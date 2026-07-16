@@ -10,13 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X, BarChart3, Brain } from "lucide-react";
+import { Building2, Truck, Users, Package, Star, UserPlus, Send, Loader2, MapPin, Boxes, Wrench, Briefcase, X, BarChart3, Brain, Calendar as CalendarIcon } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import type { Company, Driver, Vehicle, Booking, CapacityPosting, CapacityBooking, WorkerProfile, Skill, WorkerSkill, CompanyService } from "@shared/schema";
 import VehicleManager from "./VehicleManager";
 import ReviewsSection from "./ReviewsSection";
+import EntityCalendarCard from "./EntityCalendarCard";
 
 function RegisterCompanyCard() {
   const { toast } = useToast();
@@ -1032,6 +1033,59 @@ function AiOperationsTab({ companyId }: { companyId: string }) {
   );
 }
 
+function CalendarTab({ companyId }: { companyId: string }) {
+  const { data: vehicles = [] } = useQuery<Vehicle[]>({
+    queryKey: ["/api/vehicles", companyId],
+    queryFn: async () => {
+      const res = await fetch(`/api/vehicles?companyId=${companyId}`);
+      return res.ok ? res.json() : [];
+    },
+  });
+  const { data: crew = [] } = useQuery<WorkerProfile[]>({
+    queryKey: [`/api/companies/${companyId}/worker-profiles`],
+  });
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string>("");
+
+  return (
+    <div className="space-y-4">
+      <EntityCalendarCard entityType="company" entityId={companyId} title="Company Calendar" />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Truck className="w-5 h-5" />Vehicle Calendar</CardTitle>
+          <CardDescription>Maintenance windows and reservations per vehicle.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Select value={selectedVehicleId} onValueChange={setSelectedVehicleId}>
+            <SelectTrigger data-testid="select-calendar-vehicle"><SelectValue placeholder="Choose a vehicle" /></SelectTrigger>
+            <SelectContent>
+              {vehicles.map((v) => <SelectItem key={v.id} value={v.id}>{v.type} - {v.licensePlate}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+      {selectedVehicleId && <EntityCalendarCard entityType="vehicle" entityId={selectedVehicleId} title="Vehicle Calendar" />}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Wrench className="w-5 h-5" />Crew Calendar</CardTitle>
+          <CardDescription>View a crew member's schedule (they manage their own from their Skills Profile).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Select value={selectedWorkerId} onValueChange={setSelectedWorkerId}>
+            <SelectTrigger data-testid="select-calendar-worker"><SelectValue placeholder="Choose a crew member" /></SelectTrigger>
+            <SelectContent>
+              {crew.map((c) => <SelectItem key={c.id} value={c.id}>{c.bio || c.id.slice(0, 8)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+      {selectedWorkerId && <EntityCalendarCard entityType="worker" entityId={selectedWorkerId} title="Crew Calendar" />}
+    </div>
+  );
+}
+
 function CompanyDashboardTabs({ companyId }: { companyId: string }) {
   const { data: company } = useQuery<Company>({ queryKey: ["/api/companies", companyId] });
 
@@ -1058,6 +1112,7 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
           <TabsTrigger value="services" data-testid="tab-services"><Briefcase className="w-4 h-4 mr-2" />Services</TabsTrigger>
           <TabsTrigger value="enterprise" data-testid="tab-enterprise"><BarChart3 className="w-4 h-4 mr-2" />Enterprise</TabsTrigger>
           <TabsTrigger value="ai-operations" data-testid="tab-ai-operations"><Brain className="w-4 h-4 mr-2" />AI Operations</TabsTrigger>
+          <TabsTrigger value="calendar" data-testid="tab-calendar"><CalendarIcon className="w-4 h-4 mr-2" />Calendar</TabsTrigger>
           <TabsTrigger value="reviews" data-testid="tab-company-reviews"><Star className="w-4 h-4 mr-2" />Reviews</TabsTrigger>
         </TabsList>
         <TabsContent value="fleet" className="pt-4">
@@ -1083,6 +1138,9 @@ function CompanyDashboardTabs({ companyId }: { companyId: string }) {
         </TabsContent>
         <TabsContent value="ai-operations" className="pt-4">
           <AiOperationsTab companyId={companyId} />
+        </TabsContent>
+        <TabsContent value="calendar" className="pt-4">
+          <CalendarTab companyId={companyId} />
         </TabsContent>
         <TabsContent value="reviews" className="pt-4">
           <ReviewsSection companyId={companyId} />

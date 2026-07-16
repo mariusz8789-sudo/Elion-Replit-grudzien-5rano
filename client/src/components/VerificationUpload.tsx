@@ -125,8 +125,8 @@ export default function VerificationUpload({ holderType, holderId, docTypes, col
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileSelect} className="hidden" />
         {docTypes.map(({ value, label }) => {
           const doc = statusFor(value);
-          const isHistoryOpen = historyDocId === doc?.id;
-          const isOcrOpen = ocrResult?.docId === doc?.id;
+          const isHistoryOpen = !!doc && historyDocId === doc.id;
+          const isOcrOpen = !!doc && ocrResult?.docId === doc.id;
           return (
             <div key={value} className="p-3 border rounded-md space-y-2" data-testid={`row-doc-${value}`}>
               <div className="flex items-center justify-between gap-3 flex-wrap">

@@ -9,8 +9,9 @@ import { useSession, clearSession, getToken } from '../../core/backend/session';
 import { logout } from '../../core/backend/client';
 
 const LINKS: { hash: string; label: string; icon: IconName }[] = [
+  { hash: '#/genesis', label: 'Pulpit', icon: 'graph' },
   { hash: '#/assistant', label: 'Asystent', icon: 'flask' },
-  { hash: '#/compare', label: 'Porównaj', icon: 'graph' },
+  { hash: '#/compare', label: 'Porównaj', icon: 'atom' },
   { hash: '#/campaigns', label: 'Kampanie', icon: 'briefcase' },
   { hash: '#/analyses', label: 'Moje analizy', icon: 'book' },
   { hash: '#/billing', label: 'Rozliczenia', icon: 'lock' },
@@ -18,11 +19,11 @@ const LINKS: { hash: string; label: string; icon: IconName }[] = [
 
 export function ProductChrome({ active, children }: { active: string; children: ReactNode }) {
   const session = useSession();
-  const doLogout = async () => { const t = getToken(); if (t) await logout(t); clearSession(); window.location.hash = '#/assistant'; };
+  const doLogout = async () => { const t = getToken(); if (t) await logout(t); clearSession(); window.location.hash = '#/genesis'; };
   return (
     <div className="product">
       <header className="product-top">
-        <a className="product-brand" href="#/assistant">
+        <a className="product-brand" href="#/genesis">
           <span className="product-brand-mark"><Icon name="flask" size={20} /></span>
           <span className="product-brand-text">Genesis <em>Grounded Chemistry</em></span>
         </a>

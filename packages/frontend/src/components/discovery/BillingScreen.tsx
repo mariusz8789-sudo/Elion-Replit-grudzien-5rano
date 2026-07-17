@@ -9,7 +9,8 @@
  * If Stripe is not configured → "Billing unavailable" (no crash, upgrade disabled).
  */
 import { useCallback, useEffect, useState } from 'react';
-import { DiscoveryShell, Panel, StatusPill } from './DiscoveryShell';
+import { Panel, StatusPill } from './DiscoveryShell';
+import { ProductChrome } from '../product/ProductChrome';
 import { StatCard, Donut } from '../charts/Charts';
 import { Icon } from '../Icon';
 import { AccountPanel } from '../AccountPanel';
@@ -37,9 +38,10 @@ export function BillingScreen() {
 
   if (!session) {
     return (
-      <DiscoveryShell active="#/billing" title="Rozliczenia" subtitle="Zaloguj się, aby zarządzać planem i kluczem API">
+      <ProductChrome active="#/billing">
+        <div className="product-page-head"><div><h1>Rozliczenia</h1><p>Zaloguj się, aby zarządzać planem i kluczem API</p></div></div>
         <Panel title="Zaloguj się" icon="lock"><AccountPanel /></Panel>
-      </DiscoveryShell>
+      </ProductChrome>
     );
   }
 
@@ -76,7 +78,8 @@ export function BillingScreen() {
   );
 
   return (
-    <DiscoveryShell active="#/billing" title="Rozliczenia" subtitle="Plan, zużycie API i klucz — samoobsługa" actions={renewalPill}>
+    <ProductChrome active="#/billing">
+      <div className="product-page-head"><div><h1>Rozliczenia</h1><p>Plan, zużycie API i klucz — samoobsługa</p></div>{renewalPill}</div>
       {err ? <div className="ds-empty"><Icon name="alert" size={22} className="ds-empty-icon" /><h4>Nie udało się wczytać</h4><p>{err}</p></div> : null}
       {!data && !err ? <div className="skeleton" style={{ height: 200 }} /> : null}
 
@@ -135,6 +138,6 @@ export function BillingScreen() {
           </Panel>
         </>
       ) : null}
-    </DiscoveryShell>
+    </ProductChrome>
   );
 }

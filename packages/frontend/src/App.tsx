@@ -45,6 +45,7 @@ import { MyAnalysesScreen } from './components/product/MyAnalysesScreen';
 import { ComparePlatformScreen } from './components/product/ComparePlatformScreen';
 import { CampaignsScreen } from './components/product/CampaignsScreen';
 import { CampaignScreen as ResearchCampaignScreen } from './components/product/CampaignScreen';
+import { DashboardScreen } from './components/product/DashboardScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -85,7 +86,8 @@ type Route =
   | { kind: 'analyses' }
   | { kind: 'compare' }
   | { kind: 'research-campaigns' }
-  | { kind: 'research-campaign'; id: string };
+  | { kind: 'research-campaign'; id: string }
+  | { kind: 'genesis' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -122,6 +124,7 @@ function parseHash(): Route {
   const camp = h.match(/^#\/campaigns\/([\w-]+)/);
   if (camp) return { kind: 'research-campaign', id: camp[1] };
   if (h === '#/campaigns') return { kind: 'research-campaigns' };
+  if (h === '#/genesis') return { kind: 'genesis' };
   return { kind: 'home' };
 }
 
@@ -456,6 +459,7 @@ export default function App() {
     if (route.kind === 'compare') return <div className="app"><ErrorBoundary><ComparePlatformScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'research-campaigns') return <div className="app"><ErrorBoundary><CampaignsScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'research-campaign') return <div className="app"><ErrorBoundary><ResearchCampaignScreen id={route.id} /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'genesis') return <div className="app"><ErrorBoundary><DashboardScreen /></ErrorBoundary>{overlays}</div>;
 
     return (
       <div className="app">
@@ -468,6 +472,14 @@ export default function App() {
             <span className="hud-corner hud-br" aria-hidden="true" />
           </div>
           <div className="section-label">Zacznij tutaj</div>
+          <button className="timeline-cta timeline-cta-genesis" onClick={() => { window.location.hash = '#/genesis'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true"><Icon name="flask" size={26} /></span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Genesis Grounded Chemistry <em>(produkt)</em></span>
+              <span className="timeline-cta-sub">Komercyjny produkt: analiza cząsteczek RDKit, porównywanie kandydatów i kampanie badawcze — z provenance i eksportem. Pulpit ze wszystkimi modułami.</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
           <button className="timeline-cta timeline-cta-console" onClick={() => { window.location.hash = '#/dashboard'; }}>
             <span className="timeline-cta-icon" aria-hidden="true"><Icon name="rocket" size={26} /></span>
             <span className="timeline-cta-text">

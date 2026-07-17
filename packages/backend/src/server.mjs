@@ -325,7 +325,11 @@ function handleBilling(req, res, kind) {
 }
 
 /* ---------------- API trwałości (/api/auth, /api/projects) ---------------- */
-const persistLimiter = createRateLimiter({ limit: 60, windowMs: 60_000 });
+// Limit podniesiony 60 → 180/min (pilot-readiness audit): jedna aktywna sesja Scientific
+// Version Control (panel odświeża 4 zasoby po każdej automatycznej migawce) + kilka realnych
+// analiz RDKit/ADMET w Compare potrafiły w normalnym, szybkim pokazie produktu realnie
+// przekroczyć 60/min i dostać fałszywe 429 — odtworzone na żywo podczas tego audytu.
+const persistLimiter = createRateLimiter({ limit: 180, windowMs: 60_000 });
 setInterval(() => persistLimiter.cleanup(), 300_000).unref();
 
 /** Odczytuje ciało JSON (limit 64 kB — próby to małe wektory liczb), token z nagłówka i woła router. */

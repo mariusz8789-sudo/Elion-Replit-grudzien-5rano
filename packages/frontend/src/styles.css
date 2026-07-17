@@ -1560,7 +1560,7 @@ kbd {
 .ds-defs dd { margin: 0; font-size: 0.9rem; font-weight: 600; }
 .ds-mono { font-family: var(--font-mono); font-size: 0.82rem; }
 
-.ds-input-row { display: flex; gap: 0.5rem; }
+.ds-input-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .ds-input-row input { flex: 1; font-family: var(--font-mono); font-size: 0.82rem; }
 .ds-btn { padding: 0.55rem 1rem; border-radius: 9px; border: 1px solid var(--border-strong); background: var(--bg-elevated); color: var(--text); font-weight: 600; font-size: 0.82rem; cursor: pointer; transition: transform var(--dur-fast) var(--ease-spring), border-color var(--dur-fast); white-space: nowrap; }
 .ds-btn:hover { border-color: var(--cyan); } .ds-btn:active { transform: scale(0.98); }
@@ -1734,7 +1734,8 @@ kbd {
 .product-link:hover { background: var(--bg-elevated); color: var(--text); }
 .product-link.active { background: linear-gradient(90deg, rgba(92,214,232,0.16), rgba(167,139,250,0.1)); color: var(--text); }
 .product-account { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
-.product-email { font-size: 0.78rem; color: var(--text-dim); }
+.product-email { font-size: 0.78rem; color: var(--text-dim); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 620px) { .product-email { max-width: 150px; } }
 .product-main { max-width: 1040px; width: 100%; margin: 0 auto; padding: 1.4rem 1.4rem 4rem; }
 .product-hero { text-align: center; padding: 1.4rem 0 1.8rem; }
 .product-hero h1 { margin: 0 0 0.5rem; font-size: 1.7rem; letter-spacing: -0.02em; }
@@ -2063,7 +2064,7 @@ kbd {
 @media print { .trace-grid { grid-template-columns: repeat(3, 1fr); } .campaign-cards { grid-template-columns: 1fr; } }
 
 @media (max-width: 620px) {
-  .product-nav { order: 3; width: 100%; margin-left: 0; }
+  .product-nav { order: 3; width: 100%; margin-left: 0; flex-wrap: wrap; }
   .product-account { order: 2; }
   .product-nav .product-link span { display: inline; }
 }

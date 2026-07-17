@@ -49,11 +49,19 @@ export function VersionControlPanel({ campaignId, currentUserId, onSnapshotsChan
   const [diffError, setDiffError] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = () => {
     const token = getToken();
     if (!token) return;
-    fetchCampaignWithRole(token, campaignId).then((r) => { if (r.ok) setRole(r.data.role); });
+    fetchCampaignWithRole(token, campaignId).then((r) => {
+      if (r.ok) { setRole(r.data.role); setLoadError(null); }
+      // Nie zerujemy `role`, gdy już był ustalony — chwilowy błąd sieci/limitu żądań nie
+      // ma chować panel, który już poprawnie się załadował. Błąd pokazujemy tylko, gdy
+      // NIC jeszcze nie wczytaliśmy (pierwsze ładowanie), żeby użytkownik wiedział, że coś
+      // poszło nie tak, zamiast widzieć, jakby funkcja historii wersji w ogóle nie istniała.
+      else if (!role) setLoadError(r.status === 429 ? 'Zbyt wiele żądań — odczekaj chwilę i spróbuj ponownie.' : (r.message || 'Nie udało się wczytać historii wersji.'));
+    });
     listCampaignMembersRemote(token, campaignId).then((r) => { if (r.ok) setMembers(r.data.members); });
     listSnapshotsRemote(token, campaignId).then((r) => {
       if (!r.ok) return;
@@ -65,7 +73,17 @@ export function VersionControlPanel({ campaignId, currentUserId, onSnapshotsChan
   };
   useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [campaignId, refreshToken]);
 
-  if (!role) return null; // brak dostępu do warstwy wersjonowania lub trwa ładowanie — cicho pomijamy
+  if (!role) {
+    if (loadError) {
+      return (
+        <Panel title="Historia wersji naukowych" icon="clock" className="ds-mt">
+          <p className="ds-note">{loadError}</p>
+          <button className="ds-btn ds-mt" onClick={refresh}>Spróbuj ponownie</button>
+        </Panel>
+      );
+    }
+    return null; // trwa pierwsze ładowanie — jeszcze nic do pokazania
+  }
 
   const canEdit = role === 'owner' || role === 'collaborator';
   const isOwner = role === 'owner';

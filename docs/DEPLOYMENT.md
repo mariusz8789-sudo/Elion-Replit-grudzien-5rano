@@ -74,7 +74,12 @@ which also enables the network campaign acquisition path (see `OPERATOR_GUIDE.md
 
 - **Liveness / readiness**: `GET /api/health` → `200` with `{ ok, version, persistence, ai, static }`.
   Treat `persistence: "unavailable"` as degraded (project APIs return `503`) but still live.
-- **Rate limits**: `/api/ask` 10/min per IP; persistence 60/min per IP (in-memory, auto-cleaned).
+- **Rate limits**: `/api/ask` 10/min per IP; persistence + compute (`/api/auth`, `/api/projects`,
+  `/api/compute`, `/api/science`, `/api/campaigns`) 180/min per IP (in-memory, auto-cleaned).
+  Raised from 60 during the pilot-readiness audit: a single active Scientific Version Control
+  session plus a few real RDKit/ADMET analyses in Compare could exceed 60/min in normal,
+  fast-paced product usage (reproduced live). If multiple pilot users sit behind one shared
+  office IP/NAT, watch for 429s during a demo and raise further if needed.
 - **Sessions**: expired sessions are purged hourly; no action needed.
 
 ## Persistence & backup

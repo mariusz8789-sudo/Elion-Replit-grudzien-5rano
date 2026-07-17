@@ -25,6 +25,18 @@ until feedback from real users has been collected and analysed.**
 6. **First grant applications** (see GRANTS.md).
 7. **First paying customer.**
 
+## Business-value audit (2026-07) — the top 5 product improvements
+A code-cited UX audit (every screen, every persona: first-time user, PhD student,
+researcher, biotech founder, professor, investor) plus a competitive analysis against
+RDKit/ChemAxon/DataWarrior/Schrödinger/general LLMs produced a ranked top-5, all reusing
+existing architecture (no new engine, no new AI model): **(1)** CSV/SDF bulk import for
+Compare & Campaigns, **(2)** unify CSV/JSON export across Assistant/Compare to match
+Campaigns, **(3)** server-side persistence for Assistant analysis history (matching the
+Campaigns pattern), **(4)** surface the already-built ADMET-AI engine in Compare/Campaigns
+(clearly tagged ⚠ MODEL_INFERRED), **(5)** a lightweight read-only share link for a
+campaign/report. Full reasoning, effort/impact ranking, and rejected alternatives:
+FUTURE_WORK.md "Current top 5". Full competitive table: COMMERCIALIZATION.md.
+
 ## Explicitly NOT on the roadmap right now
 No new scientific engines. No new AI models. No scope expansion. The temptation after
 Stage 7 is to build an Evidence Engine / PubMed-ChEMBL integration / docking pipeline — **do

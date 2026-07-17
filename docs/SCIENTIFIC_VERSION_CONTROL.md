@@ -104,6 +104,20 @@ an error to the user — a missed snapshot loses history depth, not data (the ca
 itself is still saved via the existing `persist()`/`pushCampaign` write-through). A user
 can also trigger a snapshot manually via the version-history panel (`triggerKind: 'manual'`).
 
+**Ordering matters, and a live-browser QA pass caught it:** `autoSnapshot()` only fires
+*after* `persist()`'s campaign PUT resolves (`persist(next).then(() => autoSnapshot(...))`),
+never concurrently with it. Firing both at once let the snapshot POST occasionally reach the
+server before the campaign row existed (404 on a brand-new campaign's very first snapshot) —
+a real race that only showed up testing against the real server over the network, not in the
+in-process `handleApi()` test harness where both calls are effectively synchronous.
+
+**`VersionControlPanel` only fetches on mount** — it has no subscription to campaign writes
+happening elsewhere. `CampaignScreen` therefore threads a `refreshToken` counter into the
+panel, bumped once each auto-snapshot's `createSnapshotRemote` call resolves, so the timeline
+actually reflects new snapshots without a manual page reload. This was also only found by
+clicking through the real UI, not by unit tests (the panel and the screen are both correct in
+isolation; the gap was in how they were wired together).
+
 ## 5. Permissions
 
 Three roles, checked on every new route (`campaignVersioning.mjs → hasRole`, rank

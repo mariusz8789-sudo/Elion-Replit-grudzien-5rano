@@ -30,8 +30,11 @@ function fmt(ts: number): string {
   return new Date(ts).toLocaleString('pl-PL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-export function VersionControlPanel({ campaignId, currentUserId, onSnapshotsChange }: {
+export function VersionControlPanel({ campaignId, currentUserId, onSnapshotsChange, refreshToken }: {
   campaignId: string; currentUserId: string; onSnapshotsChange?: (snapshots: SnapshotMeta[]) => void;
+  /** Bump this (e.g. a counter) whenever the parent knows the campaign changed server-side —
+   *  this panel only fetches on mount otherwise, so it would never see new snapshots appear. */
+  refreshToken?: number | string;
 }) {
   const [role, setRole] = useState<CampaignRole | null>(null);
   const [members, setMembers] = useState<CampaignMember[]>([]);
@@ -60,7 +63,7 @@ export function VersionControlPanel({ campaignId, currentUserId, onSnapshotsChan
     });
     listCommentsRemote(token, campaignId).then((r) => { if (r.ok) setComments(r.data.comments); });
   };
-  useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [campaignId]);
+  useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [campaignId, refreshToken]);
 
   if (!role) return null; // brak dostępu do warstwy wersjonowania lub trwa ładowanie — cicho pomijamy
 

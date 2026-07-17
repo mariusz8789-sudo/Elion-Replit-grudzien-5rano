@@ -58,6 +58,7 @@ export function CampaignScreen({ id }: { id: string }) {
   const [rdkitVersion, setRdkitVersion] = useState('nieznana');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [latestSnapshot, setLatestSnapshot] = useState<SnapshotMeta | null>(null);
+  const [versionSyncTick, setVersionSyncTick] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -89,28 +90,34 @@ export function CampaignScreen({ id }: { id: string }) {
   }
 
   // Zapis lokalny (natychmiastowy) + write-through na serwer (best-effort, offline-first).
-  const persist = (c: Campaign) => {
+  // Zwraca Promise, żeby wywołujący mógł poczekać na dotarcie do serwera PRZED wywołaniem
+  // autoSnapshot() poniżej — inaczej POST /snapshots mógłby wyścigowo dotrzeć przed PUT
+  // kampanii i dostać 404 (kampania jeszcze nie istnieje po stronie serwera).
+  const persist = (c: Campaign): Promise<void> => {
     setCampaign(c); saveCampaign(c);
     const t = getToken();
-    if (t) pushCampaign(t, c).catch(() => { /* offline → zostaje lokalne, zsynchronizuje się później */ });
+    if (!t) return Promise.resolve();
+    return pushCampaign(t, c).then(() => undefined).catch(() => { /* offline → zostaje lokalne, zsynchronizuje się później */ });
   };
 
   // Scientific Version Control (Genesis 2.1, Part 4): automatic, best-effort snapshot at the
   // two triggers the approved architecture defines — molecules added, analysis completed.
   // Never blocks the UI and never surfaces an error: a missed snapshot loses history depth,
-  // not data (the campaign body itself is still saved via persist()/pushCampaign above).
+  // not data (the campaign body itself is still saved via persist()/pushCampaign above). Bumps
+  // versionSyncTick so VersionControlPanel (which only fetches on mount) picks up the change.
   const autoSnapshot = (c: Campaign, triggerKind: 'molecules_added' | 'analysis_completed') => {
     const t = getToken();
     if (!t) return;
-    createSnapshotRemote(t, c.id, { data: c, triggerKind, groundingVersion: GROUNDING_VERSION, scoringVersion: SCORING_VERSION }).catch(() => {});
+    createSnapshotRemote(t, c.id, { data: c, triggerKind, groundingVersion: GROUNDING_VERSION, scoringVersion: SCORING_VERSION })
+      .then(() => setVersionSyncTick((n) => n + 1))
+      .catch(() => {});
   };
 
   const doAdd = () => {
     const entries = parseMoleculeLines(addRaw, 2000);
     if (!entries.length) return;
     const next = addMolecules(campaign, entries);
-    persist(next);
-    autoSnapshot(next, 'molecules_added');
+    persist(next).then(() => autoSnapshot(next, 'molecules_added'));
     setAddRaw('');
   };
 
@@ -130,8 +137,7 @@ export function CampaignScreen({ id }: { id: string }) {
       },
     });
     working = markCompared(working);
-    persist(working);
-    autoSnapshot(working, 'analysis_completed');
+    persist(working).then(() => autoSnapshot(working, 'analysis_completed'));
     setRun(null); abortRef.current = null;
   };
 
@@ -377,7 +383,7 @@ export function CampaignScreen({ id }: { id: string }) {
 
       {/* Scientific Version Control — one shared component for both breakpoints (no duplicated UI logic) */}
       <VersionControlPanel
-        campaignId={campaign.id} currentUserId={session.user.id}
+        campaignId={campaign.id} currentUserId={session.user.id} refreshToken={versionSyncTick}
         onSnapshotsChange={(snapshots) => setLatestSnapshot(snapshots[0] ?? null)}
       />
 

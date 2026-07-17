@@ -79,7 +79,11 @@ which also enables the network campaign acquisition path (see `OPERATOR_GUIDE.md
 
 ## Persistence & backup
 
-- Schema is versioned via `PRAGMA user_version` and migrates **additively** on boot (currently v21).
+- Schema is versioned via `PRAGMA user_version` and migrates **additively** on boot
+  (currently v27 — v27 adds Scientific Version Control: `campaign_members`,
+  `campaign_snapshots`, `campaign_comments`; see `docs/SCIENTIFIC_VERSION_CONTROL.md`).
+  No new environment variables or configuration are required for this feature — it reuses
+  the existing `GENESIS_DB_PATH` database and existing auth/session infrastructure.
 - Back up by copying the SQLite file while the process is quiescent, or use `sqlite3 .backup`.
 - The schema is portable to Postgres if a managed DB is later required (no code path assumes SQLite
   internals beyond the store layer).

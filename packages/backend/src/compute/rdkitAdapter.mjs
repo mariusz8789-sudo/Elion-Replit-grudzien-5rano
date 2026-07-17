@@ -219,6 +219,38 @@ export function denovo(spec) {
   }
 }
 
+/**
+ * SDF/MOL import (pilot readiness): parses ONE MOL-format block (a .mol file, or one
+ * record already split out of a .sdf) into a canonical SMILES + the record's title line.
+ * Real RDKit atom/bond parsing (MolFromMolBlock) — never a text/regex hack.
+ */
+export function parseMolfile(molblock) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'parse-molfile', molblock: String(molblock ?? '') }, 20_000);
+    return r.ok ? { ok: true, smiles: r.smiles, name: r.name ?? null } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/**
+ * SDF/MOL import (pilot readiness): parses a multi-record .sdf file (records separated by
+ * the standard `$$$$` delimiter). A malformed record is skipped and counted, never aborts
+ * the whole batch. Returns `{ ok, molecules:[{smiles,name}], parsed, errors, total }`.
+ */
+export function parseSdf(sdfText) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'parse-sdf', sdf: String(sdfText ?? '') }, 60_000);
+    return r.ok ? { ok: true, molecules: r.molecules, parsed: r.parsed, errors: r.errors, total: r.total } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
 /** Max Tanimoto vs a reference set. maxTanimoto=null / nReference=0 → NOT ASSESSED. */
 export function novelty(smiles, reference = []) {
   const d = detect();

@@ -12,7 +12,7 @@ import type { CSSProperties } from 'react';
 export type IconName =
   | 'settings' | 'flask' | 'dna' | 'atom' | 'molecule' | 'graph' | 'cpu' | 'chart'
   | 'shield' | 'book' | 'rocket' | 'brain' | 'users' | 'lock' | 'back' | 'search'
-  | 'memory' | 'briefcase' | 'clock' | 'target' | 'check' | 'alert' | 'block' | 'spark';
+  | 'memory' | 'briefcase' | 'clock' | 'target' | 'check' | 'alert' | 'block' | 'spark' | 'upload';
 
 /** Path/child markup per icon, drawn inside a shared 24×24 stroke frame. */
 const PATHS: Record<IconName, JSX.Element> = {
@@ -40,6 +40,7 @@ const PATHS: Record<IconName, JSX.Element> = {
   alert: <><path d="M12 3.5L21 19H3z" /><path d="M12 9.5v4M12 16.2v.2" /></>,
   block: <><circle cx="12" cy="12" r="8.5" /><path d="M6.5 6.5l11 11" /></>,
   spark: <><path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z" /></>,
+  upload: <><path d="M12 16V4M8 8l4-4 4 4" /><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></>,
 };
 
 export interface IconProps {

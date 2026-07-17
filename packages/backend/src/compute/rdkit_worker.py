@@ -127,6 +127,46 @@ def main():
         print(json.dumps({"ok": True, "meanPairwiseDistance": round(total / pairs, 5), "n": len(mols)}))
         return
 
+    if cmd == "parse-molfile":
+        # SDF/MOL import (V-format MOL block: one .mol file, or one record of a multi-
+        # molecule .sdf). RDKit parses the real atom/bond table — never a text/regex hack —
+        # so structure fidelity matches the file-format spec exactly.
+        block = req.get("molblock", "")
+        if not isinstance(block, str) or not block.strip():
+            print(json.dumps({"ok": False, "error": "invalid_input: pusty blok molfile"}))
+            return
+        m = Chem.MolFromMolBlock(block, sanitize=True)
+        if m is None:
+            print(json.dumps({"ok": False, "error": "invalid_molfile"}))
+            return
+        # First line of a MOL/SDF block conventionally carries the compound name/title.
+        first_line = block.split("\n", 1)[0].strip()
+        print(json.dumps({"ok": True, "smiles": Chem.MolToSmiles(m), "name": first_line or None}))
+        return
+
+    if cmd == "parse-sdf":
+        # Multi-record .sdf file — split on the standard "$$$$" record delimiter; a
+        # malformed record is skipped and counted, never aborts the whole batch.
+        text = req.get("sdf", "")
+        if not isinstance(text, str) or not text.strip():
+            print(json.dumps({"ok": False, "error": "invalid_input: pusty plik SDF"}))
+            return
+        # Every record after the first still carries the newline that followed the previous
+        # "$$$$" delimiter; strip ONLY that leading blank line, or the fixed-position V2000
+        # header (title/program/comment/counts on lines 1-4) shifts by one and fails to parse.
+        records = [r.lstrip("\r\n") for r in text.split("$$$$") if r.strip()]
+        out = []
+        errors = 0
+        for i, block in enumerate(records[:2000]):
+            m = Chem.MolFromMolBlock(block, sanitize=True)
+            if m is None:
+                errors += 1
+                continue
+            first_line = block.strip().split("\n", 1)[0].strip()
+            out.append({"smiles": Chem.MolToSmiles(m), "name": first_line or ("cząsteczka %d" % (i + 1))})
+        print(json.dumps({"ok": True, "molecules": out, "parsed": len(out), "errors": errors, "total": len(records)}))
+        return
+
     smiles = req.get("smiles", "")
     mol = Chem.MolFromSmiles(smiles) if isinstance(smiles, str) else None
     if mol is None:

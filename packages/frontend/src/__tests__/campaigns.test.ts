@@ -141,4 +141,21 @@ describe('exports carry only verified + grounded + provenance', () => {
     const forbidden = /\b(jest aktywn|wykazuje aktywność|będzie skuteczn|jest skuteczn|leczy|potwierdzona skuteczność)\b/i;
     expect(JSON.stringify(json)).not.toMatch(forbidden);
   });
+  it('carries the Scientific Snapshot reference in both CSV and JSON when one is supplied', () => {
+    const metaWithSnapshot = { ...meta, snapshot: { id: 'abc123def456', createdAt: 1_700_000_000_000, scoringVersion: 'genesis-scoring/1', admetVersion: '2.0.1' } };
+    const csv = campaignToCSV(seeded(), metaWithSnapshot);
+    expect(csv.split('\n')[0]).toMatch(/abc123def456/);
+    expect(csv.split('\n')[0]).toMatch(/genesis-scoring\/1/);
+    expect(csv.split('\n')[1]).toContain('score,verdict,molWt'); // header still lands on line 2, unshifted otherwise
+
+    const json = JSON.parse(campaignToJSON(seeded(), metaWithSnapshot));
+    expect(json.provenance.scientificSnapshot.id).toBe('abc123def456');
+    expect(json.provenance.scientificSnapshot.scoringVersion).toBe('genesis-scoring/1');
+  });
+  it('omits the Scientific Snapshot reference entirely when none is supplied (no snapshot yet)', () => {
+    const csv = campaignToCSV(seeded(), meta);
+    expect(csv.split('\n')[0]).toContain('score,verdict,molWt'); // header stays on line 1 — unchanged behaviour
+    const json = JSON.parse(campaignToJSON(seeded(), meta));
+    expect(json.provenance.scientificSnapshot).toBeNull();
+  });
 });

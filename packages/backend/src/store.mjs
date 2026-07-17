@@ -967,6 +967,50 @@ function migrate(db) {
     db.exec('CREATE INDEX IF NOT EXISTS idx_user_campaigns_owner ON user_campaigns(owner_id, updated_at DESC);');
     db.exec('PRAGMA user_version = 26');
   }
+  // v27 — Genesis 2.1 (Part 4): Scientific Version Control. Content-addressed, immutable
+  // snapshots of a campaign's full state (id = SHA-256 of canonical JSON, computed in
+  // campaignVersioning.mjs — same idea as a git commit hash). `user_campaigns`'s existing
+  // shape/PK is untouched; sharing is layered on top via `campaign_members` (role by
+  // campaign_id+user_id), so a non-owner collaborator can be authorized WITHOUT the
+  // owner_id-keyed lookups above ever changing.
+  if (version < 27) {
+    db.exec(`CREATE TABLE IF NOT EXISTS campaign_members (
+      campaign_id TEXT NOT NULL,
+      user_id     TEXT NOT NULL,
+      role        TEXT NOT NULL,
+      added_by    TEXT NOT NULL,
+      created_at  INTEGER NOT NULL,
+      PRIMARY KEY (campaign_id, user_id)
+    );`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_campaign_members_user ON campaign_members(user_id);');
+    db.exec(`CREATE TABLE IF NOT EXISTS campaign_snapshots (
+      id                TEXT PRIMARY KEY,
+      campaign_id       TEXT NOT NULL,
+      parent_id         TEXT,
+      data              TEXT NOT NULL,
+      trigger_kind      TEXT NOT NULL,
+      author_id         TEXT NOT NULL,
+      restored_from     TEXT,
+      rdkit_version     TEXT,
+      admet_version     TEXT,
+      grounding_version TEXT,
+      scoring_version   TEXT,
+      created_at        INTEGER NOT NULL
+    );`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_campaign_snapshots_campaign ON campaign_snapshots(campaign_id, created_at DESC);');
+    db.exec(`CREATE TABLE IF NOT EXISTS campaign_comments (
+      id          TEXT PRIMARY KEY,
+      campaign_id TEXT NOT NULL,
+      snapshot_id TEXT,
+      molecule_id TEXT,
+      author_id   TEXT NOT NULL,
+      body        TEXT NOT NULL,
+      resolved    INTEGER NOT NULL DEFAULT 0,
+      created_at  INTEGER NOT NULL
+    );`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_campaign_comments_campaign ON campaign_comments(campaign_id, created_at DESC);');
+    db.exec('PRAGMA user_version = 27');
+  }
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1191,7 +1235,115 @@ export function deleteCampaignRow(db, ownerId, id) {
   if (ownerId && id) db.prepare('DELETE FROM user_campaigns WHERE owner_id = ? AND id = ?').run(String(ownerId), String(id));
 }
 
+/** Campaign by id alone, regardless of owner — needed to authorize a non-owner collaborator. */
+export function getCampaignRowById(db, id) {
+  if (!id) return null;
+  const r = db.prepare('SELECT id, owner_id, data, created_at, updated_at FROM user_campaigns WHERE id = ?').get(String(id));
+  return r ? { id: r.id, ownerId: r.owner_id, data: safeParse(r.data), createdAt: r.created_at, updatedAt: r.updated_at } : null;
+}
+
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
+
+/* ---------------- Scientific Version Control (Genesis 2.1, Part 4) ---------------- */
+
+export function addCampaignMember(db, { campaignId, userId, role, addedBy, now = Date.now() }) {
+  db.prepare(`INSERT INTO campaign_members (campaign_id, user_id, role, added_by, created_at) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(campaign_id, user_id) DO UPDATE SET role = excluded.role`)
+    .run(String(campaignId), String(userId), String(role), String(addedBy), now);
+  return getCampaignMember(db, campaignId, userId);
+}
+
+function toMemberRow(r) {
+  return r ? { campaignId: r.campaign_id, userId: r.user_id, role: r.role, addedBy: r.added_by, createdAt: r.created_at } : null;
+}
+
+export function getCampaignMember(db, campaignId, userId) {
+  return toMemberRow(db.prepare('SELECT * FROM campaign_members WHERE campaign_id = ? AND user_id = ?').get(String(campaignId), String(userId)));
+}
+
+export function listCampaignMembers(db, campaignId) {
+  return db.prepare('SELECT * FROM campaign_members WHERE campaign_id = ? ORDER BY created_at ASC').all(String(campaignId)).map(toMemberRow);
+}
+
+export function removeCampaignMember(db, campaignId, userId) {
+  db.prepare('DELETE FROM campaign_members WHERE campaign_id = ? AND user_id = ?').run(String(campaignId), String(userId));
+}
+
+/** Effective role on a campaign: 'owner' | member role | null (no access). Never throws on a missing campaign. */
+export function resolveCampaignRole(db, campaignId, userId) {
+  const row = getCampaignRowById(db, campaignId);
+  if (!row) return null;
+  if (row.ownerId === userId) return 'owner';
+  return getCampaignMember(db, campaignId, userId)?.role ?? null;
+}
+
+function toSnapshotRow(r) {
+  return r ? {
+    id: r.id, campaignId: r.campaign_id, parentId: r.parent_id, data: safeParse(r.data),
+    triggerKind: r.trigger_kind, authorId: r.author_id, restoredFrom: r.restored_from,
+    rdkitVersion: r.rdkit_version, admetVersion: r.admet_version, groundingVersion: r.grounding_version,
+    scoringVersion: r.scoring_version, createdAt: r.created_at,
+  } : null;
+}
+
+/** Insert an immutable snapshot. Content-addressed: re-inserting the same id (same content) is a no-op. */
+export function insertCampaignSnapshot(db, snap) {
+  const existing = getSnapshot(db, snap.id);
+  if (existing) return existing;
+  db.prepare(`INSERT INTO campaign_snapshots
+    (id, campaign_id, parent_id, data, trigger_kind, author_id, restored_from, rdkit_version, admet_version, grounding_version, scoring_version, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(
+      String(snap.id), String(snap.campaignId), snap.parentId ?? null, JSON.stringify(snap.data ?? {}),
+      String(snap.triggerKind), String(snap.authorId), snap.restoredFrom ?? null,
+      snap.rdkitVersion ?? null, snap.admetVersion ?? null, snap.groundingVersion ?? null, snap.scoringVersion ?? null,
+      snap.now ?? Date.now(),
+    );
+  return getSnapshot(db, snap.id);
+}
+
+export function getSnapshot(db, id) {
+  if (!id) return null;
+  return toSnapshotRow(db.prepare('SELECT * FROM campaign_snapshots WHERE id = ?').get(String(id)));
+}
+
+export function getLatestSnapshot(db, campaignId) {
+  return toSnapshotRow(
+    db.prepare('SELECT * FROM campaign_snapshots WHERE campaign_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1').get(String(campaignId)),
+  );
+}
+
+export function listCampaignSnapshots(db, campaignId) {
+  return db.prepare('SELECT * FROM campaign_snapshots WHERE campaign_id = ? ORDER BY created_at DESC, rowid DESC').all(String(campaignId)).map(toSnapshotRow);
+}
+
+function toCommentRow(r) {
+  return r ? {
+    id: r.id, campaignId: r.campaign_id, snapshotId: r.snapshot_id, moleculeId: r.molecule_id,
+    authorId: r.author_id, body: r.body, resolved: !!r.resolved, createdAt: r.created_at,
+  } : null;
+}
+
+export function insertCampaignComment(db, c) {
+  db.prepare(`INSERT INTO campaign_comments (id, campaign_id, snapshot_id, molecule_id, author_id, body, resolved, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, 0, ?)`)
+    .run(String(c.id), String(c.campaignId), c.snapshotId ?? null, c.moleculeId ?? null, String(c.authorId), String(c.body), c.now ?? Date.now());
+  return getCampaignComment(db, c.id);
+}
+
+export function getCampaignComment(db, id) {
+  if (!id) return null;
+  return toCommentRow(db.prepare('SELECT * FROM campaign_comments WHERE id = ?').get(String(id)));
+}
+
+export function listCampaignComments(db, campaignId) {
+  return db.prepare('SELECT * FROM campaign_comments WHERE campaign_id = ? ORDER BY created_at ASC').all(String(campaignId)).map(toCommentRow);
+}
+
+export function resolveCampaignComment(db, id, resolved = true) {
+  db.prepare('UPDATE campaign_comments SET resolved = ? WHERE id = ?').run(resolved ? 1 : 0, String(id));
+  return getCampaignComment(db, id);
+}
 
 /* ---------------- Projekty i członkostwa (RBAC) ---------------- */
 

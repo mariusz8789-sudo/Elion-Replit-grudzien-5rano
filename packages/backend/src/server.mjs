@@ -79,7 +79,7 @@ const ASYNC_EXECUTION = process.env.ASYNC_EXECUTION === 'true';
 const computePool = ASYNC_EXECUTION
   ? createComputePool(process.env.GENESIS_WORKER_POOL_SIZE ? { size: Number(process.env.GENESIS_WORKER_POOL_SIZE) } : {})
   : null;
-const ASYNC_COMPUTE_ROUTES = new Set(['/api/science/laboratory-readiness', '/api/science/molecule/render', '/api/compute/admet/predict']);
+const ASYNC_COMPUTE_ROUTES = new Set(['/api/science/laboratory-readiness', '/api/science/molecule/render', '/api/compute/admet/predict', '/api/science/molecule/parse-file']);
 
 /**
  * Nieblokujący tor obliczeń (flaga ON). Auth + rate-limit + walidacja w wątku głównym;
@@ -109,6 +109,24 @@ function handleAsyncCompute(req, res, pathname) {
         const r = await computePool.run('admet-predict', { smiles: list });
         if (r.ok) return json(res, 200, { predictions: r.predictions, version: r.version });
         return json(res, r.error === 'invalid_input' ? 400 : 503, { error: r.error ?? 'BLOCKED_BY_RUNTIME', message: r.reason });
+      }
+      if (pathname === '/api/science/molecule/parse-file') {
+        const kind = String(body?.kind ?? '');
+        if (kind === 'mol') {
+          const molblock = String(body?.content ?? '');
+          if (!molblock.trim()) return json(res, 400, { error: 'invalid_input', message: 'Plik MOL jest pusty.' });
+          const r = await computePool.run('molecule-parse-mol', { molblock });
+          if (r.ok) return json(res, 200, { molecules: [{ smiles: r.smiles, name: r.name }] });
+          return json(res, r.error === 'invalid_molfile' || r.error === 'invalid_input' ? 400 : 503, { error: r.error, message: r.reason });
+        }
+        if (kind === 'sdf') {
+          const sdf = String(body?.content ?? '');
+          if (!sdf.trim()) return json(res, 400, { error: 'invalid_input', message: 'Plik SDF jest pusty.' });
+          const r = await computePool.run('molecule-parse-sdf', { sdf });
+          if (r.ok) return json(res, 200, { molecules: r.molecules, parsed: r.parsed, errors: r.errors, total: r.total });
+          return json(res, r.error === 'invalid_input' ? 400 : 503, { error: r.error, message: r.reason });
+        }
+        return json(res, 400, { error: 'invalid_input', message: 'kind musi być "mol" lub "sdf".' });
       }
       return json(res, 200, await computePool.run('laboratory-readiness', { candidate: body?.candidate ?? {}, scientificQuestion: body?.scientificQuestion ?? null }));
     } catch (err) {

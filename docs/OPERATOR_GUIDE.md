@@ -94,6 +94,27 @@ Genesis find a drug?" is **NO** absent independent experimental/clinical validat
   all report **runtime-verified** engine status. `POST /api/compute/run {modelId,inputs}` runs a
   deterministic model (persisted if a token is attached).
 
+## 8b. Research Campaigns sharing + version history (Scientific Version Control)
+
+Distinct from §4/§5's cognitive discovery-campaign engine — this is the product's
+`/api/campaigns/:id` Research Campaigns (Compare/Campaigns UI). There is no separate admin
+console for this; owners self-manage sharing from the product UI's version-history panel.
+Operationally relevant for an administrator:
+
+- A campaign has exactly one **owner** (the creator) plus any number of invited members
+  with role `collaborator` or `viewer`. Manage via `POST/PUT/DELETE
+  /api/campaigns/:id/members[/:userId]` (owner-only; full reference in
+  `docs/SCIENTIFIC_VERSION_CONTROL.md` §6).
+- Invites resolve by e-mail against `users.email` — **the invitee must already have a
+  Genesis account**. There is no invite-then-signup flow and no e-mail is sent; the
+  invited user only sees the shared campaign next time they open it.
+- Snapshots are immutable and additive (`campaign_snapshots` never has rows deleted or
+  updated) — a campaign's disk footprint grows with its snapshot count. At pilot scale
+  (a handful of campaigns per lab, each with a few hundred snapshot events) this is
+  negligible; there is no retention/pruning policy yet if that changes.
+- No new environment variables. Standard `VACUUM INTO` backups (see §"Persistence &
+  backup" in `DEPLOYMENT.md`) already capture these tables — nothing extra to configure.
+
 ## 9. Troubleshooting
 
 | Symptom | Cause | Action |

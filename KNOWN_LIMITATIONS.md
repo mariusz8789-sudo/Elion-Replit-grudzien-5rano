@@ -184,3 +184,33 @@ graceful SIGTERM/SIGINT shutdown.
 Everything larger (C1/C2/H1/H2/H3, TPSA S/P, UI tests, chrome unification) is **documented
 here and in FUTURE_WORK.md, deliberately not rushed**, because a hasty security or
 scientific-engine change is worse than an honest disclosure.
+
+---
+
+## 6. Pilot-readiness milestone (Genesis 2.1, Part 4) — what shipped, what didn't
+
+Full detail in `docs/SCIENTIFIC_VERSION_CONTROL.md` §9; summarized here for anyone reading
+top-to-bottom.
+
+**Shipped this milestone, real and tested (863/863 backend, 740/740 frontend tests green):**
+Scientific Version Control (content-addressed immutable snapshots, structural scientific
+diff, restore, Owner/Collaborator/Viewer sharing, scientific comments — `campaignVersioning.mjs`
++ `VersionControlPanel.tsx`); CSV import for Compare/Campaigns; real SDF/MOL import via a
+new RDKit worker command (`parse-molfile`/`parse-sdf`); Scientific Snapshot metadata in
+CSV/JSON campaign exports.
+
+**Explicitly deferred, not silently skipped:**
+- **No branching/merge UI.** Data model supports it (`parent_id` DAG); not built. See
+  `docs/SCIENTIFIC_VERSION_CONTROL.md` §9.
+- **No per-molecule ADMET version history** — ADMET predictions were never persisted
+  per-molecule before this milestone and still aren't; only the engine *version* active at
+  snapshot time is recorded. Extending this is a bounded, well-understood follow-up.
+- **Invite-by-email requires an existing Genesis account**; no invite-then-signup flow, no
+  email notification on invite. Fine for a same-lab pilot with named collaborators; not a
+  general-audience sharing product.
+- **A full end-to-end audit of the ~230 pre-existing files this milestone did NOT touch**
+  (the broader "cognitive" subsystem, the education-simulation labs, docking/QM pipelines)
+  was out of scope for a single session; this document's §§0–5 above already cover that
+  ground from the prior audit and remain the accurate source for it. This milestone's own
+  audit pass (grep for TODO/FIXME/HACK/stub across `packages/`) found nothing new to
+  disclose beyond what §§0–5 already state.

@@ -16,6 +16,7 @@ import { AccountPanel } from '../AccountPanel';
 import { useSession } from '../../core/backend/session';
 import { runBatch } from '../../core/batchRunner';
 import { rankCandidates, type Candidate, type RankedCandidate } from '../../core/moleculeComparison';
+import { MoleculeCsvImport } from './MoleculeCsvImport';
 
 const MAX = 50;
 const EXAMPLE = `Aspiryna = CC(=O)Oc1ccccc1C(=O)O
@@ -84,6 +85,7 @@ export function ComparePlatformScreen() {
         <div className="ds-input-row ds-mt">
           <button className="ds-btn ds-btn-primary" onClick={run} disabled={busy}>{busy ? (progress ? `Liczę… ${progress.done}/${progress.total}` : 'Liczę…') : 'Porównaj i uszereguj'}</button>
           <button className="ds-btn" onClick={() => setRaw(EXAMPLE)} disabled={busy}>Przykład</button>
+          <MoleculeCsvImport disabled={busy} onImport={(lines) => setRaw((prev) => (prev.trim() ? `${prev}\n${lines}` : lines))} />
           {ranked.length ? <button className="ds-btn" onClick={() => window.print()}>Eksportuj PDF (batch)</button> : null}
         </div>
         {ranked.length >= 1 ? (

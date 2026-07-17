@@ -175,6 +175,83 @@ export async function deleteCampaignRemote(token: string, id: string): Promise<A
   return request<{ ok: boolean }>('DELETE', `/campaigns/${encodeURIComponent(id)}`, { token });
 }
 
+/* ---------------- Scientific Version Control (Genesis 2.1, Part 4) ---------------- */
+
+export type CampaignRole = 'owner' | 'collaborator' | 'viewer';
+
+export interface CampaignMember { campaignId: string; userId: string; role: CampaignRole; addedBy: string; createdAt: number }
+
+export interface SnapshotMeta {
+  id: string; campaignId: string; parentId: string | null; triggerKind: string; authorId: string;
+  restoredFrom: string | null; rdkitVersion: string | null; admetVersion: string | null;
+  groundingVersion: string | null; scoringVersion: string | null; createdAt: number;
+}
+export interface Snapshot extends SnapshotMeta { data: unknown }
+
+export interface ScientificDiff {
+  moleculesAdded: { id: string; name: string; smiles: string }[];
+  moleculesRemoved: { id: string; name: string; smiles: string }[];
+  stageChanges: { id: string; name: string; from: string; to: string }[];
+  alertChanges: { id: string; name: string; added: string[]; removed: string[] }[];
+  descriptorChanges: { id: string; name: string; fields: { field: string; from: number; to: number; causedBy: 'rdkit_version_change' | 'data_change' }[] }[];
+  engineVersionChanges: { engine: string; from: string | null; to: string | null }[];
+  summary: Record<string, number>;
+}
+
+export interface CampaignComment {
+  id: string; campaignId: string; snapshotId: string | null; moleculeId: string | null;
+  authorId: string; body: string; resolved: boolean; createdAt: number;
+}
+
+/** Read the current campaign body, scoped by role (owner or invited collaborator/viewer). */
+export async function fetchCampaignWithRole(token: string, id: string): Promise<ApiResult<{ campaign: RemoteCampaign; role: CampaignRole }>> {
+  return request('GET', `/campaigns/${encodeURIComponent(id)}`, { token });
+}
+
+export async function listCampaignMembersRemote(token: string, campaignId: string): Promise<ApiResult<{ members: CampaignMember[]; owner: { id: string } }>> {
+  return request('GET', `/campaigns/${encodeURIComponent(campaignId)}/members`, { token });
+}
+export async function inviteCampaignMember(token: string, campaignId: string, email: string, role: 'collaborator' | 'viewer'): Promise<ApiResult<{ member: CampaignMember }>> {
+  return request('POST', `/campaigns/${encodeURIComponent(campaignId)}/members`, { token, body: { email, role } });
+}
+export async function removeCampaignMemberRemote(token: string, campaignId: string, userId: string): Promise<ApiResult<{ ok: boolean }>> {
+  return request('DELETE', `/campaigns/${encodeURIComponent(campaignId)}/members/${encodeURIComponent(userId)}`, { token });
+}
+
+export async function listSnapshotsRemote(token: string, campaignId: string): Promise<ApiResult<{ snapshots: SnapshotMeta[] }>> {
+  return request('GET', `/campaigns/${encodeURIComponent(campaignId)}/snapshots`, { token });
+}
+export async function createSnapshotRemote(
+  token: string, campaignId: string,
+  input: { data: unknown; triggerKind: string; expectedParentId?: string | null; groundingVersion?: string; scoringVersion?: string },
+): Promise<ApiResult<{ snapshot: Snapshot }>> {
+  return request('POST', `/campaigns/${encodeURIComponent(campaignId)}/snapshots`, { token, body: input });
+}
+export async function getSnapshotRemote(token: string, campaignId: string, snapshotId: string): Promise<ApiResult<{ snapshot: Snapshot }>> {
+  return request('GET', `/campaigns/${encodeURIComponent(campaignId)}/snapshots/${encodeURIComponent(snapshotId)}`, { token });
+}
+export async function restoreSnapshotRemote(
+  token: string, campaignId: string, snapshotId: string, expectedParentId?: string | null,
+): Promise<ApiResult<{ snapshot: Snapshot }>> {
+  return request('POST', `/campaigns/${encodeURIComponent(campaignId)}/snapshots/${encodeURIComponent(snapshotId)}/restore`, { token, body: { expectedParentId } });
+}
+export async function diffSnapshotsRemote(token: string, campaignId: string, from: string, to: string): Promise<ApiResult<{ from: string; to: string; diff: ScientificDiff }>> {
+  const params = new URLSearchParams({ from, to });
+  return request('GET', `/campaigns/${encodeURIComponent(campaignId)}/diff?${params.toString()}`, { token });
+}
+
+export async function listCommentsRemote(token: string, campaignId: string): Promise<ApiResult<{ comments: CampaignComment[] }>> {
+  return request('GET', `/campaigns/${encodeURIComponent(campaignId)}/comments`, { token });
+}
+export async function addCommentRemote(
+  token: string, campaignId: string, body: string, opts: { snapshotId?: string; moleculeId?: string } = {},
+): Promise<ApiResult<{ comment: CampaignComment }>> {
+  return request('POST', `/campaigns/${encodeURIComponent(campaignId)}/comments`, { token, body: { body, ...opts } });
+}
+export async function resolveCommentRemote(token: string, campaignId: string, commentId: string, resolved = true): Promise<ApiResult<{ comment: CampaignComment }>> {
+  return request('POST', `/campaigns/${encodeURIComponent(campaignId)}/comments/${encodeURIComponent(commentId)}/resolve`, { token, body: { resolved } });
+}
+
 /* ---------------- Projekty i członkostwa (RBAC) ---------------- */
 
 export async function listProjects(token: string): Promise<ApiResult<Project[]>> {
@@ -536,6 +613,16 @@ export interface MoleculeRender {
 export async function renderMolecule(smiles: string, mode: '2d' | 'both' = 'both'): Promise<ApiResult<MoleculeRender>> {
   // Stage 8, PART 2: compute endpoint requires auth — send the session token.
   return request<MoleculeRender>('POST', '/science/molecule/render', { token: getToken(), body: { smiles, mode } });
+}
+
+export interface ParsedFileMolecule { smiles: string; name: string | null }
+/**
+ * SDF/MOL import (pilot readiness): real RDKit MOL-block parsing (never a text/regex hack).
+ * `kind: 'mol'` expects one MOL-format file's raw text; `kind: 'sdf'` expects a multi-record
+ * .sdf file (parsed server-side, malformed records skipped and counted, never aborting).
+ */
+export async function parseMoleculeFile(kind: 'mol' | 'sdf', content: string): Promise<ApiResult<{ molecules: ParsedFileMolecule[]; parsed?: number; errors?: number; total?: number }>> {
+  return request('POST', '/science/molecule/parse-file', { token: getToken(), body: { kind, content } });
 }
 
 export async function listTargets(token: string, projectId: string): Promise<ApiResult<Target[]>> {

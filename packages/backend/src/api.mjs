@@ -30,6 +30,19 @@ import {
   getCampaignRow,
   upsertCampaign,
   deleteCampaignRow,
+  getCampaignRowById,
+  addCampaignMember,
+  getCampaignMember,
+  listCampaignMembers,
+  removeCampaignMember,
+  resolveCampaignRole,
+  getSnapshot,
+  getLatestSnapshot,
+  listCampaignSnapshots,
+  insertCampaignComment,
+  getCampaignComment,
+  listCampaignComments,
+  resolveCampaignComment,
   getPasswordHash,
   createSession,
   getUserByToken,
@@ -103,6 +116,9 @@ import { buildLaboratoryReadiness } from './cognitive/laboratoryReadiness.mjs';
 import { generateInvestorPackage } from './validation/investorEdition.mjs';
 // Public, versioned external API (v1) — self-contained, reuses the RDKit adapter.
 import { handleV1 } from './apiV1.mjs';
+// Scientific Version Control (Genesis 2.1, Part 4) — content-addressed campaign snapshots.
+import * as versioning from './campaignVersioning.mjs';
+import { newId as newUuid } from './auth.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -221,6 +237,26 @@ export function handleApi(db, ctx) {
       const three = want3d ? rdkitAdapter.embed3d(smiles) : null;
       return ok({ smiles, depiction2d: two, model3d: three });
     }
+    // SDF/MOL import (pilot readiness): real RDKit MOL-block parsing, never a text/regex hack.
+    if (seg[1] === 'molecule' && seg[2] === 'parse-file' && seg.length === 3 && method === 'POST') {
+      if (!getUserByToken(db, ctx.token)) return err(401, 'unauthorized', 'Zaloguj się, aby zaimportować plik.');
+      const kind = String(body?.kind ?? '');
+      if (kind === 'mol') {
+        const molblock = String(body?.content ?? '');
+        if (!molblock.trim()) return err(400, 'invalid_input', 'Plik MOL jest pusty.');
+        const r = rdkitAdapter.parseMolfile(molblock);
+        if (!r.ok) return err(r.error === 'invalid_molfile' || r.error === 'invalid_input' ? 400 : 503, r.error, r.reason);
+        return ok({ molecules: [{ smiles: r.smiles, name: r.name }] });
+      }
+      if (kind === 'sdf') {
+        const sdf = String(body?.content ?? '');
+        if (!sdf.trim()) return err(400, 'invalid_input', 'Plik SDF jest pusty.');
+        const r = rdkitAdapter.parseSdf(sdf);
+        if (!r.ok) return err(r.error === 'invalid_input' ? 400 : 503, r.error, r.reason);
+        return ok({ molecules: r.molecules, parsed: r.parsed, errors: r.errors, total: r.total });
+      }
+      return err(400, 'invalid_input', 'kind musi być "mol" lub "sdf".');
+    }
     return err(404, 'not_found');
   }
 
@@ -246,16 +282,151 @@ export function handleApi(db, ctx) {
       }));
       return ok({ campaigns: rows });
     }
+
+    const id = seg[1];
+    const row = id ? getCampaignRowById(db, id) : null;
+    const role = row ? (row.ownerId === user.id ? 'owner' : resolveCampaignRole(db, id, user.id)) : null;
+
     if (seg.length === 2) {
-      const id = seg[1];
-      if (method === 'GET') { const c = getCampaignRow(db, user.id, id); return c ? ok({ campaign: c }) : err(404, 'not_found'); }
+      if (method === 'GET') return row && role ? ok({ campaign: row, role }) : err(404, 'not_found');
       if (method === 'PUT') {
         const data = body && 'campaign' in body ? body.campaign : body; // {campaign:...} lub samo ciało
         if (!data || typeof data !== 'object' || Array.isArray(data)) return err(400, 'invalid_input', 'Brak danych kampanii.');
-        return ok({ campaign: upsertCampaign(db, user.id, id, data) });
+        // Brak istniejącego wiersza → tworzy go bieżący użytkownik jako właściciel (pierwszy push z klienta).
+        if (!row) return ok({ campaign: upsertCampaign(db, user.id, id, data) });
+        if (!versioning.hasRole(role, 'collaborator')) return err(403, 'forbidden', 'Rola widza nie pozwala na edycję kampanii.');
+        return ok({ campaign: upsertCampaign(db, row.ownerId, id, data) });
       }
-      if (method === 'DELETE') { deleteCampaignRow(db, user.id, id); return ok({ ok: true }); }
+      if (method === 'DELETE') {
+        if (row && role !== 'owner') return err(403, 'forbidden', 'Tylko właściciel może usunąć kampanię.');
+        deleteCampaignRow(db, user.id, id);
+        return ok({ ok: true });
+      }
+      return err(405, 'method_not_allowed');
     }
+
+    // ---- Poniższe podtrasy wymagają istniejącej kampanii + co najmniej roli widza ----
+    if (!row || !role) return err(404, 'not_found');
+
+    // /api/campaigns/:id/members — udostępnianie (Scientific Version Control MVP: 1 współpracownik+)
+    if (seg[2] === 'members') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ members: listCampaignMembers(db, id), owner: { id: row.ownerId } });
+        if (method === 'POST') {
+          if (role !== 'owner') return err(403, 'forbidden', 'Tylko właściciel może zapraszać współpracowników.');
+          const email = String(body?.email ?? '').trim().toLowerCase();
+          const memberRole = String(body?.role ?? 'collaborator');
+          if (!email) return err(400, 'invalid_input', 'Adres e-mail jest wymagany.');
+          if (!['viewer', 'collaborator'].includes(memberRole)) return err(400, 'invalid_input', 'Rola musi być "viewer" lub "collaborator".');
+          const invitee = getUserByEmail(db, email);
+          if (!invitee) return err(404, 'user_not_found', 'Brak użytkownika Genesis o tym adresie e-mail.');
+          if (invitee.id === row.ownerId) return err(400, 'invalid_input', 'Właściciel już ma pełny dostęp.');
+          const member = addCampaignMember(db, { campaignId: id, userId: invitee.id, role: memberRole, addedBy: user.id });
+          return ok({ member }, 201);
+        }
+        return err(405, 'method_not_allowed');
+      }
+      if (seg.length === 4) {
+        const memberId = seg[3];
+        if (method === 'PUT') {
+          if (role !== 'owner') return err(403, 'forbidden');
+          const memberRole = String(body?.role ?? '');
+          if (!['viewer', 'collaborator'].includes(memberRole)) return err(400, 'invalid_input', 'Rola musi być "viewer" lub "collaborator".');
+          if (!getCampaignMember(db, id, memberId)) return err(404, 'not_found');
+          return ok({ member: addCampaignMember(db, { campaignId: id, userId: memberId, role: memberRole, addedBy: user.id }) });
+        }
+        if (method === 'DELETE') {
+          if (role !== 'owner' && memberId !== user.id) return err(403, 'forbidden', 'Tylko właściciel może usuwać innych współpracowników.');
+          removeCampaignMember(db, id, memberId);
+          return ok({ ok: true });
+        }
+      }
+      return err(404, 'not_found');
+    }
+
+    // /api/campaigns/:id/snapshots — niemutowalna historia wersji (Scientific Version Control)
+    if (seg[2] === 'snapshots') {
+      if (seg.length === 3) {
+        if (method === 'GET') {
+          // Lista bez pełnego blobu `data` — lekki widok osi czasu.
+          const list = listCampaignSnapshots(db, id).map(({ data: _data, ...meta }) => meta);
+          return ok({ snapshots: list });
+        }
+        if (method === 'POST') {
+          if (!versioning.hasRole(role, 'collaborator')) return err(403, 'forbidden', 'Rola widza nie pozwala tworzyć wersji.');
+          const data = body?.data;
+          if (!data || typeof data !== 'object' || Array.isArray(data)) return err(400, 'invalid_input', 'Brak danych migawki (data).');
+          const triggerKind = String(body?.triggerKind ?? 'manual');
+          const versions = {
+            rdkitVersion: rdkitAdapter.detect().version ?? null,
+            admetVersion: admetAdapter.detect().version ?? null,
+            groundingVersion: typeof body?.groundingVersion === 'string' ? body.groundingVersion : null,
+            scoringVersion: typeof body?.scoringVersion === 'string' ? body.scoringVersion : null,
+          };
+          const expectedParentId = 'expectedParentId' in (body ?? {}) ? (body.expectedParentId ?? null) : undefined;
+          const result = versioning.createSnapshot(db, { campaignId: id, data, triggerKind, authorId: user.id, expectedParentId, versions });
+          if (result.conflict) return err(409, 'stale_write', 'Ktoś inny zapisał nowszą wersję. Odśwież i spróbuj ponownie.');
+          return ok({ snapshot: result.snapshot }, 201);
+        }
+        return err(405, 'method_not_allowed');
+      }
+      if (seg.length === 4 && method === 'GET') {
+        const snap = getSnapshot(db, seg[3]);
+        return snap && snap.campaignId === id ? ok({ snapshot: snap }) : err(404, 'not_found');
+      }
+      if (seg.length === 5 && seg[4] === 'restore' && method === 'POST') {
+        if (!versioning.hasRole(role, 'collaborator')) return err(403, 'forbidden', 'Rola widza nie pozwala przywracać wersji.');
+        const versions = {
+          rdkitVersion: rdkitAdapter.detect().version ?? null,
+          admetVersion: admetAdapter.detect().version ?? null,
+          groundingVersion: typeof body?.groundingVersion === 'string' ? body.groundingVersion : null,
+          scoringVersion: typeof body?.scoringVersion === 'string' ? body.scoringVersion : null,
+        };
+        const expectedParentId = 'expectedParentId' in (body ?? {}) ? (body.expectedParentId ?? null) : undefined;
+        const result = versioning.restoreSnapshot(db, { campaignId: id, targetSnapshotId: seg[3], authorId: user.id, expectedParentId, versions });
+        if (result.notFound) return err(404, 'not_found');
+        if (result.conflict) return err(409, 'stale_write', 'Ktoś inny zapisał nowszą wersję. Odśwież i spróbuj ponownie.');
+        return ok({ snapshot: result.snapshot }, 201);
+      }
+      return err(404, 'not_found');
+    }
+
+    // /api/campaigns/:id/diff?from=<snapshotId>&to=<snapshotId> — czytelny diff naukowy
+    if (seg[2] === 'diff' && seg.length === 3 && method === 'GET') {
+      const fromId = typeof ctx.query?.from === 'string' ? ctx.query.from : null;
+      const toId = typeof ctx.query?.to === 'string' ? ctx.query.to : (getLatestSnapshot(db, id)?.id ?? null);
+      if (!fromId || !toId) return err(400, 'invalid_input', 'Parametry from i to (identyfikatory migawek) są wymagane.');
+      const fromSnap = getSnapshot(db, fromId);
+      const toSnap = getSnapshot(db, toId);
+      if (!fromSnap || fromSnap.campaignId !== id || !toSnap || toSnap.campaignId !== id) return err(404, 'not_found');
+      return ok({ from: fromId, to: toId, diff: versioning.diffCampaigns(fromSnap, toSnap) });
+    }
+
+    // /api/campaigns/:id/comments — komentarze naukowe (przypięte do migawki/cząsteczki)
+    if (seg[2] === 'comments') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ comments: listCampaignComments(db, id) });
+        if (method === 'POST') {
+          const text = String(body?.body ?? '').trim();
+          if (!text) return err(400, 'invalid_input', 'Treść komentarza jest wymagana.');
+          const comment = insertCampaignComment(db, {
+            id: newUuid(), campaignId: id, authorId: user.id, body: text.slice(0, 4000),
+            snapshotId: typeof body?.snapshotId === 'string' ? body.snapshotId : null,
+            moleculeId: typeof body?.moleculeId === 'string' ? body.moleculeId : null,
+          });
+          return ok({ comment }, 201);
+        }
+        return err(405, 'method_not_allowed');
+      }
+      if (seg.length === 5 && seg[4] === 'resolve' && method === 'POST') {
+        if (!versioning.hasRole(role, 'collaborator')) return err(403, 'forbidden');
+        const existing = getCampaignComment(db, seg[3]);
+        if (!existing || existing.campaignId !== id) return err(404, 'not_found');
+        return ok({ comment: resolveCampaignComment(db, seg[3], body?.resolved !== false) });
+      }
+      return err(404, 'not_found');
+    }
+
     return err(404, 'not_found');
   }
 

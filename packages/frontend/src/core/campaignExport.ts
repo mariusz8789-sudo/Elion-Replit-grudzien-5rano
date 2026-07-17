@@ -8,7 +8,13 @@ import { campaignCandidates, type Campaign } from './campaigns';
 import { GROUNDING_VERSION } from './provenance';
 import { rankCandidates, decisionTrace, VERDICT_META, type RankedCandidate } from './moleculeComparison';
 
-export interface ExportMeta { rdkitVersion: string; generatedAt: number }
+/**
+ * Scientific Snapshot reference (Genesis 2.1, Part 4): identifies EXACTLY which immutable,
+ * content-addressed version of the campaign this export was generated from — so a reviewer
+ * can look up the same snapshot later and confirm nothing drifted since the export.
+ */
+export interface ExportSnapshotRef { id: string; createdAt: number; scoringVersion?: string | null; admetVersion?: string | null }
+export interface ExportMeta { rdkitVersion: string; generatedAt: number; snapshot?: ExportSnapshotRef | null }
 
 const num = (n: number, d = 2) => (Number.isFinite(n) ? Number(n.toFixed(d)) : '');
 function csvField(v: unknown): string {
@@ -25,7 +31,13 @@ export function campaignToCSV(campaign: Campaign, meta: ExportMeta): string {
   const ranked = rankedFor(campaign);
   const byId = new Map(ranked.map((c) => [c.id, c]));
   const cols = ['rank', 'name', 'smiles', 'status', 'stage', 'score', 'verdict', 'molWt', 'logP', 'tpsa', 'hbd', 'hba', 'lipinskiViolations', 'lipinskiPass', 'structuralAlerts', 'rdkitVersion', 'groundingVersion', 'note'];
-  const rows: string[] = [cols.join(',')];
+  const rows: string[] = [];
+  if (meta.snapshot) {
+    // A comment-prefixed provenance line, before the header — Excel/Sheets ignore it as a comment
+    // once quoted; it exists so a reviewer can trace this exact export back to its source version.
+    rows.push(csvField(`# Scientific Snapshot: ${meta.snapshot.id} · zapisana ${new Date(meta.snapshot.createdAt).toISOString()} · scoringVersion=${meta.snapshot.scoringVersion ?? '—'} · admetVersion=${meta.snapshot.admetVersion ?? '—'}`));
+  }
+  rows.push(cols.join(','));
   for (const m of campaign.molecules) {
     const c = byId.get(m.id);
     const row = [
@@ -48,7 +60,10 @@ export function campaignToJSON(campaign: Campaign, meta: ExportMeta): string {
   const byId = new Map(ranked.map((c) => [c.id, c]));
   const payload = {
     schema: 'genesis-campaign-export/1',
-    provenance: { engine: 'RDKit', rdkitVersion: meta.rdkitVersion, groundingVersion: GROUNDING_VERSION, generatedAt: meta.generatedAt },
+    provenance: {
+      engine: 'RDKit', rdkitVersion: meta.rdkitVersion, groundingVersion: GROUNDING_VERSION, generatedAt: meta.generatedAt,
+      scientificSnapshot: meta.snapshot ?? null,
+    },
     campaign: { id: campaign.id, name: campaign.name, description: campaign.description, goal: campaign.goal, owner: campaign.owner, createdAt: campaign.createdAt, status: campaign.status },
     molecules: campaign.molecules.map((m) => {
       const c = byId.get(m.id);

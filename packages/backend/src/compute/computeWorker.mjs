@@ -25,6 +25,10 @@ function handle(cmd, args) {
     }
     case 'admet-predict':
       return admetAdapter.predict(args.smiles);
+    case 'molecule-parse-mol':
+      return rdkitAdapter.parseMolfile(args.molblock);
+    case 'molecule-parse-sdf':
+      return rdkitAdapter.parseSdf(args.sdf);
     default:
       throw new Error(`unknown compute command: ${cmd}`);
   }

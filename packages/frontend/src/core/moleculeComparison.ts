@@ -16,6 +16,14 @@ import type { MoleculeProps } from './moleculeInterpretation';
 import type { IconName } from '../components/Icon';
 import { GROUNDING_VERSION } from './provenance';
 
+/**
+ * Version tag for this scoring algorithm — parallels GROUNDING_VERSION. Bump it whenever the
+ * point weights, thresholds, or verdict rules below change, so a Scientific Snapshot can record
+ * exactly which ranking logic produced it (a version bump alone explains a re-ranked portfolio,
+ * distinguishing it from a genuine change in molecule data).
+ */
+export const SCORING_VERSION = 'genesis-scoring/1';
+
 export interface Candidate {
   id: string;
   name: string;

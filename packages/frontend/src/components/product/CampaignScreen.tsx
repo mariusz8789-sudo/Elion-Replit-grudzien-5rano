@@ -15,7 +15,7 @@ import { Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { Icon } from '../Icon';
 import { AccountPanel } from '../AccountPanel';
 import { useSession, getToken } from '../../core/backend/session';
-import { fetchScienceCapabilities, fetchCampaignRemote } from '../../core/backend/client';
+import { fetchScienceCapabilities, fetchCampaignRemote, createSnapshotRemote } from '../../core/backend/client';
 import { runBatch } from '../../core/batchRunner';
 import { pushCampaign } from '../../core/campaignSync';
 import {
@@ -23,9 +23,13 @@ import {
   transitionMolecule, pendingMolecules, campaignCandidates, STAGE_LABEL,
   type Campaign, type MoleculeStage,
 } from '../../core/campaigns';
-import { rankCandidates, decisionTrace, rankingWhy, VERDICT_META } from '../../core/moleculeComparison';
+import { rankCandidates, decisionTrace, rankingWhy, VERDICT_META, SCORING_VERSION } from '../../core/moleculeComparison';
+import { GROUNDING_VERSION } from '../../core/provenance';
 import { campaignSummary } from '../../core/campaignStats';
 import { campaignToCSV, campaignToJSON, downloadText } from '../../core/campaignExport';
+import { VersionControlPanel } from './VersionControlPanel';
+import type { SnapshotMeta } from '../../core/backend/client';
+import { MoleculeCsvImport } from './MoleculeCsvImport';
 
 interface RunState { total: number; done: number; ok: number; invalid: number; startedAt: number }
 
@@ -53,6 +57,7 @@ export function CampaignScreen({ id }: { id: string }) {
   const [referenceId, setReferenceId] = useState<string | null>(null);
   const [rdkitVersion, setRdkitVersion] = useState('nieznana');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [latestSnapshot, setLatestSnapshot] = useState<SnapshotMeta | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -90,10 +95,22 @@ export function CampaignScreen({ id }: { id: string }) {
     if (t) pushCampaign(t, c).catch(() => { /* offline → zostaje lokalne, zsynchronizuje się później */ });
   };
 
+  // Scientific Version Control (Genesis 2.1, Part 4): automatic, best-effort snapshot at the
+  // two triggers the approved architecture defines — molecules added, analysis completed.
+  // Never blocks the UI and never surfaces an error: a missed snapshot loses history depth,
+  // not data (the campaign body itself is still saved via persist()/pushCampaign above).
+  const autoSnapshot = (c: Campaign, triggerKind: 'molecules_added' | 'analysis_completed') => {
+    const t = getToken();
+    if (!t) return;
+    createSnapshotRemote(t, c.id, { data: c, triggerKind, groundingVersion: GROUNDING_VERSION, scoringVersion: SCORING_VERSION }).catch(() => {});
+  };
+
   const doAdd = () => {
     const entries = parseMoleculeLines(addRaw, 2000);
     if (!entries.length) return;
-    persist(addMolecules(campaign, entries));
+    const next = addMolecules(campaign, entries);
+    persist(next);
+    autoSnapshot(next, 'molecules_added');
     setAddRaw('');
   };
 
@@ -114,14 +131,19 @@ export function CampaignScreen({ id }: { id: string }) {
     });
     working = markCompared(working);
     persist(working);
+    autoSnapshot(working, 'analysis_completed');
     setRun(null); abortRef.current = null;
   };
 
   const cancel = () => abortRef.current?.abort();
   const setStage = (moleculeId: string, stage: MoleculeStage) => persist(transitionMolecule(campaign, moleculeId, stage));
 
-  const exportCSV = () => downloadText(`${campaign.name || 'kampania'}.csv`, 'text/csv', campaignToCSV(campaign, { rdkitVersion, generatedAt: Date.now() }));
-  const exportJSON = () => downloadText(`${campaign.name || 'kampania'}.json`, 'application/json', campaignToJSON(campaign, { rdkitVersion, generatedAt: Date.now() }));
+  const exportMeta = () => ({
+    rdkitVersion, generatedAt: Date.now(),
+    snapshot: latestSnapshot ? { id: latestSnapshot.id, createdAt: latestSnapshot.createdAt, scoringVersion: latestSnapshot.scoringVersion, admetVersion: latestSnapshot.admetVersion } : null,
+  });
+  const exportCSV = () => downloadText(`${campaign.name || 'kampania'}.csv`, 'text/csv', campaignToCSV(campaign, exportMeta()));
+  const exportJSON = () => downloadText(`${campaign.name || 'kampania'}.json`, 'application/json', campaignToJSON(campaign, exportMeta()));
 
   const pendCount = pendingMolecules(campaign).length;
   const progressPct = run ? Math.round((run.done / run.total) * 100) : (summary ? Math.round(summary.progress * 100) : 0);
@@ -136,6 +158,7 @@ export function CampaignScreen({ id }: { id: string }) {
         <textarea className="compare-input ds-mono" value={addRaw} onChange={(e) => setAddRaw(e.target.value)} rows={4} spellCheck={false} placeholder={'Dodaj cząsteczki — jedna na wiersz, opcjonalnie Nazwa = SMILES\nAspiryna = CC(=O)Oc1ccccc1C(=O)O'} />
         <div className="ds-input-row ds-mt">
           <button className="ds-btn" onClick={doAdd} disabled={!!run || !addRaw.trim()}><Icon name="spark" size={14} /> Dodaj cząsteczki</button>
+          <MoleculeCsvImport disabled={!!run} onImport={(lines) => setAddRaw((prev) => (prev.trim() ? `${prev}\n${lines}` : lines))} />
           {pendCount > 0 && !run ? <button className="ds-btn ds-btn-primary" onClick={runPending}>{runLabel} ({pendCount})</button> : null}
           {run ? <button className="ds-btn" onClick={cancel}><Icon name="block" size={14} /> Przerwij</button> : null}
           {ranked.length ? <>
@@ -250,6 +273,7 @@ export function CampaignScreen({ id }: { id: string }) {
         <textarea className="compare-input ds-mono" value={addRaw} onChange={(e) => setAddRaw(e.target.value)} rows={4} spellCheck={false} placeholder={'Jedna na wiersz, opcjonalnie Nazwa = SMILES\nAspiryna = CC(=O)Oc1ccccc1C(=O)O'} />
         <div className="ds-input-row ds-mt">
           <button className="ds-btn" onClick={doAdd} disabled={!!run || !addRaw.trim()}><Icon name="spark" size={14} /> Dodaj</button>
+          <MoleculeCsvImport disabled={!!run} onImport={(lines) => setAddRaw((prev) => (prev.trim() ? `${prev}\n${lines}` : lines))} />
           {run ? <button className="ds-btn" onClick={cancel}><Icon name="block" size={14} /> Przerwij</button> : null}
         </div>
         {pendCount > 0 && !run ? (
@@ -350,6 +374,12 @@ export function CampaignScreen({ id }: { id: string }) {
     <ProductChrome active="#/campaigns">
       <div className="cmp-desktop-view">{desktopBody}</div>
       <div className="cmp-mobile-view">{mobileBody}</div>
+
+      {/* Scientific Version Control — one shared component for both breakpoints (no duplicated UI logic) */}
+      <VersionControlPanel
+        campaignId={campaign.id} currentUserId={session.user.id}
+        onSnapshotsChange={(snapshots) => setLatestSnapshot(snapshots[0] ?? null)}
+      />
 
       {/* Full campaign report — the print/PDF surface (reuses Stage 6 matrix + trace) */}
       {summary && ranked.length ? (

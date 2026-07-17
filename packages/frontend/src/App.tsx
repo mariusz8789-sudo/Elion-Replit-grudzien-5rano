@@ -46,6 +46,7 @@ import { ComparePlatformScreen } from './components/product/ComparePlatformScree
 import { CampaignsScreen } from './components/product/CampaignsScreen';
 import { CampaignScreen as ResearchCampaignScreen } from './components/product/CampaignScreen';
 import { DashboardScreen } from './components/product/DashboardScreen';
+import { HomeScreen } from './components/product/HomeScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -87,7 +88,8 @@ type Route =
   | { kind: 'compare' }
   | { kind: 'research-campaigns' }
   | { kind: 'research-campaign'; id: string }
-  | { kind: 'genesis' };
+  | { kind: 'genesis' }
+  | { kind: 'labs' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -125,6 +127,7 @@ function parseHash(): Route {
   if (camp) return { kind: 'research-campaign', id: camp[1] };
   if (h === '#/campaigns') return { kind: 'research-campaigns' };
   if (h === '#/genesis') return { kind: 'genesis' };
+  if (h === '#/labs') return { kind: 'labs' };
   return { kind: 'home' };
 }
 
@@ -230,7 +233,7 @@ export default function App() {
             <TopBar title="Nieznane laboratorium" onSearch={() => setSearchOpen(true)} />
             <main className="home">
               <p className="empty-state">Nie znaleziono laboratorium „{route.id}".</p>
-              <button className="chip-btn" onClick={() => { window.location.hash = ''; }}>← Wróć</button>
+              <button className="chip-btn" onClick={() => { window.location.hash = '#/labs'; }}>← Wróć</button>
             </main>
             {overlays}
           </div>
@@ -240,7 +243,7 @@ export default function App() {
       return (
         <div className="app">
           <header className="topbar">
-            <button className="back" aria-label="Wróć do laboratoriów" onClick={() => { window.location.hash = ''; }}>
+            <button className="back" aria-label="Wróć do laboratoriów" onClick={() => { window.location.hash = '#/labs'; }}>
               ←
             </button>
             <div className="titles">
@@ -460,7 +463,12 @@ export default function App() {
     if (route.kind === 'research-campaigns') return <div className="app"><ErrorBoundary><CampaignsScreen /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'research-campaign') return <div className="app"><ErrorBoundary><ResearchCampaignScreen id={route.id} /></ErrorBoundary>{overlays}</div>;
     if (route.kind === 'genesis') return <div className="app"><ErrorBoundary><DashboardScreen /></ErrorBoundary>{overlays}</div>;
+    if (route.kind === 'home') return <div className="app"><ErrorBoundary><HomeScreen /></ErrorBoundary>{overlays}</div>;
 
+    // route.kind === 'labs' — platforma edukacyjna Genesis OS (ScaleJourney + 13
+    // laboratoriów + Discovery Console/Timeline itd.). Niezmieniona zawartość,
+    // wyłącznie przeniesiona spod domyślnej trasy pod #/labs — patrz HomeScreen.tsx
+    // (przycisk "Eksploruj fizykę") i mission o priorytecie produktu komercyjnego.
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -646,7 +654,7 @@ function MissionStatusBar() {
 function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {
   return (
     <header className="topbar">
-      <button className="back" aria-label="Wróć do laboratoriów" onClick={() => { window.location.hash = ''; }}>
+      <button className="back" aria-label="Wróć do laboratoriów" onClick={() => { window.location.hash = '#/labs'; }}>
         <Icon name="back" size={22} />
       </button>
       <div className="titles">

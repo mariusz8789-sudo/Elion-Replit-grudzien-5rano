@@ -79,7 +79,7 @@ export function DashboardScreen() {
       </div>
 
       <div className="gx-section-label">Osobny moduł</div>
-      <a className="gx-edu" href="#/">
+      <a className="gx-edu" href="#/labs">
         <span className="gx-edu-icon"><Icon name="atom" size={22} /></span>
         <span className="gx-edu-text">
           <span className="gx-edu-title">Platforma edukacyjna Genesis OS</span>

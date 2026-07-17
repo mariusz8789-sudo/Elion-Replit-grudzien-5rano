@@ -172,6 +172,37 @@ function PortfolioContent({ portfolio }: { portfolio: Portfolio }) {
   );
 }
 
+/**
+ * The full, per-category 52-endpoint breakdown — shared between the desktop panel
+ * and the mobile drill-down. One legend line replaces a MODEL_ESTIMATE pill repeated
+ * on all 52 rows (still traceable via the small "†" mark on every value) — the exact
+ * kind of repeated-badge weight a "developer dashboard" carries and a premium product
+ * doesn't.
+ */
+function AdmetFullBreakdown({ version, totalCount, byCategory }: { version: string; totalCount: number; byCategory: [string, { meta: AdmetEndpointMeta; id: string; value: number }[]][] }) {
+  return (
+    <>
+      <p className="cmp-model-estimate-legend">ADMET-AI {version} · {totalCount} endpointów (katalog TDC) · <span className="cmp-model-estimate-mark">†</span> = MODEL_ESTIMATE, nigdy wartość zmierzona</p>
+      {byCategory.map(([category, rows]) => (
+        <div key={category} className="ds-table-wrap ds-mt">
+          <table className="ds-table">
+            <thead><tr><th colSpan={3}>{category}</th></tr><tr><th>Endpoint</th><th>Wartość</th><th>Publikowana metryka (TDC)</th></tr></thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.meta?.name ?? row.id}</td>
+                  <td className="ds-strong">{formatAdmetValue(row.value, row.meta)}<span className="cmp-model-estimate-mark">†</span></td>
+                  <td className="ds-dim">{formatAdmetMetric(row.meta)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </>
+  );
+}
+
 /** One candidate as a mobile-native card (never a table row). Tap to expand its WHY. */
 function CandidateCard({ c, isReference, expanded, onToggle }: { c: RankedCandidate; isReference: boolean; expanded: boolean; onToggle: () => void }) {
   const meta = VERDICT_META[c.decision.verdict];
@@ -233,7 +264,10 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
     return () => { alive = false; };
   }, []);
 
-  const admetCandidate = ranked.find((c) => c.id === admetSelectedId) ?? ranked.find((c) => c.id === referenceId) ?? ranked[0] ?? null;
+  // Defaults to the top-ranked candidate (the "winner"), not the reference — the two are
+  // different axes (best-scoring vs. comparison baseline), and the mobile hero always
+  // reports on the winner, so its risk chip must reflect the SAME molecule by default.
+  const admetCandidate = ranked.find((c) => c.id === admetSelectedId) ?? ranked[0] ?? null;
   const admetSmiles = admetCandidate?.smiles ?? null;
 
   useEffect(() => {
@@ -384,24 +418,7 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
             </div>
             <div className="ds-mt">
               <ToggleSection label={`Pokaż wszystkie ${admetTotalCount} endpointów (wg kategorii, katalog TDC) →`}>
-                <p className="ds-dim" style={{ marginTop: 0 }}>ADMET-AI {admetEntry.version} · {admetTotalCount} endpointów (katalog TDC)</p>
-                {admetByCategory.map(([category, rows]) => (
-                  <div key={category} className="ds-table-wrap ds-mt">
-                    <table className="ds-table">
-                      <thead><tr><th colSpan={4}>{category}</th></tr><tr><th>Endpoint</th><th>Wartość</th><th>Publikowana metryka (TDC)</th><th></th></tr></thead>
-                      <tbody>
-                        {rows.map((row) => (
-                          <tr key={row.id}>
-                            <td>{row.meta?.name ?? row.id}</td>
-                            <td className="ds-strong">{formatAdmetValue(row.value, row.meta)}</td>
-                            <td className="ds-dim">{formatAdmetMetric(row.meta)}</td>
-                            <td><StatusPill kind="warn">MODEL_ESTIMATE</StatusPill></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
+                <AdmetFullBreakdown version={admetEntry.version} totalCount={admetTotalCount} byCategory={admetByCategory} />
               </ToggleSection>
             </div>
           </>
@@ -508,23 +525,7 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
             </div>
             <div className="ds-mt">
               <ToggleSection label={`Zobacz wszystkie ${admetTotalCount} endpointów (katalog TDC) →`}>
-                {admetByCategory.map(([category, rows]) => (
-                  <div key={category} className="ds-table-wrap ds-mt">
-                    <table className="ds-table">
-                      <thead><tr><th colSpan={4}>{category}</th></tr><tr><th>Endpoint</th><th>Wartość</th><th>Metryka</th><th></th></tr></thead>
-                      <tbody>
-                        {rows.map((row) => (
-                          <tr key={row.id}>
-                            <td>{row.meta?.name ?? row.id}</td>
-                            <td className="ds-strong">{formatAdmetValue(row.value, row.meta)}</td>
-                            <td className="ds-dim">{formatAdmetMetric(row.meta)}</td>
-                            <td><StatusPill kind="warn">MODEL_ESTIMATE</StatusPill></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
+                <AdmetFullBreakdown version={admetEntry.version} totalCount={admetTotalCount} byCategory={admetByCategory} />
               </ToggleSection>
             </div>
           </>

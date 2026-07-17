@@ -79,7 +79,7 @@ const ASYNC_EXECUTION = process.env.ASYNC_EXECUTION === 'true';
 const computePool = ASYNC_EXECUTION
   ? createComputePool(process.env.GENESIS_WORKER_POOL_SIZE ? { size: Number(process.env.GENESIS_WORKER_POOL_SIZE) } : {})
   : null;
-const ASYNC_COMPUTE_ROUTES = new Set(['/api/science/laboratory-readiness', '/api/science/molecule/render']);
+const ASYNC_COMPUTE_ROUTES = new Set(['/api/science/laboratory-readiness', '/api/science/molecule/render', '/api/compute/admet/predict']);
 
 /**
  * Nieblokujący tor obliczeń (flaga ON). Auth + rate-limit + walidacja w wątku głównym;
@@ -102,6 +102,13 @@ function handleAsyncCompute(req, res, pathname) {
         const smiles = String(body?.smiles ?? '');
         if (!smiles) return json(res, 400, { error: 'invalid_input', message: 'SMILES required' });
         return json(res, 200, await computePool.run('molecule-render', { smiles, mode: body?.mode, width: body?.width, height: body?.height }));
+      }
+      if (pathname === '/api/compute/admet/predict') {
+        const list = Array.isArray(body?.smiles) ? body.smiles.filter((s) => typeof s === 'string' && s) : [];
+        if (!list.length) return json(res, 400, { error: 'invalid_input', message: 'smiles[] wymagane (co najmniej jeden SMILES).' });
+        const r = await computePool.run('admet-predict', { smiles: list });
+        if (r.ok) return json(res, 200, { predictions: r.predictions, version: r.version });
+        return json(res, r.error === 'invalid_input' ? 400 : 503, { error: r.error ?? 'BLOCKED_BY_RUNTIME', message: r.reason });
       }
       return json(res, 200, await computePool.run('laboratory-readiness', { candidate: body?.candidate ?? {}, scientificQuestion: body?.scientificQuestion ?? null }));
     } catch (err) {

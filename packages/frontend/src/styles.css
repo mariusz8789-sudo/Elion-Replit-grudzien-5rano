@@ -1945,71 +1945,86 @@ kbd {
   .cmp-mobile-view { display: none !important; }
 }
 
-.cmp-mobile { display: flex; flex-direction: column; gap: 1.75rem; padding: 0 0.1rem; }
+.cmp-mobile { display: flex; flex-direction: column; gap: 2rem; padding: 0 0.15rem; }
 
-/* Hero: winner, why, confidence, biggest risk, one CTA — the entire first screen. */
+/* Hero: winner, why, confidence, biggest risk, one CTA — the entire first screen.
+   Visual-weight pass (2026-07): borderless card, soft shadow only, filled (not
+   outlined) tags, larger radius/whitespace — reads as a SaaS summary, not a
+   bordered admin-panel widget. */
 .cmp-hero {
-  border-radius: 22px; padding: 1.6rem 1.4rem; background: linear-gradient(165deg, var(--bg-raised, #161c2c), var(--bg-panel));
-  border: 1px solid var(--border); box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,0.25));
+  border-radius: 26px; padding: 1.85rem 1.6rem; background: linear-gradient(165deg, var(--bg-raised, #161c2c), var(--bg-panel));
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15), 0 12px 32px -8px rgba(0,0,0,0.35);
 }
-.cmp-hero-eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); font-weight: 600; }
-.cmp-hero-name { margin: 0.35rem 0 0.9rem; font-size: 1.65rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.15; }
+.cmp-hero-eyebrow { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-faint, var(--text-dim)); font-weight: 600; opacity: 0.85; }
+.cmp-hero-name { margin: 0.4rem 0 1.1rem; font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.12; }
 .cmp-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; }
-.cmp-hero-score { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.cmp-hero-score { font-size: 2.6rem; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .cmp-hero-score small { font-size: 1rem; font-weight: 600; color: var(--text-dim); }
-.cmp-hero-why { margin: 0.9rem 0 0; font-size: 0.95rem; line-height: 1.55; color: var(--text); }
-.cmp-hero-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+.cmp-hero-why { margin: 1.1rem 0 0; font-size: 0.96rem; line-height: 1.6; color: var(--text-dim); }
+.cmp-hero-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.2rem; }
 .cmp-hero-tag {
   display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; font-weight: 600;
-  padding: 0.35rem 0.7rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim);
+  padding: 0.4rem 0.75rem; border-radius: 999px; border: none; color: var(--text);
+  background: var(--surface-2, rgba(255,255,255,0.05));
 }
-.cmp-hero-tag-ok { color: var(--green, #4ade80); border-color: color-mix(in srgb, var(--green, #4ade80) 40%, var(--border)); }
-.cmp-hero-tag-warn { color: var(--gold, #fbbf24); border-color: color-mix(in srgb, var(--gold, #fbbf24) 40%, var(--border)); }
-.cmp-hero-tag-blocked { color: var(--red, #f87171); border-color: color-mix(in srgb, var(--red, #f87171) 40%, var(--border)); }
+.cmp-hero-tag-ok { color: var(--green, #4ade80); background: color-mix(in srgb, var(--green, #4ade80) 14%, transparent); }
+.cmp-hero-tag-warn { color: var(--gold, #fbbf24); background: color-mix(in srgb, var(--gold, #fbbf24) 14%, transparent); }
+.cmp-hero-tag-blocked { color: var(--red, #f87171); background: color-mix(in srgb, var(--red, #f87171) 14%, transparent); }
 .cmp-hero-cta {
-  display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; margin-top: 1.3rem;
-  padding: 0.9rem 1rem; border-radius: 14px; border: none; background: var(--cyan); color: #04141a;
-  font: inherit; font-weight: 700; font-size: 0.94rem; cursor: pointer; transition: transform var(--dur-base, 0.15s);
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; margin-top: 1.5rem;
+  padding: 1rem 1rem; border-radius: 16px; border: none; background: var(--cyan); color: #04141a;
+  font: inherit; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: transform var(--dur-base, 0.15s);
 }
 .cmp-hero-cta:active { transform: scale(0.98); }
 
 /* Compact decision strip — replaces the 4-card verdict grid on mobile. */
 .cmp-stat-strip {
-  display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; font-size: 0.78rem; color: var(--text-dim);
-  padding: 0 0.1rem;
+  display: flex; flex-wrap: wrap; gap: 0.6rem 1.3rem; align-items: center; font-size: 0.8rem; color: var(--text-dim);
+  padding: 0 0.2rem;
 }
-.cmp-stat-strip-item { display: inline-flex; align-items: center; gap: 0.4rem; }
+.cmp-stat-strip-item { display: inline-flex; align-items: center; gap: 0.45rem; }
 
-.cmp-section-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 700; margin: 0 0 0.9rem; }
-.cmp-subhead { font-size: 0.92rem; font-weight: 700; margin: 0 0 0.6rem; }
+.cmp-section-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 700; margin: 0 0 1rem; letter-spacing: -0.01em; }
+.cmp-subhead { font-size: 0.94rem; font-weight: 700; margin: 0 0 0.7rem; }
 
-/* Candidate cards — replace the ranking table on mobile entirely. */
-.cmp-cand-list { display: flex; flex-direction: column; gap: 0.7rem; }
-.cmp-cand-card { border: 1px solid var(--border); border-radius: 16px; padding: 0.9rem 1rem; background: var(--bg-panel); }
-.cmp-cand-head { display: flex; align-items: center; gap: 0.8rem; width: 100%; background: none; border: none; padding: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; min-height: 44px; }
+/* Candidate cards — replace the ranking table on mobile entirely. Hairline border
+   (not a heavy outline) + soft background lift does the separating, not a box. */
+.cmp-cand-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.cmp-cand-card {
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); border-radius: 18px;
+  padding: 1rem 1.1rem; background: var(--bg-panel);
+}
+.cmp-cand-head { display: flex; align-items: center; gap: 0.85rem; width: 100%; background: none; border: none; padding: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; min-height: 44px; }
 .cmp-cand-rank {
-  flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px;
-  border-radius: 999px; background: var(--surface-2, rgba(255,255,255,0.04)); font-size: 0.78rem; font-weight: 700; color: var(--text-dim);
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+  border-radius: 999px; background: var(--surface-2, rgba(255,255,255,0.05)); font-size: 0.78rem; font-weight: 700; color: var(--text-dim);
 }
-.cmp-cand-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
-.cmp-cand-name { font-weight: 700; font-size: 0.98rem; }
-.cmp-cand-smiles { font-size: 0.68rem; color: var(--text-dim); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cmp-cand-score { flex: 0 0 auto; font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.cmp-cand-verdict { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.65rem; }
-.cmp-cand-chevron { color: var(--text-dim); font-size: 0.75rem; }
-.cmp-cand-why { margin-top: 0.7rem; padding-top: 0.65rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.82rem; line-height: 1.4; }
+.cmp-cand-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.cmp-cand-name { font-weight: 700; font-size: 1rem; }
+.cmp-cand-smiles { font-size: 0.68rem; color: var(--text-faint, var(--text-dim)); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-cand-score { flex: 0 0 auto; font-size: 1.45rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cmp-cand-verdict { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.75rem; }
+.cmp-cand-chevron { color: var(--text-faint, var(--text-dim)); font-size: 0.75rem; }
+.cmp-cand-why { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.83rem; line-height: 1.45; }
 
 /* Compact ADMET summary — one card, dense rows, never six identical boxes. */
-.cmp-admet-compact { border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
-.cmp-admet-row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+.cmp-admet-compact { border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); border-radius: 18px; overflow: hidden; }
+.cmp-admet-row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding: 0.85rem 1.1rem; border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent); }
 .cmp-admet-row:last-child { border-bottom: none; }
 .cmp-admet-row-label { font-size: 0.85rem; color: var(--text-dim); }
-.cmp-admet-row-value { font-size: 0.95rem; font-weight: 700; color: var(--gold, #fbbf24); font-variant-numeric: tabular-nums; }
+.cmp-admet-row-value { font-size: 0.96rem; font-weight: 700; color: var(--gold, #fbbf24); font-variant-numeric: tabular-nums; }
+
+/* A lighter honesty marker for dense per-row tables (the full 52-endpoint
+   breakdown) — a repeated colourful pill on every one of 52 rows is the exact
+   "developer dashboard" weight being removed; one legend line + a small
+   superscript keeps every value traceably marked without the visual noise. */
+.cmp-model-estimate-legend { display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem; color: var(--text-dim); margin: 0 0 0.7rem; }
+.cmp-model-estimate-mark { color: var(--gold, #fbbf24); font-weight: 700; font-size: 0.72rem; vertical-align: super; margin-left: 0.15rem; }
 
 @media (max-width: 480px) {
-  .cmp-hero { padding: 1.3rem 1.1rem; }
-  .cmp-hero-name { font-size: 1.4rem; }
-  .cmp-hero-score { font-size: 2.1rem; }
+  .cmp-hero { padding: 1.5rem 1.25rem; }
+  .cmp-hero-name { font-size: 1.5rem; }
+  .cmp-hero-score { font-size: 2.2rem; }
 }
 
 /* Stage 7 — Research Campaigns. */

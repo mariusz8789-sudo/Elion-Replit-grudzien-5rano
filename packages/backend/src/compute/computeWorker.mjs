@@ -2,12 +2,14 @@
  * computeWorker (Genesis 2.1, Part 1) — wątek roboczy puli obliczeniowej.
  *
  * Uruchamiany jako worker_thread przez computePool. Wykonuje DOKŁADNIE ten sam,
- * istniejący, synchroniczny kod RDKit (buildLaboratoryReadiness / depict2d / embed3d) —
- * ale w OSOBNYM wątku, więc blokujący execFileSync nie zamraża głównej pętli zdarzeń.
- * Zero zmian w logice RDKit; zero duplikacji logiki obliczeniowej.
+ * istniejący, synchroniczny kod RDKit/ADMET-AI (buildLaboratoryReadiness / depict2d /
+ * embed3d / admetAdapter.predict) — ale w OSOBNYM wątku, więc blokujący execFileSync
+ * nie zamraża głównej pętli zdarzeń (np. zapisów kampanii w toku podczas predykcji
+ * ADMET). Zero zmian w logice silników; zero duplikacji logiki obliczeniowej.
  */
 import { parentPort } from 'node:worker_threads';
 import * as rdkitAdapter from './rdkitAdapter.mjs';
+import * as admetAdapter from './admetAdapter.mjs';
 import { buildLaboratoryReadiness } from '../cognitive/laboratoryReadiness.mjs';
 
 function handle(cmd, args) {
@@ -21,6 +23,8 @@ function handle(cmd, args) {
       const model3d = want3d ? rdkitAdapter.embed3d(smiles) : null;
       return { smiles, depiction2d, model3d };
     }
+    case 'admet-predict':
+      return admetAdapter.predict(args.smiles);
     default:
       throw new Error(`unknown compute command: ${cmd}`);
   }

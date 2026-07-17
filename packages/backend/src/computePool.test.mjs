@@ -7,8 +7,10 @@ import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createComputePool } from './compute/computePool.mjs';
 import * as rdkit from './compute/rdkitAdapter.mjs';
+import { detect as admetDetect } from './compute/admetAdapter.mjs';
 
 const RDKIT = rdkit.detect().available;
+const ADMET = admetDetect().available;
 const pools = [];
 const mk = (opts) => { const p = createComputePool(opts); pools.push(p); return p; };
 after(async () => { for (const p of pools) await p.close(); });
@@ -46,5 +48,16 @@ describe('computePool', () => {
   test('a job that exceeds the timeout is rejected (self-heal)', { skip: RDKIT ? false : 'RDKit unavailable' }, async () => {
     const pool = mk({ size: 1, timeoutMs: 1 }); // 1 ms → real RDKit work overruns
     await assert.rejects(() => pool.run('laboratory-readiness', { candidate: { smiles: 'CC(=O)Oc1ccccc1C(=O)O' } }), /compute_timeout/);
+  });
+
+  // Genesis 2.1 follow-up: the blocking execFileSync inside ADMET-AI's predict() must run
+  // off the main thread too — this is what keeps a campaign save (or anything else) from
+  // stalling for the several seconds a real inference call takes.
+  test('admet-predict runs real ADMET-AI inference on a worker thread with the same shape as the sync path', { skip: ADMET ? false : 'ADMET-AI unavailable' }, async () => {
+    const pool = mk({ size: 1 });
+    const r = await pool.run('admet-predict', { smiles: ['CC(=O)Oc1ccccc1C(=O)O'] });
+    assert.equal(r.ok, true);
+    assert.ok(r.version);
+    assert.equal(typeof r.predictions['CC(=O)Oc1ccccc1C(=O)O'].hERG, 'number');
   });
 });

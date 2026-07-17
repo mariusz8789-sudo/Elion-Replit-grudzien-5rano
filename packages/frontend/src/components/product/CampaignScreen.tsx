@@ -125,16 +125,18 @@ export function CampaignScreen({ id }: { id: string }) {
 
   const pendCount = pendingMolecules(campaign).length;
   const progressPct = run ? Math.round((run.done / run.total) * 100) : (summary ? Math.round(summary.progress * 100) : 0);
+  const toggleExpand = (id: string) => setExpanded((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const runLabel = campaign.molecules.some((m) => m.status !== 'PENDING') ? 'Wznów analizę' : 'Analizuj';
 
-  return (
-    <ProductChrome active="#/campaigns">
+  const desktopBody = (
+    <>
       {/* Header + controls */}
       <Panel title={campaign.name} icon="briefcase" right={<a className="ds-chip" href="#/campaigns"><Icon name="back" size={13} /> Kampanie</a>}>
         <p className="ds-note" style={{ marginTop: 0 }}><strong>Cel:</strong> {campaign.goal || '—'} · <span className="ds-dim">{campaign.owner} · {new Date(campaign.createdAt).toLocaleDateString('pl-PL')}</span></p>
         <textarea className="compare-input ds-mono" value={addRaw} onChange={(e) => setAddRaw(e.target.value)} rows={4} spellCheck={false} placeholder={'Dodaj cząsteczki — jedna na wiersz, opcjonalnie Nazwa = SMILES\nAspiryna = CC(=O)Oc1ccccc1C(=O)O'} />
         <div className="ds-input-row ds-mt">
           <button className="ds-btn" onClick={doAdd} disabled={!!run || !addRaw.trim()}><Icon name="spark" size={14} /> Dodaj cząsteczki</button>
-          {pendCount > 0 && !run ? <button className="ds-btn ds-btn-primary" onClick={runPending}>{campaign.molecules.some((m) => m.status !== 'PENDING') ? 'Wznów analizę' : 'Analizuj'} ({pendCount})</button> : null}
+          {pendCount > 0 && !run ? <button className="ds-btn ds-btn-primary" onClick={runPending}>{runLabel} ({pendCount})</button> : null}
           {run ? <button className="ds-btn" onClick={cancel}><Icon name="block" size={14} /> Przerwij</button> : null}
           {ranked.length ? <>
             <button className="ds-btn" onClick={exportCSV}>Eksport CSV</button>
@@ -193,7 +195,7 @@ export function CampaignScreen({ id }: { id: string }) {
                         <td><div className="score-bar"><span style={{ width: `${c.scored.score}%` }} /></div><span className="score-num">{c.scored.score}</span></td>
                         <td><StatusPill kind={meta.kind}><Icon name={meta.icon} size={11} /> {meta.label}</StatusPill></td>
                         <td className="rank-why">{rankingWhy(c).map((w, i) => <div key={i} className={w.startsWith('−') ? 'why-neg' : 'why-pos'}>{w}</div>)}</td>
-                        <td><button className="decision-explain-btn" onClick={() => setExpanded((s) => { const n = new Set(s); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; })}>{open ? 'Ukryj' : 'Ślad'}</button></td>
+                        <td><button className="decision-explain-btn" onClick={() => toggleExpand(c.id)}>{open ? 'Ukryj' : 'Ślad'}</button></td>
                       </tr>
                       {open ? <tr><td colSpan={6}><DecisionTraceView trace={decisionTrace(c)} /></td></tr> : null}
                     </Fragment>
@@ -226,6 +228,128 @@ export function CampaignScreen({ id }: { id: string }) {
           </div>
         </Panel>
       ) : null}
+    </>
+  );
+
+  /* ---------------- Mobile: same IA as ComparisonReport — hero, cards, compact strip ---------------- */
+  const mobileBody = (
+    <div className="cmp-mobile">
+      <section className="cmp-hero">
+        <div className="cmp-hero-eyebrow">Kampania badawcza</div>
+        <h2 className="cmp-hero-name">{campaign.name}</h2>
+        <p className="cmp-hero-why">{campaign.goal || 'Brak zdefiniowanego celu naukowego.'}</p>
+        <div className="cmp-hero-tags">
+          <span className="cmp-hero-tag">{campaign.owner}</span>
+          <span className="cmp-hero-tag">{new Date(campaign.createdAt).toLocaleDateString('pl-PL')}</span>
+          <a className="cmp-hero-tag" href="#/campaigns"><Icon name="back" size={11} /> Kampanie</a>
+        </div>
+      </section>
+
+      <section className="cmp-section">
+        <h3 className="cmp-section-title">Dodaj cząsteczki</h3>
+        <textarea className="compare-input ds-mono" value={addRaw} onChange={(e) => setAddRaw(e.target.value)} rows={4} spellCheck={false} placeholder={'Jedna na wiersz, opcjonalnie Nazwa = SMILES\nAspiryna = CC(=O)Oc1ccccc1C(=O)O'} />
+        <div className="ds-input-row ds-mt">
+          <button className="ds-btn" onClick={doAdd} disabled={!!run || !addRaw.trim()}><Icon name="spark" size={14} /> Dodaj</button>
+          {run ? <button className="ds-btn" onClick={cancel}><Icon name="block" size={14} /> Przerwij</button> : null}
+        </div>
+        {pendCount > 0 && !run ? (
+          <button type="button" className="cmp-hero-cta" onClick={runPending}>{runLabel} ({pendCount}) <span aria-hidden="true">→</span></button>
+        ) : null}
+        {(run || pendCount > 0) ? (
+          <div className="run-status ds-mt">
+            <div className="run-bar"><span style={{ width: `${progressPct}%` }} /></div>
+            <div className="run-stats">
+              <span>Łącznie: <strong>{campaign.molecules.length}</strong></span>
+              <span className="ok">Przeanalizowane: <strong>{campaign.molecules.filter((m) => m.status === 'ANALYSED').length}</strong></span>
+              <span className="bad">Nieprawidłowe: <strong>{campaign.molecules.filter((m) => m.status === 'INVALID').length}</strong></span>
+              {run ? <><span>Postęp: <strong>{run.done}/{run.total}</strong></span><span>Pozostało: <strong>{etaText(run)}</strong></span></> : null}
+            </div>
+          </div>
+        ) : null}
+        {ranked.length ? (
+          <div className="ds-input-row ds-mt">
+            <button className="ds-btn" onClick={exportCSV}>CSV</button>
+            <button className="ds-btn" onClick={exportJSON}>JSON</button>
+            <button className="ds-btn" onClick={() => window.print()}>PDF</button>
+          </div>
+        ) : null}
+      </section>
+
+      {ranked.length === 0 ? (
+        <div className="ds-empty"><Icon name="flask" size={24} className="ds-empty-icon" /><h4>Brak przeanalizowanych cząsteczek</h4><p>Dodaj cząsteczki i uruchom analizę, aby zobaczyć ranking i raport.</p></div>
+      ) : null}
+
+      {summary && ranked.length ? (
+        <>
+          <div className="cmp-stat-strip">
+            <span className="cmp-stat-strip-item"><StatusPill kind="ok">{summary.verdictCounts.CONTINUE}</StatusPill> Kontynuuj</span>
+            <span className="cmp-stat-strip-item"><StatusPill kind="warn">{summary.needsValidation.length}</StatusPill> Do walidacji</span>
+            <span className="cmp-stat-strip-item"><StatusPill kind="blocked">{summary.rejected.length}</StatusPill> Odrzuceni</span>
+            <span className="cmp-stat-strip-item"><StatusPill kind="info">{summary.invalid}</StatusPill> Nieprawidłowe</span>
+          </div>
+
+          <section className="cmp-section">
+            <h3 className="cmp-section-title">Ranking</h3>
+            <div className="cmp-cand-list">
+              {ranked.map((c) => {
+                const meta = VERDICT_META[c.decision.verdict];
+                const open = expanded.has(c.id);
+                return (
+                  <div key={c.id} className={`cmp-cand-card${open ? ' is-open' : ''}`}>
+                    <button type="button" className="cmp-cand-head" onClick={() => toggleExpand(c.id)} aria-expanded={open}>
+                      <span className="cmp-cand-rank">#{c.rank}</span>
+                      <span className="cmp-cand-main">
+                        <span className="cmp-cand-name">{c.name}</span>
+                        <span className="cmp-cand-smiles">{c.smiles}</span>
+                      </span>
+                      <span className="cmp-cand-score">{c.scored.score}</span>
+                    </button>
+                    <div className="cmp-cand-verdict">
+                      <StatusPill kind={meta.kind}><Icon name={meta.icon} size={11} /> {meta.label}</StatusPill>
+                      <span className="cmp-cand-chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
+                    </div>
+                    {open ? <div className="cmp-cand-why"><DecisionTraceView trace={decisionTrace(c)} /></div> : null}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {campaign.molecules.length ? (
+        <section className="cmp-section">
+          <h3 className="cmp-section-title">Cykl życia cząsteczek</h3>
+          <div className="cmp-cand-list">
+            {campaign.molecules.map((m) => (
+              <div key={m.id} className="cmp-cand-card">
+                <div className="cmp-cand-main">
+                  <span className="cmp-cand-name">{m.name}</span>
+                  <span className="cmp-cand-smiles">{m.smiles}</span>
+                </div>
+                <div className="cmp-cand-verdict">
+                  <StatusPill kind={m.status === 'ANALYSED' ? 'ok' : m.status === 'INVALID' ? 'blocked' : 'warn'}>{m.status === 'ANALYSED' ? STAGE_LABEL[m.stage] : m.status === 'INVALID' ? 'Invalid SMILES' : 'Oczekuje'}</StatusPill>
+                </div>
+                {m.status === 'INVALID' && m.invalidReason ? <p className="ds-dim invalid-reason" style={{ marginTop: '0.4rem' }}>{m.invalidReason}</p> : null}
+                {m.status === 'ANALYSED' ? (
+                  <div className="ds-input-row ds-mt">
+                    {STAGE_ACTIONS.map((a) => (
+                      <button key={a.stage} className="ds-chip" disabled={m.stage === a.stage} onClick={() => setStage(m.id, a.stage)}><Icon name={a.icon} size={12} /> {a.label}</button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <ProductChrome active="#/campaigns">
+      <div className="cmp-desktop-view">{desktopBody}</div>
+      <div className="cmp-mobile-view">{mobileBody}</div>
 
       {/* Full campaign report — the print/PDF surface (reuses Stage 6 matrix + trace) */}
       {summary && ranked.length ? (

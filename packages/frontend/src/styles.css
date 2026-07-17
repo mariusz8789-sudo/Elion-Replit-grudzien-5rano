@@ -1909,6 +1909,27 @@ kbd {
 @media (max-width: 860px) { .dash-grid, .portfolio-grid { grid-template-columns: repeat(2, 1fr); } .matrix-swot { grid-template-columns: 1fr; } }
 @media print { .matrix-cell { color: #10241f !important; } .dash-grid, .portfolio-grid { grid-template-columns: repeat(2, 1fr); } }
 
+/* Progressive disclosure (ComparisonReport IA redesign) — decision/ranking/headline
+   ADMET stay open; dense tables (full ADMET breakdown, matrix, reference diff) sit
+   behind one click, so the report reads as a decision, not a data dump. */
+.cmp-headline-grid { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 860px) { .cmp-headline-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .cmp-headline-grid { grid-template-columns: 1fr; } }
+.cmp-toggle-btn {
+  display: inline-flex; align-items: center; gap: 0.5rem; background: var(--surface-2, rgba(255,255,255,0.03));
+  border: 1px solid var(--border); color: var(--cyan); font: inherit; font-weight: 600; font-size: 0.82rem;
+  padding: 0.55rem 1rem; border-radius: 999px; cursor: pointer; transition: border-color var(--dur-base, 0.15s);
+}
+.cmp-toggle-btn:hover { border-color: var(--cyan); }
+.cmp-toggle-chevron { font-size: 0.7rem; }
+.cmp-toggle-body { display: none; margin-top: 1.1rem; }
+.cmp-toggle.is-open .cmp-toggle-body { display: block; }
+/* Export/PDF must stay complete regardless of on-screen collapsed state. */
+@media print {
+  .cmp-toggle-body { display: block !important; margin-top: 0.6rem; }
+  .cmp-toggle-btn { display: none !important; }
+}
+
 /* Stage 7 — Research Campaigns. */
 .campaign-form { display: flex; flex-direction: column; gap: 0.7rem; margin-bottom: 0.5rem; }
 .campaign-form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem; color: var(--text-dim); }

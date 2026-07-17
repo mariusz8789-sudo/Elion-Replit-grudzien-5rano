@@ -740,9 +740,20 @@ export async function runCampaignStage(
   return request('POST', `/projects/${projectId}/campaigns/${campaignId}/stage`, { token, body: config });
 }
 
-export async function getAdmetEndpoints(): Promise<ApiResult<{ id: string; name: string; category: string; taskType: string; units: string; publishedMetric: string | null; publishedMetricValue: number | null; source: string }[]>> {
-  const r = await request<{ endpoints: { id: string; name: string; category: string; taskType: string; units: string; publishedMetric: string | null; publishedMetricValue: number | null; source: string }[] }>('GET', '/compute/admet/endpoints');
+export interface AdmetEndpointMeta { id: string; name: string; category: string; taskType: string; units: string; publishedMetric: string | null; publishedMetricValue: number | null; source: string }
+
+export async function getAdmetEndpoints(): Promise<ApiResult<AdmetEndpointMeta[]>> {
+  const r = await request<{ endpoints: AdmetEndpointMeta[] }>('GET', '/compute/admet/endpoints');
   return r.ok ? { ok: true, data: r.data.endpoints } : r;
+}
+
+/**
+ * Realne predykcje ADMET-AI (Compare/Campaigns) dla 1..200 SMILES na wywołanie —
+ * ten sam, jedyny silnik `compute/admetAdapter.mjs` co endpoints/toolchain. Każda
+ * wartość to MODEL_ESTIMATE (prawdopodobieństwo lub regresja), NIGDY fakt zmierzony.
+ */
+export async function predictAdmet(smiles: string[]): Promise<ApiResult<{ predictions: Record<string, Record<string, number>>; version: string }>> {
+  return request('POST', '/compute/admet/predict', { token: getToken(), body: { smiles } });
 }
 
 export async function askCampaignWhy(

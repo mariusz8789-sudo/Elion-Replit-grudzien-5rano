@@ -52,6 +52,32 @@ describe('toolchain registry route', () => {
     assert.equal(herg.category, 'Toxicity');
     assert.ok(herg.publishedMetricValue > 0.5);
   });
+
+  describe('POST /api/compute/admet/predict — real ADMET-AI predictions for Compare/Campaigns', () => {
+    test('requires authentication', () => {
+      const r = call('POST', '/api/compute/admet/predict', { body: { smiles: ['CC(=O)Oc1ccccc1C(=O)O'] } });
+      assert.equal(r.status, 401);
+    });
+
+    test('rejects an empty/missing smiles list', () => {
+      const user = register('admetuser1@lab.org');
+      assert.equal(call('POST', '/api/compute/admet/predict', { token: user.token, body: {} }).status, 400);
+      assert.equal(call('POST', '/api/compute/admet/predict', { token: user.token, body: { smiles: [] } }).status, 400);
+    });
+
+    test('returns real MODEL_ESTIMATE predictions for a known molecule (aspirin)', (t) => {
+      if (!ADMET) return t.skip('ADMET-AI niedostępny — BLOCKED_BY_RUNTIME (uczciwy stan).');
+      const user = register('admetuser2@lab.org');
+      const smiles = 'CC(=O)Oc1ccccc1C(=O)O';
+      const r = call('POST', '/api/compute/admet/predict', { token: user.token, body: { smiles: [smiles] } });
+      assert.equal(r.status, 200);
+      assert.ok(r.body.version);
+      const preds = r.body.predictions[smiles];
+      assert.ok(preds, 'brak predykcji dla podanego SMILES');
+      assert.equal(typeof preds.hERG, 'number');
+      assert.ok(preds.hERG >= 0 && preds.hERG <= 1);
+    });
+  });
 });
 
 describe('campaign CRUD + RBAC + resource limits', () => {

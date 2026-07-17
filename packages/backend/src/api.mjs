@@ -174,6 +174,16 @@ export function handleApi(db, ctx) {
       const r = listEndpoints();
       return r.ok ? ok({ endpoints: r.endpoints }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
     }
+    // Realne predykcje ADMET/toksyczności (Compare/Campaigns) — MODEL_ESTIMATE, nigdy fakt.
+    // Ciężki podproces (jak molecule/render, laboratory-readiness) → wymaga zalogowania.
+    if (seg[1] === 'admet' && seg[2] === 'predict' && seg.length === 3 && method === 'POST') {
+      if (!getUserByToken(db, ctx.token)) return err(401, 'unauthorized', 'Zaloguj się, aby uruchomić predykcję ADMET.');
+      const list = Array.isArray(body?.smiles) ? body.smiles.filter((s) => typeof s === 'string' && s) : [];
+      if (!list.length) return err(400, 'invalid_input', 'smiles[] wymagane (co najmniej jeden SMILES).');
+      const r = admetAdapter.predict(list);
+      if (r.ok) return ok({ predictions: r.predictions, version: r.version });
+      return err(r.error === 'invalid_input' ? 400 : 503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+    }
     return err(404, 'not_found');
   }
 

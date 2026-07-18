@@ -16,12 +16,14 @@ import { Icon } from '../Icon';
 import { AccountPanel } from '../AccountPanel';
 import { useSession, getToken } from '../../core/backend/session';
 import { fetchAccountBilling, regenerateApiKey, startCheckout, type AccountBilling } from '../../core/backend/client';
+import { useI18n } from '../../core/i18n';
 
 const TIER_LABEL: Record<string, string> = { free: 'Free', starter: 'Starter', pro: 'Pro' };
 const maskKey = (k: string) => (k.length > 14 ? `${k.slice(0, 7)}…${k.slice(-4)}` : k);
 
 export function BillingScreen() {
   const session = useSession();
+  const { t, locale } = useI18n();
   const [data, setData] = useState<AccountBilling | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,8 +41,8 @@ export function BillingScreen() {
   if (!session) {
     return (
       <ProductChrome active="#/billing">
-        <div className="product-page-head"><div><h1>Rozliczenia</h1><p>Zaloguj się, aby zarządzać planem i kluczem API</p></div></div>
-        <Panel title="Zaloguj się" icon="lock"><AccountPanel /></Panel>
+        <div className="product-page-head"><div><h1>{t('nav.billing')}</h1><p>{t('billing.signin.sub')}</p></div></div>
+        <Panel title={t('common.signIn')} icon="lock"><AccountPanel /></Panel>
       </ProductChrome>
     );
   }
@@ -52,11 +54,11 @@ export function BillingScreen() {
 
   const doRegenerate = async () => {
     const token = getToken(); if (!token) return;
-    if (!window.confirm('Wygenerować nowy klucz? Obecny klucz przestanie działać natychmiast.')) return;
+    if (!window.confirm(t('billing.key.confirmRegen'))) return;
     setBusy(true); setNotice(null);
     const r = await regenerateApiKey(token);
     setBusy(false);
-    if (r.ok) { setRevealed(true); setNotice('Nowy klucz wygenerowany. Skopiuj go teraz.'); load(); }
+    if (r.ok) { setRevealed(true); setNotice(t('billing.key.regenNotice')); load(); }
     else setErr(r.message);
   };
   const doCopy = async () => {
@@ -72,67 +74,68 @@ export function BillingScreen() {
   };
 
   const renewalPill = data && (
-    data.plan.renewalState === 'RENEWING' ? <StatusPill kind="ok">odnawia się</StatusPill>
-      : data.plan.renewalState === 'CANCELED' ? <StatusPill kind="warn">anulowana</StatusPill>
-      : <StatusPill kind="info">brak subskrypcji</StatusPill>
+    data.plan.renewalState === 'RENEWING' ? <StatusPill kind="ok">{t('billing.renewal.renewing')}</StatusPill>
+      : data.plan.renewalState === 'CANCELED' ? <StatusPill kind="warn">{t('billing.renewal.canceled')}</StatusPill>
+      : <StatusPill kind="info">{t('billing.renewal.none')}</StatusPill>
   );
+  const fmtDate = (ms: number) => new Date(ms).toLocaleDateString(locale === 'pl' ? 'pl-PL' : 'en-US');
 
   return (
     <ProductChrome active="#/billing">
-      <div className="product-page-head"><div><h1>Rozliczenia</h1><p>Plan, zużycie API i klucz — samoobsługa</p></div>{renewalPill}</div>
-      {err ? <div className="ds-empty"><Icon name="alert" size={22} className="ds-empty-icon" /><h4>Nie udało się wczytać</h4><p>{err}</p></div> : null}
+      <div className="product-page-head"><div><h1>{t('nav.billing')}</h1><p>{t('billing.subtitle')}</p></div>{renewalPill}</div>
+      {err ? <div className="ds-empty"><Icon name="alert" size={22} className="ds-empty-icon" /><h4>{t('billing.loadError')}</h4><p>{err}</p></div> : null}
       {!data && !err ? <div className="skeleton" style={{ height: 200 }} /> : null}
 
       {data ? (
         <>
           <div className="ds-grid ds-grid-4">
-            <StatCard label="Plan" value={TIER_LABEL[data.plan.tier] ?? data.plan.tier} sub={data.plan.status} accent="var(--violet)" />
-            <StatCard label="Użyte (miesiąc)" value={used} sub="zapytań API" accent="var(--cyan)" />
-            <StatCard label="Limit miesięczny" value={limit || '—'} sub={`tier ${data.plan.tier}`} accent="var(--gold)" />
-            <StatCard label="Pozostało" value={remaining} sub={limit ? `${Math.round((remaining / limit) * 100)}%` : '—'} accent="var(--green)" />
+            <StatCard label={t('billing.stat.plan')} value={TIER_LABEL[data.plan.tier] ?? data.plan.tier} sub={data.plan.status} accent="var(--violet)" />
+            <StatCard label={t('billing.stat.used')} value={used} sub={t('billing.stat.usedSub')} accent="var(--cyan)" />
+            <StatCard label={t('billing.stat.limit')} value={limit || '—'} sub={t('billing.stat.limitSub', { tier: data.plan.tier })} accent="var(--gold)" />
+            <StatCard label={t('billing.stat.remaining')} value={remaining} sub={limit ? `${Math.round((remaining / limit) * 100)}%` : '—'} accent="var(--green)" />
           </div>
 
           <div className="ds-grid ds-grid-2 ds-mt">
-            <Panel title="Zużycie w tym okresie" icon="chart">
+            <Panel title={t('billing.usage.title')} icon="chart">
               {key ? (
-                <Donut size={150} thickness={18} centerLabel={String(remaining)} centerSub="pozostało"
-                  data={[{ label: 'Użyte', value: used, color: 'var(--violet)' }, { label: 'Pozostałe', value: remaining, color: 'var(--bg-elevated)' }]} />
-              ) : <p className="ds-note">Brak klucza API. Wygeneruj klucz poniżej, aby zacząć korzystać z API.</p>}
-              {key ? <p className="ds-note ds-mt">Reset licznika: {new Date(key.resetDate).toLocaleDateString('pl-PL')}</p> : null}
+                <Donut size={150} thickness={18} centerLabel={String(remaining)} centerSub={t('billing.usage.remainingCenter')}
+                  data={[{ label: t('billing.usage.used'), value: used, color: 'var(--violet)' }, { label: t('billing.usage.remaining'), value: remaining, color: 'var(--bg-elevated)' }]} />
+              ) : <p className="ds-note">{t('billing.usage.noKey')}</p>}
+              {key ? <p className="ds-note ds-mt">{t('billing.usage.reset', { date: fmtDate(key.resetDate) })}</p> : null}
             </Panel>
 
-            <Panel title="Klucz API" icon="lock" right={key ? <StatusPill kind="info">{TIER_LABEL[key.tier] ?? key.tier}</StatusPill> : null}>
+            <Panel title={t('billing.key.title')} icon="lock" right={key ? <StatusPill kind="info">{TIER_LABEL[key.tier] ?? key.tier}</StatusPill> : null}>
               {key ? (
                 <>
                   <div className="ds-input-row">
                     <input readOnly value={revealed ? key.key : maskKey(key.key)} spellCheck={false} style={{ fontFamily: 'var(--font-mono)' }} />
-                    <button className="ds-btn" onClick={() => setRevealed((v) => !v)}>{revealed ? 'Ukryj' : 'Pokaż'}</button>
-                    <button className="ds-btn ds-btn-primary" onClick={doCopy}><Icon name={copied ? 'check' : 'chart'} size={14} /> {copied ? 'Skopiowano' : 'Kopiuj'}</button>
+                    <button className="ds-btn" onClick={() => setRevealed((v) => !v)}>{revealed ? t('billing.key.hide') : t('billing.key.show')}</button>
+                    <button className="ds-btn ds-btn-primary" onClick={doCopy}><Icon name={copied ? 'check' : 'chart'} size={14} /> {copied ? t('billing.key.copied') : t('billing.key.copy')}</button>
                   </div>
                   <div className="ds-chips ds-mt">
-                    <button className="ds-chip" onClick={doRegenerate} disabled={busy}><Icon name="spark" size={13} /> Wygeneruj nowy klucz</button>
+                    <button className="ds-chip" onClick={doRegenerate} disabled={busy}><Icon name="spark" size={13} /> {t('billing.key.regenerate')}</button>
                   </div>
-                  <p className="ds-note ds-mt">Użycie w nagłówku: <code>Authorization: Bearer {maskKey(key.key)}</code></p>
+                  <p className="ds-note ds-mt">{t('billing.key.usageHeader')} <code>Authorization: Bearer {maskKey(key.key)}</code></p>
                 </>
               ) : (
-                <button className="ds-btn ds-btn-primary" onClick={doRegenerate} disabled={busy}><Icon name="spark" size={14} /> Wygeneruj klucz API</button>
+                <button className="ds-btn ds-btn-primary" onClick={doRegenerate} disabled={busy}><Icon name="spark" size={14} /> {t('billing.key.generate')}</button>
               )}
               {notice ? <p className="ds-note ds-mt" style={{ color: 'var(--green)' }}>{notice}</p> : null}
             </Panel>
           </div>
 
-          <Panel title="Plan i płatności" icon="briefcase" className="ds-mt"
-            right={data.stripeConfigured ? <StatusPill kind="ok">Stripe aktywny</StatusPill> : <StatusPill kind="blocked">Billing niedostępny</StatusPill>}>
+          <Panel title={t('billing.plan.title')} icon="briefcase" className="ds-mt"
+            right={data.stripeConfigured ? <StatusPill kind="ok">{t('billing.plan.stripeActive')}</StatusPill> : <StatusPill kind="blocked">{t('billing.plan.stripeOff')}</StatusPill>}>
             {!data.stripeConfigured ? (
-              <p className="ds-note">Płatności nie są skonfigurowane w tym wdrożeniu. Możesz korzystać z planu <strong>{TIER_LABEL[data.plan.tier]}</strong> i klucza API; upgrade będzie dostępny po podłączeniu Stripe.</p>
+              <p className="ds-note">{t('billing.plan.notConfigured', { tier: TIER_LABEL[data.plan.tier] ?? data.plan.tier })}</p>
             ) : (
               <>
-                <p className="ds-para">Aktualny plan: <strong>{TIER_LABEL[data.plan.tier]}</strong> · status: {data.plan.status}. Wybierz wyższy plan, aby zwiększyć limit zapytań.</p>
+                <p className="ds-para">{t('billing.plan.current', { tier: TIER_LABEL[data.plan.tier] ?? data.plan.tier, status: data.plan.status })}</p>
                 <div className="ds-chips">
-                  <button className="ds-btn" onClick={() => doUpgrade('starter')} disabled={busy || data.plan.tier === 'starter'}>Starter — 10 000/mies.</button>
-                  <button className="ds-btn ds-btn-primary" onClick={() => doUpgrade('pro')} disabled={busy || data.plan.tier === 'pro'}>Pro — 100 000/mies.</button>
+                  <button className="ds-btn" onClick={() => doUpgrade('starter')} disabled={busy || data.plan.tier === 'starter'}>{t('billing.plan.starter')}</button>
+                  <button className="ds-btn ds-btn-primary" onClick={() => doUpgrade('pro')} disabled={busy || data.plan.tier === 'pro'}>{t('billing.plan.pro')}</button>
                 </div>
-                <p className="ds-note ds-mt">Płatność obsługuje Stripe Checkout; po opłaceniu klucz zostaje automatycznie przypisany do planu.</p>
+                <p className="ds-note ds-mt">{t('billing.plan.stripeNote')}</p>
               </>
             )}
           </Panel>

@@ -10,22 +10,20 @@ import { Icon } from '../Icon';
 import { AccountPanel } from '../AccountPanel';
 import { useSession } from '../../core/backend/session';
 import { listAnalyses, deleteAnalysis, type SavedAnalysis, type AnalysisStatus } from '../../core/assistantHistory';
+import { useI18n } from '../../core/i18n';
 
 const REOPEN_KEY = 'genesis-assistant-reopen';
-const STATUS: Record<AnalysisStatus, { kind: 'ok' | 'warn' | 'blocked'; label: string }> = {
-  VERIFIED: { kind: 'ok', label: 'Zweryfikowana' },
-  INVALID: { kind: 'warn', label: 'Błędny SMILES' },
-  BLOCKED: { kind: 'blocked', label: 'RDKit niedostępny' },
-};
+const STATUS_KIND: Record<AnalysisStatus, 'ok' | 'warn' | 'blocked'> = { VERIFIED: 'ok', INVALID: 'warn', BLOCKED: 'blocked' };
 
 export function MyAnalysesScreen() {
   const session = useSession();
+  const { t, locale } = useI18n();
   const [items, setItems] = useState<SavedAnalysis[]>([]);
   const refresh = () => { if (session) setItems(listAnalyses(session.user.id)); };
   useEffect(refresh, [session]);
 
   if (!session) {
-    return <ProductChrome active="#/analyses"><Panel title="Zaloguj się" icon="lock"><AccountPanel /></Panel></ProductChrome>;
+    return <ProductChrome active="#/analyses"><Panel title={t('common.signIn')} icon="lock"><AccountPanel /></Panel></ProductChrome>;
   }
 
   const reopen = (a: SavedAnalysis) => {
@@ -37,22 +35,22 @@ export function MyAnalysesScreen() {
 
   return (
     <ProductChrome active="#/analyses">
-      <Panel title="Moje analizy" icon="book" right={<StatusPill kind="info">{items.length} zapisanych</StatusPill>}>
+      <Panel title={t('nav.analyses')} icon="book" right={<StatusPill kind="info">{t('analyses.saved', { count: items.length })}</StatusPill>}>
         {items.length === 0 ? (
-          <div className="ds-empty"><Icon name="flask" size={26} className="ds-empty-icon" /><h4>Brak analiz</h4><p>Przejdź do Asystenta i przeanalizuj pierwszą cząsteczkę.</p><a className="ds-btn ds-btn-primary" href="#/assistant">Nowa analiza</a></div>
+          <div className="ds-empty"><Icon name="flask" size={26} className="ds-empty-icon" /><h4>{t('analyses.empty.title')}</h4><p>{t('analyses.empty.body')}</p><a className="ds-btn ds-btn-primary" href="#/assistant">{t('analyses.empty.cta')}</a></div>
         ) : (
           <div className="ds-table-wrap">
             <table className="ds-table">
-              <thead><tr><th>Data</th><th>Nazwa</th><th>SMILES</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>{t('analyses.col.date')}</th><th>{t('analyses.col.name')}</th><th>{t('analyses.col.smiles')}</th><th>{t('analyses.col.status')}</th><th></th></tr></thead>
               <tbody>
                 {items.map((a) => (
                   <tr key={a.id}>
-                    <td className="ds-dim">{new Date(a.date).toLocaleDateString('pl-PL')}</td>
+                    <td className="ds-dim">{new Date(a.date).toLocaleDateString(locale === 'pl' ? 'pl-PL' : 'en-US')}</td>
                     <td className="ds-strong">{a.name}</td>
                     <td className="ds-mono" style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.smiles}>{a.smiles}</td>
-                    <td><StatusPill kind={STATUS[a.status].kind}>{STATUS[a.status].label}</StatusPill></td>
+                    <td><StatusPill kind={STATUS_KIND[a.status]}>{t(`analyses.status.${a.status}`)}</StatusPill></td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      <button className="ds-chip" onClick={() => reopen(a)} disabled={a.status !== 'VERIFIED'}><Icon name="book" size={13} /> Otwórz</button>
+                      <button className="ds-chip" onClick={() => reopen(a)} disabled={a.status !== 'VERIFIED'}><Icon name="book" size={13} /> {t('common.open')}</button>
                       <button className="ds-chip" onClick={() => remove(a)} style={{ marginLeft: 6 }}><Icon name="block" size={13} /></button>
                     </td>
                   </tr>

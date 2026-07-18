@@ -15,6 +15,7 @@ import { useSession, getToken } from '../../core/backend/session';
 import { listCampaigns, type Campaign } from '../../core/campaigns';
 import { fetchPortfolio, type PortfolioEntry } from '../../core/backend/client';
 import { buildCommandCenter, reproState, reproLabel, relativeTime } from '../../core/dashboard';
+import { loadSampleProject } from '../../core/sampleProject';
 
 function greeting(hour: number): string {
   if (hour < 12) return 'Good morning';
@@ -34,6 +35,7 @@ export function DashboardScreen() {
   const [portfolio, setPortfolio] = useState<PortfolioEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   const load = useCallback(() => {
     const token = getToken();
@@ -67,6 +69,13 @@ export function DashboardScreen() {
     () => (portfolio ? buildCommandCenter(portfolio, localById) : null),
     [portfolio, localById],
   );
+
+  const loadSample = async () => {
+    if (!session || seeding) return;
+    setSeeding(true);
+    try { await loadSampleProject(session.user.id, session.user.email); } finally { setSeeding(false); }
+    load(); // refetch the portfolio so the sample projects appear immediately
+  };
 
   const now = Date.now();
   const hour = new Date().getHours();
@@ -117,7 +126,11 @@ export function DashboardScreen() {
         <div className="cc-firstrun">
           <h2>Start your first project</h2>
           <p>A project is where you evaluate molecules together — rank candidates from real RDKit descriptors, with every decision and its full history kept.</p>
-          <button className="cc-btn cc-btn-primary" onClick={() => go('#/campaigns')}>Create a project</button>
+          <div className="cc-firstrun-actions">
+            <button className="cc-btn cc-btn-primary" onClick={() => go('#/campaigns')}>Create a project</button>
+            <button className="cc-btn cc-btn-ghost" onClick={loadSample} disabled={seeding}>{seeding ? 'Loading…' : 'Load a sample project'}</button>
+          </div>
+          <p className="cc-firstrun-note">The sample adds real molecules, ready for you to run the analysis — no fake results.</p>
         </div>
       ) : null}
 

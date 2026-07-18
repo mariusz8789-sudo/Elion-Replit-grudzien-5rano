@@ -2172,3 +2172,12 @@ kbd {
 .cc-signin { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
 .cc-signin-copy h1 { margin-bottom: 0.6rem; }
 @media (max-width: 720px) { .cc-signin { grid-template-columns: 1fr; } }
+
+/* Command Center first-run actions (sample project) */
+.cc-firstrun-actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; }
+.cc-firstrun-note { margin-top: 0.9rem !important; font-size: 0.78rem !important; color: var(--text-faint) !important; }
+
+/* Education/physics demoted to a quiet secondary link on the product home */
+.gx-secondary-link { margin-top: 2.5rem; text-align: center; font-size: 0.82rem; color: var(--text-faint); }
+.gx-secondary-link a { color: var(--text-dim); text-decoration: none; font-weight: 600; }
+.gx-secondary-link a:hover { color: var(--cyan); }

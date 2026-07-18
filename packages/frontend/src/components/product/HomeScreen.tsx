@@ -45,15 +45,11 @@ export function HomeScreen() {
         ))}
       </div>
 
-      <div className="gx-section-label">Laboratoria edukacyjne</div>
-      <div className="gx-edu">
-        <span className="gx-edu-icon"><Icon name="atom" size={22} /></span>
-        <span className="gx-edu-text">
-          <span className="gx-edu-title">Platforma edukacyjna Genesis OS</span>
-          <span className="gx-edu-sub">13 laboratoriów fizyki i nauki, Discovery Timeline, symulacje — oddzielny moduł, w pełni dostępny obok produktu naukowego.</span>
-        </span>
-        <a className="gx-btn gx-btn-ghost" href="#/labs">Eksploruj fizykę</a>
-      </div>
+      {/* The education/physics platform is a separate workspace — kept reachable but
+          out of the chemistry product's primary path (hidden, not removed). */}
+      <p className="gx-secondary-link">
+        Szukasz platformy edukacyjnej? <a href="#/labs">Laboratoria fizyki →</a>
+      </p>
     </ProductChrome>
   );
 }

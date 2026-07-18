@@ -11,11 +11,13 @@ import { AccountPanel } from '../AccountPanel';
 import { useSession, getToken } from '../../core/backend/session';
 import { listCampaigns, createCampaign, deleteCampaign, type Campaign } from '../../core/campaigns';
 import { syncCampaigns, removeCampaignRemote } from '../../core/campaignSync';
+import { loadSampleProject } from '../../core/sampleProject';
 
 export function CampaignsScreen() {
   const session = useSession();
   const [items, setItems] = useState<Campaign[]>([]);
   const [creating, setCreating] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const [form, setForm] = useState({ name: '', goal: '', description: '' });
   const refresh = () => { if (session) setItems(listCampaigns(session.user.id)); };
   useEffect(refresh, [session]);
@@ -51,6 +53,15 @@ export function CampaignsScreen() {
     if (t) removeCampaignRemote(t, c.id).catch(() => { /* best-effort */ });
     refresh();
   };
+  const loadSample = async () => {
+    if (seeding) return;
+    setSeeding(true);
+    try {
+      const firstId = await loadSampleProject(session.user.id, session.user.email);
+      refresh();
+      window.location.hash = `#/campaigns/${firstId}`;
+    } finally { setSeeding(false); }
+  };
 
   return (
     <ProductChrome active="#/campaigns">
@@ -68,7 +79,15 @@ export function CampaignsScreen() {
         ) : null}
 
         {items.length === 0 && !creating ? (
-          <div className="ds-empty"><Icon name="briefcase" size={26} className="ds-empty-icon" /><h4>Brak kampanii</h4><p>Utwórz pierwszy projekt badawczy i dodaj cząsteczki do porównania.</p></div>
+          <div className="ds-empty">
+            <Icon name="briefcase" size={26} className="ds-empty-icon" />
+            <h4>Brak kampanii</h4>
+            <p>Utwórz pierwszy projekt badawczy i dodaj cząsteczki do porównania — albo zacznij od gotowego przykładu z prawdziwymi cząsteczkami.</p>
+            <div className="ds-input-row" style={{ justifyContent: 'center' }}>
+              <button className="ds-btn ds-btn-primary" onClick={() => setCreating(true)}>Nowa kampania</button>
+              <button className="ds-btn" onClick={loadSample} disabled={seeding}>{seeding ? 'Wczytywanie…' : 'Wczytaj przykładowy projekt'}</button>
+            </div>
+          </div>
         ) : (
           <div className="campaign-cards ds-mt">
             {items.map((c) => {

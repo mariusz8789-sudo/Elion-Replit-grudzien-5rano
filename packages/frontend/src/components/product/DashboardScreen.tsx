@@ -1,12 +1,10 @@
 /**
  * DashboardScreen — the Scientific Command Center (Genesis V3, P0 · Milestone 2).
  *
- * The first screen a scientist sees each morning. It answers, in one glance: what to
- * continue (Zone 1), what needs attention (Zone 2), and what's happening across all
- * research (Zone 5) — the three zones P0 lights up. It is a SURFACE over systems that
- * already exist: the new /api/portfolio rollup for the cross-project facts, and the
- * existing scoring engine (core/moleculeComparison.ts) for the leading candidate. No new
- * system, no fabricated data. English-first per the V3 language mandate.
+ * The first screen a scientist sees each morning: what to continue (Zone 1), what needs
+ * attention (Zone 2), and what's happening across all research (Zone 5) — a SURFACE over
+ * the /api/portfolio rollup and the existing scoring engine, no new system, no fabricated
+ * data. Fully bilingual (EN/PL) via the i18n seam; switches language with the whole app.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProductChrome } from './ProductChrome';
@@ -16,11 +14,12 @@ import { listCampaigns, type Campaign } from '../../core/campaigns';
 import { fetchPortfolio, type PortfolioEntry } from '../../core/backend/client';
 import { buildCommandCenter, reproState, reproLabel, relativeTime } from '../../core/dashboard';
 import { loadSampleProject } from '../../core/sampleProject';
+import { useI18n } from '../../core/i18n';
 
-function greeting(hour: number): string {
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+function greetingKey(hour: number): string {
+  if (hour < 12) return 'dash.greeting.morning';
+  if (hour < 18) return 'dash.greeting.afternoon';
+  return 'dash.greeting.evening';
 }
 
 function ReproBadge({ analysed, total }: { analysed: number; total: number }) {
@@ -32,6 +31,7 @@ const go = (hash: string) => { window.location.hash = hash; };
 
 export function DashboardScreen() {
   const session = useSession();
+  const { t, tp } = useI18n();
   const [portfolio, setPortfolio] = useState<PortfolioEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,8 +57,6 @@ export function DashboardScreen() {
     return load();
   }, [session, load]);
 
-  // Local-first: locally-held campaigns supply molecule data so the scoring engine can
-  // compute a leading candidate. Re-read whenever the portfolio refreshes.
   const localById = useMemo(() => {
     const m = new Map<string, Campaign>();
     if (session) for (const c of listCampaigns(session.user.id)) m.set(c.id, c);
@@ -74,7 +72,7 @@ export function DashboardScreen() {
     if (!session || seeding) return;
     setSeeding(true);
     try { await loadSampleProject(session.user.id, session.user.email); } finally { setSeeding(false); }
-    load(); // refetch the portfolio so the sample projects appear immediately
+    load();
   };
 
   const now = Date.now();
@@ -86,8 +84,8 @@ export function DashboardScreen() {
       <ProductChrome active="#/genesis">
         <div className="cc-signin">
           <div className="cc-signin-copy">
-            <h1 className="cc-title">Your Scientific Command Center</h1>
-            <p className="cc-sub">Sign in to see what changed, what needs your attention, and what to continue — across every project.</p>
+            <h1 className="cc-title">{t('dash.signin.title')}</h1>
+            <p className="cc-sub">{t('dash.signin.sub')}</p>
           </div>
           <div className="cc-signin-panel"><AccountPanel /></div>
         </div>
@@ -99,38 +97,38 @@ export function DashboardScreen() {
     <ProductChrome active="#/genesis">
       <div className="cc-header">
         <div>
-          <h1 className="cc-title">{greeting(hour)}, {name}</h1>
+          <h1 className="cc-title">{t(greetingKey(hour), { name })}</h1>
           <p className="cc-sub">
             {model
-              ? `${model.rows.length} ${model.rows.length === 1 ? 'project' : 'projects'} · ${model.needsAttention.length} need${model.needsAttention.length === 1 ? 's' : ''} attention`
-              : 'Loading your research…'}
+              ? `${tp('dash.projects', model.rows.length)} · ${tp('dash.needCount', model.needsAttention.length)}`
+              : t('dash.loading')}
           </p>
         </div>
-        <button className="cc-btn cc-btn-primary" onClick={() => go('#/campaigns')}>+ New project</button>
+        <button className="cc-btn cc-btn-primary" onClick={() => go('#/campaigns')}>{t('dash.newProject')}</button>
       </div>
 
       {error ? (
         <div className="cc-error" role="alert">
-          <span>Couldn&rsquo;t load your portfolio. {error}</span>
-          <button className="cc-btn cc-btn-ghost" onClick={load}>Try again</button>
+          <span>{t('dash.error', { message: error })}</span>
+          <button className="cc-btn cc-btn-ghost" onClick={load}>{t('common.tryAgain')}</button>
         </div>
       ) : null}
 
       {!model && loading ? (
-        <div className="cc-skeleton" aria-busy="true" aria-label="Loading">
+        <div className="cc-skeleton" aria-busy="true" aria-label={t('dash.loading')}>
           <div className="cc-sk-row" /><div className="cc-sk-row" /><div className="cc-sk-row" />
         </div>
       ) : null}
 
       {model && model.rows.length === 0 ? (
         <div className="cc-firstrun">
-          <h2>Start your first project</h2>
-          <p>A project is where you evaluate molecules together — rank candidates from real RDKit descriptors, with every decision and its full history kept.</p>
+          <h2>{t('dash.firstrun.title')}</h2>
+          <p>{t('dash.firstrun.body')}</p>
           <div className="cc-firstrun-actions">
-            <button className="cc-btn cc-btn-primary" onClick={() => go('#/campaigns')}>Create a project</button>
-            <button className="cc-btn cc-btn-ghost" onClick={loadSample} disabled={seeding}>{seeding ? 'Loading…' : 'Load a sample project'}</button>
+            <button className="cc-btn cc-btn-primary" onClick={() => go('#/campaigns')}>{t('dash.firstrun.create')}</button>
+            <button className="cc-btn cc-btn-ghost" onClick={loadSample} disabled={seeding}>{seeding ? t('dash.firstrun.loading') : t('dash.firstrun.sample')}</button>
           </div>
-          <p className="cc-firstrun-note">The sample adds real molecules, ready for you to run the analysis — no fake results.</p>
+          <p className="cc-firstrun-note">{t('dash.firstrun.note')}</p>
         </div>
       ) : null}
 
@@ -139,45 +137,46 @@ export function DashboardScreen() {
           {model.continueRow ? (
             <div className="cc-continue">
               <div className="cc-continue-text">
-                <span className="cc-eyebrow">Continue</span>
-                <span className="cc-continue-name">{model.continueRow.entry.name || 'Untitled project'}</span>
-                <span className="cc-continue-meta">Last activity {relativeTime(model.continueRow.entry.lastActivityAt, now)}</span>
+                <span className="cc-eyebrow">{t('dash.continue')}</span>
+                <span className="cc-continue-name">{model.continueRow.entry.name || t('campaigns.empty.title')}</span>
+                <span className="cc-continue-meta">{t('dash.lastActivity', { time: relativeTime(model.continueRow.entry.lastActivityAt, now) })}</span>
               </div>
-              <button className="cc-btn cc-btn-primary" onClick={() => go(`#/campaigns/${model.continueRow!.entry.id}`)}>Resume →</button>
+              <button className="cc-btn cc-btn-primary" onClick={() => go(`#/campaigns/${model.continueRow!.entry.id}`)}>{t('dash.resume')}</button>
             </div>
           ) : null}
 
           <div className="cc-section-label">
-            <span className="cc-dot cc-dot-attn" aria-hidden="true" /> Needs attention
+            <span className="cc-dot cc-dot-attn" aria-hidden="true" /> {t('dash.needsAttention')}
             {model.needsAttention.length > 0 ? <span className="cc-count">{model.needsAttention.length}</span> : null}
           </div>
           {model.needsAttention.length === 0 ? (
-            <div className="cc-empty-note">Nothing needs attention — every project is fully analysed and has no open comments.</div>
+            <div className="cc-empty-note">{t('dash.nothingAttention')}</div>
           ) : (
             <div className="cc-attention-list">
               {model.needsAttention.map((r) => (
                 <div key={r.entry.id} className="cc-attn">
                   <div className="cc-attn-body">
                     <div className="cc-attn-head">
-                      <span className="cc-attn-name">{r.entry.name || 'Untitled project'}</span>
+                      <span className="cc-attn-name">{r.entry.name || '—'}</span>
                       {r.leading ? (
-                        <span className="cc-attn-lead">Leading: {r.leading.name} · <span className="cc-mono">{r.leading.scored.score}/100</span></span>
+                        <span className="cc-attn-lead">{t('dash.leading', { name: r.leading.name })} · <span className="cc-mono">{r.leading.scored.score}/100</span></span>
                       ) : null}
                     </div>
                     <div className="cc-attn-reasons">{r.attention.reasons.join(' · ')}</div>
                   </div>
-                  <button className="cc-btn cc-btn-ghost" onClick={() => go(`#/campaigns/${r.entry.id}`)}>Open</button>
+                  <button className="cc-btn cc-btn-ghost" onClick={() => go(`#/campaigns/${r.entry.id}`)}>{t('common.open')}</button>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="cc-section-label">All projects</div>
+          <div className="cc-section-label">{t('dash.allProjects')}</div>
           <div className="cc-table-wrap">
             <table className="cc-table">
               <thead>
                 <tr>
-                  <th>Project</th><th>Status</th><th>Analysed</th><th>Open comments</th><th>Last activity</th><th>Role</th>
+                  <th>{t('dash.col.project')}</th><th>{t('dash.col.status')}</th><th>{t('dash.col.analysed')}</th>
+                  <th>{t('dash.col.comments')}</th><th>{t('dash.col.activity')}</th><th>{t('dash.col.role')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -191,12 +190,12 @@ export function DashboardScreen() {
                       onClick={open}
                       onKeyDown={(e) => { if (e.key === 'Enter') open(); }}
                     >
-                      <td className="cc-cell-name">{r.entry.name || 'Untitled project'}</td>
-                      <td className="cc-cell-status">{r.entry.status}</td>
+                      <td className="cc-cell-name">{r.entry.name || '—'}</td>
+                      <td className="cc-cell-status">{t(`status.${r.entry.status}`)}</td>
                       <td><ReproBadge analysed={r.entry.analysed} total={r.entry.total} /></td>
                       <td>{r.entry.unresolvedComments > 0 ? r.entry.unresolvedComments : '—'}</td>
                       <td className="cc-cell-time">{relativeTime(r.entry.lastActivityAt, now)}</td>
-                      <td className="cc-cell-role">{r.entry.role}</td>
+                      <td className="cc-cell-role">{t(`role.${r.entry.role}`)}</td>
                     </tr>
                   );
                 })}

@@ -5,10 +5,14 @@
  * leading candidate comes from the single scoring engine, and the view model assembles
  * and sorts correctly. No DOM, no network.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
   reproState, reproLabel, deriveAttention, leadingCandidate, relativeTime, buildCommandCenter,
 } from '../core/dashboard';
+import { setLocale } from '../core/i18n';
+
+// These assertions read the English strings; pin the locale so they're deterministic.
+beforeEach(() => { setLocale('en'); });
 import type { Campaign, CampaignMolecule } from '../core/campaigns';
 import type { PortfolioEntry } from '../core/backend/client';
 import type { MoleculeProps } from '../core/moleculeInterpretation';

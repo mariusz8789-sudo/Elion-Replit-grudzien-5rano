@@ -1,55 +1,90 @@
 /**
- * Szkielet i18n — jedno miejsce prawdy dla tekstów UI (nie treści naukowej
- * eksperymentów, która na razie zostaje po polsku w kodzie labów; to
- * osobna, dużo większa decyzja, patrz CONTRIBUTING.md „Dodawanie języka").
+ * i18n — one source of truth for UI text. Production-grade seam:
+ *  - translation FILES only (locales/en.ts, locales/pl.ts), never inline strings here;
+ *  - persisted user choice (localStorage) + browser-language default;
+ *  - {name}-style interpolation and Intl.PluralRules-based plurals (tp);
+ *  - a React hook (useI18n) that re-renders subscribers when the language changes;
+ *  - adding a language = one more file + one LOCALES entry (Spanish/German/French/
+ *    Arabic/Chinese drop in with no code change here).
  *
- * Dziś aktywny jest wyłącznie `pl` — celowo nie generujemy `en` przez
- * automatyczne tłumaczenie: fizyka wymaga precyzji terminologicznej, którą
- * może zweryfikować tylko native speaker/fizyk, nie zgadywanie. To co jest
- * gotowe: seam (`t()`), mechanizm przełączania (`setLocale`/subskrypcja) i
- * przykład migracji (nawigacja główna, skip link) — reszta stringów w
- * labach zostaje po polsku aż do decyzji o realnym tłumaczeniu.
+ * The existing seam (t / getLocale / setLocale / subscribeLocale) is preserved so no
+ * caller breaks; this only extends it.
  */
+import { useSyncExternalStore } from 'react';
+import { readJSON, writeJSON } from './storage';
+import { en } from './locales/en';
+import { pl } from './locales/pl';
 
 export type Locale = 'pl' | 'en';
 
+/** Registered languages, in switcher order. Add a locale here + a dictionary to ship it. */
+export const LOCALES: { code: Locale; label: string }[] = [
+  { code: 'en', label: 'English' },
+  { code: 'pl', label: 'Polski' },
+];
+
 type Dictionary = Record<string, string>;
+const DICTIONARIES: Record<Locale, Dictionary> = { en, pl };
+const STORAGE_KEY = 'locale/v1';
 
-const pl: Dictionary = {
-  'nav.search': 'Szukaj',
-  'nav.discoveryLog': 'Dziennik odkryć',
-  'nav.glossary': 'Słowniczek',
-  'nav.settings': 'Ustawienia',
-  'nav.whatIf': 'Co by było, gdyby?',
-  'nav.decisionExplorer': 'Decision Explorer',
-  'skipLink': 'Przejdź do treści',
-};
+function isLocale(v: unknown): v is Locale {
+  return v === 'pl' || v === 'en';
+}
 
-// Celowo pusty — patrz komentarz u góry pliku. Klucze spadają na `pl` przez
-// fallback w t(), więc pusty słownik nie psuje niczego, gdyby ktoś ustawił
-// locale='en' zanim tłumaczenie powstanie.
-const en: Dictionary = {};
+function detectInitial(): Locale {
+  const saved = readJSON<unknown>(STORAGE_KEY, null);
+  if (isLocale(saved)) return saved;
+  const nav = typeof navigator !== 'undefined' ? (navigator.language || '') : '';
+  return nav.toLowerCase().startsWith('pl') ? 'pl' : 'en';
+}
 
-const DICTIONARIES: Record<Locale, Dictionary> = { pl, en };
-
-let currentLocale: Locale = 'pl';
+let currentLocale: Locale = detectInitial();
 const listeners = new Set<(locale: Locale) => void>();
+const pluralRules: Record<Locale, Intl.PluralRules> = {
+  en: new Intl.PluralRules('en'),
+  pl: new Intl.PluralRules('pl'),
+};
 
 export function getLocale(): Locale {
   return currentLocale;
 }
 
 export function setLocale(locale: Locale): void {
+  if (!isLocale(locale) || locale === currentLocale) return;
   currentLocale = locale;
+  writeJSON(STORAGE_KEY, locale);
   listeners.forEach((fn) => fn(currentLocale));
 }
 
 export function subscribeLocale(fn: (locale: Locale) => void): () => void {
   listeners.add(fn);
-  return () => listeners.delete(fn);
+  return () => { listeners.delete(fn); };
 }
 
-/** Tłumaczy klucz; brak w aktywnym słowniku spada na polski, brak wszędzie zwraca sam klucz (widoczny błąd, nie cichy pusty tekst). */
-export function t(key: string): string {
-  return DICTIONARIES[currentLocale][key] ?? pl[key] ?? key;
+function interpolate(str: string, params?: Record<string, string | number>): string {
+  if (!params) return str;
+  return str.replace(/\{(\w+)\}/g, (_, k) => (k in params ? String(params[k]) : `{${k}}`));
+}
+
+/** Translate a key. Falls back active → English → the key itself (a visible miss, never blank). */
+export function t(key: string, params?: Record<string, string | number>): string {
+  const raw = DICTIONARIES[currentLocale][key] ?? en[key] ?? key;
+  return interpolate(raw, params);
+}
+
+/** Plural-aware translate: picks `${key}.${category}` for the count (one/few/many/other). */
+export function tp(key: string, count: number, params: Record<string, string | number> = {}): string {
+  const category = pluralRules[currentLocale].select(count);
+  const dict = DICTIONARIES[currentLocale];
+  const raw = dict[`${key}.${category}`] ?? dict[`${key}.other`] ?? en[`${key}.other`] ?? en[`${key}.one`] ?? key;
+  return interpolate(raw, { count, ...params });
+}
+
+/**
+ * React hook: subscribes to language changes so the component re-renders and re-runs t().
+ * Returns the live locale plus the (stable) t/tp/setLocale helpers.
+ */
+export function useI18n() {
+  const locale = useSyncExternalStore(subscribeLocale, getLocale, getLocale);
+  return { locale, t, tp, setLocale };
 }

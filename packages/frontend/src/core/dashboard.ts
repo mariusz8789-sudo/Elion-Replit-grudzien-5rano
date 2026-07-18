@@ -11,8 +11,9 @@
  * scoring engine (core/moleculeComparison.ts), never re-implemented.
  */
 import type { PortfolioEntry } from './backend/client';
-import { rankCandidates, type RankedCandidate, type Verdict } from './moleculeComparison';
+import { rankCandidates, type RankedCandidate } from './moleculeComparison';
 import { campaignCandidates, type Campaign } from './campaigns';
+import { t, tp } from './i18n';
 
 /** Campaign-level analysis completeness — the honest basis for the reproducibility badge. */
 export type ReproState = 'verified' | 'partial' | 'unchecked';
@@ -23,22 +24,14 @@ export function reproState(analysed: number, total: number): ReproState {
   return 'unchecked';
 }
 
-/** Human label for the badge. "Verified" means every molecule carries real RDKit descriptors. */
+/** Human label for the badge (localized). "Verified" means every molecule carries real RDKit descriptors. */
 export function reproLabel(analysed: number, total: number): string {
   switch (reproState(analysed, total)) {
-    case 'verified': return 'Verified';
-    case 'partial': return `${analysed}/${total} analysed`;
-    default: return total === 0 ? 'No molecules' : 'Not analysed';
+    case 'verified': return t('repro.verified');
+    case 'partial': return t('repro.partial', { analysed, total });
+    default: return total === 0 ? t('repro.noMolecules') : t('repro.notAnalysed');
   }
 }
-
-/** English labels for the scoring engine's verdicts (the Command Center is English-first per V3). */
-export const VERDICT_LABEL_EN: Record<Verdict, string> = {
-  CONTINUE: 'Continue',
-  NEEDS_EXPERIMENTS: 'Needs experiments',
-  HIGH_UNCERTAINTY: 'High uncertainty',
-  REJECT: 'Reject for now',
-};
 
 /** The leading candidate of a campaign, via the single scoring engine. Null if nothing is analysed. */
 export function leadingCandidate(campaign: Campaign): RankedCandidate | null {
@@ -65,18 +58,18 @@ export function deriveAttention(entry: PortfolioEntry, leading?: RankedCandidate
   let severity = 0;
 
   if (entry.unresolvedComments > 0) {
-    reasons.push(`${entry.unresolvedComments} unresolved comment${entry.unresolvedComments > 1 ? 's' : ''}`);
+    reasons.push(tp('attn.comments', entry.unresolvedComments));
     severity += 2;
   }
   if (entry.total > 0 && entry.analysed === 0) {
-    reasons.push('No molecules analysed yet');
+    reasons.push(t('attn.noneAnalysed'));
     severity += 2;
   } else if (entry.pending > 0) {
-    reasons.push(`${entry.pending} molecule${entry.pending > 1 ? 's' : ''} awaiting analysis`);
+    reasons.push(tp('attn.awaiting', entry.pending));
     severity += 1;
   }
   if (leading && (leading.decision.verdict === 'REJECT' || leading.decision.verdict === 'HIGH_UNCERTAINTY')) {
-    reasons.push(`Leading candidate flagged "${VERDICT_LABEL_EN[leading.decision.verdict]}"`);
+    reasons.push(t('attn.leadingFlagged', { verdict: t(`verdict.${leading.decision.verdict}`) }));
     severity += 1;
   }
   return { reasons, severity };
@@ -85,17 +78,17 @@ export function deriveAttention(entry: PortfolioEntry, leading?: RankedCandidate
 /** Short relative-time label ("just now", "2h ago", "yesterday", "3d ago", or a date). */
 export function relativeTime(ts: number, now: number): string {
   const ms = now - ts;
-  if (!Number.isFinite(ts) || ts <= 0 || ms < 0) return '—';
+  if (!Number.isFinite(ts) || ts <= 0 || ms < 0) return t('time.invalid');
   const min = Math.floor(ms / 60_000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min}m ago`;
+  if (min < 1) return t('time.justNow');
+  if (min < 60) return t('time.mAgo', { m: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t('time.hAgo', { h: hr });
   const day = Math.floor(hr / 24);
-  if (day === 1) return 'yesterday';
-  if (day < 7) return `${day}d ago`;
+  if (day === 1) return t('time.yesterday');
+  if (day < 7) return t('time.dAgo', { d: day });
   const wk = Math.floor(day / 7);
-  if (wk < 5) return `${wk}w ago`;
+  if (wk < 5) return t('time.wAgo', { w: wk });
   return new Date(ts).toISOString().slice(0, 10);
 }
 

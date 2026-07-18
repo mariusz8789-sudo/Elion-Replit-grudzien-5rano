@@ -1,0 +1,140 @@
+/**
+ * English translations (source locale). Keys are shared 1:1 with pl.ts — the i18n
+ * test asserts both dictionaries have the exact same key set, so a missing translation
+ * is a failing test, never a silent English-in-Polish leak.
+ *
+ * Plurals use Intl.PluralRules categories as key suffixes (.one/.other for English).
+ * Interpolation uses {name}-style placeholders.
+ */
+export const en: Record<string, string> = {
+  // Common
+  'common.signOut': 'Sign out',
+  'common.tryAgain': 'Try again',
+  'common.cancel': 'Cancel',
+  'common.create': 'Create',
+  'common.open': 'Open',
+  'common.signIn': 'Sign in',
+
+  // Navigation
+  'nav.dashboard': 'Dashboard',
+  'nav.assistant': 'Assistant',
+  'nav.compare': 'Compare',
+  'nav.projects': 'Projects',
+  'nav.analyses': 'My analyses',
+  'nav.billing': 'Billing',
+  'nav.search': 'Search',
+  'nav.discoveryLog': 'Discovery log',
+  'nav.glossary': 'Glossary',
+  'nav.settings': 'Settings',
+  'nav.whatIf': 'What if?',
+  'nav.decisionExplorer': 'Decision Explorer',
+  'skipLink': 'Skip to content',
+
+  // Language switcher
+  'lang.label': 'Language',
+
+  // Command Center
+  'dash.greeting.morning': 'Good morning, {name}',
+  'dash.greeting.afternoon': 'Good afternoon, {name}',
+  'dash.greeting.evening': 'Good evening, {name}',
+  'dash.loading': 'Loading your research…',
+  'dash.newProject': '+ New project',
+  'dash.error': 'Couldn’t load your portfolio. {message}',
+  'dash.continue': 'Continue',
+  'dash.lastActivity': 'Last activity {time}',
+  'dash.resume': 'Resume →',
+  'dash.needsAttention': 'Needs attention',
+  'dash.nothingAttention': 'Nothing needs attention — every project is fully analysed and has no open comments.',
+  'dash.allProjects': 'All projects',
+  'dash.leading': 'Leading: {name}',
+  'dash.col.project': 'Project',
+  'dash.col.status': 'Status',
+  'dash.col.analysed': 'Analysed',
+  'dash.col.comments': 'Open comments',
+  'dash.col.activity': 'Last activity',
+  'dash.col.role': 'Role',
+  'dash.projects.one': '{count} project',
+  'dash.projects.other': '{count} projects',
+  'dash.needCount.one': '{count} needs attention',
+  'dash.needCount.other': '{count} need attention',
+  'dash.firstrun.title': 'Start your first project',
+  'dash.firstrun.body': 'A project is where you evaluate molecules together — rank candidates from real RDKit descriptors, with every decision and its full history kept.',
+  'dash.firstrun.create': 'Create a project',
+  'dash.firstrun.sample': 'Load a sample project',
+  'dash.firstrun.loading': 'Loading…',
+  'dash.firstrun.note': 'The sample adds real molecules, ready for you to run the analysis — no fake results.',
+  'dash.signin.title': 'Your Scientific Command Center',
+  'dash.signin.sub': 'Sign in to see what changed, what needs your attention, and what to continue — across every project.',
+
+  // Relative time
+  'time.justNow': 'just now',
+  'time.mAgo': '{m}m ago',
+  'time.hAgo': '{h}h ago',
+  'time.yesterday': 'yesterday',
+  'time.dAgo': '{d}d ago',
+  'time.wAgo': '{w}w ago',
+  'time.invalid': '—',
+
+  // Roles & statuses
+  'role.owner': 'Owner',
+  'role.collaborator': 'Collaborator',
+  'role.viewer': 'Viewer',
+  'status.ACTIVE': 'Active',
+  'status.COMPLETED': 'Completed',
+  'status.ARCHIVED': 'Archived',
+
+  // Reproducibility badge
+  'repro.verified': 'Verified',
+  'repro.notAnalysed': 'Not analysed',
+  'repro.noMolecules': 'No molecules',
+  'repro.partial': '{analysed}/{total} analysed',
+
+  // Attention reasons
+  'attn.comments.one': '{count} unresolved comment',
+  'attn.comments.other': '{count} unresolved comments',
+  'attn.noneAnalysed': 'No molecules analysed yet',
+  'attn.awaiting.one': '{count} molecule awaiting analysis',
+  'attn.awaiting.other': '{count} molecules awaiting analysis',
+  'attn.leadingFlagged': 'Leading candidate flagged “{verdict}”',
+
+  // Scoring verdicts
+  'verdict.CONTINUE': 'Continue',
+  'verdict.NEEDS_EXPERIMENTS': 'Needs experiments',
+  'verdict.HIGH_UNCERTAINTY': 'High uncertainty',
+  'verdict.REJECT': 'Reject for now',
+
+  // Product home
+  'home.badge': 'RDKit 2026.03.3 · real computations, never fabricated',
+  'home.titleAccent': '— AI Scientific Discovery Platform',
+  'home.lede': 'Trustworthy molecule analysis: real RDKit computations, explicit provenance, and a clear label on every value. From a single molecule to a 2000-candidate campaign.',
+  'home.cta.analyse': 'Start an analysis',
+  'home.modules': 'Product modules',
+  'home.mod.compare.desc': 'Rank 2–50 candidates: developability ranking with reasons, a matrix heatmap, and a portfolio view.',
+  'home.mod.compare.cta': 'Compare candidates',
+  'home.mod.projects.desc': 'Research projects of 2–2000 molecules. Saved on the server, with CSV/JSON/PDF export.',
+  'home.mod.projects.cta': 'Open projects',
+  'home.mod.analyses.desc': 'History of saved analyses — reopen any report in one click.',
+  'home.mod.analyses.cta': 'Browse history',
+  'home.mod.billing.desc': 'Plan, usage and API limit, key copy and regeneration, upgrade via Stripe.',
+  'home.mod.billing.cta': 'Manage plan',
+  'home.labsLink': 'Looking for the education platform?',
+  'home.labsLinkText': 'Physics labs →',
+
+  // Projects (list) screen
+  'campaigns.new': 'New project',
+  'campaigns.signin.title': 'Research projects',
+  'campaigns.signin.lede': 'Scientists don’t analyse one molecule — they run projects. Sign in to create one.',
+  'campaigns.title': 'Research projects',
+  'campaigns.form.name': 'Project name',
+  'campaigns.form.namePlaceholder': 'e.g. Snake Venom Inhibitors',
+  'campaigns.form.goal': 'Scientific goal',
+  'campaigns.form.goalPlaceholder': 'e.g. Identify the most promising candidates for validation',
+  'campaigns.form.desc': 'Description (optional)',
+  'campaigns.empty.title': 'No projects',
+  'campaigns.empty.body': 'Create your first research project and add molecules to compare — or start from a ready-made sample with real molecules.',
+  'campaigns.sample': 'Load a sample project',
+  'campaigns.sampleLoading': 'Loading…',
+  'campaigns.card.noGoal': 'No goal defined',
+  'campaigns.card.stats': '{molecules} molecules · {analysed} analysed',
+  'campaigns.delete': 'Delete project',
+};

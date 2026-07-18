@@ -12,9 +12,11 @@ import { useSession, getToken } from '../../core/backend/session';
 import { listCampaigns, createCampaign, deleteCampaign, type Campaign } from '../../core/campaigns';
 import { syncCampaigns, removeCampaignRemote } from '../../core/campaignSync';
 import { loadSampleProject } from '../../core/sampleProject';
+import { useI18n } from '../../core/i18n';
 
 export function CampaignsScreen() {
   const session = useSession();
+  const { t } = useI18n();
   const [items, setItems] = useState<Campaign[]>([]);
   const [creating, setCreating] = useState(false);
   const [seeding, setSeeding] = useState(false);
@@ -33,10 +35,10 @@ export function CampaignsScreen() {
     return (
       <ProductChrome active="#/campaigns">
         <div className="product-hero">
-          <h1>Kampanie badawcze</h1>
-          <p className="product-lede">Naukowcy nie analizują jednej cząsteczki — prowadzą kampanie. Zaloguj się, aby utworzyć projekt.</p>
+          <h1>{t('campaigns.signin.title')}</h1>
+          <p className="product-lede">{t('campaigns.signin.lede')}</p>
         </div>
-        <Panel title="Zaloguj się" icon="lock"><AccountPanel /></Panel>
+        <Panel title={t('common.signIn')} icon="lock"><AccountPanel /></Panel>
       </ProductChrome>
     );
   }
@@ -65,15 +67,15 @@ export function CampaignsScreen() {
 
   return (
     <ProductChrome active="#/campaigns">
-      <Panel title="Kampanie badawcze" icon="briefcase" right={<button className="ds-btn ds-btn-primary" onClick={() => setCreating((v) => !v)}><Icon name="spark" size={14} /> Nowa kampania</button>}>
+      <Panel title={t('campaigns.title')} icon="briefcase" right={<button className="ds-btn ds-btn-primary" onClick={() => setCreating((v) => !v)}><Icon name="spark" size={14} /> {t('campaigns.new')}</button>}>
         {creating ? (
           <div className="campaign-form">
-            <label>Nazwa projektu<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="np. Snake Venom Inhibitors" maxLength={80} autoFocus /></label>
-            <label>Cel naukowy<input value={form.goal} onChange={(e) => setForm({ ...form, goal: e.target.value })} placeholder="np. Wskazać najbardziej obiecujących kandydatów do walidacji" maxLength={160} /></label>
-            <label>Opis (opcjonalnie)<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} maxLength={400} /></label>
+            <label>{t('campaigns.form.name')}<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t('campaigns.form.namePlaceholder')} maxLength={80} autoFocus /></label>
+            <label>{t('campaigns.form.goal')}<input value={form.goal} onChange={(e) => setForm({ ...form, goal: e.target.value })} placeholder={t('campaigns.form.goalPlaceholder')} maxLength={160} /></label>
+            <label>{t('campaigns.form.desc')}<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} maxLength={400} /></label>
             <div className="ds-input-row">
-              <button className="ds-btn ds-btn-primary" onClick={submit} disabled={!form.name.trim()}>Utwórz</button>
-              <button className="ds-btn" onClick={() => setCreating(false)}>Anuluj</button>
+              <button className="ds-btn ds-btn-primary" onClick={submit} disabled={!form.name.trim()}>{t('common.create')}</button>
+              <button className="ds-btn" onClick={() => setCreating(false)}>{t('common.cancel')}</button>
             </div>
           </div>
         ) : null}
@@ -81,11 +83,11 @@ export function CampaignsScreen() {
         {items.length === 0 && !creating ? (
           <div className="ds-empty">
             <Icon name="briefcase" size={26} className="ds-empty-icon" />
-            <h4>Brak kampanii</h4>
-            <p>Utwórz pierwszy projekt badawczy i dodaj cząsteczki do porównania — albo zacznij od gotowego przykładu z prawdziwymi cząsteczkami.</p>
+            <h4>{t('campaigns.empty.title')}</h4>
+            <p>{t('campaigns.empty.body')}</p>
             <div className="ds-input-row" style={{ justifyContent: 'center' }}>
-              <button className="ds-btn ds-btn-primary" onClick={() => setCreating(true)}>Nowa kampania</button>
-              <button className="ds-btn" onClick={loadSample} disabled={seeding}>{seeding ? 'Wczytywanie…' : 'Wczytaj przykładowy projekt'}</button>
+              <button className="ds-btn ds-btn-primary" onClick={() => setCreating(true)}>{t('campaigns.new')}</button>
+              <button className="ds-btn" onClick={loadSample} disabled={seeding}>{seeding ? t('campaigns.sampleLoading') : t('campaigns.sample')}</button>
             </div>
           </div>
         ) : (
@@ -94,11 +96,11 @@ export function CampaignsScreen() {
               const analysed = c.molecules.filter((m) => m.status === 'ANALYSED').length;
               return (
                 <a key={c.id} className="campaign-card" href={`#/campaigns/${c.id}`}>
-                  <header><span className="ds-strong">{c.name}</span><StatusPill kind={c.status === 'ACTIVE' ? 'ok' : 'info'}>{c.status}</StatusPill></header>
-                  <p className="campaign-goal">{c.goal || 'Bez zdefiniowanego celu'}</p>
+                  <header><span className="ds-strong">{c.name}</span><StatusPill kind={c.status === 'ACTIVE' ? 'ok' : 'info'}>{t(`status.${c.status}`)}</StatusPill></header>
+                  <p className="campaign-goal">{c.goal || t('campaigns.card.noGoal')}</p>
                   <footer>
-                    <span className="ds-dim">{c.molecules.length} cząsteczek · {analysed} przeanalizowanych</span>
-                    <button className="ds-chip" onClick={(e) => { e.preventDefault(); remove(c); }} title="Usuń kampanię"><Icon name="block" size={13} /></button>
+                    <span className="ds-dim">{t('campaigns.card.stats', { molecules: c.molecules.length, analysed })}</span>
+                    <button className="ds-chip" onClick={(e) => { e.preventDefault(); remove(c); }} title={t('campaigns.delete')}><Icon name="block" size={13} /></button>
                   </footer>
                 </a>
               );

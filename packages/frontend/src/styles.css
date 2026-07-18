@@ -2181,3 +2181,10 @@ kbd {
 .gx-secondary-link { margin-top: 2.5rem; text-align: center; font-size: 0.82rem; color: var(--text-faint); }
 .gx-secondary-link a { color: var(--text-dim); text-decoration: none; font-weight: 600; }
 .gx-secondary-link a:hover { color: var(--cyan); }
+
+/* Language switcher (i18n) */
+.lang-switch { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+.lang-opt { background: transparent; color: var(--text-dim); border: none; padding: 0.3rem 0.5rem; font-size: 0.72rem; font-weight: 700; font-family: var(--font-mono); cursor: pointer; letter-spacing: 0.03em; }
+.lang-opt:hover { color: var(--text); }
+.lang-opt.active { background: var(--cyan); color: #04121a; }
+.lang-opt:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }

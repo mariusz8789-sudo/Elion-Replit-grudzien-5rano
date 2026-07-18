@@ -1345,6 +1345,52 @@ export function resolveCampaignComment(db, id, resolved = true) {
   return getCampaignComment(db, id);
 }
 
+/* ---------------- Portfolio rollup (Genesis V3, P0) ---------------- */
+
+/**
+ * Every campaign a user can access — owned (user_campaigns) plus shared (via
+ * campaign_members) — each tagged with the user's effective role. This is the pure
+ * aggregation SOURCE for the dashboard Portfolio: no scoring, no new data, no new
+ * system — it only unions two lookups that already exist so the dashboard needs one
+ * call instead of N. Owner rows win over any stale membership row for the same id.
+ */
+export function listAccessibleCampaigns(db, userId) {
+  if (!userId) return [];
+  const out = [];
+  const seen = new Set();
+  for (const c of listCampaignsForOwner(db, userId)) {
+    out.push({ id: c.id, ownerId: userId, data: c.data, createdAt: c.createdAt, updatedAt: c.updatedAt, role: 'owner' });
+    seen.add(c.id);
+  }
+  const shared = db.prepare('SELECT campaign_id, role FROM campaign_members WHERE user_id = ?').all(String(userId));
+  for (const m of shared) {
+    if (seen.has(m.campaign_id)) continue; // an owner row for this campaign already added
+    const row = getCampaignRowById(db, m.campaign_id);
+    if (!row || row.ownerId === userId) continue; // deleted campaign, or self — skip
+    out.push({ id: row.id, ownerId: row.ownerId, data: row.data, createdAt: row.createdAt, updatedAt: row.updatedAt, role: m.role });
+    seen.add(m.campaign_id);
+  }
+  return out;
+}
+
+/**
+ * Cheap per-campaign aggregates for the rollup: open (unresolved) comment count,
+ * snapshot count, and the latest snapshot/comment timestamps (feeding "last activity").
+ * One place for this SQL — api.mjs composes rollups from store functions, never queries.
+ */
+export function getCampaignRollupAggregates(db, campaignId) {
+  const cid = String(campaignId);
+  const unresolved = db.prepare('SELECT COUNT(*) AS n FROM campaign_comments WHERE campaign_id = ? AND resolved = 0').get(cid);
+  const snaps = db.prepare('SELECT COUNT(*) AS n, MAX(created_at) AS latest FROM campaign_snapshots WHERE campaign_id = ?').get(cid);
+  const latestComment = db.prepare('SELECT MAX(created_at) AS latest FROM campaign_comments WHERE campaign_id = ?').get(cid);
+  return {
+    unresolvedComments: unresolved?.n ?? 0,
+    snapshotCount: snaps?.n ?? 0,
+    latestSnapshotAt: snaps?.latest ?? null,
+    latestCommentAt: latestComment?.latest ?? null,
+  };
+}
+
 /* ---------------- Projekty i członkostwa (RBAC) ---------------- */
 
 /** Tworzy projekt i nadaje twórcy rolę 'owner' (jedna transakcja). */

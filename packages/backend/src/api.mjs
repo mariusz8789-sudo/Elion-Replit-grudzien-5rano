@@ -43,6 +43,8 @@ import {
   getCampaignComment,
   listCampaignComments,
   resolveCampaignComment,
+  listAccessibleCampaigns,
+  getCampaignRollupAggregates,
   getPasswordHash,
   createSession,
   getUserByToken,
@@ -269,6 +271,48 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'billing' && seg.length === 2 && method === 'GET') return ok(accountBillingView(db, user));
     if (seg[1] === 'api-key' && seg[2] === 'regenerate' && seg.length === 3 && method === 'POST') return regenerateAccountKey(db, user);
     return err(404, 'not_found');
+  }
+
+  // ---- Portfolio rollup (Genesis V3, P0) — read-only aggregation for the dashboard.
+  // One call returns every campaign the user can reach (owned + shared) with cheap
+  // counts that already exist: molecule statuses, unresolved comments, snapshots,
+  // last activity. Deliberately SCORING-FREE — the leading-candidate ranking lives in
+  // exactly one place (frontend core/moleculeComparison.ts) and is never recomputed
+  // here, so this endpoint can never drift from the real verdict. No new system.
+  if (seg[0] === 'portfolio') {
+    if (seg.length === 1 && method === 'GET') {
+      const rows = listAccessibleCampaigns(db, user.id).map((c) => {
+        const molecules = Array.isArray(c.data?.molecules) ? c.data.molecules : [];
+        let analysed = 0; let pending = 0; let invalid = 0;
+        for (const m of molecules) {
+          if (m?.status === 'ANALYSED' && m?.props) analysed += 1;
+          else if (m?.status === 'INVALID') invalid += 1;
+          else pending += 1;
+        }
+        const agg = getCampaignRollupAggregates(db, c.id);
+        const lastActivityAt = Math.max(c.updatedAt ?? 0, agg.latestSnapshotAt ?? 0, agg.latestCommentAt ?? 0)
+          || c.updatedAt || c.createdAt || 0;
+        return {
+          id: c.id,
+          name: c.data?.name ?? '',
+          status: c.data?.status ?? 'ACTIVE',
+          role: c.role,
+          ownerId: c.ownerId,
+          total: molecules.length,
+          analysed,
+          pending,
+          invalid,
+          unresolvedComments: agg.unresolvedComments,
+          snapshotCount: agg.snapshotCount,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+          lastActivityAt,
+        };
+      });
+      rows.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+      return ok({ portfolio: rows });
+    }
+    return err(405, 'method_not_allowed');
   }
 
   // ---- Trwałość kampanii badawczych (Genesis 2.1, Part 2) — scoped per właściciel ----

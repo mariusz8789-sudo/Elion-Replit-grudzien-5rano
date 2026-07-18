@@ -9,6 +9,7 @@ import { DiscoveryShell, Panel, StatusPill } from './DiscoveryShell';
 import { KnowledgeGraph } from '../graph/KnowledgeGraph';
 import type { GNode, GEdge } from '../graph/graphLayout';
 import { fetchScienceCapabilities, type ScienceCapabilities } from '../../core/backend/client';
+import { useI18n } from '../../core/i18n';
 
 /** Representative relations wiring the real node types into a legible ontology. */
 const ONTOLOGY_EDGES: [string, string, string][] = [
@@ -26,6 +27,7 @@ const ONTOLOGY_EDGES: [string, string, string][] = [
 ];
 
 export function KnowledgeGraphScreen() {
+  const { t } = useI18n();
   const [caps, setCaps] = useState<ScienceCapabilities | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => { fetchScienceCapabilities().then((r) => r.ok ? setCaps(r.data) : setErr(r.message)); }, []);
@@ -41,22 +43,22 @@ export function KnowledgeGraphScreen() {
   }, [caps]);
 
   return (
-    <DiscoveryShell active="#/knowledge-graph" title="Knowledge Graph" subtitle="Ontologia grafu wiedzy — każda krawędź kampanii nosi prowieniencję"
+    <DiscoveryShell active="#/knowledge-graph" title="Knowledge Graph" subtitle={t('kg.subtitle')}
       actions={caps ? <StatusPill kind={caps.knowledgeGraph.provenanceRequired ? 'ok' : 'warn'}>provenance {caps.knowledgeGraph.provenanceRequired ? 'required' : 'optional'}</StatusPill> : null}>
-      {err ? <div className="ds-empty"><h4>Backend niedostępny</h4><p>{err}</p></div> : null}
+      {err ? <div className="ds-empty"><h4>{t('mv.backendDown')}</h4><p>{err}</p></div> : null}
       {!caps && !err ? <div className="skeleton" style={{ height: 440 }} /> : null}
       {caps ? (
         <>
           <div className="ds-grid ds-grid-4">
-            <StatBox label="Typy węzłów" value={caps.knowledgeGraph.nodeTypes.length} />
-            <StatBox label="Typy relacji" value={caps.knowledgeGraph.edgeTypes.length} />
-            <StatBox label="Krawędzie ontologii" value={edges.length} />
-            <StatBox label="Prowieniencja" value={caps.knowledgeGraph.provenanceRequired ? 'wymagana' : 'opc.'} />
+            <StatBox label={t('kg.stat.nodeTypes')} value={caps.knowledgeGraph.nodeTypes.length} />
+            <StatBox label={t('kg.stat.edgeTypes')} value={caps.knowledgeGraph.edgeTypes.length} />
+            <StatBox label={t('kg.stat.ontologyEdges')} value={edges.length} />
+            <StatBox label={t('kg.stat.provenance')} value={caps.knowledgeGraph.provenanceRequired ? t('kg.prov.required') : t('kg.prov.optional')} />
           </div>
-          <Panel title="Graf ontologii (interaktywny — najedź na węzeł)" icon="graph" className="ds-mt">
+          <Panel title={t('kg.panel.graph')} icon="graph" className="ds-mt">
             <KnowledgeGraph nodes={nodes} edges={edges} width={760} height={460} />
           </Panel>
-          <Panel title="Typy relacji" icon="graph" className="ds-mt">
+          <Panel title={t('kg.panel.relations')} icon="graph" className="ds-mt">
             <div className="ds-tags">{caps.knowledgeGraph.edgeTypes.map((e) => <span key={e} className="ds-tag">{e}</span>)}</div>
             <p className="ds-note ds-mt">{caps.honesty}</p>
           </Panel>

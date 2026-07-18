@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { DiscoveryShell, Panel, StatusPill } from './DiscoveryShell';
 import { Icon } from '../Icon';
 import { fetchAgentRoles, runMultiAgentPanel, type AgentPanel } from '../../core/backend/client';
+import { useI18n } from '../../core/i18n';
 
 /** Representative campaign dossier (illustrative input — analysis is real). */
 const SAMPLE_DOSSIER = {
@@ -29,13 +30,16 @@ const SAMPLE_DOSSIER = {
   candidates: [{ structuralAlerts: [] }],
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  MedicinalChemist: 'Chemik medyczny', ComputationalChemist: 'Chemik obliczeniowy', StructuralBiologist: 'Biolog strukturalny',
-  Toxicologist: 'Toksykolog', PKPDScientist: 'Naukowiec PK/PD', Bioinformatician: 'Bioinformatyk',
-  ClinicalStrategist: 'Strateg kliniczny', RegulatoryExpert: 'Ekspert regulacyjny', GrantWriter: 'Autor grantów', ProjectManager: 'Kierownik projektu',
+/** Expert role → i18n label key (resolved at render so the roster follows the language). */
+const ROLE_LABEL_KEYS: Record<string, string> = {
+  MedicinalChemist: 'ma.role.MedicinalChemist', ComputationalChemist: 'ma.role.ComputationalChemist', StructuralBiologist: 'ma.role.StructuralBiologist',
+  Toxicologist: 'ma.role.Toxicologist', PKPDScientist: 'ma.role.PKPDScientist', Bioinformatician: 'ma.role.Bioinformatician',
+  ClinicalStrategist: 'ma.role.ClinicalStrategist', RegulatoryExpert: 'ma.role.RegulatoryExpert', GrantWriter: 'ma.role.GrantWriter', ProjectManager: 'ma.role.ProjectManager',
 };
+const roleLabel = (t: (k: string) => string, role: string) => (ROLE_LABEL_KEYS[role] ? t(ROLE_LABEL_KEYS[role]) : role);
 
 export function MultiAgentScreen() {
+  const { t } = useI18n();
   const [roles, setRoles] = useState<string[]>([]);
   const [panel, setPanel] = useState<AgentPanel | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,20 +59,20 @@ export function MultiAgentScreen() {
   const activeAgent = panel?.agents.find((a) => a.role === active) ?? null;
 
   return (
-    <DiscoveryShell active="#/multi-agent" title="Multi-Agent Scientific AI" subtitle="10 agentów-ekspertów analizuje realne dane kampanii"
+    <DiscoveryShell active="#/multi-agent" title="Multi-Agent Scientific AI" subtitle={t('ma.subtitle')}
       actions={<StatusPill kind="blocked">Reasoning: {panel?.reasoningLayer ?? '—'}</StatusPill>}>
-      <div className="ds-callout ds-mt"><Icon name="alert" size={15} /> Dossier poniżej to <strong>reprezentatywne wejście kampanii</strong> (ilustracyjne). Oceny agentów są <strong>realne</strong> — deterministyczne reguły na tych danych.</div>
+      <div className="ds-callout ds-mt"><Icon name="alert" size={15} /> {t('ma.callout.a')}<strong>{t('ma.callout.b')}</strong>{t('ma.callout.c')}<strong>{t('ma.callout.d')}</strong>{t('ma.callout.e')}</div>
 
       {loading ? <div className="skeleton ds-mt" style={{ height: 320 }} /> : (
         <div className="ds-grid ds-agent-layout ds-mt">
-          <Panel title={`Zespół (${roles.length} agentów)`} icon="users">
+          <Panel title={t('ma.team', { n: roles.length })} icon="users">
             <ul className="ds-agent-list">
               {panel?.agents.map((a) => (
                 <li key={a.role}>
                   <button className={`ds-agent-row${active === a.role ? ' active' : ''}`} onClick={() => setActive(a.role)}>
                     <span className="ds-agent-avatar"><Icon name="brain" size={15} /></span>
-                    <span className="ds-agent-name">{ROLE_LABELS[a.role] ?? a.role}</span>
-                    {a.concerns.length > 0 ? <span className="ds-agent-flag" title="zgłasza obawy"><Icon name="alert" size={13} /></span> : <span className="ds-agent-ok"><Icon name="check" size={13} /></span>}
+                    <span className="ds-agent-name">{roleLabel(t, a.role)}</span>
+                    {a.concerns.length > 0 ? <span className="ds-agent-flag" title={t('ma.raisesConcerns')}><Icon name="alert" size={13} /></span> : <span className="ds-agent-ok"><Icon name="check" size={13} /></span>}
                   </button>
                 </li>
               ))}
@@ -77,19 +81,19 @@ export function MultiAgentScreen() {
 
           <div>
             {activeAgent ? (
-              <Panel title={ROLE_LABELS[activeAgent.role] ?? activeAgent.role} icon="brain" right={<StatusPill kind="blocked">{activeAgent.reasoningStatus}</StatusPill>}>
-                <h5 className="ds-sub-h">Ocena</h5><p className="ds-para">{activeAgent.assessment}</p>
-                <h5 className="ds-sub-h">Rekomendacja</h5><p className="ds-para">{activeAgent.recommendation}</p>
-                {activeAgent.concerns.length > 0 ? <><h5 className="ds-sub-h">Obawy</h5><ul className="ds-ul">{activeAgent.concerns.map((c, i) => <li key={i}>{c}</li>)}</ul></> : null}
+              <Panel title={roleLabel(t, activeAgent.role)} icon="brain" right={<StatusPill kind="blocked">{activeAgent.reasoningStatus}</StatusPill>}>
+                <h5 className="ds-sub-h">{t('ma.assessment')}</h5><p className="ds-para">{activeAgent.assessment}</p>
+                <h5 className="ds-sub-h">{t('ma.recommendation')}</h5><p className="ds-para">{activeAgent.recommendation}</p>
+                {activeAgent.concerns.length > 0 ? <><h5 className="ds-sub-h">{t('ma.concerns')}</h5><ul className="ds-ul">{activeAgent.concerns.map((c, i) => <li key={i}>{c}</li>)}</ul></> : null}
                 {activeAgent.reasoningNote ? <p className="ds-note ds-mt">{activeAgent.reasoningNote}</p> : null}
               </Panel>
             ) : null}
 
             {panel?.consensus ? (
-              <Panel title="Konsensus panelu" icon="users" className="ds-mt" right={<StatusPill kind={panel.consensus.proceed ? 'ok' : 'warn'}>{panel.consensus.verdict}</StatusPill>}>
+              <Panel title={t('ma.consensus')} icon="users" className="ds-mt" right={<StatusPill kind={panel.consensus.proceed ? 'ok' : 'warn'}>{panel.consensus.verdict}</StatusPill>}>
                 <p className="ds-para">{panel.consensus.nextAction}</p>
                 {panel.consensus.openConcerns.length > 0 ? (
-                  <><h5 className="ds-sub-h">Otwarte obawy zespołu</h5>
+                  <><h5 className="ds-sub-h">{t('ma.openConcerns')}</h5>
                   <div className="ds-tags">{panel.consensus.openConcerns.map((c, i) => <span key={i} className="ds-tag">{c}</span>)}</div></>
                 ) : null}
                 <p className="ds-note ds-mt">{panel.honesty}</p>

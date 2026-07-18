@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from './core/i18n';
 import './labs/index';
 import { getLab, getLabs } from './core/registry';
 import { LabShell } from './components/LabShell';
@@ -137,6 +138,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 export default function App() {
+  const { t } = useI18n();
   const [route, setRoute] = useState<Route>(parseHash);
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -366,7 +368,7 @@ export default function App() {
     if (route.kind === 'projects') {
       return (
         <div className="app">
-          <TopBar title="☁ Projekty (chmura)" onSearch={() => setSearchOpen(true)} />
+          <TopBar title={`☁ ${t('cp.title')}`} onSearch={() => setSearchOpen(true)} />
           <ErrorBoundary>
             <CloudProjectsScreen />
           </ErrorBoundary>
@@ -402,7 +404,7 @@ export default function App() {
     if (route.kind === 'campaign') {
       return (
         <div className="app">
-          <TopBar title="⚡ Silnik Przyspieszenia Naukowego" onSearch={() => setSearchOpen(true)} />
+          <TopBar title={`⚡ ${t('cs.engine.title')}`} onSearch={() => setSearchOpen(true)} />
           <ErrorBoundary>
             <CampaignScreen />
           </ErrorBoundary>

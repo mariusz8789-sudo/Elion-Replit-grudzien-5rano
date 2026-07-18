@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useFocusTrap } from '../core/useFocusTrap';
 import { track } from '../core/analytics';
+import { useI18n } from '../core/i18n';
 
 /**
  * Wprowadzenie przy pierwszym uruchomieniu — 4 krótkie, interaktywne kroki
@@ -8,9 +9,10 @@ import { track } from '../core/analytics';
  * Cel: w mniej niż 2 minuty użytkownik wie, czym jest Genesis OS, że
  * parametry są przeciągalne, że Narrator AI tłumaczy obserwacje, i gdzie
  * zacząć. Pomijalne w każdej chwili — pominięcie liczy się tak samo jak
- * ukończenie (patrz onFinish poniżej).
+ * ukończenie (patrz onFinish poniżej). Wszystkie napisy przez seam i18n.
  */
 export function OnboardingOverlay({ onFinish }: { onFinish: (destination: 'timeline' | 'home') => void }) {
+  const { t } = useI18n();
   const [step, setStep] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
   useFocusTrap(panelRef, true);
@@ -24,7 +26,7 @@ export function OnboardingOverlay({ onFinish }: { onFinish: (destination: 'timel
   };
 
   return (
-    <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Wprowadzenie do Genesis OS">
+    <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label={t('onb.aria.overlay')}>
       <span className="onboarding-brand">Genesis OS</span>
       <span className="hud-corner hud-tl" aria-hidden="true" />
       <span className="hud-corner hud-tr" aria-hidden="true" />
@@ -32,7 +34,7 @@ export function OnboardingOverlay({ onFinish }: { onFinish: (destination: 'timel
       <span className="hud-corner hud-br" aria-hidden="true" />
       <div className="onboarding-panel" ref={panelRef}>
         <button className="onboarding-skip" onClick={() => finish('home')}>
-          Pomiń →
+          {t('onb.skip')}
         </button>
 
         {step === 0 && <StepWelcome />}
@@ -50,11 +52,11 @@ export function OnboardingOverlay({ onFinish }: { onFinish: (destination: 'timel
           <div className="onboarding-nav">
             {step > 0 && (
               <button className="chip-btn" onClick={() => setStep((s) => s - 1)}>
-                ← Wstecz
+                {t('onb.back')}
               </button>
             )}
             <button className="chip-btn onboarding-next" onClick={() => setStep((s) => s + 1)} autoFocus={step === 0}>
-              Dalej →
+              {t('onb.next')}
             </button>
           </div>
         )}
@@ -64,30 +66,28 @@ export function OnboardingOverlay({ onFinish }: { onFinish: (destination: 'timel
 }
 
 function StepWelcome() {
+  const { t } = useI18n();
   return (
     <div className="onboarding-step">
       <div className="onboarding-icons" aria-hidden="true">
         <span>🌌</span><span>⚛️</span><span>🧬</span><span>∑</span>
       </div>
-      <h2>Witaj w Genesis OS</h2>
-      <p>
-        Interaktywna platforma naukowa — 13 laboratoriów, każde uruchamia
-        prawdziwą fizykę i matematykę na żywo. To nie są animacje: liczby
-        na ekranie to wynik realnych równań, liczonych w Twojej przeglądarce.
-      </p>
+      <h2>{t('onb.welcome.title')}</h2>
+      <p>{t('onb.welcome.body')}</p>
     </div>
   );
 }
 
 function StepInteractive() {
+  const { t } = useI18n();
   const [v, setV] = useState(30);
   return (
     <div className="onboarding-step">
-      <h2>Przesuwaj — wszystko reaguje na żywo</h2>
-      <p>Każdy parametr symulacji jest przeciągalny. Spróbuj teraz:</p>
+      <h2>{t('onb.interactive.title')}</h2>
+      <p>{t('onb.interactive.body')}</p>
       <div className="control onboarding-demo-control">
         <label>
-          <span>Przykładowy parametr</span>
+          <span>{t('onb.interactive.param')}</span>
           <span className="val">{v}%</span>
         </label>
         <input
@@ -95,7 +95,7 @@ function StepInteractive() {
           min={0}
           max={100}
           value={v}
-          aria-label="Przykładowy przeciągalny suwak"
+          aria-label={t('onb.interactive.sliderAria')}
           onChange={(e) => setV(Number(e.target.value))}
         />
       </div>
@@ -110,38 +110,30 @@ function StepInteractive() {
 }
 
 function StepNarrator() {
+  const { t } = useI18n();
   return (
     <div className="onboarding-step">
-      <h2>Narrator AI tłumaczy, co widzisz</h2>
-      <p>
-        Pod każdą symulacją Narrator opisuje realne wielkości fizyczne z
-        aktualnych parametrów — zawsze aktywny, bez czekania. Możesz też
-        zapytać go wprost o to, co się dzieje.
-      </p>
+      <h2>{t('onb.narrator.title')}</h2>
+      <p>{t('onb.narrator.body')}</p>
       <div className="nblock insight onboarding-narrator-demo">
-        <div className="ntitle">Przykład</div>
-        <div className="nbody">
-          „Zwiększyłeś energię pakietu ponad wysokość bariery — dokładnie
-          tak zachowuje się prawdziwe równanie Schrödingera."
-        </div>
+        <div className="ntitle">{t('onb.narrator.exampleLabel')}</div>
+        <div className="nbody">{t('onb.narrator.exampleBody')}</div>
       </div>
     </div>
   );
 }
 
 function StepStart({ onStart, onGoHome }: { onStart: () => void; onGoHome: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="onboarding-step">
-      <h2>Gotowy?</h2>
-      <p>
-        Najlepszy pierwszy krok: Discovery Timeline — jedna ciągła podróż
-        przez 13,8 miliarda lat historii Wszechświata, bez ekranów ładowania.
-      </p>
+      <h2>{t('onb.start.title')}</h2>
+      <p>{t('onb.start.body')}</p>
       <button className="chip-btn onboarding-start-btn" onClick={onStart} autoFocus>
-        🌌 Zacznij podróż
+        {t('onb.start.cta')}
       </button>
       <button className="onboarding-later" onClick={onGoHome}>
-        Może innym razem — pokaż laboratoria
+        {t('onb.start.later')}
       </button>
     </div>
   );

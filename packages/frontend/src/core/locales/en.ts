@@ -842,6 +842,8 @@ export const en: Record<string, string> = {
   'kg.prov.optional': 'opt.',
   'kg.panel.graph': 'Ontology graph (interactive — hover a node)',
   'kg.panel.relations': 'Relation types',
+  'kg.empty.title': 'The knowledge graph is empty',
+  'kg.empty.body': 'Run a discovery campaign to build a graph with provenance on every edge.',
   'ma.subtitle': '10 expert agents analyze real campaign data',
   'ma.callout.a': 'The dossier below is a ',
   'ma.callout.b': 'representative campaign input',

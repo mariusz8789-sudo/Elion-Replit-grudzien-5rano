@@ -6,6 +6,7 @@
  */
 import { useMemo, useState } from 'react';
 import { layoutGraph, type GNode, type GEdge } from './graphLayout';
+import { useI18n } from '../../core/i18n';
 
 export const NODE_COLORS: Record<string, string> = {
   Target: '#5cd6e8', Molecule: '#a78bfa', Compound: '#a78bfa', Ligand: '#8b7ff5',
@@ -17,13 +18,14 @@ const nodeColor = (t: string) => NODE_COLORS[t] ?? '#8d97b4';
 export function KnowledgeGraph({ nodes, edges, width = 640, height = 420 }: {
   nodes: GNode[]; edges: GEdge[]; width?: number; height?: number;
 }) {
+  const { t } = useI18n();
   const positioned = useMemo(() => layoutGraph(nodes, edges, { width, height }), [nodes, edges, width, height]);
   const posById = useMemo(() => new Map(positioned.map((p) => [p.id, p])), [positioned]);
   const [hover, setHover] = useState<string | null>(null);
   const usedTypes = useMemo(() => [...new Set(nodes.map((n) => n.type))], [nodes]);
 
   if (nodes.length === 0) {
-    return <div className="ds-empty"><h4>Graf wiedzy jest pusty</h4><p>Uruchom kampanię odkrywczą, aby zbudować graf z prowieniencją na każdej krawędzi.</p></div>;
+    return <div className="ds-empty"><h4>{t('kg.empty.title')}</h4><p>{t('kg.empty.body')}</p></div>;
   }
 
   return (

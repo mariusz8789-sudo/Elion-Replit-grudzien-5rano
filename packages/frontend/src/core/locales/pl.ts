@@ -846,6 +846,8 @@ export const pl: Record<string, string> = {
   'kg.prov.optional': 'opc.',
   'kg.panel.graph': 'Graf ontologii (interaktywny — najedź na węzeł)',
   'kg.panel.relations': 'Typy relacji',
+  'kg.empty.title': 'Graf wiedzy jest pusty',
+  'kg.empty.body': 'Uruchom kampanię odkrywczą, aby zbudować graf z prowieniencją na każdej krawędzi.',
   'ma.subtitle': '10 agentów-ekspertów analizuje realne dane kampanii',
   'ma.callout.a': 'Dossier poniżej to ',
   'ma.callout.b': 'reprezentatywne wejście kampanii',

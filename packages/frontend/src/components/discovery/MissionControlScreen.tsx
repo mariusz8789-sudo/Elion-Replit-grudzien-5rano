@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { DiscoveryShell, Panel, DISCOVERY_NAV, StatusPill } from './DiscoveryShell';
 import { StatCard } from '../charts/Charts';
 import { Icon } from '../Icon';
+import { useI18n } from '../../core/i18n';
 import {
   fetchComputeResources, fetchScienceCapabilities, fetchAgentRoles,
   type ComputeResources, type ScienceCapabilities,
@@ -26,6 +27,7 @@ const PIPELINE = [
 ];
 
 export function MissionControlScreen() {
+  const { t } = useI18n();
   const [res, setRes] = useState<ComputeResources | null>(null);
   const [caps, setCaps] = useState<ScienceCapabilities | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
@@ -47,21 +49,21 @@ export function MissionControlScreen() {
   const enginesUp = engines.filter(([, e]) => e.available).length;
 
   return (
-    <DiscoveryShell active="#/dashboard" title="Mission Control" subtitle="Realny status platformy odkrywczej — bez zmyślonych liczb"
+    <DiscoveryShell active="#/dashboard" title="Mission Control" subtitle={t('mc.subtitle')}
       actions={<StatusPill kind="info">DID GENESIS FIND A DRUG? <strong>NO</strong></StatusPill>}>
       {loading ? (
         <div className="ds-grid ds-grid-4">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 96 }} />)}</div>
       ) : (
         <>
           <div className="ds-grid ds-grid-4">
-            <StatCard label="Silniki dostępne" value={`${enginesUp}/${engines.length}`} sub="RDKit · ADMET-AI · Vina" accent="var(--green)" />
-            <StatCard label="Rdzenie CPU" value={res?.cpu.cores ?? '—'} sub={`RAM ${res ? res.cpu.totalMemGB.toFixed(0) : '—'} GB`} accent="var(--cyan)" />
-            <StatCard label="Agenci eksperccy" value={roles.length || '—'} sub="rule-based · reasoning blocked" accent="var(--violet)" />
-            <StatCard label="Panel off-target" value={caps?.offTarget.panel.length ?? '—'} sub="białka · MODEL_INFERRED" accent="var(--gold)" />
+            <StatCard label={t('mc.stat.engines')} value={`${enginesUp}/${engines.length}`} sub="RDKit · ADMET-AI · Vina" accent="var(--green)" />
+            <StatCard label={t('mc.stat.cpu')} value={res?.cpu.cores ?? '—'} sub={`RAM ${res ? res.cpu.totalMemGB.toFixed(0) : '—'} GB`} accent="var(--cyan)" />
+            <StatCard label={t('mc.stat.agents')} value={roles.length || '—'} sub="rule-based · reasoning blocked" accent="var(--violet)" />
+            <StatCard label={t('mc.stat.offtarget')} value={caps?.offTarget.panel.length ?? '—'} sub={t('mc.stat.offtarget.sub')} accent="var(--gold)" />
           </div>
 
           <div className="ds-grid ds-grid-2" style={{ marginTop: '1rem' }}>
-            <Panel title="Silniki naukowe (runtime)" icon="cpu">
+            <Panel title={t('mc.panel.engines')} icon="cpu">
               <ul className="ds-list">
                 {engines.map(([name, e]) => (
                   <li key={name} className="ds-list-row">
@@ -73,20 +75,20 @@ export function MissionControlScreen() {
                 ))}
               </ul>
             </Panel>
-            <Panel title="Zasoby obliczeniowe" icon="cpu">
+            <Panel title={t('mc.panel.resources')} icon="cpu">
               <div className="ds-resource-grid">
-                <ResourceStat label="GPU" ok={res?.gpu.available} detail={res?.gpu.available ? 'CUDA' : 'brak (CPU-only)'} />
+                <ResourceStat label="GPU" ok={res?.gpu.available} detail={res?.gpu.available ? 'CUDA' : t('mc.res.gpu.none')} />
                 <ResourceStat label="Docker" ok={res?.docker.available} />
                 <ResourceStat label="Kubernetes" ok={res?.kubernetes.available} />
                 <ResourceStat label="Slurm HPC" ok={res?.hpcScheduler.slurm} />
-                <ResourceStat label="Kolejka zadań" ok={res?.jobQueue.available} />
+                <ResourceStat label={t('mc.res.jobQueue')} ok={res?.jobQueue.available} />
                 <ResourceStat label="Distributed" ok={res?.distributedProcessing.available} />
               </div>
-              <p className="ds-note ds-mt">Rdzenie: {res?.cpu.cores ?? '—'} · RAM: {res ? res.cpu.totalMemGB.toFixed(1) : '—'} GB · manifest K8s: <code>deploy/genesis-k8s.yaml</code></p>
+              <p className="ds-note ds-mt">{t('mc.note.cores', { cores: res?.cpu.cores ?? '—', ram: res ? res.cpu.totalMemGB.toFixed(1) : '—' })}<code>deploy/genesis-k8s.yaml</code></p>
             </Panel>
           </div>
 
-          <Panel title="Pipeline odkrywczy" icon="spark" className="ds-mt">
+          <Panel title={t('mc.panel.pipeline')} icon="spark" className="ds-mt">
             <div className="ds-pipeline">
               {PIPELINE.map((s, i) => {
                 const eng = caps?.engines[Object.keys(caps.engines).find((k) => k.toLowerCase().includes(s.engine.split(' ')[0].toLowerCase())) ?? ''];
@@ -103,10 +105,10 @@ export function MissionControlScreen() {
             </div>
           </Panel>
 
-          <Panel title="Skróty konsoli" icon="rocket" className="ds-mt">
+          <Panel title={t('mc.panel.shortcuts')} icon="rocket" className="ds-mt">
             <div className="ds-grid ds-grid-4">
               {DISCOVERY_NAV.filter((n) => n.hash !== '#/dashboard').slice(0, 8).map((n) => (
-                <a key={n.hash} href={n.hash} className="ds-quicklink"><Icon name={n.icon} size={20} /><span>{n.label}</span></a>
+                <a key={n.hash} href={n.hash} className="ds-quicklink"><Icon name={n.icon} size={20} /><span>{n.labelKey ? t(n.labelKey) : n.label}</span></a>
               ))}
             </div>
           </Panel>
@@ -117,10 +119,11 @@ export function MissionControlScreen() {
 }
 
 function ResourceStat({ label, ok, detail }: { label: string; ok?: boolean; detail?: string }) {
+  const { t } = useI18n();
   return (
     <div className="ds-resource">
       <span className="ds-resource-label">{label}</span>
-      <span className={`ds-resource-val ${ok ? 'up' : 'down'}`}>{ok ? 'dostępny' : 'niedostępny'}</span>
+      <span className={`ds-resource-val ${ok ? 'up' : 'down'}`}>{ok ? t('mc.res.available') : t('mc.res.unavailable')}</span>
       {detail ? <span className="ds-resource-detail">{detail}</span> : null}
     </div>
   );

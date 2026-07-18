@@ -7,23 +7,26 @@
  */
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../Icon';
+import { useI18n } from '../../core/i18n';
 
-export interface NavItem { hash: string; label: string; icon: IconName }
+export interface NavItem { hash: string; label: string; icon: IconName; labelKey?: string }
 
-/** The discovery console's navigation model. Hashes map to App.tsx routes. */
+/** The discovery console's navigation model. Hashes map to App.tsx routes.
+ *  Most labels are product feature names (kept as-is across locales); the two
+ *  translatable labels carry a labelKey resolved through the i18n seam. */
 export const DISCOVERY_NAV: NavItem[] = [
   { hash: '#/dashboard', label: 'Mission Control', icon: 'rocket' },
   { hash: '#/ai-chat', label: 'AI Chat', icon: 'brain' },
   { hash: '#/drug', label: 'Drug Discovery', icon: 'flask' },
   { hash: '#/discovery-forge', label: 'Discovery Forge', icon: 'dna' },
-  { hash: '#/campaign', label: 'Kampanie', icon: 'spark' },
+  { hash: '#/campaign', label: 'Kampanie', labelKey: 'dsh.nav.campaign', icon: 'spark' },
   { hash: '#/lab-readiness', label: 'Laboratory Readiness', icon: 'target' },
   { hash: '#/multi-agent', label: 'Multi-Agent AI', icon: 'users' },
   { hash: '#/knowledge-graph', label: 'Knowledge Graph', icon: 'graph' },
   { hash: '#/compute', label: 'Compute Cluster', icon: 'cpu' },
   { hash: '#/scientific-memory', label: 'Scientific Memory', icon: 'memory' },
   { hash: '#/investor', label: 'Investor Dashboard', icon: 'briefcase' },
-  { hash: '#/billing', label: 'Rozliczenia', icon: 'lock' },
+  { hash: '#/billing', label: 'Rozliczenia', labelKey: 'dsh.nav.billing', icon: 'lock' },
   { hash: '#/truth-engine', label: 'Truth Engine', icon: 'shield' },
   { hash: '#/discovery-workspace', label: 'Workspace', icon: 'chart' },
 ];
@@ -31,10 +34,11 @@ export const DISCOVERY_NAV: NavItem[] = [
 export function DiscoveryShell({ active, title, subtitle, children, actions }: {
   active: string; title: string; subtitle?: string; children: ReactNode; actions?: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <div className="ds-shell">
-      <aside className="ds-sidebar" aria-label="Nawigacja konsoli odkryć">
-        <a className="ds-brand" href="#/" aria-label="Genesis OS — strona główna">
+      <aside className="ds-sidebar" aria-label={t('dsh.aria.nav')}>
+        <a className="ds-brand" href="#/" aria-label={t('dsh.aria.home')}>
           <span className="ds-brand-mark"><Icon name="atom" size={22} /></span>
           <span className="ds-brand-text">GENESIS OS<span className="ds-brand-badge">V5</span></span>
         </a>
@@ -42,11 +46,11 @@ export function DiscoveryShell({ active, title, subtitle, children, actions }: {
           {DISCOVERY_NAV.map((it) => (
             <a key={it.hash} href={it.hash} className={`ds-nav-item${active === it.hash ? ' active' : ''}`} aria-current={active === it.hash ? 'page' : undefined}>
               <Icon name={it.icon} size={18} />
-              <span>{it.label}</span>
+              <span>{it.labelKey ? t(it.labelKey) : it.label}</span>
             </a>
           ))}
         </nav>
-        <a className="ds-nav-item ds-nav-foot" href="#/settings"><Icon name="settings" size={18} /><span>Ustawienia</span></a>
+        <a className="ds-nav-item ds-nav-foot" href="#/settings"><Icon name="settings" size={18} /><span>{t('dsh.nav.settings')}</span></a>
       </aside>
       <div className="ds-main">
         <header className="ds-topbar">

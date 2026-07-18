@@ -4,9 +4,14 @@
  * invent biology, (4) always demand experimental validation. These are honesty
  * invariants, not cosmetics — so they are asserted, not just smoke-tested.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { buildDecisionReport, EVIDENCE_TAG_META, DECISION_CATEGORY_META } from '../core/scientificDecision';
 import type { MoleculeProps } from '../core/moleculeInterpretation';
+import { setLocale, t } from '../core/i18n';
+
+// The decision engine now emits its text through the i18n seam; these honesty
+// invariants are asserted against the Polish copy, so pin PL for this suite.
+beforeAll(() => setLocale('pl'));
 
 const ASPIRIN: MoleculeProps = { molWt: 180.159, logP: 1.31, tpsa: 63.6, hbd: 1, hba: 3, lipinskiViolations: 0, lipinskiPass: true };
 const HEAVY: MoleculeProps = { molWt: 620, logP: 6.2, tpsa: 160, hbd: 7, hba: 12, lipinskiViolations: 3, lipinskiPass: false };
@@ -94,10 +99,10 @@ describe('buildDecisionReport', () => {
 
   it('exposes complete category and tag metadata for the UI', () => {
     for (const c of ['VERIFIED', 'PROMISING', 'UNKNOWN', 'VALIDATION', 'NEXT'] as const) {
-      expect(DECISION_CATEGORY_META[c].label.length).toBeGreaterThan(0);
+      expect(t(DECISION_CATEGORY_META[c].labelKey).length).toBeGreaterThan(0);
     }
-    for (const t of ['VERIFIED', 'GROUNDED', 'GENERAL'] as const) {
-      expect(EVIDENCE_TAG_META[t].label.length).toBeGreaterThan(0);
+    for (const tag of ['VERIFIED', 'GROUNDED', 'GENERAL'] as const) {
+      expect(t(EVIDENCE_TAG_META[tag].labelKey).length).toBeGreaterThan(0);
     }
   });
 });

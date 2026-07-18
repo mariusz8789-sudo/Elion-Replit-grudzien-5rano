@@ -14,6 +14,7 @@ import type * as THREE from 'three';
 import { renderMolecule, type MoleculeRender, type MoleculeAtom, type MoleculeBond } from '../../core/backend/client';
 import { Icon } from '../Icon';
 import { StatusPill } from './DiscoveryShell';
+import { useI18n } from '../../core/i18n';
 
 /** CPK-ish element colours (hex) for the 3D model. */
 const CPK: Record<string, number> = {
@@ -23,6 +24,7 @@ const CPK: Record<string, number> = {
 const ATOM_R: Record<string, number> = { H: 0.28, C: 0.42, N: 0.4, O: 0.4, S: 0.5, P: 0.5, default: 0.44 };
 
 export function MoleculeViewer({ smiles, title }: { smiles: string; title?: string }) {
+  const { t } = useI18n();
   const [data, setData] = useState<MoleculeRender | null>(null);
   const [tab, setTab] = useState<'2d' | '3d' | 'props'>('2d');
   const [loading, setLoading] = useState(false);
@@ -46,13 +48,13 @@ export function MoleculeViewer({ smiles, title }: { smiles: string; title?: stri
         <div className="ds-tabs" style={{ margin: 0 }}>
           <button className={`ds-tab${tab === '2d' ? ' active' : ''}`} onClick={() => setTab('2d')}><Icon name="molecule" size={14} /> 2D</button>
           <button className={`ds-tab${tab === '3d' ? ' active' : ''}`} onClick={() => setTab('3d')}><Icon name="atom" size={14} /> 3D</button>
-          <button className={`ds-tab${tab === 'props' ? ' active' : ''}`} onClick={() => setTab('props')}><Icon name="chart" size={14} /> Właściwości</button>
+          <button className={`ds-tab${tab === 'props' ? ' active' : ''}`} onClick={() => setTab('props')}><Icon name="chart" size={14} /> {t('mv.tab.props')}</button>
         </div>
         {d2?.ok ? <StatusPill kind="info">RDKit · {d2.molecularFormula}</StatusPill> : null}
       </div>
 
       {loading ? <div className="skeleton" style={{ height: 300 }} /> : null}
-      {err ? <div className="ds-empty"><Icon name="alert" size={22} className="ds-empty-icon" /><h4>Backend niedostępny</h4><p>{err}</p></div> : null}
+      {err ? <div className="ds-empty"><Icon name="alert" size={22} className="ds-empty-icon" /><h4>{t('mv.backendDown')}</h4><p>{err}</p></div> : null}
 
       {data && !loading ? (
         <>
@@ -66,8 +68,9 @@ export function MoleculeViewer({ smiles, title }: { smiles: string; title?: stri
 }
 
 function Viewer2D({ depiction, title }: { depiction: MoleculeRender['depiction2d'] | undefined; title: string }) {
+  const { t } = useI18n();
   if (!depiction?.ok || !depiction.svg) {
-    return <div className="ds-empty"><Icon name="block" size={22} className="ds-empty-icon" /><h4>{depiction?.error ?? 'BLOCKED_BY_RUNTIME'}</h4><p>{depiction?.reason ?? 'RDKit nie jest dostępny — struktura nie jest rysowana (nigdy nie zmyślamy).'}</p></div>;
+    return <div className="ds-empty"><Icon name="block" size={22} className="ds-empty-icon" /><h4>{depiction?.error ?? 'BLOCKED_BY_RUNTIME'}</h4><p>{depiction?.reason ?? t('mv.2d.blockedReason')}</p></div>;
   }
   // Render the RDKit SVG as an isolated <img> data-URI: the depiction shows exactly
   // as authored (white card, black skeleton) with zero CSS/DOM bleed from the app.
@@ -79,35 +82,37 @@ function Viewer2D({ depiction, title }: { depiction: MoleculeRender['depiction2d
   };
   return (
     <div className="mv-stage">
-      <div className="mv-2d"><img src={dataUri} alt={`Struktura 2D: ${title}`} /></div>
+      <div className="mv-2d"><img src={dataUri} alt={t('mv.2d.alt', { title })} /></div>
       <div className="mv-toolbar">
-        <button className="ds-btn" onClick={exportSvg}><Icon name="chart" size={14} /> Eksportuj SVG</button>
+        <button className="ds-btn" onClick={exportSvg}><Icon name="chart" size={14} /> {t('mv.exportSvg')}</button>
       </div>
     </div>
   );
 }
 
 function ViewerProps({ data }: { data: MoleculeRender }) {
+  const { t } = useI18n();
   const d2 = data.depiction2d, m3 = data.model3d;
   const rows: [string, string][] = [
-    ['Wzór sumaryczny', d2?.molecularFormula ?? '—'],
-    ['SMILES (kanoniczny)', d2?.canonicalSmiles ?? data.smiles],
-    ['Atomy (z H)', m3?.ok ? String(m3.nAtoms) : '—'],
-    ['Wiązania', m3?.ok ? String(m3.bonds?.length ?? 0) : '—'],
-    ['Pole siłowe (3D)', m3?.ok ? String(m3.forceField) : '—'],
-    ['Ładunek formalny', m3?.ok ? String(m3.charge) : '—'],
+    [t('mv.props.formula'), d2?.molecularFormula ?? '—'],
+    [t('mv.props.smiles'), d2?.canonicalSmiles ?? data.smiles],
+    [t('mv.props.atoms'), m3?.ok ? String(m3.nAtoms) : '—'],
+    [t('mv.props.bonds'), m3?.ok ? String(m3.bonds?.length ?? 0) : '—'],
+    [t('mv.props.forceField'), m3?.ok ? String(m3.forceField) : '—'],
+    [t('mv.props.charge'), m3?.ok ? String(m3.charge) : '—'],
   ];
   return (
     <div className="mv-stage">
       <dl className="ds-defs" style={{ gridTemplateColumns: '1fr' }}>
         {rows.map(([k, v]) => <div key={k} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: '1rem' }}><dt>{k}</dt><dd className="ds-mono" style={{ textAlign: 'right', wordBreak: 'break-all' }}>{v}</dd></div>)}
       </dl>
-      <p className="ds-note ds-mt">Geometria 3D jest <strong>obliczona</strong> (ETKDG + MMFF/UFF), nie zmierzona eksperymentalnie.</p>
+      <p className="ds-note ds-mt">{t('mv.props.note.a')}<strong>{t('mv.props.note.b')}</strong>{t('mv.props.note.c')}</p>
     </div>
   );
 }
 
 function Viewer3D({ model }: { model: MoleculeRender['model3d'] }) {
+  const { t } = useI18n();
   const mountRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [selected, setSelected] = useState<{ element: string; x: number; y: number; z: number } | null>(null);
@@ -213,8 +218,8 @@ function Viewer3D({ model }: { model: MoleculeRender['model3d'] }) {
     return () => { disposed = true; cleanup(); };
   }, [model]);
 
-  if (!model) return <div className="ds-empty"><Icon name="block" size={22} className="ds-empty-icon" /><h4>3D pominięte</h4><p>Model 3D nie został zażądany.</p></div>;
-  if (!model.ok) return <div className="ds-empty"><Icon name="block" size={22} className="ds-empty-icon" /><h4>{model.error ?? 'BLOCKED_BY_RUNTIME'}</h4><p>{model.reason ?? 'RDKit/embed 3D niedostępny — nie rysujemy zmyślonej geometrii.'}</p></div>;
+  if (!model) return <div className="ds-empty"><Icon name="block" size={22} className="ds-empty-icon" /><h4>{t('mv.3d.skipped')}</h4><p>{t('mv.3d.skippedReason')}</p></div>;
+  if (!model.ok) return <div className="ds-empty"><Icon name="block" size={22} className="ds-empty-icon" /><h4>{model.error ?? 'BLOCKED_BY_RUNTIME'}</h4><p>{model.reason ?? t('mv.3d.blockedReason')}</p></div>;
 
   const exportPng = () => {
     const c = canvasRef.current; if (!c) return;
@@ -224,9 +229,9 @@ function Viewer3D({ model }: { model: MoleculeRender['model3d'] }) {
     <div className="mv-stage">
       <div className="mv-3d" ref={mountRef} />
       <div className="mv-toolbar">
-        <span className="ds-note">Przeciągnij, aby obrócić · scroll = zoom · kliknij atom</span>
+        <span className="ds-note">{t('mv.3d.hint')}</span>
         {selected ? <span className="mv-atom">Atom: <strong>{selected.element}</strong> ({selected.x.toFixed(2)}, {selected.y.toFixed(2)}, {selected.z.toFixed(2)} Å)</span> : null}
-        <button className="ds-btn" onClick={exportPng} style={{ marginLeft: 'auto' }}><Icon name="chart" size={14} /> Eksportuj PNG</button>
+        <button className="ds-btn" onClick={exportPng} style={{ marginLeft: 'auto' }}><Icon name="chart" size={14} /> {t('mv.exportPng')}</button>
       </div>
     </div>
   );

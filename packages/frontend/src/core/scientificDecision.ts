@@ -18,6 +18,7 @@
  */
 import type { MoleculeProps } from './moleculeInterpretation';
 import type { IconName } from '../components/Icon';
+import { t } from './i18n';
 
 /** How a statement is justified. Ordered weakest-claim-first in meaning. */
 export type EvidenceTag = 'VERIFIED' | 'GROUNDED' | 'GENERAL';
@@ -62,7 +63,6 @@ export interface DecisionReport {
 }
 
 const f = (n: number, d = 2) => (Number.isFinite(n) ? Number(n.toFixed(d)) : n);
-const REQUIRED = 'Wymagana walidacja eksperymentalna.';
 
 function st(category: DecisionCategory, tag: EvidenceTag, text: string, explain: Partial<Explanation>): DecisionStatement {
   return {
@@ -76,6 +76,7 @@ function st(category: DecisionCategory, tag: EvidenceTag, text: string, explain:
  * `alerts` is the list of RDKit structural-alert names (may be empty/absent).
  */
 export function buildDecisionReport(p: MoleculeProps, alerts: string[] = []): DecisionReport {
+  const REQUIRED = t('dec.required');
   const statements: DecisionStatement[] = [];
   const strengths: string[] = [];
   const risks: string[] = [];
@@ -84,100 +85,100 @@ export function buildDecisionReport(p: MoleculeProps, alerts: string[] = []): De
   const alertNames = alerts.map((a) => a.trim()).filter(Boolean);
 
   // ── VERIFIED: direct RDKit computations (never dressed up as biology) ──────────
-  statements.push(st('VERIFIED', 'VERIFIED', `Masa molowa ${f(p.molWt)} g/mol obliczona przez RDKit.`, {
-    descriptors: ['molWt'], origin: 'Obliczenie RDKit (Descriptors.MolWt)',
-    limitations: ['Wartość fizykochemiczna — nie mówi nic o aktywności biologicznej.'],
+  statements.push(st('VERIFIED', 'VERIFIED', t('dec.v.molWt', { molWt: f(p.molWt) }), {
+    descriptors: ['molWt'], origin: t('dec.v.molWt.origin'),
+    limitations: [t('dec.v.molWt.lim')],
   }));
-  statements.push(st('VERIFIED', 'VERIFIED', `LogP ${f(p.logP)} (model Wildman–Crippen, RDKit).`, {
-    descriptors: ['logP'], origin: 'Obliczenie RDKit (Crippen.MolLogP)',
-    assumptions: ['LogP to oszacowanie modelowe, nie wartość zmierzona.'],
-    limitations: ['Typowy błąd modelu ~±0.5 jednostki logP — traktuj jako oszacowanie, nie pomiar.'],
+  statements.push(st('VERIFIED', 'VERIFIED', t('dec.v.logP', { logP: f(p.logP) }), {
+    descriptors: ['logP'], origin: t('dec.v.logP.origin'),
+    assumptions: [t('dec.v.logP.assum')],
+    limitations: [t('dec.v.logP.lim')],
   }));
-  statements.push(st('VERIFIED', 'VERIFIED', `TPSA ${f(p.tpsa, 1)} Å² (Ertl 2000, RDKit).`, {
-    descriptors: ['tpsa'], origin: 'Obliczenie RDKit (Descriptors.TPSA)',
-    limitations: ['Deskryptor topologiczny — nie zastępuje pomiaru permeacji.'],
+  statements.push(st('VERIFIED', 'VERIFIED', t('dec.v.tpsa', { tpsa: f(p.tpsa, 1) }), {
+    descriptors: ['tpsa'], origin: t('dec.v.tpsa.origin'),
+    limitations: [t('dec.v.tpsa.lim')],
   }));
-  statements.push(st('VERIFIED', 'VERIFIED', `Donory/akceptory wiązań H: HBD ${p.hbd}, HBA ${p.hba} (zliczenie grafowe, RDKit).`, {
-    descriptors: ['hbd', 'hba'], origin: 'Obliczenie RDKit (Lipinski.NumHDonors / NumHAcceptors)',
+  statements.push(st('VERIFIED', 'VERIFIED', t('dec.v.hbond', { hbd: p.hbd, hba: p.hba }), {
+    descriptors: ['hbd', 'hba'], origin: t('dec.v.hbond.origin'),
   }));
   statements.push(st('VERIFIED', 'VERIFIED',
-    p.lipinskiPass ? `Reguła Lipinskiego: spełniona (${p.lipinskiViolations} naruszeń).` : `Reguła Lipinskiego: ${p.lipinskiViolations} naruszeń.`, {
+    p.lipinskiPass ? t('dec.v.lipinski.pass', { viol: p.lipinskiViolations }) : t('dec.v.lipinski.fail', { viol: p.lipinskiViolations }), {
     descriptors: ['molWt', 'logP', 'hbd', 'hba', 'lipinskiViolations'],
-    rule: 'Ro5: MW≤500, LogP≤5, HBD≤5, HBA≤10', origin: 'Reguła nad zweryfikowanymi deskryptorami RDKit',
-    limitations: ['Ro5 to heurystyka biodostępności doustnej, nie gwarancja wchłaniania.'],
+    rule: t('dec.v.lipinski.rule'), origin: t('dec.v.lipinski.origin'),
+    limitations: [t('dec.v.lipinski.lim')],
   }));
 
   // ── PROMISING: grounded interpretation of favorable verified values ────────────
   if (p.lipinskiPass) {
-    groundingRules.push('lipinskiPass → profil drug-like');
-    statements.push(st('PROMISING', 'GROUNDED', 'Profil fizykochemiczny zgodny z drug-like (Ro5) — sprzyja podaniu doustnemu.', {
-      descriptors: ['molWt', 'logP', 'hbd', 'hba'], rule: 'Ro5 spełniona → drug-like',
-      origin: 'Interpretacja deterministyczna na zweryfikowanych faktach RDKit',
-      assumptions: ['Ro5 przewiduje tendencję, nie potwierdza biodostępności.'],
-      limitations: ['Nie dowodzi wchłaniania, ekspozycji ani aktywności — to wymaga eksperymentu.'],
+    groundingRules.push(t('dec.gr.lipinski'));
+    statements.push(st('PROMISING', 'GROUNDED', t('dec.p.druglike'), {
+      descriptors: ['molWt', 'logP', 'hbd', 'hba'], rule: t('dec.p.druglike.rule'),
+      origin: t('dec.p.druglike.origin'),
+      assumptions: [t('dec.p.druglike.assum')],
+      limitations: [t('dec.p.druglike.lim')],
     }));
-    strengths.push('Zgodność z regułą Lipinskiego (Ro5) — korzystny punkt startowy dla podania doustnego.');
+    strengths.push(t('dec.p.druglike.strength'));
   } else {
-    risks.push(`Naruszenie Ro5 (${p.lipinskiViolations}) — podwyższone ryzyko słabej biodostępności doustnej.`);
+    risks.push(t('dec.p.ro5.risk', { viol: p.lipinskiViolations }));
   }
   if (p.logP >= 0 && p.logP <= 3) {
-    groundingRules.push('0 ≤ LogP ≤ 3 → zrównoważona lipofilowość');
-    statements.push(st('PROMISING', 'GROUNDED', `Zrównoważona lipofilowość (LogP ${f(p.logP)}) — korzystny zakres dla permeacji i rozpuszczalności.`, {
-      descriptors: ['logP'], rule: '0 ≤ LogP ≤ 3', origin: 'Interpretacja deterministyczna na LogP',
-      assumptions: ['LogP jest oszacowaniem modelowym.'], limitations: ['Rozpuszczalność i permeacja wymagają pomiaru.'],
+    groundingRules.push(t('dec.gr.logp'));
+    statements.push(st('PROMISING', 'GROUNDED', t('dec.p.logp', { logP: f(p.logP) }), {
+      descriptors: ['logP'], rule: t('dec.p.logp.rule'), origin: t('dec.p.logp.origin'),
+      assumptions: [t('dec.p.logp.assum')], limitations: [t('dec.p.logp.lim')],
     }));
-    strengths.push(`Zrównoważona lipofilowość (LogP ${f(p.logP)}).`);
+    strengths.push(t('dec.p.logp.strength', { logP: f(p.logP) }));
   }
   if (p.tpsa < 90) {
-    groundingRules.push('TPSA < 90 → sprzyja absorpcji doustnej');
-    strengths.push(`Niska TPSA (${f(p.tpsa, 1)} Å²) — sprzyja absorpcji doustnej.`);
+    groundingRules.push(t('dec.gr.tpsa'));
+    strengths.push(t('dec.p.tpsa.strength', { tpsa: f(p.tpsa, 1) }));
   }
 
   // ── UNKNOWN + risks: things descriptors CANNOT establish (never fabricate) ──────
-  if (p.logP > 5) risks.push(`Wysoka lipofilowość (LogP ${f(p.logP)} > 5) — ryzyko słabej rozpuszczalności.`);
-  if (p.tpsa > 140) risks.push(`Wysoka TPSA (${f(p.tpsa, 1)} Å² > 140) — przewidywana słaba permeacja bierna.`);
+  if (p.logP > 5) risks.push(t('dec.risk.logp', { logP: f(p.logP) }));
+  if (p.tpsa > 140) risks.push(t('dec.risk.tpsa', { tpsa: f(p.tpsa, 1) }));
   for (const name of alertNames) {
-    risks.push(`Alert strukturalny: ${name} — do oceny pod kątem liabilności (nie przesądza toksyczności).`);
-    statements.push(st('UNKNOWN', 'GENERAL', `Wykryto alert strukturalny „${name}" — wymaga oceny ekspertackiej.`, {
-      origin: 'Ogólna wiedza chemii medycznej (dopasowanie wzorca strukturalnego)',
-      assumptions: ['Alert wskazuje motyw do sprawdzenia, nie potwierdza szkodliwości.'],
-      limitations: ['Nie stanowi predykcji toksyczności ani aktywności — wymaga danych eksperymentalnych.'],
+    risks.push(t('dec.risk.alert', { name }));
+    statements.push(st('UNKNOWN', 'GENERAL', t('dec.alert.text', { name }), {
+      origin: t('dec.alert.origin'),
+      assumptions: [t('dec.alert.assum')],
+      limitations: [t('dec.alert.lim')],
     }));
   }
 
   // These are ALWAYS unknown from structure alone — we state that explicitly.
-  unknowns.push('Aktywność biologiczna i cel molekularny — nie wynikają z deskryptorów fizykochemicznych.');
-  unknowns.push('Toksyczność i profil bezpieczeństwa in vitro/in vivo — nieoznaczone.');
-  unknowns.push('Rozpuszczalność, przenikalność i parametry PK — wartości zmierzone nieznane.');
-  unknowns.push('Metabolizm i interakcje — nieoznaczone.');
-  statements.push(st('UNKNOWN', 'GENERAL', 'Genesis nie przewiduje aktywności biologicznej ani wyników eksperymentów — te pozostają nieznane do czasu badań.', {
-    origin: 'Zasada uczciwości Genesis', limitations: ['Deskryptory obliczeniowe nie zastępują danych eksperymentalnych.'],
+  unknowns.push(t('dec.unk.activity'));
+  unknowns.push(t('dec.unk.tox'));
+  unknowns.push(t('dec.unk.solub'));
+  unknowns.push(t('dec.unk.metab'));
+  statements.push(st('UNKNOWN', 'GENERAL', t('dec.unk.statement'), {
+    origin: t('dec.unk.statement.origin'), limitations: [t('dec.unk.statement.lim')],
   }));
 
   // ── VALIDATION: standard workflows only, never predicted outcomes ──────────────
   const validation: ValidationStep[] = [
-    { workflow: 'Oznaczenie rozpuszczalności kinetycznej i termodynamicznej', purpose: 'zmierzyć realną rozpuszczalność (uzupełnić LogP/TPSA obliczone)', note: REQUIRED },
-    { workflow: 'Test permeacji (PAMPA / Caco-2)', purpose: 'zmierzyć przenikalność błonową', note: REQUIRED },
-    { workflow: 'Panel ADMET in vitro (mikrosomy, CYP, hERG)', purpose: 'ocenić metabolizm i wczesne liabilności', note: REQUIRED },
-    { workflow: 'Docking molekularny wobec hipotetycznego celu', purpose: 'wygenerować hipotezę wiązania do dalszej weryfikacji', note: REQUIRED },
-    { workflow: 'Testy komórkowe (aktywność / cytotoksyczność)', purpose: 'zmierzyć efekt biologiczny', note: REQUIRED },
-    { workflow: 'Wstępne badania PK in vivo', purpose: 'zmierzyć ekspozycję i klirens', note: REQUIRED },
+    { workflow: t('dec.val.solub.wf'), purpose: t('dec.val.solub.p'), note: REQUIRED },
+    { workflow: t('dec.val.perm.wf'), purpose: t('dec.val.perm.p'), note: REQUIRED },
+    { workflow: t('dec.val.admet.wf'), purpose: t('dec.val.admet.p'), note: REQUIRED },
+    { workflow: t('dec.val.dock.wf'), purpose: t('dec.val.dock.p'), note: REQUIRED },
+    { workflow: t('dec.val.cell.wf'), purpose: t('dec.val.cell.p'), note: REQUIRED },
+    { workflow: t('dec.val.pk.wf'), purpose: t('dec.val.pk.p'), note: REQUIRED },
   ];
 
   // ── NEXT STEPS: what the scientist should do, honestly ─────────────────────────
   const next: string[] = [];
-  if (!p.lipinskiPass || p.logP > 5) next.push('Rozważ optymalizację struktury pod kątem lipofilowości/rozpuszczalności przed testami in vitro.');
-  if (alertNames.length) next.push('Zleć ekspercki przegląd alertów strukturalnych przed syntezą.');
-  next.push('Zmierz rozpuszczalność i permeację, aby zastąpić oszacowania obliczeniowe danymi.');
-  next.push('Sformułuj i przetestuj hipotezę celu molekularnego w standardowym workflow (docking → assay).');
-  for (const n of next) statements.push(st('NEXT', 'GENERAL', n, { origin: 'Sugerowany standardowy workflow badawczy', limitations: [REQUIRED] }));
+  if (!p.lipinskiPass || p.logP > 5) next.push(t('dec.next.optimize'));
+  if (alertNames.length) next.push(t('dec.next.alerts'));
+  next.push(t('dec.next.measure'));
+  next.push(t('dec.next.hypothesis'));
+  for (const n of next) statements.push(st('NEXT', 'GENERAL', n, { origin: t('dec.next.origin'), limitations: [REQUIRED] }));
 
   // ── Transparency: why Genesis reached this conclusion ──────────────────────────
   const removedClaims = [
-    'Nie twierdzimy, że cząsteczka jest aktywna biologicznie.',
-    'Nie przewidujemy wyniku żadnego eksperymentu.',
-    'Nie deklarujemy skuteczności ani bezpieczeństwa.',
-    'Nie prezentujemy interpretacji (⚠) jako zweryfikowanego faktu (✓).',
+    t('dec.rem.active'),
+    t('dec.rem.outcome'),
+    t('dec.rem.efficacy'),
+    t('dec.rem.interp'),
   ];
 
   return {
@@ -186,26 +187,26 @@ export function buildDecisionReport(p: MoleculeProps, alerts: string[] = []): De
       verifiedDescriptors: ['molWt', 'logP', 'tpsa', 'hbd', 'hba', 'lipinskiViolations'],
       groundingRules,
       removedClaims,
-      confidenceNote: 'Klasyfikacja: ✓ Zweryfikowane obliczenie (RDKit) · ⚠ Interpretacja ugruntowana (reguła na faktach) · ⓘ Ogólna wiedza naukowa. LogP oznaczono jako oszacowanie modelowe (~±0.5).',
+      confidenceNote: t('dec.confidenceNote'),
       limitations: [
-        'Raport opiera się wyłącznie na deskryptorach obliczeniowych RDKit — bez danych eksperymentalnych.',
-        'Deskryptory fizykochemiczne nie przewidują aktywności biologicznej ani bezpieczeństwa.',
-        'Każdy wniosek kierunkowy wymaga potwierdzenia eksperymentalnego.',
+        t('dec.lim.rdkit'),
+        t('dec.lim.nopredict'),
+        t('dec.lim.confirm'),
       ],
     },
   };
 }
 
-export const DECISION_CATEGORY_META: Record<DecisionCategory, { label: string; icon: IconName }> = {
-  VERIFIED: { label: 'Zweryfikowane', icon: 'check' },
-  PROMISING: { label: 'Obiecujące', icon: 'alert' },
-  UNKNOWN: { label: 'Nieznane', icon: 'search' },
-  VALIDATION: { label: 'Wymaga walidacji', icon: 'flask' },
-  NEXT: { label: 'Następne kroki', icon: 'book' },
+export const DECISION_CATEGORY_META: Record<DecisionCategory, { labelKey: string; icon: IconName }> = {
+  VERIFIED: { labelKey: 'dec.cat.verified', icon: 'check' },
+  PROMISING: { labelKey: 'dec.cat.promising', icon: 'alert' },
+  UNKNOWN: { labelKey: 'dec.cat.unknown', icon: 'search' },
+  VALIDATION: { labelKey: 'dec.cat.validation', icon: 'flask' },
+  NEXT: { labelKey: 'dec.cat.next', icon: 'book' },
 };
 
-export const EVIDENCE_TAG_META: Record<EvidenceTag, { kind: 'ok' | 'warn' | 'info'; label: string; icon: IconName }> = {
-  VERIFIED: { kind: 'ok', label: 'Zweryfikowane obliczenie', icon: 'check' },
-  GROUNDED: { kind: 'warn', label: 'Interpretacja ugruntowana', icon: 'alert' },
-  GENERAL: { kind: 'info', label: 'Ogólna wiedza naukowa', icon: 'spark' },
+export const EVIDENCE_TAG_META: Record<EvidenceTag, { kind: 'ok' | 'warn' | 'info'; labelKey: string; icon: IconName }> = {
+  VERIFIED: { kind: 'ok', labelKey: 'dec.tag.verified', icon: 'check' },
+  GROUNDED: { kind: 'warn', labelKey: 'dec.tag.grounded', icon: 'alert' },
+  GENERAL: { kind: 'info', labelKey: 'dec.tag.general', icon: 'spark' },
 };

@@ -20,17 +20,19 @@ import { askDiscovery } from '../../core/aiChat';
 import { interpretMolecule } from '../../core/moleculeInterpretation';
 import { analysisHash, newReportId, GROUNDING_VERSION } from '../../core/provenance';
 import { saveAnalysis, getAnalysis, type AnalysisStatus } from '../../core/assistantHistory';
+import { useI18n } from '../../core/i18n';
 
 const EXAMPLES = [
-  { name: 'Aspiryna', smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
-  { name: 'Ibuprofen', smiles: 'CC(C)Cc1ccc(C(C)C(=O)O)cc1' },
-  { name: 'Paracetamol', smiles: 'CC(=O)Nc1ccc(O)cc1' },
-  { name: 'Kofeina', smiles: 'Cn1cnc2c1c(=O)n(C)c(=O)n2C' },
+  { nameKey: 'asst.ex.aspirin', smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
+  { nameKey: 'asst.ex.ibuprofen', smiles: 'CC(C)Cc1ccc(C(C)C(=O)O)cc1' },
+  { nameKey: 'asst.ex.paracetamol', smiles: 'CC(=O)Nc1ccc(O)cc1' },
+  { nameKey: 'asst.ex.caffeine', smiles: 'Cn1cnc2c1c(=O)n(C)c(=O)n2C' },
 ];
 const REOPEN_KEY = 'genesis-assistant-reopen';
 
 export function ChemistryAssistantScreen() {
   const session = useSession();
+  const { t } = useI18n();
   const [smiles, setSmiles] = useState(EXAMPLES[0].smiles);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -51,7 +53,7 @@ export function ChemistryAssistantScreen() {
       setSmiles(saved.smiles); setName(saved.name);
       setReport({ name: saved.name, smiles: saved.smiles, inchiKey: saved.report.inchiKey, molecularFormula: saved.report.molecularFormula, props: saved.report.props, notes: saved.report.notes, alerts: saved.report.alerts ?? [] });
       setMeta(null); // reproducibility hash is per-run; a reopened report shows the decision layer without a fresh hash
-      setAi({ available: false, unavailableReason: 'zapisana analiza' });
+      setAi({ available: false, unavailableReason: t('asst.savedAnalysis') });
     }
   }, [session]);
 
@@ -59,10 +61,10 @@ export function ChemistryAssistantScreen() {
     return (
       <ProductChrome active="#/assistant">
         <div className="product-hero">
-          <h1>Wiarygodna analiza cząsteczki w &lt; minutę</h1>
-          <p className="product-lede">Wpisz SMILES. RDKit liczy realnie, Grounding Layer weryfikuje każde twierdzenie — AI nie może niczego zmyślić.</p>
+          <h1>{t('asst.hero.title')}</h1>
+          <p className="product-lede">{t('asst.hero.lede')}</p>
         </div>
-        <Panel title="Zaloguj się, aby zacząć" icon="lock"><AccountPanel /></Panel>
+        <Panel title={t('asst.signin')} icon="lock"><AccountPanel /></Panel>
       </ProductChrome>
     );
   }
@@ -76,7 +78,7 @@ export function ChemistryAssistantScreen() {
     const readiness = r.data;
     if (readiness.status !== 'COMPLETED' || !readiness.dossier) {
       const status: AnalysisStatus = readiness.status === 'BLOCKED_BY_RUNTIME' ? 'BLOCKED' : 'INVALID';
-      setStatusMsg({ status, text: readiness.status === 'BLOCKED_BY_RUNTIME' ? 'Silnik RDKit jest niedostępny (BLOCKED_BY_RUNTIME) — nie liczymy i nie zmyślamy.' : 'Nie udało się sparsować SMILES — sprawdź poprawność.' });
+      setStatusMsg({ status, text: readiness.status === 'BLOCKED_BY_RUNTIME' ? t('asst.blocked.runtime') : t('asst.invalid.parse') });
       saveAnalysis({ ownerId: session.user.id, name: name || q.slice(0, 24), smiles: q, status, report: null });
       setBusy(false);
       return;
@@ -92,8 +94,8 @@ export function ChemistryAssistantScreen() {
     setReport(data);
     // Reproducibility + provenance metadata (Stage 5): real RDKit version + deterministic hash.
     const caps = await fetchScienceCapabilities();
-    const rdkitVersion = caps.ok ? (caps.data.engines.rdkit?.version ?? 'nieznana') : 'nieznana';
-    const genesisVersion = caps.ok ? caps.data.version : 'nieznana';
+    const rdkitVersion = caps.ok ? (caps.data.engines.rdkit?.version ?? t('asst.unknown')) : t('asst.unknown');
+    const genesisVersion = caps.ok ? caps.data.version : t('asst.unknown');
     const generatedAt = Date.now();
     const hash = await analysisHash({
       canonicalSmiles: d.identity.smiles, inchiKey: d.identity.inchiKey,
@@ -102,7 +104,8 @@ export function ChemistryAssistantScreen() {
     });
     setMeta({ rdkitVersion, repro: { reportId: newReportId(), analysisHash: hash, genesisVersion, rdkitVersion, groundingVersion: GROUNDING_VERSION, generatedAt } });
     // AI interpretation via the existing /api/ask (grounded server-side). Honest if unavailable.
-    const aiReply = await askDiscovery(`Podaj krótką, praktyczną interpretację tej cząsteczki WYŁĄCZNIE na podstawie faktów: MW ${props.molWt}, LogP ${props.logP}, TPSA ${props.tpsa}, HBD ${props.hbd}, HBA ${props.hba}, Lipinski ${props.lipinskiPass ? 'pass' : props.lipinskiViolations + ' viol'}. SMILES ${d.identity.smiles}.`);
+    const lipinski = props.lipinskiPass ? 'pass' : props.lipinskiViolations + ' viol';
+    const aiReply = await askDiscovery(t('asst.aiPrompt', { molWt: props.molWt, logP: props.logP, tpsa: props.tpsa, hbd: props.hbd, hba: props.hba, lipinski, smiles: d.identity.smiles }));
     setAi(aiReply.ok ? { available: true, text: aiReply.answer } : { available: false, unavailableReason: aiReply.message });
     saveAnalysis({ ownerId: session.user.id, name: data.name, smiles: data.smiles, status: 'VERIFIED', report: { inchiKey: data.inchiKey, molecularFormula: data.molecularFormula, props, notes, alerts } });
     setBusy(false);
@@ -110,21 +113,21 @@ export function ChemistryAssistantScreen() {
 
   return (
     <ProductChrome active="#/assistant">
-      <Panel title="Analiza cząsteczki" icon="molecule" right={<StatusPill kind="info">RDKit + Grounding Layer</StatusPill>}>
+      <Panel title={t('asst.panel.title')} icon="molecule" right={<StatusPill kind="info">RDKit + Grounding Layer</StatusPill>}>
         <div className="ds-input-row">
-          <input value={smiles} onChange={(e) => setSmiles(e.target.value)} placeholder="SMILES, np. CC(=O)Oc1ccccc1C(=O)O"
+          <input value={smiles} onChange={(e) => setSmiles(e.target.value)} placeholder={t('asst.smilesPlaceholder')}
             spellCheck={false} style={{ fontFamily: 'var(--font-mono)' }} onKeyDown={(e) => { if (e.key === 'Enter') analyze(smiles); }} />
-          <button className="ds-btn ds-btn-primary" onClick={() => analyze(smiles)} disabled={busy}>{busy ? 'Liczę…' : 'Analizuj'}</button>
+          <button className="ds-btn ds-btn-primary" onClick={() => analyze(smiles)} disabled={busy}>{busy ? t('asst.busy') : t('asst.analyze')}</button>
         </div>
         <div className="ds-input-row ds-mt" style={{ maxWidth: 360 }}>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nazwa analizy (opcjonalnie)" maxLength={60} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('asst.namePlaceholder')} maxLength={60} />
         </div>
         <div className="ds-chips ds-mt">
-          {EXAMPLES.map((ex) => <button key={ex.name} className="ds-chip" onClick={() => { setSmiles(ex.smiles); setName(ex.name); analyze(ex.smiles); }}>{ex.name}</button>)}
+          {EXAMPLES.map((ex) => { const exName = t(ex.nameKey); return <button key={ex.nameKey} className="ds-chip" onClick={() => { setSmiles(ex.smiles); setName(exName); analyze(ex.smiles); }}>{exName}</button>; })}
         </div>
       </Panel>
 
-      {error ? <div className="ds-empty ds-mt"><Icon name="alert" size={22} className="ds-empty-icon" /><h4>Backend niedostępny</h4><p>{error}</p></div> : null}
+      {error ? <div className="ds-empty ds-mt"><Icon name="alert" size={22} className="ds-empty-icon" /><h4>{t('asst.backendDown')}</h4><p>{error}</p></div> : null}
       {busy && !report ? <div className="skeleton ds-mt" style={{ height: 220 }} /> : null}
       {statusMsg ? (
         <div className="ds-empty ds-mt"><Icon name={statusMsg.status === 'BLOCKED' ? 'block' : 'alert'} size={24} className="ds-empty-icon" /><h4>{statusMsg.status}</h4><p>{statusMsg.text}</p></div>

@@ -3,8 +3,12 @@
  * mapping. Every note is a consequence of a verified value; every displayed fact
  * carries a status (nothing statusless).
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { interpretMolecule, verificationRows, type MoleculeProps } from '../core/moleculeInterpretation';
+import { setLocale } from '../core/i18n';
+
+// Notes/rows now flow through the i18n seam; these assertions target the Polish copy.
+beforeAll(() => setLocale('pl'));
 
 const ASPIRIN: MoleculeProps = { molWt: 180.159, logP: 1.31, tpsa: 63.6, hbd: 1, hba: 3, lipinskiViolations: 0, lipinskiPass: true };
 
@@ -28,7 +32,10 @@ describe('interpretMolecule', () => {
 });
 
 describe('verificationRows', () => {
-  const rows = verificationRows({ inchiKey: 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N', molecularFormula: 'C9H8O4', props: ASPIRIN, notes: interpretMolecule(ASPIRIN) });
+  // Built inside beforeAll so it runs after the PL locale is pinned (collection-time
+  // evaluation would capture the default locale and mismatch the Polish assertions).
+  let rows: ReturnType<typeof verificationRows>;
+  beforeAll(() => { rows = verificationRows({ inchiKey: 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N', molecularFormula: 'C9H8O4', props: ASPIRIN, notes: interpretMolecule(ASPIRIN) }); });
   it('marks every RDKit fact as RDKIT and every interpretation note as GROUNDING', () => {
     const facts = rows.filter((r) => r.label !== 'Interpretacja (reguły)');
     expect(facts.every((r) => r.status === 'RDKIT')).toBe(true);

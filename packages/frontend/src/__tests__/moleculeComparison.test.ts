@@ -3,13 +3,18 @@
  * diffs, portfolio and matrix must be deterministic, explain themselves, and never
  * assert biology/efficacy. These are the honesty + correctness invariants.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   developabilityScore, decisionFor, rankCandidates, rankingWhy, differencesVsReference,
   portfolioBuckets, buildMatrix, descriptorFavorability, strengthsWeaknesses, VERDICT_META,
   type Candidate,
 } from '../core/moleculeComparison';
+import { setLocale } from '../core/i18n';
 import type { MoleculeProps } from '../core/moleculeInterpretation';
+
+// The engine now emits localized reason text; these assertions were written against the
+// Polish wording, so pin the locale. (i18n.test.ts covers EN/PL switching of the seam.)
+beforeAll(() => { setLocale('pl'); });
 
 const ASPIRIN: MoleculeProps = { molWt: 180.16, logP: 1.31, tpsa: 63.6, hbd: 1, hba: 3, lipinskiViolations: 0, lipinskiPass: true };
 const IBUPROFEN: MoleculeProps = { molWt: 206.28, logP: 3.5, tpsa: 37.3, hbd: 1, hba: 2, lipinskiViolations: 0, lipinskiPass: true };

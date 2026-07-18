@@ -15,6 +15,7 @@
 import type { MoleculeProps } from './moleculeInterpretation';
 import type { IconName } from '../components/Icon';
 import { GROUNDING_VERSION } from './provenance';
+import { t } from './i18n';
 
 /**
  * Version tag for this scoring algorithm — parallels GROUNDING_VERSION. Bump it whenever the
@@ -64,37 +65,37 @@ export function developabilityScore(p: MoleculeProps, alerts: string[] = []): Sc
   const parts: ScorePart[] = [];
 
   // Lipinski (25)
-  if (p.lipinskiPass) parts.push({ label: 'Reguła Lipinskiego', points: 25, max: 25, reason: `spełniona (${p.lipinskiViolations} naruszeń)` });
-  else parts.push({ label: 'Reguła Lipinskiego', points: clamp(25 - p.lipinskiViolations * 12, 0, 25), max: 25, reason: `${p.lipinskiViolations} naruszeń Ro5` });
+  if (p.lipinskiPass) parts.push({ label: t('score.lipinski.label'), points: 25, max: 25, reason: t('score.lipinski.pass', { v: p.lipinskiViolations }) });
+  else parts.push({ label: t('score.lipinski.label'), points: clamp(25 - p.lipinskiViolations * 12, 0, 25), max: 25, reason: t('score.lipinski.fail', { v: p.lipinskiViolations }) });
 
   // LogP (25) — favours 1–3
   const lp = p.logP;
-  let lpPts = 5, lpReason = `LogP ${f(lp)} poza korzystnym zakresem`;
-  if (lp >= 1 && lp <= 3) { lpPts = 25; lpReason = `LogP ${f(lp)} w idealnym zakresie 1–3`; }
-  else if ((lp >= 0 && lp < 1) || (lp > 3 && lp <= 5)) { lpPts = 15; lpReason = `LogP ${f(lp)} akceptowalny`; }
-  parts.push({ label: 'Lipofilowość (LogP)', points: lpPts, max: 25, reason: lpReason });
+  let lpPts = 5, lpReason = t('score.logp.out', { v: f(lp) });
+  if (lp >= 1 && lp <= 3) { lpPts = 25; lpReason = t('score.logp.ideal', { v: f(lp) }); }
+  else if ((lp >= 0 && lp < 1) || (lp > 3 && lp <= 5)) { lpPts = 15; lpReason = t('score.logp.ok', { v: f(lp) }); }
+  parts.push({ label: t('score.logp.label'), points: lpPts, max: 25, reason: lpReason });
 
   // TPSA (20) — favours 20–90 (oral), 90–140 acceptable
-  const t = p.tpsa;
-  let tPts = 5, tReason = `TPSA ${f(t, 1)} Å² poza zakresem absorpcji`;
-  if (t >= 20 && t <= 90) { tPts = 20; tReason = `TPSA ${f(t, 1)} Å² sprzyja absorpcji doustnej`; }
-  else if (t > 90 && t <= 140) { tPts = 12; tReason = `TPSA ${f(t, 1)} Å² akceptowalna dla absorpcji`; }
-  parts.push({ label: 'Polarna powierzchnia (TPSA)', points: tPts, max: 20, reason: tReason });
+  const tp = p.tpsa;
+  let tPts = 5, tReason = t('score.tpsa.out', { v: f(tp, 1) });
+  if (tp >= 20 && tp <= 90) { tPts = 20; tReason = t('score.tpsa.oral', { v: f(tp, 1) }); }
+  else if (tp > 90 && tp <= 140) { tPts = 12; tReason = t('score.tpsa.ok', { v: f(tp, 1) }); }
+  parts.push({ label: t('score.tpsa.label'), points: tPts, max: 20, reason: tReason });
 
   // H-bonds (15)
-  if (p.hbd <= 5 && p.hba <= 10) parts.push({ label: 'Wiązania wodorowe', points: 15, max: 15, reason: `HBD ${p.hbd} ≤ 5, HBA ${p.hba} ≤ 10` });
-  else parts.push({ label: 'Wiązania wodorowe', points: 5, max: 15, reason: `HBD ${p.hbd} / HBA ${p.hba} poza Ro5` });
+  if (p.hbd <= 5 && p.hba <= 10) parts.push({ label: t('score.hbond.label'), points: 15, max: 15, reason: t('score.hbond.ok', { hbd: p.hbd, hba: p.hba }) });
+  else parts.push({ label: t('score.hbond.label'), points: 5, max: 15, reason: t('score.hbond.out', { hbd: p.hbd, hba: p.hba }) });
 
   // MW (15) — favours 250–500
   const mw = p.molWt;
-  let mwPts = 5, mwReason = `MW ${f(mw)} g/mol poza korzystnym zakresem`;
-  if (mw >= 250 && mw <= 500) { mwPts = 15; mwReason = `MW ${f(mw)} g/mol w zakresie 250–500`; }
-  else if (mw < 250) { mwPts = 10; mwReason = `MW ${f(mw)} g/mol — niska (fragment-like)`; }
-  parts.push({ label: 'Masa molowa (MW)', points: mwPts, max: 15, reason: mwReason });
+  let mwPts = 5, mwReason = t('score.mw.out', { v: f(mw) });
+  if (mw >= 250 && mw <= 500) { mwPts = 15; mwReason = t('score.mw.ideal', { v: f(mw) }); }
+  else if (mw < 250) { mwPts = 10; mwReason = t('score.mw.low', { v: f(mw) }); }
+  parts.push({ label: t('score.mw.label'), points: mwPts, max: 15, reason: mwReason });
 
   // Structural alerts (penalty up to −24, tracked as a 0-point line with negative)
   const alertPenalty = clamp(-alerts.length * 8, -24, 0);
-  parts.push({ label: 'Alerty strukturalne', points: alertPenalty, max: 0, reason: alerts.length ? `${alerts.length} alert(y): ${alerts.join(', ')}` : 'brak alertów' });
+  parts.push({ label: t('score.alerts.label'), points: alertPenalty, max: 0, reason: alerts.length ? t('score.alerts.some', { n: alerts.length, list: alerts.join(', ') }) : t('score.alerts.none') });
 
   const raw = parts.reduce((s, x) => s + x.points, 0);
   return { score: clamp(Math.round(raw), 0, 100), parts };
@@ -121,29 +122,29 @@ export function decisionFor(p: MoleculeProps, alerts: string[] = []): Decision {
   const reasons: string[] = [];
   // REJECT — hard physicochemical liabilities
   if (p.lipinskiViolations >= 2 || p.logP > 6 || p.molWt > 700) {
-    if (p.lipinskiViolations >= 2) reasons.push(`${p.lipinskiViolations} naruszenia reguły Lipinskiego — poważne ryzyko biodostępności doustnej.`);
-    if (p.logP > 6) reasons.push(`LogP ${f(p.logP)} > 6 — przewidywana bardzo słaba rozpuszczalność.`);
-    if (p.molWt > 700) reasons.push(`MW ${f(p.molWt)} g/mol > 700 — poza typową przestrzenią leków doustnych.`);
-    reasons.push('Rekomendacja dotyczy wyłącznie profilu fizykochemicznego — nie przesądza o aktywności.');
+    if (p.lipinskiViolations >= 2) reasons.push(t('decision.reject.lipinski', { v: p.lipinskiViolations }));
+    if (p.logP > 6) reasons.push(t('decision.reject.logp', { v: f(p.logP) }));
+    if (p.molWt > 700) reasons.push(t('decision.reject.mw', { v: f(p.molWt) }));
+    reasons.push(t('decision.reject.note'));
     return { verdict: 'REJECT', reasons };
   }
   // HIGH UNCERTAINTY — alerts or LogP near the edge (model estimate)
   if (alerts.length > 0 || p.logP > 5 || p.logP < 0) {
-    if (alerts.length) reasons.push(`Alert(y) strukturalne (${alerts.join(', ')}) — wymagają oceny ekspertackiej przed syntezą.`);
-    if (p.logP > 5) reasons.push(`LogP ${f(p.logP)} tuż powyżej progu 5, a to oszacowanie modelu (~±0.5) — realna wartość niepewna.`);
-    if (p.logP < 0) reasons.push(`LogP ${f(p.logP)} < 0 — silnie hydrofilowy, możliwa słaba permeacja; wartość modelowa niepewna.`);
-    reasons.push('Wymagane pomiary rozstrzygające niepewność (rozpuszczalność, permeacja).');
+    if (alerts.length) reasons.push(t('decision.uncertain.alerts', { list: alerts.join(', ') }));
+    if (p.logP > 5) reasons.push(t('decision.uncertain.logpHigh', { v: f(p.logP) }));
+    if (p.logP < 0) reasons.push(t('decision.uncertain.logpLow', { v: f(p.logP) }));
+    reasons.push(t('decision.uncertain.note'));
     return { verdict: 'HIGH_UNCERTAINTY', reasons };
   }
   // CONTINUE — strong, clean physicochemical profile
   if (p.lipinskiPass && p.logP >= 0 && p.logP <= 5 && p.tpsa <= 140) {
-    reasons.push(`Zgodny z Ro5 (${p.lipinskiViolations} naruszeń), LogP ${f(p.logP)} i TPSA ${f(p.tpsa, 1)} Å² w korzystnych zakresach.`);
-    reasons.push('Priorytet do dalszych badań — konieczna walidacja eksperymentalna (ADMET, rozpuszczalność, assay).');
+    reasons.push(t('decision.continue.profile', { v: p.lipinskiViolations, logp: f(p.logP), tpsa: f(p.tpsa, 1) }));
+    reasons.push(t('decision.continue.note'));
     return { verdict: 'CONTINUE', reasons };
   }
   // NEEDS EXPERIMENTS — the honest default
-  reasons.push('Profil bez twardych przeciwwskazań, ale z parametrami wymagającymi pomiaru.');
-  reasons.push('Konieczna walidacja eksperymentalna przed decyzją.');
+  reasons.push(t('decision.needs.profile'));
+  reasons.push(t('decision.needs.note'));
   return { verdict: 'NEEDS_EXPERIMENTS', reasons };
 }
 
@@ -177,11 +178,11 @@ export interface DescriptorDiff {
 interface DescMeta { key: keyof MoleculeProps; label: string; unit: string; eps: number; interpret: (delta: number, dir: Direction) => string }
 
 const DESC: DescMeta[] = [
-  { key: 'molWt', label: 'Masa molowa', unit: 'g/mol', eps: 0.5, interpret: (d, dir) => dir === 'higher' ? `cięższa o ${f(Math.abs(d))} g/mol — bliżej górnego limitu Ro5` : dir === 'lower' ? `lżejsza o ${f(Math.abs(d))} g/mol — więcej miejsca na optymalizację` : 'porównywalna masa' },
-  { key: 'logP', label: 'LogP', unit: '', eps: 0.05, interpret: (d, dir) => dir === 'higher' ? `bardziej lipofilowa (+${f(Math.abs(d))}) — lepsza permeacja, większe ryzyko rozpuszczalności` : dir === 'lower' ? `bardziej hydrofilowa (−${f(Math.abs(d))}) — lepsza rozpuszczalność, możliwa słabsza permeacja` : 'porównywalna lipofilowość' },
-  { key: 'tpsa', label: 'TPSA', unit: 'Å²', eps: 0.5, interpret: (d, dir) => dir === 'higher' ? `wyższa TPSA (+${f(Math.abs(d), 1)}) — słabsza absorpcja bierna` : dir === 'lower' ? `niższa TPSA (−${f(Math.abs(d), 1)}) — sprzyja absorpcji doustnej` : 'porównywalna TPSA' },
-  { key: 'hbd', label: 'Donory H (HBD)', unit: '', eps: 0.5, interpret: (d, dir) => dir === 'equal' ? 'tyle samo donorów H' : `${dir === 'higher' ? 'więcej' : 'mniej'} donorów H (${d > 0 ? '+' : ''}${d})` },
-  { key: 'hba', label: 'Akceptory H (HBA)', unit: '', eps: 0.5, interpret: (d, dir) => dir === 'equal' ? 'tyle samo akceptorów H' : `${dir === 'higher' ? 'więcej' : 'mniej'} akceptorów H (${d > 0 ? '+' : ''}${d})` },
+  { key: 'molWt', label: 'Masa molowa', unit: 'g/mol', eps: 0.5, interpret: (d, dir) => dir === 'higher' ? t('desc.mw.higher', { v: f(Math.abs(d)) }) : dir === 'lower' ? t('desc.mw.lower', { v: f(Math.abs(d)) }) : t('desc.mw.equal') },
+  { key: 'logP', label: 'LogP', unit: '', eps: 0.05, interpret: (d, dir) => dir === 'higher' ? t('desc.logp.higher', { v: f(Math.abs(d)) }) : dir === 'lower' ? t('desc.logp.lower', { v: f(Math.abs(d)) }) : t('desc.logp.equal') },
+  { key: 'tpsa', label: 'TPSA', unit: 'Å²', eps: 0.5, interpret: (d, dir) => dir === 'higher' ? t('desc.tpsa.higher', { v: f(Math.abs(d), 1) }) : dir === 'lower' ? t('desc.tpsa.lower', { v: f(Math.abs(d), 1) }) : t('desc.tpsa.equal') },
+  { key: 'hbd', label: 'Donory H (HBD)', unit: '', eps: 0.5, interpret: (d, dir) => dir === 'equal' ? t('desc.hbd.equal') : t('desc.hbd.diff', { cmp: dir === 'higher' ? t('desc.more') : t('desc.less'), v: `${d > 0 ? '+' : ''}${d}` }) },
+  { key: 'hba', label: 'Akceptory H (HBA)', unit: '', eps: 0.5, interpret: (d, dir) => dir === 'equal' ? t('desc.hba.equal') : t('desc.hba.diff', { cmp: dir === 'higher' ? t('desc.more') : t('desc.less'), v: `${d > 0 ? '+' : ''}${d}` }) },
 ];
 
 /** Interpreted differences of a candidate vs a reference molecule. */
@@ -290,7 +291,7 @@ export function decisionTrace(c: RankedCandidate): DecisionTrace {
     negatives: why.filter((w) => w.startsWith('−')),
     rejectedRules: c.scored.parts.filter((p) => p.points < 0 || (p.max > 0 && p.points <= p.max * 0.4)).map((p) => ({ label: p.label, reason: p.reason })),
     verdictReasons: c.decision.reasons,
-    groundingStatus: `Wartości zweryfikowane przez RDKit; interpretacja ugruntowana regułami (${GROUNDING_VERSION}). Bez predykcji biologicznych.`,
+    groundingStatus: t('score.grounding', { version: GROUNDING_VERSION }),
   };
 }
 

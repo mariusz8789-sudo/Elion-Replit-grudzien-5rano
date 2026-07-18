@@ -11,7 +11,6 @@
  * caller breaks; this only extends it.
  */
 import { useSyncExternalStore } from 'react';
-import { readJSON, writeJSON } from './storage';
 import { en } from './locales/en';
 import { pl } from './locales/pl';
 
@@ -25,14 +24,27 @@ export const LOCALES: { code: Locale; label: string }[] = [
 
 type Dictionary = Record<string, string>;
 const DICTIONARIES: Record<Locale, Dictionary> = { en, pl };
-const STORAGE_KEY = 'locale/v1';
+// Same prefixed key shape as storage.ts, but accessed directly here: i18n initializes at
+// module load, and must NOT trip storage.ts's cached availability probe (which would poison
+// the localStorage-backed stores when window is stubbed later, e.g. in tests).
+const STORAGE_KEY = 'genesis-os:locale/v1';
 
 function isLocale(v: unknown): v is Locale {
   return v === 'pl' || v === 'en';
 }
 
+function readSaved(): Locale | null {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Locale) : null;
+  } catch { return null; }
+}
+function writeSaved(locale: Locale): void {
+  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(locale)); } catch { /* unavailable — in-memory only */ }
+}
+
 function detectInitial(): Locale {
-  const saved = readJSON<unknown>(STORAGE_KEY, null);
+  const saved = readSaved();
   if (isLocale(saved)) return saved;
   const nav = typeof navigator !== 'undefined' ? (navigator.language || '') : '';
   return nav.toLowerCase().startsWith('pl') ? 'pl' : 'en';
@@ -52,7 +64,7 @@ export function getLocale(): Locale {
 export function setLocale(locale: Locale): void {
   if (!isLocale(locale) || locale === currentLocale) return;
   currentLocale = locale;
-  writeJSON(STORAGE_KEY, locale);
+  writeSaved(locale);
   listeners.forEach((fn) => fn(currentLocale));
 }
 

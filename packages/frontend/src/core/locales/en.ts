@@ -810,4 +810,7 @@ export const en: Record<string, string> = {
   'set.sc.reset': 'Reset simulation',
   'set.sc.question': 'Show this shortcut list',
   'set.sc.esc': 'Close the search / help window',
+  'err.title': 'Something went wrong',
+  'err.body': 'This simulation hit an unexpected error. Your other labs are fine — go back to the list and try again.',
+  'err.back': '← Back to the labs',
 };

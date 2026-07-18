@@ -814,4 +814,7 @@ export const pl: Record<string, string> = {
   'set.sc.reset': 'Reset symulacji',
   'set.sc.question': 'Pokaż tę listę skrótów',
   'set.sc.esc': 'Zamknij okno wyszukiwania / pomocy',
+  'err.title': 'Coś poszło nie tak',
+  'err.body': 'Ta symulacja napotkała nieoczekiwany błąd. Twoje pozostałe laboratoria działają — wróć do listy i spróbuj ponownie.',
+  'err.back': '← Wróć do laboratoriów',
 };

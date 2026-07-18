@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../core/i18n';
 
 /**
  * Granica błędów aplikacji: wyjątek w jednym laboratorium nie może wywalić
@@ -32,14 +33,11 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Stat
         <div className="error-icon" aria-hidden="true">
           ⚠️
         </div>
-        <h1>Coś poszło nie tak</h1>
-        <p>
-          Ta symulacja napotkała nieoczekiwany błąd. Twoje pozostałe laboratoria działają — wróć do listy
-          i spróbuj ponownie.
-        </p>
+        <h1>{t('err.title')}</h1>
+        <p>{t('err.body')}</p>
         <p className="error-detail">{this.state.error.message}</p>
         <button className="chip-btn" onClick={this.reset}>
-          ← Wróć do laboratoriów
+          {t('err.back')}
         </button>
       </div>
     );

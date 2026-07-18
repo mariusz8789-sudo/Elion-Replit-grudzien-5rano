@@ -938,6 +938,7 @@ export const pl: Record<string, string> = {
   'lr.panel.invitro': 'Proponowane badania in-vitro',
   'lr.panel.invivo': 'Proponowane badania in-vivo',
   'lr.panel.clinical': 'Zarys planu klinicznego',
+  'lr.signin': 'Zaloguj się, aby uruchamiać analizy gotowości laboratoryjnej na realnych silnikach (RDKit).',
   'ai.subtitle': 'Asystent naukowy ugruntowany na bazie wiedzy Genesis — nigdy nie zmyśla',
   'ai.unavailable': 'Asystent AI niedostępny',
   'ai.new': 'Nowa rozmowa',

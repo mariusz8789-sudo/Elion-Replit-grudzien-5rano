@@ -934,6 +934,7 @@ export const en: Record<string, string> = {
   'lr.panel.invitro': 'Proposed in-vitro studies',
   'lr.panel.invivo': 'Proposed in-vivo studies',
   'lr.panel.clinical': 'Clinical plan outline',
+  'lr.signin': 'Sign in to run lab-readiness analyses on real engines (RDKit).',
   'ai.subtitle': 'A science assistant grounded in the Genesis knowledge base — never fabricates',
   'ai.unavailable': 'AI assistant unavailable',
   'ai.new': 'New conversation',

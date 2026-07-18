@@ -11,6 +11,8 @@ import { Icon } from '../Icon';
 import { MoleculeViewer } from './MoleculeViewer';
 import { buildLabReadiness, type LabReadiness } from '../../core/backend/client';
 import { useI18n } from '../../core/i18n';
+import { useSession } from '../../core/backend/session';
+import { AccountPanel } from '../AccountPanel';
 
 const EXAMPLES: { nameKey: string; smiles: string }[] = [
   { nameKey: 'asst.ex.aspirin', smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
@@ -21,6 +23,7 @@ const EXAMPLES: { nameKey: string; smiles: string }[] = [
 
 export function LaboratoryReadinessScreen() {
   const { t } = useI18n();
+  const session = useSession();
   const [smiles, setSmiles] = useState(EXAMPLES[0].smiles);
   const [data, setData] = useState<LabReadiness | null>(null);
   const [loading, setLoading] = useState(false);
@@ -33,8 +36,20 @@ export function LaboratoryReadinessScreen() {
       if (r.ok) setData(r.data); else setErr(r.message);
     });
   };
-  // Run once on mount with the default example; `run` is stable enough for this screen.
-  useEffect(() => { run(EXAMPLES[0].smiles); }, []);
+  // The compute endpoint requires auth — only auto-run once a session exists, so a
+  // logged-out visitor sees a localized sign-in gate, not a raw backend 401.
+  useEffect(() => { if (session) run(EXAMPLES[0].smiles); }, [session]);
+
+  if (!session) {
+    return (
+      <DiscoveryShell active="#/lab-readiness" title="Laboratory Readiness" subtitle={t('lr.subtitle')}>
+        <Panel title={t('common.signIn')} icon="lock">
+          <p className="ds-note" style={{ marginTop: 0 }}>{t('lr.signin')}</p>
+          <AccountPanel />
+        </Panel>
+      </DiscoveryShell>
+    );
+  }
 
   const d = data?.dossier;
   const props = d?.properties ?? {};

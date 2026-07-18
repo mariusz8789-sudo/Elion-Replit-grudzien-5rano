@@ -1,92 +1,197 @@
 /**
- * DashboardScreen (Genesis premium UI) — the commercial product landing / pulpit.
- * A calm, modern SaaS entry: hero, real usage stats (from the user's own local data —
- * no fabricated numbers), and professional cards linking to every Genesis module, with
- * the educational platform kept as a clearly separate module. No new logic, no new
- * endpoints — pure navigation + presentation over existing screens.
+ * DashboardScreen — the Scientific Command Center (Genesis V3, P0 · Milestone 2).
+ *
+ * The first screen a scientist sees each morning. It answers, in one glance: what to
+ * continue (Zone 1), what needs attention (Zone 2), and what's happening across all
+ * research (Zone 5) — the three zones P0 lights up. It is a SURFACE over systems that
+ * already exist: the new /api/portfolio rollup for the cross-project facts, and the
+ * existing scoring engine (core/moleculeComparison.ts) for the leading candidate. No new
+ * system, no fabricated data. English-first per the V3 language mandate.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProductChrome } from './ProductChrome';
-import { Icon, type IconName } from '../Icon';
 import { AccountPanel } from '../AccountPanel';
-import { useSession } from '../../core/backend/session';
-import { listAnalyses } from '../../core/assistantHistory';
-import { listCampaigns } from '../../core/campaigns';
+import { useSession, getToken } from '../../core/backend/session';
+import { listCampaigns, type Campaign } from '../../core/campaigns';
+import { fetchPortfolio, type PortfolioEntry } from '../../core/backend/client';
+import { buildCommandCenter, reproState, reproLabel, relativeTime } from '../../core/dashboard';
 
-interface ModuleCard { hash: string; icon: IconName; title: string; desc: string; accent: string; cta: string }
+function greeting(hour: number): string {
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
-const MODULES: ModuleCard[] = [
-  { hash: '#/assistant', icon: 'flask', title: 'Asystent', desc: 'Wpisz SMILES — realne deskryptory RDKit, weryfikacja i raport w mniej niż minutę.', accent: 'var(--cyan)', cta: 'Analizuj cząsteczkę' },
-  { hash: '#/compare', icon: 'graph', title: 'Porównaj', desc: 'Zestaw 2–50 kandydatów: ranking rozwojowy z uzasadnieniem, macierz-heatmapa, portfolio.', accent: 'var(--violet)', cta: 'Porównaj kandydatów' },
-  { hash: '#/campaigns', icon: 'briefcase', title: 'Kampanie', desc: 'Projekty badawcze 2–2000 cząsteczek. Trwałe na serwerze, z eksportem CSV/JSON/PDF.', accent: 'var(--gold)', cta: 'Otwórz kampanie' },
-  { hash: '#/analyses', icon: 'book', title: 'Moje analizy', desc: 'Historia zapisanych analiz — otwórz ponownie każdy raport jednym kliknięciem.', accent: 'var(--green)', cta: 'Przeglądaj historię' },
-  { hash: '#/billing', icon: 'lock', title: 'Rozliczenia', desc: 'Plan, zużycie i limit API, kopiowanie i regeneracja klucza, upgrade przez Stripe.', accent: 'var(--cyan)', cta: 'Zarządzaj planem' },
-];
+function ReproBadge({ analysed, total }: { analysed: number; total: number }) {
+  const state = reproState(analysed, total);
+  return <span className={`cc-badge cc-badge-${state}`}>{reproLabel(analysed, total)}</span>;
+}
+
+const go = (hash: string) => { window.location.hash = hash; };
 
 export function DashboardScreen() {
   const session = useSession();
-  const [stats, setStats] = useState({ analyses: 0, verified: 0, campaigns: 0 });
+  const [portfolio, setPortfolio] = useState<PortfolioEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(() => {
+    const token = getToken();
+    if (!token) return () => {};
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchPortfolio(token).then((r) => {
+      if (cancelled) return;
+      if (r.ok) setPortfolio(r.data);
+      else setError(r.message);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
-    if (!session) { setStats({ analyses: 0, verified: 0, campaigns: 0 }); return; }
-    const a = listAnalyses(session.user.id);
-    const c = listCampaigns(session.user.id);
-    setStats({ analyses: a.length, verified: a.filter((x) => x.status === 'VERIFIED').length, campaigns: c.length });
-  }, [session]);
+    if (!session) { setPortfolio(null); setError(null); return; }
+    return load();
+  }, [session, load]);
+
+  // Local-first: locally-held campaigns supply molecule data so the scoring engine can
+  // compute a leading candidate. Re-read whenever the portfolio refreshes.
+  const localById = useMemo(() => {
+    const m = new Map<string, Campaign>();
+    if (session) for (const c of listCampaigns(session.user.id)) m.set(c.id, c);
+    return m;
+  }, [session, portfolio]);
+
+  const model = useMemo(
+    () => (portfolio ? buildCommandCenter(portfolio, localById) : null),
+    [portfolio, localById],
+  );
+
+  const now = Date.now();
+  const hour = new Date().getHours();
+  const name = session ? (session.user.displayName || session.user.email.split('@')[0]) : '';
+
+  if (!session) {
+    return (
+      <ProductChrome active="#/genesis">
+        <div className="cc-signin">
+          <div className="cc-signin-copy">
+            <h1 className="cc-title">Your Scientific Command Center</h1>
+            <p className="cc-sub">Sign in to see what changed, what needs your attention, and what to continue — across every project.</p>
+          </div>
+          <div className="cc-signin-panel"><AccountPanel /></div>
+        </div>
+      </ProductChrome>
+    );
+  }
 
   return (
     <ProductChrome active="#/genesis">
-      <section className="gx-hero">
-        <div className="gx-hero-badge"><span className="gx-dot" /> Grounded Chemistry · RDKit 2026.03.3</div>
-        <h1>Wiarygodna analiza cząsteczek,<br /><span className="gx-hero-accent">której AI nie zmyśli</span></h1>
-        <p className="gx-hero-lede">
-          Realne obliczenia RDKit, provenance przy każdej wartości i jawne rozróżnienie
-          zweryfikowanego faktu od interpretacji. Od pojedynczej cząsteczki po kampanię 2000 kandydatów.
-        </p>
-        <div className="gx-hero-actions">
-          <a className="gx-btn gx-btn-primary" href="#/assistant"><Icon name="flask" size={16} /> Rozpocznij analizę</a>
-          <a className="gx-btn gx-btn-ghost" href="#/campaigns"><Icon name="briefcase" size={16} /> Kampanie badawcze</a>
+      <div className="cc-header">
+        <div>
+          <h1 className="cc-title">{greeting(hour)}, {name}</h1>
+          <p className="cc-sub">
+            {model
+              ? `${model.rows.length} ${model.rows.length === 1 ? 'project' : 'projects'} · ${model.needsAttention.length} need${model.needsAttention.length === 1 ? 's' : ''} attention`
+              : 'Loading your research…'}
+          </p>
         </div>
-      </section>
-
-      {session ? (
-        <div className="gx-stats">
-          <div className="gx-stat"><span className="gx-stat-val">{stats.analyses}</span><span className="gx-stat-label">Analiz łącznie</span></div>
-          <div className="gx-stat"><span className="gx-stat-val gx-ok">{stats.verified}</span><span className="gx-stat-label">Zweryfikowanych RDKit</span></div>
-          <div className="gx-stat"><span className="gx-stat-val">{stats.campaigns}</span><span className="gx-stat-label">Kampanii</span></div>
-          <div className="gx-stat"><span className="gx-stat-val gx-mono">{session.user.email.split('@')[0]}</span><span className="gx-stat-label">Zalogowano</span></div>
-        </div>
-      ) : (
-        <div className="gx-login">
-          <div className="gx-login-copy">
-            <h3>Zaloguj się, aby zacząć</h3>
-            <p>Twoje analizy i kampanie są zapisywane na Twoim koncie — przetrwają wylogowanie i zmianę urządzenia.</p>
-          </div>
-          <div className="gx-login-panel"><AccountPanel /></div>
-        </div>
-      )}
-
-      <div className="gx-section-label">Moduły produktu</div>
-      <div className="gx-grid">
-        {MODULES.map((m) => (
-          <a key={m.hash} className="gx-card" href={m.hash} style={{ ['--card-accent' as string]: m.accent }}>
-            <span className="gx-card-icon"><Icon name={m.icon} size={20} /></span>
-            <span className="gx-card-title">{m.title}</span>
-            <span className="gx-card-desc">{m.desc}</span>
-            <span className="gx-card-cta">{m.cta} <span className="gx-card-arrow">→</span></span>
-          </a>
-        ))}
+        <button className="cc-btn cc-btn-primary" onClick={() => go('#/campaigns')}>+ New project</button>
       </div>
 
-      <div className="gx-section-label">Osobny moduł</div>
-      <a className="gx-edu" href="#/labs">
-        <span className="gx-edu-icon"><Icon name="atom" size={22} /></span>
-        <span className="gx-edu-text">
-          <span className="gx-edu-title">Platforma edukacyjna Genesis OS</span>
-          <span className="gx-edu-sub">13 laboratoriów fizyki i nauki, Discovery Timeline, symulacje — oddzielny moduł, dostępny obok produktu chemicznego.</span>
-        </span>
-        <span className="gx-edu-arrow">→</span>
-      </a>
+      {error ? (
+        <div className="cc-error" role="alert">
+          <span>Couldn&rsquo;t load your portfolio. {error}</span>
+          <button className="cc-btn cc-btn-ghost" onClick={load}>Try again</button>
+        </div>
+      ) : null}
+
+      {!model && loading ? (
+        <div className="cc-skeleton" aria-busy="true" aria-label="Loading">
+          <div className="cc-sk-row" /><div className="cc-sk-row" /><div className="cc-sk-row" />
+        </div>
+      ) : null}
+
+      {model && model.rows.length === 0 ? (
+        <div className="cc-firstrun">
+          <h2>Start your first project</h2>
+          <p>A project is where you evaluate molecules together — rank candidates from real RDKit descriptors, with every decision and its full history kept.</p>
+          <button className="cc-btn cc-btn-primary" onClick={() => go('#/campaigns')}>Create a project</button>
+        </div>
+      ) : null}
+
+      {model && model.rows.length > 0 ? (
+        <>
+          {model.continueRow ? (
+            <div className="cc-continue">
+              <div className="cc-continue-text">
+                <span className="cc-eyebrow">Continue</span>
+                <span className="cc-continue-name">{model.continueRow.entry.name || 'Untitled project'}</span>
+                <span className="cc-continue-meta">Last activity {relativeTime(model.continueRow.entry.lastActivityAt, now)}</span>
+              </div>
+              <button className="cc-btn cc-btn-primary" onClick={() => go(`#/campaigns/${model.continueRow!.entry.id}`)}>Resume →</button>
+            </div>
+          ) : null}
+
+          <div className="cc-section-label">
+            <span className="cc-dot cc-dot-attn" aria-hidden="true" /> Needs attention
+            {model.needsAttention.length > 0 ? <span className="cc-count">{model.needsAttention.length}</span> : null}
+          </div>
+          {model.needsAttention.length === 0 ? (
+            <div className="cc-empty-note">Nothing needs attention — every project is fully analysed and has no open comments.</div>
+          ) : (
+            <div className="cc-attention-list">
+              {model.needsAttention.map((r) => (
+                <div key={r.entry.id} className="cc-attn">
+                  <div className="cc-attn-body">
+                    <div className="cc-attn-head">
+                      <span className="cc-attn-name">{r.entry.name || 'Untitled project'}</span>
+                      {r.leading ? (
+                        <span className="cc-attn-lead">Leading: {r.leading.name} · <span className="cc-mono">{r.leading.scored.score}/100</span></span>
+                      ) : null}
+                    </div>
+                    <div className="cc-attn-reasons">{r.attention.reasons.join(' · ')}</div>
+                  </div>
+                  <button className="cc-btn cc-btn-ghost" onClick={() => go(`#/campaigns/${r.entry.id}`)}>Open</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="cc-section-label">All projects</div>
+          <div className="cc-table-wrap">
+            <table className="cc-table">
+              <thead>
+                <tr>
+                  <th>Project</th><th>Status</th><th>Analysed</th><th>Open comments</th><th>Last activity</th><th>Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                {model.rows.map((r) => {
+                  const open = () => go(`#/campaigns/${r.entry.id}`);
+                  return (
+                    <tr
+                      key={r.entry.id}
+                      className="cc-row"
+                      tabIndex={0}
+                      onClick={open}
+                      onKeyDown={(e) => { if (e.key === 'Enter') open(); }}
+                    >
+                      <td className="cc-cell-name">{r.entry.name || 'Untitled project'}</td>
+                      <td className="cc-cell-status">{r.entry.status}</td>
+                      <td><ReproBadge analysed={r.entry.analysed} total={r.entry.total} /></td>
+                      <td>{r.entry.unresolvedComments > 0 ? r.entry.unresolvedComments : '—'}</td>
+                      <td className="cc-cell-time">{relativeTime(r.entry.lastActivityAt, now)}</td>
+                      <td className="cc-cell-role">{r.entry.role}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : null}
     </ProductChrome>
   );
 }

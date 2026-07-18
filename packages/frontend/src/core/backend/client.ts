@@ -159,6 +159,35 @@ export async function startCheckout(token: string, tier: 'starter' | 'pro'): Pro
 export interface RemoteCampaignMeta { id: string; name: string; status: string; molecules: number; createdAt: number; updatedAt: number }
 export interface RemoteCampaign { id: string; data: unknown; createdAt: number; updatedAt: number }
 
+/**
+ * One row of the dashboard Portfolio rollup (Genesis V3, P0). Every field is a cheap
+ * aggregate the backend already had — molecule-status counts, unresolved comments,
+ * snapshots, last activity — for every campaign the user can reach (owned + shared).
+ * Deliberately carries NO ranking: the leading candidate is computed on the client by
+ * the existing scoring engine, never sent from the server.
+ */
+export interface PortfolioEntry {
+  id: string;
+  name: string;
+  status: string;
+  role: CampaignRole;
+  ownerId: string;
+  total: number;
+  analysed: number;
+  pending: number;
+  invalid: number;
+  unresolvedComments: number;
+  snapshotCount: number;
+  createdAt: number;
+  updatedAt: number;
+  lastActivityAt: number;
+}
+
+export async function fetchPortfolio(token: string): Promise<ApiResult<PortfolioEntry[]>> {
+  const r = await request<{ portfolio: PortfolioEntry[] }>('GET', '/portfolio', { token });
+  return r.ok ? { ok: true, data: r.data.portfolio } : r;
+}
+
 export async function fetchCampaignsRemote(token: string): Promise<ApiResult<RemoteCampaignMeta[]>> {
   const r = await request<{ campaigns: RemoteCampaignMeta[] }>('GET', '/campaigns', { token });
   return r.ok ? { ok: true, data: r.data.campaigns } : r;

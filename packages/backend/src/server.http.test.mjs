@@ -100,6 +100,19 @@ describe('server HTTP persistence', () => {
     assert.equal(r.status, 401);
   });
 
+  test('/api/portfolio reaches the persist API over HTTP (allowlist wired)', async () => {
+    // Unauthenticated must be 401 — a 404 would mean the server prefix allowlist
+    // dropped the route before it ever reached handleApi (a real bug we hit once).
+    const anon = await api('GET', '/api/portfolio');
+    assert.equal(anon.status, 401);
+
+    const reg = await api('POST', '/api/auth/register', { body: { email: 'portfolio@lab.org', password: 'password123' } });
+    const token = reg.json.token;
+    const mine = await api('GET', '/api/portfolio', { token });
+    assert.equal(mine.status, 200);
+    assert.ok(Array.isArray(mine.json.portfolio));
+  });
+
   test('malformed JSON body is a clean 400', async () => {
     const res = await fetch(base + '/api/auth/login', {
       method: 'POST',

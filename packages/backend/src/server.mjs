@@ -71,7 +71,7 @@ const CORS_ORIGINS = (process.env.GENESIS_CORS_ORIGINS ?? '').split(',').map((s)
 
 // Genesis 2.0 (M3): jedno źródło prefiksów tras trafiających do handleApi (persist API).
 // Musi pozostać zgodne z routingiem seg[0] w api.mjs — patrz test serverRouting.test.mjs.
-const PERSIST_API_PREFIXES = ['/api/auth/', '/api/projects', '/api/compute', '/api/science', '/api/account/', '/api/campaigns'];
+const PERSIST_API_PREFIXES = ['/api/auth/', '/api/projects', '/api/compute', '/api/science', '/api/account/', '/api/campaigns', '/api/portfolio'];
 
 // Genesis 2.1 (Part 1): asynchroniczny worker pool dla RDKit — ZA FLAGĄ, domyślnie OFF.
 // OFF → nietknięty, synchroniczny tor (execFileSync). ON → nieblokujący pool wątków.

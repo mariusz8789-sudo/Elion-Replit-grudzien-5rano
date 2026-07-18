@@ -5,6 +5,7 @@
  * director; it states its scientific limitation explicitly and claims no validation.
  */
 import type { PilotReport, KillSwitchDecision } from '../core/backend/client';
+import { useI18n } from '../core/i18n';
 
 const DECISION_CLASS: Record<KillSwitchDecision, string> = {
   GO: 'pill-ok', WARN: 'pill-warn', BLOCK: 'pill-danger', INSUFFICIENT_DATA: 'pill-neutral',
@@ -27,62 +28,63 @@ function Block({ title, items }: { title: string; items: string[] }) {
 }
 
 export function PilotReportView({ report }: { report: PilotReport }) {
+  const { t } = useI18n();
   const r = report;
   return (
     <article className="pilot-report">
       <header className="pilot-report-header">
-        <h1>ZEFIR — Pre-Flight R&amp;D Kill-Switch — Raport analizy</h1>
+        <h1>{t('pr.title')}</h1>
         <div className="pilot-report-meta">
-          <div><span>Projekt (najemca)</span><code>{r.projectId ?? '—'}</code></div>
-          <div><span>ID analizy</span><code>{r.analysisId ?? '—'}</code></div>
-          <div><span>Data</span><code>{fmtDate(r.analysisDate)}</code></div>
-          <div><span>Hash decyzji</span><code>{r.decisionHash ?? '—'}</code></div>
-          <div><span>Hash propozycji</span><code>{r.proposalHash ?? '—'}</code></div>
-          <div><span>Certyfikat</span><code>{r.certificate.schema} · truthEngine {r.certificate.engineVersions.truthEngine ?? '?'}</code></div>
+          <div><span>{t('df.label.project')}</span><code>{r.projectId ?? '—'}</code></div>
+          <div><span>{t('pr.meta.analysisId')}</span><code>{r.analysisId ?? '—'}</code></div>
+          <div><span>{t('pr.meta.date')}</span><code>{fmtDate(r.analysisDate)}</code></div>
+          <div><span>{t('te.res.decisionHash')}</span><code>{r.decisionHash ?? '—'}</code></div>
+          <div><span>{t('te.res.proposalHash')}</span><code>{r.proposalHash ?? '—'}</code></div>
+          <div><span>{t('te.cert.h')}</span><code>{r.certificate.schema} · truthEngine {r.certificate.engineVersions.truthEngine ?? '?'}</code></div>
         </div>
       </header>
 
       <div className="pilot-report-decision">
         <span className={`pill ${DECISION_CLASS[r.finalDecision]}`}>{r.finalDecision}</span>
-        <span className="report-strength">Siła decyzji: {r.decisionStrength ?? '—'}</span>
+        <span className="report-strength">{t('pr.strength')}{r.decisionStrength ?? '—'}</span>
       </div>
 
-      <Block title="Krytyczne przesłanki (powody zabicia)" items={r.criticalFailures} />
-      <Block title="Naruszenia ograniczeń deterministycznych" items={r.constraintFindings.map((c) => `${c.id}: ${c.detail}`)} />
-      <Block title="Niespójności wymiarowe" items={r.dimensionalFindings} />
-      <Block title="Naruszenia ograniczeń fizycznych" items={r.physicalConstraintViolations} />
-      <Block title="Brakujące informacje" items={r.missingInformation} />
-      <Block title="Nierozstrzygnięte założenia" items={r.unresolvedAssumptions} />
-      <Block title="Luki zdolności (nieocenione)" items={r.capabilityGaps} />
-      <Block title="Domeny bez zakodowanej wiedzy" items={r.unsupportedDomains.map((u) => `${u.domain}: ${u.reason}`)} />
+      <Block title={t('pr.block.critical')} items={r.criticalFailures} />
+      <Block title={t('pr.block.constraintFindings')} items={r.constraintFindings.map((c) => `${c.id}: ${c.detail}`)} />
+      <Block title={t('te.list.dimensional')} items={r.dimensionalFindings} />
+      <Block title={t('te.list.physViolations')} items={r.physicalConstraintViolations} />
+      <Block title={t('te.list.missingInfo')} items={r.missingInformation} />
+      <Block title={t('te.list.unresolvedAssumptions')} items={r.unresolvedAssumptions} />
+      <Block title={t('pr.block.capGaps')} items={r.capabilityGaps} />
+      <Block title={t('te.list.unsupportedDomains')} items={r.unsupportedDomains.map((u) => `${u.domain}: ${u.reason}`)} />
 
       <div className="report-block">
-        <h3>Wpływ pamięci porażek (Necropolis)</h3>
+        <h3>{t('pr.necro.h')}</h3>
         <p>{r.necropolisInfluence.influenced
-          ? `TAK — dopasowano do wcześniej zarejestrowanego martwego końca (${r.necropolisInfluence.findings.join(', ')}).`
-          : 'Nie — propozycja nie leży blisko żadnego zarejestrowanego martwego końca tego najemcy.'}</p>
+          ? t('pr.necro.yes', { findings: r.necropolisInfluence.findings.join(', ') })
+          : t('pr.necro.no')}</p>
       </div>
 
       {r.cheapestFalsification && (
         <div className="report-block">
-          <h3>Najtańszy test falsyfikujący (najwyższa informacja / najniższy koszt)</h3>
-          <p>Cel: <strong>{r.cheapestFalsification.targetAssumption}</strong></p>
-          <p>Test: {r.cheapestFalsification.recommendedTestType} ({r.cheapestFalsification.relativeCostClass})</p>
-          <p>Wymagane wejście: {r.cheapestFalsification.requiredInput}</p>
+          <h3>{t('pr.fals.h')}</h3>
+          <p>{t('te.fals.target')}<strong>{r.cheapestFalsification.targetAssumption}</strong></p>
+          <p>{t('te.fals.test')}{r.cheapestFalsification.recommendedTestType} ({r.cheapestFalsification.relativeCostClass})</p>
+          <p>{t('pr.fals.input')}{r.cheapestFalsification.requiredInput}</p>
           <p className="report-muted">{r.cheapestFalsification.priorityReason}</p>
         </div>
       )}
 
-      <Block title="Powody, by NIE zabijać projektu" items={r.reasonsNotToKill} />
+      <Block title={t('pr.block.notKill')} items={r.reasonsNotToKill} />
 
       <div className="report-block">
-        <h3>Silniki: wykonane / pominięte</h3>
-        <p><strong>Wykonane:</strong> {r.enginesExecuted.join(', ') || '—'}</p>
-        <p><strong>Pominięte:</strong> {r.enginesSkipped.map((s) => `${s.stage} (${s.reason})`).join('; ') || '—'}</p>
+        <h3>{t('pr.engines.h')}</h3>
+        <p><strong>{t('df.executed')}</strong> {r.enginesExecuted.join(', ') || '—'}</p>
+        <p><strong>{t('pr.engines.skipped')}</strong> {r.enginesSkipped.map((s) => `${s.stage} (${s.reason})`).join('; ') || '—'}</p>
       </div>
 
       <footer className="pilot-report-footer">
-        <h3>Ograniczenie interpretacyjne</h3>
+        <h3>{t('pr.limitation.h')}</h3>
         <p>{r.limitationStatement}</p>
       </footer>
     </article>

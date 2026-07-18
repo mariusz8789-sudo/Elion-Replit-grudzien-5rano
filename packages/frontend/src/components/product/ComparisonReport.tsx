@@ -37,6 +37,7 @@ import {
   type RankedCandidate, type Verdict, type MatrixRow, type Portfolio,
 } from '../../core/moleculeComparison';
 import { predictAdmet, getAdmetEndpoints, type AdmetEndpointMeta } from '../../core/backend/client';
+import { useI18n, t as translate } from '../../core/i18n';
 
 const VERDICTS: Verdict[] = ['CONTINUE', 'NEEDS_EXPERIMENTS', 'HIGH_UNCERTAINTY', 'REJECT'];
 // Endpoints treated as "risk-up-is-bad" when picking the single biggest risk for the
@@ -78,7 +79,7 @@ function heat(fav: number): string {
  * alerts (deterministic) take priority over an ADMET model estimate (probabilistic).
  * Returns null rather than guessing when no signal is available yet. */
 function biggestRisk(c: RankedCandidate, entry: AdmetEntry | undefined, endpointById: Map<string, AdmetEndpointMeta>): { label: string; kind: 'ok' | 'warn' | 'blocked' } | null {
-  if (c.alerts.length > 0) return { label: `${c.alerts.length} alert${c.alerts.length > 1 ? 'y' : ''} strukturalne (RDKit)`, kind: 'blocked' };
+  if (c.alerts.length > 0) return { label: translate('cr.risk.alerts', { n: c.alerts.length }), kind: 'blocked' };
   if (!entry || entry.status !== 'ready') return null;
   const risky = RISK_ADMET_IDS
     .filter((id) => Number.isFinite(entry.values[id]))
@@ -87,18 +88,19 @@ function biggestRisk(c: RankedCandidate, entry: AdmetEntry | undefined, endpoint
   const top = risky.reduce((a, b) => (b.value > a.value ? b : a));
   const pct = Math.round(top.value * 100);
   const kind: 'ok' | 'warn' | 'blocked' = pct >= 50 ? 'blocked' : pct >= 20 ? 'warn' : 'ok';
-  return { label: `${top.meta?.name ?? top.id} ${pct}% (MODEL_ESTIMATE)`, kind };
+  return { label: translate('cr.risk.modelEstimate', { name: top.meta?.name ?? top.id, pct }), kind };
 }
 
 /** Scientific Matrix (heatmap) content — shared verbatim between the desktop panel and the mobile "more analyses" disclosure. */
 function MatrixContent({ ranked, matrix }: { ranked: RankedCandidate[]; matrix: MatrixRow[] }) {
+  const { t } = useI18n();
   return (
     <>
       <div className="ds-table-wrap">
         <table className="ds-table matrix-table">
           <thead>
             <tr>
-              <th>Cząsteczka</th><th>#</th><th>Score</th>
+              <th>{t('cd.col.molecule')}</th><th>#</th><th>{t('cd.col.score')}</th>
               {MATRIX_COLUMNS.map((col) => <th key={col.key}>{col.label}</th>)}
             </tr>
           </thead>
@@ -116,14 +118,14 @@ function MatrixContent({ ranked, matrix }: { ranked: RankedCandidate[]; matrix: 
           </tbody>
         </table>
       </div>
-      <p className="ds-note ds-mt">Kolor = korzystność deskryptora (zielony sprzyja rozwojowi, czerwony to liability), według tych samych progów co score. Wartości są zweryfikowane przez RDKit; interpretacja koloru jest heurystyką rozwojową.</p>
+      <p className="ds-note ds-mt">{t('cr.matrixNote')}</p>
       <div className="matrix-swot">
         {ranked.map((c) => (
           <div key={c.id} className="swot-card">
             <h6 className="swot-h">{c.name}</h6>
-            {c.strengths.length ? <div className="swot-line"><StatusPill kind="ok"><Icon name="check" size={10} /> Mocne</StatusPill> <span>{c.strengths.join(' · ')}</span></div> : null}
-            {c.weaknesses.length ? <div className="swot-line"><StatusPill kind="warn"><Icon name="alert" size={10} /> Słabe</StatusPill> <span>{c.weaknesses.join(' · ')}</span></div> : null}
-            {c.alerts.length ? <div className="swot-line"><StatusPill kind="blocked"><Icon name="block" size={10} /> Alerty</StatusPill> <span>{c.alerts.join(', ')}</span></div> : null}
+            {c.strengths.length ? <div className="swot-line"><StatusPill kind="ok"><Icon name="check" size={10} /> {t('cr.swot.strong')}</StatusPill> <span>{c.strengths.join(' · ')}</span></div> : null}
+            {c.weaknesses.length ? <div className="swot-line"><StatusPill kind="warn"><Icon name="alert" size={10} /> {t('cr.swot.weak')}</StatusPill> <span>{c.weaknesses.join(' · ')}</span></div> : null}
+            {c.alerts.length ? <div className="swot-line"><StatusPill kind="blocked"><Icon name="block" size={10} /> {t('cr.swot.alerts')}</StatusPill> <span>{c.alerts.join(', ')}</span></div> : null}
           </div>
         ))}
       </div>
@@ -133,6 +135,7 @@ function MatrixContent({ ranked, matrix }: { ranked: RankedCandidate[]; matrix: 
 
 /** Reference-diff content — shared verbatim between the desktop panel and the mobile "more analyses" disclosure. */
 function ReferenceDiffContent({ reference, others }: { reference: RankedCandidate; others: RankedCandidate[] }) {
+  const { t } = useI18n();
   return (
     <>
       {others.map((c) => (
@@ -140,7 +143,7 @@ function ReferenceDiffContent({ reference, others }: { reference: RankedCandidat
           <h6 className="diff-h">{c.name} <span className="ds-dim">vs {reference.name}</span></h6>
           <div className="ds-table-wrap">
             <table className="ds-table diff-table">
-              <thead><tr><th>Deskryptor</th><th>{c.name}</th><th>{reference.name}</th><th>Różnica</th><th>Interpretacja</th></tr></thead>
+              <thead><tr><th>{t('cr.diff.col.descriptor')}</th><th>{c.name}</th><th>{reference.name}</th><th>{t('cr.diff.col.diff')}</th><th>{t('cr.diff.col.interpretation')}</th></tr></thead>
               <tbody>
                 {differencesVsReference(c.props, reference.props).map((d) => (
                   <tr key={d.key}>
@@ -162,12 +165,13 @@ function ReferenceDiffContent({ reference, others }: { reference: RankedCandidat
 
 /** Portfolio content — shared verbatim between the desktop panel and the mobile "more analyses" disclosure. */
 function PortfolioContent({ portfolio }: { portfolio: Portfolio }) {
+  const { t } = useI18n();
   return (
     <div className="portfolio-grid">
-      <PortfolioCol title="Najlepsi kandydaci" kind="ok" icon="check" items={portfolio.best} empty="brak kandydatów z rekomendacją Kontynuuj" />
-      <PortfolioCol title="Do walidacji" kind="warn" icon="flask" items={portfolio.needsValidation} empty="brak" />
-      <PortfolioCol title="Odrzuceni" kind="blocked" icon="block" items={portfolio.rejected} empty="brak odrzuconych" />
-      <PortfolioCol title="Najsłabsi (ogon rankingu)" kind="info" icon="chart" items={portfolio.worst} empty="—" />
+      <PortfolioCol title={t('cr.portfolio.best')} kind="ok" icon="check" items={portfolio.best} empty={t('cr.portfolio.bestEmpty')} />
+      <PortfolioCol title={t('cr.portfolio.needsValidation')} kind="warn" icon="flask" items={portfolio.needsValidation} empty={t('cr.portfolio.needsValidationEmpty')} />
+      <PortfolioCol title={t('cr.portfolio.rejected')} kind="blocked" icon="block" items={portfolio.rejected} empty={t('cr.portfolio.rejectedEmpty')} />
+      <PortfolioCol title={t('cr.portfolio.worst')} kind="info" icon="chart" items={portfolio.worst} empty={t('cr.portfolio.worstEmpty')} />
     </div>
   );
 }
@@ -180,13 +184,14 @@ function PortfolioContent({ portfolio }: { portfolio: Portfolio }) {
  * doesn't.
  */
 function AdmetFullBreakdown({ version, totalCount, byCategory }: { version: string; totalCount: number; byCategory: [string, { meta: AdmetEndpointMeta; id: string; value: number }[]][] }) {
+  const { t } = useI18n();
   return (
     <>
-      <p className="cmp-model-estimate-legend">ADMET-AI {version} · {totalCount} endpointów (katalog TDC) · <span className="cmp-model-estimate-mark">†</span> = MODEL_ESTIMATE, nigdy wartość zmierzona</p>
+      <p className="cmp-model-estimate-legend">{t('cr.admet.legend', { version, count: totalCount })}</p>
       {byCategory.map(([category, rows]) => (
         <div key={category} className="ds-table-wrap ds-mt">
           <table className="ds-table">
-            <thead><tr><th colSpan={3}>{category}</th></tr><tr><th>Endpoint</th><th>Wartość</th><th>Publikowana metryka (TDC)</th></tr></thead>
+            <thead><tr><th colSpan={3}>{category}</th></tr><tr><th>{t('cr.admet.col.endpoint')}</th><th>{t('cr.admet.col.value')}</th><th>{t('cr.admet.col.metric')}</th></tr></thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
@@ -205,19 +210,20 @@ function AdmetFullBreakdown({ version, totalCount, byCategory }: { version: stri
 
 /** One candidate as a mobile-native card (never a table row). Tap to expand its WHY. */
 function CandidateCard({ c, isReference, expanded, onToggle }: { c: RankedCandidate; isReference: boolean; expanded: boolean; onToggle: () => void }) {
+  const { t } = useI18n();
   const meta = VERDICT_META[c.decision.verdict];
   return (
     <div className={`cmp-cand-card${expanded ? ' is-open' : ''}`}>
       <button type="button" className="cmp-cand-head" onClick={onToggle} aria-expanded={expanded}>
         <span className="cmp-cand-rank">#{c.rank}</span>
         <span className="cmp-cand-main">
-          <span className="cmp-cand-name">{c.name}{isReference ? <span className="ref-badge">referencja</span> : null}</span>
+          <span className="cmp-cand-name">{c.name}{isReference ? <span className="ref-badge">{t('cr.reference')}</span> : null}</span>
           <span className="cmp-cand-smiles">{c.smiles}</span>
         </span>
         <span className="cmp-cand-score">{c.scored.score}</span>
       </button>
       <div className="cmp-cand-verdict">
-        <StatusPill kind={meta.kind}><Icon name={meta.icon} size={11} /> {meta.label}</StatusPill>
+        <StatusPill kind={meta.kind}><Icon name={meta.icon} size={11} /> {t(`verdict.${c.decision.verdict}`)}</StatusPill>
         <span className="cmp-cand-chevron" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
       </div>
       {expanded ? (
@@ -235,11 +241,12 @@ function CandidateCard({ c, isReference, expanded, onToggle }: { c: RankedCandid
  * complete. Purely a display toggle — renders exactly the children it's given.
  */
 function ToggleSection({ label, closeLabel, defaultOpen = false, children }: { label: string; closeLabel?: string; defaultOpen?: boolean; children: ReactNode }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className={`cmp-toggle${open ? ' is-open' : ''}`}>
       <button type="button" className="cmp-toggle-btn" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <span>{open ? (closeLabel ?? 'Ukryj') : label}</span>
+        <span>{open ? (closeLabel ?? t('cr.hide')) : label}</span>
         <span className="cmp-toggle-chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
       </button>
       <div className="cmp-toggle-body">{children}</div>
@@ -248,6 +255,7 @@ function ToggleSection({ label, closeLabel, defaultOpen = false, children }: { l
 }
 
 export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: RankedCandidate[]; referenceId: string | null; embedded?: boolean }) {
+  const { t } = useI18n();
   const [admetEndpoints, setAdmetEndpoints] = useState<AdmetEndpointMeta[] | null>(null);
   const [admetEndpointsError, setAdmetEndpointsError] = useState<string | null>(null);
   const [admetResults, setAdmetResults] = useState<Record<string, AdmetEntry>>({});
@@ -283,7 +291,7 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
       const values = r.data.predictions[admetSmiles];
       if (!values) {
         console.error('[ADMET] silnik nie zwrócił predykcji dla tego SMILES', { smiles: admetSmiles });
-        setAdmetResults((prev) => ({ ...prev, [admetSmiles]: { status: 'unavailable', reason: 'Silnik nie zwrócił wyniku dla tej cząsteczki.' } }));
+        setAdmetResults((prev) => ({ ...prev, [admetSmiles]: { status: 'unavailable', reason: translate('cr.admetNoResult') } }));
         return;
       }
       setAdmetResults((prev) => ({ ...prev, [admetSmiles]: { status: 'ready', values, version: r.data.version } }));
@@ -337,14 +345,14 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
   const body = (
     <>
       {/* Decision Dashboard */}
-      <Panel title="Panel decyzyjny" icon="target" right={<StatusPill kind="info">{ranked.length} kandydatów</StatusPill>}>
+      <Panel title={t('cr.dashboard')} icon="target" right={<StatusPill kind="info">{t('cr.dashCount', { n: ranked.length })}</StatusPill>}>
         <div className="dash-grid">
           {VERDICTS.map((v) => {
             const meta = VERDICT_META[v];
             const items = ranked.filter((c) => c.decision.verdict === v);
             return (
               <div key={v} className={`dash-card dash-${meta.kind}`}>
-                <header><StatusPill kind={meta.kind}><Icon name={meta.icon} size={12} /> {meta.label}</StatusPill><span className="dash-count">{items.length}</span></header>
+                <header><StatusPill kind={meta.kind}><Icon name={meta.icon} size={12} /> {t(`verdict.${v}`)}</StatusPill><span className="dash-count">{items.length}</span></header>
                 {items.length ? (
                   <ul>
                     {items.map((c) => (
@@ -359,23 +367,23 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
             );
           })}
         </div>
-        <p className="ds-note ds-mt">Rekomendacje wynikają wyłącznie z deskryptorów fizykochemicznych RDKit. To triage rozwojowy, <strong>nie</strong> ocena aktywności biologicznej — każda ścieżka wymaga walidacji eksperymentalnej.</p>
+        <p className="ds-note ds-mt">{t('cr.dashNote')}</p>
       </Panel>
 
       {/* Candidate Ranking */}
-      <Panel title="Ranking kandydatów" icon="chart" className="ds-mt" right={<StatusPill kind="info">score rozwojowy 0–100</StatusPill>}>
+      <Panel title={t('cr.ranking')} icon="chart" className="ds-mt" right={<StatusPill kind="info">{t('cr.rankScore')}</StatusPill>}>
         <div className="ds-table-wrap">
           <table className="ds-table rank-table">
-            <thead><tr><th>#</th><th>Cząsteczka</th><th>Score</th><th>Rekomendacja</th><th>Dlaczego</th></tr></thead>
+            <thead><tr><th>#</th><th>{t('cd.col.molecule')}</th><th>{t('cd.col.score')}</th><th>{t('cd.col.recommendation')}</th><th>{t('cd.col.why')}</th></tr></thead>
             <tbody>
               {ranked.map((c) => {
                 const meta = VERDICT_META[c.decision.verdict];
                 return (
                   <tr key={c.id} className={c.id === referenceId ? 'is-reference' : ''}>
                     <td className="ds-strong">{c.rank}</td>
-                    <td><span className="ds-strong">{c.name}</span>{c.id === referenceId ? <span className="ref-badge">referencja</span> : null}<div className="ds-mono rank-smiles" title={c.smiles}>{c.smiles}</div></td>
+                    <td><span className="ds-strong">{c.name}</span>{c.id === referenceId ? <span className="ref-badge">{t('cr.reference')}</span> : null}<div className="ds-mono rank-smiles" title={c.smiles}>{c.smiles}</div></td>
                     <td><div className="score-bar"><span style={{ width: `${c.scored.score}%` }} /></div><span className="score-num">{c.scored.score}</span></td>
-                    <td><StatusPill kind={meta.kind}><Icon name={meta.icon} size={11} /> {meta.label}</StatusPill></td>
+                    <td><StatusPill kind={meta.kind}><Icon name={meta.icon} size={11} /> {t(`verdict.${c.decision.verdict}`)}</StatusPill></td>
                     <td className="rank-why">{rankingWhy(c).map((w, i) => <div key={i} className={w.startsWith('−') ? 'why-neg' : 'why-pos'}>{w}</div>)}</td>
                   </tr>
                 );
@@ -387,28 +395,24 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
 
       {/* Kluczowe ADMET (model AI) — headline endpoints only; full 52 stay one click away */}
       <Panel
-        title="Kluczowe ADMET"
+        title={t('cr.admetTitle')}
         icon="shield"
         className="ds-mt"
         right={<StatusPill kind="warn"><Icon name="alert" size={11} /> MODEL_ESTIMATE</StatusPill>}
       >
-        <p className="ds-note" style={{ marginTop: 0 }}>
-          Predykcje modelu AI (ADMET-AI, D-MPNN wytrenowany na TDC) — <strong>nigdy wartości zmierzone
-          eksperymentalnie</strong>. RDKit powyżej liczy deskryptory fizykochemiczne; ADMET-AI szacuje
-          właściwości biologiczne/toksykologiczne. Nie są mieszane w jeden wynik.
-        </p>
+        <p className="ds-note" style={{ marginTop: 0 }}>{t('cr.admetNote')}</p>
         <div className="ds-input-row" style={{ maxWidth: 420, alignItems: 'center' }}>
-          <label className="ds-dim" style={{ whiteSpace: 'nowrap' }}>Cząsteczka:</label>
+          <label className="ds-dim" style={{ whiteSpace: 'nowrap' }}>{t('cr.molecule')}</label>
           <select value={admetCandidate?.id ?? ''} onChange={(e) => setAdmetSelectedId(e.target.value || null)} className="compare-select">
             {ranked.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         {admetEndpointsError ? (
-          <div className="ds-callout ds-mt"><Icon name="alert" size={15} /> Niedostępne — katalog endpointów ADMET nie odpowiedział: {admetEndpointsError}</div>
+          <div className="ds-callout ds-mt"><Icon name="alert" size={15} /> {t('cr.admetEndpointsErr', { msg: admetEndpointsError })}</div>
         ) : !admetEntry || admetEntry.status === 'loading' ? (
           <div className="skeleton ds-mt" style={{ height: 120 }} />
         ) : admetEntry.status === 'unavailable' ? (
-          <div className="ds-callout ds-mt"><Icon name="alert" size={15} /> Niedostępne — {admetEntry.reason} Pozostałe wyniki (RDKit) powyżej pozostają bez zmian.</div>
+          <div className="ds-callout ds-mt"><Icon name="alert" size={15} /> {t('cr.admetUnavail', { reason: admetEntry.reason })}</div>
         ) : (
           <>
             <div className="ds-grid cmp-headline-grid ds-mt">
@@ -417,7 +421,7 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
               ))}
             </div>
             <div className="ds-mt">
-              <ToggleSection label={`Pokaż wszystkie ${admetTotalCount} endpointów (wg kategorii, katalog TDC) →`}>
+              <ToggleSection label={t('cr.admetShowAll', { count: admetTotalCount })}>
                 <AdmetFullBreakdown version={admetEntry.version} totalCount={admetTotalCount} byCategory={admetByCategory} />
               </ToggleSection>
             </div>
@@ -426,19 +430,19 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
       </Panel>
 
       {/* Scientific Matrix (heatmap) — RDKit, collapsed by default */}
-      <Panel title="Macierz naukowa" icon="graph" className="ds-mt" right={<StatusPill kind="info">heatmapa deskryptorów</StatusPill>}>
-        <ToggleSection label={`Pokaż heatmapę deskryptorów (${ranked.length} cząsteczek) →`}>
+      <Panel title={t('cr.matrixTitle')} icon="graph" className="ds-mt" right={<StatusPill kind="info">{t('cr.matrixHeatmap')}</StatusPill>}>
+        <ToggleSection label={t('cr.matrixShow', { n: ranked.length })}>
           <MatrixContent ranked={ranked} matrix={matrix} />
         </ToggleSection>
       </Panel>
 
       {/* Reference comparison — RDKit, collapsed by default */}
       {reference ? (
-        <Panel title={`Porównanie z referencją: ${reference.name}`} icon="atom" className="ds-mt" right={<StatusPill kind="info">różnice zinterpretowane</StatusPill>}>
+        <Panel title={t('cr.refTitle', { name: reference.name })} icon="atom" className="ds-mt" right={<StatusPill kind="info">{t('cr.refInterpreted')}</StatusPill>}>
           {ranked.filter((c) => c.id !== reference.id).length === 0 ? (
-            <p className="ds-dim">Dodaj przynajmniej jedną cząsteczkę poza referencją, aby zobaczyć różnice.</p>
+            <p className="ds-dim">{t('cr.refAddMore')}</p>
           ) : (
-            <ToggleSection label={`Pokaż różnice względem ${reference.name} (${ranked.length - 1}) →`}>
+            <ToggleSection label={t('cr.refShow', { name: reference.name, n: ranked.length - 1 })}>
               <ReferenceDiffContent reference={reference} others={ranked.filter((c) => c.id !== reference.id)} />
             </ToggleSection>
           )}
@@ -446,7 +450,7 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
       ) : null}
 
       {/* Portfolio view */}
-      <Panel title="Portfolio projektu" icon="briefcase" className="ds-mt">
+      <Panel title={t('cr.portfolioTitle')} icon="briefcase" className="ds-mt">
         <PortfolioContent portfolio={portfolio} />
       </Panel>
     </>
@@ -456,19 +460,19 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
   const mobileBody = (
     <div className="cmp-mobile">
       <section className="cmp-hero">
-        <div className="cmp-hero-eyebrow">Najlepszy kandydat · {ranked.length} porównanych</div>
+        <div className="cmp-hero-eyebrow">{t('cr.hero.eyebrow', { n: ranked.length })}</div>
         <h2 className="cmp-hero-name">{winner.name}</h2>
         <div className="cmp-hero-row">
-          <StatusPill kind={VERDICT_META[winner.decision.verdict].kind}><Icon name={VERDICT_META[winner.decision.verdict].icon} size={13} /> {VERDICT_META[winner.decision.verdict].label}</StatusPill>
+          <StatusPill kind={VERDICT_META[winner.decision.verdict].kind}><Icon name={VERDICT_META[winner.decision.verdict].icon} size={13} /> {t(`verdict.${winner.decision.verdict}`)}</StatusPill>
           <span className="cmp-hero-score">{winner.scored.score}<small>/100</small></span>
         </div>
         <p className="cmp-hero-why">{winner.decision.reasons[0]}</p>
         <div className="cmp-hero-tags">
-          <span className="cmp-hero-tag cmp-hero-tag-ok"><Icon name="check" size={11} /> RDKit zweryfikowane</span>
+          <span className="cmp-hero-tag cmp-hero-tag-ok"><Icon name="check" size={11} /> {t('cr.hero.rdkitVerified')}</span>
           {winnerRisk ? <span className={`cmp-hero-tag cmp-hero-tag-${winnerRisk.kind}`}><Icon name="alert" size={11} /> {winnerRisk.label}</span> : null}
         </div>
         <button type="button" className="cmp-hero-cta" onClick={() => rankingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-          Zobacz pełny ranking ({ranked.length}) <span aria-hidden="true">→</span>
+          {t('cr.hero.seeRanking', { n: ranked.length })} <span aria-hidden="true">→</span>
         </button>
       </section>
 
@@ -476,12 +480,12 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
         {VERDICTS.map((v) => {
           const n = ranked.filter((c) => c.decision.verdict === v).length;
           const m = VERDICT_META[v];
-          return <span key={v} className="cmp-stat-strip-item"><StatusPill kind={m.kind}>{n}</StatusPill> {m.label}</span>;
+          return <span key={v} className="cmp-stat-strip-item"><StatusPill kind={m.kind}>{n}</StatusPill> {t(`verdict.${v}`)}</span>;
         })}
       </div>
 
       <section className="cmp-section" ref={rankingRef}>
-        <h3 className="cmp-section-title">Ranking</h3>
+        <h3 className="cmp-section-title">{t('cd.ranking')}</h3>
         <div className="cmp-cand-list">
           {visibleCandidates.map((c) => (
             <CandidateCard
@@ -493,26 +497,26 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
         </div>
         {!showAllCandidates && ranked.length > MOBILE_CARD_LIMIT ? (
           <button type="button" className="cmp-toggle-btn cmp-mt" onClick={() => setShowAllCandidates(true)}>
-            <span>Pokaż wszystkich {ranked.length} kandydatów →</span>
+            <span>{t('cr.showAllCandidates', { n: ranked.length })}</span>
           </button>
         ) : null}
       </section>
 
       <section className="cmp-section">
         <h3 className="cmp-section-title">ADMET <StatusPill kind="warn">MODEL_ESTIMATE</StatusPill></h3>
-        <p className="ds-note" style={{ marginTop: 0 }}>Predykcje modelu AI (D-MPNN, TDC) — nigdy wartości zmierzone. Oddzielone od deskryptorów RDKit powyżej.</p>
+        <p className="ds-note" style={{ marginTop: 0 }}>{t('cr.admetMobileNote')}</p>
         <div className="ds-input-row">
-          <label className="ds-dim" style={{ whiteSpace: 'nowrap' }}>Cząsteczka:</label>
+          <label className="ds-dim" style={{ whiteSpace: 'nowrap' }}>{t('cr.molecule')}</label>
           <select value={admetCandidate?.id ?? ''} onChange={(e) => setAdmetSelectedId(e.target.value || null)} className="compare-select">
             {ranked.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         {admetEndpointsError ? (
-          <div className="ds-callout ds-mt"><Icon name="alert" size={15} /> Niedostępne — katalog endpointów ADMET nie odpowiedział: {admetEndpointsError}</div>
+          <div className="ds-callout ds-mt"><Icon name="alert" size={15} /> {t('cr.admetEndpointsErr', { msg: admetEndpointsError })}</div>
         ) : !admetEntry || admetEntry.status === 'loading' ? (
           <div className="skeleton ds-mt" style={{ height: 160 }} />
         ) : admetEntry.status === 'unavailable' ? (
-          <div className="ds-callout ds-mt"><Icon name="alert" size={15} /> Niedostępne — {admetEntry.reason} Pozostałe wyniki (RDKit) powyżej pozostają bez zmian.</div>
+          <div className="ds-callout ds-mt"><Icon name="alert" size={15} /> {t('cr.admetUnavail', { reason: admetEntry.reason })}</div>
         ) : (
           <>
             <div className="cmp-admet-compact ds-mt">
@@ -524,7 +528,7 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
               ))}
             </div>
             <div className="ds-mt">
-              <ToggleSection label={`Zobacz wszystkie ${admetTotalCount} endpointów (katalog TDC) →`}>
+              <ToggleSection label={t('cr.admetShowAllMobile', { count: admetTotalCount })}>
                 <AdmetFullBreakdown version={admetEntry.version} totalCount={admetTotalCount} byCategory={admetByCategory} />
               </ToggleSection>
             </div>
@@ -532,16 +536,16 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
         )}
       </section>
 
-      <ToggleSection label="Więcej analiz naukowych (macierz, referencja, portfolio) →">
-        <h4 className="cmp-subhead">Macierz naukowa</h4>
+      <ToggleSection label={t('cr.moreAnalyses')}>
+        <h4 className="cmp-subhead">{t('cr.matrixTitle')}</h4>
         <MatrixContent ranked={ranked} matrix={matrix} />
         {reference && ranked.filter((c) => c.id !== reference.id).length > 0 ? (
           <>
-            <h4 className="cmp-subhead cmp-mt">Porównanie z referencją: {reference.name}</h4>
+            <h4 className="cmp-subhead cmp-mt">{t('cr.refTitle', { name: reference.name })}</h4>
             <ReferenceDiffContent reference={reference} others={ranked.filter((c) => c.id !== reference.id)} />
           </>
         ) : null}
-        <h4 className="cmp-subhead cmp-mt">Portfolio projektu</h4>
+        <h4 className="cmp-subhead cmp-mt">{t('cr.portfolioTitle')}</h4>
         <PortfolioContent portfolio={portfolio} />
       </ToggleSection>
     </div>
@@ -550,7 +554,7 @@ export function ComparisonReport({ ranked, referenceId, embedded }: { ranked: Ra
   if (embedded) return <><div className="cmp-desktop-view">{body}</div><div className="cmp-mobile-view">{mobileBody}</div></>;
   return (
     <div className="print-report">
-      <div className="report-print-title" aria-hidden="true">Molecule Selection Report — Genesis ({ranked.length} cząsteczek)</div>
+      <div className="report-print-title" aria-hidden="true">{t('cr.printTitle', { n: ranked.length })}</div>
       <div className="cmp-desktop-view">{body}</div>
       <div className="cmp-mobile-view">{mobileBody}</div>
     </div>

@@ -487,4 +487,14 @@ export const pl: Record<string, string> = {
   'mci.importFail': 'Nie udało się zaimportować pliku {kind}.',
   'mci.noStructure': 'Plik nie zawierał żadnej poprawnej struktury.',
   'mci.partial': 'Zaimportowano {parsed}/{total} — {errors} rekordów pominięto (nieprawidłowa struktura).',
+
+  // Account panel (sign in / register)
+  'acct.register': 'Utwórz konto',
+  'acct.loggedIn': 'Zalogowano. Twoje projekty i trwałe serie prób są zapisywane na serwerze i przetrwają restart.',
+  'acct.displayName': 'Nazwa wyświetlana (opcjonalnie)',
+  'acct.email': 'E-mail',
+  'acct.password': 'Hasło',
+  'acct.passwordMin': '(min. 8 znaków)',
+  'acct.busy': 'Chwila…',
+  'acct.optional': 'Konto jest opcjonalne. Bez logowania Genesis działa w pełni lokalnie (offline). Hasło jest haszowane (scrypt) po stronie serwera i nigdy nie jest przechowywane jawnie.',
 };

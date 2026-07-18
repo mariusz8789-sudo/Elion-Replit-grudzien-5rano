@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { register, login, logout } from '../core/backend/client';
 import { useSession, setSession, clearSession, getToken } from '../core/backend/session';
+import { useI18n } from '../core/i18n';
 
 /**
  * Panel konta (Milestone 1: Backend Persistence). Realne logowanie/rejestracja
@@ -13,6 +14,7 @@ type Mode = 'login' | 'register';
 
 export function AccountPanel() {
   const session = useSession();
+  const { t } = useI18n();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,11 +54,8 @@ export function AccountPanel() {
             <span className="account-email">{session.user.email}</span>
           </div>
         </div>
-        <p className="settings-hint">
-          Zalogowano. Twoje Projekty i trwałe Serie Prób są zapisywane na serwerze i przetrwają restart —
-          zobacz zakładkę „Projekty (chmura)".
-        </p>
-        <button className="chip-btn" onClick={handleLogout}>Wyloguj się</button>
+        <p className="settings-hint">{t('acct.loggedIn')}</p>
+        <button className="chip-btn" onClick={handleLogout}>{t('common.signOut')}</button>
       </div>
     );
   }
@@ -65,36 +64,33 @@ export function AccountPanel() {
     <div className="account-panel">
       <div className="account-tabs" role="tablist">
         <button role="tab" aria-selected={mode === 'login'} className={`account-tab${mode === 'login' ? ' active' : ''}`} onClick={() => setMode('login')}>
-          Zaloguj się
+          {t('common.signIn')}
         </button>
         <button role="tab" aria-selected={mode === 'register'} className={`account-tab${mode === 'register' ? ' active' : ''}`} onClick={() => setMode('register')}>
-          Utwórz konto
+          {t('acct.register')}
         </button>
       </div>
       <form className="account-form" onSubmit={submit}>
         {mode === 'register' && (
           <label className="account-field">
-            <span>Nazwa wyświetlana (opcjonalnie)</span>
+            <span>{t('acct.displayName')}</span>
             <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={80} autoComplete="nickname" />
           </label>
         )}
         <label className="account-field">
-          <span>E-mail</span>
+          <span>{t('acct.email')}</span>
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
         </label>
         <label className="account-field">
-          <span>Hasło {mode === 'register' && <em>(min. 8 znaków)</em>}</span>
+          <span>{t('acct.password')} {mode === 'register' && <em>{t('acct.passwordMin')}</em>}</span>
           <input type="password" required minLength={mode === 'register' ? 8 : undefined} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />
         </label>
         {error && <div className="account-error" role="alert">{error}</div>}
         <button className="chip-btn primary" type="submit" disabled={busy}>
-          {busy ? 'Chwila…' : mode === 'register' ? 'Utwórz konto' : 'Zaloguj się'}
+          {busy ? t('acct.busy') : mode === 'register' ? t('acct.register') : t('common.signIn')}
         </button>
       </form>
-      <p className="settings-hint">
-        Konto jest opcjonalne. Bez logowania Genesis OS działa w pełni lokalnie (offline). Hasło jest haszowane
-        (scrypt) po stronie serwera i nigdy nie jest przechowywane jawnie.
-      </p>
+      <p className="settings-hint">{t('acct.optional')}</p>
     </div>
   );
 }

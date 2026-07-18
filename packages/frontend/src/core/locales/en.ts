@@ -483,4 +483,14 @@ export const en: Record<string, string> = {
   'mci.importFail': 'Couldn’t import the {kind} file.',
   'mci.noStructure': 'The file contained no valid structure.',
   'mci.partial': 'Imported {parsed}/{total} — {errors} records skipped (invalid structure).',
+
+  // Account panel (sign in / register)
+  'acct.register': 'Create account',
+  'acct.loggedIn': 'Signed in. Your projects and persistent runs are saved on the server and survive restarts.',
+  'acct.displayName': 'Display name (optional)',
+  'acct.email': 'Email',
+  'acct.password': 'Password',
+  'acct.passwordMin': '(min. 8 characters)',
+  'acct.busy': 'One moment…',
+  'acct.optional': 'An account is optional. Without signing in, Genesis works fully locally (offline). Passwords are hashed (scrypt) server-side and never stored in plain text.',
 };

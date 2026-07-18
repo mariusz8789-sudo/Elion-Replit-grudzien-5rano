@@ -21,28 +21,22 @@ import {
   type ContributionGraph,
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
+import { useI18n } from '../core/i18n';
 
 /**
  * Projekty (chmura) — reachable UI trwałości (Milestone 1). Zalogowany
  * użytkownik zakłada współdzielone projekty, zaprasza współpracowników z rolami
- * (RBAC) i przegląda TRWAŁE, reprodukowalne Serie Prób (zamrożone parametry,
- * wyjścia, wersja modelu, autor). Wszystko realnie przechodzi przez backend —
- * to nie makieta. Bez logowania pokazujemy panel konta i jasny komunikat, że
- * aplikacja i tak działa lokalnie.
+ * (RBAC) i przegląda TRWAŁE, reprodukowalne Serie Prób. Wszystkie napisy przez seam i18n.
  */
 
-const ROLE_LABEL: Record<ProjectRole, string> = {
-  owner: 'właściciel',
-  admin: 'administrator',
-  editor: 'edytor',
-  viewer: 'obserwator',
+const ROLE_LABEL_KEYS: Record<ProjectRole, string> = {
+  owner: 'cp.role.owner', admin: 'cp.role.admin', editor: 'cp.role.editor', viewer: 'cp.role.viewer',
 };
-
-const STATUS_LABEL: Record<CloudTrial['status'], string> = {
-  baseline: 'punkt odniesienia',
-  draft: 'robocza',
-  promising: 'obiecująca',
-  failed: 'nieudana',
+const STATUS_LABEL_KEYS: Record<CloudTrial['status'], string> = {
+  baseline: 'cp.status.baseline', draft: 'cp.status.draft', promising: 'cp.status.promising', failed: 'cp.status.failed',
+};
+const MERGE_STATUS_KEYS: Record<MergeRequest['status'], string> = {
+  open: 'cp.mr.open', approved: 'cp.mr.approved', rejected: 'cp.mr.rejected', merged: 'cp.mr.merged',
 };
 
 function canManageMembers(role?: ProjectRole): boolean {
@@ -50,18 +44,15 @@ function canManageMembers(role?: ProjectRole): boolean {
 }
 
 export function CloudProjectsScreen() {
+  const { t } = useI18n();
   const session = useSession();
 
   if (!session) {
     return (
       <main className="settings-view" id="main-content" tabIndex={-1}>
         <section className="settings-section">
-          <h2>Projekty (chmura)</h2>
-          <p className="settings-hint">
-            Zaloguj się, aby tworzyć współdzielone Projekty i trwałe Serie Prób, które przetrwają restart i pozwolą
-            pracować zespołowo (role: właściciel / administrator / edytor / obserwator). Bez logowania Genesis OS działa
-            w pełni lokalnie — konto jest opcją współdzielenia.
-          </p>
+          <h2>{t('cp.title')}</h2>
+          <p className="settings-hint">{t('cp.signin')}</p>
           <AccountPanel />
         </section>
       </main>
@@ -72,6 +63,7 @@ export function CloudProjectsScreen() {
 }
 
 function ProjectsWorkspace() {
+  const { t } = useI18n();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [selected, setSelected] = useState<Project | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -116,18 +108,18 @@ function ProjectsWorkspace() {
   return (
     <main className="settings-view" id="main-content" tabIndex={-1}>
       <section className="settings-section">
-        <h2>Twoje projekty</h2>
+        <h2>{t('cp.yourProjects')}</h2>
         {error && <div className="account-error" role="alert">{error}</div>}
         {projects === null ? (
-          <p className="settings-hint">Ładowanie…</p>
+          <p className="settings-hint">{t('cp.loading')}</p>
         ) : projects.length === 0 ? (
-          <p className="settings-hint">Nie masz jeszcze żadnego projektu. Utwórz pierwszy poniżej.</p>
+          <p className="settings-hint">{t('cp.noProjects')}</p>
         ) : (
           <div className="project-list">
             {projects.map((p) => (
               <button key={p.id} className="project-row" onClick={() => setSelected(p)}>
                 <span className="project-name">{p.name}</span>
-                <span className={`project-role role-${p.role}`}>{p.role ? ROLE_LABEL[p.role] : ''}</span>
+                <span className={`project-role role-${p.role}`}>{p.role ? t(ROLE_LABEL_KEYS[p.role]) : ''}</span>
               </button>
             ))}
           </div>
@@ -135,32 +127,24 @@ function ProjectsWorkspace() {
       </section>
 
       <section className="settings-section">
-        <h2>Nowy projekt</h2>
+        <h2>{t('cp.newProject')}</h2>
         <form className="account-form" onSubmit={handleCreate}>
           <label className="account-field">
-            <span>Nazwa projektu</span>
+            <span>{t('cp.projectName')}</span>
             <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={120} required />
           </label>
           <button className="chip-btn primary" type="submit" disabled={creating || !newName.trim()}>
-            {creating ? 'Tworzenie…' : '✚ Utwórz projekt'}
+            {creating ? t('cp.creating') : t('cp.createProject')}
           </button>
         </form>
-        <p className="settings-hint">
-          Zostaniesz właścicielem. Współpracowników z rolami dodasz w szczegółach projektu.
-        </p>
+        <p className="settings-hint">{t('cp.ownerHint')}</p>
       </section>
     </main>
   );
 }
 
-const MERGE_STATUS_LABEL: Record<MergeRequest['status'], string> = {
-  open: 'otwarte',
-  approved: 'zatwierdzone',
-  rejected: 'odrzucone',
-  merged: 'scalone',
-};
-
 function ProjectDetail({ project, onBack }: { project: Project; onBack: () => void }) {
+  const { t } = useI18n();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [activeBranch, setActiveBranch] = useState<string>('');
@@ -198,8 +182,8 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
   const loadTrials = useCallback(async (branchId: string) => {
     const token = getToken();
     if (!token || !branchId) return;
-    const t = await listCloudTrials(token, project.id, undefined, branchId);
-    if (t.ok) setTrials(t.data);
+    const tr = await listCloudTrials(token, project.id, undefined, branchId);
+    if (tr.ok) setTrials(tr.data);
   }, [project.id]);
 
   useEffect(() => { void loadStatic(); }, [loadStatic]);
@@ -228,7 +212,7 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
     if (!token || !mrTarget || mrTarget === activeBranch) return;
     const src = branches.find((b) => b.id === activeBranch);
     const tgt = branches.find((b) => b.id === mrTarget);
-    const r = await createMergeRequest(token, project.id, activeBranch, mrTarget, `Scal ${src?.name} → ${tgt?.name}`);
+    const r = await createMergeRequest(token, project.id, activeBranch, mrTarget, t('cp.mergeName', { src: src?.name ?? '', tgt: tgt?.name ?? '' }));
     if (r.ok) { setError(null); await loadStatic(); } else setError(r.message);
   }
 
@@ -244,31 +228,28 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
 
   // Grupuj próby po eksperymencie — każda seria to osobny „notatnik" reprodukowalny.
   const byExperiment = new Map<string, CloudTrial[]>();
-  for (const t of trials ?? []) {
-    const arr = byExperiment.get(t.experimentId) ?? [];
-    arr.push(t);
-    byExperiment.set(t.experimentId, arr);
+  for (const tr of trials ?? []) {
+    const arr = byExperiment.get(tr.experimentId) ?? [];
+    arr.push(tr);
+    byExperiment.set(tr.experimentId, arr);
   }
 
   return (
     <main className="settings-view" id="main-content" tabIndex={-1}>
-      <button className="chip-btn" onClick={onBack}>← Wszystkie projekty</button>
+      <button className="chip-btn" onClick={onBack}>{t('cp.allProjects')}</button>
 
       <section className="settings-section">
         <h2>{project.name}</h2>
         <div className="stat-row">
-          <span>Twoja rola</span>
-          <span className={`project-role role-${project.role}`}>{project.role ? ROLE_LABEL[project.role] : ''}</span>
+          <span>{t('cp.yourRole')}</span>
+          <span className={`project-role role-${project.role}`}>{project.role ? t(ROLE_LABEL_KEYS[project.role]) : ''}</span>
         </div>
         {error && <div className="account-error" role="alert">{error}</div>}
       </section>
 
       <section className="settings-section">
-        <h2>Gałęzie (Scientific Git)</h2>
-        <p className="settings-hint">
-          Gałąź to nazwana linia pracy. Odgałęzienie kopiuje bieżące próby z rodowodem — możesz badać wariant hipotezy,
-          nie ruszając „main". Scalanie wnosi wyniki do innej gałęzi po recenzji; nic nie jest nadpisywane.
-        </p>
+        <h2>{t('cp.branches.h')}</h2>
+        <p className="settings-hint">{t('cp.branches.hint')}</p>
         <div className="branch-bar">
           {branches.map((b) => (
             <button
@@ -284,39 +265,36 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
         {canWrite && (
           <form className="account-form" onSubmit={handleCreateBranch}>
             <label className="account-field">
-              <span>Nowa gałąź (z „{branchName(activeBranch)}")</span>
-              <input type="text" value={newBranch} onChange={(e) => setNewBranch(e.target.value)} maxLength={80} placeholder="np. hipoteza-A" />
+              <span>{t('cp.newBranch', { base: branchName(activeBranch) })}</span>
+              <input type="text" value={newBranch} onChange={(e) => setNewBranch(e.target.value)} maxLength={80} placeholder={t('cp.newBranch.ph')} />
             </label>
             <label className="toggle-inline">
               <input type="checkbox" checked={forkOnCreate} onChange={(e) => setForkOnCreate(e.target.checked)} />
-              <span>skopiuj istniejące próby (fork)</span>
+              <span>{t('cp.forkCopy')}</span>
             </label>
-            <button className="chip-btn" type="submit" disabled={!newBranch.trim()}>⑂ Utwórz gałąź</button>
+            <button className="chip-btn" type="submit" disabled={!newBranch.trim()}>{t('cp.createBranch')}</button>
           </form>
         )}
       </section>
 
       <section className="settings-section">
-        <h2>Historia wersji · gałąź „{branchName(activeBranch)}"</h2>
-        <p className="settings-hint">
-          Uporządkowana, niezmienna historia prób tej gałęzi. Każda próba to „commit" z autorem, znacznikiem czasu i
-          zamrożoną prowieniencją (parametry, wyjścia, wersja modelu). Próby zapisujesz z eksperymentów-grafów (przycisk „☁ do chmury").
-        </p>
+        <h2>{t('cp.versionHistory', { branch: branchName(activeBranch) })}</h2>
+        <p className="settings-hint">{t('cp.versionHistory.hint')}</p>
         {trials === null ? (
-          <p className="settings-hint">Ładowanie…</p>
+          <p className="settings-hint">{t('cp.loading')}</p>
         ) : trials.length === 0 ? (
-          <p className="settings-hint">Ta gałąź nie ma jeszcze zapisanych prób.</p>
+          <p className="settings-hint">{t('cp.noBranchTrials')}</p>
         ) : (
           [...byExperiment.entries()].map(([experimentId, list]) => (
             <div className="cloud-experiment" key={experimentId}>
-              <div className="section-label">{experimentId} · {list.length} prób</div>
+              <div className="section-label">{experimentId} · {t('cp.trialsCount', { n: list.length })}</div>
               <div className="trial-list">
-                {list.map((t) => (
-                  <div key={t.id} className={`trial-row status-${t.status}`}>
-                    <span className="trial-idx">#{String(t.index).padStart(3, '0')}</span>
-                    <span className="trial-label">{t.label}{t.parentId && <span className="trial-fork" title="rodowód: odbita/scalona z innej próby"> ⑂</span>}</span>
-                    <span className={`trial-status status-${t.status}`}>{STATUS_LABEL[t.status]}</span>
-                    {t.modelVersion && <span className="cloud-modelver" title="wersja modelu (prowieniencja)">{t.modelVersion}</span>}
+                {list.map((tr) => (
+                  <div key={tr.id} className={`trial-row status-${tr.status}`}>
+                    <span className="trial-idx">#{String(tr.index).padStart(3, '0')}</span>
+                    <span className="trial-label">{tr.label}{tr.parentId && <span className="trial-fork" title={t('cp.trial.forkTitle')}> ⑂</span>}</span>
+                    <span className={`trial-status status-${tr.status}`}>{t(STATUS_LABEL_KEYS[tr.status])}</span>
+                    {tr.modelVersion && <span className="cloud-modelver" title={t('cp.trial.modelverTitle')}>{tr.modelVersion}</span>}
                   </div>
                 ))}
               </div>
@@ -326,21 +304,21 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
       </section>
 
       <section className="settings-section">
-        <h2>Scalenia (recenzja)</h2>
+        <h2>{t('cp.merges.h')}</h2>
         {canWrite && branches.length > 1 && (
           <div className="mr-open">
             <label className="account-field">
-              <span>Scal „{branchName(activeBranch)}" do:</span>
+              <span>{t('cp.mergeTo', { branch: branchName(activeBranch) })}</span>
               <select value={mrTarget} onChange={(e) => setMrTarget(e.target.value)}>
-                <option value="">— wybierz gałąź docelową —</option>
+                <option value="">{t('cp.chooseBranch')}</option>
                 {branches.filter((b) => b.id !== activeBranch).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </label>
-            <button className="chip-btn" onClick={handleOpenMr} disabled={!mrTarget}>Zgłoś scalenie do recenzji</button>
+            <button className="chip-btn" onClick={handleOpenMr} disabled={!mrTarget}>{t('cp.requestMerge')}</button>
           </div>
         )}
         {mrs.length === 0 ? (
-          <p className="settings-hint">Brak zgłoszeń scalenia.</p>
+          <p className="settings-hint">{t('cp.noMerges')}</p>
         ) : (
           <div className="mr-list">
             {mrs.map((mr) => (
@@ -349,14 +327,14 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
                   <span className="mr-title">{mr.title}</span>
                   <span className="mr-branches">{branchName(mr.sourceBranchId)} → {branchName(mr.targetBranchId)}</span>
                 </div>
-                <span className={`mr-status status-${mr.status}`}>{MERGE_STATUS_LABEL[mr.status]}{mr.status === 'merged' ? ` (${mr.mergedCount})` : ''}</span>
+                <span className={`mr-status status-${mr.status}`}>{t(MERGE_STATUS_KEYS[mr.status])}{mr.status === 'merged' ? ` (${mr.mergedCount})` : ''}</span>
                 {mr.status === 'open' && canReview && (
                   <div className="mr-actions">
-                    <button className="chip-btn tiny" onClick={() => handleDecide(mr.id, true)} title="Zatwierdź i scal">✓ scal</button>
-                    <button className="chip-btn tiny danger" onClick={() => handleDecide(mr.id, false)} title="Odrzuć">✕</button>
+                    <button className="chip-btn tiny" onClick={() => handleDecide(mr.id, true)} title={t('cp.mergeTitle')}>{t('cp.merge')}</button>
+                    <button className="chip-btn tiny danger" onClick={() => handleDecide(mr.id, false)} title={t('cp.rejectTitle')}>✕</button>
                   </div>
                 )}
-                {mr.status === 'open' && !canReview && <span className="mr-hint">czeka na recenzję (admin+)</span>}
+                {mr.status === 'open' && !canReview && <span className="mr-hint">{t('cp.awaitReview')}</span>}
               </div>
             ))}
           </div>
@@ -364,14 +342,14 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
       </section>
 
       <section className="settings-section">
-        <h2>Graf kontrybucji</h2>
+        <h2>{t('cp.contrib.h')}</h2>
         {contrib === null ? (
-          <p className="settings-hint">Ładowanie…</p>
+          <p className="settings-hint">{t('cp.loading')}</p>
         ) : contrib.totalTrials === 0 ? (
-          <p className="settings-hint">Brak prób do podsumowania.</p>
+          <p className="settings-hint">{t('cp.noContrib')}</p>
         ) : (
           <>
-            <p className="settings-hint">Łącznie {contrib.totalTrials} prób. Liczone z realnego autorstwa (nie metryka szacunkowa).</p>
+            <p className="settings-hint">{t('cp.contribTotal', { n: contrib.totalTrials })}</p>
             <div className="contrib-list">
               {contrib.contributors.map((c) => (
                 <div className="contrib-row" key={c.userId}>
@@ -388,15 +366,15 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
       </section>
 
       <section className="settings-section">
-        <h2>Współpracownicy</h2>
+        <h2>{t('cp.collaborators.h')}</h2>
         {members === null ? (
-          <p className="settings-hint">Ładowanie…</p>
+          <p className="settings-hint">{t('cp.loading')}</p>
         ) : (
           <div className="member-list">
             {members.map((m) => (
               <div className="member-row" key={m.userId}>
                 <span className="member-name">{m.displayName} <span className="account-email">{m.email}</span></span>
-                <span className={`project-role role-${m.role}`}>{ROLE_LABEL[m.role]}</span>
+                <span className={`project-role role-${m.role}`}>{t(ROLE_LABEL_KEYS[m.role])}</span>
               </div>
             ))}
           </div>
@@ -404,19 +382,19 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
         {canManageMembers(project.role) && (
           <form className="account-form" onSubmit={handleAddMember}>
             <label className="account-field">
-              <span>E-mail współpracownika</span>
+              <span>{t('cp.memberEmail')}</span>
               <input type="email" value={memberEmail} onChange={(e) => setMemberEmail(e.target.value)} required />
             </label>
             <label className="account-field">
-              <span>Rola</span>
+              <span>{t('cp.role')}</span>
               <select value={memberRole} onChange={(e) => setMemberRole(e.target.value as ProjectRole)}>
-                <option value="viewer">obserwator (odczyt)</option>
-                <option value="editor">edytor (zapis prób)</option>
-                <option value="admin">administrator (zarządza członkami, recenzuje scalenia)</option>
-                {project.role === 'owner' && <option value="owner">właściciel</option>}
+                <option value="viewer">{t('cp.roleOpt.viewer')}</option>
+                <option value="editor">{t('cp.roleOpt.editor')}</option>
+                <option value="admin">{t('cp.roleOpt.admin')}</option>
+                {project.role === 'owner' && <option value="owner">{t('cp.role.owner')}</option>}
               </select>
             </label>
-            <button className="chip-btn" type="submit" disabled={!memberEmail.trim()}>Dodaj / zmień rolę</button>
+            <button className="chip-btn" type="submit" disabled={!memberEmail.trim()}>{t('cp.addChangeRole')}</button>
           </form>
         )}
       </section>

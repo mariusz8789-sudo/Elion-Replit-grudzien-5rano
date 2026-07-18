@@ -12,6 +12,7 @@ import { DiscoveryShell, Panel, StatusPill } from './DiscoveryShell';
 import { StatCard, Donut } from '../charts/Charts';
 import { Icon } from '../Icon';
 import { buildInvestorPackage, type InvestorPackage } from '../../core/backend/client';
+import { useI18n } from '../../core/i18n';
 
 /** Representative campaign + validation input (illustrative); documents are real. */
 const SAMPLE_DOSSIER = {
@@ -36,6 +37,7 @@ const DOCS: { key: keyof InvestorPackage['documents']; label: string; icon: 'bri
 ];
 
 export function InvestorDashboardScreen() {
+  const { t } = useI18n();
   const [pkg, setPkg] = useState<InvestorPackage | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [doc, setDoc] = useState<keyof InvestorPackage['documents']>('investorReport');
@@ -50,19 +52,19 @@ export function InvestorDashboardScreen() {
   ];
 
   return (
-    <DiscoveryShell active="#/investor" title="Investor Dashboard" subtitle="Realny pakiet inwestorski — bez zmyślonych finansów"
+    <DiscoveryShell active="#/investor" title="Investor Dashboard" subtitle={t('inv.subtitle')}
       actions={<StatusPill kind="info">DID GENESIS FIND A DRUG? <strong>NO</strong></StatusPill>}>
-      <div className="ds-callout"><Icon name="alert" size={15} /> Genesis <strong>nie zmyśla ROI/NPV/IRR</strong>. Poniżej realny output modułu Investor Edition: gotowość zdolności + następny kamień milowy. IP/patent to niewiążące <strong>szkice</strong>.</div>
+      <div className="ds-callout"><Icon name="alert" size={15} /> {t('inv.callout.a')}<strong>{t('inv.callout.b')}</strong>{t('inv.callout.c')}<strong>{t('inv.callout.d')}</strong>{t('inv.callout.e')}</div>
 
       <div className="ds-grid ds-grid-4 ds-mt">
-        <StatCard label="Wygenerowane" value={SAMPLE_DOSSIER.benchmark.candidatesGenerated} sub="kandydaci (przykład)" accent="var(--cyan)" />
-        <StatCard label="Przetrwałe" value={SAMPLE_DOSSIER.benchmark.candidatesSurviving} sub="po filtrach" accent="var(--violet)" />
-        <StatCard label="Zadokowane" value={SAMPLE_DOSSIER.benchmark.dockedCount} sub="AutoDock Vina" accent="var(--green)" />
-        <StatCard label="Gotowość ogólna" value={SAMPLE_VALIDATION.readiness.overallBand} sub={`${(SAMPLE_VALIDATION.readiness.overall * 100).toFixed(0)}% (capped)`} accent="var(--gold)" />
+        <StatCard label={t('inv.stat.generated')} value={SAMPLE_DOSSIER.benchmark.candidatesGenerated} sub={t('inv.stat.generated.sub')} accent="var(--cyan)" />
+        <StatCard label={t('inv.stat.surviving')} value={SAMPLE_DOSSIER.benchmark.candidatesSurviving} sub={t('inv.stat.surviving.sub')} accent="var(--violet)" />
+        <StatCard label={t('inv.stat.docked')} value={SAMPLE_DOSSIER.benchmark.dockedCount} sub="AutoDock Vina" accent="var(--green)" />
+        <StatCard label={t('inv.stat.readiness')} value={SAMPLE_VALIDATION.readiness.overallBand} sub={`${(SAMPLE_VALIDATION.readiness.overall * 100).toFixed(0)}% (capped)`} accent="var(--gold)" />
       </div>
 
       <div className="ds-grid ds-grid-2 ds-mt">
-        <Panel title="Gotowość wg wymiaru (realne, z pułapami)" icon="chart">
+        <Panel title={t('inv.panel.readiness')} icon="chart">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
             {Object.entries(dims).map(([k, v]) => (
               <div key={k} className="ds-readiness-row">
@@ -73,15 +75,15 @@ export function InvestorDashboardScreen() {
             ))}
           </div>
         </Panel>
-        <Panel title="Alokacja wysiłku (ilustracyjna)" icon="briefcase">
+        <Panel title={t('inv.panel.alloc')} icon="briefcase">
           <Donut data={alloc} size={150} thickness={18} centerLabel="R&D" centerSub="focus" />
         </Panel>
       </div>
 
-      {err ? <div className="ds-empty ds-mt"><h4>Backend niedostępny</h4><p>{err}</p></div> : null}
+      {err ? <div className="ds-empty ds-mt"><h4>{t('mv.backendDown')}</h4><p>{err}</p></div> : null}
       {!pkg && !err ? <div className="skeleton ds-mt" style={{ height: 260 }} /> : null}
       {pkg ? (
-        <Panel title="Dokumenty inwestorskie (realny output)" icon="briefcase" className="ds-mt"
+        <Panel title={t('inv.panel.docs')} icon="briefcase" className="ds-mt"
           right={<StatusPill kind="warn">non-binding</StatusPill>}>
           <div className="ds-tabs">
             {DOCS.map((dd) => (

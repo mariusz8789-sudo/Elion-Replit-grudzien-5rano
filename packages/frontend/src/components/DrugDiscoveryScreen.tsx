@@ -6,31 +6,29 @@ import {
   type Project, type Capability, type Target, type Candidate, type CandidatePassport, type RankedCandidate,
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
+import { useI18n } from '../core/i18n';
 
 /**
  * Drug Discovery — reachable workspace (P6.9). Uczciwy przepływ na Backend
  * Compute Engine: projekt → cel biologiczny → kandydaci (realna cheminformatyka)
  * → paszport (realne właściwości + WIDOCZNE luki zdolności) → ranking. Nic tu nie
- * udaje dokowania/ADMET/toksyczności ani „leku".
+ * udaje dokowania/ADMET/toksyczności ani „leku". Wszystkie napisy przez seam i18n.
  */
 
-const STATUS_LABEL: Record<string, string> = {
-  AVAILABLE: 'dostępne', NOT_IMPLEMENTED: 'niezaimplementowane',
-  EXTERNAL_ENGINE_REQUIRED: 'wymaga zewn. silnika', MODEL_NOT_VALID_FOR_DOMAIN: 'model poza dziedziną',
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  AVAILABLE: 'dd.status.available', NOT_IMPLEMENTED: 'dd.status.notImplemented',
+  EXTERNAL_ENGINE_REQUIRED: 'dd.status.externalEngine', MODEL_NOT_VALID_FOR_DOMAIN: 'dd.status.outOfDomain',
 };
 
 export function DrugDiscoveryScreen() {
+  const { t } = useI18n();
   const session = useSession();
   if (!session) {
     return (
       <main className="settings-view" id="main-content" tabIndex={-1}>
         <section className="settings-section">
           <h2>Drug Discovery</h2>
-          <p className="settings-hint">
-            Zaloguj się, aby projektować cele biologiczne i oceniać kandydatów obliczeniowych. Platforma liczy realną
-            chemię (masa molowa, skład) i JAWNIE oznacza brakujące zdolności (dokowanie, ADMET, toksyczność) — niczego
-            nie zmyśla. To nie jest narzędzie diagnostyczne ani deklaracja skuteczności leku.
-          </p>
+          <p className="settings-hint">{t('dd.signin')}</p>
           <AccountPanel />
         </section>
       </main>
@@ -40,6 +38,8 @@ export function DrugDiscoveryScreen() {
 }
 
 function DrugWorkspace() {
+  const { t } = useI18n();
+  const statusLabel = (s: string) => (STATUS_LABEL_KEYS[s] ? t(STATUS_LABEL_KEYS[s]) : s);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -70,10 +70,10 @@ function DrugWorkspace() {
   const reload = useCallback(async () => {
     const token = getToken();
     if (!token || !projectId) return;
-    const [t, c, r] = await Promise.all([
+    const [tg, c, r] = await Promise.all([
       listTargets(token, projectId), listCandidates(token, projectId), getCandidateRanking(token, projectId),
     ]);
-    if (t.ok) setTargets(t.data);
+    if (tg.ok) setTargets(tg.data);
     if (c.ok) setCandidates(c.data);
     if (r.ok) setRanking(r.data);
   }, [projectId]);
@@ -92,7 +92,7 @@ function DrugWorkspace() {
     e.preventDefault();
     const token = getToken();
     if (!token || !projectId || !candFormula.trim()) return;
-    const r = await createCandidate(token, projectId, { label: candLabel.trim() || 'Kandydat', formula: candFormula.trim(), targetId: targets[0]?.id });
+    const r = await createCandidate(token, projectId, { label: candLabel.trim() || t('dd.cand.default'), formula: candFormula.trim(), targetId: targets[0]?.id });
     if (r.ok) { setCandLabel(''); setCandFormula(''); setError(null); await reload(); } else setError(r.message);
   }
 
@@ -108,16 +108,13 @@ function DrugWorkspace() {
   return (
     <main className="settings-view cde-view" id="main-content" tabIndex={-1}>
       <section className="settings-section">
-        <h2>Drug Discovery — projektowanie obliczeniowe</h2>
-        <p className="settings-hint">
-          Uczciwy przepływ: cel → kandydaci → paszport → ranking. Liczymy realną chemię; brakujące zdolności są widoczne.
-          „Kandydat obliczeniowy" ≠ lek. Każdy wymaga walidacji laboratoryjnej.
-        </p>
+        <h2>{t('dd.title')}</h2>
+        <p className="settings-hint">{t('dd.intro')}</p>
         {projects.length === 0 ? (
-          <p className="settings-hint">Nie masz projektu z prawem zapisu. Utwórz projekt w zakładce „Projekty".</p>
+          <p className="settings-hint">{t('dd.noProject')}</p>
         ) : (
           <label className="account-field">
-            <span>Projekt</span>
+            <span>{t('dd.project')}</span>
             <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -127,32 +124,32 @@ function DrugWorkspace() {
       </section>
 
       <section className="settings-section">
-        <h2>Cel biologiczny</h2>
+        <h2>{t('dd.target.h')}</h2>
         <div className="member-list">
-          {targets.map((t) => (
-            <div className="member-row" key={t.id}>
-              <span className="member-name">{t.name} {t.indication && <span className="account-email">{t.indication}</span>}</span>
-              <span className="project-role">{t.evidenceStatus}</span>
+          {targets.map((tg) => (
+            <div className="member-row" key={tg.id}>
+              <span className="member-name">{tg.name} {tg.indication && <span className="account-email">{tg.indication}</span>}</span>
+              <span className="project-role">{tg.evidenceStatus}</span>
             </div>
           ))}
         </div>
         <form className="account-form" onSubmit={addTarget}>
-          <label className="account-field"><span>Nazwa celu (gen/białko)</span>
-            <input type="text" value={targetName} onChange={(e) => setTargetName(e.target.value)} placeholder="np. EGFR" /></label>
-          <label className="account-field"><span>Wskazanie</span>
-            <input type="text" value={targetIndication} onChange={(e) => setTargetIndication(e.target.value)} placeholder="np. NSCLC" /></label>
-          <button className="chip-btn" type="submit" disabled={!targetName.trim()}>Zdefiniuj cel</button>
+          <label className="account-field"><span>{t('dd.target.name')}</span>
+            <input type="text" value={targetName} onChange={(e) => setTargetName(e.target.value)} placeholder={t('dd.ph.target')} /></label>
+          <label className="account-field"><span>{t('dd.target.indication')}</span>
+            <input type="text" value={targetIndication} onChange={(e) => setTargetIndication(e.target.value)} placeholder={t('dd.ph.indication')} /></label>
+          <button className="chip-btn" type="submit" disabled={!targetName.trim()}>{t('dd.target.define')}</button>
         </form>
       </section>
 
       <section className="settings-section">
-        <h2>Kandydaci molekularni</h2>
+        <h2>{t('dd.cand.h')}</h2>
         <form className="account-form" onSubmit={addCandidate}>
-          <label className="account-field"><span>Etykieta</span>
-            <input type="text" value={candLabel} onChange={(e) => setCandLabel(e.target.value)} placeholder="np. Aspiryna (ref)" /></label>
-          <label className="account-field"><span>Wzór sumaryczny (v1: bez nawiasów)</span>
-            <input type="text" value={candFormula} onChange={(e) => setCandFormula(e.target.value)} placeholder="np. C9H8O4" /></label>
-          <button className="chip-btn primary" type="submit" disabled={!candFormula.trim()}>Dodaj kandydata</button>
+          <label className="account-field"><span>{t('dd.cand.label')}</span>
+            <input type="text" value={candLabel} onChange={(e) => setCandLabel(e.target.value)} placeholder={t('dd.ph.label')} /></label>
+          <label className="account-field"><span>{t('dd.cand.formula')}</span>
+            <input type="text" value={candFormula} onChange={(e) => setCandFormula(e.target.value)} placeholder={t('dd.ph.formula')} /></label>
+          <button className="chip-btn primary" type="submit" disabled={!candFormula.trim()}>{t('dd.cand.add')}</button>
         </form>
         <div className="trial-list">
           {candidates.map((c) => {
@@ -162,7 +159,7 @@ function DrugWorkspace() {
                 {rk && <span className="trial-idx">#{rk.rank}</span>}
                 <span className="trial-label">{c.label} <span className="cloud-modelver">{c.formula}</span></span>
                 <span className="cloud-modelver">{c.molecularWeight ? `${c.molecularWeight.toFixed(2)} g/mol` : '—'}</span>
-                <button className="chip-btn tiny" onClick={() => openPassport(c.id)}>paszport</button>
+                <button className="chip-btn tiny" onClick={() => openPassport(c.id)}>{t('dd.passport')}</button>
               </div>
             );
           })}
@@ -171,12 +168,12 @@ function DrugWorkspace() {
 
       {passport && (
         <section className="settings-section">
-          <h2>Paszport kandydata · {passport.label}</h2>
+          <h2>{t('dd.passport.h')}{passport.label}</h2>
           <div className="cde-verdict rejected" role="status" style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}>
             {passport.verdict}
           </div>
 
-          <div className="section-label">Policzone właściwości (realne)</div>
+          <div className="section-label">{t('dd.calcProps')}</div>
           <div className="cde-results">
             {Object.entries(passport.calculatedProperties).map(([k, v]) => (
               <div className="cde-result pass" key={k}>
@@ -186,46 +183,46 @@ function DrugWorkspace() {
             ))}
           </div>
 
-          <div className="section-label">Składniki oceny</div>
+          <div className="section-label">{t('dd.scoreComponents')}</div>
           {passport.scoreComponents.map((s) => (
             <div className="cde-result" key={s.id}>
-              <span className={`project-role ${s.kind === 'heuristic' ? 'role-editor' : 'role-owner'}`}>{s.kind === 'heuristic' ? 'heurystyka' : 'obliczone'}</span>
+              <span className={`project-role ${s.kind === 'heuristic' ? 'role-editor' : 'role-owner'}`}>{s.kind === 'heuristic' ? t('dd.heuristic') : t('dd.computed')}</span>
               <span className="cde-result-label">{s.label}</span>
               <span className="cde-result-actual">{s.value}{s.unit ? ` ${s.unit}` : ''}</span>
               {s.note && <span className="cde-result-bound">{s.note}</span>}
             </div>
           ))}
 
-          <div className="section-label">Luki zdolności (CAPABILITY GAP DETECTED)</div>
+          <div className="section-label">{t('dd.capGaps')}</div>
           <div className="cde-market">
             {passport.capabilityGaps.map((g) => (
               <div className="cde-listing" key={g.id}>
                 <span className="cde-listing-name">{g.label}</span>
-                <span className="project-role role-viewer">{STATUS_LABEL[g.status] ?? g.status}</span>
+                <span className="project-role role-viewer">{statusLabel(g.status)}</span>
               </div>
             ))}
           </div>
 
-          <div className="section-label">Rekomendowane pomiary / obliczenia</div>
+          <div className="section-label">{t('dd.recommendations')}</div>
           {passport.measurementRecommendations.map((m) => (
-            <div className="cde-reason" key={m.capability}>• {m.label} — {m.requires ?? STATUS_LABEL[m.status]}</div>
+            <div className="cde-reason" key={m.capability}>• {m.label} — {m.requires ?? statusLabel(m.status)}</div>
           ))}
 
-          <div className="section-label">Wymagana walidacja laboratoryjna</div>
+          <div className="section-label">{t('dd.reqValidation')}</div>
           {passport.requiredLaboratoryValidation.map((v, i) => <div className="cde-reason" key={i}>• {v}</div>)}
 
-          <p className="settings-hint">Niepewność: {passport.uncertainty} · runIds: {passport.runIds.join(', ')}</p>
+          <p className="settings-hint">{t('dd.uncertainty')}{passport.uncertainty} · runIds: {passport.runIds.join(', ')}</p>
         </section>
       )}
 
       <section className="settings-section">
-        <h2>Manifest zdolności obliczeniowych</h2>
-        <p className="settings-hint">Co Genesis Lab realnie liczy, a co wymaga zewnętrznego silnika. Metody niedostępne NIGDY nie zwracają zmyślonych liczb.</p>
+        <h2>{t('dd.manifest.h')}</h2>
+        <p className="settings-hint">{t('dd.manifest.hint')}</p>
         <div className="cde-market">
           {capabilities.map((c) => (
             <div className="cde-listing" key={c.id}>
               <span className="cde-listing-name">{c.label}</span>
-              <span className={`project-role ${c.status === 'AVAILABLE' ? 'role-owner' : 'role-viewer'}`}>{STATUS_LABEL[c.status] ?? c.status}</span>
+              <span className={`project-role ${c.status === 'AVAILABLE' ? 'role-owner' : 'role-viewer'}`}>{statusLabel(c.status)}</span>
             </div>
           ))}
         </div>

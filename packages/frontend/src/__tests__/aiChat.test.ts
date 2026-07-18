@@ -35,6 +35,8 @@ describe('aiChat persistence + helpers', () => {
   });
   it('derives a short title and truncates long ones', async () => {
     const m = await import('../core/aiChat');
+    const { setLocale } = await import('../core/i18n');
+    setLocale('pl'); // the empty-title default now flows through the i18n seam
     expect(m.deriveTitle('  hello   world ')).toBe('hello world');
     expect(m.deriveTitle('x'.repeat(60)).endsWith('…')).toBe(true);
     expect(m.deriveTitle('')).toBe('Nowa rozmowa');

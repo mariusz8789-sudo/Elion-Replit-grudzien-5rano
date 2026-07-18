@@ -15,14 +15,16 @@ import {
   type Conversation, type ChatMessage, loadConversations, saveConversations, createConversation,
   sortConversations, deriveTitle, askDiscovery, newId, PROMPT_SUGGESTIONS,
 } from '../../core/aiChat';
+import { useI18n } from '../../core/i18n';
 
 const MODELS = [
-  { id: 'auto', label: 'Auto (serwer)', available: true },
+  { id: 'auto', labelKey: 'ai.model.auto', label: 'Auto', available: true },
   { id: 'opus', label: 'Claude Opus 4.8', available: false },
   { id: 'sonnet', label: 'Claude Sonnet 5', available: false },
 ];
 
 export function AIChatScreen() {
+  const { t } = useI18n();
   const [convs, setConvs] = useState<Conversation[]>(() => loadConversations());
   const [activeId, setActiveId] = useState<string | null>(() => loadConversations()[0]?.id ?? null);
   const [input, setInput] = useState('');
@@ -52,7 +54,7 @@ export function AIChatScreen() {
 
     const reply = await askDiscovery(q);
     const asstMsg: ChatMessage = reply.ok
-      ? { id: newId('m'), role: 'assistant', content: reply.answer, at: Date.now(), status: 'ok', provenance: 'Odpowiedź modelu ugruntowana na bazie wiedzy Genesis (backend /api/ask).' }
+      ? { id: newId('m'), role: 'assistant', content: reply.answer, at: Date.now(), status: 'ok', provenance: t('ai.msg.provenance') }
       : { id: newId('m'), role: 'assistant', content: reply.message, at: Date.now(), status: reply.kind === 'unavailable' ? 'unavailable' : 'error' };
     setAiStatus(reply.ok ? 'ready' : (reply.kind === 'unavailable' ? 'unavailable' : 'unknown'));
     // `withUser` is the freshest state (single-threaded; no mutation happened during await).
@@ -63,31 +65,31 @@ export function AIChatScreen() {
   const lastAssistant = active?.messages.slice().reverse().find((m) => m.role === 'assistant');
 
   return (
-    <DiscoveryShell active="#/ai-chat" title="AI Discovery Chat" subtitle="Asystent naukowy ugruntowany na bazie wiedzy Genesis — nigdy nie zmyśla"
+    <DiscoveryShell active="#/ai-chat" title="AI Discovery Chat" subtitle={t('ai.subtitle')}
       actions={aiStatus === 'unavailable'
-        ? <StatusPill kind="blocked">Asystent AI niedostępny</StatusPill>
+        ? <StatusPill kind="blocked">{t('ai.unavailable')}</StatusPill>
         : <StatusPill kind="info">grounded · honest</StatusPill>}>
       <div className="chat-layout">
         {/* History rail */}
         <aside className="chat-rail">
-          <button className="ds-btn ds-btn-primary chat-new" onClick={startNew}><Icon name="spark" size={15} /> Nowa rozmowa</button>
+          <button className="ds-btn ds-btn-primary chat-new" onClick={startNew}><Icon name="spark" size={15} /> {t('ai.new')}</button>
           <div className="chat-list">
-            {ordered.length === 0 ? <p className="ds-note" style={{ padding: '0.5rem' }}>Brak rozmów. Rozpocznij nową.</p> : null}
+            {ordered.length === 0 ? <p className="ds-note" style={{ padding: '0.5rem' }}>{t('ai.noConvs')}</p> : null}
             {ordered.map((c) => (
               <div key={c.id} className={`chat-item${c.id === activeId ? ' active' : ''}`}>
                 <button className="chat-item-main" onClick={() => setActiveId(c.id)}>
                   <Icon name={c.pinned ? 'spark' : 'book'} size={14} />
                   <span className="chat-item-title">{c.title}</span>
                 </button>
-                <button className="chat-item-act" title={c.pinned ? 'Odepnij' : 'Przypnij'} onClick={() => togglePin(c.id)}><Icon name={c.pinned ? 'check' : 'target'} size={13} /></button>
-                <button className="chat-item-act" title="Usuń" onClick={() => removeConv(c.id)}><Icon name="block" size={13} /></button>
+                <button className="chat-item-act" title={c.pinned ? t('ai.unpin') : t('ai.pin')} onClick={() => togglePin(c.id)}><Icon name={c.pinned ? 'check' : 'target'} size={13} /></button>
+                <button className="chat-item-act" title={t('ai.delete')} onClick={() => removeConv(c.id)}><Icon name="block" size={13} /></button>
               </div>
             ))}
           </div>
           <div className="chat-model">
-            <label className="ds-note">Model (future-ready)</label>
+            <label className="ds-note">{t('ai.model.label')}</label>
             <select defaultValue="auto">
-              {MODELS.map((m) => <option key={m.id} value={m.id} disabled={!m.available}>{m.label}{m.available ? '' : ' — wkrótce'}</option>)}
+              {MODELS.map((m) => <option key={m.id} value={m.id} disabled={!m.available}>{m.labelKey ? t(m.labelKey) : m.label}{m.available ? '' : t('ai.model.soon')}</option>)}
             </select>
           </div>
         </aside>
@@ -98,10 +100,10 @@ export function AIChatScreen() {
             {!active || active.messages.length === 0 ? (
               <div className="chat-welcome">
                 <span className="chat-welcome-icon"><Icon name="brain" size={30} /></span>
-                <h3>Asystent Genesis Discovery</h3>
-                <p className="ds-note">Zadaj pytanie o pipeline odkrywczy, ADMET, dokowanie, Truth Engine lub prowieniencję. Odpowiedzi są ugruntowane na realnej bazie wiedzy — a gdy model nie jest skonfigurowany, powiemy to wprost.</p>
+                <h3>{t('ai.welcome.title')}</h3>
+                <p className="ds-note">{t('ai.welcome.body')}</p>
                 <div className="chat-suggest">
-                  {PROMPT_SUGGESTIONS.map((s) => <button key={s} className="ds-chip" onClick={() => send(s)}>{s}</button>)}
+                  {PROMPT_SUGGESTIONS.map((k) => { const s = t(k); return <button key={k} className="ds-chip" onClick={() => send(s)}>{s}</button>; })}
                 </div>
               </div>
             ) : active.messages.map((m) => (
@@ -109,7 +111,7 @@ export function AIChatScreen() {
                 <span className="chat-avatar">{m.role === 'user' ? <Icon name="target" size={16} /> : <Icon name="brain" size={16} />}</span>
                 <div className="chat-bubble">
                   {m.role === 'assistant' && m.status === 'unavailable' ? (
-                    <div className="chat-unavailable"><Icon name="block" size={16} /><div><strong>Asystent AI niedostępny</strong><p className="ds-note">{m.content}</p></div></div>
+                    <div className="chat-unavailable"><Icon name="block" size={16} /><div><strong>{t('ai.unavailable')}</strong><p className="ds-note">{m.content}</p></div></div>
                   ) : m.role === 'assistant' ? <Markdown source={m.content} /> : <p className="md-p">{m.content}</p>}
                 </div>
               </div>
@@ -120,12 +122,12 @@ export function AIChatScreen() {
           {/* Follow-ups + provenance */}
           {lastAssistant && lastAssistant.status === 'ok' ? (
             <div className="chat-followups">
-              {['Rozwiń', 'Podaj źródła', 'Uprość'].map((f) => <button key={f} className="ds-chip" onClick={() => send(`${f}: ${active?.title}`)}>{f}</button>)}
+              {[t('ai.followup.expand'), t('ai.followup.sources'), t('ai.followup.simplify')].map((f) => <button key={f} className="ds-chip" onClick={() => send(`${f}: ${active?.title}`)}>{f}</button>)}
             </div>
           ) : null}
 
           <form className="chat-input" onSubmit={(e) => { e.preventDefault(); send(input); }}>
-            <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Zapytaj o naukę Genesis…" rows={1}
+            <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={t('ai.input.placeholder')} rows={1}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }} />
             <button type="submit" className="ds-btn ds-btn-primary" disabled={sending || !input.trim()}><Icon name="spark" size={16} /></button>
           </form>
@@ -133,18 +135,18 @@ export function AIChatScreen() {
 
         {/* Provenance panel */}
         <aside className="chat-prov">
-          <Panel title="Panel prowieniencji" icon="shield">
+          <Panel title={t('ai.prov.panel')} icon="shield">
             {lastAssistant?.provenance ? (
               <><p className="ds-para">{lastAssistant.provenance}</p><StatusPill kind="ok">grounded</StatusPill></>
             ) : (
-              <p className="ds-note">Prowieniencja pojawi się po pierwszej odpowiedzi asystenta. Genesis nigdy nie podaje odpowiedzi bez źródła — a gdy model jest niedostępny, mówi to wprost.</p>
+              <p className="ds-note">{t('ai.prov.empty')}</p>
             )}
             <hr className="chat-hr" />
-            <h5 className="ds-sub-h">Kontrakt uczciwości</h5>
+            <h5 className="ds-sub-h">{t('ai.honesty.title')}</h5>
             <ul className="ds-ul">
-              <li>Brak klucza modelu → jawny status „niedostępny".</li>
-              <li>Odpowiedzi ugruntowane na bazie wiedzy Genesis.</li>
-              <li>Żadne wyniki naukowe nie są zmyślane.</li>
+              <li>{t('ai.honesty.1')}</li>
+              <li>{t('ai.honesty.2')}</li>
+              <li>{t('ai.honesty.3')}</li>
             </ul>
           </Panel>
         </aside>

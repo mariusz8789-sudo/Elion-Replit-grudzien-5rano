@@ -18,6 +18,7 @@ import {
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
 import { PilotReportView } from './PilotReportView';
+import { useI18n } from '../core/i18n';
 
 const DECISION_CLASS: Record<KillSwitchDecision, string> = {
   GO: 'pill-ok', WARN: 'pill-warn', BLOCK: 'pill-danger', INSUFFICIENT_DATA: 'pill-neutral',
@@ -34,6 +35,7 @@ const numOr = (s: string): number | undefined => {
 const lines = (s: string): string[] => s.split('\n').map((x) => x.trim()).filter(Boolean);
 
 export function TruthEngineScreen() {
+  const { t } = useI18n();
   const session = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
@@ -93,7 +95,7 @@ export function TruthEngineScreen() {
     return (
       <div className="settings-view">
         <h2>🛑 Truth Engine / R&amp;D Kill-Switch</h2>
-        <p className="settings-hint">Zaloguj się, aby uruchamiać deterministyczne analizy pre-flight w kontekście projektu (najemcy).</p>
+        <p className="settings-hint">{t('te.signin')}</p>
         <AccountPanel />
       </div>
     );
@@ -133,7 +135,7 @@ export function TruthEngineScreen() {
 
   async function onRun() {
     const token = getToken();
-    if (!token || !projectId) { setError('Wybierz projekt.'); return; }
+    if (!token || !projectId) { setError(t('df.err.pickProject')); return; }
     setError(null); setBusy(true); setResult(null);
     const r = await runTruthAnalysis(token, projectId, buildProposal());
     setBusy(false);
@@ -175,89 +177,87 @@ export function TruthEngineScreen() {
     <div className="settings-view truth-engine">
       <h2>🛑 Truth Engine / R&amp;D Kill-Switch</h2>
       <p className="settings-hint">
-        Deterministyczna decyzja pre-flight <strong>zanim</strong> wydasz budżet: GO / WARN / BLOCK / INSUFFICIENT_DATA,
-        najtańszy test falsyfikujący i podpisany certyfikat. GO jest warunkiem <em>koniecznym, nie wystarczającym</em> —
-        nie jest twierdzeniem o poprawności naukowej. BLOCK dotyczy podanych założeń i zakodowanych sprawdzeń, nie „niemożliwości we wszechświecie".
+        {t('te.intro.a')}<strong>{t('te.intro.b')}</strong>{t('te.intro.c')}<em>{t('te.intro.d')}</em>{t('te.intro.e')}
       </p>
 
       <section className="settings-section">
-        <h3>1 · Kontekst</h3>
+        <h3>{t('te.s1')}</h3>
         <div className="form-grid">
-          <label>Projekt (najemca)
+          <label>{t('df.label.project')}
             <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-              {projects.length === 0 && <option value="">— brak projektów z prawem zapisu —</option>}
+              {projects.length === 0 && <option value="">{t('df.noWritableProjects')}</option>}
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </label>
         </div>
-        {necro && <p className="small muted">Pamięć porażek tego najemcy (Necropolis): <strong>{necro.total}</strong> region(ów).</p>}
+        {necro && <p className="small muted">{t('te.necroMem.a')}<strong>{necro.total}</strong>{t('te.necroMem.b')}</p>}
       </section>
 
       <section className="settings-section">
-        <h3>2 · Propozycja badawcza</h3>
+        <h3>{t('te.s2')}</h3>
         <div className="form-grid">
-          <label>Problem
-            <textarea rows={2} value={problemStatement} onChange={(e) => setProblemStatement(e.target.value)} placeholder="Co próbujesz osiągnąć?" />
+          <label>{t('te.problem')}
+            <textarea rows={2} value={problemStatement} onChange={(e) => setProblemStatement(e.target.value)} placeholder={t('te.problem.ph')} />
           </label>
-          <label>Proponowany mechanizm
+          <label>{t('te.mechanism')}
             <textarea rows={2} value={proposedMechanism} onChange={(e) => setProposedMechanism(e.target.value)} />
           </label>
-          <label>Roszczony wynik
-            <textarea rows={2} value={claimedResult} onChange={(e) => setClaimedResult(e.target.value)} placeholder="Np. sprawność 45%, przepływ 2 m³/s…" />
+          <label>{t('te.claimed')}
+            <textarea rows={2} value={claimedResult} onChange={(e) => setClaimedResult(e.target.value)} placeholder={t('te.claimed.ph')} />
           </label>
-          <label>Założenia (jedno na linię)
-            <textarea rows={3} value={assumptions} onChange={(e) => setAssumptions(e.target.value)} placeholder="izotermicznie&#10;stan ustalony" />
+          <label>{t('te.assumptions')}
+            <textarea rows={3} value={assumptions} onChange={(e) => setAssumptions(e.target.value)} placeholder={t('te.assumptions.ph')} />
           </label>
-          <label>Ograniczenia fizyczne (jedno na linię)
+          <label>{t('te.physConstraints')}
             <textarea rows={2} value={physicalConstraints} onChange={(e) => setPhysicalConstraints(e.target.value)} />
           </label>
-          <label>Materiały (nazwa, maxTemp, maxPressure — jeden na linię)
-            <textarea rows={2} value={materials} onChange={(e) => setMaterials(e.target.value)} placeholder="PVC, 60&#10;stal, 400, 250" />
+          <label>{t('te.materials')}
+            <textarea rows={2} value={materials} onChange={(e) => setMaterials(e.target.value)} placeholder={t('te.materials.ph')} />
           </label>
-          <label>Wymagane zdolności (jedna na linię)
+          <label>{t('te.reqCaps')}
             <textarea rows={2} value={requiredCapabilities} onChange={(e) => setRequiredCapabilities(e.target.value)} placeholder="molecular-docking" />
           </label>
-          <label>Domeny wymagające wiedzy (jedna na linię)
+          <label>{t('te.domains')}
             <textarea rows={2} value={requestedDomains} onChange={(e) => setRequestedDomains(e.target.value)} placeholder="oxygen-transfer-efficiency" />
           </label>
-          <label>Oczekiwana wydajność
+          <label>{t('te.expectedPerf')}
             <input value={expectedPerformance} onChange={(e) => setExpectedPerformance(e.target.value)} />
           </label>
-          <label>Szacowany koszt
+          <label>{t('te.estCost')}
             <input value={estimatedCost} onChange={(e) => setEstimatedCost(e.target.value)} />
           </label>
-          <label>Dowody / źródła
+          <label>{t('te.evidence')}
             <textarea rows={2} value={evidence} onChange={(e) => setEvidence(e.target.value)} />
           </label>
         </div>
       </section>
 
       <section className="settings-section">
-        <h3>3 · Dane strukturalne (dla deterministycznych ograniczeń)</h3>
-        <p className="settings-hint">Puste pola są pomijane (SKIPPED) — nigdy nie stają się cichym GO.</p>
+        <h3>{t('te.s3')}</h3>
+        <p className="settings-hint">{t('te.s3.hint')}</p>
         <div className="form-grid truth-numeric">
-          <label>Energia wejściowa<input type="number" value={energyIn} onChange={(e) => setEnergyIn(e.target.value)} /></label>
-          <label>Energia użyteczna wyj.<input type="number" value={energyOut} onChange={(e) => setEnergyOut(e.target.value)} /></label>
-          <label>Sprawność (0–1)<input type="number" value={efficiency} onChange={(e) => setEfficiency(e.target.value)} /></label>
-          <label>Przepływ Q<input type="number" value={flowQ} onChange={(e) => setFlowQ(e.target.value)} /></label>
-          <label>Objętość V<input type="number" value={flowV} onChange={(e) => setFlowV(e.target.value)} /></label>
-          <label>Czas t (przepływ)<input type="number" value={flowT} onChange={(e) => setFlowT(e.target.value)} /></label>
-          <label>Moc P<input type="number" value={powerP} onChange={(e) => setPowerP(e.target.value)} /></label>
-          <label>Energia E<input type="number" value={powerE} onChange={(e) => setPowerE(e.target.value)} /></label>
-          <label>Czas t (moc)<input type="number" value={powerT} onChange={(e) => setPowerT(e.target.value)} /></label>
-          <label>Temperatura pracy<input type="number" value={tempValue} onChange={(e) => setTempValue(e.target.value)} /></label>
-          <label>Temp. maks.<input type="number" value={tempMax} onChange={(e) => setTempMax(e.target.value)} /></label>
-          <label>Ciśnienie pracy<input type="number" value={presValue} onChange={(e) => setPresValue(e.target.value)} /></label>
-          <label>Ciśnienie maks.<input type="number" value={presMax} onChange={(e) => setPresMax(e.target.value)} /></label>
-          <label>Kontekst (Necropolis)<input value={context} onChange={(e) => setContext(e.target.value)} placeholder="reactor" /></label>
+          <label>{t('te.energyIn')}<input type="number" value={energyIn} onChange={(e) => setEnergyIn(e.target.value)} /></label>
+          <label>{t('te.energyOut')}<input type="number" value={energyOut} onChange={(e) => setEnergyOut(e.target.value)} /></label>
+          <label>{t('te.efficiency')}<input type="number" value={efficiency} onChange={(e) => setEfficiency(e.target.value)} /></label>
+          <label>{t('te.flowQ')}<input type="number" value={flowQ} onChange={(e) => setFlowQ(e.target.value)} /></label>
+          <label>{t('te.volumeV')}<input type="number" value={flowV} onChange={(e) => setFlowV(e.target.value)} /></label>
+          <label>{t('te.timeFlow')}<input type="number" value={flowT} onChange={(e) => setFlowT(e.target.value)} /></label>
+          <label>{t('te.powerP')}<input type="number" value={powerP} onChange={(e) => setPowerP(e.target.value)} /></label>
+          <label>{t('te.energyE')}<input type="number" value={powerE} onChange={(e) => setPowerE(e.target.value)} /></label>
+          <label>{t('te.timePower')}<input type="number" value={powerT} onChange={(e) => setPowerT(e.target.value)} /></label>
+          <label>{t('te.tempOp')}<input type="number" value={tempValue} onChange={(e) => setTempValue(e.target.value)} /></label>
+          <label>{t('te.tempMax')}<input type="number" value={tempMax} onChange={(e) => setTempMax(e.target.value)} /></label>
+          <label>{t('te.presOp')}<input type="number" value={presValue} onChange={(e) => setPresValue(e.target.value)} /></label>
+          <label>{t('te.presMax')}<input type="number" value={presMax} onChange={(e) => setPresMax(e.target.value)} /></label>
+          <label>{t('te.contextNecro')}<input value={context} onChange={(e) => setContext(e.target.value)} placeholder="reactor" /></label>
         </div>
         <details>
-          <summary>Zaawansowane: równania (JSON) i wektor parametrów (JSON)</summary>
+          <summary>{t('te.advanced')}</summary>
           <div className="form-grid">
-            <label>Równania (JSON: [{'{'}symbol, terms:[{'{'}symbol, dimension{'}'}]{'}'}])
+            <label>{t('te.equations')} (JSON: [{'{'}symbol, terms:[{'{'}symbol, dimension{'}'}]{'}'}])
               <textarea rows={3} value={equationsJson} onChange={(e) => setEquationsJson(e.target.value)} />
             </label>
-            <label>Wektor parametrów (JSON, dla dopasowania Necropolis)
+            <label>{t('te.paramVector')}
               <textarea rows={2} value={paramVectorJson} onChange={(e) => setParamVectorJson(e.target.value)} placeholder='{"T": 905}' />
             </label>
           </div>
@@ -266,7 +266,7 @@ export function TruthEngineScreen() {
 
       <div className="form-grid">
         <button className="primary-btn" disabled={busy || !projectId} onClick={() => void onRun()}>
-          {busy ? 'Analiza…' : 'Uruchom analizę pre-flight'}
+          {busy ? t('te.busy') : t('te.run')}
         </button>
       </div>
       {error && <p className="error-text" role="alert">{error}</p>}
@@ -276,9 +276,9 @@ export function TruthEngineScreen() {
       )}
 
       <section className="settings-section">
-        <h3>Historia analiz (ten najemca)</h3>
-        <p className="settings-hint">Zaznacz dwie analizy, aby je porównać (co się zmieniło, czy Necropolis wpłynął na późniejszą).</p>
-        {history.length === 0 && <p className="muted small">Brak analiz.</p>}
+        <h3>{t('te.history.h')}</h3>
+        <p className="settings-hint">{t('te.history.hint')}</p>
+        {history.length === 0 && <p className="muted small">{t('te.noAnalyses')}</p>}
         <ul className="plain-list truth-history">
           {history.map((h) => (
             <li key={h.id}>
@@ -288,20 +288,20 @@ export function TruthEngineScreen() {
                   <span className={`pill ${DECISION_CLASS[h.decision]}`}>{h.decision}</span>{' '}
                   <code className="small">{h.decisionHash.slice(0, 16)}…</code>
                 </button>
-                <button className="chip-btn tiny" onClick={() => void openReport(h.id)}>Raport</button>
+                <button className="chip-btn tiny" onClick={() => void openReport(h.id)}>{t('te.report')}</button>
               </label>
             </li>
           ))}
         </ul>
-        {compareSel.length === 2 && <button className="chip-btn primary" onClick={() => void doCompare()}>Porównaj wybrane</button>}
+        {compareSel.length === 2 && <button className="chip-btn primary" onClick={() => void doCompare()}>{t('te.compareSelected')}</button>}
         {comparison && <ComparisonView cmp={comparison} />}
       </section>
 
       {report && (
-        <div className="truth-report-overlay" role="dialog" aria-label="Raport pilotażowy">
+        <div className="truth-report-overlay" role="dialog" aria-label={t('te.report.aria')}>
           <div className="truth-report-actions no-print">
-            <button className="chip-btn primary" onClick={() => window.print()}>Drukuj / zapisz PDF</button>
-            <button className="chip-btn" onClick={() => setReport(null)}>Zamknij</button>
+            <button className="chip-btn primary" onClick={() => window.print()}>{t('te.print')}</button>
+            <button className="chip-btn" onClick={() => setReport(null)}>{t('ovl.close')}</button>
           </div>
           <PilotReportView report={report} />
         </div>
@@ -311,17 +311,18 @@ export function TruthEngineScreen() {
 }
 
 function ComparisonView({ cmp }: { cmp: AnalysisComparison }) {
+  const { t } = useI18n();
   return (
     <div className="truth-block truth-comparison">
-      <h4>Porównanie analiz</h4>
+      <h4>{t('te.cmp.h')}</h4>
       <p className="small">
-        Wcześniejsza <span className={`pill ${DECISION_CLASS[cmp.from]}`}>{cmp.from}</span>
-        {' → '}późniejsza <span className={`pill ${DECISION_CLASS[cmp.to]}`}>{cmp.to}</span>
+        {t('te.cmp.earlier')}<span className={`pill ${DECISION_CLASS[cmp.from]}`}>{cmp.from}</span>
+        {' → '}{t('te.cmp.later')}<span className={`pill ${DECISION_CLASS[cmp.to]}`}>{cmp.to}</span>
       </p>
       <p className={`small ${cmp.decisionChanged ? 'ok-text' : 'muted'}`}>
-        Decyzja {cmp.decisionChanged ? 'ZMIENIŁA SIĘ' : 'bez zmian'} · hash {cmp.decisionHashChanged ? 'inny' : 'identyczny'}
+        {t('te.cmp.decision')}{cmp.decisionChanged ? t('te.cmp.changed') : t('df.unchanged')}{t('te.cmp.hash')}{cmp.decisionHashChanged ? t('te.cmp.hashDiff') : t('te.cmp.hashSame')}
       </p>
-      {cmp.necropolis.newlyInfluenced && <p className="small error-text">Necropolis wpłynął na późniejszą decyzję (nowy martwy koniec dopasowany).</p>}
+      {cmp.necropolis.newlyInfluenced && <p className="small error-text">{t('te.cmp.necroInfluence')}</p>}
       {Object.entries(cmp.findingsChanged).map(([k, v]) => (
         (v.added.length > 0 || v.removed.length > 0) && (
           <div key={k} className="small">
@@ -347,58 +348,59 @@ function List({ title, items, kind }: { title: string; items: string[]; kind?: '
 }
 
 function TruthResult({ result, onReport }: { result: TruthAnalysis; onReport: () => void }) {
+  const { t } = useI18n();
   const d = result.decision;
   const f = d.cheapestFalsificationTest;
   return (
     <section className="settings-section truth-result">
       <div className="truth-result-head">
-        <h3>Decyzja R&amp;D Kill-Switch</h3>
-        {result.id && <button className="chip-btn" onClick={onReport}>Raport pilotażowy</button>}
+        <h3>{t('te.res.h')}</h3>
+        {result.id && <button className="chip-btn" onClick={onReport}>{t('te.res.pilotReport')}</button>}
       </div>
       <div className="metric-grid">
-        <div className="metric-cell"><span className="metric-label">Decyzja</span><span className={`pill ${DECISION_CLASS[d.decision]} metric-value`}>{DECISION_LABEL[d.decision]}</span></div>
-        <div className="metric-cell"><span className="metric-label">Siła decyzji</span><span className="metric-value">{d.decisionStrength}</span></div>
-        <div className="metric-cell"><span className="metric-label">Hash decyzji</span><code className="small">{result.certificate.decisionHash.slice(0, 16)}…</code></div>
-        <div className="metric-cell"><span className="metric-label">Hash propozycji</span><code className="small">{result.proposalHash.slice(0, 16)}…</code></div>
+        <div className="metric-cell"><span className="metric-label">{t('te.res.decision')}</span><span className={`pill ${DECISION_CLASS[d.decision]} metric-value`}>{DECISION_LABEL[d.decision]}</span></div>
+        <div className="metric-cell"><span className="metric-label">{t('te.res.strength')}</span><span className="metric-value">{d.decisionStrength}</span></div>
+        <div className="metric-cell"><span className="metric-label">{t('te.res.decisionHash')}</span><code className="small">{result.certificate.decisionHash.slice(0, 16)}…</code></div>
+        <div className="metric-cell"><span className="metric-label">{t('te.res.proposalHash')}</span><code className="small">{result.proposalHash.slice(0, 16)}…</code></div>
       </div>
 
-      <h4>Potok analizy</h4>
+      <h4>{t('te.res.pipeline')}</h4>
       <ul className="plain-list truth-stages">
         {result.stages.map((s) => (
           <li key={s.stage} className={`stage-${s.status.toLowerCase()}`}>
             <span className="stage-status">{s.status}</span> {s.stage}
-            {s.status === 'SKIPPED' && s.missing.length > 0 && <span className="muted small"> — brak: {s.missing.join(', ')}</span>}
+            {s.status === 'SKIPPED' && s.missing.length > 0 && <span className="muted small">{t('te.res.missing')}{s.missing.join(', ')}</span>}
           </li>
         ))}
       </ul>
 
-      <List title="Powody, by ZABIĆ projekt" items={d.reasonsToKill} kind="bad" />
-      <List title="Niespójności wymiarowe" items={d.dimensionalInconsistencies} kind="bad" />
-      <List title="Naruszenia ograniczeń fizycznych" items={d.physicalConstraintViolations} kind="bad" />
-      <List title="Naruszenia ograniczeń (rejestr)" items={d.constraintViolations.map((c) => `${c.id}: ${c.detail}`)} kind="bad" />
-      <List title="Znane martwe końce (Necropolis)" items={d.knownDeadEndSimilarities} kind="bad" />
-      <List title="Brakujące informacje" items={d.missingInformation} kind="warn" />
-      <List title="Nierozstrzygnięte założenia" items={d.unresolvedAssumptions} kind="warn" />
-      <List title="Luki zdolności" items={d.capabilityGaps} kind="warn" />
-      <List title="Domeny bez zakodowanej wiedzy" items={d.unsupportedDomains.map((u) => `${u.domain}: ${u.reason}`)} kind="warn" />
-      <List title="Powody, by NIE zabijać" items={d.reasonsNotToKill} kind="good" />
+      <List title={t('te.list.kill')} items={d.reasonsToKill} kind="bad" />
+      <List title={t('te.list.dimensional')} items={d.dimensionalInconsistencies} kind="bad" />
+      <List title={t('te.list.physViolations')} items={d.physicalConstraintViolations} kind="bad" />
+      <List title={t('te.list.constraintViolations')} items={d.constraintViolations.map((c) => `${c.id}: ${c.detail}`)} kind="bad" />
+      <List title={t('te.list.deadEnds')} items={d.knownDeadEndSimilarities} kind="bad" />
+      <List title={t('te.list.missingInfo')} items={d.missingInformation} kind="warn" />
+      <List title={t('te.list.unresolvedAssumptions')} items={d.unresolvedAssumptions} kind="warn" />
+      <List title={t('te.list.capGaps')} items={d.capabilityGaps} kind="warn" />
+      <List title={t('te.list.unsupportedDomains')} items={d.unsupportedDomains.map((u) => `${u.domain}: ${u.reason}`)} kind="warn" />
+      <List title={t('te.list.notKill')} items={d.reasonsNotToKill} kind="good" />
 
       {f && (
         <div className="truth-block">
-          <h4>Najtańszy test falsyfikujący</h4>
-          <p className="small">Cel: <strong>{f.targetAssumption}</strong></p>
-          <p className="small">Test: {f.recommendedTestType} <span className="muted">({f.relativeCostClass})</span></p>
-          <p className="small">Wejście: {f.requiredInput}</p>
+          <h4>{t('te.falsification')}</h4>
+          <p className="small">{t('te.fals.target')}<strong>{f.targetAssumption}</strong></p>
+          <p className="small">{t('te.fals.test')}{f.recommendedTestType} <span className="muted">({f.relativeCostClass})</span></p>
+          <p className="small">{t('te.fals.input')}{f.requiredInput}</p>
           <p className="muted small">{f.priorityReason}</p>
-          {f.expertReviewRequested && <p className="pill pill-warn">Wymaga przeglądu eksperta</p>}
+          {f.expertReviewRequested && <p className="pill pill-warn">{t('te.fals.expertReview')}</p>}
         </div>
       )}
 
       <div className="truth-block">
-        <h4>Certyfikat</h4>
-        <p className="small">Schemat: <code>{result.certificate.schema}</code></p>
-        <p className="small">Silniki wykonane: {result.certificate.enginesExecuted.join(', ')}</p>
-        <p className="small muted">Silniki pominięte: {result.certificate.enginesSkipped.map((s) => `${s.stage} (${s.reason})`).join('; ')}</p>
+        <h4>{t('te.cert.h')}</h4>
+        <p className="small">{t('te.cert.schema')}<code>{result.certificate.schema}</code></p>
+        <p className="small">{t('te.cert.enginesExec')}{result.certificate.enginesExecuted.join(', ')}</p>
+        <p className="small muted">{t('te.cert.enginesSkip')}{result.certificate.enginesSkipped.map((s) => `${s.stage} (${s.reason})`).join('; ')}</p>
         <p className="muted small">{d.boundedClaim}</p>
       </div>
     </section>

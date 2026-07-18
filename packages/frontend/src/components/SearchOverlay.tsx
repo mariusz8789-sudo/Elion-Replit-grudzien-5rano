@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildSearchIndex, filterSearchIndex, type SearchEntry } from '../core/search';
 import { track } from '../core/analytics';
 import { useFocusTrap } from '../core/useFocusTrap';
+import { useI18n } from '../core/i18n';
 
 /**
  * Paleta poleceń (Ctrl/Cmd+K lub „/"): szuka po nazwach i tagline'ach
  * laboratoriów/eksperymentów z rejestru pluginów — zero osobnej bazy danych.
  */
 export function SearchOverlay({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const index = useMemo(buildSearchIndex, []);
@@ -39,14 +41,14 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
         className="overlay-panel search-panel"
         role="dialog"
         aria-modal="true"
-        aria-label="Szukaj laboratorium lub eksperymentu"
+        aria-label={t('ovl.search.aria')}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <input
           ref={inputRef}
           type="search"
           className="glossary-search"
-          placeholder="Szukaj laboratorium lub eksperymentu…"
+          placeholder={t('ovl.search.placeholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -56,7 +58,7 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
           }}
         />
         {results.length === 0 ? (
-          <p className="empty-state" role="status">Brak wyników dla „{query}".</p>
+          <p className="empty-state" role="status">{t('ovl.search.noResults', { query })}</p>
         ) : (
           <ul className="search-results" role="listbox" aria-live="polite">
             {results.map((r, i) => (

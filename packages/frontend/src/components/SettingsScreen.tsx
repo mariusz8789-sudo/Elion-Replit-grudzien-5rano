@@ -4,18 +4,20 @@ import { getCounters, clearAnalytics, type AnalyticsEvent } from '../core/analyt
 import { getVisitedCount, getLogState, ACHIEVEMENTS } from '../core/discoveryLog';
 import { clearAll } from '../core/storage';
 import { AccountPanel } from './AccountPanel';
+import { useI18n } from '../core/i18n';
 
-const EVENT_LABELS: Record<AnalyticsEvent, string> = {
-  experiment_open: 'Otwarte eksperymenty',
-  ask_ai_used: 'Pytania do AI',
-  search_used: 'Użycia wyszukiwarki',
-  shortcut_used: 'Użycia skrótów klawiszowych',
-  discovery_log_viewed: 'Wizyty w dzienniku odkryć',
-  glossary_viewed: 'Wizyty w słowniczku',
-  custom_experiment_run: 'Uruchomione własne eksperymenty',
-  custom_experiment_saved: 'Zapisane własne eksperymenty',
-  what_if_opened: 'Otwarte scenariusze „Co by było, gdyby?"',
-  onboarding_finished: 'Ukończone wprowadzenie',
+/** Analytics event → its i18n label key (resolved at render so it follows the language). */
+const EVENT_LABEL_KEYS: Record<AnalyticsEvent, string> = {
+  experiment_open: 'set.ev.experiment_open',
+  ask_ai_used: 'set.ev.ask_ai_used',
+  search_used: 'set.ev.search_used',
+  shortcut_used: 'set.ev.shortcut_used',
+  discovery_log_viewed: 'set.ev.discovery_log_viewed',
+  glossary_viewed: 'set.ev.glossary_viewed',
+  custom_experiment_run: 'set.ev.custom_experiment_run',
+  custom_experiment_saved: 'set.ev.custom_experiment_saved',
+  what_if_opened: 'set.ev.what_if_opened',
+  onboarding_finished: 'set.ev.onboarding_finished',
 };
 
 /**
@@ -25,6 +27,7 @@ const EVENT_LABELS: Record<AnalyticsEvent, string> = {
  * dokładnie to, co jest zliczane) i skróty klawiszowe (dokumentacja).
  */
 export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding?: () => void }) {
+  const { t } = useI18n();
   const [settings, updateSettings] = useSettings();
   const [counters, setCounters] = useState(getCounters);
   const [logSummary, setLogSummary] = useState(() => ({
@@ -39,7 +42,7 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding?: ()
   };
 
   const handleClearAll = () => {
-    if (!window.confirm('To usunie wszystkie lokalne dane: ustawienia, dziennik odkryć i statystyki aktywności. Kontynuować?')) {
+    if (!window.confirm(t('set.confirmClearAll'))) {
       return;
     }
     clearAll();
@@ -53,146 +56,131 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding?: ()
   return (
     <main className="settings-view" id="main-content" tabIndex={-1}>
       <section className="settings-section">
-        <h2>Konto (chmura)</h2>
-        <p className="settings-hint">
-          Opcjonalne konto odblokowuje współdzielone Projekty i trwałe, reprodukowalne Serie Prób na serwerze —
-          zobacz zakładkę „Projekty" na ekranie głównym. Bez logowania Genesis OS działa w pełni lokalnie (offline).
-        </p>
+        <h2>{t('set.account.h')}</h2>
+        <p className="settings-hint">{t('set.account.hint')}</p>
         <AccountPanel />
       </section>
 
       <section className="settings-section">
-        <h2>Dostępność</h2>
+        <h2>{t('set.a11y.h')}</h2>
         <div className="control toggle-row">
-          <span>Ogranicz animacje</span>
+          <span>{t('set.a11y.reduceMotion')}</span>
           <button
             className="switch"
             role="switch"
             aria-checked={settings.reducedMotion}
-            aria-label="Ogranicz animacje"
+            aria-label={t('set.a11y.reduceMotion')}
             onClick={() => updateSettings({ reducedMotion: !settings.reducedMotion })}
           />
         </div>
         <div className="control toggle-row">
-          <span>Wysoki kontrast</span>
+          <span>{t('set.a11y.highContrast')}</span>
           <button
             className="switch"
             role="switch"
             aria-checked={settings.highContrast}
-            aria-label="Wysoki kontrast"
+            aria-label={t('set.a11y.highContrast')}
             onClick={() => updateSettings({ highContrast: !settings.highContrast })}
           />
         </div>
         <div className="control toggle-row">
-          <span>Kompaktowy Narrator</span>
+          <span>{t('set.a11y.compactNarrator')}</span>
           <button
             className="switch"
             role="switch"
             aria-checked={settings.compactNarrator}
-            aria-label="Kompaktowy Narrator"
+            aria-label={t('set.a11y.compactNarrator')}
             onClick={() => updateSettings({ compactNarrator: !settings.compactNarrator })}
           />
         </div>
       </section>
 
       <section className="settings-section">
-        <h2>Dźwięk</h2>
+        <h2>{t('set.sound.h')}</h2>
         <div className="control toggle-row">
-          <span>Dźwięki interfejsu</span>
+          <span>{t('set.sound.ui')}</span>
           <button
             className="switch"
             role="switch"
             aria-checked={settings.soundEnabled}
-            aria-label="Dźwięki interfejsu"
+            aria-label={t('set.sound.ui')}
             onClick={() => updateSettings({ soundEnabled: !settings.soundEnabled })}
           />
         </div>
-        <p className="settings-hint">
-          Krótkie, ciche dźwięki potwierdzające: wejście do laboratorium, start/pauza symulacji, odblokowana
-          odznaka, przejście epoki w Discovery Timeline, odpowiedź Narratora AI. Zero muzyki, zero pętli.
-        </p>
+        <p className="settings-hint">{t('set.sound.hint')}</p>
       </section>
 
       <section className="settings-section">
-        <h2>Prywatność</h2>
+        <h2>{t('set.privacy.h')}</h2>
         <div className="control toggle-row">
-          <span>Lokalna statystyka aktywności</span>
+          <span>{t('set.privacy.localStats')}</span>
           <button
             className="switch"
             role="switch"
             aria-checked={settings.analyticsEnabled}
-            aria-label="Lokalna statystyka aktywności"
+            aria-label={t('set.privacy.localStats')}
             onClick={() => updateSettings({ analyticsEnabled: !settings.analyticsEnabled })}
           />
         </div>
-        <p className="settings-hint">
-          Te liczniki nigdy nie opuszczają Twojego urządzenia — nie ma żadnego serwera analitycznego. Służą wyłącznie
-          do panelu poniżej.
-        </p>
+        <p className="settings-hint">{t('set.privacy.hint')}</p>
       </section>
 
       <section className="settings-section">
-        <h2>Twoja aktywność</h2>
+        <h2>{t('set.activity.h')}</h2>
         {counterEntries.length === 0 ? (
-          <p className="settings-hint">Jeszcze nic nie zliczono w tej sesji.</p>
+          <p className="settings-hint">{t('set.activity.empty')}</p>
         ) : (
           <div className="stat-list">
             {counterEntries.map(([event, count]) => (
               <div className="stat-row" key={event}>
-                <span>{EVENT_LABELS[event] ?? event}</span>
+                <span>{EVENT_LABEL_KEYS[event] ? t(EVENT_LABEL_KEYS[event]) : event}</span>
                 <span className="val">{count}</span>
               </div>
             ))}
           </div>
         )}
         <div className="stat-row">
-          <span>Laboratoria odwiedzone</span>
+          <span>{t('set.activity.labsVisited')}</span>
           <span className="val">{logSummary.visited} / {logSummary.totalLabs}</span>
         </div>
         <div className="stat-row">
-          <span>Odznaki odblokowane</span>
+          <span>{t('set.activity.badges')}</span>
           <span className="val">{logSummary.unlocked} / {logSummary.total}</span>
         </div>
-        <button className="chip-btn" onClick={handleClearAnalytics}>Wyczyść statystykę aktywności</button>
+        <button className="chip-btn" onClick={handleClearAnalytics}>{t('set.activity.clear')}</button>
       </section>
 
       {onReplayOnboarding && (
         <section className="settings-section">
-          <h2>Wprowadzenie</h2>
-          <p className="settings-hint">
-            Krótkie, interaktywne wprowadzenie pokazywane automatycznie przy pierwszym uruchomieniu. Możesz je
-            obejrzeć ponownie w każdej chwili — nie wpływa to na Twój zapisany postęp.
-          </p>
-          <button className="chip-btn" onClick={onReplayOnboarding}>🔁 Pokaż wprowadzenie ponownie</button>
+          <h2>{t('set.onb.h')}</h2>
+          <p className="settings-hint">{t('set.onb.hint')}</p>
+          <button className="chip-btn" onClick={onReplayOnboarding}>{t('set.onb.replay')}</button>
         </section>
       )}
 
       <section className="settings-section">
-        <h2>Skróty klawiszowe</h2>
+        <h2>{t('ovl.help.title')}</h2>
         <ShortcutsList />
       </section>
 
       <section className="settings-section">
-        <h2>Dane lokalne</h2>
-        <p className="settings-hint">
-          Domyślnie wszystko (ustawienia, dziennik odkryć, statystyka aktywności, próby lokalne) mieszka w
-          localStorage tej przeglądarki — bez konta i bez serwera. Trwałe Projekty w chmurze (po zalogowaniu) to
-          osobna, opcjonalna warstwa; ten przycisk czyści tylko dane lokalne.
-        </p>
-        <button className="chip-btn danger" onClick={handleClearAll}>Wyczyść wszystkie dane lokalne</button>
+        <h2>{t('set.local.h')}</h2>
+        <p className="settings-hint">{t('set.local.hint')}</p>
+        <button className="chip-btn danger" onClick={handleClearAll}>{t('set.local.clear')}</button>
       </section>
     </main>
   );
 }
 
 export function ShortcutsList() {
+  const { t } = useI18n();
   return (
     <div className="shortcuts-list">
-      <div className="shortcut-row"><kbd>Spacja</kbd><span>Pauza / start symulacji</span></div>
-      <div className="shortcut-row"><kbd>R</kbd><span>Reset symulacji</span></div>
-      <div className="shortcut-row"><kbd>/</kbd><span>Szukaj laboratorium lub eksperymentu</span></div>
-      <div className="shortcut-row"><kbd>?</kbd><span>Pokaż tę listę skrótów</span></div>
-      <div className="shortcut-row"><kbd>Esc</kbd><span>Zamknij okno wyszukiwania / pomocy</span></div>
+      <div className="shortcut-row"><kbd>{t('set.sc.spaceKey')}</kbd><span>{t('set.sc.space')}</span></div>
+      <div className="shortcut-row"><kbd>R</kbd><span>{t('set.sc.reset')}</span></div>
+      <div className="shortcut-row"><kbd>/</kbd><span>{t('ovl.search.aria')}</span></div>
+      <div className="shortcut-row"><kbd>?</kbd><span>{t('set.sc.question')}</span></div>
+      <div className="shortcut-row"><kbd>Esc</kbd><span>{t('set.sc.esc')}</span></div>
     </div>
   );
 }

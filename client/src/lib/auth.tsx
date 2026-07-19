@@ -1,0 +1,132 @@
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "./queryClient";
+import { getDeviceFingerprintHash } from "./deviceFingerprint";
+import type { User } from "@shared/schema";
+
+type AuthUser = Omit<User, "password">;
+
+interface LoginResult {
+  mfaRequired: boolean;
+  challengeToken?: string;
+}
+
+interface AuthContextType {
+  user: AuthUser | null;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  verifyMfa: (challengeToken: string, code: string) => Promise<void>;
+  register: (name: string, email: string, phone: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Reports this browser's fingerprint after a successful login/registration so the server's
+// duplicate-account heuristic (server/services/fraud.ts) has something to compare against.
+// Never blocks the auth flow - a failed report just means this one signal is missing.
+function reportDeviceFingerprint() {
+  getDeviceFingerprintHash()
+    .then((fingerprintHash) => apiRequest("POST", "/api/fraud/device-fingerprint", { fingerprintHash }))
+    .catch(() => undefined);
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  const { data: currentUser, isLoading } = useQuery<AuthUser>({
+    queryKey: ["/api/auth/me"],
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (currentUser) {
+      setUser(currentUser);
+    } else {
+      setUser(null);
+    }
+  }, [currentUser]);
+
+  const loginMutation = useMutation({
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const response = await apiRequest("POST", "/api/auth/login", { email, password });
+      return await response.json() as (AuthUser & { mfaRequired?: false }) | { mfaRequired: true; challengeToken: string };
+    },
+    onSuccess: (data) => {
+      if (!data.mfaRequired) {
+        setUser(data);
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        reportDeviceFingerprint();
+      }
+    },
+  });
+
+  const mfaVerifyMutation = useMutation({
+    mutationFn: async ({ challengeToken, code }: { challengeToken: string; code: string }) => {
+      const response = await apiRequest("POST", "/api/auth/mfa/verify", { challengeToken, code });
+      return await response.json() as AuthUser;
+    },
+    onSuccess: (data: AuthUser) => {
+      setUser(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      reportDeviceFingerprint();
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async ({ name, email, phone, password }: { name: string; email: string; phone: string; password: string }) => {
+      const response = await apiRequest("POST", "/api/auth/register", { name, email, phone, password });
+      return await response.json() as AuthUser;
+    },
+    onSuccess: (data: AuthUser) => {
+      setUser(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      reportDeviceFingerprint();
+    },
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/auth/logout", {});
+    },
+    onSuccess: () => {
+      setUser(null);
+      queryClient.clear();
+    },
+  });
+
+  const login = async (email: string, password: string): Promise<LoginResult> => {
+    const result = await loginMutation.mutateAsync({ email, password });
+    return result.mfaRequired
+      ? { mfaRequired: true, challengeToken: result.challengeToken }
+      : { mfaRequired: false };
+  };
+
+  const verifyMfa = async (challengeToken: string, code: string) => {
+    await mfaVerifyMutation.mutateAsync({ challengeToken, code });
+  };
+
+  const register = async (name: string, email: string, phone: string, password: string) => {
+    await registerMutation.mutateAsync({ name, email, phone, password });
+  };
+
+  const logout = async () => {
+    await logoutMutation.mutateAsync();
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, isLoading, login, verifyMfa, register, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+  return context;
+}

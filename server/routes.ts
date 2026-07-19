@@ -846,11 +846,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Only the assigned company/driver or an admin may drive status transitions
     // (the customer who placed the booking can view it, but not advance its status).
+    // NOTE: compare company identity only when BOTH sides actually have a company - a
+    // customer (companyId null) acting on an as-yet-unassigned booking (companyId null)
+    // must NOT satisfy this check via null === null, which would let any customer drive
+    // the status of any open booking they don't own.
     const user = req.user as User;
     const isAssignedDriver = existing.driverId
       ? (await storage.getDriver(existing.driverId))?.userId === user.id
       : false;
-    if (user.role !== "admin" && user.companyId !== existing.companyId && !isAssignedDriver) {
+    const isAssignedCompany = Boolean(user.companyId) && user.companyId === existing.companyId;
+    if (user.role !== "admin" && !isAssignedCompany && !isAssignedDriver) {
       return res.status(403).json({ message: "Not authorized to update this booking" });
     }
 
@@ -994,6 +999,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existing = await storage.getBooking(req.params.id);
       if (!existing) {
         return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // A company can only assign a driver/vehicle to a booking it has ALREADY been awarded
+      // through the customer's acceptance of its offer - it can never seize an open booking
+      // (or another company's booking) here, which would bypass the customer's choice in the
+      // competitive-bidding marketplace. Admins may assign directly for operational oversight.
+      if (user.role !== "admin" && existing.companyId !== companyId) {
+        return res.status(403).json({ message: "Your company can only assign a booking it has already been awarded" });
       }
 
       const booking = await storage.assignCompanyToBooking(req.params.id, companyId, driverId, vehicleId);

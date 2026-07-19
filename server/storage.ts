@@ -819,11 +819,19 @@ export class DbStorage implements IStorage {
     }
 
     // Conditional update guards against a race between concurrent assignment attempts (or
-    // against the offer-acceptance flow assigning the same booking first): only succeeds if
-    // the booking hasn't already been assigned to a company.
+    // against the offer-acceptance flow assigning the same booking first). It succeeds either
+    // when the booking is still unassigned (draft/posted - the admin/direct path) OR when it
+    // is already awarded to THIS company (accepted) and we're only (re)assigning its specific
+    // driver/vehicle. It can never overwrite a booking already awarded to a different company.
     const result = await db.update(bookings)
       .set({ companyId, driverId, vehicleId, status: "accepted", updatedAt: new Date() })
-      .where(and(eq(bookings.id, bookingId), inArray(bookings.status, ["draft", "posted"])))
+      .where(and(
+        eq(bookings.id, bookingId),
+        or(
+          inArray(bookings.status, ["draft", "posted"]),
+          and(eq(bookings.companyId, companyId), eq(bookings.status, "accepted")),
+        ),
+      ))
       .returning();
     return result[0];
   }

@@ -155,7 +155,8 @@ export interface IStorage {
   getCompanyBookings(companyId: string): Promise<Booking[]>;
   getCompanyMonthlyBookingCount(companyId: string): Promise<number>;
   getPublicBookings(): Promise<Booking[]>;
-  createBooking(booking: InsertBooking & { discountAmount?: string }): Promise<Booking>;
+  createBooking(booking: InsertBooking & { discountAmount?: string; status?: string }): Promise<Booking>;
+  publishBooking(id: string): Promise<Booking | undefined>;
   updateBookingStatus(id: string, status: string): Promise<Booking | undefined>;
   updateBookingDriver(id: string, driverId: string): Promise<Booking | undefined>;
   updateBookingCo2(id: string, co2Emission: string): Promise<Booking | undefined>;
@@ -742,13 +743,28 @@ export class DbStorage implements IStorage {
       .orderBy(desc(bookings.createdAt));
   }
 
-  async createBooking(insertBooking: InsertBooking & { discountAmount?: string }): Promise<Booking> {
+  async createBooking(insertBooking: InsertBooking & { discountAmount?: string; status?: string }): Promise<Booking> {
     const publicLink = randomUUID();
     const result = await db.insert(bookings).values({
       ...insertBooking,
       publicLink,
     }).returning();
     return result[0];
+  }
+
+  // Publish a booking to the public bidding marketplace. Only a booking still in
+  // "draft" is moved to "posted" (and made public) - once it has already been posted,
+  // accepted, or advanced further, the conditional WHERE makes this a safe no-op that
+  // returns the existing row rather than resurrecting a completed/cancelled booking.
+  async publishBooking(id: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ status: "posted", isPublic: true, updatedAt: new Date() })
+      .where(and(eq(bookings.id, id), eq(bookings.status, "draft")))
+      .returning();
+    if (result[0]) return result[0];
+    // Already published (or beyond) - return the current row so callers can treat
+    // publish as idempotent instead of a 404.
+    return this.getBooking(id);
   }
 
   async updateBookingStatus(id: string, status: string): Promise<Booking | undefined> {

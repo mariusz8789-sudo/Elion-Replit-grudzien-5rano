@@ -150,6 +150,10 @@ export default function BookingFlow() {
       totalPrice: quoteData.estimatedPrice.toFixed(2),
       co2Emission: co2Emission.toFixed(2),
       couponCode: couponCode.trim() || undefined,
+      // Publish the request to the bidding marketplace so companies can compete for
+      // it right away (server maps isPublic -> status "posted"). This is what makes
+      // the booking visible in the public feed and eligible to receive offers.
+      isPublic: true,
     });
   };
 

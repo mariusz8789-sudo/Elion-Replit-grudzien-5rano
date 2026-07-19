@@ -56,6 +56,27 @@ export default function CustomerDashboard() {
     },
   });
 
+  const publishBookingMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const response = await apiRequest("PATCH", `/api/bookings/${bookingId}/publish`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      toast({
+        title: "Published to marketplace",
+        description: "Transport companies can now see your request and send you competing offers.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Publish failed",
+        description: error.message || "Unable to publish booking. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const filteredBookings = bookings.filter((booking) => {
     const matchesSearch =
       booking.pickupAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -265,6 +286,18 @@ export default function CustomerDashboard() {
                   <Navigation className="w-4 h-4 mr-2" />
                   Live GPS Tracking
                 </Button>
+                {booking.status === "draft" && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => publishBookingMutation.mutate(booking.id)}
+                    disabled={publishBookingMutation.isPending}
+                    data-testid={`button-publish-${booking.id}`}
+                  >
+                    <Package className="w-4 h-4 mr-2" />
+                    {publishBookingMutation.isPending ? "Publishing..." : "Publish to Marketplace"}
+                  </Button>
+                )}
                 {(booking.status === "pending" || booking.status === "posted") && (
                   <OffersDialog bookingId={booking.id} />
                 )}
@@ -275,7 +308,7 @@ export default function CustomerDashboard() {
                     paymentStatus={booking.paymentStatus || undefined}
                   />
                 )}
-                {booking.status === "pending" && (
+                {(booking.status === "pending" || booking.status === "draft" || booking.status === "posted") && (
                   <Button
                     variant="outline"
                     size="sm"

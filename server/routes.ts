@@ -727,10 +727,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const distanceKm = Number(bookingData.estimatedDistance) * 1.60934;
       const co2Summary = calculateTripEnvironmentalSummary(distanceKm, BASELINE_VEHICLE_CLASS);
 
+      // A public booking is published straight to the bidding marketplace ("posted")
+      // so companies can see and compete for it immediately. isPublic defaults to true
+      // (see schema), so a booking is only held back as a private "draft" when the
+      // customer explicitly opts out with isPublic:false - which they can later publish
+      // via PATCH /api/bookings/:id/publish. Without this, a public booking would sit in
+      // "draft" forever - invisible to the public feed and un-biddable (the offers route
+      // requires isPublic && status === "posted"). Keeping status and isPublic in lockstep
+      // avoids the inconsistent "public draft" row (public flag true but never biddable).
+      const isPrivateDraft = bookingData.isPublic === false;
       const booking = await storage.createBooking({
         ...bookingData,
         totalPrice: finalPrice,
         discountAmount,
+        isPublic: !isPrivateDraft,
+        status: isPrivateDraft ? "draft" : "posted",
         co2Emission: String(co2Summary.estimatedCo2Kg),
       });
 
@@ -758,6 +769,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
+  });
+
+  // Publish a draft booking to the public bidding marketplace. Only the customer who
+  // owns the booking (or an admin) may publish it, and only while it is still a draft
+  // or already posted - once a company has been engaged (accepted/in_transit/...) the
+  // booking can no longer be reopened for competitive bidding.
+  app.patch("/api/bookings/:id/publish", requireAuth, async (req, res) => {
+    const existing = await storage.getBooking(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    const user = req.user as User;
+    if (existing.userId !== user.id && user.role !== "admin") {
+      return res.status(403).json({ message: "Only the booking's owner can publish it" });
+    }
+
+    if (existing.status !== "draft" && existing.status !== "posted") {
+      return res.status(409).json({
+        message: `This booking can no longer be published because it is already ${existing.status}`,
+      });
+    }
+
+    const booking = await storage.publishBooking(req.params.id);
+    res.json(booking);
   });
 
   app.patch("/api/bookings/:id/status", requireAuth, async (req, res) => {

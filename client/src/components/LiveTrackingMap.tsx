@@ -5,6 +5,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Navigation, Truck } from "lucide-react";
 import type { TrackingUpdate } from "@shared/schema";
+import {
+  haversineMeters,
+  interpolateLngLat,
+  interpolationDurationMs,
+  type LngLat,
+} from "@shared/mapInterpolation";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -23,6 +29,11 @@ export default function LiveTrackingMap({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const truckMarker = useRef<mapboxgl.Marker | null>(null);
+  // The position currently painted on screen (which may be mid-glide, distinct from the
+  // latest GPS target) and the in-flight animation frame, so a new ping can hand off smoothly
+  // from wherever the marker actually is rather than snapping.
+  const renderedPos = useRef<LngLat | null>(null);
+  const animFrame = useRef<number | null>(null);
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
 
   useEffect(() => {
@@ -88,43 +99,68 @@ export default function LiveTrackingMap({
     map.current.fitBounds(bounds, { padding: 100 });
 
     return () => {
+      if (animFrame.current) cancelAnimationFrame(animFrame.current);
+      animFrame.current = null;
       map.current?.remove();
       truckMarker.current = null;
+      renderedPos.current = null;
     };
   }, [pickupCoords, deliveryCoords]);
 
-  // Update live location from tracking updates
+  // Update live location from tracking updates. Rather than snapping the marker from its old
+  // coordinate to the new GPS ping, we glide it there with per-frame linear interpolation
+  // (requestAnimationFrame) so movement reads as continuous, Uber-style motion. A ping that
+  // arrives mid-glide cancels the current animation and re-targets from wherever the marker
+  // actually is, so it never jumps.
   useEffect(() => {
-    if (trackingUpdates.length > 0 && map.current) {
-      const latest = trackingUpdates[trackingUpdates.length - 1];
-      const coords: [number, number] = [
-        parseFloat(latest.lng as string),
-        parseFloat(latest.lat as string),
-      ];
-      setCurrentLocation(coords);
+    if (trackingUpdates.length === 0 || !map.current) return;
+    const latest = trackingUpdates[trackingUpdates.length - 1];
+    const target: LngLat = [parseFloat(latest.lng as string), parseFloat(latest.lat as string)];
+    if (Number.isNaN(target[0]) || Number.isNaN(target[1])) return;
+    setCurrentLocation(target);
 
-      // Move the existing truck marker instead of creating a new one each update — creating
-      // a fresh marker per tracking update (without ever removing the previous one) leaked a
-      // marker/popup per update and left multiple stacked truck icons on the map.
-      if (truckMarker.current) {
-        truckMarker.current.setLngLat(coords);
-        truckMarker.current.getPopup()?.setHTML(
-          `<strong>Current Location</strong><br/>${latest.note || "In transit"}`
-        );
-      } else {
-        truckMarker.current = new mapboxgl.Marker({ color: "#0ea5e9" })
-          .setLngLat(coords)
-          .setPopup(
-            new mapboxgl.Popup().setHTML(
-              `<strong>Current Location</strong><br/>${latest.note || "In transit"}`
-            )
-          )
-          .addTo(map.current);
-      }
+    const popupHtml = `<strong>Current Location</strong><br/>${latest.note || "In transit"}`;
 
-      // Pan to current location
-      map.current.flyTo({ center: coords, zoom: 13 });
+    // First fix: place the marker directly (nothing to glide from yet).
+    if (!truckMarker.current) {
+      truckMarker.current = new mapboxgl.Marker({ color: "#0ea5e9" })
+        .setLngLat(target)
+        .setPopup(new mapboxgl.Popup().setHTML(popupHtml))
+        .addTo(map.current);
+      renderedPos.current = target;
+      map.current.easeTo({ center: target, duration: 800 });
+      return;
     }
+
+    truckMarker.current.getPopup()?.setHTML(popupHtml);
+
+    const start = renderedPos.current ?? target;
+    const distance = haversineMeters(start, target);
+    if (distance < 0.5) {
+      truckMarker.current.setLngLat(target);
+      renderedPos.current = target;
+      return;
+    }
+
+    const duration = interpolationDurationMs(distance);
+    const startTime = performance.now();
+    if (animFrame.current) cancelAnimationFrame(animFrame.current);
+
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      const pos = interpolateLngLat(start, target, t);
+      truckMarker.current?.setLngLat(pos);
+      renderedPos.current = pos;
+      if (t < 1) {
+        animFrame.current = requestAnimationFrame(step);
+      } else {
+        animFrame.current = null;
+      }
+    };
+    animFrame.current = requestAnimationFrame(step);
+
+    // Gently keep the vehicle in view without yanking the zoom on every ping.
+    map.current.easeTo({ center: target, duration: Math.min(duration, 1500) });
   }, [trackingUpdates]);
 
   const centerOnTruck = () => {

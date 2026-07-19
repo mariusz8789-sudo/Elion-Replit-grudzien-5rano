@@ -65,6 +65,31 @@ function sanitizeUser(user: User): Omit<User, "password" | "mfaSecret" | "mfaBac
   return safe;
 }
 
+// Real-time discovery for carriers: when a customer's booking is published to the public
+// bidding marketplace, push a live "new job" signal to every company member so their
+// available-jobs feed and notification badge update instantly instead of polling. Only a
+// compact summary is sent (never the customer's private contact details) - clients use it
+// to invalidate their public-bookings query and show a toast. Best-effort: a delivery
+// failure must never block the booking that triggered it, so callers fire-and-forget.
+async function broadcastNewMarketplaceJob(booking: Booking): Promise<void> {
+  const broadcaster = getBroadcaster();
+  if (!broadcaster) return;
+  const memberIds = await storage.getCompanyMemberUserIds();
+  const summary = {
+    id: booking.id,
+    pickupAddress: booking.pickupAddress,
+    deliveryAddress: booking.deliveryAddress,
+    pickupDate: booking.pickupDate,
+    estimatedDistance: booking.estimatedDistance,
+    totalPrice: booking.totalPrice,
+    serviceId: booking.serviceId,
+    postedAt: booking.updatedAt ?? booking.createdAt,
+  };
+  for (const userId of memberIds) {
+    broadcaster.broadcastToUser(userId, { type: "marketplace:new_job", booking: summary });
+  }
+}
+
 // Recomputes and persists the booking's CO2 estimate now that a real vehicle is assigned -
 // called from both the direct company-assignment route and offer acceptance, the two paths
 // that can attach a vehicleId to a booking after its initial (baseline-only) estimate.
@@ -765,6 +790,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         runAutomationRules(booking.companyId, "booking.created", { booking }).catch((err) => console.error("Automation rules failed:", err.message));
       }
 
+      // Live signal to carriers the moment a public job hits the marketplace.
+      if (booking.status === "posted") {
+        broadcastNewMarketplaceJob(booking).catch((err) => console.error("Marketplace broadcast failed:", err.message));
+      }
+
       res.status(201).json(booking);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -792,7 +822,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
 
+    const wasDraft = existing.status === "draft";
     const booking = await storage.publishBooking(req.params.id);
+
+    // Only fan out the live "new job" signal on a real draft -> posted transition, so a
+    // redundant re-publish of an already-posted booking doesn't re-alert every carrier.
+    if (wasDraft && booking?.status === "posted") {
+      broadcastNewMarketplaceJob(booking).catch((err) => console.error("Marketplace broadcast failed:", err.message));
+    }
     res.json(booking);
   });
 

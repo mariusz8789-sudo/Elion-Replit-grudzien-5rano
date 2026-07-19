@@ -65,7 +65,7 @@ import {
   skills, workerProfiles, workerSkills, recurringRouteSubscriptions, companyServices
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, or, gte, lte, lt, isNull, inArray, ilike } from "drizzle-orm";
+import { eq, and, desc, sql, or, gte, lte, lt, isNull, isNotNull, inArray, ilike } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { encryptSecret, decryptSecret } from "./lib/crypto";
 import { linearTrendForecast, computeSeasonalityIndex, FORECAST_METHODOLOGY, MIN_MONTHS_FOR_FORECAST, type MonthlyValue } from "@shared/forecasting";
@@ -110,6 +110,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   linkUserToCompany(userId: string, companyId: string, role: "company" | "driver"): Promise<User | undefined>;
   getCompanyUsers(companyId: string): Promise<User[]>;
+  getCompanyMemberUserIds(): Promise<string[]>;
 
   // Security hardening: TOTP MFA (shared/totp.ts) + GDPR account anonymization. The password
   // step never establishes a session on its own once mfaEnabled is true - see
@@ -503,6 +504,14 @@ export class DbStorage implements IStorage {
 
   async getCompanyUsers(companyId: string): Promise<User[]> {
     return await db.select().from(users).where(eq(users.companyId, companyId));
+  }
+
+  // Every user that belongs to some company - the audience for a "new job on the
+  // marketplace" real-time signal, so carriers see fresh public bookings live instead
+  // of polling the feed. Returns ids only (all we need to fan out a WS broadcast).
+  async getCompanyMemberUserIds(): Promise<string[]> {
+    const rows = await db.select({ id: users.id }).from(users).where(isNotNull(users.companyId));
+    return rows.map((r) => r.id);
   }
 
   async setUserMfaSecret(userId: string, encryptedSecret: string): Promise<User | undefined> {

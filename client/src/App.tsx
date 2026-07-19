@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { CallProvider } from "./lib/CallProvider";
+import { MarketplaceLiveProvider } from "./lib/MarketplaceLiveProvider";
 import PointToPointLanding from "@/components/PointToPointLanding";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -302,10 +303,12 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <CallProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
+            <MarketplaceLiveProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Router />
+              </TooltipProvider>
+            </MarketplaceLiveProvider>
           </CallProvider>
         </AuthProvider>
       </QueryClientProvider>

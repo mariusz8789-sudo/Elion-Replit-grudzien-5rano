@@ -241,8 +241,21 @@ function OpenBookingsTab({ companyId }: { companyId: string }) {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-bold">Open Bookings</h2>
-        <p className="text-sm text-muted-foreground">Submit a price to bid on a customer's posted shipment.</p>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold">Open Bookings</h2>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+            title="New jobs appear here the moment a customer posts them"
+            data-testid="badge-live-feed"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            Live
+          </span>
+        </div>
+        <p className="text-sm text-muted-foreground">Submit a price to bid on a customer's posted shipment. This feed updates in real time as new jobs are posted.</p>
       </div>
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading...</p>

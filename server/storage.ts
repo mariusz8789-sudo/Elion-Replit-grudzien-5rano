@@ -334,7 +334,7 @@ export interface IStorage {
   // individual customer's request) and the Stripe Connect payout wiring behind them.
   getCompanyCapacityClaims(companyId: string): Promise<CapacityBooking[]>;
   updateCapacityBookingPayment(id: string, paymentIntentId: string, paymentStatus: string): Promise<CapacityBooking | undefined>;
-  isCompanyTrustedForCapacityNetwork(companyId: string): Promise<boolean>;
+  getCapacityNetworkTrustStatus(companyId: string): Promise<"ok" | "expired" | "missing">;
   setCompanyStripeConnectAccount(companyId: string, accountId: string): Promise<Company | undefined>;
   getCompanyByStripeConnectAccountId(accountId: string): Promise<Company | undefined>;
   setCompanyStripeConnectPayoutsEnabled(accountId: string, enabled: boolean): Promise<Company | undefined>;
@@ -454,6 +454,11 @@ export interface IStorage {
   deleteWebhookSubscription(id: string, companyId: string): Promise<boolean>;
   recordWebhookDelivery(subscriptionId: string, event: string, payload: unknown, responseStatus: number | undefined, success: boolean, error?: string): Promise<WebhookDelivery>;
 }
+
+// Thrown inside acceptCapacityBooking's transaction purely to force a rollback when the posting
+// no longer has room; caught immediately and turned into a normal { error } result. Using a
+// dedicated class (not a bare Error) keeps it from being confused with a real DB failure.
+class CapacityOverbookError extends Error {}
 
 export class DbStorage implements IStorage {
   // === USER OPERATIONS ===
@@ -1971,43 +1976,60 @@ export class DbStorage implements IStorage {
       .orderBy(desc(capacityBookings.createdAt));
   }
 
-  // Atomic: the posting's remaining capacity is only decremented if it still has enough
-  // free volume/weight/pallets AND is still open, in the same conditional UPDATE as the
-  // booking's pending->accepted transition - so two carriers (or the same carrier
-  // double-clicking) can never both accept requests that together overbook the posting.
+  // Race-safe accept. Two independent points of mutual exclusion, both enforced by Postgres
+  // row locks under the default READ COMMITTED isolation:
+  //
+  //  1. The pending->accepted flip is done FIRST as a conditional UPDATE. Two concurrent accepts
+  //     of the SAME booking serialize on that booking's row; only the first sees status='pending'
+  //     and proceeds, so the posting can never be decremented twice for one booking.
+  //  2. The capacity decrement is a conditional UPDATE guarded by `free >= requested`. Two accepts
+  //     of DIFFERENT bookings that together overbook serialize on the posting's row; the second
+  //     re-evaluates the guard against the first's committed value and matches 0 rows, so free
+  //     capacity can never go negative.
+  //
+  // If the decrement finds no room we throw to roll the whole transaction back, which also undoes
+  // the accept flip from step 1 - the booking stays pending rather than being stranded as
+  // "accepted" against a posting that never reserved its space.
   async acceptCapacityBooking(id: string): Promise<{ booking?: CapacityBooking; error?: string }> {
-    return await db.transaction(async (tx) => {
-      const bookingResult = await tx.select().from(capacityBookings).where(eq(capacityBookings.id, id));
-      const booking = bookingResult[0];
-      if (!booking) return { error: "Booking not found" };
-      if (booking.status !== "pending") return { error: "This request is no longer pending" };
+    try {
+      return await db.transaction(async (tx) => {
+        const claimed = await tx.update(capacityBookings)
+          .set({ status: "accepted" })
+          .where(and(eq(capacityBookings.id, id), eq(capacityBookings.status, "pending")))
+          .returning();
+        if (claimed.length === 0) {
+          const exists = await tx.select().from(capacityBookings).where(eq(capacityBookings.id, id));
+          return { error: exists.length === 0 ? "Booking not found" : "This request is no longer pending" };
+        }
+        const booking = claimed[0];
 
-      const postingUpdate = await tx.update(capacityPostings)
-        .set({
-          freeVolumeM3: sql`${capacityPostings.freeVolumeM3} - ${booking.volumeM3}`,
-          freeWeightKg: sql`${capacityPostings.freeWeightKg} - ${booking.weightKg}`,
-          freePalletSpaces: sql`${capacityPostings.freePalletSpaces} - ${booking.palletSpaces}`,
-        })
-        .where(and(
-          eq(capacityPostings.id, booking.postingId),
-          eq(capacityPostings.status, "open"),
-          gte(capacityPostings.freeVolumeM3, booking.volumeM3),
-          gte(capacityPostings.freeWeightKg, booking.weightKg),
-          gte(capacityPostings.freePalletSpaces, booking.palletSpaces),
-        ))
-        .returning();
+        const postingUpdate = await tx.update(capacityPostings)
+          .set({
+            freeVolumeM3: sql`${capacityPostings.freeVolumeM3} - ${booking.volumeM3}`,
+            freeWeightKg: sql`${capacityPostings.freeWeightKg} - ${booking.weightKg}`,
+            freePalletSpaces: sql`${capacityPostings.freePalletSpaces} - ${booking.palletSpaces}`,
+          })
+          .where(and(
+            eq(capacityPostings.id, booking.postingId),
+            eq(capacityPostings.status, "open"),
+            gte(capacityPostings.freeVolumeM3, booking.volumeM3),
+            gte(capacityPostings.freeWeightKg, booking.weightKg),
+            gte(capacityPostings.freePalletSpaces, booking.palletSpaces),
+          ))
+          .returning();
 
-      if (postingUpdate.length === 0) {
+        if (postingUpdate.length === 0) {
+          throw new CapacityOverbookError();
+        }
+
+        return { booking };
+      });
+    } catch (e) {
+      if (e instanceof CapacityOverbookError) {
         return { error: "Not enough capacity remaining on this posting" };
       }
-
-      const updatedBooking = await tx.update(capacityBookings)
-        .set({ status: "accepted" })
-        .where(and(eq(capacityBookings.id, id), eq(capacityBookings.status, "pending")))
-        .returning();
-
-      return { booking: updatedBooking[0] };
-    });
+      throw e;
+    }
   }
 
   async updateCapacityBookingStatus(id: string, fromStatuses: string[], toStatus: "rejected" | "cancelled"): Promise<CapacityBooking | undefined> {
@@ -2064,7 +2086,9 @@ export class DbStorage implements IStorage {
   // Minimum trust bar for the Return Trip Marketplace network launch (Etap 1): an approved,
   // unexpired carrier-authority (DOT/MC or national equivalent) or insurance document on file -
   // reuses the existing Document Center review workflow rather than a parallel approval system.
-  async isCompanyTrustedForCapacityNetwork(companyId: string): Promise<boolean> {
+  // Returns a tri-state so the caller can tell a company that never uploaded a document apart
+  // from one whose document was approved but has since expired (they need to *renew*, not upload).
+  async getCapacityNetworkTrustStatus(companyId: string): Promise<"ok" | "expired" | "missing"> {
     const now = new Date();
     const docs = await db.select().from(verificationDocuments).where(and(
       eq(verificationDocuments.holderType, "company"),
@@ -2072,7 +2096,9 @@ export class DbStorage implements IStorage {
       eq(verificationDocuments.status, "approved"),
       inArray(verificationDocuments.docType, ["carrier_authority", "insurance_certificate"]),
     ));
-    return docs.some((d) => !d.expiresAt || d.expiresAt > now);
+    if (docs.length === 0) return "missing";
+    if (docs.some((d) => !d.expiresAt || d.expiresAt > now)) return "ok";
+    return "expired";
   }
 
   async setCompanyStripeConnectAccount(companyId: string, accountId: string): Promise<Company | undefined> {

@@ -2331,10 +2331,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (posting.companyId === user.companyId) {
         return res.status(400).json({ message: "You cannot claim your own posting" });
       }
-      const trusted = await storage.isCompanyTrustedForCapacityNetwork(user.companyId);
-      if (!trusted) {
+      const trust = await storage.getCapacityNetworkTrustStatus(user.companyId);
+      if (trust === "missing") {
         return res.status(403).json({
           message: "Your company needs an approved carrier authority (DOT/MC) or insurance document on file before claiming network capacity - upload one in the Document Center.",
+        });
+      }
+      if (trust === "expired") {
+        return res.status(403).json({
+          message: "Your company's carrier authority / insurance document has expired. Renew it in the Document Center before claiming network capacity.",
         });
       }
 
@@ -2358,6 +2363,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       const booking = await storage.createCapacityBooking(bookingData, String(priceEur));
 
+      await storage.writeAuditLog(user.id, "capacity.claim_created", "capacity_booking", booking.id, {
+        postingId: posting.id,
+        postingCompanyId: posting.companyId,
+        claimingCompanyId: user.companyId,
+        priceEur,
+        volumeM3: Number(booking.volumeM3),
+        weightKg: Number(booking.weightKg),
+        palletSpaces: booking.palletSpaces,
+      }, req.ip);
+
       const companyUsers = await storage.getCompanyUsers(posting.companyId);
       await Promise.all(companyUsers.map((u) => storage.createNotification({
         userId: u.id,
@@ -2378,6 +2393,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // app: money never moves before both sides have committed). Automatic capture (not manual,
   // unlike the main booking flow) since there is no separate "delivery confirmation" step for
   // a capacity claim - accept + pay is the whole transaction.
+  //
+  // TODO(capacity-network refunds/disputes): there is deliberately NO refund/dispute/reversal
+  // path yet. Once a claim is paid, the split has already been transferred to the publishing
+  // company's Connect account; if the trip falls through, neither the claiming company nor the
+  // platform can currently claw the money back in-app. This is a conscious gap for the network's
+  // first pilot (small set of trusted, hand-vetted companies) - it MUST be built (Stripe
+  // Refund + reverse_transfer, plus a dispute status on the claim) before opening the network
+  // to companies that don't already trust each other. Tracked as a task in the project list.
   app.post("/api/capacity-bookings/:id/create-payment-intent", requireAuth, async (req, res) => {
     try {
       if (!isStripeConnectConfigured()) {
@@ -2516,6 +2539,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: "success",
         link: "/capacity",
       }).catch(() => undefined)));
+      await storage.writeAuditLog(user.id, "capacity.claim_accepted", "capacity_booking", booking.id, {
+        postingCompanyId: posting.companyId,
+        claimingCompanyId: booking.claimingCompanyId,
+        priceEur: Number(booking.priceEur),
+      }, req.ip);
     }
     res.json(result.booking);
   });
@@ -2534,6 +2562,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!updated) {
       return res.status(409).json({ message: "This request is no longer pending" });
     }
+    if (booking.claimingCompanyId) {
+      await storage.writeAuditLog(user.id, "capacity.claim_rejected", "capacity_booking", booking.id, {
+        postingCompanyId: posting.companyId,
+        claimingCompanyId: booking.claimingCompanyId,
+        priceEur: Number(booking.priceEur),
+      }, req.ip);
+    }
     res.json(updated);
   });
 
@@ -2551,6 +2586,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const updated = await storage.updateCapacityBookingStatus(req.params.id, ["pending", "accepted"], "cancelled");
     if (!updated) {
       return res.status(409).json({ message: "This request could not be cancelled" });
+    }
+    if (booking.claimingCompanyId) {
+      const posting = await storage.getCapacityPosting(booking.postingId);
+      await storage.writeAuditLog(user.id, "capacity.claim_cancelled", "capacity_booking", booking.id, {
+        postingCompanyId: posting?.companyId,
+        claimingCompanyId: booking.claimingCompanyId,
+        priceEur: Number(booking.priceEur),
+        cancelledFromStatus: booking.status,
+      }, req.ip);
     }
     res.json(updated);
   });
@@ -2853,7 +2897,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await handleRoadServiceOrderPayment(roadServiceOrderId, paymentIntent.id, true);
           }
           if (capacityBookingId) {
-            await storage.updateCapacityBookingPayment(capacityBookingId, paymentIntent.id, "captured");
+            const paidClaim = await storage.updateCapacityBookingPayment(capacityBookingId, paymentIntent.id, "captured");
+            if (paidClaim?.claimingCompanyId) {
+              const paidPosting = await storage.getCapacityPosting(paidClaim.postingId);
+              const { platformFeeEur, payoutEur } = calculateCapacityClaimSplit(Number(paidClaim.priceEur));
+              await storage.writeAuditLog(undefined, "capacity.claim_paid", "capacity_booking", paidClaim.id, {
+                postingCompanyId: paidPosting?.companyId,
+                claimingCompanyId: paidClaim.claimingCompanyId,
+                amountEur: Number(paidClaim.priceEur),
+                platformFeeEur,
+                payoutEur,
+                paymentIntentId: paymentIntent.id,
+              }, undefined);
+            }
           }
           break;
         }
@@ -2875,7 +2931,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await handleRoadServiceOrderPayment(failedRoadServiceOrderId, failedIntent.id, false);
           }
           if (failedCapacityBookingId) {
-            await storage.updateCapacityBookingPayment(failedCapacityBookingId, failedIntent.id, "failed");
+            const failedClaim = await storage.updateCapacityBookingPayment(failedCapacityBookingId, failedIntent.id, "failed");
+            if (failedClaim?.claimingCompanyId) {
+              const failedPosting = await storage.getCapacityPosting(failedClaim.postingId);
+              await storage.writeAuditLog(undefined, "capacity.claim_payment_failed", "capacity_booking", failedClaim.id, {
+                postingCompanyId: failedPosting?.companyId,
+                claimingCompanyId: failedClaim.claimingCompanyId,
+                amountEur: Number(failedClaim.priceEur),
+                paymentIntentId: failedIntent.id,
+              }, undefined);
+            }
           }
           break;
         }

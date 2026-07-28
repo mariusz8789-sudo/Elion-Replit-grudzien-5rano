@@ -104,6 +104,7 @@ import { buryHypothesis, assessHypothesis, exhume, listGraves, lessons } from '.
 import { runAndRecord } from './reasoning/discoveryEngine.mjs';
 import { diffArtifacts, replayArtifact, answerHistory } from './reasoning/replay.mjs';
 import { knowledgeTimeline, timelineSummary } from './reasoning/timeline.mjs';
+import { edgeCriticality, criticalReviewWorklist } from './reasoning/criticality.mjs';
 import { GRAPH_NODES, GRAPH_EDGES } from '@genesis-os/reasoning/knowledgeGraph';
 import { gradeEvidence, validateEvidence } from '@genesis-os/reasoning/evidence';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
@@ -316,6 +317,19 @@ export function handleApi(db, ctx) {
     // statement about the integrity of a public ledger.
     if (seg[1] === 'graph' && seg[2] === 'orphans' && method === 'GET') {
       return ok({ orphans: orphanReviews(db), snapshot: currentSnapshot(db)?.id ?? null });
+    }
+
+    // PUBLIC, and that is the point. A visiting expert must be able to see
+    // "these three claims decide what this platform concludes" BEFORE deciding
+    // whether to spend an hour on it. Putting the ask behind a registration
+    // form is what makes the ask refusable. Both are derived from the public
+    // graph and the public ledger, so nothing private is exposed.
+    if (seg[1] === 'criticality' && seg.length === 2 && method === 'GET') {
+      return ok(edgeCriticality(db, { limit: Number(ctx.query?.limit ?? 50) }));
+    }
+
+    if (seg[1] === 'review-priority' && seg.length === 2 && method === 'GET') {
+      return ok(criticalReviewWorklist(db, { limit: Number(ctx.query?.limit ?? 10) }));
     }
 
     // Everything below is tenant-scoped and therefore needs an identified user.

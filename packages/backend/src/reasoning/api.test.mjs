@@ -585,3 +585,36 @@ describe('the knowledge history over HTTP', () => {
     assert.equal(call('GET', '/api/reasoning/history-of-knowledge', { token: bobToken }).body.events.length, 0);
   });
 });
+
+describe('edge criticality is public, deliberately', () => {
+  test('the analysis needs no account', () => {
+    // A visiting expert must be able to see which claims decide the output
+    // before deciding whether to spend an hour on them. Putting this behind a
+    // registration form is what makes the ask refusable.
+    const r = call('GET', '/api/reasoning/criticality');
+    assert.equal(r.status, 200);
+    assert.ok(r.body.loadBearing > 0);
+    assert.equal(r.body.loadBearing + r.body.inert, r.body.edgesAnalysed);
+    assert.match(r.body.statement, /STRUCTURAL DEPENDENCE, not scientific importance/);
+  });
+
+  test('the review priority list needs no account either', () => {
+    const r = call('GET', '/api/reasoning/review-priority', { query: { limit: '5' } });
+    assert.equal(r.status, 200);
+    assert.ok(r.body.worklist.length > 0 && r.body.worklist.length <= 5);
+    assert.ok(r.body.worklist.every((e) => e.why.startsWith('If this claim is wrong:')));
+  });
+
+  test('the list shrinks as edges are confirmed', () => {
+    // The funnel this exists to create: a shorter ask each time somebody helps.
+    const before = call('GET', '/api/reasoning/review-priority', { query: { limit: '50' } }).body.total;
+    call('PUT', '/api/review/profile', { token: aliceToken, body: { displayName: 'Dr A', affiliation: 'Lab' } });
+    const target = call('GET', '/api/reasoning/review-priority', { query: { limit: '1' } }).body.worklist[0];
+    const submitted = call('POST', '/api/review/submit', {
+      token: aliceToken, body: { edgeKey: target.edgeKey, verdict: 'confirm' },
+    });
+    assert.equal(submitted.status, 201);
+    const after = call('GET', '/api/reasoning/review-priority', { query: { limit: '50' } }).body.total;
+    assert.equal(after, before - 1);
+  });
+});

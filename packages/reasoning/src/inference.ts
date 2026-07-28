@@ -113,13 +113,18 @@ export function explainPath(path: SignedPath): string[] {
 }
 
 /**
- * Net influence of one node on another across ALL documented paths. When paths
- * disagree the verdict is 'conflicting' and both sets are returned: the honest
- * answer to "does A help or hurt B?" is sometimes "the literature encodes both,
- * and here is each route".
+ * The verdict rule, over a set of already-computed paths.
+ *
+ * Extracted from `netInfluence` so a COUNTERFACTUAL — what the verdict becomes
+ * when one edge is removed — can be evaluated with the same rule rather than a
+ * copy of it. A second implementation of this rule would be a second source of
+ * truth for the most consequential decision in the system: whether two
+ * mechanisms agree, disagree, or are unconnected.
+ *
+ * Pure and cheap: it does no graph walking, so a caller can compute the paths
+ * once and re-judge many subsets of them.
  */
-export function netInfluence(from: GraphNodeId, to: GraphNodeId, maxHops = 4): InfluenceVerdict {
-  const paths = signedPaths(from, to, maxHops);
+export function verdictFromPaths(from: GraphNodeId, to: GraphNodeId, paths: SignedPath[]): InfluenceVerdict {
   const promoting = paths.filter((p) => p.net === 'promotes');
   const counteracting = paths.filter((p) => p.net === 'counteracts');
 
@@ -137,6 +142,16 @@ export function netInfluence(from: GraphNodeId, to: GraphNodeId, maxHops = 4): I
     confidence: leading ? leading.confidence : 0,
     explanation: leading ? explainPath(leading) : [],
   };
+}
+
+/**
+ * Net influence of one node on another across ALL documented paths. When paths
+ * disagree the verdict is 'conflicting' and both sets are returned: the honest
+ * answer to "does A help or hurt B?" is sometimes "the literature encodes both,
+ * and here is each route".
+ */
+export function netInfluence(from: GraphNodeId, to: GraphNodeId, maxHops = 4): InfluenceVerdict {
+  return verdictFromPaths(from, to, signedPaths(from, to, maxHops));
 }
 
 /* ------------------------- structural discovery ------------------------- */

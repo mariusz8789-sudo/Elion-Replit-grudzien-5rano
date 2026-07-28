@@ -24,8 +24,14 @@ const dockOn = docking.detect().available;
 const protOn = protein.detect().available;
 const rdkitOn = rdkitDetect().available;
 
+// Sonda uruchamia python3. Na hoście bez Pythona jej niedostępność jest
+// UCZCIWYM stanem, nie porażką testu — dokładnie tak, jak dla każdego silnika
+// niżej. Rozdzielamy więc dwa twierdzenia: co sonda mówi, gdy Python JEST, i co
+// mówi, gdy go NIE MA. Jedno z nich jest prawdziwe zawsze.
+const PROBE_OK = probeEnvironment().ok === true;
+
 describe('runtime scientific-environment audit', () => {
-  test('probe returns real runtime + honest per-engine statuses', () => {
+  test('probe returns real runtime + honest per-engine statuses', { skip: PROBE_OK ? false : 'Python probe unavailable' }, () => {
     const r = probeEnvironment();
     assert.equal(r.ok, true);
     assert.ok(r.runtime.os && r.runtime.python && r.runtime.cpuCount >= 1);
@@ -34,6 +40,14 @@ describe('runtime scientific-environment audit', () => {
     for (const e of Object.values(r.engines)) {
       assert.ok(['AVAILABLE', 'NOT_INSTALLED', 'BLOCKED_BY_RUNTIME'].includes(e.status));
     }
+  });
+
+  test('bez Pythona sonda zgłasza uczciwy błąd, nigdy zmyślonego runtime', { skip: PROBE_OK ? 'Python jest dostępny w tym środowisku' : false }, () => {
+    const r = probeEnvironment();
+    assert.equal(r.ok, false);
+    assert.match(r.error, /env_probe_unavailable|probe_failed/);
+    assert.equal(r.runtime, undefined, 'nieudana sonda nie może zwrócić runtime');
+    assert.equal(r.engines, undefined, 'nieudana sonda nie może zwrócić statusów silników');
   });
 });
 

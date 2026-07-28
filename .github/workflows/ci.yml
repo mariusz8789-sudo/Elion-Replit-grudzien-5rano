@@ -22,6 +22,26 @@ jobs:
           node-version: '22.18'
           cache: npm
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # RDKit only — deliberately NOT the whole of requirements-compute.txt.
+      #
+      # The public API surface (/api/v1/analyze, render/2d, render/3d) is RDKit
+      # all the way down, and its tests assert real chemistry: aspirin's formula,
+      # its InChIKey, an actual SVG. Without RDKit those endpoints correctly
+      # fail closed with 503 and the tests fail — which is what was turning this
+      # workflow red while the same suite passed on a workstation that happened
+      # to have the scientific stack installed.
+      #
+      # The heavy engines (PySCF, OpenMM, Vina, ADMET-AI) stay out: minutes of
+      # install and hundreds of megabytes for tests that already skip honestly
+      # when their engine is absent. RDKit is one 40 MB wheel and it is the only
+      # one the billable API path needs.
+      - name: Install RDKit (real chemistry for the API v1 tests)
+        run: python -m pip install --disable-pip-version-check 'rdkit>=2023.9'
+
       - name: Install dependencies
         run: npm ci
 

@@ -53,12 +53,24 @@ describe('maxRelativeDiff', () => {
   });
 });
 
+// snapshotEnvironment spawns the Python probe. On a host without Python it
+// returns { ok: false } by design; that is a state to assert, not a red build.
+const PROBE_OK = snapshotEnvironment().ok === true;
+
 describe('snapshotEnvironment', () => {
-  test('returns a stable hash for repeated probes of an unchanged runtime', () => {
+  test('returns a stable hash for repeated probes of an unchanged runtime', { skip: PROBE_OK ? false : 'Python probe unavailable' }, () => {
     const s1 = snapshotEnvironment();
     const s2 = snapshotEnvironment();
     assert.equal(s1.ok, true);
     assert.equal(s1.hash, s2.hash, 'unchanged runtime must fingerprint identically');
     assert.equal(s1.hash.length, 64);
+  });
+
+  test('an unprobeable runtime yields no hash at all, rather than a hash of nothing', { skip: PROBE_OK ? 'Python probe works here' : false }, () => {
+    const s = snapshotEnvironment();
+    assert.equal(s.ok, false);
+    assert.equal(s.hash, undefined, 'there is no such thing as a fingerprint of an unknown environment');
+    assert.equal(s.snapshot, undefined);
+    assert.ok(s.error);
   });
 });

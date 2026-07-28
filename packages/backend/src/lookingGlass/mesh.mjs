@@ -243,7 +243,11 @@ export function conceptsValidAt(db, cutoffYear) {
 export function classifyTargets(db, targets, cutoffYear) {
   const anachronistic = new Set(anachronisticConcepts(db, cutoffYear).map((c) => c.ui));
   return targets.map((t) => {
-    const involved = [t.aUi, t.cUi, ...(t.bridgeUis ?? [])].filter(Boolean);
+    // Both spellings are accepted because the benchmark harness names the field
+    // `expectedBridgeUis`. A target whose bridge is contaminated but whose
+    // endpoints are clean would otherwise pass the audit silently, which is the
+    // exact failure this function exists to prevent.
+    const involved = [t.aUi, t.cUi, ...(t.bridgeUis ?? []), ...(t.expectedBridgeUis ?? [])].filter(Boolean);
     const offending = involved.filter((ui) => anachronistic.has(ui));
     return {
       ...t,

@@ -251,7 +251,27 @@ export function recordIngest(db, { id, query, requested, retrieved, fromYear, to
  * with the square of concepts per article, and single-article pairs are almost
  * entirely indexing noise.
  */
-export function rebuildStatistics(db, { throughYear = null, minSupport = 2, majorOnly = false } = {}) {
+export function rebuildStatistics(db, { throughYear = null, minSupport = 2, majorOnly = false, enforceVocabulary = true, vocabularyGuard = null } = {}) {
+  // A time-sliced rebuild on an unaudited vocabulary produces statistics that
+  // LOOK historical and are not: NLM re-indexes older articles against newer
+  // descriptors, so a 2015 slice can carry 2020 concepts. Refusing here is the
+  // single most important fail-closed point in the module — every downstream
+  // claim about "what was knowable in year N" rests on this call.
+  let vocabulary = null;
+  if (throughYear !== null && enforceVocabulary) {
+    if (typeof vocabularyGuard !== 'function') {
+      throw new Error(
+        'rebuildStatistics: a time-sliced rebuild requires a vocabularyGuard (see mesh.mjs conceptsValidAt). '
+        + 'Pass enforceVocabulary:false only to build statistics you will NOT describe as historical.',
+      );
+    }
+    const guard = vocabularyGuard(db, throughYear);
+    if (!guard.auditable) {
+      throw new Error(`rebuildStatistics: vocabulary is not auditable at ${throughYear}. ${guard.reason}`);
+    }
+    vocabulary = new Set(guard.concepts);
+  }
+
   const yearClause = throughYear ? 'AND (ar.year IS NOT NULL AND ar.year <= ?)' : '';
   const majorClause = majorOnly ? 'AND an.is_major = 1' : '';
   const params = throughYear ? [throughYear] : [];
@@ -284,8 +304,37 @@ export function rebuildStatistics(db, { throughYear = null, minSupport = 2, majo
       HAVING COUNT(DISTINCT x.article_id) >= ?
     `).run(...params, minSupport);
 
+    if (vocabulary) {
+      // Drop every statistic that rests on a concept which did not exist at the
+      // cut-off. Done as a delete rather than a WHERE clause because SQLite
+      // cannot bind an array, and a temp table would survive a rollback.
+      const drop = (sql) => {
+        for (const row of db.prepare(sql).all()) {
+          if (!vocabulary.has(row.ui)) {
+            db.prepare('DELETE FROM lg_concept_stats WHERE concept_ui = ?').run(row.ui);
+            db.prepare('DELETE FROM lg_cooccurrence WHERE a_ui = ? OR b_ui = ?').run(row.ui, row.ui);
+          }
+        }
+      };
+      drop('SELECT concept_ui AS ui FROM lg_concept_stats');
+    }
+
+    // The denominator every association is measured against. It MUST be the
+    // number of articles in the slice, not in the database: a corpus holding
+    // 1990–2024 with statistics built through 2015 would otherwise divide by a
+    // total containing the very literature the slice exists to exclude, shifting
+    // every nPMI value and making the fixed thresholds mean something different
+    // at each cut-off.
+    const sliced = db.prepare(
+      `SELECT COUNT(*) AS n FROM lg_articles ${throughYear ? 'WHERE year IS NOT NULL AND year <= ?' : ''}`,
+    ).get(...params) ?? { n: 0 };
+
+    db.prepare('INSERT INTO lg_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run('stats_articles', String(sliced.n ?? 0));
     db.prepare('INSERT INTO lg_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
       .run('stats_through_year', throughYear === null ? 'all' : String(throughYear));
+    db.prepare('INSERT INTO lg_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run('stats_vocabulary_enforced', vocabulary ? 'yes' : 'no');
     db.prepare('INSERT INTO lg_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
       .run('stats_min_support', String(minSupport));
 
@@ -301,14 +350,23 @@ export function corpusStats(db) {
   const one = (sql, ...args) => db.prepare(sql).get(...args) ?? {};
   const articles = one('SELECT COUNT(*) AS n, MIN(year) AS lo, MAX(year) AS hi FROM lg_articles');
   const bySource = db.prepare('SELECT source, COUNT(*) AS n FROM lg_articles GROUP BY source').all();
+  const statsArticles = one('SELECT value AS v FROM lg_meta WHERE key = ?', 'stats_articles').v;
   return {
     articles: articles.n ?? 0,
+    /**
+     * Articles the current statistics were built from — the correct denominator
+     * for any association measure. Equal to `articles` unless a time slice is in
+     * force. Falls back to `articles` before the first rebuild.
+     */
+    statsArticles: statsArticles === undefined || statsArticles === null ? (articles.n ?? 0) : Number(statsArticles),
     yearRange: [articles.lo ?? null, articles.hi ?? null],
     bySource: Object.fromEntries(bySource.map((r) => [r.source, r.n])),
     concepts: one('SELECT COUNT(*) AS n FROM lg_concepts').n ?? 0,
     annotations: one('SELECT COUNT(*) AS n FROM lg_annotations').n ?? 0,
     pairs: one('SELECT COUNT(*) AS n FROM lg_cooccurrence').n ?? 0,
     statsThroughYear: one('SELECT value AS v FROM lg_meta WHERE key = ?', 'stats_through_year').v ?? null,
+    /** Whether post-cut-off vocabulary was excluded. 'no' on a time slice means the numbers are NOT historical. */
+    vocabularyEnforced: one('SELECT value AS v FROM lg_meta WHERE key = ?', 'stats_vocabulary_enforced').v ?? 'no',
     minSupport: Number(one('SELECT value AS v FROM lg_meta WHERE key = ?', 'stats_min_support').v ?? 0),
   };
 }

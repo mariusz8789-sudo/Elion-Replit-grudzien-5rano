@@ -1,6 +1,19 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openCorpus, ingestArticles, rebuildStatistics, corpusStats, cooccurrence, isCitable, mapNode, conceptsForNode } from './store.mjs';
+import { loadDescriptors, conceptsValidAt } from './mesh.mjs';
+
+/**
+ * Two rebuild helpers, and the difference between them is the point.
+ *
+ * `mechanics()` builds statistics WITHOUT a vocabulary guard and says so: these
+ * tests exercise ABC mechanics and must never be read as historical claims.
+ * `historical()` loads a descriptor vocabulary and enforces it, which is what a
+ * retrospective claim actually requires.
+ */
+const mechanics = (db, opts = {}) => rebuildStatistics(db, { minSupport: 2, enforceVocabulary: false, ...opts });
+const historical = (db, throughYear, opts = {}) =>
+  rebuildStatistics(db, { throughYear, minSupport: 2, vocabularyGuard: conceptsValidAt, ...opts });
 import { npmi, association, openDiscovery, closedDiscovery, citationsForChain } from './swanson.mjs';
 
 /**
@@ -92,7 +105,7 @@ describe('association measure', () => {
   });
 
   test('reports a non-co-occurring pair as cooccurs:false rather than throwing', () => {
-    rebuildStatistics(db, { throughYear: 2015, minSupport: 2 });
+    mechanics(db, { throughYear: 2015 });
     const a = association(db, 'FXA', 'FXC', corpusStats(db).articles);
     assert.equal(a.cooccurs, false);
     assert.equal(a.bothArticles, 0);
@@ -100,7 +113,7 @@ describe('association measure', () => {
 });
 
 describe('open discovery (Swanson ABC)', () => {
-  beforeEach(() => rebuildStatistics(db, { throughYear: 2015, minSupport: 2 }));
+  beforeEach(() => mechanics(db, { throughYear: 2015 }));
 
   test('finds the target that the literature implies but never states', () => {
     const result = openDiscovery(db, 'FXA', { minCArticles: 10 });
@@ -147,16 +160,33 @@ describe('open discovery (Swanson ABC)', () => {
 });
 
 describe('retrospective validation — the capability that matters', () => {
+  /** A vocabulary in which every fixture concept predates the cut-off. */
+  function loadFixtureVocabulary() {
+    loadDescriptors(db, Object.values(CONCEPTS).map((c) => ({
+      ui: c.ui, name: c.name, treeNumbers: ['G01.001'],
+      dateEstablished: '1990-01-01', dateCreated: '1990-01-01', vocabularyYear: 2015,
+    })));
+  }
+
+  test('a time-sliced rebuild REFUSES to run without an audited vocabulary', () => {
+    // The single most important fail-closed point: statistics that look
+    // historical but are not would invalidate every downstream claim.
+    assert.throws(() => rebuildStatistics(db, { throughYear: 2015 }), /requires a vocabularyGuard/);
+    assert.throws(() => historical(db, 2015), /not auditable/);
+  });
+
   test('a pre-2016 corpus proposes a link that was only published in 2020', () => {
+    loadFixtureVocabulary();
     // Build the corpus AS OF 2015. The A–C papers (2020) are excluded.
-    rebuildStatistics(db, { throughYear: 2015, minSupport: 2 });
+    historical(db, 2015);
+    assert.equal(corpusStats(db).vocabularyEnforced, 'yes');
     assert.equal(cooccurrence(db, 'FXA', 'FXC'), null, 'A and C must not co-occur in the 2015 corpus');
 
     const proposed = openDiscovery(db, 'FXA', { minCArticles: 10 }).candidates.some((c) => c.target.ui === 'FXC');
     assert.ok(proposed, 'the 2015 corpus should imply the link');
 
     // Now include everything. The link exists in the literature.
-    rebuildStatistics(db, { throughYear: null, minSupport: 2 });
+    mechanics(db, { throughYear: null });
     const now = cooccurrence(db, 'FXA', 'FXC');
     assert.ok(now, 'A and C DO co-occur once 2020 is included');
     assert.equal(now.first_year, 2020);
@@ -167,18 +197,19 @@ describe('retrospective validation — the capability that matters', () => {
   });
 
   test('closed discovery states plainly whether A and C ever co-occur', () => {
-    rebuildStatistics(db, { throughYear: 2015, minSupport: 2 });
+    loadFixtureVocabulary();
+    historical(db, 2015);
     const before = closedDiscovery(db, 'FXA', 'FXC');
     assert.equal(before.aAndCEverCoOccur, false);
     assert.ok(before.bridges.length >= 2, 'both intermediates should be recoverable');
 
-    rebuildStatistics(db, { throughYear: null, minSupport: 2 });
+    mechanics(db, { throughYear: null });
     assert.equal(closedDiscovery(db, 'FXA', 'FXC').aAndCEverCoOccur, true);
   });
 });
 
 describe('citations and provenance', () => {
-  beforeEach(() => rebuildStatistics(db, { throughYear: 2015, minSupport: 2 }));
+  beforeEach(() => mechanics(db, { throughYear: 2015 }));
 
   test('every link in a chain resolves to concrete articles', () => {
     const cites = citationsForChain(db, 'FXA', 'FXB', 'FXC');
@@ -205,26 +236,26 @@ describe('citations and provenance', () => {
 
 describe('corpus hygiene', () => {
   test('re-ingesting the same articles does not inflate counts', () => {
-    rebuildStatistics(db, { throughYear: null, minSupport: 2 });
+    mechanics(db, { throughYear: null });
     const before = corpusStats(db);
     const beforePair = cooccurrence(db, 'FXA', 'FXB');
 
     ingestArticles(db, papers('AB', 12, [CONCEPTS.A, CONCEPTS.B, CONCEPTS.NOISE], 2010), { source: 'fixture', now: 2 });
-    rebuildStatistics(db, { throughYear: null, minSupport: 2 });
+    mechanics(db, { throughYear: null });
 
     assert.equal(corpusStats(db).articles, before.articles, 'duplicate ingest must not add articles');
     assert.equal(cooccurrence(db, 'FXA', 'FXB').articles, beforePair.articles, 'nor inflate co-occurrence');
   });
 
   test('minSupport prunes single-article pairs', () => {
-    rebuildStatistics(db, { throughYear: null, minSupport: 1 });
+    mechanics(db, { throughYear: null, minSupport: 1 });
     const loose = corpusStats(db).pairs;
-    rebuildStatistics(db, { throughYear: null, minSupport: 5 });
+    mechanics(db, { throughYear: null, minSupport: 5 });
     assert.ok(corpusStats(db).pairs < loose);
   });
 
   test('corpus reports its own coverage, including which source the records came from', () => {
-    rebuildStatistics(db, { throughYear: null, minSupport: 2 });
+    mechanics(db, { throughYear: null });
     const s = corpusStats(db);
     assert.equal(s.bySource.fixture, s.articles);
     assert.equal(s.bySource.pubmed, undefined);
@@ -235,7 +266,7 @@ describe('corpus hygiene', () => {
 
 describe('bridge to the curated Genesis graph', () => {
   test('a curated node maps to one or more MeSH concepts, with attribution', () => {
-    rebuildStatistics(db, { throughYear: null, minSupport: 2 });
+    mechanics(db, { throughYear: null });
     mapNode(db, 'mitochondrial-dysfunction', 'FXB', 'curator:test');
     mapNode(db, 'mitochondrial-dysfunction', 'FXB2', 'curator:test');
     const mapped = conceptsForNode(db, 'mitochondrial-dysfunction');

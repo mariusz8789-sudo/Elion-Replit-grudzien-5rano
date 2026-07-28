@@ -109,7 +109,7 @@ export function openDiscovery(db, aUi, options = {}) {
     requireInformativeTypes = true,
   } = options;
 
-  const total = corpusStats(db).articles;
+  const total = corpusStats(db).statsArticles;
   const a = getConcept(db, aUi);
   if (!a || total === 0) {
     return { source: aUi, candidates: [], corpus: corpusStats(db), rejected: { reason: 'unknown concept or empty corpus' } };
@@ -199,7 +199,7 @@ export function openDiscovery(db, aUi, options = {}) {
  */
 export function closedDiscovery(db, aUi, cUi, options = {}) {
   const { minLinkNpmi = 0.1, minLinkArticles = 2, maxResults = 40 } = options;
-  const total = corpusStats(db).articles;
+  const total = corpusStats(db).statsArticles;
   const a = getConcept(db, aUi);
   const c = getConcept(db, cUi);
   if (!a || !c || total === 0) return { a, c, bridges: [], direct: null, corpus: corpusStats(db) };

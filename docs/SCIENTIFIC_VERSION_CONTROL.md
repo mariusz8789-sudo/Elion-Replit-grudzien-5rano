@@ -6,7 +6,7 @@ changed and why* between two points in time, restore an earlier state, and keep 
 immutable, author-attributed audit trail. Git terminology never reaches the UI — the
 product says "wersja" ("version"), never "commit"/"branch"/"snapshot".
 
-Implemented Genesis 2.1, Part 4. Branch `claude/genesis-takeover-audit-kpz019`.
+Implemented Genesis 2.1, Part 4. Development branch.
 
 ## 1. Data model
 

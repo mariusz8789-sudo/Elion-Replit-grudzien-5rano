@@ -1289,7 +1289,7 @@ i utwardzenie inicjalizacji Web Audio pod Safari/iOS.
 
 ## Etap Audytu 2 — utwardzanie produkcyjne i funkcje lokalne
 
-Pełny raport z uzasadnieniem każdej zmiany: [`RAPORT-AUDYT-2.md`](RAPORT-AUDYT-2.md).
+Pełny raport z uzasadnieniem każdej zmiany: [`docs/history/RAPORT-AUDYT-2.md`](docs/history/RAPORT-AUDYT-2.md).
 
 ### Dodano
 - Ustawienia (redukcja ruchu, wysoki kontrast, kompaktowy Narrator,

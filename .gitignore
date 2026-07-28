@@ -17,3 +17,8 @@ campaigns/candidate-gen-v2/ranking.json
 
 # Full Discovery Campaign v2 — bulky regenerable full dossier (keep compact benchmark.json)
 campaigns/discovery-campaign-v2/discovery-dossier.json
+
+# Python tooling caches (ruff, mypy) — never committed.
+.ruff_cache/
+.mypy_cache/
+__pycache__/

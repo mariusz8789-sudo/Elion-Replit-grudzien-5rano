@@ -5,7 +5,7 @@
 > against the actual code, not the marketing. Nothing here is hidden. If you are a
 > grant reviewer, investor, or laboratory evaluating Genesis, **read this first.**
 
-Last audit: 2026-07 · Branch `claude/genesis-takeover-audit-kpz019`.
+Last audit: 2026-07 · Development branch.
 
 ---
 

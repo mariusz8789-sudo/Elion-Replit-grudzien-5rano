@@ -1,6 +1,6 @@
 # Genesis — First-Users Readiness Report
 
-Branch `claude/genesis-takeover-audit-kpz019`, commit `dadc989`. Scope: a production-readiness
+Commit `dadc989`. Scope: a production-readiness
 audit assuming the next people to touch Genesis are biotech companies, pharmaceutical
 researchers, universities, pilot customers, and investors. No new features were built. Every
 major workflow was re-tested live (real backend, real browser — Compare, Campaigns, Scientific

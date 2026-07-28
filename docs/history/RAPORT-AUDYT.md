@@ -10,10 +10,10 @@ zero nowych laboratoriów i funkcji użytkowych.
 | Zmiana | Uzasadnienie |
 |---|---|
 | `.replit`: `deployment.run` → `node packages/backend/src/server.mjs` | Poprzedni wpis wskazywał nieistniejący plik — Deploy w Replit kończył się błędem. Run działał i działa (vite, port 5000). |
-| `.replit`: usunięta integracja `javascript_openai` | Relikt poprzedniego projektu (ELION); martwa konfiguracja myli środowisko agenta Replit. |
+| `.replit`: usunięta integracja `javascript_openai` | Relikt poprzedniego projektu; martwa konfiguracja myli środowisko agenta Replit. |
 | Backend = serwer produkcyjny (statyczny dist + /api) | Jeden proces obsługuje całość na autoscale: fallback SPA, poprawne MIME, `immutable` cache dla hashowanych assetów Vite, `nosniff`. |
 | Graceful shutdown (SIGTERM/SIGINT) | Autoscale i kontenery ubijają procesy sygnałem — bez obsługi żądania w locie giną twardo. |
-| `Dockerfile` (multi-stage) + `.dockerignore` + `docker-compose.yml` | Wdrożenie poza Replit jednym poleceniem; obraz slim bez devDependencies, proces bez roota, HEALTHCHECK. Stary compose (Postgres ELION-a bez aplikacji) usunięty jako relikt. |
+| `Dockerfile` (multi-stage) + `.dockerignore` + `docker-compose.yml` | Wdrożenie poza Replit jednym poleceniem; obraz slim bez devDependencies, proces bez roota, HEALTHCHECK. Stary compose (Postgres poprzedniego projektu, bez aplikacji) usunięty jako relikt. |
 | `.env.example` | Dokumentuje wszystkie zmienne środowiskowe; koniec zgadywania nazw. |
 
 ### CI/CD i automatyzacja

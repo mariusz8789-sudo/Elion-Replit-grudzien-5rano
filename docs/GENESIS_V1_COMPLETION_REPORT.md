@@ -1,7 +1,7 @@
 # Genesis OS — Version 1.0 Completion Report
 
 **Status: v1.0 complete for all in-software scope. Externally-blocked items are classified, not open.**
-Date: 2026-07-15 · Branch: `claude/genesis-takeover-audit-kpz019`
+Date: 2026-07-15 · Branch: development
 
 Genesis OS is an AI scientific research platform: interactive science labs + a persistent,
 multi-tenant backend that runs **real** computational engines (RDKit, ADMET-AI) behind a Truth

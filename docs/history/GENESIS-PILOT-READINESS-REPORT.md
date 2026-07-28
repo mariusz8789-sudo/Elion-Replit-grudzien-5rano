@@ -1,6 +1,6 @@
 # Genesis — Pilot-Readiness Milestone: Final Report
 
-Branch `claude/genesis-takeover-audit-kpz019`, commit `72df89d`. This report covers the
+Commit `72df89d`. This report covers the
 "CLOSE THE GENESIS PILOT-READY MILESTONE" mission. Read this alongside
 `KNOWN_LIMITATIONS.md` (the standing, blunt audit) and `docs/SCIENTIFIC_VERSION_CONTROL.md`
 (full technical detail on this milestone's centerpiece) — this report does not repeat their

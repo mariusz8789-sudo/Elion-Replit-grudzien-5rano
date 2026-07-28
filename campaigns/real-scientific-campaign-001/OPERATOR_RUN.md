@@ -39,7 +39,7 @@ python3 -m pip install --upgrade "rdkit>=2024.3" "admet-ai>=2.0" --ignore-instal
 ### Local Linux machine
 ```bash
 git clone <your fork of this repo> genesis && cd genesis
-git checkout claude/genesis-takeover-audit-kpz019
+git checkout genesis/main
 python3 -m pip install --upgrade "rdkit>=2024.3" "admet-ai>=2.0" --ignore-installed packaging setuptools
 node scripts/run-campaign-001.mjs --with-structure
 ```
@@ -48,7 +48,7 @@ node scripts/run-campaign-001.mjs --with-structure
 ```bash
 sudo apt-get update && sudo apt-get install -y python3 python3-pip curl git
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs
-git clone <your fork> genesis && cd genesis && git checkout claude/genesis-takeover-audit-kpz019
+git clone <your fork> genesis && cd genesis && git checkout genesis/main
 python3 -m pip install --upgrade "rdkit>=2024.3" "admet-ai>=2.0" --ignore-installed packaging setuptools
 node scripts/run-campaign-001.mjs --with-structure
 ```

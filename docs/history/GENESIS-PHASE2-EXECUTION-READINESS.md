@@ -1,7 +1,7 @@
 # Genesis Lab — Phase 2 Execution Readiness Report
 
-**Date:** 2026-07-14 · **Branch:** `claude/genesis-takeover-audit-kpz019`
-**Scope:** Step H of the takeover audit — establish the maximum REAL scientific
+**Date:** 2026-07-14 · **Branch:** development
+**Scope:** Step H of the initial audit — establish the maximum REAL scientific
 execution capability in the current runtime and assess Phase 2 executability.
 **Honesty contract:** no invented affinities / ADMET / molecules / mock-as-real;
 100 ns MD/FEP remains CAPABILITY_GAP; external DB failures = BLOCKED_BY_RESOURCES;
@@ -24,7 +24,7 @@ honest gap. Nothing is fabricated.
 | RAM | ~15 GiB |
 | Network to external science DBs | BLOCKED (see J) — `files.rcsb.org` / external egress restricted by policy |
 
-At takeover, **zero** scientific Python packages were installed and `node_modules`
+At the start of the audit, **zero** scientific Python packages were installed and `node_modules`
 was absent. Both were established during this step.
 
 ## B. Installation attempts
@@ -170,7 +170,7 @@ docking, MD, Tanimoto, SA_Score all run for real; 6 counting provenance). Only
 stages*, only ADMET, docking, and provenance are integrated; BRICS, MD relaxation,
 the 0.7 novelty filter, and SA_Score need adapter/stage wiring (they are not
 missing engines — they are missing glue). No Phase-2 discovery classes, targets,
-or portfolio exist yet (confirmed in the takeover audit).
+or portfolio exist yet (confirmed in the initial audit).
 
 ## I. BRICS proof-of-capability results (REAL, executed)
 

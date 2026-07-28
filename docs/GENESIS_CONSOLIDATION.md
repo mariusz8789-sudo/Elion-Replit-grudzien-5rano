@@ -1,6 +1,14 @@
 # Genesis — Final Architecture & Product Consolidation
 
 Written as Chief Product Architect, from the repository at commit `25b4e80`.
+
+> **Update — Parts 1's conclusions were then acted on.** Phases 5 (Discovery
+> Engine), 6 (replay + diff) and 3 (knowledge timeline, merged into Memory) were
+> implemented immediately after this document was written; Phases 7 (AI
+> Scientist) and ∞ (Global Discovery Network) were eliminated as recommended and
+> not built. Part 1's status table below is therefore **the state at the time of
+> analysis**, kept as written so the reasoning can be checked against what was
+> actually done. See §7 at the end for what changed.
 Every percentage below is an estimate of *implemented surface against a stated
 definition of done*, and the definition is given each time so the number can be
 argued with. Nothing is assumed.
@@ -347,3 +355,44 @@ benchmark result, including if the result is negative.**
 
 The engineering is not the bottleneck. It stopped being the bottleneck at
 Phase 0.
+
+
+---
+
+# Part 7 — What was implemented after this analysis
+
+Added so this document does not read as a plan when it is partly a record.
+
+| Phase | Analysis said | What was built | Tests |
+|---|---|---|---|
+| **5 Discovery Engine** | Build. Highest priority. ~85% of parts existed, 0% composed | The eight-stage composer, `POST /api/reasoning/ask`, artifacts through the existing gate | 22 + 4 API |
+| **6 Replay & diff** | Build. Cheapest moat | `diffArtifacts`, `replayArtifact`, `answerHistory`, three endpoints | 18 + 4 API |
+| **3 Timeline** | Merge into Memory | `knowledgeTimeline` over four append-only sources, `timelineSummary`, one endpoint | 17 + 3 API |
+| **4 Virtual Laboratory** | Merge into the Engine | Done — the frontier and feasibility now emit as the Engine's planning stage | (covered by Engine tests) |
+| **7 AI Scientist** | Eliminate | **Not built, deliberately** | — |
+| **∞ Network** | Eliminate as a phase | **Not built, deliberately** | — |
+
+## Three real bugs that only composition could find
+
+1. **`graveContentHash` included a lone subject in the identity.** Burying a
+   statement and later assessing it with a partial triple produced different
+   hashes and never matched — precisely the shape the Engine generates, since a
+   single-node hypothesis has a subject and no object.
+2. **`runDiscovery` crashed when only the reasoning schema was initialised**,
+   because it consults the review ledger. `reviewsForEdge` now returns nothing
+   when the ledger was never created.
+3. **Belief direction was measured from the wrong baseline.** A claim asserted
+   at 0.8 and revised once to 0.2 compared 0.2 against itself and reported as
+   unmoved.
+
+None of these were reachable by unit tests. They are the argument for building
+the composer rather than leaving eight correct libraries side by side.
+
+## What Part 5's blocker analysis still says, unchanged
+
+Everything in **Engineering** moved. Nothing in **Scientific validation**,
+**Data**, **Expert network**, **Commercial** or **Legal** moved, because none of
+it is engineering. The Discovery Engine now runs and produces an auditable
+artifact — over a graph nobody has reviewed, with no corpus, for no user.
+
+The highest priority is still not a feature.

@@ -24,7 +24,7 @@ import { DatabaseSync } from 'node:sqlite';
  * rather than relying on discipline.
  */
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS lg_articles (
@@ -46,8 +46,15 @@ CREATE TABLE IF NOT EXISTS lg_concepts (
   -- constrained to biologically sensible shapes (a drug→gene→disease chain is
   -- interesting; a "Humans → Male → Adult" chain is noise).
   semantic_type  TEXT NOT NULL,
-  tree_numbers   TEXT
+  tree_numbers   TEXT,
+  -- From the NLM descriptor record, NOT from article annotations. Needed because
+  -- an article predating a descriptor's establishment proves NLM re-indexed it,
+  -- which is how post-cut-off knowledge leaks into a "historical" corpus.
+  date_established TEXT,
+  date_created     TEXT,
+  vocabulary_year  INTEGER
 );
+CREATE INDEX IF NOT EXISTS idx_lg_concepts_established ON lg_concepts(date_established);
 CREATE INDEX IF NOT EXISTS idx_lg_concepts_type ON lg_concepts(semantic_type);
 
 CREATE TABLE IF NOT EXISTS lg_annotations (
@@ -166,8 +173,12 @@ export function openCorpus(path = ':memory:') {
   db.exec('PRAGMA journal_mode = WAL;');
   db.exec('PRAGMA synchronous = NORMAL;');
   db.exec(SCHEMA);
-  const row = db.prepare('SELECT value FROM lg_meta WHERE key = ?').get('schema_version');
-  if (!row) db.prepare('INSERT INTO lg_meta (key, value) VALUES (?, ?)').run('schema_version', String(SCHEMA_VERSION));
+  // Forward migration for corpora created before descriptor dates existed.
+  for (const col of ['date_established TEXT', 'date_created TEXT', 'vocabulary_year INTEGER']) {
+    try { db.exec(`ALTER TABLE lg_concepts ADD COLUMN ${col}`); } catch { /* already present */ }
+  }
+  db.prepare('INSERT INTO lg_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run('schema_version', String(SCHEMA_VERSION));
   return db;
 }
 

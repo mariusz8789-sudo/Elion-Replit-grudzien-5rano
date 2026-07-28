@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS reasoning_edges (
   effect      TEXT,
   honesty     TEXT NOT NULL,
   mechanism   TEXT NOT NULL DEFAULT '',
+  content_hash TEXT NOT NULL,       -- what a reviewer of THIS edge actually read
   PRIMARY KEY (snapshot_id, edge_key)
 );
 CREATE INDEX IF NOT EXISTS idx_reasoning_edges_key ON reasoning_edges(edge_key);
@@ -133,14 +134,38 @@ export function edgeKeyOf(edge) {
   return `${edge.from}→${edge.to}→${edge.kind}`;
 }
 
+/**
+ * Identity of one edge's CONTENT, which is what an expert actually reviewed.
+ *
+ * Everything substantive is hashed, including the mechanism prose. That is a
+ * deliberate refusal to judge which wording changes matter: the system is not
+ * competent to decide that a re-worded mechanism describes the same claim, and
+ * guessing wrong in the permissive direction is how an expert confirmation ends
+ * up attached to a sentence nobody read.
+ *
+ * The cost of being conservative is small, because a review of a previous
+ * version is MARKED, never deleted — a typo fix asks for a cheap re-affirmation
+ * rather than destroying anything. The cost of being permissive is a confirmed
+ * edge no expert confirmed.
+ */
+export function edgeContentHash(edge) {
+  return canonicalHash({
+    from: String(edge.from ?? edge.from_id ?? ''),
+    to: String(edge.to ?? edge.to_id ?? ''),
+    kind: String(edge.kind ?? ''),
+    effect: edge.effect ?? null,
+    honesty: String(edge.honesty ?? ''),
+    mechanism: String(edge.mechanism ?? ''),
+  });
+}
+
 /** Identity of a graph: its content, not when it was loaded or by whom. */
 export function snapshotHash(nodes, edges) {
   return canonicalHash({
     nodes: [...nodes].map((n) => ({ id: n.id, kind: n.kind, label: n.label, honesty: n.honesty }))
       .sort((a, b) => a.id.localeCompare(b.id)),
-    edges: [...edges].map((e) => ({
-      key: edgeKeyOf(e), effect: e.effect ?? null, honesty: e.honesty, mechanism: e.mechanism ?? '',
-    })).sort((a, b) => a.key.localeCompare(b.key)),
+    edges: [...edges].map((e) => ({ key: edgeKeyOf(e), content: edgeContentHash(e) }))
+      .sort((a, b) => a.key.localeCompare(b.key)),
   });
 }
 
@@ -173,10 +198,11 @@ export function seedGraphSnapshot(db, { nodes, edges, source = 'curated:@genesis
     for (const n of nodes) node.run(id, String(n.id), String(n.kind), String(n.label), String(n.honesty));
 
     const edge = db.prepare(
-      'INSERT INTO reasoning_edges (snapshot_id, edge_key, from_id, to_id, kind, effect, honesty, mechanism) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO reasoning_edges (snapshot_id, edge_key, from_id, to_id, kind, effect, honesty, mechanism, content_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
     for (const e of edges) {
-      edge.run(id, edgeKeyOf(e), String(e.from), String(e.to), String(e.kind), e.effect ?? null, String(e.honesty), String(e.mechanism ?? ''));
+      edge.run(id, edgeKeyOf(e), String(e.from), String(e.to), String(e.kind), e.effect ?? null,
+        String(e.honesty), String(e.mechanism ?? ''), edgeContentHash(e));
     }
     db.exec('COMMIT');
   } catch (err) {
@@ -186,13 +212,34 @@ export function seedGraphSnapshot(db, { nodes, edges, source = 'curated:@genesis
   return { ...db.prepare('SELECT * FROM reasoning_snapshots WHERE id = ?').get(id), created: true };
 }
 
-/** The snapshot nothing has superseded, or null before the first seed. */
+/**
+ * The snapshot nothing has superseded, or null before the first seed.
+ *
+ * Also null when the reasoning schema was never created. The review ledger is
+ * usable on its own — a reviewer needs no graph tables to file a verdict — and
+ * in that configuration there is simply nothing to compare a version against.
+ * Null means "cannot tell", and every caller is required to say so rather than
+ * assume "unchanged" (see edgeStatus's versionTracked flag).
+ */
 export function currentSnapshot(db) {
+  const present = db.prepare("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'reasoning_snapshots'").get();
+  if (!present) return null;
   return db.prepare('SELECT * FROM reasoning_snapshots WHERE superseded_by IS NULL ORDER BY created_at DESC LIMIT 1').get() ?? null;
 }
 
 export function snapshotEdges(db, snapshotId) {
   return db.prepare('SELECT * FROM reasoning_edges WHERE snapshot_id = ? ORDER BY edge_key').all(String(snapshotId));
+}
+
+/**
+ * The content hash of an edge as it stands right now, or null when the graph is
+ * not available to say.
+ *
+ * Null is not "unchanged". Callers must treat it as "cannot tell" — see
+ * edgeStatus, which reports versionTracked: false rather than pretending.
+ */
+export function currentEdgeContentHash(db, edgeKey) {
+  return resolveEdgeKey(db, edgeKey)?.content_hash ?? null;
 }
 
 /** Does this edge key name a real claim? Returns the edge, or null. */

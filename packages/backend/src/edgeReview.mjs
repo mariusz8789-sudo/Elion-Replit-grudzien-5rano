@@ -1,4 +1,5 @@
 import { newId } from './auth.mjs';
+import { currentEdgeContentHash } from './reasoning/store.mjs';
 
 /**
  * Reviewed edge ledger — the platform's actual moat.
@@ -58,7 +59,11 @@ CREATE TABLE IF NOT EXISTS edge_reviews (
   proposed_mechanism  TEXT,
   proposed_honesty    TEXT,
   created_at          INTEGER NOT NULL,
-  superseded_by       TEXT
+  superseded_by       TEXT,
+  -- WHICH VERSION of the claim this verdict was about. Null means the review
+  -- predates version tracking: it must never be counted as speaking for the
+  -- current text (see edgeStatus).
+  edge_content_hash   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_edge_reviews_edge ON edge_reviews(edge_key);
 CREATE INDEX IF NOT EXISTS idx_edge_reviews_reviewer ON edge_reviews(reviewer_id);
@@ -67,8 +72,21 @@ CREATE INDEX IF NOT EXISTS idx_edge_reviews_reviewer ON edge_reviews(reviewer_id
 export const VERDICTS = ['confirm', 'dispute', 'refine', 'insufficient-expertise'];
 export const CONFIDENCES = ['low', 'moderate', 'high'];
 
+/**
+ * Forward migration for ledgers created before Phase 1a. Adding the column is
+ * safe and idempotent; the existing rows keep a NULL hash, which is the honest
+ * answer — nobody recorded what those reviewers actually read.
+ */
+function addContentHashColumn(db) {
+  const columns = db.prepare('PRAGMA table_info(edge_reviews)').all().map((c) => c.name);
+  if (!columns.includes('edge_content_hash')) {
+    db.exec('ALTER TABLE edge_reviews ADD COLUMN edge_content_hash TEXT');
+  }
+}
+
 export function ensureReviewSchema(db) {
   db.exec(SCHEMA);
+  addContentHashColumn(db);
 }
 
 /* ------------------------------- profiles ------------------------------- */
@@ -115,6 +133,11 @@ export function submitReview(db, { edgeKey, reviewerId, verdict, confidence = 'm
   const v = validateReview({ edgeKey, verdict, confidence, comment, proposedEffect, proposedMechanism, proposedHonesty });
   if (!v.ok) return { ok: false, errors: v.errors };
 
+  // Stamp WHICH VERSION of the claim this verdict is about. Looked up here
+  // rather than accepted from the caller: a client-supplied version would let a
+  // verdict be filed against text the reviewer never saw.
+  const contentHash = currentEdgeContentHash(db, edgeKey);
+
   const id = newId();
   db.exec('BEGIN');
   try {
@@ -124,10 +147,10 @@ export function submitReview(db, { edgeKey, reviewerId, verdict, confidence = 'm
 
     db.prepare(
       `INSERT INTO edge_reviews (id, edge_key, reviewer_id, verdict, confidence, comment, citation,
-         proposed_effect, proposed_mechanism, proposed_honesty, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         proposed_effect, proposed_mechanism, proposed_honesty, created_at, edge_content_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(id, String(edgeKey), String(reviewerId), String(verdict), String(confidence),
-      String(comment), String(citation), proposedEffect, proposedMechanism, proposedHonesty, now);
+      String(comment), String(citation), proposedEffect, proposedMechanism, proposedHonesty, now, contentHash);
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');
@@ -159,50 +182,103 @@ export function reviewHistory(db, edgeKey) {
  * confirmations do not answer it. Counting votes here would be exactly the
  * failure the platform criticises in the literature.
  */
+/**
+ * Status of one edge, derived — never cached.
+ *
+ * PHASE 1a: A VERDICT SPEAKS ONLY FOR THE VERSION IT REVIEWED.
+ *
+ * Reviews carry the content hash of the claim as it stood when they were filed.
+ * Only reviews matching the CURRENT content decide the status. Everything else
+ * is reported separately, because both directions of drift are attacks:
+ *
+ *   - Confirmations must not follow a re-curated edge. Flip an effect from
+ *     promotes to counteracts and three expert confirmations would otherwise
+ *     transfer onto the reversed claim — an expert-confirmed edge that no
+ *     expert confirmed.
+ *   - Disputes must not be cleared by re-wording. If a stale dispute simply
+ *     vanished, a curator could dodge any objection by editing a comma, and the
+ *     edge would read as pristine. A superseded dispute is surfaced and, when
+ *     nothing current replaces it, the edge reports `re-review-needed` rather
+ *     than `unreviewed`.
+ *
+ * When the graph has not been seeded, there is nothing to compare against.
+ * That case reports `versionTracked: false` and falls back to counting every
+ * review — stated in the output rather than silently assumed, so a caller can
+ * tell "no drift" from "cannot tell".
+ */
 export function edgeStatus(db, edgeKey) {
-  const reviews = reviewsForEdge(db, edgeKey);
-  const byVerdict = (v) => reviews.filter((r) => r.verdict === v);
-  const disputes = byVerdict('dispute');
-  const confirms = byVerdict('confirm');
-  const refinements = byVerdict('refine');
-  const declined = byVerdict('insufficient-expertise');
+  const all = reviewsForEdge(db, edgeKey);
+  const currentHash = currentEdgeContentHash(db, edgeKey);
+  const versionTracked = currentHash !== null;
+
+  // A review of a previous version, or of an unrecorded one, does not speak for
+  // the text as it stands now.
+  const current = versionTracked ? all.filter((r) => r.edge_content_hash === currentHash) : all;
+  const superseded = versionTracked ? all.filter((r) => r.edge_content_hash !== currentHash) : [];
+
+  const byVerdict = (list, v) => list.filter((r) => r.verdict === v);
+  const disputes = byVerdict(current, 'dispute');
+  const confirms = byVerdict(current, 'confirm');
+  const refinements = byVerdict(current, 'refine');
+  const declined = byVerdict(current, 'insufficient-expertise');
+  const supersededDisputes = byVerdict(superseded, 'dispute');
 
   let status;
-  if (reviews.length === 0) status = 'unreviewed';
-  else if (disputes.length > 0) status = 'disputed';
+  if (disputes.length > 0) status = 'disputed';
   else if (refinements.length > 0) status = 'refinement-proposed';
   else if (confirms.length > 0) status = 'confirmed';
-  else status = 'awaiting-expertise'; // only declines so far
+  else if (declined.length > 0) status = 'awaiting-expertise';
+  else if (superseded.length > 0) status = 're-review-needed';
+  else status = 'unreviewed';
 
   return {
     edgeKey, status,
-    reviewCount: reviews.length,
+    versionTracked,
+    contentHash: currentHash,
+    reviewCount: current.length,
     confirms: confirms.length,
     disputes: disputes.length,
     refinements: refinements.length,
     declined: declined.length,
-    reviewers: reviews.map((r) => ({
+    /** Reviews of a previous version of this claim. Kept, never counted. */
+    supersededReviews: superseded.length,
+    supersededDisputes: supersededDisputes.length,
+    reviewers: current.map((r) => ({
       name: r.display_name ?? r.reviewer_id, orcid: r.orcid ?? null,
       affiliation: r.affiliation ?? '', verdict: r.verdict, confidence: r.confidence,
       comment: r.comment, citation: r.citation, at: r.created_at,
     })),
+    priorVersionReviewers: superseded.map((r) => ({
+      name: r.display_name ?? r.reviewer_id, verdict: r.verdict,
+      comment: r.comment, at: r.created_at,
+      reviewedVersion: r.edge_content_hash ? r.edge_content_hash.slice(0, 12) : 'unrecorded',
+    })),
     // What a reader should take from this edge, in one sentence.
-    basis: buildBasis(status, confirms, disputes, refinements, declined),
+    basis: buildBasis(status, confirms, disputes, refinements, declined, superseded, supersededDisputes),
   };
 }
 
-function buildBasis(status, confirms, disputes, refinements, declined) {
+function buildBasis(status, confirms, disputes, refinements, declined, superseded, supersededDisputes) {
+  // Appended to every status: a prior objection does not stop mattering because
+  // the wording moved.
+  const priorDispute = supersededDisputes.length > 0
+    ? ` ${supersededDisputes.length} expert(s) disputed an EARLIER version of this claim and have not revisited it since it changed.`
+    : '';
+
   switch (status) {
     case 'unreviewed':
       return 'No domain expert has reviewed this edge. It rests on the original curation alone, and any conclusion traversing it inherits that.';
+    case 're-review-needed':
+      return `This claim has changed since it was last reviewed. ${superseded.length} review(s) apply to a previous version and are not counted.`
+        + `${priorDispute} The edge is effectively unreviewed in its current form.`;
     case 'disputed':
-      return `${disputes.length} expert(s) dispute this edge${confirms.length ? ` despite ${confirms.length} confirmation(s)` : ''}. A dispute is not outvoted — it names a specific problem that the confirmations do not answer.`;
+      return `${disputes.length} expert(s) dispute this edge${confirms.length ? ` despite ${confirms.length} confirmation(s)` : ''}. A dispute is not outvoted — it names a specific problem that the confirmations do not answer.${priorDispute}`;
     case 'refinement-proposed':
-      return `${refinements.length} expert(s) accept the relationship but propose a change to how it is stated. The edge is usable; the wording is not final.`;
+      return `${refinements.length} expert(s) accept the relationship but propose a change to how it is stated. The edge is usable; the wording is not final.${priorDispute}`;
     case 'confirmed':
-      return `Confirmed by ${confirms.length} domain expert(s) with no outstanding dispute.`;
+      return `Confirmed by ${confirms.length} domain expert(s) with no outstanding dispute.${priorDispute}`;
     default:
-      return `${declined.length} reviewer(s) declined on expertise grounds. This edge needs a different specialist — which is useful information, not a gap.`;
+      return `${declined.length} reviewer(s) declined on expertise grounds. This edge needs a different specialist — which is useful information, not a gap.${priorDispute}`;
   }
 }
 
@@ -228,7 +304,9 @@ export function reviewWorklist(db, allEdgeKeys, { reviewerId = null, limit = 50 
       .all(String(reviewerId)).map((r) => r.edge_key))
     : new Set();
 
-  const rank = { unreviewed: 0, 'awaiting-expertise': 1, disputed: 2, 'refinement-proposed': 3, confirmed: 4 };
+  // 're-review-needed' ranks alongside 'unreviewed': the claim changed and no
+  // current verdict exists, so an expert's time is worth just as much here.
+  const rank = { unreviewed: 0, 're-review-needed': 0, 'awaiting-expertise': 1, disputed: 2, 'refinement-proposed': 3, confirmed: 4 };
   return allEdgeKeys
     .filter((k) => !seen.has(k))
     .map((k) => edgeStatus(db, k))
@@ -321,8 +399,10 @@ export function reviewCoverage(db, allEdgeKeys) {
 export function edgesPassingStandard(db, allEdgeKeys, standard = 'any') {
   const allowed = {
     any: () => true,
-    'not-disputed': (s) => s.status !== 'disputed',
-    reviewed: (s) => s.status !== 'unreviewed',
+    // A claim disputed in an earlier version is not "not disputed" — the
+    // objection was never answered, only outrun by an edit.
+    'not-disputed': (s) => s.status !== 'disputed' && s.supersededDisputes === 0,
+    reviewed: (s) => s.status !== 'unreviewed' && s.status !== 're-review-needed',
     'expert-confirmed': (s) => s.status === 'confirmed',
   }[standard] ?? (() => true);
 

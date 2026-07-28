@@ -210,6 +210,16 @@ export type CampaignRole = 'owner' | 'collaborator' | 'viewer';
 
 export interface CampaignMember { campaignId: string; userId: string; role: CampaignRole; addedBy: string; createdAt: number }
 
+/** A promise of membership for an e-mail address that has no Genesis account yet. */
+export interface CampaignInvite {
+  id: string; campaignId: string; email: string; role: CampaignRole; invitedBy: string;
+  token: string; createdAt: number; acceptedAt: number | null; acceptedBy: string | null;
+}
+/** What the invite link shows before sign-up — deliberately no campaign contents. */
+export interface InvitePreview {
+  email: string; role: CampaignRole; campaignName: string | null; invitedByName: string | null; createdAt: number;
+}
+
 export interface SnapshotMeta {
   id: string; campaignId: string; parentId: string | null; triggerKind: string; authorId: string;
   restoredFrom: string | null; rdkitVersion: string | null; admetVersion: string | null;
@@ -237,11 +247,28 @@ export async function fetchCampaignWithRole(token: string, id: string): Promise<
   return request('GET', `/campaigns/${encodeURIComponent(id)}`, { token });
 }
 
-export async function listCampaignMembersRemote(token: string, campaignId: string): Promise<ApiResult<{ members: CampaignMember[]; owner: { id: string } }>> {
+export async function listCampaignMembersRemote(
+  token: string, campaignId: string,
+): Promise<ApiResult<{ members: CampaignMember[]; invites: CampaignInvite[]; owner: { id: string } }>> {
   return request('GET', `/campaigns/${encodeURIComponent(campaignId)}/members`, { token });
 }
-export async function inviteCampaignMember(token: string, campaignId: string, email: string, role: 'collaborator' | 'viewer'): Promise<ApiResult<{ member: CampaignMember }>> {
+/**
+ * Invite by e-mail. An address that has no Genesis account yet is NOT an error:
+ * the server stores a pending invite (→ `invite`) which becomes a membership the
+ * moment that person registers. An address that already has one joins immediately
+ * (→ `member`). Exactly one of the two fields is present.
+ */
+export async function inviteCampaignMember(
+  token: string, campaignId: string, email: string, role: 'collaborator' | 'viewer',
+): Promise<ApiResult<{ member?: CampaignMember; invite?: CampaignInvite }>> {
   return request('POST', `/campaigns/${encodeURIComponent(campaignId)}/members`, { token, body: { email, role } });
+}
+export async function revokeCampaignInvite(token: string, campaignId: string, inviteId: string): Promise<ApiResult<{ ok: boolean }>> {
+  return request('DELETE', `/campaigns/${encodeURIComponent(campaignId)}/invites/${encodeURIComponent(inviteId)}`, { token });
+}
+/** Public preview of an invite link — resolves before the invited person has an account. */
+export async function fetchInvitePreview(inviteToken: string): Promise<ApiResult<{ invite: InvitePreview }>> {
+  return request('GET', `/invites/${encodeURIComponent(inviteToken)}`, {});
 }
 export async function removeCampaignMemberRemote(token: string, campaignId: string, userId: string): Promise<ApiResult<{ ok: boolean }>> {
   return request('DELETE', `/campaigns/${encodeURIComponent(campaignId)}/members/${encodeURIComponent(userId)}`, { token });

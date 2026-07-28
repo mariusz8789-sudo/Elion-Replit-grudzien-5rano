@@ -15,9 +15,10 @@ import { Icon } from '../Icon';
 import { getToken } from '../../core/backend/session';
 import {
   fetchCampaignWithRole, listCampaignMembersRemote, inviteCampaignMember, removeCampaignMemberRemote,
+  revokeCampaignInvite,
   listSnapshotsRemote, restoreSnapshotRemote, diffSnapshotsRemote,
   listCommentsRemote, addCommentRemote, resolveCommentRemote,
-  type CampaignRole, type CampaignMember, type SnapshotMeta, type ScientificDiff, type CampaignComment,
+  type CampaignRole, type CampaignMember, type CampaignInvite, type SnapshotMeta, type ScientificDiff, type CampaignComment,
 } from '../../core/backend/client';
 import { useI18n } from '../../core/i18n';
 
@@ -32,6 +33,8 @@ export function VersionControlPanel({ campaignId, currentUserId, onSnapshotsChan
   const triggerLabel = (k: string) => (k === 'molecules_added' || k === 'analysis_completed' || k === 'restore' || k === 'manual') ? t(`vc.trigger.${k}`) : k;
   const [role, setRole] = useState<CampaignRole | null>(null);
   const [members, setMembers] = useState<CampaignMember[]>([]);
+  const [invites, setInvites] = useState<CampaignInvite[]>([]);
+  const [copiedInvite, setCopiedInvite] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<SnapshotMeta[]>([]);
   const [comments, setComments] = useState<CampaignComment[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -56,7 +59,7 @@ export function VersionControlPanel({ campaignId, currentUserId, onSnapshotsChan
       // poszło nie tak, zamiast widzieć, jakby funkcja historii wersji w ogóle nie istniała.
       else if (!role) setLoadError(r.status === 429 ? t('vc.rateLimited') : (r.message || t('vc.loadError')));
     });
-    listCampaignMembersRemote(token, campaignId).then((r) => { if (r.ok) setMembers(r.data.members); });
+    listCampaignMembersRemote(token, campaignId).then((r) => { if (r.ok) { setMembers(r.data.members); setInvites(r.data.invites ?? []); } });
     listSnapshotsRemote(token, campaignId).then((r) => {
       if (!r.ok) return;
       setSnapshots(r.data.snapshots);
@@ -88,9 +91,32 @@ export function VersionControlPanel({ campaignId, currentUserId, onSnapshotsChan
     setBusy(true); setInviteMsg(null);
     inviteCampaignMember(token, campaignId, inviteEmail.trim().toLowerCase(), inviteRole).then((r) => {
       setBusy(false);
-      if (r.ok) { setInviteMsg(t('vc.inviteAdded', { email: inviteEmail, role: t(`role.${inviteRole}`) })); setInviteEmail(''); refresh(); }
-      else setInviteMsg(r.message || t('vc.inviteFail'));
+      if (!r.ok) { setInviteMsg(r.message || t('vc.inviteFail')); return; }
+      // Konto istnieje → od razu współpracownik. Konto nie istnieje → zaproszenie
+      // czeka; mówimy to wprost, żeby właściciel wiedział, że musi wysłać link.
+      setInviteMsg(r.data.member
+        ? t('vc.inviteAdded', { email: inviteEmail, role: t(`role.${inviteRole}`) })
+        : t('vc.invitePending', { email: inviteEmail, role: t(`role.${inviteRole}`) }));
+      setInviteEmail('');
+      refresh();
     });
+  };
+  /**
+   * Link zapraszający. Token idzie w query (PRZED hashem), bo routing jest hashowy,
+   * a celem jest #/campaigns — jedyny ekran, który pokazuje panel konta osobie
+   * niezalogowanej, a zaraz po rejestracji tę samą, właśnie udostępnioną kampanię.
+   */
+  const inviteLink = (inviteToken: string) => `${window.location.origin}/?invite=${encodeURIComponent(inviteToken)}#/campaigns`;
+  const copyInvite = (inv: CampaignInvite) => {
+    void navigator.clipboard?.writeText(inviteLink(inv.token)).then(
+      () => { setCopiedInvite(inv.id); window.setTimeout(() => setCopiedInvite(null), 2000); },
+      () => setInviteMsg(t('vc.inviteCopyFail')),
+    );
+  };
+  const revokeInvite = (inviteId: string) => {
+    const token = getToken();
+    if (!token) return;
+    revokeCampaignInvite(token, campaignId, inviteId).then((r) => { if (r.ok) refresh(); });
   };
   const removeMember = (userId: string) => {
     const token = getToken();
@@ -153,6 +179,31 @@ export function VersionControlPanel({ campaignId, currentUserId, onSnapshotsChan
         </div>
       ) : null}
       {inviteMsg ? <p className="ds-note ds-dim">{inviteMsg}</p> : null}
+      {/* Zaproszenia oczekujące — osoby bez konta Genesis. Właściciel kopiuje link
+          i wysyła go dowolnym kanałem; po rejestracji tym adresem dostęp jest nadany. */}
+      {invites.length > 0 ? (
+        <>
+          <h5 className="cmp-section-title">{t('vc.pendingInvites')}</h5>
+          <p className="ds-note ds-dim" style={{ marginTop: 0 }}>{t('vc.pendingHint')}</p>
+          <div className="ds-input-row">
+            {invites.map((inv) => (
+              <span key={inv.id} className="ds-chip">
+                {inv.email} · {t(`role.${inv.role}`)}
+                <button type="button" onClick={() => copyInvite(inv)} aria-label={t('vc.copyInviteLink')}
+                  title={t('vc.copyInviteLink')} style={{ marginLeft: 6, border: 'none', background: 'none', cursor: 'pointer' }}>
+                  <Icon name={copiedInvite === inv.id ? 'check' : 'upload'} size={11} />
+                </button>
+                {isOwner ? (
+                  <button type="button" onClick={() => revokeInvite(inv.id)} aria-label={t('vc.revokeInvite')}
+                    title={t('vc.revokeInvite')} style={{ marginLeft: 2, border: 'none', background: 'none', cursor: 'pointer' }}>
+                    <Icon name="block" size={11} />
+                  </button>
+                ) : null}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : null}
 
       {/* Version timeline */}
       <h4 className="cmp-section-title">{t('vc.timeline')}</h4>

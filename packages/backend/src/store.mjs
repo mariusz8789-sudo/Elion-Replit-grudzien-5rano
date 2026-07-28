@@ -1011,6 +1011,29 @@ function migrate(db) {
     db.exec('CREATE INDEX IF NOT EXISTS idx_campaign_comments_campaign ON campaign_comments(campaign_id, created_at DESC);');
     db.exec('PRAGMA user_version = 27');
   }
+
+  // v28 — zaproszenia oczekujące. Do tej pory zaprosić można było WYŁĄCZNIE osobę,
+  // która ma już konto Genesis (POST members → 404 user_not_found), więc kontakt
+  // z nowym współpracownikiem trzeba było nawiązać poza produktem. Tu zapraszamy
+  // po adresie e-mail niezależnie od tego, czy konto istnieje: zaproszenie czeka,
+  // a przy rejestracji tym adresem zamienia się w członkostwo (claimInvitesForUser).
+  // `campaign_members` pozostaje nietknięte — to warstwa PRZED członkostwem, nie zamiast.
+  if (version < 28) {
+    db.exec(`CREATE TABLE IF NOT EXISTS campaign_invites (
+      id          TEXT PRIMARY KEY,
+      campaign_id TEXT NOT NULL,
+      email       TEXT NOT NULL,
+      role        TEXT NOT NULL,
+      invited_by  TEXT NOT NULL,
+      token       TEXT NOT NULL UNIQUE,
+      created_at  INTEGER NOT NULL,
+      accepted_at INTEGER,
+      accepted_by TEXT,
+      UNIQUE (campaign_id, email)
+    );`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_campaign_invites_email ON campaign_invites(email, accepted_at);');
+    db.exec('PRAGMA user_version = 28');
+  }
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1267,6 +1290,71 @@ export function listCampaignMembers(db, campaignId) {
 
 export function removeCampaignMember(db, campaignId, userId) {
   db.prepare('DELETE FROM campaign_members WHERE campaign_id = ? AND user_id = ?').run(String(campaignId), String(userId));
+}
+
+/* ---------------- Zaproszenia oczekujące (v28) ----------------
+ * Zaproszenie to obietnica członkostwa dla adresu e-mail, który NIE MA jeszcze
+ * konta. Rozwiązuje jedyny krok, którego nie dało się wykonać wewnątrz produktu:
+ * dopuszczenie do wspólnej pracy kogoś z zewnątrz. Realizacja zaproszenia
+ * (claimInvitesForUser) przechodzi przez addCampaignMember — model uprawnień
+ * pozostaje jeden, bez drugiej ścieżki autoryzacji.
+ */
+
+function toInviteRow(r) {
+  return r
+    ? { id: r.id, campaignId: r.campaign_id, email: r.email, role: r.role, invitedBy: r.invited_by,
+        token: r.token, createdAt: r.created_at, acceptedAt: r.accepted_at, acceptedBy: r.accepted_by }
+    : null;
+}
+
+/** Tworzy (lub odświeża rolę) zaproszenie dla adresu e-mail. Token służy do linku zapraszającego. */
+export function createCampaignInvite(db, { campaignId, email, role, invitedBy, token, now = Date.now() }) {
+  const addr = String(email).trim().toLowerCase();
+  db.prepare(`INSERT INTO campaign_invites (id, campaign_id, email, role, invited_by, token, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(campaign_id, email) DO UPDATE SET role = excluded.role, invited_by = excluded.invited_by`)
+    .run(newId(), String(campaignId), addr, String(role), String(invitedBy), String(token), now);
+  return toInviteRow(db.prepare('SELECT * FROM campaign_invites WHERE campaign_id = ? AND email = ?').get(String(campaignId), addr));
+}
+
+export function getCampaignInvite(db, inviteId) {
+  return toInviteRow(db.prepare('SELECT * FROM campaign_invites WHERE id = ?').get(String(inviteId)));
+}
+
+export function getCampaignInviteByToken(db, token) {
+  return toInviteRow(db.prepare('SELECT * FROM campaign_invites WHERE token = ?').get(String(token)));
+}
+
+/** Zaproszenia kampanii — domyślnie tylko oczekujące (jeszcze niezrealizowane). */
+export function listCampaignInvites(db, campaignId, { includeAccepted = false } = {}) {
+  const sql = includeAccepted
+    ? 'SELECT * FROM campaign_invites WHERE campaign_id = ? ORDER BY created_at ASC'
+    : 'SELECT * FROM campaign_invites WHERE campaign_id = ? AND accepted_at IS NULL ORDER BY created_at ASC';
+  return db.prepare(sql).all(String(campaignId)).map(toInviteRow);
+}
+
+export function deleteCampaignInvite(db, inviteId) {
+  db.prepare('DELETE FROM campaign_invites WHERE id = ?').run(String(inviteId));
+}
+
+/**
+ * Realizuje wszystkie oczekujące zaproszenia dla adresu e-mail — wywoływane przy
+ * rejestracji. Zwraca listę kampanii, do których użytkownik właśnie dołączył, więc
+ * po założeniu konta wspólna praca jest widoczna od razu, bez żadnego kolejnego kroku.
+ */
+export function claimInvitesForUser(db, { email, userId, now = Date.now() }) {
+  const addr = String(email).trim().toLowerCase();
+  const pending = db.prepare('SELECT * FROM campaign_invites WHERE email = ? AND accepted_at IS NULL').all(addr).map(toInviteRow);
+  const claimed = [];
+  for (const inv of pending) {
+    const campaign = getCampaignRowById(db, inv.campaignId);
+    // Kampania mogła zniknąć od czasu zaproszenia — sprzątamy zamiast tworzyć sierotę.
+    if (!campaign) { deleteCampaignInvite(db, inv.id); continue; }
+    if (campaign.ownerId !== userId) addCampaignMember(db, { campaignId: inv.campaignId, userId, role: inv.role, addedBy: inv.invitedBy, now });
+    db.prepare('UPDATE campaign_invites SET accepted_at = ?, accepted_by = ? WHERE id = ?').run(now, String(userId), inv.id);
+    claimed.push({ campaignId: inv.campaignId, role: inv.role });
+  }
+  return claimed;
 }
 
 /** Effective role on a campaign: 'owner' | member role | null (no access). Never throws on a missing campaign. */

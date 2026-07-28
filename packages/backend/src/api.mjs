@@ -23,10 +23,10 @@ import {
   ROLES,
   createUser,
   getUserByEmail,
+  getUserById,
   loginLockState,
   recordLoginFailure,
   clearLoginAttempts,
-  listCampaignsForOwner,
   getCampaignRow,
   upsertCampaign,
   deleteCampaignRow,
@@ -36,6 +36,12 @@ import {
   listCampaignMembers,
   removeCampaignMember,
   resolveCampaignRole,
+  createCampaignInvite,
+  getCampaignInvite,
+  getCampaignInviteByToken,
+  listCampaignInvites,
+  deleteCampaignInvite,
+  claimInvitesForUser,
   getSnapshot,
   getLatestSnapshot,
   listCampaignSnapshots,
@@ -164,6 +170,29 @@ export function handleApi(db, ctx) {
       return user ? ok({ user }) : err(401, 'unauthorized');
     }
     return err(404, 'not_found');
+  }
+
+  // ---- Podgląd zaproszenia po tokenie z linku (bez uwierzytelnienia) ----
+  // Osoba zapraszana klika link ZANIM ma konto, więc ta trasa musi działać bez
+  // tokenu sesji. Oddaje wyłącznie to, co potrzebne do decyzji „rejestruję się?":
+  // kto zaprasza, do czego i w jakiej roli. Nigdy nie oddaje samej kampanii ani
+  // adresu e-mail zapraszającego — token z linku nie daje dostępu do danych.
+  if (seg[0] === 'invites' && seg.length === 2 && method === 'GET') {
+    const invite = getCampaignInviteByToken(db, seg[1]);
+    if (!invite) return err(404, 'not_found', 'Zaproszenie nie istnieje lub zostało odwołane.');
+    if (invite.acceptedAt) return err(410, 'invite_used', 'To zaproszenie zostało już zrealizowane.');
+    const campaign = getCampaignRowById(db, invite.campaignId);
+    if (!campaign) return err(404, 'not_found', 'Kampania, do której zapraszano, już nie istnieje.');
+    const inviter = getUserById(db, invite.invitedBy);
+    return ok({
+      invite: {
+        email: invite.email,
+        role: invite.role,
+        campaignName: campaign.data?.name ?? null,
+        invitedByName: inviter?.displayName ?? null,
+        createdAt: invite.createdAt,
+      },
+    });
   }
 
   // ---- Backend Compute Engine (modele publiczne; run opcjonalnie utrwalany) ----
@@ -319,10 +348,15 @@ export function handleApi(db, ctx) {
   if (seg[0] === 'campaigns') {
     if (seg.length === 1 && method === 'GET') {
       // Lista: metadane (bez pełnych blobów) — do synchronizacji i widoku listy.
-      const rows = listCampaignsForOwner(db, user.id).map((c) => ({
+      // Kampanie WŁASNE i UDOSTĘPNIONE, każda z efektywną rolą. Wcześniej lista
+      // pokazywała wyłącznie własne, więc zaproszony współpracownik po zalogowaniu
+      // widział pustkę i musiał dostać bezpośredni identyfikator poza produktem.
+      // `listAccessibleCampaigns` to ta sama agregacja, z której korzysta dashboard —
+      // bez nowego zapytania i bez drugiej ścieżki autoryzacji.
+      const rows = listAccessibleCampaigns(db, user.id).map((c) => ({
         id: c.id, name: c.data?.name ?? '', status: c.data?.status ?? 'ACTIVE',
         molecules: Array.isArray(c.data?.molecules) ? c.data.molecules.length : 0,
-        createdAt: c.createdAt, updatedAt: c.updatedAt,
+        createdAt: c.createdAt, updatedAt: c.updatedAt, role: c.role, ownerId: c.ownerId,
       }));
       return ok({ campaigns: rows });
     }
@@ -355,7 +389,9 @@ export function handleApi(db, ctx) {
     // /api/campaigns/:id/members — udostępnianie (Scientific Version Control MVP: 1 współpracownik+)
     if (seg[2] === 'members') {
       if (seg.length === 3) {
-        if (method === 'GET') return ok({ members: listCampaignMembers(db, id), owner: { id: row.ownerId } });
+        if (method === 'GET') {
+          return ok({ members: listCampaignMembers(db, id), invites: listCampaignInvites(db, id), owner: { id: row.ownerId } });
+        }
         if (method === 'POST') {
           if (role !== 'owner') return err(403, 'forbidden', 'Tylko właściciel może zapraszać współpracowników.');
           const email = String(body?.email ?? '').trim().toLowerCase();
@@ -363,7 +399,12 @@ export function handleApi(db, ctx) {
           if (!email) return err(400, 'invalid_input', 'Adres e-mail jest wymagany.');
           if (!['viewer', 'collaborator'].includes(memberRole)) return err(400, 'invalid_input', 'Rola musi być "viewer" lub "collaborator".');
           const invitee = getUserByEmail(db, email);
-          if (!invitee) return err(404, 'user_not_found', 'Brak użytkownika Genesis o tym adresie e-mail.');
+          // Adres bez konta nie jest już błędem: zapisujemy zaproszenie oczekujące,
+          // które zamieni się w członkostwo, gdy ta osoba się zarejestruje (v28).
+          if (!invitee) {
+            const invite = createCampaignInvite(db, { campaignId: id, email, role: memberRole, invitedBy: user.id, token: generateToken() });
+            return ok({ invite }, 201);
+          }
           if (invitee.id === row.ownerId) return err(400, 'invalid_input', 'Właściciel już ma pełny dostęp.');
           const member = addCampaignMember(db, { campaignId: id, userId: invitee.id, role: memberRole, addedBy: user.id });
           return ok({ member }, 201);
@@ -386,6 +427,18 @@ export function handleApi(db, ctx) {
         }
       }
       return err(404, 'not_found');
+    }
+
+    // /api/campaigns/:id/invites/:inviteId — odwołanie oczekującego zaproszenia.
+    if (seg[2] === 'invites' && seg.length === 4) {
+      if (method === 'DELETE') {
+        if (role !== 'owner') return err(403, 'forbidden', 'Tylko właściciel może odwoływać zaproszenia.');
+        const invite = getCampaignInvite(db, seg[3]);
+        if (!invite || invite.campaignId !== id) return err(404, 'not_found');
+        deleteCampaignInvite(db, invite.id);
+        return ok({ ok: true });
+      }
+      return err(405, 'method_not_allowed');
     }
 
     // /api/campaigns/:id/snapshots — niemutowalna historia wersji (Scientific Version Control)
@@ -952,7 +1005,11 @@ function register(db, body) {
     displayName: v.value.displayName,
     passwordHash: hashPassword(v.value.password),
   });
-  return issueSession(db, user);
+  // Zaproszenia wysłane na ten adres, ZANIM konto powstało, stają się członkostwem
+  // w chwili rejestracji — zaproszona osoba loguje się i od razu widzi wspólną pracę.
+  const claimed = claimInvitesForUser(db, { email: user.email, userId: user.id });
+  const session = issueSession(db, user);
+  return claimed.length ? { ...session, body: { ...session.body, claimedInvites: claimed } } : session;
 }
 
 function login(db, body) {

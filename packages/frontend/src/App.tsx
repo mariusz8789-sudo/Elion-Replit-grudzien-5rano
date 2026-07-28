@@ -142,7 +142,13 @@ export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [onboardingOpen, setOnboardingOpen] = useState(() => !hasCompletedOnboarding());
+  // Osoba przychodząca z linku zapraszającego ma konkretny powód wejścia — czeka na
+  // nią czyjeś zaproszenie do wspólnej pracy. Samouczek powitalny zasłoniłby je
+  // czterema ekranami wprowadzenia, więc przy ?invite= startujemy od razu na ekranie
+  // konta. Samouczek pozostaje dostępny później z Ustawień (onReplayOnboarding).
+  const [onboardingOpen, setOnboardingOpen] = useState(
+    () => !hasCompletedOnboarding() && !new URLSearchParams(window.location.search).has('invite'),
+  );
   const lastLabId = useRef<string | null>(null);
 
   useEffect(() => {

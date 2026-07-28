@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { register, login, logout } from '../core/backend/client';
+import { useEffect, useState } from 'react';
+import { register, login, logout, fetchInvitePreview, type InvitePreview } from '../core/backend/client';
 import { useSession, setSession, clearSession, getToken } from '../core/backend/session';
 import { useI18n } from '../core/i18n';
 
@@ -21,6 +21,23 @@ export function AccountPanel() {
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [invitePreview, setInvitePreview] = useState<InvitePreview | null>(null);
+
+  // Ktoś wszedł linkiem zapraszającym (?invite=…) — pokazujemy, KTO i DO CZEGO
+  // zaprasza, przełączamy na rejestrację i podstawiamy zaproszony adres. Dostęp
+  // nadaje serwer przy rejestracji tym adresem; sam token z linku nic nie otwiera.
+  useEffect(() => {
+    const inviteToken = new URLSearchParams(window.location.search).get('invite');
+    if (!inviteToken) return;
+    let live = true;
+    void fetchInvitePreview(inviteToken).then((r) => {
+      if (!live || !r.ok) return;
+      setInvitePreview(r.data.invite);
+      setMode('register');
+      setEmail(r.data.invite.email);
+    });
+    return () => { live = false; };
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,6 +79,16 @@ export function AccountPanel() {
 
   return (
     <div className="account-panel">
+      {invitePreview ? (
+        <div className="account-invite" role="status">
+          <strong>
+            {invitePreview.invitedByName
+              ? t('acct.inviteFrom', { who: invitePreview.invitedByName, campaign: invitePreview.campaignName ?? t('acct.inviteUnnamed') })
+              : t('acct.inviteTo', { campaign: invitePreview.campaignName ?? t('acct.inviteUnnamed') })}
+          </strong>
+          <p className="settings-hint">{t('acct.inviteHint', { email: invitePreview.email, role: t(`role.${invitePreview.role}`) })}</p>
+        </div>
+      ) : null}
       <div className="account-tabs" role="tablist">
         <button role="tab" aria-selected={mode === 'login'} className={`account-tab${mode === 'login' ? ' active' : ''}`} onClick={() => setMode('login')}>
           {t('common.signIn')}

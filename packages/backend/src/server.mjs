@@ -73,7 +73,7 @@ const CORS_ORIGINS = (process.env.GENESIS_CORS_ORIGINS ?? '').split(',').map((s)
 // Musi pozostać zgodne z routingiem seg[0] w api.mjs — patrz test serverRouting.test.mjs.
 // `/api/invites` jest celowo publiczne (bez tokenu sesji): zaproszona osoba otwiera
 // link, ZANIM ma konto. Oddaje wyłącznie nazwę kampanii, rolę i imię zapraszającego.
-const PERSIST_API_PREFIXES = ['/api/auth/', '/api/projects', '/api/compute', '/api/science', '/api/account/', '/api/campaigns', '/api/portfolio', '/api/invites', '/api/review'];
+const PERSIST_API_PREFIXES = ['/api/auth/', '/api/projects', '/api/compute', '/api/science', '/api/account/', '/api/campaigns', '/api/portfolio', '/api/invites', '/api/review', '/api/reasoning'];
 
 // Genesis 2.1 (Part 1): asynchroniczny worker pool dla RDKit — ZA FLAGĄ, domyślnie OFF.
 // OFF → nietknięty, synchroniczny tor (execFileSync). ON → nieblokujący pool wątków.

@@ -90,6 +90,14 @@ import {
   reviewWorklist as edgeReviewWorklist, reviewerCredit, contributors,
   reviewCoverage, upsertReviewerProfile, getReviewerProfile, VERDICTS,
 } from './edgeReview.mjs';
+import {
+  ensureReasoningSchema, seedGraphSnapshot, currentSnapshot, snapshotEdges,
+  orphanReviews, recordEvidence, listEvidence, retireEvidence,
+  getArtifact, listArtifacts, replayHistory,
+} from './reasoning/store.mjs';
+import { resolveTenant } from './reasoning/tenancy.mjs';
+import { GRAPH_NODES, GRAPH_EDGES } from '@genesis-os/reasoning/knowledgeGraph';
+import { gradeEvidence, validateEvidence } from '@genesis-os/reasoning/evidence';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
 import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
 import { listCapabilities } from './compute/capabilities.mjs';
@@ -265,6 +273,102 @@ export function handleApi(db, ctx) {
     }
 
     if (seg[1] === 'credit' && method === 'GET') return ok({ credit: reviewerCredit(db, reviewer.id) });
+
+    return err(404, 'not_found');
+  }
+
+  // ---- Reasoning core (L3 pure) + its persistence (L2) ----
+  //
+  // The curated mechanism graph is public: it is the thing a visiting scientist
+  // is being asked to argue with, and requiring an account to read it is the
+  // friction that kills expert recruitment (same reasoning as /api/review).
+  //
+  // There is deliberately NO endpoint that accepts an artifact from a client.
+  // Artifacts are what the platform concluded; letting a caller post one would
+  // let anyone write conclusions into the record and then have them reviewed as
+  // though Genesis had produced them. Artifacts are written by orchestrators
+  // (L4) only, through recordArtifact and its gate.
+  if (seg[0] === 'reasoning') {
+    ensureReasoningSchema(db);
+    ensureReviewSchema(db);
+    // Idempotent: the snapshot id is the content hash, so this is a no-op once
+    // seeded and does NOT orphan reviews on restart.
+    seedGraphSnapshot(db, { nodes: GRAPH_NODES, edges: GRAPH_EDGES });
+
+    if (seg[1] === 'graph' && seg.length === 2 && method === 'GET') {
+      const snap = currentSnapshot(db);
+      return ok({
+        snapshot: { id: snap.id, createdAt: snap.created_at, source: snap.source, nodes: snap.node_count, edges: snap.edge_count },
+        nodes: GRAPH_NODES,
+        edges: snapshotEdges(db, snap.id),
+      });
+    }
+
+    // Reviews pointing at an edge that no longer exists. Public because it is a
+    // statement about the integrity of a public ledger.
+    if (seg[1] === 'graph' && seg[2] === 'orphans' && method === 'GET') {
+      return ok({ orphans: orphanReviews(db), snapshot: currentSnapshot(db)?.id ?? null });
+    }
+
+    // Everything below is tenant-scoped and therefore needs an identified user.
+    const user = getUserByToken(db, ctx.token);
+    const tenant = resolveTenant(db, user, body?.projectId ?? ctx.query?.projectId ?? null);
+    if (!tenant.ok) return err(tenant.status, tenant.code, tenant.message);
+
+    if (seg[1] === 'evidence' && seg.length === 2 && method === 'GET') {
+      return ok({
+        projectId: tenant.projectId,
+        evidence: listEvidence(db, tenant.projectId, {
+          edgeKey: typeof ctx.query?.edgeKey === 'string' ? ctx.query.edgeKey : null,
+          includeRetired: ctx.query?.includeRetired === 'true',
+        }),
+      });
+    }
+
+    if (seg[1] === 'evidence' && seg.length === 2 && method === 'POST') {
+      // Graded on the SERVER, using the same pure function the browser uses.
+      // A client-supplied grade would be a number with no rule behind it, and
+      // the whole two-axis discipline rests on the rule being knowable.
+      const record = {
+        id: 'pending', interventionId: String(body?.interventionId ?? ''), hallmarkId: String(body?.hallmarkId ?? ''),
+        tier: body?.tier, outcome: body?.outcome, direction: body?.direction,
+        citation: String(body?.citation ?? ''), system: String(body?.system ?? ''),
+        replicated: Boolean(body?.replicated), randomised: Boolean(body?.randomised),
+        blinded: Boolean(body?.blinded), preregistered: Boolean(body?.preregistered),
+        sampleSize: Number(body?.sampleSize ?? 0), readoutKind: body?.readoutKind ?? 'proxy',
+        effectSize: body?.effectSize ?? null, notes: String(body?.notes ?? ''),
+      };
+      const validation = validateEvidence(record);
+      if (!validation.ok) return err(400, 'invalid_evidence', validation.errors.join(' '));
+
+      const grade = gradeEvidence(record);
+      const stored = recordEvidence(db, {
+        projectId: tenant.projectId, edgeKey: body?.edgeKey ?? null,
+        intervention: record.interventionId, hallmark: record.hallmarkId,
+        citation: record.citation, tier: record.tier, outcome: record.outcome, direction: record.direction,
+        species: record.system, sampleSize: record.sampleSize, effectSize: record.effectSize,
+        notes: record.notes, strength: grade.strength, humanRelevance: grade.humanRelevance,
+        createdBy: user.id,
+      });
+      return ok({ evidence: stored, grade }, 201);
+    }
+
+    if (seg[1] === 'evidence' && seg.length === 3 && method === 'DELETE') {
+      // Retire, never delete — see recordEvidence's comment on retractions.
+      const retired = retireEvidence(db, decodeURIComponent(seg[2]), tenant.projectId);
+      if (!retired) return err(404, 'not_found', 'No live evidence record with that id in this tenant.');
+      return ok({ retired: true });
+    }
+
+    if (seg[1] === 'artifacts' && seg.length === 2 && method === 'GET') {
+      return ok({ artifacts: listArtifacts(db, tenant.projectId, { kind: typeof ctx.query?.kind === 'string' ? ctx.query.kind : null, limit: Number(ctx.query?.limit ?? 50) }) });
+    }
+
+    if (seg[1] === 'artifact' && seg.length === 3 && method === 'GET') {
+      const artifact = getArtifact(db, decodeURIComponent(seg[2]), tenant.projectId);
+      if (!artifact) return err(404, 'not_found');
+      return ok({ artifact, history: replayHistory(db, tenant.projectId, artifact.inputs_hash) });
+    }
 
     return err(404, 'not_found');
   }

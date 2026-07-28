@@ -1146,3 +1146,55 @@ export async function storeEvidence(
 export async function retireStoredEvidence(token: string, id: string): Promise<ApiResult<{ retired: boolean }>> {
   return request<{ retired: boolean }>('DELETE', `/reasoning/evidence/${encodeURIComponent(id)}`, { token });
 }
+
+/* ------------------------- the Discovery Engine ------------------------- */
+
+/** One stored answer. Shaped by the server; the client never constructs one. */
+export interface DiscoveryArtifact {
+  id: string;
+  kind: string;
+  question: string;
+  snapshot_id: string;
+  inputs_hash: string;
+  review_status: string;
+  created_at: number;
+  refusals: string[];
+  uncertainty: { coverage: number; belief: number; basis: string };
+  provenance: {
+    engine: string; snapshotId: string; edgeCount: number;
+    evidenceIds: string[]; claimIds: string[]; focusNodes: string[]; literature: string;
+    review?: { confirmed: number; disputed: number; staleReviewed: number; totalEdges: number };
+  };
+  body: {
+    engine: string;
+    focus: { id: string; label: string; kind: string }[];
+    hypotheses: {
+      statement: string; kind: string; reasoning: string[]; nodes: string[];
+      plausibility: number; novelty: number; missingEvidence: string[];
+      /**
+       * Structured, NOT strings. An earlier version of this type declared
+       * `string[]` and TypeScript accepted it because the response crosses an
+       * untyped boundary — the screen then crashed on real data with React
+       * error #31. Types at a network edge are a claim about the server, and
+       * this one was wrong.
+       */
+      challenges: { id: string; severity: string; statement: string; discriminatingTest?: string }[];
+    }[];
+    suppressedByMemory: { statement: string; why: string }[];
+    literature: { status: string; candidates: unknown[] };
+    nextExperiments: {
+      interventionId: string; interventionLabel: string; tierLabel: string;
+      outcomeLabel: string; uncertaintyReduction: number; effort: number;
+    }[];
+    degeneracy: { isDegenerate: boolean; tiedCandidates: number; topValue: number };
+  };
+}
+
+/**
+ * Ask the Discovery Engine. Requires an account, because the answer is stored
+ * as an auditable artifact — reading the graph and reviewing an edge do not.
+ */
+export async function askDiscoveryEngine(token: string, question: string): Promise<ApiResult<DiscoveryArtifact>> {
+  const r = await request<{ artifact: DiscoveryArtifact }>('POST', '/reasoning/ask', { token, body: { question } });
+  return r.ok ? { ok: true, data: r.data.artifact } : r;
+}

@@ -2404,3 +2404,61 @@ kbd {
 .lg-verdict-btn span { font-size: 0.74rem; color: var(--text-dim); line-height: 1.45; }
 .lg-field textarea { width: 100%; font: inherit; padding: 0.5rem 0.6rem; border-radius: 7px; background: var(--bg-raised); border: 1px solid var(--border); color: var(--text); resize: vertical; }
 .lg-share { width: 100%; font-family: ui-monospace, monospace; font-size: 0.76rem; padding: 0.55rem 0.7rem; border-radius: 7px; background: var(--bg-raised); border: 1px solid var(--border); color: var(--text); }
+
+/* ---------------------------------------------------------------------------
+   Ask — the Discovery Engine surface.
+
+   The refusal list is styled to be READ, not skimmed past: full width, warning
+   accent, generous line height. Every other product in this space renders its
+   caveats as small grey text under the answer; here they are the first thing on
+   the page and they look like it.
+   --------------------------------------------------------------------------- */
+.ask-form { display: flex; flex-direction: column; gap: 0.7rem; }
+.ask-input {
+  width: 100%; resize: vertical; font: inherit; line-height: 1.5;
+  padding: 0.7rem 0.8rem; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--bg-input, var(--bg-panel)); color: inherit;
+}
+.ask-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.ask-refusals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.ask-refusals li {
+  display: flex; gap: 0.55rem; align-items: flex-start; line-height: 1.55;
+  padding: 0.6rem 0.75rem; border-radius: 10px;
+  background: color-mix(in srgb, var(--warn, #d98324) 9%, transparent);
+  border-left: 3px solid var(--warn, #d98324);
+}
+.ask-refusals li svg { flex: 0 0 auto; margin-top: 0.2rem; }
+
+.ask-axes { display: grid; gap: 1rem; margin: 0.5rem 0 0.75rem; }
+@media (min-width: 720px) { .ask-axes { grid-template-columns: 1fr 1fr; } }
+.ask-axis-head { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.35rem; font-size: 0.9rem; }
+.ask-axis-head strong { font-variant-numeric: tabular-nums; }
+.ask-axis-track { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.ask-axis-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+.ask-axis-note { margin: 0.35rem 0 0; font-size: 0.82rem; }
+
+.ask-hypotheses { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 1.1rem; }
+.ask-statement { margin: 0 0 0.4rem; font-weight: 600; line-height: 1.5; }
+.ask-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
+.ask-reasoning { margin: 0 0 0.5rem; padding-left: 1.1rem; font-size: 0.9rem; line-height: 1.55; opacity: 0.9; }
+.ask-challenges, .ask-missing { margin-top: 0.5rem; }
+.ask-challenges h6, .ask-missing h6 {
+  margin: 0 0 0.25rem; font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; opacity: 0.7;
+}
+.ask-challenges ul, .ask-missing ul { margin: 0; padding-left: 1.1rem; font-size: 0.9rem; line-height: 1.5; }
+.ask-suppressed { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.5rem; line-height: 1.5; }
+
+/* Wide content scrolls inside its own container; the page never scrolls sideways. */
+.ask-table-wrap { overflow-x: auto; }
+.ask-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.ask-table th, .ask-table td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); }
+.ask-table th { font-weight: 600; opacity: 0.75; font-size: 0.8rem; letter-spacing: 0.03em; text-transform: uppercase; }
+.ask-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.ask-provenance { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; margin: 0; font-size: 0.9rem; }
+.ask-provenance dt { opacity: 0.7; }
+.ask-provenance dd { margin: 0; font-variant-numeric: tabular-nums; }
+.ask-provenance code { font-size: 0.85em; }
+
+.ask-preview { margin: 0; padding-left: 1.15rem; line-height: 1.65; }

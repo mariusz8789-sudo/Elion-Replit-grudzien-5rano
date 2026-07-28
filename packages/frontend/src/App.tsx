@@ -48,6 +48,7 @@ import { CampaignsScreen } from './components/product/CampaignsScreen';
 import { CampaignScreen as ResearchCampaignScreen } from './components/product/CampaignScreen';
 import { DashboardScreen } from './components/product/DashboardScreen';
 import { HomeScreen } from './components/product/HomeScreen';
+import { AskScreen } from './components/discovery/AskScreen';
 import { LongevityScreen } from './components/longevity/LongevityScreen';
 import { EdgeReviewScreen } from './components/longevity/EdgeReview';
 import { DiscoveryShell, StatusPill } from './components/discovery/DiscoveryShell';
@@ -92,6 +93,7 @@ type Route =
   | { kind: 'compare' }
   | { kind: 'research-campaigns' }
   | { kind: 'research-campaign'; id: string }
+  | { kind: 'ask' }
   | { kind: 'longevity' }
   | { kind: 'review'; edge?: string }
   | { kind: 'genesis' }
@@ -111,6 +113,7 @@ function parseHash(): Route {
   if (h === '#/prebuild') return { kind: 'prebuild' };
   if (h === '#/conflict') return { kind: 'conflict' };
   if (h === '#/projects') return { kind: 'projects' };
+  if (h === '#/ask') return { kind: 'ask' };
   if (h === '#/longevity') return { kind: 'longevity' };
   // Deep link to a single edge, e.g. #/review?edge=…  — the recruitment link an
   // expert receives by e-mail. Must resolve without a session.
@@ -409,6 +412,7 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'ask') return <AskScreen />;
     if (route.kind === 'longevity') return <LongevityScreen />;
 
     if (route.kind === 'review') {

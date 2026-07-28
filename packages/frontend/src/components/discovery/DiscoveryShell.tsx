@@ -15,6 +15,9 @@ export interface NavItem { hash: string; label: string; icon: IconName; labelKey
  *  Most labels are product feature names (kept as-is across locales); the two
  *  translatable labels carry a labelKey resolved through the i18n seam. */
 export const DISCOVERY_NAV: NavItem[] = [
+  // First, deliberately: per docs/GENESIS_CONSOLIDATION.md, Ask is the product
+  // and every other item is where you go when you disagree with it.
+  { hash: '#/ask', label: 'Ask', icon: 'brain' },
   { hash: '#/dashboard', label: 'Mission Control', icon: 'rocket' },
   { hash: '#/ai-chat', label: 'AI Chat', icon: 'brain' },
   { hash: '#/drug', label: 'Drug Discovery', icon: 'flask' },

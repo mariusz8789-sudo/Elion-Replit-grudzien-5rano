@@ -48,19 +48,38 @@ import { edgeStatuses } from '../edgeReview.mjs';
 
 export const ENGINE_VERSION = 'genesis-discovery-engine/1';
 
-/** Uncertainty is reported on two axes and never merged. */
-function uncertaintyOf({ evidenceCount, reviewedEdges, totalEdges, hypotheses }) {
-  // COVERAGE: how much of the relevant literature this workspace has actually
-  // read. With no evidence records the honest answer is zero, not "unknown".
-  const coverage = evidenceCount === 0 ? 0 : Math.min(1, evidenceCount / 40);
-  // BELIEF: how much of the mechanism graph the answer traverses has been
-  // confirmed by a named expert. Also zero when nobody has reviewed anything.
+/**
+ * Uncertainty on two axes, neither of which contains an invented constant.
+ *
+ * An earlier version computed coverage as `min(1, evidenceCount / 40)`. Forty
+ * is not derived from anything. Worse, the field is called COVERAGE, so the
+ * number read as a measured fraction of the relevant literature — which is not
+ * knowable without a corpus, and this deployment has none. A platform that
+ * refuses unjustified numbers elsewhere must not publish one in its flagship
+ * output.
+ *
+ * Both axes are now ratios whose denominator is a thing that exists:
+ *
+ *   COVERAGE  mechanism nodes in this answer that carry at least one evidence
+ *             record, over the nodes the answer traverses. It measures how much
+ *             of THIS ARGUMENT is evidenced — not how much of the field is read,
+ *             which nothing here can measure.
+ *   BELIEF    traversed edges carrying a current expert confirmation, over the
+ *             edges traversed.
+ *
+ * Both are zero when nothing has been entered, and zero is the honest answer
+ * rather than "unknown": no evidence has been attached, and that is a fact.
+ */
+function uncertaintyOf({ evidencedNodes, answerNodes, reviewedEdges, totalEdges, hypotheses }) {
+  const coverage = answerNodes === 0 ? 0 : Number((evidencedNodes / answerNodes).toFixed(4));
   const belief = totalEdges === 0 ? 0 : Number((reviewedEdges / totalEdges).toFixed(4));
   return {
-    coverage: Number(coverage.toFixed(4)),
+    coverage,
     belief,
-    basis: `Coverage from ${evidenceCount} evidence record(s); belief from ${reviewedEdges} of ${totalEdges} traversed edge(s) carrying an expert verdict. `
-      + `${hypotheses} hypothesis(es) survived the graveyard and the critic.`,
+    basis: `Coverage: ${evidencedNodes} of ${answerNodes} mechanism(s) in this answer carry evidence. `
+      + `Belief: ${reviewedEdges} of ${totalEdges} traversed edge(s) carry a current expert verdict. `
+      + `${hypotheses} hypothesis(es) survived the graveyard and the critic. `
+      + 'Neither axis measures how much of the published literature was read — nothing here can measure that without a corpus.',
   };
 }
 
@@ -252,8 +271,17 @@ export function runDiscovery(db, { projectId, question, focus = null, limit = 8 
     review: { confirmed, disputed, staleReviewed, totalEdges: edges.length },
   };
 
+  // Denominator: the mechanism nodes this answer actually reasons over.
+  // Numerator: those with at least one evidence record attached.
+  const answerNodes = new Set(survivors.flatMap((s) => s.hypothesis.nodes));
+  for (const n of resolved.nodes) answerNodes.add(n.id);
+  const evidencedNodes = new Set(
+    evidence.map((e) => e.hallmark).filter((h) => h && answerNodes.has(h)),
+  );
+
   const uncertainty = uncertaintyOf({
-    evidenceCount: evidence.length,
+    evidencedNodes: evidencedNodes.size,
+    answerNodes: answerNodes.size,
     reviewedEdges,
     totalEdges: edges.length,
     hypotheses: survivors.length,

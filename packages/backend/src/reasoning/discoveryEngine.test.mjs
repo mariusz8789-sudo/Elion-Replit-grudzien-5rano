@@ -184,12 +184,33 @@ describe('the refusal that matters most', () => {
     assert.equal(typeof r.uncertainty.coverage, 'number');
     assert.equal(typeof r.uncertainty.belief, 'number');
     assert.notEqual(r.uncertainty.coverage, undefined);
-    assert.match(r.uncertainty.basis, /Coverage from .* evidence record/);
-    assert.match(r.uncertainty.basis, /belief from .* edge/);
+    assert.match(r.uncertainty.basis, /Coverage: \d+ of \d+ mechanism/);
+    assert.match(r.uncertainty.basis, /Belief: \d+ of \d+ traversed edge/);
+    // Both axes must be ratios of things that exist. An earlier version divided
+    // the evidence count by the constant 40, which is not derived from anything
+    // and made the field read as a measured fraction of the literature.
+    assert.match(r.uncertainty.basis, /Neither axis measures how much of the published literature was read/);
   });
 });
 
 describe('review status is measured, not assumed', () => {
+  test('coverage is a ratio of mechanisms evidenced, not an invented denominator', () => {
+    // With no evidence at all, coverage is 0 because the numerator is 0 — not
+    // because a magic constant happened to produce a small number.
+    const empty = ask();
+    assert.equal(empty.uncertainty.coverage, 0);
+    assert.match(empty.uncertainty.basis, /Coverage: 0 of \d+ mechanism/);
+
+    recordEvidence(db, {
+      projectId: P, citation: 'doi:10.1000/x', tier: 'rodent', outcome: 'lifespan', direction: 'increase',
+      hallmark: 'cellular-senescence', intervention: 'senolytics',
+      strength: 0.6, humanRelevance: 0.2, createdBy: actor, now: 5,
+    });
+    const after = ask();
+    assert.ok(after.uncertainty.coverage > 0, 'attaching evidence to a traversed mechanism raises coverage');
+    assert.ok(after.uncertainty.coverage <= 1);
+  });
+
   test('with no reviews it says so, counting the edges it traversed', () => {
     const r = ask();
     assert.equal(r.provenance.review.confirmed, 0);

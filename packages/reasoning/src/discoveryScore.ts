@@ -1,10 +1,10 @@
-import { INTERVENTIONS, type InterventionId } from './interventions';
-import { appraiseIntervention, type InterventionAppraisal } from './appraisal';
-import { analyseCancerSafety } from './cancerSafety';
-import { analyseSafeRegeneration } from './safeRegeneration';
-import { hubRanking } from './inference';
-import { nextExperiments } from './discovery';
-import type { EvidenceRecord } from './evidence';
+import { INTERVENTIONS, type InterventionId } from './interventions.ts';
+import { appraiseIntervention, type InterventionAppraisal } from './appraisal.ts';
+import { analyseCancerSafety } from './cancerSafety.ts';
+import { analyseSafeRegeneration } from './safeRegeneration.ts';
+import { hubRanking } from './inference.ts';
+import { nextExperiments } from './discovery.ts';
+import type { EvidenceRecord } from './evidence.ts';
 
 /**
  * Scientific Discovery Score.

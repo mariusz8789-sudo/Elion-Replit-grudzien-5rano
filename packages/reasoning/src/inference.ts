@@ -1,8 +1,8 @@
 import {
   GRAPH_EDGES, GRAPH_NODES, edgesFrom, getNode, nodesOfKind,
   type GraphEdge, type GraphNodeId,
-} from './knowledgeGraph';
-import type { HallmarkId } from './hallmarks';
+} from './knowledgeGraph.ts';
+import type { HallmarkId } from './hallmarks.ts';
 
 /**
  * Longevity Discovery Platform — inference engine.

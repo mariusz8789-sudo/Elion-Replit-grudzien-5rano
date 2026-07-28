@@ -1,5 +1,5 @@
-import type { HonestyLevel } from '../types';
-import type { CellState } from './cellStates';
+import type { HonestyLevel } from './types.ts';
+import type { CellState } from './cellStates.ts';
 
 /**
  * Partial Reprogramming Engine.

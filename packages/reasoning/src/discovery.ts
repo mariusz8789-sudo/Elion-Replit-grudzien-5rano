@@ -1,13 +1,13 @@
 import {
   openTriads, structuralGaps, interactionMatrix, feedbackLoops, netInfluence, explainPath, hubRanking,
   type OpenTriad,
-} from './inference';
-import { getNode, nodesOfKind, type GraphNodeId } from './knowledgeGraph';
-import { offsettingPairs } from './cancerSafety';
-import { INTERVENTIONS, getIntervention, type InterventionId } from './interventions';
-import { appraiseIntervention } from './appraisal';
-import { TIERS, OUTCOMES, type EvidenceRecord, type EvidenceTier, type OutcomeType } from './evidence';
-import type { HallmarkId } from './hallmarks';
+} from './inference.ts';
+import { getNode, nodesOfKind, type GraphNodeId } from './knowledgeGraph.ts';
+import { offsettingPairs } from './cancerSafety.ts';
+import { INTERVENTIONS, getIntervention, type InterventionId } from './interventions.ts';
+import { appraiseIntervention } from './appraisal.ts';
+import { TIERS, OUTCOMES, type EvidenceRecord, type EvidenceTier, type OutcomeType } from './evidence.ts';
+import type { HallmarkId } from './hallmarks.ts';
 
 /**
  * Longevity Discovery Platform — Discovery Engine.

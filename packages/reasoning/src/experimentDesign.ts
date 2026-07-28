@@ -1,9 +1,9 @@
-import { getHallmark, type HallmarkId, type Readout } from './hallmarks';
-import { getIntervention, type InterventionId } from './interventions';
-import { analyseCancerSafety } from './cancerSafety';
-import type { EvidenceTier } from './evidence';
-import { critique } from './critic';
-import type { Hypothesis } from './discovery';
+import { getHallmark, type HallmarkId, type Readout } from './hallmarks.ts';
+import { getIntervention, type InterventionId } from './interventions.ts';
+import { analyseCancerSafety } from './cancerSafety.ts';
+import type { EvidenceTier } from './evidence.ts';
+import { critique } from './critic.ts';
+import type { Hypothesis } from './discovery.ts';
 
 /**
  * Longevity Discovery Platform — Experiment Designer.

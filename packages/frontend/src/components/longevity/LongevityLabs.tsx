@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { Icon } from '../Icon';
-import { simulate, PRESET_PERTURBATIONS, type Perturbation, type Direction } from '../../core/longevity/simulator';
-import { CELL_STATES, STATE_TRANSITIONS, transitionsFrom, transitionsInto, type CellState } from '../../core/longevity/cellStates';
-import { SPECIES, conservedMechanisms, unexplainedTraits } from '../../core/longevity/species';
-import { REPROGRAMMING_PHASES, analyseWindow, phaseRisks, windowRequirements } from '../../core/longevity/reprogramming';
-import { rankDiscoveryDirections, rankWithWeights, SCORE_WEIGHTS } from '../../core/longevity/discoveryScore';
-import { auditGraph, reviewWorklist } from '../../core/longevity/edgeEvidence';
-import { getNode, nodesOfKind, type GraphNodeId } from '../../core/longevity/knowledgeGraph';
-import type { EvidenceRecord } from '../../core/longevity/evidence';
+import { simulate, PRESET_PERTURBATIONS, type Perturbation, type Direction } from '@genesis-os/reasoning/simulator';
+import { CELL_STATES, STATE_TRANSITIONS, transitionsFrom, transitionsInto, type CellState } from '@genesis-os/reasoning/cellStates';
+import { SPECIES, conservedMechanisms, unexplainedTraits } from '@genesis-os/reasoning/species';
+import { REPROGRAMMING_PHASES, analyseWindow, phaseRisks, windowRequirements } from '@genesis-os/reasoning/reprogramming';
+import { rankDiscoveryDirections, rankWithWeights, SCORE_WEIGHTS } from '@genesis-os/reasoning/discoveryScore';
+import { auditGraph, reviewWorklist } from '@genesis-os/reasoning/edgeEvidence';
+import { getNode, nodesOfKind, type GraphNodeId } from '@genesis-os/reasoning/knowledgeGraph';
+import type { EvidenceRecord } from '@genesis-os/reasoning/evidence';
 
 /**
  * The remaining Longevity workbenches: simulator, cell states, comparative

@@ -4,13 +4,13 @@
   "description": "Genesis OS — mobilna platforma do eksploracji fizyki, kosmologii i nauki poprzez interaktywne symulacje oraz AI.",
   "private": true,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "scripts": {
     "dev": "npm run dev --workspace=packages/frontend",
     "dev:backend": "npm run dev --workspace=packages/backend",
     "build": "npm run build --workspace=packages/frontend",
-    "test": "npm run test --workspace=packages/frontend && npm run test --workspace=packages/backend",
+    "test": "npm run test --workspace=packages/reasoning && npm run test --workspace=packages/frontend && npm run test --workspace=packages/backend",
     "lint": "eslint .",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,mjs,css}\" \"*.md\" \"knowledge/*.md\"",
     "preview": "npm run preview --workspace=packages/frontend",
@@ -37,6 +37,7 @@
   ],
   "license": "UNLICENSED",
   "workspaces": [
+    "packages/reasoning",
     "packages/frontend",
     "packages/backend"
   ],

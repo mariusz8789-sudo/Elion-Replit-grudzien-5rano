@@ -1,15 +1,15 @@
 import {
   signedPaths, netInfluence, explainPath, interactionMatrix, structuralGaps, hubRanking,
   type SignedPath,
-} from './inference';
-import { getNode, nodesOfKind, type GraphNodeId, type GraphEdge } from './knowledgeGraph';
-import { analyseCancerSafety, oncogenicLoadRanking } from './cancerSafety';
-import { INTERVENTIONS, type InterventionId } from './interventions';
-import { appraiseAll, evidenceTranslationGap } from './appraisal';
-import { generateHypotheses, nextExperiments, experimentFrontier, rankingDegeneracy } from './discovery';
-import { survivingHypotheses } from './critic';
-import type { EvidenceRecord } from './evidence';
-import type { HallmarkId } from './hallmarks';
+} from './inference.ts';
+import { getNode, nodesOfKind, type GraphNodeId, type GraphEdge } from './knowledgeGraph.ts';
+import { analyseCancerSafety, oncogenicLoadRanking } from './cancerSafety.ts';
+import { INTERVENTIONS, type InterventionId } from './interventions.ts';
+import { appraiseAll, evidenceTranslationGap } from './appraisal.ts';
+import { generateHypotheses, nextExperiments, experimentFrontier, rankingDegeneracy } from './discovery.ts';
+import { survivingHypotheses } from './critic.ts';
+import type { EvidenceRecord } from './evidence.ts';
+import type { HallmarkId } from './hallmarks.ts';
 
 /**
  * Longevity Discovery Platform — Discovery Workspace query layer.

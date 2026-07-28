@@ -1,7 +1,7 @@
-import { INTERVENTIONS, getIntervention, modulationOf, type InterventionId } from './interventions';
-import { analyseCancerSafety, type AxisFinding } from './cancerSafety';
-import { getNode, type CancerNodeId } from './knowledgeGraph';
-import type { HallmarkId } from './hallmarks';
+import { INTERVENTIONS, getIntervention, modulationOf, type InterventionId } from './interventions.ts';
+import { analyseCancerSafety, type AxisFinding } from './cancerSafety.ts';
+import { getNode, type CancerNodeId } from './knowledgeGraph.ts';
+import type { HallmarkId } from './hallmarks.ts';
 
 /**
  * Safe Regeneration Engine — the platform's central question, made computable.

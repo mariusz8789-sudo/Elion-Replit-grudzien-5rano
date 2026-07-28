@@ -1,6 +1,6 @@
-import type { HallmarkId } from './hallmarks';
-import { getNode, type CancerNodeId } from './knowledgeGraph';
-import type { HonestyLevel } from '../types';
+import type { HallmarkId } from './hallmarks.ts';
+import { getNode, type CancerNodeId } from './knowledgeGraph.ts';
+import type { HonestyLevel } from './types.ts';
 
 /**
  * Cell State Transition Engine.

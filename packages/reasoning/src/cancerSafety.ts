@@ -1,9 +1,9 @@
 import {
   INTERVENTIONS, getIntervention, modulationOf,
   type Intervention, type InterventionId, type MechanisticTension, type ModulationDirection,
-} from './interventions';
-import { CANCER_NODES, ONCOGENIC_EDGES, getNode, type CancerNodeId, type GraphEdge } from './knowledgeGraph';
-import type { HallmarkId } from './hallmarks';
+} from './interventions.ts';
+import { CANCER_NODES, ONCOGENIC_EDGES, getNode, type CancerNodeId, type GraphEdge } from './knowledgeGraph.ts';
+import type { HallmarkId } from './hallmarks.ts';
 
 /**
  * Longevity Discovery Platform — Cancer Safety Engine.

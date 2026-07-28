@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import {
   GRAPH_NODES, GRAPH_EDGES, neighbourhood,
   type GraphNode, type GraphNodeId, type NodeKind, type EdgeKind,
-} from '../../core/longevity/knowledgeGraph';
+} from '@genesis-os/reasoning/knowledgeGraph';
 
 /**
  * Interactive knowledge graph.

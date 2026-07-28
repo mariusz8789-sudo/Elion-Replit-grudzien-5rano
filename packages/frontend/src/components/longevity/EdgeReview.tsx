@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { Icon } from '../Icon';
 import { getToken } from '../../core/backend/session';
-import { GRAPH_EDGES, getNode, type GraphEdge } from '../../core/longevity/knowledgeGraph';
+import { GRAPH_EDGES, getNode, type GraphEdge } from '@genesis-os/reasoning/knowledgeGraph';
 
 /**
  * Expert review surface.

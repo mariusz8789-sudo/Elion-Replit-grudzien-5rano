@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 import { Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { Icon } from '../Icon';
-import { answerCentralQuestion, analyseAllSafeRegeneration } from '../../core/longevity/safeRegeneration';
-import { recommendNextExperiment, generateHypotheses } from '../../core/longevity/discovery';
-import { rankDiscoveryDirections } from '../../core/longevity/discoveryScore';
-import { auditGraph } from '../../core/longevity/edgeEvidence';
-import { GRAPH_NODES, GRAPH_EDGES, nodesOfKind } from '../../core/longevity/knowledgeGraph';
-import { oncogenicLoadRanking } from '../../core/longevity/cancerSafety';
-import { unexplainedTraits } from '../../core/longevity/species';
-import type { EvidenceRecord } from '../../core/longevity/evidence';
+import { answerCentralQuestion, analyseAllSafeRegeneration } from '@genesis-os/reasoning/safeRegeneration';
+import { recommendNextExperiment, generateHypotheses } from '@genesis-os/reasoning/discovery';
+import { rankDiscoveryDirections } from '@genesis-os/reasoning/discoveryScore';
+import { auditGraph } from '@genesis-os/reasoning/edgeEvidence';
+import { GRAPH_NODES, GRAPH_EDGES, nodesOfKind } from '@genesis-os/reasoning/knowledgeGraph';
+import { oncogenicLoadRanking } from '@genesis-os/reasoning/cancerSafety';
+import { unexplainedTraits } from '@genesis-os/reasoning/species';
+import type { EvidenceRecord } from '@genesis-os/reasoning/evidence';
 
 /**
  * Flagship overview — the first screen, and the thirty seconds that decide whether

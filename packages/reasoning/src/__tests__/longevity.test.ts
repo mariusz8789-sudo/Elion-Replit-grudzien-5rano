@@ -14,17 +14,17 @@
  * no dosing, no efficacy language — structurally, over every shipped string.
  */
 import { describe, expect, it } from 'vitest';
-import { HALLMARKS, MECHANISTIC_EDGES, getHallmark, propagationFrom } from '../core/longevity/hallmarks';
-import { INTERVENTIONS, TARGET_DIRECTIONS, getIntervention, allTensions } from '../core/longevity/interventions';
-import { GRAPH_NODES, GRAPH_EDGES, danglingEdges, findPath, nodesOfKind, CANCER_NODES } from '../core/longevity/knowledgeGraph';
-import { signedPaths, netInfluence, openTriads, structuralGaps, interactionMatrix, feedbackLoops } from '../core/longevity/inference';
-import { analyseCancerSafety, analyseAll, oncogenicLoadRanking, offsettingPairs } from '../core/longevity/cancerSafety';
-import { gradeEvidence, validateEvidence, findConflicts, TIERS, type EvidenceRecord } from '../core/longevity/evidence';
-import { appraiseIntervention, evidenceTranslationGap, appraiseAll } from '../core/longevity/appraisal';
-import { generateHypotheses, nextExperiments, recommendNextExperiment, discoveryScore, isFeasible } from '../core/longevity/discovery';
-import { critique, survivingHypotheses } from '../core/longevity/critic';
-import { designExperiment } from '../core/longevity/experimentDesign';
-import { analyseSafeRegeneration, analyseAllSafeRegeneration, answerCentralQuestion } from '../core/longevity/safeRegeneration';
+import { HALLMARKS, MECHANISTIC_EDGES, getHallmark, propagationFrom } from '../hallmarks.ts';
+import { INTERVENTIONS, TARGET_DIRECTIONS, getIntervention, allTensions } from '../interventions.ts';
+import { GRAPH_NODES, GRAPH_EDGES, danglingEdges, findPath, nodesOfKind, CANCER_NODES } from '../knowledgeGraph.ts';
+import { signedPaths, netInfluence, openTriads, structuralGaps, interactionMatrix, feedbackLoops } from '../inference.ts';
+import { analyseCancerSafety, analyseAll, oncogenicLoadRanking, offsettingPairs } from '../cancerSafety.ts';
+import { gradeEvidence, validateEvidence, findConflicts, TIERS, type EvidenceRecord } from '../evidence.ts';
+import { appraiseIntervention, evidenceTranslationGap, appraiseAll } from '../appraisal.ts';
+import { generateHypotheses, nextExperiments, recommendNextExperiment, discoveryScore, isFeasible } from '../discovery.ts';
+import { critique, survivingHypotheses } from '../critic.ts';
+import { designExperiment } from '../experimentDesign.ts';
+import { analyseSafeRegeneration, analyseAllSafeRegeneration, answerCentralQuestion } from '../safeRegeneration.ts';
 
 /** A realistic record, so tests exercise the same shape the UI produces. */
 function record(over: Partial<EvidenceRecord> = {}): EvidenceRecord {

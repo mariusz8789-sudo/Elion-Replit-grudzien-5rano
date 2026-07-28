@@ -1,4 +1,4 @@
-import type { HonestyLevel } from '../types';
+import type { HonestyLevel } from './types.ts';
 
 /**
  * Longevity Discovery Platform — mechanism registry (layer 1 of 4).

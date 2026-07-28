@@ -1,5 +1,5 @@
-import type { HallmarkId } from './hallmarks';
-import type { HonestyLevel } from '../types';
+import type { HallmarkId } from './hallmarks.ts';
+import type { HonestyLevel } from './types.ts';
 
 /**
  * Longevity Discovery Platform — intervention strategy registry (layer 3 of 4).

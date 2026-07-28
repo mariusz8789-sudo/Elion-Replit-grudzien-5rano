@@ -1,0 +1,20 @@
+{
+  "name": "@genesis-os/reasoning",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Genesis L3 — the scientific reasoning core. Pure: no I/O, no database, no clock, no UI.",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

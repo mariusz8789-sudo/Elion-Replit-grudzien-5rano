@@ -1,5 +1,5 @@
-import { GRAPH_EDGES, getNode, type GraphEdge, type GraphNodeId } from './knowledgeGraph';
-import { transitionPressure, adverseTransitions, beneficialTransitions, type TransitionPressure, type StateInfluence } from './cellStates';
+import { GRAPH_EDGES, getNode, type GraphEdge, type GraphNodeId } from './knowledgeGraph.ts';
+import { transitionPressure, adverseTransitions, beneficialTransitions, type TransitionPressure, type StateInfluence } from './cellStates.ts';
 
 /**
  * Digital Cell Simulator.

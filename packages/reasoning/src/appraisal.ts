@@ -1,11 +1,11 @@
 import {
   gradeEvidence, findConflicts, TIERS, OUTCOMES,
   type EvidenceRecord, type EvidenceGrade, type EvidenceTier, type EvidenceConflict,
-} from './evidence';
-import { getIntervention, type InterventionId } from './interventions';
-import { analyseCancerSafety, type CancerSafetyProfile } from './cancerSafety';
-import { getNode } from './knowledgeGraph';
-import type { HallmarkId } from './hallmarks';
+} from './evidence.ts';
+import { getIntervention, type InterventionId } from './interventions.ts';
+import { analyseCancerSafety, type CancerSafetyProfile } from './cancerSafety.ts';
+import { getNode } from './knowledgeGraph.ts';
+import type { HallmarkId } from './hallmarks.ts';
 
 /**
  * Longevity Discovery Platform — appraisal engine.

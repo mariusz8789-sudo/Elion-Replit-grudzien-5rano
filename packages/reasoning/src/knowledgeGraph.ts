@@ -1,6 +1,6 @@
-import { HALLMARKS, MECHANISTIC_EDGES, type HallmarkId } from './hallmarks';
-import { INTERVENTIONS, type InterventionId } from './interventions';
-import type { HonestyLevel } from '../types';
+import { HALLMARKS, MECHANISTIC_EDGES, type HallmarkId } from './hallmarks.ts';
+import { INTERVENTIONS, type InterventionId } from './interventions.ts';
+import type { HonestyLevel } from './types.ts';
 
 /**
  * Longevity Discovery Platform — unified knowledge graph (layer 4 of 4).

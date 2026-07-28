@@ -19,7 +19,11 @@ export type SimParams = Record<string, number | boolean | string>;
  * jeśli pochodzi ze Scientific Model Graph) — 'cinematic' nigdy nie zastępuje
  * etykiety fizyki, tylko oznacza dodatkowo warstwę reżyserii nad nią.
  */
-export type HonestyLevel = 'exact' | 'simplified' | 'educational' | 'theoretical' | 'cinematic';
+// Declared in the reasoning core and re-exported here. The scientific reasoning
+// must not depend on a UI package, so the definition moved down and this stayed
+// a name the rest of the frontend can keep importing unchanged.
+export type { HonestyLevel } from '@genesis-os/reasoning/types';
+import type { HonestyLevel } from '@genesis-os/reasoning/types';
 
 export const HONESTY_LABELS: Record<HonestyLevel, string> = {
   exact: 'Dokładne wzory fizyczne',

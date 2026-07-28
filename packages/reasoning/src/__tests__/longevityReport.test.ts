@@ -9,15 +9,15 @@
  * To print:  npm run longevity:report
  */
 import { describe, expect, it } from 'vitest';
-import { analyseCancerSafety, oncogenicLoadRanking } from '../core/longevity/cancerSafety';
-import { interactionMatrix, feedbackLoops, structuralGaps, netInfluence } from '../core/longevity/inference';
-import { generateHypotheses } from '../core/longevity/discovery';
-import { survivingHypotheses } from '../core/longevity/critic';
-import { nextExperiments, experimentFrontier, rankingDegeneracy } from '../core/longevity/discovery';
-import { designExperiment } from '../core/longevity/experimentDesign';
-import { getNode } from '../core/longevity/knowledgeGraph';
-import { answerCentralQuestion, analyseAllSafeRegeneration } from '../core/longevity/safeRegeneration';
-import { simulate, PRESET_PERTURBATIONS } from '../core/longevity/simulator';
+import { analyseCancerSafety, oncogenicLoadRanking } from '../cancerSafety.ts';
+import { interactionMatrix, feedbackLoops, structuralGaps, netInfluence } from '../inference.ts';
+import { generateHypotheses } from '../discovery.ts';
+import { survivingHypotheses } from '../critic.ts';
+import { nextExperiments, experimentFrontier, rankingDegeneracy } from '../discovery.ts';
+import { designExperiment } from '../experimentDesign.ts';
+import { getNode } from '../knowledgeGraph.ts';
+import { answerCentralQuestion, analyseAllSafeRegeneration } from '../safeRegeneration.ts';
+import { simulate, PRESET_PERTURBATIONS } from '../simulator.ts';
 
 /* eslint-disable no-console */
 const log = (...a: unknown[]) => console.log(...a);

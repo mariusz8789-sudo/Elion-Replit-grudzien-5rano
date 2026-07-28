@@ -1,8 +1,8 @@
-import { signedPaths, explainPath } from './inference';
-import { getNode, edgesTo, type GraphNodeId } from './knowledgeGraph';
-import { analyseCancerSafety } from './cancerSafety';
-import { getIntervention, type InterventionId } from './interventions';
-import type { Hypothesis } from './discovery';
+import { signedPaths, explainPath } from './inference.ts';
+import { getNode, edgesTo, type GraphNodeId } from './knowledgeGraph.ts';
+import { analyseCancerSafety } from './cancerSafety.ts';
+import { getIntervention, type InterventionId } from './interventions.ts';
+import type { Hypothesis } from './discovery.ts';
 
 /**
  * Longevity Discovery Platform — Scientific Critic.

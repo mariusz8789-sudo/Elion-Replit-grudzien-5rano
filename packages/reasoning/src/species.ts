@@ -1,6 +1,6 @@
-import type { HallmarkId } from './hallmarks';
-import { getNode } from './knowledgeGraph';
-import type { HonestyLevel } from '../types';
+import type { HallmarkId } from './hallmarks.ts';
+import { getNode } from './knowledgeGraph.ts';
+import type { HonestyLevel } from './types.ts';
 
 /**
  * Multi-species Longevity Engine.

@@ -1,5 +1,5 @@
-import { GRAPH_EDGES, getNode, type GraphEdge } from './knowledgeGraph';
-import { gradeEvidence, type EvidenceRecord, type EvidenceGrade } from './evidence';
+import { GRAPH_EDGES, getNode, type GraphEdge } from './knowledgeGraph.ts';
+import { gradeEvidence, type EvidenceRecord, type EvidenceGrade } from './evidence.ts';
 
 /**
  * Edge evidence linkage — Phase 2 of scientific validation.

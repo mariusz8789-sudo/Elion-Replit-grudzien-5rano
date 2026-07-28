@@ -4,23 +4,23 @@ import { Icon } from '../Icon';
 import { useI18n } from '../../core/i18n';
 import { LongevityGraph } from './LongevityGraph';
 import { SimulatorTab, CellStateTab, SpeciesTab, ReprogrammingTab, ScoreTab, AuditTab } from './LongevityLabs';
-import { getNode, neighbourhood, nodesOfKind, type GraphNodeId } from '../../core/longevity/knowledgeGraph';
-import { INTERVENTIONS, type InterventionId } from '../../core/longevity/interventions';
-import { analyseCancerSafety } from '../../core/longevity/cancerSafety';
-import { generateHypotheses } from '../../core/longevity/discovery';
-import { survivingHypotheses } from '../../core/longevity/critic';
-import { designExperiment } from '../../core/longevity/experimentDesign';
-import { appraiseIntervention } from '../../core/longevity/appraisal';
-import { validateEvidence, TIERS, OUTCOMES, type EvidenceRecord, type EvidenceTier, type OutcomeType } from '../../core/longevity/evidence';
+import { getNode, neighbourhood, nodesOfKind, type GraphNodeId } from '@genesis-os/reasoning/knowledgeGraph';
+import { INTERVENTIONS, type InterventionId } from '@genesis-os/reasoning/interventions';
+import { analyseCancerSafety } from '@genesis-os/reasoning/cancerSafety';
+import { generateHypotheses } from '@genesis-os/reasoning/discovery';
+import { survivingHypotheses } from '@genesis-os/reasoning/critic';
+import { designExperiment } from '@genesis-os/reasoning/experimentDesign';
+import { appraiseIntervention } from '@genesis-os/reasoning/appraisal';
+import { validateEvidence, TIERS, OUTCOMES, type EvidenceRecord, type EvidenceTier, type OutcomeType } from '@genesis-os/reasoning/evidence';
 import {
   allPathsBetween, highestValueExperiments, strongestInteractions,
   strongestEvidenceWeakestTranslation, researchGaps,
   influencesWithoutCancerRisk, safetyProfile, hypothesesAbout,
   type QueryAnswer,
-} from '../../core/longevity/query';
-import { traceSupport } from '../../core/longevity/edgeEvidence';
+} from '@genesis-os/reasoning/query';
+import { traceSupport } from '@genesis-os/reasoning/edgeEvidence';
 import { LongevityOverview } from './LongevityOverview';
-import type { HallmarkId } from '../../core/longevity/hallmarks';
+import type { HallmarkId } from '@genesis-os/reasoning/hallmarks';
 
 /**
  * Longevity Discovery Workspace.

@@ -48,6 +48,7 @@ import { CampaignsScreen } from './components/product/CampaignsScreen';
 import { CampaignScreen as ResearchCampaignScreen } from './components/product/CampaignScreen';
 import { DashboardScreen } from './components/product/DashboardScreen';
 import { HomeScreen } from './components/product/HomeScreen';
+import { LongevityScreen } from './components/longevity/LongevityScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -89,6 +90,7 @@ type Route =
   | { kind: 'compare' }
   | { kind: 'research-campaigns' }
   | { kind: 'research-campaign'; id: string }
+  | { kind: 'longevity' }
   | { kind: 'genesis' }
   | { kind: 'labs' };
 
@@ -106,6 +108,7 @@ function parseHash(): Route {
   if (h === '#/prebuild') return { kind: 'prebuild' };
   if (h === '#/conflict') return { kind: 'conflict' };
   if (h === '#/projects') return { kind: 'projects' };
+  if (h === '#/longevity') return { kind: 'longevity' };
   if (h === '#/cde') return { kind: 'cde' };
   if (h === '#/drug') return { kind: 'drug' };
   if (h === '#/campaign') return { kind: 'campaign' };
@@ -382,6 +385,8 @@ export default function App() {
         </div>
       );
     }
+
+    if (route.kind === 'longevity') return <LongevityScreen />;
 
     if (route.kind === 'cde') {
       return (

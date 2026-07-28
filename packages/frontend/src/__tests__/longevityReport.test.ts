@@ -16,6 +16,7 @@ import { survivingHypotheses } from '../core/longevity/critic';
 import { nextExperiments, experimentFrontier, rankingDegeneracy } from '../core/longevity/discovery';
 import { designExperiment } from '../core/longevity/experimentDesign';
 import { getNode } from '../core/longevity/knowledgeGraph';
+import { answerCentralQuestion, analyseAllSafeRegeneration } from '../core/longevity/safeRegeneration';
 
 /* eslint-disable no-console */
 const log = (...a: unknown[]) => console.log(...a);
@@ -134,5 +135,29 @@ describe('efficiency frontier', () => {
       expect(frontier[i].effort).toBeGreaterThan(frontier[i - 1].effort);
       expect(frontier[i].uncertaintyReduction).toBeGreaterThan(frontier[i - 1].uncertaintyReduction);
     }
+  });
+});
+
+describe('the central question', () => {
+  it('answers: can biological age be reversed without increasing cancer risk?', () => {
+    const a = answerCentralQuestion();
+    log('\n\n================ CENTRAL QUESTION ================');
+    log('Can biological age be reversed without increasing cancer risk?\n');
+    log('ANSWER AS THE GRAPH CURRENTLY STANDS:');
+    log(`  ${a.statement}\n`);
+    log('DERIVATION:');
+    a.derivation.forEach((d, i) => log(`  ${i + 1}) ${d}`));
+    log('\nPER-STRATEGY WINDOW:');
+    for (const p of analyseAllSafeRegeneration()) {
+      log(`  [${p.window.padEnd(17)}] ${p.label.padEnd(38)} regen +${p.regenerationGain}  suppression cost ${p.suppressionCost}`);
+    }
+    if (a.offsetCombinations.length) {
+      log('\nOFFSETTING COMBINATIONS (hypotheses, not recommendations):');
+      for (const c of a.offsetCombinations.slice(0, 3)) {
+        log(`  ${c.a} + ${c.b} on ${c.axis}`);
+        c.reasoning.forEach((r) => log(`      · ${r}`));
+      }
+    }
+    expect(a.statement.length).toBeGreaterThan(50);
   });
 });

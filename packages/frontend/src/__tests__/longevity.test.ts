@@ -24,6 +24,7 @@ import { appraiseIntervention, evidenceTranslationGap, appraiseAll } from '../co
 import { generateHypotheses, nextExperiments, recommendNextExperiment, discoveryScore, isFeasible } from '../core/longevity/discovery';
 import { critique, survivingHypotheses } from '../core/longevity/critic';
 import { designExperiment } from '../core/longevity/experimentDesign';
+import { analyseSafeRegeneration, analyseAllSafeRegeneration, answerCentralQuestion } from '../core/longevity/safeRegeneration';
 
 /** A realistic record, so tests exercise the same shape the UI produces. */
 function record(over: Partial<EvidenceRecord> = {}): EvidenceRecord {
@@ -598,5 +599,49 @@ describe('platform invariants — no medical claims, no fabrication', () => {
     expect(getIntervention('nope' as never)).toBeUndefined();
     expect(analyseCancerSafety('nope' as never)).toBeNull();
     expect(appraiseIntervention('nope' as never, [])).toBeNull();
+  });
+});
+
+describe('safe regeneration — the central question', () => {
+  it('separates regenerative gain from tumour-suppression cost', () => {
+    for (const p of analyseAllSafeRegeneration()) {
+      expect(['in-window', 'trades-off', 'cost-without-gain', 'not-assessable']).toContain(p.window);
+      // A strategy in the window must genuinely have no suppression cost.
+      if (p.window === 'in-window') {
+        expect(p.suppressionCost).toBe(0);
+        expect(p.regenerationGain).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('places senolytics in trades-off — it restores function AND weakens the arrest', () => {
+    const p = analyseSafeRegeneration('senolytics')!;
+    expect(p.window).toBe('trades-off');
+    expect(p.suppressionCost).toBeGreaterThan(0);
+    expect(p.suppressionCosts.map((c) => c.axis)).toContain('tp53-axis');
+  });
+
+  it('gets the damage/capacity inversion right for mitochondrial strategies', () => {
+    // 'mitochondrial-dysfunction' names the DAMAGE, so decreasing it restores.
+    const p = analyseSafeRegeneration('mitophagy-enhancement')!;
+    const route = p.regenerationRoutes.find((r) => r.mechanism === 'mitochondrial-dysfunction')!;
+    expect(route.direction).toBe('decrease');
+    expect(route.restores).toBe(true);
+  });
+
+  it('never states that anything is safe', () => {
+    for (const p of analyseAllSafeRegeneration()) {
+      expect(p.verdict).not.toMatch(/\bis safe\b|\bsafe to use\b|\bno cancer risk\b/i);
+      expect(p.verdict).toMatch(/direction only|absence of analysis|documented/i);
+    }
+  });
+
+  it('answers the central question with an auditable derivation', () => {
+    const a = answerCentralQuestion();
+    expect(a.derivation.length).toBeGreaterThan(2);
+    expect(a.statement).toMatch(/absence of documented coupling|no registered strategy/i);
+    // The answer must be allowed to be empty — a platform that always finds a
+    // winner is not measuring anything.
+    expect(Array.isArray(a.inWindow)).toBe(true);
   });
 });

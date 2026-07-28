@@ -9,6 +9,7 @@ Written as Chief Product Architect, from the repository at commit `25b4e80`.
 > not built. Part 1's status table below is therefore **the state at the time of
 > analysis**, kept as written so the reasoning can be checked against what was
 > actually done. See §7 at the end for what changed.
+
 Every percentage below is an estimate of *implemented surface against a stated
 definition of done*, and the definition is given each time so the number can be
 argued with. Nothing is assumed.

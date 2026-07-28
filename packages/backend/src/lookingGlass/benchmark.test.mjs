@@ -32,7 +32,7 @@ import { runTarget, samplePairedControls, nullDistribution, runBenchmark, format
 
 const CUTOFF = 2015;
 
-/** Descriptor records, as `loadDescriptors` consumes them. */
+/** One descriptor, in the shape the release XML below is generated from. */
 function descriptor(ui, name, tree, dateEstablished) {
   return { ui, name, treeNumbers: [tree], dateEstablished, dateCreated: dateEstablished, vocabularyYear: 2024 };
 }

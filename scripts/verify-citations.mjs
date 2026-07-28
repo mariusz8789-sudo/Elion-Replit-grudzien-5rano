@@ -38,6 +38,22 @@ const TIMEOUT_MS = 20_000;
 const asJson = process.argv.includes('--json');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * The surname out of a label like "von Zglinicki 2002" or "García-Prat 2016" —
+ * everything before the trailing year. Compound and particled surnames are the
+ * normal case in this field, so anything cleverer than "strip the year" would
+ * break on d'Adda di Fagagna.
+ */
+function labelSurname(label) {
+  const m = /^(.*?)\s+(?:19|20)\d{2}\s*$/.exec(String(label ?? '').trim());
+  return m ? m[1].trim() : null;
+}
+
+/** Fold accents and case, so "Coppé" matches "Coppe JP" in a plain-ASCII author string. */
+function normalise(s) {
+  return String(s).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+}
+
 /** Europe PMC query for one citation. An id search is exact; there is no fuzzy fallback on purpose. */
 function queryFor({ pmid, doi }) {
   if (pmid) return `EXT_ID:${pmid} AND SRC:MED`;
@@ -73,6 +89,19 @@ async function resolve(citation) {
   const mismatch = [];
   if (citation.pmid && found.pmid && citation.pmid !== found.pmid) mismatch.push(`PMID ${citation.pmid} → record says ${found.pmid}`);
   if (citation.doi && found.doi && citation.doi.toLowerCase() !== found.doi) mismatch.push(`DOI ${citation.doi} → record says ${found.doi}`);
+
+  // AND THE AUTHOR MUST MATCH. An identifier that resolves proves only that
+  // SOMETHING is there; it does not prove the something is what the label says.
+  //
+  // This check exists because a verification pass returned "OK" for three
+  // identifiers whose titles belonged to entirely different papers — it had
+  // confirmed the numbers resolve and never compared them to the labels. The
+  // label is the only part a human scans, so it is the part worth checking
+  // hardest.
+  const surname = labelSurname(citation.label);
+  if (surname && found.authors && !normalise(found.authors).includes(normalise(surname))) {
+    mismatch.push(`label says "${citation.label}" but the record's authors are: ${found.authors.slice(0, 90)}`);
+  }
 
   return { status: mismatch.length ? 'MISMATCH' : 'OK', found, mismatch };
 }

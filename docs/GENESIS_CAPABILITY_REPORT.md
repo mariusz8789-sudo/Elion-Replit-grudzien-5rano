@@ -11,6 +11,15 @@ contains **4 users, 0 projects, 0 campaigns, 0 expert reviews and 0 evidence
 records**. Genesis is a working system with no users and no data in it. Every
 capability described below is demonstrated by tests, not by usage.
 
+> **Superseded in part.** This report was written at commit `9865929`. Phases 5
+> (Discovery Engine), 6 (replay + diff) and 3 (knowledge timeline) were built
+> afterwards, and the Ask screen gave the engine a user interface. See
+> `GENESIS_CONSOLIDATION.md` §7. Three gaps named in §6 below are now closed —
+> "no Discovery Engine", "no replay API", and "no UI for anything built after
+> Phase 0.4" (partly: Ask exists, Graph/Evidence/Memory do not). Everything in
+> §7 (scientific gaps) and §8 (commercial risks) is unchanged, because none of
+> it was engineering.
+
 ---
 
 ## 0. What was measured

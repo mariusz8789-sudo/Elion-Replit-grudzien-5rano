@@ -17,6 +17,7 @@ import { nextExperiments, experimentFrontier, rankingDegeneracy } from '../core/
 import { designExperiment } from '../core/longevity/experimentDesign';
 import { getNode } from '../core/longevity/knowledgeGraph';
 import { answerCentralQuestion, analyseAllSafeRegeneration } from '../core/longevity/safeRegeneration';
+import { simulate, PRESET_PERTURBATIONS } from '../core/longevity/simulator';
 
 /* eslint-disable no-console */
 const log = (...a: unknown[]) => console.log(...a);
@@ -159,5 +160,38 @@ describe('the central question', () => {
       }
     }
     expect(a.statement.length).toBeGreaterThan(50);
+  });
+});
+
+describe('digital cell simulator', () => {
+  it('propagates a telomerase activation and explains every consequence', () => {
+    const r = simulate([{ node: 'telomerase', direction: 'up' }]);
+    log('\n\n================ DIGITAL CELL SIMULATOR ================');
+    log(`INPUT: ↑ Telomerase\n`);
+    log('SUMMARY:', r.summary);
+    log('\nDOWNSTREAM EFFECTS:');
+    for (const e of r.effects) {
+      log(`  ${e.direction === 'conflicted' ? '⚠ CONFLICTED' : e.direction === 'up' ? '↑' : '↓'} ${e.label}  (distance ${e.distance}, confidence ${e.confidence})`);
+      log(`      via: ${e.routes[0].steps[e.routes[0].steps.length - 1]}`);
+    }
+    log('\nONCOGENIC AXES REACHED:');
+    for (const e of r.oncogenicEffects) log(`  ${e.direction} ${e.label} (confidence ${e.confidence})`);
+    log('\nCELL-STATE PRESSURE:');
+    for (const p of r.statePressures.slice(0, 6)) {
+      log(`  ${p.pressure > 0 ? '+' : ''}${p.pressure}  ${p.transition.from} → ${p.transition.to} (${p.transition.label})`);
+    }
+    expect(r.effects.length).toBeGreaterThan(0);
+  });
+
+  it('combined quality-control perturbation', () => {
+    const preset = PRESET_PERTURBATIONS.find((p) => p.id === 'combo-safe')!;
+    const r = simulate(preset.perturbations);
+    log(`\n\n=== PRESET: ${preset.label} ===`);
+    log(r.summary);
+    log('\nBENEFICIAL TRANSITIONS FAVOURED:');
+    for (const p of r.beneficial) log(`  +${p.pressure} ${p.transition.from} → ${p.transition.to}`);
+    log('ADVERSE TRANSITIONS FAVOURED:');
+    for (const p of r.adverse) log(`  +${p.pressure} ${p.transition.from} → ${p.transition.to} (${p.transition.label})`);
+    expect(r.summary.length).toBeGreaterThan(50);
   });
 });

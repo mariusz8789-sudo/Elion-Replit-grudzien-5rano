@@ -197,8 +197,10 @@ export function rankDiscoveryDirections(records: EvidenceRecord[]): DiscoverySco
  * conclusion survives a different value system — if the ranking inverts when
  * cancer risk is weighted more heavily, that is worth knowing before funding it.
  */
-export function rankWithWeights(records: EvidenceRecord[], weights: Partial<typeof SCORE_WEIGHTS>): DiscoveryScore[] {
-  const merged = { ...SCORE_WEIGHTS, ...weights };
+export type ScoreWeights = Record<keyof typeof SCORE_WEIGHTS, number>;
+
+export function rankWithWeights(records: EvidenceRecord[], weights: Partial<ScoreWeights>): DiscoveryScore[] {
+  const merged: ScoreWeights = { ...SCORE_WEIGHTS, ...weights };
   const positiveWeight = Object.values(merged).filter((w) => w > 0).reduce((a, b) => a + b, 0) || 1;
   const keyByFactor: Record<string, keyof typeof SCORE_WEIGHTS> = {
     'Evidence quality': 'evidenceQuality', Novelty: 'novelty', 'Potential impact': 'potentialImpact',

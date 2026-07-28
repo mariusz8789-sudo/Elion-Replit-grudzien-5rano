@@ -3,6 +3,7 @@ import { DiscoveryShell, Panel, StatusPill } from '../discovery/DiscoveryShell';
 import { Icon } from '../Icon';
 import { useI18n } from '../../core/i18n';
 import { LongevityGraph } from './LongevityGraph';
+import { SimulatorTab, CellStateTab, SpeciesTab, ReprogrammingTab, ScoreTab, AuditTab } from './LongevityLabs';
 import { getNode, neighbourhood, nodesOfKind, type GraphNodeId } from '../../core/longevity/knowledgeGraph';
 import { INTERVENTIONS, type InterventionId } from '../../core/longevity/interventions';
 import { analyseCancerSafety } from '../../core/longevity/cancerSafety';
@@ -14,8 +15,11 @@ import { validateEvidence, TIERS, OUTCOMES, type EvidenceRecord, type EvidenceTi
 import {
   allPathsBetween, highestValueExperiments, strongestInteractions,
   strongestEvidenceWeakestTranslation, researchGaps,
+  influencesWithoutCancerRisk, safetyProfile, hypothesesAbout,
   type QueryAnswer,
 } from '../../core/longevity/query';
+import { traceSupport } from '../../core/longevity/edgeEvidence';
+import { LongevityOverview } from './LongevityOverview';
 import type { HallmarkId } from '../../core/longevity/hallmarks';
 
 /**
@@ -32,7 +36,7 @@ import type { HallmarkId } from '../../core/longevity/hallmarks';
  * second source of truth.
  */
 
-type Tab = 'graph' | 'safety' | 'discovery' | 'experiments' | 'evidence';
+type Tab = 'overview' | 'graph' | 'safety' | 'simulator' | 'states' | 'discovery' | 'score' | 'experiments' | 'species' | 'reprogramming' | 'evidence' | 'audit';
 
 /** Shared renderer for a query answer's derivation and limitations. */
 function Derivation({ answer }: { answer: QueryAnswer<unknown> }) {
@@ -108,6 +112,8 @@ function GraphTab() {
           ) : <p className="ds-dim">Click any node to inspect its mechanism, molecules and documented edges.</p>}
         </Panel>
 
+        {selected ? <QuestionsPanel node={selected} /> : null}
+
         {selected ? (
           <Panel title="Trace every pathway" icon="search">
             <label className="lg-field">
@@ -128,6 +134,7 @@ function GraphTab() {
                         net {p.net} · {p.hops} hop(s) · confidence {p.confidence.toFixed(2)}
                       </StatusPill>
                       <ReasoningChain steps={p.steps} />
+                      <p className="ds-dim lg-weakest">{traceSupport(p.edges, []).verdict}</p>
                     </div>
                   ))}
                   <Derivation answer={paths} />
@@ -615,15 +622,22 @@ function EvidenceTab({ records, onAdd }: { records: EvidenceRecord[]; onAdd: (r:
 
 export function LongevityScreen() {
   const { t } = useI18n();
-  const [tab, setTab] = useState<Tab>('graph');
+  const [tab, setTab] = useState<Tab>('overview');
   const [records, setRecords] = useState<EvidenceRecord[]>([]);
 
   const tabs: { id: Tab; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+    { id: 'overview', label: t('lg.tab.overview'), icon: 'rocket' },
     { id: 'graph', label: t('lg.tab.graph'), icon: 'graph' },
     { id: 'safety', label: t('lg.tab.safety'), icon: 'shield' },
+    { id: 'simulator', label: t('lg.tab.simulator'), icon: 'cpu' },
+    { id: 'states', label: t('lg.tab.states'), icon: 'dna' },
     { id: 'discovery', label: t('lg.tab.discovery'), icon: 'brain' },
+    { id: 'score', label: t('lg.tab.score'), icon: 'chart' },
     { id: 'experiments', label: t('lg.tab.experiments'), icon: 'target' },
+    { id: 'species', label: t('lg.tab.species'), icon: 'flask' },
+    { id: 'reprogramming', label: t('lg.tab.reprogramming'), icon: 'atom' },
     { id: 'evidence', label: t('lg.tab.evidence'), icon: 'book' },
+    { id: 'audit', label: t('lg.tab.audit'), icon: 'shield' },
   ];
 
   return (
@@ -642,11 +656,67 @@ export function LongevityScreen() {
         ))}
       </div>
 
+      {tab === 'overview' ? <LongevityOverview records={records} onNavigate={(x) => setTab(x as Tab)} /> : null}
       {tab === 'graph' ? <GraphTab /> : null}
       {tab === 'safety' ? <SafetyTab /> : null}
       {tab === 'discovery' ? <DiscoveryTab records={records} /> : null}
       {tab === 'experiments' ? <ExperimentsTab records={records} /> : null}
       {tab === 'evidence' ? <EvidenceTab records={records} onAdd={(r) => setRecords((prev) => [...prev, r])} /> : null}
+      {tab === 'simulator' ? <SimulatorTab /> : null}
+      {tab === 'states' ? <CellStateTab /> : null}
+      {tab === 'score' ? <ScoreTab records={records} /> : null}
+      {tab === 'species' ? <SpeciesTab /> : null}
+      {tab === 'reprogramming' ? <ReprogrammingTab /> : null}
+      {tab === 'audit' ? <AuditTab records={records} /> : null}
     </DiscoveryShell>
+  );
+}
+
+
+/**
+ * The questions a researcher actually asks, as typed queries. Free text is
+ * deliberately absent: a box that accepts anything cannot tell the user what it
+ * is unable to answer, and fails by producing fluent output instead of an error.
+ */
+function QuestionsPanel({ node }: { node: GraphNodeId }) {
+  const [which, setWhich] = useState<'safe-influences' | 'safety' | 'hypotheses'>('safe-influences');
+  const nodeLabel = getNode(node)?.label ?? String(node);
+  const isHallmark = nodesOfKind('hallmark').some((n) => n.id === node);
+  const isIntervention = INTERVENTIONS.some((i) => i.id === node);
+
+  const answer: QueryAnswer<unknown> | null = useMemo(() => {
+    if (which === 'safe-influences') return isHallmark ? influencesWithoutCancerRisk(node as HallmarkId) : null;
+    if (which === 'safety') return isIntervention ? safetyProfile(node as InterventionId) : safetyProfile();
+    return hypothesesAbout(node, []);
+  }, [which, node, isHallmark, isIntervention]);
+
+  return (
+    <Panel title="Ask the graph" icon="brain" right={<StatusPill kind="info">typed queries, not free text</StatusPill>}>
+      <div className="lg-presets">
+        <button className={`chip-btn${which === 'safe-influences' ? ' active' : ''}`} onClick={() => setWhich('safe-influences')}>
+          What influences {nodeLabel} without raising cancer risk?
+        </button>
+        <button className={`chip-btn${which === 'safety' ? ' active' : ''}`} onClick={() => setWhich('safety')}>
+          Oncogenic profile
+        </button>
+        <button className={`chip-btn${which === 'hypotheses' ? ' active' : ''}`} onClick={() => setWhich('hypotheses')}>
+          Testable hypotheses involving {nodeLabel}
+        </button>
+      </div>
+
+      {!answer ? (
+        <p className="ds-note">
+          That question does not apply to a node of this kind. The engine says so rather than answering anyway.
+        </p>
+      ) : answer.empty ? (
+        <p className="ds-note"><strong>No result.</strong> {answer.derivation[answer.derivation.length - 1]}</p>
+      ) : (
+        <>
+          <p className="ds-note lg-summary">{answer.question}</p>
+          <p className="ds-dim">{answer.results.length} result(s).</p>
+          <Derivation answer={answer} />
+        </>
+      )}
+    </Panel>
   );
 }

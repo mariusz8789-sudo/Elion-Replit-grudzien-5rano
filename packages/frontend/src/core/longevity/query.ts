@@ -2,7 +2,7 @@ import {
   signedPaths, netInfluence, explainPath, interactionMatrix, structuralGaps, hubRanking,
   type SignedPath,
 } from './inference';
-import { getNode, nodesOfKind, type GraphNodeId } from './knowledgeGraph';
+import { getNode, nodesOfKind, type GraphNodeId, type GraphEdge } from './knowledgeGraph';
 import { analyseCancerSafety, oncogenicLoadRanking } from './cancerSafety';
 import { INTERVENTIONS, type InterventionId } from './interventions';
 import { appraiseAll, evidenceTranslationGap } from './appraisal';
@@ -110,7 +110,7 @@ export function influencesWithoutCancerRisk(target: HallmarkId): QueryAnswer<{
 
 /** "Show every pathway connecting A to B." Complete enumeration up to a hop limit. */
 export function allPathsBetween(from: GraphNodeId, to: GraphNodeId, maxHops = 4): QueryAnswer<{
-  net: 'promotes' | 'counteracts'; hops: number; confidence: number; steps: string[];
+  net: 'promotes' | 'counteracts'; hops: number; confidence: number; steps: string[]; edges: GraphEdge[];
 }> {
   const paths: SignedPath[] = signedPaths(from, to, maxHops);
   const verdict = netInfluence(from, to, maxHops);
@@ -127,7 +127,7 @@ export function allPathsBetween(from: GraphNodeId, to: GraphNodeId, maxHops = 4)
   return {
     kind: 'all-paths-between',
     question: `Every documented pathway connecting ${label(from)} to ${label(to)}.`,
-    results: paths.map((p) => ({ net: p.net, hops: p.hops, confidence: p.confidence, steps: explainPath(p) })),
+    results: paths.map((p) => ({ net: p.net, hops: p.hops, confidence: p.confidence, steps: explainPath(p), edges: p.edges })),
     derivation,
     limitations: [
       `Only paths of at most ${maxHops} hops were considered; longer routes exist in biology and are not shown.`,

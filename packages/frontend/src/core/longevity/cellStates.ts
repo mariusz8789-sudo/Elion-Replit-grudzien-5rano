@@ -192,10 +192,6 @@ export function transitionsInto(state: CellState): StateTransition[] {
   return STATE_TRANSITIONS.filter((t) => t.to === state);
 }
 
-export function getTransition(id: string): StateTransition | undefined {
-  return STATE_TRANSITIONS.find((t) => t.id === id);
-}
-
 export interface TransitionPressure {
   transition: StateTransition;
   /**

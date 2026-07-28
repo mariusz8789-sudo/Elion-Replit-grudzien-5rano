@@ -264,16 +264,6 @@ export function getHallmark(id: HallmarkId): Hallmark | undefined {
   return BY_ID.get(id);
 }
 
-/** Every edge leaving `id` (what this mechanism drives or opposes). */
-export function downstreamOf(id: HallmarkId): MechanisticEdge[] {
-  return MECHANISTIC_EDGES.filter((e) => e.from === id);
-}
-
-/** Every edge arriving at `id` (what drives or opposes this mechanism). */
-export function upstreamOf(id: HallmarkId): MechanisticEdge[] {
-  return MECHANISTIC_EDGES.filter((e) => e.to === id);
-}
-
 /**
  * Mechanisms reachable from `id` by following `promotes` edges, with the depth
  * at which each was first reached. Used to show what a mechanism propagates to.
@@ -295,9 +285,4 @@ export function propagationFrom(id: HallmarkId, maxDepth = 3): { id: HallmarkId;
   }
   seen.delete(id);
   return [...seen.entries()].map(([hid, depth]) => ({ id: hid, depth })).sort((a, b) => a.depth - b.depth);
-}
-
-/** All readouts across the registry, tagged with their mechanism. */
-export function allReadouts(): { hallmark: HallmarkId; readout: Readout }[] {
-  return HALLMARKS.flatMap((h) => h.readouts.map((r) => ({ hallmark: h.id, readout: r })));
 }

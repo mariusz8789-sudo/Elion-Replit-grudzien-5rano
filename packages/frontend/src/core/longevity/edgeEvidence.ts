@@ -1,4 +1,4 @@
-import { GRAPH_EDGES, getNode, type GraphEdge, type GraphNodeId } from './knowledgeGraph';
+import { GRAPH_EDGES, getNode, type GraphEdge } from './knowledgeGraph';
 import { gradeEvidence, type EvidenceRecord, type EvidenceGrade } from './evidence';
 
 /**
@@ -132,14 +132,6 @@ export function auditGraph(records: EvidenceRecord[]): GraphAudit {
   };
 }
 
-/** Edges declared as hypotheses — the ones a reviewer should challenge first. */
-export function uncertainEdges(): EdgeAudit[] {
-  return GRAPH_EDGES
-    .filter((e) => e.honesty === 'theoretical' || e.honesty === 'simplified')
-    .map((e) => auditEdge(e, []))
-    .sort((a, b) => (a.declaredConfidence === 'theoretical' ? -1 : 1) - (b.declaredConfidence === 'theoretical' ? -1 : 1));
-}
-
 /** Which edges a conclusion traversed, and what each rests on. For audit trails. */
 export function traceSupport(path: GraphEdge[], records: EvidenceRecord[]): {
   audits: EdgeAudit[];
@@ -165,16 +157,4 @@ export function reviewWorklist(records: EvidenceRecord[], limit = 25): EdgeAudit
     .filter((a) => a.edge.kind === 'mechanistic' || a.edge.kind === 'oncogenic-coupling')
     .sort((a, b) => order[a.status] - order[b.status])
     .slice(0, limit);
-}
-
-/** Every distinct node pair in the graph, for coverage checks. */
-export function assertedPairs(): { from: GraphNodeId; to: GraphNodeId; kinds: string[] }[] {
-  const map = new Map<string, { from: GraphNodeId; to: GraphNodeId; kinds: string[] }>();
-  for (const e of GRAPH_EDGES) {
-    const key = `${e.from}|${e.to}`;
-    const entry = map.get(key) ?? { from: e.from, to: e.to, kinds: [] };
-    if (!entry.kinds.includes(e.kind)) entry.kinds.push(e.kind);
-    map.set(key, entry);
-  }
-  return [...map.values()];
 }

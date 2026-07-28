@@ -441,11 +441,6 @@ export function getIntervention(id: InterventionId): Intervention | undefined {
   return BY_ID.get(id);
 }
 
-/** Every strategy that targets a given mechanism. */
-export function interventionsTargeting(hallmarkId: HallmarkId): Intervention[] {
-  return INTERVENTIONS.filter((i) => i.targets.includes(hallmarkId));
-}
-
 /** Every documented tension across the registry, most severe first. */
 export function allTensions(): { intervention: InterventionId; tension: MechanisticTension }[] {
   const order: Record<MechanisticTension['severity'], number> = {
@@ -454,21 +449,4 @@ export function allTensions(): { intervention: InterventionId; tension: Mechanis
   return INTERVENTIONS
     .flatMap((i) => i.tensions.map((tension) => ({ intervention: i.id, tension })))
     .sort((a, b) => order[a.tension.severity] - order[b.tension.severity]);
-}
-
-/**
- * Strategies whose targeted mechanisms overlap — candidates for combination, and
- * equally candidates for redundancy. Returned as a symmetric list of pairs.
- */
-export function overlappingStrategies(): { a: InterventionId; b: InterventionId; shared: HallmarkId[] }[] {
-  const pairs: { a: InterventionId; b: InterventionId; shared: HallmarkId[] }[] = [];
-  for (let i = 0; i < INTERVENTIONS.length; i++) {
-    for (let j = i + 1; j < INTERVENTIONS.length; j++) {
-      const a = INTERVENTIONS[i];
-      const b = INTERVENTIONS[j];
-      const shared = a.targets.filter((t) => b.targets.includes(t));
-      if (shared.length >= 2) pairs.push({ a: a.id, b: b.id, shared });
-    }
-  }
-  return pairs.sort((x, y) => y.shared.length - x.shared.length);
 }

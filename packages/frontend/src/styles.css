@@ -2301,3 +2301,91 @@ kbd {
 .lg-metric { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .lg-metrics span:last-child { font-size: 0.7rem; color: var(--text-dim); }
 .lg-grade { margin: 0.6rem 0; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); }
+
+/* Longevity workbenches: simulator, cell states, species, reprogramming. */
+.lg-presets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.7rem 0; }
+.lg-perturb-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; }
+.lg-perturb-row select { flex: 1 1 180px; }
+.lg-chain-ol { margin: 0.3rem 0; padding-left: 1.15rem; font-size: 0.75rem; line-height: 1.5; }
+.lg-route { margin: 0.4rem 0; padding-left: 0.5rem; border-left: 2px solid var(--border); }
+.lg-route-cell { max-width: 420px; }
+.lg-finding-conflict { border-left: 3px solid var(--lg-biomarker); }
+
+.lg-state-row { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.8rem 0; }
+.lg-state-chip {
+  padding: 0.45rem 0.8rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  background: var(--bg-raised); border: 1px solid var(--border); color: var(--text-dim);
+}
+.lg-state-chip.desirable { border-color: var(--lg-hallmark); }
+.lg-state-chip.active { color: var(--text); border-color: var(--accent); border-width: 2px; }
+.lg-drivers { font-size: 0.78rem; margin: 0.3rem 0; }
+
+.lg-species { margin: 0.8rem 0; padding: 0.75rem 0.85rem; border-radius: 8px; border: 1px solid var(--border); }
+.lg-trait { margin: 0.6rem 0; padding-left: 0.6rem; border-left: 2px solid var(--border); }
+.lg-trait-text { font-size: 0.82rem; margin: 0.35rem 0; }
+.lg-details summary { cursor: pointer; font-size: 0.78rem; color: var(--accent); margin-top: 0.5rem; }
+
+/* Reprogramming trajectory: a single axis with phase markers and the window band. */
+/* Inset so the first and last phase labels, which are centred on their dot, have
+   room to sit inside the container instead of being clipped by it. */
+.lg-trajectory { position: relative; height: 92px; margin: 1.5rem 5.5rem 2.6rem; border-bottom: 2px solid var(--border-strong); }
+.lg-window-band { position: absolute; bottom: 0; height: 100%; background: color-mix(in srgb, var(--lg-hallmark) 12%, transparent); pointer-events: none; }
+.lg-phase { position: absolute; bottom: -6px; transform: translateX(-50%); text-align: center; }
+.lg-phase-dot { display: block; width: 12px; height: 12px; border-radius: 50%; margin: 0 auto; background: var(--bg-raised); border: 2px solid var(--lg-hallmark); }
+.lg-phase-uncertain .lg-phase-dot { border-color: var(--lg-biomarker); }
+.lg-phase-no .lg-phase-dot { border-color: var(--lg-cancer); }
+.lg-phase-label { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 0.66rem; color: var(--text-dim); }
+/* Edge phases align their label inward so it cannot overflow the panel. */
+.lg-phase:first-of-type .lg-phase-label { transform: translateX(-25%); }
+.lg-phase:last-of-type .lg-phase-label { transform: translateX(-75%); }
+@media (max-width: 900px) {
+  .lg-trajectory { margin-inline: 3rem; height: 120px; }
+  .lg-phase-label { writing-mode: vertical-rl; bottom: 22px; }
+}
+.lg-requirements { padding-left: 1.2rem; font-size: 0.82rem; }
+.lg-requirements li { margin-bottom: 0.8rem; }
+.lg-weights { font-size: 0.72rem; color: var(--text-dim); margin: 0.5rem 0 1rem; }
+
+/* ── Longevity flagship overview ─────────────────────────────────────────
+   The first thirty seconds. Every figure on this screen is computed live by the
+   engines, so the layout is built to make numbers legible rather than to
+   decorate: large tabular figures, one idea per block, generous separation. */
+.lg-overview { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.lg-hero { padding: 1.6rem 1.5rem; border-radius: 12px; background: var(--bg-raised); border: 1px solid var(--border); }
+.lg-hero-q { margin: 0 0 0.7rem; font-size: 1.55rem; line-height: 1.25; text-wrap: balance; max-width: 30ch; }
+.lg-hero-sub { margin: 0 0 1.2rem; font-size: 0.92rem; line-height: 1.6; color: var(--text-dim); max-width: 78ch; }
+.lg-hero-contrast { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.9rem; }
+.lg-hero-no, .lg-hero-yes { padding: 0.9rem 1rem; border-radius: 9px; border: 1px solid var(--border); }
+.lg-hero-no { border-left: 3px solid var(--lg-cancer); }
+.lg-hero-yes { border-left: 3px solid var(--lg-hallmark); }
+.lg-hero-tag { display: block; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 0.4rem; }
+.lg-hero-no p, .lg-hero-yes p { margin: 0 0 0.4rem; font-size: 1.02rem; font-weight: 600; }
+
+.lg-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; }
+.lg-stat { padding: 0.9rem 1rem; border-radius: 10px; background: var(--bg-raised); border: 1px solid var(--border); }
+.lg-stat-n { display: block; font-size: 1.9rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.lg-stat-l { display: block; margin-top: 0.25rem; font-size: 0.72rem; color: var(--text-dim); line-height: 1.35; }
+
+.lg-answer { font-size: 0.98rem; line-height: 1.6; margin: 0.3rem 0 0.9rem; }
+.lg-answer-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.7rem; margin-bottom: 0.9rem; }
+.lg-answer-metrics > div { padding: 0.65rem 0.8rem; border-radius: 9px; background: var(--bg-raised); display: flex; flex-direction: column; }
+.lg-answer-metrics span:last-child { font-size: 0.7rem; color: var(--text-dim); margin-top: 0.15rem; }
+
+.lg-window-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.9rem; margin: 0.9rem 0; }
+.lg-window-col { padding: 0.85rem 1rem; border-radius: 9px; border: 1px solid var(--border); }
+.lg-window-ok { border-left: 3px solid var(--lg-hallmark); }
+.lg-window-warn { border-left: 3px solid var(--lg-biomarker); }
+.lg-window-col h5 { margin: 0 0 0.6rem; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); }
+.lg-window-item { display: flex; flex-direction: column; padding: 0.35rem 0; font-size: 0.84rem; font-weight: 600; border-top: 1px solid var(--border); }
+.lg-window-item:first-of-type { border-top: none; }
+.lg-window-item span { font-weight: 400; font-size: 0.72rem; }
+
+.lg-why-h { margin: 0.4rem 0 0.9rem; font-size: 1.05rem; }
+.lg-why-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.9rem; }
+.lg-why-card { padding: 1.1rem 1.1rem 1.2rem; border-radius: 11px; background: var(--bg-raised); border: 1px solid var(--border); }
+.lg-why-card h4 { margin: 0.6rem 0 0.5rem; font-size: 0.98rem; }
+.lg-why-card p { margin: 0 0 0.6rem; font-size: 0.85rem; line-height: 1.55; }
+.lg-why-card > span { font-size: 0.74rem; line-height: 1.5; display: block; }
+.lg-weakest { margin-top: 0.4rem; font-size: 0.72rem; }
+.ds-btn-sm { padding: 0.3rem 0.6rem; font-size: 0.74rem; }

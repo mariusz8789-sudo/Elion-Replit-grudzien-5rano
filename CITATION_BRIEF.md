@@ -1,7 +1,7 @@
 # Citation brief — Genesis mechanism graph
 
-14 edges assert something about human biology with no source attached.
-0 already have a proposed citation awaiting verification; **14 are open**.
+6 edges assert something about human biology with no source attached.
+0 already have a proposed citation awaiting verification; **6 are open**.
 
 ## What I need for each edge
 
@@ -26,29 +26,6 @@ have wasted both our time.
 ---
 
 
-## mechanistic  (3)
-
-A drives or opposes B mechanistically.
-
-### DNA damage and repair ──counteracts──▶ Cellular senescence
-
-> Resolving double-strand breaks terminates the persistent damage response that would otherwise enforce arrest.
-
-`dna-repair→cellular-senescence→mechanistic` · declared honesty: `exact`
-
-### DNA damage and repair ──counteracts──▶ Telomere attrition
-
-> Telomeric DNA is prone to oxidative lesions; repair capacity affects the rate of telomere loss beyond the end-replication problem.
-
-`dna-repair→telomere-attrition→mechanistic` · declared honesty: `simplified`
-
-### SASP (senescence-associated secretory phenotype) ──counteracts──▶ Stem-cell exhaustion and rejuvenation
-
-> Chronic inflammatory signalling in the niche impairs stem-cell function and biases lineage output.
-
-`sasp→stem-cell-rejuvenation→mechanistic` · declared honesty: `simplified`
-
-
 ## oncogenic-coupling  (1)
 
 An ageing mechanism is coupled to an oncogenic axis. These are the safety-critical claims — the ones asserting that a longevity intervention touches tumour biology.
@@ -60,21 +37,9 @@ An ageing mechanism is coupled to an oncogenic axis. These are the safety-critic
 `mitochondrial-dysfunction→genomic-instability→oncogenic-coupling` · declared honesty: `simplified`
 
 
-## measures  (10)
+## measures  (5)
 
 A biomarker reads out a mechanism. The claim is that the assay actually measures that mechanism, not that it correlates with age.
-
-### Epigenetic clock ──measures──▶ Epigenetic reprogramming
-
-> Reads the methylation state the mechanism acts on — which also makes it circular as an endpoint for reprogramming interventions.
-
-`epigenetic-clock→epigenetic-reprogramming→measures` · declared honesty: `simplified`
-
-### Telomere length ──measures──▶ Telomere attrition
-
-> Direct measurement of the quantity the mechanism describes.
-
-`telomere-length→telomere-attrition→measures` · declared honesty: `exact`
 
 ### Telomere length ──measures──▶ Telomerase
 
@@ -82,23 +47,11 @@ A biomarker reads out a mechanism. The claim is that the assay actually measures
 
 `telomere-length→telomerase→measures` · declared honesty: `simplified`
 
-### Senescent burden (p16INK4a) ──measures──▶ Cellular senescence
-
-> Proxy for senescent load; p16 also rises in non-senescent contexts, so a panel is required.
-
-`p16-burden→cellular-senescence→measures` · declared honesty: `simplified`
-
 ### Inflammatory panel ──measures──▶ SASP (senescence-associated secretory phenotype)
 
 > Circulating cytokines partly reflect SASP output, but the same analytes move with infection and adiposity.
 
 `inflammatory-panel→sasp→measures` · declared honesty: `simplified`
-
-### NAD+ pool ──measures──▶ Mitochondrial dysfunction
-
-> NAD+ availability constrains oxidative metabolism and sirtuin activity.
-
-`nad-pool→mitochondrial-dysfunction→measures` · declared honesty: `exact`
 
 ### NAD+ pool ──measures──▶ DNA damage and repair
 
@@ -112,12 +65,6 @@ A biomarker reads out a mechanism. The claim is that the assay actually measures
 
 `mitochondrial-capacity→mitochondrial-dysfunction→measures` · declared honesty: `exact`
 
-### Autophagic flux ──measures──▶ Autophagy and proteostasis
-
-> Direct measurement of pathway throughput.
-
-`autophagic-flux→autophagy→measures` · declared honesty: `exact`
-
 ### Regenerative capacity ──measures──▶ Stem-cell exhaustion and rejuvenation
 
 > Functional readout of the compartment, though assay-dependent.
@@ -127,5 +74,5 @@ A biomarker reads out a mechanism. The claim is that the assay actually measures
 
 ---
 
-Debt pinned at 14 by `packages/reasoning/src/__tests__/citations.test.ts`.
+Debt pinned at 6 by `packages/reasoning/src/__tests__/citations.test.ts`.
 Total edges in graph: 66. The other 30 record intent rather than findings and need no source.

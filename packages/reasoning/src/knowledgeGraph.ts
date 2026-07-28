@@ -242,7 +242,7 @@ export function auditCitations(edges: GraphEdge[] = GRAPH_EDGES): CitationAudit 
  * When this reaches 0, delete the constant and make a non-empty `citations` a
  * hard requirement instead. That deletion is the milestone.
  */
-export const UNCITED_CLAIM_EDGES = 14;
+export const UNCITED_CLAIM_EDGES = 6;
 
 /**
  * RATCHET TWO. Citations in the graph that no machine has resolved.
@@ -260,7 +260,7 @@ export const UNCITED_CLAIM_EDGES = 14;
  * A platform selling verifiability that could not say which of its own citations
  * had been verified would be selling the appearance of the thing.
  */
-export const UNRESOLVED_CITATIONS = 22;
+export const UNRESOLVED_CITATIONS = 30;
 
 /* ------------------------------ cancer axis ------------------------------ */
 
@@ -399,23 +399,44 @@ export const BIOMARKER_NODES: GraphNode[] = [
 /** Which mechanism each biomarker reads out, and whether it does so directly. */
 const BIOMARKER_EDGES_SOURCE: CuratedEdge[] = [
   { from: 'epigenetic-clock', to: 'epigenetic-reprogramming', kind: 'measures', effect: 'measures', honesty: 'simplified',
-    mechanism: 'Reads the methylation state the mechanism acts on — which also makes it circular as an endpoint for reprogramming interventions.' },
+    mechanism: 'Reads the methylation state the mechanism acts on — which also makes it circular as an endpoint for reprogramming interventions.',
+    citations: [{ pmid: '24138928', doi: '10.1186/gb-2013-14-10-r115', label: 'Horvath 2013', checked: 'cross-checked' }] },
   { from: 'telomere-length', to: 'telomere-attrition', kind: 'measures', effect: 'measures', honesty: 'exact',
-    mechanism: 'Direct measurement of the quantity the mechanism describes.' },
+    mechanism: 'Direct measurement of the quantity the mechanism describes.',
+    citations: [{ doi: '10.1093/nar/30.10.e47', label: 'Cawthon 2002', checked: 'cross-checked' }] },
+  // UNCITED. This edge asserts a LIMITATION — that length is a poor proxy for
+  // telomerase activity. The right source shows the dissociation; searches
+  // returned papers praising each assay instead. A paper about the method is not
+  // a paper about the method's failure mode.
   { from: 'telomere-length', to: 'telomerase', kind: 'measures', effect: 'measures', honesty: 'simplified',
     mechanism: 'Indirect: length reflects the balance of attrition and extension, not telomerase activity itself. Use TRAP for activity.' },
   { from: 'p16-burden', to: 'cellular-senescence', kind: 'measures', effect: 'measures', honesty: 'simplified',
-    mechanism: 'Proxy for senescent load; p16 also rises in non-senescent contexts, so a panel is required.' },
+    mechanism: 'Proxy for senescent load; p16 also rises in non-senescent contexts, so a panel is required.',
+    citations: [{ pmid: '28650766', doi: '10.1080/15384101.2017.1339850', label: 'Frescas 2017', checked: 'cross-checked' }] },
+  // UNCITED. Needs a source for the CONFOUND — IL-6 and TNF-alpha moving with
+  // infection and adiposity independently of senescent burden. Searches returned
+  // papers proposing SASP panels, which is the opposite claim.
   { from: 'inflammatory-panel', to: 'sasp', kind: 'measures', effect: 'measures', honesty: 'simplified',
     mechanism: 'Circulating cytokines partly reflect SASP output, but the same analytes move with infection and adiposity.' },
   { from: 'nad-pool', to: 'mitochondrial-dysfunction', kind: 'measures', effect: 'measures', honesty: 'exact',
-    mechanism: 'NAD+ availability constrains oxidative metabolism and sirtuin activity.' },
+    mechanism: 'NAD+ availability constrains oxidative metabolism and sirtuin activity.',
+    citations: [{ pmid: '26118927', doi: '10.1016/j.cmet.2015.05.023', label: 'Cantó 2015', checked: 'cross-checked' }] },
+  // UNCITED. The PARP/NAD+ biochemistry is well documented, but this edge is
+  // about NAD+ as a READOUT of repair activity, which is a different and weaker
+  // claim. No paper found that supports the measurement direction.
   { from: 'nad-pool', to: 'dna-repair', kind: 'measures', effect: 'measures', honesty: 'exact',
     mechanism: 'NAD+ is the required substrate for PARP-mediated repair signalling.' },
+  // UNCITED. "Mitochondrial capacity" covers several assays (respirometry,
+  // membrane potential, ATP flux) and no single paper establishes it as a direct
+  // readout of dysfunction. Either the edge names a specific assay, or it needs a
+  // methods review that says so explicitly.
   { from: 'mitochondrial-capacity', to: 'mitochondrial-dysfunction', kind: 'measures', effect: 'measures', honesty: 'exact',
     mechanism: 'Direct functional readout of the mechanism.' },
   { from: 'autophagic-flux', to: 'autophagy', kind: 'measures', effect: 'measures', honesty: 'exact',
-    mechanism: 'Direct measurement of pathway throughput.' },
+    mechanism: 'Direct measurement of pathway throughput.',
+    citations: [{ pmid: '33634751', doi: '10.1080/15548627.2020.1797280', label: 'Klionsky 2021', checked: 'cross-checked' }] },
+  // UNCITED. The edge concedes its own weakness ("assay-dependent"). A citation
+  // must support that concession, not a single transplantation protocol. Not found.
   { from: 'regenerative-capacity', to: 'stem-cell-rejuvenation', kind: 'measures', effect: 'measures', honesty: 'simplified',
     mechanism: 'Functional readout of the compartment, though assay-dependent.' },
 ];

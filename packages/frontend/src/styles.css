@@ -2462,3 +2462,14 @@ kbd {
 .ask-provenance code { font-size: 0.85em; }
 
 .ask-preview { margin: 0; padding-left: 1.15rem; line-height: 1.65; }
+
+/* Edge criticality — the "where your hour matters" list on the review screen. */
+.crit-list { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.85rem; }
+.crit-pick {
+  background: none; border: none; padding: 0; font: inherit; font-weight: 600;
+  color: var(--accent); cursor: pointer; text-align: left; text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.crit-pick:hover { opacity: 0.85; }
+.crit-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.crit-why { margin: 0.25rem 0 0.35rem; line-height: 1.5; font-size: 0.9rem; }

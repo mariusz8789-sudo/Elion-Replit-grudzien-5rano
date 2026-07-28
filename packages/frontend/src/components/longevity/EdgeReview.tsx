@@ -24,6 +24,17 @@ import { GRAPH_EDGES, getNode, type GraphEdge } from '@genesis-os/reasoning/know
 
 const API = '/api';
 
+/** One entry from GET /api/reasoning/review-priority. Public, no account needed. */
+interface CriticalEdge {
+  edgeKey: string;
+  from: string;
+  to: string;
+  effect: string | null;
+  why: string;
+  reviewStatus: string;
+  score: number;
+}
+
 export type EdgeVerdict = 'confirm' | 'dispute' | 'refine' | 'insufficient-expertise';
 
 interface EdgeStatus {
@@ -64,10 +75,17 @@ export function EdgeReviewScreen({ initialEdgeKey }: { initialEdgeKey?: string }
   const [proposed, setProposed] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [priority, setPriority] = useState<CriticalEdge[] | null>(null);
 
   const signedIn = Boolean(getToken());
 
   const load = () => {
+    // Which claims actually decide what Genesis concludes. Public, so this
+    // loads before any sign-in — it is the argument for spending the hour.
+    void fetch(`${API}/reasoning/review-priority?limit=5`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setPriority(d?.worklist ?? null))
+      .catch(() => setPriority(null));
     void fetch(`${API}/review/edge/${encodeURIComponent(edgeKey)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setStatus(d.status))
@@ -109,6 +127,31 @@ export function EdgeReviewScreen({ initialEdgeKey }: { initialEdgeKey?: string }
 
   return (
     <>
+      {priority && priority.length > 0 ? (
+        <Panel
+          title="Where your hour would change the most"
+          icon="target"
+          right={<StatusPill kind="warn">{priority.length} of many</StatusPill>}
+        >
+          <p className="ds-note">
+            Most edges in the graph change nothing when removed. These are the ones every conclusion rests on —
+            computed, not chosen. Reviewing one of these moves the platform; reviewing an arbitrary edge usually
+            does not.
+          </p>
+          <ol className="crit-list">
+            {priority.map((e) => (
+              <li key={e.edgeKey}>
+                <button className="crit-pick" onClick={() => setEdgeKey(e.edgeKey)}>
+                  {e.from} {e.effect === 'promotes' ? '→ drives →' : '→ opposes →'} {e.to}
+                </button>
+                <p className="ds-dim crit-why">{e.why}</p>
+                {e.reviewStatus === 'disputed' ? <StatusPill kind="warn">already disputed</StatusPill> : null}
+              </li>
+            ))}
+          </ol>
+        </Panel>
+      ) : null}
+
       <Panel title="Review one relationship" icon="shield"
         right={coverage ? <StatusPill kind="info">{coverage.reviewed}/{coverage.total} edges reviewed by {coverage.reviewers} expert(s)</StatusPill> : null}>
         <p className="ds-note">

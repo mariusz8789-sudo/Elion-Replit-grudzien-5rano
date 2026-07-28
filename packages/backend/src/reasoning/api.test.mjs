@@ -4,6 +4,7 @@ import { openDatabase, createUser, createSession } from '../store.mjs';
 import { handleApi } from '../api.mjs';
 import { resolveTenant, personalTenant, PERSONAL_PREFIX } from './tenancy.mjs';
 import { listEvidence } from './store.mjs';
+import { assertClaim as assertClaimDirect } from './livingGraph.mjs';
 
 /**
  * /api/reasoning — the surface over the reasoning core.
@@ -331,3 +332,104 @@ describe('explicit opt-in sharing', () => {
     assert.equal(r.status, 400);
   });
 });
+
+describe('living knowledge graph over HTTP', () => {
+  const seedClaims = (token = aliceToken) => call('POST', '/api/reasoning/claims/seed', { token });
+
+  test('a workspace does not silently acquire opinions', () => {
+    // Seeding is an explicit act, not a side effect of reading the graph.
+    call('GET', '/api/reasoning/graph');
+    assert.deepEqual(call('GET', '/api/reasoning/claims', { token: aliceToken }).body.claims, []);
+    assert.ok(seedClaims().body.seeded > 0);
+    assert.ok(call('GET', '/api/reasoning/claims', { token: aliceToken }).body.claims.length > 0);
+  });
+
+  test('beliefs are tenant-scoped', () => {
+    seedClaims(aliceToken);
+    assert.deepEqual(call('GET', '/api/reasoning/claims', { token: bobToken }).body.claims, []);
+  });
+
+  test('a revision without a rule is refused with the reason', () => {
+    seedClaims();
+    const claim = call('GET', '/api/reasoning/claims', { token: aliceToken }).body.claims[0];
+    const r = call('POST', `/api/reasoning/claim/${claim.id}/revise`, {
+      token: aliceToken, body: { confidence: 0.9, coverage: 0.5, cause: 'review', causeRef: 'rev-1' },
+    });
+    assert.equal(r.status, 400);
+    assert.match(r.body.message, /rule is required/);
+  });
+
+  test('a valid revision is recorded and the history is readable', () => {
+    seedClaims();
+    const claim = call('GET', '/api/reasoning/claims', { token: aliceToken }).body.claims[0];
+    const r = call('POST', `/api/reasoning/claim/${claim.id}/revise`, {
+      token: aliceToken,
+      body: { confidence: 0.85, coverage: 0.4, cause: 'review', causeRef: 'rev-1', rule: 'review-derived/1' },
+    });
+    assert.equal(r.status, 201);
+    const detail = call('GET', `/api/reasoning/claim/${claim.id}`, { token: aliceToken });
+    assert.equal(detail.body.claim.confidence, 0.85);
+    assert.equal(detail.body.history.length, 2);
+    assert.equal(detail.body.history[0].confidence, claim.confidence, 'the earlier belief survives');
+  });
+
+  test("one tenant cannot read or revise another's claim", () => {
+    seedClaims(aliceToken);
+    const claim = call('GET', '/api/reasoning/claims', { token: aliceToken }).body.claims[0];
+    assert.equal(call('GET', `/api/reasoning/claim/${claim.id}`, { token: bobToken }).status, 404);
+    assert.equal(call('POST', `/api/reasoning/claim/${claim.id}/revise`, {
+      token: bobToken, body: { confidence: 0.1, coverage: 0.1, cause: 'manual', rule: 'r/1' },
+    }).status, 404);
+  });
+
+  test('contradictions are reported with their detail, resolved with a reason', () => {
+    seedClaims();
+    // Assert the opposite of an existing curated claim to create a real conflict.
+    const claim = call('GET', '/api/reasoning/claims', { token: aliceToken }).body.claims
+      .find((c) => c.predicate === 'promotes');
+    assertOpposite(claim);
+
+    const found = call('GET', '/api/reasoning/contradictions', { token: aliceToken }).body.contradictions;
+    assert.equal(found.length, 1);
+    assert.equal(found[0].kind, 'sign-conflict');
+    assert.equal(found[0].resolution, null);
+
+    const bad = call('POST', '/api/reasoning/contradictions/resolve', {
+      token: aliceToken, body: { contradictionId: found[0].id, kind: found[0].kind, resolution: 'ok' },
+    });
+    assert.equal(bad.status, 400);
+
+    const good = call('POST', '/api/reasoning/contradictions/resolve', {
+      token: aliceToken,
+      body: { contradictionId: found[0].id, kind: found[0].kind, resolution: 'Context-dependent; both retained deliberately.' },
+    });
+    assert.equal(good.status, 201);
+
+    const after = call('GET', '/api/reasoning/contradictions', { token: aliceToken }).body.contradictions;
+    assert.equal(after.length, 1, 'a resolved conflict is still shown — resolving records a judgement, it does not erase the disagreement');
+    assert.match(after[0].resolution.resolution, /Context-dependent/);
+  });
+
+  test('the timeline carries the cause and rule behind every point', () => {
+    seedClaims();
+    const claim = call('GET', '/api/reasoning/claims', { token: aliceToken }).body.claims[0];
+    call('POST', `/api/reasoning/claim/${claim.id}/revise`, {
+      token: aliceToken,
+      body: { confidence: 0.2, coverage: 0.7, cause: 'retraction', causeRef: 'doi:10.1000/r', rule: 'retraction/1' },
+    });
+    const points = call('GET', '/api/reasoning/timeline', { token: aliceToken }).body.points;
+    const last = points.at(-1);
+    assert.equal(last.cause, 'retraction');
+    assert.equal(last.cause_ref, 'doi:10.1000/r');
+    assert.ok(points.every((p) => p.rule), 'a curve nobody can interrogate is decoration');
+  });
+});
+
+/** Direct store call: the API deliberately exposes no "create arbitrary claim". */
+function assertOpposite(claim) {
+  assertClaimDirect(db, {
+    projectId: personalTenant(alice.id), subject: claim.subject,
+    predicate: claim.predicate === 'promotes' ? 'counteracts' : 'promotes', object: claim.object,
+    origin: 'manual', confidence: 0.4, coverage: 0.1, rule: 'manual/1', actorId: alice.id,
+  });
+}

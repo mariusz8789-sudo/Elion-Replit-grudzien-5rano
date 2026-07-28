@@ -1,5 +1,6 @@
 import { canonicalHash } from '../provenance.mjs';
 import { newId } from '../auth.mjs';
+import { ensureLivingGraphSchema } from './livingGraph.mjs';
 
 /**
  * L2 — persistence for the scientific reasoning core.
@@ -129,6 +130,7 @@ export const GRADING_VERSION = 'genesis-evidence-grading/2';
 
 export function ensureReasoningSchema(db) {
   db.exec(SCHEMA);
+  ensureLivingGraphSchema(db);
   return db;
 }
 

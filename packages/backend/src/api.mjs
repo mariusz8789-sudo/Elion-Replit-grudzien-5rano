@@ -96,6 +96,10 @@ import {
   getArtifact, listArtifacts, replayHistory,
 } from './reasoning/store.mjs';
 import { resolveTenant } from './reasoning/tenancy.mjs';
+import {
+  seedClaimsFromSnapshot, liveClaims, claimState, claimHistory, reviseClaim,
+  retireClaim, detectContradictions, resolveContradiction, confidenceTimeline,
+} from './reasoning/livingGraph.mjs';
 import { GRAPH_NODES, GRAPH_EDGES } from '@genesis-os/reasoning/knowledgeGraph';
 import { gradeEvidence, validateEvidence } from '@genesis-os/reasoning/evidence';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
@@ -374,6 +378,71 @@ export function handleApi(db, ctx) {
       const retired = retireEvidence(db, decodeURIComponent(seg[2]), tenant.projectId);
       if (!retired) return err(404, 'not_found', 'No live evidence record with that id in this tenant.');
       return ok({ retired: true });
+    }
+
+    /* ---------------------- living knowledge graph ---------------------- */
+
+    // Seeding a tenant's beliefs from the curated graph is explicit, not a side
+    // effect of reading: a workspace does not silently acquire opinions.
+    if (seg[1] === 'claims' && seg[2] === 'seed' && method === 'POST') {
+      return ok(seedClaimsFromSnapshot(db, { projectId: tenant.projectId, actorId: user.id }), 201);
+    }
+
+    if (seg[1] === 'claims' && seg.length === 2 && method === 'GET') {
+      const subject = typeof ctx.query?.subject === 'string' ? ctx.query.subject : null;
+      return ok({ claims: liveClaims(db, tenant.projectId, { subject }).map((c) => claimState(db, c.id)) });
+    }
+
+    if (seg[1] === 'claim' && seg.length === 3 && method === 'GET') {
+      const state = claimState(db, decodeURIComponent(seg[2]));
+      if (!state || state.project_id !== tenant.projectId) return err(404, 'not_found');
+      return ok({ claim: state, history: claimHistory(db, state.id) });
+    }
+
+    if (seg[1] === 'claim' && seg.length === 4 && seg[3] === 'revise' && method === 'POST') {
+      let result;
+      try {
+        result = reviseClaim(db, {
+          claimId: decodeURIComponent(seg[2]), projectId: tenant.projectId,
+          confidence: Number(body?.confidence), coverage: Number(body?.coverage),
+          cause: body?.cause, causeRef: body?.causeRef ?? null, rule: body?.rule,
+          note: String(body?.note ?? ''), actorId: user.id,
+        });
+      } catch (e) {
+        return err(400, 'invalid_revision', String(e.message).replace(/^reviseClaim refused: /, ''));
+      }
+      if (!result.ok) return err(result.error === 'not_found' ? 404 : 409, result.error, result.message);
+      return ok({ revision: result.revision, claim: claimState(db, decodeURIComponent(seg[2])) }, 201);
+    }
+
+    if (seg[1] === 'claim' && seg.length === 4 && seg[3] === 'retire' && method === 'POST') {
+      const result = retireClaim(db, {
+        claimId: decodeURIComponent(seg[2]), projectId: tenant.projectId,
+        cause: body?.cause, causeRef: body?.causeRef ?? null,
+        rule: body?.rule ?? 'retirement/1', note: String(body?.note ?? ''), actorId: user.id,
+      });
+      if (!result.ok) return err(result.error === 'not_found' ? 404 : 400, result.error, result.message);
+      return ok({ claim: claimState(db, decodeURIComponent(seg[2])) });
+    }
+
+    // Derived on every read — a cached contradiction list would eventually
+    // disagree with the claims it describes.
+    if (seg[1] === 'contradictions' && seg.length === 2 && method === 'GET') {
+      return ok({ contradictions: detectContradictions(db, tenant.projectId) });
+    }
+
+    if (seg[1] === 'contradictions' && seg[2] === 'resolve' && method === 'POST') {
+      const result = resolveContradiction(db, {
+        contradictionId: body?.contradictionId, projectId: tenant.projectId,
+        kind: body?.kind, resolution: String(body?.resolution ?? ''), resolvedBy: user.id,
+      });
+      if (!result.ok) return err(400, result.error, result.message);
+      return ok({ resolution: result.resolution }, 201);
+    }
+
+    if (seg[1] === 'timeline' && seg.length === 2 && method === 'GET') {
+      const subject = typeof ctx.query?.subject === 'string' ? ctx.query.subject : null;
+      return ok({ points: confidenceTimeline(db, tenant.projectId, { subject, limit: Number(ctx.query?.limit ?? 500) }) });
     }
 
     if (seg[1] === 'artifacts' && seg.length === 2 && method === 'GET') {

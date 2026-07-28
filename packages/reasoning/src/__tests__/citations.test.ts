@@ -23,6 +23,7 @@ import {
   GRAPH_EDGES,
   CLAIM_EDGE_KINDS,
   UNCITED_CLAIM_EDGES,
+  UNRESOLVED_CITATIONS,
   auditCitations,
   isClaimEdge,
   validateCitation,
@@ -42,17 +43,17 @@ const edge = (over: Partial<GraphEdge> = {}): GraphEdge => ({
 });
 
 /** A real citation: López-Otín et al., Hallmarks of Aging, Cell 2013. */
-const REAL: Citation = { pmid: '23746838', doi: '10.1016/j.cell.2013.05.039', label: 'López-Otín 2013' };
+const REAL: Citation = { pmid: '23746838', doi: '10.1016/j.cell.2013.05.039', label: 'López-Otín 2013', checked: 'resolved' };
 
 describe('validateCitation refuses what a reader could not resolve', () => {
   it('accepts a bare PMID, a bare DOI, or both', () => {
     expect(validateCitation(REAL).ok).toBe(true);
-    expect(validateCitation({ pmid: '23746838', label: 'López-Otín 2013' }).ok).toBe(true);
-    expect(validateCitation({ doi: '10.1038/nature15759', label: 'Hensen 2015' }).ok).toBe(true);
+    expect(validateCitation({ pmid: '23746838', label: 'López-Otín 2013', checked: 'resolved' }).ok).toBe(true);
+    expect(validateCitation({ doi: '10.1038/nature15759', label: 'Hensen 2015', checked: 'cross-checked' }).ok).toBe(true);
   });
 
   it('REFUSES an edge citation with no identifier at all — this is the whole point', () => {
-    const r = validateCitation({ label: 'Someone, probably, at some point' });
+    const r = validateCitation({ label: 'Someone, probably, at some point', checked: 'resolved' });
     expect(r.ok).toBe(false);
     expect(r.errors.join(' ')).toMatch(/needs a PMID or a DOI/);
   });
@@ -70,7 +71,7 @@ describe('validateCitation refuses what a reader could not resolve', () => {
     ['not-a-number', 'letters'],
     ['', 'an empty string'],
   ])('refuses %s (%s)', (pmid) => {
-    const r = validateCitation({ pmid, label: 'x' });
+    const r = validateCitation({ pmid, label: 'x', checked: 'resolved' });
     expect(r.ok).toBe(false);
   });
 
@@ -80,11 +81,11 @@ describe('validateCitation refuses what a reader could not resolve', () => {
     ['10.1016', 'no suffix'],
     ['j.cell.2013.05.039', 'no registrant'],
   ])('refuses %s (%s)', (doi) => {
-    expect(validateCitation({ doi, label: 'x' }).ok).toBe(false);
+    expect(validateCitation({ doi, label: 'x', checked: 'resolved' }).ok).toBe(false);
   });
 
   it('requires a human-readable label — a bare identifier is unreadable in the graph', () => {
-    const r = validateCitation({ pmid: '23746838', label: '   ' });
+    const r = validateCitation({ pmid: '23746838', label: '   ', checked: 'resolved' });
     expect(r.ok).toBe(false);
     expect(r.errors.join(' ')).toMatch(/label/i);
   });
@@ -95,7 +96,7 @@ describe('validateCitation refuses what a reader could not resolve', () => {
     // source to every downstream consumer, which is exactly the failure the
     // fixture convention exists to prevent.
     for (const doi of ['10.1000/fixture-study', '10.0000/genesis-test-fixture-1']) {
-      const r = validateCitation({ doi, label: 'fixture' });
+      const r = validateCitation({ doi, label: 'fixture', checked: 'resolved' });
       expect(r.ok).toBe(false);
       expect(r.errors.join(' ')).toMatch(/fixture/i);
     }
@@ -129,9 +130,60 @@ describe('auditCitations tells the truth about the shipped graph', () => {
     expect(good.cited).toHaveLength(1);
 
     // One valid and one broken citation is NOT "mostly cited".
-    const mixed = auditCitations([edge({ citations: [REAL, { pmid: 'PMID:1', label: 'x' }] })]);
+    const mixed = auditCitations([edge({ citations: [REAL, { pmid: 'PMID:1', label: 'x', checked: 'resolved' }] })]);
     expect(mixed.cited).toHaveLength(0);
     expect(mixed.invalid).toHaveLength(1);
+  });
+});
+
+describe('a citation must say how far it was checked', () => {
+  it('refuses a citation that does not declare its check level', () => {
+    const r = validateCitation({ pmid: '23746838', label: 'López-Otín 2013' });
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(' ')).toMatch(/cross-checked/);
+  });
+
+  it('refuses an invented check level', () => {
+    // @ts-expect-error deliberately outside the union
+    expect(validateCitation({ pmid: '1', label: 'x', checked: 'verified-ish' }).ok).toBe(false);
+  });
+
+  it('every citation in the shipped graph declares one', () => {
+    for (const edge of GRAPH_EDGES.filter(isClaimEdge)) {
+      for (const c of edge.citations) {
+        expect(['cross-checked', 'resolved']).toContain(c.checked);
+      }
+    }
+  });
+});
+
+describe('the second ratchet: unresolved citations can only decrease', () => {
+  const audit = auditCitations();
+
+  it(`pins ${UNRESOLVED_CITATIONS} citations as found-but-not-machine-resolved`, () => {
+    // These identifiers were read out of canonical URLs and independently
+    // re-looked-up. No canonical record was fetched, because the environment
+    // that curated this graph cannot reach Europe PMC, NCBI or Crossref.
+    //
+    // Going UP means someone added a citation without resolving it — allowed,
+    // but it must be counted. Going DOWN means `npm run citations:verify`
+    // confirmed one: flip its `checked` to 'resolved' and decrement here.
+    expect(audit.unresolved).toHaveLength(UNRESOLVED_CITATIONS);
+  });
+
+  it('cannot be lowered without a citation actually being marked resolved', () => {
+    const all = GRAPH_EDGES.filter(isClaimEdge).flatMap((e) => e.citations);
+    const resolved = all.filter((c) => c.checked === 'resolved');
+    expect(resolved).toHaveLength(all.length - UNRESOLVED_CITATIONS);
+  });
+
+  it('does not let an unresolved citation masquerade as a resolved one', () => {
+    // The audit counts the edge as CITED either way — it does have a source —
+    // while listing the citation as unresolved. Both facts are true and the
+    // graph reports both rather than picking the flattering one.
+    const one = auditCitations([edge({ citations: [{ pmid: '19053174', label: 'Coppé 2008', checked: 'cross-checked' }] })]);
+    expect(one.cited).toHaveLength(1);
+    expect(one.unresolved).toHaveLength(1);
   });
 });
 

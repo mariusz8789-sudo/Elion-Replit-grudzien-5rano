@@ -131,6 +131,9 @@ export function validateCitation(input: Partial<Citation> | null | undefined): C
   if (!label || !label.trim()) {
     errors.push('A human-readable label (first author and year) is required.');
   }
+  if (input.checked !== 'cross-checked' && input.checked !== 'resolved') {
+    errors.push('A citation must declare how far it has been checked: "cross-checked" or "resolved". Silence about provenance is the defect this field exists to prevent.');
+  }
   return { ok: errors.length === 0, errors };
 }
 
@@ -174,6 +177,13 @@ export interface CitationAudit {
   invalid: { edge: GraphEdge; errors: string[] }[];
   /** Edges exempt by kind, listed so the exemption stays visible. */
   exempt: GraphEdge[];
+  /**
+   * Citations carried by cited edges that no machine has resolved yet. A subset
+   * of `cited`, counted separately because "we found this identifier" and "we
+   * confirmed this identifier" are different claims and the graph must not
+   * conflate them.
+   */
+  unresolved: { edge: GraphEdge; citation: Citation }[];
 }
 
 /**
@@ -181,34 +191,55 @@ export interface CitationAudit {
  * the answer is allowed to be bad, and is not allowed to be hidden.
  */
 export function auditCitations(edges: GraphEdge[] = GRAPH_EDGES): CitationAudit {
-  const audit: CitationAudit = { cited: [], uncited: [], invalid: [], exempt: [] };
+  const audit: CitationAudit = { cited: [], uncited: [], invalid: [], exempt: [], unresolved: [] };
   for (const edge of edges) {
     if (!isClaimEdge(edge)) { audit.exempt.push(edge); continue; }
     const citations = edge.citations ?? [];
     if (citations.length === 0) { audit.uncited.push(edge); continue; }
     const errors = citations.flatMap((c) => validateCitation(c).errors);
-    if (errors.length > 0) audit.invalid.push({ edge, errors });
-    else audit.cited.push(edge);
+    if (errors.length > 0) { audit.invalid.push({ edge, errors }); continue; }
+    audit.cited.push(edge);
+    for (const citation of citations) {
+      if (citation.checked !== 'resolved') audit.unresolved.push({ edge, citation });
+    }
   }
   return audit;
 }
 
 /**
- * THE RATCHET. The number of claim edges currently asserted with no source.
+ * RATCHET ONE. Claim edges asserted with no source at all.
  *
- * Every one of the 36 is a mechanism a human typed from memory. That is the
- * single largest gap between what this platform claims to be and what it is, and
- * a number in a document would drift within a week — so it is pinned by a test
- * instead (`__tests__/citations.test.ts`).
+ * Each is a mechanism a human typed from memory. That is the largest gap between
+ * what this platform claims to be and what it is, and a number in a document
+ * would drift within a week — so it is pinned by a test instead
+ * (`__tests__/citations.test.ts`).
  *
- * The test fails if this number goes UP. It also fails if the constant is lowered
- * without the citations actually being added. So the count can only move one way,
- * and only by doing the work: find the paper, add the PMID, decrement by one.
+ * The test fails if this number goes UP, and fails if the constant is lowered
+ * without the citations actually being added. The count moves one way, and only
+ * by doing the work: find the paper, add the identifier, decrement.
  *
- * When this reaches 0, delete the constant and make `citations` non-empty a hard
- * requirement in the test. That deletion is the milestone.
+ * When this reaches 0, delete the constant and make a non-empty `citations` a
+ * hard requirement instead. That deletion is the milestone.
  */
-export const UNCITED_CLAIM_EDGES = 36;
+export const UNCITED_CLAIM_EDGES = 26;
+
+/**
+ * RATCHET TWO. Citations in the graph that no machine has resolved.
+ *
+ * These identifiers were read out of canonical URLs and independently
+ * re-looked-up, which is strong — and is NOT the same as having fetched the
+ * record. The environment the graph was curated in cannot reach Europe PMC,
+ * NCBI, Crossref or any publisher, so resolution was impossible there and the
+ * graph says so rather than implying a check that never happened.
+ *
+ * Run `npm run citations:verify` on a networked machine. For every citation it
+ * confirms, change `checked: 'cross-checked'` to `'resolved'` and decrement this
+ * by one. Like ratchet one, it can only fall, and only for real.
+ *
+ * A platform selling verifiability that could not say which of its own citations
+ * had been verified would be selling the appearance of the thing.
+ */
+export const UNRESOLVED_CITATIONS = 10;
 
 /* ------------------------------ cancer axis ------------------------------ */
 

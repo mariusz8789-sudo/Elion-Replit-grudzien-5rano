@@ -1,7 +1,7 @@
 # Citation brief — Genesis mechanism graph
 
-36 edges assert something about human biology with no source attached.
-10 already have a proposed citation awaiting verification; **26 are open**.
+26 edges assert something about human biology with no source attached.
+0 already have a proposed citation awaiting verification; **26 are open**.
 
 ## What I need for each edge
 
@@ -199,36 +199,5 @@ A biomarker reads out a mechanism. The claim is that the assay actually measures
 
 ---
 
-## Already proposed (do not re-search — verify instead)
-
-- **Telomere attrition → Cellular senescence** — d'Adda di Fagagna 2003, DOI 10.1038/nature02118
-  A DNA damage checkpoint response in telomere-initiated senescence. Nature 426:194-198
-  _no PMID: no PubMed URL appeared in the results; the DOI was read from the Nature article URL_
-- **Telomerase → Telomere attrition** — Bodnar 1998, DOI 10.1126/science.279.5349.349
-  Extension of life-span by introduction of telomerase into normal human cells. Science 279:349-352
-  _no PMID: no PubMed URL for this paper appeared in the results_
-- **Cellular senescence → SASP (senescence-associated secretory phenotype)** — Coppé 2008, PMID 19053174 / 10.1371/journal.pbio.0060301
-  Senescence-associated secretory phenotypes reveal cell-nonautonomous functions of oncogenic RAS and the p53 tumor suppressor. PLoS Biol 6:e301
-- **SASP (senescence-associated secretory phenotype) → Cellular senescence** — Acosta 2008, PMID 18555777 / 10.1016/j.cell.2008.03.038
-  Chemokine signaling via the CXCR2 receptor reinforces senescence. Cell 133:1006-1018
-  ⚠ Acosta is about CXCR2-binding chemokines reinforcing arrest. The edge text names IL-1 and IL-6. Check whether this paper is the right primary source for the IL-1/IL-6 wording, or whether the edge text should change to match the evidence.
-- **Mitochondrial dysfunction → Cellular senescence** — Wiley 2016, DOI 10.1016/j.cmet.2015.11.011
-  Mitochondrial dysfunction induces senescence with a distinct secretory phenotype. Cell Metab 23:303-314
-  _no PMID: the results gave two different PMIDs (26874922 and 26686024) and one of them belongs to a commentary with a similar title. Deliberately omitted rather than guessed._
-- **Autophagy and proteostasis → Mitochondrial dysfunction** — Narendra 2008, PMID 19029340
-  Parkin is recruited selectively to impaired mitochondria and promotes their autophagy. J Cell Biol 183:795-803
-  _no DOI: the DOI in the results (10.1083/jcb.200810184) belongs to an adjacent commentary piece, PMID 19029341, not to this paper. Omitted rather than guessed._
-- **Yamanaka factors (OSKM) → Epigenetic reprogramming** — Takahashi 2006, PMID 16904174
-  Induction of pluripotent stem cells from mouse embryonic and adult fibroblast cultures by defined factors. Cell 126:663-676
-- **Epigenetic reprogramming → Cellular senescence** — Ocampo 2016, PMID 27984723
-  In vivo amelioration of age-associated hallmarks by partial reprogramming. Cell 167:1719-1733
-  ⚠ This is a progeria mouse model. Whether it licenses a general claim about senescence reversal is exactly the kind of judgement the honesty label exists for.
-- **Cellular senescence → Stem-cell exhaustion and rejuvenation** — Baker 2016, PMID 26840489
-  Naturally occurring p16(Ink4a)-positive cells shorten healthy lifespan. Nature 530:184-189
-- **Autophagy and proteostasis → Stem-cell exhaustion and rejuvenation** — García-Prat 2016, PMID 26738589 / 10.1038/nature16187
-  Autophagy maintains stemness by preventing senescence. Nature 529:37-42
-
----
-
-Debt pinned at 36 by `packages/reasoning/src/__tests__/citations.test.ts`.
+Debt pinned at 26 by `packages/reasoning/src/__tests__/citations.test.ts`.
 Total edges in graph: 66. The other 30 record intent rather than findings and need no source.

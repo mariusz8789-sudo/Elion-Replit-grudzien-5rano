@@ -40,4 +40,19 @@ export interface Citation {
   doi?: string;
   /** First author and year, so the graph is readable without resolving anything. */
   label: string;
+  /**
+   * How much checking this identifier has actually had. REQUIRED, because the
+   * difference between these two states is the difference between a platform
+   * that sells verifiability and one that performs it.
+   *
+   *  'cross-checked' — the identifier was read out of a canonical URL and an
+   *      independent lookup returned the same paper. Strong, and NOT resolution:
+   *      no canonical record was ever fetched.
+   *  'resolved' — machine-resolved against Europe PMC by `npm run
+   *      citations:verify`, which confirmed the identifier maps to this paper.
+   *
+   * Resolution still proves only that the paper EXISTS. Whether it supports the
+   * directed claim on the edge is a human judgement and is not encoded here.
+   */
+  checked: 'cross-checked' | 'resolved';
 }

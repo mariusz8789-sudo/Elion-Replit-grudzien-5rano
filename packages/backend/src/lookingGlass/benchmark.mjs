@@ -2,6 +2,7 @@ import { corpusStats, conceptStats, cooccurrence, getConcept } from './store.mjs
 import { openDiscovery, closedDiscovery } from './swanson.mjs';
 import { classifyTargets, auditVocabularyLeakage } from './mesh.mjs';
 import { releaseSuitability } from './descriptorRelease.mjs';
+import { verifyPreregistration } from './preregistration.mjs';
 
 /**
  * Retrospective benchmark harness.
@@ -169,10 +170,24 @@ export function nullDistribution(db, target, { count = 20, discoveryOptions = {}
  * enforce that, so `preregistrationRef` is required and recorded — an unsigned
  * benchmark is an anecdote.
  */
-export function runBenchmark(db, targets, { cutoffYear, preregistrationRef, nullControls = 20, discoveryOptions = {} }) {
-  if (!preregistrationRef) {
+export function runBenchmark(db, targets, {
+  cutoffYear, preregistrationRef, preregistration = null, nullControls = 20, discoveryOptions = {},
+}) {
+  if (!preregistrationRef && !preregistration) {
     throw new Error('runBenchmark: preregistrationRef is required. Choosing targets after seeing output is p-hacking with extra steps.');
   }
+
+  // A bare ref is a promise; a parsed document is a control. When one is
+  // supplied the target list is checked against it and a mismatch throws, so a
+  // target cannot be added or dropped after seeing the output.
+  const registration = preregistration
+    ? verifyPreregistration(db, preregistration, { targets, cutoffYear })
+    : {
+      ref: preregistrationRef,
+      verified: false,
+      statement: `Pre-registration cited as "${preregistrationRef}" but not supplied to the harness, so the target list was NOT `
+        + 'checked against it. Pass the parsed document to verify the list, the cut-off and the ordering.',
+    };
 
   const leakage = auditVocabularyLeakage(db, cutoffYear);
   const vocabulary = releaseSuitability(db, cutoffYear);
@@ -206,7 +221,8 @@ export function runBenchmark(db, targets, { cutoffYear, preregistrationRef, null
   const hits = rows.filter((r) => r.countsAsHit);
 
   return {
-    preregistrationRef,
+    preregistrationRef: registration.ref ?? preregistrationRef,
+    preregistration: { verified: Boolean(preregistration), ...registration },
     cutoffYear,
     corpus: { articles: corpus.articles, concepts: corpus.concepts, pairs: corpus.pairs, vocabularyEnforced: corpus.vocabularyEnforced },
     leakage: {
@@ -270,7 +286,8 @@ export function formatReport(report) {
   const lines = [
     `# Retrospective benchmark — cut-off ${report.cutoffYear}`,
     '',
-    `Pre-registration: \`${report.preregistrationRef}\``,
+    `Pre-registration: \`${report.preregistrationRef}\` — ${report.preregistration.verified ? 'VERIFIED' : 'unverified'}`,
+    report.preregistration.statement,
     `Corpus: ${report.corpus.articles} articles, ${report.corpus.concepts} concepts, ${report.corpus.pairs} pairs. Vocabulary enforced: ${report.corpus.vocabularyEnforced}.`,
     `Vocabulary leakage: ${report.leakage.auditable ? `${(report.leakage.rate * 100).toFixed(2)}% of pre-cut-off annotations` : 'NOT AUDITABLE'}.`,
     `Vocabulary: ${report.vocabulary.statement}`,

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { openCorpus, ingestArticles, rebuildStatistics, corpusStats } from './store.mjs';
 import { conceptsValidAt } from './mesh.mjs';
 import { loadReleaseFromStream } from './descriptorRelease.mjs';
+import { parsePreregistration } from './preregistration.mjs';
 import { runTarget, samplePairedControls, nullDistribution, runBenchmark, formatReport } from './benchmark.mjs';
 
 /**
@@ -393,6 +394,39 @@ describe('refusing to certify an unaudited corpus', () => {
     assert.equal(report.vocabulary.release, null);
     assert.match(report.verdict, /INVALID/);
     assert.match(report.verdict, /No MeSH release has been loaded/);
+  });
+
+  test('a bare reference is accepted but the report says it was not checked', () => {
+    // A string is a promise, not a control. The report must not let a reader
+    // mistake one for the other.
+    const report = runBenchmark(db, [TARGET], { cutoffYear: CUTOFF, preregistrationRef: PREREG, nullControls: 10 });
+    assert.equal(report.preregistration.verified, false);
+    assert.match(report.preregistration.statement, /NOT\s+checked against it/);
+    assert.match(formatReport(report), /unverified/);
+  });
+
+  test('a supplied pre-registration is verified and the report says so', () => {
+    const doc = parsePreregistration(JSON.stringify({
+      ref: 'fixture://prereg', cutoffYear: CUTOFF, registeredAt: 0, targets: [TARGET],
+    }));
+    const report = runBenchmark(db, [TARGET], { cutoffYear: CUTOFF, preregistration: doc, nullControls: 10 });
+    assert.equal(report.preregistration.verified, true);
+    assert.equal(report.preregistration.targets, 1);
+    assert.match(formatReport(report), /VERIFIED/);
+  });
+
+  test('a target added after registration stops the run', () => {
+    // The whole point: the extra target never reaches the engine, so it cannot
+    // be judged on whether it happened to rank well.
+    const doc = parsePreregistration(JSON.stringify({
+      ref: 'fixture://prereg', cutoffYear: CUTOFF, registeredAt: 0, targets: [TARGET],
+    }));
+    assert.throws(
+      () => runBenchmark(db, [TARGET, { name: 'lucky', aUi: A, cUi: WEAKEST }], {
+        cutoffYear: CUTOFF, preregistration: doc, nullControls: 10,
+      }),
+      /does not match the pre-registration/,
+    );
   });
 
   test('the report names the release it used, with its checksum', () => {

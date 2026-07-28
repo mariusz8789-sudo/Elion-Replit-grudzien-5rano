@@ -14,6 +14,7 @@ and its output published, including if the output is a failure.
 | NLM release download + load | `lookingGlass/descriptorRelease.mjs` | Built; **never run against live NLM** |
 | ABC discovery | `lookingGlass/swanson.mjs` | Built |
 | Benchmark harness + null model | `lookingGlass/benchmark.mjs` | Built |
+| Pre-registration enforcement | `lookingGlass/preregistration.mjs` | Built; target-set fingerprint is checked, not just cited |
 | PubMed ingest | `lookingGlass/pubmed.mjs` | Built; **never run against live NCBI** |
 | Pre-registered target list | — | **Not written.** Needs a domain expert (§3.3) |
 | The corpus | — | **Does not exist** |
@@ -65,6 +66,33 @@ repository **before** the first `rebuildStatistics()` call.
 
 Anything added to the target list afterwards is reported separately and labelled
 post-hoc.
+
+This is enforced, not merely requested. `preregistration.mjs` fingerprints the
+target set; `runBenchmark` refuses to run when the targets, the expected bridges
+or the cut-off differ from the registered ones, and names what was added or
+removed. A run given only a reference *string* is allowed but the report marks it
+`unverified` — a string is a promise, not a control.
+
+The file:
+
+```json
+{
+  "ref": "git:<commit> docs/preregistration-2015.json",
+  "cutoffYear": 2015,
+  "registeredAt": 1735689600000,
+  "targets": [
+    { "name": "…", "aUi": "D……", "cUi": "D……", "publishedYear": 2016,
+      "expectedBridgeUis": ["D……"] }
+  ],
+  "parameters": { "minLinkNpmi": 0.15, "nullControls": 20 }
+}
+```
+
+**What the enforcement cannot do**, and the report says so: `registeredAt` is
+self-reported and can be backdated. It is compared against the corpus's own
+ingest timestamps, which catches carelessness but not fraud. The published report
+must cite the **git commit** that introduced the file — that is the only anchor
+outside our own control.
 
 ### 3.2 Corpus
 

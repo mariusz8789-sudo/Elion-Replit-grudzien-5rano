@@ -477,3 +477,36 @@ describe('the graveyard over HTTP', () => {
     assert.equal(call('GET', '/api/reasoning/graveyard', { token: aliceToken, query: { includeExhumed: 'true' } }).body.graves.length, 1);
   });
 });
+
+describe('the Discovery Engine over HTTP', () => {
+  test('a question produces a stored artifact with refusals', () => {
+    call('GET', '/api/reasoning/graph'); // seeds the snapshot
+    const r = call('POST', '/api/reasoning/ask', {
+      token: aliceToken, body: { question: 'Can cellular senescence be reversed without increasing cancer risk?' },
+    });
+    assert.equal(r.status, 201);
+    assert.equal(r.body.artifact.kind, 'discovery');
+    assert.equal(r.body.artifact.review_status, 'unreviewed');
+    assert.ok(r.body.artifact.refusals.length > 0, 'an answer with nothing refused would be the wrong kind of answer');
+    assert.ok(r.body.artifact.body.hypotheses.length > 0);
+  });
+
+  test('an empty question is refused', () => {
+    assert.equal(call('POST', '/api/reasoning/ask', { token: aliceToken, body: { question: '  ' } }).status, 400);
+  });
+
+  test('the artifact is retrievable with its replay history', () => {
+    call('GET', '/api/reasoning/graph');
+    const created = call('POST', '/api/reasoning/ask', { token: aliceToken, body: { question: 'Q about telomerase' } }).body.artifact;
+    const fetched = call('GET', `/api/reasoning/artifact/${created.id}`, { token: aliceToken });
+    assert.equal(fetched.status, 200);
+    assert.equal(fetched.body.artifact.id, created.id);
+    assert.equal(fetched.body.history.length, 1);
+  });
+
+  test("one workspace cannot read another's answer", () => {
+    call('GET', '/api/reasoning/graph');
+    const created = call('POST', '/api/reasoning/ask', { token: aliceToken, body: { question: 'Q' } }).body.artifact;
+    assert.equal(call('GET', `/api/reasoning/artifact/${created.id}`, { token: bobToken }).status, 404);
+  });
+});

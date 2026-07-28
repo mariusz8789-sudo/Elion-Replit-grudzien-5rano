@@ -101,6 +101,7 @@ import {
   retireClaim, detectContradictions, resolveContradiction, confidenceTimeline,
 } from './reasoning/livingGraph.mjs';
 import { buryHypothesis, assessHypothesis, exhume, listGraves, lessons } from './reasoning/graveyard.mjs';
+import { runAndRecord } from './reasoning/discoveryEngine.mjs';
 import { GRAPH_NODES, GRAPH_EDGES } from '@genesis-os/reasoning/knowledgeGraph';
 import { gradeEvidence, validateEvidence } from '@genesis-os/reasoning/evidence';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
@@ -444,6 +445,26 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'timeline' && seg.length === 2 && method === 'GET') {
       const subject = typeof ctx.query?.subject === 'string' ? ctx.query.subject : null;
       return ok({ points: confidenceTimeline(db, tenant.projectId, { subject, limit: Number(ctx.query?.limit ?? 500) }) });
+    }
+
+    /* ------------------------- the Discovery Engine ---------------------- */
+
+    // The flagship. Composes eight tested libraries into one artifact, stored
+    // through the same gate as everything else — the engine gets no exemption
+    // from the rules it exists to enforce.
+    if (seg[1] === 'ask' && seg.length === 2 && method === 'POST') {
+      const question = String(body?.question ?? '').trim();
+      if (!question) return err(400, 'invalid_input', 'A question is required.');
+      try {
+        const artifact = runAndRecord(db, {
+          projectId: tenant.projectId, question,
+          focus: body?.focus ?? null, limit: Number(body?.limit ?? 8),
+          createdBy: user.id,
+        });
+        return ok({ artifact }, 201);
+      } catch (e) {
+        return err(409, 'engine_refused', String(e.message));
+      }
     }
 
     /* --------------------------- the graveyard -------------------------- */

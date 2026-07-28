@@ -79,13 +79,20 @@ export function ensureGraveyardSchema(db) {
 
 /** Identity within a tenant: the claim, not when it was buried or by whom. */
 export function graveContentHash({ subject, predicate, object, statement }) {
+  const hasTriple = Boolean(subject && object);
+  // A HALF-TRIPLE IS NOT AN IDENTITY. When only one endpoint is known the claim
+  // is identified by its statement ALONE — including the lone subject would
+  // mean that burying "statement X" and later asking about "statement X, whose
+  // subject happens to be Y" produced different identities and never matched.
+  // That is not hypothetical: it is exactly what the Discovery Engine does,
+  // because a single-node hypothesis has a subject and no object, and the bug
+  // only appeared once the two modules were composed.
   return canonicalHash({
-    subject: subject ? String(subject) : null,
-    predicate: predicate ? String(predicate) : null,
-    object: object ? String(object) : null,
-    // Only used when the hypothesis is not expressible as a triple. Normalised
-    // for whitespace and case, and NOT otherwise interpreted.
-    statement: subject && object ? null : String(statement ?? '').trim().toLowerCase().replace(/\s+/g, ' '),
+    subject: hasTriple ? String(subject) : null,
+    predicate: hasTriple && predicate ? String(predicate) : null,
+    object: hasTriple ? String(object) : null,
+    // Normalised for whitespace and case, and NOT otherwise interpreted.
+    statement: hasTriple ? null : String(statement ?? '').trim().toLowerCase().replace(/\s+/g, ' '),
   });
 }
 

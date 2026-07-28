@@ -185,3 +185,38 @@ describe('what the laboratory has learned', () => {
     assert.equal(lessons(db, P).lessons[0].evidenceRef, 'doi:10.1000/failed-repro');
   });
 });
+
+describe('a half-triple is identified by its statement alone', () => {
+  /**
+   * Regression. Burying a statement-only hypothesis and then asking about it
+   * with a lone subject produced two different identities, so the grave never
+   * matched. It surfaced only when the Discovery Engine composed the two: a
+   * single-node hypothesis has a subject and no object, which is exactly the
+   * shape that broke.
+   */
+  test('burying by statement matches an assessment carrying only a subject', () => {
+    const statement = 'Yamanaka factors have no biomarker in the graph, so no readout exists.';
+    buryHypothesis(db, {
+      projectId: P, statement, cause: 'superseded', evidenceRef: 'doi:10.1000/superseded',
+      lesson: 'Superseded by a partial-reprogramming readout.', actorId: actor, now: 1000,
+    });
+    const r = assessHypothesis(db, { projectId: P, subject: 'yamanaka-factors', object: null, statement });
+    assert.equal(r.verdict, VERDICT.BURIED);
+  });
+
+  test('the identity ignores a lone subject in both directions', () => {
+    const statement = 'Some claim with one endpoint.';
+    assert.equal(
+      graveContentHash({ statement }),
+      graveContentHash({ subject: 'anything', object: null, statement }),
+      'a lone endpoint must not change what the claim IS',
+    );
+  });
+
+  test('a complete triple is still identified by the triple, not the prose', () => {
+    assert.equal(
+      graveContentHash({ subject: 'x', predicate: 'promotes', object: 'y', statement: 'one wording' }),
+      graveContentHash({ subject: 'x', predicate: 'promotes', object: 'y', statement: 'another wording' }),
+    );
+  });
+});

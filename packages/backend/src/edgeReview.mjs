@@ -159,8 +159,15 @@ export function submitReview(db, { edgeKey, reviewerId, verdict, confidence = 'm
   return { ok: true, review: db.prepare('SELECT * FROM edge_reviews WHERE id = ?').get(id) };
 }
 
-/** Current (non-superseded) reviews for an edge, newest first. */
+/**
+ * Current (non-superseded) reviews for an edge, newest first. Returns nothing when the ledger has never been created —
+ * the reasoning schema can be initialised without it, and a caller asking about
+ * an edge in that state should learn there are no reviews, not crash. Same
+ * "cannot tell" discipline as currentSnapshot().
+ */
 export function reviewsForEdge(db, edgeKey) {
+  const present = db.prepare("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'edge_reviews'").get();
+  if (!present) return [];
   return db.prepare(`
     SELECT r.*, p.display_name, p.orcid, p.affiliation, p.expertise
     FROM edge_reviews r LEFT JOIN reviewer_profiles p ON p.user_id = r.reviewer_id

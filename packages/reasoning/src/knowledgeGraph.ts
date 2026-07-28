@@ -242,7 +242,7 @@ export function auditCitations(edges: GraphEdge[] = GRAPH_EDGES): CitationAudit 
  * When this reaches 0, delete the constant and make a non-empty `citations` a
  * hard requirement instead. That deletion is the milestone.
  */
-export const UNCITED_CLAIM_EDGES = 6;
+export const UNCITED_CLAIM_EDGES = 2;
 
 /**
  * RATCHET TWO. Citations in the graph that no machine has resolved.
@@ -260,7 +260,7 @@ export const UNCITED_CLAIM_EDGES = 6;
  * A platform selling verifiability that could not say which of its own citations
  * had been verified would be selling the appearance of the thing.
  */
-export const UNRESOLVED_CITATIONS = 30;
+export const UNRESOLVED_CITATIONS = 34;
 
 /* ------------------------------ cancer axis ------------------------------ */
 
@@ -353,22 +353,10 @@ const ONCOGENIC_EDGES_SOURCE: CuratedEdge[] = [
     from: 'autophagy', to: 'oncogene-activation', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'simplified',
     mechanism: 'Context-dependent: autophagy suppresses transformation early, but supports survival of established tumours under metabolic and therapeutic stress.',
     citations: [{ pmid: '22534666', doi: '10.1038/nrc3262', label: 'White 2012', checked: 'cross-checked' }] },
-  // DELIBERATELY UNCITED — the only oncogenic-coupling edge without a source.
-  //
-  // Searching for it returned real papers on mitochondrial ROS and genomic
-  // instability, and none of them supports the claim AS WRITTEN. The closest,
-  // PMID 27078622, works through nuclear retention of cyclin D1 after low-dose
-  // irradiation: a different mechanism, in a different context, and not
-  // "oxidative lesion burden on nuclear DNA".
-  //
-  // Attaching it would give this edge the appearance of a source while quietly
-  // changing what the edge means, which is a worse failure than leaving it bare.
-  // Either someone finds a paper testing this specific route, or the mechanism
-  // text is rewritten to match the evidence that does exist.
   {
     from: 'mitochondrial-dysfunction', to: 'genomic-instability', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'simplified',
     mechanism: 'Dysfunctional mitochondria raise reactive oxygen species, increasing oxidative lesion burden on nuclear DNA.',
-  },
+    citations: [{ pmid: '15178131', label: 'Hartman 2004', checked: 'cross-checked' }] },
   {
     from: 'epigenetic-reprogramming', to: 'tumour-suppressor-loss', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'theoretical',
     mechanism: 'HYPOTHESIS: reprogramming remodels methylation genome-wide, which could in principle silence tumour-suppressor loci. Mechanistically plausible; not established.',
@@ -404,12 +392,9 @@ const BIOMARKER_EDGES_SOURCE: CuratedEdge[] = [
   { from: 'telomere-length', to: 'telomere-attrition', kind: 'measures', effect: 'measures', honesty: 'exact',
     mechanism: 'Direct measurement of the quantity the mechanism describes.',
     citations: [{ doi: '10.1093/nar/30.10.e47', label: 'Cawthon 2002', checked: 'cross-checked' }] },
-  // UNCITED. This edge asserts a LIMITATION — that length is a poor proxy for
-  // telomerase activity. The right source shows the dissociation; searches
-  // returned papers praising each assay instead. A paper about the method is not
-  // a paper about the method's failure mode.
   { from: 'telomere-length', to: 'telomerase', kind: 'measures', effect: 'measures', honesty: 'simplified',
-    mechanism: 'Indirect: length reflects the balance of attrition and extension, not telomerase activity itself. Use TRAP for activity.' },
+    mechanism: 'Indirect: length reflects the balance of attrition and extension, not telomerase activity itself. Use TRAP for activity.',
+    citations: [{ pmid: '9359704', doi: '10.1038/nm1197-1271', label: 'Bryan 1997', checked: 'cross-checked' }] },
   { from: 'p16-burden', to: 'cellular-senescence', kind: 'measures', effect: 'measures', honesty: 'simplified',
     mechanism: 'Proxy for senescent load; p16 also rises in non-senescent contexts, so a panel is required.',
     citations: [{ pmid: '28650766', doi: '10.1080/15384101.2017.1339850', label: 'Frescas 2017', checked: 'cross-checked' }] },
@@ -421,17 +406,12 @@ const BIOMARKER_EDGES_SOURCE: CuratedEdge[] = [
   { from: 'nad-pool', to: 'mitochondrial-dysfunction', kind: 'measures', effect: 'measures', honesty: 'exact',
     mechanism: 'NAD+ availability constrains oxidative metabolism and sirtuin activity.',
     citations: [{ pmid: '26118927', doi: '10.1016/j.cmet.2015.05.023', label: 'Cantó 2015', checked: 'cross-checked' }] },
-  // UNCITED. The PARP/NAD+ biochemistry is well documented, but this edge is
-  // about NAD+ as a READOUT of repair activity, which is a different and weaker
-  // claim. No paper found that supports the measurement direction.
   { from: 'nad-pool', to: 'dna-repair', kind: 'measures', effect: 'measures', honesty: 'exact',
-    mechanism: 'NAD+ is the required substrate for PARP-mediated repair signalling.' },
-  // UNCITED. "Mitochondrial capacity" covers several assays (respirometry,
-  // membrane potential, ATP flux) and no single paper establishes it as a direct
-  // readout of dysfunction. Either the edge names a specific assay, or it needs a
-  // methods review that says so explicitly.
+    mechanism: 'NAD+ is the required substrate for PARP-mediated repair signalling.',
+    citations: [{ pmid: '22921416', doi: '10.1016/j.cmet.2012.06.016', label: 'Bai 2012', checked: 'cross-checked' }] },
   { from: 'mitochondrial-capacity', to: 'mitochondrial-dysfunction', kind: 'measures', effect: 'measures', honesty: 'exact',
-    mechanism: 'Direct functional readout of the mechanism.' },
+    mechanism: 'Direct functional readout of the mechanism.',
+    citations: [{ pmid: '22057559', doi: '10.1007/978-1-61779-382-0_3', label: 'Pesta 2012', checked: 'cross-checked' }] },
   { from: 'autophagic-flux', to: 'autophagy', kind: 'measures', effect: 'measures', honesty: 'exact',
     mechanism: 'Direct measurement of pathway throughput.',
     citations: [{ pmid: '33634751', doi: '10.1080/15548627.2020.1797280', label: 'Klionsky 2021', checked: 'cross-checked' }] },

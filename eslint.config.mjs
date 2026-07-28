@@ -25,10 +25,19 @@ export default tseslint.config(
       globals: {
         console: 'readonly', process: 'readonly', setTimeout: 'readonly', setInterval: 'readonly',
         clearTimeout: 'readonly', setImmediate: 'readonly', URL: 'readonly', Buffer: 'readonly', fetch: 'readonly',
+        // Standard Node globals. This list is hand-maintained, so anything used
+        // and not listed here fails CI with "is not defined" — which is what
+        // happened to TextDecoder/TextEncoder/URLSearchParams.
+        URLSearchParams: 'readonly', TextDecoder: 'readonly', TextEncoder: 'readonly',
+        queueMicrotask: 'readonly', structuredClone: 'readonly',
       },
     },
     rules: {
       'no-console': 'off', // backend loguje przez console (strukturalny JSON)
+      // The leading-underscore convention marks a binding that exists because a
+      // signature or a destructuring requires it. It was applied to .ts only,
+      // so the same deliberate code was an error in .mjs and not in .ts.
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
     },
   },
   {

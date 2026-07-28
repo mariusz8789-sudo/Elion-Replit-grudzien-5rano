@@ -158,7 +158,7 @@ correctly but cannot run in this environment. **Planned** = does not exist.
 | | |
 |---|---|
 | **What it does** | Molecular discovery campaigns: ADMET prediction, off-target, docking, molecular dynamics, de-novo design, candidate funnels, per-tenant failure regions |
-| **Readiness** | **Mixed, and this is the report's most uncomfortable number.** Of 48 modules, **17 are reachable from the HTTP server; 31 are not.** 14 have no production consumer at all — only tests import them |
+| **Readiness** | **Mixed.** Of 48 modules, 17 are reachable from the HTTP server. **Corrected at the production freeze:** counting CLI scripts as entry points too, only **10 of the 48 have no entry point at all**. The earlier figure of 31 was true as stated (HTTP only) and misleading without that caveat — most of the rest are script-invoked tooling, which is the correct shape for them |
 | **What that means** | ~6,500 lines of tested, working library code with no user-facing path. It is not dead code (it passes ~1,000 tests) and it is not product either |
 | **Genuinely production** | ADMET-AI (real D-MPNN ensemble on TDC benchmarks), RDKit physicochemistry, `necropolis` (per-tenant failure regions), `truthEngine`, `laboratoryReadiness` |
 | **Who pays** | Small-molecule discovery teams — the conventional, crowded market |
@@ -254,8 +254,9 @@ commercial problem.
 
 ## 6. Biggest technical gaps
 
-1. **31 of 48 cognitive modules unreachable** — the largest single body of
-   stranded value.
+1. **10 of 48 cognitive modules have no entry point at all** (revised down from
+   31 once CLI scripts were counted as entry points). All ten are tested; none
+   is reachable by a user.
 2. **No Discovery Engine.** The eight-stage flow that would compose the three
    worlds is designed, not built.
 3. **No UI for anything built after Phase 0.4** — claims, contradictions,

@@ -45,10 +45,11 @@ demo and better in a laboratory:
    what the engine declined to conclude. The Ask screen prints refusals *above*
    the hypotheses.
 2. **Uncertainty has two axes that are never merged.** *Coverage* (how much of
-   the literature was actually read) and *belief* (how confident the biology
-   makes us) are stored separately, and the persistence layer refuses an
-   artifact that collapses them into one number. A well-read doubt and an unread
-   certainty must not look identical.
+   an answer's mechanisms carry evidence) and *belief* (how much of it a named
+   expert has confirmed) are stored separately, and the persistence layer
+   refuses an artifact that collapses them into one number. Neither claims to
+   measure how much of the published literature was read — nothing here can
+   measure that without a corpus.
 3. **One expert dispute is never outvoted.** A dispute names a specific problem
    that confirmations do not answer. Averaging expert opinion would destroy the
    most informative signal the system produces.
@@ -80,8 +81,11 @@ demo and better in a laboratory:
 - **Looking Glass** (PubMed ingest, MeSH audit, Swanson discovery, retrospective
   benchmark) is written and tested against fixtures built from published DTDs.
   It has never contacted NCBI.
-- **31 of 48 modules** in the molecular campaign stack are unreachable from the
-  HTTP server. They are tested libraries, not product.
+- **16 of 129 backend modules have no entry point at all** — not reachable from
+  the HTTP server *or* from any CLI script. Ten are in the molecular campaign
+  stack; four are the retrospective-benchmark toolchain, which is blocked on a
+  corpus rather than dead. A further ~45 are reachable only through scripts,
+  which is correct for tooling.
 - Most capabilities built after the reasoning core moved to the server have **no
   user interface** yet.
 

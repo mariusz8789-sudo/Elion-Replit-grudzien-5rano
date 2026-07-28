@@ -47,8 +47,11 @@ Ordered by value. **None of these changes the platform's binding constraint.**
    other three of the five-item navigation do not. Most of what was built after
    Phase 0 has no user interface, which is the largest gap between what Genesis
    *does* and what a visitor can *see*.
-2. **Decide the 31 unreachable cognitive modules.** Keep as internal libraries
-   (correct for most) or delete. An undecided module is worse than either.
+2. **Decide the 10 genuinely orphaned cognitive modules.** They have no entry
+   point from the server or from any script. Keep as internal libraries or
+   delete — an undecided module is worse than either. (The often-quoted figure
+   of 31 counted HTTP reachability only; most of those are script-invoked
+   tooling and are correctly shaped.)
 3. **Navigation consolidation.** 16 sidebar items, 30 routes, three separate
    graph screens, two memory concepts, four discovery surfaces. The plan is in
    `GENESIS_CONSOLIDATION.md` Part 2.

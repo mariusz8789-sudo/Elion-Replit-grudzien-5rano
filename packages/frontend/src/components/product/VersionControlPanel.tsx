@@ -68,7 +68,7 @@ export function VersionControlPanel({ campaignId, currentUserId, onSnapshotsChan
     });
     listCommentsRemote(token, campaignId).then((r) => { if (r.ok) setComments(r.data.comments); });
   };
-  useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [campaignId, refreshToken]);
+  useEffect(() => { refresh(); }, [campaignId, refreshToken]);
 
   if (!role) {
     if (loadError) {

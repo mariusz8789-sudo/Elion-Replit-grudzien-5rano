@@ -99,7 +99,7 @@ export function EdgeReviewScreen({ initialEdgeKey }: { initialEdgeKey?: string }
       .catch(() => setCoverage(null));
   };
 
-  useEffect(load, [edgeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(load, [edgeKey]);
 
   const submit = () => {
     const token = getToken();

@@ -66,7 +66,7 @@ export function parsePreregistration(text, { ref = null } = {}) {
   try {
     doc = JSON.parse(String(text));
   } catch (err) {
-    throw new Error(`parsePreregistration: not valid JSON (${err.message}).`);
+    throw new Error(`parsePreregistration: not valid JSON (${err.message}).`, { cause: err });
   }
   if (!Number.isInteger(doc.cutoffYear)) {
     throw new Error('parsePreregistration: cutoffYear must be an integer year.');

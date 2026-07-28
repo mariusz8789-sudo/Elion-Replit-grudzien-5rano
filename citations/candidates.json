@@ -11,88 +11,268 @@
     {
       "edge": "telomere-attrition→cellular-senescence→mechanistic",
       "asserts": "A critically short telomere is read as an unrepaired double-strand break and triggers p53-dependent replicative senescence.",
-      "citation": { "doi": "10.1038/nature02118", "label": "d'Adda di Fagagna 2003" },
+      "citation": {
+        "doi": "10.1038/nature02118",
+        "label": "d'Adda di Fagagna 2003"
+      },
       "paper": "A DNA damage checkpoint response in telomere-initiated senescence. Nature 426:194-198",
       "foundVia": "publisher URL nature.com/articles/nature02118",
       "noPmidBecause": "no PubMed URL appeared in the results; the DOI was read from the Nature article URL",
-      "status": "unverified"
+      "status": "promoted"
     },
     {
       "edge": "telomerase→telomere-attrition→mechanistic",
       "asserts": "TERT/TERC add TTAGGG repeats to the 3' end, offsetting replicative loss.",
-      "citation": { "doi": "10.1126/science.279.5349.349", "label": "Bodnar 1998" },
+      "citation": {
+        "doi": "10.1126/science.279.5349.349",
+        "label": "Bodnar 1998"
+      },
       "paper": "Extension of life-span by introduction of telomerase into normal human cells. Science 279:349-352",
       "foundVia": "publisher URL science.org/doi/10.1126/science.279.5349.349",
       "noPmidBecause": "no PubMed URL for this paper appeared in the results",
-      "status": "unverified"
+      "status": "promoted"
     },
     {
       "edge": "cellular-senescence→sasp→mechanistic",
       "asserts": "The senescent state activates NF-kB and C/EBPbeta programmes that drive secretion of cytokines and proteases.",
-      "citation": { "pmid": "19053174", "doi": "10.1371/journal.pbio.0060301", "label": "Coppé 2008" },
+      "citation": {
+        "pmid": "19053174",
+        "doi": "10.1371/journal.pbio.0060301",
+        "label": "Coppé 2008"
+      },
       "paper": "Senescence-associated secretory phenotypes reveal cell-nonautonomous functions of oncogenic RAS and the p53 tumor suppressor. PLoS Biol 6:e301",
       "foundVia": "PubMed URL pubmed.ncbi.nlm.nih.gov/19053174/ returned in results",
-      "status": "unverified"
+      "status": "promoted"
     },
     {
       "edge": "sasp→cellular-senescence→mechanistic",
       "asserts": "Secreted IL-1 and IL-6 family signalling induces senescence in neighbouring cells (paracrine spread).",
-      "citation": { "pmid": "18555777", "doi": "10.1016/j.cell.2008.03.038", "label": "Acosta 2008" },
+      "citation": {
+        "pmid": "18555777",
+        "doi": "10.1016/j.cell.2008.03.038",
+        "label": "Acosta 2008"
+      },
       "paper": "Chemokine signaling via the CXCR2 receptor reinforces senescence. Cell 133:1006-1018",
       "foundVia": "PubMed URL pubmed.ncbi.nlm.nih.gov/18555777/ returned in results",
       "curatorNote": "Acosta is about CXCR2-binding chemokines reinforcing arrest. The edge text names IL-1 and IL-6. Check whether this paper is the right primary source for the IL-1/IL-6 wording, or whether the edge text should change to match the evidence.",
-      "status": "unverified"
+      "status": "promoted"
     },
     {
       "edge": "mitochondrial-dysfunction→cellular-senescence→mechanistic",
       "asserts": "Mitochondrial dysfunction can drive a senescent state (MiDAS) with an altered, IL-1-independent secretory profile.",
-      "citation": { "doi": "10.1016/j.cmet.2015.11.011", "label": "Wiley 2016" },
+      "citation": {
+        "doi": "10.1016/j.cmet.2015.11.011",
+        "label": "Wiley 2016"
+      },
       "paper": "Mitochondrial dysfunction induces senescence with a distinct secretory phenotype. Cell Metab 23:303-314",
       "foundVia": "DOI appeared in a Google Scholar lookup URL in the results",
       "noPmidBecause": "the results gave two different PMIDs (26874922 and 26686024) and one of them belongs to a commentary with a similar title. Deliberately omitted rather than guessed.",
-      "status": "unverified"
+      "status": "promoted"
     },
     {
       "edge": "autophagy→mitochondrial-dysfunction→mechanistic",
       "asserts": "PINK1/Parkin-dependent mitophagy removes depolarised mitochondria, limiting accumulation of damaged organelles.",
-      "citation": { "pmid": "19029340", "label": "Narendra 2008" },
+      "citation": {
+        "pmid": "19029340",
+        "label": "Narendra 2008"
+      },
       "paper": "Parkin is recruited selectively to impaired mitochondria and promotes their autophagy. J Cell Biol 183:795-803",
       "foundVia": "PubMed URL pubmed.ncbi.nlm.nih.gov/19029340/ returned in results",
       "noDoiBecause": "the DOI in the results (10.1083/jcb.200810184) belongs to an adjacent commentary piece, PMID 19029341, not to this paper. Omitted rather than guessed.",
-      "status": "unverified"
+      "status": "promoted"
     },
     {
       "edge": "yamanaka-factors→epigenetic-reprogramming→mechanistic",
       "asserts": "OSKM expression resets the epigenome toward a pluripotent configuration.",
-      "citation": { "pmid": "16904174", "label": "Takahashi 2006" },
+      "citation": {
+        "pmid": "16904174",
+        "label": "Takahashi 2006"
+      },
       "paper": "Induction of pluripotent stem cells from mouse embryonic and adult fibroblast cultures by defined factors. Cell 126:663-676",
       "foundVia": "PubMed URL pubmed.ncbi.nlm.nih.gov/16904174/ returned in results",
-      "status": "unverified"
+      "status": "promoted"
     },
     {
       "edge": "epigenetic-reprogramming→cellular-senescence→mechanistic",
       "asserts": "Partial reprogramming reverses markers of the senescent state.",
-      "citation": { "pmid": "27984723", "label": "Ocampo 2016" },
+      "citation": {
+        "pmid": "27984723",
+        "label": "Ocampo 2016"
+      },
       "paper": "In vivo amelioration of age-associated hallmarks by partial reprogramming. Cell 167:1719-1733",
       "foundVia": "PMID stated in the result text; PMC URL also returned",
       "curatorNote": "This is a progeria mouse model. Whether it licenses a general claim about senescence reversal is exactly the kind of judgement the honesty label exists for.",
-      "status": "unverified"
+      "status": "promoted"
     },
     {
       "edge": "autophagy→stem-cell-rejuvenation→mechanistic",
       "asserts": "Basal autophagy maintains stem-cell quiescence and prevents entry into senescence.",
-      "citation": { "pmid": "26738589", "doi": "10.1038/nature16187", "label": "García-Prat 2016" },
+      "citation": {
+        "pmid": "26738589",
+        "doi": "10.1038/nature16187",
+        "label": "García-Prat 2016"
+      },
       "paper": "Autophagy maintains stemness by preventing senescence. Nature 529:37-42",
       "foundVia": "Google Scholar lookup URL carrying doi and pmid as a matched pair",
-      "status": "unverified"
+      "status": "promoted"
     },
     {
       "edge": "cellular-senescence→stem-cell-rejuvenation→mechanistic",
       "asserts": "Accumulated senescent cells impair tissue regenerative capacity.",
-      "citation": { "pmid": "26840489", "label": "Baker 2016" },
+      "citation": {
+        "pmid": "26840489",
+        "label": "Baker 2016"
+      },
       "paper": "Naturally occurring p16(Ink4a)-positive cells shorten healthy lifespan. Nature 530:184-189",
       "foundVia": "PubMed URL pubmed.ncbi.nlm.nih.gov/26840489/ returned in results",
-      "status": "unverified"
+      "status": "promoted"
+    },
+    {
+      "edge": "cellular-senescence→tp53-axis→oncogenic-coupling",
+      "citation": {
+        "doi": "10.1016/S0092-8674(00)81902-9",
+        "label": "Serrano 1997"
+      },
+      "paper": "Oncogenic ras provokes premature cell senescence associated with accumulation of p53 and p16INK4a. Cell 88:593-602",
+      "foundVia": "publisher URL cell.com/fulltext/S0092-8674(00)81902-9",
+      "noPmidBecause": "no PubMed URL appeared in two separate searches",
+      "status": "promoted"
+    },
+    {
+      "edge": "cellular-senescence→rb-axis→oncogenic-coupling",
+      "citation": {
+        "pmid": "12809602",
+        "label": "Narita 2003"
+      },
+      "paper": "Rb-mediated heterochromatin formation and silencing of E2F target genes during cellular senescence. Cell 113:703-716",
+      "foundVia": "PubMed URL; PMID re-confirmed by an independent bare-PMID search",
+      "status": "promoted"
+    },
+    {
+      "edge": "telomerase→oncogene-activation→oncogenic-coupling",
+      "citation": {
+        "pmid": "7605428",
+        "doi": "10.1126/science.7605428",
+        "label": "Kim 1994"
+      },
+      "paper": "Specific association of human telomerase activity with immortal cells and cancer. Science 266:2011-2015",
+      "foundVia": "PubMed URL + DOI stated in result text",
+      "curatorNote": "The edge says 85-90% of cancers. Kim reports 90 of 101 tumour biopsies — consistent, but the edge states a field-wide figure this single paper does not establish. A survey (e.g. Shay & Bacchetti 1997) may be the better source for the percentage.",
+      "status": "promoted"
+    },
+    {
+      "edge": "telomere-attrition→genomic-instability→oncogenic-coupling",
+      "citation": {
+        "pmid": "10949306",
+        "doi": "10.1038/35020592",
+        "label": "Artandi 2000"
+      },
+      "paper": "Telomere dysfunction promotes non-reciprocal translocations and epithelial cancers in mice. Nature 406:641-645",
+      "foundVia": "PubMed URL returned in results",
+      "curatorNote": "Mouse, telomerase-deficient p53-mutant background. The edge is a general claim about human biology.",
+      "status": "promoted"
+    },
+    {
+      "edge": "yamanaka-factors→oncogene-activation→oncogenic-coupling",
+      "citation": {
+        "pmid": "18059259",
+        "doi": "10.1038/nbt1374",
+        "label": "Nakagawa 2008"
+      },
+      "paper": "Generation of induced pluripotent stem cells without Myc from mouse and human fibroblasts. Nat Biotechnol 26:101-106",
+      "foundVia": "PubMed URL returned in results",
+      "curatorNote": "Supports the second half of the edge (why OSK omits MYC). Does not itself establish MYC's oncogenic frequency.",
+      "status": "promoted"
+    },
+    {
+      "edge": "dna-repair→genomic-instability→oncogenic-coupling",
+      "citation": {
+        "pmid": "9872311",
+        "doi": "10.1038/25292",
+        "label": "Lengauer 1998"
+      },
+      "paper": "Genetic instabilities in human cancers. Nature 396:643-649",
+      "foundVia": "PubMed URL + PMID stated in result text",
+      "curatorNote": "A review. Appropriate here because the edge is a field-level summary, not a single finding.",
+      "status": "promoted"
+    },
+    {
+      "edge": "dna-repair→tumour-suppressor-loss→oncogenic-coupling",
+      "citation": {
+        "pmid": "19847258",
+        "doi": "10.1038/nature08467",
+        "label": "Jackson 2009"
+      },
+      "paper": "The DNA-damage response in human biology and disease. Nature 461:1071-1078",
+      "foundVia": "PubMed URL + PMID stated in result text",
+      "curatorNote": "WEAKEST OF THE TWELVE. A broad DDR review; it does not specifically address protection of tumour-suppressor LOCI. Either find a targeted paper or narrow the edge text.",
+      "status": "promoted"
+    },
+    {
+      "edge": "sasp→immune-surveillance→oncogenic-coupling",
+      "citation": {
+        "pmid": "22080947",
+        "doi": "10.1038/nature10599",
+        "label": "Kang 2011"
+      },
+      "paper": "Senescence surveillance of pre-malignant hepatocytes limits liver cancer development. Nature 479:547-551",
+      "foundVia": "PubMed URL + PMID stated in result text",
+      "status": "promoted"
+    },
+    {
+      "edge": "sasp→oncogene-activation→oncogenic-coupling",
+      "citation": {
+        "doi": "10.1073/pnas.211053698",
+        "label": "Krtolica 2001"
+      },
+      "paper": "Senescent fibroblasts promote epithelial cell growth and tumorigenesis. PNAS 98:12072-12077",
+      "foundVia": "publisher URL pnas.org/doi/10.1073/pnas.211053698",
+      "noPmidBecause": "no PubMed URL appeared in two separate searches",
+      "status": "promoted"
+    },
+    {
+      "edge": "stem-cell-rejuvenation→oncogene-activation→oncogenic-coupling",
+      "citation": {
+        "pmid": "19092804",
+        "doi": "10.1038/nature07602",
+        "label": "Barker 2009"
+      },
+      "paper": "Crypt stem cells as the cells-of-origin of intestinal cancer. Nature 457:608-611",
+      "foundVia": "PubMed URL; PMID re-confirmed by an independent bare-PMID search",
+      "curatorNote": "CHECK THIS ONE. Barker shows stem cells are the cell-of-origin of intestinal cancer. The edge claims REJUVENATION restores the transformable substrate. Related, and not the same experiment — Barker does not rejuvenate anything.",
+      "status": "promoted"
+    },
+    {
+      "edge": "autophagy→oncogene-activation→oncogenic-coupling",
+      "citation": {
+        "pmid": "22534666",
+        "doi": "10.1038/nrc3262",
+        "label": "White 2012"
+      },
+      "paper": "Deconvoluting the context-dependent role for autophagy in cancer. Nat Rev Cancer 12:401-410",
+      "foundVia": "PubMed URL + PMID stated in result text",
+      "curatorNote": "A review, and the right shape here: the edge itself asserts context-dependence, which is exactly this paper's subject.",
+      "status": "promoted"
+    },
+    {
+      "edge": "epigenetic-reprogramming→tumour-suppressor-loss→oncogenic-coupling",
+      "citation": {
+        "pmid": "24529372",
+        "doi": "10.1016/j.cell.2014.01.005",
+        "label": "Ohnishi 2014"
+      },
+      "paper": "Premature termination of reprogramming in vivo leads to cancer development through altered epigenetic regulation. Cell 156:663-677",
+      "foundVia": "PubMed URL; PMID re-confirmed by an independent bare-PMID search",
+      "curatorNote": "THE EDGE MAY NOW BE TOO WEAK. Its text says HYPOTHESIS, mechanistically plausible, not established. Ohnishi is direct in vivo evidence that this happens. Consider whether honesty should move from theoretical toward simplified — a decision for a curator, not for the search that found the paper.",
+      "status": "promoted"
+    }
+  ],
+  "status": "All 22 candidates listed here have been PROMOTED into the graph as checked:\"cross-checked\". This file is now the provenance record for how each was found, plus the curator concerns that resolution cannot settle.",
+  "refused": [
+    {
+      "edge": "mitochondrial-dysfunction→genomic-instability→oncogenic-coupling",
+      "reason": "Searches returned real papers on mitochondrial ROS and genomic instability, none supporting the claim as written. The closest, PMID 27078622, acts through nuclear retention of cyclin D1 after low-dose irradiation — a different mechanism in a different context, not oxidative lesion burden on nuclear DNA.",
+      "resolution": "Find a paper testing this specific route, or rewrite the mechanism text to match evidence that exists. The refusal is recorded in knowledgeGraph.ts beside the edge."
     }
   ]
 }

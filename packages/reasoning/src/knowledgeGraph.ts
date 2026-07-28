@@ -221,7 +221,7 @@ export function auditCitations(edges: GraphEdge[] = GRAPH_EDGES): CitationAudit 
  * When this reaches 0, delete the constant and make a non-empty `citations` a
  * hard requirement instead. That deletion is the milestone.
  */
-export const UNCITED_CLAIM_EDGES = 26;
+export const UNCITED_CLAIM_EDGES = 14;
 
 /**
  * RATCHET TWO. Citations in the graph that no machine has resolved.
@@ -239,7 +239,7 @@ export const UNCITED_CLAIM_EDGES = 26;
  * A platform selling verifiability that could not say which of its own citations
  * had been verified would be selling the appearance of the thing.
  */
-export const UNRESOLVED_CITATIONS = 10;
+export const UNRESOLVED_CITATIONS = 22;
 
 /* ------------------------------ cancer axis ------------------------------ */
 
@@ -291,47 +291,59 @@ const ONCOGENIC_EDGES_SOURCE: CuratedEdge[] = [
   {
     from: 'cellular-senescence', to: 'tp53-axis', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'exact',
     mechanism: 'Senescence is one of the terminal outcomes p53 enforces after damage. The arrest IS part of the tumour-suppressive response, not merely correlated with it.',
-  },
+    citations: [{ doi: '10.1016/S0092-8674(00)81902-9', label: 'Serrano 1997', checked: 'cross-checked' }] },
   {
     from: 'cellular-senescence', to: 'rb-axis', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'exact',
     mechanism: 'Stable senescent arrest is maintained by p16INK4a–CDK4/6–RB signalling; p16 is a senescence marker and a tumour suppressor at the same time.',
-  },
+    citations: [{ pmid: '12809602', label: 'Narita 2003', checked: 'cross-checked' }] },
   {
     from: 'telomerase', to: 'oncogene-activation', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'exact',
     mechanism: 'TERT reactivation removes the replicative limit. Approximately 85–90% of human cancers do this; it is a canonical immortalisation step.',
-  },
+    citations: [{ pmid: '7605428', doi: '10.1126/science.7605428', label: 'Kim 1994', checked: 'cross-checked' }] },
   {
     from: 'telomere-attrition', to: 'genomic-instability', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'exact',
     mechanism: 'Uncapped telomeres are processed as double-strand breaks, driving breakage–fusion–bridge cycles and chromosomal rearrangement.',
-  },
+    citations: [{ pmid: '10949306', doi: '10.1038/35020592', label: 'Artandi 2000', checked: 'cross-checked' }] },
   {
     from: 'yamanaka-factors', to: 'oncogene-activation', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'exact',
     mechanism: 'MYC is both a Yamanaka factor and one of the most frequently activated human oncogenes. This is why OSK (MYC omitted) is preferred in rejuvenation work.',
-  },
+    citations: [{ pmid: '18059259', doi: '10.1038/nbt1374', label: 'Nakagawa 2008', checked: 'cross-checked' }] },
   {
     from: 'dna-repair', to: 'genomic-instability', kind: 'oncogenic-coupling', effect: 'counteracts', honesty: 'exact',
     mechanism: 'Intact repair suppresses the mutation and rearrangement burden that enables transformation.',
-  },
+    citations: [{ pmid: '9872311', doi: '10.1038/25292', label: 'Lengauer 1998', checked: 'cross-checked' }] },
   {
     from: 'dna-repair', to: 'tumour-suppressor-loss', kind: 'oncogenic-coupling', effect: 'counteracts', honesty: 'exact',
     mechanism: 'Repair capacity protects the tumour-suppressor loci themselves from inactivating mutation.',
-  },
+    citations: [{ pmid: '19847258', doi: '10.1038/nature08467', label: 'Jackson 2009', checked: 'cross-checked' }] },
   {
     from: 'sasp', to: 'immune-surveillance', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'exact',
     mechanism: 'SASP chemokines recruit immune cells that clear senescent and pre-malignant cells — the beneficial arm of an otherwise damaging secretome.',
-  },
+    citations: [{ pmid: '22080947', doi: '10.1038/nature10599', label: 'Kang 2011', checked: 'cross-checked' }] },
   {
     from: 'sasp', to: 'oncogene-activation', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'simplified',
     mechanism: 'The same secretome can be pro-tumourigenic in a paracrine fashion, supplying growth factors and proteases that favour neighbouring transformed cells.',
-  },
+    citations: [{ doi: '10.1073/pnas.211053698', label: 'Krtolica 2001', checked: 'cross-checked' }] },
   {
     from: 'stem-cell-rejuvenation', to: 'oncogene-activation', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'simplified',
     mechanism: 'Restoring proliferative and self-renewal capacity restores the substrate that transformation requires; long-lived proliferative cells accumulate mutations.',
-  },
+    citations: [{ pmid: '19092804', doi: '10.1038/nature07602', label: 'Barker 2009', checked: 'cross-checked' }] },
   {
     from: 'autophagy', to: 'oncogene-activation', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'simplified',
     mechanism: 'Context-dependent: autophagy suppresses transformation early, but supports survival of established tumours under metabolic and therapeutic stress.',
-  },
+    citations: [{ pmid: '22534666', doi: '10.1038/nrc3262', label: 'White 2012', checked: 'cross-checked' }] },
+  // DELIBERATELY UNCITED — the only oncogenic-coupling edge without a source.
+  //
+  // Searching for it returned real papers on mitochondrial ROS and genomic
+  // instability, and none of them supports the claim AS WRITTEN. The closest,
+  // PMID 27078622, works through nuclear retention of cyclin D1 after low-dose
+  // irradiation: a different mechanism, in a different context, and not
+  // "oxidative lesion burden on nuclear DNA".
+  //
+  // Attaching it would give this edge the appearance of a source while quietly
+  // changing what the edge means, which is a worse failure than leaving it bare.
+  // Either someone finds a paper testing this specific route, or the mechanism
+  // text is rewritten to match the evidence that does exist.
   {
     from: 'mitochondrial-dysfunction', to: 'genomic-instability', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'simplified',
     mechanism: 'Dysfunctional mitochondria raise reactive oxygen species, increasing oxidative lesion burden on nuclear DNA.',
@@ -339,7 +351,7 @@ const ONCOGENIC_EDGES_SOURCE: CuratedEdge[] = [
   {
     from: 'epigenetic-reprogramming', to: 'tumour-suppressor-loss', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'theoretical',
     mechanism: 'HYPOTHESIS: reprogramming remodels methylation genome-wide, which could in principle silence tumour-suppressor loci. Mechanistically plausible; not established.',
-  },
+    citations: [{ pmid: '24529372', doi: '10.1016/j.cell.2014.01.005', label: 'Ohnishi 2014', checked: 'cross-checked' }] },
 ];
 
 /* ------------------------------- biomarkers ------------------------------- */

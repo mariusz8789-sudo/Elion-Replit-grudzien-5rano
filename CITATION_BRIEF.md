@@ -1,7 +1,7 @@
 # Citation brief — Genesis mechanism graph
 
-26 edges assert something about human biology with no source attached.
-0 already have a proposed citation awaiting verification; **26 are open**.
+14 edges assert something about human biology with no source attached.
+0 already have a proposed citation awaiting verification; **14 are open**.
 
 ## What I need for each edge
 
@@ -49,87 +49,15 @@ A drives or opposes B mechanistically.
 `sasp→stem-cell-rejuvenation→mechanistic` · declared honesty: `simplified`
 
 
-## oncogenic-coupling  (13)
+## oncogenic-coupling  (1)
 
 An ageing mechanism is coupled to an oncogenic axis. These are the safety-critical claims — the ones asserting that a longevity intervention touches tumour biology.
-
-### Cellular senescence ──promotes──▶ p53 axis
-
-> Senescence is one of the terminal outcomes p53 enforces after damage. The arrest IS part of the tumour-suppressive response, not merely correlated with it.
-
-`cellular-senescence→tp53-axis→oncogenic-coupling` · declared honesty: `exact`
-
-### Cellular senescence ──promotes──▶ RB axis
-
-> Stable senescent arrest is maintained by p16INK4a–CDK4/6–RB signalling; p16 is a senescence marker and a tumour suppressor at the same time.
-
-`cellular-senescence→rb-axis→oncogenic-coupling` · declared honesty: `exact`
-
-### Telomerase ──promotes──▶ Oncogene activation
-
-> TERT reactivation removes the replicative limit. Approximately 85–90% of human cancers do this; it is a canonical immortalisation step.
-
-`telomerase→oncogene-activation→oncogenic-coupling` · declared honesty: `exact`
-
-### Telomere attrition ──promotes──▶ Genomic instability
-
-> Uncapped telomeres are processed as double-strand breaks, driving breakage–fusion–bridge cycles and chromosomal rearrangement.
-
-`telomere-attrition→genomic-instability→oncogenic-coupling` · declared honesty: `exact`
-
-### Yamanaka factors (OSKM) ──promotes──▶ Oncogene activation
-
-> MYC is both a Yamanaka factor and one of the most frequently activated human oncogenes. This is why OSK (MYC omitted) is preferred in rejuvenation work.
-
-`yamanaka-factors→oncogene-activation→oncogenic-coupling` · declared honesty: `exact`
-
-### DNA damage and repair ──counteracts──▶ Genomic instability
-
-> Intact repair suppresses the mutation and rearrangement burden that enables transformation.
-
-`dna-repair→genomic-instability→oncogenic-coupling` · declared honesty: `exact`
-
-### DNA damage and repair ──counteracts──▶ Tumour suppressor loss
-
-> Repair capacity protects the tumour-suppressor loci themselves from inactivating mutation.
-
-`dna-repair→tumour-suppressor-loss→oncogenic-coupling` · declared honesty: `exact`
-
-### SASP (senescence-associated secretory phenotype) ──promotes──▶ Immune surveillance
-
-> SASP chemokines recruit immune cells that clear senescent and pre-malignant cells — the beneficial arm of an otherwise damaging secretome.
-
-`sasp→immune-surveillance→oncogenic-coupling` · declared honesty: `exact`
-
-### SASP (senescence-associated secretory phenotype) ──promotes──▶ Oncogene activation
-
-> The same secretome can be pro-tumourigenic in a paracrine fashion, supplying growth factors and proteases that favour neighbouring transformed cells.
-
-`sasp→oncogene-activation→oncogenic-coupling` · declared honesty: `simplified`
-
-### Stem-cell exhaustion and rejuvenation ──promotes──▶ Oncogene activation
-
-> Restoring proliferative and self-renewal capacity restores the substrate that transformation requires; long-lived proliferative cells accumulate mutations.
-
-`stem-cell-rejuvenation→oncogene-activation→oncogenic-coupling` · declared honesty: `simplified`
-
-### Autophagy and proteostasis ──promotes──▶ Oncogene activation
-
-> Context-dependent: autophagy suppresses transformation early, but supports survival of established tumours under metabolic and therapeutic stress.
-
-`autophagy→oncogene-activation→oncogenic-coupling` · declared honesty: `simplified`
 
 ### Mitochondrial dysfunction ──promotes──▶ Genomic instability
 
 > Dysfunctional mitochondria raise reactive oxygen species, increasing oxidative lesion burden on nuclear DNA.
 
 `mitochondrial-dysfunction→genomic-instability→oncogenic-coupling` · declared honesty: `simplified`
-
-### Epigenetic reprogramming ──promotes──▶ Tumour suppressor loss
-
-> HYPOTHESIS: reprogramming remodels methylation genome-wide, which could in principle silence tumour-suppressor loci. Mechanistically plausible; not established.
-
-`epigenetic-reprogramming→tumour-suppressor-loss→oncogenic-coupling` · declared honesty: `theoretical`
 
 
 ## measures  (10)
@@ -199,5 +127,5 @@ A biomarker reads out a mechanism. The claim is that the assay actually measures
 
 ---
 
-Debt pinned at 26 by `packages/reasoning/src/__tests__/citations.test.ts`.
+Debt pinned at 14 by `packages/reasoning/src/__tests__/citations.test.ts`.
 Total edges in graph: 66. The other 30 record intent rather than findings and need no source.

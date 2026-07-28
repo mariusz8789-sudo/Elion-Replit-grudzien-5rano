@@ -22,11 +22,13 @@ capability described below is demonstrated by tests, not by usage.
 | `packages/reasoning` | 5,361 lines / 19 files | 844 lines / 2 files |
 | **Total** | **72,333 lines** | **22,752 lines** |
 
-Test suites, measured: **frontend 780, reasoning 88, backend 1173 (1170 pass,
-3 skipped by design into an isolated pass that runs 7/7)** — the backend figure
-is from the Phase 1b run; Phase 2 adds 23 more. The
-ratio of test to production code is roughly 1:3, which is high, and the tests are
-unusually adversarial — see §4.1.
+Test suites, measured at this commit: **backend 1192 (1189 pass, 0 fail, 3
+skipped by design into an isolated pass that runs 7/7) · frontend 780 ·
+reasoning 88 — 2,067 tests, 0 failures.** The ratio of test to production code
+is roughly 1:3, which is high, and the tests are unusually adversarial: they
+pin refusals and failure modes rather than happy paths, and several exist to
+assert that something does NOT happen (an endpoint that must 404, a verdict
+that must not transfer, a record that must not be reported as saved).
 
 ---
 

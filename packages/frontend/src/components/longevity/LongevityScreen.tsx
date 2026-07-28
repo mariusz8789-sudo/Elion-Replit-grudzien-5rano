@@ -12,6 +12,7 @@ import { survivingHypotheses } from '@genesis-os/reasoning/critic';
 import { designExperiment } from '@genesis-os/reasoning/experimentDesign';
 import { appraiseIntervention } from '@genesis-os/reasoning/appraisal';
 import { validateEvidence, TIERS, OUTCOMES, type EvidenceRecord, type EvidenceTier, type OutcomeType } from '@genesis-os/reasoning/evidence';
+import { useEvidenceStore, type EvidenceStore } from '../../core/longevityEvidence';
 import {
   allPathsBetween, highestValueExperiments, strongestInteractions,
   strongestEvidenceWeakestTranslation, researchGaps,
@@ -474,7 +475,7 @@ const EMPTY_FORM = {
   readoutKind: 'direct' as 'direct' | 'proxy',
 };
 
-function EvidenceTab({ records, onAdd }: { records: EvidenceRecord[]; onAdd: (r: EvidenceRecord) => void }) {
+function EvidenceTab({ records, onAdd, store }: { records: EvidenceRecord[]; onAdd: (r: EvidenceRecord) => void; store: EvidenceStore }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState<string[]>([]);
   const [appraiseId, setAppraiseId] = useState<InterventionId>('senolytics');
@@ -486,13 +487,28 @@ function EvidenceTab({ records, onAdd }: { records: EvidenceRecord[]; onAdd: (r:
     const v = validateEvidence(candidate);
     if (!v.ok) { setErrors(v.errors); return; }
     setErrors([]);
-    onAdd(candidate);
+    void onAdd(candidate);
     setForm({ ...EMPTY_FORM, interventionId: form.interventionId });
   };
 
   return (
     <>
-      <Panel title="Add an evidence record" icon="book" right={<StatusPill kind="warn">citation required</StatusPill>}>
+      <Panel
+        title="Add an evidence record"
+        icon="book"
+        right={
+          <StatusPill kind={store.persisted ? 'ok' : 'warn'}>
+            {store.persisted ? 'saved to your account' : 'this tab only'}
+          </StatusPill>
+        }
+      >
+        {store.error ? <p className="ds-note ds-warn">{store.error}</p> : null}
+        {!store.persisted && !store.error ? (
+          <p className="ds-note">
+            You are not signed in, so these records live in this browser tab and vanish when it closes. Sign in to keep
+            them, have them graded on the server and make them citable by an artifact.
+          </p>
+        ) : null}
         <p className="ds-note">
           The platform ships <strong>no efficacy data at all</strong>. Every claim about whether a strategy does
           anything enters here, with a citation, and is graded on two independent axes. An uncited record is refused
@@ -623,7 +639,10 @@ function EvidenceTab({ records, onAdd }: { records: EvidenceRecord[]; onAdd: (r:
 export function LongevityScreen() {
   const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('overview');
-  const [records, setRecords] = useState<EvidenceRecord[]>([]);
+  // Evidence now lives on the server when there is an account to attach it to.
+  // See core/longevityEvidence.ts for why it still works without one.
+  const evidence = useEvidenceStore();
+  const records = evidence.records;
 
   const tabs: { id: Tab; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
     { id: 'overview', label: t('lg.tab.overview'), icon: 'rocket' },
@@ -661,7 +680,7 @@ export function LongevityScreen() {
       {tab === 'safety' ? <SafetyTab /> : null}
       {tab === 'discovery' ? <DiscoveryTab records={records} /> : null}
       {tab === 'experiments' ? <ExperimentsTab records={records} /> : null}
-      {tab === 'evidence' ? <EvidenceTab records={records} onAdd={(r) => setRecords((prev) => [...prev, r])} /> : null}
+      {tab === 'evidence' ? <EvidenceTab records={records} onAdd={evidence.add} store={evidence} /> : null}
       {tab === 'simulator' ? <SimulatorTab /> : null}
       {tab === 'states' ? <CellStateTab /> : null}
       {tab === 'score' ? <ScoreTab records={records} /> : null}

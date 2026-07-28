@@ -1080,3 +1080,69 @@ export async function getDiscoveryDossier(token: string, projectId: string, camp
   const r = await request<{ dossier: DiscoveryDossier }>('GET', `/projects/${projectId}/discovery-campaigns/${campaignId}/dossier`, { token });
   return r.ok ? { ok: true, data: r.data.dossier } : r;
 }
+
+/* ------------------------- reasoning core (L2/L3) ------------------------- */
+
+/**
+ * Evidence as the server stores it. Snake-cased because it is a row, and
+ * deliberately NOT the same type as `EvidenceRecord`: the record is what a
+ * scientist typed, the row is what the server graded and kept. Conflating them
+ * is how a client-side grade sneaks in.
+ */
+export interface StoredEvidence {
+  id: string;
+  project_id: string;
+  edge_key: string | null;
+  intervention: string | null;
+  hallmark: string | null;
+  citation: string;
+  tier: string;
+  outcome: string;
+  direction: string;
+  species: string | null;
+  sample_size: number | null;
+  effect_size: number | null;
+  notes: string;
+  strength: number;
+  human_relevance: number;
+  graded_with: string;
+  provenance: string;
+  created_at: number;
+  created_by: string;
+  retired_at: number | null;
+}
+
+export interface GraphSnapshotInfo {
+  id: string; createdAt: number; source: string; nodes: number; edges: number;
+}
+
+/** The curated mechanism graph and the hash that identifies it. No token needed. */
+export async function fetchReasoningGraph(): Promise<ApiResult<{ snapshot: GraphSnapshotInfo; edges: unknown[] }>> {
+  return request<{ snapshot: GraphSnapshotInfo; edges: unknown[] }>('GET', '/reasoning/graph');
+}
+
+export async function listStoredEvidence(token: string, projectId?: string): Promise<ApiResult<StoredEvidence[]>> {
+  const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+  const r = await request<{ evidence: StoredEvidence[] }>('GET', `/reasoning/evidence${q}`, { token });
+  return r.ok ? { ok: true, data: r.data.evidence } : r;
+}
+
+/**
+ * Store one record. The grade comes back FROM the server — it is not sent.
+ * Whatever the browser computed for display is a preview; the stored number is
+ * the one produced by the server's copy of the same pure function, and only
+ * that one carries a `graded_with` version.
+ */
+export async function storeEvidence(
+  token: string,
+  record: Record<string, unknown>,
+  projectId?: string,
+): Promise<ApiResult<{ evidence: StoredEvidence; grade: { strength: number; humanRelevance: number } }>> {
+  return request<{ evidence: StoredEvidence; grade: { strength: number; humanRelevance: number } }>(
+    'POST', '/reasoning/evidence', { token, body: projectId ? { ...record, projectId } : record },
+  );
+}
+
+export async function retireStoredEvidence(token: string, id: string): Promise<ApiResult<{ retired: boolean }>> {
+  return request<{ retired: boolean }>('DELETE', `/reasoning/evidence/${encodeURIComponent(id)}`, { token });
+}

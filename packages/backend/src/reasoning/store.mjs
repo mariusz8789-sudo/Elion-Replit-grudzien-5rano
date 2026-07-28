@@ -93,8 +93,13 @@ CREATE TABLE IF NOT EXISTS evidence_records (
   provenance      TEXT NOT NULL,
   created_at      INTEGER NOT NULL,
   created_by      TEXT NOT NULL,
-  retired_at      INTEGER           -- append-only: retracted evidence is retired, not deleted
+  retired_at      INTEGER,          -- append-only: retracted evidence is retired, not deleted
+  shared_from     TEXT              -- the record this was copied from, when shared into a project
 );
+-- One record reaches a given project once. A second share would create a second
+-- copy that then diverges from the first.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_evidence_shared_once ON evidence_records(project_id, shared_from)
+  WHERE shared_from IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_evidence_project ON evidence_records(project_id, retired_at);
 CREATE INDEX IF NOT EXISTS idx_evidence_edge ON evidence_records(edge_key);
 
@@ -328,6 +333,53 @@ export function listEvidence(db, projectId, { edgeKey = null, includeRetired = f
   if (edgeKey) { clauses.push('edge_key = ?'); params.push(String(edgeKey)); }
   if (!includeRetired) clauses.push('retired_at IS NULL');
   return db.prepare(`SELECT * FROM evidence_records WHERE ${clauses.join(' AND ')} ORDER BY created_at DESC`).all(...params);
+}
+
+/**
+ * Share one record into a project — the explicit act the tenancy policy is built
+ * around.
+ *
+ * Personal is the default and sharing is deliberate: laboratories do not want
+ * working hypotheses visible the moment a colleague joins, and evidence that
+ * silently becomes readable is a privacy surprise, not a collaboration feature.
+ *
+ * It COPIES rather than moves. Moving would take the record out of the owner's
+ * own space, so leaving a project would cost them their own work. The copy
+ * carries `shared_from`, so the two are linked and the origin is never lost —
+ * and the unique index means a record reaches a given project once, because a
+ * second copy would immediately start diverging from the first.
+ *
+ * The grade is copied verbatim rather than recomputed. Re-grading here would
+ * silently produce a different number under a newer rule while presenting as the
+ * same record; if the rules changed, that is a fact worth seeing, not hiding.
+ */
+export function shareEvidence(db, { id, fromProjectId, toProjectId, actorId, now = Date.now() }) {
+  const source = db.prepare('SELECT * FROM evidence_records WHERE id = ? AND project_id = ? AND retired_at IS NULL')
+    .get(String(id), String(fromProjectId));
+  if (!source) return { ok: false, error: 'not_found', message: 'No live evidence record with that id in your workspace.' };
+  if (String(fromProjectId) === String(toProjectId)) {
+    return { ok: false, error: 'invalid_target', message: 'That record is already in this workspace.' };
+  }
+
+  const existing = db.prepare('SELECT id FROM evidence_records WHERE project_id = ? AND shared_from = ?')
+    .get(String(toProjectId), String(id));
+  if (existing) {
+    return { ok: false, error: 'already_shared', message: 'That record has already been shared into this workspace.' };
+  }
+
+  const copyId = newId();
+  db.prepare(`
+    INSERT INTO evidence_records
+      (id, project_id, edge_key, intervention, hallmark, citation, tier, outcome, direction,
+       species, sample_size, effect_size, notes, strength, human_relevance, graded_with,
+       provenance, created_at, created_by, shared_from)
+    SELECT ?, ?, edge_key, intervention, hallmark, citation, tier, outcome, direction,
+       species, sample_size, effect_size, notes, strength, human_relevance, graded_with,
+       provenance, ?, ?, id
+    FROM evidence_records WHERE id = ?
+  `).run(copyId, String(toProjectId), Number(now), String(actorId), String(id));
+
+  return { ok: true, evidence: db.prepare('SELECT * FROM evidence_records WHERE id = ?').get(copyId) };
 }
 
 /**

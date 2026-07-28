@@ -92,7 +92,7 @@ import {
 } from './edgeReview.mjs';
 import {
   ensureReasoningSchema, seedGraphSnapshot, currentSnapshot, snapshotEdges,
-  orphanReviews, recordEvidence, listEvidence, retireEvidence,
+  orphanReviews, recordEvidence, listEvidence, retireEvidence, shareEvidence,
   getArtifact, listArtifacts, replayHistory,
 } from './reasoning/store.mjs';
 import { resolveTenant } from './reasoning/tenancy.mjs';
@@ -351,6 +351,22 @@ export function handleApi(db, ctx) {
         createdBy: user.id,
       });
       return ok({ evidence: stored, grade }, 201);
+    }
+
+    // The explicit opt-in half of the tenancy policy. Personal is the default;
+    // reaching a shared workspace is an act, never a side effect.
+    if (seg[1] === 'evidence' && seg.length === 4 && seg[3] === 'share' && method === 'POST') {
+      const target = resolveTenant(db, user, body?.toProjectId);
+      if (!target.ok) return err(target.status, target.code, target.message);
+      if (target.projectId === tenant.projectId) {
+        return err(400, 'invalid_target', 'Name the project to share into. Omitting it targets your own workspace.');
+      }
+      const result = shareEvidence(db, {
+        id: decodeURIComponent(seg[2]), fromProjectId: tenant.projectId,
+        toProjectId: target.projectId, actorId: user.id,
+      });
+      if (!result.ok) return err(result.error === 'not_found' ? 404 : 409, result.error, result.message);
+      return ok({ evidence: result.evidence, sharedInto: target.projectId }, 201);
     }
 
     if (seg[1] === 'evidence' && seg.length === 3 && method === 'DELETE') {

@@ -245,3 +245,89 @@ describe('artifacts are read-only over HTTP', () => {
     assert.deepEqual(r.body.artifacts, []);
   });
 });
+
+describe('explicit opt-in sharing', () => {
+  /** A project both scientists belong to. Created deliberately, never implicitly. */
+  function sharedProject(id = 'lab-1') {
+    db.prepare('INSERT INTO projects (id, name, owner_id, created_at) VALUES (?, ?, ?, ?)')
+      .run(id, 'Shared lab', alice.id, 1);
+    for (const u of [alice, bob]) {
+      db.prepare('INSERT INTO memberships (project_id, user_id, role, created_at) VALUES (?, ?, ?, ?)')
+        .run(id, u.id, 'member', 1);
+    }
+    return id;
+  }
+
+  test('a record stays private until it is shared on purpose', () => {
+    // The whole policy in one test: joining a lab must not reveal working notes.
+    const project = sharedProject();
+    const mine = call('POST', '/api/reasoning/evidence', { token: aliceToken, body: VALID_EVIDENCE }).body.evidence;
+    assert.equal(call('GET', '/api/reasoning/evidence', { token: bobToken, query: { projectId: project } }).body.evidence.length, 0);
+
+    const shared = call('POST', `/api/reasoning/evidence/${mine.id}/share`, { token: aliceToken, body: { toProjectId: project } });
+    assert.equal(shared.status, 201);
+    assert.equal(call('GET', '/api/reasoning/evidence', { token: bobToken, query: { projectId: project } }).body.evidence.length, 1);
+  });
+
+  test('sharing copies rather than moves, and records the origin', () => {
+    // Moving would mean leaving a project costs you your own work.
+    const project = sharedProject();
+    const mine = call('POST', '/api/reasoning/evidence', { token: aliceToken, body: VALID_EVIDENCE }).body.evidence;
+    const copy = call('POST', `/api/reasoning/evidence/${mine.id}/share`, { token: aliceToken, body: { toProjectId: project } }).body.evidence;
+    assert.notEqual(copy.id, mine.id);
+    assert.equal(copy.shared_from, mine.id);
+    assert.equal(call('GET', '/api/reasoning/evidence', { token: aliceToken }).body.evidence.length, 1, 'the original stays yours');
+  });
+
+  test('the grade is carried across verbatim, not recomputed', () => {
+    // Re-grading under a newer rule would present a different number as the same
+    // record. If the rules changed, that is a fact worth seeing.
+    const project = sharedProject();
+    const mine = call('POST', '/api/reasoning/evidence', { token: aliceToken, body: VALID_EVIDENCE }).body.evidence;
+    const copy = call('POST', `/api/reasoning/evidence/${mine.id}/share`, { token: aliceToken, body: { toProjectId: project } }).body.evidence;
+    assert.equal(copy.strength, mine.strength);
+    assert.equal(copy.human_relevance, mine.human_relevance);
+    assert.equal(copy.graded_with, mine.graded_with);
+    assert.equal(copy.provenance, mine.provenance);
+  });
+
+  test('sharing twice into the same workspace is refused', () => {
+    const project = sharedProject();
+    const mine = call('POST', '/api/reasoning/evidence', { token: aliceToken, body: VALID_EVIDENCE }).body.evidence;
+    call('POST', `/api/reasoning/evidence/${mine.id}/share`, { token: aliceToken, body: { toProjectId: project } });
+    const again = call('POST', `/api/reasoning/evidence/${mine.id}/share`, { token: aliceToken, body: { toProjectId: project } });
+    assert.equal(again.status, 409);
+    assert.equal(call('GET', '/api/reasoning/evidence', { token: bobToken, query: { projectId: project } }).body.evidence.length, 1);
+  });
+
+  test('you cannot share into a project you do not belong to', () => {
+    db.prepare('INSERT INTO projects (id, name, owner_id, created_at) VALUES (?, ?, ?, ?)')
+      .run('bob-only', 'Bob only', bob.id, 1);
+    db.prepare('INSERT INTO memberships (project_id, user_id, role, created_at) VALUES (?, ?, ?, ?)')
+      .run('bob-only', bob.id, 'owner', 1);
+    const mine = call('POST', '/api/reasoning/evidence', { token: aliceToken, body: VALID_EVIDENCE }).body.evidence;
+    assert.equal(call('POST', `/api/reasoning/evidence/${mine.id}/share`, { token: aliceToken, body: { toProjectId: 'bob-only' } }).status, 403);
+  });
+
+  test("you cannot push a record into someone else's personal workspace", () => {
+    const mine = call('POST', '/api/reasoning/evidence', { token: aliceToken, body: VALID_EVIDENCE }).body.evidence;
+    const r = call('POST', `/api/reasoning/evidence/${mine.id}/share`, {
+      token: aliceToken, body: { toProjectId: personalTenant(bob.id) },
+    });
+    assert.equal(r.status, 403);
+    assert.equal(listEvidence(db, personalTenant(bob.id)).length, 0);
+  });
+
+  test("you cannot share a record you do not own", () => {
+    const project = sharedProject();
+    const bobs = call('POST', '/api/reasoning/evidence', { token: bobToken, body: VALID_EVIDENCE }).body.evidence;
+    assert.equal(call('POST', `/api/reasoning/evidence/${bobs.id}/share`, { token: aliceToken, body: { toProjectId: project } }).status, 404);
+  });
+
+  test('omitting the target is refused rather than defaulting to your own space', () => {
+    // A silent no-op would look like a successful share.
+    const mine = call('POST', '/api/reasoning/evidence', { token: aliceToken, body: VALID_EVIDENCE }).body.evidence;
+    const r = call('POST', `/api/reasoning/evidence/${mine.id}/share`, { token: aliceToken, body: {} });
+    assert.equal(r.status, 400);
+  });
+});

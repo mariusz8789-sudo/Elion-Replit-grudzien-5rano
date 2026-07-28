@@ -413,8 +413,17 @@ ingesting 500k would be the classic mistake.
 ### 9.2 Security model
 
 - **Tenancy is a read filter, not a convention.** The Necropolis contract already
-  states this; every new table carries `project_id` and every read is filtered.
-  A static test asserts no query against a tenant table omits the filter.
+  states this; every new table carries `project_id` and every read is filtered
+  through one resolver that refuses rather than guesses.
+- **Personal by default; sharing is an act** (decided, implemented). Evidence
+  lands in a personal workspace unless the caller names a project they belong to.
+  Laboratories do not want working hypotheses visible the moment a colleague
+  joins, and evidence that silently becomes readable is a privacy surprise rather
+  than a collaboration feature. Sharing copies rather than moves, so leaving a
+  project never costs someone their own work, and a record reaches a given
+  project once. Personal workspaces are addressed by omission, never by name —
+  a project whose id collides with the reserved `user:` namespace is refused even
+  when membership checks out.
 - **Publication is explicit.** An artifact is private until published. Publishing
   is an append with a named actor.
 - **The ledger is public-readable by design** — that is the recruitment

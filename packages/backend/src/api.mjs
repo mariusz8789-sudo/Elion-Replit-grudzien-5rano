@@ -85,6 +85,11 @@ import {
   getCandidate,
   listCandidates,
 } from './store.mjs';
+import {
+  ensureReviewSchema, submitReview, reviewsForEdge, edgeStatus, edgeStatuses,
+  reviewWorklist as edgeReviewWorklist, reviewerCredit, contributors,
+  reviewCoverage, upsertReviewerProfile, getReviewerProfile, VERDICTS,
+} from './edgeReview.mjs';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
 import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
 import { listCapabilities } from './compute/capabilities.mjs';
@@ -193,6 +198,75 @@ export function handleApi(db, ctx) {
         createdAt: invite.createdAt,
       },
     });
+  }
+
+
+  // ---- Edge review: PUBLIC read surface (no session required) ----
+  // An expert arriving from a cold email must be able to READ an edge, its
+  // reviews and the reviewers' names before deciding whether to participate.
+  // Requiring an account to look is the friction that kills expert recruitment.
+  if (seg[0] === 'review') {
+    ensureReviewSchema(db);
+
+    // /api/review/edge/:edgeKey — one edge, its status and every review on it.
+    if (seg[1] === 'edge' && seg.length === 3 && method === 'GET') {
+      return ok({ status: edgeStatus(db, decodeURIComponent(seg[2])), reviews: reviewsForEdge(db, decodeURIComponent(seg[2])) });
+    }
+
+    // /api/review/coverage — the asset number; safe to show publicly.
+    if (seg[1] === 'coverage' && method === 'POST') {
+      const keys = Array.isArray(body?.edgeKeys) ? body.edgeKeys.map(String) : [];
+      return ok({ coverage: reviewCoverage(db, keys), statuses: edgeStatuses(db, keys) });
+    }
+
+    // /api/review/contributors — who has reviewed. Public by design: the
+    // acknowledgement is part of what a reviewer is offered.
+    if (seg[1] === 'contributors' && method === 'GET') {
+      return ok({ contributors: contributors(db) });
+    }
+
+    // /api/review/verdicts — the vocabulary, so a client never invents one.
+    if (seg[1] === 'verdicts' && method === 'GET') return ok({ verdicts: VERDICTS });
+
+    // Everything below WRITES, and therefore needs an identified reviewer.
+    const reviewer = getUserByToken(db, ctx.token);
+    if (!reviewer) return err(401, 'unauthorized', 'Zaloguj się, aby zapisać recenzję. Podgląd krawędzi nie wymaga konta.');
+
+    if (seg[1] === 'profile' && method === 'GET') return ok({ profile: getReviewerProfile(db, reviewer.id) });
+    if (seg[1] === 'profile' && method === 'PUT') {
+      const displayName = String(body?.displayName ?? '').trim();
+      if (!displayName) return err(400, 'invalid_input', 'Nazwa recenzenta jest wymagana — recenzja bez atrybucji nie ma wartości.');
+      return ok({ profile: upsertReviewerProfile(db, reviewer.id, {
+        displayName, orcid: body?.orcid ?? null,
+        affiliation: body?.affiliation ?? '', expertise: body?.expertise ?? '',
+      }) });
+    }
+
+    if (seg[1] === 'submit' && method === 'POST') {
+      // A review without attribution is an opinion; refuse before storing it.
+      if (!getReviewerProfile(db, reviewer.id)) {
+        return err(409, 'profile_required', 'Uzupełnij profil recenzenta (nazwa, afiliacja) przed pierwszą recenzją.');
+      }
+      const result = submitReview(db, {
+        edgeKey: String(body?.edgeKey ?? ''), reviewerId: reviewer.id,
+        verdict: String(body?.verdict ?? ''), confidence: body?.confidence ?? 'moderate',
+        comment: String(body?.comment ?? ''), citation: String(body?.citation ?? ''),
+        proposedEffect: body?.proposedEffect ?? null,
+        proposedMechanism: body?.proposedMechanism ?? null,
+        proposedHonesty: body?.proposedHonesty ?? null,
+      });
+      if (!result.ok) return err(400, 'invalid_review', result.errors.join(' '));
+      return ok({ review: result.review, status: edgeStatus(db, String(body.edgeKey)) }, 201);
+    }
+
+    if (seg[1] === 'worklist' && method === 'POST') {
+      const keys = Array.isArray(body?.edgeKeys) ? body.edgeKeys.map(String) : [];
+      return ok({ worklist: edgeReviewWorklist(db, keys, { reviewerId: reviewer.id, limit: Number(body?.limit ?? 50) }) });
+    }
+
+    if (seg[1] === 'credit' && method === 'GET') return ok({ credit: reviewerCredit(db, reviewer.id) });
+
+    return err(404, 'not_found');
   }
 
   // ---- Backend Compute Engine (modele publiczne; run opcjonalnie utrwalany) ----

@@ -1,7 +1,8 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDatabase, createUser } from './store.mjs';
-import { hashPassword } from './auth.mjs';
+import { openDatabase, createUser, createSession } from './store.mjs';
+import { handleApi } from './api.mjs';
+import { hashPassword, generateToken } from './auth.mjs';
 import {
   ensureReviewSchema, upsertReviewerProfile, submitReview, validateReview,
   reviewsForEdge, reviewHistory, edgeStatus, edgeStatuses, reviewWorklist,
@@ -220,5 +221,73 @@ describe('evidence standards — what makes the ledger matter', () => {
 
   test('an unknown standard falls open rather than silently dropping everything', () => {
     assert.equal(edgesPassingStandard(db, EDGES, 'nonsense').length, EDGES.length);
+  });
+});
+
+/* ------------------------- HTTP surface ------------------------- */
+
+describe('review API — public read, authenticated write', () => {
+  const call = (method, pathname, opts = {}) => handleApi(db, { method, pathname, ...opts });
+  const EDGE = 'cellular-senescence→sasp→mechanistic';
+
+  function session(user) {
+    const token = generateToken();
+    createSession(db, { userId: user.id, token, ttlMs: 1e9 });
+    return token;
+  }
+
+  test('an edge can be READ with no account at all', () => {
+    // The whole recruitment funnel depends on this: an expert arriving from a
+    // cold email must be able to look before being asked to sign up.
+    const r = call('GET', `/api/review/edge/${encodeURIComponent(EDGE)}`);
+    assert.equal(r.status, 200);
+    assert.equal(r.body.status.status, 'unreviewed');
+    assert.deepEqual(r.body.reviews, []);
+  });
+
+  test('contributors and coverage are public', () => {
+    assert.equal(call('GET', '/api/review/contributors').status, 200);
+    assert.equal(call('POST', '/api/review/coverage', { body: { edgeKeys: EDGES } }).status, 200);
+  });
+
+  test('submitting requires a session, and says so helpfully', () => {
+    const r = call('POST', '/api/review/submit', { body: { edgeKey: EDGE, verdict: 'confirm' } });
+    assert.equal(r.status, 401);
+    assert.match(r.body.message, /Podgląd krawędzi nie wymaga konta/);
+  });
+
+  test('submitting requires a reviewer profile — an unattributed review is an opinion', () => {
+    const u = createUser(db, { email: 'new@lab.io', displayName: 'New', passwordHash: hashPassword('pw12345678') });
+    const token = session(u);
+    const r = call('POST', '/api/review/submit', { token, body: { edgeKey: EDGE, verdict: 'confirm' } });
+    assert.equal(r.status, 409);
+    assert.equal(r.body.error, 'profile_required');
+  });
+
+  test('full round trip: profile, review, status, credit', () => {
+    const token = session(alice);
+    assert.equal(call('PUT', '/api/review/profile', { token, body: { displayName: 'Alice Reviewer', orcid: '0000-0002-1825-0097', affiliation: 'Uni' } }).status, 200);
+
+    const posted = call('POST', '/api/review/submit', {
+      token, body: { edgeKey: EDGE, verdict: 'confirm', confidence: 'high', comment: 'Standard cell biology.' },
+    });
+    assert.equal(posted.status, 201);
+    assert.equal(posted.body.status.status, 'confirmed');
+
+    // …and it is immediately visible to an anonymous reader.
+    const anon = call('GET', `/api/review/edge/${encodeURIComponent(EDGE)}`);
+    assert.equal(anon.body.status.confirms, 1);
+    assert.equal(anon.body.reviews[0].display_name, 'Alice Reviewer');
+
+    assert.equal(call('GET', '/api/review/credit', { token }).body.credit.total, 1);
+  });
+
+  test('an invalid verdict is rejected with the reason, not stored', () => {
+    const token = session(alice);
+    call('PUT', '/api/review/profile', { token, body: { displayName: 'Alice Reviewer' } });
+    const r = call('POST', '/api/review/submit', { token, body: { edgeKey: EDGE, verdict: 'dispute', comment: '' } });
+    assert.equal(r.status, 400);
+    assert.match(r.body.message, /must state why/);
+    assert.equal(reviewsForEdge(db, EDGE).length, 0);
   });
 });

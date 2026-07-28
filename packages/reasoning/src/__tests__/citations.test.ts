@@ -136,6 +136,40 @@ describe('auditCitations tells the truth about the shipped graph', () => {
   });
 });
 
+describe('a PMC id pasted as a PMID is caught by its own date', () => {
+  // Not hypothetical. A search assistant proposed all three of these for the
+  // papers named. Each is a valid PMID that resolves to something entirely
+  // unrelated, decades older — the "PMC" prefix had been stripped.
+  it.each([
+    ['5959857', 'Gonzalez-Meljem 2018', 'really a 1966 paper on air sampling in the upper atmosphere'],
+    ['2737083', 'Levine 2009', 'really a 1989 study of cough suppressants'],
+    ['2922531', 'Nakagawa 2010', 'really a 1989 French-language article'],
+  ])('refuses %s claimed as %s (%s)', (pmid, label) => {
+    const r = validateCitation({ pmid, label, checked: 'cross-checked' });
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(' ')).toMatch(/PMC/);
+  });
+
+  it('does NOT refuse a genuinely old paper with a short PMID', () => {
+    // Kim 1994 really does have a seven-digit PMID. The guard keys on the
+    // mismatch between the year and the id, not on the id being short.
+    expect(validateCitation({ pmid: '7605428', label: 'Kim 1994', checked: 'cross-checked' }).ok).toBe(true);
+    expect(validateCitation({ pmid: '9872311', label: 'Lengauer 1998', checked: 'cross-checked' }).ok).toBe(true);
+  });
+
+  it('does not fire when the label carries no year to check against', () => {
+    expect(validateCitation({ pmid: '5959857', label: 'some paper', checked: 'cross-checked' }).ok).toBe(true);
+  });
+
+  it('every PMID in the shipped graph survives the check', () => {
+    for (const e of GRAPH_EDGES.filter(isClaimEdge)) {
+      for (const c of e.citations) {
+        expect(validateCitation(c).ok, `${e.from}→${e.to}: ${c.label}`).toBe(true);
+      }
+    }
+  });
+});
+
 describe('a citation must say how far it was checked', () => {
   it('refuses a citation that does not declare its check level', () => {
     const r = validateCitation({ pmid: '23746838', label: 'López-Otín 2013' });

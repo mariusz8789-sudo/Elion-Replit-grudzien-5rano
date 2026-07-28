@@ -93,6 +93,19 @@ export interface CitationValidation {
 
 /** PubMed ids are positive integers with no leading zero; 8 digits today, room to grow. */
 const PMID_PATTERN = /^[1-9]\d{0,8}$/;
+/**
+ * PubMed crossed eight digits around 1999, so anything published from 2000 on
+ * has a PMID above this. Below it, with a 2000s year on the label, the number is
+ * almost always a PMC id someone pasted after stripping the "PMC".
+ *
+ * This guard exists because it caught three real ones. A search assistant
+ * proposed 5959857, 2737083 and 2922531 for papers dated 2018, 2009 and 2010.
+ * All three are well-formed PMIDs and all three resolve — to a 1966 paper on
+ * sampling microorganisms in the upper atmosphere, a 1989 study of cough
+ * suppressants, and a 1989 French-language article. Format validation passes
+ * every one of them. Only the year does not fit, and the year is free to check.
+ */
+const PMID_FLOOR_2000 = 10_000_000;
 /** DOI: the "10." prefix, a registrant code, a slash, and a non-empty suffix. */
 const DOI_PATTERN = /^10\.\d{4,9}\/\S+$/;
 /**
@@ -119,6 +132,14 @@ export function validateCitation(input: Partial<Citation> | null | undefined): C
       errors.push(
         `"${pmid}" is not a PMID. Expected digits only (e.g. "23746838") — no "PMID:" prefix, no URL, no leading zero.`,
       );
+    } else {
+      const yearInLabel = /\b(19|20)\d{2}\b/.exec(label ?? '');
+      const year = yearInLabel ? Number(yearInLabel[0]) : null;
+      if (year !== null && year >= 2000 && Number(pmid) < PMID_FLOOR_2000) {
+        errors.push(
+          `"${pmid}" cannot be the PMID of a ${year} paper — PubMed passed ${PMID_FLOOR_2000} around 1999, so this is almost certainly a PMC id (PMC${pmid}) pasted into the wrong field. Drop the "PMC" prefix and you get a completely different, much older paper.`,
+        );
+      }
     }
   }
   if (doi !== undefined) {

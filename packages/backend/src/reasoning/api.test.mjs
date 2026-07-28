@@ -564,7 +564,12 @@ describe('the knowledge history over HTTP', () => {
     const r = call('GET', '/api/reasoning/history-of-knowledge', { token: aliceToken });
     assert.equal(r.status, 200);
     assert.equal(r.body.events.length, 2);
-    assert.deepEqual(r.body.events.map((e) => e.kind), ['evidence', 'burial']);
+    // Set, not sequence. Both writes go through HTTP without an injected clock,
+    // so they can land in the same millisecond — and within one millisecond the
+    // timeline's tie-break is alphabetical, which flipped this assertion
+    // intermittently under parallel test load. Ordering is pinned in the unit
+    // tests, where the timestamps are controlled.
+    assert.deepEqual(r.body.events.map((e) => e.kind).sort(), ['burial', 'evidence']);
     assert.match(r.body.summary.statement, /1 study\(ies\) entered/);
   });
 

@@ -127,6 +127,11 @@ export function knowledgeTimeline(db, projectId, { since = null, until = null, k
   }
 
   const inWindow = events.filter((e) => (since === null || e.at >= since) && (until === null || e.at <= until));
+  // Ties are broken by kind name. Two events CAN share a millisecond — entering
+  // a study and burying a hypothesis in the same request, for instance — and
+  // within that millisecond there is no true order to recover. The tie-break is
+  // therefore arbitrary but STABLE, so the same data always renders the same
+  // way. Callers must not read same-millisecond adjacency as causality.
   inWindow.sort((a, b) => a.at - b.at || a.kind.localeCompare(b.kind));
 
   return {

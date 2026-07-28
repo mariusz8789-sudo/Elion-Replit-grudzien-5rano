@@ -45,4 +45,4 @@ statyczny produkcyjny, zero zależności poza `@anthropic-ai/sdk`).
 - Nowe laboratorium: plik w `src/labs/` + `registerLab()` w manifeście
 - Każdy nowy moduł projektuje się w oparciu o `knowledge/<lab>.md`
   (Genesis Knowledge Base) i aktualizuje ją w tym samym commicie
-- Szczegóły konwencji i checklisty przed commitem: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Szczegóły konwencji i checklisty przed commitem: [`CONTRIBUTING.md`](../../CONTRIBUTING.md)

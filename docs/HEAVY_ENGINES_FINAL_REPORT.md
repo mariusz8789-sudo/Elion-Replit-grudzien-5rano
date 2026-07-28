@@ -6,7 +6,7 @@ Every number below comes from an executed reference case or the recorded
 ADMET / toxicity / protein results. No therapeutic or clinical claims.
 
 1. **VERIFIED STARTING HEAD** — `eba84fe`.
-2. **FINAL HEAD** — see the last pushed commit in this branch (`claude/quantum-forge-p845ux`); this report ships in the final milestone.
+2. **FINAL HEAD** — see the last pushed commit on `genesis/main`; this report ships in the final milestone.
 3. **RUNTIME ENVIRONMENT** — Ubuntu 24.04 (Linux 6.18.5), x86_64, Python 3.11.15, Node 22.22.2, 4 CPU, ~15.7 GiB RAM, ~28 GiB free disk.
 4. **CPU/GPU STATUS** — CPU-only (4 cores). No GPU, no CUDA (`nvidia-smi` absent, no `/dev/nvidia*`, no `nvcc`).
 5. **RDKit STATUS AND VERSION** — AVAILABLE, 2026.03.3 (reference: aspirin logP 1.31; benzene→`Cc1ccccc1`).

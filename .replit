@@ -1,4 +1,7 @@
-modules = ["nodejs-20", "web"]
+# nodejs-22 is a hard requirement, not a preference: the reasoning package is
+# TypeScript imported directly by the server, which needs Node's type stripping
+# (>= 22.18, declared in engines). On nodejs-20 the server fails at import.
+modules = ["nodejs-22", "web"]
 [agent]
 expertMode = true
 

@@ -1,6 +1,6 @@
 # Genesis OS — Raport Etapu 2 (jakość produkcyjna / przygotowanie do bety)
 
-Data: 2026-07-08 · Branch: `claude/quantum-forge-p845ux`
+Data: 2026-07-08
 Zasada etapu: **zero nowych funkcji ponad zatwierdzoną listę — jakość, testy, offline, AI backend, wydajność, audyt.**
 
 ## Co zostało wykonane

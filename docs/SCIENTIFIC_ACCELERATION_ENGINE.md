@@ -14,7 +14,7 @@ self-learning. Rule-based, deterministic, evidence-backed.
 
 ### 1. Repository state
 Built on HEAD `4081739` (engine core). Milestones pushed to
-`claude/quantum-forge-p845ux`: `4081739` → `16cd658` → `5982ced` → `7a87fe9`.
+Commit sequence: `4081739` → `16cd658` → `5982ced` → `7a87fe9`.
 
 ### 2. Scientific Campaign persistence (P1)
 `store.mjs` schema v6 adds `campaigns`, `campaign_candidates` (full lineage),

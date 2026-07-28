@@ -1,6 +1,6 @@
 # Genesis OS — Raport Etapu 1
 
-Data: 2026-07-08 · Branch: `claude/quantum-forge-p845ux`
+Data: 2026-07-08
 Zasada etapu: **zero nowych laboratoriów — wyłącznie pogłębienie istniejących.**
 
 ## Co zostało dodane

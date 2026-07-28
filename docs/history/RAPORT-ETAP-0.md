@@ -1,6 +1,6 @@
 # Genesis OS — Raport Etapu 0
 
-Data: 2026-07-07 · Branch: `claude/quantum-forge-p845ux`
+Data: 2026-07-07
 
 ## Co zostało wykonane
 

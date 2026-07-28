@@ -1,6 +1,6 @@
 # Genesis OS — Raport audytu produkcyjnego
 
-Data: 2026-07-09 · Branch: `claude/quantum-forge-p845ux`
+Data: 2026-07-09
 Zakres: wyłącznie jakość, architektura, bezpieczeństwo i gotowość produkcyjna —
 zero nowych laboratoriów i funkcji użytkowych.
 

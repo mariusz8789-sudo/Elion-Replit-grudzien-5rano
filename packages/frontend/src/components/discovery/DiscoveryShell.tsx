@@ -30,6 +30,7 @@ export const DISCOVERY_NAV: NavItem[] = [
   { hash: '#/truth-engine', label: 'Truth Engine', icon: 'shield' },
   { hash: '#/discovery-workspace', label: 'Workspace', icon: 'chart' },
   { hash: '#/longevity', label: 'Longevity', labelKey: 'lg.nav', icon: 'dna' },
+  { hash: '#/review', label: 'Expert review', labelKey: 'rev.nav', icon: 'shield' },
 ];
 
 export function DiscoveryShell({ active, title, subtitle, children, actions }: {

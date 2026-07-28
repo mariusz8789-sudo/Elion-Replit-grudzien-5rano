@@ -49,6 +49,8 @@ import { CampaignScreen as ResearchCampaignScreen } from './components/product/C
 import { DashboardScreen } from './components/product/DashboardScreen';
 import { HomeScreen } from './components/product/HomeScreen';
 import { LongevityScreen } from './components/longevity/LongevityScreen';
+import { EdgeReviewScreen } from './components/longevity/EdgeReview';
+import { DiscoveryShell, StatusPill } from './components/discovery/DiscoveryShell';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -91,6 +93,7 @@ type Route =
   | { kind: 'research-campaigns' }
   | { kind: 'research-campaign'; id: string }
   | { kind: 'longevity' }
+  | { kind: 'review'; edge?: string }
   | { kind: 'genesis' }
   | { kind: 'labs' };
 
@@ -109,6 +112,10 @@ function parseHash(): Route {
   if (h === '#/conflict') return { kind: 'conflict' };
   if (h === '#/projects') return { kind: 'projects' };
   if (h === '#/longevity') return { kind: 'longevity' };
+  // Deep link to a single edge, e.g. #/review?edge=…  — the recruitment link an
+  // expert receives by e-mail. Must resolve without a session.
+  const review = h.match(/^#\/review(?:\?edge=([^&]+))?/);
+  if (review) return { kind: 'review', edge: review[1] ? decodeURIComponent(review[1]) : undefined };
   if (h === '#/cde') return { kind: 'cde' };
   if (h === '#/drug') return { kind: 'drug' };
   if (h === '#/campaign') return { kind: 'campaign' };
@@ -135,6 +142,19 @@ function parseHash(): Route {
   return { kind: 'home' };
 }
 
+/**
+ * Did this visitor arrive at a specific destination rather than at the product?
+ * Directed entries skip onboarding, because the tour hides the very thing the
+ * link was sent for.
+ */
+export function isDirectedEntry(search = window.location.search, hash = window.location.hash): boolean {
+  const params = new URLSearchParams(search);
+  if (params.has('invite')) return true;
+  // #/review?edge=… — the expert-review recruitment link.
+  if (/^#\/review\b/.test(hash)) return true;
+  return false;
+}
+
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
@@ -145,13 +165,16 @@ export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  // Osoba przychodząca z linku zapraszającego ma konkretny powód wejścia — czeka na
-  // nią czyjeś zaproszenie do wspólnej pracy. Samouczek powitalny zasłoniłby je
-  // czterema ekranami wprowadzenia, więc przy ?invite= startujemy od razu na ekranie
-  // konta. Samouczek pozostaje dostępny później z Ustawień (onReplayOnboarding).
-  const [onboardingOpen, setOnboardingOpen] = useState(
-    () => !hasCompletedOnboarding() && !new URLSearchParams(window.location.search).has('invite'),
-  );
+  // Ktoś, kto przyszedł z linku KIEROWANEGO — zaproszenia do współpracy albo
+  // prośby o recenzję krawędzi — ma konkretny powód wejścia i zwykle pięć minut.
+  // Samouczek powitalny zasłoniłby ten powód czterema ekranami wprowadzenia i
+  // realnie zabija taki lej: adresat widzi „Welcome" zamiast tego, po co przyszedł.
+  // Dlatego reguła jest OGÓLNA, a nie listą wyjątków — każdy przyszły link
+  // kierowany dziedziczy ją automatycznie. Samouczek zostaje w Ustawieniach.
+  const [onboardingOpen, setOnboardingOpen] = useState(() => {
+    if (hasCompletedOnboarding()) return false;
+    return !isDirectedEntry();
+  });
   const lastLabId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -387,6 +410,15 @@ export default function App() {
     }
 
     if (route.kind === 'longevity') return <LongevityScreen />;
+
+    if (route.kind === 'review') {
+      return (
+        <DiscoveryShell active="#/review" title={t('rev.title')} subtitle={t('rev.subtitle')}
+          actions={<StatusPill kind="info">{t('rev.noAccount')}</StatusPill>}>
+          <EdgeReviewScreen initialEdgeKey={route.edge} />
+        </DiscoveryShell>
+      );
+    }
 
     if (route.kind === 'cde') {
       return (

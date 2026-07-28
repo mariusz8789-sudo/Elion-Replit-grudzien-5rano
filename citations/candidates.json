@@ -1,0 +1,98 @@
+{
+  "schema": "genesis-citation-candidates/1",
+  "purpose": "Proposed citations for uncited claim edges. THIS FILE IS NOT THE GRAPH. Nothing here is asserted by the platform, nothing here is served to a user, and no engine reads it. It is a staging area, and the distinction is the entire point: a citation nobody has resolved is a hypothesis about the literature, not a source.",
+  "howThisWasProduced": "Identified by web search from the mechanism text of each edge. The search engine returned a PubMed or publisher URL, and the identifier was read out of that URL or out of the result text. NO identifier here was written from memory. That still is not verification: a search snippet is not a canonical record, and the environment this was produced in cannot reach NCBI, EBI, Crossref or any publisher (the egress proxy answers 403 to CONNECT).",
+  "beforeYouPromoteAnyOfThese": [
+    "1. Run `npm run citations:verify -- --candidates` on a networked machine. It resolves every entry against Europe PMC and reports NOT_FOUND or MISMATCH.",
+    "2. Read the abstract. Resolution proves the paper EXISTS; it does not prove the paper supports THIS directed claim. A paper about both endpoints is not automatically evidence that one drives the other, and that judgement is not automatable.",
+    "3. Only then move the citation onto the edge and lower UNCITED_CLAIM_EDGES by one."
+  ],
+  "candidates": [
+    {
+      "edge": "telomere-attrition→cellular-senescence→mechanistic",
+      "asserts": "A critically short telomere is read as an unrepaired double-strand break and triggers p53-dependent replicative senescence.",
+      "citation": { "doi": "10.1038/nature02118", "label": "d'Adda di Fagagna 2003" },
+      "paper": "A DNA damage checkpoint response in telomere-initiated senescence. Nature 426:194-198",
+      "foundVia": "publisher URL nature.com/articles/nature02118",
+      "noPmidBecause": "no PubMed URL appeared in the results; the DOI was read from the Nature article URL",
+      "status": "unverified"
+    },
+    {
+      "edge": "telomerase→telomere-attrition→mechanistic",
+      "asserts": "TERT/TERC add TTAGGG repeats to the 3' end, offsetting replicative loss.",
+      "citation": { "doi": "10.1126/science.279.5349.349", "label": "Bodnar 1998" },
+      "paper": "Extension of life-span by introduction of telomerase into normal human cells. Science 279:349-352",
+      "foundVia": "publisher URL science.org/doi/10.1126/science.279.5349.349",
+      "noPmidBecause": "no PubMed URL for this paper appeared in the results",
+      "status": "unverified"
+    },
+    {
+      "edge": "cellular-senescence→sasp→mechanistic",
+      "asserts": "The senescent state activates NF-kB and C/EBPbeta programmes that drive secretion of cytokines and proteases.",
+      "citation": { "pmid": "19053174", "doi": "10.1371/journal.pbio.0060301", "label": "Coppé 2008" },
+      "paper": "Senescence-associated secretory phenotypes reveal cell-nonautonomous functions of oncogenic RAS and the p53 tumor suppressor. PLoS Biol 6:e301",
+      "foundVia": "PubMed URL pubmed.ncbi.nlm.nih.gov/19053174/ returned in results",
+      "status": "unverified"
+    },
+    {
+      "edge": "sasp→cellular-senescence→mechanistic",
+      "asserts": "Secreted IL-1 and IL-6 family signalling induces senescence in neighbouring cells (paracrine spread).",
+      "citation": { "pmid": "18555777", "doi": "10.1016/j.cell.2008.03.038", "label": "Acosta 2008" },
+      "paper": "Chemokine signaling via the CXCR2 receptor reinforces senescence. Cell 133:1006-1018",
+      "foundVia": "PubMed URL pubmed.ncbi.nlm.nih.gov/18555777/ returned in results",
+      "curatorNote": "Acosta is about CXCR2-binding chemokines reinforcing arrest. The edge text names IL-1 and IL-6. Check whether this paper is the right primary source for the IL-1/IL-6 wording, or whether the edge text should change to match the evidence.",
+      "status": "unverified"
+    },
+    {
+      "edge": "mitochondrial-dysfunction→cellular-senescence→mechanistic",
+      "asserts": "Mitochondrial dysfunction can drive a senescent state (MiDAS) with an altered, IL-1-independent secretory profile.",
+      "citation": { "doi": "10.1016/j.cmet.2015.11.011", "label": "Wiley 2016" },
+      "paper": "Mitochondrial dysfunction induces senescence with a distinct secretory phenotype. Cell Metab 23:303-314",
+      "foundVia": "DOI appeared in a Google Scholar lookup URL in the results",
+      "noPmidBecause": "the results gave two different PMIDs (26874922 and 26686024) and one of them belongs to a commentary with a similar title. Deliberately omitted rather than guessed.",
+      "status": "unverified"
+    },
+    {
+      "edge": "autophagy→mitochondrial-dysfunction→mechanistic",
+      "asserts": "PINK1/Parkin-dependent mitophagy removes depolarised mitochondria, limiting accumulation of damaged organelles.",
+      "citation": { "pmid": "19029340", "label": "Narendra 2008" },
+      "paper": "Parkin is recruited selectively to impaired mitochondria and promotes their autophagy. J Cell Biol 183:795-803",
+      "foundVia": "PubMed URL pubmed.ncbi.nlm.nih.gov/19029340/ returned in results",
+      "noDoiBecause": "the DOI in the results (10.1083/jcb.200810184) belongs to an adjacent commentary piece, PMID 19029341, not to this paper. Omitted rather than guessed.",
+      "status": "unverified"
+    },
+    {
+      "edge": "yamanaka-factors→epigenetic-reprogramming→mechanistic",
+      "asserts": "OSKM expression resets the epigenome toward a pluripotent configuration.",
+      "citation": { "pmid": "16904174", "label": "Takahashi 2006" },
+      "paper": "Induction of pluripotent stem cells from mouse embryonic and adult fibroblast cultures by defined factors. Cell 126:663-676",
+      "foundVia": "PubMed URL pubmed.ncbi.nlm.nih.gov/16904174/ returned in results",
+      "status": "unverified"
+    },
+    {
+      "edge": "epigenetic-reprogramming→cellular-senescence→mechanistic",
+      "asserts": "Partial reprogramming reverses markers of the senescent state.",
+      "citation": { "pmid": "27984723", "label": "Ocampo 2016" },
+      "paper": "In vivo amelioration of age-associated hallmarks by partial reprogramming. Cell 167:1719-1733",
+      "foundVia": "PMID stated in the result text; PMC URL also returned",
+      "curatorNote": "This is a progeria mouse model. Whether it licenses a general claim about senescence reversal is exactly the kind of judgement the honesty label exists for.",
+      "status": "unverified"
+    },
+    {
+      "edge": "autophagy→stem-cell-rejuvenation→mechanistic",
+      "asserts": "Basal autophagy maintains stem-cell quiescence and prevents entry into senescence.",
+      "citation": { "pmid": "26738589", "doi": "10.1038/nature16187", "label": "García-Prat 2016" },
+      "paper": "Autophagy maintains stemness by preventing senescence. Nature 529:37-42",
+      "foundVia": "Google Scholar lookup URL carrying doi and pmid as a matched pair",
+      "status": "unverified"
+    },
+    {
+      "edge": "cellular-senescence→stem-cell-rejuvenation→mechanistic",
+      "asserts": "Accumulated senescent cells impair tissue regenerative capacity.",
+      "citation": { "pmid": "26840489", "label": "Baker 2016" },
+      "paper": "Naturally occurring p16(Ink4a)-positive cells shorten healthy lifespan. Nature 530:184-189",
+      "foundVia": "PubMed URL pubmed.ncbi.nlm.nih.gov/26840489/ returned in results",
+      "status": "unverified"
+    }
+  ]
+}

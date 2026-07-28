@@ -45,6 +45,11 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         console: 'readonly', process: 'readonly', fetch: 'readonly', URL: 'readonly',
+        // Timery i anulowanie żądań — realnie używane przez skrypty sieciowe
+        // (verify-citations.mjs grzecznie odstępuje między zapytaniami i nakłada
+        // limit czasu). Ta lista jest ręczna, więc brak wpisu wygląda jak błąd
+        // w kodzie, a nie jak luka w konfiguracji.
+        setTimeout: 'readonly', clearTimeout: 'readonly', AbortSignal: 'readonly',
         // Skrypty e2e (Playwright) używają globali przeglądarki wewnątrz page.evaluate().
         document: 'readonly', window: 'readonly', Event: 'readonly',
       },

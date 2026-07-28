@@ -1,4 +1,4 @@
-/* global AbortController, setTimeout, clearTimeout */
+/* global AbortController */
 /**
  * Campaign #001 preflight (external execution package). Checks the runtime dependencies and
  * genuine network reachability of every required scientific source, with per-source diagnostics.

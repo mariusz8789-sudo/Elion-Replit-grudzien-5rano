@@ -1,4 +1,4 @@
-/* global setTimeout, clearTimeout, AbortController, Buffer */
+/* global AbortController, Buffer */
 /**
  * Campaign #001 REAL evidence acquisition pipeline (external, network-enabled).
  *

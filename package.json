@@ -24,6 +24,9 @@
     "compute:bundle:check": "node scripts/check-compute-bundle.mjs",
     "campaign:validate": "node scripts/validation-campaign.mjs",
     "benchmark": "node scripts/benchmark-suite.mjs",
+    "citations:worklist": "node scripts/citation-worklist.mjs",
+    "citations:verify": "node scripts/verify-citations.mjs",
+    "citations:brief": "node scripts/citation-brief.mjs",
     "benchmark:cognitive": "node scripts/cognitive-benchmark.mjs",
     "trial:discovery": "node scripts/genesis-discovery-trial.mjs",
     "campaign:zefir": "node scripts/zefir-discovery-campaign.mjs"

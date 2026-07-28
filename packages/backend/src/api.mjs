@@ -100,6 +100,7 @@ import {
   seedClaimsFromSnapshot, liveClaims, claimState, claimHistory, reviseClaim,
   retireClaim, detectContradictions, resolveContradiction, confidenceTimeline,
 } from './reasoning/livingGraph.mjs';
+import { buryHypothesis, assessHypothesis, exhume, listGraves, lessons } from './reasoning/graveyard.mjs';
 import { GRAPH_NODES, GRAPH_EDGES } from '@genesis-os/reasoning/knowledgeGraph';
 import { gradeEvidence, validateEvidence } from '@genesis-os/reasoning/evidence';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
@@ -443,6 +444,47 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'timeline' && seg.length === 2 && method === 'GET') {
       const subject = typeof ctx.query?.subject === 'string' ? ctx.query.subject : null;
       return ok({ points: confidenceTimeline(db, tenant.projectId, { subject, limit: Number(ctx.query?.limit ?? 500) }) });
+    }
+
+    /* --------------------------- the graveyard -------------------------- */
+
+    if (seg[1] === 'graveyard' && seg.length === 2 && method === 'GET') {
+      return ok({
+        graves: listGraves(db, tenant.projectId, { includeExhumed: ctx.query?.includeExhumed === 'true' }),
+        lessons: lessons(db, tenant.projectId),
+      });
+    }
+
+    if (seg[1] === 'graveyard' && seg[2] === 'bury' && method === 'POST') {
+      try {
+        const r = buryHypothesis(db, {
+          projectId: tenant.projectId, statement: body?.statement,
+          subject: body?.subject ?? null, predicate: body?.predicate ?? null, object: body?.object ?? null,
+          cause: body?.cause, evidenceRef: body?.evidenceRef, lesson: String(body?.lesson ?? ''),
+          resurrectable: body?.resurrectable !== false, actorId: user.id,
+        });
+        return ok({ grave: r.grave, created: r.created }, r.created ? 201 : 200);
+      } catch (e) {
+        return err(400, 'invalid_burial', String(e.message).replace(/^buryHypothesis refused: /, ''));
+      }
+    }
+
+    // Never a bare boolean: the caller has to be able to show a scientist WHY a
+    // proposal was held back, and the scientist has to be able to disagree.
+    if (seg[1] === 'graveyard' && seg[2] === 'assess' && method === 'POST') {
+      return ok(assessHypothesis(db, {
+        projectId: tenant.projectId, subject: body?.subject ?? null,
+        predicate: body?.predicate ?? null, object: body?.object ?? null, statement: body?.statement ?? null,
+      }));
+    }
+
+    if (seg[1] === 'graveyard' && seg.length === 4 && seg[3] === 'exhume' && method === 'POST') {
+      const r = exhume(db, {
+        id: decodeURIComponent(seg[2]), projectId: tenant.projectId,
+        why: String(body?.why ?? ''), actorId: user.id,
+      });
+      if (!r.ok) return err(r.error === 'not_found' ? 404 : 400, r.error, r.message);
+      return ok({ grave: r.grave });
     }
 
     if (seg[1] === 'artifacts' && seg.length === 2 && method === 'GET') {

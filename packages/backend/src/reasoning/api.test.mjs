@@ -433,3 +433,47 @@ function assertOpposite(claim) {
     origin: 'manual', confidence: 0.4, coverage: 0.1, rule: 'manual/1', actorId: alice.id,
   });
 }
+
+describe('the graveyard over HTTP', () => {
+  const BURIAL = {
+    statement: 'Telomerase activation extends healthspan in wild-type mice.',
+    subject: 'telomerase', predicate: 'promotes', object: 'healthspan',
+    cause: 'failed-replication', evidenceRef: 'doi:10.1000/failed-repro',
+    lesson: 'Did not survive a second cohort; the original used a mixed background.',
+  };
+
+  test('burying requires evidence and says so when it is missing', () => {
+    const r = call('POST', '/api/reasoning/graveyard/bury', { token: aliceToken, body: { ...BURIAL, evidenceRef: '' } });
+    assert.equal(r.status, 400);
+    assert.match(r.body.message, /prejudice/);
+  });
+
+  test('a buried hypothesis is found again by assessment, with its lesson', () => {
+    assert.equal(call('POST', '/api/reasoning/graveyard/bury', { token: aliceToken, body: BURIAL }).status, 201);
+    const r = call('POST', '/api/reasoning/graveyard/assess', {
+      token: aliceToken, body: { subject: 'telomerase', predicate: 'promotes', object: 'healthspan' },
+    });
+    assert.equal(r.body.verdict, 'BURIED');
+    assert.match(r.body.statement, /mixed background/);
+    assert.equal(r.body.graves.length, 1, 'the caller must be able to show WHY, not just that');
+  });
+
+  test("a laboratory's failures are invisible to another", () => {
+    call('POST', '/api/reasoning/graveyard/bury', { token: aliceToken, body: BURIAL });
+    const r = call('POST', '/api/reasoning/graveyard/assess', {
+      token: bobToken, body: { subject: 'telomerase', predicate: 'promotes', object: 'healthspan' },
+    });
+    assert.equal(r.body.verdict, 'NOVEL');
+    assert.deepEqual(call('GET', '/api/reasoning/graveyard', { token: bobToken }).body.graves, []);
+  });
+
+  test('reopening a grave requires a reason and keeps the burial', () => {
+    const grave = call('POST', '/api/reasoning/graveyard/bury', { token: aliceToken, body: BURIAL }).body.grave;
+    assert.equal(call('POST', `/api/reasoning/graveyard/${grave.id}/exhume`, { token: aliceToken, body: { why: 'no' } }).status, 400);
+    const ok2 = call('POST', `/api/reasoning/graveyard/${grave.id}/exhume`, {
+      token: aliceToken, body: { why: 'A cleaner knock-in line makes the original objection testable again.' },
+    });
+    assert.equal(ok2.status, 200);
+    assert.equal(call('GET', '/api/reasoning/graveyard', { token: aliceToken, query: { includeExhumed: 'true' } }).body.graves.length, 1);
+  });
+});

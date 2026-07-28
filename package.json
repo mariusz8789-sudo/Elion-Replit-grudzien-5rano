@@ -10,7 +10,7 @@
     "dev": "npm run dev --workspace=packages/frontend",
     "dev:backend": "npm run dev --workspace=packages/backend",
     "build": "npm run build --workspace=packages/frontend",
-    "test": "npm run test --workspace=packages/reasoning && npm run test --workspace=packages/frontend && npm run test --workspace=packages/backend",
+    "test": "npm run test --workspace=packages/reasoning && npm run test --workspace=packages/frontend && npm run test --workspace=packages/backend && npm run test:isolated --workspace=packages/backend",
     "lint": "eslint .",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,mjs,css}\" \"*.md\" \"knowledge/*.md\"",
     "preview": "npm run preview --workspace=packages/frontend",

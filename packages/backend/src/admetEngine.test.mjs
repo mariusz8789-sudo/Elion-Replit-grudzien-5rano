@@ -14,6 +14,24 @@ import { getTool, TOOL_STATUS, _resetValidation } from './campaign/toolchain.mjs
 const on = admet.detect().available;
 const maybe = on ? test : test.skip;
 
+/**
+ * Some of these drive a real Python ML subprocess under a strict 30 s timeout
+ * (admetAdapter.mjs). `node --test` runs files in parallel across every core, so
+ * under the full suite that subprocess competes with ~96 other test files and
+ * times out at 30 049 ms — a resource failure reporting as a scientific one.
+ *
+ * The timeout is NOT relaxed. A 30 s ceiling on a prediction call is a real
+ * product constraint, and widening it to obtain a green suite would trade a
+ * true signal for a cosmetic statistic. Instead these run in a dedicated,
+ * serialised pass: `npm run test:isolated`, which the root `npm test` invokes
+ * after the parallel suite. They report as skipped in the parallel pass, never
+ * as passed.
+ *
+ * See docs/TECH_DEBT.md — "ADMET tests require isolated execution".
+ */
+const ISOLATED = process.env.GENESIS_ISOLATED_TESTS === '1';
+const contended = on && ISOLATED ? test : test.skip;
+
 describe('ADMET-AI adapter', () => {
   maybe('detect reports a real installed version', () => {
     const d = admet.detect();
@@ -21,7 +39,7 @@ describe('ADMET-AI adapter', () => {
     assert.match(d.version, /^\d+\.\d+/);
   });
 
-  maybe('endpoint table exposes 52 endpoints with published TDC metrics', () => {
+  contended('endpoint table exposes 52 endpoints with published TDC metrics', () => {
     const r = admet.listEndpoints();
     assert.equal(r.ok, true);
     assert.equal(r.endpoints.length, 52);
@@ -35,7 +53,7 @@ describe('ADMET-AI adapter', () => {
     assert.equal(mw.publishedMetric, null);
   });
 
-  maybe('reference case: execution + determinism + RDKit physchem cross-check', () => {
+  contended('reference case: execution + determinism + RDKit physchem cross-check', () => {
     const r = admet.referenceCase();
     assert.equal(r.ok, true);
     assert.equal(r.pass, true, JSON.stringify(r.checks));
@@ -45,7 +63,7 @@ describe('ADMET-AI adapter', () => {
     assert.equal(r.nEndpoints, 52);
   });
 
-  maybe('predict returns per-endpoint MODEL_ESTIMATEs for real molecules, in request order', () => {
+  contended('predict returns per-endpoint MODEL_ESTIMATEs for real molecules, in request order', () => {
     const aspirin = 'CC(=O)Oc1ccccc1C(=O)O';
     const phenol = 'c1ccccc1O';
     const r = admet.predict([phenol, aspirin]);

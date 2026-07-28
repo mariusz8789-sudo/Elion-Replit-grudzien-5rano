@@ -102,6 +102,7 @@ import {
 } from './reasoning/livingGraph.mjs';
 import { buryHypothesis, assessHypothesis, exhume, listGraves, lessons } from './reasoning/graveyard.mjs';
 import { runAndRecord } from './reasoning/discoveryEngine.mjs';
+import { diffArtifacts, replayArtifact, answerHistory } from './reasoning/replay.mjs';
 import { GRAPH_NODES, GRAPH_EDGES } from '@genesis-os/reasoning/knowledgeGraph';
 import { gradeEvidence, validateEvidence } from '@genesis-os/reasoning/evidence';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
@@ -465,6 +466,27 @@ export function handleApi(db, ctx) {
       } catch (e) {
         return err(409, 'engine_refused', String(e.message));
       }
+    }
+
+    /* ---------------------------- replay --------------------------------- */
+
+    // "Here is what Genesis concluded in March; here is the same question
+    // today; here is what changed." Cheap to build on append-only history and
+    // impossible to retrofit without it.
+    if (seg[1] === 'artifact' && seg.length === 4 && seg[3] === 'replay' && method === 'POST') {
+      const r = replayArtifact(db, { artifactId: decodeURIComponent(seg[2]), projectId: tenant.projectId, createdBy: user.id });
+      if (!r.ok) return err(r.error === 'not_found' ? 404 : 409, r.error, r.message);
+      return ok({ original: r.original, replayed: r.replayed, diff: r.diff }, 201);
+    }
+
+    if (seg[1] === 'diff' && seg.length === 2 && method === 'POST') {
+      const d = diffArtifacts(db, tenant.projectId, body?.before, body?.after);
+      if (!d.ok) return err(d.error === 'not_found' ? 404 : 400, d.error, d.message);
+      return ok({ diff: d });
+    }
+
+    if (seg[1] === 'history' && seg.length === 2 && method === 'POST') {
+      return ok(answerHistory(db, tenant.projectId, String(body?.question ?? '')));
     }
 
     /* --------------------------- the graveyard -------------------------- */

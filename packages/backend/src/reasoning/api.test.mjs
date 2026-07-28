@@ -510,3 +510,42 @@ describe('the Discovery Engine over HTTP', () => {
     assert.equal(call('GET', `/api/reasoning/artifact/${created.id}`, { token: bobToken }).status, 404);
   });
 });
+
+describe('replay over HTTP', () => {
+  const ask = (q = 'Can cellular senescence be reversed?') =>
+    call('POST', '/api/reasoning/ask', { token: aliceToken, body: { question: q } }).body.artifact;
+
+  test('replaying produces a second answer and a diff, leaving the first intact', () => {
+    call('GET', '/api/reasoning/graph');
+    const first = ask();
+    const r = call('POST', `/api/reasoning/artifact/${first.id}/replay`, { token: aliceToken });
+    assert.equal(r.status, 201);
+    assert.notEqual(r.body.replayed.id, first.id);
+    assert.equal(r.body.diff.kind, 'unchanged', 'nothing changed between the two runs');
+    assert.equal(call('GET', `/api/reasoning/artifact/${first.id}`, { token: aliceToken }).body.artifact.id, first.id);
+  });
+
+  test('the diff endpoint refuses two different questions', () => {
+    call('GET', '/api/reasoning/graph');
+    const a = ask('Question about senescence');
+    const b = ask('Question about autophagy');
+    const r = call('POST', '/api/reasoning/diff', { token: aliceToken, body: { before: a.id, after: b.id } });
+    assert.equal(r.status, 400);
+    assert.match(r.body.message, /different questions/);
+  });
+
+  test('history returns the answers and the transitions between them', () => {
+    call('GET', '/api/reasoning/graph');
+    const q = 'Can cellular senescence be reversed?';
+    ask(q); ask(q);
+    const r = call('POST', '/api/reasoning/history', { token: aliceToken, body: { question: q } });
+    assert.equal(r.body.answers.length, 2);
+    assert.equal(r.body.transitions.length, 1);
+  });
+
+  test("one workspace cannot replay another's artifact", () => {
+    call('GET', '/api/reasoning/graph');
+    const first = ask();
+    assert.equal(call('POST', `/api/reasoning/artifact/${first.id}/replay`, { token: bobToken }).status, 404);
+  });
+});

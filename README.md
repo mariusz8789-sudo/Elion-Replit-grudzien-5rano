@@ -16,8 +16,8 @@ front.
 
 | | |
 |---|---|
-| **Code** | ~72k lines of production code under ~22k lines of tests |
-| **Tests** | 2,162 · 0 failures |
+| **Code** | ~74k lines of production code under ~24k lines of tests |
+| **Tests** | 2,166 · **0 failures** · 6 skipped, each naming the engine it needs |
 | **Users** | **0** |
 | **Expert reviews filed** | **0** |
 | **Literature corpus** | **none — the platform has never processed a real paper** |

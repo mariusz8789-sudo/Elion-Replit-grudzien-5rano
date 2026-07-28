@@ -1,6 +1,8 @@
 import { HALLMARKS, MECHANISTIC_EDGES, type HallmarkId } from './hallmarks.ts';
 import { INTERVENTIONS, type InterventionId } from './interventions.ts';
-import type { HonestyLevel } from './types.ts';
+import type { Citation, HonestyLevel } from './types.ts';
+
+export type { Citation } from './types.ts';
 
 /**
  * Longevity Discovery Platform — unified knowledge graph (layer 4 of 4).
@@ -74,7 +76,139 @@ export interface GraphEdge {
   effect: 'promotes' | 'counteracts' | 'measures' | 'targets';
   mechanism: string;
   honesty: HonestyLevel;
+  /**
+   * Literature this edge rests on. REQUIRED FIELD, empty array permitted — see
+   * the note on `UNCITED_CLAIM_EDGES` below for why those are not the same
+   * thing. `targets` edges are exempt (they record intent, not a finding).
+   */
+  citations: Citation[];
 }
+
+/* ------------------------------- citations ------------------------------- */
+
+export interface CitationValidation {
+  ok: boolean;
+  errors: string[];
+}
+
+/** PubMed ids are positive integers with no leading zero; 8 digits today, room to grow. */
+const PMID_PATTERN = /^[1-9]\d{0,8}$/;
+/** DOI: the "10." prefix, a registrant code, a slash, and a non-empty suffix. */
+const DOI_PATTERN = /^10\.\d{4,9}\/\S+$/;
+/**
+ * The DOI range this repository uses for test fixtures. A fixture citation
+ * reaching the shipped graph is the exact failure the fixture convention exists
+ * to make impossible, so it is refused by name rather than merely discouraged.
+ */
+const FIXTURE_DOI_PREFIXES = ['10.1000/', '10.0000/'];
+
+/**
+ * Validates one citation. Fail-closed: an identifier that cannot be resolved is
+ * refused outright rather than stored and hoped over.
+ */
+export function validateCitation(input: Partial<Citation> | null | undefined): CitationValidation {
+  const errors: string[] = [];
+  if (!input) return { ok: false, errors: ['A citation is required — an uncited edge is an assertion, not a claim.'] };
+
+  const { pmid, doi, label } = input;
+  if (!pmid && !doi) {
+    errors.push('A citation needs a PMID or a DOI. A label alone is not resolvable, so it is not a citation.');
+  }
+  if (pmid !== undefined) {
+    if (!PMID_PATTERN.test(pmid)) {
+      errors.push(
+        `"${pmid}" is not a PMID. Expected digits only (e.g. "23746838") — no "PMID:" prefix, no URL, no leading zero.`,
+      );
+    }
+  }
+  if (doi !== undefined) {
+    if (!DOI_PATTERN.test(doi)) {
+      errors.push(`"${doi}" is not a DOI. Expected a bare DOI (e.g. "10.1016/j.cell.2013.05.039") — no "doi:" prefix, no https:// URL.`);
+    } else if (FIXTURE_DOI_PREFIXES.some((p) => doi.startsWith(p))) {
+      errors.push(`"${doi}" is a test-fixture DOI. Fixtures must never appear in the shipped graph.`);
+    }
+  }
+  if (!label || !label.trim()) {
+    errors.push('A human-readable label (first author and year) is required.');
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+/**
+ * Edge kinds that assert something about the world and therefore need a source.
+ *
+ * `targets` is NOT among them, and that is a judgement worth stating. Those 30
+ * edges are generated from `interventions.ts` and their own mechanism string says
+ * they "record intent, not demonstrated effect" — that an intervention is AIMED at
+ * a mechanism. There is no finding to cite. Demanding a citation there would
+ * manufacture 30 fake requirements and teach whoever fills them in that the
+ * requirement is a formality. The other three kinds each assert that something is
+ * true of biology, and each needs a source.
+ */
+export const CLAIM_EDGE_KINDS: readonly EdgeKind[] = ['mechanistic', 'oncogenic-coupling', 'measures'];
+
+/**
+ * The authoring shape for a hand-curated edge: everything a `GraphEdge` has,
+ * with `citations` optional. Adding an edge should not require typing
+ * `citations: []` to say "none yet" — the composition below fills that in and
+ * `auditCitations` counts it. The strictness lives in the audit, not in the
+ * ceremony of declaring one.
+ */
+export type CuratedEdge = Omit<GraphEdge, 'citations'> & { citations?: Citation[] };
+
+/** Fills in the empty-citation default, so an unsourced edge is recorded as unsourced. */
+function curated(edges: CuratedEdge[]): GraphEdge[] {
+  return edges.map((e) => ({ ...e, citations: e.citations ?? [] }));
+}
+
+export function isClaimEdge(edge: GraphEdge): boolean {
+  return CLAIM_EDGE_KINDS.includes(edge.kind);
+}
+
+export interface CitationAudit {
+  /** Claim edges carrying at least one valid citation. */
+  cited: GraphEdge[];
+  /** Claim edges asserting biology with nothing behind them. */
+  uncited: GraphEdge[];
+  /** Edges whose citations are present but malformed — worse than absent. */
+  invalid: { edge: GraphEdge; errors: string[] }[];
+  /** Edges exempt by kind, listed so the exemption stays visible. */
+  exempt: GraphEdge[];
+}
+
+/**
+ * What the shipped graph currently rests on. The point of this function is that
+ * the answer is allowed to be bad, and is not allowed to be hidden.
+ */
+export function auditCitations(edges: GraphEdge[] = GRAPH_EDGES): CitationAudit {
+  const audit: CitationAudit = { cited: [], uncited: [], invalid: [], exempt: [] };
+  for (const edge of edges) {
+    if (!isClaimEdge(edge)) { audit.exempt.push(edge); continue; }
+    const citations = edge.citations ?? [];
+    if (citations.length === 0) { audit.uncited.push(edge); continue; }
+    const errors = citations.flatMap((c) => validateCitation(c).errors);
+    if (errors.length > 0) audit.invalid.push({ edge, errors });
+    else audit.cited.push(edge);
+  }
+  return audit;
+}
+
+/**
+ * THE RATCHET. The number of claim edges currently asserted with no source.
+ *
+ * Every one of the 36 is a mechanism a human typed from memory. That is the
+ * single largest gap between what this platform claims to be and what it is, and
+ * a number in a document would drift within a week — so it is pinned by a test
+ * instead (`__tests__/citations.test.ts`).
+ *
+ * The test fails if this number goes UP. It also fails if the constant is lowered
+ * without the citations actually being added. So the count can only move one way,
+ * and only by doing the work: find the paper, add the PMID, decrement by one.
+ *
+ * When this reaches 0, delete the constant and make `citations` non-empty a hard
+ * requirement in the test. That deletion is the milestone.
+ */
+export const UNCITED_CLAIM_EDGES = 36;
 
 /* ------------------------------ cancer axis ------------------------------ */
 
@@ -122,7 +256,7 @@ export const CANCER_NODES: GraphNode[] = [
  * the Cancer Safety Engine walks. Each states the shared mechanism explicitly, so
  * a reader can check the reasoning rather than trust a risk label.
  */
-export const ONCOGENIC_EDGES: GraphEdge[] = [
+const ONCOGENIC_EDGES_SOURCE: CuratedEdge[] = [
   {
     from: 'cellular-senescence', to: 'tp53-axis', kind: 'oncogenic-coupling', effect: 'promotes', honesty: 'exact',
     mechanism: 'Senescence is one of the terminal outcomes p53 enforces after damage. The arrest IS part of the tumour-suppressive response, not merely correlated with it.',
@@ -199,7 +333,7 @@ export const BIOMARKER_NODES: GraphNode[] = [
 ];
 
 /** Which mechanism each biomarker reads out, and whether it does so directly. */
-export const BIOMARKER_EDGES: GraphEdge[] = [
+const BIOMARKER_EDGES_SOURCE: CuratedEdge[] = [
   { from: 'epigenetic-clock', to: 'epigenetic-reprogramming', kind: 'measures', effect: 'measures', honesty: 'simplified',
     mechanism: 'Reads the methylation state the mechanism acts on — which also makes it circular as an endpoint for reprogramming interventions.' },
   { from: 'telomere-length', to: 'telomere-attrition', kind: 'measures', effect: 'measures', honesty: 'exact',
@@ -237,6 +371,13 @@ function interventionNodes(): GraphNode[] {
   }));
 }
 
+/**
+ * The curated edges, with the empty-citation default applied. Consumers see a
+ * `GraphEdge` with a `citations` array; authors above write the array without it.
+ */
+export const ONCOGENIC_EDGES: GraphEdge[] = curated(ONCOGENIC_EDGES_SOURCE);
+export const BIOMARKER_EDGES: GraphEdge[] = curated(BIOMARKER_EDGES_SOURCE);
+
 export const GRAPH_NODES: GraphNode[] = [
   ...hallmarkNodes(),
   ...CANCER_NODES,
@@ -247,13 +388,18 @@ export const GRAPH_NODES: GraphNode[] = [
 export const GRAPH_EDGES: GraphEdge[] = [
   ...MECHANISTIC_EDGES.map((e): GraphEdge => ({
     from: e.from, to: e.to, kind: 'mechanistic', effect: e.effect, mechanism: e.mechanism, honesty: e.honesty,
+    citations: e.citations ?? [],
   })),
   ...ONCOGENIC_EDGES,
   ...BIOMARKER_EDGES,
+  // `targets` edges are generated from the intervention registry and record
+  // intent rather than a finding, so they carry no citations by construction and
+  // are exempt from the audit — see CLAIM_EDGE_KINDS.
   ...INTERVENTIONS.flatMap((i): GraphEdge[] => i.targets.map((t) => ({
     from: i.id, to: t, kind: 'targets', effect: 'targets',
     mechanism: `${i.label} is aimed at ${t}. This edge records intent, not demonstrated effect.`,
     honesty: i.honesty,
+    citations: [],
   }))),
 ];
 

@@ -1,4 +1,4 @@
-import type { HonestyLevel } from './types.ts';
+import type { Citation, HonestyLevel } from './types.ts';
 
 /**
  * Longevity Discovery Platform — mechanism registry (layer 1 of 4).
@@ -71,6 +71,15 @@ export interface MechanisticEdge {
   effect: 'promotes' | 'counteracts';
   mechanism: string;
   honesty: HonestyLevel;
+  /**
+   * Literature this edge rests on. Optional HERE and required on `GraphEdge`,
+   * which is not an inconsistency: this is the authoring shape, and an author
+   * adding an edge should not be forced to type `citations: []` to say "none
+   * yet". The composition in knowledgeGraph.ts defaults it to the empty array,
+   * and `auditCitations` counts every empty one. Absent is recorded, not waved
+   * through.
+   */
+  citations?: Citation[];
 }
 
 export const HALLMARKS: Hallmark[] = [

@@ -103,6 +103,7 @@ import {
 import { buryHypothesis, assessHypothesis, exhume, listGraves, lessons } from './reasoning/graveyard.mjs';
 import { runAndRecord } from './reasoning/discoveryEngine.mjs';
 import { diffArtifacts, replayArtifact, answerHistory } from './reasoning/replay.mjs';
+import { knowledgeTimeline, timelineSummary } from './reasoning/timeline.mjs';
 import { GRAPH_NODES, GRAPH_EDGES } from '@genesis-os/reasoning/knowledgeGraph';
 import { gradeEvidence, validateEvidence } from '@genesis-os/reasoning/evidence';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
@@ -443,9 +444,30 @@ export function handleApi(db, ctx) {
       return ok({ resolution: result.resolution }, 201);
     }
 
+    // Belief-only curve, kept because a confidence chart wants exactly this.
     if (seg[1] === 'timeline' && seg.length === 2 && method === 'GET') {
       const subject = typeof ctx.query?.subject === 'string' ? ctx.query.subject : null;
       return ok({ points: confidenceTimeline(db, tenant.projectId, { subject, limit: Number(ctx.query?.limit ?? 500) }) });
+    }
+
+    // The whole knowledge history: beliefs, reviews, evidence, burials. Derived
+    // on every read — a cached scientific history eventually disagrees with the
+    // records it describes.
+    if (seg[1] === 'history-of-knowledge' && seg.length === 2 && method === 'GET') {
+      try {
+        const kinds = typeof ctx.query?.kinds === 'string' ? ctx.query.kinds.split(',') : null;
+        return ok({
+          ...knowledgeTimeline(db, tenant.projectId, {
+            kinds,
+            since: ctx.query?.since ? Number(ctx.query.since) : null,
+            until: ctx.query?.until ? Number(ctx.query.until) : null,
+            limit: Number(ctx.query?.limit ?? 500),
+          }),
+          summary: timelineSummary(db, tenant.projectId),
+        });
+      } catch (e) {
+        return err(400, 'invalid_input', String(e.message).replace(/^knowledgeTimeline: /, ''));
+      }
     }
 
     /* ------------------------- the Discovery Engine ---------------------- */

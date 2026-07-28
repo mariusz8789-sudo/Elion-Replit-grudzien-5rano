@@ -549,3 +549,34 @@ describe('replay over HTTP', () => {
     assert.equal(call('POST', `/api/reasoning/artifact/${first.id}/replay`, { token: bobToken }).status, 404);
   });
 });
+
+describe('the knowledge history over HTTP', () => {
+  test('returns the merged stream with a non-editorialising summary', () => {
+    call('GET', '/api/reasoning/graph');
+    call('POST', '/api/reasoning/evidence', { token: aliceToken, body: VALID_EVIDENCE });
+    call('POST', '/api/reasoning/graveyard/bury', {
+      token: aliceToken,
+      body: {
+        statement: 'A hypothesis that did not survive.', cause: 'refuted',
+        evidenceRef: 'doi:10.1000/refutation', lesson: 'Confounded by passage number.',
+      },
+    });
+    const r = call('GET', '/api/reasoning/history-of-knowledge', { token: aliceToken });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.events.length, 2);
+    assert.deepEqual(r.body.events.map((e) => e.kind), ['evidence', 'burial']);
+    assert.match(r.body.summary.statement, /1 study\(ies\) entered/);
+  });
+
+  test('an unknown event kind is a 400, not an empty list', () => {
+    const r = call('GET', '/api/reasoning/history-of-knowledge', { token: aliceToken, query: { kinds: 'beleif' } });
+    assert.equal(r.status, 400);
+    assert.match(r.body.message, /unknown event kind/);
+  });
+
+  test('another workspace sees its own history', () => {
+    call('GET', '/api/reasoning/graph');
+    call('POST', '/api/reasoning/evidence', { token: aliceToken, body: VALID_EVIDENCE });
+    assert.equal(call('GET', '/api/reasoning/history-of-knowledge', { token: bobToken }).body.events.length, 0);
+  });
+});

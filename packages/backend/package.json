@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch src/server.mjs",
     "start": "node src/server.mjs",
-    "test": "node --test \"src/**/*.test.mjs\""
+    "test": "node --test \"src/**/*.test.mjs\"",
+    "mesh:load": "node scripts/load-mesh-release.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0"

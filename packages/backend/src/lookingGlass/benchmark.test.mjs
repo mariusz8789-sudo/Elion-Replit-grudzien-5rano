@@ -1,7 +1,8 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openCorpus, ingestArticles, rebuildStatistics, corpusStats } from './store.mjs';
-import { loadDescriptors, conceptsValidAt } from './mesh.mjs';
+import { conceptsValidAt } from './mesh.mjs';
+import { loadReleaseFromStream } from './descriptorRelease.mjs';
 import { runTarget, samplePairedControls, nullDistribution, runBenchmark, formatReport } from './benchmark.mjs';
 
 /**
@@ -92,8 +93,34 @@ function papers(prefix, n, uis, year) {
   }));
 }
 
-function buildCorpus(db, { contaminate = false } = {}) {
-  loadDescriptors(db, DESCRIPTORS);
+/**
+ * The descriptor set as an NLM release file.
+ *
+ * Declared as 2024, not 2015, and that is deliberate: a real audit of a 2015
+ * corpus needs a release that CONTAINS the post-2015 descriptors, or there is
+ * nothing to catch NLM's re-indexing with. The benchmark then has to say it used
+ * a later release — which is a limitation to report, not a reason to refuse.
+ */
+const RELEASE_XML = `<?xml version="1.0"?>
+<!DOCTYPE DescriptorRecordSet SYSTEM "https://www.nlm.nih.gov/databases/dtd/nlmdescriptorrecordset_20240101.dtd">
+<DescriptorRecordSet LanguageCode="eng">
+${DESCRIPTORS.map((d) => {
+    const [year, month, day] = d.dateEstablished.split('-');
+    return `<DescriptorRecord DescriptorClass="1">
+  <DescriptorUI>${d.ui}</DescriptorUI>
+  <DescriptorName><String>${d.name}</String></DescriptorName>
+  <DateEstablished><Year>${year}</Year><Month>${month}</Month><Day>${day}</Day></DateEstablished>
+  <TreeNumberList><TreeNumber>${d.treeNumbers[0]}</TreeNumber></TreeNumberList>
+</DescriptorRecord>`;
+  }).join('\n')}
+</DescriptorRecordSet>
+`;
+
+async function buildCorpus(db, { contaminate = false } = {}) {
+  // Loaded through the real release path rather than `loadDescriptors`, so the
+  // corpus carries the provenance the benchmark now requires — and so these
+  // tests exercise the loader the way a real run would use it.
+  await loadReleaseFromStream(db, [RELEASE_XML], { expectYear: 2024, url: 'fixture://desc2024.xml', now: 1 });
   const corpus = [
     // The two arms of the hidden link, written by different communities.
     ...papers('AB1', 12, [A, B1, HUMANS], 2010),
@@ -141,9 +168,9 @@ const TARGET = { name: 'compound alpha → fixture myopathy', aUi: A, cUi: C, pu
 const PREREG = 'fixture://preregistration/2026-01-01';
 
 let db;
-beforeEach(() => {
+beforeEach(async () => {
   db = openCorpus(':memory:');
-  buildCorpus(db);
+  await buildCorpus(db);
 });
 
 describe('the denominator associations are measured against', () => {
@@ -314,9 +341,9 @@ describe('the whole benchmark', () => {
 
 describe('contamination', () => {
   let dirty;
-  beforeEach(() => {
+  beforeEach(async () => {
     dirty = openCorpus(':memory:');
-    buildCorpus(dirty, { contaminate: true });
+    await buildCorpus(dirty, { contaminate: true });
   });
 
   test('a target depending on post-cut-off vocabulary is marked, never counted', () => {
@@ -348,9 +375,9 @@ describe('contamination', () => {
 });
 
 describe('refusing to certify an unaudited corpus', () => {
-  test('statistics built without the vocabulary guard invalidate the benchmark', () => {
+  test('statistics built without the vocabulary guard invalidate the benchmark', async () => {
     const loose = openCorpus(':memory:');
-    buildCorpus(loose);
+    await buildCorpus(loose);
     rebuildStatistics(loose, { throughYear: CUTOFF, minSupport: 2, enforceVocabulary: false });
     const report = runBenchmark(loose, [TARGET], { cutoffYear: CUTOFF, preregistrationRef: PREREG, nullControls: 10 });
     assert.match(report.verdict, /INVALID/);
@@ -363,7 +390,28 @@ describe('refusing to certify an unaudited corpus', () => {
     rebuildStatistics(unaudited, { minSupport: 2 });
     const report = runBenchmark(unaudited, [TARGET], { cutoffYear: CUTOFF, preregistrationRef: PREREG, nullControls: 10 });
     assert.equal(report.leakage.auditable, false);
+    assert.equal(report.vocabulary.release, null);
     assert.match(report.verdict, /INVALID/);
-    assert.match(report.verdict, /Load an NLM descriptor release/);
+    assert.match(report.verdict, /No MeSH release has been loaded/);
+  });
+
+  test('the report names the release it used, with its checksum', () => {
+    // "We used MeSH" is not a method. The vocabulary changes every year and
+    // decides what the engine can even represent, so a reader who does not trust
+    // us has to be able to fetch the same file and check it.
+    const report = runBenchmark(db, [TARGET], { cutoffYear: CUTOFF, preregistrationRef: PREREG, nullControls: 10 });
+    assert.equal(report.vocabulary.release.year, 2024);
+    assert.equal(report.vocabulary.release.url, 'fixture://desc2024.xml');
+    assert.match(report.vocabulary.release.sha256, /^[0-9a-f]{64}$/);
+    assert.match(formatReport(report), /Vocabulary: /);
+  });
+
+  test('a later release than the cut-off is used but declared as a limitation', () => {
+    // It is not disqualifying: establishment dates are historical facts. What is
+    // lost is descriptors that existed in 2015 and were deleted afterwards.
+    const report = runBenchmark(db, [TARGET], { cutoffYear: CUTOFF, preregistrationRef: PREREG, nullControls: 10 });
+    assert.equal(report.vocabulary.matchesCutoff, false);
+    assert.match(report.vocabulary.statement, /later deleted are absent/);
+    assert.ok(!report.verdict.startsWith('INVALID'), 'a later release weakens the claim; it does not void it');
   });
 });

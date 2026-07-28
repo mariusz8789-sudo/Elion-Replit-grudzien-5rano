@@ -1,9 +1,28 @@
 # Retrospective Benchmark — design
 
-**Status: designed, not run.** No corpus exists yet, because the environment this
-was written in cannot reach NCBI. Nothing in this document may be described as a
-result until the protocol below has been executed and its output published,
-including if the output is a failure.
+**Status: harness built, not run.** No corpus exists yet, because the environment
+this was written in cannot reach NCBI or the NLM file server. Nothing in this
+document may be described as a result until the protocol below has been executed
+and its output published, including if the output is a failure.
+
+## What exists in code
+
+| Piece | Module | State |
+|---|---|---|
+| Time-sliced statistics | `lookingGlass/store.mjs` — `rebuildStatistics` | Built; refuses a slice without a vocabulary guard |
+| Descriptor dates + leakage audit | `lookingGlass/mesh.mjs` | Built; fails closed when unaudited |
+| NLM release download + load | `lookingGlass/descriptorRelease.mjs` | Built; **never run against live NLM** |
+| ABC discovery | `lookingGlass/swanson.mjs` | Built |
+| Benchmark harness + null model | `lookingGlass/benchmark.mjs` | Built |
+| PubMed ingest | `lookingGlass/pubmed.mjs` | Built; **never run against live NCBI** |
+| Pre-registered target list | — | **Not written.** Needs a domain expert (§3.3) |
+| The corpus | — | **Does not exist** |
+
+The two "never run" entries are the honest blockers: both parsers were written
+from published DTDs and validated against fixtures built from those DTDs, which
+proves they handle the documented format and proves nothing about what the
+servers currently emit. Each module exposes a `verifyAgainstLive()` that closes
+the gap and must be run from a machine with egress before any real ingest.
 
 ---
 
@@ -112,6 +131,17 @@ engine is ranking by popularity and the whole exercise has failed.
 
 **This comparison is the benchmark.** Everything else is descriptive.
 
+A control the engine never returns is **censored at one past the last
+candidate**, not discarded. Dropping unreturned controls would take the median
+over only the controls that did well — the arrangement most flattering to the
+target — and in the strongest case, where the target ranks and no control does,
+it would leave no median at all and make a clean win unreportable. Censoring is
+conservative: it credits each unreturned control with the best rank it could
+possibly have had.
+
+`countsAsHit` therefore requires all four of: vocabulary clean, target not
+disqualified, target returned, and `rank < median(control ranks)`.
+
 ---
 
 ## 5. Threats to validity, and what to do about them
@@ -143,8 +173,39 @@ the benchmark is contaminated.
 3. At minimum, report which target concepts were established after 2015 and treat
    those targets as contaminated.
 
+All three are implemented. `rebuildStatistics` refuses a time-sliced rebuild
+unless a vocabulary guard is supplied and the vocabulary is auditable;
+`auditVocabularyLeakage` publishes the contamination *rate* rather than merely
+filtering, because a pre-cut-off article carrying a post-cut-off descriptor is
+direct evidence of re-indexing and counting it measures the damage; contaminated
+targets are marked in the report and never dropped.
+
+One subtlety worth stating, because it looks like a contradiction. The audit
+needs a release that **contains** the post-cut-off descriptors — a pure 2015
+release has nothing to catch 2018 vocabulary with. The strongest configuration is
+therefore to load a current release for the audit and report which release was
+used; `releaseSuitability()` states the limitation either way. What a later
+release cannot recover is descriptors that existed at the cut-off and were
+deleted afterwards.
+
+`descriptorRelease.mjs` records the release year, source URL and **SHA-256 of the
+downloaded bytes**, and `runBenchmark` refuses to issue a verdict without them. A
+run whose vocabulary has no checksum cannot be reproduced by anyone who does not
+already trust the authors, which is the only kind of reproducibility worth
+having.
+
 Not addressing this would be the single easiest way for a reviewer to dismiss the
 entire result, and they would be right.
+
+### 5.2.1 The denominator
+
+nPMI is measured against the number of articles in the **slice**, not in the
+database. This was wrong in the first implementation: a corpus holding 1990–2024
+with statistics built through 2015 divided by a total containing the literature
+the slice exists to exclude. The effect is not a uniform rescaling — it shifts
+every association value and gives the fixed `minLinkNpmi` threshold a different
+meaning at each cut-off, which would have quietly broken the §5.4 multi-cut-off
+comparison that is meant to be the strongest evidence in the whole protocol.
 
 ### 5.3 Survivorship in the target list
 

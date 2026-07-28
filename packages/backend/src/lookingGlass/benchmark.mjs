@@ -1,6 +1,7 @@
 import { corpusStats, conceptStats, cooccurrence, getConcept } from './store.mjs';
 import { openDiscovery, closedDiscovery } from './swanson.mjs';
 import { classifyTargets, auditVocabularyLeakage } from './mesh.mjs';
+import { releaseSuitability } from './descriptorRelease.mjs';
 
 /**
  * Retrospective benchmark harness.
@@ -174,6 +175,7 @@ export function runBenchmark(db, targets, { cutoffYear, preregistrationRef, null
   }
 
   const leakage = auditVocabularyLeakage(db, cutoffYear);
+  const vocabulary = releaseSuitability(db, cutoffYear);
   const classified = classifyTargets(db, targets, cutoffYear);
   const corpus = corpusStats(db);
 
@@ -213,6 +215,15 @@ export function runBenchmark(db, targets, { cutoffYear, preregistrationRef, null
       anachronisticConcepts: leakage.anachronisticConcepts,
       statement: leakage.statement,
     },
+    // Which MeSH release the vocabulary came from, with its checksum. Without
+    // this a reader cannot reproduce the run, and "we used MeSH" is not a
+    // method — the vocabulary changes every year and determines what the engine
+    // could even represent.
+    vocabulary: {
+      release: vocabulary.release,
+      matchesCutoff: vocabulary.suitable,
+      statement: vocabulary.statement,
+    },
     targets: rows,
     summary: {
       total: rows.length,
@@ -222,11 +233,17 @@ export function runBenchmark(db, targets, { cutoffYear, preregistrationRef, null
       hits: hits.length,
       hitRate: eligible.length ? Number((hits.length / eligible.length).toFixed(3)) : null,
     },
-    verdict: buildVerdict(leakage, eligible, hits, corpus),
+    verdict: buildVerdict(leakage, eligible, hits, corpus, vocabulary),
   };
 }
 
-function buildVerdict(leakage, eligible, hits, corpus) {
+function buildVerdict(leakage, eligible, hits, corpus, vocabulary) {
+  // A vocabulary with no recorded provenance cannot be reproduced by anyone who
+  // does not trust us, and an interrupted load is worse than none — its rows are
+  // all correct, so nothing about the corpus looks wrong.
+  if (!vocabulary.release || vocabulary.release.complete === false) {
+    return `INVALID: ${vocabulary.statement} Load a release through descriptorRelease.mjs, which records its checksum, and re-run.`;
+  }
   if (!leakage.auditable) {
     return 'INVALID: vocabulary leakage could not be audited, so the corpus cannot be described as historical. Load an NLM descriptor release and re-run.';
   }
@@ -256,6 +273,7 @@ export function formatReport(report) {
     `Pre-registration: \`${report.preregistrationRef}\``,
     `Corpus: ${report.corpus.articles} articles, ${report.corpus.concepts} concepts, ${report.corpus.pairs} pairs. Vocabulary enforced: ${report.corpus.vocabularyEnforced}.`,
     `Vocabulary leakage: ${report.leakage.auditable ? `${(report.leakage.rate * 100).toFixed(2)}% of pre-cut-off annotations` : 'NOT AUDITABLE'}.`,
+    `Vocabulary: ${report.vocabulary.statement}`,
     '',
     `**${report.verdict}**`,
     '',

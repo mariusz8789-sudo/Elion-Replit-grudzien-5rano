@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # The backend suite alone runs 10-14 minutes locally (1,288 tests, several
+    # driving real subprocesses). Ten minutes would fail the workflow on time
+    # rather than on a defect, which is the least useful kind of red build.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # >= 22.18 is a hard requirement: the reasoning package is TypeScript
+          # imported directly by the server, which needs Node's type stripping.
+          node-version: '22.18'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # RDKit only — deliberately NOT the whole of requirements-compute.txt.
+      #
+      # The public API surface (/api/v1/analyze, render/2d, render/3d) is RDKit
+      # all the way down, and its tests assert real chemistry: aspirin's formula,
+      # its InChIKey, an actual SVG. Without RDKit those endpoints correctly
+      # fail closed with 503 and the tests fail — which is what was turning this
+      # workflow red while the same suite passed on a workstation that happened
+      # to have the scientific stack installed.
+      #
+      # The heavy engines (PySCF, OpenMM, Vina, ADMET-AI) stay out: minutes of
+      # install and hundreds of megabytes for tests that already skip honestly
+      # when their engine is absent. RDKit is one 40 MB wheel and it is the only
+      # one the billable API path needs.
+      - name: Install RDKit (real chemistry for the API v1 tests)
+        run: python -m pip install --disable-pip-version-check 'rdkit>=2023.9'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests (reasoning, frontend, backend, isolated pass)
+        run: npm test
+
+      - name: Typecheck + production build
+        run: npm run build
+
+      - name: Build artifact (PR preview)
+        uses: actions/upload-artifact@v4
+        with:
+          name: genesis-dist
+          path: packages/frontend/dist
+          retention-days: 7

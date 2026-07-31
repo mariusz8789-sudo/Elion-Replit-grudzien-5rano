@@ -1,0 +1,80 @@
+{
+  "schema": "genesis-campaign-blocker-dossier/1",
+  "campaignId": "real-scientific-campaign-001",
+  "outcome": "CAMPAIGN_BLOCKED",
+  "reason": "mandatory real evidence unavailable (missing: CHEMBL, PUBCHEM, UNIPROT) — cannot honestly reach a candidate conclusion on real data",
+  "evidenceBlockers": [
+    {
+      "sourceService": "UNIPROT",
+      "failureClass": "CONNECT_TUNNEL_REJECTED_403",
+      "httpStatus": null,
+      "diagnosis": "gateway rejected CONNECT before TLS/HTTP — environment egress policy, not app/DNS/TLS/rate/auth",
+      "remediation": "acquire on a network-enabled machine via scripts/build-real-campaign-001-bundle.mjs"
+    },
+    {
+      "sourceService": "CHEMBL",
+      "failureClass": "CONNECT_TUNNEL_REJECTED_403",
+      "httpStatus": null,
+      "diagnosis": "same — CONNECT rejected at gateway",
+      "remediation": "acquire on a network-enabled machine via scripts/build-real-campaign-001-bundle.mjs"
+    },
+    {
+      "sourceService": "PUBCHEM",
+      "failureClass": "CONNECT_TUNNEL_REJECTED_403",
+      "httpStatus": null,
+      "diagnosis": "same — CONNECT rejected at gateway",
+      "remediation": "acquire on a network-enabled machine via scripts/build-real-campaign-001-bundle.mjs"
+    },
+    {
+      "sourceService": "EUROPE_PMC",
+      "failureClass": "CONNECT_TUNNEL_REJECTED_403",
+      "httpStatus": null,
+      "diagnosis": "same — CONNECT rejected at gateway",
+      "remediation": "acquire on a network-enabled machine via scripts/build-real-campaign-001-bundle.mjs"
+    },
+    {
+      "sourceService": "RCSB_PDB",
+      "failureClass": "CONNECT_TUNNEL_REJECTED_403",
+      "httpStatus": null,
+      "diagnosis": "same — CONNECT rejected at gateway",
+      "remediation": "acquire on a network-enabled machine via scripts/build-real-campaign-001-bundle.mjs"
+    }
+  ],
+  "capabilityBlockers": [
+    {
+      "engine": "Docking",
+      "status": "BLOCKED_BY_RUNTIME",
+      "reason": "no prepared receptor — docking NOT run, NOT substituted by a heuristic"
+    },
+    {
+      "engine": "OpenMM",
+      "status": "BLOCKED_BY_RUNTIME",
+      "reason": "no prepared system"
+    },
+    {
+      "engine": "PySCF",
+      "status": "NOT_IMPLEMENTED",
+      "reason": "no defined quantum question in this campaign"
+    }
+  ],
+  "mandatorySources": [
+    "CHEMBL",
+    "PUBCHEM",
+    "UNIPROT"
+  ],
+  "missingMandatorySources": [
+    "CHEMBL",
+    "PUBCHEM",
+    "UNIPROT"
+  ],
+  "acquiredSources": [],
+  "honesty": {
+    "fabricatedPayloads": 0,
+    "fixtureSubstitution": false,
+    "note": "No payloads fabricated; TEST_FIXTURE data is NOT substituted for real evidence in a real campaign. This is a genuine capability blocker, not a hidden test skip."
+  },
+  "operatorResume": "On a network-enabled machine: node scripts/build-real-campaign-001-bundle.mjs --out campaigns/real-scientific-campaign-001/bundle  →  verify  →  node scripts/genesis-campaign-001.mjs --bundle campaigns/real-scientific-campaign-001/bundle",
+  "didGenesisFindADrug": "NO",
+  "didGenesisFindAComputationalCandidate": "NO (real evidence unavailable; no candidate produced on real data)",
+  "dossierHash": "2ade9255783edca5a8d0672d37991fd146c876044b68b5f832a83a77cb208f4e"
+}

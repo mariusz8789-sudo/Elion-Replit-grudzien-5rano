@@ -1,0 +1,12 @@
+| metric | value | status | label_provenance |
+| --- | --- | --- | --- |
+| descriptor_MAE_gmol | 0.000 | COMPLETED | DETERMINISTIC_CHEMISTRY |
+| descriptor_pearson_r | 1.000 | COMPLETED |  |
+| reproducibility_rate | 1.000 | COMPLETED |  |
+| truth_accuracy | 1.000 | COMPLETED | SOFTWARE_EXPECTATION |
+| truth_consistency | 1.000 | COMPLETED |  |
+| mcre_accuracy | 1.000 | COMPLETED | SOFTWARE_EXPECTATION |
+| mcre_consistency | 1.000 | COMPLETED |  |
+| recovery_roc_auc | 1.000 | COMPLETED | COMPUTATIONAL_CRITERION |
+| recovery_precision | 1.000 | COMPLETED |  |
+| recovery_recall | 1.000 | COMPLETED |  |

@@ -1,0 +1,16 @@
+{
+  "name": "@genesis-os/backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.mjs",
+    "start": "node src/server.mjs",
+    "test": "node --test \"src/**/*.test.mjs\"",
+    "mesh:load": "node scripts/load-mesh-release.mjs",
+    "test:isolated": "GENESIS_ISOLATED_TESTS=1 node --test --test-concurrency=1 src/admetEngine.test.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0"
+  }
+}

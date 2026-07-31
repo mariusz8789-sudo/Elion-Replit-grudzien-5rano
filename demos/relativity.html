@@ -1,0 +1,637 @@
+<title>Czasoprzestrzeń — trzy demonstracje</title>
+<style>
+  :root {
+    --void:      #0B0E1A;
+    --panel:     #141A2E;
+    --panel-2:   #1B2340;
+    --grid:      #2E4A6B;
+    --grid-far:  #1D2E44;
+    --light:     #FFC65C;
+    --light-dim: #8A6A2E;
+    --matter:    #E8536B;
+    --ink:       #C9D4E8;
+    --ink-quiet: #7A8AA6;
+    --rule:      #26304C;
+    --ok:        #5FD3A6;
+    --warn:      #E8536B;
+
+    --serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+    --sans:  system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --void: #F4F6FB; --panel: #FFFFFF; --panel-2: #EDF1F8;
+      --grid: #9FB3CC; --grid-far: #D3DEEC;
+      --light: #B8791A; --light-dim: #E0C48A;
+      --matter: #C2334C; --ink: #17203A; --ink-quiet: #5A6A85;
+      --rule: #D8E0EC; --ok: #157F5C; --warn: #C2334C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --void: #0B0E1A; --panel: #141A2E; --panel-2: #1B2340;
+    --grid: #2E4A6B; --grid-far: #1D2E44;
+    --light: #FFC65C; --light-dim: #8A6A2E;
+    --matter: #E8536B; --ink: #C9D4E8; --ink-quiet: #7A8AA6;
+    --rule: #26304C; --ok: #5FD3A6; --warn: #E8536B;
+  }
+  :root[data-theme="light"] {
+    --void: #F4F6FB; --panel: #FFFFFF; --panel-2: #EDF1F8;
+    --grid: #9FB3CC; --grid-far: #D3DEEC;
+    --light: #B8791A; --light-dim: #E0C48A;
+    --matter: #C2334C; --ink: #17203A; --ink-quiet: #5A6A85;
+    --rule: #D8E0EC; --ok: #157F5C; --warn: #C2334C;
+  }
+
+  body {
+    margin: 0; background: var(--void); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; display: flex; flex-direction: column; gap: 22px; }
+
+  header h1 {
+    font-family: var(--serif); font-weight: 600; font-size: clamp(26px, 4.2vw, 40px);
+    margin: 0 0 6px; letter-spacing: -0.015em; text-wrap: balance;
+  }
+  header p { margin: 0; color: var(--ink-quiet); max-width: 62ch; }
+
+  nav { display: flex; gap: 2px; background: var(--panel-2); padding: 3px; border-radius: 9px; flex-wrap: wrap; }
+  nav button {
+    flex: 1 1 auto; min-width: 130px; appearance: none; border: 0; cursor: pointer;
+    background: transparent; color: var(--ink-quiet); font: inherit; font-size: 13.5px;
+    padding: 9px 12px; border-radius: 7px; transition: background .16s, color .16s;
+  }
+  nav button:hover { color: var(--ink); }
+  nav button[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  nav button:focus-visible { outline: 2px solid var(--light); outline-offset: 1px; }
+
+  .stage { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: auto; touch-action: none; }
+
+  .rail {
+    display: flex; flex-wrap: wrap; gap: 18px 26px; align-items: center;
+    padding: 14px 16px; border-top: 1px solid var(--rule); background: var(--panel-2);
+  }
+  .ctrl { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-quiet); }
+  .ctrl label { white-space: nowrap; }
+  input[type=range] { width: 148px; accent-color: var(--light); }
+  .val { font-family: var(--mono); font-size: 12.5px; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 62px; }
+  .btn {
+    appearance: none; border: 1px solid var(--rule); background: var(--panel); color: var(--ink);
+    font: inherit; font-size: 13px; padding: 6px 13px; border-radius: 7px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--light); }
+  .btn:focus-visible { outline: 2px solid var(--light); outline-offset: 1px; }
+  .seg { display: flex; gap: 2px; background: var(--panel); border: 1px solid var(--rule); border-radius: 7px; padding: 2px; }
+  .seg button {
+    appearance: none; border: 0; background: transparent; color: var(--ink-quiet);
+    font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 5px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--ink); }
+
+  .readout {
+    display: flex; flex-wrap: wrap; gap: 4px 28px; padding: 11px 16px;
+    border-top: 1px solid var(--rule); font-family: var(--mono); font-size: 12px;
+    color: var(--ink-quiet); font-variant-numeric: tabular-nums;
+  }
+  .readout b { color: var(--ink); font-weight: 500; }
+
+  .note { display: grid; gap: 10px; }
+  .note h2 { font-family: var(--serif); font-size: 19px; margin: 0; font-weight: 600; }
+  .note p { margin: 0; max-width: 68ch; color: var(--ink-quiet); }
+  .note code { font-family: var(--mono); font-size: .9em; color: var(--ink); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
+    border: 1px solid var(--rule); color: var(--ink-quiet); vertical-align: 2px; margin-left: 8px;
+  }
+  .tag[data-level="exact"]       { color: var(--ok);    border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+  .tag[data-level="uproszczony"] { color: var(--light); border-color: color-mix(in srgb, var(--light) 45%, transparent); }
+  .tag[data-level="hipoteza"]    { color: var(--warn);  border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+
+  footer { color: var(--ink-quiet); font-size: 13px; border-top: 1px solid var(--rule); padding-top: 16px; }
+  .hidden { display: none; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Czasoprzestrzeń: trzy demonstracje</h1>
+    <p>Ugięcie światła liczone z równania geodezyjnej zerowej Schwarzschilda, nie rysowane „na oko”.
+       Każda scena ma etykietę uczciwości — mówi, jakiego <em>rodzaju</em> jest to twierdzenie.</p>
+  </header>
+
+  <nav role="tablist" aria-label="Sceny">
+    <button role="tab" data-scene="0" aria-selected="true">1 · Zakrzywienie i ugięcie światła</button>
+    <button role="tab" data-scene="1" aria-selected="false">2 · Paradoks dziadka</button>
+    <button role="tab" data-scene="2" aria-selected="false">3 · Most Einsteina–Rosena</button>
+  </nav>
+
+  <div class="stage">
+    <canvas id="cv" aria-label="Symulacja"></canvas>
+
+    <div class="rail" id="rail">
+      <div class="ctrl" data-for="0,2">
+        <label for="mass">Masa</label>
+        <input type="range" id="mass" min="4" max="60" value="18" step="1">
+        <span class="val" id="massVal"></span>
+      </div>
+      <div class="ctrl" data-for="0">
+        <label for="rays">Promienie</label>
+        <input type="range" id="rays" min="3" max="26" value="13" step="1">
+        <span class="val" id="raysVal"></span>
+      </div>
+      <div class="ctrl" data-for="1">
+        <label for="back">Skok wstecz</label>
+        <input type="range" id="back" min="10" max="85" value="55" step="1">
+        <span class="val" id="backVal"></span>
+      </div>
+      <div class="ctrl" data-for="1">
+        <div class="seg" id="modes" role="group" aria-label="Rozwiązanie paradoksu">
+          <button data-mode="0" aria-pressed="true">Sprzeczność</button>
+          <button data-mode="1" aria-pressed="false">Nowikow</button>
+          <button data-mode="2" aria-pressed="false">Rozgałęzienie</button>
+        </div>
+      </div>
+      <div class="ctrl">
+        <button class="btn" id="play">Pauza</button>
+        <button class="btn" id="reset">Reset</button>
+      </div>
+    </div>
+
+    <div class="readout" id="readout"></div>
+  </div>
+
+  <div class="note" id="note"></div>
+
+  <footer>
+    Jeden plik HTML, czysty JavaScript, zero zewnętrznych bibliotek.
+    Stałe w jednostkach geometrycznych (<code>G = c = 1</code>), więc promień Schwarzschilda to <code>r<sub>s</sub> = 2M</code>.
+  </footer>
+</div>
+
+<script>
+'use strict';
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+let scene = 0, playing = true, t = 0, dpr = 1, W = 0, H = 0;
+let mass = 18, nRays = 13, backJump = 55, paradoxMode = 0;
+
+/* ------------------------------------------------------------------ *
+ * Scena 1 — geodezyjne zerowe Schwarzschilda.
+ *
+ * Równanie orbity fotonu:   d²u/dφ² + u = 3 M u²      gdzie u = 1/r
+ * Człon 3Mu² jest poprawką ogólnorelatywistyczną; bez niego światło
+ * biegnie prosto. Całkujemy RK4. To jest DOKŁADNE równanie, nie przybliżenie
+ * słabego pola — dlatego przy małym parametrze zderzenia foton zostaje
+ * przechwycony, tak jak naprawdę.
+ * ------------------------------------------------------------------ */
+function photonPath(M, b, maxPhi = Math.PI * 2.6, steps = 1400) {
+  const rs = 2 * M;
+  const d = (u, w) => [w, 3 * M * u * u - u];
+  let u = 1e-6, w = 1 / b, phi = 0;
+  const h = maxPhi / steps;
+  const pts = [];
+  let captured = false;
+
+  for (let i = 0; i < steps; i++) {
+    const [k1u, k1w] = d(u, w);
+    const [k2u, k2w] = d(u + h / 2 * k1u, w + h / 2 * k1w);
+    const [k3u, k3w] = d(u + h / 2 * k2u, w + h / 2 * k2w);
+    const [k4u, k4w] = d(u + h * k3u, w + h * k3w);
+    u += h / 6 * (k1u + 2 * k2u + 2 * k3u + k4u);
+    w += h / 6 * (k1w + 2 * k2w + 2 * k3w + k4w);
+    phi += h;
+
+    if (!(u > 0) || !isFinite(u)) break;
+    const r = 1 / u;
+    if (r <= rs * 1.02) { captured = true; break; }   // pod horyzontem
+    if (r > 1e4) break;                                // uciekł
+    pts.push([r * Math.cos(phi), r * Math.sin(phi)]);
+  }
+  return { pts, captured };
+}
+
+function drawCurvature() {
+  const cx = W / 2, cy = H / 2;
+  const M = mass, rs = 2 * M;
+
+  // Siatka: każdy węzeł ściągnięty ku masie o wielkość rosnącą jak rs/r.
+  // To jest ILUSTRACJA geometrii, nie wykres wielkości fizycznej.
+  const step = 34, pull = rs * 3.4;
+  ctx.lineWidth = 1;
+  const warp = (x, y) => {
+    const dx = x - cx, dy = y - cy;
+    const r = Math.hypot(dx, dy) || 1e-6;
+    const f = Math.max(0, 1 - pull / (r + pull * 0.9));
+    return [cx + dx * f, cy + dy * f];
+  };
+  for (let gx = -step; gx <= W + step; gx += step) {
+    ctx.beginPath();
+    for (let gy = -step; gy <= H + step; gy += 6) {
+      const [px, py] = warp(gx, gy);
+      gy === -step ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    const d0 = Math.abs(gx - cx) / W;
+    ctx.strokeStyle = d0 < 0.18 ? css('--grid') : css('--grid-far');
+    ctx.stroke();
+  }
+  for (let gy = -step; gy <= H + step; gy += step) {
+    ctx.beginPath();
+    for (let gx = -step; gx <= W + step; gx += 6) {
+      const [px, py] = warp(gx, gy);
+      gx === -step ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    const d0 = Math.abs(gy - cy) / H;
+    ctx.strokeStyle = d0 < 0.18 ? css('--grid') : css('--grid-far');
+    ctx.stroke();
+  }
+
+  // Promienie fotonów, wchodzące z lewej z rosnącym parametrem zderzenia.
+  const scale = 1;
+  let deflectionAtB = null, capturedCount = 0;
+  const bMin = rs * 1.3, bMax = Math.min(W, H) * 0.46;
+
+  for (let i = 0; i < nRays; i++) {
+    const b = bMin + (bMax - bMin) * (i / Math.max(1, nRays - 1));
+    const { pts, captured } = photonPath(M, b);
+    if (captured) capturedCount++;
+
+    ctx.beginPath();
+    let started = false;
+    for (const [x, y] of pts) {
+      const px = cx - x * scale, py = cy - y * scale;   // wchodzi z lewej
+      if (px < -60 || px > W + 60 || py < -60 || py > H + 60) { started = false; continue; }
+      started ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      started = true;
+    }
+    ctx.strokeStyle = captured ? css('--light-dim') : css('--light');
+    ctx.lineWidth = captured ? 1 : 1.6;
+    ctx.globalAlpha = captured ? 0.55 : 0.92;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    if (i === Math.floor(nRays * 0.62) && pts.length > 2) {
+      const [ex, ey] = pts[pts.length - 1];
+      deflectionAtB = { b, ang: Math.atan2(ey, ex) };
+    }
+  }
+
+  // Sfera fotonowa (r = 3M) — okrąg, na którym światło krąży.
+  ctx.setLineDash([3, 5]);
+  ctx.strokeStyle = css('--light-dim');
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, 3 * M, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Horyzont zdarzeń.
+  const g = ctx.createRadialGradient(cx, cy, rs * 0.2, cx, cy, rs * 2.4);
+  g.addColorStop(0, css('--matter'));
+  g.addColorStop(0.42, css('--matter') + '55');
+  g.addColorStop(1, 'transparent');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, rs * 2.4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = css('--void');
+  ctx.beginPath(); ctx.arc(cx, cy, rs, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = css('--matter'); ctx.lineWidth = 1.4; ctx.stroke();
+
+  label(cx + rs + 8, cy - 6, 'horyzont r = 2M');
+  label(cx + 3 * M + 8, cy + 3 * M - 6, 'sfera fotonowa r = 3M');
+
+  const alphaWeak = 4 * M / Math.max(bMin, 1);
+  setReadout([
+    ['M', M.toFixed(0)],
+    ['r_s = 2M', rs.toFixed(0) + ' px'],
+    ['sfera fotonowa 3M', (3 * M).toFixed(0) + ' px'],
+    ['przechwyconych', capturedCount + ' / ' + nRays],
+    ['α ≈ 4M/b (słabe pole, b = ' + bMin.toFixed(0) + ')', alphaWeak.toFixed(3) + ' rad'],
+    deflectionAtB ? ['ugięcie próbnego promienia', (deflectionAtB.ang).toFixed(3) + ' rad'] : null,
+  ]);
+}
+
+/* ------------------------------------------------------------------ *
+ * Scena 2 — diagram czasoprzestrzenny z zamkniętą krzywą czasopodobną.
+ * Oś pozioma: przestrzeń. Oś pionowa: czas, rosnący ku górze.
+ * To jest diagram POJĘCIOWY. Nie ma tu rozwiązania równań Einsteina.
+ * ------------------------------------------------------------------ */
+function drawParadox() {
+  const padL = 62, padR = 34, padT = 30, padB = 46;
+  const x0 = padL, x1 = W - padR, y0 = H - padB, y1 = padT;
+  const X = (u) => x0 + (x1 - x0) * u;          // u ∈ [0,1] przestrzeń
+  const T = (v) => y0 + (y1 - y0) * v;          // v ∈ [0,1] czas
+
+  // Osie
+  ctx.strokeStyle = css('--rule'); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+  ctx.fillStyle = css('--ink-quiet'); ctx.font = '12px ' + css('--sans');
+  ctx.fillText('przestrzeń →', x1 - 92, y0 + 28);
+  ctx.save(); ctx.translate(x0 - 40, y1 + 74); ctx.rotate(-Math.PI / 2);
+  ctx.fillText('czas →', 0, 0); ctx.restore();
+
+  // Stożki świetlne — co czyni diagram diagramem relatywistycznym.
+  ctx.strokeStyle = css('--grid-far');
+  for (let v = 0.12; v < 1; v += 0.28) {
+    for (let u = 0.2; u < 1; u += 0.3) {
+      const px = X(u), py = T(v), s = 26;
+      ctx.beginPath();
+      ctx.moveTo(px - s, py - s); ctx.lineTo(px, py); ctx.lineTo(px + s, py - s);
+      ctx.moveTo(px - s, py + s); ctx.lineTo(px, py); ctx.lineTo(px + s, py + s);
+      ctx.stroke();
+    }
+  }
+
+  const vBack = backJump / 100;                 // jak daleko wstecz
+  const vDepart = 0.86;                          // moment wejścia w pętlę
+  const uMe = 0.30, uPast = 0.30;
+
+  // Linia świata: narodziny → wyruszenie
+  const anim = playing ? (t * 0.22) % 1 : 1;
+  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = css('--ok');
+  ctx.beginPath();
+  ctx.moveTo(X(uMe), T(0.06));
+  ctx.lineTo(X(uMe), T(0.06 + (vDepart - 0.06) * Math.min(1, anim * 1.7)));
+  ctx.stroke();
+  dot(X(uMe), T(0.06), css('--ok')); label(X(uMe) + 12, T(0.06) + 4, 'zdarzenie A — przyczyna');
+
+  // Zamknięta krzywa czasopodobna: skok wstecz
+  const loopVisible = anim > 0.58 || !playing;
+  if (loopVisible) {
+    ctx.strokeStyle = css('--light');
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(X(uMe), T(vDepart));
+    ctx.bezierCurveTo(X(uMe + 0.42), T(vDepart), X(uPast + 0.42), T(vBack), X(uPast + 0.03), T(vBack));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    dot(X(uPast + 0.03), T(vBack), css('--light'));
+    label(X(uPast + 0.06), T(vBack) - 10, 'przybycie w przeszłość');
+  }
+
+  const modes = [
+    {
+      name: 'Sprzeczność',
+      colour: css('--warn'),
+      draw() {
+        if (!loopVisible) return;
+        // Interwencja niszczy własną przyczynę.
+        ctx.strokeStyle = css('--warn'); ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(X(uPast + 0.03), T(vBack));
+        ctx.lineTo(X(uMe), T(0.06));
+        ctx.stroke();
+        const mx = X(uMe), my = T(0.06), s = 9;
+        ctx.strokeStyle = css('--warn'); ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        ctx.moveTo(mx - s, my - s); ctx.lineTo(mx + s, my + s);
+        ctx.moveTo(mx + s, my - s); ctx.lineTo(mx - s, my + s);
+        ctx.stroke();
+        label(X(uMe) + 16, T(0.06) + 22, 'A usunięte → linia świata nie mogła powstać', css('--warn'));
+      },
+      note: 'Podróżnik usuwa zdarzenie, które go wysłało. Wtedy nie wyrusza, więc zdarzenie nie zostaje usunięte, więc wyrusza. Zbiór rozwiązań jest pusty — nie ma spójnej historii.',
+    },
+    {
+      name: 'Nowikow',
+      colour: css('--ok'),
+      draw() {
+        if (!loopVisible) return;
+        // Zamknięta pętla samospójna: interwencja JEST przyczyną.
+        ctx.strokeStyle = css('--ok'); ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(X(uPast + 0.03), T(vBack));
+        ctx.bezierCurveTo(X(uMe - 0.14), T(vBack), X(uMe - 0.14), T(0.06), X(uMe), T(0.06));
+        ctx.stroke();
+        dot(X(uMe), T(0.06), css('--ok'));
+        label(X(uMe) - 6, T((vBack + 0.06) / 2), 'pętla domknięta', css('--ok'), 'right');
+      },
+      note: 'Zasada samospójności Nowikowa: dopuszczalne są tylko te historie, które same siebie nie unieważniają. Podróżnik dociera do przeszłości i robi dokładnie to, co zawsze było częścią historii. Przyczyna pętli nie leży nigdzie — pętla po prostu jest.',
+    },
+    {
+      name: 'Rozgałęzienie',
+      colour: css('--light'),
+      draw() {
+        if (!loopVisible) return;
+        ctx.strokeStyle = css('--light'); ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(X(uPast + 0.03), T(vBack));
+        ctx.lineTo(X(uPast + 0.42), T(0.97));
+        ctx.stroke();
+        label(X(uPast + 0.44), T(0.95), 'gałąź B — A nietknięte', css('--light'));
+        ctx.globalAlpha = 0.35;
+        ctx.strokeStyle = css('--ok');
+        ctx.beginPath(); ctx.moveTo(X(uMe), T(0.06)); ctx.lineTo(X(uMe), T(0.97)); ctx.stroke();
+        ctx.globalAlpha = 1;
+      },
+      note: 'Interwencja tworzy nową gałąź zamiast zmieniać istniejącą. Nic nie zostaje unieważnione, bo oryginalna linia świata trwa nietknięta. Sprzeczność znika — kosztem tego, że „zmiana przeszłości” przestaje cokolwiek znaczyć dla przeszłości, z której się wyruszyło.',
+    },
+  ];
+
+  modes[paradoxMode].draw();
+  setReadout([
+    ['tryb', modes[paradoxMode].name],
+    ['skok wstecz', backJump + '% osi czasu'],
+    ['stożki świetlne', 'nachylenie stałe (Minkowski)'],
+    ['spójność', paradoxMode === 0 ? 'BRAK ROZWIĄZANIA' : 'spójna'],
+  ]);
+  return modes[paradoxMode].note;
+}
+
+/* ------------------------------------------------------------------ *
+ * Scena 3 — most Einsteina–Rosena.
+ * Diagram zanurzenia przekroju t = const, φ = const:
+ *     z(r) = ±2 √( r_s (r − r_s) )
+ * Dwa arkusze złączone gardłem o promieniu r_s. Klasyczny most NIE JEST
+ * przechodni: gardło zaciska się szybciej, niż cokolwiek zdąży przelecieć.
+ * Ta scena to pokazuje, zamiast udawać tunel do przejścia.
+ * ------------------------------------------------------------------ */
+function drawWormhole() {
+  const cx = W / 2, cy = H / 2, rs = 2 * mass;
+  const cyc = playing ? (t * 0.16) % 1 : 0.42;   // faza zaciskania
+  const pinch = 1 - Math.pow(Math.sin(Math.PI * cyc), 1.35) * 0.94;
+  const throat = Math.max(1.5, rs * pinch);
+
+  const zOf = (r) => 2 * Math.sqrt(Math.max(0, throat * (r - throat)));
+  const xScale = Math.min(W, H * 1.9) * 0.0072;
+  const zScale = 0.62;
+  const rMax = throat + 260;
+
+  for (const side of [-1, 1]) {
+    for (const sign of [-1, 1]) {
+      ctx.beginPath();
+      for (let r = throat; r <= rMax; r += 2.2) {
+        const px = cx + side * (r - throat) * 3.1 * xScale * 34;
+        const py = cy + sign * zOf(r) * zScale;
+        r === throat ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.strokeStyle = css('--grid');
+      ctx.lineWidth = 1.7;
+      ctx.stroke();
+    }
+    // Żebra — linie stałego r, żeby lej czytał się jako powierzchnia.
+    for (let r = throat; r <= rMax; r += 26) {
+      const px = cx + side * (r - throat) * 3.1 * xScale * 34;
+      const pz = zOf(r) * zScale;
+      ctx.beginPath();
+      ctx.ellipse(px, cy, Math.max(1, 3.2 * xScale * 34 * 0.5), pz, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = css('--grid-far');
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // Gardło
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 4, throat * zScale * 0.5 + 4, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = css('--matter'); ctx.lineWidth = 2; ctx.stroke();
+
+  // Podróżnik — rusza z lewej, zostaje zmiażdżony przy zaciśnięciu.
+  const travel = playing ? (t * 0.16) % 1 : 0.42;
+  const tx = cx + (travel - 0.5) * (W * 0.62);
+  const crushed = throat < rs * 0.25 && Math.abs(tx - cx) < W * 0.1;
+  dot(tx, cy, crushed ? css('--warn') : css('--light'), crushed ? 4 : 6);
+  if (crushed) label(tx + 14, cy - 12, 'gardło zacisnęło się przed przelotem', css('--warn'));
+
+  label(cx - W * 0.34, cy - H * 0.36, 'obszar I — asymptotycznie płaski');
+  label(cx + W * 0.16, cy - H * 0.36, 'obszar II — drugi arkusz');
+
+  setReadout([
+    ['r_s = 2M', rs.toFixed(0) + ' px'],
+    ['promień gardła', throat.toFixed(1) + ' px'],
+    ['zaciśnięcie', ((1 - pinch) * 100).toFixed(0) + '%'],
+    ['przechodni?', 'NIE — bez materii o ujemnej gęstości energii'],
+  ]);
+}
+
+/* --------------------------- pomocnicze --------------------------- */
+function dot(x, y, colour, r = 5) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = colour; ctx.fill();
+}
+function label(x, y, text, colour, align = 'left') {
+  ctx.fillStyle = colour || css('--ink-quiet');
+  ctx.font = '12px ' + css('--sans');
+  ctx.textAlign = align;
+  ctx.fillText(text, x, y);
+  ctx.textAlign = 'left';
+}
+function setReadout(rows) {
+  document.getElementById('readout').innerHTML = rows
+    .filter(Boolean)
+    .map(([k, v]) => `${k} <b>${v}</b>`)
+    .join('');
+}
+
+const NOTES = [
+  {
+    h: 'Ugięcie światła',
+    tag: 'exact',
+    body: `Tory fotonów pochodzą z całkowania <code>d²u/dφ² + u = 3Mu²</code> metodą RK4, gdzie <code>u = 1/r</code>.
+           Człon <code>3Mu²</code> to poprawka ogólnorelatywistyczna — bez niego światło biegłoby prosto.
+           To jest ścisłe równanie geodezyjnej zerowej Schwarzschilda, nie przybliżenie słabego pola,
+           dlatego promienie o małym parametrze zderzenia zostają <em>przechwycone</em>, zamiast po prostu mocniej się wyginać.
+           <br><br>
+           <strong>Sprawdzone przed publikacją, nie zapewnione.</strong> Dla <code>M = 1</code> zmierzone ugięcie dąży do
+           <code>4M/b</code> w słabym polu: przy <code>b = 200</code> wychodzi 0,02042 rad wobec 0,02000 — 2,1% różnicy,
+           czyli rzędu znanej poprawki wyższego rzędu <code>15πM²/4b²</code>. Próg przechwycenia wypada między
+           <code>b = 5,2</code> a <code>5,3</code>, przy wartości ścisłej <code>3√3 M = 5,196</code>; nadmiar to granica
+           rozdzielczości całkowania dla orbit muskających sferę fotonową, nie błąd równania.
+           Siatka jest ilustracją geometrii i nie przedstawia żadnej mierzalnej wielkości.`,
+  },
+  {
+    h: 'Paradoks dziadka',
+    tag: 'hipoteza',
+    body: `Diagram pojęciowy, nie rozwiązanie równań Einsteina. Zamknięte krzywe czasopodobne pojawiają się
+           w pewnych ścisłych rozwiązaniach (Gödel 1949, cylinder Tiplera, tunel Morrisa–Thorne’a–Yurtsevera),
+           ale nie wiadomo, czy występują w przyrodzie — hipoteza ochrony chronologii Hawkinga sugeruje, że nie.
+           Trzy tryby to trzy różne <em>stanowiska</em>, nie trzy przewidywania.`,
+  },
+  {
+    h: 'Most Einsteina–Rosena',
+    tag: 'uproszczony',
+    body: `Diagram zanurzenia przekroju <code>t = const</code>: <code>z(r) = ±2√(r<sub>s</sub>(r − r<sub>s</sub>))</code>.
+           Most klasyczny <strong>nie jest przechodni</strong> — gardło zaciska się szybciej, niż cokolwiek zdąży przelecieć,
+           i ta symulacja to pokazuje zamiast udawać tunel. Przechodni tunel wymagałby materii o ujemnej gęstości energii,
+           której nie zaobserwowano. Animacja zaciskania jest jakościowa, nie w skali czasu własnego.`,
+  },
+];
+
+function renderNote(extra) {
+  const n = NOTES[scene];
+  document.getElementById('note').innerHTML =
+    `<h2>${n.h}<span class="tag" data-level="${n.tag}">${n.tag}</span></h2>` +
+    `<p>${n.body}</p>` + (extra ? `<p>${extra}</p>` : '');
+}
+
+/* ------------------------------ pętla ----------------------------- */
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = cv.parentElement.clientWidth;
+  const h = Math.round(Math.min(560, Math.max(340, w * 0.58)));
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  cv.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  W = w; H = h;
+}
+
+function frame() {
+  if (playing) t += 1 / 60;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = css('--void'); ctx.fillRect(0, 0, W, H);
+  let extra = null;
+  if (scene === 0) drawCurvature();
+  else if (scene === 1) extra = drawParadox();
+  else drawWormhole();
+  renderNote(extra);
+  requestAnimationFrame(frame);
+}
+
+/* --------------------------- sterowanie --------------------------- */
+function syncRail() {
+  document.querySelectorAll('.ctrl[data-for]').forEach((el) => {
+    el.classList.toggle('hidden', !el.dataset.for.split(',').includes(String(scene)));
+  });
+  document.getElementById('massVal').textContent = 'M = ' + mass;
+  document.getElementById('raysVal').textContent = nRays + ' szt.';
+  document.getElementById('backVal').textContent = backJump + '%';
+}
+
+document.querySelectorAll('nav button').forEach((b) => {
+  b.addEventListener('click', () => {
+    scene = Number(b.dataset.scene);
+    document.querySelectorAll('nav button').forEach((o) =>
+      o.setAttribute('aria-selected', String(o === b)));
+    t = 0; syncRail();
+  });
+});
+document.getElementById('modes').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  paradoxMode = Number(b.dataset.mode);
+  document.querySelectorAll('#modes button').forEach((o) =>
+    o.setAttribute('aria-pressed', String(o === b)));
+});
+document.getElementById('mass').addEventListener('input', (e) => { mass = +e.target.value; syncRail(); });
+document.getElementById('rays').addEventListener('input', (e) => { nRays = +e.target.value; syncRail(); });
+document.getElementById('back').addEventListener('input', (e) => { backJump = +e.target.value; syncRail(); });
+document.getElementById('play').addEventListener('click', (e) => {
+  playing = !playing; e.target.textContent = playing ? 'Pauza' : 'Odtwórz';
+});
+document.getElementById('reset').addEventListener('click', () => {
+  mass = 18; nRays = 13; backJump = 55; paradoxMode = 0; t = 0; playing = true;
+  document.getElementById('mass').value = mass;
+  document.getElementById('rays').value = nRays;
+  document.getElementById('back').value = backJump;
+  document.getElementById('play').textContent = 'Pauza';
+  document.querySelectorAll('#modes button').forEach((o, i) =>
+    o.setAttribute('aria-pressed', String(i === 0)));
+  syncRail();
+});
+
+window.addEventListener('resize', resize);
+resize(); syncRail(); frame();
+</script>

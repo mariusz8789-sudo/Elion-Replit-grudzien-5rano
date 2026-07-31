@@ -1,281 +1,180 @@
-# ELION OMEGA - Full Production System
+# Genesis
 
-**ELION OMEGA** to kompletny, produkcyjny system AI Agent z pełną funkcjonalnością:
-- **Agent Core** z Tool Use, RAG i planowaniem
-- **AutoDev Service** z pełnym pipeline'm generowania kodu
-- **DaveOps** z orkiestracją Docker/Vercel
-- **User Memory** z trwałą bazą danych (PostgreSQL + pgvector)
-- **LLM Service** z obsługą streamingu (SSE)
-- **Frontend** z pełnymi stronami (Agi, Opportunities, Lessons, Settings, Memory)
-- **Terminal Logs** z pełnym pollingiem
+**A scientific reasoning platform that refuses to tell you a therapy works.**
+
+Genesis answers a different question — *what should be investigated next, and
+why* — and makes every answer auditable: what it rested on, how uncertain it is
+on two separate axes, what it declined to conclude, and which named expert has
+or has not reviewed the underlying claim.
 
 ---
 
-## 📋 Wymagania
+## Read this before evaluating anything
 
-- **Node.js** >= 18.x
-- **npm** >= 9.x
-- **Docker** (dla bazy danych PostgreSQL)
-- **OpenAI API Key** (dla LLM i embeddingów)
+This repository is honest about its own state, which is unusual enough to say up
+front.
 
----
+| | |
+|---|---|
+| **Code** | ~74k lines of production code under ~24k lines of tests |
+| **Tests** | 2,166 · **0 failures** · 6 skipped, each naming the engine it needs |
+| **Users** | **0** |
+| **Expert reviews filed** | **0** |
+| **Literature corpus** | **none — the platform has never processed a real paper** |
+| **Retrospective benchmark** | **built, never run** |
 
-## 🚀 Uruchomienie Deweloperskie (Dev)
+Everything below is demonstrated by tests, not by usage. Where a capability is
+partial, the documentation says so. Where something is planned, it says that
+instead of describing it in the present tense.
 
-### 1. Instalacja Zależności
-
-```bash
-npm install
-```
-
-### 2. Konfiguracja Zmiennych Środowiskowych
-
-Utwórz plik `.env` w katalogu głównym projektu na podstawie `.env.example`:
-
-```bash
-cp .env.example .env
-```
-
-Uzupełnij plik `.env` swoimi kluczami API:
-
-```env
-# OpenAI API
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=elion_omega
-DB_USER=elion
-DB_PASSWORD=elion_password
-
-# JWT
-JWT_SECRET=your_super_secret_jwt_key_here
-
-# Server
-PORT=8080
-```
-
-### 3. Uruchomienie Bazy Danych
-
-Uruchom PostgreSQL z rozszerzeniem `pgvector` za pomocą Docker Compose:
-
-```bash
-docker-compose up -d
-```
-
-Sprawdź, czy kontener działa:
-
-```bash
-docker ps
-```
-
-### 4. Migracja i Seedowanie Bazy Danych
-
-Uruchom skrypty migracji i seedowania:
-
-```bash
-npm run db:migrate --workspace=packages/backend
-npm run db:seed --workspace=packages/backend
-```
-
-### 5. Uruchomienie Aplikacji
-
-Uruchom backend i frontend jednocześnie w trybie deweloperskim:
-
-```bash
-npm run dev
-```
-
-Aplikacja będzie dostępna pod adresem:
-- **Frontend:** `http://localhost:3000`
-- **Backend API:** `http://localhost:8080`
-
-### 6. Logowanie
-
-Użyj domyślnych danych logowania:
-- **Email:** `admin@elion.com`
-- **Hasło:** `ElionOmega1`
+The full measured assessment is in
+[`docs/GENESIS_CAPABILITY_REPORT.md`](docs/GENESIS_CAPABILITY_REPORT.md).
 
 ---
 
-## 🏭 Uruchomienie Produkcyjne (Production)
+## The thesis
 
-### 1. Zbuduj Projekt
+Every competitor in AI-for-biology produces confident scientific prose. None is
+believed by people qualified to evaluate it. The scarce asset is not generation —
+it is **trust**.
+
+Genesis is therefore built around four constraints that make it look *worse* in a
+demo and better in a laboratory:
+
+1. **It refuses, and the refusal is an output.** Every answer carries a list of
+   what the engine declined to conclude. The Ask screen prints refusals *above*
+   the hypotheses.
+2. **Uncertainty has two axes that are never merged.** *Coverage* (how much of
+   an answer's mechanisms carry evidence) and *belief* (how much of it a named
+   expert has confirmed) are stored separately, and the persistence layer
+   refuses an artifact that collapses them into one number. Neither claims to
+   measure how much of the published literature was read — nothing here can
+   measure that without a corpus.
+3. **One expert dispute is never outvoted.** A dispute names a specific problem
+   that confirmations do not answer. Averaging expert opinion would destroy the
+   most informative signal the system produces.
+4. **Nothing is updated in place.** Graph snapshots supersede, evidence retires,
+   beliefs revise. That is what makes replay possible — *"here is what Genesis
+   concluded in March; here is the same question today; here is what changed."*
+
+---
+
+## What works today
+
+| Capability | Where | State |
+|---|---|---|
+| Signed mechanism graph, conflict detection | `packages/reasoning` | Production · 88 tests |
+| Two-axis evidence grading | `packages/reasoning/src/evidence.ts` | Production |
+| Cancer-safety composition | `packages/reasoning/src/cancerSafety.ts` | Production |
+| Version-bound expert review ledger | `backend/src/edgeReview.mjs` | Production · **empty** |
+| Content-addressed snapshots, artifact gate | `backend/src/reasoning/store.mjs` | Production |
+| Living knowledge graph, contradiction detection | `backend/src/reasoning/livingGraph.mjs` | Production · no UI |
+| Hypothesis graveyard (per-tenant failure memory) | `backend/src/reasoning/graveyard.mjs` | Production · no UI |
+| Discovery Engine (eight-stage composer) | `backend/src/reasoning/discoveryEngine.mjs` | Production · **Ask screen** |
+| Replay and diff | `backend/src/reasoning/replay.mjs` | Production · no UI |
+| Edge criticality + review priority | `backend/src/reasoning/criticality.mjs` | Production · on the review screen |
+| ADMET-AI / RDKit prediction | `backend/src/compute` | Production · real models |
+| Physics laboratories | `packages/frontend` | Production · validated to 0.23 K vs NASA reference |
+
+### What does not work
+
+- **Looking Glass** (PubMed ingest, MeSH audit, Swanson discovery, retrospective
+  benchmark) is written and tested against fixtures built from published DTDs.
+  It has never contacted NCBI.
+- **16 of 129 backend modules have no entry point at all** — not reachable from
+  the HTTP server *or* from any CLI script. Ten are in the molecular campaign
+  stack; four are the retrospective-benchmark toolchain, which is blocked on a
+  corpus rather than dead. A further ~45 are reachable only through scripts,
+  which is correct for tooling.
+- Most capabilities built after the reasoning core moved to the server have **no
+  user interface** yet.
+
+---
+
+## Architecture
+
+Five layers. A layer may depend only on layers below it, and this is enforced by
+a static test (`backend/src/layerGuard.test.mjs`) rather than by convention.
+
+```
+L5  Surfaces        Ask · Graph · Evidence · Memory · Review
+L4  Orchestration   Discovery Engine · replay · criticality
+L3  Reasoning       @genesis-os/reasoning — PURE: no I/O, no clock, no randomness
+L2  Memory          review ledger · graveyard · evidence · corpus
+L1  Substrate       store · provenance · auth · compute
+```
+
+`packages/reasoning` is imported directly by both the server and the browser —
+no build step and no generated artifact that can drift from its source. This
+requires **Node ≥ 22.18**, declared in `engines`.
+
+Full design: [`docs/DISCOVERY_OS_ARCHITECTURE.md`](docs/DISCOVERY_OS_ARCHITECTURE.md).
+
+---
+
+## Getting started
 
 ```bash
-npm run build
+npm install                 # Node >= 22.18 required
+npm test                    # reasoning + frontend + backend, then the isolated pass
+npm run dev                 # frontend
+npm run dev:backend         # API + static server
 ```
 
-To polecenie skompiluje:
-- Backend (TypeScript → JavaScript w `packages/backend/dist`)
-- Frontend (React → statyczne pliki w `packages/frontend/dist`)
-
-### 2. Uruchom Backend
-
-```bash
-npm start --workspace=packages/backend
-```
-
-Backend będzie nasłuchiwał na porcie `8080` (lub porcie zdefiniowanym w `.env`).
-
-### 3. Serwuj Frontend
-
-Skopiuj zawartość katalogu `packages/frontend/dist` do serwera WWW (np. **Nginx**, **Apache**, **Vercel**, **Netlify**).
-
-#### Przykładowa konfiguracja Nginx:
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    root /var/www/elion-omega/frontend/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://localhost:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-### 4. Uruchom jako Usługa (Opcjonalnie)
-
-Możesz użyć **PM2** do zarządzania procesem backendu:
-
-```bash
-npm install -g pm2
-pm2 start packages/backend/dist/index.js --name elion-omega-backend
-pm2 save
-pm2 startup
-```
+**`npm test` runs two passes.** Three ADMET tests drive a real Python ML
+subprocess under a strict 30 s timeout and are serialised into their own pass;
+they report as *skipped* in the parallel run, never as passed. A CI pipeline
+that runs only the parallel glob will silently skip three real tests of a real
+model — see [`docs/TECH_DEBT.md`](docs/TECH_DEBT.md).
 
 ---
 
-## 📂 Struktura Projektu
+## Documentation
 
-```
-elion-omega/
-├── packages/
-│   ├── backend/          # Backend (Express + TypeScript)
-│   │   ├── src/
-│   │   │   ├── agent/    # Agent Core (Tool Use, RAG)
-│   │   │   ├── autodev/  # AutoDev Service
-│   │   │   ├── chat/     # Chat Service
-│   │   │   ├── daveops/  # DaveOps Orchestrator
-│   │   │   ├── memory/   # Memory Manager, VectorStore, UserMemory
-│   │   │   ├── routes/   # API Routes
-│   │   │   ├── services/ # LLM, Embedding Services
-│   │   │   └── index.ts  # Entry Point
-│   │   └── package.json
-│   └── frontend/         # Frontend (React + Vite + Tailwind)
-│       ├── src/
-│       │   ├── components/
-│       │   ├── pages/
-│       │   ├── context/
-│       │   └── lib/
-│       └── package.json
-├── .env.example          # Przykładowa konfiguracja zmiennych środowiskowych
-├── docker-compose.yml    # Konfiguracja PostgreSQL + pgvector
-├── package.json          # Root package.json (workspaces)
-└── README.md             # Ten plik
-```
+| Start here | |
+|---|---|
+| [`docs/GENESIS_CAPABILITY_REPORT.md`](docs/GENESIS_CAPABILITY_REPORT.md) | Measured audit: what works, what does not, what it is worth |
+| [`docs/GENESIS_CONSOLIDATION.md`](docs/GENESIS_CONSOLIDATION.md) | Product architecture, roadmap validation, tiers, blockers |
+| [`docs/DISCOVERY_OS_ARCHITECTURE.md`](docs/DISCOVERY_OS_ARCHITECTURE.md) | Layers, boundaries, database design, security model |
+| [`ROADMAP.md`](ROADMAP.md) | What is done, what is next, what will never be built |
+| [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md) | What Genesis cannot do |
+| [`docs/EDGE_CRITICALITY.md`](docs/EDGE_CRITICALITY.md) | Which claims decide the output |
+| [`docs/RETROSPECTIVE_BENCHMARK.md`](docs/RETROSPECTIVE_BENCHMARK.md) | The protocol that would validate the thesis |
+
+The molecular-discovery product line has its own documentation:
+[`SCIENTIFIC_ENGINE.md`](SCIENTIFIC_ENGINE.md) ·
+[`GROUNDING.md`](GROUNDING.md) ·
+[`PROVENANCE.md`](PROVENANCE.md) ·
+[`CAMPAIGNS.md`](CAMPAIGNS.md) ·
+[`API.md`](API.md) ·
+[`DEPLOYMENT.md`](DEPLOYMENT.md) ·
+[`SECURITY.md`](SECURITY.md).
+
+Historical audits and superseded reports are kept in
+[`docs/history/`](docs/history/) rather than deleted — the record of what was
+believed, and when, is part of the evidence.
 
 ---
 
-## 🔧 Skrypty NPM
+## Engineering standards
 
-### Root (Monorepo)
+Enforced, not aspirational:
 
-- `npm install` - Instaluje wszystkie zależności dla całego monorepo
-- `npm run dev` - Uruchamia backend i frontend w trybie deweloperskim
-- `npm run build` - Buduje backend i frontend dla produkcji
-- `npm run db:migrate` - Uruchamia migracje bazy danych
-- `npm run db:seed` - Seeduje bazę danych przykładowymi danymi
-
-### Backend (`packages/backend`)
-
-- `npm run dev --workspace=packages/backend` - Uruchamia backend w trybie deweloperskim (nodemon)
-- `npm run build --workspace=packages/backend` - Kompiluje TypeScript do JavaScript
-- `npm start --workspace=packages/backend` - Uruchamia skompilowany backend
-
-### Frontend (`packages/frontend`)
-
-- `npm run dev --workspace=packages/frontend` - Uruchamia frontend w trybie deweloperskim (Vite)
-- `npm run build --workspace=packages/frontend` - Buduje frontend dla produkcji
+- **Fail closed.** Unknown → refuse. A time-sliced corpus rebuild throws without
+  a vocabulary guard; an unaudited vocabulary returns nothing rather than
+  everything.
+- **Refusals are mutation-verified.** Every guard added since the reasoning core
+  moved to the server was checked by deleting it and confirming tests turn red.
+  A refusal that can be removed with tests still green is not a refusal.
+- **Derived, never cached.** Edge status, contradictions, timelines and
+  criticality are recomputed on read. A cached scientific judgement eventually
+  contradicts its own evidence.
+- **Synthetic fixtures are unmistakable.** `FIXTURE-…` article ids, `D9…`
+  descriptor UIs, impossible PMIDs. A fixture that leaks into real output must be
+  obvious, not plausible.
 
 ---
 
-## 🧪 Testowanie
+## Licence
 
-Po uruchomieniu aplikacji w trybie deweloperskim:
-
-1. **Zaloguj się** na `http://localhost:3000/login` używając `admin@elion.com` / `ElionOmega1`
-2. **Przejdź do Chat** i wyślij wiadomość - Agent Core automatycznie użyje Tool Use i RAG
-3. **Sprawdź Agi Page** - zobaczysz status wszystkich serwisów
-4. **Sprawdź Opportunities** - zobaczysz listę możliwości biznesowych
-5. **Sprawdź Lessons** - zobaczysz listę lekcji
-6. **Sprawdź Memory** - zobaczysz pamięć projektu
-7. **Sprawdź Settings** - możesz zmienić ustawienia użytkownika
-
----
-
-## 🐛 Rozwiązywanie Problemów
-
-### Błąd: `ECONNREFUSED` podczas migracji bazy danych
-
-**Przyczyna:** Baza danych PostgreSQL nie jest uruchomiona.
-
-**Rozwiązanie:**
-```bash
-docker-compose up -d
-```
-
-### Błąd: `Invalid token` podczas logowania
-
-**Przyczyna:** Brak lub nieprawidłowy `JWT_SECRET` w pliku `.env`.
-
-**Rozwiązanie:**
-```bash
-# Dodaj do .env
-JWT_SECRET=your_super_secret_jwt_key_here
-```
-
-### Błąd: `OpenAI API Key not set`
-
-**Przyczyna:** Brak klucza API OpenAI w pliku `.env`.
-
-**Rozwiązanie:**
-```bash
-# Dodaj do .env
-OPENAI_API_KEY=your_openai_api_key_here
-```
-
----
-
-## 📝 Licencja
-
-Ten projekt jest własnością **ELION OMEGA** i jest udostępniany wyłącznie do celów wewnętrznych.
-
----
-
-## 🎯 Kontakt
-
-W przypadku pytań lub problemów, skontaktuj się z zespołem deweloperskim.
-
----
-
-**Wersja:** 1.0.0 (Production-Ready)
-**Data:** 2025-01-04
-test
+UNLICENSED — all rights reserved.

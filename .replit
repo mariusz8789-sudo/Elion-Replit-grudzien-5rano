@@ -1,7 +1,9 @@
-modules = ["nodejs-20", "web"]
+# nodejs-22 is a hard requirement, not a preference: the reasoning package is
+# TypeScript imported directly by the server, which needs Node's type stripping
+# (>= 22.18, declared in engines). On nodejs-20 the server fails at import.
+modules = ["nodejs-22", "web"]
 [agent]
 expertMode = true
-integrations = ["javascript_openai:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
@@ -44,5 +46,5 @@ externalPort = 8080
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["node", "packages/backend/dist/index.js"]
+run = ["node", "packages/backend/src/server.mjs"]
 build = ["npm", "run", "build"]

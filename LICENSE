@@ -1,0 +1,16 @@
+Copyright (c) 2026 Właściciel projektu Genesis OS. Wszelkie prawa zastrzeżone.
+All rights reserved.
+
+Kod źródłowy Genesis OS jest własnością autora projektu i nie jest objęty
+licencją otwartą. Kopiowanie, modyfikowanie, dystrybucja lub użycie komercyjne
+bez pisemnej zgody właściciela jest zabronione.
+
+Uwagi o danych i treściach osób trzecich:
+- Dane naukowe wykorzystywane przez aplikację pochodzą ze źródeł otwartych
+  (m.in. NIST, NASA/JPL — domena publiczna; CERN Open Data — CC0; PDG — wolny
+  dostęp z cytowaniem) — szczegóły i zasady użycia: RESEARCH.md.
+- Zależności open source (React, Vite, @anthropic-ai/sdk itd.) pozostają na
+  swoich licencjach (MIT i zgodne).
+
+Status licencyjny może zostać zmieniony świadomą decyzją właściciela
+(np. otwarcie części silnika symulacji) — do tego czasu obowiązuje powyższe.

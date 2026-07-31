@@ -1,0 +1,455 @@
+{
+  "schema": "genesis-validation-supplementary/1",
+  "generatedFrom": {
+    "generatedAt": "(run timestamp omitted for deterministic hashing)",
+    "engineVersions": {
+      "RDKit": "2026.03.3",
+      "ADMET-AI": "2.0.1",
+      "Vina": "1.2.7"
+    },
+    "node": "v22.22.2",
+    "resultHash": "d81a4a77a5da7f8aa3386f74a9970ec04a0514676f0b16cbd118f6b24905319e"
+  },
+  "result": {
+    "version": "genesis-scientific-validation-suite/1",
+    "metrics": {
+      "descriptorAccuracy": {
+        "status": "COMPLETED",
+        "metric": "descriptorAccuracy",
+        "labelProvenance": "DETERMINISTIC_CHEMISTRY",
+        "n": 13,
+        "tolerance": 0.6,
+        "rmse": 0,
+        "mae": 0,
+        "pearsonR": 1,
+        "maxAbsError": 0,
+        "pass": true,
+        "cases": [
+          {
+            "name": "water",
+            "formula": "H2O",
+            "referenceMolWt": 18.015,
+            "computedMolWt": 18.015,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "methanol",
+            "formula": "CH4O",
+            "referenceMolWt": 32.042,
+            "computedMolWt": 32.042,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "ethanol",
+            "formula": "C2H6O",
+            "referenceMolWt": 46.069,
+            "computedMolWt": 46.069,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "acetic acid",
+            "formula": "C2H4O2",
+            "referenceMolWt": 60.052,
+            "computedMolWt": 60.052,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "benzene",
+            "formula": "C6H6",
+            "referenceMolWt": 78.114,
+            "computedMolWt": 78.114,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "toluene",
+            "formula": "C7H8",
+            "referenceMolWt": 92.141,
+            "computedMolWt": 92.141,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "phenol",
+            "formula": "C6H6O",
+            "referenceMolWt": 94.113,
+            "computedMolWt": 94.113,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "aspirin",
+            "formula": "C9H8O4",
+            "referenceMolWt": 180.159,
+            "computedMolWt": 180.159,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "paracetamol",
+            "formula": "C8H9NO2",
+            "referenceMolWt": 151.165,
+            "computedMolWt": 151.165,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "ibuprofen",
+            "formula": "C13H18O2",
+            "referenceMolWt": 206.285,
+            "computedMolWt": 206.285,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "caffeine",
+            "formula": "C8H10N4O2",
+            "referenceMolWt": 194.194,
+            "computedMolWt": 194.194,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "naproxen",
+            "formula": "C14H14O3",
+            "referenceMolWt": 230.263,
+            "computedMolWt": 230.263,
+            "absError": 0,
+            "withinTolerance": true
+          },
+          {
+            "name": "glucose",
+            "formula": "C6H12O6",
+            "referenceMolWt": 180.156,
+            "computedMolWt": 180.156,
+            "absError": 0,
+            "withinTolerance": true
+          }
+        ]
+      },
+      "rankingRecovery": {
+        "status": "COMPLETED",
+        "metric": "rankingRecovery",
+        "labelProvenance": "COMPUTATIONAL_CRITERION",
+        "criterion": "curated small-molecule drug set (aspirin/ibuprofen/caffeine/paracetamol/naproxen) vs simple non-drug molecules",
+        "n": 13,
+        "positives": 5,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "topK": {
+          "top1": {
+            "precisionAtK": 1,
+            "recallAtK": 0.2,
+            "hitAtK": 1
+          },
+          "top5": {
+            "precisionAtK": 1,
+            "recallAtK": 1,
+            "hitAtK": 1
+          },
+          "top10": {
+            "precisionAtK": 0.5,
+            "recallAtK": 1,
+            "hitAtK": 1
+          }
+        },
+        "enrichment": {
+          "ef10": 2.6,
+          "ef20": 2.6
+        },
+        "rocAuc": 1,
+        "note": "metrics validate the ranking + recovery MACHINERY against non-experimental labels; real biological recovery requires EXPERIMENTAL labels"
+      },
+      "rankingStability": {
+        "status": "COMPLETED",
+        "metric": "rankingStability",
+        "n": 13,
+        "spearmanRho": 1,
+        "identicalOrder": true,
+        "stable": true
+      },
+      "reproducibility": [
+        {
+          "status": "COMPLETED",
+          "metric": "reproducibility",
+          "label": "descriptorAccuracy",
+          "runs": 3,
+          "reproducible": true,
+          "hash": "c738fd811e3407b6b121d42e10882aa6f540ec2c75deb33ce746e7c30dab9967",
+          "hashes": [
+            "c738fd811e3407b6b121d42e10882aa6f540ec2c75deb33ce746e7c30dab9967",
+            "c738fd811e3407b6b121d42e10882aa6f540ec2c75deb33ce746e7c30dab9967",
+            "c738fd811e3407b6b121d42e10882aa6f540ec2c75deb33ce746e7c30dab9967"
+          ]
+        },
+        {
+          "status": "COMPLETED",
+          "metric": "reproducibility",
+          "label": "rankingRecovery",
+          "runs": 3,
+          "reproducible": true,
+          "hash": "f0db7ef441c5b16588934d12b8dabd5f9fe11efb5f0a935edcc3d8f0dd1324b6",
+          "hashes": [
+            "f0db7ef441c5b16588934d12b8dabd5f9fe11efb5f0a935edcc3d8f0dd1324b6",
+            "f0db7ef441c5b16588934d12b8dabd5f9fe11efb5f0a935edcc3d8f0dd1324b6",
+            "f0db7ef441c5b16588934d12b8dabd5f9fe11efb5f0a935edcc3d8f0dd1324b6"
+          ]
+        },
+        {
+          "status": "COMPLETED",
+          "metric": "reproducibility",
+          "label": "truthDecisions",
+          "runs": 3,
+          "reproducible": true,
+          "hash": "a545081e724ee4580db31fe2bdc1969316a4ff67fa003ca889d9670d3d64b828",
+          "hashes": [
+            "a545081e724ee4580db31fe2bdc1969316a4ff67fa003ca889d9670d3d64b828",
+            "a545081e724ee4580db31fe2bdc1969316a4ff67fa003ca889d9670d3d64b828",
+            "a545081e724ee4580db31fe2bdc1969316a4ff67fa003ca889d9670d3d64b828"
+          ]
+        },
+        {
+          "metric": "reproducibility",
+          "label": "campaign",
+          "runs": 2,
+          "reproducible": true,
+          "hash": "67d761ec7fbe95c5ced2c7fdf22768764f2993b3a8285ac7b5acd8eb29bbea79"
+        }
+      ],
+      "truth": {
+        "status": "COMPLETED",
+        "metric": "truthEngineBenchmark",
+        "n": 5,
+        "accuracy": 1,
+        "consistency": 1,
+        "results": [
+          {
+            "name": "insufficient_information",
+            "expected": "INSUFFICIENT_DATA",
+            "actual": "INSUFFICIENT_DATA",
+            "correct": true,
+            "consistent": true,
+            "error": null
+          },
+          {
+            "name": "efficiency_over_100pct",
+            "expected": "BLOCK",
+            "actual": "BLOCK",
+            "correct": true,
+            "consistent": true,
+            "error": null
+          },
+          {
+            "name": "energy_out_gt_in",
+            "expected": "BLOCK",
+            "actual": "BLOCK",
+            "correct": true,
+            "consistent": true,
+            "error": null
+          },
+          {
+            "name": "material_over_temperature",
+            "expected": "BLOCK",
+            "actual": "BLOCK",
+            "correct": true,
+            "consistent": true,
+            "error": null
+          },
+          {
+            "name": "well_specified_consistent",
+            "expected": "GO",
+            "actual": "GO",
+            "correct": true,
+            "consistent": true,
+            "error": null
+          }
+        ]
+      },
+      "mcre": {
+        "status": "COMPLETED",
+        "metric": "mcreBenchmark",
+        "n": 3,
+        "accuracy": 1,
+        "consistency": 1,
+        "results": [
+          {
+            "name": "reported_activity_vs_predicted_liability",
+            "expectConflict": true,
+            "detected": true,
+            "conflicts": 1,
+            "correct": true,
+            "consistent": true,
+            "error": null
+          },
+          {
+            "name": "no_data_no_conflict",
+            "expectConflict": false,
+            "detected": false,
+            "conflicts": 0,
+            "correct": true,
+            "consistent": true,
+            "error": null
+          },
+          {
+            "name": "ki_vs_ic50_interpretation",
+            "expectConflict": true,
+            "detected": true,
+            "conflicts": 1,
+            "correct": true,
+            "consistent": true,
+            "error": null
+          }
+        ]
+      }
+    },
+    "researchQuality": {
+      "version": "genesis-research-quality/1",
+      "pass": true,
+      "score": 1,
+      "passedChecks": 8,
+      "totalChecks": 8,
+      "checks": [
+        {
+          "dimension": "provenance.integrity",
+          "pass": true,
+          "detail": "dossierHash recomputes exactly"
+        },
+        {
+          "dimension": "provenance.evidence",
+          "pass": true,
+          "detail": "campaign evidence provenance present"
+        },
+        {
+          "dimension": "provenance.candidates",
+          "pass": true,
+          "detail": "all 20 candidates carry provenance"
+        },
+        {
+          "dimension": "confidence",
+          "pass": true,
+          "detail": "every candidate has a computationalConfidence"
+        },
+        {
+          "dimension": "uncertainty",
+          "pass": true,
+          "detail": "6 remaining-uncertainty statements"
+        },
+        {
+          "dimension": "explainability",
+          "pass": true,
+          "detail": "every candidate has rationale + nextExperiment + alternatives"
+        },
+        {
+          "dimension": "honesty",
+          "pass": true,
+          "detail": "drug verdict NO; ADMET MODEL_INFERRED; docking MODEL_ESTIMATE"
+        },
+        {
+          "dimension": "experimentalRecommendations",
+          "pass": true,
+          "detail": "4 recommendations"
+        }
+      ]
+    },
+    "readiness": {
+      "version": "genesis-readiness/1",
+      "overall": 0.7493,
+      "overallBand": "MEDIUM",
+      "dimensions": {
+        "research": {
+          "score": 0.95,
+          "band": "HIGH",
+          "computationalScore": 1,
+          "externalCeiling": 0.95,
+          "evidence": [
+            "descriptor correctness pass=true (MAE 0 g/mol)",
+            "reproducibility 100% of checks bit-identical",
+            "research-quality 8/8 checks",
+            "Truth consistency 100%, MCRE consistency 100%"
+          ],
+          "gaps": [
+            "Live external evidence + biological validation are external (V3)."
+          ]
+        },
+        "biotech": {
+          "score": 0.6183,
+          "band": "MEDIUM",
+          "computationalScore": 0.8833,
+          "externalCeiling": 0.7,
+          "evidence": [
+            "real engines executed: RDKit, TruthEngine, MCRE, AutoDock Vina",
+            "blocked engines honestly reported: none",
+            "recovery ROC-AUC 1 (COMPUTATIONAL_CRITERION)"
+          ],
+          "gaps": [
+            "MD-in-loop, MM-GBSA/FEP, off-target panel, wet-lab validation are external / Genesis V3."
+          ]
+        },
+        "pharma": {
+          "score": 0.55,
+          "band": "MEDIUM",
+          "computationalScore": 1,
+          "externalCeiling": 0.55,
+          "evidence": [
+            "provenance integrity verified (hash recomputes)",
+            "reproducibility 100%",
+            "Truth-Engine accuracy 100%"
+          ],
+          "gaps": [
+            "GxP audit trail depth, lead-opt/FEP, clinical validation, regulatory review are external / V3."
+          ]
+        },
+        "grant": {
+          "score": 0.9,
+          "band": "HIGH",
+          "computationalScore": 1,
+          "externalCeiling": 0.9,
+          "evidence": [
+            "reproducible, provenance-hashed validation with auto-generated methodology + figures + tables",
+            "8/8 research-quality checks passed",
+            "descriptor correctness vs first-principles chemistry (Pearson r=1)"
+          ],
+          "gaps": [
+            "Live-data reference campaign requires network egress (external)."
+          ]
+        },
+        "investor": {
+          "score": 0.728,
+          "band": "MEDIUM",
+          "computationalScore": 0.9333,
+          "externalCeiling": 0.78,
+          "evidence": [
+            "quantified, reproducible benchmark metrics (not claims): descriptor MAE, reproducibility, recovery, Truth/MCRE accuracy",
+            "real engines: RDKit, TruthEngine, MCRE, AutoDock Vina",
+            "honesty contract enforced — no fabricated metrics or evidence"
+          ],
+          "gaps": [
+            "A live-data reference campaign + design-partner traction remain (external)."
+          ]
+        }
+      },
+      "note": "Scores reflect COMPUTATIONAL validation only; biological/clinical validation and live external data are external dependencies (Genesis V3)."
+    },
+    "enginesExecuted": [
+      "RDKit",
+      "TruthEngine",
+      "MCRE",
+      "AutoDock Vina"
+    ],
+    "blockedEngines": [],
+    "campaignValidation": {
+      "candidateRanking": 10,
+      "dossierResearchQuality": {
+        "pass": true,
+        "score": 1
+      },
+      "campaignReproducible": true,
+      "dossierHash": "67d761ec7fbe95c5ced2c7fdf22768764f2993b3a8285ac7b5acd8eb29bbea79"
+    }
+  }
+}

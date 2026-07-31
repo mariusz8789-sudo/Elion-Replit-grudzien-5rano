@@ -1,0 +1,36 @@
+{
+  "schema": "genesis-reproducibility-package/1",
+  "suiteVersion": "genesis-scientific-validation-suite/1",
+  "generatedAt": "(run timestamp omitted for deterministic hashing)",
+  "engineVersions": {
+    "RDKit": "2026.03.3",
+    "ADMET-AI": "2.0.1",
+    "Vina": "1.2.7"
+  },
+  "node": "v22.22.2",
+  "python": null,
+  "determinism": "All benchmarks are deterministic; reported hashes reproduce bit-for-bit under identical inputs + engine versions.",
+  "hashes": {
+    "resultHash": "d81a4a77a5da7f8aa3386f74a9970ec04a0514676f0b16cbd118f6b24905319e",
+    "reproducibility": [
+      {
+        "label": "descriptorAccuracy",
+        "hash": "c738fd811e3407b6b121d42e10882aa6f540ec2c75deb33ce746e7c30dab9967"
+      },
+      {
+        "label": "rankingRecovery",
+        "hash": "f0db7ef441c5b16588934d12b8dabd5f9fe11efb5f0a935edcc3d8f0dd1324b6"
+      },
+      {
+        "label": "truthDecisions",
+        "hash": "a545081e724ee4580db31fe2bdc1969316a4ff67fa003ca889d9670d3d64b828"
+      },
+      {
+        "label": "campaign",
+        "hash": "67d761ec7fbe95c5ced2c7fdf22768764f2993b3a8285ac7b5acd8eb29bbea79"
+      }
+    ]
+  },
+  "reproduceCommand": "node scripts/run-scientific-validation.mjs",
+  "honesty": "No fabricated data. Computational validation only; biological/clinical validation and live external data are external dependencies."
+}

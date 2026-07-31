@@ -242,7 +242,7 @@ export function auditCitations(edges: GraphEdge[] = GRAPH_EDGES): CitationAudit 
  * When this reaches 0, delete the constant and make a non-empty `citations` a
  * hard requirement instead. That deletion is the milestone.
  */
-export const UNCITED_CLAIM_EDGES = 2;
+export const UNCITED_CLAIM_EDGES = 1;
 
 /**
  * RATCHET TWO. Citations in the graph that no machine has resolved.
@@ -260,7 +260,7 @@ export const UNCITED_CLAIM_EDGES = 2;
  * A platform selling verifiability that could not say which of its own citations
  * had been verified would be selling the appearance of the thing.
  */
-export const UNRESOLVED_CITATIONS = 34;
+export const UNRESOLVED_CITATIONS = 35;
 
 /* ------------------------------ cancer axis ------------------------------ */
 
@@ -398,9 +398,14 @@ const BIOMARKER_EDGES_SOURCE: CuratedEdge[] = [
   { from: 'p16-burden', to: 'cellular-senescence', kind: 'measures', effect: 'measures', honesty: 'simplified',
     mechanism: 'Proxy for senescent load; p16 also rises in non-senescent contexts, so a panel is required.',
     citations: [{ pmid: '28650766', doi: '10.1080/15384101.2017.1339850', label: 'Frescas 2017', checked: 'cross-checked' }] },
-  // UNCITED. Needs a source for the CONFOUND — IL-6 and TNF-alpha moving with
-  // infection and adiposity independently of senescent burden. Searches returned
-  // papers proposing SASP panels, which is the opposite claim.
+  // UNCITED, and re-attempted once already. Searches for the CONFOUND (IL-6/
+  // TNF-alpha rising with infection or adiposity independent of senescent
+  // burden — the specific claim this edge makes) returned papers proposing SASP
+  // panels or discussing senescence-marker heterogeneity in general, none of
+  // which is a confident, cross-checkable primary source for THIS confound as
+  // stated. Per instruction: keep CAPABILITY_GAP rather than force a marginal
+  // fit. Next attempt should search the obesity/adiposity literature directly
+  // for IL-6 rather than the senescence literature.
   { from: 'inflammatory-panel', to: 'sasp', kind: 'measures', effect: 'measures', honesty: 'simplified',
     mechanism: 'Circulating cytokines partly reflect SASP output, but the same analytes move with infection and adiposity.' },
   { from: 'nad-pool', to: 'mitochondrial-dysfunction', kind: 'measures', effect: 'measures', honesty: 'exact',
@@ -415,10 +420,9 @@ const BIOMARKER_EDGES_SOURCE: CuratedEdge[] = [
   { from: 'autophagic-flux', to: 'autophagy', kind: 'measures', effect: 'measures', honesty: 'exact',
     mechanism: 'Direct measurement of pathway throughput.',
     citations: [{ pmid: '33634751', doi: '10.1080/15548627.2020.1797280', label: 'Klionsky 2021', checked: 'cross-checked' }] },
-  // UNCITED. The edge concedes its own weakness ("assay-dependent"). A citation
-  // must support that concession, not a single transplantation protocol. Not found.
   { from: 'regenerative-capacity', to: 'stem-cell-rejuvenation', kind: 'measures', effect: 'measures', honesty: 'simplified',
-    mechanism: 'Functional readout of the compartment, though assay-dependent.' },
+    mechanism: 'Functional readout of the compartment, though assay-dependent.',
+    citations: [{ pmid: '34463902', doi: '10.1007/s12015-021-10244-5', label: 'Gómez-Cid 2021', checked: 'cross-checked' }] },
 ];
 
 /* --------------------------- assembled graph --------------------------- */

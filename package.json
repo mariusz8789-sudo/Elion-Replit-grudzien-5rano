@@ -27,6 +27,8 @@
     "citations:worklist": "node scripts/citation-worklist.mjs",
     "citations:verify": "node scripts/verify-citations.mjs",
     "citations:brief": "node scripts/citation-brief.mjs",
+    "corpus:ingest": "node scripts/corpus-ingest.mjs",
+    "benchmark:retrospective": "node scripts/run-retrospective-benchmark.mjs",
     "benchmark:cognitive": "node scripts/cognitive-benchmark.mjs",
     "trial:discovery": "node scripts/genesis-discovery-trial.mjs",
     "campaign:zefir": "node scripts/zefir-discovery-campaign.mjs"

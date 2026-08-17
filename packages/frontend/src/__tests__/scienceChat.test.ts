@@ -32,6 +32,34 @@ describe('scienceChat: open (reuse generatora)', () => {
   });
 });
 
+describe('scienceChat: porównanie modeli (COMPARE_MODELS, FAZA 1/P5)', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('"porównaj dwa modele" -> akcja compare z domyślnym scenariuszem (SIR 1.5 vs 3)', () => {
+    const r = resolveCommand('porównaj dwa modele', null);
+    expect(r.action?.type).toBe('compare');
+    if (r.action?.type === 'compare') {
+      expect(r.action.a.params.r0).toBe(1.5);
+      expect(r.action.b.params.r0).toBe(3);
+    }
+  });
+
+  it('"porównaj SIR R0=1.5 z SIR R0=3" -> wyłapuje obie liczby jako R0', () => {
+    const r = resolveCommand('porównaj SIR R0=1.5 z SIR R0=3', null);
+    expect(r.action?.type).toBe('compare');
+    if (r.action?.type === 'compare') {
+      expect(r.action.a.params.r0).toBe(1.5);
+      expect(r.action.b.params.r0).toBe(3);
+      expect(r.action.a.params.model).toBe('SIR');
+    }
+  });
+
+  it('compare ma priorytet nad open — „porównaj SIR..." nie otwiera pojedynczego modelu', () => {
+    const r = resolveCommand('porównaj SIR 2 z SIR 4', null);
+    expect(r.action?.type).toBe('compare');
+  });
+});
+
 describe('scienceChat: sterowanie parametrem aktualnej symulacji', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 
@@ -129,10 +157,10 @@ describe('scienceChat: Scientific Memory (zapis / lista / wczytanie)', () => {
 describe('scienceChat: uczciwe TODO dla niegotowych funkcji', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 
-  it('"porównaj dwa modele" -> TODO (Faza 5), nie atrapa', () => {
+  it('"porównaj dwa modele" -> realna akcja compare (P5 gotowe), nawet z otwartą symulacją', () => {
     const r = resolveCommand('porównaj dwa modele', ctx());
-    expect(r.todo).toBe(true);
-    expect(r.action).toBeUndefined();
+    expect(r.action?.type).toBe('compare');
+    expect(r.todo).toBeFalsy();
   });
 
   it('"sprawdź wynik" -> weryfikacja oznaczona TODO', () => {

@@ -2,6 +2,8 @@ import type { HonestyLevel, ParamDef, SimParams } from '../types';
 import { resolveQuery } from '../generator/resolve';
 import { getRecipes, type SimulationRecipe } from '../generator/recipe';
 import { normalize } from '../generator/resolve';
+import { defaultComparison, type ModelConfig } from '../epidemic/compare';
+import { DEFAULT_EPIDEMIC, type EpidemicModel } from '../epidemic/sir';
 
 /**
  * Resolver komend Science Chat (INTENT / COMMAND RESOLVER w architekturze
@@ -27,7 +29,8 @@ export type ChatAction =
   | { type: 'control'; op: 'pause' | 'run' | 'reset' }
   | { type: 'save' }
   | { type: 'list' }
-  | { type: 'load'; index: number };
+  | { type: 'load'; index: number }
+  | { type: 'compare'; a: ModelConfig; b: ModelConfig };
 
 export interface ChatResponse {
   text: string;
@@ -118,6 +121,31 @@ function recipeFor(ctx: ChatSimSnapshot): SimulationRecipe | undefined {
 
 const has = (norm: string, ...kw: string[]) => kw.some((k) => norm.includes(k));
 
+/**
+ * Buduje konfigurację porównania A vs B z SUROWEGO zdania (nie znormalizowanego —
+ * normalize usuwa kropki dziesiętne i tworzy fałszywe „0" z „R0"). Wyłapuje
+ * model (SIR/SEIR/SEIRD) i do dwóch liczb jako R0. Bez rozpoznanych liczb
+ * używa domyślnego scenariusza z dyrektywy (SIR R0=1.5 vs 3.0).
+ */
+function buildComparison(raw: string): { a: ModelConfig; b: ModelConfig } {
+  const low = raw.toLowerCase();
+  const model: EpidemicModel = /seird/.test(low) ? 'SEIRD' : /seir/.test(low) ? 'SEIR' : /\bsir\b/.test(low) ? 'SIR' : 'SIR';
+  // 1) Preferuj jawne „r0 = X" (X z kropką/przecinkiem).
+  let nums = [...low.matchAll(/r0\s*[=:]?\s*(\d+(?:[.,]\d+)?)/g)].map((m) => parseFloat(m[1].replace(',', '.')));
+  // 2) Inaczej ogólne liczby, ale najpierw usuń „r0", by cyfra 0 z niego nie liczyła się jako wartość.
+  if (nums.length < 2) {
+    nums = [...low.replace(/r0/g, ' ').matchAll(/\d+(?:[.,]\d+)?/g)]
+      .map((m) => parseFloat(m[0].replace(',', '.'))).filter((x) => x >= 0 && x <= 20);
+  }
+  const mk = (r0: number, tag: 'A' | 'B'): ModelConfig => ({
+    label: `Model ${tag} · ${model} R₀=${r0}`,
+    params: { ...DEFAULT_EPIDEMIC, model, r0 },
+  });
+  if (nums.length >= 2) return { a: mk(nums[0], 'A'), b: mk(nums[1], 'B') };
+  if (/sir|seir|seird/.test(low)) return { a: mk(1.5, 'A'), b: mk(3, 'B') };
+  return defaultComparison();
+}
+
 export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): ChatResponse {
   const norm = normalize(message);
   if (!norm) return { text: 'Napisz, co chcesz zobaczyć — np. „pokaż czarną dziurę" albo „zwiększ masę 2×".', tag: 'SYSTEM' };
@@ -137,6 +165,17 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     return { text: `Zapisuję „${ctx.experimentName}" do Pamięci Naukowej…`, tag: 'SYSTEM', action: { type: 'save' } };
   }
 
+  // --- Porównanie modeli (FAZA 1 / PRIORYTET 5) — MUSI być przed „otwórz",
+  //     bo „porównaj SIR..." trafiłby w alias 'sir' i otworzył jeden model. ---
+  if (has(norm, 'porownaj', 'porownanie', 'porownac', ' vs ', 'dwa modele', 'oba modele', 'model a', 'a vs b')) {
+    const { a, b } = buildComparison(message);
+    return {
+      text: `Otwieram porównanie modeli: ${a.label} vs ${b.label}. Zobaczysz nałożone przebiegi, różnice (szczyt, łącznie zakażonych, zgony), równania i ograniczenia. To porównanie MODELU z MODELEM, nie z rzeczywistością.`,
+      tag: 'MODEL',
+      action: { type: 'compare', a, b },
+    };
+  }
+
   // --- Otwórz zjawisko (reuse generatora) — ma priorytet, gdy pada nazwa zjawiska ---
   const open = resolveQuery(message);
   const looksLikeOpen = has(norm, 'pokaz', 'stworz', 'zbuduj', 'otworz', 'uruchom', 'zasymuluj', 'symulacj', 'wyswietl', 'chce zobaczyc', 'zbadaj', 'przeanalizuj', 'model');
@@ -147,11 +186,6 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       tag: 'MODEL',
       action: { type: 'open', labId: r.labId, experimentId: r.experimentId, params: r.params },
     };
-  }
-
-  // --- Porównanie modeli (Faza 5) — uczciwe TODO ---
-  if (has(norm, 'porownaj', 'porownanie', 'vs ', 'dwa modele')) {
-    return { text: 'Porównywanie dwóch modeli obok siebie to Faza 5 (zaprojektowana, jeszcze nie podłączona). Zapisuję to jako wymaganie. Na razie mogę otworzyć jeden model i zmieniać jego parametry.', tag: 'SYSTEM', todo: true };
   }
 
   // --- Bez otwartej symulacji: dalsze komendy wymagają kontekstu ---

@@ -3,6 +3,7 @@ import { ensureGeneratorReady, getRecipes, epistemicStatusOf, EPISTEMIC_LABELS }
 import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag } from '../core/scienceChat/resolveCommand';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { setPendingScenario } from '../core/scenarioBridge';
+import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
 import { saveExperiment, listExperiments } from '../core/scienceMemory';
 import { track } from '../core/analytics';
@@ -28,6 +29,7 @@ const SUGGESTIONS = [
   'Zwiększ masę 2×',
   'Co się zmieniło?',
   'Pokaż równanie',
+  'Porównaj SIR R0=1.5 z SIR R0=3',
   'Zapisz eksperyment',
   'Pokaż zapisane',
 ];
@@ -71,6 +73,10 @@ export function ScienceChat() {
       setPendingScenario(a.labId, a.params ?? {}, a.experimentId);
       window.location.hash = `#/lab/${a.labId}`;
       setOpen(false); // pokaż uruchomioną symulację
+    } else if (a?.type === 'compare') {
+      setPendingComparison(a.a, a.b);
+      window.location.hash = '#/compare';
+      setOpen(false);
     } else if (a?.type === 'setParam') {
       getSimContext()?.setParam(a.key, a.value);
     } else if (a?.type === 'control') {

@@ -39,6 +39,7 @@ const CandidateDiscoveryScreen = lazy(() => import('./components/CandidateDiscov
 const DrugDiscoveryScreen = lazy(() => import('./components/DrugDiscoveryScreen').then((m) => ({ default: m.DrugDiscoveryScreen })));
 const CampaignScreen = lazy(() => import('./components/CampaignScreen').then((m) => ({ default: m.CampaignScreen })));
 const SimulationGeneratorScreen = lazy(() => import('./components/SimulationGeneratorScreen').then((m) => ({ default: m.SimulationGeneratorScreen })));
+const ModelComparisonScreen = lazy(() => import('./components/ModelComparisonScreen').then((m) => ({ default: m.ModelComparisonScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -74,7 +75,8 @@ type Route =
   | { kind: 'cde' }
   | { kind: 'drug' }
   | { kind: 'campaign' }
-  | { kind: 'generate' };
+  | { kind: 'generate' }
+  | { kind: 'compare' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -94,6 +96,7 @@ function parseHash(): Route {
   if (h === '#/drug') return { kind: 'drug' };
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
+  if (h === '#/compare') return { kind: 'compare' };
   return { kind: 'home' };
 }
 
@@ -383,6 +386,18 @@ export default function App() {
           <TopBar title="🔭 Generator symulacji" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <SimulationGeneratorScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'compare') {
+      return (
+        <div className="app">
+          <TopBar title="⚖ Porównanie modeli (A vs B)" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <ModelComparisonScreen />
           </HeavyRoute>
           {overlays}
         </div>

@@ -1433,3 +1433,27 @@ kbd {
   border: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.64rem;
   color: var(--text-dim); overflow-x: auto; max-height: 240px;
 }
+
+/* --- Porównanie modeli A vs B (PRIORYTET 5) --- */
+.compare-screen { display: flex; flex-direction: column; gap: 0.9rem; }
+.compare-legend { display: flex; flex-wrap: wrap; gap: 1.2rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); }
+.compare-legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+.compare-legend i { width: 16px; height: 10px; border-radius: 3px; display: inline-block; }
+.compare-legend i.dashed { background: repeating-linear-gradient(90deg, var(--red) 0 5px, transparent 5px 8px) !important; }
+.compare-canvas { width: 100%; height: 320px; background: #070b12; border: 1px solid var(--border); border-radius: 12px; }
+.compare-controls { display: grid; grid-template-columns: 1fr; gap: 0.8rem; }
+@media (min-width: 720px) { .compare-controls { grid-template-columns: 1fr 1fr; } }
+.compare-model-card { border: 1px solid var(--border); border-top: 3px solid var(--accent, var(--border-strong)); border-radius: 12px; padding: 0.9rem 1rem; background: var(--bg-panel); display: flex; flex-direction: column; gap: 0.7rem; }
+.compare-model-title { font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; letter-spacing: 0.02em; }
+.compare-field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.82rem; color: var(--text-dim); }
+.compare-field input[type=range] { width: 100%; }
+.compare-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.compare-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.compare-table th, .compare-table td { padding: 0.55rem 0.8rem; text-align: right; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.compare-table th:first-child, .compare-table td:first-child { text-align: left; }
+.compare-table thead th { color: var(--text-faint); font-weight: 600; font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.compare-table tbody tr:last-child td { border-bottom: 0; }
+.compare-meta { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 720px) { .compare-meta { grid-template-columns: repeat(3, 1fr); } }
+.compare-meta ul { margin: 0.4rem 0 0; padding-left: 1.1rem; color: var(--text-dim); font-size: 0.82rem; }
+.compare-meta li { margin-bottom: 0.35rem; }

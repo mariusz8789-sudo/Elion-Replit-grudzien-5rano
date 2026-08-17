@@ -34,6 +34,13 @@ export interface SimAgent {
   behavior: string;
   /** ID agenta-źródła zakażenia (provenance transmisji) lub -1. */
   infectedBy: number;
+  /** Cechy „ludzkie" agenta (opcjonalne — warstwa wizualna/inspekcja). */
+  age?: number;
+  role?: string;
+  /** Ciężki przypadek skierowany do szpitala (podzbiór stanu I). */
+  hospitalized?: boolean;
+  /** Faza ruchu do animacji chodu (radiany, akumulowana z prędkości). */
+  gait?: number;
 }
 
 /** Zdarzenie transmisji w bieżącym ticku (do podświetlenia na scenie). */

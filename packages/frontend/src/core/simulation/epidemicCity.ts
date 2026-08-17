@@ -1,5 +1,5 @@
 import type { VisualSimulation, SimAgent, WorldObject, TransmissionEvent } from './types';
-import { buildCity, type CityLayout } from '../world/cityWorld';
+import { buildCity, pointInBuilding, type CityLayout } from '../world/cityWorld';
 import { spawnAgents, chooseDestination, stepMovement, type CityAgent } from '../agents/cityAgent';
 import { resolveContacts } from '../interactions/contacts';
 import { interventionEffects, type InterventionState } from '../interventions/interventions';
@@ -34,6 +34,7 @@ export interface EpidemicCityParams {
   restrictions: number;    // 0..1 (interwencja)
   isolate: boolean;        // izolacja objawowych
   mobility: number;        // 0..1 bazowa chęć wychodzenia (skalowana przez restrykcje)
+  severeRate: number;      // 0..1 odsetek zakażonych z ciężkim przebiegiem → szpital
   seed: number;
 }
 
@@ -49,6 +50,7 @@ export const DEFAULT_CITY_PARAMS: EpidemicCityParams = {
   restrictions: 0,
   isolate: false,
   mobility: 0.85,
+  severeRate: 0.15,
   seed: 20260817,
 };
 
@@ -141,28 +143,37 @@ export class EpidemicCitySimulation implements VisualSimulation {
   }
 
   private progress(isolateInfected: boolean): void {
-    const { incubationDays, infectiousDays, ifr } = this.params;
+    const { incubationDays, infectiousDays, ifr, severeRate } = this.params;
+    const hosp = this.layout.buildings.findIndex((b) => b.kind === 'hospital');
     for (const a of this.agentsArr) {
       if (a.state === 'E' && this.time - a.exposedAt >= incubationDays) {
         a.state = 'I'; a.stateSince = 0; a.infectedAt = this.time; a.behavior = 'zakażony';
+        // Ciężki przebieg → hospitalizacja (deterministycznie z RNG).
+        if (this.rng() < clamp01(severeRate) && hosp >= 0) {
+          a.hospitalized = true; a.isolated = true; a.behavior = 'szpital';
+          const pt = pointInBuilding(this.layout.buildings[hosp], this.rng);
+          a.destIdx = hosp; a.destKind = 'hospital'; a.goalX = pt.x; a.goalY = pt.y;
+        }
       }
       if (a.state === 'I') {
-        // Izolacja: wykryty objawowy zostaje skierowany do izolatki (zmiana trajektorii).
+        // Izolacja domowa: wykryty objawowy (nie-hospitalizowany) → izolatka.
         if (isolateInfected && !a.isolated && this.time - a.infectedAt >= 1) {
           a.isolated = true; a.behavior = 'izolacja';
           chooseDestination(a, this.layout, interventionEffects({ level: this.params.restrictions, isolate: true }), this.rng);
         }
         if (this.time - a.infectedAt >= infectiousDays) {
-          if (this.rng() < clamp01(ifr)) { a.state = 'D'; a.stateSince = 0; a.behavior = 'zgon'; a.vx = 0; a.vy = 0; }
-          else { a.state = 'R'; a.stateSince = 0; a.isolated = false; a.behavior = 'ozdrowiały'; }
+          // Hospitalizowani mają wyższą śmiertelność (ciężki przebieg).
+          const risk = a.hospitalized ? Math.min(1, clamp01(ifr) * 3 + 0.05) : clamp01(ifr);
+          if (this.rng() < risk) { a.state = 'D'; a.stateSince = 0; a.behavior = 'zgon'; a.vx = 0; a.vy = 0; }
+          else { a.state = 'R'; a.stateSince = 0; a.isolated = false; a.hospitalized = false; a.behavior = 'ozdrowiały'; }
         }
       }
     }
   }
 
-  private counts(): { S: number; E: number; I: number; R: number; D: number; isolated: number } {
-    const c = { S: 0, E: 0, I: 0, R: 0, D: 0, isolated: 0 };
-    for (const a of this.agentsArr) { c[a.state as 'S' | 'E' | 'I' | 'R' | 'D']++; if (a.isolated) c.isolated++; }
+  private counts(): { S: number; E: number; I: number; R: number; D: number; isolated: number; hospitalized: number } {
+    const c = { S: 0, E: 0, I: 0, R: 0, D: 0, isolated: 0, hospitalized: 0 };
+    for (const a of this.agentsArr) { c[a.state as 'S' | 'E' | 'I' | 'R' | 'D']++; if (a.isolated) c.isolated++; if (a.hospitalized) c.hospitalized++; }
     return c;
   }
 
@@ -201,6 +212,7 @@ export class EpidemicCitySimulation implements VisualSimulation {
       dzien: Math.floor(this.time),
       S: c.S, E: c.E, I: c.I, R: c.R, D: c.D,
       izolowani: c.isolated,
+      hospitalizowani: c.hospitalized,
       szczyt_I: this.peakI,
       kontakty: this.lastContactPairs,
       agenci: this.agentsArr.length,
@@ -213,12 +225,14 @@ export class EpidemicCitySimulation implements VisualSimulation {
     const a = this.agentsArr.find((x) => x.id === agentId);
     if (!a) return null;
     return {
-      id: a.id, stan: a.state, zachowanie: a.behavior,
+      id: a.id, wiek: a.age ?? 0, rola: a.role ?? '—',
+      stan: a.state, zachowanie: a.behavior,
       x: Math.round(a.x), y: Math.round(a.y),
       predkosc: Math.round(Math.hypot(a.vx, a.vy)),
       cel: `${Math.round(a.goalX)},${Math.round(a.goalY)} (${a.destKind})`,
       czas_w_stanie: a.stateSince.toFixed(2),
       izolowany: a.isolated ? 'tak' : 'nie',
+      hospitalizowany: a.hospitalized ? 'tak' : 'nie',
       zarazony_przez: a.infectedBy,
     };
   }

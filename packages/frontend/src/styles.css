@@ -1484,3 +1484,14 @@ kbd {
 @media (min-width: 900px) { .sim-controls { grid-template-columns: 1fr 1fr 1fr 1fr; } }
 .sim-control { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.78rem; color: var(--text-dim); }
 .sim-control input[type=range] { width: 100%; }
+
+/* --- Visual Fidelity: kamera, oś czasu, karta osoby --- */
+.sim-scene { cursor: grab; }
+.sim-scene:active { cursor: grabbing; }
+.sim-timeline { position: relative; height: 22px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.sim-timeline-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(90,162,255,0.35), rgba(240,85,85,0.35)); }
+.sim-timeline-label { position: absolute; left: 8px; top: 3px; font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dim); }
+.sim-person-card { position: absolute; right: 10px; top: 10px; width: 230px; background: rgba(8,12,20,0.92); border: 1px solid var(--border-strong); border-radius: 10px; padding: 0.6rem 0.75rem; box-shadow: var(--shadow-md); }
+.sim-person-card strong { font-size: 0.9rem; }
+.sim-person-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.6rem; margin: 0.4rem 0 0.5rem; font-size: 0.74rem; color: var(--text-dim); }
+.sim-person-grid b { color: var(--text); }

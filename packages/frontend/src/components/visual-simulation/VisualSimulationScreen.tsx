@@ -2,15 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS, type EpidemicCityParams } from '../../core/simulation/epidemicCity';
 import { SimulationClock, CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
 import { renderCity } from '../../core/simulationRenderer/cityRenderer';
+import {
+  defaultCamera, computeTransform, screenToWorld, zoomAt, panBy, type Camera,
+} from '../../core/simulationRenderer/camera';
 import { consumePendingComparison } from '../../core/compareBridge';
 
 /**
- * VISUAL SIMULATION SCREEN — żywa scena „Epidemia w małym mieście".
- *
- * SCENA jest głównym elementem; wykres i liczby są PODRZĘDNE. Pętla rAF pędzi
- * niezależnie od cyklu renderu Reacta: zegar → sim.tick() → renderer. React
- * zarządza tylko UI (suwaki, przyciski) i odświeża panel ~4×/s. Zmiana suwaka
- * natychmiast wpływa na świat (sim.setParam), bo silnik jest źródłem prawdy.
+ * VISUAL SIMULATION SCREEN — żywa scena „Epidemia w małym mieście" z warstwą
+ * VISUAL FIDELITY: agenci to animowani ludzie (AgentVisual), kamera (zoom/pan/
+ * follow), klik→karta osoby, oś czasu. SCENA jest główna; wykres podrzędny.
+ * Pętla rAF pędzi niezależnie od cyklu Reacta: zegar → sim.tick() → renderer.
  */
 
 const SLIDERS: { key: keyof EpidemicCityParams; label: string; min: number; max: number; step: number; unit?: string; scale?: number }[] = [
@@ -19,9 +20,9 @@ const SLIDERS: { key: keyof EpidemicCityParams; label: string; min: number; max:
   { key: 'transmissionScale', label: 'Prawd. transmisji', min: 0, max: 100, step: 5, unit: '%', scale: 100 },
   { key: 'restrictions', label: 'Restrykcje', min: 0, max: 100, step: 5, unit: '%', scale: 100 },
   { key: 'mobility', label: 'Mobilność', min: 0, max: 100, step: 5, unit: '%', scale: 100 },
+  { key: 'severeRate', label: 'Ciężkie przypadki', min: 0, max: 60, step: 5, unit: '%', scale: 100 },
   { key: 'contactRadius', label: 'Zasięg kontaktu', min: 6, max: 30, step: 1, unit: 'px' },
   { key: 'nAgents', label: 'Liczba agentów', min: 100, max: 500, step: 20 },
-  { key: 'initialInfected', label: 'Początkowo zakażeni', min: 1, max: 30, step: 1 },
 ];
 
 const STATE_LEGEND: [string, string, string][] = [
@@ -31,7 +32,6 @@ const STATE_LEGEND: [string, string, string][] = [
 
 export function VisualSimulationScreen() {
   const sim = useMemo(() => {
-    // Jeśli Science Chat/porównanie przekazało preset R0 — użyj go dla świata.
     const pending = consumePendingComparison();
     const r0 = pending?.a.params.r0 ?? DEFAULT_CITY_PARAMS.r0;
     return new EpidemicCitySimulation({ r0 });
@@ -39,24 +39,25 @@ export function VisualSimulationScreen() {
   const clock = useMemo(() => new SimulationClock(), []);
   const sceneRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<HTMLCanvasElement>(null);
+  const cam = useRef<Camera>(defaultCamera(sim.worldWidth, sim.worldHeight));
+  const followId = useRef<number>(-1);
+  const drag = useRef<{ x: number; y: number } | null>(null);
 
   const [params, setParams] = useState<EpidemicCityParams>(() => sim.getParams() as unknown as EpidemicCityParams);
   const [speed, setSpeedState] = useState<ClockSpeed>(1);
   const [running, setRunning] = useState(false);
   const [debug, setDebug] = useState(false);
   const [showChart, setShowChart] = useState(true);
-  const [focusId, setFocusId] = useState(-1);
+  const [selectedId, setSelectedId] = useState(-1);
+  const [zoomLabel, setZoomLabel] = useState(1);
   const [stats, setStats] = useState<Record<string, number>>(() => sim.stats());
-  const [tick, setTick] = useState(0);
 
   const debugRef = useRef(debug); debugRef.current = debug;
-  const chartRef2 = useRef(showChart); chartRef2.current = showChart;
-  const focusRef = useRef(focusId); focusRef.current = focusId;
+  const showChartRef = useRef(showChart); showChartRef.current = showChart;
+  const selectedRef = useRef(selectedId); selectedRef.current = selectedId;
 
-  // Pętla animacji (rAF) — niezależna od renderu Reacta.
   useEffect(() => {
-    let raf = 0; let last = performance.now();
-    let statAcc = 0;
+    let raf = 0; let last = performance.now(); let statAcc = 0;
     const frame = (now: number) => {
       const dtSec = Math.min(0.1, (now - last) / 1000); last = now;
       clock.advance(dtSec, (dtDays) => sim.tick(dtDays));
@@ -68,12 +69,21 @@ export function VisualSimulationScreen() {
           const cssW = canvas.clientWidth || 900, cssH = canvas.clientHeight || 620;
           if (canvas.width !== cssW * dpr || canvas.height !== cssH * dpr) { canvas.width = cssW * dpr; canvas.height = cssH * dpr; }
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          renderCity(ctx, sim, cssW, cssH, { debug: debugRef.current, focusId: focusRef.current, contactRadius: Number(sim.getParams().contactRadius) });
+          // Follow: kamera podąża za wybranym agentem.
+          if (followId.current >= 0) {
+            const a = sim.agents().find((x) => x.id === followId.current);
+            if (a) { cam.current.cx = a.x; cam.current.cy = a.y; }
+          }
+          const transform = computeTransform(cam.current, sim.worldWidth, sim.worldHeight, cssW, cssH);
+          renderCity(ctx, sim, cssW, cssH, {
+            transform, debug: debugRef.current, focusId: selectedRef.current,
+            contactRadius: Number(sim.getParams().contactRadius),
+          });
         }
       }
-      if (chartRef2.current) drawChart(chartRef.current, sim);
+      if (showChartRef.current) drawChart(chartRef.current, sim);
       statAcc += dtSec;
-      if (statAcc >= 0.25) { statAcc = 0; setStats(sim.stats()); setTick((t) => t + 1); }
+      if (statAcc >= 0.25) { statAcc = 0; setStats(sim.stats()); }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -83,43 +93,70 @@ export function VisualSimulationScreen() {
   const applySpeed = (s: ClockSpeed) => { clock.setSpeed(s); setSpeedState(s); setRunning(clock.running); };
   const play = () => { clock.play(); if (clock.speed === 0) applySpeed(1); setRunning(true); };
   const pause = () => { clock.pause(); setRunning(false); };
-  const step = () => { clock.singleStep((dt) => sim.tick(dt)); setStats(sim.stats()); setTick((t) => t + 1); };
-  const restart = () => { sim.reset(); clock.reset(); setRunning(false); setStats(sim.stats()); setParams(sim.getParams() as unknown as EpidemicCityParams); setTick((t) => t + 1); };
+  const step = () => { clock.singleStep((dt) => sim.tick(dt)); setStats(sim.stats()); };
+  const restart = () => { sim.reset(); clock.reset(); setRunning(false); followId.current = -1; setSelectedId(-1); setStats(sim.stats()); setParams(sim.getParams() as unknown as EpidemicCityParams); };
 
   const onSlider = (key: keyof EpidemicCityParams, raw: number, scale?: number) => {
     const value = scale ? raw / scale : raw;
     sim.setParam(key, value);
     setParams((p) => ({ ...p, [key]: value }));
-    if (key === 'nAgents' || key === 'initialInfected') { clock.reset(); setRunning(false); }
+    if (key === 'nAgents') { clock.reset(); setRunning(false); followId.current = -1; setSelectedId(-1); }
     setStats(sim.stats());
   };
   const toggleIsolate = () => { const v = !params.isolate; sim.setParam('isolate', v); setParams((p) => ({ ...p, isolate: v })); };
 
-  const onSceneClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!debug) return;
-    const canvas = sceneRef.current; if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const wx = ((e.clientX - rect.left) / rect.width) * sim.worldWidth;
-    const wy = ((e.clientY - rect.top) / rect.height) * sim.worldHeight;
-    let best = -1, bestD = Infinity;
-    for (const a of sim.agents()) { const d = (a.x - wx) ** 2 + (a.y - wy) ** 2; if (d < bestD) { bestD = d; best = a.id; } }
-    setFocusId(best);
+  // --- Kamera ---
+  const viewSize = () => { const c = sceneRef.current; return { w: c?.clientWidth || 900, h: c?.clientHeight || 620 }; };
+  const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { w, h } = viewSize();
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    cam.current = zoomAt(cam.current, factor, e.clientX - rect.left, e.clientY - rect.top, sim.worldWidth, sim.worldHeight, w, h);
+    setZoomLabel(Math.round(cam.current.zoom * 10) / 10);
   };
+  const onDown = (e: React.MouseEvent<HTMLCanvasElement>) => { drag.current = { x: e.clientX, y: e.clientY }; };
+  const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!drag.current) return;
+    const { w, h } = viewSize();
+    const tr = computeTransform(cam.current, sim.worldWidth, sim.worldHeight, w, h);
+    const dxWorld = (e.clientX - drag.current.x) / tr.scale;
+    const dyWorld = (e.clientY - drag.current.y) / tr.scale;
+    cam.current = panBy(cam.current, dxWorld, dyWorld, sim.worldWidth, sim.worldHeight);
+    drag.current = { x: e.clientX, y: e.clientY };
+    followId.current = -1; // ręczny pan wyłącza śledzenie
+  };
+  const onUp = () => { drag.current = null; };
+  const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (drag.current && (Math.abs(e.clientX - drag.current.x) > 3)) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { w, h } = viewSize();
+    const tr = computeTransform(cam.current, sim.worldWidth, sim.worldHeight, w, h);
+    const world = screenToWorld(tr, e.clientX - rect.left, e.clientY - rect.top);
+    let best = -1, bestD = Infinity;
+    for (const a of sim.agents()) { const d = (a.x - world.x) ** 2 + (a.y - world.y) ** 2; if (d < bestD) { bestD = d; best = a.id; } }
+    const maxDist = 25 / tr.scale; // tolerancja kliknięcia
+    if (best >= 0 && Math.sqrt(bestD) <= maxDist) { setSelectedId(best); followId.current = best; }
+    else { setSelectedId(-1); followId.current = -1; }
+  };
+  const zoomBtn = (factor: number) => {
+    const { w, h } = viewSize();
+    cam.current = zoomAt(cam.current, factor, w / 2, h / 2, sim.worldWidth, sim.worldHeight, w, h);
+    setZoomLabel(Math.round(cam.current.zoom * 10) / 10);
+  };
+  const resetView = () => { cam.current = defaultCamera(sim.worldWidth, sim.worldHeight); followId.current = -1; setZoomLabel(1); };
 
-  const dbg = debug && focusId >= 0 ? sim.debugInfo(focusId) : null;
-  void tick; // wymusza odświeżenie paneli zależnych od stanu silnika
+  const person = selectedId >= 0 ? sim.debugInfo(selectedId) : null;
 
   return (
     <main id="main-content" tabIndex={-1} className="home visual-sim">
       <div className="honesty-row">
         <span className="honesty educational">Model edukacyjny</span>
         <span className="honesty-note">
-          Żywa symulacja agentowa (proces, nie nagranie): zakażenie powstaje z KONTAKTÓW na scenie, ruch i izolacja wynikają ze stanu modelu.
-          Agenci to wirtualne punkty modelu, patogen abstrakcyjny „Pathogen X" — symulacja EDUKACYJNA, nie prognoza rzeczywistej epidemii.
+          Żywa symulacja agentowa: agenci to animowani ludzie, a każda animacja wynika ze STANU MODELU (ruch → chód, izolacja/szpital → zmiana trajektorii, kontakt → transmisja).
+          Wirtualne punkty modelu, patogen abstrakcyjny „Pathogen X" — symulacja EDUKACYJNA, nie prognoza.
         </span>
       </div>
 
-      {/* Pasek transportu czasu */}
       <div className="sim-transport">
         <button className="chip-btn" onClick={running ? pause : play}>{running ? '⏸ Pauza' : '▶ Start'}</button>
         <button className="chip-btn" onClick={step}>⏭ Krok</button>
@@ -129,43 +166,63 @@ export function VisualSimulationScreen() {
             <button key={s} className="chip-btn" aria-pressed={speed === s} onClick={() => applySpeed(s)}>{s}×</button>
           ))}
         </span>
+        <span className="sim-speed" role="group" aria-label="Kamera">
+          <button className="chip-btn" onClick={() => zoomBtn(1.3)} aria-label="Przybliż">＋</button>
+          <button className="chip-btn" onClick={() => zoomBtn(1 / 1.3)} aria-label="Oddal">－</button>
+          <button className="chip-btn" onClick={resetView}>Widok</button>
+        </span>
         <label className="sim-toggle"><input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} /> Debug</label>
         <label className="sim-toggle"><input type="checkbox" checked={showChart} onChange={(e) => setShowChart(e.target.checked)} /> Wykres</label>
-        <label className="sim-toggle"><input type="checkbox" checked={params.isolate} onChange={toggleIsolate} /> Izolacja objawowych</label>
-        <span className="sim-daylabel">dzień {stats.dzien ?? 0}</span>
+        <label className="sim-toggle"><input type="checkbox" checked={params.isolate} onChange={toggleIsolate} /> Izolacja</label>
+        <span className="sim-daylabel">dzień {stats.dzien ?? 0} · zoom {zoomLabel}×{followId.current >= 0 ? ` · śledzę #${followId.current}` : ''}</span>
       </div>
 
-      {/* SCENA = główny element */}
+      {/* Oś czasu (żywa) */}
+      <div className="sim-timeline" aria-label="Oś czasu">
+        <div className="sim-timeline-fill" style={{ width: `${Math.min(100, ((stats.dzien ?? 0) / 120) * 100)}%` }} />
+        <span className="sim-timeline-label">DZIEŃ {stats.dzien ?? 0} / ~120 · szczyt zakażeń w dniu, gdy I było najwyższe</span>
+      </div>
+
       <div className="sim-stage-wrap">
-        <canvas ref={sceneRef} className="sim-scene" onClick={onSceneClick} aria-label="Żywa scena symulacji: małe miasto z agentami" />
+        <canvas
+          ref={sceneRef} className="sim-scene"
+          onWheel={onWheel} onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp} onClick={onClick}
+          aria-label="Żywa scena symulacji: miasto z animowanymi ludźmi"
+        />
         <div className="sim-legend">
           {STATE_LEGEND.map(([k, c, label]) => (
             <span key={k}><i style={{ background: c }} /> {label} ({stats[k] ?? 0})</span>
           ))}
+          <span>🏥 hosp.: {stats.hospitalizowani ?? 0}</span>
         </div>
+        {person && (
+          <div className="sim-person-card">
+            <strong>👤 Osoba #{selectedId}</strong>
+            <div className="sim-person-grid">
+              <span>wiek: <b>{String(person.wiek)}</b></span>
+              <span>rola: <b>{String(person.rola)}</b></span>
+              <span>stan: <b>{String(person.stan)}</b></span>
+              <span>aktywność: <b>{String(person.zachowanie)}</b></span>
+              <span>izolacja: <b>{String(person.izolowany)}</b></span>
+              <span>szpital: <b>{String(person.hospitalizowany)}</b></span>
+              <span>zakażony przez: <b>{String(person.zarazony_przez)}</b></span>
+              <span>pozycja: <b>{String(person.x)},{String(person.y)}</b></span>
+            </div>
+            <button className="chip-btn" onClick={() => { setSelectedId(-1); followId.current = -1; }}>Przestań śledzić</button>
+          </div>
+        )}
       </div>
 
-      {/* Panel podrzędny: statystyki + wykres */}
       <div className="sim-secondary">
         <div className="sim-stats">
           <div><span>Szczyt zakażonych</span><strong>{stats.szczyt_I ?? 0}</strong></div>
-          <div><span>Kontakty / tick</span><strong>{stats.kontakty ?? 0}</strong></div>
+          <div><span>Hospitalizowani</span><strong>{stats.hospitalizowani ?? 0}</strong></div>
           <div><span>W izolacji</span><strong>{stats.izolowani ?? 0}</strong></div>
           <div><span>Zgony</span><strong>{stats.D ?? 0}</strong></div>
         </div>
         {showChart && <canvas ref={chartRef} className="sim-chart" aria-label="Wykres pomocniczy S/E/I/R/D w czasie" />}
       </div>
 
-      {dbg && (
-        <div className="sim-debug-card">
-          <strong>Agent #{focusId}</strong>
-          <div className="sim-debug-grid">
-            {Object.entries(dbg).map(([k, v]) => <span key={k}>{k}: <b>{String(v)}</b></span>)}
-          </div>
-        </div>
-      )}
-
-      {/* Sterowanie parametrami — świat reaguje na żywo */}
       <div className="section-label">Parametry (świat reaguje natychmiast)</div>
       <div className="sim-controls">
         {SLIDERS.map((s) => {
@@ -174,16 +231,15 @@ export function VisualSimulationScreen() {
             <label className="sim-control" key={s.key}>
               <span>{s.label}: <b>{raw}{s.unit ? ` ${s.unit}` : ''}</b></span>
               <input type="range" min={s.min} max={s.max} step={s.step} value={raw}
-                aria-label={s.label}
-                onChange={(e) => onSlider(s.key, Number(e.target.value), s.scale)} />
+                aria-label={s.label} onChange={(e) => onSlider(s.key, Number(e.target.value), s.scale)} />
             </label>
           );
         })}
       </div>
 
       <p className="footer-note">
-        Test akceptacyjny: ustaw R₀ = 1.5, obserwuj świat; potem R₀ = 3.0 — epidemia rozlewa się wyraźnie szybciej, ZANIM spojrzysz na wykres.
-        Silnik: core/simulation/epidemicCity.ts · zegar: core/simulationClock · renderer: core/simulationRenderer.
+        Kliknij osobę, aby ją śledzić i zobaczyć jej dane. Kółko myszy = zoom, przeciąganie = przesuwanie kamery.
+        Test akceptacyjny: R₀=1.5 vs R₀=3.0 — różnicę widać na scenie, zanim spojrzysz na wykres.
       </p>
     </main>
   );

@@ -18,6 +18,17 @@ export interface CityAgent extends SimAgent {
   infectedAt: number;   // dzień wejścia w I
 }
 
+const ROLES = ['uczeń', 'pracownik', 'senior', 'rodzic', 'sprzedawca', 'lekarz'];
+
+/** Deterministyczny wiek/rola z RNG (cecha „ludzka" agenta do inspekcji). */
+function assignPerson(rng: () => number): { age: number; role: string } {
+  const role = ROLES[Math.floor(rng() * ROLES.length)];
+  const age = role === 'uczeń' ? 6 + Math.floor(rng() * 12)
+    : role === 'senior' ? 65 + Math.floor(rng() * 25)
+    : 20 + Math.floor(rng() * 45);
+  return { age, role };
+}
+
 export interface SpawnParams {
   nAgents: number;
   initialInfected: number;
@@ -32,10 +43,12 @@ export function spawnAgents(layout: CityLayout, p: SpawnParams, rng: () => numbe
     const homeIdx = homes[Math.floor(rng() * homes.length)];
     const home = layout.buildings[homeIdx];
     const pos = pointInBuilding(home, rng);
+    const person = assignPerson(rng);
     agents.push({
       id: i, x: pos.x, y: pos.y, vx: 0, vy: 0,
       goalX: pos.x, goalY: pos.y,
       state: 'S', stateSince: 0, isolated: false, behavior: 'dom', infectedBy: -1,
+      age: person.age, role: person.role, hospitalized: false, gait: rng() * Math.PI * 2,
       homeIdx, destIdx: homeIdx, destKind: 'home', dwell: rng() * 0.5,
       exposedAt: -1, infectedAt: -1,
     });
@@ -97,5 +110,7 @@ export function stepMovement(a: CityAgent, dt: number, speed: number): boolean {
   }
   a.vx = (dx / dist) * speed; a.vy = (dy / dist) * speed;
   a.x += (dx / dist) * stepLen; a.y += (dy / dist) * stepLen;
+  // Faza chodu rośnie z pokonanym dystansem → animacja nóg wynika z RUCHU modelu.
+  a.gait = ((a.gait ?? 0) + stepLen * 0.5) % (Math.PI * 2);
   return false;
 }

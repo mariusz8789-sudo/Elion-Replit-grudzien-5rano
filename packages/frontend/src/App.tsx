@@ -28,6 +28,7 @@ import { CloudProjectsScreen } from './components/CloudProjectsScreen';
 import { CandidateDiscoveryScreen } from './components/CandidateDiscoveryScreen';
 import { DrugDiscoveryScreen } from './components/DrugDiscoveryScreen';
 import { CampaignScreen } from './components/CampaignScreen';
+import { SimulationGeneratorScreen } from './components/SimulationGeneratorScreen';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -51,7 +52,8 @@ type Route =
   | { kind: 'projects' }
   | { kind: 'cde' }
   | { kind: 'drug' }
-  | { kind: 'campaign' };
+  | { kind: 'campaign' }
+  | { kind: 'generate' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -70,6 +72,7 @@ function parseHash(): Route {
   if (h === '#/cde') return { kind: 'cde' };
   if (h === '#/drug') return { kind: 'drug' };
   if (h === '#/campaign') return { kind: 'campaign' };
+  if (h === '#/generate') return { kind: 'generate' };
   return { kind: 'home' };
 }
 
@@ -353,6 +356,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'generate') {
+      return (
+        <div className="app">
+          <TopBar title="🔭 Generator symulacji" onSearch={() => setSearchOpen(true)} />
+          <ErrorBoundary>
+            <SimulationGeneratorScreen />
+          </ErrorBoundary>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -364,7 +379,15 @@ export default function App() {
             <span className="hud-corner hud-br" aria-hidden="true" />
           </div>
           <div className="section-label">Zacznij tutaj</div>
-          <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/timeline'; }}>
+          <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/generate'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true">🔭</span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Generator symulacji</span>
+              <span className="timeline-cta-sub">Opisz zjawisko jednym zdaniem — Genesis dobierze realny model, uruchomi go i pozwoli zmieniać parametry na żywo. „Zasymuluj dylatację czasu", „zwiększ masę gwiazdy 2×"…</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
+          <button className="timeline-cta" onClick={() => { window.location.hash = '#/timeline'; }}>
             <span className="timeline-cta-icon" aria-hidden="true">🌌</span>
             <span className="timeline-cta-text">
               <span className="timeline-cta-title">Discovery Timeline</span>

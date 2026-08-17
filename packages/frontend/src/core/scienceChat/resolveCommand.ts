@@ -24,7 +24,10 @@ export type EpistemicTag =
 export type ChatAction =
   | { type: 'open'; labId: string; experimentId?: string; params?: Partial<SimParams> }
   | { type: 'setParam'; key: string; value: number | boolean | string }
-  | { type: 'control'; op: 'pause' | 'run' | 'reset' };
+  | { type: 'control'; op: 'pause' | 'run' | 'reset' }
+  | { type: 'save' }
+  | { type: 'list' }
+  | { type: 'load'; index: number };
 
 export interface ChatResponse {
   text: string;
@@ -123,9 +126,20 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   if (has(norm, 'pauza', 'zatrzymaj', 'wstrzymaj', 'stop ')) return { text: 'Wstrzymuję symulację.', tag: 'SYSTEM', action: { type: 'control', op: 'pause' } };
   if (has(norm, 'reset', 'od nowa', 'zresetuj', 'restart')) return { text: 'Restartuję symulację do stanu początkowego.', tag: 'SYSTEM', action: { type: 'control', op: 'reset' } };
 
+  // --- Scientific Memory (sekcja 21): wczytanie / lista / zapis ---
+  const loadMatch = norm.match(/(?:wczytaj|otworz zapisany|przywroc)\D*(\d+)/);
+  if (loadMatch) return { text: `Wczytuję zapisany eksperyment #${loadMatch[1]}…`, tag: 'SYSTEM', action: { type: 'load', index: parseInt(loadMatch[1], 10) } };
+  if (has(norm, 'zapisane eksperyment', 'moje eksperyment', 'pokaz zapisane', 'lista eksperyment', 'pamiec naukowa', 'historia eksperyment')) {
+    return { text: 'Twoje zapisane eksperymenty (Pamięć Naukowa, lokalnie w tej przeglądarce):', tag: 'SYSTEM', action: { type: 'list' } };
+  }
+  if (has(norm, 'zapisz eksperyment', 'zapisz to', 'zapisz symulacj', 'zapisz wynik', 'zapisz ten') || /^zapisz\b/.test(norm)) {
+    if (!ctx) return { text: 'Nie ma otwartej symulacji do zapisania. Najpierw otwórz zjawisko, np. „problem trzech ciał".', tag: 'SYSTEM' };
+    return { text: `Zapisuję „${ctx.experimentName}" do Pamięci Naukowej…`, tag: 'SYSTEM', action: { type: 'save' } };
+  }
+
   // --- Otwórz zjawisko (reuse generatora) — ma priorytet, gdy pada nazwa zjawiska ---
   const open = resolveQuery(message);
-  const looksLikeOpen = has(norm, 'pokaz', 'stworz', 'zbuduj', 'otworz', 'uruchom', 'zasymuluj', 'symulacj', 'wyswietl', 'chce zobaczyc');
+  const looksLikeOpen = has(norm, 'pokaz', 'stworz', 'zbuduj', 'otworz', 'uruchom', 'zasymuluj', 'symulacj', 'wyswietl', 'chce zobaczyc', 'zbadaj', 'przeanalizuj', 'model');
   if (open.best && (looksLikeOpen || !ctx)) {
     const r = open.best.recipe;
     return {

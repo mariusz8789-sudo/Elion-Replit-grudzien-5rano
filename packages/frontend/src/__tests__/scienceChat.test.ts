@@ -95,6 +95,37 @@ describe('scienceChat: wyjaśnienia, równania, założenia, zadania', () => {
   });
 });
 
+describe('scienceChat: Scientific Memory (zapis / lista / wczytanie)', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('"zbadaj problem trzech ciał" -> open na Universe (DEMO A)', () => {
+    const r = resolveCommand('Zbadaj problem trzech ciał', null);
+    expect(r.action?.type).toBe('open');
+    if (r.action?.type === 'open') { expect(r.action.labId).toBe('universe'); expect(r.action.experimentId).toBe('threebody'); }
+  });
+
+  it('"zapisz eksperyment" z kontekstem -> akcja save', () => {
+    const r = resolveCommand('zapisz eksperyment', ctx());
+    expect(r.action).toEqual({ type: 'save' });
+  });
+
+  it('"zapisz eksperyment" bez kontekstu -> nie zapisuje, prosi o otwarcie', () => {
+    const r = resolveCommand('zapisz eksperyment', null);
+    expect(r.action).toBeUndefined();
+    expect(r.text).toMatch(/otwórz|otworz/i);
+  });
+
+  it('"pokaż zapisane" -> akcja list', () => {
+    const r = resolveCommand('pokaż zapisane', null);
+    expect(r.action).toEqual({ type: 'list' });
+  });
+
+  it('"wczytaj 2" -> akcja load z indeksem', () => {
+    const r = resolveCommand('wczytaj 2', null);
+    expect(r.action).toEqual({ type: 'load', index: 2 });
+  });
+});
+
 describe('scienceChat: uczciwe TODO dla niegotowych funkcji', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 

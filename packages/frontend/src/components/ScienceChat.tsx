@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { ensureGeneratorReady } from '../core/generator';
+import { ensureGeneratorReady, getRecipes, epistemicStatusOf, EPISTEMIC_LABELS } from '../core/generator';
 import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag } from '../core/scienceChat/resolveCommand';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
+import { saveExperiment, listExperiments } from '../core/scienceMemory';
 import { track } from '../core/analytics';
 
 /**
@@ -23,12 +24,12 @@ const TAG_LABELS: Record<EpistemicTag, string> = {
 };
 
 const SUGGESTIONS = [
-  'Pokaż czarną dziurę',
+  'Zbadaj problem trzech ciał',
   'Zwiększ masę 2×',
   'Co się zmieniło?',
   'Pokaż równanie',
-  'Założenia modelu',
-  'Zrób zadanie',
+  'Zapisz eksperyment',
+  'Pokaż zapisane',
 ];
 
 export function ScienceChat() {
@@ -64,6 +65,7 @@ export function ScienceChat() {
     track('ask_ai_used', { via: 'science-chat' });
 
     // Efekty uboczne — sterowanie istniejącymi mechanizmami.
+    const appendGenesis = (t: string, tag: EpistemicTag = 'SYSTEM') => setTurns((prev) => [...prev, { role: 'genesis', text: t, tag }]);
     const a = res.action;
     if (a?.type === 'open') {
       setPendingScenario(a.labId, a.params ?? {}, a.experimentId);
@@ -74,6 +76,30 @@ export function ScienceChat() {
     } else if (a?.type === 'control') {
       if (a.op === 'reset') resetActiveSim();
       else toggleActiveSimRunning();
+    } else if (a?.type === 'save') {
+      const c = getSimContext();
+      if (c) {
+        const recipe = getRecipes().find((r) => r.labId === c.labId && r.experimentId === c.experimentId)
+          ?? getRecipes().find((r) => r.labId === c.labId);
+        const saved = saveExperiment({
+          labId: c.labId, experimentId: c.experimentId, experimentName: c.experimentName,
+          params: c.getParams(), stats: c.getStats(),
+          honesty: c.honesty, honestyNote: c.honestyNote,
+          equations: recipe?.equations, assumptions: recipe?.assumptions,
+          epistemicStatus: recipe ? EPISTEMIC_LABELS[epistemicStatusOf(recipe)] : undefined,
+        });
+        appendGenesis(`Zapisano ✓ Odcisk treści: #${saved.contentHash}. Rekord zawiera model, parametry, równania, założenia, status epistemiczny i migawkę wyników. Wpisz „pokaż zapisane", by wrócić do niego później.`);
+      }
+    } else if (a?.type === 'list') {
+      const recs = listExperiments();
+      if (recs.length === 0) appendGenesis('Pamięć Naukowa jest pusta. Otwórz zjawisko i powiedz „zapisz eksperyment".');
+      else appendGenesis(
+        recs.slice(0, 10).map((r, i) => `${i + 1}. ${r.experimentName} · #${r.contentHash} · ${new Date(r.createdAt).toLocaleString('pl-PL')}`).join('\n')
+        + '\n\nWpisz „wczytaj N", by go ponownie otworzyć z zapisanymi parametrami.');
+    } else if (a?.type === 'load') {
+      const rec = listExperiments()[a.index - 1];
+      if (!rec) appendGenesis(`Nie ma zapisanego eksperymentu #${a.index}. Wpisz „pokaż zapisane", by zobaczyć listę.`);
+      else { setPendingScenario(rec.labId, rec.params, rec.experimentId); window.location.hash = `#/lab/${rec.labId}`; setOpen(false); }
     }
   };
 

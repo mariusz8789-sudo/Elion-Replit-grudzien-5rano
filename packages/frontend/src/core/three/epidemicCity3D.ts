@@ -4,7 +4,7 @@ import { computeField, heatColor, type AnalysisMode } from '../simulation/analys
 import { EpidemicCitySimulation, type EpidemicCityParams } from '../simulation/epidemicCity';
 import { SimulationClock, type ClockSpeed } from '../simulationClock/clock';
 import type { SimAgent, WorldObject } from '../simulation/types';
-import type { Sim3D, ThreeRenderMetrics } from './types';
+import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -16,14 +16,25 @@ import {
 export const CITY_WORLD_SCALE = 0.018;
 const CITY_VELOCITY_SCALE_FACTOR = 0.10;
 const MAX_DETAILED_HUMANOIDS = 10;
-const MAX_CROWD_HUMANOIDS = 512;
+// InstancedMesh utrzymuje stałą liczbę draw calls; P1 umożliwia uczciwy benchmark do 1000 agentów.
+const MAX_CROWD_HUMANOIDS = 1024;
 /** Czas prezentacji odczytanego eventu — nie wpływa na czas ani prawdopodobieństwo modelu. */
 const TRANSMISSION_MARKER_LIFETIME_SECONDS = 3;
 const ANALYSIS_COLS = 36;
 const ANALYSIS_ROWS = 24;
 
+/** Presety obserwacji są cechą kamery; nie zmieniają modeli, agentów ani ich zachowania. */
+export type CityCameraPreset = 'city' | 'district' | 'street' | 'agent';
+
 export interface City3DCallbacks {
   onAgentSelected?: (agentId: number | null) => void;
+}
+
+/** Ostatnie rzeczywiście zaobserwowane A→B do prezentacji; to nie jest nowy Event Engine ani historia zdarzeń. */
+export interface CityTransmissionView {
+  from: number;
+  to: number;
+  day: number;
 }
 
 /**
@@ -50,9 +61,13 @@ export class EpidemicCity3DSim implements Sim3D {
   private selectedId: number | null = null;
   /** Cel jest ustawiany wyłącznie podczas odczytu prawdziwego TransmissionEvent. */
   private latestTransmissionTarget: number | null = null;
+  private latestTransmissionView: CityTransmissionView | null = null;
   private pointerDown: { x: number; y: number } | null = null;
   private pointerDragged = false;
   private followTarget: THREE_NS.Vector3 | null = null;
+  private cameraPreset: CityCameraPreset = 'city';
+  /** Agent pozostaje źródłem punktu kamery; preset ulicy nie tworzy wirtualnej choreografii. */
+  private cameraTrackId: number | null = null;
   private detailVisuals = new Map<number, HumanoidAgentVisual>();
   private crowd: InstancedHumanoidCrowd | null = null;
   private analysisMesh: THREE_NS.InstancedMesh | null = null;
@@ -87,6 +102,11 @@ export class EpidemicCity3DSim implements Sim3D {
     this.clock.setSpeed(speed);
   }
 
+  /** View-model UI pochodzi z najnowszego odczytu `lastTransmissions()`, nie tworzy ani nie przepisuje eventu. */
+  getLatestTransmissionView(): CityTransmissionView | null {
+    return this.latestTransmissionView;
+  }
+
   setParam(key: string, value: number | boolean): void {
     this.simulation.setParam(key, value);
   }
@@ -96,7 +116,30 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   clearSelection(): void {
+    this.cameraPreset = 'city';
+    this.cameraTrackId = null;
     this.selectAgent(null);
+  }
+
+  getCameraPreset(): CityCameraPreset {
+    return this.cameraPreset;
+  }
+
+  /** Jeden mechanizm kamery dla świata, dzielnicy, ulicy i modelowego agenta. */
+  setCameraPreset(preset: CityCameraPreset): number | null {
+    this.cameraPreset = preset;
+    if (preset === 'city') {
+      this.cameraTrackId = null;
+      this.selectAgent(null);
+      return null;
+    }
+    const agents = this.simulation.agents();
+    const moving = agents.find((agent) => Math.hypot(agent.vx, agent.vy) > 1e-3);
+    const infected = agents.find((agent) => agent.state === 'I') ?? agents.find((agent) => agent.state === 'E');
+    const candidate = preset === 'agent' ? infected ?? moving : moving ?? infected ?? agents[0] ?? null;
+    this.cameraTrackId = candidate?.id ?? null;
+    this.selectAgent(preset === 'agent' ? candidate?.id ?? null : null);
+    return candidate?.id ?? null;
   }
 
   /** Wybiera faktycznego zakażonego/narażonego agenta z aktualnego stanu modelu. */
@@ -120,6 +163,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.clock.reset();
     this.simulation.reset();
     this.latestTransmissionTarget = null;
+    this.latestTransmissionView = null;
     this.selectAgent(null);
   }
 
@@ -136,9 +180,35 @@ export class EpidemicCity3DSim implements Sim3D {
 
     this.addLightsAndGround();
     this.addRoadsAndBuildings();
+    this.addStreetAtmosphere();
     this.addAnalysisLayer();
     this.crowd = new InstancedHumanoidCrowd(THREE, MAX_CROWD_HUMANOIDS);
     this.crowd.addTo(scene);
+  }
+
+  /** Delikatny bloom wzmacnia rzeczywiste światła, okna i epidemiologiczne akcenty bez efektu "neonowej gry". */
+  setupPostProcessing(
+    modules: PostProcessingModules,
+    renderer: THREE_NS.WebGLRenderer,
+    scene: THREE_NS.Scene,
+    camera: THREE_NS.PerspectiveCamera,
+    w: number,
+    h: number,
+  ): PostProcessor {
+    const THREE = this.THREE!;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    const composer = new modules.EffectComposer(renderer);
+    composer.addPass(new modules.RenderPass(scene, camera));
+    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.42, 0.88);
+    composer.addPass(bloom);
+    composer.addPass(new modules.OutputPass());
+    return {
+      render: () => composer.render(),
+      setSize: (width, height) => composer.setSize(width, height),
+      dispose: () => composer.dispose(),
+    };
   }
 
   update(dt: number, params: SimParams): void {
@@ -184,7 +254,10 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   getOrbitFocusDistance(): number | null {
-    return this.followTarget ? 4.2 : null;
+    if (!this.followTarget) return null;
+    if (this.cameraPreset === 'district') return 8.6;
+    if (this.cameraPreset === 'street') return 5.6;
+    return 4.2;
   }
 
   onResize(w: number, h: number): void {
@@ -284,9 +357,9 @@ export class EpidemicCity3DSim implements Sim3D {
   private addLightsAndGround(): void {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
-    this.scene.add(new THREE.HemisphereLight(0xbfdcff, 0x24331d, 1.95));
-    this.scene.add(new THREE.AmbientLight(0x8fb8e8, 0.34));
-    const key = new THREE.DirectionalLight(0xffd7a1, 3.0);
+    this.scene.add(new THREE.HemisphereLight(0xa9c9ff, 0x1c3022, 1.72));
+    this.scene.add(new THREE.AmbientLight(0x7598c4, 0.28));
+    const key = new THREE.DirectionalLight(0xffd7a1, 2.65);
     key.position.set(7, 15, 8);
     key.castShadow = false;
     this.scene.add(key);
@@ -305,6 +378,81 @@ export class EpidemicCity3DSim implements Sim3D {
     ground.position.y = -0.012;
     this.scene.add(ground);
     this.buildingMeshes.push(ground);
+  }
+
+  /** Lekka, deterministyczna infrastruktura uliczna; nie jest drugim modelem miasta. */
+  private addStreetAtmosphere(): void {
+    if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
+    const worldW = this.simulation.worldWidth * CITY_WORLD_SCALE;
+    const worldH = this.simulation.worldHeight * CITY_WORLD_SCALE;
+    const streets = this.simulation.streets;
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3(1, 1, 1);
+    const rotation = new THREE.Quaternion();
+    const roadMat = new THREE.MeshBasicMaterial({ color: 0xf2f6ff, transparent: true, opacity: 0.76 });
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.62, metalness: 0.58 });
+    const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffd89a, transparent: true, opacity: 0.94 });
+    const lamps: Array<{ x: number; z: number }> = [];
+    for (const y of streets.h) for (let x = -worldW / 2 + 0.55; x < worldW / 2; x += 1.4) lamps.push({ x, z: (y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE - 0.30 });
+    for (const x of streets.v) for (let z = -worldH / 2 + 0.65; z < worldH / 2; z += 1.55) lamps.push({ x: (x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE + 0.30, z });
+    const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.022, 0.032, 0.66, 7), poleMat, lamps.length);
+    const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.055, 8, 6), bulbMat, lamps.length);
+    lamps.forEach((lamp, index) => {
+      position.set(lamp.x, 0.33, lamp.z); matrix.compose(position, rotation, scale); poles.setMatrixAt(index, matrix);
+      position.set(lamp.x, 0.67, lamp.z); matrix.compose(position, rotation, scale); bulbs.setMatrixAt(index, matrix);
+    });
+    poles.instanceMatrix.needsUpdate = true; bulbs.instanceMatrix.needsUpdate = true;
+    poles.name = 'city-streetlight-poles'; bulbs.name = 'city-streetlight-bulbs';
+    this.scene.add(poles, bulbs); this.buildingMeshes.push(poles, bulbs);
+
+    // Dziewięć punktów świetlnych na skrzyżowaniach zapewnia głębię bez kosztu światła per latarnia.
+    streets.v.forEach((x, col) => streets.h.forEach((y, row) => {
+      const light = new THREE.PointLight(0xffc875, 0.62 + ((row + col) % 3) * 0.12, 3.1, 2);
+      light.position.set((x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 1.20, (y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
+      this.scene!.add(light);
+    }));
+
+    const crossings = new THREE.InstancedMesh(new THREE.BoxGeometry(0.055, 0.009, 0.25), roadMat, streets.v.length * streets.h.length * 10);
+    let crossingIndex = 0;
+    streets.v.forEach((x) => streets.h.forEach((y) => {
+      const ix = (x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE;
+      const iz = (y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE;
+      for (let mark = -2; mark <= 2; mark++) {
+        position.set(ix + mark * 0.07, 0.026, iz - 0.23); matrix.compose(position, rotation, scale); crossings.setMatrixAt(crossingIndex++, matrix);
+        position.set(ix - 0.23, 0.026, iz + mark * 0.07); rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2); matrix.compose(position, rotation, scale); crossings.setMatrixAt(crossingIndex++, matrix); rotation.identity();
+      }
+    }));
+    crossings.count = crossingIndex; crossings.instanceMatrix.needsUpdate = true; crossings.name = 'city-crosswalks';
+    this.scene.add(crossings); this.buildingMeshes.push(crossings);
+
+    const park = this.simulation.objects().find((object) => object.kind === 'park');
+    if (park) {
+      const px = (park.x + park.w / 2 - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE;
+      const pz = (park.y + park.h / 2 - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE;
+      const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(0.15, 0.62, 7), new THREE.MeshStandardMaterial({ color: 0x1f6b43, roughness: 0.95 }), 18);
+      const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.026, 0.036, 0.34, 6), new THREE.MeshStandardMaterial({ color: 0x65412d, roughness: 1 }), 18);
+      for (let index = 0; index < 18; index++) {
+        const angle = index * 2.39996;
+        const radius = 0.26 + (index % 4) * 0.13;
+        const x = px + Math.cos(angle) * radius * 1.65;
+        const z = pz + Math.sin(angle) * radius;
+        position.set(x, 0.48, z); matrix.compose(position, rotation, scale); trees.setMatrixAt(index, matrix);
+        position.set(x, 0.17, z); matrix.compose(position, rotation, scale); trunks.setMatrixAt(index, matrix);
+      }
+      trees.instanceMatrix.needsUpdate = true; trunks.instanceMatrix.needsUpdate = true;
+      trees.name = 'city-park-tree-canopies'; trunks.name = 'city-park-tree-trunks';
+      this.scene.add(trees, trunks); this.buildingMeshes.push(trees, trunks);
+    }
+
+    const benches = new THREE.InstancedMesh(new THREE.BoxGeometry(0.32, 0.055, 0.10), new THREE.MeshStandardMaterial({ color: 0x8d5d3c, roughness: 0.78, metalness: 0.08 }), 8);
+    for (let index = 0; index < 8; index++) {
+      position.set(-worldW / 2 + 0.72 + (index % 4) * 1.7, 0.18, worldH / 2 - 0.48 - Math.floor(index / 4) * 1.2);
+      rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), index % 2 ? Math.PI / 2 : 0); matrix.compose(position, rotation, scale); benches.setMatrixAt(index, matrix); rotation.identity();
+    }
+    benches.instanceMatrix.needsUpdate = true; benches.name = 'city-street-benches';
+    this.scene.add(benches); this.buildingMeshes.push(benches);
   }
 
   private addRoadsAndBuildings(): void {
@@ -370,30 +518,44 @@ export class EpidemicCity3DSim implements Sim3D {
       park: { color: 0x3d855d, height: 0.05, roof: 0x3d855d, accent: 0x78dca0 },
     };
     const s = style[building.kind] ?? { color: 0x718096, height: 0.8, roof: 0x3f4a5a, accent: 0x9fb3c8 };
+    // Wariacja zależy wyłącznie od stabilnej geometrii CityWorld — nie jest losowym stanem dodatkowym.
+    const variation = Math.abs(Math.round(building.x * 7 + building.y * 11 + building.w * 3)) % 5;
     const body = new THREE.Mesh(
       new THREE.BoxGeometry(w, s.height, d),
-      new THREE.MeshStandardMaterial({ color: s.color, roughness: 0.82, metalness: 0.02, transparent: true, opacity: 0.72, depthWrite: false }),
+      new THREE.MeshStandardMaterial({ color: s.color, roughness: 0.76, metalness: 0.04, transparent: true, opacity: 0.88, depthWrite: false }),
     );
     body.position.y = s.height / 2;
     group.add(body);
 
     if (building.kind !== 'park') {
       const roof = new THREE.Mesh(
-        new THREE.BoxGeometry(w * 1.08, 0.12, d * 1.08),
-        new THREE.MeshStandardMaterial({ color: s.roof, roughness: 0.9, transparent: true, opacity: 0.84, depthWrite: false }),
+        new THREE.BoxGeometry(w * (1.04 + variation * 0.008), 0.12 + (variation % 2) * 0.025, d * 1.08),
+        new THREE.MeshStandardMaterial({ color: s.roof, roughness: 0.83, metalness: 0.10, transparent: true, opacity: 0.92, depthWrite: false }),
       );
       roof.position.y = s.height + 0.06;
       group.add(roof);
-      const glassMat = new THREE.MeshStandardMaterial({ color: 0xaad8f4, emissive: 0x173850, emissiveIntensity: 0.45, roughness: 0.36, metalness: 0.12 });
-      const columns = Math.max(1, Math.floor(w / 0.32));
-      const rows = Math.max(1, Math.floor(s.height / 0.34));
+      if (building.kind === 'home' || variation === 0) {
+        const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.26, 0.09), new THREE.MeshStandardMaterial({ color: 0x684d49, roughness: 0.92 }));
+        chimney.position.set(w * 0.28, s.height + 0.20, -d * 0.18); group.add(chimney);
+      }
+      const litGlass = new THREE.MeshStandardMaterial({ color: 0xd8efff, emissive: 0x8ccfff, emissiveIntensity: 0.82, roughness: 0.28, metalness: 0.14 });
+      const darkGlass = new THREE.MeshStandardMaterial({ color: 0x426b88, emissive: 0x10243a, emissiveIntensity: 0.25, roughness: 0.38, metalness: 0.16 });
+      const columns = Math.max(1, Math.floor(w / 0.30));
+      const rows = Math.max(1, Math.floor(s.height / 0.31));
       for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
-        const window = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.16, w / (columns + 1)), 0.12, 0.02), glassMat);
-        window.position.set(-w / 2 + (col + 1) * w / (columns + 1), 0.30 + row * 0.28, d / 2 + 0.012);
+        const lit = (row * 3 + col * 5 + variation) % 4 !== 0;
+        const window = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.15, w / (columns + 1.35)), 0.115, 0.024), lit ? litGlass : darkGlass);
+        window.position.set(-w / 2 + (col + 1) * w / (columns + 1), 0.28 + row * 0.26, d / 2 + 0.014);
         group.add(window);
       }
-      const sign = new THREE.Mesh(new THREE.BoxGeometry(Math.min(w * 0.62, 0.78), 0.09, 0.028), new THREE.MeshBasicMaterial({ color: s.accent }));
-      sign.position.set(0, Math.min(s.height - 0.12, 0.62), d / 2 + 0.026);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.15, w * 0.16), Math.min(0.32, s.height * 0.42), 0.038), new THREE.MeshStandardMaterial({ color: 0x183247, roughness: 0.64, metalness: 0.16, emissive: 0x091622, emissiveIntensity: 0.35 }));
+      door.position.set(variation % 2 ? w * 0.22 : -w * 0.22, Math.min(0.17, s.height * 0.21), d / 2 + 0.026); group.add(door);
+      if (building.kind !== 'home') {
+        const awning = new THREE.Mesh(new THREE.BoxGeometry(Math.min(w * 0.68, 0.90), 0.045, 0.16), new THREE.MeshStandardMaterial({ color: s.accent, emissive: s.accent, emissiveIntensity: 0.22, roughness: 0.55 }));
+        awning.position.set(0, Math.min(s.height - 0.14, 0.66), d / 2 + 0.10); group.add(awning);
+      }
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(Math.min(w * 0.62, 0.78), 0.085, 0.03), new THREE.MeshBasicMaterial({ color: s.accent }));
+      sign.position.set(0, Math.min(s.height - 0.14, 0.63), d / 2 + 0.028);
       group.add(sign);
       if (building.kind === 'hospital') {
         const crossMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -553,6 +715,7 @@ export class EpidemicCity3DSim implements Sim3D {
     for (const event of this.simulation.lastTransmissions()) {
       const key = `${event.from}-${event.to}`;
       this.latestTransmissionTarget = event.to;
+      this.latestTransmissionView = { from: event.from, to: event.to, day: Number(this.simulation.stats().dzien ?? 0) };
       alive.add(key);
       if (this.transmissionMarkers.has(key)) continue;
       const from = agents.get(event.from);
@@ -600,21 +763,28 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   private syncFollowTarget(states: readonly HumanoidAgentState[]): void {
-    if (!this.THREE || this.selectedId === null) {
+    if (!this.THREE) return;
+    const trackedId = this.selectedId ?? this.cameraTrackId;
+    if (trackedId === null) {
       this.followTarget = null;
       return;
     }
-    const selected = states.find((state) => state.id === this.selectedId);
-    if (!selected) {
+    const tracked = states.find((state) => state.id === trackedId);
+    if (!tracked) {
+      this.cameraTrackId = null;
       this.selectAgent(null);
       return;
     }
     if (!this.followTarget) this.followTarget = new this.THREE.Vector3();
-    this.followTarget.set(selected.worldX, 0.85, selected.worldZ);
+    this.followTarget.set(tracked.worldX, this.cameraPreset === 'district' ? 0.2 : 0.85, tracked.worldZ);
   }
 
   private selectAgent(id: number | null): void {
     this.selectedId = id;
+    if (id !== null) {
+      this.cameraPreset = 'agent';
+      this.cameraTrackId = id;
+    }
     this.callbacks.onAgentSelected?.(id);
   }
 }

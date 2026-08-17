@@ -1596,3 +1596,23 @@ kbd {
 .city-world-note { margin-top: .75rem; color: #7e9ab4; font-size: .69rem; line-height: 1.45; }
 @media (max-width: 1120px) { .city-world-layout { grid-template-columns: minmax(185px, 220px) minmax(0, 1fr); } .city-world-right { grid-column: span 2; display: grid; grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 760px) { .city-world-header { align-items: start; flex-direction: column; } .city-world-clock { text-align: left; } .city-world-layout, .city-world-right { grid-template-columns: 1fr; } .city-world-right { grid-column: auto; } .city-world-left { order: 2; } .city-world-right { order: 3; } .city-world-stage, .city-world-stage .city-3d-canvas { min-height: 31rem; height: 31rem; } .world-action.ghost { margin-left: 0; } .city-speed-control { border-left: 0; } }
+
+/* --- Visual P1: obiektywność świata, minimapa i bieżący odczyt transmisji --- */
+.city-camera-control { display: inline-flex; gap: .22rem; padding: .15rem .28rem; border-left: 1px solid rgba(141, 197, 255, .16); }
+.event-feed-panel, .minimap-panel, .science-chat-world-panel { padding-bottom: .68rem; }
+.world-panel-empty { margin: .62rem .72rem .18rem; color: #89a5bd; font: .68rem/1.45 var(--font-mono); }
+.event-feed-item { display: grid; grid-template-columns: .62rem minmax(0, 1fr) auto; align-items: center; gap: .48rem; margin: .65rem .72rem .12rem; }
+.event-feed-item > i { width: .48rem; height: .48rem; border-radius: 50%; background: #ff5964; box-shadow: 0 0 .7rem #ff5964; }
+.event-feed-item > div { display: grid; gap: .16rem; min-width: 0; }
+.event-feed-item b { color: #fff0f1; font: 700 .69rem/1 var(--font-mono); }
+.event-feed-item span { color: #b8c9d8; font: .63rem/1.28 var(--font-mono); overflow-wrap: anywhere; }
+.event-feed-item .world-action { padding: .32rem .42rem; font-size: .61rem; }
+.city-minimap { display: block; width: calc(100% - 1.4rem); aspect-ratio: 900 / 620; margin: .7rem; border: 1px solid rgba(130, 188, 238, .26); border-radius: .48rem; background: #173126; overflow: hidden; }
+.minimap-key { display: flex; flex-wrap: wrap; gap: .48rem .72rem; padding: 0 .72rem; color: #9eb7cc; font: .59rem/1.25 var(--font-mono); }
+.minimap-key span { display: inline-flex; align-items: center; gap: .28rem; }
+.minimap-key i { width: .52rem; height: .52rem; border-radius: .12rem; background: #6689aa; }
+.minimap-key .minimap-agent-key { border-radius: 50%; background: linear-gradient(135deg, #54d98c 0 35%, #e8b34a 35% 53%, #f05555 53% 72%, #5aa2ff 72%); }
+.science-chat-world-panel p { margin: .62rem .72rem .56rem; color: #a8bed0; font-size: .69rem; line-height: 1.42; }
+.science-chat-world-panel .world-action { margin-left: .72rem; }
+@media (max-width: 1120px) { .city-camera-control { border-left: 0; } }
+@media (max-width: 760px) { .city-camera-control { width: 100%; overflow-x: auto; } .event-feed-item { grid-template-columns: .62rem minmax(0, 1fr); } .event-feed-item .world-action { grid-column: 2; justify-self: start; } }

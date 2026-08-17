@@ -47,6 +47,11 @@ export function ScienceChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { ensureGeneratorReady(); }, []);
+  useEffect(() => {
+    const openFromWorld = () => setOpen(true);
+    window.addEventListener('genesis:open-science-chat', openFromWorld);
+    return () => window.removeEventListener('genesis:open-science-chat', openFromWorld);
+  }, []);
   useEffect(() => subscribeSimContext((c) => setCtxName(c?.experimentName ?? null)), []);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [turns, open]);
 

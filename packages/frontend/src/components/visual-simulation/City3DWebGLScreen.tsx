@@ -3,7 +3,7 @@ import { registerActiveSimControls } from '../../core/activeSimControls';
 import { registerSimContext } from '../../core/simContext';
 import { ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
 import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
-import { EpidemicCity3DSim } from '../../core/three/epidemicCity3D';
+import { EpidemicCity3DSim, type CityCameraPreset } from '../../core/three/epidemicCity3D';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 
@@ -15,7 +15,7 @@ const CITY_PARAM_DEFS: ParamDef[] = [
   { key: 'mobility', label: 'Mobilność', type: 'slider', default: 0.85, min: 0, max: 1, step: 0.05 },
   { key: 'severeRate', label: 'Ciężkie przypadki', type: 'slider', default: 0.15, min: 0, max: 0.6, step: 0.05 },
   { key: 'contactRadius', label: 'Zasięg kontaktu', type: 'slider', default: 14, min: 6, max: 30, step: 1, unit: 'px' },
-  { key: 'nAgents', label: 'Liczba agentów', type: 'slider', default: 260, min: 1, max: 500, step: 1 },
+  { key: 'nAgents', label: 'Liczba agentów', type: 'slider', default: 260, min: 1, max: 1000, step: 1 },
   { key: 'isolate', label: 'Izolacja objawowych', type: 'toggle', default: false },
 ];
 
@@ -23,6 +23,15 @@ const SLIDERS = CITY_PARAM_DEFS.filter((def) => def.type === 'slider');
 const EPIDEMIC_LEGEND = [
   ['S', 'podatny', '#54d98c'], ['E', 'narażony', '#e8b34a'], ['I', 'zakażony', '#f05555'], ['R', 'ozdrowiały', '#5aa2ff'], ['D', 'nieaktywny', '#6b7280'],
 ] as const;
+const CAMERA_PRESETS: Array<{ id: CityCameraPreset; label: string }> = [
+  { id: 'city', label: 'CITY' }, { id: 'district', label: 'DISTRICT' }, { id: 'street', label: 'STREET' }, { id: 'agent', label: 'AGENT' },
+];
+const MINIMAP_COLORS: Record<string, string> = {
+  S: '#54d98c', E: '#e8b34a', I: '#f05555', R: '#5aa2ff', D: '#6b7280',
+};
+const MINIMAP_OBJECT_COLORS: Record<string, string> = {
+  home: '#6689aa', shop: '#d4a15e', school: '#7fc0d8', hospital: '#e7edf4', isolation: '#968bac', park: '#3d855d',
+};
 
 /**
  * Główna ścieżka 3D miasta. Canvas 2D pozostaje pod #/city jako fallback,
@@ -30,7 +39,13 @@ const EPIDEMIC_LEGEND = [
  */
 export function City3DWebGLScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const sim = useMemo(() => new EpidemicCity3DSim({}, { onAgentSelected: setSelectedId }), []);
+  const [cameraPreset, setCameraPreset] = useState<CityCameraPreset>('city');
+  const sim = useMemo(() => new EpidemicCity3DSim({}, {
+    onAgentSelected: (id) => {
+      setSelectedId(id);
+      if (id !== null) setCameraPreset('agent');
+    },
+  }), []);
   const [params, setParams] = useState<SimParams>(() => sim.getSim().getParams());
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState<ClockSpeed>(1);
@@ -57,8 +72,13 @@ export function City3DWebGLScreen() {
   const pause = () => setRunning(false);
   const step = () => { sim.step(); setStats(sim.getStats()); };
   const reset = () => {
-    sim.reset(); setRunning(false); setSelectedId(null);
+    sim.reset(); setRunning(false); setSelectedId(null); setCameraPreset('city');
     setParams(sim.getSim().getParams()); setStats(sim.getStats());
+  };
+  const changeCamera = (preset: CityCameraPreset) => {
+    sim.setCameraPreset(preset);
+    setCameraPreset(preset);
+    setStats(sim.getStats());
   };
 
   useEffect(() => registerActiveSimControls({ toggleRunning: () => setRunning((value) => !value), reset }), [sim]);
@@ -78,6 +98,11 @@ export function City3DWebGLScreen() {
   const displayedAgentCount = Number(params.nAgents ?? 0);
   const renderBudget = Number(stats.webgl_total_humanoids ?? 0);
   const analysisLabel = ANALYSIS_MODES.find((mode) => mode.id === analysis)?.label ?? 'Brak';
+  const latestTransmission = sim.getLatestTransmissionView();
+  const modelObjects = sim.getSim().objects();
+  const modelAgents = sim.getSim().agents();
+  const worldWidth = sim.getSim().worldWidth;
+  const worldHeight = sim.getSim().worldHeight;
   const percentageKeys = ['transmissionScale', 'restrictions', 'mobility', 'severeRate'];
 
   return (
@@ -104,8 +129,11 @@ export function City3DWebGLScreen() {
             <button key={value} className="world-speed" aria-pressed={speed === value} onClick={() => { setSpeed(value); setRunning(true); }}>{value}×</button>
           ))}
         </span>
-        <button className="world-action accent" onClick={() => { sim.focusFirstInfected(); setStats(sim.getStats()); }}>◉ Śledź zakażonego</button>
-        <button className="world-action" onClick={() => { sim.focusLatestTransmission(); setStats(sim.getStats()); }}>↗ Ostatnia transmisja</button>
+        <span className="city-camera-control" role="group" aria-label="Poziom obserwacji świata">
+          {CAMERA_PRESETS.map((preset) => <button key={preset.id} className="world-speed" aria-pressed={cameraPreset === preset.id} onClick={() => changeCamera(preset.id)}>{preset.label}</button>)}
+        </span>
+        <button className="world-action accent" onClick={() => { sim.focusFirstInfected(); setCameraPreset(sim.getCameraPreset()); setStats(sim.getStats()); }}>◉ Śledź zakażonego</button>
+        <button className="world-action" onClick={() => { sim.focusLatestTransmission(); setCameraPreset(sim.getCameraPreset()); setStats(sim.getStats()); }}>↗ Ostatnia transmisja</button>
         <button className="world-action ghost" onClick={() => { window.location.hash = '#/city'; }}>Tryb 2D</button>
       </section>
 
@@ -147,18 +175,18 @@ export function City3DWebGLScreen() {
             {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
             {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu Canvas 2D</button>.</div>}
             <div className="city-scene-readout" aria-live="polite">
-              <span>model aktywny</span><strong>dzień {stats.dzien ?? 0}</strong><span>{analysis === 'none' ? 'widok normalny' : `warstwa: ${analysisLabel}`}</span>
+              <span>model aktywny</span><strong>dzień {stats.dzien ?? 0}</strong><span>widok: {cameraPreset}</span><span>{analysis === 'none' ? 'widok normalny' : `warstwa: ${analysisLabel}`}</span>
             </div>
             {person && (
               <aside className="city-3d-person-card city-agent-inspector">
-                <div className="agent-inspector-heading"><span>AGENT #{selectedId}</span><button onClick={() => sim.clearSelection()} aria-label="Zamknij inspekcję">×</button></div>
+                <div className="agent-inspector-heading"><span>AGENT #{selectedId}</span><button onClick={() => { sim.clearSelection(); setCameraPreset('city'); }} aria-label="Zamknij inspekcję">×</button></div>
                 <div className="agent-inspector-grid">
                   <span>wiek<b>{String(person.wiek)}</b></span><span>rola<b>{String(person.rola)}</b></span>
                   <span>stan<b>{String(person.stan)}</b></span><span>zachowanie<b>{String(person.zachowanie)}</b></span>
                   <span>izolacja<b>{String(person.izolowany)}</b></span><span>szpital<b>{String(person.hospitalizowany)}</b></span>
                   <span>zakażony przez<b>#{String(person.zarazony_przez)}</b></span>
                 </div>
-                <button className="world-action accent" onClick={() => sim.clearSelection()}>Przestań śledzić</button>
+                <button className="world-action accent" onClick={() => { sim.clearSelection(); setCameraPreset('city'); }}>Przestań śledzić</button>
               </aside>
             )}
           </div>
@@ -181,6 +209,29 @@ export function City3DWebGLScreen() {
             <div className="world-panel-heading"><span>WARSTWY</span><small>odczyt modelu</small></div>
             {ANALYSIS_MODES.filter((mode) => mode.id !== 'none').map((mode) => <button key={mode.id} className="world-layer" aria-pressed={analysis === mode.id} onClick={() => setAnalysis(mode.id)}><span>{mode.label}</span><i /></button>)}
             <label className="world-layer transmission-layer"><span>Ślady transmisji</span><input type="checkbox" checked={showTransmissions} onChange={(event) => setShowTransmissions(event.target.checked)} /></label>
+          </div>
+          <div className="world-panel event-feed-panel">
+            <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>
+            {latestTransmission ? (
+              <div className="event-feed-item event-feed-transmission">
+                <i /><div><b>Transmisja A → B</b><span>dzień {latestTransmission.day} · #{latestTransmission.from} → #{latestTransmission.to}</span></div>
+                <button className="world-action" onClick={() => { sim.focusLatestTransmission(); setCameraPreset(sim.getCameraPreset()); }}>Pokaż</button>
+              </div>
+            ) : <p className="world-panel-empty">Brak potwierdzonej transmisji w bieżącym przebiegu.</p>}
+          </div>
+          <div className="world-panel minimap-panel">
+            <div className="world-panel-heading"><span>MINIMAPA ŚWIATA</span><small>{modelAgents.length} agentów modelu</small></div>
+            <svg className="city-minimap" viewBox={`0 0 ${worldWidth} ${worldHeight}`} role="img" aria-label="Minimapa miasta z obiektami i agentami modelu">
+              <rect width={worldWidth} height={worldHeight} fill="#173126" />
+              {modelObjects.map((object, index) => <rect key={`object-${index}`} x={object.x} y={object.y} width={object.w} height={object.h} rx="4" fill={MINIMAP_OBJECT_COLORS[object.kind] ?? '#718096'} opacity={object.closed ? 0.34 : 0.92} />)}
+              {modelAgents.map((agent) => <circle key={agent.id} cx={agent.x} cy={agent.y} r="4.1" fill={MINIMAP_COLORS[agent.state] ?? '#cbd5e1'} opacity={agent.isolated ? 0.50 : 0.92} />)}
+            </svg>
+            <div className="minimap-key"><span><i className="minimap-building-key" /> obiekty</span><span><i className="minimap-agent-key" /> S/E/I/R/D</span></div>
+          </div>
+          <div className="world-panel science-chat-world-panel">
+            <div className="world-panel-heading"><span>SCIENCE CHAT</span><small>aktywny kontekst</small></div>
+            <p>Jeden punkt sterowania dla parametrów, pytań i zapisu aktualnego eksperymentu.</p>
+            <button className="world-action accent" onClick={() => window.dispatchEvent(new Event('genesis:open-science-chat'))}>Otwórz panel</button>
           </div>
           <div className="world-panel observability-panel">
             <div className="world-panel-heading"><span>OBSERWOWALNOŚĆ</span><small>renderer</small></div>

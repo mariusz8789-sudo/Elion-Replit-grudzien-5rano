@@ -85,17 +85,37 @@ export type GenesisEventInput<P extends Record<string, unknown> = Record<string,
 
 export interface ValidationResult { ok: boolean; errors: string[] }
 
+export const PROVENANCE_ORIGINS = ['model', 'experiment-action', 'consequence-rule'] as const;
+export const EVENT_TYPE_PATTERN = /^[a-z0-9]+(\.[a-z0-9]+)+$/;
+
+function isEntityRef(v: unknown): boolean {
+  if (!v || typeof v !== 'object') return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.kind === 'string' && o.kind.length > 0 && (typeof o.id === 'string' || typeof o.id === 'number');
+}
+
 /** Walidacja kształtu zdarzenia (bez znajomości domeny). */
 export function validateEvent(e: Partial<GenesisEvent>): ValidationResult {
   const errors: string[] = [];
-  if (!e.type || typeof e.type !== 'string' || !/^[a-z0-9]+(\.[a-z0-9]+)+$/.test(e.type)) {
+  if (!e.type || typeof e.type !== 'string' || !EVENT_TYPE_PATTERN.test(e.type)) {
     errors.push('type must be a dotted lowercase string (e.g. "infection.transmission")');
   }
   if (typeof e.timestamp !== 'number' || !Number.isFinite(e.timestamp)) errors.push('timestamp must be a finite number');
   if (!Array.isArray(e.affectedEntities)) errors.push('affectedEntities must be an array');
+  else if (!e.affectedEntities.every(isEntityRef)) errors.push('affectedEntities entries must be {kind:string, id:string|number}');
+  if (e.source != null && !isEntityRef(e.source)) errors.push('source, when present, must be {kind:string, id:string|number}');
+  if (e.location != null) {
+    const l = e.location;
+    if (typeof l.x !== 'number' || typeof l.y !== 'number' || (l.z != null && typeof l.z !== 'number')) {
+      errors.push('location, when present, must have numeric x, y (and optional numeric z)');
+    }
+  }
   if (e.severity != null && (typeof e.severity !== 'number' || e.severity < 0 || e.severity > 1)) {
     errors.push('severity, when present, must be in [0,1]');
   }
   if (e.parameters == null || typeof e.parameters !== 'object') errors.push('parameters must be an object');
+  if (e.provenance != null && !PROVENANCE_ORIGINS.includes(e.provenance.origin)) {
+    errors.push(`provenance.origin must be one of ${PROVENANCE_ORIGINS.join(' | ')}`);
+  }
   return { ok: errors.length === 0, errors };
 }

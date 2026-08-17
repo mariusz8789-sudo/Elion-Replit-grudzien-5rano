@@ -2,43 +2,55 @@ import type { GenesisEvent, GenesisEventInput } from './genesisEvent';
 import type { EventRegistry } from './eventRegistry';
 
 /**
- * CONSEQUENCE ENGINE — TYLKO FUNDAMENT ARCHITEKTONICZNY.
+ * CONSEQUENCE ENGINE — neutralna warstwa PRZYCZYNOWOŚCI zdarzeń.
  *
  * Łańcuch: Event → Rule → Secondary Event → (Model) → Result.
- * Ta warstwa odpowiada wyłącznie za PRZYCZYNOWOŚĆ zdarzeń (kto z czego wynika),
- * a nie za obliczenia domenowe — te delegujemy do ISTNIEJĄCEGO core/modelGraph
- * (nie tworzymy drugiego grafu). Reguła może w `derive` policzyć skutek przez
- * model/graf i wystawić zdarzenie potomne z `parentEventId` = zdarzenie źródłowe.
- *
- * NIE implementujemy tu żadnej domeny (flood/fire/earthquake/blackout/asteroid).
- * To dowód, że jedno prawdziwe zdarzenie może rozgałęzić się przez neutralne
- * reguły z zachowaniem provenance i łańcucha rodzic-dziecko.
+ * Ta warstwa NIE liczy fizyki domenowej — obliczenia deleguje do istniejącego
+ * core/modelGraph (nie tworzymy drugiego grafu). Reguła jedynie DECYDUJE, jakie
+ * zdarzenie potomne powstaje z jakiego zdarzenia źródłowego i z jakim
+ * ładunkiem/entities/provenance.
  */
 
-export interface ConsequenceRule {
-  id: string;
-  description: string;
-  /** Czy reguła dotyczy danego zdarzenia (np. po type). */
-  appliesTo(event: GenesisEvent): boolean;
-  /**
-   * Wyprowadza zdarzenia potomne. NIE ustawia `parentEventId`/provenance.origin
-   * — robi to `applyConsequences` (spójnie i deterministycznie). Może zwrócić [].
-   */
-  derive(event: GenesisEvent): GenesisEventInput[];
+/** Kontekst przekazywany regule (opcjonalny; domena może dołożyć swoje pola). */
+export interface RuleContext {
+  [key: string]: unknown;
 }
 
 /**
- * Stosuje reguły do zdarzenia, rejestrując zdarzenia potomne z poprawnym
- * `parentEventId` i provenance.origin = 'consequence-rule'. Deterministyczne:
- * kolejność reguł + kolejność `derive` decyduje o kolejności rejestracji.
+ * GenesisRule — deklaratywna reguła konsekwencji. Neutralna domenowo.
+ *  - `trigger.type`: typ zdarzenia wyzwalającego (kropkowany),
+ *  - `when`: dodatkowe warunki (opcjonalne),
+ *  - `emit`: wyprowadza zdarzenia potomne (bez ustawiania parentEventId/origin —
+ *    robi to silnik, spójnie).
  */
-export function applyConsequences(
-  registry: EventRegistry, event: GenesisEvent, rules: readonly ConsequenceRule[],
+export interface GenesisRule {
+  id: string;
+  description: string;
+  trigger: { type: string };
+  when?(event: GenesisEvent, ctx: RuleContext): boolean;
+  emit(event: GenesisEvent, ctx: RuleContext): GenesisEventInput[];
+}
+
+/** Zgodność wsteczna z pierwotnym interfejsem (Etap F). */
+export type ConsequenceRule = GenesisRule;
+
+function ruleApplies(rule: GenesisRule, event: GenesisEvent, ctx: RuleContext): boolean {
+  if (rule.trigger.type !== event.type) return false;
+  return rule.when ? rule.when(event, ctx) : true;
+}
+
+/**
+ * Uruchamia reguły dla POJEDYNCZEGO zdarzenia, rejestrując potomne z poprawnym
+ * `parentEventId` i provenance.origin='consequence-rule'. Deterministyczne:
+ * kolejność reguł × kolejność `emit` = kolejność rejestracji.
+ */
+export function runRules(
+  registry: EventRegistry, event: GenesisEvent, rules: readonly GenesisRule[], ctx: RuleContext = {},
 ): GenesisEvent[] {
   const out: GenesisEvent[] = [];
   for (const rule of rules) {
-    if (!rule.appliesTo(event)) continue;
-    for (const derived of rule.derive(event)) {
+    if (!ruleApplies(rule, event, ctx)) continue;
+    for (const derived of rule.emit(event, ctx)) {
       out.push(registry.add({
         ...derived,
         parentEventId: event.id,
@@ -52,5 +64,21 @@ export function applyConsequences(
       }));
     }
   }
+  return out;
+}
+
+/** Zgodność wsteczna — nazwa z Etapu F (single-event). */
+export const applyConsequences = runRules;
+
+/**
+ * Uruchamia reguły dla WSZYSTKICH zdarzeń w rejestrze (jednoprzebiegowo, po
+ * migawce bieżących zdarzeń — nie kaskaduje w nieskończoność w jednym wywołaniu).
+ */
+export function runRulesOverRegistry(
+  registry: EventRegistry, rules: readonly GenesisRule[], ctx: RuleContext = {},
+): GenesisEvent[] {
+  const snapshot = [...registry.all()];
+  const out: GenesisEvent[] = [];
+  for (const e of snapshot) out.push(...runRules(registry, e, rules, ctx));
   return out;
 }

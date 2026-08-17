@@ -114,3 +114,65 @@ second graph.
 
 `EPIDEMIC MODEL → REAL TRANSMISSION → GenesisEvent → EventRegistry → Provenance → TEST`.
 Nothing beyond this (Urban Cascade / flood / fire / asteroid / WebGPU) is started.
+
+---
+
+# Addendum (Etapy 1–10) — expanded read-only API
+
+## 12. `EventStream` — the read-only interface Manus consumes
+
+`new EventStream(registry)` exposes ONLY reads (no `add`). Recommended per-tick loop:
+```ts
+const stream = new EventStream(registry);
+let cur = stream.cursor();
+// each tick, after the model+adapter have appended events:
+const { events, cursor } = stream.getEventsSince(cur); cur = cursor;
+// render transient markers from `events`
+```
+Methods:
+| Method | Returns |
+|---|---|
+| `cursor()` | current stream cursor (monotonic) |
+| `getEventsSince(cursor)` | `{ events, cursor }` — only events added since `cursor` |
+| `getEvent(id)` | one event or `undefined` |
+| `getEventsByType(type)` | all events of a type |
+| `getChildren(parentId)` | direct children (consequence chain) |
+| `getProvenance(id)` | `EventProvenance \| null` |
+| `getExperimentHistory(experimentId)` | all events of an experiment, time-ordered |
+| `all()` / `count()` | full ordered snapshot / size |
+
+`getEventsSince` is deterministic: same registration order ⇒ same batches.
+
+## 13. Rules & secondary events (consequence chain)
+
+`GenesisRule { id, description, trigger:{type}, when?(e,ctx), emit(e,ctx) }`.
+`runRules(registry, event, rules)` / `runRulesOverRegistry(registry, rules)` register
+secondary events with `parentEventId` set and `provenance.origin='consequence-rule'`
+(`ruleId` recorded). Manus reads them like any other event; use `getChildren(id)` to
+walk the chain. **Shipped domain rule:** `epidemic.transmission-causes-exposure`
+(`infection.transmission` → `infection.exposure`, a faithful event-level restatement
+of the model's own S→E — not new dynamics).
+
+## 14. Event type registry (extensible, contracts-first)
+
+`listEventTypes()` / `getEventType(type)` / `isKnownType(type)` describe every declared
+type: `{ type, domain, description, requiredParams, implemented }`. Epidemic types are
+`implemented:true`; Urban-Cascade (`power.failure`, `water.pumpfailure`,
+`water.shortage`, `hospital.capacityreduction`, `emergency.response`) and future hazards
+(`hazard.flood/fire/earthquake/asteroidimpact/solarstorm`, `grid.blackout`,
+`population.evacuation`) are **declared but `implemented:false`** — the contract is ready,
+the model is not. Manus can style/label unknown-but-declared types without code changes.
+
+## 15. Replay & provenance chain
+
+- `provenanceChain(registry, eventId)` → `[event, parent, …root]` for full traceability.
+- `reconstructionKey(event)` → `{ modelId, experimentId, seed, paramsHash }` — everything
+  needed to re-run a deterministic model and reproduce the same event ids.
+- Reproducibility is proven by integration tests on the REAL `EpidemicCitySimulation`
+  (same seed+params ⇒ identical transmission AND exposure event ids).
+
+## 16. Boundary (unchanged)
+
+Claude owns: event contract, registry/stream, rules, provenance, type registry, tests.
+Manus owns: markers, animations, HUD, event-feed/timeline UI, cameras, shaders, heatmap
+rendering, city, materials, CSS. No file overlap; the stream is the only coupling.

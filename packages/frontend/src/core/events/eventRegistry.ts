@@ -79,5 +79,24 @@ export class EventRegistry {
   children(parentId: string): GenesisEvent[] { return this.events.filter((e) => e.parentEventId === parentId); }
   provenanceOf(id: string): EventProvenance | null { return this.get(id)?.provenance ?? null; }
   count(): number { return this.events.length; }
+
+  /** Kursor strumienia = liczba dotąd zarejestrowanych zdarzeń (monotoniczny). */
+  cursor(): number { return this.events.length; }
+
+  /**
+   * Zdarzenia dodane OD podanego kursora (włącznie z indeksem `cursor`).
+   * Zwraca porcję + nowy kursor — do konsumpcji per tick przez renderer.
+   * Deterministyczne: kolejność rejestracji jest kolejnością zwracania.
+   */
+  since(cursor: number): { events: readonly GenesisEvent[]; cursor: number } {
+    const from = Math.max(0, Math.min(cursor, this.events.length));
+    return { events: this.events.slice(from), cursor: this.events.length };
+  }
+
+  /** Wszystkie zdarzenia danego eksperymentu (po experimentId), w kolejności czasowej. */
+  experimentHistory(experimentId: string): GenesisEvent[] {
+    return this.all().filter((e) => e.experimentId === experimentId);
+  }
+
   reset(): void { this.events = []; this.seq = 0; }
 }

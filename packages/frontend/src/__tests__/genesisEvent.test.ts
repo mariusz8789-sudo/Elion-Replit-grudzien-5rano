@@ -109,8 +109,8 @@ describe('Consequence Engine — architecture proof (no domain impl)', () => {
     const rule: ConsequenceRule = {
       id: 'demo.echo',
       description: 'Architecture proof: emits one neutral secondary event per source event.',
-      appliesTo: (e) => e.type === 'infection.transmission',
-      derive: (e) => [{
+      trigger: { type: 'infection.transmission' },
+      emit: (e) => [{
         type: 'demo.secondary', timestamp: e.timestamp + 1,
         affectedEntities: e.affectedEntities, parameters: { of: e.id },
         provenance: { origin: 'consequence-rule' },

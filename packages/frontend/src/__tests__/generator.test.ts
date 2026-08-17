@@ -79,10 +79,19 @@ describe('generator: real catalog integrity', () => {
       ['atraktor Lorenza', 'lorenz'],
       ['problem trzech ciał', 'three-body'],
       ['soczewkowanie grawitacyjne', 'gravitational-lensing'],
+      ['zasymuluj epidemię na fikcyjnej wyspie', 'epidemic-sir'],
+      ['pokaż epidemię na lotnisku z agentami', 'epidemic-airport'],
+      ['model agentowy epidemii', 'epidemic-airport'],
     ];
     for (const [prompt, expectedId] of cases) {
       const r = resolveQuery(prompt);
       expect(r.best?.recipe.id, `prompt "${prompt}" should resolve to ${expectedId}`).toBe(expectedId);
     }
+  });
+
+  it('disambiguates island (compartmental) vs airport (agent-based) epidemic', () => {
+    expect(resolveQuery('epidemia na wyspie').best?.recipe.id).toBe('epidemic-sir');
+    expect(resolveQuery('epidemia na lotnisku').best?.recipe.id).toBe('epidemic-airport');
+    expect(resolveQuery('kwarantanna i izolacja na lotnisku').best?.recipe.id).toBe('epidemic-airport');
   });
 });

@@ -199,6 +199,25 @@ export function registerCatalog(): void {
     assumptions: ['Mieszanie jednorodne, stała populacja', 'Bez struktury wiekowej/przestrzennej', 'Patogen abstrakcyjny „Pathogen X" — model, nie prognoza'],
   });
   registerRecipe({
+    id: 'epidemic-airport',
+    title: 'Epidemia na lotnisku (model agentowy)',
+    category: 'physics',
+    aliases: [
+      'lotnisko', 'lotnisku', 'lotniska', 'na lotnisku',
+      'epidemia na lotnisku', 'epidemie na lotnisku',
+      'model agentowy', 'agentowy', 'agentowa', 'agentowego', 'symulacja agentowa',
+      'agenci', 'agentami', 'agentow', 'agentach', 'agent based', 'individual based',
+      'kwarantanna', 'izolacja', 'kontakty', 'terminal', 'tlum', 'w tlumie', 'rozprzestrzenianie w tlumie',
+    ],
+    labId: 'biology',
+    experimentId: 'biology.airport',
+    honesty: 'educational',
+    epistemicStatus: 'WELL_SUPPORTED_MODEL',
+    summary: 'Model AGENTOWY: setki wirtualnych agentów przechodzą przez strefy lotniska, a zakażenie przenosi się przez kontakty (bliskość). Włącz izolację objawowych i porównaj z modelem przedziałowym.',
+    equations: ['β = R0/D_zak (jak w modelu przedziałowym)', 'P(zakażenie na kontakt) = 1 − e^(−β·Δt)'],
+    assumptions: ['Agenci to wirtualne punkty modelu, NIE realni ludzie', 'Ruch proceduralny przez strefy; kontakt = bliskość', 'Patogen abstrakcyjny „Pathogen X" — symulacja edukacyjna, nie prognoza'],
+  });
+  registerRecipe({
     id: 'ising-phase',
     title: 'Przejście fazowe (model Isinga)',
     category: 'chemistry',

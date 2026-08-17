@@ -2,6 +2,7 @@ import type { ExperimentDef, LabDefinition, NarrationBlock, Sim, SimParams } fro
 import { biologyDnaHelix } from './experiments/biology-dnahelix';
 import { biologyProteinFolding } from './experiments/biology-proteinfolding';
 import { biologyLogisticConsequence } from './experiments/biology-logistic-consequence';
+import { biologyEpidemic } from './experiments/biology-epidemic';
 
 /**
  * Biology Lab — flagowy eksperyment to teraz prawdziwa podwójna helisa DNA
@@ -216,6 +217,6 @@ export const biologyLab: LabDefinition = {
   honestyNote: biologyDnaHelix.honestyNote,
   params: biologyDnaHelix.params,
   createSim3D: biologyDnaHelix.createSim3D,
-  experiments: [biologyMembraneTransport2D, biologyProteinFolding, biologyLogisticConsequence],
+  experiments: [biologyMembraneTransport2D, biologyProteinFolding, biologyLogisticConsequence, biologyEpidemic],
   narrate: biologyDnaHelix.narrate,
 };

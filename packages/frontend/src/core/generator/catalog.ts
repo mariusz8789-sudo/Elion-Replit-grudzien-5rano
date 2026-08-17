@@ -184,6 +184,20 @@ export function registerCatalog(): void {
     summary: 'Jak temperatura i energia aktywacji sterują szybkością reakcji (Arrhenius) — łańcuch konsekwencji.',
     equations: ['k = A · e^(−Ea/RT) (Arrhenius)'],
   });
+  // ---- Epidemiologia (DEMO B) ----
+  registerRecipe({
+    id: 'epidemic-sir',
+    title: 'Epidemia na wyspie (SIR/SEIR)',
+    category: 'physics',
+    aliases: ['epidemia', 'epidemie', 'pandemia', 'sir', 'seir', 'model epidemii', 'zaraza', 'wirus', 'rozprzestrzenianie choroby', 'fikcyjna wyspa'],
+    labId: 'biology',
+    experimentId: 'biology.epidemic',
+    honesty: 'simplified',
+    epistemicStatus: 'WELL_SUPPORTED_MODEL',
+    summary: 'Model przedziałowy SIR/SEIR/SEIRD na fikcyjnej wyspie — zmień R0, inkubację, śmiertelność i interwencje, obserwuj krzywą i populację.',
+    equations: ['dS/dt = −β·S·I/N', 'dI/dt = β·S·I/N − γ·I', 'dR/dt = γ·I', 'R0 = β·D_zakaźności'],
+    assumptions: ['Mieszanie jednorodne, stała populacja', 'Bez struktury wiekowej/przestrzennej', 'Patogen abstrakcyjny „Pathogen X" — model, nie prognoza'],
+  });
   registerRecipe({
     id: 'ising-phase',
     title: 'Przejście fazowe (model Isinga)',

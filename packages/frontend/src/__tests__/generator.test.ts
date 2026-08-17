@@ -55,7 +55,7 @@ describe('generator: real catalog integrity', () => {
   it('registers a non-trivial catalog, all pointing at real labs', () => {
     const recipes = getRecipes();
     expect(recipes.length).toBeGreaterThanOrEqual(15);
-    const knownLabs = new Set(['universe', 'spacetime', 'einstein', 'quantum', 'chemistry', 'civilization']);
+    const knownLabs = new Set(['universe', 'spacetime', 'einstein', 'quantum', 'chemistry', 'civilization', 'biology']);
     for (const r of recipes) {
       expect(knownLabs.has(r.labId), `recipe ${r.id} -> unknown lab ${r.labId}`).toBe(true);
       expect(r.title.length).toBeGreaterThan(0);

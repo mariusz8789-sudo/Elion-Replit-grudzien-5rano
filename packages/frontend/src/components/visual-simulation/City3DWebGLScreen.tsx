@@ -25,9 +25,8 @@ const EPIDEMIC_LEGEND = [
 ] as const;
 
 /**
- * Główna ścieżka 3D miasta. Canvas 2D nadal pozostaje pod #/city jako tryb
- * wydajnościowy / fallback, lecz ten ekran renderuje ten sam EpidemicCitySimulation
- * przez Three.js. Nie ma tu drugiego modelu ani nagranej animacji.
+ * Główna ścieżka 3D miasta. Canvas 2D pozostaje pod #/city jako fallback,
+ * a wszystkie dane sceny nadal pochodzą z istniejącego EpidemicCitySimulation.
  */
 export function City3DWebGLScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -46,32 +45,20 @@ export function City3DWebGLScreen() {
   const renderParams = useMemo<SimParams>(() => ({ ...params, clockSpeed: running ? speed : 0 }), [params, running, speed]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, renderParams, true, setStats);
 
-  useEffect(() => {
-    sim.setAnalysisMode(analysis);
-  }, [analysis, sim]);
-
-  useEffect(() => {
-    sim.setShowTransmissions(showTransmissions);
-  }, [showTransmissions, sim]);
+  useEffect(() => { sim.setAnalysisMode(analysis); }, [analysis, sim]);
+  useEffect(() => { sim.setShowTransmissions(showTransmissions); }, [showTransmissions, sim]);
 
   const updateParam = (key: string, value: number | boolean) => {
     sim.setParam(key, value);
     setParams((previous) => ({ ...previous, [key]: value }));
     setStats(sim.getStats());
   };
-
   const play = () => setRunning(true);
   const pause = () => setRunning(false);
-  const step = () => {
-    sim.step();
-    setStats(sim.getStats());
-  };
+  const step = () => { sim.step(); setStats(sim.getStats()); };
   const reset = () => {
-    sim.reset();
-    setRunning(false);
-    setSelectedId(null);
-    setParams(sim.getSim().getParams());
-    setStats(sim.getStats());
+    sim.reset(); setRunning(false); setSelectedId(null);
+    setParams(sim.getSim().getParams()); setStats(sim.getStats());
   };
 
   useEffect(() => registerActiveSimControls({ toggleRunning: () => setRunning((value) => !value), reset }), [sim]);
@@ -80,7 +67,7 @@ export function City3DWebGLScreen() {
     experimentId: 'epidemic-city-3d',
     experimentName: 'Epidemia w małym mieście — WebGL',
     honesty: 'educational',
-    honestyNote: 'Fikcyjne miasto i abstrakcyjny Pathogen X. Trójwymiarowa scena tylko odczytuje wynik rzeczywistego modelu agentowego; nie jest prognozą.',
+    honestyNote: 'Fikcyjne miasto i abstrakcyjny Pathogen X. Scena 3D odczytuje wynik modelu agentowego; nie jest prognozą.',
     paramDefs: CITY_PARAM_DEFS,
     getParams: () => paramsRef.current,
     getStats: () => statsRef.current,
@@ -90,115 +77,121 @@ export function City3DWebGLScreen() {
   const person = selectedId === null ? null : sim.getSim().debugInfo(selectedId);
   const displayedAgentCount = Number(params.nAgents ?? 0);
   const renderBudget = Number(stats.webgl_total_humanoids ?? 0);
+  const analysisLabel = ANALYSIS_MODES.find((mode) => mode.id === analysis)?.label ?? 'Brak';
+  const percentageKeys = ['transmissionScale', 'restrictions', 'mobility', 'severeRate'];
 
   return (
-    <main id="main-content" tabIndex={-1} className="home city-3d-screen">
-      <div className="honesty-row">
-        <span className="honesty educational">Symulacja · dane syntetyczne · WebGL</span>
-        <span className="honesty-note">
-          Fikcyjne miasto i abstrakcyjny patogen: to wynik modelu edukacyjnego, nie prognoza. Każdy człowiek w scenie 3D odczytuje bieżący stan istniejącego EpidemicCitySimulation: pozycję, prędkość, gait, stan, zachowanie, izolację i hospitalizację.
-          Canvas 2D pozostaje pod #/city jako tryb wydajnościowy; ten widok nie zmienia równań ani wyników modelu.
-        </span>
-      </div>
+    <main id="main-content" tabIndex={-1} className="home city-3d-screen city-world-shell">
+      <header className="city-world-header">
+        <div>
+          <span className="city-world-eyebrow">GENESIS OS · ŚWIAT NAUKOWY</span>
+          <h1>EPIDEMIA — MIASTO 3D</h1>
+          <p>Żywy model agentowy · dane syntetyczne · WebGL</p>
+        </div>
+        <div className="city-world-clock">
+          <span>czas symulacji</span>
+          <strong>dzień {stats.dzien ?? 0}</strong>
+          <small>{renderBudget}/{displayedAgentCount} widocznych agentów</small>
+        </div>
+      </header>
 
-      <div className="sim-transport city-3d-transport">
-        <button className="chip-btn" onClick={running ? pause : play}>{running ? '⏸ Pauza' : '▶ Start'}</button>
-        <button className="chip-btn" onClick={step}>⏭ Krok</button>
-        <button className="chip-btn" onClick={reset}>↺ Restart</button>
-        <span className="sim-speed" role="group" aria-label="Prędkość symulacji">
+      <section className="city-world-transport" aria-label="Sterowanie czasem symulacji">
+        <button className="world-action primary" onClick={running ? pause : play}>{running ? '⏸ Pauza' : '▶ Start'}</button>
+        <button className="world-action" onClick={step}>⏭ Krok</button>
+        <button className="world-action" onClick={reset}>↺ Restart</button>
+        <span className="city-speed-control" role="group" aria-label="Prędkość symulacji">
           {CLOCK_SPEEDS.filter((value) => value > 0).map((value) => (
-            <button key={value} className="chip-btn" aria-pressed={speed === value} onClick={() => { setSpeed(value); setRunning(true); }}>{value}×</button>
+            <button key={value} className="world-speed" aria-pressed={speed === value} onClick={() => { setSpeed(value); setRunning(true); }}>{value}×</button>
           ))}
         </span>
-        <label className="sim-toggle">Analiza:
-          <select value={analysis} onChange={(event) => setAnalysis(event.target.value as AnalysisMode)} aria-label="Warstwa analizy 3D">
-            {ANALYSIS_MODES.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}
-          </select>
-        </label>
-        <label className="sim-toggle" title="Wyświetla wyłącznie eventy wygenerowane przez model w bieżącym ticku.">
-          <input type="checkbox" checked={showTransmissions} onChange={(event) => setShowTransmissions(event.target.checked)} /> Ślady transmisji modelu
-        </label>
-        <button className="chip-btn" onClick={() => { sim.focusFirstInfected(); setStats(sim.getStats()); }}>Śledź zakażonego</button>
-        <button className="chip-btn" onClick={() => { window.location.hash = '#/city'; }}>Tryb wydajnościowy 2D</button>
-        <span className="sim-daylabel">dzień {stats.dzien ?? 0} · {renderBudget}/{displayedAgentCount} widocznych humanoidów 3D</span>
-      </div>
+        <button className="world-action accent" onClick={() => { sim.focusFirstInfected(); setStats(sim.getStats()); }}>◉ Śledź zakażonego</button>
+        <button className="world-action" onClick={() => { sim.focusLatestTransmission(); setStats(sim.getStats()); }}>↗ Ostatnia transmisja</button>
+        <button className="world-action ghost" onClick={() => { window.location.hash = '#/city'; }}>Tryb 2D</button>
+      </section>
 
-      <div className="city-3d-legend" aria-label="Legenda stanów epidemiologicznych">
-        <strong>Stan modelu</strong>
-        {EPIDEMIC_LEGEND.map(([id, label, color]) => <span key={id}><i style={{ backgroundColor: color }} />{id} · {label}</span>)}
-        <span><i className="legend-isolation" />izolacja</span>
-        <span><i className="legend-hospital" />hospitalizacja</span>
-      </div>
-
-      <div className="city-3d-stage-wrap">
-        <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
-        {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
-        {failed && (
-          <div className="empty-state">
-            WebGL nie uruchomił się w tej przeglądarce. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu wydajnościowego Canvas 2D</button>.
+      <section className="city-world-layout">
+        <aside className="city-world-sidebar city-world-left" aria-label="Model i parametry epidemii">
+          <div className="world-panel model-panel">
+            <div className="world-panel-heading"><span>SEIRDD</span><small>aktywny model</small></div>
+            <div className="epidemic-summary">
+              {EPIDEMIC_LEGEND.map(([id, label, color]) => (
+                <div key={id} className="epidemic-summary-row"><i style={{ backgroundColor: color }} /><span>{id} · {label}</span><strong>{stats[id] ?? 0}</strong></div>
+              ))}
+              <div className="epidemic-summary-row accent-row"><i className="legend-hospital" /><span>hospitalizacja</span><strong>{stats.hospitalizowani ?? 0}</strong></div>
+              <div className="epidemic-summary-row accent-row"><i className="legend-isolation" /><span>izolacja</span><strong>{stats.izolowani ?? 0}</strong></div>
+            </div>
           </div>
-        )}
-        <div className="city-3d-overlay" aria-live="polite">
-          <span>pełne rigu: {stats.webgl_detailed_humanoids ?? 0}</span>
-          <span>instanced crowd: {stats.webgl_instanced_humanoids ?? 0}</span>
-          <span>kontakty: {stats.kontakty ?? 0}</span>
-          <span>hosp.: {stats.hospitalizowani ?? 0}</span>
-          <span>{Math.round(stats.webgl_fps ?? 0)} FPS · {Math.round(stats.webgl_draw_calls ?? 0)} draw calls</span>
-          <span>tick {Number(stats.sim_tick_ms ?? 0).toFixed(2)} ms · render {Number(stats.webgl_render_ms ?? 0).toFixed(2)} ms</span>
-          <span>geom.: {stats.webgl_geometries ?? 0} · tex.: {stats.webgl_textures ?? 0}</span>
-        </div>
-        {person && (
-          <aside className="city-3d-person-card">
-            <strong>Osoba #{selectedId}</strong>
-            <span>wiek: {String(person.wiek)}</span>
-            <span>rola: {String(person.rola)}</span>
-            <span>stan: {String(person.stan)}</span>
-            <span>zachowanie: {String(person.zachowanie)}</span>
-            <span>izolacja: {String(person.izolowany)}</span>
-            <span>szpital: {String(person.hospitalizowany)}</span>
-            <span>źródło zakażenia: {String(person.zarazony_przez)}</span>
-            <button className="chip-btn" onClick={() => sim.clearSelection()}>Przestań śledzić</button>
-          </aside>
-        )}
-      </div>
 
-      <div className="sim-secondary">
-        <div className="sim-stats">
-          <div><span>Zdrowi</span><strong>{stats.S ?? 0}</strong></div>
-          <div><span>Zakażeni</span><strong>{stats.I ?? 0}</strong></div>
-          <div><span>Hospitalizowani</span><strong>{stats.hospitalizowani ?? 0}</strong></div>
-          <div><span>W izolacji</span><strong>{stats.izolowani ?? 0}</strong></div>
-        </div>
-      </div>
+          <div className="world-panel parameter-panel">
+            <div className="world-panel-heading"><span>PARAMETRY MODELU</span><small>to samo źródło co Canvas</small></div>
+            <div className="world-parameter-list">
+              {SLIDERS.map((definition) => {
+                const raw = Number(params[definition.key] ?? definition.default);
+                const percentage = percentageKeys.includes(definition.key);
+                const shown = percentage ? Math.round(raw * 100) : raw;
+                return (
+                  <label className="world-parameter" key={definition.key}>
+                    <span>{definition.label}<b>{shown}{percentage ? '%' : definition.unit ? ` ${definition.unit}` : ''}</b></span>
+                    <input type="range" min={percentage ? Number(definition.min) * 100 : definition.min} max={percentage ? Number(definition.max) * 100 : definition.max} step={percentage ? Number(definition.step) * 100 : definition.step} value={shown} aria-label={definition.label} onChange={(event) => updateParam(definition.key, percentage ? Number(event.target.value) / 100 : Number(event.target.value))} />
+                  </label>
+                );
+              })}
+              <label className="world-toggle"><input type="checkbox" checked={Boolean(params.isolate)} onChange={(event) => updateParam('isolate', event.target.checked)} /><span>Izolacja objawowych</span></label>
+            </div>
+          </div>
+        </aside>
 
-      <div className="section-label">Parametry modelu (to samo źródło prawdy co Canvas)</div>
-      <div className="sim-controls">
-        {SLIDERS.map((definition) => {
-          const raw = Number(params[definition.key] ?? definition.default);
-          const percentage = ['transmissionScale', 'restrictions', 'mobility', 'severeRate'].includes(definition.key);
-          const shown = percentage ? Math.round(raw * 100) : raw;
-          return (
-            <label className="sim-control" key={definition.key}>
-              <span>{definition.label}: <b>{shown}{percentage ? '%' : definition.unit ? ` ${definition.unit}` : ''}</b></span>
-              <input
-                type="range"
-                min={percentage ? Number(definition.min) * 100 : definition.min}
-                max={percentage ? Number(definition.max) * 100 : definition.max}
-                step={percentage ? Number(definition.step) * 100 : definition.step}
-                value={shown}
-                aria-label={definition.label}
-                onChange={(event) => updateParam(definition.key, percentage ? Number(event.target.value) / 100 : Number(event.target.value))}
-              />
-            </label>
-          );
-        })}
-        <label className="sim-toggle"><input type="checkbox" checked={Boolean(params.isolate)} onChange={(event) => updateParam('isolate', event.target.checked)} /> Izolacja objawowych</label>
-      </div>
+        <section className="city-world-center" aria-label="Żywa scena miasta 3D">
+          <div className="city-3d-stage-wrap city-world-stage">
+            <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
+            {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
+            {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu Canvas 2D</button>.</div>}
+            <div className="city-scene-readout" aria-live="polite">
+              <span>model aktywny</span><strong>dzień {stats.dzien ?? 0}</strong><span>{analysis === 'none' ? 'widok normalny' : `warstwa: ${analysisLabel}`}</span>
+            </div>
+            {person && (
+              <aside className="city-3d-person-card city-agent-inspector">
+                <div className="agent-inspector-heading"><span>AGENT #{selectedId}</span><button onClick={() => sim.clearSelection()} aria-label="Zamknij inspekcję">×</button></div>
+                <div className="agent-inspector-grid">
+                  <span>wiek<b>{String(person.wiek)}</b></span><span>rola<b>{String(person.rola)}</b></span>
+                  <span>stan<b>{String(person.stan)}</b></span><span>zachowanie<b>{String(person.zachowanie)}</b></span>
+                  <span>izolacja<b>{String(person.izolowany)}</b></span><span>szpital<b>{String(person.hospitalizowany)}</b></span>
+                  <span>zakażony przez<b>#{String(person.zarazony_przez)}</b></span>
+                </div>
+                <button className="world-action accent" onClick={() => sim.clearSelection()}>Przestań śledzić</button>
+              </aside>
+            )}
+          </div>
+          <div className="city-event-timeline" aria-label="Bieżący punkt osi symulacji">
+            <div className="timeline-heading"><span>OŚ SYMULACJI</span><small>zdarzenia wynikają z modelu</small></div>
+            <div className="timeline-track"><i /><b style={{ left: `${Math.min(96, 8 + Number(stats.dzien ?? 0) * 2)}%` }} /></div>
+            <div className="timeline-labels"><span>start</span><span>dzień {stats.dzien ?? 0}</span><span>{stats.kontakty ?? 0} kontaktów · {stats.hospitalizowani ?? 0} hosp.</span></div>
+          </div>
+        </section>
 
-      <p className="footer-note">
-        Kliknij człowieka, aby odczytać dane bezpośrednio z symulacji i śledzić go kamerą. Czerwony łuk A→B pojawia się wyłącznie dla transmisji zarejestrowanej przez model w bieżącym ticku. Przeciągnij scenę, aby obrócić kamerę; użyj kółka do zoomu.
-        Dla większej populacji do 10 agentów otrzymuje pełny rig proceduralny, a pozostałe osoby są renderowane jako instanced 3D humanoids z tymi samymi pozycjami i stanami modelu.
-      </p>
+        <aside className="city-world-sidebar city-world-right" aria-label="Analityka i warstwy świata">
+          <div className="world-panel risk-panel">
+            <div className="world-panel-heading"><span>MAPA RYZYKA</span><small>warstwa świata</small></div>
+            <select className="world-analysis-select" value={analysis} onChange={(event) => setAnalysis(event.target.value as AnalysisMode)} aria-label="Warstwa analizy 3D">
+              {ANALYSIS_MODES.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}
+            </select>
+            <div className="risk-gradient"><span>niskie</span><i /><span>wysokie</span></div>
+          </div>
+          <div className="world-panel layers-panel">
+            <div className="world-panel-heading"><span>WARSTWY</span><small>odczyt modelu</small></div>
+            {ANALYSIS_MODES.filter((mode) => mode.id !== 'none').map((mode) => <button key={mode.id} className="world-layer" aria-pressed={analysis === mode.id} onClick={() => setAnalysis(mode.id)}><span>{mode.label}</span><i /></button>)}
+            <label className="world-layer transmission-layer"><span>Ślady transmisji</span><input type="checkbox" checked={showTransmissions} onChange={(event) => setShowTransmissions(event.target.checked)} /></label>
+          </div>
+          <div className="world-panel observability-panel">
+            <div className="world-panel-heading"><span>OBSERWOWALNOŚĆ</span><small>renderer</small></div>
+            <div><span>FPS</span><b>{Math.round(stats.webgl_fps ?? 0)}</b></div>
+            <div><span>render</span><b>{Number(stats.webgl_render_ms ?? 0).toFixed(2)} ms</b></div>
+            <div><span>draw calls</span><b>{Math.round(stats.webgl_draw_calls ?? 0)}</b></div>
+          </div>
+        </aside>
+      </section>
+
+      <footer className="city-world-note">Fikcyjne miasto i abstrakcyjny patogen. Kolor ubrania, znaczniki, heatmapa i transmisje są odczytem modelu edukacyjnego, nie diagnozą ani prognozą.</footer>
     </main>
   );
 }

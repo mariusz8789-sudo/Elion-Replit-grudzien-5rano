@@ -17,6 +17,8 @@ export const CITY_WORLD_SCALE = 0.018;
 const CITY_VELOCITY_SCALE_FACTOR = 0.10;
 const MAX_DETAILED_HUMANOIDS = 10;
 const MAX_CROWD_HUMANOIDS = 512;
+/** Czas prezentacji odczytanego eventu — nie wpływa na czas ani prawdopodobieństwo modelu. */
+const TRANSMISSION_MARKER_LIFETIME_SECONDS = 3;
 const ANALYSIS_COLS = 36;
 const ANALYSIS_ROWS = 24;
 
@@ -46,6 +48,8 @@ export class EpidemicCity3DSim implements Sim3D {
   private analysisMode: AnalysisMode = 'none';
   private showTransmissions = true;
   private selectedId: number | null = null;
+  /** Cel jest ustawiany wyłącznie podczas odczytu prawdziwego TransmissionEvent. */
+  private latestTransmissionTarget: number | null = null;
   private pointerDown: { x: number; y: number } | null = null;
   private pointerDragged = false;
   private followTarget: THREE_NS.Vector3 | null = null;
@@ -104,9 +108,18 @@ export class EpidemicCity3DSim implements Sim3D {
     return agent?.id ?? null;
   }
 
+  /** Fokus ma sens tylko dla celu prawdziwego zdarzenia odczytanego z modelu. */
+  focusLatestTransmission(): number | null {
+    if (this.latestTransmissionTarget === null) return null;
+    const target = this.simulation.agents().find((agent) => agent.id === this.latestTransmissionTarget) ?? null;
+    this.selectAgent(target?.id ?? null);
+    return target?.id ?? null;
+  }
+
   reset(): void {
     this.clock.reset();
     this.simulation.reset();
+    this.latestTransmissionTarget = null;
     this.selectAgent(null);
   }
 
@@ -116,9 +129,9 @@ export class EpidemicCity3DSim implements Sim3D {
     this.camera = camera;
     this.viewport = { w, h };
     this.raycaster = new THREE.Raycaster();
-    scene.background = new THREE.Color(0x07111d);
-    scene.fog = new THREE.Fog(0x07111d, 12, 34);
-    camera.position.set(0, 13.5, 11.5);
+    scene.background = new THREE.Color(0x0d1c2d);
+    scene.fog = new THREE.Fog(0x0d1c2d, 16, 38);
+    camera.position.set(0, 12.2, 11.0);
     camera.lookAt(0, 0, 0);
 
     this.addLightsAndGround();
@@ -129,9 +142,10 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   update(dt: number, params: SimParams): void {
-    this.timeSeconds += dt;
     const speed = Number(params.clockSpeed ?? 1) as ClockSpeed;
     if (speed !== this.clock.speed) this.clock.setSpeed(speed);
+    // Ślad eventu zatrzymuje się razem z czasem modelu; ręczny krok można więc sprawdzić bez wyścigu z renderem.
+    if (this.clock.running) this.timeSeconds += dt;
     const tickStartedAt = performance.now();
     this.clock.advance(dt, (dtDays) => this.simulation.tick(dtDays));
     this.lastTickMs = performance.now() - tickStartedAt;
@@ -141,7 +155,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.renderMetrics = metrics;
   }
 
-  syncScene(): void {
+  syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
     if (!this.THREE || !this.scene) return;
     const agents = this.simulation.agents();
     const velocityScale = this.simulation.worldWidth * CITY_VELOCITY_SCALE_FACTOR;
@@ -157,6 +171,12 @@ export class EpidemicCity3DSim implements Sim3D {
     this.syncAnalysis(agents);
     this.syncTransmissionMarkers();
     this.syncFollowTarget(states);
+    if (this.followTarget) {
+      const desired = this.followTarget.clone().add(new this.THREE.Vector3(2.15, 1.65, 2.15));
+      // Focus to świadomy drugi poziom kamery; po wyłączeniu follow OrbitControls wraca do widoku świata.
+      camera.position.copy(desired);
+      camera.lookAt(this.followTarget);
+    }
   }
 
   getOrbitTarget(): THREE_NS.Vector3 | null {
@@ -264,18 +284,22 @@ export class EpidemicCity3DSim implements Sim3D {
   private addLightsAndGround(): void {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
-    this.scene.add(new THREE.HemisphereLight(0xb8d8ff, 0x142016, 1.35));
-    const key = new THREE.DirectionalLight(0xfff1d0, 2.0);
-    key.position.set(6, 13, 7);
+    this.scene.add(new THREE.HemisphereLight(0xbfdcff, 0x24331d, 1.95));
+    this.scene.add(new THREE.AmbientLight(0x8fb8e8, 0.34));
+    const key = new THREE.DirectionalLight(0xffd7a1, 3.0);
+    key.position.set(7, 15, 8);
     key.castShadow = false;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x7eb3ff, 0.65);
-    rim.position.set(-8, 5, -8);
+    const rim = new THREE.DirectionalLight(0x79b6ff, 1.15);
+    rim.position.set(-9, 7, -8);
     this.scene.add(rim);
+    const fill = new THREE.DirectionalLight(0x8ce3c6, 0.55);
+    fill.position.set(-2, 4, 12);
+    this.scene.add(fill);
 
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(this.simulation.worldWidth * CITY_WORLD_SCALE + 2, this.simulation.worldHeight * CITY_WORLD_SCALE + 2),
-      new THREE.MeshStandardMaterial({ color: 0x15251d, roughness: 0.98 }),
+      new THREE.MeshStandardMaterial({ color: 0x224033, roughness: 0.94, metalness: 0.02 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.012;
@@ -286,9 +310,9 @@ export class EpidemicCity3DSim implements Sim3D {
   private addRoadsAndBuildings(): void {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0x222b38, roughness: 0.91 });
-    const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x738094, roughness: 0.96 });
-    const markingMat = new THREE.MeshBasicMaterial({ color: 0xd8e4f3, transparent: true, opacity: 0.72 });
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x2d3848, roughness: 0.84, metalness: 0.04 });
+    const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x91a6bb, roughness: 0.88, metalness: 0.02 });
+    const markingMat = new THREE.MeshBasicMaterial({ color: 0xf2f7ff, transparent: true, opacity: 0.92 });
     const roadWidth = 0.34;
     const sidewalkWidth = 0.10;
     const worldW = this.simulation.worldWidth * CITY_WORLD_SCALE;
@@ -377,6 +401,8 @@ export class EpidemicCity3DSim implements Sim3D {
         const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.18, 0.03), crossMat);
         crossH.position.set(0, s.height + 0.18, d / 2 + 0.032); crossV.position.copy(crossH.position); group.add(crossH, crossV);
       }
+      const label: Record<string, string> = { shop: 'SKLEP', school: 'SZKOŁA', hospital: 'SZPITAL', isolation: 'IZOLACJA' };
+      if (label[building.kind]) this.addBuildingLabel(group, label[building.kind], s.height + 0.28, d / 2 + 0.08);
     } else {
       for (let i = 0; i < 4; i++) {
         const tree = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.55, 8), new THREE.MeshStandardMaterial({ color: 0x245c37, roughness: 0.95 }));
@@ -384,6 +410,7 @@ export class EpidemicCity3DSim implements Sim3D {
         group.add(tree);
       }
     }
+    if (building.kind === 'park') this.addBuildingLabel(group, 'PARK', 0.34, 0);
     if (building.closed) {
       const marker = new THREE.Mesh(new THREE.BoxGeometry(w * 0.72, 0.08, 0.04), new THREE.MeshBasicMaterial({ color: 0xffc857 }));
       marker.position.set(0, s.height + 0.18, d / 2 + 0.02);
@@ -393,13 +420,55 @@ export class EpidemicCity3DSim implements Sim3D {
     return group;
   }
 
+  /** Etykieta opisuje wyłącznie rodzaj obiektu zwróconego przez CityWorld. */
+  private addBuildingLabel(group: THREE_NS.Group, text: string, y: number, z: number): void {
+    if (!this.THREE || typeof document === 'undefined') return;
+    const THREE = this.THREE;
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = 'rgba(6, 16, 29, .78)';
+    ctx.roundRect(3, 5, 250, 54, 10); ctx.fill();
+    ctx.strokeStyle = '#9fd4ff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.font = '700 25px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 33);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
+    sprite.scale.set(0.95, 0.24, 1);
+    sprite.position.set(0, y, z);
+    group.add(sprite);
+  }
+
+  /** Etykieta jest tylko objaśnieniem tego samego TransmissionEvent, nigdy nie tworzy relacji. */
+  private addTransmissionLabel(group: THREE_NS.Group, text: string, x: number, y: number, z: number): void {
+    if (!this.THREE || typeof document === 'undefined') return;
+    const THREE = this.THREE;
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 58;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = 'rgba(76, 16, 27, .92)';
+    ctx.roundRect(3, 4, 250, 50, 10); ctx.fill();
+    ctx.strokeStyle = '#ff9ca5'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.font = '700 21px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`TRANSMISJA ${text}`, 128, 29);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, depthTest: false }));
+    sprite.scale.set(1.18, 0.27, 1);
+    sprite.position.set(x, y, z);
+    group.add(sprite);
+  }
+
   private addAnalysisLayer(): void {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
-    this.analysisMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
+    this.analysisMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.48, depthWrite: false, side: THREE.DoubleSide });
     this.analysisMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), this.analysisMaterial, ANALYSIS_COLS * ANALYSIS_ROWS);
     this.analysisMesh.rotation.x = -Math.PI / 2;
-    this.analysisMesh.position.y = 0.018;
+    this.analysisMesh.position.y = 0.035;
     this.analysisMesh.name = 'city-analysis-field';
     this.analysisMesh.count = 0;
     this.scene.add(this.analysisMesh);
@@ -460,7 +529,9 @@ export class EpidemicCity3DSim implements Sim3D {
         scale.set(cellW * 0.97, cellH * 0.97, 1);
         matrix.compose(position, quaternion, scale);
         this.analysisMesh.setMatrixAt(index, matrix);
-        const [r, g, b] = heatColor(value);
+        // Gamma zwiększa czytelność rzeczywistego pola przy małej liczbie przypadków;
+        // nie dodaje danych i nie zmienia porządku komórek.
+        const [r, g, b] = heatColor(Math.pow(Math.max(0, value), 0.45));
         this.analysisMesh.setColorAt(index, new this.THREE.Color(r / 255, g / 255, b / 255));
       }
     }
@@ -481,26 +552,29 @@ export class EpidemicCity3DSim implements Sim3D {
     const agents = new Map(this.simulation.agents().map((agent) => [agent.id, agent]));
     for (const event of this.simulation.lastTransmissions()) {
       const key = `${event.from}-${event.to}`;
+      this.latestTransmissionTarget = event.to;
       alive.add(key);
       if (this.transmissionMarkers.has(key)) continue;
       const from = agents.get(event.from);
       const to = agents.get(event.to);
       if (!from || !to) continue;
-      const source = new THREE.Vector3((from.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.22, (from.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
-      const target = new THREE.Vector3((to.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.22, (to.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
-      const contact = new THREE.Vector3((event.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.07, (event.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
-      const middle = source.clone().lerp(target, 0.5); middle.y += Math.max(0.18, source.distanceTo(target) * 0.38);
+      // Prowadzenie ponad tłumem i drogami: event nadal pochodzi wyłącznie z modelu.
+      const source = new THREE.Vector3((from.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.56, (from.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
+      const target = new THREE.Vector3((to.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.56, (to.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
+      const contact = new THREE.Vector3((event.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.08, (event.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
+      const middle = source.clone().lerp(target, 0.5); middle.y += Math.max(0.30, source.distanceTo(target) * 0.45);
       const curve = new THREE.QuadraticBezierCurve3(source, middle, target);
-      const material = new THREE.MeshBasicMaterial({ color: 0xff5964, transparent: true, opacity: 0.94, depthWrite: false });
+      const material = new THREE.MeshBasicMaterial({ color: 0xff5964, transparent: true, opacity: 0.98, depthWrite: false, depthTest: false });
       const group = new THREE.Group(); group.name = `transmission-${key}`;
-      const arc = new THREE.Mesh(new THREE.TubeGeometry(curve, 18, 0.018, 5, false), material);
+      const arc = new THREE.Mesh(new THREE.TubeGeometry(curve, 18, 0.032, 6, false), material);
       const pulseMaterial = material.clone();
-      const pulse = new THREE.Mesh(new THREE.RingGeometry(0.10, 0.15, 24), pulseMaterial);
+      const pulse = new THREE.Mesh(new THREE.RingGeometry(0.11, 0.17, 24), pulseMaterial);
       pulse.rotation.x = -Math.PI / 2; pulse.position.copy(contact);
-      const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.20, 5), material.clone());
+      const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.26, 5), material.clone());
       arrow.position.copy(target); arrow.position.y += 0.08;
       const direction = target.clone().sub(source).normalize();
       arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+      this.addTransmissionLabel(group, `#${event.from} → #${event.to}`, middle.x, middle.y + 0.18, middle.z);
       group.add(arc, pulse, arrow); this.scene.add(group);
       this.transmissionMarkers.set(key, { group, born: this.timeSeconds, material });
     }
@@ -510,9 +584,9 @@ export class EpidemicCity3DSim implements Sim3D {
       marker.group.traverse((node) => {
         const mesh = node as THREE_NS.Mesh;
         const material = mesh.material as THREE_NS.MeshBasicMaterial;
-        if (material?.transparent) material.opacity = Math.max(0, 0.94 - age * 1.25);
+        if (material?.transparent) material.opacity = Math.max(0, 0.94 * (1 - age / TRANSMISSION_MARKER_LIFETIME_SECONDS));
       });
-      if (age > 0.95 || (!alive.has(key) && age > 0.45)) {
+      if (age > TRANSMISSION_MARKER_LIFETIME_SECONDS) {
         this.scene.remove(marker.group);
         marker.group.traverse((node) => {
           const mesh = node as THREE_NS.Mesh;

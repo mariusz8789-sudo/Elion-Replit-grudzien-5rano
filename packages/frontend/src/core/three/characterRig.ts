@@ -37,7 +37,7 @@ export function paletteFromSeed(seed: number): Required<Pick<CharacterOptions, '
   const skins = [0xf2c9a0, 0xe0a878, 0xc98a5e, 0x8d5a3c, 0xf5d6b8];
   const shirts = [0x4a76c4, 0xc44a4a, 0x4aa06a, 0xd7a13a, 0x8a5ac4, 0x3aa0a0, 0xcccccc];
   const pants = [0x2f3a4c, 0x394b3a, 0x4c3a2f, 0x33384a, 0x555555];
-  const hairs = [0x2a1e14, 0x4a3020, 0x120f0c, 0x6b4a2a, 0x9a9a9a];
+  const hairs = [0x3d2b20, 0x62422a, 0x241d18, 0x866044, 0xa6a6a6];
   const pick = (arr: number[], salt: number) => arr[Math.abs((seed * 2654435761 + salt * 40503) | 0) % arr.length];
   return { skin: pick(skins, 1), shirt: pick(shirts, 2), pants: pick(pants, 3), shoes: 0x22262e, hair: pick(hairs, 4) };
 }

@@ -152,6 +152,17 @@ export function useThreeLoop(
             }
           }
           controls?.update();
+          // OrbitControls aktualizuje pozycję w swojej pętli; finalny focus jest nakładany
+          // po update, aby wybrany obiekt rzeczywiście otrzymał drugi poziom kamery.
+          if (sim.getOrbitTarget) {
+            const target = sim.getOrbitTarget();
+            const focusDistance = sim.getOrbitFocusDistance?.();
+            if (target && focusDistance && focusDistance > 0) {
+              const direction = new THREE.Vector3(1, 0.72, 1).normalize();
+              camera.position.copy(target).addScaledVector(direction, focusDistance);
+              camera.lookAt(target);
+            }
+          }
           const renderStartedAt = performance.now();
           if (post) post.render();
           else renderer!.render(scene, camera);

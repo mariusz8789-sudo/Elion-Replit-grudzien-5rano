@@ -29,6 +29,7 @@ import { CandidateDiscoveryScreen } from './components/CandidateDiscoveryScreen'
 import { DrugDiscoveryScreen } from './components/DrugDiscoveryScreen';
 import { CampaignScreen } from './components/CampaignScreen';
 import { SimulationGeneratorScreen } from './components/SimulationGeneratorScreen';
+import { ScienceChat } from './components/ScienceChat';
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -508,6 +509,7 @@ export default function App() {
     <>
       <RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} />
       {renderRoute()}
+      {!onboardingOpen && <ScienceChat />}
     </>
   );
 }

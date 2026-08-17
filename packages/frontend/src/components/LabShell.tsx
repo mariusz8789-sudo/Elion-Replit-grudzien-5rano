@@ -10,6 +10,7 @@ import { ConsequenceChainPanel } from './ConsequenceChainPanel';
 import { narrate } from '../narrator/engine';
 import { buildContext } from '../narrator/askAI';
 import { registerActiveSimControls } from '../core/activeSimControls';
+import { registerSimContext } from '../core/simContext';
 import { recordVisit, recordStats } from '../core/discoveryLog';
 import { track } from '../core/analytics';
 import { consumePendingScenario } from '../core/scenarioBridge';
@@ -120,6 +121,28 @@ function useExperimentShell(exp: ExperimentDef, lab: LabDefinition, initialParam
   const [stats, setStats] = useState<Record<string, number>>({});
   const statsRef = useRef(stats);
   const lastStatsAt = useRef(0);
+
+  // Ref do bieżących parametrów — Science Chat czyta je przez most simContext
+  // (getParams), bez re-renderów zależnych od zmiany referencji.
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+
+  // Rejestracja KONTEKSTU aktualnej symulacji dla Science Chat: metadane +
+  // odczyt parametrów/statystyk + zapis parametru (ten sam setParams co
+  // kontrolki). Wyrejestrowywane przy zmianie eksperymentu/odmontowaniu.
+  useEffect(() => {
+    return registerSimContext({
+      labId: lab.id,
+      experimentId: exp.id,
+      experimentName: exp.id === '__base' ? lab.name : exp.name,
+      honesty: exp.honesty,
+      honestyNote: exp.honestyNote,
+      paramDefs: exp.params,
+      getParams: () => paramsRef.current,
+      getStats: () => statsRef.current,
+      setParam: (key, value) => setParams((p) => ({ ...p, [key]: value })),
+    });
+  }, [lab.id, lab.name, exp]);
 
   const onStats = useMemo(
     () => (s: Record<string, number>) => {

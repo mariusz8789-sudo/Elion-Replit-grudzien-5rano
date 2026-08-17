@@ -48,7 +48,7 @@ export function registerCatalog(): void {
     id: 'black-hole',
     title: 'Czarna dziura',
     category: 'physics',
-    aliases: ['czarna dziura', 'powstawanie czarnej dziury', 'horyzont zdarzen', 'black hole'],
+    aliases: ['czarna dziura', 'czarna dziure', 'czarnej dziury', 'powstawanie czarnej dziury', 'horyzont zdarzen', 'black hole'],
     labId: 'einstein',
     honesty: 'simplified',
     summary: 'Zakrzywienie światła i horyzont zdarzeń wokół masy — scena 3D na parametryzowanej masie.',

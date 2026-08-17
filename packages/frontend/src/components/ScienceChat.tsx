@@ -1,0 +1,128 @@
+import { useEffect, useRef, useState } from 'react';
+import { ensureGeneratorReady } from '../core/generator';
+import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag } from '../core/scienceChat/resolveCommand';
+import { getSimContext, subscribeSimContext } from '../core/simContext';
+import { setPendingScenario } from '../core/scenarioBridge';
+import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
+import { track } from '../core/analytics';
+
+/**
+ * Genesis Science Chat — inteligentna warstwa rozmowy NAD istniejącymi
+ * silnikami (nie zamiast menu). Globalny panel dostępny z każdego ekranu:
+ * otwiera zjawiska (reuse generatora), steruje parametrami AKTUALNEJ symulacji
+ * (przez core/simContext), wyjaśnia stan, pokazuje równania/założenia i buduje
+ * zadania. Ścieżka sterująca jest deterministyczna (core/scienceChat) — bez
+ * atrap; funkcje niegotowe są jawnie oznaczone jako TODO w odpowiedzi.
+ */
+
+interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; equations?: string[]; todo?: boolean }
+
+const TAG_LABELS: Record<EpistemicTag, string> = {
+  FAKT: 'FAKT', MODEL: 'MODEL', ZALOZENIE: 'ZAŁOŻENIE', HIPOTEZA: 'HIPOTEZA',
+  WYNIK: 'WYNIK SYMULACJI', INTERPRETACJA: 'INTERPRETACJA', SYSTEM: 'SYSTEM',
+};
+
+const SUGGESTIONS = [
+  'Pokaż czarną dziurę',
+  'Zwiększ masę 2×',
+  'Co się zmieniło?',
+  'Pokaż równanie',
+  'Założenia modelu',
+  'Zrób zadanie',
+];
+
+export function ScienceChat() {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const [turns, setTurns] = useState<ChatTurn[]>([{
+    role: 'genesis',
+    text: 'Cześć! Jestem Science Chat. Napisz np. „pokaż czarną dziurę", potem „zwiększ masę 2×", a potem „co się zmieniło?". Rozmawiam z realnymi silnikami Genesis i steruję otwartą symulacją.',
+    tag: 'SYSTEM',
+  }]);
+  const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { ensureGeneratorReady(); }, []);
+  useEffect(() => subscribeSimContext((c) => setCtxName(c?.experimentName ?? null)), []);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [turns, open]);
+
+  const send = (text: string) => {
+    const msg = text.trim();
+    if (!msg) return;
+    const live = getSimContext();
+    const snapshot: ChatSimSnapshot | null = live
+      ? {
+          labId: live.labId, experimentId: live.experimentId, experimentName: live.experimentName,
+          honesty: live.honesty, honestyNote: live.honestyNote, paramDefs: live.paramDefs,
+          params: live.getParams(), stats: live.getStats(),
+        }
+      : null;
+
+    const res: ChatResponse = resolveCommand(msg, snapshot);
+    setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: res.text, tag: res.tag, equations: res.equations, todo: res.todo }]);
+    setInput('');
+    track('ask_ai_used', { via: 'science-chat' });
+
+    // Efekty uboczne — sterowanie istniejącymi mechanizmami.
+    const a = res.action;
+    if (a?.type === 'open') {
+      setPendingScenario(a.labId, a.params ?? {}, a.experimentId);
+      window.location.hash = `#/lab/${a.labId}`;
+      setOpen(false); // pokaż uruchomioną symulację
+    } else if (a?.type === 'setParam') {
+      getSimContext()?.setParam(a.key, a.value);
+    } else if (a?.type === 'control') {
+      if (a.op === 'reset') resetActiveSim();
+      else toggleActiveSimRunning();
+    }
+  };
+
+  if (!open) {
+    return (
+      <button className="science-chat-fab" onClick={() => setOpen(true)} aria-label="Otwórz Science Chat">
+        💬 Science Chat
+      </button>
+    );
+  }
+
+  return (
+    <aside className="science-chat" role="dialog" aria-label="Science Chat">
+      <header className="science-chat-head">
+        <div>
+          <strong>💬 Science Chat</strong>
+          <span className="science-chat-ctx">{ctxName ? `kontekst: ${ctxName}` : 'brak otwartej symulacji'}</span>
+        </div>
+        <button className="back" aria-label="Zamknij Science Chat" onClick={() => setOpen(false)}>✕</button>
+      </header>
+
+      <div className="science-chat-log" ref={scrollRef}>
+        {turns.map((t, i) => (
+          <div key={i} className={`sc-turn sc-${t.role}`}>
+            {t.role === 'genesis' && t.tag && <span className={`sc-tag sc-tag-${t.tag.toLowerCase()}`}>{TAG_LABELS[t.tag]}{t.todo ? ' · TODO' : ''}</span>}
+            <div className="sc-text">{t.text}</div>
+            {t.equations && t.equations.length > 0 && (
+              <div className="generator-eqs">{t.equations.map((eq) => <code key={eq}>{eq}</code>)}</div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="science-chat-suggest">
+        {SUGGESTIONS.map((s) => (
+          <button key={s} className="chip-btn" onClick={() => send(s)}>{s}</button>
+        ))}
+      </div>
+
+      <form className="science-chat-form" onSubmit={(e) => { e.preventDefault(); send(input); }}>
+        <input
+          className="generator-input"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Napisz komendę lub pytanie…"
+          aria-label="Wiadomość do Science Chat"
+        />
+        <button className="primary-btn" type="submit" disabled={!input.trim()}>Wyślij</button>
+      </form>
+    </aside>
+  );
+}

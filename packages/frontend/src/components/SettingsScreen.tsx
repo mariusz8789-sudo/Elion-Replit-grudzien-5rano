@@ -62,6 +62,26 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding?: ()
       </section>
 
       <section className="settings-section">
+        <h2>Tryb badawczy</h2>
+        <div className="control toggle-row">
+          <span>Collaborative Scientific Discovery <em>(Faza 2, w budowie)</em></span>
+          <button
+            className="switch"
+            role="switch"
+            aria-checked={settings.researchModeEnabled}
+            aria-label="Tryb badawczy (Collaborative Scientific Discovery)"
+            onClick={() => updateSettings({ researchModeEnabled: !settings.researchModeEnabled })}
+          />
+        </div>
+        <p className="settings-hint">
+          Domyślnie wyłączony — domyślną twarzą Genesis OS jest produkt edukacyjny (laboratoria + Discovery
+          Timeline). Włączenie odsłania na stronie głównej stos badawczy: Kampanię naukową, Drug Discovery,
+          Silnik odkryć (CDE), Konflikt modeli (MCRE), Reality Navigator, Machine Pre-Build i Projekty w chmurze.
+          Nic nie jest usuwane — to tylko przełącznik widoczności; wszystkie moduły działają niezależnie od flagi.
+        </p>
+      </section>
+
+      <section className="settings-section">
         <h2>Dostępność</h2>
         <div className="control toggle-row">
           <span>Ogranicz animacje</span>

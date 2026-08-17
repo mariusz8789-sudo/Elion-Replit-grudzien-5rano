@@ -15,6 +15,7 @@ import { HelpOverlay } from './components/HelpOverlay';
 import { OnboardingOverlay } from './components/OnboardingOverlay';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
 import { track } from './core/analytics';
+import { getSettings } from './core/settings';
 import { t } from './core/i18n';
 import { getVisitedCount } from './core/discoveryLog';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
@@ -371,38 +372,7 @@ export default function App() {
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>
-          <button className="timeline-cta" onClick={() => { window.location.hash = '#/reality'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">🎬</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Reality Navigator <em>(prototyp)</em></span>
-              <span className="timeline-cta-sub">Zmień masę gwiazdy centralnej i patrz, jak kamera odwiedza rzeczywiste konsekwencje w Scientific Model Graph — nie animację, obliczenia.</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          <button className="timeline-cta" onClick={() => { window.location.hash = '#/prebuild'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">🏭</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Machine Pre-Build <em>(prototyp)</em></span>
-              <span className="timeline-cta-sub">Zaprojektuj układ pompa–rurociąg, zobacz konsekwencje z prowieniencją (obliczone vs empiryczne vs oszacowane), ranking wrażliwości i CO ZMIERZYĆ przed budową. Symulacja koncepcyjna — nie CFD.</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          <button className="timeline-cta" onClick={() => { window.location.hash = '#/conflict'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">⚖</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Konflikt modeli <em>(MCRE)</em></span>
-              <span className="timeline-cta-sub">Dwa uznane modele tej samej wielkości. Zobacz, gdzie i dlaczego się rozjeżdżają, które są poza dziedziną ważności, i JAKI POMIAR rozstrzygnie spór. Genesis OS potrafi powiedzieć „nie wiemy".</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
-          <button className="timeline-cta" onClick={() => { window.location.hash = '#/cde'; }}>
-            <span className="timeline-cta-icon" aria-hidden="true">🧭</span>
-            <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Silnik odkryć <em>(CDE)</em></span>
-              <span className="timeline-cta-sub">Zdefiniuj dziedzinę, przepuść kandydata przez wykonywalny Graf Modeli i dostań Paszport: które kryteria spełnia, co zmierzyć najpierw (Rynek Pomiarów), a które ślepe zaułki już znamy (Biblioteka Porażek). Bez ogłaszania „odkryć".</span>
-            </span>
-            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
-          </button>
+          {/* Narzędzia do nauki — produkt edukacyjny (Faza 1). Zawsze widoczne. */}
           <nav className="home-nav" aria-label="Nawigacja Genesis OS">
             <button className="whatif-nav-btn" onClick={() => { window.location.hash = '#/what-if'; }}>
               <span aria-hidden="true">🌀</span> {t('nav.whatIf')}
@@ -412,15 +382,6 @@ export default function App() {
             </button>
             <button onClick={() => setSearchOpen(true)}>
               <span aria-hidden="true">🔍</span> {t('nav.search')}
-            </button>
-            <button onClick={() => { window.location.hash = '#/projects'; }}>
-              <span aria-hidden="true">☁</span> Projekty
-            </button>
-            <button onClick={() => { window.location.hash = '#/drug'; }}>
-              <span aria-hidden="true">💊</span> Drug Discovery
-            </button>
-            <button onClick={() => { window.location.hash = '#/campaign'; }}>
-              <span aria-hidden="true">⚡</span> Kampania naukowa
             </button>
             <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
               <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}
@@ -432,6 +393,68 @@ export default function App() {
               <span aria-hidden="true">⚙</span> {t('nav.settings')}
             </button>
           </nav>
+
+          {/* FAZA 2: Collaborative Scientific Discovery — cały stos badawczy, ukryty za flagą
+              (Ustawienia → Tryb badawczy). NIC nie usunięte: trasy działają zawsze, także z deep-linku;
+              flaga decyduje wyłącznie o widoczności na stronie głównej. */}
+          {getSettings().researchModeEnabled && (
+            <div className="research-zone">
+              <div className="section-label">🔬 Tryb badawczy · Collaborative Scientific Discovery <em>(Faza 2)</em></div>
+              <button className="timeline-cta" onClick={() => { window.location.hash = '#/campaign'; }}>
+                <span className="timeline-cta-icon" aria-hidden="true">⚡</span>
+                <span className="timeline-cta-text">
+                  <span className="timeline-cta-title">Kampania naukowa</span>
+                  <span className="timeline-cta-sub">Wielofidelitowe kampanie na realnych silnikach (RDKit → ADMET → dokowanie → chemia kwantowa) z pełną prowieniencją i weryfikacją odtwarzalności.</span>
+                </span>
+                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+              </button>
+              <button className="timeline-cta" onClick={() => { window.location.hash = '#/drug'; }}>
+                <span className="timeline-cta-icon" aria-hidden="true">💊</span>
+                <span className="timeline-cta-text">
+                  <span className="timeline-cta-title">Drug Discovery</span>
+                  <span className="timeline-cta-sub">Paszport kandydata, deskryptory RDKit i realne silniki naukowe. Wyniki to MODEL_ESTIMATE — walidacja oprogramowania, nie odkrycie terapeutyczne.</span>
+                </span>
+                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+              </button>
+              <button className="timeline-cta" onClick={() => { window.location.hash = '#/cde'; }}>
+                <span className="timeline-cta-icon" aria-hidden="true">🧭</span>
+                <span className="timeline-cta-text">
+                  <span className="timeline-cta-title">Silnik odkryć <em>(CDE)</em></span>
+                  <span className="timeline-cta-sub">Przepuść kandydata przez wykonywalny Graf Modeli i dostań Paszport: co zmierzyć najpierw (Rynek Pomiarów), które ślepe zaułki już znamy (Biblioteka Porażek).</span>
+                </span>
+                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+              </button>
+              <button className="timeline-cta" onClick={() => { window.location.hash = '#/conflict'; }}>
+                <span className="timeline-cta-icon" aria-hidden="true">⚖</span>
+                <span className="timeline-cta-text">
+                  <span className="timeline-cta-title">Konflikt modeli <em>(MCRE)</em></span>
+                  <span className="timeline-cta-sub">Dwa uznane modele tej samej wielkości. Gdzie i dlaczego się rozjeżdżają, i JAKI POMIAR rozstrzygnie spór. Genesis OS potrafi powiedzieć „nie wiemy".</span>
+                </span>
+                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+              </button>
+              <button className="timeline-cta" onClick={() => { window.location.hash = '#/reality'; }}>
+                <span className="timeline-cta-icon" aria-hidden="true">🎬</span>
+                <span className="timeline-cta-text">
+                  <span className="timeline-cta-title">Reality Navigator <em>(prototyp)</em></span>
+                  <span className="timeline-cta-sub">Zmień masę gwiazdy centralnej i patrz, jak kamera odwiedza rzeczywiste konsekwencje w Scientific Model Graph — nie animację, obliczenia.</span>
+                </span>
+                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+              </button>
+              <button className="timeline-cta" onClick={() => { window.location.hash = '#/prebuild'; }}>
+                <span className="timeline-cta-icon" aria-hidden="true">🏭</span>
+                <span className="timeline-cta-text">
+                  <span className="timeline-cta-title">Machine Pre-Build <em>(prototyp)</em></span>
+                  <span className="timeline-cta-sub">Zaprojektuj układ pompa–rurociąg z prowieniencją (obliczone vs empiryczne vs oszacowane), ranking wrażliwości i CO ZMIERZYĆ przed budową. Symulacja koncepcyjna — nie CFD.</span>
+                </span>
+                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+              </button>
+              <nav className="home-nav" aria-label="Nawigacja trybu badawczego">
+                <button onClick={() => { window.location.hash = '#/projects'; }}>
+                  <span aria-hidden="true">☁</span> Projekty
+                </button>
+              </nav>
+            </div>
+          )}
           <MissionStatusBar />
           <div className="section-label">Laboratoria · {getLabs().length} modułów</div>
           <div className="labs-grid">

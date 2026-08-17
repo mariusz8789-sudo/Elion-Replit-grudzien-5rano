@@ -17,6 +17,15 @@ export interface Settings {
   analyticsEnabled: boolean;
   /** Krótkie, subtelne dźwięki UI (patrz core/sound.ts) — jeden przełącznik globalny. */
   soundEnabled: boolean;
+  /**
+   * Tryb badawczy (Faza 2: Collaborative Scientific Discovery). Domyślnie OFF —
+   * domyślną twarzą aplikacji jest produkt edukacyjny (laboratoria + Timeline).
+   * Po włączeniu odsłania stos badawczy (Kampania naukowa, Drug Discovery, CDE,
+   * MCRE, Projekty chmurowe, Reality Navigator, Machine Pre-Build). NIC nie jest
+   * usuwane — flaga tylko decyduje, co jest widoczne na stronie głównej; trasy
+   * (#/campaign, #/drug, …) działają zawsze, także z deep-linku.
+   */
+  researchModeEnabled: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -25,6 +34,7 @@ const DEFAULTS: Settings = {
   compactNarrator: false,
   analyticsEnabled: true,
   soundEnabled: true,
+  researchModeEnabled: false,
 };
 
 const KEY = 'settings/v1';
@@ -38,6 +48,7 @@ function sanitize(raw: Partial<Settings> | null | undefined): Settings {
     compactNarrator: typeof raw?.compactNarrator === 'boolean' ? raw.compactNarrator : DEFAULTS.compactNarrator,
     analyticsEnabled: typeof raw?.analyticsEnabled === 'boolean' ? raw.analyticsEnabled : DEFAULTS.analyticsEnabled,
     soundEnabled: typeof raw?.soundEnabled === 'boolean' ? raw.soundEnabled : DEFAULTS.soundEnabled,
+    researchModeEnabled: typeof raw?.researchModeEnabled === 'boolean' ? raw.researchModeEnabled : DEFAULTS.researchModeEnabled,
   };
 }
 

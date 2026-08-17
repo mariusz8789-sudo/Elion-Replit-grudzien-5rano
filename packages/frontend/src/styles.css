@@ -812,6 +812,16 @@ kbd {
 .home-nav button:hover { color: var(--text); border-color: var(--cyan); }
 .home-nav button:active { transform: scale(0.96); }
 
+/* ---------- Strefa badawcza (Faza 2: Collaborative Scientific Discovery) ---------- */
+/* Widoczna tylko gdy Ustawienia → Tryb badawczy jest włączony. Subtelnie oddzielona
+   od produktu edukacyjnego linią i chłodniejszym tłem, żeby wizualnie sygnalizować
+   „inna publiczność / inny tryb" bez usuwania czegokolwiek. */
+.research-zone {
+  margin-top: 0.6rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--border);
+}
+
 /* ---------- Ekrany podrzędne (Ustawienia / Dziennik / Słowniczek / Co by było) ---------- */
 .settings-view, .discovery-view, .glossary-view, .whatif-view {
   flex: 1; overflow-y: auto; padding: 0.2rem 0 calc(1.6rem + var(--safe-bottom));

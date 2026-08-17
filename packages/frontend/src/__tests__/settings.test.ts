@@ -49,7 +49,27 @@ describe('settings: defaults and persistence', () => {
       compactNarrator: false,
       analyticsEnabled: true,
       soundEnabled: true,
+      researchModeEnabled: false,
     });
+  });
+
+  it('research mode is OFF by default (education product is the default face)', async () => {
+    vi.stubGlobal('window', { localStorage: makeFakeStorage() });
+    const { getSettings } = await import('../core/settings');
+    expect(getSettings().researchModeEnabled).toBe(false);
+  });
+
+  it('research mode can be toggled on and persists', async () => {
+    const fake = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: fake });
+    const first = await import('../core/settings');
+    first.updateSettings({ researchModeEnabled: true });
+    expect(first.getSettings().researchModeEnabled).toBe(true);
+
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: fake });
+    const second = await import('../core/settings');
+    expect(second.getSettings().researchModeEnabled).toBe(true);
   });
 
   it('updateSettings persists a patch and notifies subscribers', async () => {
@@ -110,6 +130,7 @@ describe('settings: defensive validation of corrupted storage', () => {
       compactNarrator: false, // invalid type -> default
       analyticsEnabled: true, // invalid type -> default
       soundEnabled: true, // invalid type -> default
+      researchModeEnabled: false, // absent -> default
     });
   });
 
@@ -133,6 +154,7 @@ describe('applyDocumentFlags', () => {
         compactNarrator: false,
         analyticsEnabled: true,
         soundEnabled: true,
+        researchModeEnabled: false,
       }),
     ).not.toThrow();
   });
@@ -148,6 +170,7 @@ describe('applyDocumentFlags', () => {
       compactNarrator: false,
       analyticsEnabled: true,
       soundEnabled: true,
+      researchModeEnabled: false,
     });
     expect(fakeDoc.classes.has('force-reduced-motion')).toBe(true);
     expect(fakeDoc.classes.has('high-contrast')).toBe(false);

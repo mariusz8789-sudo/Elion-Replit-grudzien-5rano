@@ -176,3 +176,62 @@ the model is not. Manus can style/label unknown-but-declared types without code 
 Claude owns: event contract, registry/stream, rules, provenance, type registry, tests.
 Manus owns: markers, animations, HUD, event-feed/timeline UI, cameras, shaders, heatmap
 rendering, city, materials, CSS. No file overlap; the stream is the only coupling.
+
+---
+
+# Assurance Package addendum (v1.0.0 hardening)
+
+## 17. Version compatibility
+`isCompatibleContractVersion(consumerVersion, eventVersion)` (semver-lite): same
+major, and event's minor/patch ≤ consumer's. `consumerCapability()` returns the
+declared readable features for v1.0.0 (`location`, `source`, `affectedEntities`,
+`provenance`, `parent-chain`). Guaranteed vs optional fields are enumerated in
+`CONSUMER_CAPABILITY_V1`. `parameters` is domain payload — read it per event type,
+not as a universal guaranteed feature.
+
+## 18. Replay (no second store)
+`fingerprintRun(registry, {seed, paramsHash, …})` → `EventRunFingerprint`
+(contractVersion, modelId, experimentId, seed, paramsHash, eventCount, ordered
+eventIds, digest). `compareEventRuns(a, b)` → `{ match, firstDivergenceIndex,
+divergence:{index,a,b,reason} }` — divergence is reported explicitly (reason:
+id/type/timestamp/source/target/provenance/missing-in-a/-b), never masked. Pure
+read-only over existing registries; nothing persisted.
+
+## 19. Stream cursor & run reset
+Cursor is a monotonic count; `getEventsSince(cursor)` returns only events appended
+since it and the new cursor. A new run = a new `EventRegistry` (fresh cursor at 0);
+events from different runs never mix (proven). Do not reuse a registry across runs
+if you want isolated replay.
+
+## 20. Real city example (canonical consumer protocol)
+```
+infection.transmission
+  source            = infecting agent   (EntityRef kind 'agent')
+  affectedEntities0 = recipient agent
+  location          = model contact point {x,y}
+  provenance.origin = 'model'
+  child infection.exposure (via rule epidemic.transmission-causes-exposure)
+    parentEventId   = the transmission id
+    provenance.origin = 'consequence-rule', ruleId = 'epidemic.transmission-causes-exposure'
+    = the model's own S→E, restated at the event layer (no new dynamics)
+```
+Proven by a real-model integration test (`lastTransmissions()` → ingest → stream
+cursor → transmission → child exposure → provenance chain).
+
+## 21. Consumer boundary
+Manus holds an `EventConsumer` (read-only), never the `EventRegistry`, inside the
+renderer. No writes to the registry from the render layer. No `EventViewModel` in
+`core/events` — mapping events to markers/feed/timeline is Manus's, in his files.
+
+## 22. Consequence safety
+Rules are idempotent per `(parentEventId, ruleId)` — re-running `runRulesOverRegistry`
+does not duplicate children. Cycle guard: a rule never fires on an event it itself
+produced. Rules never mutate `SimAgent` or model stats (proven). Future-domain types
+(`implemented:false`) cannot be emitted by any builtin rule.
+
+## 23. Base strategy
+This branch is based on `0242131` (the only reachable ref carrying the epidemic
+model). The referenced Visual P0 `4fbc5c9`/`b794a52` exist only locally on Manus's
+side (not pushed by project rule). Integration path: Manus selectively imports
+`core/events/**`, the event tests, and this doc onto the current world tip — no
+rebase/force-push of history required; `core/events` is self-contained.

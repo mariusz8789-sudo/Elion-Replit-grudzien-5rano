@@ -36,13 +36,24 @@ export type ConsequenceRule = GenesisRule;
 
 function ruleApplies(rule: GenesisRule, event: GenesisEvent, ctx: RuleContext): boolean {
   if (rule.trigger.type !== event.type) return false;
+  // CYCLE GUARD: a rule must not fire on an event it (the same rule) produced —
+  // stops A→A loops even across repeated passes.
+  if (event.provenance?.origin === 'consequence-rule' && event.provenance.ruleId === rule.id) return false;
   return rule.when ? rule.when(event, ctx) : true;
+}
+
+/** IDEMPOTENCY: has this rule already fired for this parent event? */
+function alreadyFired(registry: EventRegistry, parentId: string, ruleId: string): boolean {
+  return registry.children(parentId).some((c) => c.provenance?.ruleId === ruleId);
 }
 
 /**
  * Uruchamia reguły dla POJEDYNCZEGO zdarzenia, rejestrując potomne z poprawnym
  * `parentEventId` i provenance.origin='consequence-rule'. Deterministyczne:
  * kolejność reguł × kolejność `emit` = kolejność rejestracji.
+ *
+ * IDEMPOTENTNE: ponowne wywołanie dla tego samego (parent, rule) NIE dubluje
+ * dzieci. CYKLICZNIE BEZPIECZNE: reguła nie odpala się na własnym wyjściu.
  */
 export function runRules(
   registry: EventRegistry, event: GenesisEvent, rules: readonly GenesisRule[], ctx: RuleContext = {},
@@ -50,6 +61,7 @@ export function runRules(
   const out: GenesisEvent[] = [];
   for (const rule of rules) {
     if (!ruleApplies(rule, event, ctx)) continue;
+    if (alreadyFired(registry, event.id, rule.id)) continue; // idempotent
     for (const derived of rule.emit(event, ctx)) {
       out.push(registry.add({
         ...derived,

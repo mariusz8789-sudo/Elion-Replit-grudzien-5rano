@@ -9,8 +9,17 @@ export {
   type EventProvenance, type ValidationResult,
 } from './genesisEvent';
 export { EventRegistry } from './eventRegistry';
-export { EventStream } from './eventStream';
+export { EventStream, type EventConsumer } from './eventStream';
 export { fnv1a, canonicalJson } from './hash';
+export {
+  isCompatibleContractVersion, parseVersion, consumerCapability, CONSUMER_CAPABILITY_V1,
+  type SemVer, type ConsumerCapability,
+} from './contractCompat';
+export { serializeEvent, serializeEvents, deserializeEvent, deserializeEvents } from './serialization';
+export {
+  fingerprintRun, compareEventRuns,
+  type EventRunFingerprint, type RunComparison, type DivergenceReason,
+} from './runFingerprint';
 export { paramsHash, provenanceFromModel, provenanceFromSavedExperiment } from './provenance';
 export {
   adaptTransmission, ingestTransmissions,

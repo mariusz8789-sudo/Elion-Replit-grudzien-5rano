@@ -2,6 +2,23 @@ import type { EventRegistry } from './eventRegistry';
 import type { GenesisEvent, EventProvenance } from './genesisEvent';
 
 /**
+ * EVENT CONSUMER — nazwany, WĄSKI kontrakt read-only dla Manusa (Pakiet C).
+ * Renderer trzyma referencję tego typu, nie EventRegistry — nie ma dostępu do
+ * `add()` ani do mutacji. Żadnego EventViewModel tutaj (to własność Manusa).
+ */
+export interface EventConsumer {
+  cursor(): number;
+  getEventsSince(cursor: number): { events: readonly GenesisEvent[]; cursor: number };
+  getEvent(id: string): GenesisEvent | undefined;
+  getEventsByType(type: string): readonly GenesisEvent[];
+  getChildren(parentId: string): readonly GenesisEvent[];
+  getProvenance(id: string): EventProvenance | null;
+  getExperimentHistory(experimentId: string): readonly GenesisEvent[];
+  all(): readonly GenesisEvent[];
+  count(): number;
+}
+
+/**
  * EVENT STREAM — READ-ONLY fasada strumienia zdarzeń dla KONSUMENTA (Manus).
  *
  * Ukrywa `add()` i wszystko, co mutuje. Konsument dostaje stabilny, wąski
@@ -13,7 +30,7 @@ import type { GenesisEvent, EventProvenance } from './genesisEvent';
  *   // ...model tyka, adapter dokłada zdarzenia do registry...
  *   const { events, cursor } = stream.getEventsSince(cur); cur = cursor;
  */
-export class EventStream {
+export class EventStream implements EventConsumer {
   constructor(private readonly registry: EventRegistry) {}
 
   /** Bieżący kursor (do zapamiętania między tickami). */

@@ -32,6 +32,40 @@ describe('scienceChat: open (reuse generatora)', () => {
   });
 });
 
+describe('scienceChat: SCIENTIFIC INTENT — każda odpowiedź ma typowaną intencję', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('klasyfikuje intencje głównych komend', () => {
+    expect(resolveCommand('pokaż czarną dziurę', null).intent).toBe('OPEN_SIMULATION');
+    expect(resolveCommand('porównaj dwa modele', null).intent).toBe('COMPARE_MODELS');
+    expect(resolveCommand('zwiększ masę 2x', ctx()).intent).toBe('CHANGE_PARAMETER');
+    expect(resolveCommand('co jeśli zmniejszymy prędkość?', ctx()).intent).toBe('WHAT_IF');
+    expect(resolveCommand('pokaż równanie', ctx()).intent).toBe('SHOW_EQUATION');
+    expect(resolveCommand('założenia modelu', ctx()).intent).toBe('SHOW_ASSUMPTIONS');
+    expect(resolveCommand('zrób zadanie', ctx()).intent).toBe('CREATE_TASK');
+    expect(resolveCommand('co się zmieniło?', ctx()).intent).toBe('EXPLAIN');
+    expect(resolveCommand('pauza', ctx()).intent).toBe('CONTROL');
+    expect(resolveCommand('zapisz eksperyment', ctx()).intent).toBe('SAVE');
+    expect(resolveCommand('pokaż zapisane', null).intent).toBe('LIST');
+    expect(resolveCommand('wczytaj 1', null).intent).toBe('LOAD');
+    expect(resolveCommand('zweryfikuj', ctx()).intent).toBe('VERIFY');
+    expect(resolveCommand('pomoc', null).intent).toBe('HELP');
+  });
+
+  it('PROPOSE_EXPERIMENT bez kontekstu proponuje realny start (akcja open)', () => {
+    const r = resolveCommand('zaproponuj kolejny eksperyment', null);
+    expect(r.intent).toBe('PROPOSE_EXPERIMENT');
+    expect(r.action?.type).toBe('open');
+  });
+
+  it('PROPOSE_EXPERIMENT w kontekście epidemii proponuje porównanie (akcja compare)', () => {
+    const epiCtx = ctx({ labId: 'biology', experimentId: 'biology.epidemic', experimentName: 'Epidemia na wyspie (SIR/SEIR)' });
+    const r = resolveCommand('zaproponuj eksperyment', epiCtx);
+    expect(r.intent).toBe('PROPOSE_EXPERIMENT');
+    expect(r.action?.type).toBe('compare');
+  });
+});
+
 describe('scienceChat: porównanie modeli (COMPARE_MODELS, FAZA 1/P5)', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ensureGeneratorReady, getRecipes, epistemicStatusOf, EPISTEMIC_LABELS } from '../core/generator';
-import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag } from '../core/scienceChat/resolveCommand';
+import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingComparison } from '../core/compareBridge';
@@ -17,7 +17,7 @@ import { track } from '../core/analytics';
  * atrap; funkcje niegotowe są jawnie oznaczone jako TODO w odpowiedzi.
  */
 
-interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; equations?: string[]; todo?: boolean }
+interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean }
 
 const TAG_LABELS: Record<EpistemicTag, string> = {
   FAKT: 'FAKT', MODEL: 'MODEL', ZALOZENIE: 'ZAŁOŻENIE', HIPOTEZA: 'HIPOTEZA',
@@ -30,6 +30,7 @@ const SUGGESTIONS = [
   'Co się zmieniło?',
   'Pokaż równanie',
   'Porównaj SIR R0=1.5 z SIR R0=3',
+  'Zaproponuj kolejny eksperyment',
   'Zapisz eksperyment',
   'Pokaż zapisane',
 ];
@@ -62,7 +63,7 @@ export function ScienceChat() {
       : null;
 
     const res: ChatResponse = resolveCommand(msg, snapshot);
-    setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: res.text, tag: res.tag, equations: res.equations, todo: res.todo }]);
+    setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: res.text, tag: res.tag, intent: res.intent, equations: res.equations, todo: res.todo }]);
     setInput('');
     track('ask_ai_used', { via: 'science-chat' });
 
@@ -130,7 +131,11 @@ export function ScienceChat() {
       <div className="science-chat-log" ref={scrollRef}>
         {turns.map((t, i) => (
           <div key={i} className={`sc-turn sc-${t.role}`}>
-            {t.role === 'genesis' && t.tag && <span className={`sc-tag sc-tag-${t.tag.toLowerCase()}`}>{TAG_LABELS[t.tag]}{t.todo ? ' · TODO' : ''}</span>}
+            {t.role === 'genesis' && t.tag && (
+              <span className={`sc-tag sc-tag-${t.tag.toLowerCase()}`}>
+                {TAG_LABELS[t.tag]}{t.intent && t.intent !== 'UNKNOWN' ? ` · ${t.intent}` : ''}{t.todo ? ' · TODO' : ''}
+              </span>
+            )}
             <div className="sc-text">{t.text}</div>
             {t.equations && t.equations.length > 0 && (
               <div className="generator-eqs">{t.equations.map((eq) => <code key={eq}>{eq}</code>)}</div>

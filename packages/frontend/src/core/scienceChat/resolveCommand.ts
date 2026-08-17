@@ -23,6 +23,19 @@ import { DEFAULT_EPIDEMIC, type EpidemicModel } from '../epidemic/sir';
 export type EpistemicTag =
   | 'FAKT' | 'MODEL' | 'ZALOZENIE' | 'HIPOTEZA' | 'WYNIK' | 'INTERPRETACJA' | 'SYSTEM';
 
+/**
+ * SCIENTIFIC INTENT — jawna, typowana klasyfikacja intencji użytkownika
+ * (warstwa TEXT → SCIENTIFIC INTENT → MODEL SELECTION → EXPERIMENT). Każda
+ * odpowiedź resolvera niesie swoją intencję, więc UI i testy mogą na niej
+ * polegać, a nie zgadywać z treści. To NIE nowy resolver — to etykieta nad
+ * istniejącą, deterministyczną ścieżką.
+ */
+export type ScientificIntent =
+  | 'OPEN_SIMULATION' | 'CHANGE_PARAMETER' | 'WHAT_IF' | 'EXPLAIN'
+  | 'SHOW_EQUATION' | 'SHOW_ASSUMPTIONS' | 'COMPARE_MODELS' | 'CREATE_TASK'
+  | 'CHECK_RESULT' | 'VERIFY' | 'PROPOSE_EXPERIMENT'
+  | 'SAVE' | 'LIST' | 'LOAD' | 'CONTROL' | 'HELP' | 'UNKNOWN';
+
 export type ChatAction =
   | { type: 'open'; labId: string; experimentId?: string; params?: Partial<SimParams> }
   | { type: 'setParam'; key: string; value: number | boolean | string }
@@ -35,6 +48,8 @@ export type ChatAction =
 export interface ChatResponse {
   text: string;
   tag: EpistemicTag;
+  /** Jawna, typowana intencja naukowa tej odpowiedzi (SCIENTIFIC INTENT). */
+  intent: ScientificIntent;
   action?: ChatAction;
   /** Oznacza funkcję świadomie jeszcze niegotową (uczciwe TODO, nie atrapa). */
   todo?: boolean;
@@ -148,21 +163,27 @@ function buildComparison(raw: string): { a: ModelConfig; b: ModelConfig } {
 
 export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): ChatResponse {
   const norm = normalize(message);
-  if (!norm) return { text: 'Napisz, co chcesz zobaczyć — np. „pokaż czarną dziurę" albo „zwiększ masę 2×".', tag: 'SYSTEM' };
+  if (!norm) return { text: 'Napisz, co chcesz zobaczyć — np. „pokaż czarną dziurę" albo „zwiększ masę 2×".', tag: 'SYSTEM', intent: 'HELP' };
 
   // --- Sterowanie odtwarzaniem (istniejący activeSimControls) ---
-  if (has(norm, 'pauza', 'zatrzymaj', 'wstrzymaj', 'stop ')) return { text: 'Wstrzymuję symulację.', tag: 'SYSTEM', action: { type: 'control', op: 'pause' } };
-  if (has(norm, 'reset', 'od nowa', 'zresetuj', 'restart')) return { text: 'Restartuję symulację do stanu początkowego.', tag: 'SYSTEM', action: { type: 'control', op: 'reset' } };
+  if (has(norm, 'pauza', 'zatrzymaj', 'wstrzymaj', 'stop ')) return { text: 'Wstrzymuję symulację.', tag: 'SYSTEM', intent: 'CONTROL', action: { type: 'control', op: 'pause' } };
+  if (has(norm, 'reset', 'od nowa', 'zresetuj', 'restart')) return { text: 'Restartuję symulację do stanu początkowego.', tag: 'SYSTEM', intent: 'CONTROL', action: { type: 'control', op: 'reset' } };
 
   // --- Scientific Memory (sekcja 21): wczytanie / lista / zapis ---
   const loadMatch = norm.match(/(?:wczytaj|otworz zapisany|przywroc)\D*(\d+)/);
-  if (loadMatch) return { text: `Wczytuję zapisany eksperyment #${loadMatch[1]}…`, tag: 'SYSTEM', action: { type: 'load', index: parseInt(loadMatch[1], 10) } };
+  if (loadMatch) return { text: `Wczytuję zapisany eksperyment #${loadMatch[1]}…`, tag: 'SYSTEM', intent: 'LOAD', action: { type: 'load', index: parseInt(loadMatch[1], 10) } };
   if (has(norm, 'zapisane eksperyment', 'moje eksperyment', 'pokaz zapisane', 'lista eksperyment', 'pamiec naukowa', 'historia eksperyment')) {
-    return { text: 'Twoje zapisane eksperymenty (Pamięć Naukowa, lokalnie w tej przeglądarce):', tag: 'SYSTEM', action: { type: 'list' } };
+    return { text: 'Twoje zapisane eksperymenty (Pamięć Naukowa, lokalnie w tej przeglądarce):', tag: 'SYSTEM', intent: 'LIST', action: { type: 'list' } };
   }
   if (has(norm, 'zapisz eksperyment', 'zapisz to', 'zapisz symulacj', 'zapisz wynik', 'zapisz ten') || /^zapisz\b/.test(norm)) {
-    if (!ctx) return { text: 'Nie ma otwartej symulacji do zapisania. Najpierw otwórz zjawisko, np. „problem trzech ciał".', tag: 'SYSTEM' };
-    return { text: `Zapisuję „${ctx.experimentName}" do Pamięci Naukowej…`, tag: 'SYSTEM', action: { type: 'save' } };
+    if (!ctx) return { text: 'Nie ma otwartej symulacji do zapisania. Najpierw otwórz zjawisko, np. „problem trzech ciał".', tag: 'SYSTEM', intent: 'SAVE' };
+    return { text: `Zapisuję „${ctx.experimentName}" do Pamięci Naukowej…`, tag: 'SYSTEM', intent: 'SAVE', action: { type: 'save' } };
+  }
+
+  // --- Zaproponuj kolejny eksperyment (SCIENTIFIC INTENT: PROPOSE_EXPERIMENT).
+  //     Przed „otwórz", by „zaproponuj..." nie trafiło przypadkiem w nazwę zjawiska. ---
+  if (has(norm, 'zaproponuj', 'kolejny eksperyment', 'nastepny eksperyment', 'co dalej', 'jaki eksperyment', 'propozycj', 'co teraz zbadac', 'zaproponuj eksperyment')) {
+    return proposeExperiment(ctx);
   }
 
   // --- Porównanie modeli (FAZA 1 / PRIORYTET 5) — MUSI być przed „otwórz",
@@ -172,6 +193,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     return {
       text: `Otwieram porównanie modeli: ${a.label} vs ${b.label}. Zobaczysz nałożone przebiegi, różnice (szczyt, łącznie zakażonych, zgony), równania i ograniczenia. To porównanie MODELU z MODELEM, nie z rzeczywistością.`,
       tag: 'MODEL',
+      intent: 'COMPARE_MODELS',
       action: { type: 'compare', a, b },
     };
   }
@@ -184,6 +206,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     return {
       text: `Otwieram: ${r.title}. ${r.summary}`,
       tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
       action: { type: 'open', labId: r.labId, experimentId: r.experimentId, params: r.params },
     };
   }
@@ -194,6 +217,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     return {
       text: 'Nie mam teraz otwartej symulacji. Powiedz np. „pokaż czarną dziurę" albo „zasymuluj dylatację czasu", a potem będę mógł zmieniać parametry, wyjaśniać i tworzyć zadania.',
       tag: 'SYSTEM',
+      intent: 'UNKNOWN',
     };
   }
 
@@ -202,19 +226,19 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   // --- Równania ---
   if (has(norm, 'rownanie', 'rownania', 'wzor', 'wzory', 'equation')) {
     const eqs = recipe?.equations ?? [];
-    if (eqs.length === 0) return { text: `Dla „${ctx.experimentName}" nie mam jeszcze zarejestrowanych równań w katalogu. TODO: uzupełnić metadane modelu.`, tag: 'MODEL', todo: true };
-    return { text: `Równania modelu „${ctx.experimentName}":`, tag: 'MODEL', equations: eqs };
+    if (eqs.length === 0) return { text: `Dla „${ctx.experimentName}" nie mam jeszcze zarejestrowanych równań w katalogu. TODO: uzupełnić metadane modelu.`, tag: 'MODEL', intent: 'SHOW_EQUATION', todo: true };
+    return { text: `Równania modelu „${ctx.experimentName}":`, tag: 'MODEL', intent: 'SHOW_EQUATION', equations: eqs };
   }
 
   // --- Założenia / ograniczenia ---
   if (has(norm, 'zalozeni', 'ograniczeni', 'assumption', 'limit')) {
     const extra = recipe?.assumptions?.length ? ` Założenia: ${recipe.assumptions.join(' · ')}.` : '';
-    return { text: `Model „${ctx.experimentName}" — poziom uczciwości: ${ctx.honesty}. ${ctx.honestyNote}${extra}`, tag: 'ZALOZENIE' };
+    return { text: `Model „${ctx.experimentName}" — poziom uczciwości: ${ctx.honesty}. ${ctx.honestyNote}${extra}`, tag: 'ZALOZENIE', intent: 'SHOW_ASSUMPTIONS' };
   }
 
   // --- Źródła (istnieją per-twierdzenie w Narratorze; katalog per-model to TODO) ---
   if (has(norm, 'zrodl', 'source', 'bibliograf', 'cytow')) {
-    return { text: 'Źródła konkretnych twierdzeń pokazuje panel Narratora przy danej wartości. Spójny katalog źródeł per-model to TODO (Provenance dla generatora).', tag: 'SYSTEM', todo: true };
+    return { text: 'Źródła konkretnych twierdzeń pokazuje panel Narratora przy danej wartości. Spójny katalog źródeł per-model to TODO (Provenance dla generatora).', tag: 'SYSTEM', intent: 'EXPLAIN', todo: true };
   }
 
   // --- Zadanie / praca domowa / quiz (fundament, powiązane z realnym modelem) ---
@@ -224,7 +248,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
 
   // --- Weryfikacja (Faza 6 — inwarianty; uczciwe TODO) ---
   if (has(norm, 'sprawdz wynik', 'zweryfikuj', 'weryfik', 'verify')) {
-    return { text: 'Weryfikacja inwariantami (jednostki, zakresy, prawa zachowania) dla żywej symulacji to Faza 6 — interfejs gotowy, kontrole do podłączenia. TODO.', tag: 'SYSTEM', todo: true };
+    return { text: 'Weryfikacja inwariantami (jednostki, zakresy, prawa zachowania) dla żywej symulacji to Faza 6 — interfejs gotowy, kontrole do podłączenia. TODO.', tag: 'SYSTEM', intent: 'VERIFY', todo: true };
   }
 
   // --- „Co się zmieniło?" / analiza aktualnego wyniku (PRZED zmianą parametru,
@@ -237,25 +261,28 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   const numericDefs = ctx.paramDefs.filter((d) => d.type === 'slider');
   const target = findParam(ctx.paramDefs, message);
   const op = detectNumericOp(message);
-  const wantsChange = has(norm, 'zwieksz', 'zmniejsz', 'zmien', 'ustaw', 'co jesli', 'co sie stanie', 'podwoj', 'obniz', 'podnie');
+  const isWhatIf = has(norm, 'co jesli', 'co sie stanie', 'gdyby');
+  const wantsChange = has(norm, 'zwieksz', 'zmniejsz', 'zmien', 'ustaw', 'podwoj', 'obniz', 'podnie') || isWhatIf;
   if (wantsChange || (target && op)) {
+    const paramIntent: ScientificIntent = isWhatIf ? 'WHAT_IF' : 'CHANGE_PARAMETER';
     if (!target) {
       const names = numericDefs.map((d) => d.label).join(', ') || 'brak regulowanych parametrów';
-      return { text: `Który parametr zmienić? Dostępne w „${ctx.experimentName}": ${names}.`, tag: 'SYSTEM' };
+      return { text: `Który parametr zmienić? Dostępne w „${ctx.experimentName}": ${names}.`, tag: 'SYSTEM', intent: paramIntent };
     }
     if (target.type !== 'slider') {
-      return { text: `Parametr „${target.label}" nie jest liczbowy — nie umiem go skalować. Dostępne liczbowe: ${numericDefs.map((d) => d.label).join(', ')}.`, tag: 'SYSTEM' };
+      return { text: `Parametr „${target.label}" nie jest liczbowy — nie umiem go skalować. Dostępne liczbowe: ${numericDefs.map((d) => d.label).join(', ')}.`, tag: 'SYSTEM', intent: paramIntent };
     }
     const oldVal = Number(ctx.params[target.key] ?? target.default);
     const transform = op ?? ((o: number) => o * 2); // „co jeśli zwiększymy X" bez liczby → domyślnie ×2
     const newVal = clamp(transform(oldVal), target);
     if (newVal === oldVal) {
-      return { text: `Parametr „${target.label}" jest już na granicy zakresu (${oldVal}${target.unit ? ' ' + target.unit : ''}) — nie mogę zmienić dalej w tę stronę.`, tag: 'WYNIK' };
+      return { text: `Parametr „${target.label}" jest już na granicy zakresu (${oldVal}${target.unit ? ' ' + target.unit : ''}) — nie mogę zmienić dalej w tę stronę.`, tag: 'WYNIK', intent: paramIntent };
     }
     const unit = target.unit ? ` ${target.unit}` : '';
     return {
       text: `Zmieniam „${target.label}": ${oldVal}${unit} → ${newVal}${unit}. Obserwuj scenę — to realny parametr silnika, nie animacja. Zapytaj „co się zmieniło?", by porównać wynik.`,
       tag: 'WYNIK',
+      intent: paramIntent,
       action: { type: 'setParam', key: target.key, value: newVal },
     };
   }
@@ -269,8 +296,47 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
 
   // --- Nierozpoznane w kontekście symulacji ---
   return {
-    text: `Nie rozpoznałem komendy w kontekście „${ctx.experimentName}". Spróbuj: „zwiększ ${numericDefs[0]?.label ?? 'parametr'} 2×", „pokaż równanie", „założenia modelu", „zrób zadanie" albo „co się zmieniło?".`,
+    text: `Nie rozpoznałem komendy w kontekście „${ctx.experimentName}". Spróbuj: „zwiększ ${numericDefs[0]?.label ?? 'parametr'} 2×", „pokaż równanie", „założenia modelu", „zrób zadanie", „porównaj modele" albo „zaproponuj kolejny eksperyment".`,
     tag: 'SYSTEM',
+    intent: 'UNKNOWN',
+  };
+}
+
+/**
+ * PROPOSE_EXPERIMENT — deterministyczna propozycja kolejnego kroku badawczego.
+ * Bez kontekstu: proponuje sensowny punkt startowy z katalogu (akcja open).
+ * Z kontekstem epidemicznym: proponuje porównanie reżimów (akcja compare).
+ * W innym kontekście z parametrem: proponuje konkretne „co jeśli?" na parametrze.
+ */
+function proposeExperiment(ctx: ChatSimSnapshot | null): ChatResponse {
+  if (!ctx) {
+    const r = getRecipes().find((x) => x.id === 'three-body') ?? getRecipes()[0];
+    if (!r) return { text: 'Katalog jest pusty. Otwórz Generator symulacji i opisz zjawisko jednym zdaniem.', tag: 'SYSTEM', intent: 'PROPOSE_EXPERIMENT' };
+    return {
+      text: `Propozycja na start: „${r.title}". ${r.summary} Uruchamiam ten eksperyment — potem możesz zmieniać parametry i pytać „co się zmieniło?".`,
+      tag: 'HIPOTEZA', intent: 'PROPOSE_EXPERIMENT',
+      action: { type: 'open', labId: r.labId, experimentId: r.experimentId, params: r.params },
+    };
+  }
+  // Model epidemiczny → zaproponuj porównanie reżimów R0 (realna akcja compare).
+  if (ctx.labId === 'biology' && /epidem|lotnisk|airport/i.test(`${ctx.experimentId} ${ctx.experimentName}`)) {
+    const { a, b } = defaultComparison();
+    return {
+      text: `Kolejny eksperyment: porównaj dwa reżimy — ${a.label} vs ${b.label} — i zobacz, jak R₀ przesuwa i podnosi szczyt. Otwieram panel porównania (możesz potem zmienić parametry obu modeli).`,
+      tag: 'HIPOTEZA', intent: 'PROPOSE_EXPERIMENT',
+      action: { type: 'compare', a, b },
+    };
+  }
+  const slider = ctx.paramDefs.find((d) => d.type === 'slider');
+  if (slider) {
+    return {
+      text: `Kolejny eksperyment (hipoteza do sprawdzenia): zmień „${slider.label}" i zbadaj reakcję wyniku. Np. „zwiększ ${slider.label} 2×", potem „co się zmieniło?". Chcesz zestawić dwa warianty obok siebie? Napisz „porównaj".`,
+      tag: 'HIPOTEZA', intent: 'PROPOSE_EXPERIMENT',
+    };
+  }
+  return {
+    text: `„${ctx.experimentName}" nie ma regulowanego parametru liczbowego. Kolejnym krokiem może być otwarcie powiązanego zjawiska — np. „pokaż problem trzech ciał".`,
+    tag: 'SYSTEM', intent: 'PROPOSE_EXPERIMENT',
   };
 }
 
@@ -287,13 +353,14 @@ function explainState(ctx: ChatSimSnapshot, lay = false): ChatResponse {
   return {
     text: `${lead}Parametry — ${params || 'brak regulowanych'}. Odczyty — ${stats}. To WYNIK SYMULACJI modelu (${ctx.honesty}), nie dowód o rzeczywistości: ${ctx.honestyNote}`,
     tag: 'WYNIK',
+    intent: 'EXPLAIN',
   };
 }
 
 function taskResponse(ctx: ChatSimSnapshot): ChatResponse {
   const p = ctx.paramDefs.find((d) => d.type === 'slider');
   if (!p) {
-    return { text: `„${ctx.experimentName}" nie ma regulowanego parametru liczbowego, więc nie zbuduję z niego zadania obliczeniowego. Fundament generatora zadań jest gotowy — TODO: zadania jakościowe.`, tag: 'SYSTEM', todo: true };
+    return { text: `„${ctx.experimentName}" nie ma regulowanego parametru liczbowego, więc nie zbuduję z niego zadania obliczeniowego. Fundament generatora zadań jest gotowy — TODO: zadania jakościowe.`, tag: 'SYSTEM', intent: 'CREATE_TASK', todo: true };
   }
   const lo = typeof p.min === 'number' ? p.min : Number(p.default);
   const hi = typeof p.max === 'number' ? p.max : Number(p.default) * 2;
@@ -309,6 +376,7 @@ function taskResponse(ctx: ChatSimSnapshot): ChatResponse {
       `3. Wyjaśnij, dlaczego wynik się zmienił, odwołując się do modelu.\n` +
       `Punktacja i auto-ocena wyniku liczbowego: fundament gotowy — TODO (Faza 4).`,
     tag: 'SYSTEM',
+    intent: 'CREATE_TASK',
     todo: true,
   };
 }
@@ -317,10 +385,12 @@ function helpResponse(): ChatResponse {
   return {
     text:
       'Science Chat rozmawia z realnymi silnikami Genesis. Potrafię: otworzyć zjawisko („pokaż czarną dziurę"), ' +
-      'zmienić parametr otwartej symulacji („zwiększ masę 2×", „co jeśli zmniejszymy prędkość?"), wyjaśnić stan ' +
-      '(„co się zmieniło?", „wyjaśnij jak laikowi"), pokazać równania i założenia modelu, oraz zbudować zadanie ' +
-      'z bieżącego eksperymentu. Porównanie modeli, weryfikacja inwariantami i katalog źródeł są w drodze (TODO).',
+      'zmienić parametr otwartej symulacji („zwiększ masę 2×", „co jeśli zmniejszymy prędkość?"), porównać dwa modele ' +
+      '(„porównaj SIR R0=1.5 z SIR R0=3"), wyjaśnić stan („co się zmieniło?"), pokazać równania i założenia, ' +
+      'zbudować zadanie oraz zaproponować kolejny eksperyment („zaproponuj eksperyment"). ' +
+      'Weryfikacja inwariantami i katalog źródeł są w drodze (TODO).',
     tag: 'SYSTEM',
+    intent: 'HELP',
   };
 }
 

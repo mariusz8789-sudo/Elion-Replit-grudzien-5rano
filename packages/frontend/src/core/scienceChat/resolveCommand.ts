@@ -43,7 +43,8 @@ export type ChatAction =
   | { type: 'save' }
   | { type: 'list' }
   | { type: 'load'; index: number }
-  | { type: 'compare'; a: ModelConfig; b: ModelConfig };
+  | { type: 'compare'; a: ModelConfig; b: ModelConfig }
+  | { type: 'openRoute'; hash: string };
 
 export interface ChatResponse {
   text: string;
@@ -184,6 +185,17 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   //     Przed „otwórz", by „zaproponuj..." nie trafiło przypadkiem w nazwę zjawiska. ---
   if (has(norm, 'zaproponuj', 'kolejny eksperyment', 'nastepny eksperyment', 'co dalej', 'jaki eksperyment', 'propozycj', 'co teraz zbadac', 'zaproponuj eksperyment')) {
     return proposeExperiment(ctx);
+  }
+
+  // --- Żywa symulacja wizualna „miasto" (Visual Scene Engine) — przed „otwórz",
+  //     by trafić do sceny agentowej, a nie do modelu przedziałowego. ---
+  if (has(norm, 'zywa symulacja', 'wizualna symulacja', 'symulacja wizualna', 'epidemia w miescie', 'male miasto', 'w miescie', 'pokaz miasto', 'scena', 'agenci w miescie', 'visual scene')) {
+    return {
+      text: 'Otwieram żywą symulację „Epidemia w małym mieście": setki agentów chodzą po mieście na żywo, a zakażenie powstaje z realnych kontaktów. Zmień R₀ lub włącz restrykcje i patrz, jak świat reaguje — wykres jest tylko skutkiem.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/city' },
+    };
   }
 
   // --- Porównanie modeli (FAZA 1 / PRIORYTET 5) — MUSI być przed „otwórz",

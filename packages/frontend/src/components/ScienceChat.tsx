@@ -78,6 +78,9 @@ export function ScienceChat() {
       setPendingComparison(a.a, a.b);
       window.location.hash = '#/compare';
       setOpen(false);
+    } else if (a?.type === 'openRoute') {
+      window.location.hash = a.hash;
+      setOpen(false);
     } else if (a?.type === 'setParam') {
       getSimContext()?.setParam(a.key, a.value);
     } else if (a?.type === 'control') {

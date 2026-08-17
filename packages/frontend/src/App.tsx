@@ -40,6 +40,7 @@ const DrugDiscoveryScreen = lazy(() => import('./components/DrugDiscoveryScreen'
 const CampaignScreen = lazy(() => import('./components/CampaignScreen').then((m) => ({ default: m.CampaignScreen })));
 const SimulationGeneratorScreen = lazy(() => import('./components/SimulationGeneratorScreen').then((m) => ({ default: m.SimulationGeneratorScreen })));
 const ModelComparisonScreen = lazy(() => import('./components/ModelComparisonScreen').then((m) => ({ default: m.ModelComparisonScreen })));
+const VisualSimulationScreen = lazy(() => import('./components/visual-simulation/VisualSimulationScreen').then((m) => ({ default: m.VisualSimulationScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -76,7 +77,8 @@ type Route =
   | { kind: 'drug' }
   | { kind: 'campaign' }
   | { kind: 'generate' }
-  | { kind: 'compare' };
+  | { kind: 'compare' }
+  | { kind: 'city' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -97,6 +99,7 @@ function parseHash(): Route {
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };
+  if (h === '#/city') return { kind: 'city' };
   return { kind: 'home' };
 }
 
@@ -404,6 +407,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'city') {
+      return (
+        <div className="app">
+          <TopBar title="🏙 Epidemia w małym mieście (żywa symulacja)" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <VisualSimulationScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -420,6 +435,14 @@ export default function App() {
             <span className="timeline-cta-text">
               <span className="timeline-cta-title">Generator symulacji</span>
               <span className="timeline-cta-sub">Opisz zjawisko jednym zdaniem — Genesis dobierze realny model, uruchomi go i pozwoli zmieniać parametry na żywo. „Zasymuluj dylatację czasu", „zwiększ masę gwiazdy 2×"…</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
+          <button className="timeline-cta" onClick={() => { window.location.hash = '#/city'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true">🏙</span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Żywa symulacja: epidemia w mieście</span>
+              <span className="timeline-cta-sub">Setki agentów chodzą po mieście na żywo — zakażenie powstaje z realnych kontaktów, nie z wykresu. Zmień R₀ albo włącz restrykcje i zobacz, jak świat reaguje. Wykres jest tylko skutkiem.</span>
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>

@@ -847,6 +847,13 @@ kbd {
 .generator-recipe button { margin-top: 0.5rem; }
 .generator-catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.6rem; }
 
+/* ---------- Lazy route loading (P0-hardening) ---------- */
+.route-loading {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 40vh; color: var(--text-dim); font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+
 /* ---------- Science Chat (warstwa rozmowy nad silnikami) ---------- */
 .science-chat-fab {
   position: fixed; right: 1rem; bottom: 1rem; z-index: 50;

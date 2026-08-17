@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import './labs/index';
 import { getLab, getLabs } from './core/registry';
 import { LabShell } from './components/LabShell';
@@ -8,8 +8,6 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
 import { GlossaryScreen } from './components/GlossaryScreen';
 import { WhatIfScreen } from './components/WhatIfScreen';
-import { DiscoveryTimeline } from './components/DiscoveryTimeline';
-import { QuantumDecisionExplorer } from './components/QuantumDecisionExplorer';
 import { SearchOverlay } from './components/SearchOverlay';
 import { HelpOverlay } from './components/HelpOverlay';
 import { OnboardingOverlay } from './components/OnboardingOverlay';
@@ -21,15 +19,37 @@ import { getVisitedCount } from './core/discoveryLog';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
 import { playEnterLab } from './core/sound';
 import { RealityCanvas } from './components/RealityCanvas';
-import { RealityNavigator } from './components/RealityNavigator';
-import { EngineeringNavigator } from './components/EngineeringNavigator';
-import { ModelConflictPanel } from './components/ModelConflictPanel';
-import { CloudProjectsScreen } from './components/CloudProjectsScreen';
-import { CandidateDiscoveryScreen } from './components/CandidateDiscoveryScreen';
-import { DrugDiscoveryScreen } from './components/DrugDiscoveryScreen';
-import { CampaignScreen } from './components/CampaignScreen';
-import { SimulationGeneratorScreen } from './components/SimulationGeneratorScreen';
 import { ScienceChat } from './components/ScienceChat';
+
+/**
+ * P0-hardening: ciężkie/opcjonalne ekrany ładowane leniwie (React.lazy).
+ * Efekt: (1) rdzeń edukacyjny startuje szybciej i mniejszym bundlem, (2)
+ * awaria (lub błąd importu) JEDNEGO ciężkiego modułu nie może wyzerować całej
+ * aplikacji — każdy jest owinięty w <HeavyRoute> (ErrorBoundary + Suspense),
+ * więc pokazuje kartę błędu/ładowania, a nie biały ekran. Named-exporty
+ * mapujemy na `default`, którego wymaga React.lazy.
+ */
+const DiscoveryTimeline = lazy(() => import('./components/DiscoveryTimeline').then((m) => ({ default: m.DiscoveryTimeline })));
+const QuantumDecisionExplorer = lazy(() => import('./components/QuantumDecisionExplorer').then((m) => ({ default: m.QuantumDecisionExplorer })));
+const RealityNavigator = lazy(() => import('./components/RealityNavigator').then((m) => ({ default: m.RealityNavigator })));
+const EngineeringNavigator = lazy(() => import('./components/EngineeringNavigator').then((m) => ({ default: m.EngineeringNavigator })));
+const ModelConflictPanel = lazy(() => import('./components/ModelConflictPanel').then((m) => ({ default: m.ModelConflictPanel })));
+const CloudProjectsScreen = lazy(() => import('./components/CloudProjectsScreen').then((m) => ({ default: m.CloudProjectsScreen })));
+const CandidateDiscoveryScreen = lazy(() => import('./components/CandidateDiscoveryScreen').then((m) => ({ default: m.CandidateDiscoveryScreen })));
+const DrugDiscoveryScreen = lazy(() => import('./components/DrugDiscoveryScreen').then((m) => ({ default: m.DrugDiscoveryScreen })));
+const CampaignScreen = lazy(() => import('./components/CampaignScreen').then((m) => ({ default: m.CampaignScreen })));
+const SimulationGeneratorScreen = lazy(() => import('./components/SimulationGeneratorScreen').then((m) => ({ default: m.SimulationGeneratorScreen })));
+
+/** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
+function HeavyRoute({ children }: { children: ReactNode }) {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<div className="route-loading" role="status">Ładowanie modułu…</div>}>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
 
 /**
  * Genesis OS — powłoka aplikacji.
@@ -251,7 +271,7 @@ export default function App() {
       return (
         <div className="app">
           <TopBar title="🌌 Discovery Timeline" onSearch={() => setSearchOpen(true)} />
-          <DiscoveryTimeline />
+          <HeavyRoute><DiscoveryTimeline /></HeavyRoute>
           {overlays}
         </div>
       );
@@ -261,7 +281,7 @@ export default function App() {
       return (
         <div className="app">
           <TopBar title="🌠 Quantum Decision Explorer" onSearch={() => setSearchOpen(true)} />
-          <QuantumDecisionExplorer />
+          <HeavyRoute><QuantumDecisionExplorer /></HeavyRoute>
           {overlays}
         </div>
       );
@@ -272,9 +292,9 @@ export default function App() {
         <div className="app reality-app">
           <TopBar title="🎬 Reality Navigator" onSearch={() => setSearchOpen(true)} />
           <main id="main-content" tabIndex={-1} className="reality-main">
-            <ErrorBoundary>
+            <HeavyRoute>
               <RealityNavigator />
-            </ErrorBoundary>
+            </HeavyRoute>
           </main>
           {overlays}
         </div>
@@ -286,9 +306,9 @@ export default function App() {
         <div className="app reality-app">
           <TopBar title="🏭 Machine Pre-Build" onSearch={() => setSearchOpen(true)} />
           <main id="main-content" tabIndex={-1} className="reality-main">
-            <ErrorBoundary>
+            <HeavyRoute>
               <EngineeringNavigator />
-            </ErrorBoundary>
+            </HeavyRoute>
           </main>
           {overlays}
         </div>
@@ -300,9 +320,9 @@ export default function App() {
         <div className="app">
           <TopBar title="⚖ Konflikt modeli (MCRE)" onSearch={() => setSearchOpen(true)} />
           <main id="main-content" tabIndex={-1} className="home">
-            <ErrorBoundary>
+            <HeavyRoute>
               <ModelConflictPanel />
-            </ErrorBoundary>
+            </HeavyRoute>
           </main>
           {overlays}
         </div>
@@ -313,9 +333,9 @@ export default function App() {
       return (
         <div className="app">
           <TopBar title="☁ Projekty (chmura)" onSearch={() => setSearchOpen(true)} />
-          <ErrorBoundary>
+          <HeavyRoute>
             <CloudProjectsScreen />
-          </ErrorBoundary>
+          </HeavyRoute>
           {overlays}
         </div>
       );
@@ -325,9 +345,9 @@ export default function App() {
       return (
         <div className="app">
           <TopBar title="🧭 Silnik odkryć (CDE)" onSearch={() => setSearchOpen(true)} />
-          <ErrorBoundary>
+          <HeavyRoute>
             <CandidateDiscoveryScreen />
-          </ErrorBoundary>
+          </HeavyRoute>
           {overlays}
         </div>
       );
@@ -337,9 +357,9 @@ export default function App() {
       return (
         <div className="app">
           <TopBar title="💊 Drug Discovery" onSearch={() => setSearchOpen(true)} />
-          <ErrorBoundary>
+          <HeavyRoute>
             <DrugDiscoveryScreen />
-          </ErrorBoundary>
+          </HeavyRoute>
           {overlays}
         </div>
       );
@@ -349,9 +369,9 @@ export default function App() {
       return (
         <div className="app">
           <TopBar title="⚡ Silnik Przyspieszenia Naukowego" onSearch={() => setSearchOpen(true)} />
-          <ErrorBoundary>
+          <HeavyRoute>
             <CampaignScreen />
-          </ErrorBoundary>
+          </HeavyRoute>
           {overlays}
         </div>
       );
@@ -361,9 +381,9 @@ export default function App() {
       return (
         <div className="app">
           <TopBar title="🔭 Generator symulacji" onSearch={() => setSearchOpen(true)} />
-          <ErrorBoundary>
+          <HeavyRoute>
             <SimulationGeneratorScreen />
-          </ErrorBoundary>
+          </HeavyRoute>
           {overlays}
         </div>
       );
@@ -507,9 +527,11 @@ export default function App() {
 
   return (
     <>
-      <RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} />
+      {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
+          własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
+      <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>
       {renderRoute()}
-      {!onboardingOpen && <ScienceChat />}
+      {!onboardingOpen && <ErrorBoundary><ScienceChat /></ErrorBoundary>}
     </>
   );
 }

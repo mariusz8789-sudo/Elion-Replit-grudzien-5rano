@@ -41,6 +41,8 @@ const CampaignScreen = lazy(() => import('./components/CampaignScreen').then((m)
 const SimulationGeneratorScreen = lazy(() => import('./components/SimulationGeneratorScreen').then((m) => ({ default: m.SimulationGeneratorScreen })));
 const ModelComparisonScreen = lazy(() => import('./components/ModelComparisonScreen').then((m) => ({ default: m.ModelComparisonScreen })));
 const VisualSimulationScreen = lazy(() => import('./components/visual-simulation/VisualSimulationScreen').then((m) => ({ default: m.VisualSimulationScreen })));
+const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/ConceptFilmScreen').then((m) => ({ default: m.ConceptFilmScreen })));
+const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -78,7 +80,9 @@ type Route =
   | { kind: 'campaign' }
   | { kind: 'generate' }
   | { kind: 'compare' }
-  | { kind: 'city' };
+  | { kind: 'city' }
+  | { kind: 'concept' }
+  | { kind: 'character' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -100,6 +104,8 @@ function parseHash(): Route {
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };
   if (h === '#/city') return { kind: 'city' };
+  if (h === '#/concept') return { kind: 'concept' };
+  if (h === '#/character') return { kind: 'character' };
   return { kind: 'home' };
 }
 
@@ -419,6 +425,30 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'concept') {
+      return (
+        <div className="app">
+          <TopBar title="🎬 Genesis OS 2030 — film koncepcyjny" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <ConceptFilmScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'character') {
+      return (
+        <div className="app">
+          <TopBar title="🧍 Character Lab — humanoid 3D (Etap 1)" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <CharacterLabScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -435,6 +465,14 @@ export default function App() {
             <span className="timeline-cta-text">
               <span className="timeline-cta-title">Generator symulacji</span>
               <span className="timeline-cta-sub">Opisz zjawisko jednym zdaniem — Genesis dobierze realny model, uruchomi go i pozwoli zmieniać parametry na żywo. „Zasymuluj dylatację czasu", „zwiększ masę gwiazdy 2×"…</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
+          <button className="timeline-cta" onClick={() => { window.location.hash = '#/character'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true">🧍</span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Character Lab — humanoid 3D <em>(Etap 1)</em></span>
+              <span className="timeline-cta-sub">Migracja warstwy wizualnej do WebGL: zrigowany człowiek 3D (pełna sylwetka, ubranie, chód/idle/gest, kontakt stóp). Walidacja jakości postaci przed tłumem.</span>
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>

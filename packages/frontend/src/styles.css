@@ -1495,3 +1495,17 @@ kbd {
 .sim-person-card strong { font-size: 0.9rem; }
 .sim-person-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.6rem; margin: 0.4rem 0 0.5rem; font-size: 0.74rem; color: var(--text-dim); }
 .sim-person-grid b { color: var(--text); }
+
+/* --- Concept Film --- */
+.concept-film { display: flex; flex-direction: column; gap: 0.6rem; }
+.concept-stage { width: 100%; }
+.concept-canvas { width: 100%; aspect-ratio: 16 / 10; display: block; background: #05080e; border: 1px solid var(--border); border-radius: 12px; }
+.concept-bar { display: flex; align-items: center; gap: 0.6rem; }
+.concept-progress { flex: 1; height: 8px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.concept-progress-fill { height: 100%; background: linear-gradient(90deg, #5aa2ff, #f05555); }
+.concept-time { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim); }
+
+/* --- Character Lab (WebGL humanoid) --- */
+.character-lab { display: flex; flex-direction: column; gap: 0.7rem; }
+.character-stage { position: relative; width: 100%; }
+.character-canvas { width: 100%; aspect-ratio: 16 / 10; display: block; background: #0b1220; border: 1px solid var(--border); border-radius: 12px; touch-action: none; }

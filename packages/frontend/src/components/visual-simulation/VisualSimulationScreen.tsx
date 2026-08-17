@@ -6,6 +6,7 @@ import {
   defaultCamera, computeTransform, screenToWorld, zoomAt, panBy, type Camera,
 } from '../../core/simulationRenderer/camera';
 import { consumePendingComparison } from '../../core/compareBridge';
+import { computeField, ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
 
 /**
  * VISUAL SIMULATION SCREEN — żywa scena „Epidemia w małym mieście" z warstwą
@@ -50,11 +51,13 @@ export function VisualSimulationScreen() {
   const [showChart, setShowChart] = useState(true);
   const [selectedId, setSelectedId] = useState(-1);
   const [zoomLabel, setZoomLabel] = useState(1);
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('none');
   const [stats, setStats] = useState<Record<string, number>>(() => sim.stats());
 
   const debugRef = useRef(debug); debugRef.current = debug;
   const showChartRef = useRef(showChart); showChartRef.current = showChart;
   const selectedRef = useRef(selectedId); selectedRef.current = selectedId;
+  const analysisRef = useRef(analysisMode); analysisRef.current = analysisMode;
 
   useEffect(() => {
     let raf = 0; let last = performance.now(); let statAcc = 0;
@@ -75,9 +78,12 @@ export function VisualSimulationScreen() {
             if (a) { cam.current.cx = a.x; cam.current.cy = a.y; }
           }
           const transform = computeTransform(cam.current, sim.worldWidth, sim.worldHeight, cssW, cssH);
+          const analysis = analysisRef.current !== 'none'
+            ? computeField(sim.agents(), sim.worldWidth, sim.worldHeight, analysisRef.current)
+            : null;
           renderCity(ctx, sim, cssW, cssH, {
             transform, debug: debugRef.current, focusId: selectedRef.current,
-            contactRadius: Number(sim.getParams().contactRadius),
+            contactRadius: Number(sim.getParams().contactRadius), analysis,
           });
         }
       }
@@ -174,6 +180,11 @@ export function VisualSimulationScreen() {
         <label className="sim-toggle"><input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} /> Debug</label>
         <label className="sim-toggle"><input type="checkbox" checked={showChart} onChange={(e) => setShowChart(e.target.checked)} /> Wykres</label>
         <label className="sim-toggle"><input type="checkbox" checked={params.isolate} onChange={toggleIsolate} /> Izolacja</label>
+        <label className="sim-toggle">Analiza:
+          <select value={analysisMode} onChange={(e) => setAnalysisMode(e.target.value as AnalysisMode)} aria-label="Warstwa analizy">
+            {ANALYSIS_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </label>
         <span className="sim-daylabel">dzień {stats.dzien ?? 0} · zoom {zoomLabel}×{followId.current >= 0 ? ` · śledzę #${followId.current}` : ''}</span>
       </div>
 

@@ -187,6 +187,16 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     return proposeExperiment(ctx);
   }
 
+  // --- Film koncepcyjny 2030 (reżyserowany przejazd po żywym silniku). ---
+  if (has(norm, 'film koncepcyjny', 'koncept', 'concept film', 'pokaz wizje', 'wizja 2030', 'genesis 2030', 'concept video', 'trailer')) {
+    return {
+      text: 'Odtwarzam film koncepcyjny „Genesis OS 2030" — reżyserowany przejazd kamery po ŻYWEJ symulacji (agenci, kontakty, transmisja, interwencja, szpital, heatmapa). To CONCEPT / docelowa wizja, napędzana prawdziwym silnikiem — nie deklaracja gotowej funkcji.',
+      tag: 'SYSTEM',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/concept' },
+    };
+  }
+
   // --- Żywa symulacja wizualna „miasto" (Visual Scene Engine) — przed „otwórz",
   //     by trafić do sceny agentowej, a nie do modelu przedziałowego. ---
   if (has(norm, 'zywa symulacja', 'wizualna symulacja', 'symulacja wizualna', 'epidemia w miescie', 'male miasto', 'w miescie', 'pokaz miasto', 'scena', 'agenci w miescie', 'visual scene')) {

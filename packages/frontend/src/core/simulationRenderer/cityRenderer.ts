@@ -1,6 +1,7 @@
 import type { VisualSimulation, SimAgent } from '../simulation/types';
 import { drawAgent, lodFor } from './agentVisual';
 import { worldToScreen, type Transform } from './camera';
+import { heatColor, type AnalysisField } from '../simulation/analysis';
 
 /**
  * SIMULATION RENDERER — rysuje ŻYWY ŚWIAT na Canvas przez transformację kamery
@@ -27,6 +28,8 @@ export interface RenderOptions {
   debug?: boolean;
   focusId?: number;
   contactRadius?: number;
+  /** Warstwa analizy (heatmapa gęstość/ryzyko/odporność) rysowana pod agentami. */
+  analysis?: AnalysisField | null;
 }
 
 export function renderCity(ctx: CanvasRenderingContext2D, sim: VisualSimulation, w: number, h: number, opts: RenderOptions): void {
@@ -62,6 +65,9 @@ export function renderCity(ctx: CanvasRenderingContext2D, sim: VisualSimulation,
     }
   }
 
+  // Warstwa analizy (pod agentami) — heatmapa wprost ze stanu modelu.
+  if (opts.analysis && opts.analysis.mode !== 'none') drawAnalysis(ctx, opts.analysis, t, sim.worldWidth, sim.worldHeight);
+
   const agents = sim.agents();
   // Rozmiar sylwetki: bazowa wysokość świata × skala kamery.
   const sizePx = Math.max(3, 13 * t.scale);
@@ -84,6 +90,20 @@ export function renderCity(ctx: CanvasRenderingContext2D, sim: VisualSimulation,
 
   if (opts.debug) drawDebug(ctx, sim, agents, t, opts, sizePx);
   void lod;
+}
+
+function drawAnalysis(ctx: CanvasRenderingContext2D, f: AnalysisField, t: Transform, worldW: number, worldH: number): void {
+  const cw = worldW / f.cols, ch = worldH / f.rows;
+  for (let cy = 0; cy < f.rows; cy++) {
+    for (let cx = 0; cx < f.cols; cx++) {
+      const v = f.values[cy * f.cols + cx];
+      if (v <= 0.02) continue;
+      const [r, g, b] = heatColor(v);
+      ctx.fillStyle = `rgba(${r | 0},${g | 0},${b | 0},${0.12 + v * 0.4})`;
+      const p = worldToScreen(t, cx * cw, cy * ch);
+      ctx.fillRect(p.x, p.y, cw * t.scale + 1, ch * t.scale + 1);
+    }
+  }
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {

@@ -204,7 +204,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       text: 'Otwieram żywą symulację „Epidemia w małym mieście": setki agentów chodzą po mieście na żywo, a zakażenie powstaje z realnych kontaktów. Zmień R₀ lub włącz restrykcje i patrz, jak świat reaguje — wykres jest tylko skutkiem.',
       tag: 'MODEL',
       intent: 'OPEN_SIMULATION',
-      action: { type: 'openRoute', hash: '#/city' },
+      action: { type: 'openRoute', hash: '#/city3d' },
     };
   }
 

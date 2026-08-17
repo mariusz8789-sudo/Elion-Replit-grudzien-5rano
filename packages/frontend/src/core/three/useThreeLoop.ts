@@ -142,8 +142,19 @@ export function useThreeLoop(
             if (target) orbitControls.target.copy(target);
           }
           controls?.update();
+          const renderStartedAt = performance.now();
           if (post) post.render();
           else renderer!.render(scene, camera);
+          const renderMs = performance.now() - renderStartedAt;
+          sim.onRenderMetrics?.({
+            fps: 1 / Math.max(0.001, dt),
+            frameMs: dt * 1000,
+            renderMs,
+            drawCalls: renderer!.info.render.calls,
+            triangles: renderer!.info.render.triangles,
+            geometries: renderer!.info.memory.geometries,
+            textures: renderer!.info.memory.textures,
+          });
           if (onStats && sim.getStats && now - statsAt > 250) {
             statsAt = now;
             onStats(sim.getStats());

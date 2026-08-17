@@ -32,12 +32,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'packages/frontend/scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         console: 'readonly', process: 'readonly', fetch: 'readonly', URL: 'readonly',
         // Skrypty e2e (Playwright) używają globali przeglądarki wewnątrz page.evaluate().
-        document: 'readonly', window: 'readonly', Event: 'readonly',
+        document: 'readonly', window: 'readonly', Event: 'readonly', localStorage: 'readonly',
       },
     },
     rules: {

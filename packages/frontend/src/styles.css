@@ -1509,3 +1509,16 @@ kbd {
 .character-lab { display: flex; flex-direction: column; gap: 0.7rem; }
 .character-stage { position: relative; width: 100%; }
 .character-canvas { width: 100%; aspect-ratio: 16 / 10; display: block; background: #0b1220; border: 1px solid var(--border); border-radius: 12px; touch-action: none; }
+
+/* --- Żywe miasto WebGL: model → SimAgent → humanoid 3D --- */
+.city-3d-screen .honesty-note { max-width: 80rem; }
+.city-3d-stage-wrap { position: relative; min-height: clamp(27rem, 64vh, 44rem); margin-top: .8rem; overflow: hidden; border: 1px solid rgba(126, 179, 255, .28); border-radius: 1rem; background: #07111d; box-shadow: 0 1.25rem 4rem rgba(0, 0, 0, .35); }
+.city-3d-canvas { display: block; width: 100%; height: clamp(27rem, 64vh, 44rem); touch-action: none; }
+.city-3d-overlay { position: absolute; top: .85rem; left: .85rem; display: flex; flex-wrap: wrap; gap: .45rem; max-width: calc(100% - 1.7rem); pointer-events: none; }
+.city-3d-overlay span { padding: .28rem .5rem; border: 1px solid rgba(181, 219, 255, .18); border-radius: 999px; background: rgba(5, 13, 24, .76); color: #d7e8ff; font: 600 .71rem/1 var(--font-mono); }
+.city-3d-person-card { position: absolute; right: .85rem; bottom: .85rem; z-index: 2; display: grid; gap: .28rem; min-width: 13rem; padding: .8rem; border: 1px solid rgba(255, 209, 102, .55); border-radius: .7rem; background: rgba(7, 17, 29, .9); color: #ecf5ff; box-shadow: 0 .8rem 2rem rgba(0, 0, 0, .35); font-size: .8rem; }
+.city-3d-person-card strong { color: #ffd166; }
+.city-3d-person-card .chip-btn { margin-top: .25rem; }
+.city-3d-transport { align-items: center; }
+.link-button { border: 0; padding: 0; background: transparent; color: #8bd3ff; text-decoration: underline; cursor: pointer; font: inherit; }
+@media (max-width: 640px) { .city-3d-stage-wrap, .city-3d-canvas { min-height: 30rem; height: 30rem; } .city-3d-person-card { right: .55rem; bottom: .55rem; max-width: calc(100% - 1.1rem); } .city-3d-overlay { top: .55rem; left: .55rem; } }

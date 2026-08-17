@@ -41,6 +41,7 @@ const CampaignScreen = lazy(() => import('./components/CampaignScreen').then((m)
 const SimulationGeneratorScreen = lazy(() => import('./components/SimulationGeneratorScreen').then((m) => ({ default: m.SimulationGeneratorScreen })));
 const ModelComparisonScreen = lazy(() => import('./components/ModelComparisonScreen').then((m) => ({ default: m.ModelComparisonScreen })));
 const VisualSimulationScreen = lazy(() => import('./components/visual-simulation/VisualSimulationScreen').then((m) => ({ default: m.VisualSimulationScreen })));
+const City3DWebGLScreen = lazy(() => import('./components/visual-simulation/City3DWebGLScreen').then((m) => ({ default: m.City3DWebGLScreen })));
 const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/ConceptFilmScreen').then((m) => ({ default: m.ConceptFilmScreen })));
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 
@@ -81,6 +82,7 @@ type Route =
   | { kind: 'generate' }
   | { kind: 'compare' }
   | { kind: 'city' }
+  | { kind: 'city3d' }
   | { kind: 'concept' }
   | { kind: 'character' };
 
@@ -104,6 +106,7 @@ function parseHash(): Route {
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };
   if (h === '#/city') return { kind: 'city' };
+  if (h === '#/city3d') return { kind: 'city3d' };
   if (h === '#/concept') return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
   return { kind: 'home' };
@@ -416,9 +419,21 @@ export default function App() {
     if (route.kind === 'city') {
       return (
         <div className="app">
-          <TopBar title="🏙 Epidemia w małym mieście (żywa symulacja)" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="🏙 Epidemia w małym mieście — tryb wydajnościowy 2D" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <VisualSimulationScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'city3d') {
+      return (
+        <div className="app">
+          <TopBar title="🏙 Epidemia w małym mieście — żywa scena WebGL" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <City3DWebGLScreen />
           </HeavyRoute>
           {overlays}
         </div>
@@ -476,11 +491,11 @@ export default function App() {
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>
-          <button className="timeline-cta" onClick={() => { window.location.hash = '#/city'; }}>
+          <button className="timeline-cta" onClick={() => { window.location.hash = '#/city3d'; }}>
             <span className="timeline-cta-icon" aria-hidden="true">🏙</span>
             <span className="timeline-cta-text">
-              <span className="timeline-cta-title">Żywa symulacja: epidemia w mieście</span>
-              <span className="timeline-cta-sub">Setki agentów chodzą po mieście na żywo — zakażenie powstaje z realnych kontaktów, nie z wykresu. Zmień R₀ albo włącz restrykcje i zobacz, jak świat reaguje. Wykres jest tylko skutkiem.</span>
+              <span className="timeline-cta-title">Żywa symulacja 3D: epidemia w mieście</span>
+              <span className="timeline-cta-sub">Rzeczywiści agenci modelu epidemii są renderowani jako humanoidy WebGL. Pozycja, ruch, stan, izolacja i hospitalizacja pochodzą bezpośrednio z symulacji; Canvas 2D pozostaje trybem wydajnościowym.</span>
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>

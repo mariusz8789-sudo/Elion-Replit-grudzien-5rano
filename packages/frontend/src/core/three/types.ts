@@ -30,6 +30,17 @@ export interface PostProcessor {
   dispose?(): void;
 }
 
+/** Neutralna telemetria renderera — bez zależności od konkretnego scenariusza świata. */
+export interface ThreeRenderMetrics {
+  fps: number;
+  frameMs: number;
+  renderMs: number;
+  drawCalls: number;
+  triangles: number;
+  geometries: number;
+  textures: number;
+}
+
 /**
  * Kontrakt symulacji 3D — świadome lustro `core/types.ts::Sim`, NIE osobna
  * architektura. Ten sam cykl życia (init/update/render/getStats/reset/
@@ -66,6 +77,8 @@ export interface Sim3D {
   /** Reakcja na zmianę rozmiaru viewportu (poza standardowym auto-resize kamery/renderera). */
   onResize?(w: number, h: number): void;
   getStats?(): Record<string, number>;
+  /** Render loop przekazuje metryki GPU/WebGL bez mieszania ich ze stanem naukowym. */
+  onRenderMetrics?(metrics: ThreeRenderMetrics): void;
   reset?(): void;
   pointer?(x: number, y: number, type: 'down' | 'move' | 'up'): void;
   dispose?(): void;

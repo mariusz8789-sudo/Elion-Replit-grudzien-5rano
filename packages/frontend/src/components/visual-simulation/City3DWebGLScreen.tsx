@@ -20,6 +20,9 @@ const CITY_PARAM_DEFS: ParamDef[] = [
 ];
 
 const SLIDERS = CITY_PARAM_DEFS.filter((def) => def.type === 'slider');
+const EPIDEMIC_LEGEND = [
+  ['S', 'podatny', '#54d98c'], ['E', 'narażony', '#e8b34a'], ['I', 'zakażony', '#f05555'], ['R', 'ozdrowiały', '#5aa2ff'], ['D', 'nieaktywny', '#6b7280'],
+] as const;
 
 /**
  * Główna ścieżka 3D miasta. Canvas 2D nadal pozostaje pod #/city jako tryb
@@ -33,6 +36,7 @@ export function City3DWebGLScreen() {
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState<ClockSpeed>(1);
   const [analysis, setAnalysis] = useState<AnalysisMode>('none');
+  const [showTransmissions, setShowTransmissions] = useState(true);
   const [stats, setStats] = useState<Record<string, number>>(() => sim.getStats());
   const paramsRef = useRef(params);
   const statsRef = useRef(stats);
@@ -45,6 +49,10 @@ export function City3DWebGLScreen() {
   useEffect(() => {
     sim.setAnalysisMode(analysis);
   }, [analysis, sim]);
+
+  useEffect(() => {
+    sim.setShowTransmissions(showTransmissions);
+  }, [showTransmissions, sim]);
 
   const updateParam = (key: string, value: number | boolean) => {
     sim.setParam(key, value);
@@ -86,9 +94,9 @@ export function City3DWebGLScreen() {
   return (
     <main id="main-content" tabIndex={-1} className="home city-3d-screen">
       <div className="honesty-row">
-        <span className="honesty educational">Model edukacyjny · WebGL</span>
+        <span className="honesty educational">Symulacja · dane syntetyczne · WebGL</span>
         <span className="honesty-note">
-          Każdy człowiek w scenie 3D odczytuje bieżący stan istniejącego EpidemicCitySimulation: pozycję, prędkość, gait, stan, zachowanie, izolację i hospitalizację.
+          Fikcyjne miasto i abstrakcyjny patogen: to wynik modelu edukacyjnego, nie prognoza. Każdy człowiek w scenie 3D odczytuje bieżący stan istniejącego EpidemicCitySimulation: pozycję, prędkość, gait, stan, zachowanie, izolację i hospitalizację.
           Canvas 2D pozostaje pod #/city jako tryb wydajnościowy; ten widok nie zmienia równań ani wyników modelu.
         </span>
       </div>
@@ -107,8 +115,19 @@ export function City3DWebGLScreen() {
             {ANALYSIS_MODES.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}
           </select>
         </label>
+        <label className="sim-toggle" title="Wyświetla wyłącznie eventy wygenerowane przez model w bieżącym ticku.">
+          <input type="checkbox" checked={showTransmissions} onChange={(event) => setShowTransmissions(event.target.checked)} /> Ślady transmisji modelu
+        </label>
+        <button className="chip-btn" onClick={() => { sim.focusFirstInfected(); setStats(sim.getStats()); }}>Śledź zakażonego</button>
         <button className="chip-btn" onClick={() => { window.location.hash = '#/city'; }}>Tryb wydajnościowy 2D</button>
         <span className="sim-daylabel">dzień {stats.dzien ?? 0} · {renderBudget}/{displayedAgentCount} widocznych humanoidów 3D</span>
+      </div>
+
+      <div className="city-3d-legend" aria-label="Legenda stanów epidemiologicznych">
+        <strong>Stan modelu</strong>
+        {EPIDEMIC_LEGEND.map(([id, label, color]) => <span key={id}><i style={{ backgroundColor: color }} />{id} · {label}</span>)}
+        <span><i className="legend-isolation" />izolacja</span>
+        <span><i className="legend-hospital" />hospitalizacja</span>
       </div>
 
       <div className="city-3d-stage-wrap">
@@ -177,7 +196,7 @@ export function City3DWebGLScreen() {
       </div>
 
       <p className="footer-note">
-        Kliknij człowieka, aby odczytać dane bezpośrednio z symulacji i śledzić go kamerą. Przeciągnij scenę, aby obrócić kamerę; użyj kółka do zoomu.
+        Kliknij człowieka, aby odczytać dane bezpośrednio z symulacji i śledzić go kamerą. Czerwony łuk A→B pojawia się wyłącznie dla transmisji zarejestrowanej przez model w bieżącym ticku. Przeciągnij scenę, aby obrócić kamerę; użyj kółka do zoomu.
         Dla większej populacji do 10 agentów otrzymuje pełny rig proceduralny, a pozostałe osoby są renderowane jako instanced 3D humanoids z tymi samymi pozycjami i stanami modelu.
       </p>
     </main>

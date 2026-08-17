@@ -1520,5 +1520,11 @@ kbd {
 .city-3d-person-card strong { color: #ffd166; }
 .city-3d-person-card .chip-btn { margin-top: .25rem; }
 .city-3d-transport { align-items: center; }
+.city-3d-legend { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; margin: .6rem 0 0; padding: .55rem .75rem; border: 1px solid rgba(126, 179, 255, .2); border-radius: .7rem; background: rgba(8, 18, 31, .72); color: #d7e8ff; font: 600 .74rem/1 var(--font-mono); }
+.city-3d-legend strong { color: #fff; margin-right: .15rem; }
+.city-3d-legend span { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+.city-3d-legend i { width: .62rem; height: .62rem; display: inline-block; border-radius: 50%; box-shadow: 0 0 .45rem currentColor; }
+.city-3d-legend .legend-isolation { border: 2px solid #ff9f43; background: transparent; box-shadow: none; }
+.city-3d-legend .legend-hospital { border-radius: .12rem; background: #a66cff; box-shadow: 0 0 .45rem #a66cff; }
 .link-button { border: 0; padding: 0; background: transparent; color: #8bd3ff; text-decoration: underline; cursor: pointer; font: inherit; }
 @media (max-width: 640px) { .city-3d-stage-wrap, .city-3d-canvas { min-height: 30rem; height: 30rem; } .city-3d-person-card { right: .55rem; bottom: .55rem; max-width: calc(100% - 1.1rem); } .city-3d-overlay { top: .55rem; left: .55rem; } }

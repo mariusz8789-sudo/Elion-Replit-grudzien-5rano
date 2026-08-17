@@ -27,6 +27,8 @@ export interface Character {
   /** Aktualizacja pozy: tryb, czas [s], tempo (0..1 = intensywność chodu). */
   update(mode: PoseMode, t: number, speed: number): void;
   setFacing(angleRad: number): void;
+  /** Płynny tint ubrań; skóra, włosy i anatomia pozostają naturalne. */
+  setEpidemicTint(color: number, intensity: number): void;
   dispose(): void;
 }
 
@@ -48,6 +50,9 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
     pants: mat(opts.pants ?? 0x2f3a4c), shoes: mat(opts.shoes ?? 0x22262e), hair: mat(opts.hair ?? 0x2a1e14),
   };
   const disposables: THREE_NS.BufferGeometry[] = [];
+  const baseShirt = M.shirt.color.clone();
+  const basePants = M.pants.color.clone();
+  const targetTint = new THREE.Color();
 
   const root = new THREE.Group(); root.name = 'character';
 
@@ -155,6 +160,14 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
     root,
     update,
     setFacing: (a: number) => { root.rotation.y = a; },
+    setEpidemicTint: (color: number, intensity: number) => {
+      targetTint.setHex(color);
+      const shirtTarget = baseShirt.clone().lerp(targetTint, Math.max(0, Math.min(0.78, intensity)));
+      const pantsTarget = basePants.clone().lerp(targetTint, Math.max(0, Math.min(0.45, intensity * 0.55)));
+      // Przejście jest płynne między kolejnymi stanami modelu, nie skok materiału.
+      M.shirt.color.lerp(shirtTarget, 0.14);
+      M.pants.color.lerp(pantsTarget, 0.12);
+    },
     dispose: () => { for (const g of disposables) g.dispose(); Object.values(M).forEach((m) => m.dispose()); },
   };
 }

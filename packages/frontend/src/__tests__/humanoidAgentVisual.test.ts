@@ -32,6 +32,8 @@ describe('mapSimAgentToHumanoid — most wyłącznie do odczytu', () => {
     expect(visual.worldZ).toBe(0);
     expect(visual.pose).toBe('idle');
     expect(visual.gait).toBe(1.25);
+    expect(visual.age).toBe(31);
+    expect(visual.role).toBe('pracownik');
     expect(JSON.stringify(source)).toBe(before);
   });
 

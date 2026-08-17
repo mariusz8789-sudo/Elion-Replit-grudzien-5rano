@@ -68,6 +68,8 @@ export interface Sim3D {
    * równoległej implementacji sterowania kamerą — patrz useThreeLoop.ts.
    */
   getOrbitTarget?(): THREE.Vector3 | null;
+  /** Opcjonalny dystans kamery podczas focusu na ruchomy obiekt. */
+  getOrbitFocusDistance?(): number | null;
   /** Budowa sceny — wywoływane raz przy montażu (i przy zmianie eksperymentu). */
   init(three: typeof THREE, scene: THREE.Scene, camera: THREE.PerspectiveCamera, w: number, h: number): void;
   /** Krok fizyki/animacji — CZYSTE dane, bez efektów ubocznych na WebGL (testowalne bez GPU). */

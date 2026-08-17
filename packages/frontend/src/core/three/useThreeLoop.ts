@@ -139,7 +139,17 @@ export function useThreeLoop(
           sim.syncScene(scene, camera);
           if (sim.getOrbitTarget) {
             const target = sim.getOrbitTarget();
-            if (target) orbitControls.target.copy(target);
+            if (target) {
+              const focusDistance = sim.getOrbitFocusDistance?.();
+              if (focusDistance && focusDistance > 0) {
+                const offset = camera.position.clone().sub(orbitControls.target);
+                if (offset.lengthSq() > 1e-5) {
+                  const desired = target.clone().add(offset.normalize().multiplyScalar(focusDistance));
+                  camera.position.lerp(desired, 0.09);
+                }
+                orbitControls.target.lerp(target, 0.14);
+              } else orbitControls.target.copy(target);
+            }
           }
           controls?.update();
           const renderStartedAt = performance.now();

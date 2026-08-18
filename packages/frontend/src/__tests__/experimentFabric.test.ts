@@ -14,6 +14,7 @@ import {
   normalizeOsmMapXml,
   OSM_ATTRIBUTION,
   OSM_LICENSE,
+  planCrossDomainOrchestration,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -61,6 +62,17 @@ describe('Genesis Experiment Fabric', () => {
     const observer = runExperiment(parseScienceChatMessage('Wyjaśnij psychologiczny efekt obserwatora.'));
     expect(observer.result.status).toBe('engine_not_available');
     expect(observer.intent.supplementalKnowledgeIds).toContain('video-n-psychological-observer');
+  });
+
+  it('blocks incompatible multi-domain transfers rather than fabricating a cascade', () => {
+    const source = runExperiment(parseScienceChatMessage('Oblicz promień Schwarzschilda dla 2 masy Słońca.'));
+    const target = parseScienceChatMessage('Oblicz dylatację czasu dla beta=0.8.');
+    const plan = planCrossDomainOrchestration({
+      fromDomainId: 'spacetime-einstein', toDomainId: 'spacetime-einstein', outputKey: 'radiusKm', targetParameter: 'velocityFraction',
+      transform: 'identity-only', status: 'NOT_WIRED', reason: 'Test zgodności jednostek.',
+    }, source, target);
+    expect(plan.status).toBe('BLOCKED_UNITS');
+    expect(plan.derivedRequest).toBeUndefined();
   });
 
   it('normalizes bounded OSM base geometry with ODbL attribution and full source provenance', () => {

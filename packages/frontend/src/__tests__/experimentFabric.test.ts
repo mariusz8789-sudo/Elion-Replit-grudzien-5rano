@@ -11,6 +11,9 @@ import {
   designScientificExperiment,
   executeScientificExperiment,
   serializeScientificEvidencePack,
+  exportEvidencePackRoCrate,
+  serializeEvidencePackRoCrate,
+  RO_CRATE_EVIDENCE_PACK_VERSION,
   normalizeOsmMapXml,
   OSM_ATTRIBUTION,
   OSM_LICENSE,
@@ -126,6 +129,41 @@ describe('Genesis Experiment Fabric', () => {
     expect(pack.reproducibility.allArmsMatched).toBe(true);
     expect(pack.runs.every((run) => run.provenance.resultOrigin === 'real-engine')).toBe(true);
     expect(JSON.parse(serializeScientificEvidencePack(pack)).evidencePackId).toBe(pack.evidencePackId);
+  });
+
+  it('exports only a real Evidence Pack as deterministic RO-Crate JSON-LD with PROV relations', () => {
+    const baselineRequest = parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.');
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'W granicach modelu Schwarzschilda promień horyzontu rośnie wraz z masą.',
+        domainId: 'spacetime-einstein', modelId: 'einstein-schwarzschild', declaredAssumptions: [],
+        falsification: { metric: 'radiusKm', relation: 'monotonic-increase', rationale: 'Kontrola eksportu provenance dla realnych runów.' },
+      },
+      baselineRequest,
+      sweep: { parameter: 'massSolar', values: [1, 2], label: 'Masa M☉' },
+      repetitionsPerArm: 1,
+    });
+    const pack = createScientificEvidencePack(executeScientificExperiment(design));
+    const crate = exportEvidencePackRoCrate(pack);
+    const graph = crate['@graph'];
+    const packNode = graph.find((node) => node.identifier === pack.evidencePackId);
+    const protocolNode = graph.find((node) => node.identifier === pack.protocol.designId);
+    const activities = graph.filter((node) => node['@type'] === 'prov:Activity');
+    const results = graph.filter((node) => Array.isArray(node['@type']) && (node['@type'] as readonly string[]).includes('prov:Entity') && node['prov:wasGeneratedBy'] !== undefined);
+
+    expect(crate['@context'][0]).toContain('ro/crate');
+    expect(packNode?.['genesis:roCrateProfileVersion']).toBeUndefined();
+    expect(protocolNode?.['genesis:protocolFingerprint']).toBe(pack.protocol.protocolFingerprint);
+    expect(activities).toHaveLength(pack.runCount);
+    expect(results).toHaveLength(pack.runCount);
+    expect(activities.every((activity) => activity['prov:used'] !== undefined)).toBe(true);
+    expect(results.every((result) => result['prov:wasGeneratedBy'] !== undefined)).toBe(true);
+    expect(results.every((result) => result['genesis:status'] === 'completed')).toBe(true);
+    expect(activities.every((activity) => activity['genesis:resultOrigin'] === 'real-engine')).toBe(true);
+    expect(graph.some((node) => Array.isArray(node['@type']) && (node['@type'] as readonly string[]).includes('prov:SoftwareAgent'))).toBe(true);
+    expect(serializeEvidencePackRoCrate(pack)).toBe(serializeEvidencePackRoCrate(pack));
+    expect(JSON.parse(serializeEvidencePackRoCrate(pack))['@graph'].some((node: Record<string, unknown>) => node['genesis:roCrateProfileVersion'] === RO_CRATE_EVIDENCE_PACK_VERSION)).toBe(true);
+    expect(packNode?.['genesis:disclaimer']).toContain('nie stanowi odkrycia');
   });
 
   it('runs a real Schwarzschild calculation from natural language with provenance', () => {

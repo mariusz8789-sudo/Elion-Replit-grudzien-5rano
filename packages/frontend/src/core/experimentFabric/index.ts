@@ -77,5 +77,6 @@ export {
 export { designScientificExperiment } from './scientificPlanner';
 export { executeScientificExperiment } from './scientificExecutor';
 export { EVIDENCE_PACK_VERSION, createScientificEvidencePack, serializeScientificEvidencePack, type EvidencePackRun, type ScientificEvidencePack } from './evidencePack';
+export { RO_CRATE_EVIDENCE_PACK_VERSION, exportEvidencePackRoCrate, serializeEvidencePackRoCrate, type GenesisRoCrate, type RoCrateGraphNode } from './evidencePackRoCrate';
 export { GENESIS_SPATIAL_DATASET_VERSION, OSM_ATTRIBUTION, OSM_LICENSE, normalizeOsmMapXml, importOsmMap, type SpatialLayer, type LonLat, type GenesisSpatialFeature, type GenesisSpatialDataset, type OsmMapImportRequest } from './spatialImport';
 export { ORCHESTRATION_CONTRACT_VERSION, planCrossDomainOrchestration, type CrossDomainPlanStatus, type CrossDomainOrchestrationPlan } from './orchestration';

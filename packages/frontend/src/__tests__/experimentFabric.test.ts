@@ -14,6 +14,8 @@ import {
   exportEvidencePackRoCrate,
   serializeEvidencePackRoCrate,
   RO_CRATE_EVIDENCE_PACK_VERSION,
+  compareCounterfactual,
+  serializeCounterfactualComparison,
   normalizeOsmMapXml,
   OSM_ATTRIBUTION,
   OSM_LICENSE,
@@ -164,6 +166,55 @@ describe('Genesis Experiment Fabric', () => {
     expect(serializeEvidencePackRoCrate(pack)).toBe(serializeEvidencePackRoCrate(pack));
     expect(JSON.parse(serializeEvidencePackRoCrate(pack))['@graph'].some((node: Record<string, unknown>) => node['genesis:roCrateProfileVersion'] === RO_CRATE_EVIDENCE_PACK_VERSION)).toBe(true);
     expect(packNode?.['genesis:disclaimer']).toContain('nie stanowi odkrycia');
+  });
+
+  it('compares two real Schwarzschild runs as a deterministic evidence-backed counterfactual', () => {
+    const comparison = compareCounterfactual({
+      baseline: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'),
+      variant: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 2 masy Słońca.'),
+      labels: { baseline: 'Masa 1 M☉', variant: 'Masa 2 M☉' },
+    });
+    const radius = comparison.metrics.find((metric) => metric.key === 'radiusKm');
+
+    expect(comparison.status).toBe('COMPLETED');
+    expect(comparison.model?.modelId).toBe('einstein-schwarzschild');
+    expect(comparison.seedControl.status).toBe('DETERMINISTIC_NO_SEED');
+    expect(comparison.parameterDifferences.find((parameter) => parameter.key === 'massSolar')?.changed).toBe(true);
+    expect(radius?.baseline).toBeCloseTo(2.95, 1);
+    expect(radius?.variant).toBeCloseTo(5.91, 1);
+    expect(radius?.absoluteDelta).toBeGreaterThan(0);
+    expect(comparison.evidence?.baselineResultOrigin).toBe('real-engine');
+    expect(comparison.evidence?.variantResultOrigin).toBe('real-engine');
+    expect(serializeCounterfactualComparison(comparison)).toBe(serializeCounterfactualComparison(comparison));
+    expect(comparison.disclaimer).toMatch(/nie jest predykcją świata rzeczywistego/i);
+  });
+
+  it('compares seeded epidemic scenarios through the original EpidemicCitySimulation', () => {
+    const comparison = compareCounterfactual({
+      baseline: parseScienceChatMessage('Zasymuluj epidemię z R0=2 przez 14 dni seed=909.'),
+      variant: parseScienceChatMessage('Zasymuluj epidemię z R0=6 przez 14 dni seed=909.'),
+    });
+
+    expect(comparison.status).toBe('COMPLETED');
+    expect(comparison.model?.modelId).toBe('epidemic-city');
+    expect(comparison.seedControl).toEqual({ status: 'MATCHED', baselineSeed: 909, variantSeed: 909 });
+    expect(comparison.baseline?.provenance.seed).toBe(909);
+    expect(comparison.variant?.provenance.seed).toBe(909);
+    expect(comparison.evidence?.baselineResultOrigin).toBe('real-engine');
+    expect(comparison.metrics.length).toBeGreaterThan(0);
+  });
+
+  it('blocks model mismatch before executing a counterfactual comparison', () => {
+    const comparison = compareCounterfactual({
+      baseline: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'),
+      variant: parseScienceChatMessage('Oblicz dylatację czasu dla beta=0.8.'),
+    });
+
+    expect(comparison.status).toBe('BLOCKED_MODEL_MISMATCH');
+    expect(comparison.baseline).toBeUndefined();
+    expect(comparison.variant).toBeUndefined();
+    expect(comparison.metrics).toEqual([]);
+    expect(comparison.validationErrors[0]).toContain('identycznej domeny i modelId');
   });
 
   it('runs a real Schwarzschild calculation from natural language with provenance', () => {

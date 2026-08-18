@@ -16,6 +16,8 @@ import {
   RO_CRATE_EVIDENCE_PACK_VERSION,
   compareCounterfactual,
   serializeCounterfactualComparison,
+  planEvidenceGuidedExperiment,
+  confirmEvidenceGuidedExperiment,
   normalizeOsmMapXml,
   OSM_ATTRIBUTION,
   OSM_LICENSE,
@@ -166,6 +168,43 @@ describe('Genesis Experiment Fabric', () => {
     expect(serializeEvidencePackRoCrate(pack)).toBe(serializeEvidencePackRoCrate(pack));
     expect(JSON.parse(serializeEvidencePackRoCrate(pack))['@graph'].some((node: Record<string, unknown>) => node['genesis:roCrateProfileVersion'] === RO_CRATE_EVIDENCE_PACK_VERSION)).toBe(true);
     expect(packNode?.['genesis:disclaimer']).toContain('nie stanowi odkrycia');
+  });
+
+  it('creates an evidence-guided plan before a real run and executes only after confirmation', () => {
+    const request = parseScienceChatMessage('Oblicz promień Schwarzschilda dla 2 masy Słońca.');
+    const reviewed = planEvidenceGuidedExperiment(request);
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.modelId).toBe('einstein-schwarzschild');
+    expect(reviewed.disclosure.engine).toContain('genesis-physics');
+    expect(reviewed.disclosure.resultWillComeFromRealRun).toBe(true);
+    expect(reviewed.disclosure.requestedParameters.massSolar).toBe(2);
+    expect(reviewed.disclosure.limitations.join(' ')).toContain('granicach modelu');
+
+    const confirmed = confirmEvidenceGuidedExperiment(reviewed);
+    expect(confirmed.run.result.status).toBe('completed');
+    expect(confirmed.run.provenance.resultOrigin).toBe('real-engine');
+    expect(confirmed.handoff.evidencePack.status).toBe('PROTOCOL_REQUIRED');
+    expect(confirmed.handoff.counterfactual.status).toBe('VARIANT_REQUIRED');
+  });
+
+  it('rejects an evidence-guided plan modified after review before executing it', () => {
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'));
+    const modified = {
+      ...reviewed,
+      disclosure: { ...reviewed.disclosure, engine: 'invented-solver@9.9.9' },
+    };
+
+    expect(() => confirmEvidenceGuidedExperiment(modified)).toThrow('modified after review');
+  });
+
+  it('discloses ENGINE_NOT_AVAILABLE and never confirms an absent quantum solver', () => {
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Rozwiąż równanie Schrödingera dla tunelowania.'));
+
+    expect(reviewed.status).toBe('ENGINE_NOT_AVAILABLE');
+    expect(reviewed.disclosure.resultWillComeFromRealRun).toBe(false);
+    expect(reviewed.disclosure.requiredSolver).toBeTruthy();
+    expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
   });
 
   it('compares two real Schwarzschild runs as a deterministic evidence-backed counterfactual', () => {

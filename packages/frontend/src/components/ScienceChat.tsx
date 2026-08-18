@@ -7,7 +7,7 @@ import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
 import { saveExperiment, listExperiments } from '../core/scienceMemory';
 import { track } from '../core/analytics';
-import { parseScienceChatMessage, runExperiment, type ExperimentRun } from '../core/experimentFabric';
+import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, type EvidenceGuidedExperimentPlan, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
 
 /**
@@ -25,6 +25,27 @@ const TAG_LABELS: Record<EpistemicTag, string> = {
   FAKT: 'FAKT', MODEL: 'MODEL', ZALOZENIE: 'ZAŁOŻENIE', HIPOTEZA: 'HIPOTEZA',
   WYNIK: 'WYNIK SYMULACJI', INTERPRETACJA: 'INTERPRETACJA', SYSTEM: 'SYSTEM',
 };
+
+function formatEvidenceGuidedPlan(reviewed: EvidenceGuidedExperimentPlan): string {
+  const disclosure = reviewed.disclosure;
+  const params = Object.entries(disclosure.requestedParameters).map(([key, value]) => `${key}=${String(value)}`).join(', ') || 'parametry domyślne modelu';
+  const schema = disclosure.parameterSchema.map((parameter) => `${parameter.id}${parameter.unit ? ` [${parameter.unit}]` : ''}`).join(', ') || 'brak parametrów dla tego requestu';
+  const engine = disclosure.engine ?? 'brak dostępnego engine';
+  const seed = disclosure.seed === undefined ? 'brak jawnego seedu' : `seed=${disclosure.seed}`;
+  const limits = disclosure.limitations.map((limit) => `• ${limit}`).join('\n');
+  const ready = reviewed.status === 'READY_FOR_CONFIRMATION';
+  return [
+    `PLAN EKSPERYMENTU — ${ready ? 'oczekuje na potwierdzenie; nic nie zostało jeszcze uruchomione.' : 'nie może zostać uruchomiony.'}`,
+    `Model / solver: ${disclosure.modelId ?? 'brak zarejestrowanego modelu'} · ${engine}`,
+    `Capability: ${disclosure.capability} · ${disclosure.resultWillComeFromRealRun ? 'po potwierdzeniu wynik będzie pochodził z realnego runu.' : 'brak realnego runu dla tej prośby.'}`,
+    `Parametry: ${params}. Dostępna schema: ${schema}.`,
+    `Warunki: ${reviewed.request.operation}, ${seed}. Route: ${disclosure.route?.kind ?? 'none'}.`,
+    `Ograniczenia:\n${limits}`,
+    ready
+      ? 'Wpisz „potwierdź” albo użyj przycisku „Uruchom potwierdzony plan”. Pojedynczy run zachowa provenance; Evidence Pack wymaga osobnego prerejestrowanego protokołu, a A/B drugiego wariantu.'
+      : `Nie uruchomiono wyniku. ${reviewed.validationErrors.length > 0 ? `Walidacja: ${reviewed.validationErrors.join(' ')}` : `Wymagany komponent: ${disclosure.requiredSolver}.`}`,
+  ].join('\n\n');
+}
 
 function formatFabricRun(run: ExperimentRun): string {
   const entries = Object.entries(run.result.outputs).slice(0, 6).map(([key, value]) => {
@@ -60,6 +81,7 @@ export function ScienceChat() {
     tag: 'SYSTEM',
   }]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
+  const [pendingGuidedPlan, setPendingGuidedPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { ensureGeneratorReady(); }, []);
@@ -74,20 +96,49 @@ export function ScienceChat() {
   const send = (text: string) => {
     const msg = text.trim();
     if (!msg) return;
+    const isConfirmation = /^(?:potwierdź|potwierdz|uruchom potwierdzony plan)$/i.test(msg);
+    const isCancellation = /^(?:anuluj|anuluj plan)$/i.test(msg);
+    if (isCancellation && pendingGuidedPlan) {
+      setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `Plan ${pendingGuidedPlan.plan.planId} anulowano. Żaden model nie został uruchomiony.`, tag: 'SYSTEM' }]);
+      setPendingGuidedPlan(null);
+      setInput('');
+      return;
+    }
+    if (isConfirmation) {
+      const reviewed = pendingGuidedPlan;
+      setInput('');
+      if (!reviewed) {
+        setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: 'Nie ma planu oczekującego na potwierdzenie. Najpierw opisz eksperyment.', tag: 'SYSTEM' }]);
+        return;
+      }
+      try {
+        const confirmed = confirmEvidenceGuidedExperiment(reviewed);
+        const run = confirmed.run;
+        const handoff = `\n\nEvidence Pack: ${confirmed.handoff.evidencePack.status} — ${confirmed.handoff.evidencePack.reason}\nA/B: ${confirmed.handoff.counterfactual.status} — ${confirmed.handoff.counterfactual.reason}`;
+        const tag: EpistemicTag = run.result.status === 'completed' ? 'WYNIK' : 'SYSTEM';
+        setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `${formatFabricRun(run)}${handoff}`, tag }]);
+        setPendingGuidedPlan(null);
+        track('experiment_fabric_run', { model: run.request.modelId ?? run.request.domainId, status: run.result.status, confirmed: 'true' });
+        if (run.result.status === 'completed' && run.result.route.kind === 'live-world') {
+          if (setPendingExperimentWorld(run.runId)) window.location.hash = run.result.route.hash;
+        } else if (run.result.status === 'completed' && run.result.route.kind === 'lab') {
+          setPendingScenario(run.result.route.labId, run.provenance.parameterSnapshot, run.result.route.experimentId);
+          window.location.hash = `#/lab/${run.result.route.labId}`;
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Nieznany błąd potwierdzenia planu.';
+        setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `Plan nie został uruchomiony: ${reason}`, tag: 'SYSTEM' }]);
+      }
+      return;
+    }
     const fabricRequest = parseScienceChatMessage(msg);
     const isFabricRequest = fabricRequest.modelId !== undefined || fabricRequest.domainId !== 'unknown';
     if (isFabricRequest) {
-      const run = runExperiment(fabricRequest);
-      const tag: EpistemicTag = run.result.status === 'completed' ? 'WYNIK' : 'SYSTEM';
-      setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatFabricRun(run), tag }]);
+      const reviewed = planEvidenceGuidedExperiment(fabricRequest);
+      setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
+      setPendingGuidedPlan(reviewed.status === 'READY_FOR_CONFIRMATION' ? reviewed : null);
       setInput('');
-      track('experiment_fabric_run', { model: run.request.modelId ?? run.request.domainId, status: run.result.status });
-      if (run.result.status === 'completed' && run.result.route.kind === 'live-world') {
-        if (setPendingExperimentWorld(run.runId)) window.location.hash = run.result.route.hash;
-      } else if (run.result.status === 'completed' && run.result.route.kind === 'lab') {
-        setPendingScenario(run.result.route.labId, run.provenance.parameterSnapshot, run.result.route.experimentId);
-        window.location.hash = `#/lab/${run.result.route.labId}`;
-      }
+      track('ask_ai_used', { via: 'science-chat-plan', model: fabricRequest.modelId ?? fabricRequest.domainId, status: reviewed.status });
       return;
     }
 
@@ -184,6 +235,13 @@ export function ScienceChat() {
           </div>
         ))}
       </div>
+
+      {pendingGuidedPlan?.status === 'READY_FOR_CONFIRMATION' && (
+        <div className="science-chat-suggest" aria-label="Potwierdzenie planu eksperymentu">
+          <button className="primary-btn" onClick={() => send('potwierdź')}>Uruchom potwierdzony plan</button>
+          <button className="chip-btn" onClick={() => send('anuluj plan')}>Anuluj plan</button>
+        </div>
+      )}
 
       <div className="science-chat-suggest">
         {SUGGESTIONS.map((s) => (

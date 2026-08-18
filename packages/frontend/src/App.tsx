@@ -44,6 +44,7 @@ const VisualSimulationScreen = lazy(() => import('./components/visual-simulation
 const City3DWebGLScreen = lazy(() => import('./components/visual-simulation/City3DWebGLScreen').then((m) => ({ default: m.City3DWebGLScreen })));
 const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/ConceptFilmScreen').then((m) => ({ default: m.ConceptFilmScreen })));
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
+const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -84,7 +85,8 @@ type Route =
   | { kind: 'city' }
   | { kind: 'city3d' }
   | { kind: 'concept' }
-  | { kind: 'character' };
+  | { kind: 'character' }
+  | { kind: 'hf-slice' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -109,6 +111,7 @@ function parseHash(): Route {
   if (h === '#/city3d') return { kind: 'city3d' };
   if (h === '#/concept') return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
+  if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
   return { kind: 'home' };
 }
 
@@ -434,6 +437,18 @@ export default function App() {
           <TopBar title="🏙 Epidemia w małym mieście — żywa scena WebGL" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <City3DWebGLScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'hf-slice') {
+      return (
+        <div className="app">
+          <TopBar title="Genesis — High-Fidelity Street Slice" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <HighFidelitySliceScreen />
           </HeavyRoute>
           {overlays}
         </div>

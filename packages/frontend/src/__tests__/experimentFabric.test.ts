@@ -18,6 +18,9 @@ import {
   serializeCounterfactualComparison,
   planEvidenceGuidedExperiment,
   confirmEvidenceGuidedExperiment,
+  createScenarioCapsule,
+  replayScenarioCapsule,
+  serializeScenarioCapsule,
   normalizeOsmMapXml,
   OSM_ATTRIBUTION,
   OSM_LICENSE,
@@ -205,6 +208,44 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.disclosure.resultWillComeFromRealRun).toBe(false);
     expect(reviewed.disclosure.requiredSolver).toBeTruthy();
     expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
+  });
+
+  it('creates and replays a reproducible scenario capsule from real A/B runs only', () => {
+    const comparison = compareCounterfactual({
+      baseline: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'),
+      variant: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 2 masy Słońca.'),
+    });
+    const capsule = createScenarioCapsule({
+      title: 'Schwarzschild 1 M☉ vs 2 M☉',
+      baselineRun: comparison.baseline!,
+      variantRun: comparison.variant!,
+      comparison,
+    });
+    const replay = replayScenarioCapsule(capsule);
+
+    expect(capsule.references.baselineRunFingerprint).toBe(comparison.evidence?.baselineRunFingerprint);
+    expect(capsule.references.variantRunFingerprint).toBe(comparison.evidence?.variantRunFingerprint);
+    expect(capsule.comparison?.comparisonId).toBe(comparison.comparisonId);
+    expect(replay.status).toBe('MATCH');
+    expect(replay.checks.every((check) => check.matched)).toBe(true);
+    expect(serializeScenarioCapsule(capsule)).toBe(serializeScenarioCapsule(capsule));
+  });
+
+  it('rejects Scenario Capsules from absent engines or mismatched A/B provenance', () => {
+    const unavailable = runExperiment(parseScienceChatMessage('Rozwiąż równanie Schrödingera dla tunelowania.'));
+    expect(() => createScenarioCapsule({ title: 'Brak silnika', baselineRun: unavailable })).toThrow('completed real-engine');
+
+    const comparison = compareCounterfactual({
+      baseline: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'),
+      variant: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 2 masy Słońca.'),
+    });
+    const unrelatedVariant = runExperiment(parseScienceChatMessage('Oblicz promień Schwarzschilda dla 3 masy Słońca.'));
+    expect(() => createScenarioCapsule({
+      title: 'Niespójny wariant',
+      baselineRun: comparison.baseline!,
+      variantRun: unrelatedVariant,
+      comparison,
+    })).toThrow('fingerprints do not match');
   });
 
   it('compares two real Schwarzschild runs as a deterministic evidence-backed counterfactual', () => {

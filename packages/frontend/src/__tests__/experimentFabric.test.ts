@@ -231,6 +231,36 @@ describe('Genesis Experiment Fabric', () => {
     expect(serializeScenarioCapsule(capsule)).toBe(serializeScenarioCapsule(capsule));
   });
 
+  it('retains a real OSM dataset as static provenance in a reproducible scenario capsule', () => {
+    const comparison = compareCounterfactual({
+      baseline: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'),
+      variant: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 2 masy Słońca.'),
+    });
+    const xml = `<?xml version="1.0"?><osm version="0.6" generator="osm-test"><node id="1" lat="35.8885" lon="-5.3240"/><node id="2" lat="35.8886" lon="-5.3238"/><way id="102"><nd ref="1"/><nd ref="2"/><tag k="highway" v="residential"/></way></osm>`;
+    const spatialDataset = normalizeOsmMapXml(xml, { bbox: [-5.3240, 35.8885, -5.3235, 35.8890], sourceTimestamp: '2026-08-18T00:00:00.000Z' });
+    const capsule = createScenarioCapsule({
+      title: 'Realny kontekst OSM dla A/B Schwarzschilda',
+      baselineRun: comparison.baseline!,
+      variantRun: comparison.variant!,
+      comparison,
+      spatialDataset,
+    });
+    const replay = replayScenarioCapsule(capsule);
+
+    expect(capsule.references.spatialDatasetId).toBe(spatialDataset.datasetId);
+    expect(capsule.references.spatialNormalizationFingerprint).toBe(spatialDataset.provenance.normalizationFingerprint);
+    expect(capsule.spatial?.status).toBe('RETAINED_STATIC_ARTIFACT');
+    expect(capsule.spatial?.dataset.worldIntegration).toBe('NOT_WIRED');
+    expect(replay.status).toBe('MATCH');
+    expect(replay.spatial?.datasetId).toBe(spatialDataset.datasetId);
+    expect(replay.spatial?.license).toBe(OSM_LICENSE);
+
+    const invalidAttribution = { ...spatialDataset, attribution: 'no attribution' } as unknown as typeof spatialDataset;
+    expect(() => createScenarioCapsule({
+      title: 'Nieważny artefakt OSM', baselineRun: comparison.baseline!, variantRun: comparison.variant!, comparison, spatialDataset: invalidAttribution,
+    })).toThrow('ODbL license');
+  });
+
   it('rejects Scenario Capsules from absent engines or mismatched A/B provenance', () => {
     const unavailable = runExperiment(parseScienceChatMessage('Rozwiąż równanie Schrödingera dla tunelowania.'));
     expect(() => createScenarioCapsule({ title: 'Brak silnika', baselineRun: unavailable })).toThrow('completed real-engine');

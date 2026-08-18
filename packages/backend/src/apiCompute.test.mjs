@@ -23,6 +23,32 @@ describe('compute API', () => {
     assert.equal(call('GET', '/api/compute/models/nope').status, 404);
   });
 
+  test('fabric contract is public and exposes only existing backend models', () => {
+    const r = call('GET', '/api/compute/fabric/contract');
+    assert.equal(r.status, 200);
+    assert.equal(r.body.contract.contractVersion, '1.0.0');
+    assert.ok(r.body.contract.models.some((model) => model.id === 'sr-lorentz'));
+    assert.equal(r.body.contract.response.capabilityRule.includes('ENGINE_NOT_AVAILABLE'), true);
+  });
+
+  test('fabric run validates envelope and delegates to the existing real compute run', () => {
+    const r = call('POST', '/api/compute/fabric/run', {
+      body: {
+        contractVersion: '1.0.0', sourceText: 'Oblicz dylatację czasu dla β=0.8.', domainId: 'spacetime-einstein',
+        modelId: 'sr-lorentz', inputs: { velocityFraction: 0.8 }, seed: 9,
+      },
+    });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.contractVersion, '1.0.0');
+    assert.equal(r.body.persisted, false);
+    assert.equal(r.body.run.status, 'ok');
+    assert.equal(r.body.run.seed, 9);
+    assert.ok(Math.abs(r.body.run.outputs.lorentzGammaFactor - 1.66667) < 0.001);
+    assert.equal(call('POST', '/api/compute/fabric/run', {
+      body: { contractVersion: 'wrong', modelId: 'sr-lorentz', inputs: {} },
+    }).status, 400);
+  });
+
   test('run without project is ephemeral (persisted:false) and returns provenance', () => {
     const r = call('POST', '/api/compute/run', { body: { modelId: 'sr-lorentz', inputs: { velocityFraction: 0.8 } } });
     assert.equal(r.status, 200);

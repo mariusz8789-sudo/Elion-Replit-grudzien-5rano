@@ -7,6 +7,8 @@ import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
 import { saveExperiment, listExperiments } from '../core/scienceMemory';
 import { track } from '../core/analytics';
+import { parseScienceChatMessage, runExperiment, type ExperimentRun } from '../core/experimentFabric';
+import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
 
 /**
  * Genesis Science Chat — inteligentna warstwa rozmowy NAD istniejącymi
@@ -23,6 +25,20 @@ const TAG_LABELS: Record<EpistemicTag, string> = {
   FAKT: 'FAKT', MODEL: 'MODEL', ZALOZENIE: 'ZAŁOŻENIE', HIPOTEZA: 'HIPOTEZA',
   WYNIK: 'WYNIK SYMULACJI', INTERPRETACJA: 'INTERPRETACJA', SYSTEM: 'SYSTEM',
 };
+
+function formatFabricRun(run: ExperimentRun): string {
+  const entries = Object.entries(run.result.outputs).slice(0, 6).map(([key, value]) => {
+    const unit = run.result.units[key] ? ` ${run.result.units[key]}` : '';
+    return `${key}: ${typeof value === 'number' ? value.toPrecision(5) : String(value)}${unit}`;
+  });
+  const source = run.provenance.knowledgeSources.length > 0 ? `\nCorpus: ${run.provenance.knowledgeSources.join(', ')}.` : '';
+  const route = run.result.route.kind === 'live-world'
+    ? '\nŚwiat 3D używa tej samej instancji modelu z tego przebiegu.'
+    : run.result.route.kind === 'lab'
+      ? `\nWizualizacja: laboratorium ${run.result.route.labId}.`
+      : '';
+  return `${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${route}\nProvenance: ${run.provenance.runFingerprint}.`;
+}
 
 const SUGGESTIONS = [
   'Zbadaj problem trzech ciał',
@@ -58,6 +74,23 @@ export function ScienceChat() {
   const send = (text: string) => {
     const msg = text.trim();
     if (!msg) return;
+    const fabricRequest = parseScienceChatMessage(msg);
+    const isFabricRequest = fabricRequest.modelId !== undefined || fabricRequest.domainId !== 'unknown';
+    if (isFabricRequest) {
+      const run = runExperiment(fabricRequest);
+      const tag: EpistemicTag = run.result.status === 'completed' ? 'WYNIK' : 'SYSTEM';
+      setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatFabricRun(run), tag }]);
+      setInput('');
+      track('experiment_fabric_run', { model: run.request.modelId ?? run.request.domainId, status: run.result.status });
+      if (run.result.status === 'completed' && run.result.route.kind === 'live-world') {
+        if (setPendingExperimentWorld(run.runId)) window.location.hash = run.result.route.hash;
+      } else if (run.result.status === 'completed' && run.result.route.kind === 'lab') {
+        setPendingScenario(run.result.route.labId, run.provenance.parameterSnapshot, run.result.route.experimentId);
+        window.location.hash = `#/lab/${run.result.route.labId}`;
+      }
+      return;
+    }
+
     const live = getSimContext();
     const snapshot: ChatSimSnapshot | null = live
       ? {

@@ -378,6 +378,40 @@ export async function runCompute(modelId: string, inputs: Record<string, number>
   return r.ok ? { ok: true, data: r.data.run } : r;
 }
 
+export interface FabricComputeContract {
+  contractVersion: string;
+  request: { required: string[]; optional: string[]; inputRule: string };
+  response: { statuses: string[]; provenance: string; capabilityRule: string };
+  models: { id: string; version: string; domain: string; inputs: { id: string; type: string; unit?: string; min?: number; max?: number }[]; outputs: { id: string; unit?: string }[]; deterministic: boolean }[];
+}
+
+export interface FabricComputeResponse {
+  contractVersion: string;
+  request: { sourceText: string | null; domainId: string | null; modelId: string; requestedVisualization: string | null };
+  run: ComputeRun;
+  persisted: boolean;
+}
+
+/** Public, typed access to the model-first Fabric contract; external capability seams never execute through this endpoint. */
+export async function getFabricComputeContract(): Promise<ApiResult<FabricComputeContract>> {
+  const r = await request<{ contract: FabricComputeContract }>('GET', '/compute/fabric/contract');
+  return r.ok ? { ok: true, data: r.data.contract } : r;
+}
+
+export async function runFabricCompute(input: {
+  modelId: string;
+  inputs: Record<string, number>;
+  sourceText?: string;
+  domainId?: string;
+  requestedVisualization?: string;
+  seed?: number;
+  projectId?: string;
+}): Promise<ApiResult<FabricComputeResponse>> {
+  return request<FabricComputeResponse>('POST', '/compute/fabric/run', {
+    body: { contractVersion: '1.0.0', ...input },
+  });
+}
+
 export async function listCapabilities(): Promise<ApiResult<Capability[]>> {
   const r = await request<{ capabilities: Capability[] }>('GET', '/compute/capabilities');
   return r.ok ? { ok: true, data: r.data.capabilities } : r;

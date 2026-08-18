@@ -4,6 +4,7 @@ import { type AnalysisMode } from '../../core/simulation/analysis';
 import { HighFidelityStreetSlice3D, type HighFidelityCameraMode } from '../../core/three/highFidelitySlice3D';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { SimParams } from '../../core/types';
+import { consumePendingExperimentWorld } from '../../core/experimentFabric/worldHandoff';
 
 const LEGEND = [
   ['S', 'podatny', '#54d98c'],
@@ -27,7 +28,13 @@ export function HighFidelitySliceScreen() {
   const requestedView = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('view');
   const initialCameraMode: HighFidelityCameraMode = requestedView === 'city' || requestedView === 'agent' || requestedView === 'event' ? requestedView : 'street';
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const sim = useMemo(() => new HighFidelityStreetSlice3D({}, { onAgentSelected: setSelectedId }), []);
+  // Jednorazowo przejmuje tę samą instancję World Engine z Experiment Fabric.
+  // Brak handoffu zachowuje dotychczasowy samodzielny proof na tej trasie.
+  const [experimentWorld] = useState(() => consumePendingExperimentWorld());
+  const sim = useMemo(
+    () => new HighFidelityStreetSlice3D({}, { onAgentSelected: setSelectedId }, experimentWorld?.simulation),
+    [experimentWorld],
+  );
   const [running, setRunning] = useState(true);
   const [cameraMode, setCameraMode] = useState<HighFidelityCameraMode>(initialCameraMode);
   const [heatmap, setHeatmap] = useState(true);

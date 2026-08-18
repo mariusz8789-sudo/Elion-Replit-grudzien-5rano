@@ -59,6 +59,7 @@ import {
 } from './store.mjs';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
 import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
+import { buildFabricContract, fabricRunEnvelope, validateFabricRunRequest } from './compute/experimentFabricContract.mjs';
 import { listCapabilities } from './compute/capabilities.mjs';
 import { buildCandidatePassport, rankCandidates } from './compute/drugDiscovery.mjs';
 import { parseFormula, molecularWeight } from './compute/core.bundle.mjs';
@@ -124,6 +125,8 @@ export function handleApi(db, ctx) {
       return m ? ok({ model: modelMetadata(m) }) : err(404, 'not_found');
     }
     if (seg[1] === 'run' && seg.length === 2 && method === 'POST') return runComputeHandler(db, ctx, body);
+    if (seg[1] === 'fabric' && seg[2] === 'contract' && seg.length === 3 && method === 'GET') return ok({ contract: buildFabricContract(listModels()) });
+    if (seg[1] === 'fabric' && seg[2] === 'run' && seg.length === 3 && method === 'POST') return runFabricHandler(db, ctx, body);
     // Rejestr Toolchain (P6): status silników ustalony w runtime realną walidacją.
     if (seg[1] === 'toolchain' && seg.length === 2 && method === 'GET') return ok({ toolchain: listToolchain() });
     if (seg[1] === 'toolchain' && seg.length === 3 && method === 'GET') {
@@ -682,6 +685,18 @@ const RUN_STATUS_TO_HTTP = { ok: 200, rejected: 400, error: 500 };
  * TRWALE zapisany (audytowalny, odtwarzalny). Bez kontekstu projektu run jest
  * efemeryczny (persisted:false) — sam wynik i tak wraca.
  */
+function runFabricHandler(db, ctx, body) {
+  const validation = validateFabricRunRequest(body);
+  if (!validation.ok) return err(400, 'invalid_fabric_request', validation.errors.join(' '));
+  const delegated = runComputeHandler(db, ctx, body);
+  // Preserve authentication / RBAC errors from the established compute route.
+  if (!delegated.body?.run) return delegated;
+  return {
+    status: delegated.status,
+    body: fabricRunEnvelope(body, delegated.body.run, delegated.body.persisted),
+  };
+}
+
 function runComputeHandler(db, ctx, body) {
   const modelId = String(body.modelId ?? '');
   const seed = typeof body.seed === 'number' && Number.isFinite(body.seed) ? body.seed : null;

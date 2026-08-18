@@ -104,9 +104,13 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private pointerDown: { x: number; y: number } | null = null;
   private pointerDragged = false;
 
-  constructor(params: Partial<EpidemicCityParams> = {}, callbacks: HighFidelitySliceCallbacks = {}) {
-    this.simulation = new EpidemicCitySimulation(params);
-    this.eventSeed = params.seed;
+  constructor(
+    params: Partial<EpidemicCityParams> = {},
+    callbacks: HighFidelitySliceCallbacks = {},
+    existingSimulation?: EpidemicCitySimulation,
+  ) {
+    this.simulation = existingSimulation ?? new EpidemicCitySimulation(params);
+    this.eventSeed = this.simulation.getParams().seed as number | undefined;
     this.registry = new EventRegistry({ modelId: 'epidemic.city', seed: this.eventSeed });
     this.stream = new EventStream(this.registry);
     this.eventCursor = this.stream.cursor();

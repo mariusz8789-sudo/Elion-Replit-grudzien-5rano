@@ -23,6 +23,7 @@ export type AnalyticsEvent =
   | 'glossary_viewed'
   | 'custom_experiment_run'
   | 'custom_experiment_saved'
+  | 'experiment_fabric_run'
   | 'what_if_opened'
   | 'onboarding_finished';
 

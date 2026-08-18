@@ -4,6 +4,7 @@ import { computeField, heatColor, type AnalysisMode } from '../simulation/analys
 import { EpidemicCitySimulation, type EpidemicCityParams } from '../simulation/epidemicCity';
 import { SimulationClock, type ClockSpeed } from '../simulationClock/clock';
 import type { SimAgent, WorldObject } from '../simulation/types';
+import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import {
   HumanoidAgentVisual,
@@ -19,7 +20,8 @@ const MAX_DETAILED_HUMANOIDS = 10;
 // InstancedMesh utrzymuje stałą liczbę draw calls; P1 umożliwia uczciwy benchmark do 1000 agentów.
 const MAX_CROWD_HUMANOIDS = 1024;
 /** Czas prezentacji odczytanego eventu — nie wpływa na czas ani prawdopodobieństwo modelu. */
-const TRANSMISSION_MARKER_LIFETIME_SECONDS = 3;
+// Krótka obserwacja rzeczywistego kontaktu: po pauzie zegara pozostaje do inspekcji, ale w ruchu nie zamienia świata w dashboard.
+const TRANSMISSION_MARKER_LIFETIME_SECONDS = 1.1;
 const ANALYSIS_COLS = 36;
 const ANALYSIS_ROWS = 24;
 
@@ -49,6 +51,11 @@ export class EpidemicCity3DSim implements Sim3D {
   cameraAutoRotateSpeed = 0.16;
   private readonly simulation: EpidemicCitySimulation;
   private readonly clock = new SimulationClock();
+  /** Jeden kontraktowy rejestr per przebieg; nie jest World State i renderer czyta wyłącznie przez EventStream. */
+  private readonly eventRegistry: EventRegistry;
+  private readonly eventStream: EventStream;
+  private readonly eventSeed: number | string | undefined;
+  private eventCursor = 0;
   private readonly callbacks: City3DCallbacks;
   private THREE: typeof THREE_NS | null = null;
   private camera: THREE_NS.PerspectiveCamera | null = null;
@@ -66,6 +73,7 @@ export class EpidemicCity3DSim implements Sim3D {
   private pointerDragged = false;
   private followTarget: THREE_NS.Vector3 | null = null;
   private cameraPreset: CityCameraPreset = 'city';
+  private resetCityCameraPending = false;
   /** Agent pozostaje źródłem punktu kamery; preset ulicy nie tworzy wirtualnej choreografii. */
   private cameraTrackId: number | null = null;
   private detailVisuals = new Map<number, HumanoidAgentVisual>();
@@ -82,6 +90,10 @@ export class EpidemicCity3DSim implements Sim3D {
 
   constructor(params: Partial<EpidemicCityParams> = {}, callbacks: City3DCallbacks = {}) {
     this.simulation = new EpidemicCitySimulation(params);
+    this.eventSeed = params.seed;
+    this.eventRegistry = new EventRegistry({ modelId: 'epidemic.city', seed: this.eventSeed });
+    this.eventStream = new EventStream(this.eventRegistry);
+    this.eventCursor = this.eventStream.cursor();
     this.callbacks = callbacks;
   }
 
@@ -130,15 +142,19 @@ export class EpidemicCity3DSim implements Sim3D {
     this.cameraPreset = preset;
     if (preset === 'city') {
       this.cameraTrackId = null;
+      this.resetCityCameraPending = true;
       this.selectAgent(null);
       return null;
     }
     const agents = this.simulation.agents();
     const moving = agents.find((agent) => Math.hypot(agent.vx, agent.vy) > 1e-3);
     const infected = agents.find((agent) => agent.state === 'I') ?? agents.find((agent) => agent.state === 'E');
-    const candidate = preset === 'agent' ? infected ?? moving : moving ?? infected ?? agents[0] ?? null;
+    const candidate = (preset === 'agent' || preset === 'street')
+      ? infected ?? moving ?? agents[0] ?? null
+      : moving ?? infected ?? agents[0] ?? null;
     this.cameraTrackId = candidate?.id ?? null;
-    this.selectAgent(preset === 'agent' ? candidate?.id ?? null : null);
+    // STREET i AGENT używają prawdziwego celu oraz pełnego rigu; nie tworzą osobnej postaci ani kamery.
+    this.selectAgent((preset === 'agent' || preset === 'street') ? candidate?.id ?? null : null, preset === 'street');
     return candidate?.id ?? null;
   }
 
@@ -162,6 +178,8 @@ export class EpidemicCity3DSim implements Sim3D {
   reset(): void {
     this.clock.reset();
     this.simulation.reset();
+    this.eventRegistry.reset();
+    this.eventCursor = this.eventStream.cursor();
     this.latestTransmissionTarget = null;
     this.latestTransmissionView = null;
     this.selectAgent(null);
@@ -217,7 +235,16 @@ export class EpidemicCity3DSim implements Sim3D {
     // Ślad eventu zatrzymuje się razem z czasem modelu; ręczny krok można więc sprawdzić bez wyścigu z renderem.
     if (this.clock.running) this.timeSeconds += dt;
     const tickStartedAt = performance.now();
-    this.clock.advance(dt, (dtDays) => this.simulation.tick(dtDays));
+    this.clock.advance(dt, (dtDays) => {
+      this.simulation.tick(dtDays);
+      // Adapter odczytuje wyłącznie faktyczne TransmissionEvent po każdym kroku modelu.
+      ingestTransmissions(this.eventRegistry, this.simulation.lastTransmissions(), {
+        simTime: this.clock.time,
+        modelId: 'epidemic.city',
+        seed: this.eventSeed,
+        params: this.simulation.getParams(),
+      });
+    });
     this.lastTickMs = performance.now() - tickStartedAt;
   }
 
@@ -241,10 +268,16 @@ export class EpidemicCity3DSim implements Sim3D {
     this.syncAnalysis(agents);
     this.syncTransmissionMarkers();
     this.syncFollowTarget(states);
+    if (this.resetCityCameraPending) {
+      camera.position.set(0, 12.2, 11.0);
+      camera.lookAt(0, 0, 0);
+      this.resetCityCameraPending = false;
+    }
     if (this.followTarget) {
-      const desired = this.followTarget.clone().add(new this.THREE.Vector3(2.15, 1.65, 2.15));
-      // Focus to świadomy drugi poziom kamery; po wyłączeniu follow OrbitControls wraca do widoku świata.
-      camera.position.copy(desired);
+      const focusDistance = this.getOrbitFocusDistance() ?? 4.2;
+      const focusDirection = this.getOrbitCameraDirection() ?? new this.THREE.Vector3(1, 0.72, 1).normalize();
+      // Pierwsza klatka focusu używa tej samej orientacji co wspólna pętla OrbitControls, bez drugiej kamery.
+      camera.position.copy(this.followTarget).addScaledVector(focusDirection, focusDistance);
       camera.lookAt(this.followTarget);
     }
   }
@@ -255,9 +288,16 @@ export class EpidemicCity3DSim implements Sim3D {
 
   getOrbitFocusDistance(): number | null {
     if (!this.followTarget) return null;
-    if (this.cameraPreset === 'district') return 8.6;
-    if (this.cameraPreset === 'street') return 5.6;
-    return 4.2;
+    if (this.cameraPreset === 'district') return 7.2;
+    // Ten sam rig i OrbitControls: STREET jest na wysokości obserwatora, AGENT pozwala obejrzeć twarz i ubranie.
+    if (this.cameraPreset === 'street') return 2.9;
+    return 1.85;
+  }
+
+  getOrbitCameraDirection(): THREE_NS.Vector3 | null {
+    if (!this.THREE || !this.followTarget || this.cameraPreset !== 'street') return null;
+    // Niski, stabilny kierunek uliczny: nadal jedna kamera OrbitControls, bez fikcyjnego ruchu lub danych agenta.
+    return new this.THREE.Vector3(1, 0.16, 1).normalize();
   }
 
   onResize(w: number, h: number): void {
@@ -510,11 +550,12 @@ export class EpidemicCity3DSim implements Sim3D {
     const w = Math.max(0.18, building.w * CITY_WORLD_SCALE);
     const d = Math.max(0.18, building.h * CITY_WORLD_SCALE);
     const style: Record<string, { color: number; height: number; roof: number; accent: number }> = {
-      home: { color: 0x6d8eb7, height: 0.72, roof: 0x364d6b, accent: 0xffd37c },
-      shop: { color: 0xd4a15e, height: 1.00, roof: 0x784825, accent: 0xffcd70 },
-      school: { color: 0x89bdd3, height: 1.08, roof: 0x2e687e, accent: 0x7ce9ff },
-      hospital: { color: 0xd9e1e8, height: 1.24, roof: 0xb13e46, accent: 0xff6670 },
-      isolation: { color: 0x8d8c9a, height: 0.88, roof: 0x565460, accent: 0xc6b6f5 },
+      // Wysokości odpowiadają parterom i piętrom w tej samej skali co rig człowieka oraz drogi.
+      home: { color: 0x6d8eb7, height: 1.18, roof: 0x364d6b, accent: 0xffd37c },
+      shop: { color: 0xd4a15e, height: 1.32, roof: 0x784825, accent: 0xffcd70 },
+      school: { color: 0x89bdd3, height: 1.56, roof: 0x2e687e, accent: 0x7ce9ff },
+      hospital: { color: 0xd9e1e8, height: 1.82, roof: 0xb13e46, accent: 0xff6670 },
+      isolation: { color: 0x8d8c9a, height: 1.28, roof: 0x565460, accent: 0xc6b6f5 },
       park: { color: 0x3d855d, height: 0.05, roof: 0x3d855d, accent: 0x78dca0 },
     };
     const s = style[building.kind] ?? { color: 0x718096, height: 0.8, roof: 0x3f4a5a, accent: 0x9fb3c8 };
@@ -522,16 +563,18 @@ export class EpidemicCity3DSim implements Sim3D {
     const variation = Math.abs(Math.round(building.x * 7 + building.y * 11 + building.w * 3)) % 5;
     const body = new THREE.Mesh(
       new THREE.BoxGeometry(w, s.height, d),
-      new THREE.MeshStandardMaterial({ color: s.color, roughness: 0.76, metalness: 0.04, transparent: true, opacity: 0.88, depthWrite: false }),
+      new THREE.MeshStandardMaterial({ color: s.color, roughness: 0.76, metalness: 0.04 }),
     );
+    body.userData.focusOccluder = true;
     body.position.y = s.height / 2;
     group.add(body);
 
     if (building.kind !== 'park') {
       const roof = new THREE.Mesh(
         new THREE.BoxGeometry(w * (1.04 + variation * 0.008), 0.12 + (variation % 2) * 0.025, d * 1.08),
-        new THREE.MeshStandardMaterial({ color: s.roof, roughness: 0.83, metalness: 0.10, transparent: true, opacity: 0.92, depthWrite: false }),
+        new THREE.MeshStandardMaterial({ color: s.roof, roughness: 0.83, metalness: 0.10 }),
       );
+      roof.userData.focusOccluder = true;
       roof.position.y = s.height + 0.06;
       group.add(roof);
       if (building.kind === 'home' || variation === 0) {
@@ -548,14 +591,21 @@ export class EpidemicCity3DSim implements Sim3D {
         window.position.set(-w / 2 + (col + 1) * w / (columns + 1), 0.28 + row * 0.26, d / 2 + 0.014);
         group.add(window);
       }
-      const door = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.15, w * 0.16), Math.min(0.32, s.height * 0.42), 0.038), new THREE.MeshStandardMaterial({ color: 0x183247, roughness: 0.64, metalness: 0.16, emissive: 0x091622, emissiveIntensity: 0.35 }));
-      door.position.set(variation % 2 ? w * 0.22 : -w * 0.22, Math.min(0.17, s.height * 0.21), d / 2 + 0.026); group.add(door);
+      const doorHeight = Math.min(0.48, s.height * 0.38);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.19, w * 0.18), doorHeight, 0.038), new THREE.MeshStandardMaterial({ color: 0x183247, roughness: 0.64, metalness: 0.16, emissive: 0x091622, emissiveIntensity: 0.35 }));
+      door.position.set(variation % 2 ? w * 0.22 : -w * 0.22, doorHeight / 2, d / 2 + 0.026); group.add(door);
+      if (building.kind === 'home' || building.kind === 'school') {
+        const balcony = new THREE.Mesh(new THREE.BoxGeometry(Math.min(w * 0.56, 0.72), 0.032, 0.14), new THREE.MeshStandardMaterial({ color: s.roof, roughness: 0.72, metalness: 0.18 }));
+        balcony.position.set(variation % 2 ? -w * 0.14 : w * 0.14, s.height * 0.54, d / 2 + 0.07); group.add(balcony);
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(Math.min(w * 0.52, 0.68), 0.11, 0.018), new THREE.MeshStandardMaterial({ color: 0xbfd4e5, roughness: 0.42, metalness: 0.42 }));
+        rail.position.set(balcony.position.x, s.height * 0.54 + 0.07, d / 2 + 0.135); group.add(rail);
+      }
       if (building.kind !== 'home') {
-        const awning = new THREE.Mesh(new THREE.BoxGeometry(Math.min(w * 0.68, 0.90), 0.045, 0.16), new THREE.MeshStandardMaterial({ color: s.accent, emissive: s.accent, emissiveIntensity: 0.22, roughness: 0.55 }));
-        awning.position.set(0, Math.min(s.height - 0.14, 0.66), d / 2 + 0.10); group.add(awning);
+        const awning = new THREE.Mesh(new THREE.BoxGeometry(Math.min(w * 0.68, 0.90), 0.045, 0.16), new THREE.MeshStandardMaterial({ color: s.accent, emissive: s.accent, emissiveIntensity: 0.18, roughness: 0.55 }));
+        awning.position.set(0, Math.min(s.height - 0.18, 0.78), d / 2 + 0.10); group.add(awning);
       }
       const sign = new THREE.Mesh(new THREE.BoxGeometry(Math.min(w * 0.62, 0.78), 0.085, 0.03), new THREE.MeshBasicMaterial({ color: s.accent }));
-      sign.position.set(0, Math.min(s.height - 0.14, 0.63), d / 2 + 0.028);
+      sign.position.set(0, Math.min(s.height - 0.17, 0.75), d / 2 + 0.028);
       group.add(sign);
       if (building.kind === 'hospital') {
         const crossMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -572,6 +622,7 @@ export class EpidemicCity3DSim implements Sim3D {
         group.add(tree);
       }
     }
+    group.userData.cityBuilding = { width: w, depth: d };
     if (building.kind === 'park') this.addBuildingLabel(group, 'PARK', 0.34, 0);
     if (building.closed) {
       const marker = new THREE.Mesh(new THREE.BoxGeometry(w * 0.72, 0.08, 0.04), new THREE.MeshBasicMaterial({ color: 0xffc857 }));
@@ -600,27 +651,6 @@ export class EpidemicCity3DSim implements Sim3D {
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
     sprite.scale.set(0.95, 0.24, 1);
     sprite.position.set(0, y, z);
-    group.add(sprite);
-  }
-
-  /** Etykieta jest tylko objaśnieniem tego samego TransmissionEvent, nigdy nie tworzy relacji. */
-  private addTransmissionLabel(group: THREE_NS.Group, text: string, x: number, y: number, z: number): void {
-    if (!this.THREE || typeof document === 'undefined') return;
-    const THREE = this.THREE;
-    const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 58;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.fillStyle = 'rgba(76, 16, 27, .92)';
-    ctx.roundRect(3, 4, 250, 50, 10); ctx.fill();
-    ctx.strokeStyle = '#ff9ca5'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = '#ffffff'; ctx.font = '700 21px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(`TRANSMISJA ${text}`, 128, 29);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, depthTest: false }));
-    sprite.scale.set(1.18, 0.27, 1);
-    sprite.position.set(x, y, z);
     group.add(sprite);
   }
 
@@ -662,8 +692,34 @@ export class EpidemicCity3DSim implements Sim3D {
     }
 
     this.crowd.update(liveStates.filter((state) => !detailedIds.has(state.id)).slice(0, MAX_CROWD_HUMANOIDS));
+    this.syncFocusOcclusion(selected);
     this.lastDetailCount = this.detailVisuals.size;
     this.lastCrowdCount = Math.min(Math.max(0, liveStates.length - this.lastDetailCount), MAX_CROWD_HUMANOIDS);
+  }
+
+  /** Odsłania tylko rendererową bryłę zawierającą wybranego realnego agenta; po zamknięciu focusu przywraca materiały. */
+  private syncFocusOcclusion(selected: HumanoidAgentState | null): void {
+    for (const object of this.buildingMeshes) {
+      const bounds = object.userData.cityBuilding as { width: number; depth: number } | undefined;
+      if (!bounds) continue;
+      const containsSelected = Boolean(selected
+        && Math.abs(object.position.x - selected.worldX) < bounds.width * 0.52
+        && Math.abs(object.position.z - selected.worldZ) < bounds.depth * 0.52);
+      object.traverse((node) => {
+        const mesh = node as THREE_NS.Mesh;
+        if (!mesh.isMesh || !mesh.userData.focusOccluder) return;
+        const material = mesh.material;
+        if (Array.isArray(material)) return;
+        const original = mesh.userData.focusMaterialState as { transparent: boolean; depthWrite: boolean; opacity: number } | undefined;
+        if (!original) {
+          mesh.userData.focusMaterialState = { transparent: material.transparent, depthWrite: material.depthWrite, opacity: material.opacity };
+        }
+        const base = (mesh.userData.focusMaterialState as { transparent: boolean; depthWrite: boolean; opacity: number });
+        material.transparent = containsSelected || base.transparent;
+        material.depthWrite = containsSelected ? false : base.depthWrite;
+        material.opacity = containsSelected ? Math.min(base.opacity, 0.025) : base.opacity;
+      });
+    }
   }
 
   private syncAnalysis(agents: readonly SimAgent[]): void {
@@ -710,44 +766,61 @@ export class EpidemicCity3DSim implements Sim3D {
       return;
     }
     const THREE = this.THREE;
-    const alive = new Set<string>();
     const agents = new Map(this.simulation.agents().map((agent) => [agent.id, agent]));
-    for (const event of this.simulation.lastTransmissions()) {
-      const key = `${event.from}-${event.to}`;
-      this.latestTransmissionTarget = event.to;
-      this.latestTransmissionView = { from: event.from, to: event.to, day: Number(this.simulation.stats().dzien ?? 0) };
-      alive.add(key);
+    const batch = this.eventStream.getEventsSince(this.eventCursor);
+    this.eventCursor = batch.cursor;
+    // Strumień zachowuje wszystkie prawdziwe zdarzenia; świat 3D eksponuje tylko najnowsze, aby nie zamienić sceny w pajęczynę markerów.
+    const latestTransmissionEvent = [...batch.events].reverse().find((event) => event.type === 'infection.transmission');
+    if (latestTransmissionEvent) {
+      for (const marker of this.transmissionMarkers.values()) {
+        this.scene.remove(marker.group);
+        marker.group.traverse((node) => {
+          const mesh = node as THREE_NS.Mesh;
+          if (mesh.geometry) mesh.geometry.dispose();
+          const material = mesh.material;
+          if (material && !Array.isArray(material)) material.dispose();
+        });
+      }
+      this.transmissionMarkers.clear();
+    }
+    for (const event of latestTransmissionEvent ? [latestTransmissionEvent] : []) {
+      const fromId = Number(event.source?.id);
+      const toId = Number(event.affectedEntities[0]?.id);
+      if (!Number.isFinite(fromId) || !Number.isFinite(toId) || !event.location) continue;
+      const key = event.id;
+      this.latestTransmissionTarget = toId;
+      this.latestTransmissionView = { from: fromId, to: toId, day: event.timestamp };
       if (this.transmissionMarkers.has(key)) continue;
-      const from = agents.get(event.from);
-      const to = agents.get(event.to);
+      const from = agents.get(fromId);
+      const to = agents.get(toId);
       if (!from || !to) continue;
-      // Prowadzenie ponad tłumem i drogami: event nadal pochodzi wyłącznie z modelu.
-      const source = new THREE.Vector3((from.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.56, (from.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
-      const target = new THREE.Vector3((to.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.56, (to.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
-      const contact = new THREE.Vector3((event.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.08, (event.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
-      const middle = source.clone().lerp(target, 0.5); middle.y += Math.max(0.30, source.distanceTo(target) * 0.45);
+      // Dyskretna trajektoria w przestrzeni: jedynie realny kontakt A→B z modelu, bez billboardu lub danych dekoracyjnych.
+      const source = new THREE.Vector3((from.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.74, (from.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
+      const target = new THREE.Vector3((to.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.74, (to.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
+      const contact = new THREE.Vector3((event.location.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE, 0.055, (event.location.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE);
+      const middle = source.clone().lerp(target, 0.5); middle.y += Math.max(0.14, source.distanceTo(target) * 0.26);
       const curve = new THREE.QuadraticBezierCurve3(source, middle, target);
-      const material = new THREE.MeshBasicMaterial({ color: 0xff5964, transparent: true, opacity: 0.98, depthWrite: false, depthTest: false });
+      const material = new THREE.MeshBasicMaterial({ color: 0xff8b96, transparent: true, opacity: 0.82, depthWrite: false, depthTest: true });
       const group = new THREE.Group(); group.name = `transmission-${key}`;
-      const arc = new THREE.Mesh(new THREE.TubeGeometry(curve, 18, 0.032, 6, false), material);
-      const pulseMaterial = material.clone();
-      const pulse = new THREE.Mesh(new THREE.RingGeometry(0.11, 0.17, 24), pulseMaterial);
+      const arc = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.013, 5, false), material);
+      const contactMaterial = new THREE.MeshBasicMaterial({ color: 0xffd3d8, transparent: true, opacity: 0.72, depthWrite: false, depthTest: true });
+      const pulse = new THREE.Mesh(new THREE.RingGeometry(0.040, 0.072, 20), contactMaterial);
       pulse.rotation.x = -Math.PI / 2; pulse.position.copy(contact);
-      const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.26, 5), material.clone());
-      arrow.position.copy(target); arrow.position.y += 0.08;
+      const targetPulse = new THREE.Mesh(new THREE.RingGeometry(0.045, 0.078, 20), contactMaterial.clone());
+      targetPulse.rotation.x = -Math.PI / 2; targetPulse.position.copy(target); targetPulse.position.y = 0.065;
+      const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.038, 0.105, 5), material.clone());
+      arrow.position.copy(target); arrow.position.y += 0.045;
       const direction = target.clone().sub(source).normalize();
       arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-      this.addTransmissionLabel(group, `#${event.from} → #${event.to}`, middle.x, middle.y + 0.18, middle.z);
-      group.add(arc, pulse, arrow); this.scene.add(group);
+      group.add(arc, pulse, targetPulse, arrow); this.scene.add(group);
       this.transmissionMarkers.set(key, { group, born: this.timeSeconds, material });
     }
     for (const [key, marker] of this.transmissionMarkers) {
       const age = this.timeSeconds - marker.born;
-      marker.group.scale.setScalar(1 + age * 0.12);
       marker.group.traverse((node) => {
         const mesh = node as THREE_NS.Mesh;
         const material = mesh.material as THREE_NS.MeshBasicMaterial;
-        if (material?.transparent) material.opacity = Math.max(0, 0.94 * (1 - age / TRANSMISSION_MARKER_LIFETIME_SECONDS));
+        if (material?.transparent) material.opacity = Math.max(0, 0.82 * (1 - age / TRANSMISSION_MARKER_LIFETIME_SECONDS));
       });
       if (age > TRANSMISSION_MARKER_LIFETIME_SECONDS) {
         this.scene.remove(marker.group);
@@ -776,13 +849,14 @@ export class EpidemicCity3DSim implements Sim3D {
       return;
     }
     if (!this.followTarget) this.followTarget = new this.THREE.Vector3();
-    this.followTarget.set(tracked.worldX, this.cameraPreset === 'district' ? 0.2 : 0.85, tracked.worldZ);
+    const focusHeight = this.cameraPreset === 'district' ? 0.2 : this.cameraPreset === 'street' ? 0.42 : 0.85;
+    this.followTarget.set(tracked.worldX, focusHeight, tracked.worldZ);
   }
 
-  private selectAgent(id: number | null): void {
+  private selectAgent(id: number | null, preserveCameraPreset = false): void {
     this.selectedId = id;
     if (id !== null) {
-      this.cameraPreset = 'agent';
+      if (!preserveCameraPreset) this.cameraPreset = 'agent';
       this.cameraTrackId = id;
     }
     this.callbacks.onAgentSelected?.(id);

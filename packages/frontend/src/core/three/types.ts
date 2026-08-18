@@ -70,6 +70,8 @@ export interface Sim3D {
   getOrbitTarget?(): THREE.Vector3 | null;
   /** Opcjonalny dystans kamery podczas focusu na ruchomy obiekt. */
   getOrbitFocusDistance?(): number | null;
+  /** Opcjonalny kierunek obserwacji dla presetów tej samej kamery OrbitControls. */
+  getOrbitCameraDirection?(): THREE.Vector3 | null;
   /** Budowa sceny — wywoływane raz przy montażu (i przy zmianie eksperymentu). */
   init(three: typeof THREE, scene: THREE.Scene, camera: THREE.PerspectiveCamera, w: number, h: number): void;
   /** Krok fizyki/animacji — CZYSTE dane, bez efektów ubocznych na WebGL (testowalne bez GPU). */

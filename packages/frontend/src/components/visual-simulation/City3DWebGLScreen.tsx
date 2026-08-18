@@ -214,7 +214,7 @@ export function City3DWebGLScreen() {
             <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>
             {latestTransmission ? (
               <div className="event-feed-item event-feed-transmission">
-                <i /><div><b>Transmisja A → B</b><span>dzień {latestTransmission.day} · #{latestTransmission.from} → #{latestTransmission.to}</span></div>
+                <i /><div><b>Transmisja A → B</b><span>dzień {Number(latestTransmission.day.toFixed(2))} · #{latestTransmission.from} → #{latestTransmission.to}</span></div>
                 <button className="world-action" onClick={() => { sim.focusLatestTransmission(); setCameraPreset(sim.getCameraPreset()); }}>Pokaż</button>
               </div>
             ) : <p className="world-panel-empty">Brak potwierdzonej transmisji w bieżącym przebiegu.</p>}

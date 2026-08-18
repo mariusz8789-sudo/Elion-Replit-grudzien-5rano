@@ -106,14 +106,14 @@ export class HumanoidAgentVisual {
     this.root.add(this.character.root);
 
     this.healthMaterial = new THREE.MeshBasicMaterial({ color: HEALTH_COLORS.S, transparent: true, opacity: 0.85, depthWrite: false });
-    const healthGeometry = new THREE.RingGeometry(0.18, 0.23, 24);
+    const healthGeometry = new THREE.RingGeometry(0.075, 0.098, 20);
     healthGeometry.rotateX(-Math.PI / 2);
     this.healthRing = new THREE.Mesh(healthGeometry, this.healthMaterial);
     this.healthRing.position.y = DETAILED_HUMAN_HEIGHT * 1.06;
     this.root.add(this.healthRing);
 
     this.isolationMaterial = new THREE.MeshBasicMaterial({ color: 0xd7dde8, transparent: true, opacity: 0.75, depthWrite: false });
-    const isolationGeometry = new THREE.RingGeometry(0.15, 0.175, 24);
+    const isolationGeometry = new THREE.RingGeometry(0.085, 0.105, 20);
     isolationGeometry.rotateX(-Math.PI / 2);
     this.isolationRing = new THREE.Mesh(isolationGeometry, this.isolationMaterial);
     this.isolationRing.position.y = 0.014;
@@ -127,7 +127,7 @@ export class HumanoidAgentVisual {
     const background = new THREE.Mesh(new THREE.CircleGeometry(0.082, 16), new THREE.MeshBasicMaterial({ color: 0xc73b3b, depthWrite: false }));
     background.position.z = -0.008;
     this.hospitalCross.add(background, barH, barV);
-    this.hospitalCross.position.set(0, HUMAN_VISUAL_HEIGHT + 0.15, 0);
+    this.hospitalCross.position.set(0, DETAILED_HUMAN_HEIGHT * 1.18, 0);
     this.hospitalCross.visible = false;
     this.root.add(this.hospitalCross);
   }
@@ -150,7 +150,7 @@ export class HumanoidAgentVisual {
     this.character.setEpidemicTint(HEALTH_COLORS[state.health], intensity);
     this.healthMaterial.color.setHex(this.selected ? 0xffd166 : HEALTH_COLORS[state.health]);
     this.healthMaterial.opacity = state.health === 'D' ? 0.45 : 0.72 + pulse * 0.22;
-    this.healthRing.scale.setScalar((this.selected ? 1.5 : 1) * (1 + pulse * (state.health === 'I' ? 0.18 : 0.07)));
+    this.healthRing.scale.setScalar((this.selected ? 1.22 : 1) * (1 + pulse * (state.health === 'I' ? 0.12 : 0.05)));
     this.isolationRing.visible = state.isolated && !state.hospitalized;
     this.isolationRing.rotation.z = timeSeconds * 0.7;
     this.hospitalCross.visible = state.hospitalized;
@@ -204,7 +204,7 @@ export class InstancedHumanoidCrowd {
     const clothingMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.72, metalness: 0.02, emissive: 0xffffff, emissiveIntensity: 0.18 });
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.86, emissive: 0xffffff, emissiveIntensity: 0.10 });
     const hairMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92, emissive: 0xffffff, emissiveIntensity: 0.06 });
-    const statusMat = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.96, depthWrite: false });
+    const statusMat = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.76, depthWrite: false });
     this.torso = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.142, 0.37, 6, 10), clothingMat, capacity);
     this.head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.120, 12, 10), skinMat, capacity);
     this.hair = new THREE.InstancedMesh(new THREE.SphereGeometry(0.078, 10, 7, 0, Math.PI * 2, 0, Math.PI * 0.56), hairMat, capacity);
@@ -214,8 +214,8 @@ export class InstancedHumanoidCrowd {
     const legGeometry = new THREE.CapsuleGeometry(0.062, 0.42, 5, 7);
     this.leftLeg = new THREE.InstancedMesh(legGeometry, clothingMat, capacity);
     this.rightLeg = new THREE.InstancedMesh(legGeometry.clone(), clothingMat, capacity);
-    this.status = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.12, 0), statusMat, capacity);
-    this.aura = new THREE.InstancedMesh(new THREE.CircleGeometry(0.18, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.34, depthWrite: false }), capacity);
+    this.status = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.070, 0), statusMat, capacity);
+    this.aura = new THREE.InstancedMesh(new THREE.CircleGeometry(0.070, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.20, depthWrite: false }), capacity);
     this.aura.rotation.x = -Math.PI / 2;
     this.torso.name = 'instanced-humanoid-torsos';
     this.head.name = 'instanced-humanoid-heads';
@@ -268,7 +268,7 @@ export class InstancedHumanoidCrowd {
       const scale = HUMAN_VISUAL_HEIGHT * ageScale * deterministicBuild;
       const stride = state.speed > 0.02 ? Math.sin(state.gait) * 0.52 * state.speed : Math.sin(state.gait * 0.4) * 0.035;
       const armSwing = state.pose === 'gesture' ? Math.sin(state.gait * 1.8) * 0.42 : -stride * 0.85;
-      const statusScale = (state.hospitalized ? 1.55 : state.isolated ? 1.30 : 1 + pulse * (state.health === 'I' ? 0.18 : 0.07)) * scale;
+      const statusScale = (state.hospitalized ? 1.25 : state.isolated ? 1.14 : 1 + pulse * (state.health === 'I' ? 0.10 : 0.04)) * scale;
       const side = scale * 0.18;
 
       this.compose(i, this.torso, state.worldX, scale * 0.92, state.worldZ, this.facing, scale, shirt);
@@ -290,7 +290,7 @@ export class InstancedHumanoidCrowd {
       this.compose(i, this.rightLeg, state.worldX + scale * 0.08, scale * 0.35, state.worldZ, this.composedRotation, scale, pants);
 
       this.compose(i, this.status, state.worldX, scale * 1.95, state.worldZ, this.facing, statusScale, health);
-      this.compose(i, this.aura, state.worldX, 0.024, state.worldZ, this.facing, 1 + pulse * 0.22, health);
+      this.compose(i, this.aura, state.worldX, 0.018, state.worldZ, this.facing, 1 + pulse * 0.12, health);
     }
     for (const mesh of this.meshes) {
       mesh.count = this.count;

@@ -160,7 +160,10 @@ export function useThreeLoop(
             const target = sim.getOrbitTarget();
             const focusDistance = sim.getOrbitFocusDistance?.();
             if (target && focusDistance && focusDistance > 0) {
-              const direction = new THREE.Vector3(1, 0.72, 1).normalize();
+              const presetDirection = sim.getOrbitCameraDirection?.();
+              const direction = presetDirection
+                ? presetDirection.clone().normalize()
+                : new THREE.Vector3(1, 0.72, 1).normalize();
               camera.position.copy(target).addScaledVector(direction, focusDistance);
               camera.lookAt(target);
             }

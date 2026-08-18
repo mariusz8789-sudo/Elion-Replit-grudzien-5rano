@@ -47,7 +47,7 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
   const mat = (color: number, rough = 0.85) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.02 });
   const M = {
     skin: mat(opts.skin ?? 0xf2c9a0), shirt: mat(opts.shirt ?? 0x4a76c4),
-    pants: mat(opts.pants ?? 0x2f3a4c), shoes: mat(opts.shoes ?? 0x22262e), hair: mat(opts.hair ?? 0x2a1e14),
+    pants: mat(opts.pants ?? 0x2f3a4c), shoes: mat(opts.shoes ?? 0x22262e), hair: mat(opts.hair ?? 0x2a1e14), face: mat(0x202b38, 0.72),
   };
   const disposables: THREE_NS.BufferGeometry[] = [];
   const baseShirt = M.shirt.color.clone();
@@ -85,6 +85,15 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
   const head = new THREE.Mesh(headGeo, M.skin); head.position.y = headY - chestY; head.scale.set(0.9, 1.05, 0.95); neck.add(head);
   const hairGeo = new THREE.SphereGeometry(H * 0.079, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.62); disposables.push(hairGeo);
   const hair = new THREE.Mesh(hairGeo, M.hair); hair.position.copy(head.position); hair.position.y += H * 0.012; hair.scale.copy(head.scale); neck.add(hair);
+  // Minimalne cechy twarzy są tylko detalem rigu obserwowanego z bliska; nie reprezentują danych demograficznych ani stanu modelu.
+  const eyeGeo = new THREE.SphereGeometry(H * 0.010, 8, 6); disposables.push(eyeGeo);
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(eyeGeo, M.face);
+    eye.position.set(side * H * 0.025, head.position.y + H * 0.008, H * 0.067);
+    neck.add(eye);
+  }
+  const noseGeo = new THREE.SphereGeometry(H * 0.012, 8, 6); disposables.push(noseGeo);
+  const nose = new THREE.Mesh(noseGeo, M.skin); nose.position.set(0, head.position.y - H * 0.010, H * 0.075); neck.add(nose);
 
   // Ramiona: bark → łokieć → dłoń.
   const arm = (side: number) => {

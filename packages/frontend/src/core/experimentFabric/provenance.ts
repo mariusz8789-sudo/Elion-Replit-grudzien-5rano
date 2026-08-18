@@ -30,6 +30,7 @@ export function fingerprintExperimentPlan(plan: ExperimentPlan): string {
   return `plan_${fnv1a(canonicalJson({
     request: stableRequest(plan.intent.request),
     capability: plan.intent.capability,
+    supplementalKnowledgeIds: plan.intent.supplementalKnowledgeIds,
     engine: plan.engine,
     modelVersion: plan.modelVersion,
     parameterSchema: plan.parameterSchema,
@@ -60,6 +61,7 @@ export function createExperimentProvenance(input: {
   plan: ExperimentPlan;
   result: ExperimentResult;
   knowledgeSources: readonly KnowledgeCorpusFile[];
+  supplementalKnowledgeIds: readonly string[];
   deterministic: boolean;
 }): ExperimentProvenance {
   const requestFingerprint = fingerprintStructuredRequest(input.request);
@@ -76,6 +78,7 @@ export function createExperimentProvenance(input: {
     requestFingerprint,
     runFingerprint,
     knowledgeSources: input.knowledgeSources,
+    supplementalKnowledgeIds: input.supplementalKnowledgeIds,
     domainId: input.request.domainId,
     modelId: input.request.modelId,
     modelVersion: input.plan.modelVersion ?? undefined,

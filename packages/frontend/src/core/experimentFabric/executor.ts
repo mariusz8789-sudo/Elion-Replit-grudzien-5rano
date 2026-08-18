@@ -1,9 +1,17 @@
+import { atomCount, degreeOfUnsaturation, molecularWeight, parseFormula } from '../compute/cheminformatics';
 import { buildPumpPipeModel } from '../engineeringGraph/pumpPipe';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
+import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
 import { buildBohrModelGraph } from '../modelGraph/bohrModelGraph';
+import { buildChemistryKineticsGraph } from '../modelGraph/chemistryKineticsGraph';
+import { buildGaussianGraph } from '../modelGraph/gaussianGraph';
+import { buildLogisticGrowthGraph } from '../modelGraph/logisticGrowthGraph';
+import { buildNuclearModelGraph } from '../modelGraph/nuclearGraph';
 import { buildOrbitalModelGraph } from '../modelGraph/orbitalGraph';
+import { buildRelativisticEnergyGraph } from '../modelGraph/relativisticEnergyGraph';
+import { buildSpecialRelativityGraph } from '../modelGraph/specialRelativityGraph';
 import { buildPhotonGraph } from '../modelGraph/photonGraph';
-import { schwarzschildRadius } from '../physics';
+import { chirpMassSolar, iscoFrequency, kardashevPower, schwarzschildRadius } from '../physics';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS } from '../simulation/epidemicCity';
 import { createExperimentProvenance, statusForCapability } from './provenance';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
@@ -18,6 +26,13 @@ import {
 } from './types';
 
 const SOLAR_MASS_KG = 1.989e30;
+
+type ExecutableGraph = {
+  getParameterNodeIds(): readonly string[];
+  applyParameterSnapshot(snapshot: Record<string, number>): void;
+  getValue(id: string): number;
+  getNode(id: string): { unit: string; honestyNote: string } | undefined;
+};
 
 function routeForUnavailable(): ExperimentRoute { return { kind: 'none' }; }
 
@@ -45,7 +60,7 @@ function rejectedResult(errors: readonly string[]): ExperimentResult {
 }
 
 function graphOutputs(
-  graph: ReturnType<typeof buildOrbitalModelGraph> | ReturnType<typeof buildBohrModelGraph> | ReturnType<typeof buildPhotonGraph>,
+  graph: ExecutableGraph,
   params: Record<string, ExperimentValue>,
   outputIds: readonly string[],
 ): { outputs: Record<string, number>; units: Record<string, string>; assumptions: string[] } {
@@ -104,6 +119,97 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Obliczono energię i częstotliwość fotonu z długości fali.',
         outputs: details.outputs, units: details.units, warnings: [], validity: 'Model opisuje pojedynczy foton E = hc/λ, nie pole elektromagnetyczne.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'nuclear-semf': {
+      const details = graphOutputs(buildNuclearModelGraph(), params, ['massNumber', 'bindingEnergy', 'bindingPerNucleon', 'stabilityGradient']);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący model jądrowy SEMF.',
+        outputs: details.outputs, units: details.units, warnings: [], validity: 'Model kroplowy; pomija efekty powłokowe.',
+        assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'sr-lorentz': {
+      const details = graphOutputs(buildSpecialRelativityGraph(), params, ['lorentzGammaFactor', 'dilatedTimeSeconds', 'contractedLengthMeters', 'dopplerApproaching']);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący graf szczególnej teorii względności.',
+        outputs: details.outputs, units: details.units, warnings: [], validity: 'Ruch inercjalny wzdłuż jednej osi; β < 1.',
+        assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'universe-atmospheric-escape': {
+      const details = graphOutputs(buildAtmosphericEscapeGraph(), params, ['equilibriumTempK', 'escapeVelocityMs', 'thermalVelocityMs', 'jeansParameter', 'thermalToEscapeRatio']);
+      const lambda = details.outputs.jeansParameter;
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący model ucieczki atmosferycznej Jeansa.',
+        outputs: details.outputs, units: details.units,
+        warnings: lambda < 15 ? ['Parametr Jeansa < 15: przybliżenie stabilnej atmosfery nie obowiązuje.'] : [],
+        validity: 'Ucieczka termiczna Jeansa; bez efektu cieplarnianego, hydrodynamiki i wiatru gwiazdowego.',
+        assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'particle-relativistic-energy': {
+      const details = graphOutputs(buildRelativisticEnergyGraph(), params, ['lorentzGammaFactor', 'totalEnergyMeV', 'kineticEnergyMeV', 'momentumMeVc']);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący model energii relatywistycznej cząstki.',
+        outputs: details.outputs, units: details.units, warnings: [], validity: 'Cząstka swobodna w próżni; β < 1.',
+        assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'chemistry-arrhenius': {
+      const details = graphOutputs(buildChemistryKineticsGraph(), params, ['rateConstant', 'halfLifeFirstOrder', 'speedupVsRoom']);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący graf kinetyki Arrheniusa.',
+        outputs: details.outputs, units: details.units, warnings: [], validity: 'Stały czynnik A i energia aktywacji; model reakcji I rzędu dla t½.',
+        assumptions: details.assumptions, visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'math-gaussian': {
+      const details = graphOutputs(buildGaussianGraph(), params, ['zScore', 'pdfValue', 'probWithinZ']);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący graf rozkładu normalnego.',
+        outputs: details.outputs, units: details.units, warnings: [], validity: 'σ > 0; rozkład normalny.',
+        assumptions: details.assumptions, visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'biology-logistic': {
+      const details = graphOutputs(buildLogisticGrowthGraph(), params, ['populationAtT', 'fractionOfCapacity']);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący model wzrostu logistycznego.',
+        outputs: details.outputs, units: details.units, warnings: [], validity: 'Stałe r i K; bez struktury wiekowej, opóźnień i stochastyki.',
+        assumptions: details.assumptions, visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'einstein-chirp-mass': {
+      const m1Solar = numberParam(params, 'm1Solar', 30);
+      const m2Solar = numberParam(params, 'm2Solar', 30);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Obliczono istniejącą funkcję masy chirp i częstotliwości ISCO.',
+        outputs: { chirpMassSolar: chirpMassSolar(m1Solar, m2Solar), iscoFrequencyHz: iscoFrequency(m1Solar + m2Solar) },
+        units: { chirpMassSolar: 'M☉', iscoFrequencyHz: 'Hz' }, warnings: [],
+        validity: 'Przybliżenie punktowe inspiralu; ISCO Schwarzschilda przed połączeniem.',
+        assumptions: ['Brak spinu i pełnej numerycznej relatywistyki.'], visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'chem-molecular-weight': {
+      const formula = typeof params.formula === 'string' ? params.formula : 'H2O';
+      const parsed = parseFormula(formula);
+      if (!parsed.ok) throw new Error(parsed.error ?? 'Niepoprawny wzór sumaryczny.');
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Obliczono masę molową z istniejącego parsera wzoru sumarycznego.',
+        outputs: { molarMassGmol: molecularWeight(parsed.counts), atomCount: atomCount(parsed.counts), degreeOfUnsaturation: degreeOfUnsaturation(parsed.counts) },
+        units: { molarMassGmol: 'g/mol', atomCount: '', degreeOfUnsaturation: '' }, warnings: [],
+        validity: 'Wzory bez nawiasów, hydratów i izotopów; stopień nienasycenia dla CHNOX.',
+        assumptions: ['Parser cheminformatyczny Genesis v1.'], visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'civilization-kardashev': {
+      const kardashevType = numberParam(params, 'kardashevType', 1);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Obliczono istniejącą klasyfikacyjną skalę mocy Kardaszewa.',
+        outputs: { powerWatts: kardashevPower(kardashevType) }, units: { powerWatts: 'W' }, warnings: [],
+        validity: 'Skala klasyfikacyjna Sagana; ekstrapolacja interpretacyjna, nie prognoza społeczna.',
+        assumptions: ['P = 10^(10K+6) W.'], visualization: ['numeric', 'graph', 'narrative'], route: model.route,
       };
     }
     case 'water-pump-pipe': {
@@ -194,7 +300,9 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
     }
   }
   const provenance = createExperimentProvenance({
-    request, plan, result, knowledgeSources: intent.knowledgeSources, deterministic: result.status === 'completed',
+    request, plan, result, knowledgeSources: intent.knowledgeSources,
+    supplementalKnowledgeIds: intent.supplementalKnowledgeIds,
+    deterministic: result.status === 'completed',
   });
   const run: ExperimentRun = {
     contractVersion: EXPERIMENT_FABRIC_VERSION,

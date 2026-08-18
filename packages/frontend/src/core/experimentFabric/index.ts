@@ -55,3 +55,26 @@ export {
   type DiscoveryFinding,
   type DiscoveryAnalysis,
 } from './discovery';
+
+export {
+  SCIENTIFIC_DISCOVERY_VERSION,
+  type HypothesisAssessment,
+  type ExperimentArmKind,
+  type ReproductionVerdict,
+  type FalsificationCriterion,
+  type ScientificHypothesis,
+  type ExperimentArm,
+  type ScientificExperimentDesign,
+  type ExperimentArmEvidence,
+  type HypothesisAssessmentEvidence,
+  type ScientificEvidenceChain,
+  type ParameterSweepSpec,
+  type CrossDomainLink,
+  type HypothesisProposal,
+  type ScientificExperimentInput,
+} from './scientificDiscovery';
+
+export { designScientificExperiment } from './scientificPlanner';
+export { executeScientificExperiment } from './scientificExecutor';
+export { EVIDENCE_PACK_VERSION, createScientificEvidencePack, serializeScientificEvidencePack, type EvidencePackRun, type ScientificEvidencePack } from './evidencePack';
+export { GENESIS_SPATIAL_DATASET_VERSION, OSM_ATTRIBUTION, OSM_LICENSE, normalizeOsmMapXml, importOsmMap, type SpatialLayer, type LonLat, type GenesisSpatialFeature, type GenesisSpatialDataset, type OsmMapImportRequest } from './spatialImport';

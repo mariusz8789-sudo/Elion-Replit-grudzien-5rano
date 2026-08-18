@@ -95,12 +95,12 @@ const ENGINE_ADAPTERS: readonly ExternalAdapterManifest[] = [
 
 const SPATIAL_IMPORTS: readonly SpatialImportManifest[] = [
   {
-    contractVersion: EXTERNAL_ADAPTER_CONTRACT_VERSION, id: 'osm-overpass', title: 'OpenStreetMap / Overpass import', status: 'NOT_CONFIGURED',
+    contractVersion: EXTERNAL_ADAPTER_CONTRACT_VERSION, id: 'osm-overpass', title: 'OpenStreetMap / Overpass import', status: 'REQUIRES_VALIDATION',
     primaryDocumentation: 'https://dev.overpass-api.de/overpass-doc/en/preface/preface.html', sourceLicenseOrTerms: 'Wymaga utrwalenia licencji, atrybucji i timestampu źródła dla każdej paczki.',
     supportedLayers: ['buildings', 'roads', 'rail', 'water', 'boundaries'],
     requiredRequestFields: ['bbox', 'crs', 'sourceTimestamp', 'sourceQuery', 'license', 'attribution'], normalizedOutput: 'GenesisSpatialDataset@1.0.0',
     requiredProvenance: ['Overpass endpoint', 'query hash', 'OSM base timestamp', 'bbox', 'CRS', 'attribution', 'normalized artifact hash'],
-    limitation: 'Nie wykonuje zapytań i nie zasila jeszcze World Engine; import wymaga limitów, cache oraz walidacji geometrii.',
+    limitation: 'Minimalny importer oficjalnego OSM Map API pobiera ograniczony bbox i normalizuje drogi/budynki/wodę z pełnym provenance. Overpass, relacje, cache produkcyjny, walidacja geometrii i podłączenie do WorldAdapter wymagają osobnego etapu.',
   },
   {
     contractVersion: EXTERNAL_ADAPTER_CONTRACT_VERSION, id: 'usgs-national-map', title: 'USGS National Map / DEM import', status: 'NOT_CONFIGURED',

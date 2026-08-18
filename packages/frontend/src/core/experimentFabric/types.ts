@@ -35,6 +35,8 @@ export interface ExperimentIntent {
   rationale: string;
   requiredSolver: string;
   knowledgeSources: readonly KnowledgeCorpusFile[];
+  /** Additive, source-bound records; they never upgrade a model capability. */
+  supplementalKnowledgeIds: readonly string[];
 }
 
 /** Immutable plan presented or consumed before a real engine is called. */
@@ -72,6 +74,7 @@ export interface ExperimentProvenance {
   requestFingerprint: string;
   runFingerprint: string;
   knowledgeSources: readonly KnowledgeCorpusFile[];
+  supplementalKnowledgeIds: readonly string[];
   domainId: string;
   modelId?: string;
   modelVersion?: string;

@@ -4,6 +4,7 @@ import {
   type KnowledgeCapability,
   type KnowledgeCorpusFile,
 } from '../knowledge/registry';
+import { findSupplementalKnowledge } from '../knowledge/supplementalRegistry';
 import { fingerprintExperimentPlan } from './provenance';
 import {
   EXPERIMENT_FABRIC_VERSION,
@@ -32,6 +33,8 @@ export interface RouterModel {
 
 const number = (id: string, label: string, unit: string, min: number, max: number, defaultValue: number): ExperimentParameterSpec =>
   ({ id, label, unit, type: 'number', required: false, min, max, default: defaultValue });
+const text = (id: string, label: string, defaultValue: string): ExperimentParameterSpec =>
+  ({ id, label, unit: '', type: 'string', required: false, default: defaultValue });
 
 const ROUTER_MODELS: readonly RouterModel[] = [
   {
@@ -78,6 +81,66 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     parameters: [number('r0', 'Liczba reprodukcji R₀', '', 0, 20, 2.5), number('horizonDays', 'Horyzont symulacji', 'dni', 1, 365, 90), number('nAgents', 'Liczba agentów', 'osób', 10, 10000, 260)],
     route: { kind: 'live-world', target: 'epidemic-city', hash: '#/hf-slice' }, knowledgeSources: ['biology.md'],
     rationale: 'Realny agentowy EpidemicCitySimulation; renderer zachowuje się jako konsument read-only tego samego świata.',
+  },
+  {
+    id: 'nuclear-semf', domainId: 'nuclear', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
+    parameters: [number('protonNumber', 'Liczba protonów Z', '', 1, 118, 26), number('neutronNumber', 'Liczba neutronów N', '', 0, 180, 30)],
+    route: { kind: 'lab', labId: 'nuclear' }, knowledgeSources: ['nuclear.md', 'particle.md'],
+    rationale: 'Realny graf SEMF; model kroplowy energii wiązania, bez efektów powłokowych.',
+  },
+  {
+    id: 'sr-lorentz', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
+    parameters: [number('velocityFraction', 'Prędkość β = v/c', '', 0, 0.999999, 0.8), number('properTimeSeconds', 'Czas własny', 's', 0, 1e9, 1), number('restLengthMeters', 'Długość spoczynkowa', 'm', 0, 1e12, 1)],
+    route: { kind: 'lab', labId: 'einstein' }, knowledgeSources: ['spacetime-einstein.md'],
+    rationale: 'Realny graf Lorentza dla ruchu inercjalnego w jednej osi.',
+  },
+  {
+    id: 'einstein-chirp-mass', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-physics@1.0.0',
+    parameters: [number('m1Solar', 'Masa obiektu 1', 'M☉', 0.1, 1e3, 30), number('m2Solar', 'Masa obiektu 2', 'M☉', 0.1, 1e3, 30)],
+    route: { kind: 'lab', labId: 'einstein' }, knowledgeSources: ['spacetime-einstein.md'],
+    rationale: 'Realna funkcja masy chirp i częstotliwości ISCO w zakresie inspiralu.',
+  },
+  {
+    id: 'universe-atmospheric-escape', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
+    parameters: [number('stellarLuminositySolar', 'Jasność gwiazdy', 'L☉', 0.01, 100, 1), number('orbitalDistanceAu', 'Odległość orbitalna', 'AU', 0.05, 30, 1), number('planetAlbedo', 'Albedo', '', 0, 0.9, 0.3), number('planetMassEarth', 'Masa planety', 'M⊕', 0.01, 300, 1), number('planetRadiusEarth', 'Promień planety', 'R⊕', 0.1, 12, 1), number('moleculeMassAmu', 'Masa cząsteczki', 'u', 1, 50, 18)],
+    route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['universe.md', 'thermodynamics.md', 'chemistry.md'],
+    rationale: 'Realny graf ucieczki termicznej Jeansa; nie jest pełnym modelem klimatu.',
+  },
+  {
+    id: 'particle-relativistic-energy', domainId: 'particle', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
+    parameters: [number('restMassMeV', 'Masa spoczynkowa', 'MeV/c²', 0, 1e6, 0.511), number('velocityFraction', 'Prędkość β = v/c', '', 0, 0.999999, 0.866)],
+    route: { kind: 'lab', labId: 'particle' }, knowledgeSources: ['particle.md', 'spacetime-einstein.md'],
+    rationale: 'Realny graf energii relatywistycznej cząstki swobodnej.',
+  },
+  {
+    id: 'chemistry-arrhenius', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
+    parameters: [number('temperatureK', 'Temperatura', 'K', 200, 1000, 350), number('activationEnergyKJ', 'Energia aktywacji', 'kJ/mol', 0, 300, 60), number('preExponentialLog10', 'log₁₀ A', 'log₁₀(1/s)', -10, 25, 11)],
+    route: { kind: 'lab', labId: 'chemistry' }, knowledgeSources: ['chemistry.md', 'thermodynamics.md'],
+    rationale: 'Realny graf kinetyki Arrheniusa; trend, nie pełny mechanizm reakcji.',
+  },
+  {
+    id: 'chem-molecular-weight', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-cheminformatics@1.0.0',
+    parameters: [text('formula', 'Wzór sumaryczny', 'H2O')],
+    route: { kind: 'lab', labId: 'chemistry' }, knowledgeSources: ['chemistry.md'],
+    rationale: 'Realny parser prostego wzoru i obliczenie masy molowej; nie obsługuje nawiasów ani izotopów.',
+  },
+  {
+    id: 'math-gaussian', domainId: 'mathematics', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
+    parameters: [number('mean', 'Średnia μ', '', -100, 100, 0), number('sigma', 'Odchylenie σ', '', 0.001, 100, 1), number('xValue', 'Wartość x', '', -100, 100, 1)],
+    route: { kind: 'lab', labId: 'mathematics' }, knowledgeSources: ['mathematics.md'],
+    rationale: 'Realny graf rozkładu normalnego.',
+  },
+  {
+    id: 'biology-logistic', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
+    parameters: [number('growthRate', 'Tempo wzrostu r', '1/czas', 0, 5, 0.5), number('carryingCapacity', 'Pojemność K', 'osobn.', 1, 1e9, 1000), number('initialPopulation', 'Populacja początkowa N₀', 'osobn.', 1, 1e9, 10), number('timeElapsed', 'Czas t', 'czas', 0, 1000, 10)],
+    route: { kind: 'lab', labId: 'biology' }, knowledgeSources: ['biology.md', 'mathematics.md'],
+    rationale: 'Realny graf wzrostu logistycznego populacji.',
+  },
+  {
+    id: 'civilization-kardashev', domainId: 'civilization', modelVersion: '1.0.0', engine: 'genesis-physics@1.0.0',
+    parameters: [number('kardashevType', 'Typ Kardaszewa K', '', 0, 3, 1)],
+    route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['civilization.md', 'universe.md'],
+    rationale: 'Realna funkcja klasyfikacyjnej skali mocy Kardaszewa; nie jest prognozą społeczną.',
   },
 ] as const;
 
@@ -126,6 +189,7 @@ function intentSources(request: StructuredExperimentRequest, model?: RouterModel
 
 export function createExperimentIntent(request: StructuredExperimentRequest): ExperimentIntent {
   const model = request.modelId ? getRouterModel(request.modelId) : undefined;
+  const supplementalKnowledgeIds = findSupplementalKnowledge(request.sourceText).map((entry) => entry.id);
   const domain = getKnowledgeDomain(request.domainId);
   let capability: KnowledgeCapability = 'ENGINE_NOT_AVAILABLE';
   let rationale = 'Nie znaleziono zarejestrowanego modelu ani bezpiecznego adaptera dla tej prośby.';
@@ -135,8 +199,10 @@ export function createExperimentIntent(request: StructuredExperimentRequest): Ex
     rationale = model.rationale;
     requiredSolver = model.engine;
   } else if (domain) {
-    capability = domain.capability;
-    rationale = domain.assumptions[0] ?? 'Domena jest zarejestrowana w corpus Genesis.';
+    capability = domain.capability === 'REAL_ENGINE' ? 'ENGINE_NOT_AVAILABLE' : domain.capability;
+    rationale = domain.capability === 'REAL_ENGINE'
+      ? `Domena zawiera działające modele, ale prośba nie wskazuje zarejestrowanego adaptera dla tego zjawiska. ${domain.assumptions[0] ?? ''}`
+      : (domain.assumptions[0] ?? 'Domena jest zarejestrowana w corpus Genesis.');
     requiredSolver = domain.requiredSolver;
   } else if (request.domainId === 'hazard-cascade') {
     capability = 'ENGINE_NOT_AVAILABLE';
@@ -151,6 +217,7 @@ export function createExperimentIntent(request: StructuredExperimentRequest): Ex
     rationale,
     requiredSolver,
     knowledgeSources: intentSources(request, model),
+    supplementalKnowledgeIds,
   };
 }
 

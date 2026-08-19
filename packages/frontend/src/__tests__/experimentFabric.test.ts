@@ -284,6 +284,16 @@ describe('Genesis Experiment Fabric', () => {
     expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
   });
 
+  it('runs bounded 1D split-step tunneling through Fabric without claiming a general Schrödinger solver', () => {
+    const run = runExperiment(parseScienceChatMessage('Zasymuluj tunelowanie kwantowe.'));
+    expect(run.request.modelId).toBe('quantum-tunneling-1d');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'quantum', experimentId: 'tunneling' });
+    expect(Number(run.result.outputs.transmission)).toBeGreaterThanOrEqual(0);
+    expect(Number(run.result.outputs.reflection)).toBeGreaterThanOrEqual(0);
+    expect(run.result.validity).toContain('nie jest ogólnym solverem Schrödingera');
+  });
+
   it('runs the local single-qubit Bloch circuit through Fabric without claiming hardware or entanglement', () => {
     const command = 'Wykonaj obwód kubitowy: H X.';
     const run = runExperiment(parseScienceChatMessage(command));
@@ -703,11 +713,11 @@ describe('Genesis Experiment Fabric', () => {
     clearExperimentWorldHandoffs();
   });
 
-  it('never fabricates a tunnelling solver or an urban hazard cascade', () => {
+  it('runs bounded tunnelling but never fabricates an urban hazard cascade', () => {
     const quantum = runExperiment(parseScienceChatMessage('Zasymuluj tunelowanie kwantowe.'));
-    expect(quantum.result.status).toBe('capability_seam');
-    expect(quantum.result.outputs).toEqual({});
-    expect(quantum.result.summary).toContain('Wymagany solver');
+    expect(quantum.result.status).toBe('completed');
+    expect(quantum.result.outputs.transmission).toBeTypeOf('number');
+    expect(quantum.result.validity).toContain('nie jest ogólnym solverem Schrödingera');
 
     const flood = runExperiment(parseScienceChatMessage('Zasymuluj kaskadę: powódź → infrastruktura → epidemia.'));
     expect(flood.result.status).toBe('engine_not_available');

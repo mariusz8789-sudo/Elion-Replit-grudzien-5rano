@@ -235,6 +235,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny, analitycznie minimalizowany bulk model BdG łańcucha Kitaeva; nie jest symulacją nanodrutu, materiału ani urządzenia Majorana 1.',
   },
   {
+    id: 'quantum-tunneling-1d', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-split-step-fft@1.0.0',
+    parameters: [number('energy', 'Energia / wysokość bariery', '', 0.2, 1.6, 0.55), number('barrier', 'Wysokość bariery', 'j. nat.', 0.4, 2.5, 1), number('width', 'Szerokość bariery', 'j. nat.', 1, 8, 3)],
+    route: { kind: 'lab', labId: 'quantum', experimentId: 'tunneling' }, knowledgeSources: ['quantum.md'],
+    rationale: 'Istniejący 1D split-step Fourier dla pakietu Gaussa i bariery prostokątnej, ħ=m=1; nie jest ogólnym solverem Schrödingera, modelem 3D ani symulacją materiału.',
+  },
+  {
     id: 'quantum-bloch-circuit', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-single-qubit@1.0.0',
     parameters: [text('circuit', 'Sekwencja bramek jednokubitowych', 'H X')],
     route: { kind: 'lab', labId: 'quantum', experimentId: 'bloch' }, knowledgeSources: ['quantum.md'],

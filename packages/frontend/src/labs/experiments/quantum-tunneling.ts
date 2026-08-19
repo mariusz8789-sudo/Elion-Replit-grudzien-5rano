@@ -110,6 +110,20 @@ class TunnelingSim implements Sim {
     this.launch(this.lastE, this.lastV0, this.lastW);
   };
 
+  /** Bounded, deterministyczny run tego samego solvera split-step co Canvas. */
+  runScenario({ energy = 0.55, barrier = 1, width = 3, frames = 1200 }: {
+    energy?: number; barrier?: number; width?: number; frames?: number;
+  } = {}) {
+    if (!Number.isFinite(energy) || energy < 0.2 || energy > 1.6) throw new Error('energy musi mieścić się w zakresie 0.2–1.6.');
+    if (!Number.isFinite(barrier) || barrier < 0.4 || barrier > 2.5) throw new Error('barrier musi mieścić się w zakresie 0.4–2.5.');
+    if (!Number.isFinite(width) || width < 1 || width > 8) throw new Error('width musi mieścić się w zakresie 1–8.');
+    if (!Number.isInteger(frames) || frames < 1 || frames > 2400) throw new Error('frames musi być liczbą całkowitą z zakresu 1–2400.');
+    this.launch(energy, barrier, width);
+    for (let frame = 0; frame < frames; frame++) this.step(0.02);
+    this.measure();
+    return { energy, barrier, width, frames, transmission: this.trans, reflection: this.refl, remainingProbability: Math.max(0, 1 - this.trans - this.refl) };
+  }
+
   update(dt: number, p: SimParams) {
     const eFrac = Number(p.energy);
     const v0 = Number(p.barrier);
@@ -121,11 +135,15 @@ class TunnelingSim implements Sim {
     const steps = Math.min(6, Math.max(1, Math.round(dt * 240)));
     const dts = 0.02;
     for (let s = 0; s < steps; s++) this.step(dts);
+    this.measure();
+  }
+
+  private measure() {
     // prawdopodobieństwa: za barierą / przed barierą
     let t = 0;
     let r = 0;
-    const bEnd = Math.floor(((L / 2 + w / 2) / L) * N);
-    const bStart = Math.floor(((L / 2 - w / 2) / L) * N);
+    const bEnd = Math.floor(((L / 2 + this.lastW / 2) / L) * N);
+    const bStart = Math.floor(((L / 2 - this.lastW / 2) / L) * N);
     for (let i = 0; i < N; i++) {
       const d = (this.re[i] ** 2 + this.im[i] ** 2) * DX;
       if (i > bEnd) t += d;
@@ -261,6 +279,12 @@ class TunnelingSim implements Sim {
       refl: Math.round(this.refl * 1000) / 10,
     };
   }
+}
+
+/** Eksportowalny kontrakt dla Fabric, wykonujący dokładnie ten sam `TunnelingSim`. */
+export function runTunnelingScenario(input: { energy?: number; barrier?: number; width?: number; frames?: number } = {}) {
+  const sim = new TunnelingSim();
+  return sim.runScenario(input);
 }
 
 export const quantumTunneling: ExperimentDef = {

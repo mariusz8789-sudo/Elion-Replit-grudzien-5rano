@@ -206,7 +206,8 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/\b(majorana\s*1|topoconductor|urządzenie majorana|urzadzenie majorana)\b/.test(normalized)) return request('quantum', undefined, 'graph', []);
   if (/(?:sfera blocha|bloch|bramk[a-ząćęłńóśźż]* kwantow[a-ząćęłńóśźż]*|obw[oó]d kubitow[a-ząćęłńóśźż]*|jednokubitow[a-ząćęłńóśźż]*|hadamard)/.test(normalized)) return request('quantum', 'quantum-bloch-circuit', 'scene-3d', ['circuit']);
   if (/(?:kitaev[a-ząćęłńóśźż]*|łańcuch kitaeva|lancuch kitaeva)/.test(normalized)) return request('quantum', 'quantum-kitaev-bulk', 'graph', ['chemicalPotential', 'hopping', 'pairing']);
-  if (/\b(tunelowanie|równanie schrödingera|rownanie schrodingera)\b/.test(normalized)) return request('quantum', undefined, 'graph', []);
+  if (/\btunelowanie\b/.test(normalized)) return request('quantum', 'quantum-tunneling-1d', 'canvas-2d', ['energy', 'barrier', 'width']);
+  if (/\b(równanie schrödingera|rownanie schrodingera)\b/.test(normalized)) return request('quantum', undefined, 'graph', []);
   if (/\b(fala elektromagnetyczna|maxwell|pole elektromagnetyczne)\b/.test(normalized)) return request('electrodynamics', undefined, 'graph', []);
   if (/\b(termodynam|entropia|ciepło|cieplo)\b/.test(normalized)) return request('thermodynamics', undefined, 'graph', []);
   return request('unknown', undefined, 'narrative', []);

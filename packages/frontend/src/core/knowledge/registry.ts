@@ -178,9 +178,9 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'quantum', title: 'Mechanika kwantowa', sourceFile: 'quantum.md', scale: 'micro',
-    capability: 'CAPABILITY_SEAM', realModels: ['quantum-bloch', 'quantum-bloch-circuit', 'chsh-correlation', 'quantum-kitaev-bulk'],
-    concepts: ['superpozycja', 'interferencja', 'splątanie', 'tunelowanie', 'kubit', 'bramki', 'bulk BdG', 'łańcuch Kitaeva'], parameters: ['theta', 'phi', 'circuit', 'chemicalPotential', 'hopping', 'pairing'], units: ['rad', 'jedn. energii'],
-    assumptions: ['Lokalny model obwodu Blocha liczy dokładne bramki jednokubitowe H, X, Y, Z, S i T od stanu |0⟩ oraz raportuje amplitudy, ale nie losuje pomiaru ani nie obejmuje splątania; Q1 oblicza wyłącznie translacyjnie niezmienny bulk model Kitaeva; solver tunelowania Schrödingera nie jest obecnie uniwersalnym engine.'],
+    capability: 'CAPABILITY_SEAM', realModels: ['quantum-bloch', 'quantum-bloch-circuit', 'quantum-tunneling-1d', 'chsh-correlation', 'quantum-kitaev-bulk'],
+    concepts: ['superpozycja', 'interferencja', 'splątanie', 'tunelowanie', 'kubit', 'bramki', 'bulk BdG', 'łańcuch Kitaeva'], parameters: ['theta', 'phi', 'circuit', 'energy', 'barrier', 'width', 'chemicalPotential', 'hopping', 'pairing'], units: ['rad', 'jedn. energii'],
+    assumptions: ['Lokalny model obwodu Blocha liczy dokładne bramki jednokubitowe H, X, Y, Z, S i T od stanu |0⟩ oraz raportuje amplitudy, ale nie losuje pomiaru ani nie obejmuje splątania; tunelowanie to ograniczony 1D split-step Fourier dla pakietu Gaussa i bariery prostokątnej, nie ogólny solver; Q1 oblicza wyłącznie translacyjnie niezmienny bulk model Kitaeva; solver tunelowania Schrödingera nie jest obecnie uniwersalnym engine.'],
     possibleExperiments: ['wykonaj obwód jednokubitowy Blocha', 'pokaż stan kubitu', 'zbadaj korelację CHSH', 'oblicz bulk gap łańcucha Kitaeva'], requiredSolver: 'single-qubit matrices / quantumState / Schrödinger solver required for tunneling; Q1 Kitaev bulk dostępny dla zdefiniowanego modelu',
     visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['mathematics', 'electrodynamics'], keywords: ['kwant', 'kubit', 'bloch', 'bramka', 'obwód kwantowy', 'splątanie', 'splatanie', 'tunelowanie', 'chsh', 'kitaev', 'majorana'],
   },

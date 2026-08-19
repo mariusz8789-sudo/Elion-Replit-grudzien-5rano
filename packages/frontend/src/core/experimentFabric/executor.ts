@@ -2,6 +2,7 @@ import { atomCount, degreeOfUnsaturation, molecularWeight, parseFormula } from '
 import { buildPumpPipeModel } from '../engineeringGraph/pumpPipe';
 import { solveKitaevBulk } from '../compute/kitaevBulk';
 import { runBlochCircuitScenario } from '../../labs/experiments/quantum-bloch';
+import { runTunnelingScenario } from '../../labs/experiments/quantum-tunneling';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
@@ -489,6 +490,10 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         validity: 'Skala klasyfikacyjna Sagana; ekstrapolacja interpretacyjna, nie prognoza społeczna.',
         assumptions: ['P = 10^(10K+6) W.'], visualization: ['numeric', 'graph', 'narrative'], route: model.route,
       };
+    }
+    case 'quantum-tunneling-1d': {
+      const solved = runTunnelingScenario({ energy: numberParam(params, 'energy', 0.55), barrier: numberParam(params, 'barrier', 1), width: numberParam(params, 'width', 3) });
+      return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Wykonano 1D split-step Fourier: transmisja ${(solved.transmission * 100).toFixed(2)}%, odbicie ${(solved.reflection * 100).toFixed(2)}%.`, outputs: { ...solved }, units: { energy: '', barrier: 'j. nat.', width: 'j. nat.', frames: 'kroki', transmission: '', reflection: '', remainingProbability: '' }, warnings: ['Tłumiąca maska przy brzegach redukuje odbicia numeryczne; pozostałe prawdopodobieństwo obejmuje falę w barierze i absorpcję brzegu.'], validity: 'Pakiet Gaussa 1D i pojedyncza bariera prostokątna, ħ=m=1, N=512; nie jest ogólnym solverem Schrödingera, obliczeniem 3D ani modelem materiałowym.', assumptions: ['Integrator i pomiar są współdzielone z istniejącym Canvasem.', 'Horyzont 1200 kroków jest ustalony dla porównywalnego scenariusza.'], visualization: ['numeric', 'graph', 'canvas-2d'], route: model.route };
     }
     case 'quantum-bloch-circuit': {
       const circuit = typeof params.circuit === 'string' ? params.circuit : 'H X';

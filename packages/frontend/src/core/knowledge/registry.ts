@@ -7,7 +7,7 @@
  * routing, provenance and user explanations.
  */
 
-export const KNOWLEDGE_REGISTRY_VERSION = '1.0.0';
+export const KNOWLEDGE_REGISTRY_VERSION = '1.1.0';
 
 export const KNOWLEDGE_CORPUS_FILES = [
   'README.md',
@@ -113,11 +113,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'classical-mechanics', title: 'Mechanika klasyczna', sourceFile: 'classical-mechanics.md', scale: 'micro-meso',
-    capability: 'REAL_ENGINE', realModels: ['universe-kepler'],
+    capability: 'REAL_ENGINE', realModels: ['universe-kepler', 'universe-three-body', 'universe-double-pendulum', 'universe-lorenz-attractor'],
     concepts: ['Newton', 'Kepler', 'N-body', 'Lagrange', 'Hamilton', 'chaos'],
-    parameters: ['centralMassSolar', 'orbitalRadiusAu'], units: ['M☉', 'AU', 'yr'],
-    assumptions: ['Obecny model orbitalny zakłada dwa ciała i orbitę kołową.'],
-    possibleExperiments: ['oblicz orbitę planety', 'zbadaj problem trzech ciał'], requiredSolver: 'universe-kepler / existing three-body lab',
+    parameters: ['centralMassSolar', 'orbitalRadiusAu', 'preset', 'horizonTime', 'divergence', 'angleDeg', 'horizonSeconds', 'rho'], units: ['M☉', 'AU', 'yr', 's', 'rad'],
+    assumptions: ['Model Keplera zakłada dwa ciała i orbitę kołową; trzy ciała, podwójne wahadło i Lorenz są odrębnymi, ograniczonymi modelami deterministycznymi.'],
+    possibleExperiments: ['oblicz orbitę planety', 'zbadaj problem trzech ciał', 'zbadaj podwójne wahadło', 'uruchom atraktor Lorenza'], requiredSolver: 'universe-kepler / universe-three-body / universe-double-pendulum / universe-lorenz-attractor',
     visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['mathematics'], keywords: ['orbita', 'planeta', 'kepler', 'trzy ciała', 'grawitacja newtona', 'mechanika'],
   },
   {
@@ -219,11 +219,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'universe', title: 'Astrofizyka i kosmologia', sourceFile: 'universe.md', scale: 'cosmic',
-    capability: 'REAL_ENGINE', realModels: ['universe-kepler', 'universe-atmospheric-escape'],
+    capability: 'REAL_ENGINE', realModels: ['universe-kepler', 'universe-atmospheric-escape', 'universe-hubble-tension', 'universe-planet-stability'],
     concepts: ['ΛCDM', 'ekspansja', 'galaktyki', 'ciemna materia', 'soczewkowanie', 'planety'],
-    parameters: ['centralMassSolar', 'orbitalRadiusAu', 'stellarLuminositySolar', 'planetMassEarth'], units: ['AU', 'yr', 'K', 'M☉', 'M⊕'],
-    assumptions: ['Obecne modele są analityczne/uproszczone, nie pełną numeryczną kosmologią.'],
-    possibleExperiments: ['oblicz orbitę planety', 'zbadaj ucieczkę atmosfery'], requiredSolver: 'universe-kepler / universe-atmospheric-escape',
+    parameters: ['centralMassSolar', 'orbitalRadiusAu', 'stellarLuminositySolar', 'planetMassEarth', 'extraSystematic', 'showTrgb', 'years', 'jupiter', 'saturn'], units: ['AU', 'yr', 'K', 'M☉', 'M⊕', 'km/s/Mpc', 'lat'],
+    assumptions: ['Obecne modele są analityczne/uproszczone, nie pełną numeryczną kosmologią; napięcie Hubble’a porównuje ustalone wartości referencyjne, a stabilność planet używa ograniczonego czteroplanetowego modelu N-ciał.'],
+    possibleExperiments: ['oblicz orbitę planety', 'zbadaj ucieczkę atmosfery', 'porównaj napięcie Hubble’a', 'zbadaj stabilność planet'], requiredSolver: 'universe-kepler / universe-atmospheric-escape / universe-hubble-tension / universe-planet-stability',
     visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['classical-mechanics', 'spacetime-einstein'], keywords: ['wszechświat', 'kosmologia', 'planeta', 'orbita', 'atmosfera', 'galaktyka', 'soczewkowanie'],
   },
 ] as const;

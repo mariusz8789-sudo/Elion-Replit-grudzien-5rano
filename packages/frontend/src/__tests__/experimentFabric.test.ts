@@ -121,6 +121,28 @@ describe('Genesis Experiment Fabric', () => {
     expect(insufficient.findings[0]?.verdict).toBe('INSUFFICIENT_DATA');
   });
 
+  it('preregisters and executes a real Lorenz sensitivity protocol after registry-based model admission', () => {
+    const baselineRequest = parseScienceChatMessage('Uruchom atraktor Lorenza: rho=20, horyzont=2, drugi start.');
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'W granicach modelu Lorenza z drugim startem rozjazd końcowy pozostaje dodatni dla prerejestrowanego zakresu ρ.',
+        domainId: 'classical-mechanics', modelId: 'universe-lorenz-attractor', declaredAssumptions: [],
+        falsification: { metric: 'finalSeparation', relation: 'greater-than', expectedValue: 0, rationale: 'Każdy wariant musi pokazać obliczony, dodatni rozjazd dwóch startów.' },
+      },
+      baselineRequest,
+      sweep: { parameter: 'rho', values: [20, 28, 30], label: 'ρ' },
+      repetitionsPerArm: 2,
+    });
+    const evidence = executeScientificExperiment(design);
+
+    expect(design.hypothesis.assessment).toBe('CANDIDATE');
+    expect(evidence.createdFromRealRunsOnly).toBe(true);
+    expect(evidence.arms.every((arm) => arm.reproduction === 'MATCH')).toBe(true);
+    expect(evidence.assessment.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
+    expect(evidence.assessment.message).toContain('nie jest odkrycie');
+    expect(evidence.allRuns.every((run) => run.provenance.modelId === 'universe-lorenz-attractor')).toBe(true);
+  });
+
   it('builds an auditable What-if protocol and Evidence Pack from real Schwarzschild runs only', () => {
     const baselineRequest = parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.');
     const design = designScientificExperiment({

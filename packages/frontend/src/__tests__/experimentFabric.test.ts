@@ -284,6 +284,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
   });
 
+  it('runs bounded Schwarzschild photon geodesic through Fabric without claiming Kerr or ray tracing', () => {
+    const command = 'Zintegruj geodezyjną fotonu wokół czarnej dziury Schwarzschilda.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const spacetime = getKnowledgeDomain('spacetime-einstein');
+
+    expect(run.request.modelId).toBe('einstein-schwarzschild-geodesic');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'einstein', experimentId: 'geodesics' });
+    expect(run.result.outputs.outcome).toBeTypeOf('string');
+    expect(Number(run.result.outputs.criticalImpact)).toBeCloseTo((3 * Math.sqrt(3) / 2) * 26, 12);
+    expect(run.result.validity).toContain('Brak Kerra');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(spacetime?.realModels).toContain('einstein-schwarzschild-geodesic');
+  });
+
   it('runs analytic CHSH singlet correlation through Fabric without claiming a detector experiment', () => {
     const command = 'Oblicz korelację CHSH dla nierówności Bella.';
     const run = runExperiment(parseScienceChatMessage(command));

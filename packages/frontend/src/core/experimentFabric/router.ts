@@ -46,6 +46,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny wzór Schwarzschilda dla nieobracającej się, nie naładowanej czarnej dziury.',
   },
   {
+    id: 'einstein-schwarzschild-geodesic', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-schwarzschild-rk4@1.0.0',
+    parameters: [number('impact', 'Parametr zderzenia b/bₖ', '', 0.5, 2.2, 1.1)],
+    route: { kind: 'lab', labId: 'einstein', experimentId: 'geodesics' }, knowledgeSources: ['spacetime-einstein.md'],
+    rationale: 'Istniejąca geodezyjna zerowa Schwarzschilda w płaszczyźnie równikowej, całkowana współdzielonym RK4; nie jest Kerr, 3D ray tracingiem ani modelem dysku.',
+  },
+  {
     id: 'universe-kepler', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('centralMassSolar', 'Masa centralna', 'M☉', 0.01, 1e9, 1), number('orbitalRadiusAu', 'Promień orbity', 'AU', 0.001, 1e5, 1)],
     route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['universe.md', 'classical-mechanics.md'],

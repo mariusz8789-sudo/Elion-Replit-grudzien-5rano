@@ -202,11 +202,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'spacetime-einstein', title: 'Czasoprzestrzeń i Einstein', sourceFile: 'spacetime-einstein.md', scale: 'cosmic',
-    capability: 'REAL_ENGINE', realModels: ['sr-lorentz', 'einstein-schwarzschild', 'einstein-chirp-mass'],
+    capability: 'REAL_ENGINE', realModels: ['sr-lorentz', 'einstein-schwarzschild', 'einstein-schwarzschild-geodesic', 'einstein-chirp-mass'],
     concepts: ['SR', 'GR', 'Schwarzschild', 'geodezyjna', 'czarna dziura', 'fale grawitacyjne'],
-    parameters: ['velocityFraction', 'massSolar', 'm1Solar', 'm2Solar'], units: ['s', 'm', 'km', 'M☉', 'Hz'],
-    assumptions: ['Schwarzschild nie uwzględnia spinu/ładunku; inspiral jest ograniczony do zakresu przed połączeniem.'],
-    possibleExperiments: ['oblicz promień Schwarzschilda', 'oblicz dylatację czasu', 'oblicz masę chirp'], requiredSolver: 'sr-lorentz / einstein functions',
+    parameters: ['velocityFraction', 'massSolar', 'impact', 'm1Solar', 'm2Solar'], units: ['s', 'm', 'km', 'M☉', 'Hz'],
+    assumptions: ['Schwarzschild nie uwzględnia spinu/ładunku; geodezyjna jest pojedynczym promieniem w płaszczyźnie równikowej bez Kerra, ray tracingu 3D i fizyki dysku; inspiral jest ograniczony do zakresu przed połączeniem.'],
+    possibleExperiments: ['oblicz promień Schwarzschilda', 'zintegruj geodezyjną fotonu Schwarzschilda', 'oblicz dylatację czasu', 'oblicz masę chirp'], requiredSolver: 'sr-lorentz / einstein functions',
     visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['classical-mechanics', 'universe'], keywords: ['czarna dziura', 'schwarzschild', 'czasoprzestrzeń', 'czasoprzestrzen', 'dylatacja', 'einstein', 'grawitacyj'],
   },
   {

@@ -4,6 +4,7 @@ import { solveKitaevBulk } from '../compute/kitaevBulk';
 import { runBlochCircuitScenario } from '../../labs/experiments/quantum-bloch';
 import { runTunnelingScenario } from '../../labs/experiments/quantum-tunneling';
 import { runChshCorrelationScenario } from '../../labs/experiments/quantum-chsh';
+import { runSchwarzschildGeodesicScenario } from '../../labs/experiments/einstein-geodesics';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
@@ -99,6 +100,10 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
   if (!model) throw new Error('Brak lokalnego adaptera realnego modelu.');
   const params = request.parameters;
   switch (model.id) {
+    case 'einstein-schwarzschild-geodesic': {
+      const solved = runSchwarzschildGeodesicScenario({ impact: numberParam(params, 'impact', 1.1) });
+      return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Zintegrowano geodezyjną zerową: ${solved.outcome === 'captured' ? 'foton został pochłonięty' : solved.outcome === 'escaped' ? 'foton uciekł' : 'osiągnięto limit integracji'}.`, outputs: solved, units: { impact: '', b: 'jedn. ekranu', criticalImpact: 'jedn. ekranu', outcome: '', steps: 'kroki RK4', minRadius: 'jedn. ekranu', turns: 'obroty' }, warnings: ['Model dotyczy pojedynczego promienia w płaszczyźnie równikowej; rendering dysku jest poza wynikiem obliczeniowym.'], validity: 'Równanie geodezyjnej zerowej Schwarzschilda w płaszczyźnie równikowej, rozwiązywane istniejącym krokiem RK4. Brak Kerra, ray tracingu 3D, pełnego soczewkowania obrazu i fizyki dysku.', assumptions: ['Promień Schwarzschilda jest jednostką wizualnego scenariusza, nie estymacją masy obserwowanej czarnej dziury.', 'Klasyfikacja opiera się na istniejących progach horyzontu i ucieczki Canvasu.'], visualization: ['numeric', 'graph', 'canvas-2d'], route: model.route };
+    }
     case 'einstein-schwarzschild': {
       const massSolar = typeof params.massSolar === 'number' ? params.massSolar : 1;
       const radiusMeters = schwarzschildRadius(massSolar * SOLAR_MASS_KG);

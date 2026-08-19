@@ -149,6 +149,30 @@ class GeodesicSim implements Sim {
   }
 }
 
+export function runSchwarzschildGeodesicScenario({ impact = 1.1, maxSteps = 6000 }: { impact?: number; maxSteps?: number } = {}) {
+  if (!Number.isFinite(impact) || impact < 0.5 || impact > 2.2) throw new Error('impact musi mieścić się w zakresie 0.5–2.2.');
+  if (!Number.isInteger(maxSteps) || maxSteps < 1 || maxSteps > 12000) throw new Error('maxSteps musi mieścić się w zakresie 1–12000.');
+  const criticalImpact = (3 * Math.sqrt(3) / 2) * RS;
+  const b = criticalImpact * impact;
+  const r0 = RS * 40;
+  const phi0 = Math.PI - Math.asin(Math.min(1, b / r0));
+  let u = Math.sin(phi0) / b;
+  let du = Math.cos(phi0) / b;
+  let phi = phi0;
+  let minRadius = 1 / u;
+  for (let step = 1; step <= maxSteps; step++) {
+    const next = stepSchwarzschildGeodesic(u, du, -0.02, RS);
+    u = next.u;
+    du = next.du;
+    phi -= 0.02;
+    const radius = 1 / u;
+    minRadius = Math.min(minRadius, radius);
+    if (u > 1 / (RS * 1.01)) return { impact, b, criticalImpact, outcome: 'captured' as const, steps: step, minRadius, turns: Math.abs(phi - phi0) / (2 * Math.PI) };
+    if (u <= 1 / (RS * 44)) return { impact, b, criticalImpact, outcome: 'escaped' as const, steps: step, minRadius, turns: Math.abs(phi - phi0) / (2 * Math.PI) };
+  }
+  return { impact, b, criticalImpact, outcome: 'integration_limit' as const, steps: maxSteps, minRadius, turns: Math.abs(phi - phi0) / (2 * Math.PI) };
+}
+
 export const einsteinGeodesics: ExperimentDef = {
   id: 'geodesics',
   name: 'Geodezyjne + dysk',

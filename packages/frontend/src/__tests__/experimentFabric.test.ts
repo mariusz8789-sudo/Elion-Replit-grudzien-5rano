@@ -19,6 +19,7 @@ import {
   serializeCounterfactualComparison,
   planEvidenceGuidedExperiment,
   confirmEvidenceGuidedExperiment,
+  capsuleFromConfirmedExperiment,
   createMajorana1QuantumEvidenceCard,
   createScenarioCapsule,
   replayScenarioCapsule,
@@ -250,6 +251,13 @@ describe('Genesis Experiment Fabric', () => {
     expect(confirmed.run.provenance.resultOrigin).toBe('real-engine');
     expect(confirmed.handoff.evidencePack.status).toBe('PROTOCOL_REQUIRED');
     expect(confirmed.handoff.counterfactual.status).toBe('VARIANT_REQUIRED');
+    const capsule = capsuleFromConfirmedExperiment(confirmed);
+    expect(capsule.status).toBe('CONFIRMED_REAL_RUN');
+    expect(capsule.modelId).toBe('einstein-schwarzschild');
+    expect(capsule.runFingerprint).toBe(confirmed.run.provenance.runFingerprint);
+    expect(capsule.outputs.radiusKm).toBe(confirmed.run.result.outputs.radiusKm);
+    expect(capsule.evidencePack).toEqual(confirmed.handoff.evidencePack);
+    expect(capsule.counterfactual).toEqual(confirmed.handoff.counterfactual);
   });
 
   it('rejects an evidence-guided plan modified after review before executing it', () => {

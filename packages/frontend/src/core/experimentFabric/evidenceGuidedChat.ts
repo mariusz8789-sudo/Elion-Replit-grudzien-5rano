@@ -59,6 +59,29 @@ export interface ConfirmedEvidenceGuidedExperiment {
   handoff: EvidenceGuidedOutcomeHandoff;
 }
 
+/** Read-only presentation contract: it only re-expresses an already confirmed plan and real run. */
+export interface EvidenceGuidedExperimentCapsule {
+  contractVersion: string;
+  capsuleId: string;
+  status: 'CONFIRMED_REAL_RUN';
+  planId: string;
+  confirmationId: string;
+  modelId?: string;
+  engine: string;
+  modelVersion: string;
+  parameters: Readonly<Record<string, string | number | boolean>>;
+  seed?: number;
+  runId: string;
+  runFingerprint: string;
+  resultOrigin: ExperimentRun['provenance']['resultOrigin'];
+  route: ExperimentRun['result']['route'];
+  outputs: ExperimentRun['result']['outputs'];
+  units: ExperimentRun['result']['units'];
+  limitations: readonly string[];
+  evidencePack: EvidenceGuidedOutcomeHandoff['evidencePack'];
+  counterfactual: EvidenceGuidedOutcomeHandoff['counterfactual'];
+}
+
 function limitationsFor(plan: ExperimentPlan): readonly string[] {
   const intent = plan.intent;
   if (!plan.runnable) {
@@ -133,6 +156,25 @@ export function planEvidenceGuidedExperiment(request: StructuredExperimentReques
  * Rebuilds the plan before execution to prevent callers from changing a reviewed model,
  * parameter, solver or capability between disclosure and confirmation.
  */
+export function capsuleFromConfirmedExperiment(confirmed: ConfirmedEvidenceGuidedExperiment): EvidenceGuidedExperimentCapsule {
+  const { plan, run, handoff } = confirmed;
+  if (run.result.status !== 'completed' || run.provenance.resultOrigin !== 'real-engine') {
+    throw new Error('Evidence-Guided Capsule requires a completed real-engine run.');
+  }
+  return {
+    contractVersion: EVIDENCE_GUIDED_CHAT_VERSION,
+    capsuleId: `capsule_${fnv1a(canonicalJson({ planId: plan.plan.planId, confirmationId: plan.confirmationId, runFingerprint: run.provenance.runFingerprint }))}`,
+    status: 'CONFIRMED_REAL_RUN', planId: plan.plan.planId, confirmationId: plan.confirmationId,
+    ...(plan.disclosure.modelId === undefined ? {} : { modelId: plan.disclosure.modelId }),
+    engine: plan.disclosure.engine ?? 'unknown-engine', modelVersion: plan.disclosure.modelVersion ?? 'unknown-version',
+    parameters: plan.disclosure.requestedParameters,
+    ...(plan.disclosure.seed === undefined ? {} : { seed: plan.disclosure.seed }),
+    runId: run.runId, runFingerprint: run.provenance.runFingerprint, resultOrigin: run.provenance.resultOrigin,
+    route: run.result.route, outputs: run.result.outputs, units: run.result.units,
+    limitations: plan.disclosure.limitations, evidencePack: handoff.evidencePack, counterfactual: handoff.counterfactual,
+  };
+}
+
 export function confirmEvidenceGuidedExperiment(reviewedPlan: EvidenceGuidedExperimentPlan): ConfirmedEvidenceGuidedExperiment {
   const canonicalPlan = planEvidenceGuidedExperiment(reviewedPlan.request);
   if (canonicalJson(canonicalPlan) !== canonicalJson(reviewedPlan)) {

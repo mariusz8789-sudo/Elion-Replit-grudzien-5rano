@@ -7,7 +7,7 @@ import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
 import { saveExperiment, listExperiments } from '../core/scienceMemory';
 import { track } from '../core/analytics';
-import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, type EvidenceGuidedExperimentPlan, type ExperimentRun } from '../core/experimentFabric';
+import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
 import { getToken } from '../core/backend/session';
 import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
@@ -78,6 +78,29 @@ function formatFabricRun(run: ExperimentRun): string {
   return `${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${route}\nProvenance: ${run.provenance.runFingerprint}.`;
 }
 
+function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule }) {
+  const outputs = Object.entries(capsule.outputs).slice(0, 6);
+  const params = Object.entries(capsule.parameters);
+  return (
+    <section className="evidence-capsule" aria-label="Kapsuła potwierdzonego eksperymentu">
+      <div className="evidence-capsule-head">
+        <span className="sc-tag sc-tag-wynik">POTWIERDZONY REALNY RUN</span>
+        <code>{capsule.capsuleId}</code>
+      </div>
+      <div className="evidence-capsule-grid">
+        <div><span>Model / engine</span><strong>{capsule.modelId ?? 'brak modelId'} · {capsule.engine}</strong></div>
+        <div><span>Wersja / origin</span><strong>{capsule.modelVersion} · {capsule.resultOrigin}</strong></div>
+        <div><span>Run / provenance</span><code>{capsule.runId} · {capsule.runFingerprint}</code></div>
+        <div><span>Route</span><strong>{capsule.route.kind === 'lab' ? `lab: ${capsule.route.labId}` : capsule.route.kind}</strong></div>
+      </div>
+      {params.length > 0 && <div className="evidence-capsule-section"><span>Parametry zatwierdzone</span><code>{params.map(([key, value]) => `${key}=${String(value)}`).join(' · ')}</code></div>}
+      {outputs.length > 0 && <div className="evidence-capsule-section"><span>Odczytane outputy realnego runu</span><div className="evidence-capsule-outputs">{outputs.map(([key, value]) => <code key={key}>{key}: {typeof value === 'number' ? value.toPrecision(5) : String(value)}{capsule.units[key] ? ` ${capsule.units[key]}` : ''}</code>)}</div></div>}
+      <div className="evidence-capsule-section"><span>Granice modelu</span><p>{capsule.limitations.join(' ')}</p></div>
+      <div className="evidence-capsule-status"><span>Evidence Pack: {capsule.evidencePack.status}</span><span>A/B: {capsule.counterfactual.status}</span></div>
+    </section>
+  );
+}
+
 const SUGGESTIONS = [
   'Zbadaj problem trzech ciał',
   'Zwiększ masę 2×',
@@ -99,6 +122,7 @@ export function ScienceChat() {
   }]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
   const [pendingGuidedPlan, setPendingGuidedPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
+  const [lastEvidenceCapsule, setLastEvidenceCapsule] = useState<EvidenceGuidedExperimentCapsule | null>(null);
   const [activeKnowledgeProject, setActiveKnowledgeProject] = useState<ActiveKnowledgeProject | null>(() => getActiveKnowledgeProject());
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -142,6 +166,7 @@ export function ScienceChat() {
       try {
         const confirmed = confirmEvidenceGuidedExperiment(reviewed);
         const run = confirmed.run;
+        setLastEvidenceCapsule(capsuleFromConfirmedExperiment(confirmed));
         const handoff = `\n\nEvidence Pack: ${confirmed.handoff.evidencePack.status} — ${confirmed.handoff.evidencePack.reason}\nA/B: ${confirmed.handoff.counterfactual.status} — ${confirmed.handoff.counterfactual.reason}`;
         const tag: EpistemicTag = run.result.status === 'completed' ? 'WYNIK' : 'SYSTEM';
         setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `${formatFabricRun(run)}${handoff}`, tag }]);
@@ -265,6 +290,8 @@ export function ScienceChat() {
           </div>
         ))}
       </div>
+
+      {lastEvidenceCapsule && <div className="science-chat-capsule-wrap"><EvidenceCapsule capsule={lastEvidenceCapsule} /></div>}
 
       {pendingGuidedPlan?.status === 'READY_FOR_CONFIRMATION' && (
         <div className="science-chat-suggest" aria-label="Potwierdzenie planu eksperymentu">

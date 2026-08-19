@@ -7,6 +7,10 @@ import {
 } from '../../core/simulationRenderer/camera';
 import { consumePendingComparison } from '../../core/compareBridge';
 import { computeField, ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
+import { createSpatialWorldOverlay, type SpatialWorldOverlay } from '../../core/simulationRenderer/spatialOverlay';
+import { getToken } from '../../core/backend/session';
+import { getProjectSpatialDataset } from '../../core/backend/client';
+import { getActiveSpatialOverlay, subscribeActiveSpatialOverlay } from '../../core/backend/spatialOverlayContext';
 
 /**
  * VISUAL SIMULATION SCREEN — żywa scena „Epidemia w małym mieście" z warstwą
@@ -53,11 +57,43 @@ export function VisualSimulationScreen() {
   const [zoomLabel, setZoomLabel] = useState(1);
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('none');
   const [stats, setStats] = useState<Record<string, number>>(() => sim.stats());
+  const [spatialOverlayLabel, setSpatialOverlayLabel] = useState<string | null>(null);
+  const spatialOverlayRef = useRef<SpatialWorldOverlay | null>(null);
 
   const debugRef = useRef(debug); debugRef.current = debug;
   const showChartRef = useRef(showChart); showChartRef.current = showChart;
   const selectedRef = useRef(selectedId); selectedRef.current = selectedId;
   const analysisRef = useRef(analysisMode); analysisRef.current = analysisMode;
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSelectedOverlay = async () => {
+      const selected = getActiveSpatialOverlay();
+      if (!selected) {
+        spatialOverlayRef.current = null;
+        setSpatialOverlayLabel(null);
+        return;
+      }
+      const token = getToken();
+      if (!token) {
+        spatialOverlayRef.current = null;
+        setSpatialOverlayLabel(null);
+        return;
+      }
+      const result = await getProjectSpatialDataset(token, selected.projectId, selected.datasetId);
+      if (cancelled) return;
+      if (!result.ok) {
+        spatialOverlayRef.current = null;
+        setSpatialOverlayLabel(null);
+        return;
+      }
+      spatialOverlayRef.current = createSpatialWorldOverlay(result.data.dataset, sim.worldWidth, sim.worldHeight);
+      setSpatialOverlayLabel(result.data.label);
+    };
+    void loadSelectedOverlay();
+    const unsubscribe = subscribeActiveSpatialOverlay(() => { void loadSelectedOverlay(); });
+    return () => { cancelled = true; unsubscribe(); };
+  }, [sim]);
 
   useEffect(() => {
     let raf = 0; let last = performance.now(); let statAcc = 0;
@@ -84,6 +120,7 @@ export function VisualSimulationScreen() {
           renderCity(ctx, sim, cssW, cssH, {
             transform, debug: debugRef.current, focusId: selectedRef.current,
             contactRadius: Number(sim.getParams().contactRadius), analysis,
+            spatialOverlay: spatialOverlayRef.current,
           });
         }
       }
@@ -161,6 +198,7 @@ export function VisualSimulationScreen() {
           Żywa symulacja agentowa: agenci to animowani ludzie, a każda animacja wynika ze STANU MODELU (ruch → chód, izolacja/szpital → zmiana trajektorii, kontakt → transmisja).
           Wirtualne punkty modelu, patogen abstrakcyjny „Pathogen X" — symulacja EDUKACYJNA, nie prognoza.
         </span>
+        {spatialOverlayLabel && <span className="honesty spatial">GIS: {spatialOverlayLabel} · bbox → świat scenariusza, bez georeferencji</span>}
       </div>
 
       <div className="sim-transport">

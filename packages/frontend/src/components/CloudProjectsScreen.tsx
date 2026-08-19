@@ -28,6 +28,7 @@ import {
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
 import { setActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
+import { setActiveSpatialOverlay } from '../core/backend/spatialOverlayContext';
 import { normalizeOsmMapXml } from '../core/experimentFabric/spatialImport';
 
 /**
@@ -347,6 +348,11 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
     }
   }
 
+  function showSpatialOverlay(spatial: ProjectSpatialDataset) {
+    setActiveSpatialOverlay(spatial);
+    window.location.hash = '#/city';
+  }
+
   async function handleAddMember(e: React.FormEvent) {
     e.preventDefault();
     const token = getToken();
@@ -568,6 +574,7 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
                 <span className="trial-label">{spatial.label} <span className="cloud-modelver">{spatial.dataset.crs}</span></span>
                 <span className="trial-status">{spatial.dataset.provenance.featureCount} obiektów · {spatial.dataset.attribution}</span>
                 <span className="account-email" title={spatial.originalSha256}>SHA-256 {spatial.originalSha256.slice(0, 12)} · {new Date(spatial.createdAt).toLocaleString('pl-PL')}</span>
+                <button className="chip-btn tiny" onClick={() => showSpatialOverlay(spatial)} title="Scenariuszowe nałożenie bboxu na syntetyczny świat — bez georeferencji">Pokaż jako warstwę scenariusza</button>
               </div>
             ))}
           </div>

@@ -305,6 +305,11 @@ export async function uploadProjectSpatialDataset(token: string, projectId: stri
   return r.ok ? { ok: true, data: r.data.dataset } : r;
 }
 
+export async function getProjectSpatialDataset(token: string, projectId: string, datasetId: string): Promise<ApiResult<ProjectSpatialDataset>> {
+  const r = await request<{ dataset: ProjectSpatialDataset }>('GET', `/projects/${projectId}/spatial-datasets/${datasetId}`, { token });
+  return r.ok ? { ok: true, data: r.data.dataset } : r;
+}
+
 /* ---------------- Scientific Git: gałęzie, scalanie, kontrybucje ---------------- */
 
 export interface Branch {

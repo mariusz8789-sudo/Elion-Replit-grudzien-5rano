@@ -102,6 +102,97 @@ export function createCollisionInitialState({
   return { seed, cores, stars };
 }
 
+function coreSeparation(cores: readonly CollisionCore[]): number {
+  return Math.hypot(cores[1].x - cores[0].x, cores[1].y - cores[0].y);
+}
+
+/** Jeden krok istniejącej dynamiki: dwa masywne jądra i gwiazdy jako cząstki próbne. */
+export function advanceCollisionState(cores: CollisionCore[], stars: CollisionStar[], dt: number): void {
+  if (!Number.isFinite(dt) || dt < 0 || dt > 0.03) {
+    throw new Error('dt musi być skończoną liczbą z zakresu [0, 0.03].');
+  }
+  const [c1, c2] = cores;
+  const dx = c2.x - c1.x;
+  const dy = c2.y - c1.y;
+  const r2 = dx * dx + dy * dy + SOFT2 * 4;
+  const inv = 1 / (Math.sqrt(r2) * r2);
+  c1.vx += c2.m * dx * inv * dt;
+  c1.vy += c2.m * dy * inv * dt;
+  c2.vx -= c1.m * dx * inv * dt;
+  c2.vy -= c1.m * dy * inv * dt;
+  c1.x += c1.vx * dt;
+  c1.y += c1.vy * dt;
+  c2.x += c2.vx * dt;
+  c2.y += c2.vy * dt;
+
+  for (const star of stars) {
+    let ax = 0;
+    let ay = 0;
+    for (const core of cores) {
+      const starDx = core.x - star.x;
+      const starDy = core.y - star.y;
+      const starR2 = starDx * starDx + starDy * starDy + SOFT2;
+      const starInv = core.m / (Math.sqrt(starR2) * starR2);
+      ax += starDx * starInv;
+      ay += starDy * starInv;
+    }
+    star.vx += ax * dt;
+    star.vy += ay * dt;
+    star.x += star.vx * dt;
+    star.y += star.vy * dt;
+  }
+}
+
+export interface CollisionScenarioResult {
+  ratio: number;
+  retro: boolean;
+  seed: number;
+  horizonMyr: number;
+  initialCoreSeparationSceneUnits: number;
+  finalCoreSeparationSceneUnits: number;
+  minCoreSeparationSceneUnits: number;
+  starCount: number;
+}
+
+/**
+ * Deterministyczny adapter obliczeniowy do Experiment Fabric. Nie jest pełnym
+ * N-body ani hydrodynamicznym solverem: wykonuje istniejący restricted three-body
+ * z tym samym limitem kroku co Canvas i raportuje wyłącznie jego obserwowalne.
+ */
+export function runCollisionScenario({
+  ratio = 1,
+  retro = false,
+  horizonMyr = 240,
+}: {
+  ratio?: number;
+  retro?: boolean;
+  horizonMyr?: number;
+} = {}): CollisionScenarioResult {
+  if (!Number.isFinite(horizonMyr) || horizonMyr <= 0 || horizonMyr > 600) {
+    throw new Error('horizonMyr musi być skończoną liczbą z zakresu (0, 600].');
+  }
+  const state = createCollisionInitialState({ width: 1280, height: 720, ratio, retro });
+  const initialCoreSeparationSceneUnits = coreSeparation(state.cores);
+  let minCoreSeparationSceneUnits = initialCoreSeparationSceneUnits;
+  const integrationTime = horizonMyr / 12;
+  const steps = Math.ceil(integrationTime / 0.03);
+  const dt = integrationTime / steps;
+  for (let step = 0; step < steps; step++) {
+    advanceCollisionState(state.cores, state.stars, dt);
+    minCoreSeparationSceneUnits = Math.min(minCoreSeparationSceneUnits, coreSeparation(state.cores));
+  }
+  return {
+    ratio,
+    retro,
+    seed: state.seed,
+    horizonMyr,
+    initialCoreSeparationSceneUnits,
+    finalCoreSeparationSceneUnits: coreSeparation(state.cores),
+    minCoreSeparationSceneUnits,
+    starCount: state.stars.length,
+  };
+}
+
 class CollisionGalaxiesSim implements Sim {
   private stars: CollisionStar[] = [];
   private cores: CollisionCore[] = [
@@ -145,39 +236,7 @@ class CollisionGalaxiesSim implements Sim {
     const ddt = Math.min(dt, 0.03) * speed;
     this.elapsed += ddt;
 
-    // jądra: wzajemna grawitacja (leapfrog-lite)
-    const [c1, c2] = this.cores;
-    {
-      const dx = c2.x - c1.x;
-      const dy = c2.y - c1.y;
-      const r2 = dx * dx + dy * dy + SOFT2 * 4;
-      const inv = 1 / (Math.sqrt(r2) * r2);
-      c1.vx += c2.m * dx * inv * ddt;
-      c1.vy += c2.m * dy * inv * ddt;
-      c2.vx -= c1.m * dx * inv * ddt;
-      c2.vy -= c1.m * dy * inv * ddt;
-      c1.x += c1.vx * ddt;
-      c1.y += c1.vy * ddt;
-      c2.x += c2.vx * ddt;
-      c2.y += c2.vy * ddt;
-    }
-    // gwiazdy: pole obu jąder
-    for (const s of this.stars) {
-      let ax = 0;
-      let ay = 0;
-      for (const c of this.cores) {
-        const dx = c.x - s.x;
-        const dy = c.y - s.y;
-        const r2 = dx * dx + dy * dy + SOFT2;
-        const inv = c.m / (Math.sqrt(r2) * r2);
-        ax += dx * inv;
-        ay += dy * inv;
-      }
-      s.vx += ax * ddt;
-      s.vy += ay * ddt;
-      s.x += s.vx * ddt;
-      s.y += s.vy * ddt;
-    }
+    advanceCollisionState(this.cores, this.stars, ddt);
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {

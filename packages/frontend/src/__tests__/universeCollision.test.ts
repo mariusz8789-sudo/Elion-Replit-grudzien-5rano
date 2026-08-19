@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collisionSeedFor, createCollisionInitialState } from '../labs/experiments/universe-collision';
+import { collisionSeedFor, createCollisionInitialState, runCollisionScenario } from '../labs/experiments/universe-collision';
 
 describe('universe collision reproducibility seam', () => {
   it('creates identical restricted three-body initial conditions for the same scenario', () => {
@@ -22,9 +22,20 @@ describe('universe collision reproducibility seam', () => {
     expect(prograde.stars[900]).not.toEqual(retrograde.stars[900]);
   });
 
+  it('runs the same existing restricted three-body dynamics reproducibly for a bounded horizon', () => {
+    const first = runCollisionScenario({ ratio: 1, retro: false, horizonMyr: 24 });
+    const second = runCollisionScenario({ ratio: 1, retro: false, horizonMyr: 24 });
+
+    expect(second).toEqual(first);
+    expect(first.starCount).toBe(1800);
+    expect(first.minCoreSeparationSceneUnits).toBeLessThanOrEqual(first.initialCoreSeparationSceneUnits);
+    expect(first.finalCoreSeparationSceneUnits).toBeGreaterThan(0);
+  });
+
   it('rejects invalid viewport, mass ratio and provenance seed before generating particles', () => {
     expect(() => createCollisionInitialState({ width: 0, height: 720, ratio: 1, retro: false })).toThrow('width i height');
     expect(() => createCollisionInitialState({ width: 1280, height: 720, ratio: 3, retro: false })).toThrow('ratio');
     expect(() => createCollisionInitialState({ width: 1280, height: 720, ratio: 1, retro: false, seed: -1 })).toThrow('seed');
+    expect(() => runCollisionScenario({ horizonMyr: 601 })).toThrow('horizonMyr');
   });
 });

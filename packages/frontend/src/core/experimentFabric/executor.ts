@@ -5,6 +5,7 @@ import { runDoublePendulumScenario } from '../../labs/experiments/universe-doubl
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
 import { runPlanetStabilityScenario } from '../../labs/experiments/universe-planetstability';
+import { runCollisionScenario } from '../../labs/experiments/universe-collision';
 import { runStarLifeScenario } from '../../labs/experiments/universe-starlife';
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
@@ -287,6 +288,38 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         assumptions: [
           'Masa jest jedynym parametrem wejściowym; jasność i czas ciągu głównego są relacjami skalującymi względem Słońca.',
           'Progi białego karła, gwiazdy neutronowej i czarnej dziury są takie same jak w istniejącym Universe Lab i mają charakter edukacyjny.',
+        ],
+        visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'universe-galaxy-collision': {
+      const ratio = numberParam(params, 'ratio', 1);
+      const retro = params.retro === true;
+      const horizonMyr = numberParam(params, 'horizonMyr', 240);
+      const solved = runCollisionScenario({ ratio, retro, horizonMyr });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano ograniczony model Toomre–Toomre zderzenia galaktyk przez ${solved.horizonMyr} mln lat skalowania widoku; minimalna separacja jąder: ${solved.minCoreSeparationSceneUnits.toFixed(2)} jednostek sceny.`,
+        outputs: {
+          ratio: solved.ratio,
+          retro: solved.retro,
+          horizonMyr: solved.horizonMyr,
+          seed: solved.seed,
+          starCount: solved.starCount,
+          initialCoreSeparationSceneUnits: solved.initialCoreSeparationSceneUnits,
+          minCoreSeparationSceneUnits: solved.minCoreSeparationSceneUnits,
+          finalCoreSeparationSceneUnits: solved.finalCoreSeparationSceneUnits,
+        },
+        units: {
+          ratio: '', retro: '', horizonMyr: 'mln lat (skalowanie widoku)', seed: '', starCount: 'cząstki próbne',
+          initialCoreSeparationSceneUnits: 'jedn. sceny', minCoreSeparationSceneUnits: 'jedn. sceny', finalCoreSeparationSceneUnits: 'jedn. sceny',
+        },
+        warnings: ['Skala czasu i odległości ma charakter wizualno-edukacyjny; restricted three-body nie modeluje gazu, samograwitacji dysków, tarcia dynamicznego ani gwiazdotworzenia.'],
+        validity: 'Dwa punktowe jądra galaktyk z grawitacją Newtonowską i zmiękczeniem w jednostkach sceny; gwiazdy są bezmasowymi cząstkami próbnymi. Nie jest to pełny N-body, model hydrodynamiczny ani predykcja zderzenia konkretnej pary galaktyk.',
+        assumptions: [
+          'Warunki początkowe cząstek są deterministyczne dla ratio i retro; seed jest zapisywany w wyniku.',
+          'Integrator używa tego samego kroku do 0,03 co istniejący Canvas Universe Lab.',
+          retro ? 'Drugi dysk startuje z orbitalnym ruchem przeciwbieżnym.' : 'Drugi dysk startuje ze współbieżnym ruchem orbitalnym.',
         ],
         visualization: ['numeric', 'graph'], route: model.route,
       };

@@ -324,6 +324,28 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
   });
 
+  it('runs the existing reproducible galaxy-collision model through Fabric without claiming a full N-body merger', () => {
+    const command = 'Zasymuluj zderzenie galaktyk: stosunek mas=1.25, przeciwbieżne, 24 mln lat.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const rejected = runExperiment(parseScienceChatMessage('Zasymuluj zderzenie galaktyk: stosunek mas=3, 24 mln lat.'));
+    const universe = getKnowledgeDomain('universe');
+
+    expect(universe?.realModels).toContain('universe-galaxy-collision');
+    expect(universe?.assumptions.join(' ')).toContain('Toomre–Toomre');
+    expect(run.request.modelId).toBe('universe-galaxy-collision');
+    expect(run.request.parameters).toEqual({ ratio: 1.25, retro: true, horizonMyr: 24 });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'collision' });
+    expect(Number(run.result.outputs.starCount)).toBe(900 + Math.round(900 * 1.25));
+    expect(Number(run.result.outputs.minCoreSeparationSceneUnits)).toBeGreaterThan(0);
+    expect(run.result.validity).toContain('Nie jest to pełny N-body');
+    expect(run.result.warnings[0]).toContain('nie modeluje gazu');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(rejected.result.status).toBe('rejected');
+    expect(rejected.result.summary).toContain('poza zakresem 0.25–2');
+  });
+
   it('runs the existing stellar-scaling model through Fabric without claiming a full stellar-evolution solver', () => {
     const command = 'Pokaż życie gwiazdy o masie 10 masy Słońca.';
     const run = runExperiment(parseScienceChatMessage(command));

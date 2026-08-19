@@ -219,12 +219,12 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'universe', title: 'Astrofizyka i kosmologia', sourceFile: 'universe.md', scale: 'cosmic',
-    capability: 'REAL_ENGINE', realModels: ['universe-kepler', 'universe-atmospheric-escape', 'universe-hubble-tension', 'universe-planet-stability', 'universe-starlife'],
-    concepts: ['ΛCDM', 'ekspansja', 'galaktyki', 'ciemna materia', 'soczewkowanie', 'planety', 'życie gwiazdy'],
-    parameters: ['centralMassSolar', 'orbitalRadiusAu', 'stellarLuminositySolar', 'planetMassEarth', 'extraSystematic', 'showTrgb', 'years', 'jupiter', 'saturn', 'massSolar'], units: ['AU', 'yr', 'K', 'M☉', 'M⊕', 'km/s/Mpc', 'lat', 'mld lat', 'L☉'],
-    assumptions: ['Obecne modele są analityczne/uproszczone, nie pełną numeryczną kosmologią; napięcie Hubble’a porównuje ustalone wartości referencyjne, stabilność planet używa ograniczonego czteroplanetowego modelu N-ciał, a życie gwiazdy stosuje masowe skalowania L ∝ M³·⁵ i t_MS ∝ M⁻²·⁵ bez pełnej ewolucji wnętrza.'],
-    possibleExperiments: ['oblicz orbitę planety', 'zbadaj ucieczkę atmosfery', 'porównaj napięcie Hubble’a', 'zbadaj stabilność planet', 'zbadaj skalowanie życia gwiazdy'], requiredSolver: 'universe-kepler / universe-atmospheric-escape / universe-hubble-tension / universe-planet-stability / universe-starlife',
-    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['classical-mechanics', 'spacetime-einstein'], keywords: ['wszechświat', 'kosmologia', 'planeta', 'orbita', 'atmosfera', 'galaktyka', 'soczewkowanie', 'gwiazda', 'supernowa', 'biały karzeł'],
+    capability: 'REAL_ENGINE', realModels: ['universe-kepler', 'universe-atmospheric-escape', 'universe-hubble-tension', 'universe-planet-stability', 'universe-starlife', 'universe-galaxy-collision'],
+    concepts: ['ΛCDM', 'ekspansja', 'galaktyki', 'ciemna materia', 'soczewkowanie', 'planety', 'życie gwiazdy', 'ogony pływowe'],
+    parameters: ['centralMassSolar', 'orbitalRadiusAu', 'stellarLuminositySolar', 'planetMassEarth', 'extraSystematic', 'showTrgb', 'years', 'jupiter', 'saturn', 'massSolar', 'ratio', 'retro', 'horizonMyr'], units: ['AU', 'yr', 'K', 'M☉', 'M⊕', 'km/s/Mpc', 'lat', 'mld lat', 'L☉', 'mln lat (skalowanie widoku)'],
+    assumptions: ['Obecne modele są analityczne/uproszczone, nie pełną numeryczną kosmologią; napięcie Hubble’a porównuje ustalone wartości referencyjne, stabilność planet używa ograniczonego czteroplanetowego modelu N-ciał, życie gwiazdy stosuje masowe skalowania L ∝ M³·⁵ i t_MS ∝ M⁻²·⁵ bez pełnej ewolucji wnętrza, a zderzenie galaktyk jest restricted three-body Toomre–Toomre bez gazu, samograwitacji dysków i tarcia dynamicznego.'],
+    possibleExperiments: ['oblicz orbitę planety', 'zbadaj ucieczkę atmosfery', 'porównaj napięcie Hubble’a', 'zbadaj stabilność planet', 'zbadaj skalowanie życia gwiazdy', 'zbadaj ograniczone zderzenie galaktyk'], requiredSolver: 'universe-kepler / universe-atmospheric-escape / universe-hubble-tension / universe-planet-stability / universe-starlife / universe-galaxy-collision',
+    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['classical-mechanics', 'spacetime-einstein'], keywords: ['wszechświat', 'kosmologia', 'planeta', 'orbita', 'atmosfera', 'galaktyka', 'soczewkowanie', 'gwiazda', 'supernowa', 'biały karzeł', 'zderzenie galaktyk', 'ogony pływowe'],
   },
 ] as const;
 

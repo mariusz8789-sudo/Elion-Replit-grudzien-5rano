@@ -107,6 +107,16 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Istniejący deterministyczny model skalujący życia gwiazdy: L ∝ M³·⁵, t_MS ≈ 10·M⁻²·⁵ oraz jawne, edukacyjne progi losu końcowego; nie jest solverem ewolucji wnętrza gwiazdy.',
   },
   {
+    id: 'universe-galaxy-collision', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-toomre-toomre@1.0.0',
+    parameters: [
+      number('ratio', 'Stosunek mas galaktyk', '', 0.25, 2, 1),
+      boolean('retro', 'Druga galaktyka przeciwbieżna', false),
+      number('horizonMyr', 'Horyzont integracji', 'mln lat (skalowanie widoku)', 0.01, 600, 240),
+    ],
+    route: { kind: 'lab', labId: 'universe', experimentId: 'collision' }, knowledgeSources: ['universe.md'],
+    rationale: 'Istniejący, deterministyczny restricted three-body Toomre–Toomre: dwa jądra grawitują, gwiazdy są cząstkami próbnymi; nie jest pełnym N-body, hydrodynamiką ani rekonstrukcją konkretnej kolizji galaktyk.',
+  },
+  {
     id: 'atom-bohr', domainId: 'atom', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('atomicNumber', 'Liczba atomowa Z', '', 1, 118, 1), number('principalN', 'Główna liczba kwantowa n', '', 1, 10, 1)],
     route: { kind: 'lab', labId: 'atom' }, knowledgeSources: ['atom.md', 'quantum.md'],

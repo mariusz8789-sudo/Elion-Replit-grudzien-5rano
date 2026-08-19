@@ -1,5 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,6 +62,30 @@ async function api(method, pathname, { token, body } = {}) {
   return { status: res.status, json };
 }
 
+function requestWithDeclaredLength(pathname, declaredLength) {
+  const target = new URL(base + pathname);
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      hostname: target.hostname,
+      port: target.port,
+      path: target.pathname,
+      method: 'POST',
+      agent: false,
+      headers: {
+        connection: 'close',
+        'content-type': 'application/json',
+        'content-length': String(declaredLength),
+      },
+    }, (res) => {
+      let raw = '';
+      res.on('data', (chunk) => { raw += chunk; });
+      res.on('end', () => resolve({ status: res.statusCode, json: JSON.parse(raw) }));
+    });
+    request.on('error', reject);
+    request.end();
+  });
+}
+
 describe('server HTTP persistence', () => {
   test('health reports persistence ready', async () => {
     const res = await fetch(base + '/api/health');
@@ -107,5 +132,11 @@ describe('server HTTP persistence', () => {
       body: '{not json',
     });
     assert.equal(res.status, 400);
+  });
+
+  test('spatial upload rejects an oversized declared payload before parsing', async () => {
+    const r = await requestWithDeclaredLength('/api/projects/project-1/spatial-datasets', 7 * 1024 * 1024 + 1);
+    assert.equal(r.status, 413);
+    assert.equal(r.json.error, 'payload_too_large');
   });
 });

@@ -1,6 +1,7 @@
 import { atomCount, degreeOfUnsaturation, molecularWeight, parseFormula } from '../compute/cheminformatics';
 import { buildPumpPipeModel } from '../engineeringGraph/pumpPipe';
 import { solveKitaevBulk } from '../compute/kitaevBulk';
+import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
@@ -141,6 +142,40 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
           'Integracja adaptive velocity-Verlet z istniejącego Universe Lab.',
           preset === 'pythagorean' ? 'Masy 3:4:5 startują ze spoczynku.' : 'Trzy równe masy startują z warunku orbity ósemkowej.',
           divergence ? 'Drugi start różni się wyłącznie przesunięciem 10⁻⁶ pierwszego ciała.' : 'Nie uruchomiono drugiego startu do pomiaru rozjazdu.',
+        ],
+        visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'universe-double-pendulum': {
+      const angleDeg = numberParam(params, 'angleDeg', 120);
+      const horizonSeconds = numberParam(params, 'horizonSeconds', 10);
+      const divergence = params.divergence === true;
+      const solved = runDoublePendulumScenario({ angleDeg, horizonSeconds, divergence });
+      const warnings = solved.relativeEnergyDrift > 0.001
+        ? [`Względny drift energii RK4 wyniósł ${(solved.relativeEnergyDrift * 100).toPrecision(3)}%; wynik numeryczny należy interpretować w obrębie tego horyzontu.`]
+        : [];
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano deterministyczną integrację podwójnego wahadła: kąt ${angleDeg}°, t=${horizonSeconds} s.`,
+        outputs: {
+          initialAngleDeg: solved.initialAngleDeg,
+          horizonSeconds: solved.horizonSeconds,
+          initialEnergy: solved.initialEnergy,
+          finalEnergy: solved.finalEnergy,
+          relativeEnergyDrift: solved.relativeEnergyDrift,
+          finalTheta1Rad: solved.finalTheta1Rad,
+          finalTheta2Rad: solved.finalTheta2Rad,
+          ...(solved.finalAngularSeparation === undefined ? {} : { finalAngularSeparation: solved.finalAngularSeparation }),
+        },
+        units: {
+          initialAngleDeg: '°', horizonSeconds: 's', initialEnergy: 'J/kg', finalEnergy: 'J/kg', relativeEnergyDrift: '',
+          finalTheta1Rad: 'rad', finalTheta2Rad: 'rad', finalAngularSeparation: 'rad',
+        },
+        warnings,
+        validity: 'Dwa idealne wahadła w płaszczyźnie: m₁=m₂=1 kg, L₁=L₂=1 m, g=9,81 m/s², bez tarcia; RK4 nie jest symplektyczny i energia numerycznie dryfuje.',
+        assumptions: [
+          'Równania Lagrange’a i istniejący krok RK4 z Universe Lab.',
+          divergence ? 'Drugi start różni się wyłącznie perturbacją kąta pierwszego wahadła o 10⁻⁶ rad.' : 'Nie uruchomiono drugiego startu do pomiaru rozjazdu.',
         ],
         visualization: ['numeric', 'graph'], route: model.route,
       };

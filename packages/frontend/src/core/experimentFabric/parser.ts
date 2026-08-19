@@ -45,7 +45,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const chemicalPotential = firstNumber(normalized, /\b(?:μ|mu|potencjał chemiczny|potencjal chemiczny)\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
   const hopping = firstNumber(normalized, /\b(?:hopping|tunelowanie|t)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const pairing = firstNumber(normalized, /\b(?:pairing|delta|Δ|p-wave)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
-  const threeBodyHorizon = firstNumber(normalized, /\b(?:horyzont|czas|t)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const integrationHorizon = firstNumber(normalized, /(?:\bhoryzont\b|\bczas\b|(?:^|[\s,;])t)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const threeBodyHorizon = integrationHorizon;
+  const pendulumAngleDeg = firstNumber(normalized, /\b(?:kąt|kat|angle)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const pendulumHorizonSeconds = integrationHorizon;
   const threeBodyPreset = /(?:pitagorejsk[a-ząćęłńóśźż]*|burrau)/.test(normalized)
     ? 'pythagorean'
     : /(?:ósemk[a-ząćęłńóśźż]*|osemk[a-ząćęłńóśźż]*|figure[- ]?eight)/.test(normalized)
@@ -72,6 +75,8 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (hopping !== undefined) params.hopping = hopping;
   if (pairing !== undefined) params.pairing = pairing;
   if (threeBodyHorizon !== undefined) params.horizonTime = threeBodyHorizon;
+  if (pendulumAngleDeg !== undefined) params.angleDeg = pendulumAngleDeg;
+  if (pendulumHorizonSeconds !== undefined) params.horizonSeconds = pendulumHorizonSeconds;
   if (threeBodyPreset !== undefined) params.preset = threeBodyPreset;
   if (threeBodyDivergence) params.divergence = true;
 
@@ -82,6 +87,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
 
   if (/(?:powódź|powodz|pożar|pozar|trzęsienie|trzesienie|blackout|kaskad[a-ząćęłńóśźż]*|ewakuacj[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('hazard-cascade', undefined, 'world-3d', []);
+  }
+  if (/(?:podwójne wahadło|podwojne wahadlo|double pendulum)/.test(normalized)) {
+    return request('classical-mechanics', 'universe-double-pendulum', 'graph', ['angleDeg', 'horizonSeconds', 'divergence']);
   }
   if (/(?:problem trzech ciał|problem trzech cial|three[- ]?body|orbita ósemk[a-ząćęłńóśźż]*|orbita osemk[a-ząćęłńóśźż]*|układ pitagorejsk[a-ząćęłńóśźż]*|uklad pitagorejsk[a-ząćęłńóśźż]*|burrau)/.test(normalized)) {
     return request('classical-mechanics', 'universe-three-body', 'graph', ['preset', 'horizonTime', 'divergence']);

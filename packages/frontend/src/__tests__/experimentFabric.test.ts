@@ -263,6 +263,20 @@ describe('Genesis Experiment Fabric', () => {
     expect(majoranaDevice.result.outputs).toEqual({});
   });
 
+  it('runs the existing deterministic double-pendulum solver through Fabric without replacing its RK4 stepper', () => {
+    const run = runExperiment(parseScienceChatMessage('Zasymuluj podwójne wahadło: kąt=150, horyzont=2, drugi start.'));
+    const repeated = runExperiment(parseScienceChatMessage('Zasymuluj podwójne wahadło: kąt=150, horyzont=2, drugi start.'));
+
+    expect(run.request.modelId).toBe('universe-double-pendulum');
+    expect(run.request.parameters).toEqual({ angleDeg: 150, horizonSeconds: 2, divergence: true });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'doublependulum' });
+    expect(Number(run.result.outputs.relativeEnergyDrift)).toBeGreaterThanOrEqual(0);
+    expect(Number(run.result.outputs.finalAngularSeparation)).toBeGreaterThan(0);
+    expect(run.result.validity).toContain('RK4 nie jest symplektyczny');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+  });
+
   it('runs the existing deterministic three-body integrator through Fabric without replacing its solver', () => {
     const figureEight = runExperiment(parseScienceChatMessage('Zasymuluj problem trzech ciał: orbita ósemkowa, horyzont=1.5.'));
     const pythagorean = runExperiment(parseScienceChatMessage('Zasymuluj układ pitagorejski problemu trzech ciał, horyzont=2, drugi start.'));

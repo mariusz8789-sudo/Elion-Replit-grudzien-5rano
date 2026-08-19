@@ -62,6 +62,16 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realna integracja Newtonowskiego problemu trzech ciał metodą adaptive velocity-Verlet dla udokumentowanych warunków początkowych; nie jest prognozą układu astronomicznego.',
   },
   {
+    id: 'universe-double-pendulum', domainId: 'classical-mechanics', modelVersion: '1.0.0', engine: 'genesis-double-pendulum@1.0.0',
+    parameters: [
+      number('angleDeg', 'Kąt startowy obu wahadeł', '°', 5, 179, 120),
+      number('horizonSeconds', 'Horyzont integracji', 's', 0.01, 60, 10),
+      boolean('divergence', 'Drugi start z perturbacją 10⁻⁶ rad', false),
+    ],
+    route: { kind: 'lab', labId: 'universe', experimentId: 'doublependulum' }, knowledgeSources: ['classical-mechanics.md'],
+    rationale: 'Realne równania Lagrange’a podwójnego wahadła integrowane istniejącym RK4; energia numerycznie dryfuje i jest raportowana, nie ukrywana.',
+  },
+  {
     id: 'atom-bohr', domainId: 'atom', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('atomicNumber', 'Liczba atomowa Z', '', 1, 118, 1), number('principalN', 'Główna liczba kwantowa n', '', 1, 10, 1)],
     route: { kind: 'lab', labId: 'atom' }, knowledgeSources: ['atom.md', 'quantum.md'],

@@ -68,6 +68,65 @@ export function pendulumEnergy(s: PendulumState): number {
 }
 
 const PERTURBATION = 1e-6;
+const FABRIC_STEP_SECONDS = 0.002;
+
+export interface DoublePendulumScenarioResult {
+  initialAngleDeg: number;
+  horizonSeconds: number;
+  initialEnergy: number;
+  finalEnergy: number;
+  relativeEnergyDrift: number;
+  finalTheta1Rad: number;
+  finalTheta2Rad: number;
+  /** Obecne tylko dla drugiego deterministycznego startu różniącego się o PERTURBATION. */
+  finalAngularSeparation?: number;
+}
+
+/**
+ * Deterministyczny adapter obliczeniowy dla Experiment Fabric. Używa dokładnie
+ * `stepRK4` i `pendulumEnergy` z tego eksperymentu; nie ma własnych równań ruchu.
+ */
+export function runDoublePendulumScenario({
+  angleDeg = 120,
+  horizonSeconds = 10,
+  divergence = false,
+}: {
+  angleDeg?: number;
+  horizonSeconds?: number;
+  divergence?: boolean;
+} = {}): DoublePendulumScenarioResult {
+  if (!Number.isFinite(angleDeg) || angleDeg < 5 || angleDeg > 179) {
+    throw new Error('angleDeg musi należeć do zakresu 5–179 stopni.');
+  }
+  if (!Number.isFinite(horizonSeconds) || horizonSeconds <= 0 || horizonSeconds > 60) {
+    throw new Error('horizonSeconds musi być skończoną liczbą z zakresu (0, 60].');
+  }
+  const angleRad = (angleDeg * Math.PI) / 180;
+  let primary: PendulumState = { th1: angleRad, th2: angleRad, w1: 0, w2: 0 };
+  let shadow: PendulumState | undefined = divergence
+    ? { th1: angleRad + PERTURBATION, th2: angleRad, w1: 0, w2: 0 }
+    : undefined;
+  const initialEnergy = pendulumEnergy(primary);
+  let remaining = horizonSeconds;
+  while (remaining > Number.EPSILON) {
+    const step = Math.min(FABRIC_STEP_SECONDS, remaining);
+    primary = stepRK4(primary, step);
+    if (shadow) shadow = stepRK4(shadow, step);
+    remaining -= step;
+  }
+  const finalEnergy = pendulumEnergy(primary);
+  return {
+    initialAngleDeg: angleDeg,
+    horizonSeconds,
+    initialEnergy,
+    finalEnergy,
+    relativeEnergyDrift: Math.abs(finalEnergy - initialEnergy) / Math.max(Math.abs(initialEnergy), Number.EPSILON),
+    finalTheta1Rad: primary.th1,
+    finalTheta2Rad: primary.th2,
+    ...(shadow ? { finalAngularSeparation: Math.hypot(primary.th1 - shadow.th1, primary.th2 - shadow.th2) } : {}),
+  };
+}
+
 const TRAIL_LEN = 700;
 const SUBSTEPS = 6;
 

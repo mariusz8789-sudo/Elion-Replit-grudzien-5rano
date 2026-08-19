@@ -142,6 +142,16 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['civilization.md', 'universe.md'],
     rationale: 'Realna funkcja klasyfikacyjnej skali mocy Kardaszewa; nie jest prognozą społeczną.',
   },
+  {
+    id: 'quantum-kitaev-bulk', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-kitaev-bulk@1.0.0',
+    parameters: [
+      number('chemicalPotential', 'Potencjał chemiczny μ', 'jedn. energii', -10, 10, 0),
+      number('hopping', 'Hopping t', 'jedn. energii', 0.001, 10, 1),
+      number('pairing', 'Pairing p-wave Δ', 'jedn. energii', 0.001, 10, 1),
+    ],
+    route: { kind: 'lab', labId: 'quantum', experimentId: 'kitaev-bulk' }, knowledgeSources: ['quantum.md'],
+    rationale: 'Realny, analitycznie minimalizowany bulk model BdG łańcucha Kitaeva; nie jest symulacją nanodrutu, materiału ani urządzenia Majorana 1.',
+  },
 ] as const;
 
 const BY_MODEL = new Map(ROUTER_MODELS.map((model) => [model.id, model]));

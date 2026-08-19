@@ -42,6 +42,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const neutronNumber = firstNumber(normalized, /\b(?:neutrony|neutronów|neutronow|n)\s*[=:]?\s*(\d+)/);
   const kardashevType = firstNumber(normalized, /\b(?:kardaszew|kardashev|typ\s*k)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const formula = sourceText.match(/(?:wzór|wzor|formula|dla)\s+([A-Z][A-Za-z0-9]*)/)?.[1];
+  const chemicalPotential = firstNumber(normalized, /\b(?:μ|mu|potencjał chemiczny|potencjal chemiczny)\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
+  const hopping = firstNumber(normalized, /\b(?:hopping|tunelowanie|t)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const pairing = firstNumber(normalized, /\b(?:pairing|delta|Δ|p-wave)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
 
   if (seed !== undefined) params.seed = seed;
   if (r0 !== undefined) params.r0 = r0;
@@ -58,6 +61,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (neutronNumber !== undefined) params.neutronNumber = neutronNumber;
   if (kardashevType !== undefined) params.kardashevType = kardashevType;
   if (formula !== undefined) params.formula = formula;
+  if (chemicalPotential !== undefined) params.chemicalPotential = chemicalPotential;
+  if (hopping !== undefined) params.hopping = hopping;
+  if (pairing !== undefined) params.pairing = pairing;
 
   const base = { contractVersion: EXPERIMENT_FABRIC_VERSION, sourceText, operation: operationFor(normalized), seed } as const;
   const request = (domainId: string, modelId: string | undefined, requestedVisualization: StructuredExperimentRequest['requestedVisualization'], allowed: readonly string[]): StructuredExperimentRequest => ({
@@ -125,6 +131,8 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/\b(kardaszew|kardashev|cywilizacja typu)\b/.test(normalized)) {
     return request('civilization', 'civilization-kardashev', 'narrative', ['kardashevType']);
   }
+  if (/\b(majorana\s*1|topoconductor|urządzenie majorana|urzadzenie majorana)\b/.test(normalized)) return request('quantum', undefined, 'graph', []);
+  if (/(?:kitaev[a-ząćęłńóśźż]*|łańcuch kitaeva|lancuch kitaeva)/.test(normalized)) return request('quantum', 'quantum-kitaev-bulk', 'graph', ['chemicalPotential', 'hopping', 'pairing']);
   if (/\b(tunelowanie|równanie schrödingera|rownanie schrodingera)\b/.test(normalized)) return request('quantum', undefined, 'graph', []);
   if (/\b(fala elektromagnetyczna|maxwell|pole elektromagnetyczne)\b/.test(normalized)) return request('electrodynamics', undefined, 'graph', []);
   if (/\b(termodynam|entropia|ciepło|cieplo)\b/.test(normalized)) return request('thermodynamics', undefined, 'graph', []);

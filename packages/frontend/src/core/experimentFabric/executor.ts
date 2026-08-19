@@ -1,5 +1,6 @@
 import { atomCount, degreeOfUnsaturation, molecularWeight, parseFormula } from '../compute/cheminformatics';
 import { buildPumpPipeModel } from '../engineeringGraph/pumpPipe';
+import { solveKitaevBulk } from '../compute/kitaevBulk';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
 import { buildBohrModelGraph } from '../modelGraph/bohrModelGraph';
@@ -210,6 +211,39 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         outputs: { powerWatts: kardashevPower(kardashevType) }, units: { powerWatts: 'W' }, warnings: [],
         validity: 'Skala klasyfikacyjna Sagana; ekstrapolacja interpretacyjna, nie prognoza społeczna.',
         assumptions: ['P = 10^(10K+6) W.'], visualization: ['numeric', 'graph', 'narrative'], route: model.route,
+      };
+    }
+    case 'quantum-kitaev-bulk': {
+      const chemicalPotential = numberParam(params, 'chemicalPotential', 0);
+      const hopping = numberParam(params, 'hopping', 1);
+      const pairing = numberParam(params, 'pairing', 1);
+      const solved = solveKitaevBulk({ chemicalPotential, hopping, pairing });
+      const warning = solved.phase === 'CRITICAL_BOUNDARY'
+        ? ['Bulk gap zamyka się na granicy fazy; klasyfikacja topologiczna nie jest tam stabilna.']
+        : [];
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano analityczny bulk model BdG łańcucha Kitaeva: ${solved.phase}.`,
+        outputs: {
+          bulkGap: solved.bulkGap,
+          momentumAtGapRad: solved.momentumAtGap,
+          topologicalInvariant: solved.topologicalInvariant,
+          phaseClass: solved.phase,
+          criticalChemicalPotentialNegative: solved.criticalChemicalPotentialNegative,
+          criticalChemicalPotentialPositive: solved.criticalChemicalPotentialPositive,
+        },
+        units: {
+          bulkGap: 'jedn. energii', momentumAtGapRad: 'rad', topologicalInvariant: '', phaseClass: '',
+          criticalChemicalPotentialNegative: 'jedn. energii', criticalChemicalPotentialPositive: 'jedn. energii',
+        },
+        warnings: warning,
+        validity: 'Bezinterakcyjny, translacyjnie niezmienny 1D spinless p-wave bulk model BdG; nie jest modelem nanodrutu, materiału, urządzenia ani wyniku eksperymentu Majorana 1.',
+        assumptions: [
+          'E(k)=±√((-2t cos k−μ)²+4Δ² sin²k).',
+          'Klasyfikacja bulk: |μ|<2|t| przy Δ≠0.',
+          solved.finiteSizeCaveat,
+        ],
+        visualization: ['numeric', 'graph'], route: model.route,
       };
     }
     case 'water-pump-pipe': {

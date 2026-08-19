@@ -228,6 +228,28 @@ describe('Genesis Experiment Fabric', () => {
     expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
   });
 
+  it('runs the bounded Kitaev bulk model with reference phases but never as Majorana 1 hardware', () => {
+    const topological = runExperiment(parseScienceChatMessage('Zasymuluj łańcuch Kitaeva mu=0 t=1 delta=1.'));
+    const critical = runExperiment(parseScienceChatMessage('Zasymuluj łańcuch Kitaeva mu=2 t=1 delta=1.'));
+    const majoranaDevice = runExperiment(parseScienceChatMessage('Zasymuluj urządzenie Majorana 1.'));
+
+    expect(topological.request.modelId).toBe('quantum-kitaev-bulk');
+    expect(topological.result.status).toBe('completed');
+    expect(topological.result.outputs.phaseClass).toBe('TOPOLOGICAL_REGIME');
+    expect(topological.result.outputs.topologicalInvariant).toBe(-1);
+    expect(Number(topological.result.outputs.bulkGap)).toBeCloseTo(2, 10);
+    expect(topological.result.validity).toContain('nie jest modelem nanodrutu');
+
+    expect(critical.result.status).toBe('completed');
+    expect(critical.result.outputs.phaseClass).toBe('CRITICAL_BOUNDARY');
+    expect(Number(critical.result.outputs.bulkGap)).toBeCloseTo(0, 10);
+    expect(critical.result.warnings[0]).toContain('Bulk gap zamyka się');
+
+    expect(majoranaDevice.request.modelId).toBeUndefined();
+    expect(majoranaDevice.result.status).toBe('capability_seam');
+    expect(majoranaDevice.result.outputs).toEqual({});
+  });
+
   it('creates and replays a reproducible scenario capsule from real A/B runs only', () => {
     const comparison = compareCounterfactual({
       baseline: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'),

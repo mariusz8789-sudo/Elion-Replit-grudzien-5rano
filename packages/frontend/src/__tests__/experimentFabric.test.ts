@@ -298,6 +298,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(atom?.realModels).toContain('atom-hydrogen-orbital');
   });
 
+  it('runs bounded Kerr equatorial observables through Fabric without claiming full ray tracing', () => {
+    const command = 'Oblicz Kerr dla spin = 0,7.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const spacetime = getKnowledgeDomain('spacetime-einstein');
+
+    expect(run.request.modelId).toBe('einstein-kerr-equatorial');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'einstein', experimentId: 'kerr-3d' });
+    expect(Number(run.result.outputs.rPro)).toBeLessThan(Number(run.result.outputs.rRetro));
+    expect(Number(run.result.outputs.frameDraggingGap)).toBeGreaterThan(0);
+    expect(run.result.validity).toContain('Brak geodezyjnych poza równikiem');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(spacetime?.realModels).toContain('einstein-kerr-equatorial');
+  });
+
   it('runs bounded nuclide chart through Fabric while separating SEMF from measured catalog data', () => {
     const command = 'Pokaż mapę nuklidów dla protony = 26 neutrony = 30.';
     const run = runExperiment(parseScienceChatMessage(command));

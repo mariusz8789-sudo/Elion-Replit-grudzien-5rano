@@ -11,6 +11,7 @@ import { runPointLensScenario } from '../../labs/experiments/einstein-lensing';
 import { runLightConeScenario } from '../../labs/experiments/spacetime-lightcone-3d';
 import { runMinkowskiScenario } from '../../labs/experiments/spacetime-minkowski';
 import { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
+import { runKerrScenario } from '../../labs/experiments/einstein-kerr3d';
 import { runHydrogenOrbitalScenario } from '../../labs/experiments/atom-orbital-3d';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
@@ -438,6 +439,19 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         warnings: lambda < 15 ? ['Parametr Jeansa < 15: przybliżenie stabilnej atmosfery nie obowiązuje.'] : [],
         validity: 'Ucieczka termiczna Jeansa; bez efektu cieplarnianego, hydrodynamiki i wiatru gwiazdowego.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'einstein-kerr-equatorial': {
+      const solved = runKerrScenario({ spin: numberParam(params, 'spin', 0.7) });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Obliczono analityczne promienie Kerra dla a/M=${solved.spin.toFixed(3)}; różnica orbit fotonowych prograde/retrograde wynosi ${solved.frameDraggingGap.toFixed(6)} M.`,
+        outputs: solved,
+        units: { spin: '', mass: 'M', rPlus: 'M', rErgoEquator: 'M', rPro: 'M', rRetro: 'M', frameDraggingGap: 'M', criticalImpactPrograde: 'M', criticalImpactRetrograde: 'M' },
+        warnings: ['Wynik opisuje jedynie analityczne obserwowalne Kerra w płaszczyźnie równikowej, a nie losowe ślady fotonów renderera.'],
+        validity: 'Horyzont, ergosfera równikowa oraz kołowe orbity fotonowe Kerra dla 0 ≤ a/M ≤ 0,97. Brak geodezyjnych poza równikiem, stałej Cartera Q≠0, dysku akrecyjnego, ray tracingu 3D i danych obserwacyjnych.',
+        assumptions: ['Masa geometryczna M=1.', 'Orbity fotonowe są równikowe; brak precesji w θ.'],
+        visualization: ['numeric', 'scene-3d'], route: model.route,
       };
     }
     case 'nuclear-nuclide-chart': {

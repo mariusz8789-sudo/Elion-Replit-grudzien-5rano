@@ -36,6 +36,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const atomicNumber = firstNumber(normalized, /\bz\s*[=:]\s*(\d+)/);
   const principalN = firstNumber(normalized, /\bn\s*[=:]\s*(\d+)/);
   const beta = firstNumber(normalized, /\b(?:β|beta|v\s*\/\s*c)\s*[=:]?\s*(0(?:[.,]\d+)?|1(?:[.,]0+)?)/);
+  const kerrSpin = firstNumber(normalized, /\b(?:spin|a\s*\/\s*m)\s*[=:]?\s*(0(?:[.,]\d+)?|1(?:[.,]0+)?)/);
   const temperatureK = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*k\b/);
   const isingTemperature = firstNumber(normalized, /\b(?:t|temperatura)\s*[=:]?\s*(\d+(?:[.,]\d+)?)(?!\s*k\b)/);
   const activationEnergyKJ = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*kj\s*\/\s*mol\b/);
@@ -81,6 +82,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     params.velocityFraction = beta;
     params.beta = beta;
   }
+  if (kerrSpin !== undefined) params.spin = kerrSpin;
   if (temperatureK !== undefined) params.temperatureK = temperatureK;
   if (isingTemperature !== undefined) params.temperature = isingTemperature;
   if (activationEnergyKJ !== undefined) params.activationEnergyKJ = activationEnergyKJ;
@@ -176,6 +178,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/\b(geodezyjn[a-ząćęłńóśźż]*|tor foton[a-ząćęłńóśźż]*|parametr zderzenia)\b/.test(normalized) && /(?:czarna dziura|schwarzschild[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('spacetime-einstein', 'einstein-schwarzschild-geodesic', 'canvas-2d', ['impact']);
   }
+  if (/\b(kerr[a-ząćęłńóśźż]*|wirując[a-ząćęłńóśźż]* czarn[a-ząćęłńóśźż]* dziur[a-ząćęłńóśźż]*|wirujac[a-ząćęłńóśźż]* czarn[a-ząćęłńóśźż]* dziur[a-ząćęłńóśźż]*|frame[ -]?dragging|wleczeni[a-ząćęłńóśźż]* układ[a-ząćęłńóśźż]* inercjaln[a-ząćęłńóśźż]*)\b/.test(normalized)) return request('spacetime-einstein', 'einstein-kerr-equatorial', 'scene-3d', ['spin']);
   if (/(?:czarna dziura|schwarzschild[a-ząćęłńóśźż]*|czasoprzestrzeń|czasoprzestrzen[a-ząćęłńóśźż]*|zakrzywieni[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('spacetime-einstein', 'einstein-schwarzschild', 'scene-3d', ['massSolar']);
   }

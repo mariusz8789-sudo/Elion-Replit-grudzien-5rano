@@ -57,6 +57,26 @@ function ergosphereRadiusAtTheta(theta: number, a: number, mass: number): number
   return mass + Math.sqrt(Math.max(0, mass * mass - a * a * Math.cos(theta) * Math.cos(theta)));
 }
 
+export function runKerrScenario({ spin = 0.7 }: { spin?: number } = {}) {
+  if (!Number.isFinite(spin) || spin < 0 || spin > A_MAX) throw new Error(`spin must be within [0, ${A_MAX}].`);
+  const mass = 1;
+  const rPlus = kerrHorizonRadius(spin, mass);
+  const rErgoEquator = kerrErgosphereEquatorRadius(mass);
+  const rPro = kerrPhotonOrbitRadius(spin, mass, 1);
+  const rRetro = kerrPhotonOrbitRadius(spin, mass, -1);
+  return {
+    spin,
+    mass,
+    rPlus,
+    rErgoEquator,
+    rPro,
+    rRetro,
+    frameDraggingGap: rRetro - rPro,
+    criticalImpactPrograde: kerrCriticalImpactParameter(spin, mass, 1),
+    criticalImpactRetrograde: kerrCriticalImpactParameter(spin, mass, -1),
+  };
+}
+
 class Kerr3DSim implements Sim3D {
   private t = 0;
   private spawnAcc = 0;
@@ -290,12 +310,13 @@ class Kerr3DSim implements Sim3D {
   }
 
   getStats() {
+    const observables = runKerrScenario({ spin: this.a });
     return {
       captured: this.captured,
       escaped: this.escaped,
-      rPlus: kerrHorizonRadius(this.a, 1),
-      rPro: kerrPhotonOrbitRadius(this.a, 1, 1),
-      rRetro: kerrPhotonOrbitRadius(this.a, 1, -1),
+      rPlus: observables.rPlus,
+      rPro: observables.rPro,
+      rRetro: observables.rRetro,
     };
   }
 

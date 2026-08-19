@@ -30,6 +30,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const seed = firstNumber(normalized, /\bseed\s*[=:]?\s*(\d+)/);
   const r0 = firstNumber(normalized, /\br[₀0]\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const horizonDays = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*(?:dni|dzień|dnia|days?)\b/);
+  const proteinSteps = firstNumber(normalized, /\b(?:kroki\s*(?:mc|monte carlo)?|steps)\s*[=:]?\s*(\d+)\b/);
   const massSolar = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*(?:mas(?:a|y)\s+słońca|masy slonca|m[_ ]?sun|msun|solar masses?)\b/);
   const radiusAu = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*au\b/);
   const wavelengthNm = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*nm\b/);
@@ -78,6 +79,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (seed !== undefined) params.seed = seed;
   if (r0 !== undefined) params.r0 = r0;
   if (horizonDays !== undefined) params.horizonDays = horizonDays;
+  if (proteinSteps !== undefined) params.steps = proteinSteps;
   if (massSolar !== undefined) params.massSolar = massSolar;
   if (radiusAu !== undefined) params.orbitalRadiusAu = radiusAu;
   if (wavelengthNm !== undefined) params.wavelengthNm = wavelengthNm;
@@ -169,6 +171,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:podświadomość|podswadomosc|psychologiczny efekt obserwatora|wewnętrzny termostat|wewnetrzny termostat)/.test(normalized)) {
     return request('biology', undefined, 'narrative', []);
   }
+  if (/\b(fałdowani[a-ząćęłńóśźż]* białk[a-ząćęłńóśźż]*|faldowani[a-ząćęłńóśźż]* bialk[a-ząćęłńóśźż]*|protein folding|model hp|hydrofobow[a-ząćęłńóśźż]* rdze[nń])\b/.test(normalized)) return request('biology', 'biology-protein-folding-hp', 'canvas-2d', ['sequenceKey', 'temperature', 'steps', 'seed']);
   if (/\b(dna|helis[a-ząćęłńóśźż]* dna|b[- ]?dna|temperatur[a-ząćęłńóśźż]* topnieni[a-ząćęłńóśźż]* dna|wallace)\b/.test(normalized)) return request('biology', 'biology-dna-helix', 'scene-3d', ['sequence', 'temperatureC']);
   if (/(?:epidem[a-ząćęłńóśźż]*|seir|seird|\bsir\b|zakaż[a-ząćęłńóśźż]*|zakaz[a-ząćęłńóśźż]*|rozwój epidemii|rozwoj epidemii)/.test(normalized)) {
     return request('biology', 'epidemic-city', 'world-3d', ['r0', 'horizonDays', 'nAgents']);

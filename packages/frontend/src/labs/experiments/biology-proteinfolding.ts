@@ -1,6 +1,9 @@
 import type { ExperimentDef, Sim, SimParams } from '../../core/types';
 import {
+  contactCount,
   contactEnergy,
+  isConnected,
+  isSelfAvoiding,
   mcStep,
   parseSequence,
   straightChain,
@@ -36,6 +39,70 @@ const SEQUENCES: Record<string, string> = {
 
 const CELL_PX = 16;
 const STEPS_PER_SECOND = 400;
+
+export type ProteinFoldingScenarioInput = {
+  sequenceKey?: keyof typeof SEQUENCES;
+  temperature?: number;
+  steps?: number;
+  seed?: number;
+};
+
+/** Seedowany PRNG dla odtwarzalnego runu Metropolisa; nie zmienia jego reguł ani energii HP. */
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let value = Math.imul(state ^ (state >>> 15), 1 | state);
+    value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Współdzielony runner Fabric. Używa dokładnie istniejącego HP contactEnergy()
+ * oraz mcStep(); seed określa jedynie trajektorię Monte Carlo i jest zwracany
+ * dla reprodukowalności.
+ */
+export function runProteinFoldingScenario({
+  sequenceKey = 'classic',
+  temperature = 1,
+  steps = 5000,
+  seed = 20_260_819,
+}: ProteinFoldingScenarioInput = {}) {
+  if (!(sequenceKey in SEQUENCES)) throw new Error('sequenceKey must select an existing HP preset.');
+  if (!Number.isFinite(temperature) || temperature <= 0 || temperature > 3) throw new Error('temperature must be within (0, 3].');
+  if (!Number.isInteger(steps) || steps < 1 || steps > 50_000) throw new Error('steps must be an integer within [1, 50000].');
+  if (!Number.isInteger(seed) || seed < 0 || seed > 0xffff_ffff) throw new Error('seed must be a non-negative 32-bit integer.');
+
+  const sequence = parseSequence(SEQUENCES[sequenceKey]);
+  const random = mulberry32(seed);
+  let positions = straightChain(sequence.length);
+  const initialEnergy = contactEnergy(sequence, positions);
+  let energy = initialEnergy;
+  let bestEnergy = initialEnergy;
+  let acceptedMoves = 0;
+  for (let step = 0; step < steps; step++) {
+    const result = mcStep(sequence, positions, temperature, random);
+    positions = result.positions;
+    energy = result.energy;
+    if (result.accepted) acceptedMoves++;
+    if (energy < bestEnergy) bestEnergy = energy;
+  }
+  if (!isSelfAvoiding(positions) || !isConnected(positions)) throw new Error('HP chain invariants were violated.');
+  return {
+    sequenceKey,
+    sequenceLength: sequence.length,
+    temperature,
+    steps,
+    seed,
+    initialEnergy,
+    finalEnergy: energy,
+    bestEnergy,
+    finalHydrophobicContacts: contactCount(sequence, positions),
+    acceptedMoves,
+    acceptanceRate: acceptedMoves / steps,
+  } as const;
+}
 
 class ProteinFoldingSim implements Sim {
   private sequence: Residue[] = parseSequence(SEQUENCES.classic);

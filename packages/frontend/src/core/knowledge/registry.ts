@@ -87,11 +87,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'biology', title: 'Biologia i populacje', sourceFile: 'biology.md', scale: 'meso',
-    capability: 'REAL_ENGINE', realModels: ['biology-logistic', 'biology-dna-helix', 'biology.city'],
+    capability: 'REAL_ENGINE', realModels: ['biology-logistic', 'biology-dna-helix', 'biology-protein-folding-hp', 'biology.city'],
     concepts: ['populacja logistyczna', 'błona', 'DNA', 'białko', 'epidemia'],
-    parameters: ['growthRate', 'carryingCapacity', 'initialPopulation', 'timeElapsed', 'sequence', 'temperatureC', 'r0', 'seed'], units: ['1/czas', 'osobn.', 'dni', '°C', 'nm'],
-    assumptions: ['Modele biologiczne są edukacyjne i nie stanowią diagnozy ani prognozy medycznej. Helisa DNA używa geometrii B-DNA oraz reguły Wallace’a dla krótkich presetów, bez pełnej termodynamiki sekwencji, atomistyki i dynamiki molekularnej.'],
-    possibleExperiments: ['zasymuluj epidemię', 'pokaż rozwój epidemii w mieście', 'oblicz helisę DNA', 'wzrost populacji'], requiredSolver: 'EpidemicCitySimulation / B-DNA Wallace / ModelGraph',
+    parameters: ['growthRate', 'carryingCapacity', 'initialPopulation', 'timeElapsed', 'sequence', 'temperatureC', 'sequenceKey', 'temperature', 'steps', 'r0', 'seed'], units: ['1/czas', 'osobn.', 'dni', '°C', 'nm'],
+    assumptions: ['Modele biologiczne są edukacyjne i nie stanowią diagnozy ani prognozy medycznej. Helisa DNA używa geometrii B-DNA oraz reguły Wallace’a dla krótkich presetów, bez pełnej termodynamiki sekwencji, atomistyki i dynamiki molekularnej. Model HP folding redukuje białko do H/P i siatki 2D; seedowany Metropolis może zatrzymać się w minimum lokalnym i nie przewiduje struktury ani funkcji realnego białka.'],
+    possibleExperiments: ['zasymuluj epidemię', 'pokaż rozwój epidemii w mieście', 'oblicz helisę DNA', 'uruchom model HP fałdowania', 'wzrost populacji'], requiredSolver: 'EpidemicCitySimulation / B-DNA Wallace / HP Metropolis / ModelGraph',
     visualization: ['numeric', 'graph', 'world-3d', 'scene-3d'], dependencies: ['mathematics', 'thermodynamics'], keywords: ['epidemia', 'seir', 'seird', 'sir', 'zakaż', 'populacja', 'dna', 'helisa', 'wallace', 'miasto', 'choroba'],
   },
   {

@@ -11,6 +11,7 @@ import { runPointLensScenario } from '../../labs/experiments/einstein-lensing';
 import { runLightConeScenario } from '../../labs/experiments/spacetime-lightcone-3d';
 import { runMinkowskiScenario } from '../../labs/experiments/spacetime-minkowski';
 import { runLightSpeedScenario } from '../../labs/experiments/spacetime-cslider';
+import { runProteinFoldingScenario } from '../../labs/experiments/biology-proteinfolding';
 import { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
 import { runKerrScenario } from '../../labs/experiments/einstein-kerr3d';
 import { runQuantumTeleportScenario } from '../../labs/experiments/quantum-teleport';
@@ -593,6 +594,25 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący graf rozkładu normalnego.',
         outputs: details.outputs, units: details.units, warnings: [], validity: 'σ > 0; rozkład normalny.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'biology-protein-folding-hp': {
+      const sequenceKey = typeof params.sequenceKey === 'string' ? params.sequenceKey : 'classic';
+      const solved = runProteinFoldingScenario({
+        sequenceKey: sequenceKey as 'classic' | 'blockH' | 'alternating' | 'mostlyP',
+        temperature: numberParam(params, 'temperature', 1),
+        steps: numberParam(params, 'steps', 5000),
+        seed: numberParam(params, 'seed', 20_260_819),
+      });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano seedowany run Metropolisa HP: najlepsza energia kontaktowa ${solved.bestEnergy} po ${solved.steps} krokach.`,
+        outputs: solved,
+        units: { sequenceKey: '', sequenceLength: 'reszty HP', temperature: 'jednostki zredukowane', steps: 'kroki Monte Carlo', seed: '', initialEnergy: 'jednostki energii HP', finalEnergy: 'jednostki energii HP', bestEnergy: 'jednostki energii HP', finalHydrophobicContacts: 'kontakty H–H', acceptedMoves: 'kroki', acceptanceRate: '' },
+        warnings: ['To model HP: tylko reszty H/P i siatka 2D. Najniższa znaleziona energia może być minimum lokalnym, nie globalną strukturą białka.'],
+        validity: 'Istniejący model HP (Hydrophobic–Polar) na siatce 2D, uruchomiony seedowanym Metropolisem. Opisuje wyłącznie kontakty hydrofobowe H–H poza szkieletem; nie jest predykcją struktury, funkcji ani dynamiki prawdziwego białka.',
+        assumptions: ['Sekwencja jest jednym z czterech lokalnych presetów H/P.', 'Seed ujawnia trajektorię Monte Carlo; nie ma danych eksperymentalnych, geometrii 3D ani pełnej energii molekularnej.'],
+        visualization: ['numeric', 'canvas-2d'], route: model.route,
       };
     }
     case 'biology-logistic': {

@@ -8,6 +8,7 @@ import {
   straightChain,
   type Point,
 } from '../core/proteinFolding';
+import { runProteinFoldingScenario } from '../labs/experiments/biology-proteinfolding';
 
 /** Generator liniowy kongruentny — deterministyczny, powtarzalny RNG dla testów statystycznych. */
 function seededRng(seed: number): () => number {
@@ -48,6 +49,27 @@ describe('contactEnergy — dokładna formuła kontaktowa modelu HP (Lau & Dill 
     for (const seq of ['HHHHHH', 'HPHPHP', 'PPPPPP', 'HPPPPH']) {
       expect(contactEnergy(parseSequence(seq), hairpin)).toBeLessThanOrEqual(0);
     }
+  });
+});
+
+describe('seedowany HP runner dla Fabric', () => {
+  it('wykonuje ten sam istniejący Metropolis deterministycznie i raportuje wyłącznie jego obserwowalne', () => {
+    const input = { sequenceKey: 'classic' as const, temperature: 0.5, steps: 20_000, seed: 99 };
+    const first = runProteinFoldingScenario(input);
+    const repeated = runProteinFoldingScenario(input);
+
+    expect(first).toEqual(repeated);
+    expect(first.initialEnergy).toBe(0);
+    expect(first.bestEnergy).toBeLessThanOrEqual(first.initialEnergy);
+    expect(first.finalEnergy).toBeLessThanOrEqual(0);
+    expect(first.finalHydrophobicContacts).toBe(-first.finalEnergy);
+    expect(first.acceptanceRate).toBeGreaterThanOrEqual(0);
+    expect(first.acceptanceRate).toBeLessThanOrEqual(1);
+  });
+
+  it('odrzuca parametry poza jawnym zakresem runnera', () => {
+    expect(() => runProteinFoldingScenario({ steps: 0 })).toThrow('steps');
+    expect(() => runProteinFoldingScenario({ temperature: 0 })).toThrow('temperature');
   });
 });
 

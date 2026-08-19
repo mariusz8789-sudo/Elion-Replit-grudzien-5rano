@@ -919,6 +919,30 @@ describe('Genesis Experiment Fabric', () => {
     expect(rejected.result.summary).toContain('v≥c');
   });
 
+  it('routes the bounded seeded HP folding model through Fabric without claiming a real protein structure', () => {
+    const command = 'Uruchom model HP fałdowania białka: temperatura=0.5, kroki MC=20000, seed=99.';
+    const request = parseScienceChatMessage(command);
+    const run = runExperiment(request);
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const rejected = runExperiment(parseScienceChatMessage('Uruchom model HP fałdowania białka: kroki MC=99999, seed=99.'));
+    const biology = getKnowledgeDomain('biology');
+
+    expect(request.modelId).toBe('biology-protein-folding-hp');
+    expect(request.parameters).toEqual({ temperature: 0.5, steps: 20000, seed: 99 });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.outputs.initialEnergy).toBe(0);
+    expect(Number(run.result.outputs.bestEnergy)).toBeLessThanOrEqual(0);
+    expect(Number(run.result.outputs.acceptanceRate)).toBeGreaterThanOrEqual(0);
+    expect(run.result.validity).toContain('nie jest predykcją struktury');
+    expect(run.provenance.resultOrigin).toBe('real-engine');
+    expect(run.provenance.knowledgeSources).toContain('biology.md');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(biology?.realModels).toContain('biology-protein-folding-hp');
+    expect(biology?.assumptions.join(' ')).toContain('minimum lokalnym');
+    expect(rejected.result.status).toBe('rejected');
+    expect(rejected.result.summary).toContain('poza zakresem');
+  });
+
   it('runs the existing Kepler ModelGraph deterministically from natural language', () => {
     const request = parseScienceChatMessage('Oblicz orbitę planety przy 2 AU i 1 masie Słońca.');
     const a = runExperiment(request);

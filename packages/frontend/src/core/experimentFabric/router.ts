@@ -213,6 +213,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Istniejąca geometria B-DNA oraz reguła Wallace’a dla krótkich presetów; bez metody najbliższego sąsiada, atomistyki, dynamiki molekularnej i profilu biologicznego.',
   },
   {
+    id: 'biology-protein-folding-hp', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-hp-metropolis@1.0.0',
+    parameters: [text('sequenceKey', 'Preset sekwencji HP', 'classic'), number('temperature', 'Temperatura Metropolisa', '', 0.05, 3, 1), number('steps', 'Kroki Monte Carlo', 'kroki', 1, 50000, 5000), number('seed', 'Seed Monte Carlo', '', 0, 0xffff_ffff, 20260819)],
+    route: { kind: 'lab', labId: 'biology', experimentId: 'protein-folding' }, knowledgeSources: ['biology.md'],
+    rationale: 'Istniejący seedowany Metropolis modelu HP na siatce 2D: energia to kontakty H–H poza szkieletem. Nie jest predykcją struktury prawdziwego białka, AlphaFold ani dynamiką molekularną.',
+  },
+  {
     id: 'nuclear-semf', domainId: 'nuclear', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('protonNumber', 'Liczba protonów Z', '', 1, 118, 26), number('neutronNumber', 'Liczba neutronów N', '', 0, 180, 30)],
     route: { kind: 'lab', labId: 'nuclear' }, knowledgeSources: ['nuclear.md', 'particle.md'],

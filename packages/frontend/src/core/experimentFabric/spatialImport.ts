@@ -39,7 +39,8 @@ export interface GenesisSpatialDataset {
 
 export interface OsmMapImportRequest {
   bbox: readonly [number, number, number, number];
-  sourceTimestamp?: string;
+  /** Immutable acquisition time supplied with the source artifact; required for replayable provenance. */
+  sourceTimestamp: string;
   /** API root can be supplied only for a documented compatible OSM endpoint. */
   apiRoot?: 'https://api.openstreetmap.org/api/0.6';
 }
@@ -73,6 +74,10 @@ function validBbox(bbox: readonly [number, number, number, number]): boolean {
   return [west, south, east, north].every(Number.isFinite) && west < east && south < north && west >= -180 && east <= 180 && south >= -90 && north <= 90 && (east - west) <= 0.01 && (north - south) <= 0.01;
 }
 
+function validSourceTimestamp(value: string): boolean {
+  return typeof value === 'string' && value.length > 0 && Number.isFinite(Date.parse(value));
+}
+
 /**
  * Normalizes an already acquired official OSM API XML artifact. The parser is
  * deliberately narrow: it reads only nodes and ways necessary for base layers;
@@ -80,6 +85,7 @@ function validBbox(bbox: readonly [number, number, number, number]): boolean {
  */
 export function normalizeOsmMapXml(xml: string, request: OsmMapImportRequest): GenesisSpatialDataset {
   if (!validBbox(request.bbox)) throw new Error('OSM bbox must be valid and no larger than 0.01° × 0.01° for the public map API.');
+  if (!validSourceTimestamp(request.sourceTimestamp)) throw new Error('OSM sourceTimestamp must be an explicit valid timestamp for replayable provenance.');
   if (!xml.includes('<osm')) throw new Error('Input is not an OSM XML document.');
   const root = attributes(xml.match(/<osm\s+([^>]+)>/)?.[1] ?? '');
   const nodes = new Map<string, LonLat>();
@@ -109,7 +115,7 @@ export function normalizeOsmMapXml(xml: string, request: OsmMapImportRequest): G
   }
   const sourceQuery = `bbox=${request.bbox.join(',')}`;
   const sourceUrl = `${request.apiRoot ?? 'https://api.openstreetmap.org/api/0.6'}/map?${sourceQuery}`;
-  const sourceTimestamp = request.sourceTimestamp ?? new Date().toISOString();
+  const sourceTimestamp = request.sourceTimestamp;
   const rawArtifactFingerprint = `osm_raw_${fnv1a(xml)}`;
   const normalizationFingerprint = `osm_normalized_${fnv1a(canonicalJson({ bbox: request.bbox, sourceUrl, sourceTimestamp, layers: Object.fromEntries(Object.entries(grouped).map(([layer, features]) => [layer, features.map((feature) => feature.sourceId)])) }))}`;
   const featureCount = Object.values(grouped).reduce((sum, entries) => sum + entries.length, 0);
@@ -128,9 +134,10 @@ export function normalizeOsmMapXml(xml: string, request: OsmMapImportRequest): G
 /** Fetches one constrained public OSM API map artifact and immediately records its provenance. */
 export async function importOsmMap(request: OsmMapImportRequest, fetcher: typeof fetch = fetch): Promise<GenesisSpatialDataset> {
   if (!validBbox(request.bbox)) throw new Error('OSM bbox must be valid and no larger than 0.01° × 0.01° for the public map API.');
+  if (!validSourceTimestamp(request.sourceTimestamp)) throw new Error('OSM sourceTimestamp must be an explicit valid timestamp for replayable provenance.');
   const sourceQuery = `bbox=${request.bbox.join(',')}`;
   const sourceUrl = `${request.apiRoot ?? 'https://api.openstreetmap.org/api/0.6'}/map?${sourceQuery}`;
   const response = await fetcher(sourceUrl, { headers: { Accept: 'application/xml' } });
   if (!response.ok) throw new Error(`OSM map API failed with HTTP ${response.status}.`);
-  return normalizeOsmMapXml(await response.text(), { ...request, sourceTimestamp: request.sourceTimestamp ?? new Date().toISOString() });
+  return normalizeOsmMapXml(await response.text(), request);
 }

@@ -107,6 +107,8 @@ describe('Genesis Experiment Fabric', () => {
     expect(dataset.layers.roads).toHaveLength(1);
     expect(dataset.provenance.featureCount).toBe(2);
     expect(dataset.worldIntegration).toBe('NOT_WIRED');
+    expect(normalizeOsmMapXml(xml, { bbox: [-5.3240, 35.8885, -5.3235, 35.8890], sourceTimestamp: '2026-08-18T00:00:00.000Z' }).datasetId).toBe(dataset.datasetId);
+    expect(() => normalizeOsmMapXml(xml, { bbox: [-5.3240, 35.8885, -5.3235, 35.8890], sourceTimestamp: '' })).toThrow('sourceTimestamp');
   });
 
   it('turns only real comparable runs into reviewable observations, not discoveries', () => {

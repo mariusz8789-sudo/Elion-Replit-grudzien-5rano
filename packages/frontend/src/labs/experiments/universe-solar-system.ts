@@ -35,6 +35,30 @@ registerDataSource<PlanetData[]>({
   load: () => PLANETS,
 });
 
+function solarPositionAtDays(planet: PlanetData, daysElapsed: number) {
+  const meanAnomaly = ((2 * Math.PI * daysElapsed) / planet.periodDays) % (2 * Math.PI);
+  const { x, y } = keplerPosition(planet.semiMajorAxisAu, planet.eccentricity, meanAnomaly);
+  return { name: planet.name, xAu: x, yAu: y, radiusAu: Math.hypot(x, y) };
+}
+
+export function runSolarSystemScenario({ daysElapsed = 365.256 }: { daysElapsed?: number } = {}) {
+  if (!Number.isFinite(daysElapsed) || daysElapsed < 0 || daysElapsed > 1_000_000) {
+    throw new Error('daysElapsed must be within [0, 1000000].');
+  }
+  const positions = PLANETS.map((planet) => solarPositionAtDays(planet, daysElapsed));
+  const positionOf = (name: string) => positions.find((planet) => planet.name === name)!;
+  return {
+    daysElapsed,
+    planetCount: positions.length,
+    mercuryOrbits: daysElapsed / PLANETS[0].periodDays,
+    earthOrbits: daysElapsed / PLANETS[2].periodDays,
+    mercuryRadiusAu: positionOf('Merkury').radiusAu,
+    earthRadiusAu: positionOf('Ziemia').radiusAu,
+    neptuneRadiusAu: positionOf('Neptun').radiusAu,
+    positions,
+  };
+}
+
 interface PlanetView extends PlanetData {
   /** Skala px/AU dla TEJ planety (skompresowana skala odległości — patrz komentarz u góry). */
   scale: number;
@@ -62,8 +86,8 @@ class SolarSystemSim implements Sim {
   }
 
   private positionAu(planet: PlanetData): { x: number; y: number } {
-    const meanAnomaly = ((2 * Math.PI * this.daysElapsed) / planet.periodDays) % (2 * Math.PI);
-    return keplerPosition(planet.semiMajorAxisAu, planet.eccentricity, meanAnomaly);
+    const { xAu, yAu } = solarPositionAtDays(planet, this.daysElapsed);
+    return { x: xAu, y: yAu };
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {

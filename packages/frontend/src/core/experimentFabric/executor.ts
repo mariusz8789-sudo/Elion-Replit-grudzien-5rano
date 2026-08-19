@@ -18,6 +18,7 @@ import { runPlanetStabilityScenario } from '../../labs/experiments/universe-plan
 import { runRotationCurveScenario } from '../../labs/experiments/universe-rotationcurve';
 import { runCollisionScenario } from '../../labs/experiments/universe-collision';
 import { runStarLifeScenario } from '../../labs/experiments/universe-starlife';
+import { runSolarSystemScenario } from '../../labs/experiments/universe-solar-system';
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
@@ -412,6 +413,19 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący graf szczególnej teorii względności.',
         outputs: details.outputs, units: details.units, warnings: [], validity: 'Ruch inercjalny wzdłuż jednej osi; β < 1.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'universe-solar-system': {
+      const solved = runSolarSystemScenario({ daysElapsed: numberParam(params, 'daysElapsed', 365.256) });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Obliczono pozycje ${solved.planetCount} planet po ${solved.daysElapsed.toFixed(3)} dniach od umownego startu Keplerowskiego.`,
+        outputs: { ...solved, positions: JSON.stringify(solved.positions) },
+        units: { daysElapsed: 'dni ziemskie', planetCount: 'planets', mercuryOrbits: 'orbits', earthOrbits: 'orbits', mercuryRadiusAu: 'AU', earthRadiusAu: 'AU', neptuneRadiusAu: 'AU', positions: 'AU (JSON)' },
+        warnings: ['Fazy startowe są umowne. Wynik pokazuje pozycje względem modelu Keplera, a nie bieżącą efemerydę ani pozycję planety na datę kalendarzową.'],
+        validity: 'Rozwiązanie równania Keplera dla danych orbitalnych ośmiu planet. Pomija wzajemne zaburzenia planet, inklinacje, precesję, relatywistykę oraz aktualizowane elementy efemerydalne.',
+        assumptions: ['Płaszczyznowe, niezależne orbity Keplera o stałych elementach.', 'Czas startowy jest umowny, nie powiązany z datą UTC ani NASA JPL Horizons.'],
+        visualization: ['numeric', 'canvas-2d'], route: model.route,
       };
     }
     case 'universe-atmospheric-escape': {

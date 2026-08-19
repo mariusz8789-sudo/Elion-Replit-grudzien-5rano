@@ -123,6 +123,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:krzyw[a-ząćęłńóśźż]* rotacji|ciemna materia|\bmond\b|halo galaktyczn[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('universe', 'universe-rotation-curve', 'graph', ['haloVInf', 'altGravity']);
   }
+  if (/\b(układ słoneczny|uklad sloneczny|słońc[a-ząćęłńóśźż]* i planet[a-ząćęłńóśźż]*|slonc[a-ząćęłńóśźż]* i planet[a-ząćęłńóśźż]*)\b/.test(normalized)) {
+    if (horizonDays !== undefined) params.daysElapsed = horizonDays;
+    return request('universe', 'universe-solar-system', 'canvas-2d', ['daysElapsed']);
+  }
   if (/(?:stabilność planet|stabilnosc planet|układ planetarn[a-ząćęłńóśźż]*|uklad planetarn[a-ząćęłńóśźż]*|planetarna stabilność|planetarna stabilnosc|n[- ]?ciał planet)/.test(normalized)) {
     return request('universe', 'universe-planet-stability', 'scene-3d', ['years', 'jupiter', 'saturn']);
   }

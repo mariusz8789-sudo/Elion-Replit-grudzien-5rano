@@ -298,6 +298,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(atom?.realModels).toContain('atom-hydrogen-orbital');
   });
 
+  it('runs bounded solar-system Kepler positions through Fabric without claiming a live ephemeris', () => {
+    const command = 'Pokaż Układ Słoneczny przez 365,256 dni.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const universe = getKnowledgeDomain('universe');
+
+    expect(run.request.modelId).toBe('universe-solar-system');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'solar-system' });
+    expect(Number(run.result.outputs.planetCount)).toBe(8);
+    expect(Number(run.result.outputs.earthOrbits)).toBeCloseTo(1, 3);
+    expect(JSON.parse(String(run.result.outputs.positions))).toHaveLength(8);
+    expect(run.result.validity).toContain('efemerydalne');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(universe?.realModels).toContain('universe-solar-system');
+  });
+
   it('runs bounded Minkowski 1+1D through Fabric without claiming acceleration or gravity', () => {
     const command = 'Pokaż diagram Minkowskiego przy beta = 0,5.';
     const run = runExperiment(parseScienceChatMessage(command));

@@ -76,6 +76,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf Keplera dla zagadnienia dwóch ciał i orbity kołowej.',
   },
   {
+    id: 'universe-solar-system', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-kepler-solar-system@1.0.0',
+    parameters: [number('daysElapsed', 'Czas od umownego startu', 'dni ziemskie', 0, 1_000_000, 365.256)],
+    route: { kind: 'lab', labId: 'universe', experimentId: 'solar-system' }, knowledgeSources: ['universe.md', 'classical-mechanics.md'],
+    rationale: 'Istniejące dane orbitalne ośmiu planet i współdzielone rozwiązanie równania Keplera; fazy startowe są umowne, więc wynik nie jest efemerydą NASA JPL Horizons.',
+  },
+  {
     id: 'universe-three-body', domainId: 'classical-mechanics', modelVersion: '1.0.0', engine: 'genesis-three-body@1.0.0',
     parameters: [
       text('preset', 'Układ startowy', 'figure8'),

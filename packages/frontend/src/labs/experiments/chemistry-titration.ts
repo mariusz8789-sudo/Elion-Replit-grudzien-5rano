@@ -147,6 +147,15 @@ class TitrationSim implements Sim {
   }
 }
 
+export function runTitrationScenario({ acid = 'acetic', vb = 0 }: { acid?: string; vb?: number } = {}) {
+  const selected = ACIDS.find((candidate) => candidate.id === acid);
+  if (!selected) throw new Error('acid musi być jednym z obsługiwanych słabych kwasów.');
+  if (!Number.isFinite(vb) || vb < 0 || vb > VB_MAX) throw new Error(`vb musi mieścić się w zakresie 0–${VB_MAX} mL.`);
+  const veq = equivalenceVolumeMl(CA, VA, CB);
+  const ph = titrationPH(CA, VA, CB, Math.max(vb, 1e-6), selected.ka);
+  return { acid: selected.id, acidName: selected.name, ka: selected.ka, vb, ph, veq, pKa: -Math.log10(selected.ka) };
+}
+
 export const chemistryTitration: ExperimentDef = {
   id: 'titration',
   name: 'Miareczkowanie kwas–zasada',

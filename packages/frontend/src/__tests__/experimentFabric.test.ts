@@ -284,6 +284,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
   });
 
+  it('runs bounded acid-base titration through Fabric without claiming a sample measurement', () => {
+    const command = 'Oblicz miareczkowanie kwasowo-zasadowe NaOH.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const chemistry = getKnowledgeDomain('chemistry');
+
+    expect(run.request.modelId).toBe('chemistry-titration');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'chemistry', experimentId: 'titration' });
+    expect(Number(run.result.outputs.veq)).toBeCloseTo(25, 12);
+    expect(Number(run.result.outputs.ph)).toBeGreaterThan(0);
+    expect(run.result.validity).toContain('Brak aktywności jonowych');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(chemistry?.realModels).toContain('chemistry-titration');
+  });
+
   it('runs bounded Schwarzschild photon geodesic through Fabric without claiming Kerr or ray tracing', () => {
     const command = 'Zintegruj geodezyjną fotonu wokół czarnej dziury Schwarzschilda.';
     const run = runExperiment(parseScienceChatMessage(command));

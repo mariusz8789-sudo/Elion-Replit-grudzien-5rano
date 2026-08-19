@@ -5,6 +5,7 @@ import { runBlochCircuitScenario } from '../../labs/experiments/quantum-bloch';
 import { runTunnelingScenario } from '../../labs/experiments/quantum-tunneling';
 import { runChshCorrelationScenario } from '../../labs/experiments/quantum-chsh';
 import { runSchwarzschildGeodesicScenario } from '../../labs/experiments/einstein-geodesics';
+import { runTitrationScenario } from '../../labs/experiments/chemistry-titration';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
@@ -413,6 +414,11 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         outputs: details.outputs, units: details.units, warnings: [], validity: 'Cząstka swobodna w próżni; β < 1.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
       };
+    }
+    case 'chemistry-titration': {
+      const acid = typeof params.acid === 'string' ? params.acid : 'acetic';
+      const solved = runTitrationScenario({ acid, vb: numberParam(params, 'vb', 0) });
+      return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Obliczono pH=${solved.ph.toFixed(4)} dla ${solved.acidName} po dodaniu ${solved.vb.toFixed(2)} mL NaOH.`, outputs: solved, units: { acid: '', acidName: '', ka: 'mol/L', vb: 'mL', ph: '', veq: 'mL', pKa: '' }, warnings: ['To deterministyczny scenariusz laboratoryjny o stałych stężeniach i temperaturze; nie jest pomiarem konkretnej próbki ani automatyczną identyfikacją kwasu.'], validity: 'Bilans ładunku słabego kwasu i NaOH z autodysocjacją wody, rozwiązywany istniejącą funkcją Canvasu. Brak aktywności jonowych, temperatury zmiennej, CO₂, wieloprotonowości i niepewności pomiarowej.', assumptions: ['Ca=Cb=0,1 mol/L; Va=25 mL; NaOH jest mocną zasadą.', 'Dozwolone są tylko cztery istniejące słabe kwasy z lokalnymi Ka.'], visualization: ['numeric', 'graph', 'canvas-2d'], route: model.route };
     }
     case 'chemistry-ising': {
       const temperature = numberParam(params, 'temperature', 2);

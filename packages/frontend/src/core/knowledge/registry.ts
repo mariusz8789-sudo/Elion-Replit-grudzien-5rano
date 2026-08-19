@@ -154,11 +154,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'nuclear', title: 'Fizyka jądrowa', sourceFile: 'nuclear.md', scale: 'micro',
-    capability: 'REAL_ENGINE', realModels: ['nuclear-semf', 'nuclear-nuclide-chart'],
-    concepts: ['SEMF', 'mapa nuklidów', 'energia wiązania', 'rozpad', 'fuzja', 'reaktor'], parameters: ['protonNumber', 'neutronNumber'], units: ['MeV'],
-    assumptions: ['SEMF pomija efekty powłokowe i nie jest pełnym modelem reaktora. Charta nuklidów odróżnia predykcję SEMF od około 55 lokalnych rekordów zmierzonych NNDC/IAEA; brak rekordu nie jest twierdzeniem o nieistnieniu nuklidu.'],
-    possibleExperiments: ['oblicz energię wiązania jądra', 'pokaż mapę nuklidów'], requiredSolver: 'nuclear-semf / nuclear-nuclide-chart',
-    visualization: ['numeric', 'graph', 'canvas-2d', 'scene-3d'], dependencies: ['particle', 'quantum'], keywords: ['jądro', 'jadro', 'sefm', 'energia wiązania', 'mapa nuklidów', 'nuklid', 'fuzja', 'rozpad'],
+    capability: 'REAL_ENGINE', realModels: ['nuclear-semf', 'nuclear-nuclide-chart', 'nuclear-tokamak-lawson'],
+    concepts: ['SEMF', 'mapa nuklidów', 'energia wiązania', 'rozpad', 'fuzja', 'kryterium Lawsona', 'tokamak'], parameters: ['protonNumber', 'neutronNumber', 'densityExponent', 'temperatureKeV', 'confinementSeconds'], units: ['MeV', 'keV', 's'],
+    assumptions: ['SEMF pomija efekty powłokowe i nie jest pełnym modelem reaktora. Charta nuklidów odróżnia predykcję SEMF od około 55 lokalnych rekordów zmierzonych NNDC/IAEA; brak rekordu nie jest twierdzeniem o nieistnieniu nuklidu. Tokamak ogranicza się do bilansu 0D kryterium Lawsona, bez MHD, transportu i predykcji urządzenia.'],
+    possibleExperiments: ['oblicz energię wiązania jądra', 'pokaż mapę nuklidów', 'sprawdź kryterium Lawsona'], requiredSolver: 'nuclear-semf / nuclear-nuclide-chart / nuclear-tokamak-lawson',
+    visualization: ['numeric', 'graph', 'canvas-2d', 'scene-3d'], dependencies: ['particle', 'quantum'], keywords: ['jądro', 'jadro', 'sefm', 'energia wiązania', 'mapa nuklidów', 'nuklid', 'fuzja', 'tokamak', 'lawson', 'rozpad'],
   },
   {
     id: 'particle', title: 'Fizyka cząstek', sourceFile: 'particle.md', scale: 'micro',

@@ -8,6 +8,18 @@ import type { ExperimentDef, Sim, SimParams } from '../../core/types';
  * promieniste optimum pracy leży niżej.
  */
 
+const LAWSON_THRESHOLD = 3e21;
+
+export function runTokamakLawsonScenario({ densityExponent = 20, temperatureKeV = 15, confinementSeconds = 1.5 }: { densityExponent?: number; temperatureKeV?: number; confinementSeconds?: number } = {}) {
+  if (!Number.isFinite(densityExponent) || densityExponent < 19 || densityExponent > 21.5) throw new Error('densityExponent must be within [19, 21.5].');
+  if (!Number.isFinite(temperatureKeV) || temperatureKeV < 2 || temperatureKeV > 40) throw new Error('temperatureKeV must be within [2, 40].');
+  if (!Number.isFinite(confinementSeconds) || confinementSeconds < 0.1 || confinementSeconds > 8) throw new Error('confinementSeconds must be within [0.1, 8].');
+  const densityPerM3 = 10 ** densityExponent;
+  const tripleProduct = densityPerM3 * temperatureKeV * confinementSeconds;
+  const lawsonRatio = tripleProduct / LAWSON_THRESHOLD;
+  return { densityExponent, densityPerM3, temperatureKeV, confinementSeconds, tripleProduct, lawsonThreshold: LAWSON_THRESHOLD, lawsonRatio, ignitionCriterionMet: lawsonRatio >= 1 };
+}
+
 class TokamakSim implements Sim {
   private t = 0;
   private ratio = 0;
@@ -16,10 +28,7 @@ class TokamakSim implements Sim {
 
   update(dt: number, p: SimParams) {
     this.t += dt;
-    const n = Math.pow(10, Number(p.n)); // m⁻³
-    const T = Number(p.T); // keV
-    const tau = Number(p.tau); // s
-    this.ratio = (n * T * tau) / 3e21;
+    this.ratio = runTokamakLawsonScenario({ densityExponent: Number(p.n), temperatureKeV: Number(p.T), confinementSeconds: Number(p.tau) }).lawsonRatio;
   }
 
   render(ctx: CanvasRenderingContext2D, w: number, h: number) {

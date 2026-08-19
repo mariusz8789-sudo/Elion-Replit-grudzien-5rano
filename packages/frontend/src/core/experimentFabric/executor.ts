@@ -13,6 +13,7 @@ import { runMinkowskiScenario } from '../../labs/experiments/spacetime-minkowski
 import { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
 import { runKerrScenario } from '../../labs/experiments/einstein-kerr3d';
 import { runQuantumTeleportScenario } from '../../labs/experiments/quantum-teleport';
+import { runTokamakLawsonScenario } from '../../labs/experiments/nuclear-tokamak';
 import { runHydrogenOrbitalScenario } from '../../labs/experiments/atom-orbital-3d';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
@@ -454,6 +455,10 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         assumptions: ['Masa geometryczna M=1.', 'Orbity fotonowe są równikowe; brak precesji w θ.'],
         visualization: ['numeric', 'scene-3d'], route: model.route,
       };
+    }
+    case 'nuclear-tokamak-lawson': {
+      const solved = runTokamakLawsonScenario({ densityExponent: numberParam(params, 'densityExponent', 20), temperatureKeV: numberParam(params, 'temperatureKeV', 15), confinementSeconds: numberParam(params, 'confinementSeconds', 1.5) });
+      return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Obliczono nTτ_E = ${solved.tripleProduct.toExponential(4)} keV·s/m³, czyli ${solved.lawsonRatio.toFixed(6)}× progu Lawsona.`, outputs: solved, units: { densityExponent: '', densityPerM3: 'm⁻³', temperatureKeV: 'keV', confinementSeconds: 's', tripleProduct: 'keV·s/m³', lawsonThreshold: 'keV·s/m³', lawsonRatio: '', ignitionCriterionMet: '' }, warnings: ['Spełnienie kryterium 0D nie jest predykcją zapłonu konkretnego urządzenia.'], validity: 'Ograniczone kryterium Lawsona D-T nTτ_E / 3×10²¹. Bez MHD, profili plazmy, transportu, strat promienistych, geometrii reaktora, bilansu mocy i kalibracji eksperymentalnej.', assumptions: ['Jednorodny bilans 0D.', 'Próg Lawsona jest stałą referencyjną tego modelu.'], visualization: ['numeric', 'canvas-2d'], route: model.route };
     }
     case 'nuclear-nuclide-chart': {
       const solved = runNuclideChartScenario({

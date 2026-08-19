@@ -193,6 +193,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     if (massSolar !== undefined) params.centralMassSolar = massSolar;
     return request('universe', 'universe-kepler', 'scene-3d', ['centralMassSolar', 'orbitalRadiusAu']);
   }
+  if (/\b(tokamak[a-ząćęłńóśźż]*|kryterium lawson[a-ząćęłńóśźż]*|fuzj[a-ząćęłńóśźż]* d[- ]?t)\b/.test(normalized)) {
+    return request('nuclear', 'nuclear-tokamak-lawson', 'canvas-2d', ['densityExponent', 'temperatureKeV', 'confinementSeconds']);
+  }
   if (/\b(map[a-ząćęłńóśźż]* nuklid[a-ząćęłńóśźż]*|chart of nuclides|karta nuklid[a-ząćęłńóśźż]*)\b/.test(normalized)) {
     return request('nuclear', 'nuclear-nuclide-chart', 'canvas-2d', ['protonNumber', 'neutronNumber']);
   }

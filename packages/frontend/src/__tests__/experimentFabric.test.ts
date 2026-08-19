@@ -298,6 +298,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(atom?.realModels).toContain('atom-hydrogen-orbital');
   });
 
+  it('runs bounded tokamak Lawson criterion through Fabric without claiming reactor prediction', () => {
+    const command = 'Sprawdź kryterium Lawsona tokamak.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const nuclear = getKnowledgeDomain('nuclear');
+
+    expect(run.request.modelId).toBe('nuclear-tokamak-lawson');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'nuclear', experimentId: 'tokamak' });
+    expect(Number(run.result.outputs.lawsonRatio)).toBeCloseTo(0.75, 12);
+    expect(run.result.outputs.ignitionCriterionMet).toBe(false);
+    expect(run.result.validity).toContain('Bez MHD');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(nuclear?.realModels).toContain('nuclear-tokamak-lawson');
+  });
+
   it('runs all bounded quantum-teleportation branches through Fabric without claiming hardware', () => {
     const command = 'Zweryfikuj teleportację kwantową stan = plusI.';
     const run = runExperiment(parseScienceChatMessage(command));

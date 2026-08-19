@@ -207,6 +207,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf SEMF; model kroplowy energii wiązania, bez efektów powłokowych.',
   },
   {
+    id: 'nuclear-tokamak-lawson', domainId: 'nuclear', modelVersion: '1.0.0', engine: 'genesis-lawson-0d@1.0.0',
+    parameters: [number('densityExponent', 'log₁₀ gęstości n', '', 19, 21.5, 20), number('temperatureKeV', 'Temperatura', 'keV', 2, 40, 15), number('confinementSeconds', 'Czas utrzymania energii', 's', 0.1, 8, 1.5)],
+    route: { kind: 'lab', labId: 'nuclear', experimentId: 'tokamak' }, knowledgeSources: ['nuclear.md'],
+    rationale: 'Istniejący 0D iloraz nTτ_E wobec progu Lawsona D-T; nie jest MHD, transportem plazmy, bilansem mocy reaktora ani predykcją ITER.',
+  },
+  {
     id: 'nuclear-nuclide-chart', domainId: 'nuclear', modelVersion: '1.0.0', engine: 'genesis-semf-nuclide-catalog@1.0.0',
     parameters: [number('protonNumber', 'Liczba protonów Z', '', 1, 100, 26), number('neutronNumber', 'Liczba neutronów N', '', 0, 160, 30)],
     route: { kind: 'lab', labId: 'nuclear', experimentId: 'chart' }, knowledgeSources: ['nuclear.md', 'particle.md'],

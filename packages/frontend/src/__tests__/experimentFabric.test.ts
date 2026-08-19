@@ -28,6 +28,7 @@ import {
   OSM_LICENSE,
   planCrossDomainOrchestration,
   planAtmosphericTemperatureToArrhenius,
+  confirmCrossDomainOrchestration,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -96,9 +97,12 @@ describe('Genesis Experiment Fabric', () => {
     expect(plan.status).toBe('READY_FOR_REAL_EXECUTION');
     expect(plan.derivedRequest?.parameters.temperatureK).toBe(source.result.outputs.equilibriumTempK);
     expect(plan.reason).toContain('Wykonanie docelowego modelu wymaga osobnego wywołania');
-    const executedTarget = runExperiment(plan.derivedRequest!);
-    expect(executedTarget.result.status).toBe('completed');
-    expect(executedTarget.provenance.parameterSnapshot.temperatureK).toBe(source.result.outputs.equilibriumTempK);
+    const confirmed = confirmCrossDomainOrchestration(plan, source);
+    expect(confirmed.sourceRunId).toBe(source.runId);
+    expect(confirmed.sourceRunFingerprint).toBe(source.provenance.runFingerprint);
+    expect(confirmed.targetRun.result.status).toBe('completed');
+    expect(confirmed.targetRun.provenance.parameterSnapshot.temperatureK).toBe(source.result.outputs.equilibriumTempK);
+    expect(() => confirmCrossDomainOrchestration({ ...plan, reason: 'zmieniony plan' }, source)).toThrow('modified after review');
   });
 
   it('blocks incompatible multi-domain transfers rather than fabricating a cascade', () => {

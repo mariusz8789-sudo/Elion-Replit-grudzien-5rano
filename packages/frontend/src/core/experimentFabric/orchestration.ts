@@ -1,4 +1,5 @@
 import { canonicalJson, fnv1a } from '../events/hash';
+import { runExperiment } from './executor';
 import { getRouterModel } from './router';
 import type { CrossDomainLink } from './scientificDiscovery';
 import type { ExperimentRun, ExperimentValue, StructuredExperimentRequest } from './types';
@@ -6,6 +7,14 @@ import type { ExperimentRun, ExperimentValue, StructuredExperimentRequest } from
 export const ORCHESTRATION_CONTRACT_VERSION = '1.0.0';
 
 export type CrossDomainPlanStatus = 'READY_FOR_REAL_EXECUTION' | 'BLOCKED_SOURCE_RUN' | 'BLOCKED_OUTPUT' | 'BLOCKED_TARGET' | 'BLOCKED_UNITS' | 'BLOCKED_TRANSFORM';
+
+export interface ConfirmedCrossDomainOrchestration {
+  contractVersion: string;
+  plan: CrossDomainOrchestrationPlan;
+  sourceRunId: string;
+  sourceRunFingerprint: string;
+  targetRun: ExperimentRun;
+}
 
 export interface CrossDomainOrchestrationPlan {
   contractVersion: string;
@@ -78,6 +87,31 @@ export function planCrossDomainOrchestration(
  * target request and must explicitly execute the derived request through the
  * established Experiment Fabric flow.
  */
+/**
+ * Confirms an unchanged reviewed transfer and executes only the derived request
+ * through the existing Fabric executor. The source run is supplied again so
+ * review cannot be detached from the real output and provenance that produced it.
+ */
+export function confirmCrossDomainOrchestration(
+  reviewedPlan: CrossDomainOrchestrationPlan,
+  sourceRun: ExperimentRun,
+): ConfirmedCrossDomainOrchestration {
+  const canonicalPlan = planCrossDomainOrchestration(reviewedPlan.link, sourceRun, reviewedPlan.targetRequest);
+  if (canonicalJson(canonicalPlan) !== canonicalJson(reviewedPlan)) {
+    throw new Error('Cross-domain orchestration plan was modified after review; rebuild it before confirmation.');
+  }
+  if (canonicalPlan.status !== 'READY_FOR_REAL_EXECUTION' || !canonicalPlan.derivedRequest) {
+    throw new Error(`Cross-domain plan cannot be confirmed: ${canonicalPlan.status}. ${canonicalPlan.reason}`);
+  }
+  return {
+    contractVersion: ORCHESTRATION_CONTRACT_VERSION,
+    plan: canonicalPlan,
+    sourceRunId: sourceRun.runId,
+    sourceRunFingerprint: sourceRun.provenance.runFingerprint,
+    targetRun: runExperiment(canonicalPlan.derivedRequest),
+  };
+}
+
 export function planAtmosphericTemperatureToArrhenius(
   sourceRun: ExperimentRun,
   targetRequest: StructuredExperimentRequest,

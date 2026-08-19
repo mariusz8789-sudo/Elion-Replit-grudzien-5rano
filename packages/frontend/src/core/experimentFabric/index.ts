@@ -86,8 +86,10 @@ export { GENESIS_SPATIAL_DATASET_VERSION, OSM_ATTRIBUTION, OSM_LICENSE, normaliz
 export {
   ORCHESTRATION_CONTRACT_VERSION,
   planCrossDomainOrchestration,
+  confirmCrossDomainOrchestration,
   planAtmosphericTemperatureToArrhenius,
   ATMOSPHERIC_TEMPERATURE_TO_ARRHENIUS_LINK,
   type CrossDomainPlanStatus,
   type CrossDomainOrchestrationPlan,
+  type ConfirmedCrossDomainOrchestration,
 } from './orchestration';

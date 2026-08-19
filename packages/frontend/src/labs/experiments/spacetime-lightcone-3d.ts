@@ -32,6 +32,13 @@ const PAST_H = H * 0.32; // przeszły stożek — krótszy, tylko dla kontekstu
 const LOOP_DURATION = 3.2; // sekundy jednego przebiegu pierścienia światła
 const RING_POINTS = 64;
 
+export function runLightConeScenario({ v = 0.6, tripYears = 20 }: { v?: number; tripYears?: number } = {}) {
+  if (!Number.isFinite(v) || v < 0 || v > 0.99) throw new Error('v musi mieścić się w zakresie 0–0.99 c.');
+  if (!Number.isFinite(tripYears) || tripYears < 2 || tripYears > 60) throw new Error('tripYears musi mieścić się w zakresie 2–60 lat.');
+  const gamma = 1 / Math.sqrt(1 - v * v);
+  return { v, tripYears, gamma, travelerYears: tripYears / gamma, turnaroundFraction: 0.5, turnaroundRadiusFraction: v / 2, causal: v < 1 };
+}
+
 function buildConeEdgeLine(three: typeof THREE, apexY: number, height: number, opensUp: boolean, segments = 72): THREE.BufferGeometry {
   const pts: THREE.Vector3[] = [];
   const dir = opensUp ? 1 : -1;
@@ -225,11 +232,11 @@ class LightCone3DSim implements Sim3D {
   }
 
   getStats() {
-    const gamma = 1 / Math.sqrt(1 - this.v * this.v);
+    const scenario = runLightConeScenario({ v: this.v, tripYears: this.tripYears });
     return {
-      v: Math.round(this.v * 100) / 100,
-      gamma: Math.round(gamma * 100) / 100,
-      travelerYears: Math.round((this.tripYears / gamma) * 10) / 10,
+      v: Math.round(scenario.v * 100) / 100,
+      gamma: Math.round(scenario.gamma * 100) / 100,
+      travelerYears: Math.round(scenario.travelerYears * 10) / 10,
     };
   }
 

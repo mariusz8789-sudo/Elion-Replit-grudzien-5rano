@@ -160,6 +160,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:masa chirp|chirp|isco|fala grawitacyjna|fale grawitacyjne)/.test(normalized)) {
     return request('spacetime-einstein', 'einstein-chirp-mass', 'scene-3d', ['m1Solar', 'm2Solar']);
   }
+  if (/\b(stożek świetlny|stożek swietlny|light cone|paradoks bliźni[a-ząćęłńóśźż]*|paradoks blizni[a-ząćęłńóśźż]*)\b/.test(normalized)) return request('spacetime-einstein', 'spacetime-light-cone', 'scene-3d', ['v', 'tripYears']);
   if (/(?:dylatac[a-ząćęłńóśźż]*|lorentz[a-ząćęłńóśźż]*|skróceni[a-ząćęłńóśźż]* długości|skroceni[a-ząćęłńóśźż]* dlugosci|szczególn[a-ząćęłńóśźż]* teori[a-ząćęłńóśźż]* względności|szczegoln[a-ząćęłńóśźż]* teori[a-ząćęłńóśźż]* wzglednosci)/.test(normalized)) {
     return request('spacetime-einstein', 'sr-lorentz', 'graph', ['velocityFraction', 'properTimeSeconds', 'restLengthMeters']);
   }

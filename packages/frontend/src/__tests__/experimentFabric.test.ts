@@ -284,6 +284,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
   });
 
+  it('runs bounded Minkowski light cone through Fabric without claiming acceleration dynamics', () => {
+    const command = 'Pokaż stożek świetlny i paradoks bliźniąt.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const spacetime = getKnowledgeDomain('spacetime-einstein');
+
+    expect(run.request.modelId).toBe('spacetime-light-cone');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'spacetime', experimentId: 'lightcone-3d' });
+    expect(Number(run.result.outputs.gamma)).toBeGreaterThan(1);
+    expect(Number(run.result.outputs.travelerYears)).toBeLessThan(Number(run.result.outputs.tripYears));
+    expect(run.result.validity).toContain('Brak dynamiki napędu');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(spacetime?.realModels).toContain('spacetime-light-cone');
+  });
+
   it('runs bounded point gravitational lens through Fabric without claiming observational inference', () => {
     const command = 'Oblicz soczewkowanie grawitacyjne i pierścień Einsteina.';
     const run = runExperiment(parseScienceChatMessage(command));

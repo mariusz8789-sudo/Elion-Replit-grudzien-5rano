@@ -58,6 +58,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Istniejąca dokładna soczewka punktowa z dwoma obrazami i mikrosoczewkowaniem; nie jest soczewką rozciągłą, wielopłaszczyznową ani dopasowaniem danych obserwacyjnych.',
   },
   {
+    id: 'spacetime-light-cone', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-minkowski@1.0.0',
+    parameters: [number('v', 'Prędkość', 'c', 0, 0.99, 0.6), number('tripYears', 'Czas Ziemi', 'lata', 2, 60, 20)],
+    route: { kind: 'lab', labId: 'spacetime', experimentId: 'lightcone-3d' }, knowledgeSources: ['spacetime-einstein.md'],
+    rationale: 'Istniejący stożek Minkowskiego 2+1D oraz dylatacja Lorentza; nie obejmuje przyspieszenia końcowego ani ogólnej OTW.',
+  },
+  {
     id: 'universe-kepler', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('centralMassSolar', 'Masa centralna', 'M☉', 0.01, 1e9, 1), number('orbitalRadiusAu', 'Promień orbity', 'AU', 0.001, 1e5, 1)],
     route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['universe.md', 'classical-mechanics.md'],

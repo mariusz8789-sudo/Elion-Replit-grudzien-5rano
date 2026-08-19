@@ -7,6 +7,7 @@ import { runChshCorrelationScenario } from '../../labs/experiments/quantum-chsh'
 import { runSchwarzschildGeodesicScenario } from '../../labs/experiments/einstein-geodesics';
 import { runTitrationScenario } from '../../labs/experiments/chemistry-titration';
 import { runPointLensScenario } from '../../labs/experiments/einstein-lensing';
+import { runLightConeScenario } from '../../labs/experiments/spacetime-lightcone-3d';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
@@ -102,6 +103,10 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
   if (!model) throw new Error('Brak lokalnego adaptera realnego modelu.');
   const params = request.parameters;
   switch (model.id) {
+    case 'spacetime-light-cone': {
+      const solved = runLightConeScenario({ v: numberParam(params, 'v', 0.6), tripYears: numberParam(params, 'tripYears', 20) });
+      return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Dla v=${solved.v.toFixed(2)}c współczynnik Lorentza wynosi γ=${solved.gamma.toFixed(6)}, a czas własny podróżnika ${solved.travelerYears.toFixed(3)} lat.`, outputs: solved, units: { v: 'c', tripYears: 'lata', gamma: '', travelerYears: 'lata', turnaroundFraction: '', turnaroundRadiusFraction: '', causal: '' }, warnings: ['To idealizowany, natychmiastowy zawrót w szczególnej teorii względności; brak profilu przyspieszenia i ogólnej OTW.'], validity: 'Stożek światła 2+1D x²+z²=(ct)² i dylatacja Lorentza dla v<c. Brak dynamiki napędu, przyspieszenia końcowego i grawitacji.', assumptions: ['c=1 w geometrii sceny.', 'Wizualne skalowanie czasu nie zmienia relacji Lorentza raportowanej liczbowo.'], visualization: ['numeric', 'scene-3d'], route: model.route };
+    }
     case 'einstein-point-lens': {
       const solved = runPointLensScenario({ beta: numberParam(params, 'beta', 0.8) });
       return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: solved.einsteinRing ? 'Obliczono granicę pierścienia Einsteina idealnej soczewki punktowej.' : `Obliczono dwa obrazy soczewki punktowej; wzmocnienie całkowite ${solved.totalMagnification.toFixed(6)}×.`, outputs: solved, units: { beta: '', u: '', thetaPlus: 'θE', thetaMinus: 'θE', magnificationPlus: '', magnificationMinus: '', totalMagnification: '', einsteinRing: '' }, warnings: ['To idealna soczewka punktowa; wynik nie jest dopasowaniem do obrazu teleskopowego ani pomiarem ciemnej materii.'], validity: 'Dokładne wzory soczewki punktowej dla punktowego źródła i pojedynczej masy. Brak rozciągłej masy, wielopłaszczyznowości, efektów skończonego źródła, dynamiki i danych obserwacyjnych.', assumptions: ['β jest bezwymiarową pozycją źródła w jednostkach promienia Einsteina.', 'Dla β=0 raportowany jest idealny limit pierścienia z odcięciem numerycznym u=0,001.'], visualization: ['numeric', 'graph', 'canvas-2d'], route: model.route };

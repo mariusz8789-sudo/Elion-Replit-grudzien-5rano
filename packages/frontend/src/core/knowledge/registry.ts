@@ -202,11 +202,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'spacetime-einstein', title: 'Czasoprzestrzeń i Einstein', sourceFile: 'spacetime-einstein.md', scale: 'cosmic',
-    capability: 'REAL_ENGINE', realModels: ['sr-lorentz', 'einstein-schwarzschild', 'einstein-schwarzschild-geodesic', 'einstein-point-lens', 'einstein-chirp-mass'],
+    capability: 'REAL_ENGINE', realModels: ['sr-lorentz', 'spacetime-light-cone', 'einstein-schwarzschild', 'einstein-schwarzschild-geodesic', 'einstein-point-lens', 'einstein-chirp-mass'],
     concepts: ['SR', 'GR', 'Schwarzschild', 'geodezyjna', 'czarna dziura', 'fale grawitacyjne'],
-    parameters: ['velocityFraction', 'massSolar', 'impact', 'beta', 'm1Solar', 'm2Solar'], units: ['s', 'm', 'km', 'M☉', 'Hz'],
-    assumptions: ['Schwarzschild nie uwzględnia spinu/ładunku; geodezyjna jest pojedynczym promieniem w płaszczyźnie równikowej bez Kerra, ray tracingu 3D i fizyki dysku; soczewkowanie jest idealną soczewką punktową bez masy rozciągłej i danych obserwacyjnych; inspiral jest ograniczony do zakresu przed połączeniem.'],
-    possibleExperiments: ['oblicz promień Schwarzschilda', 'zintegruj geodezyjną fotonu Schwarzschilda', 'oblicz soczewkę punktową', 'oblicz dylatację czasu', 'oblicz masę chirp'], requiredSolver: 'sr-lorentz / einstein functions',
+    parameters: ['velocityFraction', 'v', 'tripYears', 'massSolar', 'impact', 'beta', 'm1Solar', 'm2Solar'], units: ['s', 'm', 'km', 'M☉', 'Hz'],
+    assumptions: ['Schwarzschild nie uwzględnia spinu/ładunku; geodezyjna jest pojedynczym promieniem w płaszczyźnie równikowej bez Kerra, ray tracingu 3D i fizyki dysku; soczewkowanie jest idealną soczewką punktową bez masy rozciągłej i danych obserwacyjnych; stożek świetlny jest geometrią Minkowskiego z natychmiastowym zawrotem bez profilu przyspieszenia i ogólnej OTW; inspiral jest ograniczony do zakresu przed połączeniem.'],
+    possibleExperiments: ['oblicz stożek świetlny', 'oblicz promień Schwarzschilda', 'zintegruj geodezyjną fotonu Schwarzschilda', 'oblicz soczewkę punktową', 'oblicz dylatację czasu', 'oblicz masę chirp'], requiredSolver: 'sr-lorentz / einstein functions',
     visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['classical-mechanics', 'universe'], keywords: ['czarna dziura', 'schwarzschild', 'czasoprzestrzeń', 'czasoprzestrzen', 'dylatacja', 'einstein', 'grawitacyj'],
   },
   {

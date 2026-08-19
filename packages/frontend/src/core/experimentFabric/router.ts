@@ -234,6 +234,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     route: { kind: 'none' }, knowledgeSources: ['quantum.md'],
     rationale: 'Realny, analitycznie minimalizowany bulk model BdG łańcucha Kitaeva; nie jest symulacją nanodrutu, materiału ani urządzenia Majorana 1.',
   },
+  {
+    id: 'quantum-bloch-circuit', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-single-qubit@1.0.0',
+    parameters: [text('circuit', 'Sekwencja bramek jednokubitowych', 'H X')],
+    route: { kind: 'lab', labId: 'quantum', experimentId: 'bloch' }, knowledgeSources: ['quantum.md'],
+    rationale: 'Istniejące dokładne macierze unitarne jednokubitowych bramek H, X, Y, Z, S i T, startujące z |0⟩; nie symuluje splątania, CNOT, szumu sprzętowego ani pojedynczego wyniku pomiaru.',
+  },
 ] as const;
 
 const BY_MODEL = new Map(ROUTER_MODELS.map((model) => [model.id, model]));

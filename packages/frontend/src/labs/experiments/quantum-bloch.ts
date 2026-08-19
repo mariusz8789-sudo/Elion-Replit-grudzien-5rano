@@ -91,3 +91,44 @@ export const GATE_ROTATIONS: Record<string, { axis: [number, number, number]; an
   H: { axis: [1 / Math.SQRT2, 0, 1 / Math.SQRT2], angleRad: Math.PI },
 };
 
+export interface BlochCircuitScenarioResult {
+  gates: readonly string[];
+  finalAmplitude0: C;
+  finalAmplitude1: C;
+  probability0: number;
+  probability1: number;
+  bloch: readonly [number, number, number];
+  normSquared: number;
+}
+
+/**
+ * Deterministyczny obwód jednokubitowy startujący w |0⟩. Wykorzystuje te
+ * same bramki unitarne co wizualizacja sfery Blocha; zwraca amplitudy i
+ * prawdopodobieństwa, ale nie losuje pojedynczego wyniku pomiaru.
+ */
+export function runBlochCircuitScenario({ circuit = 'H' }: { circuit?: string } = {}): BlochCircuitScenarioResult {
+  if (typeof circuit !== 'string' || circuit.trim().length === 0 || circuit.length > 128) {
+    throw new Error('circuit musi być niepustym tekstem do 128 znaków.');
+  }
+  const gates = circuit.toUpperCase().split(/[\s,;>→-]+/).filter(Boolean);
+  if (gates.length === 0 || gates.length > 32) {
+    throw new Error('circuit musi zawierać od 1 do 32 bramek.');
+  }
+  const unknown = gates.find((gate) => GATES[gate] === undefined);
+  if (unknown) {
+    throw new Error(`Nieobsługiwana bramka jednokubitowa: ${unknown}. Dozwolone: ${Object.keys(GATES).join(', ')}.`);
+  }
+  const [finalAmplitude0, finalAmplitude1] = applyCircuit([[1, 0], [0, 0]], gates);
+  const probability0 = finalAmplitude0[0] ** 2 + finalAmplitude0[1] ** 2;
+  const probability1 = finalAmplitude1[0] ** 2 + finalAmplitude1[1] ** 2;
+  return {
+    gates,
+    finalAmplitude0,
+    finalAmplitude1,
+    probability0,
+    probability1,
+    bloch: blochVector(finalAmplitude0, finalAmplitude1),
+    normSquared: probability0 + probability1,
+  };
+}
+

@@ -1,6 +1,7 @@
 import { atomCount, degreeOfUnsaturation, molecularWeight, parseFormula } from '../compute/cheminformatics';
 import { buildPumpPipeModel } from '../engineeringGraph/pumpPipe';
 import { solveKitaevBulk } from '../compute/kitaevBulk';
+import { runBlochCircuitScenario } from '../../labs/experiments/quantum-bloch';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
@@ -487,6 +488,26 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         outputs: { powerWatts: kardashevPower(kardashevType) }, units: { powerWatts: 'W' }, warnings: [],
         validity: 'Skala klasyfikacyjna Sagana; ekstrapolacja interpretacyjna, nie prognoza społeczna.',
         assumptions: ['P = 10^(10K+6) W.'], visualization: ['numeric', 'graph', 'narrative'], route: model.route,
+      };
+    }
+    case 'quantum-bloch-circuit': {
+      const circuit = typeof params.circuit === 'string' ? params.circuit : 'H X';
+      const solved = runBlochCircuitScenario({ circuit });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano dokładny obwód jednokubitowy |0⟩ → ${solved.gates.join(' → ')}; P(0)=${solved.probability0.toFixed(4)}, P(1)=${solved.probability1.toFixed(4)}.`,
+        outputs: {
+          circuit: solved.gates.join(' '),
+          amplitude0Re: solved.finalAmplitude0[0], amplitude0Im: solved.finalAmplitude0[1],
+          amplitude1Re: solved.finalAmplitude1[0], amplitude1Im: solved.finalAmplitude1[1],
+          probability0: solved.probability0, probability1: solved.probability1,
+          blochX: solved.bloch[0], blochY: solved.bloch[1], blochZ: solved.bloch[2], normSquared: solved.normSquared,
+        },
+        units: { circuit: '', amplitude0Re: '', amplitude0Im: '', amplitude1Re: '', amplitude1Im: '', probability0: '', probability1: '', blochX: '', blochY: '', blochZ: '', normSquared: '' },
+        warnings: ['Wynik podaje amplitudy i prawdopodobieństwa; nie jest pojedynczym losowym pomiarem, runem na hardware ani eksperymentem splątania.'],
+        validity: 'Dokładna ewolucja macierzy unitarnej pojedynczego kubitu rozpoczynającego w |0⟩. Brak wielokubitowych bramek, splątania, dekoherencji, szumu, kalibracji i dostępu do sprzętu kwantowego.',
+        assumptions: ['Dozwolone są wyłącznie H, X, Y, Z, S i T; globalna faza nie jest obserwowalna.', 'Norma stanu musi pozostać równa 1 w granicach arytmetyki zmiennoprzecinkowej.'],
+        visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
       };
     }
     case 'quantum-kitaev-bulk': {

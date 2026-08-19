@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyCircuit, applyGate, blochVector, GATE_ROTATIONS, GATES, rotateVector, type C } from '../labs/experiments/quantum-bloch';
+import { applyCircuit, applyGate, blochVector, GATE_ROTATIONS, GATES, rotateVector, runBlochCircuitScenario, type C } from '../labs/experiments/quantum-bloch';
 import { quantumBloch } from '../labs/experiments/quantum-bloch-3d';
 
 const ZERO: [C, C] = [[1, 0], [0, 0]];
@@ -101,6 +101,25 @@ describe('GATE_ROTATIONS ↔ applyGate (SU(2)→SO(3), sfera Blocha w 3D)', () =
     const lenBefore = Math.hypot(...v);
     const lenAfter = Math.hypot(...rotated);
     expect(lenAfter).toBeCloseTo(lenBefore, 9);
+  });
+});
+
+describe('runBlochCircuitScenario', () => {
+  it('wykonuje ten sam deterministyczny obwód jednokubitowy bez losowania pomiaru', () => {
+    const scenario = runBlochCircuitScenario({ circuit: 'H X' });
+    const repeated = runBlochCircuitScenario({ circuit: 'H X' });
+
+    expect(repeated).toEqual(scenario);
+    expect(scenario.gates).toEqual(['H', 'X']);
+    expect(scenario.probability0).toBeCloseTo(0.5, 9);
+    expect(scenario.probability1).toBeCloseTo(0.5, 9);
+    expect(scenario.normSquared).toBeCloseTo(1, 9);
+    expect(Math.hypot(...scenario.bloch)).toBeCloseTo(1, 9);
+  });
+
+  it('odrzuca pusty obwód i bramki poza zakresem jednokubitowym', () => {
+    expect(() => runBlochCircuitScenario({ circuit: '' })).toThrow('circuit');
+    expect(() => runBlochCircuitScenario({ circuit: 'H CNOT' })).toThrow('Nieobsługiwana bramka');
   });
 });
 

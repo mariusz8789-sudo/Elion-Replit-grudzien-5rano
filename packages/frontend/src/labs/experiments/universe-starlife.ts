@@ -15,6 +15,51 @@ interface Stage {
   size: number;
 }
 
+export type StellarFinalFate = 'white-dwarf' | 'neutron-star' | 'black-hole';
+
+export interface StarLifeScenarioResult {
+  massSolar: number;
+  relativeLuminositySolar: number;
+  mainSequenceLifetimeGyr: number;
+  finalFate: StellarFinalFate;
+  finalFateLabel: string;
+  finalFateDescription: string;
+}
+
+/**
+ * Deterministyczny, edukacyjny model skalujący, którego używa istniejący Universe Lab.
+ * Nie integruje wnętrza gwiazdy ani ewolucji jądrowej; zwraca tylko jawne relacje
+ * L ∝ M³·⁵ i t_MS ≈ 10·M⁻²·⁵ oraz istniejące progi losu końcowego UI.
+ */
+export function runStarLifeScenario({ massSolar = 1 }: { massSolar?: number } = {}): StarLifeScenarioResult {
+  if (!Number.isFinite(massSolar) || massSolar < 0.2 || massSolar > 40) {
+    throw new Error('massSolar musi być skończoną liczbą z zakresu 0.2–40 M☉.');
+  }
+  const finalFate: StellarFinalFate = massSolar < 8 ? 'white-dwarf' : massSolar < 22 ? 'neutron-star' : 'black-hole';
+  const fate = finalFate === 'white-dwarf'
+    ? {
+        label: 'biały karzeł',
+        description: 'spokojnie odrzuci otoczkę jako mgławicę planetarną, a węglowo-tlenowe jądro zastygnie w białego karła podtrzymywanego ciśnieniem zdegenerowanych elektronów (limit Chandrasekhara: 1,4 M☉)',
+      }
+    : finalFate === 'neutron-star'
+      ? {
+          label: 'gwiazda neutronowa',
+          description: 'zakończy życie supernową typu II; jądro zapadnie się do kuli neutronów o promieniu ~12 km i gęstości jądra atomowego',
+        }
+      : {
+          label: 'czarna dziura',
+          description: 'po supernowej (lub bezpośrednim kolapsie) jądro przekroczy granicę stabilności materii neutronowej (~2–2,5 M☉) i zapadnie się w czarną dziurę',
+        };
+  return {
+    massSolar,
+    relativeLuminositySolar: Math.pow(massSolar, 3.5),
+    mainSequenceLifetimeGyr: 10 * Math.pow(massSolar, -2.5),
+    finalFate,
+    finalFateLabel: fate.label,
+    finalFateDescription: fate.description,
+  };
+}
+
 function stagesFor(m: number): Stage[] {
   const msColor = m < 0.5 ? '#f47c7c' : m < 1.2 ? '#f0b35c' : m < 4 ? '#fdf3d0' : '#bcd6ff';
   const msSize = 0.35 + Math.log10(m + 0.12) * 0.25;
@@ -33,7 +78,7 @@ function stagesFor(m: number): Stage[] {
     base.push(
       { name: 'nadolbrzym', frac: 0.17, color: '#f47c7c', size: 1.15 },
       { name: 'SUPERNOWA', frac: 0.06, color: '#ffffff', size: 1.5 },
-      m < 22
+      runStarLifeScenario({ massSolar: m }).finalFate === 'neutron-star'
         ? { name: 'gwiazda neutronowa', frac: 0.09, color: '#a78bfa', size: 0.06 }
         : { name: 'czarna dziura', frac: 0.09, color: '#000000', size: 0.12 },
     );
@@ -168,23 +213,16 @@ export const universeStarLife: ExperimentDef = {
   ],
   createSim: () => new StarLifeSim(),
   narrate(p) {
-    const m = Number(p.mass);
-    const tMS = 10 * Math.pow(m, -2.5); // mld lat
-    const L = Math.pow(m, 3.5);
-    const fate =
-      m < 8
-        ? { name: 'biały karzeł', how: 'spokojnie odrzuci otoczkę jako mgławicę planetarną, a węglowo-tlenowe jądro zastygnie w białego karła podtrzymywanego ciśnieniem zdegenerowanych elektronów (limit Chandrasekhara: 1,4 M☉)' }
-        : m < 22
-          ? { name: 'gwiazda neutronowa', how: 'zakończy życie supernową typu II; jądro zapadnie się do kuli neutronów o promieniu ~12 km i gęstości jądra atomowego' }
-          : { name: 'czarna dziura', how: 'po supernowej (lub bezpośrednim kolapsie) jądro przekroczy granicę stabilności materii neutronowej (~2–2,5 M☉) i zapadnie się w czarną dziurę' };
+    const solved = runStarLifeScenario({ massSolar: Number(p.mass) });
+    const { massSolar: m, mainSequenceLifetimeGyr: tMS, relativeLuminositySolar: L } = solved;
     return [
       {
         title: `${m.toFixed(1)} M☉ → ciąg główny ${tMS > 100 ? '>100' : tMS < 0.01 ? sci(tMS, 1) : tMS.toFixed(tMS < 1 ? 2 : 1)} mld lat`,
         body: `Paradoks paliwa: większa gwiazda ma go więcej, ale świeci aż ${L < 10 ? L.toFixed(1) : sci(L, 1)}× jaśniej od Słońca (L ∝ M³·⁵) — i dlatego żyje krócej (t ∝ M⁻²·⁵). ${m < 0.5 ? 'Czerwone karły tej masy będą palić wodór dłużej, niż Wszechświat dotąd istnieje — żaden jeszcze nie zszedł z ciągu głównego.' : m > 15 ? 'Tak masywne gwiazdy to błyskawice: kilka milionów lat i koniec — dlatego widzimy je tylko w młodych obszarach gwiazdotwórczych.' : 'Słońce jest w połowie swojego ~10-miliardletniego życia na ciągu głównym.'}`,
       },
       {
-        title: `Finał: ${fate.name}`,
-        body: `Gwiazda o tej masie ${fate.how}. ${m >= 8 ? 'Supernowa rozsieje w przestrzeń pierwiastki od tlenu po żelazo (i w błysku — cięższe): wapń w Twoich kościach i żelazo we krwi powstały dokładnie tak.' : 'Pierwiastki z odrzuconej otoczki (węgiel, azot) zasilą kolejne pokolenia gwiazd i planet.'}`,
+        title: `Finał: ${solved.finalFateLabel}`,
+        body: `Gwiazda o tej masie ${solved.finalFateDescription}. ${m >= 8 ? 'Supernowa rozsieje w przestrzeń pierwiastki od tlenu po żelazo (i w błysku — cięższe): wapń w Twoich kościach i żelazo we krwi powstały dokładnie tak.' : 'Pierwiastki z odrzuconej otoczki (węgiel, azot) zasilą kolejne pokolenia gwiazd i planet.'}`,
       },
     ];
   },

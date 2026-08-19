@@ -101,6 +101,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Deterministyczny, czteroplanetowy model N-ciał z velocity-Verlet i obliczanymi elementami orbitalnymi; nie jest pełną efemerydą ośmiu planet.',
   },
   {
+    id: 'universe-starlife', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-stellar-scaling@1.0.0',
+    parameters: [number('massSolar', 'Masa gwiazdy', 'M☉', 0.2, 40, 1)],
+    route: { kind: 'lab', labId: 'universe', experimentId: 'starlife' }, knowledgeSources: ['universe.md'],
+    rationale: 'Istniejący deterministyczny model skalujący życia gwiazdy: L ∝ M³·⁵, t_MS ≈ 10·M⁻²·⁵ oraz jawne, edukacyjne progi losu końcowego; nie jest solverem ewolucji wnętrza gwiazdy.',
+  },
+  {
     id: 'atom-bohr', domainId: 'atom', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('atomicNumber', 'Liczba atomowa Z', '', 1, 118, 1), number('principalN', 'Główna liczba kwantowa n', '', 1, 10, 1)],
     route: { kind: 'lab', labId: 'atom' }, knowledgeSources: ['atom.md', 'quantum.md'],

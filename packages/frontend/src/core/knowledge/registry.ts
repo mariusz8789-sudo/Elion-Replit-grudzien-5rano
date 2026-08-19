@@ -219,12 +219,12 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'universe', title: 'Astrofizyka i kosmologia', sourceFile: 'universe.md', scale: 'cosmic',
-    capability: 'REAL_ENGINE', realModels: ['universe-kepler', 'universe-atmospheric-escape', 'universe-hubble-tension', 'universe-planet-stability'],
-    concepts: ['ΛCDM', 'ekspansja', 'galaktyki', 'ciemna materia', 'soczewkowanie', 'planety'],
-    parameters: ['centralMassSolar', 'orbitalRadiusAu', 'stellarLuminositySolar', 'planetMassEarth', 'extraSystematic', 'showTrgb', 'years', 'jupiter', 'saturn'], units: ['AU', 'yr', 'K', 'M☉', 'M⊕', 'km/s/Mpc', 'lat'],
-    assumptions: ['Obecne modele są analityczne/uproszczone, nie pełną numeryczną kosmologią; napięcie Hubble’a porównuje ustalone wartości referencyjne, a stabilność planet używa ograniczonego czteroplanetowego modelu N-ciał.'],
-    possibleExperiments: ['oblicz orbitę planety', 'zbadaj ucieczkę atmosfery', 'porównaj napięcie Hubble’a', 'zbadaj stabilność planet'], requiredSolver: 'universe-kepler / universe-atmospheric-escape / universe-hubble-tension / universe-planet-stability',
-    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['classical-mechanics', 'spacetime-einstein'], keywords: ['wszechświat', 'kosmologia', 'planeta', 'orbita', 'atmosfera', 'galaktyka', 'soczewkowanie'],
+    capability: 'REAL_ENGINE', realModels: ['universe-kepler', 'universe-atmospheric-escape', 'universe-hubble-tension', 'universe-planet-stability', 'universe-starlife'],
+    concepts: ['ΛCDM', 'ekspansja', 'galaktyki', 'ciemna materia', 'soczewkowanie', 'planety', 'życie gwiazdy'],
+    parameters: ['centralMassSolar', 'orbitalRadiusAu', 'stellarLuminositySolar', 'planetMassEarth', 'extraSystematic', 'showTrgb', 'years', 'jupiter', 'saturn', 'massSolar'], units: ['AU', 'yr', 'K', 'M☉', 'M⊕', 'km/s/Mpc', 'lat', 'mld lat', 'L☉'],
+    assumptions: ['Obecne modele są analityczne/uproszczone, nie pełną numeryczną kosmologią; napięcie Hubble’a porównuje ustalone wartości referencyjne, stabilność planet używa ograniczonego czteroplanetowego modelu N-ciał, a życie gwiazdy stosuje masowe skalowania L ∝ M³·⁵ i t_MS ∝ M⁻²·⁵ bez pełnej ewolucji wnętrza.'],
+    possibleExperiments: ['oblicz orbitę planety', 'zbadaj ucieczkę atmosfery', 'porównaj napięcie Hubble’a', 'zbadaj stabilność planet', 'zbadaj skalowanie życia gwiazdy'], requiredSolver: 'universe-kepler / universe-atmospheric-escape / universe-hubble-tension / universe-planet-stability / universe-starlife',
+    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['classical-mechanics', 'spacetime-einstein'], keywords: ['wszechświat', 'kosmologia', 'planeta', 'orbita', 'atmosfera', 'galaktyka', 'soczewkowanie', 'gwiazda', 'supernowa', 'biały karzeł'],
   },
 ] as const;
 

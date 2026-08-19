@@ -5,6 +5,7 @@ import { runDoublePendulumScenario } from '../../labs/experiments/universe-doubl
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
 import { runPlanetStabilityScenario } from '../../labs/experiments/universe-planetstability';
+import { runStarLifeScenario } from '../../labs/experiments/universe-starlife';
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
@@ -263,6 +264,31 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
           `Zaburzacze aktywne: ${[jupiter && 'Jowisz', saturn && 'Saturn'].filter(Boolean).join(', ') || 'brak'}.`,
         ],
         visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'universe-starlife': {
+      const massSolar = numberParam(params, 'massSolar', 1);
+      const solved = runStarLifeScenario({ massSolar });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano istniejący model skalujący życia gwiazdy dla ${solved.massSolar.toFixed(2)} M☉; prognozowany los w granicach modelu: ${solved.finalFateLabel}.`,
+        outputs: {
+          massSolar: solved.massSolar,
+          relativeLuminositySolar: solved.relativeLuminositySolar,
+          mainSequenceLifetimeGyr: solved.mainSequenceLifetimeGyr,
+          finalFate: solved.finalFate,
+          finalFateLabel: solved.finalFateLabel,
+        },
+        units: {
+          massSolar: 'M☉', relativeLuminositySolar: 'L☉', mainSequenceLifetimeGyr: 'mld lat', finalFate: '', finalFateLabel: '',
+        },
+        warnings: ['Los końcowy wynika z uproszczonych progów masy modelu; nie jest predykcją konkretnej gwiazdy ani oceną supernowej.'],
+        validity: 'Skalowania L ∝ M³·⁵ i t_MS ≈ 10·M⁻²·⁵ w zakresie 0,2–40 M☉ z edukacyjnymi progami 8 i 22 M☉; bez integracji wnętrza, metaliczności, utraty masy, rotacji, binarności i pełnej ewolucji jądrowej.',
+        assumptions: [
+          'Masa jest jedynym parametrem wejściowym; jasność i czas ciągu głównego są relacjami skalującymi względem Słońca.',
+          'Progi białego karła, gwiazdy neutronowej i czarnej dziury są takie same jak w istniejącym Universe Lab i mają charakter edukacyjny.',
+        ],
+        visualization: ['numeric', 'graph'], route: model.route,
       };
     }
     case 'atom-bohr': {

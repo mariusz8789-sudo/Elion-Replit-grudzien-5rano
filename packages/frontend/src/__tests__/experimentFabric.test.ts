@@ -324,6 +324,29 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
   });
 
+  it('runs the existing stellar-scaling model through Fabric without claiming a full stellar-evolution solver', () => {
+    const command = 'Pokaż życie gwiazdy o masie 10 masy Słońca.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const rejected = runExperiment(parseScienceChatMessage('Pokaż życie gwiazdy o masie 60 masy Słońca.'));
+    const universe = getKnowledgeDomain('universe');
+
+    expect(universe?.realModels).toContain('universe-starlife');
+    expect(universe?.assumptions.join(' ')).toContain('t_MS ∝ M⁻²·⁵');
+    expect(run.request.modelId).toBe('universe-starlife');
+    expect(run.request.parameters).toEqual({ massSolar: 10 });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'starlife' });
+    expect(Number(run.result.outputs.relativeLuminositySolar)).toBeCloseTo(Math.pow(10, 3.5));
+    expect(Number(run.result.outputs.mainSequenceLifetimeGyr)).toBeCloseTo(10 * Math.pow(10, -2.5));
+    expect(run.result.outputs.finalFate).toBe('neutron-star');
+    expect(run.result.validity).toContain('bez integracji wnętrza');
+    expect(run.result.warnings[0]).toContain('uproszczonych progów');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(rejected.result.status).toBe('rejected');
+    expect(rejected.result.summary).toContain('poza zakresem 0.2–40 M☉');
+  });
+
   it('runs the existing Lorenz attractor through Fabric without claiming a weather forecast', () => {
     const run = runExperiment(parseScienceChatMessage('Uruchom atraktor Lorenza: rho=28, horyzont=2, drugi start.'));
     const repeated = runExperiment(parseScienceChatMessage('Uruchom atraktor Lorenza: rho=28, horyzont=2, drugi start.'));

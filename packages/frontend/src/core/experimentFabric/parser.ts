@@ -103,6 +103,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:stabilność planet|stabilnosc planet|układ planetarn[a-ząćęłńóśźż]*|uklad planetarn[a-ząćęłńóśźż]*|planetarna stabilność|planetarna stabilnosc|n[- ]?ciał planet)/.test(normalized)) {
     return request('universe', 'universe-planet-stability', 'scene-3d', ['years', 'jupiter', 'saturn']);
   }
+  if (/(?:życi[a-ząćęłńóśźż]* gwiazd[a-ząćęłńóśźż]*|zyci[a-ząćęłńóśźż]* gwiazd[a-ząćęłńóśźż]*|ewolucj[a-ząćęłńóśźż]* gwiazd[a-ząćęłńóśźż]*|ewolucj[a-ząćęłńóśźż]* gwiazd[a-ząćęłńóśźż]*|los(?:u|y) gwiazd[a-ząćęłńóśźż]*|biały karzeł|bialy karzel|gwiazda neutronowa|supernow[a-ząćęłńóśźż]*)/.test(normalized)) {
+    return request('universe', 'universe-starlife', 'graph', ['massSolar']);
+  }
   if (/(?:atraktor lorenz[a-ząćęłńóśźż]*|atraktor lorenza|równani[a-ząćęłńóśźż]* lorenz[a-ząćęłńóśźż]*|rownani[a-ząćęłńóśźż]* lorenz[a-ząćęłńóśźż]*|lorenz\s+attractor)/.test(normalized)) {
     return request('classical-mechanics', 'universe-lorenz-attractor', 'scene-3d', ['rho', 'horizonTime', 'divergence']);
   }

@@ -230,6 +230,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/\b(wzrost logistyczny|logistyczn[a-ząćęłńóśźż]* populacj|pojemność środowiska|pojemnosc srodowiska)\b/.test(normalized)) {
     return request('biology', 'biology-logistic', 'graph', ['growthRate', 'carryingCapacity', 'initialPopulation', 'timeElapsed']);
   }
+  if (/\b(równani[a-ząćęłńóśźż]* drake[a-ząćęłńóśźż]*|rownani[a-ząćęłńóśźż]* drake[a-ząćęłńóśźż]*|drake equation)\b/.test(normalized)) return request('civilization', 'civilization-drake-equation', 'graph', ['starFormationRate', 'fractionWithPlanets', 'earthlikePerSystem', 'fractionDevelopingLife', 'fractionIntelligent', 'fractionCommunicative', 'lifetimeLog10Years']);
   if (/\b(kardaszew|kardashev|cywilizacja typu)\b/.test(normalized)) {
     return request('civilization', 'civilization-kardashev', 'narrative', ['kardashevType']);
   }

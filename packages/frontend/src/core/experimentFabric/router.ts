@@ -291,6 +291,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf wzrostu logistycznego populacji.',
   },
   {
+    id: 'civilization-drake-equation', domainId: 'civilization', modelVersion: '1.0.0', engine: 'genesis-model-graph-drake@1.0.0',
+    parameters: [number('starFormationRate', 'Tempo formowania gwiazd', 'gwiazd/rok', 0.1, 10, 1.5), number('fractionWithPlanets', 'fₚ', '', 0, 1, 0.9), number('earthlikePerSystem', 'nₑ', '', 0, 5, 0.2), number('fractionDevelopingLife', 'fₗ', '', 0, 1, 0.5), number('fractionIntelligent', 'fᵢ', '', 0, 1, 0.1), number('fractionCommunicative', 'f𝚌', '', 0, 1, 0.1), number('lifetimeLog10Years', 'log₁₀ L', 'log₁₀ lat', 2, 9, 4)],
+    route: { kind: 'lab', labId: 'civilization' }, knowledgeSources: ['civilization.md'],
+    rationale: 'Istniejący ModelGraph równania Drake’a; algebra jest dokładna przy podanych parametrach, ale czynniki astrobiologiczne pozostają interpretacyjne, nie są danymi obserwacyjnymi.',
+  },
+  {
     id: 'civilization-kardashev', domainId: 'civilization', modelVersion: '1.0.0', engine: 'genesis-physics@1.0.0',
     parameters: [number('kardashevType', 'Typ Kardaszewa K', '', 0, 3, 1)],
     route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['civilization.md', 'universe.md'],

@@ -105,11 +105,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'civilization', title: 'Cywilizacja i skale energetyczne', sourceFile: 'civilization.md', scale: 'cosmic',
-    capability: 'REAL_ENGINE', realModels: ['civilization-kardashev'],
-    concepts: ['Kardaszew', 'moc', 'SETI', 'Fermi'], parameters: ['kardashevType'], units: ['W'],
-    assumptions: ['Skala jest narzędziem klasyfikacyjnym, nie prognozą społeczną.'],
-    possibleExperiments: ['oblicz moc cywilizacji'], requiredSolver: 'civilization-kardashev',
-    visualization: ['numeric', 'graph', 'narrative'], dependencies: ['universe'], keywords: ['kardaszew', 'cywilizacja', 'seti', 'fermi'],
+    capability: 'REAL_ENGINE', realModels: ['civilization-kardashev', 'civilization-drake-equation'],
+    concepts: ['Kardaszew', 'równanie Drake’a', 'moc', 'SETI', 'Fermi'], parameters: ['kardashevType', 'starFormationRate', 'fractionWithPlanets', 'earthlikePerSystem', 'fractionDevelopingLife', 'fractionIntelligent', 'fractionCommunicative', 'lifetimeLog10Years'], units: ['W', 'gwiazd/rok', 'lat'],
+    assumptions: ['Skala Kardaszewa jest narzędziem klasyfikacyjnym, nie prognozą społeczną. Równanie Drake’a jest interpretacyjną ramą: wartości fₗ, fᵢ, f𝚌 i L nie są danymi obserwacyjnymi.'],
+    possibleExperiments: ['oblicz moc cywilizacji', 'przelicz równanie Drake’a'], requiredSolver: 'civilization-kardashev / civilization-drake-equation',
+    visualization: ['numeric', 'graph', 'narrative'], dependencies: ['universe'], keywords: ['kardaszew', 'drake', 'cywilizacja', 'seti', 'fermi'],
   },
   {
     id: 'classical-mechanics', title: 'Mechanika klasyczna', sourceFile: 'classical-mechanics.md', scale: 'micro-meso',

@@ -15,6 +15,7 @@ import { runKerrScenario } from '../../labs/experiments/einstein-kerr3d';
 import { runQuantumTeleportScenario } from '../../labs/experiments/quantum-teleport';
 import { runTokamakLawsonScenario } from '../../labs/experiments/nuclear-tokamak';
 import { runDnaHelixScenario } from '../../labs/experiments/biology-dnahelix';
+import { runDrakeEquationScenario } from '../../labs/experiments/civilization-drake-consequence';
 import { runHydrogenOrbitalScenario } from '../../labs/experiments/atom-orbital-3d';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
@@ -597,6 +598,10 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         validity: 'Wzory bez nawiasów, hydratów i izotopów; stopień nienasycenia dla CHNOX.',
         assumptions: ['Parser cheminformatyczny Genesis v1.'], visualization: ['numeric', 'graph'], route: model.route,
       };
+    }
+    case 'civilization-drake-equation': {
+      const solved = runDrakeEquationScenario({ starFormationRate: numberParam(params, 'starFormationRate', 1.5), fractionWithPlanets: numberParam(params, 'fractionWithPlanets', 0.9), earthlikePerSystem: numberParam(params, 'earthlikePerSystem', 0.2), fractionDevelopingLife: numberParam(params, 'fractionDevelopingLife', 0.5), fractionIntelligent: numberParam(params, 'fractionIntelligent', 0.1), fractionCommunicative: numberParam(params, 'fractionCommunicative', 0.1), lifetimeLog10Years: numberParam(params, 'lifetimeLog10Years', 4) });
+      return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Przeliczono warunkową ramę Drake’a: N=${solved.civilizationCount.toExponential(3)} dla jawnych założeń wejściowych.`, outputs: solved, units: { starFormationRate: 'gwiazd/rok', fractionWithPlanets: '', earthlikePerSystem: '', fractionDevelopingLife: '', fractionIntelligent: '', fractionCommunicative: '', lifetimeLog10Years: 'log₁₀ lat', assumedLifetimeYears: 'lat', civilizationCount: '' }, warnings: ['To wynik algebraiczny warunkowy względem założeń, nie estymacja liczby cywilizacji ani dowód kontaktu pozaziemskiego.'], validity: 'Równanie Drake’a jako interpretacyjna rama ModelGraph. fₗ, fᵢ, f𝚌 i L są praktycznie nieograniczone obserwacyjnie; wynik nie jest prognozą.', assumptions: ['Wszystkie siedem parametrów jest jawnie podane przez użytkownika lub bazowy preset.', 'Algebra N=R⋆·fₚ·nₑ·fₗ·fᵢ·f𝚌·L jest wykonywana przez istniejący graf.'], visualization: ['numeric', 'graph', 'narrative'], route: model.route };
     }
     case 'civilization-kardashev': {
       const kardashevType = numberParam(params, 'kardashevType', 1);

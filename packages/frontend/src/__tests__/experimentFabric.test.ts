@@ -298,6 +298,19 @@ describe('Genesis Experiment Fabric', () => {
     expect(atom?.realModels).toContain('atom-hydrogen-orbital');
   });
 
+  it('runs the Drake ModelGraph through Fabric as conditional interpretation, not prediction', () => {
+    const command = 'Przelicz równanie Drake’a.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const civilization = getKnowledgeDomain('civilization');
+    expect(run.request.modelId).toBe('civilization-drake-equation');
+    expect(run.result.status).toBe('completed');
+    expect(Number(run.result.outputs.civilizationCount)).toBeCloseTo(13.5, 12);
+    expect(run.result.validity).toContain('interpretacyjna');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(civilization?.realModels).toContain('civilization-drake-equation');
+  });
+
   it('runs bounded B-DNA and Wallace observables through Fabric without claiming full thermodynamics', () => {
     const command = 'Pokaż helisę DNA.';
     const run = runExperiment(parseScienceChatMessage(command));

@@ -12,6 +12,9 @@ import {
   createMergeRequest,
   decideMergeRequest,
   getContributions,
+  listKnowledgeMaterials,
+  uploadKnowledgeMaterial,
+  type KnowledgeMaterial,
   type Project,
   type Member,
   type CloudTrial,
@@ -21,6 +24,7 @@ import {
   type ContributionGraph,
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
+import { setActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
 
 /**
  * Projekty (chmura) — reachable UI trwałości (Milestone 1). Zalogowany
@@ -47,6 +51,36 @@ const STATUS_LABEL: Record<CloudTrial['status'], string> = {
 
 function canManageMembers(role?: ProjectRole): boolean {
   return role === 'owner' || role === 'admin';
+}
+
+const MAX_KNOWLEDGE_FILE_BYTES = 5 * 1024 * 1024;
+
+function knowledgeMimeFor(file: File): 'text/plain' | 'text/markdown' | 'application/pdf' | 'application/json' | null {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.pdf')) return 'application/pdf';
+  if (name.endsWith('.md') || name.endsWith('.markdown')) return 'text/markdown';
+  if (name.endsWith('.txt')) return 'text/plain';
+  if (name.endsWith('.json')) return 'application/json';
+  return null;
+}
+
+function fileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Nie udało się odczytać pliku.'));
+    reader.onload = () => {
+      const result = String(reader.result ?? '');
+      const comma = result.indexOf(',');
+      if (comma < 0) reject(new Error('Nieprawidłowy odczyt pliku.'));
+      else resolve(result.slice(comma + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatBytes(value: number | null): string {
+  if (value === null) return '—';
+  return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} kB`;
 }
 
 export function CloudProjectsScreen() {
@@ -161,12 +195,23 @@ const MERGE_STATUS_LABEL: Record<MergeRequest['status'], string> = {
 };
 
 function ProjectDetail({ project, onBack }: { project: Project; onBack: () => void }) {
+  useEffect(() => {
+    setActiveKnowledgeProject(project);
+    return () => setActiveKnowledgeProject(null);
+  }, [project]);
+
   const [members, setMembers] = useState<Member[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [activeBranch, setActiveBranch] = useState<string>('');
   const [trials, setTrials] = useState<CloudTrial[] | null>(null);
   const [mrs, setMrs] = useState<MergeRequest[]>([]);
   const [contrib, setContrib] = useState<ContributionGraph | null>(null);
+  const [materials, setMaterials] = useState<KnowledgeMaterial[] | null>(null);
+  const [knowledgeFile, setKnowledgeFile] = useState<File | null>(null);
+  const [knowledgeTitle, setKnowledgeTitle] = useState('');
+  const [knowledgeTopics, setKnowledgeTopics] = useState('');
+  const [knowledgeSourceUrl, setKnowledgeSourceUrl] = useState('');
+  const [uploadingKnowledge, setUploadingKnowledge] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [memberEmail, setMemberEmail] = useState('');
   const [memberRole, setMemberRole] = useState<ProjectRole>('viewer');
@@ -180,11 +225,12 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
   const loadStatic = useCallback(async () => {
     const token = getToken();
     if (!token) return;
-    const [m, b, mr, c] = await Promise.all([
+    const [m, b, mr, c, k] = await Promise.all([
       listMembers(token, project.id),
       listBranches(token, project.id),
       listMergeRequests(token, project.id),
       getContributions(token, project.id),
+      listKnowledgeMaterials(token, project.id),
     ]);
     if (m.ok) setMembers(m.data);
     if (b.ok) {
@@ -193,6 +239,7 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
     }
     if (mr.ok) setMrs(mr.data);
     if (c.ok) setContrib(c.data);
+    if (k.ok) setMaterials(k.data);
   }, [project.id]);
 
   const loadTrials = useCallback(async (branchId: string) => {
@@ -204,6 +251,47 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
 
   useEffect(() => { void loadStatic(); }, [loadStatic]);
   useEffect(() => { if (activeBranch) void loadTrials(activeBranch); }, [activeBranch, loadTrials]);
+
+  async function handleKnowledgeUpload(e: React.FormEvent) {
+    e.preventDefault();
+    const token = getToken();
+    if (!token || !knowledgeFile) return;
+    const mimeType = knowledgeMimeFor(knowledgeFile);
+    if (!mimeType) {
+      setError('Obsługiwane są wyłącznie pliki PDF, TXT, MD i JSON.');
+      return;
+    }
+    if (knowledgeFile.size > MAX_KNOWLEDGE_FILE_BYTES) {
+      setError('Maksymalny rozmiar materiału wiedzy to 5 MB.');
+      return;
+    }
+    setUploadingKnowledge(true);
+    try {
+      const contentBase64 = await fileAsBase64(knowledgeFile);
+      const result = await uploadKnowledgeMaterial(token, project.id, {
+        fileName: knowledgeFile.name,
+        mimeType,
+        title: knowledgeTitle.trim() || undefined,
+        topics: knowledgeTopics.split(',').map((topic) => topic.trim()).filter(Boolean),
+        sourceUrl: knowledgeSourceUrl.trim() || undefined,
+        contentBase64,
+      });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setKnowledgeFile(null);
+      setKnowledgeTitle('');
+      setKnowledgeTopics('');
+      setKnowledgeSourceUrl('');
+      setError(null);
+      await loadStatic();
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Nie udało się przygotować pliku do uploadu.');
+    } finally {
+      setUploadingKnowledge(false);
+    }
+  }
 
   async function handleAddMember(e: React.FormEvent) {
     e.preventDefault();
@@ -360,6 +448,52 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
               </div>
             ))}
           </div>
+        )}
+      </section>
+
+      <section className="settings-section">
+        <h2>Biblioteka wiedzy</h2>
+        <p className="settings-hint">
+          Materiał zachowuje oryginalny plik, wersję, hash i provenance. Jest oznaczony jako materiał użytkownika bez recenzji:
+          może być znaleziony jako źródło, ale nie zmienia automatycznie solvera ani wyniku symulacji.
+        </p>
+        {materials === null ? (
+          <p className="settings-hint">Ładowanie materiałów…</p>
+        ) : materials.length === 0 ? (
+          <p className="settings-hint">Brak dodanych materiałów.</p>
+        ) : (
+          <div className="trial-list">
+            {materials.map((material) => (
+              <div className="trial-row" key={material.id}>
+                <span className="trial-label">{material.title} <span className="cloud-modelver">v{material.currentVersion}</span></span>
+                <span className="trial-status">{material.epistemicStatus === 'USER_PROVIDED_UNREVIEWED' ? 'materiał użytkownika — bez recenzji' : material.epistemicStatus}</span>
+                <span className="account-email" title={material.contentSha256 ?? undefined}>{formatBytes(material.byteSize)} · SHA-256 {material.contentSha256?.slice(0, 12) ?? '—'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {canWrite && (
+          <form className="account-form" onSubmit={handleKnowledgeUpload}>
+            <label className="account-field">
+              <span>Plik źródłowy (PDF, TXT, MD lub JSON; maks. 5 MB)</span>
+              <input type="file" accept=".pdf,.txt,.md,.markdown,.json" onChange={(e) => setKnowledgeFile(e.target.files?.[0] ?? null)} required />
+            </label>
+            <label className="account-field">
+              <span>Tytuł źródła (opcjonalnie)</span>
+              <input type="text" value={knowledgeTitle} onChange={(e) => setKnowledgeTitle(e.target.value)} maxLength={180} placeholder="np. Majorana — notatki z seminarium" />
+            </label>
+            <label className="account-field">
+              <span>Tematy, rozdzielone przecinkami</span>
+              <input type="text" value={knowledgeTopics} onChange={(e) => setKnowledgeTopics(e.target.value)} maxLength={600} placeholder="quantum, Majorana, topological matter" />
+            </label>
+            <label className="account-field">
+              <span>Publiczny adres źródła (opcjonalnie)</span>
+              <input type="url" value={knowledgeSourceUrl} onChange={(e) => setKnowledgeSourceUrl(e.target.value)} maxLength={2000} placeholder="https://…" />
+            </label>
+            <button className="chip-btn primary" type="submit" disabled={uploadingKnowledge || !knowledgeFile}>
+              {uploadingKnowledge ? 'Indeksowanie…' : '↑ Dodaj materiał do biblioteki'}
+            </button>
+          </form>
         )}
       </section>
 

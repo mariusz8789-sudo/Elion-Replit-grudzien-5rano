@@ -72,8 +72,14 @@ import { listEndpoints } from './compute/admetAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
-import { saveEnvAudit, latestEnvAudit, listScienceRuns, getScienceRun } from './store.mjs';
+import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
+  ingestKnowledgeMaterial,
+  listKnowledgeMaterials,
+  getKnowledgeMaterial,
+  searchKnowledgeMaterials,
+} from './store.mjs';
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
+import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -185,6 +191,27 @@ export function handleApi(db, ctx) {
     // /api/projects/:id/runs — audytowalne przebiegi obliczeń projektu (viewer+)
     if (seg[2] === 'runs' && seg.length === 3 && method === 'GET') {
       return ok({ runs: listRuns(db, projectId) });
+    }
+
+    // ---- Knowledge Ingestion: artefakty użytkownika (viewer+ read, editor+ write) ----
+    if (seg[2] === 'knowledge-materials') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ materials: listKnowledgeMaterials(db, projectId) });
+        if (method === 'POST') return createKnowledgeMaterialHandler(db, user, role, projectId, body);
+        return err(405, 'method_not_allowed');
+      }
+      if (seg.length === 4 && seg[3] === 'search' && method === 'GET') {
+        const query = String(ctx.query?.q ?? '').slice(0, 500);
+        return ok({ materials: searchKnowledgeMaterials(db, projectId, tokenizeKnowledgeQuery(query)).map(knowledgeSearchResult) });
+      }
+      const material = getKnowledgeMaterial(db, projectId, seg[3], { includeText: false });
+      if (!material) return err(404, 'not_found');
+      if (seg.length === 4 && method === 'GET') return ok({ material });
+      if (seg.length === 5 && seg[4] === 'content' && method === 'GET') {
+        const original = getKnowledgeMaterial(db, projectId, seg[3], { includeOriginal: true });
+        return ok({ material: original });
+      }
+      return err(405, 'method_not_allowed');
     }
 
     // ---- Drug Discovery (P6): cele, kandydaci, paszporty, ranking ----
@@ -416,6 +443,25 @@ function addMemberHandler(db, role, projectId, body) {
   if (targetRole === 'owner' && role !== 'owner') return err(403, 'forbidden', 'Tylko właściciel może nadać rolę owner.');
   setMember(db, { projectId, userId: target.id, role: targetRole });
   return ok({ members: listMembers(db, projectId) });
+}
+
+/* ---------------- Handlery Knowledge Ingestion ---------------- */
+
+function knowledgeSearchResult(material) {
+  const text = String(material.extractedText ?? '');
+  return {
+    ...material,
+    extractedText: undefined,
+    excerpt: text.length > 900 ? `${text.slice(0, 900)}\n…(przycięte)` : text,
+  };
+}
+
+function createKnowledgeMaterialHandler(db, user, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Dodawanie materiałów wymaga roli editor lub wyższej.');
+  const prepared = prepareKnowledgeUpload(body);
+  if (!prepared.ok) return err(400, prepared.error, prepared.message);
+  const material = ingestKnowledgeMaterial(db, { projectId, uploadedBy: user.id, material: prepared.value });
+  return ok({ material }, 201);
 }
 
 /* ---------------- Handlery prób ---------------- */

@@ -218,6 +218,61 @@ export function deleteCloudTrial(token: string, projectId: string, trialId: stri
   return request('DELETE', `/projects/${projectId}/trials/${trialId}`, { token });
 }
 
+/* ---------------- Knowledge Ingestion ---------------- */
+
+export type KnowledgeExtractionStatus = 'EXTRACTED' | 'NO_EXTRACTABLE_TEXT' | 'EXTRACTION_UNAVAILABLE' | 'EXTRACTION_FAILED';
+export type KnowledgeEpistemicStatus = 'USER_PROVIDED_UNREVIEWED';
+
+export interface KnowledgeMaterial {
+  id: string;
+  projectId: string;
+  title: string;
+  materialKey: string;
+  currentVersion: number;
+  createdBy: string;
+  createdAt: number;
+  updatedAt: number;
+  versionId: string | null;
+  version: number | null;
+  fileName: string | null;
+  mimeType: string | null;
+  byteSize: number | null;
+  contentSha256: string | null;
+  topics: string[];
+  sourceUrl: string | null;
+  extractionStatus: KnowledgeExtractionStatus | null;
+  epistemicStatus: KnowledgeEpistemicStatus | null;
+  provenance: { kind?: string; solverEffect?: string; extraction?: { status?: string; extractor?: string } };
+  extractedText?: string;
+  excerpt?: string;
+  originalBase64?: string;
+}
+
+export interface KnowledgeUpload {
+  fileName: string;
+  mimeType: 'text/plain' | 'text/markdown' | 'application/pdf' | 'application/json';
+  title?: string;
+  topics?: string[];
+  sourceUrl?: string;
+  contentBase64: string;
+}
+
+export async function listKnowledgeMaterials(token: string, projectId: string): Promise<ApiResult<KnowledgeMaterial[]>> {
+  const r = await request<{ materials: KnowledgeMaterial[] }>('GET', `/projects/${projectId}/knowledge-materials`, { token });
+  return r.ok ? { ok: true, data: r.data.materials } : r;
+}
+
+export async function uploadKnowledgeMaterial(token: string, projectId: string, upload: KnowledgeUpload): Promise<ApiResult<KnowledgeMaterial>> {
+  const r = await request<{ material: KnowledgeMaterial }>('POST', `/projects/${projectId}/knowledge-materials`, { token, body: upload });
+  return r.ok ? { ok: true, data: r.data.material } : r;
+}
+
+export async function searchKnowledgeMaterials(token: string, projectId: string, query: string): Promise<ApiResult<KnowledgeMaterial[]>> {
+  const q = new URLSearchParams({ q: query.slice(0, 500) }).toString();
+  const r = await request<{ materials: KnowledgeMaterial[] }>('GET', `/projects/${projectId}/knowledge-materials/search?${q}`, { token });
+  return r.ok ? { ok: true, data: r.data.materials } : r;
+}
+
 /* ---------------- Scientific Git: gałęzie, scalanie, kontrybucje ---------------- */
 
 export interface Branch {

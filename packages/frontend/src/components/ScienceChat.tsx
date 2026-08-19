@@ -9,6 +9,9 @@ import { saveExperiment, listExperiments } from '../core/scienceMemory';
 import { track } from '../core/analytics';
 import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, type EvidenceGuidedExperimentPlan, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
+import { getToken } from '../core/backend/session';
+import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
+import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
 
 /**
  * Genesis Science Chat — inteligentna warstwa rozmowy NAD istniejącymi
@@ -51,6 +54,16 @@ function formatEvidenceGuidedPlan(reviewed: EvidenceGuidedExperimentPlan): strin
   ].join('\n\n');
 }
 
+function formatProjectKnowledgeSources(project: ActiveKnowledgeProject, materials: KnowledgeMaterial[]): string {
+  const entries = materials.slice(0, 3).map((material) => {
+    const topics = material.topics.length > 0 ? ` Tematy: ${material.topics.join(', ')}.` : '';
+    const hash = material.contentSha256 ? ` SHA-256: ${material.contentSha256.slice(0, 12)}…` : '';
+    const excerpt = material.excerpt ? `\n> ${material.excerpt.replace(/\n/g, '\n> ')}` : '';
+    return `• ${material.title} v${material.currentVersion} — ${material.epistemicStatus ?? 'status nieznany'}; ${material.extractionStatus ?? 'brak ekstrakcji'}.${topics}${hash}${excerpt}`;
+  });
+  return `Źródła projektu „${project.name}” — materiał użytkownika, nie wynik solvera ani instrukcja wykonawcza:\n${entries.join('\n')}`;
+}
+
 function formatFabricRun(run: ExperimentRun): string {
   const entries = Object.entries(run.result.outputs).slice(0, 6).map(([key, value]) => {
     const unit = run.result.units[key] ? ` ${run.result.units[key]}` : '';
@@ -86,6 +99,7 @@ export function ScienceChat() {
   }]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
   const [pendingGuidedPlan, setPendingGuidedPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
+  const [activeKnowledgeProject, setActiveKnowledgeProject] = useState<ActiveKnowledgeProject | null>(() => getActiveKnowledgeProject());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { ensureGeneratorReady(); }, []);
@@ -95,7 +109,17 @@ export function ScienceChat() {
     return () => window.removeEventListener('genesis:open-science-chat', openFromWorld);
   }, []);
   useEffect(() => subscribeSimContext((c) => setCtxName(c?.experimentName ?? null)), []);
+  useEffect(() => subscribeActiveKnowledgeProject(setActiveKnowledgeProject), []);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [turns, open]);
+
+  const appendProjectKnowledgeSources = async (query: string) => {
+    const token = getToken();
+    const project = activeKnowledgeProject;
+    if (!token || !project || query.trim().length < 2) return;
+    const found = await searchKnowledgeMaterials(token, project.id, query);
+    if (!found.ok || found.data.length === 0) return;
+    setTurns((current) => [...current, { role: 'genesis', text: formatProjectKnowledgeSources(project, found.data), tag: 'SYSTEM' }]);
+  };
 
   const send = (text: string) => {
     const msg = text.trim();
@@ -143,6 +167,7 @@ export function ScienceChat() {
       setPendingGuidedPlan(reviewed.status === 'READY_FOR_CONFIRMATION' ? reviewed : null);
       setInput('');
       track('ask_ai_used', { via: 'science-chat-plan', model: fabricRequest.modelId ?? fabricRequest.domainId, status: reviewed.status });
+      void appendProjectKnowledgeSources(msg);
       return;
     }
 
@@ -159,6 +184,7 @@ export function ScienceChat() {
     setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: res.text, tag: res.tag, intent: res.intent, equations: res.equations, todo: res.todo }]);
     setInput('');
     track('ask_ai_used', { via: 'science-chat' });
+    void appendProjectKnowledgeSources(msg);
 
     // Efekty uboczne — sterowanie istniejącymi mechanizmami.
     const appendGenesis = (t: string, tag: EpistemicTag = 'SYSTEM') => setTurns((prev) => [...prev, { role: 'genesis', text: t, tag }]);

@@ -185,7 +185,8 @@ async function handleAsk(req, res) {
 
 /* ---------------- API trwałości (/api/auth, /api/projects) ---------------- */
 const persistLimiter = createRateLimiter({ limit: 60, windowMs: 60_000 });
-setInterval(() => persistLimiter.cleanup(), 300_000).unref();
+const knowledgeUploadLimiter = createRateLimiter({ limit: 6, windowMs: 60_000 });
+setInterval(() => { persistLimiter.cleanup(); knowledgeUploadLimiter.cleanup(); }, 300_000).unref();
 
 /** Odczytuje ciało JSON (limit 64 kB — próby to małe wektory liczb), token z nagłówka i woła router. */
 function handlePersistApi(req, res, url) {
@@ -193,6 +194,15 @@ function handlePersistApi(req, res, url) {
   const ip = req.socket.remoteAddress ?? 'unknown';
   if (!persistLimiter.allow(ip)) {
     return json(res, 429, { error: 'rate_limited', message: 'Za dużo żądań — odczekaj chwilę.' });
+  }
+  const isKnowledgeUpload = req.method === 'POST' && /^\/api\/projects\/[^/]+\/knowledge-materials\/?$/.test(url.pathname);
+  if (isKnowledgeUpload && !knowledgeUploadLimiter.allow(ip)) {
+    return json(res, 429, { error: 'knowledge_upload_rate_limited', message: 'Limit uploadu materiałów: 6 na minutę.' });
+  }
+  const maxBodyBytes = isKnowledgeUpload ? 7 * 1024 * 1024 : 65_536;
+  const declaredLength = Number(req.headers['content-length'] ?? 0);
+  if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes) {
+    return json(res, 413, { error: 'payload_too_large', message: 'Przesłany materiał przekracza limit transportu.' });
   }
   const auth = req.headers['authorization'] ?? '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
@@ -203,7 +213,7 @@ function handlePersistApi(req, res, url) {
   let overflow = false;
   req.on('data', (chunk) => {
     size += chunk.length;
-    if (size > 65_536) { overflow = true; req.destroy(); return; }
+    if (size > maxBodyBytes) { overflow = true; req.destroy(); return; }
     raw += chunk;
   });
   req.on('end', () => {

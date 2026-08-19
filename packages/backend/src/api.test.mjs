@@ -227,3 +227,112 @@ describe('persistent reproducible trials + RBAC', () => {
     assert.equal(call('DELETE', `/api/projects/${op.id}/trials/${trial.id}`, { token: other.token }).status, 404);
   });
 });
+
+
+describe('knowledge ingestion', () => {
+  function setupKnowledgeProject() {
+    const owner = registerUser('owner@knowledge.org');
+    const project = call('POST', '/api/projects', { token: owner.token, body: { name: 'Quantum sources' } }).body.project;
+    return { owner, project };
+  }
+
+  function uploadBody(text, overrides = {}) {
+    return {
+      fileName: 'majorana-notes.md',
+      mimeType: 'text/markdown',
+      title: 'Majorana evidence notes',
+      topics: ['quantum', 'Majorana', 'topological matter'],
+      sourceUrl: 'https://example.org/source',
+      contentBase64: Buffer.from(text, 'utf8').toString('base64'),
+      ...overrides,
+    };
+  }
+
+  test('editor upload preserves original, hashes it, extracts text and never declares a solver', () => {
+    const { owner, project } = setupKnowledgeProject();
+    const response = call('POST', `/api/projects/${project.id}/knowledge-materials`, {
+      token: owner.token,
+      body: uploadBody('# Majorana\nTopological evidence requires careful verification.'),
+    });
+    assert.equal(response.status, 201);
+    const material = response.body.material;
+    assert.equal(material.currentVersion, 1);
+    assert.equal(material.version, 1);
+    assert.equal(material.extractionStatus, 'EXTRACTED');
+    assert.equal(material.epistemicStatus, 'USER_PROVIDED_UNREVIEWED');
+    assert.match(material.contentSha256, /^[0-9a-f]{64}$/);
+    assert.equal(material.provenance.kind, 'USER_UPLOAD');
+    assert.equal(material.provenance.solverEffect, 'NONE');
+    assert.match(material.extractedText, /Topological evidence/);
+
+    const original = call('GET', `/api/projects/${project.id}/knowledge-materials/${material.id}/content`, { token: owner.token });
+    assert.equal(original.status, 200);
+    assert.equal(Buffer.from(original.body.material.originalBase64, 'base64').toString('utf8'), '# Majorana\nTopological evidence requires careful verification.');
+  });
+
+  test('same material key creates immutable next version and lexical search returns source-bound excerpt', () => {
+    const { owner, project } = setupKnowledgeProject();
+    const first = call('POST', `/api/projects/${project.id}/knowledge-materials`, {
+      token: owner.token, body: uploadBody('Majorana measurement one.'),
+    }).body.material;
+    const second = call('POST', `/api/projects/${project.id}/knowledge-materials`, {
+      token: owner.token, body: uploadBody('Majorana measurement two with topological warning for łańcuch Kitaeva.'),
+    }).body.material;
+    assert.equal(first.id, second.id);
+    assert.equal(second.currentVersion, 2);
+    assert.equal(second.version, 2);
+    assert.notEqual(first.contentSha256, second.contentSha256);
+
+    const listed = call('GET', `/api/projects/${project.id}/knowledge-materials`, { token: owner.token });
+    assert.equal(listed.status, 200);
+    assert.equal(listed.body.materials.length, 1);
+    assert.equal(listed.body.materials[0].currentVersion, 2);
+
+    const found = call('GET', `/api/projects/${project.id}/knowledge-materials/search`, {
+      token: owner.token, query: { q: 'topological' },
+    });
+    assert.equal(found.status, 200);
+    assert.equal(found.body.materials.length, 1);
+    assert.match(found.body.materials[0].excerpt, /topological warning/);
+    assert.equal(found.body.materials[0].extractedText, undefined);
+
+    const naturalQuestion = call('GET', `/api/projects/${project.id}/knowledge-materials/search`, {
+      token: owner.token, query: { q: 'Co zawiera materiał o łańcuchu Kitaeva w bibliotece projektu?' },
+    });
+    assert.equal(naturalQuestion.status, 200);
+    assert.equal(naturalQuestion.body.materials.length, 1);
+    assert.match(naturalQuestion.body.materials[0].excerpt, /Kitaeva/);
+  });
+
+  test('viewer can read project knowledge but cannot upload; outsider gets 404', () => {
+    const { owner, project } = setupKnowledgeProject();
+    const viewer = registerUser('viewer@knowledge.org');
+    const outsider = registerUser('outsider@knowledge.org');
+    call('POST', `/api/projects/${project.id}/members`, {
+      token: owner.token, body: { email: viewer.user.email, role: 'viewer' },
+    });
+    const created = call('POST', `/api/projects/${project.id}/knowledge-materials`, {
+      token: owner.token, body: uploadBody('Public within project.'),
+    }).body.material;
+    assert.equal(call('GET', `/api/projects/${project.id}/knowledge-materials`, { token: viewer.token }).status, 200);
+    assert.equal(call('POST', `/api/projects/${project.id}/knowledge-materials`, { token: viewer.token, body: uploadBody('no write') }).status, 403);
+    assert.equal(call('GET', `/api/projects/${project.id}/knowledge-materials/${created.id}`, { token: outsider.token }).status, 404);
+  });
+
+  test('rejects media-type spoofing and malformed PDF before persistence', () => {
+    const { owner, project } = setupKnowledgeProject();
+    const wrongExtension = call('POST', `/api/projects/${project.id}/knowledge-materials`, {
+      token: owner.token,
+      body: uploadBody('x', { fileName: 'wrong.pdf', mimeType: 'text/markdown' }),
+    });
+    assert.equal(wrongExtension.status, 400);
+    assert.equal(wrongExtension.body.error, 'extension_mismatch');
+
+    const fakePdf = call('POST', `/api/projects/${project.id}/knowledge-materials`, {
+      token: owner.token,
+      body: uploadBody('not a PDF', { fileName: 'fake.pdf', mimeType: 'application/pdf', contentBase64: Buffer.from('not a PDF').toString('base64') }),
+    });
+    assert.equal(fakePdf.status, 400);
+    assert.equal(fakePdf.body.error, 'invalid_pdf_signature');
+  });
+});

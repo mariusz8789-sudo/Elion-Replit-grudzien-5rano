@@ -337,8 +337,47 @@ CREATE TABLE IF NOT EXISTS science_run_verifications (
 CREATE INDEX IF NOT EXISTS idx_science_run_verifications_run ON science_run_verifications(science_run_id);
 `;
 
+// Knowledge Ingestion: material is a project-scoped identity, while every uploaded
+// original is immutable in a numbered version row. This reuses the central store;
+// no second Knowledge Registry or implicit solver configuration is introduced.
+const SCHEMA_V9 = `
+CREATE TABLE IF NOT EXISTS knowledge_materials (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  material_key    TEXT NOT NULL,
+  title           TEXT NOT NULL,
+  current_version INTEGER NOT NULL DEFAULT 0,
+  created_by      TEXT NOT NULL REFERENCES users(id),
+  created_at      INTEGER NOT NULL,
+  updated_at      INTEGER NOT NULL,
+  UNIQUE (project_id, material_key)
+);
+CREATE TABLE IF NOT EXISTS knowledge_material_versions (
+  id                TEXT PRIMARY KEY,
+  material_id       TEXT NOT NULL REFERENCES knowledge_materials(id) ON DELETE CASCADE,
+  version           INTEGER NOT NULL,
+  file_name         TEXT NOT NULL,
+  mime_type         TEXT NOT NULL,
+  original_blob     BLOB NOT NULL,
+  byte_size         INTEGER NOT NULL,
+  content_sha256    TEXT NOT NULL,
+  topics_json       TEXT NOT NULL DEFAULT '[]',
+  source_url        TEXT,
+  extracted_text    TEXT NOT NULL DEFAULT '',
+  extraction_status TEXT NOT NULL,
+  epistemic_status  TEXT NOT NULL,
+  provenance_json   TEXT NOT NULL DEFAULT '{}',
+  uploaded_by       TEXT NOT NULL REFERENCES users(id),
+  created_at        INTEGER NOT NULL,
+  UNIQUE (material_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_knowledge_materials_project ON knowledge_materials(project_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_knowledge_versions_material ON knowledge_material_versions(material_id, version);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 9) db.exec(SCHEMA_V9);
   if (version < 7) db.exec(SCHEMA_V7);
   if (version < 8) {
     db.exec(SCHEMA_V8);
@@ -373,6 +412,7 @@ function migrate(db) {
     }
   }
   if (version < 8) db.exec('PRAGMA user_version = 8');
+  if (version < 9) db.exec('PRAGMA user_version = 9');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -596,6 +636,103 @@ export function listMembers(db, projectId) {
     displayName: r.display_name,
     createdAt: r.created_at,
   }));
+}
+
+/* ---------------- Knowledge Ingestion (materiały projektu) ---------------- */
+
+function toKnowledgeMaterial(row, { includeText = false, includeOriginal = false } = {}) {
+  if (!row) return null;
+  return {
+    id: row.material_id ?? row.id,
+    projectId: row.project_id,
+    title: row.title,
+    materialKey: row.material_key,
+    currentVersion: row.current_version,
+    createdBy: row.created_by,
+    createdAt: row.material_created_at ?? row.created_at,
+    updatedAt: row.updated_at,
+    versionId: row.version_id ?? null,
+    version: row.version ?? null,
+    fileName: row.file_name ?? null,
+    mimeType: row.mime_type ?? null,
+    byteSize: row.byte_size ?? null,
+    contentSha256: row.content_sha256 ?? null,
+    topics: row.topics_json ? JSON.parse(row.topics_json) : [],
+    sourceUrl: row.source_url ?? null,
+    extractionStatus: row.extraction_status ?? null,
+    epistemicStatus: row.epistemic_status ?? null,
+    provenance: row.provenance_json ? JSON.parse(row.provenance_json) : {},
+    ...(includeText ? { extractedText: row.extracted_text ?? '' } : {}),
+    ...(includeOriginal ? { originalBase64: Buffer.from(row.original_blob ?? []).toString('base64') } : {}),
+  };
+}
+
+const KNOWLEDGE_LATEST_SELECT = `
+  SELECT km.id AS material_id, km.project_id, km.material_key, km.title, km.current_version,
+         km.created_by, km.created_at AS material_created_at, km.updated_at,
+         kmv.id AS version_id, kmv.version, kmv.file_name, kmv.mime_type, kmv.original_blob,
+         kmv.byte_size, kmv.content_sha256, kmv.topics_json, kmv.source_url, kmv.extracted_text,
+         kmv.extraction_status, kmv.epistemic_status, kmv.provenance_json
+  FROM knowledge_materials km
+  JOIN knowledge_material_versions kmv ON kmv.material_id = km.id AND kmv.version = km.current_version`;
+
+/** Zapisuje oryginalny artefakt jako nową, niezmienną wersję tego samego materiału. */
+export function ingestKnowledgeMaterial(db, { projectId, uploadedBy, material }) {
+  const now = Date.now();
+  const existing = db.prepare('SELECT * FROM knowledge_materials WHERE project_id = ? AND material_key = ?').get(projectId, material.stableKey);
+  const materialId = existing?.id ?? newId();
+  const nextVersion = (existing?.current_version ?? 0) + 1;
+  const versionId = newId();
+  db.exec('BEGIN');
+  try {
+    if (!existing) {
+      db.prepare(`INSERT INTO knowledge_materials (id, project_id, material_key, title, current_version, created_by, created_at, updated_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(materialId, projectId, material.stableKey, material.title, nextVersion, uploadedBy, now, now);
+    } else {
+      db.prepare('UPDATE knowledge_materials SET title = ?, current_version = ?, updated_at = ? WHERE id = ?')
+        .run(material.title, nextVersion, now, materialId);
+    }
+    db.prepare(`INSERT INTO knowledge_material_versions
+      (id, material_id, version, file_name, mime_type, original_blob, byte_size, content_sha256, topics_json, source_url, extracted_text, extraction_status, epistemic_status, provenance_json, uploaded_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(versionId, materialId, nextVersion, material.fileName, material.mimeType, material.bytes, material.byteSize,
+        material.contentSha256, JSON.stringify(material.topics), material.sourceUrl, material.extractedText,
+        material.extractionStatus, material.epistemicStatus, JSON.stringify(material.provenance), uploadedBy, now);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+  return getKnowledgeMaterial(db, projectId, materialId, { includeText: true });
+}
+
+export function listKnowledgeMaterials(db, projectId) {
+  return db.prepare(`${KNOWLEDGE_LATEST_SELECT} WHERE km.project_id = ? ORDER BY km.updated_at DESC`).all(projectId)
+    .map((row) => toKnowledgeMaterial(row));
+}
+
+export function getKnowledgeMaterial(db, projectId, materialId, options = {}) {
+  const row = db.prepare(`${KNOWLEDGE_LATEST_SELECT} WHERE km.project_id = ? AND km.id = ?`).get(projectId, materialId);
+  return toKnowledgeMaterial(row, options);
+}
+
+/** Wyszukiwanie leksykalne w aktualnej wersji każdego materiału — bez wektorowej atrapy. */
+export function searchKnowledgeMaterials(db, projectId, tokens) {
+  const clean = Array.isArray(tokens) ? tokens.filter((token) => typeof token === 'string' && token.length >= 2).slice(0, 12) : [];
+  if (clean.length === 0) return [];
+  const clauses = clean.map(() => '(lower(km.title) LIKE ? OR lower(kmv.topics_json) LIKE ? OR lower(kmv.extracted_text) LIKE ?)');
+  const values = [projectId];
+  for (const token of clean) {
+    const needle = `%${token.toLocaleLowerCase('pl-PL')}%`;
+    values.push(needle, needle, needle);
+  }
+  // Pytania w Science Chat zawierają także słowa funkcyjne i czasowniki. Wystarczy
+  // deterministyczne trafienie co najmniej jednego terminu w tytule, tematach lub
+  // wyekstrahowanej treści; nie udajemy dopasowania semantycznego ani nie
+  // przekazujemy materiału jako instrukcji dla solvera.
+  const rows = db.prepare(`${KNOWLEDGE_LATEST_SELECT} WHERE km.project_id = ? AND (${clauses.join(' OR ')}) ORDER BY km.updated_at DESC LIMIT 12`).all(...values);
+  return rows.map((row) => toKnowledgeMaterial(row, { includeText: true }));
 }
 
 /* ---------------- Serie Prób (trwałe, reprodukowalne) ---------------- */

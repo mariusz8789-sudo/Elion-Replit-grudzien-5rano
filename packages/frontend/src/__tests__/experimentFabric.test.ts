@@ -284,6 +284,20 @@ describe('Genesis Experiment Fabric', () => {
     expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
   });
 
+  it('runs bounded hydrogen orbital through Fabric without treating a renderer cloud as a measurement', () => {
+    const command = 'Oblicz orbital atomowy wodoru.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const atom = getKnowledgeDomain('atom');
+    expect(run.request.modelId).toBe('atom-hydrogen-orbital');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'atom', experimentId: 'orbital-3d' });
+    expect(Number(run.result.outputs.relativeDensity)).toBeGreaterThanOrEqual(0);
+    expect(run.result.validity).toContain('wieloelektronowej');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(atom?.realModels).toContain('atom-hydrogen-orbital');
+  });
+
   it('runs bounded Minkowski light cone through Fabric without claiming acceleration dynamics', () => {
     const command = 'Pokaż stożek świetlny i paradoks bliźniąt.';
     const run = runExperiment(parseScienceChatMessage(command));

@@ -144,6 +144,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Istniejąca analityczna krzywa rotacji: wykładniczy dysk w przybliżeniu sferycznym z halo pseudo-izotermicznym albo alternatywną relacją MOND; nie jest dopasowaniem danych konkretnej galaktyki ani rozstrzygnięciem CDM kontra MOND.',
   },
   {
+    id: 'atom-hydrogen-orbital', domainId: 'atom', modelVersion: '1.0.0', engine: 'genesis-hydrogen-orbitals@1.0.0',
+    parameters: [text('orbital', 'Orbital wodoru', '2pz'), number('x', 'x', 'a₀', -34, 34, 0), number('y', 'y', 'a₀', -34, 34, 0), number('z', 'z', 'a₀', -34, 34, 1)],
+    route: { kind: 'lab', labId: 'atom', experimentId: 'orbital-3d' }, knowledgeSources: ['atom.md', 'quantum.md'],
+    rationale: 'Analityczne kształty orbitali wodoru z istniejących funkcji radialnych i kątowych; wynik jest lokalną gęstością względną, nie pojedynczym pomiarem elektronu.',
+  },
+  {
     id: 'atom-bohr', domainId: 'atom', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('atomicNumber', 'Liczba atomowa Z', '', 1, 118, 1), number('principalN', 'Główna liczba kwantowa n', '', 1, 10, 1)],
     route: { kind: 'lab', labId: 'atom' }, knowledgeSources: ['atom.md', 'quantum.md'],

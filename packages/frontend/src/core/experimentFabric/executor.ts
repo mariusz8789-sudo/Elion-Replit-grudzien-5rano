@@ -8,6 +8,7 @@ import { runSchwarzschildGeodesicScenario } from '../../labs/experiments/einstei
 import { runTitrationScenario } from '../../labs/experiments/chemistry-titration';
 import { runPointLensScenario } from '../../labs/experiments/einstein-lensing';
 import { runLightConeScenario } from '../../labs/experiments/spacetime-lightcone-3d';
+import { runHydrogenOrbitalScenario } from '../../labs/experiments/atom-orbital-3d';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
@@ -103,6 +104,11 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
   if (!model) throw new Error('Brak lokalnego adaptera realnego modelu.');
   const params = request.parameters;
   switch (model.id) {
+    case 'atom-hydrogen-orbital': {
+      const orbital = String(params.orbital ?? '2pz');
+      const solved = runHydrogenOrbitalScenario({ orbital, x: numberParam(params, 'x', 0), y: numberParam(params, 'y', 0), z: numberParam(params, 'z', 1) });
+      return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Obliczono analityczną amplitudę orbitalu ${solved.label} i gęstość względną w zadanym punkcie.`, outputs: solved, units: { extentBohr: 'a₀', x: 'a₀', y: 'a₀', z: 'a₀', radiusBohr: 'a₀', radial: '', angular: '', psi: '', relativeDensity: '' }, warnings: ['Gęstość jest względna dla istniejących kształtów orbitalnych; nie jest wynikiem pojedynczego pomiaru elektronu.'], validity: 'Analityczne funkcje radialne i kątowe istniejącego zestawu orbitali wodoru. Brak wieloelektronowej korelacji, dynamiki czasowej, pomiaru i pełnej normalizacji obserwacyjnej.', assumptions: ['Punkt jest podany w promieniach Bohra w zakresie istniejącej wizualizacji.', 'Chmura Monte Carlo jest wyłącznie rendererem i nie wpływa na wynik.'], visualization: ['numeric', 'canvas-2d', 'scene-3d'], route: model.route };
+    }
     case 'spacetime-light-cone': {
       const solved = runLightConeScenario({ v: numberParam(params, 'v', 0.6), tripYears: numberParam(params, 'tripYears', 20) });
       return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Dla v=${solved.v.toFixed(2)}c współczynnik Lorentza wynosi γ=${solved.gamma.toFixed(6)}, a czas własny podróżnika ${solved.travelerYears.toFixed(3)} lat.`, outputs: solved, units: { v: 'c', tripYears: 'lata', gamma: '', travelerYears: 'lata', turnaroundFraction: '', turnaroundRadiusFraction: '', causal: '' }, warnings: ['To idealizowany, natychmiastowy zawrót w szczególnej teorii względności; brak profilu przyspieszenia i ogólnej OTW.'], validity: 'Stożek światła 2+1D x²+z²=(ct)² i dylatacja Lorentza dla v<c. Brak dynamiki napędu, przyspieszenia końcowego i grawitacji.', assumptions: ['c=1 w geometrii sceny.', 'Wizualne skalowanie czasu nie zmienia relacji Lorentza raportowanej liczbowo.'], visualization: ['numeric', 'scene-3d'], route: model.route };

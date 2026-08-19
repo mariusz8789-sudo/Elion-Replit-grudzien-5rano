@@ -174,6 +174,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:ucieczka atmosfery|atmosfer[a-ząćęłńóśźż]*|parametr jeansa|albedo)/.test(normalized)) {
     return request('universe', 'universe-atmospheric-escape', 'graph', ['stellarLuminositySolar', 'orbitalDistanceAu', 'planetAlbedo', 'planetMassEarth', 'planetRadiusEarth', 'moleculeMassAmu']);
   }
+  if (/\b(orbital atomowy|chmura elektron[a-ząćęłńóśźż]*|funkcja falow[a-ząćęłńóśźż]*)\b/.test(normalized)) return request('atom', 'atom-hydrogen-orbital', 'scene-3d', ['orbital', 'x', 'y', 'z']);
   if (/(?:orbit[a-ząćęłńóśźż]*|układ planetarny|uklad planetarny|kepler[a-ząćęłńóśźż]*|planet[a-ząćęłńóśźż]*)/.test(normalized)) {
     if (massSolar !== undefined) params.centralMassSolar = massSolar;
     return request('universe', 'universe-kepler', 'scene-3d', ['centralMassSolar', 'orbitalRadiusAu']);
@@ -194,6 +195,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:mas[a-ząćęłńóśźż]* molow[a-ząćęłńóśźż]*|wz[oó]r[a-ząćęłńóśźż]* sumaryczn[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('chemistry', 'chem-molecular-weight', 'graph', ['formula']);
   }
+  if (/\b(orbital[a-ząćęłńóśźż]*|chmura elektron[a-ząćęłńóśźż]*|funkcja falow[a-ząćęłńóśźż]*)\b/.test(normalized)) return request('atom', 'atom-hydrogen-orbital', 'scene-3d', ['orbital', 'x', 'y', 'z']);
   if (/\b(atom|wodór|wodor|orbital atomowy|bohr)\b/.test(normalized)) {
     return request('atom', 'atom-bohr', 'scene-3d', ['atomicNumber', 'principalN']);
   }

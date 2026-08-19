@@ -28,6 +28,21 @@ import { getSettings } from '../../core/settings';
 const BASE_POINTS = 16000;
 const INTRO_DURATION = 1.0;
 
+export function runHydrogenOrbitalScenario({ orbital = '2pz', x = 0, y = 0, z = 1 }: { orbital?: string; x?: number; y?: number; z?: number } = {}) {
+  const orb = ORBITALS[orbital];
+  if (!orb) throw new Error('Nieznany orbital wodoru.');
+  if (![x, y, z].every(Number.isFinite)) throw new Error('Współrzędne muszą być skończone.');
+  const r = Math.hypot(x, y, z);
+  if (r > orb.extent) throw new Error('Punkt leży poza zakresem istniejącej wizualizacji orbitalu.');
+  const dx = r === 0 ? 0 : x / r;
+  const dy = r === 0 ? 0 : y / r;
+  const dz = r === 0 ? 0 : z / r;
+  const radial = orb.R(r);
+  const angular = orb.Y(dx, dy, dz);
+  const psi = radial * angular;
+  return { orbital, label: orb.label, extentBohr: orb.extent, x, y, z, radiusBohr: r, radial, angular, psi, relativeDensity: psi * psi };
+}
+
 /**
  * Maksimum GĘSTOŚCI WAŻONEJ OBJĘTOŚCIOWO r²|ψ|² (nie samego |ψ|²) po
  * (r, kąt) w płaszczyźnie x–z — dokładnie ta wielkość, którą trzeba

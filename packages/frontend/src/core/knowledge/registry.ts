@@ -78,11 +78,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'atom', title: 'Fizyka atomowa', sourceFile: 'atom.md', scale: 'micro',
-    capability: 'REAL_ENGINE', realModels: ['atom-bohr'],
+    capability: 'REAL_ENGINE', realModels: ['atom-bohr', 'atom-hydrogen-orbital'],
     concepts: ['atom wodoru', 'orbitale', 'poziomy energetyczne', 'widma', 'Rydberg'],
-    parameters: ['atomicNumber', 'principalN'], units: ['eV', 'pm'],
-    assumptions: ['Model Bohra jest ścisły dla układów wodoropodobnych, nie dla pełnej chemii atomów wieloelektronowych.'],
-    possibleExperiments: ['pokaż atom wodoru', 'oblicz poziom energetyczny'], requiredSolver: 'ModelGraph / atom-bohr',
+    parameters: ['atomicNumber', 'principalN', 'orbital', 'x', 'y', 'z'], units: ['eV', 'pm'],
+    assumptions: ['Orbital wodoru jest analitycznym kształtem funkcji falowej w ustalonym punkcie, a nie pojedynczym pomiarem ani modelem wieloelektronowym.', 'Model Bohra jest ścisły dla układów wodoropodobnych, nie dla pełnej chemii atomów wieloelektronowych.'],
+    possibleExperiments: ['pokaż atom wodoru', 'oblicz orbital wodoru', 'oblicz poziom energetyczny'], requiredSolver: 'ModelGraph / atom-bohr',
     visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['quantum'], keywords: ['atom', 'wodór', 'wodor', 'orbital', 'rydberg', 'widmo'],
   },
   {

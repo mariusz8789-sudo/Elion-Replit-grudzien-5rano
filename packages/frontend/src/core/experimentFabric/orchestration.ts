@@ -18,6 +18,22 @@ export interface CrossDomainOrchestrationPlan {
   reason: string;
 }
 
+/**
+ * The only currently approved cross-domain transfer. `equilibriumTempK` is an
+ * existing output in K and `temperatureK` is an existing Arrhenius input in K.
+ * It is a parameter hand-off, not a claim that the atmospheric model predicts
+ * a real laboratory reaction condition.
+ */
+export const ATMOSPHERIC_TEMPERATURE_TO_ARRHENIUS_LINK: CrossDomainLink = {
+  fromDomainId: 'universe',
+  toDomainId: 'chemistry',
+  outputKey: 'equilibriumTempK',
+  targetParameter: 'temperatureK',
+  transform: 'identity-only',
+  status: 'NOT_WIRED',
+  reason: 'Jawny transfer T_eq [K] do temperatury Arrheniusa [K]; oba modele są realnymi, ograniczonymi solverami Fabric.',
+};
+
 function planId(link: CrossDomainLink, sourceRun: ExperimentRun, targetRequest: StructuredExperimentRequest): string {
   return `cascade_${fnv1a(canonicalJson({ link, source: sourceRun.provenance.runFingerprint, target: targetRequest }))}`;
 }
@@ -55,4 +71,16 @@ export function planCrossDomainOrchestration(
     parameters: { ...targetRequest.parameters, [link.targetParameter]: value as ExperimentValue },
   };
   return { ...base, derivedRequest, status: 'READY_FOR_REAL_EXECUTION', reason: 'Jawny transfer identity-only między zgodnymi jednostkami. Wykonanie docelowego modelu wymaga osobnego wywołania Experiment Fabric.' };
+}
+
+/**
+ * Prepares the reviewed Universe → Chemistry hand-off. The caller retains the
+ * target request and must explicitly execute the derived request through the
+ * established Experiment Fabric flow.
+ */
+export function planAtmosphericTemperatureToArrhenius(
+  sourceRun: ExperimentRun,
+  targetRequest: StructuredExperimentRequest,
+): CrossDomainOrchestrationPlan {
+  return planCrossDomainOrchestration(ATMOSPHERIC_TEMPERATURE_TO_ARRHENIUS_LINK, sourceRun, targetRequest);
 }

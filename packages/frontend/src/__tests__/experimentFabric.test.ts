@@ -26,6 +26,7 @@ import {
   OSM_ATTRIBUTION,
   OSM_LICENSE,
   planCrossDomainOrchestration,
+  planAtmosphericTemperatureToArrhenius,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -84,6 +85,19 @@ describe('Genesis Experiment Fabric', () => {
     const observer = runExperiment(parseScienceChatMessage('Wyjaśnij psychologiczny efekt obserwatora.'));
     expect(observer.result.status).toBe('engine_not_available');
     expect(observer.intent.supplementalKnowledgeIds).toContain('video-n-psychological-observer');
+  });
+
+  it('prepares a reviewed real Universe-to-Chemistry hand-off only for matching Kelvin units', () => {
+    const source = runExperiment(parseScienceChatMessage('Oblicz ucieczkę atmosfery planety.'));
+    const target = parseScienceChatMessage('Oblicz kinetykę Arrheniusa przy 350 K i 60 kJ/mol.');
+    const plan = planAtmosphericTemperatureToArrhenius(source, target);
+
+    expect(plan.status).toBe('READY_FOR_REAL_EXECUTION');
+    expect(plan.derivedRequest?.parameters.temperatureK).toBe(source.result.outputs.equilibriumTempK);
+    expect(plan.reason).toContain('Wykonanie docelowego modelu wymaga osobnego wywołania');
+    const executedTarget = runExperiment(plan.derivedRequest!);
+    expect(executedTarget.result.status).toBe('completed');
+    expect(executedTarget.provenance.parameterSnapshot.temperatureK).toBe(source.result.outputs.equilibriumTempK);
   });
 
   it('blocks incompatible multi-domain transfers rather than fabricating a cascade', () => {

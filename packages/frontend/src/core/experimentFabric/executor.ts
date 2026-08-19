@@ -5,6 +5,7 @@ import { runDoublePendulumScenario } from '../../labs/experiments/universe-doubl
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
 import { runPlanetStabilityScenario } from '../../labs/experiments/universe-planetstability';
+import { runRotationCurveScenario } from '../../labs/experiments/universe-rotationcurve';
 import { runCollisionScenario } from '../../labs/experiments/universe-collision';
 import { runStarLifeScenario } from '../../labs/experiments/universe-starlife';
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
@@ -320,6 +321,35 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
           'Warunki początkowe cząstek są deterministyczne dla ratio i retro; seed jest zapisywany w wyniku.',
           'Integrator używa tego samego kroku do 0,03 co istniejący Canvas Universe Lab.',
           retro ? 'Drugi dysk startuje z orbitalnym ruchem przeciwbieżnym.' : 'Drugi dysk startuje ze współbieżnym ruchem orbitalnym.',
+        ],
+        visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'universe-rotation-curve': {
+      const haloVInf = numberParam(params, 'haloVInf', 150);
+      const altGravity = params.altGravity === true;
+      const solved = runRotationCurveScenario({ haloVInf, altGravity });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Obliczono krzywą rotacji przy r=${solved.markerRadiusKpc} kpc w trybie ${solved.altGravity ? 'MOND' : 'halo pseudo-izotermicznego'}: ${solved.modeledVelocityKmS.toFixed(1)} km/s wobec ${solved.visibleDiskVelocityKmS.toFixed(1)} km/s dla samego dysku.`,
+        outputs: {
+          haloVInf: solved.haloVInf,
+          altGravity: solved.altGravity,
+          markerRadiusKpc: solved.markerRadiusKpc,
+          visibleDiskVelocityKmS: solved.visibleDiskVelocityKmS,
+          modeledVelocityKmS: solved.modeledVelocityKmS,
+          gapPercent: solved.gapPercent,
+          mondAsymptoticVelocityKmS: solved.mondAsymptoticVelocityKmS,
+        },
+        units: {
+          haloVInf: 'km/s', altGravity: '', markerRadiusKpc: 'kpc', visibleDiskVelocityKmS: 'km/s',
+          modeledVelocityKmS: 'km/s', gapPercent: '%', mondAsymptoticVelocityKmS: 'km/s',
+        },
+        warnings: ['Stałe dysku i halo są typowymi wartościami edukacyjnymi, nie fitowaniem obserwacyjnej krzywej konkretnej galaktyki; wynik nie rozstrzyga CDM kontra MOND.'],
+        validity: 'Masa dysku jest przybliżona sferycznie; CDM używa pseudo-izotermicznego halo, a MOND relacji przy małym przyspieszeniu. Brak dopasowania danych, gazu, bulge, geometrii cienkiego dysku i analizy gromad/CMB.',
+        assumptions: [
+          'Punkt raportowania znajduje się przy r=20 kpc, identycznie jak w istniejącym Canvasie.',
+          solved.altGravity ? 'Wybrano alternatywną relację MOND zamiast dodania halo ciemnej materii.' : 'Wybrano wykładniczy dysk oraz pseudo-izotermiczne halo ciemnej materii.',
         ],
         visualization: ['numeric', 'graph'], route: model.route,
       };

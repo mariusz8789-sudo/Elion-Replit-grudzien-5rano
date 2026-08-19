@@ -55,6 +55,8 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const planetYears = firstNumber(normalized, /(?:\b(?:lata|years)\b\s*[=:]?\s*|przez\s+)(\d+(?:[.,]\d+)?)(?:\s+lat)?/);
   const galaxyRatio = firstNumber(normalized, /\b(?:stosunek mas|ratio)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const galaxyHorizonMyr = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*(?:mln\s*lat|myr)\b/);
+  const haloVInf = firstNumber(normalized, /\b(?:halo|v∞|vinf|prędkość graniczna|predkosc graniczna)\s*[=:]?\s*(\d+(?:[.,]\d+)?)(?:\s*km\s*\/\s*s)?/);
+  const useMond = /\bmond\b/.test(normalized);
   const retrogradeGalaxy = /(?:przeciwbieżn[a-ząćęłńóśźż]*|przeciwbiezn[a-ząćęłńóśźż]*|retrograd[a-ząćęłńóśźż]*)/.test(normalized);
   const disableJupiter = /(?:bez jowisza|wyłącz jowisza|wylacz jowisza)/.test(normalized);
   const disableSaturn = /(?:bez saturna|wyłącz saturna|wylacz saturna)/.test(normalized);
@@ -94,6 +96,8 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (disableSaturn) params.saturn = false;
   if (galaxyRatio !== undefined) params.ratio = galaxyRatio;
   if (galaxyHorizonMyr !== undefined) params.horizonMyr = galaxyHorizonMyr;
+  if (haloVInf !== undefined) params.haloVInf = haloVInf;
+  if (useMond) params.altGravity = true;
   if (retrogradeGalaxy) params.retro = true;
   if (threeBodyPreset !== undefined) params.preset = threeBodyPreset;
   if (threeBodyDivergence) params.divergence = true;
@@ -108,6 +112,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   }
   if (/(?:zderzeni[a-ząćęłńóśźż]* galaktyk|zderzeni[a-ząćęłńóśźż]* galaktyk|kolizj[a-ząćęłńóśźż]* galaktyk|merger galaktyk|toomre)/.test(normalized)) {
     return request('universe', 'universe-galaxy-collision', 'graph', ['ratio', 'retro', 'horizonMyr']);
+  }
+  if (/(?:krzyw[a-ząćęłńóśźż]* rotacji|ciemna materia|\bmond\b|halo galaktyczn[a-ząćęłńóśźż]*)/.test(normalized)) {
+    return request('universe', 'universe-rotation-curve', 'graph', ['haloVInf', 'altGravity']);
   }
   if (/(?:stabilność planet|stabilnosc planet|układ planetarn[a-ząćęłńóśźż]*|uklad planetarn[a-ząćęłńóśźż]*|planetarna stabilność|planetarna stabilnosc|n[- ]?ciał planet)/.test(normalized)) {
     return request('universe', 'universe-planet-stability', 'scene-3d', ['years', 'jupiter', 'saturn']);

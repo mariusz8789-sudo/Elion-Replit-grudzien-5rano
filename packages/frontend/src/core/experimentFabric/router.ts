@@ -117,6 +117,15 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Istniejący, deterministyczny restricted three-body Toomre–Toomre: dwa jądra grawitują, gwiazdy są cząstkami próbnymi; nie jest pełnym N-body, hydrodynamiką ani rekonstrukcją konkretnej kolizji galaktyk.',
   },
   {
+    id: 'universe-rotation-curve', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-galaxy-rotation@1.0.0',
+    parameters: [
+      number('haloVInf', 'Prędkość graniczna halo', 'km/s', 0, 220, 150),
+      boolean('altGravity', 'MOND zamiast halo ciemnej materii', false),
+    ],
+    route: { kind: 'lab', labId: 'universe', experimentId: 'rotationcurve' }, knowledgeSources: ['universe.md'],
+    rationale: 'Istniejąca analityczna krzywa rotacji: wykładniczy dysk w przybliżeniu sferycznym z halo pseudo-izotermicznym albo alternatywną relacją MOND; nie jest dopasowaniem danych konkretnej galaktyki ani rozstrzygnięciem CDM kontra MOND.',
+  },
+  {
     id: 'atom-bohr', domainId: 'atom', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('atomicNumber', 'Liczba atomowa Z', '', 1, 118, 1), number('principalN', 'Główna liczba kwantowa n', '', 1, 10, 1)],
     route: { kind: 'lab', labId: 'atom' }, knowledgeSources: ['atom.md', 'quantum.md'],

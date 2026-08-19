@@ -54,6 +54,44 @@ function mondFlatVelocity(massTotal: number): number {
   return Math.pow(G_ASTRO * massTotal * MOND_A0_ASTRO, 0.25);
 }
 
+export interface RotationCurveScenarioResult {
+  haloVInf: number;
+  altGravity: boolean;
+  markerRadiusKpc: number;
+  visibleDiskVelocityKmS: number;
+  modeledVelocityKmS: number;
+  gapPercent: number;
+  mondAsymptoticVelocityKmS: number;
+}
+
+/**
+ * Deterministyczny adapter obliczeniowy istniejącej krzywej rotacji. Oblicza
+ * dokładnie te same obserwowalne przy MARKER_R, których używa Canvas, a nie
+ * dopasowuje danych konkretnej galaktyki ani nie rozstrzyga CDM kontra MOND.
+ */
+export function runRotationCurveScenario({
+  haloVInf = 150,
+  altGravity = false,
+}: {
+  haloVInf?: number;
+  altGravity?: boolean;
+} = {}): RotationCurveScenarioResult {
+  if (!Number.isFinite(haloVInf) || haloVInf < 0 || haloVInf > 220) {
+    throw new Error('haloVInf musi być skończoną liczbą z zakresu 0–220 km/s.');
+  }
+  const visibleDiskVelocityKmS = vDiskAt(MARKER_R);
+  const modeledVelocityKmS = altGravity ? vMondAt(MARKER_R) : vCdmAt(MARKER_R, haloVInf);
+  return {
+    haloVInf,
+    altGravity,
+    markerRadiusKpc: MARKER_R,
+    visibleDiskVelocityKmS,
+    modeledVelocityKmS,
+    gapPercent: visibleDiskVelocityKmS > 0 ? ((modeledVelocityKmS - visibleDiskVelocityKmS) / visibleDiskVelocityKmS) * 100 : 0,
+    mondAsymptoticVelocityKmS: mondFlatVelocity(DISK_MASS),
+  };
+}
+
 class RotationCurveSim implements Sim {
   private t = 0;
   private lastVInf = 0;
@@ -171,13 +209,12 @@ class RotationCurveSim implements Sim {
   }
 
   getStats() {
-    const vFirst = vDiskAt(MARKER_R);
-    const vSecond = this.lastMond ? vMondAt(MARKER_R) : vCdmAt(MARKER_R, this.lastVInf);
+    const solved = runRotationCurveScenario({ haloVInf: this.lastVInf, altGravity: this.lastMond });
     return {
-      vNewtonAt20: Math.round(vFirst),
-      vObservedAt20: Math.round(vSecond),
-      gapPercent: vFirst > 0 ? Math.round(((vSecond - vFirst) / vFirst) * 100) : 0,
-      mondFlat: Math.round(mondFlatVelocity(DISK_MASS)),
+      vNewtonAt20: Math.round(solved.visibleDiskVelocityKmS),
+      vObservedAt20: Math.round(solved.modeledVelocityKmS),
+      gapPercent: Math.round(solved.gapPercent),
+      mondFlat: Math.round(solved.mondAsymptoticVelocityKmS),
     };
   }
 }

@@ -324,6 +324,28 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
   });
 
+  it('runs the existing galaxy rotation-curve model through Fabric without claiming a CDM versus MOND verdict', () => {
+    const command = 'Porównaj krzywą rotacji galaktyki MOND.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const rejected = runExperiment(parseScienceChatMessage('Oblicz krzywą rotacji z halo=300 km/s.'));
+    const universe = getKnowledgeDomain('universe');
+
+    expect(universe?.realModels).toContain('universe-rotation-curve');
+    expect(universe?.assumptions.join(' ')).toContain('halo pseudo-izotermicznym');
+    expect(run.request.modelId).toBe('universe-rotation-curve');
+    expect(run.request.parameters).toEqual({ altGravity: true });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'rotationcurve' });
+    expect(run.result.outputs.altGravity).toBe(true);
+    expect(Number(run.result.outputs.modeledVelocityKmS)).toBeGreaterThan(0);
+    expect(run.result.validity).toContain('Brak dopasowania danych');
+    expect(run.result.warnings[0]).toContain('nie rozstrzyga CDM kontra MOND');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(rejected.result.status).toBe('rejected');
+    expect(rejected.result.summary).toContain('poza zakresem 0–220 km/s');
+  });
+
   it('runs the existing reproducible galaxy-collision model through Fabric without claiming a full N-body merger', () => {
     const command = 'Zasymuluj zderzenie galaktyk: stosunek mas=1.25, przeciwbieżne, 24 mln lat.';
     const run = runExperiment(parseScienceChatMessage(command));

@@ -2,6 +2,7 @@ import { atomCount, degreeOfUnsaturation, molecularWeight, parseFormula } from '
 import { buildPumpPipeModel } from '../engineeringGraph/pumpPipe';
 import { solveKitaevBulk } from '../compute/kitaevBulk';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
+import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
@@ -176,6 +177,35 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         assumptions: [
           'Równania Lagrange’a i istniejący krok RK4 z Universe Lab.',
           divergence ? 'Drugi start różni się wyłącznie perturbacją kąta pierwszego wahadła o 10⁻⁶ rad.' : 'Nie uruchomiono drugiego startu do pomiaru rozjazdu.',
+        ],
+        visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'universe-hubble-tension': {
+      const extraSystematic = numberParam(params, 'extraSystematic', 0);
+      const showTrgb = params.showTrgb !== false;
+      const solved = runHubbleTensionScenario({ extraSystematic, showTrgb });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Porównano utrwalone wartości H₀: napięcie SH0ES–Planck wynosi ${solved.tensionSigma.toFixed(2)}σ.`,
+        outputs: {
+          tensionSigma: solved.tensionSigma,
+          shoesH0: solved.shoesH0,
+          planckH0: solved.planckH0,
+          gapPercent: solved.gapPercent,
+          extraSystematic: solved.extraSystematic,
+          ...(solved.trgbH0 === undefined ? {} : { trgbH0: solved.trgbH0 }),
+        },
+        units: {
+          tensionSigma: 'σ', shoesH0: 'km/s/Mpc', planckH0: 'km/s/Mpc', gapPercent: '%',
+          extraSystematic: 'km/s/Mpc', trgbH0: 'km/s/Mpc',
+        },
+        warnings: ['Wynik porównuje utrwalone wartości referencyjne i podane niepewności; nie ustala, czy rozbieżność pochodzi z systematyki, czy nowej fizyki.'],
+        validity: 'Statystyczne porównanie trzech opublikowanych zestawów H₀ w granicach ich ustalonych wartości i niepewności; nie jest fitowaniem ΛCDM, analizą pełnych danych CMB ani predykcją kosmologiczną.',
+        assumptions: [
+          'Napięcie = różnica H₀ podzielona przez niepewności złożone w kwadraturze.',
+          'Dodatkowa systematyka jest hipotetycznie dodawana tylko do niepewności Planck.',
+          showTrgb ? 'TRGB jest widocznym trzecim punktem referencyjnym, nie rozstrzygnięciem sporu.' : 'TRGB jest świadomie ukryte w tej projekcji.',
         ],
         visualization: ['numeric', 'graph'], route: model.route,
       };

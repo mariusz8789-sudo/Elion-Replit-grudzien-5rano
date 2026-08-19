@@ -72,6 +72,15 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realne równania Lagrange’a podwójnego wahadła integrowane istniejącym RK4; energia numerycznie dryfuje i jest raportowana, nie ukrywana.',
   },
   {
+    id: 'universe-hubble-tension', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-hubble-tension@1.0.0',
+    parameters: [
+      number('extraSystematic', 'Dodatkowa systematyka Planck', 'km/s/Mpc', 0, 3, 0),
+      boolean('showTrgb', 'Uwzględnij TRGB', true),
+    ],
+    route: { kind: 'lab', labId: 'universe', experimentId: 'hubbletension' }, knowledgeSources: ['universe.md'],
+    rationale: 'Deterministyczne porównanie utrwalonych wartości SH0ES, Planck i opcjonalnie TRGB; nie estymuje parametrów kosmologicznych ani nie rozstrzyga przyczyny napięcia.',
+  },
+  {
     id: 'atom-bohr', domainId: 'atom', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('atomicNumber', 'Liczba atomowa Z', '', 1, 118, 1), number('principalN', 'Główna liczba kwantowa n', '', 1, 10, 1)],
     route: { kind: 'lab', labId: 'atom' }, knowledgeSources: ['atom.md', 'quantum.md'],

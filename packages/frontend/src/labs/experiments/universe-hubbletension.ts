@@ -22,6 +22,44 @@ const METHODS: Method[] = [
   { id: 'trgb', name: 'TRGB (czubek gałęzi czerwonych olbrzymów)', h0: 69.8, sigma: 1.7, color: '#c68cff', citation: 'Freedman i in. (2021), ApJ 919, 16' },
 ];
 
+export interface HubbleTensionScenarioResult {
+  extraSystematic: number;
+  showTrgb: boolean;
+  tensionSigma: number;
+  shoesH0: number;
+  planckH0: number;
+  gapPercent: number;
+  trgbH0?: number;
+}
+
+/**
+ * Deterministyczny adapter obliczeniowy dla Experiment Fabric. Porównuje te
+ * same stałe referencyjne i niepewności, które rysuje HubbleTensionSim.
+ */
+export function runHubbleTensionScenario({
+  extraSystematic = 0,
+  showTrgb = true,
+}: {
+  extraSystematic?: number;
+  showTrgb?: boolean;
+} = {}): HubbleTensionScenarioResult {
+  if (!Number.isFinite(extraSystematic) || extraSystematic < 0 || extraSystematic > 3) {
+    throw new Error('extraSystematic musi należeć do zakresu 0–3 km/s/Mpc.');
+  }
+  const shoes = METHODS.find((method) => method.id === 'shoes')!;
+  const planck = METHODS.find((method) => method.id === 'planck')!;
+  const trgb = METHODS.find((method) => method.id === 'trgb')!;
+  return {
+    extraSystematic,
+    showTrgb,
+    tensionSigma: measurementTensionSigma(shoes.h0, shoes.sigma, planck.h0, planck.sigma + extraSystematic),
+    shoesH0: shoes.h0,
+    planckH0: planck.h0,
+    gapPercent: ((shoes.h0 - planck.h0) / planck.h0) * 100,
+    ...(showTrgb ? { trgbH0: trgb.h0 } : {}),
+  };
+}
+
 const X_MIN = 60;
 const X_MAX = 80;
 

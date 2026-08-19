@@ -263,6 +263,21 @@ describe('Genesis Experiment Fabric', () => {
     expect(majoranaDevice.result.outputs).toEqual({});
   });
 
+  it('runs the fixed Hubble-tension comparison through Fabric without claiming a cosmological prediction', () => {
+    const run = runExperiment(parseScienceChatMessage('Porównaj napięcie Hubble’a: dodatkowa systematyka=1.5, bez TRGB.'));
+    const repeated = runExperiment(parseScienceChatMessage('Porównaj napięcie Hubble’a: dodatkowa systematyka=1.5, bez TRGB.'));
+
+    expect(run.request.modelId).toBe('universe-hubble-tension');
+    expect(run.request.parameters).toEqual({ extraSystematic: 1.5, showTrgb: false });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'hubbletension' });
+    expect(Number(run.result.outputs.tensionSigma)).toBeGreaterThan(0);
+    expect(run.result.outputs.trgbH0).toBeUndefined();
+    expect(run.result.validity).toContain('nie jest fitowaniem ΛCDM');
+    expect(run.result.warnings[0]).toContain('nie ustala');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+  });
+
   it('runs the existing deterministic double-pendulum solver through Fabric without replacing its RK4 stepper', () => {
     const run = runExperiment(parseScienceChatMessage('Zasymuluj podwójne wahadło: kąt=150, horyzont=2, drugi start.'));
     const repeated = runExperiment(parseScienceChatMessage('Zasymuluj podwójne wahadło: kąt=150, horyzont=2, drugi start.'));

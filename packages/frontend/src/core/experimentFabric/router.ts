@@ -201,6 +201,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf SEMF; model kroplowy energii wiązania, bez efektów powłokowych.',
   },
   {
+    id: 'nuclear-nuclide-chart', domainId: 'nuclear', modelVersion: '1.0.0', engine: 'genesis-semf-nuclide-catalog@1.0.0',
+    parameters: [number('protonNumber', 'Liczba protonów Z', '', 1, 100, 26), number('neutronNumber', 'Liczba neutronów N', '', 0, 160, 30)],
+    route: { kind: 'lab', labId: 'nuclear', experimentId: 'chart' }, knowledgeSources: ['nuclear.md', 'particle.md'],
+    rationale: 'Istniejący SEMF oraz lokalny katalog około 55 zmierzonych nuklidów NNDC/IAEA. SEMF jest predykcją modelu, natomiast oznaczenie i rozpad istnieją tylko, gdy rekord katalogu jest dostępny.',
+  },
+  {
     id: 'sr-lorentz', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('velocityFraction', 'Prędkość β = v/c', '', 0, 0.999999, 0.8), number('properTimeSeconds', 'Czas własny', 's', 0, 1e9, 1), number('restLengthMeters', 'Długość spoczynkowa', 'm', 0, 1e12, 1)],
     route: { kind: 'lab', labId: 'einstein' }, knowledgeSources: ['spacetime-einstein.md'],

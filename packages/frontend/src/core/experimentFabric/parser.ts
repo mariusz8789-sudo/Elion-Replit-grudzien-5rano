@@ -187,6 +187,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     if (massSolar !== undefined) params.centralMassSolar = massSolar;
     return request('universe', 'universe-kepler', 'scene-3d', ['centralMassSolar', 'orbitalRadiusAu']);
   }
+  if (/\b(map[a-ząćęłńóśźż]* nuklid[a-ząćęłńóśźż]*|chart of nuclides|karta nuklid[a-ząćęłńóśźż]*)\b/.test(normalized)) {
+    return request('nuclear', 'nuclear-nuclide-chart', 'canvas-2d', ['protonNumber', 'neutronNumber']);
+  }
   if (/(?:jądr[a-ząćęłńóśźż]*|jadr[a-ząćęłńóśźż]*|nuklid[a-ząćęłńóśźż]*|energi[a-ząćęłńóśźż]* wiązani[a-ząćęłńóśźż]*|energi[a-ząćęłńóśźż]* wiazani[a-ząćęłńóśźż]*|semf)/.test(normalized)) {
     return request('nuclear', 'nuclear-semf', 'scene-3d', ['protonNumber', 'neutronNumber']);
   }

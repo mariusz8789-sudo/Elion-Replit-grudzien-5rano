@@ -10,6 +10,7 @@ import { runVseprScenario } from '../../labs/experiments/chemistry-vsepr';
 import { runPointLensScenario } from '../../labs/experiments/einstein-lensing';
 import { runLightConeScenario } from '../../labs/experiments/spacetime-lightcone-3d';
 import { runMinkowskiScenario } from '../../labs/experiments/spacetime-minkowski';
+import { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
 import { runHydrogenOrbitalScenario } from '../../labs/experiments/atom-orbital-3d';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
@@ -437,6 +438,24 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         warnings: lambda < 15 ? ['Parametr Jeansa < 15: przybliżenie stabilnej atmosfery nie obowiązuje.'] : [],
         validity: 'Ucieczka termiczna Jeansa; bez efektu cieplarnianego, hydrodynamiki i wiatru gwiazdowego.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'nuclear-nuclide-chart': {
+      const solved = runNuclideChartScenario({
+        protonNumber: numberParam(params, 'protonNumber', 26),
+        neutronNumber: numberParam(params, 'neutronNumber', 30),
+      });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: solved.knownNuclide
+          ? `Obliczono SEMF dla A=${solved.massNumber}; lokalny katalog zawiera rekord ${solved.measuredSymbol}.`
+          : `Obliczono predykcję SEMF dla Z=${solved.protonNumber}, N=${solved.neutronNumber}; lokalny katalog nie zawiera rekordu pomiarowego.`,
+        outputs: solved,
+        units: { protonNumber: '', neutronNumber: '', massNumber: '', bindingPerNucleonMeV: 'MeV/nucleon', stabilityGradient: 'model gradient', knownNuclide: '', measuredSymbol: '', measuredDecayMode: '', measuredHalfLife: '' },
+        warnings: solved.knownNuclide ? [] : ['Brak wpisu w lokalnym katalogu nie oznacza, że nuklid nie istnieje; oznacza wyłącznie brak rekordu w ograniczonym zbiorze około 55 wpisów.'],
+        validity: 'SEMF jest modelem kroplowym energii wiązania i pomija efekty powłokowe. Dane o rozpadzie są ujawniane wyłącznie dla rekordów istniejącego lokalnego katalogu NNDC/IAEA; nie są interpolowane.',
+        assumptions: ['1 ≤ Z ≤ 100 oraz 0 ≤ N ≤ 160.', 'Model SEMF i katalog pomiarowy pozostają źródłowo rozdzielone.'],
+        visualization: ['numeric', 'canvas-2d'], route: model.route,
       };
     }
     case 'spacetime-minkowski': {

@@ -18,6 +18,24 @@ export const ZMAX = 100;
 export const NMAX = 160;
 export const MAGIC = [2, 8, 20, 28, 50, 82, 126];
 
+export function runNuclideChartScenario({ protonNumber = 26, neutronNumber = 30 }: { protonNumber?: number; neutronNumber?: number } = {}) {
+  if (!Number.isInteger(protonNumber) || protonNumber < 1 || protonNumber > ZMAX) throw new Error(`protonNumber must be an integer within [1, ${ZMAX}].`);
+  if (!Number.isInteger(neutronNumber) || neutronNumber < 0 || neutronNumber > NMAX) throw new Error(`neutronNumber must be an integer within [0, ${NMAX}].`);
+
+  const known = findKnownNuclide(protonNumber, neutronNumber);
+  return {
+    protonNumber,
+    neutronNumber,
+    massNumber: protonNumber + neutronNumber,
+    bindingPerNucleonMeV: semfBindingPerNucleon(protonNumber, neutronNumber),
+    stabilityGradient: semfStabilityGradient(protonNumber, neutronNumber),
+    knownNuclide: Boolean(known),
+    measuredSymbol: known?.symbol ?? '',
+    measuredDecayMode: known?.decayMode ?? '',
+    measuredHalfLife: known?.halfLifeLabel ?? '',
+  };
+}
+
 registerDataSource<KnownNuclide[]>({
   id: 'nuclear.known-nuclides',
   label: 'Zmierzone okresy półtrwania i tryby rozpadu (~55 kluczowych izotopów)',

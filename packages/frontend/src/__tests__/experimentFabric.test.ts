@@ -298,6 +298,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(atom?.realModels).toContain('atom-hydrogen-orbital');
   });
 
+  it('runs bounded nuclide chart through Fabric while separating SEMF from measured catalog data', () => {
+    const command = 'Pokaż mapę nuklidów dla protony = 26 neutrony = 30.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const nuclear = getKnowledgeDomain('nuclear');
+
+    expect(run.request.modelId).toBe('nuclear-nuclide-chart');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'nuclear', experimentId: 'chart' });
+    expect(run.result.outputs).toMatchObject({ massNumber: 56, knownNuclide: true, measuredSymbol: 'Fe-56', measuredDecayMode: 'stabilny' });
+    expect(Number(run.result.outputs.bindingPerNucleonMeV)).toBeGreaterThan(0);
+    expect(run.result.validity).toContain('nie są interpolowane');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(nuclear?.realModels).toContain('nuclear-nuclide-chart');
+  });
+
   it('runs bounded solar-system Kepler positions through Fabric without claiming a live ephemeris', () => {
     const command = 'Pokaż Układ Słoneczny przez 365,256 dni.';
     const run = runExperiment(parseScienceChatMessage(command));

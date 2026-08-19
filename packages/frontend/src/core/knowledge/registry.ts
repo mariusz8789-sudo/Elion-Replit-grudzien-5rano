@@ -154,11 +154,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'nuclear', title: 'Fizyka jądrowa', sourceFile: 'nuclear.md', scale: 'micro',
-    capability: 'REAL_ENGINE', realModels: ['nuclear-semf'],
-    concepts: ['SEMF', 'energia wiązania', 'rozpad', 'fuzja', 'reaktor'], parameters: ['protonNumber', 'neutronNumber'], units: ['MeV'],
-    assumptions: ['SEMF pomija efekty powłokowe i nie jest pełnym modelem reaktora.'],
-    possibleExperiments: ['oblicz energię wiązania jądra'], requiredSolver: 'nuclear-semf',
-    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['particle', 'quantum'], keywords: ['jądro', 'jadro', 'sefm', 'energia wiązania', 'nuklid', 'fuzja', 'rozpad'],
+    capability: 'REAL_ENGINE', realModels: ['nuclear-semf', 'nuclear-nuclide-chart'],
+    concepts: ['SEMF', 'mapa nuklidów', 'energia wiązania', 'rozpad', 'fuzja', 'reaktor'], parameters: ['protonNumber', 'neutronNumber'], units: ['MeV'],
+    assumptions: ['SEMF pomija efekty powłokowe i nie jest pełnym modelem reaktora. Charta nuklidów odróżnia predykcję SEMF od około 55 lokalnych rekordów zmierzonych NNDC/IAEA; brak rekordu nie jest twierdzeniem o nieistnieniu nuklidu.'],
+    possibleExperiments: ['oblicz energię wiązania jądra', 'pokaż mapę nuklidów'], requiredSolver: 'nuclear-semf / nuclear-nuclide-chart',
+    visualization: ['numeric', 'graph', 'canvas-2d', 'scene-3d'], dependencies: ['particle', 'quantum'], keywords: ['jądro', 'jadro', 'sefm', 'energia wiązania', 'mapa nuklidów', 'nuklid', 'fuzja', 'rozpad'],
   },
   {
     id: 'particle', title: 'Fizyka cząstek', sourceFile: 'particle.md', scale: 'micro',

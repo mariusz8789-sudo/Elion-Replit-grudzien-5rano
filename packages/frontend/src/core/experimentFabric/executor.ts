@@ -6,6 +6,7 @@ import { runTunnelingScenario } from '../../labs/experiments/quantum-tunneling';
 import { runChshCorrelationScenario } from '../../labs/experiments/quantum-chsh';
 import { runSchwarzschildGeodesicScenario } from '../../labs/experiments/einstein-geodesics';
 import { runTitrationScenario } from '../../labs/experiments/chemistry-titration';
+import { runVseprScenario } from '../../labs/experiments/chemistry-vsepr';
 import { runPointLensScenario } from '../../labs/experiments/einstein-lensing';
 import { runLightConeScenario } from '../../labs/experiments/spacetime-lightcone-3d';
 import { runHydrogenOrbitalScenario } from '../../labs/experiments/atom-orbital-3d';
@@ -435,6 +436,20 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
       const acid = typeof params.acid === 'string' ? params.acid : 'acetic';
       const solved = runTitrationScenario({ acid, vb: numberParam(params, 'vb', 0) });
       return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Obliczono pH=${solved.ph.toFixed(4)} dla ${solved.acidName} po dodaniu ${solved.vb.toFixed(2)} mL NaOH.`, outputs: solved, units: { acid: '', acidName: '', ka: 'mol/L', vb: 'mL', ph: '', veq: 'mL', pKa: '' }, warnings: ['To deterministyczny scenariusz laboratoryjny o stałych stężeniach i temperaturze; nie jest pomiarem konkretnej próbki ani automatyczną identyfikacją kwasu.'], validity: 'Bilans ładunku słabego kwasu i NaOH z autodysocjacją wody, rozwiązywany istniejącą funkcją Canvasu. Brak aktywności jonowych, temperatury zmiennej, CO₂, wieloprotonowości i niepewności pomiarowej.', assumptions: ['Ca=Cb=0,1 mol/L; Va=25 mL; NaOH jest mocną zasadą.', 'Dozwolone są tylko cztery istniejące słabe kwasy z lokalnymi Ka.'], visualization: ['numeric', 'graph', 'canvas-2d'], route: model.route };
+    }
+    case 'chem-vsepr': {
+      const shapeId = typeof params.shapeId === 'string' ? params.shapeId : 'ax4';
+      const solved = runVseprScenario({ shapeId });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Odczytano geometrię VSEPR ${solved.name} (${solved.example}): ${solved.bonding} domen wiążących i ${solved.lone} wolnych par.`,
+        outputs: { ...solved, bondingVecs: JSON.stringify(solved.bondingVecs), loneVecs: JSON.stringify(solved.loneVecs) },
+        units: { shapeId: '', name: '', example: '', bonding: 'domains', lone: 'domains', angleLabel: '', angleMeasured: '', bondingVecs: 'unit-vector[] (JSON)', loneVecs: 'unit-vector[] (JSON)' },
+        warnings: solved.angleMeasured ? [] : ['Dla kształtów z wolnymi parami, poza NH₃ i H₂O, model zwraca istniejącą idealizację geometrii rodzica, a nie indywidualny zmierzony kąt związku.'],
+        validity: 'Deterministyczne wektory domen elektronowych VSEPR. Model nie oblicza funkcji falowej, energii wiązań, widm, struktury elektronowej ani dynamiki molekularnej.',
+        assumptions: ['shapeId musi wskazywać jeden z istniejących 13 kształtów VSEPR.', 'Geometrie bez wolnych par są idealne; odchylenia dla innych związków nie są estymowane.'],
+        visualization: ['numeric', 'scene-3d'], route: model.route,
+      };
     }
     case 'chemistry-ising': {
       const temperature = numberParam(params, 'temperature', 2);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bentCone, VSEPR_SHAPES, chemistryVsepr } from '../labs/experiments/chemistry-vsepr';
+import { bentCone, runVseprScenario, VSEPR_SHAPES, chemistryVsepr } from '../labs/experiments/chemistry-vsepr';
 
 function angleBetween(a: [number, number, number], b: [number, number, number]): number {
   const dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -88,5 +88,26 @@ describe('VSEPR: geometria domen elektronowych', () => {
         expect(b.body.length).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe('bounded VSEPR Fabric runner', () => {
+  it('reads the shared tetrahedral CH₄ vectors deterministically', () => {
+    const first = runVseprScenario({ shapeId: 'ax4' });
+    const second = runVseprScenario({ shapeId: 'ax4' });
+
+    expect(first).toEqual(second);
+    expect(first).toMatchObject({ shapeId: 'ax4', example: 'CH₄', bonding: 4, lone: 0, angleLabel: '109,5°', angleMeasured: false });
+    expect(first.bondingVecs).toHaveLength(4);
+    expect(first.loneVecs).toHaveLength(0);
+  });
+
+  it('reads the shared measured-angle NH₃ geometry and rejects unknown shapes', () => {
+    const ammonia = runVseprScenario({ shapeId: 'ax3e1' });
+
+    expect(ammonia).toMatchObject({ shapeId: 'ax3e1', example: 'NH₃', bonding: 3, lone: 1, angleLabel: '106,8°', angleMeasured: true });
+    expect(ammonia.bondingVecs).toHaveLength(3);
+    expect(ammonia.loneVecs).toHaveLength(1);
+    expect(() => runVseprScenario({ shapeId: 'unsupported' })).toThrow('Unknown VSEPR shape');
   });
 });

@@ -185,6 +185,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:cząstk[a-ząćęłńóśźż]*|czastk[a-ząćęłńóśźż]*|lepton[a-ząćęłńóśźż]*|kwark[a-ząćęłńóśźż]*|relatywistyczn[a-ząćęłńóśźż]* energi[a-ząćęłńóśźż]*|pęd cząstk[a-ząćęłńóśźż]*|ped czastk[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('particle', 'particle-relativistic-energy', 'scene-3d', ['restMassMeV', 'velocityFraction']);
   }
+  if (/\b(vsepr|geometri[a-ząćęłńóśźż]* cząstecz[a-ząćęłńóśźż]*|geometri[a-ząćęłńóśźż]* czastecz[a-ząćęłńóśźż]*|kształt[a-ząćęłńóśźż]* molekularn[a-ząćęłńóśźż]*|ksztalt[a-ząćęłńóśźż]* molekularn[a-ząćęłńóśźż]*)\b/.test(normalized)) return request('chemistry', 'chem-vsepr', 'scene-3d', ['shapeId']);
   if (/\b(miareczkow[a-ząćęłńóśźż]*|titration|kwas[owo-]*zasadow[a-ząćęłńóśźż]*|naoh)\b/.test(normalized)) return request('chemistry', 'chemistry-titration', 'canvas-2d', ['acid', 'vb']);
   if (/(?:ising[a-ząćęłńóśźż]*|model izinga|przejści[a-ząćęłńóśźż]* fazow[a-ząćęłńóśźż]* magnetyczn[a-ząćęłńóśźż]*|przejsc[a-ząćęłńóśźż]* fazow[a-ząćęłńóśźż]* magnetyczn[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('chemistry', 'chemistry-ising', 'canvas-2d', ['temperature', 'seed']);

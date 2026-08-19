@@ -96,11 +96,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'chemistry', title: 'Chemia', sourceFile: 'chemistry.md', scale: 'micro-meso',
-    capability: 'REAL_ENGINE', realModels: ['chemistry-arrhenius', 'chemistry-ising', 'chemistry-titration', 'chem-molecular-weight', 'chem-rdkit-descriptors'],
+    capability: 'REAL_ENGINE', realModels: ['chemistry-arrhenius', 'chemistry-ising', 'chemistry-titration', 'chem-vsepr', 'chem-molecular-weight', 'chem-rdkit-descriptors'],
     concepts: ['Arrhenius', 'VSEPR', 'miareczkowanie', 'Ising', 'magnetyzacja spontaniczna', 'masa molowa'],
-    parameters: ['temperatureK', 'activationEnergyKJ', 'temperature', 'seed', 'acid', 'vb', 'formula', 'smiles'], units: ['K', 'kJ/mol', 'J/k_B', 'g/mol'],
-    assumptions: ['Ising używa 2D siatki kwadratowej J=1, najbliższych sąsiadów, periodycznych brzegów oraz seedowanego Metropolisa; dokładna magnetyzacja jest referencją granicy termodynamicznej, a pojedynczy run na 42×42 nie jest miarą niepewności. Miareczkowanie rozwiązuje bilans ładunku czterech lokalnych słabych kwasów przy ustalonych Ca=Cb=0,1 mol/L i Va=25 mL, więc nie jest pomiarem próbki. Molecular dynamics, docking i quantum chemistry wymagają zewnętrznych silników.'],
-    possibleExperiments: ['oblicz kinetykę reakcji', 'uruchom 2D model Isinga', 'oblicz krzywą miareczkowania', 'oblicz masę molową', 'analizuj cząsteczkę'], requiredSolver: 'ModelGraph / Ising Metropolis / RDKit capability',
+    parameters: ['temperatureK', 'activationEnergyKJ', 'temperature', 'seed', 'acid', 'vb', 'shapeId', 'formula', 'smiles'], units: ['K', 'kJ/mol', 'J/k_B', 'g/mol'],
+    assumptions: ['Ising używa 2D siatki kwadratowej J=1, najbliższych sąsiadów, periodycznych brzegów oraz seedowanego Metropolisa; dokładna magnetyzacja jest referencją granicy termodynamicznej, a pojedynczy run na 42×42 nie jest miarą niepewności. Miareczkowanie rozwiązuje bilans ładunku czterech lokalnych słabych kwasów przy ustalonych Ca=Cb=0,1 mol/L i Va=25 mL, więc nie jest pomiarem próbki. VSEPR zwraca istniejące wektory geometrii domen elektronowych; dla NH₃ i H₂O używa zdefiniowanych kątów zmierzonych, a dla pozostałych geometrii z wolnymi parami nie estymuje indywidualnych odchyleń. Molecular dynamics, docking i quantum chemistry wymagają zewnętrznych silników.'],
+    possibleExperiments: ['oblicz kinetykę reakcji', 'uruchom 2D model Isinga', 'oblicz krzywą miareczkowania', 'pokaż geometrię VSEPR', 'oblicz masę molową', 'analizuj cząsteczkę'], requiredSolver: 'ModelGraph / Ising Metropolis / VSEPR geometry / RDKit capability',
     visualization: ['numeric', 'graph', 'canvas-2d', 'scene-3d'], dependencies: ['atom', 'quantum', 'thermodynamics'], keywords: ['chemia', 'reakcja', 'arrhenius', 'ising', 'magnetyzacja', 'przejście fazowe', 'molekuła', 'molekula', 'masa molowa', 'smiles', 'wiązanie'],
   },
   {

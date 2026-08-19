@@ -298,6 +298,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(atom?.realModels).toContain('atom-hydrogen-orbital');
   });
 
+  it('runs bounded VSEPR geometry through Fabric without claiming quantum chemistry', () => {
+    const command = 'Pokaż geometrię cząsteczki VSEPR.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const chemistry = getKnowledgeDomain('chemistry');
+
+    expect(run.request.modelId).toBe('chem-vsepr');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'chemistry', experimentId: 'vsepr' });
+    expect(run.result.outputs).toMatchObject({ shapeId: 'ax4', example: 'CH₄', bonding: 4, lone: 0 });
+    expect(JSON.parse(String(run.result.outputs.bondingVecs))).toHaveLength(4);
+    expect(run.result.validity).toContain('struktury elektronowej');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(chemistry?.realModels).toContain('chem-vsepr');
+  });
+
   it('runs bounded Minkowski light cone through Fabric without claiming acceleration dynamics', () => {
     const command = 'Pokaż stożek świetlny i paradoks bliźniąt.';
     const run = runExperiment(parseScienceChatMessage(command));

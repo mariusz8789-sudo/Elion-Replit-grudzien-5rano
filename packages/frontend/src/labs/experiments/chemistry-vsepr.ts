@@ -104,6 +104,24 @@ export const VSEPR_SHAPES: VseprShape[] = [
   { id: 'ax4e2', name: 'Kwadratowa płaska (AX₄E₂)', example: 'XeF₄', bonding: 4, lone: 2, angleLabel: '90°', angleMeasured: false, bondingVecs: [OCTA_VERTS[0], OCTA_VERTS[1], OCTA_VERTS[4], OCTA_VERTS[5]], loneVecs: [OCTA_VERTS[2], OCTA_VERTS[3]] },
 ];
 
+export function runVseprScenario({ shapeId = 'ax4' }: { shapeId?: string } = {}) {
+  const shape = VSEPR_SHAPES.find((candidate) => candidate.id === shapeId);
+  if (!shape) throw new Error(`Unknown VSEPR shape: ${shapeId}.`);
+
+  const copyVectors = (vectors: Vec3[]) => vectors.map(([x, y, z]) => [x, y, z] as Vec3);
+  return {
+    shapeId: shape.id,
+    name: shape.name,
+    example: shape.example,
+    bonding: shape.bonding,
+    lone: shape.lone,
+    angleLabel: shape.angleLabel,
+    angleMeasured: shape.angleMeasured,
+    bondingVecs: copyVectors(shape.bondingVecs),
+    loneVecs: copyVectors(shape.loneVecs),
+  };
+}
+
 const BOND_LEN = 1.3;
 const LONE_LEN = 0.75;
 const ATOM_COLOR = 0x5cd6e8;

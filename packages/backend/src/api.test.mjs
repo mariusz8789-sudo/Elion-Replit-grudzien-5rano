@@ -248,6 +248,15 @@ describe('knowledge ingestion', () => {
     };
   }
 
+  function spatialRawFingerprint(text) {
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < text.length; index++) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return `osm_raw_${(hash >>> 0).toString(16).padStart(8, '0')}`;
+  }
+
   function spatialUploadBody(overrides = {}) {
     const original = '<?xml version="1.0"?><osm version="0.6"><node id="1" lat="35.8885" lon="-5.3240"/><node id="2" lat="35.8886" lon="-5.3238"/><way id="101"><nd ref="1"/><nd ref="2"/><tag k="highway" v="residential"/></way></osm>';
     const layers = { buildings: [], roads: [{ sourceId: 'way/101', layer: 'roads', geometry: { kind: 'line', coordinates: [[-5.3240, 35.8885], [-5.3238, 35.8886]] }, tags: { highway: 'residential' } }], rail: [], water: [], boundaries: [] };
@@ -259,7 +268,7 @@ describe('knowledge ingestion', () => {
         bbox: [-5.3240, 35.8885, -5.3235, 35.8890], crs: 'EPSG:4326',
         sourceUrl: 'https://example.invalid/osm', sourceQuery: 'bbox=-5.324,35.8885,-5.3235,35.889',
         sourceTimestamp: '2026-08-19T00:00:00.000Z', license: 'ODbL-1.0', attribution: '© OpenStreetMap contributors',
-        provenance: { rawArtifactFingerprint: 'osm_raw_1234abcd', normalizationFingerprint: 'osm_normalized_ab12cd34', featureCount: 1, sourceMetadata: { generator: 'test' } },
+        provenance: { rawArtifactFingerprint: spatialRawFingerprint(original), normalizationFingerprint: 'osm_normalized_ab12cd34', featureCount: 1, sourceMetadata: { generator: 'test' } },
         layers, worldIntegration: 'NOT_WIRED', limitation: 'Test source data only.',
       },
       ...overrides,
@@ -353,6 +362,13 @@ describe('knowledge ingestion', () => {
     assert.equal(call('GET', `/api/projects/${project.id}/spatial-datasets/${created.body.dataset.id}`, { token: outsider.token }).status, 404);
     const original = call('GET', `/api/projects/${project.id}/spatial-datasets/${created.body.dataset.id}/content`, { token: owner.token });
     assert.match(Buffer.from(original.body.dataset.originalBase64, 'base64').toString('utf8'), /<osm/);
+
+    const mismatched = call('POST', `/api/projects/${project.id}/spatial-datasets`, {
+      token: owner.token,
+      body: spatialUploadBody({ originalBase64: Buffer.from('<osm version="0.6"><note/></osm>', 'utf8').toString('base64') }),
+    });
+    assert.equal(mismatched.status, 400);
+    assert.equal(mismatched.body.error, 'raw_fingerprint_mismatch');
   });
 
   test('rejects media-type spoofing and malformed PDF before persistence', () => {

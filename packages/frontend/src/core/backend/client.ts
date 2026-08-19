@@ -15,6 +15,8 @@
  *    go nie zwraca.
  */
 
+import type { GenesisSpatialDataset } from '../experimentFabric/spatialImport';
+
 export interface User {
   id: string;
   email: string;
@@ -271,6 +273,36 @@ export async function searchKnowledgeMaterials(token: string, projectId: string,
   const q = new URLSearchParams({ q: query.slice(0, 500) }).toString();
   const r = await request<{ materials: KnowledgeMaterial[] }>('GET', `/projects/${projectId}/knowledge-materials/search?${q}`, { token });
   return r.ok ? { ok: true, data: r.data.materials } : r;
+}
+
+/* ---------------- Project-scoped GIS artifacts ---------------- */
+
+export interface ProjectSpatialDataset {
+  id: string;
+  projectId: string;
+  datasetId: string;
+  label: string;
+  dataset: GenesisSpatialDataset;
+  originalSha256: string;
+  createdBy: string;
+  createdAt: number;
+  originalBase64?: string;
+}
+
+export interface ProjectSpatialDatasetUpload {
+  label: string;
+  dataset: GenesisSpatialDataset;
+  originalBase64: string;
+}
+
+export async function listProjectSpatialDatasets(token: string, projectId: string): Promise<ApiResult<ProjectSpatialDataset[]>> {
+  const r = await request<{ datasets: ProjectSpatialDataset[] }>('GET', `/projects/${projectId}/spatial-datasets`, { token });
+  return r.ok ? { ok: true, data: r.data.datasets } : r;
+}
+
+export async function uploadProjectSpatialDataset(token: string, projectId: string, upload: ProjectSpatialDatasetUpload): Promise<ApiResult<ProjectSpatialDataset>> {
+  const r = await request<{ dataset: ProjectSpatialDataset }>('POST', `/projects/${projectId}/spatial-datasets`, { token, body: upload });
+  return r.ok ? { ok: true, data: r.data.dataset } : r;
 }
 
 /* ---------------- Scientific Git: gałęzie, scalanie, kontrybucje ---------------- */

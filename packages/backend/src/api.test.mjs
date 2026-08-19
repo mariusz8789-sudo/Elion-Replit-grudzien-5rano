@@ -248,6 +248,24 @@ describe('knowledge ingestion', () => {
     };
   }
 
+  function spatialUploadBody(overrides = {}) {
+    const original = '<?xml version="1.0"?><osm version="0.6"><node id="1" lat="35.8885" lon="-5.3240"/><node id="2" lat="35.8886" lon="-5.3238"/><way id="101"><nd ref="1"/><nd ref="2"/><tag k="highway" v="residential"/></way></osm>';
+    const layers = { buildings: [], roads: [{ sourceId: 'way/101', layer: 'roads', geometry: { kind: 'line', coordinates: [[-5.3240, 35.8885], [-5.3238, 35.8886]] }, tags: { highway: 'residential' } }], rail: [], water: [], boundaries: [] };
+    return {
+      label: 'Ceuta source slice',
+      originalBase64: Buffer.from(original, 'utf8').toString('base64'),
+      dataset: {
+        contractVersion: '1.0.0', datasetId: 'osm_normalized_ab12cd34', source: 'openstreetmap-api',
+        bbox: [-5.3240, 35.8885, -5.3235, 35.8890], crs: 'EPSG:4326',
+        sourceUrl: 'https://example.invalid/osm', sourceQuery: 'bbox=-5.324,35.8885,-5.3235,35.889',
+        sourceTimestamp: '2026-08-19T00:00:00.000Z', license: 'ODbL-1.0', attribution: '© OpenStreetMap contributors',
+        provenance: { rawArtifactFingerprint: 'osm_raw_1234abcd', normalizationFingerprint: 'osm_normalized_ab12cd34', featureCount: 1, sourceMetadata: { generator: 'test' } },
+        layers, worldIntegration: 'NOT_WIRED', limitation: 'Test source data only.',
+      },
+      ...overrides,
+    };
+  }
+
   test('editor upload preserves original, hashes it, extracts text and never declares a solver', () => {
     const { owner, project } = setupKnowledgeProject();
     const response = call('POST', `/api/projects/${project.id}/knowledge-materials`, {
@@ -317,6 +335,24 @@ describe('knowledge ingestion', () => {
     assert.equal(call('GET', `/api/projects/${project.id}/knowledge-materials`, { token: viewer.token }).status, 200);
     assert.equal(call('POST', `/api/projects/${project.id}/knowledge-materials`, { token: viewer.token, body: uploadBody('no write') }).status, 403);
     assert.equal(call('GET', `/api/projects/${project.id}/knowledge-materials/${created.id}`, { token: outsider.token }).status, 404);
+  });
+
+  test('project GIS artifact preserves original source and enforces viewer/editor RBAC without a World State', () => {
+    const { owner, project } = setupKnowledgeProject();
+    const viewer = registerUser('viewer@spatial.org');
+    const outsider = registerUser('outsider@spatial.org');
+    call('POST', `/api/projects/${project.id}/members`, { token: owner.token, body: { email: viewer.user.email, role: 'viewer' } });
+
+    const created = call('POST', `/api/projects/${project.id}/spatial-datasets`, { token: owner.token, body: spatialUploadBody() });
+    assert.equal(created.status, 201);
+    assert.equal(created.body.dataset.dataset.datasetId, 'osm_normalized_ab12cd34');
+    assert.match(created.body.dataset.originalSha256, /^[0-9a-f]{64}$/);
+    assert.equal(created.body.dataset.dataset.worldIntegration, 'NOT_WIRED');
+    assert.equal(call('GET', `/api/projects/${project.id}/spatial-datasets`, { token: viewer.token }).body.datasets.length, 1);
+    assert.equal(call('POST', `/api/projects/${project.id}/spatial-datasets`, { token: viewer.token, body: spatialUploadBody() }).status, 403);
+    assert.equal(call('GET', `/api/projects/${project.id}/spatial-datasets/${created.body.dataset.id}`, { token: outsider.token }).status, 404);
+    const original = call('GET', `/api/projects/${project.id}/spatial-datasets/${created.body.dataset.id}/content`, { token: owner.token });
+    assert.match(Buffer.from(original.body.dataset.originalBase64, 'base64').toString('utf8'), /<osm/);
   });
 
   test('rejects media-type spoofing and malformed PDF before persistence', () => {

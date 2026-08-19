@@ -14,7 +14,10 @@ import {
   getContributions,
   listKnowledgeMaterials,
   uploadKnowledgeMaterial,
+  listProjectSpatialDatasets,
+  uploadProjectSpatialDataset,
   type KnowledgeMaterial,
+  type ProjectSpatialDataset,
   type Project,
   type Member,
   type CloudTrial,
@@ -25,6 +28,7 @@ import {
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
 import { setActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
+import { normalizeOsmMapXml } from '../core/experimentFabric/spatialImport';
 
 /**
  * Projekty (chmura) — reachable UI trwałości (Milestone 1). Zalogowany
@@ -62,6 +66,14 @@ function knowledgeMimeFor(file: File): 'text/plain' | 'text/markdown' | 'applica
   if (name.endsWith('.txt')) return 'text/plain';
   if (name.endsWith('.json')) return 'application/json';
   return null;
+}
+
+function parseSpatialBbox(raw: string): [number, number, number, number] | null {
+  const values = raw.split(',').map((value) => Number(value.trim()));
+  if (values.length !== 4 || !values.every(Number.isFinite)) return null;
+  const [west, south, east, north] = values;
+  if (west >= east || south >= north || west < -180 || east > 180 || south < -90 || north > 90 || east - west > 0.01 || north - south > 0.01) return null;
+  return [west, south, east, north];
 }
 
 function fileAsBase64(file: File): Promise<string> {
@@ -207,11 +219,16 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
   const [mrs, setMrs] = useState<MergeRequest[]>([]);
   const [contrib, setContrib] = useState<ContributionGraph | null>(null);
   const [materials, setMaterials] = useState<KnowledgeMaterial[] | null>(null);
+  const [spatialDatasets, setSpatialDatasets] = useState<ProjectSpatialDataset[] | null>(null);
   const [knowledgeFile, setKnowledgeFile] = useState<File | null>(null);
   const [knowledgeTitle, setKnowledgeTitle] = useState('');
   const [knowledgeTopics, setKnowledgeTopics] = useState('');
   const [knowledgeSourceUrl, setKnowledgeSourceUrl] = useState('');
   const [uploadingKnowledge, setUploadingKnowledge] = useState(false);
+  const [spatialFile, setSpatialFile] = useState<File | null>(null);
+  const [spatialLabel, setSpatialLabel] = useState('');
+  const [spatialBbox, setSpatialBbox] = useState('');
+  const [uploadingSpatial, setUploadingSpatial] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [memberEmail, setMemberEmail] = useState('');
   const [memberRole, setMemberRole] = useState<ProjectRole>('viewer');
@@ -225,12 +242,13 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
   const loadStatic = useCallback(async () => {
     const token = getToken();
     if (!token) return;
-    const [m, b, mr, c, k] = await Promise.all([
+    const [m, b, mr, c, k, spatial] = await Promise.all([
       listMembers(token, project.id),
       listBranches(token, project.id),
       listMergeRequests(token, project.id),
       getContributions(token, project.id),
       listKnowledgeMaterials(token, project.id),
+      listProjectSpatialDatasets(token, project.id),
     ]);
     if (m.ok) setMembers(m.data);
     if (b.ok) {
@@ -240,6 +258,7 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
     if (mr.ok) setMrs(mr.data);
     if (c.ok) setContrib(c.data);
     if (k.ok) setMaterials(k.data);
+    if (spatial.ok) setSpatialDatasets(spatial.data);
   }, [project.id]);
 
   const loadTrials = useCallback(async (branchId: string) => {
@@ -290,6 +309,41 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
       setError(uploadError instanceof Error ? uploadError.message : 'Nie udało się przygotować pliku do uploadu.');
     } finally {
       setUploadingKnowledge(false);
+    }
+  }
+
+  async function handleSpatialUpload(e: React.FormEvent) {
+    e.preventDefault();
+    const token = getToken();
+    const bbox = parseSpatialBbox(spatialBbox);
+    if (!token || !spatialFile) return;
+    if (!bbox) {
+      setError('BBOX musi mieć format west,south,east,north, mieścić się w EPSG:4326 i nie przekraczać 0,01° × 0,01°.');
+      return;
+    }
+    if (spatialFile.size > 7 * 1024 * 1024) {
+      setError('Maksymalny rozmiar artefaktu OSM XML to 7 MB.');
+      return;
+    }
+    setUploadingSpatial(true);
+    try {
+      const xml = await spatialFile.text();
+      const dataset = normalizeOsmMapXml(xml, { bbox, sourceTimestamp: new Date().toISOString() });
+      const result = await uploadProjectSpatialDataset(token, project.id, {
+        label: spatialLabel.trim() || spatialFile.name,
+        dataset,
+        originalBase64: await fileAsBase64(spatialFile),
+      });
+      if (!result.ok) { setError(result.message); return; }
+      setSpatialFile(null);
+      setSpatialLabel('');
+      setSpatialBbox('');
+      setError(null);
+      await loadStatic();
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Nie udało się przygotować artefaktu GIS.');
+    } finally {
+      setUploadingSpatial(false);
     }
   }
 
@@ -492,6 +546,48 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
             </label>
             <button className="chip-btn primary" type="submit" disabled={uploadingKnowledge || !knowledgeFile}>
               {uploadingKnowledge ? 'Indeksowanie…' : '↑ Dodaj materiał do biblioteki'}
+            </button>
+          </form>
+        )}
+      </section>
+
+      <section className="settings-section">
+        <h2>Warstwy GIS</h2>
+        <p className="settings-hint">
+          Artefakt OSM XML jest zachowywany wraz z SHA-256, bboxem, timestampem i atrybucją. Stanowi wyłącznie read-only geometrię źródłową;
+          nie tworzy drugiego World State, nie zmienia agentów ani nie jest automatycznie nakładany na świat bez jawnej kalibracji projektu.
+        </p>
+        {spatialDatasets === null ? (
+          <p className="settings-hint">Ładowanie artefaktów GIS…</p>
+        ) : spatialDatasets.length === 0 ? (
+          <p className="settings-hint">Brak dodanych artefaktów GIS.</p>
+        ) : (
+          <div className="trial-list">
+            {spatialDatasets.map((spatial) => (
+              <div className="trial-row" key={spatial.id}>
+                <span className="trial-label">{spatial.label} <span className="cloud-modelver">{spatial.dataset.crs}</span></span>
+                <span className="trial-status">{spatial.dataset.provenance.featureCount} obiektów · {spatial.dataset.attribution}</span>
+                <span className="account-email" title={spatial.originalSha256}>SHA-256 {spatial.originalSha256.slice(0, 12)} · {new Date(spatial.createdAt).toLocaleString('pl-PL')}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {canWrite && (
+          <form className="account-form" onSubmit={handleSpatialUpload}>
+            <label className="account-field">
+              <span>Źródłowy plik OSM XML (maks. 7 MB)</span>
+              <input type="file" accept=".osm,.xml,text/xml,application/xml" onChange={(e) => setSpatialFile(e.target.files?.[0] ?? null)} required />
+            </label>
+            <label className="account-field">
+              <span>Nazwa artefaktu (opcjonalnie)</span>
+              <input type="text" value={spatialLabel} onChange={(e) => setSpatialLabel(e.target.value)} maxLength={160} placeholder="np. Ceuta — fragment źródłowy OSM" />
+            </label>
+            <label className="account-field">
+              <span>BBOX EPSG:4326: west,south,east,north</span>
+              <input type="text" value={spatialBbox} onChange={(e) => setSpatialBbox(e.target.value)} required placeholder="-5.3240,35.8885,-5.3235,35.8890" />
+            </label>
+            <button className="chip-btn primary" type="submit" disabled={uploadingSpatial || !spatialFile}>
+              {uploadingSpatial ? 'Normalizowanie i zapisywanie…' : '↑ Dodaj źródłowy artefakt GIS'}
             </button>
           </form>
         )}

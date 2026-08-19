@@ -77,9 +77,13 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   listKnowledgeMaterials,
   getKnowledgeMaterial,
   searchKnowledgeMaterials,
+  saveProjectSpatialDataset,
+  listProjectSpatialDatasets,
+  getProjectSpatialDataset,
 } from './store.mjs';
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
+import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -210,6 +214,22 @@ export function handleApi(db, ctx) {
       if (seg.length === 5 && seg[4] === 'content' && method === 'GET') {
         const original = getKnowledgeMaterial(db, projectId, seg[3], { includeOriginal: true });
         return ok({ material: original });
+      }
+      return err(405, 'method_not_allowed');
+    }
+
+    // ---- GIS artifacts: user-supplied OSM source data (viewer+ read, editor+ write) ----
+    if (seg[2] === 'spatial-datasets') {
+      if (seg.length === 3) {
+        if (method === 'GET') return ok({ datasets: listProjectSpatialDatasets(db, projectId) });
+        if (method === 'POST') return createProjectSpatialDatasetHandler(db, user, role, projectId, body);
+        return err(405, 'method_not_allowed');
+      }
+      const dataset = getProjectSpatialDataset(db, projectId, seg[3], { includeOriginal: false });
+      if (!dataset) return err(404, 'not_found');
+      if (seg.length === 4 && method === 'GET') return ok({ dataset });
+      if (seg.length === 5 && seg[4] === 'content' && method === 'GET') {
+        return ok({ dataset: getProjectSpatialDataset(db, projectId, seg[3], { includeOriginal: true }) });
       }
       return err(405, 'method_not_allowed');
     }
@@ -462,6 +482,14 @@ function createKnowledgeMaterialHandler(db, user, role, projectId, body) {
   if (!prepared.ok) return err(400, prepared.error, prepared.message);
   const material = ingestKnowledgeMaterial(db, { projectId, uploadedBy: user.id, material: prepared.value });
   return ok({ material }, 201);
+}
+
+function createProjectSpatialDatasetHandler(db, user, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Dodawanie artefaktów GIS wymaga roli editor lub wyższej.');
+  const prepared = prepareProjectSpatialDataset(body);
+  if (!prepared.ok) return err(400, prepared.error, prepared.message);
+  const dataset = saveProjectSpatialDataset(db, { projectId, createdBy: user.id, spatial: prepared.value });
+  return ok({ dataset }, 201);
 }
 
 /* ---------------- Handlery prób ---------------- */

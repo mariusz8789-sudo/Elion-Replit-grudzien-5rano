@@ -375,9 +375,29 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_materials_project ON knowledge_material
 CREATE INDEX IF NOT EXISTS idx_knowledge_versions_material ON knowledge_material_versions(material_id, version);
 `;
 
+// GIS artifacts are immutable project-scoped source data. They never store agents,
+// a simulation clock or a parallel World State; normalized JSON is preserved solely
+// for provenance-carrying, read-only renderer overlays.
+const SCHEMA_V10 = `
+CREATE TABLE IF NOT EXISTS project_spatial_datasets (
+  id                  TEXT PRIMARY KEY,
+  project_id          TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  dataset_id          TEXT NOT NULL,
+  label               TEXT NOT NULL,
+  normalized_json     TEXT NOT NULL,
+  original_blob       BLOB NOT NULL,
+  original_sha256     TEXT NOT NULL,
+  created_by          TEXT NOT NULL REFERENCES users(id),
+  created_at          INTEGER NOT NULL,
+  UNIQUE (project_id, dataset_id)
+);
+CREATE INDEX IF NOT EXISTS idx_project_spatial_datasets_project ON project_spatial_datasets(project_id, created_at DESC);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
   if (version < 9) db.exec(SCHEMA_V9);
+  if (version < 10) db.exec(SCHEMA_V10);
   if (version < 7) db.exec(SCHEMA_V7);
   if (version < 8) {
     db.exec(SCHEMA_V8);
@@ -413,6 +433,7 @@ function migrate(db) {
   }
   if (version < 8) db.exec('PRAGMA user_version = 8');
   if (version < 9) db.exec('PRAGMA user_version = 9');
+  if (version < 10) db.exec('PRAGMA user_version = 10');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -733,6 +754,46 @@ export function searchKnowledgeMaterials(db, projectId, tokens) {
   // przekazujemy materiału jako instrukcji dla solvera.
   const rows = db.prepare(`${KNOWLEDGE_LATEST_SELECT} WHERE km.project_id = ? AND (${clauses.join(' OR ')}) ORDER BY km.updated_at DESC LIMIT 12`).all(...values);
   return rows.map((row) => toKnowledgeMaterial(row, { includeText: true }));
+}
+
+/* ---------------- Project-scoped GIS artifacts ---------------- */
+
+function toProjectSpatialDataset(row, { includeOriginal = false } = {}) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    datasetId: row.dataset_id,
+    label: row.label,
+    dataset: JSON.parse(row.normalized_json),
+    originalSha256: row.original_sha256,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    ...(includeOriginal ? { originalBase64: Buffer.from(row.original_blob).toString('base64') } : {}),
+  };
+}
+
+/** Persists an immutable source artifact; duplicate dataset fingerprints are reused per project. */
+export function saveProjectSpatialDataset(db, { projectId, createdBy, spatial }) {
+  const existing = db.prepare('SELECT * FROM project_spatial_datasets WHERE project_id = ? AND dataset_id = ?').get(projectId, spatial.dataset.datasetId);
+  if (existing) return toProjectSpatialDataset(existing);
+  const id = newId();
+  const now = Date.now();
+  db.prepare(`INSERT INTO project_spatial_datasets
+    (id, project_id, dataset_id, label, normalized_json, original_blob, original_sha256, created_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, projectId, spatial.dataset.datasetId, spatial.label, JSON.stringify(spatial.dataset), spatial.original,
+      spatial.originalSha256, createdBy, now);
+  return getProjectSpatialDataset(db, projectId, id);
+}
+
+export function listProjectSpatialDatasets(db, projectId) {
+  return db.prepare('SELECT * FROM project_spatial_datasets WHERE project_id = ? ORDER BY created_at DESC').all(projectId)
+    .map((row) => toProjectSpatialDataset(row));
+}
+
+export function getProjectSpatialDataset(db, projectId, id, options = {}) {
+  return toProjectSpatialDataset(db.prepare('SELECT * FROM project_spatial_datasets WHERE project_id = ? AND id = ?').get(projectId, id), options);
 }
 
 /* ---------------- Serie Prób (trwałe, reprodukowalne) ---------------- */

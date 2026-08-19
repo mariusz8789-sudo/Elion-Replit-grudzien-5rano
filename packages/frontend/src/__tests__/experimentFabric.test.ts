@@ -237,6 +237,8 @@ describe('Genesis Experiment Fabric', () => {
     expect(topological.result.status).toBe('completed');
     expect(topological.result.outputs.phaseClass).toBe('TOPOLOGICAL_REGIME');
     expect(topological.result.outputs.topologicalInvariant).toBe(-1);
+    expect(topological.result.route).toEqual({ kind: 'none' });
+    expect(topological.result.visualization).toEqual(['numeric']);
     expect(Number(topological.result.outputs.bulkGap)).toBeCloseTo(2, 10);
     expect(topological.result.validity).toContain('nie jest modelem nanodrutu');
 

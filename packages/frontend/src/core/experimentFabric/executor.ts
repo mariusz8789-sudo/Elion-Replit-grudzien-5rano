@@ -243,7 +243,7 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
           'Klasyfikacja bulk: |μ|<2|t| przy Δ≠0.',
           solved.finiteSizeCaveat,
         ],
-        visualization: ['numeric', 'graph'], route: model.route,
+        visualization: ['numeric'], route: model.route,
       };
     }
     case 'water-pump-pipe': {

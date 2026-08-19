@@ -88,8 +88,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private heroEpidemicMaterial: THREE_NS.MeshStandardMaterial | null = null;
   private heroLoaded = false;
   private heroLoadFailed = false;
-  /** PMREM HDRI jest dostępne po walidacji na prawdziwym GPU; sandboxowy WebGL startuje stabilnym PBR baseline’em. */
-  private readonly hdriEnabled = false;
+  /** Lokalny CC0 HDRI 1K wzmacnia odbicia PBR; błąd ładowania zachowuje stabilny baseline świateł. */
+  private readonly hdriEnabled = true;
   private lod1 = new Map<number, HumanoidAgentVisual>();
   private lod2: HighFidelityCrowd | null = null;
   private analysisMesh: THREE_NS.InstancedMesh | null = null;
@@ -198,8 +198,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // HDRI pozostaje zaimplementowane jako opcjonalny krok jakościowy, ale nie jest
-    // ładowane w pierwszym kadrze sandboxowego WebGL; podstawą proofu są PBR + światła.
+    // HDRI ładuje się asynchronicznie po pierwszym kadrze; podstawą pozostają PBR + światła.
     if (this.hdriEnabled) void this.loadHdri(renderer);
     renderer.toneMappingExposure = 1.02;
     renderer.outputColorSpace = THREE.SRGBColorSpace;

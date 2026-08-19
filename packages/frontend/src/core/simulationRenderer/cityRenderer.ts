@@ -2,6 +2,7 @@ import type { VisualSimulation, SimAgent } from '../simulation/types';
 import { drawAgent, lodFor } from './agentVisual';
 import { worldToScreen, type Transform } from './camera';
 import { heatColor, type AnalysisField } from '../simulation/analysis';
+import type { SpatialWorldOverlay } from './spatialOverlay';
 
 /**
  * SIMULATION RENDERER — rysuje ŻYWY ŚWIAT na Canvas przez transformację kamery
@@ -30,6 +31,8 @@ export interface RenderOptions {
   contactRadius?: number;
   /** Warstwa analizy (heatmapa gęstość/ryzyko/odporność) rysowana pod agentami. */
   analysis?: AnalysisField | null;
+  /** Rzeczywista, read-only geometria GIS pochodząca z datasetu z provenance. */
+  spatialOverlay?: SpatialWorldOverlay | null;
 }
 
 export function renderCity(ctx: CanvasRenderingContext2D, sim: VisualSimulation, w: number, h: number, opts: RenderOptions): void {
@@ -47,6 +50,9 @@ export function renderCity(ctx: CanvasRenderingContext2D, sim: VisualSimulation,
     for (const x of withStreets.streets.v) { const p = worldToScreen(t, x, 0), q = worldToScreen(t, x, sim.worldHeight); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); }
     ctx.stroke();
   }
+
+  // Rzeczywista geometria GIS jest wyłącznie warstwą wejściową rendererа; nie zmienia obiektów ani agentów symulacji.
+  if (opts.spatialOverlay) drawSpatialOverlay(ctx, opts.spatialOverlay, t, w, h);
 
   // Budynki.
   ctx.font = `${Math.round(Math.max(10, 12))}px ui-monospace, monospace`;
@@ -90,6 +96,40 @@ export function renderCity(ctx: CanvasRenderingContext2D, sim: VisualSimulation,
 
   if (opts.debug) drawDebug(ctx, sim, agents, t, opts, sizePx);
   void lod;
+}
+
+function drawSpatialOverlay(ctx: CanvasRenderingContext2D, overlay: SpatialWorldOverlay, t: Transform, width: number, height: number): void {
+  const styles: Record<string, { stroke: string; fill?: string; width: number }> = {
+    roads: { stroke: 'rgba(227, 213, 174, 0.42)', width: Math.max(1, 3 * t.scale) },
+    rail: { stroke: 'rgba(192, 174, 212, 0.50)', width: Math.max(1, 1.5 * t.scale) },
+    water: { stroke: 'rgba(84, 170, 230, 0.72)', fill: 'rgba(54, 134, 198, 0.18)', width: Math.max(1, 2 * t.scale) },
+    buildings: { stroke: 'rgba(160, 193, 226, 0.48)', fill: 'rgba(102, 137, 177, 0.14)', width: Math.max(1, 1 * t.scale) },
+    boundaries: { stroke: 'rgba(240, 181, 102, 0.62)', width: Math.max(1, 1.5 * t.scale) },
+  };
+  for (const [layer, features] of Object.entries(overlay.layers)) {
+    const style = styles[layer] ?? styles.boundaries;
+    for (const feature of features) {
+      const first = feature.geometry.coordinates[0];
+      if (!first) continue;
+      ctx.beginPath();
+      const start = worldToScreen(t, first[0], first[1]);
+      ctx.moveTo(start.x, start.y);
+      for (const coordinate of feature.geometry.coordinates.slice(1)) {
+        const point = worldToScreen(t, coordinate[0], coordinate[1]);
+        ctx.lineTo(point.x, point.y);
+      }
+      if (feature.geometry.kind === 'polygon') ctx.closePath();
+      if (style.fill && feature.geometry.kind === 'polygon') { ctx.fillStyle = style.fill; ctx.fill(); }
+      ctx.strokeStyle = style.stroke;
+      ctx.lineWidth = style.width;
+      ctx.stroke();
+    }
+  }
+  ctx.fillStyle = 'rgba(222, 232, 244, 0.68)';
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${overlay.attribution} · ${overlay.license} · openstreetmap.org/copyright`, width - 8, height - 8);
+  ctx.textAlign = 'start';
 }
 
 function drawAnalysis(ctx: CanvasRenderingContext2D, f: AnalysisField, t: Transform, worldW: number, worldH: number): void {

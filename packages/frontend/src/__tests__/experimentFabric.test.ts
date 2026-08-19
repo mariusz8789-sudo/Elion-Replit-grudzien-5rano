@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getKnowledgeDomain, validateKnowledgeRegistry } from '../core/knowledge/registry';
+import { createSpatialWorldOverlay } from '../core/simulationRenderer/spatialOverlay';
 import {
   parseScienceChatMessage,
   runExperiment,
@@ -121,6 +122,12 @@ describe('Genesis Experiment Fabric', () => {
     expect(dataset.layers.roads).toHaveLength(1);
     expect(dataset.provenance.featureCount).toBe(2);
     expect(dataset.worldIntegration).toBe('NOT_WIRED');
+    const datasetBeforeOverlay = JSON.stringify(dataset.layers);
+    const overlay = createSpatialWorldOverlay(dataset, 1000, 800);
+    expect(overlay.kind).toBe('read-only-spatial-overlay');
+    expect(overlay.datasetId).toBe(dataset.datasetId);
+    expect(overlay.layers.buildings[0]?.geometry.coordinates[0]).toEqual([0, 800]);
+    expect(JSON.stringify(dataset.layers)).toBe(datasetBeforeOverlay);
     expect(normalizeOsmMapXml(xml, { bbox: [-5.3240, 35.8885, -5.3235, 35.8890], sourceTimestamp: '2026-08-18T00:00:00.000Z' }).datasetId).toBe(dataset.datasetId);
     expect(() => normalizeOsmMapXml(xml, { bbox: [-5.3240, 35.8885, -5.3235, 35.8890], sourceTimestamp: '' })).toThrow('sourceTimestamp');
   });

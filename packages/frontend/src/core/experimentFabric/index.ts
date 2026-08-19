@@ -46,6 +46,15 @@ export {
   type ExternalAdapterManifest,
   type SpatialImportManifest,
 } from './externalAdapters';
+export {
+  EXTERNAL_SOLVER_JOB_MANIFEST_VERSION,
+  createExternalSolverJobManifest,
+  type ExternalSolverJobStatus,
+  type ExternalJobArtifact,
+  type ExternalJobResourceLimits,
+  type ExternalSolverJobRequest,
+  type ExternalSolverJobManifest,
+} from './externalJobManifest';
 
 export {
   DISCOVERY_SEAM_VERSION,

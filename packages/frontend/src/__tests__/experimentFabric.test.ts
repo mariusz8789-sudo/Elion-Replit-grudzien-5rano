@@ -6,6 +6,7 @@ import {
   runExperiment,
   validateStructuredExperimentRequest,
   listExternalEngineAdapters,
+  createExternalSolverJobManifest,
   listSpatialImportAdapters,
   analyseExperimentSeries,
   createScientificEvidencePack,
@@ -49,6 +50,25 @@ describe('Genesis Experiment Fabric', () => {
     expect(quantum?.parameters).toEqual(expect.arrayContaining(['chemicalPotential', 'hopping', 'pairing']));
     expect(quantum?.assumptions.join(' ')).toContain('bulk model Kitaeva');
     expect(quantum?.requiredSolver).toContain('Schrödinger solver required');
+  });
+
+  it('records a future external solver job as a non-executable provenance manifest', () => {
+    const manifest = createExternalSolverJobManifest({
+      adapterId: 'openfoam-cfd',
+      containerImageDigest: `sha256:${'a'.repeat(64)}`,
+      inputArtifacts: [{ role: 'case-files', sha256: 'b'.repeat(64), mediaType: 'application/x-tar', byteLength: 2048 }],
+      resourceLimits: { cpuCores: 4, memoryMiB: 4096, wallTimeSeconds: 3600 },
+    });
+    expect(manifest.status).toBe('AWAITING_RUNTIME');
+    expect(manifest.adapterId).toBe('openfoam-cfd');
+    expect(manifest.backend).toBe('local-container');
+    expect(manifest.requiredProvenance).toContain('solver log hash');
+    expect(manifest.executionProhibitedReason).toContain('does not execute a solver');
+    expect(manifest).not.toHaveProperty('outputs');
+    expect(() => createExternalSolverJobManifest({
+      adapterId: 'openfoam-cfd', containerImageDigest: 'latest', inputArtifacts: [],
+      resourceLimits: { cpuCores: 0, memoryMiB: 0, wallTimeSeconds: 0 },
+    })).toThrow('containerImageDigest');
   });
 
   it('declares mature solver and GIS integrations as explicit seams, never active engines', () => {

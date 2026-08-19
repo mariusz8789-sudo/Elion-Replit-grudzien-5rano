@@ -76,6 +76,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Istniejący diagram 1+1D z dokładną transformacją Lorentza dla dwóch ustalonych zdarzeń przestrzennopodobnych; nie opisuje przyspieszenia, grawitacji ani danych obserwacyjnych.',
   },
   {
+    id: 'spacetime-c-slider', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-light-speed-graph@1.0.0',
+    parameters: [number('velocityMs', 'Prędkość obiektu v', 'm/s', 0, 4e8, 1.5e8), number('lightSpeedMs', 'Hipotetyczna prędkość światła c', 'm/s', 5e7, 6e8, 299792458), number('distanceKm', 'Dystans', 'km', 1, 1e6, 384400)],
+    route: { kind: 'lab', labId: 'spacetime', experimentId: 'c-slider' }, knowledgeSources: ['spacetime-einstein.md'],
+    rationale: 'Istniejący graf szczególnej teorii względności dla jawnego eksperymentu myślowego: zmienia założoną wartość c, nie stałą fizyczną świata rzeczywistego. Działa wyłącznie dla v<c.',
+  },
+  {
     id: 'universe-kepler', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('centralMassSolar', 'Masa centralna', 'M☉', 0.01, 1e9, 1), number('orbitalRadiusAu', 'Promień orbity', 'AU', 0.001, 1e5, 1)],
     route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['universe.md', 'classical-mechanics.md'],

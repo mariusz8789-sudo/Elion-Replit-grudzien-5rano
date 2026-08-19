@@ -10,6 +10,7 @@ import { runVseprScenario } from '../../labs/experiments/chemistry-vsepr';
 import { runPointLensScenario } from '../../labs/experiments/einstein-lensing';
 import { runLightConeScenario } from '../../labs/experiments/spacetime-lightcone-3d';
 import { runMinkowskiScenario } from '../../labs/experiments/spacetime-minkowski';
+import { runLightSpeedScenario } from '../../labs/experiments/spacetime-cslider';
 import { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
 import { runKerrScenario } from '../../labs/experiments/einstein-kerr3d';
 import { runQuantumTeleportScenario } from '../../labs/experiments/quantum-teleport';
@@ -496,6 +497,32 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         validity: 'Dokładna szczególna transformacja Lorentza 1+1D dla β ∈ [−0,9; 0,9]. Bez przyspieszenia, ogólnej OTW, dynamiki ciał i danych obserwacyjnych.',
         assumptions: ['Zdarzenia A i B są ustalone i przestrzennopodobnie rozdzielone.', 'Jednostki diagramu są umowne oraz przyjmują c=1.'],
         visualization: ['numeric', 'canvas-2d'], route: model.route,
+      };
+    }
+    case 'spacetime-c-slider': {
+      const velocityMs = numberParam(params, 'velocityMs', 1.5e8);
+      const lightSpeedMs = numberParam(params, 'lightSpeedMs', 299792458);
+      const distanceKm = numberParam(params, 'distanceKm', 384400);
+      if (velocityMs >= lightSpeedMs) {
+        return {
+          contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'rejected',
+          summary: 'Eksperyment myślowy odrzucony: model szczególnej teorii względności nie ma rozwiązania dla v≥c.',
+          outputs: {}, units: {}, warnings: ['Zmień parametry tak, aby velocityMs było mniejsze od lightSpeedMs.'],
+          validity: 'Graf c-Slider jest ważny wyłącznie dla β=v/c<1.',
+          assumptions: ['Parametr c jest hipotetyczny i nie zmienia fizycznej stałej prędkości światła w próżni.'],
+          visualization: [], route: model.route,
+        };
+      }
+      const solved = runLightSpeedScenario({ velocityMs, lightSpeedMs, distanceKm });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano istniejący graf c-Slider dla β=${solved.betaFraction.toFixed(6)} i jawnie hipotetycznej wartości c.`,
+        outputs: solved,
+        units: { velocityMs: 'm/s', lightSpeedMs: 'm/s', distanceKm: 'km', betaFraction: '', lorentzGammaFactor: '', secondsPerProperSecond: 's per s własną', lengthContractionPercent: '%', dopplerApproaching: '×', lightTravelTimeSeconds: 's' },
+        warnings: ['To eksperyment myślowy: parametr lightSpeedMs zmienia założenie modelu, nie rzeczywistą stałą fizyczną.'],
+        validity: 'Dokładne relacje szczególnej teorii względności dla inercjalnego ruchu i β<1, przy jawnie zadanej hipotetycznej wartości c. Nie jest obserwacją, pomiarem ani zmianą stałych natury.',
+        assumptions: ['v, c i dystans są parametrami wejściowymi.', 'Brak przyspieszenia, grawitacji, danych obserwacyjnych i interpretacji świata rzeczywistego.'],
+        visualization: ['numeric', 'graph'], route: model.route,
       };
     }
     case 'particle-relativistic-energy': {

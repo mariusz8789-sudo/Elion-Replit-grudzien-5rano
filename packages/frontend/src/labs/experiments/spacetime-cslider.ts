@@ -1,5 +1,47 @@
 import type { ExperimentDef } from '../../core/types';
-import { buildLightSpeedGraph } from '../../core/modelGraph/lightSpeedGraph';
+import {
+  BASELINE_DISTANCE_KM,
+  BASELINE_VELOCITY_MS,
+  C_VACUUM_MS,
+  buildLightSpeedGraph,
+} from '../../core/modelGraph/lightSpeedGraph';
+
+export type LightSpeedScenarioInput = {
+  velocityMs?: number;
+  lightSpeedMs?: number;
+  distanceKm?: number;
+};
+
+/**
+ * Współdzielony runner Fabric dla istniejącego c-Slidera. Wszystkie wielkości
+ * pochodzą z buildLightSpeedGraph(); funkcja jedynie waliduje dziedzinę i
+ * ujawnia wyniki bez uruchamiania drugiej implementacji STW.
+ */
+export function runLightSpeedScenario({
+  velocityMs = BASELINE_VELOCITY_MS,
+  lightSpeedMs = C_VACUUM_MS,
+  distanceKm = BASELINE_DISTANCE_KM,
+}: LightSpeedScenarioInput = {}) {
+  if (!Number.isFinite(velocityMs) || velocityMs < 0) throw new Error('velocityMs must be finite and non-negative.');
+  if (!Number.isFinite(lightSpeedMs) || lightSpeedMs <= 0) throw new Error('lightSpeedMs must be finite and positive.');
+  if (!Number.isFinite(distanceKm) || distanceKm < 0) throw new Error('distanceKm must be finite and non-negative.');
+  const betaFraction = velocityMs / lightSpeedMs;
+  if (betaFraction >= 1) throw new Error('Model STW jest nieokreślony dla velocityMs ≥ lightSpeedMs (β ≥ 1).');
+
+  const graph = buildLightSpeedGraph();
+  graph.applyParameterSnapshot({ velocityMs, lightSpeedMs, distanceKm });
+  return {
+    velocityMs,
+    lightSpeedMs,
+    distanceKm,
+    betaFraction: graph.getValue('betaFraction'),
+    lorentzGammaFactor: graph.getValue('lorentzGammaFactor'),
+    secondsPerProperSecond: graph.getValue('secondsPerProperSecond'),
+    lengthContractionPercent: graph.getValue('lengthContractionPercent'),
+    dopplerApproaching: graph.getValue('dopplerApproaching'),
+    lightTravelTimeSeconds: graph.getValue('lightTravelTimeSeconds'),
+  } as const;
+}
 
 /**
  * c-Slider (Priorytet 5) — sygnaturowy eksperyment „co, gdyby zmienić prędkość

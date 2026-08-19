@@ -896,6 +896,29 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.provenance.knowledgeSources).toContain('spacetime-einstein.md');
   });
 
+  it('routes a bounded c-Slider thought experiment through the real graph with provenance', () => {
+    const command = 'Uruchom c-Slider: v=240000000 m/s, c=300000000 m/s, dystans=300000 km.';
+    const request = parseScienceChatMessage(command);
+    const run = runExperiment(request);
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const rejected = runExperiment(parseScienceChatMessage('Uruchom c-Slider: v=300000000 m/s, c=200000000 m/s.'));
+    const spacetime = getKnowledgeDomain('spacetime-einstein');
+
+    expect(request.modelId).toBe('spacetime-c-slider');
+    expect(request.parameters).toEqual({ velocityMs: 240000000, lightSpeedMs: 300000000, distanceKm: 300000 });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.outputs.betaFraction).toBeCloseTo(0.8, 12);
+    expect(run.result.outputs.lightTravelTimeSeconds).toBeCloseTo(1, 12);
+    expect(run.result.validity).toContain('hipotetycznej wartości c');
+    expect(run.provenance.resultOrigin).toBe('real-engine');
+    expect(run.provenance.knowledgeSources).toContain('spacetime-einstein.md');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(spacetime?.realModels).toContain('spacetime-c-slider');
+    expect(spacetime?.assumptions.join(' ')).toContain('eksperymentem myślowym');
+    expect(rejected.result.status).toBe('rejected');
+    expect(rejected.result.summary).toContain('v≥c');
+  });
+
   it('runs the existing Kepler ModelGraph deterministically from natural language', () => {
     const request = parseScienceChatMessage('Oblicz orbitę planety przy 2 AU i 1 masie Słońca.');
     const a = runExperiment(request);

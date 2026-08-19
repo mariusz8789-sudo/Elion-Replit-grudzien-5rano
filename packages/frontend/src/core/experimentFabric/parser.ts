@@ -36,6 +36,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const atomicNumber = firstNumber(normalized, /\bz\s*[=:]\s*(\d+)/);
   const principalN = firstNumber(normalized, /\bn\s*[=:]\s*(\d+)/);
   const beta = firstNumber(normalized, /\b(?:β|beta|v\s*\/\s*c)\s*[=:]?\s*(0(?:[.,]\d+)?|1(?:[.,]0+)?)/);
+  const lightSpeedVelocityMs = firstNumber(normalized, /\b(?:v|prędkość obiektu|predkosc obiektu)\s*[=:]?\s*(\d+(?:[.,]\d+)?)\s*(?:m\s*\/\s*s|mps)\b/);
+  const hypotheticalLightSpeedMs = firstNumber(normalized, /\b(?:c|prędkość światła|predkosc swiatla)\s*[=:]?\s*(\d+(?:[.,]\d+)?)\s*(?:m\s*\/\s*s|mps)\b/);
+  const lightSpeedDistanceKm = firstNumber(normalized, /\b(?:dystans|odległość|odleglosc)\s*[=:]?\s*(\d+(?:[.,]\d+)?)\s*km\b/);
   const kerrSpin = firstNumber(normalized, /\b(?:spin|a\s*\/\s*m)\s*[=:]?\s*(0(?:[.,]\d+)?|1(?:[.,]0+)?)/);
   const temperatureK = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*k\b/);
   const isingTemperature = firstNumber(normalized, /\b(?:t|temperatura)\s*[=:]?\s*(\d+(?:[.,]\d+)?)(?!\s*k\b)/);
@@ -84,6 +87,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     params.velocityFraction = beta;
     params.beta = beta;
   }
+  if (lightSpeedVelocityMs !== undefined) params.velocityMs = lightSpeedVelocityMs;
+  if (hypotheticalLightSpeedMs !== undefined) params.lightSpeedMs = hypotheticalLightSpeedMs;
+  if (lightSpeedDistanceKm !== undefined) params.distanceKm = lightSpeedDistanceKm;
   if (kerrSpin !== undefined) params.spin = kerrSpin;
   if (temperatureK !== undefined) params.temperatureK = temperatureK;
   if (isingTemperature !== undefined) params.temperature = isingTemperature;
@@ -173,6 +179,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:masa chirp|chirp|isco|fala grawitacyjna|fale grawitacyjne)/.test(normalized)) {
     return request('spacetime-einstein', 'einstein-chirp-mass', 'scene-3d', ['m1Solar', 'm2Solar']);
   }
+  if (/(?:c[- ]?slider|gdyby\s+(?:c|prędkość światła|predkosc swiatla)|hipotetyczn[a-ząćęłńóśźż]*\s+(?:c|prędkość światła|predkosc swiatla)|zmień\s+(?:c|prędkość światła)|zmien\s+(?:c|predkosc swiatla))/.test(normalized)) return request('spacetime-einstein', 'spacetime-c-slider', 'graph', ['velocityMs', 'lightSpeedMs', 'distanceKm']);
   if (/\b(diagram minkowskiego|minkowski|względnoś[a-ząćęłńóśźż]* równoczesnoś[a-ząćęłńóśźż]*|wzglednos[a-ząćęłńóśźż]* rownoczesnos[a-ząćęłńóśźż]*)\b/.test(normalized)) return request('spacetime-einstein', 'spacetime-minkowski', 'canvas-2d', ['beta']);
   if (/\b(stożek świetlny|stożek swietlny|light cone|paradoks bliźni[a-ząćęłńóśźż]*|paradoks blizni[a-ząćęłńóśźż]*)\b/.test(normalized)) return request('spacetime-einstein', 'spacetime-light-cone', 'scene-3d', ['v', 'tripYears']);
   if (/(?:dylatac[a-ząćęłńóśźż]*|lorentz[a-ząćęłńóśźż]*|skróceni[a-ząćęłńóśźż]* długości|skroceni[a-ząćęłńóśźż]* dlugosci|szczególn[a-ząćęłńóśźż]* teori[a-ząćęłńóśźż]* względności|szczegoln[a-ząćęłńóśźż]* teori[a-ząćęłńóśźż]* wzglednosci)/.test(normalized)) {

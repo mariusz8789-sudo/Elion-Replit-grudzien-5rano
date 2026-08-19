@@ -65,9 +65,11 @@ describe('Genesis Experiment Fabric', () => {
     }
   });
 
-  it('preserves supplemental theory and video provenance without fabricating a solver', () => {
+  it('preserves supplemental theory and video provenance while routing only the butterfly effect to its real bounded solver', () => {
     const butterfly = runExperiment(parseScienceChatMessage('Zbadaj efekt motyla w układzie chaotycznym.'));
-    expect(butterfly.result.status).toBe('engine_not_available');
+    expect(butterfly.result.status).toBe('completed');
+    expect(butterfly.request.modelId).toBe('universe-three-body');
+    expect(butterfly.result.outputs.preset).toBe('pythagorean');
     expect(butterfly.intent.supplementalKnowledgeIds).toContain('chaos-sensitive-initial-conditions');
     expect(butterfly.provenance.supplementalKnowledgeIds).toEqual(butterfly.intent.supplementalKnowledgeIds);
 
@@ -279,6 +281,18 @@ describe('Genesis Experiment Fabric', () => {
     expect(pythagorean.result.outputs.preset).toBe('pythagorean');
     expect(Number(pythagorean.result.outputs.finalSeparation)).toBeGreaterThan(0);
     expect(pythagorean.result.assumptions.some((assumption) => assumption.includes('10⁻⁶'))).toBe(true);
+  });
+
+  it('maps the butterfly-effect request only to the real perturbed three-body scenario', () => {
+    const request = parseScienceChatMessage('Pokaż efekt motyla dla warunków początkowych, horyzont=2.');
+    const run = runExperiment(request);
+
+    expect(request.modelId).toBe('universe-three-body');
+    expect(request.parameters).toEqual({ preset: 'pythagorean', horizonTime: 2, divergence: true });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.outputs.preset).toBe('pythagorean');
+    expect(Number(run.result.outputs.finalSeparation)).toBeGreaterThan(0);
+    expect(run.result.validity).toContain('nie jest prognozą konkretnego układu astronomicznego');
   });
 
   it('creates and replays a reproducible scenario capsule from real A/B runs only', () => {

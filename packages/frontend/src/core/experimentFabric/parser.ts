@@ -87,7 +87,11 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     return request('classical-mechanics', 'universe-three-body', 'graph', ['preset', 'horizonTime', 'divergence']);
   }
   if (/(?:efekt motyla|butterfly effect|chaos deterministyczny|warunk(?:i|ów) początkow(?:e|ych)|warunk(?:i|ow) poczatkow(?:e|ych))/.test(normalized)) {
-    return request('classical-mechanics', undefined, 'graph', []);
+    // Jedyny obsługiwany eksperyment „efektu motyla”: rzeczywista, niewielka perturbacja
+    // w istniejącym Newtonowskim problemie trzech ciał. Nie jest to ogólny solver chaosu.
+    if (params.preset === undefined) params.preset = 'pythagorean';
+    params.divergence = true;
+    return request('classical-mechanics', 'universe-three-body', 'graph', ['preset', 'horizonTime', 'divergence']);
   }
   if (/(?:tesla|silnik indukcyjny|prąd przemienny|prad przemienny|układ wielofazowy|uklad wielofazowy)/.test(normalized)) {
     return request('electrodynamics', undefined, 'graph', []);

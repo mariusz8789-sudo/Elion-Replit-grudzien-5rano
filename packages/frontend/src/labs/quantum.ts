@@ -4,6 +4,7 @@ import { quantumBloch } from './experiments/quantum-bloch-3d';
 import { quantumChsh } from './experiments/quantum-chsh';
 import { quantumTeleport } from './experiments/quantum-teleport';
 import { quantumPhotonConsequence } from './experiments/quantum-photon-consequence';
+import { quantumKitaevBulk } from './experiments/quantum-kitaev-bulk';
 
 /**
  * Quantum Lab — doświadczenie z dwiema szczelinami.
@@ -220,7 +221,7 @@ export const quantumLab: LabDefinition = {
     { key: 'rate', label: 'Cząstek na sekundę', type: 'slider', min: 5, max: 200, step: 5, default: 60 },
   ],
   createSim: () => new DoubleSlitSim(),
-  experiments: [quantumTunneling, quantumBloch, quantumChsh, quantumTeleport, quantumPhotonConsequence],
+  experiments: [quantumTunneling, quantumBloch, quantumChsh, quantumTeleport, quantumPhotonConsequence, quantumKitaevBulk],
   narrate(p, stats) {
     const measured = Boolean(p.measured);
     const lambda = Number(p.lambda);

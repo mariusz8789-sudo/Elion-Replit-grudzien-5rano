@@ -28,6 +28,19 @@ Model i test kontraktowy sprawdzają analityczną granicę: dla `μ=0`, `t=1`, `
 
 Q1 pomija spin, s-wave proximity pairing, Zeeman field, spin–orbit coupling, disorder, oddziaływania, geometrię kontaktów, kalibrację materiałową oraz pomiary. Te elementy są konieczne w drodze od toy model do realistycznego nanodrutu. [1] [2] [3]
 
+## Q2 — interaktywny widok Quantum Lab
+
+Q2 udostępnia eksperyment **„Łańcuch Kitaeva — bulk BdG”** w Quantum Lab. Canvas rysuje dodatnią i ujemną gałąź `±E(k)` oraz oznacza minimum gapu dla bieżących `μ`, `t` i `Δ`. Nie ma osobnej implementacji równania dla renderera: każdy punkt pasma korzysta z `kitaevBulkEnergyAtMomentum()`, a statystyki i narracja korzystają z tego samego `solveKitaevBulk()` co Q1.
+
+| Element widoku Q2 | Źródło | Czego nie oznacza |
+|---|---|---|
+| Krzywe `±E(k)` | Bezpośrednie wartości pasma BdG minimalnego modelu. | Dopasowania do pomiarów materiału. |
+| Przerywany marker | Obliczone minimum bulk gapu i jego momentum. | Stan brzegowy skończonego przewodu. |
+| Reżim topologiczny / krytyczny / trywialny | Klasyfikacja z Q1 dla bieżących parametrów bulk. | Dowód modów Majorany w urządzeniu. |
+| Panel narracji | Żywe wyniki solvera i jawne ostrzeżenia o granicach. | Potwierdzony run z provenance — do tego służy Science Chat i etap potwierdzenia. |
+
+Kontrolne E2E dla `μ=0`, `t=1`, `Δ=1` pokazało reżim topologiczny bulk oraz `E_g=2`. Po ustawieniu `μ=2` interfejs pokazał granicę krytyczną oraz numerycznie zerowy gap (`2.449e-16`, w granicy precyzji zmiennoprzecinkowej). Test Q2 porównuje dane żywego Canvasu z wynikiem istniejącego solvera i utrzymuje obligatoryjny disclosure „nie symulacja nanodrutu … ani urządzenia Majorana 1”.
+
 ## Provenance i następny etap
 
 Każdy run przechodzi przez kanoniczny `StructuredExperimentRequest → router → executor → ExperimentResult → provenance`. Q1 może być porównywany przez istniejący Counterfactual Evidence Compare i utrwalany przez Scenario Capsule, lecz nie zmienia epistemicznego statusu claimu Majorana 1.

@@ -6,6 +6,12 @@ export interface KitaevBulkParameters {
 
 export type KitaevBulkPhase = 'TOPOLOGICAL_REGIME' | 'TRIVIAL_REGIME' | 'CRITICAL_BOUNDARY';
 
+/** Dokładna dodatnia gałąź pasma bulk BdG używana także przez renderer Q2. */
+export function kitaevBulkEnergyAtMomentum(k: number, parameters: KitaevBulkParameters): number {
+  const { chemicalPotential: mu, hopping: t, pairing: delta } = parameters;
+  return Math.sqrt((-2 * t * Math.cos(k) - mu) ** 2 + 4 * delta * delta * Math.sin(k) ** 2);
+}
+
 export interface KitaevBulkResult {
   bulkGap: number;
   momentumAtGap: number;
@@ -46,7 +52,7 @@ export function solveKitaevBulk(parameters: KitaevBulkParameters): KitaevBulkRes
   let minEnergySquared = Number.POSITIVE_INFINITY;
   let xAtGap = 1;
   for (const x of candidateXs) {
-    const energySquared = (mu + 2 * t * x) ** 2 + 4 * delta * delta * (1 - x * x);
+    const energySquared = kitaevBulkEnergyAtMomentum(Math.acos(clamp(x, -1, 1)), parameters) ** 2;
     if (energySquared < minEnergySquared) {
       minEnergySquared = energySquared;
       xAtGap = x;

@@ -32,6 +32,8 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const horizonDays = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*(?:dni|dzień|dnia|days?)\b/);
   const proteinSteps = firstNumber(normalized, /\b(?:kroki\s*(?:mc|monte carlo)?|steps)\s*[=:]?\s*(\d+)\b/);
   const massSolar = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*(?:mas(?:a|y)\s+słońca|masy slonca|m[_ ]?sun|msun|solar masses?)\b/);
+  const chirpMass1Solar = firstNumber(normalized, /\b(?:m1|masa\s*1|pierwsza\s*masa)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const chirpMass2Solar = firstNumber(normalized, /\b(?:m2|masa\s*2|druga\s*masa)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const radiusAu = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*au\b/);
   const wavelengthNm = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*nm\b/);
   const atomicNumber = firstNumber(normalized, /\bz\s*[=:]\s*(\d+)/);
@@ -81,6 +83,8 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (horizonDays !== undefined) params.horizonDays = horizonDays;
   if (proteinSteps !== undefined) params.steps = proteinSteps;
   if (massSolar !== undefined) params.massSolar = massSolar;
+  if (chirpMass1Solar !== undefined) params.m1Solar = chirpMass1Solar;
+  if (chirpMass2Solar !== undefined) params.m2Solar = chirpMass2Solar;
   if (radiusAu !== undefined) params.orbitalRadiusAu = radiusAu;
   if (wavelengthNm !== undefined) params.wavelengthNm = wavelengthNm;
   if (atomicNumber !== undefined) params.atomicNumber = atomicNumber;

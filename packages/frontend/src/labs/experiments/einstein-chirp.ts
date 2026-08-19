@@ -24,6 +24,47 @@ import {
 const F_START = 20; // Hz — dolna granica pasma czułości LIGO, punkt startowy symulacji
 const AUDIO_GAIN_MAX = 0.12; // ciche, bezpieczne dla uszu
 
+export type ChirpInspiralScenarioInput = {
+  m1Solar?: number;
+  m2Solar?: number;
+};
+
+/**
+ * Współdzielony runner Fabric dla tej samej, wiodącej formuły kwadrupolowej,
+ * którą używa Canvas chirp. Kończy obliczenia na ISCO; nie wyprowadza
+ * połączenia ani ringdownu z modelu poza jego dziedziną ważności.
+ */
+export function runChirpInspiralScenario({ m1Solar = 30, m2Solar = 30 }: ChirpInspiralScenarioInput = {}) {
+  if (!Number.isFinite(m1Solar) || m1Solar <= 0) throw new Error('m1Solar must be finite and positive.');
+  if (!Number.isFinite(m2Solar) || m2Solar <= 0) throw new Error('m2Solar must be finite and positive.');
+
+  const totalMassSolar = m1Solar + m2Solar;
+  const chirpMass = chirpMassSolar(m1Solar, m2Solar);
+  const iscoFrequencyHz = iscoFrequency(totalMassSolar);
+  const startFrequencyHz = F_START;
+  if (startFrequencyHz >= iscoFrequencyHz) {
+    return { m1Solar, m2Solar, totalMassSolar, chirpMassSolar: chirpMass, startFrequencyHz, iscoFrequencyHz, startsBeforeIsco: false } as const;
+  }
+
+  const timeAtStartSeconds = timeToMerger(chirpMass, startFrequencyHz);
+  const timeAtIscoSeconds = timeToMerger(chirpMass, iscoFrequencyHz);
+  const timeToIscoSeconds = timeAtStartSeconds - timeAtIscoSeconds;
+  const halfwayTauSeconds = timeAtIscoSeconds + timeToIscoSeconds / 2;
+  return {
+    m1Solar,
+    m2Solar,
+    totalMassSolar,
+    chirpMassSolar: chirpMass,
+    startFrequencyHz,
+    iscoFrequencyHz,
+    startsBeforeIsco: true,
+    timeToIscoSeconds,
+    midInspiralFrequencyHz: chirpFrequency(chirpMass, halfwayTauSeconds),
+    startSeparationMeters: binarySeparationMeters(totalMassSolar, startFrequencyHz),
+    iscoSeparationMeters: binarySeparationMeters(totalMassSolar, iscoFrequencyHz),
+  } as const;
+}
+
 class GravWaveChirpSim implements Sim {
   private lastM1 = -1;
   private lastM2 = -1;

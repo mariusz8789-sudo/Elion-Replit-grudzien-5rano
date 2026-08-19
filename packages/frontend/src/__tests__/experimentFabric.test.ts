@@ -896,6 +896,27 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.provenance.knowledgeSources).toContain('spacetime-einstein.md');
   });
 
+  it('extends the existing chirp adapter with bounded early-inspiral observables', () => {
+    const command = 'Oblicz falę grawitacyjną chirp: m1=36, m2=29.';
+    const request = parseScienceChatMessage(command);
+    const run = runExperiment(request);
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const rejected = runExperiment(parseScienceChatMessage('Oblicz falę grawitacyjną chirp: m1=1000, m2=1000.'));
+
+    expect(request.modelId).toBe('einstein-chirp-mass');
+    expect(request.parameters).toEqual({ m1Solar: 36, m2Solar: 29 });
+    expect(run.result.status).toBe('completed');
+    expect(Number(run.result.outputs.timeToIscoSeconds)).toBeGreaterThan(0);
+    expect(Number(run.result.outputs.midInspiralFrequencyHz)).toBeGreaterThan(Number(run.result.outputs.startFrequencyHz));
+    expect(Number(run.result.outputs.midInspiralFrequencyHz)).toBeLessThan(Number(run.result.outputs.iscoFrequencyHz));
+    expect(Number(run.result.outputs.iscoSeparationMeters)).toBeLessThan(Number(run.result.outputs.startSeparationMeters));
+    expect(run.result.validity).toContain('Nie jest dopasowaniem danych LIGO');
+    expect(run.provenance.resultOrigin).toBe('real-engine');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(rejected.result.status).toBe('rejected');
+    expect(rejected.result.summary).toContain('poza zakresem wczesnego inspiralu');
+  });
+
   it('routes a bounded c-Slider thought experiment through the real graph with provenance', () => {
     const command = 'Uruchom c-Slider: v=240000000 m/s, c=300000000 m/s, dystans=300000 km.';
     const request = parseScienceChatMessage(command);

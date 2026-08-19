@@ -12,6 +12,7 @@ import { runLightConeScenario } from '../../labs/experiments/spacetime-lightcone
 import { runMinkowskiScenario } from '../../labs/experiments/spacetime-minkowski';
 import { runLightSpeedScenario } from '../../labs/experiments/spacetime-cslider';
 import { runProteinFoldingScenario } from '../../labs/experiments/biology-proteinfolding';
+import { runChirpInspiralScenario } from '../../labs/experiments/einstein-chirp';
 import { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
 import { runKerrScenario } from '../../labs/experiments/einstein-kerr3d';
 import { runQuantumTeleportScenario } from '../../labs/experiments/quantum-teleport';
@@ -39,7 +40,7 @@ import { buildOrbitalModelGraph } from '../modelGraph/orbitalGraph';
 import { buildRelativisticEnergyGraph } from '../modelGraph/relativisticEnergyGraph';
 import { buildSpecialRelativityGraph } from '../modelGraph/specialRelativityGraph';
 import { buildPhotonGraph } from '../modelGraph/photonGraph';
-import { chirpMassSolar, iscoFrequency, kardashevPower, schwarzschildRadius } from '../physics';
+import { kardashevPower, schwarzschildRadius } from '../physics';
 import { runIsingMetropolisScenario } from '../isingModel';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS } from '../simulation/epidemicCity';
 import { createExperimentProvenance, statusForCapability } from './provenance';
@@ -626,12 +627,24 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
     case 'einstein-chirp-mass': {
       const m1Solar = numberParam(params, 'm1Solar', 30);
       const m2Solar = numberParam(params, 'm2Solar', 30);
+      const solved = runChirpInspiralScenario({ m1Solar, m2Solar });
+      if (!solved.startsBeforeIsco) {
+        return {
+          contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'rejected',
+          summary: 'Eksperyment inspiralu odrzucony: dla tych mas stały start 20 Hz leży na lub powyżej ISCO, poza zakresem wczesnego inspiralu.',
+          outputs: {}, units: {}, warnings: ['Zmniejsz sumę mas, aby startFrequencyHz=20 Hz był mniejsze niż iscoFrequencyHz.'],
+          validity: 'Wiodąca formuła kwadrupolowa jest tu raportowana wyłącznie przed ISCO.',
+          assumptions: ['Brak ekstrapolacji do połączenia lub ringdownu.'], visualization: [], route: model.route,
+        };
+      }
       return {
-        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Obliczono istniejącą funkcję masy chirp i częstotliwości ISCO.',
-        outputs: { chirpMassSolar: chirpMassSolar(m1Solar, m2Solar), iscoFrequencyHz: iscoFrequency(m1Solar + m2Solar) },
-        units: { chirpMassSolar: 'M☉', iscoFrequencyHz: 'Hz' }, warnings: [],
-        validity: 'Przybliżenie punktowe inspiralu; ISCO Schwarzschilda przed połączeniem.',
-        assumptions: ['Brak spinu i pełnej numerycznej relatywistyki.'], visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Obliczono istniejący wczesny inspiral od ${solved.startFrequencyHz} Hz do ISCO; czas modelu do ISCO wynosi ${solved.timeToIscoSeconds.toPrecision(5)} s.`,
+        outputs: solved,
+        units: { m1Solar: 'M☉', m2Solar: 'M☉', totalMassSolar: 'M☉', chirpMassSolar: 'M☉', startFrequencyHz: 'Hz', iscoFrequencyHz: 'Hz', startsBeforeIsco: '', timeToIscoSeconds: 's', midInspiralFrequencyHz: 'Hz', startSeparationMeters: 'm', iscoSeparationMeters: 'm' },
+        warnings: ['Model kończy się na ISCO. Połączenie i ringdown wymagają pełnej relatywistyki numerycznej i nie są obliczane.'],
+        validity: 'Wiodąca formuła kwadrupolowa dla punktowego, nieobracającego się binarnego inspiralu do granicy ISCO Schwarzschilda. Nie jest dopasowaniem danych LIGO ani pełnym waveformem.',
+        assumptions: ['Start częstotliwości jest stały i wynosi 20 Hz.', 'Brak spinu, ekscentryczności, precesji, pełnej numerycznej relatywistyki i danych obserwacyjnych.'], visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
       };
     }
     case 'chem-molecular-weight': {

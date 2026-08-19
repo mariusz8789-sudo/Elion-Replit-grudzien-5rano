@@ -18,6 +18,56 @@ const SCALE = 0.35; // jednostki sceny na jednostkę współrzędnych Lorenza
 const MAX_TRAIL = 2400;
 const SIGMA = 10;
 const BETA = 8 / 3;
+const FABRIC_STEP_TIME = 0.01;
+const INITIAL_STATE: LorenzState = { x: 0.1, y: 0, z: 0 };
+const PERTURBATION = 1e-4;
+
+export interface LorenzScenarioResult {
+  rho: number;
+  horizonTime: number;
+  chaosThreshold: number;
+  finalX: number;
+  finalY: number;
+  finalZ: number;
+  finalSeparation?: number;
+}
+
+/**
+ * Deterministyczny runner Fabric korzystający z istniejącego `stepLorenzRK4`.
+ * Jest to klasyczny model konwekcji Lorenza, nie model ani prognoza pogody.
+ */
+export function runLorenzScenario({
+  rho = 28,
+  horizonTime = 10,
+  divergence = false,
+}: {
+  rho?: number;
+  horizonTime?: number;
+  divergence?: boolean;
+} = {}): LorenzScenarioResult {
+  if (!Number.isFinite(rho) || rho < 5 || rho > 40) throw new Error('rho musi należeć do zakresu 5–40.');
+  if (!Number.isFinite(horizonTime) || horizonTime <= 0 || horizonTime > 60) {
+    throw new Error('horizonTime musi być skończoną liczbą z zakresu (0, 60].');
+  }
+  let primary: LorenzState = { ...INITIAL_STATE };
+  let shadow: LorenzState | undefined = divergence ? { ...INITIAL_STATE, x: INITIAL_STATE.x + PERTURBATION } : undefined;
+  let remaining = horizonTime;
+  while (remaining > Number.EPSILON) {
+    const step = Math.min(FABRIC_STEP_TIME, remaining);
+    primary = stepLorenzRK4(primary, step, SIGMA, rho, BETA);
+    if (shadow) shadow = stepLorenzRK4(shadow, step, SIGMA, rho, BETA);
+    remaining -= step;
+  }
+  return {
+    rho,
+    horizonTime,
+    chaosThreshold: lorenzChaosThreshold(SIGMA, BETA),
+    finalX: primary.x,
+    finalY: primary.y,
+    finalZ: primary.z,
+    ...(shadow ? { finalSeparation: Math.hypot(primary.x - shadow.x, primary.y - shadow.y, primary.z - shadow.z) } : {}),
+  };
+}
 
 function makeTrailLine(three: typeof THREE, scene: THREE.Scene, color: number): { line: THREE.Line; geo: THREE.BufferGeometry } {
   const geo = new three.BufferGeometry();
@@ -33,8 +83,8 @@ class Lorenz3DSim implements Sim3D {
   private t = 0;
   private rho = 28;
   private divergence = false;
-  private stateA: LorenzState = { x: 0.1, y: 0, z: 0 };
-  private stateB: LorenzState = { x: 0.1 + 1e-4, y: 0, z: 0 };
+  private stateA: LorenzState = { ...INITIAL_STATE };
+  private stateB: LorenzState = { ...INITIAL_STATE, x: INITIAL_STATE.x + PERTURBATION };
   private trailA: { x: number; y: number; z: number }[] = [];
   private trailB: { x: number; y: number; z: number }[] = [];
   private three?: typeof THREE;
@@ -64,8 +114,8 @@ class Lorenz3DSim implements Sim3D {
   }
 
   reset = () => {
-    this.stateA = { x: 0.1, y: 0, z: 0 };
-    this.stateB = { x: 0.1 + 1e-4, y: 0, z: 0 };
+    this.stateA = { ...INITIAL_STATE };
+    this.stateB = { ...INITIAL_STATE, x: INITIAL_STATE.x + PERTURBATION };
     this.trailA = [];
     this.trailB = [];
     this.t = 0;
@@ -96,14 +146,14 @@ class Lorenz3DSim implements Sim3D {
       this.divergence = wantDivergence;
       if (wantDivergence) {
         this.ensureLineB();
-        this.stateB = { x: this.stateA.x + 1e-4, y: this.stateA.y, z: this.stateA.z };
+        this.stateB = { x: this.stateA.x + PERTURBATION, y: this.stateA.y, z: this.stateA.z };
         this.trailB = [];
       } else {
         this.removeLineB();
       }
     }
 
-    const dtSim = 0.01;
+    const dtSim = FABRIC_STEP_TIME;
     const steps = Math.round(dt * 1400);
     for (let i = 0; i < steps; i++) {
       this.stateA = stepLorenzRK4(this.stateA, dtSim, SIGMA, this.rho, BETA);

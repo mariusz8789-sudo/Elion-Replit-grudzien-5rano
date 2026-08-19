@@ -81,6 +81,16 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Deterministyczne porównanie utrwalonych wartości SH0ES, Planck i opcjonalnie TRGB; nie estymuje parametrów kosmologicznych ani nie rozstrzyga przyczyny napięcia.',
   },
   {
+    id: 'universe-lorenz-attractor', domainId: 'classical-mechanics', modelVersion: '1.0.0', engine: 'genesis-lorenz@1.0.0',
+    parameters: [
+      number('rho', 'Liczba Rayleigha ρ', '', 5, 40, 28),
+      number('horizonTime', 'Horyzont integracji', 'jedn. czasu Lorenza', 0.01, 60, 10),
+      boolean('divergence', 'Drugi start z perturbacją 10⁻⁴', false),
+    ],
+    route: { kind: 'lab', labId: 'universe', experimentId: 'lorenz' }, knowledgeSources: ['classical-mechanics.md', 'universe.md'],
+    rationale: 'Klasyczne równania Lorenza integrowane istniejącym RK4; to uproszczony model konwekcji i chaosu, nie prognoza pogody.',
+  },
+  {
     id: 'atom-bohr', domainId: 'atom', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('atomicNumber', 'Liczba atomowa Z', '', 1, 118, 1), number('principalN', 'Główna liczba kwantowa n', '', 1, 10, 1)],
     route: { kind: 'lab', labId: 'atom' }, knowledgeSources: ['atom.md', 'quantum.md'],

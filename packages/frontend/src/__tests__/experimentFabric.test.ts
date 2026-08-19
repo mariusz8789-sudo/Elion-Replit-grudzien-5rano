@@ -263,6 +263,21 @@ describe('Genesis Experiment Fabric', () => {
     expect(majoranaDevice.result.outputs).toEqual({});
   });
 
+  it('runs the existing Lorenz attractor through Fabric without claiming a weather forecast', () => {
+    const run = runExperiment(parseScienceChatMessage('Uruchom atraktor Lorenza: rho=28, horyzont=2, drugi start.'));
+    const repeated = runExperiment(parseScienceChatMessage('Uruchom atraktor Lorenza: rho=28, horyzont=2, drugi start.'));
+
+    expect(run.request.modelId).toBe('universe-lorenz-attractor');
+    expect(run.request.parameters).toEqual({ rho: 28, horizonTime: 2, divergence: true });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'lorenz' });
+    expect(Number(run.result.outputs.chaosThreshold)).toBeGreaterThan(24);
+    expect(Number(run.result.outputs.finalSeparation)).toBeGreaterThan(0);
+    expect(run.result.validity).toContain('nie zawiera danych meteorologicznych');
+    expect(run.result.warnings[0]).toContain('nie jest prognozą pogody');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+  });
+
   it('runs the fixed Hubble-tension comparison through Fabric without claiming a cosmological prediction', () => {
     const run = runExperiment(parseScienceChatMessage('Porównaj napięcie Hubble’a: dodatkowa systematyka=1.5, bez TRGB.'));
     const repeated = runExperiment(parseScienceChatMessage('Porównaj napięcie Hubble’a: dodatkowa systematyka=1.5, bez TRGB.'));

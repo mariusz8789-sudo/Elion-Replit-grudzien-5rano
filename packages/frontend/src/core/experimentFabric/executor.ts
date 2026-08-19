@@ -3,6 +3,7 @@ import { buildPumpPipeModel } from '../engineeringGraph/pumpPipe';
 import { solveKitaevBulk } from '../compute/kitaevBulk';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
+import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
@@ -208,6 +209,33 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
           showTrgb ? 'TRGB jest widocznym trzecim punktem referencyjnym, nie rozstrzygnięciem sporu.' : 'TRGB jest świadomie ukryte w tej projekcji.',
         ],
         visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'universe-lorenz-attractor': {
+      const rho = numberParam(params, 'rho', 28);
+      const horizonTime = numberParam(params, 'horizonTime', 10);
+      const divergence = params.divergence === true;
+      const solved = runLorenzScenario({ rho, horizonTime, divergence });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano deterministyczną integrację atraktora Lorenza: ρ=${rho}, t=${horizonTime}.`,
+        outputs: {
+          rho: solved.rho,
+          horizonTime: solved.horizonTime,
+          chaosThreshold: solved.chaosThreshold,
+          finalX: solved.finalX,
+          finalY: solved.finalY,
+          finalZ: solved.finalZ,
+          ...(solved.finalSeparation === undefined ? {} : { finalSeparation: solved.finalSeparation }),
+        },
+        units: { rho: '', horizonTime: 'jedn. czasu Lorenza', chaosThreshold: '', finalX: '', finalY: '', finalZ: '', finalSeparation: '' },
+        warnings: ['Model Lorenza opisuje uproszczoną konwekcję. Czułość na warunki początkowe ogranicza predykcję; wynik nie jest prognozą pogody.'],
+        validity: 'Klasyczny, trójwymiarowy model Lorenza z σ=10 i β=8/3, integrowany RK4; nie zawiera danych meteorologicznych, wymuszeń ani kalibracji klimatycznej.',
+        assumptions: [
+          'dx/dt=σ(y−x), dy/dt=x(ρ−z)−y, dz/dt=xy−βz.',
+          divergence ? 'Drugi start różni się wyłącznie przesunięciem x o 10⁻⁴.' : 'Nie uruchomiono drugiego startu do pomiaru rozjazdu.',
+        ],
+        visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
       };
     }
     case 'atom-bohr': {

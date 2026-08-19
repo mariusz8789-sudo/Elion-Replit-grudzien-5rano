@@ -51,6 +51,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const pendulumHorizonSeconds = integrationHorizon;
   const extraSystematic = firstNumber(normalized, /\b(?:dodatkowa systematyka|systematyka|extra systematic)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const hideTrgb = /(?:ukryj trgb|bez trgb|nie pokazuj trgb)/.test(normalized);
+  const lorenzRho = firstNumber(normalized, /\b(?:ρ|rho|liczba rayleigha)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const threeBodyPreset = /(?:pitagorejsk[a-ząćęłńóśźż]*|burrau)/.test(normalized)
     ? 'pythagorean'
     : /(?:ósemk[a-ząćęłńóśźż]*|osemk[a-ząćęłńóśźż]*|figure[- ]?eight)/.test(normalized)
@@ -81,6 +82,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (pendulumHorizonSeconds !== undefined) params.horizonSeconds = pendulumHorizonSeconds;
   if (extraSystematic !== undefined) params.extraSystematic = extraSystematic;
   if (hideTrgb) params.showTrgb = false;
+  if (lorenzRho !== undefined) params.rho = lorenzRho;
   if (threeBodyPreset !== undefined) params.preset = threeBodyPreset;
   if (threeBodyDivergence) params.divergence = true;
 
@@ -91,6 +93,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
 
   if (/(?:powódź|powodz|pożar|pozar|trzęsienie|trzesienie|blackout|kaskad[a-ząćęłńóśźż]*|ewakuacj[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('hazard-cascade', undefined, 'world-3d', []);
+  }
+  if (/(?:atraktor lorenz[a-ząćęłńóśźż]*|atraktor lorenza|równani[a-ząćęłńóśźż]* lorenz[a-ząćęłńóśźż]*|rownani[a-ząćęłńóśźż]* lorenz[a-ząćęłńóśźż]*|lorenz\s+attractor)/.test(normalized)) {
+    return request('classical-mechanics', 'universe-lorenz-attractor', 'scene-3d', ['rho', 'horizonTime', 'divergence']);
   }
   if (/(?:napięcie hubble[a-ząćęłńóśźż]*|napiecie hubble[a-ząćęłńóśźż]*|hubble tension|\bh[₀0]\b)/.test(normalized)) {
     return request('universe', 'universe-hubble-tension', 'graph', ['extraSystematic', 'showTrgb']);

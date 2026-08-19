@@ -13,6 +13,7 @@ import { runMinkowskiScenario } from '../../labs/experiments/spacetime-minkowski
 import { runLightSpeedScenario } from '../../labs/experiments/spacetime-cslider';
 import { runProteinFoldingScenario } from '../../labs/experiments/biology-proteinfolding';
 import { runChirpInspiralScenario } from '../../labs/experiments/einstein-chirp';
+import { runTesseractProjectionScenario } from '../../labs/experiments/multiverse-tesseract';
 import { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
 import { runKerrScenario } from '../../labs/experiments/einstein-kerr3d';
 import { runQuantumTeleportScenario } from '../../labs/experiments/quantum-teleport';
@@ -614,6 +615,32 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         validity: 'Istniejący model HP (Hydrophobic–Polar) na siatce 2D, uruchomiony seedowanym Metropolisem. Opisuje wyłącznie kontakty hydrofobowe H–H poza szkieletem; nie jest predykcją struktury, funkcji ani dynamiki prawdziwego białka.',
         assumptions: ['Sekwencja jest jednym z czterech lokalnych presetów H/P.', 'Seed ujawnia trajektorię Monte Carlo; nie ma danych eksperymentalnych, geometrii 3D ani pełnej energii molekularnej.'],
         visualization: ['numeric', 'canvas-2d'], route: model.route,
+      };
+    }
+    case 'math-tesseract-4d': {
+      const solved = runTesseractProjectionScenario({
+        angleXWDeg: numberParam(params, 'angleXWDeg', 0),
+        angleYZDeg: numberParam(params, 'angleYZDeg', 0),
+        doubleRotation: params.doubleRotation === true,
+      });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Obliczono dokładną rotację tesseraktu 4D w XW${solved.doubleRotation ? ' i YZ' : ''} oraz projekcję 4D→3D dla ${solved.vertexCount} wierzchołków.`,
+        outputs: {
+          angleXWDeg: solved.angleXWDeg,
+          angleYZDeg: solved.angleYZDeg,
+          doubleRotation: solved.doubleRotation,
+          viewerDistance: solved.viewerDistance,
+          vertexCount: solved.vertexCount,
+          edgeCount: solved.edgeCount,
+          maxProjectedRadius: solved.maxProjectedRadius,
+          projectedVerticesJson: JSON.stringify(solved.projectedVertices),
+        },
+        units: { angleXWDeg: '°', angleYZDeg: '°', doubleRotation: '', viewerDistance: 'jednostki projekcji', vertexCount: 'wierzchołki', edgeCount: 'krawędzie', maxProjectedRadius: 'jednostki projekcji', projectedVerticesJson: 'JSON [x,y,z][]' },
+        warnings: ['To dokładna geometria i projekcja, lecz nie model fizycznych dodatkowych wymiarów, teoria strun ani hipoteza multiwersum.'],
+        validity: 'Dokładna algebra liniowa obrotu w 4D oraz perspektywicznej projekcji 4D→3D dla ustalonego tesseraktu. Wynik nie opisuje obiektu fizycznego ani danych obserwacyjnych.',
+        assumptions: ['Tesserakt ma ustalone 16 wierzchołków i 32 krawędzie.', 'Odległość obserwatora projekcji wynosi 3; nie jest to pomiar ani parametr kosmologiczny.'],
+        visualization: ['numeric', 'scene-3d'], route: model.route,
       };
     }
     case 'biology-logistic': {

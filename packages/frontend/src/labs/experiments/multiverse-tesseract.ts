@@ -16,6 +16,44 @@ import { TESSERACT_VERTICES, TESSERACT_EDGES, rotate4D, project4Dto3D, type Vec4
 
 const VIEWER_DISTANCE = 3;
 
+export type TesseractProjectionScenarioInput = {
+  angleXWDeg?: number;
+  angleYZDeg?: number;
+  doubleRotation?: boolean;
+};
+
+/**
+ * Współdzielony runner Fabric dla dokładnej geometrii tesseraktu. Korzysta
+ * wyłącznie z istniejących rotate4D() oraz project4Dto3D(); renderer nie
+ * staje się źródłem współrzędnych ani nie wnosi fizycznej interpretacji 4D.
+ */
+export function runTesseractProjectionScenario({
+  angleXWDeg = 0,
+  angleYZDeg = 0,
+  doubleRotation = false,
+}: TesseractProjectionScenarioInput = {}) {
+  if (!Number.isFinite(angleXWDeg) || angleXWDeg < -360 || angleXWDeg > 360) throw new Error('angleXWDeg must be within [-360, 360].');
+  if (!Number.isFinite(angleYZDeg) || angleYZDeg < -360 || angleYZDeg > 360) throw new Error('angleYZDeg must be within [-360, 360].');
+  const angleXWRad = (angleXWDeg * Math.PI) / 180;
+  const angleYZRad = (angleYZDeg * Math.PI) / 180;
+  const projectedVertices = TESSERACT_VERTICES.map((vertex) => {
+    let rotated: Vec4 = rotate4D(vertex, 'xw', angleXWRad);
+    if (doubleRotation) rotated = rotate4D(rotated, 'yz', angleYZRad);
+    return project4Dto3D(rotated, VIEWER_DISTANCE);
+  });
+  const maxProjectedRadius = Math.max(...projectedVertices.map(([x, y, z]) => Math.hypot(x, y, z)));
+  return {
+    angleXWDeg,
+    angleYZDeg,
+    doubleRotation,
+    viewerDistance: VIEWER_DISTANCE,
+    vertexCount: TESSERACT_VERTICES.length,
+    edgeCount: TESSERACT_EDGES.length,
+    maxProjectedRadius,
+    projectedVertices,
+  } as const;
+}
+
 class TesseractSim implements Sim3D {
   private angleXW = 0;
   private angleYZ = 0;

@@ -297,6 +297,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf rozkładu normalnego.',
   },
   {
+    id: 'math-tesseract-4d', domainId: 'mathematics', modelVersion: '1.0.0', engine: 'genesis-tesseract-linear-algebra@1.0.0',
+    parameters: [number('angleXWDeg', 'Kąt rotacji XW', '°', -360, 360, 0), number('angleYZDeg', 'Kąt rotacji YZ', '°', -360, 360, 0), boolean('doubleRotation', 'Podwójna rotacja XW + YZ', false)],
+    route: { kind: 'lab', labId: 'multiverse', experimentId: 'tesseract' }, knowledgeSources: ['mathematics.md', 'multiverse.md'],
+    rationale: 'Istniejąca dokładna algebra liniowa: obrót tesseraktu 4D w płaszczyznach XW/YZ i perspektywiczna projekcja 4D→3D. Nie jest modelem fizycznych dodatkowych wymiarów ani teorią multiwersum.',
+  },
+  {
     id: 'biology-logistic', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('growthRate', 'Tempo wzrostu r', '1/czas', 0, 5, 0.5), number('carryingCapacity', 'Pojemność K', 'osobn.', 1, 1e9, 1000), number('initialPopulation', 'Populacja początkowa N₀', 'osobn.', 1, 1e9, 10), number('timeElapsed', 'Czas t', 'czas', 0, 1000, 10)],
     route: { kind: 'lab', labId: 'biology' }, knowledgeSources: ['biology.md', 'mathematics.md'],

@@ -940,6 +940,26 @@ describe('Genesis Experiment Fabric', () => {
     expect(rejected.result.summary).toContain('v≥c');
   });
 
+  it('routes exact tesseract geometry without claiming physical extra dimensions', () => {
+    const command = 'Obróć tesserakt: XW=45, YZ=30, podwójna rotacja.';
+    const request = parseScienceChatMessage(command);
+    const run = runExperiment(request);
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const mathematics = getKnowledgeDomain('mathematics');
+
+    expect(request.modelId).toBe('math-tesseract-4d');
+    expect(request.parameters).toEqual({ angleXWDeg: 45, angleYZDeg: 30, doubleRotation: true });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.outputs.vertexCount).toBe(16);
+    expect(run.result.outputs.edgeCount).toBe(32);
+    expect(JSON.parse(String(run.result.outputs.projectedVerticesJson))).toHaveLength(16);
+    expect(run.result.validity).toContain('nie opisuje obiektu fizycznego');
+    expect(run.provenance.resultOrigin).toBe('real-engine');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(mathematics?.realModels).toContain('math-tesseract-4d');
+    expect(mathematics?.assumptions.join(' ')).toContain('nie stanowi twierdzenia');
+  });
+
   it('routes the bounded seeded HP folding model through Fabric without claiming a real protein structure', () => {
     const command = 'Uruchom model HP fałdowania białka: temperatura=0.5, kroki MC=20000, seed=99.';
     const request = parseScienceChatMessage(command);

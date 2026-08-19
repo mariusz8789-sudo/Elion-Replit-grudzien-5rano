@@ -138,11 +138,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'mathematics', title: 'Matematyka i modele numeryczne', sourceFile: 'mathematics.md', scale: 'meta',
-    capability: 'REAL_ENGINE', realModels: ['math-gaussian'],
-    concepts: ['algebra', 'rachunek', 'ODE', 'RK4', 'bezpieczny parser'], parameters: ['mean', 'sigma', 'xValue'], units: [],
-    assumptions: ['Parser wyrażeń jest sandboxem danych, nie wykonuje kodu użytkownika.'],
-    possibleExperiments: ['oblicz rozkład normalny'], requiredSolver: 'math-gaussian / safe expression parser',
-    visualization: ['numeric', 'graph'], dependencies: [], keywords: ['matematyka', 'gauss', 'normalny', 'równanie', 'ode'],
+    capability: 'REAL_ENGINE', realModels: ['math-gaussian', 'math-tesseract-4d'],
+    concepts: ['algebra', 'rachunek', 'ODE', 'RK4', 'bezpieczny parser', 'rotacja 4D', 'projekcja 4D→3D'], parameters: ['mean', 'sigma', 'xValue', 'angleXWDeg', 'angleYZDeg', 'doubleRotation'], units: ['°'],
+    assumptions: ['Parser wyrażeń jest sandboxem danych, nie wykonuje kodu użytkownika. Tesserakt jest dokładną geometrią w 4D oraz projekcją 4D→3D; nie stanowi twierdzenia o fizycznych dodatkowych wymiarach ani multiwersum.'],
+    possibleExperiments: ['oblicz rozkład normalny', 'obróć i rzutuj tesserakt 4D'], requiredSolver: 'math-gaussian / tesseract linear algebra / safe expression parser',
+    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: [], keywords: ['matematyka', 'gauss', 'normalny', 'równanie', 'ode', 'tesserakt', 'tesseract', '4d', 'projekcja'],
   },
   {
     id: 'multiverse', title: 'Modele alternatywnych wszechświatów', sourceFile: 'multiverse.md', scale: 'cosmic',

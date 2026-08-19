@@ -42,6 +42,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const lightSpeedVelocityMs = firstNumber(normalized, /\b(?:v|prędkość obiektu|predkosc obiektu)\s*[=:]?\s*(\d+(?:[.,]\d+)?)\s*(?:m\s*\/\s*s|mps)\b/);
   const hypotheticalLightSpeedMs = firstNumber(normalized, /\b(?:c|prędkość światła|predkosc swiatla)\s*[=:]?\s*(\d+(?:[.,]\d+)?)\s*(?:m\s*\/\s*s|mps)\b/);
   const lightSpeedDistanceKm = firstNumber(normalized, /\b(?:dystans|odległość|odleglosc)\s*[=:]?\s*(\d+(?:[.,]\d+)?)\s*km\b/);
+  const tesseractAngleXWDeg = firstNumber(normalized, /\b(?:xw|kąt\s*xw|kat\s*xw|angle\s*xw)\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
+  const tesseractAngleYZDeg = firstNumber(normalized, /\b(?:yz|kąt\s*yz|kat\s*yz|angle\s*yz)\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
+  const tesseractDoubleRotation = /(?:podwójn[a-ząćęłńóśźż]*\s+rotac[a-ząćęłńóśźż]*|podwojn[a-ząćęłńóśźż]*\s+rotac[a-ząćęłńóśźż]*|double rotation)/.test(normalized);
   const kerrSpin = firstNumber(normalized, /\b(?:spin|a\s*\/\s*m)\s*[=:]?\s*(0(?:[.,]\d+)?|1(?:[.,]0+)?)/);
   const temperatureK = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*k\b/);
   const isingTemperature = firstNumber(normalized, /\b(?:t|temperatura)\s*[=:]?\s*(\d+(?:[.,]\d+)?)(?!\s*k\b)/);
@@ -96,6 +99,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (lightSpeedVelocityMs !== undefined) params.velocityMs = lightSpeedVelocityMs;
   if (hypotheticalLightSpeedMs !== undefined) params.lightSpeedMs = hypotheticalLightSpeedMs;
   if (lightSpeedDistanceKm !== undefined) params.distanceKm = lightSpeedDistanceKm;
+  if (tesseractAngleXWDeg !== undefined) params.angleXWDeg = tesseractAngleXWDeg;
+  if (tesseractAngleYZDeg !== undefined) params.angleYZDeg = tesseractAngleYZDeg;
+  if (tesseractDoubleRotation) params.doubleRotation = true;
   if (kerrSpin !== undefined) params.spin = kerrSpin;
   if (temperatureK !== undefined) params.temperatureK = temperatureK;
   if (isingTemperature !== undefined) params.temperature = isingTemperature;
@@ -238,6 +244,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/\b(foton|energia fotonu|promieniowanie)\b/.test(normalized) && !/\bfala elektromagnetyczna\b/.test(normalized)) {
     return request('electrodynamics', 'photon-energy', 'graph', ['wavelengthNm']);
   }
+  if (/\b(tesserakt|tesseract|hipersześcian|hiperszescian|hiper[- ]?sześcian|hiper[- ]?szescian)\b/.test(normalized)) return request('mathematics', 'math-tesseract-4d', 'scene-3d', ['angleXWDeg', 'angleYZDeg', 'doubleRotation']);
   if (/\b(rozkład normalny|rozklad normalny|gauss|z-score|z score)\b/.test(normalized)) {
     return request('mathematics', 'math-gaussian', 'graph', ['mean', 'sigma', 'xValue']);
   }

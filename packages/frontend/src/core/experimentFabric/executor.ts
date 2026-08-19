@@ -21,6 +21,7 @@ import { buildRelativisticEnergyGraph } from '../modelGraph/relativisticEnergyGr
 import { buildSpecialRelativityGraph } from '../modelGraph/specialRelativityGraph';
 import { buildPhotonGraph } from '../modelGraph/photonGraph';
 import { chirpMassSolar, iscoFrequency, kardashevPower, schwarzschildRadius } from '../physics';
+import { runIsingMetropolisScenario } from '../isingModel';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS } from '../simulation/epidemicCity';
 import { createExperimentProvenance, statusForCapability } from './provenance';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
@@ -403,6 +404,33 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący model energii relatywistycznej cząstki.',
         outputs: details.outputs, units: details.units, warnings: [], validity: 'Cząstka swobodna w próżni; β < 1.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'chemistry-ising': {
+      const temperature = numberParam(params, 'temperature', 2);
+      const seed = numberParam(params, 'seed', 20_260_819);
+      const solved = runIsingMetropolisScenario({ temperature, seed });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano ${solved.sweeps} sweepów Metropolisa 2D Isinga dla T=${solved.temperature.toFixed(3)}; |M|=${solved.magnetization.toFixed(3)} wobec dokładnej referencji ${solved.exactMagnetization.toFixed(3)}.`,
+        outputs: {
+          temperature: solved.temperature,
+          seed: solved.seed,
+          latticeSize: solved.latticeSize,
+          sweeps: solved.sweeps,
+          magnetization: solved.magnetization,
+          energyPerSite: solved.energyPerSite,
+          exactMagnetization: solved.exactMagnetization,
+          magnetizationDelta: solved.magnetizationDelta,
+        },
+        units: { temperature: 'J/k_B', seed: '', latticeSize: 'spiny / bok', sweeps: 'sweeps', magnetization: '', energyPerSite: 'J/spin', exactMagnetization: '', magnetizationDelta: '' },
+        warnings: ['Pojedynczy seed i skończone 100 sweepów nie są oszacowaniem niepewności ani dowodem termalizacji; blisko T_c występuje realne critical slowing down.'],
+        validity: '2D Ising J=1, bez pola zewnętrznego, z najbliższymi sąsiadami i periodycznymi brzegami. Dokładna magnetyzacja Onsagera/Yanga dotyczy granicy termodynamicznej; run Monte Carlo działa na siatce 42×42.',
+        assumptions: [
+          'Stan początkowy przybliża nieskorelowaną siatkę T=∞ i jest generowany z zapisanego seeda.',
+          '100 sweepów po 42² próby Metropolisa używa tego samego kroku co istniejący model Canvas.',
+        ],
+        visualization: ['numeric', 'graph', 'canvas-2d'], route: model.route,
       };
     }
     case 'chemistry-arrhenius': {

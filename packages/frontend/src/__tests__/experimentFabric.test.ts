@@ -634,6 +634,29 @@ describe('Genesis Experiment Fabric', () => {
     expect(typeof run.result.outputs[outputKey]).toBe('number');
   });
 
+  it('runs the existing seeded Ising Metropolis model through Fabric without claiming thermodynamic convergence', () => {
+    const command = 'Uruchom model Isinga T=1.8, seed=42.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const rejected = runExperiment(parseScienceChatMessage('Uruchom model Isinga T=6.'));
+    const chemistry = getKnowledgeDomain('chemistry');
+
+    expect(chemistry?.realModels).toContain('chemistry-ising');
+    expect(chemistry?.assumptions.join(' ')).toContain('seedowanego Metropolisa');
+    expect(run.request.modelId).toBe('chemistry-ising');
+    expect(run.request.parameters).toEqual({ seed: 42, temperature: 1.8 });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'chemistry', experimentId: 'ising' });
+    expect(run.result.outputs.seed).toBe(42);
+    expect(run.result.outputs.latticeSize).toBe(42);
+    expect(Number(run.result.outputs.exactMagnetization)).toBeGreaterThan(0);
+    expect(run.result.validity).toContain('granicy termodynamicznej');
+    expect(run.result.warnings[0]).toContain('nie są oszacowaniem niepewności');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(rejected.result.status).toBe('rejected');
+    expect(rejected.result.summary).toContain('poza zakresem 0.5–5');
+  });
+
   it('runs one deterministic EpidemicCitySimulation and exposes only real event summaries', () => {
     const request = parseScienceChatMessage('Zasymuluj epidemię z R0=8 przez 90 dni seed=20260817.');
     const a = runExperiment(request);

@@ -7,6 +7,7 @@ import {
   isingMetropolisStep,
   isingNeighborSum,
   isingRandomLattice,
+  runIsingMetropolisScenario,
 } from '../core/isingModel';
 
 /** Generator liniowy kongruentny — deterministyczny, powtarzalny RNG dla testów statystycznych. */
@@ -101,6 +102,28 @@ describe('isingMetropolisStep — symulacja Monte Carlo (RNG z ziarnem, powtarza
     expect(mBelow).toBeGreaterThan(mAbove);
     expect(mBelow).toBeGreaterThan(0.5);
     expect(mAbove).toBeLessThan(0.3);
+  });
+});
+
+describe('runIsingMetropolisScenario', () => {
+  it('jest odtwarzalny dla jawnego seeda i wykonuje istniejące kroki Metropolisa', () => {
+    const scenario = { temperature: 1.8, latticeSize: 20, sweeps: 80, seed: 42 };
+    const first = runIsingMetropolisScenario(scenario);
+    const repeated = runIsingMetropolisScenario(scenario);
+
+    expect(repeated).toEqual(first);
+    expect(first.magnetization).toBeGreaterThanOrEqual(0);
+    expect(first.magnetization).toBeLessThanOrEqual(1);
+    expect(first.energyPerSite).toBeGreaterThanOrEqual(-2);
+    expect(first.energyPerSite).toBeLessThanOrEqual(2);
+    expect(first.exactMagnetization).toBeGreaterThan(0);
+  });
+
+  it('odrzuca parametry poza jawną domeną UI i runnera', () => {
+    expect(() => runIsingMetropolisScenario({ temperature: 0.4 })).toThrow('temperature');
+    expect(() => runIsingMetropolisScenario({ latticeSize: 3 })).toThrow('latticeSize');
+    expect(() => runIsingMetropolisScenario({ sweeps: 0 })).toThrow('sweeps');
+    expect(() => runIsingMetropolisScenario({ seed: -1 })).toThrow('seed');
   });
 });
 

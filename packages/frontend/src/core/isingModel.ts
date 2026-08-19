@@ -85,3 +85,71 @@ export function isingRandomLattice(n: number, rnd: () => number = Math.random): 
   for (let k = 0; k < lattice.length; k++) lattice[k] = rnd() < 0.5 ? 1 : -1;
   return lattice;
 }
+
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let value = Math.imul(state ^ (state >>> 15), 1 | state);
+    value ^= value + Math.imul(value ^ (value >>> 7), 61 | value);
+    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
+  };
+}
+
+export interface IsingMetropolisScenarioResult {
+  temperature: number;
+  latticeSize: number;
+  sweeps: number;
+  seed: number;
+  magnetization: number;
+  energyPerSite: number;
+  exactMagnetization: number;
+  magnetizationDelta: number;
+}
+
+/**
+ * Odtwarzalny run tego samego 2D Isinga J=1 i Metropolisa co Canvas.
+ * Służy do Evidence/Experiment Fabric, więc seed i horyzont są jawne;
+ * nie zastępuje długiego uśredniania termodynamicznego ani analizy błędów.
+ */
+export function runIsingMetropolisScenario({
+  temperature = 2,
+  latticeSize = 42,
+  sweeps = 100,
+  seed = 20_260_819,
+}: {
+  temperature?: number;
+  latticeSize?: number;
+  sweeps?: number;
+  seed?: number;
+} = {}): IsingMetropolisScenarioResult {
+  if (!Number.isFinite(temperature) || temperature < 0.5 || temperature > 5) {
+    throw new Error('temperature musi być skończoną liczbą z zakresu 0.5–5.');
+  }
+  if (!Number.isInteger(latticeSize) || latticeSize < 4 || latticeSize > 128) {
+    throw new Error('latticeSize musi być liczbą całkowitą z zakresu 4–128.');
+  }
+  if (!Number.isInteger(sweeps) || sweeps < 1 || sweeps > 2_000) {
+    throw new Error('sweeps musi być liczbą całkowitą z zakresu 1–2000.');
+  }
+  if (!Number.isInteger(seed) || seed < 0 || seed > 0xffff_ffff) {
+    throw new Error('seed musi być 32-bitową nieujemną liczbą całkowitą.');
+  }
+  const random = mulberry32(seed);
+  const lattice = isingRandomLattice(latticeSize, random);
+  for (let step = 0; step < sweeps * latticeSize * latticeSize; step++) {
+    isingMetropolisStep(lattice, latticeSize, temperature, random);
+  }
+  const magnetization = isingMagnetization(lattice);
+  const exactMagnetization = isingExactMagnetization(temperature);
+  return {
+    temperature,
+    latticeSize,
+    sweeps,
+    seed,
+    magnetization,
+    energyPerSite: isingEnergyPerSite(lattice, latticeSize),
+    exactMagnetization,
+    magnetizationDelta: Math.abs(magnetization - exactMagnetization),
+  };
+}

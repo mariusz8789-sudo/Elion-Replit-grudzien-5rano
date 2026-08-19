@@ -37,6 +37,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const principalN = firstNumber(normalized, /\bn\s*[=:]\s*(\d+)/);
   const beta = firstNumber(normalized, /\b(?:β|beta|v\s*\/\s*c)\s*[=:]?\s*(0(?:[.,]\d+)?|1(?:[.,]0+)?)/);
   const temperatureK = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*k\b/);
+  const isingTemperature = firstNumber(normalized, /\b(?:t|temperatura)\s*[=:]?\s*(\d+(?:[.,]\d+)?)(?!\s*k\b)/);
   const activationEnergyKJ = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*kj\s*\/\s*mol\b/);
   const protonNumber = firstNumber(normalized, /\b(?:protony|protonów|protonow|z)\s*[=:]?\s*(\d+)/);
   const neutronNumber = firstNumber(normalized, /\b(?:neutrony|neutronów|neutronow|n)\s*[=:]?\s*(\d+)/);
@@ -77,6 +78,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (principalN !== undefined) params.principalN = principalN;
   if (beta !== undefined) params.velocityFraction = beta;
   if (temperatureK !== undefined) params.temperatureK = temperatureK;
+  if (isingTemperature !== undefined) params.temperature = isingTemperature;
   if (activationEnergyKJ !== undefined) params.activationEnergyKJ = activationEnergyKJ;
   if (protonNumber !== undefined) params.protonNumber = protonNumber;
   if (neutronNumber !== undefined) params.neutronNumber = neutronNumber;
@@ -174,6 +176,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   }
   if (/(?:cząstk[a-ząćęłńóśźż]*|czastk[a-ząćęłńóśźż]*|lepton[a-ząćęłńóśźż]*|kwark[a-ząćęłńóśźż]*|relatywistyczn[a-ząćęłńóśźż]* energi[a-ząćęłńóśźż]*|pęd cząstk[a-ząćęłńóśźż]*|ped czastk[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('particle', 'particle-relativistic-energy', 'scene-3d', ['restMassMeV', 'velocityFraction']);
+  }
+  if (/(?:ising[a-ząćęłńóśźż]*|model izinga|przejści[a-ząćęłńóśźż]* fazow[a-ząćęłńóśźż]* magnetyczn[a-ząćęłńóśźż]*|przejsc[a-ząćęłńóśźż]* fazow[a-ząćęłńóśźż]* magnetyczn[a-ząćęłńóśźż]*)/.test(normalized)) {
+    return request('chemistry', 'chemistry-ising', 'canvas-2d', ['temperature', 'seed']);
   }
   if (/(?:arrhenius[a-ząćęłńóśźż]*|kinetyk[a-ząćęłńóśźż]* reakcj[a-ząćęłńóśźż]*|energi[a-ząćęłńóśźż]* aktywacj[a-ząćęłńóśźż]*|szybkoś[a-ząćęłńóśźż]* reakcj[a-ząćęłńóśźż]*|szybkos[a-ząćęłńóśźż]* reakcj[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('chemistry', 'chemistry-arrhenius', 'graph', ['temperatureK', 'activationEnergyKJ', 'preExponentialLog10']);

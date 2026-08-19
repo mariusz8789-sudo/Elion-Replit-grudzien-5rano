@@ -195,6 +195,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf kinetyki Arrheniusa; trend, nie pełny mechanizm reakcji.',
   },
   {
+    id: 'chemistry-ising', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-ising-metropolis@1.0.0',
+    parameters: [number('temperature', 'Temperatura T', 'J/k_B', 0.5, 5, 2), number('seed', 'Seed Monte Carlo', '', 0, 0xffff_ffff, 20_260_819)],
+    route: { kind: 'lab', labId: 'chemistry', experimentId: 'ising' }, knowledgeSources: ['chemistry.md', 'thermodynamics.md'],
+    rationale: 'Istniejący 2D model Isinga J=1 na siatce kwadratowej z periodycznymi brzegami i krokami Metropolisa; skończona siatka i skończony horyzont Monte Carlo nie zastępują termodynamicznego limitu.',
+  },
+  {
     id: 'chem-molecular-weight', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-cheminformatics@1.0.0',
     parameters: [text('formula', 'Wzór sumaryczny', 'H2O')],
     route: { kind: 'lab', labId: 'chemistry' }, knowledgeSources: ['chemistry.md'],

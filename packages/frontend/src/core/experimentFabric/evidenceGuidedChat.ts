@@ -1,4 +1,5 @@
 import { canonicalJson, fnv1a } from '../events/hash';
+import { quantumEvidenceCardsForKnowledge, type QuantumEvidenceCard } from '../knowledge/quantumEvidenceCard';
 import { runExperiment } from './executor';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
 import type { ExperimentPlan, ExperimentRun, StructuredExperimentRequest } from './types';
@@ -22,6 +23,7 @@ export interface EvidenceGuidedModelDisclosure {
   requiredSolver: string;
   limitations: readonly string[];
   knowledgeSources: readonly string[];
+  quantumEvidenceCards: readonly QuantumEvidenceCard[];
 }
 
 /**
@@ -114,6 +116,7 @@ export function planEvidenceGuidedExperiment(request: StructuredExperimentReques
     requiredSolver: intent.requiredSolver,
     limitations: limitationsFor(plan),
     knowledgeSources: intent.knowledgeSources,
+    quantumEvidenceCards: quantumEvidenceCardsForKnowledge(intent.supplementalKnowledgeIds),
   };
   return {
     contractVersion: EVIDENCE_GUIDED_CHAT_VERSION,

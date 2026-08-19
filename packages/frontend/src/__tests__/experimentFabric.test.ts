@@ -18,6 +18,7 @@ import {
   serializeCounterfactualComparison,
   planEvidenceGuidedExperiment,
   confirmEvidenceGuidedExperiment,
+  createMajorana1QuantumEvidenceCard,
   createScenarioCapsule,
   replayScenarioCapsule,
   serializeScenarioCapsule,
@@ -207,6 +208,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.status).toBe('ENGINE_NOT_AVAILABLE');
     expect(reviewed.disclosure.resultWillComeFromRealRun).toBe(false);
     expect(reviewed.disclosure.requiredSolver).toBeTruthy();
+    expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
+  });
+
+  it('discloses Majorana evidence as measurement, claim under review and fiction without fabricating a solver', () => {
+    const card = createMajorana1QuantumEvidenceCard();
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Wyjaśnij Majorana 1 i topologiczny kubit.'));
+    const entries = reviewed.disclosure.quantumEvidenceCards[0]?.entries;
+
+    expect(card?.entries.map((entry) => entry.status)).toEqual([
+      'PEER_REVIEWED_MEASUREMENT', 'CLAIM_UNDER_REVIEW', 'FICTIONAL_REFERENCE',
+    ]);
+    expect(entries?.map((entry) => entry.knowledgeId)).toEqual(card?.entries.map((entry) => entry.knowledgeId));
+    expect(entries?.find((entry) => entry.status === 'PEER_REVIEWED_MEASUREMENT')?.epistemicStatus).toBe('FACT');
+    expect(entries?.find((entry) => entry.status === 'CLAIM_UNDER_REVIEW')?.epistemicStatus).toBe('HYPOTHESIS');
+    expect(entries?.find((entry) => entry.status === 'FICTIONAL_REFERENCE')?.epistemicStatus).toBe('FICTIONAL_REFERENCE');
+    expect(entries?.every((entry) => entry.runnableModelIds.length === 0)).toBe(true);
+    expect(reviewed.status).toBe('ENGINE_NOT_AVAILABLE');
     expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
   });
 

@@ -2,8 +2,8 @@ import type { KnowledgeCapability } from './registry';
 
 export const SUPPLEMENTAL_KNOWLEDGE_VERSION = '1.0.0';
 
-export type KnowledgeEpistemicStatus = 'FACT' | 'MODEL' | 'THEORY' | 'HYPOTHESIS' | 'SCENARIO_ASSUMPTION';
-export type KnowledgeSourceKind = 'institutional-reference' | 'historical-reference' | 'user-supplied-video';
+export type KnowledgeEpistemicStatus = 'FACT' | 'MODEL' | 'THEORY' | 'HYPOTHESIS' | 'SCENARIO_ASSUMPTION' | 'FICTIONAL_REFERENCE';
+export type KnowledgeSourceKind = 'institutional-reference' | 'historical-reference' | 'peer-reviewed-publication' | 'user-supplied-video' | 'fictional-reference';
 
 export interface SupplementalKnowledgeRecord {
   id: string;
@@ -80,6 +80,30 @@ const RECORDS: readonly SupplementalKnowledgeRecord[] = [
     capability: 'ENGINE_NOT_AVAILABLE', realModelIds: [], requiredSolver: 'jawnie zdefiniowany model decyzyjny agenta z testami wrażliwości', scenarioEligible: true,
     limitation: 'Nie istnieje w aktualnym modelu epidemii i nie może mutować World State bez jawnego modelu, parametrów, kontroli oraz walidacji.',
     keywords: ['termostat', 'agent', 'przekonanie', 'scenariusz zachowania'],
+  },
+  {
+    id: 'majorana-1-parity-measurement', title: 'Majorana 1 — recenzowany pomiar parzystości w InAs–Al', domainId: 'quantum',
+    epistemicStatus: 'FACT', statement: 'Publikacja Nature opisuje pojedynczy interferometryczny pomiar parzystości w hybrydowych urządzeniach InAs–Al oraz jawnie zaznacza, że sam pomiar nie odróżnia jednoznacznie topologicznych modów Majorany od dostrojonych stanów Andreeva w fazie trywialnej.',
+    source: { kind: 'peer-reviewed-publication', title: 'Nature — Interferometric single-shot parity measurement in InAs–Al hybrid devices (2025)', url: 'https://www.nature.com/articles/s41586-024-08445-2', retrievedAt: '2026-08-19' },
+    capability: 'KNOWLEDGE_ONLY', realModelIds: [], requiredSolver: 'zwalidowany model urządzenia InAs–Al z parametrami materiałowymi i eksperymentalnymi', scenarioEligible: false,
+    limitation: 'Jest to fakt o zakresie opublikowanego pomiaru, nie dowód, że Genesis posiada dane urządzenia, symuluje Majorana 1 ani rozstrzyga obecność topologicznych modów Majorany.',
+    keywords: ['majorana', 'majorana 1', 'pomiar parzystości', 'inAs', 'aluminium', 'in as al', 'topoconductor'],
+  },
+  {
+    id: 'majorana-1-topological-qubit-claim', title: 'Majorana 1 — claim topologicznego kubitu pod dalszą weryfikacją', domainId: 'quantum',
+    epistemicStatus: 'HYPOTHESIS', statement: 'Microsoft przedstawia Majorana 1 jako architekturę topologicznych kubitów, lecz niezależne omówienia APS wskazują, że pełny claim topologicznego kubitu pozostawał przedmiotem naukowej dyskusji i wymaga dalszych, rozstrzygających dowodów.',
+    source: { kind: 'institutional-reference', title: 'Microsoft — Majorana 1 (2025), skonfrontowane z omówieniami APS Physics', url: 'https://news.microsoft.com/source/features/innovation/microsofts-majorana-1-chip-carves-new-path-for-quantum-computing/', retrievedAt: '2026-08-19' },
+    capability: 'ENGINE_NOT_AVAILABLE', realModelIds: [], requiredSolver: 'zwalidowany solver topologicznego układu skondensowanej materii oraz niezależnie zweryfikowane dane eksperymentalne', scenarioEligible: false,
+    limitation: 'Nie wolno przedstawiać claimu jako rozstrzygniętego faktu, jako wyniku aktualnych modeli quantum-bloch/chsh-correlation ani jako dowodu dostępności quantum solvera w Genesis.',
+    keywords: ['majorana', 'majorana 1', 'topologiczny kubit', 'topological qubit', 'topologiczny stan', 'topological state'],
+  },
+  {
+    id: 'majorana-film-time-travel-reference', title: 'Reel Majorana 1 — fikcyjna referencja podróży w czasie', domainId: 'quantum',
+    epistemicStatus: 'FICTIONAL_REFERENCE', statement: 'Materiał używa fragmentu Avengers: Endgame jako narracyjnej analogii podróży w czasie; nie jest to fakt fizyczny, dane eksperymentalne ani model naukowy.',
+    source: { kind: 'fictional-reference', title: 'Facebook Reel użytkownika — odwołanie do Avengers: Endgame (2019)', url: 'https://www.facebook.com/reel/2139439816988286', retrievedAt: '2026-08-19' },
+    capability: 'KNOWLEDGE_ONLY', realModelIds: [], requiredSolver: 'Brak — referencja fikcyjna nie jest wejściem do eksperymentu', scenarioEligible: false,
+    limitation: 'Może inspirować warstwę narracyjną lub estetyczną, ale nie może zasilać parametrów, obserwowalnych, Evidence Pack, provenance eksperymentu ani claimu naukowego.',
+    keywords: ['avengers', 'endgame', 'podróż w czasie', 'podroz w czasie', 'film majorana'],
   },
 ] as const;
 

@@ -298,6 +298,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(atom?.realModels).toContain('atom-hydrogen-orbital');
   });
 
+  it('runs bounded Minkowski 1+1D through Fabric without claiming acceleration or gravity', () => {
+    const command = 'Pokaż diagram Minkowskiego przy beta = 0,5.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const spacetime = getKnowledgeDomain('spacetime-einstein');
+
+    expect(run.request.modelId).toBe('spacetime-minkowski');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'spacetime', experimentId: 'minkowski' });
+    expect(Number(run.result.outputs.gamma)).toBeCloseTo(1 / Math.sqrt(1 - 0.5 ** 2), 12);
+    expect(run.result.outputs.ordering).toBe('b-before-a');
+    expect(Number(run.result.outputs.intervalSquared)).toBeLessThan(0);
+    expect(run.result.validity).toContain('Bez przyspieszenia');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(spacetime?.realModels).toContain('spacetime-minkowski');
+  });
+
   it('runs bounded VSEPR geometry through Fabric without claiming quantum chemistry', () => {
     const command = 'Pokaż geometrię cząsteczki VSEPR.';
     const run = runExperiment(parseScienceChatMessage(command));

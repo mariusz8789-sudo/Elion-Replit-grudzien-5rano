@@ -9,6 +9,7 @@ import { runTitrationScenario } from '../../labs/experiments/chemistry-titration
 import { runVseprScenario } from '../../labs/experiments/chemistry-vsepr';
 import { runPointLensScenario } from '../../labs/experiments/einstein-lensing';
 import { runLightConeScenario } from '../../labs/experiments/spacetime-lightcone-3d';
+import { runMinkowskiScenario } from '../../labs/experiments/spacetime-minkowski';
 import { runHydrogenOrbitalScenario } from '../../labs/experiments/atom-orbital-3d';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
@@ -422,6 +423,19 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         warnings: lambda < 15 ? ['Parametr Jeansa < 15: przybliżenie stabilnej atmosfery nie obowiązuje.'] : [],
         validity: 'Ucieczka termiczna Jeansa; bez efektu cieplarnianego, hydrodynamiki i wiatru gwiazdowego.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'spacetime-minkowski': {
+      const solved = runMinkowskiScenario({ beta: numberParam(params, 'beta', 0) });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Przekształcono dwa ustalone zdarzenia w diagramie Minkowskiego dla β=${solved.beta.toFixed(3)}; kolejność: ${solved.ordering}.`,
+        outputs: solved,
+        units: { beta: 'c', gamma: '', tA: 'ct (unit convention)', tB: 'ct (unit convention)', ordering: '', intervalSquared: 'c²t²−x² (unit convention)' },
+        warnings: ['Wynik dotyczy wyłącznie dwóch ustalonych zdarzeń A/B i konwencji c=1; nie jest obserwacją ani predykcją fizycznego układu.'],
+        validity: 'Dokładna szczególna transformacja Lorentza 1+1D dla β ∈ [−0,9; 0,9]. Bez przyspieszenia, ogólnej OTW, dynamiki ciał i danych obserwacyjnych.',
+        assumptions: ['Zdarzenia A i B są ustalone i przestrzennopodobnie rozdzielone.', 'Jednostki diagramu są umowne oraz przyjmują c=1.'],
+        visualization: ['numeric', 'canvas-2d'], route: model.route,
       };
     }
     case 'particle-relativistic-energy': {

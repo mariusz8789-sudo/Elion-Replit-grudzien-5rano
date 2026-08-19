@@ -202,12 +202,12 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'spacetime-einstein', title: 'Czasoprzestrzeń i Einstein', sourceFile: 'spacetime-einstein.md', scale: 'cosmic',
-    capability: 'REAL_ENGINE', realModels: ['sr-lorentz', 'spacetime-light-cone', 'einstein-schwarzschild', 'einstein-schwarzschild-geodesic', 'einstein-point-lens', 'einstein-chirp-mass'],
+    capability: 'REAL_ENGINE', realModels: ['sr-lorentz', 'spacetime-light-cone', 'spacetime-minkowski', 'einstein-schwarzschild', 'einstein-schwarzschild-geodesic', 'einstein-point-lens', 'einstein-chirp-mass'],
     concepts: ['SR', 'GR', 'Schwarzschild', 'geodezyjna', 'czarna dziura', 'fale grawitacyjne'],
-    parameters: ['velocityFraction', 'v', 'tripYears', 'massSolar', 'impact', 'beta', 'm1Solar', 'm2Solar'], units: ['s', 'm', 'km', 'M☉', 'Hz'],
-    assumptions: ['Schwarzschild nie uwzględnia spinu/ładunku; geodezyjna jest pojedynczym promieniem w płaszczyźnie równikowej bez Kerra, ray tracingu 3D i fizyki dysku; soczewkowanie jest idealną soczewką punktową bez masy rozciągłej i danych obserwacyjnych; stożek świetlny jest geometrią Minkowskiego z natychmiastowym zawrotem bez profilu przyspieszenia i ogólnej OTW; inspiral jest ograniczony do zakresu przed połączeniem.'],
-    possibleExperiments: ['oblicz stożek świetlny', 'oblicz promień Schwarzschilda', 'zintegruj geodezyjną fotonu Schwarzschilda', 'oblicz soczewkę punktową', 'oblicz dylatację czasu', 'oblicz masę chirp'], requiredSolver: 'sr-lorentz / einstein functions',
-    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['classical-mechanics', 'universe'], keywords: ['czarna dziura', 'schwarzschild', 'czasoprzestrzeń', 'czasoprzestrzen', 'dylatacja', 'einstein', 'grawitacyj'],
+    parameters: ['velocityFraction', 'v', 'tripYears', 'beta', 'massSolar', 'impact', 'm1Solar', 'm2Solar'], units: ['s', 'm', 'km', 'M☉', 'Hz'],
+    assumptions: ['Schwarzschild nie uwzględnia spinu/ładunku; geodezyjna jest pojedynczym promieniem w płaszczyźnie równikowej bez Kerra, ray tracingu 3D i fizyki dysku; soczewkowanie jest idealną soczewką punktową bez masy rozciągłej i danych obserwacyjnych; stożek świetlny jest geometrią Minkowskiego z natychmiastowym zawrotem bez profilu przyspieszenia i ogólnej OTW; diagram Minkowskiego 1+1D transformuje dwa ustalone zdarzenia przestrzennopodobne w konwencji c=1, bez przyspieszenia i grawitacji; inspiral jest ograniczony do zakresu przed połączeniem.'],
+    possibleExperiments: ['oblicz stożek świetlny', 'pokaż diagram Minkowskiego', 'oblicz promień Schwarzschilda', 'zintegruj geodezyjną fotonu Schwarzschilda', 'oblicz soczewkę punktową', 'oblicz dylatację czasu', 'oblicz masę chirp'], requiredSolver: 'sr-lorentz / Minkowski 1+1D / einstein functions',
+    visualization: ['numeric', 'graph', 'canvas-2d', 'scene-3d'], dependencies: ['classical-mechanics', 'universe'], keywords: ['czarna dziura', 'schwarzschild', 'czasoprzestrzeń', 'czasoprzestrzen', 'dylatacja', 'einstein', 'grawitacyj'],
   },
   {
     id: 'thermodynamics', title: 'Termodynamika i fizyka statystyczna', sourceFile: 'thermodynamics.md', scale: 'micro-meso',

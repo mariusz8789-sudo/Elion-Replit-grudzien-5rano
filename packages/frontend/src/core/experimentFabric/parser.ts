@@ -77,7 +77,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (wavelengthNm !== undefined) params.wavelengthNm = wavelengthNm;
   if (atomicNumber !== undefined) params.atomicNumber = atomicNumber;
   if (principalN !== undefined) params.principalN = principalN;
-  if (beta !== undefined) params.velocityFraction = beta;
+  if (beta !== undefined) {
+    params.velocityFraction = beta;
+    params.beta = beta;
+  }
   if (temperatureK !== undefined) params.temperatureK = temperatureK;
   if (isingTemperature !== undefined) params.temperature = isingTemperature;
   if (activationEnergyKJ !== undefined) params.activationEnergyKJ = activationEnergyKJ;
@@ -160,6 +163,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:masa chirp|chirp|isco|fala grawitacyjna|fale grawitacyjne)/.test(normalized)) {
     return request('spacetime-einstein', 'einstein-chirp-mass', 'scene-3d', ['m1Solar', 'm2Solar']);
   }
+  if (/\b(diagram minkowskiego|minkowski|względnoś[a-ząćęłńóśźż]* równoczesnoś[a-ząćęłńóśźż]*|wzglednos[a-ząćęłńóśźż]* rownoczesnos[a-ząćęłńóśźż]*)\b/.test(normalized)) return request('spacetime-einstein', 'spacetime-minkowski', 'canvas-2d', ['beta']);
   if (/\b(stożek świetlny|stożek swietlny|light cone|paradoks bliźni[a-ząćęłńóśźż]*|paradoks blizni[a-ząćęłńóśźż]*)\b/.test(normalized)) return request('spacetime-einstein', 'spacetime-light-cone', 'scene-3d', ['v', 'tripYears']);
   if (/(?:dylatac[a-ząćęłńóśźż]*|lorentz[a-ząćęłńóśźż]*|skróceni[a-ząćęłńóśźż]* długości|skroceni[a-ząćęłńóśźż]* dlugosci|szczególn[a-ząćęłńóśźż]* teori[a-ząćęłńóśźż]* względności|szczegoln[a-ząćęłńóśźż]* teori[a-ząćęłńóśźż]* wzglednosci)/.test(normalized)) {
     return request('spacetime-einstein', 'sr-lorentz', 'graph', ['velocityFraction', 'properTimeSeconds', 'restLengthMeters']);

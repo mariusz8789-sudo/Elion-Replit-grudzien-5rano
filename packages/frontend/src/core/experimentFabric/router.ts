@@ -64,6 +64,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Istniejący stożek Minkowskiego 2+1D oraz dylatacja Lorentza; nie obejmuje przyspieszenia końcowego ani ogólnej OTW.',
   },
   {
+    id: 'spacetime-minkowski', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-minkowski-1plus1@1.0.0',
+    parameters: [number('beta', 'Prędkość obserwatora β', 'c', -0.9, 0.9, 0)],
+    route: { kind: 'lab', labId: 'spacetime', experimentId: 'minkowski' }, knowledgeSources: ['spacetime-einstein.md'],
+    rationale: 'Istniejący diagram 1+1D z dokładną transformacją Lorentza dla dwóch ustalonych zdarzeń przestrzennopodobnych; nie opisuje przyspieszenia, grawitacji ani danych obserwacyjnych.',
+  },
+  {
     id: 'universe-kepler', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('centralMassSolar', 'Masa centralna', 'M☉', 0.01, 1e9, 1), number('orbitalRadiusAu', 'Promień orbity', 'AU', 0.001, 1e5, 1)],
     route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['universe.md', 'classical-mechanics.md'],

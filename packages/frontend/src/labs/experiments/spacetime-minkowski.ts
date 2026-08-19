@@ -8,6 +8,30 @@ import type { ExperimentDef, Sim, SimParams } from '../../core/types';
  * łączy ich żaden sygnał (interwał przestrzennopodobny).
  */
 
+const MINKOWSKI_EVENTS = [
+  { x: -0.55, ct: 0.12, name: 'A', color: '#6ee7a0' },
+  { x: 0.62, ct: 0.2, name: 'B', color: '#f47c7c' },
+] as const;
+
+function minkowskiObservables(beta: number) {
+  const gamma = 1 / Math.sqrt(1 - beta * beta);
+  const tA = gamma * (MINKOWSKI_EVENTS[0].ct - beta * MINKOWSKI_EVENTS[0].x);
+  const tB = gamma * (MINKOWSKI_EVENTS[1].ct - beta * MINKOWSKI_EVENTS[1].x);
+  return {
+    beta,
+    gamma,
+    tA,
+    tB,
+    ordering: Math.abs(tA - tB) < 0.02 ? 'simultaneous' : tA < tB ? 'a-before-b' : 'b-before-a',
+    intervalSquared: (MINKOWSKI_EVENTS[1].ct - MINKOWSKI_EVENTS[0].ct) ** 2 - (MINKOWSKI_EVENTS[1].x - MINKOWSKI_EVENTS[0].x) ** 2,
+  } as const;
+}
+
+export function runMinkowskiScenario({ beta = 0 }: { beta?: number } = {}) {
+  if (!Number.isFinite(beta) || beta < -0.9 || beta > 0.9) throw new Error('beta must be within [-0.9, 0.9].');
+  return minkowskiObservables(beta);
+}
+
 class MinkowskiSim implements Sim {
   private beta = 0;
 
@@ -27,7 +51,7 @@ class MinkowskiSim implements Sim {
     const cy = h * 0.56;
     const S = Math.min(w, h) * 0.36;
     const beta = this.beta;
-    const gamma = 1 / Math.sqrt(1 - beta * beta);
+    const { tA, tB, ordering } = minkowskiObservables(beta);
 
     // stożek świetlny z początku układu
     ctx.fillStyle = 'rgba(240,179,92,0.07)';
@@ -92,11 +116,7 @@ class MinkowskiSim implements Sim {
     }
 
     // dwa zdarzenia rozdzielone przestrzennie (A i B na osi x)
-    const events = [
-      { x: -0.55, ct: 0.12, name: 'A', color: '#6ee7a0' },
-      { x: 0.62, ct: 0.2, name: 'B', color: '#f47c7c' },
-    ];
-    for (const e of events) {
+    for (const e of MINKOWSKI_EVENTS) {
       const px = cx + e.x * S;
       const py = cy - e.ct * S;
       ctx.fillStyle = e.color;
@@ -110,14 +130,12 @@ class MinkowskiSim implements Sim {
       ctx.fillText(e.name, px + 9, py + 4);
     }
     // czasy zdarzeń w układzie ruchomym: ct' = γ(ct − βx)
-    const tA = gamma * (events[0].ct - beta * events[0].x);
-    const tB = gamma * (events[1].ct - beta * events[1].x);
     ctx.fillStyle = 'rgba(230,234,245,0.85)';
     ctx.font = '11px ui-monospace, monospace';
     ctx.fillText(`t'(A) = ${tA.toFixed(2)}   t'(B) = ${tB.toFixed(2)}`, 12, 20);
     ctx.fillStyle = tA > tB ? '#6ee7a0' : tB > tA ? '#f47c7c' : 'rgba(230,234,245,0.85)';
     ctx.fillText(
-      Math.abs(tA - tB) < 0.02 ? 'A i B równoczesne' : tA < tB ? 'najpierw A, potem B' : 'najpierw B, potem A',
+      ordering === 'simultaneous' ? 'A i B równoczesne' : ordering === 'a-before-b' ? 'najpierw A, potem B' : 'najpierw B, potem A',
       12, 37,
     );
   }
@@ -144,10 +162,7 @@ export const spacetimeMinkowski: ExperimentDef = {
   createSim: () => new MinkowskiSim(),
   narrate(p) {
     const beta = Number(p.v);
-    const gamma = 1 / Math.sqrt(1 - beta * beta);
-    // zdarzenia jak w render()
-    const tA = gamma * (0.12 - beta * -0.55);
-    const tB = gamma * (0.2 - beta * 0.62);
+    const { gamma, tA, tB } = minkowskiObservables(beta);
     return [
       {
         title:

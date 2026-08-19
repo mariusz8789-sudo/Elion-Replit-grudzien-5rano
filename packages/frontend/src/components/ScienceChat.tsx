@@ -33,6 +33,9 @@ function formatEvidenceGuidedPlan(reviewed: EvidenceGuidedExperimentPlan): strin
   const engine = disclosure.engine ?? 'brak dostępnego engine';
   const seed = disclosure.seed === undefined ? 'brak jawnego seedu' : `seed=${disclosure.seed}`;
   const limits = disclosure.limitations.map((limit) => `• ${limit}`).join('\n');
+  const quantumEvidence = disclosure.quantumEvidenceCards.flatMap((card) => card.entries).map((entry) =>
+    `• ${entry.status}: ${entry.title}. ${entry.limitation}`,
+  ).join('\n');
   const ready = reviewed.status === 'READY_FOR_CONFIRMATION';
   return [
     `PLAN EKSPERYMENTU — ${ready ? 'oczekuje na potwierdzenie; nic nie zostało jeszcze uruchomione.' : 'nie może zostać uruchomiony.'}`,
@@ -41,6 +44,7 @@ function formatEvidenceGuidedPlan(reviewed: EvidenceGuidedExperimentPlan): strin
     `Parametry: ${params}. Dostępna schema: ${schema}.`,
     `Warunki: ${reviewed.request.operation}, ${seed}. Route: ${disclosure.route?.kind ?? 'none'}.`,
     `Ograniczenia:\n${limits}`,
+    ...(quantumEvidence ? [`Kontekst kwantowy (nie jest wynikiem solvera):\n${quantumEvidence}`] : []),
     ready
       ? 'Wpisz „potwierdź” albo użyj przycisku „Uruchom potwierdzony plan”. Pojedynczy run zachowa provenance; Evidence Pack wymaga osobnego prerejestrowanego protokołu, a A/B drugiego wariantu.'
       : `Nie uruchomiono wyniku. ${reviewed.validationErrors.length > 0 ? `Walidacja: ${reviewed.validationErrors.join(' ')}` : `Wymagany komponent: ${disclosure.requiredSolver}.`}`,

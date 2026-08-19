@@ -295,6 +295,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny, analitycznie minimalizowany bulk model BdG łańcucha Kitaeva; nie jest symulacją nanodrutu, materiału ani urządzenia Majorana 1.',
   },
   {
+    id: 'quantum-teleportation', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-three-qubit-state-vector@1.0.0',
+    parameters: [text('state', 'Stan wejściowy', 'plus')],
+    route: { kind: 'lab', labId: 'quantum', experimentId: 'teleport' }, knowledgeSources: ['quantum.md'],
+    rationale: 'Istniejący pełny wektor stanu trzech kubitów dla protokołu teleportacji; Fabric wylicza wszystkie cztery gałęzie pomiaru deterministycznie, a nie symuluje hardware ani transmisji nadświetlnej.',
+  },
+  {
     id: 'quantum-chsh-correlation', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-singlet-correlation@1.0.0',
     parameters: [number('a', 'Kąt Alicji a', 'deg', 0, 180, 0), number('aP', 'Kąt Alicji a′', 'deg', 0, 180, 90), number('b', 'Kąt Boba b', 'deg', 0, 180, 45), number('bP', 'Kąt Boba b′', 'deg', 0, 180, 135)],
     route: { kind: 'lab', labId: 'quantum', experimentId: 'chsh' }, knowledgeSources: ['quantum.md'],

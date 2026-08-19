@@ -12,6 +12,7 @@ import { runLightConeScenario } from '../../labs/experiments/spacetime-lightcone
 import { runMinkowskiScenario } from '../../labs/experiments/spacetime-minkowski';
 import { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
 import { runKerrScenario } from '../../labs/experiments/einstein-kerr3d';
+import { runQuantumTeleportScenario } from '../../labs/experiments/quantum-teleport';
 import { runHydrogenOrbitalScenario } from '../../labs/experiments/atom-orbital-3d';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
@@ -593,6 +594,20 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         outputs: { powerWatts: kardashevPower(kardashevType) }, units: { powerWatts: 'W' }, warnings: [],
         validity: 'Skala klasyfikacyjna Sagana; ekstrapolacja interpretacyjna, nie prognoza społeczna.',
         assumptions: ['P = 10^(10K+6) W.'], visualization: ['numeric', 'graph', 'narrative'], route: model.route,
+      };
+    }
+    case 'quantum-teleportation': {
+      const state = typeof params.state === 'string' ? params.state : 'plus';
+      const solved = runQuantumTeleportScenario({ state });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Zweryfikowano ${solved.branchCount} gałęzie teleportacji dla ${solved.stateLabel}; minimalna wierność wynosi ${solved.minFidelity.toFixed(12)}.`,
+        outputs: { ...solved, branches: JSON.stringify(solved.branches) },
+        units: { state: '', stateLabel: '', branchCount: '', minFidelity: '', averageFidelity: '', allRecovered: '', branches: 'JSON' },
+        warnings: ['Fabric wylicza wszystkie gałęzie pomiaru deterministycznie; nie reprezentuje pojedynczego losowego wyniku sprzętowego.'],
+        validity: 'Idealny pełny wektor stanu trzech kubitów dla teleportacji Bennett et al. i czterech gałęzi pomiaru. Nie obejmuje szumu, dekoherencji, bramek niedoskonałych, transmisji sieciowej, hardware’u ani teleportacji materii lub informacji nadświetlnej.',
+        assumptions: ['Stan wejściowy jest jednym z sześciu normalizowanych presetów modelu.', 'Dwa bity klasyczne są wymagane do korekty Boba.'],
+        visualization: ['numeric', 'canvas-2d'], route: model.route,
       };
     }
     case 'quantum-chsh-correlation': {

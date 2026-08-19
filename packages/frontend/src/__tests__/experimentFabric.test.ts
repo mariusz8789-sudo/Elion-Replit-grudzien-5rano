@@ -298,6 +298,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(atom?.realModels).toContain('atom-hydrogen-orbital');
   });
 
+  it('runs all bounded quantum-teleportation branches through Fabric without claiming hardware', () => {
+    const command = 'Zweryfikuj teleportację kwantową stan = plusI.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const quantum = getKnowledgeDomain('quantum');
+
+    expect(run.request.modelId).toBe('quantum-teleportation');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'quantum', experimentId: 'teleport' });
+    expect(run.result.outputs).toMatchObject({ state: 'plusI', branchCount: 4, allRecovered: true });
+    expect(Number(run.result.outputs.minFidelity)).toBeCloseTo(1, 12);
+    expect(JSON.parse(String(run.result.outputs.branches))).toHaveLength(4);
+    expect(run.result.validity).toContain('Nie obejmuje szumu');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(quantum?.realModels).toContain('quantum-teleportation');
+  });
+
   it('runs bounded Kerr equatorial observables through Fabric without claiming full ray tracing', () => {
     const command = 'Oblicz Kerr dla spin = 0,7.';
     const run = runExperiment(parseScienceChatMessage(command));

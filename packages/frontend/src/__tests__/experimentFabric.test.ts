@@ -284,6 +284,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
   });
 
+  it('runs analytic CHSH singlet correlation through Fabric without claiming a detector experiment', () => {
+    const command = 'Oblicz korelację CHSH dla nierówności Bella.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const quantum = getKnowledgeDomain('quantum');
+
+    expect(run.request.modelId).toBe('quantum-chsh-correlation');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'quantum', experimentId: 'chsh' });
+    expect(Number(run.result.outputs.absS)).toBeCloseTo(2 * Math.SQRT2, 9);
+    expect(Number(run.result.outputs.tsirelsonBound)).toBeCloseTo(2 * Math.SQRT2, 12);
+    expect(run.result.validity).toContain('brak modelu detektora');
+    expect(run.result.warnings[0]).toContain('nie statystyka wykrytych par');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(quantum?.realModels).toContain('quantum-chsh-correlation');
+  });
+
   it('runs bounded 1D split-step tunneling through Fabric without claiming a general Schrödinger solver', () => {
     const run = runExperiment(parseScienceChatMessage('Zasymuluj tunelowanie kwantowe.'));
     expect(run.request.modelId).toBe('quantum-tunneling-1d');

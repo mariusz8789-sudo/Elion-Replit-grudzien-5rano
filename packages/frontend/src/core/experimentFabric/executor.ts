@@ -3,6 +3,7 @@ import { buildPumpPipeModel } from '../engineeringGraph/pumpPipe';
 import { solveKitaevBulk } from '../compute/kitaevBulk';
 import { runBlochCircuitScenario } from '../../labs/experiments/quantum-bloch';
 import { runTunnelingScenario } from '../../labs/experiments/quantum-tunneling';
+import { runChshCorrelationScenario } from '../../labs/experiments/quantum-chsh';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
@@ -490,6 +491,10 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         validity: 'Skala klasyfikacyjna Sagana; ekstrapolacja interpretacyjna, nie prognoza społeczna.',
         assumptions: ['P = 10^(10K+6) W.'], visualization: ['numeric', 'graph', 'narrative'], route: model.route,
       };
+    }
+    case 'quantum-chsh-correlation': {
+      const solved = runChshCorrelationScenario({ a: numberParam(params, 'a', 0), aP: numberParam(params, 'aP', 90), b: numberParam(params, 'b', 45), bP: numberParam(params, 'bP', 135) });
+      return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Obliczono analitycznie |S|=${solved.absS.toFixed(6)} dla korelacji singletu.`, outputs: solved, units: { a: 'deg', aP: 'deg', b: 'deg', bP: 'deg', eAB: '', eABP: '', eAPB: '', eAPBP: '', s: '', absS: '', tsirelsonBound: '' }, warnings: ['To wynik idealnej korelacji singletu, nie statystyka wykrytych par ani dowód eksperymentalny.'], validity: 'Dokładna korelacja dwukubitowego singletu dla czterech kątów; brak modelu detektora, niesprawności, losowego wyboru ustawień, luk eksperymentalnych i hardware.', assumptions: ['E(a,b)=−cos(a−b).', 'Wartość CHSH nie umożliwia transmisji informacji.'], visualization: ['numeric', 'graph', 'canvas-2d'], route: model.route };
     }
     case 'quantum-tunneling-1d': {
       const solved = runTunnelingScenario({ energy: numberParam(params, 'energy', 0.55), barrier: numberParam(params, 'barrier', 1), width: numberParam(params, 'width', 3) });

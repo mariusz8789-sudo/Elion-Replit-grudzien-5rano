@@ -165,6 +165,22 @@ class ChshSim implements Sim {
   }
 }
 
+export function runChshCorrelationScenario({ a = 0, aP = 90, b = 45, bP = 135 }: { a?: number; aP?: number; b?: number; bP?: number } = {}) {
+  for (const [name, angle] of Object.entries({ a, aP, b, bP })) {
+    if (!Number.isFinite(angle) || angle < 0 || angle > 180) throw new Error(`${name} musi mieścić się w zakresie 0–180°.`);
+  }
+  const ar = a * DEG;
+  const aPr = aP * DEG;
+  const br = b * DEG;
+  const bPr = bP * DEG;
+  const eAB = singletCorrelation(ar, br);
+  const eABP = singletCorrelation(ar, bPr);
+  const eAPB = singletCorrelation(aPr, br);
+  const eAPBP = singletCorrelation(aPr, bPr);
+  const s = chshS(singletCorrelation, ar, aPr, br, bPr);
+  return { a, aP, b, bP, eAB, eABP, eAPB, eAPBP, s, absS: Math.abs(s), tsirelsonBound: 2 * Math.SQRT2 };
+}
+
 export const quantumChsh: ExperimentDef = {
   id: 'chsh',
   name: 'Splątanie (CHSH)',

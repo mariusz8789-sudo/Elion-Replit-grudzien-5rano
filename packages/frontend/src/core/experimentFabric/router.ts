@@ -235,6 +235,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny, analitycznie minimalizowany bulk model BdG łańcucha Kitaeva; nie jest symulacją nanodrutu, materiału ani urządzenia Majorana 1.',
   },
   {
+    id: 'quantum-chsh-correlation', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-singlet-correlation@1.0.0',
+    parameters: [number('a', 'Kąt Alicji a', 'deg', 0, 180, 0), number('aP', 'Kąt Alicji a′', 'deg', 0, 180, 90), number('b', 'Kąt Boba b', 'deg', 0, 180, 45), number('bP', 'Kąt Boba b′', 'deg', 0, 180, 135)],
+    route: { kind: 'lab', labId: 'quantum', experimentId: 'chsh' }, knowledgeSources: ['quantum.md'],
+    rationale: 'Istniejąca analityczna korelacja singletu E(a,b)=−cos(a−b) oraz wartość CHSH; nie są to dane z detektorów, test bez luk ani transmisja informacji.',
+  },
+  {
     id: 'quantum-tunneling-1d', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-split-step-fft@1.0.0',
     parameters: [number('energy', 'Energia / wysokość bariery', '', 0.2, 1.6, 0.55), number('barrier', 'Wysokość bariery', 'j. nat.', 0.4, 2.5, 1), number('width', 'Szerokość bariery', 'j. nat.', 1, 8, 3)],
     route: { kind: 'lab', labId: 'quantum', experimentId: 'tunneling' }, knowledgeSources: ['quantum.md'],

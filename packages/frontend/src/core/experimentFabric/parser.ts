@@ -204,6 +204,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     return request('civilization', 'civilization-kardashev', 'narrative', ['kardashevType']);
   }
   if (/\b(majorana\s*1|topoconductor|urządzenie majorana|urzadzenie majorana)\b/.test(normalized)) return request('quantum', undefined, 'graph', []);
+  if (/\b(chsh|bella|nierówność bella|nierownosc bella|splątanie.*korelac|splatanie.*korelac)\b/.test(normalized)) return request('quantum', 'quantum-chsh-correlation', 'canvas-2d', ['a', 'aP', 'b', 'bP']);
   if (/(?:sfera blocha|bloch|bramk[a-ząćęłńóśźż]* kwantow[a-ząćęłńóśźż]*|obw[oó]d kubitow[a-ząćęłńóśźż]*|jednokubitow[a-ząćęłńóśźż]*|hadamard)/.test(normalized)) return request('quantum', 'quantum-bloch-circuit', 'scene-3d', ['circuit']);
   if (/(?:kitaev[a-ząćęłńóśźż]*|łańcuch kitaeva|lancuch kitaeva)/.test(normalized)) return request('quantum', 'quantum-kitaev-bulk', 'graph', ['chemicalPotential', 'hopping', 'pairing']);
   if (/\btunelowanie\b/.test(normalized)) return request('quantum', 'quantum-tunneling-1d', 'canvas-2d', ['energy', 'barrier', 'width']);

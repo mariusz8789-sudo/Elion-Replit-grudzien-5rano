@@ -6,6 +6,7 @@ import { runTunnelingScenario } from '../../labs/experiments/quantum-tunneling';
 import { runChshCorrelationScenario } from '../../labs/experiments/quantum-chsh';
 import { runSchwarzschildGeodesicScenario } from '../../labs/experiments/einstein-geodesics';
 import { runTitrationScenario } from '../../labs/experiments/chemistry-titration';
+import { runPointLensScenario } from '../../labs/experiments/einstein-lensing';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
@@ -101,6 +102,10 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
   if (!model) throw new Error('Brak lokalnego adaptera realnego modelu.');
   const params = request.parameters;
   switch (model.id) {
+    case 'einstein-point-lens': {
+      const solved = runPointLensScenario({ beta: numberParam(params, 'beta', 0.8) });
+      return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: solved.einsteinRing ? 'Obliczono granicę pierścienia Einsteina idealnej soczewki punktowej.' : `Obliczono dwa obrazy soczewki punktowej; wzmocnienie całkowite ${solved.totalMagnification.toFixed(6)}×.`, outputs: solved, units: { beta: '', u: '', thetaPlus: 'θE', thetaMinus: 'θE', magnificationPlus: '', magnificationMinus: '', totalMagnification: '', einsteinRing: '' }, warnings: ['To idealna soczewka punktowa; wynik nie jest dopasowaniem do obrazu teleskopowego ani pomiarem ciemnej materii.'], validity: 'Dokładne wzory soczewki punktowej dla punktowego źródła i pojedynczej masy. Brak rozciągłej masy, wielopłaszczyznowości, efektów skończonego źródła, dynamiki i danych obserwacyjnych.', assumptions: ['β jest bezwymiarową pozycją źródła w jednostkach promienia Einsteina.', 'Dla β=0 raportowany jest idealny limit pierścienia z odcięciem numerycznym u=0,001.'], visualization: ['numeric', 'graph', 'canvas-2d'], route: model.route };
+    }
     case 'einstein-schwarzschild-geodesic': {
       const solved = runSchwarzschildGeodesicScenario({ impact: numberParam(params, 'impact', 1.1) });
       return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Zintegrowano geodezyjną zerową: ${solved.outcome === 'captured' ? 'foton został pochłonięty' : solved.outcome === 'escaped' ? 'foton uciekł' : 'osiągnięto limit integracji'}.`, outputs: solved, units: { impact: '', b: 'jedn. ekranu', criticalImpact: 'jedn. ekranu', outcome: '', steps: 'kroki RK4', minRadius: 'jedn. ekranu', turns: 'obroty' }, warnings: ['Model dotyczy pojedynczego promienia w płaszczyźnie równikowej; rendering dysku jest poza wynikiem obliczeniowym.'], validity: 'Równanie geodezyjnej zerowej Schwarzschilda w płaszczyźnie równikowej, rozwiązywane istniejącym krokiem RK4. Brak Kerra, ray tracingu 3D, pełnego soczewkowania obrazu i fizyki dysku.', assumptions: ['Promień Schwarzschilda jest jednostką wizualnego scenariusza, nie estymacją masy obserwowanej czarnej dziury.', 'Klasyfikacja opiera się na istniejących progach horyzontu i ucieczki Canvasu.'], visualization: ['numeric', 'graph', 'canvas-2d'], route: model.route };

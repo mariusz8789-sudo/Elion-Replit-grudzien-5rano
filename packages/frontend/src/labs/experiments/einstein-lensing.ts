@@ -8,6 +8,22 @@ import { tracePolylineBy } from '../../core/canvasHelpers';
  * Krzywa blasku mikrosoczewkowania: A(u) = (u²+2)/(u√(u²+4)).
  */
 
+function pointLensObservables(beta: number) {
+  const u = Math.max(beta, 0.001);
+  const root = Math.sqrt(beta * beta + 4);
+  const thetaPlus = 0.5 * (beta + root);
+  const thetaMinus = 0.5 * (beta - root);
+  const totalMagnification = (u * u + 2) / (u * Math.sqrt(u * u + 4));
+  const magnificationPlus = Math.abs(0.5 + (u * u + 2) / (2 * u * Math.sqrt(u * u + 4)));
+  const magnificationMinus = Math.abs(0.5 - (u * u + 2) / (2 * u * Math.sqrt(u * u + 4)));
+  return { beta, u, thetaPlus, thetaMinus, magnificationPlus, magnificationMinus, totalMagnification, einsteinRing: beta < 0.03 };
+}
+
+export function runPointLensScenario({ beta = 0.8 }: { beta?: number } = {}) {
+  if (!Number.isFinite(beta) || beta < 0 || beta > 1.6) throw new Error('beta musi mieścić się w zakresie 0–1.6.');
+  return pointLensObservables(beta);
+}
+
 class LensingSim implements Sim {
   private t = 0;
   private history: number[] = [];
@@ -36,9 +52,8 @@ class LensingSim implements Sim {
     } else {
       this.beta = Number(p.beta);
     }
-    const u = Math.max(this.beta, 0.001);
-    const A = (u * u + 2) / (u * Math.sqrt(u * u + 4));
-    this.history.push(Math.min(A, 12));
+    const lens = pointLensObservables(this.beta);
+    this.history.push(Math.min(lens.totalMagnification, 12));
     if (this.history.length > 320) this.history.shift();
   }
 
@@ -57,7 +72,7 @@ class LensingSim implements Sim {
     const thetaE = Math.min(w, h) * 0.14; // promień Einsteina w px
 
     const beta = this.beta;
-    const u = Math.max(beta, 0.001);
+    const lens = pointLensObservables(beta);
 
     // pierścień Einsteina (ślad)
     ctx.strokeStyle = 'rgba(92,214,232,0.25)';
@@ -88,7 +103,7 @@ class LensingSim implements Sim {
     ctx.fillStyle = 'rgba(141,151,180,0.7)';
     ctx.fillText('źródło (prawdziwe)', srcX + 7, cy - 6);
 
-    if (beta < 0.03) {
+    if (lens.einsteinRing) {
       // pierścień Einsteina
       ctx.strokeStyle = '#5cd6e8';
       ctx.lineWidth = 4;
@@ -101,10 +116,10 @@ class LensingSim implements Sim {
       ctx.lineWidth = 1;
     } else {
       // dwa obrazy na osi źródło–soczewka
-      const thP = 0.5 * (beta + Math.sqrt(beta * beta + 4));
-      const thM = 0.5 * (beta - Math.sqrt(beta * beta + 4));
-      const muP = Math.abs(0.5 + (u * u + 2) / (2 * u * Math.sqrt(u * u + 4)));
-      const muM = Math.abs(0.5 - (u * u + 2) / (2 * u * Math.sqrt(u * u + 4)));
+      const thP = lens.thetaPlus;
+      const thM = lens.thetaMinus;
+      const muP = lens.magnificationPlus;
+      const muM = lens.magnificationMinus;
       for (const [th, mu] of [[thP, muP], [thM, muM]] as const) {
         const x = cx + th * thetaE;
         const r = Math.min(3 + mu * 2.2, 12);
@@ -139,9 +154,8 @@ class LensingSim implements Sim {
   }
 
   getStats() {
-    const u = Math.max(this.beta, 0.001);
-    const A = (u * u + 2) / (u * Math.sqrt(u * u + 4));
-    return { beta: Math.round(this.beta * 100) / 100, amp: Math.round(A * 100) / 100 };
+    const lens = pointLensObservables(this.beta);
+    return { beta: Math.round(this.beta * 100) / 100, amp: Math.round(lens.totalMagnification * 100) / 100 };
   }
 }
 

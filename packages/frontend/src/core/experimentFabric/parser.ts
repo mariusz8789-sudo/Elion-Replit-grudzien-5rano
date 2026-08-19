@@ -163,6 +163,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:dylatac[a-ząćęłńóśźż]*|lorentz[a-ząćęłńóśźż]*|skróceni[a-ząćęłńóśźż]* długości|skroceni[a-ząćęłńóśźż]* dlugosci|szczególn[a-ząćęłńóśźż]* teori[a-ząćęłńóśźż]* względności|szczegoln[a-ząćęłńóśźż]* teori[a-ząćęłńóśźż]* wzglednosci)/.test(normalized)) {
     return request('spacetime-einstein', 'sr-lorentz', 'graph', ['velocityFraction', 'properTimeSeconds', 'restLengthMeters']);
   }
+  if (/\b(soczewkow[a-ząćęłńóśźż]*|pierścień einsteina|pierscien einsteina|mikrosoczewkow[a-ząćęłńóśźż]*)\b/.test(normalized)) return request('spacetime-einstein', 'einstein-point-lens', 'canvas-2d', ['beta']);
   if (/\b(geodezyjn[a-ząćęłńóśźż]*|tor foton[a-ząćęłńóśźż]*|parametr zderzenia)\b/.test(normalized) && /(?:czarna dziura|schwarzschild[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('spacetime-einstein', 'einstein-schwarzschild-geodesic', 'canvas-2d', ['impact']);
   }

@@ -284,6 +284,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(() => confirmEvidenceGuidedExperiment(reviewed)).toThrow('ENGINE_NOT_AVAILABLE');
   });
 
+  it('runs bounded point gravitational lens through Fabric without claiming observational inference', () => {
+    const command = 'Oblicz soczewkowanie grawitacyjne i pierścień Einsteina.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const spacetime = getKnowledgeDomain('spacetime-einstein');
+
+    expect(run.request.modelId).toBe('einstein-point-lens');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'einstein', experimentId: 'lensing' });
+    expect(Number(run.result.outputs.totalMagnification)).toBeGreaterThan(1);
+    expect(Number(run.result.outputs.thetaPlus)).toBeGreaterThan(0);
+    expect(Number(run.result.outputs.thetaMinus)).toBeLessThan(0);
+    expect(run.result.validity).toContain('Brak rozciągłej masy');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(spacetime?.realModels).toContain('einstein-point-lens');
+  });
+
   it('runs bounded acid-base titration through Fabric without claiming a sample measurement', () => {
     const command = 'Oblicz miareczkowanie kwasowo-zasadowe NaOH.';
     const run = runExperiment(parseScienceChatMessage(command));

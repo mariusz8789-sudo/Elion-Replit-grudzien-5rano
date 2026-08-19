@@ -52,6 +52,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Istniejąca geodezyjna zerowa Schwarzschilda w płaszczyźnie równikowej, całkowana współdzielonym RK4; nie jest Kerr, 3D ray tracingiem ani modelem dysku.',
   },
   {
+    id: 'einstein-point-lens', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-point-lens@1.0.0',
+    parameters: [number('beta', 'Pozycja źródła β/θE', '', 0, 1.6, 0.8)],
+    route: { kind: 'lab', labId: 'einstein', experimentId: 'lensing' }, knowledgeSources: ['spacetime-einstein.md'],
+    rationale: 'Istniejąca dokładna soczewka punktowa z dwoma obrazami i mikrosoczewkowaniem; nie jest soczewką rozciągłą, wielopłaszczyznową ani dopasowaniem danych obserwacyjnych.',
+  },
+  {
     id: 'universe-kepler', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('centralMassSolar', 'Masa centralna', 'M☉', 0.01, 1e9, 1), number('orbitalRadiusAu', 'Promień orbity', 'AU', 0.001, 1e5, 1)],
     route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['universe.md', 'classical-mechanics.md'],

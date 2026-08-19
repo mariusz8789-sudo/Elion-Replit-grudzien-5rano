@@ -91,6 +91,16 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Klasyczne równania Lorenza integrowane istniejącym RK4; to uproszczony model konwekcji i chaosu, nie prognoza pogody.',
   },
   {
+    id: 'universe-planet-stability', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-planet-stability@1.0.0',
+    parameters: [
+      number('years', 'Czas symulacji', 'lat', 0.01, 50, 10),
+      boolean('jupiter', 'Uwzględnij Jowisza', true),
+      boolean('saturn', 'Uwzględnij Saturna', true),
+    ],
+    route: { kind: 'lab', labId: 'universe', experimentId: 'planet-stability' }, knowledgeSources: ['universe.md'],
+    rationale: 'Deterministyczny, czteroplanetowy model N-ciał z velocity-Verlet i obliczanymi elementami orbitalnymi; nie jest pełną efemerydą ośmiu planet.',
+  },
+  {
     id: 'atom-bohr', domainId: 'atom', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('atomicNumber', 'Liczba atomowa Z', '', 1, 118, 1), number('principalN', 'Główna liczba kwantowa n', '', 1, 10, 1)],
     route: { kind: 'lab', labId: 'atom' }, knowledgeSources: ['atom.md', 'quantum.md'],

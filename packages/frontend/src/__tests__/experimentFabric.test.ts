@@ -263,6 +263,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(majoranaDevice.result.outputs).toEqual({});
   });
 
+  it('runs the existing planet-stability N-body integrator through Fabric without claiming a full ephemeris', () => {
+    const command = 'Zbadaj stabilność planet przez 2 lat, bez Jowisza, bez Saturna.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+
+    expect(run.request.modelId).toBe('universe-planet-stability');
+    expect(run.request.parameters).toEqual({ years: 2, jupiter: false, saturn: false });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'planet-stability' });
+    expect(Number(run.result.outputs.earthEccentricity)).toBeGreaterThanOrEqual(0);
+    expect(Number(run.result.outputs.marsEccentricity)).toBeGreaterThanOrEqual(0);
+    expect(run.result.validity).toContain('nie obejmuje ośmiu planet');
+    expect(run.result.warnings[0]).toContain('nie efemerydą');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+  });
+
   it('runs the existing Lorenz attractor through Fabric without claiming a weather forecast', () => {
     const run = runExperiment(parseScienceChatMessage('Uruchom atraktor Lorenza: rho=28, horyzont=2, drugi start.'));
     const repeated = runExperiment(parseScienceChatMessage('Uruchom atraktor Lorenza: rho=28, horyzont=2, drugi start.'));

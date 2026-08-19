@@ -52,6 +52,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const extraSystematic = firstNumber(normalized, /\b(?:dodatkowa systematyka|systematyka|extra systematic)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const hideTrgb = /(?:ukryj trgb|bez trgb|nie pokazuj trgb)/.test(normalized);
   const lorenzRho = firstNumber(normalized, /\b(?:ρ|rho|liczba rayleigha)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const planetYears = firstNumber(normalized, /(?:\b(?:lata|years)\b\s*[=:]?\s*|przez\s+)(\d+(?:[.,]\d+)?)(?:\s+lat)?/);
+  const disableJupiter = /(?:bez jowisza|wyłącz jowisza|wylacz jowisza)/.test(normalized);
+  const disableSaturn = /(?:bez saturna|wyłącz saturna|wylacz saturna)/.test(normalized);
   const threeBodyPreset = /(?:pitagorejsk[a-ząćęłńóśźż]*|burrau)/.test(normalized)
     ? 'pythagorean'
     : /(?:ósemk[a-ząćęłńóśźż]*|osemk[a-ząćęłńóśźż]*|figure[- ]?eight)/.test(normalized)
@@ -83,6 +86,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (extraSystematic !== undefined) params.extraSystematic = extraSystematic;
   if (hideTrgb) params.showTrgb = false;
   if (lorenzRho !== undefined) params.rho = lorenzRho;
+  if (planetYears !== undefined) params.years = planetYears;
+  if (disableJupiter) params.jupiter = false;
+  if (disableSaturn) params.saturn = false;
   if (threeBodyPreset !== undefined) params.preset = threeBodyPreset;
   if (threeBodyDivergence) params.divergence = true;
 
@@ -93,6 +99,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
 
   if (/(?:powódź|powodz|pożar|pozar|trzęsienie|trzesienie|blackout|kaskad[a-ząćęłńóśźż]*|ewakuacj[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('hazard-cascade', undefined, 'world-3d', []);
+  }
+  if (/(?:stabilność planet|stabilnosc planet|układ planetarn[a-ząćęłńóśźż]*|uklad planetarn[a-ząćęłńóśźż]*|planetarna stabilność|planetarna stabilnosc|n[- ]?ciał planet)/.test(normalized)) {
+    return request('universe', 'universe-planet-stability', 'scene-3d', ['years', 'jupiter', 'saturn']);
   }
   if (/(?:atraktor lorenz[a-ząćęłńóśźż]*|atraktor lorenza|równani[a-ząćęłńóśźż]* lorenz[a-ząćęłńóśźż]*|rownani[a-ząćęłńóśźż]* lorenz[a-ząćęłńóśźż]*|lorenz\s+attractor)/.test(normalized)) {
     return request('classical-mechanics', 'universe-lorenz-attractor', 'scene-3d', ['rho', 'horizonTime', 'divergence']);

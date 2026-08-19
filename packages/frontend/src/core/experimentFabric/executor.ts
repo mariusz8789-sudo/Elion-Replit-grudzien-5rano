@@ -4,6 +4,7 @@ import { solveKitaevBulk } from '../compute/kitaevBulk';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
 import { runLorenzScenario } from '../../labs/experiments/universe-lorenz3d';
+import { runPlanetStabilityScenario } from '../../labs/experiments/universe-planetstability';
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
@@ -234,6 +235,32 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         assumptions: [
           'dx/dt=σ(y−x), dy/dt=x(ρ−z)−y, dz/dt=xy−βz.',
           divergence ? 'Drugi start różni się wyłącznie przesunięciem x o 10⁻⁴.' : 'Nie uruchomiono drugiego startu do pomiaru rozjazdu.',
+        ],
+        visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'universe-planet-stability': {
+      const years = numberParam(params, 'years', 10);
+      const jupiter = params.jupiter !== false;
+      const saturn = params.saturn !== false;
+      const solved = runPlanetStabilityScenario({ years, jupiter, saturn });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano czteroplanetową integrację N-ciał przez ${years} lat: Jowisz=${jupiter ? 'wł.' : 'wył.'}, Saturn=${saturn ? 'wł.' : 'wył.'}.`,
+        outputs: {
+          years: solved.years,
+          earthEccentricity: solved.earthEccentricity,
+          earthEccentricityDelta: solved.earthEccentricityDelta,
+          marsEccentricity: solved.marsEccentricity,
+          marsEccentricityDelta: solved.marsEccentricityDelta,
+        },
+        units: { years: 'lat', earthEccentricity: '', earthEccentricityDelta: '', marsEccentricity: '', marsEccentricityDelta: '' },
+        warnings: ['Model ma tylko Słońce, Ziemię, Marsa oraz opcjonalnie Jowisza i Saturna; pozycje startowe są jakościowe, nie efemerydą dla konkretnej daty.'],
+        validity: 'Newtonowski, płaski model N-ciał z velocity-Verlet w AU/latach/masach Słońca; nie obejmuje ośmiu planet, relatywistyki, księżyców ani pełnych efemeryd.',
+        assumptions: [
+          'Wszystkie planety startują w peryhelium z prędkością vis-viva.',
+          'Mimośrody Ziemi i Marsa są obliczane z chwilowego stanu, nie zadawane jako wynik.',
+          `Zaburzacze aktywne: ${[jupiter && 'Jowisz', saturn && 'Saturn'].filter(Boolean).join(', ') || 'brak'}.`,
         ],
         visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
       };

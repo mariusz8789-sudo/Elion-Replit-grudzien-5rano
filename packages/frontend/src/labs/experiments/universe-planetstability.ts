@@ -112,6 +112,65 @@ function buildBodies(includePerturbers: Record<string, boolean>): Body[] {
   return bodies;
 }
 
+export interface PlanetStabilityScenarioResult {
+  years: number;
+  jupiter: boolean;
+  saturn: boolean;
+  earthEccentricity: number;
+  earthEccentricityDelta: number;
+  marsEccentricity: number;
+  marsEccentricityDelta: number;
+}
+
+/**
+ * Deterministyczny runner Fabric: ten sam czteroplanetowy model N-ciał i
+ * velocity-Verlet co Canvas. Nie używa efemerydy na datę ani pełnych 8 planet.
+ */
+export function runPlanetStabilityScenario({
+  years = 10,
+  jupiter = true,
+  saturn = true,
+}: {
+  years?: number;
+  jupiter?: boolean;
+  saturn?: boolean;
+} = {}): PlanetStabilityScenarioResult {
+  if (!Number.isFinite(years) || years <= 0 || years > 50) {
+    throw new Error('years musi być skończoną liczbą z zakresu (0, 50].');
+  }
+  const bodies = buildBodies({ jupiter, saturn });
+  const step = 0.002;
+  let remaining = years;
+  while (remaining > Number.EPSILON) {
+    const dt = Math.min(step, remaining);
+    stepVerlet(bodies, dt);
+    remaining -= dt;
+  }
+  const sun = bodies.find((body) => body.id === 'sun')!;
+  const eccentricity = (id: string) => {
+    const body = bodies.find((candidate) => candidate.id === id)!;
+    const elements = orbitalElementsFromState(
+      body.x - sun.x,
+      body.y - sun.y,
+      body.vx - sun.vx,
+      body.vy - sun.vy,
+      G_ASTRO_YEAR * (sun.m + body.m),
+    );
+    return { current: elements.eccentricity, delta: Math.abs(elements.eccentricity - body.e0) };
+  };
+  const earth = eccentricity('earth');
+  const mars = eccentricity('mars');
+  return {
+    years,
+    jupiter,
+    saturn,
+    earthEccentricity: earth.current,
+    earthEccentricityDelta: earth.delta,
+    marsEccentricity: mars.current,
+    marsEccentricityDelta: mars.delta,
+  };
+}
+
 class PlanetStabilitySim implements Sim {
   private bodies: Body[] = buildBodies({ jupiter: true, saturn: true });
   private yearsElapsed = 0;

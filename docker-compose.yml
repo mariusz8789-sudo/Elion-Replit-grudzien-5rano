@@ -9,4 +9,11 @@ services:
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GENESIS_AI_MODEL=${GENESIS_AI_MODEL:-claude-opus-4-8}
+      - GENESIS_DB_PATH=/app/packages/backend/data/genesis.db
+    volumes:
+      - genesis-data:/app/packages/backend/data
     restart: unless-stopped
+
+volumes:
+  genesis-data:
+    name: genesis-data

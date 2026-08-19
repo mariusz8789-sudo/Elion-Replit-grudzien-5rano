@@ -35,6 +35,8 @@ const number = (id: string, label: string, unit: string, min: number, max: numbe
   ({ id, label, unit, type: 'number', required: false, min, max, default: defaultValue });
 const text = (id: string, label: string, defaultValue: string): ExperimentParameterSpec =>
   ({ id, label, unit: '', type: 'string', required: false, default: defaultValue });
+const boolean = (id: string, label: string, defaultValue: boolean): ExperimentParameterSpec =>
+  ({ id, label, unit: '', type: 'boolean', required: false, default: defaultValue });
 
 const ROUTER_MODELS: readonly RouterModel[] = [
   {
@@ -48,6 +50,16 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     parameters: [number('centralMassSolar', 'Masa centralna', 'M☉', 0.01, 1e9, 1), number('orbitalRadiusAu', 'Promień orbity', 'AU', 0.001, 1e5, 1)],
     route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['universe.md', 'classical-mechanics.md'],
     rationale: 'Realny graf Keplera dla zagadnienia dwóch ciał i orbity kołowej.',
+  },
+  {
+    id: 'universe-three-body', domainId: 'classical-mechanics', modelVersion: '1.0.0', engine: 'genesis-three-body@1.0.0',
+    parameters: [
+      text('preset', 'Układ startowy', 'figure8'),
+      number('horizonTime', 'Horyzont integracji', 'jedn. bezwymiarowe', 0.01, 50, 10),
+      boolean('divergence', 'Drugi start z perturbacją 10⁻⁶', false),
+    ],
+    route: { kind: 'lab', labId: 'universe', experimentId: 'threebody' }, knowledgeSources: ['classical-mechanics.md', 'universe.md'],
+    rationale: 'Realna integracja Newtonowskiego problemu trzech ciał metodą adaptive velocity-Verlet dla udokumentowanych warunków początkowych; nie jest prognozą układu astronomicznego.',
   },
   {
     id: 'atom-bohr', domainId: 'atom', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',

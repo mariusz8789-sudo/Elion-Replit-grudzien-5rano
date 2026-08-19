@@ -125,6 +125,73 @@ export function pythagoreanBodies(): Body[] {
   ];
 }
 
+export type ThreeBodyPreset = 'figure8' | 'pythagorean';
+
+export interface ThreeBodyScenarioResult {
+  preset: ThreeBodyPreset;
+  horizonTime: number;
+  initialEnergy: number;
+  finalEnergy: number;
+  relativeEnergyDrift: number;
+  finalMinPairDistance: number;
+  /** Występuje wyłącznie, gdy uruchomiono drugi deterministyczny start różniący się o PERTURBATION. */
+  finalSeparation?: number;
+}
+
+function cloneBodies(bodies: readonly Body[]): Body[] {
+  return bodies.map((body) => ({ ...body }));
+}
+
+function totalPositionSeparation(left: readonly Body[], right: readonly Body[]): number {
+  let separation = 0;
+  for (let index = 0; index < left.length; index++) {
+    separation += Math.hypot(left[index].x - right[index].x, left[index].y - right[index].y);
+  }
+  return separation;
+}
+
+/**
+ * Deterministyczny adapter obliczeniowy dla Experiment Fabric. Nie używa Canvasu
+ * i nie tworzy drugiego modelu: wywołuje te same znane warunki początkowe oraz
+ * `integrateAdaptive` oparte na velocity-Verlet co `ThreeBodySim`.
+ */
+export function runThreeBodyScenario({
+  preset = 'figure8',
+  horizonTime = 10,
+  divergence = false,
+}: {
+  preset?: ThreeBodyPreset;
+  horizonTime?: number;
+  divergence?: boolean;
+} = {}): ThreeBodyScenarioResult {
+  if (!Number.isFinite(horizonTime) || horizonTime <= 0 || horizonTime > 50) {
+    throw new Error('horizonTime musi być skończoną liczbą z zakresu (0, 50].');
+  }
+  const initial = preset === 'pythagorean' ? pythagoreanBodies() : figure8Bodies();
+  const bodies = cloneBodies(initial);
+  const initialEnergy = totalEnergy(bodies);
+  let shadow: Body[] | undefined;
+  if (divergence) {
+    shadow = cloneBodies(initial);
+    shadow[0].x += PERTURBATION;
+  }
+
+  integrateAdaptive(bodies, horizonTime);
+  if (shadow) integrateAdaptive(shadow, horizonTime);
+
+  const finalEnergy = totalEnergy(bodies);
+  const denominator = Math.max(Math.abs(initialEnergy), Number.EPSILON);
+  return {
+    preset,
+    horizonTime,
+    initialEnergy,
+    finalEnergy,
+    relativeEnergyDrift: Math.abs(finalEnergy - initialEnergy) / denominator,
+    finalMinPairDistance: minPairDistance(bodies),
+    ...(shadow ? { finalSeparation: totalPositionSeparation(bodies, shadow) } : {}),
+  };
+}
+
 const BODY_COLORS = ['#5cd6e8', '#f0b35c', '#c68cff'];
 const SHADOW_ALPHA = 0.45;
 const TRAIL_LEN = 900;

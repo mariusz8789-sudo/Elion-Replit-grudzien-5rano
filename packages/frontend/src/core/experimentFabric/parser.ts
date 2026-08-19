@@ -45,6 +45,13 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const chemicalPotential = firstNumber(normalized, /\b(?:μ|mu|potencjał chemiczny|potencjal chemiczny)\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
   const hopping = firstNumber(normalized, /\b(?:hopping|tunelowanie|t)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const pairing = firstNumber(normalized, /\b(?:pairing|delta|Δ|p-wave)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const threeBodyHorizon = firstNumber(normalized, /\b(?:horyzont|czas|t)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const threeBodyPreset = /(?:pitagorejsk[a-ząćęłńóśźż]*|burrau)/.test(normalized)
+    ? 'pythagorean'
+    : /(?:ósemk[a-ząćęłńóśźż]*|osemk[a-ząćęłńóśźż]*|figure[- ]?eight)/.test(normalized)
+      ? 'figure8'
+      : undefined;
+  const threeBodyDivergence = /(?:drugi start|dwa starty|perturbac[a-ząćęłńóśźż]*|rozjazd|wrażliwoś[a-ząćęłńóśźż]* na warunki|wrazliwos[a-ząćęłńóśźż]* na warunki)/.test(normalized);
 
   if (seed !== undefined) params.seed = seed;
   if (r0 !== undefined) params.r0 = r0;
@@ -64,6 +71,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (chemicalPotential !== undefined) params.chemicalPotential = chemicalPotential;
   if (hopping !== undefined) params.hopping = hopping;
   if (pairing !== undefined) params.pairing = pairing;
+  if (threeBodyHorizon !== undefined) params.horizonTime = threeBodyHorizon;
+  if (threeBodyPreset !== undefined) params.preset = threeBodyPreset;
+  if (threeBodyDivergence) params.divergence = true;
 
   const base = { contractVersion: EXPERIMENT_FABRIC_VERSION, sourceText, operation: operationFor(normalized), seed } as const;
   const request = (domainId: string, modelId: string | undefined, requestedVisualization: StructuredExperimentRequest['requestedVisualization'], allowed: readonly string[]): StructuredExperimentRequest => ({
@@ -72,6 +82,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
 
   if (/(?:powódź|powodz|pożar|pozar|trzęsienie|trzesienie|blackout|kaskad[a-ząćęłńóśźż]*|ewakuacj[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('hazard-cascade', undefined, 'world-3d', []);
+  }
+  if (/(?:problem trzech ciał|problem trzech cial|three[- ]?body|orbita ósemk[a-ząćęłńóśźż]*|orbita osemk[a-ząćęłńóśźż]*|układ pitagorejsk[a-ząćęłńóśźż]*|uklad pitagorejsk[a-ząćęłńóśźż]*|burrau)/.test(normalized)) {
+    return request('classical-mechanics', 'universe-three-body', 'graph', ['preset', 'horizonTime', 'divergence']);
   }
   if (/(?:efekt motyla|butterfly effect|chaos deterministyczny|warunk(?:i|ów) początkow(?:e|ych)|warunk(?:i|ow) poczatkow(?:e|ych))/.test(normalized)) {
     return request('classical-mechanics', undefined, 'graph', []);

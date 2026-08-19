@@ -1,6 +1,7 @@
 import { atomCount, degreeOfUnsaturation, molecularWeight, parseFormula } from '../compute/cheminformatics';
 import { buildPumpPipeModel } from '../engineeringGraph/pumpPipe';
 import { solveKitaevBulk } from '../compute/kitaevBulk';
+import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
 import { buildBohrModelGraph } from '../modelGraph/bohrModelGraph';
@@ -104,6 +105,44 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano graf orbitalny Keplera.',
         outputs: details.outputs, units: details.units, warnings: [], validity: 'Zagadnienie dwóch ciał; orbita kołowa.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'universe-three-body': {
+      const requestedPreset = params.preset;
+      if (requestedPreset !== undefined && requestedPreset !== 'figure8' && requestedPreset !== 'pythagorean') {
+        throw new Error('preset problemu trzech ciał musi mieć wartość figure8 albo pythagorean.');
+      }
+      const preset: ThreeBodyPreset = requestedPreset === 'pythagorean' ? 'pythagorean' : 'figure8';
+      const horizonTime = numberParam(params, 'horizonTime', 10);
+      const divergence = params.divergence === true;
+      const solved = runThreeBodyScenario({ preset, horizonTime, divergence });
+      const warnings = solved.relativeEnergyDrift > 0.01
+        ? [`Względny drift energii wyniósł ${(solved.relativeEnergyDrift * 100).toPrecision(3)}%; zwiększ precyzję przez skrócenie horyzontu.`]
+        : [];
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Wykonano deterministyczną integrację problemu trzech ciał: ${preset === 'pythagorean' ? 'układ pitagorejski' : 'orbita ósemkowa'}, t=${horizonTime}.`,
+        outputs: {
+          preset,
+          horizonTime: solved.horizonTime,
+          initialEnergy: solved.initialEnergy,
+          finalEnergy: solved.finalEnergy,
+          relativeEnergyDrift: solved.relativeEnergyDrift,
+          finalMinPairDistance: solved.finalMinPairDistance,
+          ...(solved.finalSeparation === undefined ? {} : { finalSeparation: solved.finalSeparation }),
+        },
+        units: {
+          preset: '', horizonTime: 'jedn. bezwymiarowe', initialEnergy: 'jedn. energii', finalEnergy: 'jedn. energii',
+          relativeEnergyDrift: '', finalMinPairDistance: 'jedn. odległości', finalSeparation: 'jedn. odległości',
+        },
+        warnings,
+        validity: 'Newtonowskie trzy ciała w 2D, G=1, zmiękczenie 10⁻⁶ i ustalone warunki początkowe; nie jest prognozą konkretnego układu astronomicznego.',
+        assumptions: [
+          'Integracja adaptive velocity-Verlet z istniejącego Universe Lab.',
+          preset === 'pythagorean' ? 'Masy 3:4:5 startują ze spoczynku.' : 'Trzy równe masy startują z warunku orbity ósemkowej.',
+          divergence ? 'Drugi start różni się wyłącznie przesunięciem 10⁻⁶ pierwszego ciała.' : 'Nie uruchomiono drugiego startu do pomiaru rozjazdu.',
+        ],
+        visualization: ['numeric', 'graph'], route: model.route,
       };
     }
     case 'atom-bohr': {

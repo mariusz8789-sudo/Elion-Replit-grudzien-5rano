@@ -261,6 +261,26 @@ describe('Genesis Experiment Fabric', () => {
     expect(majoranaDevice.result.outputs).toEqual({});
   });
 
+  it('runs the existing deterministic three-body integrator through Fabric without replacing its solver', () => {
+    const figureEight = runExperiment(parseScienceChatMessage('Zasymuluj problem trzech ciał: orbita ósemkowa, horyzont=1.5.'));
+    const pythagorean = runExperiment(parseScienceChatMessage('Zasymuluj układ pitagorejski problemu trzech ciał, horyzont=2, drugi start.'));
+    const repeated = runExperiment(parseScienceChatMessage('Zasymuluj problem trzech ciał: orbita ósemkowa, horyzont=1.5.'));
+
+    expect(figureEight.request.modelId).toBe('universe-three-body');
+    expect(figureEight.result.status).toBe('completed');
+    expect(figureEight.result.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'threebody' });
+    expect(figureEight.result.outputs.preset).toBe('figure8');
+    expect(Number(figureEight.result.outputs.relativeEnergyDrift)).toBeLessThan(0.01);
+    expect(Number(figureEight.result.outputs.finalMinPairDistance)).toBeGreaterThan(0);
+    expect(figureEight.result.validity).toContain('nie jest prognozą konkretnego układu astronomicznego');
+    expect(figureEight.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+
+    expect(pythagorean.result.status).toBe('completed');
+    expect(pythagorean.result.outputs.preset).toBe('pythagorean');
+    expect(Number(pythagorean.result.outputs.finalSeparation)).toBeGreaterThan(0);
+    expect(pythagorean.result.assumptions.some((assumption) => assumption.includes('10⁻⁶'))).toBe(true);
+  });
+
   it('creates and replays a reproducible scenario capsule from real A/B runs only', () => {
     const comparison = compareCounterfactual({
       baseline: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'),

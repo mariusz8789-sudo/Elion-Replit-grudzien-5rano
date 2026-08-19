@@ -33,6 +33,16 @@ const SCENE_SCALE = 2; // jednostki sceny na nm
 
 const COMPLEMENT: Record<string, string> = { A: 'T', T: 'A', G: 'C', C: 'G' };
 const BASE_COLOR: Record<string, number> = { A: 0x6ee7a0, T: 0xf47c7c, G: 0x5cd6e8, C: 0xf0d060 };
+
+export function runDnaHelixScenario({ sequence = 'mixed', temperatureC = 37 }: { sequence?: string; temperatureC?: number } = {}) {
+  const bases = SEQUENCES[sequence];
+  if (!bases) throw new Error(`Unknown DNA sequence preset: ${sequence}.`);
+  if (!Number.isFinite(temperatureC) || temperatureC < 0 || temperatureC > 100) throw new Error('temperatureC must be within [0, 100].');
+  const tm = dnaMeltingTempWallace(bases);
+  const denaturedFraction = logisticFraction(temperatureC, tm);
+  const gcPairs = bases.split('').filter((base) => base === 'G' || base === 'C').length;
+  return { sequence, basePairs: bases.length, gcPairs, tmC: tm, temperatureC, denaturedFraction, risePerBasePairNm: RISE_PER_BP, radiusNm: RADIUS_NM, basePairsPerTurn: BP_PER_TURN };
+}
 const H_BONDS: Record<string, number> = { A: 2, T: 2, G: 3, C: 3 };
 
 // 20 par zasad (~2 skręty helisy) — długość dobrana tak, żeby (a) skręt
@@ -132,8 +142,7 @@ class DnaHelixSim implements Sim3D {
 
   syncScene() {
     if (!this.three) return;
-    const tm = dnaMeltingTempWallace(SEQUENCES[this.sequenceKey] ?? '');
-    const frac = logisticFraction(this.temperature, tm);
+    const { denaturedFraction: frac } = runDnaHelixScenario({ sequence: this.sequenceKey, temperatureC: this.temperature });
     const n = this.bases.length;
 
     const strand1Pts: THREE.Vector3[] = [];
@@ -162,8 +171,7 @@ class DnaHelixSim implements Sim3D {
   }
 
   getStats() {
-    const tm = dnaMeltingTempWallace(SEQUENCES[this.sequenceKey] ?? '');
-    const frac = logisticFraction(this.temperature, tm);
+    const { tmC: tm, denaturedFraction: frac } = runDnaHelixScenario({ sequence: this.sequenceKey, temperatureC: this.temperature });
     return {
       tm: Math.round(tm * 10) / 10,
       temperature: Math.round(this.temperature * 10) / 10,

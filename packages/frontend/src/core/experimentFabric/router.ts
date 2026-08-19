@@ -201,6 +201,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny agentowy EpidemicCitySimulation; renderer zachowuje się jako konsument read-only tego samego świata.',
   },
   {
+    id: 'biology-dna-helix', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-b-dna-wallace@1.0.0',
+    parameters: [text('sequence', 'Preset sekwencji', 'mixed'), number('temperatureC', 'Temperatura', '°C', 0, 100, 37)],
+    route: { kind: 'lab', labId: 'biology', experimentId: 'dna-helix' }, knowledgeSources: ['biology.md'],
+    rationale: 'Istniejąca geometria B-DNA oraz reguła Wallace’a dla krótkich presetów; bez metody najbliższego sąsiada, atomistyki, dynamiki molekularnej i profilu biologicznego.',
+  },
+  {
     id: 'nuclear-semf', domainId: 'nuclear', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('protonNumber', 'Liczba protonów Z', '', 1, 118, 26), number('neutronNumber', 'Liczba neutronów N', '', 0, 180, 30)],
     route: { kind: 'lab', labId: 'nuclear' }, knowledgeSources: ['nuclear.md', 'particle.md'],

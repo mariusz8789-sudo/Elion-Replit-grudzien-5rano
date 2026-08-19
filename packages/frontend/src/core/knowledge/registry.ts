@@ -87,12 +87,12 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'biology', title: 'Biologia i populacje', sourceFile: 'biology.md', scale: 'meso',
-    capability: 'REAL_ENGINE', realModels: ['biology-logistic', 'biology.city'],
+    capability: 'REAL_ENGINE', realModels: ['biology-logistic', 'biology-dna-helix', 'biology.city'],
     concepts: ['populacja logistyczna', 'błona', 'DNA', 'białko', 'epidemia'],
-    parameters: ['growthRate', 'carryingCapacity', 'initialPopulation', 'timeElapsed', 'r0', 'seed'], units: ['1/czas', 'osobn.', 'dni'],
-    assumptions: ['Modele biologiczne są edukacyjne i nie stanowią diagnozy ani prognozy medycznej.'],
-    possibleExperiments: ['zasymuluj epidemię', 'pokaż rozwój epidemii w mieście', 'wzrost populacji'], requiredSolver: 'EpidemicCitySimulation / ModelGraph',
-    visualization: ['numeric', 'graph', 'world-3d'], dependencies: ['mathematics', 'thermodynamics'], keywords: ['epidemia', 'seir', 'seird', 'sir', 'zakaż', 'populacja', 'miasto', 'choroba'],
+    parameters: ['growthRate', 'carryingCapacity', 'initialPopulation', 'timeElapsed', 'sequence', 'temperatureC', 'r0', 'seed'], units: ['1/czas', 'osobn.', 'dni', '°C', 'nm'],
+    assumptions: ['Modele biologiczne są edukacyjne i nie stanowią diagnozy ani prognozy medycznej. Helisa DNA używa geometrii B-DNA oraz reguły Wallace’a dla krótkich presetów, bez pełnej termodynamiki sekwencji, atomistyki i dynamiki molekularnej.'],
+    possibleExperiments: ['zasymuluj epidemię', 'pokaż rozwój epidemii w mieście', 'oblicz helisę DNA', 'wzrost populacji'], requiredSolver: 'EpidemicCitySimulation / B-DNA Wallace / ModelGraph',
+    visualization: ['numeric', 'graph', 'world-3d', 'scene-3d'], dependencies: ['mathematics', 'thermodynamics'], keywords: ['epidemia', 'seir', 'seird', 'sir', 'zakaż', 'populacja', 'dna', 'helisa', 'wallace', 'miasto', 'choroba'],
   },
   {
     id: 'chemistry', title: 'Chemia', sourceFile: 'chemistry.md', scale: 'micro-meso',

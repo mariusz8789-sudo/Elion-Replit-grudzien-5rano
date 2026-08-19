@@ -163,6 +163,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:podświadomość|podswadomosc|psychologiczny efekt obserwatora|wewnętrzny termostat|wewnetrzny termostat)/.test(normalized)) {
     return request('biology', undefined, 'narrative', []);
   }
+  if (/\b(dna|helis[a-ząćęłńóśźż]* dna|b[- ]?dna|temperatur[a-ząćęłńóśźż]* topnieni[a-ząćęłńóśźż]* dna|wallace)\b/.test(normalized)) return request('biology', 'biology-dna-helix', 'scene-3d', ['sequence', 'temperatureC']);
   if (/(?:epidem[a-ząćęłńóśźż]*|seir|seird|\bsir\b|zakaż[a-ząćęłńóśźż]*|zakaz[a-ząćęłńóśźż]*|rozwój epidemii|rozwoj epidemii)/.test(normalized)) {
     return request('biology', 'epidemic-city', 'world-3d', ['r0', 'horizonDays', 'nAgents']);
   }

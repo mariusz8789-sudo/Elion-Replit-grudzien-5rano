@@ -298,6 +298,19 @@ describe('Genesis Experiment Fabric', () => {
     expect(atom?.realModels).toContain('atom-hydrogen-orbital');
   });
 
+  it('runs bounded B-DNA and Wallace observables through Fabric without claiming full thermodynamics', () => {
+    const command = 'Pokaż helisę DNA.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const biology = getKnowledgeDomain('biology');
+    expect(run.request.modelId).toBe('biology-dna-helix');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.outputs).toMatchObject({ sequence: 'mixed', basePairs: 20, radiusNm: 1, risePerBasePairNm: 0.34 });
+    expect(run.result.validity).toContain('Bez metody najbliższego sąsiada');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(biology?.realModels).toContain('biology-dna-helix');
+  });
+
   it('runs bounded tokamak Lawson criterion through Fabric without claiming reactor prediction', () => {
     const command = 'Sprawdź kryterium Lawsona tokamak.';
     const run = runExperiment(parseScienceChatMessage(command));

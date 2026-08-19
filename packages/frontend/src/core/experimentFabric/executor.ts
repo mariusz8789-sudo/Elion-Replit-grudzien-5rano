@@ -14,6 +14,7 @@ import { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
 import { runKerrScenario } from '../../labs/experiments/einstein-kerr3d';
 import { runQuantumTeleportScenario } from '../../labs/experiments/quantum-teleport';
 import { runTokamakLawsonScenario } from '../../labs/experiments/nuclear-tokamak';
+import { runDnaHelixScenario } from '../../labs/experiments/biology-dnahelix';
 import { runHydrogenOrbitalScenario } from '../../labs/experiments/atom-orbital-3d';
 import { runDoublePendulumScenario } from '../../labs/experiments/universe-doublependulum';
 import { runHubbleTensionScenario } from '../../labs/experiments/universe-hubbletension';
@@ -455,6 +456,11 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         assumptions: ['Masa geometryczna M=1.', 'Orbity fotonowe są równikowe; brak precesji w θ.'],
         visualization: ['numeric', 'scene-3d'], route: model.route,
       };
+    }
+    case 'biology-dna-helix': {
+      const sequence = typeof params.sequence === 'string' ? params.sequence : 'mixed';
+      const solved = runDnaHelixScenario({ sequence, temperatureC: numberParam(params, 'temperatureC', 37) });
+      return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Obliczono B-DNA dla ${solved.basePairs} par zasad (${solved.gcPairs} G/C): Tm=${solved.tmC.toFixed(1)}°C, frakcja rozdzielona=${(solved.denaturedFraction * 100).toFixed(2)}%.`, outputs: solved, units: { sequence: '', basePairs: 'bp', gcPairs: 'bp', tmC: '°C', temperatureC: '°C', denaturedFraction: '', risePerBasePairNm: 'nm/bp', radiusNm: 'nm', basePairsPerTurn: 'bp/turn' }, warnings: ['Frakcja denaturacji używa ilustracyjnej szerokości logistycznej; nie jest pomiarem ani parametrem termodynamicznym konkretnej sekwencji.'], validity: 'Geometria B-DNA oraz reguła Wallace’a dla krótkich presetów. Bez metody najbliższego sąsiada, parametrów soli, pełnej termodynamiki, struktury atomowej, dynamiki molekularnej i biologii komórkowej.', assumptions: ['Sekwencja jest jednym z trzech lokalnych presetów długości 20 bp.', 'Temperatura w zakresie 0–100°C.'], visualization: ['numeric', 'scene-3d'], route: model.route };
     }
     case 'nuclear-tokamak-lawson': {
       const solved = runTokamakLawsonScenario({ densityExponent: numberParam(params, 'densityExponent', 20), temperatureKeV: numberParam(params, 'temperatureKeV', 15), confinementSeconds: numberParam(params, 'confinementSeconds', 1.5) });

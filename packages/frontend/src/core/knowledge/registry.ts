@@ -178,11 +178,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'quantum', title: 'Mechanika kwantowa', sourceFile: 'quantum.md', scale: 'micro',
-    capability: 'CAPABILITY_SEAM', realModels: ['quantum-bloch', 'chsh-correlation'],
-    concepts: ['superpozycja', 'interferencja', 'splątanie', 'tunelowanie', 'kubit', 'bramki'], parameters: ['theta', 'phi'], units: ['rad'],
-    assumptions: ['Jednokubitowe bramki i korelacje istnieją; solver tunelowania Schrödingera nie jest obecnie uniwersalnym engine.'],
-    possibleExperiments: ['pokaż stan kubitu', 'zbadaj korelację CHSH'], requiredSolver: 'quantumState / Schrödinger solver required for tunneling',
-    visualization: ['graph', 'scene-3d'], dependencies: ['mathematics', 'electrodynamics'], keywords: ['kwant', 'kubit', 'bloch', 'splątanie', 'splatanie', 'tunelowanie', 'chsh'],
+    capability: 'CAPABILITY_SEAM', realModels: ['quantum-bloch', 'chsh-correlation', 'quantum-kitaev-bulk'],
+    concepts: ['superpozycja', 'interferencja', 'splątanie', 'tunelowanie', 'kubit', 'bramki', 'bulk BdG', 'łańcuch Kitaeva'], parameters: ['theta', 'phi', 'chemicalPotential', 'hopping', 'pairing'], units: ['rad', 'jedn. energii'],
+    assumptions: ['Jednokubitowe bramki i korelacje istnieją; Q1 oblicza wyłącznie translacyjnie niezmienny bulk model Kitaeva; solver tunelowania Schrödingera nie jest obecnie uniwersalnym engine.'],
+    possibleExperiments: ['pokaż stan kubitu', 'zbadaj korelację CHSH', 'oblicz bulk gap łańcucha Kitaeva'], requiredSolver: 'quantumState / Schrödinger solver required for tunneling; Q1 Kitaev bulk dostępny dla zdefiniowanego modelu',
+    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['mathematics', 'electrodynamics'], keywords: ['kwant', 'kubit', 'bloch', 'splątanie', 'splatanie', 'tunelowanie', 'chsh', 'kitaev', 'majorana'],
   },
   {
     id: 'scale-journey', title: 'Podróż przez skale', sourceFile: 'scale-journey.md', scale: 'micro-cosmic',

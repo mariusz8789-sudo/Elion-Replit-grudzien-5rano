@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateKnowledgeRegistry } from '../core/knowledge/registry';
+import { getKnowledgeDomain, validateKnowledgeRegistry } from '../core/knowledge/registry';
 import {
   parseScienceChatMessage,
   runExperiment,
@@ -36,6 +36,15 @@ import {
 describe('Genesis Experiment Fabric', () => {
   it('indexes each of the 20 authoritative knowledge files exactly once', () => {
     expect(validateKnowledgeRegistry()).toEqual({ ok: true, missing: [], duplicateFiles: [] });
+  });
+
+  it('registers the bounded Kitaev bulk model without upgrading absent quantum hardware', () => {
+    const quantum = getKnowledgeDomain('quantum');
+    expect(quantum?.capability).toBe('CAPABILITY_SEAM');
+    expect(quantum?.realModels).toContain('quantum-kitaev-bulk');
+    expect(quantum?.parameters).toEqual(expect.arrayContaining(['chemicalPotential', 'hopping', 'pairing']));
+    expect(quantum?.assumptions.join(' ')).toContain('bulk model Kitaeva');
+    expect(quantum?.requiredSolver).toContain('Schrödinger solver required');
   });
 
   it('declares mature solver and GIS integrations as explicit seams, never active engines', () => {

@@ -18,6 +18,8 @@ const ACIDS: Acid[] = [
   { id: 'hcn', name: 'Kwas cyjanowodorowy HCN (pKa≈9,21)', ka: 6.2e-10 },
 ];
 
+export const TITRATION_ACID_IDS = ACIDS.map((acid) => acid.id) as readonly string[];
+
 const CA = 0.1; // mol/L — stężenie kwasu
 const VA = 25; // mL — objętość próbki kwasu
 const CB = 0.1; // mol/L — stężenie titranta NaOH

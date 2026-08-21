@@ -551,19 +551,19 @@ describe('Genesis Experiment Fabric', () => {
     expect(spacetime?.realModels).toContain('einstein-point-lens');
   });
 
-  it('runs bounded acid-base titration through Fabric without claiming a sample measurement', () => {
+  it('plans bounded acid-base titration for backend Fabric without claiming a sample measurement', () => {
     const command = 'Oblicz miareczkowanie kwasowo-zasadowe NaOH.';
-    const run = runExperiment(parseScienceChatMessage(command));
-    const repeated = runExperiment(parseScienceChatMessage(command));
+    const request = parseScienceChatMessage(command);
+    const reviewed = planEvidenceGuidedExperiment(request);
     const chemistry = getKnowledgeDomain('chemistry');
 
-    expect(run.request.modelId).toBe('chemistry-titration');
-    expect(run.result.status).toBe('completed');
-    expect(run.result.route).toEqual({ kind: 'lab', labId: 'chemistry', experimentId: 'titration' });
-    expect(Number(run.result.outputs.veq)).toBeCloseTo(25, 12);
-    expect(Number(run.result.outputs.ph)).toBeGreaterThan(0);
-    expect(run.result.validity).toContain('Brak aktywności jonowych');
-    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(request.modelId).toBe('chemistry-titration');
+    expect(request.parameters).toEqual({});
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.1.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('nie danymi jednego pomiaru');
     expect(chemistry?.realModels).toContain('chemistry-titration');
   });
 

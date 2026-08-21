@@ -35,6 +35,7 @@ export { solveKitaevBulk } from './kitaevBulk';
 export { runChshCorrelationScenario } from '../../labs/experiments/quantum-chsh';
 export { runTokamakLawsonScenario } from '../../labs/experiments/nuclear-tokamak';
 export { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
+export { runTitrationScenario, TITRATION_ACID_IDS } from '../../labs/experiments/chemistry-titration';
 
 // Cheminformatyka (deterministyczna) — fundament domeny drug-discovery.
 export * from './cheminformatics';

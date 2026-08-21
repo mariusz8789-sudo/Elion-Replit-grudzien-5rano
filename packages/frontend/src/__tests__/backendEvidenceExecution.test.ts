@@ -191,6 +191,24 @@ const nuclideRun = {
   },
 };
 
+const titrationRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000015',
+  modelId: 'chemistry-titration',
+  modelVersion: '1.1.0',
+  domain: 'chemistry',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { acid: 'acetic', acidName: 'Kwas octowy CH₃COOH (pKa≈4,74)', ka: 1.8e-5, vb: 0, ph: 2.88, veq: 25, pKa: 4.744727494896694 },
+  units: { acid: '', acidName: '', ka: 'mol/L', vb: 'mL', ph: '', veq: 'mL', pKa: '' },
+  warnings: ['Wynik dotyczy ustalonego, idealizowanego scenariusza laboratoryjnego.'],
+  validity: 'Charge balance scenario only; not a sample measurement.',
+  assumptions: ['Ca=Cb=0,1 mol/L; Va=25 mL; NaOH mocna zasada.'],
+  provenance: {
+    source: 'labs/experiments/chemistry-titration.ts via compute/core.bundle.mjs; core/physics.ts:titrationPH', formula: 'bilans ładunku słabego kwasu + NaOH z autodysocjacją wody', honesty: 'bounded_charge_balance_scenario', engine: 'Genesis weak-acid charge-balance titration (shared frontend/backend runner)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -451,6 +469,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ massNumber: 56, knownNuclide: true, measuredSymbol: 'Fe-56' });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis nuclide SEMF + bounded measured catalog (shared frontend/backend runner)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(nuclideRun.runId);
+  });
+
+  it('confirms a reviewed titration plan through the canonical backend and preserves shared-runner provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: titrationRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz miareczkowanie kwasowo-zasadowe NaOH.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'chemistry-titration', domainId: 'chemistry', inputs: {},
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ acid: 'acetic', veq: 25 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis weak-acid charge-balance titration (shared frontend/backend runner)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(titrationRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

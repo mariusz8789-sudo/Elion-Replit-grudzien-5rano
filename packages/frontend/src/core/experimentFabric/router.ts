@@ -338,10 +338,11 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Istniejący 2D model Isinga J=1 na siatce kwadratowej z periodycznymi brzegami i krokami Metropolisa; skończona siatka i skończony horyzont Monte Carlo nie zastępują termodynamicznego limitu.',
   },
   {
-    id: 'chemistry-titration', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-charge-balance@1.0.0',
-    parameters: [text('acid', 'Słaby kwas', 'acetic'), number('vb', 'Objętość NaOH', 'mL', 0, 60, 0)],
-    route: { kind: 'lab', labId: 'chemistry', experimentId: 'titration' }, knowledgeSources: ['chemistry.md'],
-    rationale: 'Istniejący bilans ładunku słabego kwasu i NaOH z autodysocjacją wody; parametry laboratoryjne są ustalonym scenariuszem, nie danymi jednego pomiaru.',
+    id: 'chemistry-titration', domainId: 'chemistry', modelVersion: '1.1.0', engine: 'genesis-charge-balance@1.0.0',
+    parameters: [text('acid', 'Kwas', 'acetic'), number('vb', 'Objętość NaOH', 'mL', 0, 60, 0)],
+    route: { kind: 'none' }, knowledgeSources: ['chemistry.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje ten sam bilans ładunku słabego kwasu i NaOH co Chemistry Lab dla czterech kanonicznych kwasów. Parametry laboratoryjne są ustalonym scenariuszem, nie danymi jednego pomiaru, automatyczną identyfikacją kwasu ani titracją dowolnej próbki.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'chem-vsepr', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-vsepr-geometry@1.0.0',

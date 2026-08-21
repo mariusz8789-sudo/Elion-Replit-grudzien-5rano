@@ -1983,6 +1983,178 @@ registerDataSource({
   load: () => KNOWN_NUCLIDES
 });
 
+// packages/frontend/src/labs/experiments/chemistry-titration.ts
+var ACIDS = [
+  { id: "acetic", name: "Kwas octowy CH\u2083COOH (pKa\u22484,74)", ka: 18e-6 },
+  { id: "formic", name: "Kwas mr\xF3wkowy HCOOH (pKa\u22483,75)", ka: 18e-5 },
+  { id: "benzoic", name: "Kwas benzoesowy C\u2086H\u2085COOH (pKa\u22484,20)", ka: 63e-6 },
+  { id: "hcn", name: "Kwas cyjanowodorowy HCN (pKa\u22489,21)", ka: 62e-11 }
+];
+var TITRATION_ACID_IDS = ACIDS.map((acid) => acid.id);
+var CA = 0.1;
+var VA = 25;
+var CB = 0.1;
+var VB_MAX = 60;
+function acidById(id) {
+  return ACIDS.find((a) => a.id === id) ?? ACIDS[0];
+}
+var TitrationSim = class {
+  lastAcidId = "";
+  lastVb = -1;
+  ka = ACIDS[0].ka;
+  currentPH = 7;
+  veq = 25;
+  init() {
+  }
+  reset = () => {
+  };
+  update(_dt, p) {
+    const acidId = String(p.acid ?? "acetic");
+    const vb = Number(p.vb ?? 0);
+    if (acidId !== this.lastAcidId || vb !== this.lastVb) {
+      this.lastAcidId = acidId;
+      this.lastVb = vb;
+      this.ka = acidById(acidId).ka;
+      this.veq = equivalenceVolumeMl(CA, VA, CB);
+      const vbSafe = Math.max(vb, 1e-6);
+      this.currentPH = titrationPH(CA, VA, CB, vbSafe, this.ka);
+    }
+  }
+  render(ctx, w, h) {
+    ctx.fillStyle = "#05060f";
+    ctx.fillRect(0, 0, w, h);
+    const padL = 34;
+    const padR = 14;
+    const padT = 16;
+    const padB = 30;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+    const toX = (vb) => padL + vb / VB_MAX * plotW;
+    const toY = (ph) => padT + plotH - ph / 14 * plotH;
+    ctx.strokeStyle = "rgba(230,234,245,0.08)";
+    ctx.lineWidth = 1;
+    ctx.font = "9px ui-monospace, monospace";
+    ctx.fillStyle = "rgba(230,234,245,0.45)";
+    for (let vb = 0; vb <= VB_MAX; vb += 10) {
+      const x = toX(vb);
+      ctx.beginPath();
+      ctx.moveTo(x, padT);
+      ctx.lineTo(x, padT + plotH);
+      ctx.stroke();
+      ctx.fillText(`${vb}`, x - 5, padT + plotH + 12);
+    }
+    for (let ph = 0; ph <= 14; ph += 2) {
+      const y = toY(ph);
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(padL + plotW, y);
+      ctx.stroke();
+      ctx.fillText(`${ph}`, 4, y + 3);
+    }
+    ctx.fillText("V(NaOH) [mL]", padL + plotW - 46, padT + plotH + 24);
+    ctx.beginPath();
+    ctx.strokeStyle = "#5cd6e8";
+    ctx.lineWidth = 2;
+    for (let i = 0; i <= 240; i++) {
+      const vb = i / 240 * VB_MAX;
+      const ph = titrationPH(CA, VA, CB, Math.max(vb, 1e-6), this.ka);
+      const x = toX(vb);
+      const y = toY(ph);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    const xEq = toX(this.veq);
+    ctx.strokeStyle = "rgba(240,179,92,0.5)";
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(xEq, padT);
+    ctx.lineTo(xEq, padT + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#f0b35c";
+    ctx.fillText(`Veq=${this.veq.toFixed(1)}mL`, xEq + 3, padT + 10);
+    const xHalf = toX(this.veq / 2);
+    const pKa = -Math.log10(this.ka);
+    ctx.fillStyle = "rgba(198,140,255,0.7)";
+    ctx.beginPath();
+    ctx.arc(xHalf, toY(pKa), 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText(`pH=pKa=${pKa.toFixed(2)}`, xHalf + 5, toY(pKa) - 6);
+    const mx = toX(this.lastVb);
+    const my = toY(this.currentPH);
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "#5cd6e8";
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(mx, my, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(230,234,245,0.75)";
+    ctx.font = "10px ui-monospace, monospace";
+    ctx.fillText(`V(NaOH)=${this.lastVb.toFixed(1)} mL \xB7 pH=${this.currentPH.toFixed(2)}`, 10, h - 8);
+  }
+  getStats() {
+    return {
+      ph: Math.round(this.currentPH * 100) / 100,
+      vb: Math.round(this.lastVb * 10) / 10,
+      veq: Math.round(this.veq * 10) / 10,
+      pKa: Math.round(-Math.log10(this.ka) * 100) / 100
+    };
+  }
+};
+function runTitrationScenario({ acid = "acetic", vb = 0 } = {}) {
+  const selected = ACIDS.find((candidate) => candidate.id === acid);
+  if (!selected) throw new Error("acid musi by\u0107 jednym z obs\u0142ugiwanych s\u0142abych kwas\xF3w.");
+  if (!Number.isFinite(vb) || vb < 0 || vb > VB_MAX) throw new Error(`vb musi mie\u015Bci\u0107 si\u0119 w zakresie 0\u2013${VB_MAX} mL.`);
+  const veq = equivalenceVolumeMl(CA, VA, CB);
+  const ph = titrationPH(CA, VA, CB, Math.max(vb, 1e-6), selected.ka);
+  return { acid: selected.id, acidName: selected.name, ka: selected.ka, vb, ph, veq, pKa: -Math.log10(selected.ka) };
+}
+var chemistryTitration = {
+  id: "titration",
+  name: "Miareczkowanie kwas\u2013zasada",
+  honesty: "exact",
+  honestyNote: "Krzywa liczona DOK\u0141ADNYM r\xF3wnaniem bilansu \u0142adunku ([Na\u207A]+[H\u207A]=[A\u207B]+[OH\u207B], z uwzgl\u0119dnieniem autodysocjacji wody), rozwi\u0105zywanym numerycznie (bisekcja) \u2014 nie tylko przybli\u017Ceniem Hendersona\u2013Hasselbalcha, kt\xF3re jest widoczne na wykresie jako dok\u0142adne TYLKO w punkcie p\xF3\u0142r\xF3wnowa\u017Cnikowym. Warto\u015Bci Ka: CRC Handbook of Chemistry and Physics. St\u0119\u017Cenia i obj\u0119to\u015Bci (0,1 mol/L, 25 mL kwasu) s\u0105 typowymi warto\u015Bciami laboratoryjnymi, nie danymi jednego konkretnego eksperymentu.",
+  params: [
+    {
+      key: "acid",
+      label: "Kwas",
+      type: "select",
+      default: "acetic",
+      options: ACIDS.map((a) => ({ value: a.id, label: a.name }))
+    },
+    { key: "vb", label: "Obj\u0119to\u015B\u0107 dodanego NaOH", type: "slider", min: 0, max: VB_MAX, step: 0.5, default: 0, unit: "mL" }
+  ],
+  createSim: () => new TitrationSim(),
+  narrate(p, stats) {
+    const acid = acidById(String(p.acid ?? "acetic"));
+    const vb = Number(stats.vb ?? 0);
+    const ph = Number(stats.ph ?? 7);
+    const veq = Number(stats.veq ?? 25);
+    const pKa = Number(stats.pKa ?? 4.74);
+    const region = vb < 0.5 ? "start" : vb < veq * 0.95 ? "buffer" : vb < veq * 1.05 ? "equivalence" : "excess";
+    const regionTitle = region === "start" ? `Czysty ${acid.name.split(" (")[0]}: pH = ${ph.toFixed(2)}` : region === "buffer" ? `Strefa buforowa: pH = ${ph.toFixed(2)}` : region === "equivalence" ? `Punkt r\xF3wnowa\u017Cnikowy: pH = ${ph.toFixed(2)}` : `Nadmiar NaOH: pH = ${ph.toFixed(2)}`;
+    const regionBody = region === "start" ? `Na starcie w roztworze jest tylko s\u0142aby kwas \u2014 pH wynika z jego cz\u0119\u015Bciowej dysocjacji (Ka=${acid.ka.toExponential(2)}), nie z pe\u0142nego st\u0119\u017Cenia jak dla mocnego kwasu. To dlatego pH s\u0142abego kwasu 0,1 mol/L jest WY\u017BSZE (mniej kwa\u015Bne) ni\u017C dla mocnego kwasu o tym samym st\u0119\u017Ceniu.` : region === "buffer" ? `W tej strefie roztw\xF3r zawiera jednocze\u015Bnie kwas (HA) i jego sprz\u0119\u017Con\u0105 zasad\u0119 (A\u207B) \u2014 to bufor, kt\xF3ry opiera si\u0119 zmianom pH. Przybli\u017Cenie Hendersona\u2013Hasselbalcha (pH=pKa+log([A\u207B]/[HA])) jest tu dobre, ale dok\u0142adna krzywa (bilans \u0142adunku) uwzgl\u0119dnia te\u017C to, czego ten wz\xF3r pomija: rozcie\u0144czenie i autodysocjacj\u0119 wody.` : region === "equivalence" ? `Ca\u0142y kwas przereagowa\u0142 z zasad\u0105 \u2014 w roztworze jest teraz TYLKO sprz\u0119\u017Cona zasada A\u207B (rozcie\u0144czona). Poniewa\u017C A\u207B jest s\u0142ab\u0105 zasad\u0105 (hydrolizuje wod\u0119: A\u207B+H\u2082O\u21CCHA+OH\u207B), pH w punkcie r\xF3wnowa\u017Cnikowym jest ZASADOWE (>7), nie oboj\u0119tne \u2014 klasyczny b\u0142\u0105d popularnonaukowy do naprawienia: "punkt r\xF3wnowa\u017Cnikowy" \u2260 "pH=7" dla s\u0142abego kwasu.` : `Dodano wi\u0119cej NaOH ni\u017C potrzeba do zoboj\u0119tnienia kwasu \u2014 nadmiar mocnej zasady dominuje pH, kt\xF3re zbli\u017Ca si\u0119 do pH samego roztworu NaOH o tym st\u0119\u017Ceniu.`;
+    const blocks = [
+      {
+        title: regionTitle,
+        body: regionBody,
+        citation: { source: "CRC Handbook of Chemistry and Physics \u2014 sta\u0142e dysocjacji kwas\xF3w", confirmation: "confirmed", note: `Ka(${acid.name.split(" (")[0]}) = ${acid.ka.toExponential(2)}` }
+      },
+      {
+        title: `Punkt p\xF3\u0142r\xF3wnowa\u017Cnikowy: pH = pKa = ${pKa.toFixed(2)} (dok\u0142adnie)`,
+        body: `W po\u0142owie drogi do punktu r\xF3wnowa\u017Cnikowego (V=${(veq / 2).toFixed(1)} mL) st\u0119\u017Cenia kwasu i sprz\u0119\u017Conej zasady s\u0105 R\xD3WNE \u2014 wtedy r\xF3wnanie Hendersona\u2013Hasselbalcha upraszcza si\u0119 do pH=pKa dok\u0142adnie (log(1)=0). To jeden z niewielu punkt\xF3w na ca\u0142ej krzywej, gdzie proste przybli\u017Cenie i dok\u0142adne r\xF3wnanie bilansu \u0142adunku daj\u0105 identyczny wynik.`
+      },
+      {
+        title: "Dlaczego krzywa robi gwa\u0142towny skok",
+        body: `Blisko punktu r\xF3wnowa\u017Cnikowego (V=${veq.toFixed(1)} mL) nawet KROPLA dodatkowego NaOH gwa\u0142townie zmienia pH \u2014 to w\u0142a\u015Bnie ten stromy skok wykorzystuj\u0105 wska\u017Aniki pH (fenoloftaleina, oran\u017C metylowy) i pehametry do wykrywania ko\u0144ca miareczkowania w prawdziwym laboratorium.`
+      }
+    ];
+    return blocks;
+  }
+};
+
 // packages/frontend/src/core/compute/cheminformatics.ts
 var ATOMIC_WEIGHTS = {
   H: 1.008,
@@ -2080,6 +2252,7 @@ export {
   SCHWARZSCHILD_CRITICAL_IMPACT,
   TESSERACT_EDGES,
   TESSERACT_VERTICES,
+  TITRATION_ACID_IDS,
   atomCount,
   binarySeparationMeters,
   bondPolarity,
@@ -2132,6 +2305,7 @@ export {
   runChshCorrelationScenario,
   runNuclideChartScenario,
   runQuantumTeleportScenario,
+  runTitrationScenario,
   runTokamakLawsonScenario,
   runTunnelingScenario,
   sampleLocalHiddenPair,

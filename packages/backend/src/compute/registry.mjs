@@ -403,6 +403,43 @@ const MODELS = [
 
   functionModel(
     {
+      id: 'chemistry-titration', name: 'Titracja słabego kwasu mocną zasadą', domain: 'chemistry', version: '1.1.0',
+      description: 'Deterministyczny bilans ładunku słabego kwasu i NaOH dla czterech jawnie ograniczonych lokalnych scenariuszy kwasów.',
+      inputs: [
+        { id: 'acid', label: 'Scenariusz kwasu', type: 'string', unit: '', maxLength: 16, default: 'acetic' },
+        { id: 'vb', label: 'Objętość dodanego NaOH', type: 'number', unit: 'mL', min: 0, max: 60, default: 0 },
+      ],
+      outputs: [
+        { id: 'acid', label: 'Id kwasu', unit: '' }, { id: 'acidName', label: 'Nazwa kwasu', unit: '' }, { id: 'ka', label: 'Ka', unit: 'mol/L' },
+        { id: 'vb', label: 'Dodany NaOH', unit: 'mL' }, { id: 'ph', label: 'pH', unit: '' }, { id: 'veq', label: 'Objętość równoważnikowa', unit: 'mL' }, { id: 'pKa', label: 'pKa', unit: '' },
+      ],
+      assumptions: 'Ca=Cb=0,1 mol/L, Va=25 mL, NaOH jako mocna zasada i jedna z czterech lokalnych wartości Ka.',
+      validity: 'Tylko scenariusze acetic/formic/benzoic/hcn oraz 0≤Vb≤60 mL. Model nie obejmuje aktywności jonowych, zmiennej temperatury, CO₂, wieloprotonowości, niepewności pomiarowej, automatycznej identyfikacji próbki ani titracji innego kwasu.',
+      provenance: {
+        source: 'labs/experiments/chemistry-titration.ts via compute/core.bundle.mjs; core/physics.ts:titrationPH',
+        formula: 'bilans ładunku słabego kwasu + NaOH z autodysocjacją wody',
+        honesty: 'bounded_charge_balance_scenario',
+        engine: 'Genesis weak-acid charge-balance titration (shared frontend/backend runner)',
+      },
+    },
+    (v) => {
+      const result = core.runTitrationScenario({ acid: v.acid, vb: v.vb });
+      return {
+        outputs: result,
+        warnings: ['Wynik dotyczy ustalonego, idealizowanego scenariusza laboratoryjnego; nie jest pomiarem konkretnej próbki ani identyfikacją kwasu.'],
+      };
+    },
+    {
+      validate(values) {
+        return core.TITRATION_ACID_IDS.includes(values.acid)
+          ? { ok: true }
+          : { ok: false, error: 'unsupported_acid', message: `acid musi być jednym z: ${core.TITRATION_ACID_IDS.join(', ')}.` };
+      },
+    },
+  ),
+
+  functionModel(
+    {
       id: 'nuclear-nuclide-chart', name: 'Wykres nuklidów: SEMF i katalog', domain: 'nuclear', version: '1.1.0',
       description: 'Półempiryczny wzór masowy (SEMF) dla energii wiązania na nukleon wraz z ograniczonym katalogiem zmierzonych nuklidów i metadanych rozpadu.',
       inputs: [

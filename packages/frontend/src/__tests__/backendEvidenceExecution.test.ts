@@ -263,6 +263,24 @@ const gaussianRun = {
   },
 };
 
+const arrheniusRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000019',
+  modelId: 'chemistry-arrhenius',
+  modelVersion: '1.1.0',
+  domain: 'chemistry',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { rateConstant: 111.2, halfLifeFirstOrder: 0.00623, speedupVsRoom: 31.4 },
+  units: { rateConstant: '1/s', halfLifeFirstOrder: 's', speedupVsRoom: '×' },
+  warnings: [],
+  validity: 'Zakres, w którym A i Ea są w przybliżeniu stałe.',
+  assumptions: ['Równanie Arrheniusa z jawnym, stałym czynnikiem A. Reakcja I rzędu dla t½.'],
+  provenance: {
+    source: 'core/modelGraph/chemistryKineticsGraph.ts', formula: 'k = A·exp(−Ea/RT)', honesty: 'simplified', engine: 'Genesis chemistry-kinetics ModelGraph (shared frontend/backend graph)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -591,6 +609,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ zScore: 1, pdfValue: 0.24197072451914337 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toBe('f(x)=exp(−½z²)/(σ√2π), P=erf(|z|/√2)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(gaussianRun.runId);
+  });
+
+  it('confirms a reviewed Arrhenius plan through the canonical backend and preserves full ModelGraph inputs', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: arrheniusRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz kinetykę Arrheniusa przy 350 K i 60 kJ/mol.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'chemistry-arrhenius', domainId: 'chemistry', inputs: { temperatureK: 350, activationEnergyKJ: 60 },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ rateConstant: 111.2, speedupVsRoom: 31.4 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis chemistry-kinetics ModelGraph (shared frontend/backend graph)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(arrheniusRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

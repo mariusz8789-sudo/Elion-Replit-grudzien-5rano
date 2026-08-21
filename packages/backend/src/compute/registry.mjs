@@ -197,20 +197,21 @@ const MODELS = [
 
   graphModel(
     {
-      id: 'chemistry-arrhenius', name: 'Kinetyka Arrheniusa', domain: 'chemistry', version: '1.0.0',
+      id: 'chemistry-arrhenius', name: 'Kinetyka Arrheniusa', domain: 'chemistry', version: '1.1.0',
       description: 'Stała szybkości reakcji, czas połowicznej przemiany i przyspieszenie względem temperatury pokojowej.',
       inputs: [
         { id: 'temperatureK', label: 'Temperatura', unit: 'K', min: 200, max: 1000, default: 298 },
         { id: 'activationEnergyKJ', label: 'Energia aktywacji Ea', unit: 'kJ/mol', min: 0, max: 300, default: 50 },
+        { id: 'preExponentialLog10', label: 'log₁₀ czynnika A', unit: 'log₁₀(1/s)', min: -10, max: 25, default: 11 },
       ],
       outputs: [
         { id: 'rateConstant', label: 'Stała szybkości k', unit: '1/s' },
         { id: 'halfLifeFirstOrder', label: 'Czas połowiczny (I rzędu)', unit: 's' },
         { id: 'speedupVsRoom', label: 'Przyspieszenie vs 298 K', unit: '×' },
       ],
-      assumptions: 'Równanie Arrheniusa ze stałym czynnikiem przedwykładniczym A. Reakcja I rzędu dla t½.',
-      validity: 'Zakres, w którym A i Ea są w przybliżeniu stałe.',
-      provenance: { source: 'core/modelGraph/chemistryKineticsGraph.ts', formula: 'k = A·exp(−Ea/RT)', honesty: 'simplified' },
+      assumptions: 'Równanie Arrheniusa z jawnym, stałym czynnikiem przedwykładniczym A. Reakcja I rzędu dla t½.',
+      validity: 'Zakres, w którym A i Ea są w przybliżeniu stałe; parametr log₁₀ A jest scenariuszem wejściowym, nie dopasowaniem z danych.',
+      provenance: { source: 'core/modelGraph/chemistryKineticsGraph.ts', formula: 'k = A·exp(−Ea/RT)', honesty: 'simplified', engine: 'Genesis chemistry-kinetics ModelGraph (shared frontend/backend graph)' },
     },
     core.buildChemistryKineticsGraph,
   ),

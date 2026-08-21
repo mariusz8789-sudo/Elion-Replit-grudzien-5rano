@@ -326,10 +326,11 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf energii relatywistycznej cząstki swobodnej.',
   },
   {
-    id: 'chemistry-arrhenius', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
+    id: 'chemistry-arrhenius', domainId: 'chemistry', modelVersion: '1.1.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('temperatureK', 'Temperatura', 'K', 200, 1000, 350), number('activationEnergyKJ', 'Energia aktywacji', 'kJ/mol', 0, 300, 60), number('preExponentialLog10', 'log₁₀ A', 'log₁₀(1/s)', -10, 25, 11)],
-    route: { kind: 'lab', labId: 'chemistry' }, knowledgeSources: ['chemistry.md', 'thermodynamics.md'],
-    rationale: 'Realny graf kinetyki Arrheniusa; trend, nie pełny mechanizm reakcji.',
+    route: { kind: 'none' }, knowledgeSources: ['chemistry.md', 'thermodynamics.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje istniejący graf Arrheniusa k=A·exp(−Ea/RT), z jawnym log₁₀ A i czasem połowicznym pierwszego rzędu. Nie jest to dopasowanie parametrów reakcji z danych, model mechanizmu, katalizy, równowagi ani predykcja konkretnej reakcji.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'chemistry-ising', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-ising-metropolis@1.0.0',

@@ -1084,12 +1084,24 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.disclosure.rationale).toContain('nie jest dopasowaniem danych');
   });
 
+  it('plans Arrhenius kinetics for canonical backend Fabric without claiming a reaction-specific prediction', () => {
+    const request = parseScienceChatMessage('Oblicz kinetykę Arrheniusa przy 350 K i 60 kJ/mol.');
+    const reviewed = planEvidenceGuidedExperiment(request);
+
+    expect(request.modelId).toBe('chemistry-arrhenius');
+    expect(request.parameters).toEqual({ temperatureK: 350, activationEnergyKJ: 60 });
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.1.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('Nie jest to dopasowanie parametrów reakcji z danych');
+  });
+
   it.each([
     ['Oblicz energię wiązania jądra protony=26 neutrony=30.', 'nuclear-semf', 'bindingEnergy'],
     ['Oblicz dylatację czasu dla beta=0.8.', 'sr-lorentz', 'lorentzGammaFactor'],
     ['Oblicz ucieczkę atmosfery planety.', 'universe-atmospheric-escape', 'jeansParameter'],
     ['Oblicz energię relatywistyczną cząstki beta=0.8.', 'particle-relativistic-energy', 'totalEnergyMeV'],
-    ['Oblicz kinetykę Arrheniusa przy 350 K i 60 kJ/mol.', 'chemistry-arrhenius', 'rateConstant'],
     ['Oblicz wzrost logistyczny populacji.', 'biology-logistic', 'populationAtT'],
     ['Oblicz Kardaszew typ K=1.', 'civilization-kardashev', 'powerWatts'],
   ])('routes Chat through real local model %s', (prompt, modelId, outputKey) => {

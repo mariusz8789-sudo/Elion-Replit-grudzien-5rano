@@ -227,6 +227,24 @@ const vseprRun = {
   },
 };
 
+const molecularWeightRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000017',
+  modelId: 'chem-molecular-weight',
+  modelVersion: '1.0.0',
+  domain: 'chemistry',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { molarMassGmol: 18.01528, atomCount: 3, degreeOfUnsaturation: 0 },
+  units: { molarMassGmol: 'g/mol', atomCount: '', degreeOfUnsaturation: '' },
+  warnings: [],
+  validity: 'Prosty wzór bez nawiasów, hydratów i izotopów.',
+  assumptions: ['Parser cheminformatyczny Genesis v1.'],
+  provenance: {
+    source: 'core/compute/cheminformatics.ts via compute/core.bundle.mjs', formula: 'MW=Σ nᵢ·Aᵢ; DoU=(2C+2+N−H−X)/2', honesty: 'exact', engine: 'Genesis cheminformatics parser (shared frontend/backend core)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -521,6 +539,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ shapeId: 'ax4', example: 'CH₄', bonding: 4, lone: 0 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis VSEPR domain-geometry runner (shared frontend/backend runner)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(vseprRun.runId);
+  });
+
+  it('confirms a reviewed molecular-weight plan through the canonical backend and preserves parser provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: molecularWeightRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz masę molową wzór H2O.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'chem-molecular-weight', domainId: 'chemistry', inputs: { formula: 'H2O' },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ atomCount: 3, degreeOfUnsaturation: 0 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis cheminformatics parser (shared frontend/backend core)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(molecularWeightRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

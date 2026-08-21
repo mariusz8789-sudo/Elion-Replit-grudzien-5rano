@@ -1058,13 +1058,25 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.result.validity).toContain('nie jest CFD');
   });
 
+  it('plans molecular weight for canonical backend Fabric without claiming a structural chemistry parser', () => {
+    const request = parseScienceChatMessage('Oblicz masę molową wzór H2O.');
+    const reviewed = planEvidenceGuidedExperiment(request);
+
+    expect(request.modelId).toBe('chem-molecular-weight');
+    expect(request.parameters).toEqual({ formula: 'H2O' });
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.0.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('nie jest pełnym parserem struktury chemicznej');
+  });
+
   it.each([
     ['Oblicz energię wiązania jądra protony=26 neutrony=30.', 'nuclear-semf', 'bindingEnergy'],
     ['Oblicz dylatację czasu dla beta=0.8.', 'sr-lorentz', 'lorentzGammaFactor'],
     ['Oblicz ucieczkę atmosfery planety.', 'universe-atmospheric-escape', 'jeansParameter'],
     ['Oblicz energię relatywistyczną cząstki beta=0.8.', 'particle-relativistic-energy', 'totalEnergyMeV'],
     ['Oblicz kinetykę Arrheniusa przy 350 K i 60 kJ/mol.', 'chemistry-arrhenius', 'rateConstant'],
-    ['Oblicz masę molową wzór H2O.', 'chem-molecular-weight', 'molarMassGmol'],
     ['Oblicz rozkład normalny.', 'math-gaussian', 'pdfValue'],
     ['Oblicz wzrost logistyczny populacji.', 'biology-logistic', 'populationAtT'],
     ['Oblicz Kardaszew typ K=1.', 'civilization-kardashev', 'powerWatts'],

@@ -354,8 +354,9 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'chem-molecular-weight', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-cheminformatics@1.0.0',
     parameters: [text('formula', 'Wzór sumaryczny', 'H2O')],
-    route: { kind: 'lab', labId: 'chemistry' }, knowledgeSources: ['chemistry.md'],
-    rationale: 'Realny parser prostego wzoru i obliczenie masy molowej; nie obsługuje nawiasów ani izotopów.',
+    route: { kind: 'none' }, knowledgeSources: ['chemistry.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje ten sam parser prostego wzoru i obliczenie masy molowej. Model nie obsługuje nawiasów, hydratów ani izotopów i nie jest pełnym parserem struktury chemicznej.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'math-gaussian', domainId: 'mathematics', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',

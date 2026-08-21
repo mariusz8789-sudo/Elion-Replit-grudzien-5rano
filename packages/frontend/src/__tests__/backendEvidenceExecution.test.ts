@@ -371,6 +371,24 @@ const atmosphericEscapeRun = {
   },
 };
 
+const relativisticParticleRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000025',
+  modelId: 'particle-relativistic-energy',
+  modelVersion: '1.0.0',
+  domain: 'particle',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { totalEnergyMeV: 0.851666666666667, kineticEnergyMeV: 0.340666666666667, momentumMeVc: 0.681333333333334 },
+  units: { totalEnergyMeV: 'MeV', kineticEnergyMeV: 'MeV', momentumMeVc: 'MeV/c' },
+  warnings: [],
+  validity: 'β < 1.',
+  assumptions: ['Cząstka swobodna, próżnia.'],
+  provenance: {
+    source: 'core/modelGraph/relativisticEnergyGraph.ts', formula: 'E = γmc², p = γmv', honesty: 'exact', engine: 'Genesis ModelGraph (particle-relativistic-energy)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -801,6 +819,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ jeansParameter: 353.5 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toContain('T_eq=278.5');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(atmosphericEscapeRun.runId);
+  });
+
+  it('confirms a reviewed relativistic-particle plan through the canonical backend and preserves ModelGraph provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: relativisticParticleRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz energię relatywistyczną cząstki beta=0.8.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'particle-relativistic-energy', domainId: 'particle', inputs: { velocityFraction: 0.8 },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ totalEnergyMeV: 0.851666666666667 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toBe('E = γmc², p = γmv');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(relativisticParticleRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

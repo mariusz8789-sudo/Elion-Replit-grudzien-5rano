@@ -326,8 +326,9 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'particle-relativistic-energy', domainId: 'particle', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('restMassMeV', 'Masa spoczynkowa', 'MeV/c²', 0, 1e6, 0.511), number('velocityFraction', 'Prędkość β = v/c', '', 0, 0.999999, 0.866)],
-    route: { kind: 'lab', labId: 'particle' }, knowledgeSources: ['particle.md', 'spacetime-einstein.md'],
-    rationale: 'Realny graf energii relatywistycznej cząstki swobodnej.',
+    route: { kind: 'none' }, knowledgeSources: ['particle.md', 'spacetime-einstein.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje istniejący graf energii relatywistycznej swobodnej cząstki w próżni. Nie jest to model pola elektromagnetycznego, przyspieszenia, promieniowania, oddziaływań, detektora, zderzenia ani danych eksperymentalnych.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'chemistry-arrhenius', domainId: 'chemistry', modelVersion: '1.1.0', engine: 'genesis-model-graph@1.0.0',

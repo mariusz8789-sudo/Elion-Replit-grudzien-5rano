@@ -1151,8 +1151,20 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.disclosure.rationale).toContain('Nie jest to pełny model klimatu');
   });
 
+  it('plans relativistic particle energy for canonical backend Fabric without claiming a detector event', () => {
+    const request = parseScienceChatMessage('Oblicz energię relatywistyczną cząstki beta=0.8.');
+    const reviewed = planEvidenceGuidedExperiment(request);
+
+    expect(request.modelId).toBe('particle-relativistic-energy');
+    expect(request.parameters).toEqual({ velocityFraction: 0.8 });
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.0.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('Nie jest to model pola elektromagnetycznego');
+  });
+
   it.each([
-    ['Oblicz energię relatywistyczną cząstki beta=0.8.', 'particle-relativistic-energy', 'totalEnergyMeV'],
     ['Oblicz Kardaszew typ K=1.', 'civilization-kardashev', 'powerWatts'],
   ])('routes Chat through real local model %s', (prompt, modelId, outputKey) => {
     const run = runExperiment(parseScienceChatMessage(prompt));

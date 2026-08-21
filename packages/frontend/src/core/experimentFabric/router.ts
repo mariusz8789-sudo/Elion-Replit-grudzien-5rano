@@ -29,6 +29,8 @@ export interface RouterModel {
   route: ExperimentRoute;
   knowledgeSources: readonly KnowledgeCorpusFile[];
   rationale: string;
+  /** Domyślnie realny silnik; scenariusze legend używają jawnej capability zamiast udawać solver. */
+  capability?: KnowledgeCapability;
 }
 
 const number = (id: string, label: string, unit: string, min: number, max: number, defaultValue: number): ExperimentParameterSpec =>
@@ -80,6 +82,13 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     parameters: [number('velocityMs', 'Prędkość obiektu v', 'm/s', 0, 4e8, 1.5e8), number('lightSpeedMs', 'Hipotetyczna prędkość światła c', 'm/s', 5e7, 6e8, 299792458), number('distanceKm', 'Dystans', 'km', 1, 1e6, 384400)],
     route: { kind: 'lab', labId: 'spacetime', experimentId: 'c-slider' }, knowledgeSources: ['spacetime-einstein.md'],
     rationale: 'Istniejący graf szczególnej teorii względności dla jawnego eksperymentu myślowego: zmienia założoną wartość c, nie stałą fizyczną świata rzeczywistego. Działa wyłącznie dla v<c.',
+  },
+  {
+    id: 'historical-philadelphia-legend', domainId: 'historical-legends', modelVersion: '1.0.0', engine: 'genesis-hypothetical-visualization@1.0.0',
+    parameters: [text('viewMode', 'Tryb interpretacji', 'legend')],
+    route: { kind: 'hypothetical-visualization', scenarioId: 'philadelphia-legend', hash: '#/hf-slice?scenario=philadelphia' }, knowledgeSources: ['historical-legends-philadelphia.md'],
+    rationale: 'Hipotetyczna wizualizacja legendy o Eksperymencie Filadelfia. Historyczny rekord, legenda, założenia i granice znanej fizyki są ujawniane osobno; nie ma wyniku fizycznego ani danych pomiarowych.',
+    capability: 'HYPOTHETICAL_VISUALIZATION',
   },
   {
     id: 'universe-kepler', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
@@ -407,7 +416,7 @@ export function createExperimentIntent(request: StructuredExperimentRequest): Ex
   let rationale = 'Nie znaleziono zarejestrowanego modelu ani bezpiecznego adaptera dla tej prośby.';
   let requiredSolver = 'Zarejestrowany solver dla wskazanej domeny';
   if (model) {
-    capability = 'REAL_ENGINE';
+    capability = model.capability ?? 'REAL_ENGINE';
     rationale = model.rationale;
     requiredSolver = model.engine;
   } else if (domain) {
@@ -441,7 +450,7 @@ export function createExperimentPlan(intent: ExperimentIntent): ExperimentPlan {
     engine: model?.engine ?? null,
     modelVersion: model?.modelVersion ?? null,
     parameterSchema: model?.parameters ?? [],
-    runnable: intent.capability === 'REAL_ENGINE' && Boolean(model),
+    runnable: (intent.capability === 'REAL_ENGINE' || intent.capability === 'HYPOTHETICAL_VISUALIZATION') && Boolean(model),
     route: model?.route ?? { kind: 'none' },
   };
   return { ...provisional, planId: fingerprintExperimentPlan({ ...provisional, planId: '' }) };

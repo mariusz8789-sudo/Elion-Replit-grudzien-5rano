@@ -137,6 +137,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     ...base, domainId, modelId, requestedVisualization, parameters: only(params, allowed),
   });
 
+  if (/(?:eksperyment\s+filadelf(?:ia|ijski)|philadelphia\s+experiment|uss\s+eldridge|\beldridge\b|legend[a-ząćęłńóśźż]*\s+filadelf[a-ząćęłńóśźż]*)/.test(normalized)) {
+    params.viewMode = /(?:zgodne\s+ze\s+(?:znan[a-ząćęłńóśźż]*\s+)?fizyk[a-ząćęłńóśźż]*|porównaj\s+legend[a-ząćęłńóśźż]*\s+z\s+fizyk[a-ząćęłńóśźż]*|porownaj\s+legend[a-ząćęłńóśźż]*\s+z\s+fizyk[a-ząćęłńóśźż]*|czego\s+potrzeba)/.test(normalized) ? 'physics' : 'legend';
+    return request('historical-legends', 'historical-philadelphia-legend', 'scene-3d', ['viewMode']);
+  }
   if (/(?:powódź|powodz|pożar|pozar|trzęsienie|trzesienie|blackout|kaskad[a-ząćęłńóśźż]*|ewakuacj[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('hazard-cascade', undefined, 'world-3d', []);
   }

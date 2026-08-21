@@ -39,17 +39,20 @@ function formatEvidenceGuidedPlan(reviewed: EvidenceGuidedExperimentPlan): strin
   const quantumEvidence = disclosure.quantumEvidenceCards.flatMap((card) => card.entries).map((entry) =>
     `• ${entry.status}: ${entry.title}. ${entry.limitation}`,
   ).join('\n');
-  const ready = reviewed.status === 'READY_FOR_CONFIRMATION';
+  const hypothetical = reviewed.status === 'READY_FOR_HYPOTHETICAL_CONFIRMATION';
+  const ready = reviewed.status === 'READY_FOR_CONFIRMATION' || hypothetical;
   return [
-    `PLAN EKSPERYMENTU — ${ready ? 'oczekuje na potwierdzenie; nic nie zostało jeszcze uruchomione.' : 'nie może zostać uruchomiony.'}`,
+    `PLAN ${hypothetical ? 'SCENARIUSZA HISTORYCZNEJ LEGENDY' : 'EKSPERYMENTU'} — ${ready ? 'oczekuje na potwierdzenie; nic nie zostało jeszcze uruchomione.' : 'nie może zostać uruchomiony.'}`,
     `Model / solver: ${disclosure.modelId ?? 'brak zarejestrowanego modelu'} · ${engine}`,
-    `Capability: ${disclosure.capability} · ${disclosure.resultWillComeFromRealRun ? 'po potwierdzeniu wynik będzie pochodził z realnego runu.' : 'brak realnego runu dla tej prośby.'}`,
+    `Capability: ${disclosure.capability} · ${hypothetical ? 'po potwierdzeniu otworzy się jawnie oznaczona hipotetyczna wizualizacja; nie będzie realnego runu ani danych pomiarowych.' : disclosure.resultWillComeFromRealRun ? 'po potwierdzeniu wynik będzie pochodził z realnego runu.' : 'brak realnego runu dla tej prośby.'}`,
     `Parametry: ${params}. Dostępna schema: ${schema}.`,
     `Warunki: ${reviewed.request.operation}, ${seed}. Route: ${disclosure.route?.kind ?? 'none'}.`,
     `Ograniczenia:\n${limits}`,
     ...(quantumEvidence ? [`Kontekst kwantowy (nie jest wynikiem solvera):\n${quantumEvidence}`] : []),
     ready
-      ? 'Wpisz „potwierdź” albo użyj przycisku „Uruchom potwierdzony plan”. Pojedynczy run zachowa provenance; Evidence Pack wymaga osobnego prerejestrowanego protokołu, a A/B drugiego wariantu.'
+      ? hypothetical
+        ? 'Wpisz „potwierdź”, aby otworzyć HYPOTHETICAL_VISUALIZATION z provenance. Genesis nie wygeneruje wyniku fizycznego, danych pomiarowych ani Evidence Pack.'
+        : 'Wpisz „potwierdź” albo użyj przycisku „Uruchom potwierdzony plan”. Pojedynczy run zachowa provenance; Evidence Pack wymaga osobnego prerejestrowanego protokołu, a A/B drugiego wariantu.'
       : `Nie uruchomiono wyniku. ${reviewed.validationErrors.length > 0 ? `Walidacja: ${reviewed.validationErrors.join(' ')}` : `Wymagany komponent: ${disclosure.requiredSolver}.`}`,
   ].join('\n\n');
 }
@@ -166,9 +169,12 @@ export function ScienceChat() {
       try {
         const confirmed = confirmEvidenceGuidedExperiment(reviewed);
         const run = confirmed.run;
-        setLastEvidenceCapsule(capsuleFromConfirmedExperiment(confirmed));
-        const handoff = `\n\nEvidence Pack: ${confirmed.handoff.evidencePack.status} — ${confirmed.handoff.evidencePack.reason}\nA/B: ${confirmed.handoff.counterfactual.status} — ${confirmed.handoff.counterfactual.reason}`;
-        const tag: EpistemicTag = run.result.status === 'completed' ? 'WYNIK' : 'SYSTEM';
+        const hypothetical = run.result.status === 'hypothetical_visualization';
+        if (run.result.status === 'completed') setLastEvidenceCapsule(capsuleFromConfirmedExperiment(confirmed));
+        const handoff = hypothetical
+          ? '\n\nStatus epistemiczny: HISTORICAL_LEGEND / HYPOTHETICAL_VISUALIZATION. Evidence Pack i A/B nie są tworzone, ponieważ nie wykonano modelu fizycznego.'
+          : `\n\nEvidence Pack: ${confirmed.handoff.evidencePack.status} — ${confirmed.handoff.evidencePack.reason}\nA/B: ${confirmed.handoff.counterfactual.status} — ${confirmed.handoff.counterfactual.reason}`;
+        const tag: EpistemicTag = run.result.status === 'completed' ? 'WYNIK' : hypothetical ? 'HIPOTEZA' : 'SYSTEM';
         setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `${formatFabricRun(run)}${handoff}`, tag }]);
         setPendingGuidedPlan(null);
         track('experiment_fabric_run', { model: run.request.modelId ?? run.request.domainId, status: run.result.status, confirmed: 'true' });
@@ -177,6 +183,10 @@ export function ScienceChat() {
         } else if (run.result.status === 'completed' && run.result.route.kind === 'lab') {
           setPendingScenario(run.result.route.labId, run.provenance.parameterSnapshot, run.result.route.experimentId);
           window.location.hash = `#/lab/${run.result.route.labId}`;
+        } else if (run.result.status === 'hypothetical_visualization' && run.result.route.kind === 'hypothetical-visualization') {
+          const legendView = run.provenance.parameterSnapshot.viewMode === 'physics' ? '&legendView=physics' : '';
+          window.location.hash = `${run.result.route.hash}${legendView}`;
+          setOpen(false);
         }
       } catch (error) {
         const reason = error instanceof Error ? error.message : 'Nieznany błąd potwierdzenia planu.';
@@ -189,7 +199,7 @@ export function ScienceChat() {
     if (isFabricRequest) {
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
-      setPendingGuidedPlan(reviewed.status === 'READY_FOR_CONFIRMATION' ? reviewed : null);
+      setPendingGuidedPlan(reviewed.status === 'READY_FOR_CONFIRMATION' || reviewed.status === 'READY_FOR_HYPOTHETICAL_CONFIRMATION' ? reviewed : null);
       setInput('');
       track('ask_ai_used', { via: 'science-chat-plan', model: fabricRequest.modelId ?? fabricRequest.domainId, status: reviewed.status });
       void appendProjectKnowledgeSources(msg);

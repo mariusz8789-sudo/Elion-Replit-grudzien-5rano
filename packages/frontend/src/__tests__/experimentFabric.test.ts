@@ -298,6 +298,29 @@ describe('Genesis Experiment Fabric', () => {
     expect(capsule.counterfactual).toEqual(confirmed.handoff.counterfactual);
   });
 
+  it('routes the Philadelphia Experiment only as a confirmed historical-legend hypothetical visualization', () => {
+    const legendRequest = parseScienceChatMessage('Pokaż wersję według legendy Eksperymentu Filadelfia z USS Eldridge.');
+    expect(legendRequest.domainId).toBe('historical-legends');
+    expect(legendRequest.modelId).toBe('historical-philadelphia-legend');
+    expect(legendRequest.parameters.viewMode).toBe('legend');
+
+    const reviewed = planEvidenceGuidedExperiment(legendRequest);
+    expect(reviewed.status).toBe('READY_FOR_HYPOTHETICAL_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('HYPOTHETICAL_VISUALIZATION');
+    expect(reviewed.disclosure.resultWillComeFromRealRun).toBe(false);
+    expect(reviewed.disclosure.knowledgeSources).toContain('historical-legends-philadelphia.md');
+
+    const confirmed = confirmEvidenceGuidedExperiment(reviewed);
+    expect(confirmed.run.result.status).toBe('hypothetical_visualization');
+    expect(confirmed.run.provenance.resultOrigin).toBe('hypothetical-visualization');
+    expect(confirmed.run.result.outputs).toMatchObject({ classification: 'HISTORICAL_LEGEND', viewMode: 'legend', realEngineAvailable: false });
+    expect(confirmed.run.result.route).toEqual({ kind: 'hypothetical-visualization', scenarioId: 'philadelphia-legend', hash: '#/hf-slice?scenario=philadelphia' });
+    expect(confirmed.run.result.warnings.join(' ')).toContain('REAL_ENGINE: brak');
+    expect(() => capsuleFromConfirmedExperiment(confirmed)).toThrow('completed real-engine run');
+
+    const physicsRequest = parseScienceChatMessage('Pokaż, co jest zgodne ze znaną fizyką w legendzie Filadelfii.');
+    expect(physicsRequest.parameters.viewMode).toBe('physics');
+  });
   it('rejects an evidence-guided plan modified after review before executing it', () => {
     const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'));
     const modified = {

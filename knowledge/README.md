@@ -58,6 +58,7 @@ Mapowanie na etykiety w aplikacji: ★★★★–★★★★★ → `exact`/`s
 | [quantum-decision-explorer.md](quantum-decision-explorer.md) | Quantum Decision Explorer — narzędzie narracyjne (NIE fizyka) |
 | [classical-mechanics.md](classical-mechanics.md) | Fundament pod Universe/Civilization (bez własnego laba) |
 | [electrodynamics.md](electrodynamics.md) | Fundament pod Atom/Particle (bez własnego laba) |
+| [historical-legends-philadelphia.md](historical-legends-philadelphia.md) | Historical Legends — źródłowe rozdzielenie rekordu historycznego, legendy i hipotetycznej wizualizacji Filadelfii; nie jest solverem fizycznym |
 | [thermodynamics.md](thermodynamics.md) | Fundament pod Nuclear/Einstein (bez własnego laba) |
 | [scientists.md](scientists.md) | Dossier 13 naukowców — jeden plik, nie rozproszone po katalogach domenowych |
 

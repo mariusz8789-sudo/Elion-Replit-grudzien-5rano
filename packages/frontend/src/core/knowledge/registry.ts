@@ -20,6 +20,7 @@ export const KNOWLEDGE_CORPUS_FILES = [
   'classical-mechanics.md',
   'discovery-timeline.md',
   'electrodynamics.md',
+  'historical-legends-philadelphia.md',
   'mathematics.md',
   'multiverse.md',
   'nuclear.md',
@@ -35,7 +36,7 @@ export const KNOWLEDGE_CORPUS_FILES = [
 
 export type KnowledgeCorpusFile = (typeof KNOWLEDGE_CORPUS_FILES)[number];
 export type KnowledgeScale = 'meta' | 'micro' | 'micro-meso' | 'meso' | 'macro' | 'cosmic' | 'micro-cosmic';
-export type KnowledgeCapability = 'REAL_ENGINE' | 'KNOWLEDGE_ONLY' | 'CAPABILITY_SEAM' | 'ENGINE_NOT_AVAILABLE';
+export type KnowledgeCapability = 'REAL_ENGINE' | 'KNOWLEDGE_ONLY' | 'CAPABILITY_SEAM' | 'ENGINE_NOT_AVAILABLE' | 'HYPOTHETICAL_VISUALIZATION';
 export type KnowledgeVisualization = 'numeric' | 'graph' | 'canvas-2d' | 'scene-3d' | 'world-3d' | 'narrative';
 
 export interface KnowledgeDomainDescriptor {
@@ -218,6 +219,15 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
     assumptions: ['Schwarzschild nie uwzględnia spinu/ładunku; geodezyjna jest pojedynczym promieniem w płaszczyźnie równikowej bez Kerra, ray tracingu 3D i fizyki dysku; soczewkowanie jest idealną soczewką punktową bez masy rozciągłej i danych obserwacyjnych; stożek świetlny jest geometrią Minkowskiego z natychmiastowym zawrotem bez profilu przyspieszenia i ogólnej OTW; diagram Minkowskiego 1+1D transformuje dwa ustalone zdarzenia przestrzennopodobne w konwencji c=1, bez przyspieszenia i grawitacji; c-Slider jest eksperymentem myślowym ważnym tylko dla v<c i zmienia założenie modelu, nie fizyczną stałą natury; Kerr obejmuje jedynie horyzont, ergosferę równikową i orbity fotonowe w płaszczyźnie równikowej, bez Q≠0 i ray tracingu 3D; inspiral jest ograniczony do zakresu przed połączeniem.'],
     possibleExperiments: ['oblicz stożek świetlny', 'pokaż diagram Minkowskiego', 'uruchom c-Slider', 'oblicz obserwowalne Kerra', 'oblicz promień Schwarzschilda', 'zintegruj geodezyjną fotonu Schwarzschilda', 'oblicz soczewkę punktową', 'oblicz dylatację czasu', 'oblicz masę chirp'], requiredSolver: 'sr-lorentz / c-Slider / Minkowski 1+1D / Kerr equatorial / einstein functions',
     visualization: ['numeric', 'graph', 'canvas-2d', 'scene-3d'], dependencies: ['classical-mechanics', 'universe'], keywords: ['czarna dziura', 'schwarzschild', 'czasoprzestrzeń', 'czasoprzestrzen', 'dylatacja', 'einstein', 'grawitacyj'],
+  },
+  {
+    id: 'historical-legends', title: 'Legendy historyczne — scenariusze hipotetyczne', sourceFile: 'historical-legends-philadelphia.md', scale: 'meso',
+    capability: 'HYPOTHETICAL_VISUALIZATION', realModels: [],
+    concepts: ['Eksperyment Filadelfia', 'USS Eldridge', 'źródło historyczne', 'legenda', 'hipoteza', 'wizualizacja hipotetyczna', 'elektromagnetyzm'],
+    parameters: ['viewMode'], units: [],
+    assumptions: ['Scenariusz odróżnia historyczny rekord od legendy i wizualizacji założeń. Nie jest symulacją fizycznego eksperymentu, źródłem danych pomiarowych ani modelem teleportacji.', 'Znana fizyka elektromagnetyzmu jest prezentowana wyłącznie jako granica porównawcza; bez solvera Maxwella i danych nie ma real-engine.'],
+    possibleExperiments: ['pokaż Eksperyment Filadelfia jako legendę', 'porównaj legendę z fizyką elektromagnetyzmu', 'pokaż wymagania realnego modelu pola'], requiredSolver: 'Brak solvera — HYPOTHETICAL_VISUALIZATION; dla fizycznej analizy wymagany zwalidowany solver Maxwella, geometria i warunki brzegowe',
+    visualization: ['scene-3d', 'narrative'], dependencies: ['spacetime-einstein', 'electrodynamics'], keywords: ['eksperyment filadelfia', 'eksperyment filadelfijski', 'philadelphia experiment', 'uss eldridge', 'eldridge', 'legenda filadelfii'],
   },
   {
     id: 'thermodynamics', title: 'Termodynamika i fizyka statystyczna', sourceFile: 'thermodynamics.md', scale: 'micro-meso',

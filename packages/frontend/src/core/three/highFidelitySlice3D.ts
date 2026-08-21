@@ -7,6 +7,7 @@ import type { SimAgent } from '../simulation/types';
 import type { SimParams } from '../types';
 import { HEALTH_COLORS, HumanoidAgentVisual, mapSimAgentToHumanoid, type AgentHealthState, type HumanoidAgentState } from './humanoidAgentVisual';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
+import { createPhiladelphiaLegendVisual, type PhiladelphiaLegendViewMode, type PhiladelphiaLegendVisual } from './philadelphiaLegendVisual';
 
 /** Jeden metr wizualny jest skalowany wyłącznie z odczytywanego modelu CityWorld. */
 export const HIGH_FIDELITY_WORLD_SCALE = 0.02;
@@ -103,13 +104,18 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private metrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
   private pointerDown: { x: number; y: number } | null = null;
   private pointerDragged = false;
+  /** Opcjonalna scenografia legendy; nie zawiera World State ani solvera. */
+  private readonly philadelphiaLegendMode: PhiladelphiaLegendViewMode | null;
+  private philadelphiaLegend: PhiladelphiaLegendVisual | null = null;
 
   constructor(
     params: Partial<EpidemicCityParams> = {},
     callbacks: HighFidelitySliceCallbacks = {},
     existingSimulation?: EpidemicCitySimulation,
+    philadelphiaLegendMode: PhiladelphiaLegendViewMode | null = null,
   ) {
     this.simulation = existingSimulation ?? new EpidemicCitySimulation(params);
+    this.philadelphiaLegendMode = philadelphiaLegendMode;
     this.eventSeed = this.simulation.getParams().seed as number | undefined;
     this.registry = new EventRegistry({ modelId: 'epidemic.city', seed: this.eventSeed });
     this.stream = new EventStream(this.registry);
@@ -122,6 +128,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   getCameraMode(): HighFidelityCameraMode { return this.cameraMode; }
   isHeroAssetLoaded(): boolean { return this.heroLoaded; }
   isHeroAssetFailed(): boolean { return this.heroLoadFailed; }
+  isPhiladelphiaLegendScenario(): boolean { return this.philadelphiaLegendMode !== null; }
 
   setAnalysisMode(mode: AnalysisMode): void { this.analysisMode = mode; }
   setShowHeatmap(value: boolean): void { this.showHeatmap = value; }
@@ -177,6 +184,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     camera.lookAt(0, 1.2, 0);
 
     this.addLighting();
+    if (this.philadelphiaLegendMode) {
+      this.addPhiladelphiaLegendScene(this.philadelphiaLegendMode);
+      return;
+    }
     this.createMaterials();
     this.addStreetSlice();
     void this.loadUrbanAssetsV2();
@@ -211,6 +222,11 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   update(dt: number, params: SimParams): void {
+    if (this.philadelphiaLegend) {
+      this.timeSeconds += dt;
+      this.philadelphiaLegend.update(this.timeSeconds);
+      return;
+    }
     const speed = Math.max(0, Number(params.clockSpeed ?? 1)) as ClockSpeed;
     if (speed !== this.clock.speed) this.clock.setSpeed(speed);
     if (this.clock.running) this.timeSeconds += dt;
@@ -229,6 +245,11 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
+    if (this.philadelphiaLegend && this.THREE) {
+      camera.position.lerp(new this.THREE.Vector3(8.5, 4.1, 10.5), 0.055);
+      camera.lookAt(0, 0.65, 0);
+      return;
+    }
     if (!this.THREE || !this.scene || !this.lod2) return;
     const allStates = this.simulation.agents().map((agent) => this.toVisualState(agent));
     const focus = this.pickFocusState(allStates);
@@ -267,6 +288,18 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   onRenderMetrics(metrics: ThreeRenderMetrics): void { this.metrics = metrics; }
 
   getStats(): Record<string, number> {
+    if (this.philadelphiaLegend) return {
+      historical_legend: 1,
+      hypothetical_visualization: 1,
+      real_engine_available: 0,
+      webgl_fps: this.metrics.fps,
+      webgl_frame_ms: this.metrics.frameMs,
+      webgl_render_ms: this.metrics.renderMs,
+      webgl_draw_calls: this.metrics.drawCalls,
+      webgl_triangles: this.metrics.triangles,
+      webgl_geometries: this.metrics.geometries,
+      webgl_textures: this.metrics.textures,
+    };
     return {
       ...this.simulation.stats(),
       sim_clock_days: Math.round(this.clock.time * 100) / 100,
@@ -314,6 +347,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.lod2 = null;
     this.heroMixer?.stopAllAction();
     this.heroMixer = null;
+    this.philadelphiaLegend?.dispose();
+    this.philadelphiaLegend = null;
     this.analysisMesh?.geometry.dispose();
     this.analysisMaterial?.dispose();
     this.materials?.asphalt.dispose();
@@ -341,6 +376,20 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const fill = new THREE.DirectionalLight(0xc2d3df, 0.78);
     fill.position.set(8, 5, -7);
     this.scene!.add(fill);
+  }
+
+  private addPhiladelphiaLegendScene(mode: PhiladelphiaLegendViewMode): void {
+    const THREE = this.THREE!;
+    // To środowisko jest wyłącznie prezentacyjnym tłem oznaczonej legendy.
+    // Nie ma obiektów CityWorld, agentów, zdarzeń ani obliczeń pola elektromagnetycznego.
+    this.scene!.background = new THREE.Color(0x081923);
+    this.scene!.fog = new THREE.FogExp2(0x102d3a, 0.035);
+    const moon = new THREE.DirectionalLight(0xaad8e8, 1.35);
+    moon.position.set(-4, 8, 6);
+    this.scene!.add(moon);
+    const legend = createPhiladelphiaLegendVisual(THREE, mode);
+    this.philadelphiaLegend = legend;
+    this.scene!.add(legend.root);
   }
 
   private createMaterials(): void {

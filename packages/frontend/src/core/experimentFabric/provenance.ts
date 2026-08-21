@@ -43,6 +43,7 @@ export function statusForCapability(capability: KnowledgeCapability): Experiment
     case 'KNOWLEDGE_ONLY': return 'knowledge_only';
     case 'CAPABILITY_SEAM': return 'capability_seam';
     case 'ENGINE_NOT_AVAILABLE': return 'engine_not_available';
+    case 'HYPOTHETICAL_VISUALIZATION': return 'hypothetical_visualization';
     case 'REAL_ENGINE': return null;
   }
 }
@@ -53,6 +54,7 @@ export function resultOriginForCapability(capability: KnowledgeCapability): Expe
     case 'KNOWLEDGE_ONLY': return 'knowledge-only';
     case 'CAPABILITY_SEAM': return 'capability-seam';
     case 'ENGINE_NOT_AVAILABLE': return 'engine-not-available';
+    case 'HYPOTHETICAL_VISUALIZATION': return 'hypothetical-visualization';
   }
 }
 

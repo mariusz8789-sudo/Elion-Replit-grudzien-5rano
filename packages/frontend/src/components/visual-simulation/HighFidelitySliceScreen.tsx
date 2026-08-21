@@ -25,15 +25,18 @@ const CAMERA_MODES: Array<{ id: HighFidelityCameraMode; label: string }> = [
  * renderuje wyłącznie odczyt EpidemicCitySimulation i GenesisEvent z HighFidelityStreetSlice3D.
  */
 export function HighFidelitySliceScreen() {
-  const requestedView = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('view');
+  const query = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+  const requestedView = query.get('view');
+  const philadelphiaScenario = query.get('scenario') === 'philadelphia';
+  const philadelphiaLegendMode = query.get('legendView') === 'physics' ? 'physics' as const : 'legend' as const;
   const initialCameraMode: HighFidelityCameraMode = requestedView === 'city' || requestedView === 'agent' || requestedView === 'event' ? requestedView : 'street';
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // Jednorazowo przejmuje tę samą instancję World Engine z Experiment Fabric.
   // Brak handoffu zachowuje dotychczasowy samodzielny proof na tej trasie.
   const [experimentWorld] = useState(() => consumePendingExperimentWorld());
   const sim = useMemo(
-    () => new HighFidelityStreetSlice3D({}, { onAgentSelected: setSelectedId }, experimentWorld?.simulation),
-    [experimentWorld],
+    () => new HighFidelityStreetSlice3D({}, { onAgentSelected: setSelectedId }, experimentWorld?.simulation, philadelphiaScenario ? philadelphiaLegendMode : null),
+    [experimentWorld, philadelphiaScenario, philadelphiaLegendMode],
   );
   const [running, setRunning] = useState(true);
   const [cameraMode, setCameraMode] = useState<HighFidelityCameraMode>(initialCameraMode);
@@ -63,56 +66,84 @@ export function HighFidelitySliceScreen() {
   return (
     <main id="main-content" tabIndex={-1} className="hf-slice-screen">
       <section className="hf-stage" aria-label="Genesis high-fidelity street slice">
-        <canvas ref={canvasRef} className="hf-canvas" aria-label="High-fidelity fragment ulicy Genesis oparty na żywym modelu epidemii" />
+        <canvas ref={canvasRef} className="hf-canvas" aria-label={philadelphiaScenario ? 'Hipotetyczna wizualizacja legendy Eksperymentu Filadelfia; nie jest symulacją fizyczną' : 'High-fidelity fragment ulicy Genesis oparty na żywym modelu epidemii'} />
         {loading && <div className="hf-loading" role="status">Ładowanie świata high-fidelity…</div>}
         {failed && <div className="hf-loading hf-error">WebGL nie uruchomił sceny na tym urządzeniu.</div>}
 
         <header className="hf-topbar">
           <div>
-            <span className="hf-kicker">GENESIS OS · WORLD ENGINE PROOF</span>
-            <h1>HIGH-FIDELITY STREET SLICE</h1>
-            <p>Żywy model agentowy · PBR · CC0 asset pipeline · WebGL baseline</p>
+            <span className="hf-kicker">GENESIS OS · {philadelphiaScenario ? 'HISTORICAL LEGEND SCENARIO' : 'WORLD ENGINE PROOF'}</span>
+            <h1>{philadelphiaScenario ? 'PHILADELPHIA EXPERIMENT — HYPOTHETICAL VISUALIZATION' : 'HIGH-FIDELITY STREET SLICE'}</h1>
+            <p>{philadelphiaScenario ? 'FACT / HISTORICAL_RECORD / LEGEND / HYPOTHESIS rozdzielone · brak REAL_ENGINE' : 'Żywy model agentowy · PBR · CC0 asset pipeline · WebGL baseline'}</p>
           </div>
           <div className="hf-model-status">
-            <span>MODEL LIVE</span>
-            <strong>dzień {stats.dzien ?? 0}</strong>
-            <small>{stats.agenci ?? 0} realnych agentów · {stats.hf_event_count ?? 0} GenesisEvent</small>
+            <span>{philadelphiaScenario ? 'HISTORICAL_LEGEND' : 'MODEL LIVE'}</span>
+            <strong>{philadelphiaScenario ? 'HYPOTHETICAL_VISUALIZATION' : `dzień ${stats.dzien ?? 0}`}</strong>
+            <small>{philadelphiaScenario ? 'Brak danych pomiarowych · brak solvera Maxwella · brak real-engine' : `${stats.agenci ?? 0} realnych agentów · ${stats.hf_event_count ?? 0} GenesisEvent`}</small>
           </div>
         </header>
 
         <aside className="hf-controls" aria-label="Sterowanie proof-of-concept">
-          <div className="hf-control-label">KAMERA</div>
-          <div className="hf-button-row">
-            {CAMERA_MODES.map((item) => <button key={item.id} className={cameraMode === item.id ? 'active' : ''} onClick={() => setCamera(item.id)}>{item.label}</button>)}
-          </div>
-          <div className="hf-button-row">
-            <button onClick={() => setRunning((value) => !value)}>{running ? 'PAUZA' : 'START'}</button>
-            <button onClick={reset}>RESET</button>
-            <button className={heatmap ? 'active' : ''} onClick={() => setHeatmap((value) => !value)}>HEATMAPA</button>
-          </div>
+          {philadelphiaScenario ? <>
+            <div className="hf-control-label">STATUS SCENARIUSZA</div>
+            <p><b>{philadelphiaLegendMode === 'physics' ? 'PHYSICS BOUNDARY VIEW' : 'LEGEND VIEW'}</b></p>
+            <p>Ta scena ilustruje założenia narracji. Animowane pole nie jest wynikiem równania Maxwella, pomiarem ani dowodem teleportacji.</p>
+          </> : <>
+            <div className="hf-control-label">KAMERA</div>
+            <div className="hf-button-row">
+              {CAMERA_MODES.map((item) => <button key={item.id} className={cameraMode === item.id ? 'active' : ''} onClick={() => setCamera(item.id)}>{item.label}</button>)}
+            </div>
+            <div className="hf-button-row">
+              <button onClick={() => setRunning((value) => !value)}>{running ? 'PAUZA' : 'START'}</button>
+              <button onClick={reset}>RESET</button>
+              <button className={heatmap ? 'active' : ''} onClick={() => setHeatmap((value) => !value)}>HEATMAPA</button>
+            </div>
+          </>}
         </aside>
 
-        <aside className="hf-legend" aria-label="Legenda epidemiologiczna">
-          <span className="hf-control-label">JĘZYK EPIDEMII</span>
-          {LEGEND.map(([key, label, color]) => <div className="hf-legend-row" key={key}><i style={{ backgroundColor: color }} /><strong>{key}</strong><span>{label}</span></div>)}
-          <p><b>Puls</b> = ciężkość · <b>obwódka</b> = izolacja · <b>krzyż</b> = hospitalizacja</p>
+        <aside className="hf-legend" aria-label={philadelphiaScenario ? 'Klasyfikacja wiedzy scenariusza' : 'Legenda epidemiologiczna'}>
+          {philadelphiaScenario ? <>
+            <span className="hf-control-label">KLASYFIKACJA WIEDZY</span>
+            <div className="hf-legend-row"><i style={{ backgroundColor: '#9fd6ff' }} /><strong>FACT</strong><span>USS Eldridge był realnym okrętem.</span></div>
+            <div className="hf-legend-row"><i style={{ backgroundColor: '#f5cf74' }} /><strong>HISTORICAL_RECORD</strong><span>Nie ma wiarygodnego zapisu opisywanego eksperymentu.</span></div>
+            <div className="hf-legend-row"><i style={{ backgroundColor: '#c68cff' }} /><strong>LEGEND / HYPOTHESIS</strong><span>Zniknięcie i teleportacja należą do narracji.</span></div>
+            <div className="hf-legend-row"><i style={{ backgroundColor: '#79e1d3' }} /><strong>HYPOTHETICAL_VISUALIZATION</strong><span>Statek i pole są ilustracją założeń.</span></div>
+            <div className="hf-legend-row"><i style={{ backgroundColor: '#ff847b' }} /><strong>REAL_ENGINE</strong><span>Brak — potrzebny solver Maxwella i dane.</span></div>
+          </> : <>
+            <span className="hf-control-label">JĘZYK EPIDEMII</span>
+            {LEGEND.map(([key, label, color]) => <div className="hf-legend-row" key={key}><i style={{ backgroundColor: color }} /><strong>{key}</strong><span>{label}</span></div>)}
+            <p><b>Puls</b> = ciężkość · <b>obwódka</b> = izolacja · <b>krzyż</b> = hospitalizacja</p>
+          </>}
         </aside>
 
         <aside className="hf-event-card" aria-live="polite">
-          <span className="hf-control-label">PRAWDZIWY EVENT</span>
-          {event ? <>
-            <strong>Transmisja A → B</strong>
-            <p>dzień {event.day.toFixed(2)} · #{event.from} → #{event.to}</p>
-            <button onClick={showEvent}>POKAŻ W ŚWIECIE</button>
-          </> : <p>Czekam na transmisję odczytaną z modelu. Nie tworzę zdarzenia zastępczego.</p>}
+          {philadelphiaScenario ? <>
+            <span className="hf-control-label">GRANICA FIZYKI</span>
+            <strong>Brak wyniku eksperymentalnego</strong>
+            <p>Znana fizyka elektromagnetyzmu nie zapewnia tu mechanizmu teleportacji. Do analizy pola potrzebne są geometria, materiały, warunki brzegowe i zwalidowany solver Maxwella.</p>
+          </> : <>
+            <span className="hf-control-label">PRAWDZIWY EVENT</span>
+            {event ? <>
+              <strong>Transmisja A → B</strong>
+              <p>dzień {event.day.toFixed(2)} · #{event.from} → #{event.to}</p>
+              <button onClick={showEvent}>POKAŻ W ŚWIECIE</button>
+            </> : <p>Czekam na transmisję odczytaną z modelu. Nie tworzę zdarzenia zastępczego.</p>}
+          </>}
         </aside>
 
         <footer className="hf-proof-strip">
-          <span><b>LOD0</b> {stats.hf_lod0_ready ? 'CC0 GLB gotowy' : 'CC0 GLB na żądanie'}</span>
-          <span><b>LOD1</b> {stats.hf_lod1_agents ?? 0} bliskich agentów</span>
-          <span><b>LOD2</b> {stats.hf_lod2_agents ?? 0} crowd</span>
-          <span><b>PBR</b> asfalt · beton · cegła</span>
-          <span><b>render</b> {(stats.webgl_render_ms ?? 0).toFixed(1)} ms</span>
+          {philadelphiaScenario ? <>
+            <span><b>ROUTE</b> Experiment Fabric → confirmed HYPOTHETICAL_VISUALIZATION</span>
+            <span><b>PROVENANCE</b> source-bound history / legend classification</span>
+            <span><b>NO DATA</b> brak pomiarów i liczb eksperymentalnych</span>
+            <span><b>render</b> {(stats.webgl_render_ms ?? 0).toFixed(1)} ms</span>
+          </> : <>
+            <span><b>LOD0</b> {stats.hf_lod0_ready ? 'CC0 GLB gotowy' : 'CC0 GLB na żądanie'}</span>
+            <span><b>LOD1</b> {stats.hf_lod1_agents ?? 0} bliskich agentów</span>
+            <span><b>LOD2</b> {stats.hf_lod2_agents ?? 0} crowd</span>
+            <span><b>PBR</b> asfalt · beton · cegła</span>
+            <span><b>render</b> {(stats.webgl_render_ms ?? 0).toFixed(1)} ms</span>
+          </>}
         </footer>
       </section>
 

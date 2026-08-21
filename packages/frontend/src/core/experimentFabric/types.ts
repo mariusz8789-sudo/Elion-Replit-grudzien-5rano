@@ -4,7 +4,7 @@ import type { KnowledgeCapability, KnowledgeCorpusFile, KnowledgeVisualization }
 export const EXPERIMENT_FABRIC_VERSION = '1.0.0';
 
 export type ExperimentOperation = 'compute' | 'simulate' | 'visualize' | 'explain';
-export type ExperimentRunStatus = 'completed' | 'rejected' | 'knowledge_only' | 'capability_seam' | 'engine_not_available' | 'failed';
+export type ExperimentRunStatus = 'completed' | 'hypothetical_visualization' | 'rejected' | 'knowledge_only' | 'capability_seam' | 'engine_not_available' | 'failed';
 export type ExperimentValue = number | string | boolean;
 
 /**
@@ -66,6 +66,7 @@ export interface ExperimentParameterSpec {
 export type ExperimentRoute =
   | { kind: 'analytic'; target: string }
   | { kind: 'live-world'; target: 'epidemic-city'; hash: '#/hf-slice' | '#/city3d' | '#/city' }
+  | { kind: 'hypothetical-visualization'; scenarioId: 'philadelphia-legend'; hash: '#/hf-slice?scenario=philadelphia' }
   | { kind: 'lab'; labId: string; experimentId?: string }
   | { kind: 'none' };
 
@@ -83,7 +84,7 @@ export interface ExperimentProvenance {
   seed?: number;
   deterministic: boolean;
   /** The source of all numeric output: real engine, never parser or LLM. */
-  resultOrigin: 'real-engine' | 'knowledge-only' | 'capability-seam' | 'engine-not-available';
+  resultOrigin: 'real-engine' | 'hypothetical-visualization' | 'knowledge-only' | 'capability-seam' | 'engine-not-available';
 }
 
 export interface ExperimentResult {

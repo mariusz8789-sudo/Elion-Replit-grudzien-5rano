@@ -6,7 +6,7 @@ import type { ExperimentPlan, ExperimentRun, StructuredExperimentRequest } from 
 
 export const EVIDENCE_GUIDED_CHAT_VERSION = '1.0.0';
 
-export type EvidenceGuidedPlanStatus = 'READY_FOR_CONFIRMATION' | 'ENGINE_NOT_AVAILABLE' | 'INVALID_REQUEST';
+export type EvidenceGuidedPlanStatus = 'READY_FOR_CONFIRMATION' | 'READY_FOR_HYPOTHETICAL_CONFIRMATION' | 'ENGINE_NOT_AVAILABLE' | 'INVALID_REQUEST';
 
 export interface EvidenceGuidedModelDisclosure {
   modelId?: string;
@@ -101,6 +101,7 @@ function limitationsFor(plan: ExperimentPlan): readonly string[] {
 
 function statusFor(plan: ExperimentPlan, validationErrors: readonly string[]): EvidenceGuidedPlanStatus {
   if (validationErrors.length > 0) return 'INVALID_REQUEST';
+  if (plan.intent.capability === 'HYPOTHETICAL_VISUALIZATION' && plan.runnable) return 'READY_FOR_HYPOTHETICAL_CONFIRMATION';
   return plan.runnable ? 'READY_FOR_CONFIRMATION' : 'ENGINE_NOT_AVAILABLE';
 }
 
@@ -180,7 +181,7 @@ export function confirmEvidenceGuidedExperiment(reviewedPlan: EvidenceGuidedExpe
   if (canonicalJson(canonicalPlan) !== canonicalJson(reviewedPlan)) {
     throw new Error('Evidence-Guided Chat Plan was modified after review; rebuild and present the plan before confirmation.');
   }
-  if (canonicalPlan.status !== 'READY_FOR_CONFIRMATION') {
+  if (canonicalPlan.status !== 'READY_FOR_CONFIRMATION' && canonicalPlan.status !== 'READY_FOR_HYPOTHETICAL_CONFIRMATION') {
     throw new Error(`Plan cannot be confirmed: ${canonicalPlan.status}. ${canonicalPlan.disclosure.rationale}`);
   }
   const run = runExperiment(canonicalPlan.request);

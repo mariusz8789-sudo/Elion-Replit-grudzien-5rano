@@ -847,7 +847,33 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
   if (!validation.ok) result = rejectedResult(validation.errors);
   else {
     const status = statusForCapability(intent.capability);
-    if (status === 'knowledge_only') result = unavailableResult(status, `Corpus Genesis opisuje domenę „${request.domainId}”, ale nie ma dla niej wykonawczego solvera.`, routeForUnavailable());
+    if (status === 'hypothetical_visualization' && request.modelId === 'historical-philadelphia-legend') {
+      const model = getRouterModel(request.modelId);
+      const viewMode = request.parameters.viewMode === 'physics' ? 'physics' : 'legend';
+      result = {
+        contractVersion: EXPERIMENT_FABRIC_VERSION,
+        status: 'hypothetical_visualization',
+        summary: viewMode === 'physics'
+          ? 'Przygotowano porównawczą wizualizację granic legendy Filadelfii i znanej fizyki elektromagnetyzmu. Nie wykonano solvera pola ani nie wygenerowano danych pomiarowych.'
+          : 'Przygotowano oznaczoną hipotetyczną wizualizację narracji legendy o Eksperymencie Filadelfia. Nie jest to rekonstrukcja potwierdzonego zdarzenia ani symulacja teleportacji.',
+        outputs: { classification: 'HISTORICAL_LEGEND', viewMode, realEngineAvailable: false },
+        units: {},
+        warnings: [
+          'FACT / HISTORICAL_RECORD: USS Eldridge był realnym okrętem; brak wiarygodnego potwierdzenia opisywanego eksperymentu.',
+          'LEGEND / HYPOTHESIS: zniknięcie, teleportacja i efekty czasoprzestrzenne są elementami narracji, nie wynikiem Genesis.',
+          'HYPOTHETICAL_VISUALIZATION: statek i pole są ilustracją założeń legendy, nie odtworzeniem fizycznego mechanizmu.',
+          'REAL_ENGINE: brak. Analiza rzeczywistego pola wymagałaby zwalidowanego solvera Maxwella, geometrii, materiałów i warunków brzegowych.',
+        ],
+        validity: 'Deterministyczna klasyfikacja i route wizualizacji; brak równań, danych lub wyników fizycznych.',
+        assumptions: [
+          'Widok legendy obrazuje wyłącznie narrację przypisaną Eksperymentowi Filadelfia.',
+          'Widok fizyki pokazuje granicę interpretacji: znane elektromagnetyzm i ekranowanie nie stanowią modelu teleportacji.',
+        ],
+        visualization: ['scene-3d', 'narrative'],
+        route: model?.route ?? routeForUnavailable(),
+      };
+    }
+    else if (status === 'knowledge_only') result = unavailableResult(status, `Corpus Genesis opisuje domenę „${request.domainId}”, ale nie ma dla niej wykonawczego solvera.`, routeForUnavailable());
     else if (status === 'capability_seam') result = unavailableResult(status, `${intent.rationale} Wymagany solver: ${intent.requiredSolver}.`, routeForUnavailable());
     else if (status === 'engine_not_available') result = unavailableResult(status, `${intent.rationale} Wymagany solver: ${intent.requiredSolver}.`, routeForUnavailable());
     else {

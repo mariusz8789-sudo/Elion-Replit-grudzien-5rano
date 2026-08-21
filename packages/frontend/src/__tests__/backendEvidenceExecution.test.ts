@@ -173,6 +173,24 @@ const lawsonRun = {
   },
 };
 
+const nuclideRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000014',
+  modelId: 'nuclear-nuclide-chart',
+  modelVersion: '1.1.0',
+  domain: 'nuclear',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { protonNumber: 26, neutronNumber: 30, massNumber: 56, bindingPerNucleonMeV: 8.67, stabilityGradient: 0, knownNuclide: true, measuredSymbol: 'Fe-56', measuredDecayMode: 'stabilny', measuredHalfLife: 'stabilny' },
+  units: { protonNumber: '', neutronNumber: '', massNumber: '', bindingPerNucleonMeV: 'MeV/nukleon', stabilityGradient: '', knownNuclide: '', measuredSymbol: '', measuredDecayMode: '', measuredHalfLife: '' },
+  warnings: ['Symbol i rozpad pochodzą z ograniczonego lokalnego katalogu; energia pochodzi z SEMF.'],
+  validity: 'SEMF plus bounded measured catalog; no decay kinetics.',
+  assumptions: ['SEMF jako przybliżenie kroplowe.'],
+  provenance: {
+    source: 'labs/experiments/nuclear-chart.ts via compute/core.bundle.mjs; data/nuclides.ts', formula: 'SEMF binding per nucleon and local catalog lookup', honesty: 'semf_model_plus_bounded_measured_catalog', engine: 'Genesis nuclide SEMF + bounded measured catalog (shared frontend/backend runner)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -416,6 +434,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ lawsonRatio: 0.75, ignitionCriterionMet: false });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis D–T Lawson 0D criterion (shared frontend/backend runner)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(lawsonRun.runId);
+  });
+
+  it('confirms a reviewed nuclide plan through the canonical backend and preserves model-versus-catalog provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: nuclideRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Pokaż mapę nuklidów dla protony = 26 neutrony = 30.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'nuclear-nuclide-chart', domainId: 'nuclear', inputs: { protonNumber: 26, neutronNumber: 30 },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ massNumber: 56, knownNuclide: true, measuredSymbol: 'Fe-56' });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis nuclide SEMF + bounded measured catalog (shared frontend/backend runner)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(nuclideRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

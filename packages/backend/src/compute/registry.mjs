@@ -403,6 +403,41 @@ const MODELS = [
 
   functionModel(
     {
+      id: 'nuclear-nuclide-chart', name: 'Wykres nuklidów: SEMF i katalog', domain: 'nuclear', version: '1.1.0',
+      description: 'Półempiryczny wzór masowy (SEMF) dla energii wiązania na nukleon wraz z ograniczonym katalogiem zmierzonych nuklidów i metadanych rozpadu.',
+      inputs: [
+        { id: 'protonNumber', label: 'Liczba protonów Z', type: 'number', unit: '', min: 1, max: 100, default: 26 },
+        { id: 'neutronNumber', label: 'Liczba neutronów N', type: 'number', unit: '', min: 0, max: 160, default: 30 },
+      ],
+      outputs: [
+        { id: 'protonNumber', label: 'Z', unit: '' }, { id: 'neutronNumber', label: 'N', unit: '' }, { id: 'massNumber', label: 'A', unit: '' },
+        { id: 'bindingPerNucleonMeV', label: 'Energia wiązania na nukleon (SEMF)', unit: 'MeV/nukleon' },
+        { id: 'stabilityGradient', label: 'Gradient stabilności (SEMF)', unit: '' }, { id: 'knownNuclide', label: 'Wpis w katalogu zmierzonym', unit: '' },
+        { id: 'measuredSymbol', label: 'Symbol zmierzony', unit: '' }, { id: 'measuredDecayMode', label: 'Tryb rozpadu z katalogu', unit: '' }, { id: 'measuredHalfLife', label: 'Okres półtrwania z katalogu', unit: '' },
+      ],
+      assumptions: 'SEMF jest przybliżeniem kroplowym; dane katalogowe obejmują wyłącznie ograniczony, lokalny zbiór sprawdzonych nuklidów.',
+      validity: 'Z całkowite 1–100 i N całkowite 0–160. SEMF pomija efekty powłokowe; brak wpisu w lokalnym katalogu nie dowodzi nieistnienia nuklidu ani nie jest interpolacją danych. Model nie przewiduje przekrojów czynnych, kinetyki rozpadu, syntezy izotopów ani bezpieczeństwa jądrowego.',
+      provenance: {
+        source: 'labs/experiments/nuclear-chart.ts via compute/core.bundle.mjs; data/nuclides.ts',
+        formula: 'SEMF binding per nucleon and local catalog lookup',
+        dataSource: 'NNDC / IAEA Live Chart of Nuclides (bounded local catalog)',
+        honesty: 'semf_model_plus_bounded_measured_catalog',
+        engine: 'Genesis nuclide SEMF + bounded measured catalog (shared frontend/backend runner)',
+      },
+    },
+    (v) => {
+      const result = core.runNuclideChartScenario({ protonNumber: v.protonNumber, neutronNumber: v.neutronNumber });
+      return {
+        outputs: result,
+        warnings: [result.knownNuclide
+          ? 'Symbol, tryb rozpadu i okres półtrwania pochodzą z ograniczonego lokalnego katalogu zmierzonych nuklidów; energia wiązania i gradient pochodzą z modelu SEMF.'
+          : 'Brak wpisu w ograniczonym lokalnym katalogu nie jest twierdzeniem o nieistnieniu nuklidu; energia wiązania i gradient pochodzą z przybliżenia SEMF.'],
+      };
+    },
+  ),
+
+  functionModel(
+    {
       id: 'nuclear-tokamak-lawson', name: 'Kryterium Lawsona D–T (0D)', domain: 'nuclear', version: '1.1.0',
       description: 'Ograniczony, deterministyczny iloraz n·T·τ_E względem jawnego progu Lawsona 3×10²¹ keV·s/m³ dla scenariusza D–T.',
       inputs: [

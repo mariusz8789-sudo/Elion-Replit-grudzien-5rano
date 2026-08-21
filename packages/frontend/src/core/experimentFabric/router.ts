@@ -295,10 +295,11 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
-    id: 'nuclear-nuclide-chart', domainId: 'nuclear', modelVersion: '1.0.0', engine: 'genesis-semf-nuclide-catalog@1.0.0',
+    id: 'nuclear-nuclide-chart', domainId: 'nuclear', modelVersion: '1.1.0', engine: 'genesis-semf-nuclide-catalog@1.0.0',
     parameters: [number('protonNumber', 'Liczba protonów Z', '', 1, 100, 26), number('neutronNumber', 'Liczba neutronów N', '', 0, 160, 30)],
-    route: { kind: 'lab', labId: 'nuclear', experimentId: 'chart' }, knowledgeSources: ['nuclear.md', 'particle.md'],
-    rationale: 'Istniejący SEMF oraz lokalny katalog około 55 zmierzonych nuklidów NNDC/IAEA. SEMF jest predykcją modelu, natomiast oznaczenie i rozpad istnieją tylko, gdy rekord katalogu jest dostępny.',
+    route: { kind: 'none' }, knowledgeSources: ['nuclear.md', 'particle.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje ten sam SEMF i lookup ograniczonego lokalnego katalogu mierzonych nuklidów NNDC/IAEA co Nuclear Lab. Brak wpisu katalogowego nie jest twierdzeniem o nieistnieniu; SEMF nie obejmuje efektów powłokowych, kinetyki rozpadu ani bezpieczeństwa jądrowego.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'sr-lorentz', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',

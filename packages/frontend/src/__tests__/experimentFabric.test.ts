@@ -452,19 +452,19 @@ describe('Genesis Experiment Fabric', () => {
     expect(spacetime?.realModels).toContain('einstein-kerr-equatorial');
   });
 
-  it('runs bounded nuclide chart through Fabric while separating SEMF from measured catalog data', () => {
+  it('plans the bounded nuclide chart for backend Fabric while separating SEMF from measured catalog data', () => {
     const command = 'Pokaż mapę nuklidów dla protony = 26 neutrony = 30.';
-    const run = runExperiment(parseScienceChatMessage(command));
-    const repeated = runExperiment(parseScienceChatMessage(command));
+    const request = parseScienceChatMessage(command);
+    const reviewed = planEvidenceGuidedExperiment(request);
     const nuclear = getKnowledgeDomain('nuclear');
 
-    expect(run.request.modelId).toBe('nuclear-nuclide-chart');
-    expect(run.result.status).toBe('completed');
-    expect(run.result.route).toEqual({ kind: 'lab', labId: 'nuclear', experimentId: 'chart' });
-    expect(run.result.outputs).toMatchObject({ massNumber: 56, knownNuclide: true, measuredSymbol: 'Fe-56', measuredDecayMode: 'stabilny' });
-    expect(Number(run.result.outputs.bindingPerNucleonMeV)).toBeGreaterThan(0);
-    expect(run.result.validity).toContain('nie są interpolowane');
-    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(request.modelId).toBe('nuclear-nuclide-chart');
+    expect(request.parameters).toEqual({ protonNumber: 26, neutronNumber: 30 });
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.1.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('Brak wpisu katalogowego nie jest twierdzeniem o nieistnieniu');
     expect(nuclear?.realModels).toContain('nuclear-nuclide-chart');
   });
 

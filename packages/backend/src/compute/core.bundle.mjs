@@ -1861,6 +1861,128 @@ function runTokamakLawsonScenario({ densityExponent = 20, temperatureKeV = 15, c
   return { densityExponent, densityPerM3, temperatureKeV, confinementSeconds, tripleProduct, lawsonThreshold: LAWSON_THRESHOLD, lawsonRatio, ignitionCriterionMet: lawsonRatio >= 1 };
 }
 
+// packages/frontend/src/core/dataSource.ts
+var sources = /* @__PURE__ */ new Map();
+function registerDataSource(source) {
+  if (sources.has(source.id)) {
+    throw new Error(`\u0179r\xF3d\u0142o danych "${source.id}" jest ju\u017C zarejestrowane`);
+  }
+  sources.set(source.id, source);
+}
+
+// packages/frontend/src/data/nuclides.ts
+var Y = 31557e3;
+var D = 86400;
+var H = 3600;
+var KNOWN_NUCLIDES = [
+  { z: 1, n: 0, symbol: "H-1", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 1, n: 1, symbol: "H-2 (D)", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 1, n: 2, symbol: "H-3 (T)", halfLifeSec: 12.32 * Y, halfLifeLabel: "12,32 roku", decayMode: "\u03B2\u207B" },
+  { z: 2, n: 1, symbol: "He-3", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 2, n: 2, symbol: "He-4", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny", note: "cz\u0105stka \u03B1, najcia\u015Bniej zwi\u0105zane lekkie j\u0105dro" },
+  { z: 3, n: 3, symbol: "Li-6", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 3, n: 4, symbol: "Li-7", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 4, n: 3, symbol: "Be-7", halfLifeSec: 53.22 * D, halfLifeLabel: "53,22 dnia", decayMode: "\u03B2\u207A/EC" },
+  { z: 4, n: 5, symbol: "Be-9", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 4, n: 6, symbol: "Be-10", halfLifeSec: 151e4 * Y, halfLifeLabel: "1,51 mln lat", decayMode: "\u03B2\u207B" },
+  { z: 5, n: 5, symbol: "B-10", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 5, n: 6, symbol: "B-11", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 6, n: 6, symbol: "C-12", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 6, n: 7, symbol: "C-13", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 6, n: 8, symbol: "C-14", halfLifeSec: 5730 * Y, halfLifeLabel: "5 730 lat", decayMode: "\u03B2\u207B", note: "datowanie radiow\u0119glowe" },
+  { z: 7, n: 7, symbol: "N-14", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 7, n: 8, symbol: "N-15", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 8, n: 8, symbol: "O-16", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 8, n: 9, symbol: "O-17", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 8, n: 10, symbol: "O-18", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 9, n: 10, symbol: "F-19", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 10, n: 10, symbol: "Ne-20", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 11, n: 11, symbol: "Na-22", halfLifeSec: 2.602 * Y, halfLifeLabel: "2,602 roku", decayMode: "\u03B2\u207A/EC", note: "\u017Ar\xF3d\u0142o pozyton\xF3w w laboratoriach" },
+  { z: 11, n: 12, symbol: "Na-23", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 13, n: 13, symbol: "Al-26", halfLifeSec: 717e3 * Y, halfLifeLabel: "717 tys. lat", decayMode: "\u03B2\u207A/EC", note: "nuklid kosmogeniczny" },
+  { z: 13, n: 14, symbol: "Al-27", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 14, n: 14, symbol: "Si-28", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 15, n: 16, symbol: "P-31", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 15, n: 17, symbol: "P-32", halfLifeSec: 14.27 * D, halfLifeLabel: "14,27 dnia", decayMode: "\u03B2\u207B", note: "znacznik w biologii molekularnej" },
+  { z: 16, n: 16, symbol: "S-32", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 17, n: 18, symbol: "Cl-35", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 17, n: 20, symbol: "Cl-37", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 18, n: 22, symbol: "Ar-40", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 19, n: 20, symbol: "K-39", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 19, n: 21, symbol: "K-40", halfLifeSec: 1248e6 * Y, halfLifeLabel: "1,248 mld lat", decayMode: "\u03B2\u207B", note: "rozga\u0142\u0119zia si\u0119 te\u017C do Ar-40 (EC) \u2014 podstawa datowania K-Ar; \u017Ar\xF3d\u0142o ~ciep\u0142a Ziemi" },
+  { z: 20, n: 20, symbol: "Ca-40", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 26, n: 30, symbol: "Fe-56", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny", note: "blisko szczytu krzywej energii wi\u0105zania \u2014 koniec syntezy w gwiazdach" },
+  { z: 27, n: 32, symbol: "Co-59", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 27, n: 33, symbol: "Co-60", halfLifeSec: 5.271 * Y, halfLifeLabel: "5,271 roku", decayMode: "\u03B2\u207B", note: "radioterapia, defektoskopia" },
+  { z: 28, n: 30, symbol: "Ni-58", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 29, n: 34, symbol: "Cu-63", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 30, n: 34, symbol: "Zn-64", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 38, n: 50, symbol: "Sr-88", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny", note: "magiczne N=50" },
+  { z: 38, n: 52, symbol: "Sr-90", halfLifeSec: 28.8 * Y, halfLifeLabel: "28,8 roku", decayMode: "\u03B2\u207B", note: "produkt rozszczepienia, ska\u017Cenie po awariach reaktor\xF3w" },
+  { z: 40, n: 50, symbol: "Zr-90", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny", note: "magiczne N=50" },
+  { z: 43, n: 56, symbol: "Tc-99", halfLifeSec: 211100 * Y, halfLifeLabel: "211 tys. lat", decayMode: "\u03B2\u207B", note: "technet (Z=43) nie ma stabilnych izotop\xF3w" },
+  { z: 43, n: 56, symbol: "Tc-99m", halfLifeSec: 6.01 * H, halfLifeLabel: "6,01 godz. (izomer)", decayMode: "IT", note: "najcz\u0119\u015Bciej u\u017Cywany izotop w medycynie nuklearnej (~80% bada\u0144 SPECT)" },
+  { z: 53, n: 74, symbol: "I-127", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny" },
+  { z: 53, n: 76, symbol: "I-129", halfLifeSec: 157e5 * Y, halfLifeLabel: "15,7 mln lat", decayMode: "\u03B2\u207B" },
+  { z: 53, n: 78, symbol: "I-131", halfLifeSec: 8.02 * D, halfLifeLabel: "8,02 dnia", decayMode: "\u03B2\u207B", note: "medycyna nuklearna; uwalniany po awariach reaktor\xF3w" },
+  { z: 55, n: 78, symbol: "Cs-133", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny", note: "definicja sekundy SI (przej\u015Bcie nadsubtelne)" },
+  { z: 55, n: 82, symbol: "Cs-137", halfLifeSec: 30.1 * Y, halfLifeLabel: "~30,1 roku", decayMode: "\u03B2\u207B", note: "produkt rozszczepienia, g\u0142\xF3wne ska\u017Cenie po Czarnobylu" },
+  { z: 82, n: 124, symbol: "Pb-206", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny", note: "koniec \u0142a\u0144cucha U-238" },
+  { z: 82, n: 125, symbol: "Pb-207", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny", note: "koniec \u0142a\u0144cucha U-235" },
+  { z: 82, n: 126, symbol: "Pb-208", halfLifeSec: Infinity, halfLifeLabel: "stabilny", decayMode: "stabilny", note: "podw\xF3jnie magiczny (Z=82, N=126) \u2014 koniec \u0142a\u0144cucha Th-232" },
+  { z: 82, n: 128, symbol: "Pb-210", halfLifeSec: 22.3 * Y, halfLifeLabel: "22,3 roku", decayMode: "\u03B2\u207B" },
+  { z: 83, n: 126, symbol: "Bi-209", halfLifeSec: 201e17 * Y, halfLifeLabel: "~2,01\xD710\xB9\u2079 lat", decayMode: "\u03B1", note: "najd\u0142u\u017Cszy zmierzony okres p\xF3\u0142trwania \u2014 \u03B1 zmierzone dopiero w 2003 r. (Marcillac i in., Nature 422, 876); d\u0142u\u017Cej ni\u017C wiek Wszech\u015Bwiata" },
+  { z: 84, n: 126, symbol: "Po-210", halfLifeSec: 138.4 * D, halfLifeLabel: "138,4 dnia", decayMode: "\u03B1", note: "odkryty przez Mari\u0119 Sk\u0142odowsk\u0105-Curie (1898)" },
+  { z: 86, n: 136, symbol: "Rn-222", halfLifeSec: 3.82 * D, halfLifeLabel: "3,82 dnia", decayMode: "\u03B1", note: "gaz radonowy \u2014 \u017Ar\xF3d\u0142o dawki w domach" },
+  { z: 88, n: 138, symbol: "Ra-226", halfLifeSec: 1600 * Y, halfLifeLabel: "1 600 lat", decayMode: "\u03B1", note: "odkryty przez Mari\u0119 Sk\u0142odowsk\u0105-Curie (1898)" },
+  { z: 90, n: 140, symbol: "Th-230", halfLifeSec: 75400 * Y, halfLifeLabel: "75 400 lat", decayMode: "\u03B1" },
+  { z: 90, n: 142, symbol: "Th-232", halfLifeSec: 1405e7 * Y, halfLifeLabel: "14,05 mld lat", decayMode: "\u03B1", note: "d\u0142u\u017Cszy okres p\xF3\u0142trwania ni\u017C wiek Wszech\u015Bwiata" },
+  { z: 92, n: 141, symbol: "U-233", halfLifeSec: 159200 * Y, halfLifeLabel: "159 200 lat", decayMode: "\u03B1" },
+  { z: 92, n: 143, symbol: "U-235", halfLifeSec: 704e6 * Y, halfLifeLabel: "704 mln lat", decayMode: "\u03B1", note: "paliwo rozszczepialne (Nuclear Lab \u2192 Reakcja \u0142a\u0144cuchowa)" },
+  { z: 92, n: 146, symbol: "U-238", halfLifeSec: 4468e6 * Y, halfLifeLabel: "4,468 mld lat", decayMode: "\u03B1", note: "zegar wieku Ziemi; pocz\u0105tek \u0142a\u0144cucha 14 rozpad\xF3w do Pb-206" },
+  { z: 93, n: 144, symbol: "Np-237", halfLifeSec: 2144e3 * Y, halfLifeLabel: "2,144 mln lat", decayMode: "\u03B1" },
+  { z: 94, n: 144, symbol: "Pu-238", halfLifeSec: 87.7 * Y, halfLifeLabel: "87,7 roku", decayMode: "\u03B1", note: "paliwo RTG (Voyager, Curiosity, New Horizons)" },
+  { z: 94, n: 145, symbol: "Pu-239", halfLifeSec: 24110 * Y, halfLifeLabel: "24 110 lat", decayMode: "\u03B1", note: "paliwo reaktorowe i bro\u0144 j\u0105drowa" },
+  { z: 94, n: 147, symbol: "Pu-241", halfLifeSec: 14.33 * Y, halfLifeLabel: "14,33 roku", decayMode: "\u03B2\u207B" },
+  { z: 95, n: 146, symbol: "Am-241", halfLifeSec: 432.2 * Y, halfLifeLabel: "432,2 roku", decayMode: "\u03B1", note: "czujki dymu" },
+  { z: 96, n: 148, symbol: "Cm-244", halfLifeSec: 18.1 * Y, halfLifeLabel: "18,1 roku", decayMode: "\u03B1" },
+  { z: 98, n: 154, symbol: "Cf-252", halfLifeSec: 2.645 * Y, halfLifeLabel: "2,645 roku", decayMode: "\u03B1+SF", note: "silne spontaniczne rozszczepienie (~3%) \u2014 przeno\u015Bne \u017Ar\xF3d\u0142o neutron\xF3w" }
+];
+function findKnownNuclide(z, n) {
+  return KNOWN_NUCLIDES.find((k) => k.z === z && k.n === n);
+}
+
+// packages/frontend/src/labs/experiments/nuclear-chart.ts
+var ZMAX = 100;
+var NMAX = 160;
+function runNuclideChartScenario({ protonNumber = 26, neutronNumber = 30 } = {}) {
+  if (!Number.isInteger(protonNumber) || protonNumber < 1 || protonNumber > ZMAX) throw new Error(`protonNumber must be an integer within [1, ${ZMAX}].`);
+  if (!Number.isInteger(neutronNumber) || neutronNumber < 0 || neutronNumber > NMAX) throw new Error(`neutronNumber must be an integer within [0, ${NMAX}].`);
+  const known = findKnownNuclide(protonNumber, neutronNumber);
+  return {
+    protonNumber,
+    neutronNumber,
+    massNumber: protonNumber + neutronNumber,
+    bindingPerNucleonMeV: semfBindingPerNucleon(protonNumber, neutronNumber),
+    stabilityGradient: semfStabilityGradient(protonNumber, neutronNumber),
+    knownNuclide: Boolean(known),
+    measuredSymbol: known?.symbol ?? "",
+    measuredDecayMode: known?.decayMode ?? "",
+    measuredHalfLife: known?.halfLifeLabel ?? ""
+  };
+}
+registerDataSource({
+  id: "nuclear.known-nuclides",
+  label: "Zmierzone okresy p\xF3\u0142trwania i tryby rozpadu (~55 kluczowych izotop\xF3w)",
+  citation: {
+    label: "NNDC / IAEA Live Chart of Nuclides",
+    url: "https://www-nds.iaea.org/relnsd/vcharthtml/VChartHTML.html",
+    confirmation: "confirmed"
+  },
+  isSynthetic: false,
+  load: () => KNOWN_NUCLIDES
+});
+
 // packages/frontend/src/core/compute/cheminformatics.ts
 var ATOMIC_WEIGHTS = {
   H: 1.008,
@@ -2008,6 +2130,7 @@ export {
   rotate4D,
   runBlochCircuitScenario,
   runChshCorrelationScenario,
+  runNuclideChartScenario,
   runQuantumTeleportScenario,
   runTokamakLawsonScenario,
   runTunnelingScenario,

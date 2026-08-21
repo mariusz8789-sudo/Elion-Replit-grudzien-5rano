@@ -403,6 +403,39 @@ const MODELS = [
 
   functionModel(
     {
+      id: 'nuclear-tokamak-lawson', name: 'Kryterium Lawsona D–T (0D)', domain: 'nuclear', version: '1.1.0',
+      description: 'Ograniczony, deterministyczny iloraz n·T·τ_E względem jawnego progu Lawsona 3×10²¹ keV·s/m³ dla scenariusza D–T.',
+      inputs: [
+        { id: 'densityExponent', label: 'log₁₀ gęstości n', type: 'number', unit: '', min: 19, max: 21.5, default: 20 },
+        { id: 'temperatureKeV', label: 'Temperatura', type: 'number', unit: 'keV', min: 2, max: 40, default: 15 },
+        { id: 'confinementSeconds', label: 'Czas utrzymania energii τ_E', type: 'number', unit: 's', min: 0.1, max: 8, default: 1.5 },
+      ],
+      outputs: [
+        { id: 'densityExponent', label: 'log₁₀ n', unit: '' }, { id: 'densityPerM3', label: 'Gęstość n', unit: 'm⁻³' },
+        { id: 'temperatureKeV', label: 'Temperatura T', unit: 'keV' }, { id: 'confinementSeconds', label: 'τ_E', unit: 's' },
+        { id: 'tripleProduct', label: 'n·T·τ_E', unit: 'keV·s/m³' }, { id: 'lawsonThreshold', label: 'Próg Lawsona', unit: 'keV·s/m³' },
+        { id: 'lawsonRatio', label: 'Iloraz wobec progu', unit: '' }, { id: 'ignitionCriterionMet', label: 'Kryterium zapłonu spełnione', unit: '' },
+      ],
+      assumptions: 'Jednorodny, 0D scenariusz D–T z ustalonym progiem n·T·τ_E = 3×10²¹ keV·s/m³.',
+      validity: 'Tylko zadany zakres n, T i τ_E. Wynik nie obejmuje MHD, transportu, profili plazmy, strat promienistych, geometrii, bilansu mocy, niestabilności, materiałów, technologii magnesów ani predykcji ITER/NIF czy innego reaktora.',
+      provenance: {
+        source: 'labs/experiments/nuclear-tokamak.ts via compute/core.bundle.mjs',
+        formula: 'n·T·τ_E / (3×10²¹ keV·s/m³)',
+        honesty: 'bounded_0d_lawson_criterion',
+        engine: 'Genesis D–T Lawson 0D criterion (shared frontend/backend runner)',
+      },
+    },
+    (v) => {
+      const result = core.runTokamakLawsonScenario({ densityExponent: v.densityExponent, temperatureKeV: v.temperatureKeV, confinementSeconds: v.confinementSeconds });
+      return {
+        outputs: result,
+        warnings: ['Przekroczenie progu w tym modelu 0D oznacza wyłącznie spełnienie zadanego kryterium n·T·τ_E; nie dowodzi zapłonu, zysku energetycznego ani wykonalności reaktora.'],
+      };
+    },
+  ),
+
+  functionModel(
+    {
       id: 'quantum-chsh-correlation', name: 'Korelacja singletu i nierówność CHSH', domain: 'quantum', version: '1.1.0',
       description: 'Dokładne, analityczne korelacje singletu E(a,b)=−cos(a−b) oraz wartość CHSH dla czterech ustawień kątowych.',
       inputs: [

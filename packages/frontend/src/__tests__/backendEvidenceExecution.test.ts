@@ -155,6 +155,24 @@ const photonRun = {
   },
 };
 
+const lawsonRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000013',
+  modelId: 'nuclear-tokamak-lawson',
+  modelVersion: '1.1.0',
+  domain: 'nuclear',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { densityExponent: 20, densityPerM3: 1e20, temperatureKeV: 15, confinementSeconds: 1.5, tripleProduct: 2.25e21, lawsonThreshold: 3e21, lawsonRatio: 0.75, ignitionCriterionMet: false },
+  units: { densityExponent: '', densityPerM3: 'm⁻³', temperatureKeV: 'keV', confinementSeconds: 's', tripleProduct: 'keV·s/m³', lawsonThreshold: 'keV·s/m³', lawsonRatio: '', ignitionCriterionMet: '' },
+  warnings: ['Przekroczenie progu w tym modelu 0D nie dowodzi wykonalności reaktora.'],
+  validity: '0D criterion only; not MHD or a reactor prediction.',
+  assumptions: ['Jednorodny scenariusz D–T z ustalonym progiem Lawsona.'],
+  provenance: {
+    source: 'labs/experiments/nuclear-tokamak.ts via compute/core.bundle.mjs', formula: 'n·T·τ_E / (3×10²¹ keV·s/m³)', honesty: 'bounded_0d_lawson_criterion', engine: 'Genesis D–T Lawson 0D criterion (shared frontend/backend runner)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -381,6 +399,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs.photonEnergyEV).toBeCloseTo(2.479683968, 12);
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis photon-energy ModelGraph (shared frontend/backend graph)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(photonRun.runId);
+  });
+
+  it('confirms a reviewed Lawson 0D plan through the canonical backend and preserves shared-runner provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: lawsonRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Sprawdź kryterium Lawsona tokamak.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'nuclear-tokamak-lawson', domainId: 'nuclear', inputs: {},
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ lawsonRatio: 0.75, ignitionCriterionMet: false });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis D–T Lawson 0D criterion (shared frontend/backend runner)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(lawsonRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

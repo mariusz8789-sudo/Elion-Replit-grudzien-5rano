@@ -288,10 +288,11 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf SEMF; model kroplowy energii wiązania, bez efektów powłokowych.',
   },
   {
-    id: 'nuclear-tokamak-lawson', domainId: 'nuclear', modelVersion: '1.0.0', engine: 'genesis-lawson-0d@1.0.0',
+    id: 'nuclear-tokamak-lawson', domainId: 'nuclear', modelVersion: '1.1.0', engine: 'genesis-lawson-0d@1.0.0',
     parameters: [number('densityExponent', 'log₁₀ gęstości n', '', 19, 21.5, 20), number('temperatureKeV', 'Temperatura', 'keV', 2, 40, 15), number('confinementSeconds', 'Czas utrzymania energii', 's', 0.1, 8, 1.5)],
-    route: { kind: 'lab', labId: 'nuclear', experimentId: 'tokamak' }, knowledgeSources: ['nuclear.md'],
-    rationale: 'Istniejący 0D iloraz nTτ_E wobec progu Lawsona D-T; nie jest MHD, transportem plazmy, bilansem mocy reaktora ani predykcją ITER.',
+    route: { kind: 'none' }, knowledgeSources: ['nuclear.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje ten sam ograniczony 0D iloraz n·T·τ_E wobec progu Lawsona D–T co Nuclear Lab. Nie jest MHD, transportem plazmy, bilansem mocy reaktora, dowodem zapłonu ani predykcją ITER.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'nuclear-nuclide-chart', domainId: 'nuclear', modelVersion: '1.0.0', engine: 'genesis-semf-nuclide-catalog@1.0.0',

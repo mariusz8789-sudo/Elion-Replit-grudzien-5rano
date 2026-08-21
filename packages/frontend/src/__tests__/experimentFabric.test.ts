@@ -403,19 +403,19 @@ describe('Genesis Experiment Fabric', () => {
     expect(biology?.realModels).toContain('biology-dna-helix');
   });
 
-  it('runs bounded tokamak Lawson criterion through Fabric without claiming reactor prediction', () => {
+  it('plans the bounded tokamak Lawson criterion for backend Fabric without claiming reactor prediction', () => {
     const command = 'Sprawdź kryterium Lawsona tokamak.';
-    const run = runExperiment(parseScienceChatMessage(command));
-    const repeated = runExperiment(parseScienceChatMessage(command));
+    const request = parseScienceChatMessage(command);
+    const reviewed = planEvidenceGuidedExperiment(request);
     const nuclear = getKnowledgeDomain('nuclear');
 
-    expect(run.request.modelId).toBe('nuclear-tokamak-lawson');
-    expect(run.result.status).toBe('completed');
-    expect(run.result.route).toEqual({ kind: 'lab', labId: 'nuclear', experimentId: 'tokamak' });
-    expect(Number(run.result.outputs.lawsonRatio)).toBeCloseTo(0.75, 12);
-    expect(run.result.outputs.ignitionCriterionMet).toBe(false);
-    expect(run.result.validity).toContain('Bez MHD');
-    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(request.modelId).toBe('nuclear-tokamak-lawson');
+    expect(request.parameters).toEqual({});
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.1.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('Nie jest MHD');
     expect(nuclear?.realModels).toContain('nuclear-tokamak-lawson');
   });
 

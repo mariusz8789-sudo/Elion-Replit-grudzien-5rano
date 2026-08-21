@@ -7,7 +7,7 @@ export type ExternalAdapterStatus = 'ENGINE_NOT_AVAILABLE' | 'NOT_CONFIGURED' | 
 export type ExternalExecutionBackend = 'local-container' | 'remote-api' | 'hpc-job' | 'webgpu' | 'file-import';
 export type ExternalScientificDomain =
   | 'cfd' | 'pde' | 'electromagnetism' | 'thermodynamics' | 'general-relativity'
-  | 'astrophysics' | 'radiation-transport' | 'nuclear' | 'quantum' | 'gis' | 'environment' | 'cheminformatics';
+  | 'astrophysics' | 'radiation-transport' | 'nuclear' | 'quantum' | 'gis' | 'environment' | 'cheminformatics' | 'biology';
 
 export interface ExternalAdapterManifest {
   contractVersion: string;
@@ -60,6 +60,16 @@ const ENGINE_ADAPTERS: readonly ExternalAdapterManifest[] = [
     requiredProvenance: ['RDKit version', 'worker hash', 'canonical SMILES', 'descriptor method', 'declared runtime interpreter'],
     requiredRuntime: ['GENESIS_RDKIT_PYTHON interpreter', 'RDKit import', 'reference descriptor cases pass'], route: { kind: 'none' },
     limitation: 'Backend uruchamia rzeczywisty worker RDKit do deskryptorów topologicznych 2D jawnego SMILES. Science Chat przekazuje zatwierdzony tekst struktury do /api/compute/fabric/run; przeglądarka nie wyprowadza wartości. Bez runtime’u endpoint zwraca blokadę bez wyniku. Adapter nie wykonuje QSAR, docking, ADMET, dynamiki molekularnej, predykcji aktywności lub zaleceń chemicznych.',
+  },
+  {
+    contractVersion: EXTERNAL_ADAPTER_CONTRACT_VERSION, id: 'openmm-hiv-10e8-long-md', title: 'OpenMM HIV 10E8/MPER long-MD job adapter', status: 'ENGINE_NOT_AVAILABLE',
+    domains: ['biology'], backend: 'hpc-job',
+    primaryDocumentation: 'https://docs.openmm.org/latest/userguide/application/01_getting_started.html',
+    inputSchema: ['manifested PDB artifact', 'chain mapping', 'PDBFixer preparation policy', 'force-field and solvent policy', 'integrator and random seed', 'run length', 'hardware allocation'],
+    outputSchema: ['prepared topology hash', 'trajectory artifact hash', 'energy time series', 'RMSD/RMSF observables', 'run diagnostics', 'redocking-validation link when applicable'],
+    requiredProvenance: ['PDB ID and SHA-256', 'chain mapping', 'PDBFixer version and preparation log', 'OpenMM version', 'force-field XML hashes', 'platform/GPU driver metadata', 'seed', 'trajectory and log hashes'],
+    requiredRuntime: ['persistent long-job execution environment', 'approved OpenMM runtime', 'validated PDBFixer policy', 'resource quota', 'artifact storage', 'predeclared geometric acceptance criteria'], route: { kind: 'none' },
+    limitation: 'Nie jest uruchomiony przez bieżący Fabric. Krótki run 5GHW po PDBFixer przekroczył budżet CPU sandboxa bez wyniku, dlatego adapter pozostaje ENGINE_NOT_AVAILABLE. Dopuszczenie wymaga reprodukowalnego jobu długotrwałego, kontroli przygotowania PDB, artefaktów trajektorii i predefiniowanego benchmarku; wynik MD nie może być przedstawiany jako powinowactwo, neutralizacja, immunogenność ani skuteczność szczepionki.',
   },
   {
     contractVersion: EXTERNAL_ADAPTER_CONTRACT_VERSION, id: 'openfoam-cfd', title: 'OpenFOAM CFD adapter', status: 'ENGINE_NOT_AVAILABLE',

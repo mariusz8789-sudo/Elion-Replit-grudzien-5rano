@@ -98,7 +98,7 @@ describe('Genesis Experiment Fabric', () => {
   it('declares solver and GIS integrations as explicit seams with runtime-specific availability', () => {
     const engines = listExternalEngineAdapters();
     expect(engines.map((entry) => entry.id)).toEqual([
-      'pymeep-maxwell-fdtd', 'rdkit-molecular-descriptors', 'openfoam-cfd', 'fenicsx-pde', 'einstein-toolkit-nr', 'openmc-radiation', 'quantum-schrodinger',
+      'pymeep-maxwell-fdtd', 'rdkit-molecular-descriptors', 'openmm-hiv-10e8-long-md', 'openfoam-cfd', 'fenicsx-pde', 'einstein-toolkit-nr', 'openmc-radiation', 'quantum-schrodinger',
     ]);
     for (const entry of engines) {
       expect(entry.status).toBe(['pymeep-maxwell-fdtd', 'rdkit-molecular-descriptors'].includes(entry.id) ? 'REQUIRES_VALIDATION' : 'ENGINE_NOT_AVAILABLE');

@@ -213,6 +213,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
+    id: 'quantum-chemistry-pyscf-h2-rhf', domainId: 'quantum-chemistry', modelVersion: '1.0.0', engine: 'pyscf@2.13.0',
+    parameters: [number('bondLengthAngstrom', 'Długość wiązania H–H', 'Å', 0.5, 3, 0.74)], route: { kind: 'none' }, knowledgeSources: ['quantum.md', 'chemistry.md'],
+    rationale: 'Rzeczywisty backendowy PySCF wykonuje ograniczone obliczenie single-point H₂: neutralny singlet, RHF/STO-3G i geometria liniowa o zatwierdzonej długości wiązania. Przeglądarka nie wyprowadza energii ani orbitali; endpoint Fabric wymaga GENESIS_PYSCF_PYTHON oraz zaliczonego benchmarku H₂ RHF/STO-3G. Nie jest to optymalizacja geometrii, skan powierzchni energii, ogólna chemia kwantowa, pomiar ani predykcja zastosowania chemicznego.',
+    capability: 'BACKEND_REAL_ENGINE',
+  },
+  {
     id: 'photon-energy', domainId: 'electrodynamics', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('wavelengthNm', 'Długość fali', 'nm', 0.001, 1e9, 500)],
     route: { kind: 'lab', labId: 'quantum', experimentId: 'photon-graph' }, knowledgeSources: ['electrodynamics.md', 'quantum.md', 'chemistry.md'],

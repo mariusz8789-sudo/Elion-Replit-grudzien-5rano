@@ -18,6 +18,7 @@
 import * as core from './core.bundle.mjs';
 import { detect as rdkitDetect, descriptors as rdkitDescriptors, validate as rdkitValidate } from './rdkitAdapter.mjs';
 import { detect as meepDetect, interfaceTransmission as meepInterfaceTransmission } from './meepAdapter.mjs';
+import { detect as pyscfDetect, referenceCase as pyscfReferenceCase, singlePoint as pyscfSinglePoint } from './qmAdapter.mjs';
 import { detect as depmapDetect, senescenceCellCyclePanel } from './depmapAdapter.mjs';
 
 const SOLAR_MASS_KG = 1.989e30;
@@ -377,6 +378,81 @@ const MODELS = [
       if (!det.available) return { ok: false, error: 'capability_unavailable', message: `RDKit niedostępny (${det.reason}). Skonfiguruj GENESIS_RDKIT_PYTHON do zwalidowanego interpretera RDKit.` };
       const val = rdkitValidate(v.smiles);
       return val.ok ? { ok: true } : { ok: false, error: 'invalid_smiles', message: 'Nieprawidłowy SMILES.' };
+    },
+  },
+
+  {
+    ...functionModel(
+      {
+        id: 'quantum-chemistry-pyscf-h2-rhf', name: 'H₂ RHF/STO-3G (PySCF)', domain: 'quantum-chemistry', version: '1.0.0',
+        description: 'Rzeczywiste obliczenie single-point Hartreego–Focka dla neutralnego H₂ w zadanej odległości między jądrami przez PySCF.',
+        inputs: [{ id: 'bondLengthAngstrom', label: 'Długość wiązania H–H', type: 'number', unit: 'Å', min: 0.5, max: 3, default: 0.74 }],
+        outputs: [
+          { id: 'energyHartree', label: 'Energia całkowita RHF', unit: 'Hartree' },
+          { id: 'homoHartree', label: 'Orbital HOMO', unit: 'Hartree' },
+          { id: 'lumoHartree', label: 'Orbital LUMO', unit: 'Hartree' },
+          { id: 'homoLumoGapHartree', label: 'Luka HOMO–LUMO', unit: 'Hartree' },
+          { id: 'homoLumoGapEv', label: 'Luka HOMO–LUMO', unit: 'eV' },
+          { id: 'dipoleDebye', label: 'Moment dipolowy', unit: 'D' },
+          { id: 'nElectrons', label: 'Liczba elektronów', unit: '' },
+          { id: 'nBasisFunctions', label: 'Liczba funkcji bazowych', unit: '' },
+        ],
+        assumptions: 'Neutralny H₂, singlet, geometria liniowa H(0,0,0)–H(0,0,R), metoda restricted Hartree–Fock i minimalna baza STO-3G. Jest to obliczenie modelowe single-point, nie pomiar ani predykcja własności biologicznej, klinicznej lub materiałowej.',
+        validity: 'Wyłącznie H₂ w przedziale 0,5–3,0 Å oraz dostępny interpreter PySCF wskazany przez GENESIS_PYSCF_PYTHON. Nie jest to skan pełnej powierzchni energii, optymalizacja geometrii, chemia wielocząsteczkowa ani wynik wysokiego poziomu ab initio.',
+        provenance: {
+          source: 'compute/qm_worker.py via compute/qmAdapter.mjs',
+          formula: 'PySCF RHF single-point; H₂ singlet; STO-3G; R = bondLengthAngstrom',
+          honesty: 'real_external_engine',
+          engine: 'PySCF runtime (version reported per run)',
+          requiredEnvironmentVariable: 'GENESIS_PYSCF_PYTHON',
+        },
+      },
+      (v) => {
+        const result = pyscfSinglePoint({
+          atoms: [
+            { element: 'H', x: 0, y: 0, z: 0 },
+            { element: 'H', x: 0, y: 0, z: v.bondLengthAngstrom },
+          ],
+          charge: 0,
+          spin: 0,
+          basis: 'sto-3g',
+          method: 'RHF',
+        });
+        if (!result.ok) throw new Error(result.error + (result.reason ? `: ${result.reason}` : ''));
+        const d = result.data;
+        return {
+          outputs: {
+            energyHartree: d.energyHartree,
+            homoHartree: d.homoHartree,
+            lumoHartree: d.lumoHartree,
+            homoLumoGapHartree: d.homoLumoGapHartree,
+            homoLumoGapEv: d.homoLumoGapEv,
+            dipoleDebye: d.dipoleDebye,
+            nElectrons: d.nElectrons,
+            nBasisFunctions: d.nBasisFunctions,
+          },
+          warnings: [
+            `${result.meta.engine}; ${result.meta.method}/${result.meta.basis}; neutralny H₂ singlet.`,
+            'Wynik jest ograniczonym obliczeniem modelowym H₂ i nie stanowi potwierdzenia eksperymentalnego ani predykcji zastosowania chemicznego.',
+          ],
+          provenance: {
+            engine: result.meta.engine,
+            method: result.meta.method,
+            basis: result.meta.basis,
+            charge: String(result.meta.charge),
+            multiplicity: String(result.meta.multiplicity),
+            requiredEnvironmentVariable: 'GENESIS_PYSCF_PYTHON',
+          },
+        };
+      },
+    ),
+    validate: () => {
+      const runtime = pyscfDetect();
+      if (!runtime.available) return { ok: false, error: 'capability_unavailable', message: `PySCF niedostępny (${runtime.reason}). Skonfiguruj GENESIS_PYSCF_PYTHON do zwalidowanego interpretera PySCF.` };
+      const reference = pyscfReferenceCase();
+      return reference.ok && reference.pass
+        ? { ok: true }
+        : { ok: false, error: 'reference_validation_failed', message: `PySCF nie przeszedł przypadku referencyjnego H₂ RHF/STO-3G (${reference.reason ?? reference.error ?? 'unknown'}).` };
     },
   },
 

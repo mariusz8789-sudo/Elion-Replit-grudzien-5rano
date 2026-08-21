@@ -85,6 +85,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const meepN2 = firstNumber(normalized, /\b(?:n2|n₂|współczynnik\s*(?:załamania\s*)?(?:ośrodka\s*)?2)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const meepFrequency = firstNumber(normalized, /\b(?:częstotliwość\s*meep|czestotliwosc\s*meep|frequency)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const meepResolution = firstNumber(normalized, /\b(?:rozdzielczość\s*fdtd|rozdzielczosc\s*fdtd|resolution)\s*[=:]?\s*(\d+)/);
+  const h2BondLengthAngstrom = firstNumber(normalized, /\b(?:r(?:\s*h[−-]?h)?|długość\s+wiązania|dlugosc\s+wiazania|bond\s+length)\s*[=:]?\s*(\d+(?:[.,]\d+)?)\s*(?:å|a|angstrom|angstroem)/);
 
   if (seed !== undefined) params.seed = seed;
   if (r0 !== undefined) params.r0 = r0;
@@ -141,6 +142,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (meepN2 !== undefined) params.n2 = meepN2;
   if (meepFrequency !== undefined) params.frequency = meepFrequency;
   if (meepResolution !== undefined) params.resolution = meepResolution;
+  if (h2BondLengthAngstrom !== undefined) params.bondLengthAngstrom = h2BondLengthAngstrom;
 
   const base = { contractVersion: EXPERIMENT_FABRIC_VERSION, sourceText, operation: operationFor(normalized), seed } as const;
   const request = (domainId: string, modelId: string | undefined, requestedVisualization: StructuredExperimentRequest['requestedVisualization'], allowed: readonly string[]): StructuredExperimentRequest => ({
@@ -203,6 +205,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   }
   if (smiles !== undefined && /(?:\brdkit\b|deskryptor[a-ząćęłńóśźż]*\s+(?:molekularn[a-ząćęłńóśźż]*|smiles)|(?:analizuj|oblicz|uruchom)\s+smiles)/.test(normalized)) {
     return request('chemistry', 'chem-rdkit-descriptors', 'graph', ['smiles']);
+  }
+  if (/(?:\bpyscf\b|hartree[ -]?fock|\brhf\b)/.test(normalized) && /(?:\bh2\b|h₂|wod(?:ó|o)r\s+dwuatomow[a-ząćęłńóśźż]*)/.test(normalized)) {
+    return request('quantum-chemistry', 'quantum-chemistry-pyscf-h2-rhf', 'graph', ['bondLengthAngstrom']);
   }
   if (/\b(fałdowani[a-ząćęłńóśźż]* białk[a-ząćęłńóśźż]*|faldowani[a-ząćęłńóśźż]* bialk[a-ząćęłńóśźż]*|protein folding|model hp|hydrofobow[a-ząćęłńóśźż]* rdze[nń])\b/.test(normalized)) return request('biology', 'biology-protein-folding-hp', 'canvas-2d', ['sequenceKey', 'temperature', 'steps', 'seed']);
   if (/\b(dna|helis[a-ząćęłńóśźż]* dna|b[- ]?dna|temperatur[a-ząćęłńóśźż]* topnieni[a-ząćęłńóśźż]* dna|wallace)\b/.test(normalized)) return request('biology', 'biology-dna-helix', 'scene-3d', ['sequence', 'temperatureC']);

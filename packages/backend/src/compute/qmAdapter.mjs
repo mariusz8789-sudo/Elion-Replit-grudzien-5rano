@@ -2,8 +2,10 @@
  * Adapter Chemii Kwantowej (PySCF) — most Node → realny silnik ab initio / DFT.
  *
  * PySCF to dojrzałe, otwarte oprogramowanie (Apache-2.0). Uruchamiamy je przez
- * krótkotrwały proces `python3 qm_worker.py` (execFileSync) z twardym limitem
- * czasu. Adapter NIGDY nie zmyśla wyniku: gdy PySCF nie jest zainstalowany,
+ * krótkotrwały proces `qm_worker.py` (execFileSync) z twardym limitem czasu.
+ * Ustaw `GENESIS_PYSCF_PYTHON` na odizolowany interpreter PySCF; historyczny
+ * `GENESIS_PYTHON` pozostaje wyłącznie kompatybilnym fallbackiem. Adapter NIGDY
+ * nie zmyśla wyniku: gdy PySCF nie jest zainstalowany,
  * `detect()` zwraca `available:false`, a zdolność jest BLOCKED_BY_RUNTIME.
  *
  * Kontrakt zweryfikowanego adaptera: DETECT → VERSION → VALIDATE_INPUT →
@@ -19,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'qm_worker.py');
-const PYTHON = process.env.GENESIS_PYTHON ?? 'python3';
+const PYTHON = process.env.GENESIS_PYSCF_PYTHON ?? process.env.GENESIS_PYTHON ?? 'python3';
 const TIMEOUT_MS = 120_000; // QM bywa kosztowne; twardy limit chroni serwer
 
 let detectCache = null;

@@ -65,6 +65,24 @@ const rdkitRun = {
   },
 };
 
+const pyscfRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000004',
+  modelId: 'quantum-chemistry-pyscf-h2-rhf',
+  modelVersion: '1.0.0',
+  domain: 'quantum-chemistry',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { energyHartree: -1.11675931, homoHartree: -0.578554, lumoHartree: 0.671143, homoLumoGapHartree: 1.249697, homoLumoGapEv: 34.0052, dipoleDebye: 0, nElectrons: 2, nBasisFunctions: 2 },
+  units: { energyHartree: 'Hartree', homoHartree: 'Hartree', lumoHartree: 'Hartree', homoLumoGapHartree: 'Hartree', homoLumoGapEv: 'eV', dipoleDebye: 'D', nElectrons: '', nBasisFunctions: '' },
+  warnings: ['PySCF 2.13.0; RHF/sto-3g; neutral H2 singlet.'],
+  validity: 'H2 only, 0.5–3.0 Å, real validated PySCF runtime.',
+  assumptions: ['Neutralny H2, singlet, RHF/STO-3G.'],
+  provenance: {
+    source: 'compute/qm_worker.py via compute/qmAdapter.mjs', formula: 'PySCF RHF single-point; H2 singlet; STO-3G', honesty: 'real_external_engine', engine: 'PySCF 2.13.0', requiredEnvironmentVariable: 'GENESIS_PYSCF_PYTHON',
+  },
+};
+
 const depmapRun = {
   runId: '0aa4e400-0000-4000-8000-000000000002',
   modelId: 'biology-depmap-crispr-senescence-panel',
@@ -137,6 +155,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs.canonicalSmiles).toBe('CCO');
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('RDKit 2026.03.5');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(rdkitRun.runId);
+  });
+
+  it('confirms a reviewed PySCF H2 plan through the same canonical Fabric endpoint and preserves real-engine provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: pyscfRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Uruchom PySCF RHF dla H2; długość wiązania 0.74 Å.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'quantum-chemistry-pyscf-h2-rhf', domainId: 'quantum-chemistry', inputs: { bondLengthAngstrom: 0.74 },
+    });
+    expect(confirmed.run.result.outputs.energyHartree).toBeCloseTo(-1.11675931, 12);
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('PySCF 2.13.0');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(pyscfRun.runId);
   });
 
   it('confirms a reviewed DepMap data plan through the same canonical Fabric endpoint and preserves data provenance', async () => {

@@ -1144,6 +1144,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(localAttempt.result.outputs).toEqual({});
   });
 
+  it('routes an explicit PySCF H2 RHF request to a confirmable real backend plan without fabricating a local quantum result', () => {
+    const request = parseScienceChatMessage('Uruchom PySCF RHF dla H2; długość wiązania 0.74 Å.');
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(request.modelId).toBe('quantum-chemistry-pyscf-h2-rhf');
+    expect(request.domainId).toBe('quantum-chemistry');
+    expect(request.parameters).toEqual({ bondLengthAngstrom: 0.74 });
+    expect(planned.plan.engine).toBe('pyscf@2.13.0');
+    expect(planned.plan.runnable).toBe(true);
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(planned.disclosure.resultWillComeFromRealRun).toBe(true);
+    expect(planned.disclosure.limitations.join(' ')).toContain('Nie jest to optymalizacja geometrii');
+    const localAttempt = runExperiment(request);
+    expect(localAttempt.result.status).not.toBe('completed');
+    expect(localAttempt.result.outputs).toEqual({});
+  });
+
   it('routes a Maxwell/FDTD dielectric-interface request to a confirmable real backend PyMeep plan without fabricating local browser output', () => {
     const request = parseScienceChatMessage('Uruchom Meep FDTD dla granicy dielektrycznej n1=1 n2=2.');
     const planned = planEvidenceGuidedExperiment(request);

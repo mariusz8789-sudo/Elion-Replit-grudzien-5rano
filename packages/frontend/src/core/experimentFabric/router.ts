@@ -413,10 +413,11 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
-    id: 'quantum-bloch-circuit', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-single-qubit@1.0.0',
+    id: 'quantum-bloch-circuit', domainId: 'quantum', modelVersion: '1.1.0', engine: 'genesis-single-qubit@1.0.0',
     parameters: [text('circuit', 'Sekwencja bramek jednokubitowych', 'H X')],
-    route: { kind: 'lab', labId: 'quantum', experimentId: 'bloch' }, knowledgeSources: ['quantum.md'],
-    rationale: 'Istniejące dokładne macierze unitarne jednokubitowych bramek H, X, Y, Z, S i T, startujące z |0⟩; nie symuluje splątania, CNOT, szumu sprzętowego ani pojedynczego wyniku pomiaru.',
+    route: { kind: 'none' }, knowledgeSources: ['quantum.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje te same dokładne macierze unitarne jednokubitowych bramek H, X, Y, Z, S i T co wizualizacja sfery Blocha, startując z |0⟩. Przeglądarka nie wyprowadza zastępczego wyniku. Model nie symuluje splątania, CNOT, szumu sprzętowego ani pojedynczego wyniku pomiaru.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
 ] as const;
 

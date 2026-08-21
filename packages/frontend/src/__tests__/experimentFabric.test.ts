@@ -610,25 +610,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.result.validity).toContain('nie jest ogólnym solverem Schrödingera');
   });
 
-  it('runs the local single-qubit Bloch circuit through Fabric without claiming hardware or entanglement', () => {
+  it('plans a single-qubit Bloch circuit for the canonical backend Fabric without claiming hardware or entanglement', () => {
     const command = 'Wykonaj obwód kubitowy: H X.';
-    const run = runExperiment(parseScienceChatMessage(command));
-    const repeated = runExperiment(parseScienceChatMessage(command));
+    const request = parseScienceChatMessage(command);
+    const reviewed = planEvidenceGuidedExperiment(request);
     const quantum = getKnowledgeDomain('quantum');
 
     expect(quantum?.capability).toBe('CAPABILITY_SEAM');
     expect(quantum?.realModels).toContain('quantum-bloch-circuit');
     expect(quantum?.assumptions.join(' ')).toContain('nie losuje pomiaru');
-    expect(run.request.modelId).toBe('quantum-bloch-circuit');
-    expect(run.request.parameters).toEqual({ circuit: 'H X' });
-    expect(run.result.status).toBe('completed');
-    expect(run.result.route).toEqual({ kind: 'lab', labId: 'quantum', experimentId: 'bloch' });
-    expect(Number(run.result.outputs.probability0)).toBeCloseTo(0.5, 9);
-    expect(Number(run.result.outputs.probability1)).toBeCloseTo(0.5, 9);
-    expect(Number(run.result.outputs.normSquared)).toBeCloseTo(1, 9);
-    expect(run.result.validity).toContain('Brak wielokubitowych bramek');
-    expect(run.result.warnings[0]).toContain('nie jest pojedynczym losowym pomiarem');
-    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(request.modelId).toBe('quantum-bloch-circuit');
+    expect(request.parameters).toEqual({ circuit: 'H X' });
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.1.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('nie symuluje splątania');
   });
 
   it('runs the bounded Kitaev bulk model with reference phases but never as Majorana 1 hardware', () => {

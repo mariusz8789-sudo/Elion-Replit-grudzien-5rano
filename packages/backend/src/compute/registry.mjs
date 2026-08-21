@@ -386,6 +386,59 @@ const MODELS = [
 
   functionModel(
     {
+      id: 'quantum-bloch-circuit', name: 'Obwód jednokubitowy i sfera Blocha', domain: 'quantum', version: '1.1.0',
+      description: 'Dokładna, deterministyczna ewolucja pojedynczego kubitu od |0⟩ przez sekwencję bramek H, X, Y, Z, S i T; wykonuje wspólny runner macierzy unitarnej używany przez wizualizację sfery Blocha.',
+      inputs: [{ id: 'circuit', label: 'Sekwencja bramek jednokubitowych', type: 'string', unit: '', maxLength: 128, default: 'H X' }],
+      outputs: [
+        { id: 'gates', label: 'Zastosowane bramki', unit: '' },
+        { id: 'finalAmplitude0Re', label: 'Re amplitudy |0⟩', unit: '' },
+        { id: 'finalAmplitude0Im', label: 'Im amplitudy |0⟩', unit: '' },
+        { id: 'finalAmplitude1Re', label: 'Re amplitudy |1⟩', unit: '' },
+        { id: 'finalAmplitude1Im', label: 'Im amplitudy |1⟩', unit: '' },
+        { id: 'probability0', label: 'P(|0⟩)', unit: '' },
+        { id: 'probability1', label: 'P(|1⟩)', unit: '' },
+        { id: 'blochX', label: 'Składowa Blocha x', unit: '' },
+        { id: 'blochY', label: 'Składowa Blocha y', unit: '' },
+        { id: 'blochZ', label: 'Składowa Blocha z', unit: '' },
+        { id: 'normSquared', label: 'Norma² stanu', unit: '' },
+      ],
+      assumptions: 'Stan początkowy |0⟩ i idealne bramki jednokubitowe H, X, Y, Z, S, T. Wynik zawiera amplitudy i Bornowskie prawdopodobieństwa, lecz nie losuje wyniku pomiaru.',
+      validity: 'Od 1 do 32 bramek z dozwolonego alfabetu. Nie obejmuje splątania, CNOT, szumu, dekoherencji, sprzętu kwantowego, detektorów ani transmisji informacji.',
+      provenance: {
+        source: 'labs/experiments/quantum-bloch.ts via compute/core.bundle.mjs',
+        formula: '|ψ_final⟩ = U_n · … · U_2 · U_1 · |0⟩; exact 2×2 complex unitary matrices',
+        honesty: 'exact_ideal_single_qubit_state_vector',
+        engine: 'Genesis single-qubit unitary state-vector (shared Canvas/backend runner)',
+      },
+    },
+    (v) => {
+      const scenario = core.runBlochCircuitScenario({ circuit: v.circuit });
+      return {
+        outputs: {
+          gates: scenario.gates.join(' '),
+          finalAmplitude0Re: scenario.finalAmplitude0[0], finalAmplitude0Im: scenario.finalAmplitude0[1],
+          finalAmplitude1Re: scenario.finalAmplitude1[0], finalAmplitude1Im: scenario.finalAmplitude1[1],
+          probability0: scenario.probability0, probability1: scenario.probability1,
+          blochX: scenario.bloch[0], blochY: scenario.bloch[1], blochZ: scenario.bloch[2],
+          normSquared: scenario.normSquared,
+        },
+        warnings: ['Prawdopodobieństwa wynikają z reguły Borna dla idealnego wektora stanu. Fabric nie losuje pojedynczego wyniku pomiaru ani nie wykonuje obwodu na hardware.'],
+      };
+    },
+    {
+      validate(values) {
+        try {
+          core.parseSingleQubitCircuit(values.circuit);
+          return { ok: true };
+        } catch (error) {
+          return { ok: false, error: 'invalid_circuit', message: error instanceof Error ? error.message : 'Nieprawidłowy obwód jednokubitowy.' };
+        }
+      },
+    },
+  ),
+
+  functionModel(
+    {
       id: 'quantum-tunneling-1d', name: 'Tunelowanie pakietu falowego 1D', domain: 'quantum', version: '1.0.0',
       description: 'Rzeczywista numeryczna ewolucja pakietu Gaussa przez pojedynczą barierę prostokątną, liczona współdzielonym integratorem split-step Fourier.',
       inputs: [

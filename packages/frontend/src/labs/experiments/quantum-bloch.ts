@@ -101,12 +101,8 @@ export interface BlochCircuitScenarioResult {
   normSquared: number;
 }
 
-/**
- * Deterministyczny obwód jednokubitowy startujący w |0⟩. Wykorzystuje te
- * same bramki unitarne co wizualizacja sfery Blocha; zwraca amplitudy i
- * prawdopodobieństwa, ale nie losuje pojedynczego wyniku pomiaru.
- */
-export function runBlochCircuitScenario({ circuit = 'H' }: { circuit?: string } = {}): BlochCircuitScenarioResult {
+/** Waliduje i kanonizuje ograniczony alfabet bramek używany przez Canvas oraz Fabric. */
+export function parseSingleQubitCircuit(circuit: unknown): string[] {
   if (typeof circuit !== 'string' || circuit.trim().length === 0 || circuit.length > 128) {
     throw new Error('circuit musi być niepustym tekstem do 128 znaków.');
   }
@@ -118,6 +114,16 @@ export function runBlochCircuitScenario({ circuit = 'H' }: { circuit?: string } 
   if (unknown) {
     throw new Error(`Nieobsługiwana bramka jednokubitowa: ${unknown}. Dozwolone: ${Object.keys(GATES).join(', ')}.`);
   }
+  return gates;
+}
+
+/**
+ * Deterministyczny obwód jednokubitowy startujący w |0⟩. Wykorzystuje te
+ * same bramki unitarne co wizualizacja sfery Blocha; zwraca amplitudy i
+ * prawdopodobieństwa, ale nie losuje pojedynczego wyniku pomiaru.
+ */
+export function runBlochCircuitScenario({ circuit = 'H' }: { circuit?: string } = {}): BlochCircuitScenarioResult {
+  const gates = parseSingleQubitCircuit(circuit);
   const [finalAmplitude0, finalAmplitude1] = applyCircuit([[1, 0], [0, 0]], gates);
   const probability0 = finalAmplitude0[0] ** 2 + finalAmplitude0[1] ** 2;
   const probability1 = finalAmplitude1[0] ** 2 + finalAmplitude1[1] ** 2;

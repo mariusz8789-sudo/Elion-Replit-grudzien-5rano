@@ -83,6 +83,24 @@ const teleportRun = {
   },
 };
 
+const blochRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000009',
+  modelId: 'quantum-bloch-circuit',
+  modelVersion: '1.1.0',
+  domain: 'quantum',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { gates: 'H X', finalAmplitude0Re: 0.7071067811865475, finalAmplitude0Im: 0, finalAmplitude1Re: 0.7071067811865475, finalAmplitude1Im: 0, probability0: 0.5, probability1: 0.5, blochX: 1, blochY: 0, blochZ: 0, normSquared: 1 },
+  units: { gates: '', finalAmplitude0Re: '', finalAmplitude0Im: '', finalAmplitude1Re: '', finalAmplitude1Im: '', probability0: '', probability1: '', blochX: '', blochY: '', blochZ: '', normSquared: '' },
+  warnings: ['Prawdopodobieństwa wynikają z reguły Borna dla idealnego wektora stanu.'],
+  validity: 'Idealne bramki jednokubitowe; bez sprzętu, szumu i pomiaru.',
+  assumptions: ['Stan początkowy |0⟩.', 'Nie jest wykonywany pojedynczy losowy pomiar.'],
+  provenance: {
+    source: 'labs/experiments/quantum-bloch.ts via compute/core.bundle.mjs', formula: 'exact 2×2 complex unitary matrices', honesty: 'exact_ideal_single_qubit_state_vector', engine: 'Genesis single-qubit unitary state-vector (shared Canvas/backend runner)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -241,6 +259,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ branchCount: 4, allRecovered: true, minFidelity: 1 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis three-qubit state-vector teleportation (shared Canvas/backend runner)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(teleportRun.runId);
+  });
+
+  it('confirms a reviewed single-qubit Bloch plan through the canonical backend and preserves shared-runner provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: blochRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Wykonaj obwód kubitowy: H X.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'quantum-bloch-circuit', domainId: 'quantum', inputs: { circuit: 'H X' },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ probability0: 0.5, probability1: 0.5, normSquared: 1, blochX: 1 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis single-qubit unitary state-vector (shared Canvas/backend runner)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(blochRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

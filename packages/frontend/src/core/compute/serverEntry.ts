@@ -30,6 +30,7 @@ export { buildPhotonGraph } from '../modelGraph/photonGraph';
 // Czyste, deterministyczne runnery numeryczne (bez Canvasu/DOM).
 export { runTunnelingScenario } from '../quantum/tunnelingRunner';
 export { runQuantumTeleportScenario } from '../quantum/teleportationRunner';
+export { parseSingleQubitCircuit, runBlochCircuitScenario } from '../../labs/experiments/quantum-bloch';
 
 // Cheminformatyka (deterministyczna) — fundament domeny drug-discovery.
 export * from './cheminformatics';

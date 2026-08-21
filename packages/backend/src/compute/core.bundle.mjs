@@ -157,15 +157,15 @@ function lorenzDerivative(s, sigma, rho, beta) {
   return { x: sigma * (s.y - s.x), y: s.x * (rho - s.z) - s.y, z: s.x * s.y - beta * s.z };
 }
 function stepLorenzRK4(s, dt, sigma, rho, beta) {
-  const add = (a, b, f) => ({
+  const add2 = (a, b, f) => ({
     x: a.x + b.x * f,
     y: a.y + b.y * f,
     z: a.z + b.z * f
   });
   const k1 = lorenzDerivative(s, sigma, rho, beta);
-  const k2 = lorenzDerivative(add(s, k1, dt / 2), sigma, rho, beta);
-  const k3 = lorenzDerivative(add(s, k2, dt / 2), sigma, rho, beta);
-  const k4 = lorenzDerivative(add(s, k3, dt), sigma, rho, beta);
+  const k2 = lorenzDerivative(add2(s, k1, dt / 2), sigma, rho, beta);
+  const k3 = lorenzDerivative(add2(s, k2, dt / 2), sigma, rho, beta);
+  const k4 = lorenzDerivative(add2(s, k3, dt), sigma, rho, beta);
   return {
     x: s.x + dt / 6 * (k1.x + 2 * k2.x + 2 * k3.x + k4.x),
     y: s.y + dt / 6 * (k1.y + 2 * k2.y + 2 * k3.y + k4.y),
@@ -1721,6 +1721,73 @@ function runQuantumTeleportScenario({ state = "plus" } = {}) {
   };
 }
 
+// packages/frontend/src/labs/experiments/quantum-bloch.ts
+var GATES = {
+  // [a b; c d] jako [a, b, c, d]
+  H: [[1 / Math.SQRT2, 0], [1 / Math.SQRT2, 0], [1 / Math.SQRT2, 0], [-1 / Math.SQRT2, 0]],
+  X: [[0, 0], [1, 0], [1, 0], [0, 0]],
+  Y: [[0, 0], [0, -1], [0, 1], [0, 0]],
+  Z: [[1, 0], [0, 0], [0, 0], [-1, 0]],
+  S: [[1, 0], [0, 0], [0, 0], [0, 1]],
+  T: [[1, 0], [0, 0], [0, 0], [Math.SQRT1_2, Math.SQRT1_2]]
+};
+var mul = (a, b) => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
+var add = (a, b) => [a[0] + b[0], a[1] + b[1]];
+function applyGate(state, gate) {
+  const m = GATES[gate];
+  if (!m) return state;
+  const [a, b] = state;
+  return [add(mul(m[0], a), mul(m[1], b)), add(mul(m[2], a), mul(m[3], b))];
+}
+function applyCircuit(state, gates) {
+  return gates.reduce((s, g) => applyGate(s, g), state);
+}
+function blochVector(a, b) {
+  const [ar, ai] = a;
+  const [br, bi] = b;
+  const x = 2 * (ar * br + ai * bi);
+  const y = 2 * (ar * bi - ai * br);
+  const z = ar * ar + ai * ai - (br * br + bi * bi);
+  return [x, y, z];
+}
+var GATE_ROTATIONS = {
+  X: { axis: [1, 0, 0], angleRad: Math.PI },
+  Y: { axis: [0, 1, 0], angleRad: Math.PI },
+  Z: { axis: [0, 0, 1], angleRad: Math.PI },
+  S: { axis: [0, 0, 1], angleRad: Math.PI / 2 },
+  T: { axis: [0, 0, 1], angleRad: Math.PI / 4 },
+  H: { axis: [1 / Math.SQRT2, 0, 1 / Math.SQRT2], angleRad: Math.PI }
+};
+function parseSingleQubitCircuit(circuit) {
+  if (typeof circuit !== "string" || circuit.trim().length === 0 || circuit.length > 128) {
+    throw new Error("circuit musi by\u0107 niepustym tekstem do 128 znak\xF3w.");
+  }
+  const gates = circuit.toUpperCase().split(/[\s,;>→-]+/).filter(Boolean);
+  if (gates.length === 0 || gates.length > 32) {
+    throw new Error("circuit musi zawiera\u0107 od 1 do 32 bramek.");
+  }
+  const unknown = gates.find((gate) => GATES[gate] === void 0);
+  if (unknown) {
+    throw new Error(`Nieobs\u0142ugiwana bramka jednokubitowa: ${unknown}. Dozwolone: ${Object.keys(GATES).join(", ")}.`);
+  }
+  return gates;
+}
+function runBlochCircuitScenario({ circuit = "H" } = {}) {
+  const gates = parseSingleQubitCircuit(circuit);
+  const [finalAmplitude0, finalAmplitude1] = applyCircuit([[1, 0], [0, 0]], gates);
+  const probability0 = finalAmplitude0[0] ** 2 + finalAmplitude0[1] ** 2;
+  const probability1 = finalAmplitude1[0] ** 2 + finalAmplitude1[1] ** 2;
+  return {
+    gates,
+    finalAmplitude0,
+    finalAmplitude1,
+    probability0,
+    probability1,
+    bloch: blochVector(finalAmplitude0, finalAmplitude1),
+    normSquared: probability0 + probability1
+  };
+}
+
 // packages/frontend/src/core/compute/cheminformatics.ts
 var ATOMIC_WEIGHTS = {
   H: 1.008,
@@ -1863,8 +1930,10 @@ export {
   mondAcceleration,
   orbitalElementsFromState,
   parseFormula,
+  parseSingleQubitCircuit,
   project4Dto3D,
   rotate4D,
+  runBlochCircuitScenario,
   runQuantumTeleportScenario,
   runTunnelingScenario,
   sampleLocalHiddenPair,

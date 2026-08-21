@@ -386,6 +386,40 @@ const MODELS = [
 
   functionModel(
     {
+      id: 'quantum-chsh-correlation', name: 'Korelacja singletu i nierówność CHSH', domain: 'quantum', version: '1.1.0',
+      description: 'Dokładne, analityczne korelacje singletu E(a,b)=−cos(a−b) oraz wartość CHSH dla czterech ustawień kątowych.',
+      inputs: [
+        { id: 'a', label: 'Kąt Alicji a', type: 'number', unit: 'deg', min: 0, max: 180, default: 0 },
+        { id: 'aP', label: 'Kąt Alicji a′', type: 'number', unit: 'deg', min: 0, max: 180, default: 90 },
+        { id: 'b', label: 'Kąt Boba b', type: 'number', unit: 'deg', min: 0, max: 180, default: 45 },
+        { id: 'bP', label: 'Kąt Boba b′', type: 'number', unit: 'deg', min: 0, max: 180, default: 135 },
+      ],
+      outputs: [
+        { id: 'eAB', label: 'E(a,b)', unit: '' }, { id: 'eABP', label: 'E(a,b′)', unit: '' },
+        { id: 'eAPB', label: 'E(a′,b)', unit: '' }, { id: 'eAPBP', label: 'E(a′,b′)', unit: '' },
+        { id: 's', label: 'S CHSH', unit: '' }, { id: 'absS', label: '|S|', unit: '' },
+        { id: 'tsirelsonBound', label: 'Granica Tsirelsona', unit: '' },
+      ],
+      assumptions: 'Idealny stan singletowy dwóch kubitów, idealne ustawienia pomiarowe i reguła korelacji E(a,b)=−cos(a−b).',
+      validity: 'Kąty 0–180°. Wynik jest analityczną predykcją mechaniki kwantowej; nie obejmuje próbki par, detektorów, wydajności detekcji, przypadkowości pojedynczych pomiarów, luk lokalności/detekcji ani transmisji informacji.',
+      provenance: {
+        source: 'labs/experiments/quantum-chsh.ts via compute/core.bundle.mjs',
+        formula: 'E(a,b)=−cos(a−b); S=E(a,b)−E(a,b′)+E(a′,b)+E(a′,b′)',
+        honesty: 'exact_ideal_singlet_correlation',
+        engine: 'Genesis analytical singlet CHSH correlation (shared frontend/backend runner)',
+      },
+    },
+    (v) => {
+      const result = core.runChshCorrelationScenario({ a: v.a, aP: v.aP, b: v.b, bP: v.bP });
+      return {
+        outputs: { eAB: result.eAB, eABP: result.eABP, eAPB: result.eAPB, eAPBP: result.eAPBP, s: result.s, absS: result.absS, tsirelsonBound: result.tsirelsonBound },
+        warnings: ['To dokładna predykcja idealnego singletu, nie wynik eksperymentu detektorowego ani test Bella bez luk. Splątanie nie przesyła informacji.'],
+      };
+    },
+  ),
+
+  functionModel(
+    {
       id: 'quantum-kitaev-bulk', name: 'Bulk łańcucha Kitaeva p-wave', domain: 'quantum', version: '1.1.0',
       description: 'Analityczne minimum dodatniej gałęzi pasma BdG translacyjnie niezmiennego, spinless łańcucha Kitaeva p-wave; klasyfikuje jedynie reżim bulk względem |μ|=2|t|.',
       inputs: [

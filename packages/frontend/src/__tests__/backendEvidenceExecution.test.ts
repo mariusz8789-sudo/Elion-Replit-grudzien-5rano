@@ -119,6 +119,24 @@ const kitaevRun = {
   },
 };
 
+const chshRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000011',
+  modelId: 'quantum-chsh-correlation',
+  modelVersion: '1.1.0',
+  domain: 'quantum',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { eAB: -Math.SQRT1_2, eABP: Math.SQRT1_2, eAPB: -Math.SQRT1_2, eAPBP: -Math.SQRT1_2, s: -2 * Math.SQRT2, absS: 2 * Math.SQRT2, tsirelsonBound: 2 * Math.SQRT2 },
+  units: { eAB: '', eABP: '', eAPB: '', eAPBP: '', s: '', absS: '', tsirelsonBound: '' },
+  warnings: ['To dokładna predykcja idealnego singletu, nie wynik eksperymentu detektorowego.'],
+  validity: 'Ideal singlet correlation only; not a detector experiment.',
+  assumptions: ['Idealny stan singletowy i idealne ustawienia pomiarowe.'],
+  provenance: {
+    source: 'labs/experiments/quantum-chsh.ts via compute/core.bundle.mjs', formula: 'E(a,b)=−cos(a−b); CHSH combination', honesty: 'exact_ideal_singlet_correlation', engine: 'Genesis analytical singlet CHSH correlation (shared frontend/backend runner)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -311,6 +329,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ bulkGap: 2, topologicalInvariant: -1, phase: 'TOPOLOGICAL_REGIME' });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis Kitaev bulk BdG analytical minimizer (shared frontend/backend runner)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(kitaevRun.runId);
+  });
+
+  it('confirms a reviewed CHSH plan through the canonical backend and preserves analytical-singlet provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: chshRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz korelację CHSH dla nierówności Bella.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'quantum-chsh-correlation', domainId: 'quantum', inputs: {},
+    });
+    expect(confirmed.run.result.outputs.absS).toBeCloseTo(2 * Math.SQRT2, 12);
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis analytical singlet CHSH correlation (shared frontend/backend runner)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(chshRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

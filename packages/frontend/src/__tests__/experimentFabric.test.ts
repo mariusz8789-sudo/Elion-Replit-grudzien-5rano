@@ -583,20 +583,19 @@ describe('Genesis Experiment Fabric', () => {
     expect(spacetime?.realModels).toContain('einstein-schwarzschild-geodesic');
   });
 
-  it('runs analytic CHSH singlet correlation through Fabric without claiming a detector experiment', () => {
+  it('plans analytic CHSH singlet correlation for backend Fabric without claiming a detector experiment', () => {
     const command = 'Oblicz korelację CHSH dla nierówności Bella.';
-    const run = runExperiment(parseScienceChatMessage(command));
-    const repeated = runExperiment(parseScienceChatMessage(command));
+    const request = parseScienceChatMessage(command);
+    const reviewed = planEvidenceGuidedExperiment(request);
     const quantum = getKnowledgeDomain('quantum');
 
-    expect(run.request.modelId).toBe('quantum-chsh-correlation');
-    expect(run.result.status).toBe('completed');
-    expect(run.result.route).toEqual({ kind: 'lab', labId: 'quantum', experimentId: 'chsh' });
-    expect(Number(run.result.outputs.absS)).toBeCloseTo(2 * Math.SQRT2, 9);
-    expect(Number(run.result.outputs.tsirelsonBound)).toBeCloseTo(2 * Math.SQRT2, 12);
-    expect(run.result.validity).toContain('brak modelu detektora');
-    expect(run.result.warnings[0]).toContain('nie statystyka wykrytych par');
-    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(request.modelId).toBe('quantum-chsh-correlation');
+    expect(request.parameters).toEqual({});
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.1.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('Nie są to dane z detektorów');
     expect(quantum?.realModels).toContain('quantum-chsh-correlation');
   });
 

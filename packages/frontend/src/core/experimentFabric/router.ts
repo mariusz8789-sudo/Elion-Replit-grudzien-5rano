@@ -401,10 +401,11 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
-    id: 'quantum-chsh-correlation', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-singlet-correlation@1.0.0',
+    id: 'quantum-chsh-correlation', domainId: 'quantum', modelVersion: '1.1.0', engine: 'genesis-singlet-correlation@1.0.0',
     parameters: [number('a', 'Kąt Alicji a', 'deg', 0, 180, 0), number('aP', 'Kąt Alicji a′', 'deg', 0, 180, 90), number('b', 'Kąt Boba b', 'deg', 0, 180, 45), number('bP', 'Kąt Boba b′', 'deg', 0, 180, 135)],
-    route: { kind: 'lab', labId: 'quantum', experimentId: 'chsh' }, knowledgeSources: ['quantum.md'],
-    rationale: 'Istniejąca analityczna korelacja singletu E(a,b)=−cos(a−b) oraz wartość CHSH; nie są to dane z detektorów, test bez luk ani transmisja informacji.',
+    route: { kind: 'none' }, knowledgeSources: ['quantum.md'],
+    rationale: 'Rzeczywisty backendowy Fabric uruchamia tę samą analityczną korelację singletu E(a,b)=−cos(a−b) i wartość CHSH co Quantum Lab. Nie są to dane z detektorów, statystyka próby, test bez luk ani transmisja informacji.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'quantum-tunneling-1d', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-split-step-fft@1.0.0',

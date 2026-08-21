@@ -1831,6 +1831,24 @@ function solveKitaevBulk(parameters) {
   };
 }
 
+// packages/frontend/src/labs/experiments/quantum-chsh.ts
+var DEG = Math.PI / 180;
+function runChshCorrelationScenario({ a = 0, aP = 90, b = 45, bP = 135 } = {}) {
+  for (const [name, angle] of Object.entries({ a, aP, b, bP })) {
+    if (!Number.isFinite(angle) || angle < 0 || angle > 180) throw new Error(`${name} musi mie\u015Bci\u0107 si\u0119 w zakresie 0\u2013180\xB0.`);
+  }
+  const ar = a * DEG;
+  const aPr = aP * DEG;
+  const br = b * DEG;
+  const bPr = bP * DEG;
+  const eAB = singletCorrelation(ar, br);
+  const eABP = singletCorrelation(ar, bPr);
+  const eAPB = singletCorrelation(aPr, br);
+  const eAPBP = singletCorrelation(aPr, bPr);
+  const s = chshS(singletCorrelation, ar, aPr, br, bPr);
+  return { a, aP, b, bP, eAB, eABP, eAPB, eAPBP, s, absS: Math.abs(s), tsirelsonBound: 2 * Math.SQRT2 };
+}
+
 // packages/frontend/src/core/compute/cheminformatics.ts
 var ATOMIC_WEIGHTS = {
   H: 1.008,
@@ -1977,6 +1995,7 @@ export {
   project4Dto3D,
   rotate4D,
   runBlochCircuitScenario,
+  runChshCorrelationScenario,
   runQuantumTeleportScenario,
   runTunnelingScenario,
   sampleLocalHiddenPair,

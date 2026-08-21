@@ -32,6 +32,7 @@ export { runTunnelingScenario } from '../quantum/tunnelingRunner';
 export { runQuantumTeleportScenario } from '../quantum/teleportationRunner';
 export { parseSingleQubitCircuit, runBlochCircuitScenario } from '../../labs/experiments/quantum-bloch';
 export { solveKitaevBulk } from './kitaevBulk';
+export { runChshCorrelationScenario } from '../../labs/experiments/quantum-chsh';
 
 // Cheminformatyka (deterministyczna) — fundament domeny drug-discovery.
 export * from './cheminformatics';

@@ -49,8 +49,8 @@ function resultFromBackend(plan: EvidenceGuidedExperimentPlan, backendRun: Compu
   if (!model || backendRun.modelId !== model.id || backendRun.modelVersion !== model.modelVersion) {
     throw new Error('Backend returned a model identity or version different from the reviewed plan.');
   }
-  if (backendRun.provenance?.engine !== 'PyMeep') {
-    throw new Error('Backend did not provide PyMeep provenance for the reviewed Maxwell/FDTD plan.');
+  if (!backendRun.provenance?.engine) {
+    throw new Error('Backend did not provide engine provenance for the reviewed plan.');
   }
   if (!backendRun.outputs || !backendRun.units || backendRun.status !== 'ok') {
     throw new Error(backendRun.message ?? `Backend run finished with status ${backendRun.status}.`);
@@ -58,7 +58,7 @@ function resultFromBackend(plan: EvidenceGuidedExperimentPlan, backendRun: Compu
   return {
     contractVersion: EXPERIMENT_FABRIC_VERSION,
     status: 'completed',
-    summary: `Backend PyMeep Maxwell/FDTD ukończył rzeczywisty run dla n₁=${String(plan.request.parameters.n1)}, n₂=${String(plan.request.parameters.n2)}.`,
+    summary: `Backend ${backendRun.provenance.engine} ukończył rzeczywisty run modelu ${model.id}${Object.keys(plan.request.parameters).length === 0 ? '' : ` dla zatwierdzonych parametrów: ${Object.entries(plan.request.parameters).map(([key, value]) => `${key}=${String(value)}`).join(', ')}`}.`,
     outputs: backendRun.outputs,
     units: backendRun.units,
     warnings: backendRun.warnings ?? [],
@@ -79,7 +79,7 @@ export async function confirmBackendEvidenceGuidedExperiment(
   const plan = reviewedBackendPlan(reviewedPlan);
   const numericInputs: Record<string, number> = {};
   for (const [key, value] of Object.entries(plan.request.parameters)) {
-    if (typeof value !== 'number') throw new Error(`Backend Maxwell/FDTD accepts only numeric input; ${key} is not numeric.`);
+    if (typeof value !== 'number') throw new Error(`Backend Fabric accepts only numeric input in the current API contract; ${key} is not numeric.`);
     numericInputs[key] = value;
   }
   const response = await runFabricCompute({

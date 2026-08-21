@@ -47,6 +47,28 @@ const meepRun = {
   },
 };
 
+const depmapRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000002',
+  modelId: 'biology-depmap-crispr-senescence-panel',
+  modelVersion: '1.0.0',
+  domain: 'biology',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { cellLineCount: 1150, matrixGeneCount: 18443, controlCalibrationPass: 1, controlMedianSeparation: -1.0028181467925583, cdkn1aMedian: 0.27315700381056046 },
+  units: { cellLineCount: 'modele komórkowe', matrixGeneCount: 'geny', controlCalibrationPass: '0/1', controlMedianSeparation: 'CERES gene effect', cdkn1aMedian: 'CERES gene effect' },
+  warnings: ['Descriptive cancer-cell-line result only; not clinical evidence.'],
+  validity: 'Checksum-verified DepMap 24Q2 source artefacts only.',
+  assumptions: ['Predeclared p53/p21 and p16/RB panel.'],
+  provenance: {
+    source: 'DepMap 24Q2 Public, DOI:10.25452/figshare.plus.25880521 via compute/depmap_worker.py',
+    formula: 'Descriptive corrected CERES gene-effect summaries.',
+    honesty: 'real_versioned_dataset',
+    engine: 'DepMap 24Q2 CRISPR Gene Effect (Chronos/CERES)',
+    requiredEnvironmentVariable: 'GENESIS_DEPMAP_24Q2_DATA_DIR',
+  },
+};
+
 describe('backend Evidence-Guided execution', () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -80,6 +102,26 @@ describe('backend Evidence-Guided execution', () => {
     expect(capsule.backendExecution?.backendProvenance.engine).toBe('PyMeep');
     expect(confirmed.handoff.evidencePack.status).toBe('PROTOCOL_REQUIRED');
     expect(confirmed.handoff.counterfactual.status).toBe('VARIANT_REQUIRED');
+  });
+
+  it('confirms a reviewed DepMap data plan through the same canonical Fabric endpoint and preserves data provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: depmapRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Uruchom DepMap CRISPR panel p53 i p21.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'biology-depmap-crispr-senescence-panel', domainId: 'biology-aging-lab', inputs: {},
+    });
+    expect(confirmed.run.result.status).toBe('completed');
+    expect(confirmed.run.result.outputs.cellLineCount).toBe(1150);
+    expect(confirmed.run.result.summary).toContain('DepMap 24Q2 CRISPR Gene Effect');
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toContain('DepMap 24Q2');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(depmapRun.runId);
   });
 
   it('rejects a backend response whose model identity differs from the reviewed plan', async () => {

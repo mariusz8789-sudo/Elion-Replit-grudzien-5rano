@@ -98,11 +98,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'biology-aging-lab', title: 'Aging, senescencja i onkologia — Evidence Lab', sourceFile: 'biology-aging-senescence-cancer.md', scale: 'micro-meso',
-    capability: 'CAPABILITY_SEAM', realModels: [],
-    concepts: ['senescencja komórkowa', 'SASP', 'p16/p21', 'telomery', 'zegar epigenetyczny', 'senolityki', 'senomorfiki', 'częściowe przeprogramowanie', 'ryzyko onkologiczne'],
-    parameters: ['evidenceQuality', 'reproducibility', 'toxicityEvidence', 'oncogenicRiskEvidence', 'dataCoverage'], units: ['score 0–1'],
-    assumptions: ['Ten katalog klasyfikuje dowody i projektuje odtwarzalny protokół. Nie jest modelem pacjenta, diagnostyką, predykcją odpowiedzi na terapię ani aktywnym solverem biologicznym.', 'Senescencja jest heterogeniczna; pojedynczy marker nie stanowi dowodu odmłodzenia ani skuteczności klinicznej.', 'Dynamika komórek, omika, docking, molecular dynamics i QSAR wymagają zatwierdzonych danych oraz zwalidowanego runtime’u.'],
-    possibleExperiments: ['zaprojektuj hipotezę senescencji', 'porównaj jakość dowodów kandydatów', 'zidentyfikuj brakujące dane', 'przygotuj Evidence Pack Aging Lab'], requiredSolver: 'zatwierdzony dataset biologiczny + zwalidowany solver; bez nich DATA_REQUIRED / ENGINE_NOT_AVAILABLE',
+    capability: 'BACKEND_REAL_ENGINE', realModels: ['biology-depmap-crispr-senescence-panel'],
+    concepts: ['senescencja komórkowa', 'SASP', 'p16/p21', 'telomery', 'zegar epigenetyczny', 'senolityki', 'senomorfiki', 'częściowe przeprogramowanie', 'ryzyko onkologiczne', 'DepMap CRISPR gene effect', 'CERES', 'kontrole esencjalności'],
+    parameters: ['evidenceQuality', 'reproducibility', 'toxicityEvidence', 'oncogenicRiskEvidence', 'dataCoverage'], units: ['score 0–1', 'CERES gene effect'],
+    assumptions: ['Ten katalog klasyfikuje dowody i projektuje odtwarzalny protokół. Nie jest modelem pacjenta, diagnostyką, predykcją odpowiedzi na terapię ani rekomendacją kliniczną.', 'DepMap jest wersjonowaną obserwacją gene effect po knockout CRISPR w modelach komórkowych raka; pojedynczy panel nie ustala mechanizmu senescencji, celu terapeutycznego ani skuteczności leku.', 'Model DepMap uruchamia się tylko po checksumowej walidacji zatwierdzonych artefaktów DepMap 24Q2; CellAge pozostaje źródłem referencyjnym do czasu odrębnego potwierdzenia licencji.', 'Senescencja jest heterogeniczna; pojedynczy marker nie stanowi dowodu odmłodzenia ani skuteczności klinicznej.', 'Dynamika komórek, omika, docking, molecular dynamics i QSAR wymagają zatwierdzonych danych oraz zwalidowanego runtime’u.'],
+    possibleExperiments: ['uruchom read-only panel DepMap p53/p21 oraz p16/RB', 'zaprojektuj hipotezę senescencji', 'porównaj jakość dowodów kandydatów', 'zidentyfikuj brakujące dane', 'przygotuj Evidence Pack Aging Lab'], requiredSolver: 'DepMap 24Q2 CRISPR Gene Effect + checksumowo zweryfikowane artefakty; pozostałe omiki wymagają odrębnego źródła i walidacji',
     visualization: ['numeric', 'graph', 'narrative'], dependencies: ['biology', 'chemistry', 'ai-discovery'], keywords: ['starzenie', 'aging', 'senescencja', 'senescence', 'sasp', 'p16', 'p21', 'telomer', 'senolityk', 'senolytic', 'senomorfik', 'reprogramowanie', 'oskm', 'yamanaka', 'onkologia', 'rak', 'cancer'],
   },
   {

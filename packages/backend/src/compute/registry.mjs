@@ -18,6 +18,7 @@
 import * as core from './core.bundle.mjs';
 import { detect as rdkitDetect, descriptors as rdkitDescriptors, validate as rdkitValidate } from './rdkitAdapter.mjs';
 import { detect as meepDetect, interfaceTransmission as meepInterfaceTransmission } from './meepAdapter.mjs';
+import { detect as depmapDetect, senescenceCellCyclePanel } from './depmapAdapter.mjs';
 
 const SOLAR_MASS_KG = 1.989e30;
 
@@ -439,6 +440,73 @@ const MODELS = [
           `PyMeep ${result.version}; ${result.meta.measurement}.`,
           'Wynik dotyczy wyłącznie zadanej granicy dielektrycznej. Nie jest modelem niewidzialności, teleportacji ani legendy Filadelfii.',
         ],
+      };
+    },
+  },
+
+  {
+    id: 'biology-depmap-crispr-senescence-panel',
+    name: 'DepMap CRISPR — panel osi p53/p21 i p16/RB',
+    domain: 'biology',
+    version: '1.0.0',
+    description: 'Odtwarzalna, read-only analiza opisowa danych DepMap 24Q2 CRISPR Gene Effect dla z góry określonego panelu CDKN1A, CDKN2A, TP53, RB1, CDK4, CDK6 i MDM2, skalibrowana oficjalnymi kontrolami esencjalnymi i nieesencjalnymi.',
+    inputs: [],
+    outputs: [
+      { id: 'cellLineCount', label: 'Modele komórkowe z wynikiem', unit: 'modele komórkowe' },
+      { id: 'matrixGeneCount', label: 'Geny w macierzy CRISPR', unit: 'geny' },
+      { id: 'commonEssentialControlMedian', label: 'Mediana kontroli wspólnie esencjalnych', unit: 'CERES gene effect' },
+      { id: 'nonessentialControlMedian', label: 'Mediana kontroli nieesencjalnych', unit: 'CERES gene effect' },
+      { id: 'controlMedianSeparation', label: 'Różnica median kontroli', unit: 'CERES gene effect' },
+      { id: 'controlCalibrationPass', label: 'Kontrola kalibracji zaliczona', unit: '0/1' },
+      { id: 'cdkn1aMedian', label: 'CDKN1A — mediana gene effect', unit: 'CERES gene effect' },
+      { id: 'cdkn2aMedian', label: 'CDKN2A — mediana gene effect', unit: 'CERES gene effect' },
+      { id: 'tp53Median', label: 'TP53 — mediana gene effect', unit: 'CERES gene effect' },
+      { id: 'rb1Median', label: 'RB1 — mediana gene effect', unit: 'CERES gene effect' },
+      { id: 'cdk4Median', label: 'CDK4 — mediana gene effect', unit: 'CERES gene effect' },
+      { id: 'cdk6Median', label: 'CDK6 — mediana gene effect', unit: 'CERES gene effect' },
+      { id: 'mdm2Median', label: 'MDM2 — mediana gene effect', unit: 'CERES gene effect' },
+    ],
+    assumptions: 'Wersjonowany artefakt DepMap 24Q2, predefiniowany panel genów oraz oficjalne kontrolne listy Achilles. Wynik jest opisem CRISPR knockout gene-effect w liniach komórkowych raka.',
+    validity: 'Tylko dane DepMap 24Q2 o czterech wymaganych artefaktach SHA-256; bez inferencji dotyczącej pacjentów, mechanizmu senescencji, celu terapeutycznego, leku, bezpieczeństwa ani korzyści klinicznej.',
+    provenance: {
+      source: 'DepMap 24Q2 Public, DOI:10.25452/figshare.plus.25880521 via compute/depmap_worker.py',
+      formula: 'Descriptive corrected CERES gene-effect summaries; preregistered control separation common-essential versus nonessential genes.',
+      honesty: 'real_versioned_dataset',
+      engine: 'DepMap 24Q2 CRISPR Gene Effect (Chronos/CERES)',
+      datasetLicense: 'CC BY 4.0',
+      requiredEnvironmentVariable: 'GENESIS_DEPMAP_24Q2_DATA_DIR',
+    },
+    stochastic: false,
+    backendExecutable: true,
+    kind: 'external-data',
+    validate() {
+      const runtime = depmapDetect();
+      return runtime.available
+        ? { ok: true }
+        : { ok: false, error: 'data_required', message: `DepMap 24Q2 jest niedostępny lub niezweryfikowany (${runtime.reason}). Skonfiguruj GENESIS_DEPMAP_24Q2_DATA_DIR do kompletnego zestawu źródłowego.` };
+    },
+    execute() {
+      const result = senescenceCellCyclePanel();
+      if (!result.ok) throw new Error(result.error + (result.reason ? `: ${result.reason}` : ''));
+      const { data } = result;
+      if (!data.control.predeclaredPass) throw new Error('DepMap control calibration failed; source result is not admitted as an experiment output.');
+      return {
+        outputs: {
+          cellLineCount: data.cellLineCount,
+          matrixGeneCount: data.matrixGeneCount,
+          commonEssentialControlMedian: data.control.commonEssentialMedian,
+          nonessentialControlMedian: data.control.nonessentialMedian,
+          controlMedianSeparation: data.control.medianSeparation,
+          controlCalibrationPass: data.control.predeclaredPass ? 1 : 0,
+          cdkn1aMedian: data.panel.CDKN1A.median,
+          cdkn2aMedian: data.panel.CDKN2A.median,
+          tp53Median: data.panel.TP53.median,
+          rb1Median: data.panel.RB1.median,
+          cdk4Median: data.panel.CDK4.median,
+          cdk6Median: data.panel.CDK6.median,
+          mdm2Median: data.panel.MDM2.median,
+        },
+        warnings: [...data.interpretationBoundary, `Dataset ${data.datasetVersion}; DOI:${data.datasetDoi}; panel ${data.panelId}.`],
       };
     },
   },

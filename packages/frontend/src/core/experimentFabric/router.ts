@@ -201,6 +201,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
+    id: 'biology-depmap-crispr-senescence-panel', domainId: 'biology-aging-lab', modelVersion: '1.0.0', engine: 'depmap-24q2-crispr@1.0.0',
+    parameters: [], route: { kind: 'none' }, knowledgeSources: ['biology-aging-senescence-cancer.md'],
+    rationale: 'Rzeczywisty, read-only backendowy audyt DepMap 24Q2 CRISPR Gene Effect dla z góry określonego panelu p53/p21 i p16/RB. Uruchamia się wyłącznie po checksumowej walidacji czterech artefaktów danych; nie jest modelem pacjenta, targetem terapeutycznym ani predykcją leku.',
+    capability: 'BACKEND_REAL_ENGINE',
+  },
+  {
     id: 'photon-energy', domainId: 'electrodynamics', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('wavelengthNm', 'Długość fali', 'nm', 0.001, 1e9, 500)],
     route: { kind: 'lab', labId: 'quantum', experimentId: 'photon-graph' }, knowledgeSources: ['electrodynamics.md', 'quantum.md', 'chemistry.md'],

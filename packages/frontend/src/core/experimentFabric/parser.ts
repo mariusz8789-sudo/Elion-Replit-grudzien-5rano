@@ -196,6 +196,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:podświadomość|podswadomosc|psychologiczny efekt obserwatora|wewnętrzny termostat|wewnetrzny termostat)/.test(normalized)) {
     return request('biology', undefined, 'narrative', []);
   }
+  if (/(?:\bdepmap\b|crispr\s+(?:gene\s+)?effect|panel\s+(?:p53|p21|p16|rb)|(?:p53|p21|p16|rb)\s*(?:\/|i|oraz|and)\s*(?:p21|p16|rb)|senescence\s+panel\s+crispr)/.test(normalized)) {
+    return request('biology-aging-lab', 'biology-depmap-crispr-senescence-panel', 'graph', []);
+  }
   if (/\b(fałdowani[a-ząćęłńóśźż]* białk[a-ząćęłńóśźż]*|faldowani[a-ząćęłńóśźż]* bialk[a-ząćęłńóśźż]*|protein folding|model hp|hydrofobow[a-ząćęłńóśźż]* rdze[nń])\b/.test(normalized)) return request('biology', 'biology-protein-folding-hp', 'canvas-2d', ['sequenceKey', 'temperature', 'steps', 'seed']);
   if (/\b(dna|helis[a-ząćęłńóśźż]* dna|b[- ]?dna|temperatur[a-ząćęłńóśźż]* topnieni[a-ząćęłńóśźż]* dna|wallace)\b/.test(normalized)) return request('biology', 'biology-dna-helix', 'scene-3d', ['sequence', 'temperatureC']);
   if (/(?:epidem[a-ząćęłńóśźż]*|seir|seird|\bsir\b|zakaż[a-ząćęłńóśźż]*|zakaz[a-ząćęłńóśźż]*|rozwój epidemii|rozwoj epidemii)/.test(normalized)) {

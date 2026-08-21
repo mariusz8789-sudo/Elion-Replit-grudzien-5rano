@@ -45,12 +45,18 @@ describe('Genesis Experiment Fabric', () => {
     expect(validateKnowledgeRegistry()).toEqual({ ok: true, missing: [], duplicateFiles: [] });
   });
 
-  it('registers the Aging Lab as an evidence-first capability seam without upgrading absent biological engines', () => {
+  it('registers one data-verified DepMap model in the Aging Lab without upgrading absent biological engines', () => {
     const aging = getKnowledgeDomain('biology-aging-lab');
-    expect(aging?.capability).toBe('CAPABILITY_SEAM');
-    expect(aging?.realModels).toEqual([]);
+    expect(aging?.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(aging?.realModels).toEqual(['biology-depmap-crispr-senescence-panel']);
     expect(aging?.sourceFile).toBe('biology-aging-senescence-cancer.md');
-    expect(aging?.requiredSolver).toContain('DATA_REQUIRED');
+    expect(aging?.requiredSolver).toContain('DepMap 24Q2');
+    expect(aging?.assumptions.join(' ').toLowerCase()).toContain('nie jest modelem pacjenta');
+
+    const depmap = parseScienceChatMessage('Uruchom DepMap CRISPR panel p53 i p21.');
+    expect(depmap.domainId).toBe('biology-aging-lab');
+    expect(depmap.modelId).toBe('biology-depmap-crispr-senescence-panel');
+    expect(depmap.parameters).toEqual({});
 
     const [row] = rankAgingEvidenceCandidates([{
       candidateId: 'evidence-only', label: 'Evidence-only record', knowledgeSources: [],

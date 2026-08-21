@@ -17,7 +17,7 @@
 
 import * as core from './core.bundle.mjs';
 import { detect as rdkitDetect, descriptors as rdkitDescriptors, validate as rdkitValidate } from './rdkitAdapter.mjs';
-import { detect as meepDetect, interfaceTransmission as meepInterfaceTransmission } from './meepAdapter.mjs';
+import { detect as meepDetect, interfaceTransmission as meepInterfaceTransmission, pecReflection as meepPecReflection } from './meepAdapter.mjs';
 import { detect as pyscfDetect, referenceCase as pyscfReferenceCase, singlePoint as pyscfSinglePoint } from './qmAdapter.mjs';
 import { detect as depmapDetect, senescenceCellCyclePanel } from './depmapAdapter.mjs';
 
@@ -613,6 +613,54 @@ const MODELS = [
           `PyMeep ${result.version}; ${result.meta.measurement}.`,
           'Wynik dotyczy wyłącznie zadanej granicy dielektrycznej. Nie jest modelem niewidzialności, teleportacji ani legendy Filadelfii.',
         ],
+      };
+    },
+  },
+
+  {
+    id: 'electrodynamics-maxwell-fdtd-pec-reflection',
+    name: 'Maxwell FDTD — odbicie od idealnego przewodnika (PyMeep)',
+    domain: 'electrodynamics',
+    version: '1.0.0',
+    description: 'Rzeczywisty benchmark PyMeep FDTD: impuls Ex pada normalnie na półprzestrzeń idealnego przewodnika PEC, z PML oraz odejmowaniem pola padającego.',
+    inputs: [
+      { id: 'frequency', label: 'Częstotliwość Meep', unit: 'c / jednostka długości', min: 0.2, max: 2, default: 1 },
+      { id: 'resolution', label: 'Rozdzielczość FDTD', unit: 'piksele / jednostka długości', min: 40, max: 160, default: 80 },
+    ],
+    outputs: [
+      { id: 'computedReflectance', label: 'Reflektancja mocy FDTD R', unit: '' },
+      { id: 'expectedReflectance', label: 'Oczekiwana reflektancja PEC', unit: '' },
+      { id: 'reflectanceAbsoluteError', label: 'Błąd bezwzględny R', unit: '' },
+      { id: 'incidentFlux', label: 'Strumień fali padającej', unit: 'jednostki Meep' },
+      { id: 'reflectedFlux', label: 'Strumień fali odbitej', unit: 'jednostki Meep' },
+      { id: 'peakAbsExAtSample', label: 'Szczyt |Ex| w próbce', unit: 'jednostki Meep' },
+      { id: 'peakAbsHyAtSample', label: 'Szczyt |Hy| w próbce', unit: 'jednostki Meep' },
+    ],
+    assumptions: '1D, normalne padanie impulsu Ex na półprzestrzeń idealnego przewodnika `mp.metal` dla z>0; PML; punkt próbki pola z<0.',
+    validity: 'Tylko idealny przewodnik PEC w 1D i zadane zakresy wejść. Nie modeluje przewodności skończonej, dyspersji metalu, 2D/3D obiektu, geometrii okrętu, ekranowania ani teleportacji.',
+    provenance: { source: 'compute/meep_worker.py via compute/meepAdapter.mjs', formula: 'Maxwell FDTD + reflected-flux incident-field subtraction; PEC reference R=1', honesty: 'real_external_engine', engine: 'PyMeep', requiredEnvironmentVariable: 'GENESIS_MEEP_PYTHON' },
+    stochastic: false,
+    backendExecutable: true,
+    kind: 'external-engine',
+    validate() {
+      const runtime = meepDetect();
+      return runtime.available
+        ? { ok: true }
+        : { ok: false, error: 'capability_unavailable', message: `PyMeep niedostępny (${runtime.reason}). Skonfiguruj GENESIS_MEEP_PYTHON do zwalidowanego interpretera PyMeep.` };
+    },
+    execute(values) {
+      const result = meepPecReflection(values);
+      if (!result.ok) throw new Error(result.error + (result.reason ? `: ${result.reason}` : ''));
+      const data = result.data;
+      if (!result.pass) throw new Error(`pec_reference_failed: |R-1|=${data.reflectanceAbsoluteError} > ${result.tolerance}`);
+      return {
+        outputs: {
+          computedReflectance: data.computedReflectance, expectedReflectance: data.expectedReflectance,
+          reflectanceAbsoluteError: data.reflectanceAbsoluteError, incidentFlux: data.incidentFlux,
+          reflectedFlux: data.reflectedFlux, peakAbsExAtSample: data.peakAbsExAtSample,
+          peakAbsHyAtSample: data.peakAbsHyAtSample,
+        },
+        warnings: [`PyMeep ${result.version}; ${result.meta.measurement}.`, 'To ograniczony benchmark idealnego przewodnika PEC w 1D; nie jest wynikiem dla rzeczywistego metalu, obiektu 3D, niewidzialności, teleportacji ani legendy Filadelfii.'],
       };
     },
   },

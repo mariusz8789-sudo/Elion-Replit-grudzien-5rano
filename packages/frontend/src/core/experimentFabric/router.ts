@@ -201,6 +201,16 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
+    id: 'electrodynamics-maxwell-fdtd-pec-reflection', domainId: 'electrodynamics', modelVersion: '1.0.0', engine: 'pymeep-fdtd@1.34.0',
+    parameters: [
+      number('frequency', 'Częstotliwość Meep', 'c / jednostka długości', 0.2, 2, 1),
+      number('resolution', 'Rozdzielczość FDTD', 'piksele / jednostka długości', 40, 160, 80),
+    ],
+    route: { kind: 'none' }, knowledgeSources: ['electrodynamics.md'],
+    rationale: 'Rzeczywisty, ograniczony backendowy benchmark PyMeep: impuls Ex pada normalnie na półprzestrzeń idealnego przewodnika PEC w 1D, z PML i odejmowaniem pola padającego. Wynik raportuje reflektancję oraz próbki |Ex| i |Hy|, lecz nie opisuje przewodności rzeczywistego metalu, obiektu 3D, ekranu statku, niewidzialności ani teleportacji.',
+    capability: 'BACKEND_REAL_ENGINE',
+  },
+  {
     id: 'biology-depmap-crispr-senescence-panel', domainId: 'biology-aging-lab', modelVersion: '1.0.0', engine: 'depmap-24q2-crispr@1.0.0',
     parameters: [], route: { kind: 'none' }, knowledgeSources: ['biology-aging-senescence-cancer.md'],
     rationale: 'Rzeczywisty, read-only backendowy audyt DepMap 24Q2 CRISPR Gene Effect dla z góry określonego panelu p53/p21 i p16/RB. Uruchamia się wyłącznie po checksumowej walidacji czterech artefaktów danych; nie jest modelem pacjenta, targetem terapeutycznym ani predykcją leku.',

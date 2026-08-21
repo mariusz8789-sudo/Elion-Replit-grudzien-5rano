@@ -73,6 +73,24 @@ export function referenceCase() {
  * Executes the declared, limited real FDTD experiment. Input scope is intentionally
  * small: lossless non-dispersive planar n1/n2 interface at normal incidence.
  */
+/** Runs the real 1D normal-incidence ideal-conductor reflection reference case. */
+export function pecReflection(spec = {}) {
+  const runtime = detect();
+  if (!runtime.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: runtime.reason };
+  try {
+    const result = invoke({
+      cmd: 'pec_reflection',
+      frequency: spec.frequency ?? 1,
+      resolution: spec.resolution ?? 80,
+    });
+    return result.ok
+      ? { ok: true, data: result.data, meta: result.meta, version: result.version, pass: result.pass, tolerance: result.tolerance }
+      : { ok: false, error: result.error ?? 'meep_execution_failed' };
+  } catch (error) {
+    return { ok: false, error: 'execution_failed', reason: String(error?.message ?? error).slice(0, 180) };
+  }
+}
+
 export function interfaceTransmission(spec = {}) {
   const runtime = detect();
   if (!runtime.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: runtime.reason };

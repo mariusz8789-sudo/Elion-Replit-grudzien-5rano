@@ -197,6 +197,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     params.divergence = true;
     return request('classical-mechanics', 'universe-three-body', 'graph', ['preset', 'horizonTime', 'divergence']);
   }
+  if (/(?:\bpec\b|idealn[a-ząćęłńóśźż]* przewodnik[a-ząćęłńóśźż]*|perfect electric conductor|odbici[a-ząćęłńóśźż]*.*przewodnik|przewodnik.*odbici[a-ząćęłńóśźż]*)/.test(normalized)) {
+    return request('electrodynamics', 'electrodynamics-maxwell-fdtd-pec-reflection', 'graph', ['frequency', 'resolution']);
+  }
   if (/(?:meep|fdtd|różnic skończon[a-ząćęłńóśźż]* w dziedzinie czasu|roznic skonczon[a-ząćęłńóśźż]* w dziedzinie czasu|granica dielektryczn[a-ząćęłńóśźż]*|transmisj[a-ząćęłńóśźż]* fresnela|refleksj[a-ząćęłńóśźż]* fresnela|maxwell.*dielektryk|dielektryk.*maxwell)/.test(normalized)) {
     return request('electrodynamics', 'electrodynamics-maxwell-fdtd', 'graph', ['n1', 'n2', 'frequency', 'resolution']);
   }

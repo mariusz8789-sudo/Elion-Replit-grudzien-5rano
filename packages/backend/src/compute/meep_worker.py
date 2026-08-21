@@ -137,6 +137,95 @@ def simulate_interface(mp, n1: float, n2: float, frequency: float, resolution: i
     }
 
 
+def simulate_pec_reflection(mp, frequency: float, resolution: int) -> dict[str, float]:
+    """Real 1D FDTD reflection from a declared ideal-conductor half-space."""
+    pml = 1.0
+    interior_z = 10.0
+    cell_z = interior_z + 2.0 * pml
+    source_z = -0.5 * cell_z + pml
+    monitor_z = -0.25 * cell_z
+    sample_z = -0.5
+    pulse_width = max(0.08, min(0.25, frequency * 0.25))
+    source = mp.Source(
+        mp.GaussianSource(frequency, fwidth=pulse_width),
+        component=mp.Ex,
+        center=mp.Vector3(0, 0, source_z),
+    )
+
+    def simulation(with_pec: bool):
+        geometry = []
+        if with_pec:
+            geometry = [
+                mp.Block(
+                    center=mp.Vector3(0, 0, 0.25 * cell_z),
+                    size=mp.Vector3(mp.inf, mp.inf, 0.5 * cell_z),
+                    material=mp.metal,
+                )
+            ]
+        return mp.Simulation(
+            cell_size=mp.Vector3(0, 0, cell_z),
+            geometry=geometry,
+            boundary_layers=[mp.PML(pml)],
+            sources=[source],
+            dimensions=1,
+            resolution=resolution,
+        )
+
+    reference = simulation(with_pec=False)
+    incident_monitor = reference.add_flux(
+        frequency, 0, 1, mp.FluxRegion(center=mp.Vector3(0, 0, monitor_z))
+    )
+    reference.run(
+        until_after_sources=mp.stop_when_fields_decayed(
+            50, mp.Ex, mp.Vector3(0, 0, source_z), 1e-9
+        )
+    )
+    incident_flux = float(mp.get_fluxes(incident_monitor)[0])
+    if not math.isfinite(incident_flux) or incident_flux <= 0:
+        reference.reset_meep()
+        raise RuntimeError("nonpositive_incident_flux")
+    incident_flux_data = reference.get_flux_data(incident_monitor)
+    reference.reset_meep()
+
+    pec = simulation(with_pec=True)
+    reflected_monitor = pec.add_flux(
+        frequency, 0, 1, mp.FluxRegion(center=mp.Vector3(0, 0, monitor_z))
+    )
+    pec.load_minus_flux_data(reflected_monitor, incident_flux_data)
+    peak_ex = 0.0
+    peak_hy = 0.0
+
+    def sample_fields(sim):
+        nonlocal peak_ex, peak_hy
+        point = mp.Vector3(0, 0, sample_z)
+        peak_ex = max(peak_ex, abs(complex(sim.get_field_point(mp.Ex, point))))
+        peak_hy = max(peak_hy, abs(complex(sim.get_field_point(mp.Hy, point))))
+
+    pec.run(
+        mp.at_every(0.05, sample_fields),
+        until_after_sources=mp.stop_when_fields_decayed(
+            50, mp.Ex, mp.Vector3(0, 0, source_z), 1e-9
+        )
+    )
+    reflected_flux = -float(mp.get_fluxes(reflected_monitor)[0])
+    pec.reset_meep()
+    reflectance = reflected_flux / incident_flux
+    return {
+        "incidentFlux": incident_flux,
+        "reflectedFlux": reflected_flux,
+        "computedReflectance": reflectance,
+        "expectedReflectance": 1.0,
+        "reflectanceAbsoluteError": abs(reflectance - 1.0),
+        "energyClosure": reflectance,
+        "frequency": frequency,
+        "resolution": resolution,
+        "pulseWidth": pulse_width,
+        "fieldSampleZ": sample_z,
+        "peakAbsExAtSample": peak_ex,
+        "peakAbsHyAtSample": peak_hy,
+    }
+
+
 def main() -> None:
     try:
         request = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
@@ -166,6 +255,29 @@ def main() -> None:
                 "tolerance": tolerance,
                 "pass": data["transmittanceAbsoluteError"] <= tolerance,
                 "data": data,
+            })
+        if command == "pec_reflection":
+            frequency = finite_float(request.get("frequency", 1.0), "frequency", 0.2, 2.0)
+            resolution = finite_int(request.get("resolution", 80), "resolution", 40, 160)
+            data = simulate_pec_reflection(mp, frequency, resolution)
+            tolerance = 0.003
+            emit({
+                "ok": True,
+                "version": mp.__version__,
+                "data": data,
+                "meta": {
+                    "method": "FDTD",
+                    "dimension": "1D normal incidence",
+                    "geometry": "ideal-conductor (PEC) half-space z>0 via mp.metal",
+                    "source": "Ex Gaussian pulse",
+                    "boundaries": "PML",
+                    "measurement": "Meep reflected-flux incident-field subtraction; expected R=1 for PEC",
+                    "modelScope": "ideal PEC reflection only; no finite-conductivity material fit or 3D object",
+                },
+                "expectedReflectance": 1.0,
+                "actualReflectance": data["computedReflectance"],
+                "tolerance": tolerance,
+                "pass": data["reflectanceAbsoluteError"] <= tolerance,
             })
         if command == "interface":
             n1 = finite_float(request.get("n1", 1.0), "n1", 1.0, 4.0)

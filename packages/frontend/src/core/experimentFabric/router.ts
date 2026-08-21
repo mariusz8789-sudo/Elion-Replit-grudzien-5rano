@@ -375,8 +375,9 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'biology-logistic', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('growthRate', 'Tempo wzrostu r', '1/czas', 0, 5, 0.5), number('carryingCapacity', 'Pojemność K', 'osobn.', 1, 1e9, 1000), number('initialPopulation', 'Populacja początkowa N₀', 'osobn.', 1, 1e9, 10), number('timeElapsed', 'Czas t', 'czas', 0, 1000, 10)],
-    route: { kind: 'lab', labId: 'biology' }, knowledgeSources: ['biology.md', 'mathematics.md'],
-    rationale: 'Realny graf wzrostu logistycznego populacji.',
+    route: { kind: 'none' }, knowledgeSources: ['biology.md', 'mathematics.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje istniejący zamknięty ModelGraph wzrostu logistycznego. Nie jest to model populacji z wiekiem, migracją, opóźnieniami, stochastyką, interwencjami biologicznymi ani prognozą konkretnej populacji.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'civilization-drake-equation', domainId: 'civilization', modelVersion: '1.0.0', engine: 'genesis-model-graph-drake@1.0.0',

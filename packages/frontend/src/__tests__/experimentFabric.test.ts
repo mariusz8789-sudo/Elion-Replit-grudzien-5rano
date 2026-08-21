@@ -1097,12 +1097,24 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.disclosure.rationale).toContain('Nie jest to dopasowanie parametrów reakcji z danych');
   });
 
+  it('plans logistic growth for canonical backend Fabric without claiming a population forecast', () => {
+    const request = parseScienceChatMessage('Oblicz wzrost logistyczny populacji.');
+    const reviewed = planEvidenceGuidedExperiment(request);
+
+    expect(request.modelId).toBe('biology-logistic');
+    expect(request.parameters).toEqual({});
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.0.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('Nie jest to model populacji z wiekiem');
+  });
+
   it.each([
     ['Oblicz energię wiązania jądra protony=26 neutrony=30.', 'nuclear-semf', 'bindingEnergy'],
     ['Oblicz dylatację czasu dla beta=0.8.', 'sr-lorentz', 'lorentzGammaFactor'],
     ['Oblicz ucieczkę atmosfery planety.', 'universe-atmospheric-escape', 'jeansParameter'],
     ['Oblicz energię relatywistyczną cząstki beta=0.8.', 'particle-relativistic-energy', 'totalEnergyMeV'],
-    ['Oblicz wzrost logistyczny populacji.', 'biology-logistic', 'populationAtT'],
     ['Oblicz Kardaszew typ K=1.', 'civilization-kardashev', 'powerWatts'],
   ])('routes Chat through real local model %s', (prompt, modelId, outputKey) => {
     const run = runExperiment(parseScienceChatMessage(prompt));

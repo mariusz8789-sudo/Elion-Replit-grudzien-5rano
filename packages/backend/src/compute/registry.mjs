@@ -32,6 +32,7 @@ function graphModel(meta, build, opts = {}) {
     stochastic: false,
     backendExecutable: true,
     kind: 'graph',
+    ...(typeof opts.validate === 'function' ? { validate: opts.validate } : {}),
     execute(values) {
       const g = build();
       const snapshot = {};
@@ -273,6 +274,13 @@ const MODELS = [
       provenance: { source: 'core/modelGraph/logisticGrowthGraph.ts', formula: 'N(t)=K/(1+((K−N₀)/N₀)·e^(−rt))', honesty: 'simplified' },
     },
     core.buildLogisticGrowthGraph,
+    {
+      validate(values) {
+        return values.initialPopulation <= values.carryingCapacity
+          ? { ok: true }
+          : { ok: false, error: 'invalid_input', message: 'initialPopulation musi być mniejsze lub równe carryingCapacity.' };
+      },
+    },
   ),
 
   functionModel(

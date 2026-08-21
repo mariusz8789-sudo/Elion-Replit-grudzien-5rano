@@ -281,6 +281,24 @@ const arrheniusRun = {
   },
 };
 
+const logisticRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000020',
+  modelId: 'biology-logistic',
+  modelVersion: '1.0.0',
+  domain: 'biology',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { populationAtT: 109.57, fractionOfCapacity: 0.10957 },
+  units: { populationAtT: 'osobn.', fractionOfCapacity: '' },
+  warnings: [],
+  validity: 'N₀ ≤ K, r ≥ 0.',
+  assumptions: ['Zamknięte rozwiązanie logistyczne przy stałych r i K.'],
+  provenance: {
+    source: 'core/modelGraph/logisticGrowthGraph.ts', formula: 'N(t)=K/(1+((K−N₀)/N₀)·e^(−rt))', honesty: 'simplified', engine: 'Genesis ModelGraph (biology-logistic)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -626,6 +644,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ rateConstant: 111.2, speedupVsRoom: 31.4 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis chemistry-kinetics ModelGraph (shared frontend/backend graph)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(arrheniusRun.runId);
+  });
+
+  it('confirms a reviewed logistic-growth plan through the canonical backend and preserves ModelGraph provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: logisticRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz wzrost logistyczny populacji.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'biology-logistic', domainId: 'biology', inputs: {},
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ populationAtT: 109.57, fractionOfCapacity: 0.10957 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toBe('N(t)=K/(1+((K−N₀)/N₀)·e^(−rt))');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(logisticRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

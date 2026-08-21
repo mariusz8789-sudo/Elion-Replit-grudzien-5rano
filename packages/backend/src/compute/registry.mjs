@@ -51,7 +51,7 @@ function functionModel(meta, compute) {
     kind: 'function',
     execute(values) {
       const r = compute(values);
-      return { outputs: r.outputs ?? r, warnings: r.warnings ?? [] };
+      return { outputs: r.outputs ?? r, warnings: r.warnings ?? [], ...(r.provenance ? { provenance: r.provenance } : {}) };
     },
   };
 }
@@ -351,8 +351,8 @@ const MODELS = [
           { id: 'lipinskiViolations', label: 'Naruszenia reguły 5 Lipińskiego', unit: '' },
         ],
         assumptions: 'RDKit (open-source, walidowany). logP metodą wkładów atomowych Crippena; deskryptory topologiczne 2D (bez konformacji 3D).',
-        validity: 'Poprawny SMILES ORAZ RDKit dostępny w środowisku uruchomieniowym (pip install rdkit).',
-        provenance: { source: 'RDKit via compute/rdkitAdapter.mjs', formula: 'RDKit Descriptors / Lipinski / Crippen', honesty: 'simplified' },
+        validity: 'Poprawny SMILES ORAZ RDKit dostępny przez skonfigurowany interpreter GENESIS_RDKIT_PYTHON.',
+        provenance: { source: 'RDKit via compute/rdkitAdapter.mjs', formula: 'RDKit Descriptors / Lipinski / Crippen', honesty: 'real_external_engine', engine: 'RDKit runtime (version reported per run)', requiredEnvironmentVariable: 'GENESIS_RDKIT_PYTHON' },
       },
       (v) => {
         const r = rdkitDescriptors(v.smiles);
@@ -367,13 +367,14 @@ const MODELS = [
             canonicalSmiles: d.canonicalSmiles, molecularFormula: d.molecularFormula,
           },
           warnings: [],
+          provenance: { engine: r.engine, requiredEnvironmentVariable: 'GENESIS_RDKIT_PYTHON' },
         };
       },
     ),
     // Walidacja: RDKit obecny + poprawny SMILES. Bez RDKit → 'rejected' z jawną przyczyną (nie fałszywy wynik).
     validate: (v) => {
       const det = rdkitDetect();
-      if (!det.available) return { ok: false, error: 'capability_unavailable', message: `RDKit niedostępny (${det.reason}). Zainstaluj: pip install rdkit.` };
+      if (!det.available) return { ok: false, error: 'capability_unavailable', message: `RDKit niedostępny (${det.reason}). Skonfiguruj GENESIS_RDKIT_PYTHON do zwalidowanego interpretera RDKit.` };
       const val = rdkitValidate(v.smiles);
       return val.ok ? { ok: true } : { ok: false, error: 'invalid_smiles', message: 'Nieprawidłowy SMILES.' };
     },

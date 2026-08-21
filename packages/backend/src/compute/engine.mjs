@@ -138,7 +138,7 @@ export function runModel(modelId, rawInputs, opts = {}) {
     warnings: result.warnings ?? [],
     validity: model.validity,
     assumptions: model.assumptions,
-    provenance: model.provenance,
+    provenance: { ...model.provenance, ...(result.provenance ?? {}) },
     finishedAt,
     durationMs: finishedAt - startedAt,
   };

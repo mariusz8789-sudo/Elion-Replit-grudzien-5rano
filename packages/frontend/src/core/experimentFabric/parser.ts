@@ -53,6 +53,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const neutronNumber = firstNumber(normalized, /\b(?:neutrony|neutronów|neutronow|n)\s*[=:]?\s*(\d+)/);
   const kardashevType = firstNumber(normalized, /\b(?:kardaszew|kardashev|typ\s*k)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const formula = sourceText.match(/(?:wzór|wzor|formula|dla)\s+([A-Z][A-Za-z0-9]*)/)?.[1];
+  const smiles = sourceText.match(/\bsmiles\s*(?:=|:)?\s*([^\s,;]+)/i)?.[1];
   const blochCircuit = sourceText.match(/(?:obw[oó]d(?:\s+kubitowy)?|circuit|bramki)\s*(?:=|:)?\s*((?:[HXYZSThxyzst]\s*[,;>→-]?\s*)+)/i)?.[1]?.trim();
   const teleportStateMatch = sourceText.match(/(?:stan|state)\s*[=:]?\s*(zero|one|plus|minus|plusi|minusi)\b/i)?.[1]?.toLowerCase();
   const teleportState = teleportStateMatch === 'plusi' ? 'plusI' : teleportStateMatch === 'minusi' ? 'minusI' : teleportStateMatch;
@@ -114,6 +115,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (neutronNumber !== undefined) params.neutronNumber = neutronNumber;
   if (kardashevType !== undefined) params.kardashevType = kardashevType;
   if (formula !== undefined) params.formula = formula;
+  if (smiles !== undefined) params.smiles = smiles;
   if (blochCircuit !== undefined) params.circuit = blochCircuit;
   if (teleportState !== undefined) params.state = teleportState;
   if (chemicalPotential !== undefined) params.chemicalPotential = chemicalPotential;
@@ -198,6 +200,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   }
   if (/(?:\bdepmap\b|crispr\s+(?:gene\s+)?effect|panel\s+(?:p53|p21|p16|rb)|(?:p53|p21|p16|rb)\s*(?:\/|i|oraz|and)\s*(?:p21|p16|rb)|senescence\s+panel\s+crispr)/.test(normalized)) {
     return request('biology-aging-lab', 'biology-depmap-crispr-senescence-panel', 'graph', []);
+  }
+  if (smiles !== undefined && /(?:\brdkit\b|deskryptor[a-ząćęłńóśźż]*\s+(?:molekularn[a-ząćęłńóśźż]*|smiles)|(?:analizuj|oblicz|uruchom)\s+smiles)/.test(normalized)) {
+    return request('chemistry', 'chem-rdkit-descriptors', 'graph', ['smiles']);
   }
   if (/\b(fałdowani[a-ząćęłńóśźż]* białk[a-ząćęłńóśźż]*|faldowani[a-ząćęłńóśźż]* bialk[a-ząćęłńóśźż]*|protein folding|model hp|hydrofobow[a-ząćęłńóśźż]* rdze[nń])\b/.test(normalized)) return request('biology', 'biology-protein-folding-hp', 'canvas-2d', ['sequenceKey', 'temperature', 'steps', 'seed']);
   if (/\b(dna|helis[a-ząćęłńóśźż]* dna|b[- ]?dna|temperatur[a-ząćęłńóśźż]* topnieni[a-ząćęłńóśźż]* dna|wallace)\b/.test(normalized)) return request('biology', 'biology-dna-helix', 'scene-3d', ['sequence', 'temperatureC']);

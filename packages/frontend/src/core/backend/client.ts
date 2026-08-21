@@ -458,16 +458,18 @@ export interface RankedCandidate {
   capabilityGapCount: number; note: string;
 }
 
+export type ComputeValue = string | number | boolean;
+
 export interface ComputeRun {
   runId: string; modelId: string; modelName?: string; modelVersion: string; domain: string; engine?: string;
-  status: 'ok' | 'rejected' | 'error'; outputs?: Record<string, number>; units?: Record<string, string>;
+  status: 'ok' | 'rejected' | 'error'; outputs?: Record<string, ComputeValue>; units?: Record<string, string>;
   warnings?: string[]; validity?: string; assumptions?: string[]; deterministic?: boolean;
   provenance?: { source: string; formula: string; honesty: string; engine?: string; requiredEnvironmentVariable?: string };
   message?: string;
 }
 
 /** Uruchamia model na backendzie (publiczne, efemeryczne). Do weryfikacji „na serwerze" w labach (P4). */
-export async function runCompute(modelId: string, inputs: Record<string, number>): Promise<ApiResult<ComputeRun>> {
+export async function runCompute(modelId: string, inputs: Record<string, ComputeValue>): Promise<ApiResult<ComputeRun>> {
   const r = await request<{ run: ComputeRun; persisted: boolean }>('POST', '/compute/run', { body: { modelId, inputs } });
   return r.ok ? { ok: true, data: r.data.run } : r;
 }
@@ -494,7 +496,7 @@ export async function getFabricComputeContract(): Promise<ApiResult<FabricComput
 
 export async function runFabricCompute(input: {
   modelId: string;
-  inputs: Record<string, number>;
+  inputs: Record<string, ComputeValue>;
   sourceText?: string;
   domainId?: string;
   requestedVisualization?: string;

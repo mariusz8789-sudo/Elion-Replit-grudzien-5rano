@@ -98,10 +98,10 @@ describe('Genesis Experiment Fabric', () => {
   it('declares solver and GIS integrations as explicit seams with runtime-specific availability', () => {
     const engines = listExternalEngineAdapters();
     expect(engines.map((entry) => entry.id)).toEqual([
-      'pymeep-maxwell-fdtd', 'openfoam-cfd', 'fenicsx-pde', 'einstein-toolkit-nr', 'openmc-radiation', 'quantum-schrodinger',
+      'pymeep-maxwell-fdtd', 'rdkit-molecular-descriptors', 'openfoam-cfd', 'fenicsx-pde', 'einstein-toolkit-nr', 'openmc-radiation', 'quantum-schrodinger',
     ]);
     for (const entry of engines) {
-      expect(entry.status).toBe(entry.id === 'pymeep-maxwell-fdtd' ? 'REQUIRES_VALIDATION' : 'ENGINE_NOT_AVAILABLE');
+      expect(entry.status).toBe(['pymeep-maxwell-fdtd', 'rdkit-molecular-descriptors'].includes(entry.id) ? 'REQUIRES_VALIDATION' : 'ENGINE_NOT_AVAILABLE');
       expect(entry.inputSchema.length).toBeGreaterThan(0);
       expect(entry.outputSchema.length).toBeGreaterThan(0);
       expect(entry.requiredProvenance.length).toBeGreaterThan(0);
@@ -1127,6 +1127,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(flood.result.outputs).toEqual({});
     expect(flood.result.summary).toContain('Wymagany solver');
   });
+  it('routes a bounded RDKit descriptor request to a confirmable real backend plan without fabricating a local molecular result', () => {
+    const request = parseScienceChatMessage('Uruchom RDKit deskryptory SMILES: CCO.');
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(request.modelId).toBe('chem-rdkit-descriptors');
+    expect(request.domainId).toBe('chemistry');
+    expect(request.parameters).toEqual({ smiles: 'CCO.' });
+    expect(planned.plan.engine).toBe('rdkit@2026.03.5');
+    expect(planned.plan.runnable).toBe(true);
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(planned.disclosure.resultWillComeFromRealRun).toBe(true);
+    expect(planned.disclosure.limitations.join(' ')).toContain('Nie jest to QSAR');
+    const localAttempt = runExperiment(request);
+    expect(localAttempt.result.status).not.toBe('completed');
+    expect(localAttempt.result.outputs).toEqual({});
+  });
+
   it('routes a Maxwell/FDTD dielectric-interface request to a confirmable real backend PyMeep plan without fabricating local browser output', () => {
     const request = parseScienceChatMessage('Uruchom Meep FDTD dla granicy dielektrycznej n1=1 n2=2.');
     const planned = planEvidenceGuidedExperiment(request);

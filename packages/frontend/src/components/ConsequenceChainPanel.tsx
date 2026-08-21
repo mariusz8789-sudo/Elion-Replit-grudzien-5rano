@@ -363,17 +363,17 @@ function ServerVerify({ experimentId, graph, outputs }: { experimentId: string; 
     else setMsg(r.ok ? (r.data.message ?? 'Serwer odrzucił żądanie.') : r.message);
   }
 
-  const rows = run?.outputs
-    ? outputs
-        .filter((o) => run.outputs![o.id] !== undefined)
-        .map((o) => {
-          const local = graph.getValue(o.id);
-          const server = run.outputs![o.id];
-          const denom = Math.max(Math.abs(server), 1e-9);
-          const equal = Math.abs(local - server) / denom < 1e-6;
-          return { id: o.id, label: graph.getNode(o.id)?.label ?? o.id, local, server, equal, format: o.format };
-        })
-    : [];
+  const rows: { id: string; label: string; local: number; server: number; equal: boolean; format?: ConsequenceOutputSpec['format'] }[] = [];
+  if (run?.outputs) {
+    for (const output of outputs) {
+      const server = run.outputs[output.id];
+      if (typeof server !== 'number') continue;
+      const local = graph.getValue(output.id);
+      const denom = Math.max(Math.abs(server), 1e-9);
+      const equal = Math.abs(local - server) / denom < 1e-6;
+      rows.push({ id: output.id, label: graph.getNode(output.id)?.label ?? output.id, local, server, equal, format: output.format });
+    }
+  }
   const allEqual = rows.length > 0 && rows.every((r) => r.equal);
 
   return (

@@ -8,7 +8,8 @@
  * `available:false`, a modele/przepływy oznaczają zdolność jako niedostępną.
  *
  * Uwaga wdrożeniowa: RDKit jest OPCJONALNĄ zależnością runtime (nie npm).
- * Zainstaluj: `pip install rdkit` (patrz requirements-compute.txt). Bez tego
+ * Skonfiguruj `GENESIS_RDKIT_PYTHON` do odizolowanego interpretera z RDKit
+ * (np. Conda `genesis-rdkit`). Bez tego
  * podstawowa cheminformatyka (masa molowa ze wzoru) działa dalej; deskryptory
  * strukturalne z SMILES są wtedy niedostępne — jawnie, nie po cichu.
  */
@@ -18,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'rdkit_worker.py');
-const PYTHON = process.env.GENESIS_PYTHON ?? 'python3';
+const PYTHON = process.env.GENESIS_RDKIT_PYTHON ?? process.env.GENESIS_PYTHON ?? 'python3';
 const TIMEOUT_MS = 10_000;
 
 let detectCache = null;

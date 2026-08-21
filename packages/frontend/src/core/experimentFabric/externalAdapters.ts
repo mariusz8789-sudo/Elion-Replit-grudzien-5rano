@@ -7,7 +7,7 @@ export type ExternalAdapterStatus = 'ENGINE_NOT_AVAILABLE' | 'NOT_CONFIGURED' | 
 export type ExternalExecutionBackend = 'local-container' | 'remote-api' | 'hpc-job' | 'webgpu' | 'file-import';
 export type ExternalScientificDomain =
   | 'cfd' | 'pde' | 'electromagnetism' | 'thermodynamics' | 'general-relativity'
-  | 'astrophysics' | 'radiation-transport' | 'nuclear' | 'quantum' | 'gis' | 'environment';
+  | 'astrophysics' | 'radiation-transport' | 'nuclear' | 'quantum' | 'gis' | 'environment' | 'cheminformatics';
 
 export interface ExternalAdapterManifest {
   contractVersion: string;
@@ -50,6 +50,16 @@ const ENGINE_ADAPTERS: readonly ExternalAdapterManifest[] = [
     requiredProvenance: ['PyMeep version', 'worker hash', 'declared material indices', 'frequency', 'resolution', 'reference-case evidence'],
     requiredRuntime: ['GENESIS_MEEP_PYTHON interpreter', 'PyMeep import', 'reference n1=1/n2=2 Fresnel case passes'], route: { kind: 'none' },
     limitation: 'Backend zawiera rzeczywisty adapter Node → PyMeep dla 1D, normalnego padania na bezstratną granicę dielektryczną. Science Chat przekazuje niezmieniony, zatwierdzony plan do /api/compute/fabric/run; przeglądarka nie wykonuje FDTD. Endpoint przed wykonaniem weryfikuje GENESIS_MEEP_PYTHON oraz referencyjny przypadek Fresnela, a bez runtime’u zwraca blokadę bez wyniku.',
+  },
+  {
+    contractVersion: EXTERNAL_ADAPTER_CONTRACT_VERSION, id: 'rdkit-molecular-descriptors', title: 'RDKit molecular-descriptors adapter', status: 'REQUIRES_VALIDATION',
+    domains: ['cheminformatics'], backend: 'local-container',
+    primaryDocumentation: 'https://www.rdkit.org/docs/GettingStartedInPython.html',
+    inputSchema: ['SMILES molecular graph'],
+    outputSchema: ['canonical SMILES', 'formula', 'molecular mass', 'Crippen logP', 'HBD/HBA', 'ring metrics', 'TPSA', 'Lipinski rule-of-five violations'],
+    requiredProvenance: ['RDKit version', 'worker hash', 'canonical SMILES', 'descriptor method', 'declared runtime interpreter'],
+    requiredRuntime: ['GENESIS_RDKIT_PYTHON interpreter', 'RDKit import', 'reference descriptor cases pass'], route: { kind: 'none' },
+    limitation: 'Backend uruchamia rzeczywisty worker RDKit do deskryptorów topologicznych 2D jawnego SMILES. Science Chat przekazuje zatwierdzony tekst struktury do /api/compute/fabric/run; przeglądarka nie wyprowadza wartości. Bez runtime’u endpoint zwraca blokadę bez wyniku. Adapter nie wykonuje QSAR, docking, ADMET, dynamiki molekularnej, predykcji aktywności lub zaleceń chemicznych.',
   },
   {
     contractVersion: EXTERNAL_ADAPTER_CONTRACT_VERSION, id: 'openfoam-cfd', title: 'OpenFOAM CFD adapter', status: 'ENGINE_NOT_AVAILABLE',

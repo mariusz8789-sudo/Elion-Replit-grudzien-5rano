@@ -207,6 +207,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
+    id: 'chem-rdkit-descriptors', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'rdkit@2026.03.5',
+    parameters: [text('smiles', 'SMILES cząsteczki', 'CC(=O)Oc1ccccc1C(=O)O')], route: { kind: 'none' }, knowledgeSources: ['chemistry.md'],
+    rationale: 'Rzeczywisty backendowy RDKit wylicza deskryptory topologiczne 2D dla jawnego SMILES: masa, logP Crippena, HBD/HBA, pierścienie, TPSA i naruszenia reguły 5 Lipińskiego. Przeglądarka nie wyprowadza tych wartości; endpoint Fabric wymaga skonfigurowanego GENESIS_RDKIT_PYTHON. Nie jest to QSAR, docking, ADMET, aktywność biologiczna ani rekomendacja chemiczna.',
+    capability: 'BACKEND_REAL_ENGINE',
+  },
+  {
     id: 'photon-energy', domainId: 'electrodynamics', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('wavelengthNm', 'Długość fali', 'nm', 0.001, 1e9, 500)],
     route: { kind: 'lab', labId: 'quantum', experimentId: 'photon-graph' }, knowledgeSources: ['electrodynamics.md', 'quantum.md', 'chemistry.md'],

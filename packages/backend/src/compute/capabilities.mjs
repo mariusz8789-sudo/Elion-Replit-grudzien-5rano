@@ -25,7 +25,7 @@ export const CAPABILITY_STATUS = {
 
 /**
  * Zdolności zależne od RDKit: status USTALANY W RUNTIME. Jeśli RDKit jest
- * zainstalowany (pip install rdkit) → AVAILABLE i realnie liczy; jeśli nie →
+ * dostępny przez `GENESIS_RDKIT_PYTHON` → AVAILABLE i realnie liczy; jeśli nie →
  * BLOCKED_BY_RUNTIME z dokładną przyczyną. Nigdy nie udajemy wyniku.
  */
 const RDKIT_CAPABILITIES = [
@@ -41,8 +41,8 @@ function rdkitCapabilityEntries() {
     ...c,
     status: det.available ? CAPABILITY_STATUS.AVAILABLE : CAPABILITY_STATUS.BLOCKED_BY_RUNTIME,
     engine: det.available ? det.engine : undefined,
-    requires: det.available ? undefined : `RDKit w runtime (pip install rdkit). Przyczyna: ${det.reason}`,
-    note: det.available ? 'Realne obliczenie przez RDKit.' : 'Zainstaluj RDKit, aby aktywować — bez niego wynik NIE jest zwracany.',
+    requires: det.available ? undefined : `RDKit w runtime (GENESIS_RDKIT_PYTHON). Przyczyna: ${det.reason}`,
+    note: det.available ? 'Realne obliczenie przez RDKit.' : 'Skonfiguruj zwalidowany runtime RDKit, aby aktywować — bez niego wynik NIE jest zwracany.',
   }));
 }
 

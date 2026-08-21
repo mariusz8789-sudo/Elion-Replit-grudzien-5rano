@@ -71,20 +71,25 @@ function resultFromBackend(plan: EvidenceGuidedExperimentPlan, backendRun: Compu
 
 /**
  * Confirms an unchanged reviewed backend plan and invokes the canonical Fabric API.
- * It accepts no numeric output from the caller and performs no physics in the browser.
+ * It accepts no output from the caller and performs no science calculation in the browser.
  */
 export async function confirmBackendEvidenceGuidedExperiment(
   reviewedPlan: EvidenceGuidedExperimentPlan,
 ): Promise<ConfirmedEvidenceGuidedExperiment> {
   const plan = reviewedBackendPlan(reviewedPlan);
-  const numericInputs: Record<string, number> = {};
+  const flatInputs: Record<string, ExperimentValue> = {};
   for (const [key, value] of Object.entries(plan.request.parameters)) {
-    if (typeof value !== 'number') throw new Error(`Backend Fabric accepts only numeric input in the current API contract; ${key} is not numeric.`);
-    numericInputs[key] = value;
+    if (typeof value !== 'number' && typeof value !== 'string' && typeof value !== 'boolean') {
+      throw new Error(`Backend Fabric accepts only flat primitive input; ${key} is not a primitive.`);
+    }
+    if (typeof value === 'string' && value.length > 500) {
+      throw new Error(`Backend Fabric input ${key} exceeds the reviewed text limit.`);
+    }
+    flatInputs[key] = value;
   }
   const response = await runFabricCompute({
     modelId: plan.request.modelId!,
-    inputs: numericInputs,
+    inputs: flatInputs,
     sourceText: plan.request.sourceText,
     domainId: plan.request.domainId,
     requestedVisualization: plan.request.requestedVisualization,

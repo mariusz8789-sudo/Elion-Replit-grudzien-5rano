@@ -47,6 +47,24 @@ const meepRun = {
   },
 };
 
+const rdkitRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000003',
+  modelId: 'chem-rdkit-descriptors',
+  modelVersion: '1.0.0',
+  domain: 'chemistry',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { molWt: 46.069, exactMolWt: 46.04186, crippenLogP: -0.0014, hbd: 1, hba: 1, rotatableBonds: 0, ringCount: 0, aromaticRings: 0, fractionCsp3: 1, tpsa: 20.23, heavyAtomCount: 3, heteroatomCount: 1, formalCharge: 0, lipinskiViolations: 0, canonicalSmiles: 'CCO', molecularFormula: 'C2H6O' },
+  units: { molWt: 'g/mol', exactMolWt: 'g/mol', crippenLogP: '', hbd: '', hba: '', rotatableBonds: '', ringCount: '', aromaticRings: '', fractionCsp3: '', tpsa: 'Å²', heavyAtomCount: '', heteroatomCount: '', formalCharge: '', lipinskiViolations: '' },
+  warnings: ['RDKit descriptors are not QSAR, docking, ADMET or biological activity.'],
+  validity: 'Valid SMILES and configured RDKit runtime only.',
+  assumptions: ['Two-dimensional topological molecular descriptors.'],
+  provenance: {
+    source: 'RDKit via compute/rdkitAdapter.mjs', formula: 'RDKit Descriptors / Lipinski / Crippen', honesty: 'real_external_engine', engine: 'RDKit 2026.03.5', requiredEnvironmentVariable: 'GENESIS_RDKIT_PYTHON',
+  },
+};
+
 const depmapRun = {
   runId: '0aa4e400-0000-4000-8000-000000000002',
   modelId: 'biology-depmap-crispr-senescence-panel',
@@ -102,6 +120,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(capsule.backendExecution?.backendProvenance.engine).toBe('PyMeep');
     expect(confirmed.handoff.evidencePack.status).toBe('PROTOCOL_REQUIRED');
     expect(confirmed.handoff.counterfactual.status).toBe('VARIANT_REQUIRED');
+  });
+
+  it('confirms a reviewed RDKit descriptor plan through the same canonical Fabric endpoint and preserves structure provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: rdkitRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Uruchom RDKit deskryptory SMILES: CCO'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'chem-rdkit-descriptors', domainId: 'chemistry', inputs: { smiles: 'CCO' },
+    });
+    expect(confirmed.run.result.outputs.molWt).toBeCloseTo(46.069, 12);
+    expect(confirmed.run.result.outputs.canonicalSmiles).toBe('CCO');
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('RDKit 2026.03.5');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(rdkitRun.runId);
   });
 
   it('confirms a reviewed DepMap data plan through the same canonical Fabric endpoint and preserves data provenance', async () => {

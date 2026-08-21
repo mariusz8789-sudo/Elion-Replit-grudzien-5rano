@@ -305,8 +305,9 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'sr-lorentz', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('velocityFraction', 'Prędkość β = v/c', '', 0, 0.999999, 0.8), number('properTimeSeconds', 'Czas własny', 's', 0, 1e9, 1), number('restLengthMeters', 'Długość spoczynkowa', 'm', 0, 1e12, 1)],
-    route: { kind: 'lab', labId: 'einstein' }, knowledgeSources: ['spacetime-einstein.md'],
-    rationale: 'Realny graf Lorentza dla ruchu inercjalnego w jednej osi.',
+    route: { kind: 'none' }, knowledgeSources: ['spacetime-einstein.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje istniejący graf Lorentza: czynnik γ, dylatację czasu i skrócenie długości dla ruchu inercjalnego w jednej osi i próżni. Nie jest to model przyspieszenia, OTW, grawitacji, pola elektromagnetycznego, danych obserwacyjnych ani podróży międzygwiezdnej.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'einstein-chirp-mass', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-physics@1.0.0',

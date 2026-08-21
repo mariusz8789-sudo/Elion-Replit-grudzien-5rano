@@ -317,6 +317,24 @@ const semfRun = {
   },
 };
 
+const lorentzRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000022',
+  modelId: 'sr-lorentz',
+  modelVersion: '1.0.0',
+  domain: 'spacetime',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { lorentzGammaFactor: 1.666666666666667, dilatedTimeSeconds: 1.666666666666667, contractedLengthMeters: 0.6 },
+  units: { lorentzGammaFactor: '', dilatedTimeSeconds: 's', contractedLengthMeters: 'm' },
+  warnings: [],
+  validity: 'β < 1 (v < c).',
+  assumptions: ['Ruch inercjalny wzdłuż jednej osi, próżnia.'],
+  provenance: {
+    source: 'core/physics.ts:lorentzGamma', formula: 'γ = 1/√(1−β²)', honesty: 'exact', engine: 'Genesis ModelGraph (sr-lorentz)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -696,6 +714,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ massNumber: 56, bindingEnergy: 492.25 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toContain('a_V·A');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(semfRun.runId);
+  });
+
+  it('confirms a reviewed Lorentz plan through the canonical backend and preserves exact ModelGraph provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: lorentzRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz dylatację czasu dla beta=0.8.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'sr-lorentz', domainId: 'spacetime-einstein', inputs: { velocityFraction: 0.8 },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ lorentzGammaFactor: 1.666666666666667 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toBe('γ = 1/√(1−β²)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(lorentzRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

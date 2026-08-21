@@ -211,10 +211,10 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
-    id: 'biology-hiv-10e8-pdb-structural-comparison', domainId: 'biology-vaccine-discovery', modelVersion: '1.0.0', engine: 'biopython-pdb-rmsd@1.88',
+    id: 'biology-hiv-10e8-pdb-structural-comparison', domainId: 'biology-vaccine-discovery', modelVersion: '1.1.0', engine: 'biopython-pdb-rmsd@1.88',
     parameters: [text('referencePdb', 'Struktura referencyjna PDB', '5GHW'), text('mobilePdb', 'Struktura porównywana PDB', '4G6F')],
     route: { kind: 'none' }, knowledgeSources: ['biology-vaccine-discovery.md', 'biology.md', 'chemistry.md'],
-    rationale: 'Rzeczywisty, ograniczony backendowy Biopython oblicza Cα RMSD publicznej pary HIV MPER / bnAb 10E8: 5GHW jako reference i 4G6F jako mobile. Wynik jest COMPUTATIONAL_RESULT z SHA-256 obu artefaktów PDB. RMSD opisuje geometrię zdeponowanych struktur, a nie K_D, docking, neutralizację, immunogenność ani skuteczność szczepionki. Przeglądarka nie liczy wyniku; endpoint wymaga GENESIS_BIOPYTHON_PYTHON oraz GENESIS_PDB_STRUCTURES_DIR.',
+    rationale: 'Rzeczywisty backendowy Biopython oblicza Cα RMSD manifestowanych publicznych par HIV MPER / 10E8: 5GHW→4G6F albo 5GHW→5WDF. 5WDF jest eksperymentalnie zdeponowanym kompleksem wariantu 10E8v4-5R+100cF z peptydem gp41, a nie mutacją zaprojektowaną przez Genesis. Wynik jest COMPUTATIONAL_RESULT z SHA-256 obu artefaktów PDB. RMSD opisuje geometrię zdeponowanych struktur, a nie K_D, docking, neutralizację, immunogenność ani skuteczność szczepionki. Przeglądarka nie liczy wyniku; endpoint wymaga GENESIS_BIOPYTHON_PYTHON oraz GENESIS_PDB_STRUCTURES_DIR.',
     capability: 'BACKEND_REAL_ENGINE',
   },
   {

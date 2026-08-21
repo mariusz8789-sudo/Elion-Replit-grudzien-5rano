@@ -132,7 +132,7 @@ const openmmRun = {
 const structuralRun = {
   runId: '0aa4e400-0000-4000-8000-000000000007',
   modelId: 'biology-hiv-10e8-pdb-structural-comparison',
-  modelVersion: '1.0.0',
+  modelVersion: '1.1.0',
   domain: 'biology-vaccine-discovery',
   engine: 'genesis-compute@1.0.0',
   status: 'ok',
@@ -140,10 +140,10 @@ const structuralRun = {
   outputs: { fab10e8RmsdAngstrom: 8.242672750748403, fabMatchedCaAtoms: 422, mperInFabAlignedFrameRmsdAngstrom: 17.041076297900034, mperMatchedIdenticalCaAtoms: 13 },
   units: { fab10e8RmsdAngstrom: 'Å', fabMatchedCaAtoms: 'atomy', mperInFabAlignedFrameRmsdAngstrom: 'Å', mperMatchedIdenticalCaAtoms: 'atomy' },
   warnings: ['COMPUTATIONAL_RESULT: structure-only comparison; not affinity or efficacy.'],
-  validity: '5GHW→4G6F only.',
+  validity: 'Manifestowane pary 5GHW→4G6F oraz 5GHW→5WDF.',
   assumptions: ['C-alpha least-squares superposition in the Fab 10E8 frame.'],
   provenance: {
-    source: 'RCSB PDB 5GHW / 4G6F; compute/structural_worker.py',
+    source: 'RCSB PDB 5GHW / 4G6F / 5WDF; compute/structural_worker.py',
     formula: 'C-alpha least-squares superposition + RMSD',
     honesty: 'real_external_engine_computational_result',
     engine: 'Biopython 1.88', classification: 'COMPUTATIONAL_RESULT',

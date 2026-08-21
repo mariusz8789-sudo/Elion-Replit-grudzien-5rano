@@ -209,9 +209,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/(?:podświadomość|podswadomosc|psychologiczny efekt obserwatora|wewnętrzny termostat|wewnetrzny termostat)/.test(normalized)) {
     return request('biology', undefined, 'narrative', []);
   }
-  if (/(?:\b(?:rmsd|pdb)\b.*(?:10e8|mper|hiv)|(?:10e8|mper|hiv).*(?:\brmsd\b|pdb|porównaj struktur)|porównaj\s+(?:struktury|strukture)\s+(?:5ghw|4g6f))/i.test(normalized)) {
+  if (/(?:\b(?:rmsd|pdb)\b.*(?:10e8|mper|hiv)|(?:10e8|mper|hiv).*(?:\brmsd\b|pdb|porównaj struktur)|porównaj\s+(?:struktury|strukture)\s+(?:5ghw|4g6f|5wdf))/i.test(normalized)) {
     params.referencePdb = '5GHW';
-    params.mobilePdb = '4G6F';
+    params.mobilePdb = /\b5wdf\b|10e8v4|5r\+100cf/.test(normalized) ? '5WDF' : '4G6F';
     return request('biology-vaccine-discovery', 'biology-hiv-10e8-pdb-structural-comparison', 'graph', ['referencePdb', 'mobilePdb']);
   }
   if (/(?:\bopenmm\b|(?:dynamik[a-ząćęłńóśźż]*\s+molekularn[a-ząćęłńóśźż]*|molecular dynamics|\bmd\b).*(?:1vii|benchmark|referencyjn)|(?:1vii|benchmark\s+md).*(?:openmm|dynamik[a-ząćęłńóśźż]*))/i.test(normalized)) {

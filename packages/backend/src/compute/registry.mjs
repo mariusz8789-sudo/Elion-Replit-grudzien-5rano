@@ -671,8 +671,8 @@ const MODELS = [
     id: 'biology-hiv-10e8-pdb-structural-comparison',
     name: 'HIV MPER / 10E8 — porównanie struktur PDB (Biopython)',
     domain: 'biology-vaccine-discovery',
-    version: '1.0.0',
-    description: 'Rzeczywiste porównanie Cα RMSD publicznych struktur 5GHW i 4G6F: Fab 10E8 oraz wspólny identyczny segment HIV MPER w ramie wyrównanej do Fab.',
+    version: '1.1.0',
+    description: 'Rzeczywiste porównanie Cα RMSD manifestowanych par publicznych struktur 10E8/MPER: 5GHW→4G6F albo 5GHW→5WDF. Oblicza geometrię Fab oraz wspólnych identycznych atomów Cα MPER w ramie wyrównanej do Fab.',
     inputs: [
       { id: 'referencePdb', label: 'Referencyjna struktura PDB', type: 'string', unit: '', maxLength: 8, default: '5GHW' },
       { id: 'mobilePdb', label: 'Porównywana struktura PDB', type: 'string', unit: '', maxLength: 8, default: '4G6F' },
@@ -684,13 +684,13 @@ const MODELS = [
       { id: 'mperMatchedIdenticalCaAtoms', label: 'Dopasowane identyczne atomy Cα MPER', unit: 'atomy' },
     ],
     assumptions: 'Biopython PDBParser; least-squares superposition atomów Cα identycznych reszt. Referencyjny Fab 10E8 (H/L) ustala ramę, w której porównywany jest wspólny segment MPER (P).',
-    validity: 'Wyłącznie para publicznych artefaktów 5GHW↔4G6F z manifestowanego katalogu danych. RMSD opisuje różnicę geometrii struktur zdeponowanych eksperymentalnie; nie jest dockingiem, dynamiką molekularną, predykcją K_D/off-rate, neutralizacji, immunogenności ani skuteczności szczepionki.',
+    validity: 'Wyłącznie manifestowane, kierunkowe pary publicznych artefaktów 5GHW→4G6F oraz 5GHW→5WDF. Druga para obejmuje eksperymentalnie zdeponowany wariant 10E8v4-5R+100cF i peptyd gp41; Genesis nie projektuje mutacji. RMSD opisuje różnicę geometrii struktur zdeponowanych eksperymentalnie; nie jest dockingiem, dynamiką molekularną, predykcją K_D/off-rate, neutralizacji, immunogenności ani skuteczności szczepionki.',
     provenance: {
-      source: 'RCSB PDB 5GHW / 4G6F; compute/structural_worker.py via compute/structuralAdapter.mjs',
+      source: 'RCSB PDB 5GHW / 4G6F / 5WDF; compute/structural_worker.py via compute/structuralAdapter.mjs',
       formula: 'Cα least-squares superposition (Biopython Superimposer) + RMSD in antibody-aligned frame',
       honesty: 'real_external_engine_computational_result',
       engine: 'Biopython',
-      sourcePublication: 'RCSB 5GHW: crystal structure of broadly neutralizing antibody 10E8 with long HIV-1 MPER epitope',
+      sourcePublication: 'RCSB 5GHW/4G6F public 10E8 complexes; RCSB 5WDF: deposited 10E8v4-5R+100cF Fab in complex with HIV-1 gp41 peptide',
       requiredEnvironmentVariables: ['GENESIS_BIOPYTHON_PYTHON', 'GENESIS_PDB_STRUCTURES_DIR'],
     },
     stochastic: false,
@@ -699,12 +699,12 @@ const MODELS = [
     validate(values) {
       const runtime = structuralDetect();
       if (!runtime.available) {
-        return { ok: false, error: 'capability_unavailable', message: `Biopython/PDB runtime niedostępny (${runtime.reason}). Skonfiguruj GENESIS_BIOPYTHON_PYTHON oraz GENESIS_PDB_STRUCTURES_DIR do zweryfikowanych artefaktów 5GHW i 4G6F.` };
+        return { ok: false, error: 'capability_unavailable', message: `Biopython/PDB runtime niedostępny (${runtime.reason}). Skonfiguruj GENESIS_BIOPYTHON_PYTHON oraz GENESIS_PDB_STRUCTURES_DIR do zweryfikowanych artefaktów 5GHW, 4G6F i 5WDF.` };
       }
       const ref = values.referencePdb.toUpperCase();
       const mobile = values.mobilePdb.toUpperCase();
-      if (ref !== '5GHW' || mobile !== '4G6F') {
-        return { ok: false, error: 'unsupported_pdb_pair', message: 'Wersja 1.0.0 dopuszcza wyłącznie odtwarzalny benchmark 5GHW (reference) → 4G6F (mobile).' };
+      if (ref !== '5GHW' || !['4G6F', '5WDF'].includes(mobile)) {
+        return { ok: false, error: 'unsupported_pdb_pair', message: 'Wersja 1.1.0 dopuszcza wyłącznie odtwarzalne pary 5GHW (reference) → 4G6F lub 5WDF (mobile).' };
       }
       values.referencePdb = ref;
       values.mobilePdb = mobile;

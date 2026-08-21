@@ -335,6 +335,24 @@ const lorentzRun = {
   },
 };
 
+const keplerRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000023',
+  modelId: 'universe-kepler',
+  modelVersion: '1.0.0',
+  domain: 'universe',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { orbitalPeriodYears: 2.8284271247461903, orbitalSpeedAuPerYear: 4.442882938158366, relativeTidalStrength: 0.125 },
+  units: { orbitalPeriodYears: 'yr', orbitalSpeedAuPerYear: 'AU/yr', relativeTidalStrength: '' },
+  warnings: [],
+  validity: 'Reżim niereawistyczny.',
+  assumptions: ['Zagadnienie dwóch ciał, orbita kołowa, masa próbna pomijalna.'],
+  provenance: {
+    source: 'core/modelGraph/orbitalGraph.ts', formula: 'T = √(a³/M) [yr, AU, M☉]', honesty: 'exact', engine: 'Genesis ModelGraph (universe-kepler)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -731,6 +749,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ lorentzGammaFactor: 1.666666666666667 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toBe('γ = 1/√(1−β²)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(lorentzRun.runId);
+  });
+
+  it('confirms a reviewed Kepler plan through the canonical backend and preserves ModelGraph provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: keplerRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz orbitę planety przy 2 AU i 1 masie Słońca.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'universe-kepler', domainId: 'universe', inputs: { orbitalRadiusAu: 2 },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ orbitalPeriodYears: 2.8284271247461903 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toBe('T = √(a³/M) [yr, AU, M☉]');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(keplerRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

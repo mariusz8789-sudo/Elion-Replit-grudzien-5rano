@@ -93,8 +93,9 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'universe-kepler', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('centralMassSolar', 'Masa centralna', 'M☉', 0.01, 1e9, 1), number('orbitalRadiusAu', 'Promień orbity', 'AU', 0.001, 1e5, 1)],
-    route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['universe.md', 'classical-mechanics.md'],
-    rationale: 'Realny graf Keplera dla zagadnienia dwóch ciał i orbity kołowej.',
+    route: { kind: 'none' }, knowledgeSources: ['universe.md', 'classical-mechanics.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje istniejący graf Keplera dla zagadnienia dwóch ciał i orbity kołowej. Nie jest to model orbity eliptycznej, perturbacji wielu ciał, relativistyki, stabilności długookresowej, efemeryd ani danych obserwacyjnych.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'universe-solar-system', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-kepler-solar-system@1.0.0',

@@ -1038,15 +1038,17 @@ describe('Genesis Experiment Fabric', () => {
     expect(rejected.result.summary).toContain('poza zakresem');
   });
 
-  it('runs the existing Kepler ModelGraph deterministically from natural language', () => {
+  it('plans Kepler orbit for canonical backend Fabric without claiming ephemerides or multi-body dynamics', () => {
     const request = parseScienceChatMessage('Oblicz orbitę planety przy 2 AU i 1 masie Słońca.');
-    const a = runExperiment(request);
-    const b = runExperiment(request);
-    expect(a.result.status).toBe('completed');
-    expect(a.result.outputs.orbitalPeriodYears).toBeCloseTo(Math.sqrt(8), 8);
-    expect(a.result.outputs).toEqual(b.result.outputs);
-    expect(a.runId).toBe(b.runId);
-    expect(a.provenance.knowledgeSources).toContain('universe.md');
+    const reviewed = planEvidenceGuidedExperiment(request);
+
+    expect(request.modelId).toBe('universe-kepler');
+    expect(request.parameters).toEqual({ orbitalRadiusAu: 2 });
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.0.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('Nie jest to model orbity eliptycznej');
   });
 
   it('runs the existing pump-pipe engineering graph rather than a water stub', () => {

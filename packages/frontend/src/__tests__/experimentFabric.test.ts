@@ -1121,16 +1121,16 @@ describe('Genesis Experiment Fabric', () => {
     expect(flood.result.outputs).toEqual({});
     expect(flood.result.summary).toContain('Wymagany solver');
   });
-  it('routes a Maxwell/FDTD dielectric-interface request to the real PyMeep backend seam without fabricating browser output', () => {
-    const run = runExperiment(parseScienceChatMessage('Uruchom Meep FDTD dla granicy dielektrycznej i transmisji Fresnela.'));
-    expect(run.request.modelId).toBe('electrodynamics-maxwell-fdtd');
-    expect(run.request.domainId).toBe('electrodynamics');
-    expect(run.plan.engine).toBe('pymeep-fdtd@1.34.0');
-    expect(run.plan.runnable).toBe(false);
-    expect(run.result.status).toBe('capability_seam');
-    expect(run.result.outputs).toEqual({});
-    expect(run.provenance.resultOrigin).toBe('capability-seam');
-    expect(run.result.summary).toContain('PyMeep');
-    expect(run.result.summary).toContain('GENESIS_MEEP_PYTHON');
+  it('routes a Maxwell/FDTD dielectric-interface request to a confirmable real backend PyMeep plan without fabricating local browser output', () => {
+    const request = parseScienceChatMessage('Uruchom Meep FDTD dla granicy dielektrycznej n1=1 n2=2.');
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(request.modelId).toBe('electrodynamics-maxwell-fdtd');
+    expect(request.domainId).toBe('electrodynamics');
+    expect(planned.plan.engine).toBe('pymeep-fdtd@1.34.0');
+    expect(planned.plan.runnable).toBe(true);
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(planned.disclosure.resultWillComeFromRealRun).toBe(true);
+    expect(planned.disclosure.limitations.join(' ')).toContain('backendowy adapter PyMeep');
   });
 });

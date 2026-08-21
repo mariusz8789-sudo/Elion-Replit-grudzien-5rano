@@ -85,6 +85,13 @@ export interface ExperimentProvenance {
   deterministic: boolean;
   /** The source of all numeric output: real engine, never parser or LLM. */
   resultOrigin: 'real-engine' | 'hypothetical-visualization' | 'knowledge-only' | 'capability-seam' | 'engine-not-available';
+  /** Present only when this canonical run was executed by the existing backend Fabric endpoint. */
+  backendExecution?: {
+    backendRunId: string;
+    backendEngine: string;
+    backendModelVersion: string;
+    backendProvenance: Readonly<Record<string, string>>;
+  };
 }
 
 export interface ExperimentResult {

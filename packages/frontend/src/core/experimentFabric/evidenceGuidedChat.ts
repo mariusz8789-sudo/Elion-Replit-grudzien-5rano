@@ -74,6 +74,7 @@ export interface EvidenceGuidedExperimentCapsule {
   runId: string;
   runFingerprint: string;
   resultOrigin: ExperimentRun['provenance']['resultOrigin'];
+  backendExecution?: ExperimentRun['provenance']['backendExecution'];
   route: ExperimentRun['result']['route'];
   outputs: ExperimentRun['result']['outputs'];
   units: ExperimentRun['result']['units'];
@@ -131,7 +132,7 @@ export function planEvidenceGuidedExperiment(request: StructuredExperimentReques
     engine: plan.engine,
     capability: intent.capability,
     runnable: plan.runnable,
-    resultWillComeFromRealRun: plan.runnable && intent.capability === 'REAL_ENGINE',
+    resultWillComeFromRealRun: plan.runnable && (intent.capability === 'REAL_ENGINE' || intent.capability === 'BACKEND_REAL_ENGINE'),
     requestedParameters: request.parameters,
     parameterSchema: plan.parameterSchema,
     ...(request.seed === undefined ? {} : { seed: request.seed }),
@@ -171,6 +172,7 @@ export function capsuleFromConfirmedExperiment(confirmed: ConfirmedEvidenceGuide
     parameters: plan.disclosure.requestedParameters,
     ...(plan.disclosure.seed === undefined ? {} : { seed: plan.disclosure.seed }),
     runId: run.runId, runFingerprint: run.provenance.runFingerprint, resultOrigin: run.provenance.resultOrigin,
+    ...(run.provenance.backendExecution === undefined ? {} : { backendExecution: run.provenance.backendExecution }),
     route: run.result.route, outputs: run.result.outputs, units: run.result.units,
     limitations: plan.disclosure.limitations, evidencePack: handoff.evidencePack, counterfactual: handoff.counterfactual,
   };

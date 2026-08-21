@@ -49,7 +49,7 @@ const ENGINE_ADAPTERS: readonly ExternalAdapterManifest[] = [
     outputSchema: ['power transmittance', 'power reflectance', 'Fresnel analytical reference', 'absolute error', 'energy closure'],
     requiredProvenance: ['PyMeep version', 'worker hash', 'declared material indices', 'frequency', 'resolution', 'reference-case evidence'],
     requiredRuntime: ['GENESIS_MEEP_PYTHON interpreter', 'PyMeep import', 'reference n1=1/n2=2 Fresnel case passes'], route: { kind: 'none' },
-    limitation: 'Backend zawiera rzeczywisty adapter Node → PyMeep dla 1D, normalnego padania na bezstratną granicę dielektryczną. Frontend Experiment Fabric nie uruchamia solvera w przeglądarce i pozostaje capability seam do czasu skonfigurowania wywołania /api/compute/fabric/run w wdrożeniu.',
+    limitation: 'Backend zawiera rzeczywisty adapter Node → PyMeep dla 1D, normalnego padania na bezstratną granicę dielektryczną. Science Chat przekazuje niezmieniony, zatwierdzony plan do /api/compute/fabric/run; przeglądarka nie wykonuje FDTD. Endpoint przed wykonaniem weryfikuje GENESIS_MEEP_PYTHON oraz referencyjny przypadek Fresnela, a bez runtime’u zwraca blokadę bez wyniku.',
   },
   {
     contractVersion: EXTERNAL_ADAPTER_CONTRACT_VERSION, id: 'openfoam-cfd', title: 'OpenFOAM CFD adapter', status: 'ENGINE_NOT_AVAILABLE',

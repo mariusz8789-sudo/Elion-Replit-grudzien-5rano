@@ -36,7 +36,7 @@ export const KNOWLEDGE_CORPUS_FILES = [
 
 export type KnowledgeCorpusFile = (typeof KNOWLEDGE_CORPUS_FILES)[number];
 export type KnowledgeScale = 'meta' | 'micro' | 'micro-meso' | 'meso' | 'macro' | 'cosmic' | 'micro-cosmic';
-export type KnowledgeCapability = 'REAL_ENGINE' | 'KNOWLEDGE_ONLY' | 'CAPABILITY_SEAM' | 'ENGINE_NOT_AVAILABLE' | 'HYPOTHETICAL_VISUALIZATION';
+export type KnowledgeCapability = 'REAL_ENGINE' | 'BACKEND_REAL_ENGINE' | 'KNOWLEDGE_ONLY' | 'CAPABILITY_SEAM' | 'ENGINE_NOT_AVAILABLE' | 'HYPOTHETICAL_VISUALIZATION';
 export type KnowledgeVisualization = 'numeric' | 'graph' | 'canvas-2d' | 'scene-3d' | 'world-3d' | 'narrative';
 
 export interface KnowledgeDomainDescriptor {

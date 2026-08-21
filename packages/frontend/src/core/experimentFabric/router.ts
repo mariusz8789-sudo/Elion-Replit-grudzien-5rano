@@ -197,8 +197,8 @@ const ROUTER_MODELS: readonly RouterModel[] = [
       number('resolution', 'Rozdzielczość FDTD', 'piksele / jednostka długości', 40, 160, 80),
     ],
     route: { kind: 'none' }, knowledgeSources: ['electrodynamics.md'],
-    rationale: 'Rzeczywisty backendowy adapter PyMeep wykonuje ograniczony przypadek Maxwell/FDTD: normalne padanie w 1D na płaską, bezstratną granicę dielektryczną. Browser nie oblicza zastępczego wyniku; wykonanie wymaga skonfigurowanego backendu /api/compute/fabric/run z GENESIS_MEEP_PYTHON i referencyjnej walidacji FDTD.',
-    capability: 'CAPABILITY_SEAM',
+    rationale: 'Rzeczywisty backendowy adapter PyMeep wykonuje ograniczony przypadek Maxwell/FDTD: normalne padanie w 1D na płaską, bezstratną granicę dielektryczną. Browser nie oblicza zastępczego wyniku; po potwierdzeniu istniejący endpoint /api/compute/fabric/run sprawdza GENESIS_MEEP_PYTHON oraz referencyjną walidację FDTD przed wykonaniem.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'photon-energy', domainId: 'electrodynamics', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
@@ -462,7 +462,7 @@ export function createExperimentPlan(intent: ExperimentIntent): ExperimentPlan {
     engine: model?.engine ?? null,
     modelVersion: model?.modelVersion ?? null,
     parameterSchema: model?.parameters ?? [],
-    runnable: (intent.capability === 'REAL_ENGINE' || intent.capability === 'HYPOTHETICAL_VISUALIZATION') && Boolean(model),
+    runnable: (intent.capability === 'REAL_ENGINE' || intent.capability === 'BACKEND_REAL_ENGINE' || intent.capability === 'HYPOTHETICAL_VISUALIZATION') && Boolean(model),
     route: model?.route ?? { kind: 'none' },
   };
   return { ...provisional, planId: fingerprintExperimentPlan({ ...provisional, planId: '' }) };

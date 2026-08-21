@@ -45,12 +45,14 @@ export function statusForCapability(capability: KnowledgeCapability): Experiment
     case 'ENGINE_NOT_AVAILABLE': return 'engine_not_available';
     case 'HYPOTHETICAL_VISUALIZATION': return 'hypothetical_visualization';
     case 'REAL_ENGINE': return null;
+    case 'BACKEND_REAL_ENGINE': return null;
   }
 }
 
 export function resultOriginForCapability(capability: KnowledgeCapability): ExperimentProvenance['resultOrigin'] {
   switch (capability) {
     case 'REAL_ENGINE': return 'real-engine';
+    case 'BACKEND_REAL_ENGINE': return 'real-engine';
     case 'KNOWLEDGE_ONLY': return 'knowledge-only';
     case 'CAPABILITY_SEAM': return 'capability-seam';
     case 'ENGINE_NOT_AVAILABLE': return 'engine-not-available';
@@ -65,6 +67,7 @@ export function createExperimentProvenance(input: {
   knowledgeSources: readonly KnowledgeCorpusFile[];
   supplementalKnowledgeIds: readonly string[];
   deterministic: boolean;
+  backendExecution?: ExperimentProvenance['backendExecution'];
 }): ExperimentProvenance {
   const requestFingerprint = fingerprintStructuredRequest(input.request);
   const runFingerprint = `run_${fnv1a(canonicalJson({
@@ -74,6 +77,7 @@ export function createExperimentProvenance(input: {
     outputs: input.result.outputs,
     units: input.result.units,
     warnings: input.result.warnings,
+    backendExecution: input.backendExecution ?? null,
   }))}`;
   return {
     contractVersion: EXPERIMENT_FABRIC_VERSION,
@@ -91,5 +95,6 @@ export function createExperimentProvenance(input: {
     resultOrigin: input.result.status === 'completed'
       ? 'real-engine'
       : resultOriginForCapability(input.plan.intent.capability),
+    ...(input.backendExecution === undefined ? {} : { backendExecution: input.backendExecution }),
   };
 }

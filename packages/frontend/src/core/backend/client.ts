@@ -459,9 +459,11 @@ export interface RankedCandidate {
 }
 
 export interface ComputeRun {
-  runId: string; modelId: string; modelName?: string; modelVersion: string; domain: string;
+  runId: string; modelId: string; modelName?: string; modelVersion: string; domain: string; engine?: string;
   status: 'ok' | 'rejected' | 'error'; outputs?: Record<string, number>; units?: Record<string, string>;
-  warnings?: string[]; provenance?: { source: string; formula: string; honesty: string }; message?: string;
+  warnings?: string[]; validity?: string; assumptions?: string[]; deterministic?: boolean;
+  provenance?: { source: string; formula: string; honesty: string; engine?: string; requiredEnvironmentVariable?: string };
+  message?: string;
 }
 
 /** Uruchamia model na backendzie (publiczne, efemeryczne). Do weryfikacji „na serwerze" w labach (P4). */

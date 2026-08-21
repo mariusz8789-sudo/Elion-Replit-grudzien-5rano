@@ -7,7 +7,7 @@ import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
 import { saveExperiment, listExperiments } from '../core/scienceMemory';
 import { track } from '../core/analytics';
-import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
+import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
 import { getToken } from '../core/backend/session';
 import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
@@ -73,12 +73,15 @@ function formatFabricRun(run: ExperimentRun): string {
     return `${key}: ${typeof value === 'number' ? value.toPrecision(5) : String(value)}${unit}`;
   });
   const source = run.provenance.knowledgeSources.length > 0 ? `\nCorpus: ${run.provenance.knowledgeSources.join(', ')}.` : '';
+  const backend = run.provenance.backendExecution
+    ? `\nBackend: ${run.provenance.backendExecution.backendEngine}; run ${run.provenance.backendExecution.backendRunId}; solver ${run.provenance.backendExecution.backendProvenance.engine}.`
+    : '';
   const route = run.result.route.kind === 'live-world'
     ? '\nŚwiat 3D używa tej samej instancji modelu z tego przebiegu.'
     : run.result.route.kind === 'lab'
       ? `\nWizualizacja: laboratorium ${run.result.route.labId}.`
       : '';
-  return `${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${route}\nProvenance: ${run.provenance.runFingerprint}.`;
+  return `${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}\nProvenance: ${run.provenance.runFingerprint}.`;
 }
 
 function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule }) {
@@ -94,6 +97,7 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
         <div><span>Model / engine</span><strong>{capsule.modelId ?? 'brak modelId'} · {capsule.engine}</strong></div>
         <div><span>Wersja / origin</span><strong>{capsule.modelVersion} · {capsule.resultOrigin}</strong></div>
         <div><span>Run / provenance</span><code>{capsule.runId} · {capsule.runFingerprint}</code></div>
+        {capsule.backendExecution && <div><span>Backend / solver</span><code>{capsule.backendExecution.backendEngine} · {capsule.backendExecution.backendProvenance.engine} · {capsule.backendExecution.backendRunId}</code></div>}
         <div><span>Route</span><strong>{capsule.route.kind === 'lab' ? `lab: ${capsule.route.labId}` : capsule.route.kind}</strong></div>
       </div>
       {params.length > 0 && <div className="evidence-capsule-section"><span>Parametry zatwierdzone</span><code>{params.map(([key, value]) => `${key}=${String(value)}`).join(' · ')}</code></div>}
@@ -125,6 +129,7 @@ export function ScienceChat() {
   }]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
   const [pendingGuidedPlan, setPendingGuidedPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
+  const [backendConfirmationPending, setBackendConfirmationPending] = useState(false);
   const [lastEvidenceCapsule, setLastEvidenceCapsule] = useState<EvidenceGuidedExperimentCapsule | null>(null);
   const [activeKnowledgeProject, setActiveKnowledgeProject] = useState<ActiveKnowledgeProject | null>(() => getActiveKnowledgeProject());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -148,9 +153,9 @@ export function ScienceChat() {
     setTurns((current) => [...current, { role: 'genesis', text: formatProjectKnowledgeSources(project, found.data), tag: 'SYSTEM' }]);
   };
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const msg = text.trim();
-    if (!msg) return;
+    if (!msg || backendConfirmationPending) return;
     const isConfirmation = /^(?:potwierdź|potwierdz|uruchom potwierdzony plan)$/i.test(msg);
     const isCancellation = /^(?:anuluj|anuluj plan)$/i.test(msg);
     if (isCancellation && pendingGuidedPlan) {
@@ -167,7 +172,11 @@ export function ScienceChat() {
         return;
       }
       try {
-        const confirmed = confirmEvidenceGuidedExperiment(reviewed);
+        const backendPlan = isBackendEvidenceGuidedPlan(reviewed);
+        if (backendPlan) setBackendConfirmationPending(true);
+        const confirmed = backendPlan
+          ? await confirmBackendEvidenceGuidedExperiment(reviewed)
+          : confirmEvidenceGuidedExperiment(reviewed);
         const run = confirmed.run;
         const hypothetical = run.result.status === 'hypothetical_visualization';
         if (run.result.status === 'completed') setLastEvidenceCapsule(capsuleFromConfirmedExperiment(confirmed));
@@ -191,6 +200,8 @@ export function ScienceChat() {
       } catch (error) {
         const reason = error instanceof Error ? error.message : 'Nieznany błąd potwierdzenia planu.';
         setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `Plan nie został uruchomiony: ${reason}`, tag: 'SYSTEM' }]);
+      } finally {
+        setBackendConfirmationPending(false);
       }
       return;
     }
@@ -305,8 +316,8 @@ export function ScienceChat() {
 
       {pendingGuidedPlan?.status === 'READY_FOR_CONFIRMATION' && (
         <div className="science-chat-suggest" aria-label="Potwierdzenie planu eksperymentu">
-          <button className="primary-btn" onClick={() => send('potwierdź')}>Uruchom potwierdzony plan</button>
-          <button className="chip-btn" onClick={() => send('anuluj plan')}>Anuluj plan</button>
+          <button className="primary-btn" disabled={backendConfirmationPending} onClick={() => void send('potwierdź')}>{backendConfirmationPending ? 'Uruchamianie realnego solvera…' : 'Uruchom potwierdzony plan'}</button>
+          <button className="chip-btn" disabled={backendConfirmationPending} onClick={() => void send('anuluj plan')}>Anuluj plan</button>
         </div>
       )}
 
@@ -321,10 +332,11 @@ export function ScienceChat() {
           className="generator-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          disabled={backendConfirmationPending}
           placeholder="Napisz komendę lub pytanie…"
           aria-label="Wiadomość do Science Chat"
         />
-        <button className="primary-btn" type="submit" disabled={!input.trim()}>Wyślij</button>
+        <button className="primary-btn" type="submit" disabled={!input.trim() || backendConfirmationPending}>Wyślij</button>
       </form>
     </aside>
   );

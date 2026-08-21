@@ -80,6 +80,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
       ? 'figure8'
       : undefined;
   const threeBodyDivergence = /(?:drugi start|dwa starty|perturbac[a-ząćęłńóśźż]*|rozjazd|wrażliwoś[a-ząćęłńóśźż]* na warunki|wrazliwos[a-ząćęłńóśźż]* na warunki)/.test(normalized);
+  const meepN1 = firstNumber(normalized, /\b(?:n1|n₁|współczynnik\s*(?:załamania\s*)?(?:ośrodka\s*)?1)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const meepN2 = firstNumber(normalized, /\b(?:n2|n₂|współczynnik\s*(?:załamania\s*)?(?:ośrodka\s*)?2)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const meepFrequency = firstNumber(normalized, /\b(?:częstotliwość\s*meep|czestotliwosc\s*meep|frequency)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const meepResolution = firstNumber(normalized, /\b(?:rozdzielczość\s*fdtd|rozdzielczosc\s*fdtd|resolution)\s*[=:]?\s*(\d+)/);
 
   if (seed !== undefined) params.seed = seed;
   if (r0 !== undefined) params.r0 = r0;
@@ -131,6 +135,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (retrogradeGalaxy) params.retro = true;
   if (threeBodyPreset !== undefined) params.preset = threeBodyPreset;
   if (threeBodyDivergence) params.divergence = true;
+  if (meepN1 !== undefined) params.n1 = meepN1;
+  if (meepN2 !== undefined) params.n2 = meepN2;
+  if (meepFrequency !== undefined) params.frequency = meepFrequency;
+  if (meepResolution !== undefined) params.resolution = meepResolution;
 
   const base = { contractVersion: EXPERIMENT_FABRIC_VERSION, sourceText, operation: operationFor(normalized), seed } as const;
   const request = (domainId: string, modelId: string | undefined, requestedVisualization: StructuredExperimentRequest['requestedVisualization'], allowed: readonly string[]): StructuredExperimentRequest => ({

@@ -1164,14 +1164,17 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.disclosure.rationale).toContain('Nie jest to model pola elektromagnetycznego');
   });
 
-  it.each([
-    ['Oblicz Kardaszew typ K=1.', 'civilization-kardashev', 'powerWatts'],
-  ])('routes Chat through real local model %s', (prompt, modelId, outputKey) => {
-    const run = runExperiment(parseScienceChatMessage(prompt));
-    expect(run.request.modelId).toBe(modelId);
-    expect(run.result.status).toBe('completed');
-    expect(run.provenance.resultOrigin).toBe('real-engine');
-    expect(typeof run.result.outputs[outputKey]).toBe('number');
+  it('plans Kardashev power classification for canonical backend Fabric without claiming empirical evidence', () => {
+    const request = parseScienceChatMessage('Oblicz Kardaszew typ K=1.');
+    const reviewed = planEvidenceGuidedExperiment(request);
+
+    expect(request.modelId).toBe('civilization-kardashev');
+    expect(request.parameters).toEqual({ kardashevType: 1 });
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.0.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('teoretyczna ekstrapolacja');
   });
 
   it('runs the existing seeded Ising Metropolis model through Fabric without claiming thermodynamic convergence', () => {

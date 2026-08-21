@@ -393,8 +393,9 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'civilization-kardashev', domainId: 'civilization', modelVersion: '1.0.0', engine: 'genesis-physics@1.0.0',
     parameters: [number('kardashevType', 'Typ Kardaszewa K', '', 0, 3, 1)],
-    route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['civilization.md', 'universe.md'],
-    rationale: 'Realna funkcja klasyfikacyjnej skali mocy Kardaszewa; nie jest prognozą społeczną.',
+    route: { kind: 'none' }, knowledgeSources: ['civilization.md', 'universe.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje istniejący wzór klasyfikacyjnej skali mocy Kardaszewa. Jest to teoretyczna ekstrapolacja definicji Sagana; nie jest prognozą społeczną, obserwacją cywilizacji, dowodem życia pozaziemskiego ani wynikiem danych empirycznych.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'quantum-kitaev-bulk', domainId: 'quantum', modelVersion: '1.1.0', engine: 'genesis-kitaev-bulk@1.0.0',

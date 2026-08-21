@@ -389,6 +389,24 @@ const relativisticParticleRun = {
   },
 };
 
+const kardashevRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000027',
+  modelId: 'civilization-kardashev',
+  modelVersion: '1.0.0',
+  domain: 'civilization',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { powerWatts: 1e16 },
+  units: { powerWatts: 'W' },
+  warnings: [],
+  validity: 'Skala ciągła, ekstrapolacja poza obserwacje — interpretacyjna.',
+  assumptions: ['Definicja Sagana.'],
+  provenance: {
+    source: 'core/physics.ts:kardashevPower', formula: 'P = 10^{10K+6} W', honesty: 'theoretical', engine: 'Genesis physics function (civilization-kardashev)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -836,6 +854,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ totalEnergyMeV: 0.851666666666667 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toBe('E = γmc², p = γmv');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(relativisticParticleRun.runId);
+  });
+
+  it('confirms a reviewed Kardashev plan through the canonical backend and preserves theoretical provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: kardashevRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz Kardaszew typ K=1.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'civilization-kardashev', domainId: 'civilization', inputs: { kardashevType: 1 },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ powerWatts: 1e16 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.honesty).toBe('theoretical');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(kardashevRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

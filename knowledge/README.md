@@ -50,6 +50,7 @@ Mapowanie na etykiety w aplikacji: ★★★★–★★★★★ → `exact`/`s
 | [multiverse.md](multiverse.md) | Multiverse Lab — fine-tuning, hipotezy |
 | [civilization.md](civilization.md) | Civilization Lab — Kardaszew, SETI |
 | [biology.md](biology.md) | Biology Lab — błona komórkowa, DNA, fałdowanie białka |
+| [biology-aging-senescence-cancer.md](biology-aging-senescence-cancer.md) | Aging / Senescence / Cancer Evidence Lab — klasyfikacja dowodów, ograniczenia translacji i wymagania danych; nie diagnoza ani terapia |
 | [mathematics.md](mathematics.md) | Mathematics Lab — algebra, rachunek różniczkowy/całkowy, równania różniczkowe |
 | [ai-discovery.md](ai-discovery.md) | Warstwa AI — korpus, grounding, architektura |
 | [scale-journey.md](scale-journey.md) | Scale Journey — dane rozmiarów, narracja skal |

@@ -35,6 +35,19 @@ export {
 export { runExperiment } from './executor';
 
 export {
+  AGING_EVIDENCE_RANKING_VERSION,
+  AGING_LAB_KNOWLEDGE_SOURCE,
+  rankAgingEvidenceCandidates,
+  createAgingModelDataRequirement,
+  type AgingEpistemicStatus,
+  type AgingEvidenceDisposition,
+  type AgingEvidenceSource,
+  type AgingCandidateEvidenceInput,
+  type AgingEvidenceRankingRow,
+  type AgingDataRequirement,
+} from './agingEvidenceRanking';
+
+export {
   EXTERNAL_ADAPTER_CONTRACT_VERSION,
   listExternalEngineAdapters,
   getExternalEngineAdapter,

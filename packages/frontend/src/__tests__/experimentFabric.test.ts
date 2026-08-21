@@ -31,6 +31,8 @@ import {
   planCrossDomainOrchestration,
   planAtmosphericTemperatureToArrhenius,
   confirmCrossDomainOrchestration,
+  createAgingModelDataRequirement,
+  rankAgingEvidenceCandidates,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -41,6 +43,22 @@ import {
 describe('Genesis Experiment Fabric', () => {
   it('indexes each of the 20 authoritative knowledge files exactly once', () => {
     expect(validateKnowledgeRegistry()).toEqual({ ok: true, missing: [], duplicateFiles: [] });
+  });
+
+  it('registers the Aging Lab as an evidence-first capability seam without upgrading absent biological engines', () => {
+    const aging = getKnowledgeDomain('biology-aging-lab');
+    expect(aging?.capability).toBe('CAPABILITY_SEAM');
+    expect(aging?.realModels).toEqual([]);
+    expect(aging?.sourceFile).toBe('biology-aging-senescence-cancer.md');
+    expect(aging?.requiredSolver).toContain('DATA_REQUIRED');
+
+    const [row] = rankAgingEvidenceCandidates([{
+      candidateId: 'evidence-only', label: 'Evidence-only record', knowledgeSources: [],
+      evidenceQuality: 0.8, declaredLimitations: ['No biological data supplied.'],
+    }]);
+    expect(row.disposition).toBe('DATA_REQUIRED');
+    expect(row.evidenceReadinessScore).toBeNull();
+    expect(createAgingModelDataRequirement('cell-state dynamics').status).toBe('DATA_REQUIRED');
   });
 
   it('registers the bounded Kitaev bulk model without upgrading absent quantum hardware', () => {

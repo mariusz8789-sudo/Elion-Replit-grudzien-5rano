@@ -14,6 +14,7 @@ export const KNOWLEDGE_CORPUS_FILES = [
   'ai-discovery.md',
   'atom.md',
   'biology.md',
+  'biology-aging-senescence-cancer.md',
   'chemistry.md',
   'civilization.md',
   'classical-mechanics.md',
@@ -93,6 +94,15 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
     assumptions: ['Modele biologiczne są edukacyjne i nie stanowią diagnozy ani prognozy medycznej. Helisa DNA używa geometrii B-DNA oraz reguły Wallace’a dla krótkich presetów, bez pełnej termodynamiki sekwencji, atomistyki i dynamiki molekularnej. Model HP folding redukuje białko do H/P i siatki 2D; seedowany Metropolis może zatrzymać się w minimum lokalnym i nie przewiduje struktury ani funkcji realnego białka.'],
     possibleExperiments: ['zasymuluj epidemię', 'pokaż rozwój epidemii w mieście', 'oblicz helisę DNA', 'uruchom model HP fałdowania', 'wzrost populacji'], requiredSolver: 'EpidemicCitySimulation / B-DNA Wallace / HP Metropolis / ModelGraph',
     visualization: ['numeric', 'graph', 'world-3d', 'scene-3d'], dependencies: ['mathematics', 'thermodynamics'], keywords: ['epidemia', 'seir', 'seird', 'sir', 'zakaż', 'populacja', 'dna', 'helisa', 'wallace', 'miasto', 'choroba'],
+  },
+  {
+    id: 'biology-aging-lab', title: 'Aging, senescencja i onkologia — Evidence Lab', sourceFile: 'biology-aging-senescence-cancer.md', scale: 'micro-meso',
+    capability: 'CAPABILITY_SEAM', realModels: [],
+    concepts: ['senescencja komórkowa', 'SASP', 'p16/p21', 'telomery', 'zegar epigenetyczny', 'senolityki', 'senomorfiki', 'częściowe przeprogramowanie', 'ryzyko onkologiczne'],
+    parameters: ['evidenceQuality', 'reproducibility', 'toxicityEvidence', 'oncogenicRiskEvidence', 'dataCoverage'], units: ['score 0–1'],
+    assumptions: ['Ten katalog klasyfikuje dowody i projektuje odtwarzalny protokół. Nie jest modelem pacjenta, diagnostyką, predykcją odpowiedzi na terapię ani aktywnym solverem biologicznym.', 'Senescencja jest heterogeniczna; pojedynczy marker nie stanowi dowodu odmłodzenia ani skuteczności klinicznej.', 'Dynamika komórek, omika, docking, molecular dynamics i QSAR wymagają zatwierdzonych danych oraz zwalidowanego runtime’u.'],
+    possibleExperiments: ['zaprojektuj hipotezę senescencji', 'porównaj jakość dowodów kandydatów', 'zidentyfikuj brakujące dane', 'przygotuj Evidence Pack Aging Lab'], requiredSolver: 'zatwierdzony dataset biologiczny + zwalidowany solver; bez nich DATA_REQUIRED / ENGINE_NOT_AVAILABLE',
+    visualization: ['numeric', 'graph', 'narrative'], dependencies: ['biology', 'chemistry', 'ai-discovery'], keywords: ['starzenie', 'aging', 'senescencja', 'senescence', 'sasp', 'p16', 'p21', 'telomer', 'senolityk', 'senolytic', 'senomorfik', 'reprogramowanie', 'oskm', 'yamanaka', 'onkologia', 'rak', 'cancer'],
   },
   {
     id: 'chemistry', title: 'Chemia', sourceFile: 'chemistry.md', scale: 'micro-meso',

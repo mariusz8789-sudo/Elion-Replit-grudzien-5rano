@@ -983,14 +983,17 @@ const MODELS = [
     backendExecutable: true,
     kind: 'external-engine',
     validate(values) {
-      const runtime = structuralDetect();
-      if (!runtime.available) {
-        return { ok: false, error: 'capability_unavailable', message: `Biopython/PDB runtime niedostępny (${runtime.reason}). Skonfiguruj GENESIS_BIOPYTHON_PYTHON oraz GENESIS_PDB_STRUCTURES_DIR do zweryfikowanych artefaktów 5GHW, 4G6F i 5WDF.` };
-      }
+      // Bounded whitelist is a pure, static check — validate it BEFORE touching the
+      // runtime, so an unsupported pair is rejected the same way regardless of
+      // whether the Biopython runtime happens to be configured in this environment.
       const ref = values.referencePdb.toUpperCase();
       const mobile = values.mobilePdb.toUpperCase();
       if (ref !== '5GHW' || !['4G6F', '5WDF'].includes(mobile)) {
         return { ok: false, error: 'unsupported_pdb_pair', message: 'Wersja 1.1.0 dopuszcza wyłącznie odtwarzalne pary 5GHW (reference) → 4G6F lub 5WDF (mobile).' };
+      }
+      const runtime = structuralDetect();
+      if (!runtime.available) {
+        return { ok: false, error: 'capability_unavailable', message: `Biopython/PDB runtime niedostępny (${runtime.reason}). Skonfiguruj GENESIS_BIOPYTHON_PYTHON oraz GENESIS_PDB_STRUCTURES_DIR do zweryfikowanych artefaktów 5GHW, 4G6F i 5WDF.` };
       }
       values.referencePdb = ref;
       values.mobilePdb = mobile;

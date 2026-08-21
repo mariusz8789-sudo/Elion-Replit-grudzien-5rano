@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { handleApi } from './api.mjs';
 import { openDatabase } from './store.mjs';
+import { detect } from './compute/meepAdapter.mjs';
 
+const runtime = detect();
 const db = openDatabase(':memory:');
 const request = {
   contractVersion: '1.0.0', modelId: 'electrodynamics-maxwell-fdtd-pec-reflection', domainId: 'electrodynamics',
@@ -19,13 +21,22 @@ test('Fabric exposes the bounded real PyMeep PEC reflection benchmark', () => {
   assert.ok(model.outputs.some((output) => output.id === 'peakAbsHyAtSample'));
 });
 
-test('Fabric runs real PyMeep PEC reflection and preserves external-engine provenance', () => {
-  const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
-  assert.equal(response.status, 200);
-  assert.equal(response.body.run.status, 'ok');
-  assert.ok(Math.abs(response.body.run.outputs.computedReflectance - 1) <= 0.003);
-  assert.ok(response.body.run.outputs.peakAbsExAtSample > 0);
-  assert.ok(response.body.run.outputs.peakAbsHyAtSample > 0);
-  assert.equal(response.body.run.provenance.engine, 'PyMeep');
-  assert.equal(response.body.run.provenance.honesty, 'real_external_engine');
-});
+if (runtime.available) {
+  test('Fabric runs real PyMeep PEC reflection and preserves external-engine provenance', () => {
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.run.status, 'ok');
+    assert.ok(Math.abs(response.body.run.outputs.computedReflectance - 1) <= 0.003);
+    assert.ok(response.body.run.outputs.peakAbsExAtSample > 0);
+    assert.ok(response.body.run.outputs.peakAbsHyAtSample > 0);
+    assert.equal(response.body.run.provenance.engine, 'PyMeep');
+    assert.equal(response.body.run.provenance.honesty, 'real_external_engine');
+  });
+} else {
+  test('Fabric API rejects PEC reflection instead of emitting a fabricated result without runtime', () => {
+    const response = handleApi(db, { method: 'POST', pathname: '/api/compute/fabric/run', body: request, query: {}, token: null });
+    assert.equal(response.status, 400);
+    assert.equal(response.body.run.status, 'rejected');
+    assert.equal(response.body.run.error, 'capability_unavailable');
+  });
+}

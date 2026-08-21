@@ -41,7 +41,7 @@ function rdkitCapabilityEntries() {
     ...c,
     status: det.available ? CAPABILITY_STATUS.AVAILABLE : CAPABILITY_STATUS.BLOCKED_BY_RUNTIME,
     engine: det.available ? det.engine : undefined,
-    requires: det.available ? undefined : `RDKit w runtime (GENESIS_RDKIT_PYTHON). Przyczyna: ${det.reason}`,
+    requires: det.available ? undefined : `pip install rdkit oraz GENESIS_RDKIT_PYTHON w runtime. Przyczyna: ${det.reason}`,
     note: det.available ? 'Realne obliczenie przez RDKit.' : 'Skonfiguruj zwalidowany runtime RDKit, aby aktywować — bez niego wynik NIE jest zwracany.',
   }));
 }

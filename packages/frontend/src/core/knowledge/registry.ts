@@ -32,6 +32,7 @@ export const KNOWLEDGE_CORPUS_FILES = [
   'spacetime-einstein.md',
   'thermodynamics.md',
   'universe.md',
+  'biology-vaccine-discovery.md',
 ] as const;
 
 export type KnowledgeCorpusFile = (typeof KNOWLEDGE_CORPUS_FILES)[number];
@@ -228,6 +229,48 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
     assumptions: ['Scenariusz odróżnia historyczny rekord od legendy i wizualizacji założeń. Nie jest symulacją fizycznego eksperymentu, źródłem danych pomiarowych ani modelem teleportacji.', 'Znana fizyka elektromagnetyzmu jest prezentowana wyłącznie jako granica porównawcza; bez solvera Maxwella i danych nie ma real-engine.'],
     possibleExperiments: ['pokaż Eksperyment Filadelfia jako legendę', 'porównaj legendę z fizyką elektromagnetyzmu', 'pokaż wymagania realnego modelu pola'], requiredSolver: 'Brak solvera — HYPOTHETICAL_VISUALIZATION; dla fizycznej analizy wymagany zwalidowany solver Maxwella, geometria i warunki brzegowe',
     visualization: ['scene-3d', 'narrative'], dependencies: ['spacetime-einstein', 'electrodynamics'], keywords: ['eksperyment filadelfia', 'eksperyment filadelfijski', 'philadelphia experiment', 'uss eldridge', 'eldridge', 'legenda filadelfii'],
+  },
+  {
+    id: 'biology-vaccine-discovery',
+    title: 'Vaccine & Viral Discovery Lab — nanodyski i przeciwciała',
+    sourceFile: 'biology-vaccine-discovery.md',
+    scale: 'micro-meso',
+    capability: 'CAPABILITY_SEAM',
+    realModels: [],
+    concepts: [
+      'nanodysk wirusowy', 'glikoproteina transmembranowa', 'HIV MPER', 'Ebola GP',
+      'przeciwciało neutralizujące', 'bnAb', '10E8', 'SPR', 'FACS', 'cryo-EM',
+      'awidność nanoparticle', 'HCV E1E2', 'szczepionka iteracyjna', 'immunogen',
+      'struktura białka', 'epitop', 'limfocyt B', 'powinowactwo', 'off-rate',
+    ],
+    parameters: ['antigen_sequence', 'antibody_id', 'membrane_context', 'measurement_type'],
+    units: ['nM', 'Å', 's⁻¹'],
+    assumptions: [
+      'Wiedza pochodzi z publikacji peer-reviewed 2026 (Nature Commun., Nature, Sci Transl Med). Każde twierdzenie nosi jawny status epistemiczny.',
+      'Genesis nie generuje wyników SPR, FACS ani cryo-EM obliczeniowo — to dane eksperymentalne ze źródeł pierwotnych.',
+      'Molecular docking, molecular dynamics i strukturalne porównanie PDB wymagają zewnętrznych runtime\'ów (ENGINE_NOT_AVAILABLE).',
+      'Dostępne obliczenia: RDKit deskryptory 2D fragmentu peptydowego, PySCF single-point dla małego fragmentu.',
+      'Platforma nanodysków nie jest szczepionką dla ludzi (Scripps Research: "the platform isn\'t a vaccine itself").',
+      'Wyniki na makakach i myszach są przedkliniczne; przeniesienie na ludzi wymaga dalszych badań.',
+    ],
+    possibleExperiments: [
+      'oblicz deskryptory RDKit fragmentu MPER',
+      'porównaj wariant WT vs. MPER ND (deskryptory)',
+      'wyjaśnij mechanizm neutralizacji HIV przez 10E8',
+      'pokaż schemat eksperymentu nanodyskowego',
+      'porównaj awidność nanoparticle A vs. B',
+      'zaprojektuj hipotezę dla Vaccine Discovery Lab',
+    ],
+    requiredSolver:
+      'RDKit (deskryptory 2D — dostępne); PySCF (single-point — dostępne, ograniczone); molecular docking/dynamics — ENGINE_NOT_AVAILABLE; strukturalne porównanie PDB — ENGINE_NOT_AVAILABLE',
+    visualization: ['numeric', 'graph', 'narrative'],
+    dependencies: ['biology', 'biology-aging-lab', 'chemistry'],
+    keywords: [
+      'nanodysk', 'nanodisc', 'hiv mper', 'ebola gp', 'hcv e1e2', 'szczepionka wirusowa',
+      'vaccine discovery', 'przeciwciało neutralizujące', 'bnab', '10e8', 'spr', 'facs',
+      'cryo-em', 'awidność', 'avidity', 'immunogen', 'epitop', 'limfocyt b', 'b cell',
+      'scripps', 'rantalainen', 'wyatt', 'schief', 'zhu',
+    ],
   },
   {
     id: 'thermodynamics', title: 'Termodynamika i fizyka statystyczna', sourceFile: 'thermodynamics.md', scale: 'micro-meso',

@@ -2,7 +2,7 @@ import { atomCount, degreeOfUnsaturation, molecularWeight, parseFormula } from '
 import { buildPumpPipeModel } from '../engineeringGraph/pumpPipe';
 import { solveKitaevBulk } from '../compute/kitaevBulk';
 import { runBlochCircuitScenario } from '../../labs/experiments/quantum-bloch';
-import { runTunnelingScenario } from '../../labs/experiments/quantum-tunneling';
+import { runTunnelingScenario } from '../quantum/tunnelingRunner';
 import { runChshCorrelationScenario } from '../../labs/experiments/quantum-chsh';
 import { runSchwarzschildGeodesicScenario } from '../../labs/experiments/einstein-geodesics';
 import { runTitrationScenario } from '../../labs/experiments/chemistry-titration';

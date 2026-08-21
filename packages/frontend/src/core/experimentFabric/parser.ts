@@ -86,6 +86,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const meepFrequency = firstNumber(normalized, /\b(?:częstotliwość\s*meep|czestotliwosc\s*meep|frequency)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const meepResolution = firstNumber(normalized, /\b(?:rozdzielczość\s*fdtd|rozdzielczosc\s*fdtd|resolution)\s*[=:]?\s*(\d+)/);
   const h2BondLengthAngstrom = firstNumber(normalized, /\b(?:r(?:\s*h[−-]?h)?|długość\s+wiązania|dlugosc\s+wiazania|bond\s+length)\s*[=:]?\s*(\d+(?:[.,]\d+)?)\s*(?:å|a|angstrom|angstroem)/);
+  const tunnelingEnergy = firstNumber(normalized, /\b(?:energy|energia)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const tunnelingBarrier = firstNumber(normalized, /\b(?:barrier|bariera)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const tunnelingWidth = firstNumber(normalized, /\b(?:width|szerokość(?:\s+barier[ya])?|szerokosc(?:\s+barier[ya])?)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
 
   if (seed !== undefined) params.seed = seed;
   if (r0 !== undefined) params.r0 = r0;
@@ -143,6 +146,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (meepFrequency !== undefined) params.frequency = meepFrequency;
   if (meepResolution !== undefined) params.resolution = meepResolution;
   if (h2BondLengthAngstrom !== undefined) params.bondLengthAngstrom = h2BondLengthAngstrom;
+  if (tunnelingEnergy !== undefined) params.energy = tunnelingEnergy;
+  if (tunnelingBarrier !== undefined) params.barrier = tunnelingBarrier;
+  if (tunnelingWidth !== undefined) params.width = tunnelingWidth;
 
   const base = { contractVersion: EXPERIMENT_FABRIC_VERSION, sourceText, operation: operationFor(normalized), seed } as const;
   const request = (domainId: string, modelId: string | undefined, requestedVisualization: StructuredExperimentRequest['requestedVisualization'], allowed: readonly string[]): StructuredExperimentRequest => ({

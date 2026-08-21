@@ -381,6 +381,42 @@ const MODELS = [
     },
   },
 
+  functionModel(
+    {
+      id: 'quantum-tunneling-1d', name: 'Tunelowanie pakietu falowego 1D', domain: 'quantum', version: '1.0.0',
+      description: 'Rzeczywista numeryczna ewolucja pakietu Gaussa przez pojedynczą barierę prostokątną, liczona współdzielonym integratorem split-step Fourier.',
+      inputs: [
+        { id: 'energy', label: 'Energia pakietu / wysokość bariery', type: 'number', unit: '', min: 0.2, max: 1.6, default: 0.55 },
+        { id: 'barrier', label: 'Wysokość bariery', type: 'number', unit: 'j. nat.', min: 0.4, max: 2.5, default: 1 },
+        { id: 'width', label: 'Szerokość bariery', type: 'number', unit: 'j. nat.', min: 1, max: 8, default: 3 },
+      ],
+      outputs: [
+        { id: 'energy', label: 'Energia pakietu / wysokość bariery', unit: '' },
+        { id: 'barrier', label: 'Wysokość bariery', unit: 'j. nat.' },
+        { id: 'width', label: 'Szerokość bariery', unit: 'j. nat.' },
+        { id: 'frames', label: 'Kroki scenariusza', unit: 'kroki' },
+        { id: 'transmission', label: 'Prawdopodobieństwo transmisji', unit: '' },
+        { id: 'reflection', label: 'Prawdopodobieństwo odbicia', unit: '' },
+        { id: 'remainingProbability', label: 'Pozostałe prawdopodobieństwo', unit: '' },
+      ],
+      assumptions: 'Jednowymiarowy pakiet Gaussa i jedna bariera prostokątna; ħ=m=1; siatka 512 punktów; horyzont 1200 kroków po 0,02; tłumiąca maska przy brzegach.',
+      validity: 'Tylko ustalony scenariusz 1D i zakresy wejść. Nie jest ogólnym solverem Schrödingera, obliczeniem 2D/3D, modelem materiałowym, eksperymentem detektorowym ani predykcją urządzenia.',
+      provenance: {
+        source: 'core/quantum/tunnelingRunner.ts via compute/core.bundle.mjs',
+        formula: 'ψ(t+dt)=V½·F⁻¹[K·F[V½·ψ]]; split-step Fourier, ħ=m=1',
+        honesty: 'real_shared_numerical_engine',
+        engine: 'Genesis split-step Fourier 1D (shared Canvas/backend runner)',
+      },
+    },
+    (v) => {
+      const result = core.runTunnelingScenario({ energy: v.energy, barrier: v.barrier, width: v.width });
+      return {
+        outputs: result,
+        warnings: ['Maska pochłaniająca przy brzegach redukuje numeryczne odbicia. Pozostałe prawdopodobieństwo obejmuje falę w barierze i absorpcję brzegu.'],
+      };
+    },
+  ),
+
   {
     ...functionModel(
       {

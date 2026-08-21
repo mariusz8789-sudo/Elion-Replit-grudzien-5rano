@@ -385,7 +385,8 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     id: 'quantum-tunneling-1d', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-split-step-fft@1.0.0',
     parameters: [number('energy', 'Energia / wysokość bariery', '', 0.2, 1.6, 0.55), number('barrier', 'Wysokość bariery', 'j. nat.', 0.4, 2.5, 1), number('width', 'Szerokość bariery', 'j. nat.', 1, 8, 3)],
     route: { kind: 'lab', labId: 'quantum', experimentId: 'tunneling' }, knowledgeSources: ['quantum.md'],
-    rationale: 'Istniejący 1D split-step Fourier dla pakietu Gaussa i bariery prostokątnej, ħ=m=1; nie jest ogólnym solverem Schrödingera, modelem 3D ani symulacją materiału.',
+    rationale: 'Rzeczywisty, wspólny runner 1D split-step Fourier dla pakietu Gaussa i bariery prostokątnej, ħ=m=1. Po potwierdzeniu Science Chat kanoniczny backend wywołuje ten sam wydzielony runner co Canvas; przeglądarka nie generuje zastępczego wyniku. Nie jest to ogólny solver Schrödingera, model 2D/3D, symulacja materiału ani predykcja urządzenia.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'quantum-bloch-circuit', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-single-qubit@1.0.0',

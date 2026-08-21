@@ -65,6 +65,24 @@ const rdkitRun = {
   },
 };
 
+const tunnelingRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000005',
+  modelId: 'quantum-tunneling-1d',
+  modelVersion: '1.0.0',
+  domain: 'quantum',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { energy: 0.55, barrier: 1, width: 3, frames: 1200, transmission: 0.138912, reflection: 0.784201, remainingProbability: 0.076887 },
+  units: { energy: '', barrier: 'j. nat.', width: 'j. nat.', frames: 'kroki', transmission: '', reflection: '', remainingProbability: '' },
+  warnings: ['Maska pochłaniająca przy brzegach redukuje numeryczne odbicia.'],
+  validity: 'Pakiet Gaussa 1D i pojedyncza bariera prostokątna, ħ=m=1.',
+  assumptions: ['Wspólny runner split-step Fourier Canvas/backend.'],
+  provenance: {
+    source: 'core/quantum/tunnelingRunner.ts via compute/core.bundle.mjs', formula: 'split-step Fourier, ħ=m=1', honesty: 'real_shared_numerical_engine', engine: 'Genesis split-step Fourier 1D (shared Canvas/backend runner)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const pyscfRun = {
   runId: '0aa4e400-0000-4000-8000-000000000004',
   modelId: 'quantum-chemistry-pyscf-h2-rhf',
@@ -155,6 +173,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs.canonicalSmiles).toBe('CCO');
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('RDKit 2026.03.5');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(rdkitRun.runId);
+  });
+
+  it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: tunnelingRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Zasymuluj tunelowanie kwantowe energy=0.55 barrier=1 width=3.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'quantum-tunneling-1d', domainId: 'quantum', inputs: { energy: 0.55, barrier: 1, width: 3 },
+    });
+    expect(confirmed.run.result.outputs.transmission).toBeCloseTo(0.138912, 12);
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis split-step Fourier 1D (shared Canvas/backend runner)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(tunnelingRun.runId);
   });
 
   it('confirms a reviewed PySCF H2 plan through the same canonical Fabric endpoint and preserves real-engine provenance', async () => {

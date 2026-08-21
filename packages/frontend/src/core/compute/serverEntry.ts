@@ -27,5 +27,8 @@ export { buildGaussianGraph } from '../modelGraph/gaussianGraph';
 export { buildLogisticGrowthGraph } from '../modelGraph/logisticGrowthGraph';
 export { buildPhotonGraph } from '../modelGraph/photonGraph';
 
+// Czyste, deterministyczne runnery numeryczne (bez Canvasu/DOM).
+export { runTunnelingScenario } from '../quantum/tunnelingRunner';
+
 // Cheminformatyka (deterministyczna) — fundament domeny drug-discovery.
 export * from './cheminformatics';

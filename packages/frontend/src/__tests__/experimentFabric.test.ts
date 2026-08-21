@@ -1138,8 +1138,20 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.disclosure.rationale).toContain('Nie jest to model przyspieszenia');
   });
 
+  it('plans Jeans escape for canonical backend Fabric without claiming a climate forecast', () => {
+    const request = parseScienceChatMessage('Oblicz ucieczkę atmosfery planety.');
+    const reviewed = planEvidenceGuidedExperiment(request);
+
+    expect(request.modelId).toBe('universe-atmospheric-escape');
+    expect(request.parameters).toEqual({});
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.0.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('Nie jest to pełny model klimatu');
+  });
+
   it.each([
-    ['Oblicz ucieczkę atmosfery planety.', 'universe-atmospheric-escape', 'jeansParameter'],
     ['Oblicz energię relatywistyczną cząstki beta=0.8.', 'particle-relativistic-energy', 'totalEnergyMeV'],
     ['Oblicz Kardaszew typ K=1.', 'civilization-kardashev', 'powerWatts'],
   ])('routes Chat through real local model %s', (prompt, modelId, outputKey) => {

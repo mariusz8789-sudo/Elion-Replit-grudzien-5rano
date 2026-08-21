@@ -353,6 +353,24 @@ const keplerRun = {
   },
 };
 
+const atmosphericEscapeRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000024',
+  modelId: 'universe-atmospheric-escape',
+  modelVersion: '1.0.0',
+  domain: 'universe',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { equilibriumTempK: 254.6, escapeVelocityMs: 11186, thermalVelocityMs: 595, jeansParameter: 353.5 },
+  units: { equilibriumTempK: 'K', escapeVelocityMs: 'm/s', thermalVelocityMs: 'm/s', jeansParameter: '' },
+  warnings: [],
+  validity: 'λ ≥ ~15 → atmosfera utrzymana w skali Gyr.',
+  assumptions: ['Ucieczka termiczna Jeansa bez efektu cieplarnianego i wiatru gwiazdowego.'],
+  provenance: {
+    source: 'core/modelGraph/atmosphericEscapeGraph.ts', formula: 'T_eq=278.5·((1−A)L/a²)^¼; v_esc=√(2GM/R); λ=v_esc²/v_th²', honesty: 'simplified', engine: 'Genesis ModelGraph (universe-atmospheric-escape)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -766,6 +784,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ orbitalPeriodYears: 2.8284271247461903 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toBe('T = √(a³/M) [yr, AU, M☉]');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(keplerRun.runId);
+  });
+
+  it('confirms a reviewed Jeans-escape plan through the canonical backend and preserves ModelGraph provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: atmosphericEscapeRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz ucieczkę atmosfery planety.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'universe-atmospheric-escape', domainId: 'universe', inputs: {},
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ jeansParameter: 353.5 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toContain('T_eq=278.5');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(atmosphericEscapeRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

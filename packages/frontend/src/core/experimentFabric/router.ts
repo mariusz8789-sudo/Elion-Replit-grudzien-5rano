@@ -319,8 +319,9 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'universe-atmospheric-escape', domainId: 'universe', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('stellarLuminositySolar', 'Jasność gwiazdy', 'L☉', 0.01, 100, 1), number('orbitalDistanceAu', 'Odległość orbitalna', 'AU', 0.05, 30, 1), number('planetAlbedo', 'Albedo', '', 0, 0.9, 0.3), number('planetMassEarth', 'Masa planety', 'M⊕', 0.01, 300, 1), number('planetRadiusEarth', 'Promień planety', 'R⊕', 0.1, 12, 1), number('moleculeMassAmu', 'Masa cząsteczki', 'u', 1, 50, 18)],
-    route: { kind: 'lab', labId: 'universe' }, knowledgeSources: ['universe.md', 'thermodynamics.md', 'chemistry.md'],
-    rationale: 'Realny graf ucieczki termicznej Jeansa; nie jest pełnym modelem klimatu.',
+    route: { kind: 'none' }, knowledgeSources: ['universe.md', 'thermodynamics.md', 'chemistry.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje istniejący graf termicznej ucieczki Jeansa. Nie jest to pełny model klimatu, efektu cieplarnianego, ucieczki hydrodynamicznej, wiatru gwiazdowego, składu atmosfery, ewolucji planety ani prognoza habitowalności.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'particle-relativistic-energy', domainId: 'particle', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',

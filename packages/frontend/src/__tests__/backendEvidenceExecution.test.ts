@@ -65,6 +65,24 @@ const rdkitRun = {
   },
 };
 
+const teleportRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000006',
+  modelId: 'quantum-teleportation',
+  modelVersion: '1.0.0',
+  domain: 'quantum',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { state: 'plusI', stateLabel: '|+i⟩ = (|0⟩+i|1⟩)/√2', branchCount: 4, minFidelity: 1, averageFidelity: 1, allRecovered: true, branch00Correction: 'I', branch01Correction: 'X', branch10Correction: 'Z', branch11Correction: 'XZ', branch00Fidelity: 1, branch01Fidelity: 1, branch10Fidelity: 1, branch11Fidelity: 1 },
+  units: { state: '', stateLabel: '', branchCount: '', minFidelity: '', averageFidelity: '', allRecovered: '', branch00Correction: '', branch01Correction: '', branch10Correction: '', branch11Correction: '', branch00Fidelity: '', branch01Fidelity: '', branch10Fidelity: '', branch11Fidelity: '' },
+  warnings: ['Wierność równa 1 wynika z idealnego protokołu stanu-wektora.'],
+  validity: 'Idealny pełny wektor stanu trzech kubitów dla teleportacji.',
+  assumptions: ['Dwa bity klasyczne są wymagane do korekty Boba.'],
+  provenance: {
+    source: 'core/quantum/teleportationRunner.ts → core/quantumState.ts via compute/core.bundle.mjs', formula: 'full three-qubit state vector', honesty: 'exact_ideal_state_vector_protocol', engine: 'Genesis three-qubit state-vector teleportation (shared Canvas/backend runner)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -173,6 +191,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs.canonicalSmiles).toBe('CCO');
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('RDKit 2026.03.5');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(rdkitRun.runId);
+  });
+
+  it('confirms a reviewed teleportation plan through the canonical backend Fabric endpoint and preserves state-vector provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: teleportRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Uruchom teleportację kwantową stan=plusI.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'quantum-teleportation', domainId: 'quantum', inputs: { state: 'plusI' },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ branchCount: 4, allRecovered: true, minFidelity: 1 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis three-qubit state-vector teleportation (shared Canvas/backend runner)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(teleportRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

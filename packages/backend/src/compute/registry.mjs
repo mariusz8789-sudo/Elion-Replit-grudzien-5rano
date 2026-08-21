@@ -44,12 +44,13 @@ function graphModel(meta, build, opts = {}) {
 }
 
 /** Buduje model oparty o czystą funkcję z physics.ts. */
-function functionModel(meta, compute) {
+function functionModel(meta, compute, opts = {}) {
   return {
     ...meta,
     stochastic: false,
     backendExecutable: true,
     kind: 'function',
+    ...(typeof opts.validate === 'function' ? { validate: opts.validate } : {}),
     execute(values) {
       const r = compute(values);
       return { outputs: r.outputs ?? r, warnings: r.warnings ?? [], ...(r.provenance ? { provenance: r.provenance } : {}) };
@@ -414,6 +415,65 @@ const MODELS = [
         outputs: result,
         warnings: ['Maska pochłaniająca przy brzegach redukuje numeryczne odbicia. Pozostałe prawdopodobieństwo obejmuje falę w barierze i absorpcję brzegu.'],
       };
+    },
+  ),
+
+  functionModel(
+    {
+      id: 'quantum-teleportation', name: 'Teleportacja kwantowa trzech kubitów', domain: 'quantum', version: '1.0.0',
+      description: 'Dokładny protokół teleportacji dla jednego z sześciu znormalizowanych stanów wejściowych, wykonywany pełnym wektorem stanu trzech kubitów i enumerujący wszystkie cztery gałęzie pomiaru.',
+      inputs: [{ id: 'state', label: 'Stan wejściowy', type: 'string', unit: '', maxLength: 10, default: 'plus' }],
+      outputs: [
+        { id: 'state', label: 'Preset stanu', unit: '' },
+        { id: 'stateLabel', label: 'Opis stanu', unit: '' },
+        { id: 'branchCount', label: 'Liczba gałęzi pomiaru', unit: '' },
+        { id: 'minFidelity', label: 'Minimalna wierność gałęzi', unit: '' },
+        { id: 'averageFidelity', label: 'Średnia wierność gałęzi', unit: '' },
+        { id: 'allRecovered', label: 'Wszystkie gałęzie odtworzone', unit: '' },
+        { id: 'branch00Correction', label: 'Korekta dla m₀=0,m₁=0', unit: '' },
+        { id: 'branch01Correction', label: 'Korekta dla m₀=0,m₁=1', unit: '' },
+        { id: 'branch10Correction', label: 'Korekta dla m₀=1,m₁=0', unit: '' },
+        { id: 'branch11Correction', label: 'Korekta dla m₀=1,m₁=1', unit: '' },
+        { id: 'branch00Fidelity', label: 'Wierność dla m₀=0,m₁=0', unit: '' },
+        { id: 'branch01Fidelity', label: 'Wierność dla m₀=0,m₁=1', unit: '' },
+        { id: 'branch10Fidelity', label: 'Wierność dla m₀=1,m₁=0', unit: '' },
+        { id: 'branch11Fidelity', label: 'Wierność dla m₀=1,m₁=1', unit: '' },
+      ],
+      assumptions: 'Idealny stan czysty trzech kubitów, bramki H/CNOT oraz idealny pomiar projektorowy; wszystkie cztery gałęzie są enumerowane deterministycznie.',
+      validity: 'Dowodzi własności idealnego protokołu dla wymienionych presetów. Nie symuluje hardware, szumu, dekoherencji, strat kanału, odczytu detektora, komunikacji sieciowej, teleportacji materii ani transmisji nadświetlnej.',
+      provenance: {
+        source: 'core/quantum/teleportationRunner.ts → core/quantumState.ts via compute/core.bundle.mjs',
+        formula: 'Bell pair + CNOT + H + two projective measurements + conditional I/X/Z/XZ; full 2³ complex state vector',
+        honesty: 'exact_ideal_state_vector_protocol',
+        engine: 'Genesis three-qubit state-vector teleportation (shared Canvas/backend runner)',
+      },
+    },
+    (v) => {
+      const scenario = core.runQuantumTeleportScenario({ state: v.state });
+      const outputs = {
+        state: scenario.state,
+        stateLabel: scenario.stateLabel,
+        branchCount: scenario.branchCount,
+        minFidelity: scenario.minFidelity,
+        averageFidelity: scenario.averageFidelity,
+        allRecovered: scenario.allRecovered,
+      };
+      for (const branch of scenario.branches) {
+        const suffix = `${branch.outcome0}${branch.outcome1}`;
+        outputs[`branch${suffix}Correction`] = branch.correction;
+        outputs[`branch${suffix}Fidelity`] = branch.fidelity;
+      }
+      return {
+        outputs,
+        warnings: ['Wierność równa 1 wynika z idealnego protokołu stanu-wektora. Nie jest to wynik hardware ani kanału fizycznego. Do odzyskania stanu Bob potrzebuje dwóch klasycznych bitów od Alicji.'],
+      };
+    },
+    {
+      validate(values) {
+        return ['zero', 'one', 'plus', 'minus', 'plusI', 'minusI'].includes(values.state)
+          ? { ok: true }
+          : { ok: false, error: 'invalid_input', message: 'Nieznany preset stanu teleportacji.' };
+      },
     },
   ),
 

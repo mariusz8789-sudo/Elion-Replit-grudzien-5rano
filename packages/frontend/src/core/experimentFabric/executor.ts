@@ -16,7 +16,7 @@ import { runChirpInspiralScenario } from '../../labs/experiments/einstein-chirp'
 import { runTesseractProjectionScenario } from '../../labs/experiments/multiverse-tesseract';
 import { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
 import { runKerrScenario } from '../../labs/experiments/einstein-kerr3d';
-import { runQuantumTeleportScenario } from '../../labs/experiments/quantum-teleport';
+import { runQuantumTeleportScenario } from '../quantum/teleportationRunner';
 import { runTokamakLawsonScenario } from '../../labs/experiments/nuclear-tokamak';
 import { runDnaHelixScenario } from '../../labs/experiments/biology-dnahelix';
 import { runDrakeEquationScenario } from '../../labs/experiments/civilization-drake-consequence';

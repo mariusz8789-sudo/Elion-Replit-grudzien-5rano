@@ -373,7 +373,8 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     id: 'quantum-teleportation', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-three-qubit-state-vector@1.0.0',
     parameters: [text('state', 'Stan wejściowy', 'plus')],
     route: { kind: 'lab', labId: 'quantum', experimentId: 'teleport' }, knowledgeSources: ['quantum.md'],
-    rationale: 'Istniejący pełny wektor stanu trzech kubitów dla protokołu teleportacji; Fabric wylicza wszystkie cztery gałęzie pomiaru deterministycznie, a nie symuluje hardware ani transmisji nadświetlnej.',
+    rationale: 'Dokładny wspólny pełny wektor stanu trzech kubitów dla protokołu teleportacji. Po potwierdzeniu kanoniczny backend enumeruje wszystkie cztery gałęzie pomiaru; nie jest to hardware, kanał fizyczny, teleportacja materii ani transmisja nadświetlna.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'quantum-chsh-correlation', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-singlet-correlation@1.0.0',

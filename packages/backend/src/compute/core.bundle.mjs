@@ -1583,6 +1583,144 @@ function runTunnelingScenario(input = {}) {
   return new TunnelingSolver().runScenario(input);
 }
 
+// packages/frontend/src/core/quantumState.ts
+function cAdd(a, b) {
+  return [a[0] + b[0], a[1] + b[1]];
+}
+function cMul(a, b) {
+  return [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
+}
+function cScale(a, s) {
+  return [a[0] * s, a[1] * s];
+}
+function cAbs2(a) {
+  return a[0] * a[0] + a[1] * a[1];
+}
+var H_GATE = [[Math.SQRT1_2, 0], [Math.SQRT1_2, 0], [Math.SQRT1_2, 0], [-Math.SQRT1_2, 0]];
+var X_GATE = [[0, 0], [1, 0], [1, 0], [0, 0]];
+var Z_GATE = [[1, 0], [0, 0], [0, 0], [-1, 0]];
+function initState(n) {
+  const state = Array.from({ length: 2 ** n }, () => [0, 0]);
+  state[0] = [1, 0];
+  return state;
+}
+function applySingleQubitGate(state, n, qubit, gate) {
+  const [a, b, c, d] = gate;
+  const size = state.length;
+  const out = state.slice();
+  const mask = 1 << n - 1 - qubit;
+  for (let i = 0; i < size; i++) {
+    if ((i & mask) === 0) {
+      const i1 = i | mask;
+      const s0 = state[i];
+      const s1 = state[i1];
+      out[i] = cAdd(cMul(a, s0), cMul(b, s1));
+      out[i1] = cAdd(cMul(c, s0), cMul(d, s1));
+    }
+  }
+  return out;
+}
+function applyCNOT(state, n, control, target) {
+  const size = state.length;
+  const out = state.slice();
+  const cMask = 1 << n - 1 - control;
+  const tMask = 1 << n - 1 - target;
+  for (let i = 0; i < size; i++) {
+    if ((i & cMask) !== 0) {
+      const j = i ^ tMask;
+      if (i < j) {
+        out[i] = state[j];
+        out[j] = state[i];
+      }
+    }
+  }
+  return out;
+}
+function measureQubit(state, n, qubit, rnd = Math.random) {
+  const mask = 1 << n - 1 - qubit;
+  let p1 = 0;
+  for (let i = 0; i < state.length; i++) {
+    if ((i & mask) !== 0) p1 += cAbs2(state[i]);
+  }
+  const outcome = rnd() < p1 ? 1 : 0;
+  const collapsed = state.map((amp, i) => ((i & mask) !== 0 ? 1 : 0) === outcome ? amp : [0, 0]);
+  const norm = Math.sqrt(collapsed.reduce((sum, a) => sum + cAbs2(a), 0));
+  const newState = norm > 0 ? collapsed.map((a) => cScale(a, 1 / norm)) : collapsed;
+  return { outcome, newState };
+}
+function stateOverlapSquared(psi, phi) {
+  const re = psi[0][0] * phi[0][0] + psi[0][1] * phi[0][1] + psi[1][0] * phi[1][0] + psi[1][1] * phi[1][1];
+  const im = psi[0][0] * phi[0][1] - psi[0][1] * phi[0][0] + psi[1][0] * phi[1][1] - psi[1][1] * phi[1][0];
+  return re * re + im * im;
+}
+function teleport(alpha, beta, rnd = Math.random) {
+  const n = 3;
+  let state = initState(n);
+  state[0] = alpha;
+  state[4] = beta;
+  state = applySingleQubitGate(state, n, 1, H_GATE);
+  state = applyCNOT(state, n, 1, 2);
+  state = applyCNOT(state, n, 0, 1);
+  state = applySingleQubitGate(state, n, 0, H_GATE);
+  const m0 = measureQubit(state, n, 0, rnd);
+  state = m0.newState;
+  const m1 = measureQubit(state, n, 1, rnd);
+  state = m1.newState;
+  const idx0 = m0.outcome << 2 | m1.outcome << 1 | 0;
+  const idx1 = m0.outcome << 2 | m1.outcome << 1 | 1;
+  let qubit2 = [state[idx0], state[idx1]];
+  let correction = "I";
+  const apply1 = (gate, amp) => {
+    const [a, b, c, d] = gate;
+    return [cAdd(cMul(a, amp[0]), cMul(b, amp[1])), cAdd(cMul(c, amp[0]), cMul(d, amp[1]))];
+  };
+  if (m0.outcome === 0 && m1.outcome === 1) {
+    qubit2 = apply1(X_GATE, qubit2);
+    correction = "X";
+  } else if (m0.outcome === 1 && m1.outcome === 0) {
+    qubit2 = apply1(Z_GATE, qubit2);
+    correction = "Z";
+  } else if (m0.outcome === 1 && m1.outcome === 1) {
+    qubit2 = apply1(X_GATE, qubit2);
+    qubit2 = apply1(Z_GATE, qubit2);
+    correction = "XZ";
+  }
+  const norm = Math.sqrt(cAbs2(qubit2[0]) + cAbs2(qubit2[1]));
+  const normalized = norm > 0 ? [cScale(qubit2[0], 1 / norm), cScale(qubit2[1], 1 / norm)] : qubit2;
+  const fidelity = stateOverlapSquared([alpha, beta], normalized);
+  return { outcome0: m0.outcome, outcome1: m1.outcome, correction, finalQubit: normalized, fidelity };
+}
+
+// packages/frontend/src/core/quantum/teleportationRunner.ts
+var TELEPORT_STATE_PRESETS = {
+  zero: { label: "|0\u27E9", alpha: [1, 0], beta: [0, 0] },
+  one: { label: "|1\u27E9", alpha: [0, 0], beta: [1, 0] },
+  plus: { label: "|+\u27E9 = (|0\u27E9+|1\u27E9)/\u221A2", alpha: [Math.SQRT1_2, 0], beta: [Math.SQRT1_2, 0] },
+  minus: { label: "|\u2212\u27E9 = (|0\u27E9\u2212|1\u27E9)/\u221A2", alpha: [Math.SQRT1_2, 0], beta: [-Math.SQRT1_2, 0] },
+  plusI: { label: "|+i\u27E9 = (|0\u27E9+i|1\u27E9)/\u221A2", alpha: [Math.SQRT1_2, 0], beta: [0, Math.SQRT1_2] },
+  minusI: { label: "|\u2212i\u27E9 = (|0\u27E9\u2212i|1\u27E9)/\u221A2", alpha: [Math.SQRT1_2, 0], beta: [0, -Math.SQRT1_2] }
+};
+function runQuantumTeleportScenario({ state = "plus" } = {}) {
+  const preset = TELEPORT_STATE_PRESETS[state];
+  if (!preset) throw new Error(`Unknown teleport state preset: ${state}.`);
+  const branches = [0, 1].flatMap((outcome0) => [0, 1].map((outcome1) => {
+    const randomValues = [outcome0 === 1 ? 0.25 : 0.75, outcome1 === 1 ? 0.25 : 0.75];
+    let cursor = 0;
+    const trial = teleport(preset.alpha, preset.beta, () => randomValues[cursor++]);
+    return { outcome0: trial.outcome0, outcome1: trial.outcome1, correction: trial.correction, fidelity: trial.fidelity };
+  }));
+  const fidelities = branches.map((branch) => branch.fidelity);
+  return {
+    state,
+    stateLabel: preset.label,
+    branchCount: branches.length,
+    minFidelity: Math.min(...fidelities),
+    averageFidelity: fidelities.reduce((sum, fidelity) => sum + fidelity, 0) / fidelities.length,
+    allRecovered: branches.every((branch) => Math.abs(branch.fidelity - 1) < 1e-12),
+    branches
+  };
+}
+
 // packages/frontend/src/core/compute/cheminformatics.ts
 var ATOMIC_WEIGHTS = {
   H: 1.008,
@@ -1727,6 +1865,7 @@ export {
   parseFormula,
   project4Dto3D,
   rotate4D,
+  runQuantumTeleportScenario,
   runTunnelingScenario,
   sampleLocalHiddenPair,
   sampleSingletPair,

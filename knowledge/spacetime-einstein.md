@@ -105,6 +105,59 @@ moduł "otwarte problemy fizyki" (Etap 2+).
   *Spacetime Physics* (II wyd. darmowe od autorów); Carroll — darmowe notatki
   arXiv:gr-qc/9712019
 
+## Interstellar, wizualizacja i legendy — klasyfikacja epistemiczna
+
+**Czarne dziury jak w _Interstellar_ — co jest nauką** ★★★★★
+
+- Wirująca czarna dziura Kerra, geodezyjne światła, soczewkowanie grawitacyjne,
+  przesunięcia Dopplera i grawitacyjne oraz dylatacja czasu są elementami ogólnej
+  teorii względności. Zespół filmu użył renderera DNGR do propagacji wiązek promieni
+  przez czasoprzestrzeń Kerra (James, von Tunzelmann, Franklin, Thorne 2015).
+- Widoczny „dysk nad i pod czarną dziurą” ma fizyczne źródło: światło z dysku po
+  przeciwnej stronie może zostać zakrzywione przez silne pole grawitacyjne. NASA
+  opisuje analogiczny efekt w obrazie dysku akrecyjnego.
+- Ekstremalna różnica upływu czasu w filmie wymaga bardzo szczególnych warunków
+  blisko szybko wirującej, supermasywnej czarnej dziury. Jest to obliczeniowo
+  umotywowany scenariusz graniczny, nie opis potwierdzonego układu planetarnego.
+
+**Co jest decyzją filmową albo uproszczeniem** ★★★
+
+- Artykuł o DNGR wyjaśnia, że dla czytelności filmu ograniczono część efektów
+  Dopplera i przesunięcia grawitacyjnego oraz zmieniono spin użyty w obrazie.
+  Obraz filmowy jest inspirowaną równaniami wizualizacją, nie obserwacją.
+- Obecny renderer Genesis wykorzystuje ścisłe geodezyjne Schwarzschilda i
+  równikowe Kerra, lecz NIE jest pełnym DNGR: nie rozwiązuje pełnego transferu
+  promieniowania dysku akrecyjnego, nie całkuje ogólnych geodezyjnych Kerra z
+  Q≠0 i nie wyprowadza warunków przeżywalnej orbity planety.
+
+**Tunel czasoprzestrzenny i dodatkowe wymiary** ★★ — hipoteza / dydaktyka
+
+- Mosty Einsteina–Rosena i metryki tuneli są prawidłowymi obiektami
+  matematycznymi OTW, ale nie ma znanego mechanizmu tworzenia ani potwierdzenia
+  makroskopowego, przechodniego tunelu w naszym Wszechświecie. Przechodnie tunele
+  wymagają założeń o egzotycznej energii, a ich stabilność jest nierozstrzygnięta.
+- „Piąty wymiar”, podróż przez tunel i manipulowanie przeszłością w _Interstellar_
+  należą do fabuły / spekulacji. Mogą być eksplorowane jako jawny eksperyment
+  myślowy, lecz bez `REAL_ENGINE` ani predykcji rzeczywistości.
+
+**Eksperyment Filadelfia / Project Rainbow** ★ — legenda historyczna, nie model
+
+- Materiał `xz2iOt3YRq8` nie dotyczy _Interstellar_; opisuje rzekomy Eksperyment
+  Filadelfia z USS *Eldridge*. Zasługuje na zapis jako przykład hipotezy i
+  narracji kulturowej, NIE jako wynik fizyki.
+- Naval History and Heritage Command nie znalazło dokumentu potwierdzającego
+  niewidzialność lub teleportację. Dzienniki USS *Eldridge* wskazują, że okręt
+  nie przebywał w Filadelfii w opisywanym okresie. Degaussing redukuje sygnaturę
+  magnetyczną dla min, ale nie czyni statku niewidzialnym dla oka, radaru ani
+  urządzeń nasłuchowych. Genesis nie tworzy dla tej legendy solvera ani eventu.
+
+**Źródła:**
+- James, von Tunzelmann, Franklin, Thorne 2015, *Classical and Quantum Gravity*
+  32, 065001, DOI 10.1088/0264-9381/32/6/065001.
+- NASA, *What Happens When Something Gets ‘Too Close’ to a Black Hole?*.
+- Naval History and Heritage Command, *Philadelphia Experiment*.
+- Luminet 2015, *The Warped Science of Interstellar*, arXiv:1503.08305.
+
 ## Ograniczenia implementacyjne
 - Pełny ray-tracing Kerra w czasie rzeczywistym za ciężki na telefon →
   strategia: prekomputowane tablice ugięć + shader WebGL (tak robił zespół

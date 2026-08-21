@@ -211,6 +211,13 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
+    id: 'biology-hiv-10e8-pdb-structural-comparison', domainId: 'biology-vaccine-discovery', modelVersion: '1.0.0', engine: 'biopython-pdb-rmsd@1.88',
+    parameters: [text('referencePdb', 'Struktura referencyjna PDB', '5GHW'), text('mobilePdb', 'Struktura porównywana PDB', '4G6F')],
+    route: { kind: 'none' }, knowledgeSources: ['biology-vaccine-discovery.md', 'biology.md', 'chemistry.md'],
+    rationale: 'Rzeczywisty, ograniczony backendowy Biopython oblicza Cα RMSD publicznej pary HIV MPER / bnAb 10E8: 5GHW jako reference i 4G6F jako mobile. Wynik jest COMPUTATIONAL_RESULT z SHA-256 obu artefaktów PDB. RMSD opisuje geometrię zdeponowanych struktur, a nie K_D, docking, neutralizację, immunogenność ani skuteczność szczepionki. Przeglądarka nie liczy wyniku; endpoint wymaga GENESIS_BIOPYTHON_PYTHON oraz GENESIS_PDB_STRUCTURES_DIR.',
+    capability: 'BACKEND_REAL_ENGINE',
+  },
+  {
     id: 'biology-depmap-crispr-senescence-panel', domainId: 'biology-aging-lab', modelVersion: '1.0.0', engine: 'depmap-24q2-crispr@1.0.0',
     parameters: [], route: { kind: 'none' }, knowledgeSources: ['biology-aging-senescence-cancer.md'],
     rationale: 'Rzeczywisty, read-only backendowy audyt DepMap 24Q2 CRISPR Gene Effect dla z góry określonego panelu p53/p21 i p16/RB. Uruchamia się wyłącznie po checksumowej walidacji czterech artefaktów danych; nie jest modelem pacjenta, targetem terapeutycznym ani predykcją leku.',

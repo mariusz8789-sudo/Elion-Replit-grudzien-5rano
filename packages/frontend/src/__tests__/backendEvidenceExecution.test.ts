@@ -119,6 +119,29 @@ const pyscfRun = {
   },
 };
 
+const structuralRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000007',
+  modelId: 'biology-hiv-10e8-pdb-structural-comparison',
+  modelVersion: '1.0.0',
+  domain: 'biology-vaccine-discovery',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { fab10e8RmsdAngstrom: 8.242672750748403, fabMatchedCaAtoms: 422, mperInFabAlignedFrameRmsdAngstrom: 17.041076297900034, mperMatchedIdenticalCaAtoms: 13 },
+  units: { fab10e8RmsdAngstrom: 'Å', fabMatchedCaAtoms: 'atomy', mperInFabAlignedFrameRmsdAngstrom: 'Å', mperMatchedIdenticalCaAtoms: 'atomy' },
+  warnings: ['COMPUTATIONAL_RESULT: structure-only comparison; not affinity or efficacy.'],
+  validity: '5GHW→4G6F only.',
+  assumptions: ['C-alpha least-squares superposition in the Fab 10E8 frame.'],
+  provenance: {
+    source: 'RCSB PDB 5GHW / 4G6F; compute/structural_worker.py',
+    formula: 'C-alpha least-squares superposition + RMSD',
+    honesty: 'real_external_engine_computational_result',
+    engine: 'Biopython 1.88', classification: 'COMPUTATIONAL_RESULT',
+    referencePdb: '5GHW', mobilePdb: '4G6F', referenceSha256: 'a'.repeat(64), mobileSha256: 'b'.repeat(64),
+    requiredEnvironmentVariables: ['GENESIS_BIOPYTHON_PYTHON', 'GENESIS_PDB_STRUCTURES_DIR'],
+  },
+};
+
 const depmapRun = {
   runId: '0aa4e400-0000-4000-8000-000000000002',
   modelId: 'biology-depmap-crispr-senescence-panel',
@@ -242,6 +265,25 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs.energyHartree).toBeCloseTo(-1.11675931, 12);
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('PySCF 2.13.0');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(pyscfRun.runId);
+  });
+
+  it('confirms a reviewed HIV MPER/10E8 PDB RMSD plan through the canonical backend and preserves structural provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: structuralRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Porównaj PDB RMSD HIV MPER 10E8: 5GHW i 4G6F.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'biology-hiv-10e8-pdb-structural-comparison', domainId: 'biology-vaccine-discovery',
+      inputs: { referencePdb: '5GHW', mobilePdb: '4G6F' },
+    });
+    expect(confirmed.run.result.outputs.fab10e8RmsdAngstrom).toBeCloseTo(8.242672750748403, 12);
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Biopython 1.88');
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.classification).toBe('COMPUTATIONAL_RESULT');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendProvenance.referenceSha256).toBe('a'.repeat(64));
   });
 
   it('confirms a reviewed DepMap data plan through the same canonical Fabric endpoint and preserves data provenance', async () => {

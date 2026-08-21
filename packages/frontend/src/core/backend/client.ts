@@ -464,7 +464,11 @@ export interface ComputeRun {
   runId: string; modelId: string; modelName?: string; modelVersion: string; domain: string; engine?: string;
   status: 'ok' | 'rejected' | 'error'; outputs?: Record<string, ComputeValue>; units?: Record<string, string>;
   warnings?: string[]; validity?: string; assumptions?: string[]; deterministic?: boolean;
-  provenance?: { source: string; formula: string; honesty: string; engine?: string; requiredEnvironmentVariable?: string };
+  provenance?: {
+    source: string; formula: string; honesty: string; engine?: string; requiredEnvironmentVariable?: string;
+    classification?: string; referencePdb?: string; mobilePdb?: string;
+    referenceSha256?: string; mobileSha256?: string; requiredEnvironmentVariables?: string[];
+  };
   message?: string;
 }
 

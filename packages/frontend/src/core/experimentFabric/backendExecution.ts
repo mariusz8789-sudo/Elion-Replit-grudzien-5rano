@@ -41,6 +41,14 @@ function backendProvenanceRecord(run: ComputeRun): Readonly<Record<string, strin
     honesty: provenance?.honesty ?? 'unknown',
     engine: provenance?.engine ?? 'unknown',
     requiredEnvironmentVariable: provenance?.requiredEnvironmentVariable ?? 'unknown',
+    classification: provenance?.classification ?? 'UNCLASSIFIED',
+    referencePdb: provenance?.referencePdb ?? 'not-applicable',
+    mobilePdb: provenance?.mobilePdb ?? 'not-applicable',
+    referenceSha256: provenance?.referenceSha256 ?? 'not-applicable',
+    mobileSha256: provenance?.mobileSha256 ?? 'not-applicable',
+    requiredEnvironmentVariables: Array.isArray(provenance?.requiredEnvironmentVariables)
+      ? provenance.requiredEnvironmentVariables.join(',')
+      : 'not-applicable',
   };
 }
 

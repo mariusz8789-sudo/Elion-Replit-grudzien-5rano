@@ -20,6 +20,7 @@ import { detect as rdkitDetect, descriptors as rdkitDescriptors, validate as rdk
 import { detect as meepDetect, interfaceTransmission as meepInterfaceTransmission, pecReflection as meepPecReflection } from './meepAdapter.mjs';
 import { detect as pyscfDetect, referenceCase as pyscfReferenceCase, singlePoint as pyscfSinglePoint } from './qmAdapter.mjs';
 import { detect as depmapDetect, senescenceCellCyclePanel } from './depmapAdapter.mjs';
+import { detect as structuralDetect, compare10e8Mper } from './structuralAdapter.mjs';
 
 const SOLAR_MASS_KG = 1.989e30;
 
@@ -661,6 +662,63 @@ const MODELS = [
           peakAbsHyAtSample: data.peakAbsHyAtSample,
         },
         warnings: [`PyMeep ${result.version}; ${result.meta.measurement}.`, 'To ograniczony benchmark idealnego przewodnika PEC w 1D; nie jest wynikiem dla rzeczywistego metalu, obiektu 3D, niewidzialności, teleportacji ani legendy Filadelfii.'],
+      };
+    },
+  },
+
+  {
+    id: 'biology-hiv-10e8-pdb-structural-comparison',
+    name: 'HIV MPER / 10E8 — porównanie struktur PDB (Biopython)',
+    domain: 'biology-vaccine-discovery',
+    version: '1.0.0',
+    description: 'Rzeczywiste porównanie Cα RMSD publicznych struktur 5GHW i 4G6F: Fab 10E8 oraz wspólny identyczny segment HIV MPER w ramie wyrównanej do Fab.',
+    inputs: [
+      { id: 'referencePdb', label: 'Referencyjna struktura PDB', type: 'string', unit: '', maxLength: 8, default: '5GHW' },
+      { id: 'mobilePdb', label: 'Porównywana struktura PDB', type: 'string', unit: '', maxLength: 8, default: '4G6F' },
+    ],
+    outputs: [
+      { id: 'fab10e8RmsdAngstrom', label: 'Fab 10E8 RMSD po superpozycji Cα', unit: 'Å' },
+      { id: 'fabMatchedCaAtoms', label: 'Dopasowane atomy Cα Fab', unit: 'atomy' },
+      { id: 'mperInFabAlignedFrameRmsdAngstrom', label: 'MPER RMSD w ramie wyrównanego Fab', unit: 'Å' },
+      { id: 'mperMatchedIdenticalCaAtoms', label: 'Dopasowane identyczne atomy Cα MPER', unit: 'atomy' },
+    ],
+    assumptions: 'Biopython PDBParser; least-squares superposition atomów Cα identycznych reszt. Referencyjny Fab 10E8 (H/L) ustala ramę, w której porównywany jest wspólny segment MPER (P).',
+    validity: 'Wyłącznie para publicznych artefaktów 5GHW↔4G6F z manifestowanego katalogu danych. RMSD opisuje różnicę geometrii struktur zdeponowanych eksperymentalnie; nie jest dockingiem, dynamiką molekularną, predykcją K_D/off-rate, neutralizacji, immunogenności ani skuteczności szczepionki.',
+    provenance: {
+      source: 'RCSB PDB 5GHW / 4G6F; compute/structural_worker.py via compute/structuralAdapter.mjs',
+      formula: 'Cα least-squares superposition (Biopython Superimposer) + RMSD in antibody-aligned frame',
+      honesty: 'real_external_engine_computational_result',
+      engine: 'Biopython',
+      sourcePublication: 'RCSB 5GHW: crystal structure of broadly neutralizing antibody 10E8 with long HIV-1 MPER epitope',
+      requiredEnvironmentVariables: ['GENESIS_BIOPYTHON_PYTHON', 'GENESIS_PDB_STRUCTURES_DIR'],
+    },
+    stochastic: false,
+    backendExecutable: true,
+    kind: 'external-engine',
+    validate(values) {
+      const runtime = structuralDetect();
+      if (!runtime.available) {
+        return { ok: false, error: 'capability_unavailable', message: `Biopython/PDB runtime niedostępny (${runtime.reason}). Skonfiguruj GENESIS_BIOPYTHON_PYTHON oraz GENESIS_PDB_STRUCTURES_DIR do zweryfikowanych artefaktów 5GHW i 4G6F.` };
+      }
+      const ref = values.referencePdb.toUpperCase();
+      const mobile = values.mobilePdb.toUpperCase();
+      if (ref !== '5GHW' || mobile !== '4G6F') {
+        return { ok: false, error: 'unsupported_pdb_pair', message: 'Wersja 1.0.0 dopuszcza wyłącznie odtwarzalny benchmark 5GHW (reference) → 4G6F (mobile).' };
+      }
+      values.referencePdb = ref;
+      values.mobilePdb = mobile;
+      return { ok: true };
+    },
+    execute(values) {
+      const result = compare10e8Mper(values.referencePdb, values.mobilePdb);
+      if (!result.ok) throw new Error(result.error + (result.reason ? `: ${result.reason}` : ''));
+      return {
+        outputs: result.data,
+        warnings: [
+          'COMPUTATIONAL_RESULT: RMSD opisuje różnicę geometrii zdeponowanych struktur po wyrównaniu, a nie powinowactwo, neutralizację, immunogenność ani skuteczność szczepionki.',
+          'AutoDock Vina i molecular dynamics są poza zakresem tego modelu; score dockingowy nie jest dołączany jako wynik zastępczy.',
+        ],
+        provenance: { engine: result.engine, ...result.provenance },
       };
     },
   },

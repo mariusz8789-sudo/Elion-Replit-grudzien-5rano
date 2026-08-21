@@ -214,6 +214,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     params.mobilePdb = '4G6F';
     return request('biology-vaccine-discovery', 'biology-hiv-10e8-pdb-structural-comparison', 'graph', ['referencePdb', 'mobilePdb']);
   }
+  if (/(?:\bopenmm\b|(?:dynamik[a-ząćęłńóśźż]*\s+molekularn[a-ząćęłńóśźż]*|molecular dynamics|\bmd\b).*(?:1vii|benchmark|referencyjn)|(?:1vii|benchmark\s+md).*(?:openmm|dynamik[a-ząćęłńóśźż]*))/i.test(normalized)) {
+    return request('biology-vaccine-discovery', 'biology-openmm-md-1vii-reference', 'graph', ['steps']);
+  }
   if (/(?:\bdepmap\b|crispr\s+(?:gene\s+)?effect|panel\s+(?:p53|p21|p16|rb)|(?:p53|p21|p16|rb)\s*(?:\/|i|oraz|and)\s*(?:p21|p16|rb)|senescence\s+panel\s+crispr)/.test(normalized)) {
     return request('biology-aging-lab', 'biology-depmap-crispr-senescence-panel', 'graph', []);
   }

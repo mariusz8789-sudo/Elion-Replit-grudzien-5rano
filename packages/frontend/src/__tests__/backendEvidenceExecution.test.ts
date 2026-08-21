@@ -119,6 +119,16 @@ const pyscfRun = {
   },
 };
 
+const openmmRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000008',
+  modelId: 'biology-openmm-md-1vii-reference', modelVersion: '1.0.0', domain: 'biology-vaccine-discovery', engine: 'genesis-compute@1.0.0', status: 'ok', deterministic: true,
+  outputs: { atomCountAfterHydrogenAddition: 596, potentialEnergyBeforeKjPerMol: -798.3842000735617, potentialEnergyMinimizedKjPerMol: -5091.295432895097, potentialEnergyAfterKjPerMol: -3705.2575889291966, simulatedPicoseconds: 0.2 },
+  units: { atomCountAfterHydrogenAddition: 'atomy', potentialEnergyBeforeKjPerMol: 'kJ/mol', potentialEnergyMinimizedKjPerMol: 'kJ/mol', potentialEnergyAfterKjPerMol: 'kJ/mol', simulatedPicoseconds: 'ps' },
+  warnings: ['COMPUTATIONAL_RESULT: bounded OpenMM runtime benchmark only.'],
+  validity: 'PDB 1VII reference only.', assumptions: ['AMBER14 implicit OBC2; single CPU thread; 100 steps.'],
+  provenance: { source: 'RCSB PDB 1VII via compute/openmm_worker.py', formula: 'AMBER14 implicit OBC2 + LangevinMiddle MD', honesty: 'real_external_engine_computational_result', engine: 'OpenMM 8.6 CPU', classification: 'COMPUTATIONAL_RESULT', requiredEnvironmentVariables: ['GENESIS_OPENMM_PYTHON', 'GENESIS_OPENMM_DATA_DIR'] },
+};
+
 const structuralRun = {
   runId: '0aa4e400-0000-4000-8000-000000000007',
   modelId: 'biology-hiv-10e8-pdb-structural-comparison',
@@ -265,6 +275,21 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs.energyHartree).toBeCloseTo(-1.11675931, 12);
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('PySCF 2.13.0');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(pyscfRun.runId);
+  });
+
+  it('confirms a reviewed OpenMM MD reference plan through the canonical backend and preserves engine provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: openmmRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Uruchom OpenMM MD benchmark 1VII.'));
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'biology-openmm-md-1vii-reference', domainId: 'biology-vaccine-discovery', inputs: {},
+    });
+    expect(confirmed.run.result.outputs.simulatedPicoseconds).toBe(0.2);
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('OpenMM 8.6 CPU');
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.classification).toBe('COMPUTATIONAL_RESULT');
   });
 
   it('confirms a reviewed HIV MPER/10E8 PDB RMSD plan through the canonical backend and preserves structural provenance', async () => {

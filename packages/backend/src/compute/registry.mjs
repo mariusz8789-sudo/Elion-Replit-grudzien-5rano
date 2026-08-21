@@ -21,6 +21,7 @@ import { detect as meepDetect, interfaceTransmission as meepInterfaceTransmissio
 import { detect as pyscfDetect, referenceCase as pyscfReferenceCase, singlePoint as pyscfSinglePoint } from './qmAdapter.mjs';
 import { detect as depmapDetect, senescenceCellCyclePanel } from './depmapAdapter.mjs';
 import { detect as structuralDetect, compare10e8Mper } from './structuralAdapter.mjs';
+import { detect as openmmDetect, referenceBenchmark as openmmReferenceBenchmark } from './openmmAdapter.mjs';
 
 const SOLAR_MASS_KG = 1.989e30;
 
@@ -717,6 +718,51 @@ const MODELS = [
         warnings: [
           'COMPUTATIONAL_RESULT: RMSD opisuje różnicę geometrii zdeponowanych struktur po wyrównaniu, a nie powinowactwo, neutralizację, immunogenność ani skuteczność szczepionki.',
           'AutoDock Vina i molecular dynamics są poza zakresem tego modelu; score dockingowy nie jest dołączany jako wynik zastępczy.',
+        ],
+        provenance: { engine: result.engine, ...result.provenance },
+      };
+    },
+  },
+
+  {
+    id: 'biology-openmm-md-1vii-reference',
+    name: 'OpenMM MD — benchmark publicznego białka 1VII',
+    domain: 'biology-vaccine-discovery',
+    version: '1.0.0',
+    description: 'Rzeczywisty, ograniczony benchmark OpenMM MD CPU dla publicznej struktury małego białka 1VII: AMBER14, implicit OBC2, minimizacja i krótki przebieg Langevin Middle.',
+    inputs: [{ id: 'steps', label: 'Kroki MD', type: 'number', unit: 'kroki', min: 100, max: 1000, default: 100 }],
+    outputs: [
+      { id: 'atomCountAfterHydrogenAddition', label: 'Atomy po dodaniu wodoru', unit: 'atomy' },
+      { id: 'potentialEnergyBeforeKjPerMol', label: 'Energia potencjalna przed minimizacją', unit: 'kJ/mol' },
+      { id: 'potentialEnergyMinimizedKjPerMol', label: 'Energia potencjalna po minimizacji', unit: 'kJ/mol' },
+      { id: 'potentialEnergyAfterKjPerMol', label: 'Energia potencjalna po MD', unit: 'kJ/mol' },
+      { id: 'simulatedPicoseconds', label: 'Czas symulowany', unit: 'ps' },
+    ],
+    assumptions: 'Publiczny PDB 1VII; AMBER14-all.xml + implicit/obc2.xml; CPU OpenMM z OPENMM_CPU_THREADS=1; constraints=HBonds; LangevinMiddle 300 K, γ=1/ps, dt=0,002 ps, seed 20260821.',
+    validity: 'Tylko benchmark PDB 1VII, 100–1000 kroków na CPU i zweryfikowany artefakt źródłowy. Krótki run kontroluje runtime i odtwarzalność, nie równowagę, sampling konformacyjny, model HIV Env/10E8, nanodysk, błonę, kompleks białko–ligand, docking, powinowactwo ani skuteczność szczepionki.',
+    provenance: {
+      source: 'RCSB PDB 1VII via compute/openmm_worker.py and compute/openmmAdapter.mjs',
+      formula: 'AMBER14 implicit OBC2 energy minimization + LangevinMiddle molecular dynamics',
+      honesty: 'real_external_engine_computational_result', engine: 'OpenMM CPU',
+      requiredEnvironmentVariables: ['GENESIS_OPENMM_PYTHON', 'GENESIS_OPENMM_DATA_DIR'],
+    },
+    stochastic: false,
+    backendExecutable: true,
+    kind: 'external-engine',
+    validate() {
+      const runtime = openmmDetect();
+      return runtime.available
+        ? { ok: true }
+        : { ok: false, error: 'capability_unavailable', message: `OpenMM CPU runtime niedostępny (${runtime.reason}). Skonfiguruj GENESIS_OPENMM_PYTHON i GENESIS_OPENMM_DATA_DIR do zweryfikowanego runtime’u oraz PDB 1VII.` };
+    },
+    execute(values) {
+      const result = openmmReferenceBenchmark(values.steps);
+      if (!result.ok) throw new Error(result.error + (result.reason ? `: ${result.reason}` : ''));
+      return {
+        outputs: result.data,
+        warnings: [
+          'COMPUTATIONAL_RESULT: to krótki benchmark runtime’u OpenMM MD dla 1VII, nie badanie równowagi, wiązania, HIV, nanodysku ani szczepionki.',
+          'Energie potencjalne force field nie są wolnymi energiami wiązania ani obserwowalnymi eksperymentalnymi.',
         ],
         provenance: { engine: result.engine, ...result.provenance },
       };

@@ -218,6 +218,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
+    id: 'biology-openmm-md-1vii-reference', domainId: 'biology-vaccine-discovery', modelVersion: '1.0.0', engine: 'openmm-cpu@8.6',
+    parameters: [number('steps', 'Kroki MD', 'kroki', 100, 1000, 100)], route: { kind: 'none' }, knowledgeSources: ['biology-vaccine-discovery.md', 'biology.md'],
+    rationale: 'Rzeczywisty, ograniczony backendowy OpenMM CPU wykonuje AMBER14 + implicit OBC2 dla publicznego białka 1VII: minimizacja i 100–1000 kroków Langevin Middle. Jeden wątek CPU i seed są częścią kontraktu odtwarzalności. Wynik jest COMPUTATIONAL_RESULT dla kontroli runtime’u, nie symulacją HIV/10E8, nanodysku, błony, kompleksu białko–ligand, dockingiem, powinowactwem ani predykcją szczepionki.',
+    capability: 'BACKEND_REAL_ENGINE',
+  },
+  {
     id: 'biology-depmap-crispr-senescence-panel', domainId: 'biology-aging-lab', modelVersion: '1.0.0', engine: 'depmap-24q2-crispr@1.0.0',
     parameters: [], route: { kind: 'none' }, knowledgeSources: ['biology-aging-senescence-cancer.md'],
     rationale: 'Rzeczywisty, read-only backendowy audyt DepMap 24Q2 CRISPR Gene Effect dla z góry określonego panelu p53/p21 i p16/RB. Uruchamia się wyłącznie po checksumowej walidacji czterech artefaktów danych; nie jest modelem pacjenta, targetem terapeutycznym ani predykcją leku.',

@@ -299,6 +299,24 @@ const logisticRun = {
   },
 };
 
+const semfRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000021',
+  modelId: 'nuclear-semf',
+  modelVersion: '1.0.0',
+  domain: 'nuclear',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { bindingEnergy: 492.25, bindingPerNucleon: 8.79, massNumber: 56 },
+  units: { bindingEnergy: 'MeV', bindingPerNucleon: 'MeV', massNumber: '' },
+  warnings: [],
+  validity: 'Najlepszy dla 20 < A < 250.',
+  assumptions: ['Model kroplowy bez efektów powłokowych.'],
+  provenance: {
+    source: 'core/physics.ts:semfBindingEnergy', formula: 'B = a_V·A − a_S·A^⅔ − a_C·Z(Z−1)/A^⅓ − a_A·(A−2Z)²/A ± δ', honesty: 'simplified', engine: 'Genesis ModelGraph (nuclear-semf)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -661,6 +679,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ populationAtT: 109.57, fractionOfCapacity: 0.10957 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toBe('N(t)=K/(1+((K−N₀)/N₀)·e^(−rt))');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(logisticRun.runId);
+  });
+
+  it('confirms a reviewed SEMF plan through the canonical backend and preserves semi-empirical provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: semfRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz energię wiązania jądra protony=26 neutrony=30.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'nuclear-semf', domainId: 'nuclear', inputs: { protonNumber: 26, neutronNumber: 30 },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ massNumber: 56, bindingEnergy: 492.25 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toContain('a_V·A');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(semfRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

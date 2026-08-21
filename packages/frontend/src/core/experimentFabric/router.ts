@@ -284,8 +284,9 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'nuclear-semf', domainId: 'nuclear', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('protonNumber', 'Liczba protonów Z', '', 1, 118, 26), number('neutronNumber', 'Liczba neutronów N', '', 0, 180, 30)],
-    route: { kind: 'lab', labId: 'nuclear' }, knowledgeSources: ['nuclear.md', 'particle.md'],
-    rationale: 'Realny graf SEMF; model kroplowy energii wiązania, bez efektów powłokowych.',
+    route: { kind: 'none' }, knowledgeSources: ['nuclear.md', 'particle.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje istniejący ModelGraph SEMF energii wiązania. Jest to półempiryczny model kroplowy bez efektów powłokowych; nie jest pomiarem masy, katalogiem izotopów, modelem rozpadu, przekrojów czynnych ani bezpieczeństwa jądrowego.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'nuclear-tokamak-lawson', domainId: 'nuclear', modelVersion: '1.1.0', engine: 'genesis-lawson-0d@1.0.0',

@@ -137,6 +137,24 @@ const chshRun = {
   },
 };
 
+const photonRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000012',
+  modelId: 'photon-energy',
+  modelVersion: '1.1.0',
+  domain: 'electrodynamics',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { photonEnergyEV: 2.479683968, photonFrequencyTHz: 599.584916, photonEnergyKJmol: 239.305005736 },
+  units: { photonEnergyEV: 'eV', photonFrequencyTHz: 'THz', photonEnergyKJmol: 'kJ/mol' },
+  warnings: [],
+  validity: 'Pojedynczy foton w próżni; nie jest modelem oddziaływania z materiałem.',
+  assumptions: ['E=hc/λ i f=c/λ.'],
+  provenance: {
+    source: 'core/modelGraph/photonGraph.ts via compute/core.bundle.mjs', formula: 'E=hc/λ; f=c/λ; E[kJ/mol]=E[eV]·96.485332', honesty: 'exact', engine: 'Genesis photon-energy ModelGraph (shared frontend/backend graph)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -346,6 +364,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs.absS).toBeCloseTo(2 * Math.SQRT2, 12);
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis analytical singlet CHSH correlation (shared frontend/backend runner)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(chshRun.runId);
+  });
+
+  it('confirms a reviewed photon-energy plan through the canonical backend and preserves shared-graph provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: photonRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz energię fotonu o długości fali 500 nm.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'photon-energy', domainId: 'electrodynamics', inputs: { wavelengthNm: 500 },
+    });
+    expect(confirmed.run.result.outputs.photonEnergyEV).toBeCloseTo(2.479683968, 12);
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis photon-energy ModelGraph (shared frontend/backend graph)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(photonRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

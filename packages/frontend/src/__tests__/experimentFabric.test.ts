@@ -599,6 +599,19 @@ describe('Genesis Experiment Fabric', () => {
     expect(quantum?.realModels).toContain('quantum-chsh-correlation');
   });
 
+  it('plans photon energy for the canonical backend ModelGraph without claiming material interaction', () => {
+    const request = parseScienceChatMessage('Oblicz energię fotonu o długości fali 500 nm.');
+    const reviewed = planEvidenceGuidedExperiment(request);
+
+    expect(request.modelId).toBe('photon-energy');
+    expect(request.parameters).toEqual({ wavelengthNm: 500 });
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.1.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('nie jest pełnym solverem pola Maxwella');
+  });
+
   it('runs bounded 1D split-step tunneling through Fabric without claiming a general Schrödinger solver', () => {
     const run = runExperiment(parseScienceChatMessage('Zasymuluj tunelowanie kwantowe.'));
     expect(run.request.modelId).toBe('quantum-tunneling-1d');

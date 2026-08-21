@@ -242,10 +242,11 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
-    id: 'photon-energy', domainId: 'electrodynamics', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
+    id: 'photon-energy', domainId: 'electrodynamics', modelVersion: '1.1.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('wavelengthNm', 'Długość fali', 'nm', 0.001, 1e9, 500)],
-    route: { kind: 'lab', labId: 'quantum', experimentId: 'photon-graph' }, knowledgeSources: ['electrodynamics.md', 'quantum.md', 'chemistry.md'],
-    rationale: 'Realny graf E = hc/λ; nie jest pełnym solverem pola Maxwella.',
+    route: { kind: 'none' }, knowledgeSources: ['electrodynamics.md', 'quantum.md', 'chemistry.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje ten sam ModelGraph E=hc/λ co Quantum Lab. Wynik opisuje energię i częstotliwość fotonu, lecz nie jest pełnym solverem pola Maxwella, modelem absorpcji, materiału ani konkretnym oddziaływaniem chemicznym.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'water-pump-pipe', domainId: 'engineering-water', modelVersion: '1.0.0', engine: 'genesis-engineering-graph@1.0.0',

@@ -238,6 +238,23 @@ const MODELS = [
 
   graphModel(
     {
+      id: 'photon-energy', name: 'Energia fotonu', domain: 'electrodynamics', version: '1.1.0',
+      description: 'Dokładne wyprowadzenie energii i częstotliwości pojedynczego fotonu z długości fali oraz konwersja energii na skalę molową.',
+      inputs: [{ id: 'wavelengthNm', label: 'Długość fali λ', unit: 'nm', min: 0.001, max: 1e9, default: 500 }],
+      outputs: [
+        { id: 'photonEnergyEV', label: 'Energia fotonu E', unit: 'eV' },
+        { id: 'photonFrequencyTHz', label: 'Częstotliwość f', unit: 'THz' },
+        { id: 'photonEnergyKJmol', label: 'Energia fotonu w skali molowej', unit: 'kJ/mol' },
+      ],
+      assumptions: 'Pojedynczy foton w próżni; długość fali jest parametrem wejściowym. Konwersja eV→kJ/mol jest przeliczeniem jednostek.',
+      validity: 'λ > 0. Wynik opisuje energię i częstotliwość, nie absorpcję, przekrój czynny, fluorescencję, emisję, rozkład widmowy, materiał ani rozerwanie konkretnego wiązania.',
+      provenance: { source: 'core/modelGraph/photonGraph.ts via compute/core.bundle.mjs', formula: 'E=hc/λ; f=c/λ; E[kJ/mol]=E[eV]·96.485332', honesty: 'exact', engine: 'Genesis photon-energy ModelGraph (shared frontend/backend graph)' },
+    },
+    core.buildPhotonGraph,
+  ),
+
+  graphModel(
+    {
       id: 'biology-logistic', name: 'Wzrost logistyczny', domain: 'biology', version: '1.0.0',
       description: 'Wielkość populacji w czasie t z rozwiązania równania logistycznego.',
       inputs: [

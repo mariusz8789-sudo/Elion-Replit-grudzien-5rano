@@ -286,7 +286,7 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/\b(atom|wodór|wodor|orbital atomowy|bohr)\b/.test(normalized)) {
     return request('atom', 'atom-bohr', 'scene-3d', ['atomicNumber', 'principalN']);
   }
-  if (/\b(foton|energia fotonu|promieniowanie)\b/.test(normalized) && !/\bfala elektromagnetyczna\b/.test(normalized)) {
+  if (/\b(foton[a-ząćęłńóśźż]*|energia fotonu|promieniowanie)\b/.test(normalized) && !/\bfala elektromagnetyczna\b/.test(normalized)) {
     return request('electrodynamics', 'photon-energy', 'graph', ['wavelengthNm']);
   }
   if (/\b(tesserakt|tesseract|hipersześcian|hiperszescian|hiper[- ]?sześcian|hiper[- ]?szescian)\b/.test(normalized)) return request('mathematics', 'math-tesseract-4d', 'scene-3d', ['angleXWDeg', 'angleYZDeg', 'doubleRotation']);

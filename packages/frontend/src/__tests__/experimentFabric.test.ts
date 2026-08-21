@@ -502,19 +502,19 @@ describe('Genesis Experiment Fabric', () => {
     expect(spacetime?.realModels).toContain('spacetime-minkowski');
   });
 
-  it('runs bounded VSEPR geometry through Fabric without claiming quantum chemistry', () => {
+  it('plans bounded VSEPR geometry for backend Fabric without claiming quantum chemistry', () => {
     const command = 'Pokaż geometrię cząsteczki VSEPR.';
-    const run = runExperiment(parseScienceChatMessage(command));
-    const repeated = runExperiment(parseScienceChatMessage(command));
+    const request = parseScienceChatMessage(command);
+    const reviewed = planEvidenceGuidedExperiment(request);
     const chemistry = getKnowledgeDomain('chemistry');
 
-    expect(run.request.modelId).toBe('chem-vsepr');
-    expect(run.result.status).toBe('completed');
-    expect(run.result.route).toEqual({ kind: 'lab', labId: 'chemistry', experimentId: 'vsepr' });
-    expect(run.result.outputs).toMatchObject({ shapeId: 'ax4', example: 'CH₄', bonding: 4, lone: 0 });
-    expect(JSON.parse(String(run.result.outputs.bondingVecs))).toHaveLength(4);
-    expect(run.result.validity).toContain('struktury elektronowej');
-    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(request.modelId).toBe('chem-vsepr');
+    expect(request.parameters).toEqual({});
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.1.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('Nie jest to obliczenie struktury elektronowej');
     expect(chemistry?.realModels).toContain('chem-vsepr');
   });
 

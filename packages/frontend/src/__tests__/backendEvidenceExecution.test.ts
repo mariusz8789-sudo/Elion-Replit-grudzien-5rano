@@ -209,6 +209,24 @@ const titrationRun = {
   },
 };
 
+const vseprRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000016',
+  modelId: 'chem-vsepr',
+  modelVersion: '1.1.0',
+  domain: 'chemistry',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { shapeId: 'ax4', name: 'Tetraedryczna (AX₄)', example: 'CH₄', bonding: 4, lone: 0, angleLabel: '109,5°', angleMeasured: false, bondingVecs: '[[0.577,0.577,0.577]]', loneVecs: '[]' },
+  units: { shapeId: '', name: '', example: '', bonding: '', lone: '', angleLabel: '', angleMeasured: '', bondingVecs: 'unit-vector[] (JSON)', loneVecs: 'unit-vector[] (JSON)' },
+  warnings: [],
+  validity: 'VSEPR domain geometry only; not electronic structure.',
+  assumptions: ['Idealna geometria domen VSEPR.'],
+  provenance: {
+    source: 'labs/experiments/chemistry-vsepr.ts via compute/core.bundle.mjs', formula: 'deterministic VSEPR domain vectors', honesty: 'bounded_vsepr_geometry', engine: 'Genesis VSEPR domain-geometry runner (shared frontend/backend runner)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -486,6 +504,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ acid: 'acetic', veq: 25 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis weak-acid charge-balance titration (shared frontend/backend runner)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(titrationRun.runId);
+  });
+
+  it('confirms a reviewed VSEPR plan through the canonical backend and preserves shared-runner provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: vseprRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Pokaż geometrię cząsteczki VSEPR.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'chem-vsepr', domainId: 'chemistry', inputs: {},
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ shapeId: 'ax4', example: 'CH₄', bonding: 4, lone: 0 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis VSEPR domain-geometry runner (shared frontend/backend runner)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(vseprRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

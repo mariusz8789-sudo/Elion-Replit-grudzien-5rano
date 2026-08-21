@@ -2155,6 +2155,212 @@ var chemistryTitration = {
   }
 };
 
+// packages/frontend/src/labs/experiments/chemistry-vsepr.ts
+function normalize3(v) {
+  const len = Math.hypot(v[0], v[1], v[2]);
+  return [v[0] / len, v[1] / len, v[2] / len];
+}
+var TETRA_VERTS = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]].map(normalize3);
+var OCTA_VERTS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+function trigPlanar() {
+  return [90, 210, 330].map((deg) => {
+    const a = deg * Math.PI / 180;
+    return [Math.cos(a), 0, Math.sin(a)];
+  });
+}
+var LINEAR_VERTS = [[0, 1, 0], [0, -1, 0]];
+function trigBipy() {
+  return [[0, 1, 0], [0, -1, 0], ...trigPlanar()];
+}
+function bentCone(n, realAngleDeg, openUp, swapAxis = false) {
+  const gamma = realAngleDeg * Math.PI / 180;
+  const sign = openUp ? 1 : -1;
+  if (n === 2) {
+    const half = gamma / 2;
+    const y2 = Math.cos(half) * sign;
+    const s = Math.sin(half);
+    return swapAxis ? [[0, y2, s], [0, y2, -s]] : [[s, y2, 0], [-s, y2, 0]];
+  }
+  const cos2Theta = (Math.cos(gamma) + 0.5) / 1.5;
+  const cosTheta = Math.sqrt(Math.max(0, cos2Theta));
+  const sinTheta = Math.sqrt(Math.max(0, 1 - cos2Theta));
+  const y = cosTheta * sign;
+  const out = [];
+  for (let i = 0; i < 3; i++) {
+    const phi = i / 3 * Math.PI * 2;
+    out.push([sinTheta * Math.cos(phi), y, sinTheta * Math.sin(phi)]);
+  }
+  return out;
+}
+var VSEPR_SHAPES = [
+  { id: "ax2", name: "Liniowa (AX\u2082)", example: "BeCl\u2082, CO\u2082", bonding: 2, lone: 0, angleLabel: "180\xB0", angleMeasured: false, bondingVecs: LINEAR_VERTS, loneVecs: [] },
+  { id: "ax3", name: "Trygonalna p\u0142aska (AX\u2083)", example: "BF\u2083", bonding: 3, lone: 0, angleLabel: "120\xB0", angleMeasured: false, bondingVecs: trigPlanar(), loneVecs: [] },
+  { id: "ax2e1", name: "K\u0105towa, 3 domeny (AX\u2082E)", example: "SO\u2082", bonding: 2, lone: 1, angleLabel: "~119\xB0 (idealnie 120\xB0)", angleMeasured: false, bondingVecs: trigPlanar().slice(0, 2), loneVecs: trigPlanar().slice(2, 3) },
+  { id: "ax4", name: "Tetraedryczna (AX\u2084)", example: "CH\u2084", bonding: 4, lone: 0, angleLabel: "109,5\xB0", angleMeasured: false, bondingVecs: TETRA_VERTS, loneVecs: [] },
+  { id: "ax3e1", name: "Piramida trygonalna (AX\u2083E)", example: "NH\u2083", bonding: 3, lone: 1, angleLabel: "106,8\xB0", angleMeasured: true, bondingVecs: bentCone(3, 106.8, false), loneVecs: [[0, 1, 0]] },
+  { id: "ax2e2", name: "K\u0105towa, 4 domeny (AX\u2082E\u2082)", example: "H\u2082O", bonding: 2, lone: 2, angleLabel: "104,5\xB0", angleMeasured: true, bondingVecs: bentCone(2, 104.5, true), loneVecs: bentCone(2, 115, false, true) },
+  { id: "ax5", name: "Bipiramida trygonalna (AX\u2085)", example: "PCl\u2085", bonding: 5, lone: 0, angleLabel: "90\xB0 / 120\xB0", angleMeasured: false, bondingVecs: trigBipy(), loneVecs: [] },
+  { id: "ax4e1", name: "Hu\u015Btawka (AX\u2084E)", example: "SF\u2084", bonding: 4, lone: 1, angleLabel: "~89\xB0 / 119\xB0 / 173\xB0 (idealizacja)", angleMeasured: false, bondingVecs: trigBipy().slice(0, 4), loneVecs: trigBipy().slice(4, 5) },
+  { id: "ax3e2", name: "Kszta\u0142t T (AX\u2083E\u2082)", example: "ClF\u2083", bonding: 3, lone: 2, angleLabel: "~87,5\xB0 (idealnie 90\xB0)", angleMeasured: false, bondingVecs: [trigBipy()[0], trigBipy()[1], trigBipy()[2]], loneVecs: [trigBipy()[3], trigBipy()[4]] },
+  { id: "ax2e3", name: "Liniowa, 5 domen (AX\u2082E\u2083)", example: "XeF\u2082", bonding: 2, lone: 3, angleLabel: "180\xB0", angleMeasured: false, bondingVecs: [trigBipy()[0], trigBipy()[1]], loneVecs: trigBipy().slice(2, 5) },
+  { id: "ax6", name: "Oktaedryczna (AX\u2086)", example: "SF\u2086", bonding: 6, lone: 0, angleLabel: "90\xB0", angleMeasured: false, bondingVecs: OCTA_VERTS, loneVecs: [] },
+  { id: "ax5e1", name: "Piramida kwadratowa (AX\u2085E)", example: "BrF\u2085", bonding: 5, lone: 1, angleLabel: "~84,8\xB0 (idealnie 90\xB0)", angleMeasured: false, bondingVecs: OCTA_VERTS.slice(0, 5), loneVecs: OCTA_VERTS.slice(5, 6) },
+  { id: "ax4e2", name: "Kwadratowa p\u0142aska (AX\u2084E\u2082)", example: "XeF\u2084", bonding: 4, lone: 2, angleLabel: "90\xB0", angleMeasured: false, bondingVecs: [OCTA_VERTS[0], OCTA_VERTS[1], OCTA_VERTS[4], OCTA_VERTS[5]], loneVecs: [OCTA_VERTS[2], OCTA_VERTS[3]] }
+];
+function runVseprScenario({ shapeId = "ax4" } = {}) {
+  const shape = VSEPR_SHAPES.find((candidate) => candidate.id === shapeId);
+  if (!shape) throw new Error(`Unknown VSEPR shape: ${shapeId}.`);
+  const copyVectors = (vectors) => vectors.map(([x, y, z]) => [x, y, z]);
+  return {
+    shapeId: shape.id,
+    name: shape.name,
+    example: shape.example,
+    bonding: shape.bonding,
+    lone: shape.lone,
+    angleLabel: shape.angleLabel,
+    angleMeasured: shape.angleMeasured,
+    bondingVecs: copyVectors(shape.bondingVecs),
+    loneVecs: copyVectors(shape.loneVecs)
+  };
+}
+var BOND_LEN = 1.3;
+var LONE_LEN = 0.75;
+var ATOM_COLOR = 6084328;
+var CENTER_COLOR = 15774556;
+var LONE_COLOR = 15235577;
+var VseprSim = class {
+  group;
+  disposables = [];
+  lastShapeId = "";
+  t = 0;
+  angle = 0;
+  three;
+  init(three, scene, camera) {
+    this.three = three;
+    scene.add(new three.AmbientLight(4477030, 1.1));
+    const light = new three.PointLight(16777215, 1.4, 0, 0.1);
+    light.position.set(3, 4, 5);
+    scene.add(light);
+    camera.position.set(2.6, 2, 3.6);
+    camera.lookAt(0, 0, 0);
+  }
+  reset = () => {
+    this.angle = 0;
+  };
+  rebuild(scene, shapeId) {
+    const three = this.three;
+    if (this.group) {
+      scene.remove(this.group);
+      for (const d of this.disposables) d.dispose();
+      this.disposables = [];
+    }
+    const shape = VSEPR_SHAPES.find((s) => s.id === shapeId) ?? VSEPR_SHAPES[0];
+    this.lastShapeId = shapeId;
+    const group = new three.Group();
+    const centerGeo = new three.SphereGeometry(0.36, 24, 24);
+    const centerMat = new three.MeshStandardMaterial({ color: CENTER_COLOR, roughness: 0.5, metalness: 0.1 });
+    const centerMesh = new three.Mesh(centerGeo, centerMat);
+    group.add(centerMesh);
+    this.disposables.push(centerGeo, centerMat);
+    const bondGeo = new three.CylinderGeometry(0.06, 0.06, 1, 12);
+    const bondMat = new three.MeshStandardMaterial({ color: 9279412, roughness: 0.6 });
+    this.disposables.push(bondGeo, bondMat);
+    const atomGeo = new three.SphereGeometry(0.26, 20, 20);
+    const atomMat = new three.MeshStandardMaterial({ color: ATOM_COLOR, roughness: 0.5, metalness: 0.05 });
+    this.disposables.push(atomGeo, atomMat);
+    for (const v of shape.bondingVecs) {
+      const dir = new three.Vector3(v[0], v[1], v[2]);
+      const bond = new three.Mesh(bondGeo, bondMat);
+      bond.position.copy(dir.clone().multiplyScalar(BOND_LEN / 2));
+      bond.quaternion.setFromUnitVectors(new three.Vector3(0, 1, 0), dir);
+      bond.scale.set(1, BOND_LEN, 1);
+      group.add(bond);
+      const atom = new three.Mesh(atomGeo, atomMat);
+      atom.position.copy(dir.clone().multiplyScalar(BOND_LEN));
+      group.add(atom);
+    }
+    const loneGeo = new three.SphereGeometry(0.3, 16, 16);
+    const loneMat = new three.MeshStandardMaterial({ color: LONE_COLOR, roughness: 0.3, transparent: true, opacity: 0.45 });
+    this.disposables.push(loneGeo, loneMat);
+    for (const v of shape.loneVecs) {
+      const dir = new three.Vector3(v[0], v[1], v[2]);
+      const lone = new three.Mesh(loneGeo, loneMat);
+      lone.position.copy(dir.clone().multiplyScalar(LONE_LEN));
+      lone.name = "lone";
+      group.add(lone);
+    }
+    scene.add(group);
+    this.group = group;
+  }
+  update(dt, p) {
+    this.t += dt;
+    const shapeId = String(p.shape ?? "ax4");
+    if (shapeId !== this.lastShapeId) this.needsRebuild = shapeId;
+    if (p.autoRotate) this.angle += dt * 0.4;
+  }
+  needsRebuild = null;
+  syncScene(scene) {
+    if (this.needsRebuild) {
+      this.rebuild(scene, this.needsRebuild);
+      this.needsRebuild = null;
+    }
+    if (!this.group) return;
+    this.group.rotation.y = this.angle;
+    const pulse = 1 + 0.08 * Math.sin(this.t * 2);
+    for (const child of this.group.children) {
+      if (child.name === "lone") child.scale.setScalar(pulse);
+    }
+  }
+  getStats() {
+    const shape = VSEPR_SHAPES.find((s) => s.id === this.lastShapeId) ?? VSEPR_SHAPES[0];
+    return { bonding: shape.bonding, lone: shape.lone, domains: shape.bonding + shape.lone };
+  }
+  dispose() {
+    for (const d of this.disposables) d.dispose();
+    this.disposables = [];
+  }
+};
+var chemistryVsepr = {
+  id: "vsepr",
+  name: "Geometria molekularna (VSEPR)",
+  honesty: "educational",
+  honestyNote: "Teoria VSEPR (Gillespie & Nyholm, 1957) jest dobrze potwierdzonym modelem geometrii molekularnej. Geometrie bez wolnych par (liniowa, trygonalna, tetraedryczna, bipiramida trygonalna, oktaedryczna) to dok\u0142adna geometria bry\u0142/rozk\u0142ad\xF3w na okr\u0119gu. Dla NH\u2083 i H\u2082O k\u0105ty wi\u0105za\u0144 s\u0105 PRAWDZIWYMI zmierzonymi warto\u015Bciami (106,8\xB0 i 104,5\xB0, NIST/CCCBDB). Dla pozosta\u0142ych geometrii z wolnymi parami (SF\u2084, ClF\u2083, XeF\u2082, BrF\u2085, XeF\u2084) pokazano pozycje IDEALNE bry\u0142y-rodzica \u2014 realne k\u0105ty w tych cz\u0105steczkach odbiegaj\u0105 o kilka stopni (wolna para odpycha silniej ni\u017C para wi\u0105\u017C\u0105ca), co tu jest jawnie zaznaczone, nie udawana fa\u0142szywa precyzja. Kolory atom\xF3w s\u0105 schematyczne, nie prawdziwymi kolorami pierwiastk\xF3w.",
+  params: [
+    {
+      key: "shape",
+      label: "Geometria (typ AX\u2099E\u2098)",
+      type: "select",
+      default: "ax4",
+      options: VSEPR_SHAPES.map((s) => ({ value: s.id, label: `${s.name} \u2014 ${s.example}` }))
+    },
+    { key: "autoRotate", label: "Automatyczny obr\xF3t", type: "toggle", default: true }
+  ],
+  createSim3D: () => new VseprSim(),
+  narrate(p, stats) {
+    const shapeId = String(p.shape ?? "ax4");
+    const shape = VSEPR_SHAPES.find((s) => s.id === shapeId) ?? VSEPR_SHAPES[0];
+    const domains = Number(stats.domains ?? shape.bonding + shape.lone);
+    return [
+      {
+        title: `${shape.name}: ${domains} domen elektronowych`,
+        body: `Przyk\u0142ad: ${shape.example}. ${shape.bonding} ${shape.bonding === 1 ? "para wi\u0105\u017C\u0105ca" : "par wi\u0105\u017C\u0105cych"} (niebieskie atomy) ${shape.lone > 0 ? `+ ${shape.lone} ${shape.lone === 1 ? "wolna para" : "wolne pary"} (fioletowe \u201Echmury", bez atomu na ko\u0144cu)` : "i brak wolnych par"} \u2014 wszystkie domeny odpychaj\u0105 si\u0119 nawzajem i uk\u0142adaj\u0105 tak, by zmaksymalizowa\u0107 odleg\u0142o\u015Bci mi\u0119dzy sob\u0105. K\u0105t: ${shape.angleLabel}.`,
+        citation: shape.angleMeasured ? { source: "NIST/CCCBDB (Computational Chemistry Comparison and Benchmark DataBase)", confirmation: "confirmed", note: "Zmierzony/obliczony k\u0105t wi\u0105zania" } : { source: "Gillespie & Nyholm (1957), Quarterly Reviews", confirmation: shape.lone > 0 ? "partial" : "confirmed", note: shape.lone > 0 ? "Pozycje idealne bry\u0142y-rodzica; realny k\u0105t odbiega o kilka stopni" : "Dok\u0142adna geometria bez wolnych par" }
+      },
+      shape.lone > 0 ? {
+        title: 'Dlaczego wolna para "zajmuje wi\u0119cej miejsca"',
+        body: "Wolna para elektronowa jest przyci\u0105gana tylko przez JEDNO j\u0105dro (atomu centralnego), wi\u0119c jej chmura jest bardziej rozmyta i silniej odpycha s\u0105siednie domeny ni\u017C para wi\u0105\u017C\u0105ca (przyci\u0105gana przez DWA j\u0105dra, cia\u015Bniej zwi\u0105zana mi\u0119dzy nimi). Dlatego k\u0105ty mi\u0119dzy parami wi\u0105\u017C\u0105cymi kurcz\u0105 si\u0119 poni\u017Cej idealnej warto\u015Bci geometrycznej za ka\u017Cdym razem, gdy w grze jest wolna para \u2014 to realny, mierzalny efekt (NH\u2083: 106,8\xB0 zamiast 109,5\xB0; H\u2082O: 104,5\xB0 zamiast 109,5\xB0)."
+      } : {
+        title: "Zero wolnych par: geometria czysto idealna",
+        body: `Gdy wszystkie domeny elektronowe to wi\u0105zania, k\u0105ty odpowiadaj\u0105 dok\u0142adnie idealnej bryle geometrycznej (${shape.bonding === 2 ? "linia" : shape.bonding === 3 ? "tr\xF3jk\u0105t" : shape.bonding === 4 ? "tetraedr" : shape.bonding === 5 ? "bipiramida trygonalna" : "oktaedr"}) \u2014 \u017Cadnych odchyle\u0144 do wyja\u015Bniania.`
+      },
+      {
+        title: "Sk\u0105d VSEPR w og\xF3le dzia\u0142a",
+        body: "Ronald Gillespie i Ronald Nyholm sformalizowali t\u0119 regu\u0142\u0119 w 1957 r., ale intuicja jest prosta: elektrony maj\u0105 ten sam \u0142adunek i odpychaj\u0105 si\u0119 elektrostatycznie (prawo Coulomba) \u2014 uk\u0142ad minimalizuj\u0105cy energi\u0119 to uk\u0142ad maksymalizuj\u0105cy wzajemne odleg\u0142o\u015Bci domen na sferze wok\xF3\u0142 atomu centralnego. Dok\u0142adnie ten sam mechanizm co elektrony w Bohr Lab odpychaj\u0105ce si\u0119 na pow\u0142okach, tylko w 3D i dla ca\u0142ych par, nie pojedynczych elektron\xF3w."
+      }
+    ];
+  }
+};
+
 // packages/frontend/src/core/compute/cheminformatics.ts
 var ATOMIC_WEIGHTS = {
   H: 1.008,
@@ -2308,6 +2514,7 @@ export {
   runTitrationScenario,
   runTokamakLawsonScenario,
   runTunnelingScenario,
+  runVseprScenario,
   sampleLocalHiddenPair,
   sampleSingletPair,
   schwarzschildGeodesicRHS,

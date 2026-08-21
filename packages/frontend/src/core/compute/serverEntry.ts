@@ -36,6 +36,7 @@ export { runChshCorrelationScenario } from '../../labs/experiments/quantum-chsh'
 export { runTokamakLawsonScenario } from '../../labs/experiments/nuclear-tokamak';
 export { runNuclideChartScenario } from '../../labs/experiments/nuclear-chart';
 export { runTitrationScenario, TITRATION_ACID_IDS } from '../../labs/experiments/chemistry-titration';
+export { runVseprScenario } from '../../labs/experiments/chemistry-vsepr';
 
 // Cheminformatyka (deterministyczna) — fundament domeny drug-discovery.
 export * from './cheminformatics';

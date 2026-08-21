@@ -403,6 +403,44 @@ const MODELS = [
 
   functionModel(
     {
+      id: 'chem-vsepr', name: 'Geometria VSEPR domen elektronowych', domain: 'chemistry', version: '1.1.0',
+      description: 'Deterministyczne wektory domen wiążących i wolnych par dla ograniczonego zestawu 13 geometrii VSEPR.',
+      inputs: [{ id: 'shapeId', label: 'Kształt VSEPR', type: 'string', unit: '', maxLength: 16, default: 'ax4' }],
+      outputs: [
+        { id: 'shapeId', label: 'Id kształtu', unit: '' }, { id: 'name', label: 'Nazwa geometrii', unit: '' }, { id: 'example', label: 'Przykład', unit: '' },
+        { id: 'bonding', label: 'Domeny wiążące', unit: '' }, { id: 'lone', label: 'Wolne pary', unit: '' }, { id: 'angleLabel', label: 'Kąt', unit: '' }, { id: 'angleMeasured', label: 'Kąt zmierzony', unit: '' },
+        { id: 'bondingVecs', label: 'Wektory domen wiążących', unit: 'unit-vector[] (JSON)' }, { id: 'loneVecs', label: 'Wektory wolnych par', unit: 'unit-vector[] (JSON)' },
+      ],
+      assumptions: 'Geometria domen VSEPR; kształty bez wolnych par używają geometrii idealnej, a NH₃/H₂O mają istniejące, zmierzone kąty.',
+      validity: 'Wyłącznie jeden z 13 istniejących shapeId. Model nie oblicza struktury elektronowej, funkcji falowej, energii wiązań, widm, dynamiki, geometrii konkretnej konformacji ani precyzyjnych odchyleń kątowych poza NH₃/H₂O.',
+      provenance: {
+        source: 'labs/experiments/chemistry-vsepr.ts via compute/core.bundle.mjs',
+        formula: 'deterministic VSEPR domain vectors; measured NH₃/H₂O angles where encoded',
+        honesty: 'bounded_vsepr_geometry',
+        engine: 'Genesis VSEPR domain-geometry runner (shared frontend/backend runner)',
+      },
+    },
+    (v) => {
+      const result = core.runVseprScenario({ shapeId: v.shapeId });
+      return {
+        outputs: { ...result, bondingVecs: JSON.stringify(result.bondingVecs), loneVecs: JSON.stringify(result.loneVecs) },
+        warnings: result.angleMeasured ? [] : ['Poza NH₃ i H₂O kąty dla geometrii z wolnymi parami są istniejącą idealizacją geometrii rodzica, nie indywidualnym pomiarem konkretnej cząsteczki.'],
+      };
+    },
+    {
+      validate(values) {
+        try {
+          core.runVseprScenario({ shapeId: values.shapeId });
+          return { ok: true };
+        } catch (error) {
+          return { ok: false, error: 'unsupported_shape', message: error instanceof Error ? error.message : 'Nieobsługiwany kształt VSEPR.' };
+        }
+      },
+    },
+  ),
+
+  functionModel(
+    {
       id: 'chemistry-titration', name: 'Titracja słabego kwasu mocną zasadą', domain: 'chemistry', version: '1.1.0',
       description: 'Deterministyczny bilans ładunku słabego kwasu i NaOH dla czterech jawnie ograniczonych lokalnych scenariuszy kwasów.',
       inputs: [

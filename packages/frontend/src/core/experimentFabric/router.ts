@@ -345,10 +345,11 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
-    id: 'chem-vsepr', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-vsepr-geometry@1.0.0',
+    id: 'chem-vsepr', domainId: 'chemistry', modelVersion: '1.1.0', engine: 'genesis-vsepr-geometry@1.0.0',
     parameters: [text('shapeId', 'Kształt VSEPR', 'ax4')],
-    route: { kind: 'lab', labId: 'chemistry', experimentId: 'vsepr' }, knowledgeSources: ['chemistry.md'],
-    rationale: 'Istniejące jawne wektory domen elektronowych VSEPR, obejmujące dokładne geometrie idealne oraz istniejące kąty NH₃/H₂O; nie jest to obliczenie struktury elektronowej ani pełna chemia kwantowa.',
+    route: { kind: 'none' }, knowledgeSources: ['chemistry.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje te same jawne wektory domen elektronowych VSEPR co scena 3D, obejmujące geometrie idealne i istniejące kąty NH₃/H₂O. Nie jest to obliczenie struktury elektronowej, energii wiązań ani pełna chemia kwantowa.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'chem-molecular-weight', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-cheminformatics@1.0.0',

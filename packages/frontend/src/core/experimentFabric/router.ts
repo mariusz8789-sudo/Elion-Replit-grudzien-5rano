@@ -361,8 +361,9 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'math-gaussian', domainId: 'mathematics', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('mean', 'Średnia μ', '', -100, 100, 0), number('sigma', 'Odchylenie σ', '', 0.001, 100, 1), number('xValue', 'Wartość x', '', -100, 100, 1)],
-    route: { kind: 'lab', labId: 'mathematics' }, knowledgeSources: ['mathematics.md'],
-    rationale: 'Realny graf rozkładu normalnego.',
+    route: { kind: 'none' }, knowledgeSources: ['mathematics.md'],
+    rationale: 'Rzeczywisty backendowy Fabric wykonuje istniejący ModelGraph rozkładu normalnego. Jest to wyłącznie obliczenie gęstości i z-score dla jawnych parametrów; nie jest dopasowaniem danych, testem hipotez, prognozą ani estymacją niepewności z próbki.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'math-tesseract-4d', domainId: 'mathematics', modelVersion: '1.0.0', engine: 'genesis-tesseract-linear-algebra@1.0.0',

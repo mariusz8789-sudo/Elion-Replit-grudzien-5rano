@@ -1071,13 +1071,25 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.disclosure.rationale).toContain('nie jest pełnym parserem struktury chemicznej');
   });
 
+  it('plans a Gaussian density calculation for canonical backend Fabric without claiming data analysis', () => {
+    const request = parseScienceChatMessage('Oblicz rozkład normalny.');
+    const reviewed = planEvidenceGuidedExperiment(request);
+
+    expect(request.modelId).toBe('math-gaussian');
+    expect(request.parameters).toEqual({});
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(reviewed.plan.modelVersion).toBe('1.0.0');
+    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    expect(reviewed.disclosure.rationale).toContain('nie jest dopasowaniem danych');
+  });
+
   it.each([
     ['Oblicz energię wiązania jądra protony=26 neutrony=30.', 'nuclear-semf', 'bindingEnergy'],
     ['Oblicz dylatację czasu dla beta=0.8.', 'sr-lorentz', 'lorentzGammaFactor'],
     ['Oblicz ucieczkę atmosfery planety.', 'universe-atmospheric-escape', 'jeansParameter'],
     ['Oblicz energię relatywistyczną cząstki beta=0.8.', 'particle-relativistic-energy', 'totalEnergyMeV'],
     ['Oblicz kinetykę Arrheniusa przy 350 K i 60 kJ/mol.', 'chemistry-arrhenius', 'rateConstant'],
-    ['Oblicz rozkład normalny.', 'math-gaussian', 'pdfValue'],
     ['Oblicz wzrost logistyczny populacji.', 'biology-logistic', 'populationAtT'],
     ['Oblicz Kardaszew typ K=1.', 'civilization-kardashev', 'powerWatts'],
   ])('routes Chat through real local model %s', (prompt, modelId, outputKey) => {

@@ -245,6 +245,24 @@ const molecularWeightRun = {
   },
 };
 
+const gaussianRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000018',
+  modelId: 'math-gaussian',
+  modelVersion: '1.0.0',
+  domain: 'mathematics',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { zScore: 1, pdfValue: 0.24197072451914337, probWithinZ: 0.6826894723352726 },
+  units: { zScore: '', pdfValue: '', probWithinZ: '' },
+  warnings: [],
+  validity: 'σ > 0.',
+  assumptions: ['Rozkład normalny; erf przez przybliżenie Abramowitza–Steguna.'],
+  provenance: {
+    source: 'core/modelGraph/gaussianGraph.ts', formula: 'f(x)=exp(−½z²)/(σ√2π), P=erf(|z|/√2)', honesty: 'exact', engine: 'Genesis ModelGraph (math-gaussian)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -556,6 +574,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ atomCount: 3, degreeOfUnsaturation: 0 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis cheminformatics parser (shared frontend/backend core)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(molecularWeightRun.runId);
+  });
+
+  it('confirms a reviewed Gaussian plan through the canonical backend and preserves ModelGraph provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: gaussianRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Oblicz rozkład normalny.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'math-gaussian', domainId: 'mathematics', inputs: {},
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ zScore: 1, pdfValue: 0.24197072451914337 });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.formula).toBe('f(x)=exp(−½z²)/(σ√2π), P=erf(|z|/√2)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(gaussianRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

@@ -383,14 +383,15 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realna funkcja klasyfikacyjnej skali mocy Kardaszewa; nie jest prognozą społeczną.',
   },
   {
-    id: 'quantum-kitaev-bulk', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-kitaev-bulk@1.0.0',
+    id: 'quantum-kitaev-bulk', domainId: 'quantum', modelVersion: '1.1.0', engine: 'genesis-kitaev-bulk@1.0.0',
     parameters: [
       number('chemicalPotential', 'Potencjał chemiczny μ', 'jedn. energii', -10, 10, 0),
       number('hopping', 'Hopping t', 'jedn. energii', 0.001, 10, 1),
       number('pairing', 'Pairing p-wave Δ', 'jedn. energii', 0.001, 10, 1),
     ],
     route: { kind: 'none' }, knowledgeSources: ['quantum.md'],
-    rationale: 'Realny, analitycznie minimalizowany bulk model BdG łańcucha Kitaeva; nie jest symulacją nanodrutu, materiału ani urządzenia Majorana 1.',
+    rationale: 'Rzeczywisty backendowy Fabric wywołuje ten sam analityczny minimalizator bulk BdG łańcucha Kitaeva co frontend. Wynik klasyfikuje wyłącznie idealny reżim bulk; nie jest symulacją nanodrutu, materiału, stanów brzegowych, urządzenia Majorana 1 ani hardware.',
+    capability: 'BACKEND_REAL_ENGINE',
   },
   {
     id: 'quantum-teleportation', domainId: 'quantum', modelVersion: '1.0.0', engine: 'genesis-three-qubit-state-vector@1.0.0',

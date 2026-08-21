@@ -101,6 +101,24 @@ const blochRun = {
   },
 };
 
+const kitaevRun = {
+  runId: '0aa4e400-0000-4000-8000-000000000010',
+  modelId: 'quantum-kitaev-bulk',
+  modelVersion: '1.1.0',
+  domain: 'quantum',
+  engine: 'genesis-compute@1.0.0',
+  status: 'ok',
+  deterministic: true,
+  outputs: { bulkGap: 2, momentumAtGap: Math.PI, topologicalInvariant: -1, phase: 'TOPOLOGICAL_REGIME', criticalChemicalPotentialNegative: -2, criticalChemicalPotentialPositive: 2 },
+  units: { bulkGap: 'jedn. energii', momentumAtGap: 'rad', topologicalInvariant: '', phase: '', criticalChemicalPotentialNegative: 'jedn. energii', criticalChemicalPotentialPositive: 'jedn. energii' },
+  warnings: ['Klasyfikacja dotyczy translacyjnie niezmiennego bulk modelu.'],
+  validity: 'Bulk model only; not a material, nanowire or device.',
+  assumptions: ['Translacyjnie niezmienny łańcuch p-wave.'],
+  provenance: {
+    source: 'core/compute/kitaevBulk.ts via compute/core.bundle.mjs', formula: 'E(k)² = (−2t cos k − μ)² + 4Δ² sin²k', honesty: 'exact_bounded_analytic_bulk_model', engine: 'Genesis Kitaev bulk BdG analytical minimizer (shared frontend/backend runner)', requiredEnvironmentVariable: 'not-required',
+  },
+};
+
 const tunnelingRun = {
   runId: '0aa4e400-0000-4000-8000-000000000005',
   modelId: 'quantum-tunneling-1d',
@@ -276,6 +294,23 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs).toMatchObject({ probability0: 0.5, probability1: 0.5, normSquared: 1, blochX: 1 });
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis single-qubit unitary state-vector (shared Canvas/backend runner)');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(blochRun.runId);
+  });
+
+  it('confirms a reviewed Kitaev bulk plan through the canonical backend and preserves bounded analytical provenance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: kitaevRun, persisted: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Zasymuluj łańcuch Kitaeva mu=0 t=1 delta=1.'));
+
+    expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
+    expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
+    const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      contractVersion: '1.0.0', modelId: 'quantum-kitaev-bulk', domainId: 'quantum', inputs: { chemicalPotential: 0, hopping: 1, pairing: 1 },
+    });
+    expect(confirmed.run.result.outputs).toMatchObject({ bulkGap: 2, topologicalInvariant: -1, phase: 'TOPOLOGICAL_REGIME' });
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('Genesis Kitaev bulk BdG analytical minimizer (shared frontend/backend runner)');
+    expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(kitaevRun.runId);
   });
 
   it('confirms a reviewed tunneling plan through the canonical backend Fabric endpoint and preserves shared-runner provenance', async () => {

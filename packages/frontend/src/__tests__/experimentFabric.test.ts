@@ -628,24 +628,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.disclosure.rationale).toContain('nie symuluje splątania');
   });
 
-  it('runs the bounded Kitaev bulk model with reference phases but never as Majorana 1 hardware', () => {
-    const topological = runExperiment(parseScienceChatMessage('Zasymuluj łańcuch Kitaeva mu=0 t=1 delta=1.'));
-    const critical = runExperiment(parseScienceChatMessage('Zasymuluj łańcuch Kitaeva mu=2 t=1 delta=1.'));
+  it('plans the bounded Kitaev bulk model for canonical backend execution but never routes a Majorana 1 device to it', () => {
+    const topological = planEvidenceGuidedExperiment(parseScienceChatMessage('Zasymuluj łańcuch Kitaeva mu=0 t=1 delta=1.'));
+    const critical = planEvidenceGuidedExperiment(parseScienceChatMessage('Zasymuluj łańcuch Kitaeva mu=2 t=1 delta=1.'));
     const majoranaDevice = runExperiment(parseScienceChatMessage('Zasymuluj urządzenie Majorana 1.'));
 
     expect(topological.request.modelId).toBe('quantum-kitaev-bulk');
-    expect(topological.result.status).toBe('completed');
-    expect(topological.result.outputs.phaseClass).toBe('TOPOLOGICAL_REGIME');
-    expect(topological.result.outputs.topologicalInvariant).toBe(-1);
-    expect(topological.result.route).toEqual({ kind: 'none' });
-    expect(topological.result.visualization).toEqual(['numeric']);
-    expect(Number(topological.result.outputs.bulkGap)).toBeCloseTo(2, 10);
-    expect(topological.result.validity).toContain('nie jest modelem nanodrutu');
+    expect(topological.request.parameters).toEqual({ chemicalPotential: 0, hopping: 1, pairing: 1 });
+    expect(topological.status).toBe('READY_FOR_CONFIRMATION');
+    expect(topological.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
+    expect(topological.plan.modelVersion).toBe('1.1.0');
+    expect(topological.plan.route).toEqual({ kind: 'none' });
+    expect(topological.disclosure.rationale).toContain('nie jest symulacją nanodrutu');
 
-    expect(critical.result.status).toBe('completed');
-    expect(critical.result.outputs.phaseClass).toBe('CRITICAL_BOUNDARY');
-    expect(Number(critical.result.outputs.bulkGap)).toBeCloseTo(0, 10);
-    expect(critical.result.warnings[0]).toContain('Bulk gap zamyka się');
+    expect(critical.request.parameters).toEqual({ chemicalPotential: 2, hopping: 1, pairing: 1 });
+    expect(critical.status).toBe('READY_FOR_CONFIRMATION');
+    expect(critical.disclosure.rationale).toContain('urządzenia Majorana 1');
 
     expect(majoranaDevice.request.modelId).toBeUndefined();
     expect(majoranaDevice.result.status).toBe('capability_seam');

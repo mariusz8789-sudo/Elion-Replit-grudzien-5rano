@@ -1788,6 +1788,49 @@ function runBlochCircuitScenario({ circuit = "H" } = {}) {
   };
 }
 
+// packages/frontend/src/core/compute/kitaevBulk.ts
+function kitaevBulkEnergyAtMomentum(k, parameters) {
+  const { chemicalPotential: mu, hopping: t, pairing: delta } = parameters;
+  return Math.sqrt((-2 * t * Math.cos(k) - mu) ** 2 + 4 * delta * delta * Math.sin(k) ** 2);
+}
+var EPSILON = 1e-10;
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+function solveKitaevBulk(parameters) {
+  const { chemicalPotential: mu, hopping: t, pairing: delta } = parameters;
+  if (!Number.isFinite(mu) || !Number.isFinite(t) || !Number.isFinite(delta)) {
+    throw new Error("Parametry modelu Kitaeva musz\u0105 by\u0107 sko\u0144czonymi liczbami.");
+  }
+  if (Math.abs(t) <= EPSILON) throw new Error("Parametr hopping t musi by\u0107 r\xF3\u017Cny od zera.");
+  if (Math.abs(delta) <= EPSILON) throw new Error("Parametr pairing \u0394 musi by\u0107 r\xF3\u017Cny od zera dla modelu p-wave.");
+  const candidateXs = [-1, 1];
+  const quadratic = 4 * (t * t - delta * delta);
+  if (quadratic > EPSILON) candidateXs.push(clamp(-2 * mu * t / quadratic, -1, 1));
+  let minEnergySquared = Number.POSITIVE_INFINITY;
+  let xAtGap = 1;
+  for (const x of candidateXs) {
+    const energySquared = kitaevBulkEnergyAtMomentum(Math.acos(clamp(x, -1, 1)), parameters) ** 2;
+    if (energySquared < minEnergySquared) {
+      minEnergySquared = energySquared;
+      xAtGap = x;
+    }
+  }
+  const threshold = 2 * Math.abs(t);
+  const absoluteMu = Math.abs(mu);
+  const phase = Math.abs(absoluteMu - threshold) <= EPSILON ? "CRITICAL_BOUNDARY" : absoluteMu < threshold ? "TOPOLOGICAL_REGIME" : "TRIVIAL_REGIME";
+  const topologicalInvariant = phase === "TOPOLOGICAL_REGIME" ? -1 : phase === "TRIVIAL_REGIME" ? 1 : 0;
+  return {
+    bulkGap: Math.sqrt(Math.max(0, minEnergySquared)),
+    momentumAtGap: Math.acos(clamp(xAtGap, -1, 1)),
+    topologicalInvariant,
+    phase,
+    criticalChemicalPotentialNegative: -threshold,
+    criticalChemicalPotentialPositive: threshold,
+    finiteSizeCaveat: "Klasyfikacja dotyczy translacyjnie niezmiennego bulk modelu. Sko\u0144czony otwarty \u0142a\u0144cuch mo\u017Ce wykazywa\u0107 rozszczepienie niskoenergetycznych stan\xF3w brzegowych; wynik nie symuluje materia\u0142u, nanodrutu ani urz\u0105dzenia Majorana 1."
+  };
+}
+
 // packages/frontend/src/core/compute/cheminformatics.ts
 var ATOMIC_WEIGHTS = {
   H: 1.008,
@@ -1945,6 +1988,7 @@ export {
   semfStabilityGradient,
   singletCorrelation,
   solveKepler,
+  solveKitaevBulk,
   stepKerrEquatorialGeodesic,
   stepLorenzRK4,
   stepSchwarzschildGeodesic,

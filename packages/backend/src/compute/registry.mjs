@@ -386,6 +386,45 @@ const MODELS = [
 
   functionModel(
     {
+      id: 'quantum-kitaev-bulk', name: 'Bulk łańcucha Kitaeva p-wave', domain: 'quantum', version: '1.1.0',
+      description: 'Analityczne minimum dodatniej gałęzi pasma BdG translacyjnie niezmiennego, spinless łańcucha Kitaeva p-wave; klasyfikuje jedynie reżim bulk względem |μ|=2|t|.',
+      inputs: [
+        { id: 'chemicalPotential', label: 'Potencjał chemiczny μ', type: 'number', unit: 'jedn. energii', min: -10, max: 10, default: 0 },
+        { id: 'hopping', label: 'Hopping t', type: 'number', unit: 'jedn. energii', min: 0.001, max: 10, default: 1 },
+        { id: 'pairing', label: 'Pairing p-wave Δ', type: 'number', unit: 'jedn. energii', min: 0.001, max: 10, default: 1 },
+      ],
+      outputs: [
+        { id: 'bulkGap', label: 'Luka bulk', unit: 'jedn. energii' },
+        { id: 'momentumAtGap', label: 'Pęd przy minimum luki', unit: 'rad' },
+        { id: 'topologicalInvariant', label: 'Niezmiennik topologiczny bulk', unit: '' },
+        { id: 'phase', label: 'Klasyfikacja reżimu bulk', unit: '' },
+        { id: 'criticalChemicalPotentialNegative', label: 'Krytyczne μ−', unit: 'jedn. energii' },
+        { id: 'criticalChemicalPotentialPositive', label: 'Krytyczne μ+', unit: 'jedn. energii' },
+      ],
+      assumptions: 'Nieskończony, translacyjnie niezmienny, bezspinowy łańcuch p-wave z idealną parą BdG. Minimum E(k)² jest liczone analitycznie dla cos(k)∈[−1,1].',
+      validity: 't ≠ 0, Δ ≠ 0 i parametry w zadanym zakresie. Wynik klasyfikuje wyłącznie bulk model; nie symuluje skończonego przewodu, stanów brzegowych, materiału, nanodrutu, urządzenia Majorana 1, pomiaru ani hardware.',
+      provenance: {
+        source: 'core/compute/kitaevBulk.ts via compute/core.bundle.mjs',
+        formula: 'E(k)² = (−2t cos k − μ)² + 4Δ² sin²k; bulk phase boundary |μ|=2|t|',
+        honesty: 'exact_bounded_analytic_bulk_model',
+        engine: 'Genesis Kitaev bulk BdG analytical minimizer (shared frontend/backend runner)',
+      },
+    },
+    (v) => {
+      const result = core.solveKitaevBulk({ chemicalPotential: v.chemicalPotential, hopping: v.hopping, pairing: v.pairing });
+      return {
+        outputs: {
+          bulkGap: result.bulkGap, momentumAtGap: result.momentumAtGap, topologicalInvariant: result.topologicalInvariant,
+          phase: result.phase, criticalChemicalPotentialNegative: result.criticalChemicalPotentialNegative,
+          criticalChemicalPotentialPositive: result.criticalChemicalPotentialPositive,
+        },
+        warnings: [result.finiteSizeCaveat],
+      };
+    },
+  ),
+
+  functionModel(
+    {
       id: 'quantum-bloch-circuit', name: 'Obwód jednokubitowy i sfera Blocha', domain: 'quantum', version: '1.1.0',
       description: 'Dokładna, deterministyczna ewolucja pojedynczego kubitu od |0⟩ przez sekwencję bramek H, X, Y, Z, S i T; wykonuje wspólny runner macierzy unitarnej używany przez wizualizację sfery Blocha.',
       inputs: [{ id: 'circuit', label: 'Sekwencja bramek jednokubitowych', type: 'string', unit: '', maxLength: 128, default: 'H X' }],

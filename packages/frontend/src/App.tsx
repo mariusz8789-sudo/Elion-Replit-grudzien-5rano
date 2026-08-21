@@ -45,6 +45,7 @@ const City3DWebGLScreen = lazy(() => import('./components/visual-simulation/City
 const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/ConceptFilmScreen').then((m) => ({ default: m.ConceptFilmScreen })));
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
+const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -86,7 +87,8 @@ type Route =
   | { kind: 'city3d' }
   | { kind: 'concept' }
   | { kind: 'character' }
-  | { kind: 'hf-slice' };
+  | { kind: 'hf-slice' }
+  | { kind: 'pilot' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -112,6 +114,7 @@ function parseHash(): Route {
   if (h === '#/concept') return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
+  if (h === '#/pilot') return { kind: 'pilot' };
   return { kind: 'home' };
 }
 
@@ -449,6 +452,18 @@ export default function App() {
           <TopBar title="Genesis — High-Fidelity Street Slice" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <HighFidelitySliceScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'pilot') {
+      return (
+        <div className="app">
+          <TopBar title="🧪 Pilot eksperymentu — plan → wynik → Scenario Capsule" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <ExperimentPilotScreen />
           </HeavyRoute>
           {overlays}
         </div>

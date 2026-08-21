@@ -202,3 +202,17 @@ describe('scienceChat: uczciwe TODO dla niegotowych funkcji', () => {
     expect(r.todo).toBe(true);
   });
 });
+
+describe('scienceChat: Pilot eksperymentu (P2.1 UI)', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('"pilot eksperymentu" -> otwiera #/pilot', () => {
+    const r = resolveCommand('pilot eksperymentu', null);
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/pilot' });
+  });
+
+  it('"uruchom pilota" -> otwiera #/pilot nawet z otwartą symulacją', () => {
+    const r = resolveCommand('uruchom pilota', ctx());
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/pilot' });
+  });
+});

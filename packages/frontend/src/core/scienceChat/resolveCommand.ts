@@ -187,6 +187,17 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     return proposeExperiment(ctx);
   }
 
+  // --- Pilot eksperymentu (P2.1 UI): plan -> potwierdzenie -> realny run ->
+  //     Scenario Capsule -> eksport, na istniejącym Experiment Fabric. ---
+  if (has(norm, 'pilot eksperymentu', 'otworz pilota', 'uruchom pilota', 'eksperyment krok po kroku', 'reprodukowalny eksperyment', 'scenario capsule', 'kapsula scenariusza')) {
+    return {
+      text: 'Otwieram Pilota eksperymentu: opisz albo wybierz model, zobacz jawny plan, potwierdź, uruchom istniejący silnik i pobierz odtwarzalny dowód metody (Scenario Capsule).',
+      tag: 'SYSTEM',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/pilot' },
+    };
+  }
+
   // --- Film koncepcyjny 2030 (reżyserowany przejazd po żywym silniku). ---
   if (has(norm, 'film koncepcyjny', 'koncept', 'concept film', 'pokaz wizje', 'wizja 2030', 'genesis 2030', 'concept video', 'trailer')) {
     return {

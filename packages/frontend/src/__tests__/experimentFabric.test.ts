@@ -89,13 +89,13 @@ describe('Genesis Experiment Fabric', () => {
     })).toThrow('containerImageDigest');
   });
 
-  it('declares mature solver and GIS integrations as explicit seams, never active engines', () => {
+  it('declares solver and GIS integrations as explicit seams with runtime-specific availability', () => {
     const engines = listExternalEngineAdapters();
     expect(engines.map((entry) => entry.id)).toEqual([
-      'openfoam-cfd', 'fenicsx-pde', 'einstein-toolkit-nr', 'openmc-radiation', 'quantum-schrodinger',
+      'pymeep-maxwell-fdtd', 'openfoam-cfd', 'fenicsx-pde', 'einstein-toolkit-nr', 'openmc-radiation', 'quantum-schrodinger',
     ]);
     for (const entry of engines) {
-      expect(entry.status).toBe('ENGINE_NOT_AVAILABLE');
+      expect(entry.status).toBe(entry.id === 'pymeep-maxwell-fdtd' ? 'REQUIRES_VALIDATION' : 'ENGINE_NOT_AVAILABLE');
       expect(entry.inputSchema.length).toBeGreaterThan(0);
       expect(entry.outputSchema.length).toBeGreaterThan(0);
       expect(entry.requiredProvenance.length).toBeGreaterThan(0);
@@ -1111,15 +1111,26 @@ describe('Genesis Experiment Fabric', () => {
     clearExperimentWorldHandoffs();
   });
 
-  it('runs bounded tunnelling but never fabricates an urban hazard cascade', () => {
+    it('runs bounded tunnelling but never fabricates an urban hazard cascade', () => {
     const quantum = runExperiment(parseScienceChatMessage('Zasymuluj tunelowanie kwantowe.'));
     expect(quantum.result.status).toBe('completed');
     expect(quantum.result.outputs.transmission).toBeTypeOf('number');
     expect(quantum.result.validity).toContain('nie jest ogólnym solverem Schrödingera');
-
     const flood = runExperiment(parseScienceChatMessage('Zasymuluj kaskadę: powódź → infrastruktura → epidemia.'));
     expect(flood.result.status).toBe('engine_not_available');
     expect(flood.result.outputs).toEqual({});
     expect(flood.result.summary).toContain('Wymagany solver');
+  });
+  it('routes a Maxwell/FDTD dielectric-interface request to the real PyMeep backend seam without fabricating browser output', () => {
+    const run = runExperiment(parseScienceChatMessage('Uruchom Meep FDTD dla granicy dielektrycznej i transmisji Fresnela.'));
+    expect(run.request.modelId).toBe('electrodynamics-maxwell-fdtd');
+    expect(run.request.domainId).toBe('electrodynamics');
+    expect(run.plan.engine).toBe('pymeep-fdtd@1.34.0');
+    expect(run.plan.runnable).toBe(false);
+    expect(run.result.status).toBe('capability_seam');
+    expect(run.result.outputs).toEqual({});
+    expect(run.provenance.resultOrigin).toBe('capability-seam');
+    expect(run.result.summary).toContain('PyMeep');
+    expect(run.result.summary).toContain('GENESIS_MEEP_PYTHON');
   });
 });

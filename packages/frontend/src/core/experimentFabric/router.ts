@@ -189,6 +189,18 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf Bohra; ścisły dla atomów wodoropodobnych.',
   },
   {
+    id: 'electrodynamics-maxwell-fdtd', domainId: 'electrodynamics', modelVersion: '1.0.0', engine: 'pymeep-fdtd@1.34.0',
+    parameters: [
+      number('n1', 'Współczynnik załamania ośrodka 1', '', 1, 4, 1),
+      number('n2', 'Współczynnik załamania ośrodka 2', '', 1, 4, 2),
+      number('frequency', 'Częstotliwość Meep', 'c / jednostka długości', 0.2, 2, 1),
+      number('resolution', 'Rozdzielczość FDTD', 'piksele / jednostka długości', 40, 160, 80),
+    ],
+    route: { kind: 'none' }, knowledgeSources: ['electrodynamics.md'],
+    rationale: 'Rzeczywisty backendowy adapter PyMeep wykonuje ograniczony przypadek Maxwell/FDTD: normalne padanie w 1D na płaską, bezstratną granicę dielektryczną. Browser nie oblicza zastępczego wyniku; wykonanie wymaga skonfigurowanego backendu /api/compute/fabric/run z GENESIS_MEEP_PYTHON i referencyjnej walidacji FDTD.',
+    capability: 'CAPABILITY_SEAM',
+  },
+  {
     id: 'photon-energy', domainId: 'electrodynamics', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('wavelengthNm', 'Długość fali', 'nm', 0.001, 1e9, 500)],
     route: { kind: 'lab', labId: 'quantum', experimentId: 'photon-graph' }, knowledgeSources: ['electrodynamics.md', 'quantum.md', 'chemistry.md'],

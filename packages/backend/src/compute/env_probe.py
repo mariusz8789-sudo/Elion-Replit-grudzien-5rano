@@ -93,6 +93,7 @@ def main():
         "rdkit": "rdkit",
         "openmm": "openmm",
         "pyscf": "pyscf",
+        "pymeep": "meep",
         "mdanalysis": "MDAnalysis",
         "pdbfixer": "pdbfixer",
         "biopython": "Bio",

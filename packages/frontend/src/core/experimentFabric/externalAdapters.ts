@@ -1,6 +1,6 @@
 import type { ExperimentRoute } from './types';
 
-/** Extension seam only. No entry in this registry claims a runtime integration. */
+/** Extension manifests. Runtime availability remains separately validated by the execution environment. */
 export const EXTERNAL_ADAPTER_CONTRACT_VERSION = '1.0.0';
 
 export type ExternalAdapterStatus = 'ENGINE_NOT_AVAILABLE' | 'NOT_CONFIGURED' | 'REQUIRES_VALIDATION';
@@ -41,6 +41,16 @@ export interface SpatialImportManifest {
 }
 
 const ENGINE_ADAPTERS: readonly ExternalAdapterManifest[] = [
+  {
+    contractVersion: EXTERNAL_ADAPTER_CONTRACT_VERSION, id: 'pymeep-maxwell-fdtd', title: 'PyMeep Maxwell / FDTD adapter', status: 'REQUIRES_VALIDATION',
+    domains: ['electromagnetism'], backend: 'local-container',
+    primaryDocumentation: 'https://meep.readthedocs.io/en/latest/Python_Tutorials/Basics/',
+    inputSchema: ['n1 refractive index', 'n2 refractive index', 'Meep frequency', 'FDTD resolution'],
+    outputSchema: ['power transmittance', 'power reflectance', 'Fresnel analytical reference', 'absolute error', 'energy closure'],
+    requiredProvenance: ['PyMeep version', 'worker hash', 'declared material indices', 'frequency', 'resolution', 'reference-case evidence'],
+    requiredRuntime: ['GENESIS_MEEP_PYTHON interpreter', 'PyMeep import', 'reference n1=1/n2=2 Fresnel case passes'], route: { kind: 'none' },
+    limitation: 'Backend zawiera rzeczywisty adapter Node → PyMeep dla 1D, normalnego padania na bezstratną granicę dielektryczną. Frontend Experiment Fabric nie uruchamia solvera w przeglądarce i pozostaje capability seam do czasu skonfigurowania wywołania /api/compute/fabric/run w wdrożeniu.',
+  },
   {
     contractVersion: EXTERNAL_ADAPTER_CONTRACT_VERSION, id: 'openfoam-cfd', title: 'OpenFOAM CFD adapter', status: 'ENGINE_NOT_AVAILABLE',
     domains: ['cfd', 'thermodynamics', 'radiation-transport'], backend: 'local-container',

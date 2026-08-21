@@ -15,6 +15,7 @@ import * as md from '../compute/mdAdapter.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
 import * as protein from '../compute/proteinAdapter.mjs';
 import * as admet from '../compute/admetAdapter.mjs';
+import * as meep from '../compute/meepAdapter.mjs';
 
 export const TOOL_STATUS = {
   AVAILABLE: 'AVAILABLE',
@@ -85,6 +86,17 @@ const TOOLS = [
     assumptions: 'Nigdy nie modyfikuje struktury po cichu; materialne decyzje przygotowawcze wymagają zatwierdzenia.',
     evidenceClass: 'DETERMINISTIC',
     validate: validateProtein,
+  },
+  {
+    toolId: 'pymeep',
+    capabilityId: 'maxwell-fdtd',
+    domain: 'ELECTRODYNAMICS',
+    engineName: 'PyMeep',
+    license: 'GPL-2.0-or-later',
+    modelDomain: 'Maxwell FDTD: normalne padanie w 1D na płaską, bezstratną granicę dielektryczną.',
+    assumptions: 'Bieżący adapter obsługuje wyłącznie jawnie zadany interfejs n₁/n₂, 1D, polaryzację Ex i materiały bezstratne/niedyspersyjne. Nie jest ogólną elektromagnetyką 2D/3D ani modelem legendy Filadelfii.',
+    evidenceClass: 'MODEL_ESTIMATE',
+    validate: validateMeep,
   },
   {
     toolId: 'admet',
@@ -166,6 +178,22 @@ let admetReferenceCache = null;
 function admetReferenceOnce() {
   if (!admetReferenceCache) admetReferenceCache = admet.referenceCase();
   return admetReferenceCache;
+}
+
+function validateMeep() {
+  const d = meep.detect();
+  if (!d.available) return { status: TOOL_STATUS.BLOCKED_BY_RUNTIME, reason: d.reason };
+  const r = meep.referenceCase();
+  if (!r.ok) return { status: TOOL_STATUS.BLOCKED_BY_RUNTIME, reason: r.reason ?? r.error };
+  const evidence = [{
+    id: r.case,
+    pass: r.pass,
+    expectedTransmittance: r.expectedTransmittance,
+    actualTransmittance: r.actualTransmittance,
+    tolerance: r.tolerance,
+    energyClosure: r.data?.energyClosure ?? null,
+  }];
+  return { status: r.pass ? TOOL_STATUS.AVAILABLE : TOOL_STATUS.VALIDATION_FAILED, version: r.version, engine: `PyMeep ${r.version}`, evidence };
 }
 
 function validateAdmet() {

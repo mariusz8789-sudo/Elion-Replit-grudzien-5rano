@@ -179,6 +179,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     params.divergence = true;
     return request('classical-mechanics', 'universe-three-body', 'graph', ['preset', 'horizonTime', 'divergence']);
   }
+  if (/(?:meep|fdtd|różnic skończon[a-ząćęłńóśźż]* w dziedzinie czasu|roznic skonczon[a-ząćęłńóśźż]* w dziedzinie czasu|granica dielektryczn[a-ząćęłńóśźż]*|transmisj[a-ząćęłńóśźż]* fresnela|refleksj[a-ząćęłńóśźż]* fresnela|maxwell.*dielektryk|dielektryk.*maxwell)/.test(normalized)) {
+    return request('electrodynamics', 'electrodynamics-maxwell-fdtd', 'graph', ['n1', 'n2', 'frequency', 'resolution']);
+  }
   if (/(?:tesla|silnik indukcyjny|prąd przemienny|prad przemienny|układ wielofazowy|uklad wielofazowy)/.test(normalized)) {
     return request('electrodynamics', undefined, 'graph', []);
   }

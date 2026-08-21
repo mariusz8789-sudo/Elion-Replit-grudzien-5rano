@@ -17,6 +17,7 @@
 
 import * as core from './core.bundle.mjs';
 import { detect as rdkitDetect, descriptors as rdkitDescriptors, validate as rdkitValidate } from './rdkitAdapter.mjs';
+import { detect as meepDetect, interfaceTransmission as meepInterfaceTransmission } from './meepAdapter.mjs';
 
 const SOLAR_MASS_KG = 1.989e30;
 
@@ -374,6 +375,71 @@ const MODELS = [
       if (!det.available) return { ok: false, error: 'capability_unavailable', message: `RDKit niedostępny (${det.reason}). Zainstaluj: pip install rdkit.` };
       const val = rdkitValidate(v.smiles);
       return val.ok ? { ok: true } : { ok: false, error: 'invalid_smiles', message: 'Nieprawidłowy SMILES.' };
+    },
+  },
+
+  {
+    id: 'electrodynamics-maxwell-fdtd',
+    name: 'Transmisja fali elektromagnetycznej FDTD (PyMeep)',
+    domain: 'electrodynamics',
+    version: '1.0.0',
+    description: 'Rzeczywista symulacja Maxwell/FDTD normalnego padania na bezstratną, płaską granicę dwóch dielektryków przez PyMeep.',
+    inputs: [
+      { id: 'n1', label: 'Współczynnik załamania ośrodka 1', unit: '', min: 1, max: 4, default: 1 },
+      { id: 'n2', label: 'Współczynnik załamania ośrodka 2', unit: '', min: 1, max: 4, default: 2 },
+      { id: 'frequency', label: 'Częstotliwość Meep', unit: 'c / jednostka długości', min: 0.2, max: 2, default: 1 },
+      { id: 'resolution', label: 'Rozdzielczość FDTD', unit: 'piksele / jednostka długości', min: 40, max: 160, default: 80 },
+    ],
+    outputs: [
+      { id: 'computedTransmittance', label: 'Transmitancja mocy FDTD T', unit: '' },
+      { id: 'computedReflectance', label: 'Reflektancja mocy FDTD R', unit: '' },
+      { id: 'analyticTransmittance', label: 'Transmitancja Fresnela T', unit: '' },
+      { id: 'analyticReflectance', label: 'Reflektancja Fresnela R', unit: '' },
+      { id: 'transmittanceAbsoluteError', label: 'Błąd bezwzględny T', unit: '' },
+      { id: 'reflectanceAbsoluteError', label: 'Błąd bezwzględny R', unit: '' },
+      { id: 'energyClosure', label: 'Domknięcie energii R+T', unit: '' },
+      { id: 'incidentFlux', label: 'Strumień fali padającej', unit: 'jednostki Meep' },
+      { id: 'reflectedFlux', label: 'Strumień fali odbitej', unit: 'jednostki Meep' },
+    ],
+    assumptions: 'Dwa jednorodne, bezstratne i niedyspersyjne dielektryki; płaska granica, normalne padanie, 1D oraz polaryzacja Ex. Transmisja jest liczona jako 1−R tylko dlatego, że ośrodki są jawnie zadane jako bezstratne.',
+    validity: 'Wyłącznie 1D planarnej granicy dielektrycznej w zakresie 1≤n₁,n₂≤4, częstotliwości Meep 0,2–2 i rozdzielczości 40–160. Nie jest to symulacja 2D/3D, materiałów dyspersyjnych, metamateriałów, ekranowania okrętu ani teleportacji.',
+    provenance: {
+      source: 'compute/meep_worker.py via compute/meepAdapter.mjs',
+      formula: 'Maxwell FDTD + reflected-flux incident-field subtraction; analytical check T=4n₁n₂/(n₁+n₂)²',
+      honesty: 'real_external_engine',
+      engine: 'PyMeep',
+      requiredEnvironmentVariable: 'GENESIS_MEEP_PYTHON',
+    },
+    stochastic: false,
+    backendExecutable: true,
+    kind: 'external-engine',
+    validate() {
+      const runtime = meepDetect();
+      return runtime.available
+        ? { ok: true }
+        : { ok: false, error: 'capability_unavailable', message: `PyMeep niedostępny (${runtime.reason}). Skonfiguruj GENESIS_MEEP_PYTHON do zwalidowanego interpretera PyMeep.` };
+    },
+    execute(values) {
+      const result = meepInterfaceTransmission(values);
+      if (!result.ok) throw new Error(result.error + (result.reason ? `: ${result.reason}` : ''));
+      const data = result.data;
+      return {
+        outputs: {
+          computedTransmittance: data.computedTransmittance,
+          computedReflectance: data.computedReflectance,
+          analyticTransmittance: data.analyticTransmittance,
+          analyticReflectance: data.analyticReflectance,
+          transmittanceAbsoluteError: data.transmittanceAbsoluteError,
+          reflectanceAbsoluteError: data.reflectanceAbsoluteError,
+          energyClosure: data.energyClosure,
+          incidentFlux: data.incidentFlux,
+          reflectedFlux: data.reflectedFlux,
+        },
+        warnings: [
+          `PyMeep ${result.version}; ${result.meta.measurement}.`,
+          'Wynik dotyczy wyłącznie zadanej granicy dielektrycznej. Nie jest modelem niewidzialności, teleportacji ani legendy Filadelfii.',
+        ],
+      };
     },
   },
 

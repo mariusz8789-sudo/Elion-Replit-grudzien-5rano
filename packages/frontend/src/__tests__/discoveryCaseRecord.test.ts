@@ -3,6 +3,7 @@ import {
   analyseExperimentSeries,
   createDiscoveryCaseRecord,
   createGenesisResearchPacket,
+  createScientificReviewDecision,
   createScenarioCapsule,
   designScientificExperiment,
   executeScientificExperiment,
@@ -10,8 +11,10 @@ import {
   parseScienceChatMessage,
   replayDiscoveryCaseRecord,
   replayScenarioCapsule,
+  replayScientificReviewDecision,
   selectNextScientificExperiment,
   serializeDiscoveryCaseRecord,
+  serializeScientificReviewDecision,
 } from '../core/experimentFabric';
 
 function realSchwarzschildArtifacts() {
@@ -85,6 +88,35 @@ describe('Genesis Discovery Case Record', () => {
     });
   });
 
+  it('records an explicitly declared human review for a real review-ready case without approving a protocol', () => {
+    const artifacts = realSchwarzschildArtifacts();
+    const research = createGenesisResearchPacket('czarna dziura Schwarzschilda');
+    const record = createDiscoveryCaseRecord({ research, ...artifacts });
+    const input = {
+      reviewerReference: 'reviewer:independent-scientist-01',
+      reviewedAt: '2026-08-22T01:30:00.000Z',
+      decision: 'ACCEPT_FOR_PREREGISTRATION' as const,
+      rationale: 'Obserwacja jest source-bound, odtwarzalna i kwalifikuje się wyłącznie do niezależnej prerejestracji follow-up.',
+    };
+    const review = createScientificReviewDecision(record, input);
+    const replay = replayScientificReviewDecision(record, input);
+
+    expect(review).toMatchObject({
+      decision: 'ACCEPT_FOR_PREREGISTRATION',
+      caseId: record.caseId,
+      caseFingerprint: record.caseFingerprint,
+      candidateFingerprint: record.candidate.selectionFingerprint,
+      evidenceFingerprint: record.evidence.provenanceFingerprint,
+      provenance: {
+        reviewerIdentity: 'DECLARED_NOT_VERIFIED',
+        caseStatusAtReview: 'READY_FOR_REVIEW',
+      },
+    });
+    expect(JSON.parse(serializeScientificReviewDecision(review)).reviewId).toBe(review.reviewId);
+    expect(replay.reviewFingerprint).toBe(review.reviewFingerprint);
+    expect(review.disclaimer).toContain('nie uruchamia eksperymentu');
+  });
+
   it('blocks a case record when research does not cover the Evidence Chain domain', () => {
     const artifacts = realSchwarzschildArtifacts();
     const unrelatedResearch = createGenesisResearchPacket('Tesla silnik indukcyjny');
@@ -98,6 +130,12 @@ describe('Genesis Discovery Case Record', () => {
       title: 'Blocked discovery case',
       baselineRun: artifacts.evidence.allRuns[0],
       discoveryCase: record,
+    })).toThrow('READY_FOR_REVIEW');
+    expect(() => createScientificReviewDecision(record, {
+      reviewerReference: 'reviewer:independent-scientist-01',
+      reviewedAt: '2026-08-22T01:30:00.000Z',
+      decision: 'RETURN_FOR_MORE_EVIDENCE',
+      rationale: 'Brak zgodnego source-bound case nie pozwala rozpocząć review.',
     })).toThrow('READY_FOR_REVIEW');
   });
 });

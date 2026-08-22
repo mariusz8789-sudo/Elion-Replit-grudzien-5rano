@@ -131,6 +131,15 @@ export {
   type ScientificHypothesisCandidate,
 } from './scientificHypothesisCandidate';
 export {
+  SCIENTIFIC_REVIEW_DECISION_VERSION,
+  createScientificReviewDecision,
+  serializeScientificReviewDecision,
+  replayScientificReviewDecision,
+  type ScientificReviewDecisionKind,
+  type ScientificReviewDecisionInput,
+  type ScientificReviewDecision,
+} from './scientificReviewDecision';
+export {
   SEEDED_UNCERTAINTY_VERSION,
   MAX_PREREGISTERED_SEEDS,
   isSeededStochasticModel,

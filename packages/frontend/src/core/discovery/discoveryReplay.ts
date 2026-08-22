@@ -55,8 +55,10 @@ function rerunArm(arm: DiscoveryArm, record: DiscoveryCase): ScenarioRun {
   return runScenario(arm.scenario, {
     days: record.initialConditions.days,
     stepsPerDay: record.initialConditions.stepsPerDay,
-    baseParams: arm.run.params,
-    baseHospital: arm.run.hospitalCapacity,
+    baseParams: arm.run.preInterventionParams,
+    overrideParams: arm.run.params,
+    baseHospital: arm.run.preInterventionHospital,
+    interventionStartDay: arm.run.interventionStartDay,
   });
 }
 

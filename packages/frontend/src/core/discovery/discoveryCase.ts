@@ -168,15 +168,56 @@ export interface DiscoveryModelIdentity {
   domainId: string;
 }
 
+/** Wejście sweepu jednego parametru — kontrakt wejściowy, nie wynik. */
+export interface SweepSpec {
+  question: string;
+  scenario: ScenarioId;
+  parameter: string;
+  values: readonly number[];
+  initialConditions: DiscoveryInitialConditions;
+  baseParams?: Partial<EpidemicCityParams>;
+  hospitalCapacity?: HospitalCapacityParams;
+}
+
+/** Wejście sweepu momentu wejścia interwencji w życie. */
+export interface TimingSweepSpec {
+  question: string;
+  scenario: ScenarioId;
+  startDays: readonly number[];
+  initialConditions: DiscoveryInitialConditions;
+  baseParams?: Partial<EpidemicCityParams>;
+  hospitalCapacity?: HospitalCapacityParams;
+}
+
+/** Wejście przebiegu wielokrotnego po ziarnach. */
+export interface MultiRunSpec {
+  question: string;
+  scenario: ScenarioId;
+  seeds: readonly number[];
+  initialConditions: Omit<DiscoveryInitialConditions, 'seed'>;
+  baseParams?: Partial<EpidemicCityParams>;
+  hospitalCapacity?: HospitalCapacityParams;
+}
+
+/**
+ * Wykonywalne wejście kolejnego eksperymentu. Follow-up nie jest zdaniem do
+ * przeczytania — jest kompletnym wsadem, który da się od razu uruchomić.
+ */
+export type DiscoveryFollowUpPlan =
+  | { kind: 'scenario-comparison'; spec: DiscoveryCaseSpec }
+  | { kind: 'parameter-sweep'; spec: SweepSpec }
+  | { kind: 'intervention-timing'; spec: TimingSweepSpec }
+  | { kind: 'multi-seed'; spec: MultiRunSpec };
+
 /** Propozycja kolejnego eksperymentu — wykonywalna, nie opisowa. */
 export interface DiscoveryFollowUp {
   question: string;
+  /** Co w TEJ sprawie uzasadnia akurat ten następny krok. */
   rationale: string;
   /** Wypełnione, gdy follow-up da się uruchomić na tym modelu. */
-  spec: DiscoveryCaseSpec | null;
+  plan: DiscoveryFollowUpPlan | null;
   /** Wypełnione, gdy modelowi brakuje dźwigni. */
   notModeledReason?: string;
-  kind: 'scenario-comparison' | 'parameter-sweep' | 'multi-seed';
 }
 
 export interface DiscoveryEvidencePack {

@@ -1,9 +1,11 @@
 import { canonicalJson, fnv1a } from '../events/hash';
-import { DEFAULT_HOSPITAL_CAPACITY, type HospitalCapacityParams } from '../simulation/hospitalResource';
+import { DEFAULT_HOSPITAL_CAPACITY } from '../simulation/hospitalResource';
+import { DEFAULT_CITY_PARAMS } from '../simulation/epidemicCity';
 import { SCENARIOS, runScenario, type ScenarioId, type ScenarioRun, type ScenarioSummary } from '../simulation/scenarioEngine';
-import type { EpidemicCityParams } from '../simulation/epidemicCity';
 import { DISCOVERY_LIMITATIONS, DISCOVERY_METRIC_KEYS, discoveryModelIdentity, type DiscoveryMetricKey } from './discoveryExecution';
-import type { DiscoveryInitialConditions, DiscoveryModelIdentity } from './discoveryCase';
+import type { DiscoveryModelIdentity, SweepSpec, TimingSweepSpec } from './discoveryCase';
+
+export type { SweepSpec, TimingSweepSpec };
 
 /**
  * PARAMETER SWEEP — jeden REALNY przebieg na każdy punkt.
@@ -64,16 +66,6 @@ export const NON_SWEEPABLE_PARAMETERS: Readonly<Record<string, string>> = {
   nAgents: 'Zmiana populacji zmienia świat, a nie ustawienie interwencji; przebiegi przestałyby być porównywalne między punktami.',
   initialInfected: 'Zmiana liczby początkowo zakażonych zmienia warunki początkowe, a nie badaną dźwignię.',
 };
-
-export interface SweepSpec {
-  question: string;
-  scenario: ScenarioId;
-  parameter: string;
-  values: readonly number[];
-  initialConditions: DiscoveryInitialConditions;
-  baseParams?: Partial<EpidemicCityParams>;
-  hospitalCapacity?: HospitalCapacityParams;
-}
 
 export interface SweepPoint {
   value: number;
@@ -274,5 +266,116 @@ export function runParameterSweep(spec: SweepSpec): SweepResult {
         }
       : {}),
     message: `Wykonano ${completed.length} z ${points.length} punktów, każdy jako osobny przebieg modelu.`,
+  };
+}
+
+/**
+ * SWEEP MOMENTU INTERWENCJI — kiedy polityka wchodzi w życie.
+ *
+ * To osobna dźwignia od siły polityki: model dostaje zmianę parametru w trakcie
+ * przebiegu, więc „ta sama izolacja od dnia 3" i „od dnia 20" to dwa różne,
+ * policzalne światy. Każdy punkt to znów jeden realny przebieg.
+ */
+export function runInterventionTimingSweep(spec: TimingSweepSpec): SweepResult {
+  const model = discoveryModelIdentity();
+  const sweepId = `timing_${fnv1a(canonicalJson({
+    v: SWEEP_VERSION,
+    scenario: spec.scenario,
+    startDays: spec.startDays,
+    initialConditions: spec.initialConditions,
+    baseParams: spec.baseParams ?? null,
+    hospitalCapacity: spec.hospitalCapacity ?? null,
+  }))}`;
+  const shell = {
+    contractVersion: SWEEP_VERSION,
+    sweepId,
+    question: spec.question,
+    model,
+    scenario: spec.scenario,
+    parameter: 'interventionStartDay',
+    points: [] as readonly SweepPoint[],
+    monotonicity: [] as readonly SweepMonotonicity[],
+    limitations: DISCOVERY_LIMITATIONS,
+  };
+
+  const definition = SCENARIOS[spec.scenario];
+  if (definition.notModeledReason !== undefined) {
+    return { ...shell, status: 'NOT_MODELED', message: `${definition.label}: ${definition.notModeledReason}` };
+  }
+  // Sama obecność nadpisania nie wystarczy: liczy się, czy różni się ono od
+  // wartości bazowej. BASELINE deklaruje restrictions=0, co przy domyślnej
+  // bazie nie jest żadną interwencją i nie ma czego opóźniać.
+  const effectiveBase = { ...DEFAULT_CITY_PARAMS, ...spec.baseParams };
+  const effectiveHospital = spec.hospitalCapacity ?? DEFAULT_HOSPITAL_CAPACITY;
+  const changesEpidemic = Object.entries(definition.epidemicOverrides)
+    .some(([key, value]) => effectiveBase[key as keyof typeof effectiveBase] !== value);
+  const changesHospital = Object.entries(definition.hospitalOverrides)
+    .some(([key, value]) => (effectiveHospital as unknown as Record<string, unknown>)[key] !== value);
+  if (!changesEpidemic && !changesHospital) {
+    return {
+      ...shell,
+      status: 'BLOCKED_INVALID_PARAMETER',
+      message: `Scenariusz „${definition.label}" nie wprowadza żadnej interwencji wobec tych warunków bazowych, więc moment jej wejścia w życie nie ma znaczenia.`,
+    };
+  }
+  if (spec.startDays.length < 2) {
+    return { ...shell, status: 'BLOCKED_NOT_ENOUGH_POINTS', message: 'Sweep momentu interwencji wymaga co najmniej dwóch dni startu.' };
+  }
+
+  const points: SweepPoint[] = spec.startDays.map((day) => {
+    if (!Number.isInteger(day) || day < 0 || day > spec.initialConditions.days) {
+      return {
+        value: day,
+        status: 'INVALID_VALUE',
+        inputFingerprint: null,
+        runFingerprint: null,
+        summary: null,
+        reason: `Dzień startu musi być całkowity i mieścić się w horyzoncie przebiegu [0, ${spec.initialConditions.days}].`,
+      };
+    }
+    const run = runScenario(spec.scenario, {
+      days: spec.initialConditions.days,
+      stepsPerDay: spec.initialConditions.stepsPerDay,
+      baseParams: {
+        ...spec.baseParams,
+        nAgents: spec.initialConditions.nAgents,
+        initialInfected: spec.initialConditions.initialInfected,
+        seed: spec.initialConditions.seed,
+      },
+      baseHospital: spec.hospitalCapacity ?? DEFAULT_HOSPITAL_CAPACITY,
+      interventionStartDay: day,
+    });
+    if (run.interventionStartDay !== day) {
+      return {
+        value: day,
+        status: 'VALUE_NOT_APPLIED',
+        inputFingerprint: run.inputFingerprint,
+        runFingerprint: null,
+        summary: null,
+        reason: `Model wystartował interwencję w dniu ${run.interventionStartDay}, a nie ${day}.`,
+      };
+    }
+    return {
+      value: day,
+      status: run.status === 'COMPLETED' ? 'COMPLETED' : 'NOT_EXECUTED',
+      inputFingerprint: run.inputFingerprint,
+      runFingerprint: run.resultFingerprint,
+      summary: run.summary,
+      ...(run.status === 'COMPLETED' ? {} : { reason: run.notModeledReason ?? 'Przebieg nie zakończył się wynikiem.' }),
+    };
+  });
+
+  const completed = points.filter((p) => p.status === 'COMPLETED');
+  const monotonicity = DISCOVERY_METRIC_KEYS.map((metric) => {
+    const values = completed.map((p) => p.summary![metric]);
+    return { metric, verdict: monotonicityOf(values), values };
+  });
+
+  return {
+    ...shell,
+    status: 'COMPLETED',
+    points,
+    monotonicity,
+    message: `Wykonano ${completed.length} z ${points.length} momentów startu, każdy jako osobny przebieg modelu.`,
   };
 }

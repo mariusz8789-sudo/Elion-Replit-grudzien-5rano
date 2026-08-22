@@ -1,9 +1,10 @@
 import { canonicalJson, fnv1a } from '../events/hash';
-import { DEFAULT_HOSPITAL_CAPACITY, type HospitalCapacityParams } from '../simulation/hospitalResource';
+import { DEFAULT_HOSPITAL_CAPACITY } from '../simulation/hospitalResource';
 import { runScenario, type ScenarioId, type ScenarioSummary } from '../simulation/scenarioEngine';
-import type { EpidemicCityParams } from '../simulation/epidemicCity';
 import { DISCOVERY_LIMITATIONS, DISCOVERY_METRIC_KEYS, discoveryModelIdentity, type DiscoveryMetricKey } from './discoveryExecution';
-import type { DiscoveryInitialConditions, DiscoveryModelIdentity } from './discoveryCase';
+import type { DiscoveryModelIdentity, MultiRunSpec } from './discoveryCase';
+
+export type { MultiRunSpec };
 
 /**
  * MULTI-RUN — ten sam scenariusz na wielu ziarnach.
@@ -20,15 +21,6 @@ import type { DiscoveryInitialConditions, DiscoveryModelIdentity } from './disco
  */
 
 export const MULTI_RUN_VERSION = '1.0.0';
-
-export interface MultiRunSpec {
-  question: string;
-  scenario: ScenarioId;
-  seeds: readonly number[];
-  initialConditions: Omit<DiscoveryInitialConditions, 'seed'>;
-  baseParams?: Partial<EpidemicCityParams>;
-  hospitalCapacity?: HospitalCapacityParams;
-}
 
 export interface MultiRunSeedResult {
   seed: number;

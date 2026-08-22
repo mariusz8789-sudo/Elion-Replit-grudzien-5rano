@@ -141,6 +141,15 @@ export interface ScenarioRunOptions {
    * widoczne w odcisku wejścia.
    */
   overrideParams?: Partial<EpidemicCityParams>;
+  /**
+   * Dzień, od którego interwencja wchodzi w życie. Przed nim świat biegnie bez
+   * niej. Pominięty albo 0 = interwencja obowiązuje od początku.
+   *
+   * To realna dźwignia czasu, nie kosmetyka: model dostaje zmianę parametru w
+   * trakcie przebiegu przez `setParam`, więc wcześniejsze i późniejsze
+   * uruchomienie tej samej polityki daje różne, policzalne wyniki.
+   */
+  interventionStartDay?: number;
 }
 
 export const DEFAULT_SCENARIO_RUN: Required<Pick<ScenarioRunOptions, 'days' | 'stepsPerDay'>> = {
@@ -184,6 +193,15 @@ export interface ScenarioRun {
   hospitalCapacity: HospitalCapacityParams;
   days: number;
   stepsPerDay: number;
+  /** Dzień wejścia interwencji w życie; 0 = od początku przebiegu. */
+  interventionStartDay: number;
+  /**
+   * Parametry obowiązujące PRZED interwencją. Równe `params`, gdy interwencja
+   * działa od początku. Zapisane, bo bez nich opóźnionego przebiegu nie dałoby
+   * się odtworzyć — replay musiałby zgadywać stan sprzed zmiany.
+   */
+  preInterventionParams: EpidemicCityParams;
+  preInterventionHospital: HospitalCapacityParams;
   /** Odcisk WEJŚCIA: identyczny odcisk => identyczne warunki startowe. */
   inputFingerprint: string;
   /** Odcisk WYNIKU: podstawa dowodu odtwarzalności. Pusty dla NOT_MODELED. */
@@ -207,19 +225,43 @@ function resolveHospital(def: ScenarioDefinition, base: HospitalCapacityParams =
 }
 
 /**
+ * Wartości dźwigni scenariusza sprzed interwencji — czyli to, co model miałby
+ * bez tej polityki. Bierzemy je z bazy, a nie zgadujemy „stanu neutralnego".
+ */
+function pickBaseValues(def: ScenarioDefinition, options: ScenarioRunOptions): Partial<EpidemicCityParams> {
+  const base = { ...DEFAULT_CITY_PARAMS, ...options.baseParams };
+  const out: Record<string, number | boolean> = {};
+  for (const key of [...Object.keys(def.epidemicOverrides), ...Object.keys(options.overrideParams ?? {})]) {
+    out[key] = base[key as keyof EpidemicCityParams];
+  }
+  return out as Partial<EpidemicCityParams>;
+}
+
+/**
  * Uruchamia nazwany scenariusz na realnym modelu.
  *
  * Scenariusz nadpisuje wyłącznie parametry; cała dynamika pochodzi z
  * `EpidemicCitySimulation`. Przy tym samym ziarnie wynik jest identyczny.
  */
+/**
+ * Parametry, których nie da się zmienić w trakcie przebiegu: model przesiewa na
+ * nich świat od nowa, więc opóźniona interwencja przestałaby być tym samym
+ * eksperymentem.
+ */
+const STRUCTURAL_PARAMS: readonly (keyof EpidemicCityParams)[] = ['nAgents', 'initialInfected', 'seed'];
+
 export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions = {}): ScenarioRun {
   const def = SCENARIOS[scenarioId];
   const days = options.days ?? DEFAULT_SCENARIO_RUN.days;
   const stepsPerDay = Math.max(1, Math.floor(options.stepsPerDay ?? DEFAULT_SCENARIO_RUN.stepsPerDay));
   const params = resolveParams(def, options.baseParams, options.overrideParams);
   const hospitalCapacity = resolveHospital(def, options.baseHospital);
+  const interventionStartDay = Math.max(0, Math.floor(options.interventionStartDay ?? 0));
+  const timed = interventionStartDay > 0;
+  const preInterventionParams: EpidemicCityParams = timed ? { ...params, ...pickBaseValues(def, options) } : params;
+  const preInterventionHospital = timed ? (options.baseHospital ?? DEFAULT_HOSPITAL_CAPACITY) : hospitalCapacity;
   const inputFingerprint = fnv1a(
-    canonicalJson({ v: SCENARIO_ENGINE_VERSION, scenarioId, params, hospitalCapacity, days, stepsPerDay }),
+    canonicalJson({ v: SCENARIO_ENGINE_VERSION, scenarioId, params, hospitalCapacity, days, stepsPerDay, interventionStartDay }),
   );
 
   const shell: Omit<ScenarioRun, 'status' | 'series' | 'summary' | 'resultFingerprint'> = {
@@ -230,6 +272,9 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
     hospitalCapacity,
     days,
     stepsPerDay,
+    interventionStartDay,
+    preInterventionParams,
+    preInterventionHospital,
     inputFingerprint,
   };
 
@@ -245,11 +290,34 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
     };
   }
 
-  const sim = new EpidemicCitySimulation(params);
+  // Zmiany strukturalne przesiewają świat, więc nie da się ich włączyć w trakcie.
+  // Liczy się faktyczna różnica przed/po, a nie samo wymienienie klucza.
+  const timedStructural = timed
+    ? STRUCTURAL_PARAMS.filter((key) => preInterventionParams[key] !== params[key])
+    : [];
+  if (timedStructural.length > 0) {
+    return {
+      ...shell,
+      status: 'NOT_MODELED',
+      resultFingerprint: null,
+      series: [],
+      summary: null,
+      notModeledReason: `Opóźniona interwencja nie może zmieniać parametrów strukturalnych (${timedStructural.join(', ')}) — model przesiewa dla nich świat od nowa, więc przebieg przestałby być porównywalny.`,
+    };
+  }
+
+  const sim = new EpidemicCitySimulation(preInterventionParams);
   const dt = 1 / stepsPerDay;
   const series: ScenarioDaySample[] = [];
+  let interventionApplied = !timed;
 
   for (let day = 1; day <= days; day++) {
+    if (timed && !interventionApplied && day >= interventionStartDay) {
+      for (const [key, value] of Object.entries(params)) {
+        if (preInterventionParams[key as keyof EpidemicCityParams] !== value) sim.setParam(key, value as number | boolean);
+      }
+      interventionApplied = true;
+    }
     for (let step = 0; step < stepsPerDay; step++) sim.tick(dt);
     const s = sim.stats();
     series.push({
@@ -261,7 +329,10 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
       deceased: s.D,
       isolated: s.izolowani,
       hospitalized: s.hospitalizowani,
-      hospital: evaluateHospitalState({ day: s.dzien, hospitalizedNow: s.hospitalizowani }, hospitalCapacity),
+      hospital: evaluateHospitalState(
+        { day: s.dzien, hospitalizedNow: s.hospitalizowani },
+        interventionApplied ? hospitalCapacity : preInterventionHospital,
+      ),
     });
   }
 
@@ -325,11 +396,15 @@ export function replayScenario(run: ScenarioRun): ScenarioReplay {
       message: 'Scenariusz nie jest modelowany — nie ma czego odtwarzać.',
     };
   }
+  // Odtworzenie musi wyjść od stanu SPRZED interwencji i dołożyć ją w tym samym
+  // dniu — inaczej opóźniony przebieg zostałby odtworzony jako natychmiastowy.
   const replayed = runScenario(run.scenarioId, {
     days: run.days,
     stepsPerDay: run.stepsPerDay,
-    baseParams: run.params,
-    baseHospital: run.hospitalCapacity,
+    baseParams: run.preInterventionParams,
+    overrideParams: run.params,
+    baseHospital: run.preInterventionHospital,
+    interventionStartDay: run.interventionStartDay,
   });
   const matched = replayed.resultFingerprint === run.resultFingerprint;
   return {

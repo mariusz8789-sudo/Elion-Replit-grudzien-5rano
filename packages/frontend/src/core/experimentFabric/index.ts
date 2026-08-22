@@ -83,6 +83,8 @@ export {
   type HypothesisAssessment,
   type ExperimentArmKind,
   type ReproductionVerdict,
+  type HypothesisKnowledgeReference,
+  type HypothesisKnowledgeReferenceInput,
   type FalsificationCriterion,
   type ScientificHypothesis,
   type ExperimentArm,
@@ -97,7 +99,21 @@ export {
 } from './scientificDiscovery';
 
 export { designScientificExperiment } from './scientificPlanner';
+export {
+  SCIENTIFIC_HYPOTHESIS_EVIDENCE_VERSION,
+  resolveHypothesisKnowledgeReferences,
+} from './scientificHypothesisEvidence';
 export { executeScientificExperiment } from './scientificExecutor';
+export {
+  SCIENTIFIC_NEXT_EXPERIMENT_VERSION,
+  selectNextScientificExperiment,
+  replayNextScientificExperimentSelection,
+  type NextExperimentSelectionStatus,
+  type CandidateEligibilityStatus,
+  type NextExperimentCandidateEvaluation,
+  type NextExperimentSelection,
+  type NextExperimentSelectionInput,
+} from './scientificNextExperiment';
 export {
   SCIENTIFIC_BACKEND_EXECUTOR_VERSION,
   executeScientificExperimentOnBackend,

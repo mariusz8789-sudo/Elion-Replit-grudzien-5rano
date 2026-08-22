@@ -16,6 +16,34 @@ export interface FalsificationCriterion {
   rationale: string;
 }
 
+/**
+ * An immutable, source-bound reference used to justify a preregistered
+ * hypothesis. It records existing Registry metadata only; it never turns a
+ * source into a calculation, a solver capability or a scientific conclusion.
+ */
+export interface HypothesisKnowledgeReference {
+  referenceId: string;
+  kind: 'knowledge-corpus' | 'supplemental-knowledge';
+  domainId: string;
+  title: string;
+  epistemicStatus: 'CORPUS_REFERENCE' | 'FACT' | 'MODEL' | 'THEORY' | 'HYPOTHESIS';
+  source: {
+    title: string;
+    /** Corpus-relative path or immutable public URL from an existing registry record. */
+    locator: string;
+    retrievedAt: string | null;
+  };
+  statement: string;
+  limitation: string;
+}
+
+/** Input accepted by the deterministic evidence resolver. */
+export interface HypothesisKnowledgeReferenceInput {
+  domainId: string;
+  modelId: string;
+  supplementalKnowledgeIds?: readonly string[];
+}
+
 export interface ScientificHypothesis {
   contractVersion: string;
   hypothesisId: string;
@@ -24,6 +52,8 @@ export interface ScientificHypothesis {
   domainId: string;
   assessment: HypothesisAssessment;
   knowledgeSources: readonly KnowledgeCorpusFile[];
+  /** Source-bound rationale present before the protocol is executed. */
+  knowledgeReferences: readonly HypothesisKnowledgeReference[];
   declaredAssumptions: readonly string[];
   falsification: FalsificationCriterion;
   disclaimer: string;
@@ -84,6 +114,12 @@ export interface HypothesisProposal {
   domainId: string;
   modelId: string;
   declaredAssumptions: readonly string[];
+  /**
+   * Optional IDs of already registered supplemental knowledge records.
+   * The planner validates their domain, target model and epistemic status;
+   * unknown, fictional and scenario-assumption records are rejected.
+   */
+  supplementalKnowledgeIds?: readonly string[];
   falsification: FalsificationCriterion;
 }
 

@@ -1,6 +1,7 @@
 import { canonicalJson, fnv1a } from '../events/hash';
 import { getKnowledgeDomain, knowledgeSourcesForDomain } from '../knowledge/registry';
 import { getRouterModel } from './router';
+import { resolveHypothesisKnowledgeReferences } from './scientificHypothesisEvidence';
 import { SCIENTIFIC_DISCOVERY_VERSION, type ExperimentArm, type ScientificExperimentDesign, type ScientificExperimentInput, type ScientificHypothesis } from './scientificDiscovery';
 import type { ExperimentValue, StructuredExperimentRequest } from './types';
 
@@ -50,9 +51,25 @@ export function designScientificExperiment(input: ScientificExperimentInput): Sc
     throw new Error(`repetitionsPerArm must be an integer from 1 to ${MAX_REPETITIONS}.`);
   }
 
+  // Resolve existing knowledge before building the immutable protocol fingerprint.
+  // The resolver rejects unknown, cross-domain, fictional and scenario-only
+  // records; it never generates a source or changes any model capability.
+  const knowledgeReferences = resolveHypothesisKnowledgeReferences({
+    domainId: hypothesis.domainId,
+    modelId: hypothesis.modelId,
+    supplementalKnowledgeIds: hypothesis.supplementalKnowledgeIds,
+  });
   const seed = {
     version: SCIENTIFIC_DISCOVERY_VERSION,
-    hypothesis, baselineRequest, sweep, repetitions,
+    hypothesis: {
+      statement: hypothesis.statement,
+      domainId: hypothesis.domainId,
+      modelId: hypothesis.modelId,
+      declaredAssumptions: hypothesis.declaredAssumptions,
+      falsification: hypothesis.falsification,
+      knowledgeReferences,
+    },
+    baselineRequest, sweep, repetitions,
     positiveControl: input.positiveControl ?? null,
     knowledgeSources: knowledgeSourcesForDomain(hypothesis.domainId),
   };
@@ -65,6 +82,7 @@ export function designScientificExperiment(input: ScientificExperimentInput): Sc
     domainId: hypothesis.domainId,
     assessment: 'CANDIDATE',
     knowledgeSources: knowledgeSourcesForDomain(hypothesis.domainId),
+    knowledgeReferences,
     declaredAssumptions: [...new Set([...domain.assumptions, ...hypothesis.declaredAssumptions])],
     falsification: hypothesis.falsification,
     disclaimer: 'To kandydat hipotezy w granicach wskazanego modelu. Nie jest odkryciem, dowodem przyczynowym ani predykcją poza zakresem modelu.',

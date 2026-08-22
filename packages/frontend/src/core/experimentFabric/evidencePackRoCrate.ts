@@ -59,6 +59,20 @@ export function exportEvidencePackRoCrate(pack: ScientificEvidencePack): Genesis
   const activityNodes: RoCrateGraphNode[] = [];
   const inputNodes: RoCrateGraphNode[] = [];
   const resultNodes: RoCrateGraphNode[] = [];
+  const hypothesisSourceNodes: RoCrateGraphNode[] = pack.protocol.hypothesis.knowledgeReferences.map((reference) => ({
+    '@id': `#hypothesis-source/${stableId(reference.referenceId)}`,
+    '@type': ['prov:Entity', 'CreativeWork'],
+    name: reference.title,
+    identifier: reference.referenceId,
+    'genesis:referenceKind': reference.kind,
+    'genesis:domainId': reference.domainId,
+    'genesis:epistemicStatus': reference.epistemicStatus,
+    'genesis:sourceTitle': reference.source.title,
+    'genesis:sourceLocator': reference.source.locator,
+    'genesis:retrievedAt': reference.source.retrievedAt,
+    'genesis:statement': reference.statement,
+    'genesis:limitation': reference.limitation,
+  }));
 
   for (const run of pack.runs) {
     const runActivityId = activityId(run.runId);
@@ -122,7 +136,7 @@ export function exportEvidencePackRoCrate(pack: ScientificEvidencePack): Genesis
     '@id': './',
     '@type': 'Dataset',
     name: `Genesis RO-Crate: ${pack.evidencePackId}`,
-    hasPart: [entityRef(packId), entityRef(protocolId), ...inputNodes.map((node) => entityRef(node['@id'])), ...activityNodes.map((node) => entityRef(node['@id'])), ...resultNodes.map((node) => entityRef(node['@id']))],
+    hasPart: [entityRef(packId), entityRef(protocolId), ...hypothesisSourceNodes.map((node) => entityRef(node['@id'])), ...inputNodes.map((node) => entityRef(node['@id'])), ...activityNodes.map((node) => entityRef(node['@id'])), ...resultNodes.map((node) => entityRef(node['@id']))],
     'genesis:roCrateProfileVersion': RO_CRATE_EVIDENCE_PACK_VERSION,
   });
 
@@ -149,12 +163,13 @@ export function exportEvidencePackRoCrate(pack: ScientificEvidencePack): Genesis
     'genesis:protocolFingerprint': pack.protocol.protocolFingerprint,
     'genesis:primaryMetric': pack.protocol.primaryMetric,
     'genesis:protocolAssumptions': pack.protocol.protocolAssumptions,
+    'prov:wasDerivedFrom': hypothesisSourceNodes.map((node) => entityRef(node['@id'])),
     'genesis:hypothesis': pack.protocol.hypothesis,
     'genesis:arms': pack.protocol.arms,
     'genesis:repetitionsPerArm': pack.protocol.repetitionsPerArm,
   });
 
-  graph.push(...Array.from(softwareAgents.values()), ...inputNodes, ...activityNodes, ...resultNodes);
+  graph.push(...hypothesisSourceNodes, ...Array.from(softwareAgents.values()), ...inputNodes, ...activityNodes, ...resultNodes);
 
   return {
     '@context': [

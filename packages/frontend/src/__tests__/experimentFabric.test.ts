@@ -33,6 +33,9 @@ import {
   confirmCrossDomainOrchestration,
   createAgingModelDataRequirement,
   rankAgingEvidenceCandidates,
+  resolveHypothesisKnowledgeReferences,
+  selectNextScientificExperiment,
+  replayNextScientificExperimentSelection,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -191,6 +194,144 @@ describe('Genesis Experiment Fabric', () => {
 
     const insufficient = analyseExperimentSeries(runs.slice(0, 2), 'massSolar', 'radiusKm');
     expect(insufficient.findings[0]?.verdict).toBe('INSUFFICIENT_DATA');
+  });
+
+  it('binds a preregistered hypothesis to existing source metadata without generating a citation', () => {
+    const references = resolveHypothesisKnowledgeReferences({
+      domainId: 'spacetime-einstein',
+      modelId: 'sr-lorentz',
+      supplementalKnowledgeIds: ['einstein-special-relativity'],
+    });
+
+    expect(references).toHaveLength(2);
+    expect(references[0]).toMatchObject({
+      referenceId: 'corpus:spacetime-einstein.md',
+      kind: 'knowledge-corpus',
+      epistemicStatus: 'CORPUS_REFERENCE',
+      source: { locator: 'knowledge/spacetime-einstein.md' },
+    });
+    expect(references[1]).toMatchObject({
+      referenceId: 'supplemental:einstein-special-relativity',
+      kind: 'supplemental-knowledge',
+      epistemicStatus: 'THEORY',
+      source: { locator: 'https://einsteinpapers.press.princeton.edu/', retrievedAt: '2026-08-18' },
+    });
+    expect(references[1].limitation).toContain('nie pełną dynamikę relatywistyczną');
+  });
+
+  it('embeds source-bound evidence in an immutable protocol and Evidence Pack', () => {
+    const baselineRequest = parseScienceChatMessage('Oblicz dylatację czasu dla beta=0.1.');
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'W granicach modelu Lorentza czynnik gamma rośnie wraz z beta.',
+        domainId: 'spacetime-einstein',
+        modelId: 'sr-lorentz',
+        declaredAssumptions: [],
+        supplementalKnowledgeIds: ['einstein-special-relativity'],
+        falsification: { metric: 'lorentzGammaFactor', relation: 'monotonic-increase', rationale: 'Dla beta w (0,1) gamma rośnie.' },
+      },
+      baselineRequest,
+      sweep: { parameter: 'velocityFraction', values: [0.1, 0.5, 0.8], label: 'beta' },
+      repetitionsPerArm: 1,
+    });
+    const pack = createScientificEvidencePack(executeScientificExperiment(design));
+    const crate = exportEvidencePackRoCrate(pack);
+    const protocolNode = crate['@graph'].find((node) => node.identifier === design.designId);
+    const sourceNode = crate['@graph'].find((node) => node.identifier === 'supplemental:einstein-special-relativity');
+
+    expect(design.hypothesis.knowledgeReferences.map((reference) => reference.referenceId)).toEqual([
+      'corpus:spacetime-einstein.md',
+      'supplemental:einstein-special-relativity',
+    ]);
+    expect(pack.protocol.hypothesis.knowledgeReferences).toEqual(design.hypothesis.knowledgeReferences);
+    expect(JSON.parse(serializeScientificEvidencePack(pack)).protocol.hypothesis.knowledgeReferences).toEqual(design.hypothesis.knowledgeReferences);
+    expect(sourceNode?.['genesis:epistemicStatus']).toBe('THEORY');
+    expect(sourceNode?.['genesis:sourceLocator']).toBe('https://einsteinpapers.press.princeton.edu/');
+    expect(protocolNode?.['prov:wasDerivedFrom']).toEqual([
+      { '@id': '#hypothesis-source/corpus_3Aspacetime-einstein.md' },
+      { '@id': '#hypothesis-source/supplemental_3Aeinstein-special-relativity' },
+    ]);
+  });
+
+  it('rejects supplemental knowledge that is unknown, cross-domain or not registered for the model', () => {
+    expect(() => resolveHypothesisKnowledgeReferences({
+      domainId: 'spacetime-einstein', modelId: 'sr-lorentz', supplementalKnowledgeIds: ['absent-record'],
+    })).toThrow('not registered');
+    expect(() => resolveHypothesisKnowledgeReferences({
+      domainId: 'spacetime-einstein', modelId: 'sr-lorentz', supplementalKnowledgeIds: ['chaos-sensitive-initial-conditions'],
+    })).toThrow("belongs to 'classical-mechanics'");
+    expect(() => resolveHypothesisKnowledgeReferences({
+      domainId: 'spacetime-einstein', modelId: 'sr-lorentz', supplementalKnowledgeIds: ['einstein-general-relativity-static'],
+    })).toThrow("not registered as rationale for model 'sr-lorentz'");
+  });
+
+  it('selects only an existing preregistered next protocol with unexecuted arms and replays deterministically', () => {
+    const baselineRequest = parseScienceChatMessage('Uruchom atraktor Lorenza: rho=20, horyzont=2, drugi start.');
+    const observedDesign = designScientificExperiment({
+      hypothesis: {
+        statement: 'W granicach modelu Lorenza rozjazd końcowy jest dodatni dla prerejestrowanego zakresu rho.',
+        domainId: 'classical-mechanics', modelId: 'universe-lorenz-attractor', declaredAssumptions: [],
+        falsification: { metric: 'finalSeparation', relation: 'greater-than', expectedValue: 0, rationale: 'Rozjazd dwóch startów musi pozostać dodatni.' },
+      },
+      baselineRequest,
+      sweep: { parameter: 'rho', values: [20, 28], label: 'rho' },
+      repetitionsPerArm: 1,
+    });
+    const candidateDesign = designScientificExperiment({
+      hypothesis: {
+        statement: 'W granicach modelu Lorenza rozjazd końcowy jest dodatni dla rozszerzonego prerejestrowanego zakresu rho.',
+        domainId: 'classical-mechanics', modelId: 'universe-lorenz-attractor', declaredAssumptions: [],
+        falsification: { metric: 'finalSeparation', relation: 'greater-than', expectedValue: 0, rationale: 'Rozjazd dwóch startów musi pozostać dodatni.' },
+      },
+      baselineRequest,
+      sweep: { parameter: 'rho', values: [20, 30, 35], label: 'rho' },
+      repetitionsPerArm: 1,
+    });
+    const evidence = executeScientificExperiment(observedDesign);
+    const selection = selectNextScientificExperiment({ evidence, candidates: [candidateDesign, observedDesign] });
+    const replay = replayNextScientificExperimentSelection({ evidence, candidates: [observedDesign, candidateDesign] });
+
+    expect(selection.status).toBe('SELECTED');
+    expect(selection.selectedDesign?.designId).toBe(candidateDesign.designId);
+    expect(selection.selectedDesign).toBe(candidateDesign);
+    expect(selection.candidateEvaluations.find((candidate) => candidate.candidateDesignId === candidateDesign.designId)?.novelArmCount).toBe(2);
+    expect(selection.candidateEvaluations.find((candidate) => candidate.candidateDesignId === observedDesign.designId)?.status).toBe('DUPLICATE_PROTOCOL');
+    expect(replay.selectionFingerprint).toBe(selection.selectionFingerprint);
+    expect(replay.selectedDesign?.protocolFingerprint).toBe(candidateDesign.protocolFingerprint);
+    expect(selection.disclaimer).toContain('Nie generuje hipotezy');
+  });
+
+  it('does not select a next protocol from inconclusive evidence', () => {
+    const baselineRequest = parseScienceChatMessage('Uruchom atraktor Lorenza: rho=20, horyzont=2, drugi start.');
+    const inconclusiveDesign = designScientificExperiment({
+      hypothesis: {
+        statement: 'Test nierozstrzygającej oceny.',
+        domainId: 'classical-mechanics', modelId: 'universe-lorenz-attractor', declaredAssumptions: [],
+        falsification: { metric: 'finalSeparation', relation: 'equal-within-tolerance', rationale: 'Celowo brak prerejestrowanej tolerancji.' },
+      },
+      baselineRequest,
+      sweep: { parameter: 'rho', values: [20, 28], label: 'rho' },
+      repetitionsPerArm: 1,
+    });
+    const candidateDesign = designScientificExperiment({
+      hypothesis: {
+        statement: 'Kandydat po nierozstrzygającym teście.',
+        domainId: 'classical-mechanics', modelId: 'universe-lorenz-attractor', declaredAssumptions: [],
+        falsification: { metric: 'finalSeparation', relation: 'greater-than', expectedValue: 0, rationale: 'Test.' },
+      },
+      baselineRequest,
+      sweep: { parameter: 'rho', values: [20, 35], label: 'rho' },
+      repetitionsPerArm: 1,
+    });
+
+    const selection = selectNextScientificExperiment({
+      evidence: executeScientificExperiment(inconclusiveDesign),
+      candidates: [candidateDesign],
+    });
+
+    expect(selection.status).toBe('BLOCKED_INCONCLUSIVE_EVIDENCE');
+    expect(selection.selectedDesign).toBeUndefined();
+    expect(selection.rationale).toContain('nierozstrzygający');
   });
 
   it('preregisters and executes a real Lorenz sensitivity protocol after registry-based model admission', () => {

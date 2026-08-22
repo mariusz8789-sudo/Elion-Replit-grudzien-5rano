@@ -138,10 +138,11 @@ export function HighFidelitySliceScreen() {
             <span><b>NO DATA</b> brak pomiarów i liczb eksperymentalnych</span>
             <span><b>render</b> {(stats.webgl_render_ms ?? 0).toFixed(1)} ms</span>
           </> : <>
-            <span><b>LOD0</b> {stats.hf_lod0_ready ? 'CC0 GLB gotowy' : 'CC0 GLB na żądanie'}</span>
+            <span><b>LOD0</b> {stats.hf_lod0_ready ? 'asset zweryfikowany' : 'NOT_APPROVED — fallback LOD1/2'}</span>
             <span><b>LOD1</b> {stats.hf_lod1_agents ?? 0} bliskich agentów</span>
             <span><b>LOD2</b> {stats.hf_lod2_agents ?? 0} crowd</span>
-            <span><b>PBR</b> asfalt · beton · cegła</span>
+            <span><b>ASSETS</b> {stats.hf_approved_assets ?? 0} APPROVED · {stats.hf_unverified_assets ?? 0} UNVERIFIED</span>
+            <span><b>PBR</b> bez niezweryfikowanych map</span>
             <span><b>render</b> {(stats.webgl_render_ms ?? 0).toFixed(1)} ms</span>
           </>}
         </footer>

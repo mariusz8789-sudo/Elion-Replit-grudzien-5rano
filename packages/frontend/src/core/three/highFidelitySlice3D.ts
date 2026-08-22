@@ -8,6 +8,7 @@ import type { SimParams } from '../types';
 import { HEALTH_COLORS, HumanoidAgentVisual, mapSimAgentToHumanoid, type AgentHealthState, type HumanoidAgentState } from './humanoidAgentVisual';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { createPhiladelphiaLegendVisual, type PhiladelphiaLegendViewMode, type PhiladelphiaLegendVisual } from './philadelphiaLegendVisual';
+import { approvedWorldAssetCount, isWorldAssetApproved, isWorldAssetPathApproved, unverifiedWorldAssetCount } from './assetGovernance';
 
 /** Jeden metr wizualny jest skalowany wyłącznie z odczytywanego modelu CityWorld. */
 export const HIGH_FIDELITY_WORLD_SCALE = 0.02;
@@ -309,6 +310,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       hf_lod2_agents: this.lod2?.count ?? 0,
       hf_selected_agent: this.selectedId ?? -1,
       hf_event_count: this.stream.count(),
+      hf_approved_assets: approvedWorldAssetCount(),
+      hf_unverified_assets: unverifiedWorldAssetCount(),
       sim_tick_ms: this.lastTickMs,
       webgl_fps: this.metrics.fps,
       webgl_frame_ms: this.metrics.frameMs,
@@ -419,11 +422,13 @@ export class HighFidelityStreetSlice3D implements Sim3D {
 
   /** HDRI jest CC0 assetem środowiska; nie jest mapą świata ani źródłem danych modelu. */
   private async loadHdri(renderer: THREE_NS.WebGLRenderer): Promise<void> {
+    const hdriPath = '/assets/genesis-hf/hdr/braustuble_alley_1k.hdr';
+    if (!isWorldAssetApproved(hdriPath)) return;
     try {
       const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
       if (!this.THREE || !this.scene) return;
       const pmrem = new this.THREE.PMREMGenerator(renderer);
-      new RGBELoader().load('/assets/genesis-hf/hdr/braustuble_alley_1k.hdr', (texture) => {
+      new RGBELoader().load(hdriPath, (texture) => {
         if (!this.scene) { texture.dispose(); pmrem.dispose(); return; }
         const environment = pmrem.fromEquirectangular(texture).texture;
         this.scene.environment = environment;
@@ -444,6 +449,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     repeatX: number,
     repeatY: number,
   ): void {
+    if (!isWorldAssetPathApproved(path)) return;
     const THREE = this.THREE!;
     loader.load(path, (texture) => {
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -518,6 +524,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       { id: 'hydrant', path: '/assets/genesis-hf-v2/models/fire_hydrant/fire_hydrant.gltf', position: [1.85, 0.1, -1.83], scale: 0.74 },
       ...[-5.7, -2.8, 0.2, 3.3, 6.1].map((x, index): UrbanAssetSpec => ({ id: `lamp-${index}`, path: '/assets/genesis-hf-v2/models/street_lamp_01/street_lamp_01.gltf', position: [x, 0.1, -1.92], scale: 0.88 })),
     ];
+    const approvedAssets = assets.filter((asset) => isWorldAssetApproved(asset.path));
     const loaded = new Map<string, THREE_NS.Object3D>();
     const pending = new Map<string, Promise<THREE_NS.Object3D | null>>();
     const loader = new GLTFLoader();
@@ -532,7 +539,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       pending.set(path, request);
       return request;
     };
-    await Promise.all(assets.map(async (spec) => {
+    await Promise.all(approvedAssets.map(async (spec) => {
       const prototype = await getPrototype(spec.path);
       if (!prototype) return;
       const instantiate = (source: THREE_NS.Object3D) => {
@@ -823,11 +830,16 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   private async loadHeroAsset(): Promise<void> {
+    const heroPath = '/assets/genesis-hf/characters/mpfb-lod0.glb';
+    if (!isWorldAssetApproved(heroPath)) {
+      this.heroLoadFailed = true;
+      return;
+    }
     try {
       const [{ GLTFLoader }] = await Promise.all([import('three/examples/jsm/loaders/GLTFLoader.js')]);
       if (!this.THREE || !this.scene) return;
       const loader = new GLTFLoader();
-      loader.load('/assets/genesis-hf/characters/mpfb-lod0.glb', (gltf) => {
+      loader.load(heroPath, (gltf) => {
         if (!this.THREE || !this.scene) return;
         const hero = gltf.scene;
         const bounds = new this.THREE.Box3().setFromObject(hero);

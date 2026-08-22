@@ -142,10 +142,10 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'electrodynamics', title: 'Elektrodynamika i optyka', sourceFile: 'electrodynamics.md', scale: 'micro-meso',
-    capability: 'CAPABILITY_SEAM', realModels: ['photon-energy'],
-    concepts: ['Maxwell', 'fala elektromagnetyczna', 'Lorentz', 'foton', 'promieniowanie'], parameters: ['wavelengthNm'], units: ['nm', 'THz', 'eV', 'kJ/mol'],
-    assumptions: ['Istnieje model energii fotonu; pełny solver równań Maxwella nie jest zaimplementowany.'],
-    possibleExperiments: ['oblicz energię fotonu', 'przeanalizuj promieniowanie'], requiredSolver: 'photon graph / Maxwell solver required for wave field',
+    capability: 'BACKEND_REAL_ENGINE', realModels: ['photon-energy', 'electrodynamics-maxwell-fdtd-pec-reflection'],
+    concepts: ['Maxwell', 'fala elektromagnetyczna', 'Lorentz', 'foton', 'promieniowanie', 'FDTD', 'PEC'], parameters: ['wavelengthNm', 'frequency', 'resolution'], units: ['nm', 'THz', 'eV', 'kJ/mol'],
+    assumptions: ['Istnieje model energii fotonu oraz ograniczony backendowy benchmark PyMeep FDTD: normalne padanie w 1D na idealny PEC. Nie jest to pełny solver równań Maxwella dla rzeczywistego metalu, geometrii 2D/3D, ekranowania ani obiektu fizycznego.'],
+    possibleExperiments: ['oblicz energię fotonu', 'uruchom ograniczony benchmark odbicia PEC 1D PyMeep', 'przeanalizuj promieniowanie'], requiredSolver: 'photon graph / PyMeep PEC reflection benchmark; pełny Maxwell solver wymaga odrębnego runtime’u i walidacji',
     visualization: ['numeric', 'graph'], dependencies: ['quantum', 'chemistry'], keywords: ['elektromagnetycz', 'fala', 'promieniowanie', 'foton', 'maxwell', 'optyka'],
   },
   {

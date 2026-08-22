@@ -325,7 +325,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     switch (this.cameraMode) {
       case 'city':
         // GŁÓWNY WIDOK: cały kwartał, lekko podniesiony, bez lotu ptaka.
-        return { pos: [w * 0.62, h * 0.95, h * 1.75], look: [0, 1.8, 0] };
+        return { pos: [w * 0.42, h * 0.62, h * 1.12], look: [0, 1.6, 0] };
       case 'district':
         // Analiza hotspotu — bliżej, wciąż ponad tłumem.
         return { pos: [w * 0.3, h * 0.5, h * 0.95], look: [0, 1.2, 0] };
@@ -600,7 +600,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const materials = this.materials!;
     const worldW = this.simulation.worldWidth * HIGH_FIDELITY_WORLD_SCALE;
     const worldH = this.simulation.worldHeight * HIGH_FIDELITY_WORLD_SCALE;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(worldW + 2, worldH + 2), new THREE.MeshStandardMaterial({ color: 0x4e5450, roughness: 0.96 }));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(worldW * 9, worldH * 9), new THREE.MeshStandardMaterial({ color: 0x4e5450, roughness: 0.96 }));
 
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;

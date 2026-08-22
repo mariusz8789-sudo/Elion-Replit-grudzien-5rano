@@ -110,6 +110,13 @@ async function main(): Promise<void> {
   assert(secondPacket.status === 200, `Second packet request failed: ${JSON.stringify(secondPacket)}`);
   assert(secondPacket.body.packet.packetFingerprint !== firstPacket.body.packet.packetFingerprint, 'Changed material version must change packet fingerprint.');
   assert(secondPacket.body.packet.sources[0].contentSha256 === versionTwo.body.material.contentSha256, 'Packet must bind current material version SHA-256.');
+  const historicalReplay = await request<{ replay: { status: string; replayedPacketFingerprint: string; packet: PacketResult['packet'] } }>(`/api/projects/${projectId}/research-packet`, {
+    method: 'POST', token: owner.body.token, body: { packet: firstPacket.body.packet },
+  });
+  assert(historicalReplay.status === 200, `Historical replay failed: ${JSON.stringify(historicalReplay)}`);
+  assert(historicalReplay.body.replay.status === 'MATCH', 'Historical source-version replay must match the original packet.');
+  assert(historicalReplay.body.replay.replayedPacketFingerprint === firstPacket.body.packet.packetFingerprint, 'Historical replay fingerprint must bind version 1.');
+  assert(historicalReplay.body.replay.packet.sources[0].materialVersion === 1, 'Historical replay must resolve material version 1, not current version 2.');
 
   const membership = await request(`/api/projects/${projectId}/members`, {
     method: 'POST', token: owner.body.token, body: { email: viewer.body.user.email, role: 'viewer' },
@@ -126,6 +133,8 @@ async function main(): Promise<void> {
     sourceReference: secondPacket.body.packet.sources[0].referenceId,
     firstPacketFingerprint: firstPacket.body.packet.packetFingerprint,
     secondPacketFingerprint: secondPacket.body.packet.packetFingerprint,
+    historicalReplayStatus: historicalReplay.body.replay.status,
+    historicalReplayFingerprint: historicalReplay.body.replay.replayedPacketFingerprint,
     sourceContentSha256: secondPacket.body.packet.sources[0].contentSha256,
     sourceVersion: secondPacket.body.packet.sources[0].materialVersion,
     solverEffect: secondPacket.body.packet.solverEffect,

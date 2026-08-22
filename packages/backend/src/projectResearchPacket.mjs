@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 export const PROJECT_RESEARCH_PACKET_VERSION = '1.0.0';
 export const MAX_PROJECT_RESEARCH_QUERY_LENGTH = 500;
 export const MAX_PROJECT_RESEARCH_EXCERPT_LENGTH = 900;
+export const PROJECT_RESEARCH_REPLAY_VERSION = '1.0.0';
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
@@ -92,6 +93,57 @@ export function createProjectResearchPacket({ projectId, query, materials }) {
     packetFingerprint,
     solverEffect: 'NONE',
     disclaimer: 'Project Research Packet zawiera wyłącznie uprawnione, wersjonowane referencje do materiałów projektu i ograniczone excerpty. Nie jest RAG-generowaną odpowiedzią, naukowym claimem, pełnym eksportem źródła, zmianą capability solvera ani wynikiem obliczeń. Każdy eksperyment nadal wymaga osobnego, prerejestrowanego protokołu i realnego execution.',
+  };
+}
+
+/**
+ * Rebuilds a packet from the exact immutable source versions named by an
+ * earlier packet. The caller must resolve those versions through the project
+ * RBAC boundary before calling this function. MATCH proves only packet
+ * identity; it does not prove scientific validity, source truth or solver
+ * correctness.
+ */
+export function replayProjectResearchPacket({ projectId, expectedPacket, materials }) {
+  if (!expectedPacket || expectedPacket.projectId !== projectId) {
+    return {
+      contractVersion: PROJECT_RESEARCH_REPLAY_VERSION,
+      status: 'PROJECT_MISMATCH',
+      expectedPacketFingerprint: expectedPacket?.packetFingerprint ?? null,
+      replayedPacketFingerprint: null,
+      packet: null,
+      disclaimer: 'Replay wymaga packetu należącego do tego samego projektu. Nie wykonano obliczeń ani nie zmieniono solvera.',
+    };
+  }
+  const expectedSourceIds = (Array.isArray(expectedPacket.sources) ? expectedPacket.sources : [])
+    .map((source) => source?.referenceId)
+    .filter((referenceId) => typeof referenceId === 'string')
+    .sort((left, right) => left.localeCompare(right));
+  const availableSourceIds = (Array.isArray(materials) ? materials : [])
+    .map((material) => sourceReference(projectId, material).referenceId)
+    .sort((left, right) => left.localeCompare(right));
+  if (expectedSourceIds.length !== availableSourceIds.length || expectedSourceIds.some((id, index) => id !== availableSourceIds[index])) {
+    return {
+      contractVersion: PROJECT_RESEARCH_REPLAY_VERSION,
+      status: 'SOURCE_VERSION_UNAVAILABLE',
+      expectedPacketFingerprint: expectedPacket.packetFingerprint ?? null,
+      replayedPacketFingerprint: null,
+      packet: null,
+      disclaimer: 'Replay nie odnalazł kompletu immutable wersji źródeł wskazanych przez packet. Nie wykonano obliczeń ani nie zmieniono solvera.',
+    };
+  }
+  const packet = createProjectResearchPacket({
+    projectId,
+    query: expectedPacket.normalizedQuery ?? '',
+    materials,
+  });
+  const status = packet.packetFingerprint === expectedPacket.packetFingerprint ? 'MATCH' : 'DRIFT';
+  return {
+    contractVersion: PROJECT_RESEARCH_REPLAY_VERSION,
+    status,
+    expectedPacketFingerprint: expectedPacket.packetFingerprint ?? null,
+    replayedPacketFingerprint: packet.packetFingerprint,
+    packet,
+    disclaimer: 'MATCH oznacza, że wskazane immutable wersje źródeł odtworzyły ten sam packet. Nie oznacza prawdziwości materiału, niezależnej recenzji, poprawności naukowej ani zmiany capability solvera.',
   };
 }
 

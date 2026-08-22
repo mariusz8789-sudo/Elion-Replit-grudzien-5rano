@@ -738,6 +738,21 @@ export function getKnowledgeMaterial(db, projectId, materialId, options = {}) {
   return toKnowledgeMaterial(row, options);
 }
 
+/** Resolves an immutable project material version for source-bound packet replay. */
+export function getKnowledgeMaterialVersion(db, projectId, materialId, versionId, options = {}) {
+  const row = db.prepare(`
+    SELECT km.id AS material_id, km.project_id, km.material_key, km.title, km.current_version,
+           km.created_by, km.created_at AS material_created_at, km.updated_at,
+           kmv.id AS version_id, kmv.version, kmv.file_name, kmv.mime_type, kmv.original_blob,
+           kmv.byte_size, kmv.content_sha256, kmv.topics_json, kmv.source_url, kmv.extracted_text,
+           kmv.extraction_status, kmv.epistemic_status, kmv.provenance_json
+    FROM knowledge_materials km
+    JOIN knowledge_material_versions kmv ON kmv.material_id = km.id
+    WHERE km.project_id = ? AND km.id = ? AND kmv.id = ?
+  `).get(projectId, materialId, versionId);
+  return toKnowledgeMaterial(row, options);
+}
+
 /** Wyszukiwanie leksykalne w aktualnej wersji każdego materiału — bez wektorowej atrapy. */
 export function searchKnowledgeMaterials(db, projectId, tokens) {
   const clean = Array.isArray(tokens) ? tokens.filter((token) => typeof token === 'string' && token.length >= 2).slice(0, 12) : [];

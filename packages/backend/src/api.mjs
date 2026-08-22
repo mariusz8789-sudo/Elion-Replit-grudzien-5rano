@@ -76,6 +76,7 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   ingestKnowledgeMaterial,
   listKnowledgeMaterials,
   getKnowledgeMaterial,
+  getKnowledgeMaterialVersion,
   searchKnowledgeMaterials,
   saveProjectSpatialDataset,
   listProjectSpatialDatasets,
@@ -83,7 +84,7 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
 } from './store.mjs';
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
-import { createProjectResearchPacket } from './projectResearchPacket.mjs';
+import { createProjectResearchPacket, replayProjectResearchPacket } from './projectResearchPacket.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
@@ -198,11 +199,29 @@ export function handleApi(db, ctx) {
       return ok({ runs: listRuns(db, projectId) });
     }
 
-    // ---- Project Research Packet: source-bound projection of RBAC-scoped Knowledge Ingestion ----
-    if (seg[2] === 'research-packet' && seg.length === 3 && method === 'GET') {
-      const query = String(ctx.query?.q ?? '').slice(0, 500);
-      const materials = searchKnowledgeMaterials(db, projectId, tokenizeKnowledgeQuery(query));
-      return ok({ packet: createProjectResearchPacket({ projectId, query, materials }) });
+    // ---- Project Research Packet: source-bound projection and historical replay of RBAC-scoped Knowledge Ingestion ----
+    if (seg[2] === 'research-packet' && seg.length === 3) {
+      if (method === 'GET') {
+        const query = String(ctx.query?.q ?? '').slice(0, 500);
+        const materials = searchKnowledgeMaterials(db, projectId, tokenizeKnowledgeQuery(query));
+        return ok({ packet: createProjectResearchPacket({ projectId, query, materials }) });
+      }
+      if (method === 'POST') {
+        const expectedPacket = body?.packet;
+        const expectedSources = Array.isArray(expectedPacket?.sources) ? expectedPacket.sources : null;
+        if (!expectedSources) return err(400, 'invalid_project_research_packet', 'Replay wymaga packetu z listą source references.');
+        const materials = [];
+        for (const source of expectedSources) {
+          const materialId = typeof source?.materialId === 'string' ? source.materialId : '';
+          const versionId = typeof source?.materialVersionId === 'string' ? source.materialVersionId : '';
+          if (!materialId || !versionId) return err(400, 'invalid_project_research_source', 'Każde źródło replay wymaga materialId i materialVersionId.');
+          const material = getKnowledgeMaterialVersion(db, projectId, materialId, versionId, { includeText: true });
+          if (!material) return ok({ replay: replayProjectResearchPacket({ projectId, expectedPacket, materials }) }, 409);
+          materials.push(material);
+        }
+        return ok({ replay: replayProjectResearchPacket({ projectId, expectedPacket, materials }) });
+      }
+      return err(405, 'method_not_allowed');
     }
     // ---- Knowledge Ingestion: artefakty użytkownika (viewer+ read, editor+ write) ----
     if (seg[2] === 'knowledge-materials') {

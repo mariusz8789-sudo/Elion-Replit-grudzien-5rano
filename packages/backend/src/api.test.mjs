@@ -361,6 +361,26 @@ describe('knowledge ingestion', () => {
     assert.equal(source.solverEffect, 'NONE');
     assert.match(source.excerpt, /Kitaev-chain/);
     assert.equal(source.originalBase64, undefined);
+
+    const versionTwo = call('POST', `/api/projects/${project.id}/knowledge-materials`, {
+      token: owner.token,
+      body: uploadBody('Topological Kitaev-chain evidence v2 remains USER_PROVIDED_UNREVIEWED and has no solver effect.'),
+    });
+    assert.equal(versionTwo.status, 201);
+    assert.equal(versionTwo.body.material.version, 2);
+    const current = call('GET', `/api/projects/${project.id}/research-packet`, {
+      token: owner.token, query: { q: 'Kitaev topological evidence' },
+    });
+    assert.notEqual(current.body.packet.packetFingerprint, first.body.packet.packetFingerprint);
+    const historicalReplay = call('POST', `/api/projects/${project.id}/research-packet`, {
+      token: owner.token, body: { packet: first.body.packet },
+    });
+    assert.equal(historicalReplay.status, 200);
+    assert.equal(historicalReplay.body.replay.status, 'MATCH');
+    assert.equal(historicalReplay.body.replay.packet.packetFingerprint, first.body.packet.packetFingerprint);
+    assert.equal(historicalReplay.body.replay.packet.sources[0].materialVersion, 1);
+    assert.equal(historicalReplay.body.replay.packet.sources[0].contentSha256, source.contentSha256);
+
     assert.equal(call('GET', `/api/projects/${project.id}/research-packet`, {
       token: viewer.token, query: { q: 'Kitaev' },
     }).status, 200);

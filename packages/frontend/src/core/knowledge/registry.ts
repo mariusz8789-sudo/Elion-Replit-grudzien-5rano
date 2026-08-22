@@ -142,10 +142,10 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'electrodynamics', title: 'Elektrodynamika i optyka', sourceFile: 'electrodynamics.md', scale: 'micro-meso',
-    capability: 'BACKEND_REAL_ENGINE', realModels: ['photon-energy', 'electrodynamics-maxwell-fdtd-pec-reflection'],
-    concepts: ['Maxwell', 'fala elektromagnetyczna', 'Lorentz', 'foton', 'promieniowanie', 'FDTD', 'PEC'], parameters: ['wavelengthNm', 'frequency', 'resolution'], units: ['nm', 'THz', 'eV', 'kJ/mol'],
-    assumptions: ['Istnieje model energii fotonu oraz ograniczony backendowy benchmark PyMeep FDTD: normalne padanie w 1D na idealny PEC. Nie jest to pełny solver równań Maxwella dla rzeczywistego metalu, geometrii 2D/3D, ekranowania ani obiektu fizycznego.'],
-    possibleExperiments: ['oblicz energię fotonu', 'uruchom ograniczony benchmark odbicia PEC 1D PyMeep', 'przeanalizuj promieniowanie'], requiredSolver: 'photon graph / PyMeep PEC reflection benchmark; pełny Maxwell solver wymaga odrębnego runtime’u i walidacji',
+    capability: 'BACKEND_REAL_ENGINE', realModels: ['photon-energy', 'electrodynamics-maxwell-fdtd', 'electrodynamics-maxwell-fdtd-pec-reflection'],
+    concepts: ['Maxwell', 'fala elektromagnetyczna', 'Lorentz', 'foton', 'promieniowanie', 'FDTD', 'PEC'], parameters: ['wavelengthNm', 'n1', 'n2', 'frequency', 'resolution'], units: ['nm', 'THz', 'eV', 'kJ/mol'],
+    assumptions: ['Istnieje model energii fotonu oraz dwa ograniczone backendowe benchmarki PyMeep FDTD: normalne padanie w 1D na idealny PEC albo na płaską granicę dwóch bezstratnych dielektryków. Nie są to pełne solvery równań Maxwella dla rzeczywistych metali, materiałów dyspersyjnych, geometrii 2D/3D, ekranowania ani obiektów fizycznych.'],
+    possibleExperiments: ['oblicz energię fotonu', 'uruchom ograniczony benchmark transmisji przez granicę dielektryczną PyMeep, uruchom ograniczony benchmark odbicia PEC 1D PyMeep', 'przeanalizuj promieniowanie'], requiredSolver: 'photon graph / PyMeep PEC reflection benchmark; pełny Maxwell solver wymaga odrębnego runtime’u i walidacji',
     visualization: ['numeric', 'graph'], dependencies: ['quantum', 'chemistry'], keywords: ['elektromagnetycz', 'fala', 'promieniowanie', 'foton', 'maxwell', 'optyka'],
   },
   {

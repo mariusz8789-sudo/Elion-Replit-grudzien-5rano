@@ -4,9 +4,11 @@ import {
   provenanceChain, reconstructionKey, validateEvent, provenanceFromModel,
   isKnownType, getEventType, assertKnownType, listEventTypes,
   transmissionCausesExposure, EVENT_INFECTION_TRANSMISSION, EVENT_INFECTION_EXPOSURE,
+  analyseEpidemicTransmissionEvents, serializeEpidemicTransmissionAnalysis,
   type GenesisRule, type GenesisEventInput,
 } from '../core/events';
 import { EpidemicCitySimulation } from '../core/simulation/epidemicCity';
+import { runExperiment } from '../core/experimentFabric';
 
 const modelInput = (over: Partial<GenesisEventInput> = {}): GenesisEventInput => ({
   type: 'infection.transmission', timestamp: 1, affectedEntities: [{ kind: 'agent', id: 2 }],
@@ -106,6 +108,59 @@ describe('Etap 3 + 5 — REAL transmission -> GenesisEvent -> exposure consequen
     expect(key.seed).toBe(321);
     expect(typeof key.paramsHash).toBe('string');
     expect(key.experimentId).toBe('exp-A');
+  });
+
+  it('projects real model transmissions into a provenance-bound graph and coordinate hotspot ranking', () => {
+    const { registry } = build();
+    const analysis = analyseEpidemicTransmissionEvents(registry.byType(EVENT_INFECTION_TRANSMISSION), { cellSizeWorldUnits: 100 });
+    expect(analysis.status).toBe('AVAILABLE');
+    expect(analysis.classification).toBe('SIMULATED_MODEL_OUTPUT');
+    expect(analysis.metrics.transmissionCount).toBe(registry.byType(EVENT_INFECTION_TRANSMISSION).length);
+    expect(analysis.metrics.uniqueSourceAgents).toBeGreaterThan(0);
+    expect(analysis.metrics.uniqueTargetAgents).toBeGreaterThan(0);
+    expect(analysis.graph.nodes.length).toBeGreaterThan(0);
+    expect(analysis.graph.edges.length).toBeGreaterThan(0);
+    expect(analysis.hotspots[0].transmissionCount).toBeGreaterThan(0);
+    expect(analysis.sourceModelIds).toEqual(['biology.city']);
+    expect(analysis.experimentIds).toEqual(['exp-A']);
+    expect(analysis.seedValues).toEqual([321]);
+
+    const replay = analyseEpidemicTransmissionEvents(build().registry.byType(EVENT_INFECTION_TRANSMISSION), { cellSizeWorldUnits: 100 });
+    expect(serializeEpidemicTransmissionAnalysis(replay)).toBe(serializeEpidemicTransmissionAnalysis(analysis));
+  });
+
+  it('does not infer a graph from missing or unprovenanced transmission events', () => {
+    expect(analyseEpidemicTransmissionEvents([]).status).toBe('NO_TRANSMISSIONS');
+    const { registry } = build();
+    const [realTransmission] = registry.byType(EVENT_INFECTION_TRANSMISSION);
+    const blocked = analyseEpidemicTransmissionEvents([{ ...realTransmission, provenance: undefined }]);
+    expect(blocked.status).toBe('BLOCKED_INCOMPLETE_PROVENANCE');
+    expect(blocked.metrics.transmissionCount).toBe(0);
+  });
+});
+
+describe('Epidemic Digital Twin — canonical Fabric metrics', () => {
+  it('publishes graph and hotspot metrics calculated from the same real EpidemicCity event stream', () => {
+    const request = {
+      contractVersion: '1.0.0',
+      sourceText: 'Uruchom realną epidemię i policz transmisje modelu.',
+      domainId: 'biology',
+      operation: 'simulate' as const,
+      modelId: 'epidemic-city',
+      parameters: { r0: 4, horizonDays: 30, nAgents: 220 },
+      seed: 321,
+    };
+    const first = runExperiment(request);
+    const replay = runExperiment(request);
+    expect(first.result.status).toBe('completed');
+    expect(first.result.eventAnalysis?.status).toBe('AVAILABLE');
+    expect(first.result.eventAnalysis?.metrics.transmissionEvents).toBeGreaterThan(0);
+    expect(first.result.eventAnalysis?.metrics.uniqueTransmissionSources).toBeGreaterThan(0);
+    expect(first.result.eventAnalysis?.metrics.uniqueTransmissionTargets).toBeGreaterThan(0);
+    expect(first.result.eventAnalysis?.metrics.transmissionHotspotCells).toBeGreaterThan(0);
+    expect(first.result.eventAnalysis?.metrics.largestTransmissionHotspotEvents).toBeGreaterThan(0);
+    expect(first.result.eventSummary?.count).toBe(first.result.eventAnalysis?.metrics.transmissionEvents);
+    expect(replay.result.eventAnalysis).toEqual(first.result.eventAnalysis);
   });
 });
 

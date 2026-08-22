@@ -107,6 +107,17 @@ export interface ExperimentResult {
   route: ExperimentRoute;
   /** A spatial run may expose count/IDs without duplicating the EventRegistry. */
   eventSummary?: { count: number; types: readonly string[] };
+  /**
+   * Read-only aggregation of canonical GenesisEvent records. It is never a
+   * second World State and does not alter the model outputs in `outputs`.
+   */
+  eventAnalysis?: {
+    status: string;
+    classification: 'SIMULATED_MODEL_OUTPUT';
+    analysisFingerprint: string;
+    metrics: Readonly<Record<string, number>>;
+    limitations: readonly string[];
+  };
 }
 
 /** Canonical record: request → plan → real engine/result → provenance. */

@@ -25,6 +25,17 @@ export {
   registerBuiltinEventTypes, type EventTypeDecl,
 } from './eventTypeRegistry';
 export { provenanceChain, reconstructionKey, type ReconstructionKey } from './replay';
+export {
+  EPIDEMIC_TRANSMISSION_ANALYSIS_VERSION,
+  analyseEpidemicTransmissionEvents,
+  serializeEpidemicTransmissionAnalysis,
+  type EpidemicTransmissionAnalysisStatus,
+  type EpidemicTransmissionAnalysisOptions,
+  type EpidemicTransmissionAnalysis,
+  type TransmissionGraphNode,
+  type TransmissionGraphEdge,
+  type TransmissionHotspot,
+} from './epidemicTransmissionAnalysis';
 
 // Domeny (typy + reguły; NIE modele).
 export {

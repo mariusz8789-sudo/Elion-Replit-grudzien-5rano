@@ -30,7 +30,7 @@ import { runCollisionScenario } from '../../labs/experiments/universe-collision'
 import { runStarLifeScenario } from '../../labs/experiments/universe-starlife';
 import { runSolarSystemScenario } from '../../labs/experiments/universe-solar-system';
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
-import { EventRegistry, EventStream, ingestTransmissions } from '../events';
+import { EventRegistry, EventStream, analyseEpidemicTransmissionEvents, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
 import { buildBohrModelGraph } from '../modelGraph/bohrModelGraph';
 import { buildChemistryKineticsGraph } from '../modelGraph/chemistryKineticsGraph';
@@ -816,16 +816,40 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
       }
       const stream = new EventStream(registry);
       const events = stream.all();
+      const transmissionAnalysis = analyseEpidemicTransmissionEvents(events);
       onLiveWorld?.(sim);
       return {
         contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
-        summary: `Wykonano ${horizonDays}-dniowy, deterministyczny przebieg EpidemicCitySimulation.`,
-        outputs: sim.stats(), units: { dzien: 'dni', agenci: 'osób', S: 'osób', E: 'osób', I: 'osób', R: 'osób', D: 'osób' },
-        warnings: ['Model przedstawia abstrakcyjny Pathogen X i jest edukacyjny, nie prognostyczny.'],
-        validity: 'Agentowy model SEIRD z kontaktami przestrzennymi i stałymi parametrami runu.',
-        assumptions: ['Jeden realny model EpidemicCitySimulation.', 'GenesisEvent powstaje wyłącznie z lastTransmissions().'],
+        summary: `Wykonano ${horizonDays}-dniowy, deterministyczny przebieg EpidemicCitySimulation z analizą ${transmissionAnalysis.metrics.transmissionCount} rzeczywistych GenesisEvent transmisji.`,
+        outputs: sim.stats(),
+        units: { dzien: 'dni', agenci: 'osób', S: 'osób', E: 'osób', I: 'osób', R: 'osób', D: 'osób' },
+        warnings: [
+          'Model przedstawia abstrakcyjny Pathogen X i jest edukacyjny, nie prognostyczny.',
+          ...transmissionAnalysis.limitations,
+        ],
+        validity: 'Agentowy model SEIRD z kontaktami przestrzennymi i stałymi parametrami runu; transmission graph i hotspoty są read-only projekcją realnych GenesisEvent.',
+        assumptions: [
+          'Jeden realny model EpidemicCitySimulation.',
+          'GenesisEvent powstaje wyłącznie z lastTransmissions().',
+          'Hotspoty agregują dokładne współrzędne transmisji w stałej siatce modelu; nie są mapą administracyjną ani klasyfikacją miejsca.',
+        ],
         visualization: ['world-3d', 'graph'], route: model.route,
         eventSummary: { count: events.length, types: [...new Set(events.map((event) => event.type))] },
+        eventAnalysis: {
+          status: transmissionAnalysis.status,
+          classification: transmissionAnalysis.classification,
+          analysisFingerprint: transmissionAnalysis.analysisFingerprint,
+          metrics: {
+            transmissionEvents: transmissionAnalysis.metrics.transmissionCount,
+            uniqueTransmissionSources: transmissionAnalysis.metrics.uniqueSourceAgents,
+            uniqueTransmissionTargets: transmissionAnalysis.metrics.uniqueTargetAgents,
+            transmissionHotspotCells: transmissionAnalysis.hotspots.length,
+            largestTransmissionHotspotEvents: transmissionAnalysis.hotspots[0]?.transmissionCount ?? 0,
+            peakTransmissionTime: transmissionAnalysis.metrics.peakTransmissionTimestamp ?? -1,
+            peakTransmissionEvents: transmissionAnalysis.metrics.peakTransmissionCountAtTimestamp,
+          },
+          limitations: transmissionAnalysis.limitations,
+        },
       };
     }
   }

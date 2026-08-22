@@ -21,6 +21,13 @@ const LOD1_COUNT = 12;
  * Liczba jest świadomie mała — każdy klon to pełny skinned mesh.
  */
 const REAL_HUMAN_COUNT = 10;
+/**
+ * Docelowa wysokość klonowanych ludzi glTF, w tych samych jednostkach co
+ * `DETAILED_HUMAN_HEIGHT` (0.86) proceduralnego rigu LOD1 — WCZEŚNIEJ klony
+ * celowały w 1.72 (realny metraż), czyli 2x więcej niż reszta sceny używa dla
+ * "bliskiego" człowieka. To był główny powód wrażenia "ludzie za duzi".
+ */
+const REAL_HUMAN_TARGET_HEIGHT = 0.9;
 const LOD2_COUNT = 32;
 const EVENT_MARKER_SECONDS = 7;
 
@@ -97,7 +104,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private humanTemplateClips: THREE_NS.AnimationClip[] = [];
   private humanTemplateScale = 1;
   private humanTemplateOffsetY = 0;
-  private realHumans = new Map<number, { root: THREE_NS.Group; mixer: THREE_NS.AnimationMixer | null; tint: THREE_NS.MeshStandardMaterial | null; baseColor?: THREE_NS.Color }>();
+  private realHumans = new Map<number, { root: THREE_NS.Group; mixer: THREE_NS.AnimationMixer | null; tints: THREE_NS.MeshStandardMaterial[]; hueJitter: number; satJitter: number; lightJitter: number }>();
   private realHumanLoadStarted = false;
   /** Delta ostatniej klatki — miksery animacji muszą dostać realny czas, nie prędkość agenta. */
   private lastFrameDt = 0.016;
@@ -289,7 +296,9 @@ export class HighFidelityStreetSlice3D implements Sim3D {
 
   getOrbitFocusDistance(): number | null {
     if (!this.followTarget) return null;
-    if (this.cameraMode === 'street') return 4.6;
+    // Trochę dalej niż poprzednio (4.6): mniejsi ludzie + szerszy kadr dają
+    // wrażenie skali ulicy, zamiast kilku ludzi wypełniających cały ekran.
+    if (this.cameraMode === 'street') return 6.4;
     if (this.cameraMode === 'event') return 5.1;
     return 2.65;
   }
@@ -720,7 +729,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       if (!this.THREE) return;
       const bounds = new this.THREE.Box3().setFromObject(gltf.scene);
       const size = bounds.getSize(new this.THREE.Vector3());
-      this.humanTemplateScale = 1.72 / Math.max(0.001, size.y);
+      this.humanTemplateScale = REAL_HUMAN_TARGET_HEIGHT / Math.max(0.001, size.y);
       this.humanTemplateOffsetY = -bounds.min.y * this.humanTemplateScale;
       this.humanTemplate = gltf.scene;
       this.humanTemplateClips = gltf.animations ?? [];
@@ -758,14 +767,20 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       entry.root.visible = true;
       entry.root.position.set(state.worldX, this.humanTemplateOffsetY, state.worldZ);
       entry.root.rotation.y = state.facing;
-      // Stan epidemiologiczny niesie odcień ubrania — dane pochodzą z modelu.
-      // Stan epidemiologiczny DOMIESZKUJE sie do wlasnego koloru ubrania, a nie
-      // nadpisuje go. Nadpisywanie maskowalo cala wariancje: caly tlum stawal
-      // sie jednym odcieniem zieleni (wszyscy 'S') i wygladal jak jedna osoba.
-      if (entry.tint && this.THREE) {
-        if (!entry.baseColor) entry.baseColor = entry.tint.color.clone();
-        const mix = state.health === 'S' ? 0.08 : state.health === 'D' ? 0.5 : 0.34;
-        entry.tint.color.copy(entry.baseColor).lerp(new this.THREE.Color(HEALTH_COLORS[state.health]), mix);
+      // Kolor ubrania NIESIE stan epidemiologiczny — to jest wymóg czytelności
+      // (zdrowy/narażony/zakażony/ozdrowiały/zgon muszą być widoczne w świecie,
+      // nie tylko na liście). Rodzina barwy = stan modelu; dokładny odcień
+      // (nasycenie/jasność) jest deterministyczną cechą OSOBY, żeby dwudziestu
+      // "podatnych" nie nosiło identycznej zieleni — to jest oddzielna oś
+      // różnorodności od koloru, nie zamiennik dla niego.
+      if (entry.tints.length && this.THREE) {
+        const base = new this.THREE.Color(HEALTH_COLORS[state.health]);
+        const hsl = { h: 0, s: 0, l: 0 };
+        base.getHSL(hsl);
+        const finalH = (hsl.h + entry.hueJitter + 1) % 1;
+        const finalS = Math.min(1, Math.max(0.18, hsl.s + entry.satJitter));
+        const finalL = Math.min(0.72, Math.max(0.16, hsl.l + entry.lightJitter));
+        for (const mat of entry.tints) mat.color.setHSL(finalH, finalS, finalL);
       }
       if (entry.mixer) entry.mixer.update(state.health === 'D' ? 0 : this.lastFrameDt);
     }
@@ -781,7 +796,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     return claimed;
   }
 
-  private instantiateRealHuman(agentId: number): { root: THREE_NS.Group; mixer: THREE_NS.AnimationMixer | null; tint: THREE_NS.MeshStandardMaterial | null; baseColor?: THREE_NS.Color } | null {
+  private instantiateRealHuman(agentId: number): { root: THREE_NS.Group; mixer: THREE_NS.AnimationMixer | null; tints: THREE_NS.MeshStandardMaterial[]; hueJitter: number; satJitter: number; lightJitter: number } | null {
     const THREE = this.THREE;
     if (!THREE || !this.humanTemplate) return null;
     const clone = this.cloneSkinned(this.humanTemplate);
@@ -795,7 +810,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     clone.scale.multiplyScalar(0.88 + r01(0) * 0.24);
     clone.scale.x *= 0.94 + r01(3) * 0.12;
     clone.rotation.y = (r01(5) - 0.5) * 0.7;
-    let tint: THREE_NS.MeshStandardMaterial | null = null;
+    const tints: THREE_NS.MeshStandardMaterial[] = [];
     clone.traverse((node) => {
       const mesh = node as THREE_NS.Mesh;
       if (!mesh.isMesh) return;
@@ -806,12 +821,21 @@ export class HighFidelityStreetSlice3D implements Sim3D {
         // Kazdy klon dostaje WLASNE materialy: inaczej zmiana koloru jednej
         // osoby przemalowywala caly tlum na ten sam odcien.
         const cloned = (src0 as THREE_NS.MeshStandardMaterial).clone();
-        if (/casualsuit|clothes|shirt|dress|trouser|pant/i.test(mesh.name)) {
-          cloned.color.setHSL(r01(8), 0.16 + r01(11) * 0.34, 0.28 + r01(14) * 0.34);
-          if (!tint) tint = cloned;
-        } else if (/skin|body|head|face/i.test(mesh.name)) {
-          cloned.color.offsetHSL(0, 0, (r01(17) - 0.5) * 0.16);
-        } else if (/hair/i.test(mesh.name)) {
+        if (/casualsuit|clothes|shirt|dress|trouser|pant|jacket|coat|skirt|shoe|sock/i.test(mesh.name)) {
+          // WSZYSTKIE części garderoby trafiają na listę — jeśli tylko jedna
+          // (np. koszula) dostawała kolor stanu, reszta (spodnie, buty) zostawała
+          // w surowym kolorze assetu i dawała losowe łaty różowego/beżowego.
+          tints.push(cloned);
+        } else if (/skin|body|head|face|high-poly/i.test(mesh.name)) {
+          // "high-poly" to prawdziwa nazwa materiału ciała w tym assecie
+          // (Human.high-poly) — "skin"/"body" nigdy tam nie występowało,
+          // więc ten kanał wariancji wcześniej nic nie robił.
+          // Szerszy zakres odcieni skóry: przesunięcie odcienia+nasycenia+jasności,
+          // nie tylko jasności — jeden płaski "beż ±trochę" nie daje realnej
+          // różnorodności populacji.
+          cloned.color.offsetHSL((r01(19) - 0.5) * 0.05, (r01(21) - 0.5) * 0.14, (r01(17) - 0.5) * 0.24);
+        } else if (/hair|ponytail/i.test(mesh.name)) {
+          // Realna nazwa to "ponytail01" — "hair" też się nie trafiał.
           cloned.color.setHSL(0.06 + r01(20) * 0.06, 0.12 + r01(22) * 0.5, 0.06 + r01(24) * 0.34);
         }
         mesh.material = cloned;
@@ -825,7 +849,12 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       mixer = new THREE.AnimationMixer(clone);
       mixer.clipAction(this.humanTemplateClips[0]).play();
     }
-    return { root, mixer, tint };
+    // Deterministyczna, MAŁA wariancja wokół barwy stanu zdrowia — wystarczy,
+    // by ubrania nie były identyczne, za mało, by zamaskować sygnał S/E/I/R/D.
+    const hueJitter = (r01(27) - 0.5) * 0.05;
+    const satJitter = (r01(29) - 0.5) * 0.3;
+    const lightJitter = (r01(31) - 0.5) * 0.22;
+    return { root, mixer, tints, hueJitter, satJitter, lightJitter };
   }
 
   /** Klon zachowujący skeleton (SkinnedMesh nie da się poprawnie sklonować przez .clone()). */

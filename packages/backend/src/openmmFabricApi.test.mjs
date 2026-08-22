@@ -36,7 +36,7 @@ if (runtime.available) {
     assert.equal(response.body.run.provenance.classification, 'COMPUTATIONAL_RESULT');
     assert.equal(response.body.run.provenance.pdbId, '1VII');
     assert.equal(response.body.run.provenance.cpuThreads, 1);
-    assert.match(response.body.run.provenance.pdbSha256, /^[a-f0-9]{64}$/);
+    assert.equal(response.body.run.provenance.pdbSha256, 'ebecd3d6c0dd9c8b34bcbea9b57c73e4f73986cc674150f0aaa0687db66e77ef');
   });
 } else {
   test('Fabric API rejects MD instead of creating synthetic output when OpenMM is unavailable', () => {

@@ -14,6 +14,8 @@ from pathlib import Path
 # Must be set before OpenMM CPU platform creation for reproducible reference runs.
 os.environ.setdefault('OPENMM_CPU_THREADS', '1')
 EXPECTED_PDB = '1VII.pdb'
+# SHA-256 artefaktu pobranego z oficjalnego RCSB PDB: https://files.rcsb.org/download/1VII.pdb
+EXPECTED_PDB_SHA256 = 'ebecd3d6c0dd9c8b34bcbea9b57c73e4f73986cc674150f0aaa0687db66e77ef'
 SEED = 20260821
 
 
@@ -33,10 +35,13 @@ def detect():
         return {'ok': False, 'error': 'missing_GENESIS_OPENMM_DATA_DIR'}
     if not artifact.is_file():
         return {'ok': False, 'error': f'missing_md_artifact:{EXPECTED_PDB}'}
+    artifact_sha256 = sha256(artifact)
+    if artifact_sha256 != EXPECTED_PDB_SHA256:
+        return {'ok': False, 'error': f'md_artifact_checksum_mismatch:{EXPECTED_PDB}'}
     platforms = [openmm.Platform.getPlatform(i).getName() for i in range(openmm.Platform.getNumPlatforms())]
     if 'CPU' not in platforms:
         return {'ok': False, 'error': 'openmm_cpu_platform_unavailable'}
-    return {'ok': True, 'version': openmm.__version__, 'platforms': platforms, 'pdbSha256': sha256(artifact)}
+    return {'ok': True, 'version': openmm.__version__, 'platforms': platforms, 'pdbSha256': artifact_sha256}
 
 
 def run_reference(steps: int):

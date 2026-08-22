@@ -14,10 +14,16 @@ const LEGEND = [
   ['D', 'nieaktywny', '#6b7280'],
 ] as const;
 
+/**
+ * CITY jest widokiem GŁÓWNYM — bohaterem jest miasto i epidemia, nie pojedynczy
+ * agent. AGENT zostaje wyłącznie jako tryb diagnostyczny (stąd etykieta).
+ */
 const CAMERA_MODES: Array<{ id: HighFidelityCameraMode; label: string }> = [
   { id: 'city', label: 'CITY' },
+  { id: 'district', label: 'DISTRICT' },
   { id: 'street', label: 'STREET' },
-  { id: 'agent', label: 'AGENT CLOSE-UP' },
+  { id: 'hospital', label: 'HOSPITAL' },
+  { id: 'agent', label: 'AGENT (DIAG)' },
 ];
 
 /**
@@ -29,7 +35,10 @@ export function HighFidelitySliceScreen() {
   const requestedView = query.get('view');
   const philadelphiaScenario = query.get('scenario') === 'philadelphia';
   const philadelphiaLegendMode = query.get('legendView') === 'physics' ? 'physics' as const : 'legend' as const;
-  const initialCameraMode: HighFidelityCameraMode = requestedView === 'city' || requestedView === 'agent' || requestedView === 'event' ? requestedView : 'street';
+  // Domyślnie CITY: bohaterem jest miasto i epidemia, nie pojedynczy agent.
+  const KNOWN_VIEWS: HighFidelityCameraMode[] = ['city', 'district', 'street', 'hospital', 'agent', 'event'];
+  const initialCameraMode: HighFidelityCameraMode =
+    KNOWN_VIEWS.includes(requestedView as HighFidelityCameraMode) ? (requestedView as HighFidelityCameraMode) : 'city';
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // Jednorazowo przejmuje tę samą instancję World Engine z Experiment Fabric.
   // Brak handoffu zachowuje dotychczasowy samodzielny proof na tej trasie.

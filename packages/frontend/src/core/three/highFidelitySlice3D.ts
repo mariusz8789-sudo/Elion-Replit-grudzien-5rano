@@ -38,7 +38,14 @@ const REAL_HUMAN_TARGET_HEIGHT = 0.9;
 const LOD2_COUNT = 140;
 const EVENT_MARKER_SECONDS = 7;
 
-export type HighFidelityCameraMode = 'city' | 'street' | 'agent' | 'event';
+export type HighFidelityCameraMode = 'city' | 'district' | 'street' | 'hospital' | 'agent' | 'event';
+
+/**
+ * Ujęcie komponowane: stała pozycja i cel liczone z granic świata modelu.
+ * Kamery miejskie NIE śledzą agenta — śledzenie stawiało obiektyw w losowym
+ * miejscu (regularnie przy pniu drzewa) i gubiło kompozycję kadru.
+ */
+export interface ComposedShot { pos: [number, number, number]; look: [number, number, number] }
 
 export interface HighFidelitySliceCallbacks {
   onAgentSelected?: (id: number | null) => void;
@@ -98,7 +105,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private viewport = { w: 1, h: 1 };
   private timeSeconds = 0;
   private eventCursor = 0;
-  private cameraMode: HighFidelityCameraMode = 'street';
+  private cameraMode: HighFidelityCameraMode = 'city';
   private analysisMode: AnalysisMode = 'risk';
   private showHeatmap = true;
   private selectedId: number | null = null;
@@ -167,7 +174,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
 
   setCameraMode(mode: HighFidelityCameraMode): number | null {
     this.cameraMode = mode;
-    if (mode === 'city') {
+    if (mode === 'city' || mode === 'district' || mode === 'hospital') {
       this.selectedId = null;
       this.followTarget = null;
       this.callbacks.onAgentSelected?.(null);
@@ -294,10 +301,46 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.syncEventMarkers();
     this.syncFollowTarget(focus);
 
-    if (this.cameraMode === 'city') {
+    const shot = this.composedShot();
+    if (shot) {
       this.followTarget = null;
-      camera.position.lerp(new this.THREE.Vector3(20.5, 21.0, 33.0), 0.045);
-      camera.lookAt(0, 2.2, 0);
+      camera.position.lerp(new this.THREE.Vector3(...shot.pos), 0.05);
+      camera.lookAt(...shot.look);
+    }
+  }
+
+  /**
+   * SYSTEM KOMPONOWANYCH KAMER.
+   *
+   * Wszystkie ujęcia miejskie mają stałą, policzoną z granic świata pozycję,
+   * więc kadr jest powtarzalny i nigdy nie ląduje w koronie drzewa. Tylko
+   * `agent` (diagnostyka) i `event` nadal podążają za obiektem — to jest ich
+   * jedyny sens. Zwraca null, gdy tryb ma używać orbity.
+   */
+  private composedShot(): ComposedShot | null {
+    const w = this.simulation.worldWidth * HIGH_FIDELITY_WORLD_SCALE;
+    const h = this.simulation.worldHeight * HIGH_FIDELITY_WORLD_SCALE;
+    const lane = this.simulation.streets.h.length ? this.toWorldY(this.simulation.streets.h[0]) : 0;
+
+    switch (this.cameraMode) {
+      case 'city':
+        // GŁÓWNY WIDOK: cały kwartał, lekko podniesiony, bez lotu ptaka.
+        return { pos: [w * 0.62, h * 0.95, h * 1.75], look: [0, 1.8, 0] };
+      case 'district':
+        // Analiza hotspotu — bliżej, wciąż ponad tłumem.
+        return { pos: [w * 0.3, h * 0.5, h * 0.95], look: [0, 1.2, 0] };
+      case 'street':
+        // Z chodnika, WZDŁUŻ jezdni, na wysokości oczu.
+        return { pos: [-w * 0.46, 1.62, lane + 3.05], look: [w * 0.3, 1.35, lane - 0.15] };
+      case 'hospital': {
+        const hospital = this.simulation.objects().find((o) => o.kind === 'hospital');
+        if (!hospital) return { pos: [w * 0.3, h * 0.5, h * 0.9], look: [0, 1.2, 0] };
+        const hx = this.toWorldX(hospital.x + hospital.w / 2);
+        const hz = this.toWorldY(hospital.y + hospital.h / 2);
+        return { pos: [hx + 5.2, 3.4, hz + 7.4], look: [hx, 1.6, hz] };
+      }
+      default:
+        return null; // agent / event korzystają z orbity
     }
   }
 
@@ -819,7 +862,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const group = new THREE.Group();
     const height = 2.6 + r01(0) * 1.9;
     const bark = new THREE.MeshStandardMaterial({
-      color: new THREE.Color().setHSL(0.08, 0.22 + r01(3) * 0.15, 0.16 + r01(5) * 0.08),
+      color: new THREE.Color().setHSL(0.075, 0.3 + r01(3) * 0.14, 0.085 + r01(5) * 0.045),
       roughness: 0.94,
     });
     const leaf = new THREE.MeshStandardMaterial({
@@ -847,7 +890,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
 
     const blobs = 3 + Math.floor(r01(2) * 3);
     for (let i = 0; i < blobs; i++) {
-      const rr = height * (0.19 + r01(4 + i) * 0.12);
+      const rr = height * (0.15 + r01(4 + i) * 0.09);
       const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(rr, 1), leaf);
       const a = (i / blobs) * Math.PI * 2;
       crown.position.set(

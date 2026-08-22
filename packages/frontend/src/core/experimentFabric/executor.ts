@@ -803,6 +803,10 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
       const sim = new EpidemicCitySimulation({
         r0: numberParam(params, 'r0', DEFAULT_CITY_PARAMS.r0),
         nAgents: numberParam(params, 'nAgents', DEFAULT_CITY_PARAMS.nAgents),
+        initialInfected: numberParam(params, 'initialInfected', DEFAULT_CITY_PARAMS.initialInfected),
+        transmissionScale: numberParam(params, 'transmissionScale', DEFAULT_CITY_PARAMS.transmissionScale),
+        restrictions: numberParam(params, 'restrictions', DEFAULT_CITY_PARAMS.restrictions),
+        isolate: params.isolate === true,
         seed,
       });
       const registry = new EventRegistry({ modelId: 'biology.city', experimentId: 'epidemic-city', seed });

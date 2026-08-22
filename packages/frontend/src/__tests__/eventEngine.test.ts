@@ -162,6 +162,24 @@ describe('Epidemic Digital Twin — canonical Fabric metrics', () => {
     expect(first.result.eventSummary?.count).toBe(first.result.eventAnalysis?.metrics.transmissionEvents);
     expect(replay.result.eventAnalysis).toEqual(first.result.eventAnalysis);
   });
+
+  it('applies declared transmission and isolation controls to the same real model rather than recording inert parameters', () => {
+    const run = runExperiment({
+      contractVersion: '1.0.0',
+      sourceText: 'Uruchom przebieg kontrolny z wyłączoną transmisją i izolacją.',
+      domainId: 'biology',
+      operation: 'simulate',
+      modelId: 'epidemic-city',
+      parameters: { r0: 4, horizonDays: 30, nAgents: 220, initialInfected: 4, transmissionScale: 0, restrictions: 0.9, isolate: true },
+      seed: 321,
+    });
+    expect(run.result.status).toBe('completed');
+    expect(run.provenance.parameterSnapshot.transmissionScale).toBe(0);
+    expect(run.provenance.parameterSnapshot.isolate).toBe(true);
+    expect(run.result.eventSummary?.count).toBe(0);
+    expect(run.result.eventAnalysis?.status).toBe('NO_TRANSMISSIONS');
+    expect(run.result.outputs.izolowani).toBe(0);
+  });
 });
 
 describe('Etap 6 + 7 — event type registry (contracts ready, models not)', () => {

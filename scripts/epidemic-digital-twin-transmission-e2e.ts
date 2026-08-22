@@ -42,6 +42,11 @@ function main(): void {
     seed: SEED,
   };
   const fabricRun = runExperiment(fabricRequest);
+  const noTransmissionControl = runExperiment({
+    ...fabricRequest,
+    sourceText: 'Uruchom kontrolny wariant z wyłączoną transmisją i izolacją.',
+    parameters: { ...fabricRequest.parameters, transmissionScale: 0, restrictions: 0.9, isolate: true },
+  });
   const assertions = {
     realModelProducedEvents: first.events.length > 0,
     analysisAvailable: first.analysis.status === 'AVAILABLE',
@@ -53,6 +58,11 @@ function main(): void {
       && fabricRun.result.eventAnalysis?.status === 'AVAILABLE'
       && Number(fabricRun.result.eventAnalysis.metrics.transmissionEvents) > 0
       && Number(fabricRun.result.eventAnalysis.metrics.transmissionHotspotCells) > 0,
+    noTransmissionControlIsReal: noTransmissionControl.result.status === 'completed'
+      && noTransmissionControl.provenance.parameterSnapshot.transmissionScale === 0
+      && noTransmissionControl.provenance.parameterSnapshot.isolate === true
+      && noTransmissionControl.result.eventSummary?.count === 0
+      && noTransmissionControl.result.eventAnalysis?.status === 'NO_TRANSMISSIONS',
   };
   if (Object.values(assertions).some((value) => !value)) {
     throw new Error(`Epidemic Digital Twin E2E assertions failed:\n${JSON.stringify({ assertions, first: first.analysis, replay: replay.analysis, fabricRun }, null, 2)}`);
@@ -72,6 +82,7 @@ function main(): void {
     analysisFingerprint: first.analysis.analysisFingerprint,
     replayStatus: 'MATCH',
     fabricRunFingerprint: fabricRun.provenance.runFingerprint,
+    noTransmissionControlRunFingerprint: noTransmissionControl.provenance.runFingerprint,
     assertions,
     limitations: first.analysis.limitations,
   }, null, 2)}\n`);

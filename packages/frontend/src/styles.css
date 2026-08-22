@@ -161,59 +161,238 @@ button:disabled { cursor: default; }
 .hud-bl { bottom: 0.7rem; left: 0.7rem; transform: scaleY(-1); }
 .hud-br { bottom: 0.7rem; right: 0.7rem; transform: scale(-1); }
 
-/* ---------- Genesis Command Center — hero Dashboardu (silnik 3D jako środowisko) ---------- */
-.gx-hero {
-  position: relative; margin: 0.6rem 0.8rem 1rem; height: 54vh; min-height: 340px; max-height: 620px;
-  border-radius: 20px; overflow: hidden; border: 1px solid var(--border);
-  background: radial-gradient(ellipse 120% 90% at 50% 15%, rgba(92, 214, 232, 0.08), transparent 60%), var(--bg-panel);
-  box-shadow: var(--shadow-lg);
-}
-.gx-hero-scene { position: absolute; inset: 0; }
-.gx-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
-.gx-hero-fallback {
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse 90% 70% at 50% 30%, rgba(167, 139, 250, 0.16), transparent 65%),
-              radial-gradient(ellipse 70% 60% at 50% 90%, rgba(92, 214, 232, 0.1), transparent 70%), var(--bg-panel);
-}
-.gx-hero-loading {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; color: var(--text-faint);
-}
-.gx-hero-overlay {
-  position: absolute; left: 0; right: 0; bottom: 0; padding: 1.3rem 1.3rem 1rem;
-  display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none;
-  background: linear-gradient(to top, rgba(4, 5, 12, 0.92), rgba(4, 5, 12, 0.55) 55%, transparent 100%);
-}
-.gx-hero-overlay > * { pointer-events: auto; }
-.gx-hero-eyebrow {
-  font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--cyan); text-shadow: 0 0 12px rgba(92, 214, 232, 0.5);
-}
-.gx-hero-title {
-  margin: 0; font-size: clamp(1.5rem, 4vw, 2.15rem); font-weight: 780; letter-spacing: -0.02em; line-height: 1.08;
-  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.85);
-}
-.gx-hero-sub {
-  margin: 0; max-width: 62ch; font-size: 0.84rem; line-height: 1.55; color: var(--text-dim);
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.85);
-}
-.gx-hero .mission-bar { margin-top: 0.15rem; }
-@media (max-width: 640px) { .gx-hero { height: 42vh; min-height: 280px; } }
-@media (prefers-reduced-motion: reduce) { .gx-hero-canvas { opacity: 0.9; } }
+/* =========================================================================
+   GENESIS VISUAL SYSTEM
+   Jeden język wizualny dla wszystkich powierzchni: Command Center,
+   Simulation Dashboard, Pilot, Science Chat, Experiment View.
+   Buduje WYŁĄCZNIE na istniejących tokenach (:root) — nie wprowadza
+   drugiej palety ani drugiej skali ruchu.
+   ========================================================================= */
 
-/* ---------- Genesis shared panel language (gx-panel) — także używane przez Pilot (.pilot-step) ---------- */
-.gx-panel, .pilot-step {
-  border: 1px solid var(--border); border-radius: 16px;
-  background: linear-gradient(160deg, var(--bg-elevated), var(--bg-raised) 70%);
-  box-shadow: var(--shadow-sm);
+:root {
+  /* Skala typograficzna (major third, zakotwiczona w 0.82rem body) */
+  --fs-micro: 0.66rem;
+  --fs-meta: 0.74rem;
+  --fs-body: 0.84rem;
+  --fs-lead: 0.95rem;
+  --fs-title: 1.15rem;
+  --fs-display: clamp(1.9rem, 4.6vw, 3.1rem);
+
+  /* Rytm przestrzenny */
+  --sp-1: 0.35rem;
+  --sp-2: 0.6rem;
+  --sp-3: 0.9rem;
+  --sp-4: 1.3rem;
+  --sp-5: 2rem;
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+
+  /* Szkło: powierzchnia unosząca się NAD sceną 3D (nie nieprzezroczysty panel) */
+  --glass: rgba(10, 14, 28, 0.62);
+  --glass-strong: rgba(8, 11, 22, 0.82);
+  --glass-border: rgba(160, 178, 220, 0.16);
+  --glass-blur: blur(18px) saturate(1.25);
 }
+
+/* ---------- Typografia ---------- */
+.gx-display {
+  margin: 0;
+  font-size: var(--fs-display);
+  font-weight: 300;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  text-wrap: balance;
+  text-shadow: 0 2px 40px rgba(0, 0, 0, 0.9);
+}
+.gx-eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* ---------- Powierzchnia szklana (wspólna dla paneli i overlayów) ---------- */
+.gx-glass, .gx-panel, .pilot-step {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md);
+}
+.gx-panel, .pilot-step { box-shadow: var(--shadow-md); }
+
+/* ---------- Przyciski ---------- */
+.gx-btn {
+  font-size: var(--fs-body); font-weight: 550; color: var(--text);
+  padding: 0.6rem 1.15rem; border-radius: 999px;
+  border: 1px solid var(--glass-border); background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  transition: border-color var(--dur-base) var(--ease-out), transform var(--dur-fast) var(--ease-spring), background var(--dur-base) var(--ease-out);
+}
+.gx-btn:hover { border-color: var(--border-strong); background: var(--glass-strong); }
+.gx-btn:active { transform: scale(0.97); }
+.gx-btn.primary {
+  color: #041018; font-weight: 650; border-color: transparent;
+  background: linear-gradient(135deg, #7fe3f2, var(--cyan) 60%, #3fb6cc);
+  box-shadow: 0 8px 30px -10px rgba(92, 214, 232, 0.7);
+}
+.gx-btn.primary:hover { background: linear-gradient(135deg, #96e9f6, #6cdcee 60%, #46c2d8); }
+
+/* ---------- Wskaźniki stanu ---------- */
+.gx-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); flex: none; }
+.gx-dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2.6s ease-in-out infinite; }
+.gx-dot.warn { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+.gx-dot.idle { background: var(--text-faint); }
+
+/* ---------- Metryki ---------- */
+.gx-metric { display: flex; flex-direction: column; gap: 0.1rem; }
+.gx-metric-label {
+  font-family: var(--font-mono); font-size: var(--fs-micro);
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint);
+}
+.gx-metric-value {
+  font-size: 1.55rem; font-weight: 300; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums; line-height: 1.1; color: var(--text);
+}
+.gx-metric-note { font-size: var(--fs-micro); color: var(--text-dim); }
 .gx-metric-row {
-  display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.82rem;
+  display: flex; justify-content: space-between; gap: var(--sp-2); font-size: var(--fs-body);
   padding: 0.3rem 0; border-bottom: 1px solid var(--border);
 }
 .gx-metric-row:last-child { border-bottom: none; }
 .gx-metric-row dt { color: var(--text-dim); }
 .gx-metric-row dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--text); }
+
+/* =========================================================================
+   COMMAND CENTER — pełnoekranowe środowisko przestrzenne (nie kafelek z 3D)
+   ========================================================================= */
+.gx-stage {
+  position: relative;
+  width: 100%;
+  height: min(88vh, 900px);
+  min-height: 520px;
+  overflow: hidden;
+  isolation: isolate;
+}
+.gx-stage-scene { position: absolute; inset: 0; z-index: 0; }
+.gx-stage-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.gx-stage-fallback {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(92, 214, 232, 0.15), transparent 68%),
+    radial-gradient(ellipse 90% 60% at 50% 100%, rgba(167, 139, 250, 0.12), transparent 70%);
+}
+.gx-stage-loading {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font-family: var(--font-mono); font-size: var(--fs-micro);
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-faint);
+}
+/* Winieta wiąże scenę ze stroną — kadr, nie ramka. */
+.gx-stage-vignette {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(4, 5, 12, 0.55) 0%, transparent 22%, transparent 52%, rgba(4, 5, 12, 0.86) 92%, var(--bg) 100%),
+    radial-gradient(ellipse 78% 62% at 50% 48%, transparent 42%, rgba(4, 5, 12, 0.6) 100%);
+}
+.gx-stage-top {
+  position: absolute; z-index: 2; top: var(--sp-4); left: var(--sp-4); right: var(--sp-4);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+}
+.gx-telemetry {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-family: var(--font-mono); font-size: var(--fs-micro);
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
+}
+.gx-telemetry-item b { color: var(--text); font-weight: 600; }
+.gx-telemetry-sep { width: 1px; height: 10px; background: var(--border-strong); }
+.gx-stage-lede {
+  position: absolute; z-index: 2; left: var(--sp-5); bottom: var(--sp-5); right: var(--sp-5);
+  max-width: 44rem; display: flex; flex-direction: column; gap: var(--sp-3);
+  animation: gx-rise var(--dur-slow) var(--ease-out) both;
+}
+.gx-lede-sub {
+  margin: 0; max-width: 54ch; font-size: var(--fs-body); line-height: 1.6;
+  color: var(--text-dim); text-shadow: 0 2px 18px rgba(0, 0, 0, 0.9);
+}
+.gx-cta-row { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-1); }
+.gx-stage-metrics {
+  position: absolute; z-index: 2; right: var(--sp-5); top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-4) var(--sp-4) var(--sp-5);
+  border-left: 1px solid var(--glass-border);
+  animation: gx-rise var(--dur-slow) var(--ease-out) both;
+}
+@keyframes gx-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 900px) {
+  .gx-stage { height: min(72vh, 620px); }
+  .gx-stage-metrics {
+    position: static; transform: none; flex-direction: row; flex-wrap: wrap;
+    border-left: none; border-top: 1px solid var(--glass-border);
+    padding: var(--sp-3) var(--sp-4); gap: var(--sp-4);
+  }
+  .gx-stage-lede { left: var(--sp-4); right: var(--sp-4); bottom: var(--sp-4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gx-stage-lede, .gx-stage-metrics { animation: none; }
+}
+
+/* ---------- Szyna postępu badawczego (Science Chat) ---------- */
+.gx-stagerail {
+  display: flex; align-items: center; gap: 0; margin: 0; padding: var(--sp-2) var(--sp-3);
+  list-style: none; border-bottom: 1px solid var(--border); overflow-x: auto;
+  scrollbar-width: none;
+}
+.gx-stagerail::-webkit-scrollbar { display: none; }
+.gx-stagerail-step {
+  display: flex; align-items: center; gap: 0.3rem; flex: none;
+  font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-faint); white-space: nowrap;
+}
+.gx-stagerail-step + .gx-stagerail-step::before {
+  content: ''; width: 14px; height: 1px; margin: 0 0.3rem; background: var(--border-strong); flex: none;
+  transition: background var(--dur-base) var(--ease-out);
+}
+.gx-stagerail-step.done + .gx-stagerail-step::before,
+.gx-stagerail-step.active + .gx-stagerail-step::before { background: rgba(110, 231, 160, 0.5); }
+/* Etykietę pokazuje tylko BIEŻĄCY etap — sześć pełnych podpisów nie mieści się
+   w panelu czatu. Pozostałe zostają w DOM dla czytników ekranu. */
+.gx-stagerail-step:not(.active) .gx-stagerail-label {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.gx-stagerail-dot {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--border-strong); flex: none;
+  transition: background var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+.gx-stagerail-step.done { color: var(--text-dim); }
+.gx-stagerail-step.done .gx-stagerail-dot { background: var(--green); }
+.gx-stagerail-step.active { color: var(--cyan); }
+.gx-stagerail-step.active .gx-stagerail-dot {
+  background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+  animation: pulse 2.2s ease-in-out infinite;
+}
+
+/* ---------- Experiment View / Pilot — na wspólnym języku wizualnym ---------- */
+.pilot-view { max-width: 940px; }
+.pilot-step { padding: var(--sp-4); gap: var(--sp-3); }
+.pilot-step h2 {
+  font-family: var(--font-mono); font-size: var(--fs-micro); font-weight: 500;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-faint);
+}
+.pilot-summary { font-size: var(--fs-lead); font-weight: 400; letter-spacing: -0.01em; }
+.pilot-primary {
+  color: #041018 !important; font-weight: 650 !important; border-color: transparent !important;
+  background: linear-gradient(135deg, #7fe3f2, var(--cyan) 60%, #3fb6cc) !important;
+  box-shadow: 0 8px 30px -12px rgba(92, 214, 232, 0.7);
+}
+.pilot-outputs .pilot-output-row { border-bottom: 1px solid var(--border); padding: 0.3rem 0; }
+.pilot-outputs .pilot-output-row:last-child { border-bottom: none; }
+.pilot-outputs dd { font-size: var(--fs-lead); font-weight: 300; font-variant-numeric: tabular-nums; }
+.pilot-provenance { padding-top: var(--sp-2); border-top: 1px solid var(--border); }
+.pilot-provenance dt { font-family: var(--font-mono); font-size: var(--fs-micro); letter-spacing: 0.1em; text-transform: uppercase; }
 
 /* Reality Navigator — canvas jest position:fixed i persystentny (core/reality/RealityEngine.ts,
    components/RealityCanvas.tsx); reszta trasy musi zostawić przezroczystą "dziurę" (.reality-stage-spacer),
@@ -1797,3 +1976,58 @@ kbd {
 .evidence-capsule-status span { padding: 0.12rem 0.35rem; border: 1px solid var(--border); border-radius: 4px; color: var(--text-faint); font: 0.6rem var(--font-mono); }
 @media (max-width: 360px) { .evidence-capsule-grid { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .evidence-capsule { transition: none; } }
+
+/* =========================================================================
+   SIMULATION DASHBOARD — renderer jako bohater ekranu (Visual Redesign 2.0)
+   Nadpisuje siatkę 3-kolumnową: scena wypełnia kadr, a panele modelu,
+   analityki i osi czasu unoszą się NAD nią jako szklane overlaye. Zmiana jest
+   czysto wizualna — struktura DOM i logika City3DWebGLScreen zostają
+   nietknięte (te same dane z EpidemicCitySimulation).
+   ========================================================================= */
+@media (min-width: 1100px) {
+  .city-world-shell { max-width: none; padding: 0; }
+  .city-world-header { padding: var(--sp-3) var(--sp-4) var(--sp-2); border-bottom: none; }
+  .city-world-transport {
+    position: relative; z-index: 3; margin: 0 var(--sp-4) var(--sp-2);
+    padding: var(--sp-2) var(--sp-3); border-radius: 999px;
+    background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+  }
+
+  /* Jedna warstwa: scena wypełnia całość, panele lądują na niej absolutnie. */
+  .city-world-layout {
+    position: relative; display: block; margin: 0 var(--sp-4) var(--sp-4);
+    border-radius: var(--r-lg); overflow: hidden;
+    border: 1px solid var(--glass-border); box-shadow: var(--shadow-lg);
+  }
+  .city-world-center { position: relative; }
+  .city-world-stage {
+    min-height: min(68vh, 780px); margin: 0;
+    border: none; border-radius: 0; box-shadow: none;
+  }
+  .city-world-stage .city-3d-canvas { height: min(68vh, 780px); }
+
+  .city-world-sidebar {
+    position: absolute; z-index: 4; top: var(--sp-3); width: 250px;
+    max-height: calc(100% - 2 * var(--sp-3)); overflow-y: auto;
+    gap: var(--sp-2); scrollbar-width: thin;
+  }
+  .city-world-left { left: var(--sp-3); }
+  .city-world-right { right: var(--sp-3); }
+
+  /* Panele stają się szkłem — ta sama powierzchnia co reszta Genesis. */
+  .city-world-sidebar .world-panel {
+    background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border); border-radius: var(--r-md); box-shadow: var(--shadow-md);
+  }
+  /* Oś czasu zakotwiczona u dołu sceny, nie doklejona pod ramką. */
+  .city-event-timeline {
+    position: absolute; z-index: 4; bottom: var(--sp-3);
+    left: calc(250px + 2 * var(--sp-3)); right: calc(250px + 2 * var(--sp-3));
+    margin: 0; border-radius: var(--r-md);
+    background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border); box-shadow: var(--shadow-md);
+  }
+  /* Odczyt sceny schodzi poniżej lewego panelu, żeby się z nim nie zderzał. */
+  .city-scene-readout { left: calc(250px + 2 * var(--sp-3)); top: var(--sp-3); }
+}

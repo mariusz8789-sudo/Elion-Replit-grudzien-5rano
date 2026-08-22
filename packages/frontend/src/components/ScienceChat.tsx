@@ -12,6 +12,7 @@ import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff
 import { getToken } from '../core/backend/session';
 import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
 import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
+import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
 
 /**
  * Genesis Science Chat — inteligentna warstwa rozmowy NAD istniejącymi
@@ -133,6 +134,14 @@ export function ScienceChat() {
   const [lastEvidenceCapsule, setLastEvidenceCapsule] = useState<EvidenceGuidedExperimentCapsule | null>(null);
   const [activeKnowledgeProject, setActiveKnowledgeProject] = useState<ActiveKnowledgeProject | null>(() => getActiveKnowledgeProject());
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Etap procesu badawczego wyliczony z REALNEGO stanu rozmowy (typowane
+  // intencje deterministycznego resolvera + istnienie planu/kapsuły/symulacji).
+  const stage = resolveDiscoveryStage(turns, {
+    hasPendingPlan: pendingGuidedPlan?.status === 'READY_FOR_CONFIRMATION',
+    hasConfirmedCapsule: Boolean(lastEvidenceCapsule),
+    hasLiveSimulation: Boolean(ctxName),
+  });
 
   useEffect(() => { ensureGeneratorReady(); }, []);
   useEffect(() => {
@@ -296,6 +305,8 @@ export function ScienceChat() {
         <button className="back" aria-label="Zamknij Science Chat" onClick={() => setOpen(false)}>✕</button>
       </header>
 
+      <DiscoveryStageRail stage={stage} />
+
       <div className="science-chat-log" ref={scrollRef}>
         {turns.map((t, i) => (
           <div key={i} className={`sc-turn sc-${t.role}`}>
@@ -339,5 +350,29 @@ export function ScienceChat() {
         <button className="primary-btn" type="submit" disabled={!input.trim() || backendConfirmationPending}>Wyślij</button>
       </form>
     </aside>
+  );
+}
+
+/**
+ * Szyna postępu badawczego: Pytanie → Hipoteza → Eksperyment → Symulacja →
+ * Analiza → Odkrycie. Odzwierciedla WYLICZONY etap (patrz
+ * core/scienceChat/discoveryStage.ts) — nie jest paskiem ładowania ani
+ * obietnicą, że kolejne etapy nastąpią.
+ */
+function DiscoveryStageRail({ stage }: { stage: DiscoveryStage }) {
+  const active = stageIndex(stage);
+  return (
+    <ol className="gx-stagerail" aria-label={`Etap procesu badawczego: ${DISCOVERY_STAGE_LABELS[stage]}`}>
+      {DISCOVERY_STAGES.map((s, i) => (
+        <li
+          key={s}
+          className={`gx-stagerail-step${i < active ? ' done' : ''}${i === active ? ' active' : ''}`}
+          aria-current={i === active ? 'step' : undefined}
+        >
+          <span className="gx-stagerail-dot" aria-hidden="true" />
+          <span className="gx-stagerail-label">{DISCOVERY_STAGE_LABELS[s]}</span>
+        </li>
+      ))}
+    </ol>
   );
 }

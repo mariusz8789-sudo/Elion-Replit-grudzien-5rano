@@ -134,6 +134,13 @@ export interface ScenarioRunOptions {
   baseParams?: Partial<EpidemicCityParams>;
   /** Pojemność placówki, przed nadpisaniem przez scenariusz. */
   baseHospital?: HospitalCapacityParams;
+  /**
+   * Nadpisania stosowane PO scenariuszu. Służą przemiataniu dźwigni, którą sam
+   * scenariusz deklaruje — bez tego wartość scenariusza zawsze by wygrywała i
+   * sweep po cichu liczyłby pięć razy to samo. Wchodzą do `params`, więc są
+   * widoczne w odcisku wejścia.
+   */
+  overrideParams?: Partial<EpidemicCityParams>;
 }
 
 export const DEFAULT_SCENARIO_RUN: Required<Pick<ScenarioRunOptions, 'days' | 'stepsPerDay'>> = {
@@ -187,8 +194,12 @@ export interface ScenarioRun {
   notModeledReason?: string;
 }
 
-function resolveParams(def: ScenarioDefinition, base: Partial<EpidemicCityParams> = {}): EpidemicCityParams {
-  return { ...DEFAULT_CITY_PARAMS, ...base, ...def.epidemicOverrides };
+function resolveParams(
+  def: ScenarioDefinition,
+  base: Partial<EpidemicCityParams> = {},
+  override: Partial<EpidemicCityParams> = {},
+): EpidemicCityParams {
+  return { ...DEFAULT_CITY_PARAMS, ...base, ...def.epidemicOverrides, ...override };
 }
 
 function resolveHospital(def: ScenarioDefinition, base: HospitalCapacityParams = DEFAULT_HOSPITAL_CAPACITY): HospitalCapacityParams {
@@ -205,7 +216,7 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
   const def = SCENARIOS[scenarioId];
   const days = options.days ?? DEFAULT_SCENARIO_RUN.days;
   const stepsPerDay = Math.max(1, Math.floor(options.stepsPerDay ?? DEFAULT_SCENARIO_RUN.stepsPerDay));
-  const params = resolveParams(def, options.baseParams);
+  const params = resolveParams(def, options.baseParams, options.overrideParams);
   const hospitalCapacity = resolveHospital(def, options.baseHospital);
   const inputFingerprint = fnv1a(
     canonicalJson({ v: SCENARIO_ENGINE_VERSION, scenarioId, params, hospitalCapacity, days, stepsPerDay }),

@@ -105,6 +105,15 @@ export {
 } from './scientificHypothesisEvidence';
 export { executeScientificExperiment } from './scientificExecutor';
 export {
+  DISCOVERY_CASE_RECORD_VERSION,
+  createDiscoveryCaseRecord,
+  serializeDiscoveryCaseRecord,
+  replayDiscoveryCaseRecord,
+  type DiscoveryCaseStatus,
+  type DiscoveryCaseRecordInput,
+  type DiscoveryCaseRecord,
+} from './discoveryCaseRecord';
+export {
   GENESIS_RESEARCH_PACKET_VERSION,
   MAX_RESEARCH_QUERY_LENGTH,
   createGenesisResearchPacket,

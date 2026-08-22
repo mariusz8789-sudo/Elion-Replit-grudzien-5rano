@@ -126,6 +126,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private analysisMesh: THREE_NS.InstancedMesh | null = null;
   private analysisMaterial: THREE_NS.MeshBasicMaterial | null = null;
   private materials: MaterialBundle | null = null;
+  /** Elewacje czekające na tekstury — mapy PBR dochodzą po zbudowaniu geometrii. */
+  private facadeMaterials: Array<{ mat: THREE_NS.MeshStandardMaterial; kind: string; w: number; h: number }> = [];
   private sceneObjects: THREE_NS.Object3D[] = [];
   private readonly urbanAssets = new Map<string, THREE_NS.Object3D>();
   private eventMarkers = new Map<string, EventMarker>();
@@ -478,6 +480,58 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     }
   }
 
+  /**
+   * MATERIAŁ ELEWACJI O STAŁEJ GĘSTOŚCI TEKSELI.
+   *
+   * Dotąd wszystkie budynki współdzieliły JEDEN materiał ze stałym
+   * `texture.repeat` (np. 3x2). BoxGeometry ma UV 0..1 na ścianę, więc ten sam
+   * repeat rozciągał cegłę na całą elewację niezależnie od jej rozmiaru —
+   * 10-jednostkowa ściana dostawała cegły ~6 m szerokości. To jest powód, dla
+   * którego budynki czytały się jak gładkie pudełka MIMO wczytanych map PBR.
+   */
+  private facadeMaterial(kind: string, w: number, h: number): THREE_NS.MeshStandardMaterial {
+    const THREE = this.THREE!;
+    const base = kind === 'home' ? this.materials!.brick : this.materials!.concrete;
+    const mat = base.clone();
+    const slots: Array<'map' | 'normalMap' | 'roughnessMap' | 'aoMap'> = ['map', 'normalMap', 'roughnessMap', 'aoMap'];
+    for (const slot of slots) {
+      const src = base[slot] as THREE_NS.Texture | null;
+      if (!src) continue;
+      const tex = src.clone();
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(Math.max(1, Math.round(w)), Math.max(1, Math.round(h)));
+      tex.needsUpdate = true;
+      mat[slot] = tex as never;
+    }
+    mat.needsUpdate = true;
+    this.facadeMaterials.push({ mat, kind, w, h });
+    return mat;
+  }
+
+  /**
+   * Ponowne nałożenie map po asynchronicznym dojściu tekstur. Geometria powstaje
+   * natychmiast, a mapy PBR dopiero po pobraniu — klon zrobiony za wcześnie
+   * kopiowałby pusty slot i budynek zostawał gładki.
+   */
+  private refreshFacadeTextures(): void {
+    const THREE = this.THREE;
+    if (!THREE || !this.materials) return;
+    const slots: Array<'map' | 'normalMap' | 'roughnessMap' | 'aoMap'> = ['map', 'normalMap', 'roughnessMap', 'aoMap'];
+    for (const entry of this.facadeMaterials) {
+      const base = entry.kind === 'home' ? this.materials.brick : this.materials.concrete;
+      for (const slot of slots) {
+        const src = base[slot] as THREE_NS.Texture | null;
+        if (!src || entry.mat[slot]) continue;
+        const tex = src.clone();
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(Math.max(1, Math.round(entry.w)), Math.max(1, Math.round(entry.h)));
+        tex.needsUpdate = true;
+        entry.mat[slot] = tex as never;
+        entry.mat.needsUpdate = true;
+      }
+    }
+  }
+
   private loadPbrTexture(
     loader: THREE_NS.TextureLoader,
     path: string,
@@ -494,6 +548,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
       material[slot] = texture as never;
       material.needsUpdate = true;
+      this.refreshFacadeTextures();
     }, undefined, () => undefined);
   }
 
@@ -576,7 +631,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       const height = Math.max(STOREY, levels * STOREY);
       const body = new THREE.Mesh(
         new THREE.BoxGeometry(w, height, d),
-        obj.kind === 'home' ? materials.brick : materials.concrete,
+        this.facadeMaterial(obj.kind, Math.max(w, d), height),
       );
       body.position.set(cx, height / 2, cz);
       body.castShadow = true;
@@ -750,38 +805,82 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   /** Szpaler drzew wzdłuż chodników — instancing, jeden draw call na całą ulicę. */
-  private addStreetTrees(): void {
+  /**
+   * DRZEWO PROCEDURALNE — pień ze zbieżnością, rozwidlone konary i WARSTWOWA
+   * korona z kilku brył. Zastępuje pojedynczy ikosaedr ("zielona kula na
+   * patyku"), najbardziej rzucający się w oczy element proceduralny w kadrze.
+   * Wariant deterministyczny (seed), więc świat jest powtarzalny.
+   */
+  private buildTree(seed: number): THREE_NS.Group {
     const THREE = this.THREE!;
+    const hs = ((seed * 2654435761) >>> 0);
+    const r01 = (n: number) => (((hs >>> (n % 24)) & 0xff) / 255);
+
+    const group = new THREE.Group();
+    const height = 2.6 + r01(0) * 1.9;
+    const bark = new THREE.MeshStandardMaterial({
+      color: new THREE.Color().setHSL(0.08, 0.22 + r01(3) * 0.15, 0.16 + r01(5) * 0.08),
+      roughness: 0.94,
+    });
+    const leaf = new THREE.MeshStandardMaterial({
+      color: new THREE.Color().setHSL(0.24 + r01(6) * 0.07, 0.34 + r01(9) * 0.22, 0.22 + r01(12) * 0.13),
+      roughness: 0.88,
+      flatShading: true,
+    });
+
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(height * 0.028, height * 0.055, height * 0.62, 7), bark);
+    trunk.position.y = height * 0.31;
+    trunk.castShadow = true;
+    group.add(trunk);
+
+    const branches = 2 + Math.floor(r01(15) * 3);
+    for (let i = 0; i < branches; i++) {
+      const a = (i / branches) * Math.PI * 2 + r01(18) * 1.2;
+      const len = height * (0.2 + r01(21 + i) * 0.14);
+      const br = new THREE.Mesh(new THREE.CylinderGeometry(height * 0.012, height * 0.022, len, 5), bark);
+      br.position.set(Math.cos(a) * height * 0.09, height * 0.5 + i * height * 0.05, Math.sin(a) * height * 0.09);
+      br.rotation.z = Math.cos(a) * 0.55;
+      br.rotation.x = Math.sin(a) * 0.55;
+      br.castShadow = true;
+      group.add(br);
+    }
+
+    const blobs = 3 + Math.floor(r01(2) * 3);
+    for (let i = 0; i < blobs; i++) {
+      const rr = height * (0.19 + r01(4 + i) * 0.12);
+      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(rr, 1), leaf);
+      const a = (i / blobs) * Math.PI * 2;
+      crown.position.set(
+        Math.cos(a) * height * (0.06 + r01(7 + i) * 0.1),
+        height * (0.68 + r01(10 + i) * 0.24),
+        Math.sin(a) * height * (0.06 + r01(13 + i) * 0.1),
+      );
+      crown.scale.y = 0.8 + r01(16 + i) * 0.35;
+      crown.castShadow = true;
+      group.add(crown);
+    }
+    return group;
+  }
+
+  /** Szpaler drzew wzdłuż chodników — rzadziej i DALEJ od osi jezdni. */
+  private addStreetTrees(): void {
     const worldW = this.simulation.worldWidth * HIGH_FIDELITY_WORLD_SCALE;
     const spots: Array<[number, number]> = [];
     for (const y of this.simulation.streets.h) {
       const z = this.toWorldY(y);
-      for (let x = -worldW / 2 + 1.2; x < worldW / 2; x += 3.6) {
-        spots.push([x, z + 1.45]);
-        spots.push([x + 1.8, z - 1.45]);
+      // Wcześniej szpaler stał dokładnie tam, gdzie ustawia się kamera uliczna,
+      // i zasłaniał cały kadr. Rozstaw 5.2, odsunięcie 2.15 od osi jezdni.
+      for (let x = -worldW / 2 + 1.6; x < worldW / 2; x += 5.2) {
+        spots.push([x, z + 2.15]);
+        spots.push([x + 2.6, z - 2.15]);
       }
     }
-    if (!spots.length) return;
-    const trunkGeo = new THREE.CylinderGeometry(0.06, 0.09, 1.7, 6);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4b3a2a, roughness: 0.9 });
-    const crownGeo = new THREE.IcosahedronGeometry(0.55, 1);
-    const crownMat = new THREE.MeshStandardMaterial({ color: 0x3c6f36, roughness: 0.85, flatShading: true });
-    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);
-    const crowns = new THREE.InstancedMesh(crownGeo, crownMat, spots.length);
-    crowns.castShadow = true;
-    const m = new THREE.Matrix4();
     spots.forEach(([x, z], i) => {
-      const hsh = ((i * 2654435761) >>> 0);
-      const sc = 0.85 + ((hsh >>> 7) & 0xff) / 255 * 0.5;
-      m.makeTranslation(x, 0.9 * sc, z);
-      trunks.setMatrixAt(i, m);
-      m.makeTranslation(x, 2.05 * sc, z);
-      crowns.setMatrixAt(i, m);
+      const tree = this.buildTree(i + 7);
+      tree.position.set(x, 0.06, z);
+      tree.rotation.y = ((i * 97) % 360) * Math.PI / 180;
+      this.addSceneObject(tree);
     });
-    trunks.instanceMatrix.needsUpdate = true;
-    crowns.instanceMatrix.needsUpdate = true;
-    this.addSceneObject(trunks);
-    this.addSceneObject(crowns);
   }
 
   /**

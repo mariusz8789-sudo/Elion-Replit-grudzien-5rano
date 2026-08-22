@@ -266,6 +266,101 @@ export function analyseCategoricalExperimentSeries(
 }
 
 /**
+ * Analyses fresh executions of one identical preregistered request. This is for
+ * deterministic zero-input models where no physical/model parameter can be
+ * swept honestly. It never invents an ordinal execution parameter, correlation,
+ * trend, candidate hypothesis or solver input.
+ */
+export function analyseReplicationExperimentSeries(
+  runs: readonly ExperimentRun[],
+  outputKey: string,
+): DiscoveryAnalysis {
+  const valid = runs.filter((run) => {
+    const output = run.result.outputs[outputKey];
+    return run.result.status === 'completed'
+      && run.provenance.resultOrigin === 'real-engine'
+      && typeof output === 'number'
+      && Number.isFinite(output);
+  });
+  const modelIds = [...new Set(valid.map((run) => run.provenance.modelId ?? ''))].filter(Boolean);
+  const modelVersions = new Set(valid.map((run) => run.provenance.modelVersion ?? ''));
+  const engines = new Set(valid.map((run) => run.provenance.engine ?? ''));
+  const units = new Set(valid.map((run) => run.result.units[outputKey] ?? ''));
+  const outputs = valid.map((run) => run.result.outputs[outputKey] as number);
+  const comparable = valid.length >= 2
+    && modelIds.length === 1
+    && modelVersions.size === 1
+    && engines.size === 1
+    && units.size === 1;
+  const diagnostics: DiscoverySeriesDiagnostics = comparable
+    ? {
+      status: 'AVAILABLE',
+      validRuns: valid.length,
+      distinctModels: modelIds.length,
+      distinctModelVersions: modelVersions.size,
+      distinctEngines: engines.size,
+      distinctOutputUnits: units.size,
+      parameterDistinctValueCount: 0,
+      outputUnit: [...units][0],
+      outputMinimum: Math.min(...outputs),
+      outputMaximum: Math.max(...outputs),
+      monotonicTrend: 'NOT_ASSESSABLE',
+      limitations: [
+        'Runy są świeżymi replikacjami identycznego prerejestrowanego requestu bez parametru wejściowego.',
+        'Brak osi parametru blokuje Pearson r, slope, monotoniczność, endpoint effect i automatyczne tworzenie kandydata hipotezy.',
+        'Analiza nie jest niezależną walidacją naukową ani predykcją poza granicami istniejącego modelu.',
+      ],
+    }
+    : {
+      status: 'NOT_COMPARABLE',
+      validRuns: valid.length,
+      distinctModels: modelIds.length,
+      distinctModelVersions: modelVersions.size,
+      distinctEngines: engines.size,
+      distinctOutputUnits: units.size,
+      parameterDistinctValueCount: 0,
+      monotonicTrend: 'NOT_ASSESSABLE',
+      limitations: ['Replikacja wymaga co najmniej dwóch real-engine runów tego samego modelu, wersji, engine i jednostki outputu.'],
+    };
+  const base = {
+    contractVersion: DISCOVERY_SEAM_VERSION,
+    modelId: modelIds.length === 1 ? modelIds[0] : null,
+    parameterKey: '__identical_request_replication__',
+    outputKey,
+    diagnostics,
+    disclaimer: 'Wynik opisuje tylko zgodność świeżych real-engine replikacji identycznego requestu. Nie jest sweepem parametru, korelacją, odkryciem, dowodem przyczynowym ani prognozą.',
+  };
+  if (diagnostics.status !== 'AVAILABLE') {
+    return {
+      ...base,
+      findings: [{
+        kind: 'insufficient-data',
+        verdict: 'INSUFFICIENT_DATA',
+        message: `Replikacja nie jest porównywalna: ${diagnostics.limitations.join(' ')}`,
+        evidence: { validRuns: diagnostics.validRuns },
+        runIds: valid.map((run) => run.runId),
+      }],
+    };
+  }
+  if (diagnostics.outputMinimum === diagnostics.outputMaximum) return { ...base, findings: [] };
+  return {
+    ...base,
+    findings: [{
+      kind: 'observed-outlier',
+      verdict: 'REQUIRES_SCIENTIFIC_REVIEW',
+      message: 'Identyczne prerejestrowane requesty zwróciły różne wartości outputu. Wymaga to review runtime’u, danych wejściowych i provenance; nie tworzy automatycznie hipotezy.',
+      evidence: {
+        validRuns: diagnostics.validRuns,
+        outputMin: diagnostics.outputMinimum!,
+        outputMax: diagnostics.outputMaximum!,
+        comparison: 'IDENTICAL_REQUEST_REPLICATION_ONLY',
+      },
+      runIds: valid.map((run) => run.runId),
+    }],
+  };
+}
+
+/**
  * Analyses comparable, already-executed real-engine runs. It has no simulator,
  * no search over hypothetical points and no causal claim. A finding is only a
  * prompt for scientist review with complete run IDs as evidence.

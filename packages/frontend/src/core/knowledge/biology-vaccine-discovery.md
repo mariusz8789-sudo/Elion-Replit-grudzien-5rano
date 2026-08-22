@@ -93,12 +93,12 @@ OBLICZENIE (wyłącznie z realnym solverem):
   → PySCF: single-point energy małego fragmentu (DOSTĘPNE, ograniczone)
   → Molecular docking: ENGINE_NOT_AVAILABLE
   → Molecular dynamics: ENGINE_NOT_AVAILABLE
-  → Strukturalne porównanie PDB: ENGINE_NOT_AVAILABLE
+  → Strukturalne porównanie PDB: BACKEND_REAL_ENGINE (Biopython; pary 5GHW→4G6F i 5GHW→5WDF; RMSD Fab i MPER; provenance SHA-256; replay przez Evidence Pack)
 
 BLOKERY:
   1. Molecular docking: wymaga AutoDock Vina, Rosetta lub AlphaFold.
   2. Molecular dynamics: wymaga OpenMM lub GROMACS.
-  3. Strukturalne porównanie PDB: wymaga parsera mmCIF i solvera RMSD.
+  3. Strukturalne porównanie PDB: DOSTĖPNE dla zarejestrowanych par (patrz Knowledge Registry).
   4. Dane SPR/FACS: dane eksperymentalne — Genesis ich nie generuje obliczeniowo.
 ```
 

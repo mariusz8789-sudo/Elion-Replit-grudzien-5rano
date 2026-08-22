@@ -37,29 +37,29 @@ export function assessPredeclaredScientificCriterion(
   }
 
   const baseline = arms.find((arm) => arm.kind === 'baseline');
-  const variants = arms.filter((arm) => arm.kind === 'variant');
+  const comparisonArms = arms.filter((arm) => arm.kind === 'variant' || arm.kind === 'replication');
   const baselineMean = baseline ? mean(baseline.outputValues) : null;
-  const variantMeans = variants.map((arm) => mean(arm.outputValues));
-  if (baselineMean === null || variants.length === 0 || variantMeans.some((value) => value === null)) {
+  const comparisonMeans = comparisonArms.map((arm) => mean(arm.outputValues));
+  if (baselineMean === null || comparisonArms.length === 0 || comparisonMeans.some((value) => value === null)) {
     return {
       assessment: 'INCONCLUSIVE',
-      message: `Nie można ocenić hipotezy: brakuje numerycznej wartości baseline lub wariantu${context === 'backend' ? ' z backendowego runu' : ''}.`,
+      message: `Nie można ocenić hipotezy: brakuje numerycznej wartości baseline lub prerejestrowanego armu porównawczego${context === 'backend' ? ' z backendowego runu' : ''}.`,
       criterion,
       referenceRunIds,
     };
   }
 
-  const numbers = variantMeans as number[];
+  const numbers = comparisonMeans as number[];
   let supported = false;
   let explanation = '';
   switch (criterion.relation) {
     case 'greater-than':
       supported = numbers.every((value) => value > (criterion.expectedValue ?? baselineMean));
-      explanation = `Każdy wariant porównano z ${criterion.expectedValue ?? 'baseline'}.`;
+      explanation = `Każdy prerejestrowany arm porównawczy porównano z ${criterion.expectedValue ?? 'baseline'}.`;
       break;
     case 'less-than':
       supported = numbers.every((value) => value < (criterion.expectedValue ?? baselineMean));
-      explanation = `Każdy wariant porównano z ${criterion.expectedValue ?? 'baseline'}.`;
+      explanation = `Każdy prerejestrowany arm porównawczy porównano z ${criterion.expectedValue ?? 'baseline'}.`;
       break;
     case 'equal-within-tolerance': {
       const expectedValue = criterion.expectedValue;
@@ -73,16 +73,16 @@ export function assessPredeclaredScientificCriterion(
         };
       }
       supported = numbers.every((value) => Math.abs(value - expectedValue) <= tolerance);
-      explanation = `Każdy wariant porównano z prerejestrowaną wartością ${expectedValue} ± ${tolerance}.`;
+      explanation = `Każdy prerejestrowany arm porównawczy porównano z wartością ${expectedValue} ± ${tolerance}.`;
       break;
     }
     case 'monotonic-increase':
       supported = numbers.every((value, index) => index === 0 || value >= numbers[index - 1]);
-      explanation = 'Warianty oceniono w prerejestrowanej kolejności sweepu.';
+      explanation = 'Arms oceniono w prerejestrowanej kolejności protokołu.';
       break;
     case 'monotonic-decrease':
       supported = numbers.every((value, index) => index === 0 || value <= numbers[index - 1]);
-      explanation = 'Warianty oceniono w prerejestrowanej kolejności sweepu.';
+      explanation = 'Arms oceniono w prerejestrowanej kolejności protokołu.';
       break;
   }
 

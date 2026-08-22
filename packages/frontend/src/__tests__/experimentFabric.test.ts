@@ -250,6 +250,41 @@ describe('Genesis Experiment Fabric', () => {
     expect(candidate.requiredNextStep).toContain('Genesis nie formułuje kandydata');
   });
 
+  it('preregisters one identical replication arm for the zero-input real DepMap model without synthetic parameters', () => {
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'Panel DepMap 24Q2 ma odtwarzać prerejestrowaną medianę CDKN1A z tego samego checksumowo zweryfikowanego datasetu.',
+        domainId: 'biology-aging-lab',
+        modelId: 'biology-depmap-crispr-senescence-panel',
+        declaredAssumptions: [],
+        falsification: {
+          metric: 'cdkn1aMedian',
+          relation: 'greater-than',
+          expectedValue: -0.5,
+          rationale: 'Opisowy próg prerejestrowany dla mediany CERES; nie jest predykcją terapeutyczną.',
+        },
+      },
+      baselineRequest: {
+        contractVersion: '1.0.0',
+        sourceText: 'Uruchom read-only panel DepMap 24Q2 dla osi p53/p21 oraz p16/RB.',
+        domainId: 'biology-aging-lab',
+        operation: 'compute',
+        modelId: 'biology-depmap-crispr-senescence-panel',
+        parameters: {},
+      },
+      replication: {
+        label: 'Świeża replikacja DepMap 24Q2',
+        rationale: 'Model nie ma zarejestrowanego parametru wejściowego; drugi arm jest wyłącznie świeżym identycznym executionem.',
+      },
+      repetitionsPerArm: 2,
+    });
+    expect(design.arms).toHaveLength(2);
+    expect(design.arms.map((arm) => arm.kind)).toEqual(['baseline', 'replication']);
+    expect(design.arms[0].request.parameters).toEqual({});
+    expect(design.arms[1].request.parameters).toEqual({});
+    expect(design.arms[1].expectedRole).toContain('replikacja');
+    expect(design.protocolAssumptions.join(' ')).toContain('nie jest wariantem parametru');
+  });
   it('preregisters bounded categorical PDB arms for the existing real structural comparison model', () => {
     const design = designScientificExperiment({
       hypothesis: {

@@ -126,10 +126,23 @@ export interface HypothesisProposal {
 export interface ScientificExperimentInput {
   hypothesis: HypothesisProposal;
   baselineRequest: StructuredExperimentRequest;
-  sweep: ParameterSweepSpec;
+  /** One bounded real input sweep for models with registered parameters. */
+  sweep?: ParameterSweepSpec;
+  /**
+   * One fresh, identical preregistered execution for a deterministic model that
+   * has no admissible input parameters. It is a repeatability check, never a
+   * synthetic variant or a hidden solver input. Exactly one of sweep/replication
+   * must be present.
+   */
+  replication?: ReplicationSpec;
   repetitionsPerArm?: number;
   /** An optional predeclared calibration/control request; it is still executed by the real model. */
   positiveControl?: Omit<ExperimentArm, 'armId' | 'kind'>;
+}
+
+export interface ReplicationSpec {
+  label: string;
+  rationale: string;
 }
 
 export interface ParameterSweepSpec {

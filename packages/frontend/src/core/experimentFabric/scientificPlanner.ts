@@ -28,7 +28,7 @@ function buildArmId(designSeed: object, suffix: string): string {
  * instead of the synchronous executeScientificExperiment().
  */
 export function designScientificExperiment(input: ScientificExperimentInput): ScientificExperimentDesign {
-  const { hypothesis, baselineRequest, sweep } = input;
+  const { hypothesis, baselineRequest, sweep, replication } = input;
   const domain = getKnowledgeDomain(hypothesis.domainId);
   const routerModel = getRouterModel(hypothesis.modelId);
   const admissibleCapabilities: readonly string[] = ['REAL_ENGINE', 'BACKEND_REAL_ENGINE'];
@@ -38,14 +38,20 @@ export function designScientificExperiment(input: ScientificExperimentInput): Sc
   if (baselineRequest.domainId !== hypothesis.domainId || baselineRequest.modelId !== hypothesis.modelId) {
     throw new Error('Baseline request must target the same domain and model as the hypothesis.');
   }
-  if (!domain.parameters.includes(sweep.parameter)) {
+  if ((sweep === undefined) === (replication === undefined)) {
+    throw new Error('Scientific protocol requires exactly one bounded sweep or one explicit replication arm.');
+  }
+  if (sweep !== undefined && !domain.parameters.includes(sweep.parameter)) {
     throw new Error(`Parameter '${sweep.parameter}' is not declared by Knowledge Registry for ${hypothesis.domainId}.`);
   }
-  if (sweep.values.length === 0 || sweep.values.length > MAX_VARIANTS) {
+  if (sweep !== undefined && (sweep.values.length === 0 || sweep.values.length > MAX_VARIANTS)) {
     throw new Error(`Sweep requires 1–${MAX_VARIANTS} predeclared values.`);
   }
-  const uniqueValues = [...new Map(sweep.values.map((value) => [valueKey(value), value])).values()];
-  if (uniqueValues.length !== sweep.values.length) throw new Error('Sweep values must be unique.');
+  const uniqueValues = sweep === undefined ? [] : [...new Map(sweep.values.map((value) => [valueKey(value), value])).values()];
+  if (sweep !== undefined && uniqueValues.length !== sweep.values.length) throw new Error('Sweep values must be unique.');
+  if (replication !== undefined && (replication.label.trim().length < 2 || replication.rationale.trim().length < 10)) {
+    throw new Error('Replication requires a label and a rationale of at least 10 characters.');
+  }
   const repetitions = input.repetitionsPerArm ?? 2;
   if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > MAX_REPETITIONS) {
     throw new Error(`repetitionsPerArm must be an integer from 1 to ${MAX_REPETITIONS}.`);
@@ -69,7 +75,7 @@ export function designScientificExperiment(input: ScientificExperimentInput): Sc
       falsification: hypothesis.falsification,
       knowledgeReferences,
     },
-    baselineRequest, sweep, repetitions,
+    baselineRequest, sweep: sweep ?? null, replication: replication ?? null, repetitions,
     positiveControl: input.positiveControl ?? null,
     knowledgeSources: knowledgeSourcesForDomain(hypothesis.domainId),
   };
@@ -92,16 +98,24 @@ export function designScientificExperiment(input: ScientificExperimentInput): Sc
     armId: buildArmId(seed, 'baseline'), label: 'Baseline', kind: 'baseline', request: { ...baselineRequest, parameters: { ...baselineRequest.parameters } },
     expectedRole: 'Punkt odniesienia. Wynik nie jest z góry zakładany.',
   }];
-  for (const value of uniqueValues) {
-    const isBaselineValue = valueKey(value) === valueKey(baselineRequest.parameters[sweep.parameter] ?? 'undefined');
-    if (isBaselineValue) continue;
+  if (sweep !== undefined) {
+    for (const value of uniqueValues) {
+      const isBaselineValue = valueKey(value) === valueKey(baselineRequest.parameters[sweep.parameter] ?? 'undefined');
+      if (isBaselineValue) continue;
+      arms.push({
+        armId: buildArmId(seed, `variant:${valueKey(value)}`), label: `${sweep.label}: ${String(value)}`, kind: 'variant',
+        request: cloneRequest(baselineRequest, sweep.parameter, value),
+        expectedRole: `Jedna predeclared zmiana: ${sweep.parameter}=${String(value)}.`,
+      });
+    }
+    if (arms.length < 2) throw new Error('At least one sweep value must differ from the baseline parameter.');
+  } else if (replication !== undefined) {
     arms.push({
-      armId: buildArmId(seed, `variant:${valueKey(value)}`), label: `${sweep.label}: ${String(value)}`, kind: 'variant',
-      request: cloneRequest(baselineRequest, sweep.parameter, value),
-      expectedRole: `Jedna predeclared zmiana: ${sweep.parameter}=${String(value)}.`,
+      armId: buildArmId(seed, 'replication'), label: replication.label.trim(), kind: 'replication',
+      request: { ...baselineRequest, parameters: { ...baselineRequest.parameters } },
+      expectedRole: `Świeża prerejestrowana replikacja identycznego requestu. ${replication.rationale.trim()}`,
     });
   }
-  if (arms.length < 2) throw new Error('At least one sweep value must differ from the baseline parameter.');
   if (input.positiveControl) {
     if (input.positiveControl.request.domainId !== hypothesis.domainId || input.positiveControl.request.modelId !== hypothesis.modelId) {
       throw new Error('Positive control must target the same domain and model.');
@@ -120,6 +134,7 @@ export function designScientificExperiment(input: ScientificExperimentInput): Sc
       'Każdy arm jest wykonany przez istniejący Experiment Router.',
       'Kontrola i warianty są predeclared przed odczytaniem wyników.',
       'Powtórzenia korzystają z identycznego requestu; dla modeli deterministycznych oczekiwany jest zgodny wynik.',
+      ...(replication === undefined ? [] : ['Arm replikacji nie jest wariantem parametru ani dodatkowym solver inputem; sprawdza wyłącznie świeżą odtwarzalność identycznego requestu.']),
     ],
     protocolFingerprint,
   };

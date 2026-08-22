@@ -2031,3 +2031,30 @@ kbd {
   /* Odczyt sceny schodzi poniżej lewego panelu, żeby się z nim nie zderzał. */
   .city-scene-readout { left: calc(250px + 2 * var(--sp-3)); top: var(--sp-3); }
 }
+
+/* =========================================================================
+   SHOWCASE / FOCUS MODE — świat dostaje cały kadr.
+   Nie usuwa narzędzi produktu: chowa chrome, zostawia jeden dyskretny
+   overlay identyfikujący realny model/run, żeby screenshot showcase nie
+   konkurował z UI (kryterium F). Wyłączany tym samym przyciskiem.
+   ========================================================================= */
+.hf-slice-screen.hf-showcase { min-height: 100vh; }
+.hf-showcase .hf-stage {
+  min-height: 100vh; border-bottom: none;
+}
+/* Chrome znika; canvas i minimalny znacznik zostają. */
+.hf-showcase .hf-topbar,
+.hf-showcase .hf-legend,
+.hf-showcase .hf-event-card,
+.hf-showcase .hf-proof-notes,
+.hf-showcase .hf-metrics,
+.hf-showcase .hf-agent-card { display: none; }
+/* Kontrolki zwijają się do dyskretnego paska przy krawędzi. */
+.hf-showcase .hf-controls {
+  bottom: 1rem; left: 1rem; right: auto; top: auto;
+  opacity: 0.24; transform: scale(0.86); transform-origin: bottom left;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.hf-showcase .hf-controls:hover, .hf-showcase .hf-controls:focus-within { opacity: 1; }
+/* Science Chat nie może zasłaniać świata w kadrze showcase. */
+.hf-showcase ~ .science-chat-fab, body:has(.hf-showcase) .science-chat-fab { display: none; }

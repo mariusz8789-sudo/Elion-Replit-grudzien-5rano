@@ -14,6 +14,13 @@ export const HIGH_FIDELITY_WORLD_SCALE = 0.02;
 const HF_ANALYSIS_COLS = 34;
 const HF_ANALYSIS_ROWS = 22;
 const LOD1_COUNT = 12;
+/**
+ * Ilu NAJBLIŻSZYCH agentów dostaje prawdziwą, skinowaną postać glTF zamiast
+ * proceduralnej sylwetki. To jest różnica między „ludźmi na ulicy" a
+ * „kolorowymi kapsułami": w kadrze ulicznym widz patrzy właśnie na tę grupę.
+ * Liczba jest świadomie mała — każdy klon to pełny skinned mesh.
+ */
+const REAL_HUMAN_COUNT = 10;
 const LOD2_COUNT = 32;
 const EVENT_MARKER_SECONDS = 7;
 
@@ -85,6 +92,15 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private latestEventTarget: number | null = null;
   private hero: THREE_NS.Group | null = null;
   private heroMixer: THREE_NS.AnimationMixer | null = null;
+  /** Surowy glTF postaci trzymany RAZ jako szablon do klonowania tłumu LOD1. */
+  private humanTemplate: THREE_NS.Group | null = null;
+  private humanTemplateClips: THREE_NS.AnimationClip[] = [];
+  private humanTemplateScale = 1;
+  private humanTemplateOffsetY = 0;
+  private realHumans = new Map<number, { root: THREE_NS.Group; mixer: THREE_NS.AnimationMixer | null; tint: THREE_NS.MeshStandardMaterial | null; baseColor?: THREE_NS.Color }>();
+  private realHumanLoadStarted = false;
+  /** Delta ostatniej klatki — miksery animacji muszą dostać realny czas, nie prędkość agenta. */
+  private lastFrameDt = 0.016;
   /** Materiał istniejącego ubrania GLB — kolor stanu nie jest nakładaną figurką. */
   private heroEpidemicMaterial: THREE_NS.MeshStandardMaterial | null = null;
   private heroLoaded = false;
@@ -227,6 +243,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       this.philadelphiaLegend.update(this.timeSeconds);
       return;
     }
+    this.lastFrameDt = dt;
     const speed = Math.max(0, Number(params.clockSpeed ?? 1)) as ClockSpeed;
     if (speed !== this.clock.speed) this.clock.setSpeed(speed);
     if (this.clock.running) this.timeSeconds += dt;
@@ -272,14 +289,14 @@ export class HighFidelityStreetSlice3D implements Sim3D {
 
   getOrbitFocusDistance(): number | null {
     if (!this.followTarget) return null;
-    if (this.cameraMode === 'street') return 8.4;
+    if (this.cameraMode === 'street') return 4.6;
     if (this.cameraMode === 'event') return 5.1;
     return 2.65;
   }
 
   getOrbitCameraDirection(): THREE_NS.Vector3 | null {
     if (!this.THREE || !this.followTarget) return null;
-    if (this.cameraMode === 'street') return new this.THREE.Vector3(1.6, 0.08, 3.2).normalize();
+    if (this.cameraMode === 'street') return new this.THREE.Vector3(1.35, 0.012, 2.6).normalize();
     if (this.cameraMode === 'event') return new this.THREE.Vector3(3.2, 0.46, 3.8).normalize();
     return new this.THREE.Vector3(1.9, 0.75, 2.3).normalize();
   }
@@ -427,6 +444,14 @@ export class HighFidelityStreetSlice3D implements Sim3D {
         if (!this.scene) { texture.dispose(); pmrem.dispose(); return; }
         const environment = pmrem.fromEquirectangular(texture).texture;
         this.scene.environment = environment;
+        // TŁO ze środowiska HDRI zamiast płaskiego jasnego koloru. Bez tego
+        // kwartał "unosił się" na białym prześwietlonym niebie i cała scena
+        // czytała się jak makieta na stole, mimo poprawnych materiałów PBR.
+        this.scene.background = environment;
+        this.scene.backgroundBlurriness = 0.42;
+        this.scene.backgroundIntensity = 0.72;
+        // Mgła dociągnięta do realnego tła, żeby horyzont nie odcinał się kantem.
+        if (this.THREE) this.scene.fog = new this.THREE.FogExp2(0x8d99a3, 0.0125);
         texture.dispose();
         pmrem.dispose();
       }, undefined, () => pmrem.dispose());
@@ -676,11 +701,156 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     }
   }
 
+  /**
+   * Ładuje szablon postaci RAZ i klonuje go (SkeletonUtils) dla kilku
+   * najbliższych agentów. Nie tworzy nowych agentów ani demografii — każdy
+   * klon jest przypięty do istniejącego, realnego stanu z modelu.
+   */
+  private async loadHumanTemplate(): Promise<void> {
+    if (this.realHumanLoadStarted) return;
+    this.realHumanLoadStarted = true;
+    try {
+      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+      if (!this.THREE) return;
+      const gltf = await new Promise<{ scene: THREE_NS.Group; animations: THREE_NS.AnimationClip[] }>((resolve, reject) => {
+        new GLTFLoader().load('/assets/genesis-hf/characters/mpfb-lod0.glb',
+          (g) => resolve(g as unknown as { scene: THREE_NS.Group; animations: THREE_NS.AnimationClip[] }),
+          undefined, reject);
+      });
+      if (!this.THREE) return;
+      const bounds = new this.THREE.Box3().setFromObject(gltf.scene);
+      const size = bounds.getSize(new this.THREE.Vector3());
+      this.humanTemplateScale = 1.72 / Math.max(0.001, size.y);
+      this.humanTemplateOffsetY = -bounds.min.y * this.humanTemplateScale;
+      this.humanTemplate = gltf.scene;
+      this.humanTemplateClips = gltf.animations ?? [];
+    } catch {
+      this.humanTemplate = null; // Bez szablonu zostaje proceduralny LOD1 — bez atrapy.
+    }
+  }
+
+  /** Buduje/aktualizuje klony prawdziwej postaci dla najbliższych agentów. */
+  private syncRealHumans(states: readonly HumanoidAgentState[]): Set<number> {
+    const claimed = new Set<number>();
+    if (!this.THREE || !this.scene) return claimed;
+    if (this.cameraMode === 'agent' || this.cameraMode === 'event') return claimed;
+    if (!this.humanTemplate) { void this.loadHumanTemplate(); return claimed; }
+
+    const cam = this.camera;
+    const near = [...states];
+    if (cam) {
+      near.sort((a, b) =>
+        ((a.worldX - cam.position.x) ** 2 + (a.worldZ - cam.position.z) ** 2)
+        - ((b.worldX - cam.position.x) ** 2 + (b.worldZ - cam.position.z) ** 2));
+    }
+    const chosen = near.slice(0, REAL_HUMAN_COUNT);
+
+    for (const state of chosen) {
+      claimed.add(state.id);
+      let entry = this.realHumans.get(state.id);
+      if (!entry) {
+        const created = this.instantiateRealHuman(state.id);
+        if (!created) break;
+        entry = created;
+        this.realHumans.set(state.id, entry);
+        this.scene.add(entry.root);
+      }
+      entry.root.visible = true;
+      entry.root.position.set(state.worldX, this.humanTemplateOffsetY, state.worldZ);
+      entry.root.rotation.y = state.facing;
+      // Stan epidemiologiczny niesie odcień ubrania — dane pochodzą z modelu.
+      // Stan epidemiologiczny DOMIESZKUJE sie do wlasnego koloru ubrania, a nie
+      // nadpisuje go. Nadpisywanie maskowalo cala wariancje: caly tlum stawal
+      // sie jednym odcieniem zieleni (wszyscy 'S') i wygladal jak jedna osoba.
+      if (entry.tint && this.THREE) {
+        if (!entry.baseColor) entry.baseColor = entry.tint.color.clone();
+        const mix = state.health === 'S' ? 0.08 : state.health === 'D' ? 0.5 : 0.34;
+        entry.tint.color.copy(entry.baseColor).lerp(new this.THREE.Color(HEALTH_COLORS[state.health]), mix);
+      }
+      if (entry.mixer) entry.mixer.update(state.health === 'D' ? 0 : this.lastFrameDt);
+    }
+    for (const [id, entry] of [...this.realHumans]) {
+      if (claimed.has(id)) continue;
+      this.scene.remove(entry.root);
+      entry.root.traverse((n) => {
+        const m = n as THREE_NS.Mesh;
+        if (m.isMesh) m.geometry.dispose();
+      });
+      this.realHumans.delete(id);
+    }
+    return claimed;
+  }
+
+  private instantiateRealHuman(agentId: number): { root: THREE_NS.Group; mixer: THREE_NS.AnimationMixer | null; tint: THREE_NS.MeshStandardMaterial | null; baseColor?: THREE_NS.Color } | null {
+    const THREE = this.THREE;
+    if (!THREE || !this.humanTemplate) return null;
+    const clone = this.cloneSkinned(this.humanTemplate);
+    clone.scale.setScalar(this.humanTemplateScale);
+    // Deterministyczna wariancja wzrostu/obrotu: ci sami ludzie w tej samej
+    // klatce nie mogą być sześcioma identycznymi kopiami.
+    const h = ((agentId * 2654435761) >>> 0);
+    const r01 = (n: number) => (((h >>> n) & 0xff) / 255);
+    // Wzrost 0.88-1.12 (dziecko/dorosly/senior w granicach jednego assetu),
+    // lekki skos sylwetki i obrot - zeby dziesieciu ludzi nie bylo jednym czlowiekiem.
+    clone.scale.multiplyScalar(0.88 + r01(0) * 0.24);
+    clone.scale.x *= 0.94 + r01(3) * 0.12;
+    clone.rotation.y = (r01(5) - 0.5) * 0.7;
+    let tint: THREE_NS.MeshStandardMaterial | null = null;
+    clone.traverse((node) => {
+      const mesh = node as THREE_NS.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      const src0 = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+      if (src0 && 'color' in src0) {
+        // Kazdy klon dostaje WLASNE materialy: inaczej zmiana koloru jednej
+        // osoby przemalowywala caly tlum na ten sam odcien.
+        const cloned = (src0 as THREE_NS.MeshStandardMaterial).clone();
+        if (/casualsuit|clothes|shirt|dress|trouser|pant/i.test(mesh.name)) {
+          cloned.color.setHSL(r01(8), 0.16 + r01(11) * 0.34, 0.28 + r01(14) * 0.34);
+          if (!tint) tint = cloned;
+        } else if (/skin|body|head|face/i.test(mesh.name)) {
+          cloned.color.offsetHSL(0, 0, (r01(17) - 0.5) * 0.16);
+        } else if (/hair/i.test(mesh.name)) {
+          cloned.color.setHSL(0.06 + r01(20) * 0.06, 0.12 + r01(22) * 0.5, 0.06 + r01(24) * 0.34);
+        }
+        mesh.material = cloned;
+      }
+    });
+    const root = new THREE.Group();
+    root.name = 'hf-lod1-real-human';
+    root.add(clone);
+    let mixer: THREE_NS.AnimationMixer | null = null;
+    if (this.humanTemplateClips.length) {
+      mixer = new THREE.AnimationMixer(clone);
+      mixer.clipAction(this.humanTemplateClips[0]).play();
+    }
+    return { root, mixer, tint };
+  }
+
+  /** Klon zachowujący skeleton (SkinnedMesh nie da się poprawnie sklonować przez .clone()). */
+  private cloneSkinned(source: THREE_NS.Group): THREE_NS.Group {
+    const bones = new Map<string, THREE_NS.Bone>();
+    const clone = source.clone(true) as THREE_NS.Group;
+    clone.traverse((n) => { const b = n as THREE_NS.Bone; if (b.isBone) bones.set(b.name, b); });
+    source.traverse((srcNode) => {
+      const srcSkinned = srcNode as THREE_NS.SkinnedMesh;
+      if (!srcSkinned.isSkinnedMesh) return;
+      const target = clone.getObjectByName(srcSkinned.name) as THREE_NS.SkinnedMesh | undefined;
+      if (!target || !target.isSkinnedMesh) return;
+      const rebound = srcSkinned.skeleton.bones.map((b) => bones.get(b.name) ?? b);
+      const skeleton = new (this.THREE!).Skeleton(rebound, srcSkinned.skeleton.boneInverses);
+      target.bind(skeleton, srcSkinned.bindMatrix);
+    });
+    return clone;
+  }
+
   private syncLod1(states: readonly HumanoidAgentState[], focus: HumanoidAgentState | null): void {
+    const realIds = this.syncRealHumans(states.filter((s) => s.id !== focus?.id));
     const ids = new Set<number>();
     const candidates = this.cameraMode === 'agent'
       ? []
-      : states.filter((state) => state.id !== focus?.id).slice(0, LOD1_COUNT);
+      : states.filter((state) => state.id !== focus?.id && !realIds.has(state.id)).slice(0, LOD1_COUNT);
     for (const state of candidates) {
       ids.add(state.id);
       let visual = this.lod1.get(state.id);
@@ -692,12 +862,19 @@ export class HighFidelityStreetSlice3D implements Sim3D {
         visual.root.traverse((node) => {
           const mesh = node as THREE_NS.Mesh;
           if (!mesh.isMesh) return;
-          mesh.castShadow = false;
+          // Postacie MUSZĄ rzucać cień — bez kontaktu z gruntem czytały się jak
+          // naklejki zawieszone nad ulicą, a nie ludzie stojący na chodniku.
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
           const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
           if (material && 'emissive' in material) {
+            // Emisja własna została USUNIĘTA: rozświetlała ubrania na płaski,
+            // zabawkowy kolor i kasowała całe cieniowanie PBR. Stan
+            // epidemiologiczny niosą kolor materiału i znaczniki, nie świecenie.
             const standard = material as THREE_NS.MeshStandardMaterial;
-            standard.emissive.copy(standard.color).multiplyScalar(0.38);
-            standard.emissiveIntensity = 0.42;
+            standard.emissive.setRGB(0, 0, 0);
+            standard.emissiveIntensity = 0;
+            standard.roughness = Math.min(1, Math.max(0.55, standard.roughness));
           }
         });
         this.lod1.set(state.id, visual);
@@ -719,7 +896,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       this.lod2!.update([], this.timeSeconds);
       return;
     }
-    const excluded = new Set<number>([focus?.id ?? -1, ...this.lod1.keys()]);
+    const excluded = new Set<number>([focus?.id ?? -1, ...this.lod1.keys(), ...this.realHumans.keys()]);
     this.lod2!.update(states.filter((state) => !excluded.has(state.id)).slice(0, LOD2_COUNT), this.timeSeconds);
   }
 

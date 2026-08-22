@@ -60,11 +60,12 @@ export function HighFidelitySliceScreen() {
     setStats(sim.getStats());
   };
   const reset = () => { sim.reset(); setRunning(false); setCameraMode('street'); setStats(sim.getStats()); };
+  const [showcase, setShowcase] = useState(false);
   const event = sim.getLatestEvent();
   const agent = selectedId === null ? null : sim.getSim().debugInfo(selectedId);
 
   return (
-    <main id="main-content" tabIndex={-1} className="hf-slice-screen">
+    <main id="main-content" tabIndex={-1} className={`hf-slice-screen${showcase ? ' hf-showcase' : ''}`}>
       <section className="hf-stage" aria-label="Genesis high-fidelity street slice">
         <canvas ref={canvasRef} className="hf-canvas" aria-label={philadelphiaScenario ? 'Hipotetyczna wizualizacja legendy Eksperymentu Filadelfia; nie jest symulacją fizyczną' : 'High-fidelity fragment ulicy Genesis oparty na żywym modelu epidemii'} />
         {loading && <div className="hf-loading" role="status">Ładowanie świata high-fidelity…</div>}
@@ -97,6 +98,7 @@ export function HighFidelitySliceScreen() {
               <button onClick={() => setRunning((value) => !value)}>{running ? 'PAUZA' : 'START'}</button>
               <button onClick={reset}>RESET</button>
               <button className={heatmap ? 'active' : ''} onClick={() => setHeatmap((value) => !value)}>HEATMAPA</button>
+              <button className={showcase ? 'active' : ''} onClick={() => setShowcase((v) => !v)}>SHOWCASE</button>
             </div>
           </>}
         </aside>

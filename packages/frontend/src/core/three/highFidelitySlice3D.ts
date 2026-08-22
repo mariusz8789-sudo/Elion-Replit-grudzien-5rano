@@ -493,7 +493,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const materials = this.materials!;
     const worldW = this.simulation.worldWidth * HIGH_FIDELITY_WORLD_SCALE;
     const worldH = this.simulation.worldHeight * HIGH_FIDELITY_WORLD_SCALE;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(worldW + 2, worldH + 2), new THREE.MeshStandardMaterial({ color: 0x405048, roughness: 0.97 }));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(worldW + 2, worldH + 2), new THREE.MeshStandardMaterial({ color: 0x5c5f5a, roughness: 0.95 }));
 
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -523,7 +523,171 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       this.addRoadLine(worldH, px, true);
     }
 
+    this.addModelBuildings();
+    this.addBackgroundCity();
     this.addUrbanStreetDetails();
+  }
+
+  /**
+   * BUDYNKI Z MODELU — kwartał dotąd renderował płaską płytę i JEDEN prop
+   * fasady, mimo że `simulation.objects()` zwraca prawdziwe budynki świata
+   * (sklep, szkoła, szpital, izolacja, park + siatka domów) wraz z ich
+   * pozycją, rozmiarem i stanem `closed`. To był brak konsumpcji istniejących
+   * danych, nie brak assetów — scena wyglądała jak rekwizyty na płycie.
+   *
+   * Renderer pozostaje READ-ONLY: nie tworzy budynków, nie zmienia layoutu,
+   * tylko wystawia to, co model już opisuje. Wysokość jest funkcją rodzaju
+   * (prezentacja), a nie wymyśloną daną naukową.
+   */
+  private addModelBuildings(): void {
+    const THREE = this.THREE!;
+    const materials = this.materials!;
+    const scale = HIGH_FIDELITY_WORLD_SCALE;
+
+    // Wysokość kondygnacji wg funkcji budynku — czysta warstwa prezentacji.
+    const storeys: Record<string, number> = {
+      home: 2, shop: 1, school: 3, hospital: 4, isolation: 2, park: 0,
+    };
+    const STOREY = 0.62;
+
+    for (const obj of this.simulation.objects()) {
+      const w = obj.w * scale;
+      const d = obj.h * scale;
+      const cx = this.toWorldX(obj.x + obj.w / 2);
+      const cz = this.toWorldY(obj.y + obj.h / 2);
+
+      if (obj.kind === 'park') {
+        this.addPark(cx, cz, w, d);
+        continue;
+      }
+
+      const levels = storeys[obj.kind] ?? 2;
+      const height = Math.max(STOREY, levels * STOREY);
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(w, height, d),
+        obj.kind === 'home' ? materials.brick : materials.concrete,
+      );
+      body.position.set(cx, height / 2, cz);
+      body.castShadow = true;
+      body.receiveShadow = true;
+      this.enableAo(body);
+      this.addSceneObject(body);
+
+      // Gzyms/dach — bez niego bryły czytają się jak pudełka.
+      const capGeo = new THREE.BoxGeometry(w * 1.04, 0.08, d * 1.04);
+      const cap = new THREE.Mesh(capGeo, materials.metal);
+      cap.position.set(cx, height + 0.04, cz);
+      cap.castShadow = true;
+      this.addSceneObject(cap);
+
+      this.addWindows(cx, cz, w, d, height, levels, Boolean(obj.closed));
+    }
+  }
+
+  /** Siatka okien na dwóch dłuższych elewacjach — instancing, jeden draw call na budynek. */
+  private addWindows(cx: number, cz: number, w: number, d: number, height: number, levels: number, closed: boolean): void {
+    const THREE = this.THREE!;
+    if (levels <= 0) return;
+    const perRow = Math.max(1, Math.floor(w / 0.55));
+    const total = perRow * levels * 2;
+    if (total <= 0) return;
+    const geo = new THREE.BoxGeometry(0.26, 0.34, 0.03);
+    // Zamknięty interwencją budynek ma ciemne okna — to REALNY stan z modelu.
+    const mat = new THREE.MeshStandardMaterial({
+      color: closed ? 0x2a3038 : 0x9fc6da,
+      emissive: closed ? 0x000000 : 0x243a47,
+      emissiveIntensity: closed ? 0 : 0.55,
+      roughness: 0.22, metalness: 0.1,
+    });
+    const mesh = new THREE.InstancedMesh(geo, mat, total);
+    const m = new THREE.Matrix4();
+    let i = 0;
+    for (let level = 0; level < levels; level++) {
+      const y = 0.42 + level * 0.62;
+      if (y > height - 0.16) continue;
+      for (let c = 0; c < perRow; c++) {
+        const ox = -w / 2 + 0.34 + c * (w - 0.68) / Math.max(1, perRow - 1);
+        m.makeTranslation(cx + ox, y, cz + d / 2 + 0.015);
+        mesh.setMatrixAt(i++, m);
+        m.makeTranslation(cx + ox, y, cz - d / 2 - 0.015);
+        mesh.setMatrixAt(i++, m);
+      }
+    }
+    mesh.count = i;
+    mesh.instanceMatrix.needsUpdate = true;
+    this.addSceneObject(mesh);
+  }
+
+  /** Park z modelu: trawa + drzewa (instancing). Pozycja i rozmiar pochodzą z layoutu. */
+  private addPark(cx: number, cz: number, w: number, d: number): void {
+    const THREE = this.THREE!;
+    const grass = new THREE.Mesh(
+      new THREE.BoxGeometry(w, 0.06, d),
+      new THREE.MeshStandardMaterial({ color: 0x3f6b43, roughness: 0.95 }),
+    );
+    grass.position.set(cx, 0.07, cz);
+    grass.receiveShadow = true;
+    this.addSceneObject(grass);
+
+    const count = Math.max(3, Math.floor((w * d) / 1.1));
+    const trunkGeo = new THREE.CylinderGeometry(0.045, 0.06, 0.42, 6);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.9 });
+    const crownGeo = new THREE.IcosahedronGeometry(0.3, 0);
+    const crownMat = new THREE.MeshStandardMaterial({ color: 0x35632f, roughness: 0.85, flatShading: true });
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
+    const crowns = new THREE.InstancedMesh(crownGeo, crownMat, count);
+    crowns.castShadow = true;
+    const m = new THREE.Matrix4();
+    for (let i = 0; i < count; i++) {
+      // Deterministyczne rozmieszczenie — ten sam świat przy tym samym seedzie.
+      const h = ((i * 2654435761) >>> 0);
+      const fx = (((h >>> 3) & 0xff) / 255 - 0.5) * (w - 0.5);
+      const fz = (((h >>> 13) & 0xff) / 255 - 0.5) * (d - 0.5);
+      const sc = 0.8 + ((h >>> 21) & 0xff) / 255 * 0.5;
+      m.makeTranslation(cx + fx, 0.3 * sc, cz + fz);
+      trunks.setMatrixAt(i, m);
+      m.makeTranslation(cx + fx, 0.62 * sc, cz + fz);
+      crowns.setMatrixAt(i, m);
+    }
+    trunks.instanceMatrix.needsUpdate = true;
+    crowns.instanceMatrix.needsUpdate = true;
+    this.addSceneObject(trunks);
+    this.addSceneObject(crowns);
+  }
+
+  /**
+   * TŁO MIASTA — pierścień brył ZA granicami świata modelu, gasnący we mgle.
+   * Czysta scenografia: nie zawiera agentów, nie jest World State i nie ma
+   * z nią żadnej interakcji epidemiologicznej. Istnieje wyłącznie po to, żeby
+   * kwartał nie kończył się ostrą krawędzią w pustce.
+   */
+  private addBackgroundCity(): void {
+    const THREE = this.THREE!;
+    const worldW = this.simulation.worldWidth * HIGH_FIDELITY_WORLD_SCALE;
+    const worldH = this.simulation.worldHeight * HIGH_FIDELITY_WORLD_SCALE;
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x6a7078, roughness: 0.92 });
+    const COUNT = 90;
+    const mesh = new THREE.InstancedMesh(geo, mat, COUNT);
+    mesh.name = 'hf-background-scenery';
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const pos = new THREE.Vector3();
+    const sc = new THREE.Vector3();
+    for (let i = 0; i < COUNT; i++) {
+      const h = ((i * 40503 + 12345) >>> 0);
+      const r01 = (n: number) => (((h >>> n) & 0xff) / 255);
+      const ring = worldW * (0.85 + r01(2) * 1.5);
+      const angle = (i / COUNT) * Math.PI * 2 + r01(5) * 0.08;
+      const height = 1.2 + r01(9) * 5.5;
+      pos.set(Math.cos(angle) * ring, height / 2, Math.sin(angle) * (ring * (worldH / worldW)));
+      sc.set(0.9 + r01(13) * 1.8, height, 0.9 + r01(17) * 1.8);
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r01(21) * Math.PI);
+      m.compose(pos, q, sc);
+      mesh.setMatrixAt(i, m);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    this.addSceneObject(mesh);
   }
 
   private addRoadLine(length: number, position: number, vertical: boolean): void {

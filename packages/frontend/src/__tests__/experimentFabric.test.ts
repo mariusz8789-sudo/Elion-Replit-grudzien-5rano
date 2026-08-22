@@ -36,6 +36,8 @@ import {
   resolveHypothesisKnowledgeReferences,
   selectNextScientificExperiment,
   replayNextScientificExperimentSelection,
+  formulateScientificHypothesisCandidate,
+  replayScientificHypothesisCandidate,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -194,6 +196,58 @@ describe('Genesis Experiment Fabric', () => {
 
     const insufficient = analyseExperimentSeries(runs.slice(0, 2), 'massSolar', 'radiusKm');
     expect(insufficient.findings[0]?.verdict).toBe('INSUFFICIENT_DATA');
+  });
+
+  it('forms a review-gated hypothesis candidate only from a real reproducible Evidence Chain and its analysis', () => {
+    const baselineRequest = parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.');
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'W granicach modelu Schwarzschilda promień horyzontu rośnie monotonicznie wraz z masą.',
+        domainId: 'spacetime-einstein', modelId: 'einstein-schwarzschild', declaredAssumptions: [],
+        supplementalKnowledgeIds: ['einstein-general-relativity-static'],
+        falsification: { metric: 'radiusKm', relation: 'monotonic-increase', rationale: 'Przerejestrowany test kolejnych mas.' },
+      },
+      baselineRequest,
+      sweep: { parameter: 'massSolar', values: [1, 2, 3], label: 'Masa M☉' },
+      repetitionsPerArm: 1,
+    });
+    const evidence = executeScientificExperiment(design);
+    const analysis = analyseExperimentSeries(evidence.allRuns, 'massSolar', 'radiusKm');
+    const candidate = formulateScientificHypothesisCandidate(analysis, evidence);
+    const replay = replayScientificHypothesisCandidate(analysis, evidence);
+
+    expect(candidate.status).toBe('CANDIDATE_READY');
+    expect(candidate.candidateStatement).toContain("modelu 'einstein-schwarzschild'");
+    expect(candidate.candidateStatement).toContain('nie twierdzenie przyczynowe ani odkrycie');
+    expect(candidate.observation?.runIds).toEqual(analysis.findings[0]?.runIds);
+    expect(candidate.observation?.runFingerprints).toEqual(evidence.allRuns.map((run) => run.provenance.runFingerprint));
+    expect(candidate.knowledgeReferences.map((reference) => reference.referenceId)).toEqual([
+      'corpus:spacetime-einstein.md',
+      'supplemental:einstein-general-relativity-static',
+    ]);
+    expect(candidate.requiredNextStep).toContain('Niezależny naukowy review');
+    expect(replay.selectionFingerprint).toBe(candidate.selectionFingerprint);
+  });
+
+  it('blocks a hypothesis candidate when the supplied analysis has no reviewable finding', () => {
+    const baselineRequest = parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.');
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'Test analizy niewystarczającej.',
+        domainId: 'spacetime-einstein', modelId: 'einstein-schwarzschild', declaredAssumptions: [],
+        falsification: { metric: 'radiusKm', relation: 'monotonic-increase', rationale: 'Test.' },
+      },
+      baselineRequest,
+      sweep: { parameter: 'massSolar', values: [1, 2, 3], label: 'Masa M☉' },
+      repetitionsPerArm: 1,
+    });
+    const evidence = executeScientificExperiment(design);
+    const insufficientAnalysis = analyseExperimentSeries(evidence.allRuns.slice(0, 2), 'massSolar', 'radiusKm');
+    const candidate = formulateScientificHypothesisCandidate(insufficientAnalysis, evidence);
+
+    expect(candidate.status).toBe('BLOCKED_NO_REVIEWABLE_FINDING');
+    expect(candidate.candidateStatement).toBeUndefined();
+    expect(candidate.requiredNextStep).toContain('Genesis nie formułuje kandydata');
   });
 
   it('binds a preregistered hypothesis to existing source metadata without generating a citation', () => {

@@ -105,6 +105,13 @@ export {
 } from './scientificHypothesisEvidence';
 export { executeScientificExperiment } from './scientificExecutor';
 export {
+  SCIENTIFIC_HYPOTHESIS_CANDIDATE_VERSION,
+  formulateScientificHypothesisCandidate,
+  replayScientificHypothesisCandidate,
+  type HypothesisCandidateStatus,
+  type ScientificHypothesisCandidate,
+} from './scientificHypothesisCandidate';
+export {
   SEEDED_UNCERTAINTY_VERSION,
   MAX_PREREGISTERED_SEEDS,
   isSeededStochasticModel,

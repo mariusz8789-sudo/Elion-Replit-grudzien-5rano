@@ -24,6 +24,21 @@ describe('Parameter sweep — one real run per point', () => {
     expect(fingerprints.size).toBe(5);
   });
 
+  it('a fingerprint identifies the result: same outcome, same print; different outcome, different print', () => {
+    const beds = sweep({ parameter: 'totalBeds', values: [2, 4, 8, 16, 32], hospitalCapacity: tight });
+    // Każdy punkt to osobne WEJŚCIE.
+    expect(new Set(beds.points.map((p) => p.inputFingerprint)).size).toBe(5);
+    // Powyżej progu przeciążenia rozdział pacjentów jest identyczny, więc
+    // odcisk WYNIKU słusznie się powtarza — a poniżej progu musi się różnić.
+    for (let i = 0; i < beds.points.length; i++) {
+      for (let j = i + 1; j < beds.points.length; j++) {
+        const sameResult = JSON.stringify(beds.points[i].summary) === JSON.stringify(beds.points[j].summary);
+        expect(beds.points[i].runFingerprint === beds.points[j].runFingerprint).toBe(sameResult);
+      }
+    }
+    expect(new Set(beds.points.map((p) => p.runFingerprint)).size).toBeGreaterThan(1);
+  });
+
   it('every point carries a real summary — no interpolated values', () => {
     for (const p of sweep().points) {
       expect(p.summary).not.toBeNull();

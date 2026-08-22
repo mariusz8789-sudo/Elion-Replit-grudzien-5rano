@@ -80,12 +80,27 @@ describe('Scenario Engine — reproducibility', () => {
     expect(b.resultFingerprint).not.toBe(a.resultFingerprint);
   });
 
-  it('the result fingerprint depends on the run, not on the scenario name', () => {
+  it('the fingerprints depend on the run, not on the scenario name', () => {
     // BASELINE i HEALTHCARE_EXPANSION nie różnią się parametrami epidemii, więc
     // przebieg epidemii MUSI być ten sam mimo innej nazwy.
-    const base = runScenario('BASELINE', OPTS);
-    const expansion = runScenario('HEALTHCARE_EXPANSION', { ...OPTS, baseParams: { ...OPTS.baseParams, restrictions: 0, isolate: false } });
-    expect(expansion.resultFingerprint).toBe(base.resultFingerprint);
+    const tight = { totalBeds: 4, icuBeds: 1, icuShareOfAdmissions: 0.22 };
+    const base = runScenario('BASELINE', { ...OPTS, baseHospital: tight });
+    const expansion = runScenario('HEALTHCARE_EXPANSION', {
+      ...OPTS,
+      baseParams: { ...OPTS.baseParams, restrictions: 0, isolate: false },
+      baseHospital: tight,
+    });
+    expect(expansion.epidemicFingerprint).toBe(base.epidemicFingerprint);
+    // Ale obciążenie szpitala jest inne, więc to NIE jest ten sam wynik.
+    expect(expansion.summary!.totalUnmetCareDays).not.toBe(base.summary!.totalUnmetCareDays);
+    expect(expansion.resultFingerprint).not.toBe(base.resultFingerprint);
+  });
+
+  it('a pure capacity change leaves the epidemic fingerprint untouched', () => {
+    const few = runScenario('BASELINE', { ...OPTS, baseHospital: { totalBeds: 2, icuBeds: 0, icuShareOfAdmissions: 0.2 } });
+    const many = runScenario('BASELINE', { ...OPTS, baseHospital: { totalBeds: 200, icuBeds: 50, icuShareOfAdmissions: 0.2 } });
+    expect(many.epidemicFingerprint).toBe(few.epidemicFingerprint);
+    expect(many.resultFingerprint).not.toBe(few.resultFingerprint);
   });
 });
 

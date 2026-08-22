@@ -204,8 +204,19 @@ export interface ScenarioRun {
   preInterventionHospital: HospitalCapacityParams;
   /** Odcisk WEJŚCIA: identyczny odcisk => identyczne warunki startowe. */
   inputFingerprint: string;
-  /** Odcisk WYNIKU: podstawa dowodu odtwarzalności. Pusty dla NOT_MODELED. */
+  /**
+   * Odcisk PEŁNEGO WYNIKU: przebieg epidemii RAZEM z obciążeniem systemu
+   * ochrony zdrowia. To jest tożsamość przebiegu do celów dowodowych — dwa
+   * przebiegi o tej samej krzywej zakażeń, ale różnym obłożeniu łóżek, są
+   * różnymi wynikami i muszą mieć różne odciski.
+   */
   resultFingerprint: string | null;
+  /**
+   * Odcisk SAMEJ EPIDEMII (S/E/I/R/D). Pozwala wykazać, że warstwa szpitalna
+   * niczego w epidemii nie zmieniła — przy wyłączonym sprzężeniu śmiertelności
+   * rozbudowa szpitala musi zostawić ten odcisk nietknięty.
+   */
+  epidemicFingerprint: string | null;
   series: readonly ScenarioDaySample[];
   summary: ScenarioSummary | null;
   /** Wypełnione tylko dla NOT_MODELED — dlaczego model tego nie potrafi. */
@@ -264,7 +275,7 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
     canonicalJson({ v: SCENARIO_ENGINE_VERSION, scenarioId, params, hospitalCapacity, days, stepsPerDay, interventionStartDay }),
   );
 
-  const shell: Omit<ScenarioRun, 'status' | 'series' | 'summary' | 'resultFingerprint'> = {
+  const shell: Omit<ScenarioRun, 'status' | 'series' | 'summary' | 'resultFingerprint' | 'epidemicFingerprint'> = {
     contractVersion: SCENARIO_ENGINE_VERSION,
     scenarioId,
     label: def.label,
@@ -284,6 +295,7 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
       ...shell,
       status: 'NOT_MODELED',
       resultFingerprint: null,
+      epidemicFingerprint: null,
       series: [],
       summary: null,
       notModeledReason: def.notModeledReason,
@@ -300,6 +312,7 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
       ...shell,
       status: 'NOT_MODELED',
       resultFingerprint: null,
+      epidemicFingerprint: null,
       series: [],
       summary: null,
       notModeledReason: `Opóźniona interwencja nie może zmieniać parametrów strukturalnych (${timedStructural.join(', ')}) — model przesiewa dla nich świat od nowa, więc przebieg przestałby być porównywalny.`,
@@ -362,9 +375,20 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
   return {
     ...shell,
     status: 'COMPLETED',
-    // Odcisk wyniku liczony z samego przebiegu epidemii — niezależny od tego,
-    // jak nazwaliśmy scenariusz.
+    // Odciski liczone z samego przebiegu — nie z nazwy scenariusza.
     resultFingerprint: fnv1a(
+      canonicalJson(
+        // Wszystko, co przebieg raportuje jako wynik dnia — łącznie z obłożeniem
+        // względnym, bo to ono odróżnia „10 pacjentów na 16 łóżek" od
+        // „10 pacjentów na 32 łóżka" przy identycznym rozdziale bezwzględnym.
+        series.map((d) => [
+          d.day, d.susceptible, d.exposed, d.infectious, d.recovered, d.deceased,
+          d.hospital.occupiedBeds, d.hospital.occupiedIcu, d.hospital.unmetCare,
+          d.hospital.bedOccupancy, d.hospital.icuOccupancy, d.hospital.status,
+        ]),
+      ),
+    ),
+    epidemicFingerprint: fnv1a(
       canonicalJson(series.map((d) => [d.day, d.susceptible, d.exposed, d.infectious, d.recovered, d.deceased])),
     ),
     series,

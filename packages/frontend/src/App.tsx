@@ -15,7 +15,6 @@ import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/act
 import { track } from './core/analytics';
 import { getSettings } from './core/settings';
 import { t } from './core/i18n';
-import { getVisitedCount } from './core/discoveryLog';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
 import { playEnterLab } from './core/sound';
 import { RealityCanvas } from './components/RealityCanvas';
@@ -46,6 +45,7 @@ const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/Conc
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
+const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -497,6 +497,9 @@ export default function App() {
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
+          <HeavyRoute>
+            <GenesisCommandCenterHero />
+          </HeavyRoute>
           <div style={{ position: 'relative' }}>
             <ScaleJourney />
             <span className="hud-corner hud-tl" aria-hidden="true" />
@@ -620,7 +623,6 @@ export default function App() {
               </nav>
             </div>
           )}
-          <MissionStatusBar />
           <div className="section-label">Laboratoria · {getLabs().length} modułów</div>
           <div className="labs-grid">
             {getLabs().map((l) => (
@@ -654,49 +656,6 @@ export default function App() {
       {renderRoute()}
       {!onboardingOpen && <ErrorBoundary><ScienceChat /></ErrorBoundary>}
     </>
-  );
-}
-
-/**
- * Pasek statusu misji — estetyka centrum kontroli, ale WYŁĄCZNIE realne
- * dane: liczba laboratoriów z rejestru, żywy status backendu AI
- * (GET /api/health, ten sam endpoint co w discovery.tsx), postęp
- * eksploracji z Dziennika Odkryć. Zero wymyślonych liczb.
- */
-function MissionStatusBar() {
-  const [aiStatus, setAiStatus] = useState<'checking' | 'ready' | 'no-key' | 'offline'>('checking');
-  const { visited, totalLabs } = getVisitedCount();
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/health')
-      .then((r) => r.json())
-      .then((d: { ai?: string }) => {
-        if (!cancelled) setAiStatus(d.ai === 'ready' ? 'ready' : 'no-key');
-      })
-      .catch(() => {
-        if (!cancelled) setAiStatus('offline');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const aiLabel =
-    aiStatus === 'checking' ? 'sprawdzanie…' : aiStatus === 'ready' ? 'online' : aiStatus === 'no-key' ? 'brak klucza' : 'offline';
-
-  return (
-    <div className="mission-bar" role="status" aria-label="Status systemu Genesis OS">
-      <span className={`mdot on`} aria-hidden="true" />
-      <span>NARRATOR: <strong>zawsze aktywny</strong></span>
-      <span className="msep">·</span>
-      <span className={`mdot ${aiStatus === 'ready' ? 'on' : aiStatus === 'checking' ? '' : 'warn'}`} aria-hidden="true" />
-      <span>AI: <strong>{aiLabel}</strong></span>
-      <span className="msep">·</span>
-      <span>LABORATORIA: <strong>{getLabs().length}</strong></span>
-      <span className="msep">·</span>
-      <span>ODWIEDZONE: <strong>{visited}/{totalLabs}</strong></span>
-    </div>
   );
 }
 

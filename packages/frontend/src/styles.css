@@ -161,6 +161,60 @@ button:disabled { cursor: default; }
 .hud-bl { bottom: 0.7rem; left: 0.7rem; transform: scaleY(-1); }
 .hud-br { bottom: 0.7rem; right: 0.7rem; transform: scale(-1); }
 
+/* ---------- Genesis Command Center — hero Dashboardu (silnik 3D jako środowisko) ---------- */
+.gx-hero {
+  position: relative; margin: 0.6rem 0.8rem 1rem; height: 54vh; min-height: 340px; max-height: 620px;
+  border-radius: 20px; overflow: hidden; border: 1px solid var(--border);
+  background: radial-gradient(ellipse 120% 90% at 50% 15%, rgba(92, 214, 232, 0.08), transparent 60%), var(--bg-panel);
+  box-shadow: var(--shadow-lg);
+}
+.gx-hero-scene { position: absolute; inset: 0; }
+.gx-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+.gx-hero-fallback {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 90% 70% at 50% 30%, rgba(167, 139, 250, 0.16), transparent 65%),
+              radial-gradient(ellipse 70% 60% at 50% 90%, rgba(92, 214, 232, 0.1), transparent 70%), var(--bg-panel);
+}
+.gx-hero-loading {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; color: var(--text-faint);
+}
+.gx-hero-overlay {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 1.3rem 1.3rem 1rem;
+  display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none;
+  background: linear-gradient(to top, rgba(4, 5, 12, 0.92), rgba(4, 5, 12, 0.55) 55%, transparent 100%);
+}
+.gx-hero-overlay > * { pointer-events: auto; }
+.gx-hero-eyebrow {
+  font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--cyan); text-shadow: 0 0 12px rgba(92, 214, 232, 0.5);
+}
+.gx-hero-title {
+  margin: 0; font-size: clamp(1.5rem, 4vw, 2.15rem); font-weight: 780; letter-spacing: -0.02em; line-height: 1.08;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.85);
+}
+.gx-hero-sub {
+  margin: 0; max-width: 62ch; font-size: 0.84rem; line-height: 1.55; color: var(--text-dim);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.85);
+}
+.gx-hero .mission-bar { margin-top: 0.15rem; }
+@media (max-width: 640px) { .gx-hero { height: 42vh; min-height: 280px; } }
+@media (prefers-reduced-motion: reduce) { .gx-hero-canvas { opacity: 0.9; } }
+
+/* ---------- Genesis shared panel language (gx-panel) — także używane przez Pilot (.pilot-step) ---------- */
+.gx-panel, .pilot-step {
+  border: 1px solid var(--border); border-radius: 16px;
+  background: linear-gradient(160deg, var(--bg-elevated), var(--bg-raised) 70%);
+  box-shadow: var(--shadow-sm);
+}
+.gx-metric-row {
+  display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.82rem;
+  padding: 0.3rem 0; border-bottom: 1px solid var(--border);
+}
+.gx-metric-row:last-child { border-bottom: none; }
+.gx-metric-row dt { color: var(--text-dim); }
+.gx-metric-row dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--text); }
+
 /* Reality Navigator — canvas jest position:fixed i persystentny (core/reality/RealityEngine.ts,
    components/RealityCanvas.tsx); reszta trasy musi zostawić przezroczystą "dziurę" (.reality-stage-spacer),
    żeby canvas był widoczny POD chromem UI, nie za nim. */

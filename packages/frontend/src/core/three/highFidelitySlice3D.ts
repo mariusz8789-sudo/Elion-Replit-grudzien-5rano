@@ -502,7 +502,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const materials = this.materials!;
     const worldW = this.simulation.worldWidth * HIGH_FIDELITY_WORLD_SCALE;
     const worldH = this.simulation.worldHeight * HIGH_FIDELITY_WORLD_SCALE;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(worldW + 2, worldH + 2), new THREE.MeshStandardMaterial({ color: 0x5c5f5a, roughness: 0.95 }));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(worldW + 2, worldH + 2), new THREE.MeshStandardMaterial({ color: 0x4e5450, roughness: 0.96 }));
 
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -592,7 +592,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       this.addSceneObject(cap);
 
       this.addRetailBase(cx, cz, w, d, obj.kind);
-      this.addWindows(cx, cz, w, d, height, levels, Boolean(obj.closed));
+      this.addFacadeDetail(cx, cz, w, d, height, levels, obj.kind, Boolean(obj.closed));
       if (obj.label) this.addBuildingSign(cx, cz, w, d, obj.label, obj.kind);
     }
   }
@@ -784,38 +784,113 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.addSceneObject(crowns);
   }
 
-  /** Siatka okien na dwóch dłuższych elewacjach — instancing, jeden draw call na budynek. */
-  private addWindows(cx: number, cz: number, w: number, d: number, height: number, levels: number, closed: boolean): void {
+  /**
+   * DETAL ELEWACJI — podniesienie poziomu renderingu z "pudełko + płaska plama
+   * okna" do realnej architektury: wnęki okienne z ościeżem, parapety, nadproża,
+   * podziały międzykondygnacyjne i gzyms wieńczący.
+   *
+   * Wszystko powtarzalne idzie przez InstancedMesh, więc cały detal jednego
+   * budynku to kilka draw calli, nie kilkaset.
+   */
+  private addFacadeDetail(
+    cx: number, cz: number, w: number, d: number,
+    height: number, levels: number, kind: string, closed: boolean,
+  ): void {
     const THREE = this.THREE!;
     if (levels <= 0) return;
-    const perRow = Math.max(1, Math.floor(w / 0.55));
-    const total = perRow * levels * 2;
-    if (total <= 0) return;
-    const geo = new THREE.BoxGeometry(0.34, 0.62, 0.03);
-    // Zamknięty interwencją budynek ma ciemne okna — to REALNY stan z modelu.
-    const mat = new THREE.MeshStandardMaterial({
-      color: closed ? 0x2a3038 : 0x9fc6da,
-      emissive: closed ? 0x000000 : 0x243a47,
-      emissiveIntensity: closed ? 0 : 0.55,
-      roughness: 0.22, metalness: 0.1,
-    });
-    const mesh = new THREE.InstancedMesh(geo, mat, total);
+
+    const groundTop = kind === 'home' ? 0.15 : 1.45;   // parter usługowy albo cokół
+    const usable = height - groundTop - 0.35;          // pod gzymsem
+    if (usable <= 0.6) return;
+    const rows = Math.max(1, Math.min(levels, Math.floor(usable / 1.5)));
+    const bays = Math.max(2, Math.min(8, Math.floor(w / 1.15)));
+    const perFace = rows * bays;
+    const total = perFace * 2;
+
+    const WIN_W = 0.62, WIN_H = 0.95, REVEAL = 0.09;
+
+    // Wnęka: ciemny prostopadłościan wpuszczony w lico — daje realny cień okna.
+    const reveal = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(WIN_W, WIN_H, REVEAL * 2),
+      new THREE.MeshStandardMaterial({ color: 0x14181d, roughness: 0.85 }),
+      total,
+    );
+    // Szyba: osobno, żeby stan `closed` gasił światło bez gaszenia ościeża.
+    const glass = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(WIN_W * 0.86, WIN_H * 0.86, 0.02),
+      new THREE.MeshStandardMaterial({
+        color: closed ? 0x2b3138 : 0xbcd8e8,
+        emissive: closed ? 0x000000 : 0x3d5b6e,
+        emissiveIntensity: closed ? 0 : 0.6,
+        roughness: 0.16, metalness: 0.25,
+      }),
+      total,
+    );
+    // Parapet — wystaje z lica, łapie światło i rzuca cień na elewację.
+    const sill = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(WIN_W * 1.2, 0.07, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0xb9b2a4, roughness: 0.75 }),
+      total,
+    );
+    sill.castShadow = true;
+    // Nadproże.
+    const lintel = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(WIN_W * 1.16, 0.09, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xa89e8d, roughness: 0.8 }),
+      total,
+    );
+    lintel.castShadow = true;
+
     const m = new THREE.Matrix4();
+    const rot = new THREE.Matrix4().makeRotationY(Math.PI);
     let i = 0;
-    for (let level = 0; level < levels; level++) {
-      const y = 0.9 + level * 1.5;
-      if (y > height - 0.16) continue;
-      for (let c = 0; c < perRow; c++) {
-        const ox = -w / 2 + 0.34 + c * (w - 0.68) / Math.max(1, perRow - 1);
-        m.makeTranslation(cx + ox, y, cz + d / 2 + 0.015);
-        mesh.setMatrixAt(i++, m);
-        m.makeTranslation(cx + ox, y, cz - d / 2 - 0.015);
-        mesh.setMatrixAt(i++, m);
+    for (let r = 0; r < rows; r++) {
+      const y = groundTop + 0.62 + r * 1.5;
+      if (y + WIN_H / 2 > height - 0.4) continue;
+      for (let b = 0; b < bays; b++) {
+        const ox = -w / 2 + (w / bays) * (b + 0.5);
+        for (const face of [1, -1]) {
+          const z = cz + face * (d / 2);
+          const flip = face < 0;
+          const place = (mesh: THREE_NS.InstancedMesh, dy: number, dz: number) => {
+            m.makeTranslation(cx + ox, y + dy, z + face * dz);
+            if (flip) m.multiply(rot);
+            mesh.setMatrixAt(i, m);
+          };
+          place(reveal, 0, -REVEAL);
+          place(glass, 0, -REVEAL * 0.4);
+          place(sill, -WIN_H / 2 - 0.05, 0.05);
+          place(lintel, WIN_H / 2 + 0.06, 0.03);
+          i++;
+        }
       }
     }
-    mesh.count = i;
-    mesh.instanceMatrix.needsUpdate = true;
-    this.addSceneObject(mesh);
+    for (const mesh of [reveal, glass, sill, lintel]) {
+      mesh.count = i;
+      mesh.instanceMatrix.needsUpdate = true;
+      this.addSceneObject(mesh);
+    }
+
+    // Gzyms wieńczący — wyraźny okap zamiast ostrej krawędzi bryły.
+    const cornice = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 1.07, 0.22, d * 1.07),
+      new THREE.MeshStandardMaterial({ color: 0x9a9184, roughness: 0.78 }),
+    );
+    cornice.position.set(cx, height - 0.16, cz);
+    cornice.castShadow = true;
+    cornice.receiveShadow = true;
+    this.addSceneObject(cornice);
+
+    // Pas międzykondygnacyjny nad parterem.
+    if (kind !== 'home') {
+      const band = new THREE.Mesh(
+        new THREE.BoxGeometry(w * 1.04, 0.14, d * 1.04),
+        new THREE.MeshStandardMaterial({ color: 0x8f8778, roughness: 0.8 }),
+      );
+      band.position.set(cx, groundTop + 0.05, cz);
+      band.castShadow = true;
+      this.addSceneObject(band);
+    }
   }
 
   /** Park z modelu: trawa + drzewa (instancing). Pozycja i rozmiar pochodzą z layoutu. */
@@ -866,8 +941,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const worldW = this.simulation.worldWidth * HIGH_FIDELITY_WORLD_SCALE;
     const worldH = this.simulation.worldHeight * HIGH_FIDELITY_WORLD_SCALE;
     const geo = new THREE.BoxGeometry(1, 1, 1);
-    const mat = new THREE.MeshStandardMaterial({ color: 0x6a7078, roughness: 0.92 });
-    const COUNT = 90;
+    const mat = new THREE.MeshStandardMaterial({ color: 0x8896a6, roughness: 0.95 });
+    const COUNT = 130;
     const mesh = new THREE.InstancedMesh(geo, mat, COUNT);
     mesh.name = 'hf-background-scenery';
     const m = new THREE.Matrix4();
@@ -877,11 +952,11 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     for (let i = 0; i < COUNT; i++) {
       const h = ((i * 40503 + 12345) >>> 0);
       const r01 = (n: number) => (((h >>> n) & 0xff) / 255);
-      const ring = worldW * (0.85 + r01(2) * 1.5);
+      const ring = worldW * (2.1 + r01(2) * 2.6);
       const angle = (i / COUNT) * Math.PI * 2 + r01(5) * 0.08;
-      const height = 1.2 + r01(9) * 5.5;
+      const height = 6 + r01(9) * 22;
       pos.set(Math.cos(angle) * ring, height / 2, Math.sin(angle) * (ring * (worldH / worldW)));
-      sc.set(0.9 + r01(13) * 1.8, height, 0.9 + r01(17) * 1.8);
+      sc.set(2.6 + r01(13) * 4.2, height, 2.6 + r01(17) * 4.2);
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r01(21) * Math.PI);
       m.compose(pos, q, sc);
       mesh.setMatrixAt(i, m);

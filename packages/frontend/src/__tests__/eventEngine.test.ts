@@ -8,7 +8,7 @@ import {
   type GenesisRule, type GenesisEventInput,
 } from '../core/events';
 import { EpidemicCitySimulation } from '../core/simulation/epidemicCity';
-import { runExperiment } from '../core/experimentFabric';
+import { parseScienceChatMessage, runExperiment } from '../core/experimentFabric';
 
 const modelInput = (over: Partial<GenesisEventInput> = {}): GenesisEventInput => ({
   type: 'infection.transmission', timestamp: 1, affectedEntities: [{ kind: 'agent', id: 2 }],
@@ -161,6 +161,16 @@ describe('Epidemic Digital Twin — canonical Fabric metrics', () => {
     expect(first.result.eventAnalysis?.metrics.largestTransmissionHotspotEvents).toBeGreaterThan(0);
     expect(first.result.eventSummary?.count).toBe(first.result.eventAnalysis?.metrics.transmissionEvents);
     expect(replay.result.eventAnalysis).toEqual(first.result.eventAnalysis);
+  });
+
+  it('parses declared real intervention controls and routes PySCF H₂ to the existing chemistry domain', () => {
+    const epidemic = parseScienceChatMessage('Zasymuluj epidemię R0=4 przez 30 dni seed=321, restrictions=0.9, transmission scale=0, izoluj zakażonych, początkowo zakażeni=4.');
+    expect(epidemic.domainId).toBe('biology');
+    expect(epidemic.parameters).toMatchObject({ r0: 4, horizonDays: 30, restrictions: 0.9, transmissionScale: 0, isolate: true, initialInfected: 4 });
+    const h2 = parseScienceChatMessage('Uruchom PySCF H2 RHF bond length=0.74 Å.');
+    expect(h2.domainId).toBe('chemistry');
+    expect(h2.modelId).toBe('quantum-chemistry-pyscf-h2-rhf');
+    expect(h2.parameters.bondLengthAngstrom).toBe(0.74);
   });
 
   it('applies declared transmission and isolation controls to the same real model rather than recording inert parameters', () => {

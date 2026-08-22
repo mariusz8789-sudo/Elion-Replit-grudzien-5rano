@@ -900,7 +900,7 @@ describe('backend Evidence-Guided execution', () => {
     expect(isBackendEvidenceGuidedPlan(reviewed)).toBe(true);
     const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewed);
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
-      contractVersion: '1.0.0', modelId: 'quantum-chemistry-pyscf-h2-rhf', domainId: 'quantum-chemistry', inputs: { bondLengthAngstrom: 0.74 },
+      contractVersion: '1.0.0', modelId: 'quantum-chemistry-pyscf-h2-rhf', domainId: 'chemistry', inputs: { bondLengthAngstrom: 0.74 },
     });
     expect(confirmed.run.result.outputs.energyHartree).toBeCloseTo(-1.11675931, 12);
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('PySCF 2.13.0');

@@ -1526,7 +1526,7 @@ describe('Genesis Experiment Fabric', () => {
     const request = parseScienceChatMessage('Uruchom PySCF RHF dla H2; długość wiązania 0.74 Å.');
     const planned = planEvidenceGuidedExperiment(request);
     expect(request.modelId).toBe('quantum-chemistry-pyscf-h2-rhf');
-    expect(request.domainId).toBe('quantum-chemistry');
+    expect(request.domainId).toBe('chemistry');
     expect(request.parameters).toEqual({ bondLengthAngstrom: 0.74 });
     expect(planned.plan.engine).toBe('pyscf@2.13.0');
     expect(planned.plan.runnable).toBe(true);

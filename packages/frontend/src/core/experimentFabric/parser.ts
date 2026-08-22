@@ -30,6 +30,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const seed = firstNumber(normalized, /\bseed\s*[=:]?\s*(\d+)/);
   const r0 = firstNumber(normalized, /\br[₀0]\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const horizonDays = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*(?:dni|dzień|dnia|days?)\b/);
+  const initialInfected = firstNumber(normalized, /\b(?:initial infected|początkowo zakażeni|poczatkowo zakazeni|początkowe zakażenia|poczatkowe zakazenia)\s*[=:]?\s*(\d+)/);
+  const transmissionScale = firstNumber(normalized, /\b(?:transmission scale|mnożnik transmisji|mnoznik transmisji)\s*[=:]?\s*(0(?:[.,]\d+)?|1(?:[.,]0+)?)/);
+  const restrictions = firstNumber(normalized, /\b(?:restrictions|restrykcje|lockdown)\s*[=:]?\s*(0(?:[.,]\d+)?|1(?:[.,]0+)?)/);
+  const isolateInfected = /(?:\bizoluj(?:\s+zakażonych|\s+zakazonych)?\b|\bizolacja\s+(?:zakażonych|zakazonych)\b|\bquarantine\b)/.test(normalized);
   const proteinSteps = firstNumber(normalized, /\b(?:kroki\s*(?:mc|monte carlo)?|steps)\s*[=:]?\s*(\d+)\b/);
   const massSolar = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*(?:mas(?:a|y)\s+słońca|masy slonca|m[_ ]?sun|msun|solar masses?)\b/);
   const chirpMass1Solar = firstNumber(normalized, /\b(?:m1|masa\s*1|pierwsza\s*masa)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
@@ -93,6 +97,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (seed !== undefined) params.seed = seed;
   if (r0 !== undefined) params.r0 = r0;
   if (horizonDays !== undefined) params.horizonDays = horizonDays;
+  if (initialInfected !== undefined) params.initialInfected = initialInfected;
+  if (transmissionScale !== undefined) params.transmissionScale = transmissionScale;
+  if (restrictions !== undefined) params.restrictions = restrictions;
+  if (isolateInfected) params.isolate = true;
   if (proteinSteps !== undefined) params.steps = proteinSteps;
   if (massSolar !== undefined) params.massSolar = massSolar;
   if (chirpMass1Solar !== undefined) params.m1Solar = chirpMass1Solar;
@@ -224,12 +232,12 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     return request('chemistry', 'chem-rdkit-descriptors', 'graph', ['smiles']);
   }
   if (/(?:\bpyscf\b|hartree[ -]?fock|\brhf\b)/.test(normalized) && /(?:\bh2\b|h₂|wod(?:ó|o)r\s+dwuatomow[a-ząćęłńóśźż]*)/.test(normalized)) {
-    return request('quantum-chemistry', 'quantum-chemistry-pyscf-h2-rhf', 'graph', ['bondLengthAngstrom']);
+    return request('chemistry', 'quantum-chemistry-pyscf-h2-rhf', 'graph', ['bondLengthAngstrom']);
   }
   if (/\b(fałdowani[a-ząćęłńóśźż]* białk[a-ząćęłńóśźż]*|faldowani[a-ząćęłńóśźż]* bialk[a-ząćęłńóśźż]*|protein folding|model hp|hydrofobow[a-ząćęłńóśźż]* rdze[nń])\b/.test(normalized)) return request('biology', 'biology-protein-folding-hp', 'canvas-2d', ['sequenceKey', 'temperature', 'steps', 'seed']);
   if (/\b(dna|helis[a-ząćęłńóśźż]* dna|b[- ]?dna|temperatur[a-ząćęłńóśźż]* topnieni[a-ząćęłńóśźż]* dna|wallace)\b/.test(normalized)) return request('biology', 'biology-dna-helix', 'scene-3d', ['sequence', 'temperatureC']);
   if (/(?:epidem[a-ząćęłńóśźż]*|seir|seird|\bsir\b|zakaż[a-ząćęłńóśźż]*|zakaz[a-ząćęłńóśźż]*|rozwój epidemii|rozwoj epidemii)/.test(normalized)) {
-    return request('biology', 'epidemic-city', 'world-3d', ['r0', 'horizonDays', 'nAgents']);
+    return request('biology', 'epidemic-city', 'world-3d', ['r0', 'horizonDays', 'nAgents', 'initialInfected', 'transmissionScale', 'restrictions', 'isolate']);
   }
   if (/\b(przepływ wody|przeplyw wody|pompa|rurociąg|rurociag|darcy|reynolds)\b/.test(normalized)) {
     return request('engineering-water', 'water-pump-pipe', 'graph', ['volumetricFlow', 'pipeDiameter', 'pipeLength', 'pipeRoughnessMm', 'staticLift', 'fluidDensity', 'fluidViscosity', 'pumpEfficiency']);

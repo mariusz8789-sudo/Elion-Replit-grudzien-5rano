@@ -1,9 +1,34 @@
 import type { ExperimentRun } from './types';
 
-export const DISCOVERY_SEAM_VERSION = '1.0.0';
+export const DISCOVERY_SEAM_VERSION = '1.1.0';
 
 export type DiscoveryFindingKind = 'insufficient-data' | 'observed-correlation' | 'observed-outlier';
 export type DiscoveryVerdict = 'INSUFFICIENT_DATA' | 'REQUIRES_SCIENTIFIC_REVIEW';
+export type DiscoveryDiagnosticsStatus = 'AVAILABLE' | 'NOT_COMPARABLE';
+export type DiscoveryMonotonicTrend = 'STRICTLY_INCREASING' | 'STRICTLY_DECREASING' | 'CONSTANT' | 'NON_MONOTONIC' | 'NOT_ASSESSABLE';
+
+export interface DiscoverySeriesDiagnostics {
+  status: DiscoveryDiagnosticsStatus;
+  validRuns: number;
+  distinctModels: number;
+  distinctModelVersions: number;
+  distinctEngines: number;
+  distinctOutputUnits: number;
+  parameterDistinctValueCount: number;
+  outputUnit?: string;
+  parameterMinimum?: number;
+  parameterMaximum?: number;
+  outputMinimum?: number;
+  outputMaximum?: number;
+  /** Descriptive least-squares slope; never a causal estimate or forecast. */
+  leastSquaresSlope?: number;
+  monotonicTrend: DiscoveryMonotonicTrend;
+  /** Difference between outputs at the lowest and highest unique parameter values. */
+  endpointAbsoluteDifference?: number;
+  /** Undefined where the low-end output is zero; never imputed. */
+  endpointRelativeDifference?: number;
+  limitations: readonly string[];
+}
 
 export interface DiscoveryFinding {
   kind: DiscoveryFindingKind;
@@ -18,6 +43,7 @@ export interface DiscoveryAnalysis {
   modelId: string | null;
   parameterKey: string;
   outputKey: string;
+  diagnostics: DiscoverySeriesDiagnostics;
   findings: readonly DiscoveryFinding[];
   disclaimer: string;
 }
@@ -40,10 +66,97 @@ function pearson(xs: readonly number[], ys: readonly number[]): number | null {
   return numerator / Math.sqrt(xx * yy);
 }
 
+function leastSquaresSlope(xs: readonly number[], ys: readonly number[]): number | null {
+  if (xs.length < 2 || xs.length !== ys.length) return null;
+  const meanX = xs.reduce((sum, value) => sum + value, 0) / xs.length;
+  const meanY = ys.reduce((sum, value) => sum + value, 0) / ys.length;
+  const denominator = xs.reduce((sum, value) => sum + (value - meanX) ** 2, 0);
+  if (denominator === 0) return null;
+  return xs.reduce((sum, value, index) => sum + (value - meanX) * (ys[index] - meanY), 0) / denominator;
+}
+
+function diagnosticsFor(
+  valid: readonly ExperimentRun[],
+  parameterKey: string,
+  outputKey: string,
+): DiscoverySeriesDiagnostics {
+  const modelIds = new Set(valid.map((run) => run.provenance.modelId ?? ''));
+  const versions = new Set(valid.map((run) => run.provenance.modelVersion ?? ''));
+  const engines = new Set(valid.map((run) => run.provenance.engine ?? ''));
+  const units = new Set(valid.map((run) => run.result.units[outputKey] ?? ''));
+  const xs = valid.map((run) => run.provenance.parameterSnapshot[parameterKey] as number);
+  const ys = valid.map((run) => run.result.outputs[outputKey] as number);
+  const parameterDistinctValueCount = new Set(xs).size;
+  const comparable = valid.length >= 3
+    && modelIds.size === 1
+    && versions.size === 1
+    && engines.size === 1
+    && units.size === 1
+    && parameterDistinctValueCount >= 2;
+  if (!comparable) {
+    const limitations: string[] = [];
+    if (valid.length < 3) limitations.push('Mniej niż trzy ukończone runy z numerycznym parametrem i outputem.');
+    if (modelIds.size !== 1) limitations.push('Runy mają różne modele.');
+    if (versions.size !== 1) limitations.push('Runy mają różne wersje modelu.');
+    if (engines.size !== 1) limitations.push('Runy mają różne engine IDs.');
+    if (units.size !== 1) limitations.push('Runy mają niespójne jednostki outputu.');
+    if (parameterDistinctValueCount < 2) limitations.push('Brak co najmniej dwóch różnych wartości badanego parametru.');
+    return {
+      status: 'NOT_COMPARABLE',
+      validRuns: valid.length,
+      distinctModels: modelIds.size,
+      distinctModelVersions: versions.size,
+      distinctEngines: engines.size,
+      distinctOutputUnits: units.size,
+      parameterDistinctValueCount,
+      monotonicTrend: 'NOT_ASSESSABLE',
+      limitations,
+    };
+  }
+
+  const points = xs.map((x, index) => ({ x, y: ys[index] })).sort((left, right) => left.x - right.x);
+  const hasDuplicateParameters = parameterDistinctValueCount !== points.length;
+  const deltas = points.slice(1).map((point, index) => point.y - points[index].y);
+  const monotonicTrend: DiscoveryMonotonicTrend = hasDuplicateParameters
+    ? 'NOT_ASSESSABLE'
+    : deltas.every((delta) => delta > 0)
+      ? 'STRICTLY_INCREASING'
+      : deltas.every((delta) => delta < 0)
+        ? 'STRICTLY_DECREASING'
+        : deltas.every((delta) => delta === 0)
+          ? 'CONSTANT'
+          : 'NON_MONOTONIC';
+  const endpointAbsoluteDifference = points.at(-1)!.y - points[0].y;
+  const endpointRelativeDifference = points[0].y === 0 ? undefined : endpointAbsoluteDifference / Math.abs(points[0].y);
+  return {
+    status: 'AVAILABLE',
+    validRuns: valid.length,
+    distinctModels: modelIds.size,
+    distinctModelVersions: versions.size,
+    distinctEngines: engines.size,
+    distinctOutputUnits: units.size,
+    parameterDistinctValueCount,
+    outputUnit: [...units][0],
+    parameterMinimum: Math.min(...xs),
+    parameterMaximum: Math.max(...xs),
+    outputMinimum: Math.min(...ys),
+    outputMaximum: Math.max(...ys),
+    leastSquaresSlope: leastSquaresSlope(xs, ys) ?? undefined,
+    monotonicTrend,
+    endpointAbsoluteDifference,
+    ...(endpointRelativeDifference === undefined ? {} : { endpointRelativeDifference }),
+    limitations: [
+      'Diagnostyki opisują wyłącznie ukończoną, porównywalną serię realnych runów w granicach istniejącego modelu.',
+      'Least-squares slope, monotoniczność i endpoint effect nie są p-value, przedziałem ufności, dowodem przyczynowym, kalibracją ani prognozą.',
+      ...(hasDuplicateParameters ? ['Powtórzone wartości parametru blokują ocenę monotoniczności; możliwa zmienność wymaga osobnego prerejestrowanego protokołu.'] : []),
+    ],
+  };
+}
+
 /**
- * Analyses comparable, already-executed runs. It has no simulator, no search
- * over hypothetical points and no causal claim. A finding is only a prompt for
- * scientist review with complete run IDs as evidence.
+ * Analyses comparable, already-executed real-engine runs. It has no simulator,
+ * no search over hypothetical points and no causal claim. A finding is only a
+ * prompt for scientist review with complete run IDs as evidence.
  */
 export function analyseExperimentSeries(
   runs: readonly ExperimentRun[],
@@ -53,26 +166,37 @@ export function analyseExperimentSeries(
   const valid = runs.filter((run) => {
     const parameter = run.provenance.parameterSnapshot[parameterKey];
     const output = run.result.outputs[outputKey];
-    return run.result.status === 'completed' && typeof parameter === 'number' && Number.isFinite(parameter)
-      && typeof output === 'number' && Number.isFinite(output);
+    return run.result.status === 'completed'
+      && run.provenance.resultOrigin === 'real-engine'
+      && typeof parameter === 'number'
+      && Number.isFinite(parameter)
+      && typeof output === 'number'
+      && Number.isFinite(output);
   });
   const modelIds = [...new Set(valid.map((run) => run.provenance.modelId ?? ''))].filter(Boolean);
+  const diagnostics = diagnosticsFor(valid, parameterKey, outputKey);
   const base = {
     contractVersion: DISCOVERY_SEAM_VERSION,
     modelId: modelIds.length === 1 ? modelIds[0] : null,
     parameterKey,
     outputKey,
-    disclaimer: 'Wynik jest obserwacją z istniejących, audytowalnych runów; nie jest odkryciem, dowodem przyczynowym ani prognozą.',
+    diagnostics,
+    disclaimer: 'Wynik jest obserwacją z istniejących, audytowalnych real-engine runów; nie jest odkryciem, dowodem przyczynowym, p-value, przedziałem ufności ani prognozą.',
   };
-  if (valid.length < 3 || modelIds.length !== 1) {
+  if (diagnostics.status !== 'AVAILABLE') {
     return {
       ...base,
       findings: [{
         kind: 'insufficient-data', verdict: 'INSUFFICIENT_DATA',
-        message: valid.length < 3
-          ? 'Potrzebne są co najmniej trzy porównywalne, zakończone runy z numerycznym parametrem i wynikiem.'
-          : 'Runy pochodzą z różnych modeli i nie są porównywalne bez jawnej metody normalizacji.',
-        evidence: { validRuns: valid.length, distinctModels: modelIds.length }, runIds: valid.map((run) => run.runId),
+        message: `Seria nie jest porównywalna dla diagnostyki: ${diagnostics.limitations.join(' ')}`,
+        evidence: {
+          validRuns: diagnostics.validRuns,
+          distinctModels: diagnostics.distinctModels,
+          distinctModelVersions: diagnostics.distinctModelVersions,
+          distinctEngines: diagnostics.distinctEngines,
+          distinctOutputUnits: diagnostics.distinctOutputUnits,
+        },
+        runIds: valid.map((run) => run.runId),
       }],
     };
   }
@@ -85,7 +209,18 @@ export function analyseExperimentSeries(
     findings: [{
       kind: 'observed-correlation', verdict: 'REQUIRES_SCIENTIFIC_REVIEW',
       message: `Zaobserwowano silną korelację Pearsona (r=${r.toFixed(3)}) w tej serii. Wymaga ona niezależnej analizy założeń i replikacji.`,
-      evidence: { pearsonR: r, validRuns: valid.length, parameterMin: Math.min(...xs), parameterMax: Math.max(...xs), outputMin: Math.min(...ys), outputMax: Math.max(...ys) },
+      evidence: {
+        pearsonR: r,
+        validRuns: valid.length,
+        parameterMin: diagnostics.parameterMinimum!,
+        parameterMax: diagnostics.parameterMaximum!,
+        outputMin: diagnostics.outputMinimum!,
+        outputMax: diagnostics.outputMaximum!,
+        leastSquaresSlope: diagnostics.leastSquaresSlope ?? 'NOT_ASSESSABLE',
+        monotonicTrend: diagnostics.monotonicTrend,
+        endpointAbsoluteDifference: diagnostics.endpointAbsoluteDifference!,
+        ...(diagnostics.endpointRelativeDifference === undefined ? {} : { endpointRelativeDifference: diagnostics.endpointRelativeDifference }),
+      },
       runIds: valid.map((run) => run.runId),
     }],
   };

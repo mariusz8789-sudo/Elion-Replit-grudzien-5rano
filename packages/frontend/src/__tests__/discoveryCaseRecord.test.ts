@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   analyseExperimentSeries,
+  concludeScientificDiscovery,
   createDiscoveryCaseRecord,
   createGenesisResearchPacket,
   createScientificReviewDecision,
@@ -11,9 +12,11 @@ import {
   parseScienceChatMessage,
   replayDiscoveryCaseRecord,
   replayScenarioCapsule,
+  replayScientificConclusion,
   replayScientificReviewDecision,
   selectNextScientificExperiment,
   serializeDiscoveryCaseRecord,
+  serializeScientificConclusion,
   serializeScientificReviewDecision,
 } from '../core/experimentFabric';
 
@@ -115,6 +118,38 @@ describe('Genesis Discovery Case Record', () => {
     expect(JSON.parse(serializeScientificReviewDecision(review)).reviewId).toBe(review.reviewId);
     expect(replay.reviewFingerprint).toBe(review.reviewFingerprint);
     expect(review.disclaimer).toContain('nie uruchamia eksperymentu');
+  });
+
+  it('derives a source-bound, conservative conclusion from a real case without claiming discovery', () => {
+    const artifacts = realSchwarzschildArtifacts();
+    const research = createGenesisResearchPacket('czarna dziura Schwarzschilda');
+    const record = createDiscoveryCaseRecord({ research, ...artifacts });
+    const review = createScientificReviewDecision(record, {
+      reviewerReference: 'reviewer:independent-scientist-01',
+      reviewedAt: '2026-08-22T01:30:00.000Z',
+      decision: 'ACCEPT_FOR_PREREGISTRATION',
+      rationale: 'Replikowalne source-bound evidence może być ocenione wyłącznie w granicach prerejestrowanego protokołu.',
+    });
+    const conclusion = concludeScientificDiscovery(record, review);
+    const replay = replayScientificConclusion(record, review);
+
+    expect(conclusion).toMatchObject({
+      status: 'OBSERVATION_SUPPORTED_WITHIN_PROTOCOL',
+      reviewStatus: 'DECLARED_REVIEW_RECORDED',
+      protocolAssessment: 'SUPPORTED_WITHIN_PROTOCOL',
+      evidenceId: artifacts.evidence.evidenceId,
+      provenance: {
+        caseFingerprint: record.caseFingerprint,
+        reviewFingerprint: review.reviewFingerprint,
+      },
+    });
+    expect(conclusion.statement).toContain('prerejestrowanego protokołu');
+    expect(conclusion.disclaimer).toContain('nie ogłasza odkrycia');
+    expect(JSON.parse(serializeScientificConclusion(conclusion)).conclusionId).toBe(conclusion.conclusionId);
+    expect(replay.conclusionFingerprint).toBe(conclusion.conclusionFingerprint);
+
+    const mismatchedReview = { ...review, evidenceFingerprint: 'evidence_mismatch' };
+    expect(concludeScientificDiscovery(record, mismatchedReview).status).toBe('BLOCKED_REVIEW_MISMATCH');
   });
 
   it('blocks a case record when research does not cover the Evidence Chain domain', () => {

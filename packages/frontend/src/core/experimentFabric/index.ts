@@ -140,6 +140,15 @@ export {
   type ScientificReviewDecision,
 } from './scientificReviewDecision';
 export {
+  SCIENTIFIC_CONCLUSION_VERSION,
+  concludeScientificDiscovery,
+  serializeScientificConclusion,
+  replayScientificConclusion,
+  type ScientificConclusionStatus,
+  type ScientificConclusionReviewStatus,
+  type ScientificConclusion,
+} from './scientificConclusion';
+export {
   SEEDED_UNCERTAINTY_VERSION,
   MAX_PREREGISTERED_SEEDS,
   isSeededStochasticModel,

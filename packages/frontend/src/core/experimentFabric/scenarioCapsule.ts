@@ -1,5 +1,6 @@
 import { canonicalJson, fnv1a } from '../events/hash';
 import { compareCounterfactual, type CounterfactualComparison } from './counterfactualCompare';
+import type { DiscoveryCaseRecord } from './discoveryCaseRecord';
 import type { ScientificEvidencePack } from './evidencePack';
 import { runExperiment } from './executor';
 import { GENESIS_SPATIAL_DATASET_VERSION, OSM_ATTRIBUTION, OSM_LICENSE, type GenesisSpatialDataset } from './spatialImport';
@@ -17,6 +18,8 @@ export interface ScenarioCapsuleInput {
   evidencePack?: ScientificEvidencePack;
   /** Static, provenance-bearing GIS context; it is never a World State. */
   spatialDataset?: GenesisSpatialDataset;
+  /** Existing review-ready Discovery envelope; it never approves follow-up execution. */
+  discoveryCase?: DiscoveryCaseRecord;
 }
 
 /**
@@ -29,6 +32,12 @@ export interface SpatialScenarioAttachment {
   disclaimer: string;
 }
 
+export interface DiscoveryScenarioAttachment {
+  status: 'RETAINED_DISCOVERY_CASE';
+  record: DiscoveryCaseRecord;
+  disclaimer: string;
+}
+
 export interface ReproducibleScenarioCapsule {
   contractVersion: string;
   capsuleId: string;
@@ -38,6 +47,7 @@ export interface ReproducibleScenarioCapsule {
   comparison?: CounterfactualComparison;
   evidencePack?: ScientificEvidencePack;
   spatial?: SpatialScenarioAttachment;
+  discovery?: DiscoveryScenarioAttachment;
   references: {
     baselineRunFingerprint: string;
     variantRunFingerprint?: string;
@@ -45,6 +55,8 @@ export interface ReproducibleScenarioCapsule {
     evidencePackId?: string;
     spatialDatasetId?: string;
     spatialNormalizationFingerprint?: string;
+    discoveryCaseId?: string;
+    discoveryCaseFingerprint?: string;
   };
   disclaimer: string;
 }
@@ -58,6 +70,7 @@ export interface ScenarioCapsuleReplay {
   comparison?: CounterfactualComparison;
   checks: readonly { artifact: 'baseline' | 'variant' | 'comparison'; expected: string; actual?: string; matched: boolean }[];
   spatial?: { status: 'RETAINED_STATIC_ARTIFACT'; datasetId: string; normalizationFingerprint: string; license: string; attribution: string };
+  discovery?: { status: 'RETAINED_DISCOVERY_CASE'; caseId: string; caseFingerprint: string; evidenceFingerprint: string };
   message: string;
 }
 
@@ -93,6 +106,27 @@ function requireConsistentEvidencePack(baselineRun: ExperimentRun, variantRun: E
   }
 }
 
+function requireConsistentDiscoveryCase(
+  baselineRun: ExperimentRun,
+  variantRun: ExperimentRun | undefined,
+  discoveryCase: DiscoveryCaseRecord | undefined,
+): void {
+  if (!discoveryCase) return;
+  if (discoveryCase.status !== 'READY_FOR_REVIEW') {
+    throw new Error('Scenario Capsule accepts a Discovery Case Record only when it is READY_FOR_REVIEW.');
+  }
+  if (
+    discoveryCase.provenance.evidenceFingerprint !== discoveryCase.evidence.provenanceFingerprint
+    || discoveryCase.candidate.evidenceProvenanceFingerprint !== discoveryCase.evidence.provenanceFingerprint
+  ) {
+    throw new Error('Scenario Capsule Discovery Case Record has inconsistent evidence provenance.');
+  }
+  const caseRunFingerprints = new Set(discoveryCase.evidence.allRuns.map((run) => run.provenance.runFingerprint));
+  if (!caseRunFingerprints.has(baselineRun.provenance.runFingerprint) || (variantRun !== undefined && !caseRunFingerprints.has(variantRun.provenance.runFingerprint))) {
+    throw new Error('Scenario Capsule Discovery Case Record must contain every canonical capsule run in its real Evidence Chain.');
+  }
+}
+
 function requireSpatialDataset(dataset: GenesisSpatialDataset | undefined): void {
   if (!dataset) return;
   if (dataset.contractVersion !== GENESIS_SPATIAL_DATASET_VERSION) {
@@ -107,6 +141,16 @@ function requireSpatialDataset(dataset: GenesisSpatialDataset | undefined): void
   if (!dataset.sourceTimestamp || !dataset.sourceUrl || !dataset.sourceQuery || !dataset.provenance.rawArtifactFingerprint || !dataset.provenance.normalizationFingerprint) {
     throw new Error('Scenario Capsule spatial dataset requires source timestamp, URL, query and both provenance fingerprints.');
   }
+}
+
+function discoveryReplayAttachment(record: DiscoveryCaseRecord | undefined): ScenarioCapsuleReplay['discovery'] | undefined {
+  if (!record) return undefined;
+  return {
+    status: 'RETAINED_DISCOVERY_CASE',
+    caseId: record.caseId,
+    caseFingerprint: record.caseFingerprint,
+    evidenceFingerprint: record.provenance.evidenceFingerprint,
+  };
 }
 
 function spatialReplayAttachment(dataset: GenesisSpatialDataset | undefined): ScenarioCapsuleReplay['spatial'] | undefined {
@@ -129,6 +173,7 @@ function capsuleIdFor(input: ScenarioCapsuleInput): string {
     comparison: input.comparison?.comparisonId ?? null,
     evidencePack: input.evidencePack?.evidencePackId ?? null,
     spatialDataset: input.spatialDataset?.provenance.normalizationFingerprint ?? null,
+    discoveryCase: input.discoveryCase?.caseFingerprint ?? null,
   }))}`;
 }
 
@@ -139,6 +184,7 @@ export function createScenarioCapsule(input: ScenarioCapsuleInput): Reproducible
   if (input.variantRun) requireRealRun('variant', input.variantRun);
   requireConsistentComparison(input.baselineRun, input.variantRun, input.comparison);
   requireConsistentEvidencePack(input.baselineRun, input.variantRun, input.evidencePack);
+  requireConsistentDiscoveryCase(input.baselineRun, input.variantRun, input.discoveryCase);
   requireSpatialDataset(input.spatialDataset);
   return {
     contractVersion: SCENARIO_CAPSULE_VERSION,
@@ -155,6 +201,13 @@ export function createScenarioCapsule(input: ScenarioCapsuleInput): Reproducible
         disclaimer: 'Artefakt przestrzenny zachowano jako realny kontekst danych OSM z provenance. Nie jest World State, nie modyfikuje parametrów eksperymentu i nie oznacza Digital Twin ani kalibracji do lokalizacji.',
       },
     } : {}),
+    ...(input.discoveryCase ? {
+      discovery: {
+        status: 'RETAINED_DISCOVERY_CASE' as const,
+        record: input.discoveryCase,
+        disclaimer: 'Discovery Case Record zachowano jako review-gated, source-bound provenance. Nie uruchamia on nowego solvera, nie zatwierdza hipotezy ani follow-up protocolu i nie zastępuje review eksperckiego.',
+      },
+    } : {}),
     references: {
       baselineRunFingerprint: input.baselineRun.provenance.runFingerprint,
       ...(input.variantRun ? { variantRunFingerprint: input.variantRun.provenance.runFingerprint } : {}),
@@ -163,6 +216,10 @@ export function createScenarioCapsule(input: ScenarioCapsuleInput): Reproducible
       ...(input.spatialDataset ? {
         spatialDatasetId: input.spatialDataset.datasetId,
         spatialNormalizationFingerprint: input.spatialDataset.provenance.normalizationFingerprint,
+      } : {}),
+      ...(input.discoveryCase ? {
+        discoveryCaseId: input.discoveryCase.caseId,
+        discoveryCaseFingerprint: input.discoveryCase.caseFingerprint,
       } : {}),
     },
     disclaimer: 'Scenario Capsule zachowuje rzeczywiste runy i ich provenance jako przenośny rekord. Re-run może wykazać MATCH, DRIFT albo NOT_COMPARABLE; kapsuła nie kalibruje modelu do świata rzeczywistego, nie tworzy nowego wyniku i nie zastępuje review eksperckiego.',
@@ -179,6 +236,7 @@ function replaySingle(capsule: ReproducibleScenarioCapsule): ScenarioCapsuleRepl
     baselineRun,
     checks: [{ artifact: 'baseline', expected: capsule.references.baselineRunFingerprint, actual: baselineRun.provenance.runFingerprint, matched }],
     ...(spatialReplayAttachment(capsule.spatial?.dataset) ? { spatial: spatialReplayAttachment(capsule.spatial?.dataset) } : {}),
+    ...(discoveryReplayAttachment(capsule.discovery?.record) ? { discovery: discoveryReplayAttachment(capsule.discovery?.record) } : {}),
     message: baselineRun.result.status !== 'completed'
       ? 'Nie można porównać kapsuły: re-run baseline nie ukończył się.'
       : matched ? 'Re-run baseline odpowiada fingerprintowi kapsuły.' : 'Re-run baseline ukończył się, lecz fingerprint różni się od kapsuły.',
@@ -209,6 +267,7 @@ export function replayScenarioCapsule(capsule: ReproducibleScenarioCapsule): Sce
     ...(variantRun ? { variantRun } : {}),
     comparison,
     ...(spatialReplayAttachment(capsule.spatial?.dataset) ? { spatial: spatialReplayAttachment(capsule.spatial?.dataset) } : {}),
+    ...(discoveryReplayAttachment(capsule.discovery?.record) ? { discovery: discoveryReplayAttachment(capsule.discovery?.record) } : {}),
     checks: [
       { artifact: 'baseline', expected: capsule.references.baselineRunFingerprint, ...(baselineRun ? { actual: baselineRun.provenance.runFingerprint } : {}), matched: baselineMatched },
       { artifact: 'variant', expected: capsule.references.variantRunFingerprint ?? '', ...(variantRun ? { actual: variantRun.provenance.runFingerprint } : {}), matched: variantMatched },

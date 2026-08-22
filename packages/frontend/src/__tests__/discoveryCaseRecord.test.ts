@@ -3,11 +3,13 @@ import {
   analyseExperimentSeries,
   createDiscoveryCaseRecord,
   createGenesisResearchPacket,
+  createScenarioCapsule,
   designScientificExperiment,
   executeScientificExperiment,
   formulateScientificHypothesisCandidate,
   parseScienceChatMessage,
   replayDiscoveryCaseRecord,
+  replayScenarioCapsule,
   selectNextScientificExperiment,
   serializeDiscoveryCaseRecord,
 } from '../core/experimentFabric';
@@ -63,6 +65,24 @@ describe('Genesis Discovery Case Record', () => {
     expect(JSON.parse(serializeDiscoveryCaseRecord(record)).caseId).toBe(record.caseId);
     expect(replay.caseFingerprint).toBe(record.caseFingerprint);
     expect(record.disclaimer).toContain('Nie jest zatwierdzeniem hipotezy');
+
+    const capsule = createScenarioCapsule({
+      title: 'Schwarzschild discovery case',
+      baselineRun: artifacts.evidence.allRuns[0],
+      discoveryCase: record,
+    });
+    const capsuleReplay = replayScenarioCapsule(capsule);
+    expect(capsule.references).toMatchObject({
+      discoveryCaseId: record.caseId,
+      discoveryCaseFingerprint: record.caseFingerprint,
+    });
+    expect(capsule.discovery?.record.caseFingerprint).toBe(record.caseFingerprint);
+    expect(capsuleReplay.status).toBe('MATCH');
+    expect(capsuleReplay.discovery).toMatchObject({
+      status: 'RETAINED_DISCOVERY_CASE',
+      caseId: record.caseId,
+      evidenceFingerprint: record.provenance.evidenceFingerprint,
+    });
   });
 
   it('blocks a case record when research does not cover the Evidence Chain domain', () => {
@@ -74,5 +94,10 @@ describe('Genesis Discovery Case Record', () => {
     expect(record.blockingReasons).toEqual(expect.arrayContaining([
       expect.stringContaining('nie obejmuje domeny Evidence Chain'),
     ]));
+    expect(() => createScenarioCapsule({
+      title: 'Blocked discovery case',
+      baselineRun: artifacts.evidence.allRuns[0],
+      discoveryCase: record,
+    })).toThrow('READY_FOR_REVIEW');
   });
 });

@@ -39,7 +39,10 @@ function backendProvenanceRecord(run: ComputeRun): Readonly<Record<string, strin
     source: provenance?.source ?? 'backend provenance absent',
     formula: provenance?.formula ?? 'backend provenance absent',
     honesty: provenance?.honesty ?? 'unknown',
-    engine: provenance?.engine ?? 'unknown',
+    // ComputeRun.engine is authoritative backend metadata. Some ModelGraph
+    // adapters intentionally keep provenance limited to source/formula/honesty
+    // and therefore do not duplicate the engine in provenance.engine.
+    engine: provenance?.engine ?? run.engine ?? 'unknown',
     requiredEnvironmentVariable: provenance?.requiredEnvironmentVariable ?? 'unknown',
     classification: provenance?.classification ?? 'UNCLASSIFIED',
     referencePdb: provenance?.referencePdb ?? 'not-applicable',
@@ -57,7 +60,7 @@ function resultFromBackend(plan: EvidenceGuidedExperimentPlan, backendRun: Compu
   if (!model || backendRun.modelId !== model.id || backendRun.modelVersion !== model.modelVersion) {
     throw new Error('Backend returned a model identity or version different from the reviewed plan.');
   }
-  if (!backendRun.provenance?.engine) {
+  if (!backendRun.provenance?.engine && !backendRun.engine) {
     throw new Error('Backend did not provide engine provenance for the reviewed plan.');
   }
   if (!backendRun.outputs || !backendRun.units || backendRun.status !== 'ok') {
@@ -66,7 +69,7 @@ function resultFromBackend(plan: EvidenceGuidedExperimentPlan, backendRun: Compu
   return {
     contractVersion: EXPERIMENT_FABRIC_VERSION,
     status: 'completed',
-    summary: `Backend ${backendRun.provenance.engine} ukończył rzeczywisty run modelu ${model.id}${Object.keys(plan.request.parameters).length === 0 ? '' : ` dla zatwierdzonych parametrów: ${Object.entries(plan.request.parameters).map(([key, value]) => `${key}=${String(value)}`).join(', ')}`}.`,
+    summary: `Backend ${backendRun.provenance?.engine ?? backendRun.engine ?? 'unknown-engine'} ukończył rzeczywisty run modelu ${model.id}${Object.keys(plan.request.parameters).length === 0 ? '' : ` dla zatwierdzonych parametrów: ${Object.entries(plan.request.parameters).map(([key, value]) => `${key}=${String(value)}`).join(', ')}`}.`,
     outputs: backendRun.outputs,
     units: backendRun.units,
     warnings: backendRun.warnings ?? [],

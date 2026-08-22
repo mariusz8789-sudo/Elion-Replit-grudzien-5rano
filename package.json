@@ -20,6 +20,7 @@
     "smoke:mobile": "node scripts/smoke-e2e.mjs mobile",
     "compute:bundle": "esbuild packages/frontend/src/core/compute/serverEntry.ts --bundle --format=esm --platform=node --target=node22 --legal-comments=none --outfile=packages/backend/src/compute/core.bundle.mjs",
     "compute:bundle:check": "node scripts/check-compute-bundle.mjs",
+    "e2e:discovery-backend": "esbuild scripts/scientific-discovery-backend-e2e.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/genesis-scientific-discovery-backend-e2e.mjs && node /tmp/genesis-scientific-discovery-backend-e2e.mjs",
     "campaign:validate": "node scripts/validation-campaign.mjs",
     "benchmark": "node scripts/benchmark-suite.mjs"
   },

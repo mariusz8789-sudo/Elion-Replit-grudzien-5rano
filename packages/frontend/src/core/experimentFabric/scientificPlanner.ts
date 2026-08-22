@@ -18,15 +18,21 @@ function buildArmId(designSeed: object, suffix: string): string {
 }
 
 /**
- * Creates a preregistered protocol. It validates only existing local real
- * models; absent capabilities must remain in the Experiment Fabric seam path.
+ * Creates a preregistered protocol. Accepts REAL_ENGINE (local synchronous) and
+ * BACKEND_REAL_ENGINE (async backend Fabric) models. All other capabilities are
+ * rejected so that the Discovery Layer never designs a protocol for a missing
+ * solver, a hypothetical visualization, or a knowledge-only domain.
+ *
+ * For BACKEND_REAL_ENGINE designs, use executeScientificExperimentOnBackend()
+ * instead of the synchronous executeScientificExperiment().
  */
 export function designScientificExperiment(input: ScientificExperimentInput): ScientificExperimentDesign {
   const { hypothesis, baselineRequest, sweep } = input;
   const domain = getKnowledgeDomain(hypothesis.domainId);
   const routerModel = getRouterModel(hypothesis.modelId);
-  if (!domain || !routerModel || domain.capability !== 'REAL_ENGINE' || !domain.realModels.includes(hypothesis.modelId)) {
-    throw new Error('Scientific Discovery Layer can design a protocol only for an existing REAL_ENGINE registered in Knowledge Registry.');
+  const admissibleCapabilities: readonly string[] = ['REAL_ENGINE', 'BACKEND_REAL_ENGINE'];
+  if (!domain || !routerModel || !admissibleCapabilities.includes(domain.capability) || !domain.realModels.includes(hypothesis.modelId)) {
+    throw new Error('Scientific Discovery Layer can design a protocol only for an existing REAL_ENGINE or BACKEND_REAL_ENGINE registered in Knowledge Registry.');
   }
   if (baselineRequest.domainId !== hypothesis.domainId || baselineRequest.modelId !== hypothesis.modelId) {
     throw new Error('Baseline request must target the same domain and model as the hypothesis.');

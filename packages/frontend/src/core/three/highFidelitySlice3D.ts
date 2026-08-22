@@ -294,8 +294,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
 
     if (this.cameraMode === 'city') {
       this.followTarget = null;
-      camera.position.lerp(new this.THREE.Vector3(11.5, 13.5, 19.5), 0.045);
-      camera.lookAt(0, 1.6, 0);
+      camera.position.lerp(new this.THREE.Vector3(20.5, 21.0, 33.0), 0.045);
+      camera.lookAt(0, 2.2, 0);
     }
   }
 
@@ -647,12 +647,12 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     ctx.fillText(label.toUpperCase(), 256, 68);
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
-    const signW = Math.min(w * 0.72, 3.0);
+    const signW = Math.min(w * 0.42, 1.25);
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(signW, signW * 0.25),
       new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.35, roughness: 0.6 }),
     );
-    sign.position.set(cx, 1.72, cz + d / 2 + 0.03);
+    sign.position.set(cx, 1.78, cz + d / 2 + 0.04);
     this.addSceneObject(sign);
   }
 

@@ -275,6 +275,55 @@ export async function searchKnowledgeMaterials(token: string, projectId: string,
   return r.ok ? { ok: true, data: r.data.materials } : r;
 }
 
+/** A read-only, source-bound projection of current project Knowledge versions. */
+export interface ProjectResearchPacketSource {
+  referenceId: string;
+  kind: 'project-knowledge';
+  projectId: string;
+  materialId: string;
+  materialVersionId: string;
+  materialVersion: number | null;
+  title: string;
+  fileName: string | null;
+  mimeType: string | null;
+  byteSize: number | null;
+  contentSha256: string;
+  topics: string[];
+  sourceUrl: string | null;
+  extractionStatus: KnowledgeExtractionStatus | null;
+  epistemicStatus: KnowledgeEpistemicStatus | null;
+  provenance: KnowledgeMaterial['provenance'];
+  excerpt: string;
+  solverEffect: 'NONE';
+}
+
+export interface ProjectResearchPacket {
+  contractVersion: '1.0.0';
+  packetId: string;
+  projectId: string;
+  status: 'RETRIEVED' | 'NO_MATCH';
+  normalizedQuery: string;
+  sources: ProjectResearchPacketSource[];
+  packetFingerprint: string;
+  solverEffect: 'NONE';
+  disclaimer: string;
+}
+
+/**
+ * Fetches a project/RBAC-scoped evidence packet. This is intentionally
+ * separate from the synchronous GenesisResearchPacket and never selects or
+ * modifies a Scientific Discovery solver.
+ */
+export async function getProjectResearchPacket(
+  token: string,
+  projectId: string,
+  query: string,
+): Promise<ApiResult<ProjectResearchPacket>> {
+  const q = new URLSearchParams({ q: query.slice(0, 500) }).toString();
+  const r = await request<{ packet: ProjectResearchPacket }>('GET', `/projects/${projectId}/research-packet?${q}`, { token });
+  return r.ok ? { ok: true, data: r.data.packet } : r;
+}
+
 /* ---------------- Project-scoped GIS artifacts ---------------- */
 
 export interface ProjectSpatialDataset {

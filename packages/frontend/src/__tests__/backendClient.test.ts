@@ -13,6 +13,7 @@ import {
   createMergeRequest,
   decideMergeRequest,
   getContributions,
+  getProjectResearchPacket,
 } from '../core/backend/client';
 
 /**
@@ -122,6 +123,30 @@ describe('projects and trials client', () => {
     const url = fetchMock.mock.calls[0][0];
     expect(url).toContain('experimentId=e');
     expect(url).toContain('branchId=branch-1');
+  });
+});
+
+describe('Project Research Packet client', () => {
+  it('fetches a scoped source packet through the existing authenticated client', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(200, {
+      packet: {
+        contractVersion: '1.0.0', packetId: 'project_research_abc', projectId: 'p1', status: 'RETRIEVED',
+        normalizedQuery: 'kitaev', packetFingerprint: 'project_research_abc', solverEffect: 'NONE',
+        sources: [{ referenceId: 'project:p1:knowledge:m1:version:v1', kind: 'project-knowledge', projectId: 'p1', materialId: 'm1', materialVersionId: 'v1', materialVersion: 1, title: 'Kitaev', fileName: 'k.md', mimeType: 'text/markdown', byteSize: 12, contentSha256: 'a'.repeat(64), topics: ['quantum'], sourceUrl: null, extractionStatus: 'EXTRACTED', epistemicStatus: 'USER_PROVIDED_UNREVIEWED', provenance: { solverEffect: 'NONE' }, excerpt: 'Evidence', solverEffect: 'NONE' }],
+        disclaimer: 'Source-bound only.',
+      },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await getProjectResearchPacket('tok', 'p1', 'Kitaev chain');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.solverEffect).toBe('NONE');
+      expect(result.data.sources[0].contentSha256).toHaveLength(64);
+    }
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/projects/p1/research-packet?q=Kitaev+chain');
+    expect(fetchMock.mock.calls[0][1].headers.authorization).toBe('Bearer tok');
+    expect(fetchMock.mock.calls[0][1].method).toBe('GET');
   });
 });
 

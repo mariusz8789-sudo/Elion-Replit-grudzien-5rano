@@ -83,6 +83,7 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
 } from './store.mjs';
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
+import { createProjectResearchPacket } from './projectResearchPacket.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
@@ -197,6 +198,12 @@ export function handleApi(db, ctx) {
       return ok({ runs: listRuns(db, projectId) });
     }
 
+    // ---- Project Research Packet: source-bound projection of RBAC-scoped Knowledge Ingestion ----
+    if (seg[2] === 'research-packet' && seg.length === 3 && method === 'GET') {
+      const query = String(ctx.query?.q ?? '').slice(0, 500);
+      const materials = searchKnowledgeMaterials(db, projectId, tokenizeKnowledgeQuery(query));
+      return ok({ packet: createProjectResearchPacket({ projectId, query, materials }) });
+    }
     // ---- Knowledge Ingestion: artefakty użytkownika (viewer+ read, editor+ write) ----
     if (seg[2] === 'knowledge-materials') {
       if (seg.length === 3) {

@@ -331,6 +331,49 @@ describe('knowledge ingestion', () => {
     assert.match(naturalQuestion.body.materials[0].excerpt, /Kitaeva/);
   });
 
+  test('builds a deterministic, source-bound Project Research Packet without a solver effect', () => {
+    const { owner, project } = setupKnowledgeProject();
+    const viewer = registerUser('packet-viewer@knowledge.org');
+    const outsider = registerUser('packet-outsider@knowledge.org');
+    call('POST', `/api/projects/${project.id}/members`, {
+      token: owner.token, body: { email: viewer.user.email, role: 'viewer' },
+    });
+    call('POST', `/api/projects/${project.id}/knowledge-materials`, {
+      token: owner.token,
+      body: uploadBody('Topological Kitaev-chain evidence remains USER_PROVIDED_UNREVIEWED and has no solver effect.'),
+    });
+
+    const first = call('GET', `/api/projects/${project.id}/research-packet`, {
+      token: owner.token, query: { q: 'Kitaev topological evidence' },
+    });
+    const second = call('GET', `/api/projects/${project.id}/research-packet`, {
+      token: owner.token, query: { q: 'Kitaev topological evidence' },
+    });
+    assert.equal(first.status, 200);
+    assert.equal(first.body.packet.status, 'RETRIEVED');
+    assert.equal(first.body.packet.solverEffect, 'NONE');
+    assert.equal(first.body.packet.packetFingerprint, second.body.packet.packetFingerprint);
+    assert.equal(first.body.packet.sources.length, 1);
+    const [source] = first.body.packet.sources;
+    assert.match(source.referenceId, new RegExp(`^project:${project.id}:knowledge:`));
+    assert.match(source.contentSha256, /^[0-9a-f]{64}$/);
+    assert.equal(source.epistemicStatus, 'USER_PROVIDED_UNREVIEWED');
+    assert.equal(source.solverEffect, 'NONE');
+    assert.match(source.excerpt, /Kitaev-chain/);
+    assert.equal(source.originalBase64, undefined);
+    assert.equal(call('GET', `/api/projects/${project.id}/research-packet`, {
+      token: viewer.token, query: { q: 'Kitaev' },
+    }).status, 200);
+    assert.equal(call('GET', `/api/projects/${project.id}/research-packet`, {
+      token: outsider.token, query: { q: 'Kitaev' },
+    }).status, 404);
+    const empty = call('GET', `/api/projects/${project.id}/research-packet`, {
+      token: owner.token, query: { q: 'nieistniejący termin' },
+    });
+    assert.equal(empty.body.packet.status, 'NO_MATCH');
+    assert.equal(empty.body.packet.sources.length, 0);
+  });
+
   test('viewer can read project knowledge but cannot upload; outsider gets 404', () => {
     const { owner, project } = setupKnowledgeProject();
     const viewer = registerUser('viewer@knowledge.org');

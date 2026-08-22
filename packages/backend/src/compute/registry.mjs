@@ -20,6 +20,7 @@ import { detect as rdkitDetect, descriptors as rdkitDescriptors, validate as rdk
 import { detect as meepDetect, interfaceTransmission as meepInterfaceTransmission, pecReflection as meepPecReflection } from './meepAdapter.mjs';
 import { detect as pyscfDetect, referenceCase as pyscfReferenceCase, singlePoint as pyscfSinglePoint } from './qmAdapter.mjs';
 import { detect as depmapDetect, senescenceCellCyclePanel } from './depmapAdapter.mjs';
+import { detect as cmsOpenDataDetect, zMuMuInvariantMassStats } from './cmsOpenDataAdapter.mjs';
 import { detect as structuralDetect, compare10e8Mper } from './structuralAdapter.mjs';
 import { detect as openmmDetect, referenceBenchmark as openmmReferenceBenchmark } from './openmmAdapter.mjs';
 
@@ -1127,6 +1128,71 @@ const MODELS = [
           mdm2Median: data.panel.MDM2.median,
         },
         warnings: [...data.interpretationBoundary, `Dataset ${data.datasetVersion}; DOI:${data.datasetDoi}; panel ${data.panelId}.`],
+      };
+    },
+  },
+
+  {
+    id: 'particle-cern-cms-zmumu-invariant-mass',
+    name: 'CMS Open Data — Z→μμ: masa niezmiennicza',
+    domain: 'particle',
+    version: '1.0.0',
+    description: 'Read-only opisowa analiza masy niezmienniczej 10 000 uprzednio wyselekcjonowanych zdarzeń dimionowych CMS z 2011 r. (CERN Open Data record 5208).',
+    inputs: [],
+    outputs: [
+      { id: 'eventCount', label: 'Zdarzenia źródłowe', unit: 'zdarzenia' },
+      { id: 'uniqueEventCount', label: 'Unikalne zdarzenia', unit: 'zdarzenia' },
+      { id: 'massMinGeV', label: 'Minimalna masa dimionowa', unit: 'GeV' },
+      { id: 'massMaxGeV', label: 'Maksymalna masa dimionowa', unit: 'GeV' },
+      { id: 'massMeanGeV', label: 'Średnia masa dimionowa', unit: 'GeV' },
+      { id: 'massMedianGeV', label: 'Mediana masy dimionowej', unit: 'GeV' },
+      { id: 'events80To100GeV', label: 'Zdarzenia w oknie 80–100 GeV', unit: 'zdarzenia' },
+      { id: 'peakBin90To95GeV', label: 'Zdarzenia w binie 90–95 GeV', unit: 'zdarzenia' },
+    ],
+    assumptions: 'Próbka CMS jest uprzednio wyselekcjonowanym, edukacyjnym zbiorem Z-enriched; masa jest liczona relacją ultrarelatywistyczną z pT, η i φ dwóch kandydatów mionowych.',
+    validity: 'Tylko checksumowo zweryfikowany rekord CMS Open Data 5208. Wynik jest statystyką opisową wcześniej wyselekcjonowanych danych; nie jest rekonstrukcją detektora, pełną analizą fizyczną, pomiarem masy bozonu Z ani odkryciem.',
+    provenance: {
+      source: 'CERN Open Data record 5208: Z to two muons from 2011',
+      recordUrl: 'https://opendata.cern.ch/record/5208',
+      dataUrl: 'https://opendata.cern.ch/record/5208/files/Zmumu.csv',
+      sha256: '7782778f8417d2c732f4a64efcbfceb6192c97c3bcfd21c0cf1322d38ed965d1',
+      datasetLicense: 'CC0-1.0',
+      formula: 'm² = 2 pT1 pT2 (cosh(Δη) − cos(Δφ))',
+      honesty: 'real_preselected_public_dataset',
+      engine: 'CMS Open Data Z→μμ invariant-mass descriptive analysis',
+      requiredEnvironmentVariable: 'GENESIS_CERN_OPEN_DATA_DIR',
+    },
+    stochastic: false,
+    backendExecutable: true,
+    kind: 'external-data',
+    validate() {
+      const runtime = cmsOpenDataDetect();
+      return runtime.available
+        ? { ok: true }
+        : { ok: false, error: 'data_required', message: `CMS Open Data Z→μμ jest niedostępny lub checksum nie pasuje (${runtime.reason}). Skonfiguruj GENESIS_CERN_OPEN_DATA_DIR do zweryfikowanego Zmumu.csv rekordu 5208.` };
+    },
+    execute() {
+      const result = zMuMuInvariantMassStats();
+      if (!result.ok) throw new Error(result.error + (result.reason ? `: ${result.reason}` : ''));
+      const mass = result.data.invariantMassGeV;
+      const peakBin = mass.histogram5GeV60To120.find((bin) => bin.lowerGeV === 90 && bin.upperGeV === 95);
+      if (!peakBin) throw new Error('CMS Open Data histogram contract is missing 90–95 GeV bin.');
+      return {
+        outputs: {
+          eventCount: result.data.eventCount,
+          uniqueEventCount: result.data.uniqueEventCount,
+          massMinGeV: mass.min,
+          massMaxGeV: mass.max,
+          massMeanGeV: mass.mean,
+          massMedianGeV: mass.median,
+          events80To100GeV: mass.events80To100GeV,
+          peakBin90To95GeV: peakBin.eventCount,
+        },
+        warnings: [
+          'COMPUTATIONAL_RESULT: read-only statystyka invariant mass dla uprzednio wyselekcjonowanej próbki edukacyjnej CMS Z→μμ.',
+          'Próbka nie nadaje się do pełnej analizy fizycznej; wynik nie jest rekonstrukcją detektora, pomiarem masy Z, testem Modelu Standardowego ani nowym odkryciem.',
+        ],
+        provenance: { ...result.data.dataset, engine: result.engine, version: result.version },
       };
     },
   },

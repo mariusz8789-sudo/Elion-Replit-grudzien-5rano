@@ -174,11 +174,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'particle', title: 'Fizyka cząstek', sourceFile: 'particle.md', scale: 'micro',
-    capability: 'REAL_ENGINE', realModels: ['particle-relativistic-energy'],
-    concepts: ['Model Standardowy', 'kwarki', 'leptony', 'bozony', 'kinematyka relatywistyczna'], parameters: ['restMassMeV', 'velocityFraction'], units: ['MeV', 'MeV/c'],
-    assumptions: ['Pełna nieperturbacyjna QCD i hadronizacja nie są obliczane.'],
-    possibleExperiments: ['oblicz energię relatywistyczną cząstki'], requiredSolver: 'particle-relativistic-energy',
-    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['spacetime-einstein', 'quantum'], keywords: ['cząstka', 'czastka', 'kwark', 'lepton', 'bozon', 'relatywistyczna energia', 'detektor'],
+    capability: 'BACKEND_REAL_ENGINE', realModels: ['particle-relativistic-energy', 'particle-cern-cms-zmumu-invariant-mass'],
+    concepts: ['Model Standardowy', 'kwarki', 'leptony', 'bozony', 'kinematyka relatywistyczna', 'CMS Open Data', 'masa niezmiennicza dimionów', 'CERN Open Data'], parameters: ['restMassMeV', 'velocityFraction'], units: ['MeV', 'MeV/c', 'GeV'],
+    assumptions: ['Pełna nieperturbacyjna QCD i hadronizacja nie są obliczane.', 'CMS Z→μμ rekord 5208 jest małą, uprzednio wyselekcjonowaną próbką edukacyjną. Dostępny backend liczy jedynie opisową masę niezmienniczą z jej realnych rekordów po walidacji SHA-256; nie rekonstruuje detektora, nie mierzy masy Z i nie ustanawia odkrycia.'],
+    possibleExperiments: ['oblicz energię relatywistyczną cząstki', 'uruchom opisową analizę CMS Open Data Z→μμ'], requiredSolver: 'particle-relativistic-energy / CMS Open Data record 5208 checksum-verified CSV analysis',
+    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['spacetime-einstein', 'quantum'], keywords: ['cząstka', 'czastka', 'kwark', 'lepton', 'bozon', 'relatywistyczna energia', 'detektor', 'cern', 'lhc', 'cms', 'zmumu', 'dimuon', 'masa niezmiennicza'],
   },
   {
     id: 'quantum-decision-explorer', title: 'Quantum Decision Explorer', sourceFile: 'quantum-decision-explorer.md', scale: 'meta',

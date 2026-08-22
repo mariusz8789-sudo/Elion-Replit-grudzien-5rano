@@ -339,6 +339,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     capability: 'BACKEND_REAL_ENGINE',
   },
   {
+    id: 'particle-cern-cms-zmumu-invariant-mass', domainId: 'particle', modelVersion: '1.0.0', engine: 'cms-open-data-5208@2011-published-2019',
+    parameters: [], route: { kind: 'none' }, knowledgeSources: ['particle.md'],
+    rationale: 'Rzeczywisty backendowy worker odczytuje checksumowo zweryfikowany CSV CMS Open Data record 5208 (Z→μμ 2011, CC0), liczy masę niezmienniczą z pT, η i φ oraz zwraca wyłącznie statystykę opisową uprzednio wyselekcjonowanej próbki. Endpoint wymaga GENESIS_CERN_OPEN_DATA_DIR. Nie jest to rekonstrukcja detektora, pełna analiza HEP, pomiar masy Z, test Modelu Standardowego, generator zdarzeń ani odkrycie.',
+    capability: 'BACKEND_REAL_ENGINE',
+  },
+  {
     id: 'chemistry-arrhenius', domainId: 'chemistry', modelVersion: '1.1.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('temperatureK', 'Temperatura', 'K', 200, 1000, 350), number('activationEnergyKJ', 'Energia aktywacji', 'kJ/mol', 0, 300, 60), number('preExponentialLog10', 'log₁₀ A', 'log₁₀(1/s)', -10, 25, 11)],
     route: { kind: 'none' }, knowledgeSources: ['chemistry.md', 'thermodynamics.md'],

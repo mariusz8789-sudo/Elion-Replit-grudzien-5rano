@@ -294,8 +294,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
 
     if (this.cameraMode === 'city') {
       this.followTarget = null;
-      camera.position.lerp(new this.THREE.Vector3(5.8, 7.1, 10.6), 0.045);
-      camera.lookAt(0, 0.7, 0);
+      camera.position.lerp(new this.THREE.Vector3(11.5, 13.5, 19.5), 0.045);
+      camera.lookAt(0, 1.6, 0);
     }
   }
 
@@ -559,7 +559,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const storeys: Record<string, number> = {
       home: 2, shop: 1, school: 3, hospital: 4, isolation: 2, park: 0,
     };
-    const STOREY = 0.62;
+    const STOREY = 1.5;
 
     for (const obj of this.simulation.objects()) {
       const w = obj.w * scale;
@@ -604,7 +604,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private addRetailBase(cx: number, cz: number, w: number, d: number, kind: string): void {
     const THREE = this.THREE!;
     if (kind === 'home') return;
-    const h = 0.5;
+    const h = 1.45;
     const base = new THREE.Mesh(
       new THREE.BoxGeometry(w * 1.01, h, d * 1.01),
       new THREE.MeshStandardMaterial({ color: 0x2c2f35, roughness: 0.35, metalness: 0.15 }),
@@ -647,12 +647,12 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     ctx.fillText(label.toUpperCase(), 256, 68);
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
-    const signW = Math.min(w * 0.7, 2.2);
+    const signW = Math.min(w * 0.72, 3.0);
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(signW, signW * 0.25),
       new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.35, roughness: 0.6 }),
     );
-    sign.position.set(cx, 0.72, cz + d / 2 + 0.03);
+    sign.position.set(cx, 1.72, cz + d / 2 + 0.03);
     this.addSceneObject(sign);
   }
 
@@ -756,15 +756,15 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const spots: Array<[number, number]> = [];
     for (const y of this.simulation.streets.h) {
       const z = this.toWorldY(y);
-      for (let x = -worldW / 2 + 0.9; x < worldW / 2; x += 1.9) {
-        spots.push([x, z + 1.28]);
-        spots.push([x + 0.95, z - 1.28]);
+      for (let x = -worldW / 2 + 1.2; x < worldW / 2; x += 3.6) {
+        spots.push([x, z + 1.45]);
+        spots.push([x + 1.8, z - 1.45]);
       }
     }
     if (!spots.length) return;
-    const trunkGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.9, 6);
+    const trunkGeo = new THREE.CylinderGeometry(0.06, 0.09, 1.7, 6);
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4b3a2a, roughness: 0.9 });
-    const crownGeo = new THREE.IcosahedronGeometry(0.42, 0);
+    const crownGeo = new THREE.IcosahedronGeometry(0.55, 1);
     const crownMat = new THREE.MeshStandardMaterial({ color: 0x3c6f36, roughness: 0.85, flatShading: true });
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);
     const crowns = new THREE.InstancedMesh(crownGeo, crownMat, spots.length);
@@ -773,9 +773,9 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     spots.forEach(([x, z], i) => {
       const hsh = ((i * 2654435761) >>> 0);
       const sc = 0.85 + ((hsh >>> 7) & 0xff) / 255 * 0.5;
-      m.makeTranslation(x, 0.5 * sc, z);
+      m.makeTranslation(x, 0.9 * sc, z);
       trunks.setMatrixAt(i, m);
-      m.makeTranslation(x, 1.12 * sc, z);
+      m.makeTranslation(x, 2.05 * sc, z);
       crowns.setMatrixAt(i, m);
     });
     trunks.instanceMatrix.needsUpdate = true;
@@ -791,7 +791,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const perRow = Math.max(1, Math.floor(w / 0.55));
     const total = perRow * levels * 2;
     if (total <= 0) return;
-    const geo = new THREE.BoxGeometry(0.26, 0.34, 0.03);
+    const geo = new THREE.BoxGeometry(0.34, 0.62, 0.03);
     // Zamknięty interwencją budynek ma ciemne okna — to REALNY stan z modelu.
     const mat = new THREE.MeshStandardMaterial({
       color: closed ? 0x2a3038 : 0x9fc6da,
@@ -803,7 +803,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const m = new THREE.Matrix4();
     let i = 0;
     for (let level = 0; level < levels; level++) {
-      const y = 0.42 + level * 0.62;
+      const y = 0.9 + level * 1.5;
       if (y > height - 0.16) continue;
       for (let c = 0; c < perRow; c++) {
         const ox = -w / 2 + 0.34 + c * (w - 0.68) / Math.max(1, perRow - 1);

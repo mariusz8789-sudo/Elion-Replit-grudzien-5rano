@@ -41,6 +41,15 @@ if (runtime.available) {
     assert.equal(response.body.run.provenance.mobilePdb, '4G6F');
     assert.match(response.body.run.provenance.referenceSha256, /^[a-f0-9]{64}$/);
     assert.match(response.body.run.provenance.mobileSha256, /^[a-f0-9]{64}$/);
+    assert.equal(response.body.run.provenance.sourceArchive, 'RCSB Protein Data Bank / wwPDB');
+    assert.equal(response.body.run.provenance.sourceLicense, 'CC0-1.0');
+    assert.equal(response.body.run.provenance.sourceLicenseUrl, 'https://www.rcsb.org/pages/usage-policy');
+    assert.deepEqual(response.body.run.provenance.inputArtifacts.map((artifact) => artifact.pdbId), ['5GHW', '4G6F']);
+    assert.equal(response.body.run.provenance.inputArtifacts[0].recordUrl, 'https://www.rcsb.org/structure/5GHW');
+    assert.equal(response.body.run.provenance.inputArtifacts[1].downloadUrl, 'https://files.rcsb.org/download/4G6F.pdb');
+    assert.equal(response.body.run.provenance.inputArtifacts[0].license, 'CC0-1.0');
+    assert.equal(response.body.run.provenance.inputArtifacts[0].sha256, response.body.run.provenance.referenceSha256);
+    assert.equal(response.body.run.provenance.inputArtifacts[1].sha256, response.body.run.provenance.mobileSha256);
     assert.equal(response.body.persisted, false);
   });
 
@@ -61,6 +70,8 @@ if (runtime.available) {
     assert.equal(response.body.run.provenance.mobilePdb, '5WDF');
     assert.equal(response.body.run.provenance.classification, 'COMPUTATIONAL_RESULT');
     assert.match(response.body.run.provenance.mobileSha256, /^[a-f0-9]{64}$/);
+    assert.deepEqual(response.body.run.provenance.inputArtifacts.map((artifact) => artifact.pdbId), ['5GHW', '5WDF']);
+    assert.equal(response.body.run.provenance.inputArtifacts[1].sha256, response.body.run.provenance.mobileSha256);
   });
 } else {
   test('Fabric API rejects structural comparison rather than emitting a synthetic RMSD without runtime', () => {

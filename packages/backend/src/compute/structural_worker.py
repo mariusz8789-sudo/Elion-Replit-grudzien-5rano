@@ -30,6 +30,10 @@ PAIR_PROFILES = {
     },
 }
 BASE_REQUIRED_PDBS = {"5GHW", "4G6F"}
+RCSB_PDB_RECORD_URL = "https://www.rcsb.org/structure/{pdb_id}"
+RCSB_PDB_DOWNLOAD_URL = "https://files.rcsb.org/download/{pdb_id}.pdb"
+RCSB_PDB_USAGE_POLICY_URL = "https://www.rcsb.org/pages/usage-policy"
+PDB_ARCHIVE_LICENSE = "CC0-1.0"
 
 
 def sha256(path: Path) -> str:
@@ -41,6 +45,24 @@ def load_structure(parser, root: Path, pdb_id: str):
     if not path.is_file():
         raise ValueError(f"missing_pdb_artifact:{pdb_id}")
     return parser.get_structure(pdb_id, path)[0], path
+
+
+def pdb_artifact_provenance(pdb_id: str, path: Path):
+    """Return source-bound metadata for the exact local PDB bytes used by the run.
+
+    The source URL identifies the public archive record; the SHA-256 identifies
+    the exact locally verified copy. No retrieval timestamp is invented.
+    """
+    return {
+        "artifactType": "PDB_COORDINATE_FILE",
+        "pdbId": pdb_id,
+        "recordUrl": RCSB_PDB_RECORD_URL.format(pdb_id=pdb_id),
+        "downloadUrl": RCSB_PDB_DOWNLOAD_URL.format(pdb_id=pdb_id),
+        "sha256": sha256(path),
+        "license": PDB_ARCHIVE_LICENSE,
+        "licenseUrl": RCSB_PDB_USAGE_POLICY_URL,
+        "attribution": "RCSB Protein Data Bank / wwPDB; original depositors should be attributed where possible.",
+    }
 
 
 def standard_residues(chain):
@@ -147,6 +169,13 @@ def compare(req):
             "pairProfile": profile["label"],
             "referencePdb": reference_id, "mobilePdb": mobile_id,
             "referenceSha256": sha256(reference_path), "mobileSha256": sha256(mobile_path),
+            "inputArtifacts": [
+                pdb_artifact_provenance(reference_id, reference_path),
+                pdb_artifact_provenance(mobile_id, mobile_path),
+            ],
+            "sourceArchive": "RCSB Protein Data Bank / wwPDB",
+            "sourceLicense": PDB_ARCHIVE_LICENSE,
+            "sourceLicenseUrl": RCSB_PDB_USAGE_POLICY_URL,
             "fabChainMapping": [{"reference": ref, "mobile": mob} for ref, mob in profile["fab"]],
             "mperChainMapping": {"reference": reference_mper, "mobile": mobile_mper},
             "mperPairingMode": profile["mperMode"],

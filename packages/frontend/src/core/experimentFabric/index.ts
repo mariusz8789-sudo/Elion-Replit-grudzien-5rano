@@ -105,6 +105,19 @@ export {
 } from './scientificHypothesisEvidence';
 export { executeScientificExperiment } from './scientificExecutor';
 export {
+  SEEDED_UNCERTAINTY_VERSION,
+  MAX_PREREGISTERED_SEEDS,
+  isSeededStochasticModel,
+  planSeededUncertainty,
+  executeSeededUncertainty,
+  replaySeededUncertainty,
+  type SeededUncertaintyInput,
+  type SeededUncertaintyArm,
+  type SeededUncertaintyPlan,
+  type SeededUncertaintySummary,
+  type SeededUncertaintyEvidence,
+} from './seededUncertainty';
+export {
   SCIENTIFIC_NEXT_EXPERIMENT_VERSION,
   selectNextScientificExperiment,
   replayNextScientificExperimentSelection,

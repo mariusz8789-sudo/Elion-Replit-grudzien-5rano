@@ -20,11 +20,18 @@ export interface RequestValidation {
   errors: readonly string[];
 }
 
+export type RouterModelExecutionMode = 'deterministic' | 'seeded-stochastic';
+
 export interface RouterModel {
   id: string;
   domainId: string;
   modelVersion: string;
   engine: string;
+  /**
+   * `seeded-stochastic` means seed variation is a model input and must be
+   * preregistered for any uncertainty analysis. Omitted is deterministic.
+   */
+  executionMode?: RouterModelExecutionMode;
   parameters: readonly ExperimentParameterSpec[];
   route: ExperimentRoute;
   knowledgeSources: readonly KnowledgeCorpusFile[];
@@ -278,6 +285,7 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   },
   {
     id: 'biology-protein-folding-hp', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-hp-metropolis@1.0.0',
+    executionMode: 'seeded-stochastic',
     parameters: [text('sequenceKey', 'Preset sekwencji HP', 'classic'), number('temperature', 'Temperatura Metropolisa', '', 0.05, 3, 1), number('steps', 'Kroki Monte Carlo', 'kroki', 1, 50000, 5000), number('seed', 'Seed Monte Carlo', '', 0, 0xffff_ffff, 20260819)],
     route: { kind: 'lab', labId: 'biology', experimentId: 'protein-folding' }, knowledgeSources: ['biology.md'],
     rationale: 'Istniejący seedowany Metropolis modelu HP na siatce 2D: energia to kontakty H–H poza szkieletem. Nie jest predykcją struktury prawdziwego białka, AlphaFold ani dynamiką molekularną.',
@@ -339,6 +347,7 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   },
   {
     id: 'chemistry-ising', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-ising-metropolis@1.0.0',
+    executionMode: 'seeded-stochastic',
     parameters: [number('temperature', 'Temperatura T', 'J/k_B', 0.5, 5, 2), number('seed', 'Seed Monte Carlo', '', 0, 0xffff_ffff, 20_260_819)],
     route: { kind: 'lab', labId: 'chemistry', experimentId: 'ising' }, knowledgeSources: ['chemistry.md', 'thermodynamics.md'],
     rationale: 'Istniejący 2D model Isinga J=1 na siatce kwadratowej z periodycznymi brzegami i krokami Metropolisa; skończona siatka i skończony horyzont Monte Carlo nie zastępują termodynamicznego limitu.',

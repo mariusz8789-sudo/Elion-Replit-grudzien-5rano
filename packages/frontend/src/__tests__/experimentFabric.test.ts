@@ -72,6 +72,15 @@ describe('Genesis Experiment Fabric', () => {
     expect(createAgingModelDataRequirement('cell-state dynamics').status).toBe('DATA_REQUIRED');
   });
 
+  it('registers the real PySCF H₂ single-point model under the existing chemistry corpus', () => {
+    const chemistry = getKnowledgeDomain('chemistry');
+    expect(chemistry?.capability).toBe('REAL_ENGINE');
+    expect(chemistry?.realModels).toContain('quantum-chemistry-pyscf-h2-rhf');
+    expect(chemistry?.parameters).toContain('bondLengthAngstrom');
+    expect(chemistry?.assumptions.join(' ')).toContain('RHF/STO-3G');
+    expect(chemistry?.assumptions.join(' ')).toContain('nie eksperymentalnym pomiarem');
+  });
+
   it('registers the bounded Kitaev bulk model without upgrading absent quantum hardware', () => {
     const quantum = getKnowledgeDomain('quantum');
     expect(quantum?.capability).toBe('CAPABILITY_SEAM');

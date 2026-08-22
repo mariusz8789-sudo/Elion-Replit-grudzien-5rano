@@ -10,7 +10,7 @@ export type ReproductionVerdict = 'MATCH' | 'DRIFT' | 'NOT_COMPARABLE' | 'NOT_EX
 
 export interface FalsificationCriterion {
   metric: string;
-  relation: 'greater-than' | 'less-than' | 'equal-within-tolerance' | 'monotonic-increase' | 'monotonic-decrease';
+  relation: 'greater-than' | 'less-than' | 'equal-within-tolerance' | 'equal-to-baseline-within-tolerance' | 'monotonic-increase' | 'monotonic-decrease';
   expectedValue?: number;
   tolerance?: number;
   rationale: string;

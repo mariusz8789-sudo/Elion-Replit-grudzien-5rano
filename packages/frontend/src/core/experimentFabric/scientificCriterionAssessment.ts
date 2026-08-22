@@ -76,6 +76,12 @@ export function assessPredeclaredScientificCriterion(
       explanation = `Każdy prerejestrowany arm porównawczy porównano z wartością ${expectedValue} ± ${tolerance}.`;
       break;
     }
+    case 'equal-to-baseline-within-tolerance': {
+      const tolerance = criterion.tolerance ?? 0;
+      supported = numbers.every((value) => Math.abs(value - baselineMean) <= tolerance);
+      explanation = `Każdy prerejestrowany arm replikacji porównano z baseline (${baselineMean.toFixed(9)}) ± ${tolerance}. Model deterministyczny musi zwrócić identyczny wynik przy identycznych parametrach.`;
+      break;
+    }
     case 'monotonic-increase':
       supported = numbers.every((value, index) => index === 0 || value >= numbers[index - 1]);
       explanation = 'Arms oceniono w prerejestrowanej kolejności protokołu.';

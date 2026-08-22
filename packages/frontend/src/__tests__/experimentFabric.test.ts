@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getKnowledgeDomain, validateKnowledgeRegistry } from '../core/knowledge/registry';
+import { assessPredeclaredScientificCriterion } from '../core/experimentFabric/scientificCriterionAssessment';
 import { createSpatialWorldOverlay } from '../core/simulationRenderer/spatialOverlay';
 import {
   parseScienceChatMessage,
@@ -1550,5 +1551,86 @@ describe('Genesis Experiment Fabric', () => {
     expect(planned.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
     expect(planned.disclosure.resultWillComeFromRealRun).toBe(true);
     expect(planned.disclosure.limitations.join(' ')).toContain('backendowy adapter PyMeep');
+  });
+
+  it('assessPredeclaredScientificCriterion supports equal-to-baseline-within-tolerance when replication matches baseline within tolerance', () => {
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'Deterministyczny integrator N-ciał planet-stability zwraca identyczną ekscentryczność Ziemi przy replikacji.',
+        domainId: 'universe',
+        modelId: 'universe-planet-stability',
+        declaredAssumptions: ['Czteroplanetowy model N-ciał z velocity-Verlet.'],
+        falsification: {
+          metric: 'earthEccentricity',
+          relation: 'equal-to-baseline-within-tolerance',
+          tolerance: 1e-10,
+          rationale: 'Model deterministyczny musi zwrócić identyczny wynik przy replikacji.',
+        },
+      },
+      baselineRequest: {
+        contractVersion: '1.0.0',
+        sourceText: 'Prerejestrowany planet-stability replication protocol.',
+        domainId: 'universe',
+        operation: 'compute',
+        modelId: 'universe-planet-stability',
+        parameters: { years: 2, jupiter: true, saturn: true },
+      },
+      replication: {
+        label: 'Replikacja deterministyczna',
+        rationale: 'Ten sam deterministyczny integrator musi zwrócić identyczny wynik przy identycznych parametrach.',
+      },
+      repetitionsPerArm: 1,
+    });
+    const baselineArm = {
+      armId: 'baseline', kind: 'baseline' as const, runIds: ['run-b1'], runFingerprints: ['fp-b1'],
+      outputValues: [0.0167086], units: '', reproduction: 'MATCH' as const, anomalyFlags: [],
+    };
+    const replicationArm = {
+      armId: 'replication', kind: 'replication' as const, runIds: ['run-r1'], runFingerprints: ['fp-r1'],
+      outputValues: [0.0167086], units: '', reproduction: 'MATCH' as const, anomalyFlags: [],
+    };
+    const result = assessPredeclaredScientificCriterion(design, [baselineArm, replicationArm]);
+    expect(result.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
+    expect(result.message).toContain('0.016708600');
+  });
+
+  it('assessPredeclaredScientificCriterion falsifies equal-to-baseline-within-tolerance when replication drifts beyond tolerance', () => {
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'Deterministyczny integrator N-ciał planet-stability zwraca identyczną ekscentryczność Ziemi przy replikacji.',
+        domainId: 'universe',
+        modelId: 'universe-planet-stability',
+        declaredAssumptions: ['Czteroplanetowy model N-ciał z velocity-Verlet.'],
+        falsification: {
+          metric: 'earthEccentricity',
+          relation: 'equal-to-baseline-within-tolerance',
+          tolerance: 1e-10,
+          rationale: 'Model deterministyczny musi zwrócić identyczny wynik przy replikacji.',
+        },
+      },
+      baselineRequest: {
+        contractVersion: '1.0.0',
+        sourceText: 'Prerejestrowany planet-stability replication protocol.',
+        domainId: 'universe',
+        operation: 'compute',
+        modelId: 'universe-planet-stability',
+        parameters: { years: 2, jupiter: true, saturn: true },
+      },
+      replication: {
+        label: 'Replikacja deterministyczna',
+        rationale: 'Ten sam deterministyczny integrator musi zwrócić identyczny wynik przy identycznych parametrach.',
+      },
+      repetitionsPerArm: 1,
+    });
+    const baselineArm = {
+      armId: 'baseline', kind: 'baseline' as const, runIds: ['run-b1'], runFingerprints: ['fp-b1'],
+      outputValues: [0.0167086], units: '', reproduction: 'MATCH' as const, anomalyFlags: [],
+    };
+    const driftArm = {
+      armId: 'replication', kind: 'replication' as const, runIds: ['run-r1'], runFingerprints: ['fp-r1'],
+      outputValues: [0.0167087], units: '', reproduction: 'MATCH' as const, anomalyFlags: [],
+    };
+    const result = assessPredeclaredScientificCriterion(design, [baselineArm, driftArm]);
+    expect(result.assessment).toBe('FALSIFIED_WITHIN_PROTOCOL');
   });
 });

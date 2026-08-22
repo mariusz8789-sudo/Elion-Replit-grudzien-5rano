@@ -105,6 +105,16 @@ export {
 } from './scientificHypothesisEvidence';
 export { executeScientificExperiment } from './scientificExecutor';
 export {
+  GENESIS_RESEARCH_PACKET_VERSION,
+  MAX_RESEARCH_QUERY_LENGTH,
+  createGenesisResearchPacket,
+  replayGenesisResearchPacket,
+  type ResearchPacketStatus,
+  type ResearchCorpusSource,
+  type ResearchSupplementalSource,
+  type GenesisResearchPacket,
+} from './researchPacket';
+export {
   SCIENTIFIC_HYPOTHESIS_CANDIDATE_VERSION,
   formulateScientificHypothesisCandidate,
   replayScientificHypothesisCandidate,

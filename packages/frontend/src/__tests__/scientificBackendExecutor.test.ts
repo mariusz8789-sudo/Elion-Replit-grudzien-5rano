@@ -19,6 +19,9 @@ import {
   executeScientificExperimentOnBackend,
   isBackendDiscoveryDesign,
   createScientificEvidencePack,
+  createBackendReplayReceipt,
+  serializeBackendReplayReceipt,
+  BACKEND_REPLAY_RECEIPT_VERSION,
   SCIENTIFIC_BACKEND_EXECUTOR_VERSION,
 } from '../core/experimentFabric';
 
@@ -299,6 +302,72 @@ describe('executeScientificExperimentOnBackend — Gaussian (math-gaussian)', ()
     expect(pack.reproducibility.allArmsMatched).toBe(true);
     expect(pack.evidencePackId).toMatch(/^pack_/);
     expect(pack.protocol.designId).toBe(design.designId);
+  });
+});
+
+describe('Backend Replay Receipt', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function gaussianReplayDesign() {
+    return designScientificExperiment({
+      hypothesis: {
+        statement: 'Replay receipt porównuje wyłącznie zgodność backendowego wykonania prerejestrowanego protokołu Gaussa.',
+        domainId: 'mathematics',
+        modelId: 'math-gaussian',
+        declaredAssumptions: [],
+        falsification: { metric: 'pdfValue', relation: 'monotonic-decrease', rationale: 'Kontrakt replay nie formułuje nowej hipotezy.' },
+      },
+      baselineRequest: { domainId: 'mathematics', modelId: 'math-gaussian', parameters: { mean: 0, sigma: 1, xValue: 0 }, contractVersion: '1.0.0', operation: 'compute', sourceText: 'Prerejestrowany backendowy replay receipt.' },
+      sweep: { parameter: 'xValue', values: [0, 1], label: 'x' },
+      repetitionsPerArm: 1,
+    });
+  }
+
+  it('records MATCH only for a semantically equal real backend rerun and keeps invocation IDs distinct', async () => {
+    let callNumber = 0;
+    const fetchMock = vi.fn().mockImplementation(() => {
+      callNumber += 1;
+      const run = { ...gaussianRun, runId: `receipt-match-${String(callNumber).padStart(3, '0')}` };
+      return Promise.resolve(fakeResponse({ contractVersion: '1.0.0', request: {}, run, persisted: false }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const design = gaussianReplayDesign();
+    const source = await executeScientificExperimentOnBackend(design);
+    const replay = await executeScientificExperimentOnBackend(design);
+    const receipt = createBackendReplayReceipt(source, replay);
+
+    expect(BACKEND_REPLAY_RECEIPT_VERSION).toBe('1.0.0');
+    expect(receipt.status).toBe('MATCH');
+    expect(receipt.armReceipts).toHaveLength(design.arms.length);
+    expect(receipt.armReceipts.every((arm) => arm.status === 'MATCH')).toBe(true);
+    expect(receipt.armReceipts.every((arm) => arm.sourceRunIds[0] !== arm.replayRunIds[0])).toBe(true);
+    expect(receipt.receiptId).toMatch(/^replay_/);
+    expect(serializeBackendReplayReceipt(receipt)).toBe(serializeBackendReplayReceipt(receipt));
+    expect(receipt.disclaimer).toContain('nie oznacza niezależnej replikacji');
+  });
+
+  it('records DRIFT when a completed backend rerun has a different semantic outcome', async () => {
+    let callNumber = 0;
+    const fetchMock = vi.fn().mockImplementation(() => {
+      callNumber += 1;
+      const isReplay = callNumber > 2;
+      const run = {
+        ...gaussianRun,
+        runId: `receipt-drift-${String(callNumber).padStart(3, '0')}`,
+        outputs: isReplay ? { ...gaussianRun.outputs, pdfValue: 0.123456789 } : gaussianRun.outputs,
+      };
+      return Promise.resolve(fakeResponse({ contractVersion: '1.0.0', request: {}, run, persisted: false }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const design = gaussianReplayDesign();
+    const source = await executeScientificExperimentOnBackend(design);
+    const replay = await executeScientificExperimentOnBackend(design);
+    const receipt = createBackendReplayReceipt(source, replay);
+
+    expect(receipt.status).toBe('DRIFT');
+    expect(receipt.armReceipts.some((arm) => arm.status === 'DRIFT')).toBe(true);
   });
 });
 

@@ -16,6 +16,7 @@
 
 import { canonicalJson, fnv1a } from '../events/hash';
 import { getRouterModel } from './router';
+import { backendSemanticReproductionFingerprint } from './scientificReproduction';
 import { confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan } from './backendExecution';
 import { planEvidenceGuidedExperiment } from './evidenceGuidedChat';
 import { assessPredeclaredScientificCriterion } from './scientificCriterionAssessment';
@@ -34,33 +35,10 @@ export const SCIENTIFIC_BACKEND_EXECUTOR_VERSION = '1.0.0';
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Backend run IDs are intentionally unique for every remote invocation, so the
- * canonical runFingerprint includes a different backendRunId for each repeat.
- * Reproducibility must therefore compare a semantic result fingerprint that
- * retains the reviewed request, model/version, engine, outputs, units and
- * warnings, while excluding only that invocation-specific identifier.
- */
-function semanticReproductionFingerprint(run: ExperimentRun): string {
-  return `reproduction_${fnv1a(canonicalJson({
-    requestFingerprint: run.provenance.requestFingerprint,
-    modelId: run.provenance.modelId ?? null,
-    modelVersion: run.provenance.modelVersion ?? null,
-    engine: run.provenance.engine ?? null,
-    deterministic: run.provenance.deterministic,
-    outputs: run.result.outputs,
-    units: run.result.units,
-    warnings: run.result.warnings,
-    backendEngine: run.provenance.backendExecution?.backendEngine ?? null,
-    backendModelVersion: run.provenance.backendExecution?.backendModelVersion ?? null,
-    backendProvenance: run.provenance.backendExecution?.backendProvenance ?? null,
-  }))}`;
-}
-
 function reproductionVerdict(runs: readonly ExperimentRun[]): ReproductionVerdict {
   if (runs.length === 0 || runs.some((run) => run.result.status !== 'completed')) return 'NOT_EXECUTED';
   if (runs.some((run) => !run.provenance.deterministic)) return 'NOT_COMPARABLE';
-  const fingerprints = new Set(runs.map(semanticReproductionFingerprint));
+  const fingerprints = new Set(runs.map(backendSemanticReproductionFingerprint));
   return fingerprints.size === 1 ? 'MATCH' : 'DRIFT';
 }
 

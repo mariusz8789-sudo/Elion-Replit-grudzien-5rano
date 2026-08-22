@@ -14,6 +14,7 @@
 import {
   designScientificExperiment,
   executeScientificExperimentOnBackend,
+  createBackendReplayReceipt,
   createScientificEvidencePack,
   createGenesisResearchPacket,
   analyseCategoricalExperimentSeries,
@@ -98,6 +99,12 @@ console.log(`[E2E] Arms: ${design.arms.map((a) => a.request.parameters.mobilePdb
 
 const chain = await executeScientificExperimentOnBackend(design);
 
+// Bounded fresh rerun through the same canonical Backend Real Engine. This is
+// not an external replication and is reported separately from case replay.
+console.log(`[E2E] Executing bounded backend rerun for Replay Receipt...`);
+const replayChain = await executeScientificExperimentOnBackend(design);
+const replayReceipt = createBackendReplayReceipt(chain, replayChain);
+
 const evidencePack = createScientificEvidencePack(chain);
 const research = createGenesisResearchPacket('HIV MPER 10E8 PDB structural comparison');
 const analysis = analyseCategoricalExperimentSeries(chain.allRuns, 'mobilePdb', 'mperInFabAlignedFrameRmsdAngstrom');
@@ -133,6 +140,10 @@ const assertions = {
       ),
   ),
   deterministicArmsMatch: chain.arms.every((arm) => arm.reproduction === 'MATCH'),
+  replayExecutedWithFreshRunIds:
+    replayChain.allRuns.length === chain.allRuns.length &&
+    replayChain.allRuns.every((run) => !chain.allRuns.some((sourceRun) => sourceRun.runId === run.runId)),
+  replayReceiptMatches: replayReceipt.status === 'MATCH' && replayReceipt.armReceipts.every((arm) => arm.status === 'MATCH'),
   hypothesisAssessment: chain.assessment.assessment === 'SUPPORTED_WITHIN_PROTOCOL',
   evidencePackMatches:
     evidencePack.runCount === chain.allRuns.length && evidencePack.reproducibility.allArmsMatched,
@@ -177,6 +188,7 @@ for (const run of chain.allRuns) {
 
 console.log(`[E2E] Assessment: ${chain.assessment.assessment}`);
 console.log(`[E2E] Evidence pack: ${evidencePack.runCount} runs, allArmsMatched=${evidencePack.reproducibility.allArmsMatched}`);
+console.log(`[E2E] Replay receipt: ${replayReceipt.receiptId} | status=${replayReceipt.status} | fresh backend rerun only`);
 console.log(`[E2E] Candidate status: ${candidate.status} (expected for non-ordinal categorical arms)`);
 console.log(`[E2E] Conclusion: ${conclusion.status} | review=${conclusion.reviewStatus} | computational result only`);
 console.log(`[E2E] Next protocol: ${nextSelection.status} (no automatic follow-up for categorical PDB evidence)`);

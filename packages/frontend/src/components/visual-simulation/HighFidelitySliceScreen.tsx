@@ -142,7 +142,7 @@ export function HighFidelitySliceScreen() {
             <span><b>LOD1</b> {stats.hf_lod1_agents ?? 0} bliskich agentów</span>
             <span><b>LOD2</b> {stats.hf_lod2_agents ?? 0} crowd</span>
             <span><b>ASSETS</b> {stats.hf_approved_assets ?? 0} APPROVED · {stats.hf_unverified_assets ?? 0} UNVERIFIED</span>
-            <span><b>PBR</b> bez niezweryfikowanych map</span>
+            <span><b>PBR</b> CC0 · asfalt · beton · cegła</span>
             <span><b>render</b> {(stats.webgl_render_ms ?? 0).toFixed(1)} ms</span>
           </>}
         </footer>

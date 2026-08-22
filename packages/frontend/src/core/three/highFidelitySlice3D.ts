@@ -406,18 +406,18 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       markings: new THREE.MeshStandardMaterial({ color: 0xe7e2d2, roughness: 0.54, metalness: 0.02 }),
     };
     const loader = new THREE.TextureLoader();
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/asphalt/diffuse.jpg', this.materials.asphalt, 'map', true, 5, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/asphalt/normal.jpg', this.materials.asphalt, 'normalMap', false, 5, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/asphalt/roughness.jpg', this.materials.asphalt, 'roughnessMap', false, 5, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/asphalt/ao.jpg', this.materials.asphalt, 'aoMap', false, 5, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/diffuse.jpg', this.materials.concrete, 'map', true, 4, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/normal.jpg', this.materials.concrete, 'normalMap', false, 4, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/roughness.jpg', this.materials.concrete, 'roughnessMap', false, 4, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/ao.jpg', this.materials.concrete, 'aoMap', false, 4, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/diffuse.jpg', this.materials.brick, 'map', true, 3, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/normal.jpg', this.materials.brick, 'normalMap', false, 3, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/roughness.jpg', this.materials.brick, 'roughnessMap', false, 3, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/ao.jpg', this.materials.brick, 'aoMap', false, 3, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/diffuse.jpg', this.materials.asphalt, 'map', true, 5, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/normal.jpg', this.materials.asphalt, 'normalMap', false, 5, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/arm.jpg', this.materials.asphalt, 'roughnessMap', false, 5, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/arm.jpg', this.materials.asphalt, 'aoMap', false, 5, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/diffuse.jpg', this.materials.concrete, 'map', true, 4, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/normal.jpg', this.materials.concrete, 'normalMap', false, 4, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/arm.jpg', this.materials.concrete, 'roughnessMap', false, 4, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/arm.jpg', this.materials.concrete, 'aoMap', false, 4, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/diffuse.jpg', this.materials.brick, 'map', true, 3, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/normal.jpg', this.materials.brick, 'normalMap', false, 3, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/arm.jpg', this.materials.brick, 'roughnessMap', false, 3, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/arm.jpg', this.materials.brick, 'aoMap', false, 3, 2);
   }
 
   /** HDRI jest CC0 assetem środowiska; nie jest mapą świata ani źródłem danych modelu. */

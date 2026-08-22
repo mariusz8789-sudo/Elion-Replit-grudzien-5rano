@@ -4,6 +4,17 @@ import { spawnAgents, chooseDestination, stepMovement, type CityAgent } from '..
 import { resolveContacts } from '../interactions/contacts';
 import { interventionEffects, type InterventionState } from '../interventions/interventions';
 import { makeRng } from '../epidemic/agents';
+import {
+  NEUTRAL_COHORT_PROFILE,
+  AGE_BANDS,
+  bandOfAgent,
+  contactMultiplierFor,
+  susceptibilityFor,
+  severityFor,
+  fatalityFor,
+  type AgeBand,
+  type CohortProfile,
+} from '../agents/cohortModel';
 
 /**
  * EPIDEMIC CITY SIMULATION — pierwszy model Visual Scene Engine: „Epidemia w
@@ -76,9 +87,24 @@ export class EpidemicCitySimulation implements VisualSimulation {
   private lastSample = -1;
   private peakI = 0;
   private lastContactPairs = 0;
+  /**
+   * Profil kohortowy. Domyślnie NEUTRALNY: wszystkie mnożniki równe 1, więc
+   * model zachowuje się dokładnie tak jak przed dołożeniem heterogeniczności.
+   * Pasma wieku i tak są liczone — do rozbicia WYNIKÓW na grupy.
+   */
+  private cohort: CohortProfile;
+  /** Ilu agentów danego pasma w ogóle jest w populacji (mianownik dla grup). */
+  private bandPopulation: Record<AgeBand, number> = { child: 0, adult: 0, senior: 0 };
+  /**
+   * Ilu agentów danego pasma KIEDYKOLWIEK trafiło do szpitala. Flaga
+   * `hospitalized` gaśnie przy wyzdrowieniu, więc bez tego licznika ciężkość
+   * przebiegu w grupie byłaby niepoliczalna.
+   */
+  private bandHospitalizedEver: Record<AgeBand, number> = { child: 0, adult: 0, senior: 0 };
 
-  constructor(params: Partial<EpidemicCityParams> = {}, width = 900, height = 620) {
+  constructor(params: Partial<EpidemicCityParams> = {}, width = 900, height = 620, cohort: CohortProfile = NEUTRAL_COHORT_PROFILE) {
     this.params = { ...DEFAULT_CITY_PARAMS, ...params };
+    this.cohort = cohort;
     this.layout = buildCity(width, height);
     this.worldWidth = this.layout.width;
     this.worldHeight = this.layout.height;
@@ -90,6 +116,9 @@ export class EpidemicCitySimulation implements VisualSimulation {
     this.rng = makeRng(this.params.seed);
     this.time = 0; this.peakI = 0; this.lastSample = -1; this.events = []; this.hist = [];
     this.agentsArr = spawnAgents(this.layout, { nAgents: this.params.nAgents, initialInfected: this.params.initialInfected }, this.rng);
+    this.bandPopulation = { child: 0, adult: 0, senior: 0 };
+    this.bandHospitalizedEver = { child: 0, adult: 0, senior: 0 };
+    for (const a of this.agentsArr) this.bandPopulation[bandOfAgent(a, this.cohort)]++;
     this.sample(true);
   }
 
@@ -113,7 +142,7 @@ export class EpidemicCitySimulation implements VisualSimulation {
       if (arrived) {
         a.dwell -= dt;
         if (a.dwell <= 0) {
-          chooseDestination(a, this.layout, eff, this.rng);
+          chooseDestination(a, this.layout, eff, this.rng, contactMultiplierFor(a, this.cohort));
           a.dwell = 0.15 + this.rng() * (a.destKind === 'home' ? 0.8 : 0.4);
         }
       }
@@ -127,6 +156,7 @@ export class EpidemicCitySimulation implements VisualSimulation {
       rng: this.rng,
       transmissionScale: clamp01(this.params.transmissionScale) * eff.transmissionScale,
       susceptible: 'S', infectious: 'I',
+      susceptibilityOf: (a) => susceptibilityFor(a, this.cohort),
     });
     this.lastContactPairs = c.contactPairs;
     for (const [ti, src] of c.exposures) {
@@ -149,8 +179,9 @@ export class EpidemicCitySimulation implements VisualSimulation {
       if (a.state === 'E' && this.time - a.exposedAt >= incubationDays) {
         a.state = 'I'; a.stateSince = 0; a.infectedAt = this.time; a.behavior = 'zakażony';
         // Ciężki przebieg → hospitalizacja (deterministycznie z RNG).
-        if (this.rng() < clamp01(severeRate) && hosp >= 0) {
+        if (this.rng() < clamp01(severeRate * severityFor(a, this.cohort)) && hosp >= 0) {
           a.hospitalized = true; a.isolated = true; a.behavior = 'szpital';
+          this.bandHospitalizedEver[bandOfAgent(a, this.cohort)]++;
           const pt = pointInBuilding(this.layout.buildings[hosp], this.rng);
           a.destIdx = hosp; a.destKind = 'hospital'; a.goalX = pt.x; a.goalY = pt.y;
         }
@@ -163,7 +194,10 @@ export class EpidemicCitySimulation implements VisualSimulation {
         }
         if (this.time - a.infectedAt >= infectiousDays) {
           // Hospitalizowani mają wyższą śmiertelność (ciężki przebieg).
-          const risk = a.hospitalized ? Math.min(1, clamp01(ifr) * 3 + 0.05) : clamp01(ifr);
+          // Ryzyko bazowe modelu przemnożone przez mnożnik pasma wieku; przy
+          // profilu neutralnym mnożnik wynosi 1 i wyrażenie jest identyczne.
+          const byBand = clamp01(ifr * fatalityFor(a, this.cohort));
+          const risk = a.hospitalized ? Math.min(1, byBand * 3 + 0.05) : byBand;
           if (this.rng() < risk) { a.state = 'D'; a.stateSince = 0; a.behavior = 'zgon'; a.vx = 0; a.vy = 0; }
           else { a.state = 'R'; a.stateSince = 0; a.isolated = false; a.hospitalized = false; a.behavior = 'ozdrowiały'; }
         }
@@ -208,6 +242,23 @@ export class EpidemicCitySimulation implements VisualSimulation {
 
   stats(): Record<string, number> {
     const c = this.counts();
+    const byBand: Record<string, number> = {};
+    // Wyniki w rozbiciu na pasma wieku. Liczone ZAWSZE, także przy profilu
+    // neutralnym — pasma nie zmieniają wtedy dynamiki, ale pozwalają zmierzyć,
+    // czy model w ogóle różnicuje grupy. Równe wartości są uczciwym wynikiem.
+    for (const band of AGE_BANDS) {
+      byBand[`pop_${band}`] = this.bandPopulation[band];
+      byBand[`zakazeni_${band}`] = 0;
+      byBand[`zgony_${band}`] = 0;
+      byBand[`hospitalizowani_kiedykolwiek_${band}`] = this.bandHospitalizedEver[band];
+    }
+    for (const a of this.agentsArr) {
+      const band = bandOfAgent(a, this.cohort);
+      // „Zakażony kiedykolwiek" = opuścił stan S; w tym modelu każdy zgon
+      // poprzedza zakażenie, więc D też się liczy.
+      if (a.state !== 'S') byBand[`zakazeni_${band}`]++;
+      if (a.state === 'D') byBand[`zgony_${band}`]++;
+    }
     return {
       dzien: Math.floor(this.time),
       S: c.S, E: c.E, I: c.I, R: c.R, D: c.D,
@@ -216,8 +267,12 @@ export class EpidemicCitySimulation implements VisualSimulation {
       szczyt_I: this.peakI,
       kontakty: this.lastContactPairs,
       agenci: this.agentsArr.length,
+      ...byBand,
     };
   }
+
+  /** Aktywny profil kohortowy — do prowenancji przebiegu, tylko do odczytu. */
+  cohortProfile(): CohortProfile { return this.cohort; }
 
   history(): readonly Record<string, number>[] { return this.hist; }
 

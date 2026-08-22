@@ -69,13 +69,25 @@ const PUBLIC_KINDS: BuildingKind[] = ['shop', 'school', 'park', 'shop', 'park'];
  * - zamknięte typy budynków są pomijane,
  * - izolowani zawsze celują w izolatkę.
  */
-export function chooseDestination(a: CityAgent, layout: CityLayout, eff: InterventionEffects, rng: () => number): void {
+export function chooseDestination(
+  a: CityAgent,
+  layout: CityLayout,
+  eff: InterventionEffects,
+  rng: () => number,
+  /**
+   * Mnożnik skłonności do wyjścia z domu dla tego agenta (waga pasma wieku i
+   * ewentualna ochrona priorytetowa). Domyślnie 1 — wtedy decyzja jest
+   * identyczna jak w modelu jednorodnym, bo zmienia się wyłącznie próg, a nie
+   * kolejność losowań.
+   */
+  contactMultiplier = 1,
+): void {
   if (a.isolated) {
     const iso = firstOfKind(layout, 'isolation');
     if (iso >= 0) { setDest(a, layout, iso, 'isolation', rng); a.behavior = 'izolacja'; return; }
   }
   // Mobilność: czy w ogóle wyruszać z domu w miasto?
-  const goOut = rng() < eff.mobilityScale;
+  const goOut = rng() < eff.mobilityScale * contactMultiplier;
   if (!goOut) { setDest(a, layout, a.homeIdx, 'home', rng); a.behavior = 'dom'; return; }
   // Wybierz publiczny cel, pomijając zamknięte typy.
   const options = PUBLIC_KINDS.filter((k) => !eff.closedKinds.has(k));

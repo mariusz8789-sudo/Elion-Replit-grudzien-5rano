@@ -1,4 +1,5 @@
 import type { FalsificationCriterion } from '../experimentFabric/scientificDiscovery';
+import type { CohortProfile } from '../agents/cohortModel';
 import type { EpidemicCityParams } from '../simulation/epidemicCity';
 import type { HospitalCapacityParams } from '../simulation/hospitalResource';
 import type { ScenarioId, ScenarioRun, ScenarioSummary } from '../simulation/scenarioEngine';
@@ -72,6 +73,11 @@ export interface DiscoveryCaseSpec {
   /** Parametry modelu wspólne dla obu ramion, przed nadpisaniem scenariuszem. */
   baseParams?: Partial<EpidemicCityParams>;
   hospitalCapacity?: HospitalCapacityParams;
+  /**
+   * Profil kohortowy wspólny dla obu ramion. Domyślnie neutralny — wiek nie
+   * wpływa wtedy na dynamikę, a jedynie na rozbicie wyników na grupy.
+   */
+  cohort?: CohortProfile;
   /**
    * Dopuszczalna rozbieżność metryki przy odtworzeniu. Model jest
    * deterministyczny, więc domyślnie 0 — każda różnica to DRIFT.

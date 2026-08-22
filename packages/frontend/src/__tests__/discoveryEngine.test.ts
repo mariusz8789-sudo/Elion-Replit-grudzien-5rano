@@ -315,9 +315,12 @@ describe('Discovery Engine — conclusion is derived, not written', () => {
     expect(basis).toContain('peakInfectious');
   });
 
-  it('every conclusion carries the model limitations', () => {
-    expect(runDiscoveryCase(spec()).conclusion!.limitations).toEqual(DISCOVERY_LIMITATIONS);
+  it('every conclusion carries the model limitations plus the cohort provenance', () => {
+    const limitations = runDiscoveryCase(spec()).conclusion!.limitations;
+    for (const l of DISCOVERY_LIMITATIONS) expect(limitations).toContain(l);
     expect(DISCOVERY_LIMITATIONS.join(' ')).toContain('nie jest prognozą');
+    // Domyślny profil jest neutralny i sprawa musi to powiedzieć wprost.
+    expect(limitations.join(' ')).toContain('NEUTRALNY');
   });
 });
 

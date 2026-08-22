@@ -58,6 +58,9 @@ function rerunArm(arm: DiscoveryArm, record: DiscoveryCase): ScenarioRun {
     baseParams: arm.run.preInterventionParams,
     overrideParams: arm.run.params,
     baseHospital: arm.run.preInterventionHospital,
+    // Bez profilu kohortowego odtworzenie biegłoby na populacji jednorodnej i
+    // każdy przebieg z heterogenicznością wychodziłby jako DRIFT.
+    baseCohort: arm.run.cohort,
     interventionStartDay: arm.run.interventionStartDay,
   });
 }

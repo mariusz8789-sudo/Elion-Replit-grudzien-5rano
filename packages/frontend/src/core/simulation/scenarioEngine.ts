@@ -1,4 +1,11 @@
 import { canonicalJson, fnv1a } from '../events/hash';
+import {
+  NEUTRAL_COHORT_PROFILE,
+  AGE_BANDS,
+  differentiatesCohorts,
+  type AgeBand,
+  type CohortProfile,
+} from '../agents/cohortModel';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS, type EpidemicCityParams } from './epidemicCity';
 import {
   evaluateHospitalState,
@@ -37,9 +44,19 @@ export type ScenarioId =
   | 'ISOLATION'
   | 'CONTACT_REDUCTION'
   | 'HEALTHCARE_EXPANSION'
+  | 'PROTECT_SENIORS'
+  | 'PROTECT_CHILDREN'
+  | 'PROTECT_ADULTS'
   | 'SCHOOL_CLOSURE_ONLY'
   | 'TRANSPORT_REDUCTION'
   | 'VACCINATION';
+
+/**
+ * Siła ochrony priorytetowej: o ile spada skłonność chronionej grupy do
+ * opuszczenia domu. To DŹWIGNIA POLITYKI, tej samej natury co `restrictions` —
+ * nie oszacowanie empiryczne skuteczności żadnego realnego programu.
+ */
+export const PRIORITY_PROTECTION_EFFECTIVENESS = 0.75;
 
 export type ScenarioStatus = 'COMPLETED' | 'NOT_MODELED';
 
@@ -52,6 +69,11 @@ export interface ScenarioDefinition {
   epidemicOverrides: Partial<EpidemicCityParams>;
   /** Nadpisania pojemności systemu ochrony zdrowia. */
   hospitalOverrides: Partial<HospitalCapacityParams>;
+  /**
+   * Nadpisania profilu kohortowego — tak wyraża się ochrona priorytetowa
+   * wybranej grupy. Puste dla polityk, które nie dotyczą struktury populacji.
+   */
+  cohortOverrides?: Partial<CohortProfile>;
   /** Ustawione, gdy model NIE MA dźwigni dla tej polityki. */
   notModeledReason?: string;
 }
@@ -91,6 +113,33 @@ export const SCENARIOS: Readonly<Record<ScenarioId, ScenarioDefinition>> = {
     epidemicOverrides: {},
     hospitalOverrides: { totalBeds: 72, icuBeds: 18 },
   },
+  PROTECT_SENIORS: {
+    id: 'PROTECT_SENIORS',
+    label: 'Ochrona priorytetowa seniorów',
+    rationale:
+      'Ogranicza wychodzenie z domu w paśmie seniorów o 75%. Ochrona działa WYŁĄCZNIE przez zmniejszenie liczby kontaktów — model nie zna odporności nabytej inaczej niż przez przechorowanie, więc to nie jest szczepienie. Siła ochrony jest dźwignią polityki, nie oszacowaniem skuteczności realnego programu.',
+    epidemicOverrides: { restrictions: 0, isolate: false },
+    hospitalOverrides: {},
+    cohortOverrides: { shieldedBands: ['senior'], shieldingEffectiveness: PRIORITY_PROTECTION_EFFECTIVENESS },
+  },
+  PROTECT_CHILDREN: {
+    id: 'PROTECT_CHILDREN',
+    label: 'Ochrona priorytetowa dzieci i młodzieży',
+    rationale:
+      'To samo ograniczenie kontaktów, skierowane do pasma dziecięcego. Porównywalne z ochroną seniorów przy identycznych warunkach początkowych.',
+    epidemicOverrides: { restrictions: 0, isolate: false },
+    hospitalOverrides: {},
+    cohortOverrides: { shieldedBands: ['child'], shieldingEffectiveness: PRIORITY_PROTECTION_EFFECTIVENESS },
+  },
+  PROTECT_ADULTS: {
+    id: 'PROTECT_ADULTS',
+    label: 'Ochrona priorytetowa dorosłych',
+    rationale:
+      'To samo ograniczenie kontaktów, skierowane do pasma dorosłych — najliczniejszej grupy w tej populacji.',
+    epidemicOverrides: { restrictions: 0, isolate: false },
+    hospitalOverrides: {},
+    cohortOverrides: { shieldedBands: ['adult'], shieldingEffectiveness: PRIORITY_PROTECTION_EFFECTIVENESS },
+  },
   SCHOOL_CLOSURE_ONLY: {
     id: 'SCHOOL_CLOSURE_ONLY',
     label: 'Zamknięcie samych szkół',
@@ -116,7 +165,7 @@ export const SCENARIOS: Readonly<Record<ScenarioId, ScenarioDefinition>> = {
     epidemicOverrides: {},
     hospitalOverrides: {},
     notModeledReason:
-      'Model ma przedziały S/E/I/R/D bez odporności nabytej inaczej niż przez przechorowanie. Brak parametru pokrycia, skuteczności i opóźnienia odpowiedzi immunologicznej.',
+      'Model ma przedziały S/E/I/R/D bez odporności nabytej inaczej niż przez przechorowanie. Brak parametru pokrycia, skuteczności i opóźnienia odpowiedzi immunologicznej. Dostępnym zamiennikiem jest OCHRONA PRIORYTETOWA (PROTECT_*), która ogranicza kontakty wybranej grupy — to inna interwencja i nie wolno jej opisywać jako szczepień.',
   },
 };
 
@@ -134,6 +183,8 @@ export interface ScenarioRunOptions {
   baseParams?: Partial<EpidemicCityParams>;
   /** Pojemność placówki, przed nadpisaniem przez scenariusz. */
   baseHospital?: HospitalCapacityParams;
+  /** Profil kohortowy przed nadpisaniem przez scenariusz. Domyślnie neutralny. */
+  baseCohort?: CohortProfile;
   /**
    * Nadpisania stosowane PO scenariuszu. Służą przemiataniu dźwigni, którą sam
    * scenariusz deklaruje — bez tego wartość scenariusza zawsze by wygrywała i
@@ -170,6 +221,19 @@ export interface ScenarioDaySample {
   hospital: HospitalState;
 }
 
+/** Wynik w rozbiciu na pasmo wieku. Mianownikiem jest liczebność pasma. */
+export interface BandOutcome {
+  population: number;
+  infected: number;
+  deaths: number;
+  hospitalizedEver: number;
+  attackRate: number;
+  /** Odsetek ZAKAŻONYCH w tym paśmie, którzy trafili do szpitala. */
+  severeShareOfInfected: number;
+  /** Odsetek ZAKAŻONYCH w tym paśmie, którzy zmarli. */
+  caseFatalityOfInfected: number;
+}
+
 export interface ScenarioSummary {
   population: number;
   peakInfectious: number;
@@ -181,6 +245,8 @@ export interface ScenarioSummary {
   peakIcuOccupancy: number;
   totalUnmetCareDays: number;
   firstCriticalDay: number | null;
+  /** Wyniki per pasmo wieku — liczone zawsze, także przy profilu neutralnym. */
+  byBand: Record<AgeBand, BandOutcome>;
 }
 
 export interface ScenarioRun {
@@ -202,6 +268,8 @@ export interface ScenarioRun {
    */
   preInterventionParams: EpidemicCityParams;
   preInterventionHospital: HospitalCapacityParams;
+  /** Profil kohortowy użyty w przebiegu — część prowenancji, nie ozdoba. */
+  cohort: CohortProfile;
   /** Odcisk WEJŚCIA: identyczny odcisk => identyczne warunki startowe. */
   inputFingerprint: string;
   /**
@@ -229,6 +297,35 @@ function resolveParams(
   override: Partial<EpidemicCityParams> = {},
 ): EpidemicCityParams {
   return { ...DEFAULT_CITY_PARAMS, ...base, ...def.epidemicOverrides, ...override };
+}
+
+/**
+ * Wyniki per pasmo wieku z końcowego stanu modelu. Wszystkie liczniki pochodzą
+ * z `stats()`; nic tu nie jest doszacowywane. Pasmo bez ani jednego zakażenia
+ * dostaje udziały 0, a nie dzielenie przez zero.
+ */
+function bandOutcomes(stats: Record<string, number>): Record<AgeBand, BandOutcome> {
+  const out = {} as Record<AgeBand, BandOutcome>;
+  for (const band of AGE_BANDS) {
+    const bandPopulation = stats[`pop_${band}`] ?? 0;
+    const infected = stats[`zakazeni_${band}`] ?? 0;
+    const deaths = stats[`zgony_${band}`] ?? 0;
+    const hospitalizedEver = stats[`hospitalizowani_kiedykolwiek_${band}`] ?? 0;
+    out[band] = {
+      population: bandPopulation,
+      infected,
+      deaths,
+      hospitalizedEver,
+      attackRate: bandPopulation > 0 ? infected / bandPopulation : 0,
+      severeShareOfInfected: infected > 0 ? hospitalizedEver / infected : 0,
+      caseFatalityOfInfected: infected > 0 ? deaths / infected : 0,
+    };
+  }
+  return out;
+}
+
+function resolveCohort(def: ScenarioDefinition, base: CohortProfile = NEUTRAL_COHORT_PROFILE): CohortProfile {
+  return def.cohortOverrides ? { ...base, ...def.cohortOverrides } : base;
 }
 
 function resolveHospital(def: ScenarioDefinition, base: HospitalCapacityParams = DEFAULT_HOSPITAL_CAPACITY): HospitalCapacityParams {
@@ -267,12 +364,19 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
   const stepsPerDay = Math.max(1, Math.floor(options.stepsPerDay ?? DEFAULT_SCENARIO_RUN.stepsPerDay));
   const params = resolveParams(def, options.baseParams, options.overrideParams);
   const hospitalCapacity = resolveHospital(def, options.baseHospital);
+  const cohort = resolveCohort(def, options.baseCohort);
   const interventionStartDay = Math.max(0, Math.floor(options.interventionStartDay ?? 0));
   const timed = interventionStartDay > 0;
   const preInterventionParams: EpidemicCityParams = timed ? { ...params, ...pickBaseValues(def, options) } : params;
   const preInterventionHospital = timed ? (options.baseHospital ?? DEFAULT_HOSPITAL_CAPACITY) : hospitalCapacity;
+  // Profil wchodzi do odcisku tylko wtedy, gdy w ogóle różnicuje grupy. Dzięki
+  // temu przebiegi nietykające warstwy kohortowej zachowują dotychczasowe
+  // odciski, a te z heterogenicznością są od nich odróżnialne.
   const inputFingerprint = fnv1a(
-    canonicalJson({ v: SCENARIO_ENGINE_VERSION, scenarioId, params, hospitalCapacity, days, stepsPerDay, interventionStartDay }),
+    canonicalJson({
+      v: SCENARIO_ENGINE_VERSION, scenarioId, params, hospitalCapacity, days, stepsPerDay, interventionStartDay,
+      ...(differentiatesCohorts(cohort) ? { cohort } : {}),
+    }),
   );
 
   const shell: Omit<ScenarioRun, 'status' | 'series' | 'summary' | 'resultFingerprint' | 'epidemicFingerprint'> = {
@@ -286,6 +390,7 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
     interventionStartDay,
     preInterventionParams,
     preInterventionHospital,
+    cohort,
     inputFingerprint,
   };
 
@@ -319,7 +424,7 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
     };
   }
 
-  const sim = new EpidemicCitySimulation(preInterventionParams);
+  const sim = new EpidemicCitySimulation(preInterventionParams, undefined, undefined, cohort);
   const dt = 1 / stepsPerDay;
   const series: ScenarioDaySample[] = [];
   let interventionApplied = !timed;
@@ -349,7 +454,8 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
     });
   }
 
-  const population = sim.stats().agenci;
+  const finalStats = sim.stats();
+  const population = finalStats.agenci;
   const pressure = peakHospitalPressure(series.map((d) => d.hospital));
   let peakInfectious = 0;
   let peakInfectiousDay = 0;
@@ -370,6 +476,7 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
     peakIcuOccupancy: pressure.peakIcuOccupancy,
     totalUnmetCareDays: pressure.totalUnmetCareDays,
     firstCriticalDay: pressure.firstCriticalDay,
+    byBand: bandOutcomes(finalStats),
   };
 
   return {
@@ -428,6 +535,7 @@ export function replayScenario(run: ScenarioRun): ScenarioReplay {
     baseParams: run.preInterventionParams,
     overrideParams: run.params,
     baseHospital: run.preInterventionHospital,
+    baseCohort: run.cohort,
     interventionStartDay: run.interventionStartDay,
   });
   const matched = replayed.resultFingerprint === run.resultFingerprint;

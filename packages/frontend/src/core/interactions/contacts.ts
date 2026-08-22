@@ -29,6 +29,13 @@ export interface ContactParams {
   /** Który stan jest podatny / zakaźny. */
   susceptible: string;
   infectious: string;
+  /**
+   * Mnożnik podatności celu (heterogeniczność populacji). Domyślnie 1 dla
+   * każdego agenta, co daje DOKŁADNIE ten sam strumień losowy i ten sam wynik
+   * co model jednorodny — warstwa kohortowa nic nie zmienia, dopóki ktoś jej
+   * jawnie nie skalibruje.
+   */
+  susceptibilityOf?: (agent: SimAgent) => number;
 }
 
 /**
@@ -71,7 +78,10 @@ export function resolveContacts(agents: readonly SimAgent[], p: ContactParams): 
           const dx = tgt.x - src.x, dy = tgt.y - src.y;
           if (dx * dx + dy * dy > R2) continue;
           contactPairs++;
-          if (!exposures.has(ti) && p.rng() < pInfect) {
+          // Losowanie zachodzi zawsze i w tej samej kolejności; różnicuje je
+          // wyłącznie próg, więc profil neutralny jest bitowo nierozróżnialny.
+          const susceptibility = p.susceptibilityOf ? p.susceptibilityOf(tgt) : 1;
+          if (!exposures.has(ti) && p.rng() < pInfect * susceptibility) {
             exposures.set(ti, src.id);
             events.push({ from: src.id, to: tgt.id, x: tgt.x, y: tgt.y });
           }

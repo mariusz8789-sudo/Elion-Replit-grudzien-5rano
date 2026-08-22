@@ -69,6 +69,30 @@ export default function scenario(d) {
   });
   const blocked = d.runDiscoveryCase({ ...spec, baselineScenario: 'ISOLATION', variantScenario: 'CONTACT_REDUCTION' });
   const notModeled = d.runDiscoveryCase({ ...spec, variantScenario: 'VACCINATION' });
+
+  // --- Warstwa kohortowa: heterogeniczna populacja ---
+  const cohortConditions = { nAgents: 260, initialInfected: 5, seed: 4242, days: 60, stepsPerDay: 4 };
+  const illustrative = d.defineCohortProfile('age-gradient-illustrative', {
+    severityMultiplier: { child: 0.2, adult: 1, senior: 4 },
+    fatalityMultiplier: { child: 0.1, adult: 1, senior: 6 },
+  });
+  const neutralCase = d.runDiscoveryCase({
+    ...spec, initialConditions: cohortConditions, baseParams: { severeRate: 0.2 },
+    baselineScenario: 'BASELINE', variantScenario: 'PROTECT_SENIORS',
+  });
+  const calibratedCase = d.runDiscoveryCase({
+    ...spec, initialConditions: cohortConditions, baseParams: { severeRate: 0.2 },
+    baselineScenario: 'BASELINE', variantScenario: 'PROTECT_SENIORS', cohort: illustrative,
+  });
+  const priority = d.runProtectionPriorityStudy({
+    question: 'Kogo chronić najpierw?',
+    initialConditions: cohortConditions, baseParams: { severeRate: 0.2 }, cohort: illustrative,
+  });
+  const priorityNeutral = d.runProtectionPriorityStudy({
+    question: 'Kogo chronić najpierw?',
+    initialConditions: cohortConditions, baseParams: { severeRate: 0.2 },
+  });
+  const plainRun = d.runDiscoveryCase({ ...spec, initialConditions: cohortConditions, baseParams: { severeRate: 0.2 } });
   return {
     caseId: c.caseId,
     status: c.status,
@@ -94,6 +118,26 @@ export default function scenario(d) {
     blockedGate: d.evaluateGate(blocked, 'SUPPORTED').allowed,
     notModeledStatus: notModeled.status,
     notModeledHasReason: Boolean(notModeled.notModeledReason),
+
+    cohortNotModeled: d.COHORT_NOT_MODELED.slice(),
+    cohortVariableProvenance: d.COHORT_VARIABLES.map((v) => v.id + ':' + v.provenance),
+    illustrativeCalibration: illustrative.calibration,
+    neutralIsNeutral: d.differentiatesCohorts(d.NEUTRAL_COHORT_PROFILE),
+    plainBands: plainRun.arms[0].summary.byBand,
+    neutralProtectFingerprint: neutralCase.arms[1].run.resultFingerprint,
+    calibratedProtectFingerprint: calibratedCase.arms[1].run.resultFingerprint,
+    calibratedBands: calibratedCase.arms[0].summary.byBand,
+    cohortLever: calibratedCase.comparison.controlledDifference,
+    cohortReplay: calibratedCase.replay.status,
+    cohortCaseStatus: calibratedCase.status,
+    cohortLimitations: calibratedCase.limitations.join(' | '),
+    priorityStatus: priority.status,
+    priorityWinners: priority.winnerByObjective,
+    priorityConflict: Boolean(priority.conflictNote),
+    priorityAdmitted: priority.candidates.filter((c) => c.admitted).length,
+    priorityReplays: priority.candidates.map((c) => c.case.replay.status),
+    priorityRankingDeaths: priority.rankingByObjective.totalDeaths.map((r) => [r.scenario, r.value, r.referenceValue]),
+    priorityNeutralWinnerDeaths: priorityNeutral.winnerByObjective.totalDeaths,
   };
 }
 `;
@@ -155,8 +199,28 @@ check('sprawa splątana jest zablokowana', actual.blockedStatus === 'BLOCKED' &&
 check('bramka nie przepuszcza zablokowanej sprawy do SUPPORTED', actual.blockedGate === false);
 check('scenariusz spoza modelu kończy się NOT_MODELED z powodem', actual.notModeledStatus === 'NOT_MODELED' && actual.notModeledHasReason);
 
+// --- Heterogeniczna populacja ---
+check('każda zmienna kohortowa deklaruje prowenancję', actual.cohortVariableProvenance.every((v) => /:(STRUCTURAL|REQUIRES_CALIBRATION|NOT_MODELED)$/.test(v)), JSON.stringify(actual.cohortVariableProvenance));
+check('profil bez źródła jest oznaczony REQUIRES_CALIBRATION', actual.illustrativeCalibration === 'REQUIRES_CALIBRATION', actual.illustrativeCalibration);
+check('profil neutralny niczego nie różnicuje', actual.neutralIsNeutral === false);
+check('model deklaruje, czego w strukturze populacji nie ma', actual.cohortNotModeled.includes('comorbidities') && actual.cohortNotModeled.includes('vaccine-efficacy'), JSON.stringify(actual.cohortNotModeled));
+check('bez kalibracji wiek nie tworzy gradientu ciężkości', (() => {
+  const shares = ['child', 'adult', 'senior'].map((b) => actual.plainBands[b].severeShareOfInfected).filter((v) => v > 0);
+  return Math.max(...shares) / Math.min(...shares) < 2.5;
+})(), JSON.stringify(actual.plainBands));
+check('kalibracja tworzy realny gradient ciężkości wg wieku', actual.calibratedBands.senior.severeShareOfInfected > actual.calibratedBands.child.severeShareOfInfected * 3, JSON.stringify(['child', 'senior'].map((b) => actual.calibratedBands[b].severeShareOfInfected)));
+check('profil kohortowy zmienia przebieg, więc i odcisk', actual.neutralProtectFingerprint !== actual.calibratedProtectFingerprint, `${actual.neutralProtectFingerprint} vs ${actual.calibratedProtectFingerprint}`);
+check('ochrona priorytetowa to jedna kontrolowana dźwignia', actual.cohortLever === 'priority-protection', actual.cohortLever);
+check('sprawa z heterogeniczną populacją odtwarza się', actual.cohortReplay === 'MATCH' && actual.cohortCaseStatus !== 'BLOCKED', `${actual.cohortReplay}/${actual.cohortCaseStatus}`);
+check('sprawa niesie prowenancję profilu w ograniczeniach', actual.cohortLimitations.includes('REQUIRES_CALIBRATION'), actual.cohortLimitations.slice(0, 160));
+check('„kogo chronić najpierw": wszyscy kandydaci udowodnieni', actual.priorityStatus === 'COMPLETED' && actual.priorityAdmitted === 3 && actual.priorityReplays.every((r) => r === 'MATCH'), `${actual.priorityStatus}/${actual.priorityAdmitted}/${JSON.stringify(actual.priorityReplays)}`);
+check('najmniej zgonów daje ochrona seniorów przy tej kalibracji', actual.priorityWinners.totalDeaths === 'PROTECT_SENIORS', JSON.stringify(actual.priorityRankingDeaths));
+check('najniższy szczyt daje ochrona dorosłych — inny cel, inny zwycięzca', actual.priorityWinners.peakInfectious === 'PROTECT_ADULTS', actual.priorityWinners.peakInfectious);
+check('rozbieżność celów jest zgłoszona, a nie ukryta', actual.priorityConflict === true);
+check('bez kalibracji odpowiedź jest inna — nie jest wpisana na stałe', actual.priorityNeutralWinnerDeaths !== actual.priorityWinners.totalDeaths, `${actual.priorityNeutralWinnerDeaths} vs ${actual.priorityWinners.totalDeaths}`);
+
 // Najmocniejszy dowód: identyczne odciski w Node i w przeglądarce.
-for (const key of ['caseId', 'runFingerprint', 'evidencePackId', 'timingFingerprints', 'bedInputFingerprints', 'bedFingerprints', 'timingPeaks', 'bedUnmet', 'followUpKinds']) {
+for (const key of ['caseId', 'runFingerprint', 'evidencePackId', 'timingFingerprints', 'bedInputFingerprints', 'bedFingerprints', 'timingPeaks', 'bedUnmet', 'followUpKinds', 'calibratedProtectFingerprint', 'plainBands', 'calibratedBands', 'priorityWinners', 'priorityRankingDeaths']) {
   check(`Node i Chromium zgodne: ${key}`, JSON.stringify(actual[key]) === JSON.stringify(expected[key]), `${JSON.stringify(expected[key])} vs ${JSON.stringify(actual[key])}`);
 }
 

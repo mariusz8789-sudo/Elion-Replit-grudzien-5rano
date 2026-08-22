@@ -1,4 +1,5 @@
 import { canonicalJson, fnv1a } from '../events/hash';
+import { AGE_BANDS, COHORT_NOT_MODELED, NEUTRAL_COHORT_PROFILE, type CohortProfile } from '../agents/cohortModel';
 import { getRouterModel } from '../experimentFabric/router';
 import { DEFAULT_HOSPITAL_CAPACITY, HOSPITAL_NOT_MODELED, type HospitalCapacityParams } from '../simulation/hospitalResource';
 import { WORLD_NOT_MODELED } from '../simulation/worldEngineContract';
@@ -8,6 +9,7 @@ import {
   runScenario,
   type ScenarioId,
   type ScenarioRun,
+  type ScenarioSummary,
 } from '../simulation/scenarioEngine';
 import {
   DISCOVERY_ENGINE_VERSION,
@@ -46,6 +48,33 @@ export const DISCOVERY_METRIC_KEYS = [
 
 export type DiscoveryMetricKey = (typeof DISCOVERY_METRIC_KEYS)[number];
 
+/**
+ * Metryki w rozbiciu na pasma wieku. Liczone z realnych przebiegów także przy
+ * profilu neutralnym — wtedy odpowiadają na pytanie, czy model w ogóle
+ * różnicuje grupy. Równe wartości są wynikiem, nie brakiem wyniku.
+ */
+export const DISCOVERY_BAND_METRIC_KEYS = AGE_BANDS.flatMap((band) => [
+  `attackRate_${band}`,
+  `deaths_${band}`,
+  `hospitalizedEver_${band}`,
+  `caseFatalityOfInfected_${band}`,
+  `severeShareOfInfected_${band}`,
+]);
+
+/** Płaska mapa metryk pasmowych z podsumowania przebiegu. */
+export function bandMetricsOf(summary: ScenarioSummary): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const band of AGE_BANDS) {
+    const o = summary.byBand[band];
+    out[`attackRate_${band}`] = o.attackRate;
+    out[`deaths_${band}`] = o.deaths;
+    out[`hospitalizedEver_${band}`] = o.hospitalizedEver;
+    out[`caseFatalityOfInfected_${band}`] = o.caseFatalityOfInfected;
+    out[`severeShareOfInfected_${band}`] = o.severeShareOfInfected;
+  }
+  return out;
+}
+
 /** Granice ważności każdego wniosku z tego modelu — dołączane do sprawy. */
 export const DISCOVERY_LIMITATIONS: readonly string[] = [
   'Model jest agentowy i edukacyjny; nie jest prognozą dla żadnej rzeczywistej populacji.',
@@ -53,7 +82,30 @@ export const DISCOVERY_LIMITATIONS: readonly string[] = [
   'Warstwa szpitalna to księgowość pojemności; sprzężenie śmiertelności jest domyślnie wyłączone.',
   `Model nie obejmuje: ${[...WORLD_NOT_MODELED].join(', ')}.`,
   `Szpital nie obejmuje: ${[...HOSPITAL_NOT_MODELED].join(', ')}.`,
+  `Struktura populacji nie obejmuje: ${[...COHORT_NOT_MODELED].join(', ')}.`,
 ];
+
+/**
+ * Ograniczenia wynikające z użytego profilu kohortowego. Profil bez podanego
+ * źródła MUSI unieważnić każde twierdzenie o rzeczywistej populacji — sprawa
+ * zapisuje to sobie sama, zamiast liczyć na czujność czytelnika.
+ */
+export function cohortLimitations(cohort: CohortProfile): string[] {
+  if (cohort.calibration === 'NEUTRAL') {
+    return [
+      'Profil kohortowy jest NEUTRALNY: wiek nie wpływa na podatność, ciężkość ani śmiertelność. Różnice między pasmami w wynikach mogą pochodzić wyłącznie z ekspozycji i losowości, nie z biologii.',
+    ];
+  }
+  const base = [
+    `Profil kohortowy „${cohort.profileId}" różnicuje grupy. ${cohort.provenanceNote}`,
+  ];
+  if (cohort.calibration === 'REQUIRES_CALIBRATION') {
+    base.push(
+      'Mnożniki nie mają podanego źródła (REQUIRES_CALIBRATION). Wynik wolno czytać wyłącznie jako analizę „co, jeśli"; nie jest to twierdzenie o żadnej rzeczywistej populacji.',
+    );
+  }
+  return base;
+}
 
 export function discoveryModelIdentity(): DiscoveryModelIdentity {
   const model = getRouterModel(DISCOVERY_MODEL_ID);
@@ -87,6 +139,7 @@ export function fingerprintDiscoverySpec(spec: DiscoveryCaseSpec): string {
       initialConditions: spec.initialConditions,
       baseParams: spec.baseParams ?? null,
       hospitalCapacity: spec.hospitalCapacity ?? null,
+      cohort: spec.cohort ?? null,
       replayTolerance: spec.replayTolerance ?? 0,
     }),
   );
@@ -97,14 +150,35 @@ function executeArm(
   scenario: ScenarioId,
   role: 'baseline' | 'variant',
   hospital: HospitalCapacityParams,
+  cohort: CohortProfile,
 ): DiscoveryArm {
   const run = runScenario(scenario, {
     days: spec.initialConditions.days,
     stepsPerDay: spec.initialConditions.stepsPerDay,
     baseParams: sharedBaseParams(spec),
     baseHospital: hospital,
+    baseCohort: cohort,
   });
   return { armId: `${role}:${scenario}`, scenario, role, run, summary: run.summary };
+}
+
+/**
+ * Różnice w profilu kohortowym. Wyszczególniamy je po nazwie pola, żeby było
+ * widać, CO dokładnie odróżnia ramiona — „inny profil" nie byłoby dowodem.
+ */
+function cohortDifferences(a: ScenarioRun, b: ScenarioRun): string[] {
+  const out: string[] = [];
+  const left = a.cohort as unknown as Record<string, unknown>;
+  const right = b.cohort as unknown as Record<string, unknown>;
+  for (const key of ['susceptibilityMultiplier', 'severityMultiplier', 'fatalityMultiplier', 'contactWeight', 'ageBandBounds']) {
+    if (canonicalJson(left[key]) !== canonicalJson(right[key])) out.push(`cohort.${key}`);
+  }
+  const shieldingOf = (run: ScenarioRun) =>
+    run.cohort.shieldingEffectiveness > 0 ? [...run.cohort.shieldedBands].sort() : [];
+  if (canonicalJson(shieldingOf(a)) !== canonicalJson(shieldingOf(b)) || (shieldingOf(a).length > 0 && a.cohort.shieldingEffectiveness !== b.cohort.shieldingEffectiveness)) {
+    out.push('cohort.shielding');
+  }
+  return out.sort();
 }
 
 function hospitalDifferences(a: ScenarioRun, b: ScenarioRun): string[] {
@@ -127,7 +201,11 @@ function hospitalDifferences(a: ScenarioRun, b: ScenarioRun): string[] {
  * ICU — to trafia do ograniczeń sprawy, a nie pod dywan.
  */
 export function leverOf(difference: string): string {
-  return difference.startsWith('hospital.') ? 'hospital-capacity' : difference;
+  if (difference.startsWith('hospital.')) return 'hospital-capacity';
+  // Ochrona priorytetowa to jedna dźwignia niezależnie od tego, ile pasm obejmuje.
+  if (difference === 'cohort.shielding') return 'priority-protection';
+  if (difference.startsWith('cohort.')) return 'cohort-calibration';
+  return difference;
 }
 
 /**
@@ -166,7 +244,11 @@ export function compareDiscoveryArms(baseline: DiscoveryArm, variant: DiscoveryA
   }
 
   const scenarioCompare = compareScenarios(baseline.run, variant.run);
-  const observedDifferences = [...scenarioCompare.changedParameters, ...hospitalDifferences(baseline.run, variant.run)].sort();
+  const observedDifferences = [
+    ...scenarioCompare.changedParameters,
+    ...hospitalDifferences(baseline.run, variant.run),
+    ...cohortDifferences(baseline.run, variant.run),
+  ].sort();
   const levers = [...new Set(observedDifferences.map(leverOf))].sort();
 
   if (levers.length === 0) {
@@ -184,17 +266,19 @@ export function compareDiscoveryArms(baseline: DiscoveryArm, variant: DiscoveryA
 
   const b = baseline.summary!;
   const v = variant.summary!;
-  const metrics = DISCOVERY_METRIC_KEYS.map((key) => {
-    const base = b[key];
-    const variantValue = v[key];
-    return {
-      key,
-      baseline: base,
-      variant: variantValue,
-      absoluteDelta: variantValue - base,
-      relativeDeltaPercent: base === 0 ? null : ((variantValue - base) / base) * 100,
-    };
+  const baseBands = bandMetricsOf(b);
+  const variantBands = bandMetricsOf(v);
+  const delta = (key: string, base: number, variantValue: number) => ({
+    key,
+    baseline: base,
+    variant: variantValue,
+    absoluteDelta: variantValue - base,
+    relativeDeltaPercent: base === 0 ? null : ((variantValue - base) / base) * 100,
   });
+  const metrics = [
+    ...DISCOVERY_METRIC_KEYS.map((key) => delta(key, b[key], v[key])),
+    ...DISCOVERY_BAND_METRIC_KEYS.map((key) => delta(key, baseBands[key], variantBands[key])),
+  ];
 
   const bundled = observedDifferences.length > 1;
   return {
@@ -217,6 +301,7 @@ export function compareDiscoveryArms(baseline: DiscoveryArm, variant: DiscoveryA
 export function executeDiscoveryCase(spec: DiscoveryCaseSpec): DiscoveryCase {
   const model = discoveryModelIdentity();
   const hospital = spec.hospitalCapacity ?? DEFAULT_HOSPITAL_CAPACITY;
+  const cohort = spec.cohort ?? NEUTRAL_COHORT_PROFILE;
   const inputFingerprint = fingerprintDiscoverySpec(spec);
 
   const shell = {
@@ -253,13 +338,16 @@ export function executeDiscoveryCase(spec: DiscoveryCaseSpec): DiscoveryCase {
     };
   }
 
-  const baseline = executeArm(spec, spec.baselineScenario, 'baseline', hospital);
-  const variant = executeArm(spec, spec.variantScenario, 'variant', hospital);
+  const baseline = executeArm(spec, spec.baselineScenario, 'baseline', hospital, cohort);
+  const variant = executeArm(spec, spec.variantScenario, 'variant', hospital, cohort);
+  // Prowenancja kohorty obu ramion trafia do ograniczeń sprawy.
+  const cohortNotes = [...new Set([...cohortLimitations(baseline.run.cohort), ...cohortLimitations(variant.run.cohort)])];
   const arms = [baseline, variant];
   const comparison = compareDiscoveryArms(baseline, variant);
 
   const record: DiscoveryCase = {
     ...shell,
+    limitations: [...shell.limitations, ...cohortNotes],
     status: 'RUNNING',
     // Snapshot parametrów bierzemy z ramienia bazowego — to warunki wyjściowe.
     parameters: { ...baseline.run.params },

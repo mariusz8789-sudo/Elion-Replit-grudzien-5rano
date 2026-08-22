@@ -250,6 +250,37 @@ describe('Genesis Experiment Fabric', () => {
     expect(candidate.requiredNextStep).toContain('Genesis nie formułuje kandydata');
   });
 
+  it('preregisters bounded categorical PDB arms for the existing real structural comparison model', () => {
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'W granicach Structural Fabric porównujemy geometrię MPER w dwóch publicznie dozwolonych parach PDB względem 5GHW.',
+        domainId: 'biology-vaccine-discovery',
+        modelId: 'biology-hiv-10e8-pdb-structural-comparison',
+        declaredAssumptions: [],
+        falsification: {
+          metric: 'mperInFabAlignedFrameRmsdAngstrom',
+          relation: 'less-than',
+          rationale: 'Porównanie jest wyłącznie obliczeniową geometrią RMSD zdeponowanych struktur, nie miarą powinowactwa ani skuteczności szczepionki.',
+        },
+      },
+      baselineRequest: {
+        contractVersion: '1.0.0',
+        sourceText: 'Prerejestrowany A/B Structural Fabric: 5GHW do 4G6F i 5WDF.',
+        domainId: 'biology-vaccine-discovery',
+        operation: 'compute',
+        modelId: 'biology-hiv-10e8-pdb-structural-comparison',
+        parameters: { referencePdb: '5GHW', mobilePdb: '4G6F' },
+      },
+      sweep: { parameter: 'mobilePdb', values: ['4G6F', '5WDF'], label: 'PDB mobile' },
+      repetitionsPerArm: 2,
+    });
+
+    expect(design.arms).toHaveLength(2);
+    expect(design.arms.map((arm) => arm.request.parameters.mobilePdb)).toEqual(['4G6F', '5WDF']);
+    expect(design.primaryMetric).toBe('mperInFabAlignedFrameRmsdAngstrom');
+    expect(design.protocolFingerprint).toMatch(/^protocol_/);
+  });
+
   it('binds a preregistered hypothesis to existing source metadata without generating a citation', () => {
     const references = resolveHypothesisKnowledgeReferences({
       domainId: 'spacetime-einstein',

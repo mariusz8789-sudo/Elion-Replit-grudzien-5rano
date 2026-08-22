@@ -72,6 +72,7 @@ export {
 export {
   DISCOVERY_SEAM_VERSION,
   analyseExperimentSeries,
+  analyseCategoricalExperimentSeries,
   type DiscoveryFindingKind,
   type DiscoveryVerdict,
   type DiscoveryFinding,

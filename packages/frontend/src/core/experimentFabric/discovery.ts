@@ -154,6 +154,118 @@ function diagnosticsFor(
 }
 
 /**
+ * Analyses completed real-engine runs where the swept parameter is a bounded
+ * categorical label (for example, an allowlisted PDB ID). It deliberately does
+ * not invent an ordinal scale for categories: no Pearson r, least-squares
+ * slope, monotonic trend or automatic hypothesis candidate can arise here.
+ */
+export function analyseCategoricalExperimentSeries(
+  runs: readonly ExperimentRun[],
+  parameterKey: string,
+  outputKey: string,
+): DiscoveryAnalysis {
+  const valid = runs.filter((run) => {
+    const parameter = run.provenance.parameterSnapshot[parameterKey];
+    const output = run.result.outputs[outputKey];
+    return run.result.status === 'completed'
+      && run.provenance.resultOrigin === 'real-engine'
+      && typeof parameter === 'string'
+      && parameter.trim().length > 0
+      && typeof output === 'number'
+      && Number.isFinite(output);
+  });
+  const modelIds = [...new Set(valid.map((run) => run.provenance.modelId ?? ''))].filter(Boolean);
+  const modelVersions = new Set(valid.map((run) => run.provenance.modelVersion ?? ''));
+  const engines = new Set(valid.map((run) => run.provenance.engine ?? ''));
+  const units = new Set(valid.map((run) => run.result.units[outputKey] ?? ''));
+  const grouped = new Map<string, ExperimentRun[]>();
+  for (const run of valid) {
+    const category = run.provenance.parameterSnapshot[parameterKey] as string;
+    const existing = grouped.get(category) ?? [];
+    existing.push(run);
+    grouped.set(category, existing);
+  }
+  const categoryCounts = [...grouped.values()].map((group) => group.length);
+  const outputs = valid.map((run) => run.result.outputs[outputKey] as number);
+  const comparable = valid.length >= 4
+    && grouped.size >= 2
+    && categoryCounts.every((count) => count >= 2)
+    && modelIds.length === 1
+    && modelVersions.size === 1
+    && engines.size === 1
+    && units.size === 1;
+  const diagnostics: DiscoverySeriesDiagnostics = comparable
+    ? {
+      status: 'AVAILABLE',
+      validRuns: valid.length,
+      distinctModels: modelIds.length,
+      distinctModelVersions: modelVersions.size,
+      distinctEngines: engines.size,
+      distinctOutputUnits: units.size,
+      parameterDistinctValueCount: grouped.size,
+      outputUnit: [...units][0],
+      outputMinimum: Math.min(...outputs),
+      outputMaximum: Math.max(...outputs),
+      monotonicTrend: 'NOT_ASSESSABLE',
+      limitations: [
+        'Parameter jest kategorią bez jawnej osi liczbowej; Genesis nie wylicza Pearsona, slope, monotoniczności ani endpoint effect.',
+        'Porównanie opisuje wyłącznie ukończone real-engine runy w granicach tego samego modelu, wersji i engine.',
+        'Kategoryczna obserwacja nie generuje automatycznie kandydata hipotezy; wymaga osobnego naukowego projektu porównawczego.',
+      ],
+    }
+    : {
+      status: 'NOT_COMPARABLE',
+      validRuns: valid.length,
+      distinctModels: modelIds.length,
+      distinctModelVersions: modelVersions.size,
+      distinctEngines: engines.size,
+      distinctOutputUnits: units.size,
+      parameterDistinctValueCount: grouped.size,
+      monotonicTrend: 'NOT_ASSESSABLE',
+      limitations: [
+        'Kategoryczna seria wymaga co najmniej dwóch kategorii, dwóch realnych powtórzeń każdej kategorii oraz zgodnego modelu, wersji, engine i jednostki outputu.',
+      ],
+    };
+  const base = {
+    contractVersion: DISCOVERY_SEAM_VERSION,
+    modelId: modelIds.length === 1 ? modelIds[0] : null,
+    parameterKey,
+    outputKey,
+    diagnostics,
+    disclaimer: 'Wynik jest opisową obserwacją z istniejących, audytowalnych real-engine runów. Kategorie nie są sztucznie porządkowane, a wynik nie jest odkryciem, dowodem przyczynowym, rankingiem biologicznym ani prognozą.',
+  };
+  if (diagnostics.status !== 'AVAILABLE') {
+    return {
+      ...base,
+      findings: [{
+        kind: 'insufficient-data',
+        verdict: 'INSUFFICIENT_DATA',
+        message: `Kategoryczna seria nie jest porównywalna: ${diagnostics.limitations.join(' ')}`,
+        evidence: { validRuns: diagnostics.validRuns, categories: diagnostics.parameterDistinctValueCount },
+        runIds: valid.map((run) => run.runId),
+      }],
+    };
+  }
+  if (diagnostics.outputMinimum === diagnostics.outputMaximum) return { ...base, findings: [] };
+  return {
+    ...base,
+    findings: [{
+      kind: 'observed-outlier',
+      verdict: 'REQUIRES_SCIENTIFIC_REVIEW',
+      message: 'Zaobserwowano różne wartości outputu pomiędzy prerejestrowanymi kategoriami. Nie ustala to porządku przyczynowego, mechanizmu ani skuteczności biologicznej.',
+      evidence: {
+        validRuns: diagnostics.validRuns,
+        categories: diagnostics.parameterDistinctValueCount,
+        outputMin: diagnostics.outputMinimum!,
+        outputMax: diagnostics.outputMaximum!,
+        comparison: 'CATEGORICAL_DESCRIPTIVE_ONLY',
+      },
+      runIds: valid.map((run) => run.runId),
+    }],
+  };
+}
+
+/**
  * Analyses comparable, already-executed real-engine runs. It has no simulator,
  * no search over hypothetical points and no causal claim. A finding is only a
  * prompt for scientist review with complete run IDs as evidence.

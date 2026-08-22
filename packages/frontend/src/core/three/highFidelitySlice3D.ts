@@ -13,14 +13,20 @@ import { createPhiladelphiaLegendVisual, type PhiladelphiaLegendViewMode, type P
 export const HIGH_FIDELITY_WORLD_SCALE = 0.02;
 const HF_ANALYSIS_COLS = 34;
 const HF_ANALYSIS_ROWS = 22;
-const LOD1_COUNT = 12;
+/** Średni plan — proceduralny rig z chodem: tańszy, animowany, zróżnicowany. */
+const LOD1_COUNT = 22;
 /**
  * Ilu NAJBLIŻSZYCH agentów dostaje prawdziwą, skinowaną postać glTF zamiast
  * proceduralnej sylwetki. To jest różnica między „ludźmi na ulicy" a
  * „kolorowymi kapsułami": w kadrze ulicznym widz patrzy właśnie na tę grupę.
  * Liczba jest świadomie mała — każdy klon to pełny skinned mesh.
  */
-const REAL_HUMAN_COUNT = 10;
+/**
+ * Ilu agentów dostaje pełną, skinowaną postać glTF. Świadomie NISKA liczba:
+ * hierarchia skali wymaga KILKU szczegółowych ludzi blisko kamery, a nie tłumu
+ * bohaterów — przy 10 kadr zamieniał się w galerię tych samych modeli.
+ */
+const REAL_HUMAN_COUNT = 3;
 /**
  * Docelowa wysokość klonowanych ludzi glTF, w tych samych jednostkach co
  * `DETAILED_HUMAN_HEIGHT` (0.86) proceduralnego rigu LOD1 — WCZEŚNIEJ klony
@@ -28,7 +34,8 @@ const REAL_HUMAN_COUNT = 10;
  * "bliskiego" człowieka. To był główny powód wrażenia "ludzie za duzi".
  */
 const REAL_HUMAN_TARGET_HEIGHT = 0.9;
-const LOD2_COUNT = 32;
+/** Dalszy plan — instancing; to jest większość populacji i ma być mała. */
+const LOD2_COUNT = 140;
 const EVENT_MARKER_SECONDS = 7;
 
 export type HighFidelityCameraMode = 'city' | 'street' | 'agent' | 'event';
@@ -234,7 +241,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     // HDRI ładuje się asynchronicznie po pierwszym kadrze; podstawą pozostają PBR + światła.
     if (this.hdriEnabled) void this.loadHdri(renderer);
-    renderer.toneMappingExposure = 1.02;
+    renderer.toneMappingExposure = 1.18;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     const composer = new modules.EffectComposer(renderer);
     composer.addPass(new modules.RenderPass(scene, camera));
@@ -389,18 +396,20 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private addLighting(): void {
     const THREE = this.THREE!;
     // Neutralne dzienne światło: kontrast materiałów i skala miasta bez neonowego gradingu.
-    const sky = new THREE.HemisphereLight(0xc7d8e8, 0x5b5348, 1.42);
+    const sky = new THREE.HemisphereLight(0xbcd4ee, 0x6b5a44, 0.85);
     this.scene!.add(sky);
-    const sun = new THREE.DirectionalLight(0xffe2bd, 3.0);
-    sun.position.set(-8, 13, 7);
+    // GOLDEN HOUR: słońce nisko nad horyzontem daje długie, kierunkowe cienie
+    // i ciepłe zamodelowanie brył. Wysokie, białe światło spłaszczało kwartał.
+    const sun = new THREE.DirectionalLight(0xffd9a0, 4.2);
+    sun.position.set(-16, 7.5, 9);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -9; sun.shadow.camera.right = 9; sun.shadow.camera.top = 9; sun.shadow.camera.bottom = -9;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -16; sun.shadow.camera.right = 16; sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
     sun.shadow.bias = -0.00022;
     sun.shadow.normalBias = 0.018;
     this.scene!.add(sun);
-    const fill = new THREE.DirectionalLight(0xc2d3df, 0.78);
-    fill.position.set(8, 5, -7);
+    const fill = new THREE.DirectionalLight(0x9fc0e0, 0.5);
+    fill.position.set(10, 6, -9);
     this.scene!.add(fill);
   }
 
@@ -458,9 +467,9 @@ export class HighFidelityStreetSlice3D implements Sim3D {
         // czytała się jak makieta na stole, mimo poprawnych materiałów PBR.
         this.scene.background = environment;
         this.scene.backgroundBlurriness = 0.42;
-        this.scene.backgroundIntensity = 0.72;
+        this.scene.backgroundIntensity = 0.95;
         // Mgła dociągnięta do realnego tła, żeby horyzont nie odcinał się kantem.
-        if (this.THREE) this.scene.fog = new this.THREE.FogExp2(0x8d99a3, 0.0125);
+        if (this.THREE) this.scene.fog = new this.THREE.FogExp2(0xc2a887, 0.0105);
         texture.dispose();
         pmrem.dispose();
       }, undefined, () => pmrem.dispose());
@@ -524,6 +533,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     }
 
     this.addModelBuildings();
+    this.addStreetTrees();
+    this.addTraffic();
     this.addBackgroundCity();
     this.addUrbanStreetDetails();
   }
@@ -580,8 +591,197 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       cap.castShadow = true;
       this.addSceneObject(cap);
 
+      this.addRetailBase(cx, cz, w, d, obj.kind);
       this.addWindows(cx, cz, w, d, height, levels, Boolean(obj.closed));
+      if (obj.label) this.addBuildingSign(cx, cz, w, d, obj.label, obj.kind);
     }
+  }
+
+  /**
+   * PARTER USŁUGOWY — ciemniejsza, przeszklona baza pod elewacją. Bez niej
+   * budynki stały "wprost z asfaltu" i czytały się jak wyciągnięte prostopadłościany.
+   */
+  private addRetailBase(cx: number, cz: number, w: number, d: number, kind: string): void {
+    const THREE = this.THREE!;
+    if (kind === 'home') return;
+    const h = 0.5;
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 1.01, h, d * 1.01),
+      new THREE.MeshStandardMaterial({ color: 0x2c2f35, roughness: 0.35, metalness: 0.15 }),
+    );
+    base.position.set(cx, h / 2, cz);
+    base.castShadow = true; base.receiveShadow = true;
+    this.addSceneObject(base);
+    // Witryna: ciepłe światło wnętrza widoczne z ulicy.
+    for (const sz of [d / 2 + 0.012, -d / 2 - 0.012]) {
+      const glass = new THREE.Mesh(
+        new THREE.PlaneGeometry(w * 0.82, h * 0.62),
+        new THREE.MeshStandardMaterial({
+          color: 0xffdda8, emissive: 0xffc27a, emissiveIntensity: 0.75,
+          roughness: 0.15, metalness: 0.1,
+        }),
+      );
+      glass.position.set(cx, h * 0.55, cz + sz);
+      if (sz < 0) glass.rotation.y = Math.PI;
+      this.addSceneObject(glass);
+    }
+  }
+
+  /**
+   * SZYLD Z MODELU — `WorldObject.label` ("Sklep", "Szkoła", "Szpital", ...) jest
+   * realną daną layoutu i dotąd nie był w ogóle pokazywany w świecie 3D.
+   * Renderujemy go jako teksturę canvas, więc widz czyta funkcję budynku
+   * bezpośrednio z ulicy, a nie z legendy w panelu.
+   */
+  private addBuildingSign(cx: number, cz: number, w: number, d: number, label: string, kind: string): void {
+    const THREE = this.THREE!;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = kind === 'hospital' ? '#f2f4f7' : kind === 'school' ? '#1d3a5c' : '#14181d';
+    ctx.fillRect(0, 0, 512, 128);
+    ctx.fillStyle = kind === 'hospital' ? '#c8322d' : '#f6e3c0';
+    ctx.font = 'bold 68px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label.toUpperCase(), 256, 68);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const signW = Math.min(w * 0.7, 2.2);
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(signW, signW * 0.25),
+      new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.35, roughness: 0.6 }),
+    );
+    sign.position.set(cx, 0.72, cz + d / 2 + 0.03);
+    this.addSceneObject(sign);
+  }
+
+  /**
+   * RUCH ULICZNY — samochody, autobus i przystanki jako scenografia kwartału.
+   * WAŻNE: to jest warstwa WIZUALNA. Model epidemii nie opisuje pojazdów ani
+   * transportu zbiorowego, więc nic tu nie przenosi zakażeń i nic nie jest
+   * liczone. Gdy kontrakt modelu dostanie transport, te obiekty dostaną dane;
+   * do tego czasu są jawnie oznaczone jako scenografia.
+   */
+  private addTraffic(): void {
+    const THREE = this.THREE!;
+    const worldW = this.simulation.worldWidth * HIGH_FIDELITY_WORLD_SCALE;
+    const lanes = this.simulation.streets.h.map((y) => this.toWorldY(y));
+    if (!lanes.length) return;
+
+    const carBody = new THREE.BoxGeometry(0.92, 0.3, 0.42);
+    const carCab = new THREE.BoxGeometry(0.46, 0.22, 0.4);
+    const wheelGeo = new THREE.CylinderGeometry(0.085, 0.085, 0.06, 10);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.9 });
+    const paints = [0x9aa3ad, 0x2b3a4a, 0x8c2f2a, 0xd8d3c8, 0x1d1f24, 0x3f5f4a];
+
+    let slot = 0;
+    for (const z of lanes) {
+      for (let x = -worldW / 2 + 1.4; x < worldW / 2 - 1; x += 3.1) {
+        const hsh = ((slot * 2654435761) >>> 0);
+        const r = (n: number) => (((hsh >>> n) & 0xff) / 255);
+        slot++;
+        if (r(3) < 0.32) continue;
+        const dir = r(5) > 0.5 ? 1 : -1;
+        const lane = z + dir * 0.34;
+        const paint = paints[slot % paints.length];
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(carBody, new THREE.MeshStandardMaterial({ color: paint, roughness: 0.42, metalness: 0.35 }));
+        body.position.y = 0.24; body.castShadow = true; g.add(body);
+        const cab = new THREE.Mesh(carCab, new THREE.MeshStandardMaterial({ color: 0x1a2027, roughness: 0.2, metalness: 0.3 }));
+        cab.position.set(-0.05, 0.44, 0); cab.castShadow = true; g.add(cab);
+        for (const wx of [-0.3, 0.3]) for (const wz of [-0.21, 0.21]) {
+          const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+          wheel.rotation.x = Math.PI / 2;
+          wheel.position.set(wx, 0.085, wz);
+          g.add(wheel);
+        }
+        g.position.set(x + r(11) * 0.6, 0.06, lane);
+        g.rotation.y = dir > 0 ? 0 : Math.PI;
+        this.addSceneObject(g);
+      }
+    }
+
+    // Autobus miejski — czytelna sylwetka transportu zbiorowego.
+    const bus = new THREE.Group();
+    const busBody = new THREE.Mesh(
+      new THREE.BoxGeometry(2.6, 0.72, 0.62),
+      new THREE.MeshStandardMaterial({ color: 0xd9a02b, roughness: 0.5, metalness: 0.2 }),
+    );
+    busBody.position.y = 0.52; busBody.castShadow = true; bus.add(busBody);
+    const busGlass = new THREE.Mesh(
+      new THREE.BoxGeometry(2.45, 0.26, 0.64),
+      new THREE.MeshStandardMaterial({ color: 0x22303c, roughness: 0.15, metalness: 0.4 }),
+    );
+    busGlass.position.y = 0.72; bus.add(busGlass);
+    for (const wx of [-0.85, 0.85]) for (const wz of [-0.31, 0.31]) {
+      const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+      wheel.rotation.x = Math.PI / 2;
+      wheel.position.set(wx, 0.11, wz);
+      bus.add(wheel);
+    }
+    bus.position.set(-worldW * 0.16, 0.06, lanes[0] - 0.34);
+    bus.rotation.y = Math.PI;
+    this.addSceneObject(bus);
+
+    // Przystanki przy chodniku.
+    for (const [i, z] of lanes.entries()) {
+      const stop = new THREE.Group();
+      const roof = new THREE.Mesh(
+        new THREE.BoxGeometry(1.25, 0.05, 0.42),
+        new THREE.MeshStandardMaterial({ color: 0x39424c, roughness: 0.5, metalness: 0.45 }),
+      );
+      roof.position.y = 0.92; roof.castShadow = true; stop.add(roof);
+      for (const px of [-0.55, 0.55]) {
+        const post = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.025, 0.025, 0.92, 8),
+          new THREE.MeshStandardMaterial({ color: 0x2e353d, roughness: 0.55, metalness: 0.5 }),
+        );
+        post.position.set(px, 0.46, -0.16); stop.add(post);
+      }
+      const panel = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.15, 0.6),
+        new THREE.MeshStandardMaterial({ color: 0x18202a, emissive: 0x2b3f52, emissiveIntensity: 0.5, roughness: 0.3 }),
+      );
+      panel.position.set(0, 0.56, -0.2); stop.add(panel);
+      stop.position.set(i === 0 ? -2.6 : 3.1, 0.06, z + 1.5);
+      this.addSceneObject(stop);
+    }
+  }
+
+  /** Szpaler drzew wzdłuż chodników — instancing, jeden draw call na całą ulicę. */
+  private addStreetTrees(): void {
+    const THREE = this.THREE!;
+    const worldW = this.simulation.worldWidth * HIGH_FIDELITY_WORLD_SCALE;
+    const spots: Array<[number, number]> = [];
+    for (const y of this.simulation.streets.h) {
+      const z = this.toWorldY(y);
+      for (let x = -worldW / 2 + 0.9; x < worldW / 2; x += 1.9) {
+        spots.push([x, z + 1.28]);
+        spots.push([x + 0.95, z - 1.28]);
+      }
+    }
+    if (!spots.length) return;
+    const trunkGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.9, 6);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4b3a2a, roughness: 0.9 });
+    const crownGeo = new THREE.IcosahedronGeometry(0.42, 0);
+    const crownMat = new THREE.MeshStandardMaterial({ color: 0x3c6f36, roughness: 0.85, flatShading: true });
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);
+    const crowns = new THREE.InstancedMesh(crownGeo, crownMat, spots.length);
+    crowns.castShadow = true;
+    const m = new THREE.Matrix4();
+    spots.forEach(([x, z], i) => {
+      const hsh = ((i * 2654435761) >>> 0);
+      const sc = 0.85 + ((hsh >>> 7) & 0xff) / 255 * 0.5;
+      m.makeTranslation(x, 0.5 * sc, z);
+      trunks.setMatrixAt(i, m);
+      m.makeTranslation(x, 1.12 * sc, z);
+      crowns.setMatrixAt(i, m);
+    });
+    trunks.instanceMatrix.needsUpdate = true;
+    crowns.instanceMatrix.needsUpdate = true;
+    this.addSceneObject(trunks);
+    this.addSceneObject(crowns);
   }
 
   /** Siatka okien na dwóch dłuższych elewacjach — instancing, jeden draw call na budynek. */
@@ -1085,10 +1285,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   private syncLod2(states: readonly HumanoidAgentState[], focus: HumanoidAgentState | null): void {
-    if (this.cameraMode !== 'city') {
-      this.lod2!.update([], this.timeSeconds);
-      return;
-    }
+    // Tłum dalekiego planu jest widoczny w KAŻDYM trybie kamery — wcześniej
+    // poza widokiem CITY miasto było wyludnione, co psuło poczucie skali.
     const excluded = new Set<number>([focus?.id ?? -1, ...this.lod1.keys(), ...this.realHumans.keys()]);
     this.lod2!.update(states.filter((state) => !excluded.has(state.id)).slice(0, LOD2_COUNT), this.timeSeconds);
   }

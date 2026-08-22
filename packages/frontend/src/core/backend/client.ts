@@ -516,7 +516,7 @@ export interface ComputeRun {
   provenance?: {
     source: string; formula: string; honesty: string; engine?: string; requiredEnvironmentVariable?: string;
     classification?: string; referencePdb?: string; mobilePdb?: string;
-    referenceSha256?: string; mobileSha256?: string; requiredEnvironmentVariables?: string[];
+    referenceSha256?: string; mobileSha256?: string; pdbId?: string; pdbSha256?: string; requiredEnvironmentVariables?: string[];
   };
   message?: string;
 }

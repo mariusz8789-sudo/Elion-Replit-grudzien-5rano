@@ -236,7 +236,7 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
     sourceFile: 'biology-vaccine-discovery.md',
     scale: 'micro-meso',
     capability: 'BACKEND_REAL_ENGINE',
-    realModels: ['biology-hiv-10e8-pdb-structural-comparison'],
+    realModels: ['biology-hiv-10e8-pdb-structural-comparison', 'biology-openmm-md-1vii-reference'],
     concepts: [
       'nanodysk wirusowy', 'glikoproteina transmembranowa', 'HIV MPER', 'Ebola GP',
       'przeciwciało neutralizujące', 'bnAb', '10E8', 'SPR', 'FACS', 'cryo-EM',
@@ -250,7 +250,7 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
       'Genesis nie generuje wyników SPR, FACS ani cryo-EM obliczeniowo — to dane eksperymentalne ze źródeł pierwotnych.',
       'Molecular docking i ogólna dynamika molekularna wymagają zewnętrznych runtime\'ów (ENGINE_NOT_AVAILABLE).',
       'Dostępne obliczenia: Biopython Structural Fabric dla jawnie dozwolonych publicznych par PDB 5GHW→4G6F i 5GHW→5WDF; RMSD opisuje geometrię zdeponowanych struktur, nie powinowactwo, neutralizację, immunogenność ani skuteczność szczepionki.',
-      'Dostępne obliczenia: RDKit deskryptory 2D fragmentu peptydowego, PySCF single-point dla małego fragmentu.',
+      'Dostępne obliczenia: RDKit deskryptory 2D fragmentu peptydowego, PySCF single-point dla małego fragmentu oraz ograniczony, checksumowo zweryfikowany benchmark OpenMM CPU PDB 1VII (AMBER14 + implicit OBC2, 100–1000 kroków).',
       'Platforma nanodysków nie jest szczepionką dla ludzi (Scripps Research: "the platform isn\'t a vaccine itself").',
       'Wyniki na makakach i myszach są przedkliniczne; przeniesienie na ludzi wymaga dalszych badań.',
     ],
@@ -264,7 +264,7 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
       'zaprojektuj hipotezę dla Vaccine Discovery Lab',
     ],
     requiredSolver:
-      'Biopython PDB Structural Fabric (jawnie dozwolone pary 5GHW→4G6F i 5GHW→5WDF — dostępne); RDKit (deskryptory 2D — dostępne); PySCF (single-point — dostępne, ograniczone); molecular docking/dynamics — ENGINE_NOT_AVAILABLE',
+      'Biopython PDB Structural Fabric (jawnie dozwolone pary 5GHW→4G6F i 5GHW→5WDF — dostępne); RDKit (deskryptory 2D — dostępne); PySCF (single-point — dostępne, ograniczone); OpenMM CPU PDB 1VII (ograniczony benchmark runtime’u — dostępny); molecular docking i długotrwała dynamika molekularna — ENGINE_NOT_AVAILABLE',
     visualization: ['numeric', 'graph', 'narrative'],
     dependencies: ['biology', 'biology-aging-lab', 'chemistry'],
     keywords: [

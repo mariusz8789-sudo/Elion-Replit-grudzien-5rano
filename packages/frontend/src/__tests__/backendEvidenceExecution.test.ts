@@ -450,7 +450,7 @@ const openmmRun = {
   units: { atomCountAfterHydrogenAddition: 'atomy', potentialEnergyBeforeKjPerMol: 'kJ/mol', potentialEnergyMinimizedKjPerMol: 'kJ/mol', potentialEnergyAfterKjPerMol: 'kJ/mol', simulatedPicoseconds: 'ps' },
   warnings: ['COMPUTATIONAL_RESULT: bounded OpenMM runtime benchmark only.'],
   validity: 'PDB 1VII reference only.', assumptions: ['AMBER14 implicit OBC2; single CPU thread; 100 steps.'],
-  provenance: { source: 'RCSB PDB 1VII via compute/openmm_worker.py', formula: 'AMBER14 implicit OBC2 + LangevinMiddle MD', honesty: 'real_external_engine_computational_result', engine: 'OpenMM 8.6 CPU', classification: 'COMPUTATIONAL_RESULT', requiredEnvironmentVariables: ['GENESIS_OPENMM_PYTHON', 'GENESIS_OPENMM_DATA_DIR'] },
+  provenance: { source: 'RCSB PDB 1VII via compute/openmm_worker.py', formula: 'AMBER14 implicit OBC2 + LangevinMiddle MD', honesty: 'real_external_engine_computational_result', engine: 'OpenMM 8.6 CPU', classification: 'COMPUTATIONAL_RESULT', pdbId: '1VII', pdbSha256: 'ebecd3d6c0dd9c8b34bcbea9b57c73e4f73986cc674150f0aaa0687db66e77ef', requiredEnvironmentVariables: ['GENESIS_OPENMM_PYTHON', 'GENESIS_OPENMM_DATA_DIR'] },
 };
 
 const structuralRun = {
@@ -920,6 +920,8 @@ describe('backend Evidence-Guided execution', () => {
     expect(confirmed.run.result.outputs.simulatedPicoseconds).toBe(0.2);
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('OpenMM 8.6 CPU');
     expect(confirmed.run.provenance.backendExecution?.backendProvenance.classification).toBe('COMPUTATIONAL_RESULT');
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.pdbId).toBe('1VII');
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.pdbSha256).toBe('ebecd3d6c0dd9c8b34bcbea9b57c73e4f73986cc674150f0aaa0687db66e77ef');
   });
 
   it('confirms a reviewed HIV MPER/10E8 PDB RMSD plan through the canonical backend and preserves structural provenance', async () => {

@@ -49,6 +49,8 @@ function backendProvenanceRecord(run: ComputeRun): Readonly<Record<string, strin
     mobilePdb: provenance?.mobilePdb ?? 'not-applicable',
     referenceSha256: provenance?.referenceSha256 ?? 'not-applicable',
     mobileSha256: provenance?.mobileSha256 ?? 'not-applicable',
+    pdbId: provenance?.pdbId ?? 'not-applicable',
+    pdbSha256: provenance?.pdbSha256 ?? 'not-applicable',
     requiredEnvironmentVariables: Array.isArray(provenance?.requiredEnvironmentVariables)
       ? provenance.requiredEnvironmentVariables.join(',')
       : 'not-applicable',

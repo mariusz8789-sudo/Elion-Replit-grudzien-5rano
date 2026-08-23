@@ -226,6 +226,9 @@ export class EpidemicCitySimulation implements VisualSimulation {
           time: this.time,
           stepDurationDays: dt,
           transmissionProbability: c.exposureProbability.get(ti) ?? 0,
+          // Prędkość niezerowa = agent jest w drodze, a nie stoi w celu.
+          targetInTransit: a.vx !== 0 || a.vy !== 0,
+          targetDestinationKind: a.destKind,
         });
       }
     }

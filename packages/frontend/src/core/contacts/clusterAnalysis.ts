@@ -43,6 +43,34 @@ export interface ContactTypeAttribution {
   share: number;
   /** Ustawione dla typów, których model nie zna — zero nie znaczy tu „brak zakażeń". */
   notModeled: boolean;
+  /** Transmisje, w których cel STAŁ w danym miejscu (dotarł do celu podróży). */
+  dwellTransmissions: number;
+  /**
+   * Transmisje, w których cel był W DRODZE. Dla budynku znaczy to, że agent
+   * PRZECHODZIŁ przez jego obrys po linii prostej, a nie że tam poszedł —
+   * przypisanie miejsca jest wtedy artefaktem geometrii ruchu.
+   */
+  transitTransmissions: number;
+}
+
+/**
+ * Jakość przypisania miejsca dla całego przebiegu.
+ *
+ * Ruch po liniach prostych sprawia, że agent mija (i przecina) obiekty, których
+ * nie wybrał. Im większy udział transmisji „w drodze", tym mniej wiarygodne
+ * jest zdanie „to zakażenie zaszło w szkole". Ta liczba jest raportowana
+ * zawsze, żeby nikt nie czytał atrybucji miejsca jako pewnej.
+ */
+export interface LocationAttributionQuality {
+  /** Udział transmisji, w których cel był w ruchu. */
+  transitShare: number;
+  /** Transmisje przypisane do budynku, choć agent tylko przez niego przechodził. */
+  transitInsideBuildings: number;
+  /** Transmisje przypisane do budynku, w którym agent faktycznie przebywał. */
+  dwellInsideBuildings: number;
+  /** HIGH: prawie wszystko w postoju. LOW: większość w tranzycie. */
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  caveat: string;
 }
 
 export interface CrossCohortFlow {
@@ -63,6 +91,8 @@ export interface ClusterAnalysis {
   notModeledContactTypes: readonly ContactType[];
   /** Transmisje, których typu nie dało się ustalić. Nigdy nie zgadywane. */
   unknownContactTypeTransmissions: number;
+  /** Na ile w ogóle wolno wierzyć przypisaniu miejsca w tym przebiegu. */
+  locationAttribution: LocationAttributionQuality;
 }
 
 function emptyBands(): Record<AgeBand, number> {
@@ -119,14 +149,30 @@ export function analyseTransmissionClusters(
   for (const edge of edges) counts.set(edge.contactType, (counts.get(edge.contactType) ?? 0) + 1);
 
   const attribution = CONTACT_TYPES.map((contactType) => {
-    const transmissions = counts.get(contactType) ?? 0;
+    const ofType = edges.filter((e) => e.contactType === contactType);
+    const transitTransmissions = ofType.filter((e) => e.targetInTransit).length;
     return {
       contactType,
-      transmissions,
-      share: total > 0 ? transmissions / total : 0,
+      transmissions: ofType.length,
+      share: total > 0 ? ofType.length / total : 0,
       notModeled: CONTACT_TYPES_NOT_MODELED.includes(contactType),
+      dwellTransmissions: ofType.length - transitTransmissions,
+      transitTransmissions,
     };
   }).sort((a, b) => b.transmissions - a.transmissions || a.contactType.localeCompare(b.contactType));
+
+  const inTransit = edges.filter((e) => e.targetInTransit).length;
+  const insideBuildings = edges.filter((e) => e.locationIndex >= 0);
+  const transitInsideBuildings = insideBuildings.filter((e) => e.targetInTransit).length;
+  const transitShare = total > 0 ? inTransit / total : 0;
+  const locationAttribution: LocationAttributionQuality = {
+    transitShare,
+    transitInsideBuildings,
+    dwellInsideBuildings: insideBuildings.length - transitInsideBuildings,
+    confidence: transitShare >= 0.5 ? 'LOW' : transitShare >= 0.2 ? 'MEDIUM' : 'HIGH',
+    caveat:
+      'Agenci poruszają się po liniach prostych między obiektami, więc przecinają obrysy budynków, których nie wybrali. Transmisje oznaczone jako „w drodze" mają przypisane miejsce wynikające z geometrii ruchu, a nie z decyzji agenta — i nie wolno ich czytać jako zakażeń „w szkole" czy „w sklepie".',
+  };
 
   const flowMap = new Map<string, CrossCohortFlow>();
   for (const edge of edges) {
@@ -159,6 +205,7 @@ export function analyseTransmissionClusters(
     crossCohortFlows,
     notModeledContactTypes: CONTACT_TYPES_NOT_MODELED,
     unknownContactTypeTransmissions: counts.get('UNKNOWN_CONTACT_TYPE') ?? 0,
+    locationAttribution,
   };
 }
 

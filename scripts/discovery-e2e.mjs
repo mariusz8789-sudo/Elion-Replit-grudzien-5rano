@@ -184,6 +184,28 @@ export default function scenario(d) {
     seniorAttackHomeBase: metricOf(shieldHome, 'attackRate_senior').baseline,
     seniorAttackHomeShielded: metricOf(shieldHome, 'attackRate_senior').variant,
     shieldHomeReplay: shieldHome.replay.status,
+
+    interfaceVersion: d.WORLD_ENGINE_INTERFACE_VERSION,
+    contractEntities: [...new Set(d.WORLD_ENGINE_FIELD_CONTRACT.map((f) => f.entity))].sort(),
+    contractProvenances: [...new Set(d.WORLD_ENGINE_FIELD_CONTRACT.map((f) => f.provenance))].sort(),
+    decisionFieldsOwnedByCore: d.WORLD_ENGINE_FIELD_CONTRACT
+      .filter((f) => ['transmissionOccurred', 'transmissionProbability', 'contactType'].includes(f.field))
+      .every((f) => f.provenance === 'MODEL_DERIVED'),
+    blockedCapabilities: d.CAPABILITY_REQUIREMENTS.map((c) => c.capability).sort(),
+    everyCapabilityBlockedToday: d.CAPABILITY_REQUIREMENTS.every((c) => c.availableToday === false),
+    emptyPayloadUnlocks: d.validateWorldPayload({ contractVersion: d.WORLD_ENGINE_INTERFACE_VERSION }).unlockedCapabilities,
+    rejectsNotModeled: d.validateWorldPayload({ contractVersion: d.WORLD_ENGINE_INTERFACE_VERSION, providedFields: ['ContactEvent.duration'] }).valid,
+    rejectsBadVersion: d.validateWorldPayload({ contractVersion: '0.0.1' }).valid,
+    unlocksOnlyOnCompleteFields: [
+      d.validateWorldPayload({ contractVersion: d.WORLD_ENGINE_INTERFACE_VERSION, providedFields: ['Route.segments'] }).unlockedCapabilities.length,
+      d.validateWorldPayload({ contractVersion: d.WORLD_ENGINE_INTERFACE_VERSION, providedFields: ['Route.segments', 'AgentMovement.route'] }).unlockedCapabilities.length,
+    ],
+    transitShare: clusters.locationAttribution.transitShare,
+    attributionConfidence: clusters.locationAttribution.confidence,
+    otherDwell: clusters.attribution.find((a) => a.contactType === 'OTHER').dwellTransmissions,
+    otherTransit: clusters.attribution.find((a) => a.contactType === 'OTHER').transitTransmissions,
+    transitInsideBuildings: clusters.locationAttribution.transitInsideBuildings,
+    dwellInsideBuildings: clusters.locationAttribution.dwellInsideBuildings,
   };
 }
 `;
@@ -281,8 +303,20 @@ check('A. ale łączna transmisja nie spada — kontakty się przenoszą', actua
 check('B. przy pozostaniu w domu zakażenia seniorów biegną przez gospodarstwo', actual.seniorHouseholdShareHome > actual.seniorHouseholdShareMobile && actual.seniorHouseholdShareHome > 0.3, `${(actual.seniorHouseholdShareMobile * 100).toFixed(0)}% → ${(actual.seniorHouseholdShareHome * 100).toFixed(0)}%`);
 check('B. i wtedy ochrona seniorów przestaje chronić', actual.seniorAttackHomeShielded > actual.seniorAttackHomeBase && actual.shieldHomeReplay === 'MATCH', `${actual.seniorAttackHomeBase.toFixed(3)} → ${actual.seniorAttackHomeShielded.toFixed(3)}`);
 
+// --- Kontrakt dla World Engine ---
+check('kontrakt pokrywa wszystkie encje z briefu', ['AgentPosition', 'AgentMovement', 'Location', 'Route', 'ContactEvent', 'TransmissionEvent'].every((e) => actual.contractEntities.includes(e)), JSON.stringify(actual.contractEntities));
+check('każde pole ma prowenancję z zamkniętej listy', JSON.stringify(actual.contractProvenances) === JSON.stringify(['MODEL_DERIVED', 'NOT_MODELED', 'WORLD_DERIVED']), JSON.stringify(actual.contractProvenances));
+check('pola decyzyjne zostają po stronie Scientific Core', actual.decisionFieldsOwnedByCore === true);
+check('wszystkie zdolności zależne od świata są dziś zablokowane', actual.everyCapabilityBlockedToday === true && actual.emptyPayloadUnlocks.length === 0, JSON.stringify(actual.blockedCapabilities));
+check('walidator odrzuca złą wersję kontraktu', actual.rejectsBadVersion === false);
+check('walidator odrzuca ładunek podający pole NOT_MODELED', actual.rejectsNotModeled === false);
+check('zdolność odblokowuje dopiero komplet pól', actual.unlocksOnlyOnCompleteFields[0] === 0 && actual.unlocksOnlyOnCompleteFields[1] === 1, JSON.stringify(actual.unlocksOnlyOnCompleteFields));
+check('atrybucja miejsca zgłasza niską wiarygodność', actual.transitShare > 0.5 && actual.attributionConfidence === 'LOW', `${(actual.transitShare * 100).toFixed(1)}% w tranzycie`);
+check('OTHER jest w 100% artefaktem ruchu, nie miejscem', actual.otherDwell === 0 && actual.otherTransit > 0, `dwell=${actual.otherDwell} transit=${actual.otherTransit}`);
+check('nawet w budynkach przeważa przechodzenie nad pobytem', actual.transitInsideBuildings > actual.dwellInsideBuildings, `${actual.transitInsideBuildings} vs ${actual.dwellInsideBuildings}`);
+
 // Najmocniejszy dowód: identyczne odciski w Node i w przeglądarce.
-for (const key of ['caseId', 'runFingerprint', 'evidencePackId', 'timingFingerprints', 'bedInputFingerprints', 'bedFingerprints', 'timingPeaks', 'bedUnmet', 'followUpKinds', 'calibratedProtectFingerprint', 'plainBands', 'calibratedBands', 'priorityWinners', 'priorityRankingDeaths', 'attribution', 'graphTypes', 'dominantRoute', 'schoolTransBefore', 'schoolTotalAfter', 'seniorHouseholdShareHome']) {
+for (const key of ['caseId', 'runFingerprint', 'evidencePackId', 'timingFingerprints', 'bedInputFingerprints', 'bedFingerprints', 'timingPeaks', 'bedUnmet', 'followUpKinds', 'calibratedProtectFingerprint', 'plainBands', 'calibratedBands', 'priorityWinners', 'priorityRankingDeaths', 'attribution', 'graphTypes', 'dominantRoute', 'schoolTransBefore', 'schoolTotalAfter', 'seniorHouseholdShareHome', 'transitShare', 'otherTransit', 'transitInsideBuildings', 'blockedCapabilities']) {
   check(`Node i Chromium zgodne: ${key}`, JSON.stringify(actual[key]) === JSON.stringify(expected[key]), `${JSON.stringify(expected[key])} vs ${JSON.stringify(actual[key])}`);
 }
 

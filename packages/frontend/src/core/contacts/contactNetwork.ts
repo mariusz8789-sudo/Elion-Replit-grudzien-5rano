@@ -196,4 +196,13 @@ export interface TransmissionEdge {
   stepDurationDays: number;
   /** Prawdopodobieństwo faktycznie użyte przez model w tym kroku. */
   transmissionProbability: number;
+  /**
+   * Czy cel był W DRODZE (nie dotarł jeszcze do celu podróży) w chwili
+   * zakażenia. To jest miara diagnostyczna dla kategorii OTHER: kontakt w
+   * ruchu po linii prostej między obiektami jest artefaktem geometrii ruchu,
+   * a nie miejscem, które da się opisać polityką.
+   */
+  targetInTransit: boolean;
+  /** Dokąd zmierzał cel — kontekst kontaktu tranzytowego. */
+  targetDestinationKind: string;
 }

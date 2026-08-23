@@ -86,3 +86,24 @@ export {
   type CohortProfile,
   type CohortVariable,
 } from '../agents/cohortModel';
+
+/**
+ * Kontrakt dla World Engine. Wystawiony razem z warstwą naukową, bo to Core
+ * definiuje, czego potrzebuje — implementacja świata należy do Manusa.
+ */
+export {
+  WORLD_ENGINE_INTERFACE_VERSION,
+  WORLD_ENGINE_FIELD_CONTRACT,
+  REQUIRED_LOCATION_TYPES,
+  CAPABILITY_REQUIREMENTS,
+  AVAILABLE_EXPERIMENTS,
+  OTHER_REFINEMENT,
+  REPLAY_REQUIREMENTS,
+  INTERFACE_NOT_MODELED,
+  capabilityFor,
+  isCapabilityUnlocked,
+  validateWorldPayload,
+  type ScientificCapability,
+  type WorldPayload,
+  type WorldPayloadValidation,
+} from '../world/worldEngineInterface';

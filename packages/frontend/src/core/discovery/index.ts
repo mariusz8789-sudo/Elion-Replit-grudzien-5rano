@@ -43,7 +43,32 @@ export {
   type ProtectionPriorityStudy,
   type ProtectionPrioritySpec,
 } from './protectionPriority';
-export { bandMetricsOf, cohortLimitations, DISCOVERY_BAND_METRIC_KEYS } from './discoveryExecution';
+export { bandMetricsOf, contactMetricsOf, cohortLimitations, DISCOVERY_BAND_METRIC_KEYS, DISCOVERY_CONTACT_METRIC_KEYS } from './discoveryExecution';
+
+/**
+ * Warstwa kontaktów. Typ kontaktu, gospodarstwa i ogniska pochodzą z realnych
+ * zdarzeń transmisji; konsument dostaje je razem z deklaracją, czego model nie
+ * potrafi rozpoznać.
+ */
+export {
+  CONTACT_TYPES,
+  CONTACT_TYPE_DECLARATIONS,
+  CONTACT_TYPES_NOT_MODELED,
+  CONTACT_GRAPH_PARAMETERS,
+  CONTACT_NETWORK_NOT_MODELED,
+  HOUSEHOLD_PROVENANCE_NOTE,
+  classifyContact,
+  type ContactType,
+  type TransmissionEdge,
+  type HouseholdStructure,
+} from '../contacts/contactNetwork';
+export {
+  analyseTransmissionClusters,
+  dominantContactType,
+  shareIntoBand,
+  type ClusterAnalysis,
+  type TransmissionCluster,
+} from '../contacts/clusterAnalysis';
 
 /**
  * Warstwa kohortowa. Konsument dostaje ją stąd razem z Discovery Engine, bo

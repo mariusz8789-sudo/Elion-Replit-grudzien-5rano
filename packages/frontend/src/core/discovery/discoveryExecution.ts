@@ -1,5 +1,6 @@
 import { canonicalJson, fnv1a } from '../events/hash';
 import { AGE_BANDS, COHORT_NOT_MODELED, NEUTRAL_COHORT_PROFILE, type CohortProfile } from '../agents/cohortModel';
+import { CONTACT_NETWORK_NOT_MODELED, CONTACT_TYPES, CONTACT_TYPES_NOT_MODELED } from '../contacts/contactNetwork';
 import { getRouterModel } from '../experimentFabric/router';
 import { DEFAULT_HOSPITAL_CAPACITY, HOSPITAL_NOT_MODELED, type HospitalCapacityParams } from '../simulation/hospitalResource';
 import { WORLD_NOT_MODELED } from '../simulation/worldEngineContract';
@@ -53,6 +54,24 @@ export type DiscoveryMetricKey = (typeof DISCOVERY_METRIC_KEYS)[number];
  * profilu neutralnym — wtedy odpowiadają na pytanie, czy model w ogóle
  * różnicuje grupy. Równe wartości są wynikiem, nie brakiem wyniku.
  */
+/**
+ * Metryki transmisji wg typu kontaktu. Typy niemodelowane (praca, transport)
+ * NIE mają tu wpisu — zero przy nich byłoby czytane jako wynik, a jest brakiem
+ * zdolności modelu.
+ */
+export const DISCOVERY_CONTACT_METRIC_KEYS = CONTACT_TYPES
+  .filter((t) => !CONTACT_TYPES_NOT_MODELED.includes(t))
+  .map((t) => `transmissions_${t}`);
+
+export function contactMetricsOf(summary: ScenarioSummary): Record<string, number> {
+  const out: Record<string, number> = { transmissions_total: summary.totalTransmissions };
+  for (const type of CONTACT_TYPES) {
+    if (CONTACT_TYPES_NOT_MODELED.includes(type)) continue;
+    out[`transmissions_${type}`] = summary.transmissionsByContactType[type] ?? 0;
+  }
+  return out;
+}
+
 export const DISCOVERY_BAND_METRIC_KEYS = AGE_BANDS.flatMap((band) => [
   `attackRate_${band}`,
   `deaths_${band}`,
@@ -83,6 +102,8 @@ export const DISCOVERY_LIMITATIONS: readonly string[] = [
   `Model nie obejmuje: ${[...WORLD_NOT_MODELED].join(', ')}.`,
   `Szpital nie obejmuje: ${[...HOSPITAL_NOT_MODELED].join(', ')}.`,
   `Struktura populacji nie obejmuje: ${[...COHORT_NOT_MODELED].join(', ')}.`,
+  `Sieć kontaktów nie obejmuje: ${[...CONTACT_NETWORK_NOT_MODELED].join(', ')}.`,
+  `Typy kontaktu nierozpoznawalne w tym modelu: ${[...CONTACT_TYPES_NOT_MODELED].join(', ')} — zero transmisji w tych kategoriach oznacza brak zdolności modelu, a nie brak zakażeń.`,
 ];
 
 /**
@@ -275,9 +296,12 @@ export function compareDiscoveryArms(baseline: DiscoveryArm, variant: DiscoveryA
     absoluteDelta: variantValue - base,
     relativeDeltaPercent: base === 0 ? null : ((variantValue - base) / base) * 100,
   });
+  const baseContacts = contactMetricsOf(b);
+  const variantContacts = contactMetricsOf(v);
   const metrics = [
     ...DISCOVERY_METRIC_KEYS.map((key) => delta(key, b[key], v[key])),
     ...DISCOVERY_BAND_METRIC_KEYS.map((key) => delta(key, baseBands[key], variantBands[key])),
+    ...['transmissions_total', ...DISCOVERY_CONTACT_METRIC_KEYS].map((key) => delta(key, baseContacts[key], variantContacts[key])),
   ];
 
   const bundled = observedDifferences.length > 1;

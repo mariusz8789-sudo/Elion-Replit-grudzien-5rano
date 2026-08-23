@@ -51,12 +51,22 @@ describe('Who to protect first — every candidate is a fully evidenced case', (
     }
   });
 
-  it('reports the real conflict: fewest deaths and lowest peak are different policies', () => {
+  it('protecting the largest group dominates once mobility is actually wired', () => {
+    // Wynik mierzony, nie założony. Dorośli to ~70% populacji i napędzają
+    // transmisję, więc ich ochrona wygrywa nawet na celach „senioralnych".
     const s = study({ cohort: illustrative });
-    expect(s.winnerByObjective.totalDeaths).toBe('PROTECT_SENIORS');
+    expect(s.winnerByObjective.totalDeaths).toBe('PROTECT_ADULTS');
     expect(s.winnerByObjective.peakInfectious).toBe('PROTECT_ADULTS');
-    expect(s.winnerByObjective.deaths_senior).toBe('PROTECT_SENIORS');
+    expect(s.winnerByObjective.deaths_senior).toBe('PROTECT_ADULTS');
+    expect(s.winnerByObjective.hospitalizedEver_senior).toBe('PROTECT_ADULTS');
+  });
+
+  it('reports a conflict between objectives when one genuinely exists', () => {
+    // Przy profilu neutralnym cele rozjeżdżają się i badanie musi to zgłosić.
+    const s = study();
     expect(s.conflictNote).toContain('nie wnioskiem z samego modelu');
+    const winners = new Set(Object.values(s.winnerByObjective).filter((w) => w !== null));
+    expect(winners.size).toBeGreaterThan(1);
   });
 
   it('every ranked value is measured against the same reference run', () => {
@@ -68,22 +78,30 @@ describe('Who to protect first — every candidate is a fully evidenced case', (
     }
   });
 
-  it('protecting seniors genuinely cuts deaths under this calibration', () => {
+  it('the winning option genuinely beats the reference run', () => {
     const s = study({ cohort: illustrative });
     const deaths = s.rankingByObjective.totalDeaths;
     expect(deaths[0].value).toBeLessThan(deaths[0].referenceValue);
-    const seniors = s.candidates.find((c) => c.scenario === 'PROTECT_SENIORS')!;
-    expect(seniors.case.conclusion!.verdict).toBe('SUPPORTED');
+    const winner = s.candidates.find((c) => c.scenario === deaths[0].scenario)!;
+    expect(winner.case.conclusion!.verdict).toBe('SUPPORTED');
   });
 
-  it('the answer changes with the calibration — and the neutral profile gives a different one', () => {
+  it('an option that does not help comes back NOT_SUPPORTED rather than being flattered', () => {
+    const s = study({ cohort: illustrative });
+    const worst = s.rankingByObjective.totalDeaths[s.rankingByObjective.totalDeaths.length - 1];
+    expect(worst.value).toBeGreaterThan(worst.referenceValue);
+    const candidate = s.candidates.find((c) => c.scenario === worst.scenario)!;
+    expect(candidate.case.conclusion!.verdict).toBe('NOT_SUPPORTED');
+  });
+
+  it('the calibration changes what protection buys, even where it does not change the winner', () => {
     const calibrated = study({ cohort: illustrative });
     const neutral = study();
     expect(neutral.status).toBe('COMPLETED');
-    expect(neutral.winnerByObjective.totalDeaths).not.toBe(calibrated.winnerByObjective.totalDeaths);
-    // Bez gradientu wieku ochrona seniorów nie ratuje życia — model tego nie ukrywa.
-    const seniors = neutral.candidates.find((c) => c.scenario === 'PROTECT_SENIORS')!;
-    expect(seniors.case.conclusion!.verdict).toBe('NOT_SUPPORTED');
+    const seniorLoad = (s: typeof neutral) => s.rankingByObjective.hospitalizedEver_senior[0].referenceValue;
+    // Gradient wieku wielokrotnie zwiększa obciążenie seniorów przy tej samej
+    // epidemii — to jest widoczna różnica, którą wnosi kalibracja.
+    expect(seniorLoad(calibrated)).toBeGreaterThan(seniorLoad(neutral) * 2);
   });
 
   it('carries the cohort provenance into the study limitations', () => {

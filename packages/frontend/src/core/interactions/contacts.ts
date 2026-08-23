@@ -13,6 +13,12 @@ import type { SimAgent, TransmissionEvent } from '../simulation/types';
 export interface ContactResult {
   /** Nowo narażeni: id agenta → id źródła. */
   exposures: Map<number, number>;
+  /**
+   * Prawdopodobieństwo faktycznie użyte przy tej ekspozycji (indeks agenta →
+   * wartość). Nie jest przeliczane po fakcie: to dokładnie ta liczba, którą
+   * model porównał z losowaniem.
+   */
+  exposureProbability: Map<number, number>;
   /** Zdarzenia transmisji (do wizualizacji iskier). */
   events: TransmissionEvent[];
   /** Liczba par w kontakcie (statystyka/obserwowalność). */
@@ -36,6 +42,12 @@ export interface ContactParams {
    * jawnie nie skalibruje.
    */
   susceptibilityOf?: (agent: SimAgent) => number;
+  /**
+   * Mnożnik dla konkretnej PARY — pozwala osłabić transmisję w wybranym typie
+   * kontaktu (np. ochrona wewnątrz gospodarstwa). Domyślnie 1, więc strumień
+   * losowy i wynik pozostają identyczne.
+   */
+  pairScaleOf?: (source: SimAgent, target: SimAgent) => number;
 }
 
 /**
@@ -47,9 +59,10 @@ export function resolveContacts(agents: readonly SimAgent[], p: ContactParams): 
   const R = p.contactRadius;
   const pInfect = (1 - Math.exp(-p.beta * p.dt)) * clamp01(p.transmissionScale);
   const exposures = new Map<number, number>();
+  const exposureProbability = new Map<number, number>();
   const events: TransmissionEvent[] = [];
   let contactPairs = 0;
-  if (R <= 0) return { exposures, events, contactPairs };
+  if (R <= 0) return { exposures, exposureProbability, events, contactPairs };
 
   const cell = R;
   const grid = new Map<number, number[]>();
@@ -81,15 +94,18 @@ export function resolveContacts(agents: readonly SimAgent[], p: ContactParams): 
           // Losowanie zachodzi zawsze i w tej samej kolejności; różnicuje je
           // wyłącznie próg, więc profil neutralny jest bitowo nierozróżnialny.
           const susceptibility = p.susceptibilityOf ? p.susceptibilityOf(tgt) : 1;
-          if (!exposures.has(ti) && p.rng() < pInfect * susceptibility) {
+          const pairScale = p.pairScaleOf ? p.pairScaleOf(src, tgt) : 1;
+          const probability = pInfect * susceptibility * pairScale;
+          if (!exposures.has(ti) && p.rng() < probability) {
             exposures.set(ti, src.id);
+            exposureProbability.set(ti, probability);
             events.push({ from: src.id, to: tgt.id, x: tgt.x, y: tgt.y });
           }
         }
       }
     }
   }
-  return { exposures, events, contactPairs };
+  return { exposures, exposureProbability, events, contactPairs };
 }
 
 function clamp01(x: number): number { return Math.max(0, Math.min(1, x)); }

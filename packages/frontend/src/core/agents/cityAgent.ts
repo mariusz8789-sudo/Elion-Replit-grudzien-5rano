@@ -75,19 +75,18 @@ export function chooseDestination(
   eff: InterventionEffects,
   rng: () => number,
   /**
-   * Mnożnik skłonności do wyjścia z domu dla tego agenta (waga pasma wieku i
-   * ewentualna ochrona priorytetowa). Domyślnie 1 — wtedy decyzja jest
-   * identyczna jak w modelu jednorodnym, bo zmienia się wyłącznie próg, a nie
-   * kolejność losowań.
+   * Skłonność tego agenta do wyjścia z domu: bazowa mobilność modelu razy waga
+   * pasma wieku razy ewentualna ochrona priorytetowa. Silnik składa tę liczbę i
+   * podaje gotową — tutaj zmienia się wyłącznie próg, nigdy kolejność losowań.
    */
-  contactMultiplier = 1,
+  goOutScale = 1,
 ): void {
   if (a.isolated) {
     const iso = firstOfKind(layout, 'isolation');
     if (iso >= 0) { setDest(a, layout, iso, 'isolation', rng); a.behavior = 'izolacja'; return; }
   }
   // Mobilność: czy w ogóle wyruszać z domu w miasto?
-  const goOut = rng() < eff.mobilityScale * contactMultiplier;
+  const goOut = rng() < eff.mobilityScale * goOutScale;
   if (!goOut) { setDest(a, layout, a.homeIdx, 'home', rng); a.behavior = 'dom'; return; }
   // Wybierz publiczny cel, pomijając zamknięte typy.
   const options = PUBLIC_KINDS.filter((k) => !eff.closedKinds.has(k));

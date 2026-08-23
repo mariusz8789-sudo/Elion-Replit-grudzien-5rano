@@ -69,6 +69,21 @@ export function homeIndices(layout: CityLayout): number[] {
 }
 
 /** Losowy punkt WEWNĄTRZ budynku (z marginesem), przez podany RNG. */
+/**
+ * Indeks budynku zawierającego punkt, albo -1 dla przestrzeni otwartej.
+ *
+ * Służy do ustalenia, GDZIE zaszedł kontakt. To odczyt geometrii świata, nie
+ * domysł: budynki nie zachodzą na siebie w tym układzie, więc punkt należy do
+ * co najwyżej jednego z nich.
+ */
+export function buildingAt(layout: CityLayout, x: number, y: number): number {
+  for (let i = 0; i < layout.buildings.length; i++) {
+    const b = layout.buildings[i];
+    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return i;
+  }
+  return -1;
+}
+
 export function pointInBuilding(bl: Building, rng: () => number, margin = 6): { x: number; y: number } {
   return {
     x: bl.x + margin + rng() * Math.max(1, bl.w - margin * 2),

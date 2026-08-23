@@ -12,6 +12,13 @@ export interface InterventionState {
   level: number;
   /** Czy izolować wykrytych objawowych (kwarantanna). */
   isolate: boolean;
+  /**
+   * Niezależne zamknięcie szkół. Dotąd szkoła zamykała się WYŁĄCZNIE jako skutek
+   * uboczny dźwigni restrykcji (>= 0,35), razem ze spadkiem mobilności i
+   * zaraźliwości — więc efektu samego zamknięcia szkół nie dało się odseparować.
+   * Ta dźwignia to zmienia i nie rusza niczego poza szkołą.
+   */
+  closeSchools?: boolean;
 }
 
 export interface InterventionEffects {
@@ -29,7 +36,7 @@ export function interventionEffects(s: InterventionState): InterventionEffects {
   const lvl = clamp01(s.level);
   const closed = new Set<string>();
   // Przy umiarkowanych restrykcjach zamyka się szkoła, przy wyższych też sklep.
-  if (lvl >= 0.35) closed.add('school');
+  if (lvl >= 0.35 || s.closeSchools === true) closed.add('school');
   if (lvl >= 0.6) closed.add('shop');
   return {
     // Mobilność spada nawet do ~25% przy pełnym lockdownie.

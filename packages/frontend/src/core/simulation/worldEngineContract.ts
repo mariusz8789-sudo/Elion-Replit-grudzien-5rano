@@ -1,3 +1,5 @@
+import { analyseTransmissionClusters, type TransmissionCluster } from '../contacts/clusterAnalysis';
+import { CONTACT_NETWORK_NOT_MODELED, type HouseholdView, type TransmissionEdge } from '../contacts/contactNetwork';
 import type { EpidemicCitySimulation } from './epidemicCity';
 import type { TransmissionEvent } from './types';
 import { interventionEffects } from '../interventions/interventions';
@@ -123,6 +125,20 @@ export interface MobilityStateView {
   isolationEnabled: boolean;
 }
 
+/** Krawędź transmisji w ujęciu konsumenta — kopia, nie żywy bufor. */
+export type TransmissionEdgeView = TransmissionEdge;
+
+/** Ognisko w ujęciu konsumenta. */
+export type TransmissionClusterView = TransmissionCluster;
+
+/** Gospodarstwo domowe w ujęciu konsumenta, wraz z prowenancją rozkładu. */
+export interface HouseholdsView {
+  calibration: string;
+  provenanceNote: string;
+  households: readonly HouseholdView[];
+  meanSize: number;
+}
+
 export interface WorldStateView {
   contractVersion: string;
   clock: SimulationClockView;
@@ -133,6 +149,19 @@ export interface WorldStateView {
   locations: readonly LocationStateView[];
   hotspots: readonly HotspotView[];
   transmissions: readonly TransmissionEventView[];
+  /**
+   * Graf transmisji z typem kontaktu i miejscem. To jest to, co World Engine
+   * może pokazać jako „gdzie i jak doszło do zakażenia" — bez liczenia
+   * czegokolwiek po swojej stronie.
+   */
+  transmissionGraph: readonly TransmissionEdgeView[];
+  /** Ogniska wyprowadzone z realnych zdarzeń. */
+  clusters: {
+    household: readonly TransmissionClusterView[];
+    location: readonly TransmissionClusterView[];
+  };
+  /** Gospodarstwa domowe wraz z zastrzeżeniem o pochodzeniu rozkładu. */
+  households: HouseholdsView;
   world: { width: number; height: number };
   /** Jawna lista tego, czego model NIE dostarcza — konsument nie ma zgadywać. */
   notModeled: readonly string[];
@@ -150,6 +179,7 @@ export const WORLD_NOT_MODELED = [
   'weather',
   'resource-stock-levels', // ResourceState: model nie prowadzi zapasów ani zużycia
   'resource-consumption',  // patrz hospitalResource.HOSPITAL_NOT_MODELED
+  ...CONTACT_NETWORK_NOT_MODELED,
 ] as const;
 
 /** Rozmiar komórki siatki hotspotów w jednostkach świata modelu. */
@@ -198,6 +228,9 @@ export function projectWorldState(
   hospitalCapacity: HospitalCapacityParams = DEFAULT_HOSPITAL_CAPACITY,
 ): WorldStateView {
   const stats = simulation.stats();
+  const graph = simulation.transmissionGraph();
+  const clusters = analyseTransmissionClusters(graph);
+  const households = simulation.households();
   const agents: AgentStateView[] = simulation.agents().map((a) => ({
     id: a.id,
     x: a.x,
@@ -243,6 +276,17 @@ export function projectWorldState(
     hotspots: computeHotspots(agents),
     // Kopia listy z modelu: konsument nie może wpłynąć na bufor symulacji.
     transmissions: simulation.lastTransmissions().map((t) => ({ ...t })),
+    transmissionGraph: graph.map((e) => ({ ...e })),
+    clusters: {
+      household: clusters.householdClusters.map((c) => ({ ...c })),
+      location: clusters.locationClusters.map((c) => ({ ...c })),
+    },
+    households: {
+      calibration: households.calibration,
+      provenanceNote: households.provenanceNote,
+      households: households.households.map((h) => ({ ...h })),
+      meanSize: households.meanSize,
+    },
     world: { width: simulation.worldWidth, height: simulation.worldHeight },
     notModeled: WORLD_NOT_MODELED,
   };

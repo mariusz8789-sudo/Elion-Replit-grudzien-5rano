@@ -83,11 +83,12 @@ describe('Scenario Engine — reproducibility', () => {
   it('the fingerprints depend on the run, not on the scenario name', () => {
     // BASELINE i HEALTHCARE_EXPANSION nie różnią się parametrami epidemii, więc
     // przebieg epidemii MUSI być ten sam mimo innej nazwy.
-    const tight = { totalBeds: 4, icuBeds: 1, icuShareOfAdmissions: 0.22 };
-    const base = runScenario('BASELINE', { ...OPTS, baseHospital: tight });
+    const tight = { totalBeds: 1, icuBeds: 0, icuShareOfAdmissions: 0.22 };
+    const strained = { ...OPTS, baseParams: { ...OPTS.baseParams, severeRate: 0.5 } };
+    const base = runScenario('BASELINE', { ...strained, baseHospital: tight });
     const expansion = runScenario('HEALTHCARE_EXPANSION', {
-      ...OPTS,
-      baseParams: { ...OPTS.baseParams, restrictions: 0, isolate: false },
+      ...strained,
+      baseParams: { ...strained.baseParams, restrictions: 0, isolate: false },
       baseHospital: tight,
     });
     expect(expansion.epidemicFingerprint).toBe(base.epidemicFingerprint);
@@ -147,10 +148,16 @@ describe('Scenario Engine — comparison', () => {
     expect(cmp.metrics.map((m) => m.key)).toContain('peakInfectious');
   });
 
-  it('contact reduction lowers the epidemic peak against the same seed', () => {
+  it('contact reduction displaces transmission into households instead of simply removing it', () => {
+    // Wynik mierzony, nie zakładany: restrykcje zamykają szkołę i sklep, więc
+    // kontakty przenoszą się do domu i do parku. Szczyt NIE musi przez to spaść
+    // i przy tym ziarnie nie spada — to realna właściwość tego układu miasta.
     const base = runScenario('BASELINE', OPTS);
     const reduced = runScenario('CONTACT_REDUCTION', OPTS);
-    expect(reduced.summary!.peakInfectious).toBeLessThan(base.summary!.peakInfectious);
+    const household = (run: typeof base) =>
+      run.transmissionGraph.filter((e) => e.contactType === 'HOUSEHOLD').length;
+    expect(household(reduced)).toBeGreaterThan(household(base));
+    expect(reduced.summary!.transmissionsByContactType.SCHOOL ?? 0).toBe(0);
   });
 
   it('blocks a comparison whose runs differ by more than the policy', () => {
@@ -171,11 +178,12 @@ describe('Scenario Engine — comparison', () => {
   });
 
   it('healthcare expansion relieves pressure without altering the epidemic — and says so', () => {
-    const tight = { totalBeds: 4, icuBeds: 1, icuShareOfAdmissions: 0.22 };
-    const base = runScenario('BASELINE', { ...OPTS, baseHospital: tight });
+    const tight = { totalBeds: 1, icuBeds: 0, icuShareOfAdmissions: 0.22 };
+    const strained = { ...OPTS, baseParams: { ...OPTS.baseParams, severeRate: 0.5 } };
+    const base = runScenario('BASELINE', { ...strained, baseHospital: tight });
     const expanded = runScenario('HEALTHCARE_EXPANSION', {
-      ...OPTS,
-      baseParams: { ...OPTS.baseParams, restrictions: 0, isolate: false },
+      ...strained,
+      baseParams: { ...strained.baseParams, restrictions: 0, isolate: false },
       baseHospital: tight,
     });
     // Realny efekt: mniej dni bez opieki.

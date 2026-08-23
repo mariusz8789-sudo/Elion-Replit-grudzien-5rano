@@ -1,4 +1,6 @@
 import { canonicalJson, fnv1a } from '../events/hash';
+import { analyseTransmissionClusters } from '../contacts/clusterAnalysis';
+import type { HouseholdStructure, TransmissionEdge } from '../contacts/contactNetwork';
 import {
   NEUTRAL_COHORT_PROFILE,
   AGE_BANDS,
@@ -47,6 +49,8 @@ export type ScenarioId =
   | 'PROTECT_SENIORS'
   | 'PROTECT_CHILDREN'
   | 'PROTECT_ADULTS'
+  | 'SCHOOL_CLOSURE'
+  | 'HOUSEHOLD_PROTECTION'
   | 'SCHOOL_CLOSURE_ONLY'
   | 'TRANSPORT_REDUCTION'
   | 'VACCINATION';
@@ -57,6 +61,12 @@ export type ScenarioId =
  * nie oszacowanie empiryczne skuteczności żadnego realnego programu.
  */
 export const PRIORITY_PROTECTION_EFFECTIVENESS = 0.75;
+
+/**
+ * Siła ochrony domowej: mnożnik zaraźliwości wewnątrz gospodarstwa. Dźwignia
+ * polityki, nie zmierzona skuteczność żadnego realnego programu.
+ */
+export const HOUSEHOLD_PROTECTION_SCALE = 0.3;
 
 export type ScenarioStatus = 'COMPLETED' | 'NOT_MODELED';
 
@@ -140,14 +150,30 @@ export const SCENARIOS: Readonly<Record<ScenarioId, ScenarioDefinition>> = {
     hospitalOverrides: {},
     cohortOverrides: { shieldedBands: ['adult'], shieldingEffectiveness: PRIORITY_PROTECTION_EFFECTIVENESS },
   },
+  SCHOOL_CLOSURE: {
+    id: 'SCHOOL_CLOSURE',
+    label: 'Zamknięcie szkół',
+    rationale:
+      'Niezależna dźwignia `closeSchools`: szkoła znika z listy celów podróży, a mobilność, zaraźliwość na kontakt i pozostałe obiekty zostają nietknięte. Dzięki temu efekt SAMEGO zamknięcia szkół da się zmierzyć — wcześniej był nierozerwalnie sklejony z ogólnymi restrykcjami.',
+    epidemicOverrides: { restrictions: 0, isolate: false, closeSchools: true },
+    hospitalOverrides: {},
+  },
+  HOUSEHOLD_PROTECTION: {
+    id: 'HOUSEHOLD_PROTECTION',
+    label: 'Ochrona wewnątrz gospodarstwa domowego',
+    rationale:
+      'Obniża zaraźliwość WYŁĄCZNIE w kontakcie domowym (wspólny dom obu agentów). Siła jest dźwignią polityki, nie zmierzoną skutecznością realnego programu — model nie ma danych o skuteczności izolacji domowej.',
+    epidemicOverrides: { restrictions: 0, isolate: false, householdTransmissionScale: HOUSEHOLD_PROTECTION_SCALE },
+    hospitalOverrides: {},
+  },
   SCHOOL_CLOSURE_ONLY: {
     id: 'SCHOOL_CLOSURE_ONLY',
-    label: 'Zamknięcie samych szkół',
-    rationale: 'Nie do wyrażenia w tym modelu.',
+    label: 'Zamknięcie samych szkół (wycofane)',
+    rationale: 'Zastąpione realnym scenariuszem SCHOOL_CLOSURE.',
     epidemicOverrides: {},
     hospitalOverrides: {},
     notModeledReason:
-      'Model zamyka szkołę wyłącznie jako skutek uboczny dźwigni restrykcji (>= 0,35), razem ze spadkiem mobilności i zaraźliwości. Nie ma niezależnego parametru zamknięcia szkół, więc efektu tej polityki nie da się odseparować.',
+      'Ten wpis pozostaje wyłącznie jako ślad po ograniczeniu, którego już nie ma. Model ma teraz niezależną dźwignię zamknięcia szkół — użyj SCHOOL_CLOSURE, które wykonuje realny przebieg.',
   },
   TRANSPORT_REDUCTION: {
     id: 'TRANSPORT_REDUCTION',
@@ -247,6 +273,9 @@ export interface ScenarioSummary {
   firstCriticalDay: number | null;
   /** Wyniki per pasmo wieku — liczone zawsze, także przy profilu neutralnym. */
   byBand: Record<AgeBand, BandOutcome>;
+  /** Transmisje wg typu kontaktu, z realnego grafu transmisji przebiegu. */
+  transmissionsByContactType: Record<string, number>;
+  totalTransmissions: number;
 }
 
 export interface ScenarioRun {
@@ -270,6 +299,13 @@ export interface ScenarioRun {
   preInterventionHospital: HospitalCapacityParams;
   /** Profil kohortowy użyty w przebiegu — część prowenancji, nie ozdoba. */
   cohort: CohortProfile;
+  /**
+   * Pełny graf transmisji przebiegu: kto kogo zaraził, gdzie i jakim typem
+   * kontaktu. Puste dla przebiegów NOT_MODELED.
+   */
+  transmissionGraph: readonly TransmissionEdge[];
+  /** Gospodarstwa domowe wraz z zastrzeżeniem o pochodzeniu ich rozkładu. */
+  households: HouseholdStructure | null;
   /** Odcisk WEJŚCIA: identyczny odcisk => identyczne warunki startowe. */
   inputFingerprint: string;
   /**
@@ -379,7 +415,7 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
     }),
   );
 
-  const shell: Omit<ScenarioRun, 'status' | 'series' | 'summary' | 'resultFingerprint' | 'epidemicFingerprint'> = {
+  const shell: Omit<ScenarioRun, 'status' | 'series' | 'summary' | 'resultFingerprint' | 'epidemicFingerprint' | 'transmissionGraph' | 'households'> = {
     contractVersion: SCENARIO_ENGINE_VERSION,
     scenarioId,
     label: def.label,
@@ -403,6 +439,8 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
       epidemicFingerprint: null,
       series: [],
       summary: null,
+      transmissionGraph: [],
+      households: null,
       notModeledReason: def.notModeledReason,
     };
   }
@@ -420,6 +458,8 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
       epidemicFingerprint: null,
       series: [],
       summary: null,
+      transmissionGraph: [],
+      households: null,
       notModeledReason: `Opóźniona interwencja nie może zmieniać parametrów strukturalnych (${timedStructural.join(', ')}) — model przesiewa dla nich świat od nowa, więc przebieg przestałby być porównywalny.`,
     };
   }
@@ -455,6 +495,8 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
   }
 
   const finalStats = sim.stats();
+  const transmissionGraph = [...sim.transmissionGraph()];
+  const analysis = analyseTransmissionClusters(transmissionGraph);
   const population = finalStats.agenci;
   const pressure = peakHospitalPressure(series.map((d) => d.hospital));
   let peakInfectious = 0;
@@ -477,11 +519,17 @@ export function runScenario(scenarioId: ScenarioId, options: ScenarioRunOptions 
     totalUnmetCareDays: pressure.totalUnmetCareDays,
     firstCriticalDay: pressure.firstCriticalDay,
     byBand: bandOutcomes(finalStats),
+    transmissionsByContactType: Object.fromEntries(
+      analysis.attribution.filter((a) => a.transmissions > 0).map((a) => [a.contactType, a.transmissions]),
+    ),
+    totalTransmissions: analysis.totalTransmissions,
   };
 
   return {
     ...shell,
     status: 'COMPLETED',
+    transmissionGraph,
+    households: sim.households(),
     // Odciski liczone z samego przebiegu — nie z nazwy scenariusza.
     resultFingerprint: fnv1a(
       canonicalJson(

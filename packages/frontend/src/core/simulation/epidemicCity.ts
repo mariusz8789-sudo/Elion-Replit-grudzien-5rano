@@ -5,6 +5,12 @@ import { resolveContacts } from '../interactions/contacts';
 import { interventionEffects, type InterventionState } from '../interventions/interventions';
 import { makeRng } from '../epidemic/agents';
 import {
+  classifyContact,
+  HOUSEHOLD_PROVENANCE_NOTE,
+  type HouseholdStructure,
+  type TransmissionEdge,
+} from '../contacts/contactNetwork';
+import {
   NEUTRAL_COHORT_PROFILE,
   AGE_BANDS,
   bandOfAgent,
@@ -44,8 +50,20 @@ export interface EpidemicCityParams {
   transmissionScale: number; // dodatkowy globalny mnożnik zaraźliwości 0..1 (parametr użytkownika)
   restrictions: number;    // 0..1 (interwencja)
   isolate: boolean;        // izolacja objawowych
-  mobility: number;        // 0..1 bazowa chęć wychodzenia (skalowana przez restrykcje)
+  /** 0..1 bazowa chęć wychodzenia z domu, dodatkowo skalowana przez restrykcje. */
+  mobility: number;
   severeRate: number;      // 0..1 odsetek zakażonych z ciężkim przebiegiem → szpital
+  /**
+   * Niezależne zamknięcie szkół — dźwignia oddzielona od `restrictions`, dzięki
+   * czemu efekt samego zamknięcia szkoły da się zmierzyć.
+   */
+  closeSchools: boolean;
+  /**
+   * Mnożnik zaraźliwości WEWNĄTRZ gospodarstwa domowego (1 = bez zmian).
+   * To dźwignia polityki („ochrona domowa"), nie zmierzona skuteczność
+   * jakiegokolwiek realnego programu.
+   */
+  householdTransmissionScale: number;
   seed: number;
 }
 
@@ -62,6 +80,8 @@ export const DEFAULT_CITY_PARAMS: EpidemicCityParams = {
   isolate: false,
   mobility: 0.85,
   severeRate: 0.15,
+  closeSchools: false,
+  householdTransmissionScale: 1,
   seed: 20260817,
 };
 
@@ -101,6 +121,18 @@ export class EpidemicCitySimulation implements VisualSimulation {
    * przebiegu w grupie byłaby niepoliczalna.
    */
   private bandHospitalizedEver: Record<AgeBand, number> = { child: 0, adult: 0, senior: 0 };
+  /** Krawędzie transmisji z ostatniego kroku (efemeryczne, jak `events`). */
+  private edges: TransmissionEdge[] = [];
+  /** Pełny graf transmisji przebiegu — podstawa analizy klastrów. */
+  private allEdges: TransmissionEdge[] = [];
+
+  /**
+   * Typ kontaktu dla pary agentów w miejscu, w którym stoi cel. Pozycja celu
+   * jest tym samym punktem, który trafia do zdarzenia transmisji.
+   */
+  private classify(source: CityAgent, target: CityAgent) {
+    return classifyContact(this.layout, target.x, target.y, source.homeIdx, target.homeIdx);
+  }
 
   constructor(params: Partial<EpidemicCityParams> = {}, width = 900, height = 620, cohort: CohortProfile = NEUTRAL_COHORT_PROFILE) {
     this.params = { ...DEFAULT_CITY_PARAMS, ...params };
@@ -118,6 +150,8 @@ export class EpidemicCitySimulation implements VisualSimulation {
     this.agentsArr = spawnAgents(this.layout, { nAgents: this.params.nAgents, initialInfected: this.params.initialInfected }, this.rng);
     this.bandPopulation = { child: 0, adult: 0, senior: 0 };
     this.bandHospitalizedEver = { child: 0, adult: 0, senior: 0 };
+    this.edges = [];
+    this.allEdges = [];
     for (const a of this.agentsArr) this.bandPopulation[bandOfAgent(a, this.cohort)]++;
     this.sample(true);
   }
@@ -129,7 +163,11 @@ export class EpidemicCitySimulation implements VisualSimulation {
   tick(dt: number): void {
     this.time += dt;
     this.events = [];
-    const eff = interventionEffects({ level: this.params.restrictions, isolate: this.params.isolate } as InterventionState);
+    const eff = interventionEffects({
+      level: this.params.restrictions,
+      isolate: this.params.isolate,
+      closeSchools: this.params.closeSchools,
+    } as InterventionState);
     // Zamknięcia budynków (widoczne w renderze).
     for (const b of this.layout.buildings) b.closed = eff.closedKinds.has(b.kind);
 
@@ -142,7 +180,11 @@ export class EpidemicCitySimulation implements VisualSimulation {
       if (arrived) {
         a.dwell -= dt;
         if (a.dwell <= 0) {
-          chooseDestination(a, this.layout, eff, this.rng, contactMultiplierFor(a, this.cohort));
+          // Bazowa mobilność modelu BYŁA MARTWYM PARAMETREM: zadeklarowana,
+          // udokumentowana i nigdy nieczytana, więc świat zawsze biegł tak,
+          // jakby wynosiła 1. Tu wchodzi do decyzji o wyjściu z domu razem z
+          // wagą pasma wieku i ochroną priorytetową.
+          chooseDestination(a, this.layout, eff, this.rng, clamp01(this.params.mobility) * contactMultiplierFor(a, this.cohort));
           a.dwell = 0.15 + this.rng() * (a.destKind === 'home' ? 0.8 : 0.4);
         }
       }
@@ -157,12 +199,37 @@ export class EpidemicCitySimulation implements VisualSimulation {
       transmissionScale: clamp01(this.params.transmissionScale) * eff.transmissionScale,
       susceptible: 'S', infectious: 'I',
       susceptibilityOf: (a) => susceptibilityFor(a, this.cohort),
+      // Ochrona domowa osłabia transmisję wyłącznie w kontakcie domowym.
+      // Domyślny mnożnik 1 nie zmienia progu ani strumienia losowego.
+      pairScaleOf: this.params.householdTransmissionScale === 1
+        ? undefined
+        : (src, tgt) => (this.classify(src as CityAgent, tgt as CityAgent).contactType === 'HOUSEHOLD' ? this.params.householdTransmissionScale : 1),
     });
     this.lastContactPairs = c.contactPairs;
+    this.edges = [];
     for (const [ti, src] of c.exposures) {
       const a = this.agentsArr[ti];
       a.state = 'E'; a.stateSince = 0; a.exposedAt = this.time; a.infectedBy = src; a.behavior = 'narażony';
+      // Typ kontaktu jest ustalany W CHWILI transmisji, z pozycji obu agentów.
+      // Po fakcie byłby już nie do odtworzenia — agenci zdążą się rozejść.
+      const source = this.agentsArr.find((x) => x.id === src);
+      if (source) {
+        const classification = this.classify(source, a);
+        this.edges.push({
+          source: src,
+          target: a.id,
+          sourceBand: bandOfAgent(source, this.cohort),
+          targetBand: bandOfAgent(a, this.cohort),
+          sourceHouseholdId: source.homeIdx,
+          targetHouseholdId: a.homeIdx,
+          ...classification,
+          time: this.time,
+          stepDurationDays: dt,
+          transmissionProbability: c.exposureProbability.get(ti) ?? 0,
+        });
+      }
     }
+    this.allEdges.push(...this.edges);
     this.events = c.events;
 
     // (5)+(6) Przejścia stanów + izolacja objawowych.
@@ -273,6 +340,43 @@ export class EpidemicCitySimulation implements VisualSimulation {
 
   /** Aktywny profil kohortowy — do prowenancji przebiegu, tylko do odczytu. */
   cohortProfile(): CohortProfile { return this.cohort; }
+
+  /** Krawędzie transmisji z ostatniego kroku. */
+  lastTransmissionEdges(): readonly TransmissionEdge[] { return this.edges; }
+
+  /** Pełny graf transmisji od początku przebiegu. */
+  transmissionGraph(): readonly TransmissionEdge[] { return this.allEdges; }
+
+  /**
+   * Gospodarstwa domowe wyprowadzone z realnego przydziału domów. Relacja jest
+   * prawdziwa i odtwarzalna; rozkład liczebności jest artefaktem losowania i
+   * niesie to zastrzeżenie ze sobą.
+   */
+  households(): HouseholdStructure {
+    const byHome = new Map<number, number[]>();
+    for (const a of this.agentsArr) {
+      const list = byHome.get(a.homeIdx);
+      if (list) list.push(a.id);
+      else byHome.set(a.homeIdx, [a.id]);
+    }
+    const households = [...byHome.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([buildingIndex, memberIds]) => {
+        const bandCounts: Record<AgeBand, number> = { child: 0, adult: 0, senior: 0 };
+        for (const id of memberIds) {
+          const agent = this.agentsArr.find((x) => x.id === id);
+          if (agent) bandCounts[bandOfAgent(agent, this.cohort)]++;
+        }
+        return { householdId: buildingIndex, buildingIndex, memberIds, size: memberIds.length, bandCounts };
+      });
+    const total = households.reduce((n, h) => n + h.size, 0);
+    return {
+      calibration: 'SYNTHETIC_CALIBRATION_REQUIRED',
+      provenanceNote: HOUSEHOLD_PROVENANCE_NOTE,
+      households,
+      meanSize: households.length > 0 ? total / households.length : 0,
+    };
+  }
 
   history(): readonly Record<string, number>[] { return this.hist; }
 

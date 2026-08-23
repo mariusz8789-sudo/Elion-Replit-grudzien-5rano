@@ -142,7 +142,8 @@ describe('Discovery Engine — comparison blocking', () => {
         ...spec().hypothesis,
         falsification: { metric: 'totalUnmetCareDays', relation: 'less-than', rationale: 'Więcej łóżek to mniej dni bez opieki.' },
       },
-      hospitalCapacity: { totalBeds: 4, icuBeds: 1, icuShareOfAdmissions: 0.22 },
+      baseParams: { severeRate: 0.5 },
+      hospitalCapacity: { totalBeds: 1, icuBeds: 0, icuShareOfAdmissions: 0.22 },
     }));
     expect(c.comparison!.status).toBe('COMPLETED');
     expect(c.comparison!.controlledDifference).toBe('hospital-capacity');
@@ -252,10 +253,14 @@ describe('Discovery Engine — missing model capability', () => {
     expect(deriveDiscoveryConclusion(c, null, null).verdict).toBe('INSUFFICIENT_EVIDENCE');
   });
 
-  it('school closure alone is refused because the model cannot separate it', () => {
+  it('the retired school-closure placeholder points at the real scenario that replaced it', () => {
     const c = runDiscoveryCase(spec({ variantScenario: 'SCHOOL_CLOSURE_ONLY' }));
     expect(c.status).toBe('NOT_MODELED');
-    expect(c.notModeledReason).toContain('restrykcji');
+    expect(c.notModeledReason).toContain('SCHOOL_CLOSURE');
+    // Dźwignia już istnieje, więc realny scenariusz musi się wykonać.
+    const real = runDiscoveryCase(spec({ variantScenario: 'SCHOOL_CLOSURE' }));
+    expect(real.status).not.toBe('NOT_MODELED');
+    expect(real.comparison!.controlledDifference).toBe('closeSchools');
   });
 });
 

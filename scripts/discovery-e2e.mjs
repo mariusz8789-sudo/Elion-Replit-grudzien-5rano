@@ -93,6 +93,20 @@ export default function scenario(d) {
     initialConditions: cohortConditions, baseParams: { severeRate: 0.2 },
   });
   const plainRun = d.runDiscoveryCase({ ...spec, initialConditions: cohortConditions, baseParams: { severeRate: 0.2 } });
+
+  // --- Warstwa kontaktów: kto z kim, gdzie i jakim kanałem ---
+  const contactCase = (variant, mobility) => d.runDiscoveryCase({
+    ...spec, initialConditions: cohortConditions,
+    baseParams: mobility === undefined ? { severeRate: 0.2 } : { severeRate: 0.2, mobility: mobility },
+    baselineScenario: 'BASELINE', variantScenario: variant,
+  });
+  const schoolCase = contactCase('SCHOOL_CLOSURE');
+  const shieldMobile = contactCase('PROTECT_SENIORS');
+  const shieldHome = contactCase('PROTECT_SENIORS', 0.4);
+  const metricOf = (c, key) => c.comparison.metrics.find((m) => m.key === key);
+  const baselineGraph = schoolCase.arms[0].run.transmissionGraph;
+  const clusters = d.analyseTransmissionClusters(baselineGraph);
+  const homeboundClusters = d.analyseTransmissionClusters(shieldHome.arms[1].run.transmissionGraph);
   return {
     caseId: c.caseId,
     status: c.status,
@@ -138,6 +152,38 @@ export default function scenario(d) {
     priorityReplays: priority.candidates.map((c) => c.case.replay.status),
     priorityRankingDeaths: priority.rankingByObjective.totalDeaths.map((r) => [r.scenario, r.value, r.referenceValue]),
     priorityNeutralWinnerDeaths: priorityNeutral.winnerByObjective.totalDeaths,
+    priorityNeutralWinners: priorityNeutral.winnerByObjective,
+    priorityNeutralConflict: Boolean(priorityNeutral.conflictNote),
+    seniorLoadCalibrated: priority.rankingByObjective.hospitalizedEver_senior[0].referenceValue,
+    seniorLoadNeutral: priorityNeutral.rankingByObjective.hospitalizedEver_senior[0].referenceValue,
+
+    contactTypesNotModeled: d.CONTACT_TYPES_NOT_MODELED.slice(),
+    contactNetworkNotModeled: d.CONTACT_NETWORK_NOT_MODELED.slice(),
+    graphSize: baselineGraph.length,
+    graphTypes: baselineGraph.map((e) => e.contactType).filter((t, i, a) => a.indexOf(t) === i).sort(),
+    graphHasProbability: baselineGraph.every((e) => e.transmissionProbability > 0 && e.transmissionProbability <= 1),
+    householdEdgesConsistent: baselineGraph.filter((e) => e.contactType === 'HOUSEHOLD').every((e) => e.sourceHouseholdId === e.targetHouseholdId),
+    attribution: clusters.attribution.filter((a) => a.transmissions > 0).map((a) => [a.contactType, a.transmissions]),
+    attributionTotal: clusters.attribution.reduce((n, a) => n + a.transmissions, 0),
+    dominantRoute: d.dominantContactType(clusters),
+    householdClusterCount: clusters.householdClusters.length,
+    householdCalibration: schoolCase.arms[0].run.households.calibration,
+    householdMembersUnique: (() => {
+      const m = schoolCase.arms[0].run.households.households.flatMap((h) => h.memberIds);
+      return new Set(m).size === m.length;
+    })(),
+    schoolLever: schoolCase.comparison.controlledDifference,
+    schoolReplay: schoolCase.replay.status,
+    schoolVerdict: schoolCase.conclusion.verdict,
+    schoolTransBefore: metricOf(schoolCase, 'transmissions_SCHOOL').baseline,
+    schoolTransAfter: metricOf(schoolCase, 'transmissions_SCHOOL').variant,
+    schoolTotalBefore: metricOf(schoolCase, 'transmissions_total').baseline,
+    schoolTotalAfter: metricOf(schoolCase, 'transmissions_total').variant,
+    seniorHouseholdShareMobile: d.shareIntoBand(d.analyseTransmissionClusters(shieldMobile.arms[1].run.transmissionGraph), 'senior', 'HOUSEHOLD'),
+    seniorHouseholdShareHome: d.shareIntoBand(homeboundClusters, 'senior', 'HOUSEHOLD'),
+    seniorAttackHomeBase: metricOf(shieldHome, 'attackRate_senior').baseline,
+    seniorAttackHomeShielded: metricOf(shieldHome, 'attackRate_senior').variant,
+    shieldHomeReplay: shieldHome.replay.status,
   };
 }
 `;
@@ -214,13 +260,29 @@ check('ochrona priorytetowa to jedna kontrolowana dźwignia', actual.cohortLever
 check('sprawa z heterogeniczną populacją odtwarza się', actual.cohortReplay === 'MATCH' && actual.cohortCaseStatus !== 'BLOCKED', `${actual.cohortReplay}/${actual.cohortCaseStatus}`);
 check('sprawa niesie prowenancję profilu w ograniczeniach', actual.cohortLimitations.includes('REQUIRES_CALIBRATION'), actual.cohortLimitations.slice(0, 160));
 check('„kogo chronić najpierw": wszyscy kandydaci udowodnieni', actual.priorityStatus === 'COMPLETED' && actual.priorityAdmitted === 3 && actual.priorityReplays.every((r) => r === 'MATCH'), `${actual.priorityStatus}/${actual.priorityAdmitted}/${JSON.stringify(actual.priorityReplays)}`);
-check('najmniej zgonów daje ochrona seniorów przy tej kalibracji', actual.priorityWinners.totalDeaths === 'PROTECT_SENIORS', JSON.stringify(actual.priorityRankingDeaths));
-check('najniższy szczyt daje ochrona dorosłych — inny cel, inny zwycięzca', actual.priorityWinners.peakInfectious === 'PROTECT_ADULTS', actual.priorityWinners.peakInfectious);
-check('rozbieżność celów jest zgłoszona, a nie ukryta', actual.priorityConflict === true);
-check('bez kalibracji odpowiedź jest inna — nie jest wpisana na stałe', actual.priorityNeutralWinnerDeaths !== actual.priorityWinners.totalDeaths, `${actual.priorityNeutralWinnerDeaths} vs ${actual.priorityWinners.totalDeaths}`);
+check('ochrona najliczniejszej grupy wygrywa i na zgonach, i na szczycie', actual.priorityWinners.totalDeaths === 'PROTECT_ADULTS' && actual.priorityWinners.peakInfectious === 'PROTECT_ADULTS', JSON.stringify(actual.priorityRankingDeaths));
+check('zwycięzca faktycznie bije odniesienie', actual.priorityRankingDeaths[0][1] < actual.priorityRankingDeaths[0][2], JSON.stringify(actual.priorityRankingDeaths[0]));
+check('najgorsza opcja jest raportowana jako gorsza od odniesienia', actual.priorityRankingDeaths[2][1] > actual.priorityRankingDeaths[2][2], JSON.stringify(actual.priorityRankingDeaths[2]));
+check('rozbieżność celów jest zgłaszana, gdy naprawdę występuje', actual.priorityNeutralConflict === true && new Set(Object.values(actual.priorityNeutralWinners).filter(Boolean)).size > 1, JSON.stringify(actual.priorityNeutralWinners));
+check('kalibracja zmienia skalę obciążenia seniorów przy tej samej epidemii', actual.seniorLoadCalibrated > actual.seniorLoadNeutral * 2, `${actual.seniorLoadNeutral} → ${actual.seniorLoadCalibrated}`);
+
+// --- Sieć kontaktów i transmisji ---
+check('praca i transport pozostają NOT_MODELED', JSON.stringify(actual.contactTypesNotModeled.slice().sort()) === JSON.stringify(['TRANSPORT', 'WORK']), JSON.stringify(actual.contactTypesNotModeled));
+check('brak macierzy kontaktów i demografii gospodarstw jest zadeklarowany', actual.contactNetworkNotModeled.includes('age-specific-contact-matrix') && actual.contactNetworkNotModeled.includes('household-demography'), JSON.stringify(actual.contactNetworkNotModeled));
+check('graf transmisji powstał z realnych zdarzeń', actual.graphSize > 0 && actual.graphHasProbability, `${actual.graphSize} krawędzi`);
+check('żadna krawędź nie ma typu, którego model nie zna', actual.graphTypes.every((t) => !actual.contactTypesNotModeled.includes(t)), JSON.stringify(actual.graphTypes));
+check('krawędzie domowe łączą wyłącznie współmieszkańców', actual.householdEdgesConsistent === true);
+check('atrybucja pokrywa wszystkie transmisje', actual.attributionTotal === actual.graphSize, `${actual.attributionTotal} vs ${actual.graphSize}`);
+check('dominująca droga wskazana z realnych zdarzeń', actual.dominantRoute !== null && !actual.contactTypesNotModeled.includes(actual.dominantRoute), String(actual.dominantRoute));
+check('gospodarstwa są realne, ale ich rozkład oznaczony jako syntetyczny', actual.householdCalibration === 'SYNTHETIC_CALIBRATION_REQUIRED' && actual.householdMembersUnique === true, actual.householdCalibration);
+check('A. zamknięcie szkoły to osobna, kontrolowana dźwignia', actual.schoolLever === 'closeSchools' && actual.schoolReplay === 'MATCH', `${actual.schoolLever}/${actual.schoolReplay}`);
+check('A. transmisja szkolna znika całkowicie', actual.schoolTransBefore > 0 && actual.schoolTransAfter === 0, `${actual.schoolTransBefore} → ${actual.schoolTransAfter}`);
+check('A. ale łączna transmisja nie spada — kontakty się przenoszą', actual.schoolTotalAfter > actual.schoolTotalBefore && actual.schoolVerdict === 'NOT_SUPPORTED', `${actual.schoolTotalBefore} → ${actual.schoolTotalAfter}, ${actual.schoolVerdict}`);
+check('B. przy pozostaniu w domu zakażenia seniorów biegną przez gospodarstwo', actual.seniorHouseholdShareHome > actual.seniorHouseholdShareMobile && actual.seniorHouseholdShareHome > 0.3, `${(actual.seniorHouseholdShareMobile * 100).toFixed(0)}% → ${(actual.seniorHouseholdShareHome * 100).toFixed(0)}%`);
+check('B. i wtedy ochrona seniorów przestaje chronić', actual.seniorAttackHomeShielded > actual.seniorAttackHomeBase && actual.shieldHomeReplay === 'MATCH', `${actual.seniorAttackHomeBase.toFixed(3)} → ${actual.seniorAttackHomeShielded.toFixed(3)}`);
 
 // Najmocniejszy dowód: identyczne odciski w Node i w przeglądarce.
-for (const key of ['caseId', 'runFingerprint', 'evidencePackId', 'timingFingerprints', 'bedInputFingerprints', 'bedFingerprints', 'timingPeaks', 'bedUnmet', 'followUpKinds', 'calibratedProtectFingerprint', 'plainBands', 'calibratedBands', 'priorityWinners', 'priorityRankingDeaths']) {
+for (const key of ['caseId', 'runFingerprint', 'evidencePackId', 'timingFingerprints', 'bedInputFingerprints', 'bedFingerprints', 'timingPeaks', 'bedUnmet', 'followUpKinds', 'calibratedProtectFingerprint', 'plainBands', 'calibratedBands', 'priorityWinners', 'priorityRankingDeaths', 'attribution', 'graphTypes', 'dominantRoute', 'schoolTransBefore', 'schoolTotalAfter', 'seniorHouseholdShareHome']) {
   check(`Node i Chromium zgodne: ${key}`, JSON.stringify(actual[key]) === JSON.stringify(expected[key]), `${JSON.stringify(expected[key])} vs ${JSON.stringify(actual[key])}`);
 }
 

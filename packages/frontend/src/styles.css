@@ -1837,6 +1837,9 @@ kbd {
 .epidemic-summary-row i { width: .48rem; height: .48rem; border-radius: 50%; box-shadow: 0 0 .45rem currentColor; }
 .epidemic-summary-row strong { color: #fff; font: 700 .78rem/1 var(--font-mono); }
 .epidemic-summary-row .legend-isolation { border: 2px solid #ff9f43; background: transparent; box-shadow: none; }
+.hospital-panel .epidemic-summary-row { grid-template-columns: 1fr auto; }
+.hospital-panel-note { margin: 0; padding: 0 .7rem .65rem; color: #7e9ab4; font-size: .64rem; line-height: 1.45; }
+.hospital-panel-note code { color: #a9c4dd; }
 .epidemic-summary-row .legend-hospital { border-radius: .12rem; background: #a66cff; }
 .world-parameter-list { display: grid; gap: .55rem; padding: .65rem .72rem; }
 .world-parameter { display: grid; gap: .28rem; color: #acc0d5; font-size: .7rem; }

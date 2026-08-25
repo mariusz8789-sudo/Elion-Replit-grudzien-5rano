@@ -6,6 +6,10 @@ import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock'
 import { EpidemicCity3DSim, type CityCameraPreset } from '../../core/three/epidemicCity3D';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
+import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
+
+/** Musi zgadzać się z EpidemicCity3DSim.hospitalStatusCode — indeks, nie liczba wyniku. */
+const HOSPITAL_STATUS_LABELS = ['NORMAL', 'WARNING', 'HIGH', 'CRITICAL'] as const;
 
 const CITY_PARAM_DEFS: ParamDef[] = [
   { key: 'r0', label: 'R₀', type: 'slider', default: 2.5, min: 0, max: 6, step: 0.1 },
@@ -148,6 +152,27 @@ export function City3DWebGLScreen() {
               <div className="epidemic-summary-row accent-row"><i className="legend-hospital" /><span>hospitalizacja</span><strong>{stats.hospitalizowani ?? 0}</strong></div>
               <div className="epidemic-summary-row accent-row"><i className="legend-isolation" /><span>izolacja</span><strong>{stats.izolowani ?? 0}</strong></div>
             </div>
+          </div>
+
+          <div className="world-panel hospital-panel">
+            <div className="world-panel-heading">
+              <span>SZPITAL</span>
+              <small>{HOSPITAL_STATUS_LABELS[stats.hosp_status_code ?? 0]}</small>
+            </div>
+            <div className="epidemic-summary">
+              <div className="epidemic-summary-row"><span>łóżka ogólne</span><strong>{stats.hosp_occupied_beds ?? 0} / {stats.hosp_total_beds ?? 0}</strong></div>
+              <div className="epidemic-summary-row"><span>ICU</span><strong>{stats.hosp_occupied_icu ?? 0} / {stats.hosp_icu_beds ?? 0}</strong></div>
+              <div className="epidemic-summary-row"><span>obłożenie ogólne</span><strong>{(stats.hosp_bed_occupancy_pct ?? 0).toFixed(1)}%</strong></div>
+              <div className="epidemic-summary-row"><span>obłożenie ICU</span><strong>{(stats.hosp_icu_occupancy_pct ?? 0).toFixed(1)}%</strong></div>
+              <div className={`epidemic-summary-row ${(stats.hosp_unmet_care ?? 0) > 0 ? 'accent-row' : ''}`}>
+                <span>bez opieki</span><strong>{stats.hosp_unmet_care ?? 0}</strong>
+              </div>
+            </div>
+            <p className="hospital-panel-note">
+              Pojemność {DEFAULT_HOSPITAL_CAPACITY.totalBeds} łóżek / {DEFAULT_HOSPITAL_CAPACITY.icuBeds} ICU — ta sama
+              stała co w Scientific Core (<code>hospitalResource.ts</code>). Sprzężenie śmiertelności wyłączone: ta
+              warstwa liczy obciążenie, nie zmienia przebiegu epidemii.
+            </p>
           </div>
 
           <div className="world-panel parameter-panel">

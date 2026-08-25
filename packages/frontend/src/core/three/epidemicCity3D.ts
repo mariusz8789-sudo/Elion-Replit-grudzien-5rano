@@ -2,6 +2,7 @@ import type * as THREE_NS from 'three';
 import type { SimParams } from '../types';
 import { computeField, heatColor, type AnalysisMode } from '../simulation/analysis';
 import { EpidemicCitySimulation, type EpidemicCityParams } from '../simulation/epidemicCity';
+import { DEFAULT_HOSPITAL_CAPACITY, evaluateHospitalState, type HospitalStatus } from '../simulation/hospitalResource';
 import { SimulationClock, type ClockSpeed } from '../simulationClock/clock';
 import type { SimAgent, WorldObject } from '../simulation/types';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
@@ -304,9 +305,36 @@ export class EpidemicCity3DSim implements Sim3D {
     this.viewport = { w, h };
   }
 
+  /**
+   * Kody statusu szpitala jako liczby, żeby zmieścić się w kontrakcie
+   * `getStats(): Record<string, number>`, którego trzyma się cała reszta tego
+   * ekranu. Etykieta wraca z `HOSPITAL_STATUS_LABELS` po stronie UI — liczba
+   * tutaj nie jest wynikiem, tylko indeksem.
+   */
+  private hospitalStatusCode(status: HospitalStatus): number {
+    return (['NORMAL', 'WARNING', 'HIGH', 'CRITICAL'] as const).indexOf(status);
+  }
+
   getStats(): Record<string, number> {
+    const base = this.simulation.stats();
+    // Realna księgowość łóżek nad realną liczbą hospitalizowanych — ta sama
+    // czysta funkcja, którą pokrywają testy Scientific Core i Discovery
+    // Engine. Pojemność domyślna (`DEFAULT_HOSPITAL_CAPACITY`) jest tą samą
+    // stałą co w silniku, nie liczbą wymyśloną dla ekranu.
+    const hospital = evaluateHospitalState(
+      { day: base.dzien, hospitalizedNow: base.hospitalizowani },
+      DEFAULT_HOSPITAL_CAPACITY,
+    );
     return {
-      ...this.simulation.stats(),
+      ...base,
+      hosp_total_beds: DEFAULT_HOSPITAL_CAPACITY.totalBeds,
+      hosp_icu_beds: DEFAULT_HOSPITAL_CAPACITY.icuBeds,
+      hosp_occupied_beds: hospital.occupiedBeds,
+      hosp_occupied_icu: hospital.occupiedIcu,
+      hosp_unmet_care: hospital.unmetCare,
+      hosp_bed_occupancy_pct: Math.round(hospital.bedOccupancy * 1000) / 10,
+      hosp_icu_occupancy_pct: Math.round(hospital.icuOccupancy * 1000) / 10,
+      hosp_status_code: this.hospitalStatusCode(hospital.status),
       webgl_detailed_humanoids: this.lastDetailCount,
       webgl_instanced_humanoids: this.lastCrowdCount,
       webgl_total_humanoids: this.lastDetailCount + this.lastCrowdCount,

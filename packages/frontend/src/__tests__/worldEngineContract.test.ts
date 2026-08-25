@@ -17,7 +17,8 @@ const run = (s: EpidemicCitySimulation, days: number) => {
 };
 
 const agent = (over: Partial<AgentStateView>): AgentStateView => ({
-  id: 0, x: 0, y: 0, vx: 0, vy: 0, health: 'S', isolated: false, hospitalized: false, behavior: 'idzie', ...over,
+  id: 0, x: 0, y: 0, vx: 0, vy: 0, health: 'S', isolated: false, hospitalized: false, behavior: 'idzie',
+  ...over,
 });
 
 describe('World Engine contract — one read-only projection of the real world state', () => {
@@ -88,6 +89,14 @@ describe('World Engine contract — one read-only projection of the real world s
       expect(loc.kind).toBe(s.objects()[i].kind);
       expect(loc.closed).toBe(Boolean(s.objects()[i].closed));
     }
+  });
+
+  it('projects the deterministic routing topology and a copied segment assignment for each agent', () => {
+    const s = run(sim(), 8);
+    const w = projectWorldState(s);
+    expect(w.routing.mapId).toBe('genesis-city-grid');
+    expect(w.routing.routeSegments.length).toBeGreaterThan(0);
+    expect(w.routing.providedFields).toEqual(['Route.segments', 'Route.segmentType']);
   });
 
   it('hospital state is wired from the real hospitalised count', () => {

@@ -1,5 +1,6 @@
 import type { VisualSimulation, SimAgent, WorldObject, TransmissionEvent } from './types';
 import { buildCity, pointInBuilding, type CityLayout } from '../world/cityWorld';
+import { buildRoadNetwork, copyRoadNetwork, type CityRoadNetwork } from '../world/roadNetwork';
 import { spawnAgents, chooseDestination, stepMovement, type CityAgent } from '../agents/cityAgent';
 import { resolveContacts } from '../interactions/contacts';
 import { interventionEffects, type InterventionState } from '../interventions/interventions';
@@ -98,6 +99,8 @@ export class EpidemicCitySimulation implements VisualSimulation {
   readonly worldHeight: number;
   readonly stateColors = COLORS;
   private layout: CityLayout;
+  /** Topologia świata jest wyłącznie odczytem dla rendererów i adapterów danych. */
+  private readonly roadNetwork: CityRoadNetwork;
   private agentsArr: CityAgent[] = [];
   private rng: () => number;
   private params: EpidemicCityParams;
@@ -138,6 +141,7 @@ export class EpidemicCitySimulation implements VisualSimulation {
     this.params = { ...DEFAULT_CITY_PARAMS, ...params };
     this.cohort = cohort;
     this.layout = buildCity(width, height);
+    this.roadNetwork = buildRoadNetwork(this.layout);
     this.worldWidth = this.layout.width;
     this.worldHeight = this.layout.height;
     this.rng = makeRng(this.params.seed);
@@ -295,6 +299,8 @@ export class EpidemicCitySimulation implements VisualSimulation {
   // --- VisualSimulation API ---
   /** Ulice do tła (opcjonalne, odczytywane przez renderer). */
   get streets(): { h: number[]; v: number[] } { return { h: this.layout.streetsH, v: this.layout.streetsV }; }
+  /** Read-only kopia realnej topologii miasta dla rendererów i adapterów danych. */
+  roadNetworkView(): CityRoadNetwork { return copyRoadNetwork(this.roadNetwork); }
   objects(): readonly WorldObject[] { return this.layout.buildings; }
   agents(): readonly SimAgent[] { return this.agentsArr; }
   lastTransmissions(): readonly TransmissionEvent[] { return this.events; }

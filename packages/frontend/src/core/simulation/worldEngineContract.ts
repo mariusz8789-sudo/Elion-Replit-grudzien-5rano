@@ -4,6 +4,7 @@ import type { EpidemicCitySimulation } from './epidemicCity';
 import type { TransmissionEvent } from './types';
 import { interventionEffects } from '../interventions/interventions';
 import { evaluateHospitalState, DEFAULT_HOSPITAL_CAPACITY, type HospitalCapacityParams, type HospitalState } from './hospitalResource';
+import type { RouteSegment } from '../world/roadNetwork';
 
 /**
  * WORLD ENGINE CONTRACT — stabilny, READ-ONLY widok świata dla World Engine
@@ -125,6 +126,15 @@ export interface MobilityStateView {
   isolationEnabled: boolean;
 }
 
+/** Read-only topologia tras dostarczana przez World Engine. */
+export interface RoutingStateView {
+  mapId: string;
+  mapVersion: string;
+  mapFingerprint: string;
+  routeSegments: readonly RouteSegment[];
+  providedFields: readonly ['Route.segments', 'Route.segmentType'];
+}
+
 /** Krawędź transmisji w ujęciu konsumenta — kopia, nie żywy bufor. */
 export type TransmissionEdgeView = TransmissionEdge;
 
@@ -145,6 +155,7 @@ export interface WorldStateView {
   epidemic: EpidemicStateView;
   hospital: HospitalState;
   mobility: MobilityStateView;
+  routing: RoutingStateView;
   agents: readonly AgentStateView[];
   locations: readonly LocationStateView[];
   hotspots: readonly HotspotView[];
@@ -231,6 +242,7 @@ export function projectWorldState(
   const graph = simulation.transmissionGraph();
   const clusters = analyseTransmissionClusters(graph);
   const households = simulation.households();
+  const roadNetwork = simulation.roadNetworkView();
   const agents: AgentStateView[] = simulation.agents().map((a) => ({
     id: a.id,
     x: a.x,
@@ -271,6 +283,13 @@ export function projectWorldState(
     },
     hospital: evaluateHospitalState({ day: stats.dzien, hospitalizedNow: stats.hospitalizowani }, hospitalCapacity),
     mobility: projectMobilityState(simulation.getParams()),
+    routing: {
+      mapId: roadNetwork.mapId,
+      mapVersion: roadNetwork.mapVersion,
+      mapFingerprint: roadNetwork.mapFingerprint,
+      routeSegments: roadNetwork.segments.map((segment) => ({ ...segment, from: { ...segment.from }, to: { ...segment.to } })),
+      providedFields: ['Route.segments', 'Route.segmentType'],
+    },
     agents,
     locations,
     hotspots: computeHotspots(agents),

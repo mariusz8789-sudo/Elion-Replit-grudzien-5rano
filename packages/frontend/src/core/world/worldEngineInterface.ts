@@ -58,8 +58,8 @@ export const WORLD_ENGINE_FIELD_CONTRACT: readonly FieldContract[] = [
   { entity: 'AgentMovement', field: 'speed', provenance: 'MODEL_DERIVED', meaning: 'Prędkość w jednostkach świata na dzień; dziś stała dla wszystkich agentów.' },
   { entity: 'AgentMovement', field: 'inTransit', provenance: 'MODEL_DERIVED', meaning: 'Czy agent jest w drodze, czy dotarł do celu. Podstawa oceny wiarygodności przypisania miejsca.' },
   { entity: 'AgentMovement', field: 'destinationLocationId', provenance: 'MODEL_DERIVED', meaning: 'Dokąd agent zmierza — decyzja modelu, nie świata.' },
-  { entity: 'AgentMovement', field: 'route', provenance: 'WORLD_DERIVED', meaning: 'Rzeczywista trasa przejścia jako uporządkowana lista segmentów sieci. Bez tego ruch jest linią prostą i przecina obiekty, których agent nie wybrał.', unlocks: ['ROAD_NETWORK_VS_STRAIGHT_LINE', 'STREET_SIDEWALK_SPLIT'] },
-  { entity: 'AgentMovement', field: 'routeSegmentId', provenance: 'WORLD_DERIVED', meaning: 'Segment sieci, na którym agent aktualnie się znajduje. Pozwala przypisać kontakt do ulicy, chodnika lub przejścia.', unlocks: ['STREET_SIDEWALK_SPLIT'] },
+  { entity: 'AgentMovement', field: 'route', provenance: 'WORLD_DERIVED', meaning: 'Rzeczywista trasa przejścia jako uporządkowana lista segmentów sieci. Topologia tras jest dostępna w WorldStateView, ale Scientific Core nie konsumuje jeszcze trasy pojedynczego agenta.', unlocks: ['ROAD_NETWORK_VS_STRAIGHT_LINE', 'STREET_SIDEWALK_SPLIT'] },
+  { entity: 'AgentMovement', field: 'routeSegmentId', provenance: 'WORLD_DERIVED', meaning: 'Segment sieci, na którym agent aktualnie się znajduje. Sieć ma stabilne segmenty, lecz przypisanie bieżącej pozycji agenta do segmentu pozostaje niedostarczone.', unlocks: ['STREET_SIDEWALK_SPLIT'] },
 
   // --- Location ---
   { entity: 'Location', field: 'locationId', provenance: 'WORLD_DERIVED', meaning: 'Stabilny identyfikator miejsca, niezmienny między przebiegami tej samej mapy.' },
@@ -69,8 +69,8 @@ export const WORLD_ENGINE_FIELD_CONTRACT: readonly FieldContract[] = [
   { entity: 'Location', field: 'ventilation', provenance: 'NOT_MODELED', meaning: 'Wentylacja/otwartość miejsca. Brak danych po obu stronach.' },
 
   // --- Route ---
-  { entity: 'Route', field: 'segments', provenance: 'WORLD_DERIVED', meaning: 'Uporządkowane segmenty sieci między punktem startu a celem.', unlocks: ['ROAD_NETWORK_VS_STRAIGHT_LINE'] },
-  { entity: 'Route', field: 'segmentType', provenance: 'WORLD_DERIVED', meaning: 'ROAD | SIDEWALK | CROSSING | INDOOR — to ono rozbija dzisiejsze OTHER.', unlocks: ['STREET_SIDEWALK_SPLIT'] },
+  { entity: 'Route', field: 'segments', provenance: 'WORLD_DERIVED', meaning: 'Stabilna topologia sieci dostępna przez WorldStateView.routing. Trasy agentów między punktem startu a celem nadal nie są częścią modelu.', unlocks: ['ROAD_NETWORK_VS_STRAIGHT_LINE'] },
+  { entity: 'Route', field: 'segmentType', provenance: 'WORLD_DERIVED', meaning: 'ROAD | SIDEWALK | CROSSING | INDOOR — typy są dostarczane przez topologię, ale nie są jeszcze przypisane do kontaktów.', unlocks: ['STREET_SIDEWALK_SPLIT'] },
   { entity: 'Route', field: 'length', provenance: 'WORLD_DERIVED', meaning: 'Długość segmentu w jednostkach świata; potrzebna do czasu przebywania na segmencie.' },
 
   // --- ContactEvent ---
@@ -112,9 +112,9 @@ export const REQUIRED_LOCATION_TYPES: readonly LocationTypeRequirement[] = [
   { locationType: 'SHOP', availableToday: true, requires: 'Obrys sklepu — istnieje, z tym samym zastrzeżeniem o tranzycie.', mapsToContactType: 'SHOP' },
   { locationType: 'HOSPITAL', availableToday: true, requires: 'Obrys szpitala i izolatki — istnieją.', mapsToContactType: 'HEALTHCARE' },
   { locationType: 'PARK', availableToday: true, requires: 'Obrys parku — istnieje, z tym samym zastrzeżeniem o tranzycie.', mapsToContactType: 'PUBLIC' },
-  { locationType: 'ROAD', availableToday: false, requires: 'Sieć jezdni z identyfikatorami segmentów oraz przypisanie pozycji agenta do segmentu.', mapsToContactType: 'OTHER' },
-  { locationType: 'SIDEWALK', availableToday: false, requires: 'Sieć chodników odrębna od jezdni; bez niej nie da się odróżnić kontaktu pieszego od przejazdu.', mapsToContactType: 'OTHER' },
-  { locationType: 'CROSSING', availableToday: false, requires: 'Przejścia jako osobne segmenty sieci, w których gęstość pieszych rośnie.', mapsToContactType: 'OTHER' },
+  { locationType: 'ROAD', availableToday: true, requires: 'Sieć jezdni z identyfikatorami segmentów jest dostępna w WorldStateView.routing. Brakuje przypisania pozycji agenta do segmentu.', mapsToContactType: 'OTHER' },
+  { locationType: 'SIDEWALK', availableToday: true, requires: 'Sieć chodników odrębna od jezdni jest dostępna w WorldStateView.routing. Brakuje przypisania kontaktu do segmentu.', mapsToContactType: 'OTHER' },
+  { locationType: 'CROSSING', availableToday: true, requires: 'Przejścia są osobnymi stabilnymi segmentami topologii. Brakuje ruchu agentów po tych segmentach.', mapsToContactType: 'OTHER' },
   { locationType: 'WORK', availableToday: false, requires: 'Miejsca pracy jako obiekty w layoucie ORAZ stabilne przypisanie agent → miejsce pracy.', mapsToContactType: 'WORK' },
   { locationType: 'TRANSPORT', availableToday: false, requires: 'Pojazdy jako poruszające się pojemniki z listą pasażerów, linie i przystanki.', mapsToContactType: 'TRANSPORT' },
 ];
@@ -345,7 +345,6 @@ export const INTERFACE_NOT_MODELED = [
   'ventilation',
   'vehicle-occupancy',
   'workplace-assignment',
-  'road-network',
-  'sidewalk-network',
-  'pedestrian-crossings',
+  'agent-route-assignment',
+  'contact-route-segment-attribution',
 ] as const;

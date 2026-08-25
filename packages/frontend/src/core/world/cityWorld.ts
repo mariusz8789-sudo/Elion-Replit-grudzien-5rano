@@ -13,6 +13,8 @@ import type { WorldObject } from '../simulation/types';
 export type BuildingKind = 'home' | 'shop' | 'school' | 'hospital' | 'isolation' | 'park';
 
 export interface Building extends WorldObject {
+  /** Stabilny identyfikator miejsca, niezależny od kolejności renderowania. */
+  id: string;
   kind: BuildingKind;
   cx: number; cy: number; // środek (punkt docelowy)
 }
@@ -29,8 +31,10 @@ export interface CityLayout {
 /** Deterministyczny układ miasta (zależny tylko od rozmiaru — powtarzalny). */
 export function buildCity(width = 900, height = 620): CityLayout {
   const b: Building[] = [];
-  const add = (kind: BuildingKind, x: number, y: number, w: number, h: number, label?: string) =>
-    b.push({ kind, x, y, w, h, cx: x + w / 2, cy: y + h / 2, label });
+  const add = (kind: BuildingKind, x: number, y: number, w: number, h: number, label?: string) => {
+    const id = `location:${kind}:${b.length}`;
+    b.push({ id, kind, x, y, w, h, cx: x + w / 2, cy: y + h / 2, label });
+  };
 
   // Główne obiekty publiczne (środek/rogi), reszta to domy w dzielnicach.
   add('shop', width * 0.44, height * 0.12, 90, 60, 'Sklep');

@@ -36,6 +36,22 @@ const REAL_HUMAN_COUNT = 3;
 const REAL_HUMAN_TARGET_HEIGHT = 0.9;
 /** Dalszy plan — instancing; to jest większość populacji i ma być mała. */
 const LOD2_COUNT = 140;
+
+/**
+ * Proporcje sylwetki LOD2, wyprowadzone ze skali świata (1 jednostka = 2 m).
+ * Suma bodyLength + 2·bodyRadius + 2·headRadius wynosi dokładnie 0,9 jednostki,
+ * czyli 1,8 m — tyle samo, co animowany LOD0. Bez tego tłum i postacie przy
+ * kamerze byłyby dwoma różnymi gatunkami w jednej scenie.
+ */
+const HF_CROWD = {
+  bodyRadius: 0.11,
+  bodyLength: 0.57,
+  headRadius: 0.055,
+  /** Środek kapsuły tułowia: połowa jej pełnej wysokości (0,79). */
+  bodyCentreY: 0.395,
+  /** Głowa siada na tułowiu: 0,79 + promień głowy. */
+  headCentreY: 0.845,
+} as const;
 const EVENT_MARKER_SECONDS = 7;
 
 export type HighFidelityCameraMode = 'city' | 'district' | 'street' | 'hospital' | 'agent' | 'event';
@@ -1799,16 +1815,35 @@ class HighFidelityCrowd {
   count = 0;
 
   constructor(private readonly THREE: typeof THREE_NS, readonly capacity: number) {
-    const bodyGeometry = new THREE.CapsuleGeometry(0.17, 0.62, 8, 12);
+    // SKALA: 1 jednostka świata = 2 m (człowiek 1,8 m = 0,9 jednostki).
+    // Poprzednia sylwetka mierzyła 1,455 jednostki, czyli 2,91 m — o 62% za
+    // dużo. Razem z nieoświetlonym materiałem dawało to „kolorowy marker",
+    // a nie postać. Proporcje poniżej sumują się dokładnie do 0,9.
+    const bodyGeometry = new THREE.CapsuleGeometry(HF_CROWD.bodyRadius, HF_CROWD.bodyLength, 6, 10);
     for (const health of HighFidelityCrowd.healthKeys) {
-      const color = new THREE.Color(HEALTH_COLORS[health]).lerp(new THREE.Color(0x64707a), 0.34);
-      const material = new THREE.MeshBasicMaterial({ color });
+      // Barwa stanu zdrowia zostaje, ale bliżej ubrania niż znacznika:
+      // silniejsze zmieszanie z szarością odbiera jej charakter etykiety.
+      const color = new THREE.Color(HEALTH_COLORS[health]).lerp(new THREE.Color(0x64707a), 0.46);
+      // MeshLambertMaterial zamiast MeshBasicMaterial: postać wchodzi w to samo
+      // oświetlenie co reszta sceny i przestaje być płaską naklejką. Lambert,
+      // bo przy 140 instancjach jest tańszy od PBR, a różnicy na tym dystansie
+      // i tak nie widać.
+      const material = new THREE.MeshLambertMaterial({ color });
       const body = new THREE.InstancedMesh(bodyGeometry, material, capacity);
       body.name = `hf-lod2-clothes-${health}`;
+      body.castShadow = true;
+      body.receiveShadow = true;
       this.bodies.set(health, body);
     }
-    this.head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.145, 14, 12), new THREE.MeshBasicMaterial({ color: 0xd6a27c }), capacity);
-    this.glow = new THREE.InstancedMesh(new THREE.RingGeometry(0.24, 0.29, 24), new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.16, depthWrite: false }), capacity);
+    this.head = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(HF_CROWD.headRadius, 10, 8),
+      new THREE.MeshLambertMaterial({ color: 0xc79a78 }),
+      capacity,
+    );
+    this.head.castShadow = true;
+    // Pierścień stanu zostaje jako odczyt epidemiologiczny, ale przeskalowany
+    // do nowej sylwetki i przygaszony, żeby nie dominował nad postacią.
+    this.glow = new THREE.InstancedMesh(new THREE.RingGeometry(0.15, 0.19, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.13, depthWrite: false }), capacity);
     this.glow.rotation.x = -Math.PI / 2;
     this.matrix = new THREE.Matrix4(); this.position = new THREE.Vector3(); this.scale = new THREE.Vector3(1, 1, 1); this.rotation = new THREE.Quaternion(); this.axis = new THREE.Vector3(0, 1, 0);
     this.head.name = 'hf-lod2-heads'; this.glow.name = 'hf-lod2-epidemiology';
@@ -1826,8 +1861,8 @@ class HighFidelityCrowd {
       cursors.set(health, bodyIndex + 1);
       const pulse = health === 'I' ? 1 + Math.sin(time * 3.1) * 0.035 : 1;
       this.rotation.setFromAxisAngle(this.axis, state.facing);
-      this.position.set(state.worldX, 0.62, state.worldZ); this.scale.setScalar(1); this.matrix.compose(this.position, this.rotation, this.scale); this.bodies.get(health)!.setMatrixAt(bodyIndex, this.matrix);
-      this.position.set(state.worldX, 1.31, state.worldZ); this.matrix.compose(this.position, this.rotation, this.scale); this.head.setMatrixAt(index, this.matrix);
+      this.position.set(state.worldX, HF_CROWD.bodyCentreY, state.worldZ); this.scale.setScalar(1); this.matrix.compose(this.position, this.rotation, this.scale); this.bodies.get(health)!.setMatrixAt(bodyIndex, this.matrix);
+      this.position.set(state.worldX, HF_CROWD.headCentreY, state.worldZ); this.matrix.compose(this.position, this.rotation, this.scale); this.head.setMatrixAt(index, this.matrix);
       this.position.set(state.worldX, 0.075, state.worldZ); this.scale.setScalar(pulse); this.matrix.compose(this.position, this.rotation, this.scale); this.glow.setMatrixAt(index, this.matrix); this.glow.setColorAt(index, new this.THREE.Color(HEALTH_COLORS[health]));
     }
     for (const [health, body] of this.bodies) { body.count = cursors.get(health) ?? 0; body.instanceMatrix.needsUpdate = true; }

@@ -250,7 +250,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     // HDRI ładuje się asynchronicznie po pierwszym kadrze; podstawą pozostają PBR + światła.
     if (this.hdriEnabled) void this.loadHdri(renderer);
-    renderer.toneMappingExposure = 1.18;
+    // Ekspozycja poniżej 1: ACES ma wtedy zapas w światłach zamiast ścinać je
+    // do bieli. Razem z obniżonym budżetem świateł to jest właśnie ta zmiana,
+    // która przywraca kolor gruntowi i listowiu.
+    renderer.toneMappingExposure = 0.86;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     const composer = new modules.EffectComposer(renderer);
     composer.addPass(new modules.RenderPass(scene, camera));
@@ -440,12 +443,21 @@ export class HighFidelityStreetSlice3D implements Sim3D {
 
   private addLighting(): void {
     const THREE = this.THREE!;
-    // Neutralne dzienne światło: kontrast materiałów i skala miasta bez neonowego gradingu.
-    const sky = new THREE.HemisphereLight(0xbcd4ee, 0x6b5a44, 0.85);
+    // BUDŻET ŚWIATŁA — scena była prześwietlona i to, a nie geometria, dawało
+    // efekt „plastiku": grunt wychodził prawie biały, ciemnozielone listowie
+    // (HSL lightness 0.22–0.35) renderowało się jako neonowa żółć, a tło jako
+    // szara plama. Three.js v0.170 używa fizycznych jednostek światła, więc
+    // słońce 4.2 + hemisfera 0.85 + fill 0.5 + IBL z HDRI wypychało całą krzywą
+    // tonalną w biel, zanim jeszcze zadziałała ekspozycja 1.18.
+    //
+    // Sumaryczny budżet jest tu obniżony ok. 2×, żeby krzywa miała zapas i
+    // materiały odzyskały własny kolor. Kierunek i barwa świateł zostają —
+    // zmienia się natężenie, nie zamysł.
+    const sky = new THREE.HemisphereLight(0xbcd4ee, 0x6b5a44, 0.42);
     this.scene!.add(sky);
     // GOLDEN HOUR: słońce nisko nad horyzontem daje długie, kierunkowe cienie
     // i ciepłe zamodelowanie brył. Wysokie, białe światło spłaszczało kwartał.
-    const sun = new THREE.DirectionalLight(0xffd9a0, 4.2);
+    const sun = new THREE.DirectionalLight(0xffd9a0, 2.15);
     sun.position.set(-16, 7.5, 9);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -453,7 +465,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     sun.shadow.bias = -0.00022;
     sun.shadow.normalBias = 0.018;
     this.scene!.add(sun);
-    const fill = new THREE.DirectionalLight(0x9fc0e0, 0.5);
+    const fill = new THREE.DirectionalLight(0x9fc0e0, 0.26);
     fill.position.set(10, 6, -9);
     this.scene!.add(fill);
   }
@@ -507,6 +519,9 @@ export class HighFidelityStreetSlice3D implements Sim3D {
         if (!this.scene) { texture.dispose(); pmrem.dispose(); return; }
         const environment = pmrem.fromEquirectangular(texture).texture;
         this.scene.environment = environment;
+        // IBL dokłada się do KAŻDEGO materiału PBR, więc przy pełnej sile
+        // sumuje się ze światłami kierunkowymi i to on dopychał scenę w biel.
+        this.scene.environmentIntensity = 0.55;
         // TŁO ze środowiska HDRI zamiast płaskiego jasnego koloru. Bez tego
         // kwartał "unosił się" na białym prześwietlonym niebie i cała scena
         // czytała się jak makieta na stole, mimo poprawnych materiałów PBR.
@@ -865,14 +880,19 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       color: new THREE.Color().setHSL(0.075, 0.3 + r01(3) * 0.14, 0.085 + r01(5) * 0.045),
       roughness: 0.94,
     });
+    // Listowie: ciemniejsze i mniej nasycone niż wcześniej. Przy flatShadingu
+    // górne ścianki łapią pełne słońce, więc jasna baza wychodziła neonem
+    // nawet po skorygowaniu ekspozycji — kolor bazowy musi mieć zapas w dół.
     const leaf = new THREE.MeshStandardMaterial({
-      color: new THREE.Color().setHSL(0.24 + r01(6) * 0.07, 0.34 + r01(9) * 0.22, 0.22 + r01(12) * 0.13),
-      roughness: 0.88,
+      color: new THREE.Color().setHSL(0.245 + r01(6) * 0.055, 0.26 + r01(9) * 0.16, 0.13 + r01(12) * 0.075),
+      roughness: 0.92,
       flatShading: true,
     });
 
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(height * 0.028, height * 0.055, height * 0.62, 7), bark);
-    trunk.position.y = height * 0.31;
+    // Drzewo ULICZNE ma wysoki, czysty pień i koronę zaczynającą się ponad
+    // parterem — inaczej zasłania witryny i całą fasadę.
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(height * 0.026, height * 0.05, height * 0.74, 7), bark);
+    trunk.position.y = height * 0.37;
     trunk.castShadow = true;
     group.add(trunk);
 
@@ -881,24 +901,29 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       const a = (i / branches) * Math.PI * 2 + r01(18) * 1.2;
       const len = height * (0.2 + r01(21 + i) * 0.14);
       const br = new THREE.Mesh(new THREE.CylinderGeometry(height * 0.012, height * 0.022, len, 5), bark);
-      br.position.set(Math.cos(a) * height * 0.09, height * 0.5 + i * height * 0.05, Math.sin(a) * height * 0.09);
+      br.position.set(Math.cos(a) * height * 0.075, height * 0.6 + i * height * 0.045, Math.sin(a) * height * 0.075);
       br.rotation.z = Math.cos(a) * 0.55;
       br.rotation.x = Math.sin(a) * 0.55;
       br.castShadow = true;
       group.add(br);
     }
 
-    const blobs = 3 + Math.floor(r01(2) * 3);
+    // Korona: WIĘCEJ i MNIEJSZYCH brył zamiast kilku wielkich kul. Poprzednio
+    // 3–5 icosahedronów o promieniu do 0.24·h dawało koronę ~7 m szerokości
+    // przy 5–9 m wysokości — kształt prawie kulisty, czytany jako „kula na
+    // patyku". Drobniejsze bryły w węższym obrysie czytają się jako listowie.
+    const blobs = 6 + Math.floor(r01(2) * 4);
     for (let i = 0; i < blobs; i++) {
-      const rr = height * (0.15 + r01(4 + i) * 0.09);
+      const rr = height * (0.082 + r01(4 + i) * 0.05);
       const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(rr, 1), leaf);
-      const a = (i / blobs) * Math.PI * 2;
+      const a = (i / blobs) * Math.PI * 2 + r01(19) * 0.9;
+      const spread = height * (0.045 + r01(7 + i) * 0.07);
       crown.position.set(
-        Math.cos(a) * height * (0.06 + r01(7 + i) * 0.1),
-        height * (0.68 + r01(10 + i) * 0.24),
-        Math.sin(a) * height * (0.06 + r01(13 + i) * 0.1),
+        Math.cos(a) * spread,
+        height * (0.76 + r01(10 + i) * 0.2),
+        Math.sin(a) * spread,
       );
-      crown.scale.y = 0.8 + r01(16 + i) * 0.35;
+      crown.scale.y = 0.72 + r01(16 + i) * 0.3;
       crown.castShadow = true;
       group.add(crown);
     }
@@ -913,9 +938,12 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       const z = this.toWorldY(y);
       // Wcześniej szpaler stał dokładnie tam, gdzie ustawia się kamera uliczna,
       // i zasłaniał cały kadr. Rozstaw 5.2, odsunięcie 2.15 od osi jezdni.
-      for (let x = -worldW / 2 + 1.6; x < worldW / 2; x += 5.2) {
-        spots.push([x, z + 2.15]);
-        spots.push([x + 2.6, z - 2.15]);
+      // Rozstaw 5.2 dawał zwarty szpaler po obu stronach każdej jezdni — na
+      // kadrze wychodził las zasłaniający kwartał. 8.6 zostawia prześwity,
+      // przez które widać architekturę, po którą ta scena w ogóle powstała.
+      for (let x = -worldW / 2 + 1.6; x < worldW / 2; x += 8.6) {
+        spots.push([x, z + 2.35]);
+        spots.push([x + 4.3, z - 2.35]);
       }
     }
     spots.forEach(([x, z], i) => {

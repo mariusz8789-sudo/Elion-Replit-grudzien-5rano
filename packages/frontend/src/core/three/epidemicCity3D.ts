@@ -17,9 +17,12 @@ import {
 /** Ten sam współczynnik świata używany przez budynki, drogi, agentów i heatmapę. */
 export const CITY_WORLD_SCALE = 0.018;
 const CITY_VELOCITY_SCALE_FACTOR = 0.10;
-const MAX_DETAILED_HUMANOIDS = 10;
+/** High-fidelity City View: detaliczne rigi są wyjątkami, a nie dominantą kadru miasta. */
+const MAX_DETAILED_HUMANOIDS = 4;
 // InstancedMesh utrzymuje stałą liczbę draw calls; P1 umożliwia uczciwy benchmark do 1000 agentów.
 const MAX_CROWD_HUMANOIDS = 1024;
+const CITY_CAMERA_POSITION = { x: 0, y: 13.2, z: 10.6 };
+const CITY_CAMERA_TARGET = { x: 0, y: 0, z: -0.35 };
 /** Czas prezentacji odczytanego eventu — nie wpływa na czas ani prawdopodobieństwo modelu. */
 // Krótka obserwacja rzeczywistego kontaktu: po pauzie zegara pozostaje do inspekcji, ale w ruchu nie zamienia świata w dashboard.
 const TRANSMISSION_MARKER_LIFETIME_SECONDS = 1.1;
@@ -192,10 +195,12 @@ export class EpidemicCity3DSim implements Sim3D {
     this.camera = camera;
     this.viewport = { w, h };
     this.raycaster = new THREE.Raycaster();
-    scene.background = new THREE.Color(0x0d1c2d);
-    scene.fog = new THREE.Fog(0x0d1c2d, 16, 38);
-    camera.position.set(0, 12.2, 11.0);
-    camera.lookAt(0, 0, 0);
+    scene.background = new THREE.Color(0x0d1b2a);
+    scene.fog = new THREE.Fog(0x0d1b2a, 18, 42);
+    camera.fov = 44;
+    camera.updateProjectionMatrix();
+    camera.position.set(CITY_CAMERA_POSITION.x, CITY_CAMERA_POSITION.y, CITY_CAMERA_POSITION.z);
+    camera.lookAt(CITY_CAMERA_TARGET.x, CITY_CAMERA_TARGET.y, CITY_CAMERA_TARGET.z);
 
     this.addLightsAndGround();
     this.addRoadsAndBuildings();
@@ -216,11 +221,13 @@ export class EpidemicCity3DSim implements Sim3D {
   ): PostProcessor {
     const THREE = this.THREE!;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 1.18;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const composer = new modules.EffectComposer(renderer);
     composer.addPass(new modules.RenderPass(scene, camera));
-    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.42, 0.88);
+    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.20, 0.46, 0.90);
     composer.addPass(bloom);
     composer.addPass(new modules.OutputPass());
     return {
@@ -270,8 +277,8 @@ export class EpidemicCity3DSim implements Sim3D {
     this.syncTransmissionMarkers();
     this.syncFollowTarget(states);
     if (this.resetCityCameraPending) {
-      camera.position.set(0, 12.2, 11.0);
-      camera.lookAt(0, 0, 0);
+      camera.position.set(CITY_CAMERA_POSITION.x, CITY_CAMERA_POSITION.y, CITY_CAMERA_POSITION.z);
+      camera.lookAt(CITY_CAMERA_TARGET.x, CITY_CAMERA_TARGET.y, CITY_CAMERA_TARGET.z);
       this.resetCityCameraPending = false;
     }
     if (this.followTarget) {
@@ -425,25 +432,32 @@ export class EpidemicCity3DSim implements Sim3D {
   private addLightsAndGround(): void {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
-    this.scene.add(new THREE.HemisphereLight(0xa9c9ff, 0x1c3022, 1.72));
-    this.scene.add(new THREE.AmbientLight(0x7598c4, 0.28));
-    const key = new THREE.DirectionalLight(0xffd7a1, 2.65);
-    key.position.set(7, 15, 8);
-    key.castShadow = false;
+    this.scene.add(new THREE.HemisphereLight(0xc5ddff, 0x1d3023, 1.16));
+    this.scene.add(new THREE.AmbientLight(0x6988b2, 0.20));
+    const key = new THREE.DirectionalLight(0xffdcad, 2.35);
+    key.position.set(9, 16, 10);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.left = -13;
+    key.shadow.camera.right = 13;
+    key.shadow.camera.top = 13;
+    key.shadow.camera.bottom = -13;
+    key.shadow.bias = -0.00035;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x79b6ff, 1.15);
-    rim.position.set(-9, 7, -8);
+    const rim = new THREE.DirectionalLight(0x80b9ff, 0.68);
+    rim.position.set(-9, 9, -8);
     this.scene.add(rim);
-    const fill = new THREE.DirectionalLight(0x8ce3c6, 0.55);
+    const fill = new THREE.DirectionalLight(0x8ce3c6, 0.30);
     fill.position.set(-2, 4, 12);
     this.scene.add(fill);
 
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(this.simulation.worldWidth * CITY_WORLD_SCALE + 2, this.simulation.worldHeight * CITY_WORLD_SCALE + 2),
-      new THREE.MeshStandardMaterial({ color: 0x224033, roughness: 0.94, metalness: 0.02 }),
+      new THREE.MeshStandardMaterial({ color: 0x284b3e, roughness: 0.98, metalness: 0.01 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.012;
+    ground.receiveShadow = true;
     this.scene.add(ground);
     this.buildingMeshes.push(ground);
   }
@@ -459,7 +473,7 @@ export class EpidemicCity3DSim implements Sim3D {
     const position = new THREE.Vector3();
     const scale = new THREE.Vector3(1, 1, 1);
     const rotation = new THREE.Quaternion();
-    const roadMat = new THREE.MeshBasicMaterial({ color: 0xf2f6ff, transparent: true, opacity: 0.76 });
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0xe1e8ec, roughness: 0.68, metalness: 0.04, transparent: true, opacity: 0.82 });
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.62, metalness: 0.58 });
     const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffd89a, transparent: true, opacity: 0.94 });
     const lamps: Array<{ x: number; z: number }> = [];
@@ -499,17 +513,21 @@ export class EpidemicCity3DSim implements Sim3D {
     if (park) {
       const px = (park.x + park.w / 2 - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE;
       const pz = (park.y + park.h / 2 - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE;
-      const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(0.15, 0.62, 7), new THREE.MeshStandardMaterial({ color: 0x1f6b43, roughness: 0.95 }), 18);
-      const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.026, 0.036, 0.34, 6), new THREE.MeshStandardMaterial({ color: 0x65412d, roughness: 1 }), 18);
-      for (let index = 0; index < 18; index++) {
-        const angle = index * 2.39996;
-        const radius = 0.26 + (index % 4) * 0.13;
-        const x = px + Math.cos(angle) * radius * 1.65;
-        const z = pz + Math.sin(angle) * radius;
-        position.set(x, 0.48, z); matrix.compose(position, rotation, scale); trees.setMatrixAt(index, matrix);
-        position.set(x, 0.17, z); matrix.compose(position, rotation, scale); trunks.setMatrixAt(index, matrix);
+      const treeCount = 12;
+      const trees = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.12, 0), new THREE.MeshStandardMaterial({ color: 0x2d7550, roughness: 0.96 }), treeCount);
+      const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.018, 0.026, 0.25, 6), new THREE.MeshStandardMaterial({ color: 0x664533, roughness: 1 }), treeCount);
+      for (let index = 0; index < treeCount; index++) {
+        const angle = index * 2.39996 + 0.4;
+        const radius = 0.38 + (index % 3) * 0.19;
+        const x = px + Math.cos(angle) * radius * 1.45;
+        const z = pz + Math.sin(angle) * radius * 0.90;
+        const size = 0.84 + (index % 4) * 0.08;
+        position.set(x, 0.30 * size, z); scale.set(size, size, size); matrix.compose(position, rotation, scale); trees.setMatrixAt(index, matrix);
+        position.set(x, 0.125 * size, z); matrix.compose(position, rotation, scale); trunks.setMatrixAt(index, matrix);
+        scale.set(1, 1, 1);
       }
       trees.instanceMatrix.needsUpdate = true; trunks.instanceMatrix.needsUpdate = true;
+      trees.castShadow = true; trees.receiveShadow = true; trunks.castShadow = true; trunks.receiveShadow = true;
       trees.name = 'city-park-tree-canopies'; trunks.name = 'city-park-tree-trunks';
       this.scene.add(trees, trunks); this.buildingMeshes.push(trees, trunks);
     }
@@ -526,11 +544,12 @@ export class EpidemicCity3DSim implements Sim3D {
   private addRoadsAndBuildings(): void {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0x2d3848, roughness: 0.84, metalness: 0.04 });
-    const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x91a6bb, roughness: 0.88, metalness: 0.02 });
-    const markingMat = new THREE.MeshBasicMaterial({ color: 0xf2f7ff, transparent: true, opacity: 0.92 });
-    const roadWidth = 0.34;
-    const sidewalkWidth = 0.10;
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x263545, roughness: 0.92, metalness: 0.03 });
+    const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x9aaabd, roughness: 0.96, metalness: 0.01 });
+    const curbMat = new THREE.MeshStandardMaterial({ color: 0xc7d0d8, roughness: 0.82, metalness: 0.05 });
+    const markingMat = new THREE.MeshBasicMaterial({ color: 0xeef4f7, transparent: true, opacity: 0.84 });
+    const roadWidth = 0.38;
+    const sidewalkWidth = 0.13;
     const worldW = this.simulation.worldWidth * CITY_WORLD_SCALE;
     const worldH = this.simulation.worldHeight * CITY_WORLD_SCALE;
     const streets = this.simulation.streets;
@@ -541,8 +560,12 @@ export class EpidemicCity3DSim implements Sim3D {
       const northWalk = new THREE.Mesh(new THREE.BoxGeometry(worldW, 0.014, sidewalkWidth), sidewalkMat.clone());
       northWalk.position.set(0, 0.003, z - roadWidth / 2 - sidewalkWidth / 2);
       const southWalk = northWalk.clone(); southWalk.position.z = z + roadWidth / 2 + sidewalkWidth / 2;
-      this.scene.add(road, northWalk, southWalk);
-      this.buildingMeshes.push(road, northWalk, southWalk);
+      const northCurb = new THREE.Mesh(new THREE.BoxGeometry(worldW, 0.038, 0.028), curbMat.clone());
+      northCurb.position.set(0, 0.018, z - roadWidth / 2);
+      const southCurb = northCurb.clone(); southCurb.position.z = z + roadWidth / 2;
+      [road, northWalk, southWalk, northCurb, southCurb].forEach((mesh) => { mesh.receiveShadow = true; mesh.castShadow = true; });
+      this.scene.add(road, northWalk, southWalk, northCurb, southCurb);
+      this.buildingMeshes.push(road, northWalk, southWalk, northCurb, southCurb);
       for (let xi = -worldW / 2 + 0.35; xi < worldW / 2; xi += 0.58) {
         const mark = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.008, 0.022), markingMat);
         mark.position.set(xi, 0.018, z); this.scene.add(mark); this.buildingMeshes.push(mark);
@@ -555,8 +578,12 @@ export class EpidemicCity3DSim implements Sim3D {
       const eastWalk = new THREE.Mesh(new THREE.BoxGeometry(sidewalkWidth, 0.014, worldH), sidewalkMat.clone());
       eastWalk.position.set(px - roadWidth / 2 - sidewalkWidth / 2, 0.003, 0);
       const westWalk = eastWalk.clone(); westWalk.position.x = px + roadWidth / 2 + sidewalkWidth / 2;
-      this.scene.add(road, eastWalk, westWalk);
-      this.buildingMeshes.push(road, eastWalk, westWalk);
+      const eastCurb = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.038, worldH), curbMat.clone());
+      eastCurb.position.set(px - roadWidth / 2, 0.018, 0);
+      const westCurb = eastCurb.clone(); westCurb.position.x = px + roadWidth / 2;
+      [road, eastWalk, westWalk, eastCurb, westCurb].forEach((mesh) => { mesh.receiveShadow = true; mesh.castShadow = true; });
+      this.scene.add(road, eastWalk, westWalk, eastCurb, westCurb);
+      this.buildingMeshes.push(road, eastWalk, westWalk, eastCurb, westCurb);
       for (let zi = -worldH / 2 + 0.35; zi < worldH / 2; zi += 0.58) {
         const mark = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.008, 0.25), markingMat);
         mark.position.set(px, 0.018, zi); this.scene.add(mark); this.buildingMeshes.push(mark);
@@ -568,6 +595,79 @@ export class EpidemicCity3DSim implements Sim3D {
       this.scene.add(group);
       this.buildingMeshes.push(group);
     }
+    this.addDistrictInfill();
+  }
+
+  /**
+   * Wysoka gęstość to rendererowy kontekst między prawdziwymi obiektami CityWorld.
+   * Te bryły nie mają ID lokacji, nie są celami agentów i nie uczestniczą w kontakcie.
+   */
+  private addDistrictInfill(): void {
+    if (!this.THREE || !this.scene) return;
+    const realFootprints = this.simulation.objects().map((building) => ({
+      x: (building.x + building.w / 2 - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE,
+      z: (building.y + building.h / 2 - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE,
+      w: building.w * CITY_WORLD_SCALE,
+      d: building.h * CITY_WORLD_SCALE,
+    }));
+    const zones = [
+      { x: -1.68, z: -1.66, w: 2.05, d: 1.30, cols: 3, rows: 2 },
+      { x: 1.95, z: -1.66, w: 1.64, d: 1.30, cols: 2, rows: 2 },
+      { x: -1.68, z: 0.96, w: 2.05, d: 0.82, cols: 3, rows: 1 },
+      { x: 1.95, z: 0.96, w: 1.64, d: 0.82, cols: 2, rows: 1 },
+      { x: -6.88, z: -1.68, w: 1.10, d: 1.18, cols: 1, rows: 2 },
+    ];
+    let serial = 0;
+    for (const zone of zones) {
+      const cellW = zone.w / zone.cols;
+      const cellD = zone.d / zone.rows;
+      for (let row = 0; row < zone.rows; row++) for (let col = 0; col < zone.cols; col++) {
+        const x = zone.x - zone.w / 2 + cellW * (col + 0.5);
+        const z = zone.z - zone.d / 2 + cellD * (row + 0.5);
+        const w = cellW * (0.70 + ((row + col) % 3) * 0.05);
+        const d = cellD * (0.70 + ((row * 2 + col) % 2) * 0.08);
+        const overlapsReal = realFootprints.some((real) => Math.abs(real.x - x) < (real.w + w) * 0.54 && Math.abs(real.z - z) < (real.d + d) * 0.54);
+        if (overlapsReal) continue;
+        const building = this.createContextBuilding(x, z, w, d, serial++);
+        this.scene.add(building);
+        this.buildingMeshes.push(building);
+      }
+    }
+  }
+
+  /** Deterministyczna, wizualna zabudowa uzupełniająca; nie jest obiektem modelu ani World Engine. */
+  private createContextBuilding(x: number, z: number, w: number, d: number, serial: number): THREE_NS.Group {
+    const THREE = this.THREE!;
+    const group = new THREE.Group();
+    const palettes = [
+      { wall: 0x728ca5, roof: 0x344554, glass: 0x9cc8e5 },
+      { wall: 0xa89376, roof: 0x4f4740, glass: 0xd7c29a },
+      { wall: 0x8b9d93, roof: 0x3b534f, glass: 0xa8ded1 },
+      { wall: 0x9a8792, roof: 0x503f53, glass: 0xd7b6d3 },
+    ];
+    const palette = palettes[serial % palettes.length];
+    const height = 0.66 + (serial % 4) * 0.19;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, height, d), new THREE.MeshStandardMaterial({ color: palette.wall, roughness: 0.78, metalness: 0.05 }));
+    body.position.y = height / 2;
+    body.castShadow = true; body.receiveShadow = true;
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, 0.10, d * 1.08), new THREE.MeshStandardMaterial({ color: palette.roof, roughness: 0.86, metalness: 0.10 }));
+    roof.position.y = height + 0.05; roof.castShadow = true; roof.receiveShadow = true;
+    group.add(body, roof);
+    const glass = new THREE.MeshStandardMaterial({ color: palette.glass, emissive: palette.glass, emissiveIntensity: 0.20, roughness: 0.30, metalness: 0.16 });
+    const columns = Math.max(1, Math.floor(w / 0.22));
+    const rows = Math.max(2, Math.floor(height / 0.20));
+    for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.11, w / (columns + 1.5)), 0.085, 0.018), glass);
+      pane.position.set(-w / 2 + (col + 1) * w / (columns + 1), 0.19 + row * Math.min(0.20, (height - 0.24) / rows), d / 2 + 0.012);
+      group.add(pane);
+    }
+    if (serial % 3 === 0) {
+      const roofUnit = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.22, w * 0.25), 0.10, Math.min(0.18, d * 0.28)), new THREE.MeshStandardMaterial({ color: 0x65717d, roughness: 0.72, metalness: 0.22 }));
+      roofUnit.position.set(w * 0.18, height + 0.15, -d * 0.18); roofUnit.castShadow = true; group.add(roofUnit);
+    }
+    group.userData.visualOnlyContext = true;
+    group.position.set(x, 0, z);
+    return group;
   }
 
   private createBuilding(building: WorldObject): THREE_NS.Group {
@@ -657,6 +757,12 @@ export class EpidemicCity3DSim implements Sim3D {
       marker.position.set(0, s.height + 0.18, d / 2 + 0.02);
       group.add(marker);
     }
+    group.traverse((node) => {
+      const mesh = node as THREE_NS.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    });
     group.position.set(x, 0, z);
     return group;
   }

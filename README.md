@@ -6,6 +6,7 @@ Wszechświata (8,8×10²⁶ m).
 
 ## Obecny stan
 
+- **High-Fidelity City View** — reprezentacyjna, gęstsza dzielnica 3D dla `#/city3d`: wspólna kamera obserwuje kilka kwartałów, istniejąca topologia dróg jest czytelna przez jezdnie/chodniki/krawężniki/przejścia, a obiekty CityWorld zachowują swoje rzeczywiste znaczenie. Wizualne infill buildings są jawnie rendererowe i nie są lokacjami modelu, celami agentów ani źródłem kontaktów. Szczegóły, benchmark renderera, testy i ścieżka rozbudowy: `docs/HIGH_FIDELITY_CITY_VIEW_DELIVERY.md`.
 - **Quantum Decision Explorer** — galaktyka złożona z decyzji użytkownika:
   każda gwiazda to jedna decyzja życiowa, suwak osi czasu przesuwa aktywną
   gwiazdę i pokazuje jej alternatywne ścieżki jako świecące odgałęzienia.

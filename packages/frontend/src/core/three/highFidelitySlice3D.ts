@@ -8,6 +8,29 @@ import type { SimParams } from '../types';
 import { HEALTH_COLORS, HumanoidAgentVisual, mapSimAgentToHumanoid, type AgentHealthState, type HumanoidAgentState } from './humanoidAgentVisual';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { createPhiladelphiaLegendVisual, type PhiladelphiaLegendViewMode, type PhiladelphiaLegendVisual } from './philadelphiaLegendVisual';
+import { approvedWorldAssetCount, isWorldAssetApproved, isWorldAssetPathApproved, unverifiedWorldAssetCount } from './assetGovernance';
+
+/**
+ * Wysokość kamery ulicznej. Ponad najwyższą koroną (4,91 jednostki ≈ 9,8 m),
+ * więc szpaler przestaje dzielić kadr — ale wciąż na tyle nisko, żeby to była
+ * ulica, a nie widok dzielnicy.
+ */
+const HF_STREET_EYE_HEIGHT = 6.2;
+
+/**
+ * Środek największej wolnej przerwy między przeszkodami na odcinku [from, to].
+ * Używane przez kamerę uliczną, żeby nigdy nie stanąć tuż za pniem.
+ */
+function largestGapCentre(obstacles: readonly number[], from: number, to: number): number {
+  const marks = [from, ...obstacles.filter((x) => x > from && x < to), to];
+  let bestCentre = (from + to) / 2;
+  let bestWidth = -1;
+  for (let i = 1; i < marks.length; i++) {
+    const width = marks[i] - marks[i - 1];
+    if (width > bestWidth) { bestWidth = width; bestCentre = (marks[i - 1] + marks[i]) / 2; }
+  }
+  return bestCentre;
+}
 
 /** Jeden metr wizualny jest skalowany wyłącznie z odczytywanego modelu CityWorld. */
 export const HIGH_FIDELITY_WORLD_SCALE = 0.02;
@@ -144,6 +167,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private heroEpidemicMaterial: THREE_NS.MeshStandardMaterial | null = null;
   private heroLoaded = false;
   private heroLoadFailed = false;
+  /** Realne pozycje pni — podstawa doboru kadru ulicznego. */
+  private treeSpots: Array<[number, number]> = [];
   /** Lokalny CC0 HDRI 1K wzmacnia odbicia PBR; błąd ładowania zachowuje stabilny baseline świateł. */
   private readonly hdriEnabled = true;
   private lod1 = new Map<number, HumanoidAgentVisual>();
@@ -350,9 +375,31 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       case 'district':
         // Analiza hotspotu — bliżej, wciąż ponad tłumem.
         return { pos: [w * 0.3, h * 0.5, h * 0.95], look: [0, 1.2, 0] };
-      case 'street':
-        // Z chodnika, WZDŁUŻ jezdni, na wysokości oczu.
-        return { pos: [-w * 0.46, 1.62, lane + 3.05], look: [w * 0.3, 1.35, lane - 0.15] };
+      case 'street': {
+        // KADR ULICZNY: MIASTO JEST BOHATEREM, NIE SZPALER.
+        //
+        // Dwa realne błędy, które ten kadr psuły, obydwa policzone, nie zgadnięte:
+        //
+        // 1. Filtr `z > lane` łapał rzędy drzew z WSZYSTKICH trzech ulic
+        //    poziomych, nie tylko z tej, przy której stoi kamera — więc „luka"
+        //    liczona była na wymieszanym zbiorze i nie odpowiadała rzeczywistości.
+        //    Teraz bierzemy wyłącznie rząd przypisany do tego pasa.
+        //
+        // 2. Korony sięgają 4,91 jednostki (9,8 m). Kamera na wysokości oczu
+        //    (1,78) siedziała pod nimi, więc ŻADNE przesunięcie w poziomie nie
+        //    mogło jej uwolnić od pni. Kadr idzie ponad koronę i patrzy wzdłuż
+        //    ulicy pod kątem — widać jezdnię, oba chodniki, fasady i populację
+        //    jako małe sylwetki, a drzewa są poniżej linii wzroku.
+        const nearRow = this.treeSpots
+          .filter(([, z]) => z > lane && z - lane < 3)
+          .map(([x]) => x)
+          .sort((a, b) => a - b);
+        const gapCentre = largestGapCentre(nearRow, -w / 2, w / 2);
+        return {
+          pos: [gapCentre - 4.2, HF_STREET_EYE_HEIGHT, lane + 7.2],
+          look: [gapCentre + 5.5, 0.9, lane - 1.2],
+        };
+      }
       case 'hospital': {
         const hospital = this.simulation.objects().find((o) => o.kind === 'hospital');
         if (!hospital) return { pos: [w * 0.3, h * 0.5, h * 0.9], look: [0, 1.2, 0] };
@@ -405,6 +452,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       hf_lod0_ready: this.heroLoaded ? 1 : 0,
       hf_lod0_asset_failed: this.heroLoadFailed ? 1 : 0,
       hf_lod1_agents: this.lod1.size,
+      hf_approved_assets: approvedWorldAssetCount(),
+      hf_unverified_assets: unverifiedWorldAssetCount(),
       hf_lod2_agents: this.lod2?.count ?? 0,
       hf_selected_agent: this.selectedId ?? -1,
       hf_event_count: this.stream.count(),
@@ -518,32 +567,42 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       markings: new THREE.MeshStandardMaterial({ color: 0xe7e2d2, roughness: 0.54, metalness: 0.02 }),
     };
     const loader = new THREE.TextureLoader();
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/asphalt/diffuse.jpg', this.materials.asphalt, 'map', true, 5, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/asphalt/normal.jpg', this.materials.asphalt, 'normalMap', false, 5, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/asphalt/roughness.jpg', this.materials.asphalt, 'roughnessMap', false, 5, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/asphalt/ao.jpg', this.materials.asphalt, 'aoMap', false, 5, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/diffuse.jpg', this.materials.concrete, 'map', true, 4, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/normal.jpg', this.materials.concrete, 'normalMap', false, 4, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/roughness.jpg', this.materials.concrete, 'roughnessMap', false, 4, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/ao.jpg', this.materials.concrete, 'aoMap', false, 4, 2);
+    // GOVERNED PBR — wyłącznie zestawy z potwierdzonym źródłem, licencją CC0 i
+    // policzonym skrótem SHA-256 (patrz assetGovernance.ts). Poprzednie ścieżki
+    // /assets/genesis-hf/pbr/ nie mają rekordu licencji i są w manifeście
+    // UNVERIFIED, więc bramka i tak by ich nie wpuściła.
+    //
+    // Poly Haven pakuje ARM w jeden plik: R=ambient occlusion, G=roughness,
+    // B=metalness. Three.js czyta aoMap z kanału R i roughnessMap z G, więc ten
+    // sam obraz podpięty pod oba sloty jest poprawnym użyciem, nie skrótem.
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/diffuse.jpg', this.materials.asphalt, 'map', true, 5, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/normal.jpg', this.materials.asphalt, 'normalMap', false, 5, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/arm.jpg', this.materials.asphalt, 'roughnessMap', false, 5, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/arm.jpg', this.materials.asphalt, 'aoMap', false, 5, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/diffuse.jpg', this.materials.concrete, 'map', true, 4, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/normal.jpg', this.materials.concrete, 'normalMap', false, 4, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/arm.jpg', this.materials.concrete, 'roughnessMap', false, 4, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/arm.jpg', this.materials.concrete, 'aoMap', false, 4, 2);
     // Wysoki rozstaw: podłoże jest wielokrotnie większe od chodnika, więc bez
     // zagęszczenia tekstura rozciągnęłaby się w jednolitą plamę.
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/diffuse.jpg', this.materials.ground, 'map', true, 50, 34);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/normal.jpg', this.materials.ground, 'normalMap', false, 50, 34);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/roughness.jpg', this.materials.ground, 'roughnessMap', false, 50, 34);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/diffuse.jpg', this.materials.brick, 'map', true, 3, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/normal.jpg', this.materials.brick, 'normalMap', false, 3, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/roughness.jpg', this.materials.brick, 'roughnessMap', false, 3, 2);
-    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/ao.jpg', this.materials.brick, 'aoMap', false, 3, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/diffuse.jpg', this.materials.ground, 'map', true, 50, 34);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/normal.jpg', this.materials.ground, 'normalMap', false, 50, 34);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/arm.jpg', this.materials.ground, 'roughnessMap', false, 50, 34);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/diffuse.jpg', this.materials.brick, 'map', true, 3, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/normal.jpg', this.materials.brick, 'normalMap', false, 3, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/arm.jpg', this.materials.brick, 'roughnessMap', false, 3, 2);
+    this.loadPbrTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/arm.jpg', this.materials.brick, 'aoMap', false, 3, 2);
   }
 
   /** HDRI jest CC0 assetem środowiska; nie jest mapą świata ani źródłem danych modelu. */
   private async loadHdri(renderer: THREE_NS.WebGLRenderer): Promise<void> {
+    const hdriPath = '/assets/genesis-hf/hdr/braustuble_alley_1k.hdr';
+    if (!isWorldAssetApproved(hdriPath)) return;
     try {
       const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
       if (!this.THREE || !this.scene) return;
       const pmrem = new this.THREE.PMREMGenerator(renderer);
-      new RGBELoader().load('/assets/genesis-hf/hdr/braustuble_alley_1k.hdr', (texture) => {
+      new RGBELoader().load(hdriPath, (texture) => {
         if (!this.scene) { texture.dispose(); pmrem.dispose(); return; }
         const environment = pmrem.fromEquirectangular(texture).texture;
         this.scene.environment = environment;
@@ -633,6 +692,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     repeatX: number,
     repeatY: number,
   ): void {
+    // Bramka prowenancji: plik bez potwierdzonego źródła i licencji nie wchodzi
+    // do sceny. Materiał zostaje wtedy przy swoim kolorze bazowym — brak
+    // tekstury jest widoczny, a nie zastąpiony czymś nieudokumentowanym.
+    if (!isWorldAssetPathApproved(path)) return;
     const THREE = this.THREE!;
     loader.load(path, (texture) => {
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -1030,6 +1093,9 @@ export class HighFidelityStreetSlice3D implements Sim3D {
         spots.push([x + 4.3, z - 2.35]);
       }
     }
+    // Kamera uliczna musi wiedzieć, GDZIE stoją pnie, żeby nie stanąć za jednym
+    // z nich. Zapisujemy realne pozycje zamiast zgadywać je drugi raz.
+    this.treeSpots = spots.map(([x, z]) => [x, z] as [number, number]);
     spots.forEach(([x, z], i) => {
       const tree = this.buildTree(i + 7);
       tree.position.set(x, 0.06, z);
@@ -1274,6 +1340,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       { id: 'hydrant', path: '/assets/genesis-hf-v2/models/fire_hydrant/fire_hydrant.gltf', position: [1.85, 0.1, -1.83], scale: 0.74 },
       ...[-5.7, -2.8, 0.2, 3.3, 6.1].map((x, index): UrbanAssetSpec => ({ id: `lamp-${index}`, path: '/assets/genesis-hf-v2/models/street_lamp_01/street_lamp_01.gltf', position: [x, 0.1, -1.92], scale: 0.88 })),
     ];
+    // Scenografia miejska przechodzi przez tę samą bramkę. Hydrant, ławka,
+    // samochód i klatka pożarowa nie mają rekordu licencji, więc po prostu ich
+    // nie ma w kadrze — zamiast trafiać tam „na razie".
+    const approvedAssets = assets.filter((asset) => isWorldAssetApproved(asset.path));
     const loaded = new Map<string, THREE_NS.Object3D>();
     const pending = new Map<string, Promise<THREE_NS.Object3D | null>>();
     const loader = new GLTFLoader();
@@ -1288,7 +1358,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       pending.set(path, request);
       return request;
     };
-    await Promise.all(assets.map(async (spec) => {
+    await Promise.all(approvedAssets.map(async (spec) => {
       const prototype = await getPrototype(spec.path);
       if (!prototype) return;
       const instantiate = (source: THREE_NS.Object3D) => {
@@ -1440,6 +1510,13 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private async loadHumanTemplate(): Promise<void> {
     if (this.realHumanLoadStarted) return;
     this.realHumanLoadStarted = true;
+    // DRUGA ścieżka do tego samego nieudokumentowanego GLB. Bramka na
+    // loadHeroAsset nie wystarczała — szablon tłumu LOD1 wchodził obok niej.
+    // Bez tej blokady „APPROVED" na pasku UI byłoby nieprawdą.
+    if (!isWorldAssetApproved('/assets/genesis-hf/characters/mpfb-lod0.glb')) {
+      this.humanTemplate = null;
+      return;
+    }
     try {
       const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
       if (!this.THREE) return;
@@ -1749,11 +1826,19 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   private async loadHeroAsset(): Promise<void> {
+    // LOD0 nie ma udokumentowanego źródła ani licencji, więc NIE jest ładowany.
+    // Scena spada na LOD1/LOD2, a status trafia do metryk i na pasek UI —
+    // brak jest zgłoszony, nie zamaskowany.
+    const heroPath = '/assets/genesis-hf/characters/mpfb-lod0.glb';
+    if (!isWorldAssetApproved(heroPath)) {
+      this.heroLoadFailed = true;
+      return;
+    }
     try {
       const [{ GLTFLoader }] = await Promise.all([import('three/examples/jsm/loaders/GLTFLoader.js')]);
       if (!this.THREE || !this.scene) return;
       const loader = new GLTFLoader();
-      loader.load('/assets/genesis-hf/characters/mpfb-lod0.glb', (gltf) => {
+      loader.load(heroPath, (gltf) => {
         if (!this.THREE || !this.scene) return;
         const hero = gltf.scene;
         const bounds = new this.THREE.Box3().setFromObject(hero);

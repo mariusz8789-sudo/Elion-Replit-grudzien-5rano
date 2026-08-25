@@ -61,6 +61,8 @@ export interface HighFidelityEventView {
 interface MaterialBundle {
   asphalt: THREE_NS.MeshStandardMaterial;
   concrete: THREE_NS.MeshStandardMaterial;
+  /** Nawierzchnia kwartału — osobny materiał, bo ma inną gęstość teksela niż chodnik. */
+  ground: THREE_NS.MeshStandardMaterial;
   brick: THREE_NS.MeshStandardMaterial;
   glass: THREE_NS.MeshStandardMaterial;
   metal: THREE_NS.MeshStandardMaterial;
@@ -434,6 +436,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.analysisMaterial?.dispose();
     this.materials?.asphalt.dispose();
     this.materials?.concrete.dispose();
+    this.materials?.ground.dispose();
     this.materials?.brick.dispose();
     for (const object of this.sceneObjects) this.disposeObject(object);
     for (const marker of this.eventMarkers.values()) this.disposeObject(marker.group);
@@ -489,6 +492,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.materials = {
       asphalt: new THREE.MeshStandardMaterial({ color: 0x313943, roughness: 0.87, metalness: 0.04, aoMapIntensity: 0.62 }),
       concrete: new THREE.MeshStandardMaterial({ color: 0x9da1a2, roughness: 0.82, metalness: 0.02, aoMapIntensity: 0.74 }),
+      // Podłoże kwartału: ta sama zweryfikowana tekstura betonu co chodnik, ale
+      // dużo ciemniejsza i o innym rozstawie teksela. Bez własnego materiału
+      // grunt był jednolitą płaszczyzną, którą HDRI i mgła malowały na beż.
+      ground: new THREE.MeshStandardMaterial({ color: 0x4a4d4b, roughness: 0.95, metalness: 0.01, aoMapIntensity: 0.5 }),
       brick: new THREE.MeshStandardMaterial({ color: 0x8a5140, roughness: 0.78, metalness: 0.01, aoMapIntensity: 0.68 }),
       glass: new THREE.MeshStandardMaterial({ color: 0x7190a3, roughness: 0.18, metalness: 0.22, transparent: true, opacity: 0.58 }),
       metal: new THREE.MeshStandardMaterial({ color: 0x3d4850, roughness: 0.38, metalness: 0.82 }),
@@ -503,6 +510,11 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/normal.jpg', this.materials.concrete, 'normalMap', false, 4, 2);
     this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/roughness.jpg', this.materials.concrete, 'roughnessMap', false, 4, 2);
     this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/ao.jpg', this.materials.concrete, 'aoMap', false, 4, 2);
+    // Wysoki rozstaw: podłoże jest wielokrotnie większe od chodnika, więc bez
+    // zagęszczenia tekstura rozciągnęłaby się w jednolitą plamę.
+    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/diffuse.jpg', this.materials.ground, 'map', true, 50, 34);
+    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/normal.jpg', this.materials.ground, 'normalMap', false, 50, 34);
+    this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/concrete/roughness.jpg', this.materials.ground, 'roughnessMap', false, 50, 34);
     this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/diffuse.jpg', this.materials.brick, 'map', true, 3, 2);
     this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/normal.jpg', this.materials.brick, 'normalMap', false, 3, 2);
     this.loadPbrTexture(loader, '/assets/genesis-hf/pbr/brick/roughness.jpg', this.materials.brick, 'roughnessMap', false, 3, 2);
@@ -527,9 +539,15 @@ export class HighFidelityStreetSlice3D implements Sim3D {
         // czytała się jak makieta na stole, mimo poprawnych materiałów PBR.
         this.scene.background = environment;
         this.scene.backgroundBlurriness = 0.42;
-        this.scene.backgroundIntensity = 0.95;
+        // Tło musi mieć tę samą jasność co oświetlenie ze środowiska, inaczej
+        // horyzont świeci mocniej niż oświetlona scena i wypłukuje jej górę.
+        this.scene.backgroundIntensity = 0.6;
         // Mgła dociągnięta do realnego tła, żeby horyzont nie odcinał się kantem.
-        if (this.THREE) this.scene.fog = new this.THREE.FogExp2(0xc2a887, 0.0105);
+        // Mgła przy 0.0105 dawała ok. 6% przesłony na krańcu kwartału, czyli
+        // praktycznie nic — nie ona rozjaśniała grunt (winna była jednolita
+        // płaszczyzna bez tekstury). Teraz ma realne zadanie: wygasić daleką
+        // krawędź płyty. Barwa zestrojona z przyciemnionym tłem HDRI.
+        if (this.THREE) this.scene.fog = new this.THREE.FogExp2(0x6b6358, 0.024);
         texture.dispose();
         pmrem.dispose();
       }, undefined, () => pmrem.dispose());
@@ -615,8 +633,15 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const materials = this.materials!;
     const worldW = this.simulation.worldWidth * HIGH_FIDELITY_WORLD_SCALE;
     const worldH = this.simulation.worldHeight * HIGH_FIDELITY_WORLD_SCALE;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(worldW * 9, worldH * 9), new THREE.MeshStandardMaterial({ color: 0x4e5450, roughness: 0.96 }));
-
+    // PODŁOŻE — ograniczone, nie nieskończone. Wcześniej płaszczyzna miała 9×
+    // rozmiar świata, więc większość kadru stanowił grunt rozpuszczony we mgle:
+    // stąd wrażenie pustej, jasnobeżowej płyty. Teraz jest to nawierzchnia
+    // kwartału o skończonym zasięgu i z realną teksturą.
+    // Zasięg 2.6× odsłaniał krawędź płyty w kadrze. 5× z proporcjonalnie
+    // gęstszą teksturą i mgłą, która wygasza dal — płyta nie kończy się szwem,
+    // tylko rozpływa. Nie jest to przykrycie problemu: gęstość teksela zostaje
+    // stała (ok. 3,6 m na kafel), więc podłoże nadal jest materiałem, nie plamą.
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(worldW * 5, worldH * 5), materials.ground);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.enableAo(ground);
@@ -624,25 +649,68 @@ export class HighFidelityStreetSlice3D implements Sim3D {
 
     const roadWidth = 1.35;
     const walkWidth = 1.12;
-    for (const y of this.simulation.streets.h) {
-      const z = this.toWorldY(y);
+    // Zasięg skrzyżowania: jezdnia plus chodnik ulicy poprzecznej. Do tego
+    // miejsca dobiega chodnik ulicy równoległej i tam się kończy.
+    const crossReach = roadWidth / 2 + walkWidth;
+    const hLines = this.simulation.streets.h.map((y) => this.toWorldY(y));
+    const vLines = this.simulation.streets.v.map((x) => this.toWorldX(x));
+
+    // --- JEZDNIE: pełne przęsła, bez przerw ---
+    for (const z of hLines) {
       const road = new THREE.Mesh(new THREE.BoxGeometry(worldW, 0.08, roadWidth), materials.asphalt);
       road.position.set(0, 0.02, z); road.receiveShadow = true; this.enableAo(road); this.addSceneObject(road);
-      for (const offset of [-roadWidth / 2 - walkWidth / 2, roadWidth / 2 + walkWidth / 2]) {
-        const walk = new THREE.Mesh(new THREE.BoxGeometry(worldW, 0.055, walkWidth), materials.concrete);
-        walk.position.set(0, 0.045, z + offset); walk.receiveShadow = true; this.enableAo(walk); this.addSceneObject(walk);
-      }
-      this.addRoadLine(worldW, z, false);
     }
-    for (const x of this.simulation.streets.v) {
-      const px = this.toWorldX(x);
+    for (const px of vLines) {
       const road = new THREE.Mesh(new THREE.BoxGeometry(roadWidth, 0.082, worldH), materials.asphalt);
       road.position.set(px, 0.025, 0); road.receiveShadow = true; this.enableAo(road); this.addSceneObject(road);
-      for (const offset of [-roadWidth / 2 - walkWidth / 2, roadWidth / 2 + walkWidth / 2]) {
-        const walk = new THREE.Mesh(new THREE.BoxGeometry(walkWidth, 0.058, worldH), materials.concrete);
-        walk.position.set(px + offset, 0.048, 0); walk.receiveShadow = true; this.enableAo(walk); this.addSceneObject(walk);
+    }
+
+    // --- SKRZYŻOWANIA: jedna tafla asfaltu ponad obiema jezdniami ---
+    // Bez tego pionowa jezdnia leżała nad poziomą i szew był widoczny.
+    for (const z of hLines) {
+      for (const px of vLines) {
+        const patch = new THREE.Mesh(new THREE.BoxGeometry(roadWidth, 0.086, roadWidth), materials.asphalt);
+        patch.position.set(px, 0.028, z); patch.receiveShadow = true; this.enableAo(patch); this.addSceneObject(patch);
       }
-      this.addRoadLine(worldH, px, true);
+    }
+
+    // --- CHODNIKI: segmentowane, przerwane na każdym skrzyżowaniu ---
+    // To był właściwy powód „pływających kafli": chodnik biegł przez CAŁĄ
+    // szerokość świata na wyższym Y niż jezdnia, więc kładł betonowy pas w
+    // poprzek każdej jezdni prostopadłej i ciął ją na prostokąty.
+    for (const z of hLines) {
+      for (const offset of [-roadWidth / 2 - walkWidth / 2, roadWidth / 2 + walkWidth / 2]) {
+        for (const [from, to] of this.spanSegments(-worldW / 2, worldW / 2, vLines, crossReach)) {
+          const walk = new THREE.Mesh(new THREE.BoxGeometry(to - from, 0.055, walkWidth), materials.concrete);
+          walk.position.set((from + to) / 2, 0.045, z + offset);
+          walk.receiveShadow = true; this.enableAo(walk); this.addSceneObject(walk);
+        }
+      }
+      this.addRoadLine(worldW, z, false, vLines, crossReach);
+    }
+    for (const px of vLines) {
+      for (const offset of [-roadWidth / 2 - walkWidth / 2, roadWidth / 2 + walkWidth / 2]) {
+        for (const [from, to] of this.spanSegments(-worldH / 2, worldH / 2, hLines, crossReach)) {
+          const walk = new THREE.Mesh(new THREE.BoxGeometry(walkWidth, 0.058, to - from), materials.concrete);
+          walk.position.set(px + offset, 0.048, (from + to) / 2);
+          walk.receiveShadow = true; this.enableAo(walk); this.addSceneObject(walk);
+        }
+      }
+      this.addRoadLine(worldH, px, true, hLines, crossReach);
+    }
+
+    // --- NAROŻNIKI: domykają chodnik wokół skrzyżowania ---
+    // Bez nich w każdym rogu zostawała dziura, przez którą było widać podłoże.
+    for (const z of hLines) {
+      for (const px of vLines) {
+        for (const dx of [-1, 1]) {
+          for (const dz of [-1, 1]) {
+            const corner = new THREE.Mesh(new THREE.BoxGeometry(walkWidth, 0.055, walkWidth), materials.concrete);
+            corner.position.set(px + dx * (roadWidth / 2 + walkWidth / 2), 0.046, z + dz * (roadWidth / 2 + walkWidth / 2));
+            corner.receiveShadow = true; this.enableAo(corner); this.addSceneObject(corner);
+          }
+        }
+      }
     }
 
     this.addModelBuildings();
@@ -1135,10 +1203,39 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.addSceneObject(mesh);
   }
 
-  private addRoadLine(length: number, position: number, vertical: boolean): void {
+  /**
+   * Dzieli odcinek [from, to] na kawałki pomiędzy przecięciami, zostawiając
+   * wokół każdego przecięcia przerwę o zasięgu `reach`. Tak powstaje chodnik,
+   * który dobiega do skrzyżowania i się kończy, zamiast przez nie przechodzić.
+   */
+  private spanSegments(from: number, to: number, crossings: readonly number[], reach: number): Array<[number, number]> {
+    const blocked = [...crossings].sort((a, b) => a - b);
+    const out: Array<[number, number]> = [];
+    let cursor = from;
+    for (const c of blocked) {
+      const gapStart = c - reach;
+      const gapEnd = c + reach;
+      if (gapStart > cursor) out.push([cursor, Math.min(gapStart, to)]);
+      cursor = Math.max(cursor, gapEnd);
+    }
+    if (cursor < to) out.push([cursor, to]);
+    // Odcinki krótsze niż 5 cm nie mają fizycznego sensu i tylko generują z-fighting.
+    return out.filter(([a, b]) => b - a > 0.05);
+  }
+
+  private addRoadLine(
+    length: number,
+    position: number,
+    vertical: boolean,
+    crossings: readonly number[] = [],
+    reach = 0,
+  ): void {
     const THREE = this.THREE!;
     const material = new THREE.MeshStandardMaterial({ color: 0xf7dcaa, emissive: 0x9c7340, emissiveIntensity: 0.08, roughness: 0.5 });
     for (let offset = -length / 2 + 0.25; offset < length / 2; offset += 0.72) {
+      // Przerywana oś nie biegnie przez skrzyżowanie — tak jest w realnej ulicy
+      // i dzięki temu tafla skrzyżowania czyta się jako jedna powierzchnia.
+      if (crossings.some((c) => Math.abs(offset - c) < reach)) continue;
       const marker = new THREE.Mesh(new THREE.BoxGeometry(vertical ? 0.07 : 0.36, 0.025, vertical ? 0.36 : 0.07), material);
       marker.position.set(vertical ? position : offset, 0.09, vertical ? offset : position);
       this.addSceneObject(marker);

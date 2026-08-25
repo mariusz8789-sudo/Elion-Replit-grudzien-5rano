@@ -7,6 +7,7 @@ import { EpidemicCity3DSim, type CityCameraPreset } from '../../core/three/epide
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
+import { ScenarioCommandCenterPanel } from './ScenarioCommandCenterPanel';
 
 /** Command Center reads existing model and World Engine state only; it does not generate epidemic data or agent routes. */
 /** Musi zgadzać się z EpidemicCity3DSim.hospitalStatusCode — indeks, nie liczba wyniku. */
@@ -250,6 +251,7 @@ export function City3DWebGLScreen() {
             </div>
             <p className="hospital-panel-note">Topologia pochodzi z tego samego układu miasta co renderer. Przypisanie agentów do tras i segmentów kontaktu pozostaje <code>NOT_MODELED</code>.</p>
           </div>
+          <ScenarioCommandCenterPanel params={params} />
           <div className="world-panel event-feed-panel">
             <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>
             {latestTransmission ? (

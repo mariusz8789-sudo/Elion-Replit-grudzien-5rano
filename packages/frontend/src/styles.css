@@ -1916,6 +1916,59 @@ kbd {
 .city-scene-readout { opacity: .84; pointer-events: none; }
 .city-event-timeline { margin-top: .45rem; padding: .48rem .62rem; }
 
+/* Scenario Engine Command Center: real ScenarioRun projections only; no synthetic metrics or secondary model. */
+.scenario-command-panel { padding-bottom: .7rem; }
+.scenario-selector { display: grid; gap: .48rem; padding: .58rem .68rem .35rem; }
+.scenario-selector label { display: grid; gap: .22rem; color: #8faec7; font: .58rem/1 var(--font-mono); letter-spacing: .07em; }
+.scenario-selector output, .scenario-selector select { min-width: 0; box-sizing: border-box; padding: .42rem .46rem; border: 1px solid rgba(126, 190, 238, .28); border-radius: .35rem; background: #10283d; color: #edf8ff; font: .66rem/1.2 var(--font-mono); }
+.scenario-selector select { width: 100%; cursor: pointer; }
+.scenario-rationale { margin: .35rem .68rem .6rem; color: #9eb9cc; font-size: .65rem; line-height: 1.45; }
+.scenario-parameters { display: grid; gap: .3rem; margin: 0 .68rem .55rem; padding: .48rem .52rem; border: 1px solid rgba(128, 183, 225, .18); border-radius: .45rem; background: rgba(5, 18, 30, .48); }
+.scenario-parameters > span, .scenario-result-heading > span, .scenario-chart-controls > span, .scenario-timeline > div > span { color: #86b9dc; font: 700 .58rem/1 var(--font-mono); letter-spacing: .08em; }
+.scenario-parameters > div { display: flex; justify-content: space-between; gap: .35rem; color: #b7d2e7; font-size: .62rem; }
+.scenario-parameters b { font-weight: 500; }
+.scenario-parameters code { max-width: 56%; overflow-wrap: anywhere; color: #eaf7ff; font: .61rem/1.25 var(--font-mono); text-align: right; }
+.scenario-parameters p, .scenario-empty { margin: 0; color: #8fa9bd; font-size: .63rem; line-height: 1.4; }
+.scenario-run-button, .scenario-replay-button { margin: 0 .68rem .58rem; font-size: .62rem; }
+.scenario-not-modeled { margin: .15rem .68rem .55rem; padding: .46rem .5rem; border: 1px solid rgba(240, 179, 92, .42); border-radius: .4rem; color: #f4ca7d; background: rgba(240, 179, 92, .08); font: .62rem/1.4 var(--font-mono); }
+.scenario-empty { margin: .1rem .68rem .55rem; }
+.scenario-result-heading { display: grid; gap: .18rem; margin: .2rem .68rem .42rem; padding-top: .55rem; border-top: 1px solid rgba(127, 184, 226, .14); }
+.scenario-result-heading small { color: #9db7ca; font: .6rem/1.35 var(--font-mono); }
+.scenario-metrics { display: grid; gap: .24rem; margin: 0 .68rem .55rem; }
+.scenario-metric { display: grid; grid-template-columns: minmax(0, 1fr) auto .6rem auto; gap: .32rem; align-items: center; padding: .33rem .38rem; border-radius: .35rem; background: rgba(10, 29, 45, .64); color: #97b3c9; font: .61rem/1 var(--font-mono); }
+.scenario-metric b { color: #a9c6dd; font-weight: 500; }
+.scenario-metric i { color: #55718a; font-style: normal; text-align: center; }
+.scenario-metric strong { color: #55d5c3; font-weight: 700; }
+.scenario-chart-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .28rem; margin: 0 .68rem .36rem; }
+.scenario-chart-controls > span { margin-right: .12rem; }
+.scenario-chart-controls button { border: 1px solid rgba(128, 190, 232, .24); border-radius: .28rem; background: rgba(16, 40, 61, .72); color: #a8c7dc; padding: .24rem .32rem; font: .57rem/1 var(--font-mono); cursor: pointer; }
+.scenario-chart-controls button[aria-pressed='true'] { border-color: #42d7c0; background: rgba(66, 215, 192, .12); color: #d9fffa; }
+.scenario-chart-wrap { margin: 0 .68rem .58rem; padding: .42rem; border: 1px solid rgba(129, 190, 235, .2); border-radius: .45rem; background: rgba(4, 17, 28, .66); }
+.scenario-chart-key { display: flex; flex-wrap: wrap; gap: .42rem; align-items: center; margin-bottom: .28rem; color: #9eb7c9; font: .56rem/1 var(--font-mono); }
+.scenario-chart-key span { display: inline-flex; align-items: center; gap: .22rem; }
+.scenario-chart-key b { margin-left: auto; color: #dff5ff; font-weight: 500; }
+.scenario-line { display: inline-block; width: .95rem; height: .13rem; border-radius: 999px; }
+.scenario-line.baseline, .scenario-series.baseline { color: #58baf2; background: #58baf2; stroke: #58baf2; }
+.scenario-line.intervention, .scenario-series.intervention { color: #54d98c; background: #54d98c; stroke: #54d98c; }
+.scenario-chart { display: block; width: 100%; height: 7.2rem; overflow: visible; }
+.scenario-axis { stroke: rgba(156, 193, 219, .28); stroke-width: 1; }
+.scenario-series { fill: none; stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
+.scenario-timeline { margin: 0 .68rem .55rem; padding: .45rem .5rem; border-left: 2px solid #4abfdc; background: rgba(9, 28, 43, .56); }
+.scenario-timeline > div { display: flex; justify-content: space-between; gap: .3rem; }
+.scenario-timeline > div b { color: #e1f5ff; font: .59rem var(--font-mono); }
+.scenario-timeline input { width: 100%; margin: .38rem 0; accent-color: #4ac9dc; }
+.scenario-timeline p { margin: 0; color: #a4bfd2; font: .6rem/1.4 var(--font-mono); }
+.scenario-trace { margin: .2rem .68rem .5rem; padding-top: .5rem; border-top: 1px dashed rgba(134, 182, 218, .28); }
+.scenario-trace-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .28rem; }
+.scenario-trace-grid span { display: grid; gap: .08rem; min-width: 0; color: #7696ad; font: .55rem/1 var(--font-mono); text-transform: uppercase; }
+.scenario-trace-grid b, .scenario-trace-grid code { overflow: hidden; color: #d8edfb; font: .58rem/1.25 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; text-transform: none; }
+.scenario-provenance { margin-top: .45rem; color: #94afc2; font-size: .61rem; line-height: 1.4; }
+.scenario-provenance > b { color: #79bedf; font: 700 .56rem var(--font-mono); letter-spacing: .07em; text-transform: uppercase; }
+.scenario-provenance p { margin: .22rem 0 0; }
+.scenario-provenance code { color: #cceaff; font-size: .59rem; }
+.scenario-replay-match { color: #70e1a4; }
+.scenario-replay-other { color: #f5c57c; }
+
 /* --- Genesis High-Fidelity Street Slice: świat ma priorytet nad dashboardem --- */
 .hf-slice-screen { min-height: calc(100vh - 4rem); background: radial-gradient(circle at 50% 0%, #24344f 0%, #101821 46%, #090d13 100%); color: #eef5fb; }
 .hf-stage { position: relative; isolation: isolate; min-height: min(76vh, 58rem); overflow: hidden; border-bottom: 1px solid rgba(195, 217, 240, .14); background: #162033; }

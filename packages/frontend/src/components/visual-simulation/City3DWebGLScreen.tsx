@@ -7,6 +7,7 @@ import { EpidemicCity3DSim, type CityCameraPreset } from '../../core/three/epide
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
+import { projectWorldState } from '../../core/simulation/worldEngineContract';
 
 /** Musi zgadzać się z EpidemicCity3DSim.hospitalStatusCode — indeks, nie liczba wyniku. */
 const HOSPITAL_STATUS_LABELS = ['NORMAL', 'WARNING', 'HIGH', 'CRITICAL'] as const;
@@ -108,6 +109,12 @@ export function City3DWebGLScreen() {
   const worldWidth = sim.getSim().worldWidth;
   const worldHeight = sim.getSim().worldHeight;
   const percentageKeys = ['transmissionScale', 'restrictions', 'mobility', 'severeRate'];
+  // Ta sama projekcja World Engine Contract, którą dostaje każdy zewnętrzny konsument (SC2) — brak drugiego liczenia hotspotów/klastrów.
+  const worldState = projectWorldState(sim.getSim());
+  const topHotspots = worldState.hotspots.slice(0, 3);
+  const topClusters = [...worldState.clusters.household, ...worldState.clusters.location]
+    .sort((a, b) => b.transmissions - a.transmissions)
+    .slice(0, 3);
 
   return (
     <main id="main-content" tabIndex={-1} className="home city-3d-screen city-world-shell">
@@ -234,6 +241,33 @@ export function City3DWebGLScreen() {
             <div className="world-panel-heading"><span>WARSTWY</span><small>odczyt modelu</small></div>
             {ANALYSIS_MODES.filter((mode) => mode.id !== 'none').map((mode) => <button key={mode.id} className="world-layer" aria-pressed={analysis === mode.id} onClick={() => setAnalysis(mode.id)}><span>{mode.label}</span><i /></button>)}
             <label className="world-layer transmission-layer"><span>Ślady transmisji</span><input type="checkbox" checked={showTransmissions} onChange={(event) => setShowTransmissions(event.target.checked)} /></label>
+          </div>
+          <div className="world-panel hotspot-panel">
+            <div className="world-panel-heading"><span>OGNISKA</span><small>World Engine Contract</small></div>
+            <div className="epidemic-summary">
+              <div className="epidemic-summary-row"><span>aktywne ogniska (siatka)</span><strong>{worldState.hotspots.length}</strong></div>
+              <div className="epidemic-summary-row"><span>klastry gospodarstw</span><strong>{worldState.clusters.household.length}</strong></div>
+              <div className="epidemic-summary-row"><span>klastry miejsc</span><strong>{worldState.clusters.location.length}</strong></div>
+            </div>
+            {topHotspots.length > 0 ? (
+              <ul className="hotspot-list">
+                {topHotspots.map((hotspot, index) => (
+                  <li key={`hotspot-${index}`}><span>({Math.round(hotspot.x)}, {Math.round(hotspot.y)})</span><strong>{hotspot.infectious} zakaźnych</strong></li>
+                ))}
+              </ul>
+            ) : <p className="world-panel-empty">Brak ognisk — za mało jednoczesnych zakażeń w jednej komórce siatki.</p>}
+            {topClusters.length > 0 && (
+              <ul className="hotspot-list hotspot-cluster-list">
+                {topClusters.map((cluster) => (
+                  <li key={cluster.clusterId}><span>{cluster.kind === 'household' ? 'gospodarstwo' : cluster.contactType} · dzień {Math.round(cluster.firstDay)}–{Math.round(cluster.lastDay)}</span><strong>{cluster.transmissions} transmisji</strong></li>
+                ))}
+              </ul>
+            )}
+            <p className="hospital-panel-note">
+              Ognisko = komórka siatki z realnymi zakaźnymi agentami; klaster = realne krawędzie transmisji w tym
+              samym gospodarstwie lub miejscu (<code>clusterAnalysis.ts</code>). Bez wykrywania heurystycznego —
+              pusty wynik jest wynikiem.
+            </p>
           </div>
           <div className="world-panel event-feed-panel">
             <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>

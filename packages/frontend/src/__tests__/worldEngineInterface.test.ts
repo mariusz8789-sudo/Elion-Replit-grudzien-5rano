@@ -81,7 +81,8 @@ describe('World Engine contract — location and movement requirements', () => {
     const today = REQUIRED_LOCATION_TYPES.filter((r) => r.availableToday).map((r) => r.locationType);
     const pending = REQUIRED_LOCATION_TYPES.filter((r) => !r.availableToday).map((r) => r.locationType);
     expect(today).toEqual(expect.arrayContaining(['SCHOOL', 'SHOP', 'HOSPITAL', 'PARK', 'BUILDING']));
-    expect(pending).toEqual(expect.arrayContaining(['ROAD', 'SIDEWALK', 'CROSSING', 'WORK', 'TRANSPORT']));
+    expect(today).toEqual(expect.arrayContaining(['ROAD', 'SIDEWALK', 'CROSSING']));
+    expect(pending).toEqual(expect.arrayContaining(['WORK', 'TRANSPORT']));
     for (const r of REQUIRED_LOCATION_TYPES) expect(r.requires.length).toBeGreaterThan(25);
   });
 
@@ -117,8 +118,8 @@ describe('World Engine contract — OTHER is not split without data', () => {
 });
 
 describe('World Engine contract — blocked capabilities stay blocked', () => {
-  it('every pending capability is blocked today with a concrete reason', () => {
-    for (const c of CAPABILITY_REQUIREMENTS) {
+  it('every capability that still lacks a complete payload is blocked with a concrete reason', () => {
+    for (const c of CAPABILITY_REQUIREMENTS.filter((capability) => !capability.availableToday)) {
       expect(c.availableToday).toBe(false);
       expect(c.requiredFields.length).toBeGreaterThan(0);
       expect(c.blockedReason.length).toBeGreaterThan(40);
@@ -212,7 +213,7 @@ describe('World Engine contract — replay requirements are stated and already h
   });
 
   it('declares the interface gaps rather than hiding them', () => {
-    for (const gap of ['contact-duration', 'road-network', 'workplace-assignment', 'vehicle-occupancy']) {
+    for (const gap of ['contact-duration', 'agent-route-assignment', 'workplace-assignment', 'vehicle-occupancy']) {
       expect(INTERFACE_NOT_MODELED).toContain(gap);
     }
   });

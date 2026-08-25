@@ -32,10 +32,13 @@ export interface HumanoidAgentState {
   hospitalized: boolean;
 }
 
-/** Skala dobrana do rzeczywistego rozmiaru budynków CityWorld (człowiek < parter). */
-export const HUMAN_VISUAL_HEIGHT = 0.38;
-/** Rig oglądany w focusie jest większy od LOD tłumu, ale nadal pozostaje w tym samym punkcie modelu. */
-export const DETAILED_HUMAN_HEIGHT = 0.86;
+/**
+ * High-fidelity City View: populacja ma czytać się jako warstwa skali miasta.
+ * Mapowanie nadal korzysta wyłącznie z realnego SimAgent i nie zmienia stanu modelu.
+ */
+export const HUMAN_VISUAL_HEIGHT = 0.30;
+/** Rig focusu jest czytelny, lecz nie może wizualnie konkurować z tkanką miejską. */
+export const DETAILED_HUMAN_HEIGHT = 0.68;
 
 export const HEALTH_COLORS: Record<AgentHealthState, number> = {
   S: 0x54d98c,

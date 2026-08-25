@@ -8,7 +8,9 @@ import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
 import { projectWorldState } from '../../core/simulation/worldEngineContract';
+import { ScenarioCommandCenterPanel } from './ScenarioCommandCenterPanel';
 
+/** Command Center reads existing model and World Engine state only; it does not generate epidemic data or agent routes. */
 /** Musi zgadzać się z EpidemicCity3DSim.hospitalStatusCode — indeks, nie liczba wyniku. */
 const HOSPITAL_STATUS_LABELS = ['NORMAL', 'WARNING', 'HIGH', 'CRITICAL'] as const;
 
@@ -108,6 +110,11 @@ export function City3DWebGLScreen() {
   const modelAgents = sim.getSim().agents();
   const worldWidth = sim.getSim().worldWidth;
   const worldHeight = sim.getSim().worldHeight;
+  const roadNetwork = useMemo(() => sim.getSim().roadNetworkView(), [sim]);
+  const topologyCounts = useMemo(() => roadNetwork.segments.reduce<Record<string, number>>((counts, segment) => {
+    counts[segment.segmentType] = (counts[segment.segmentType] ?? 0) + 1;
+    return counts;
+  }, {}), [roadNetwork]);
   const percentageKeys = ['transmissionScale', 'restrictions', 'mobility', 'severeRate'];
   // Ta sama projekcja World Engine Contract, którą dostaje każdy zewnętrzny konsument (SC2) — brak drugiego liczenia hotspotów/klastrów.
   const worldState = projectWorldState(sim.getSim());
@@ -269,6 +276,16 @@ export function City3DWebGLScreen() {
               pusty wynik jest wynikiem.
             </p>
           </div>
+          <div className="world-panel route-network-panel">
+            <div className="world-panel-heading"><span>SIEĆ MIEJSKA</span><small>World Engine · topologia</small></div>
+            <div className="epidemic-summary">
+              <div className="epidemic-summary-row"><span>jezdnie</span><strong>{topologyCounts.ROAD ?? 0}</strong></div>
+              <div className="epidemic-summary-row"><span>chodniki</span><strong>{topologyCounts.SIDEWALK ?? 0}</strong></div>
+              <div className="epidemic-summary-row"><span>przejścia</span><strong>{topologyCounts.CROSSING ?? 0}</strong></div>
+            </div>
+            <p className="hospital-panel-note">Topologia pochodzi z tego samego układu miasta co renderer. Przypisanie agentów do tras i segmentów kontaktu pozostaje <code>NOT_MODELED</code>.</p>
+          </div>
+          <ScenarioCommandCenterPanel params={params} />
           <div className="world-panel event-feed-panel">
             <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>
             {latestTransmission ? (

@@ -3,7 +3,7 @@ import { registerActiveSimControls } from '../../core/activeSimControls';
 import { registerSimContext } from '../../core/simContext';
 import { ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
 import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
-import { EpidemicCity3DSim, type CityCameraPreset } from '../../core/three/epidemicCity3D';
+import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
@@ -46,12 +46,14 @@ const MINIMAP_OBJECT_COLORS: Record<string, string> = {
  */
 export function City3DWebGLScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [worldSelection, setWorldSelection] = useState<CityWorldSelection | null>(null);
   const [cameraPreset, setCameraPreset] = useState<CityCameraPreset>('city');
   const sim = useMemo(() => new EpidemicCity3DSim({}, {
     onAgentSelected: (id) => {
       setSelectedId(id);
       if (id !== null) setCameraPreset('agent');
     },
+    onWorldSelected: setWorldSelection,
   }), []);
   const [params, setParams] = useState<SimParams>(() => sim.getSim().getParams());
   const [running, setRunning] = useState(false);
@@ -79,7 +81,7 @@ export function City3DWebGLScreen() {
   const pause = () => setRunning(false);
   const step = () => { sim.step(); setStats(sim.getStats()); };
   const reset = () => {
-    sim.reset(); setRunning(false); setSelectedId(null); setCameraPreset('city');
+    sim.reset(); setRunning(false); setSelectedId(null); setWorldSelection(null); setCameraPreset('city');
     setParams(sim.getSim().getParams()); setStats(sim.getStats());
   };
   const changeCamera = (preset: CityCameraPreset) => {
@@ -117,7 +119,8 @@ export function City3DWebGLScreen() {
   }, {}), [roadNetwork]);
   const percentageKeys = ['transmissionScale', 'restrictions', 'mobility', 'severeRate'];
   // Ta sama projekcja World Engine Contract, którą dostaje każdy zewnętrzny konsument (SC2) — brak drugiego liczenia hotspotów/klastrów.
-  const worldState = projectWorldState(sim.getSim());
+  const worldState = useMemo(() => projectWorldState(sim.getSim()), [sim, stats]);
+  useEffect(() => { sim.setWorldState(worldState); }, [sim, worldState]);
   const topHotspots = worldState.hotspots.slice(0, 3);
   const topClusters = [...worldState.clusters.household, ...worldState.clusters.location]
     .sort((a, b) => b.transmissions - a.transmissions)
@@ -228,12 +231,27 @@ export function City3DWebGLScreen() {
                 <button className="world-action accent" onClick={() => { sim.clearSelection(); setCameraPreset('city'); }}>Przestań śledzić</button>
               </aside>
             )}
+            {worldSelection && (
+              <aside className="city-3d-person-card city-world-object-card">
+                <div className="agent-inspector-heading"><span>{worldSelection.kind.toUpperCase()}</span><button onClick={() => { sim.clearSelection(); setCameraPreset('city'); }} aria-label="Zamknij inspekcję świata">×</button></div>
+                <strong>{worldSelection.label}</strong>
+                <p>{worldSelection.detail}</p>
+                <button className="world-action accent" onClick={() => { sim.clearSelection(); setCameraPreset('city'); }}>Wyczyść fokus</button>
+              </aside>
+            )}
           </div>
           <div className="city-event-timeline" aria-label="Bieżący punkt osi symulacji">
             <div className="timeline-heading"><span>OŚ SYMULACJI</span><small>zdarzenia wynikają z modelu</small></div>
             <div className="timeline-track"><i /><b style={{ left: `${Math.min(96, 8 + Number(stats.dzien ?? 0) * 2)}%` }} /></div>
             <div className="timeline-labels"><span>start</span><span>dzień {stats.dzien ?? 0}</span><span>{stats.kontakty ?? 0} kontaktów · {stats.hospitalizowani ?? 0} hosp.</span></div>
           </div>
+          <section className="city-world-analytics-rail" aria-label="Skrócona analityka World State">
+            <div><span>HOTSPOTY</span><strong>{worldState.hotspots.length}</strong><small>komórki z zakaźnymi</small></div>
+            <div><span>KLASTRY</span><strong>{worldState.clusters.household.length + worldState.clusters.location.length}</strong><small>realne transmisje</small></div>
+            <div><span>HOSPITAL</span><strong>{worldState.hospital.status}</strong><small>{worldState.hospital.unmetCare} bez opieki</small></div>
+            <div><span>MOBILITY</span><strong>{Math.round(worldState.mobility.effectiveMobility * 100)}%</strong><small>efektywna mobilność</small></div>
+            <div className="analytics-rail-not-modeled"><span>ROUTES</span><strong>NOT_MODELED</strong><small>atrybucja kontaktów</small></div>
+          </section>
         </section>
 
         <aside className="city-world-sidebar city-world-right" aria-label="Analityka i warstwy świata">
@@ -312,8 +330,10 @@ export function City3DWebGLScreen() {
           <div className="world-panel observability-panel">
             <div className="world-panel-heading"><span>OBSERWOWALNOŚĆ</span><small>renderer</small></div>
             <div><span>FPS</span><b>{Math.round(stats.webgl_fps ?? 0)}</b></div>
+            <div><span>frame</span><b>{Number(stats.webgl_frame_ms ?? 0).toFixed(2)} ms</b></div>
             <div><span>render</span><b>{Number(stats.webgl_render_ms ?? 0).toFixed(2)} ms</b></div>
             <div><span>draw calls</span><b>{Math.round(stats.webgl_draw_calls ?? 0)}</b></div>
+            <div><span>triangles</span><b>{Math.round(stats.webgl_triangles ?? 0)}</b></div>
           </div>
         </aside>
       </section>

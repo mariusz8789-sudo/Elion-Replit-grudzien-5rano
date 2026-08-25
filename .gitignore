@@ -10,3 +10,7 @@ packages/backend/data/
 # heavy-engine scientific artifacts (runtime, not source)
 _dock*/
 *.pdbqt
+
+# Delivery archive and local Chromium capture helpers are generated outside the source review path.
+artifacts/*.zip
+artifacts/*.mjs

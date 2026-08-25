@@ -1920,6 +1920,16 @@ kbd {
 }
 .city-scene-readout { opacity: .84; pointer-events: none; }
 .city-event-timeline { margin-top: .45rem; padding: .48rem .62rem; }
+.city-world-object-card { width: min(18rem, calc(100% - 2rem)); }
+.city-world-object-card > strong { display: block; margin: .38rem 0 .22rem; color: #eff9ff; font: 700 .78rem/1.3 var(--font-body); }
+.city-world-object-card > p { margin: 0 0 .62rem; color: #b5cad9; font: .62rem/1.45 var(--font-mono); }
+.city-world-analytics-rail { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; margin-top: .48rem; overflow: hidden; border: 1px solid rgba(127, 184, 226, .2); border-radius: .52rem; background: rgba(127, 184, 226, .16); }
+.city-world-analytics-rail > div { display: grid; min-width: 0; gap: .12rem; padding: .48rem .58rem; background: rgba(7, 23, 37, .76); }
+.city-world-analytics-rail span { color: #8dbbd9; font: 700 .53rem/1 var(--font-mono); letter-spacing: .10em; }
+.city-world-analytics-rail strong { overflow: hidden; color: #edf9ff; font: 700 .76rem/1.2 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.city-world-analytics-rail small { overflow: hidden; color: #9bb4c8; font: .55rem/1.2 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.city-world-analytics-rail .analytics-rail-not-modeled strong { color: #f4ca7d; font-size: .61rem; }
+@media (max-width: 760px) { .city-world-analytics-rail { grid-template-columns: 1fr 1fr; } .city-world-analytics-rail > div:last-child { grid-column: 1 / -1; } }
 
 /* Scenario Engine Command Center: real ScenarioRun projections only; no synthetic metrics or secondary model. */
 .scenario-command-panel { padding-bottom: .7rem; }
@@ -2088,6 +2098,12 @@ kbd {
     margin: 0; border-radius: var(--r-md);
     background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-border); box-shadow: var(--shadow-md);
+  }
+  .city-world-analytics-rail {
+    position: absolute; z-index: 4; bottom: calc(var(--sp-3) + 4.2rem);
+    left: calc(250px + 2 * var(--sp-3)); right: calc(250px + 2 * var(--sp-3));
+    margin: 0; background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+    border-color: var(--glass-border); box-shadow: var(--shadow-md);
   }
   /* Odczyt sceny schodzi poniżej lewego panelu, żeby się z nim nie zderzał. */
   .city-scene-readout { left: calc(250px + 2 * var(--sp-3)); top: var(--sp-3); }

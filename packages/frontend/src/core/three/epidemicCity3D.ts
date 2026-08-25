@@ -3,10 +3,12 @@ import type { SimParams } from '../types';
 import { computeField, heatColor, type AnalysisMode } from '../simulation/analysis';
 import { EpidemicCitySimulation, type EpidemicCityParams } from '../simulation/epidemicCity';
 import { DEFAULT_HOSPITAL_CAPACITY, evaluateHospitalState, type HospitalStatus } from '../simulation/hospitalResource';
+import type { WorldStateView } from '../simulation/worldEngineContract';
 import { SimulationClock, type ClockSpeed } from '../simulationClock/clock';
 import type { SimAgent, WorldObject } from '../simulation/types';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
+import { isWorldAssetApproved, isWorldAssetPathApproved } from './assetGovernance';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -34,6 +36,24 @@ export type CityCameraPreset = 'city' | 'district' | 'street' | 'agent';
 
 export interface City3DCallbacks {
   onAgentSelected?: (agentId: number | null) => void;
+  onWorldSelected?: (selection: CityWorldSelection | null) => void;
+}
+
+/** Read-only selection returned from genuine WorldState or semantic CityWorld objects. */
+export interface CityWorldSelection {
+  kind: 'location' | 'hotspot' | 'cluster' | 'hospital' | 'transmission';
+  label: string;
+  detail: string;
+  x: number;
+  y: number;
+}
+
+/** Zatwierdzone materiały renderera; nie są stanem świata ani danymi naukowymi. */
+interface CityPbrMaterials {
+  asphalt: THREE_NS.MeshStandardMaterial;
+  concrete: THREE_NS.MeshStandardMaterial;
+  ground: THREE_NS.MeshStandardMaterial;
+  brick: THREE_NS.MeshStandardMaterial;
 }
 
 /** Ostatnie rzeczywiście zaobserwowane A→B do prezentacji; to nie jest nowy Event Engine ani historia zdarzeń. */
@@ -84,6 +104,16 @@ export class EpidemicCity3DSim implements Sim3D {
   private crowd: InstancedHumanoidCrowd | null = null;
   private analysisMesh: THREE_NS.InstancedMesh | null = null;
   private analysisMaterial: THREE_NS.MeshBasicMaterial | null = null;
+  private cityMaterials: CityPbrMaterials | null = null;
+  private semanticBuildingSlots: Array<{ group: THREE_NS.Group; building: WorldObject }> = [];
+  private approvedFacadeTemplate: THREE_NS.Object3D | null = null;
+  private approvedLampTemplate: THREE_NS.Object3D | null = null;
+  private approvedAssetRoots: THREE_NS.Object3D[] = [];
+  private worldState: WorldStateView | null = null;
+  private worldOverlayGroup: THREE_NS.Group | null = null;
+  private worldInteractive: THREE_NS.Object3D[] = [];
+  private selectedWorld: CityWorldSelection | null = null;
+  private worldOverlayFingerprint = '';
   /** Efemeryczne ślady są tworzone wyłącznie z `lastTransmissions()` silnika. */
   private transmissionMarkers = new Map<string, { group: THREE_NS.Group; born: number; material: THREE_NS.MeshBasicMaterial }>();
   private buildingMeshes: THREE_NS.Object3D[] = [];
@@ -103,6 +133,15 @@ export class EpidemicCity3DSim implements Sim3D {
 
   getSim(): EpidemicCitySimulation {
     return this.simulation;
+  }
+
+  /** Konsumuje gotową, niemutowalną projekcję World Engine; nie uruchamia obliczeń naukowych. */
+  setWorldState(worldState: WorldStateView): void {
+    this.worldState = worldState;
+  }
+
+  getSelectedWorld(): CityWorldSelection | null {
+    return this.selectedWorld;
   }
 
   setAnalysisMode(mode: AnalysisMode): void {
@@ -135,6 +174,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.cameraPreset = 'city';
     this.cameraTrackId = null;
     this.selectAgent(null);
+    this.selectWorld(null);
   }
 
   getCameraPreset(): CityCameraPreset {
@@ -148,6 +188,7 @@ export class EpidemicCity3DSim implements Sim3D {
       this.cameraTrackId = null;
       this.resetCityCameraPending = true;
       this.selectAgent(null);
+      this.selectWorld(null);
       return null;
     }
     const agents = this.simulation.agents();
@@ -187,6 +228,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.latestTransmissionTarget = null;
     this.latestTransmissionView = null;
     this.selectAgent(null);
+    this.selectWorld(null);
   }
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, w: number, h: number): void {
@@ -202,10 +244,15 @@ export class EpidemicCity3DSim implements Sim3D {
     camera.position.set(CITY_CAMERA_POSITION.x, CITY_CAMERA_POSITION.y, CITY_CAMERA_POSITION.z);
     camera.lookAt(CITY_CAMERA_TARGET.x, CITY_CAMERA_TARGET.y, CITY_CAMERA_TARGET.z);
 
+    this.createApprovedCityMaterials();
     this.addLightsAndGround();
     this.addRoadsAndBuildings();
     this.addStreetAtmosphere();
+    void this.loadApprovedCityAssets();
     this.addAnalysisLayer();
+    this.worldOverlayGroup = new THREE.Group();
+    this.worldOverlayGroup.name = 'read-only-worldstate-overlays';
+    scene.add(this.worldOverlayGroup);
     this.crowd = new InstancedHumanoidCrowd(THREE, MAX_CROWD_HUMANOIDS);
     this.crowd.addTo(scene);
   }
@@ -221,10 +268,11 @@ export class EpidemicCity3DSim implements Sim3D {
   ): PostProcessor {
     const THREE = this.THREE!;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.18;
+    renderer.toneMappingExposure = 0.92;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    void this.loadApprovedHdri(renderer);
     const composer = new modules.EffectComposer(renderer);
     composer.addPass(new modules.RenderPass(scene, camera));
     const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.20, 0.46, 0.90);
@@ -275,6 +323,8 @@ export class EpidemicCity3DSim implements Sim3D {
     this.syncHumanoids(states);
     this.syncAnalysis(agents);
     this.syncTransmissionMarkers();
+    this.syncWorldStateVisuals();
+    this.syncApprovedAssetLod();
     this.syncFollowTarget(states);
     if (this.resetCityCameraPending) {
       camera.position.set(CITY_CAMERA_POSITION.x, CITY_CAMERA_POSITION.y, CITY_CAMERA_POSITION.z);
@@ -296,6 +346,7 @@ export class EpidemicCity3DSim implements Sim3D {
 
   getOrbitFocusDistance(): number | null {
     if (!this.followTarget) return null;
+    if (this.selectedWorld) return 4.6;
     if (this.cameraPreset === 'district') return 7.2;
     // Ten sam rig i OrbitControls: STREET jest na wysokości obserwatora, AGENT pozwala obejrzeć twarz i ubranie.
     if (this.cameraPreset === 'street') return 2.9;
@@ -397,7 +448,17 @@ export class EpidemicCity3DSim implements Sim3D {
         }
       }
     }
+    const worldHits = this.raycaster.intersectObjects([...this.worldInteractive, ...this.buildingMeshes], true);
+    if (worldHits.length) {
+      let node: THREE_NS.Object3D | null = worldHits[0].object;
+      while (node && !node.userData.worldSelection) node = node.parent;
+      if (node?.userData.worldSelection) {
+        this.selectWorld(node.userData.worldSelection as CityWorldSelection);
+        return;
+      }
+    }
     this.selectAgent(null);
+    this.selectWorld(null);
   }
 
   dispose(): void {
@@ -418,6 +479,19 @@ export class EpidemicCity3DSim implements Sim3D {
       });
     }
     this.transmissionMarkers.clear();
+    if (this.worldOverlayGroup) {
+      for (const marker of this.worldOverlayGroup.children) {
+        marker.traverse((node) => {
+          const mesh = node as THREE_NS.Mesh;
+          mesh.geometry?.dispose();
+          const material = mesh.material;
+          if (material && !Array.isArray(material)) material.dispose();
+        });
+      }
+      this.scene?.remove(this.worldOverlayGroup);
+      this.worldOverlayGroup = null;
+      this.worldInteractive = [];
+    }
     for (const object of this.buildingMeshes) {
       object.traverse((node) => {
         const mesh = node as THREE_NS.Mesh;
@@ -427,6 +501,151 @@ export class EpidemicCity3DSim implements Sim3D {
       });
     }
     this.buildingMeshes = [];
+    for (const asset of this.approvedAssetRoots) this.scene?.remove(asset);
+    this.approvedAssetRoots = [];
+    this.semanticBuildingSlots = [];
+  }
+
+  /** Materiały są ładowane tylko po przejściu istniejącej bramki Asset Governance. */
+  private createApprovedCityMaterials(): void {
+    if (!this.THREE) return;
+    const THREE = this.THREE;
+    this.cityMaterials = {
+      asphalt: new THREE.MeshStandardMaterial({ color: 0x2b3034, roughness: 0.82, metalness: 0.03 }),
+      concrete: new THREE.MeshStandardMaterial({ color: 0x87919a, roughness: 0.88, metalness: 0.02 }),
+      ground: new THREE.MeshStandardMaterial({ color: 0x42534b, roughness: 0.96, metalness: 0.01 }),
+      brick: new THREE.MeshStandardMaterial({ color: 0x835a4b, roughness: 0.80, metalness: 0.01 }),
+    };
+    const loader = new THREE.TextureLoader();
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/diffuse.jpg', this.cityMaterials.asphalt, 'map', true, 5, 2);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/normal.jpg', this.cityMaterials.asphalt, 'normalMap', false, 5, 2);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/arm.jpg', this.cityMaterials.asphalt, 'roughnessMap', false, 5, 2);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/arm.jpg', this.cityMaterials.asphalt, 'aoMap', false, 5, 2);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/diffuse.jpg', this.cityMaterials.concrete, 'map', true, 4, 2);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/normal.jpg', this.cityMaterials.concrete, 'normalMap', false, 4, 2);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/arm.jpg', this.cityMaterials.concrete, 'roughnessMap', false, 4, 2);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/diffuse.jpg', this.cityMaterials.brick, 'map', true, 3, 2);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/normal.jpg', this.cityMaterials.brick, 'normalMap', false, 3, 2);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/brick-wall-10/arm.jpg', this.cityMaterials.brick, 'roughnessMap', false, 3, 2);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/diffuse.jpg', this.cityMaterials.ground, 'map', true, 30, 22);
+    this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/concrete-floor-01/normal.jpg', this.cityMaterials.ground, 'normalMap', false, 30, 22);
+  }
+
+  private loadGovernedTexture(
+    loader: THREE_NS.TextureLoader,
+    path: string,
+    material: THREE_NS.MeshStandardMaterial,
+    slot: 'map' | 'normalMap' | 'roughnessMap' | 'aoMap',
+    srgb: boolean,
+    repeatX: number,
+    repeatY: number,
+  ): void {
+    if (!this.THREE || !isWorldAssetPathApproved(path)) return;
+    const THREE = this.THREE;
+    loader.load(path, (texture) => {
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(repeatX, repeatY);
+      if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
+      material[slot] = texture as never;
+      material.needsUpdate = true;
+    }, undefined, () => undefined);
+  }
+
+  private async loadApprovedHdri(renderer: THREE_NS.WebGLRenderer): Promise<void> {
+    const path = '/assets/genesis-hf/hdr/braustuble_alley_1k.hdr';
+    if (!this.THREE || !this.scene || !isWorldAssetApproved(path)) return;
+    try {
+      const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
+      const THREE = this.THREE;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      new RGBELoader().load(path, (texture) => {
+        if (!this.scene || !this.THREE) { texture.dispose(); pmrem.dispose(); return; }
+        const environment = pmrem.fromEquirectangular(texture).texture;
+        this.scene.environment = environment;
+        this.scene.environmentIntensity = 0.45;
+        this.scene.background = environment;
+        this.scene.backgroundIntensity = 0.42;
+        this.scene.backgroundBlurriness = 0.50;
+        this.scene.fog = new this.THREE.FogExp2(0x59615a, 0.022);
+        texture.dispose();
+        pmrem.dispose();
+      }, undefined, () => pmrem.dispose());
+    } catch {
+      // Zatwierdzone materiały oraz światło kierunkowe pozostają pełnym fallbackiem.
+    }
+  }
+
+  /** Ładuje tylko dwie zatwierdzone biblioteki city assetów; brak assetu nie zmienia danych modelu. */
+  private async loadApprovedCityAssets(): Promise<void> {
+    if (!this.THREE || !this.scene) return;
+    try {
+      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+      const loader = new GLTFLoader();
+      const facadePath = '/assets/genesis-hf-v2/models/modular_urban_apartments_facade/modular_urban_apartments_facade.gltf';
+      const lampPath = '/assets/genesis-hf-v2/models/street_lamp_01/street_lamp_01.gltf';
+      if (isWorldAssetApproved(facadePath)) {
+        const facade = await loader.loadAsync(facadePath);
+        this.approvedFacadeTemplate = facade.scene;
+        this.attachApprovedFacades();
+      }
+      if (isWorldAssetApproved(lampPath)) {
+        const lamp = await loader.loadAsync(lampPath);
+        this.approvedLampTemplate = lamp.scene;
+        this.attachApprovedLamps();
+      }
+    } catch {
+      // Brak pliku lub błąd WebGL nie zastępuje assetu niezweryfikowanym fallbackiem.
+    }
+  }
+
+  private attachApprovedFacades(): void {
+    if (!this.THREE || !this.approvedFacadeTemplate || !this.scene) return;
+    const THREE = this.THREE;
+    // Facade asset has 118k polygons: one representative semantic location keeps the approved material language visible without turning CityWorld objects into an asset stress test.
+    for (const { group, building } of this.semanticBuildingSlots
+      .filter(({ building }) => building.kind === 'home' || building.kind === 'shop' || building.kind === 'school')
+      .slice(0, 1)) {
+      const facade = this.approvedFacadeTemplate.clone(true);
+      const bounds = new THREE.Box3().setFromObject(facade);
+      const size = bounds.getSize(new THREE.Vector3());
+      if (size.x <= 0 || size.y <= 0 || size.z <= 0) continue;
+      const width = Math.max(0.18, building.w * CITY_WORLD_SCALE);
+      const depth = Math.max(0.18, building.h * CITY_WORLD_SCALE);
+      const targetHeight = building.kind === 'school' ? 1.5 : building.kind === 'shop' ? 1.24 : 1.06;
+      const scale = Math.min(width / size.x, depth / size.z, targetHeight / size.y);
+      facade.scale.setScalar(scale * 0.92);
+      const adjusted = new THREE.Box3().setFromObject(facade);
+      facade.position.set(-adjusted.getCenter(new THREE.Vector3()).x, -adjusted.min.y, -adjusted.getCenter(new THREE.Vector3()).z);
+      facade.userData.visualOnlyFacade = true;
+      facade.userData.assetLod = 'street-only';
+      facade.traverse((node) => { const mesh = node as THREE_NS.Mesh; if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; } });
+      group.add(facade);
+      this.approvedAssetRoots.push(facade);
+    }
+  }
+
+  private attachApprovedLamps(): void {
+    if (!this.THREE || !this.approvedLampTemplate || !this.scene) return;
+    const lampSlots = this.simulation.streets.h.flatMap((y, row) => this.simulation.streets.v.map((x, col) => ({ x, y, row, col }))).slice(0, 1);
+    for (const slot of lampSlots) {
+      const lamp = this.approvedLampTemplate.clone(true);
+      lamp.scale.setScalar(0.09);
+      lamp.position.set((slot.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE + 0.22, 0.01, (slot.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE + 0.22);
+      lamp.rotation.y = ((slot.row + slot.col) % 2) * Math.PI;
+      lamp.userData.visualOnlyStreetFurniture = true;
+      lamp.userData.assetLod = 'always';
+      lamp.traverse((node) => { const mesh = node as THREE_NS.Mesh; if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; } });
+      this.scene.add(lamp);
+      this.approvedAssetRoots.push(lamp);
+    }
+  }
+
+  /** City and district cameras retain governed PBR material density; the high-poly modular facade enters only when its street-level detail is inspectable. */
+  private syncApprovedAssetLod(): void {
+    const showStreetFacade = this.cameraPreset === 'street' || this.cameraPreset === 'agent' || this.selectedWorld?.kind === 'location';
+    for (const asset of this.approvedAssetRoots) {
+      if (asset.userData.assetLod === 'street-only') asset.visible = showStreetFacade;
+    }
   }
 
   private addLightsAndGround(): void {
@@ -452,8 +671,8 @@ export class EpidemicCity3DSim implements Sim3D {
     this.scene.add(fill);
 
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(this.simulation.worldWidth * CITY_WORLD_SCALE + 2, this.simulation.worldHeight * CITY_WORLD_SCALE + 2),
-      new THREE.MeshStandardMaterial({ color: 0x284b3e, roughness: 0.98, metalness: 0.01 }),
+      new THREE.PlaneGeometry(this.simulation.worldWidth * CITY_WORLD_SCALE + 3.5, this.simulation.worldHeight * CITY_WORLD_SCALE + 3.5),
+      this.cityMaterials?.ground ?? new THREE.MeshStandardMaterial({ color: 0x284b3e, roughness: 0.98, metalness: 0.01 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.012;
@@ -473,7 +692,9 @@ export class EpidemicCity3DSim implements Sim3D {
     const position = new THREE.Vector3();
     const scale = new THREE.Vector3(1, 1, 1);
     const rotation = new THREE.Quaternion();
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0xe1e8ec, roughness: 0.68, metalness: 0.04, transparent: true, opacity: 0.82 });
+    const roadMat = (this.cityMaterials?.concrete ?? new THREE.MeshStandardMaterial({ color: 0xe1e8ec, roughness: 0.68, metalness: 0.04 })).clone();
+    roadMat.transparent = true;
+    roadMat.opacity = 0.82;
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.62, metalness: 0.58 });
     const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffd89a, transparent: true, opacity: 0.94 });
     const lamps: Array<{ x: number; z: number }> = [];
@@ -544,8 +765,8 @@ export class EpidemicCity3DSim implements Sim3D {
   private addRoadsAndBuildings(): void {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0x263545, roughness: 0.92, metalness: 0.03 });
-    const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x9aaabd, roughness: 0.96, metalness: 0.01 });
+    const roadMat = this.cityMaterials?.asphalt ?? new THREE.MeshStandardMaterial({ color: 0x263545, roughness: 0.92, metalness: 0.03 });
+    const sidewalkMat = this.cityMaterials?.concrete ?? new THREE.MeshStandardMaterial({ color: 0x9aaabd, roughness: 0.96, metalness: 0.01 });
     const curbMat = new THREE.MeshStandardMaterial({ color: 0xc7d0d8, roughness: 0.82, metalness: 0.05 });
     const markingMat = new THREE.MeshBasicMaterial({ color: 0xeef4f7, transparent: true, opacity: 0.84 });
     const roadWidth = 0.38;
@@ -689,10 +910,10 @@ export class EpidemicCity3DSim implements Sim3D {
     const s = style[building.kind] ?? { color: 0x718096, height: 0.8, roof: 0x3f4a5a, accent: 0x9fb3c8 };
     // Wariacja zależy wyłącznie od stabilnej geometrii CityWorld — nie jest losowym stanem dodatkowym.
     const variation = Math.abs(Math.round(building.x * 7 + building.y * 11 + building.w * 3)) % 5;
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(w, s.height, d),
-      new THREE.MeshStandardMaterial({ color: s.color, roughness: 0.76, metalness: 0.04 }),
-    );
+    const facadeBase = building.kind === 'home' ? this.cityMaterials?.brick : this.cityMaterials?.concrete;
+    const facadeMaterial = facadeBase ? facadeBase.clone() : new THREE.MeshStandardMaterial({ color: s.color, roughness: 0.76, metalness: 0.04 });
+    facadeMaterial.color.multiply(new THREE.Color(s.color));
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, s.height, d), facadeMaterial);
     body.userData.focusOccluder = true;
     body.position.y = s.height / 2;
     group.add(body);
@@ -751,6 +972,13 @@ export class EpidemicCity3DSim implements Sim3D {
       }
     }
     group.userData.cityBuilding = { width: w, depth: d };
+    group.userData.worldSelection = {
+      kind: 'location',
+      label: building.kind.toUpperCase(),
+      detail: building.closed ? 'Closed — state supplied by the semantic CityWorld location.' : 'Semantic CityWorld location.',
+      x: building.x + building.w / 2,
+      y: building.y + building.h / 2,
+    } satisfies CityWorldSelection;
     if (building.kind === 'park') this.addBuildingLabel(group, 'PARK', 0.34, 0);
     if (building.closed) {
       const marker = new THREE.Mesh(new THREE.BoxGeometry(w * 0.72, 0.08, 0.04), new THREE.MeshBasicMaterial({ color: 0xffc857 }));
@@ -764,6 +992,7 @@ export class EpidemicCity3DSim implements Sim3D {
       mesh.receiveShadow = true;
     });
     group.position.set(x, 0, z);
+    this.semanticBuildingSlots.push({ group, building });
     return group;
   }
 
@@ -908,6 +1137,7 @@ export class EpidemicCity3DSim implements Sim3D {
     if (latestTransmissionEvent) {
       for (const marker of this.transmissionMarkers.values()) {
         this.scene.remove(marker.group);
+        this.worldInteractive = this.worldInteractive.filter((object) => object !== marker.group);
         marker.group.traverse((node) => {
           const mesh = node as THREE_NS.Mesh;
           if (mesh.geometry) mesh.geometry.dispose();
@@ -936,6 +1166,13 @@ export class EpidemicCity3DSim implements Sim3D {
       const curve = new THREE.QuadraticBezierCurve3(source, middle, target);
       const material = new THREE.MeshBasicMaterial({ color: 0xff8b96, transparent: true, opacity: 0.82, depthWrite: false, depthTest: true });
       const group = new THREE.Group(); group.name = `transmission-${key}`;
+      group.userData.worldSelection = {
+        kind: 'transmission',
+        label: `Transmission ${fromId} → ${toId}`,
+        detail: `Observed model transmission on simulation day ${event.timestamp}.`,
+        x: event.location.x,
+        y: event.location.y,
+      } satisfies CityWorldSelection;
       const arc = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.013, 5, false), material);
       const contactMaterial = new THREE.MeshBasicMaterial({ color: 0xffd3d8, transparent: true, opacity: 0.72, depthWrite: false, depthTest: true });
       const pulse = new THREE.Mesh(new THREE.RingGeometry(0.040, 0.072, 20), contactMaterial);
@@ -947,6 +1184,7 @@ export class EpidemicCity3DSim implements Sim3D {
       const direction = target.clone().sub(source).normalize();
       arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
       group.add(arc, pulse, targetPulse, arrow); this.scene.add(group);
+      this.worldInteractive.push(group);
       this.transmissionMarkers.set(key, { group, born: this.timeSeconds, material });
     }
     for (const [key, marker] of this.transmissionMarkers) {
@@ -958,6 +1196,7 @@ export class EpidemicCity3DSim implements Sim3D {
       });
       if (age > TRANSMISSION_MARKER_LIFETIME_SECONDS) {
         this.scene.remove(marker.group);
+        this.worldInteractive = this.worldInteractive.filter((object) => object !== marker.group);
         marker.group.traverse((node) => {
           const mesh = node as THREE_NS.Mesh;
           if (mesh.geometry) mesh.geometry.dispose();
@@ -969,8 +1208,94 @@ export class EpidemicCity3DSim implements Sim3D {
     }
   }
 
+  /** Wszystkie sygnały są bezpośrednim odczytem WorldState; ten renderer nie agreguje epidemii. */
+  private syncWorldStateVisuals(): void {
+    if (!this.THREE || !this.worldOverlayGroup || !this.worldState) return;
+    const world = this.worldState;
+    const fingerprint = JSON.stringify({
+      hotspots: world.hotspots.map((hotspot) => [hotspot.x, hotspot.y, hotspot.infectious]),
+      clusters: [...world.clusters.household, ...world.clusters.location].map((cluster) => [cluster.clusterId, cluster.locationIndex, cluster.transmissions, cluster.lastDay]),
+      hospital: [world.hospital.status, world.hospital.occupiedBeds, world.hospital.occupiedIcu, world.hospital.unmetCare],
+      locations: world.locations.map((location) => [location.kind, location.x, location.y, location.closed]),
+    });
+    if (fingerprint === this.worldOverlayFingerprint) return;
+    this.worldOverlayFingerprint = fingerprint;
+    const previousMarkers = [...this.worldOverlayGroup.children];
+    this.worldInteractive = this.worldInteractive.filter((object) => !previousMarkers.includes(object));
+    this.worldOverlayGroup.clear();
+    for (const marker of previousMarkers) {
+      marker.traverse((node) => {
+        const mesh = node as THREE_NS.Mesh;
+        mesh.geometry?.dispose();
+        const material = mesh.material;
+        if (material && !Array.isArray(material)) material.dispose();
+      });
+    }
+
+    for (const hotspot of world.hotspots) {
+      this.addWorldMarker({
+        kind: 'hotspot',
+        label: `Hotspot · ${hotspot.infectious} infectious`,
+        detail: `Grid cell aggregated from current infectious agent positions; ${hotspot.infectious} infectious agent(s).`,
+        x: hotspot.x,
+        y: hotspot.y,
+      }, 0xff5b6b, Math.min(0.38, 0.11 + hotspot.infectious * 0.028), 0.26);
+    }
+    for (const cluster of [...world.clusters.household, ...world.clusters.location]) {
+      const location = world.locations[cluster.locationIndex];
+      // Cluster without a modeled location coordinate remains an analytics value, not an invented map marker.
+      if (!location) continue;
+      this.addWorldMarker({
+        kind: 'cluster',
+        label: `${cluster.kind} cluster · ${cluster.transmissions} transmission(s)`,
+        detail: `Cluster ${cluster.clusterId}; model contact type ${cluster.contactType}; day ${cluster.firstDay}–${cluster.lastDay}.`,
+        x: location.x + location.w / 2,
+        y: location.y + location.h / 2,
+      }, 0xb993ff, Math.min(0.30, 0.10 + cluster.transmissions * 0.025), 0.20);
+    }
+    const hospitalLocation = world.locations.find((location) => location.kind === 'hospital');
+    if (hospitalLocation) {
+      const hospitalColor: Record<string, number> = { NORMAL: 0x68d8ae, WARNING: 0xffc857, HIGH: 0xff965c, CRITICAL: 0xff5b6b };
+      this.addWorldMarker({
+        kind: 'hospital',
+        label: `Hospital · ${world.hospital.status}`,
+        detail: `Occupied beds ${world.hospital.occupiedBeds}; occupied ICU ${world.hospital.occupiedIcu}; unmet care ${world.hospital.unmetCare}.`,
+        x: hospitalLocation.x + hospitalLocation.w / 2,
+        y: hospitalLocation.y + hospitalLocation.h / 2,
+      }, hospitalColor[world.hospital.status] ?? 0xffffff, 0.23, 0.35);
+    }
+  }
+
+  private addWorldMarker(selection: CityWorldSelection, color: number, radius: number, height: number): void {
+    if (!this.THREE || !this.worldOverlayGroup) return;
+    const THREE = this.THREE;
+    const group = new THREE.Group();
+    const worldX = (selection.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE;
+    const worldZ = (selection.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(radius * 0.64, radius, 24), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.74, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, height, 8), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.58, depthWrite: false }));
+    stem.position.y = height / 2;
+    const cap = new THREE.Mesh(new THREE.OctahedronGeometry(Math.max(0.045, radius * 0.34), 0), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.92, depthWrite: false }));
+    cap.position.y = height;
+    group.position.set(worldX, 0.07, worldZ);
+    group.add(ring, stem, cap);
+    group.userData.worldSelection = selection;
+    this.worldOverlayGroup.add(group);
+    this.worldInteractive.push(group);
+  }
+
   private syncFollowTarget(states: readonly HumanoidAgentState[]): void {
     if (!this.THREE) return;
+    if (this.selectedWorld) {
+      if (!this.followTarget) this.followTarget = new this.THREE.Vector3();
+      this.followTarget.set(
+        (this.selectedWorld.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE,
+        0.26,
+        (this.selectedWorld.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE,
+      );
+      return;
+    }
     const trackedId = this.selectedId ?? this.cameraTrackId;
     if (trackedId === null) {
       this.followTarget = null;
@@ -988,11 +1313,23 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   private selectAgent(id: number | null, preserveCameraPreset = false): void {
+    if (id !== null && this.selectedWorld) this.selectWorld(null);
     this.selectedId = id;
     if (id !== null) {
       if (!preserveCameraPreset) this.cameraPreset = 'agent';
       this.cameraTrackId = id;
     }
     this.callbacks.onAgentSelected?.(id);
+  }
+
+  private selectWorld(selection: CityWorldSelection | null): void {
+    this.selectedWorld = selection;
+    if (selection) {
+      this.selectedId = null;
+      this.cameraTrackId = null;
+      this.cameraPreset = 'district';
+      this.callbacks.onAgentSelected?.(null);
+    }
+    this.callbacks.onWorldSelected?.(selection);
   }
 }

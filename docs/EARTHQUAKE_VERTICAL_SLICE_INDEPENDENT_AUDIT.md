@@ -29,6 +29,14 @@ In the isolated checkout, focused tests and the full frontend suite passed **121
 
 > **Audit verdict: the vertical slice is scope-clean and its synthetic/non-operational framing is credible, but it is BLOCKED FOR MERGE until portable cross-engine E2E and semantic/admission validation gates are corrected and independently rerun.**
 
+## Remediation re-audit — `558aa03`
+
+The revised branch was independently retested in a fresh isolated checkout. The committed E2E now resolves Playwright through declared project dependencies and selects system Chromium through its documented environment/discovery path. The cross-engine test completed **25/25** checks in this environment.
+
+The branch also adds a scenario-contract guard before artifact construction, rejecting non-finite magnitude/depth/epicenter/seed values and negative depth without claiming scientific calibration. `SourceArtifact.provenance.retrievedAt` now requires a finite, non-negative value. The full isolated frontend suite completed **121 files / 1,268 tests**, alongside TypeScript, production build and clean diff validation.
+
+> **Re-audit verdict: the three remediation blockers are closed for `558aa03`. The Earthquake vertical slice is eligible for a separate, deliberate merge review; City3D overlay activation remains disabled until a versioned coordinate-mapping artifact and the documented scenario-overlay gates are supplied.**
+
 ## Safe ownership after remediation
 
 Claude may take a bounded **Earthquake Integration Readiness** correction: portability of the existing E2E, scenario/admission validation and tests only. Claude must not add a second hazard solver, cascade engine, real-data adapter, GIS wiring, City3D layer or epidemic/routing integration.

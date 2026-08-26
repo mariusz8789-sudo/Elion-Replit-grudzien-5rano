@@ -46,7 +46,10 @@ import type { HazardProvenanceStore } from './hazardProvenanceStore';
  * phase.
  */
 export interface HazardReferenceEvaluator {
-  evaluate(input: HazardInput, artifact: SourceArtifact): Promise<Readonly<Record<string, unknown>>> | Readonly<Record<string, unknown>>;
+  evaluate(
+    input: HazardInput,
+    artifact: SourceArtifact,
+  ): Promise<Readonly<Record<string, unknown>>> | Readonly<Record<string, unknown>>;
 }
 
 export interface HazardReplayReport {
@@ -80,7 +83,9 @@ export async function replayHazardRun(options: {
 
   const originalRun = await store.getRun(hazardRunId);
   if (!originalRun) {
-    return report(hazardRunId, 'NOT_REPRODUCIBLE', null, null, [`hazardRun "${hazardRunId}" not found in store`]);
+    return report(hazardRunId, 'NOT_REPRODUCIBLE', null, null, [
+      `hazardRun "${hazardRunId}" not found in store`,
+    ]);
   }
 
   const input = await store.getInput(originalRun.hazardInputId);
@@ -95,7 +100,9 @@ export async function replayHazardRun(options: {
       assertHazardRunCompatibleWithModule({ hazardType, run: originalRun, input, projectionSchemaVersion });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return report(hazardRunId, 'BLOCKED', originalRun.resultFingerprint, null, [`capability fence rejected replay: ${message}`]);
+      return report(hazardRunId, 'BLOCKED', originalRun.resultFingerprint, null, [
+        `capability fence rejected replay: ${message}`,
+      ]);
     }
   }
 
@@ -123,18 +130,25 @@ export async function replayHazardRun(options: {
     ]);
   }
 
-  const outputFields = await evaluator.evaluate(input, artifact);
-  const replayResultFingerprint = await computeHazardRunResultFingerprint({
-    hazardInputId: originalRun.hazardInputId,
-    hazardModuleVersion: originalRun.hazardModuleVersion,
-    codeCommitHash: originalRun.codeCommitHash,
-    outputFields,
-  });
+  try {
+    const outputFields = await evaluator.evaluate(input, artifact);
+    const replayResultFingerprint = await computeHazardRunResultFingerprint({
+      hazardInputId: originalRun.hazardInputId,
+      hazardModuleVersion: originalRun.hazardModuleVersion,
+      codeCommitHash: originalRun.codeCommitHash,
+      outputFields,
+    });
 
-  if (replayResultFingerprint === originalRun.resultFingerprint) {
-    return report(hazardRunId, 'MATCH', originalRun.resultFingerprint, replayResultFingerprint, []);
+    if (replayResultFingerprint === originalRun.resultFingerprint) {
+      return report(hazardRunId, 'MATCH', originalRun.resultFingerprint, replayResultFingerprint, []);
+    }
+    return report(hazardRunId, 'DRIFT', originalRun.resultFingerprint, replayResultFingerprint, [
+      'result fingerprint differs on re-evaluation of the same frozen input and artifact',
+    ]);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return report(hazardRunId, 'BLOCKED', originalRun.resultFingerprint, null, [
+      `reference evaluator failed during replay: ${message}`,
+    ]);
   }
-  return report(hazardRunId, 'DRIFT', originalRun.resultFingerprint, replayResultFingerprint, [
-    'result fingerprint differs on re-evaluation of the same frozen input and artifact',
-  ]);
 }

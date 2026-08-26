@@ -14,10 +14,7 @@ import {
   checkHazardRunAdmission,
   checkSourceArtifactAdmission,
 } from '../core/hazard/hazardEvidenceGate';
-import {
-  ImmutableConflictError,
-  InMemoryHazardProvenanceStore,
-} from '../core/hazard/hazardProvenanceStore';
+import { ImmutableConflictError, InMemoryHazardProvenanceStore } from '../core/hazard/hazardProvenanceStore';
 import { replayHazardRun, type HazardReferenceEvaluator } from '../core/hazard/hazardReplay';
 import type { HazardInput, HazardRun, SourceArtifact } from '../core/hazard/contracts';
 
@@ -28,10 +25,16 @@ function makeFakeStorage() {
   const map = new Map<string, string>();
   return {
     getItem: (k: string) => (map.has(k) ? (map.get(k) as string) : null),
-    setItem: (k: string, v: string) => { map.set(k, v); },
-    removeItem: (k: string) => { map.delete(k); },
+    setItem: (k: string, v: string) => {
+      map.set(k, v);
+    },
+    removeItem: (k: string) => {
+      map.delete(k);
+    },
     key: (i: number) => Array.from(map.keys())[i] ?? null,
-    get length() { return map.size; },
+    get length() {
+      return map.size;
+    },
   };
 }
 
@@ -55,7 +58,11 @@ async function makeArtifact(overrides: Partial<SourceArtifact> = {}): Promise<So
   };
 }
 
-async function makeInput(artifact: SourceArtifact, scientificFields: Record<string, unknown> = { magnitude: 5.5 }, overrides: Partial<HazardInput> = {}): Promise<HazardInput> {
+async function makeInput(
+  artifact: SourceArtifact,
+  scientificFields: Record<string, unknown> = { magnitude: 5.5 },
+  overrides: Partial<HazardInput> = {},
+): Promise<HazardInput> {
   const seed = 42;
   const inputFingerprint = await computeHazardInputFingerprint({
     hazardType: 'test-hazard',
@@ -78,12 +85,19 @@ async function makeInput(artifact: SourceArtifact, scientificFields: Record<stri
 /** A deterministic, test-local reference fixture — NOT a hazard scientific model. See hazardReplay.ts's own disclaimer. */
 const sumFieldsEvaluator: HazardReferenceEvaluator = {
   evaluate: (input) => {
-    const total = Object.values(input.scientificFields).reduce<number>((acc, v) => acc + (typeof v === 'number' ? v : 0), 0);
+    const total = Object.values(input.scientificFields).reduce<number>(
+      (acc, v) => acc + (typeof v === 'number' ? v : 0),
+      0,
+    );
     return { total };
   },
 };
 
-async function makeRun(input: HazardInput, artifact: SourceArtifact, overrides: Partial<HazardRun> = {}): Promise<HazardRun> {
+async function makeRun(
+  input: HazardInput,
+  artifact: SourceArtifact,
+  overrides: Partial<HazardRun> = {},
+): Promise<HazardRun> {
   const outputFields = await sumFieldsEvaluator.evaluate(input, artifact);
   const resultFingerprint = await computeHazardRunResultFingerprint({
     hazardInputId: input.hazardInputId,
@@ -140,7 +154,11 @@ describe('Test 2 — input fingerprint sensitivity', () => {
   it('does not change when only displayName changes', async () => {
     const artifact = await makeArtifact();
     const a = await makeInput(artifact, { magnitude: 5.5 }, { displayName: 'Run A' });
-    const b = await makeInput(artifact, { magnitude: 5.5 }, { displayName: 'Something Completely Different' });
+    const b = await makeInput(
+      artifact,
+      { magnitude: 5.5 },
+      { displayName: 'Something Completely Different' },
+    );
     expect(a.inputFingerprint).toBe(b.inputFingerprint);
   });
 });
@@ -155,7 +173,11 @@ describe('Test 3 — honest replay: same frozen artifact + input + evaluator re-
     await store.putInput(input);
     await store.putRun(run);
 
-    const result = await replayHazardRun({ store, hazardRunId: run.hazardRunId, evaluator: sumFieldsEvaluator });
+    const result = await replayHazardRun({
+      store,
+      hazardRunId: run.hazardRunId,
+      evaluator: sumFieldsEvaluator,
+    });
     expect(result.status).toBe('MATCH');
     expect(result.replayResultFingerprint).toBe(run.resultFingerprint);
     expect(result.differences).toEqual([]);
@@ -173,7 +195,11 @@ describe('Test 4 — a real input or output change yields DRIFT', () => {
     // Tamper the stored run's fingerprint directly (bypassing the evaluator) to simulate a genuine output change without touching immutability rules on creation.
     await store.putRun({ ...run, resultFingerprint: 'deliberately-wrong-fingerprint-to-force-drift' });
 
-    const result = await replayHazardRun({ store, hazardRunId: run.hazardRunId, evaluator: sumFieldsEvaluator });
+    const result = await replayHazardRun({
+      store,
+      hazardRunId: run.hazardRunId,
+      evaluator: sumFieldsEvaluator,
+    });
     expect(result.status).toBe('DRIFT');
     expect(result.differences.length).toBeGreaterThan(0);
   });
@@ -182,7 +208,11 @@ describe('Test 4 — a real input or output change yields DRIFT', () => {
 describe('Test 5 — missing or mutated artifact never yields a false MATCH', () => {
   it('returns NOT_REPRODUCIBLE when the hazardRun itself is not found', async () => {
     const store = new InMemoryHazardProvenanceStore();
-    const result = await replayHazardRun({ store, hazardRunId: 'never-saved', evaluator: sumFieldsEvaluator });
+    const result = await replayHazardRun({
+      store,
+      hazardRunId: 'never-saved',
+      evaluator: sumFieldsEvaluator,
+    });
     expect(result.status).toBe('NOT_REPRODUCIBLE');
   });
 
@@ -195,7 +225,11 @@ describe('Test 5 — missing or mutated artifact never yields a false MATCH', ()
     // Input intentionally not saved.
     await store.putRun(run);
 
-    const result = await replayHazardRun({ store, hazardRunId: run.hazardRunId, evaluator: sumFieldsEvaluator });
+    const result = await replayHazardRun({
+      store,
+      hazardRunId: run.hazardRunId,
+      evaluator: sumFieldsEvaluator,
+    });
     expect(result.status).toBe('NOT_REPRODUCIBLE');
   });
 
@@ -208,7 +242,11 @@ describe('Test 5 — missing or mutated artifact never yields a false MATCH', ()
     await store.putInput(input);
     await store.putRun(run);
 
-    const result = await replayHazardRun({ store, hazardRunId: run.hazardRunId, evaluator: sumFieldsEvaluator });
+    const result = await replayHazardRun({
+      store,
+      hazardRunId: run.hazardRunId,
+      evaluator: sumFieldsEvaluator,
+    });
     expect(result.status).toBe('BLOCKED');
   });
 
@@ -220,12 +258,67 @@ describe('Test 5 — missing or mutated artifact never yields a false MATCH', ()
     await store.putInput(input);
     await store.putRun(run);
     // Simulate tampering that bypasses store immutability entirely (e.g. a corrupted external write).
-    await store.putArtifact({ ...artifact, contentHash: await computeSourceArtifactContentHash('different-raw-content') });
+    await store.putArtifact({
+      ...artifact,
+      contentHash: await computeSourceArtifactContentHash('different-raw-content'),
+    });
 
-    const result = await replayHazardRun({ store, hazardRunId: run.hazardRunId, evaluator: sumFieldsEvaluator });
+    const result = await replayHazardRun({
+      store,
+      hazardRunId: run.hazardRunId,
+      evaluator: sumFieldsEvaluator,
+    });
     expect(result.status).toBe('BLOCKED');
     expect(result.status).not.toBe('MATCH');
   });
+});
+
+describe('Test 5b — evaluator failure preserves the replay never-throw contract', () => {
+  it.each([
+    [
+      'synchronous throw',
+      {
+        evaluate: () => {
+          throw new Error('sync fixture failure');
+        },
+      } satisfies HazardReferenceEvaluator,
+    ],
+    [
+      'asynchronous rejection',
+      {
+        evaluate: async () => {
+          throw new Error('async fixture failure');
+        },
+      } satisfies HazardReferenceEvaluator,
+    ],
+  ])(
+    'returns BLOCKED rather than rejecting when the evaluator has a %s',
+    async (_label, failingEvaluator) => {
+      const store = new InMemoryHazardProvenanceStore();
+      const artifact = await makeArtifact();
+      const input = await makeInput(artifact);
+      const run = await makeRun(input, artifact);
+      await store.putArtifact(artifact);
+      await store.putInput(input);
+      await store.putRun(run);
+
+      await expect(
+        replayHazardRun({
+          store,
+          hazardRunId: run.hazardRunId,
+          evaluator: failingEvaluator,
+        }),
+      ).resolves.toEqual({
+        hazardRunId: run.hazardRunId,
+        status: 'BLOCKED',
+        originalResultFingerprint: run.resultFingerprint,
+        replayResultFingerprint: null,
+        differences: [
+          `reference evaluator failed during replay: ${_label === 'synchronous throw' ? 'sync' : 'async'} fixture failure`,
+        ],
+      });
+    },
+  );
 });
 
 describe('Test 6 — store immutability: same id with different content is rejected', () => {
@@ -233,7 +326,9 @@ describe('Test 6 — store immutability: same id with different content is rejec
     const store = new InMemoryHazardProvenanceStore();
     const artifact = await makeArtifact();
     await store.putArtifact(artifact);
-    await expect(store.putArtifact({ ...artifact, crs: 'EPSG:3857' })).rejects.toThrow(ImmutableConflictError);
+    await expect(store.putArtifact({ ...artifact, crs: 'EPSG:3857' })).rejects.toThrow(
+      ImmutableConflictError,
+    );
   });
 
   it('allows re-putting the exact same content under the same id (idempotent, not a conflict)', async () => {
@@ -251,7 +346,9 @@ describe('Test 6 — store immutability: same id with different content is rejec
     await store.putInput(input);
     await store.putRun(run);
     await expect(store.putInput({ ...input, seed: 999 })).rejects.toThrow(ImmutableConflictError);
-    await expect(store.putRun({ ...run, hazardModuleVersion: 'module-v2' })).rejects.toThrow(ImmutableConflictError);
+    await expect(store.putRun({ ...run, hazardModuleVersion: 'module-v2' })).rejects.toThrow(
+      ImmutableConflictError,
+    );
   });
 
   describe('LocalHazardProvenanceStore — persistent backend, same immutability guarantee', () => {
@@ -383,7 +480,11 @@ describe('Test 7 — evidence completeness gate blocks admission on missing mand
     it('still rejects a FAILED run missing resultFingerprint, regardless of the outputFields exemption', async () => {
       const artifact = await makeArtifact();
       const input = await makeInput(artifact);
-      const run = await makeRun(input, artifact, { status: 'FAILED', outputFields: {}, resultFingerprint: '' });
+      const run = await makeRun(input, artifact, {
+        status: 'FAILED',
+        outputFields: {},
+        resultFingerprint: '',
+      });
       const result = checkHazardRunAdmission(run);
       expect(result.admitted).toBe(false);
       expect(result.missingFields).toContain('resultFingerprint');

@@ -73,3 +73,4 @@
 - [x] Add regression protection that the delivered synthetic Earthquake runtime and dry dataset-governance modules remain local-only and contain no live network/data-acquisition behavior; do not add hazards, GIS, rendering or Scientific Core changes.
 - [x] Audit the locked JavaScript dependency tree for production-relevant security advisories and apply only evidence-based compatible remediation, with full validation and no scientific, renderer, hazard, GIS or data-behavior change.
 - [x] Add a repository-native CI dependency-security gate that fails on high or critical npm advisories while preserving existing quality-gate steps and all Genesis application boundaries.
+- [x] Enforce the existing canonical hazard replay never-throw contract when an evaluator rejects or throws for a retained record, with a truthful non-success verdict and no solver, persistence-schema, renderer, data/GIS, hazard or Scientific Core change.

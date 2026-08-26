@@ -15,17 +15,16 @@ import {
 import { evaluateScenarioOverlayEligibility, type ScenarioOverlayGateResult, type ScenarioOverlayPolicy } from './scenarioOverlayGate';
 import { LocalHazardProvenanceStore, type HazardProvenanceStore } from '../hazard/hazardProvenanceStore';
 import { replayHazardRun, type HazardReplayReport } from '../hazard/hazardReplay';
+import { getHazardModule, type HazardModuleDescriptor } from '../hazard/hazardModuleRegistry';
 import { buildHazardEvidencePack, type HazardEvidencePack } from '../hazard/earthquake/earthquakeEvidence';
 import { earthquakeEvaluator } from '../hazard/earthquake/earthquakeEvaluator';
-import {
-  EARTHQUAKE_WORLD_PROJECTION_SCHEMA_VERSION,
-  projectEarthquakeWorldState,
-  type EarthquakeWorldStateView,
-} from '../hazard/earthquake/earthquakeWorldProjection';
+import { projectEarthquakeWorldState, type EarthquakeWorldStateView } from '../hazard/earthquake/earthquakeWorldProjection';
 import { runEarthquakeScenario, type EarthquakeScenarioResult, type EarthquakeScenarioSpec } from '../hazard/earthquake/earthquakeScenario';
 
 export interface EarthquakeCommandCenterExecution {
   readonly scenario: EarthquakeScenarioResult;
+  /** Immutable descriptor that admitted this run for the registered hazard module. */
+  readonly moduleDescriptor: HazardModuleDescriptor;
   readonly projection: EarthquakeWorldStateView;
   readonly evidence: HazardEvidencePack;
   readonly replay: HazardReplayReport;
@@ -46,6 +45,7 @@ export async function executeEarthquakeCommandCenterScenario(
   options: { readonly store?: HazardProvenanceStore; readonly commitHash?: string; readonly overlayPolicy?: ScenarioOverlayPolicy } = {},
 ): Promise<EarthquakeCommandCenterExecution> {
   const store = options.store ?? new LocalHazardProvenanceStore();
+  const moduleDescriptor = getHazardModule('earthquake');
   const scenario = await runEarthquakeScenario(spec, options.commitHash ?? codeCommitHash());
   await persistScenario(store, scenario);
   const evidence = await buildHazardEvidencePack(scenario);
@@ -54,8 +54,8 @@ export async function executeEarthquakeCommandCenterScenario(
     hazardRunId: scenario.run.hazardRunId,
     evaluator: earthquakeEvaluator,
     // Registered admission happens before evaluator execution; mapping/UI never bypass this fence.
-    hazardType: 'earthquake',
-    projectionSchemaVersion: EARTHQUAKE_WORLD_PROJECTION_SCHEMA_VERSION,
+    hazardType: moduleDescriptor.hazardType,
+    projectionSchemaVersion: moduleDescriptor.projectionSchemaVersion,
   });
   const projection = projectEarthquakeWorldState(scenario);
   const mappedOverlay = await projectEarthquakeToCityOverlay(projection);
@@ -73,6 +73,7 @@ export async function executeEarthquakeCommandCenterScenario(
 
   return Object.freeze({
     scenario,
+    moduleDescriptor,
     projection,
     evidence,
     replay,

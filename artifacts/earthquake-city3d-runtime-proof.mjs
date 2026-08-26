@@ -40,6 +40,9 @@ try {
   await sleep(900);
   await evaluate(`(() => [...document.querySelectorAll('button')].find((b) => /^Pomiń/.test(b.textContent?.trim() ?? ''))?.click())()`);
   await sleep(1900);
+  // The target may have prior DevTools history from a Fast Refresh session;
+  // only diagnostics emitted by this clean navigation belong to this proof.
+  consoleEntries.length = 0;
   const before = JSON.parse(await evaluate(`JSON.stringify((() => ({
     canvasCount: document.querySelectorAll('canvas').length,
     cityCanvasCount: document.querySelectorAll('.city-3d-canvas').length,
@@ -68,6 +71,8 @@ try {
       scenarioSynthetic: /SCENARIO/.test(proof) && /SYNTHETIC/.test(proof),
       mappingVisible: /Mapping/.test(proof),
       evidenceHashVisible: /Evidence SHA-256/.test(proof),
+      registryModuleVisible: /Registry module/.test(proof) && /earthquake/.test(proof) && /schema 1\.0\.0/.test(proof),
+      capabilitiesVisible: /Declared capabilities/.test(proof) && /ground-motion-attenuation-synthetic/.test(proof),
       notModeledVisible: /NOT_MODELED/.test(proof),
       clearedButtonEnabled: ![...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Wyczyść overlay')?.disabled,
       stageFailed: Boolean(document.querySelector('.empty-state')),
@@ -96,6 +101,8 @@ try {
     active.scenarioSynthetic,
     active.mappingVisible,
     active.evidenceHashVisible,
+    active.registryModuleVisible,
+    active.capabilitiesVisible,
     active.notModeledVisible,
     active.clearedButtonEnabled,
     !active.stageFailed,

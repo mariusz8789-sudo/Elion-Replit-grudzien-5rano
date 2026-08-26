@@ -49,3 +49,4 @@
 - [x] Commit and push the validated Earthquake demonstrator, then prepare the saved version for user-controlled publishing.
 - [x] Independently audit Claude’s unmerged `4ff08bd` hazard-registry and `287a788` Earthquake execution-envelope changes against the delivered demonstrator; do not merge or introduce additional hazards, GIS, cascades or epidemic coupling during the audit.
 - [x] Curate only the audited hazard-module registry into the live Earthquake workflow with registered replay admission and corrected documentation; defer the overlapping execution envelope, additional hazards, GIS, cascades and epidemic coupling.
+- [x] Expose the existing registered Earthquake module version/schema/capability provenance in the compact Command Center panel, without adding a renderer, solver, hazard type, GIS or execution envelope.

@@ -8,6 +8,11 @@ describe('Earthquake command-center execution', () => {
       scenarioLabel: 'city3d-demo-fixture', magnitude: 5.4, depthKm: 12, epicenter: { x: 0, y: 0 }, seed: 42,
     }, { store: new InMemoryHazardProvenanceStore(), commitHash: 'test-commit' });
     expect(execution.scenario.input.hazardType).toBe('earthquake');
+    expect(execution.moduleDescriptor).toMatchObject({
+      hazardType: 'earthquake',
+      projectionSchemaVersion: execution.projection.schemaVersion,
+      scenarioOnly: true,
+    });
     expect(execution.evidence.missingFields).toEqual([]);
     expect(execution.replay.status).toBe('MATCH');
     expect(execution.overlayGate).toEqual({ enabled: true, reasons: [] });

@@ -4,6 +4,7 @@
  * no epidemic parameter, WorldState, route or Scientific Core mutation occurs here.
  */
 import { useRef, useState } from 'react';
+import { getHazardModule } from '../../core/hazard/hazardModuleRegistry';
 import type { EarthquakeCityOverlayProjection } from '../../core/simulationRenderer/earthquakeCoordinateMapping';
 import {
   executeEarthquakeCommandCenterScenario,
@@ -26,6 +27,9 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
   const [error, setError] = useState<string | null>(null);
   const [overlayDisplayed, setOverlayDisplayed] = useState(false);
   const runSequence = useRef(0);
+  // Fast Refresh may preserve a result created before registry provenance was added.
+  // The live registry fallback keeps its read-only traceability display safe until rerun.
+  const moduleDescriptor = execution?.moduleDescriptor ?? getHazardModule('earthquake');
 
   const runScenario = async () => {
     setRunning(true);
@@ -88,6 +92,8 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
               <div><dt>Evidence SHA-256</dt><dd title={execution.evidence.sha256}>{shorten(execution.evidence.sha256)}</dd></div>
               <div><dt>Mapping</dt><dd title={execution.overlay?.mappingFingerprint ?? ''}>{execution.overlay?.mappingId} · {shorten(execution.overlay?.mappingFingerprint ?? '')}</dd></div>
               <div><dt>Projection</dt><dd>{execution.projection.schemaVersion} · {execution.overlay?.datasetStatus ?? 'BLOCKED'}</dd></div>
+              <div><dt>Registry module</dt><dd>{moduleDescriptor.hazardType} · v{moduleDescriptor.moduleVersion} · schema {moduleDescriptor.projectionSchemaVersion}</dd></div>
+              <div><dt>Declared capabilities</dt><dd>{moduleDescriptor.supportedCapabilities.join(' · ')}</dd></div>
             </dl>
           </details>
           <details className="earthquake-not-modeled-details">

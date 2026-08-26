@@ -129,7 +129,7 @@ The path to `READY_FOR_EDUCATIONAL_POC` is narrow and concrete: adopt `makeRng(s
 ---
 
 **Branch:** `claude/hadron-collider-capability-audit`
-**Commit:** (this document's own commit — see the accompanying commit message for its hash)
+**Commit:** `e92f2cf78eb9fa2fd3eaf7b33a77df4a24170bc3`
 **Changed files:** `docs/HADRON_COLLIDER_POC_READINESS_AUDIT.md` only. No code file was created, modified, or deleted.
 
 **Summary — EXISTS:** Particle Lab (species, tracks, detector shells, invariant-mass histogram, real PDG data), honesty/citation discipline, real-vs-synthetic data hook, Experiment Fabric dispatch pattern, a seeded gravitational N-body collision precedent (different domain).

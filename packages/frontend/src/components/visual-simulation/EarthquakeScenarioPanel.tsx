@@ -69,27 +69,34 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
     try {
       setHistory(await listEarthquakePersistedRunHistory(provenanceStore));
     } catch (cause) {
-      setHistoryError(cause instanceof Error ? cause.message : 'Nie udało się odczytać lokalnej historii provenance.');
+      setHistoryError(
+        cause instanceof Error ? cause.message : 'Nie udało się odczytać lokalnej historii provenance.',
+      );
     } finally {
       setHistoryLoading(false);
     }
   };
 
-  useEffect(() => { void refreshHistory(); }, []);
+  useEffect(() => {
+    void refreshHistory();
+  }, []);
 
   const runScenario = async () => {
     setRunning(true);
     setError(null);
     try {
       runSequence.current += 1;
-      const outcome = await executeEarthquakeCommandCenterScenario({
-        magnitude: parameters.magnitude,
-        depthKm: parameters.depthKm,
-        epicenter: { x: parameters.epicenterX, y: parameters.epicenterY },
-        seed: parameters.seed,
-        // Provenance labels must remain unique because the local hazard store is immutable.
-        scenarioLabel: `city3d-synthetic-${Date.now()}-${runSequence.current}`,
-      }, { store: provenanceStore });
+      const outcome = await executeEarthquakeCommandCenterScenario(
+        {
+          magnitude: parameters.magnitude,
+          depthKm: parameters.depthKm,
+          epicenter: { x: parameters.epicenterX, y: parameters.epicenterY },
+          seed: parameters.seed,
+          // Provenance labels must remain unique because the local hazard store is immutable.
+          scenarioLabel: `city3d-synthetic-${Date.now()}-${runSequence.current}`,
+        },
+        { store: provenanceStore },
+      );
       setExecution(outcome);
       onOverlayChange(outcome.overlay);
       setOverlayDisplayed(outcome.status === 'READY' && outcome.overlay !== null);
@@ -111,7 +118,9 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
 
   const exportEvidence = () => {
     if (!execution) return;
-    const blob = new Blob([serializeEarthquakeEvidenceExport(execution)], { type: 'application/json;charset=utf-8' });
+    const blob = new Blob([serializeEarthquakeEvidenceExport(execution)], {
+      type: 'application/json;charset=utf-8',
+    });
     const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = objectUrl;
@@ -123,91 +132,250 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
   return (
     <section className="world-panel earthquake-scenario-panel" aria-label="Scenariusz trzęsienia ziemi">
       <div className="world-panel-heading earthquake-panel-heading">
-        <span>TRZĘSIENIE ZIEMI</span><small>read-only overlay</small>
+        <span>TRZĘSIENIE ZIEMI</span>
+        <small>read-only overlay</small>
       </div>
       <div className="earthquake-status-row">
-        <b>SCENARIO</b><b>SYNTHETIC</b><b>NON_OPERATIONAL</b>
+        <b>SCENARIO</b>
+        <b>SYNTHETIC</b>
+        <b>NON_OPERATIONAL</b>
       </div>
       <p className="earthquake-intro">
-        Parametry są wyłącznie syntetycznym wejściem istniejącego kontraktu scenariusza; nie są kalibracją ani obserwacją.
+        Parametry są wyłącznie syntetycznym wejściem istniejącego kontraktu scenariusza; nie są kalibracją ani
+        obserwacją.
       </p>
       <fieldset className="earthquake-parameter-grid" disabled={running}>
         <legend>Synthetic scenario parameters</legend>
-        <label>Magnitude<input aria-label="Synthetic magnitude" type="number" step="0.1" value={parameters.magnitude} onChange={(event) => updateParameter('magnitude', event.currentTarget.valueAsNumber)} /></label>
-        <label>Depth km<input aria-label="Synthetic depth km" type="number" step="0.1" value={parameters.depthKm} onChange={(event) => updateParameter('depthKm', event.currentTarget.valueAsNumber)} /></label>
-        <label>Fixture X<input aria-label="Synthetic fixture X" type="number" step="0.1" value={parameters.epicenterX} onChange={(event) => updateParameter('epicenterX', event.currentTarget.valueAsNumber)} /></label>
-        <label>Fixture Y<input aria-label="Synthetic fixture Y" type="number" step="0.1" value={parameters.epicenterY} onChange={(event) => updateParameter('epicenterY', event.currentTarget.valueAsNumber)} /></label>
-        <label>Seed<input aria-label="Synthetic seed" type="number" step="1" value={parameters.seed} onChange={(event) => updateParameter('seed', event.currentTarget.valueAsNumber)} /></label>
+        <label>
+          Magnitude
+          <input
+            aria-label="Synthetic magnitude"
+            type="number"
+            step="0.1"
+            value={parameters.magnitude}
+            onChange={(event) => updateParameter('magnitude', event.currentTarget.valueAsNumber)}
+          />
+        </label>
+        <label>
+          Depth km
+          <input
+            aria-label="Synthetic depth km"
+            type="number"
+            step="0.1"
+            value={parameters.depthKm}
+            onChange={(event) => updateParameter('depthKm', event.currentTarget.valueAsNumber)}
+          />
+        </label>
+        <label>
+          Fixture X
+          <input
+            aria-label="Synthetic fixture X"
+            type="number"
+            step="0.1"
+            value={parameters.epicenterX}
+            onChange={(event) => updateParameter('epicenterX', event.currentTarget.valueAsNumber)}
+          />
+        </label>
+        <label>
+          Fixture Y
+          <input
+            aria-label="Synthetic fixture Y"
+            type="number"
+            step="0.1"
+            value={parameters.epicenterY}
+            onChange={(event) => updateParameter('epicenterY', event.currentTarget.valueAsNumber)}
+          />
+        </label>
+        <label>
+          Seed
+          <input
+            aria-label="Synthetic seed"
+            type="number"
+            step="1"
+            value={parameters.seed}
+            onChange={(event) => updateParameter('seed', event.currentTarget.valueAsNumber)}
+          />
+        </label>
       </fieldset>
       <div className="earthquake-actions">
-        <button className="world-action accent" onClick={runScenario} disabled={running}>{running ? 'Obliczanie…' : 'Uruchom scenariusz'}</button>
-        <button className="world-action" onClick={clearOverlay} disabled={!overlayDisplayed}>Wyczyść overlay</button>
-        <button className="world-action" onClick={exportEvidence} disabled={!execution}>Eksportuj evidence</button>
+        <button className="world-action accent" onClick={runScenario} disabled={running}>
+          {running ? 'Obliczanie…' : 'Uruchom scenariusz'}
+        </button>
+        <button className="world-action" onClick={clearOverlay} disabled={!overlayDisplayed}>
+          Wyczyść overlay
+        </button>
+        <button className="world-action" onClick={exportEvidence} disabled={!execution}>
+          Eksportuj evidence
+        </button>
       </div>
       <details className="earthquake-history-details">
         <summary>Local persisted runs ({history.length})</summary>
         <p>Read-only canonical replay history. It never remaps, restores or changes the City3D overlay.</p>
-        <button className="world-action" onClick={() => { void refreshHistory(); }} disabled={historyLoading}>{historyLoading ? 'Odczyt…' : 'Odśwież replay'}</button>
-        {historyError && <p className="earthquake-error" role="alert">HISTORIA: {historyError}</p>}
-        {history.length === 0 && !historyLoading && <p className="earthquake-history-empty">Brak lokalnie zapisanych Earthquake HazardRun.</p>}
+        <button
+          className="world-action"
+          onClick={() => {
+            void refreshHistory();
+          }}
+          disabled={historyLoading}
+        >
+          {historyLoading ? 'Odczyt…' : 'Odśwież replay'}
+        </button>
+        {historyError && (
+          <p className="earthquake-error" role="alert">
+            HISTORIA: {historyError}
+          </p>
+        )}
+        {history.length === 0 && !historyLoading && (
+          <p className="earthquake-history-empty">Brak lokalnie zapisanych Earthquake HazardRun.</p>
+        )}
         {history.length > 0 && (
           <ul className="earthquake-history-list">
             {history.map((entry) => (
               <li key={entry.hazardRunId}>
-                <div><b title={entry.hazardRunId}>{shorten(entry.hazardRunId, 9)}</b><span className={`earthquake-history-verdict ${entry.replay.status.toLowerCase()}`}>{entry.replay.status}</span></div>
-                <small>{new Date(entry.createdAt).toISOString()} · {entry.replay.differences.length === 0 ? 'no differences' : `${entry.replay.differences.length} difference(s)`}</small>
+                <div>
+                  <b title={entry.hazardRunId}>{shorten(entry.hazardRunId, 9)}</b>
+                  <span className={`earthquake-history-verdict ${entry.replay.status.toLowerCase()}`}>
+                    {entry.replay.status}
+                  </span>
+                </div>
+                <small>
+                  {new Date(entry.createdAt).toISOString()} ·{' '}
+                  {entry.replay.differences.length === 0
+                    ? 'no differences'
+                    : `${entry.replay.differences.length} difference(s)`}
+                </small>
               </li>
             ))}
           </ul>
         )}
       </details>
-      {error && <p className="earthquake-error" role="alert">BLOKADA: {error}</p>}
+      {error && (
+        <p className="earthquake-error" role="alert">
+          BLOKADA: {error}
+        </p>
+      )}
       {execution?.status === 'BLOCKED' && (
-        <div className="earthquake-proof">
+        <div className="earthquake-proof" role="status" aria-live="polite" aria-atomic="true">
           <div className="earthquake-verdict blocked">
             <b>ENVELOPE BLOCKED</b>
-            <span>{execution.blockCode} · {execution.blockReason}</span>
+            <span>
+              {execution.blockCode} · {execution.blockReason}
+            </span>
           </div>
           <dl className="earthquake-proof-grid">
-            <div><dt>replay</dt><dd>{execution.envelope.replay?.status ?? 'NOT_RUN'}</dd></div>
-            <div><dt>overlay</dt><dd>NOT_RENDERED</dd></div>
-            <div><dt>status</dt><dd>SCENARIO ONLY</dd></div>
+            <div>
+              <dt>replay</dt>
+              <dd>{execution.envelope.replay?.status ?? 'NOT_RUN'}</dd>
+            </div>
+            <div>
+              <dt>overlay</dt>
+              <dd>NOT_RENDERED</dd>
+            </div>
+            <div>
+              <dt>status</dt>
+              <dd>SCENARIO ONLY</dd>
+            </div>
           </dl>
           <details className="earthquake-not-modeled-details">
             <summary>NOT_MODELED ({execution.envelope.notModeled.length})</summary>
-            <ul>{execution.envelope.notModeled.map((item) => <li key={item}>{item}</li>)}</ul>
+            <ul>
+              {execution.envelope.notModeled.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </details>
         </div>
       )}
       {execution?.status === 'READY' && (
-        <div className="earthquake-proof">
-          <div className={`earthquake-verdict ${execution.overlayGate.enabled ? overlayDisplayed ? 'approved' : 'cleared' : 'blocked'}`}>
-            <b>{execution.overlayGate.enabled ? overlayDisplayed ? 'OVERLAY ACTIVE' : 'OVERLAY CLEARED' : 'OVERLAY BLOCKED'}</b>
-            <span>{execution.overlayGate.enabled ? overlayDisplayed ? 'Gated display projection only' : 'Evidence and replay retained; display projection cleared.' : execution.overlayGate.reasons.join(' · ')}</span>
+        <div className="earthquake-proof" role="status" aria-live="polite" aria-atomic="true">
+          <div
+            className={`earthquake-verdict ${execution.overlayGate.enabled ? (overlayDisplayed ? 'approved' : 'cleared') : 'blocked'}`}
+          >
+            <b>
+              {execution.overlayGate.enabled
+                ? overlayDisplayed
+                  ? 'OVERLAY ACTIVE'
+                  : 'OVERLAY CLEARED'
+                : 'OVERLAY BLOCKED'}
+            </b>
+            <span>
+              {execution.overlayGate.enabled
+                ? overlayDisplayed
+                  ? 'Gated display projection only'
+                  : 'Evidence and replay retained; display projection cleared.'
+                : execution.overlayGate.reasons.join(' · ')}
+            </span>
           </div>
           <dl className="earthquake-proof-grid">
-            <div><dt>replay</dt><dd>{execution.replay.status}</dd></div>
-            <div><dt>evidence</dt><dd>{execution.evidence.missingFields.length === 0 ? 'COMPLETE' : `MISSING ${execution.evidence.missingFields.length}`}</dd></div>
-            <div><dt>sites</dt><dd>{execution.overlay?.sites.length ?? 0} mapped</dd></div>
+            <div>
+              <dt>replay</dt>
+              <dd>{execution.replay.status}</dd>
+            </div>
+            <div>
+              <dt>evidence</dt>
+              <dd>
+                {execution.evidence.missingFields.length === 0
+                  ? 'COMPLETE'
+                  : `MISSING ${execution.evidence.missingFields.length}`}
+              </dd>
+            </div>
+            <div>
+              <dt>sites</dt>
+              <dd>{execution.overlay?.sites.length ?? 0} mapped</dd>
+            </div>
           </dl>
           <details className="earthquake-evidence-details">
             <summary>Evidence · replay · mapping</summary>
             <dl className="earthquake-long-values">
-              <div><dt>HazardRun</dt><dd title={execution.scenario.run.hazardRunId}>{shorten(execution.scenario.run.hazardRunId)}</dd></div>
-              <div><dt>Evidence SHA-256</dt><dd title={execution.evidence.sha256}>{shorten(execution.evidence.sha256)}</dd></div>
-              <div><dt>Mapping</dt><dd title={execution.overlay?.mappingFingerprint ?? ''}>{execution.overlay?.mappingId} · {shorten(execution.overlay?.mappingFingerprint ?? '')}</dd></div>
-              <div><dt>Projection</dt><dd>{execution.projection.schemaVersion} · {execution.overlay?.datasetStatus ?? 'BLOCKED'}</dd></div>
-              <div><dt>Registry module</dt><dd>{moduleDescriptor.hazardType} · v{moduleDescriptor.moduleVersion} · schema {moduleDescriptor.projectionSchemaVersion}</dd></div>
-              <div><dt>Declared capabilities</dt><dd>{moduleDescriptor.supportedCapabilities.join(' · ')}</dd></div>
+              <div>
+                <dt>HazardRun</dt>
+                <dd title={execution.scenario.run.hazardRunId}>
+                  {shorten(execution.scenario.run.hazardRunId)}
+                </dd>
+              </div>
+              <div>
+                <dt>Evidence SHA-256</dt>
+                <dd title={execution.evidence.sha256}>{shorten(execution.evidence.sha256)}</dd>
+              </div>
+              <div>
+                <dt>Mapping</dt>
+                <dd title={execution.overlay?.mappingFingerprint ?? ''}>
+                  {execution.overlay?.mappingId} · {shorten(execution.overlay?.mappingFingerprint ?? '')}
+                </dd>
+              </div>
+              <div>
+                <dt>Projection</dt>
+                <dd>
+                  {execution.projection.schemaVersion} · {execution.overlay?.datasetStatus ?? 'BLOCKED'}
+                </dd>
+              </div>
+              <div>
+                <dt>Registry module</dt>
+                <dd>
+                  {moduleDescriptor.hazardType} · v{moduleDescriptor.moduleVersion} · schema{' '}
+                  {moduleDescriptor.projectionSchemaVersion}
+                </dd>
+              </div>
+              <div>
+                <dt>Declared capabilities</dt>
+                <dd>{moduleDescriptor.supportedCapabilities.join(' · ')}</dd>
+              </div>
             </dl>
           </details>
           <details className="earthquake-not-modeled-details">
             <summary>NOT_MODELED ({execution.projection.notModeled.length})</summary>
-            <ul>{execution.projection.notModeled.map((item) => <li key={item}>{item}</li>)}</ul>
+            <ul>
+              {execution.projection.notModeled.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </details>
         </div>
       )}
-      <p className="earthquake-caveat">Brak danych obserwowanych, GIS, kalibracji, prognozy, oceny ofiar lub szkód, ewakuacji i kaskad infrastruktury.</p>
+      <p className="earthquake-caveat">
+        Brak danych obserwowanych, GIS, kalibracji, prognozy, oceny ofiar lub szkód, ewakuacji i kaskad
+        infrastruktury.
+      </p>
     </section>
   );
 }

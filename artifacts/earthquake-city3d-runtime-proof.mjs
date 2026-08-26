@@ -89,6 +89,7 @@ try {
     const panel = document.querySelector('.earthquake-scenario-panel');
     const verdict = panel?.querySelector('.earthquake-verdict b')?.textContent?.trim() ?? null;
     const proof = panel?.textContent ?? '';
+    const outcomeRegion = panel?.querySelector('.earthquake-proof[role="status"]');
     return {
       canvasCount: document.querySelectorAll('canvas').length,
       cityCanvasCount: document.querySelectorAll('.city-3d-canvas').length,
@@ -106,6 +107,9 @@ try {
       persistedHistoryEntries: panel?.querySelectorAll('.earthquake-history-list li').length ?? 0,
       persistedHistoryMatch: [...(panel?.querySelectorAll('.earthquake-history-verdict') ?? [])].some((element) => element.textContent?.trim() === 'MATCH'),
       clearedButtonEnabled: ![...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Wyczyść overlay')?.disabled,
+      outcomeAnnounced: outcomeRegion?.getAttribute('aria-live') === 'polite'
+        && outcomeRegion?.getAttribute('aria-atomic') === 'true'
+        && /OVERLAY ACTIVE/.test(outcomeRegion.textContent ?? ''),
       stageFailed: Boolean(document.querySelector('.empty-state')),
       loading: Boolean(document.querySelector('.route-loading'))
     };
@@ -151,10 +155,14 @@ try {
   await sleep(420);
   const blockedParameter = JSON.parse(await evaluate(`JSON.stringify((() => {
     const panel = document.querySelector('.earthquake-scenario-panel');
+    const outcomeRegion = panel?.querySelector('.earthquake-proof[role="status"]');
     return {
       verdict: panel?.querySelector('.earthquake-verdict b')?.textContent?.trim() ?? null,
       invalidBlockVisible: /INVALID_SCENARIO_SPEC/.test(panel?.textContent ?? ''),
       overlayNotRendered: /NOT_RENDERED/.test(panel?.textContent ?? ''),
+      outcomeAnnounced: outcomeRegion?.getAttribute('aria-live') === 'polite'
+        && outcomeRegion?.getAttribute('aria-atomic') === 'true'
+        && /ENVELOPE BLOCKED/.test(outcomeRegion.textContent ?? ''),
       cityCanvasCount: document.querySelectorAll('.city-3d-canvas').length,
       stageFailed: Boolean(document.querySelector('.empty-state')),
     };
@@ -180,6 +188,7 @@ try {
     active.persistedHistoryEntries >= 1,
     active.persistedHistoryMatch,
     active.clearedButtonEnabled,
+    active.outcomeAnnounced,
     !active.stageFailed,
     !active.loading,
     exportDownload.fileCount === 1,
@@ -198,6 +207,7 @@ try {
     blockedParameter.verdict === 'ENVELOPE BLOCKED',
     blockedParameter.invalidBlockVisible,
     blockedParameter.overlayNotRendered,
+    blockedParameter.outcomeAnnounced,
     blockedParameter.cityCanvasCount === 1,
     !blockedParameter.stageFailed,
   ];

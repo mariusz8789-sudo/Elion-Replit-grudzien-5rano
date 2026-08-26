@@ -4,3 +4,7 @@
 - [x] Improve real WorldState marker hierarchy and the unobtrusive analytics/readout composition without adding synthetic data.
 - [x] Produce new Chromium City, District, Street, hotspot, transmission, hospital, and Scenario runtime checks plus 1920×1080 before/after captures.
 - [x] Run build, full frontend tests, benchmark, package source ZIP, commit, push, and document remaining fidelity gaps.
+- [x] Inventory existing Genesis systems relevant to a future Multi-Hazard Digital Twin without modifying any hazard or scientific logic.
+- [x] Define a shared Hazard Engine boundary, identifying what belongs to Scientific Core, data adapters, world/GIS infrastructure, and City3D visualization.
+- [x] Assess authoritative data needs, scientific validation requirements, risks, effort, dependencies, and phased implementation order for multi-hazard support.
+- [x] Deliver a Multi-Hazard architecture audit and roadmap; do not begin hazard implementation.

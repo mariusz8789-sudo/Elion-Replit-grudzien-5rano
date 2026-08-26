@@ -191,6 +191,7 @@ export class InstancedHumanoidCrowd {
   readonly rightLeg: THREE_NS.InstancedMesh;
   readonly status: THREE_NS.InstancedMesh;
   readonly aura: THREE_NS.InstancedMesh;
+  readonly groundShadow: THREE_NS.InstancedMesh;
   private readonly matrix: THREE_NS.Matrix4;
   private readonly facing: THREE_NS.Quaternion;
   private readonly localRotation: THREE_NS.Quaternion;
@@ -219,7 +220,9 @@ export class InstancedHumanoidCrowd {
     this.rightLeg = new THREE.InstancedMesh(legGeometry.clone(), clothingMat, capacity);
     this.status = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.070, 0), statusMat, capacity);
     this.aura = new THREE.InstancedMesh(new THREE.CircleGeometry(0.070, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.20, depthWrite: false }), capacity);
+    this.groundShadow = new THREE.InstancedMesh(new THREE.CircleGeometry(0.145, 16), new THREE.MeshBasicMaterial({ color: 0x152331, transparent: true, opacity: 0.28, depthWrite: false }), capacity);
     this.aura.rotation.x = -Math.PI / 2;
+    this.groundShadow.rotation.x = -Math.PI / 2;
     this.torso.name = 'instanced-humanoid-torsos';
     this.head.name = 'instanced-humanoid-heads';
     this.hair.name = 'instanced-humanoid-hair';
@@ -229,7 +232,9 @@ export class InstancedHumanoidCrowd {
     this.rightLeg.name = 'instanced-humanoid-right-legs';
     this.status.name = 'instanced-humanoid-health-markers';
     this.aura.name = 'instanced-humanoid-epidemiology-aura';
-    this.meshes = [this.torso, this.head, this.hair, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg, this.status, this.aura];
+    this.groundShadow.name = 'instanced-humanoid-ground-shadows';
+    this.groundShadow.userData.visualOnlyAgentShadow = true;
+    this.meshes = [this.groundShadow, this.torso, this.head, this.hair, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg, this.status, this.aura];
     for (const mesh of this.meshes) mesh.frustumCulled = false;
     this.matrix = new THREE.Matrix4();
     this.facing = new THREE.Quaternion();
@@ -294,6 +299,7 @@ export class InstancedHumanoidCrowd {
 
       this.compose(i, this.status, state.worldX, scale * 1.95, state.worldZ, this.facing, statusScale, health);
       this.compose(i, this.aura, state.worldX, 0.018, state.worldZ, this.facing, 1 + pulse * 0.12, health);
+      this.compose(i, this.groundShadow, state.worldX, 0.012, state.worldZ, this.facing, 1 + state.speed * 0.14, new this.THREE.Color(0x152331));
     }
     for (const mesh of this.meshes) {
       mesh.count = this.count;

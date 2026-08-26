@@ -21,6 +21,11 @@
 - [x] Capture fresh 1920×1080 City/District/Street evidence and compare renderer telemetry against the established City3D baseline before accepting the visual-density sprint.
 - [x] Restore the local City3D runtime after its stopped development server, then complete the final visual-density iteration without changing the scientific or routing boundaries.
 - [x] Run the full frontend suite, TypeScript, production build, renderer benchmark and `git diff --check`; commit and push only the validated visual-density delivery.
+- [x] Add only deterministic visual-only façade depth and street-scale detail to the existing City3D renderer, preserving one renderer, CityWorld semantics, agents, contacts, routing and all scientific outcomes.
+- [x] Validate the façade-depth pass with fresh 1920×1080 captures, renderer telemetry and the full frontend quality gate before committing.
+- [x] Continue multiple substantial visual-only City3D iterations through façade depth, ground-plane detail, small architecture, agent legibility and CITY/DISTRICT/STREET composition; do not stop after a micro-change or alter the scientific core.
+- [x] Deliver one cumulative final evidence package: 1920×1080 before/after captures, renderer benchmark, full test/build gate, commit, push and real remaining reference gaps.
+- [x] Continue only while the next governed VISUAL_ONLY iteration yields a material reference-visible improvement proportional to its draw-call/triangle/render-time cost; do not create, package or send a ZIP during the active sprint.
 - [ ] Implement only Phase 0 domain-neutral provenance and replay contracts: frozen artifacts, canonical hazard inputs/runs, immutable evidence storage and honest replay gates.
 - [ ] Add Phase 0 deterministic serialization, immutability, MATCH/DRIFT/BLOCKED and epidemic-isolation tests; do not add a hazard solver, external live-data adapter, GIS wiring, cascade or City3D hazard layer.
 - [ ] Validate, document, commit and deliver the Phase 0 contract foundation with deferred work stated explicitly.

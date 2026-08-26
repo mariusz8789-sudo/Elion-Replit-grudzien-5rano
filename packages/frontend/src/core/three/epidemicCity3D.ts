@@ -750,6 +750,60 @@ export class EpidemicCity3DSim implements Sim3D {
     crossings.count = crossingIndex; crossings.instanceMatrix.needsUpdate = true; crossings.name = 'city-crosswalks';
     this.scene.add(crossings); this.buildingMeshes.push(crossings);
 
+    // Podziały płyt i niskie słupki są wyłącznie skalą chodnika: wynikają z
+    // już istniejącej siatki ulic, nie tworzą danych ruchu, tras ani transportu.
+    const paverSlots: Array<{ x: number; z: number; turn: boolean }> = [];
+    for (const y of streets.h) {
+      const z = (y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE;
+      for (let x = -worldW / 2 + 0.18; x < worldW / 2; x += 0.46) {
+        paverSlots.push({ x, z: z - 0.29, turn: false }, { x, z: z + 0.29, turn: false });
+      }
+    }
+    for (const x of streets.v) {
+      const px = (x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE;
+      for (let z = -worldH / 2 + 0.18; z < worldH / 2; z += 0.46) {
+        paverSlots.push({ x: px - 0.29, z, turn: true }, { x: px + 0.29, z, turn: true });
+      }
+    }
+    const paverJoints = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.010, 0.008, 0.105),
+      new THREE.MeshStandardMaterial({ color: 0x5b6871, roughness: 0.92, metalness: 0.02 }),
+      paverSlots.length,
+    );
+    paverSlots.forEach((slot, index) => {
+      position.set(slot.x, 0.018, slot.z);
+      rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), slot.turn ? Math.PI / 2 : 0);
+      matrix.compose(position, rotation, scale); paverJoints.setMatrixAt(index, matrix);
+    });
+    paverJoints.instanceMatrix.needsUpdate = true;
+    paverJoints.name = 'visual-only-sidewalk-paver-joints';
+
+    const bollardSlots: Array<{ x: number; z: number }> = [];
+    streets.v.forEach((x) => streets.h.forEach((y) => {
+      const ix = (x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE;
+      const iz = (y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE;
+      bollardSlots.push({ x: ix - 0.36, z: iz - 0.36 }, { x: ix + 0.36, z: iz + 0.36 });
+    }));
+    const bollards = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(0.028, 0.034, 0.20, 8),
+      new THREE.MeshStandardMaterial({ color: 0x394956, roughness: 0.50, metalness: 0.56 }),
+      bollardSlots.length,
+    );
+    bollardSlots.forEach((slot, index) => {
+      position.set(slot.x, 0.10, slot.z); rotation.identity(); matrix.compose(position, rotation, scale); bollards.setMatrixAt(index, matrix);
+    });
+    bollards.instanceMatrix.needsUpdate = true;
+    bollards.name = 'visual-only-intersection-bollards';
+    const groundCadence = new THREE.Group();
+    groundCadence.name = 'visual-only-ground-cadence';
+    groundCadence.userData.visualOnlyContext = true;
+    groundCadence.add(paverJoints, bollards);
+    groundCadence.traverse((node) => {
+      const mesh = node as THREE_NS.Mesh;
+      if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+    });
+    this.scene.add(groundCadence); this.buildingMeshes.push(groundCadence);
+
     const park = this.simulation.objects().find((object) => object.kind === 'park');
     if (park) {
       const px = (park.x + park.w / 2 - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE;
@@ -946,11 +1000,14 @@ export class EpidemicCity3DSim implements Sim3D {
     const warmMasses = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), warm, Math.floor(masses.length / 2));
     const caps = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x25313b, roughness: 0.58, metalness: 0.28 }), masses.length);
     const windows = new THREE.InstancedMesh(new THREE.BoxGeometry(0.13, 0.045, 0.018), new THREE.MeshStandardMaterial({ color: 0xbcdaf0, emissive: 0x4c81a5, emissiveIntensity: 0.48, roughness: 0.24, metalness: 0.16 }), masses.length * 12);
+    const sideWindows = new THREE.InstancedMesh(new THREE.BoxGeometry(0.018, 0.045, 0.13), new THREE.MeshStandardMaterial({ color: 0xbcdaf0, emissive: 0x4c81a5, emissiveIntensity: 0.42, roughness: 0.24, metalness: 0.16 }), masses.length * 12);
+    const facadeBands = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x26313d, roughness: 0.64, metalness: 0.20 }), masses.length * 2);
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
     const scale = new THREE.Vector3();
     const rotation = new THREE.Quaternion();
-    let coolIndex = 0; let warmIndex = 0; let windowIndex = 0;
+    const litTones = [new THREE.Color(0xc5e7f8), new THREE.Color(0xffe0a6), new THREE.Color(0x9dd8ff)];
+    let coolIndex = 0; let warmIndex = 0; let windowIndex = 0; let sideWindowIndex = 0; let bandIndex = 0;
     masses.forEach(([x, z, w, d, h], index) => {
       position.set(x, h / 2, z); scale.set(w, h, d); matrix.compose(position, rotation, scale);
       (index % 2 === 0 ? coolMasses : warmMasses).setMatrixAt(index % 2 === 0 ? coolIndex++ : warmIndex++, matrix);
@@ -958,12 +1015,20 @@ export class EpidemicCity3DSim implements Sim3D {
       for (let level = 0; level < 3; level++) for (let col = -1; col <= 2; col++) {
         position.set(x - w * 0.25 + col * w * 0.17, 0.58 + level * 0.48, z + d / 2 + 0.014);
         scale.set(1, 1, 1); matrix.compose(position, rotation, scale); windows.setMatrixAt(windowIndex++, matrix);
+        windows.setColorAt(windowIndex - 1, litTones[(index + level * 2 + col + 3) % litTones.length]);
+        position.set(x + w / 2 + 0.014, 0.58 + level * 0.48, z - d * 0.24 + col * d * 0.16);
+        matrix.compose(position, rotation, scale); sideWindows.setMatrixAt(sideWindowIndex++, matrix);
+        sideWindows.setColorAt(sideWindowIndex - 1, litTones[(index + level + col + 4) % litTones.length]);
       }
+      position.set(x, 0.98, z + d / 2 + 0.013); scale.set(w * 0.88, 0.032, 0.018); matrix.compose(position, rotation, scale); facadeBands.setMatrixAt(bandIndex++, matrix);
+      position.set(x + w / 2 + 0.013, 0.98, z); scale.set(0.018, 0.032, d * 0.86); matrix.compose(position, rotation, scale); facadeBands.setMatrixAt(bandIndex++, matrix);
     });
-    coolMasses.count = coolIndex; warmMasses.count = warmIndex; windows.count = windowIndex;
-    coolMasses.instanceMatrix.needsUpdate = true; warmMasses.instanceMatrix.needsUpdate = true; caps.instanceMatrix.needsUpdate = true; windows.instanceMatrix.needsUpdate = true;
+    coolMasses.count = coolIndex; warmMasses.count = warmIndex; windows.count = windowIndex; sideWindows.count = sideWindowIndex; facadeBands.count = bandIndex;
+    coolMasses.instanceMatrix.needsUpdate = true; warmMasses.instanceMatrix.needsUpdate = true; caps.instanceMatrix.needsUpdate = true; windows.instanceMatrix.needsUpdate = true; sideWindows.instanceMatrix.needsUpdate = true; facadeBands.instanceMatrix.needsUpdate = true;
+    if (windows.instanceColor) windows.instanceColor.needsUpdate = true;
+    if (sideWindows.instanceColor) sideWindows.instanceColor.needsUpdate = true;
     const context = new THREE.Group(); context.name = 'visual-only-perimeter-district'; context.userData.visualOnlyContext = true; context.userData.streetHidden = true;
-    context.add(coolMasses, warmMasses, caps, windows); context.traverse((node) => { const mesh = node as THREE_NS.Mesh; if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; } });
+    context.add(coolMasses, warmMasses, caps, windows, sideWindows, facadeBands); context.traverse((node) => { const mesh = node as THREE_NS.Mesh; if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; } });
     this.scene.add(context); this.buildingMeshes.push(context);
   }
 

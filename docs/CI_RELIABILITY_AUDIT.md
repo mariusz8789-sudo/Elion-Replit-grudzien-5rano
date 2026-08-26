@@ -59,3 +59,9 @@ The official action metadata declares `node24` for all three new pins. This matc
 2. [actions/setup-node v7 README and action metadata](https://github.com/actions/setup-node)
 3. [actions/upload-artifact v7 README, release, and action metadata](https://github.com/actions/upload-artifact)
 4. [GitHub: Deprecation of Node 20 on Actions runners](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/)
+
+### Verified v7 runtime result
+
+Commit [`8e77130`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/commit/8e771309c0d15ad696dc116e3e62722be028d221) triggered GitHub Actions run [`32954118236`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/32954118236). It completed with **success** using `actions/checkout@v7`, `actions/setup-node@v7`, and `actions/upload-artifact@v7`; lint, frontend tests, backend tests, typecheck, production build, and artifact upload all passed. The earlier Node 20 action-runtime annotation did **not** recur.
+
+The checklist-only final head [`8c45174`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/commit/8c45174247aee5dc45d4e6202c4ca58418411f97) also passed in [run `32954313815`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/32954313815), confirming the repository’s latest branch head retains the same green quality gate.

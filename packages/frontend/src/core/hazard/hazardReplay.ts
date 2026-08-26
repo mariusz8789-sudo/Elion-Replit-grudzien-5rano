@@ -67,15 +67,28 @@ function report(
   return { hazardRunId, status, originalResultFingerprint, replayResultFingerprint, differences };
 }
 
-export async function replayHazardRun(options: {
+interface ReplayHazardRunBaseOptions {
   readonly store: HazardProvenanceStore;
   readonly hazardRunId: string;
   readonly evaluator: HazardReferenceEvaluator;
-  /** When supplied, enforces the Hazard Module Registry's capability fence before artifact/fingerprint checks run. Omit only for domain-neutral Phase 0 mechanism tests. */
-  readonly hazardType?: string;
-  /** Optionally also checked against the registered module's projection schema version — same fence, same failure mode. */
-  readonly projectionSchemaVersion?: string;
-}): Promise<HazardReplayReport> {
+}
+
+/**
+ * `projectionSchemaVersion` is only ever checked as PART OF the capability
+ * fence (`assertHazardRunCompatibleWithModule`), which itself only runs
+ * when `hazardType` is supplied — so a caller passing `projectionSchemaVersion`
+ * without `hazardType` would have it silently ignored, a real footgun.
+ * This union makes that a compile error instead of a silent no-op: omit
+ * `hazardType` (for the domain-neutral Phase 0 mechanism, e.g.
+ * `hazardProvenance.test.ts`'s fixture tests) and `projectionSchemaVersion`
+ * is unavailable; supply `hazardType` and `projectionSchemaVersion` becomes
+ * available alongside it.
+ */
+export type ReplayHazardRunOptions =
+  | (ReplayHazardRunBaseOptions & { readonly hazardType?: undefined; readonly projectionSchemaVersion?: undefined })
+  | (ReplayHazardRunBaseOptions & { readonly hazardType: string; readonly projectionSchemaVersion?: string });
+
+export async function replayHazardRun(options: ReplayHazardRunOptions): Promise<HazardReplayReport> {
   const { store, hazardRunId, evaluator, hazardType, projectionSchemaVersion } = options;
 
   const originalRun = await store.getRun(hazardRunId);

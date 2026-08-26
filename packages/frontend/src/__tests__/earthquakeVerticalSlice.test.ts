@@ -233,6 +233,15 @@ describe('Earthquake vertical slice — capability fence actually enforced by re
     const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator });
     expect(replay.status).toBe('MATCH');
   });
+
+  it('supplying projectionSchemaVersion without hazardType is a COMPILE-TIME error, not a silently-ignored option', async () => {
+    const store = new InMemoryHazardProvenanceStore();
+    const result = await persistScenario(store, { ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-FENCE-SCHEMA-WITHOUT-TYPE' });
+    // @ts-expect-error projectionSchemaVersion requires hazardType — see ReplayHazardRunOptions in hazardReplay.ts.
+    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator, projectionSchemaVersion: '1.0.0' });
+    // Runtime behavior when forced past the type system (e.g. from untyped JS): silently ignored, same as omitting it entirely — never a crash.
+    expect(replay.status).toBe('MATCH');
+  });
 });
 
 describe('Earthquake vertical slice — Evidence Pack', () => {

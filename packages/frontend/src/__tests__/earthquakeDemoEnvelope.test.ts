@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,17 @@ import { getHazardModule } from '../core/hazard/hazardModuleRegistry';
 import { buildEarthquakeDemoEnvelope } from '../core/hazard/earthquake/earthquakeDemoEnvelope';
 import { runEarthquakeScenario, type EarthquakeScenarioSpec } from '../core/hazard/earthquake/earthquakeScenario';
 import type { HazardInput, HazardRun } from '../core/hazard/contracts';
+
+function makeFakeStorage() {
+  const map = new Map<string, string>();
+  return {
+    getItem: (k: string) => (map.has(k) ? (map.get(k) as string) : null),
+    setItem: (k: string, v: string) => { map.set(k, v); },
+    removeItem: (k: string) => { map.delete(k); },
+    key: (i: number) => Array.from(map.keys())[i] ?? null,
+    get length() { return map.size; },
+  };
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EARTHQUAKE_DIR = join(HERE, '..', 'core', 'hazard', 'earthquake');
@@ -63,6 +74,56 @@ describe('Earthquake demo envelope — happy path', () => {
     expect(first.projection?.epicenter).toEqual(second.projection?.epicenter);
     expect(first.projection?.magnitude).toBe(second.projection?.magnitude);
     expect(first.projection?.schemaVersion).toBe(second.projection?.schemaVersion);
+  });
+});
+
+describe('Earthquake demo envelope — production store injection policy (LocalHazardProvenanceStore, not just InMemory)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it('is READY end-to-end when a real LocalHazardProvenanceStore is injected, and survives reconstruction like a real UI reload would', async () => {
+    const fake = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: fake });
+    const { LocalHazardProvenanceStore } = await import('../core/hazard/hazardProvenanceStore');
+    const { buildEarthquakeDemoEnvelope: freshBuildEnvelope } = await import('../core/hazard/earthquake/earthquakeDemoEnvelope');
+
+    const store = new LocalHazardProvenanceStore();
+    const spec: EarthquakeScenarioSpec = { ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-ENVELOPE-LOCALSTORE' };
+    const envelope = await freshBuildEnvelope(spec, 'test-commit-hash', store);
+
+    expect(envelope.status).toBe('READY');
+    expect(envelope.replay?.status).toBe('MATCH');
+    expect(envelope.projection?.sites.length).toBeGreaterThan(0);
+
+    // Simulate a page reload: fresh module instances, same underlying localStorage-backed data.
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: fake });
+    const { LocalHazardProvenanceStore: FreshLocalStore } = await import('../core/hazard/hazardProvenanceStore');
+    const { replayHazardRun } = await import('../core/hazard/hazardReplay');
+    const { earthquakeEvaluator } = await import('../core/hazard/earthquake/earthquakeEvaluator');
+    const reloadedStore = new FreshLocalStore();
+    const replayAfterReload = await replayHazardRun({
+      store: reloadedStore, hazardRunId: envelope.run!.hazardRunId, evaluator: earthquakeEvaluator, hazardType: 'earthquake',
+    });
+    expect(replayAfterReload.status).toBe('MATCH');
+  });
+
+  it('a second call with a reused scenario label against the SAME persistent store is PROVENANCE_CONFLICT, not silently accepted', async () => {
+    const fake = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: fake });
+    const { LocalHazardProvenanceStore } = await import('../core/hazard/hazardProvenanceStore');
+    const { buildEarthquakeDemoEnvelope: freshBuildEnvelope } = await import('../core/hazard/earthquake/earthquakeDemoEnvelope');
+
+    const store = new LocalHazardProvenanceStore();
+    const label = 'SYNTHETIC-EQ-ENVELOPE-LOCALSTORE-CONFLICT';
+    const first = await freshBuildEnvelope({ ...BASE_SPEC, scenarioLabel: label, magnitude: 6.1 }, 'test-commit-hash', store);
+    expect(first.status).toBe('READY');
+
+    const second = await freshBuildEnvelope({ ...BASE_SPEC, scenarioLabel: label, magnitude: 7.4 }, 'test-commit-hash', store);
+    expect(second.status).toBe('BLOCKED');
+    expect(second.blockCode).toBe('PROVENANCE_CONFLICT');
   });
 });
 

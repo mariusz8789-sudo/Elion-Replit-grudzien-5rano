@@ -10,6 +10,7 @@ import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import type { EarthquakeCityOverlayProjection } from '../simulationRenderer/earthquakeCoordinateMapping';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { isWorldAssetApproved, isWorldAssetPathApproved } from './assetGovernance';
+import { DEFAULT_FOCUS_DIRECTION, resolveSafeFocusDirection, type CameraOccluder } from './cityCameraSafety';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -124,6 +125,13 @@ export class EpidemicCity3DSim implements Sim3D {
   /** Efemeryczne ślady są tworzone wyłącznie z `lastTransmissions()` silnika. */
   private transmissionMarkers = new Map<string, { group: THREE_NS.Group; born: number; material: THREE_NS.MeshBasicMaterial }>();
   private buildingMeshes: THREE_NS.Object3D[] = [];
+  /**
+   * Building volumes only — recorded where each building is built, so the
+   * camera-focus guard never has to re-derive layout maths or walk
+   * `buildingMeshes` (which also holds ground, roads, lamps and greenery and
+   * would therefore "contain" the camera everywhere). Rendering data only.
+   */
+  private cameraOccluders: CameraOccluder[] = [];
   private lastDetailCount = 0;
   private lastCrowdCount = 0;
   private lastTickMs = 0;
@@ -388,9 +396,25 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   getOrbitCameraDirection(): THREE_NS.Vector3 | null {
-    if (!this.THREE || !this.followTarget || this.cameraPreset !== 'street') return null;
-    // Niski, stabilny kierunek uliczny: nadal jedna kamera OrbitControls, bez fikcyjnego ruchu lub danych agenta.
-    return new this.THREE.Vector3(1.35, 0.62, 2.6).normalize();
+    if (!this.THREE || !this.followTarget) return null;
+    if (this.cameraPreset === 'street') {
+      // Niski, stabilny kierunek uliczny: nadal jedna kamera OrbitControls, bez fikcyjnego ruchu lub danych agenta.
+      return new this.THREE.Vector3(1.35, 0.62, 2.6).normalize();
+    }
+    // Bliski focus agenta trzyma kamerę ~1,69 nad ziemią, a najwyższe bryły
+    // kontekstowe sięgają 1,70 — bez tej osłony kamera potrafi wejść w bryłę
+    // budynku, gdy śledzony agent mija zabudowę. To guard geometrii renderera,
+    // nie parametr naukowy: przy czystym kadrze zwraca null i nic nie zmienia.
+    const distance = this.getOrbitFocusDistance();
+    if (distance === null) return null;
+    const base = DEFAULT_FOCUS_DIRECTION;
+    const safe = resolveSafeFocusDirection(
+      { x: this.followTarget.x, y: this.followTarget.y, z: this.followTarget.z },
+      base,
+      distance,
+      this.cameraOccluders,
+    );
+    return safe ? new this.THREE.Vector3(safe.x, safe.y, safe.z) : null;
   }
 
   onResize(w: number, h: number): void {
@@ -538,6 +562,7 @@ export class EpidemicCity3DSim implements Sim3D {
     for (const asset of this.approvedAssetRoots) this.scene?.remove(asset);
     this.approvedAssetRoots = [];
     this.semanticBuildingSlots = [];
+    this.cameraOccluders = [];
   }
 
   /** Materiały są ładowane tylko po przejściu istniejącej bramki Asset Governance. */
@@ -993,6 +1018,11 @@ export class EpidemicCity3DSim implements Sim3D {
     cornice.position.y = height * 0.72; group.add(cornice);
     group.userData.visualOnlyContext = true;
     group.position.set(x, 0, z);
+    // Roof sits at height + 0.05 and the periodic roof unit reaches height + 0.20.
+    this.cameraOccluders.push({
+      centerX: x, centerZ: z, halfWidth: w / 2, halfDepth: d / 2,
+      top: height + (serial % 3 === 0 ? 0.20 : 0.105),
+    });
     return group;
   }
 
@@ -1374,6 +1404,10 @@ export class EpidemicCity3DSim implements Sim3D {
     });
     group.position.set(x, 0, z);
     this.semanticBuildingSlots.push({ group, building });
+    // Parks are ground-level greenery, never a volume the camera can end up inside.
+    if (building.kind !== 'park') {
+      this.cameraOccluders.push({ centerX: x, centerZ: z, halfWidth: w / 2, halfDepth: d / 2, top: s.height });
+    }
     return group;
   }
 

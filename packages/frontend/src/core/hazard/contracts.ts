@@ -106,6 +106,46 @@ export interface HazardRun {
  */
 export type HazardDatasetStatus = 'OBSERVED' | 'FORECAST' | 'SCENARIO' | 'VISUAL_ONLY' | 'NOT_MODELED';
 
+/**
+ * GENESIS EXTREME-EVENT ENGINE — shared honesty vocabulary for FUTURE hazard
+ * domains (Tsunami, Flood, Wildfire, Weather, Radiological, Chemical,
+ * Biological, Industrial Explosion — see docs/EXTREME_EVENT_ENGINE_ARCHITECTURE.md).
+ *
+ * `HazardDatasetStatus` above is UNCHANGED and remains what Earthquake uses —
+ * widening or renaming a type already relied on by shipped, tested Earthquake
+ * code for a cosmetic reason is exactly the churn Genesis avoids. This is a
+ * separate, additive vocabulary for a domain that needs a distinction
+ * `HazardDatasetStatus` doesn't draw:
+ *   - `'SYNTHETIC'` vs `'SCENARIO'`: a scenario author's committed fixture
+ *     values (SCENARIO, as Earthquake already uses it) vs an artificially
+ *     generated dataset standing in for real observations (SYNTHETIC).
+ *   - `'DERIVED'`: a value computed from other already-labeled data, so a
+ *     consumer can trace it back rather than treat it as a first-hand source.
+ *   - `'NON_OPERATIONAL'`: a hard, explicit "this must never be read as a
+ *     live warning/forecast system" marker — required for any future Tsunami
+ *     or Weather module, which this task forbids from ever functioning as an
+ *     operational warning system.
+ */
+export type ExtremeEventDatasetStatus =
+  | 'OBSERVED'
+  | 'FORECAST'
+  | 'SCENARIO'
+  | 'SYNTHETIC'
+  | 'DERIVED'
+  | 'NOT_MODELED'
+  | 'NON_OPERATIONAL';
+
+/**
+ * Shared severity scale for FUTURE hazard domains. Earthquake's existing
+ * `ImpactSeverityClass` (below) is UNCHANGED for the same reason as above.
+ * `'UNKNOWN'` exists so a domain with an unresolved or ambiguous result is
+ * never forced to round to a false `'NONE'`. Assigning real-world meaning to
+ * these labels (calibration) is deliberately NOT defined here — that stays
+ * each domain module's own, separately reviewed responsibility, exactly like
+ * `classifySeverity` in `earthquakeModel.ts` today.
+ */
+export type ExtremeEventSeverityClass = 'NONE' | 'LOW' | 'MODERATE' | 'HIGH' | 'SEVERE' | 'CRITICAL' | 'UNKNOWN';
+
 /** One location/asset a hazard's impact can be evaluated against. Coordinates are an opaque local frame, not asserted geodesy. */
 export interface ExposureSite {
   readonly siteId: string;
@@ -186,4 +226,34 @@ export interface DamageAssessment {
   readonly requiredData: readonly DamageAssessmentRequirement[];
   readonly datasetStatus: HazardDatasetStatus;
   readonly provenance: { readonly hazardRunId: string; readonly hazardModuleVersion: string };
+}
+
+/**
+ * GENESIS EXTREME-EVENT ENGINE — safe Cascade contract (design-only per this
+ * task; no Cascade Engine, no traversal, no propagation, no automatic
+ * triggering between domains). A `CascadeCandidate` records that a
+ * dependency HYPOTHESIS has been named — e.g. "an earthquake might close a
+ * road, which might change hospital access" — never that it has been
+ * confirmed, computed, or is safe to render as a fact. `validationStatus`
+ * can only ever be `'NOT_MODELED'` (no evidence requirement has even been
+ * named yet) or `'BLOCKED'` (a requirement has been named but no reviewed
+ * model exists to satisfy it) — there is no type-level path to an affirmed
+ * cascade. See `cascadeCandidate.ts` for the constructor and worked example.
+ */
+export type CascadeValidationStatus = 'NOT_MODELED' | 'BLOCKED';
+
+export interface CascadeEvidenceRequirement {
+  readonly requirement: string;
+  readonly rationale: string;
+}
+
+export interface CascadeCandidate {
+  readonly cascadeCandidateId: string;
+  readonly sourceHazardRunId: string;
+  readonly sourceHazardType: string;
+  readonly potentialEffect: string;
+  readonly candidateDependency: string;
+  readonly evidenceRequired: readonly CascadeEvidenceRequirement[];
+  readonly validationStatus: CascadeValidationStatus;
+  readonly validationReason: string;
 }

@@ -1,4 +1,5 @@
 export * from './contracts';
+export * from './cascadeCandidate';
 export * from './fingerprint';
 export * from './hazardEvidenceGate';
 export * from './hazardProvenanceStore';

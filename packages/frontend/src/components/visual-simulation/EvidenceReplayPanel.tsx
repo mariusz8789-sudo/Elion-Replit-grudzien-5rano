@@ -105,7 +105,13 @@ export function EvidenceReplayPanel() {
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refreshHistory = async () => setHistory(await listExperimentRegistry(store));
+  const refreshHistory = async () => {
+    try {
+      setHistory(await listExperimentRegistry(store));
+    } catch (cause) {
+      setError(operationError('HISTORIA', cause));
+    }
+  };
   useEffect(() => { void refreshHistory(); }, [store]);
 
   const runExperiment = async () => {

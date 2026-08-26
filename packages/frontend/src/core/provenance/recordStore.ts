@@ -50,6 +50,17 @@ export class UnsafeRecordIdError extends Error {
   }
 }
 
+/** A caller requested durable local persistence, but the shared adapter could not write it. */
+export class LocalRecordPersistenceError extends Error {
+  constructor(
+    public readonly storageKey: string,
+    public readonly operation: 'write' | 'delete',
+  ) {
+    super(`Local persistence ${operation} failed for "${storageKey}". The record was not saved.`);
+    this.name = 'LocalRecordPersistenceError';
+  }
+}
+
 export interface KeyedRecordStore<T> {
   put(id: string, record: T): Promise<void>;
   get(id: string): Promise<T | null>;
@@ -140,7 +151,9 @@ export class LocalRecordStore<T> implements KeyedRecordStore<T> {
       }
     }
     all[id] = record;
-    writeJSON(this.storageKey, all);
+    if (!writeJSON(this.storageKey, all)) {
+      throw new LocalRecordPersistenceError(this.storageKey, 'write');
+    }
   }
 
   async get(id: string): Promise<T | null> {
@@ -163,6 +176,8 @@ export class LocalRecordStore<T> implements KeyedRecordStore<T> {
     const all = this.readAll();
     if (all === null) return;
     delete all[id];
-    writeJSON(this.storageKey, all);
+    if (!writeJSON(this.storageKey, all)) {
+      throw new LocalRecordPersistenceError(this.storageKey, 'delete');
+    }
   }
 }

@@ -3,6 +3,7 @@ import {
   DuplicateRecordConflictError,
   InMemoryRecordStore,
   LocalRecordStore,
+  LocalRecordPersistenceError,
   MalformedRecordCollectionError,
   UnsafeRecordIdError,
 } from '../core/provenance/recordStore';
@@ -38,6 +39,28 @@ function makeFakeStorage() {
     get length() {
       return map.size;
     },
+  };
+}
+
+function makeWriteFailingStorage(failingStorageKey: string) {
+  const map = new Map<string, string>();
+  return {
+    getItem: (k: string) => (map.has(k) ? (map.get(k) as string) : null),
+    setItem: (k: string, v: string) => {
+      if (k === `genesis-os:${failingStorageKey}`) {
+        throw new Error('Simulated persistence failure');
+      }
+      map.set(k, v);
+    },
+    removeItem: (k: string) => {
+      map.delete(k);
+    },
+    key: (i: number) => Array.from(map.keys())[i] ?? null,
+    get length() {
+      return map.size;
+    },
+    seed: (k: string, v: string) => map.set(k, v),
+    raw: (k: string) => map.get(k) ?? null,
   };
 }
 
@@ -278,6 +301,31 @@ describe('LocalRecordStore — the shared primitive directly, both policies', ()
     await store.put('existing', { v: 3 });
     expect(await store.list()).toEqual(['existing', 'fresh']);
     expect(await store.get('existing')).toEqual({ v: 3 });
+  });
+
+  it('rejects a failed durable write instead of falsely resolving success, while preserving the retained collection', async () => {
+    const key = 'convergence-test/failing-write/v1';
+    const fake = makeWriteFailingStorage(key);
+    vi.stubGlobal('window', { localStorage: fake });
+    const store = new LocalRecordStore<{ v: number }>(key, 'overwrite');
+
+    await expect(store.put('a', { v: 1 })).rejects.toEqual(
+      expect.objectContaining({ name: 'LocalRecordPersistenceError', storageKey: key, operation: 'write' }),
+    );
+    await expect(store.list()).resolves.toEqual([]);
+    expect(fake.raw(`genesis-os:${key}`)).toBeNull();
+  });
+
+  it('rejects a failed durable delete and leaves the original retained record available', async () => {
+    const key = 'convergence-test/failing-delete/v1';
+    const fake = makeWriteFailingStorage(key);
+    fake.seed(`genesis-os:${key}`, JSON.stringify({ retained: { v: 1 } }));
+    vi.stubGlobal('window', { localStorage: fake });
+    const store = new LocalRecordStore<{ v: number }>(key, 'overwrite');
+
+    await expect(store.delete('retained')).rejects.toBeInstanceOf(LocalRecordPersistenceError);
+    await expect(store.get('retained')).resolves.toEqual({ v: 1 });
+    expect(fake.raw(`genesis-os:${key}`)).toBe(JSON.stringify({ retained: { v: 1 } }));
   });
 
   it('refuses prototype-sensitive ids without exposing them through get, list, or delete', async () => {

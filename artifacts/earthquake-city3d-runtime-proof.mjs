@@ -39,7 +39,13 @@ const cdp = (method, params = {}) => new Promise((resolve, reject) => {
   pending.set(id, (message) => message.error ? reject(new Error(message.error.message)) : resolve(message.result));
   socket.send(JSON.stringify({ id, method, params }));
 });
-const evaluate = async (expression) => (await cdp('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+const evaluate = async (expression) => {
+  const response = await cdp('Runtime.evaluate', { expression, returnByValue: true });
+  if (response.exceptionDetails) {
+    throw new Error(response.exceptionDetails.exception?.description ?? response.exceptionDetails.text);
+  }
+  return response.result.value;
+};
 
 try {
   await cdp('Page.enable');
@@ -202,7 +208,39 @@ try {
       stageFailed: Boolean(document.querySelector('.empty-state')),
     };
   })())`));
-  const report = { before, active, exportDownload, cleared, evidenceReplay, blockedParameter, consoleEntries };
+  // A fresh document lets this proof fail only Evidence Store's durable write.
+  // The panel must surface an alert rather than falsely report a saved run.
+  await cdp('Page.addScriptToEvaluateOnNewDocument', {
+    source: `(() => {
+      const originalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(key, value) {
+        if (key === 'genesis-os:evidence-store/v1') {
+          throw new DOMException('Simulated Evidence registry read failure', 'SecurityError');
+        }
+        return originalSetItem.call(this, key, value);
+      };
+    })();`,
+  });
+  await cdp('Page.navigate', { url: proofUrl.replace('#', '&evidencePersistenceFailure=1#') });
+  await sleep(900);
+  await evaluate(`(() => [...document.querySelectorAll('button')].find((b) => /^Pomiń/.test(b.textContent?.trim() ?? ''))?.click())()`);
+  await sleep(1900);
+  consoleEntries.length = 0;
+  await evaluate(`(() => document.querySelector('.evidence-panel .evidence-panel-toggle')?.click())()`);
+  await evaluate(`(() => [...document.querySelectorAll('.evidence-panel button')].find((b) => b.textContent?.trim() === '▶ Uruchom eksperyment')?.click())()`);
+  await sleep(1500);
+  const evidencePersistenceFailure = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const panel = document.querySelector('.evidence-panel');
+    const alert = panel?.querySelector('.evidence-error[role="alert"]');
+    return {
+      expanded: panel?.querySelector('.evidence-panel-toggle')?.getAttribute('aria-expanded') === 'true',
+      alertText: alert?.textContent?.trim() ?? null,
+      alertVisible: (alert?.textContent ?? '').includes('EKSPERYMENT: Local persistence write failed for "evidence-store/v1"'),
+      cityCanvasCount: document.querySelectorAll('.city-3d-canvas').length,
+      stageFailed: Boolean(document.querySelector('.empty-state')),
+    };
+  })())`));
+  const report = { before, active, exportDownload, cleared, evidenceReplay, blockedParameter, evidencePersistenceFailure, consoleEntries };
   await writeFile(reportPath, JSON.stringify(report, null, 2));
   const assertions = [
     before.cityCanvasCount === 1,
@@ -253,6 +291,11 @@ try {
     blockedParameter.outcomeAnnounced,
     blockedParameter.cityCanvasCount === 1,
     !blockedParameter.stageFailed,
+    evidencePersistenceFailure.expanded,
+    evidencePersistenceFailure.alertVisible,
+    evidencePersistenceFailure.cityCanvasCount === 1,
+    !evidencePersistenceFailure.stageFailed,
+    consoleEntries.length === 0,
   ];
   if (!assertions.every(Boolean)) throw new Error(`Earthquake City3D runtime proof failed: ${JSON.stringify(report)}`);
   console.log(JSON.stringify(report, null, 2));

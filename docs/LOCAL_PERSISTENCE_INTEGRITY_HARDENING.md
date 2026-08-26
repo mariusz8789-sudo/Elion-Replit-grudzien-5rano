@@ -21,6 +21,8 @@ The pass does not add a data adapter, network request, GIS behavior, hazard solv
 
 The retention choice is deliberately conservative. A malformed outer collection cannot be interpreted honestly as a keyed record map, so it is left untouched rather than silently overwritten. A valid legacy flat map continues to load and can be extended normally.
 
+Hazard Provenance public lists are now consistent with their paired guarded reads: an ID appears in `listArtifacts`, `listInputs`, or `listRuns` only when `getArtifact`, `getInput`, or `getRun` can return the retained record structurally. Filtering happens in memory after the normal sorted ID list is read; it does not delete, repair, overwrite, migrate, or otherwise mutate retained browser data.
+
 ## Replay safety and validation
 
 The preceding canonical replay safeguard ensures an evaluator exception resolves to `BLOCKED`, never a fabricated `MATCH` and never a rejected read-only history operation. The Hazard Provenance adapter now applies read-only structural gates to retained `SourceArtifact`, `HazardInput`, and `HazardRun` values before they reach replay. The input gate requires `scientificFields` to be a non-array record, `seed` to be `null`, a finite number, or a string, and `displayName` to be `null` or a string. The artifact gate requires a structurally valid retained provenance block, finite non-negative `retrievedAt`, and finite extent coordinates when an extent exists. The run gate requires record-shaped output fields, a recognized status, and a finite non-negative creation time. These gates do not claim that a field is scientifically valid, recompute a fingerprint, mutate storage, or change a solver. They only prevent malformed persisted JSON from being treated as a runtime contract.

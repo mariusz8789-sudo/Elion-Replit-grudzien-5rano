@@ -116,6 +116,7 @@ describe('Earthquake persisted-run history', () => {
       storage.setItem(inputKey, JSON.stringify(retainedInputs));
 
       expect(await store.getInput(outcome.scenario.input.hazardInputId)).toBeNull();
+      expect(await store.listInputs()).toEqual([]);
       await expect(
         replayHazardRun({
           store,
@@ -161,6 +162,7 @@ describe('Earthquake persisted-run history', () => {
     storage.setItem(artifactKey, JSON.stringify(artifacts));
 
     expect(await store.getArtifact(outcome.scenario.artifact.artifactId)).toBeNull();
+    expect(await store.listArtifacts()).toEqual([]);
     await expect(
       replayHazardRun({
         store,
@@ -201,6 +203,7 @@ describe('Earthquake persisted-run history', () => {
     storage.setItem(runKey, JSON.stringify(runs));
 
     expect(await store.getRun(outcome.scenario.run.hazardRunId)).toBeNull();
+    expect(await store.listRuns()).toEqual([]);
     await expect(
       replayHazardRun({
         store,

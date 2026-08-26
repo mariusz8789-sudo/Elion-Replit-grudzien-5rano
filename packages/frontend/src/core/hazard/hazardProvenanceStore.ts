@@ -113,6 +113,15 @@ function readableRecord<T>(candidate: T | null, isValid: (value: unknown) => val
   return isValid(candidate) ? candidate : null;
 }
 
+/** Keeps the public list/get contract aligned without deleting unreadable retained bytes. */
+async function readableIds<T>(
+  ids: readonly string[],
+  read: (id: string) => Promise<T | null>,
+): Promise<readonly string[]> {
+  const records = await Promise.all(ids.map(read));
+  return ids.filter((_id, index) => records[index] !== null);
+}
+
 /** The three Phase 0 collections, kept separate because each has its own id namespace and shape. */
 export interface HazardProvenanceStore {
   putArtifact(artifact: SourceArtifact): Promise<void>;
@@ -139,8 +148,8 @@ export class InMemoryHazardProvenanceStore implements HazardProvenanceStore {
   async getArtifact(artifactId: string): Promise<SourceArtifact | null> {
     return readableRecord(await this.artifacts.get(artifactId), isSourceArtifactRecord);
   }
-  listArtifacts(): Promise<readonly string[]> {
-    return this.artifacts.list();
+  async listArtifacts(): Promise<readonly string[]> {
+    return readableIds(await this.artifacts.list(), (id) => this.getArtifact(id));
   }
 
   putInput(input: HazardInput): Promise<void> {
@@ -149,8 +158,8 @@ export class InMemoryHazardProvenanceStore implements HazardProvenanceStore {
   async getInput(hazardInputId: string): Promise<HazardInput | null> {
     return readableRecord(await this.inputs.get(hazardInputId), isHazardInputRecord);
   }
-  listInputs(): Promise<readonly string[]> {
-    return this.inputs.list();
+  async listInputs(): Promise<readonly string[]> {
+    return readableIds(await this.inputs.list(), (id) => this.getInput(id));
   }
 
   putRun(run: HazardRun): Promise<void> {
@@ -159,8 +168,8 @@ export class InMemoryHazardProvenanceStore implements HazardProvenanceStore {
   async getRun(hazardRunId: string): Promise<HazardRun | null> {
     return readableRecord(await this.runs.get(hazardRunId), isHazardRunRecord);
   }
-  listRuns(): Promise<readonly string[]> {
-    return this.runs.list();
+  async listRuns(): Promise<readonly string[]> {
+    return readableIds(await this.runs.list(), (id) => this.getRun(id));
   }
 }
 
@@ -188,8 +197,8 @@ export class LocalHazardProvenanceStore implements HazardProvenanceStore {
   async getArtifact(artifactId: string): Promise<SourceArtifact | null> {
     return readableRecord(await this.artifacts.get(artifactId), isSourceArtifactRecord);
   }
-  listArtifacts(): Promise<readonly string[]> {
-    return this.artifacts.list();
+  async listArtifacts(): Promise<readonly string[]> {
+    return readableIds(await this.artifacts.list(), (id) => this.getArtifact(id));
   }
 
   putInput(input: HazardInput): Promise<void> {
@@ -198,8 +207,8 @@ export class LocalHazardProvenanceStore implements HazardProvenanceStore {
   async getInput(hazardInputId: string): Promise<HazardInput | null> {
     return readableRecord(await this.inputs.get(hazardInputId), isHazardInputRecord);
   }
-  listInputs(): Promise<readonly string[]> {
-    return this.inputs.list();
+  async listInputs(): Promise<readonly string[]> {
+    return readableIds(await this.inputs.list(), (id) => this.getInput(id));
   }
 
   putRun(run: HazardRun): Promise<void> {
@@ -208,7 +217,7 @@ export class LocalHazardProvenanceStore implements HazardProvenanceStore {
   async getRun(hazardRunId: string): Promise<HazardRun | null> {
     return readableRecord(await this.runs.get(hazardRunId), isHazardRunRecord);
   }
-  listRuns(): Promise<readonly string[]> {
-    return this.runs.list();
+  async listRuns(): Promise<readonly string[]> {
+    return readableIds(await this.runs.list(), (id) => this.getRun(id));
   }
 }

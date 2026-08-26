@@ -25,6 +25,9 @@ jobs:
       - name: Instalacja zależności
         run: npm ci
 
+      - name: Audyt zależności (high/critical)
+        run: npm audit --audit-level=high
+
       - name: Sprawdzenie białych znaków w zmianie
         env:
           EVENT_NAME: ${{ github.event_name }}

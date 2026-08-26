@@ -72,3 +72,4 @@
 - [x] Audit the recurring GitHub Actions Node 20 runtime deprecation annotation and, only after confirming official compatibility, update the smallest necessary action pins without weakening CI or changing Genesis application behavior.
 - [x] Add regression protection that the delivered synthetic Earthquake runtime and dry dataset-governance modules remain local-only and contain no live network/data-acquisition behavior; do not add hazards, GIS, rendering or Scientific Core changes.
 - [x] Audit the locked JavaScript dependency tree for production-relevant security advisories and apply only evidence-based compatible remediation, with full validation and no scientific, renderer, hazard, GIS or data-behavior change.
+- [x] Add a repository-native CI dependency-security gate that fails on high or critical npm advisories while preserving existing quality-gate steps and all Genesis application boundaries.

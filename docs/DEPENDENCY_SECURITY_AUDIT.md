@@ -24,6 +24,10 @@ The candidate lockfile was first refreshed in a detached worktree with lifecycle
 
 The promoted lockfile was byte-identical to the isolated candidate. Live production-only and full audits both reported zero findings. Commit [`64eddbe`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/commit/64eddbe7eb56888e3a34a1167f5089ed6e0e8fe1) then completed the unchanged remote quality gate successfully in [GitHub Actions run `32956020910`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/32956020910): clean install, whitespace check, lint, frontend tests, backend tests, frontend typecheck, production build, and artifact upload all passed.
 
+## Continuous CI enforcement
+
+The repository quality gate now runs `npm audit --audit-level=high` immediately after `npm ci`. It fails only when npm reports a high- or critical-severity advisory, while still assessing the full locked dependency tree rather than silently excluding the development/build chain. This is intentional: the build, lint, test, and artifact-upload tools execute inside the CI trust boundary. The step neither publishes nor deploys Genesis and has no application, scientific, renderer, hazard, data, or GIS behavior.
+
 ## References
 
 1. [GitHub Advisory Database: `brace-expansion` unbounded expansion denial of service](https://github.com/advisories/GHSA-mh99-v99m-4gvg)

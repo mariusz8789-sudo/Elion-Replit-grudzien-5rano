@@ -48,3 +48,18 @@ export async function computeHazardRunResultFingerprint(input: {
     outputFields: input.outputFields,
   }));
 }
+
+/**
+ * Fingerprint over an entire derived-layer collection (e.g. all `ImpactResult`s
+ * or all `DamageAssessment`s produced from one `HazardRun`). `HazardRun`'s own
+ * `resultFingerprint` only covers the run's `outputFields` — it says nothing
+ * about whether a pure downstream projection of that output (site-by-site
+ * impact, or a damage-assessment disclosure) is itself reproducible. Recomputing
+ * this fingerprint after a replay and comparing it against the value recorded
+ * at construction time is what lets replay catch a derived-layer regression
+ * (e.g. an accidentally nondeterministic projection function) that a HazardRun-only
+ * MATCH would miss entirely.
+ */
+export async function computeDerivedLayerFingerprint(records: unknown): Promise<string> {
+  return sha256Hex(canonicalJson(records));
+}

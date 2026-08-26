@@ -17,11 +17,18 @@
  * misread as "not applicable."
  */
 import type { EarthquakePoint } from './earthquakeModel';
-import type { ImpactSeverityClass, HazardDatasetStatus } from '../contracts';
+import type { DamageAssessment, ImpactSeverityClass, HazardDatasetStatus } from '../contracts';
 import type { EarthquakeScenarioResult } from './earthquakeScenario';
 import { readEarthquakeOutputFields } from './earthquakeImpact';
 
-export const EARTHQUAKE_WORLD_PROJECTION_SCHEMA_VERSION = '1.0.0';
+/**
+ * Bumped 1.0.0 -> 1.1.0: adds the `damageAssessments` field below. Purely
+ * additive (no existing field renamed or removed), but the version still
+ * moves because a consumer pinned to schema 1.0.0 would not know this field
+ * exists — same convention `hazardModuleRegistry.ts` already relies on to
+ * detect a stale consumer via `assertHazardRunCompatibleWithModule`.
+ */
+export const EARTHQUAKE_WORLD_PROJECTION_SCHEMA_VERSION = '1.1.0';
 
 export interface EarthquakeWorldProjectionSite {
   readonly siteId: string;
@@ -43,6 +50,14 @@ export interface EarthquakeWorldStateView {
   readonly epicenter: EarthquakePoint;
   readonly magnitude: number;
   readonly sites: readonly EarthquakeWorldProjectionSite[];
+  /**
+   * One per site, always `status: 'NOT_MODELED'` today — see
+   * earthquakeDamageAssessment.ts for exactly why and what is missing.
+   * Exposed here (rather than left implicit) so a consumer must actively
+   * read `status`/`requiredData` instead of being able to assume silence
+   * means "not applicable."
+   */
+  readonly damageAssessments: readonly DamageAssessment[];
   readonly notModeled: readonly string[];
 }
 
@@ -88,6 +103,7 @@ export function projectEarthquakeWorldState(result: EarthquakeScenarioResult): E
     epicenter: output.epicenter,
     magnitude: output.magnitude,
     sites,
+    damageAssessments: result.damageAssessments,
     notModeled: EARTHQUAKE_NOT_MODELED,
   };
 }

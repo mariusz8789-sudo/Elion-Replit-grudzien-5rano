@@ -266,7 +266,7 @@ describe('Earthquake vertical slice — read-only Digital Twin projection contra
     const frozenInput = JSON.parse(JSON.stringify(result));
     const view = projectEarthquakeWorldState(result);
 
-    expect(view.schemaVersion).toBe('1.0.0');
+    expect(view.schemaVersion).toBe('1.1.0');
     expect(view.hazardRunId).toBe(result.run.hazardRunId);
     expect(view.sites.length).toBe(result.impacts.length);
     expect(view.notModeled.length).toBeGreaterThan(0);

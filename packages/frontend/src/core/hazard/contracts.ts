@@ -152,3 +152,38 @@ export interface ImpactResult {
   readonly datasetStatus: HazardDatasetStatus;
   readonly provenance: { readonly hazardRunId: string; readonly hazardModuleVersion: string };
 }
+
+/**
+ * A `DamageAssessment` is the NEXT layer beyond `ImpactResult`: structural
+ * damage state, collapse probability, casualties, or infrastructure damage —
+ * as opposed to `ImpactResult`'s ground-motion/hazard-intensity severity.
+ * Genesis has no calibrated fragility/vulnerability model, no building
+ * inventory, no occupancy data and no domain-expert review for any of this,
+ * so `status` today can only ever be `'NOT_MODELED'` — there is no field or
+ * code path anywhere that can set it to anything else. Fabricating a damage
+ * number from `ImpactResult.severityValue` alone (a proxy for shaking
+ * intensity, not for what a building actually does under that shaking) is
+ * exactly the "false precision" risk this contract exists to make
+ * structurally impossible: a caller can read `status` and `requiredData` and
+ * know, without guessing, that no damage claim is being made and precisely
+ * what would need to exist before one honestly could.
+ */
+export type DamageAssessmentStatus = 'NOT_MODELED';
+
+/** One concrete missing model or dataset, and why it is required. Never a vague placeholder string. */
+export interface DamageAssessmentRequirement {
+  readonly requirement: string;
+  readonly rationale: string;
+}
+
+export interface DamageAssessment {
+  readonly damageAssessmentId: string;
+  readonly hazardRunId: string;
+  readonly impactResultId: string;
+  readonly siteId: string;
+  readonly status: DamageAssessmentStatus;
+  readonly notModeledReason: string;
+  readonly requiredData: readonly DamageAssessmentRequirement[];
+  readonly datasetStatus: HazardDatasetStatus;
+  readonly provenance: { readonly hazardRunId: string; readonly hazardModuleVersion: string };
+}

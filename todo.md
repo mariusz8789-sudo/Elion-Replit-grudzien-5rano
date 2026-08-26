@@ -55,4 +55,5 @@
 - [x] Prove the pushed Earthquake demonstrator against the production frontend build at 1920×1080, preserving the one-renderer scenario boundary and recording release diagnostics without publishing automatically.
 - [x] Refactor the live Earthquake Command Center to use the independently audited execution envelope as the single scenario/provenance/replay path, preserving explicit mapping, overlay gate, one renderer and all existing exclusions.
 - [x] Add an end-to-end Command Center regression for immutable provenance conflict, proving a named block never reaches mapping or City3D overlay.
-- [ ] Review the remaining checked and unchecked Genesis roadmap items, their dependencies and audit status; select only the next safe, non-conflicting milestone after the Earthquake hardening closeout.
+- [x] Review the remaining checked and unchecked Genesis roadmap items, their dependencies and audit status; select only the next safe, non-conflicting milestone after the Earthquake hardening closeout.
+- [x] Add a compact local persisted-run history that reads actual Earthquake HazardRun records and canonical replay verdicts without reapplying mapping or City3D overlays, adding hazards, GIS, cascades or Scientific Core coupling.

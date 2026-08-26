@@ -62,6 +62,7 @@ try {
   await evaluate(`(() => {
     const panel = document.querySelector('.earthquake-scenario-panel');
     panel?.querySelector('.earthquake-evidence-details summary')?.click();
+    panel?.querySelector('.earthquake-history-details summary')?.click();
     const rail = document.querySelector('.city-world-right');
     if (rail && panel) rail.scrollTop = Math.max(0, panel.offsetTop - 14);
   })()`);
@@ -82,6 +83,9 @@ try {
       registryModuleVisible: /Registry module/.test(proof) && /earthquake/.test(proof) && /schema 1\.0\.0/.test(proof),
       capabilitiesVisible: /Declared capabilities/.test(proof) && /ground-motion-attenuation-synthetic/.test(proof),
       notModeledVisible: /NOT_MODELED/.test(proof),
+      persistedHistoryVisible: /Local persisted runs/.test(proof),
+      persistedHistoryEntries: panel?.querySelectorAll('.earthquake-history-list li').length ?? 0,
+      persistedHistoryMatch: [...(panel?.querySelectorAll('.earthquake-history-verdict') ?? [])].some((element) => element.textContent?.trim() === 'MATCH'),
       clearedButtonEnabled: ![...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Wyczyść overlay')?.disabled,
       stageFailed: Boolean(document.querySelector('.empty-state')),
       loading: Boolean(document.querySelector('.route-loading'))
@@ -129,6 +133,9 @@ try {
     active.registryModuleVisible,
     active.capabilitiesVisible,
     active.notModeledVisible,
+    active.persistedHistoryVisible,
+    active.persistedHistoryEntries >= 1,
+    active.persistedHistoryMatch,
     active.clearedButtonEnabled,
     !active.stageFailed,
     !active.loading,

@@ -3,7 +3,8 @@
  * It only forwards a gate-approved, SCENARIO-only overlay to the one renderer;
  * no epidemic parameter, WorldState, route or Scientific Core mutation occurs here.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { LocalHazardProvenanceStore } from '../../core/hazard/hazardProvenanceStore';
 import { getHazardModule } from '../../core/hazard/hazardModuleRegistry';
 import type { EarthquakeCityOverlayProjection } from '../../core/simulationRenderer/earthquakeCoordinateMapping';
 import {
@@ -14,6 +15,10 @@ import {
   executeEarthquakeCommandCenterScenario,
   type EarthquakeCommandCenterExecution,
 } from '../../core/simulationRenderer/earthquakeCommandCenter';
+import {
+  listEarthquakePersistedRunHistory,
+  type EarthquakePersistedRunHistoryEntry,
+} from '../../core/simulationRenderer/earthquakePersistedRunHistory';
 
 interface EarthquakeScenarioPanelProps {
   readonly onOverlayChange: (overlay: EarthquakeCityOverlayProjection | null) => void;
@@ -30,10 +35,28 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [overlayDisplayed, setOverlayDisplayed] = useState(false);
+  const [history, setHistory] = useState<readonly EarthquakePersistedRunHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const runSequence = useRef(0);
+  const provenanceStore = useMemo(() => new LocalHazardProvenanceStore(), []);
   // Fast Refresh may preserve a result created before registry provenance was added.
   // The live registry fallback keeps its read-only traceability display safe until rerun.
   const moduleDescriptor = execution?.moduleDescriptor ?? getHazardModule('earthquake');
+
+  const refreshHistory = async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      setHistory(await listEarthquakePersistedRunHistory(provenanceStore));
+    } catch (cause) {
+      setHistoryError(cause instanceof Error ? cause.message : 'Nie udało się odczytać lokalnej historii provenance.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => { void refreshHistory(); }, []);
 
   const runScenario = async () => {
     setRunning(true);
@@ -44,11 +67,12 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
         ...SYNTHETIC_PRESET,
         // Provenance labels must remain unique because the local hazard store is immutable.
         scenarioLabel: `city3d-synthetic-${Date.now()}-${runSequence.current}`,
-      });
+      }, { store: provenanceStore });
       setExecution(outcome);
       onOverlayChange(outcome.overlay);
       setOverlayDisplayed(outcome.status === 'READY' && outcome.overlay !== null);
       if (outcome.status === 'BLOCKED') setError(`${outcome.blockCode}: ${outcome.blockReason}`);
+      await refreshHistory();
     } catch (cause) {
       onOverlayChange(null);
       setOverlayDisplayed(false);
@@ -90,6 +114,23 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
         <button className="world-action" onClick={clearOverlay} disabled={!overlayDisplayed}>Wyczyść overlay</button>
         <button className="world-action" onClick={exportEvidence} disabled={!execution}>Eksportuj evidence</button>
       </div>
+      <details className="earthquake-history-details">
+        <summary>Local persisted runs ({history.length})</summary>
+        <p>Read-only canonical replay history. It never remaps, restores or changes the City3D overlay.</p>
+        <button className="world-action" onClick={() => { void refreshHistory(); }} disabled={historyLoading}>{historyLoading ? 'Odczyt…' : 'Odśwież replay'}</button>
+        {historyError && <p className="earthquake-error" role="alert">HISTORIA: {historyError}</p>}
+        {history.length === 0 && !historyLoading && <p className="earthquake-history-empty">Brak lokalnie zapisanych Earthquake HazardRun.</p>}
+        {history.length > 0 && (
+          <ul className="earthquake-history-list">
+            {history.map((entry) => (
+              <li key={entry.hazardRunId}>
+                <div><b title={entry.hazardRunId}>{shorten(entry.hazardRunId, 9)}</b><span className={`earthquake-history-verdict ${entry.replay.status.toLowerCase()}`}>{entry.replay.status}</span></div>
+                <small>{new Date(entry.createdAt).toISOString()} · {entry.replay.differences.length === 0 ? 'no differences' : `${entry.replay.differences.length} difference(s)`}</small>
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
       {error && <p className="earthquake-error" role="alert">BLOKADA: {error}</p>}
       {execution?.status === 'BLOCKED' && (
         <div className="earthquake-proof">

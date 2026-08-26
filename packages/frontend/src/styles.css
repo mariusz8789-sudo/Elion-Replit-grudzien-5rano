@@ -2194,3 +2194,17 @@ kbd {
 .earthquake-long-values div { display: grid; gap: .1rem; }
 .earthquake-long-values dd { margin: 0; color: #c5d3df; font-family: var(--font-mono); font-size: .59rem; line-height: 1.3; overflow-wrap: anywhere; }
 .earthquake-not-modeled-details ul { margin: .45rem 0 0; padding-left: 1rem; color: #d6b7a2; font-size: .65rem; line-height: 1.38; }
+.earthquake-history-details { margin-top: .52rem; padding-top: .48rem; border-top: 1px solid var(--glass-border); }
+.earthquake-history-details summary { cursor: pointer; color: var(--text); font-size: .67rem; font-weight: 700; }
+.earthquake-history-details > p { margin: .42rem 0; color: var(--text-muted); font-size: .62rem; line-height: 1.38; }
+.earthquake-history-details .world-action { margin-bottom: .42rem; padding: .3rem .45rem; font-size: .62rem; }
+.earthquake-history-list { display: grid; gap: .3rem; margin: .1rem 0 0; padding: 0; list-style: none; }
+.earthquake-history-list li { min-width: 0; padding: .38rem .42rem; border: 1px solid var(--glass-border); border-radius: .3rem; background: rgba(7, 16, 26, .18); }
+.earthquake-history-list li > div { display: flex; align-items: center; justify-content: space-between; gap: .4rem; }
+.earthquake-history-list b { min-width: 0; color: #c5d3df; font-family: var(--font-mono); font-size: .59rem; overflow-wrap: anywhere; }
+.earthquake-history-list small { display: block; margin-top: .22rem; color: var(--text-muted); font-family: var(--font-mono); font-size: .55rem; line-height: 1.3; overflow-wrap: anywhere; }
+.earthquake-history-verdict { flex: none; padding: .1rem .26rem; border-radius: .2rem; font-size: .53rem; font-weight: 700; letter-spacing: .05em; }
+.earthquake-history-verdict.match { color: #b9ebcf; background: rgba(34, 115, 72, .2); }
+.earthquake-history-verdict.drift, .earthquake-history-verdict.blocked { color: #ffc1c1; background: rgba(123, 36, 36, .22); }
+.earthquake-history-verdict.not_reproducible { color: #f9d391; background: rgba(106, 61, 20, .2); }
+.earthquake-history-empty { color: var(--text-muted); font-size: .62rem; }

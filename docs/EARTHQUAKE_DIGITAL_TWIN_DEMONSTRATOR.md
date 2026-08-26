@@ -63,6 +63,8 @@ When the gate approves the projection, `EpidemicCity3DSim.setEarthquakeScenarioO
 
 The panel also offers **Eksportuj evidence**. It creates a local browser JSON download from exactly the current execution record using existing canonical serialization. A READY export contains the real artifact, input, run, evidence, replay, projection, explicit mapping and overlay-gate result. A BLOCKED export contains its truthful named block and has `mapping: null` and `overlay: null`. Every export is explicitly labelled `SCENARIO`, `SYNTHETIC` and `NON_OPERATIONAL`; it performs no network request, external publishing, data acquisition or simulation mutation.
 
+The same panel now lists local persisted Earthquake `HazardRun` records from `LocalHazardProvenanceStore`. Each row is a read-only summary of an actual stored run and its newly recomputed canonical, registry-fenced replay verdict; it does not reuse a cached UI status. Refreshing history never remaps a fixture, restores an overlay, changes City3D, or mutates the run. Missing/non-Earthquake records are not fabricated into the list.
+
 ## Runtime proof
 
 The scripted Chromium proof ran against `#/city3d` at **1920×1080**. It dismissed only the first-run onboarding gate, then performed a real UI click on **Uruchom scenariusz**, opened the evidence/mapping details, captured the screenshot above, clicked **Wyczyść overlay**, and asserted the cleared state.
@@ -77,7 +79,7 @@ The scripted Chromium proof ran against `#/city3d` at **1920×1080**. It dismiss
 | Clear behavior | `OVERLAY CLEARED`; City3D remained present and no WebGL failure state appeared. |
 | Browser diagnostics | No captured warning or error entries. |
 
-The Chromium proof also clicks **Eksportuj evidence**, captures exactly one local JSON file and parses it. Both development and production-preview proofs assert export schema `1.0.0`, `READY`, `MATCH`, complete evidence, a real mapping fingerprint and all three synthetic/non-operational labels before clearing the overlay.
+The Chromium proof also clicks **Eksportuj evidence**, captures exactly one local JSON file and parses it. Both development and production-preview proofs assert export schema `1.0.0`, `READY`, `MATCH`, complete evidence, a real mapping fingerprint and all three synthetic/non-operational labels before clearing the overlay. The persisted-history proof additionally opens the local history, observes at least one real `MATCH` record, and verifies the existing one City3D canvas and clear transition remain unchanged.
 
 Machine-readable results are retained in `artifacts/earthquake-city3d-runtime-proof.json`; the proof procedure and observations are summarized in `artifacts/earthquake-city3d-runtime-proof-notes.md`.
 
@@ -108,6 +110,7 @@ This demonstrator does not provide real geospatial placement, observational data
 | `core/hazard/earthquake/earthquakeDemoEnvelope.ts` | Sole domain-only upstream path for validation, scenario, immutable provenance, evidence, registry admission, replay and projection. |
 | `core/simulationRenderer/earthquakeCommandCenter.ts` | Converts only a READY envelope through explicit mapping and the display overlay gate. |
 | `core/simulationRenderer/earthquakeEvidenceExport.ts` | Canonically serializes the current READY or BLOCKED Command Center record for a local browser download. |
+| `core/simulationRenderer/earthquakePersistedRunHistory.ts` | Reads only actual persisted Earthquake run/input records and recomputes the registered canonical replay verdict for compact history display. |
 | `core/simulationRenderer/earthquakeCoordinateMapping.ts` | Explicit, versioned, fingerprinted synthetic fixture-to-display-anchor adapter. |
 | `components/visual-simulation/EarthquakeScenarioPanel.tsx` | Compact provenance-first synthetic scenario UI. |
 | `components/visual-simulation/City3DWebGLScreen.tsx` | Wires panel output only to the existing renderer’s dedicated overlay setter. |

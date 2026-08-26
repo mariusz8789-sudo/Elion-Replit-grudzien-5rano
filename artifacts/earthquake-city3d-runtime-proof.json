@@ -20,7 +20,7 @@
     "notModeledVisible": true,
     "parametersVisible": true,
     "persistedHistoryVisible": true,
-    "persistedHistoryEntries": 14,
+    "persistedHistoryEntries": 15,
     "persistedHistoryMatch": true,
     "clearedButtonEnabled": true,
     "outcomeAnnounced": true,
@@ -29,7 +29,7 @@
   },
   "exportDownload": {
     "fileCount": 1,
-    "filename": "genesis-earthquake-evidence-run_input_eq_city3d-synthetic-1787776498261-1.json",
+    "filename": "genesis-earthquake-evidence-run_input_eq_city3d-synthetic-1787776944789-1.json",
     "schemaVersion": "1.0.0",
     "commandCenterStatus": "READY",
     "replayStatus": "MATCH",
@@ -70,6 +70,13 @@
     "expanded": true,
     "alertText": "EKSPERYMENT: Local persistence write failed for \"evidence-store/v1\". The record was not saved.",
     "alertVisible": true,
+    "cityCanvasCount": 1,
+    "stageFailed": false
+  },
+  "earthquakeHistoryUnavailable": {
+    "disclosed": true,
+    "atomicPolite": true,
+    "emptyHistoryNotClaimed": true,
     "cityCanvasCount": 1,
     "stageFailed": false
   },

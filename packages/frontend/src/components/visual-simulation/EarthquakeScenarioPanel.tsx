@@ -5,6 +5,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LocalHazardProvenanceStore } from '../../core/hazard/hazardProvenanceStore';
+import { storageAvailable } from '../../core/storage';
 import { getHazardModule } from '../../core/hazard/hazardModuleRegistry';
 import type { EarthquakeCityOverlayProjection } from '../../core/simulationRenderer/earthquakeCoordinateMapping';
 import {
@@ -55,6 +56,9 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
   const [historyError, setHistoryError] = useState<string | null>(null);
   const runSequence = useRef(0);
   const provenanceStore = useMemo(() => new LocalHazardProvenanceStore(), []);
+  // SSR cannot probe browser storage. In a browser, distinguish unavailable
+  // durability from a genuinely empty retained Earthquake run history.
+  const localPersistenceAvailable = typeof window === 'undefined' ? null : storageAvailable();
   // Fast Refresh may preserve a result created before registry provenance was added.
   // The live registry fallback keeps its read-only traceability display safe until rerun.
   const moduleDescriptor = execution?.moduleDescriptor ?? getHazardModule('earthquake');
@@ -225,7 +229,12 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
             HISTORIA: {historyError}
           </p>
         )}
-        {history.length === 0 && !historyLoading && (
+        {localPersistenceAvailable === false && (
+          <p className="hospital-panel-note earthquake-history-unavailable" role="status" aria-live="polite" aria-atomic="true">
+            <strong>LOCAL_PERSISTENCE_UNAVAILABLE:</strong> Przeglądarka nie udostępnia trwałego local storage. Ten widok nie może potwierdzić zapisanej historii Earthquake HazardRun.
+          </p>
+        )}
+        {history.length === 0 && !historyLoading && localPersistenceAvailable !== false && (
           <p className="earthquake-history-empty">Brak lokalnie zapisanych Earthquake HazardRun.</p>
         )}
         {history.length > 0 && (

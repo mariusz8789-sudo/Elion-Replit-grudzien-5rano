@@ -240,7 +240,39 @@ try {
       stageFailed: Boolean(document.querySelector('.empty-state')),
     };
   })())`));
-  const report = { before, active, exportDownload, cleared, evidenceReplay, blockedParameter, evidencePersistenceFailure, consoleEntries };
+  // This final fresh document simulates browser-level local-storage denial.
+  // Earthquake history must not mislabel the unknown retained state as empty.
+  await cdp('Page.addScriptToEvaluateOnNewDocument', {
+    source: `(() => {
+      const originalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(key, value) {
+        if (key === 'genesis-os:__probe__') {
+          throw new DOMException('Simulated browser local-storage denial', 'SecurityError');
+        }
+        return originalSetItem.call(this, key, value);
+      };
+    })();`,
+  });
+  await cdp('Page.navigate', { url: proofUrl.replace('#', '&earthquakeStorageUnavailable=1#') });
+  await sleep(900);
+  await evaluate(`(() => [...document.querySelectorAll('button')].find((b) => /^Pomiń/.test(b.textContent?.trim() ?? ''))?.click())()`);
+  await sleep(1900);
+  consoleEntries.length = 0;
+  await evaluate(`(() => document.querySelector('.earthquake-scenario-panel .earthquake-history-details summary')?.click())()`);
+  await sleep(160);
+  const earthquakeHistoryUnavailable = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const panel = document.querySelector('.earthquake-scenario-panel');
+    const disclosure = panel?.querySelector('.earthquake-history-unavailable[role="status"]');
+    const text = panel?.textContent ?? '';
+    return {
+      disclosed: /LOCAL_PERSISTENCE_UNAVAILABLE/.test(disclosure?.textContent ?? ''),
+      atomicPolite: disclosure?.getAttribute('aria-live') === 'polite' && disclosure?.getAttribute('aria-atomic') === 'true',
+      emptyHistoryNotClaimed: !/Brak lokalnie zapisanych Earthquake HazardRun[.]/.test(text),
+      cityCanvasCount: document.querySelectorAll('.city-3d-canvas').length,
+      stageFailed: Boolean(document.querySelector('.empty-state')),
+    };
+  })())`));
+  const report = { before, active, exportDownload, cleared, evidenceReplay, blockedParameter, evidencePersistenceFailure, earthquakeHistoryUnavailable, consoleEntries };
   await writeFile(reportPath, JSON.stringify(report, null, 2));
   const assertions = [
     before.cityCanvasCount === 1,
@@ -295,6 +327,11 @@ try {
     evidencePersistenceFailure.alertVisible,
     evidencePersistenceFailure.cityCanvasCount === 1,
     !evidencePersistenceFailure.stageFailed,
+    earthquakeHistoryUnavailable.disclosed,
+    earthquakeHistoryUnavailable.atomicPolite,
+    earthquakeHistoryUnavailable.emptyHistoryNotClaimed,
+    earthquakeHistoryUnavailable.cityCanvasCount === 1,
+    !earthquakeHistoryUnavailable.stageFailed,
     consoleEntries.length === 0,
   ];
   if (!assertions.every(Boolean)) throw new Error(`Earthquake City3D runtime proof failed: ${JSON.stringify(report)}`);

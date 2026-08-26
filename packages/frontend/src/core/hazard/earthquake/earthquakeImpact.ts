@@ -34,12 +34,12 @@ export function computeImpactResults(run: HazardRun, exposure: ExposureSnapshot)
   const output = readEarthquakeOutputFields(run);
   const uncertaintyFraction = output.uncertaintyBandPercent / 100;
 
-  return exposure.sites.map((site) => {
+  return Object.freeze(exposure.sites.map((site) => {
     const distanceKm = hypocentralDistanceKm(output.epicenter, output.depthKm, { x: site.x, y: site.y });
     const rawPgaG = syntheticPeakGroundAcceleration(output.magnitude, distanceKm);
     const siteAdjustedPgaG = rawPgaG * vulnerabilityMultiplier(site.vulnerabilityClass);
 
-    return {
+    return Object.freeze({
       impactResultId: impactResultId(run.hazardRunId, site.siteId),
       hazardRunId: run.hazardRunId,
       exposureSnapshotId: exposure.exposureSnapshotId,
@@ -47,12 +47,12 @@ export function computeImpactResults(run: HazardRun, exposure: ExposureSnapshot)
       resultType: 'GROUND_SHAKING_IMPACT',
       severity: classifySeverity(siteAdjustedPgaG),
       severityValue: siteAdjustedPgaG,
-      uncertainty: {
+      uncertainty: Object.freeze({
         low: siteAdjustedPgaG * (1 - uncertaintyFraction),
         high: siteAdjustedPgaG * (1 + uncertaintyFraction),
-      },
+      }),
       datasetStatus: 'SCENARIO',
-      provenance: { hazardRunId: run.hazardRunId, hazardModuleVersion: EARTHQUAKE_MODEL_VERSION },
-    };
-  });
+      provenance: Object.freeze({ hazardRunId: run.hazardRunId, hazardModuleVersion: EARTHQUAKE_MODEL_VERSION }),
+    });
+  }));
 }

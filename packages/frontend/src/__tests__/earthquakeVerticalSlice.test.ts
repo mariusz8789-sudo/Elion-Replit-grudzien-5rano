@@ -329,6 +329,30 @@ describe('Earthquake exposure — synthetic fixture, not epidemic CityWorld', ()
     const b = computeImpactResults(result.run, result.exposure);
     expect(a).toEqual(b);
   });
+
+  it('SYNTHETIC_EXPOSURE_SITES and the snapshots built from it are genuinely frozen — not just TypeScript-readonly — so one scenario cannot corrupt every other scenario\'s data', () => {
+    const snapshot = buildSyntheticExposureSnapshot('exposure-test-frozen');
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Object.isFrozen(snapshot.sites)).toBe(true);
+    expect(Object.isFrozen(snapshot.sites[0])).toBe(true);
+    expect(() => {
+      // @ts-expect-error deliberately violating readonly to prove the shared fixture array is truly immutable
+      snapshot.sites[0].vulnerabilityClass = 'LOW';
+    }).toThrow(TypeError);
+
+    // The bug this guards against: every ExposureSnapshot shares SYNTHETIC_EXPOSURE_SITES by
+    // reference, so an unfrozen mutation on ONE snapshot would have corrupted every other
+    // scenario's exposure data, past and future, for the lifetime of the process.
+    const otherSnapshot = buildSyntheticExposureSnapshot('exposure-test-unaffected');
+    expect(otherSnapshot.sites[0].vulnerabilityClass).toBe('HIGH');
+  });
+
+  it('computeImpactResults returns a frozen array of frozen ImpactResult objects', async () => {
+    const result = await runEarthquakeScenario({ ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-TEST-FROZEN-IMPACTS' }, 'test-commit-hash');
+    expect(Object.isFrozen(result.impacts)).toBe(true);
+    expect(Object.isFrozen(result.impacts[0])).toBe(true);
+    expect(Object.isFrozen(result.impacts[0].uncertainty)).toBe(true);
+  });
 });
 
 describe('Earthquake module isolation — Scientific Core and WorldEngineContract untouched', () => {

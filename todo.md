@@ -12,3 +12,10 @@
 - [x] Compare `e94ef16` with current `808c9df`, identifying whether the Multi-Hazard audit is the only missing additive change. Claude’s branch contained the Evidence/Replay work plus feature-flagged routing core changes.
 - [x] Reconcile only safe missing work, validate the resulting branch, and report the final integration state. Evidence/Replay was added selectively; routing core and routing tests remain excluded by scope.
 - [x] Incorporate Claude’s audit-only Phase 0 review, including artifact pinning, adapter-version provenance, replay gating, and cascade isolation, into the Multi-Hazard roadmap without starting implementation.
+- [x] Validate the reconciled City3D and collapsed Evidence/Replay panel together in Chromium, including Scenario, Hospital, WorldState and renderer status.
+- [x] Fix only an observed integration regression, then record the final runtime quality outcome; do not start Multi-Hazard implementation.
+- [x] Capture and inspect 1920×1080 post-integration runtime evidence through the established DevTools fallback, including canvas ownership, default Evidence/Replay collapse state and sidebar overflow.
+- [x] Independently fetch and scope-audit Claude commit `cf96410`; do not merge or modify its Phase 0 implementation during this bounded City3D QA task. The follow-on `cd02484` audit is scope-clean but merge-blocked pending admission-gate completeness fixes.
+- [ ] Implement only Phase 0 domain-neutral provenance and replay contracts: frozen artifacts, canonical hazard inputs/runs, immutable evidence storage and honest replay gates.
+- [ ] Add Phase 0 deterministic serialization, immutability, MATCH/DRIFT/BLOCKED and epidemic-isolation tests; do not add a hazard solver, external live-data adapter, GIS wiring, cascade or City3D hazard layer.
+- [ ] Validate, document, commit and deliver the Phase 0 contract foundation with deferred work stated explicitly.

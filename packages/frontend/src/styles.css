@@ -2081,7 +2081,11 @@ kbd {
    nietknięte (te same dane z EpidemicCitySimulation).
    ========================================================================= */
 @media (min-width: 1100px) {
-  .city-world-shell { max-width: none; padding: 0; }
+  /* City3D visual contract: at command-center widths the single governed scene
+     must own the full available canvas. Reset the earlier auto side margins,
+     which otherwise make a flex child shrink to its content and waste desktop
+     space around the renderer. */
+  .city-world-shell { width: 100%; max-width: none; margin: 0; padding: 0; align-self: stretch; }
   .city-world-header { padding: var(--sp-3) var(--sp-4) var(--sp-2); border-bottom: none; }
   .city-world-transport {
     position: relative; z-index: 3; margin: 0 var(--sp-4) var(--sp-2);

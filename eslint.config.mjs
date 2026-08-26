@@ -7,7 +7,14 @@ import tseslint from 'typescript-eslint';
  * - bez wojen stylistycznych (styl trzyma Prettier).
  */
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', 'packages/frontend/public/sw.js', 'packages/backend/src/compute/core.bundle.mjs'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      'packages/frontend/public/sw.js',
+      'packages/backend/src/compute/core.bundle.mjs',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -23,8 +30,15 @@ export default tseslint.config(
     files: ['packages/backend/**/*.mjs'],
     languageOptions: {
       globals: {
-        console: 'readonly', process: 'readonly', setTimeout: 'readonly', setInterval: 'readonly',
-        clearTimeout: 'readonly', setImmediate: 'readonly', URL: 'readonly', Buffer: 'readonly', fetch: 'readonly',
+        console: 'readonly',
+        process: 'readonly',
+        setTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearTimeout: 'readonly',
+        setImmediate: 'readonly',
+        URL: 'readonly',
+        Buffer: 'readonly',
+        fetch: 'readonly',
       },
     },
     rules: {
@@ -35,13 +49,38 @@ export default tseslint.config(
     files: ['scripts/**/*.mjs', 'packages/frontend/scripts/**/*.mjs'],
     languageOptions: {
       globals: {
-        console: 'readonly', process: 'readonly', fetch: 'readonly', URL: 'readonly',
+        console: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
         // Skrypty e2e (Playwright) używają globali przeglądarki wewnątrz page.evaluate().
-        document: 'readonly', window: 'readonly', Event: 'readonly', localStorage: 'readonly',
+        document: 'readonly',
+        window: 'readonly',
+        Event: 'readonly',
+        localStorage: 'readonly',
       },
     },
     rules: {
       'no-console': 'off', // skrypty CLI raportują postęp przez console
+    },
+  },
+  {
+    // Committed reproducibility/benchmark harnesses run under Node and attach
+    // to a real Chromium CDP endpoint; they are not browser application code.
+    files: ['artifacts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        setTimeout: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        Buffer: 'readonly',
+        WebSocket: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
     },
   },
 );

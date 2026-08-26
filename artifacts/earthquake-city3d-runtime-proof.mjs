@@ -98,7 +98,7 @@ try {
       scenarioSynthetic: /SCENARIO/.test(proof) && /SYNTHETIC/.test(proof),
       mappingVisible: /Mapping/.test(proof),
       evidenceHashVisible: /Evidence SHA-256/.test(proof),
-      registryModuleVisible: /Registry module/.test(proof) && /earthquake/.test(proof) && /schema 1\.0\.0/.test(proof),
+      registryModuleVisible: /Registry module/.test(proof) && /earthquake/.test(proof) && /schema 1[.]0[.]0/.test(proof),
       capabilitiesVisible: /Declared capabilities/.test(proof) && /ground-motion-attenuation-synthetic/.test(proof),
       notModeledVisible: /NOT_MODELED/.test(proof),
       parametersVisible: ['Synthetic magnitude', 'Synthetic depth km', 'Synthetic fixture X', 'Synthetic fixture Y', 'Synthetic seed'].every((label) => Boolean([...document.querySelectorAll('input')].find((node) => node.getAttribute('aria-label') === label))),

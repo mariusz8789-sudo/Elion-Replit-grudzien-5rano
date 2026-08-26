@@ -54,4 +54,24 @@ describe('Earthquake command-center execution', () => {
       overlay: null,
     });
   });
+
+  it('blocks an immutable provenance conflict before mapping or City3D overlay output', async () => {
+    const store = new InMemoryHazardProvenanceStore();
+    const scenarioLabel = 'command-center-reused-immutable-label';
+    const first = await executeEarthquakeCommandCenterScenario({
+      scenarioLabel, magnitude: 5.4, depthKm: 12, epicenter: { x: 0, y: 0 }, seed: 42,
+    }, { store, commitHash: 'test-commit' });
+    expect(first.status).toBe('READY');
+
+    const conflict = await executeEarthquakeCommandCenterScenario({
+      scenarioLabel, magnitude: 6.1, depthKm: 12, epicenter: { x: 0, y: 0 }, seed: 42,
+    }, { store, commitHash: 'test-commit' });
+
+    expect(conflict).toMatchObject({
+      status: 'BLOCKED',
+      blockCode: 'PROVENANCE_CONFLICT',
+      overlay: null,
+    });
+    expect(conflict.envelope.projection).toBeNull();
+  });
 });

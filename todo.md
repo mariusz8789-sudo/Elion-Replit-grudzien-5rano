@@ -59,3 +59,4 @@
 - [x] Add a compact local persisted-run history that reads actual Earthquake HazardRun records and canonical replay verdicts without reapplying mapping or City3D overlays, adding hazards, GIS, cascades or Scientific Core coupling.
 - [x] Expose only existing synthetic Earthquake scenario parameters in the Command Center with truthful validation/blocking, immutable provenance and the existing one-renderer overlay path; do not add a solver, calibration, GIS, renderer or epidemic behavior.
 - [x] Add a repository-native frontend quality gate for tests, TypeScript, production build and whitespace checks on push/pull request; do not publish, deploy or alter scientific/runtime behavior.
+- [x] Add a dry, domain-neutral dataset-governance registry with source/license/provenance metadata and no network fetch, GIS, hazard execution, cascade or epidemic coupling.

@@ -23,8 +23,9 @@ const CITY_VELOCITY_SCALE_FACTOR = 0.10;
 const MAX_DETAILED_HUMANOIDS = 4;
 // InstancedMesh utrzymuje stałą liczbę draw calls; P1 umożliwia uczciwy benchmark do 1000 agentów.
 const MAX_CROWD_HUMANOIDS = 1024;
-const CITY_CAMERA_POSITION = { x: 0, y: 13.2, z: 10.6 };
-const CITY_CAMERA_TARGET = { x: 0, y: 0, z: -0.35 };
+// City first: zwarty, izometryczny kadr dzielnicy zamiast odległego widoku planszy.
+const CITY_CAMERA_POSITION = { x: 7.7, y: 13.2, z: 8.2 };
+const CITY_CAMERA_TARGET = { x: 0, y: 0.32, z: -0.24 };
 /** Czas prezentacji odczytanego eventu — nie wpływa na czas ani prawdopodobieństwo modelu. */
 // Krótka obserwacja rzeczywistego kontaktu: po pauzie zegara pozostaje do inspekcji, ale w ruchu nie zamienia świata w dashboard.
 const TRANSMISSION_MARKER_LIFETIME_SECONDS = 1.1;
@@ -98,7 +99,8 @@ export class EpidemicCity3DSim implements Sim3D {
   private followTarget: THREE_NS.Vector3 | null = null;
   private cameraPreset: CityCameraPreset = 'city';
   private resetCityCameraPending = false;
-  /** Agent pozostaje źródłem punktu kamery; preset ulicy nie tworzy wirtualnej choreografii. */
+  /** Punkt kamery ulicznej pochodzi z istniejącej siatki ulic CityWorld; to cecha widoku, nie ruch ani cel agenta. */
+  private streetLayoutFocus: { x: number; y: number } | null = null;
   private cameraTrackId: number | null = null;
   private detailVisuals = new Map<number, HumanoidAgentVisual>();
   private crowd: InstancedHumanoidCrowd | null = null;
@@ -173,6 +175,7 @@ export class EpidemicCity3DSim implements Sim3D {
   clearSelection(): void {
     this.cameraPreset = 'city';
     this.cameraTrackId = null;
+    this.streetLayoutFocus = null;
     this.selectAgent(null);
     this.selectWorld(null);
   }
@@ -186,20 +189,33 @@ export class EpidemicCity3DSim implements Sim3D {
     this.cameraPreset = preset;
     if (preset === 'city') {
       this.cameraTrackId = null;
+      this.streetLayoutFocus = null;
       this.resetCityCameraPending = true;
       this.selectAgent(null);
       this.selectWorld(null);
       return null;
     }
+    if (preset === 'street') {
+      const vertical = this.simulation.streets.v[Math.floor(this.simulation.streets.v.length / 2)] ?? this.simulation.worldWidth / 2;
+      const horizontal = this.simulation.streets.h[Math.floor(this.simulation.streets.h.length / 2)] ?? this.simulation.worldHeight / 2;
+      const agents = this.simulation.agents();
+      const candidate = agents.find((agent) => agent.state === 'I') ?? agents.find((agent) => agent.state === 'E') ?? agents[0] ?? null;
+      this.streetLayoutFocus = { x: vertical, y: horizontal };
+      // Zachowujemy publiczny kontrakt presetu: identyfikator odnosi się wyłącznie do istniejącego agenta modelu.
+      // Kadr korzysta jednak z bezpiecznego punktu istniejącej siatki ulic, więc nie wpada w geometrię wokół agenta.
+      this.cameraTrackId = candidate?.id ?? null;
+      this.selectAgent(null, true);
+      return candidate?.id ?? null;
+    }
+    this.streetLayoutFocus = null;
     const agents = this.simulation.agents();
     const moving = agents.find((agent) => Math.hypot(agent.vx, agent.vy) > 1e-3);
     const infected = agents.find((agent) => agent.state === 'I') ?? agents.find((agent) => agent.state === 'E');
-    const candidate = (preset === 'agent' || preset === 'street')
+    const candidate = preset === 'agent'
       ? infected ?? moving ?? agents[0] ?? null
       : moving ?? infected ?? agents[0] ?? null;
     this.cameraTrackId = candidate?.id ?? null;
-    // STREET i AGENT używają prawdziwego celu oraz pełnego rigu; nie tworzą osobnej postaci ani kamery.
-    this.selectAgent((preset === 'agent' || preset === 'street') ? candidate?.id ?? null : null, preset === 'street');
+    this.selectAgent(preset === 'agent' ? candidate?.id ?? null : null);
     return candidate?.id ?? null;
   }
 
@@ -268,7 +284,7 @@ export class EpidemicCity3DSim implements Sim3D {
   ): PostProcessor {
     const THREE = this.THREE!;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.92;
+    renderer.toneMappingExposure = 1.06;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -324,6 +340,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.syncAnalysis(agents);
     this.syncTransmissionMarkers();
     this.syncWorldStateVisuals();
+    this.animateWorldMarkers();
     this.syncApprovedAssetLod();
     this.syncFollowTarget(states);
     if (this.resetCityCameraPending) {
@@ -348,15 +365,16 @@ export class EpidemicCity3DSim implements Sim3D {
     if (!this.followTarget) return null;
     if (this.selectedWorld) return 4.6;
     if (this.cameraPreset === 'district') return 7.2;
-    // Ten sam rig i OrbitControls: STREET jest na wysokości obserwatora, AGENT pozwala obejrzeć twarz i ubranie.
-    if (this.cameraPreset === 'street') return 2.9;
+    // Ten sam rig i OrbitControls: STREET zachowuje wysokość obserwatora, ale
+    // zostawia pełny rytm ulicy w kadrze zamiast zatrzymywać kamerę przy latarni.
+    if (this.cameraPreset === 'street') return 7.8;
     return 1.85;
   }
 
   getOrbitCameraDirection(): THREE_NS.Vector3 | null {
     if (!this.THREE || !this.followTarget || this.cameraPreset !== 'street') return null;
     // Niski, stabilny kierunek uliczny: nadal jedna kamera OrbitControls, bez fikcyjnego ruchu lub danych agenta.
-    return new this.THREE.Vector3(1, 0.16, 1).normalize();
+    return new this.THREE.Vector3(1.35, 0.62, 2.6).normalize();
   }
 
   onResize(w: number, h: number): void {
@@ -562,11 +580,10 @@ export class EpidemicCity3DSim implements Sim3D {
         if (!this.scene || !this.THREE) { texture.dispose(); pmrem.dispose(); return; }
         const environment = pmrem.fromEquirectangular(texture).texture;
         this.scene.environment = environment;
-        this.scene.environmentIntensity = 0.45;
-        this.scene.background = environment;
-        this.scene.backgroundIntensity = 0.42;
-        this.scene.backgroundBlurriness = 0.50;
-        this.scene.fog = new this.THREE.FogExp2(0x59615a, 0.022);
+        this.scene.environmentIntensity = 0.38;
+        // HDRI pozostaje źródłem IBL dla PBR, lecz nie przejmuje horyzontu brązowym kadrem alei.
+        this.scene.background = new this.THREE.Color(0x101923);
+        this.scene.fog = new this.THREE.FogExp2(0x101923, 0.022);
         texture.dispose();
         pmrem.dispose();
       }, undefined, () => pmrem.dispose());
@@ -646,14 +663,17 @@ export class EpidemicCity3DSim implements Sim3D {
     for (const asset of this.approvedAssetRoots) {
       if (asset.userData.assetLod === 'street-only') asset.visible = showStreetFacade;
     }
+    for (const object of this.buildingMeshes) {
+      if (object.userData.streetHidden) object.visible = this.cameraPreset !== 'street';
+    }
   }
 
   private addLightsAndGround(): void {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
-    this.scene.add(new THREE.HemisphereLight(0xc5ddff, 0x1d3023, 1.16));
-    this.scene.add(new THREE.AmbientLight(0x6988b2, 0.20));
-    const key = new THREE.DirectionalLight(0xffdcad, 2.35);
+    this.scene.add(new THREE.HemisphereLight(0x9ab8d4, 0x17251e, 0.92));
+    this.scene.add(new THREE.AmbientLight(0x365374, 0.16));
+    const key = new THREE.DirectionalLight(0xffcc91, 1.88);
     key.position.set(9, 16, 10);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
@@ -663,10 +683,10 @@ export class EpidemicCity3DSim implements Sim3D {
     key.shadow.camera.bottom = -13;
     key.shadow.bias = -0.00035;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x80b9ff, 0.68);
+    const rim = new THREE.DirectionalLight(0x77baff, 0.86);
     rim.position.set(-9, 9, -8);
     this.scene.add(rim);
-    const fill = new THREE.DirectionalLight(0x8ce3c6, 0.30);
+    const fill = new THREE.DirectionalLight(0x76d7bd, 0.22);
     fill.position.set(-2, 4, 12);
     this.scene.add(fill);
 
@@ -817,6 +837,9 @@ export class EpidemicCity3DSim implements Sim3D {
       this.buildingMeshes.push(group);
     }
     this.addDistrictInfill();
+    // Optional call keeps a live HMR-retained renderer from crashing while the
+    // newly defined visual-only method reaches a freshly constructed City3D instance.
+    this.addPerimeterDistrict?.();
   }
 
   /**
@@ -837,6 +860,8 @@ export class EpidemicCity3DSim implements Sim3D {
       { x: -1.68, z: 0.96, w: 2.05, d: 0.82, cols: 3, rows: 1 },
       { x: 1.95, z: 0.96, w: 1.64, d: 0.82, cols: 2, rows: 1 },
       { x: -6.88, z: -1.68, w: 1.10, d: 1.18, cols: 1, rows: 2 },
+      { x: -4.80, z: 1.64, w: 1.26, d: 1.05, cols: 2, rows: 2 },
+      { x: 4.65, z: -1.45, w: 1.36, d: 1.18, cols: 2, rows: 2 },
     ];
     let serial = 0;
     for (const zone of zones) {
@@ -861,20 +886,23 @@ export class EpidemicCity3DSim implements Sim3D {
     const THREE = this.THREE!;
     const group = new THREE.Group();
     const palettes = [
-      { wall: 0x728ca5, roof: 0x344554, glass: 0x9cc8e5 },
-      { wall: 0xa89376, roof: 0x4f4740, glass: 0xd7c29a },
-      { wall: 0x8b9d93, roof: 0x3b534f, glass: 0xa8ded1 },
-      { wall: 0x9a8792, roof: 0x503f53, glass: 0xd7b6d3 },
+      { wall: 0x657689, roof: 0x293746, glass: 0x9cc8e5 },
+      { wall: 0x8a7966, roof: 0x403d39, glass: 0xc4b791 },
+      { wall: 0x657970, roof: 0x2e4741, glass: 0x8ebfaf },
+      { wall: 0x786d79, roof: 0x403644, glass: 0xb7a8c3 },
     ];
     const palette = palettes[serial % palettes.length];
-    const height = 0.66 + (serial % 4) * 0.19;
-    const body = new THREE.Mesh(new THREE.BoxGeometry(w, height, d), new THREE.MeshStandardMaterial({ color: palette.wall, roughness: 0.78, metalness: 0.05 }));
+    const height = 0.78 + (serial % 5) * 0.18;
+    const facadeBase = serial % 3 === 0 ? this.cityMaterials?.brick : this.cityMaterials?.concrete;
+    const facade = facadeBase?.clone() ?? new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.05 });
+    facade.color.multiply(new THREE.Color(palette.wall));
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, height, d), facade);
     body.position.y = height / 2;
     body.castShadow = true; body.receiveShadow = true;
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, 0.10, d * 1.08), new THREE.MeshStandardMaterial({ color: palette.roof, roughness: 0.86, metalness: 0.10 }));
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 1.07, 0.11, d * 1.09), new THREE.MeshStandardMaterial({ color: palette.roof, roughness: 0.72, metalness: 0.18 }));
     roof.position.y = height + 0.05; roof.castShadow = true; roof.receiveShadow = true;
     group.add(body, roof);
-    const glass = new THREE.MeshStandardMaterial({ color: palette.glass, emissive: palette.glass, emissiveIntensity: 0.20, roughness: 0.30, metalness: 0.16 });
+    const glass = new THREE.MeshStandardMaterial({ color: palette.glass, emissive: palette.glass, emissiveIntensity: 0.34, roughness: 0.24, metalness: 0.18 });
     const columns = Math.max(1, Math.floor(w / 0.22));
     const rows = Math.max(2, Math.floor(height / 0.20));
     for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
@@ -886,9 +914,56 @@ export class EpidemicCity3DSim implements Sim3D {
       const roofUnit = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.22, w * 0.25), 0.10, Math.min(0.18, d * 0.28)), new THREE.MeshStandardMaterial({ color: 0x65717d, roughness: 0.72, metalness: 0.22 }));
       roofUnit.position.set(w * 0.18, height + 0.15, -d * 0.18); roofUnit.castShadow = true; group.add(roofUnit);
     }
+    // Ciemniejszy parter i cofnięty gzyms rozbijają sylwetę pudełka, bez dodawania obiektu modelu.
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(w * 1.015, Math.min(0.18, height * 0.22), d * 1.015), new THREE.MeshStandardMaterial({ color: 0x25313b, roughness: 0.52, metalness: 0.12 }));
+    plinth.position.y = Math.min(0.18, height * 0.22) / 2; group.add(plinth);
+    const cornice = new THREE.Mesh(new THREE.BoxGeometry(w * 1.10, 0.035, d * 1.12), new THREE.MeshStandardMaterial({ color: 0xced4d4, roughness: 0.48, metalness: 0.18 }));
+    cornice.position.y = height * 0.72; group.add(cornice);
     group.userData.visualOnlyContext = true;
     group.position.set(x, 0, z);
     return group;
+  }
+
+  /**
+   * Tło miasta jest deterministyczną scenografią widoku City: nie posiada ID,
+   * nie jest lokacją, nie jest celem ruchu ani kontaktem. Buduje głębię 3×3
+   * dzielnicy bez ingerencji w CityWorld.
+   */
+  private addPerimeterDistrict(): void {
+    if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
+    const masses = [
+      [-5.65, -3.70, 1.10, 0.72, 2.45], [-4.35, -3.55, 0.86, 0.75, 1.85], [-2.85, -3.78, 1.26, 0.70, 2.15],
+      [-0.90, -3.68, 1.05, 0.82, 2.90], [1.00, -3.72, 1.20, 0.70, 2.25], [3.00, -3.62, 0.92, 0.78, 2.72], [4.65, -3.72, 1.18, 0.74, 2.12],
+      [-5.90, 3.50, 1.08, 0.76, 2.20], [-4.18, 3.64, 1.30, 0.70, 2.62], [-2.08, 3.55, 0.90, 0.80, 1.98], [0.10, 3.70, 1.18, 0.72, 2.46], [2.15, 3.58, 1.00, 0.82, 2.86], [4.22, 3.66, 1.24, 0.72, 2.16],
+    ] as const;
+    const cool = this.cityMaterials?.concrete.clone() ?? new THREE.MeshStandardMaterial({ color: 0x667688, roughness: 0.78 });
+    const warm = this.cityMaterials?.brick.clone() ?? new THREE.MeshStandardMaterial({ color: 0x80695a, roughness: 0.78 });
+    cool.color.multiply(new THREE.Color(0x596d7c));
+    warm.color.multiply(new THREE.Color(0x7c6658));
+    const coolMasses = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cool, Math.ceil(masses.length / 2));
+    const warmMasses = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), warm, Math.floor(masses.length / 2));
+    const caps = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x25313b, roughness: 0.58, metalness: 0.28 }), masses.length);
+    const windows = new THREE.InstancedMesh(new THREE.BoxGeometry(0.13, 0.045, 0.018), new THREE.MeshStandardMaterial({ color: 0xbcdaf0, emissive: 0x4c81a5, emissiveIntensity: 0.48, roughness: 0.24, metalness: 0.16 }), masses.length * 12);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const rotation = new THREE.Quaternion();
+    let coolIndex = 0; let warmIndex = 0; let windowIndex = 0;
+    masses.forEach(([x, z, w, d, h], index) => {
+      position.set(x, h / 2, z); scale.set(w, h, d); matrix.compose(position, rotation, scale);
+      (index % 2 === 0 ? coolMasses : warmMasses).setMatrixAt(index % 2 === 0 ? coolIndex++ : warmIndex++, matrix);
+      position.set(x, h + 0.055, z); scale.set(w * 1.08, 0.11, d * 1.08); matrix.compose(position, rotation, scale); caps.setMatrixAt(index, matrix);
+      for (let level = 0; level < 3; level++) for (let col = -1; col <= 2; col++) {
+        position.set(x - w * 0.25 + col * w * 0.17, 0.58 + level * 0.48, z + d / 2 + 0.014);
+        scale.set(1, 1, 1); matrix.compose(position, rotation, scale); windows.setMatrixAt(windowIndex++, matrix);
+      }
+    });
+    coolMasses.count = coolIndex; warmMasses.count = warmIndex; windows.count = windowIndex;
+    coolMasses.instanceMatrix.needsUpdate = true; warmMasses.instanceMatrix.needsUpdate = true; caps.instanceMatrix.needsUpdate = true; windows.instanceMatrix.needsUpdate = true;
+    const context = new THREE.Group(); context.name = 'visual-only-perimeter-district'; context.userData.visualOnlyContext = true; context.userData.streetHidden = true;
+    context.add(coolMasses, warmMasses, caps, windows); context.traverse((node) => { const mesh = node as THREE_NS.Mesh; if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; } });
+    this.scene.add(context); this.buildingMeshes.push(context);
   }
 
   private createBuilding(building: WorldObject): THREE_NS.Group {
@@ -1239,7 +1314,7 @@ export class EpidemicCity3DSim implements Sim3D {
         detail: `Grid cell aggregated from current infectious agent positions; ${hotspot.infectious} infectious agent(s).`,
         x: hotspot.x,
         y: hotspot.y,
-      }, 0xff5b6b, Math.min(0.38, 0.11 + hotspot.infectious * 0.028), 0.26);
+      }, 0xff5b6b, Math.min(0.38, 0.15 + hotspot.infectious * 0.032), 0.78);
     }
     for (const cluster of [...world.clusters.household, ...world.clusters.location]) {
       const location = world.locations[cluster.locationIndex];
@@ -1251,7 +1326,7 @@ export class EpidemicCity3DSim implements Sim3D {
         detail: `Cluster ${cluster.clusterId}; model contact type ${cluster.contactType}; day ${cluster.firstDay}–${cluster.lastDay}.`,
         x: location.x + location.w / 2,
         y: location.y + location.h / 2,
-      }, 0xb993ff, Math.min(0.30, 0.10 + cluster.transmissions * 0.025), 0.20);
+      }, 0xb993ff, Math.min(0.34, 0.13 + cluster.transmissions * 0.028), 0.62);
     }
     const hospitalLocation = world.locations.find((location) => location.kind === 'hospital');
     if (hospitalLocation) {
@@ -1262,7 +1337,7 @@ export class EpidemicCity3DSim implements Sim3D {
         detail: `Occupied beds ${world.hospital.occupiedBeds}; occupied ICU ${world.hospital.occupiedIcu}; unmet care ${world.hospital.unmetCare}.`,
         x: hospitalLocation.x + hospitalLocation.w / 2,
         y: hospitalLocation.y + hospitalLocation.h / 2,
-      }, hospitalColor[world.hospital.status] ?? 0xffffff, 0.23, 0.35);
+      }, hospitalColor[world.hospital.status] ?? 0xffffff, 0.27, 0.84);
     }
   }
 
@@ -1272,17 +1347,32 @@ export class EpidemicCity3DSim implements Sim3D {
     const group = new THREE.Group();
     const worldX = (selection.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE;
     const worldZ = (selection.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE;
-    const ring = new THREE.Mesh(new THREE.RingGeometry(radius * 0.64, radius, 24), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.74, depthWrite: false }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(radius * 0.60, radius, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.90, depthWrite: false, depthTest: false }));
     ring.rotation.x = -Math.PI / 2;
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, height, 8), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.58, depthWrite: false }));
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, height, 10), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.76, depthWrite: false, depthTest: false }));
     stem.position.y = height / 2;
-    const cap = new THREE.Mesh(new THREE.OctahedronGeometry(Math.max(0.045, radius * 0.34), 0), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.92, depthWrite: false }));
+    const cap = new THREE.Mesh(new THREE.OctahedronGeometry(Math.max(0.058, radius * 0.38), 1), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.98, depthWrite: false, depthTest: false }));
     cap.position.y = height;
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.62, 0.012, 6, 28), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.82, depthWrite: false, depthTest: false }));
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = height * 0.72;
     group.position.set(worldX, 0.07, worldZ);
-    group.add(ring, stem, cap);
+    group.userData.markerPhase = ((selection.x * 17 + selection.y * 29) % 13) / 13 * Math.PI * 2;
+    group.add(ring, stem, cap, halo);
     group.userData.worldSelection = selection;
     this.worldOverlayGroup.add(group);
     this.worldInteractive.push(group);
+  }
+
+  /** Ruch markera jest wyłącznie prezentacją odczytu WorldState; nie zmienia jego położenia, wartości ani symulacji. */
+  private animateWorldMarkers(): void {
+    if (!this.worldOverlayGroup) return;
+    for (const marker of this.worldOverlayGroup.children) {
+      const phase = Number(marker.userData.markerPhase ?? 0);
+      const pulse = 1 + Math.sin(this.timeSeconds * 2.2 + phase) * 0.075;
+      marker.scale.setScalar(pulse);
+      marker.rotation.y = this.timeSeconds * 0.35 + phase;
+    }
   }
 
   private syncFollowTarget(states: readonly HumanoidAgentState[]): void {
@@ -1293,6 +1383,15 @@ export class EpidemicCity3DSim implements Sim3D {
         (this.selectedWorld.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE,
         0.26,
         (this.selectedWorld.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE,
+      );
+      return;
+    }
+    if (this.streetLayoutFocus) {
+      if (!this.followTarget) this.followTarget = new this.THREE.Vector3();
+      this.followTarget.set(
+        (this.streetLayoutFocus.x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE,
+        0.46,
+        (this.streetLayoutFocus.y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE,
       );
       return;
     }

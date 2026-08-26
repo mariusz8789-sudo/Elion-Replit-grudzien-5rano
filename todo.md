@@ -1,0 +1,6 @@
+- [x] Audit current City3D screenshot, High-Fidelity Street Slice patterns, and approved runtime assets against the supplied visual reference.
+- [x] Implement a denser aerial district composition and professional material/lighting hierarchy in the existing City3D renderer.
+- [x] Inspect the supplied Genesis source ZIP only for governed, reusable City3D visual assets or renderer components; do not change scope or create a second project. The active worktree already contains the matching governed HDRI, PBR sets, modular façade, street lamp, and High-Fidelity Slice implementation.
+- [x] Improve real WorldState marker hierarchy and the unobtrusive analytics/readout composition without adding synthetic data.
+- [x] Produce new Chromium City, District, Street, hotspot, transmission, hospital, and Scenario runtime checks plus 1920×1080 before/after captures.
+- [x] Run build, full frontend tests, benchmark, package source ZIP, commit, push, and document remaining fidelity gaps.

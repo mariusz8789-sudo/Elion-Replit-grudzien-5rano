@@ -26,6 +26,8 @@ Only assets with `APPROVED` status are requested. Any unavailable or rejected as
 
 The modular façade is intentionally **LOD-gated**: it is visible in `STREET`, `AGENT`, and selected-location focus, while the aerial `CITY` and `DISTRICT` views use the approved PBR façade surfaces. This preserves useful city-scale draw-call headroom while making the approved high-detail façade available at the view where it can be inspected.
 
+The final visual pass replaces the sparse, tabletop reading of the aerial screen with a tighter isometric City frame, a dark neutral horizon that keeps HDRI only as PBR image-based lighting, denser deterministic infill blocks, and a City-only perimeter skyline rendered through instanced PBR masses. The added blocks are explicitly `VISUAL_ONLY`; they are not WorldState locations, contacts, destinations, or epidemiological entities. The `STREET` preset uses the existing road-grid center as a camera focus point, rather than placing the shared camera inside arbitrary surrounding geometry.
+
 ## 4. Real data used in the scene
 
 The screen creates one `projectWorldState(simulation)` projection and passes it read-only into the same City3D renderer. City3D does not compute an alternate hotspot, cluster, hospital, mobility, or transmission model.
@@ -33,9 +35,9 @@ The screen creates one `projectWorldState(simulation)` projection and passes it 
 | Signal | Source | In-world treatment |
 |---|---|---|
 | Semantic locations | `WorldStateView.locations` / existing CityWorld layout | Existing semantic building geometry; selectable read-only location focus |
-| Hotspots | `WorldStateView.hotspots` | Red vertical beacon/ring per real infectious grid cell |
-| Clusters | `WorldStateView.clusters` plus real `locationIndex` coordinate | Violet beacon only where a real location coordinate exists |
-| Hospital load | `WorldStateView.hospital` | Status-colored hospital beacon and retained Hospital UI |
+| Hotspots | `WorldStateView.hotspots` | Animated red beacon, stacked rings, and cap per real infectious grid cell |
+| Clusters | `WorldStateView.clusters` plus real `locationIndex` coordinate | Animated violet beacon only where a real location coordinate exists |
+| Hospital load | `WorldStateView.hospital` | Status-colored elevated beacon and retained Hospital UI |
 | Mobility | `WorldStateView.mobility` | Compact lower analytics rail, never a fabricated vehicle layer |
 | Transmission | Existing EventStream / real `TransmissionEvent` | Existing A→B arc plus selectable event metadata |
 
@@ -55,11 +57,11 @@ The benchmark harness changes the real `nAgents` control, waits for the current 
 
 | Agents | Draw calls, median | Triangles, median | Render time samples (ms) | Render median (ms) | Notes |
 |---:|---:|---:|---|---:|---|
-| 260 | 1,399 | 573,946 | 14.4, 14.9, 22.8 | 14.9 | One City3D canvas |
-| 500 | 1,396 | 1,065,858 | 14.7, 13.4, 13.0 | 13.4 | One City3D canvas |
-| 1,000 | 1,399–1,406 | 2,090,946–2,152,502 | 12.0, 11.7, 413.8 | 12.0 | One isolated 413.8 ms outlier retained, not discarded |
+| 260 | 1,496 | 581,242 | 14.5, 15.3, 16.0 | 15.3 | One City3D canvas |
+| 500 | 1,492 | 1,072,770 | 14.2, 13.1, 13.3 | 13.3 | One City3D canvas |
+| 1,000 | 1,496–1,503 | 2,098,242–2,159,798 | 15.1, 15.1, 439.5 | 15.1 | One isolated 439.5 ms outlier retained, not discarded |
 
-The raw samples are retained in `artifacts/city3d-benchmark.json`. The final City camera’s draw-call level is approximately the prior 1.38k baseline; it does not add a second renderer or a high-detail glTF draw burden to the aerial view.
+The raw samples are retained in `artifacts/city3d-benchmark.json`. The final City camera stays within one renderer/canvas and avoids a high-detail glTF draw burden in the aerial view. The additional visual-only skyline and real-beacon hierarchy raise the City budget by roughly one hundred draw calls relative to the earlier baseline; the render median remains approximately 15 ms in the automated Chromium setup.
 
 ## 8. Validation results
 
@@ -70,9 +72,9 @@ The raw samples are retained in `artifacts/city3d-benchmark.json`. The final Cit
 | Focused City3D WorldState boundary, hotspot, scenario tests | 12/12 passed |
 | Full frontend regression suite | 113 files / 1,162 tests passed |
 | Browser runtime DOM check | City3D canvas, Hospital UI, Scenario UI, lower analytics rail present; no console errors in the final captured tab |
-| Camera smoke | `CITY` and `STREET` captured from the existing shared camera controller |
+| Camera smoke | `CITY`, `DISTRICT`, and corrected `STREET` captured from the existing shared camera controller |
 
-The headless runtime capture evidence is in `artifacts/screenshots/`; `city3d-city-final.png` records the final city-scale scene and `city3d-street-final.png` records the Street camera. A previous browser-screenshot transport issue was isolated from the application by direct Chromium DevTools capture; the final captured tab reported no WebGL failure and no console errors.
+The runtime capture evidence is in `artifacts/screenshots/`; `city3d-city-final.png`, `city3d-district-final.png`, and `city3d-street-final.png` are 1920×1080 captures from the final renderer. A previous browser-screenshot transport issue was isolated from the application by direct Chromium DevTools capture; the final captured tab reported no WebGL failure and no console errors.
 
 ## 9. Preserved systems
 
@@ -83,10 +85,10 @@ No changes were made to `EpidemicCitySimulation`, `resolveContacts`, Hospital Mo
 | Artifact | Purpose |
 |---|---|
 | `artifacts/city3d-benchmark.json` | Raw final benchmark samples |
-| `artifacts/screenshots/city3d-city-final.png` | Final City camera capture |
-| `artifacts/screenshots/city3d-street-final.png` | Final Street camera capture |
+| `artifacts/screenshots/city3d-city-final.png` | Final 1920×1080 City camera capture with real hotspots |
+| `artifacts/screenshots/city3d-district-final.png` | Final 1920×1080 District camera capture |
+| `artifacts/screenshots/city3d-street-final.png` | Final 1920×1080 Street camera capture |
 | `screenshots/city3d-before-1920x1080.png` | Earlier baseline comparison capture |
-| `screenshots/city3d-after-1920x1080.png` | Earlier High-Fidelity City View comparison capture |
 
 ## 11. Next step
 

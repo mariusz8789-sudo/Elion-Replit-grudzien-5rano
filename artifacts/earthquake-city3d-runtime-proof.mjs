@@ -1,7 +1,11 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 
 const endpoint = 'http://127.0.0.1:9222';
-const origin = process.env.GENESIS_RUNTIME_ORIGIN ?? 'http://127.0.0.1:5000/#/city3d';
+const configuredOrigin = process.env.GENESIS_RUNTIME_ORIGIN ?? 'http://127.0.0.1:5000/#/city3d';
+// Accept a bare dev/preview origin while retaining an explicitly supplied hash route.
+const origin = configuredOrigin.includes('#')
+  ? configuredOrigin
+  : `${configuredOrigin.replace(/\/$/, '')}/#/city3d`;
 const proofUrl = origin.includes('#')
   ? origin.replace('#', `?proof=${Date.now()}#`)
   : `${origin}${origin.includes('?') ? '&' : '?'}proof=${Date.now()}`;

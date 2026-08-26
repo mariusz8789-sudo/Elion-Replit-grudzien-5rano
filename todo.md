@@ -30,6 +30,7 @@
 - [ ] After Claude remedies the audit blockers, assign only a bounded Earthquake Integration Readiness task; defer further hazard solvers/cascades, reserve read-only City3D integration for Manus, and reserve licensed data/GIS readiness for Kimi.
 - [ ] Prepare and test only a disabled-by-default read-only Earthquake projection seam for the existing City3D boundary; do not merge Claude, render a hazard layer, alter WorldState or imply OBSERVED hazard data until audit remediation is approved.
 - [x] Document the disabled-by-default Earthquake-to-City3D seam: separate from `WorldStateView`, evidence/MATCH-gated, SCENARIO-labelled and blocked without an explicit coordinate mapping artifact. No renderer code is wired.
+- [x] Implement and test a domain-neutral scenario-overlay eligibility gate that is disabled by default and requires supported schema, complete MATCH evidence, SCENARIO status and explicit coordinate mapping; do not connect it to City3D until Claude is approved.
 - [ ] Implement only Phase 0 domain-neutral provenance and replay contracts: frozen artifacts, canonical hazard inputs/runs, immutable evidence storage and honest replay gates.
 - [ ] Add Phase 0 deterministic serialization, immutability, MATCH/DRIFT/BLOCKED and epidemic-isolation tests; do not add a hazard solver, external live-data adapter, GIS wiring, cascade or City3D hazard layer.
 - [ ] Validate, document, commit and deliver the Phase 0 contract foundation with deferred work stated explicitly.

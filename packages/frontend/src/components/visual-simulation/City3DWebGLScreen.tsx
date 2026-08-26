@@ -8,6 +8,8 @@ import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
 import { projectWorldState } from '../../core/simulation/worldEngineContract';
+import type { EarthquakeCityOverlayProjection } from '../../core/simulationRenderer/earthquakeCoordinateMapping';
+import { EarthquakeScenarioPanel } from './EarthquakeScenarioPanel';
 import { EvidenceReplayPanel } from './EvidenceReplayPanel';
 import { ScenarioCommandCenterPanel } from './ScenarioCommandCenterPanel';
 
@@ -61,6 +63,8 @@ export function City3DWebGLScreen() {
   const [speed, setSpeed] = useState<ClockSpeed>(1);
   const [analysis, setAnalysis] = useState<AnalysisMode>('none');
   const [showTransmissions, setShowTransmissions] = useState(true);
+  // Design reminder: Earthquake is an immutable SCENARIO overlay, never epidemic WorldState.
+  const [earthquakeOverlay, setEarthquakeOverlay] = useState<EarthquakeCityOverlayProjection | null>(null);
   const [stats, setStats] = useState<Record<string, number>>(() => sim.getStats());
   const paramsRef = useRef(params);
   const statsRef = useRef(stats);
@@ -72,6 +76,7 @@ export function City3DWebGLScreen() {
 
   useEffect(() => { sim.setAnalysisMode(analysis); }, [analysis, sim]);
   useEffect(() => { sim.setShowTransmissions(showTransmissions); }, [showTransmissions, sim]);
+  useEffect(() => { sim.setEarthquakeScenarioOverlay(earthquakeOverlay); }, [earthquakeOverlay, sim]);
 
   const updateParam = (key: string, value: number | boolean) => {
     sim.setParam(key, value);
@@ -304,6 +309,7 @@ export function City3DWebGLScreen() {
             </div>
             <p className="hospital-panel-note">Topologia pochodzi z tego samego układu miasta co renderer. Przypisanie agentów do tras i segmentów kontaktu pozostaje <code>NOT_MODELED</code>.</p>
           </div>
+          <EarthquakeScenarioPanel onOverlayChange={setEarthquakeOverlay} />
           <ScenarioCommandCenterPanel params={params} />
           <div className="world-panel event-feed-panel">
             <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>

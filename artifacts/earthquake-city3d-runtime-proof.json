@@ -1,0 +1,28 @@
+{
+  "before": {
+    "canvasCount": 2,
+    "cityCanvasCount": 1,
+    "panelPresent": true,
+    "runEnabled": true
+  },
+  "active": {
+    "canvasCount": 2,
+    "cityCanvasCount": 1,
+    "verdict": "OVERLAY ACTIVE",
+    "replayMatch": true,
+    "evidenceComplete": true,
+    "scenarioSynthetic": true,
+    "mappingVisible": true,
+    "evidenceHashVisible": true,
+    "notModeledVisible": true,
+    "clearedButtonEnabled": true,
+    "stageFailed": false,
+    "loading": false
+  },
+  "cleared": {
+    "verdict": "OVERLAY CLEARED",
+    "cityCanvasCount": 1,
+    "stageFailed": false
+  },
+  "consoleEntries": []
+}

@@ -7,6 +7,7 @@ import type { WorldStateView } from '../simulation/worldEngineContract';
 import { SimulationClock, type ClockSpeed } from '../simulationClock/clock';
 import type { SimAgent, WorldObject } from '../simulation/types';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
+import type { EarthquakeCityOverlayProjection } from '../simulationRenderer/earthquakeCoordinateMapping';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { isWorldAssetApproved, isWorldAssetPathApproved } from './assetGovernance';
 import {
@@ -113,6 +114,10 @@ export class EpidemicCity3DSim implements Sim3D {
   private approvedAssetRoots: THREE_NS.Object3D[] = [];
   private worldState: WorldStateView | null = null;
   private worldOverlayGroup: THREE_NS.Group | null = null;
+  /** Separate SCENARIO-only hazard view; never extends or replaces epidemic WorldStateView. */
+  private earthquakeOverlay: EarthquakeCityOverlayProjection | null = null;
+  private earthquakeOverlayGroup: THREE_NS.Group | null = null;
+  private earthquakeOverlayFingerprint = '';
   private worldInteractive: THREE_NS.Object3D[] = [];
   private selectedWorld: CityWorldSelection | null = null;
   private worldOverlayFingerprint = '';
@@ -140,6 +145,11 @@ export class EpidemicCity3DSim implements Sim3D {
   /** Konsumuje gotową, niemutowalną projekcję World Engine; nie uruchamia obliczeń naukowych. */
   setWorldState(worldState: WorldStateView): void {
     this.worldState = worldState;
+  }
+
+  /** Consumes a gate-approved synthetic scenario projection without touching CityWorld or the epidemic simulation. */
+  setEarthquakeScenarioOverlay(overlay: EarthquakeCityOverlayProjection | null): void {
+    this.earthquakeOverlay = overlay;
   }
 
   getSelectedWorld(): CityWorldSelection | null {
@@ -269,6 +279,9 @@ export class EpidemicCity3DSim implements Sim3D {
     this.worldOverlayGroup = new THREE.Group();
     this.worldOverlayGroup.name = 'read-only-worldstate-overlays';
     scene.add(this.worldOverlayGroup);
+    this.earthquakeOverlayGroup = new THREE.Group();
+    this.earthquakeOverlayGroup.name = 'read-only-earthquake-scenario-overlay';
+    scene.add(this.earthquakeOverlayGroup);
     this.crowd = new InstancedHumanoidCrowd(THREE, MAX_CROWD_HUMANOIDS);
     this.crowd.addTo(scene);
   }
@@ -342,6 +355,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.syncAnalysis(agents);
     this.syncTransmissionMarkers();
     this.syncWorldStateVisuals();
+    this.syncEarthquakeScenarioVisuals();
     this.animateWorldMarkers();
     this.syncApprovedAssetLod();
     this.syncFollowTarget(states);
@@ -1633,6 +1647,71 @@ export class EpidemicCity3DSim implements Sim3D {
     }
   }
 
+  /**
+   * Scenario-only layer. Synthetic Earthquake fixtures remain separate from
+   * epidemic hotspots, locations, clusters and hospital signals even where
+   * their display anchors coincide with an existing CityWorld object.
+   */
+  private syncEarthquakeScenarioVisuals(): void {
+    if (!this.THREE || !this.earthquakeOverlayGroup) return;
+    const overlay = this.earthquakeOverlay;
+    const fingerprint = overlay ? JSON.stringify({
+      mapping: [overlay.mappingId, overlay.mappingSchemaVersion, overlay.mappingFingerprint],
+      run: overlay.sourceHazardRunId,
+      status: overlay.datasetStatus,
+      sites: overlay.sites.map((site) => [site.overlayId, site.cityX, site.cityY, site.severity, site.severityValue, site.uncertaintyLow, site.uncertaintyHigh]),
+    }) : '';
+    if (fingerprint === this.earthquakeOverlayFingerprint) return;
+    this.earthquakeOverlayFingerprint = fingerprint;
+    const previous = [...this.earthquakeOverlayGroup.children];
+    this.earthquakeOverlayGroup.clear();
+    for (const marker of previous) marker.traverse((node) => {
+      const mesh = node as THREE_NS.Mesh;
+      mesh.geometry?.dispose();
+      const material = mesh.material;
+      if (material && !Array.isArray(material)) material.dispose();
+    });
+    if (!overlay || overlay.datasetStatus !== 'SCENARIO') return;
+
+    const THREE = this.THREE;
+    const severityColor: Record<string, number> = { NONE: 0x8ea5af, MINOR: 0xf4c95d, MODERATE: 0xff995e, SEVERE: 0xf05b78 };
+    for (const site of overlay.sites) {
+      const color = severityColor[site.severity] ?? 0xffffff;
+      const group = new THREE.Group();
+      const worldX = (site.cityX - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE;
+      const worldZ = (site.cityY - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE;
+      const uncertaintyRadius = Math.max(0.14, Math.min(0.42, 0.12 + site.uncertaintyHigh * 0.26));
+      const coreRadius = Math.max(0.065, Math.min(0.19, 0.055 + site.severityValue * 0.14));
+      const uncertaintyRing = new THREE.Mesh(
+        new THREE.RingGeometry(uncertaintyRadius * 0.78, uncertaintyRadius, 28),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.22, depthWrite: false }),
+      );
+      uncertaintyRing.rotation.x = -Math.PI / 2;
+      const coreRing = new THREE.Mesh(
+        new THREE.RingGeometry(coreRadius * 0.55, coreRadius, 28),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.92, depthWrite: false }),
+      );
+      coreRing.rotation.x = -Math.PI / 2;
+      coreRing.position.y = 0.012;
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.014, 0.014, 0.32, 8),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.84, depthWrite: false }),
+      );
+      stem.position.y = 0.17;
+      const scenarioCap = new THREE.Mesh(
+        new THREE.TetrahedronGeometry(0.07, 0),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.96, depthWrite: false }),
+      );
+      scenarioCap.position.y = 0.37;
+      group.position.set(worldX, 0.075, worldZ);
+      group.userData.markerPhase = ((site.cityX * 13 + site.cityY * 19) % 11) / 11 * Math.PI * 2;
+      group.userData.scenarioOverlay = true;
+      group.userData.scenarioLabel = `SCENARIO · SYNTHETIC · ${site.severity}`;
+      group.add(uncertaintyRing, coreRing, stem, scenarioCap);
+      this.earthquakeOverlayGroup.add(group);
+    }
+  }
+
   private addWorldMarker(selection: CityWorldSelection, color: number, radius: number, height: number): void {
     if (!this.THREE || !this.worldOverlayGroup) return;
     const THREE = this.THREE;
@@ -1664,6 +1743,13 @@ export class EpidemicCity3DSim implements Sim3D {
       const pulse = 1 + Math.sin(this.timeSeconds * 2.2 + phase) * 0.075;
       marker.scale.setScalar(pulse);
       marker.rotation.y = this.timeSeconds * 0.35 + phase;
+    }
+    if (!this.earthquakeOverlayGroup) return;
+    for (const marker of this.earthquakeOverlayGroup.children) {
+      const phase = Number(marker.userData.markerPhase ?? 0);
+      const pulse = 1 + Math.sin(this.timeSeconds * 1.45 + phase) * 0.045;
+      marker.scale.setScalar(pulse);
+      marker.rotation.y = -(this.timeSeconds * 0.18 + phase);
     }
   }
 

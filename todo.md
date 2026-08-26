@@ -36,7 +36,14 @@
 - [x] Build coherent visual-only street compositions from the existing road grid: sidewalk/curb cadence, crossings, parking/street furnishings and greenery, using instancing/shared materials rather than random props.
 - [x] Improve controlled material, lighting, shadow and skyline-depth quality across CITY/DISTRICT/STREET as one shared scene; do not create another world, renderer, canvas or scientific layer.
 - [x] Benchmark every substantial pass at 260/500/1000 agents and deliver one cumulative Chromium/runtime/test/build/commit report only after the final quality gate.
-- [ ] Perform a separate merge review for independently audited Earthquake revision `558aa03`; retain the disabled City3D overlay and do not add a second hazard solver, GIS wiring, cascades or epidemic coupling.
+- [x] Perform a separate merge review for independently audited Earthquake revision `558aa03`; retain the disabled City3D overlay and do not add a second hazard solver, GIS wiring, cascades or epidemic coupling.
+- [x] Merge only the independently audited Earthquake revision after an exact changed-path review; retain one City3D renderer, existing CityWorld and unchanged epidemic/routing core.
+- [x] Define and test a versioned, explicitly SYNTHETIC coordinate-mapping artifact from existing Earthquake fixture sites to existing CityWorld overlay anchors; never infer or claim real geography.
+- [x] Wire one read-only, scenario-labelled Earthquake overlay into the existing City3D renderer behind the evidence/MATCH/schema/mapping gates; do not extend or mutate `WorldStateView`.
+- [x] Connect the existing Earthquake scenario run, persisted HazardRun/Evidence Pack and replay verdict to a compact command-center control path, with SCENARIO/SYNTHETIC/NOT_MODELED disclosures.
+- [x] Prove mapping → projection → overlay → Evidence/Replay in integration tests and Chromium, then commit and push only the audited demonstrator.
 - [ ] Implement only Phase 0 domain-neutral provenance and replay contracts: frozen artifacts, canonical hazard inputs/runs, immutable evidence storage and honest replay gates.
 - [ ] Add Phase 0 deterministic serialization, immutability, MATCH/DRIFT/BLOCKED and epidemic-isolation tests; do not add a hazard solver, external live-data adapter, GIS wiring, cascade or City3D hazard layer.
 - [ ] Validate, document, commit and deliver the Phase 0 contract foundation with deferred work stated explicitly.
+- [x] Finalize the audited Earthquake → Digital Twin demonstrator documentation, checklist and complete-diff review without introducing additional hazards or data adapters.
+- [ ] Commit and push the validated Earthquake demonstrator, then prepare the saved version for user-controlled publishing.

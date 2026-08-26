@@ -24,6 +24,15 @@ import { fnv1a, canonicalJson } from './hash';
 export class EventRegistry {
   private events: GenesisEvent[] = [];
   private seq = 0;
+  /**
+   * O(1) id lookup, also used by `add()`'s parent-existence check. Without
+   * this, `add()`'s check and `get()` were each an O(n) scan, and a long
+   * causal chain of `n` events cost O(n^2) overall — the scaling issue
+   * `docs/MATRIX_WORLD_POC_READINESS_AUDIT.md` (Risk #5) identified as the
+   * one concrete blocker to a multi-agent event trace. No public behavior
+   * changes: same ids, same errors, same `get()` contract.
+   */
+  private eventsById = new Map<string, GenesisEvent>();
   private readonly ctx: { modelId?: string; experimentId?: string; seed?: number | string };
 
   constructor(ctx: { modelId?: string; experimentId?: string; seed?: number | string } = {}) {
@@ -52,7 +61,7 @@ export class EventRegistry {
     if (!input.provenance || !input.provenance.origin) {
       throw new Error('GenesisEvent requires provenance.origin (model | experiment-action | consequence-rule) — no fake events');
     }
-    if (input.parentEventId && !this.events.some((e) => e.id === input.parentEventId)) {
+    if (input.parentEventId && !this.eventsById.has(input.parentEventId)) {
       throw new Error(`parentEventId "${input.parentEventId}" not found in registry`);
     }
     const seq = this.seq++;
@@ -64,18 +73,19 @@ export class EventRegistry {
       experimentId: input.experimentId ?? this.ctx.experimentId,
     };
     this.events.push(event);
+    this.eventsById.set(event.id, event as GenesisEvent);
     return event;
   }
 
   /** Wszystkie zdarzenia w kolejności czasowej (stabilnej). */
   all(): readonly GenesisEvent[] {
-    return [...this.events].sort((a, b) => a.timestamp - b.timestamp || this.indexOf(a) - this.indexOf(b));
+    const insertionOrder = new Map<GenesisEvent, number>();
+    this.events.forEach((e, i) => insertionOrder.set(e, i));
+    return [...this.events].sort((a, b) => a.timestamp - b.timestamp || insertionOrder.get(a)! - insertionOrder.get(b)!);
   }
 
-  private indexOf(e: GenesisEvent): number { return this.events.indexOf(e); }
-
   byType(type: string): GenesisEvent[] { return this.events.filter((e) => e.type === type); }
-  get(id: string): GenesisEvent | undefined { return this.events.find((e) => e.id === id); }
+  get(id: string): GenesisEvent | undefined { return this.eventsById.get(id); }
   children(parentId: string): GenesisEvent[] { return this.events.filter((e) => e.parentEventId === parentId); }
   provenanceOf(id: string): EventProvenance | null { return this.get(id)?.provenance ?? null; }
   count(): number { return this.events.length; }
@@ -98,5 +108,5 @@ export class EventRegistry {
     return this.all().filter((e) => e.experimentId === experimentId);
   }
 
-  reset(): void { this.events = []; this.seq = 0; }
+  reset(): void { this.events = []; this.seq = 0; this.eventsById.clear(); }
 }

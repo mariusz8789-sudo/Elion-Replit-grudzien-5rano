@@ -33,6 +33,8 @@ export interface EarthquakeCommandCenterReadyExecution {
   readonly projection: EarthquakeWorldStateView;
   readonly evidence: HazardEvidencePack;
   readonly replay: HazardReplayReport;
+  /** Explicit synthetic fixture mapping exists even when display policy withholds the overlay. */
+  readonly mapping: EarthquakeCityOverlayProjection;
   readonly overlayGate: ScenarioOverlayGateResult;
   /** Null only when the renderer-specific mapping/evidence/replay/schema gate blocks display. */
   readonly overlay: EarthquakeCityOverlayProjection | null;
@@ -101,6 +103,7 @@ export async function executeEarthquakeCommandCenterScenario(
     projection: envelope.projection,
     evidence: envelope.evidence,
     replay: envelope.replay,
+    mapping: mappedOverlay,
     overlayGate,
     overlay: overlayGate.enabled ? mappedOverlay : null,
   });

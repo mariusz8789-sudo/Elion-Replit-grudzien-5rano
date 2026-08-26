@@ -7,6 +7,10 @@ import { useRef, useState } from 'react';
 import { getHazardModule } from '../../core/hazard/hazardModuleRegistry';
 import type { EarthquakeCityOverlayProjection } from '../../core/simulationRenderer/earthquakeCoordinateMapping';
 import {
+  getEarthquakeEvidenceExportFilename,
+  serializeEarthquakeEvidenceExport,
+} from '../../core/simulationRenderer/earthquakeEvidenceExport';
+import {
   executeEarthquakeCommandCenterScenario,
   type EarthquakeCommandCenterExecution,
 } from '../../core/simulationRenderer/earthquakeCommandCenter';
@@ -59,6 +63,17 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
     setOverlayDisplayed(false);
   };
 
+  const exportEvidence = () => {
+    if (!execution) return;
+    const blob = new Blob([serializeEarthquakeEvidenceExport(execution)], { type: 'application/json;charset=utf-8' });
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = getEarthquakeEvidenceExportFilename(execution);
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+  };
+
   return (
     <section className="world-panel earthquake-scenario-panel" aria-label="Scenariusz trzęsienia ziemi">
       <div className="world-panel-heading earthquake-panel-heading">
@@ -73,6 +88,7 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
       <div className="earthquake-actions">
         <button className="world-action accent" onClick={runScenario} disabled={running}>{running ? 'Obliczanie…' : 'Uruchom scenariusz'}</button>
         <button className="world-action" onClick={clearOverlay} disabled={!overlayDisplayed}>Wyczyść overlay</button>
+        <button className="world-action" onClick={exportEvidence} disabled={!execution}>Eksportuj evidence</button>
       </div>
       {error && <p className="earthquake-error" role="alert">BLOKADA: {error}</p>}
       {execution?.status === 'BLOCKED' && (

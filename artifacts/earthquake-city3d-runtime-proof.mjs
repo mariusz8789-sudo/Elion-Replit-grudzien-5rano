@@ -1,10 +1,11 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 
 const endpoint = 'http://127.0.0.1:9222';
 const origin = process.env.GENESIS_RUNTIME_ORIGIN ?? 'http://127.0.0.1:5000/#/city3d';
 const suffix = process.env.GENESIS_PROOF_SUFFIX ? `-${process.env.GENESIS_PROOF_SUFFIX}` : '';
 const screenshotPath = `/home/ubuntu/genesis-epidemic-digital-twin/artifacts/screenshots/city3d-earthquake-demonstrator${suffix}-1920x1080.png`;
 const reportPath = `/home/ubuntu/genesis-epidemic-digital-twin/artifacts/earthquake-city3d-runtime-proof${suffix}.json`;
+const downloadDir = '/home/ubuntu/Downloads/genesis-earthquake-runtime-proof';
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const targets = await (await fetch(`${endpoint}/json/list`)).json();
@@ -36,6 +37,12 @@ const evaluate = async (expression) => (await cdp('Runtime.evaluate', { expressi
 try {
   await cdp('Page.enable');
   await cdp('Runtime.enable');
+  await mkdir(downloadDir, { recursive: true });
+  try {
+    await cdp('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: downloadDir });
+  } catch {
+    await cdp('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloadDir });
+  }
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
   await cdp('Page.navigate', { url: origin });
   await sleep(900);
@@ -80,6 +87,23 @@ try {
       loading: Boolean(document.querySelector('.route-loading'))
     };
   })())`));
+  const downloadsBefore = new Set(await readdir(downloadDir));
+  await evaluate(`(() => [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Eksportuj evidence')?.click())()`);
+  await sleep(350);
+  const downloadedFiles = (await readdir(downloadDir)).filter((file) => !downloadsBefore.has(file) && file.endsWith('.json'));
+  const downloaded = downloadedFiles.length === 1
+    ? JSON.parse(await readFile(`${downloadDir}/${downloadedFiles[0]}`, 'utf8'))
+    : null;
+  const exportDownload = {
+    fileCount: downloadedFiles.length,
+    filename: downloadedFiles[0] ?? null,
+    schemaVersion: downloaded?.exportSchemaVersion ?? null,
+    commandCenterStatus: downloaded?.commandCenterStatus ?? null,
+    replayStatus: downloaded?.replay?.status ?? null,
+    evidenceComplete: Array.isArray(downloaded?.evidence?.missingFields) && downloaded.evidence.missingFields.length === 0,
+    mappingFingerprint: downloaded?.mapping?.mappingFingerprint ?? null,
+    labels: downloaded?.labels ?? [],
+  };
   const image = await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   await writeFile(screenshotPath, Buffer.from(image.data, 'base64'));
   await evaluate(`(() => [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Wyczyść overlay')?.click())()`);
@@ -89,7 +113,7 @@ try {
     cityCanvasCount: document.querySelectorAll('.city-3d-canvas').length,
     stageFailed: Boolean(document.querySelector('.empty-state'))
   }))())`));
-  const report = { before, active, cleared, consoleEntries };
+  const report = { before, active, exportDownload, cleared, consoleEntries };
   await writeFile(reportPath, JSON.stringify(report, null, 2));
   const assertions = [
     before.cityCanvasCount === 1,
@@ -108,6 +132,13 @@ try {
     active.clearedButtonEnabled,
     !active.stageFailed,
     !active.loading,
+    exportDownload.fileCount === 1,
+    exportDownload.schemaVersion === '1.0.0',
+    exportDownload.commandCenterStatus === 'READY',
+    exportDownload.replayStatus === 'MATCH',
+    exportDownload.evidenceComplete,
+    Boolean(exportDownload.mappingFingerprint),
+    ['SCENARIO', 'SYNTHETIC', 'NON_OPERATIONAL'].every((label) => exportDownload.labels.includes(label)),
     cleared.verdict === 'OVERLAY CLEARED',
     cleared.cityCanvasCount === 1,
     !cleared.stageFailed,

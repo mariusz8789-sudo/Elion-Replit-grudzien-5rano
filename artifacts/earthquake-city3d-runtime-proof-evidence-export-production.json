@@ -1,0 +1,44 @@
+{
+  "before": {
+    "canvasCount": 2,
+    "cityCanvasCount": 1,
+    "panelPresent": true,
+    "runEnabled": true
+  },
+  "active": {
+    "canvasCount": 2,
+    "cityCanvasCount": 1,
+    "verdict": "OVERLAY ACTIVE",
+    "replayMatch": true,
+    "evidenceComplete": true,
+    "scenarioSynthetic": true,
+    "mappingVisible": true,
+    "evidenceHashVisible": true,
+    "registryModuleVisible": true,
+    "capabilitiesVisible": true,
+    "notModeledVisible": true,
+    "clearedButtonEnabled": true,
+    "stageFailed": false,
+    "loading": false
+  },
+  "exportDownload": {
+    "fileCount": 1,
+    "filename": "genesis-earthquake-evidence-run_input_eq_city3d-synthetic-1787730699537-1.json",
+    "schemaVersion": "1.0.0",
+    "commandCenterStatus": "READY",
+    "replayStatus": "MATCH",
+    "evidenceComplete": true,
+    "mappingFingerprint": "191e5ad9c72dd2b241bec62744e00eee52988621c16a4d90cd843c148b30e9af",
+    "labels": [
+      "SCENARIO",
+      "SYNTHETIC",
+      "NON_OPERATIONAL"
+    ]
+  },
+  "cleared": {
+    "verdict": "OVERLAY CLEARED",
+    "cityCanvasCount": 1,
+    "stageFailed": false
+  },
+  "consoleEntries": []
+}

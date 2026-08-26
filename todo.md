@@ -46,6 +46,7 @@
 - [x] Add Phase 0 deterministic serialization, immutability, MATCH/DRIFT/BLOCKED and epidemic-isolation tests; do not add a hazard solver, external live-data adapter, GIS wiring, cascade or City3D hazard layer.
 - [x] Validate, document, commit and deliver the Phase 0 contract foundation with deferred work stated explicitly.
 - [x] Review the remaining checked and unchecked Genesis roadmap items, their dependencies and audit status; select only the next safe, non-conflicting milestone after the Earthquake hardening closeout.
+- [x] Add a local-only export of the current Earthquake envelope, evidence, replay, mapping and overlay-gate record from the existing Command Center; do not add data acquisition, solver, renderer, GIS, cascade or external publishing behavior.
 - [x] Finalize the audited Earthquake → Digital Twin demonstrator documentation, checklist and complete-diff review without introducing additional hazards or data adapters.
 - [x] Commit and push the validated Earthquake demonstrator, then prepare the saved version for user-controlled publishing.
 - [x] Independently audit Claude’s unmerged `4ff08bd` hazard-registry and `287a788` Earthquake execution-envelope changes against the delivered demonstrator; do not merge or introduce additional hazards, GIS, cascades or epidemic coupling during the audit.

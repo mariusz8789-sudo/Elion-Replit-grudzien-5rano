@@ -12,6 +12,7 @@ import { computeImpactResults } from '../core/hazard/earthquake/earthquakeImpact
 import { classifySeverity, hypocentralDistanceKm, syntheticPeakGroundAcceleration, syntheticUncertaintyBandPercent } from '../core/hazard/earthquake/earthquakeModel';
 import { SYNTHETIC_EXPOSURE_SITES, buildSyntheticExposureSnapshot } from '../core/hazard/earthquake/earthquakeExposure';
 import { runEarthquakeScenario, type EarthquakeScenarioSpec } from '../core/hazard/earthquake/earthquakeScenario';
+import { EarthquakeScenarioValidationError, validateEarthquakeScenarioSpec } from '../core/hazard/earthquake/earthquakeScenarioValidation';
 import { projectEarthquakeWorldState } from '../core/hazard/earthquake/earthquakeWorldProjection';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -67,6 +68,43 @@ describe('Earthquake vertical slice — end-to-end pipeline', () => {
     const nearField = bySite.get('site-alpha')!;
     const farField = bySite.get('site-echo')!;
     expect(nearField.severityValue).toBeGreaterThan(farField.severityValue);
+  });
+});
+
+describe('Earthquake scenario validation (independent-audit remediation)', () => {
+  it('accepts the base spec', () => {
+    expect(validateEarthquakeScenarioSpec(BASE_SPEC)).toEqual({ valid: true, errors: [] });
+  });
+
+  it.each([
+    ['NaN magnitude', { magnitude: Number.NaN }, 'magnitude must be a finite number'],
+    ['Infinity magnitude', { magnitude: Number.POSITIVE_INFINITY }, 'magnitude must be a finite number'],
+    ['NaN depthKm', { depthKm: Number.NaN }, 'depthKm must be a finite number >= 0'],
+    ['negative depthKm', { depthKm: -5 }, 'depthKm must be a finite number >= 0'],
+    ['Infinity depthKm', { depthKm: Number.POSITIVE_INFINITY }, 'depthKm must be a finite number >= 0'],
+    ['NaN epicenter.x', { epicenter: { x: Number.NaN, y: 0 } }, 'epicenter.x and epicenter.y must be finite numbers'],
+    ['Infinity epicenter.y', { epicenter: { x: 0, y: Number.POSITIVE_INFINITY } }, 'epicenter.x and epicenter.y must be finite numbers'],
+    ['NaN seed', { seed: Number.NaN }, 'seed must be a finite number'],
+    ['Infinity seed', { seed: Number.POSITIVE_INFINITY }, 'seed must be a finite number'],
+    ['empty scenarioLabel', { scenarioLabel: '' }, 'scenarioLabel must be a non-empty string'],
+  ] as const)('rejects %s', (_label, override, expectedError) => {
+    const result = validateEarthquakeScenarioSpec({ ...BASE_SPEC, ...override });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(expectedError);
+  });
+
+  it('admits depthKm = 0 (a valid, finite, non-negative depth)', () => {
+    expect(validateEarthquakeScenarioSpec({ ...BASE_SPEC, depthKm: 0 }).valid).toBe(true);
+  });
+
+  it('runEarthquakeScenario throws EarthquakeScenarioValidationError for an invalid spec, before any record is built', async () => {
+    const invalid = { ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-TEST-INVALID', magnitude: Number.NaN };
+    await expect(runEarthquakeScenario(invalid, 'test-commit-hash')).rejects.toThrow(EarthquakeScenarioValidationError);
+  });
+
+  it('runEarthquakeScenario rejects a negative depth before building any record', async () => {
+    const invalid = { ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-TEST-NEGATIVE-DEPTH', depthKm: -10 };
+    await expect(runEarthquakeScenario(invalid, 'test-commit-hash')).rejects.toThrow(EarthquakeScenarioValidationError);
   });
 });
 

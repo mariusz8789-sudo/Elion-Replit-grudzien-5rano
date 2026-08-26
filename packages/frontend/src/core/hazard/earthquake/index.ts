@@ -4,5 +4,6 @@ export * from './earthquakeExposure';
 export * from './earthquakeImpact';
 export * from './earthquakeEvaluator';
 export * from './earthquakeScenario';
+export * from './earthquakeScenarioValidation';
 export * from './earthquakeEvidence';
 export * from './earthquakeWorldProjection';

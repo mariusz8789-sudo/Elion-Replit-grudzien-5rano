@@ -101,4 +101,16 @@ Not touched, not imported, not referenced, anywhere in this slice: `EpidemicCity
 - **Manus**: wiring `projectEarthquakeWorldState()`'s output into a City3D read-only layer, exactly the way `projectWorldState(simulation)` already feeds the epidemic view — the contract is stable, versioned (`schemaVersion: '1.0.0'`), and lists what it deliberately does not model (`notModeled`).
 - **Domain review**: before any of this is used for anything beyond an architecture demonstration, a seismologist needs to review (or replace) `earthquakeModel.ts`'s attenuation function, and a product decision is needed on real target geography, licensing, and intended use — exactly as `docs/MULTI_HAZARD_ARCHITECTURE_AUDIT.md` §9 already specifies.
 
+## Independent-audit remediation
+
+An independent audit of `c048592` (recorded as `d4b60ca` on `manus/high-fidelity-epidemic-digital-twin`) confirmed the slice was scope-clean but found three merge blockers, all fixed in the follow-up commit on this branch:
+
+| Blocker | Fix |
+|---|---|
+| `scripts/earthquake-e2e.mjs` imported a hard-coded `/opt/node22/lib/node_modules/playwright/index.js` and launched a hard-coded `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, neither of which exists outside this one sandbox's exact Node version/browser revision. | `playwright` is now a declared devDependency (`package.json`), resolved via normal module resolution. The Chromium executable is resolved through a fallback chain: an explicit `PLAYWRIGHT_CHROMIUM_EXECUTABLE` env var, then Playwright's own `chromium.executablePath()` if that file exists, then this environment's revision-independent `$PLAYWRIGHT_BROWSERS_PATH/chromium` symlink, then no override (Playwright's own actionable install error). Re-run: still 25/25 in this sandbox. |
+| `runEarthquakeScenario()` performed no runtime rejection of non-finite magnitude, negative/non-finite depth, non-finite epicenter coordinates, or non-finite seed. | New `earthquakeScenarioValidation.ts`: `validateEarthquakeScenarioSpec()` / `assertValidEarthquakeScenarioSpec()`, called at the top of `buildEarthquakeSourceArtifact()` (the earliest spec-consuming entry point, so it protects the whole pipeline). Explicitly a scenario-contract guard, not a calibration claim — 14 new tests. |
+| `checkSourceArtifactAdmission()` accepted `NaN`/`Infinity` for `provenance.retrievedAt` (only checked `typeof === 'number'`). | Now requires finite and `>= 0`, the same pattern already used for `HazardRun.createdAt` since Phase 0.2 — 4 new regression tests. |
+
+No UI, City3D, GIS, real-data adapter, cascade, or second hazard solver was added — this was a bounded correction of exactly the three findings above. Full suite after remediation: 121 files / 1268 tests (up from 1250 by exactly the 18 new regression tests); `tsc`/`eslint`/build/`git diff --check` all clean; `scripts/earthquake-e2e.mjs` 25/25 in this sandbox using the new portable resolution.
+
 **NO EPIDEMIC CORE CHANGE. City3D untouched. Non-operational research prototype only.**

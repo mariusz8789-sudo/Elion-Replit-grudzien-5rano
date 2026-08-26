@@ -30,7 +30,9 @@ export function checkSourceArtifactAdmission(artifact: SourceArtifact): Admissio
     if (!artifact.provenance.provider) missing.push('provenance.provider');
     if (!artifact.provenance.license) missing.push('provenance.license');
     if (!artifact.provenance.adapterVersion) missing.push('provenance.adapterVersion');
-    if (typeof artifact.provenance.retrievedAt !== 'number') missing.push('provenance.retrievedAt');
+    if (typeof artifact.provenance.retrievedAt !== 'number' || !Number.isFinite(artifact.provenance.retrievedAt) || artifact.provenance.retrievedAt < 0) {
+      missing.push('provenance.retrievedAt');
+    }
   }
   return admission(missing);
 }

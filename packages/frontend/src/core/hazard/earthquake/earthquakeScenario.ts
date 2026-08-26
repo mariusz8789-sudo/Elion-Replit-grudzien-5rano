@@ -13,6 +13,7 @@ import { earthquakeEvaluator } from './earthquakeEvaluator';
 import { buildSyntheticExposureSnapshot } from './earthquakeExposure';
 import { computeImpactResults } from './earthquakeImpact';
 import { EARTHQUAKE_MODEL_VERSION, type EarthquakePoint } from './earthquakeModel';
+import { assertValidEarthquakeScenarioSpec } from './earthquakeScenarioValidation';
 import type { ExposureSnapshot, HazardInput, HazardRun, ImpactResult, SourceArtifact } from '../contracts';
 
 export interface EarthquakeScenarioSpec {
@@ -48,6 +49,7 @@ function syntheticRawContent(spec: EarthquakeScenarioSpec): string {
 }
 
 export async function buildEarthquakeSourceArtifact(spec: EarthquakeScenarioSpec, codeCommitHash: string): Promise<SourceArtifact> {
+  assertValidEarthquakeScenarioSpec(spec);
   const rawContent = syntheticRawContent(spec);
   const contentHash = await computeSourceArtifactContentHash(rawContent);
   return {

@@ -11,19 +11,44 @@
  * że wynik jest BAJT-IDENTYCZNY między Node a Chromium — najmocniejszy
  * dostępny dowód determinizmu.
  *
+ * Portability (independent-audit remediation): `playwright` is a declared
+ * devDependency (see package.json), resolved via normal module resolution —
+ * not a hard-coded absolute path into one sandbox's global npm install. The
+ * Chromium executable is resolved in this order: an explicit
+ * `PLAYWRIGHT_CHROMIUM_EXECUTABLE` env var override; Playwright's own
+ * `chromium.executablePath()` if that file actually exists (correct for
+ * whatever revision this installed playwright version expects); this
+ * project's environment's stable, revision-independent
+ * `$PLAYWRIGHT_BROWSERS_PATH/chromium` symlink if present; otherwise no
+ * override at all, letting Playwright's own launch fail with its own
+ * actionable "run `npx playwright install`" message instead of a silent
+ * wrong-path crash.
+ *
  * Użycie: node scripts/earthquake-e2e.mjs
  * Kod wyjścia 0 = wszystkie sprawdzenia przeszły; 2 = wykryto niezgodność.
  */
 
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import pkg from '/opt/node22/lib/node_modules/playwright/index.js';
+import { chromium } from 'playwright';
 
-const { chromium } = pkg;
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+function resolveChromiumExecutable() {
+  if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE) return process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
+  try {
+    const bundled = chromium.executablePath();
+    if (bundled && existsSync(bundled)) return bundled;
+  } catch { /* fall through to other strategies */ }
+  const browsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (browsersPath) {
+    const stableSymlink = join(browsersPath, 'chromium');
+    if (existsSync(stableSymlink)) return stableSymlink;
+  }
+  return undefined; // let Playwright's own launch produce its actionable install error
+}
+const CHROME = resolveChromiumExecutable();
 const ROOT = new URL('..', import.meta.url).pathname;
 
 const failures = [];

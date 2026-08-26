@@ -318,6 +318,26 @@ describe('Test 7 — evidence completeness gate blocks admission on missing mand
     expect(result.missingFields).toContain('artifactId');
   });
 
+  describe('SourceArtifact.provenance.retrievedAt (independent-audit remediation)', () => {
+    it.each([
+      ['NaN', Number.NaN],
+      ['Infinity', Number.POSITIVE_INFINITY],
+      ['-1', -1],
+    ] as const)('rejects retrievedAt = %s', async (_label, badRetrievedAt) => {
+      const artifact = await makeArtifact();
+      const broken = { ...artifact, provenance: { ...artifact.provenance, retrievedAt: badRetrievedAt } };
+      const result = checkSourceArtifactAdmission(broken);
+      expect(result.admitted).toBe(false);
+      expect(result.missingFields).toContain('provenance.retrievedAt');
+    });
+
+    it('admits retrievedAt = 0 (a valid, finite, non-negative timestamp)', async () => {
+      const artifact = await makeArtifact();
+      const withZero = { ...artifact, provenance: { ...artifact.provenance, retrievedAt: 0 } };
+      expect(checkSourceArtifactAdmission(withZero).missingFields).not.toContain('provenance.retrievedAt');
+    });
+  });
+
   describe('HazardRun.createdAt', () => {
     it.each([
       ['undefined', undefined],

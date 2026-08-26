@@ -75,8 +75,10 @@ describe('Earthquake persisted-run history', () => {
 
   it.each<readonly [string, RetainedInputPatch]>([
     ['scientificFields: null', { scientificFields: null }],
+    ['scientificFields: []', { scientificFields: [] }],
     ['seed: true', { seed: true }],
     ['displayName: {}', { displayName: {} }],
+    ['displayName: 42', { displayName: 42 }],
   ])(
     'keeps a canonically fingerprinted retained HazardInput with %s outside replay and read-only history',
     async (_label, patch) => {

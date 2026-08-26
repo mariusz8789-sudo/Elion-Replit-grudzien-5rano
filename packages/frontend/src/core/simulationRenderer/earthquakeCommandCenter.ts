@@ -17,7 +17,11 @@ import { LocalHazardProvenanceStore, type HazardProvenanceStore } from '../hazar
 import { replayHazardRun, type HazardReplayReport } from '../hazard/hazardReplay';
 import { buildHazardEvidencePack, type HazardEvidencePack } from '../hazard/earthquake/earthquakeEvidence';
 import { earthquakeEvaluator } from '../hazard/earthquake/earthquakeEvaluator';
-import { projectEarthquakeWorldState, type EarthquakeWorldStateView } from '../hazard/earthquake/earthquakeWorldProjection';
+import {
+  EARTHQUAKE_WORLD_PROJECTION_SCHEMA_VERSION,
+  projectEarthquakeWorldState,
+  type EarthquakeWorldStateView,
+} from '../hazard/earthquake/earthquakeWorldProjection';
 import { runEarthquakeScenario, type EarthquakeScenarioResult, type EarthquakeScenarioSpec } from '../hazard/earthquake/earthquakeScenario';
 
 export interface EarthquakeCommandCenterExecution {
@@ -45,7 +49,14 @@ export async function executeEarthquakeCommandCenterScenario(
   const scenario = await runEarthquakeScenario(spec, options.commitHash ?? codeCommitHash());
   await persistScenario(store, scenario);
   const evidence = await buildHazardEvidencePack(scenario);
-  const replay = await replayHazardRun({ store, hazardRunId: scenario.run.hazardRunId, evaluator: earthquakeEvaluator });
+  const replay = await replayHazardRun({
+    store,
+    hazardRunId: scenario.run.hazardRunId,
+    evaluator: earthquakeEvaluator,
+    // Registered admission happens before evaluator execution; mapping/UI never bypass this fence.
+    hazardType: 'earthquake',
+    projectionSchemaVersion: EARTHQUAKE_WORLD_PROJECTION_SCHEMA_VERSION,
+  });
   const projection = projectEarthquakeWorldState(scenario);
   const mappedOverlay = await projectEarthquakeToCityOverlay(projection);
   const overlayGate = evaluateScenarioOverlayEligibility({

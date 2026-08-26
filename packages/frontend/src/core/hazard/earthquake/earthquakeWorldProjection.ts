@@ -46,13 +46,19 @@ export interface EarthquakeWorldStateView {
   readonly notModeled: readonly string[];
 }
 
-const NOT_MODELED: readonly string[] = [
+/**
+ * Exported so the Hazard Module Registry descriptor can reuse this exact
+ * list rather than duplicating it and risking drift. Genuinely frozen
+ * (`Object.freeze`, not just TypeScript's `readonly`) so a consumer cannot
+ * silently mutate what this module claims not to model.
+ */
+export const EARTHQUAKE_NOT_MODELED: readonly string[] = Object.freeze([
   'building-level structural damage',
   'aftershock sequence',
   'infrastructure/utility cascade effects',
   'population casualty estimation',
   'evacuation or emergency response guidance',
-];
+]);
 
 /** Pure mapping — no I/O, no rendering, no mutation of its input. */
 export function projectEarthquakeWorldState(result: EarthquakeScenarioResult): EarthquakeWorldStateView {
@@ -82,6 +88,6 @@ export function projectEarthquakeWorldState(result: EarthquakeScenarioResult): E
     epicenter: output.epicenter,
     magnitude: output.magnitude,
     sites,
-    notModeled: NOT_MODELED,
+    notModeled: EARTHQUAKE_NOT_MODELED,
   };
 }

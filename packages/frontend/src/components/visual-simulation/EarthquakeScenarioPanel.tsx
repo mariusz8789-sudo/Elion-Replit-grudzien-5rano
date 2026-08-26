@@ -404,6 +404,34 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
               </table>
             </div>
           </details>
+          <details className="earthquake-impact-details">
+            <summary>Damage assessment ({execution.scenario.damageAssessments.length})</summary>
+            <p>
+              Każda ocena jest jawnie oznaczona jako <strong>NOT_MODELED</strong>. Istniejący model dostarcza
+              syntetyczny ground-shaking ImpactResult, ale nie dostarcza podstaw do twierdzeń o uszkodzeniach
+              konstrukcji, zawaleniach, ofiarach ani infrastrukturze.
+            </p>
+            <div className="earthquake-impact-table-wrap">
+              <table className="earthquake-impact-table">
+                <thead>
+                  <tr>
+                    <th>Fixture site</th>
+                    <th>Status</th>
+                    <th>Missing evidence</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {execution.scenario.damageAssessments.map((assessment) => (
+                    <tr key={assessment.damageAssessmentId}>
+                      <td>{assessment.siteId}</td>
+                      <td>{assessment.status}</td>
+                      <td>{assessment.requiredData.join('; ')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
           <details className="earthquake-not-modeled-details">
             <summary>NOT_MODELED ({execution.projection.notModeled.length})</summary>
             <ul>

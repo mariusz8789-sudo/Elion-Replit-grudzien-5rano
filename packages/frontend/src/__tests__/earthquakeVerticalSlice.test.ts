@@ -152,6 +152,14 @@ describe('Earthquake vertical slice — Evidence Pack', () => {
     const pack = await buildHazardEvidencePack(broken);
     expect(pack.missingFields).toContain('exposure.sites');
   });
+
+  it('hashing the same fixed result twice yields the same SHA-256 (generatedAt is metadata, not hashed content)', async () => {
+    const result = await runEarthquakeScenario({ ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-TEST-HASH-IDEMPOTENT' }, 'test-commit-hash');
+    const packA = await buildHazardEvidencePack(result);
+    const packB = await buildHazardEvidencePack(result);
+    expect(packA.sha256).toBe(packB.sha256);
+    expect(Number.isFinite(packA.generatedAt)).toBe(true);
+  });
 });
 
 describe('Earthquake vertical slice — read-only Digital Twin projection contract', () => {

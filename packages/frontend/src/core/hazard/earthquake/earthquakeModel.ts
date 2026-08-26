@@ -30,6 +30,22 @@ export function hypocentralDistanceKm(epicenter: EarthquakePoint, depthKm: numbe
 }
 
 /**
+ * Rounds to 9 decimal places. `Math.pow`/`Math.log10` are NOT required by
+ * the ECMAScript spec to be correctly-rounded (unlike `Math.sqrt`), so two
+ * conforming engines (e.g. Node's V8 vs. Chromium's V8 build) can legitimately
+ * disagree in the last one or two bits of a transcendental result — confirmed
+ * empirically via scripts/earthquake-e2e.mjs, which runs this exact model in
+ * both and diffs the output. That is real, spec-permitted nondeterminism this
+ * vertical slice must not carry into a scientific result: 9 decimal places is
+ * far below this model's meaningful precision (it is explicitly
+ * non-calibrated) and comfortably collapses cross-engine ULP drift to a
+ * single value everywhere.
+ */
+function roundForCrossEngineDeterminism(value: number): number {
+  return Math.round(value * 1e9) / 1e9;
+}
+
+/**
  * Synthetic peak ground acceleration in units of g, decaying with the log of
  * hypocentral distance and scaling with magnitude. Deterministic, pure,
  * unitless-illustrative — see module doc comment above.
@@ -37,7 +53,7 @@ export function hypocentralDistanceKm(epicenter: EarthquakePoint, depthKm: numbe
 export function syntheticPeakGroundAcceleration(magnitude: number, distanceKm: number): number {
   const safeDistanceKm = Math.max(distanceKm, 1);
   const logPga = 0.5 * magnitude - 1.5 * Math.log10(safeDistanceKm) - 1.2;
-  return Math.pow(10, logPga);
+  return roundForCrossEngineDeterminism(Math.pow(10, logPga));
 }
 
 /** Deterministic, seed-derived uncertainty band width (percent) around a point estimate — never a bare unqualified number. */

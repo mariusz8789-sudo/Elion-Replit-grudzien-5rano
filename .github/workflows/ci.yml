@@ -1,9 +1,12 @@
-name: CI
+name: Genesis quality gate
 
 on:
   push:
     branches: ['**']
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   verify:
@@ -11,6 +14,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -20,13 +25,33 @@ jobs:
       - name: Instalacja zależności
         run: npm ci
 
+      - name: Sprawdzenie białych znaków w zmianie
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="$PUSH_BEFORE"
+          if [ "$EVENT_NAME" = "pull_request" ]; then base="$PR_BASE"; fi
+          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+            git diff --check "$base" "$GITHUB_SHA"
+          elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^ HEAD
+          fi
+
       - name: Lint
         run: npm run lint
 
-      - name: Testy (fizyka, funkcje lokalne, backend)
-        run: npm test
+      - name: Testy frontend (single worker)
+        run: npm run test --workspace=packages/frontend -- --maxWorkers=1
 
-      - name: Typecheck + build produkcyjny
+      - name: Testy backend
+        run: npm run test --workspace=packages/backend
+
+      - name: Typecheck frontend
+        run: npm exec --workspace=packages/frontend -- tsc --noEmit
+
+      - name: Build produkcyjny frontend
         run: npm run build
 
       - name: Artefakt buildu (podgląd PR)

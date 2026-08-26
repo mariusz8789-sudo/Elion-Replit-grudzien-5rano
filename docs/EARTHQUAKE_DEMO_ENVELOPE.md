@@ -116,7 +116,18 @@ Every object this function returns — the envelope itself, and each populated t
 ## What this document's task did NOT do
 
 - Did not build coordinate mapping, an overlay gate, or any City3D/UI work — that remains Manus's.
-- Did not touch `hazardReplay.ts`, `hazardProvenanceStore.ts`, `hazardModuleRegistry.ts`, or any Scientific Core file — every gate this envelope calls was already correct; this task only re-sequenced *which data* the registry check validates (store-persisted, not merely in-memory) and added the missing `PROVENANCE_CONFLICT` distinction.
+- Did not touch `hazardProvenanceStore.ts`, `hazardModuleRegistry.ts`, or any Scientific Core file. `hazardReplay.ts` WAS touched in a later hardening pass (see below) — a narrow, additive type-safety fix, not a semantic change.
 - Did not add a second hazard type or any new solver.
+
+## Hardening sprint addendum (`0fdbd84`…`0d453a8`, same branch)
+
+A follow-up autonomous pass looked for real engineering gaps across the earthquake pipeline and fixed four:
+
+1. **Shared, unfrozen, mutable global state (the most serious finding).** `SYNTHETIC_EXPOSURE_SITES` (`earthquakeExposure.ts`) was a module-level array that every `ExposureSnapshot`, across every scenario, shared by reference — TypeScript's `readonly` never enforced this at runtime, so mutating one scenario's exposure data would have silently corrupted every other scenario's for the lifetime of the process. Fixed by genuinely `Object.freeze`-ing the fixture array, each site, and every snapshot built from it; `computeImpactResults()`'s returned array/objects (`earthquakeImpact.ts`) are frozen the same way. Proven with a regression test that specifically checks the leak-across-snapshots scenario, not just "is it frozen."
+2. **Duplicated, incomplete admission logic.** `ExposureSnapshot`/`ImpactResult` are domain-neutral contracts, but their completeness checks lived inside `earthquakeEvidence.ts` instead of beside `checkSourceArtifactAdmission`/`checkHazardInputAdmission`/`checkHazardRunAdmission` in `hazardEvidenceGate.ts` — meaning a future hazard would have had to duplicate them. Moved, and the move surfaced a real gap: the impact check never verified `impactResultId`/`hazardRunId`/`exposureSnapshotId`/`siteId` were present. Both are now checked, domain-neutral, and directly reusable by the next hazard.
+3. **A type-level footgun in `replayHazardRun`.** `projectionSchemaVersion` was only ever checked as part of the capability fence, which itself only runs when `hazardType` is supplied — so passing `projectionSchemaVersion` without `hazardType` silently did nothing. No call site did this, but nothing prevented it. `ReplayHazardRunOptions` is now a discriminated union making that combination a compile error.
+4. **An untested production-path claim.** This document and the envelope's own doc comment both say a real consumer must inject `LocalHazardProvenanceStore`, but no test had ever run the envelope against that store type — only the raw store's own persistence was tested in isolation. Two new tests now run the full envelope against a real `LocalHazardProvenanceStore`, including a simulated page-reload and a `PROVENANCE_CONFLICT` against that same persistent backend.
+
+Net result: 123 files / 1321 tests (single-worker), up from the pre-sprint 1297; `tsc`/`eslint`/build/`git diff --check` clean throughout; `scripts/earthquake-e2e.mjs` re-verified green (25/25) after every checkpoint. No City3D, GIS, cascade, or second-hazard work at any point.
 
 **NO CITY3D / NO GIS / NO CASCADES / NO EPIDEMIC CORE CHANGE / NO NEW HAZARD SOLVER.**

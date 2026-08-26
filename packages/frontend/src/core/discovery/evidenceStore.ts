@@ -1,4 +1,4 @@
-import { readJSON, writeJSON } from '../storage';
+import { InMemoryRecordStore, LocalRecordStore } from '../provenance/recordStore';
 import type { DiscoveryCase, DiscoveryCaseStatus } from './discoveryCase';
 
 /**
@@ -42,23 +42,31 @@ export interface EvidenceStore {
   delete(caseId: string): Promise<void>;
 }
 
+/**
+ * Both implementations below delegate to the shared `core/provenance/recordStore.ts`
+ * primitive (Phase 0.1 convergence) with policy `'overwrite'` — the exact
+ * permissive behavior this store always had (an experiment may be
+ * re-saved/deleted under its own id; nothing here newly enforces
+ * immutability). Only the get/put/list mechanics moved; the persisted shape,
+ * storage key, and save/load/list/delete public API are unchanged.
+ */
 export class InMemoryEvidenceStore implements EvidenceStore {
-  private records = new Map<string, StoredEvidence>();
+  private backing = new InMemoryRecordStore<StoredEvidence>('overwrite');
 
   async save(entry: StoredEvidence): Promise<void> {
-    this.records.set(entry.record.caseId, entry);
+    await this.backing.put(entry.record.caseId, entry);
   }
 
   async load(caseId: string): Promise<StoredEvidence | null> {
-    return this.records.get(caseId) ?? null;
+    return this.backing.get(caseId);
   }
 
   async list(): Promise<readonly string[]> {
-    return [...this.records.keys()].sort();
+    return this.backing.list();
   }
 
   async delete(caseId: string): Promise<void> {
-    this.records.delete(caseId);
+    await this.backing.delete(caseId);
   }
 }
 
@@ -66,28 +74,22 @@ const STORAGE_KEY = 'evidence-store/v1';
 
 /** Persists discovery cases (with their evidence) in localStorage — survives a refresh, stays on this device. */
 export class LocalEvidenceStore implements EvidenceStore {
-  private readAll(): Record<string, StoredEvidence> {
-    return readJSON<Record<string, StoredEvidence>>(STORAGE_KEY, {});
-  }
+  private backing = new LocalRecordStore<StoredEvidence>(STORAGE_KEY, 'overwrite');
 
   async save(entry: StoredEvidence): Promise<void> {
-    const all = this.readAll();
-    all[entry.record.caseId] = entry;
-    writeJSON(STORAGE_KEY, all);
+    await this.backing.put(entry.record.caseId, entry);
   }
 
   async load(caseId: string): Promise<StoredEvidence | null> {
-    return this.readAll()[caseId] ?? null;
+    return this.backing.get(caseId);
   }
 
   async list(): Promise<readonly string[]> {
-    return Object.keys(this.readAll()).sort();
+    return this.backing.list();
   }
 
   async delete(caseId: string): Promise<void> {
-    const all = this.readAll();
-    delete all[caseId];
-    writeJSON(STORAGE_KEY, all);
+    await this.backing.delete(caseId);
   }
 }
 

@@ -394,3 +394,98 @@ describe('Test 10 — no import into City3D, GIS, live data, or Scientific Core'
     }
   });
 });
+
+describe('Test 11 — HazardInput gate rejects null/invalid scientificFields, seed, displayName; persisted Earthquake history fails honestly', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
+
+  it('a genuinely persisted, canonically fingerprinted Earthquake HazardInput with scientificFields corrupted to null is never accepted as valid — replay and history report an honest failure instead of throwing or fabricating a MATCH', async () => {
+    const fake = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: fake });
+
+    const { executeEarthquakeCommandCenterScenario: freshExecute } = await import('../core/simulationRenderer/earthquakeCommandCenter');
+    const { LocalHazardProvenanceStore: FreshHazardStore } = await import('../core/hazard/hazardProvenanceStore');
+    const { replayHazardRun: freshReplay } = await import('../core/hazard/hazardReplay');
+    const { listEarthquakePersistedRunHistory: freshListHistory } = await import('../core/simulationRenderer/earthquakePersistedRunHistory');
+    const { getHazardModule: freshGetHazardModule } = await import('../core/hazard/hazardModuleRegistry');
+    const { earthquakeEvaluator: freshEvaluator } = await import('../core/hazard/earthquake/earthquakeEvaluator');
+
+    const store = new FreshHazardStore();
+    const execution = await freshExecute(
+      { scenarioLabel: 'integrity-corrupt-input', magnitude: 5.5, depthKm: 10, epicenter: { x: 0, y: 0 }, seed: 7 },
+      { store, commitHash: 'test-commit' },
+    );
+    expect(execution.status).toBe('READY');
+    if (execution.status !== 'READY') throw new Error('expected a READY fixture run');
+
+    const hazardInputId = execution.scenario.input.hazardInputId;
+    const hazardRunId = execution.scenario.run.hazardRunId;
+
+    // Corrupt the persisted HazardInput directly in storage: keep every other field —
+    // including the already-canonically-computed inputFingerprint — untouched, and
+    // null out only scientificFields. This is exactly the gap the audit flagged: the
+    // old isHazardInputShape() checked only ids/fingerprint and would have accepted this.
+    const rawKey = 'genesis-os:hazard-provenance-store/inputs/v1';
+    const rawInputs = JSON.parse(fake.getItem(rawKey) as string) as Record<string, { scientificFields: unknown }>;
+    expect(rawInputs[hazardInputId].scientificFields).toBeTruthy(); // sanity: it really was a real object before corruption
+    rawInputs[hazardInputId] = { ...rawInputs[hazardInputId], scientificFields: null };
+    fake.setItem(rawKey, JSON.stringify(rawInputs));
+
+    const corruptedStore = new FreshHazardStore();
+    // The tightened shape gate must now reject this record outright.
+    expect(await corruptedStore.getInput(hazardInputId)).toBeNull();
+
+    const descriptor = freshGetHazardModule('earthquake');
+    const replay = await freshReplay({
+      store: corruptedStore,
+      hazardRunId,
+      evaluator: freshEvaluator,
+      hazardType: descriptor.hazardType,
+      projectionSchemaVersion: descriptor.projectionSchemaVersion,
+    });
+    // Honest failure — never a throw, never a fabricated MATCH.
+    expect(['BLOCKED', 'NOT_REPRODUCIBLE']).toContain(replay.status);
+    expect(replay.status).not.toBe('MATCH');
+
+    const putArtifactSpy = vi.spyOn(corruptedStore, 'putArtifact');
+    const putInputSpy = vi.spyOn(corruptedStore, 'putInput');
+    const putRunSpy = vi.spyOn(corruptedStore, 'putRun');
+
+    // A rejected promise here would fail this `await` itself — resolving cleanly IS the proof
+    // that persisted history never rejects/throws on a corrupted sibling record.
+    const history = await freshListHistory(corruptedStore);
+    expect(history.find((entry) => entry.hazardRunId === hazardRunId)).toBeUndefined();
+    // No write, no mapping, no overlay side effect from a read.
+    expect(putArtifactSpy).not.toHaveBeenCalled();
+    expect(putInputSpy).not.toHaveBeenCalled();
+    expect(putRunSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['scientificFields: null', { scientificFields: null }],
+    ['scientificFields: an array', { scientificFields: [] }],
+    ['seed: a boolean', { seed: true }],
+    ['displayName: a number', { displayName: 42 }],
+  ])('%s makes an otherwise well-formed HazardInput unreadable via get(), never a retainable record', async (_label, corruption) => {
+    const fake = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: fake });
+    const input = await makeInput(await makeArtifact());
+    fake.setItem('genesis-os:hazard-provenance-store/inputs/v1', JSON.stringify({
+      [input.hazardInputId]: { ...input, ...corruption },
+    }));
+
+    const { LocalHazardProvenanceStore: FreshHazardStore } = await import('../core/hazard/hazardProvenanceStore');
+    const store = new FreshHazardStore();
+    expect(await store.getInput(input.hazardInputId)).toBeNull();
+  });
+
+  it('a well-formed HazardInput (real scientificFields object, numeric seed, string displayName) still passes', async () => {
+    const fake = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: fake });
+    const input = await makeInput(await makeArtifact());
+    fake.setItem('genesis-os:hazard-provenance-store/inputs/v1', JSON.stringify({ [input.hazardInputId]: input }));
+
+    const { LocalHazardProvenanceStore: FreshHazardStore } = await import('../core/hazard/hazardProvenanceStore');
+    const store = new FreshHazardStore();
+    expect(await store.getInput(input.hazardInputId)).toEqual(input);
+  });
+});

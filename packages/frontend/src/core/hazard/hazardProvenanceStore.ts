@@ -43,8 +43,15 @@ function isSourceArtifactShape(candidate: unknown): candidate is SourceArtifact 
 function isHazardInputShape(candidate: unknown): candidate is HazardInput {
   if (typeof candidate !== 'object' || candidate === null) return false;
   const c = candidate as Record<string, unknown>;
-  return typeof c.hazardInputId === 'string' && typeof c.hazardType === 'string'
-    && typeof c.sourceArtifactId === 'string' && typeof c.inputFingerprint === 'string';
+  if (typeof c.hazardInputId !== 'string' || typeof c.hazardType !== 'string') return false;
+  if (typeof c.sourceArtifactId !== 'string' || typeof c.inputFingerprint !== 'string') return false;
+  // scientificFields is the actual scientific payload the fingerprint and every
+  // evaluator read — a null/array/primitive here must never pass as a
+  // retainable HazardInput, even when hazardInputId/inputFingerprint look fine.
+  if (typeof c.scientificFields !== 'object' || c.scientificFields === null || Array.isArray(c.scientificFields)) return false;
+  if (!(c.seed === null || typeof c.seed === 'number' || typeof c.seed === 'string')) return false;
+  if (!(c.displayName === null || typeof c.displayName === 'string')) return false;
+  return true;
 }
 
 function isHazardRunShape(candidate: unknown): candidate is HazardRun {

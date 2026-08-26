@@ -26,6 +26,8 @@
 - [x] Continue multiple substantial visual-only City3D iterations through façade depth, ground-plane detail, small architecture, agent legibility and CITY/DISTRICT/STREET composition; do not stop after a micro-change or alter the scientific core.
 - [x] Deliver one cumulative final evidence package: 1920×1080 before/after captures, renderer benchmark, full test/build gate, commit, push and real remaining reference gaps.
 - [x] Continue only while the next governed VISUAL_ONLY iteration yields a material reference-visible improvement proportional to its draw-call/triangle/render-time cost; do not create, package or send a ZIP during the active sprint.
+- [x] Independently audit `claude/earthquake-vertical-slice` from its stated base through `c048592`; do not merge, wire City3D or accept hazard-scientific claims until code scope, determinism and isolation are verified. Verdict: scope-clean but merge-blocked pending portable Chromium E2E and semantic/admission validation fixes.
+- [ ] After Claude remedies the audit blockers, assign only a bounded Earthquake Integration Readiness task; defer further hazard solvers/cascades, reserve read-only City3D integration for Manus, and reserve licensed data/GIS readiness for Kimi.
 - [ ] Implement only Phase 0 domain-neutral provenance and replay contracts: frozen artifacts, canonical hazard inputs/runs, immutable evidence storage and honest replay gates.
 - [ ] Add Phase 0 deterministic serialization, immutability, MATCH/DRIFT/BLOCKED and epidemic-isolation tests; do not add a hazard solver, external live-data adapter, GIS wiring, cascade or City3D hazard layer.
 - [ ] Validate, document, commit and deliver the Phase 0 contract foundation with deferred work stated explicitly.

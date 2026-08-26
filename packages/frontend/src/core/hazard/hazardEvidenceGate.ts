@@ -21,6 +21,7 @@ function admission(missingFields: readonly string[]): AdmissionResult {
 
 export function checkSourceArtifactAdmission(artifact: SourceArtifact): AdmissionResult {
   const missing: string[] = [];
+  if (!artifact.artifactId) missing.push('artifactId');
   if (!artifact.contentHash) missing.push('contentHash');
   if (!artifact.rawContentRef) missing.push('rawContentRef');
   if (!artifact.provenance) {
@@ -44,6 +45,15 @@ export function checkHazardInputAdmission(input: HazardInput): AdmissionResult {
   return admission(missing);
 }
 
+/**
+ * Output-field policy is status-dependent by design, not an oversight: a
+ * `COMPLETED` run that produced nothing is indistinguishable from one that
+ * silently failed, so an empty `outputFields` is rejected for it. A `FAILED`
+ * run legitimately has no output to report — an empty `outputFields` is
+ * admitted for it — but everything else (fingerprint, module/commit
+ * versioning, timing) remains mandatory regardless of status; a failure is
+ * not an excuse to drop provenance.
+ */
 export function checkHazardRunAdmission(run: HazardRun): AdmissionResult {
   const missing: string[] = [];
   if (!run.hazardRunId) missing.push('hazardRunId');
@@ -52,5 +62,13 @@ export function checkHazardRunAdmission(run: HazardRun): AdmissionResult {
   if (!run.codeCommitHash) missing.push('codeCommitHash');
   if (!run.resultFingerprint) missing.push('resultFingerprint');
   if (!run.status) missing.push('status');
+  if (typeof run.createdAt !== 'number' || !Number.isFinite(run.createdAt) || run.createdAt < 0) {
+    missing.push('createdAt');
+  }
+  if (!run.outputFields) {
+    missing.push('outputFields');
+  } else if (run.status === 'COMPLETED' && Object.keys(run.outputFields).length === 0) {
+    missing.push('outputFields');
+  }
   return admission(missing);
 }

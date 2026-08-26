@@ -309,6 +309,75 @@ describe('Test 7 — evidence completeness gate blocks admission on missing mand
     expect(result.admitted).toBe(false);
     expect(result.missingFields).toContain('hazardModuleVersion');
   });
+
+  it('rejects a SourceArtifact with an empty artifactId', async () => {
+    const artifact = await makeArtifact();
+    const broken = { ...artifact, artifactId: '' };
+    const result = checkSourceArtifactAdmission(broken);
+    expect(result.admitted).toBe(false);
+    expect(result.missingFields).toContain('artifactId');
+  });
+
+  describe('HazardRun.createdAt', () => {
+    it.each([
+      ['undefined', undefined],
+      ['NaN', Number.NaN],
+      ['Infinity', Number.POSITIVE_INFINITY],
+      ['-1', -1],
+    ] as const)('rejects createdAt = %s', async (_label, badCreatedAt) => {
+      const artifact = await makeArtifact();
+      const input = await makeInput(artifact);
+      const run = await makeRun(input, artifact, { createdAt: badCreatedAt as unknown as number });
+      const result = checkHazardRunAdmission(run);
+      expect(result.admitted).toBe(false);
+      expect(result.missingFields).toContain('createdAt');
+    });
+
+    it('admits createdAt = 0 (a valid, finite, non-negative timestamp)', async () => {
+      const artifact = await makeArtifact();
+      const input = await makeInput(artifact);
+      const run = await makeRun(input, artifact, { createdAt: 0 });
+      expect(checkHazardRunAdmission(run).missingFields).not.toContain('createdAt');
+    });
+  });
+
+  describe('HazardRun.outputFields — status-dependent policy', () => {
+    it('rejects a COMPLETED run with empty outputFields', async () => {
+      const artifact = await makeArtifact();
+      const input = await makeInput(artifact);
+      const run = await makeRun(input, artifact, { status: 'COMPLETED', outputFields: {} });
+      const result = checkHazardRunAdmission(run);
+      expect(result.admitted).toBe(false);
+      expect(result.missingFields).toContain('outputFields');
+    });
+
+    it('admits a FAILED run with empty outputFields, provided every other field is complete', async () => {
+      const artifact = await makeArtifact();
+      const input = await makeInput(artifact);
+      const run = await makeRun(input, artifact, { status: 'FAILED', outputFields: {} });
+      const result = checkHazardRunAdmission(run);
+      expect(result.admitted).toBe(true);
+      expect(result.missingFields).toEqual([]);
+    });
+
+    it('still rejects a FAILED run missing resultFingerprint, regardless of the outputFields exemption', async () => {
+      const artifact = await makeArtifact();
+      const input = await makeInput(artifact);
+      const run = await makeRun(input, artifact, { status: 'FAILED', outputFields: {}, resultFingerprint: '' });
+      const result = checkHazardRunAdmission(run);
+      expect(result.admitted).toBe(false);
+      expect(result.missingFields).toContain('resultFingerprint');
+    });
+
+    it('rejects missing resultFingerprint on a COMPLETED run too (existing guarantee, unaffected by this fix)', async () => {
+      const artifact = await makeArtifact();
+      const input = await makeInput(artifact);
+      const run = await makeRun(input, artifact, { resultFingerprint: '' });
+      const result = checkHazardRunAdmission(run);
+      expect(result.admitted).toBe(false);
+      expect(result.missingFields).toContain('resultFingerprint');
+    });
+  });
 });
 
 describe('Test 8 — isolation from epidemic Scientific Core and WorldEngineContract', () => {

@@ -1,5 +1,7 @@
 # Earthquake Demo Execution Envelope
 
+> **Superseded:** this document describes the envelope as of `287a788`. A hardening pass afterward split `REGISTRY_INCOMPATIBLE` into that code plus a distinct `PROVENANCE_CONFLICT`, added `scenario`/`evidence` fields to the DTO, made the registry check validate what is actually persisted (not just in-memory data), and froze all returned objects. See `docs/EARTHQUAKE_DEMO_ENVELOPE.md` for the current contract; this file is kept as a historical record of the initial version.
+
 **Status:** Domain-only sequencing layer over existing earthquake code. No new solver, no new hazard type, no City3D, no UI, no GIS, no coordinate mapping, no cascade engine. Builds on the Hazard Module Registry (`4ff08bd`).
 
 ## What this is

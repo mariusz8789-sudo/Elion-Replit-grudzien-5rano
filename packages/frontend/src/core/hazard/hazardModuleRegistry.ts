@@ -39,6 +39,7 @@ const EARTHQUAKE_REQUIRED_EVIDENCE_FIELDS: readonly string[] = Object.freeze([
   'run.hazardRunId', 'run.hazardInputId', 'run.hazardModuleVersion', 'run.codeCommitHash', 'run.resultFingerprint', 'run.status', 'run.createdAt', 'run.outputFields',
   'exposure.exposureSnapshotId', 'exposure.mappingMethod', 'exposure.sites', 'exposure.datasetStatus',
   'impacts',
+  'damageAssessments',
 ]);
 
 const EARTHQUAKE_DESCRIPTOR: HazardModuleDescriptor = Object.freeze({

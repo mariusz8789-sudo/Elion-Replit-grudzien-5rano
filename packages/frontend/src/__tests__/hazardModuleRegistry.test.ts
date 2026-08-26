@@ -161,9 +161,10 @@ describe('requiredEvidenceFields matches what the real evidence gate enforces', 
       exposure: { ...base.exposure, exposureSnapshotId: '', mappingMethod: '', sites: [], datasetStatus: '' as unknown as HazardDatasetStatus },
     };
     const brokenImpacts = { ...base, impacts: [] };
+    const brokenDamageAssessments = { ...base, damageAssessments: [] };
 
     const allMissing = new Set<string>();
-    for (const broken of [brokenArtifact, brokenInput, brokenRunFields, brokenRunStatus, brokenRunOutput, brokenExposure, brokenImpacts]) {
+    for (const broken of [brokenArtifact, brokenInput, brokenRunFields, brokenRunStatus, brokenRunOutput, brokenExposure, brokenImpacts, brokenDamageAssessments]) {
       const pack = await buildHazardEvidencePack(broken);
       pack.missingFields.forEach((f) => allMissing.add(f));
     }

@@ -20,7 +20,7 @@
     "notModeledVisible": true,
     "parametersVisible": true,
     "persistedHistoryVisible": true,
-    "persistedHistoryEntries": 9,
+    "persistedHistoryEntries": 11,
     "persistedHistoryMatch": true,
     "clearedButtonEnabled": true,
     "outcomeAnnounced": true,
@@ -29,7 +29,7 @@
   },
   "exportDownload": {
     "fileCount": 1,
-    "filename": "genesis-earthquake-evidence-run_input_eq_city3d-synthetic-1787761230916-1.json",
+    "filename": "genesis-earthquake-evidence-run_input_eq_city3d-synthetic-1787762398877-1.json",
     "schemaVersion": "1.0.0",
     "commandCenterStatus": "READY",
     "replayStatus": "MATCH",
@@ -46,6 +46,15 @@
   },
   "cleared": {
     "verdict": "OVERLAY CLEARED",
+    "cityCanvasCount": 1,
+    "stageFailed": false
+  },
+  "evidenceReplay": {
+    "expanded": true,
+    "replayAnnounced": true,
+    "driftAnnounced": true,
+    "historyEntries": 1,
+    "errorAbsent": true,
     "cityCanvasCount": 1,
     "stageFailed": false
   },

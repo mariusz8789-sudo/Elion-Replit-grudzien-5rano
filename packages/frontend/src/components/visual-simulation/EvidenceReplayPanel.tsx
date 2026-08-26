@@ -63,6 +63,11 @@ const REPLAY_LABELS: Record<DiscoveryReplay['status'], string> = {
   MATCH: 'MATCH', WITHIN_TOLERANCE: 'WITHIN_TOLERANCE', DRIFT: 'DRIFT', BLOCKED: 'BLOCKED', NOT_REPRODUCIBLE: 'NOT_REPRODUCIBLE',
 };
 
+function operationError(scope: string, cause: unknown): string {
+  const detail = cause instanceof Error ? cause.message : 'Nieznany błąd lokalnego zapisu.';
+  return `${scope}: ${detail}`;
+}
+
 function downloadJson(filename: string, data: unknown): void {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -98,12 +103,14 @@ export function EvidenceReplayPanel() {
   const [comparison, setComparison] = useState<ExperimentComparison | null>(null);
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const refreshHistory = async () => setHistory(await listExperimentRegistry(store));
   useEffect(() => { void refreshHistory(); }, [store]);
 
   const runExperiment = async () => {
     setBusy(true);
+    setError(null);
     setDriftDemo(null);
     setComparison(null);
     try {
@@ -112,26 +119,36 @@ export function EvidenceReplayPanel() {
       setCurrent(entry);
       setReplay(fresh.replay);
       await refreshHistory();
+    } catch (cause) {
+      setError(operationError('EKSPERYMENT', cause));
     } finally {
       setBusy(false);
     }
   };
 
   const loadEntry = async (experimentId: string) => {
-    const entry = await store.load(experimentId);
-    if (!entry) return;
-    setCurrent(entry);
-    setReplay(null);
-    setDriftDemo(null);
-    setComparison(null);
+    setError(null);
+    try {
+      const entry = await store.load(experimentId);
+      if (!entry) return;
+      setCurrent(entry);
+      setReplay(null);
+      setDriftDemo(null);
+      setComparison(null);
+    } catch (cause) {
+      setError(operationError('HISTORIA', cause));
+    }
   };
 
   const replayCurrent = async () => {
     if (!current) return;
     setBusy(true);
+    setError(null);
     try {
       const stored = await store.load(current.record.caseId);
       if (stored) setReplay(replayDiscoveryCase(stored.record));
+    } catch (cause) {
+      setError(operationError('REPLAY', cause));
     } finally {
       setBusy(false);
     }
@@ -143,15 +160,25 @@ export function EvidenceReplayPanel() {
   };
 
   const deleteEntry = async (experimentId: string) => {
-    await store.delete(experimentId);
-    if (current?.record.caseId === experimentId) { setCurrent(null); setReplay(null); setDriftDemo(null); }
-    await refreshHistory();
+    setError(null);
+    try {
+      await store.delete(experimentId);
+      if (current?.record.caseId === experimentId) { setCurrent(null); setReplay(null); setDriftDemo(null); }
+      await refreshHistory();
+    } catch (cause) {
+      setError(operationError('USUWANIE', cause));
+    }
   };
 
   const runComparison = async () => {
     if (!current || !compareWithId) return;
-    const other = await store.load(compareWithId);
-    if (other) setComparison(compareStoredExperiments(current, other));
+    setError(null);
+    try {
+      const other = await store.load(compareWithId);
+      if (other) setComparison(compareStoredExperiments(current, other));
+    } catch (cause) {
+      setError(operationError('PORÓWNANIE', cause));
+    }
   };
 
   const exportEvidence = () => {
@@ -207,6 +234,7 @@ export function EvidenceReplayPanel() {
           </>
         )}
       </div>
+      {error && <p className="evidence-error" role="alert">{error}</p>}
 
       {current ? (
         <>
@@ -220,11 +248,11 @@ export function EvidenceReplayPanel() {
             <div className="epidemic-summary-row"><span>evidence pack</span><strong>{current.record.evidence && current.record.evidence.missingFields.length === 0 ? 'KOMPLETNY' : `BRAKUJE: ${current.record.evidence?.missingFields.join(', ') ?? 'brak pakietu'}`}</strong></div>
             <div className="epidemic-summary-row"><span>SHA-256</span><strong className="evidence-hash" title={current.sha256 ?? undefined}>{current.sha256 ? `${current.sha256.slice(0, 16)}…` : '—'}</strong></div>
             {replay && (
-              <div className={`epidemic-summary-row ${replay.status === 'DRIFT' ? 'accent-row' : ''}`}><span>replay</span><strong>{REPLAY_LABELS[replay.status]}</strong></div>
+              <div className={`epidemic-summary-row ${replay.status === 'DRIFT' ? 'accent-row' : ''}`} role="status" aria-live="polite" aria-atomic="true"><span>replay</span><strong>{REPLAY_LABELS[replay.status]}</strong></div>
             )}
           </div>
           {driftDemo && (
-            <p className="hospital-panel-note evidence-drift-demo">
+            <p className="hospital-panel-note evidence-drift-demo" role="status" aria-live="polite" aria-atomic="true">
               Symulacja rozjazdu (kontrolowana zmiana w zapisanym rekordzie, nie w modelu): replay zwrócił{' '}
               <strong>{REPLAY_LABELS[driftDemo.status]}</strong>
               {driftDemo.status === 'DRIFT' && driftDemo.arms[0]?.differences.length > 0 && (

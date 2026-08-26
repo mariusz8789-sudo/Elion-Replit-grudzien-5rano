@@ -152,6 +152,32 @@ try {
     cityCanvasCount: document.querySelectorAll('.city-3d-canvas').length,
     stageFailed: Boolean(document.querySelector('.empty-state'))
   }))())`));
+  await evaluate(`(() => document.querySelector('.evidence-panel .evidence-panel-toggle')?.click())()`);
+  await sleep(180);
+  await evaluate(`(() => [...document.querySelectorAll('.evidence-panel button')].find((b) => b.textContent?.trim() === '▶ Uruchom eksperyment')?.click())()`);
+  await sleep(1500);
+  await evaluate(`(() => [...document.querySelectorAll('.evidence-panel button')].find((b) => b.textContent?.trim() === '↻ Replay')?.click())()`);
+  await sleep(260);
+  await evaluate(`(() => [...document.querySelectorAll('.evidence-panel button')].find((b) => b.textContent?.trim() === '⚠ Symuluj rozjazd')?.click())()`);
+  await sleep(120);
+  const evidenceReplay = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const panel = document.querySelector('.evidence-panel');
+    const statuses = [...(panel?.querySelectorAll('[role="status"]') ?? [])];
+    return {
+      expanded: panel?.querySelector('.evidence-panel-toggle')?.getAttribute('aria-expanded') === 'true',
+      replayAnnounced: statuses.some((element) => element.getAttribute('aria-live') === 'polite'
+        && element.getAttribute('aria-atomic') === 'true'
+        && /replay\\s*MATCH/i.test(element.textContent ?? '')),
+      driftAnnounced: statuses.some((element) => element.getAttribute('aria-live') === 'polite'
+        && element.getAttribute('aria-atomic') === 'true'
+        && /Symulacja rozjazdu/.test(element.textContent ?? '')
+        && /DRIFT/.test(element.textContent ?? '')),
+      historyEntries: panel?.querySelectorAll('.evidence-history li').length ?? 0,
+      errorAbsent: !panel?.querySelector('.evidence-error[role="alert"]'),
+      cityCanvasCount: document.querySelectorAll('.city-3d-canvas').length,
+      stageFailed: Boolean(document.querySelector('.empty-state')),
+    };
+  })())`));
   await evaluate(`(() => {
     const input = [...document.querySelectorAll('input')].find((node) => node.getAttribute('aria-label') === 'Synthetic depth km');
     if (!(input instanceof HTMLInputElement)) throw new Error('Missing synthetic depth control');
@@ -176,7 +202,7 @@ try {
       stageFailed: Boolean(document.querySelector('.empty-state')),
     };
   })())`));
-  const report = { before, active, exportDownload, cleared, blockedParameter, consoleEntries };
+  const report = { before, active, exportDownload, cleared, evidenceReplay, blockedParameter, consoleEntries };
   await writeFile(reportPath, JSON.stringify(report, null, 2));
   const assertions = [
     before.cityCanvasCount === 1,
@@ -214,6 +240,13 @@ try {
     cleared.verdict === 'OVERLAY CLEARED',
     cleared.cityCanvasCount === 1,
     !cleared.stageFailed,
+    evidenceReplay.expanded,
+    evidenceReplay.replayAnnounced,
+    evidenceReplay.driftAnnounced,
+    evidenceReplay.historyEntries >= 1,
+    evidenceReplay.errorAbsent,
+    evidenceReplay.cityCanvasCount === 1,
+    !evidenceReplay.stageFailed,
     blockedParameter.verdict === 'ENVELOPE BLOCKED',
     blockedParameter.invalidBlockVisible,
     blockedParameter.overlayNotRendered,

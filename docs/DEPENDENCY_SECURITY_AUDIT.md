@@ -28,6 +28,8 @@ The promoted lockfile was byte-identical to the isolated candidate. Live product
 
 The repository quality gate now runs `npm audit --audit-level=high` immediately after `npm ci`. It fails only when npm reports a high- or critical-severity advisory, while still assessing the full locked dependency tree rather than silently excluding the development/build chain. This is intentional: the build, lint, test, and artifact-upload tools execute inside the CI trust boundary. The step neither publishes nor deploys Genesis and has no application, scientific, renderer, hazard, data, or GIS behavior.
 
+Commit [`f4c63b2`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/commit/f4c63b2e2596197d71488e10b7e861ba662ddd7f) verified this exact gate in [GitHub Actions run `32956707727`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/32956707727). The new audit step passed before the unchanged whitespace, lint, frontend-test, backend-test, typecheck, production-build, and artifact-upload steps; the complete workflow concluded **success**.
+
 ## References
 
 1. [GitHub Advisory Database: `brace-expansion` unbounded expansion denial of service](https://github.com/advisories/GHSA-mh99-v99m-4gvg)

@@ -11,3 +11,4 @@
 - [x] Fetch and independently verify Claude commit `e94ef16` against the remote branch and reported merge base.
 - [x] Compare `e94ef16` with current `808c9df`, identifying whether the Multi-Hazard audit is the only missing additive change. Claude’s branch contained the Evidence/Replay work plus feature-flagged routing core changes.
 - [x] Reconcile only safe missing work, validate the resulting branch, and report the final integration state. Evidence/Replay was added selectively; routing core and routing tests remain excluded by scope.
+- [x] Incorporate Claude’s audit-only Phase 0 review, including artifact pinning, adapter-version provenance, replay gating, and cascade isolation, into the Multi-Hazard roadmap without starting implementation.

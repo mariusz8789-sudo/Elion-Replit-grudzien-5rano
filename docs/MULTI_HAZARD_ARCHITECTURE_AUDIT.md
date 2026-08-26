@@ -120,9 +120,35 @@ This ordering prioritizes reusable contracts and hazards with cleanly bounded in
 | Kimi | CRS/GIS adapters, source acquisition, spatial normalization, exposure registry and infrastructure data integration | Epidemiologic or physical hazard claims without domain validation |
 | Domain reviewers | Hazard assumptions, calibration, uncertainty, validation and safe-use boundaries | UI-only sign-off as a substitute for scientific review |
 
-## 8. Recommended next decision
+## 8. Phase 0 Evidence/Replay review requirements
 
-Approve **Phase 0 only**: build the shared data/provenance and contract foundation, with no hazard-impact simulation and no cross-hazard cascade. The first vertical slice should be chosen only after the target geography, intended use (research demonstration versus operational support), licensing constraints and available scientific reviewer are explicitly decided. Earthquake is the most tractable first candidate; flood should not be chosen first if the objective includes dynamic depth/velocity, because it requires terrain and hydrologic/hydraulic validation that Genesis does not currently possess.
+Claude's audit-only review of the current Evidence/Replay implementation confirms that the proposed contracts are compatible **only** if a future `HazardRun` remains the re-executable result of a pure function over a frozen `HazardInput`, explicit model configuration and seed where applicable. A live data fetch is not part of replay. Instead, a hazard replay must read the exact captured source artifact identified by its immutable content hash.
+
+| Requirement | Phase 0 decision |
+|---|---|
+| Source artifact replay | `SourceArtifact` must retain immutable `contentHash`, retrieval time, source time, adapter/normalizer version, provenance and retained raw bytes or an approved immutable artifact reference. Replay must never re-fetch a live endpoint. |
+| Replay status | If the identical captured artifact is unavailable, changed, incomplete or fails validation, replay returns `BLOCKED` or `NOT_REPRODUCIBLE`; it must never emit a false `MATCH`. |
+| Versioning | `normalizerVersion`, `hazardModuleVersion` and the existing build-provenance `codeCommitHash` must be stored independently. CRS/unit/format normalization is executable scientific-adjacent code and cannot be treated as invisible preprocessing. |
+| Fingerprints | `SourceArtifact.contentHash`, the complete canonical `HazardInput`, and `HazardRun.resultFingerprint` are immutable and fingerprinted at creation. `ExposureSnapshot` and `ImpactResult` are immutable derived projections whose provenance points to their originating `HazardRun`; they do not receive independent display-driven fingerprints. |
+| Cascades | `CascadeEdge` remains **out of Phase 0**. A cascade requires a deterministic graph replay with ordered dependencies and chain-of-custody, not a single-run replay. |
+| Scientific isolation | A hazard module cannot read or write `EpidemicCitySimulation`, `resolveContacts`, hospital capacity, Scenario Engine state, Discovery Engine state or `WorldEngineContract` except through a named, versioned, read-only adapter. Any future influence on an epidemic experiment must use an explicit opt-in request boundary, never a hidden state mutation. |
+| Evidence reuse | Generalize the existing EvidenceStore/evidenceCrypto pattern behind a domain-neutral interface before adding hazard evidence. Do not create a third parallel evidence system. |
+
+### 8.1 Required Phase 0 contract tests
+
+| Test | Required assertion |
+|---|---|
+| Canonical serialization | Each of the six primary contracts serializes deterministically regardless of input key order. |
+| Input sensitivity | Every scientifically relevant `HazardInput` change changes its input fingerprint; declared presentation-only fields do not. |
+| Honest replay | The same frozen artifact, same normalized input, model configuration and seed re-execute to `MATCH`; an actual input or output change yields `DRIFT`. |
+| Missing-artifact gate | Missing, modified or hash-mismatched source data yields `BLOCKED` / `NOT_REPRODUCIBLE`, never `MATCH`. |
+| Store immutability | An attempt to create an existing artifact or input ID with different content is rejected. |
+| Evidence completeness | Missing mandatory provenance, version or model fields blocks evidence-pack admission. |
+| Hazard/epidemic isolation | A hazard run cannot mutate or implicitly read epidemiological simulation state; an attempted undeclared dependency fails. |
+
+## 9. Revised recommended next decision
+
+Approve **Phase 0 only**: design and test the domain-neutral evidence/data-provenance boundary for frozen artifacts and no-cascade `HazardRun` requests. Do **not** create `ExposureSnapshot`, `ImpactResult`, `CascadeEdge`, a physical hazard solver, a cross-hazard orchestrator or a new City3D layer yet. The first vertical slice should be chosen only after the target geography, intended use (research demonstration versus operational support), licensing constraints and available scientific reviewer are explicitly decided. Earthquake is the most tractable first candidate; flood should not be chosen first if the objective includes dynamic depth/velocity, because it requires terrain and hydrologic/hydraulic validation that Genesis does not currently possess.
 
 ## References
 

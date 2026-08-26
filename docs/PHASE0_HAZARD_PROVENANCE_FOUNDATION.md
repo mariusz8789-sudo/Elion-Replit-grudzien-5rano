@@ -15,9 +15,9 @@ All new code lives in one new module, `packages/frontend/src/core/hazard/`:
 | `hazardReplay.ts` | `replayHazardRun`, `HazardReferenceEvaluator` — the replay gate producing `MATCH` / `DRIFT` / `BLOCKED` / `NOT_REPRODUCIBLE` |
 | `index.ts` | barrel export |
 
-Tests: `packages/frontend/src/__tests__/hazardProvenance.test.ts` (20 assertions across 8 required categories — see below).
+Tests: `packages/frontend/src/__tests__/hazardProvenance.test.ts` (34 assertions across the eight required categories plus finite-time, status-dependent output and admission regressions — see below).
 
-Nothing outside `core/hazard/` and this one test file was touched. No UI wiring was added — Phase 0 is a data/contract layer only, with no Command Center panel.
+The original Phase 0 implementation was data/contract-only. Later audited work reuses these contracts through the separate Earthquake envelope and Command Center composition; Phase 0 itself still owns no UI, City3D renderer, GIS adapter, cascade or epidemic-state boundary.
 
 ## Contracts
 
@@ -51,7 +51,7 @@ This is the same honesty guarantee the epidemic replay already has (re-execute, 
 
 Hazard replay (`hazardReplay.ts`) and epidemic replay (`core/discovery/discoveryReplay.ts`) are two independent code paths that share only the generic hashing primitives (`canonicalJson`, `sha256Hex`), not a call path. Overloading the existing `replayDiscoveryCase` to also understand hazards was explicitly rejected — that would have been exactly the "third parallel evidence system" this Phase 0 was told not to build, just merged into the wrong host instead of made standalone.
 
-## Test coverage (`hazardProvenance.test.ts`, 20 assertions)
+## Test coverage (`hazardProvenance.test.ts`, 34 assertions)
 
 | # | Requirement | Coverage |
 |---|---|---|
@@ -64,13 +64,14 @@ Hazard replay (`hazardReplay.ts`) and epidemic replay (`core/discovery/discovery
 | 7 | Missing mandatory field blocks evidence admission | One admitted case and one rejected case per contract type |
 | 8 | Hazard/epidemic isolation | Static-import scan of every file in `core/hazard/` against a list of Scientific Core / `WorldEngineContract` module names — none appear |
 
+Additional regressions enforce finite, non-negative `SourceArtifact.provenance.retrievedAt` and `HazardRun.createdAt`, validate status-dependent `outputFields` admission, and preserve the requirement that a `FAILED` run may omit output fields only when every other provenance requirement is complete.
+
 ## Validation run
 
-- `npx vitest run src/__tests__/hazardProvenance.test.ts` — 20/20 passed.
-- `npx vitest run` (full frontend suite) — 119 files / 1205 tests passed (up from the pre-existing 118 files / 1185 tests by exactly this one new file).
-- `npx tsc --noEmit` — clean.
-- `npx eslint src/core/hazard src/__tests__/hazardProvenance.test.ts` — clean.
-- `npm run build` — production build succeeds.
+- Current Phase 0-focused validation: `hazardProvenance`, `evidenceStoreConvergence` and `hazardModuleRegistry` — **61/61 passed**.
+- Current full frontend validation — **126 files / 1,311 tests passed** in single-worker mode.
+- `tsc --noEmit` — clean.
+- Production build — succeeds.
 - `git diff --check` — clean.
 
 ## Deferred (explicitly out of Phase 0 scope)

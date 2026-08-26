@@ -42,9 +42,10 @@
 - [x] Wire one read-only, scenario-labelled Earthquake overlay into the existing City3D renderer behind the evidence/MATCH/schema/mapping gates; do not extend or mutate `WorldStateView`.
 - [x] Connect the existing Earthquake scenario run, persisted HazardRun/Evidence Pack and replay verdict to a compact command-center control path, with SCENARIO/SYNTHETIC/NOT_MODELED disclosures.
 - [x] Prove mapping → projection → overlay → Evidence/Replay in integration tests and Chromium, then commit and push only the audited demonstrator.
-- [ ] Implement only Phase 0 domain-neutral provenance and replay contracts: frozen artifacts, canonical hazard inputs/runs, immutable evidence storage and honest replay gates.
-- [ ] Add Phase 0 deterministic serialization, immutability, MATCH/DRIFT/BLOCKED and epidemic-isolation tests; do not add a hazard solver, external live-data adapter, GIS wiring, cascade or City3D hazard layer.
-- [ ] Validate, document, commit and deliver the Phase 0 contract foundation with deferred work stated explicitly.
+- [x] Implement only Phase 0 domain-neutral provenance and replay contracts: frozen artifacts, canonical hazard inputs/runs, immutable evidence storage and honest replay gates.
+- [x] Add Phase 0 deterministic serialization, immutability, MATCH/DRIFT/BLOCKED and epidemic-isolation tests; do not add a hazard solver, external live-data adapter, GIS wiring, cascade or City3D hazard layer.
+- [x] Validate, document, commit and deliver the Phase 0 contract foundation with deferred work stated explicitly.
+- [x] Review the remaining checked and unchecked Genesis roadmap items, their dependencies and audit status; select only the next safe, non-conflicting milestone after the Earthquake hardening closeout.
 - [x] Finalize the audited Earthquake → Digital Twin demonstrator documentation, checklist and complete-diff review without introducing additional hazards or data adapters.
 - [x] Commit and push the validated Earthquake demonstrator, then prepare the saved version for user-controlled publishing.
 - [x] Independently audit Claude’s unmerged `4ff08bd` hazard-registry and `287a788` Earthquake execution-envelope changes against the delivered demonstrator; do not merge or introduce additional hazards, GIS, cascades or epidemic coupling during the audit.

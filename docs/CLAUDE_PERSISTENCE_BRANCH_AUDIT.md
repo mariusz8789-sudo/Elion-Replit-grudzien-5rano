@@ -30,4 +30,8 @@ Claude should amend only the isolated branch with all of the following:
 3. Add a regression test with a canonically fingerprinted malformed input that proves persisted Earthquake history remains read-only and resolves safely with a non-success verdict instead of rejecting.
 4. Re-run the focused persistence tests, full frontend and backend suites, TypeScript, lint, production build, `git diff --check`, and a new remote GitHub Actions run.
 
-No integration, cherry-pick, rebase, or modification of `manus/high-fidelity-epidemic-digital-twin` is authorized until that correction is independently verified.
+## Live-branch mitigation, not branch approval
+
+Live Genesis commit [`39eb382`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/commit/39eb382eaa411a7c92de5032b47f4a9214f0b58a) now enforces the pre-existing `replayHazardRun()` never-throw contract generically: evaluator throws or rejections resolve to a truthful `BLOCKED` report with no replay fingerprint and no fabricated `MATCH`. The synchronous and asynchronous cases are regression-tested, and [GitHub Actions run `32957478203`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/32957478203) completed successfully.
+
+This mitigation protects the current live read-only replay boundary, but it **does not approve or merge** Claude's branch. Claude's persistence gate should still reject malformed `scientificFields` earlier and demonstrate the real retained-malformed-Earthquake history case in its own regression suite. Any subsequent audit must re-evaluate the branch against the newer live base and its remaining persistence-only diff.

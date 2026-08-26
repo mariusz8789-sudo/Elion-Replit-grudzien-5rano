@@ -359,7 +359,11 @@ describe('Earthquake module isolation — Scientific Core and WorldEngineContrac
 
   it('the earthquake module only reaches outside itself into Phase 0 hazard primitives and shared hashing utilities', () => {
     const files = readdirSync(EARTHQUAKE_DIR).filter((f) => f.endsWith('.ts'));
-    const allowedExternalPrefixes = ["'../contracts", "'../fingerprint", "'../hazardEvidenceGate", "'../hazardReplay", "'../../events/hash", "'../../discovery/evidenceCrypto"];
+    const allowedExternalPrefixes = [
+      "'../contracts", "'../fingerprint", "'../hazardEvidenceGate", "'../hazardReplay",
+      "'../hazardModuleRegistry", "'../hazardProvenanceStore",
+      "'../../events/hash", "'../../discovery/evidenceCrypto",
+    ];
     for (const file of files) {
       const source = readFileSync(join(EARTHQUAKE_DIR, file), 'utf8');
       const importLines = source.match(/^import .*from '([^']+)'/gm) ?? [];

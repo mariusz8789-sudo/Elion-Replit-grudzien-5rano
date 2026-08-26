@@ -7,3 +7,4 @@ export * from './earthquakeScenario';
 export * from './earthquakeScenarioValidation';
 export * from './earthquakeEvidence';
 export * from './earthquakeWorldProjection';
+export * from './earthquakeDemoEnvelope';

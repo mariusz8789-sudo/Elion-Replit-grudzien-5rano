@@ -61,3 +61,4 @@
 - [x] Add a repository-native frontend quality gate for tests, TypeScript, production build and whitespace checks on push/pull request; do not publish, deploy or alter scientific/runtime behavior.
 - [x] Add a dry, domain-neutral dataset-governance registry with source/license/provenance metadata and no network fetch, GIS, hazard execution, cascade or epidemic coupling.
 - [x] Verify the triggered remote GitHub Actions quality gate for the pushed branch and record its actual result without publishing or deploying Genesis.
+- [x] Independently compare the uploaded Phase 0 hazard-contract package with the current Genesis provenance, registry and validation boundaries; adopt no code unless a non-duplicative, audited gap is demonstrated, and do not add hazards, data ingestion, GIS, cascades or Scientific Core coupling.

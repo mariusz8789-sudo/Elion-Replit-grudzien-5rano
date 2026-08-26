@@ -75,29 +75,43 @@ export default async function scenario(h) {
 
   const result = await h.runEarthquakeScenario(spec, commitHash);
 
-  // MATCH: fully persisted, unmodified.
+  // MATCH: fully persisted, unmodified, through the ENFORCED capability fence.
   const matchStore = new h.InMemoryHazardProvenanceStore();
   await matchStore.putArtifact(result.artifact);
   await matchStore.putInput(result.input);
   await matchStore.putRun(result.run);
-  const matchReplay = await h.replayHazardRun({ store: matchStore, hazardRunId: result.run.hazardRunId, evaluator: h.earthquakeEvaluator });
+  const matchReplay = await h.replayHazardRun({ store: matchStore, hazardRunId: result.run.hazardRunId, evaluator: h.earthquakeEvaluator, hazardType: 'earthquake' });
 
   // DRIFT: a tampered run fingerprint, never the true one, persisted directly.
   const driftStore = new h.InMemoryHazardProvenanceStore();
   await driftStore.putArtifact(result.artifact);
   await driftStore.putInput(result.input);
   await driftStore.putRun({ ...result.run, resultFingerprint: 'deliberately-wrong-fingerprint' });
-  const driftReplay = await h.replayHazardRun({ store: driftStore, hazardRunId: result.run.hazardRunId, evaluator: h.earthquakeEvaluator });
+  const driftReplay = await h.replayHazardRun({ store: driftStore, hazardRunId: result.run.hazardRunId, evaluator: h.earthquakeEvaluator, hazardType: 'earthquake' });
 
   // BLOCKED: artifact never persisted.
   const blockedStore = new h.InMemoryHazardProvenanceStore();
   await blockedStore.putInput(result.input);
   await blockedStore.putRun(result.run);
-  const blockedReplay = await h.replayHazardRun({ store: blockedStore, hazardRunId: result.run.hazardRunId, evaluator: h.earthquakeEvaluator });
+  const blockedReplay = await h.replayHazardRun({ store: blockedStore, hazardRunId: result.run.hazardRunId, evaluator: h.earthquakeEvaluator, hazardType: 'earthquake' });
 
   // NOT_REPRODUCIBLE: run id never saved anywhere.
   const emptyStore = new h.InMemoryHazardProvenanceStore();
-  const notReproducibleReplay = await h.replayHazardRun({ store: emptyStore, hazardRunId: 'never-saved', evaluator: h.earthquakeEvaluator });
+  const notReproducibleReplay = await h.replayHazardRun({ store: emptyStore, hazardRunId: 'never-saved', evaluator: h.earthquakeEvaluator, hazardType: 'earthquake' });
+
+  // Capability fence, exercised in the real browser: an unregistered hazardType must BLOCK before any artifact/fingerprint check.
+  const fenceBadTypeStore = new h.InMemoryHazardProvenanceStore();
+  await fenceBadTypeStore.putArtifact(result.artifact);
+  await fenceBadTypeStore.putInput(result.input);
+  await fenceBadTypeStore.putRun(result.run);
+  const fenceBadTypeReplay = await h.replayHazardRun({ store: fenceBadTypeStore, hazardRunId: result.run.hazardRunId, evaluator: h.earthquakeEvaluator, hazardType: 'flood' });
+
+  // Capability fence: a stale/foreign hazardModuleVersion must BLOCK.
+  const fenceBadVersionStore = new h.InMemoryHazardProvenanceStore();
+  await fenceBadVersionStore.putArtifact(result.artifact);
+  await fenceBadVersionStore.putInput(result.input);
+  await fenceBadVersionStore.putRun({ ...result.run, hazardModuleVersion: 'earthquake-synthetic-attenuation-v0-old' });
+  const fenceBadVersionReplay = await h.replayHazardRun({ store: fenceBadVersionStore, hazardRunId: result.run.hazardRunId, evaluator: h.earthquakeEvaluator, hazardType: 'earthquake' });
 
   const evidencePack = await h.buildHazardEvidencePack(result);
   // Same fixed result, hashed twice: proves the digest function itself is
@@ -129,6 +143,8 @@ export default async function scenario(h) {
     driftStatus: driftReplay.status,
     blockedStatus: blockedReplay.status,
     notReproducibleStatus: notReproducibleReplay.status,
+    fenceBadTypeStatus: fenceBadTypeReplay.status,
+    fenceBadVersionStatus: fenceBadVersionReplay.status,
     evidenceMissingFields: evidencePack.missingFields,
     evidenceSha256: evidencePack.sha256,
     evidenceSha256Repeated: evidencePackAgain.sha256,
@@ -213,6 +229,8 @@ check('replay niezmienionego przebiegu daje MATCH', actual.matchStatus === 'MATC
 check('replay przekłamanego odcisku daje DRIFT', actual.driftStatus === 'DRIFT', actual.driftStatus);
 check('replay bez zamrożonego artefaktu daje BLOCKED (nigdy fałszywy MATCH)', actual.blockedStatus === 'BLOCKED', actual.blockedStatus);
 check('replay nieznanego runId daje NOT_REPRODUCIBLE', actual.notReproducibleStatus === 'NOT_REPRODUCIBLE', actual.notReproducibleStatus);
+check('capability fence: nierejestrowany hazardType blokuje replay w prawdziwej przeglądarce', actual.fenceBadTypeStatus === 'BLOCKED', actual.fenceBadTypeStatus);
+check('capability fence: nieprawidłowa hazardModuleVersion blokuje replay w prawdziwej przeglądarce', actual.fenceBadVersionStatus === 'BLOCKED', actual.fenceBadVersionStatus);
 check('kompletny przebieg przechodzi bramkę admisji Phase 0 bez zmian', actual.admissionAllPassed === true);
 check('Evidence Pack jest kompletny i ma prawdziwy SHA-256', actual.evidenceMissingFields.length === 0 && /^[0-9a-f]{64}$/.test(actual.evidenceSha256) && actual.evidenceHazardType === 'earthquake', JSON.stringify(actual.evidenceMissingFields));
 check('SHA-256 tego samego pakietu policzony dwa razy daje ten sam wynik (funkcja skrótu jest deterministyczna)', actual.evidenceSha256 === actual.evidenceSha256Repeated, `${actual.evidenceSha256} vs ${actual.evidenceSha256Repeated}`);
@@ -224,7 +242,7 @@ check('projekcja Digital Twin jest wersjonowana i deklaruje notModeled', actual.
 // artifact.provenance.retrievedAt) frozen at scenario-build time — two
 // independently-run scenarios are legitimately different records. Its
 // determinism given a FIXED result is proven separately just above.
-for (const key of ['artifactContentHash', 'inputFingerprint', 'resultFingerprint', 'outputFields', 'impactSeverities', 'matchStatus', 'driftStatus', 'blockedStatus', 'notReproducibleStatus', 'evidenceMissingFields', 'projectionSiteCount']) {
+for (const key of ['artifactContentHash', 'inputFingerprint', 'resultFingerprint', 'outputFields', 'impactSeverities', 'matchStatus', 'driftStatus', 'blockedStatus', 'notReproducibleStatus', 'fenceBadTypeStatus', 'fenceBadVersionStatus', 'evidenceMissingFields', 'projectionSiteCount']) {
   check(`Node i Chromium zgodne: ${key}`, JSON.stringify(actual[key]) === JSON.stringify(expected[key]), `${JSON.stringify(expected[key])} vs ${JSON.stringify(actual[key])}`);
 }
 

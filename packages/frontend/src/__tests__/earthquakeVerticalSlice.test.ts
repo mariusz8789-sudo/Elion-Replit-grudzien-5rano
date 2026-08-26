@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { InMemoryHazardProvenanceStore } from '../core/hazard/hazardProvenanceStore';
+import { InMemoryHazardProvenanceStore, type HazardProvenanceStore } from '../core/hazard/hazardProvenanceStore';
 import { replayHazardRun } from '../core/hazard/hazardReplay';
 import { checkHazardInputAdmission, checkHazardRunAdmission, checkSourceArtifactAdmission } from '../core/hazard/hazardEvidenceGate';
 import { earthquakeEvaluator } from '../core/hazard/earthquake/earthquakeEvaluator';
@@ -135,12 +135,12 @@ describe('Earthquake vertical slice — determinism and drift', () => {
   });
 });
 
-describe('Earthquake vertical slice — Replay MATCH / DRIFT / BLOCKED / NOT_REPRODUCIBLE', () => {
+describe('Earthquake vertical slice — Replay MATCH / DRIFT / BLOCKED / NOT_REPRODUCIBLE (through the enforced capability fence)', () => {
   it('MATCH: replaying an unmodified, fully persisted run against the same evaluator', async () => {
     const store = new InMemoryHazardProvenanceStore();
     const result = await persistScenario(store, BASE_SPEC);
 
-    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator });
+    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator, hazardType: 'earthquake' });
     expect(replay.status).toBe('MATCH');
     expect(replay.replayResultFingerprint).toBe(result.run.resultFingerprint);
   });
@@ -153,7 +153,7 @@ describe('Earthquake vertical slice — Replay MATCH / DRIFT / BLOCKED / NOT_REP
     // Persist a tampered run directly (never the true one) — same technique Phase 0's own replay tests use to simulate a corrupted/altered record.
     await store.putRun({ ...result.run, resultFingerprint: 'deliberately-wrong-fingerprint' });
 
-    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator });
+    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator, hazardType: 'earthquake' });
     expect(replay.status).toBe('DRIFT');
   });
 
@@ -164,14 +164,74 @@ describe('Earthquake vertical slice — Replay MATCH / DRIFT / BLOCKED / NOT_REP
     await store.putRun(result.run);
     // Artifact intentionally never persisted — replay must never re-fetch it.
 
-    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator });
+    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator, hazardType: 'earthquake' });
     expect(replay.status).toBe('BLOCKED');
   });
 
   it('NOT_REPRODUCIBLE: the run id itself was never saved', async () => {
     const store = new InMemoryHazardProvenanceStore();
-    const replay = await replayHazardRun({ store, hazardRunId: 'never-saved-earthquake-run', evaluator: earthquakeEvaluator });
+    const replay = await replayHazardRun({ store, hazardRunId: 'never-saved-earthquake-run', evaluator: earthquakeEvaluator, hazardType: 'earthquake' });
     expect(replay.status).toBe('NOT_REPRODUCIBLE');
+  });
+});
+
+describe('Earthquake vertical slice — capability fence actually enforced by replayHazardRun (final readiness gate)', () => {
+  it('a correct, registered Earthquake run replays normally (fence passes, MATCH follows)', async () => {
+    const store = new InMemoryHazardProvenanceStore();
+    const result = await persistScenario(store, { ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-FENCE-OK' });
+    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator, hazardType: 'earthquake' });
+    expect(replay.status).toBe('MATCH');
+  });
+
+  it('BLOCKED: an unregistered hazardType is rejected before the artifact/fingerprint checks even run', async () => {
+    const store = new InMemoryHazardProvenanceStore();
+    const result = await persistScenario(store, { ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-FENCE-BAD-TYPE' });
+    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator, hazardType: 'flood' });
+    expect(replay.status).toBe('BLOCKED');
+    expect(replay.differences.join(' ')).toMatch(/capability fence/);
+  });
+
+  it('BLOCKED: a HazardRun.hazardModuleVersion mismatching the registered module version is rejected', async () => {
+    const store = new InMemoryHazardProvenanceStore();
+    const result = await runEarthquakeScenario({ ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-FENCE-BAD-VERSION' }, 'test-commit-hash');
+    await store.putArtifact(result.artifact);
+    await store.putInput(result.input);
+    // A stale/foreign module version, persisted directly (never the true one — the store's immutability would otherwise reject a second write).
+    await store.putRun({ ...result.run, hazardModuleVersion: 'earthquake-synthetic-attenuation-v0-old' });
+
+    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator, hazardType: 'earthquake' });
+    expect(replay.status).toBe('BLOCKED');
+  });
+
+  it('BLOCKED: a projectionSchemaVersion mismatching the registered value is rejected', async () => {
+    const store = new InMemoryHazardProvenanceStore();
+    const result = await persistScenario(store, { ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-FENCE-BAD-SCHEMA' });
+    const replay = await replayHazardRun({
+      store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator,
+      hazardType: 'earthquake', projectionSchemaVersion: '99.0.0',
+    });
+    expect(replay.status).toBe('BLOCKED');
+  });
+
+  it('BLOCKED: an inconsistent HazardInput <-> HazardRun pair (input.hazardInputId does not match run.hazardInputId) is rejected', async () => {
+    const a = await runEarthquakeScenario({ ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-FENCE-INCONSISTENT-A' }, 'test-commit-hash');
+    const b = await runEarthquakeScenario({ ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-FENCE-INCONSISTENT-B', magnitude: 7.2 }, 'test-commit-hash');
+    // A store whose getInput() returns a DIFFERENT scenario's input than the one the run actually references — simulates a corrupted/misrouted backend, not a real store bug (the real InMemory/LocalHazardProvenanceStore cannot produce this).
+    const inconsistentStore: HazardProvenanceStore = {
+      putArtifact: async () => {}, getArtifact: async () => a.artifact, listArtifacts: async () => [a.artifact.artifactId],
+      putInput: async () => {}, getInput: async () => b.input, listInputs: async () => [b.input.hazardInputId],
+      putRun: async () => {}, getRun: async () => a.run, listRuns: async () => [a.run.hazardRunId],
+    };
+
+    const replay = await replayHazardRun({ store: inconsistentStore, hazardRunId: a.run.hazardRunId, evaluator: earthquakeEvaluator, hazardType: 'earthquake' });
+    expect(replay.status).toBe('BLOCKED');
+  });
+
+  it('omitting hazardType skips the fence — the domain-neutral mechanism is unaffected', async () => {
+    const store = new InMemoryHazardProvenanceStore();
+    const result = await persistScenario(store, { ...BASE_SPEC, scenarioLabel: 'SYNTHETIC-EQ-FENCE-OMITTED' });
+    const replay = await replayHazardRun({ store, hazardRunId: result.run.hazardRunId, evaluator: earthquakeEvaluator });
+    expect(replay.status).toBe('MATCH');
   });
 });
 
@@ -299,7 +359,11 @@ describe('Earthquake module isolation — Scientific Core and WorldEngineContrac
 
   it('the earthquake module only reaches outside itself into Phase 0 hazard primitives and shared hashing utilities', () => {
     const files = readdirSync(EARTHQUAKE_DIR).filter((f) => f.endsWith('.ts'));
-    const allowedExternalPrefixes = ["'../contracts", "'../fingerprint", "'../hazardEvidenceGate", "'../hazardReplay", "'../../events/hash", "'../../discovery/evidenceCrypto"];
+    const allowedExternalPrefixes = [
+      "'../contracts", "'../fingerprint", "'../hazardEvidenceGate", "'../hazardReplay",
+      "'../hazardModuleRegistry", "'../hazardProvenanceStore",
+      "'../../events/hash", "'../../discovery/evidenceCrypto",
+    ];
     for (const file of files) {
       const source = readFileSync(join(EARTHQUAKE_DIR, file), 'utf8');
       const importLines = source.match(/^import .*from '([^']+)'/gm) ?? [];

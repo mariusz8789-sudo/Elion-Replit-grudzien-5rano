@@ -43,7 +43,8 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
       });
       setExecution(outcome);
       onOverlayChange(outcome.overlay);
-      setOverlayDisplayed(outcome.overlay !== null);
+      setOverlayDisplayed(outcome.status === 'READY' && outcome.overlay !== null);
+      if (outcome.status === 'BLOCKED') setError(`${outcome.blockCode}: ${outcome.blockReason}`);
     } catch (cause) {
       onOverlayChange(null);
       setOverlayDisplayed(false);
@@ -74,7 +75,24 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
         <button className="world-action" onClick={clearOverlay} disabled={!overlayDisplayed}>Wyczyść overlay</button>
       </div>
       {error && <p className="earthquake-error" role="alert">BLOKADA: {error}</p>}
-      {execution && (
+      {execution?.status === 'BLOCKED' && (
+        <div className="earthquake-proof">
+          <div className="earthquake-verdict blocked">
+            <b>ENVELOPE BLOCKED</b>
+            <span>{execution.blockCode} · {execution.blockReason}</span>
+          </div>
+          <dl className="earthquake-proof-grid">
+            <div><dt>replay</dt><dd>{execution.envelope.replay?.status ?? 'NOT_RUN'}</dd></div>
+            <div><dt>overlay</dt><dd>NOT_RENDERED</dd></div>
+            <div><dt>status</dt><dd>SCENARIO ONLY</dd></div>
+          </dl>
+          <details className="earthquake-not-modeled-details">
+            <summary>NOT_MODELED ({execution.envelope.notModeled.length})</summary>
+            <ul>{execution.envelope.notModeled.map((item) => <li key={item}>{item}</li>)}</ul>
+          </details>
+        </div>
+      )}
+      {execution?.status === 'READY' && (
         <div className="earthquake-proof">
           <div className={`earthquake-verdict ${execution.overlayGate.enabled ? overlayDisplayed ? 'approved' : 'cleared' : 'blocked'}`}>
             <b>{execution.overlayGate.enabled ? overlayDisplayed ? 'OVERLAY ACTIVE' : 'OVERLAY CLEARED' : 'OVERLAY BLOCKED'}</b>

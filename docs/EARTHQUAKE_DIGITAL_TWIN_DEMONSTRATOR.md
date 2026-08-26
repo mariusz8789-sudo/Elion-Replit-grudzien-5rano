@@ -26,11 +26,10 @@ The command-center service composes existing contracts in a deliberate order. Th
 
 ```text
 Declared synthetic preset
-  → runEarthquakeScenario()
-  → persist artifact + input + run
-  → buildHazardEvidencePack()
-  → replayHazardRun(... earthquakeEvaluator) = MATCH
-  → projectEarthquakeWorldState()
+  → buildEarthquakeDemoEnvelope()
+      → validation → existing runner → immutable persistence
+      → registered module admission → evidence → canonical replay MATCH
+      → pure Earthquake projection
   → projectEarthquakeToCityOverlay()
   → evaluateScenarioOverlayEligibility()
   → setEarthquakeScenarioOverlay(overlay) only when enabled
@@ -60,7 +59,7 @@ The anchors are **display anchors only**. They do not claim that an Earthquake f
 
 The panel is a compact item in the existing right rail. It displays `SCENARIO`, `SYNTHETIC`, and `NON_OPERATIONAL`, then exposes the actual replay verdict, evidence completeness, mapped-site count, hazard-run identifier, evidence SHA-256, mapping fingerprint and Earthquake `NOT_MODELED` list.
 
-When the gate approves the projection, `EpidemicCity3DSim.setEarthquakeScenarioOverlay()` stores it as an immutable renderer input and synchronizes a separate non-interactive marker group. Severity/uncertainty rings, stems and tetrahedron markers are visual annotations only. Clearing the scenario calls the same setter with `null`; evidence remains available in the panel while the display readout truthfully becomes `OVERLAY CLEARED`.
+When the gate approves the projection, `EpidemicCity3DSim.setEarthquakeScenarioOverlay()` stores it as an immutable renderer input and synchronizes a separate non-interactive marker group. Severity/uncertainty rings, stems and tetrahedron markers are visual annotations only. Clearing the scenario calls the same setter with `null`; evidence remains available in the panel while the display readout truthfully becomes `OVERLAY CLEARED`. An upstream envelope block is displayed with its named code and reason and always clears/withholds the overlay.
 
 ## Runtime proof
 
@@ -84,11 +83,13 @@ The same interaction proof was executed against the Vite production preview of t
 
 ![Production frontend proof at 1920×1080](../artifacts/screenshots/city3d-earthquake-demonstrator-production-1920x1080.png)
 
+The production preview proof was repeated after the envelope refactor. `artifacts/earthquake-city3d-runtime-proof-envelope-refactor-production.json` records the same one-canvas, `MATCH`, complete-evidence, mapping, registry-provenance, `NOT_MODELED`, clear-state and zero-console-diagnostic assertions.
+
 ## Validation
 
 Focused integration validation passed **50 tests in 5 files**, covering the Earthquake runner, mapping, evidence/replay, overlay gate and renderer isolation. The renderer isolation assertion feeds the real gate-approved projection into `setEarthquakeScenarioOverlay()` and clears it, then proves epidemic stats and `projectWorldState()` are unchanged.
 
-Full frontend validation passed **124 test files / 1,280 tests** using Vitest single-worker mode. The default multi-worker pass experienced four unrelated legacy model-test timeouts under concurrent browser/build load; all four passed when isolated and the complete single-worker suite passed with ordinary per-test assertions and timeouts unchanged. TypeScript validation, production build, and `git diff --check` also passed. The existing production build still emits its prior large-chunk advisory; no deployment claim is made here.
+Full frontend validation passed **126 test files / 1,310 tests** using Vitest single-worker mode after the envelope refactor. TypeScript validation, production build, and `git diff --check` also passed. The existing production build still emits its prior large-chunk advisory; no deployment claim is made here.
 
 ## Known limitations and prohibited interpretations
 
@@ -100,7 +101,8 @@ This demonstrator does not provide real geospatial placement, observational data
 
 | Path | Responsibility |
 |---|---|
-| `core/simulationRenderer/earthquakeCommandCenter.ts` | Orchestrates existing scenario, persistence, evidence, replay, projection, mapping and gate contracts. |
+| `core/hazard/earthquake/earthquakeDemoEnvelope.ts` | Sole domain-only upstream path for validation, scenario, immutable provenance, evidence, registry admission, replay and projection. |
+| `core/simulationRenderer/earthquakeCommandCenter.ts` | Converts only a READY envelope through explicit mapping and the display overlay gate. |
 | `core/simulationRenderer/earthquakeCoordinateMapping.ts` | Explicit, versioned, fingerprinted synthetic fixture-to-display-anchor adapter. |
 | `components/visual-simulation/EarthquakeScenarioPanel.tsx` | Compact provenance-first synthetic scenario UI. |
 | `components/visual-simulation/City3DWebGLScreen.tsx` | Wires panel output only to the existing renderer’s dedicated overlay setter. |

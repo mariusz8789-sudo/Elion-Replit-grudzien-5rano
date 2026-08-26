@@ -1,82 +1,106 @@
 /**
  * EARTHQUAKE COMMAND-CENTER EXECUTION.
  *
- * This service composes existing audited contracts for one synthetic Earthquake
- * demonstration. It owns no solver, rendering, React state or epidemic state:
- * UI receives a read-only result and City3D receives only the already gated
- * overlay projection.
+ * The audited domain-only envelope owns scenario validation, immutable
+ * provenance persistence, evidence, registered replay admission and projection.
+ * This renderer boundary owns only explicit fixture-to-CityWorld mapping and the
+ * domain-neutral overlay gate. It never owns solver, CityWorld or epidemic state.
  */
 import { codeCommitHash } from '../build/commitHash';
+import { type HazardModuleDescriptor } from '../hazard/hazardModuleRegistry';
+import { type HazardProvenanceStore, LocalHazardProvenanceStore } from '../hazard/hazardProvenanceStore';
+import { type HazardReplayReport } from '../hazard/hazardReplay';
+import {
+  buildEarthquakeDemoEnvelope,
+  type EarthquakeDemoEnvelope,
+  type EarthquakeDemoEnvelopeBlockCode,
+} from '../hazard/earthquake/earthquakeDemoEnvelope';
+import { type HazardEvidencePack } from '../hazard/earthquake/earthquakeEvidence';
+import { type EarthquakeWorldStateView } from '../hazard/earthquake/earthquakeWorldProjection';
+import { type EarthquakeScenarioResult, type EarthquakeScenarioSpec } from '../hazard/earthquake/earthquakeScenario';
 import {
   EARTHQUAKE_CITYWORLD_MAPPING,
   projectEarthquakeToCityOverlay,
   type EarthquakeCityOverlayProjection,
 } from './earthquakeCoordinateMapping';
 import { evaluateScenarioOverlayEligibility, type ScenarioOverlayGateResult, type ScenarioOverlayPolicy } from './scenarioOverlayGate';
-import { LocalHazardProvenanceStore, type HazardProvenanceStore } from '../hazard/hazardProvenanceStore';
-import { replayHazardRun, type HazardReplayReport } from '../hazard/hazardReplay';
-import { getHazardModule, type HazardModuleDescriptor } from '../hazard/hazardModuleRegistry';
-import { buildHazardEvidencePack, type HazardEvidencePack } from '../hazard/earthquake/earthquakeEvidence';
-import { earthquakeEvaluator } from '../hazard/earthquake/earthquakeEvaluator';
-import { projectEarthquakeWorldState, type EarthquakeWorldStateView } from '../hazard/earthquake/earthquakeWorldProjection';
-import { runEarthquakeScenario, type EarthquakeScenarioResult, type EarthquakeScenarioSpec } from '../hazard/earthquake/earthquakeScenario';
 
-export interface EarthquakeCommandCenterExecution {
+export interface EarthquakeCommandCenterReadyExecution {
+  readonly status: 'READY';
+  readonly envelope: EarthquakeDemoEnvelope;
   readonly scenario: EarthquakeScenarioResult;
-  /** Immutable descriptor that admitted this run for the registered hazard module. */
   readonly moduleDescriptor: HazardModuleDescriptor;
   readonly projection: EarthquakeWorldStateView;
   readonly evidence: HazardEvidencePack;
   readonly replay: HazardReplayReport;
   readonly overlayGate: ScenarioOverlayGateResult;
-  /** Null unless evidence/replay/schema/mapping gates all pass. */
+  /** Null only when the renderer-specific mapping/evidence/replay/schema gate blocks display. */
   readonly overlay: EarthquakeCityOverlayProjection | null;
 }
 
-async function persistScenario(store: HazardProvenanceStore, result: EarthquakeScenarioResult): Promise<void> {
-  await store.putArtifact(result.artifact);
-  await store.putInput(result.input);
-  await store.putRun(result.run);
+export interface EarthquakeCommandCenterBlockedExecution {
+  readonly status: 'BLOCKED';
+  readonly envelope: EarthquakeDemoEnvelope;
+  readonly blockCode: EarthquakeDemoEnvelopeBlockCode;
+  readonly blockReason: string;
+  readonly moduleDescriptor: HazardModuleDescriptor | null;
+  readonly overlay: null;
 }
 
-/** Executes existing Earthquake science once, then produces proof-bearing read-only presentation data. */
+export type EarthquakeCommandCenterExecution =
+  | EarthquakeCommandCenterReadyExecution
+  | EarthquakeCommandCenterBlockedExecution;
+
+/** Executes one synthetic Earthquake run, then maps only a READY envelope into a gated read-only overlay. */
 export async function executeEarthquakeCommandCenterScenario(
   spec: EarthquakeScenarioSpec,
   options: { readonly store?: HazardProvenanceStore; readonly commitHash?: string; readonly overlayPolicy?: ScenarioOverlayPolicy } = {},
 ): Promise<EarthquakeCommandCenterExecution> {
-  const store = options.store ?? new LocalHazardProvenanceStore();
-  const moduleDescriptor = getHazardModule('earthquake');
-  const scenario = await runEarthquakeScenario(spec, options.commitHash ?? codeCommitHash());
-  await persistScenario(store, scenario);
-  const evidence = await buildHazardEvidencePack(scenario);
-  const replay = await replayHazardRun({
-    store,
-    hazardRunId: scenario.run.hazardRunId,
-    evaluator: earthquakeEvaluator,
-    // Registered admission happens before evaluator execution; mapping/UI never bypass this fence.
-    hazardType: moduleDescriptor.hazardType,
-    projectionSchemaVersion: moduleDescriptor.projectionSchemaVersion,
-  });
-  const projection = projectEarthquakeWorldState(scenario);
-  const mappedOverlay = await projectEarthquakeToCityOverlay(projection);
+  const envelope = await buildEarthquakeDemoEnvelope(
+    spec,
+    options.commitHash ?? codeCommitHash(),
+    options.store ?? new LocalHazardProvenanceStore(),
+  );
+
+  if (
+    envelope.status !== 'READY'
+    || !envelope.scenario
+    || !envelope.moduleDescriptor
+    || !envelope.projection
+    || !envelope.evidence
+    || !envelope.replay
+  ) {
+    return Object.freeze({
+      status: 'BLOCKED' as const,
+      envelope,
+      blockCode: envelope.blockCode ?? 'REGISTRY_INCOMPATIBLE',
+      blockReason: envelope.blockReason ?? 'Earthquake execution envelope did not produce a display-safe result.',
+      moduleDescriptor: envelope.moduleDescriptor,
+      overlay: null,
+    });
+  }
+
+  const mappedOverlay = await projectEarthquakeToCityOverlay(envelope.projection);
   const overlayGate = evaluateScenarioOverlayEligibility({
     overlayKind: 'earthquake-scenario',
-    schemaVersion: projection.schemaVersion,
+    schemaVersion: envelope.projection.schemaVersion,
     datasetStatuses: mappedOverlay.sites.map((site) => site.datasetStatus),
-    evidence: { replayStatus: replay.status, missingFields: evidence.missingFields },
+    evidence: { replayStatus: envelope.replay.status, missingFields: envelope.evidence.missingFields },
     coordinateMapping: {
       mappingId: mappedOverlay.mappingId,
       mappingVersion: mappedOverlay.mappingSchemaVersion,
       mappingFingerprint: mappedOverlay.mappingFingerprint,
     },
-  }, options.overlayPolicy ?? { enabled: true, supportedSchemas: [projection.schemaVersion] });
+  }, options.overlayPolicy ?? { enabled: true, supportedSchemas: [envelope.projection.schemaVersion] });
 
   return Object.freeze({
-    scenario,
-    moduleDescriptor,
-    projection,
-    evidence,
-    replay,
+    status: 'READY' as const,
+    envelope,
+    scenario: envelope.scenario,
+    moduleDescriptor: envelope.moduleDescriptor,
+    projection: envelope.projection,
+    evidence: envelope.evidence,
+    replay: envelope.replay,
     overlayGate,
     overlay: overlayGate.enabled ? mappedOverlay : null,
   });

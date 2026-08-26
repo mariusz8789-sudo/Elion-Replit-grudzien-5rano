@@ -7,6 +7,8 @@ describe('Earthquake command-center execution', () => {
     const execution = await executeEarthquakeCommandCenterScenario({
       scenarioLabel: 'city3d-demo-fixture', magnitude: 5.4, depthKm: 12, epicenter: { x: 0, y: 0 }, seed: 42,
     }, { store: new InMemoryHazardProvenanceStore(), commitHash: 'test-commit' });
+    expect(execution.status).toBe('READY');
+    if (execution.status !== 'READY') throw new Error(`unexpected envelope block: ${execution.blockCode}`);
     expect(execution.scenario.input.hazardType).toBe('earthquake');
     expect(execution.moduleDescriptor).toMatchObject({
       hazardType: 'earthquake',
@@ -29,9 +31,27 @@ describe('Earthquake command-center execution', () => {
       commitHash: 'test-commit',
       overlayPolicy: { enabled: true, supportedSchemas: [] },
     });
+    expect(execution.status).toBe('READY');
+    if (execution.status !== 'READY') throw new Error(`unexpected envelope block: ${execution.blockCode}`);
     expect(execution.replay.status).toBe('MATCH');
     expect(execution.evidence.missingFields).toEqual([]);
     expect(execution.overlayGate).toEqual({ enabled: false, reasons: ['UNSUPPORTED_SCHEMA'] });
     expect(execution.overlay).toBeNull();
+  });
+
+  it('returns a named envelope block with no overlay for invalid synthetic input', async () => {
+    const execution = await executeEarthquakeCommandCenterScenario({
+      scenarioLabel: 'command-center-invalid-spec',
+      magnitude: Number.NaN,
+      depthKm: 8,
+      epicenter: { x: 0, y: 0 },
+      seed: 1,
+    }, { commitHash: 'test-commit', store: new InMemoryHazardProvenanceStore() });
+
+    expect(execution).toMatchObject({
+      status: 'BLOCKED',
+      blockCode: 'INVALID_SCENARIO_SPEC',
+      overlay: null,
+    });
   });
 });

@@ -65,6 +65,8 @@ The panel also offers **Eksportuj evidence**. It creates a local browser JSON do
 
 The same panel now lists local persisted Earthquake `HazardRun` records from `LocalHazardProvenanceStore`. Each row is a read-only summary of an actual stored run and its newly recomputed canonical, registry-fenced replay verdict; it does not reuse a cached UI status. Refreshing history never remaps a fixture, restores an overlay, changes City3D, or mutates the run. Missing/non-Earthquake records are not fabricated into the list.
 
+The panel exposes the existing scenario-contract fields for magnitude, depth, opaque fixture X/Y and seed. They are explicitly synthetic numeric inputs, not calibrated ranges, observations or real geography. Values pass unchanged to the audited validator: finite values with depth `>= 0` can enter the normal evidence/replay/mapping flow; non-finite or negative-depth input returns the existing named `INVALID_SCENARIO_SPEC` envelope block and renders no overlay.
+
 ## Runtime proof
 
 The scripted Chromium proof ran against `#/city3d` at **1920×1080**. It dismissed only the first-run onboarding gate, then performed a real UI click on **Uruchom scenariusz**, opened the evidence/mapping details, captured the screenshot above, clicked **Wyczyść overlay**, and asserted the cleared state.
@@ -81,6 +83,8 @@ The scripted Chromium proof ran against `#/city3d` at **1920×1080**. It dismiss
 
 The Chromium proof also clicks **Eksportuj evidence**, captures exactly one local JSON file and parses it. Both development and production-preview proofs assert export schema `1.0.0`, `READY`, `MATCH`, complete evidence, a real mapping fingerprint and all three synthetic/non-operational labels before clearing the overlay. The persisted-history proof additionally opens the local history, observes at least one real `MATCH` record, and verifies the existing one City3D canvas and clear transition remain unchanged.
 
+The parameter-control proof sets a valid custom synthetic record (`M 5.8`, depth `11`, fixture X/Y `1/-1`, seed `43`) and confirms the persisted local evidence export contains magnitude `5.8`, depth `11` and seed `43` with `MATCH`. It then sets depth `-1` and confirms the current validator presents `ENVELOPE BLOCKED` / `INVALID_SCENARIO_SPEC`, `NOT_RENDERED`, and the same single City3D canvas without console diagnostics.
+
 Machine-readable results are retained in `artifacts/earthquake-city3d-runtime-proof.json`; the proof procedure and observations are summarized in `artifacts/earthquake-city3d-runtime-proof-notes.md`.
 
 ### Production-build regression
@@ -95,7 +99,7 @@ The production preview proof was repeated after the envelope refactor. `artifact
 
 Focused integration validation passed **50 tests in 5 files**, covering the Earthquake runner, mapping, evidence/replay, overlay gate and renderer isolation. The renderer isolation assertion feeds the real gate-approved projection into `setEarthquakeScenarioOverlay()` and clears it, then proves epidemic stats and `projectWorldState()` are unchanged.
 
-Full frontend validation passed **126 test files / 1,310 tests** using Vitest single-worker mode after the envelope refactor. TypeScript validation, production build, and `git diff --check` also passed. The existing production build still emits its prior large-chunk advisory; no deployment claim is made here.
+Full frontend validation passed **128 test files / 1,315 tests** using Vitest single-worker mode after the synthetic-parameter control pass. TypeScript validation, production build, and `git diff --check` also passed. The existing production build still emits its prior large-chunk advisory; no deployment claim is made here.
 
 ## Known limitations and prohibited interpretations
 

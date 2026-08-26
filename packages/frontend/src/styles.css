@@ -2175,6 +2175,12 @@ kbd {
 }
 .earthquake-intro, .earthquake-caveat { margin: .42rem 0; color: var(--text-muted); font-size: .68rem; line-height: 1.45; }
 .earthquake-caveat { padding-top: .5rem; border-top: 1px solid var(--glass-border); color: #d6b7a2; }
+.earthquake-parameter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .38rem; margin: .55rem 0; padding: .45rem; border: 1px solid var(--glass-border); border-radius: .32rem; }
+.earthquake-parameter-grid legend { padding: 0 .18rem; color: var(--text-muted); font-size: .58rem; letter-spacing: .055em; text-transform: uppercase; }
+.earthquake-parameter-grid label { display: grid; gap: .16rem; min-width: 0; color: var(--text-muted); font-size: .58rem; }
+.earthquake-parameter-grid label:last-child { grid-column: span 2; }
+.earthquake-parameter-grid input { width: 100%; min-width: 0; padding: .28rem .34rem; border: 1px solid var(--glass-border); border-radius: .22rem; background: rgba(7, 16, 26, .35); color: var(--text); font-family: var(--font-mono); font-size: .64rem; }
+.earthquake-parameter-grid input:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
 .earthquake-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .42rem; margin: .68rem 0; }
 .earthquake-actions .world-action { min-width: 0; padding-inline: .42rem; font-size: .67rem; }
 .earthquake-error { margin: .45rem 0; padding: .44rem; border-left: 2px solid #ec6c6c; color: #ffc1c1; background: rgba(123, 36, 36, .18); font-size: .67rem; line-height: 1.35; overflow-wrap: anywhere; }

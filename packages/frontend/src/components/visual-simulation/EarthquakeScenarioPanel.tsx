@@ -26,12 +26,27 @@ interface EarthquakeScenarioPanelProps {
 
 const SYNTHETIC_PRESET = Object.freeze({ magnitude: 5.4, depthKm: 12, epicenter: { x: 0, y: 0 }, seed: 42 });
 
+type SyntheticEarthquakeParameters = {
+  magnitude: number;
+  depthKm: number;
+  epicenterX: number;
+  epicenterY: number;
+  seed: number;
+};
+
 function shorten(value: string, visible = 12): string {
   return value.length <= visible * 2 + 1 ? value : `${value.slice(0, visible)}…${value.slice(-visible)}`;
 }
 
 export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioPanelProps) {
   const [execution, setExecution] = useState<EarthquakeCommandCenterExecution | null>(null);
+  const [parameters, setParameters] = useState<SyntheticEarthquakeParameters>({
+    magnitude: SYNTHETIC_PRESET.magnitude,
+    depthKm: SYNTHETIC_PRESET.depthKm,
+    epicenterX: SYNTHETIC_PRESET.epicenter.x,
+    epicenterY: SYNTHETIC_PRESET.epicenter.y,
+    seed: SYNTHETIC_PRESET.seed,
+  });
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [overlayDisplayed, setOverlayDisplayed] = useState(false);
@@ -43,6 +58,10 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
   // Fast Refresh may preserve a result created before registry provenance was added.
   // The live registry fallback keeps its read-only traceability display safe until rerun.
   const moduleDescriptor = execution?.moduleDescriptor ?? getHazardModule('earthquake');
+
+  const updateParameter = (parameter: keyof SyntheticEarthquakeParameters, value: number) => {
+    setParameters((current) => ({ ...current, [parameter]: value }));
+  };
 
   const refreshHistory = async () => {
     setHistoryLoading(true);
@@ -64,7 +83,10 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
     try {
       runSequence.current += 1;
       const outcome = await executeEarthquakeCommandCenterScenario({
-        ...SYNTHETIC_PRESET,
+        magnitude: parameters.magnitude,
+        depthKm: parameters.depthKm,
+        epicenter: { x: parameters.epicenterX, y: parameters.epicenterY },
+        seed: parameters.seed,
         // Provenance labels must remain unique because the local hazard store is immutable.
         scenarioLabel: `city3d-synthetic-${Date.now()}-${runSequence.current}`,
       }, { store: provenanceStore });
@@ -107,8 +129,16 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
         <b>SCENARIO</b><b>SYNTHETIC</b><b>NON_OPERATIONAL</b>
       </div>
       <p className="earthquake-intro">
-        Jeden jawny preset syntetyczny: M {SYNTHETIC_PRESET.magnitude} · głębokość {SYNTHETIC_PRESET.depthKm} km · lokalne współrzędne fixture · seed {SYNTHETIC_PRESET.seed}.
+        Parametry są wyłącznie syntetycznym wejściem istniejącego kontraktu scenariusza; nie są kalibracją ani obserwacją.
       </p>
+      <fieldset className="earthquake-parameter-grid" disabled={running}>
+        <legend>Synthetic scenario parameters</legend>
+        <label>Magnitude<input aria-label="Synthetic magnitude" type="number" step="0.1" value={parameters.magnitude} onChange={(event) => updateParameter('magnitude', event.currentTarget.valueAsNumber)} /></label>
+        <label>Depth km<input aria-label="Synthetic depth km" type="number" step="0.1" value={parameters.depthKm} onChange={(event) => updateParameter('depthKm', event.currentTarget.valueAsNumber)} /></label>
+        <label>Fixture X<input aria-label="Synthetic fixture X" type="number" step="0.1" value={parameters.epicenterX} onChange={(event) => updateParameter('epicenterX', event.currentTarget.valueAsNumber)} /></label>
+        <label>Fixture Y<input aria-label="Synthetic fixture Y" type="number" step="0.1" value={parameters.epicenterY} onChange={(event) => updateParameter('epicenterY', event.currentTarget.valueAsNumber)} /></label>
+        <label>Seed<input aria-label="Synthetic seed" type="number" step="1" value={parameters.seed} onChange={(event) => updateParameter('seed', event.currentTarget.valueAsNumber)} /></label>
+      </fieldset>
       <div className="earthquake-actions">
         <button className="world-action accent" onClick={runScenario} disabled={running}>{running ? 'Obliczanie…' : 'Uruchom scenariusz'}</button>
         <button className="world-action" onClick={clearOverlay} disabled={!overlayDisplayed}>Wyczyść overlay</button>

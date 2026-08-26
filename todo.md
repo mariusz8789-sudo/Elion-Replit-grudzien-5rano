@@ -57,3 +57,4 @@
 - [x] Add an end-to-end Command Center regression for immutable provenance conflict, proving a named block never reaches mapping or City3D overlay.
 - [x] Review the remaining checked and unchecked Genesis roadmap items, their dependencies and audit status; select only the next safe, non-conflicting milestone after the Earthquake hardening closeout.
 - [x] Add a compact local persisted-run history that reads actual Earthquake HazardRun records and canonical replay verdicts without reapplying mapping or City3D overlays, adding hazards, GIS, cascades or Scientific Core coupling.
+- [x] Expose only existing synthetic Earthquake scenario parameters in the Command Center with truthful validation/blocking, immutable provenance and the existing one-renderer overlay path; do not add a solver, calibration, GIS, renderer or epidemic behavior.

@@ -1,17 +1,21 @@
 /**
- * PHASE 0 — HAZARD PROVENANCE CONTRACTS.
+ * PHASE 0 / EARTHQUAKE VERTICAL SLICE — HAZARD PROVENANCE CONTRACTS.
  *
- * Domain-neutral shapes only: no earthquake/flood/fire/weather/contamination
- * science lives here, and none is implied. These three contracts are the
- * frozen, fingerprinted building blocks a future hazard-specific scientific
- * module would plug into — see docs/PHASE0_HAZARD_PROVENANCE_FOUNDATION.md
- * for what is deliberately deferred (ExposureSnapshot, ImpactResult,
- * CascadeEdge, MultiHazardWorldState, any solver).
+ * Domain-neutral shapes: no earthquake-specific science lives in this file.
+ * `SourceArtifact`/`HazardInput`/`HazardRun` (Phase 0) plus `ExposureSnapshot`/
+ * `ImpactResult` (added for the earthquake vertical slice, see
+ * docs/EARTHQUAKE_VERTICAL_SLICE.md) are the frozen, fingerprinted building
+ * blocks any hazard-specific scientific module plugs into. `CascadeEdge` and
+ * `MultiHazardWorldState` remain deliberately deferred — see
+ * docs/PHASE0_HAZARD_PROVENANCE_FOUNDATION.md.
  *
  * Field split mirrors docs/MULTI_HAZARD_ARCHITECTURE_AUDIT.md §3.1/§8:
  * `SourceArtifact` = immutable captured data, `HazardInput` = canonical
  * scientific input referencing one artifact, `HazardRun` = immutable output
- * descriptor referencing one input. Nothing here reads or writes
+ * descriptor referencing one input, `ExposureSnapshot` = versioned
+ * asset/location references independent of any one hazard's physics,
+ * `ImpactResult` = a scientific-module-owned projection of one `HazardRun`
+ * onto one `ExposureSnapshot`. Nothing here reads or writes
  * EpidemicCitySimulation, resolveContacts, Hospital Model, Scenario Engine,
  * Discovery Engine, epidemic replay, or WorldEngineContract.
  */
@@ -92,4 +96,59 @@ export interface HazardRun {
   readonly resultFingerprint: string;
   readonly status: 'COMPLETED' | 'FAILED';
   readonly createdAt: number;
+}
+
+/**
+ * The audit doc's mandatory status vocabulary (§6, "Main risks and required
+ * controls" — "Mandatory status labels"). Every exposure/impact record below
+ * carries one of these; a vertical slice built on unreviewed, synthetic
+ * fixture data must always read `'SCENARIO'`, never `'OBSERVED'`.
+ */
+export type HazardDatasetStatus = 'OBSERVED' | 'FORECAST' | 'SCENARIO' | 'VISUAL_ONLY' | 'NOT_MODELED';
+
+/** One location/asset a hazard's impact can be evaluated against. Coordinates are an opaque local frame, not asserted geodesy. */
+export interface ExposureSite {
+  readonly siteId: string;
+  readonly assetLabel: string;
+  readonly vulnerabilityClass: 'LOW' | 'MEDIUM' | 'HIGH';
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * Versioned asset/location references a `HazardRun`'s output can be
+ * projected onto. Deliberately independent of any one hazard's physics
+ * (audit doc: "Versioned asset/population/location references and mapping
+ * method" / prohibited: "Treating synthetic CityWorld locations as real
+ * facilities" — `datasetStatus` exists precisely so this can never be
+ * silently read as `'OBSERVED'`).
+ */
+export interface ExposureSnapshot {
+  readonly exposureSnapshotId: string;
+  readonly mappingMethod: string;
+  readonly sites: readonly ExposureSite[];
+  readonly datasetStatus: HazardDatasetStatus;
+}
+
+export type ImpactSeverityClass = 'NONE' | 'MINOR' | 'MODERATE' | 'SEVERE';
+
+/**
+ * A scientific module's projection of one `HazardRun` onto one site of one
+ * `ExposureSnapshot`. Audit doc: "Explicit result type, severity/unit,
+ * confidence or uncertainty, provenance links" / prohibited: "Converting a
+ * visual intensity into a modeled impact" — this flows science → visualization
+ * only, never the reverse, and `uncertainty` is mandatory rather than a bare
+ * point estimate.
+ */
+export interface ImpactResult {
+  readonly impactResultId: string;
+  readonly hazardRunId: string;
+  readonly exposureSnapshotId: string;
+  readonly siteId: string;
+  readonly resultType: string;
+  readonly severity: ImpactSeverityClass;
+  readonly severityValue: number;
+  readonly uncertainty: { readonly low: number; readonly high: number };
+  readonly datasetStatus: HazardDatasetStatus;
+  readonly provenance: { readonly hazardRunId: string; readonly hazardModuleVersion: string };
 }

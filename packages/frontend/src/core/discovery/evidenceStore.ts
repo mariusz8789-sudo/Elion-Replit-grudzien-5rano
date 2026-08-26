@@ -43,6 +43,23 @@ export interface EvidenceStore {
 }
 
 /**
+ * Minimal shape gate for a persisted record read back as `unknown` (see
+ * docs/PHASE0_2_PERSISTENCE_INTEGRITY.md). Not a schema library — just the
+ * handful of fields every consumer (`summarizeStoredEvidence`, replay) reads
+ * unconditionally, so a legacy-correct record still passes and a malformed
+ * or semantically-wrong one is reported as absent rather than crashing a
+ * caller on `undefined.caseId`.
+ */
+function isStoredEvidenceShape(candidate: unknown): candidate is StoredEvidence {
+  if (typeof candidate !== 'object' || candidate === null) return false;
+  const c = candidate as Record<string, unknown>;
+  if (typeof c.schemaVersion !== 'string' || typeof c.codeCommitHash !== 'string' || typeof c.savedAt !== 'number') return false;
+  if (c.sha256 !== null && typeof c.sha256 !== 'string') return false;
+  if (typeof c.record !== 'object' || c.record === null) return false;
+  return typeof (c.record as Record<string, unknown>).caseId === 'string';
+}
+
+/**
  * Both implementations below delegate to the shared `core/provenance/recordStore.ts`
  * primitive (Phase 0.1 convergence) with policy `'overwrite'` — the exact
  * permissive behavior this store always had (an experiment may be
@@ -51,7 +68,7 @@ export interface EvidenceStore {
  * storage key, and save/load/list/delete public API are unchanged.
  */
 export class InMemoryEvidenceStore implements EvidenceStore {
-  private backing = new InMemoryRecordStore<StoredEvidence>('overwrite');
+  private backing = new InMemoryRecordStore<StoredEvidence>('overwrite', isStoredEvidenceShape);
 
   async save(entry: StoredEvidence): Promise<void> {
     await this.backing.put(entry.record.caseId, entry);
@@ -74,7 +91,7 @@ const STORAGE_KEY = 'evidence-store/v1';
 
 /** Persists discovery cases (with their evidence) in localStorage — survives a refresh, stays on this device. */
 export class LocalEvidenceStore implements EvidenceStore {
-  private backing = new LocalRecordStore<StoredEvidence>(STORAGE_KEY, 'overwrite');
+  private backing = new LocalRecordStore<StoredEvidence>(STORAGE_KEY, 'overwrite', isStoredEvidenceShape);
 
   async save(entry: StoredEvidence): Promise<void> {
     await this.backing.put(entry.record.caseId, entry);

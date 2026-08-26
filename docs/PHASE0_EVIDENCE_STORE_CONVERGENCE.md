@@ -58,3 +58,7 @@ New file: `packages/frontend/src/__tests__/evidenceStoreConvergence.test.ts` (12
 - No UI, hazard solver, GIS adapter, `ExposureSnapshot`, `ImpactResult`, `CascadeEdge`, `MultiHazardWorldState`, or cascade replay — none of this was in scope and none was added.
 
 **NO HAZARD SOLVER / NO GIS / NO CASCADES / NO EPIDEMIC CORE CHANGE.**
+
+## Follow-up
+
+Storage-safety hardening of the same `recordStore.ts` primitive against malformed/adversarial `localStorage` content — corrupted JSON, non-collection JSON, prototype-adjacent keys, semantically invalid records — is a separate pass: see `docs/PHASE0_2_PERSISTENCE_INTEGRITY.md`.

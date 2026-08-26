@@ -26,6 +26,35 @@ import type { HazardInput, HazardRun, SourceArtifact } from './contracts';
 export { DuplicateRecordConflictError as ImmutableConflictError };
 export type ImmutableRecordStore<T> = KeyedRecordStore<T>;
 
+/**
+ * Minimal per-collection shape gates (see docs/PHASE0_2_PERSISTENCE_INTEGRITY.md).
+ * Each checks only the identifying fields `hazardReplay.ts`/the registry
+ * fence reads unconditionally — enough that a malformed or foreign-shaped
+ * record is reported as absent (never thrown, never fabricated) instead of
+ * flowing into fingerprint recomputation or a replay verdict.
+ */
+function isSourceArtifactShape(candidate: unknown): candidate is SourceArtifact {
+  if (typeof candidate !== 'object' || candidate === null) return false;
+  const c = candidate as Record<string, unknown>;
+  return typeof c.artifactId === 'string' && typeof c.contentHash === 'string' && typeof c.rawContentRef === 'string'
+    && typeof c.provenance === 'object' && c.provenance !== null;
+}
+
+function isHazardInputShape(candidate: unknown): candidate is HazardInput {
+  if (typeof candidate !== 'object' || candidate === null) return false;
+  const c = candidate as Record<string, unknown>;
+  return typeof c.hazardInputId === 'string' && typeof c.hazardType === 'string'
+    && typeof c.sourceArtifactId === 'string' && typeof c.inputFingerprint === 'string';
+}
+
+function isHazardRunShape(candidate: unknown): candidate is HazardRun {
+  if (typeof candidate !== 'object' || candidate === null) return false;
+  const c = candidate as Record<string, unknown>;
+  return typeof c.hazardRunId === 'string' && typeof c.hazardInputId === 'string'
+    && typeof c.hazardModuleVersion === 'string' && typeof c.codeCommitHash === 'string'
+    && typeof c.resultFingerprint === 'string' && (c.status === 'COMPLETED' || c.status === 'FAILED');
+}
+
 /** The three Phase 0 collections, kept separate because each has its own id namespace and shape. */
 export interface HazardProvenanceStore {
   putArtifact(artifact: SourceArtifact): Promise<void>;
@@ -42,9 +71,9 @@ export interface HazardProvenanceStore {
 }
 
 export class InMemoryHazardProvenanceStore implements HazardProvenanceStore {
-  private artifacts = new InMemoryRecordStore<SourceArtifact>('reject-if-different');
-  private inputs = new InMemoryRecordStore<HazardInput>('reject-if-different');
-  private runs = new InMemoryRecordStore<HazardRun>('reject-if-different');
+  private artifacts = new InMemoryRecordStore<SourceArtifact>('reject-if-different', isSourceArtifactShape);
+  private inputs = new InMemoryRecordStore<HazardInput>('reject-if-different', isHazardInputShape);
+  private runs = new InMemoryRecordStore<HazardRun>('reject-if-different', isHazardRunShape);
 
   putArtifact(artifact: SourceArtifact): Promise<void> { return this.artifacts.put(artifact.artifactId, artifact); }
   getArtifact(artifactId: string): Promise<SourceArtifact | null> { return this.artifacts.get(artifactId); }
@@ -67,9 +96,9 @@ export class InMemoryHazardProvenanceStore implements HazardProvenanceStore {
  * were reused across domains.
  */
 export class LocalHazardProvenanceStore implements HazardProvenanceStore {
-  private artifacts = new LocalRecordStore<SourceArtifact>('hazard-provenance-store/artifacts/v1', 'reject-if-different');
-  private inputs = new LocalRecordStore<HazardInput>('hazard-provenance-store/inputs/v1', 'reject-if-different');
-  private runs = new LocalRecordStore<HazardRun>('hazard-provenance-store/runs/v1', 'reject-if-different');
+  private artifacts = new LocalRecordStore<SourceArtifact>('hazard-provenance-store/artifacts/v1', 'reject-if-different', isSourceArtifactShape);
+  private inputs = new LocalRecordStore<HazardInput>('hazard-provenance-store/inputs/v1', 'reject-if-different', isHazardInputShape);
+  private runs = new LocalRecordStore<HazardRun>('hazard-provenance-store/runs/v1', 'reject-if-different', isHazardRunShape);
 
   putArtifact(artifact: SourceArtifact): Promise<void> { return this.artifacts.put(artifact.artifactId, artifact); }
   getArtifact(artifactId: string): Promise<SourceArtifact | null> { return this.artifacts.get(artifactId); }

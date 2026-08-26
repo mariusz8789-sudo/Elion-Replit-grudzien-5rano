@@ -128,4 +128,88 @@ describe('Earthquake persisted-run history', () => {
       await expect(listEarthquakePersistedRunHistory(store)).resolves.toEqual([]);
     },
   );
+
+  it('blocks replay but retains a read-only history entry when a persisted SourceArtifact is structurally unreadable', async () => {
+    const storage = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: storage });
+    const { LocalHazardProvenanceStore } = await import('../core/hazard/hazardProvenanceStore');
+    const store = new LocalHazardProvenanceStore();
+    const outcome = await executeEarthquakeCommandCenterScenario(
+      {
+        scenarioLabel: 'retained-malformed-artifact',
+        magnitude: 5.4,
+        depthKm: 12,
+        epicenter: { x: 0, y: 0 },
+        seed: 42,
+      },
+      { store, commitHash: 'test-commit' },
+    );
+    expect(outcome.status).toBe('READY');
+    if (outcome.status !== 'READY') throw new Error('expected ready records');
+
+    const artifactKey = 'genesis-os:hazard-provenance-store/artifacts/v1';
+    const artifacts = JSON.parse(storage.getItem(artifactKey) ?? '{}') as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const storedArtifact = artifacts[outcome.scenario.artifact.artifactId];
+    const storedProvenance = storedArtifact.provenance as Record<string, unknown>;
+    artifacts[outcome.scenario.artifact.artifactId] = {
+      ...storedArtifact,
+      provenance: { ...storedProvenance, retrievedAt: -1 },
+    };
+    storage.setItem(artifactKey, JSON.stringify(artifacts));
+
+    expect(await store.getArtifact(outcome.scenario.artifact.artifactId)).toBeNull();
+    await expect(
+      replayHazardRun({
+        store,
+        hazardRunId: outcome.scenario.run.hazardRunId,
+        evaluator: earthquakeEvaluator,
+        hazardType: getHazardModule('earthquake').hazardType,
+        projectionSchemaVersion: getHazardModule('earthquake').projectionSchemaVersion,
+      }),
+    ).resolves.toMatchObject({ status: 'BLOCKED', replayResultFingerprint: null });
+    const history = await listEarthquakePersistedRunHistory(store);
+    expect(history).toHaveLength(1);
+    expect(history[0]?.hazardRunId).toBe(outcome.scenario.run.hazardRunId);
+    expect(history[0]?.replay.status).toBe('BLOCKED');
+  });
+
+  it('keeps a structurally unreadable persisted HazardRun outside replay and read-only history', async () => {
+    const storage = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: storage });
+    const { LocalHazardProvenanceStore } = await import('../core/hazard/hazardProvenanceStore');
+    const store = new LocalHazardProvenanceStore();
+    const outcome = await executeEarthquakeCommandCenterScenario(
+      {
+        scenarioLabel: 'retained-malformed-run',
+        magnitude: 5.4,
+        depthKm: 12,
+        epicenter: { x: 0, y: 0 },
+        seed: 42,
+      },
+      { store, commitHash: 'test-commit' },
+    );
+    expect(outcome.status).toBe('READY');
+    if (outcome.status !== 'READY') throw new Error('expected ready records');
+
+    const runKey = 'genesis-os:hazard-provenance-store/runs/v1';
+    const runs = JSON.parse(storage.getItem(runKey) ?? '{}') as Record<string, Record<string, unknown>>;
+    const storedRun = runs[outcome.scenario.run.hazardRunId];
+    runs[outcome.scenario.run.hazardRunId] = { ...storedRun, createdAt: -1 };
+    storage.setItem(runKey, JSON.stringify(runs));
+
+    expect(await store.getRun(outcome.scenario.run.hazardRunId)).toBeNull();
+    await expect(
+      replayHazardRun({
+        store,
+        hazardRunId: outcome.scenario.run.hazardRunId,
+        evaluator: earthquakeEvaluator,
+        hazardType: getHazardModule('earthquake').hazardType,
+        projectionSchemaVersion: getHazardModule('earthquake').projectionSchemaVersion,
+      }),
+    ).resolves.toMatchObject({ status: 'NOT_REPRODUCIBLE', replayResultFingerprint: null });
+    await expect(listEarthquakePersistedRunHistory(store)).resolves.toEqual([]);
+  });
 });

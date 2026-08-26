@@ -31,31 +31,86 @@ import type { HazardInput, HazardRun, SourceArtifact } from './contracts';
 export { DuplicateRecordConflictError as ImmutableConflictError };
 export type ImmutableRecordStore<T> = KeyedRecordStore<T>;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
+}
+
+function isNullableFiniteNumber(value: unknown): value is number | null {
+  return value === null || (typeof value === 'number' && Number.isFinite(value));
+}
+
 /**
  * Local JSON can retain a value that was never constructed by the current
- * TypeScript boundary. This is structural protection only: it keeps an
- * unreadable HazardInput from reaching a module evaluator; admission and
+ * TypeScript boundary. These are structural protections only: they keep an
+ * unreadable record from reaching replay or a module evaluator; admission and
  * fingerprint checks remain the canonical replay responsibilities.
  */
 function isHazardInputRecord(candidate: unknown): candidate is HazardInput {
-  if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) return false;
-  const input = candidate as Record<string, unknown>;
+  if (!isRecord(candidate)) return false;
+  const input = candidate;
   const seed = input.seed;
   return (
     typeof input.hazardInputId === 'string' &&
     typeof input.hazardType === 'string' &&
     typeof input.sourceArtifactId === 'string' &&
-    input.scientificFields !== null &&
-    typeof input.scientificFields === 'object' &&
-    !Array.isArray(input.scientificFields) &&
+    isRecord(input.scientificFields) &&
     (seed === null || typeof seed === 'string' || (typeof seed === 'number' && Number.isFinite(seed))) &&
-    (input.displayName === null || typeof input.displayName === 'string') &&
+    isNullableString(input.displayName) &&
     typeof input.inputFingerprint === 'string'
   );
 }
 
-function readableHazardInput(candidate: HazardInput | null): HazardInput | null {
-  return isHazardInputRecord(candidate) ? candidate : null;
+function isSourceArtifactRecord(candidate: unknown): candidate is SourceArtifact {
+  if (!isRecord(candidate) || !isRecord(candidate.provenance)) return false;
+  const artifact = candidate;
+  const provenance = artifact.provenance as Record<string, unknown>;
+  const extent = artifact.extent;
+  const validExtent =
+    extent === null ||
+    (isRecord(extent) &&
+      [extent.minX, extent.minY, extent.maxX, extent.maxY].every(
+        (value) => typeof value === 'number' && Number.isFinite(value),
+      ));
+  return (
+    typeof artifact.artifactId === 'string' &&
+    typeof artifact.contentHash === 'string' &&
+    isNullableString(artifact.crs) &&
+    validExtent &&
+    typeof artifact.rawContentRef === 'string' &&
+    typeof provenance.provider === 'string' &&
+    isNullableString(provenance.sourceUrl) &&
+    isNullableFiniteNumber(provenance.sourceTime) &&
+    typeof provenance.retrievedAt === 'number' &&
+    Number.isFinite(provenance.retrievedAt) &&
+    provenance.retrievedAt >= 0 &&
+    typeof provenance.license === 'string' &&
+    typeof provenance.adapterVersion === 'string'
+  );
+}
+
+function isHazardRunRecord(candidate: unknown): candidate is HazardRun {
+  if (!isRecord(candidate)) return false;
+  const run = candidate;
+  return (
+    typeof run.hazardRunId === 'string' &&
+    typeof run.hazardInputId === 'string' &&
+    typeof run.hazardModuleVersion === 'string' &&
+    typeof run.codeCommitHash === 'string' &&
+    isRecord(run.outputFields) &&
+    typeof run.resultFingerprint === 'string' &&
+    (run.status === 'COMPLETED' || run.status === 'FAILED') &&
+    typeof run.createdAt === 'number' &&
+    Number.isFinite(run.createdAt) &&
+    run.createdAt >= 0
+  );
+}
+
+function readableRecord<T>(candidate: T | null, isValid: (value: unknown) => value is T): T | null {
+  return isValid(candidate) ? candidate : null;
 }
 
 /** The three Phase 0 collections, kept separate because each has its own id namespace and shape. */
@@ -81,8 +136,8 @@ export class InMemoryHazardProvenanceStore implements HazardProvenanceStore {
   putArtifact(artifact: SourceArtifact): Promise<void> {
     return this.artifacts.put(artifact.artifactId, artifact);
   }
-  getArtifact(artifactId: string): Promise<SourceArtifact | null> {
-    return this.artifacts.get(artifactId);
+  async getArtifact(artifactId: string): Promise<SourceArtifact | null> {
+    return readableRecord(await this.artifacts.get(artifactId), isSourceArtifactRecord);
   }
   listArtifacts(): Promise<readonly string[]> {
     return this.artifacts.list();
@@ -92,7 +147,7 @@ export class InMemoryHazardProvenanceStore implements HazardProvenanceStore {
     return this.inputs.put(input.hazardInputId, input);
   }
   async getInput(hazardInputId: string): Promise<HazardInput | null> {
-    return readableHazardInput(await this.inputs.get(hazardInputId));
+    return readableRecord(await this.inputs.get(hazardInputId), isHazardInputRecord);
   }
   listInputs(): Promise<readonly string[]> {
     return this.inputs.list();
@@ -101,8 +156,8 @@ export class InMemoryHazardProvenanceStore implements HazardProvenanceStore {
   putRun(run: HazardRun): Promise<void> {
     return this.runs.put(run.hazardRunId, run);
   }
-  getRun(hazardRunId: string): Promise<HazardRun | null> {
-    return this.runs.get(hazardRunId);
+  async getRun(hazardRunId: string): Promise<HazardRun | null> {
+    return readableRecord(await this.runs.get(hazardRunId), isHazardRunRecord);
   }
   listRuns(): Promise<readonly string[]> {
     return this.runs.list();
@@ -130,8 +185,8 @@ export class LocalHazardProvenanceStore implements HazardProvenanceStore {
   putArtifact(artifact: SourceArtifact): Promise<void> {
     return this.artifacts.put(artifact.artifactId, artifact);
   }
-  getArtifact(artifactId: string): Promise<SourceArtifact | null> {
-    return this.artifacts.get(artifactId);
+  async getArtifact(artifactId: string): Promise<SourceArtifact | null> {
+    return readableRecord(await this.artifacts.get(artifactId), isSourceArtifactRecord);
   }
   listArtifacts(): Promise<readonly string[]> {
     return this.artifacts.list();
@@ -141,7 +196,7 @@ export class LocalHazardProvenanceStore implements HazardProvenanceStore {
     return this.inputs.put(input.hazardInputId, input);
   }
   async getInput(hazardInputId: string): Promise<HazardInput | null> {
-    return readableHazardInput(await this.inputs.get(hazardInputId));
+    return readableRecord(await this.inputs.get(hazardInputId), isHazardInputRecord);
   }
   listInputs(): Promise<readonly string[]> {
     return this.inputs.list();
@@ -150,8 +205,8 @@ export class LocalHazardProvenanceStore implements HazardProvenanceStore {
   putRun(run: HazardRun): Promise<void> {
     return this.runs.put(run.hazardRunId, run);
   }
-  getRun(hazardRunId: string): Promise<HazardRun | null> {
-    return this.runs.get(hazardRunId);
+  async getRun(hazardRunId: string): Promise<HazardRun | null> {
+    return readableRecord(await this.runs.get(hazardRunId), isHazardRunRecord);
   }
   listRuns(): Promise<readonly string[]> {
     return this.runs.list();

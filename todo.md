@@ -17,6 +17,10 @@
 - [x] Capture and inspect 1920×1080 post-integration runtime evidence through the established DevTools fallback, including canvas ownership, default Evidence/Replay collapse state and sidebar overflow.
 - [x] Independently fetch and scope-audit Claude commit `cf96410`; do not merge or modify its Phase 0 implementation during this bounded City3D QA task. The follow-on `cd02484` audit is scope-clean but merge-blocked pending admission-gate completeness fixes.
 - [x] Audit the uploaded Kimi package for governance-compatible Genesis roadmap material only; do not import code, data, assets or begin a new implementation from it. Reusable only as a later GIS/provenance reference; no package code, data or assets were imported.
+- [x] Refine the existing City3D renderer’s deterministic visual-only street, roof, façade and greenery rhythm toward the supplied dense-city reference; keep one renderer and do not alter CityWorld, routing, agents, contacts or outcomes.
+- [x] Capture fresh 1920×1080 City/District/Street evidence and compare renderer telemetry against the established City3D baseline before accepting the visual-density sprint.
+- [x] Restore the local City3D runtime after its stopped development server, then complete the final visual-density iteration without changing the scientific or routing boundaries.
+- [x] Run the full frontend suite, TypeScript, production build, renderer benchmark and `git diff --check`; commit and push only the validated visual-density delivery.
 - [ ] Implement only Phase 0 domain-neutral provenance and replay contracts: frozen artifacts, canonical hazard inputs/runs, immutable evidence storage and honest replay gates.
 - [ ] Add Phase 0 deterministic serialization, immutability, MATCH/DRIFT/BLOCKED and epidemic-isolation tests; do not add a hazard solver, external live-data adapter, GIS wiring, cascade or City3D hazard layer.
 - [ ] Validate, document, commit and deliver the Phase 0 contract foundation with deferred work stated explicitly.

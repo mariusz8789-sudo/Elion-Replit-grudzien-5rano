@@ -837,6 +837,7 @@ export class EpidemicCity3DSim implements Sim3D {
       this.buildingMeshes.push(group);
     }
     this.addDistrictInfill();
+    this.addUrbanCadence();
     // Optional call keeps a live HMR-retained renderer from crashing while the
     // newly defined visual-only method reaches a freshly constructed City3D instance.
     this.addPerimeterDistrict?.();
@@ -966,6 +967,85 @@ export class EpidemicCity3DSim implements Sim3D {
     this.scene.add(context); this.buildingMeshes.push(context);
   }
 
+  /**
+   * Deterministyczny rytm dachów i chodników opiera się wyłącznie na istniejącej
+   * geometrii semantycznych lokacji i siatce ulic. Nie tworzy ruchu, zasobów,
+   * infrastruktury krytycznej ani danych środowiskowych — jest VISUAL_ONLY.
+   */
+  private addUrbanCadence(): void {
+    if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3(1, 1, 1);
+    const rotation = new THREE.Quaternion();
+    const roofSlots = this.semanticBuildingSlots.filter(({ building }) => building.kind !== 'park');
+    const roofUnits = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.22, 0.10, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0x65717d, roughness: 0.66, metalness: 0.28 }),
+      roofSlots.length,
+    );
+    const skylights = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.18, 0.032, 0.12),
+      new THREE.MeshStandardMaterial({ color: 0x789cb4, emissive: 0x24495e, emissiveIntensity: 0.22, roughness: 0.22, metalness: 0.35 }),
+      Math.ceil(roofSlots.length / 2),
+    );
+    let roofUnitIndex = 0;
+    let skylightIndex = 0;
+    for (const { group, building } of roofSlots) {
+      const dimensions = group.userData.cityBuilding as { width: number; depth: number; height: number };
+      const offset = ((Math.abs(Math.round(building.x * 3 + building.y * 5)) % 3) - 1) * 0.12;
+      position.set(group.position.x + offset, dimensions.height + 0.17, group.position.z - dimensions.depth * 0.16);
+      rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), building.kind === 'school' ? Math.PI / 2 : 0);
+      matrix.compose(position, rotation, scale); roofUnits.setMatrixAt(roofUnitIndex++, matrix);
+      if ((building.x + building.y) % 2 === 0) {
+        position.set(group.position.x - offset, dimensions.height + 0.145, group.position.z + dimensions.depth * 0.15);
+        rotation.identity(); matrix.compose(position, rotation, scale); skylights.setMatrixAt(skylightIndex++, matrix);
+      }
+    }
+    roofUnits.count = roofUnitIndex; skylights.count = skylightIndex;
+    roofUnits.instanceMatrix.needsUpdate = true; skylights.instanceMatrix.needsUpdate = true;
+    roofUnits.name = 'visual-only-roof-mechanical-cadence'; skylights.name = 'visual-only-roof-skylight-cadence';
+
+    // Minimalne donice przy skrzyżowaniach robią ulice czytelniejsze w widoku
+    // CITY/DISTRICT, ale nie są roślinnością ani ruchem modelowanym przez świat.
+    const planterSlots = this.simulation.streets.v.flatMap((x, col) => this.simulation.streets.h.flatMap((y, row) => {
+      if ((row + col) % 2 !== 0) return [];
+      const px = (x - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE;
+      const pz = (y - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE;
+      return [{ x: px + 0.48, z: pz + 0.48 }, { x: px - 0.48, z: pz - 0.48 }];
+    }));
+    const planters = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.18, 0.12, 0.18),
+      new THREE.MeshStandardMaterial({ color: 0x87929b, roughness: 0.86, metalness: 0.08 }),
+      planterSlots.length,
+    );
+    const shrubs = new THREE.InstancedMesh(
+      new THREE.DodecahedronGeometry(0.13, 0),
+      new THREE.MeshStandardMaterial({ color: 0x315f47, roughness: 0.94, metalness: 0.01 }),
+      planterSlots.length,
+    );
+    planterSlots.forEach((slot, index) => {
+      position.set(slot.x, 0.06, slot.z); rotation.identity(); scale.set(1, 1, 1); matrix.compose(position, rotation, scale); planters.setMatrixAt(index, matrix);
+      const size = 0.82 + (index % 3) * 0.11;
+      position.set(slot.x, 0.19 * size, slot.z); scale.set(size, size, size); matrix.compose(position, rotation, scale); shrubs.setMatrixAt(index, matrix);
+    });
+    planters.instanceMatrix.needsUpdate = true; shrubs.instanceMatrix.needsUpdate = true;
+    planters.name = 'visual-only-sidewalk-planters'; shrubs.name = 'visual-only-sidewalk-shrubs';
+    const context = new THREE.Group();
+    context.name = 'visual-only-urban-cadence';
+    context.userData.visualOnlyContext = true;
+    context.add(roofUnits, skylights, planters, shrubs);
+    context.traverse((node) => {
+      const mesh = node as THREE_NS.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    });
+    this.scene.add(context);
+    this.buildingMeshes.push(context);
+  }
+
   private createBuilding(building: WorldObject): THREE_NS.Group {
     const THREE = this.THREE!;
     const group = new THREE.Group();
@@ -1046,7 +1126,7 @@ export class EpidemicCity3DSim implements Sim3D {
         group.add(tree);
       }
     }
-    group.userData.cityBuilding = { width: w, depth: d };
+    group.userData.cityBuilding = { width: w, depth: d, height: s.height };
     group.userData.worldSelection = {
       kind: 'location',
       label: building.kind.toUpperCase(),

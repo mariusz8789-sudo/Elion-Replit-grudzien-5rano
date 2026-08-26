@@ -46,4 +46,4 @@
 - [ ] Add Phase 0 deterministic serialization, immutability, MATCH/DRIFT/BLOCKED and epidemic-isolation tests; do not add a hazard solver, external live-data adapter, GIS wiring, cascade or City3D hazard layer.
 - [ ] Validate, document, commit and deliver the Phase 0 contract foundation with deferred work stated explicitly.
 - [x] Finalize the audited Earthquake → Digital Twin demonstrator documentation, checklist and complete-diff review without introducing additional hazards or data adapters.
-- [ ] Commit and push the validated Earthquake demonstrator, then prepare the saved version for user-controlled publishing.
+- [x] Commit and push the validated Earthquake demonstrator, then prepare the saved version for user-controlled publishing.

@@ -8,6 +8,7 @@ import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
 import { projectWorldState } from '../../core/simulation/worldEngineContract';
+import { EvidenceReplayPanel } from './EvidenceReplayPanel';
 import { ScenarioCommandCenterPanel } from './ScenarioCommandCenterPanel';
 
 /** Command Center reads existing model and World Engine state only; it does not generate epidemic data or agent routes. */
@@ -335,6 +336,7 @@ export function City3DWebGLScreen() {
             <div><span>draw calls</span><b>{Math.round(stats.webgl_draw_calls ?? 0)}</b></div>
             <div><span>triangles</span><b>{Math.round(stats.webgl_triangles ?? 0)}</b></div>
           </div>
+          <EvidenceReplayPanel />
         </aside>
       </section>
 

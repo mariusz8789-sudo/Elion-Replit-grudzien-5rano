@@ -1,7 +1,26 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { execSync } from 'node:child_process';
+
+/**
+ * Real git commit of the code that produced this build — read once, at build
+ * time, from the actual repository, not typed in by hand. If this isn't a
+ * git checkout (a stripped release tarball, a shallow clone missing HEAD),
+ * fail honestly with the reason instead of guessing a value.
+ */
+function readCommitHash(): string {
+  try {
+    return execSync('git rev-parse HEAD', { cwd: __dirname, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.split('\n')[0] : String(error);
+    return `NOT_AVAILABLE: ${reason}`;
+  }
+}
 
 export default defineConfig({
+  define: {
+    __GENESIS_COMMIT_HASH__: JSON.stringify(readCommitHash()),
+  },
   plugins: [react()],
   build: {
     // three.js (dynamically imported only by 3D eksperymenty, patrz

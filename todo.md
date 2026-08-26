@@ -8,3 +8,6 @@
 - [x] Define a shared Hazard Engine boundary, identifying what belongs to Scientific Core, data adapters, world/GIS infrastructure, and City3D visualization.
 - [x] Assess authoritative data needs, scientific validation requirements, risks, effort, dependencies, and phased implementation order for multi-hazard support.
 - [x] Deliver a Multi-Hazard architecture audit and roadmap; do not begin hazard implementation.
+- [x] Fetch and independently verify Claude commit `e94ef16` against the remote branch and reported merge base.
+- [x] Compare `e94ef16` with current `808c9df`, identifying whether the Multi-Hazard audit is the only missing additive change. Claude’s branch contained the Evidence/Replay work plus feature-flagged routing core changes.
+- [x] Reconcile only safe missing work, validate the resulting branch, and report the final integration state. Evidence/Replay was added selectively; routing core and routing tests remain excluded by scope.

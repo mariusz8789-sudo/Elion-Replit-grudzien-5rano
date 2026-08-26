@@ -78,6 +78,12 @@ The scripted Chromium proof ran against `#/city3d` at **1920×1080**. It dismiss
 
 Machine-readable results are retained in `artifacts/earthquake-city3d-runtime-proof.json`; the proof procedure and observations are summarized in `artifacts/earthquake-city3d-runtime-proof-notes.md`.
 
+### Production-build regression
+
+The same interaction proof was executed against the Vite production preview of the built `dist` output, rather than the development server. The production bundle rendered the same one `.city-3d-canvas`, reached `OVERLAY ACTIVE` with `REPLAY MATCH` and `EVIDENCE COMPLETE`, visibly exposed registered module/version/schema/capability provenance, and transitioned to `OVERLAY CLEARED` without a WebGL failure or captured browser warning/error. The production evidence is retained as `artifacts/earthquake-city3d-runtime-proof-production.json` and `artifacts/screenshots/city3d-earthquake-demonstrator-production-1920x1080.png`.
+
+![Production frontend proof at 1920×1080](../artifacts/screenshots/city3d-earthquake-demonstrator-production-1920x1080.png)
+
 ## Validation
 
 Focused integration validation passed **50 tests in 5 files**, covering the Earthquake runner, mapping, evidence/replay, overlay gate and renderer isolation. The renderer isolation assertion feeds the real gate-approved projection into `setEarthquakeScenarioOverlay()` and clears it, then proves epidemic stats and `projectWorldState()` are unchanged.

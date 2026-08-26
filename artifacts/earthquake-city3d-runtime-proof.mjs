@@ -1,9 +1,10 @@
 import { writeFile } from 'node:fs/promises';
 
 const endpoint = 'http://127.0.0.1:9222';
-const origin = 'http://127.0.0.1:5000/#/city3d';
-const screenshotPath = '/home/ubuntu/genesis-epidemic-digital-twin/artifacts/screenshots/city3d-earthquake-demonstrator-1920x1080.png';
-const reportPath = '/home/ubuntu/genesis-epidemic-digital-twin/artifacts/earthquake-city3d-runtime-proof.json';
+const origin = process.env.GENESIS_RUNTIME_ORIGIN ?? 'http://127.0.0.1:5000/#/city3d';
+const suffix = process.env.GENESIS_PROOF_SUFFIX ? `-${process.env.GENESIS_PROOF_SUFFIX}` : '';
+const screenshotPath = `/home/ubuntu/genesis-epidemic-digital-twin/artifacts/screenshots/city3d-earthquake-demonstrator${suffix}-1920x1080.png`;
+const reportPath = `/home/ubuntu/genesis-epidemic-digital-twin/artifacts/earthquake-city3d-runtime-proof${suffix}.json`;
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const targets = await (await fetch(`${endpoint}/json/list`)).json();

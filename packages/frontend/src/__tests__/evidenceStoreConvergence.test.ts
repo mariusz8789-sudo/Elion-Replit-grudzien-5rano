@@ -3,6 +3,8 @@ import {
   DuplicateRecordConflictError,
   InMemoryRecordStore,
   LocalRecordStore,
+  MalformedRecordCollectionError,
+  UnsafeRecordIdError,
 } from '../core/provenance/recordStore';
 import { InMemoryEvidenceStore, type StoredEvidence } from '../core/discovery/evidenceStore';
 import { InMemoryHazardProvenanceStore, ImmutableConflictError } from '../core/hazard/hazardProvenanceStore';
@@ -26,10 +28,16 @@ function makeFakeStorage() {
   const map = new Map<string, string>();
   return {
     getItem: (k: string) => (map.has(k) ? (map.get(k) as string) : null),
-    setItem: (k: string, v: string) => { map.set(k, v); },
-    removeItem: (k: string) => { map.delete(k); },
+    setItem: (k: string, v: string) => {
+      map.set(k, v);
+    },
+    removeItem: (k: string) => {
+      map.delete(k);
+    },
     key: (i: number) => Array.from(map.keys())[i] ?? null,
-    get length() { return map.size; },
+    get length() {
+      return map.size;
+    },
   };
 }
 
@@ -38,7 +46,11 @@ const spec = (over: Partial<DiscoveryCaseSpec> = {}): DiscoveryCaseSpec => ({
   question: 'Czy izolacja objawowych obniża szczyt zakażeń?',
   hypothesis: {
     statement: 'Izolacja objawowych obniża szczytową liczbę zakaźnych względem braku interwencji.',
-    falsification: { metric: 'peakInfectious', relation: 'less-than', rationale: 'Izolacja usuwa zakaźnych z obiegu kontaktów.' },
+    falsification: {
+      metric: 'peakInfectious',
+      relation: 'less-than',
+      rationale: 'Izolacja usuwa zakaźnych z obiegu kontaktów.',
+    },
     assumptions: ['Wykrywalność objawowych jest natychmiastowa.'],
   },
   baselineScenario: 'BASELINE',
@@ -49,7 +61,13 @@ const spec = (over: Partial<DiscoveryCaseSpec> = {}): DiscoveryCaseSpec => ({
 
 function makeEpidemicEntry(): StoredEvidence {
   const record = runDiscoveryCase(spec());
-  return { schemaVersion: '1.0.0', record, sha256: null, codeCommitHash: 'test-commit-hash', savedAt: Date.now() };
+  return {
+    schemaVersion: '1.0.0',
+    record,
+    sha256: null,
+    codeCommitHash: 'test-commit-hash',
+    savedAt: Date.now(),
+  };
 }
 
 async function makeArtifact(rawContent = 'convergence-fixture'): Promise<SourceArtifact> {
@@ -119,7 +137,9 @@ describe('Test 4 — duplicate id + different canonical content is rejected unde
     const store = new InMemoryHazardProvenanceStore();
     const artifact = await makeArtifact();
     await store.putArtifact(artifact);
-    await expect(store.putArtifact({ ...artifact, crs: 'EPSG:3857' })).rejects.toThrow(DuplicateRecordConflictError);
+    await expect(store.putArtifact({ ...artifact, crs: 'EPSG:3857' })).rejects.toThrow(
+      DuplicateRecordConflictError,
+    );
   });
 });
 
@@ -140,7 +160,8 @@ describe('Test 5 — namespace isolation between epidemic and hazard records', (
     const hazardRecord: SourceArtifact = { ...artifact, artifactId: sharedId };
 
     const { LocalEvidenceStore: FreshEvidenceStore } = await import('../core/discovery/evidenceStore');
-    const { LocalHazardProvenanceStore: FreshHazardStore } = await import('../core/hazard/hazardProvenanceStore');
+    const { LocalHazardProvenanceStore: FreshHazardStore } =
+      await import('../core/hazard/hazardProvenanceStore');
 
     const evidenceStore = new FreshEvidenceStore();
     const hazardStore = new FreshHazardStore();
@@ -162,7 +183,8 @@ describe('Test 5 — namespace isolation between epidemic and hazard records', (
     const fake = makeFakeStorage();
     vi.stubGlobal('window', { localStorage: fake });
     const { LocalEvidenceStore: FreshEvidenceStore } = await import('../core/discovery/evidenceStore');
-    const { LocalHazardProvenanceStore: FreshHazardStore } = await import('../core/hazard/hazardProvenanceStore');
+    const { LocalHazardProvenanceStore: FreshHazardStore } =
+      await import('../core/hazard/hazardProvenanceStore');
 
     await new FreshEvidenceStore().save(makeEpidemicEntry());
     await new FreshHazardStore().putArtifact(await makeArtifact());
@@ -225,5 +247,49 @@ describe('LocalRecordStore — the shared primitive directly, both policies', ()
     const store = new LocalRecordStore<{ v: number }>('convergence-test/immutable/v1', 'reject-if-different');
     await store.put('a', { v: 1 });
     await expect(store.put('a', { v: 2 })).rejects.toThrow(DuplicateRecordConflictError);
+  });
+
+  it.each(['[]', 'null', '"not-a-record-map"'])(
+    'treats retained %s collections as unreadable, preserves the raw value, and refuses a destructive write',
+    async (raw) => {
+      const fake = makeFakeStorage();
+      const key = 'convergence-test/malformed/v1';
+      fake.setItem(`genesis-os:${key}`, raw);
+      vi.stubGlobal('window', { localStorage: fake });
+      const store = new LocalRecordStore<{ v: number }>(key, 'overwrite');
+
+      await expect(store.get('a')).resolves.toBeNull();
+      await expect(store.list()).resolves.toEqual([]);
+      await expect(store.delete('a')).resolves.toBeUndefined();
+      await expect(store.put('a', { v: 1 })).rejects.toThrow(MalformedRecordCollectionError);
+      expect(fake.getItem(`genesis-os:${key}`)).toBe(raw);
+    },
+  );
+
+  it('continues to read and extend a legacy flat map without changing its overwrite policy', async () => {
+    const fake = makeFakeStorage();
+    const key = 'convergence-test/legacy-flat-map/v1';
+    fake.setItem(`genesis-os:${key}`, JSON.stringify({ existing: { v: 1 } }));
+    vi.stubGlobal('window', { localStorage: fake });
+    const store = new LocalRecordStore<{ v: number }>(key, 'overwrite');
+
+    await expect(store.get('existing')).resolves.toEqual({ v: 1 });
+    await store.put('fresh', { v: 2 });
+    await store.put('existing', { v: 3 });
+    expect(await store.list()).toEqual(['existing', 'fresh']);
+    expect(await store.get('existing')).toEqual({ v: 3 });
+  });
+
+  it('refuses prototype-sensitive ids without exposing them through get, list, or delete', async () => {
+    const fake = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: fake });
+    const store = new LocalRecordStore<{ v: number }>('convergence-test/unsafe-id/v1', 'overwrite');
+
+    await expect(store.put('__proto__', { v: 1 })).rejects.toThrow(UnsafeRecordIdError);
+    await expect(store.put('constructor', { v: 1 })).rejects.toThrow(UnsafeRecordIdError);
+    await expect(store.get('__proto__')).resolves.toBeNull();
+    await expect(store.get('toString')).resolves.toBeNull();
+    await expect(store.delete('prototype')).resolves.toBeUndefined();
+    expect(await store.list()).toEqual([]);
   });
 });

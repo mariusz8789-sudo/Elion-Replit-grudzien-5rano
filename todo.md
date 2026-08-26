@@ -74,3 +74,4 @@
 - [x] Audit the locked JavaScript dependency tree for production-relevant security advisories and apply only evidence-based compatible remediation, with full validation and no scientific, renderer, hazard, GIS or data-behavior change.
 - [x] Add a repository-native CI dependency-security gate that fails on high or critical npm advisories while preserving existing quality-gate steps and all Genesis application boundaries.
 - [x] Enforce the existing canonical hazard replay never-throw contract when an evaluator rejects or throws for a retained record, with a truthful non-success verdict and no solver, persistence-schema, renderer, data/GIS, hazard or Scientific Core change.
+- [x] Independently harden backward-compatible local Evidence and Hazard Provenance persistence against malformed retained browser storage, with corruption/conflict/replay safety coverage and no scientific, renderer, hazard, GIS, data or deployment change.

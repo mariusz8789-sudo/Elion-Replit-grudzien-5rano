@@ -25,8 +25,28 @@ export type DuplicateIdPolicy = 'overwrite' | 'reject-if-different';
 
 export class DuplicateRecordConflictError extends Error {
   constructor(public readonly id: string) {
-    super(`Record "${id}" already exists with different content — this store's policy refuses to overwrite it.`);
+    super(
+      `Record "${id}" already exists with different content — this store's policy refuses to overwrite it.`,
+    );
     this.name = 'DuplicateRecordConflictError';
+  }
+}
+
+/** A retained local value is not a usable keyed collection when it is an array, scalar, or null. */
+export class MalformedRecordCollectionError extends Error {
+  constructor(public readonly storageKey: string) {
+    super(
+      `Stored collection "${storageKey}" is not a flat record map — refusing to overwrite unreadable retained data.`,
+    );
+    this.name = 'MalformedRecordCollectionError';
+  }
+}
+
+/** Keys that can alter an ordinary JavaScript object's prototype or constructor behavior. */
+export class UnsafeRecordIdError extends Error {
+  constructor(public readonly id: string) {
+    super(`Record id "${id}" is not permitted in a local record collection.`);
+    this.name = 'UnsafeRecordIdError';
   }
 }
 
@@ -41,6 +61,22 @@ function sameContent(a: unknown, b: unknown): boolean {
   return canonicalJson(a) === canonicalJson(b);
 }
 
+const UNSAFE_RECORD_IDS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function assertSafeRecordId(id: string): void {
+  if (UNSAFE_RECORD_IDS.has(id)) {
+    throw new UnsafeRecordIdError(id);
+  }
+}
+
+function isFlatRecordMap(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function ownRecordValue<T>(records: Record<string, T>, id: string): T | undefined {
+  return Object.hasOwn(records, id) ? records[id] : undefined;
+}
+
 /** In-memory backend — used by both domains' test suites and as a non-persistent fallback. */
 export class InMemoryRecordStore<T> implements KeyedRecordStore<T> {
   private records = new Map<string, T>();
@@ -48,6 +84,7 @@ export class InMemoryRecordStore<T> implements KeyedRecordStore<T> {
   constructor(private readonly policy: DuplicateIdPolicy = 'overwrite') {}
 
   async put(id: string, record: T): Promise<void> {
+    assertSafeRecordId(id);
     if (this.policy === 'reject-if-different') {
       const existing = this.records.get(id);
       if (existing !== undefined && !sameContent(existing, record)) {
@@ -58,6 +95,7 @@ export class InMemoryRecordStore<T> implements KeyedRecordStore<T> {
   }
 
   async get(id: string): Promise<T | null> {
+    if (UNSAFE_RECORD_IDS.has(id)) return null;
     return this.records.get(id) ?? null;
   }
 
@@ -66,6 +104,7 @@ export class InMemoryRecordStore<T> implements KeyedRecordStore<T> {
   }
 
   async delete(id: string): Promise<void> {
+    if (UNSAFE_RECORD_IDS.has(id)) return;
     this.records.delete(id);
   }
 }
@@ -83,14 +122,19 @@ export class LocalRecordStore<T> implements KeyedRecordStore<T> {
     private readonly policy: DuplicateIdPolicy = 'overwrite',
   ) {}
 
-  private readAll(): Record<string, T> {
-    return readJSON<Record<string, T>>(this.storageKey, {});
+  private readAll(): Record<string, T> | null {
+    const value = readJSON<unknown>(this.storageKey, {});
+    return isFlatRecordMap(value) ? (value as Record<string, T>) : null;
   }
 
   async put(id: string, record: T): Promise<void> {
+    assertSafeRecordId(id);
     const all = this.readAll();
+    if (all === null) {
+      throw new MalformedRecordCollectionError(this.storageKey);
+    }
     if (this.policy === 'reject-if-different') {
-      const existing = all[id];
+      const existing = ownRecordValue(all, id);
       if (existing !== undefined && !sameContent(existing, record)) {
         throw new DuplicateRecordConflictError(id);
       }
@@ -100,15 +144,24 @@ export class LocalRecordStore<T> implements KeyedRecordStore<T> {
   }
 
   async get(id: string): Promise<T | null> {
-    return this.readAll()[id] ?? null;
+    if (UNSAFE_RECORD_IDS.has(id)) return null;
+    const all = this.readAll();
+    return all === null ? null : (ownRecordValue(all, id) ?? null);
   }
 
   async list(): Promise<readonly string[]> {
-    return Object.keys(this.readAll()).sort();
+    const all = this.readAll();
+    return all === null
+      ? []
+      : Object.keys(all)
+          .filter((id) => !UNSAFE_RECORD_IDS.has(id))
+          .sort();
   }
 
   async delete(id: string): Promise<void> {
+    if (UNSAFE_RECORD_IDS.has(id)) return;
     const all = this.readAll();
+    if (all === null) return;
     delete all[id];
     writeJSON(this.storageKey, all);
   }

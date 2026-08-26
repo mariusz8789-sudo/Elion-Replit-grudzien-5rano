@@ -8,7 +8,7 @@
  * provenance store, so an incomplete record can never later masquerade as a
  * trustworthy MATCH.
  */
-import type { HazardInput, HazardRun, SourceArtifact } from './contracts';
+import type { ExposureSnapshot, HazardInput, HazardRun, ImpactResult, SourceArtifact } from './contracts';
 
 export interface AdmissionResult {
   readonly admitted: boolean;
@@ -71,6 +71,40 @@ export function checkHazardRunAdmission(run: HazardRun): AdmissionResult {
     missing.push('outputFields');
   } else if (run.status === 'COMPLETED' && Object.keys(run.outputFields).length === 0) {
     missing.push('outputFields');
+  }
+  return admission(missing);
+}
+
+/**
+ * `ExposureSnapshot`/`ImpactResult` are domain-neutral contracts (see
+ * contracts.ts) exactly like `SourceArtifact`/`HazardInput`/`HazardRun`
+ * above, so their completeness checks belong here, not duplicated inside
+ * one hazard's own evidence module — any future hazard producing exposure
+ * and impact data reuses these two functions instead of re-deriving field
+ * requirements. Field names are returned bare (no `exposure.`/`impacts[i].`
+ * prefix); a caller building a combined evidence pack applies its own
+ * prefix, exactly as the three checks above already expect.
+ */
+export function checkExposureSnapshotAdmission(exposure: ExposureSnapshot): AdmissionResult {
+  const missing: string[] = [];
+  if (!exposure.exposureSnapshotId) missing.push('exposureSnapshotId');
+  if (!exposure.mappingMethod) missing.push('mappingMethod');
+  if (!exposure.sites || exposure.sites.length === 0) missing.push('sites');
+  if (!exposure.datasetStatus) missing.push('datasetStatus');
+  return admission(missing);
+}
+
+export function checkImpactResultAdmission(impact: ImpactResult): AdmissionResult {
+  const missing: string[] = [];
+  if (!impact.impactResultId) missing.push('impactResultId');
+  if (!impact.hazardRunId) missing.push('hazardRunId');
+  if (!impact.exposureSnapshotId) missing.push('exposureSnapshotId');
+  if (!impact.siteId) missing.push('siteId');
+  if (!impact.resultType) missing.push('resultType');
+  if (!impact.severity) missing.push('severity');
+  if (!impact.datasetStatus) missing.push('datasetStatus');
+  if (!Number.isFinite(impact.uncertainty?.low) || !Number.isFinite(impact.uncertainty?.high)) {
+    missing.push('uncertainty');
   }
   return admission(missing);
 }

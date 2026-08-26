@@ -10,8 +10,10 @@ import {
   computeSourceArtifactContentHash,
 } from '../core/hazard/fingerprint';
 import {
+  checkExposureSnapshotAdmission,
   checkHazardInputAdmission,
   checkHazardRunAdmission,
+  checkImpactResultAdmission,
   checkSourceArtifactAdmission,
 } from '../core/hazard/hazardEvidenceGate';
 import {
@@ -19,7 +21,7 @@ import {
   InMemoryHazardProvenanceStore,
 } from '../core/hazard/hazardProvenanceStore';
 import { replayHazardRun, type HazardReferenceEvaluator } from '../core/hazard/hazardReplay';
-import type { HazardInput, HazardRun, SourceArtifact } from '../core/hazard/contracts';
+import type { ExposureSnapshot, HazardInput, HazardRun, ImpactResult, SourceArtifact } from '../core/hazard/contracts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HAZARD_DIR = join(HERE, '..', 'core', 'hazard');
@@ -396,6 +398,77 @@ describe('Test 7 — evidence completeness gate blocks admission on missing mand
       const result = checkHazardRunAdmission(run);
       expect(result.admitted).toBe(false);
       expect(result.missingFields).toContain('resultFingerprint');
+    });
+  });
+
+  describe('checkExposureSnapshotAdmission / checkImpactResultAdmission — domain-neutral, not earthquake-specific', () => {
+    function makeExposureSnapshot(overrides: Partial<ExposureSnapshot> = {}): ExposureSnapshot {
+      return {
+        exposureSnapshotId: 'exposure-1',
+        mappingMethod: 'test-fixture-registry-v1',
+        sites: [{ siteId: 'site-1', assetLabel: 'Fixture Site', vulnerabilityClass: 'MEDIUM', x: 0, y: 0 }],
+        datasetStatus: 'SCENARIO',
+        ...overrides,
+      };
+    }
+
+    function makeImpactResult(overrides: Partial<ImpactResult> = {}): ImpactResult {
+      return {
+        impactResultId: 'impact-1',
+        hazardRunId: 'run-1',
+        exposureSnapshotId: 'exposure-1',
+        siteId: 'site-1',
+        resultType: 'TEST_IMPACT',
+        severity: 'MINOR',
+        severityValue: 0.05,
+        uncertainty: { low: 0.04, high: 0.06 },
+        datasetStatus: 'SCENARIO',
+        provenance: { hazardRunId: 'run-1', hazardModuleVersion: 'test-module-v1' },
+        ...overrides,
+      };
+    }
+
+    it('admits a fully-populated ExposureSnapshot', () => {
+      expect(checkExposureSnapshotAdmission(makeExposureSnapshot())).toEqual({ admitted: true, missingFields: [] });
+    });
+
+    it('rejects an ExposureSnapshot with an empty sites array', () => {
+      const result = checkExposureSnapshotAdmission(makeExposureSnapshot({ sites: [] }));
+      expect(result.admitted).toBe(false);
+      expect(result.missingFields).toContain('sites');
+    });
+
+    it('rejects an ExposureSnapshot missing mappingMethod', () => {
+      const result = checkExposureSnapshotAdmission(makeExposureSnapshot({ mappingMethod: '' }));
+      expect(result.admitted).toBe(false);
+      expect(result.missingFields).toContain('mappingMethod');
+    });
+
+    it('admits a fully-populated ImpactResult', () => {
+      expect(checkImpactResultAdmission(makeImpactResult())).toEqual({ admitted: true, missingFields: [] });
+    });
+
+    it.each([
+      ['impactResultId', { impactResultId: '' }],
+      ['hazardRunId', { hazardRunId: '' }],
+      ['exposureSnapshotId', { exposureSnapshotId: '' }],
+      ['siteId', { siteId: '' }],
+      ['resultType', { resultType: '' }],
+      ['severity', { severity: '' as unknown as ImpactResult['severity'] }],
+      ['datasetStatus', { datasetStatus: '' as unknown as ImpactResult['datasetStatus'] }],
+    ] as const)('rejects an ImpactResult missing %s — a gap the earthquake-only check never caught before this was generalized', (field, override) => {
+      const result = checkImpactResultAdmission(makeImpactResult(override));
+      expect(result.admitted).toBe(false);
+      expect(result.missingFields).toContain(field);
+    });
+
+    it.each([
+      ['NaN low', { uncertainty: { low: Number.NaN, high: 0.06 } }],
+      ['Infinity high', { uncertainty: { low: 0.04, high: Number.POSITIVE_INFINITY } }],
+    ] as const)('rejects an ImpactResult with a non-finite uncertainty bound (%s)', (_label, override) => {
+      const result = checkImpactResultAdmission(makeImpactResult(override));
+      expect(result.admitted).toBe(false);
+      expect(result.missingFields).toContain('uncertainty');
     });
   });
 });

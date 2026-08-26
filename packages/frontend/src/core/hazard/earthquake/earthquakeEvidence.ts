@@ -4,17 +4,24 @@
  * Reuses Genesis's existing Evidence/Replay infrastructure rather than
  * building a third one: `sha256Hex`/`canonicalJson` are the same primitives
  * `core/discovery/evidenceCrypto.ts` and `core/hazard/fingerprint.ts` already
- * use, and the completeness gating below calls Phase 0's own
- * `checkSourceArtifactAdmission`/`checkHazardInputAdmission`/`checkHazardRunAdmission`
- * (core/hazard/hazardEvidenceGate.ts) instead of re-deriving field
- * requirements. This module adds only the two checks Phase 0 didn't need
- * yet: exposure and impact completeness.
+ * use, and ALL completeness gating below — including exposure and impact —
+ * calls Phase 0's own domain-neutral checks in `core/hazard/hazardEvidenceGate.ts`.
+ * `ExposureSnapshot`/`ImpactResult` are domain-neutral contracts (see
+ * contracts.ts), so their admission checks live there too, not duplicated
+ * per hazard; this file only supplies the earthquake-specific "at least one
+ * impact must exist" business rule and the `impacts[i].` prefixing.
  */
 import { canonicalJson } from '../../events/hash';
 import { sha256Hex } from '../../discovery/evidenceCrypto';
-import { checkHazardInputAdmission, checkHazardRunAdmission, checkSourceArtifactAdmission } from '../hazardEvidenceGate';
+import {
+  checkExposureSnapshotAdmission,
+  checkHazardInputAdmission,
+  checkHazardRunAdmission,
+  checkImpactResultAdmission,
+  checkSourceArtifactAdmission,
+} from '../hazardEvidenceGate';
 import type { EarthquakeScenarioResult } from './earthquakeScenario';
-import type { ExposureSnapshot, ImpactResult } from '../contracts';
+import type { ImpactResult } from '../contracts';
 
 export interface HazardEvidencePack {
   readonly hazardRunId: string;
@@ -25,30 +32,9 @@ export interface HazardEvidencePack {
   readonly generatedAt: number;
 }
 
-function checkExposureAdmission(exposure: ExposureSnapshot): readonly string[] {
-  const missing: string[] = [];
-  if (!exposure.exposureSnapshotId) missing.push('exposure.exposureSnapshotId');
-  if (!exposure.mappingMethod) missing.push('exposure.mappingMethod');
-  if (!exposure.sites || exposure.sites.length === 0) missing.push('exposure.sites');
-  if (!exposure.datasetStatus) missing.push('exposure.datasetStatus');
-  return missing;
-}
-
 function checkImpactsAdmission(impacts: readonly ImpactResult[]): readonly string[] {
-  const missing: string[] = [];
-  if (!impacts || impacts.length === 0) {
-    missing.push('impacts');
-    return missing;
-  }
-  impacts.forEach((impact, i) => {
-    if (!impact.resultType) missing.push(`impacts[${i}].resultType`);
-    if (!impact.severity) missing.push(`impacts[${i}].severity`);
-    if (!impact.datasetStatus) missing.push(`impacts[${i}].datasetStatus`);
-    if (!Number.isFinite(impact.uncertainty?.low) || !Number.isFinite(impact.uncertainty?.high)) {
-      missing.push(`impacts[${i}].uncertainty`);
-    }
-  });
-  return missing;
+  if (!impacts || impacts.length === 0) return ['impacts'];
+  return impacts.flatMap((impact, i) => checkImpactResultAdmission(impact).missingFields.map((f) => `impacts[${i}].${f}`));
 }
 
 export async function buildHazardEvidencePack(result: EarthquakeScenarioResult): Promise<HazardEvidencePack> {
@@ -56,7 +42,7 @@ export async function buildHazardEvidencePack(result: EarthquakeScenarioResult):
     ...checkSourceArtifactAdmission(result.artifact).missingFields.map((f) => `artifact.${f}`),
     ...checkHazardInputAdmission(result.input).missingFields.map((f) => `input.${f}`),
     ...checkHazardRunAdmission(result.run).missingFields.map((f) => `run.${f}`),
-    ...checkExposureAdmission(result.exposure),
+    ...checkExposureSnapshotAdmission(result.exposure).missingFields.map((f) => `exposure.${f}`),
     ...checkImpactsAdmission(result.impacts),
   ];
 

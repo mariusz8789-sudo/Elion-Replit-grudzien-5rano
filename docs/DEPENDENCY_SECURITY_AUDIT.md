@@ -22,7 +22,7 @@ The refresh also advances compatible lockfile-resolved development packages, inc
 
 The candidate lockfile was first refreshed in a detached worktree with lifecycle scripts disabled. A clean `npm ci --ignore-scripts` installation, lint, full single-worker frontend suite, backend suite, frontend typecheck, production build, `git diff --check`, production-only audit, and full audit all passed. Both audits reported zero vulnerabilities after resolution.
 
-The same full local validation must pass again in the live worktree, followed by a GitHub Actions run for the exact committed SHA. This document will be updated with that remote outcome only after it is observed.
+The promoted lockfile was byte-identical to the isolated candidate. Live production-only and full audits both reported zero findings. Commit [`64eddbe`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/commit/64eddbe7eb56888e3a34a1167f5089ed6e0e8fe1) then completed the unchanged remote quality gate successfully in [GitHub Actions run `32956020910`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/32956020910): clean install, whitespace check, lint, frontend tests, backend tests, frontend typecheck, production build, and artifact upload all passed.
 
 ## References
 

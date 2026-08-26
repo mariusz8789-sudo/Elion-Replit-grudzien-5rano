@@ -272,7 +272,21 @@ try {
       stageFailed: Boolean(document.querySelector('.empty-state')),
     };
   })())`));
-  const report = { before, active, exportDownload, cleared, evidenceReplay, blockedParameter, evidencePersistenceFailure, earthquakeHistoryUnavailable, consoleEntries };
+  await evaluate(`(() => document.querySelector('.evidence-panel .evidence-panel-toggle')?.click())()`);
+  await sleep(160);
+  const evidenceHistoryUnavailable = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const panel = document.querySelector('.evidence-panel');
+    const disclosure = panel?.querySelector('.evidence-history-unavailable[role="status"]');
+    const text = panel?.textContent ?? '';
+    return {
+      disclosed: /LOCAL_PERSISTENCE_UNAVAILABLE/.test(disclosure?.textContent ?? ''),
+      atomicPolite: disclosure?.getAttribute('aria-live') === 'polite' && disclosure?.getAttribute('aria-atomic') === 'true',
+      emptyHistoryNotClaimed: !/Brak zapisanych eksperymentów[.]/.test(text),
+      cityCanvasCount: document.querySelectorAll('.city-3d-canvas').length,
+      stageFailed: Boolean(document.querySelector('.empty-state')),
+    };
+  })())`));
+  const report = { before, active, exportDownload, cleared, evidenceReplay, blockedParameter, evidencePersistenceFailure, earthquakeHistoryUnavailable, evidenceHistoryUnavailable, consoleEntries };
   await writeFile(reportPath, JSON.stringify(report, null, 2));
   const assertions = [
     before.cityCanvasCount === 1,
@@ -332,6 +346,11 @@ try {
     earthquakeHistoryUnavailable.emptyHistoryNotClaimed,
     earthquakeHistoryUnavailable.cityCanvasCount === 1,
     !earthquakeHistoryUnavailable.stageFailed,
+    evidenceHistoryUnavailable.disclosed,
+    evidenceHistoryUnavailable.atomicPolite,
+    evidenceHistoryUnavailable.emptyHistoryNotClaimed,
+    evidenceHistoryUnavailable.cityCanvasCount === 1,
+    !evidenceHistoryUnavailable.stageFailed,
     consoleEntries.length === 0,
   ];
   if (!assertions.every(Boolean)) throw new Error(`Earthquake City3D runtime proof failed: ${JSON.stringify(report)}`);

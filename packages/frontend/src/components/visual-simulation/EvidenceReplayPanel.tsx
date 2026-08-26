@@ -15,6 +15,7 @@ import {
 import { computeEvidencePackSha256 } from '../../core/discovery/evidenceCrypto';
 import { compareStoredExperiments, type ExperimentComparison } from '../../core/discovery/experimentComparison';
 import { codeCommitHash } from '../../core/build/commitHash';
+import { storageAvailable } from '../../core/storage';
 
 /**
  * EVIDENCE & REPLAY — the UI consumer of Genesis's existing Discovery Engine
@@ -104,6 +105,9 @@ export function EvidenceReplayPanel() {
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // SSR cannot probe browser storage. In a browser, do not conflate an
+  // unavailable durable registry with an empty list of saved experiments.
+  const localPersistenceAvailable = typeof window === 'undefined' ? null : storageAvailable();
 
   const refreshHistory = async () => {
     try {
@@ -272,9 +276,14 @@ export function EvidenceReplayPanel() {
       )}
 
       <div className="world-panel-heading evidence-subheading"><span>HISTORIA EKSPERYMENTÓW</span><small>{history.length} zapisanych</small></div>
-      {history.length === 0 ? (
+      {localPersistenceAvailable === false && (
+        <p className="hospital-panel-note evidence-history-unavailable" role="status" aria-live="polite" aria-atomic="true">
+          <strong>LOCAL_PERSISTENCE_UNAVAILABLE:</strong> Przeglądarka nie udostępnia trwałego local storage. Ten widok nie może potwierdzić zapisanej historii eksperymentów.
+        </p>
+      )}
+      {history.length === 0 && localPersistenceAvailable !== false ? (
         <p className="world-panel-empty">Brak zapisanych eksperymentów.</p>
-      ) : (
+      ) : history.length > 0 ? (
         <ul className="hotspot-list evidence-history">
           {history.map((entry) => (
             <li key={entry.experimentId} className={current?.record.caseId === entry.experimentId ? 'evidence-history-active' : ''}>
@@ -286,7 +295,7 @@ export function EvidenceReplayPanel() {
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
 
       {current && history.length > 1 && (
         <div className="evidence-compare">

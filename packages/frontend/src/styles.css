@@ -2199,6 +2199,16 @@ kbd {
 .earthquake-long-values { display: grid; gap: .36rem; margin: .46rem 0 0; }
 .earthquake-long-values div { display: grid; gap: .1rem; }
 .earthquake-long-values dd { margin: 0; color: #c5d3df; font-family: var(--font-mono); font-size: .59rem; line-height: 1.3; overflow-wrap: anywhere; }
+.earthquake-impact-details { padding-top: .45rem; border-top: 1px solid var(--glass-border); }
+.earthquake-impact-details summary { cursor: pointer; color: var(--text); font-size: .67rem; font-weight: 700; }
+.earthquake-impact-details > p { margin: .42rem 0; color: var(--text-muted); font-size: .62rem; line-height: 1.38; }
+.earthquake-impact-table-wrap { overflow-x: auto; border: 1px solid var(--glass-border); border-radius: .3rem; }
+.earthquake-impact-table { width: 100%; min-width: 30rem; border-collapse: collapse; font-family: var(--font-mono); font-size: .57rem; }
+.earthquake-impact-table th, .earthquake-impact-table td { padding: .32rem .36rem; border-bottom: 1px solid var(--glass-border); text-align: right; vertical-align: top; }
+.earthquake-impact-table th:first-child, .earthquake-impact-table td:first-child, .earthquake-impact-table th:nth-child(2), .earthquake-impact-table td:nth-child(2) { text-align: left; }
+.earthquake-impact-table th { color: var(--text-muted); font-size: .54rem; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
+.earthquake-impact-table td { color: #c5d3df; overflow-wrap: anywhere; }
+.earthquake-impact-table tbody tr:last-child td { border-bottom: 0; }
 .earthquake-not-modeled-details ul { margin: .45rem 0 0; padding-left: 1rem; color: #d6b7a2; font-size: .65rem; line-height: 1.38; }
 .earthquake-history-details { margin-top: .52rem; padding-top: .48rem; border-top: 1px solid var(--glass-border); }
 .earthquake-history-details summary { cursor: pointer; color: var(--text); font-size: .67rem; font-weight: 700; }

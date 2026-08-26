@@ -84,6 +84,7 @@ try {
   await evaluate(`(() => {
     const panel = document.querySelector('.earthquake-scenario-panel');
     panel?.querySelector('.earthquake-evidence-details summary')?.click();
+    panel?.querySelector('.earthquake-impact-details summary')?.click();
     panel?.querySelector('.earthquake-history-details summary')?.click();
     const rail = document.querySelector('.city-world-right');
     if (rail && panel) rail.scrollTop = Math.max(0, panel.offsetTop - 14);
@@ -103,6 +104,10 @@ try {
       scenarioSynthetic: /SCENARIO/.test(proof) && /SYNTHETIC/.test(proof),
       mappingVisible: /Mapping/.test(proof),
       evidenceHashVisible: /Evidence SHA-256/.test(proof),
+      modelDerivedImpactsVisible: /Model-derived impacts/.test(proof)
+        && /Read-only synthetic ground-shaking values/.test(proof)
+        && /Intensity [(]g[)]/.test(proof)
+        && /building damage/.test(proof),
       registryModuleVisible: /Registry module/.test(proof) && /earthquake/.test(proof) && /schema 1[.]0[.]0/.test(proof),
       capabilitiesVisible: /Declared capabilities/.test(proof) && /ground-motion-attenuation-synthetic/.test(proof),
       notModeledVisible: /NOT_MODELED/.test(proof),
@@ -184,6 +189,7 @@ try {
     active.scenarioSynthetic,
     active.mappingVisible,
     active.evidenceHashVisible,
+    active.modelDerivedImpactsVisible,
     active.registryModuleVisible,
     active.capabilitiesVisible,
     active.notModeledVisible,

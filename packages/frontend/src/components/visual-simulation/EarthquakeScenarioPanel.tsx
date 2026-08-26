@@ -362,6 +362,39 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
               </div>
             </dl>
           </details>
+          <details className="earthquake-impact-details">
+            <summary>Model-derived impacts ({execution.mapping.sites.length})</summary>
+            <p>
+              Read-only synthetic ground-shaking values from the completed ImpactResult. Display anchors are
+              not real facilities and values do not represent building damage.
+            </p>
+            <div className="earthquake-impact-table-wrap">
+              <table className="earthquake-impact-table">
+                <thead>
+                  <tr>
+                    <th>Fixture site</th>
+                    <th>Display anchor</th>
+                    <th>Severity</th>
+                    <th>Intensity (g)</th>
+                    <th>Uncertainty (g)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {execution.mapping.sites.map((site) => (
+                    <tr key={site.overlayId}>
+                      <td>{site.sourceSiteId}</td>
+                      <td>{site.targetCityWorldLocationId}</td>
+                      <td>{site.severity}</td>
+                      <td>{site.severityValue.toFixed(3)}</td>
+                      <td>
+                        {site.uncertaintyLow.toFixed(3)}–{site.uncertaintyHigh.toFixed(3)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
           <details className="earthquake-not-modeled-details">
             <summary>NOT_MODELED ({execution.projection.notModeled.length})</summary>
             <ul>

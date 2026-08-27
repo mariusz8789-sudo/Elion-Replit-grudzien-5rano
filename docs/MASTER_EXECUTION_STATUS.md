@@ -27,8 +27,8 @@ Every milestone must pass tests, TypeScript, lint, production build, Chromium sm
 
 | Area | Status | Decision |
 |---|---|---|
-| Formal Evidence Packs | PARTIAL | Current capsules honestly return `PROTOCOL_REQUIRED` unless a protocol exists. Do not fabricate packs. |
-| A/B and counterfactual UX | PARTIAL | Available only where two real, compatible runs exist; otherwise `VARIANT_REQUIRED`. |
+| Formal Evidence Packs | PARTIAL | Current capsules honestly return `PROTOCOL_REQUIRED` unless a protocol exists. Science Chat now opens the existing Evidence & Replay panel directly; do not fabricate packs. |
+| A/B and counterfactual UX | PARTIAL | Existing comparisons are available only where two real, compatible runs exist; Science Chat now exposes the Evidence/Replay surface, while missing variants remain `VARIANT_REQUIRED`. |
 | Science Chat visual proof for `#/hf-slice` | PARTIAL | Parser, confirmation and handoff are tested; one browser session lost its document during navigation. Repository smoke passes route sweep, but no screenshot claim is made from that session. |
 | Discovery Timeline | NOT A SOLVER | Keep as narrative visualization until a separately bounded model contract exists. |
 | Wormholes, grandfather paradox, physical time travel | PARKED | Unsupported or hypothetical; keep outside real solver path. |
@@ -38,8 +38,8 @@ Every milestone must pass tests, TypeScript, lint, production build, Chromium sm
 
 ## Current LIVE HEAD
 
-The latest published code commit is `62ab2a1` on `manus/high-fidelity-epidemic-digital-twin`. The latest CI for that commit is `33036646311` and is green. The preceding visual-proof report is `b40b914`; bounded capability commits include `39ebcf3` (Schwarzschild radius), `b3dbe3e` (galaxy rotation curve), and `cd7087f` (galaxy collision), all published to the same LIVE branch with green CI. Subsequent docs and bounded capability commits must update this section when published.
+The latest published code commit is `460c5cf` on `manus/high-fidelity-epidemic-digital-twin`. The latest CI for that commit is `33037107942` and is green. The preceding ontology audit is `62ab2a1`, visual-proof report is `b40b914`, and bounded capability commits include `39ebcf3` (Schwarzschild radius), `b3dbe3e` (galaxy rotation curve), and `cd7087f` (galaxy collision), all published to the same LIVE branch with green CI. Subsequent docs and bounded capability commits must update this section when published.
 
 ## Next CTO gate
 
-The visual-proof pass is complete for the current LIVE build. The next work item is the smallest real product gap: protocol UX for formal Evidence Packs and explicit A/B variants over existing real runs. Do not add another solver until this shared discovery path is easier to execute and inspect. Any further scientific integration must again answer: Does an existing real model already exist? Does the parser and router expose it? Does confirmation preserve one result and provenance? Is there an honest visualization or lab route? Can the limitations be shown to the user? If any answer is no, document the blocker rather than creating a parallel framework.
+The visual-proof pass and the first Evidence/Replay entry point are complete. The next work item is to expose an explicit protocol designer over the existing `designScientificExperiment` / `executeScientificExperiment` modules only if a minimal UX can preserve real-run provenance, repeatability, and honest incomplete states. Do not add another solver, router, renderer, or world. Any further scientific integration must again answer: Does an existing real model already exist? Does the parser and router expose it? Does confirmation preserve one result and provenance? Is there an honest visualization or lab route? Can the limitations be shown to the user? If any answer is no, document the blocker rather than creating a parallel framework.

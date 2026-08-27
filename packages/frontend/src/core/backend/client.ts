@@ -462,7 +462,7 @@ export type ComputeValue = string | number | boolean;
 
 export interface ComputeRun {
   runId: string; modelId: string; modelName?: string; modelVersion: string; domain: string; engine?: string;
-  status: 'ok' | 'rejected' | 'error'; outputs?: Record<string, ComputeValue>; units?: Record<string, string>;
+  status: 'ok' | 'rejected' | 'error'; inputs?: Record<string, ComputeValue>; outputs?: Record<string, ComputeValue>; units?: Record<string, string>;
   warnings?: string[]; validity?: string; assumptions?: string[]; deterministic?: boolean;
   provenance?: {
     source: string; formula: string; honesty: string; engine?: string; requiredEnvironmentVariable?: string;

@@ -729,6 +729,15 @@ describe('backend Evidence-Guided execution', () => {
     await expect(confirmBackendEvidenceGuidedExperiment(reviewed)).rejects.toThrow('model identity or version');
   });
 
+  it('blocks a backend response whose echoed basis or geometry differs from the reviewed plan', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse({
+      contractVersion: '1.0.0', request: {},
+      run: { ...pyscfRun, inputs: { bondLengthAngstrom: 0.75, basis: '6-31g' } }, persisted: false,
+    })));
+    const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Uruchom PySCF RHF dla H2; długość wiązania 0.74 Å.'));
+    await expect(confirmBackendEvidenceGuidedExperiment(reviewed)).rejects.toThrow('input bondLengthAngstrom different');
+  });
+
   it('keeps the plan without a result when the backend reports a blocked runtime', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse({ error: 'BLOCKED_BY_RUNTIME', message: 'PyMeep runtime is not configured.' }, 400)));
     const reviewed = planEvidenceGuidedExperiment(parseScienceChatMessage('Uruchom Meep FDTD dla granicy dielektrycznej.'));

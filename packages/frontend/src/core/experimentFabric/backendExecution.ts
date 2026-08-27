@@ -57,6 +57,11 @@ function resultFromBackend(plan: EvidenceGuidedExperimentPlan, backendRun: Compu
   if (!model || backendRun.modelId !== model.id || backendRun.modelVersion !== model.modelVersion) {
     throw new Error('Backend returned a model identity or version different from the reviewed plan.');
   }
+  for (const [key, expectedValue] of Object.entries(plan.request.parameters)) {
+    if (backendRun.inputs !== undefined && backendRun.inputs[key] !== expectedValue) {
+      throw new Error(`Backend returned input ${key} different from the reviewed plan; execution is blocked.`);
+    }
+  }
   if (!backendRun.provenance?.engine) {
     throw new Error('Backend did not provide engine provenance for the reviewed plan.');
   }

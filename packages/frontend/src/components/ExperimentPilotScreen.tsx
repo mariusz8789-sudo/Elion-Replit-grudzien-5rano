@@ -119,6 +119,7 @@ export function ExperimentPilotScreen() {
       return;
     }
     setInputMode('protocol');
+    setModelId(stored.pack.protocol.hypothesis.modelId);
     setProtocolDesign(stored.pack.protocol);
     setReplayReferencePack(stored.pack);
     setReplayVerdict(null);

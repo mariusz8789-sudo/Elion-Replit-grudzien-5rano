@@ -1181,6 +1181,15 @@ describe('Genesis Experiment Fabric', () => {
     expect(localAttempt.result.outputs).toEqual({});
   });
 
+  it('keeps unsupported time-travel claims outside the real solver path', () => {
+    const request = parseScienceChatMessage('Zbuduj fizyczny wehikuł czasu do podróży w przeszłość.');
+    expect(request.modelId).toBeUndefined();
+    expect(request.domainId).toBe('unknown');
+    const run = runExperiment(request);
+    expect(run.result.status).not.toBe('completed');
+    expect(run.result.outputs).toEqual({});
+  });
+
   it('routes a bounded Minkowski request through Science Chat and the existing deterministic Fabric executor', () => {
     const request = parseScienceChatMessage('Pokaż diagram Minkowskiego beta=0.5.');
     expect(request.domainId).toBe('spacetime-einstein');

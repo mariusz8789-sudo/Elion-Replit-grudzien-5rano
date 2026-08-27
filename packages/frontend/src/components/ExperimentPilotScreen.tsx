@@ -20,9 +20,12 @@ import {
   createScientificEvidencePack,
   serializeScientificEvidencePack,
   serializeEvidencePackRoCrate,
+  compareCounterfactual,
+  type CounterfactualComparison,
   type ScientificExperimentDesign,
   type ScientificEvidenceChain,
 } from '../core/experimentFabric';
+import { canonicalJson } from '../core/events/hash';
 import { confirmBackendEvidenceGuidedExperiment } from '../core/experimentFabric/backendExecution';
 import { buildStructuredRequestFromModel } from '../core/experimentFabric/structuredRequestBuilder';
 import { track } from '../core/analytics';
@@ -92,6 +95,10 @@ export function ExperimentPilotScreen() {
   const [protocolTolerance, setProtocolTolerance] = useState('');
   const [protocolDesign, setProtocolDesign] = useState<ScientificExperimentDesign | null>(null);
   const [protocolEvidence, setProtocolEvidence] = useState<ScientificEvidenceChain | null>(null);
+  // A/B over arms the executed protocol already produced — see handleCompareArms.
+  const [armA, setArmA] = useState(0);
+  const [armB, setArmB] = useState(1);
+  const [comparison, setComparison] = useState<CounterfactualComparison | null>(null);
   const [protocolAdvice, setProtocolAdvice] = useState<ReturnType<typeof explainScientificEvidence> | null>(null);
 
   const selectedModel = modelId ? getRouterModel(modelId) : undefined;
@@ -168,6 +175,14 @@ export function ExperimentPilotScreen() {
     try {
       const evidence = executeScientificExperiment(protocolDesign);
       setProtocolEvidence(evidence);
+      // Default the variant to the first arm whose parameters actually differ.
+      // Repetitions of the same arm are adjacent, so a naive index+1 default
+      // would open on a Δ 0 self-comparison that teaches the user nothing.
+      setArmA(0);
+      const firstDifferent = evidence.allRuns.findIndex((run) =>
+        canonicalJson(run.request.parameters) !== canonicalJson(evidence.allRuns[0]?.request.parameters));
+      setArmB(firstDifferent > 0 ? firstDifferent : Math.min(1, evidence.allRuns.length - 1));
+      setComparison(null);
       setProtocolAdvice(explainScientificEvidence(evidence));
       setPhase('ran');
     } catch (e) {
@@ -261,6 +276,40 @@ export function ExperimentPilotScreen() {
   function handleVerifyReplay() {
     if (!capsule) return;
     setReplay(replayScenarioCapsule(capsule));
+  }
+
+  /**
+   * A/B over two arms of the executed protocol.
+   *
+   * `compareCounterfactual` was, like the Evidence Pack, implemented and tested
+   * but had no UI caller — its only production use is inside
+   * `replayScenarioCapsule`, which is unreachable here because the Pilot builds
+   * capsules with a `baselineRun` only and never a `variantRun`. That is what
+   * "A/B and counterfactual UX: PARTIAL" describes.
+   *
+   * The protocol run already produced several real runs of the SAME registered
+   * model differing in the preregistered swept parameter — exactly the
+   * controlled pair the comparison contract expects. This passes their stored
+   * canonical requests straight to the existing function; it adds no comparison
+   * logic, no metric maths and no provenance of its own. A non-COMPLETED status
+   * (model mismatch, incomplete run, no shared numeric metrics) is rendered as
+   * that status, never smoothed into a delta.
+   */
+  function handleCompareArms() {
+    if (!protocolEvidence) return;
+    const runs = protocolEvidence.allRuns;
+    const baseline = runs[armA];
+    const variant = runs[armB];
+    if (!baseline || !variant || armA === armB) return;
+    try {
+      setComparison(compareCounterfactual({
+        baseline: baseline.request,
+        variant: variant.request,
+        labels: { baseline: `arm ${armA + 1} · ${baseline.runId.slice(0, 8)}`, variant: `arm ${armB + 1} · ${variant.runId.slice(0, 8)}` },
+      }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   }
 
   function handleReset() {
@@ -376,6 +425,50 @@ export function ExperimentPilotScreen() {
           <dl className="pilot-outputs">{protocolEvidence.arms.map((arm) => <div key={arm.armId} className="pilot-output-row"><dt>{arm.kind} · {arm.armId}</dt><dd>{arm.outputValues.join(' / ')} {arm.units} · {arm.reproduction}</dd></div>)}</dl>
           <dl className="pilot-provenance"><div><dt>evidenceId</dt><dd className="mono">{protocolEvidence.evidenceId}</dd></div><div><dt>runs</dt><dd>{protocolEvidence.allRuns.length} · createdFromRealRunsOnly=true</dd></div><div><dt>provenance</dt><dd className="mono">{protocolEvidence.provenanceFingerprint}</dd></div></dl>
           <div className="pilot-actions"><button className="chip-btn pilot-primary" onClick={handleExportProtocolEvidence}>⬇ Evidence Pack JSON</button><button className="chip-btn" onClick={handleExportProtocolRoCrate}>⬇ RO-Crate JSON-LD</button></div>
+          {protocolEvidence.allRuns.length > 1 && (
+            <div className="pilot-ab-panel">
+              <h3>A/B — porównanie dwóch ramion tego protokołu</h3>
+              <div className="pilot-actions">
+                <label>Baseline
+                  <select value={armA} onChange={(e) => setArmA(Number(e.currentTarget.value))}>
+                    {protocolEvidence.allRuns.map((r, i) => <option key={r.runId} value={i}>arm {i + 1} · {r.runId.slice(0, 8)}</option>)}
+                  </select>
+                </label>
+                <label>Wariant
+                  <select value={armB} onChange={(e) => setArmB(Number(e.currentTarget.value))}>
+                    {protocolEvidence.allRuns.map((r, i) => <option key={r.runId} value={i}>arm {i + 1} · {r.runId.slice(0, 8)}</option>)}
+                  </select>
+                </label>
+                <button className="chip-btn" onClick={handleCompareArms} disabled={armA === armB}>Porównaj A/B</button>
+              </div>
+              {comparison && (
+                <div className="pilot-ab-result">
+                  <span className={`honesty ${comparison.status === 'COMPLETED' ? 'simplified' : 'theoretical'}`}>{comparison.status}</span>
+                  {comparison.status !== 'COMPLETED'
+                    ? <p className="pilot-summary">Porównanie nie zostało wykonane. {comparison.validationErrors.join(' ')}</p>
+                    : (
+                      <>
+                        <dl className="pilot-provenance">
+                          <div><dt>model</dt><dd>{comparison.model?.modelId} · {comparison.model?.engine}</dd></div>
+                          <div><dt>seed</dt><dd>{comparison.seedControl.status}</dd></div>
+                          <div><dt>fingerprints</dt><dd className="mono">{comparison.evidence?.baselineRunFingerprint} → {comparison.evidence?.variantRunFingerprint}</dd></div>
+                        </dl>
+                        <dl className="pilot-outputs">
+                          {comparison.parameterDifferences.filter((d) => d.changed).map((d) => (
+                            <div key={d.key} className="pilot-output-row"><dt>Δ parametr · {d.key}</dt><dd>{String(d.baseline)} → {String(d.variant)}</dd></div>
+                          ))}
+                          {comparison.metrics.map((m) => (
+                            <div key={m.key} className="pilot-output-row"><dt>{m.key} {m.unit}</dt><dd>{m.baseline} → {m.variant} · Δ {m.absoluteDelta}{m.relativeDeltaStatus === 'AVAILABLE' ? ` (${m.relativeDeltaPercent}%)` : ' (baseline = 0)'}</dd></div>
+                          ))}
+                        </dl>
+                      </>
+                    )}
+                  <p className="pilot-summary">{comparison.disclaimer}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <p className="pilot-summary">Pakiet jest wierną projekcją wykonanych runów tego protokołu; nie dodaje interpretacji, nie tworzy wariantu i nie jest odkryciem naukowym.</p>
           {protocolAdvice && <div className="pilot-why-panel"><h3>WHY / NEXT EXPERIMENT</h3><p className="pilot-summary">{protocolAdvice.why}</p><p><strong>Baza dowodu:</strong> {protocolAdvice.evidenceBasis.join(' · ')}</p><ul className="pilot-limitations">{protocolAdvice.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul><p><strong>Następny bounded krok:</strong> {protocolAdvice.nextExperiment.action}</p><p><strong>Parametr:</strong> <code>{protocolAdvice.nextExperiment.parameter}</code> · {protocolAdvice.nextExperiment.rationale}</p><span className="honesty theoretical">AUTO-RUN: DISABLED</span></div>}
         </section>
       )}

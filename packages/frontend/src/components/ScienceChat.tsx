@@ -120,6 +120,7 @@ const SUGGESTIONS = [
   'Oblicz energię relatywistyczną cząstki beta=0.8',
   'Pokaż życie gwiazdy o masie 10 masy Słońca',
   'Obróć tesserakt: XW=45, YZ=30, podwójna rotacja',
+  'Pokaż zderzenie galaktyk: stosunek mas=1.25, 24 mln lat',
   'Zbadaj problem trzech ciał',
   'Zwiększ masę 2×',
   'Co się zmieniło?',

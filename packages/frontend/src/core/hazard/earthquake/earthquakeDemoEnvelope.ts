@@ -25,7 +25,7 @@ import { ImmutableConflictError, InMemoryHazardProvenanceStore, type HazardProve
 import type { HazardRun } from '../contracts';
 import { earthquakeEvaluator } from './earthquakeEvaluator';
 import { buildHazardEvidencePack, type HazardEvidencePack } from './earthquakeEvidence';
-import { runEarthquakeScenario, type EarthquakeScenarioResult, type EarthquakeScenarioSpec } from './earthquakeScenario';
+import { runEarthquakeScenario, verifyDerivedLayerDeterminism, type EarthquakeScenarioResult, type EarthquakeScenarioSpec } from './earthquakeScenario';
 import { validateEarthquakeScenarioSpec } from './earthquakeScenarioValidation';
 import { projectEarthquakeWorldState, type EarthquakeWorldStateView } from './earthquakeWorldProjection';
 
@@ -34,7 +34,8 @@ export type EarthquakeDemoEnvelopeBlockCode =
   | 'PROVENANCE_CONFLICT'
   | 'REGISTRY_INCOMPATIBLE'
   | 'EVIDENCE_INCOMPLETE'
-  | 'REPLAY_NOT_MATCH';
+  | 'REPLAY_NOT_MATCH'
+  | 'DERIVED_LAYER_DRIFT';
 
 export interface EarthquakeDemoProvenance {
   readonly artifactId: string;
@@ -151,6 +152,17 @@ export async function buildEarthquakeDemoEnvelope(
   });
   if (replay.status !== 'MATCH') {
     return blocked('REPLAY_NOT_MATCH', `replay returned ${replay.status}, not MATCH: ${replay.differences.join('; ')}`, {
+      moduleDescriptor: descriptor, scenario: result, run: result.run, evidence: evidencePack, replay,
+    });
+  }
+
+  // The HazardRun MATCH above only proves the run's own output is reproducible.
+  // The Impact/DamageAssessment projection layer is a separate pure function this
+  // envelope is responsible for proving deterministic too, before handing a READY
+  // envelope's projection to any consumer.
+  const derivedLayerCheck = await verifyDerivedLayerDeterminism(result);
+  if (!derivedLayerCheck.matches) {
+    return blocked('DERIVED_LAYER_DRIFT', `impact/damage projection did not reproduce deterministically: ${derivedLayerCheck.differences.join('; ')}`, {
       moduleDescriptor: descriptor, scenario: result, run: result.run, evidence: evidencePack, replay,
     });
   }

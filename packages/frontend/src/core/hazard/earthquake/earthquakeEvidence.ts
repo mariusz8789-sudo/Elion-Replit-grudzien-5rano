@@ -14,7 +14,7 @@ import { canonicalJson } from '../../events/hash';
 import { sha256Hex } from '../../discovery/evidenceCrypto';
 import { checkHazardInputAdmission, checkHazardRunAdmission, checkSourceArtifactAdmission } from '../hazardEvidenceGate';
 import type { EarthquakeScenarioResult } from './earthquakeScenario';
-import type { ExposureSnapshot, ImpactResult } from '../contracts';
+import type { DamageAssessment, ExposureSnapshot, ImpactResult } from '../contracts';
 
 export interface HazardEvidencePack {
   readonly hazardRunId: string;
@@ -51,6 +51,27 @@ function checkImpactsAdmission(impacts: readonly ImpactResult[]): readonly strin
   return missing;
 }
 
+/**
+ * A `DamageAssessment` that omits `notModeledReason` or `requiredData` would
+ * let a downstream consumer treat absence of damage data as "not applicable"
+ * rather than "explicitly not modeled" — exactly the silent gap this gate
+ * exists to close, mirroring `checkImpactsAdmission` above.
+ */
+function checkDamageAssessmentsAdmission(damageAssessments: readonly DamageAssessment[]): readonly string[] {
+  const missing: string[] = [];
+  if (!damageAssessments || damageAssessments.length === 0) {
+    missing.push('damageAssessments');
+    return missing;
+  }
+  damageAssessments.forEach((assessment, i) => {
+    if (assessment.status !== 'NOT_MODELED') missing.push(`damageAssessments[${i}].status`);
+    if (!assessment.notModeledReason) missing.push(`damageAssessments[${i}].notModeledReason`);
+    if (!assessment.requiredData || assessment.requiredData.length === 0) missing.push(`damageAssessments[${i}].requiredData`);
+    if (!assessment.datasetStatus) missing.push(`damageAssessments[${i}].datasetStatus`);
+  });
+  return missing;
+}
+
 export async function buildHazardEvidencePack(result: EarthquakeScenarioResult): Promise<HazardEvidencePack> {
   const missingFields = [
     ...checkSourceArtifactAdmission(result.artifact).missingFields.map((f) => `artifact.${f}`),
@@ -58,6 +79,7 @@ export async function buildHazardEvidencePack(result: EarthquakeScenarioResult):
     ...checkHazardRunAdmission(result.run).missingFields.map((f) => `run.${f}`),
     ...checkExposureAdmission(result.exposure),
     ...checkImpactsAdmission(result.impacts),
+    ...checkDamageAssessmentsAdmission(result.damageAssessments),
   ];
 
   // generatedAt is metadata about WHEN the pack was built, not part of what it

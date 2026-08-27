@@ -216,7 +216,7 @@ check('replay nieznanego runId daje NOT_REPRODUCIBLE', actual.notReproducibleSta
 check('kompletny przebieg przechodzi bramkę admisji Phase 0 bez zmian', actual.admissionAllPassed === true);
 check('Evidence Pack jest kompletny i ma prawdziwy SHA-256', actual.evidenceMissingFields.length === 0 && /^[0-9a-f]{64}$/.test(actual.evidenceSha256) && actual.evidenceHazardType === 'earthquake', JSON.stringify(actual.evidenceMissingFields));
 check('SHA-256 tego samego pakietu policzony dwa razy daje ten sam wynik (funkcja skrótu jest deterministyczna)', actual.evidenceSha256 === actual.evidenceSha256Repeated, `${actual.evidenceSha256} vs ${actual.evidenceSha256Repeated}`);
-check('projekcja Digital Twin jest wersjonowana i deklaruje notModeled', actual.projectionSchemaVersion === '1.0.0' && actual.projectionSiteCount === actual.impactCount && actual.projectionNotModeledCount > 0, JSON.stringify(actual));
+check('projekcja Digital Twin jest wersjonowana i deklaruje notModeled', actual.projectionSchemaVersion === '1.1.0' && actual.projectionSiteCount === actual.impactCount && actual.projectionNotModeledCount > 0, JSON.stringify(actual));
 
 // Najmocniejszy dowód: identyczne odciski w Node i w przeglądarce.
 // evidenceSha256 is deliberately excluded here: it hashes the full result,

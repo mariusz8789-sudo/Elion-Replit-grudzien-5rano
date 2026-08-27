@@ -9,13 +9,14 @@ import {
 import type { EarthquakeWorldStateView } from '../core/hazard/earthquake/earthquakeWorldProjection';
 
 const projection: EarthquakeWorldStateView = {
-  schemaVersion: '1.0.0',
+  schemaVersion: '1.1.0',
   hazardRunId: 'hazard-run-fixture',
   hazardModuleVersion: 'earthquake-scenario-v1',
   generatedAt: 1,
   epicenter: { x: 0, y: 0 },
   magnitude: 5.4,
   notModeled: ['casualties'],
+  damageAssessments: [],
   sites: [
     { siteId: 'site-alpha', assetLabel: 'Fixture Alpha', x: 2, y: 1, severity: 'SEVERE', severityValue: 0.8, uncertaintyLow: 0.7, uncertaintyHigh: 0.9, datasetStatus: 'SCENARIO' },
     { siteId: 'site-bravo', assetLabel: 'Fixture Bravo', x: -3, y: 2, severity: 'MODERATE', severityValue: 0.5, uncertaintyLow: 0.4, uncertaintyHigh: 0.6, datasetStatus: 'SCENARIO' },

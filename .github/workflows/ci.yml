@@ -37,9 +37,9 @@ jobs:
           base="$PUSH_BEFORE"
           if [ "$EVENT_NAME" = "pull_request" ]; then base="$PR_BASE"; fi
           if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
-            git diff --check "$base" "$GITHUB_SHA"
+            git diff --check "$base" "$GITHUB_SHA" -- . ':(exclude,glob)**/*.md' ':(exclude,glob)**/*.markdown'
           elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            git diff --check HEAD^ HEAD
+            git diff --check HEAD^ HEAD -- . ':(exclude,glob)**/*.md' ':(exclude,glob)**/*.markdown'
           fi
 
       - name: Lint

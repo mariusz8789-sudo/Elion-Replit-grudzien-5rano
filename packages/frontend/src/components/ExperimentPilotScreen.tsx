@@ -22,11 +22,14 @@ import {
   createScientificEvidencePack,
   saveScientificEvidencePack,
   getScientificEvidencePack,
+  compareScientificEvidencePacks,
   serializeScientificEvidencePack,
   serializeEvidencePackRoCrate,
   analyseExperimentSeries,
   type ScientificExperimentDesign,
   type ScientificEvidenceChain,
+  type ScientificEvidencePack,
+  type ScientificEvidenceReplayVerdict,
 } from '../core/experimentFabric';
 import { confirmBackendEvidenceGuidedExperiment } from '../core/experimentFabric/backendExecution';
 import { buildStructuredRequestFromModel } from '../core/experimentFabric/structuredRequestBuilder';
@@ -101,6 +104,8 @@ export function ExperimentPilotScreen() {
   const [protocolDesign, setProtocolDesign] = useState<ScientificExperimentDesign | null>(null);
   const [protocolEvidence, setProtocolEvidence] = useState<ScientificEvidenceChain | null>(null);
   const [protocolAdvice, setProtocolAdvice] = useState<ReturnType<typeof explainScientificEvidence> | null>(null);
+  const [replayReferencePack, setReplayReferencePack] = useState<ScientificEvidencePack | null>(null);
+  const [replayVerdict, setReplayVerdict] = useState<ScientificEvidenceReplayVerdict | null>(null);
 
   const selectedModel = modelId ? getRouterModel(modelId) : undefined;
 
@@ -115,6 +120,8 @@ export function ExperimentPilotScreen() {
     }
     setInputMode('protocol');
     setProtocolDesign(stored.pack.protocol);
+    setReplayReferencePack(stored.pack);
+    setReplayVerdict(null);
     setProtocolEvidence(null);
     setProtocolAdvice(null);
     setPhase('planned');
@@ -199,7 +206,9 @@ export function ExperimentPilotScreen() {
         ? await executeScientificBackendExperiment(protocolDesign)
         : executeScientificExperiment(protocolDesign);
       setProtocolEvidence(evidence);
-      saveScientificEvidencePack(createScientificEvidencePack(evidence));
+      const pack = createScientificEvidencePack(evidence);
+      saveScientificEvidencePack(pack);
+      setReplayVerdict(replayReferencePack ? compareScientificEvidencePacks(replayReferencePack, pack) : null);
       setProtocolAdvice(explainScientificEvidence(evidence));
       setPhase('ran');
     } catch (e) {
@@ -409,6 +418,7 @@ export function ExperimentPilotScreen() {
           <div className="pilot-disclosure"><span className={`honesty ${protocolEvidence.assessment.assessment === 'SUPPORTED_WITHIN_PROTOCOL' ? 'simplified' : 'theoretical'}`}>{protocolEvidence.assessment.assessment}</span><p className="pilot-summary">{protocolEvidence.assessment.message}</p></div>
           <dl className="pilot-outputs">{protocolEvidence.arms.map((arm) => <div key={arm.armId} className="pilot-output-row"><dt>{arm.kind} · {arm.armId}</dt><dd>{arm.outputValues.join(' / ')} {arm.units} · {arm.reproduction}</dd></div>)}</dl>
           <dl className="pilot-provenance"><div><dt>evidenceId</dt><dd className="mono">{protocolEvidence.evidenceId}</dd></div><div><dt>runs</dt><dd>{protocolEvidence.allRuns.length} · createdFromRealRunsOnly=true</dd></div><div><dt>provenance</dt><dd className="mono">{protocolEvidence.provenanceFingerprint}</dd></div></dl>
+          {replayReferencePack && replayVerdict && <div className="pilot-disclosure"><span className={`honesty ${replayVerdict === 'MATCH' ? 'simplified' : 'theoretical'}`}>REPLAY {replayVerdict}</span><p className="pilot-summary">Porównanie nowego jawnie uruchomionego packa z lokalnym snapshotem referencyjnym. Identyfikatory backend runów nie są kryterium MATCH.</p></div>}
           <div className="pilot-actions"><button className="chip-btn pilot-primary" onClick={handleExportProtocolEvidence}>⬇ Evidence Pack JSON</button><button className="chip-btn" onClick={handleExportProtocolRoCrate}>⬇ RO-Crate JSON-LD</button></div>
           {protocolAdvice && <div className="pilot-why-panel"><h3>WHY / NEXT EXPERIMENT</h3><p className="pilot-summary">{protocolAdvice.why}</p><p><strong>Baza dowodu:</strong> {protocolAdvice.evidenceBasis.join(' · ')}</p><ul className="pilot-limitations">{protocolAdvice.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul><p><strong>Następny bounded krok:</strong> {protocolAdvice.nextExperiment.action}</p><p><strong>Parametr:</strong> <code>{protocolAdvice.nextExperiment.parameter}</code> · {protocolAdvice.nextExperiment.rationale}</p><span className="honesty theoretical">AUTO-RUN: DISABLED</span></div>}
           {protocolSeriesAnalysis && <div className="pilot-why-panel" data-testid="experiment-series-analysis"><h3>SERIES OBSERVATION · NOT A DISCOVERY</h3><p><strong>Status:</strong> {protocolSeriesAnalysis.findings.length > 0 ? protocolSeriesAnalysis.findings[0].verdict : 'NO_THRESHOLD_FINDING'}</p><p><strong>Parametr:</strong> <code>{protocolSeriesAnalysis.parameterKey}</code> · <strong>Wynik:</strong> <code>{protocolSeriesAnalysis.outputKey}</code></p>{protocolSeriesAnalysis.findings.length === 0 ? <p className="pilot-summary">Nie zaobserwowano korelacji przekraczającej próg w tej serii. To nie jest dowód braku zależności ani wynik negatywny.</p> : <ul className="pilot-limitations">{protocolSeriesAnalysis.findings.map((finding) => <li key={`${finding.kind}-${finding.runIds.join('-')}`}>{finding.message} <span className="mono">[{finding.runIds.join(', ')}]</span></li>)}</ul>}<p className="pilot-disclaimer">{protocolSeriesAnalysis.disclaimer} Model: {protocolSeriesAnalysis.modelId ?? 'brak porównywalnego modelu'}.</p></div>}

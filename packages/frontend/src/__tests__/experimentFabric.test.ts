@@ -37,6 +37,7 @@ import {
   buildCapabilityAdmissionMatrix,
   assertCapabilityAdmissionMatrix,
   serializeCapabilityAdmissionMatrix,
+  compareScientificEvidencePacks,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -256,6 +257,20 @@ describe('Genesis Experiment Fabric', () => {
     expect(pack.reproducibility.allArmsMatched).toBe(true);
     expect(pack.runs.every((run) => run.provenance.resultOrigin === 'real-engine')).toBe(true);
     expect(JSON.parse(serializeScientificEvidencePack(pack)).evidencePackId).toBe(pack.evidencePackId);
+  });
+
+  it('classifies persisted Evidence Pack replay as MATCH, DRIFT or BLOCKED without using volatile run IDs', () => {
+    const baselineRequest = parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.');
+    const design = designScientificExperiment({
+      hypothesis: { statement: 'Promień rośnie wraz z masą.', domainId: 'spacetime-einstein', modelId: 'einstein-schwarzschild', declaredAssumptions: [], falsification: { metric: 'radiusKm', relation: 'monotonic-increase', rationale: 'Test comparatora.' } },
+      baselineRequest, sweep: { parameter: 'massSolar', values: [1, 2], label: 'Masa M☉' }, repetitionsPerArm: 1,
+    });
+    const pack = createScientificEvidencePack(executeScientificExperiment(design));
+    expect(compareScientificEvidencePacks(pack, pack)).toBe('MATCH');
+    const drift = { ...pack, runs: pack.runs.map((run, index) => index === 0 ? { ...run, provenance: { ...run.provenance, runFingerprint: 'tampered' } } : run) };
+    expect(compareScientificEvidencePacks(pack, drift)).toBe('DRIFT');
+    const blocked = { ...pack, runs: pack.runs.map((run, index) => index === 0 ? { ...run, status: 'failed' as const } : run) };
+    expect(compareScientificEvidencePacks(pack, blocked)).toBe('BLOCKED');
   });
 
   it('exports only a real Evidence Pack as deterministic RO-Crate JSON-LD with PROV relations', () => {

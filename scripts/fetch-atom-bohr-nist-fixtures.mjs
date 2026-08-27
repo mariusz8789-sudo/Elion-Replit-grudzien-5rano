@@ -95,7 +95,7 @@ for (const item of artifacts) {
       throw new Error(`${item.id}: payload missing required marker ${marker}; bytes=${raw.byteLength}; preview=${preview}`);
     }
   }
-  if (item.id === 'A4-nist-srd-terms' && /(?:^|["'\\s])pk\\.[A-Za-z0-9_-]+/.test(text)) {
+  if (item.id === 'A4-nist-srd-terms' && /pk[.][A-Za-z0-9_-]+/.test(text)) {
     throw new Error('A4-nist-srd-terms: official terms payload contains an embedded access token; refusing to write or upload it');
   }
   const sha256 = createHash('sha256').update(raw).digest('hex');

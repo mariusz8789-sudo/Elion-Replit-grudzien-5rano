@@ -14,6 +14,10 @@ import {
   type ReproducibleScenarioCapsule,
   type ScenarioCapsuleReplay,
   type ExperimentValue,
+  designScientificExperiment,
+  executeScientificExperiment,
+  type ScientificExperimentDesign,
+  type ScientificEvidenceChain,
 } from '../core/experimentFabric';
 import { confirmBackendEvidenceGuidedExperiment } from '../core/experimentFabric/backendExecution';
 import { buildStructuredRequestFromModel } from '../core/experimentFabric/structuredRequestBuilder';
@@ -61,7 +65,7 @@ function downloadJson(filename: string, content: string): void {
 
 export function ExperimentPilotScreen() {
   const models = useMemo(() => listRouterModels(), []);
-  const [inputMode, setInputMode] = useState<'structured' | 'freeText'>('structured');
+  const [inputMode, setInputMode] = useState<'structured' | 'freeText' | 'protocol'>('structured');
   const [modelId, setModelId] = useState<string>(() => (getRouterModel('epidemic-city') ? 'epidemic-city' : models[0]?.id ?? ''));
   const [paramInputs, setParamInputs] = useState<Record<string, string>>({});
   const [freeText, setFreeText] = useState('');
@@ -74,6 +78,16 @@ export function ExperimentPilotScreen() {
   const [replay, setReplay] = useState<ScenarioCapsuleReplay | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [protocolStatement, setProtocolStatement] = useState('Zmienność parametru wpływa na wynik modelu w sposób zgodny z kryterium.');
+  const [protocolParameter, setProtocolParameter] = useState('');
+  const [protocolMetric, setProtocolMetric] = useState('');
+  const [protocolValues, setProtocolValues] = useState('');
+  const [protocolRepetitions, setProtocolRepetitions] = useState('2');
+  const [protocolRelation, setProtocolRelation] = useState<'greater-than' | 'less-than' | 'equal-within-tolerance' | 'monotonic-increase' | 'monotonic-decrease'>('greater-than');
+  const [protocolExpectedValue, setProtocolExpectedValue] = useState('');
+  const [protocolTolerance, setProtocolTolerance] = useState('');
+  const [protocolDesign, setProtocolDesign] = useState<ScientificExperimentDesign | null>(null);
+  const [protocolEvidence, setProtocolEvidence] = useState<ScientificEvidenceChain | null>(null);
 
   const selectedModel = modelId ? getRouterModel(modelId) : undefined;
 
@@ -81,7 +95,77 @@ export function ExperimentPilotScreen() {
     setConfirmed(null);
     setCapsule(null);
     setReplay(null);
+    setProtocolDesign(null);
+    setProtocolEvidence(null);
     setError(null);
+  }
+
+  function buildBaselineRequest() {
+    if (!selectedModel) throw new Error('Wybierz model przed zbudowaniem protokołu.');
+    return buildStructuredRequestFromModel(
+      selectedModel,
+      Object.fromEntries(
+        Object.entries(paramInputs)
+          .filter(([, v]) => v.trim() !== '')
+          .map(([k, v]): [string, ExperimentValue] => {
+            const spec = selectedModel.parameters.find((p) => p.id === k);
+            if (spec?.type === 'number') return [k, Number(v)];
+            if (spec?.type === 'boolean') return [k, v === 'true'];
+            return [k, v];
+          }),
+      ),
+      { seed: seedInput.trim() ? Number(seedInput) : undefined },
+    );
+  }
+
+  function handleBuildProtocol() {
+    setError(null);
+    setProtocolEvidence(null);
+    try {
+      const baselineRequest = buildBaselineRequest();
+      if (!baselineRequest.modelId) throw new Error('Wybrany model nie ma identyfikatora wykonawczego.');
+      if (!protocolMetric.trim()) throw new Error('Podaj dokładny output key metryki z wyniku modelu.');
+      const values = protocolValues.split(',').map((value) => value.trim()).filter(Boolean).map((value) => Number(value));
+      if (values.some((value) => !Number.isFinite(value))) throw new Error('Sweep musi zawierać liczby oddzielone przecinkami.');
+      if (!protocolParameter) throw new Error('Wybierz parametr sweepu.');
+      const criterion = {
+        metric: protocolMetric.trim(),
+        relation: protocolRelation,
+        ...(protocolExpectedValue.trim() ? { expectedValue: Number(protocolExpectedValue) } : {}),
+        ...(protocolTolerance.trim() ? { tolerance: Number(protocolTolerance) } : {}),
+        rationale: 'Kryterium zostało zadeklarowane przed wykonaniem armów.',
+      } as const;
+      const built = designScientificExperiment({
+        hypothesis: {
+          statement: protocolStatement.trim(),
+          domainId: baselineRequest.domainId,
+          modelId: baselineRequest.modelId,
+          declaredAssumptions: ['Wynik obowiązuje wyłącznie w granicach wybranego modelu i jego parametrów.'],
+          falsification: criterion,
+        },
+        baselineRequest,
+        sweep: { parameter: protocolParameter, values, label: selectedModel?.parameters.find((p) => p.id === protocolParameter)?.label ?? protocolParameter },
+        repetitionsPerArm: Number(protocolRepetitions),
+      });
+      setProtocolDesign(built);
+      setPhase('planned');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  function handleExecuteProtocol() {
+    if (!protocolDesign) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setProtocolEvidence(executeScientificExperiment(protocolDesign));
+      setPhase('ran');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   function handleBuildPlan() {
@@ -177,11 +261,12 @@ export function ExperimentPilotScreen() {
       <section className="pilot-step">
         <h2>1 · Opisz eksperyment</h2>
         <div className="pilot-mode-switch" role="tablist" aria-label="Sposób wprowadzania eksperymentu">
-          <button className="chip-btn" aria-pressed={inputMode === 'structured'} onClick={() => setInputMode('structured')}>Formularz</button>
+          <button className="chip-btn" aria-pressed={inputMode === 'structured'} onClick={() => setInputMode('structured')}>Pojedynczy run</button>
+          <button className="chip-btn" aria-pressed={inputMode === 'protocol'} onClick={() => { setInputMode('protocol'); setPhase('draft'); resetDownstream(); }}>Protocol / A-B</button>
           <button className="chip-btn" aria-pressed={inputMode === 'freeText'} onClick={() => setInputMode('freeText')}>Zwykły tekst</button>
         </div>
 
-        {inputMode === 'structured' ? (
+        {inputMode === 'structured' || inputMode === 'protocol' ? (
           <div className="pilot-form">
             <label className="pilot-field">
               <span>Model</span>
@@ -232,14 +317,47 @@ export function ExperimentPilotScreen() {
           </div>
         )}
 
-        <button className="chip-btn pilot-primary" onClick={handleBuildPlan} disabled={inputMode === 'freeText' ? !freeText.trim() : !selectedModel}>
-          Zbuduj plan
+        {inputMode === 'protocol' && selectedModel && (
+          <div className="pilot-protocol-form">
+            <label className="pilot-field"><span>Hipoteza (kandydat, nie odkrycie)</span><textarea className="pilot-input pilot-textarea" rows={2} value={protocolStatement} onChange={(e) => setProtocolStatement(e.target.value)} /></label>
+            <label className="pilot-field"><span>Parametr sweepu</span><select className="pilot-input" value={protocolParameter} onChange={(e) => setProtocolParameter(e.target.value)}><option value="">— wybierz parametr —</option>{selectedModel.parameters.filter((p) => p.type === 'number').map((p) => <option key={p.id} value={p.id}>{p.label}{p.unit ? ` (${p.unit})` : ''}</option>)}</select></label>
+            <label className="pilot-field"><span>Primary metric output key</span><input className="pilot-input" value={protocolMetric} onChange={(e) => setProtocolMetric(e.target.value)} placeholder="np. I, radiusKm, totalEnergyMeV" /></label>
+            <label className="pilot-field"><span>Wartości sweepu (liczby, przecinki)</span><input className="pilot-input" value={protocolValues} onChange={(e) => setProtocolValues(e.target.value)} placeholder="np. 1, 2, 3" /></label>
+            <div className="pilot-protocol-grid">
+              <label className="pilot-field"><span>Powtórzenia / arm</span><input className="pilot-input" type="number" min="1" max="5" value={protocolRepetitions} onChange={(e) => setProtocolRepetitions(e.target.value)} /></label>
+              <label className="pilot-field"><span>Relacja kryterium</span><select className="pilot-input" value={protocolRelation} onChange={(e) => setProtocolRelation(e.target.value as typeof protocolRelation)}><option value="greater-than">greater-than</option><option value="less-than">less-than</option><option value="equal-within-tolerance">equal-within-tolerance</option><option value="monotonic-increase">monotonic-increase</option><option value="monotonic-decrease">monotonic-decrease</option></select></label>
+            </div>
+            {(protocolRelation === 'greater-than' || protocolRelation === 'less-than' || protocolRelation === 'equal-within-tolerance') && <div className="pilot-protocol-grid"><label className="pilot-field"><span>Expected value (opcjonalnie)</span><input className="pilot-input" type="number" value={protocolExpectedValue} onChange={(e) => setProtocolExpectedValue(e.target.value)} /></label>{protocolRelation === 'equal-within-tolerance' && <label className="pilot-field"><span>Tolerance</span><input className="pilot-input" type="number" min="0" value={protocolTolerance} onChange={(e) => setProtocolTolerance(e.target.value)} /></label>}</div>}
+            <p className="pilot-rationale">Planner wymaga istniejącego REAL_ENGINE. Każdy arm jest prerejestrowany przed wykonaniem, a wyniki pochodzą wyłącznie z realnych runów.</p>
+          </div>
+        )}
+
+        <button className="chip-btn pilot-primary" onClick={inputMode === 'protocol' ? handleBuildProtocol : handleBuildPlan} disabled={inputMode === 'freeText' ? !freeText.trim() : !selectedModel}>
+          {inputMode === 'protocol' ? 'Zarejestruj protokół' : 'Zbuduj plan'}
         </button>
       </section>
 
       {error && <div className="pilot-error" role="alert">⚠ {error}</div>}
 
-      {plan && (
+      {protocolDesign && (
+        <section className="pilot-step pilot-protocol-result">
+          <h2>2 · Protokół prerejestrowany (nic jeszcze nie zostało policzone)</h2>
+          <div className="pilot-disclosure"><span className="honesty simplified">REAL ENGINE · PREREGISTERED</span><p className="pilot-rationale">{protocolDesign.hypothesis.disclaimer}</p><ul className="pilot-limitations">{protocolDesign.protocolAssumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul></div>
+          <dl className="pilot-provenance"><div><dt>designId</dt><dd className="mono">{protocolDesign.designId}</dd></div><div><dt>protocolFingerprint</dt><dd className="mono">{protocolDesign.protocolFingerprint}</dd></div><div><dt>arms</dt><dd>{protocolDesign.arms.length} · {protocolDesign.repetitionsPerArm} powtórzenia</dd></div><div><dt>kryterium</dt><dd>{protocolDesign.hypothesis.falsification.relation} · {protocolDesign.primaryMetric}</dd></div></dl>
+          <button className="chip-btn pilot-primary" onClick={handleExecuteProtocol} disabled={busy}>{busy ? 'Wykonuję arm’y…' : 'Potwierdź i wykonaj protokół'}</button>
+        </section>
+      )}
+
+      {protocolEvidence && (
+        <section className="pilot-step pilot-protocol-result">
+          <h2>3 · Evidence chain z realnych runów</h2>
+          <div className="pilot-disclosure"><span className={`honesty ${protocolEvidence.assessment.assessment === 'SUPPORTED_WITHIN_PROTOCOL' ? 'simplified' : 'theoretical'}`}>{protocolEvidence.assessment.assessment}</span><p className="pilot-summary">{protocolEvidence.assessment.message}</p></div>
+          <dl className="pilot-outputs">{protocolEvidence.arms.map((arm) => <div key={arm.armId} className="pilot-output-row"><dt>{arm.kind} · {arm.armId}</dt><dd>{arm.outputValues.join(' / ')} {arm.units} · {arm.reproduction}</dd></div>)}</dl>
+          <dl className="pilot-provenance"><div><dt>evidenceId</dt><dd className="mono">{protocolEvidence.evidenceId}</dd></div><div><dt>runs</dt><dd>{protocolEvidence.allRuns.length} · createdFromRealRunsOnly=true</dd></div><div><dt>provenance</dt><dd className="mono">{protocolEvidence.provenanceFingerprint}</dd></div></dl>
+        </section>
+      )}
+
+      {plan && inputMode !== 'protocol' && (
         <section className="pilot-step">
           <h2>2 · Plan (nic jeszcze nie zostało policzone)</h2>
           <div className="pilot-disclosure">

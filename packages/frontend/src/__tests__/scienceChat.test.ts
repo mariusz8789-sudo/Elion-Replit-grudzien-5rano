@@ -157,6 +157,17 @@ describe('scienceChat: wyjaśnienia, równania, założenia, zadania', () => {
   });
 });
 
+describe('scienceChat: Campaign entry point', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('otwiera istniejący CampaignScreen bez auto-startu kampanii', () => {
+    const r = resolveCommand('Otwórz kampanię naukową', null);
+    expect(r.intent).toBe('OPEN_CAMPAIGN');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/campaign' });
+    expect(r.text).toMatch(/read-only|nie zostanie utworzona/i);
+  });
+});
+
 describe('scienceChat: Scientific Memory (zapis / lista / wczytanie)', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 

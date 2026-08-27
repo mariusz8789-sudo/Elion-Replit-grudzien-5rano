@@ -132,6 +132,7 @@ const SUGGESTIONS = [
   'Zaproponuj kolejny eksperyment',
   'Zapisz eksperyment',
   'Pokaż zapisane',
+  'Otwórz kampanię naukową',
 ];
 
 export function ScienceChat() {

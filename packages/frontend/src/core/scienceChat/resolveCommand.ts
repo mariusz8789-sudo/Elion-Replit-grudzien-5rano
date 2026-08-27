@@ -33,7 +33,7 @@ export type EpistemicTag =
 export type ScientificIntent =
   | 'OPEN_SIMULATION' | 'CHANGE_PARAMETER' | 'WHAT_IF' | 'EXPLAIN'
   | 'SHOW_EQUATION' | 'SHOW_ASSUMPTIONS' | 'COMPARE_MODELS' | 'CREATE_TASK'
-  | 'CHECK_RESULT' | 'VERIFY' | 'PROPOSE_EXPERIMENT'
+  | 'CHECK_RESULT' | 'VERIFY' | 'PROPOSE_EXPERIMENT' | 'OPEN_CAMPAIGN'
   | 'SAVE' | 'LIST' | 'LOAD' | 'CONTROL' | 'HELP' | 'UNKNOWN';
 
 export type ChatAction =
@@ -257,6 +257,9 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
 
   // --- Bez otwartej symulacji: dalsze komendy wymagają kontekstu ---
   if (!ctx) {
+    if (has(norm, 'kampania naukowa', 'kampanie naukowa', 'kampanii naukowej', 'campaign', 'silnik przyspieszenia', 'scientific acceleration')) {
+      return { text: 'Otwieram istniejący Campaign Screen. To nawigacja read-only: kampania nie zostanie utworzona ani uruchomiona bez osobnej akcji i autoryzacji.', tag: 'MODEL', intent: 'OPEN_CAMPAIGN', action: { type: 'openRoute', hash: '#/campaign' } };
+    }
     if (has(norm, 'pomoc', 'help', 'co potrafisz', 'co umiesz')) return helpResponse();
     return {
       text: 'Nie mam teraz otwartej symulacji. Powiedz np. „pokaż czarną dziurę" albo „zasymuluj dylatację czasu", a potem będę mógł zmieniać parametry, wyjaśniać i tworzyć zadania.',

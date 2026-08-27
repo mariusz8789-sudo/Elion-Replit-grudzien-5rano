@@ -21,6 +21,7 @@ import {
   createScientificEvidencePack,
   serializeScientificEvidencePack,
   serializeEvidencePackRoCrate,
+  analyseExperimentSeries,
   type ScientificExperimentDesign,
   type ScientificEvidenceChain,
 } from '../core/experimentFabric';
@@ -96,6 +97,10 @@ export function ExperimentPilotScreen() {
   const [protocolAdvice, setProtocolAdvice] = useState<ReturnType<typeof explainScientificEvidence> | null>(null);
 
   const selectedModel = modelId ? getRouterModel(modelId) : undefined;
+  const protocolSeriesAnalysis = useMemo(() => {
+    if (!protocolEvidence || !protocolParameter.trim()) return null;
+    return analyseExperimentSeries(protocolEvidence.allRuns, protocolParameter, protocolEvidence.design.primaryMetric);
+  }, [protocolEvidence, protocolParameter]);
 
   function resetDownstream() {
     setConfirmed(null);
@@ -380,6 +385,7 @@ export function ExperimentPilotScreen() {
           <dl className="pilot-provenance"><div><dt>evidenceId</dt><dd className="mono">{protocolEvidence.evidenceId}</dd></div><div><dt>runs</dt><dd>{protocolEvidence.allRuns.length} · createdFromRealRunsOnly=true</dd></div><div><dt>provenance</dt><dd className="mono">{protocolEvidence.provenanceFingerprint}</dd></div></dl>
           <div className="pilot-actions"><button className="chip-btn pilot-primary" onClick={handleExportProtocolEvidence}>⬇ Evidence Pack JSON</button><button className="chip-btn" onClick={handleExportProtocolRoCrate}>⬇ RO-Crate JSON-LD</button></div>
           {protocolAdvice && <div className="pilot-why-panel"><h3>WHY / NEXT EXPERIMENT</h3><p className="pilot-summary">{protocolAdvice.why}</p><p><strong>Baza dowodu:</strong> {protocolAdvice.evidenceBasis.join(' · ')}</p><ul className="pilot-limitations">{protocolAdvice.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul><p><strong>Następny bounded krok:</strong> {protocolAdvice.nextExperiment.action}</p><p><strong>Parametr:</strong> <code>{protocolAdvice.nextExperiment.parameter}</code> · {protocolAdvice.nextExperiment.rationale}</p><span className="honesty theoretical">AUTO-RUN: DISABLED</span></div>}
+          {protocolSeriesAnalysis && <div className="pilot-why-panel" data-testid="experiment-series-analysis"><h3>SERIES OBSERVATION · NOT A DISCOVERY</h3><p><strong>Status:</strong> {protocolSeriesAnalysis.findings.length > 0 ? protocolSeriesAnalysis.findings[0].verdict : 'NO_THRESHOLD_FINDING'}</p><p><strong>Parametr:</strong> <code>{protocolSeriesAnalysis.parameterKey}</code> · <strong>Wynik:</strong> <code>{protocolSeriesAnalysis.outputKey}</code></p>{protocolSeriesAnalysis.findings.length === 0 ? <p className="pilot-summary">Nie zaobserwowano korelacji przekraczającej próg w tej serii. To nie jest dowód braku zależności ani wynik negatywny.</p> : <ul className="pilot-limitations">{protocolSeriesAnalysis.findings.map((finding) => <li key={`${finding.kind}-${finding.runIds.join('-')}`}>{finding.message} <span className="mono">[{finding.runIds.join(', ')}]</span></li>)}</ul>}<p className="pilot-disclaimer">{protocolSeriesAnalysis.disclaimer} Model: {protocolSeriesAnalysis.modelId ?? 'brak porównywalnego modelu'}.</p></div>}
         </section>
       )}
 

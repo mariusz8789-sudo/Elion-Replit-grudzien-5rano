@@ -134,6 +134,7 @@ const SUGGESTIONS = [
   'Pokaż zapisane',
   'Otwórz kampanię naukową',
   'Uruchom model pompa–rurociąg: przepływ wody',
+  'Uruchom PySCF RHF dla H2; długość wiązania 0.74 Å',
 ];
 
 export function ScienceChat() {

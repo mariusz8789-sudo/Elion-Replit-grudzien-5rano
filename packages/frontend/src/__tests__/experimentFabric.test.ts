@@ -34,6 +34,9 @@ import {
   confirmCrossDomainOrchestration,
   createAgingModelDataRequirement,
   rankAgingEvidenceCandidates,
+  buildCapabilityAdmissionMatrix,
+  assertCapabilityAdmissionMatrix,
+  serializeCapabilityAdmissionMatrix,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -42,6 +45,16 @@ import {
 } from '../core/experimentFabric/worldHandoff';
 
 describe('Genesis Experiment Fabric', () => {
+  it('maintains a release-gated capability admission matrix from the canonical registry', () => {
+    const matrix = buildCapabilityAdmissionMatrix();
+    expect(matrix.length).toBeGreaterThan(20);
+    assertCapabilityAdmissionMatrix(matrix);
+    expect(matrix.find((record) => record.modelId === 'quantum-chemistry-pyscf-h2-rhf')).toMatchObject({
+      status: 'CONNECTED', capability: 'BACKEND_REAL_ENGINE', routeRegistered: false,
+    });
+    expect(matrix.every((record) => record.limitations.length > 0 && record.proofBoundary.length > 0)).toBe(true);
+    expect(() => serializeCapabilityAdmissionMatrix(matrix)).not.toThrow();
+  });
   it('indexes each of the 20 authoritative knowledge files exactly once', () => {
     expect(validateKnowledgeRegistry()).toEqual({ ok: true, missing: [], duplicateFiles: [] });
   });

@@ -20,6 +20,7 @@ import {
   executeScientificBackendExperiment,
   explainScientificEvidence,
   createScientificEvidencePack,
+  saveScientificEvidencePack,
   serializeScientificEvidencePack,
   serializeEvidencePackRoCrate,
   analyseExperimentSeries,
@@ -180,6 +181,7 @@ export function ExperimentPilotScreen() {
         ? await executeScientificBackendExperiment(protocolDesign)
         : executeScientificExperiment(protocolDesign);
       setProtocolEvidence(evidence);
+      saveScientificEvidencePack(createScientificEvidencePack(evidence));
       setProtocolAdvice(explainScientificEvidence(evidence));
       setPhase('ran');
     } catch (e) {

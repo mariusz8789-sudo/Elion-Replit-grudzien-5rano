@@ -19,6 +19,9 @@ Every milestone must pass tests, TypeScript, lint, production build, Chromium sm
 | c-Slider | DONE bounded lab flow | `spacetime-c-slider` → Space-Time Lab | Thought experiment with hypothetical c; does not alter physical constants. |
 | Particle energy | DONE bounded lab flow | `particle-relativistic-energy` → Particle Lab | Free-particle E=γmc² graph; not a collider or detector experiment. |
 | Stellar scaling | DONE bounded lab flow | `universe-starlife` → Universe Lab | Scaling relation with explicit simplifications; not full stellar evolution or prediction. |
+| Galaxy rotation curve | DONE bounded lab flow | `universe-rotation-curve` → Universe Lab (`rotationcurve`) | Analytic exponential disk plus pseudo-isothermal halo or MOND alternative; not a fit to any named galaxy and not a CDM-vs-MOND verdict. |
+| Galaxy collision | DONE bounded lab flow | `universe-galaxy-collision` → Universe Lab (`collision`) | Restricted Toomre–Toomre two-core plus test particles; not full N-body, hydrodynamics or reconstruction of a real merger. |
+| Schwarzschild radius | DONE bounded analytical flow | `einstein-schwarzschild` → Einstein Lab | Non-rotating, uncharged Schwarzschild metric calculation; not Kerr, not a ray tracer and not observational inference. |
 
 ## Partial or not connected yet
 
@@ -35,8 +38,8 @@ Every milestone must pass tests, TypeScript, lint, production build, Chromium sm
 
 ## Current LIVE HEAD
 
-The latest published code commit is `3faa004` on `manus/high-fidelity-epidemic-digital-twin`. The latest CI for that commit is `33035127921` and is green. Subsequent docs and bounded capability commits must update this section when published.
+The latest published code commit is `39ebcf3` on `manus/high-fidelity-epidemic-digital-twin`. The latest CI for that commit is `33035896267` and is green. The immediately preceding bounded capability commits are `b3dbe3e` (galaxy rotation curve chat exposure) and `cd7087f` (galaxy collision chat exposure), both published to the same LIVE branch with green CI. Subsequent docs and bounded capability commits must update this section when published.
 
 ## Next CTO gate
 
-Before implementing a new domain, perform a repository audit and answer: Does an existing real model already exist? Does the parser and router expose it? Does confirmation preserve one result and provenance? Is there an honest visualization or lab route? Can the limitations be shown to the user? If any answer is no, document the blocker rather than creating a parallel framework.
+The next work item is not another solver. First complete a visual-proof pass for the connected Chat-first lab routes and refresh the command-center proof pack from the current LIVE branch. Any further scientific integration must again answer: Does an existing real model already exist? Does the parser and router expose it? Does confirmation preserve one result and provenance? Is there an honest visualization or lab route? Can the limitations be shown to the user? If any answer is no, document the blocker rather than creating a parallel framework.

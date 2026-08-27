@@ -133,6 +133,7 @@ const SUGGESTIONS = [
   'Zapisz eksperyment',
   'Pokaż zapisane',
   'Otwórz kampanię naukową',
+  'Uruchom model pompa–rurociąg: przepływ wody',
 ];
 
 export function ScienceChat() {

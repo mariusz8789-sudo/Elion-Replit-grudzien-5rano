@@ -1057,6 +1057,8 @@ describe('Genesis Experiment Fabric', () => {
     expect(Number(run.result.outputs.flowVelocity)).toBeGreaterThan(0);
     expect(Number(run.result.outputs.shaftPower)).toBeGreaterThan(0);
     expect(run.result.validity).toContain('nie jest CFD');
+    expect(run.result.route).toEqual({ kind: 'lab', labId: 'engineering', experimentId: 'pump-pipe' });
+    expect(run.provenance.engine).toBe('genesis-engineering-graph@1.0.0');
   });
 
   it('plans molecular weight for canonical backend Fabric without claiming a structural chemistry parser', () => {

@@ -88,7 +88,7 @@ const manifest = {
 for (const item of artifacts) {
   console.log(`G3 FETCH ${item.id} ${item.url}`);
   const raw = await download(item.url);
-  const text = raw.toString('utf8');
+  const text = new TextDecoder('utf-8', { fatal: false }).decode(raw);
   for (const marker of item.mustContain) {
     if (!text.includes(marker)) {
       const preview = text.slice(0, 240).replace(/\s+/g, ' ');

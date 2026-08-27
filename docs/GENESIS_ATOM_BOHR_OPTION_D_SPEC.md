@@ -11,15 +11,39 @@ not touched. This report is the only new file.
 | Work branch             | `claude/atom-bohr-option-d-spec`, from `7d13c65`                                              |
 | Merged / pushed to LIVE | no                                                                                            |
 
+## 0. Status vocabulary
+
+Every claim in this document carries exactly one of these classes. Nothing outside this table is
+asserted.
+
+| Class                           | Meaning                                                                                                                                                                                             | Applies to                                                                             |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **FACT**                        | Confirmed by executing code in this repository, or read directly from a file at the stated LIVE HEAD, or taken from an official source that was actually retrieved                                  | Contract audit (§1), fingerprint composition, evaluator behaviour, planner constraints |
+| **MODEL**                       | A value produced by the existing `atom-bohr` graph as it stands today                                                                                                                               | `energyLevelEV`, `orbitalRadiusPm`, `ionizationPhotonEV`                               |
+| **PREDICTION**                  | A transition wavelength computed from `atom-bohr` level differences — **not yet a model output**; today it exists only as an off-model calculation, and Option D would make it a first-class output | `transitionWavelengthNm`, `transitionWavelengthReducedNm`                              |
+| **ESTIMATE**                    | Judgement about effort or size; not a commitment                                                                                                                                                    | Hours (§9), line counts                                                                |
+| **REFERENCE_UNPINNED**          | No NIST artifact has been fetched, hashed and committed; the value does not exist in this repository in any form                                                                                    | Every reference value in this specification, without exception                         |
+| **INCONCLUSIVE**                | A protocol outcome in which no comparison could be made. **Not a PASS.** Reached whenever a reference is missing, malformed, unlicensed or unit-mismatched                                          | Evaluator outcome (§2.5)                                                               |
+| **SUPERSEDED_BY_MODEL_VERSION** | An Evidence Pack produced under an earlier `modelVersion`. Neither a scientific failure nor a success — it is out of scope for comparison and must be re-executed                                   | Old `atom-bohr` packs after the 1.0.0 to 1.1.0 bump (§4)                               |
+
+Two distinctions that this document depends on:
+
+- **MODEL vs PREDICTION.** `ionizationPhotonEV` is a MODEL value that, at Z=1 and n=1, equals the
+  hardcoded `RYDBERG_EV` exactly (FACT, established in the admission audit). A transition
+  wavelength is a PREDICTION whose falsifiable content is the Z² and 1/n² structure rather than the
+  constant. Only the latter is admissible as a benchmark observable.
+- **INCONCLUSIVE vs FALSIFIED.** A missing reference is INCONCLUSIVE, never FALSIFIED and never
+  SUPPORTED. Absence of evidence must not be recorded as evidence of anything.
+
 ## Recommendation
 
 **BUILD LATER — pending CTO approval, pinned NIST references, and a Scientific Core contract
 decision.**
 
-The scope is now unambiguous: five files, ~55–75 production lines, one deliberate `modelVersion`
+The scope is now unambiguous: seven files, ~55–75 production lines, one deliberate `modelVersion`
 bump, and a fingerprint migration whose blast radius is bounded to `atom-bohr` evidence. Two
 findings below reduce the work below the previous estimate (§2.4, §4.2). Three gates remain
-unpassed (§9).
+unpassed (§11), and the exact acceptance criteria a future build must satisfy are in §6.
 
 ## 1. Current contract audit
 
@@ -266,31 +290,146 @@ Required product decision: old `atom-bohr` packs must be **re-executed**, not re
 should be labelled `SUPERSEDED_BY_MODEL_VERSION` in the Scientific Memory list rather than shown as
 failures.
 
-## 5. Test matrix
+## 5. Minimal contract pseudo-diff
 
-Specified, not implemented. Every case runs offline against pinned fixtures.
+Type and field names with semantics only. **No implementation code, no signatures, no bodies.**
 
-| #   | Case                                                                | Expected                                                                                                                                                   |
-| --- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Two variant arms, two distinct references, both within tolerance    | `SUPPORTED_WITHIN_PROTOCOL`; each arm `COMPARED` with its **own** residual                                                                                 |
-| 2   | Two arms, one outside its tolerance                                 | `FALSIFIED_WITHIN_PROTOCOL`; the failing arm identified by `armId`                                                                                         |
-| 3   | Asserted arm with no matching `ArmReference`                        | `VERIFY_REQUIRED` + `INCONCLUSIVE`; **never** a pass                                                                                                       |
-| 4   | Reference value changed                                             | `evidencePackId` and `protocolFingerprint` change; replay `DRIFT`                                                                                          |
-| 5   | `rawPayloadSha256` changed, value unchanged                         | replay `DRIFT`                                                                                                                                             |
-| 6   | `principalNUpper` changed (H-α → H-β)                               | different arm request, different `runFingerprint`, replay `DRIFT`                                                                                          |
-| 7   | `tolerance` changed                                                 | `protocolFingerprint` changes → `DRIFT`; tolerance absent or ≤ 0 → `BLOCKED` + `INCONCLUSIVE`                                                              |
-| 8   | Raw arm vs corrected arm, same transition                           | two distinct output keys, two distinct residuals; **no MATCH between them**; raw fails its tight tolerance, corrected passes its own — both pre-registered |
-| 9   | Old pack replayed against `modelVersion 1.1.0`                      | `DRIFT`, never `MATCH`                                                                                                                                     |
-| 10  | `backendRunId` volatility                                           | scientific fingerprints stable — already pinned by `evidenceReplayVolatility.test.ts`                                                                      |
-| 11  | Replay performs no network access                                   | no fetch; pinned files only                                                                                                                                |
-| 12  | Unit mismatch (nm vs Å)                                             | `BLOCKED` + `INCONCLUSIVE`                                                                                                                                 |
-| 13  | `licenceStatus: 'VERIFY_REQUIRED'`                                  | `VERIFY_REQUIRED` + `INCONCLUSIVE`, even if the residual is tiny                                                                                           |
-| 14  | Duplicate `armKey`                                                  | `BLOCKED`, rejected at design time                                                                                                                         |
-| 15  | Both `expectedValue` and `expectedValues` without `referencePolicy` | planner throws; protocol cannot be pre-registered                                                                                                          |
-| 16  | Existing protocols using a single `expectedValue`                   | byte-identical `evidencePackId` — **the backward-compatibility gate**                                                                                      |
-| 17  | Corrected output requested without a pinned mass-ratio reference    | output not emitted; arm `VERIFY_REQUIRED`                                                                                                                  |
+### `core/experimentFabric/scientificDiscovery.ts`
 
-## 6. NIST blocker — still `REFERENCE_UNPINNED`
+```
+NEW TYPE   ArmReference
+             armKey             identifies exactly one arm; matches the planner's arm suffix
+             referenceValue     the measured quantity, REFERENCE_UNPINNED until an artifact exists
+             unit               must equal the arm's reported metric unit, else BLOCKED
+             uncertainty        standard uncertainty in the same unit
+             uncertaintyType    standard | expanded-k2 | stated-interval
+             tolerance          per arm; may differ between arms; pre-registered
+             toleranceRationale why this tolerance, written before execution
+             sourceArtifactId   the pinned artifact this value came from
+             rawPayloadSha256   64 hex chars of the raw response bytes
+             sourceUri          canonical retrieval URL
+             datasetName        e.g. the NIST database name
+             datasetVersion     dataset version or retrieval context
+             licenceStatus      CONFIRMED | VERIFY_REQUIRED
+             transformId        which normalisation produced referenceValue
+             transformVersion   version of that normalisation
+
+NEW TYPE   ReferenceStatus
+             COMPARED | VERIFY_REQUIRED | BLOCKED | NOT_ASSERTED
+
+CHANGE     FalsificationCriterion
+  ADD        expectedValues?    ordered ArmReference list, one per asserted arm
+  ADD        referencePolicy?   'per-arm-required'; mandatory whenever expectedValues is present
+  KEEP       expectedValue?     unchanged; illegal together with expectedValues unless the
+                                policy flag is absent, in which case expectedValues is illegal
+  KEEP       tolerance?         unchanged single-value path
+  KEEP       metric, relation, rationale
+
+CHANGE     ExperimentArmEvidence
+  ADD        reference?         the ArmReference resolved for this arm
+  ADD        residual?          armMean minus referenceValue, same unit
+  ADD        referenceStatus    required; ReferenceStatus
+
+UNCHANGED  HypothesisAssessment   no BLOCKED or VERIFY_REQUIRED member is added
+UNCHANGED  ExperimentArmKind      no new arm kind
+UNCHANGED  ScientificEvidenceChain, HypothesisAssessmentEvidence
+```
+
+### `core/experimentFabric/scientificExecutor.ts`
+
+```
+CHANGE     arm evidence construction (both the local path and the duplicated backend path)
+             resolve one ArmReference per asserted arm by armKey
+             record reference, residual and referenceStatus
+CHANGE     equal-within-tolerance evaluation
+             when referencePolicy is 'per-arm-required', compare each arm to its own reference
+             never apply a single expectedValue to an arm under that policy
+             any non-COMPARED asserted arm forces INCONCLUSIVE for the protocol
+UNCHANGED  the variant-only assertion filter
+UNCHANGED  the chain provenance fingerprint composition
+```
+
+### `core/experimentFabric/scientificPlanner.ts`
+
+```
+CHANGE     design validation
+             reject expectedValues without referencePolicy
+             reject expectedValue and expectedValues together
+             reject duplicate armKey, and armKey values matching no arm
+UNCHANGED  protocol fingerprint seed  (the criterion is already inside it)
+```
+
+### `core/modelGraph/bohrModelGraph.ts`
+
+```
+ADD INPUT  principalNUpper            integer, strictly greater than principalN
+ADD NODE   transitionWavelengthNm     PREDICTION, nm, raw Bohr
+ADD NODE   transitionWavelengthReducedNm
+                                      PREDICTION, nm, reduced-mass corrected; emitted only when a
+                                      pinned mass-ratio reference is supplied, never from a default
+UNCHANGED  energyLevelEV, orbitalRadiusPm, ionizationPhotonEV  (values and meaning)
+```
+
+### `core/experimentFabric/router.ts`, `core/experimentFabric/executor.ts`, `core/knowledge/registry.ts`
+
+```
+CHANGE     atom-bohr entry            add principalNUpper parameter; modelVersion 1.0.0 -> 1.1.0
+CHANGE     atom-bohr executor case    expose the new output keys
+CHANGE     atom domain parameters     register principalNUpper so the planner accepts it as a sweep
+ADD        correctionVersion          carried alongside modelVersion for the corrected output only
+```
+
+### Explicitly not changed
+
+```
+evidencePack.ts          no new Evidence Pack; the criterion is already in the pack id seed
+evidencePackStore.ts     no new Replay; DRIFT across model versions is already automatic
+provenance.ts            no fingerprint restructuring
+scenarioCapsule.ts, counterfactualCompare.ts, all UI
+```
+
+## 6. Acceptance criteria for a future BUILD
+
+A future implementation is accepted only if **every** criterion holds. Each maps to the test matrix
+in §7.
+
+| #    | Criterion                                                                                                                                                                                                                                         | Verified by             |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| AC-1 | Every asserted arm resolves exactly one `ArmReference` through an unambiguous `armKey`; duplicates and orphans are rejected at design time, not at run time                                                                                       | T1, T7                  |
+| AC-2 | `unit`, `tolerance`, `uncertainty`, `sourceUri`, `datasetVersion`, `licenceStatus` and a 64-hex `rawPayloadSha256` are all mandatory on every `ArmReference`; any missing field prevents comparison                                               | T3, T4, T5, T6          |
+| AC-3 | A missing, malformed, unit-mismatched or unlicensed reference yields `INCONCLUSIVE` together with a precise `referenceStatus`, and **never** `SUPPORTED_WITHIN_PROTOCOL`                                                                          | T2, T3, T4, T5, T6, T17 |
+| AC-4 | Under `referencePolicy: 'per-arm-required'` no arm is ever compared against a shared `expectedValue`; the ambiguous combination cannot be pre-registered                                                                                          | T1, T14                 |
+| AC-5 | Raw and corrected predictions are separate output keys with separate `modelVersion` and `correctionVersion`; the correction is never folded into an existing value, and the corrected output is not emitted without a pinned mass-ratio reference | T11                     |
+| AC-6 | No second Evidence Pack, Replay system, comparator or fingerprint scheme is introduced; the existing `protocolFingerprint`, `evidencePackId` and `compareScientificEvidencePacks` carry the change unmodified                                     | T9, T10, T13, T15       |
+| AC-7 | Existing protocols using a single `expectedValue` produce a **byte-identical** `evidencePackId` before and after the change                                                                                                                       | T14                     |
+| AC-8 | An Evidence Pack created under `modelVersion 1.0.0` and replayed against `1.1.0` is reported as `SUPERSEDED_BY_MODEL_VERSION` — not a false success, not a scientific failure — and is re-executed rather than reinterpreted                      | T12                     |
+
+## 7. Test matrix — 17 cases
+
+Specified only. **No tests were added to the codebase.** Every case runs offline against pinned
+fixtures.
+
+| #   | Case                                                                            | Expected outcome                                                                                                                           |
+| --- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| T1  | Valid two-arm references, each within its own tolerance                         | `SUPPORTED_WITHIN_PROTOCOL`; both arms `COMPARED`; two distinct residuals                                                                  |
+| T2  | Missing reference for an asserted arm                                           | `referenceStatus: VERIFY_REQUIRED`; protocol `INCONCLUSIVE`                                                                                |
+| T3  | Reference unit differs from the arm metric unit (nm vs Å)                       | `referenceStatus: BLOCKED`; protocol `INCONCLUSIVE`                                                                                        |
+| T4  | `rawPayloadSha256` absent or not 64 hex characters                              | `referenceStatus: VERIFY_REQUIRED`; protocol `INCONCLUSIVE`                                                                                |
+| T5  | `licenceStatus: VERIFY_REQUIRED`                                                | `INCONCLUSIVE` even when the residual is far inside tolerance                                                                              |
+| T6  | `tolerance` absent, zero, negative or non-finite                                | `referenceStatus: BLOCKED`; protocol `INCONCLUSIVE`                                                                                        |
+| T7  | Duplicate `armKey`, or an `armKey` matching no arm                              | Rejected at design time; no protocol is created                                                                                            |
+| T8  | Baseline and control arms present                                               | `referenceStatus: NOT_ASSERTED`; they never affect the verdict                                                                             |
+| T9  | Reference value changed, or `rawPayloadSha256` changed with the value unchanged | `protocolFingerprint` and `evidencePackId` both change; replay `DRIFT`                                                                     |
+| T10 | Transition changed (`principalNUpper` 3 → 4)                                    | Different arm request and `runFingerprint`; replay `DRIFT`                                                                                 |
+| T11 | Raw arm and corrected arm for the same transition                               | Two distinct output keys and residuals; no MATCH between them; raw fails its tight pre-registered tolerance while corrected passes its own |
+| T12 | Pack created under `modelVersion 1.0.0`, replayed under `1.1.0`                 | `SUPERSEDED_BY_MODEL_VERSION`; comparator reports `DRIFT`; never a silent `MATCH`                                                          |
+| T13 | Full replay of a stored pack                                                    | Zero network access; pinned files only                                                                                                     |
+| T14 | Pre-existing protocol using a single `expectedValue`                            | **Byte-identical** `evidencePackId` before and after the change — hard gate                                                                |
+| T15 | `backendRunId` varies on every call                                             | Run fingerprints, `evidenceId` and `evidencePackId` all stable                                                                             |
+| T16 | An arm whose run did not complete                                               | Comparator returns `BLOCKED`; no residual is reported                                                                                      |
+| T17 | Adversarial sweep of T2 to T6 in combination                                    | **No combination produces a PASS**; every path terminates in `INCONCLUSIVE` or `BLOCKED`                                                   |
+
+## 8. NIST blocker — still `REFERENCE_UNPINNED`
 
 **No fetch was attempted in this session and no reference value was written from memory.** The
 previous audit established that egress is denied: `curl` returns `(56) CONNECT tunnel failed,
@@ -314,7 +453,7 @@ record URL, exact query, retrieval timestamp (UTC), dataset name, version, unit,
 definition, medium (**vacuum or air — they differ in the fourth digit**), stated uncertainty and
 licence. Same contract as `docs/evidence/usgs/`.
 
-## 7. Estimated hours (`ESTIMATE`)
+## 9. Estimated hours (`ESTIMATE`)
 
 | Work                                                                                        | Hours       |
 | ------------------------------------------------------------------------------------------- | ----------- |
@@ -331,7 +470,7 @@ licence. Same contract as `docs/evidence/usgs/`.
 Production lines: **~55–75** (`ESTIMATE`), unchanged from the previous audit; §2.4 and §4.2 removed
 work rather than adding it.
 
-## 8. Risks
+## 10. Risks
 
 | Risk                                                             | Severity   | Mitigation                                                                                                   |
 | ---------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
@@ -345,23 +484,49 @@ work rather than adding it.
 | `principalN` semantics shift for existing outputs                | **Medium** | `energyLevelEV` and `orbitalRadiusPm` keep their current meaning; only the new keys use `principalNUpper`    |
 | References never get pinned, work sits half-done                 | **Medium** | Gate 2 below blocks implementation start                                                                     |
 
-## 9. Decision gates
+## 11. CTO decision table — three mandatory gates
 
-1. **CTO approval of the Scientific Core contract change** — `expectedValues[]` and
-   `referencePolicy` on `FalsificationCriterion`. Not started until approved.
-2. **Pinned NIST artifacts exist**, with real SHA-256 and a resolved `licenceStatus`. Until then
-   every reference is `REFERENCE_UNPINNED` and no benchmark may report a scientific result.
-3. **Migration decision for `atom-bohr` evidence** — accept the version bump and the
-   `SUPERSEDED_BY_MODEL_VERSION` label.
+Implementation may not begin until **all three** are closed. Each has a named owner action and an
+unambiguous closure condition.
 
-Gates 1 and 3 are decisions; gate 2 needs an environment with egress. None is blocked by unknowns.
+| Gate                                             | Decision required                                                                                                                                                                | Closure condition                                                                                                                                                                                                                                                                    | Owner                                                                                     | Blocks                                                                                  |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **G1 — Scientific Core contract**                | Approve adding `expectedValues[]`, `referencePolicy` and `ArmReference` to `FalsificationCriterion`, and `reference` / `residual` / `referenceStatus` to `ExperimentArmEvidence` | Written CTO approval of the pseudo-diff in §5, including the rule that `referencePolicy: 'per-arm-required'` forbids any shared-`expectedValue` fallback                                                                                                                             | CTO                                                                                       | All implementation                                                                      |
+| **G2 — Pinned NIST artifacts**                   | Obtain and commit the reference artifacts                                                                                                                                        | Raw response bytes committed unmodified; real 64-hex SHA-256 per artifact; unit, observable definition, medium (**vacuum or air**), value range, stated uncertainty, dataset name and version, retrieval URL and UTC timestamp all recorded; `licenceStatus` resolved to `CONFIRMED` | Whoever has network egress — CI qualifies (FACT: the `pyscf-real` job installs from PyPI) | Any benchmark result; §8 lists the exact artifacts                                      |
+| **G3 — Migration policy for old Evidence Packs** | Decide how packs created under `modelVersion 1.0.0` are presented after the bump to `1.1.0`                                                                                      | Written decision that such packs are labelled `SUPERSEDED_BY_MODEL_VERSION`, are re-executed rather than reinterpreted, and are shown as neither a scientific failure nor a success                                                                                                  | CTO / product                                                                             | The `modelVersion` bump, therefore the transition output, therefore the whole benchmark |
 
-## 10. Decision
+Gate order is **G1 → G3 → G2**: the contract must be approved before the model changes, the
+migration policy must exist before the version bump reaches users, and the artifacts can be pinned
+in parallel but are only useful once G1 is closed.
+
+## 12. NOT AUTHORIZED YET
+
+Stated explicitly so that no part of this document is mistaken for permission.
+
+- **No NIST value has been written from memory.** No fetch was attempted in this session; the
+  previous audit recorded egress denial (`curl` → `(56) CONNECT tunnel failed, response 403`;
+  `WebFetch` → `EGRESS_BLOCKED`; proxy → `connect_rejected — policy denial`). Every reference in
+  this specification is `REFERENCE_UNPINNED` and appears as a **field name, never a number**.
+- **There is no `BUILD NOW`.** This document is a working specification at `BUILD LATER`. It is not
+  approval and must not be cited as one.
+- **Option D must not be implemented** until G1, G2 and G3 in §11 are all closed. Partial
+  implementation — for example adding `transitionWavelengthNm` alone — is also unauthorized,
+  because it triggers the fingerprint migration without the policy that governs it.
+- **The following must not be built** under this or any adjacent task: a new solver; a second
+  Evidence Pack; a second Replay system; a USGS adapter; Micro-Manager or any instrument control;
+  GIS or live-data pipelines; MQTT, OPC UA or any transport; new laboratories, domains or models.
+- **The following must not be modified**: Earthquake, Epidemic, the water model, and any
+  Scientific Core file outside the pseudo-diff in §5.
+- **No test from §7 has been added to the codebase.** The matrix is a plan.
+
+## 13. Decision
 
 # BUILD LATER — pending CTO approval, pinned NIST references, and Scientific Core contract decision
 
-Scope is now fully specified: eight symbols across seven files, ~55–75 production lines, 29–45 h,
-a bounded migration, and a 17-case test matrix whose 16th case is a hard backward-compatibility
-gate. Two findings reduced the work — controls need no change because only variants are asserted
-(§2.4), and the replay comparator needs no change because DRIFT across model versions is automatic
-(§4.2). Nothing here is speculative, and nothing may start before the three gates in §9.
+Scope is fully specified: eight symbols across seven files, ~55-75 production lines
+(`ESTIMATE`), 29-45 h (`ESTIMATE`), a bounded migration, eight acceptance criteria and a
+seventeen-case test matrix whose T14 is a hard byte-identity gate on existing packs. Two findings
+reduced the work rather than adding to it — only variant arms are asserted, so no control-arm or
+arm-kind change is needed (§2.4), and DRIFT across model versions is automatic, so the replay
+comparator is untouched (§4.2). Nothing in this plan is speculative. Nothing may start before the
+three gates in §11 are closed.

@@ -35,6 +35,7 @@ export { createDiscoveryEvidencePack, serializeDiscoveryEvidencePack, DISCOVERY_
 export { generateFollowUps, isRunnable } from './discoveryFollowUp';
 export { runParameterSweep, runInterventionTimingSweep, SWEEPABLE_PARAMETERS, NON_SWEEPABLE_PARAMETERS, type SweepResult } from './discoverySweep';
 export { runMultiSeed, median, STATISTICAL_NOTE, type MultiRunResult } from './discoveryMultiRun';
+export { validateStoredEvidence, type StoredEvidence, type StoredEvidenceValidation, type EvidenceStore } from './evidenceStore';
 export {
   runProtectionPriorityStudy,
   PROTECTION_OBJECTIVES,

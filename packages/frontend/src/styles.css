@@ -2373,3 +2373,15 @@ kbd {
 .pilot-protocol-result .pilot-provenance { background: rgba(4, 15, 25, .38); }
 @media (max-width: 560px) { .pilot-protocol-grid { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .pilot-protocol-form { box-shadow: none; } }
+
+.pilot-why-panel {
+  display: grid;
+  gap: .55rem;
+  margin-top: .8rem;
+  padding: .8rem;
+  border: 1px solid rgba(245, 190, 74, .38);
+  border-radius: .55rem;
+  background: linear-gradient(145deg, rgba(74, 54, 17, .25), rgba(8, 16, 27, .48));
+}
+.pilot-why-panel h3 { margin: 0; color: #f5be4a; letter-spacing: .12em; font-size: .74rem; }
+.pilot-why-panel p { margin: 0; }

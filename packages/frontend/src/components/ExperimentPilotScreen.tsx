@@ -16,6 +16,7 @@ import {
   type ExperimentValue,
   designScientificExperiment,
   executeScientificExperiment,
+  explainScientificEvidence,
   type ScientificExperimentDesign,
   type ScientificEvidenceChain,
 } from '../core/experimentFabric';
@@ -88,6 +89,7 @@ export function ExperimentPilotScreen() {
   const [protocolTolerance, setProtocolTolerance] = useState('');
   const [protocolDesign, setProtocolDesign] = useState<ScientificExperimentDesign | null>(null);
   const [protocolEvidence, setProtocolEvidence] = useState<ScientificEvidenceChain | null>(null);
+  const [protocolAdvice, setProtocolAdvice] = useState<ReturnType<typeof explainScientificEvidence> | null>(null);
 
   const selectedModel = modelId ? getRouterModel(modelId) : undefined;
 
@@ -97,6 +99,7 @@ export function ExperimentPilotScreen() {
     setReplay(null);
     setProtocolDesign(null);
     setProtocolEvidence(null);
+    setProtocolAdvice(null);
     setError(null);
   }
 
@@ -121,6 +124,7 @@ export function ExperimentPilotScreen() {
   function handleBuildProtocol() {
     setError(null);
     setProtocolEvidence(null);
+    setProtocolAdvice(null);
     try {
       const baselineRequest = buildBaselineRequest();
       if (!baselineRequest.modelId) throw new Error('Wybrany model nie ma identyfikatora wykonawczego.');
@@ -159,7 +163,9 @@ export function ExperimentPilotScreen() {
     setBusy(true);
     setError(null);
     try {
-      setProtocolEvidence(executeScientificExperiment(protocolDesign));
+      const evidence = executeScientificExperiment(protocolDesign);
+      setProtocolEvidence(evidence);
+      setProtocolAdvice(explainScientificEvidence(evidence));
       setPhase('ran');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -354,6 +360,7 @@ export function ExperimentPilotScreen() {
           <div className="pilot-disclosure"><span className={`honesty ${protocolEvidence.assessment.assessment === 'SUPPORTED_WITHIN_PROTOCOL' ? 'simplified' : 'theoretical'}`}>{protocolEvidence.assessment.assessment}</span><p className="pilot-summary">{protocolEvidence.assessment.message}</p></div>
           <dl className="pilot-outputs">{protocolEvidence.arms.map((arm) => <div key={arm.armId} className="pilot-output-row"><dt>{arm.kind} · {arm.armId}</dt><dd>{arm.outputValues.join(' / ')} {arm.units} · {arm.reproduction}</dd></div>)}</dl>
           <dl className="pilot-provenance"><div><dt>evidenceId</dt><dd className="mono">{protocolEvidence.evidenceId}</dd></div><div><dt>runs</dt><dd>{protocolEvidence.allRuns.length} · createdFromRealRunsOnly=true</dd></div><div><dt>provenance</dt><dd className="mono">{protocolEvidence.provenanceFingerprint}</dd></div></dl>
+          {protocolAdvice && <div className="pilot-why-panel"><h3>WHY / NEXT EXPERIMENT</h3><p className="pilot-summary">{protocolAdvice.why}</p><p><strong>Baza dowodu:</strong> {protocolAdvice.evidenceBasis.join(' · ')}</p><ul className="pilot-limitations">{protocolAdvice.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul><p><strong>Następny bounded krok:</strong> {protocolAdvice.nextExperiment.action}</p><p><strong>Parametr:</strong> <code>{protocolAdvice.nextExperiment.parameter}</code> · {protocolAdvice.nextExperiment.rationale}</p><span className="honesty theoretical">AUTO-RUN: DISABLED</span></div>}
         </section>
       )}
 

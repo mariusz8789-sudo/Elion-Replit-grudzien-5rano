@@ -98,6 +98,7 @@ export {
 
 export { designScientificExperiment } from './scientificPlanner';
 export { executeScientificExperiment } from './scientificExecutor';
+export { explainScientificEvidence, type WhyNextExperimentAdvice } from './whyNextExperiment';
 export { EVIDENCE_PACK_VERSION, createScientificEvidencePack, serializeScientificEvidencePack, type EvidencePackRun, type ScientificEvidencePack } from './evidencePack';
 export { RO_CRATE_EVIDENCE_PACK_VERSION, exportEvidencePackRoCrate, serializeEvidencePackRoCrate, type GenesisRoCrate, type RoCrateGraphNode } from './evidencePackRoCrate';
 export { COUNTERFACTUAL_COMPARISON_VERSION, compareCounterfactual, serializeCounterfactualComparison, type CounterfactualComparisonStatus, type SeedControlStatus, type CounterfactualComparisonInput, type CounterfactualModelIdentity, type ParameterDifference, type CounterfactualMetric, type CounterfactualEvidence, type CounterfactualComparison } from './counterfactualCompare';

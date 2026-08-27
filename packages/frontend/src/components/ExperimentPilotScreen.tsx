@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   listRouterModels,
   getRouterModel,
@@ -21,6 +21,7 @@ import {
   explainScientificEvidence,
   createScientificEvidencePack,
   saveScientificEvidencePack,
+  getScientificEvidencePack,
   serializeScientificEvidencePack,
   serializeEvidencePackRoCrate,
   analyseExperimentSeries,
@@ -102,6 +103,23 @@ export function ExperimentPilotScreen() {
   const [protocolAdvice, setProtocolAdvice] = useState<ReturnType<typeof explainScientificEvidence> | null>(null);
 
   const selectedModel = modelId ? getRouterModel(modelId) : undefined;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+    const evidencePackId = params.get('replay');
+    if (!evidencePackId) return;
+    const stored = getScientificEvidencePack(evidencePackId);
+    if (!stored) {
+      setError(`Nie znaleziono lokalnego Evidence Pack: ${evidencePackId}`);
+      return;
+    }
+    setInputMode('protocol');
+    setProtocolDesign(stored.pack.protocol);
+    setProtocolEvidence(null);
+    setProtocolAdvice(null);
+    setPhase('planned');
+  }, []);
+
   const protocolSeriesAnalysis = useMemo(() => {
     if (!protocolEvidence || !protocolParameter.trim()) return null;
     return analyseExperimentSeries(protocolEvidence.allRuns, protocolParameter, protocolEvidence.design.primaryMetric);

@@ -90,7 +90,10 @@ for (const item of artifacts) {
   const raw = await download(item.url);
   const text = raw.toString('utf8');
   for (const marker of item.mustContain) {
-    if (!text.includes(marker)) throw new Error(`${item.id}: payload missing required marker ${marker}`);
+    if (!text.includes(marker)) {
+      const preview = text.slice(0, 240).replace(/\s+/g, ' ');
+      throw new Error(`${item.id}: payload missing required marker ${marker}; bytes=${raw.byteLength}; preview=${preview}`);
+    }
   }
   const sha256 = createHash('sha256').update(raw).digest('hex');
   const target = join(OUT, item.file);

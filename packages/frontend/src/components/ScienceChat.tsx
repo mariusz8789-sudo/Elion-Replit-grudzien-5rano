@@ -112,6 +112,7 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
 }
 
 const SUGGESTIONS = [
+  'Zasymuluj epidemię z R0=5 przez 10 dni seed=12',
   'Uruchom trzęsienie ziemi magnitude=5.4 depth=12 km',
   'Pokaż diagram Minkowskiego beta=0.5',
   'Zintegruj geodezyjną fotonu wokół czarnej dziury Schwarzschilda',

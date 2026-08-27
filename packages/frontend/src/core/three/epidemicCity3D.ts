@@ -8,6 +8,7 @@ import { SimulationClock, type ClockSpeed } from '../simulationClock/clock';
 import type { SimAgent, WorldObject } from '../simulation/types';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import type { EarthquakeCityOverlayProjection } from '../simulationRenderer/earthquakeCoordinateMapping';
+import { resolveSafeFocusDirection, type CameraOccluder } from './cityCameraSafety';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { isWorldAssetApproved, isWorldAssetPathApproved } from './assetGovernance';
 import {
@@ -109,6 +110,8 @@ export class EpidemicCity3DSim implements Sim3D {
   private analysisMaterial: THREE_NS.MeshBasicMaterial | null = null;
   private cityMaterials: CityPbrMaterials | null = null;
   private semanticBuildingSlots: Array<{ group: THREE_NS.Group; building: WorldObject }> = [];
+  /** Renderer-only visual volumes used to keep agent-focus shots outside building geometry. */
+  private cameraOccluders: CameraOccluder[] = [];
   private approvedFacadeTemplate: THREE_NS.Object3D | null = null;
   private approvedLampTemplate: THREE_NS.Object3D | null = null;
   private approvedAssetRoots: THREE_NS.Object3D[] = [];
@@ -367,6 +370,15 @@ export class EpidemicCity3DSim implements Sim3D {
     if (this.followTarget) {
       const focusDistance = this.getOrbitFocusDistance() ?? 4.2;
       const focusDirection = this.getOrbitCameraDirection() ?? new this.THREE.Vector3(1, 0.72, 1).normalize();
+      if (this.cameraPreset === 'agent') {
+        const safe = resolveSafeFocusDirection(
+          this.followTarget,
+          { x: focusDirection.x, y: focusDirection.y, z: focusDirection.z },
+          focusDistance,
+          this.cameraOccluders,
+        );
+        if (safe) focusDirection.set(safe.x, safe.y, safe.z);
+      }
       // Pierwsza klatka focusu używa tej samej orientacji co wspólna pętla OrbitControls, bez drugiej kamery.
       camera.position.copy(this.followTarget).addScaledVector(focusDirection, focusDistance);
       camera.lookAt(this.followTarget);
@@ -538,6 +550,7 @@ export class EpidemicCity3DSim implements Sim3D {
     for (const asset of this.approvedAssetRoots) this.scene?.remove(asset);
     this.approvedAssetRoots = [];
     this.semanticBuildingSlots = [];
+    this.cameraOccluders = [];
   }
 
   /** Materiały są ładowane tylko po przejściu istniejącej bramki Asset Governance. */
@@ -992,6 +1005,13 @@ export class EpidemicCity3DSim implements Sim3D {
     const cornice = new THREE.Mesh(new THREE.BoxGeometry(w * 1.10, 0.035, d * 1.12), new THREE.MeshStandardMaterial({ color: 0xced4d4, roughness: 0.48, metalness: 0.18 }));
     cornice.position.y = height * 0.72; group.add(cornice);
     group.userData.visualOnlyContext = true;
+    this.cameraOccluders.push({
+      centerX: x,
+      centerZ: z,
+      halfWidth: w / 2,
+      halfDepth: d / 2,
+      top: height + (serial % 3 === 0 ? 0.20 : 0.105),
+    });
     group.position.set(x, 0, z);
     return group;
   }
@@ -1372,6 +1392,15 @@ export class EpidemicCity3DSim implements Sim3D {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
     });
+    if (building.kind !== 'park') {
+      this.cameraOccluders.push({
+        centerX: x,
+        centerZ: z,
+        halfWidth: w / 2,
+        halfDepth: d / 2,
+        top: s.height + 0.20,
+      });
+    }
     group.position.set(x, 0, z);
     this.semanticBuildingSlots.push({ group, building });
     return group;

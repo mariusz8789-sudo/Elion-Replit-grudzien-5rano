@@ -5,6 +5,7 @@ import {
   parseScienceChatMessage,
   planEvidenceGuidedExperiment,
   confirmEvidenceGuidedExperiment,
+  confirmEarthquakeEvidenceGuidedExperiment,
   isBackendEvidenceGuidedPlan,
   createScenarioCapsule,
   serializeScenarioCapsule,
@@ -216,7 +217,9 @@ export function ExperimentPilotScreen() {
     try {
       const result = isBackendEvidenceGuidedPlan(plan)
         ? await confirmBackendEvidenceGuidedExperiment(plan)
-        : confirmEvidenceGuidedExperiment(plan);
+        : plan.request.modelId === 'earthquake-scenario'
+          ? await confirmEarthquakeEvidenceGuidedExperiment(plan)
+          : confirmEvidenceGuidedExperiment(plan);
       setConfirmed(result);
       setPhase('ran');
     } catch (e) {

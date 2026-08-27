@@ -97,7 +97,7 @@ export {
 } from './scientificDiscovery';
 
 export { designScientificExperiment } from './scientificPlanner';
-export { executeScientificExperiment } from './scientificExecutor';
+export { executeScientificExperiment, executeScientificBackendExperiment } from './scientificExecutor';
 export { explainScientificEvidence, type WhyNextExperimentAdvice } from './whyNextExperiment';
 export { EVIDENCE_PACK_VERSION, createScientificEvidencePack, serializeScientificEvidencePack, type EvidencePackRun, type ScientificEvidencePack } from './evidencePack';
 export { RO_CRATE_EVIDENCE_PACK_VERSION, exportEvidencePackRoCrate, serializeEvidencePackRoCrate, type GenesisRoCrate, type RoCrateGraphNode } from './evidencePackRoCrate';

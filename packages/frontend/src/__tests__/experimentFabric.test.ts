@@ -1172,7 +1172,7 @@ describe('Genesis Experiment Fabric', () => {
     expect(request.modelId).toBe('quantum-chemistry-pyscf-h2-rhf');
     expect(request.domainId).toBe('quantum-chemistry');
     expect(request.parameters).toEqual({ bondLengthAngstrom: 0.74 });
-    expect(planned.plan.engine).toBe('pyscf@2.13.0');
+    expect(planned.plan.engine).toBe('pyscf@2.14.0');
     expect(planned.plan.runnable).toBe(true);
     expect(planned.status).toBe('READY_FOR_CONFIRMATION');
     expect(planned.disclosure.capability).toBe('BACKEND_REAL_ENGINE');

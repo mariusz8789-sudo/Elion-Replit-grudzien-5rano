@@ -18,15 +18,15 @@ function buildArmId(designSeed: object, suffix: string): string {
 }
 
 /**
- * Creates a preregistered protocol. It validates only existing local real
- * models; absent capabilities must remain in the Experiment Fabric seam path.
+ * Creates a preregistered protocol. It validates only existing real models,
+ * whether local or explicitly admitted backend engines; absent capabilities must remain in the Experiment Fabric seam path.
  */
 export function designScientificExperiment(input: ScientificExperimentInput): ScientificExperimentDesign {
   const { hypothesis, baselineRequest, sweep } = input;
   const domain = getKnowledgeDomain(hypothesis.domainId);
   const routerModel = getRouterModel(hypothesis.modelId);
-  if (!domain || !routerModel || domain.capability !== 'REAL_ENGINE' || !domain.realModels.includes(hypothesis.modelId)) {
-    throw new Error('Scientific Discovery Layer can design a protocol only for an existing REAL_ENGINE registered in Knowledge Registry.');
+  if (!domain || !routerModel || !['REAL_ENGINE', 'BACKEND_REAL_ENGINE'].includes(domain.capability) || !domain.realModels.includes(hypothesis.modelId)) {
+    throw new Error('Scientific Discovery Layer can design a protocol only for an existing admitted real engine registered in Knowledge Registry.');
   }
   if (baselineRequest.domainId !== hypothesis.domainId || baselineRequest.modelId !== hypothesis.modelId) {
     throw new Error('Baseline request must target the same domain and model as the hypothesis.');

@@ -1,3 +1,4 @@
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   confirmBackendEvidenceGuidedExperiment,
@@ -5,6 +6,10 @@ import {
   isBackendEvidenceGuidedPlan,
   parseScienceChatMessage,
   planEvidenceGuidedExperiment,
+  designScientificExperiment,
+  executeScientificBackendExperiment,
+  createScientificEvidencePack,
+  serializeScientificEvidencePack,
 } from '../core/experimentFabric';
 
 function fakeResponse(body: unknown, status = 200): Response {
@@ -266,18 +271,18 @@ const tunnelingRun = {
 const pyscfRun = {
   runId: '0aa4e400-0000-4000-8000-000000000004',
   modelId: 'quantum-chemistry-pyscf-h2-rhf',
-  modelVersion: '1.0.0',
+  modelVersion: '1.1.0',
   domain: 'quantum-chemistry',
   engine: 'genesis-compute@1.0.0',
   status: 'ok',
   deterministic: true,
   outputs: { energyHartree: -1.11675931, homoHartree: -0.578554, lumoHartree: 0.671143, homoLumoGapHartree: 1.249697, homoLumoGapEv: 34.0052, dipoleDebye: 0, nElectrons: 2, nBasisFunctions: 2 },
   units: { energyHartree: 'Hartree', homoHartree: 'Hartree', lumoHartree: 'Hartree', homoLumoGapHartree: 'Hartree', homoLumoGapEv: 'eV', dipoleDebye: 'D', nElectrons: '', nBasisFunctions: '' },
-  warnings: ['PySCF 2.13.0; RHF/sto-3g; neutral H2 singlet.'],
+  warnings: ['PySCF 2.14.0; RHF/sto-3g; neutral H2 singlet.'],
   validity: 'H2 only, 0.5–3.0 Å, real validated PySCF runtime.',
   assumptions: ['Neutralny H2, singlet, RHF/STO-3G.'],
   provenance: {
-    source: 'compute/qm_worker.py via compute/qmAdapter.mjs', formula: 'PySCF RHF single-point; H2 singlet; STO-3G', honesty: 'real_external_engine', engine: 'PySCF 2.13.0', requiredEnvironmentVariable: 'GENESIS_PYSCF_PYTHON',
+    source: 'compute/qm_worker.py via compute/qmAdapter.mjs', formula: 'PySCF RHF single-point; H2 singlet; STO-3G', honesty: 'real_external_engine', engine: 'PySCF 2.14.0', requiredEnvironmentVariable: 'GENESIS_PYSCF_PYTHON',
   },
 };
 
@@ -588,9 +593,72 @@ describe('backend Evidence-Guided execution', () => {
       contractVersion: '1.0.0', modelId: 'quantum-chemistry-pyscf-h2-rhf', domainId: 'quantum-chemistry', inputs: { bondLengthAngstrom: 0.74 },
     });
     expect(confirmed.run.result.outputs.energyHartree).toBeCloseTo(-1.11675931, 12);
-    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('PySCF 2.13.0');
+    expect(confirmed.run.provenance.backendExecution?.backendProvenance.engine).toBe('PySCF 2.14.0');
     expect(capsuleFromConfirmedExperiment(confirmed).backendExecution?.backendRunId).toBe(pyscfRun.runId);
   });
+
+  it('executes both PySCF H2 basis arms through the existing scientific chain and Evidence Pack contract', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      const basis = body.inputs?.basis ?? (fetchMock.mock.calls.length === 1 ? 'sto-3g' : '6-31g');
+      const isSto3g = basis === 'sto-3g';
+      const run = {
+        ...pyscfRun,
+        runId: isSto3g ? pyscfRun.runId : '0aa4e400-0000-4000-8000-000000000404',
+        outputs: { ...pyscfRun.outputs, energyHartree: isSto3g ? -1.11675931 : -1.12675532, nBasisFunctions: isSto3g ? 2 : 6 },
+        warnings: [`PySCF 2.14.0; RHF/${basis}; neutral H2 singlet.`],
+        assumptions: [`Neutralny H2, singlet, RHF/${basis}.`],
+        provenance: { ...pyscfRun.provenance, formula: `PySCF RHF single-point; H2 singlet; ${basis.toUpperCase()}`, engine: 'PySCF 2.14.0' },
+      };
+      return fakeResponse({ contractVersion: '1.0.0', request: body, run, persisted: false });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'W tej samej geometrii zmiana prerejestrowanej bazy zmienia energię RHF H2.',
+        domainId: 'chemistry', modelId: 'quantum-chemistry-pyscf-h2-rhf', declaredAssumptions: [],
+        falsification: { metric: 'energyHartree', relation: 'less-than', expectedValue: -1.1, rationale: 'Oba realne arms muszą zwrócić skończoną energię poniżej progu.' },
+      },
+      baselineRequest: { ...parseScienceChatMessage('Uruchom PySCF RHF dla H2; długość wiązania 0.74 Å.'), domainId: 'chemistry', modelId: 'quantum-chemistry-pyscf-h2-rhf', parameters: { bondLengthAngstrom: 0.74, basis: 'sto-3g' } },
+      sweep: { parameter: 'basis', values: ['sto-3g', '6-31g'], label: 'Baza obliczeniowa' },
+      repetitionsPerArm: 1,
+    });
+    const evidence = await executeScientificBackendExperiment(design);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(evidence.createdFromRealRunsOnly).toBe(true);
+    expect(evidence.allRuns).toHaveLength(2);
+    expect(evidence.allRuns.every((run) => run.provenance.backendExecution?.backendProvenance.engine === 'PySCF 2.14.0')).toBe(true);
+    expect(evidence.arms.map((arm) => arm.outputValues[0])).toEqual([-1.11675931, -1.12675532]);
+    expect(evidence.arms.every((arm) => arm.reproduction === 'MATCH')).toBe(true);
+    const pack = createScientificEvidencePack(evidence);
+    expect(pack.runCount).toBe(2);
+    expect(pack.reproducibility.allArmsMatched).toBe(true);
+  });
+
+  it.runIf(process.env.GENESIS_REAL_BACKEND === '1')('executes both PySCF H2 basis arms against the real local Fabric and produces a MATCH Evidence Pack', async () => {
+    const nativeFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => nativeFetch(new URL(String(input), 'http://127.0.0.1:8092'), init));
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'W tej samej geometrii zmiana prerejestrowanej bazy zmienia energię RHF H2.',
+        domainId: 'chemistry', modelId: 'quantum-chemistry-pyscf-h2-rhf', declaredAssumptions: [],
+        falsification: { metric: 'energyHartree', relation: 'less-than', expectedValue: -1.1, rationale: 'Oba realne arms muszą zwrócić energię poniżej prerejestrowanego progu.' },
+      },
+      baselineRequest: { ...parseScienceChatMessage('Uruchom PySCF RHF dla H2; długość wiązania 0.74 Å.'), domainId: 'chemistry', modelId: 'quantum-chemistry-pyscf-h2-rhf', parameters: { bondLengthAngstrom: 0.74, basis: 'sto-3g' } },
+      sweep: { parameter: 'basis', values: ['sto-3g', '6-31g'], label: 'Baza obliczeniowa' }, repetitionsPerArm: 1,
+    });
+    const evidence = await executeScientificBackendExperiment(design);
+    const pack = createScientificEvidencePack(evidence);
+    expect(evidence.allRuns).toHaveLength(2);
+    expect(evidence.allRuns.every((run) => run.provenance.backendExecution?.backendProvenance.engine === 'PySCF 2.14.0')).toBe(true);
+    expect(evidence.arms.every((arm) => arm.reproduction === 'MATCH')).toBe(true);
+    expect(pack.reproducibility.allArmsMatched).toBe(true);
+    expect(pack.runs.map((run) => run.parameters.basis)).toEqual(['sto-3g', '6-31g']);
+    if (process.env.GENESIS_WRITE_REAL_EVIDENCE === '1') {
+      mkdirSync('docs/evidence', { recursive: true });
+      writeFileSync('docs/evidence/GENESIS_PYSCF_H2_AB_EVIDENCE.json', `${serializeScientificEvidencePack(pack)}\n`, 'utf8');
+    }
+  }, 30000);
 
   it('confirms a reviewed OpenMM MD reference plan through the canonical backend and preserves engine provenance', async () => {
     const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ contractVersion: '1.0.0', request: {}, run: openmmRun, persisted: false }));

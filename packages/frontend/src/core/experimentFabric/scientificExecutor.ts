@@ -1,5 +1,7 @@
 import { canonicalJson, fnv1a } from '../events/hash';
 import { runExperiment } from './executor';
+import { confirmBackendEvidenceGuidedExperiment } from './backendExecution';
+import { planEvidenceGuidedExperiment } from './evidenceGuidedChat';
 import { SCIENTIFIC_DISCOVERY_VERSION, type ExperimentArmEvidence, type ReproductionVerdict, type ScientificEvidenceChain, type ScientificExperimentDesign } from './scientificDiscovery';
 import type { ExperimentRun } from './types';
 
@@ -92,6 +94,38 @@ function assessPredeclaredCriterion(design: ScientificExperimentDesign, arms: re
  * Runs an immutable design only through the established Fabric executor. No
  * simulator, random sample or numerical result is produced in this module.
  */
+export async function executeScientificBackendExperiment(design: ScientificExperimentDesign): Promise<ScientificEvidenceChain> {
+  const executed = [] as { evidence: ExperimentArmEvidence; runs: ExperimentRun[] }[];
+  for (const arm of design.arms) {
+    const runs: ExperimentRun[] = [];
+    for (let i = 0; i < design.repetitionsPerArm; i += 1) {
+      const request = { ...arm.request, parameters: { ...arm.request.parameters } };
+      const reviewedPlan = planEvidenceGuidedExperiment(request);
+      if (reviewedPlan.status !== 'READY_FOR_CONFIRMATION') throw new Error(`Backend arm ${arm.armId} is not runnable: ${reviewedPlan.status}.`);
+      const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewedPlan);
+      runs.push(confirmed.run);
+    }
+    const numeric = runs.map((run) => run.result.outputs[design.primaryMetric]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    const firstWithUnit = runs.find((run) => Boolean(run.result.units[design.primaryMetric]));
+    const flags: string[] = [];
+    if (numeric.length !== runs.length) flags.push('PRIMARY_METRIC_NOT_NUMERIC');
+    const reproduction = reproductionVerdict(runs);
+    if (reproduction === 'DRIFT') flags.push('REPEAT_DRIFT');
+    executed.push({
+      evidence: {
+        armId: arm.armId, kind: arm.kind, runIds: runs.map((run) => run.runId), runFingerprints: runs.map((run) => run.provenance.runFingerprint),
+        outputValues: numeric, units: firstWithUnit?.result.units[design.primaryMetric] ?? '', reproduction, anomalyFlags: flags,
+      },
+      runs,
+    });
+  }
+  const arms = executed.map((entry) => entry.evidence);
+  const allRuns = executed.flatMap((entry) => entry.runs);
+  const assessment = assessPredeclaredCriterion(design, arms);
+  const provenanceFingerprint = `evidence_${fnv1a(canonicalJson({ protocol: design.protocolFingerprint, primaryMetric: design.primaryMetric, arms: arms.map((arm) => ({ armId: arm.armId, runFingerprints: arm.runFingerprints, values: arm.outputValues, reproduction: arm.reproduction })) }))}`;
+  return { contractVersion: SCIENTIFIC_DISCOVERY_VERSION, evidenceId: provenanceFingerprint, design, arms, assessment, allRuns, provenanceFingerprint, createdFromRealRunsOnly: true };
+}
+
 export function executeScientificExperiment(design: ScientificExperimentDesign): ScientificEvidenceChain {
   const executed = design.arms.map((arm) => armEvidence(design, arm));
   const arms = executed.map((entry) => entry.evidence);

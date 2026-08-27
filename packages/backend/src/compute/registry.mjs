@@ -768,9 +768,12 @@ const MODELS = [
   {
     ...functionModel(
       {
-        id: 'quantum-chemistry-pyscf-h2-rhf', name: 'H₂ RHF/STO-3G (PySCF)', domain: 'quantum-chemistry', version: '1.0.0',
+        id: 'quantum-chemistry-pyscf-h2-rhf', name: 'H₂ RHF basis comparison (PySCF)', domain: 'quantum-chemistry', version: '1.1.0',
         description: 'Rzeczywiste obliczenie single-point Hartreego–Focka dla neutralnego H₂ w zadanej odległości między jądrami przez PySCF.',
-        inputs: [{ id: 'bondLengthAngstrom', label: 'Długość wiązania H–H', type: 'number', unit: 'Å', min: 0.5, max: 3, default: 0.74 }],
+        inputs: [
+          { id: 'bondLengthAngstrom', label: 'Długość wiązania H–H', type: 'number', unit: 'Å', min: 0.5, max: 3, default: 0.74 },
+          { id: 'basis', label: 'Baza obliczeniowa PySCF', type: 'string', unit: '', maxLength: 20, default: 'sto-3g' },
+        ],
         outputs: [
           { id: 'energyHartree', label: 'Energia całkowita RHF', unit: 'Hartree' },
           { id: 'homoHartree', label: 'Orbital HOMO', unit: 'Hartree' },
@@ -781,11 +784,11 @@ const MODELS = [
           { id: 'nElectrons', label: 'Liczba elektronów', unit: '' },
           { id: 'nBasisFunctions', label: 'Liczba funkcji bazowych', unit: '' },
         ],
-        assumptions: 'Neutralny H₂, singlet, geometria liniowa H(0,0,0)–H(0,0,R), metoda restricted Hartree–Fock i minimalna baza STO-3G. Jest to obliczenie modelowe single-point, nie pomiar ani predykcja własności biologicznej, klinicznej lub materiałowej.',
-        validity: 'Wyłącznie H₂ w przedziale 0,5–3,0 Å oraz dostępny interpreter PySCF wskazany przez GENESIS_PYSCF_PYTHON. Nie jest to skan pełnej powierzchni energii, optymalizacja geometrii, chemia wielocząsteczkowa ani wynik wysokiego poziomu ab initio.',
+        assumptions: 'Neutralny H₂, singlet, geometria liniowa H(0,0,0)–H(0,0,R), metoda restricted Hartree–Fock. Dopuszczone są wyłącznie bazy STO-3G i 6-31G. Jest to obliczenie modelowe single-point, nie pomiar ani predykcja własności biologicznej, klinicznej lub materiałowej.',
+        validity: 'Wyłącznie H₂ w przedziale 0,5–3,0 Å, baza sto-3g lub 6-31g oraz dostępny interpreter PySCF wskazany przez GENESIS_PYSCF_PYTHON. Nie jest to skan pełnej powierzchni energii, optymalizacja geometrii, chemia wielocząsteczkowa ani wynik wysokiego poziomu ab initio.',
         provenance: {
           source: 'compute/qm_worker.py via compute/qmAdapter.mjs',
-          formula: 'PySCF RHF single-point; H₂ singlet; STO-3G; R = bondLengthAngstrom',
+          formula: 'PySCF RHF single-point; H₂ singlet; basis ∈ {STO-3G, 6-31G}; R = bondLengthAngstrom',
           honesty: 'real_external_engine',
           engine: 'PySCF runtime (version reported per run)',
           requiredEnvironmentVariable: 'GENESIS_PYSCF_PYTHON',
@@ -799,7 +802,7 @@ const MODELS = [
           ],
           charge: 0,
           spin: 0,
-          basis: 'sto-3g',
+          basis: v.basis,
           method: 'RHF',
         });
         if (!result.ok) throw new Error(result.error + (result.reason ? `: ${result.reason}` : ''));
@@ -830,7 +833,8 @@ const MODELS = [
         };
       },
     ),
-    validate: () => {
+    validate: (v) => {
+      if (!['sto-3g', '6-31g'].includes(String(v.basis).toLowerCase())) return { ok: false, error: 'unsupported_basis', message: 'PySCF H₂ benchmark dopuszcza wyłącznie basis sto-3g albo 6-31g.' };
       const runtime = pyscfDetect();
       if (!runtime.available) return { ok: false, error: 'capability_unavailable', message: `PySCF niedostępny (${runtime.reason}). Skonfiguruj GENESIS_PYSCF_PYTHON do zwalidowanego interpretera PySCF.` };
       const reference = pyscfReferenceCase();

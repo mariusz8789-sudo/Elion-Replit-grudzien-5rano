@@ -31,3 +31,11 @@ The prompt is accepted as the master roadmap. The execution command for every mi
 > FIND ONE REAL GAP → IMPLEMENT THE THINNEST COMPATIBLE CHANGE → TEST → CHROMIUM → BUILD → CI → COMMIT → UPDATE ROADMAP.
 
 A feature is not considered connected merely because a button opens a lab. It is connected only when the request, model execution, result, visualization, provenance, and honest evidence/replay status are observable and tested. Unsupported capability remains `NOT_MODELED` or `UNSUPPORTED`.
+
+## Decision on the automatic-continuation prompt
+
+**Approved as the execution order.** Automatic continuation is enabled after a milestone passes implementation, tests, typecheck, lint, build, Chromium, CI, clean state, and commit. It must stop only for a real scientific, architectural, security, or missing-model blocker; otherwise the next approved milestone starts automatically.
+
+The next active milestone is **Epidemic audit and thin integration**, not Schwarzschild. The current LIVE already has an Epidemic Fabric executor that produces a deterministic `EpidemicCitySimulation`, `WorldState`-compatible outputs, `world-3d` routing, and event summaries. The remaining CTO question is whether Science Chat confirmation and the existing City3D handoff are connected end-to-end without creating a second world or recomputing model statistics.
+
+The prompt is therefore accepted with one non-negotiable interpretation: “connected” means observable request, validated capability, existing model execution, result, route, provenance, and honest evidence/replay status. A lab button or a local parser match alone does not qualify.

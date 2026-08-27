@@ -1,6 +1,6 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 
 const OUT = process.env.GENESIS_NIST_FIXTURE_DIR ?? 'artifacts/atom-bohr-nist';
 const retrievedAt = new Date().toISOString();
@@ -57,9 +57,22 @@ const artifacts = [
 ];
 
 async function download(url) {
-  const response = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Genesis-G3-pinned-fixture/1.0' } });
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${url}`);
-  return Buffer.from(await response.arrayBuffer());
+  const transient = new Set([429, 500, 502, 503, 504]);
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Genesis-G3-pinned-fixture/1.0' } });
+      if (response.ok) return Buffer.from(await response.arrayBuffer());
+      if (!transient.has(response.status) || attempt === 3) {
+        throw new Error(`${response.status} ${response.statusText} for ${url}`);
+      }
+      console.log(`G3 RETRY ${attempt}/2 ${response.status} ${url}`);
+    } catch (error) {
+      if (attempt === 3 || !String(error).match(/(?:502|503|504|429|fetch failed)/i)) throw error;
+      console.log(`G3 RETRY ${attempt}/2 transient network error for ${url}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+  }
+  throw new Error(`unreachable download state for ${url}`);
 }
 
 await mkdir(OUT, { recursive: true });

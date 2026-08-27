@@ -49,6 +49,29 @@ export function statusForCapability(capability: KnowledgeCapability): Experiment
   }
 }
 
+/**
+ * A run that did not complete produced no engine output, so its origin is reported from the
+ * actual run status. Only a completed run may be stamped `real-engine`; a `rejected` or `failed`
+ * REAL_ENGINE run never executed a solver and must not claim one.
+ */
+export function resultOriginForRunStatus(
+  status: ExperimentRunStatus,
+  capability: KnowledgeCapability,
+): ExperimentProvenance['resultOrigin'] {
+  switch (status) {
+    case 'completed': return 'real-engine';
+    case 'knowledge_only': return 'knowledge-only';
+    case 'capability_seam': return 'capability-seam';
+    case 'engine_not_available': return 'engine-not-available';
+    case 'hypothetical_visualization': return 'hypothetical-visualization';
+    case 'rejected':
+    case 'failed': {
+      const declared = resultOriginForCapability(capability);
+      return declared === 'real-engine' ? 'engine-not-available' : declared;
+    }
+  }
+}
+
 export function resultOriginForCapability(capability: KnowledgeCapability): ExperimentProvenance['resultOrigin'] {
   switch (capability) {
     case 'REAL_ENGINE': return 'real-engine';
@@ -92,9 +115,7 @@ export function createExperimentProvenance(input: {
     parameterSnapshot: { ...input.request.parameters },
     seed: input.request.seed,
     deterministic: input.deterministic,
-    resultOrigin: input.result.status === 'completed'
-      ? 'real-engine'
-      : resultOriginForCapability(input.plan.intent.capability),
+    resultOrigin: resultOriginForRunStatus(input.result.status, input.plan.intent.capability),
     ...(input.backendExecution === undefined ? {} : { backendExecution: input.backendExecution }),
   };
 }

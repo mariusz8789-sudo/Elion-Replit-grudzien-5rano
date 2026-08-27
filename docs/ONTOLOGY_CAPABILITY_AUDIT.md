@@ -43,15 +43,29 @@ Date: 2026-08-27. Source of truth: current Genesis code on `manus/high-fidelity-
 | Discovery Timeline | `EDUCATIONAL` / `NOT A SOLVER` | Narrative visualization exists | Keep outside solver and evidence claims |
 | Flood | `NOT_MODELED` or `MODEL_AVAILABLE / NOT_CONNECTED` | No admitted connected flood solver in LIVE route registry | Do not fake flood impacts; only add after a validated deterministic model exists |
 | Wildfire | `NOT_MODELED` | No connected scientific model and no approved data contract | Park |
-| Water quality / environmental chemistry | `MODEL_AVAILABLE / NOT_CONNECTED` | Possible chemistry/backend seams do not constitute an environmental solver | Require data schema, source, timestamp, license and provenance first |
+| Water quality / environmental chemistry | `MODEL_AVAILABLE / NOT_CONNECTED` | Possible chemistry/backend seams do not constitute an environmental solver | Require data schema, source, timestamp, license and provenance first; no operational toxic-release guidance |
 | Structural engineering / FEA | `MODEL_AVAILABLE / NOT_CONNECTED` | External solver seams are non-executable without validated runtime | Do not claim structural damage in Earthquake |
 | Chemical kinetics beyond existing bounded route | `PARTIAL` / `VERIFY_REQUIRED` | Existing local models and external seams have different evidence levels | Keep claims model-bounded; no laboratory or industrial prediction |
 | CFD / energy systems / radiation / climate | `MODEL_AVAILABLE / NOT_CONNECTED` | External adapters and manifests exist but do not execute locally | Keep as explicit non-executable seams |
-| Drug discovery / aging biology | `MODEL_AVAILABLE / NOT_CONNECTED` | Data-backed DepMap seam and backend contracts exist | Require validated data artifacts and backend execution; no patient/therapeutic claims |
+| Drug discovery / aging biology | `MODEL_AVAILABLE / NOT_CONNECTED` | Data-backed DepMap seam and backend contracts exist | Require validated data artifacts and backend execution; no patient/therapeutic claims and no automatic molecular design |
 | Kerr full 3D/4D | `NOT_MODELED` | No admitted connected Kerr renderer/solver | Park |
 | Collider / Matrix / second renderer/world | `VERIFY_REQUIRED` / `PARKED` | Conflicts with one-renderer/one-world architecture | Forbidden until separately approved |
 | GIS, OSM/DEM, live external data | `VERIFY_REQUIRED` / `PARKED` | Import seams require complete provenance/licensing/security design | No live fetch in current Genesis contract |
 | Wormholes, grandfather paradox, physical time travel | `EDUCATIONAL` only if later bounded | No physical solver or evidence basis | Keep hypothetical and outside real solver path |
+
+## Newly supplied Gemini capability proposals
+
+| Proposal | LIVE classification | Minimum admissibility gate | Decision |
+|---|---|---|---|
+| Singlet-oxygen / photochemistry | `MODEL_AVAILABLE / NOT_CONNECTED` | Validated molecular input, quantum-chemistry runtime, solvent/photophysics assumptions, provenance and non-operational safety review | Park; do not add a parser card as if it were a solver |
+| QM/MM drug docking / binding affinity | `MODEL_AVAILABLE / NOT_CONNECTED` | Licensed protein/ligand inputs, validated structure preparation, reproducible runtime, uncertainty and scientific review | Park; negative ΔG is not equivalent to “the drug works” |
+| CRISPR off-target / DNA thermodynamics | `MODEL_AVAILABLE / NOT_CONNECTED` | Explicit sequence scope, validated reference/guide data, safe computational contract and review | Park; no wet-lab protocol or biological efficacy claim |
+| Wildfire / Rothermel or front propagation | `MODEL_AVAILABLE / NOT_CONNECTED` | DEM and fuel-model licensing, weather provenance, validated solver runtime, uncertainty and no live GIS fetch | Park until data and solver are independently admitted |
+| Power-grid cascading failure | `NOT_MODELED` / `MODEL_AVAILABLE` only as seam | Operator-approved topology, secure data boundary, power-flow/cascade solver, validation and threat model | Park; never invent grid topology or outages |
+| Atmospheric toxic dispersion | `NOT_MODELED` / `MODEL_AVAILABLE` only as seam | Validated meteorology and substance schema, safety review, controlled non-operational scope and provenance | Park; do not expose operational release instructions |
+| Structural FEA | `MODEL_AVAILABLE / NOT_CONNECTED` | Geometry/mesh/material licensing, validated CalculiX/Code_Aster runtime, boundary-condition review | Park; Earthquake structural damage remains `NOT_MODELED` |
+
+The proposals are useful as ontology and future package requirements, but none is an ACCEPT candidate for the current browser LIVE. They must enter later as a small, isolated handoff package with full source/solver/data metadata, tests and an explicit `ACCEPT` or `ADAPT` decision. The package itself must never be auto-merged.
 
 ## Priority decision
 

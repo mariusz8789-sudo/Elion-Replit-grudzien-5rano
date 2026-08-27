@@ -30,6 +30,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const seed = firstNumber(normalized, /\bseed\s*[=:]?\s*(\d+)/);
   const r0 = firstNumber(normalized, /\br[₀0]\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const horizonDays = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*(?:dni|dzień|dnia|days?)\b/);
+  const earthquakeMagnitude = firstNumber(normalized, /(?:magnitud[aę]|magnitude|\bm)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const earthquakeDepthKm = firstNumber(normalized, /(?:głębokoś[cć]|glebokosc|depth)\s*[=:]?\s*(\d+(?:[.,]\d+)?)\s*km?/);
+  const earthquakeEpicenterX = firstNumber(normalized, /(?:epicentrum\s*x|\bx)\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
+  const earthquakeEpicenterY = firstNumber(normalized, /(?:epicentrum\s*y|\by)\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
   const proteinSteps = firstNumber(normalized, /\b(?:kroki\s*(?:mc|monte carlo)?|steps)\s*[=:]?\s*(\d+)\b/);
   const massSolar = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*(?:mas(?:a|y)\s+słońca|masy slonca|m[_ ]?sun|msun|solar masses?)\b/);
   const chirpMass1Solar = firstNumber(normalized, /\b(?:m1|masa\s*1|pierwsza\s*masa)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
@@ -93,6 +97,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (seed !== undefined) params.seed = seed;
   if (r0 !== undefined) params.r0 = r0;
   if (horizonDays !== undefined) params.horizonDays = horizonDays;
+  if (earthquakeMagnitude !== undefined) params.magnitude = earthquakeMagnitude;
+  if (earthquakeDepthKm !== undefined) params.depthKm = earthquakeDepthKm;
+  if (earthquakeEpicenterX !== undefined) params.epicenterX = earthquakeEpicenterX;
+  if (earthquakeEpicenterY !== undefined) params.epicenterY = earthquakeEpicenterY;
   if (proteinSteps !== undefined) params.steps = proteinSteps;
   if (massSolar !== undefined) params.massSolar = massSolar;
   if (chirpMass1Solar !== undefined) params.m1Solar = chirpMass1Solar;
@@ -159,7 +167,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     params.viewMode = /(?:zgodne\s+ze\s+(?:znan[a-ząćęłńóśźż]*\s+)?fizyk[a-ząćęłńóśźż]*|porównaj\s+legend[a-ząćęłńóśźż]*\s+z\s+fizyk[a-ząćęłńóśźż]*|porownaj\s+legend[a-ząćęłńóśźż]*\s+z\s+fizyk[a-ząćęłńóśźż]*|czego\s+potrzeba)/.test(normalized) ? 'physics' : 'legend';
     return request('historical-legends', 'historical-philadelphia-legend', 'scene-3d', ['viewMode']);
   }
-  if (/(?:powódź|powodz|pożar|pozar|trzęsienie|trzesienie|blackout|kaskad[a-ząćęłńóśźż]*|ewakuacj[a-ząćęłńóśźż]*)/.test(normalized)) {
+  if (/(?:trzęsienie|trzesienie|earthquake)/.test(normalized)) {
+    return request('hazard-earthquake', 'earthquake-scenario', 'world-3d', ['magnitude', 'depthKm', 'epicenterX', 'epicenterY']);
+  }
+  if (/(?:powódź|powodz|pożar|pozar|blackout|kaskad[a-ząćęłńóśźż]*|ewakuacj[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('hazard-cascade', undefined, 'world-3d', []);
   }
   if (/(?:zderzeni[a-ząćęłńóśźż]* galaktyk|zderzeni[a-ząćęłńóśźż]* galaktyk|kolizj[a-ząćęłńóśźż]* galaktyk|merger galaktyk|toomre)/.test(normalized)) {

@@ -20,6 +20,7 @@ import {
   serializeCounterfactualComparison,
   planEvidenceGuidedExperiment,
   confirmEvidenceGuidedExperiment,
+  confirmEarthquakeEvidenceGuidedExperiment,
   capsuleFromConfirmedExperiment,
   createMajorana1QuantumEvidenceCard,
   createScenarioCapsule,
@@ -1180,6 +1181,21 @@ describe('Genesis Experiment Fabric', () => {
     expect(localAttempt.result.outputs).toEqual({});
   });
 
+  it('routes and confirms the Earthquake Chat request through the existing envelope with honest replay and damage limits', async () => {
+    const request = parseScienceChatMessage('Uruchom trzęsienie ziemi magnitude=5.4 depth=12 km seed=42.');
+    expect(request.domainId).toBe('hazard-earthquake');
+    expect(request.modelId).toBe('earthquake-scenario');
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.plan.route).toEqual({ kind: 'live-world', target: 'epidemic-city', hash: '#/city3d' });
+    const confirmed = await confirmEarthquakeEvidenceGuidedExperiment(planned);
+    expect(confirmed.run.result.status).toBe('completed');
+    expect(confirmed.run.result.outputs.replayStatus).toBe('MATCH');
+    expect(confirmed.run.result.outputs.datasetStatus).toBe('SCENARIO');
+    expect(confirmed.run.result.outputs.structuralDamage).toBe('NOT_MODELED');
+    expect(confirmed.run.result.outputs.impactCount).toBeGreaterThan(0);
+    expect(confirmed.run.result.outputs.damageAssessmentCount).toBeGreaterThan(0);
+  });
   it('routes a Maxwell/FDTD dielectric-interface request to a confirmable real backend PyMeep plan without fabricating local browser output', () => {
     const request = parseScienceChatMessage('Uruchom Meep FDTD dla granicy dielektrycznej n1=1 n2=2.');
     const planned = planEvidenceGuidedExperiment(request);

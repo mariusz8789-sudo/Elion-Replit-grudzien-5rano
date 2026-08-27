@@ -42,6 +42,18 @@ const boolean = (id: string, label: string, defaultValue: boolean): ExperimentPa
 
 const ROUTER_MODELS: readonly RouterModel[] = [
   {
+    id: 'earthquake-scenario', domainId: 'hazard-earthquake', modelVersion: '1.0.0', engine: 'genesis-earthquake-command-center@1.0.0',
+    parameters: [
+      number('magnitude', 'Magnitude scenariusza', '', 0, 12, 5.4),
+      number('depthKm', 'Głębokość ogniska', 'km', 0, 700, 12),
+      number('epicenterX', 'Współrzędna epicentrum X', 'jedn. sceny', -1000, 1000, 0),
+      number('epicenterY', 'Współrzędna epicentrum Y', 'jedn. sceny', -1000, 1000, 0),
+    ],
+    route: { kind: 'live-world', target: 'epidemic-city', hash: '#/city3d' },
+    knowledgeSources: [],
+    rationale: 'Istniejący Earthquake command center: scenariusz syntetyczny → ImpactResult → DamageAssessment → CityWorld mapping → City3D → Evidence → Replay. Structural damage pozostaje NOT_MODELED.',
+  },
+  {
     id: 'einstein-schwarzschild', domainId: 'spacetime-einstein', modelVersion: '1.0.0', engine: 'genesis-physics@1.0.0',
     parameters: [number('massSolar', 'Masa czarnej dziury', 'M☉', 1e-6, 1e12, 1)],
     route: { kind: 'lab', labId: 'einstein' }, knowledgeSources: ['spacetime-einstein.md'],

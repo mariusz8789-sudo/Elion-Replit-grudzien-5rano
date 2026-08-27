@@ -16,12 +16,11 @@
  * Kod wyjścia 0 = zero błędów runtime na sprawdzonych ścieżkach; 2 = wykryto błędy.
  */
 
-import pkg from '/opt/node22/lib/node_modules/playwright/index.js';
-const { chromium } = pkg;
+import { chromium } from 'playwright';
 
 const BASE = process.env.E2E_BASE ?? 'http://127.0.0.1:8092';
 const MODE = process.argv[2] === 'mobile' ? 'mobile' : 'desktop';
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const CHROME = process.env.CHROME ?? '/usr/bin/chromium';
 
 const LABS = ['universe', 'spacetime', 'einstein', 'quantum', 'atom', 'nuclear', 'particle', 'chemistry', 'multiverse', 'civilization', 'biology', 'mathematics', 'discovery'];
 const ROUTES = ['', '#/settings', '#/glossary', '#/discovery-log', '#/what-if', '#/timeline', '#/decision-explorer', '#/reality', '#/prebuild', '#/conflict', '#/projects', '#/cde', '#/drug', '#/campaign'];

@@ -7,7 +7,7 @@ import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
 import { saveExperiment, listExperiments } from '../core/scienceMemory';
 import { track } from '../core/analytics';
-import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
+import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmEarthquakeEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
 import { getToken } from '../core/backend/session';
 import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
@@ -53,7 +53,9 @@ function formatEvidenceGuidedPlan(reviewed: EvidenceGuidedExperimentPlan): strin
     ready
       ? hypothetical
         ? 'Wpisz „potwierdź”, aby otworzyć HYPOTHETICAL_VISUALIZATION z provenance. Genesis nie wygeneruje wyniku fizycznego, danych pomiarowych ani Evidence Pack.'
-        : 'Wpisz „potwierdź” albo użyj przycisku „Uruchom potwierdzony plan”. Pojedynczy run zachowa provenance; Evidence Pack wymaga osobnego prerejestrowanego protokołu, a A/B drugiego wariantu.'
+        : reviewed.request.modelId === 'earthquake-scenario'
+          ? 'Wpisz „potwierdź”, aby uruchomić istniejący Earthquake command center. Wynik pokaże ImpactResult, DamageAssessment, Evidence i Replay MATCH; mapowanie City3D pozostaje scenariuszowe, a structural damage = NOT_MODELED.'
+          : 'Wpisz „potwierdź” albo użyj przycisku „Uruchom potwierdzony plan”. Pojedynczy run zachowa provenance; Evidence Pack wymaga osobnego prerejestrowanego protokołu, a A/B drugiego wariantu.'
       : `Nie uruchomiono wyniku. ${reviewed.validationErrors.length > 0 ? `Walidacja: ${reviewed.validationErrors.join(' ')}` : `Wymagany komponent: ${disclosure.requiredSolver}.`}`,
   ].join('\n\n');
 }
@@ -110,6 +112,7 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
 }
 
 const SUGGESTIONS = [
+  'Uruchom trzęsienie ziemi magnitude=5.4 depth=12 km',
   'Zbadaj problem trzech ciał',
   'Zwiększ masę 2×',
   'Co się zmieniło?',
@@ -125,7 +128,7 @@ export function ScienceChat() {
   const [input, setInput] = useState('');
   const [turns, setTurns] = useState<ChatTurn[]>([{
     role: 'genesis',
-    text: 'Cześć! Jestem Science Chat. Napisz np. „pokaż czarną dziurę", potem „zwiększ masę 2×", a potem „co się zmieniło?". Rozmawiam z realnymi silnikami Genesis i steruję otwartą symulacją.',
+    text: 'Cześć! Jestem Science Chat. Możesz napisać np. „uruchom trzęsienie ziemi magnitude=5.4 depth=12 km”, potwierdzić plan, a następnie zobaczyć wynik w City3D z Evidence i Replay. Obsługuję też istniejące laboratoria i sterowanie otwartą symulacją.',
     tag: 'SYSTEM',
   }]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
@@ -185,7 +188,9 @@ export function ScienceChat() {
         if (backendPlan) setBackendConfirmationPending(true);
         const confirmed = backendPlan
           ? await confirmBackendEvidenceGuidedExperiment(reviewed)
-          : confirmEvidenceGuidedExperiment(reviewed);
+          : reviewed.request.modelId === 'earthquake-scenario'
+            ? await confirmEarthquakeEvidenceGuidedExperiment(reviewed)
+            : confirmEvidenceGuidedExperiment(reviewed);
         const run = confirmed.run;
         const hypothetical = run.result.status === 'hypothetical_visualization';
         if (run.result.status === 'completed') setLastEvidenceCapsule(capsuleFromConfirmedExperiment(confirmed));
@@ -197,7 +202,10 @@ export function ScienceChat() {
         setPendingGuidedPlan(null);
         track('experiment_fabric_run', { model: run.request.modelId ?? run.request.domainId, status: run.result.status, confirmed: 'true' });
         if (run.result.status === 'completed' && run.result.route.kind === 'live-world') {
-          if (setPendingExperimentWorld(run.runId)) window.location.hash = run.result.route.hash;
+          if (run.request.modelId === 'earthquake-scenario') {
+            window.location.hash = run.result.route.hash;
+            setOpen(false);
+          } else if (setPendingExperimentWorld(run.runId)) window.location.hash = run.result.route.hash;
         } else if (run.result.status === 'completed' && run.result.route.kind === 'lab') {
           setPendingScenario(run.result.route.labId, run.provenance.parameterSnapshot, run.result.route.experimentId);
           window.location.hash = `#/lab/${run.result.route.labId}`;

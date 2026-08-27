@@ -1,8 +1,13 @@
 import { canonicalJson, fnv1a } from '../events/hash';
 import { quantumEvidenceCardsForKnowledge, type QuantumEvidenceCard } from '../knowledge/quantumEvidenceCard';
+import { executeEarthquakeCommandCenterScenario } from '../simulationRenderer/earthquakeCommandCenter';
+import { setPendingEarthquakeOverlay } from '../simulationRenderer/earthquakeChatBridge';
+import { codeCommitHash } from '../build/commitHash';
+import { InMemoryHazardProvenanceStore, LocalHazardProvenanceStore } from '../hazard/hazardProvenanceStore';
+import { createExperimentProvenance } from './provenance';
 import { runExperiment } from './executor';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
-import type { ExperimentPlan, ExperimentRun, StructuredExperimentRequest } from './types';
+import type { ExperimentPlan, ExperimentResult, ExperimentRun, StructuredExperimentRequest } from './types';
 
 export const EVIDENCE_GUIDED_CHAT_VERSION = '1.0.0';
 
@@ -175,6 +180,66 @@ export function capsuleFromConfirmedExperiment(confirmed: ConfirmedEvidenceGuide
     ...(run.provenance.backendExecution === undefined ? {} : { backendExecution: run.provenance.backendExecution }),
     route: run.result.route, outputs: run.result.outputs, units: run.result.units,
     limitations: plan.disclosure.limitations, evidencePack: handoff.evidencePack, counterfactual: handoff.counterfactual,
+  };
+}
+
+export async function confirmEarthquakeEvidenceGuidedExperiment(reviewedPlan: EvidenceGuidedExperimentPlan): Promise<ConfirmedEvidenceGuidedExperiment> {
+  const canonicalPlan = planEvidenceGuidedExperiment(reviewedPlan.request);
+  if (canonicalJson(canonicalPlan) !== canonicalJson(reviewedPlan)) {
+    throw new Error('Evidence-Guided Chat Plan was modified after review; rebuild and present the plan before confirmation.');
+  }
+  if (canonicalPlan.status !== 'READY_FOR_CONFIRMATION' || canonicalPlan.request.modelId !== 'earthquake-scenario') {
+    throw new Error(`Earthquake plan cannot be confirmed: ${canonicalPlan.status}.`);
+  }
+  const params = canonicalPlan.request.parameters;
+  const execution = await executeEarthquakeCommandCenterScenario({
+    // Hazard provenance store jest immutable; kolejne kliknięcie tego samego planu musi mieć nowy scenario ID.
+    // Same parametry i seed pozostają jawne, a Experiment Fabric fingerprintuje wynik, nie zegar.
+    scenarioLabel: `science-chat-${canonicalPlan.confirmationId}-${Date.now()}`,
+    magnitude: typeof params.magnitude === 'number' ? params.magnitude : 5.4,
+    depthKm: typeof params.depthKm === 'number' ? params.depthKm : 12,
+    epicenter: {
+      x: typeof params.epicenterX === 'number' ? params.epicenterX : 0,
+      y: typeof params.epicenterY === 'number' ? params.epicenterY : 0,
+    },
+    seed: canonicalPlan.request.seed ?? 42,
+  }, { commitHash: codeCommitHash(), store: typeof window === 'undefined' ? new InMemoryHazardProvenanceStore() : new LocalHazardProvenanceStore() });
+  if (execution.status === 'READY') setPendingEarthquakeOverlay(execution.overlay);
+  const result: ExperimentResult = execution.status === 'READY'
+    ? {
+        contractVersion: canonicalPlan.request.contractVersion,
+        status: 'completed',
+        summary: `Earthquake run gotowy: ${execution.scenario.impacts.length} ImpactResult, ${execution.scenario.damageAssessments.length} DamageAssessment, mapowanie City3D i Replay ${execution.replay.status}.`,
+        outputs: {
+          magnitude: typeof params.magnitude === 'number' ? params.magnitude : 5.4,
+          depthKm: typeof params.depthKm === 'number' ? params.depthKm : 12,
+          impactCount: execution.scenario.impacts.length,
+          damageAssessmentCount: execution.scenario.damageAssessments.length,
+          datasetStatus: execution.envelope.datasetStatus,
+          replayStatus: execution.replay.status,
+          overlayStatus: execution.overlayGate.enabled ? 'ENABLED' : 'BLOCKED',
+          structuralDamage: 'NOT_MODELED',
+        },
+        units: { magnitude: '', depthKm: 'km', impactCount: 'records', damageAssessmentCount: 'records', datasetStatus: '', replayStatus: '', overlayStatus: '', structuralDamage: '' },
+        warnings: [...execution.moduleDescriptor.notModeled, 'Wartości są syntetycznym scenariuszem demonstracyjnym; nie są pomiarem ani prognozą.'],
+        validity: 'Istniejący Earthquake command center z deterministycznym ImpactResult, DamageAssessment, mapowaniem fixture→CityWorld, Evidence i Replay.',
+        assumptions: ['Scenariusz wejściowy jest syntetyczny i jawnie oznaczony SCENARIO.', 'Structural damage pozostaje NOT_MODELED; brak danych nie jest zastępowany estymacją.'],
+        visualization: ['world-3d'],
+        route: canonicalPlan.plan.route ?? { kind: 'none' },
+      }
+    : {
+        contractVersion: canonicalPlan.request.contractVersion,
+        status: 'failed', summary: `Earthquake nie został dopuszczony do City3D: ${execution.blockCode}.`, outputs: { blockCode: execution.blockCode }, units: { blockCode: '' },
+        warnings: [execution.blockReason], assumptions: [], visualization: [], route: { kind: 'none' }, validity: 'Envelope Earthquake wymaga spełnienia wszystkich bramek provenance, evidence, replay i derived-layer determinism.',
+      };
+  const provenance = createExperimentProvenance({ request: canonicalPlan.request, plan: canonicalPlan.plan, result, knowledgeSources: canonicalPlan.plan.intent.knowledgeSources, supplementalKnowledgeIds: canonicalPlan.plan.intent.supplementalKnowledgeIds, deterministic: result.status === 'completed' });
+  const run: ExperimentRun = { contractVersion: canonicalPlan.request.contractVersion, runId: provenance.runFingerprint, request: canonicalPlan.request, intent: canonicalPlan.plan.intent, plan: canonicalPlan.plan, result, provenance };
+  return {
+    contractVersion: EVIDENCE_GUIDED_CHAT_VERSION, plan: canonicalPlan, run,
+    handoff: {
+      evidencePack: { status: 'PROTOCOL_REQUIRED', reason: execution.status === 'READY' ? `Earthquake envelope zawiera Evidence Pack ${execution.evidence.missingFields.length === 0 ? 'COMPLETE' : 'INCOMPLETE'}; pełny protokół ScientificEvidencePack nadal wymaga prerejestracji.` : 'Brak Evidence Pack, ponieważ envelope został zablokowany.', canonicalRunId: run.runId },
+      counterfactual: { status: 'VARIANT_REQUIRED', reason: 'A/B wymaga drugiego jawnie zatwierdzonego scenariusza Earthquake; nie tworzę wariantu automatycznie.', canonicalRunId: run.runId },
+    },
   };
 }
 

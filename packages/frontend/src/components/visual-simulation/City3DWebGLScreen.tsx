@@ -9,6 +9,7 @@ import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
 import { projectWorldState } from '../../core/simulation/worldEngineContract';
 import type { EarthquakeCityOverlayProjection } from '../../core/simulationRenderer/earthquakeCoordinateMapping';
+import { consumePendingEarthquakeOverlay } from '../../core/simulationRenderer/earthquakeChatBridge';
 import { EarthquakeScenarioPanel } from './EarthquakeScenarioPanel';
 import { EvidenceReplayPanel } from './EvidenceReplayPanel';
 import { ScenarioCommandCenterPanel } from './ScenarioCommandCenterPanel';
@@ -77,6 +78,15 @@ export function City3DWebGLScreen() {
   useEffect(() => { sim.setAnalysisMode(analysis); }, [analysis, sim]);
   useEffect(() => { sim.setShowTransmissions(showTransmissions); }, [showTransmissions, sim]);
   useEffect(() => { sim.setEarthquakeScenarioOverlay(earthquakeOverlay); }, [earthquakeOverlay, sim]);
+  useEffect(() => {
+    const applyPending = () => {
+      const pending = consumePendingEarthquakeOverlay();
+      if (pending) setEarthquakeOverlay(pending);
+    };
+    applyPending();
+    window.addEventListener('genesis:earthquake-overlay-ready', applyPending);
+    return () => window.removeEventListener('genesis:earthquake-overlay-ready', applyPending);
+  }, []);
 
   const updateParam = (key: string, value: number | boolean) => {
     sim.setParam(key, value);

@@ -1181,6 +1181,28 @@ describe('Genesis Experiment Fabric', () => {
     expect(localAttempt.result.outputs).toEqual({});
   });
 
+  it('confirms Epidemic through the existing model and hands the same world reference to the high-fidelity 3D renderer', () => {
+    clearExperimentWorldHandoffs();
+    const request = parseScienceChatMessage('Zasymuluj epidemię z R0=5 przez 10 dni seed=12.');
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(request.modelId).toBe('epidemic-city');
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.plan.route).toEqual({ kind: 'live-world', target: 'epidemic-city', hash: '#/hf-slice' });
+    const confirmed = confirmEvidenceGuidedExperiment(planned);
+    expect(confirmed.run.result.status).toBe('completed');
+    expect(confirmed.run.result.route).toEqual(planned.plan.route);
+    expect(confirmed.run.result.outputs).toMatchObject({ S: expect.any(Number), I: expect.any(Number), R: expect.any(Number) });
+    expect(confirmed.handoff.evidencePack.status).toBe('PROTOCOL_REQUIRED');
+    expect(confirmed.handoff.counterfactual.status).toBe('VARIANT_REQUIRED');
+    expect(setPendingExperimentWorld(confirmed.run.runId)).toBe(true);
+    const handoff = consumePendingExperimentWorld();
+    expect(handoff?.runId).toBe(confirmed.run.runId);
+    expect(handoff?.modelId).toBe('epidemic-city');
+    expect(handoff?.simulation.stats()).toEqual(confirmed.run.result.outputs);
+    expect(consumePendingExperimentWorld()).toBeNull();
+    clearExperimentWorldHandoffs();
+  });
+
   it('keeps unsupported time-travel claims outside the real solver path', () => {
     const request = parseScienceChatMessage('Zbuduj fizyczny wehikuł czasu do podróży w przeszłość.');
     expect(request.modelId).toBeUndefined();

@@ -1,6 +1,6 @@
 # Phase 3/4 — Genesis Evolution / Spacetime Navigator
 
-**Status:** PARKED SPECIFICATION  
+**Status:** PARKED SPECIFICATION
 **Source of truth:** LIVE Genesis code and verified model contracts remain authoritative.
 
 ## Product definition

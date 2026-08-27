@@ -1,6 +1,6 @@
 # Genesis Non-Stop Execution Order
 
-**Status:** ACTIVE CTO EXECUTION CONTRACT  
+**Status:** ACTIVE CTO EXECUTION CONTRACT
 **Source of truth:** `manus/high-fidelity-epidemic-digital-twin` LIVE branch.
 
 ## Mission

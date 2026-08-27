@@ -8,6 +8,7 @@ import {
   LocalEvidenceStore,
   listExperimentRegistry,
   summarizeStoredEvidence,
+  validateStoredEvidence,
   type EvidenceStore,
   type ExperimentRegistryEntry,
   type StoredEvidence,
@@ -105,6 +106,7 @@ export function EvidenceReplayPanel() {
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [integrityNotice, setIntegrityNotice] = useState<string | null>(null);
   // SSR cannot probe browser storage. In a browser, do not conflate an
   // unavailable durable registry with an empty list of saved experiments.
   const localPersistenceAvailable = typeof window === 'undefined' ? null : storageAvailable();
@@ -141,6 +143,16 @@ export function EvidenceReplayPanel() {
     try {
       const entry = await store.load(experimentId);
       if (!entry) return;
+      const validation = await validateStoredEvidence(entry);
+      if (!validation.valid) {
+        setCurrent(null);
+        setReplay(null);
+        setDriftDemo(null);
+        setComparison(null);
+        setIntegrityNotice(`Zapis odrzucony: ${validation.issues.join('; ')}.`);
+        return;
+      }
+      setIntegrityNotice(null);
       setCurrent(entry);
       setReplay(null);
       setDriftDemo(null);
@@ -156,7 +168,18 @@ export function EvidenceReplayPanel() {
     setError(null);
     try {
       const stored = await store.load(current.record.caseId);
-      if (stored) setReplay(replayDiscoveryCase(stored.record));
+      if (!stored) {
+        setIntegrityNotice('REPLAY: zapis nie istnieje już w lokalnej historii.');
+        return;
+      }
+      const validation = await validateStoredEvidence(stored);
+      if (!validation.valid) {
+        setIntegrityNotice(`REPLAY BLOCKED: ${validation.issues.join('; ')}.`);
+        setReplay({ status: 'BLOCKED', tolerance: current.record.replayTolerance, arms: [], message: 'Persisted evidence failed integrity validation.' });
+        return;
+      }
+      setIntegrityNotice(null);
+      setReplay(replayDiscoveryCase(stored.record));
     } catch (cause) {
       setError(operationError('REPLAY', cause));
     } finally {
@@ -185,7 +208,22 @@ export function EvidenceReplayPanel() {
     setError(null);
     try {
       const other = await store.load(compareWithId);
-      if (other) setComparison(compareStoredExperiments(current, other));
+      if (!other) {
+        setIntegrityNotice('PORÓWNANIE: wybrany zapis nie istnieje już w lokalnej historii.');
+        return;
+      }
+      const [currentValidation, otherValidation] = await Promise.all([
+        validateStoredEvidence(current),
+        validateStoredEvidence(other),
+      ]);
+      if (!currentValidation.valid || !otherValidation.valid) {
+        const issues = [...currentValidation.issues, ...otherValidation.issues];
+        setIntegrityNotice(`PORÓWNANIE BLOCKED: ${issues.join('; ')}.`);
+        setComparison(null);
+        return;
+      }
+      setIntegrityNotice(null);
+      setComparison(compareStoredExperiments(current, other));
     } catch (cause) {
       setError(operationError('PORÓWNANIE', cause));
     }
@@ -245,6 +283,7 @@ export function EvidenceReplayPanel() {
         )}
       </div>
       {error && <p className="evidence-error" role="alert">{error}</p>}
+      {integrityNotice && <p className="hospital-panel-note evidence-integrity-notice" role="alert">{integrityNotice}</p>}
 
       {current ? (
         <>

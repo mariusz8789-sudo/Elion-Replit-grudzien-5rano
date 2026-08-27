@@ -6,6 +6,7 @@ import {
   InMemoryEvidenceStore,
   listExperimentRegistry,
   summarizeStoredEvidence,
+  validateStoredEvidence,
   type EvidenceStore,
   type StoredEvidence,
 } from '../core/discovery/evidenceStore';
@@ -96,6 +97,30 @@ describe('LocalEvidenceStore — genuinely persistent, unlike the InMemory-only 
     const loaded = await freshInstance.load(entry.record.caseId);
     expect(loaded?.sha256).toBe(entry.sha256);
     expect(loaded?.record.arms[0].run.series.length).toBe(entry.record.arms[0].run.series.length);
+  });
+});
+
+describe('validateStoredEvidence — persisted integrity boundary', () => {
+  it('accepts a real completed entry whose SHA-256 matches the canonical evidence pack', async () => {
+    const entry = await makeEntry();
+    await expect(validateStoredEvidence(entry)).resolves.toEqual({ valid: true, issues: [] });
+  });
+
+  it('rejects a persisted evidence pack when the wrapper digest no longer matches', async () => {
+    const entry = await makeEntry();
+    const validation = await validateStoredEvidence({ ...entry, sha256: 'tampered-sha256' });
+    expect(validation.valid).toBe(false);
+    expect(validation.issues).toContain('sha256 mismatch');
+
+    const store = new InMemoryEvidenceStore();
+    await store.save({ ...entry, sha256: 'tampered-sha256' });
+    expect(await listExperimentRegistry(store)).toEqual([]);
+  });
+
+  it('rejects malformed persisted wrappers before they can be treated as a replayable record', async () => {
+    const validation = await validateStoredEvidence({ schemaVersion: EVIDENCE_STORE_SCHEMA_VERSION, record: null, sha256: null, codeCommitHash: 'test', savedAt: Date.now() });
+    expect(validation.valid).toBe(false);
+    expect(validation.issues).toContain('missing record');
   });
 });
 

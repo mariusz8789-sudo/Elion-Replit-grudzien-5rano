@@ -1,5 +1,6 @@
 import { InMemoryRecordStore, LocalRecordStore } from '../provenance/recordStore';
-import type { DiscoveryCase, DiscoveryCaseStatus } from './discoveryCase';
+import type { DiscoveryCase, DiscoveryCaseStatus, DiscoveryEvidencePack } from './discoveryCase';
+import { computeEvidencePackSha256 } from './evidenceCrypto';
 
 /**
  * EVIDENCE STORE — the persistence Genesis's Discovery Engine never had.
@@ -40,6 +41,53 @@ export interface EvidenceStore {
   load(caseId: string): Promise<StoredEvidence | null>;
   list(): Promise<readonly string[]>;
   delete(caseId: string): Promise<void>;
+}
+
+export interface StoredEvidenceValidation {
+  valid: boolean;
+  issues: readonly string[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Validates the persisted wrapper before any history, comparison or replay use.
+ * This is deliberately a boundary check, not a second Evidence/Replay system:
+ * the canonical DiscoveryCase and its existing replay remain the source of truth.
+ */
+export async function validateStoredEvidence(value: unknown): Promise<StoredEvidenceValidation> {
+  const issues: string[] = [];
+  if (!isRecord(value)) return { valid: false, issues: ['stored entry is not an object'] };
+  if (value.schemaVersion !== EVIDENCE_STORE_SCHEMA_VERSION) issues.push('unsupported schemaVersion');
+  if (!isRecord(value.record)) issues.push('missing record');
+  if (typeof value.sha256 !== 'string' && value.sha256 !== null) issues.push('sha256 must be string or null');
+  if (typeof value.codeCommitHash !== 'string') issues.push('missing codeCommitHash');
+  if (typeof value.savedAt !== 'number' || !Number.isFinite(value.savedAt)) issues.push('invalid savedAt');
+
+  const record = value.record;
+  if (isRecord(record)) {
+    if (typeof record.caseId !== 'string' || record.caseId.trim() === '') issues.push('missing record.caseId');
+    if (!Array.isArray(record.arms)) issues.push('missing record.arms');
+    if (record.evidence !== null && !isRecord(record.evidence)) issues.push('invalid record.evidence');
+    if (record.evidence === null && value.sha256 !== null) issues.push('digest exists without evidence');
+    if (isRecord(record.evidence)) {
+      if (!Array.isArray(record.evidence.missingFields)) issues.push('invalid evidence.missingFields');
+      if (typeof record.evidence.evidencePackId !== 'string') issues.push('missing evidence.evidencePackId');
+      if (typeof value.sha256 !== 'string') issues.push('completed evidence is missing sha256');
+    }
+  }
+
+  if (issues.length === 0 && isRecord(record) && isRecord(record.evidence) && typeof value.sha256 === 'string') {
+    try {
+      const actual = await computeEvidencePackSha256(record.evidence as unknown as DiscoveryEvidencePack);
+      if (actual !== value.sha256) issues.push('sha256 mismatch');
+    } catch {
+      issues.push('sha256 verification unavailable');
+    }
+  }
+  return { valid: issues.length === 0, issues };
 }
 
 /**
@@ -142,7 +190,12 @@ export function summarizeStoredEvidence(entry: StoredEvidence): ExperimentRegist
 export async function listExperimentRegistry(store: EvidenceStore): Promise<ExperimentRegistryEntry[]> {
   const ids = await store.list();
   const entries = await Promise.all(ids.map((id) => store.load(id)));
-  return entries
+  const checked = await Promise.all(entries.map(async (entry) => {
+    if (entry === null) return null;
+    const validation = await validateStoredEvidence(entry);
+    return validation.valid ? entry : null;
+  }));
+  return checked
     .filter((entry): entry is StoredEvidence => entry !== null)
     .map(summarizeStoredEvidence)
     .sort((a, b) => b.timestamp - a.timestamp);

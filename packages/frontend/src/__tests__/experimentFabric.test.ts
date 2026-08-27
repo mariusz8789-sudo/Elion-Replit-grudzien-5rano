@@ -1228,6 +1228,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.result.warnings.join(' ')).toContain('dwóch ustalonych zdarzeń');
   });
 
+  it('routes and confirms bounded galaxy rotation curve through the existing guided lab flow', () => {
+    const request = parseScienceChatMessage('Porównaj krzywą rotacji galaktyki MOND.');
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.disclosure.capability).toBe('REAL_ENGINE');
+    expect(planned.plan.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'rotationcurve' });
+    const confirmed = confirmEvidenceGuidedExperiment(planned);
+    expect(confirmed.run.result.status).toBe('completed');
+    expect(confirmed.run.result.outputs.altGravity).toBe(true);
+    expect(Number(confirmed.run.result.outputs.modeledVelocityKmS)).toBeGreaterThan(0);
+    expect(confirmed.run.result.validity).toContain('Brak dopasowania danych');
+    const capsule = capsuleFromConfirmedExperiment(confirmed);
+    expect(capsule.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'rotationcurve' });
+    expect(capsule.evidencePack.status).toBe('PROTOCOL_REQUIRED');
+    expect(capsule.counterfactual.status).toBe('VARIANT_REQUIRED');
+  });
+
   it('routes and confirms bounded galaxy collision through the existing guided lab flow', () => {
     const request = parseScienceChatMessage('Pokaż zderzenie galaktyk: stosunek mas=1.25, 24 mln lat.');
     const planned = planEvidenceGuidedExperiment(request);

@@ -1228,6 +1228,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.result.warnings.join(' ')).toContain('dwóch ustalonych zdarzeń');
   });
 
+  it('routes and confirms bounded particle energy through the existing guided lab flow', () => {
+    const request = parseScienceChatMessage('Oblicz energię relatywistyczną cząstki beta=0.8.');
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.disclosure.capability).toBe('REAL_ENGINE');
+    expect(planned.plan.route).toEqual({ kind: 'lab', labId: 'particle' });
+    const confirmed = confirmEvidenceGuidedExperiment(planned);
+    expect(confirmed.run.result.status).toBe('completed');
+    expect(Number(confirmed.run.result.outputs.lorentzGammaFactor)).toBeCloseTo(1 / Math.sqrt(1 - 0.8 ** 2), 12);
+    expect(Number(confirmed.run.result.outputs.totalEnergyMeV)).toBeGreaterThan(0);
+    expect(confirmed.run.result.validity).toContain('Cząstka swobodna w próżni');
+    const capsule = capsuleFromConfirmedExperiment(confirmed);
+    expect(capsule.route).toEqual({ kind: 'lab', labId: 'particle' });
+    expect(capsule.evidencePack.status).toBe('PROTOCOL_REQUIRED');
+    expect(capsule.counterfactual.status).toBe('VARIANT_REQUIRED');
+  });
+
   it('routes and confirms the bounded c-Slider through the existing guided lab flow', () => {
     const request = parseScienceChatMessage('Uruchom c-Slider: v=240000000 m/s, c=300000000 m/s, dystans=300000 km.');
     const planned = planEvidenceGuidedExperiment(request);

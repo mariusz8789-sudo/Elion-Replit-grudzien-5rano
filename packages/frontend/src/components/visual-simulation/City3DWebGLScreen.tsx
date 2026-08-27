@@ -151,15 +151,24 @@ export function City3DWebGLScreen() {
   return (
     <main id="main-content" tabIndex={-1} className="home city-3d-screen city-world-shell">
       <header className="city-world-header">
-        <div>
-          <span className="city-world-eyebrow">GENESIS OS · ŚWIAT NAUKOWY</span>
-          <h1>EPIDEMIA — MIASTO 3D</h1>
+        <div className="city-world-title-block">
+          <span className="city-world-eyebrow">GENESIS OS · SCIENTIFIC DISCOVERY CONSOLE</span>
+          <h1>EPIDEMIA <em>—</em> MIASTO 3D</h1>
           <p>Żywy model agentowy · dane syntetyczne · WebGL</p>
+          <div className="city-world-signal-row" aria-label="Stan epistemiczny świata">
+            <span className="city-signal live"><i />REAL RUN</span>
+            <span className="city-signal">SCENARIO: BASELINE</span>
+            <span className="city-signal">TIME: SIMULATION DAY</span>
+            <span className="city-signal muted">FUTURE: NOT_MODELED</span>
+          </div>
         </div>
-        <div className="city-world-clock">
-          <span>czas symulacji</span>
-          <strong>dzień {stats.dzien ?? 0}</strong>
-          <small>{renderBudget}/{displayedAgentCount} widocznych agentów</small>
+        <div className="city-world-header-telemetry" aria-label="Telemetry modelu">
+          <div className="city-world-clock">
+            <span>czas modelu</span>
+            <strong>dzień {stats.dzien ?? 0}</strong>
+            <small>{renderBudget}/{displayedAgentCount} widocznych agentów</small>
+          </div>
+          <div className="city-world-provenance-mark"><span>PROVENANCE</span><strong>LOCKED</strong><small>same-world handoff</small></div>
         </div>
       </header>
 

@@ -2225,3 +2225,133 @@ kbd {
 .earthquake-history-verdict.drift, .earthquake-history-verdict.blocked { color: #ffc1c1; background: rgba(123, 36, 36, .22); }
 .earthquake-history-verdict.not_reproducible { color: #f9d391; background: rgba(106, 61, 20, .2); }
 .earthquake-history-empty { color: var(--text-muted); font-size: .62rem; }
+
+
+/* =========================================================================
+   GENESIS EVOLUTION VISUAL LANGUAGE — original retro-future observatory HUD
+   Inspiration is limited to era/material language only; no franchise assets,
+   names, logos, story elements, or copied UI. Data and claims remain unchanged.
+   ========================================================================= */
+.city-world-shell {
+  --genesis-cyan: #63e6e0;
+  --genesis-blue: #76a9ff;
+  --genesis-amber: #f1b86a;
+  --genesis-ink: #050b13;
+  --genesis-line: rgba(112, 194, 215, .18);
+}
+.city-world-header {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(5, 13, 25, .96), rgba(10, 27, 42, .82) 52%, rgba(7, 13, 24, .96)),
+    radial-gradient(circle at 72% 0%, rgba(69, 168, 191, .18), transparent 38%);
+}
+.city-world-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: .34;
+  background-image: linear-gradient(rgba(111, 199, 213, .07) 1px, transparent 1px), linear-gradient(90deg, rgba(111, 199, 213, .07) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: linear-gradient(90deg, #000, transparent 82%);
+}
+.city-world-header::after {
+  content: 'GENESIS / WORLDSTATE / OBSERVATORY';
+  position: absolute;
+  right: 1.3rem;
+  bottom: .42rem;
+  color: rgba(128, 198, 218, .34);
+  font: 600 .5rem var(--font-mono);
+  letter-spacing: .22em;
+  pointer-events: none;
+}
+.city-world-title-block h1 {
+  display: flex;
+  align-items: baseline;
+  gap: .38em;
+  text-shadow: 0 0 1.5rem rgba(96, 229, 224, .16);
+}
+.city-world-title-block h1 em { color: var(--genesis-cyan); font-style: normal; font-weight: 400; }
+.city-world-signal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .36rem;
+  margin-top: .75rem;
+}
+.city-signal {
+  display: inline-flex;
+  align-items: center;
+  gap: .32rem;
+  padding: .25rem .4rem;
+  border: 1px solid rgba(120, 185, 208, .24);
+  border-radius: .18rem;
+  background: rgba(7, 16, 27, .5);
+  color: #b9d7e2;
+  font: 600 .52rem/1 var(--font-mono);
+  letter-spacing: .07em;
+}
+.city-signal.live { border-color: rgba(99, 230, 224, .55); color: #aaf8e9; }
+.city-signal.live i { width: .36rem; height: .36rem; border-radius: 50%; background: #63e6b8; box-shadow: 0 0 .65rem #63e6b8; }
+.city-signal.muted { border-style: dashed; color: #9daeb9; opacity: .78; }
+.city-world-header-telemetry { display: flex; align-items: stretch; gap: .65rem; }
+.city-world-provenance-mark {
+  display: grid;
+  align-content: center;
+  min-width: 8.3rem;
+  padding: .62rem .7rem;
+  border-left: 1px solid rgba(99, 230, 224, .32);
+  background: linear-gradient(145deg, rgba(28, 73, 86, .32), rgba(5, 15, 25, .42));
+  box-shadow: inset 0 0 1.8rem rgba(99, 230, 224, .06);
+}
+.city-world-provenance-mark span { color: #7eafbd; font: .5rem var(--font-mono); letter-spacing: .16em; }
+.city-world-provenance-mark strong { color: #aaf8e9; font: 700 1rem var(--font-mono); letter-spacing: .08em; }
+.city-world-provenance-mark small { color: #829eac; font: .52rem var(--font-mono); }
+.city-world-clock { position: relative; }
+.city-world-clock::before {
+  content: '◈';
+  position: absolute;
+  top: -.15rem;
+  left: -.85rem;
+  color: var(--genesis-amber);
+  font-size: .65rem;
+  opacity: .8;
+}
+.city-world-layout::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(178, 231, 240, .018) 4px, transparent 5px);
+  mix-blend-mode: screen;
+}
+.city-world-layout::after {
+  content: 'SCENARIO SPACE  /  01';
+  position: absolute;
+  top: .7rem;
+  right: .9rem;
+  z-index: 5;
+  padding: .22rem .36rem;
+  border: 1px solid rgba(117, 201, 219, .28);
+  background: rgba(3, 11, 20, .54);
+  color: rgba(160, 211, 222, .68);
+  font: .49rem var(--font-mono);
+  letter-spacing: .13em;
+  pointer-events: none;
+}
+.city-world-transport {
+  box-shadow: 0 0 1.8rem rgba(69, 168, 191, .07), inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+.city-world-transport .world-action.primary { box-shadow: 0 0 .9rem rgba(99, 230, 224, .2); }
+.city-world-transport .world-speed[aria-pressed='true'] { color: #d9fffa; border-color: rgba(99, 230, 224, .7); box-shadow: inset 0 0 .7rem rgba(99, 230, 224, .1); }
+@media (max-width: 760px) {
+  .city-world-header::after { display: none; }
+  .city-world-header-telemetry { width: 100%; }
+  .city-world-provenance-mark { flex: 1; }
+  .city-world-layout::after { top: .5rem; right: .55rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .city-world-layout::before { display: none; }
+}

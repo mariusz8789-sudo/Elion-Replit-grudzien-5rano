@@ -31,4 +31,3 @@ describe('GIS live-fetch boundary', () => {
     expect(statSync(join(fabricDir, 'spatialImport.ts')).isFile()).toBe(true);
   });
 });
-

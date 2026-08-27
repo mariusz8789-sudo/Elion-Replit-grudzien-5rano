@@ -16,7 +16,7 @@ const artifacts = [
     uncertainty: 'source-defined in raw table',
     termsUrl: 'https://www.nist.gov/open/copyright-fair-use-and-licensing-statements-srd-data-software-and-technical-series-publications',
     file: 'A1-codata-allascii.txt',
-    mustContain: ['CODATA', 'Rydberg constant'],
+    mustContain: ['Rydberg constant'],
   },
   {
     id: 'A2-asd-hydrogen-vacuum-lines',

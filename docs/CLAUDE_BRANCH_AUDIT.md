@@ -210,8 +210,10 @@ committed).
 
 ## 12. CI result
 
-CI for this audit branch is reported in the final message of the session that produced this
-commit, from the run triggered by pushing `claude/audit-verify-c6ae7d3`.
+Run [`33103998681`](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/33103998681)
+on `10c8ca5` (branch `claude/audit-verify-c6ae7d3`): **success**, all 15 steps green, finished
+2026-08-27T18:34:42Z. Whitespace gate, lint, frontend tests, backend tests, typecheck,
+production build and artifact upload all passed.
 
 Prior, already-recorded evidence: run `33085676219` on `4fe3c3b` concluded **success** (all 15
 steps), and LIVE's own history shows the equivalent work green after Manus integrated it.

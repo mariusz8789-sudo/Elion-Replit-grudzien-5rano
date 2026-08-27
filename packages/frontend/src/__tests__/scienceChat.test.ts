@@ -166,6 +166,39 @@ describe('scienceChat: Campaign entry point', () => {
     expect(r.action).toEqual({ type: 'openRoute', hash: '#/campaign' });
     expect(r.text).toMatch(/read-only|nie zostanie utworzona/i);
   });
+
+  // Chromium proof wykazał, że naturalne krótkie formy trafiały wcześniej w
+  // ogólny fallback „nie mam otwartej symulacji", więc Campaign wyglądał na
+  // nieosiągalny. Rdzeń „kampani" pokrywa polską odmianę.
+  it.each([
+    'otwórz kampanię',
+    'pokaż kampanię',
+    'kampania',
+    'wróć do kampanii',
+    'open campaign',
+  ])('rozpoznaje naturalną formę: %s', (phrase) => {
+    const r = resolveCommand(phrase, null);
+    expect(r.intent).toBe('OPEN_CAMPAIGN');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/campaign' });
+  });
+
+  it('działa także przy otwartej symulacji — nawigacja nie zależy od kontekstu', () => {
+    const ctx = {
+      labId: 'universe', experimentId: 'kepler', experimentName: 'Kepler',
+      honesty: 'educational' as const, honestyNote: '', paramDefs: [],
+      params: {}, stats: {},
+    };
+    const r = resolveCommand('otwórz kampanię', ctx);
+    expect(r.intent).toBe('OPEN_CAMPAIGN');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/campaign' });
+  });
+
+  it('nadal nie tworzy ani nie uruchamia kampanii — tylko nawigacja', () => {
+    const r = resolveCommand('uruchom kampanię', null);
+    expect(r.intent).toBe('OPEN_CAMPAIGN');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/campaign' });
+    expect(r.text).toMatch(/read-only/i);
+  });
 });
 
 describe('scienceChat: Scientific Memory (zapis / lista / wczytanie)', () => {

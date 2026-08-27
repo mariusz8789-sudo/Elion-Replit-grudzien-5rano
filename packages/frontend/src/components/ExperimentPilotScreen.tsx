@@ -17,6 +17,7 @@ import {
   type ExperimentValue,
   designScientificExperiment,
   executeScientificExperiment,
+  executeScientificBackendExperiment,
   explainScientificEvidence,
   createScientificEvidencePack,
   serializeScientificEvidencePack,
@@ -170,12 +171,14 @@ export function ExperimentPilotScreen() {
     }
   }
 
-  function handleExecuteProtocol() {
+  async function handleExecuteProtocol() {
     if (!protocolDesign) return;
     setBusy(true);
     setError(null);
     try {
-      const evidence = executeScientificExperiment(protocolDesign);
+      const evidence = getRouterModel(protocolDesign.hypothesis.modelId)?.capability === 'BACKEND_REAL_ENGINE'
+        ? await executeScientificBackendExperiment(protocolDesign)
+        : executeScientificExperiment(protocolDesign);
       setProtocolEvidence(evidence);
       setProtocolAdvice(explainScientificEvidence(evidence));
       setPhase('ran');

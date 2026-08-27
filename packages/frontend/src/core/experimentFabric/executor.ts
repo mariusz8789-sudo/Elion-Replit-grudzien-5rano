@@ -47,6 +47,7 @@ import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS } from '../simulation/epide
 import { createExperimentProvenance, statusForCapability } from './provenance';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
 import { registerLiveExperimentWorld } from './worldHandoff';
+import { registerPendingHazardScenario, type PendingEarthquakeScenario } from './hazardScenarioHandoff';
 import {
   EXPERIMENT_FABRIC_VERSION,
   type ExperimentResult,
@@ -112,7 +113,11 @@ function graphOutputs(
   return { outputs, units, assumptions };
 }
 
-function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (simulation: EpidemicCitySimulation) => void): ExperimentResult {
+function executeRealModel(
+  request: StructuredExperimentRequest,
+  onLiveWorld?: (simulation: EpidemicCitySimulation) => void,
+  onHazardScenario?: (scenario: Omit<PendingEarthquakeScenario, 'runId'>) => void,
+): ExperimentResult {
   const model = request.modelId ? getRouterModel(request.modelId) : undefined;
   if (!model) throw new Error('Brak lokalnego adaptera realnego modelu.');
   const params = request.parameters;
@@ -828,6 +833,36 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         eventSummary: { count: events.length, types: [...new Set(events.map((event) => event.type))] },
       };
     }
+    case 'earthquake-scenario': {
+      // This adapter never imports or calls core/hazard/* directly: it only validates and
+      // forwards a SCENARIO parameter set. The existing, unmodified Earthquake Command
+      // Center (mounted in City3D) is what actually runs SourceArtifact -> HazardInput ->
+      // HazardRun -> ImpactResult -> DamageAssessment -> Evidence -> Replay, via
+      // onHazardScenario -> registerPendingHazardScenario -> #/city3d handoff.
+      const scenario: Omit<PendingEarthquakeScenario, 'runId'> = {
+        hazardType: 'earthquake',
+        magnitude: numberParam(params, 'magnitude', 5.4),
+        depthKm: numberParam(params, 'depthKm', 12),
+        epicenterX: numberParam(params, 'epicenterX', 0),
+        epicenterY: numberParam(params, 'epicenterY', 0),
+        seed: request.seed ?? 42,
+      };
+      onHazardScenario?.(scenario);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Zwalidowano parametry syntetycznego scenariusza trzęsienia ziemi (M${scenario.magnitude}, głębokość ${scenario.depthKm} km). `
+          + 'Pełny ImpactResult, DamageAssessment (NOT_MODELED), Evidence i Replay MATCH/DRIFT/BLOCKED zostaną obliczone w Earthquake Command Center w City3D.',
+        outputs: { magnitude: scenario.magnitude, depthKm: scenario.depthKm, epicenterX: scenario.epicenterX, epicenterY: scenario.epicenterY, seed: scenario.seed },
+        units: { magnitude: '', depthKm: 'km', epicenterX: '', epicenterY: '', seed: '' },
+        warnings: [
+          'Ten krok nie wykonuje solvera i nie oblicza ImpactResult ani DamageAssessment — to robi Earthquake Command Center po przejściu do City3D.',
+          'structuralDamage/casualties pozostają NOT_MODELED niezależnie od parametrów.',
+        ],
+        validity: 'Parametry są syntetycznym, niekalibrowanym wejściem istniejącego kontraktu scenariusza (nie obserwacją ani prognozą).',
+        assumptions: ['Jeden realny Earthquake vertical slice; ten adapter nie duplikuje jego solvera, evidence ani replay.'],
+        visualization: ['world-3d'], route: model.route,
+      };
+    }
   }
   throw new Error(`Nieobsługiwany adapter ${model.id}.`);
 }
@@ -844,6 +879,7 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
   const plan = createExperimentPlan(intent);
   let result: ExperimentResult;
   let liveWorld: EpidemicCitySimulation | undefined;
+  let hazardScenario: Omit<PendingEarthquakeScenario, 'runId'> | undefined;
   if (!validation.ok) result = rejectedResult(validation.errors);
   else {
     const status = statusForCapability(intent.capability);
@@ -877,7 +913,13 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
     else if (status === 'capability_seam') result = unavailableResult(status, `${intent.rationale} Wymagany solver: ${intent.requiredSolver}.`, routeForUnavailable());
     else if (status === 'engine_not_available') result = unavailableResult(status, `${intent.rationale} Wymagany solver: ${intent.requiredSolver}.`, routeForUnavailable());
     else {
-      try { result = executeRealModel(request, (simulation) => { liveWorld = simulation; }); }
+      try {
+        result = executeRealModel(
+          request,
+          (simulation) => { liveWorld = simulation; },
+          (scenario) => { hazardScenario = scenario; },
+        );
+      }
       catch (error) {
         result = {
           contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'failed', summary: 'Realny silnik zwrócił błąd wykonania.',
@@ -902,5 +944,6 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
     provenance,
   };
   if (liveWorld && result.status === 'completed') registerLiveExperimentWorld(run.runId, liveWorld);
+  if (hazardScenario && result.status === 'completed') registerPendingHazardScenario(run.runId, hazardScenario);
   return run;
 }

@@ -89,6 +89,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const tunnelingEnergy = firstNumber(normalized, /\b(?:energy|energia)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const tunnelingBarrier = firstNumber(normalized, /\b(?:barrier|bariera)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
   const tunnelingWidth = firstNumber(normalized, /\b(?:width|szerokość(?:\s+barier[ya])?|szerokosc(?:\s+barier[ya])?)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const earthquakeMagnitude = firstNumber(normalized, /\b(?:magnitud[a-ząćęłńóśźż]*|sił[a-ząćęłńóśźż]*\s+trzęsieni[a-ząćęłńóśźż]*|sil[a-ząćęłńóśźż]*\s+trzesieni[a-ząćęłńóśźż]*|skal[a-ząćęłńóśźż]*\s+richtera|richter)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const earthquakeDepthKm = firstNumber(normalized, /\b(?:głębokoś[a-ząćęłńóśźż]*|glebokos[a-ząćęłńóśźż]*|depth)\s*[=:]?\s*(\d+(?:[.,]\d+)?)\s*km\b/);
+  const earthquakeEpicenterX = firstNumber(normalized, /\bepicentr[a-ząćęłńóśźż]*\s*x\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
+  const earthquakeEpicenterY = firstNumber(normalized, /\bepicentr[a-ząćęłńóśźż]*\s*y\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
 
   if (seed !== undefined) params.seed = seed;
   if (r0 !== undefined) params.r0 = r0;
@@ -149,6 +153,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (tunnelingEnergy !== undefined) params.energy = tunnelingEnergy;
   if (tunnelingBarrier !== undefined) params.barrier = tunnelingBarrier;
   if (tunnelingWidth !== undefined) params.width = tunnelingWidth;
+  if (earthquakeMagnitude !== undefined) params.magnitude = earthquakeMagnitude;
+  if (earthquakeDepthKm !== undefined) params.depthKm = earthquakeDepthKm;
+  if (earthquakeEpicenterX !== undefined) params.epicenterX = earthquakeEpicenterX;
+  if (earthquakeEpicenterY !== undefined) params.epicenterY = earthquakeEpicenterY;
 
   const base = { contractVersion: EXPERIMENT_FABRIC_VERSION, sourceText, operation: operationFor(normalized), seed } as const;
   const request = (domainId: string, modelId: string | undefined, requestedVisualization: StructuredExperimentRequest['requestedVisualization'], allowed: readonly string[]): StructuredExperimentRequest => ({
@@ -159,7 +167,10 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     params.viewMode = /(?:zgodne\s+ze\s+(?:znan[a-ząćęłńóśźż]*\s+)?fizyk[a-ząćęłńóśźż]*|porównaj\s+legend[a-ząćęłńóśźż]*\s+z\s+fizyk[a-ząćęłńóśźż]*|porownaj\s+legend[a-ząćęłńóśźż]*\s+z\s+fizyk[a-ząćęłńóśźż]*|czego\s+potrzeba)/.test(normalized) ? 'physics' : 'legend';
     return request('historical-legends', 'historical-philadelphia-legend', 'scene-3d', ['viewMode']);
   }
-  if (/(?:powódź|powodz|pożar|pozar|trzęsienie|trzesienie|blackout|kaskad[a-ząćęłńóśźż]*|ewakuacj[a-ząćęłńóśźż]*)/.test(normalized)) {
+  if (/(?:trzęsieni[a-ząćęłńóśźż]*\s+ziemi|trzesieni[a-ząćęłńóśźż]*\s+ziemi|\bearthquake\b|\bsejsmiczn[a-ząćęłńóśźż]*\b)/.test(normalized)) {
+    return request('earthquake', 'earthquake-scenario', 'world-3d', ['magnitude', 'depthKm', 'epicenterX', 'epicenterY']);
+  }
+  if (/(?:powódź|powodz|pożar|pozar|blackout|kaskad[a-ząćęłńóśźż]*|ewakuacj[a-ząćęłńóśźż]*)/.test(normalized)) {
     return request('hazard-cascade', undefined, 'world-3d', []);
   }
   if (/(?:zderzeni[a-ząćęłńóśźż]* galaktyk|zderzeni[a-ząćęłńóśźż]* galaktyk|kolizj[a-ząćęłńóśźż]* galaktyk|merger galaktyk|toomre)/.test(normalized)) {

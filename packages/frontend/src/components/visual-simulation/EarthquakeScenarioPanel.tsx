@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { LocalHazardProvenanceStore } from '../../core/hazard/hazardProvenanceStore';
 import { storageAvailable } from '../../core/storage';
 import { getHazardModule } from '../../core/hazard/hazardModuleRegistry';
+import { consumePendingHazardScenario } from '../../core/experimentFabric/hazardScenarioHandoff';
 import type { EarthquakeCityOverlayProjection } from '../../core/simulationRenderer/earthquakeCoordinateMapping';
 import {
   getEarthquakeEvidenceExportFilename,
@@ -85,17 +86,35 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
     void refreshHistory();
   }, []);
 
-  const runScenario = async () => {
+  // Consumes a Science-Chat-confirmed scenario handed off via #/city3d exactly once on
+  // mount. Reuses runScenario() unchanged — no second execution path, no re-derivation
+  // of the immutable-store scenario-label uniqueness the manual button relies on.
+  useEffect(() => {
+    const pending = consumePendingHazardScenario();
+    if (!pending) return;
+    const nextParameters: SyntheticEarthquakeParameters = {
+      magnitude: pending.magnitude,
+      depthKm: pending.depthKm,
+      epicenterX: pending.epicenterX,
+      epicenterY: pending.epicenterY,
+      seed: pending.seed,
+    };
+    setParameters(nextParameters);
+    void runScenario(nextParameters);
+  }, []);
+
+  const runScenario = async (override?: SyntheticEarthquakeParameters) => {
     setRunning(true);
     setError(null);
     try {
       runSequence.current += 1;
+      const effective = override ?? parameters;
       const outcome = await executeEarthquakeCommandCenterScenario(
         {
-          magnitude: parameters.magnitude,
-          depthKm: parameters.depthKm,
-          epicenter: { x: parameters.epicenterX, y: parameters.epicenterY },
-          seed: parameters.seed,
+          magnitude: effective.magnitude,
+          depthKm: effective.depthKm,
+          epicenter: { x: effective.epicenterX, y: effective.epicenterY },
+          seed: effective.seed,
           // Provenance labels must remain unique because the local hazard store is immutable.
           scenarioLabel: `city3d-synthetic-${Date.now()}-${runSequence.current}`,
         },
@@ -202,7 +221,7 @@ export function EarthquakeScenarioPanel({ onOverlayChange }: EarthquakeScenarioP
         </label>
       </fieldset>
       <div className="earthquake-actions">
-        <button className="world-action accent" onClick={runScenario} disabled={running}>
+        <button className="world-action accent" onClick={() => { void runScenario(); }} disabled={running}>
           {running ? 'Obliczanie…' : 'Uruchom scenariusz'}
         </button>
         <button className="world-action" onClick={clearOverlay} disabled={!overlayDisplayed}>

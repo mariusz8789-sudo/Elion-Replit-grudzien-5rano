@@ -9,6 +9,7 @@ import { saveExperiment, listExperiments } from '../core/scienceMemory';
 import { track } from '../core/analytics';
 import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
+import { setPendingHazardScenario } from '../core/experimentFabric/hazardScenarioHandoff';
 import { getToken } from '../core/backend/session';
 import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
 import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
@@ -198,6 +199,8 @@ export function ScienceChat() {
         track('experiment_fabric_run', { model: run.request.modelId ?? run.request.domainId, status: run.result.status, confirmed: 'true' });
         if (run.result.status === 'completed' && run.result.route.kind === 'live-world') {
           if (setPendingExperimentWorld(run.runId)) window.location.hash = run.result.route.hash;
+        } else if (run.result.status === 'completed' && run.result.route.kind === 'hazard-scenario') {
+          if (setPendingHazardScenario(run.runId)) window.location.hash = run.result.route.hash;
         } else if (run.result.status === 'completed' && run.result.route.kind === 'lab') {
           setPendingScenario(run.result.route.labId, run.provenance.parameterSnapshot, run.result.route.experimentId);
           window.location.hash = `#/lab/${run.result.route.labId}`;

@@ -5,6 +5,7 @@ import {
   type KnowledgeCorpusFile,
 } from '../knowledge/registry';
 import { findSupplementalKnowledge } from '../knowledge/supplementalRegistry';
+import { EARTHQUAKE_MODEL_VERSION } from '../hazard/earthquake/earthquakeModel';
 import { fingerprintExperimentPlan } from './provenance';
 import {
   EXPERIMENT_FABRIC_VERSION,
@@ -270,6 +271,19 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny agentowy EpidemicCitySimulation; renderer zachowuje się jako konsument read-only tego samego świata.',
   },
   {
+    id: 'earthquake-scenario', domainId: 'earthquake', modelVersion: EARTHQUAKE_MODEL_VERSION, engine: `genesis-hazard-earthquake@${EARTHQUAKE_MODEL_VERSION}`,
+    parameters: [
+      number('magnitude', 'Magnitude', '', 0, 10, 5.4),
+      number('depthKm', 'Głębokość ogniska', 'km', 0, 700, 12),
+      number('epicenterX', 'Epicentrum X (fixture)', '', -1000, 1000, 0),
+      number('epicenterY', 'Epicentrum Y (fixture)', '', -1000, 1000, 0),
+    ],
+    route: { kind: 'hazard-scenario', hazardType: 'earthquake', hash: '#/city3d' }, knowledgeSources: [],
+    rationale: 'Realny Earthquake vertical slice (SourceArtifact→HazardInput→HazardRun→ImpactResult→DamageAssessment→Evidence→Replay). '
+      + 'Ten adapter tylko przekazuje potwierdzone parametry do istniejącego Earthquake Command Center w City3D, który sam wykonuje pełny pipeline — '
+      + 'structuralDamage/casualties pozostają NOT_MODELED.',
+  },
+  {
     id: 'biology-dna-helix', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-b-dna-wallace@1.0.0',
     parameters: [text('sequence', 'Preset sekwencji', 'mixed'), number('temperatureC', 'Temperatura', '°C', 0, 100, 37)],
     route: { kind: 'lab', labId: 'biology', experimentId: 'dna-helix' }, knowledgeSources: ['biology.md'],
@@ -491,7 +505,8 @@ export function createExperimentIntent(request: StructuredExperimentRequest): Ex
     requiredSolver = domain.requiredSolver;
   } else if (request.domainId === 'hazard-cascade') {
     capability = 'ENGINE_NOT_AVAILABLE';
-    rationale = 'Kontrakt GenesisEvent deklaruje hazardy, ale repozytorium nie zawiera modelu powodzi, pożaru ani kaskady infrastruktury.';
+    rationale = 'Earthquake ma już zarejestrowany, realny model (poproś wprost o "trzęsienie ziemi", by go użyć); '
+      + 'repozytorium wciąż nie zawiera modelu powodzi, pożaru, blackoutu ani kaskady infrastruktury.';
     requiredSolver = 'Zweryfikowany model hazardu + WorldAdapter + adapter konsekwencji';
   }
   return {

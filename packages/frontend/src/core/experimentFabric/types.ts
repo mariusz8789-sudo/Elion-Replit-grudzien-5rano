@@ -68,6 +68,16 @@ export type ExperimentRoute =
   | { kind: 'live-world'; target: 'epidemic-city'; hash: '#/hf-slice' | '#/city3d' | '#/city' }
   | { kind: 'hypothetical-visualization'; scenarioId: 'philadelphia-legend'; hash: '#/hf-slice?scenario=philadelphia' }
   | { kind: 'lab'; labId: string; experimentId?: string }
+  /**
+   * Hands off a SCENARIO parameter spec (never a computed result) to the
+   * existing, already-audited Earthquake Command Center mounted inside
+   * City3D. Deliberately distinct from `live-world`: there is no running
+   * simulation instance to transfer, only a parameter set the Command
+   * Center's own `executeEarthquakeCommandCenterScenario` will run through
+   * the existing HazardRun/ImpactResult/DamageAssessment/Evidence/Replay
+   * pipeline — this route never computes or fabricates that result itself.
+   */
+  | { kind: 'hazard-scenario'; hazardType: 'earthquake'; hash: '#/city3d' }
   | { kind: 'none' };
 
 export interface ExperimentProvenance {

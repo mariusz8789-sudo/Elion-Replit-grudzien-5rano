@@ -4,6 +4,7 @@ import { registerSimContext } from '../../core/simContext';
 import { ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
 import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
+import { consumePendingExperimentWorld } from '../../core/experimentFabric/worldHandoff';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
@@ -52,13 +53,18 @@ export function City3DWebGLScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [worldSelection, setWorldSelection] = useState<CityWorldSelection | null>(null);
   const [cameraPreset, setCameraPreset] = useState<CityCameraPreset>('city');
+  // Consumed exactly once on mount, mirroring HighFidelitySliceScreen's own
+  // handoff pattern: a Science-Chat-confirmed epidemic-city run hands off its
+  // already-computed EpidemicCitySimulation instance here instead of City3D
+  // silently starting a second, disconnected simulation.
+  const [experimentWorld] = useState(() => consumePendingExperimentWorld());
   const sim = useMemo(() => new EpidemicCity3DSim({}, {
     onAgentSelected: (id) => {
       setSelectedId(id);
       if (id !== null) setCameraPreset('agent');
     },
     onWorldSelected: setWorldSelection,
-  }), []);
+  }, experimentWorld?.simulation), [experimentWorld]);
   const [params, setParams] = useState<SimParams>(() => sim.getSim().getParams());
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState<ClockSpeed>(1);

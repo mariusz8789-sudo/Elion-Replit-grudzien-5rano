@@ -438,7 +438,15 @@ export function ExperimentPilotScreen() {
             <div><dt>runFingerprint</dt><dd className="mono">{confirmed.run.provenance.runFingerprint}</dd></div>
             <div><dt>engine</dt><dd className="mono">{confirmed.run.provenance.engine ?? '—'}</dd></div>
             <div><dt>resultOrigin</dt><dd className="mono">{confirmed.run.provenance.resultOrigin}</dd></div>
+            {confirmed.run.provenance.backendExecution && <>
+              <div><dt>backendRunId</dt><dd className="mono">{confirmed.run.provenance.backendExecution.backendRunId}</dd></div>
+              <div><dt>backendEngine</dt><dd className="mono">{confirmed.run.provenance.backendExecution.backendEngine}</dd></div>
+              <div><dt>backendModelVersion</dt><dd className="mono">{confirmed.run.provenance.backendExecution.backendModelVersion}</dd></div>
+              <div><dt>backendHonesty</dt><dd className="mono">{confirmed.run.provenance.backendExecution.backendProvenance.honesty}</dd></div>
+              <div><dt>backendClassification</dt><dd className="mono">{confirmed.run.provenance.backendExecution.backendProvenance.classification}</dd></div>
+            </>}
           </dl>
+          {confirmed.run.provenance.backendExecution && <p className="pilot-disclaimer">Backend provenance pochodzi z kanonicznego Compute API; Pilot nie rekonstruuje formuły, wersji silnika ani klasyfikacji lokalnie.</p>}
           <button className="chip-btn pilot-primary" onClick={handleGenerateCapsule}>Wygeneruj Scenario Capsule</button>
         </section>
       )}

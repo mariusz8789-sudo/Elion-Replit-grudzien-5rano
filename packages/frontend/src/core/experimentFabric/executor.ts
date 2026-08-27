@@ -828,6 +828,16 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         eventSummary: { count: events.length, types: [...new Set(events.map((event) => event.type))] },
       };
     }
+    case 'earthquake-scenario': {
+      // Earthquake wykonuje się wyłącznie przez istniejący command center
+      // (confirmEarthquakeEvidenceGuidedExperiment), ponieważ wymaga asynchronicznego
+      // hazard provenance store. Generic executor nie ma adaptera i nie udaje, że go ma.
+      return unavailableResult(
+        'capability_seam',
+        'Model earthquake-scenario jest realnym silnikiem, ale nie ma adaptera w generic Experiment Fabric executorze. Uruchom go przez Earthquake command center (confirmEarthquakeEvidenceGuidedExperiment); ten wynik nie pochodzi z żadnego silnika.',
+        model.route,
+      );
+    }
   }
   throw new Error(`Nieobsługiwany adapter ${model.id}.`);
 }

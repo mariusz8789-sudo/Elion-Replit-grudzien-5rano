@@ -114,7 +114,7 @@ function parseHash(): Route {
   if (h === '#/concept') return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
-  if (h === '#/pilot') return { kind: 'pilot' };
+  if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   return { kind: 'home' };
 }
 

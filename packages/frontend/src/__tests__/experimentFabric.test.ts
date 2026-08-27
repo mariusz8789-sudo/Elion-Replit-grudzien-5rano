@@ -1228,6 +1228,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.result.warnings.join(' ')).toContain('dwóch ustalonych zdarzeń');
   });
 
+  it('routes and confirms bounded stellar scaling through the existing guided lab flow', () => {
+    const request = parseScienceChatMessage('Pokaż życie gwiazdy o masie 10 masy Słońca.');
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.disclosure.capability).toBe('REAL_ENGINE');
+    expect(planned.plan.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'starlife' });
+    const confirmed = confirmEvidenceGuidedExperiment(planned);
+    expect(confirmed.run.result.status).toBe('completed');
+    expect(Number(confirmed.run.result.outputs.relativeLuminositySolar)).toBeCloseTo(Math.pow(10, 3.5));
+    expect(confirmed.run.result.validity).toContain('bez integracji wnętrza');
+    const capsule = capsuleFromConfirmedExperiment(confirmed);
+    expect(capsule.route).toEqual({ kind: 'lab', labId: 'universe', experimentId: 'starlife' });
+    expect(capsule.evidencePack.status).toBe('PROTOCOL_REQUIRED');
+    expect(capsule.counterfactual.status).toBe('VARIANT_REQUIRED');
+  });
+
   it('routes and confirms bounded particle energy through the existing guided lab flow', () => {
     const request = parseScienceChatMessage('Oblicz energię relatywistyczną cząstki beta=0.8.');
     const planned = planEvidenceGuidedExperiment(request);

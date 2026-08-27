@@ -71,6 +71,13 @@ describe('scienceChat: SCIENTIFIC INTENT — każda odpowiedź ma typowaną inte
     expect(r.action).toEqual({ type: 'openRoute', hash: '#/pilot?mode=protocol' });
     expect(r.text).toMatch(/żaden run nie zostanie uruchomiony/i);
   });
+
+  it('Pamięć Naukowa otwiera istniejącą historię lokalną, bez claimu reprodukcji', () => {
+    const r = resolveCommand('pokaż Pamięć Naukową', null);
+    expect(r.intent).toBe('OPEN_SIMULATION');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/memory' });
+    expect(r.text).toMatch(/nie jest dowodem reprodukcji/i);
+  });
 });
 
 describe('scienceChat: porównanie modeli (COMPARE_MODELS, FAZA 1/P5)', () => {

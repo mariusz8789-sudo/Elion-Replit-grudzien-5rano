@@ -170,6 +170,17 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   if (has(norm, 'pauza', 'zatrzymaj', 'wstrzymaj', 'stop ')) return { text: 'Wstrzymuję symulację.', tag: 'SYSTEM', intent: 'CONTROL', action: { type: 'control', op: 'pause' } };
   if (has(norm, 'reset', 'od nowa', 'zresetuj', 'restart')) return { text: 'Restartuję symulację do stanu początkowego.', tag: 'SYSTEM', intent: 'CONTROL', action: { type: 'control', op: 'reset' } };
 
+  // --- Scientific Memory history — otwiera istniejący lokalny ekran historii.
+  //     Nie tworzy konta, nie synchronizuje danych i nie uruchamia modelu.
+  if (has(norm, 'pamiec naukowa', 'historia eksperyment', 'historia wynik', 'przegladaj zapisane')) {
+    return {
+      text: 'Otwieram Pamięć Naukową. Zobaczysz wyłącznie lokalne zapisy tej przeglądarki; otwarcie rekordu ponownie ustawia jego parametry w istniejącym laboratorium, ale nie jest dowodem reprodukcji.',
+      tag: 'SYSTEM',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/memory' },
+    };
+  }
+
   // --- Scientific Memory (sekcja 21): wczytanie / lista / zapis ---
   const loadMatch = norm.match(/(?:wczytaj|otworz zapisany|przywroc)\D*(\d+)/);
   if (loadMatch) return { text: `Wczytuję zapisany eksperyment #${loadMatch[1]}…`, tag: 'SYSTEM', intent: 'LOAD', action: { type: 'load', index: parseInt(loadMatch[1], 10) } };

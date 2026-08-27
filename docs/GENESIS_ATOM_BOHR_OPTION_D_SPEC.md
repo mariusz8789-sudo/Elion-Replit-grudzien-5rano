@@ -485,6 +485,30 @@ work rather than adding it.
 
 ## 11. Gate execution record
 
+### Current status
+
+```
+G3       = BLOCKED / REFERENCE_UNPINNED
+Option D = NOT AUTHORIZED
+```
+
+G3 is blocked on **two independent grounds**, either of which alone would keep it open:
+
+1. **Provenance.** A1, A2 and A3 were downloaded and their SHA-256 recorded in CI, but **their raw
+   payloads are not durably committed to the repository**. A hash without the bytes it was computed
+   from is not a pinned reference, so the no-refetch replay policy **M-7** and acceptance criterion
+   **AC-2** are both unsatisfied.
+2. **Security.** The official NIST terms HTML for **A4 contains an embedded Mapbox access token**.
+   It must not be written to disk, committed or uploaded, and the fetch pipeline now refuses it.
+
+Consequence for the benchmark: without A4 the `licenceStatus` on an `ArmReference` cannot reach
+`CONFIRMED`. Every arm therefore resolves as `VERIFY_REQUIRED`, the protocol outcome is
+`INCONCLUSIVE` (or `BLOCKED` where a field is malformed), and **a PASS is unreachable by
+construction** — which is the designed behaviour, not a defect.
+
+Authoritative incident record: **`docs/GENESIS_ATOM_BOHR_G3_BLOCKER.md`** on LIVE. No raw HTML,
+token or CI-artifact payload has been copied into this branch.
+
 CTO approved this decision pack as the basis for implementing Option D. The three gates were then
 attempted in the ordered sequence G1 → G3 → G2. **G3 could not be closed**, so implementation did
 not start; the branch remains documentation-only. Evidence below.

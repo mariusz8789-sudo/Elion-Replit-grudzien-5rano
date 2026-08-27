@@ -114,6 +114,7 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
 const SUGGESTIONS = [
   'Uruchom trzęsienie ziemi magnitude=5.4 depth=12 km',
   'Pokaż diagram Minkowskiego beta=0.5',
+  'Zintegruj geodezyjną fotonu wokół czarnej dziury Schwarzschilda',
   'Zbadaj problem trzech ciał',
   'Zwiększ masę 2×',
   'Co się zmieniło?',

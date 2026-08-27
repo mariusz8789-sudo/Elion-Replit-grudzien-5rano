@@ -70,6 +70,18 @@ function operationError(scope: string, cause: unknown): string {
   return `${scope}: ${detail}`;
 }
 
+export function formatEvidenceStatusLine(
+  current: StoredEvidence | null,
+  historyLength: number,
+  replay: DiscoveryReplay | null,
+): string {
+  if (!current) return `${historyLength} zapisanych`;
+  const verdict = replay
+    ? `replay ${REPLAY_LABELS[replay.status]}`
+    : `snapshot ${REPLAY_LABELS[current.record.replay?.status ?? 'NOT_REPRODUCIBLE']}`;
+  return `${current.record.scenarios.baseline}/${current.record.scenarios.variant} · ${verdict}`;
+}
+
 function downloadJson(filename: string, data: unknown): void {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -243,9 +255,7 @@ export function EvidenceReplayPanel() {
     });
   };
 
-  const statusLine = current
-    ? `${current.record.scenarios.baseline}/${current.record.scenarios.variant} · replay ${replay ? REPLAY_LABELS[replay.status] : REPLAY_LABELS[current.record.replay?.status ?? 'NOT_REPRODUCIBLE']}`
-    : `${history.length} zapisanych`;
+  const statusLine = formatEvidenceStatusLine(current, history.length, replay);
 
   return (
     <div className="world-panel evidence-panel">

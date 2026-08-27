@@ -128,6 +128,7 @@ const SUGGESTIONS = [
   'Co się zmieniło?',
   'Pokaż równanie',
   'Porównaj SIR R0=1.5 z SIR R0=3',
+  'Pokaż Evidence i Replay',
   'Zaproponuj kolejny eksperyment',
   'Zapisz eksperyment',
   'Pokaż zapisane',

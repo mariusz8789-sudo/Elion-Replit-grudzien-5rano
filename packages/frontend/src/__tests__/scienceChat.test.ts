@@ -203,6 +203,18 @@ describe('scienceChat: uczciwe TODO dla niegotowych funkcji', () => {
   });
 });
 
+describe('scienceChat: Evidence / Replay entry point', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('opens the existing discovery-log Evidence & Replay panel without running a fake experiment', () => {
+    const r = resolveCommand('Pokaż Evidence i Replay', null);
+    expect(r.intent).toBe('OPEN_SIMULATION');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/discovery-log' });
+    expect(r.text).toMatch(/PROTOCOL_REQUIRED/);
+    expect(r.text).toMatch(/VARIANT_REQUIRED/);
+  });
+});
+
 describe('scienceChat: Pilot eksperymentu (P2.1 UI)', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 

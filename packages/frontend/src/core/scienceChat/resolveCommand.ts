@@ -187,6 +187,17 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     return proposeExperiment(ctx);
   }
 
+  // --- Evidence / Replay — otwiera istniejący panel dowodów bez tworzenia
+  //     fikcyjnego pakietu i bez uruchamiania modelu z samej komendy.
+  if (has(norm, 'evidence', 'replay', 'pakiet dowod', 'dowod i replay', 'dowody')) {
+    return {
+      text: 'Otwieram istniejący panel Evidence & Replay. Uruchomienie, replay i eksport są jawne; brak protokołu pozostaje PROTOCOL_REQUIRED, a brak drugiego wariantu VARIANT_REQUIRED.',
+      tag: 'SYSTEM',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/discovery-log' },
+    };
+  }
+
   // --- Pilot eksperymentu (P2.1 UI): plan -> potwierdzenie -> realny run ->
   //     Scenario Capsule -> eksport, na istniejącym Experiment Fabric. ---
   if (has(norm, 'pilot eksperymentu', 'otworz pilota', 'uruchom pilota', 'eksperyment krok po kroku', 'reprodukowalny eksperyment', 'scenario capsule', 'kapsula scenariusza')) {

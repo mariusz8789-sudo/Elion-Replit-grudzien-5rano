@@ -17,6 +17,9 @@ import {
   designScientificExperiment,
   executeScientificExperiment,
   explainScientificEvidence,
+  createScientificEvidencePack,
+  serializeScientificEvidencePack,
+  serializeEvidencePackRoCrate,
   type ScientificExperimentDesign,
   type ScientificEvidenceChain,
 } from '../core/experimentFabric';
@@ -223,6 +226,18 @@ export function ExperimentPilotScreen() {
     }
   }
 
+  function handleExportProtocolEvidence() {
+    if (!protocolEvidence) return;
+    const pack = createScientificEvidencePack(protocolEvidence);
+    downloadJson(`${pack.evidencePackId}.json`, serializeScientificEvidencePack(pack));
+  }
+
+  function handleExportProtocolRoCrate() {
+    if (!protocolEvidence) return;
+    const pack = createScientificEvidencePack(protocolEvidence);
+    downloadJson(`${pack.evidencePackId}.ro-crate.json`, serializeEvidencePackRoCrate(pack));
+  }
+
   function handleGenerateCapsule() {
     if (!confirmed) return;
     try {
@@ -360,6 +375,7 @@ export function ExperimentPilotScreen() {
           <div className="pilot-disclosure"><span className={`honesty ${protocolEvidence.assessment.assessment === 'SUPPORTED_WITHIN_PROTOCOL' ? 'simplified' : 'theoretical'}`}>{protocolEvidence.assessment.assessment}</span><p className="pilot-summary">{protocolEvidence.assessment.message}</p></div>
           <dl className="pilot-outputs">{protocolEvidence.arms.map((arm) => <div key={arm.armId} className="pilot-output-row"><dt>{arm.kind} · {arm.armId}</dt><dd>{arm.outputValues.join(' / ')} {arm.units} · {arm.reproduction}</dd></div>)}</dl>
           <dl className="pilot-provenance"><div><dt>evidenceId</dt><dd className="mono">{protocolEvidence.evidenceId}</dd></div><div><dt>runs</dt><dd>{protocolEvidence.allRuns.length} · createdFromRealRunsOnly=true</dd></div><div><dt>provenance</dt><dd className="mono">{protocolEvidence.provenanceFingerprint}</dd></div></dl>
+          <div className="pilot-actions"><button className="chip-btn pilot-primary" onClick={handleExportProtocolEvidence}>⬇ Evidence Pack JSON</button><button className="chip-btn" onClick={handleExportProtocolRoCrate}>⬇ RO-Crate JSON-LD</button></div>
           {protocolAdvice && <div className="pilot-why-panel"><h3>WHY / NEXT EXPERIMENT</h3><p className="pilot-summary">{protocolAdvice.why}</p><p><strong>Baza dowodu:</strong> {protocolAdvice.evidenceBasis.join(' · ')}</p><ul className="pilot-limitations">{protocolAdvice.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul><p><strong>Następny bounded krok:</strong> {protocolAdvice.nextExperiment.action}</p><p><strong>Parametr:</strong> <code>{protocolAdvice.nextExperiment.parameter}</code> · {protocolAdvice.nextExperiment.rationale}</p><span className="honesty theoretical">AUTO-RUN: DISABLED</span></div>}
         </section>
       )}

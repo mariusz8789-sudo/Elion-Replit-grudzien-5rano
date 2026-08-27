@@ -33,7 +33,7 @@ No file under `core/hazard/**` was modified. No City3D renderer/world file besid
 | `git diff --check` | clean |
 | `scripts/smoke-e2e.mjs` | **not run** — not part of CI, requires a manually-started backend on port 8092 this session did not stand up; not extended to cover Science Chat/City3D (out of the bounded scope: it exercises unrelated lab routes only, and its hardcoded Chromium path is a separate, undemonstrated risk left as backlog per the baseline doc) |
 | Repository-native Chromium proof | **Run manually against a `vite preview` production build** (see below) — this is the real, load-bearing proof for this session's change, since `smoke-e2e.mjs` doesn't cover this flow |
-| GitHub Actions for this branch/commit | Triggered on push; result recorded in the follow-up message once confirmed (poll in progress at hand-off time) |
+| GitHub Actions for this branch/commit | **success** — run `33031574953`, commit `9735c3c`, confirmed via `actions_get` (`status: completed`, `conclusion: success`) |
 
 ## Chromium route and observed behavior
 
@@ -80,4 +80,4 @@ Single commit on `claude/genesis-10h-execution`, cleanly layered on live `2feb0e
 | NOT_MODELED fencing | VERIFIED intact | Chromium proof: 5/5 DamageAssessment rows `NOT_MODELED`; chat turn explicitly states `structuralDamage/casualties` stay `NOT_MODELED` regardless of parameters |
 | Tests / TypeScript / lint / build | GREEN | 1385 frontend + 269 backend tests, `tsc --noEmit`, `eslint .`, production build — all clean |
 | Chromium | GREEN (manual proof, not CI-native) | Screenshot + DOM assertions captured this session (see message with the delivered screenshot) |
-| CI | Triggered; result to follow once confirmed |  |
+| CI | GREEN | run `33031574953`, commit `9735c3c`, `conclusion: success` |

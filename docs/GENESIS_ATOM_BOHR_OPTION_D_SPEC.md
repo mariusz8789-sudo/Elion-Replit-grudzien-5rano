@@ -42,8 +42,7 @@ decision.**
 
 The scope is now unambiguous: seven files, ~55–75 production lines, one deliberate `modelVersion`
 bump, and a fingerprint migration whose blast radius is bounded to `atom-bohr` evidence. Two
-findings below reduce the work below the previous estimate (§2.4, §4.2). Three gates remain
-unpassed (§11), and the exact acceptance criteria a future build must satisfy are in §6.
+findings below reduce the work below the previous estimate (§2.4, §4.2). G1 and G2 are closed; **G3 is blocked** (§11), and the exact acceptance criteria a future build must satisfy are in §6.
 
 ## 1. Current contract audit
 
@@ -484,7 +483,127 @@ work rather than adding it.
 | `principalN` semantics shift for existing outputs                | **Medium** | `energyLevelEV` and `orbitalRadiusPm` keep their current meaning; only the new keys use `principalNUpper`    |
 | References never get pinned, work sits half-done                 | **Medium** | Gate 2 below blocks implementation start                                                                     |
 
-## 11. CTO decision table — three mandatory gates
+## 11. Gate execution record
+
+CTO approved this decision pack as the basis for implementing Option D. The three gates were then
+attempted in the ordered sequence G1 → G3 → G2. **G3 could not be closed**, so implementation did
+not start; the branch remains documentation-only. Evidence below.
+
+### G1 — ACCEPT CONTRACT: **CLOSED (accepted)**
+
+The specification was re-verified line by line against the code at LIVE HEAD `ddb07b4`. Every
+symbol and line number cited in §1 still matches. No inconsistency was found, so **no correction to
+the specification was required and no scope was added**.
+
+| Spec requirement                                                              | Verified against                                                 | Result                                                                            |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| per-arm `expectedValues[]` / reference mapping                                | `FalsificationCriterion`, `scientificDiscovery.ts:11`            | consistent — field does not exist yet, as documented                              |
+| unambiguous `armKey`                                                          | `buildArmId`, `scientificPlanner.ts:16`, variant suffix at `:75` | consistent — arm identity already exists                                          |
+| unit, uncertainty, tolerance                                                  | `scientificDiscovery.ts:14-15` (`expectedValue?`, `tolerance?`)  | consistent — only the single-value form exists today                              |
+| source / version / licence status, artifact id, SHA-256, transform id/version | none present today                                               | consistent — all are additions in §5                                              |
+| `referencePolicy: 'per-arm-required'` and no silent fallback                  | evaluator `equal-within-tolerance`, `scientificExecutor.ts:68`   | consistent — today one `expectedValue` applies to every variant                   |
+| missing reference never PASS; `INCONCLUSIVE` + `referenceStatus`              | `HypothesisAssessment`, `scientificDiscovery.ts:7`               | consistent — no `BLOCKED`/`VERIFY_REQUIRED` member; §2.5 keeps the enum unchanged |
+| raw / corrected as separate output keys, separate `correctionVersion`         | `bohrModelGraph.ts`, `router.ts:198` (`modelVersion: '1.0.0'`)   | consistent                                                                        |
+| no new solver, Evidence Pack, Replay, router or second system                 | `evidencePack.ts`, `evidencePackStore.ts:52`, `provenance.ts`    | consistent — §5 lists these as explicitly unchanged                               |
+| variant-only assertion, arms independent                                      | `scientificExecutor.ts:50`                                       | consistent                                                                        |
+| duplicated backend metric path must change together                           | `scientificExecutor.ts:16` and `:108`                            | consistent                                                                        |
+
+### G3 — PINNED NIST ARTIFACTS: **BLOCKED — `REFERENCE_UNPINNED`**
+
+**No artifact could be retrieved, therefore none could be hashed, therefore G3 is not closed.**
+No value was written from memory, and no substitute source was used.
+
+Attempted, all official NIST hosts, on 2026-08-27T21:25:53–55Z:
+
+| URL                                                                  | Result                                           |
+| -------------------------------------------------------------------- | ------------------------------------------------ |
+| `https://physics.nist.gov/cgi-bin/cuu/Value?ryd`                     | `curl: (56) CONNECT tunnel failed, response 403` |
+| `https://physics.nist.gov/cgi-bin/ASD/lines1.pl?spectra=H+I`         | `curl: (56) CONNECT tunnel failed, response 403` |
+| `https://physics.nist.gov/cuu/Constants/Table/allascii.txt`          | `curl: (56) CONNECT tunnel failed, response 403` |
+| `https://www.nist.gov/pml/atomic-spectra-database`                   | `curl: (56) CONNECT tunnel failed, response 403` |
+| `https://pml.nist.gov/cuu/Constants/index.html`                      | `curl: (56) CONNECT tunnel failed, response 403` |
+| `https://data.nist.gov/od/id/`                                       | `curl: (56) CONNECT tunnel failed, response 403` |
+| `WebFetch https://physics.nist.gov/cuu/Constants/Table/allascii.txt` | `EGRESS_BLOCKED`                                 |
+
+Agent proxy record, verbatim:
+
+```
+connect_rejected -> physics.nist.gov:443  gateway answered 403 to CONNECT (policy denial or upstream failure)
+connect_rejected -> www.nist.gov:443      gateway answered 403 to CONNECT (policy denial or upstream failure)
+connect_rejected -> pml.nist.gov:443      gateway answered 403 to CONNECT (policy denial or upstream failure)
+connect_rejected -> data.nist.gov:443     gateway answered 403 to CONNECT (policy denial or upstream failure)
+```
+
+The block is an environment network policy, not a NIST outage and not a credential problem. It
+cannot be worked around from inside this session, and no non-NIST substitute may be used without a
+separate CTO decision.
+
+#### Exactly what is needed to close G3
+
+Run in an environment whose egress policy permits `physics.nist.gov` — GitHub Actions qualifies
+(FACT: the existing `pyscf-real` job installs from PyPI, so that runner has network access).
+
+| #   | Artifact                                       | URL                                                                                      | Observable                                                       | Needed for                                                                  |
+| --- | ---------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| A1  | CODATA fundamental constants, full ASCII table | `https://physics.nist.gov/cuu/Constants/Table/allascii.txt`                              | R∞ and the electron–proton mass ratio, with stated uncertainties | provenance of the hardcoded `RYDBERG_EV`; the reduced-mass correction input |
+| A2  | NIST ASD H I lines, **vacuum** wavelengths     | `https://physics.nist.gov/cgi-bin/ASD/lines1.pl` with an explicit, recorded query string | H-α, H-β, H-γ transition wavelengths and their uncertainties     | `referenceValue` per arm                                                    |
+| A3  | NIST ASD H I ionization energy                 | same endpoint, ionization-energies output                                                | H I ionization energy                                            | constant-provenance check only, never a model benchmark                     |
+| A4  | NIST SRD terms of use                          | NIST SRD terms page                                                                      | licence and citation conditions                                  | resolving `licenceStatus` to `CONFIRMED`                                    |
+
+Procedure per artifact — the raw bytes must be preserved unmodified, because the hash must be of
+what the server actually returned:
+
+```
+curl -sS --fail --location --output <artifact-file> "<exact-url>"
+sha256sum <artifact-file>
+date -u +%Y-%m-%dT%H:%M:%SZ          # retrieval timestamp, recorded verbatim
+```
+
+Then record, per artifact: exact URL including the full query string; artifact title or identifier;
+access date; version or publication date; the raw payload file committed unmodified; the SHA-256
+computed from that file; unit; observable definition; validity range; uncertainty as stated by the
+source; licence and terms-of-use status; and `transformId` / `transformVersion` for the
+normalisation that turns the payload into `referenceValue`.
+
+Two constraints carried forward from the admission audit: the **medium must be explicit** — vacuum
+and air wavelengths differ in the fourth digit — and the NIST WebBook must not be used as evidence
+unless a stable raw payload, hash and version can be preserved.
+
+### G2 — MIGRATION POLICY: **DEFINED (docs-only; activates when G1 and G3 are closed)**
+
+The policy is recorded now so that no implementation step has to invent it later. It changes no
+code today.
+
+| Rule | Statement                                                                                                        | Enforced by                                                                                                                              |
+| ---- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| M-1  | Old Evidence Packs remain **readable** indefinitely; nothing is deleted or rewritten                             | `evidencePackStore` reads any pack whose shape validates                                                                                 |
+| M-2  | After a `modelVersion` change an old pack can **never** silently obtain `MATCH`                                  | `runFingerprint` hashes `outputs`, and `planFingerprint` hashes `modelVersion` and `parameterSchema` — two independent axes (FACT, §1.4) |
+| M-3  | Such packs are labelled **`SUPERSEDED_BY_MODEL_VERSION`** — neither a scientific failure nor a success           | comparator verdict `DRIFT` plus the label; re-execute rather than reinterpret                                                            |
+| M-4  | New packs compare only within a compatible contract and model version                                            | `protocolFingerprint` and `runFingerprint` equality                                                                                      |
+| M-5  | A change to any output, reference value, reference SHA-256, transition or `correctionVersion` yields **`DRIFT`** | criterion is inside `protocolFingerprint` (FACT, §1.2); outputs are inside `runFingerprint`                                              |
+| M-6  | Backend run identifiers are **not** part of the scientific fingerprint                                           | already pinned by the volatility regression test                                                                                         |
+| M-7  | Replay **never** refetches from the network; pinned files only                                                   | replay reads stored packs and pinned artifacts                                                                                           |
+
+**Hard compatibility rule (M-8).** A protocol that does not use Option D — that is, one carrying a
+single `expectedValue` and no `referencePolicy` — must produce a **byte-identical**
+`evidencePackId` before and after the change. The serialized contract of such packs must not be
+altered except along an explicitly versioned migration path. This is acceptance criterion AC-7 and
+test T14, and it is a hard gate: if it fails, the implementation is rejected rather than adjusted.
+
+### Gate status summary
+
+| Gate                           | Status                                                                                          | Consequence                   |
+| ------------------------------ | ----------------------------------------------------------------------------------------------- | ----------------------------- |
+| **G1 — contract**              | **CLOSED (accepted)** — spec verified consistent against `ddb07b4`, no correction needed        | ready                         |
+| **G3 — pinned NIST artifacts** | **BLOCKED — `REFERENCE_UNPINNED`** — six official NIST hosts denied at CONNECT by egress policy | **implementation stopped**    |
+| **G2 — migration policy**      | **DEFINED** — M-1…M-8 recorded above                                                            | ready, activates with G1 + G3 |
+
+**Because G3 is not closed, Option D was not implemented, not partially implemented, and no test
+from §7 was added.** The branch is documentation-only. Implementing the contract or the model
+output without pinned references would produce a benchmark that cannot report a scientific result,
+and would trigger the `modelVersion` fingerprint migration for no gain.
+
+## 12. CTO decision table — three mandatory gates
 
 Implementation may not begin until **all three** are closed. Each has a named owner action and an
 unambiguous closure condition.
@@ -499,7 +618,7 @@ Gate order is **G1 → G3 → G2**: the contract must be approved before the mod
 migration policy must exist before the version bump reaches users, and the artifacts can be pinned
 in parallel but are only useful once G1 is closed.
 
-## 12. NOT AUTHORIZED YET
+## 13. NOT AUTHORIZED YET
 
 Stated explicitly so that no part of this document is mistaken for permission.
 
@@ -509,7 +628,8 @@ Stated explicitly so that no part of this document is mistaken for permission.
   this specification is `REFERENCE_UNPINNED` and appears as a **field name, never a number**.
 - **There is no `BUILD NOW`.** This document is a working specification at `BUILD LATER`. It is not
   approval and must not be cited as one.
-- **Option D must not be implemented** until G1, G2 and G3 in §11 are all closed. Partial
+- **Option D must not be implemented** until G1, G2 and G3 in §12 are all closed. G1 and G2 are
+  closed; **G3 is blocked** (§11), so implementation remains unauthorized. Partial
   implementation — for example adding `transitionWavelengthNm` alone — is also unauthorized,
   because it triggers the fingerprint migration without the policy that governs it.
 - **The following must not be built** under this or any adjacent task: a new solver; a second
@@ -519,7 +639,7 @@ Stated explicitly so that no part of this document is mistaken for permission.
   Scientific Core file outside the pseudo-diff in §5.
 - **No test from §7 has been added to the codebase.** The matrix is a plan.
 
-## 13. Decision
+## 14. Decision
 
 # BUILD LATER — pending CTO approval, pinned NIST references, and Scientific Core contract decision
 
@@ -528,5 +648,9 @@ Scope is fully specified: eight symbols across seven files, ~55-75 production li
 seventeen-case test matrix whose T14 is a hard byte-identity gate on existing packs. Two findings
 reduced the work rather than adding to it — only variant arms are asserted, so no control-arm or
 arm-kind change is needed (§2.4), and DRIFT across model versions is automatic, so the replay
-comparator is untouched (§4.2). Nothing in this plan is speculative. Nothing may start before the
-three gates in §11 are closed.
+comparator is untouched (§4.2). Nothing in this plan is speculative.
+
+G1 was closed by verification and G2 is defined, but **G3 is blocked by an environment egress
+policy that denies every official NIST host** (§11). Implementation therefore did not start and
+the branch stays documentation-only. The single remaining action is to retrieve and hash the four
+artifacts A1–A4 in an environment with network access; §11 gives the exact URLs and commands.

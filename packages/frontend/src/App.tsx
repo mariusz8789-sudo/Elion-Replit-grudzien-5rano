@@ -5,6 +5,7 @@ import { LabShell } from './components/LabShell';
 import { ScaleJourney } from './components/ScaleJourney';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsScreen } from './components/SettingsScreen';
+import { ScientificMemoryScreen } from './components/ScientificMemoryScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
 import { GlossaryScreen } from './components/GlossaryScreen';
 import { WhatIfScreen } from './components/WhatIfScreen';
@@ -69,6 +70,7 @@ type Route =
   | { kind: 'home' }
   | { kind: 'lab'; id: string }
   | { kind: 'settings' }
+  | { kind: 'memory' }
   | { kind: 'discovery-log' }
   | { kind: 'glossary' }
   | { kind: 'what-if' }
@@ -95,6 +97,7 @@ function parseHash(): Route {
   const lab = h.match(/^#\/lab\/([\w-]+)/);
   if (lab) return { kind: 'lab', id: lab[1] };
   if (h === '#/settings') return { kind: 'settings' };
+  if (h === '#/memory') return { kind: 'memory' };
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
   if (h === '#/what-if') return { kind: 'what-if' };
@@ -253,6 +256,16 @@ export default function App() {
         <div className="app">
           <TopBar title={`⚙ ${t('nav.settings')}`} onSearch={() => setSearchOpen(true)} />
           <SettingsScreen onReplayOnboarding={() => setOnboardingOpen(true)} />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'memory') {
+      return (
+        <div className="app">
+          <TopBar title="🧠 Pamięć Naukowa" onSearch={() => setSearchOpen(true)} />
+          <ScientificMemoryScreen />
           {overlays}
         </div>
       );
@@ -553,6 +566,9 @@ export default function App() {
             </button>
             <button onClick={() => { window.location.hash = '#/discovery-log'; }}>
               <span aria-hidden="true">🏆</span> {t('nav.discoveryLog')}
+            </button>
+            <button onClick={() => { window.location.hash = '#/memory'; }}>
+              <span aria-hidden="true">🧠</span> Pamięć Naukowa
             </button>
             <button onClick={() => { window.location.hash = '#/glossary'; }}>
               <span aria-hidden="true">📚</span> {t('nav.glossary')}

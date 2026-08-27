@@ -64,6 +64,13 @@ describe('scienceChat: SCIENTIFIC INTENT — każda odpowiedź ma typowaną inte
     expect(r.intent).toBe('PROPOSE_EXPERIMENT');
     expect(r.action?.type).toBe('compare');
   });
+
+  it('Protocol / A-B otwiera istniejący Pilot read-only, bez uruchamiania modelu', () => {
+    const r = resolveCommand('zaprojektuj protokół A/B', null);
+    expect(r.intent).toBe('OPEN_SIMULATION');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/pilot?mode=protocol' });
+    expect(r.text).toMatch(/żaden run nie zostanie uruchomiony/i);
+  });
 });
 
 describe('scienceChat: porównanie modeli (COMPARE_MODELS, FAZA 1/P5)', () => {

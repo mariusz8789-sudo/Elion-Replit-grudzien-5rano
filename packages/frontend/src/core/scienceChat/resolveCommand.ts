@@ -198,6 +198,17 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Protocol / A-B designer — read-only navigation to the existing Pilot.
+  //     This never creates a protocol or starts a model run.
+  if (has(norm, 'protokol ab', 'protokol a b', 'zaprojektuj protokol', 'zarejestruj protokol', 'prerejestruj eksperyment', 'ab designer')) {
+    return {
+      text: 'Otwieram Protocol / A-B designer w Pilocie. Najpierw jawnie wybierzesz model, hipotezę, parametr sweepu i kryterium falsyfikacji; żaden run nie zostanie uruchomiony bez osobnego potwierdzenia.',
+      tag: 'SYSTEM',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/pilot?mode=protocol' },
+    };
+  }
+
   // --- Pilot eksperymentu (P2.1 UI): plan -> potwierdzenie -> realny run ->
   //     Scenario Capsule -> eksport, na istniejącym Experiment Fabric. ---
   if (has(norm, 'pilot eksperymentu', 'otworz pilota', 'uruchom pilota', 'eksperyment krok po kroku', 'reprodukowalny eksperyment', 'scenario capsule', 'kapsula scenariusza')) {

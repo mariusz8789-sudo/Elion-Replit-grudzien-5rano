@@ -71,7 +71,10 @@ function downloadJson(filename: string, content: string): void {
 
 export function ExperimentPilotScreen() {
   const models = useMemo(() => listRouterModels(), []);
-  const [inputMode, setInputMode] = useState<'structured' | 'freeText' | 'protocol'>('structured');
+  const [inputMode, setInputMode] = useState<'structured' | 'freeText' | 'protocol'>(() => {
+    const mode = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('mode');
+    return mode === 'protocol' ? 'protocol' : 'structured';
+  });
   const [modelId, setModelId] = useState<string>(() => (getRouterModel('epidemic-city') ? 'epidemic-city' : models[0]?.id ?? ''));
   const [paramInputs, setParamInputs] = useState<Record<string, string>>({});
   const [freeText, setFreeText] = useState('');

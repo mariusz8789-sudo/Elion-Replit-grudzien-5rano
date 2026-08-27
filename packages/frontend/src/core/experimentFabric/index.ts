@@ -106,7 +106,10 @@ export { EVIDENCE_GUIDED_CHAT_VERSION, planEvidenceGuidedExperiment, confirmEvid
 export { BACKEND_EVIDENCE_EXECUTION_VERSION, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan } from './backendExecution';
 export { QUANTUM_EVIDENCE_CARD_VERSION, createMajorana1QuantumEvidenceCard, quantumEvidenceCardsForKnowledge, type QuantumEvidenceCardStatus, type QuantumEvidenceCardEntry, type QuantumEvidenceCard } from '../knowledge/quantumEvidenceCard';
 export { SCENARIO_CAPSULE_VERSION, createScenarioCapsule, replayScenarioCapsule, serializeScenarioCapsule, type ScenarioCapsuleReplayStatus, type ScenarioCapsuleInput, type SpatialScenarioAttachment, type ReproducibleScenarioCapsule, type ScenarioCapsuleReplay } from './scenarioCapsule';
-export { GENESIS_SPATIAL_DATASET_VERSION, OSM_ATTRIBUTION, OSM_LICENSE, normalizeOsmMapXml, importOsmMap, type SpatialLayer, type LonLat, type GenesisSpatialFeature, type GenesisSpatialDataset, type OsmMapImportRequest } from './spatialImport';
+// `importOsmMap` performs a live OpenStreetMap fetch and GIS is PARKED, so it stays module-private
+// until GIS is unparked. The pure `normalizeOsmMapXml` and its types remain public because
+// CloudProjectsScreen already consumes them. Guarded by gisBarrelBoundary.test.ts.
+export { GENESIS_SPATIAL_DATASET_VERSION, OSM_ATTRIBUTION, OSM_LICENSE, normalizeOsmMapXml, type SpatialLayer, type LonLat, type GenesisSpatialFeature, type GenesisSpatialDataset, type OsmMapImportRequest } from './spatialImport';
 export {
   ORCHESTRATION_CONTRACT_VERSION,
   planCrossDomainOrchestration,

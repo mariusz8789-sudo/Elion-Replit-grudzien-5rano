@@ -61,7 +61,7 @@ async function download(url) {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const response = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Genesis-G3-pinned-fixture/1.0' } });
-      if (response.ok) return Buffer.from(await response.arrayBuffer());
+      if (response.ok) return new Uint8Array(await response.arrayBuffer());
       if (!transient.has(response.status) || attempt === 3) {
         throw new Error(`${response.status} ${response.statusText} for ${url}`);
       }
@@ -70,7 +70,7 @@ async function download(url) {
       if (attempt === 3 || !String(error).match(/(?:502|503|504|429|fetch failed)/i)) throw error;
       console.log(`G3 RETRY ${attempt}/2 transient network error for ${url}`);
     }
-    await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+    await new Promise((resolve) => globalThis.setTimeout(resolve, attempt * 2000));
   }
   throw new Error(`unreachable download state for ${url}`);
 }

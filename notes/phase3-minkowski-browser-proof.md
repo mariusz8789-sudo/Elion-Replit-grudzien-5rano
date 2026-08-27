@@ -1,0 +1,3 @@
+## Browser proof — 2026-08-27
+
+Na pełnym lokalnym stacku Genesis (`http://localhost:5001/`) Science Chat przyjął request `Pokaż diagram Minkowskiego beta=0.5`, wygenerował plan z modelem `spacetime-minkowski`, jawnie pokazał ograniczenia i oczekiwał potwierdzenia. Po kliknięciu `Uruchom potwierdzony plan` aplikacja przeszła do `#/lab/spacetime` i pokazała wynik realnego deterministycznego runu: beta=0.5 c, gamma=1.1547, ordering=b-before-a, intervalSquared=-1.3625 w konwencji jednostek. UI ujawniło provenance run/capsule, `Evidence Pack: PROTOCOL_REQUIRED` i `A/B: VARIANT_REQUIRED`; nie utworzyło fikcyjnego Evidence Pack ani wariantu.

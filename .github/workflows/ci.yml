@@ -63,3 +63,21 @@ jobs:
           name: genesis-os-dist
           path: packages/frontend/dist
           retention-days: 7
+
+  pyscf-real:
+    name: Real PySCF benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12.3'
+          cache: pip
+          cache-dependency-path: packages/backend/requirements-pyscf.txt
+      - name: Install pinned PySCF runtime
+        run: python -m pip install --disable-pip-version-check -r packages/backend/requirements-pyscf.txt
+      - name: Run real Fabric PySCF contract tests
+        env:
+          GENESIS_PYSCF_PYTHON: python
+        run: node --test packages/backend/src/pyscfFabricApi.test.mjs

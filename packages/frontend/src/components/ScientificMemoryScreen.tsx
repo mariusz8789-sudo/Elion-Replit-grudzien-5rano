@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { deleteExperiment, listExperiments, type SavedExperiment } from '../core/scienceMemory';
+import { classifyStoredEvidencePack, listScientificEvidencePacks, serializeScientificEvidencePack, type StoredEvidencePack } from '../core/experimentFabric';
 import { setPendingScenario } from '../core/scenarioBridge';
 
 function downloadJson(record: SavedExperiment): void {
@@ -12,6 +13,16 @@ function downloadJson(record: SavedExperiment): void {
   URL.revokeObjectURL(url);
 }
 
+function downloadEvidencePack(record: StoredEvidencePack): void {
+  const blob = new Blob([serializeScientificEvidencePack(record.pack)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${record.pack.evidencePackId}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function formatDate(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('pl-PL');
@@ -19,6 +30,7 @@ function formatDate(value: string): string {
 
 export function ScientificMemoryScreen() {
   const [records, setRecords] = useState(() => listExperiments());
+  const [evidencePacks] = useState(() => listScientificEvidencePacks());
   const [notice, setNotice] = useState<string | null>(null);
   const countLabel = useMemo(() => `${records.length} ${records.length === 1 ? 'zapis' : 'zapisów'}`, [records.length]);
 
@@ -73,11 +85,33 @@ export function ScientificMemoryScreen() {
         </section>
       )}
 
+      <section className="settings-section" aria-label="Lokalne Evidence Packs">
+        <h2>Evidence Packs lokalne</h2>
+        <p className="settings-hint">
+          {evidencePacks.length} zapisanych snapshotów Evidence Pack na tym urządzeniu. To pełne rekordy wyników zapisane po wykonaniu Pilota;
+          zapis lokalny nie jest jeszcze dowodem ponownego uruchomienia backendu.
+        </p>
+        {evidencePacks.length === 0 ? <p className="settings-hint">Brak lokalnych Evidence Packs. Wykonaj zatwierdzony Protocol/A-B w Pilocie.</p> : evidencePacks.map((record) => (
+          <article className="settings-section" key={record.pack.evidencePackId}>
+            <h2 className="mono">{record.pack.evidencePackId}</h2>
+            <p className="settings-hint">Zapisano: {formatDate(record.savedAt)} · {record.pack.runCount} runów · model {record.pack.protocol.hypothesis.modelId}</p>
+            <div className="stat-list">
+              <div className="stat-row"><span>Snapshot integrity</span><span className="val">{classifyStoredEvidencePack(record.pack)}</span></div>
+              <div className="stat-row"><span>Reproducibility snapshot</span><span className="val">{record.pack.reproducibility.allArmsMatched ? 'MATCH' : 'DRIFT / BLOCKED'}</span></div>
+              <div className="stat-row"><span>Source</span><span className="val">real runs only: {String(record.pack.runs.length > 0)}</span></div>
+            </div>
+            <div className="pilot-actions">
+              <button className="chip-btn" onClick={() => downloadEvidencePack(record)}>Eksportuj Evidence Pack JSON</button>
+            </div>
+          </article>
+        ))}
+      </section>
+
       <section className="settings-section">
         <h2>Granice funkcji</h2>
         <p className="settings-hint">
-          Historia nie dowodzi reprodukcji sama w sobie, nie tworzy Evidence Pack, nie synchronizuje danych z innymi użytkownikami
-          i nie uruchamia modeli w tle. Do audytowalnego wyniku użyj Experiment Pilot oraz Evidence / Replay.
+          Historia nie dowodzi reprodukcji sama w sobie, nie synchronizuje danych z innymi użytkownikami i nie uruchamia modeli w tle.
+          Evidence Pack snapshot jest lokalnym rekordem pochodzącym z realnego runu; pełny backend replay nadal wymaga jawnego ponownego wykonania w Experiment Pilot.
         </p>
       </section>
     </main>

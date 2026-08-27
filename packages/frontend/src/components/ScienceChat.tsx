@@ -114,6 +114,9 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
 const SUGGESTIONS = [
   'Uruchom trzęsienie ziemi magnitude=5.4 depth=12 km',
   'Pokaż diagram Minkowskiego beta=0.5',
+  'Policz promień Schwarzschilda dla 3 masy słońca',
+  'Uruchom epidemię z R0 3 dla 260 agentów',
+  'Policz relatywistyczną energię cząstki',
   'Zbadaj problem trzech ciał',
   'Zwiększ masę 2×',
   'Co się zmieniło?',

@@ -569,6 +569,64 @@ Two constraints carried forward from the admission audit: the **medium must be e
 and air wavelengths differ in the fourth digit — and the NIST WebBook must not be used as evidence
 unless a stable raw payload, hash and version can be preserved.
 
+### G3 verification attempt 2 — CI job exists, still **NOT CLOSED**
+
+Manus added a CI job that fetches and hashes the artifacts on a runner that does have egress. The
+mechanism is right; the gate has not passed. Verified against LIVE HEAD
+`bfc331960adef57d6034123ae7bf4602490bcb96` ("ci: validate CODATA fixture header").
+
+| Run                                                                                                     | HEAD      | `G3 pinned NIST/CODATA atom-bohr artifacts` | Whole run   |
+| ------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------- | ----------- |
+| [33118814096](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/33118814096) | `2134ae6` | failure                                     | failure     |
+| [33119310012](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/33119310012) | `9a3634d` | failure                                     | failure     |
+| [33119445862](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/33119445862) | `b40c5bb` | failure                                     | failure     |
+| [33119524088](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/33119524088) | `caa8d37` | failure                                     | failure     |
+| [33119714850](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/33119714850) | `889230a` | failure                                     | failure     |
+| [33119891923](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/33119891923) | `bfc3319` | **failure**                                 | **failure** |
+
+Latest job [98683863028](https://github.com/mariusz8789-sudo/Elion-Replit-grudzien-5rano/actions/runs/33119891923/job/98683863028), step by step:
+
+| #   | Step                                          | Result      |
+| --- | --------------------------------------------- | ----------- |
+| 4   | Fetch and hash official NIST/CODATA artifacts | **failure** |
+| 5   | Verify manifest and raw payload hashes        | **skipped** |
+| 6   | Upload immutable G3 candidate fixture         | **skipped** |
+
+Error, verbatim:
+
+```
+Error: A1-codata-fundamental-constants: payload missing required marker Fundamental Physical Constants
+    at scripts/fetch-atom-bohr-nist-fixtures.mjs:93:39
+Process completed with exit code 1.
+```
+
+What this establishes, and what it does not:
+
+- **A1 failed content validation.** The script downloads
+  `https://physics.nist.gov/cuu/Constants/Table/allascii.txt`, then requires the payload to contain
+  both `Fundamental Physical Constants` and `2022 CODATA adjustment`
+  (`fetch-atom-bohr-nist-fixtures.mjs`, `mustContain`). The first marker was absent, so the loop
+  threw before hashing. This is a **content mismatch, not a network denial** — bytes arrived, they
+  just were not the expected table. The cause is not established here and must not be guessed.
+- **A2, A3 and A4 were never reached.** The loop aborts on the first failure, so nothing is known
+  about them from this run.
+- **No SHA-256 was printed for any artifact.** The `G3 SHA256 <id>` line executes only after the
+  marker check passes; it appears nowhere in the log.
+- **No CI artifact exists.** The upload step was skipped, so `atom-bohr-nist-g3-bfc3319` was never
+  produced and there is nothing to download or verify locally.
+- **Nothing was committed.** No file under `docs/evidence/atom-bohr-nist/` was created, because
+  creating one would mean inventing bytes.
+
+**Side effect worth flagging: LIVE is currently red.** In run `33119891923` the `verify` and
+`Real PySCF benchmark` jobs both passed; the run is `failure` solely because of the G3 job. Every
+LIVE commit from `2134ae6` onward carries a failing quality gate.
+
+Two design points from the earlier note still stand and are unaffected by this failure: **A3 must
+be an official ASD output rather than a Chemistry WebBook CGI page**, whose HTML has no version
+stamp and whose hash moves with unrelated markup changes; and **the artifacts must be committed to
+the repository**, because a CI artifact with 90-day retention is not a pinned reference and cannot
+satisfy the no-refetch replay policy (M-7).
+
 ### G2 — MIGRATION POLICY: **DEFINED (docs-only; activates when G1 and G3 are closed)**
 
 The policy is recorded now so that no implementation step has to invent it later. It changes no

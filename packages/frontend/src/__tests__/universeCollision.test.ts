@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collisionSeedFor, createCollisionInitialState, runCollisionScenario } from '../labs/experiments/universe-collision';
+import { collisionSeedFor, createCollisionInitialState, runCollisionScenario, universeCollision } from '../labs/experiments/universe-collision';
 
 describe('universe collision reproducibility seam', () => {
   it('creates identical restricted three-body initial conditions for the same scenario', () => {
@@ -30,6 +30,15 @@ describe('universe collision reproducibility seam', () => {
     expect(first.starCount).toBe(1800);
     expect(first.minCoreSeparationSceneUnits).toBeLessThanOrEqual(first.initialCoreSeparationSceneUnits);
     expect(first.finalCoreSeparationSceneUnits).toBeGreaterThan(0);
+  });
+
+  it('keeps the rendered integration step within the solver contract after speed scaling', () => {
+    const createSim = universeCollision.createSim;
+    expect(createSim).toBeDefined();
+    if (!createSim) throw new Error('Universe collision factory is missing.');
+    const sim = createSim();
+    sim.init(1280, 720);
+    expect(() => sim.update(0.03, { speed: 4, ratio: 1, retro: false } as never)).not.toThrow();
   });
 
   it('rejects invalid viewport, mass ratio and provenance seed before generating particles', () => {

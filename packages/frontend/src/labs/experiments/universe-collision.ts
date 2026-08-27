@@ -233,7 +233,8 @@ class CollisionGalaxiesSim implements Sim {
     const retro = Boolean(p.retro);
     if (ratio !== this.lastRatio || retro !== this.lastRetro) this.setup(ratio, retro);
     const speed = Number(p.speed);
-    const ddt = Math.min(dt, 0.03) * speed;
+    // Clamp after applying the UI speed multiplier: the integrator contract is on the final step.
+    const ddt = Math.min(Math.max(0, dt * speed), 0.03);
     this.elapsed += ddt;
 
     advanceCollisionState(this.cores, this.stars, ddt);

@@ -1,7 +1,7 @@
 # CTO Decision — Campaign Evidence Interoperability
 
-**Decision:** `PARK / BLOCKER` for cross-pipeline Evidence export.  
-**Accepted capability:** existing Campaign backend evidence remains real and usable inside CampaignScreen.  
+**Decision:** `PARK / BLOCKER` for cross-pipeline Evidence export.
+**Accepted capability:** existing Campaign backend evidence remains real and usable inside CampaignScreen.
 **Not accepted:** automatic projection into the frontend Experiment Fabric Evidence Pack or RO-Crate.
 
 ## Finding

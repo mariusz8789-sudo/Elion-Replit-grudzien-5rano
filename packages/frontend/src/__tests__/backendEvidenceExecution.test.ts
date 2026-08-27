@@ -654,6 +654,22 @@ describe('backend Evidence-Guided execution', () => {
     expect(evidence.arms.every((arm) => arm.reproduction === 'MATCH')).toBe(true);
     expect(pack.reproducibility.allArmsMatched).toBe(true);
     expect(pack.runs.map((run) => run.parameters.basis)).toEqual(['sto-3g', '6-31g']);
+
+    const replayEvidence = await executeScientificBackendExperiment(design);
+    const replayPack = createScientificEvidencePack(replayEvidence);
+    expect(replayEvidence.arms.every((arm) => arm.reproduction === 'MATCH')).toBe(true);
+    expect(replayEvidence.allRuns.map((run) => run.provenance.runFingerprint)).toEqual(
+      evidence.allRuns.map((run) => run.provenance.runFingerprint),
+    );
+    if (process.env.GENESIS_DEBUG_REPLAY === '1') {
+      console.log(JSON.stringify({
+        original: { evidenceId: evidence.evidenceId, fingerprints: evidence.allRuns.map((run) => run.provenance.runFingerprint), outputs: evidence.allRuns.map((run) => run.result.outputs), provenance: evidence.allRuns.map((run) => run.provenance.backendExecution?.backendProvenance) },
+        replay: { evidenceId: replayEvidence.evidenceId, fingerprints: replayEvidence.allRuns.map((run) => run.provenance.runFingerprint), outputs: replayEvidence.allRuns.map((run) => run.result.outputs), provenance: replayEvidence.allRuns.map((run) => run.provenance.backendExecution?.backendProvenance) },
+        packs: [pack.evidencePackId, replayPack.evidencePackId],
+      }, null, 2));
+    }
+    expect(replayPack.evidencePackId).toBe(pack.evidencePackId);
+
     if (process.env.GENESIS_WRITE_REAL_EVIDENCE === '1') {
       mkdirSync('docs/evidence', { recursive: true });
       writeFileSync('docs/evidence/GENESIS_PYSCF_H2_AB_EVIDENCE.json', `${serializeScientificEvidencePack(pack)}\n`, 'utf8');

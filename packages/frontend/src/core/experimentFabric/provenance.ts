@@ -100,7 +100,11 @@ export function createExperimentProvenance(input: {
     outputs: input.result.outputs,
     units: input.result.units,
     warnings: input.result.warnings,
-    backendExecution: input.backendExecution ?? null,
+    backendExecution: input.backendExecution === undefined ? null : {
+      backendEngine: input.backendExecution.backendEngine,
+      backendModelVersion: input.backendExecution.backendModelVersion,
+      backendProvenance: input.backendExecution.backendProvenance,
+    },
   }))}`;
   return {
     contractVersion: EXPERIMENT_FABRIC_VERSION,

@@ -64,7 +64,12 @@ export function createScientificEvidencePack(chain: ScientificEvidenceChain): Sc
     chain: chain.provenanceFingerprint,
     protocol: chain.design.protocolFingerprint,
     runFingerprints: chain.allRuns.map((run) => run.provenance.runFingerprint),
-    assessment: chain.assessment,
+    assessment: {
+      assessment: chain.assessment.assessment,
+      message: chain.assessment.message,
+      criterion: chain.assessment.criterion,
+      referenceRunIds: [],
+    },
   };
   return {
     contractVersion: EVIDENCE_PACK_VERSION,

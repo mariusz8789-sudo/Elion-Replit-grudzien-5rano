@@ -135,6 +135,7 @@ const SUGGESTIONS = [
   'Otwórz kampanię naukową',
   'Uruchom model pompa–rurociąg: przepływ wody',
   'Uruchom PySCF RHF dla H2; długość wiązania 0.74 Å',
+  'Pokaż tunelowanie pakietu falowego 1D: bariera=1 szerokość=3',
 ];
 
 export function ScienceChat() {

@@ -242,6 +242,15 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Campaign: jawna nawigacja read-only do istniejącego ekranu ---
+  // Sprawdzane przed resolveQuery, żeby jawna nazwa ekranu nigdy nie została
+  // rozmyta na niepowiązany przepis fizyczny, i poza blokiem `!ctx`, bo
+  // otwarcie Campaign nie zależy od tego, czy jakaś symulacja jest otwarta.
+  // Rdzeń „kampani" pokrywa kampania/kampanię/kampanii/kampanie.
+  if (has(norm, 'kampani', 'campaign', 'silnik przyspieszenia', 'scientific acceleration')) {
+    return { text: 'Otwieram istniejący Campaign Screen. To nawigacja read-only: kampania nie zostanie utworzona ani uruchomiona bez osobnej akcji i autoryzacji.', tag: 'MODEL', intent: 'OPEN_CAMPAIGN', action: { type: 'openRoute', hash: '#/campaign' } };
+  }
+
   // --- Otwórz zjawisko (reuse generatora) — ma priorytet, gdy pada nazwa zjawiska ---
   const open = resolveQuery(message);
   const looksLikeOpen = has(norm, 'pokaz', 'stworz', 'zbuduj', 'otworz', 'uruchom', 'zasymuluj', 'symulacj', 'wyswietl', 'chce zobaczyc', 'zbadaj', 'przeanalizuj', 'model');
@@ -257,9 +266,6 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
 
   // --- Bez otwartej symulacji: dalsze komendy wymagają kontekstu ---
   if (!ctx) {
-    if (has(norm, 'kampania naukowa', 'kampanie naukowa', 'kampanii naukowej', 'campaign', 'silnik przyspieszenia', 'scientific acceleration')) {
-      return { text: 'Otwieram istniejący Campaign Screen. To nawigacja read-only: kampania nie zostanie utworzona ani uruchomiona bez osobnej akcji i autoryzacji.', tag: 'MODEL', intent: 'OPEN_CAMPAIGN', action: { type: 'openRoute', hash: '#/campaign' } };
-    }
     if (has(norm, 'pomoc', 'help', 'co potrafisz', 'co umiesz')) return helpResponse();
     return {
       text: 'Nie mam teraz otwartej symulacji. Powiedz np. „pokaż czarną dziurę" albo „zasymuluj dylatację czasu", a potem będę mógł zmieniać parametry, wyjaśniać i tworzyć zadania.',

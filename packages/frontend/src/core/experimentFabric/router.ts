@@ -278,8 +278,8 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'epidemic-city', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-epidemic-city@1.0.0',
     parameters: [number('r0', 'Liczba reprodukcji R₀', '', 0, 20, 2.5), number('horizonDays', 'Horyzont symulacji', 'dni', 1, 365, 90), number('nAgents', 'Liczba agentów', 'osób', 10, 10000, 260)],
-    route: { kind: 'live-world', target: 'epidemic-city', hash: '#/hf-slice' }, knowledgeSources: ['biology.md'],
-    rationale: 'Realny agentowy EpidemicCitySimulation; renderer zachowuje się jako konsument read-only tego samego świata.',
+    route: { kind: 'live-world', target: 'epidemic-city', hash: '#/city3d' }, knowledgeSources: ['biology.md'],
+    rationale: 'Realny agentowy EpidemicCitySimulation; City3D Command Center (Hospital, Hotspot, WorldState) zachowuje się jako konsument read-only tego samego świata.',
   },
   {
     id: 'biology-dna-helix', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-b-dna-wallace@1.0.0',

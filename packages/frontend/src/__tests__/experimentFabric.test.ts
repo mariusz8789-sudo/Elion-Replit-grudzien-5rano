@@ -1187,7 +1187,7 @@ describe('Genesis Experiment Fabric', () => {
     const planned = planEvidenceGuidedExperiment(request);
     expect(request.modelId).toBe('epidemic-city');
     expect(planned.status).toBe('READY_FOR_CONFIRMATION');
-    expect(planned.plan.route).toEqual({ kind: 'live-world', target: 'epidemic-city', hash: '#/hf-slice' });
+    expect(planned.plan.route).toEqual({ kind: 'live-world', target: 'epidemic-city', hash: '#/city3d' });
     const confirmed = confirmEvidenceGuidedExperiment(planned);
     expect(confirmed.run.result.status).toBe('completed');
     expect(confirmed.run.result.route).toEqual(planned.plan.route);

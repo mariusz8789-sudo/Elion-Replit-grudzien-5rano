@@ -132,9 +132,13 @@ export class EpidemicCity3DSim implements Sim3D {
   private lastTickMs = 0;
   private renderMetrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
 
-  constructor(params: Partial<EpidemicCityParams> = {}, callbacks: City3DCallbacks = {}) {
-    this.simulation = new EpidemicCitySimulation(params);
-    this.eventSeed = params.seed;
+  constructor(
+    params: Partial<EpidemicCityParams> = {},
+    callbacks: City3DCallbacks = {},
+    existingSimulation?: EpidemicCitySimulation,
+  ) {
+    this.simulation = existingSimulation ?? new EpidemicCitySimulation(params);
+    this.eventSeed = this.simulation.getParams().seed as number | undefined;
     this.eventRegistry = new EventRegistry({ modelId: 'epidemic.city', seed: this.eventSeed });
     this.eventStream = new EventStream(this.eventRegistry);
     this.eventCursor = this.eventStream.cursor();

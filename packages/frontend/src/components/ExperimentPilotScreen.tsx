@@ -17,6 +17,9 @@ import {
   designScientificExperiment,
   executeScientificExperiment,
   explainScientificEvidence,
+  createScientificEvidencePack,
+  serializeScientificEvidencePack,
+  serializeEvidencePackRoCrate,
   type ScientificExperimentDesign,
   type ScientificEvidenceChain,
 } from '../core/experimentFabric';
@@ -248,6 +251,41 @@ export function ExperimentPilotScreen() {
     setReplay(replayScenarioCapsule(capsule));
   }
 
+  /**
+   * Formal Evidence Pack / RO-Crate export.
+   *
+   * `protocolEvidence` is the `ScientificEvidenceChain` that
+   * `executeScientificExperiment` already produced from real runs — exactly the
+   * input `createScientificEvidencePack` requires. Until now those two existing,
+   * tested functions had no caller outside tests, so a user could never obtain a
+   * formal pack from the running product ("Formal Evidence Packs: PARTIAL").
+   *
+   * This adds no new Evidence/Replay system and no new contract: it calls the
+   * existing serializers on a chain that is already in state. If no protocol has
+   * been executed there is simply nothing to export, matching the honest
+   * `PROTOCOL_REQUIRED` stance rather than fabricating an empty pack.
+   */
+  function handleExportEvidencePack() {
+    if (!protocolEvidence) return;
+    try {
+      const pack = createScientificEvidencePack(protocolEvidence);
+      downloadJson(`${pack.evidencePackId}.json`, serializeScientificEvidencePack(pack));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  function handleExportRoCrate() {
+    if (!protocolEvidence) return;
+    try {
+      // serializeEvidencePackRoCrate takes the pack and projects it internally.
+      const pack = createScientificEvidencePack(protocolEvidence);
+      downloadJson(`${pack.evidencePackId}-ro-crate.json`, serializeEvidencePackRoCrate(pack));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   function handleReset() {
     setPhase('draft');
     setPlan(null);
@@ -360,6 +398,11 @@ export function ExperimentPilotScreen() {
           <div className="pilot-disclosure"><span className={`honesty ${protocolEvidence.assessment.assessment === 'SUPPORTED_WITHIN_PROTOCOL' ? 'simplified' : 'theoretical'}`}>{protocolEvidence.assessment.assessment}</span><p className="pilot-summary">{protocolEvidence.assessment.message}</p></div>
           <dl className="pilot-outputs">{protocolEvidence.arms.map((arm) => <div key={arm.armId} className="pilot-output-row"><dt>{arm.kind} · {arm.armId}</dt><dd>{arm.outputValues.join(' / ')} {arm.units} · {arm.reproduction}</dd></div>)}</dl>
           <dl className="pilot-provenance"><div><dt>evidenceId</dt><dd className="mono">{protocolEvidence.evidenceId}</dd></div><div><dt>runs</dt><dd>{protocolEvidence.allRuns.length} · createdFromRealRunsOnly=true</dd></div><div><dt>provenance</dt><dd className="mono">{protocolEvidence.provenanceFingerprint}</dd></div></dl>
+          <div className="pilot-actions">
+            <button className="chip-btn" onClick={handleExportEvidencePack}>Eksportuj Evidence Pack</button>
+            <button className="chip-btn" onClick={handleExportRoCrate}>Eksportuj RO-Crate</button>
+          </div>
+          <p className="pilot-summary">Pakiet jest wierną projekcją wykonanych runów tego protokołu; nie dodaje interpretacji, nie tworzy wariantu i nie jest odkryciem naukowym.</p>
           {protocolAdvice && <div className="pilot-why-panel"><h3>WHY / NEXT EXPERIMENT</h3><p className="pilot-summary">{protocolAdvice.why}</p><p><strong>Baza dowodu:</strong> {protocolAdvice.evidenceBasis.join(' · ')}</p><ul className="pilot-limitations">{protocolAdvice.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul><p><strong>Następny bounded krok:</strong> {protocolAdvice.nextExperiment.action}</p><p><strong>Parametr:</strong> <code>{protocolAdvice.nextExperiment.parameter}</code> · {protocolAdvice.nextExperiment.rationale}</p><span className="honesty theoretical">AUTO-RUN: DISABLED</span></div>}
         </section>
       )}

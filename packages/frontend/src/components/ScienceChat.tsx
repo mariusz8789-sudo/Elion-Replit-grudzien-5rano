@@ -115,6 +115,7 @@ const SUGGESTIONS = [
   'Zasymuluj epidemię z R0=5 przez 10 dni seed=12',
   'Uruchom trzęsienie ziemi magnitude=5.4 depth=12 km',
   'Pokaż diagram Minkowskiego beta=0.5',
+  'Oblicz promień Schwarzschilda dla 2 masy Słońca',
   'Zintegruj geodezyjną fotonu wokół czarnej dziury Schwarzschilda',
   'Uruchom c-Slider: v=240000000 m/s, c=300000000 m/s, dystans=300000 km',
   'Oblicz energię relatywistyczną cząstki beta=0.8',

@@ -1328,6 +1328,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(capsule.counterfactual.status).toBe('VARIANT_REQUIRED');
   });
 
+  it('routes and confirms the analytical Schwarzschild radius through the existing guided lab flow', () => {
+    const request = parseScienceChatMessage('Oblicz promień Schwarzschilda dla 2 masy Słońca.');
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.disclosure.capability).toBe('REAL_ENGINE');
+    expect(planned.plan.route).toEqual({ kind: 'lab', labId: 'einstein' });
+    const confirmed = confirmEvidenceGuidedExperiment(planned);
+    expect(confirmed.run.result.status).toBe('completed');
+    expect(Number(confirmed.run.result.outputs.radiusKm)).toBeCloseTo(5.94, 1);
+    expect(confirmed.run.result.validity).toContain('Metryka Schwarzschilda');
+    const capsule = capsuleFromConfirmedExperiment(confirmed);
+    expect(capsule.route).toEqual({ kind: 'lab', labId: 'einstein' });
+    expect(capsule.evidencePack.status).toBe('PROTOCOL_REQUIRED');
+    expect(capsule.counterfactual.status).toBe('VARIANT_REQUIRED');
+  });
+
   it('routes and confirms the bounded Schwarzschild geodesic through the existing guided lab flow', () => {
     const request = parseScienceChatMessage('Zintegruj geodezyjną fotonu wokół czarnej dziury Schwarzschilda.');
     const planned = planEvidenceGuidedExperiment(request);

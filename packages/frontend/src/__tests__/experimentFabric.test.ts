@@ -1181,6 +1181,22 @@ describe('Genesis Experiment Fabric', () => {
     expect(localAttempt.result.outputs).toEqual({});
   });
 
+  it('routes a bounded Minkowski request through Science Chat and the existing deterministic Fabric executor', () => {
+    const request = parseScienceChatMessage('Pokaż diagram Minkowskiego beta=0.5.');
+    expect(request.domainId).toBe('spacetime-einstein');
+    expect(request.modelId).toBe('spacetime-minkowski');
+    expect(request.parameters).toEqual({ beta: 0.5 });
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.plan.route).toEqual({ kind: 'lab', labId: 'spacetime', experimentId: 'minkowski' });
+    const run = runExperiment(request);
+    expect(run.result.status).toBe('completed');
+    expect(run.result.outputs.beta).toBe(0.5);
+    expect(run.result.outputs.gamma).toBeCloseTo(1.154700538, 8);
+    expect(run.result.outputs.ordering).toBe('b-before-a');
+    expect(run.result.warnings.join(' ')).toContain('dwóch ustalonych zdarzeń');
+  });
+
   it('routes and confirms the Earthquake Chat request through the existing envelope with honest replay and damage limits', async () => {
     const request = parseScienceChatMessage('Uruchom trzęsienie ziemi magnitude=5.4 depth=12 km seed=42.');
     expect(request.domainId).toBe('hazard-earthquake');

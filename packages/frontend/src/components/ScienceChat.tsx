@@ -119,6 +119,7 @@ const SUGGESTIONS = [
   'Uruchom c-Slider: v=240000000 m/s, c=300000000 m/s, dystans=300000 km',
   'Oblicz energię relatywistyczną cząstki beta=0.8',
   'Pokaż życie gwiazdy o masie 10 masy Słońca',
+  'Obróć tesserakt: XW=45, YZ=30, podwójna rotacja',
   'Zbadaj problem trzech ciał',
   'Zwiększ masę 2×',
   'Co się zmieniło?',

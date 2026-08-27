@@ -1228,6 +1228,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.result.warnings.join(' ')).toContain('dwóch ustalonych zdarzeń');
   });
 
+  it('routes and confirms bounded tesseract geometry through the existing guided lab flow', () => {
+    const request = parseScienceChatMessage('Obróć tesserakt: XW=45, YZ=30, podwójna rotacja.');
+    const planned = planEvidenceGuidedExperiment(request);
+    expect(planned.status).toBe('READY_FOR_CONFIRMATION');
+    expect(planned.disclosure.capability).toBe('REAL_ENGINE');
+    expect(planned.plan.route).toEqual({ kind: 'lab', labId: 'multiverse', experimentId: 'tesseract' });
+    const confirmed = confirmEvidenceGuidedExperiment(planned);
+    expect(confirmed.run.result.status).toBe('completed');
+    expect(confirmed.run.result.outputs.vertexCount).toBe(16);
+    expect(confirmed.run.result.outputs.edgeCount).toBe(32);
+    expect(confirmed.run.result.validity).toContain('nie opisuje obiektu fizycznego');
+    const capsule = capsuleFromConfirmedExperiment(confirmed);
+    expect(capsule.route).toEqual({ kind: 'lab', labId: 'multiverse', experimentId: 'tesseract' });
+    expect(capsule.evidencePack.status).toBe('PROTOCOL_REQUIRED');
+    expect(capsule.counterfactual.status).toBe('VARIANT_REQUIRED');
+  });
+
   it('routes and confirms bounded stellar scaling through the existing guided lab flow', () => {
     const request = parseScienceChatMessage('Pokaż życie gwiazdy o masie 10 masy Słońca.');
     const planned = planEvidenceGuidedExperiment(request);

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { deleteExperiment, listExperiments, type SavedExperiment } from '../core/scienceMemory';
-import { classifyStoredEvidencePack, listScientificEvidencePacks, serializeScientificEvidencePack, type StoredEvidencePack } from '../core/experimentFabric';
+import { classifyStoredEvidencePack, getStoredEvidencePackReplayVerdict, listScientificEvidencePacks, serializeScientificEvidencePack, type StoredEvidencePack } from '../core/experimentFabric';
 import { setPendingScenario } from '../core/scenarioBridge';
 
 function downloadJson(record: SavedExperiment): void {
@@ -91,21 +91,25 @@ export function ScientificMemoryScreen() {
           {evidencePacks.length} zapisanych snapshotów Evidence Pack na tym urządzeniu. To pełne rekordy wyników zapisane po wykonaniu Pilota;
           zapis lokalny nie jest jeszcze dowodem ponownego uruchomienia backendu.
         </p>
-        {evidencePacks.length === 0 ? <p className="settings-hint">Brak lokalnych Evidence Packs. Wykonaj zatwierdzony Protocol/A-B w Pilocie.</p> : evidencePacks.map((record) => (
+        {evidencePacks.length === 0 ? <p className="settings-hint">Brak lokalnych Evidence Packs. Wykonaj zatwierdzony Protocol/A-B w Pilocie.</p> : evidencePacks.map((record) => {
+          const snapshotVerdict = getStoredEvidencePackReplayVerdict(record.pack);
+          return (
           <article className="settings-section" key={record.pack.evidencePackId}>
             <h2 className="mono">{record.pack.evidencePackId}</h2>
             <p className="settings-hint">Zapisano: {formatDate(record.savedAt)} · {record.pack.runCount} runów · model {record.pack.protocol.hypothesis.modelId}</p>
             <div className="stat-list">
-              <div className="stat-row"><span>Snapshot integrity</span><span className="val">{classifyStoredEvidencePack(record.pack)}</span></div>
-              <div className="stat-row"><span>Reproducibility snapshot</span><span className="val">{record.pack.reproducibility.allArmsMatched ? 'MATCH' : 'DRIFT / BLOCKED'}</span></div>
+              <div className="stat-row"><span>Snapshot schema</span><span className="val">{classifyStoredEvidencePack(record.pack)}</span></div>
+              <div className="stat-row"><span>Persisted replay verdict</span><span className="val">{snapshotVerdict}</span></div>
               <div className="stat-row"><span>Source</span><span className="val">real runs only: {String(record.pack.runs.length > 0)}</span></div>
             </div>
+            <p className="settings-hint">{snapshotVerdict === 'MATCH' ? 'MATCH pochodzi z zapisanego snapshotu armów; nie oznacza nowego uruchomienia.' : snapshotVerdict === 'DRIFT' ? 'DRIFT zapisany w snapshotcie; wykonaj jawny rerun, aby porównać aktualny wynik.' : 'BLOCKED: zapis nie zawiera pełnego wykonanego replay; nie traktuj go jako potwierdzenia.'}</p>
             <div className="pilot-actions">
               <button className="chip-btn pilot-primary" onClick={() => { window.location.hash = `#/pilot?mode=protocol&replay=${encodeURIComponent(record.pack.evidencePackId)}`; }}>Otwórz do jawnego rerun</button>
               <button className="chip-btn" onClick={() => downloadEvidencePack(record)}>Eksportuj Evidence Pack JSON</button>
             </div>
           </article>
-        ))}
+          );
+        })}
       </section>
 
       <section className="settings-section">

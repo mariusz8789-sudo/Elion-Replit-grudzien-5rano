@@ -38,6 +38,7 @@ import {
   assertCapabilityAdmissionMatrix,
   serializeCapabilityAdmissionMatrix,
   compareScientificEvidencePacks,
+  getStoredEvidencePackReplayVerdict,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -271,6 +272,30 @@ describe('Genesis Experiment Fabric', () => {
     expect(compareScientificEvidencePacks(pack, drift)).toBe('DRIFT');
     const blocked = { ...pack, runs: pack.runs.map((run, index) => index === 0 ? { ...run, status: 'failed' as const } : run) };
     expect(compareScientificEvidencePacks(pack, blocked)).toBe('BLOCKED');
+  });
+
+  it('derives a persisted Evidence Pack snapshot verdict without rerunning or using volatile run IDs', () => {
+    const request = parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.');
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'W granicach modelu Schwarzschilda promień horyzontu rośnie wraz z masą.',
+        domainId: 'spacetime-einstein', modelId: 'einstein-schwarzschild', declaredAssumptions: [],
+        falsification: { metric: 'radiusKm', relation: 'monotonic-increase', rationale: 'Każdy kolejny wariant masy ma mieć większy obliczony promień.' },
+      },
+      baselineRequest: request,
+      sweep: { parameter: 'massSolar', values: [1, 2], label: 'Masa M☉' },
+      repetitionsPerArm: 1,
+    });
+    const pack = createScientificEvidencePack(executeScientificExperiment(design));
+    expect(getStoredEvidencePackReplayVerdict(pack)).toBe('MATCH');
+    expect(getStoredEvidencePackReplayVerdict({
+      ...pack,
+      reproducibility: { ...pack.reproducibility, allArmsMatched: false, armsWithDrift: ['variant-1'] },
+    })).toBe('DRIFT');
+    expect(getStoredEvidencePackReplayVerdict({
+      ...pack,
+      runs: pack.runs.map((run, index) => index === 0 ? { ...run, status: 'failed' as const } : run),
+    })).toBe('BLOCKED');
   });
 
   it('exports only a real Evidence Pack as deterministic RO-Crate JSON-LD with PROV relations', () => {

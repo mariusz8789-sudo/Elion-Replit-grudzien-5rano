@@ -57,3 +57,12 @@ export function compareScientificEvidencePacks(reference: ScientificEvidencePack
   const replayFingerprints = replay.runs.map((run) => run.provenance.runFingerprint);
   return referenceFingerprints.every((fingerprint, index) => fingerprint === replayFingerprints[index]) ? 'MATCH' : 'DRIFT';
 }
+
+/**
+ * Reports the verdict captured inside a persisted pack without rerunning a backend.
+ * This is a snapshot disclosure, not proof of a fresh replay.
+ */
+export function getStoredEvidencePackReplayVerdict(pack: ScientificEvidencePack): ScientificEvidenceReplayVerdict {
+  if (pack.runCount <= 0 || pack.runs.length === 0 || pack.runs.some((run) => run.status !== 'completed') || pack.reproducibility.armsNotExecuted.length > 0) return 'BLOCKED';
+  return pack.reproducibility.allArmsMatched ? 'MATCH' : 'DRIFT';
+}

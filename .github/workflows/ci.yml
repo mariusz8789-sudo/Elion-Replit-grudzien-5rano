@@ -36,10 +36,12 @@ jobs:
         run: |
           base="$PUSH_BEFORE"
           if [ "$EVENT_NAME" = "pull_request" ]; then base="$PR_BASE"; fi
+          # Markdown hard line-breaks are two trailing spaces and are valid content, so *.md is
+          # excluded. Every other path, code included, still fails on trailing whitespace.
           if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
-            git diff --check "$base" "$GITHUB_SHA"
+            git diff --check "$base" "$GITHUB_SHA" -- . ':(exclude)*.md'
           elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            git diff --check HEAD^ HEAD
+            git diff --check HEAD^ HEAD -- . ':(exclude)*.md'
           fi
 
       - name: Lint

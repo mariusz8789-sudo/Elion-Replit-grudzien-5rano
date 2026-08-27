@@ -21,6 +21,7 @@
     "compute:bundle": "esbuild packages/frontend/src/core/compute/serverEntry.ts --bundle --format=esm --platform=node --target=node22 --legal-comments=none --outfile=packages/backend/src/compute/core.bundle.mjs",
     "compute:bundle:check": "node scripts/check-compute-bundle.mjs",
     "campaign:validate": "node scripts/validation-campaign.mjs",
+    "verify:whitespace-gate": "node scripts/verify-whitespace-gate.mjs",
     "benchmark": "node scripts/benchmark-suite.mjs",
     "e2e:discovery": "node scripts/discovery-e2e.mjs"
   },

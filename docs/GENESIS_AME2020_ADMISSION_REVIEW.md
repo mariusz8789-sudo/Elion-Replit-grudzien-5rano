@@ -43,7 +43,7 @@ The AME2020 file documents `BINDING ENERGY/A` and its uncertainty in `keV`. Ther
 
 ## 3. Data semantics and honesty boundary
 
-The raw header states that `#` marks an estimated (non-experimental) value and `*` marks a non-calculable quantity. An AME row with `#` must not be treated as an experimental observation. The normalized observation must carry:
+The raw header states that `#` marks an estimated (non-experimental) value and `*` marks a non-calculable quantity. An AME row with `#` must not be treated as an experimental observation. The official AMDC and Argonne pages instruct users to cite the original AME2020 papers rather than the electronic files, but they do not expose a clear, machine-readable licence or redistribution permission for the raw electronic file. That absence is not permission; the repository fixture gate therefore remains blocked until an approved terms decision is recorded. The normalized observation must carry:
 
 - `measurementStatus: experimental | estimated | unavailable`;
 - original marker;
@@ -74,7 +74,7 @@ The first benchmark must either exclude estimated rows or report them in a separ
 | Observable | `bindingPerNucleon` selected unambiguously | READY FOR REVIEW |
 | Uncertainty | Numeric uncertainty preserved and compared separately from model residual | DESIGNED |
 | Estimated values | `#` rows excluded or separately labelled | DESIGNED |
-| Licence/terms | AMDC usage/citation terms recorded and accepted | VERIFY_REQUIRED |
+| Licence/terms | Official pages provide citation guidance but no explicit redistribution licence/terms for the electronic raw file | VERIFY_REQUIRED / BLOCKED |
 | No-network replay | Replay reads pinned bytes only | NOT_READY |
 | Existing Fabric | Reuse existing run/Evidence/Replay | READY in principle |
 | Scientific contract | preregistered nuclide set and tolerance policy | NOT_READY |
@@ -93,7 +93,7 @@ Before BUILD NOW, the admission plan requires tests for changed raw bytes, chang
 
 `nuclear-semf → AME2020 = BUILD LATER / ADMISSION REQUIRED`
 
-The candidate is substantially stronger than Kepler → JPL for the first bridge because it predicts the same nuclear quantity that the AME table explicitly reports. It is not yet `BUILD NOW`: durable raw fixture, terms, transformation and preregistered comparison policy remain open.
+The candidate is substantially stronger than Kepler → JPL for the first bridge because it predicts the same nuclear quantity that the AME table explicitly reports. It remains `BUILD LATER / BLOCKED`: the raw bytes and SHA-256 are known from a contract-only retrieval, but durable fixture publication is not authorized while electronic-file licence/redistribution terms are unresolved. No value from the temporary retrieval is admitted into Genesis.
 
 Atom-Bohr G3 stays `BLOCKED / REFERENCE_UNPINNED` and is not being reworked. USGS, GIS/live data, sensors, instruments, MQTT, OPC UA, new solvers, new domains and second Evidence/Replay systems remain out of scope.
 

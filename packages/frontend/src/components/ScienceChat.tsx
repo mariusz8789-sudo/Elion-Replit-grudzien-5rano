@@ -115,6 +115,7 @@ const SUGGESTIONS = [
   'Uruchom trzęsienie ziemi magnitude=5.4 depth=12 km',
   'Pokaż diagram Minkowskiego beta=0.5',
   'Zintegruj geodezyjną fotonu wokół czarnej dziury Schwarzschilda',
+  'Uruchom c-Slider: v=240000000 m/s, c=300000000 m/s, dystans=300000 km',
   'Zbadaj problem trzech ciał',
   'Zwiększ masę 2×',
   'Co się zmieniło?',

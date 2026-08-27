@@ -661,13 +661,6 @@ describe('backend Evidence-Guided execution', () => {
     expect(replayEvidence.allRuns.map((run) => run.provenance.runFingerprint)).toEqual(
       evidence.allRuns.map((run) => run.provenance.runFingerprint),
     );
-    if (process.env.GENESIS_DEBUG_REPLAY === '1') {
-      console.log(JSON.stringify({
-        original: { evidenceId: evidence.evidenceId, fingerprints: evidence.allRuns.map((run) => run.provenance.runFingerprint), outputs: evidence.allRuns.map((run) => run.result.outputs), provenance: evidence.allRuns.map((run) => run.provenance.backendExecution?.backendProvenance) },
-        replay: { evidenceId: replayEvidence.evidenceId, fingerprints: replayEvidence.allRuns.map((run) => run.provenance.runFingerprint), outputs: replayEvidence.allRuns.map((run) => run.result.outputs), provenance: replayEvidence.allRuns.map((run) => run.provenance.backendExecution?.backendProvenance) },
-        packs: [pack.evidencePackId, replayPack.evidencePackId],
-      }, null, 2));
-    }
     expect(replayPack.evidencePackId).toBe(pack.evidencePackId);
 
     if (process.env.GENESIS_WRITE_REAL_EVIDENCE === '1') {

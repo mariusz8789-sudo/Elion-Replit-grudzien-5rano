@@ -627,6 +627,55 @@ stamp and whose hash moves with unrelated markup changes; and **the artifacts mu
 the repository**, because a CI artifact with 90-day retention is not a pinned reference and cannot
 satisfy the no-refetch replay policy (M-7).
 
+### G3 final status — **BLOCKED / `REFERENCE_UNPINNED`**
+
+Authoritative record: **`docs/GENESIS_ATOM_BOHR_G3_BLOCKER.md`** on LIVE at
+`5751d69` ("docs: record atom-bohr G3 security blocker"). Verified present and read from that
+commit; the summary below is confirmed against it and against the code, not restated on trust.
+
+After the A1 marker failure was corrected, A1, A2 and A3 downloaded and hashed successfully in a
+green CI step. **A4 — the official NIST SRD terms page — cannot be pinned:** its raw HTML embeds a
+third-party Mapbox access token. GitHub Push Protection rejected publication, the contaminated CI
+artifact was deleted, and the unpublished commit carrying raw A4 was reverted.
+
+| Artifact                   | Status                                                        | Recorded SHA-256 (from the blocker document)                       |
+| -------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------ |
+| A1 CODATA complete listing | downloaded, SHA-256 verified in CI                            | `77fb90e66c40db3e6eb16630bc9c88e4c7c8beddbe5e71be406f2f26e3f67e67` |
+| A2 ASD H I vacuum query    | downloaded, SHA-256 verified in CI                            | `7984eb55f092c8ae168a5e7efa8c8ce02849808ea2ec87b5988183af58484557` |
+| A3 ASD H I energy levels   | downloaded, SHA-256 verified in CI                            | `796e2c5f41f1ab6a9f771b63e46250ae7d010625514915c3c0313a6c34328d50` |
+| A4 official NIST terms     | **unsafe to pin** — raw HTML carries an embedded access token | not published, and must not be                                     |
+| **Complete G3**            | **BLOCKED**                                                   | A4 cannot be pinned safely                                         |
+
+**Guard verified in code.** `scripts/fetch-atom-bohr-nist-fixtures.mjs` at `5751d69` refuses to
+write or upload a token-bearing A4 payload before it can reach disk or an artifact upload — the
+check runs on the downloaded text and throws rather than persisting. The protection is in the
+pipeline, not only in the incident report.
+
+**Two facts that keep G3 open even for A1–A3.** First, `licenceStatus` cannot be resolved to
+`CONFIRMED` without A4, and acceptance criterion **AC-2** makes licence status mandatory on every
+`ArmReference`; an unresolved licence yields `VERIFY_REQUIRED` and therefore `INCONCLUSIVE` (§2.5,
+test T5). Second, **no raw bytes for A1, A2 or A3 are committed to the repository** — verified with
+`git ls-tree -r 5751d69`, which returns no `A1-codata`, `A2-asd`, `A3-asd`, `allascii` or
+`manifest.json` path. Their hashes are recorded, but the payloads exist only in a CI step that has
+already run. A hash without the bytes it was computed from is not a pinned reference and cannot
+satisfy the no-refetch replay policy **M-7**.
+
+So the gate is blocked on two independent grounds: A4 is unsafe to pin at all, and A1–A3 are not
+yet pinned in Git.
+
+**Correction acknowledged.** A3 is now an official ASD energy-levels output rather than the
+Chemistry WebBook CGI page flagged earlier. That objection is resolved.
+
+**Nothing was added here.** No raw A4, no token-bearing HTML, no alternative source, no value from
+memory. `expectedValues[]`, `transitionWavelengthNm`, the migration and the Option D tests remain
+unimplemented.
+
+**What would close G3.** An official NIST terms artifact obtained through an approved channel in a
+form that carries no embedded secret — for example a NIST-published licence statement in plain text
+or PDF, or a written licence determination recorded as its own provenance artifact — plus the raw
+A1–A3 payloads committed to the repository alongside their manifest. Until then the status stays
+`REFERENCE_UNPINNED` and no benchmark may report a scientific result.
+
 ### G2 — MIGRATION POLICY: **DEFINED (docs-only; activates when G1 and G3 are closed)**
 
 The policy is recorded now so that no implementation step has to invent it later. It changes no

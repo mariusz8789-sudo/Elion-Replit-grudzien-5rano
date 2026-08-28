@@ -15,7 +15,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `a1050ca` — `feat(biotech): expose ChEMBL evidence in fabric`
 - `076cb87` — `feat(memory): persist experiment fabric runs`
 - `a3f0d79` — `feat(science-chat): surface biotech evidence`
-- next checkpoint in this session — show saved run identity in Scientific Memory UI
+- `97d0631` — `feat(memory-ui): expose fabric provenance`
+- next checkpoint in this session — route “Pokaż zapisane” to enriched Scientific Memory UI
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -71,9 +72,17 @@ Changed file: `packages/frontend/src/components/ScientificMemoryScreen.tsx`.
 
 Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed capability: Science Chat → Scientific Memory route
+
+The existing `Pokaż zapisane` action now includes each saved record’s execution status and result origin in the chat list, then routes to `#/memory` when records exist. This gives the user access to the enriched Scientific Memory projection from the same conversation boundary. Empty memory behavior remains in-chat. No new route or storage layer was created.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT GAP — next large logical piece
 
-Connect the saved Experiment Fabric run to the current Science Chat “Pokaż zapisane” action so users can reach the enriched Scientific Memory view from the same conversation boundary, or park this if routing is already sufficient and move to the smallest safe preregistration/protocol contract gap. Preserve status distinctions and do not claim a result before execution.
+Choose the smallest safe preregistration/protocol contract gap for the biotech knowledge result, explicitly separating a literature-backed binding record from any executable biological protocol. Do not invent efficacy, safety, baseline, arms or repetition results. If the current protocol model cannot represent this honestly, park it and document the semantic blocker rather than adding a false protocol.
 
 ## Next large gaps
 

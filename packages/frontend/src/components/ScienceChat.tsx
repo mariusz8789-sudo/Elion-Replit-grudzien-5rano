@@ -345,9 +345,14 @@ export function ScienceChat() {
     } else if (a?.type === 'list') {
       const recs = listExperiments();
       if (recs.length === 0) appendGenesis('Pamięć Naukowa jest pusta. Otwórz zjawisko i powiedz „zapisz eksperyment".');
-      else appendGenesis(
-        recs.slice(0, 10).map((r, i) => `${i + 1}. ${r.experimentName} · #${r.contentHash} · ${new Date(r.createdAt).toLocaleString('pl-PL')}`).join('\n')
-        + '\n\nWpisz „wczytaj N", by go ponownie otworzyć z zapisanymi parametrami.');
+      else {
+        appendGenesis(
+          recs.slice(0, 10).map((r, i) => `${i + 1}. ${r.experimentName} · ${r.execution?.status ?? 'legacy'} · ${r.execution?.resultOrigin ?? 'legacy'} · #${r.contentHash} · ${new Date(r.createdAt).toLocaleString('pl-PL')}`).join('\n')
+          + '\n\nOtwieram Pamięć Naukową, gdzie dostępne są pełne statusy, provenance i obserwacje.'
+        );
+        window.location.hash = '#/memory';
+        setOpen(false);
+      }
     } else if (a?.type === 'load') {
       const rec = listExperiments()[a.index - 1];
       if (!rec) appendGenesis(`Nie ma zapisanego eksperymentu #${a.index}. Wpisz „pokaż zapisane", by zobaczyć listę.`);

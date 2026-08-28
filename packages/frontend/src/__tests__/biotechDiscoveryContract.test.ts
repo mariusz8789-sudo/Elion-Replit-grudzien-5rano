@@ -56,12 +56,15 @@ describe('biotech discovery contract', () => {
       claim: 'A bounded hypothesis.', candidateId: candidate.id, targetIds: candidate.targetIds, mechanismIds: candidate.mechanismIds,
       supportingEvidenceIds: candidate.supportingEvidenceIds, safetySignalIds: candidate.safetySignalIds, provenance: [],
     };
-    const report = createCandidateDiscoveryReport({ candidate, hypothesis, uncertainty: 'Synthetic demo; no biological validation.' });
+    const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'UNKNOWN', targetRelevance: 0, safetySignals: [], uncertaintyPenalty: 1 });
+    const report = createCandidateDiscoveryReport({ candidate, hypothesis, ranking, uncertainty: 'Synthetic demo; no biological validation.' });
     expect(report.reportId).toBe(`report:${report.scientificFingerprint}`);
     expect(report.evidenceIds).toEqual(['evidence-1']);
     expect(report.safetySignalIds).toEqual(['safety-1']);
     expect(report.epistemicStatus).toBe('HYPOTHESIS');
     expect(report.uncertainty).toContain('no biological validation');
+    expect(report.ranking?.candidateId).toBe(candidate.id);
+    expect(report.ranking?.epistemicStatus).toBe('PREDICTION');
   });
 
   it('represents hypothesis to biological experiment without claiming execution', () => {

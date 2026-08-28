@@ -139,6 +139,7 @@ export interface CandidateDiscoveryReport {
   safetySignalIds: readonly string[];
   hypothesisId: string;
   experimentRequestId?: string;
+  ranking?: CandidateRanking;
   epistemicStatus: BiotechEpistemicStatus;
   uncertainty: string;
   provenance: readonly BiotechProvenance[];
@@ -149,6 +150,7 @@ export function createCandidateDiscoveryReport(input: {
   candidate: TherapeuticCandidate;
   hypothesis: TherapeuticHypothesis;
   experimentRequest?: BiologicalExperimentRequest;
+  ranking?: CandidateRanking;
   uncertainty: string;
 }): CandidateDiscoveryReport {
   if (input.hypothesis.candidateId !== input.candidate.id) throw new Error('Raport wymaga zgodności candidateId i hypothesis.candidateId.');
@@ -163,6 +165,7 @@ export function createCandidateDiscoveryReport(input: {
     safetySignalIds: input.hypothesis.safetySignalIds,
     hypothesisId: input.hypothesis.id,
     ...(input.experimentRequest === undefined ? {} : { experimentRequestId: input.experimentRequest.requestId }),
+    ...(input.ranking === undefined ? {} : { ranking: input.ranking }),
     epistemicStatus: input.hypothesis.status,
     uncertainty: input.uncertainty,
   };

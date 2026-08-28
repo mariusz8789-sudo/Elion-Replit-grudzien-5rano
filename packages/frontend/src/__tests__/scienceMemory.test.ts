@@ -160,6 +160,13 @@ describe('scienceMemory: Fabric observations', () => {
     expect(loaded.observations).toEqual(saved.observations);
   });
 
+  it('rejects empty evidence and replay identity fields', async () => {
+    const { saveExperiment } = await import('../core/scienceMemory');
+    const base = { labId: 'quantum', experimentId: 'tunneling', experimentName: 'Tunneling', params: { energy: 0.55 }, stats: { transmission: 0.2 }, honesty: 'simplified' as const, honestyNote: 'run' };
+    expect(() => saveExperiment({ ...base, evidencePackId: ' ', evidenceChainId: 'chain-1' })).toThrow(/identyfikator/);
+    expect(() => saveExperiment({ ...base, replayIdentity: { capsuleId: '', planId: 'plan-1', confirmationId: 'confirm-1' } })).toThrow(/identyfikator/);
+  });
+
   it('rejects completed execution with non-real or incomplete provenance', async () => {
     const { saveExperiment } = await import('../core/scienceMemory');
     const base = { labId: 'quantum', experimentId: 'tunneling', experimentName: 'Tunneling', params: { energy: 0.55 }, stats: { transmission: 0.2 }, honesty: 'simplified' as const, honestyNote: 'run' };

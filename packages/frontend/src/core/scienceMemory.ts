@@ -121,6 +121,17 @@ function validContentHash(o: Record<string, unknown>): boolean {
   return contentHash({ labId: o.labId, experimentId: o.experimentId, params: o.params }) === o.contentHash;
 }
 
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function validReplayIdentity(value: unknown): value is SavedExperimentReplayIdentity | undefined {
+  if (value === undefined) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const identity = value as SavedExperimentReplayIdentity;
+  return nonEmptyString(identity.capsuleId) && nonEmptyString(identity.planId) && nonEmptyString(identity.confirmationId);
+}
+
 function isSavedExperiment(v: unknown): v is SavedExperiment {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;
@@ -135,10 +146,10 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     validParams(o.params) &&
     validObservations(o.observations) &&
     validExecution(o.execution) &&
-    (o.evidencePackId === undefined || typeof o.evidencePackId === 'string') &&
-    (o.evidenceChainId === undefined || typeof o.evidenceChainId === 'string') &&
+    (o.evidencePackId === undefined || nonEmptyString(o.evidencePackId)) &&
+    (o.evidenceChainId === undefined || nonEmptyString(o.evidenceChainId)) &&
     (o.analysis === undefined || (Array.isArray(o.analysis) && o.analysis.every((block) => typeof block === 'object' && typeof (block as SavedExperimentAnalysisBlock).title === 'string' && typeof (block as SavedExperimentAnalysisBlock).body === 'string'))) &&
-    (o.replayIdentity === undefined || (typeof o.replayIdentity === 'object' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).capsuleId === 'string' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).planId === 'string' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).confirmationId === 'string'))
+    validReplayIdentity(o.replayIdentity)
   );
 }
 
@@ -171,6 +182,9 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (!validStats(input.stats ?? {})) throw new Error('Statystyki muszą zawierać wyłącznie skończone liczby.');
   if (!validObservations(input.observations)) throw new Error('Obserwacje muszą zawierać wyłącznie skończone wartości lub serie liczbowe.');
   if (!validExecution(input.execution)) throw new Error('Execution musi mieć kompletne provenance; status completed wymaga resultOrigin real-engine.');
+  if (input.evidencePackId !== undefined && !nonEmptyString(input.evidencePackId)) throw new Error('Evidence Pack musi mieć niepusty identyfikator.');
+  if (input.evidenceChainId !== undefined && !nonEmptyString(input.evidenceChainId)) throw new Error('Evidence chain musi mieć niepusty identyfikator.');
+  if (!validReplayIdentity(input.replayIdentity)) throw new Error('Replay identity musi mieć niepuste identyfikatory.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
     id: `${input.labId}:${input.experimentId}:${hash}:${Date.now()}`,

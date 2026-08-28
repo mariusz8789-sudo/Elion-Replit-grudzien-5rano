@@ -187,9 +187,12 @@ export function analyzeRun(samples: RunSample[]): NarrationBlock[] {
   // Hipoteza: dwie wielkości poruszające się razem — obserwacja korelacji, nie przyczynowości.
   if (dynamic.length >= 2) {
     const [a, b] = dynamic;
-    const va = samples.map((s) => s.stats[a.key]).filter((v) => Number.isFinite(v));
-    const vb = samples.map((s) => s.stats[b.key]).filter((v) => Number.isFinite(v));
-    if (va.length === vb.length) {
+    const paired = samples
+      .map((sample) => ({ a: sample.stats[a.key], b: sample.stats[b.key] }))
+      .filter((pair): pair is { a: number; b: number } => Number.isFinite(pair.a) && Number.isFinite(pair.b));
+    const va = paired.map((pair) => pair.a);
+    const vb = paired.map((pair) => pair.b);
+    if (va.length === vb.length && va.length >= 2) {
       const r = pearson(va, vb);
       if (Math.abs(r) > 0.7) {
         blocks.push({

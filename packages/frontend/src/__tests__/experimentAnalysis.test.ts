@@ -150,6 +150,21 @@ describe('analyzeRun: observation completeness', () => {
 
 
 
+describe('analyzeRun: aligned correlation', () => {
+  it('does not infer correlation from separately filtered, non-overlapping series', () => {
+    const samples: RunSample[] = [
+      { t: 0, stats: { x: 1, y: 1 } },
+      { t: 1, stats: { x: 2 } },
+      { t: 2, stats: { x: 3 } },
+      { t: 3, stats: { x: 4 } },
+      { t: 4, stats: { y: 2 } },
+      { t: 5, stats: { y: 3 } },
+      { t: 6, stats: { y: 4 } },
+    ];
+    expect(analyzeRun(samples).some((block) => block.kind === 'hypothesis')).toBe(false);
+  });
+});
+
 describe('analyzeRun: jump detection preserves sample adjacency', () => {
   it('does not compare values across a missing sample as if they were consecutive', () => {
     const samples: RunSample[] = [

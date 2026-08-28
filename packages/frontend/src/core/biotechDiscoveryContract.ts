@@ -75,10 +75,14 @@ export interface Mechanism extends BiotechRecord {
   description: string;
 }
 
+export type SafetyEvidenceQuality = 'UNKNOWN' | 'LOW' | 'MODERATE' | 'HIGH';
+
 export interface SafetySignal extends BiotechRecord {
   kind: 'safety-signal';
   signalType: 'toxicity' | 'adverse-effect' | 'interaction' | 'uncertainty';
   description: string;
+  evidenceQuality: SafetyEvidenceQuality;
+  uncertainty: string;
 }
 
 export interface BiologicalEvidence extends BiotechRecord {

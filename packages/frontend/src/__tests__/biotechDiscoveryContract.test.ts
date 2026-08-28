@@ -7,6 +7,7 @@ import {
   biologicalExperimentRequestFingerprint,
   type TherapeuticCandidate,
   type TherapeuticHypothesis,
+  type SafetySignal,
 } from '../core/biotechDiscoveryContract';
 
 const evidence: BiologicalEvidence = {
@@ -69,6 +70,16 @@ describe('biotech discovery contract', () => {
     } as const;
     expect(biologicalExperimentRequestFingerprint(request)).toMatch(/^[0-9a-f]{8}$/);
     expect({ ...request, targetIds: ['target-2'] }).not.toEqual(request);
+  });
+
+  it('keeps safety signals explicit without inventing a safety score', () => {
+    const signal: SafetySignal = {
+      kind: 'safety-signal', id: 'safety-demo', namespace: 'synthetic-demo', label: 'Synthetic demo safety signal', status: 'UNKNOWN',
+      signalType: 'uncertainty', description: 'Synthetic demo only.', evidenceQuality: 'UNKNOWN', uncertainty: 'Not assessed.', provenance: [],
+    };
+    expect(signal.evidenceQuality).toBe('UNKNOWN');
+    expect(signal.uncertainty).toBe('Not assessed.');
+    expect(signal).not.toHaveProperty('score');
   });
 
   it('keeps predictive statuses distinct from established fact', () => {

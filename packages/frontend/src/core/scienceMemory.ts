@@ -1,5 +1,6 @@
 import { readJSON, writeJSON } from './storage';
 import type { HonestyLevel, SimParams } from './types';
+import { biotechScientificFingerprint, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
 import type { ExperimentOutputValue } from './experimentFabric/types';
 import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 
@@ -37,6 +38,18 @@ export interface SavedExperimentAnalysisBlock {
   kind?: string;
 }
 
+export interface SavedBiotechContext {
+  candidateId: string;
+  hypothesisId: string;
+  requestId?: string;
+  hypothesisStatus: BiotechEpistemicStatus;
+  experimentRequestStatus?: BiologicalExperimentRequestStatus;
+  evidenceIds: readonly string[];
+  safetySignalIds: readonly string[];
+  provenance: readonly BiotechProvenance[];
+  scientificFingerprint: string;
+}
+
 export interface SavedExperimentReplayIdentity {
   capsuleId: string;
   planId: string;
@@ -57,6 +70,7 @@ export interface SavedExperiment {
   evidencePackId?: string;
   evidenceChainId?: string;
   analysis?: readonly SavedExperimentAnalysisBlock[];
+  biotech?: SavedBiotechContext;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -131,6 +145,17 @@ function validAnalysis(value: unknown): value is readonly SavedExperimentAnalysi
   return value.every((block) => Boolean(block) && typeof block === 'object' && nonEmptyString((block as SavedExperimentAnalysisBlock).title) && nonEmptyString((block as SavedExperimentAnalysisBlock).body) && ((block as SavedExperimentAnalysisBlock).kind === undefined || typeof (block as SavedExperimentAnalysisBlock).kind === 'string'));
 }
 
+function validBiotechContext(value: unknown): value is SavedBiotechContext | undefined {
+  if (value === undefined) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const context = value as SavedBiotechContext;
+  const statuses: readonly BiotechEpistemicStatus[] = ['FACT', 'OBSERVED', 'LITERATURE_SUPPORTED', 'PREDICTION', 'INFERENCE', 'HYPOTHESIS', 'UNKNOWN', 'BLOCKED'];
+  const requestStatuses: readonly BiologicalExperimentRequestStatus[] = ['NOT_EXECUTED', 'BLOCKED'];
+  const validIds = (ids: unknown): ids is readonly string[] => Array.isArray(ids) && ids.every((id) => nonEmptyString(id));
+  const validProvenance = Array.isArray(context.provenance) && context.provenance.every((item) => item && typeof item === 'object' && nonEmptyString(item.source) && nonEmptyString(item.sourceId) && nonEmptyString(item.evidenceType) && statuses.includes(item.status));
+  return nonEmptyString(context.candidateId) && nonEmptyString(context.hypothesisId) && (context.requestId === undefined || nonEmptyString(context.requestId)) && statuses.includes(context.hypothesisStatus) && (context.experimentRequestStatus === undefined || requestStatuses.includes(context.experimentRequestStatus)) && validIds(context.evidenceIds) && validIds(context.safetySignalIds) && validProvenance && nonEmptyString(context.scientificFingerprint);
+}
+
 function validReplayIdentity(value: unknown): value is SavedExperimentReplayIdentity | undefined {
   if (value === undefined) return true;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -155,6 +180,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     (o.evidencePackId === undefined || nonEmptyString(o.evidencePackId)) &&
     (o.evidenceChainId === undefined || nonEmptyString(o.evidenceChainId)) &&
     validAnalysis(o.analysis) &&
+    validBiotechContext(o.biotech) &&
     validReplayIdentity(o.replayIdentity)
   );
 }
@@ -180,7 +206,34 @@ export interface SaveExperimentInput {
   evidencePackId?: string;
   evidenceChainId?: string;
   analysis?: readonly SavedExperimentAnalysisBlock[];
+  biotech?: SavedBiotechContext;
   replayIdentity?: SavedExperimentReplayIdentity;
+}
+
+export interface SaveBiotechHypothesisInput {
+  candidate: TherapeuticCandidate;
+  hypothesis: TherapeuticHypothesis;
+  experimentRequest?: BiologicalExperimentRequest;
+  honestyNote?: string;
+}
+
+export function saveBiotechHypothesisToMemory(input: SaveBiotechHypothesisInput): SavedExperiment {
+  if (input.hypothesis.candidateId !== input.candidate.id) throw new Error('Hipoteza musi wskazywać ten sam candidateId co zapisany kandydat.');
+  const biotech: SavedBiotechContext = {
+    candidateId: input.candidate.id,
+    hypothesisId: input.hypothesis.id,
+    ...(input.experimentRequest === undefined ? {} : { requestId: input.experimentRequest.requestId, experimentRequestStatus: input.experimentRequest.status }),
+    hypothesisStatus: input.hypothesis.status,
+    evidenceIds: input.hypothesis.supportingEvidenceIds,
+    safetySignalIds: input.hypothesis.safetySignalIds,
+    provenance: [...input.candidate.provenance, ...input.hypothesis.provenance],
+    scientificFingerprint: biotechScientificFingerprint(input.hypothesis),
+  };
+  return saveExperiment({
+    labId: 'biotechnology', experimentId: `hypothesis:${input.hypothesis.id}`, experimentName: input.hypothesis.label,
+    params: {}, stats: {}, biotech, honesty: 'simplified', honestyNote: input.honestyNote ?? 'Scientific context only; no biological execution performed.',
+    assumptions: [], epistemicStatus: input.hypothesis.status,
+  });
 }
 
 export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
@@ -191,6 +244,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.evidencePackId !== undefined && !nonEmptyString(input.evidencePackId)) throw new Error('Evidence Pack musi mieć niepusty identyfikator.');
   if (input.evidenceChainId !== undefined && !nonEmptyString(input.evidenceChainId)) throw new Error('Evidence chain musi mieć niepusty identyfikator.');
   if (!validReplayIdentity(input.replayIdentity)) throw new Error('Replay identity musi mieć niepuste identyfikatory.');
+  if (!validBiotechContext(input.biotech)) throw new Error('Biotech context musi mieć kompletne identity, status i provenance.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -206,6 +260,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.evidencePackId === undefined ? {} : { evidencePackId: input.evidencePackId }),
     ...(input.evidenceChainId === undefined ? {} : { evidenceChainId: input.evidenceChainId }),
     ...(input.analysis === undefined ? {} : { analysis: input.analysis }),
+    ...(input.biotech === undefined ? {} : { biotech: input.biotech }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,

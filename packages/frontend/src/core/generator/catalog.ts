@@ -135,6 +135,8 @@ export function registerCatalog(): void {
     experimentId: 'doublependulum',
     honesty: 'exact',
     summary: 'Kanoniczny układ chaotyczny — wrażliwość na warunki początkowe widoczna gołym okiem.',
+    equations: ['θ̇₁ = ω₁, θ̇₂ = ω₂', 'θ̈₁, θ̈₂: równania Lagrange’a dla m₁=m₂=1 kg, L₁=L₂=1 m, g=9,81 m/s²', 'E = T + V; względny dryf energii jest raportowany'],
+    assumptions: ['Dwa idealne wahadła w płaszczyźnie', 'm₁=m₂=1 kg, L₁=L₂=1 m', 'Brak tarcia', 'Całkowanie klasycznym RK4; metoda nie jest symplektyczna, więc energia może numerycznie dryfować'],
   });
 
   // ---- Kwanty (Quantum) ----

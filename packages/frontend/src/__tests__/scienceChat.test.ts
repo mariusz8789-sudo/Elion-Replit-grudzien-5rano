@@ -160,6 +160,13 @@ describe('scienceChat: wyjaśnienia, równania, założenia, zadania', () => {
     expect((r.equations ?? []).join(' ')).toMatch(/barierą/);
   });
 
+  it('podwójne wahadło pokazuje model RK4 i jawny dryf energii', () => {
+    const r = resolveCommand('pokaż równanie', ctx({ labId: 'universe', experimentId: 'doublependulum', experimentName: 'Podwójne wahadło' }));
+    expect(r.todo).toBeFalsy();
+    expect(r.tag).toBe('MODEL');
+    expect((r.equations ?? []).join(' ')).toMatch(/Lagrange|RK4|energii/);
+  });
+
   it('"założenia modelu" -> tag ZALOZENIE + honestyNote', () => {
     const r = resolveCommand('jakie są założenia modelu', ctx());
     expect(r.tag).toBe('ZALOZENIE');

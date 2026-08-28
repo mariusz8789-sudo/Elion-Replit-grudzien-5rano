@@ -22,7 +22,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `322a369` — `feat(core): carry provenance into world handoff`
 - `f2aec5f` — `feat(core): surface replay identity in memory`
 - `d749715` — `docs(core): confirm evidence replay boundary`
-- next checkpoint in this session — verify Protocol/A-B save path; if already wired, park and continue Core queue
+- `22fd2f4` — `docs(core): verify protocol replay path`
+- next checkpoint in this session — verify model selection → Structured Request boundary; if already wired, park and continue Core queue
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -152,9 +153,13 @@ The existing `compareBridge` and `experimentComparison` cover model-vs-model or 
 
 The existing Experiment Pilot already creates the multi-run `ScientificEvidencePack`, persists it through `saveScientificEvidencePack`, indexes it through `saveScientificEvidencePackToMemory`, builds the replay capsule, and exposes the replay verdict plus explicit rerun action. This path is not a single-run shortcut and retains the existing real-run validation. No code change was necessary; the result is documented here to avoid duplicating the system.
 
+## Completed Core capability: model selection → Structured Request verified
+
+Experiment Pilot already uses the canonical `buildStructuredRequestFromModel` builder to fill declared defaults, preserve model identity and seed, and feed the resulting `StructuredExperimentRequest` into the existing plan/confirmation/Fabric flow. The builder is covered by the existing Experiment Pilot tests. No duplicate request path was introduced.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Move to the next low-cost existing integration gap after the already-wired Protocol/A-B path. Prefer the model-selection/request boundary or another place where an existing typed artifact is produced but not forwarded. Keep observation comparison parked until an independent real source exists.
+Continue with the next low-cost integration gap at the user-facing result boundary: verify that the existing real typed result, analysis, route, evidence status and replay identity are presented as one coherent report without implying execution where status is `knowledge_only`, `scenario` or `blocked`. Prefer a focused formatter/test change only where a field is actually missing.
 
 ## Next large gaps
 

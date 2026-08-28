@@ -7,6 +7,14 @@ import type { SimParams, HonestyLevel } from '../types';
  * może symulować nawet kontrowersyjny model, ale MUSI jawnie powiedzieć, że
  * symuluje ZAŁOŻENIA modelu, nie prawdę o rzeczywistości.
  */
+export interface SimulationRecipeSource {
+  /** Źródło może być wewnętrzną implementacją albo zewnętrzną referencją. */
+  kind: 'INTERNAL_MODEL' | 'EXTERNAL_REFERENCE';
+  label: string;
+  locator: string;
+  note?: string;
+}
+
 export type EpistemicStatus =
   | 'ESTABLISHED_SCIENCE'
   | 'WELL_SUPPORTED_MODEL'
@@ -73,6 +81,8 @@ export interface SimulationRecipe {
   equations?: string[];
   /** Co model upraszcza / zakłada. */
   assumptions?: string[];
+  /** Jawne źródła recepty; brak oznacza tylko internal registry provenance. */
+  sources?: readonly SimulationRecipeSource[];
 }
 
 const recipes: SimulationRecipe[] = [];

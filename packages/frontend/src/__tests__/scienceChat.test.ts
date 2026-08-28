@@ -328,3 +328,24 @@ describe('scienceChat: Pilot eksperymentu (P2.1 UI)', () => {
     expect(r.action).toEqual({ type: 'openRoute', hash: '#/pilot' });
   });
 });
+
+describe('scienceChat: model provenance source response', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('returns registry locator and does not claim an external citation exists', () => {
+    const r = resolveCommand('pokaż źródła modelu', ctx({ experimentName: 'Czarna dziura 3D' }));
+    expect(r.intent).toBe('EXPLAIN');
+    expect(r.tag).toBe('MODEL');
+    expect(r.todo).toBeUndefined();
+    expect(r.text).toContain('Genesis registry');
+    expect(r.text).toContain('Brak zarejestrowanej niezależnej referencji zewnętrznej');
+    expect(r.text).toContain('To nie jest dowód pomiarowy');
+  });
+
+  it('fails closed when the open experiment has no catalog entry', () => {
+    const r = resolveCommand('pokaż źródła', ctx({ labId: 'unknown-lab', experimentId: 'unknown-experiment', experimentName: 'Nieznany eksperyment' }));
+    expect(r.intent).toBe('EXPLAIN');
+    expect(r.tag).toBe('SYSTEM');
+    expect(r.text).toContain('Nie mogę uczciwie wskazać źródła');
+  });
+});

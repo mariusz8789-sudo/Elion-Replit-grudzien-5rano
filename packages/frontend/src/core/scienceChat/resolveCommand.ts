@@ -1,6 +1,6 @@
 import type { HonestyLevel, ParamDef, SimParams } from '../types';
 import { resolveQuery } from '../generator/resolve';
-import { getRecipes, type SimulationRecipe } from '../generator/recipe';
+import { epistemicStatusOf, getRecipes, type SimulationRecipe } from '../generator/recipe';
 import { normalize } from '../generator/resolve';
 import { defaultComparison, type ModelConfig } from '../epidemic/compare';
 import { DEFAULT_EPIDEMIC, type EpidemicModel } from '../epidemic/sir';
@@ -366,9 +366,21 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     return { text: `Model „${ctx.experimentName}" — poziom uczciwości: ${ctx.honesty}. ${ctx.honestyNote}${extra}`, tag: 'ZALOZENIE', intent: 'SHOW_ASSUMPTIONS' };
   }
 
-  // --- Źródła (istnieją per-twierdzenie w Narratorze; katalog per-model to TODO) ---
+  // --- Źródła: internal model provenance + jawny status referencji zewnętrznych ---
   if (has(norm, 'zrodl', 'source', 'bibliograf', 'cytow')) {
-    return { text: 'Źródła konkretnych twierdzeń pokazuje panel Narratora przy danej wartości. Spójny katalog źródeł per-model to TODO (Provenance dla generatora).', tag: 'SYSTEM', intent: 'EXPLAIN', todo: true };
+    if (!recipe) {
+      return { text: `Brak wpisu katalogu dla „${ctx.experimentName}”. Nie mogę uczciwie wskazać źródła modelu ani potwierdzić provenance.`, tag: 'SYSTEM', intent: 'EXPLAIN' };
+    }
+    const sources = recipe.sources ?? [];
+    const internal = `Genesis registry → lab=${recipe.labId}${recipe.experimentId ? `, experiment=${recipe.experimentId}` : ''}`;
+    const external = sources.length > 0
+      ? sources.map((source) => `${source.kind}: ${source.label} (${source.locator})${source.note ? ` — ${source.note}` : ''}`).join(' · ')
+      : 'Brak zarejestrowanej niezależnej referencji zewnętrznej dla tej recepty.';
+    return {
+      text: `Provenance modelu „${recipe.title}”: ${internal}. Status epistemiczny: ${epistemicStatusOf(recipe)}. ${external} To nie jest dowód pomiarowy ani niezależna walidacja modelu.`,
+      tag: 'MODEL',
+      intent: 'EXPLAIN',
+    };
   }
 
   // --- Zadanie / praca domowa / quiz (fundament, powiązane z realnym modelem) ---

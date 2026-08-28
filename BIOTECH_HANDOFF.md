@@ -143,9 +143,13 @@ The existing Scientific Memory already lists local multi-run Evidence Packs, cla
 
 This GAP is therefore parked as already satisfied by the current system. No code change was necessary beyond documenting the decision.
 
+## Parked Core GAP: model → independent real observation
+
+The existing `compareBridge` and `experimentComparison` cover model-vs-model or replay/comparison flows, not an independently measured observation. No trustworthy external observation fixture is currently available at this boundary. This is parked to avoid using model inputs, synthetic outputs or a second model as an alleged observation; no new contract was added.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Move to the model → independent real observation boundary. Inspect only existing prediction/observation/comparison contracts. If a real observation source is absent, add only the smallest reusable boundary or fixture policy and keep comparison `BLOCKED`/`INCONCLUSIVE`; never treat model inputs or synthetic outputs as independent observations.
+Choose the next low-cost existing integration gap after observation is parked: inspect the already implemented preregistered Protocol/A-B path in Experiment Pilot and verify that its multi-run Evidence Pack is saved and replayable end-to-end. Only change code if a real forwarding/rendering gap exists; otherwise document it as already satisfied and continue to the next queue item.
 
 ## Next large gaps
 

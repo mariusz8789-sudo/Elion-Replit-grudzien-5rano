@@ -125,6 +125,12 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function validAnalysis(value: unknown): value is readonly SavedExperimentAnalysisBlock[] | undefined {
+  if (value === undefined) return true;
+  if (!Array.isArray(value) || value.length === 0) return false;
+  return value.every((block) => Boolean(block) && typeof block === 'object' && nonEmptyString((block as SavedExperimentAnalysisBlock).title) && nonEmptyString((block as SavedExperimentAnalysisBlock).body) && ((block as SavedExperimentAnalysisBlock).kind === undefined || typeof (block as SavedExperimentAnalysisBlock).kind === 'string'));
+}
+
 function validReplayIdentity(value: unknown): value is SavedExperimentReplayIdentity | undefined {
   if (value === undefined) return true;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -148,7 +154,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     validExecution(o.execution) &&
     (o.evidencePackId === undefined || nonEmptyString(o.evidencePackId)) &&
     (o.evidenceChainId === undefined || nonEmptyString(o.evidenceChainId)) &&
-    (o.analysis === undefined || (Array.isArray(o.analysis) && o.analysis.every((block) => typeof block === 'object' && typeof (block as SavedExperimentAnalysisBlock).title === 'string' && typeof (block as SavedExperimentAnalysisBlock).body === 'string'))) &&
+    validAnalysis(o.analysis) &&
     validReplayIdentity(o.replayIdentity)
   );
 }
@@ -185,6 +191,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.evidencePackId !== undefined && !nonEmptyString(input.evidencePackId)) throw new Error('Evidence Pack musi mieć niepusty identyfikator.');
   if (input.evidenceChainId !== undefined && !nonEmptyString(input.evidenceChainId)) throw new Error('Evidence chain musi mieć niepusty identyfikator.');
   if (!validReplayIdentity(input.replayIdentity)) throw new Error('Replay identity musi mieć niepuste identyfikatory.');
+  if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
     id: `${input.labId}:${input.experimentId}:${hash}:${Date.now()}`,

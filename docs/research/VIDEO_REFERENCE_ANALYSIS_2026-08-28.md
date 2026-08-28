@@ -142,7 +142,7 @@ Automated audio/visual analysis suggests the following short English phrases; th
 | 00:00–00:02 | “Journey to the past. Oh, journey to the past.” |
 | 00:04–00:09 | “Imagine if we can travel back to our past.” |
 | 00:13–00:18 | “Oh, that’s Christ Jesus. This is very nice.” |
-| 00:18–00:00:22 | “Oh, that’s it. Wow.” |
+| 00:18–00:22 | “Oh, that’s it. Wow.” |
 | 00:23–00:27 | “Oh, the pyramid.” |
 | 00:28–00:31 | “10,000 BC.” |
 | 00:36–00:39 | “This is insane.” |

@@ -10,6 +10,7 @@ import { registerActiveSimControls } from '../core/activeSimControls';
 import { track } from '../core/analytics';
 import { appendSample, type RunSample } from '../core/experimentRun';
 import { analyzeRun, paramRangeSummary } from '../core/experimentAnalysis';
+import { saveExperiment } from '../core/scienceMemory';
 import {
   saveCustomExperiment,
   listCustomExperiments,
@@ -101,6 +102,24 @@ function useCustomExperimentState(lab: LabDefinition) {
   const handleSave = () => {
     if (!saveName.trim()) return;
     saveCustomExperiment(lab.id, saveName, params);
+    if (samples.length >= 3) {
+      const keys = [...new Set(samples.flatMap((sample) => Object.keys(sample.stats)))];
+      const observations = Object.fromEntries(keys.map((key) => [key, samples.map((sample) => sample.stats[key]).filter((value): value is number => value !== undefined)]));
+      saveExperiment({
+        labId: lab.id,
+        experimentId: 'custom-recording',
+        experimentName: `${lab.name} — ${saveName.trim()}`,
+        params,
+        stats: samples[samples.length - 1]?.stats ?? {},
+        observations,
+        analysis: analyzeRun(samples),
+        honesty: lab.honesty,
+        honestyNote: lab.honestyNote,
+        equations: [],
+        assumptions: [],
+        epistemicStatus: 'OBSERVATION_RECORDED_NOT_VALIDATED',
+      });
+    }
     setSaved(listCustomExperiments(lab.id));
     setSaveName('');
     track('custom_experiment_saved');

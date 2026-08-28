@@ -30,6 +30,12 @@ export interface SavedExperimentExecution {
   modelVersion?: string;
 }
 
+export interface SavedExperimentAnalysisBlock {
+  title: string;
+  body: string;
+  kind?: string;
+}
+
 export interface SavedExperimentReplayIdentity {
   capsuleId: string;
   planId: string;
@@ -47,6 +53,7 @@ export interface SavedExperiment {
   /** Optional canonical Fabric observations; legacy memory rows may omit this. */
   observations?: Readonly<Record<string, ExperimentOutputValue>>;
   execution?: SavedExperimentExecution;
+  analysis?: readonly SavedExperimentAnalysisBlock[];
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -111,6 +118,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     validParams(o.params) &&
     validObservations(o.observations) &&
     (o.execution === undefined || (typeof o.execution === 'object' && typeof (o.execution as SavedExperimentExecution).status === 'string' && typeof (o.execution as SavedExperimentExecution).runId === 'string' && typeof (o.execution as SavedExperimentExecution).runFingerprint === 'string' && typeof (o.execution as SavedExperimentExecution).resultOrigin === 'string' && typeof (o.execution as SavedExperimentExecution).summary === 'string')) &&
+    (o.analysis === undefined || (Array.isArray(o.analysis) && o.analysis.every((block) => typeof block === 'object' && typeof (block as SavedExperimentAnalysisBlock).title === 'string' && typeof (block as SavedExperimentAnalysisBlock).body === 'string'))) &&
     (o.replayIdentity === undefined || (typeof o.replayIdentity === 'object' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).capsuleId === 'string' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).planId === 'string' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).confirmationId === 'string'))
   );
 }
@@ -133,6 +141,7 @@ export interface SaveExperimentInput {
   assumptions?: string[];
   epistemicStatus?: string;
   execution?: SavedExperimentExecution;
+  analysis?: readonly SavedExperimentAnalysisBlock[];
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -151,6 +160,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     stats: input.stats ?? {},
     ...(input.observations === undefined ? {} : { observations: input.observations }),
     ...(input.execution === undefined ? {} : { execution: input.execution }),
+    ...(input.analysis === undefined ? {} : { analysis: input.analysis }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,

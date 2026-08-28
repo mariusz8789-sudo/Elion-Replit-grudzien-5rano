@@ -15,7 +15,7 @@ export interface RunSample {
 export const MAX_SAMPLES = 300;
 
 export function appendSample(samples: RunSample[], t: number, stats: Record<string, number>): RunSample[] {
-  if (!Number.isFinite(t) || Object.values(stats).some((value) => !Number.isFinite(value))) return samples;
+  if (!Number.isFinite(t) || Object.keys(stats).length === 0 || Object.values(stats).some((value) => !Number.isFinite(value))) return samples;
   const next = [...samples, { t, stats: { ...stats } }];
   return next.length > MAX_SAMPLES ? next.slice(next.length - MAX_SAMPLES) : next;
 }

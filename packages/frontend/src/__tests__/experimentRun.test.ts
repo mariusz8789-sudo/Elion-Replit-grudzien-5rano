@@ -35,6 +35,7 @@ describe('experimentRun: integrity gates', () => {
     const initial = [{ t: 0, stats: { a: 1 } }];
     expect(appendSample(initial, Number.NaN, { a: 2 })).toBe(initial);
     expect(appendSample(initial, 1, { a: Number.POSITIVE_INFINITY })).toBe(initial);
+    expect(appendSample(initial, 1, {})).toBe(initial);
   });
 
   it('snapshots stats so later source mutation cannot rewrite history', () => {

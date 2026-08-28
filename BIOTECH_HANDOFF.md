@@ -3,7 +3,7 @@
 ## Current state
 
 - Branch: `manus/next-gap-observation-analysis`
-- Last commit: `c3cf9c0`
+- Last commit: `e440d39`
 - LIVE: `origin/main = 9ad75f3`
 - Working tree was clean after push.
 
@@ -20,11 +20,14 @@ The Fabric router preserves the boundary: the request is explicit but non-runnab
 
 Biotech contracts already provide candidate/evidence/safety/hypothesis/report/ranking structures, and Scientific Memory persists hypothesis/report context and explainable ranking.
 
+A pinned real PubChem PUG REST fixture is now connected for CID 2519 (Caffeine) as an `OBSERVED` `Compound`, with source URL, CID, retrieval date, source version and response fingerprint. It provides chemical identity/properties only; it does not provide a biological target, efficacy or safety claim.
+
 ## Next safe work
 
-1. Add a source-neutral `BiologicalKnowledgeSource` connector interface only if needed by the first verified source.
-2. Connect one real, citable natural-product/compound source; preserve source ID, version/date, evidence type, and provenance.
-3. Convert source records into existing biotech contracts; never create placeholder compounds, targets, DOI or toxicity claims.
+1. Add a source-neutral `BiologicalKnowledgeSource` connector interface only if needed by the next verified source.
+2. Use the existing pinned PubChem compound record as chemical identity input; do not infer target, efficacy or safety.
+3. Connect one real, citable bioactivity source (for example a pinned ChEMBL record) only when its exact release/record provenance is preserved.
+4. Convert source records into existing biotech contracts; never create placeholder compounds, targets, DOI or toxicity claims.
 4. Feed only sourced evidence and safety signals into ranking; keep score as research priority, never efficacy probability.
 5. Keep biological execution `NOT_EXECUTED`/`BLOCKED` until a validated biological executor exists.
 

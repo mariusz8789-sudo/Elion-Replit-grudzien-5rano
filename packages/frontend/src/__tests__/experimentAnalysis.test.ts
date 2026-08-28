@@ -150,6 +150,19 @@ describe('analyzeRun: observation completeness', () => {
 
 
 
+describe('analyzeRun: transient jumps', () => {
+  it('reports a large transient jump even when the net trend is stable', () => {
+    const samples: RunSample[] = [
+      { t: 0, stats: { x: 0 } },
+      { t: 1, stats: { x: 1 } },
+      { t: 2, stats: { x: 100 } },
+      { t: 3, stats: { x: 1 } },
+      { t: 4, stats: { x: 0 } },
+    ];
+    expect(analyzeRun(samples).some((block) => block.title === 'Skokowa zmiana w x')).toBe(true);
+  });
+});
+
 describe('analyzeRun: aligned correlation', () => {
   it('does not infer correlation from separately filtered, non-overlapping series', () => {
     const samples: RunSample[] = [

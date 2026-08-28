@@ -174,7 +174,7 @@ export function analyzeRun(samples: RunSample[]): NarrationBlock[] {
   }
 
   // Niespójność #3: skokowa zmiana (możliwa zmiana parametru w trakcie nagrywania).
-  for (const t of dynamic) {
+  for (const t of trends) {
     const jump = largestJump(samples, t.key);
     if (jump > 0.6) {
       blocks.push({

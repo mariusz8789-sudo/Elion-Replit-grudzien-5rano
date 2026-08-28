@@ -138,3 +138,19 @@ describe('analyzeRun: observation completeness', () => {
     expect(blocks.some((b) => b.title === 'Niespójność: niepełna seria obserwacji' && b.kind === 'warning')).toBe(true);
   });
 });
+
+
+
+describe('analyzeRun: missing observables', () => {
+  it('does not call an empty stats series stabilized', () => {
+    const samples: RunSample[] = [
+      { t: 0, stats: {} },
+      { t: 1, stats: {} },
+      { t: 2, stats: {} },
+    ];
+    const blocks = analyzeRun(samples);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].title).toBe('Brak obserwowalnych wielkości');
+    expect(blocks[0].kind).toBe('warning');
+  });
+});

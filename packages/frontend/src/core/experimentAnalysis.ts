@@ -115,6 +115,13 @@ export function analyzeRun(samples: RunSample[]): NarrationBlock[] {
   const lastStats = samples[samples.length - 1].stats;
   const keys = Object.keys(lastStats);
   const blocks: NarrationBlock[] = [];
+  if (keys.length === 0) {
+    return [{
+      title: 'Brak obserwowalnych wielkości',
+      body: 'Przebieg nie zawiera żadnej statystyki do analizy. Nie można uczciwie wnioskować o trendzie ani stabilizacji modelu.',
+      kind: 'warning',
+    }];
+  }
 
   // Niespójność #1: wartości nieskończone/NaN w przebiegu (nie powinny się zdarzyć —
   // sim.getStats() jest testowane pod tym kątem w sims.test.ts, ale to prawdziwa

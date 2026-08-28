@@ -22,28 +22,33 @@ export interface StatTrend {
   relativeVariance: number;
 }
 
-function linregSlope(values: number[]): number {
+function linregSlope(times: number[], values: number[]): number {
   const n = values.length;
-  const xMean = (n - 1) / 2;
+  const xMean = times.reduce((a, b) => a + b, 0) / n;
   const yMean = values.reduce((a, b) => a + b, 0) / n;
   let num = 0;
   let den = 0;
   for (let i = 0; i < n; i++) {
-    num += (i - xMean) * (values[i] - yMean);
-    den += (i - xMean) ** 2;
+    num += (times[i] - xMean) * (values[i] - yMean);
+    den += (times[i] - xMean) ** 2;
   }
   return den === 0 ? 0 : num / den;
 }
 
 export function analyzeTrend(samples: RunSample[], key: string): StatTrend | null {
-  const values = samples.map((s) => s.stats[key]).filter((v) => Number.isFinite(v));
-  if (values.length < 2) return null;
+  const pairs = samples
+    .filter((sample) => Number.isFinite(sample.t) && Number.isFinite(sample.stats[key]))
+    .map((sample) => ({ t: sample.t, value: sample.stats[key] }));
+  if (pairs.length < 2) return null;
+  const values = pairs.map((pair) => pair.value);
+  const times = pairs.map((pair) => pair.t);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
   const range = max - min;
-  const slope = linregSlope(values);
-  const normalizedSlope = range === 0 ? 0 : (slope * values.length) / range;
+  const timeSpan = Math.max(...times) - Math.min(...times);
+  const slope = linregSlope(times, values);
+  const normalizedSlope = range === 0 ? 0 : (slope * timeSpan) / range;
   const trend: StatTrend['trend'] = normalizedSlope > 0.15 ? 'rising' : normalizedSlope < -0.15 ? 'falling' : 'stable';
   const variance = values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / values.length;
   const relativeVariance = mean !== 0 ? Math.sqrt(variance) / Math.abs(mean) : Math.sqrt(variance);

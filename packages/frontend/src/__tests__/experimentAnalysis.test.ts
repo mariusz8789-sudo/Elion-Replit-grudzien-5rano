@@ -44,6 +44,15 @@ describe('analyzeTrend', () => {
     expect(analyzeTrend(makeSamples({ x: [5] }), 'x')).toBeNull();
     expect(analyzeTrend([], 'x')).toBeNull();
   });
+
+  it('uses sample timestamps rather than array indexes for uneven sampling', () => {
+    const samples: RunSample[] = [
+      { t: 0, stats: { x: 0 } },
+      { t: 1, stats: { x: 1 } },
+      { t: 100, stats: { x: 2 } },
+    ];
+    expect(analyzeTrend(samples, 'x')?.trend).toBe('rising');
+  });
 });
 
 describe('analyzeRun', () => {

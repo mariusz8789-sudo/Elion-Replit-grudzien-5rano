@@ -1452,6 +1452,12 @@ describe('Genesis Experiment Fabric', () => {
 
 
 describe('Evidence Pack persisted contract boundary', () => {
+  it('blocks public comparisons and verdicts for malformed packs', () => {
+    const malformed = { runCount: 1, runs: [], reproducibility: {} };
+    expect(compareScientificEvidencePacks(malformed as never, malformed as never)).toBe('BLOCKED');
+    expect(getStoredEvidencePackReplayVerdict(malformed as never)).toBe('BLOCKED');
+  });
+
   it('rejects packs whose runCount or nested run provenance is inconsistent', () => {
     expect(classifyStoredEvidencePack({
       contractVersion: '1.0.0', evidencePackId: 'pack', evidenceChainId: 'chain', runCount: 1,

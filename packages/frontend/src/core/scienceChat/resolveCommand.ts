@@ -145,6 +145,10 @@ const has = (norm: string, ...kw: string[]) => kw.some((k) => norm.includes(k));
 function verifySnapshot(ctx: ChatSimSnapshot): { status: 'PASS' | 'BLOCKED'; text: string } {
   const issues: string[] = [];
   const seenKeys = new Set<string>();
+  const declaredKeys = new Set(ctx.paramDefs.map((def) => def.key));
+  for (const key of Object.keys(ctx.params)) {
+    if (!declaredKeys.has(key)) issues.push(`${key}: wartość istnieje w snapshotcie, ale parametr nie jest zadeklarowany`);
+  }
   for (const def of ctx.paramDefs) {
     if (!def.key || seenKeys.has(def.key)) issues.push(`${def.label || 'parametr'}: zduplikowany lub pusty klucz`);
     seenKeys.add(def.key);

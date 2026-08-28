@@ -420,3 +420,17 @@ describe('scienceChat: parameter contract validation', () => {
     expect(r.text).toContain('VERIFY BLOCKED');
   });
 });
+
+
+describe('scienceChat: snapshot declaration integrity', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('blocks parameters present in the snapshot but absent from paramDefs', () => {
+    const r = resolveCommand('zweryfikuj', ctx({ params: { mass: 10, speed: 0.5, hiddenCalibration: 42 } }));
+    expect(r.intent).toBe('VERIFY');
+    expect(r.tag).toBe('SYSTEM');
+    expect(r.text).toContain('hiddenCalibration');
+    expect(r.text).toContain('nie jest zadeklarowany');
+    expect(r.text).toContain('VERIFY BLOCKED');
+  });
+});

@@ -107,6 +107,15 @@ function validObservations(value: unknown): value is Readonly<Record<string, Exp
   });
 }
 
+function validExecution(value: unknown): value is SavedExperimentExecution | undefined {
+  if (value === undefined) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const execution = value as SavedExperimentExecution;
+  const required = [execution.status, execution.runId, execution.runFingerprint, execution.resultOrigin, execution.summary];
+  if (required.some((entry) => typeof entry !== 'string' || entry.trim().length === 0)) return false;
+  return execution.status !== 'completed' || execution.resultOrigin === 'real-engine';
+}
+
 function isSavedExperiment(v: unknown): v is SavedExperiment {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;
@@ -120,7 +129,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     validStats(o.stats) &&
     validParams(o.params) &&
     validObservations(o.observations) &&
-    (o.execution === undefined || (typeof o.execution === 'object' && typeof (o.execution as SavedExperimentExecution).status === 'string' && typeof (o.execution as SavedExperimentExecution).runId === 'string' && typeof (o.execution as SavedExperimentExecution).runFingerprint === 'string' && typeof (o.execution as SavedExperimentExecution).resultOrigin === 'string' && typeof (o.execution as SavedExperimentExecution).summary === 'string')) &&
+    validExecution(o.execution) &&
     (o.evidencePackId === undefined || typeof o.evidencePackId === 'string') &&
     (o.evidenceChainId === undefined || typeof o.evidenceChainId === 'string') &&
     (o.analysis === undefined || (Array.isArray(o.analysis) && o.analysis.every((block) => typeof block === 'object' && typeof (block as SavedExperimentAnalysisBlock).title === 'string' && typeof (block as SavedExperimentAnalysisBlock).body === 'string'))) &&
@@ -156,6 +165,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (!validParams(input.params)) throw new Error('Parametry muszą zawierać wyłącznie skończone liczby, teksty lub wartości logiczne.');
   if (!validStats(input.stats ?? {})) throw new Error('Statystyki muszą zawierać wyłącznie skończone liczby.');
   if (!validObservations(input.observations)) throw new Error('Obserwacje muszą zawierać wyłącznie skończone wartości lub serie liczbowe.');
+  if (!validExecution(input.execution)) throw new Error('Execution musi mieć kompletne provenance; status completed wymaga resultOrigin real-engine.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
     id: `${input.labId}:${input.experimentId}:${hash}:${Date.now()}`,

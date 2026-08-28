@@ -147,6 +147,13 @@ describe('scienceMemory: Fabric observations', () => {
     expect(loaded.observations).toEqual(saved.observations);
   });
 
+  it('rejects completed execution with non-real or incomplete provenance', async () => {
+    const { saveExperiment } = await import('../core/scienceMemory');
+    const base = { labId: 'quantum', experimentId: 'tunneling', experimentName: 'Tunneling', params: { energy: 0.55 }, stats: { transmission: 0.2 }, honesty: 'simplified' as const, honestyNote: 'run' };
+    expect(() => saveExperiment({ ...base, execution: { status: 'completed', runId: 'run-1', runFingerprint: 'fp-1', resultOrigin: 'engine-not-available', summary: 'completed' } })).toThrow(/real-engine/);
+    expect(() => saveExperiment({ ...base, execution: { status: 'completed', runId: '', runFingerprint: 'fp-1', resultOrigin: 'real-engine', summary: 'completed' } })).toThrow(/kompletne provenance/);
+  });
+
   it('rejects non-finite observation series before persisting', async () => {
     const { saveExperiment } = await import('../core/scienceMemory');
     const base = {

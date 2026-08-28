@@ -148,6 +148,8 @@ export function registerCatalog(): void {
     labId: 'quantum',
     honesty: 'educational',
     summary: 'Interferencja pojedynczych cząstek — obraz prążków buduje się kwant po kwancie.',
+    equations: ['P(u) = |ψ(u)|²', 'ψ₁ + ψ₂ → |ψ₁ + ψ₂|² ∝ cos²(φ) bez informacji o drodze', 'Pomiar drogi/dekoherencja: P(u) ≈ ½|ψ₁|² + ½|ψ₂|²'],
+    assumptions: ['Jednowymiarowy, umowny ekran i długość fali w jednostkach wizualnych', 'Pojedyncze trafienia są losowane z rozkładu P(u)', 'Model nie śledzi klasycznych trajektorii', 'Pomiar przy szczelinach jest reprezentowany jako utrata interferencji, nie jako pełny model aparatury'],
   });
   registerRecipe({
     id: 'quantum-tunneling',

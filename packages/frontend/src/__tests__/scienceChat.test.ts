@@ -167,6 +167,13 @@ describe('scienceChat: wyjaśnienia, równania, założenia, zadania', () => {
     expect((r.equations ?? []).join(' ')).toMatch(/Lagrange|RK4|energii/);
   });
 
+  it('double-slit pokazuje P(u)=|ψ|² i granicę pomiaru drogi', () => {
+    const r = resolveCommand('pokaż równanie', ctx({ labId: 'quantum', experimentId: 'double-slit', experimentName: 'Doświadczenie z dwiema szczelinami' }));
+    expect(r.todo).toBeFalsy();
+    expect(r.tag).toBe('MODEL');
+    expect((r.equations ?? []).join(' ')).toMatch(/P\(u\)|ψ|pomiar/i);
+  });
+
   it('"założenia modelu" -> tag ZALOZENIE + honestyNote', () => {
     const r = resolveCommand('jakie są założenia modelu', ctx());
     expect(r.tag).toBe('ZALOZENIE');

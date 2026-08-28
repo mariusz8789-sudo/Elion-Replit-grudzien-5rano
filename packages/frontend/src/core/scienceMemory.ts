@@ -1,6 +1,6 @@
 import { readJSON, writeJSON } from './storage';
 import type { HonestyLevel, SimParams } from './types';
-import { biotechScientificFingerprint, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
+import { biotechScientificFingerprint, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateDiscoveryReport, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
 import type { ExperimentOutputValue } from './experimentFabric/types';
 import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 
@@ -41,6 +41,7 @@ export interface SavedExperimentAnalysisBlock {
 export interface SavedBiotechContext {
   candidateId: string;
   hypothesisId: string;
+  reportId?: string;
   requestId?: string;
   hypothesisStatus: BiotechEpistemicStatus;
   experimentRequestStatus?: BiologicalExperimentRequestStatus;
@@ -153,7 +154,16 @@ function validBiotechContext(value: unknown): value is SavedBiotechContext | und
   const requestStatuses: readonly BiologicalExperimentRequestStatus[] = ['NOT_EXECUTED', 'BLOCKED'];
   const validIds = (ids: unknown): ids is readonly string[] => Array.isArray(ids) && ids.every((id) => nonEmptyString(id));
   const validProvenance = Array.isArray(context.provenance) && context.provenance.every((item) => item && typeof item === 'object' && nonEmptyString(item.source) && nonEmptyString(item.sourceId) && nonEmptyString(item.evidenceType) && statuses.includes(item.status));
-  return nonEmptyString(context.candidateId) && nonEmptyString(context.hypothesisId) && (context.requestId === undefined || nonEmptyString(context.requestId)) && statuses.includes(context.hypothesisStatus) && (context.experimentRequestStatus === undefined || requestStatuses.includes(context.experimentRequestStatus)) && validIds(context.evidenceIds) && validIds(context.safetySignalIds) && validProvenance && nonEmptyString(context.scientificFingerprint);
+  return nonEmptyString(context.candidateId)
+    && nonEmptyString(context.hypothesisId)
+    && (context.reportId === undefined || nonEmptyString(context.reportId))
+    && (context.requestId === undefined || nonEmptyString(context.requestId))
+    && statuses.includes(context.hypothesisStatus)
+    && (context.experimentRequestStatus === undefined || requestStatuses.includes(context.experimentRequestStatus))
+    && validIds(context.evidenceIds)
+    && validIds(context.safetySignalIds)
+    && validProvenance
+    && nonEmptyString(context.scientificFingerprint);
 }
 
 function validReplayIdentity(value: unknown): value is SavedExperimentReplayIdentity | undefined {
@@ -188,6 +198,25 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
 function readAll(): SavedExperiment[] {
   const raw = readJSON<unknown[]>(KEY, []);
   return Array.isArray(raw) ? raw.filter(isSavedExperiment) : [];
+}
+
+export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryReport): SavedExperiment {
+  const biotech: SavedBiotechContext = {
+    candidateId: report.candidateId,
+    hypothesisId: report.hypothesisId,
+    reportId: report.reportId,
+    ...(report.experimentRequestId === undefined ? {} : { requestId: report.experimentRequestId }),
+    hypothesisStatus: report.epistemicStatus,
+    evidenceIds: report.evidenceIds,
+    safetySignalIds: report.safetySignalIds,
+    provenance: report.provenance,
+    scientificFingerprint: report.scientificFingerprint,
+  };
+  return saveExperiment({
+    labId: 'biotechnology', experimentId: `report:${report.reportId}`, experimentName: `Candidate Discovery Report — ${report.candidateId}`,
+    params: {}, stats: {}, biotech, honesty: 'simplified', honestyNote: 'Scientific context only; no biological execution performed.',
+    assumptions: [], epistemicStatus: report.epistemicStatus,
+  });
 }
 
 export interface SaveExperimentInput {

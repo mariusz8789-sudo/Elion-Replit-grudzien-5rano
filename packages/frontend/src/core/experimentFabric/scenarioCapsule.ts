@@ -156,7 +156,9 @@ function capsuleIdFor(input: ScenarioCapsuleInput): string {
 
 /** Creates a portable record only after verifying references to real existing artefacts. */
 export function createScenarioCapsule(input: ScenarioCapsuleInput): ReproducibleScenarioCapsule {
-  if (!input.title.trim()) throw new Error('Scenario Capsule requires a non-empty title.');
+  if (!input || typeof input !== 'object') throw new Error('Scenario Capsule requires an input object.');
+  if (typeof input.title !== 'string' || !input.title.trim()) throw new Error('Scenario Capsule requires a non-empty title.');
+  if (!input.baselineRun || typeof input.baselineRun !== 'object') throw new Error('Scenario Capsule requires a baseline run.');
   requireRealRun('baseline', input.baselineRun);
   if (input.variantRun) requireRealRun('variant', input.variantRun);
   requireConsistentComparison(input.baselineRun, input.variantRun, input.comparison);

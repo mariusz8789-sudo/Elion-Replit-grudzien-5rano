@@ -1450,6 +1450,14 @@ describe('Genesis Experiment Fabric', () => {
 });
 
 
+describe('Scenario Capsule creation contract boundary', () => {
+  it('rejects malformed creation inputs with explicit contract errors', () => {
+    expect(() => createScenarioCapsule(null as never)).toThrow('input object');
+    expect(() => createScenarioCapsule({ title: 42, baselineRun: {} } as never)).toThrow('non-empty title');
+    expect(() => createScenarioCapsule({ title: 'Missing baseline' } as never)).toThrow('baseline run');
+  });
+});
+
 describe('Scenario Capsule replay contract boundary', () => {
   it('blocks replay for null input without throwing', () => {
     const replay = replayScenarioCapsule(null as never);

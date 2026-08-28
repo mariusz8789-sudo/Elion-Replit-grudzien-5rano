@@ -87,6 +87,24 @@ export interface BiologicalEvidence extends BiotechRecord {
   subjectIds: readonly string[];
 }
 
+export type BiologicalExperimentRequestStatus = 'NOT_EXECUTED' | 'BLOCKED';
+
+export interface BiologicalExperimentRequest {
+  requestId: string;
+  hypothesisId: string;
+  candidateId: string;
+  targetIds: readonly string[];
+  researchQuestion: string;
+  primaryMetric: string;
+  constraints: Readonly<Record<string, string | number | boolean>>;
+  status: BiologicalExperimentRequestStatus;
+  blockedReason?: string;
+}
+
+export function biologicalExperimentRequestFingerprint(request: Omit<BiologicalExperimentRequest, 'requestId' | 'status' | 'blockedReason'>): string {
+  return fnv1a(canonicalJson(request));
+}
+
 export interface TherapeuticHypothesis extends BiotechRecord {
   kind: 'therapeutic-hypothesis';
   claim: string;

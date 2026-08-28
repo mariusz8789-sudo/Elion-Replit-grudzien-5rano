@@ -3,6 +3,7 @@ import {
   biotechScientificFingerprint,
   isPredictiveBiotechStatus,
   type BiologicalEvidence,
+  biologicalExperimentRequestFingerprint,
   type TherapeuticCandidate,
   type TherapeuticHypothesis,
 } from '../core/biotechDiscoveryContract';
@@ -39,6 +40,15 @@ describe('biotech discovery contract', () => {
     expect(candidate.supportingEvidenceIds).toContain(evidence.id);
     expect(hypothesis.candidateId).toBe(candidate.id);
     expect(hypothesis.supportingEvidenceIds).toEqual(candidate.supportingEvidenceIds);
+  });
+
+  it('represents hypothesis to biological experiment without claiming execution', () => {
+    const request = {
+      hypothesisId: 'hypothesis-1', candidateId: 'candidate-1', targetIds: ['target-1'],
+      researchQuestion: 'What should be measured?', primaryMetric: 'defined-metric', constraints: { assay: 'example' },
+    } as const;
+    expect(biologicalExperimentRequestFingerprint(request)).toMatch(/^[0-9a-f]{8}$/);
+    expect({ ...request, targetIds: ['target-2'] }).not.toEqual(request);
   });
 
   it('keeps predictive statuses distinct from established fact', () => {

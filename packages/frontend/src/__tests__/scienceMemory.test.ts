@@ -107,5 +107,6 @@ describe('scienceMemory: Fabric observations', () => {
     expect(() => saveExperiment({ ...base, observations: { trajectory: [0, Number.NaN] } })).toThrow(/skończone/);
     expect(() => saveExperiment({ ...base, observations: { trajectory: [0, Number.POSITIVE_INFINITY] } })).toThrow(/skończone/);
     expect(() => saveExperiment({ ...base, observations: { trajectory: [] } })).toThrow(/skończone/);
+    expect(() => saveExperiment({ ...base, observations: {} })).toThrow(/skończone/);
   });
 });

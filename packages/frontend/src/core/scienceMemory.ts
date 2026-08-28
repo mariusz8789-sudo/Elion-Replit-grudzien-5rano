@@ -58,7 +58,9 @@ export function contentHash(input: { labId: string; experimentId: string; params
 function validObservations(value: unknown): value is Readonly<Record<string, ExperimentOutputValue>> {
   if (value === undefined) return true;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  return Object.values(value as Record<string, unknown>).every((entry) => {
+  const entries = Object.values(value as Record<string, unknown>);
+  if (entries.length === 0) return false;
+  return entries.every((entry) => {
     if (typeof entry === 'number' || typeof entry === 'string' || typeof entry === 'boolean') return true;
     return Array.isArray(entry) && entry.length > 0 && entry.every((sample) => typeof sample === 'number' && Number.isFinite(sample));
   });

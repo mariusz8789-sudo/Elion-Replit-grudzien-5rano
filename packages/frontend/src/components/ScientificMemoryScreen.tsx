@@ -75,6 +75,27 @@ export function ScientificMemoryScreen() {
                 <div className="stat-row"><span>Parametry</span><span className="val">{Object.keys(record.params).length}</span></div>
               </div>
               <p className="settings-hint">{record.honestyNote}</p>
+              {record.observations && (
+                <details className="settings-details">
+                  <summary>Obserwacje ({Math.max(0, ...Object.values(record.observations).map((value) => Array.isArray(value) ? value.length : 1))} próbek, {Object.keys(record.observations).length} serii)</summary>
+                  <div className="stat-list">
+                    {Object.entries(record.observations).map(([key, value]) => (
+                      <div className="stat-row" key={key}><span>{key}</span><span className="val mono">{Array.isArray(value) ? value.slice(-3).join(', ') : String(value)}</span></div>
+                    ))}
+                  </div>
+                </details>
+              )}
+              {record.analysis && record.analysis.length > 0 && (
+                <details className="settings-details">
+                  <summary>Analiza nagrania ({record.analysis.length} bloków)</summary>
+                  {record.analysis.map((block) => (
+                    <section key={`${block.title}:${block.body}`}>
+                      <strong>{block.title}</strong>
+                      <p className="settings-hint">{block.body}</p>
+                    </section>
+                  ))}
+                </details>
+              )}
               <div className="pilot-actions">
                 <button className="chip-btn pilot-primary" onClick={() => openRecord(record)}>Otwórz z parametrami</button>
                 <button className="chip-btn" onClick={() => downloadJson(record)}>Eksportuj JSON</button>

@@ -73,6 +73,7 @@ export function ScientificMemoryScreen() {
                 <div className="stat-row"><span>Honesty</span><span className="val">{record.honesty}</span></div>
                 <div className="stat-row"><span>Fingerprint treści</span><span className="val mono">#{record.contentHash}</span></div>
                 <div className="stat-row"><span>Parametry</span><span className="val">{Object.keys(record.params).length}</span></div>
+                {record.evidencePackId && <div className="stat-row"><span>Evidence Pack</span><span className="val mono">{record.evidencePackId}</span></div>}
               </div>
               <p className="settings-hint">{record.honestyNote}</p>
               {record.observations && (
@@ -98,6 +99,7 @@ export function ScientificMemoryScreen() {
               )}
               <div className="pilot-actions">
                 <button className="chip-btn pilot-primary" onClick={() => openRecord(record)}>Otwórz z parametrami</button>
+                {record.evidencePackId && <button className="chip-btn" onClick={() => { window.location.hash = `#/pilot?mode=protocol&replay=${encodeURIComponent(record.evidencePackId!)}`; }}>Otwórz Evidence replay</button>}
                 <button className="chip-btn" onClick={() => downloadJson(record)}>Eksportuj JSON</button>
                 <button className="chip-btn danger" onClick={() => removeRecord(record)}>Usuń lokalnie</button>
               </div>

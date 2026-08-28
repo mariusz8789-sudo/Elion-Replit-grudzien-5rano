@@ -20,7 +20,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `0a740ab` — `feat(biotech): connect pinned record to discovery`
 - `429a3be` — `feat(core): surface honest result analysis`
 - `322a369` — `feat(core): carry provenance into world handoff`
-- next checkpoint in this session — expose replay identity in Scientific Memory
+- `f2aec5f` — `feat(core): surface replay identity in memory`
+- next checkpoint in this session — confirm Evidence Pack → Replay boundary and move to observation comparison
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -136,9 +137,15 @@ Changed file: `packages/frontend/src/components/ScientificMemoryScreen.tsx`.
 
 Validation completed: targeted memory tests (18 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed Core capability: Evidence Pack → Replay user boundary confirmed
+
+The existing Scientific Memory already lists local multi-run Evidence Packs, classifies their persisted replay verdict (`MATCH`, `DRIFT` or `BLOCKED`), exposes the stored run count and model identity, and routes `Otwórz do jawnego rerun` back to the existing Experiment Pilot. It also states that a snapshot is not a new backend execution. No additional UI or contract was added because this integration already exists.
+
+This GAP is therefore parked as already satisfied by the current system. No code change was necessary beyond documenting the decision.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Continue with the existing Evidence/Replay boundary: find the smallest case where a fully preregistered, multi-run Evidence Pack already exists but is not reachable from the user-facing flow. If no such case exists, park the gap and move to model → independent real observation comparison. Do not create a pack from a single run or force incompatible capsule types together.
+Move to the model → independent real observation boundary. Inspect only existing prediction/observation/comparison contracts. If a real observation source is absent, add only the smallest reusable boundary or fixture policy and keep comparison `BLOCKED`/`INCONCLUSIVE`; never treat model inputs or synthetic outputs as independent observations.
 
 ## Next large gaps
 

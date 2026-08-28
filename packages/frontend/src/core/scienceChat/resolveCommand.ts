@@ -266,6 +266,16 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- World Chronicle — ten sam transport czasu, jeden punkt obserwacji.
+  if (has(norm, 'ewolucja jednego miejsca', 'ewolucja miejsca', 'od pustyni do miasta', 'pustynia do miasta', 'miasto do ruin', 'film czasu', 'świat przez milion lat', 'swiat przez milion lat')) {
+    return {
+      text: 'Otwieram „Observer at the Junction — World Chronicle”: filmową, interaktywną oś czasu jednego miejsca od pustyni przez życie, osadę i miasto do ruin oraz odrodzenia. To SCENARIO/CINEMATIC, nie zapis historii konkretnego miejsca ani prognoza.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/timeline?mode=place' },
+    };
+  }
+
   // --- Observer at the Junction — handoff do istniejącego Reality Navigatora.
   //     To interaktywny model/scenario, nie dowód fizycznego multiwersum.
   if (has(norm, 'observer at the junction', 'obserwator na skrzyzowaniu', 'rownolegla rzeczywistosc', 'równoległa rzeczywistość', 'alternatywna rzeczywistosc', 'alternatywna rzeczywistość', 'most asgard', 'most einsteina rosena', 'most einsteina-rosena', 'wormhole', 'tunel czasoprzestrzenny', 'portal do innego swiata', 'portal do innego świata', 'wieloswiat', 'wieloświat')) {

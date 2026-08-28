@@ -30,6 +30,7 @@ import { ScienceChat } from './components/ScienceChat';
  * mapujemy na `default`, którego wymaga React.lazy.
  */
 const DiscoveryTimeline = lazy(() => import('./components/DiscoveryTimeline').then((m) => ({ default: m.DiscoveryTimeline })));
+const PlaceTimeline = lazy(() => import('./components/PlaceTimeline').then((m) => ({ default: m.PlaceTimeline })));
 const QuantumDecisionExplorer = lazy(() => import('./components/QuantumDecisionExplorer').then((m) => ({ default: m.QuantumDecisionExplorer })));
 const RealityNavigator = lazy(() => import('./components/RealityNavigator').then((m) => ({ default: m.RealityNavigator })));
 const EngineeringNavigator = lazy(() => import('./components/EngineeringNavigator').then((m) => ({ default: m.EngineeringNavigator })));
@@ -74,7 +75,7 @@ type Route =
   | { kind: 'discovery-log' }
   | { kind: 'glossary' }
   | { kind: 'what-if' }
-  | { kind: 'timeline' }
+  | { kind: 'timeline'; mode?: 'cosmic' | 'place' }
   | { kind: 'decision-explorer' }
   | { kind: 'reality' }
   | { kind: 'prebuild' }
@@ -101,7 +102,8 @@ function parseHash(): Route {
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
   if (h === '#/what-if') return { kind: 'what-if' };
-  if (h === '#/timeline') return { kind: 'timeline' };
+  if (h === '#/timeline' || h === '#/timeline?mode=cosmic') return { kind: 'timeline', mode: 'cosmic' };
+  if (h === '#/timeline?mode=place') return { kind: 'timeline', mode: 'place' };
   if (h === '#/decision-explorer') return { kind: 'decision-explorer' };
   if (h === '#/reality') return { kind: 'reality' };
   if (h === '#/prebuild') return { kind: 'prebuild' };
@@ -305,7 +307,7 @@ export default function App() {
       return (
         <div className="app">
           <TopBar title="🌌 Discovery Timeline" onSearch={() => setSearchOpen(true)} />
-          <HeavyRoute><DiscoveryTimeline /></HeavyRoute>
+          <HeavyRoute>{route.mode === 'place' ? <PlaceTimeline /> : <DiscoveryTimeline />}</HeavyRoute>
           {overlays}
         </div>
       );

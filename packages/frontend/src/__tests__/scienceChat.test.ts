@@ -174,6 +174,14 @@ describe('scienceChat: wyjaśnienia, równania, założenia, zadania', () => {
     expect((r.equations ?? []).join(' ')).toMatch(/P\(u\)|ψ|pomiar/i);
   });
 
+  it('World Chronicle otwiera interaktywną oś jednego miejsca z jawnym statusem', () => {
+    const r = resolveCommand('pokaż ewolucję od pustyni do miasta', null);
+    expect(r.intent).toBe('OPEN_SIMULATION');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/timeline?mode=place' });
+    expect(r.text).toMatch(/SCENARIO\/CINEMATIC/i);
+    expect(r.text).toMatch(/jednego miejsca/i);
+  });
+
   it('Observer at the Junction otwiera istniejący Reality Navigator z granicą model/scenario', () => {
     const r = resolveCommand('pokaż Observer at the Junction', null);
     expect(r.intent).toBe('OPEN_SIMULATION');

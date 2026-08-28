@@ -69,13 +69,17 @@ function pearson(a: number[], b: number[]): number {
 
 /** Największy względny skok między kolejnymi próbkami — sygnał zmiany parametru w trakcie nagrywania lub niestabilności modelu. */
 function largestJump(samples: RunSample[], key: string): number {
-  const values = samples.map((s) => s.stats[key]).filter((v) => Number.isFinite(v));
-  if (values.length < 2) return 0;
-  const range = Math.max(...values) - Math.min(...values);
+  const values = samples.map((sample) => sample.stats[key]);
+  const finite = values.filter((value): value is number => Number.isFinite(value));
+  if (finite.length < 2) return 0;
+  const range = Math.max(...finite) - Math.min(...finite);
   if (range === 0) return 0;
   let maxJump = 0;
   for (let i = 1; i < values.length; i++) {
-    maxJump = Math.max(maxJump, Math.abs(values[i] - values[i - 1]) / range);
+    const previous = values[i - 1];
+    const current = values[i];
+    if (!Number.isFinite(previous) || !Number.isFinite(current)) continue;
+    maxJump = Math.max(maxJump, Math.abs(current - previous) / range);
   }
   return maxJump;
 }

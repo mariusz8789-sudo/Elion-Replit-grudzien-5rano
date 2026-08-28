@@ -141,6 +141,19 @@ describe('analyzeRun: observation completeness', () => {
 
 
 
+describe('analyzeRun: jump detection preserves sample adjacency', () => {
+  it('does not compare values across a missing sample as if they were consecutive', () => {
+    const samples: RunSample[] = [
+      { t: 0, stats: { x: 0 } },
+      { t: 1, stats: { x: 1 } },
+      { t: 2, stats: {} },
+      { t: 3, stats: { x: 100 } },
+    ];
+    const blocks = analyzeRun(samples);
+    expect(blocks.some((b) => b.title === 'Skokowa zmiana w x')).toBe(false);
+  });
+});
+
 describe('analyzeRun: union of observed keys', () => {
   it('reports a stat that disappears in the final sample as incomplete', () => {
     const samples: RunSample[] = [

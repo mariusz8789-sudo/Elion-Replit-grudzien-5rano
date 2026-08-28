@@ -19,7 +19,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `805e41b` — `feat(memory): route saved runs from science chat`
 - `0a740ab` — `feat(biotech): connect pinned record to discovery`
 - `429a3be` — `feat(core): surface honest result analysis`
-- next checkpoint in this session — carry real-run provenance into World/3D
+- `322a369` — `feat(core): carry provenance into world handoff`
+- next checkpoint in this session — expose replay identity in Scientific Memory
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -127,9 +128,17 @@ Changed files: `packages/frontend/src/core/experimentFabric/worldHandoff.ts`, `p
 
 Validation completed: targeted Experiment Fabric tests (107 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed Core capability: Evidence/Replay identity → Scientific Memory
+
+Scientific Memory now shows the existing replay identity (`capsuleId`, `planId`, `confirmationId`) alongside an Evidence Pack ID when those fields are present. This is a read-only projection of persisted metadata; it does not create an Evidence Pack from a single run and does not claim replayability where protocol semantics are incomplete.
+
+Changed file: `packages/frontend/src/components/ScientificMemoryScreen.tsx`.
+
+Validation completed: targeted memory tests (18 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Continue with the highest-value existing Core gap after World handoff: connect the existing completed-run metadata to Evidence/Replay only where the current capsule/protocol semantics are complete. Prefer existing Evidence Pack and Replay contracts; do not create a pack from a single run and do not force incompatible capsule types together.
+Continue with the existing Evidence/Replay boundary: find the smallest case where a fully preregistered, multi-run Evidence Pack already exists but is not reachable from the user-facing flow. If no such case exists, park the gap and move to model → independent real observation comparison. Do not create a pack from a single run or force incompatible capsule types together.
 
 ## Next large gaps
 

@@ -83,6 +83,7 @@ export function ScientificMemoryScreen() {
                 <div className="stat-row"><span>Fingerprint treści</span><span className="val mono">#{record.contentHash}</span></div>
                 <div className="stat-row"><span>Parametry</span><span className="val">{Object.keys(record.params).length}</span></div>
                 {record.evidencePackId && <div className="stat-row"><span>Evidence Pack</span><span className="val mono">{record.evidencePackId}</span></div>}
+                {record.replayIdentity && <div className="stat-row"><span>Replay identity</span><span className="val mono">{record.replayIdentity.capsuleId} · {record.replayIdentity.planId} · {record.replayIdentity.confirmationId}</span></div>}
               </div>
               <p className="settings-hint">{record.honestyNote}</p>
               {record.execution?.summary && <p className="settings-hint">{record.execution.summary}</p>}

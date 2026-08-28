@@ -1,6 +1,7 @@
 import { readJSON, writeJSON } from './storage';
 import type { HonestyLevel, SimParams } from './types';
 import type { ExperimentOutputValue } from './experimentFabric/types';
+import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 
 /**
  * Scientific Memory (sekcja O dyrektywy CTO) — trwały, lokalny zapis
@@ -53,6 +54,8 @@ export interface SavedExperiment {
   /** Optional canonical Fabric observations; legacy memory rows may omit this. */
   observations?: Readonly<Record<string, ExperimentOutputValue>>;
   execution?: SavedExperimentExecution;
+  evidencePackId?: string;
+  evidenceChainId?: string;
   analysis?: readonly SavedExperimentAnalysisBlock[];
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
@@ -118,6 +121,8 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     validParams(o.params) &&
     validObservations(o.observations) &&
     (o.execution === undefined || (typeof o.execution === 'object' && typeof (o.execution as SavedExperimentExecution).status === 'string' && typeof (o.execution as SavedExperimentExecution).runId === 'string' && typeof (o.execution as SavedExperimentExecution).runFingerprint === 'string' && typeof (o.execution as SavedExperimentExecution).resultOrigin === 'string' && typeof (o.execution as SavedExperimentExecution).summary === 'string')) &&
+    (o.evidencePackId === undefined || typeof o.evidencePackId === 'string') &&
+    (o.evidenceChainId === undefined || typeof o.evidenceChainId === 'string') &&
     (o.analysis === undefined || (Array.isArray(o.analysis) && o.analysis.every((block) => typeof block === 'object' && typeof (block as SavedExperimentAnalysisBlock).title === 'string' && typeof (block as SavedExperimentAnalysisBlock).body === 'string'))) &&
     (o.replayIdentity === undefined || (typeof o.replayIdentity === 'object' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).capsuleId === 'string' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).planId === 'string' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).confirmationId === 'string'))
   );
@@ -141,6 +146,8 @@ export interface SaveExperimentInput {
   assumptions?: string[];
   epistemicStatus?: string;
   execution?: SavedExperimentExecution;
+  evidencePackId?: string;
+  evidenceChainId?: string;
   analysis?: readonly SavedExperimentAnalysisBlock[];
   replayIdentity?: SavedExperimentReplayIdentity;
 }
@@ -160,6 +167,8 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     stats: input.stats ?? {},
     ...(input.observations === undefined ? {} : { observations: input.observations }),
     ...(input.execution === undefined ? {} : { execution: input.execution }),
+    ...(input.evidencePackId === undefined ? {} : { evidencePackId: input.evidencePackId }),
+    ...(input.evidenceChainId === undefined ? {} : { evidenceChainId: input.evidenceChainId }),
     ...(input.analysis === undefined ? {} : { analysis: input.analysis }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
@@ -175,6 +184,56 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
 }
 
 /** Najnowsze pierwsze. */
+/**
+ * Persists a faithful Memory index for a completed Scientific Evidence Pack.
+ * The full typed result remains in the Evidence Pack store; Memory keeps the
+ * canonical IDs plus finite numeric observations needed for local analysis.
+ */
+export function saveScientificEvidencePackToMemory(pack: ScientificEvidencePack): SavedExperiment {
+  const firstRun = pack.runs[0];
+  if (!firstRun) throw new Error('Nie można zapisać pustego Evidence Pack w Scientific Memory.');
+  const keys = [...new Set(pack.runs.flatMap((run) => Object.keys(run.result.outputs)))];
+  const observations = Object.fromEntries(keys.flatMap((key) => {
+    const values = pack.runs
+      .map((run) => run.result.outputs[key])
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    if (values.length === 0) return [];
+    return [[key, values.length === 1 ? values[0] : values] as const];
+  }));
+  const stats: Record<string, number> = Object.fromEntries(Object.entries(firstRun.result.outputs)
+    .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1])));
+  const assumptions = [...new Set(pack.runs.flatMap((run) => run.result.assumptions))];
+  return saveExperiment({
+    labId: pack.protocol.hypothesis.domainId,
+    experimentId: pack.protocol.hypothesis.modelId,
+    experimentName: `Protocol Evidence — ${pack.protocol.hypothesis.statement}`,
+    params: firstRun.parameters,
+    stats,
+    observations,
+    execution: {
+      status: firstRun.status,
+      runId: firstRun.runId,
+      runFingerprint: firstRun.provenance.runFingerprint,
+      resultOrigin: firstRun.provenance.resultOrigin,
+      summary: firstRun.result.summary,
+      modelId: firstRun.modelId,
+      engine: firstRun.engine ?? undefined,
+      modelVersion: firstRun.modelVersion,
+    },
+    evidencePackId: pack.evidencePackId,
+    evidenceChainId: pack.evidenceChainId,
+    analysis: [
+      { title: 'Ocena Evidence Pack', body: pack.hypothesisAssessment.message, kind: 'protocol-assessment' },
+      { title: 'Reprodukowalność armów', body: `allArmsMatched=${pack.reproducibility.allArmsMatched}; drift=${pack.reproducibility.armsWithDrift.length}; notExecuted=${pack.reproducibility.armsNotExecuted.length}.`, kind: 'reproducibility' },
+    ],
+    honesty: 'simplified',
+    honestyNote: pack.disclaimer,
+    equations: [],
+    assumptions,
+    epistemicStatus: pack.hypothesisAssessment.assessment,
+  });
+}
+
 export function listExperiments(): SavedExperiment[] {
   return readAll().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

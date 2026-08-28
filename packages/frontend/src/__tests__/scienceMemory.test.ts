@@ -97,6 +97,26 @@ describe('scienceMemory: Fabric observations', () => {
     expect((await import('../core/scienceMemory')).listExperiments()[0].observations).toEqual(saved.observations);
   });
 
+  it('indexes a real Evidence Pack in Scientific Memory without losing canonical IDs', async () => {
+    const { saveScientificEvidencePackToMemory } = await import('../core/scienceMemory');
+    const { createScientificEvidencePack, designScientificExperiment, executeScientificExperiment, parseScienceChatMessage } = await import('../core/experimentFabric');
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'Promień rośnie wraz z masą.', domainId: 'spacetime-einstein', modelId: 'einstein-schwarzschild',
+        declaredAssumptions: [], falsification: { metric: 'radiusKm', relation: 'monotonic-increase', rationale: 'Test.' },
+      },
+      baselineRequest: parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'),
+      sweep: { parameter: 'massSolar', values: [1, 2], label: 'Masa M☉' }, repetitionsPerArm: 1,
+    });
+    const pack = createScientificEvidencePack(executeScientificExperiment(design));
+    const saved = saveScientificEvidencePackToMemory(pack);
+    expect(saved.evidencePackId).toBe(pack.evidencePackId);
+    expect(saved.evidenceChainId).toBe(pack.evidenceChainId);
+    expect(saved.execution?.runFingerprint).toBe(pack.runs[0].provenance.runFingerprint);
+    expect(saved.observations?.radiusKm).toEqual(pack.runs.map((run) => run.result.outputs.radiusKm));
+    expect(saved.analysis?.[0].body).toBe(pack.hypothesisAssessment.message);
+  });
+
   it('round-trips analyzed observation blocks with series', async () => {
     const { saveExperiment } = await import('../core/scienceMemory');
     const saved = saveExperiment({

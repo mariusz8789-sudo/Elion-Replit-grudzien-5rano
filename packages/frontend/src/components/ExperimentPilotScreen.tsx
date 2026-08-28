@@ -34,6 +34,7 @@ import {
 import { confirmBackendEvidenceGuidedExperiment } from '../core/experimentFabric/backendExecution';
 import { buildStructuredRequestFromModel } from '../core/experimentFabric/structuredRequestBuilder';
 import { track } from '../core/analytics';
+import { saveScientificEvidencePackToMemory } from '../core/scienceMemory';
 
 /**
  * PILOT UI — Science Chat → eksperyment → wynik → provenance → Scenario
@@ -209,6 +210,7 @@ export function ExperimentPilotScreen() {
       setProtocolEvidence(evidence);
       const pack = createScientificEvidencePack(evidence);
       saveScientificEvidencePack(pack);
+      saveScientificEvidencePackToMemory(pack);
       setReplayVerdict(replayReferencePack ? compareScientificEvidencePacks(replayReferencePack, pack) : null);
       setProtocolAdvice(explainScientificEvidence(evidence));
       setPhase('ran');

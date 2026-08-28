@@ -97,6 +97,20 @@ describe('scienceMemory: Fabric observations', () => {
     expect((await import('../core/scienceMemory')).listExperiments()[0].observations).toEqual(saved.observations);
   });
 
+  it('round-trips analyzed observation blocks with series', async () => {
+    const { saveExperiment } = await import('../core/scienceMemory');
+    const saved = saveExperiment({
+      labId: 'biology', experimentId: 'custom-recording', experimentName: 'Recorded growth',
+      params: { rate: 0.2 }, stats: { population: 12 }, observations: { population: [8, 9, 12] },
+      analysis: [{ title: 'Trend', body: 'Population increased across the recorded samples.', kind: 'trend' }],
+      honesty: 'simplified', honestyNote: 'observed local run', assumptions: [],
+    });
+    vi.resetModules();
+    const loaded = (await import('../core/scienceMemory')).listExperiments()[0];
+    expect(loaded.analysis).toEqual(saved.analysis);
+    expect(loaded.observations).toEqual(saved.observations);
+  });
+
   it('round-trips confirmed execution and replay identity', async () => {
     const { saveExperiment } = await import('../core/scienceMemory');
     const saved = saveExperiment({

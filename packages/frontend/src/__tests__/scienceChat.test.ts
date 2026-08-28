@@ -399,3 +399,24 @@ describe('scienceChat: next experiment without numeric parameter', () => {
     expect(r.text).not.toContain('problem trzech ciał');
   });
 });
+
+
+describe('scienceChat: parameter contract validation', () => {
+  it('blocks an inverted slider range', () => {
+    const r = resolveCommand('zweryfikuj', ctx({ paramDefs: [{ ...massDef, min: 100, max: 1 }] }));
+    expect(r.text).toContain('minimum przekracza maksimum');
+    expect(r.text).toContain('VERIFY BLOCKED');
+  });
+
+  it('blocks a slider default outside its declared range', () => {
+    const r = resolveCommand('zweryfikuj', ctx({ paramDefs: [{ ...massDef, default: 101 }] }));
+    expect(r.text).toContain('default powyżej maksimum');
+    expect(r.text).toContain('VERIFY BLOCKED');
+  });
+
+  it('blocks duplicate parameter keys', () => {
+    const r = resolveCommand('zweryfikuj', ctx({ paramDefs: [massDef, { ...speedDef, key: 'mass' }] }));
+    expect(r.text).toContain('zduplikowany');
+    expect(r.text).toContain('VERIFY BLOCKED');
+  });
+});

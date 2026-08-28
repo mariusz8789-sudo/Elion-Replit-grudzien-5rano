@@ -144,7 +144,18 @@ const has = (norm: string, ...kw: string[]) => kw.some((k) => norm.includes(k));
  */
 function verifySnapshot(ctx: ChatSimSnapshot): { status: 'PASS' | 'BLOCKED'; text: string } {
   const issues: string[] = [];
+  const seenKeys = new Set<string>();
   for (const def of ctx.paramDefs) {
+    if (!def.key || seenKeys.has(def.key)) issues.push(`${def.label || 'parametr'}: zduplikowany lub pusty klucz`);
+    seenKeys.add(def.key);
+    if (def.type === 'slider') {
+      if (typeof def.default !== 'number' || !Number.isFinite(def.default)) issues.push(`${def.label}: domyślna wartość nie jest skończoną liczbą`);
+      if (def.min !== undefined && !Number.isFinite(def.min)) issues.push(`${def.label}: minimum nie jest skończoną liczbą`);
+      if (def.max !== undefined && !Number.isFinite(def.max)) issues.push(`${def.label}: maksimum nie jest skończoną liczbą`);
+      if (typeof def.min === 'number' && typeof def.max === 'number' && def.min > def.max) issues.push(`${def.label}: minimum przekracza maksimum`);
+      if (typeof def.default === 'number' && typeof def.min === 'number' && def.default < def.min) issues.push(`${def.label}: default poniżej minimum`);
+      if (typeof def.default === 'number' && typeof def.max === 'number' && def.default > def.max) issues.push(`${def.label}: default powyżej maksimum`);
+    }
     const value = ctx.params[def.key];
     if (value === undefined) {
       issues.push(`${def.label}: brak wartości`);

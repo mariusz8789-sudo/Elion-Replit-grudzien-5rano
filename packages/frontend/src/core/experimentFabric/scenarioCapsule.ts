@@ -211,6 +211,15 @@ function replaySingle(capsule: ReproducibleScenarioCapsule): ScenarioCapsuleRepl
  * Re-executes only the stored canonical requests. Persisted outputs are not treated as replay output.
  */
 export function replayScenarioCapsule(capsule: ReproducibleScenarioCapsule): ScenarioCapsuleReplay {
+  if (!capsule || typeof capsule !== 'object') {
+    return {
+      contractVersion: SCENARIO_CAPSULE_VERSION,
+      capsuleId: '',
+      status: 'NOT_COMPARABLE',
+      checks: [],
+      message: 'Replay BLOCKED — kapsuła nie jest obiektem. Nie uruchomiono silnika.',
+    };
+  }
   const issues = replayInputIssues(capsule);
   if (issues.length > 0) return blockedReplay(capsule, issues);
   if (!capsule.variantRun) return replaySingle(capsule);

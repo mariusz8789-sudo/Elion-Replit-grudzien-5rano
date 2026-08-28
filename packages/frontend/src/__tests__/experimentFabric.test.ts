@@ -1451,6 +1451,12 @@ describe('Genesis Experiment Fabric', () => {
 
 
 describe('Scenario Capsule replay contract boundary', () => {
+  it('blocks replay for null input without throwing', () => {
+    const replay = replayScenarioCapsule(null as never);
+    expect(replay.status).toBe('NOT_COMPARABLE');
+    expect(replay.message).toContain('Replay BLOCKED');
+  });
+
   it('blocks replay when baselineRun or references are missing instead of throwing', () => {
     const malformed = { contractVersion: '1.0.0', capsuleId: 'broken', title: 'Broken replay' };
     const replay = replayScenarioCapsule(malformed as never);

@@ -6,8 +6,10 @@ import { EpidemicCitySimulation } from '../simulation/epidemicCity';
  * ExperimentRun, while this module only transfers the existing model instance
  * to the existing renderer once.
  */
-interface LiveWorldHandoff {
+export interface LiveWorldHandoff {
   runId: string;
+  runFingerprint: string;
+  resultOrigin: 'real-engine';
   modelId: 'epidemic-city';
   simulation: EpidemicCitySimulation;
 }
@@ -16,8 +18,8 @@ const LIVE_WORLDS = new Map<string, LiveWorldHandoff>();
 let pendingRunId: string | null = null;
 const MAX_RETAINED_WORLDS = 8;
 
-export function registerLiveExperimentWorld(runId: string, simulation: EpidemicCitySimulation): void {
-  LIVE_WORLDS.set(runId, { runId, modelId: 'epidemic-city', simulation });
+export function registerLiveExperimentWorld(runId: string, simulation: EpidemicCitySimulation, metadata: { runFingerprint: string; resultOrigin: 'real-engine' }): void {
+  LIVE_WORLDS.set(runId, { runId, ...metadata, modelId: 'epidemic-city', simulation });
   while (LIVE_WORLDS.size > MAX_RETAINED_WORLDS) {
     const oldestId = LIVE_WORLDS.keys().next().value as string | undefined;
     if (!oldestId) break;

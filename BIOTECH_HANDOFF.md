@@ -18,7 +18,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `97d0631` — `feat(memory-ui): expose fabric provenance`
 - `805e41b` — `feat(memory): route saved runs from science chat`
 - `0a740ab` — `feat(biotech): connect pinned record to discovery`
-- next checkpoint in this session — expose existing analysis beside Core typed results
+- `429a3be` — `feat(core): surface honest result analysis`
+- next checkpoint in this session — carry real-run provenance into World/3D
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -118,9 +119,17 @@ Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
 
 Validation completed: targeted formatter/memory tests, then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed Core capability: real result → World/3D provenance handoff
+
+The existing `epidemic-city` World handoff now carries the original run fingerprint and explicit `real-engine` origin together with the original simulation reference. City3D renders a compact real-run provenance readout, so the scene cannot silently appear as a disconnected second simulation. No new solver or World state was created.
+
+Changed files: `packages/frontend/src/core/experimentFabric/worldHandoff.ts`, `packages/frontend/src/core/experimentFabric/executor.ts`, `packages/frontend/src/components/visual-simulation/City3DWebGLScreen.tsx`.
+
+Validation completed: targeted Experiment Fabric tests (107 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Continue with the highest-value existing Core integration gap after analysis: verify and strengthen the existing real result → `result.route` → World/3D handoff, then Evidence/Replay where semantics are complete. Prefer forwarding existing typed metadata over adding contracts. Make one logical piece, test, typecheck/lint/build, update this handoff, commit and push before continuing.
+Continue with the highest-value existing Core gap after World handoff: connect the existing completed-run metadata to Evidence/Replay only where the current capsule/protocol semantics are complete. Prefer existing Evidence Pack and Replay contracts; do not create a pack from a single run and do not force incompatible capsule types together.
 
 ## Next large gaps
 

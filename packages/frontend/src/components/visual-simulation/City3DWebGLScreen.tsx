@@ -248,7 +248,7 @@ export function City3DWebGLScreen() {
             {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
             {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu Canvas 2D</button>.</div>}
             <div className="city-scene-readout" aria-live="polite">
-              <span>model aktywny</span><strong>dzień {stats.dzien ?? 0}</strong><span>widok: {cameraPreset}</span><span>{analysis === 'none' ? 'widok normalny' : `warstwa: ${analysisLabel}`}</span>
+              <span>model aktywny</span><strong>dzień {stats.dzien ?? 0}</strong><span>widok: {cameraPreset}</span><span>{analysis === 'none' ? 'widok normalny' : `warstwa: ${analysisLabel}`}</span>{experimentWorld && <span title={experimentWorld.runFingerprint}>real run · {experimentWorld.resultOrigin} · {experimentWorld.runId.slice(0, 12)}…</span>}
             </div>
             {person && (
               <aside className="city-3d-person-card city-agent-inspector">

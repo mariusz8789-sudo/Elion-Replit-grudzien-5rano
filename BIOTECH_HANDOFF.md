@@ -93,9 +93,13 @@ Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run bu
 
 The current scientific protocol contract requires executable model requests, baseline/variant arms, repetition policy and real runs. A literature-backed ChEMBL binding record cannot honestly populate those fields. This is parked rather than represented as a false biological protocol.
 
+## Parked source-expansion check
+
+A limited ChEMBL check found additional caffeine/A1 activities with different assay contexts and measures, including duplicate/heterogeneous Ki and IC50 records; one candidate carries a ChEMBL data-validity warning. No second fixture was added because selecting it without a deliberate relation policy would weaken provenance semantics. Source expansion is parked until a clear relation-selection rule and fixture schema exist.
+
 ## NEXT GAP — next large logical piece
 
-Continue with the next safe source-backed biotech expansion or a strictly read-only report projection. Do not invent efficacy, safety, baseline, arms or repetition results. Prefer adding one more pinned relation only if it has complete provenance and a replayable fixture; otherwise park the source-expansion blocker.
+Continue with a strictly read-only biotech report projection or a source-relation policy contract. Do not invent efficacy, safety, baseline, arms or repetition results. Any future additional pinned relation must include complete provenance, assay context, data-validity handling and a replayable fixture.
 
 ## Next large gaps
 

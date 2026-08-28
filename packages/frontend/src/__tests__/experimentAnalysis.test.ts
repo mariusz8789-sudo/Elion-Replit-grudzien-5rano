@@ -141,6 +141,18 @@ describe('analyzeRun: observation completeness', () => {
 
 
 
+describe('analyzeRun: union of observed keys', () => {
+  it('reports a stat that disappears in the final sample as incomplete', () => {
+    const samples: RunSample[] = [
+      { t: 0, stats: { x: 1 } },
+      { t: 1, stats: { x: 2 } },
+      { t: 2, stats: {} },
+    ];
+    const blocks = analyzeRun(samples);
+    expect(blocks.some((b) => b.title === 'Niespójność: niepełna seria obserwacji' && b.body.includes('x'))).toBe(true);
+  });
+});
+
 describe('analyzeRun: missing observables', () => {
   it('does not call an empty stats series stabilized', () => {
     const samples: RunSample[] = [

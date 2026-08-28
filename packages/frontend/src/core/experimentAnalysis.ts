@@ -112,8 +112,7 @@ export function analyzeRun(samples: RunSample[]): NarrationBlock[] {
     ];
   }
 
-  const lastStats = samples[samples.length - 1].stats;
-  const keys = Object.keys(lastStats);
+  const keys = [...new Set(samples.flatMap((sample) => Object.keys(sample.stats)))];
   const blocks: NarrationBlock[] = [];
   if (keys.length === 0) {
     return [{

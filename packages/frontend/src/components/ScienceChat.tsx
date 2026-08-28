@@ -88,7 +88,10 @@ export function formatFabricRun(run: ExperimentRun): string {
   const biotech = run.result.biologicalTarget && run.result.biologicalEvidence
     ? `\nBiotech target: ${run.result.biologicalTarget.label} (${run.result.biologicalTarget.id}). Evidence: ${run.result.biologicalEvidence.id}. Status evidence: ${run.result.biologicalEvidence.status}.`
     : '';
-  return `${run.result.summary}\nStatus: ${run.result.status}; origin: ${run.provenance.resultOrigin}.${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}\nProvenance: ${run.provenance.runFingerprint}.`;
+  const biotechSource = run.result.biologicalEvidence?.provenance[0]
+    ? `\nŹródło evidence: ${run.result.biologicalEvidence.provenance[0].source} / ${run.result.biologicalEvidence.provenance[0].sourceId}${run.result.biologicalEvidence.provenance[0].sourceVersion ? ` · ${run.result.biologicalEvidence.provenance[0].sourceVersion}` : ''}${run.result.biologicalEvidence.provenance[0].sourceUrl ? ` · ${run.result.biologicalEvidence.provenance[0].sourceUrl}` : ''}.`
+    : '';
+  return `${run.result.summary}\nStatus: ${run.result.status}; origin: ${run.provenance.resultOrigin}.${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}${biotechSource}\nProvenance: ${run.provenance.runFingerprint}.`;
 }
 
 function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule }) {

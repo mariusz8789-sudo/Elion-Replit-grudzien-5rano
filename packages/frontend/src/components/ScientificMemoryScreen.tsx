@@ -86,6 +86,19 @@ export function ScientificMemoryScreen() {
               </div>
               <p className="settings-hint">{record.honestyNote}</p>
               {record.execution?.summary && <p className="settings-hint">{record.execution.summary}</p>}
+              {record.biotech && record.biotech.provenance.length > 0 && (
+                <details className="settings-details">
+                  <summary>Provenance źródeł ({record.biotech.provenance.length})</summary>
+                  <div className="stat-list">
+                    {record.biotech.provenance.map((source) => (
+                      <div className="stat-row" key={`${source.source}:${source.sourceId}`}>
+                        <span>{source.source} / {source.sourceId} · {source.status}</span>
+                        <span className="val mono">{source.sourceVersion ?? 'wersja niepodana'}{source.sourceUrl ? <> · <a href={source.sourceUrl} target="_blank" rel="noreferrer">źródło</a></> : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
               {record.observations && (
                 <details className="settings-details">
                   <summary>Obserwacje ({Math.max(0, ...Object.values(record.observations).map((value) => Array.isArray(value) ? value.length : 1))} próbek, {Object.keys(record.observations).length} serii)</summary>

@@ -16,7 +16,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `076cb87` — `feat(memory): persist experiment fabric runs`
 - `a3f0d79` — `feat(science-chat): surface biotech evidence`
 - `97d0631` — `feat(memory-ui): expose fabric provenance`
-- next checkpoint in this session — route “Pokaż zapisane” to enriched Scientific Memory UI
+- `805e41b` — `feat(memory): route saved runs from science chat`
+- next checkpoint in this session — surface source/version/URL provenance in both UI boundaries
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -80,9 +81,21 @@ Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
 
 Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed capability: source provenance visibility
+
+The pinned biotech provenance is now visible at both user-facing boundaries. Science Chat shows source, source ID, source version and source URL beside the target/evidence identity. Scientific Memory provides a `Provenance źródeł` disclosure with the same fields and an external source link. This remains read-only provenance; it does not upgrade evidence status or imply efficacy, safety or execution.
+
+Changed files: `packages/frontend/src/components/ScienceChat.tsx`, `packages/frontend/src/components/ScientificMemoryScreen.tsx`.
+
+Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Parked semantic blocker: biotech preregistration
+
+The current scientific protocol contract requires executable model requests, baseline/variant arms, repetition policy and real runs. A literature-backed ChEMBL binding record cannot honestly populate those fields. This is parked rather than represented as a false biological protocol.
+
 ## NEXT GAP — next large logical piece
 
-Choose the smallest safe preregistration/protocol contract gap for the biotech knowledge result, explicitly separating a literature-backed binding record from any executable biological protocol. Do not invent efficacy, safety, baseline, arms or repetition results. If the current protocol model cannot represent this honestly, park it and document the semantic blocker rather than adding a false protocol.
+Continue with the next safe source-backed biotech expansion or a strictly read-only report projection. Do not invent efficacy, safety, baseline, arms or repetition results. Prefer adding one more pinned relation only if it has complete provenance and a replayable fixture; otherwise park the source-expansion blocker.
 
 ## Next large gaps
 

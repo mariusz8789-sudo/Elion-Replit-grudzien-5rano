@@ -425,6 +425,11 @@ describe('scienceChat: parameter contract validation', () => {
 describe('scienceChat: snapshot declaration integrity', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 
+  it('blocks blank parameter labels and whitespace-only keys', () => {
+    expect(resolveCommand('zweryfikuj', ctx({ paramDefs: [{ ...massDef, key: '   ' }] })).text).toContain('VERIFY BLOCKED');
+    expect(resolveCommand('zweryfikuj', ctx({ paramDefs: [{ ...massDef, label: '' }] })).text).toContain('VERIFY BLOCKED');
+  });
+
   it('blocks non-finite snapshot statistics', () => {
     expect(resolveCommand('zweryfikuj', ctx({ stats: { rs: Number.NaN } })).text).toContain('VERIFY BLOCKED');
     expect(resolveCommand('zweryfikuj', ctx({ stats: { rs: Number.POSITIVE_INFINITY } })).text).toContain('VERIFY BLOCKED');

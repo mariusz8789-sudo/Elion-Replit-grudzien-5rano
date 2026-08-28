@@ -153,7 +153,8 @@ function verifySnapshot(ctx: ChatSimSnapshot): { status: 'PASS' | 'BLOCKED'; tex
     if (typeof value !== 'number' || !Number.isFinite(value)) issues.push(`${key}: statystyka nie jest skończoną liczbą`);
   }
   for (const def of ctx.paramDefs) {
-    if (!def.key || seenKeys.has(def.key)) issues.push(`${def.label || 'parametr'}: zduplikowany lub pusty klucz`);
+    if (typeof def.key !== 'string' || !def.key.trim() || seenKeys.has(def.key)) issues.push(`${def.label || 'parametr'}: zduplikowany lub pusty klucz`);
+    if (typeof def.label !== 'string' || !def.label.trim()) issues.push('parametr: pusty label');
     seenKeys.add(def.key);
     if (def.type === 'slider') {
       if (typeof def.default !== 'number' || !Number.isFinite(def.default)) issues.push(`${def.label}: domyślna wartość nie jest skończoną liczbą`);

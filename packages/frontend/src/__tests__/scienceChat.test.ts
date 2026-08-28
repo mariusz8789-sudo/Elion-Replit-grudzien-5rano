@@ -222,9 +222,27 @@ describe('scienceChat: uczciwe TODO dla niegotowych funkcji', () => {
     expect(r.todo).toBeFalsy();
   });
 
-  it('"sprawdź wynik" -> weryfikacja oznaczona TODO', () => {
+  it('"sprawdź wynik" -> wykonuje zakresową walidację snapshotu bez udawania walidacji solvera', () => {
     const r = resolveCommand('sprawdź wynik', ctx());
-    expect(r.todo).toBe(true);
+    expect(r.intent).toBe('VERIFY');
+    expect(r.todo).toBeFalsy();
+    expect(r.tag).toBe('FAKT');
+    expect(r.text).toMatch(/VERIFY PASS/);
+    expect(r.text).toMatch(/NOT_MODELED/);
+  });
+
+  it('VERIFY blokuje parametr poza zadeklarowanym zakresem', () => {
+    const r = resolveCommand('zweryfikuj', ctx({ params: { mass: 101, speed: 0.5 } }));
+    expect(r.intent).toBe('VERIFY');
+    expect(r.tag).toBe('SYSTEM');
+    expect(r.text).toMatch(/VERIFY BLOCKED/);
+    expect(r.text).toMatch(/powyżej maksimum/);
+  });
+
+  it('VERIFY blokuje się bez otwartej symulacji', () => {
+    const r = resolveCommand('zweryfikuj', null);
+    expect(r.intent).toBe('VERIFY');
+    expect(r.text).toMatch(/VERIFY BLOCKED/);
   });
 });
 

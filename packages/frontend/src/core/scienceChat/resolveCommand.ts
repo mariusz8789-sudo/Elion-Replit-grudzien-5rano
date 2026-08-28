@@ -138,6 +138,41 @@ function recipeFor(ctx: ChatSimSnapshot): SimulationRecipe | undefined {
 const has = (norm: string, ...kw: string[]) => kw.some((k) => norm.includes(k));
 
 /**
+ * VERIFY checks only the contract already present in the live snapshot.
+ * It must not claim unit, conservation-law, or solver validation when those
+ * inputs are not part of ChatSimSnapshot.
+ */
+function verifySnapshot(ctx: ChatSimSnapshot): { status: 'PASS' | 'BLOCKED'; text: string } {
+  const issues: string[] = [];
+  for (const def of ctx.paramDefs) {
+    const value = ctx.params[def.key];
+    if (value === undefined) {
+      issues.push(`${def.label}: brak wartości`);
+      continue;
+    }
+    if (def.type === 'slider' && typeof value !== 'number') {
+      issues.push(`${def.label}: oczekiwano liczby`);
+      continue;
+    }
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) issues.push(`${def.label}: wartość nie jest skończona`);
+      if (def.min !== undefined && value < def.min) issues.push(`${def.label}: poniżej minimum ${def.min}${def.unit ?? ''}`);
+      if (def.max !== undefined && value > def.max) issues.push(`${def.label}: powyżej maksimum ${def.max}${def.unit ?? ''}`);
+    }
+  }
+  if (issues.length > 0) {
+    return {
+      status: 'BLOCKED',
+      text: `VERIFY BLOCKED — ${issues.join('; ')}. Sprawdzono tylko typy i zadeklarowane zakresy parametrów. Jednostki, prawa zachowania i poprawność solvera: NOT_MODELED w tym snapshotcie.`,
+    };
+  }
+  return {
+    status: 'PASS',
+    text: `VERIFY PASS — wszystkie ${ctx.paramDefs.length} zadeklarowane parametry mają wartości zgodne z typem i zakresem. To nie jest dowód poprawności solvera: jednostki, prawa zachowania i niezależna walidacja wyniku pozostają NOT_MODELED.`,
+  };
+}
+
+/**
  * Buduje konfigurację porównania A vs B z SUROWEGO zdania (nie znormalizowanego —
  * normalize usuwa kropki dziesiętne i tworzy fałszywe „0" z „R0"). Wyłapuje
  * model (SIR/SEIR/SEIRD) i do dwóch liczb jako R0. Bez rozpoznanych liczb
@@ -277,6 +312,11 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // VERIFY bez snapshotu ma własny jawny stan BLOCKED, nie UNKNOWN.
+  if (!ctx && has(norm, 'sprawdz wynik', 'zweryfikuj', 'weryfik', 'verify')) {
+    return { text: 'VERIFY BLOCKED — nie ma otwartej symulacji ani snapshotu parametrów. Nie wykonano walidacji.', tag: 'SYSTEM', intent: 'VERIFY' };
+  }
+
   // --- Bez otwartej symulacji: dalsze komendy wymagają kontekstu ---
   if (!ctx) {
     if (has(norm, 'kampania naukowa', 'kampanie naukowa', 'kampanii naukowej', 'campaign', 'silnik przyspieszenia', 'scientific acceleration')) {
@@ -317,7 +357,8 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
 
   // --- Weryfikacja (Faza 6 — inwarianty; uczciwe TODO) ---
   if (has(norm, 'sprawdz wynik', 'zweryfikuj', 'weryfik', 'verify')) {
-    return { text: 'Weryfikacja inwariantami (jednostki, zakresy, prawa zachowania) dla żywej symulacji to Faza 6 — interfejs gotowy, kontrole do podłączenia. TODO.', tag: 'SYSTEM', intent: 'VERIFY', todo: true };
+    const verification = verifySnapshot(ctx);
+    return { text: verification.text, tag: verification.status === 'PASS' ? 'FAKT' : 'SYSTEM', intent: 'VERIFY' };
   }
 
   // --- „Co się zmieniło?" / analiza aktualnego wyniku (PRZED zmianą parametru,

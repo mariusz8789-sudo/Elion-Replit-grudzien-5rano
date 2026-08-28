@@ -15,12 +15,20 @@ export interface StoredEvidencePack {
 function isPack(value: unknown): value is ScientificEvidencePack {
   if (!value || typeof value !== 'object') return false;
   const pack = value as Partial<ScientificEvidencePack>;
+  const reproducibility = pack.reproducibility as Partial<ScientificEvidencePack['reproducibility']> | undefined;
+  const runs = pack.runs as readonly Partial<ScientificEvidencePack['runs'][number]>[] | undefined;
+  const runCount = pack.runCount;
   return typeof pack.contractVersion === 'string'
     && typeof pack.evidencePackId === 'string'
     && typeof pack.evidenceChainId === 'string'
-    && typeof pack.runCount === 'number'
-    && Array.isArray(pack.runs)
-    && typeof pack.reproducibility === 'object'
+    && Number.isInteger(runCount)
+    && typeof runCount === 'number' && runCount >= 0
+    && Array.isArray(runs)
+    && runCount === runs.length
+    && runs.every((run) => typeof run?.runId === 'string' && (run.status === 'completed' || run.status === 'failed') && typeof run.provenance?.runFingerprint === 'string')
+    && typeof reproducibility?.allArmsMatched === 'boolean'
+    && Array.isArray(reproducibility.armsWithDrift)
+    && Array.isArray(reproducibility.armsNotExecuted)
     && typeof pack.disclaimer === 'string';
 }
 

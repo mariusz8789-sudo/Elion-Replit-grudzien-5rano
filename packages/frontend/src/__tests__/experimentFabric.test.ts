@@ -43,6 +43,7 @@ import {
   validateExperimentOutputs,
   createExperimentProvenance,
 } from '../core/experimentFabric';
+import { classifyStoredEvidencePack } from '../core/experimentFabric/evidencePackStore';
 import {
   clearExperimentWorldHandoffs,
   consumePendingExperimentWorld,
@@ -1449,6 +1450,19 @@ describe('Genesis Experiment Fabric', () => {
   });
 });
 
+
+describe('Evidence Pack persisted contract boundary', () => {
+  it('rejects packs whose runCount or nested run provenance is inconsistent', () => {
+    expect(classifyStoredEvidencePack({
+      contractVersion: '1.0.0', evidencePackId: 'pack', evidenceChainId: 'chain', runCount: 1,
+      runs: [], reproducibility: { allArmsMatched: true, armsWithDrift: [], armsNotExecuted: [] }, disclaimer: 'x',
+    })).toBe('INVALID_LOCAL_RECORD');
+    expect(classifyStoredEvidencePack({
+      contractVersion: '1.0.0', evidencePackId: 'pack', evidenceChainId: 'chain', runCount: 1,
+      runs: [{ runId: 'run', status: 'completed', provenance: {} }], reproducibility: { allArmsMatched: true, armsWithDrift: [], armsNotExecuted: [] }, disclaimer: 'x',
+    })).toBe('INVALID_LOCAL_RECORD');
+  });
+});
 
 describe('Scenario Capsule creation contract boundary', () => {
   it('rejects malformed creation inputs with explicit contract errors', () => {

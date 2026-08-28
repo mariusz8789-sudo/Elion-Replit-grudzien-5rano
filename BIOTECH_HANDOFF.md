@@ -2,88 +2,66 @@
 
 ## Checkpoint state
 
-- **CURRENT HEAD:** `6cf5609`
+- **CURRENT HEAD:** `1ccdf93` (feat(biotech): pin ChEMBL caffeine bioactivity)
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
-- **CURRENT LIVE:** `origin/main = 9ad75f3`
-- **Working tree before this handoff:** clean
+- **CURRENT LIVE:** `origin/main = 9ad75f3` (unchanged)
+- **Working tree before this session:** clean
 
-This file is an emergency checkpoint. Do not assume later reports are present: verify the current Git state first.
+This handoff records the completed ChEMBL bioactivity continuation. Do not redo a broad audit; verify only the current Git state and continue from the next GAP below.
 
-## What is confirmed in the Genesis biotech path
+## Completed in this session
 
-Science Chat parses a request such as `Znajdź naturalnych kandydatów dla targetu X.` into a structured biotechnology request with `domainId: biotechnology`, a `targetQuery`, no model ID, and `executionStatus: NOT_EXECUTED`. The existing Fabric router keeps it non-runnable because Genesis has no validated biological executor or biological source connector.
-
-The biotech contract foundation contains `NaturalMaterial`, `Compound`, `TherapeuticCandidate`, `BiologicalTarget`, `Mechanism`, `SafetySignal`, `BiologicalEvidence`, `TherapeuticHypothesis`, `BiologicalExperimentRequest`, `CandidateDiscoveryReport`, ranking types and Scientific Memory context persistence. The ranking is a transparent research-priority heuristic, not efficacy probability.
-
-## Real source boundary
-
-**PubChem CID 2519 = real chemical identity/properties only.** The pinned PubChem PUG REST fixture is Caffeine and preserves source URL, CID, retrieval date, source version and chemical properties. PubChem alone does **not** confirm a biological target, efficacy or safety. Do not derive those claims from the PubChem compound record.
-
-The repository may contain PubChem fixture/mapping commits after this checkpoint only if they are visible in the current Git history. Check before editing.
-
-## Session work to preserve/check
-
-The intended completed sequence is:
+Added a minimal, source-neutral ChEMBL adapter and replayable pinned fixture for one real public bioactivity record:
 
 ```text
-Science Chat
-→ biotechnology request
-→ PubChem real pinned compound
-→ Candidate contract
-→ Safety contract
-→ explainable research ranking
-→ hypothesis
-→ discovery report
-→ Scientific Memory
+PubChem CID 2519 / Caffeine
+→ ChEMBL CHEMBL113
+→ activity 189031
+→ target CHEMBL318 / Adenosine receptor A1
+→ assay CHEMBL876556
+→ Ki = 41000.0 nM
+→ BiologicalTarget + BiologicalEvidence
 ```
 
-The last confirmed checkpoint commit from the earlier sprint was `6cf5609`. Later biotech work must be verified with `git log` before being relied upon.
+The fixture is `packages/frontend/src/core/biotechData/chembl-activity-189031.json`. It preserves the molecule ID and PubChem CID, target ID/name/type, assay ID/context/type, activity ID/type/relation/value/unit, ChEMBL release `ChEMBL_37`, release date, source URL, retrieval date, document ID and raw response fields.
 
-## Designed versus real
+The mapper is `packages/frontend/src/core/biotechData/chembl.ts`. It validates the pinned identity/activity fields, maps only the target and binding evidence actually supported by ChEMBL, preserves provenance and raw fixture data, and produces a deterministic eight-character scientific fingerprint. It does not create efficacy, safety, candidate, executor or clinical claims.
 
-Designed/contract-only: biological target links without source evidence, biological executor integration, candidate discovery from arbitrary natural-language requests, efficacy prediction, safety scoring, calibration and biological real-observation execution.
+Target provenance is `OBSERVED`; the curated activity evidence is `LITERATURE_SUPPORTED`. The evidence uncertainty explicitly states that an in vitro binding measurement does not establish clinical efficacy, therapeutic benefit or safety.
 
-Real and safe only when backed by source provenance: compound identity/properties, source IDs, evidence type, retrieval metadata and fingerprints.
+## Validation
+
+The following commands completed successfully:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/chembl.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+The build emitted only the pre-existing Vite large-chunk warning; no build failure occurred. Chromium was not needed because this change is data/core logic only.
 
 ## Parked / do not do
 
-- **PubChem → target/evidence/safety:** parked; chemical identity does not prove these fields.
-- **BiologicalEvidence → ScientificEvidencePack:** parked; it lacks real Fabric runs, arms, baseline/reference and replay semantics.
-- **Biological executor:** remains `NOT_EXECUTED`/`BLOCKED`; never reuse a physics or chemistry executor as a biological adapter.
-- **Canonical replay:** `EvidenceGuidedExperimentCapsule` is not `ReproducibleScenarioCapsule`; no cast, fake planId or artificial adapter.
-- **Double-Slit / Bloch / Atom-Bohr:** parked/out of scope.
-- **G3/NIST:** `PRE-EXISTING / UNRELATED`; do not return to it.
-- Do not invent compounds, plants, targets, DOI, toxicity claims, efficacy or synthesis instructions.
+- PubChem → target/evidence/safety remains parked; PubChem is chemical identity/properties only.
+- BiologicalEvidence → ScientificEvidencePack remains parked until real Fabric runs, arms, baseline/reference and replay semantics exist.
+- Biological executor remains `NOT_EXECUTED`/`BLOCKED`; never reuse a physics or chemistry executor as a biological adapter.
+- Canonical replay remains parked; do not cast `EvidenceGuidedExperimentCapsule` to `ReproducibleScenarioCapsule` or invent plan IDs.
+- Do not invent compounds, targets, DOI, toxicity, efficacy or synthesis instructions.
+- Double-Slit / Bloch / Atom-Bohr and G3/NIST remain unrelated/out of scope.
 
 ## NEXT GAP
 
-The next correct step is **one verified bioactivity/target relation** for the existing PubChem compound, preferably a pinned ChEMBL activity record. Before implementation, verify the exact activity ID, molecule ID, target ID/name, assay, measured value/units, ChEMBL release/version, source URL and retrieval context. Map only what the record actually supports:
+Wire the verified `BiologicalTarget` and `BiologicalEvidence` into the existing biotech discovery path without creating a biological executor. Prefer the smallest integration point that lets a discovery report or Science Chat response expose the evidence IDs and provenance while keeping execution `NOT_EXECUTED`/`BLOCKED`. Reuse existing candidate/report/memory contracts; do not invent candidate efficacy or safety scores. If this requires a broad architecture change, park it and choose a smaller contract/test/documentation gap.
 
-```text
-PubChem compound
-→ verified bioactivity record
-→ BiologicalTarget
-→ BiologicalEvidence
-```
+## Exact continuation instruction
 
-Do not create a candidate, safety signal or efficacy claim unless the source supports the corresponding relation. Keep missing fields `UNKNOWN`/`VERIFY_REQUIRED` and biological execution `NOT_EXECUTED`/`BLOCKED`.
+1. Confirm branch, HEAD, `origin/main`, and clean/dirty status.
+2. Read this handoff and inspect only the existing biotech discovery/report/memory path plus the new ChEMBL mapper and tests.
+3. Implement the smallest safe mapping of the verified ChEMBL record into existing contracts, with targeted tests and provenance assertions.
+4. Run targeted tests, full tests as needed, typecheck/build, lint and `git diff --check`.
+5. Update this handoff with the resulting HEAD/branch/live state, commit and push.
 
-## First action for the next Manus
-
-1. Run `git status --short --branch`, `git rev-parse --short HEAD`, `git rev-parse --short origin/main` and `git log --oneline -12`.
-2. Inspect existing files before adding anything:
-   - `packages/frontend/src/core/biotechDiscoveryContract.ts`
-   - `packages/frontend/src/core/biotechData/pubchem.ts`
-   - `packages/frontend/src/core/biotechData/pubchem-cid-2519.json`
-   - `packages/frontend/src/core/experimentFabric/parser.ts`
-   - `packages/frontend/src/core/experimentFabric/router.ts`
-   - `packages/frontend/src/core/scienceMemory.ts`
-   - `packages/frontend/src/__tests__/biotechDiscoveryContract.test.ts`
-   - `packages/frontend/src/__tests__/experimentFabric.test.ts`
-   - `packages/frontend/src/__tests__/scienceMemory.test.ts`
-3. Confirm whether the pinned PubChem files exist at the current HEAD.
-4. Only then retrieve and pin one real ChEMBL activity record; if provenance or target semantics are insufficient, park the task without inventing an adapter.
-
-## Verification expectation
-
-For any future code change: targeted tests, typecheck, lint, build, diff check, commit and push. Chromium is required only for UI changes. CI must be reported from an actual run; G3/NIST remains unrelated.
+Never claim CI green without an actual CI result. If interrupted, first leave the current scope consistent, test it, update this handoff, commit and push.

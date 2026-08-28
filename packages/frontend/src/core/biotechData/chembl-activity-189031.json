@@ -1,0 +1,40 @@
+{
+  "source": "ChEMBL Web Services",
+  "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity/189031.json",
+  "sourceVersion": "ChEMBL_37",
+  "retrievedAt": "2026-08-29",
+  "releaseDate": "2026-05-01",
+  "molecule": {
+    "moleculeChemblId": "CHEMBL113",
+    "pubchemCid": 2519,
+    "prefName": "CAFFEINE",
+    "canonicalSmiles": "Cn1c(=O)c2c(ncn2C)n(C)c1=O"
+  },
+  "target": {
+    "targetChemblId": "CHEMBL318",
+    "prefName": "Adenosine receptor A1",
+    "targetType": "SINGLE PROTEIN",
+    "organism": "Rattus norvegicus",
+    "taxId": 10116
+  },
+  "assay": {
+    "assayChemblId": "CHEMBL876556",
+    "assayType": "B",
+    "assayTypeDescription": "Binding",
+    "description": "Ability to inhibit binding of [3H]R-PIA to Adenosine A1 receptor in rat brain cortical membranes",
+    "subcellularFraction": "Membrane",
+    "tissue": "Brain",
+    "confidenceScore": 8,
+    "relationshipType": "H",
+    "documentChemblId": "CHEMBL1130278"
+  },
+  "activity": {
+    "activityId": 189031,
+    "standardType": "Ki",
+    "standardRelation": "=",
+    "standardValue": "41000.0",
+    "standardUnits": "nM",
+    "sourceId": 1,
+    "documentChemblId": "CHEMBL1130278"
+  }
+}

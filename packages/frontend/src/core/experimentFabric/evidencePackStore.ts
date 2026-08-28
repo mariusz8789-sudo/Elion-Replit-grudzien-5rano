@@ -18,9 +18,11 @@ function isPack(value: unknown): value is ScientificEvidencePack {
   const reproducibility = pack.reproducibility as Partial<ScientificEvidencePack['reproducibility']> | undefined;
   const runs = pack.runs as readonly Partial<ScientificEvidencePack['runs'][number]>[] | undefined;
   const runCount = pack.runCount;
+  const protocol = pack.protocol as Partial<ScientificEvidencePack['protocol']> | undefined;
   return typeof pack.contractVersion === 'string'
     && typeof pack.evidencePackId === 'string'
     && typeof pack.evidenceChainId === 'string'
+    && typeof protocol?.protocolFingerprint === 'string'
     && Number.isInteger(runCount)
     && typeof runCount === 'number' && runCount >= 0
     && Array.isArray(runs)

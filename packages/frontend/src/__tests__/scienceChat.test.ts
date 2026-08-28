@@ -376,3 +376,14 @@ describe('scienceChat: Simulation Question handoff', () => {
     expect(r.text).toContain('SCENARIO/CINEMATIC');
   });
 });
+
+
+describe('scienceChat: qualitative task fallback', () => {
+  it('creates an observation task without pretending to score it', () => {
+    const r = resolveCommand('zbuduj zadanie', ctx({ paramDefs: [], stats: { state: 1 } }));
+    expect(r.intent).toBe('CREATE_TASK');
+    expect(r.todo).toBeUndefined();
+    expect(r.text).toContain('Zadanie obserwacyjne');
+    expect(r.text).toContain('NOT_MODELED');
+  });
+});

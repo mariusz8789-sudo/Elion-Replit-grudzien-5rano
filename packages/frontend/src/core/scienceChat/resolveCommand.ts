@@ -513,7 +513,18 @@ function explainState(ctx: ChatSimSnapshot, lay = false): ChatResponse {
 function taskResponse(ctx: ChatSimSnapshot): ChatResponse {
   const p = ctx.paramDefs.find((d) => d.type === 'slider');
   if (!p) {
-    return { text: `„${ctx.experimentName}" nie ma regulowanego parametru liczbowego, więc nie zbuduję z niego zadania obliczeniowego. Fundament generatora zadań jest gotowy — TODO: zadania jakościowe.`, tag: 'SYSTEM', intent: 'CREATE_TASK', todo: true };
+    const stat = Object.keys(ctx.stats)[0];
+    const observe = stat ? `Odczytaj „${stat}" na początku i na końcu.` : 'Opisz stan sceny na początku i na końcu.';
+    return {
+      text:
+        `Zadanie obserwacyjne (powiązane z modelem „${ctx.experimentName}"):\n` +
+        `1. Zapisz warunki początkowe i założenia modelu. ${observe}\n` +
+        '2. Uruchom lub obserwuj przebieg bez zmiany konfiguracji.\n' +
+        '3. Opisz zmianę, wskaż jej przyczynę w modelu i oddziel wynik symulacji od interpretacji.\n' +
+        'Automatyczna punktacja: NOT_MODELED — Genesis nie udaje oceny, której obecny kontrakt nie definiuje.',
+      tag: 'SYSTEM',
+      intent: 'CREATE_TASK',
+    };
   }
   const lo = typeof p.min === 'number' ? p.min : Number(p.default);
   const hi = typeof p.max === 'number' ? p.max : Number(p.default) * 2;

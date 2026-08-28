@@ -50,11 +50,15 @@ export function HighFidelitySliceScreen() {
   const [running, setRunning] = useState(true);
   const [cameraMode, setCameraMode] = useState<HighFidelityCameraMode>(initialCameraMode);
   const [heatmap, setHeatmap] = useState(true);
+  const [fieldIntensity, setFieldIntensity] = useState(0.45);
+  const [threshold, setThreshold] = useState(0);
   const [stats, setStats] = useState<Record<string, number>>(() => sim.getStats());
   const params = useMemo<SimParams>(() => ({ clockSpeed: running ? 4 : 0 }), [running]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, setStats);
 
   useEffect(() => { sim.setShowHeatmap(heatmap); sim.setAnalysisMode('risk' as AnalysisMode); }, [heatmap, sim]);
+  useEffect(() => { sim.setPhiladelphiaFieldIntensity(fieldIntensity); }, [fieldIntensity, sim]);
+  useEffect(() => { sim.setPhiladelphiaThreshold(threshold); }, [threshold, sim]);
   useEffect(() => { sim.setCameraMode(initialCameraMode); }, [initialCameraMode, sim]);
   useEffect(() => registerActiveSimControls({ toggleRunning: () => setRunning((value) => !value), reset: () => { sim.reset(); setRunning(false); setCameraMode('street'); setStats(sim.getStats()); } }), [sim]);
 
@@ -98,6 +102,10 @@ export function HighFidelitySliceScreen() {
             <div className="hf-control-label">STATUS SCENARIUSZA</div>
             <p><b>{philadelphiaLegendMode === 'physics' ? 'PHYSICS BOUNDARY VIEW' : 'LEGEND VIEW'}</b></p>
             <p>Ta scena ilustruje założenia narracji. Animowane pole nie jest wynikiem równania Maxwella, pomiarem ani dowodem teleportacji.</p>
+            <label className="hf-range-label" htmlFor="philadelphia-field-intensity">INTENSYWNOŚĆ ILUSTRACJI POLA <strong>{Math.round(fieldIntensity * 100)}%</strong></label>
+            <input id="philadelphia-field-intensity" type="range" min="0" max="1" step="0.01" value={fieldIntensity} onChange={(event) => setFieldIntensity(Number(event.target.value))} />
+            <label className="hf-range-label" htmlFor="philadelphia-threshold">HIPOTETYCZNY THRESHOLD EVENT <strong>{Math.round(threshold * 100)}%</strong></label>
+            <input id="philadelphia-threshold" type="range" min="0" max="1" step="0.01" value={threshold} onChange={(event) => setThreshold(Number(event.target.value))} />
           </> : <>
             <div className="hf-control-label">KAMERA</div>
             <div className="hf-button-row">

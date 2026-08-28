@@ -211,6 +211,8 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   isHeroAssetLoaded(): boolean { return this.heroLoaded; }
   isHeroAssetFailed(): boolean { return this.heroLoadFailed; }
   isPhiladelphiaLegendScenario(): boolean { return this.philadelphiaLegendMode !== null; }
+  setPhiladelphiaFieldIntensity(value: number): void { this.philadelphiaLegend?.setFieldIntensity(value); }
+  setPhiladelphiaThreshold(value: number): void { this.philadelphiaLegend?.setThreshold(value); }
 
   setAnalysisMode(mode: AnalysisMode): void { this.analysisMode = mode; }
   setShowHeatmap(value: boolean): void { this.showHeatmap = value; }

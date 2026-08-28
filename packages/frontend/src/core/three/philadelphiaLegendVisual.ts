@@ -10,6 +10,8 @@ export type PhiladelphiaLegendViewMode = 'legend' | 'physics';
 export interface PhiladelphiaLegendVisual {
   readonly root: THREE_NS.Group;
   setViewMode(mode: PhiladelphiaLegendViewMode): void;
+  setFieldIntensity(value: number): void;
+  setThreshold(value: number): void;
   update(elapsedSeconds: number): void;
   dispose(): void;
 }
@@ -26,6 +28,10 @@ export function createPhiladelphiaLegendVisual(
   const deckMaterial = new THREE.MeshStandardMaterial({ color: 0x74808a, roughness: 0.64, metalness: 0.48 });
   const glowMaterial = new THREE.MeshBasicMaterial({ color: 0x78d8df, transparent: true, opacity: 0.34, depthWrite: false });
   const fieldMaterial = new THREE.MeshBasicMaterial({ color: 0x9af2dc, transparent: true, opacity: 0.2, depthWrite: false });
+  const portMaterial = new THREE.MeshStandardMaterial({ color: 0x26394a, roughness: 0.82, metalness: 0.25 });
+  const equipmentMaterial = new THREE.MeshStandardMaterial({ color: 0x5b6474, roughness: 0.4, metalness: 0.72 });
+  const staffMaterial = new THREE.MeshStandardMaterial({ color: 0xd7b48a, roughness: 0.68, metalness: 0.02 });
+  const thresholdMaterial = new THREE.MeshBasicMaterial({ color: 0xe879f9, transparent: true, opacity: 0, depthWrite: false });
 
   const water = new THREE.Mesh(new THREE.PlaneGeometry(24, 18, 1, 1), waterMaterial);
   water.rotation.x = -Math.PI / 2;
@@ -61,6 +67,59 @@ export function createPhiladelphiaLegendVisual(
   ship.add(wake);
   root.add(ship);
 
+  // Port i personel są proceduralnym tłem sceny; nie są rekonstrukcją historyczną.
+  const port = new THREE.Group();
+  port.name = 'hypothetical-port-environment';
+  const dock = new THREE.Mesh(new THREE.BoxGeometry(7, 0.28, 2.1), portMaterial);
+  dock.position.set(-3.2, 0.02, -3.8);
+  dock.receiveShadow = true;
+  port.add(dock);
+  for (let index = 0; index < 4; index++) {
+    const crane = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 0.12), equipmentMaterial);
+    crane.position.set(-5.3 + index * 1.45, 1.15, -3.8);
+    crane.castShadow = true;
+    port.add(crane);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.1, 0.1), equipmentMaterial);
+    arm.position.set(-4.75 + index * 1.45, 2.25, -3.8);
+    port.add(arm);
+  }
+  root.add(port);
+
+  const staff = new THREE.Group();
+  staff.name = 'hypothetical-port-personnel';
+  for (let index = 0; index < 5; index++) {
+    const person = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.42, 8), equipmentMaterial);
+    body.position.y = 0.28;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), staffMaterial);
+    head.position.y = 0.6;
+    person.add(body, head);
+    person.position.set(-3.5 + index * 0.72, 0.08, -2.7 + (index % 2) * 0.35);
+    person.scale.setScalar(0.85 + (index % 3) * 0.08);
+    person.traverse((node) => { const mesh = node as THREE_NS.Mesh; mesh.castShadow = true; });
+    staff.add(person);
+  }
+  root.add(staff);
+
+  const installation = new THREE.Group();
+  installation.name = 'hypothetical-electromagnetic-installation';
+  for (let index = 0; index < 3; index++) {
+    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.46 + index * 0.14, 0.035, 10, 36), equipmentMaterial);
+    coil.rotation.x = Math.PI / 2;
+    coil.position.set(-0.8 + index * 0.8, 0.72, -0.9);
+    installation.add(coil);
+  }
+  const console = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.42, 0.52), equipmentMaterial);
+  console.position.set(-0.4, 0.36, -1.35);
+  installation.add(console);
+  root.add(installation);
+
+  const threshold = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.075, 14, 96), thresholdMaterial);
+  threshold.name = 'hypothetical-threshold-event-not-observed';
+  threshold.rotation.y = Math.PI / 2;
+  threshold.position.set(0.6, 1.5, -0.15);
+  root.add(threshold);
+
   const field = new THREE.Group();
   field.name = 'legend-electromagnetic-field-illustration-not-solver-output';
   const ringA = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.035, 12, 72), fieldMaterial);
@@ -81,25 +140,41 @@ export function createPhiladelphiaLegendVisual(
   root.add(field);
 
   let viewMode: PhiladelphiaLegendViewMode = initialViewMode;
+  let fieldIntensity = 0.45;
+  let thresholdLevel = 0;
   const applyViewMode = () => {
     const legend = viewMode === 'legend';
     glowMaterial.opacity = legend ? 0.34 : 0.1;
     fieldMaterial.opacity = legend ? 0.2 : 0.055;
     field.visible = true;
     ship.visible = true;
+    thresholdMaterial.opacity = thresholdLevel * (legend ? 0.52 : 0.18);
   };
   applyViewMode();
 
   return {
     root,
     setViewMode(mode) { viewMode = mode; applyViewMode(); },
+    setFieldIntensity(value) {
+      fieldIntensity = Math.max(0, Math.min(1, value));
+      fieldMaterial.opacity = (viewMode === 'legend' ? 0.08 : 0.025) + fieldIntensity * (viewMode === 'legend' ? 0.34 : 0.09);
+      glowMaterial.opacity = (viewMode === 'legend' ? 0.14 : 0.04) + fieldIntensity * (viewMode === 'legend' ? 0.42 : 0.12);
+    },
+    setThreshold(value) {
+      thresholdLevel = Math.max(0, Math.min(1, value));
+      threshold.scale.setScalar(0.72 + thresholdLevel * 0.55);
+      thresholdMaterial.opacity = thresholdLevel * (viewMode === 'legend' ? 0.52 : 0.18);
+    },
     update(elapsedSeconds) {
-      // Ruch jest wyłącznie dyskretną animacją prezentacyjną; nie oznacza pomiaru pola.
+      // Ruch i pole są wyłącznie animacją prezentacyjną; nie oznaczają wyniku solvera.
       field.rotation.y = elapsedSeconds * (viewMode === 'legend' ? 0.16 : 0.045);
-      ringA.scale.setScalar(1 + Math.sin(elapsedSeconds * 1.8) * (viewMode === 'legend' ? 0.045 : 0.012));
-      ringB.scale.setScalar(1 + Math.cos(elapsedSeconds * 1.2) * (viewMode === 'legend' ? 0.075 : 0.018));
+      ringA.scale.setScalar(1 + fieldIntensity * Math.sin(elapsedSeconds * 1.8) * (viewMode === 'legend' ? 0.08 : 0.02));
+      ringB.scale.setScalar(1 + fieldIntensity * Math.cos(elapsedSeconds * 1.2) * (viewMode === 'legend' ? 0.12 : 0.03));
+      threshold.rotation.z = elapsedSeconds * 0.12;
+      thresholdMaterial.opacity = thresholdLevel * (viewMode === 'legend' ? 0.52 : 0.18) * (0.72 + 0.28 * Math.sin(elapsedSeconds * 3.4) ** 2);
       ship.position.y = Math.sin(elapsedSeconds * 0.72) * 0.035;
       ship.rotation.z = Math.sin(elapsedSeconds * 0.51) * 0.012;
+      staff.rotation.y = Math.sin(elapsedSeconds * 0.22) * 0.018;
     },
     dispose() {
       root.traverse((node) => {

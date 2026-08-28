@@ -48,7 +48,7 @@ export function listScientificEvidencePacks(): StoredEvidencePack[] {
   return raw.filter((item): item is StoredEvidencePack => {
     if (!item || typeof item !== 'object') return false;
     const record = item as Partial<StoredEvidencePack>;
-    return typeof record.savedAt === 'string' && isPack(record.pack);
+    return typeof record.savedAt === 'string' && !Number.isNaN(Date.parse(record.savedAt)) && isPack(record.pack);
   });
 }
 

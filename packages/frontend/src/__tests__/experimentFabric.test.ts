@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getKnowledgeDomain, validateKnowledgeRegistry } from '../core/knowledge/registry';
 import { createSpatialWorldOverlay } from '../core/simulationRenderer/spatialOverlay';
 import {
@@ -1461,6 +1461,13 @@ describe('Evidence Pack persisted contract boundary', () => {
     const malformed = { runCount: 1, runs: [], reproducibility: {} };
     expect(compareScientificEvidencePacks(malformed as never, malformed as never)).toBe('BLOCKED');
     expect(getStoredEvidencePackReplayVerdict(malformed as never)).toBe('BLOCKED');
+  });
+
+  it('rejects records with invalid savedAt provenance', async () => {
+    const { listScientificEvidencePacks } = await import('../core/experimentFabric/evidencePackStore');
+    const fake = { setItem: () => {}, getItem: () => JSON.stringify([{ savedAt: 'not-a-date', pack: {} }]), removeItem: () => {}, clear: () => {}, key: () => null, length: 0 };
+    vi.stubGlobal('window', { localStorage: fake });
+    expect(listScientificEvidencePacks()).toEqual([]);
   });
 
   it('rejects packs with blank identity fields', () => {

@@ -35,6 +35,8 @@ import { confirmBackendEvidenceGuidedExperiment } from '../core/experimentFabric
 import { buildStructuredRequestFromModel } from '../core/experimentFabric/structuredRequestBuilder';
 import { track } from '../core/analytics';
 import { saveScientificEvidencePackToMemory } from '../core/scienceMemory';
+import { setPendingScenario } from '../core/scenarioBridge';
+import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
 
 /**
  * PILOT UI — Science Chat → eksperyment → wynik → provenance → Scenario
@@ -284,6 +286,26 @@ export function ExperimentPilotScreen() {
     downloadJson(`${pack.evidencePackId}.ro-crate.json`, serializeEvidencePackRoCrate(pack));
   }
 
+  function handleOpenVisualization() {
+    const run = confirmed?.run;
+    if (!run) return;
+    const route = run.result.route;
+    if (route.kind === 'live-world') {
+      if (!setPendingExperimentWorld(run.runId)) {
+        setError('Wynik ma trasę World, ale live simulation nie jest dostępna w tej sesji. Replay nie został uruchomiony.');
+        return;
+      }
+      window.location.hash = route.hash;
+    } else if (route.kind === 'lab') {
+      setPendingScenario(route.labId, run.provenance.parameterSnapshot, route.experimentId);
+      window.location.hash = `#/lab/${route.labId}`;
+    } else if (route.kind === 'hypothetical-visualization') {
+      window.location.hash = route.hash;
+    } else {
+      setError('Ten wynik nie ma zarejestrowanej trasy wizualizacji.');
+    }
+  }
+
   function handleGenerateCapsule() {
     if (!confirmed) return;
     try {
@@ -486,6 +508,7 @@ export function ExperimentPilotScreen() {
             </>}
           </dl>
           {confirmed.run.provenance.backendExecution && <p className="pilot-disclaimer">Backend provenance pochodzi z kanonicznego Compute API; Pilot nie rekonstruuje formuły, wersji silnika ani klasyfikacji lokalnie.</p>}
+          {confirmed.run.result.route.kind !== 'none' && <button className="chip-btn" onClick={handleOpenVisualization}>Otwórz wynik w wizualizacji</button>}
           <button className="chip-btn pilot-primary" onClick={handleGenerateCapsule}>Wygeneruj Scenario Capsule</button>
         </section>
       )}

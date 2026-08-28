@@ -1460,6 +1460,14 @@ describe('Scenario Capsule replay contract boundary', () => {
     expect(replay.message).toContain('references');
   });
 
+  it('blocks replay when title has an invalid runtime type', () => {
+    const malformed = { contractVersion: '1.0.0', capsuleId: 'broken', title: 42, baselineRun: {}, references: {} };
+    const replay = replayScenarioCapsule(malformed as never);
+    expect(replay.status).toBe('NOT_COMPARABLE');
+    expect(replay.message).toContain('Replay BLOCKED');
+    expect(replay.message).toContain('title');
+  });
+
   it('blocks replay when the baseline fingerprint is missing', () => {
     const baseline = runExperiment(parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'));
     const capsule = createScenarioCapsule({ title: 'Replay boundary', baselineRun: baseline });

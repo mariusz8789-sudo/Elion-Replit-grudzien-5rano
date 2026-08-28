@@ -125,8 +125,8 @@ function replayInputIssues(capsule: ReproducibleScenarioCapsule): string[] {
   if (!capsule.baselineRun || typeof capsule.baselineRun !== 'object') issues.push('baselineRun');
   if (!capsule.references || typeof capsule.references !== 'object') issues.push('references');
   if (capsule.contractVersion !== SCENARIO_CAPSULE_VERSION) issues.push(`contractVersion=${capsule.contractVersion || '(brak)'}`);
-  if (!capsule.capsuleId) issues.push('capsuleId');
-  if (!capsule.title?.trim()) issues.push('title');
+  if (typeof capsule.capsuleId !== 'string' || !capsule.capsuleId) issues.push('capsuleId');
+  if (typeof capsule.title !== 'string' || !capsule.title.trim()) issues.push('title');
   if (!capsule.references?.baselineRunFingerprint) issues.push('references.baselineRunFingerprint');
   if (capsule.variantRun && !capsule.references?.variantRunFingerprint) issues.push('references.variantRunFingerprint');
   return issues;

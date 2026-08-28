@@ -12,16 +12,57 @@ export interface StoredEvidencePack {
   readonly pack: ScientificEvidencePack;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * Każdy run musi nieść to, czego czytelnicy paczki realnie dotykają:
+ * `status` (werdykt snapshotu) i `provenance.runFingerprint` (porównanie
+ * replayu). Rekord bez tych pól przechodził walidację jako VALID i wywracał
+ * porównanie na TypeError.
+ */
+function isPackRun(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return typeof value.status === 'string'
+    && isRecord(value.provenance)
+    && typeof value.provenance.runFingerprint === 'string';
+}
+
+/**
+ * Granica integralności dla paczek z localStorage.
+ *
+ * `typeof null === 'object'`, więc poprzedni warunek `typeof
+ * pack.reproducibility === 'object'` przepuszczał `reproducibility: null` i
+ * oznaczał taki rekord jako VALID — po czym ekran Scientific Memory wywracał
+ * się na odczycie `reproducibility.armsNotExecuted`. `protocol` nie był
+ * sprawdzany wcale, mimo że i ekran, i komparator replayu go czytają.
+ *
+ * VALID ma znaczyć „ten rekord da się bezpiecznie pokazać i porównać", a nie
+ * „ma kilka pól o właściwym typie". Rekord, który nie spełnia własnego
+ * niezmiennika `runCount === runs.length`, też nie jest VALID: paczka kłamiąca
+ * o liczbie własnych przebiegów nie jest dowodem.
+ */
 function isPack(value: unknown): value is ScientificEvidencePack {
-  if (!value || typeof value !== 'object') return false;
-  const pack = value as Partial<ScientificEvidencePack>;
-  return typeof pack.contractVersion === 'string'
-    && typeof pack.evidencePackId === 'string'
-    && typeof pack.evidenceChainId === 'string'
-    && typeof pack.runCount === 'number'
-    && Array.isArray(pack.runs)
-    && typeof pack.reproducibility === 'object'
-    && typeof pack.disclaimer === 'string';
+  if (!isRecord(value)) return false;
+  if (typeof value.contractVersion !== 'string'
+    || typeof value.evidencePackId !== 'string'
+    || typeof value.evidenceChainId !== 'string'
+    || typeof value.disclaimer !== 'string'
+    || typeof value.runCount !== 'number') return false;
+
+  if (!isRecord(value.protocol)
+    || typeof value.protocol.protocolFingerprint !== 'string'
+    || !isRecord(value.protocol.hypothesis)) return false;
+
+  const reproducibility = value.reproducibility;
+  if (!isRecord(reproducibility)
+    || typeof reproducibility.allArmsMatched !== 'boolean'
+    || !Array.isArray(reproducibility.armsWithDrift)
+    || !Array.isArray(reproducibility.armsNotExecuted)) return false;
+
+  if (!Array.isArray(value.runs) || !value.runs.every(isPackRun)) return false;
+  return value.runCount === value.runs.length;
 }
 
 export function saveScientificEvidencePack(pack: ScientificEvidencePack): StoredEvidencePack {

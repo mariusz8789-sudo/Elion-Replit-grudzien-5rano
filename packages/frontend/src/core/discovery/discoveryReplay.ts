@@ -18,11 +18,42 @@ import type {
 
 const COMPARTMENTS = ['susceptible', 'exposed', 'infectious', 'recovered', 'deceased'] as const;
 
-function firstDifferingDay(expected: readonly ScenarioDaySample[], actual: readonly ScenarioDaySample[]): number | null {
+/**
+ * Warstwa szpitalna wchodzi do `resultFingerprint` przebiegu, więc replay musi
+ * ją porównywać tak samo. Bez tego rozjazd wyłącznie szpitalny dawał
+ * WITHIN_TOLERANCE z komunikatem „każda metryka mieści się w tolerancji",
+ * mimo że przebieg realnie się różnił — odcisk był jedyną różnicą, a ta jest
+ * z werdyktu wyłączona. Lista pokrywa dokładnie pola, które odcisk obejmuje.
+ */
+const HOSPITAL_FIELDS = ['occupiedBeds', 'occupiedIcu', 'unmetCare', 'bedOccupancy', 'icuOccupancy', 'status'] as const;
+
+interface DaySampleDifference {
+  day: number;
+  field: string;
+  expected: number | string;
+  actual: number | string;
+}
+
+/**
+ * Pierwsza różnica w przebiegu dnia — z nazwą pola i OBIEMA wartościami.
+ * Sam numer dnia nie mówi, co się rozjechało; „firstDifferingDay (11 → 11)"
+ * było etykietą bez treści.
+ */
+function firstDaySampleDifference(
+  expected: readonly ScenarioDaySample[],
+  actual: readonly ScenarioDaySample[],
+): DaySampleDifference | null {
   const n = Math.min(expected.length, actual.length);
   for (let i = 0; i < n; i++) {
     for (const key of COMPARTMENTS) {
-      if (expected[i][key] !== actual[i][key]) return expected[i].day;
+      if (expected[i][key] !== actual[i][key]) {
+        return { day: expected[i].day, field: key, expected: expected[i][key], actual: actual[i][key] };
+      }
+    }
+    for (const key of HOSPITAL_FIELDS) {
+      if (expected[i].hospital[key] !== actual[i].hospital[key]) {
+        return { day: expected[i].day, field: `hospital.${key}`, expected: expected[i].hospital[key], actual: actual[i].hospital[key] };
+      }
     }
   }
   return null;
@@ -36,8 +67,11 @@ function armDifferences(expected: ScenarioRun, actual: ScenarioRun, tolerance: n
   if (expected.series.length !== actual.series.length) {
     differences.push({ field: 'series.length', expected: expected.series.length, actual: actual.series.length });
   }
-  const day = firstDifferingDay(expected.series, actual.series);
-  if (day !== null) differences.push({ field: 'firstDifferingDay', expected: day, actual: day });
+  const first = firstDaySampleDifference(expected.series, actual.series);
+  if (first !== null) {
+    differences.push({ field: 'firstDifferingDay', expected: first.day, actual: first.day });
+    differences.push({ field: `series.day${first.day}.${first.field}`, expected: first.expected, actual: first.actual });
+  }
 
   const a = expected.summary;
   const b = actual.summary;

@@ -552,7 +552,7 @@ function helpResponse(): ChatResponse {
       'zmienić parametr otwartej symulacji („zwiększ masę 2×", „co jeśli zmniejszymy prędkość?"), porównać dwa modele ' +
       '(„porównaj SIR R0=1.5 z SIR R0=3"), wyjaśnić stan („co się zmieniło?"), pokazać równania i założenia, ' +
       'zbudować zadanie oraz zaproponować kolejny eksperyment („zaproponuj eksperyment"). ' +
-      'Weryfikacja inwariantami i katalog źródeł są w drodze (TODO).',
+      'Weryfikacja inwariantami jest dostępna dla wspieranych snapshotów, a SHOW_SOURCE pokazuje internal model provenance; brak niezależnej referencji pozostaje VERIFY_REQUIRED.',
     tag: 'SYSTEM',
     intent: 'HELP',
   };

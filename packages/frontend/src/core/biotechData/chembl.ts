@@ -1,5 +1,5 @@
 import { canonicalJson, fnv1a } from '../events/hash';
-import type { BiologicalEvidence, BiologicalTarget } from '../biotechDiscoveryContract';
+import { createCandidateDiscoveryReport, rankTherapeuticCandidate, type BiologicalEvidence, type BiologicalTarget, type CandidateDiscoveryReport, type CandidateRanking, type TherapeuticCandidate, type TherapeuticHypothesis } from '../biotechDiscoveryContract';
 import chemblRecord from './chembl-activity-189031.json';
 
 export const CHEMBL_ACTIVITY_189031_SOURCE_URL = 'https://www.ebi.ac.uk/chembl/api/data/activity/189031.json';
@@ -7,6 +7,14 @@ export const CHEMBL_ACTIVITY_189031_RETRIEVED_AT = '2026-08-29';
 export const CHEMBL_ACTIVITY_189031_RELEASE = 'ChEMBL_37';
 
 type PinnedChEMBLRecord = typeof chemblRecord;
+
+export interface ChEMBLCaffeineDiscovery {
+  record: ChEMBLBioactivityRecord;
+  candidate: TherapeuticCandidate;
+  ranking: CandidateRanking;
+  hypothesis: TherapeuticHypothesis;
+  report: CandidateDiscoveryReport;
+}
 
 export interface ChEMBLBioactivityRecord {
   compoundId: string;
@@ -110,4 +118,54 @@ export function mapPinnedChEMBLCaffeineA1Activity(): ChEMBLBioactivityRecord {
     rawResponse: record,
     fingerprint: fnv1a(canonicalJson(scientificRecord)),
   };
+}
+
+/**
+ * Builds a research-priority record, not a therapeutic efficacy claim. The
+ * candidate status is UNKNOWN and the ranking is explicitly PREDICTION.
+ */
+export function buildPinnedChEMBLCaffeineDiscovery(): ChEMBLCaffeineDiscovery {
+  const record = mapPinnedChEMBLCaffeineA1Activity();
+  const candidate: TherapeuticCandidate = {
+    kind: 'therapeutic-candidate',
+    id: `candidate:${record.compoundId}:${record.biologicalTarget.id}`,
+    namespace: 'genesis-biotech',
+    label: 'Caffeine — A1 binding research candidate',
+    status: 'UNKNOWN',
+    materialId: record.compoundId,
+    compoundIds: [record.compoundId],
+    targetIds: [record.biologicalTarget.id],
+    mechanismIds: [],
+    supportingEvidenceIds: [record.biologicalEvidence.id],
+    safetySignalIds: [],
+    hypothesisIds: [`hypothesis:candidate:${record.compoundId}:${record.biologicalTarget.id}`],
+    provenance: [...record.biologicalEvidence.provenance],
+  };
+  const ranking = rankTherapeuticCandidate({
+    candidate,
+    evidenceQuality: 'MODERATE',
+    targetRelevance: 0.5,
+    safetySignals: [],
+    uncertaintyPenalty: 1,
+  });
+  const hypothesisBase: TherapeuticHypothesis = {
+    kind: 'therapeutic-hypothesis',
+    id: `hypothesis:${candidate.id}`,
+    namespace: 'genesis-biotech',
+    label: 'Caffeine–A1 interaction requires independent follow-up',
+    status: 'HYPOTHESIS',
+    claim: 'The pinned ChEMBL binding record supports research follow-up of the caffeine–A1 relationship; it does not establish mechanism, efficacy, therapeutic benefit or safety.',
+    candidateId: candidate.id,
+    targetIds: candidate.targetIds,
+    mechanismIds: [],
+    supportingEvidenceIds: candidate.supportingEvidenceIds,
+    safetySignalIds: [],
+    provenance: [...record.biologicalEvidence.provenance],
+  };
+  const hypothesis: TherapeuticHypothesis = {
+    ...hypothesisBase,
+    provenance: [...hypothesisBase.provenance, { ...record.biologicalEvidence.provenance[0], sourceId: record.biologicalEvidence.id, evidenceType: 'hypothesis derived from curated binding record', status: 'HYPOTHESIS' }],
+  };
+  const report = createCandidateDiscoveryReport({ candidate, hypothesis, uncertainty: ranking.uncertainty, ranking });
+  return { record, candidate, ranking, hypothesis, report };
 }

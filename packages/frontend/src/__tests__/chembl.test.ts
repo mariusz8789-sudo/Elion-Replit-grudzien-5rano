@@ -4,6 +4,7 @@ import {
   CHEMBL_ACTIVITY_189031_RETRIEVED_AT,
   CHEMBL_ACTIVITY_189031_SOURCE_URL,
   mapPinnedChEMBLCaffeineA1Activity,
+  buildPinnedChEMBLCaffeineDiscovery,
 } from '../core/biotechData/chembl';
 
 describe('pinned ChEMBL bioactivity', () => {
@@ -45,6 +46,22 @@ describe('pinned ChEMBL bioactivity', () => {
     expect(first.rawResponse.assay.assayChemblId).toBe('CHEMBL876556');
     expect(first.fingerprint).toMatch(/^[0-9a-f]{8}$/);
     expect(first.fingerprint).toBe(second.fingerprint);
+  });
+
+  it('connects the pinned record to candidate, ranking, hypothesis and report', () => {
+    const discovery = buildPinnedChEMBLCaffeineDiscovery();
+
+    expect(discovery.candidate).toMatchObject({
+      id: 'candidate:pubchem:CID:2519:chembl:target:CHEMBL318',
+      status: 'UNKNOWN',
+      supportingEvidenceIds: ['chembl:activity:189031'],
+      hypothesisIds: ['hypothesis:candidate:pubchem:CID:2519:chembl:target:CHEMBL318'],
+    });
+    expect(discovery.ranking.epistemicStatus).toBe('PREDICTION');
+    expect(discovery.ranking.rationale).toMatch(/not efficacy|probability/i);
+    expect(discovery.hypothesis).toMatchObject({ status: 'HYPOTHESIS', candidateId: discovery.candidate.id, supportingEvidenceIds: ['chembl:activity:189031'] });
+    expect(discovery.report).toMatchObject({ candidateId: discovery.candidate.id, targetIds: ['chembl:target:CHEMBL318'], evidenceIds: ['chembl:activity:189031'], epistemicStatus: 'HYPOTHESIS' });
+    expect(discovery.report.provenance.some((item) => item.sourceId === 'chembl:activity:189031')).toBe(true);
   });
 
   it('does not turn the binding record into efficacy or safety claims', () => {

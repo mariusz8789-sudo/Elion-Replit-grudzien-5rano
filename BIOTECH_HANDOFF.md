@@ -97,9 +97,21 @@ The current scientific protocol contract requires executable model requests, bas
 
 A limited ChEMBL check found additional caffeine/A1 activities with different assay contexts and measures, including duplicate/heterogeneous Ki and IC50 records; one candidate carries a ChEMBL data-validity warning. No second fixture was added because selecting it without a deliberate relation policy would weaken provenance semantics. Source expansion is parked until a clear relation-selection rule and fixture schema exist.
 
-## NEXT GAP — next large logical piece
+## Completed capability: ChEMBL → Candidate Discovery chain
 
-Continue with a strictly read-only biotech report projection or a source-relation policy contract. Do not invent efficacy, safety, baseline, arms or repetition results. Any future additional pinned relation must include complete provenance, assay context, data-validity handling and a replayable fixture.
+The pinned caffeine/A1 ChEMBL record now flows through existing contracts into a `TherapeuticCandidate` with `UNKNOWN` status, an explainable research-priority `CandidateRanking` with `PREDICTION` status, a `TherapeuticHypothesis` with `HYPOTHESIS` status, and a `CandidateDiscoveryReport` carrying target/evidence/provenance identities. The chain explicitly does not create efficacy, safety or mechanism claims. No new contract system was introduced.
+
+Changed files: `packages/frontend/src/core/biotechData/chembl.ts`, `packages/frontend/src/__tests__/chembl.test.ts`.
+
+Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Biotech status: pause for this session
+
+The remaining Biotech items are parked unless a very small, low-cost integration appears. In particular, safety needs a real source and explicit uncertainty, while preregistration needs an executable biological protocol; neither will be invented here. The additional ChEMBL relation search remains parked because available records are heterogeneous/duplicate and one candidate carries a data-validity warning.
+
+## NEXT PRIORITY — main Genesis Core
+
+Stop expanding Biotech in this session. Select the highest-value existing Core integration gap in `Science Chat → Structured Request → Model Selection → Experiment Fabric → Existing Executor → Real Typed Result → Analysis → World/3D → Evidence → Scientific Memory → Replay`. Prefer an existing path where one of these artifacts is produced but not forwarded or rendered. Make one large logical integration piece, then test, typecheck/lint/build, update this handoff, commit and push before continuing to the next Core GAP.
 
 ## Next large gaps
 

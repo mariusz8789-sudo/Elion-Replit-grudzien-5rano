@@ -448,6 +448,17 @@ button:disabled { cursor: default; }
 .reality-compare { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.4rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px; background: rgba(240, 179, 92, 0.04); }
 .reality-compare-row { display: flex; justify-content: space-between; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
 .reality-compare-hint { font-size: 0.66rem; color: var(--text-faint); }
+
+/* Scene capture — kolor niesie status epistemiczny, nie nastrój. Zielony to
+   policzony model, bursztyn to przebieg kontrfaktyczny, fiolet to warstwa
+   artystyczna, czerwony to zapis, któremu odmówiono statusu naukowego. */
+.reality-capture { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid var(--border); }
+.reality-capture label.reality-compare-row { align-items: center; justify-content: flex-start; cursor: pointer; }
+.reality-deriv.status-model, .reality-deriv.replay-match { color: var(--green); border-color: rgba(110, 231, 160, 0.4); }
+.reality-deriv.status-scenario, .reality-deriv.replay-drift { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); }
+.reality-deriv.status-cinematic { color: var(--violet); border-color: rgba(167, 139, 250, 0.45); }
+.reality-deriv.status-blocked, .reality-deriv.status-not_modeled,
+.reality-deriv.replay-blocked, .reality-deriv.replay-not_reproducible { color: var(--red, #ef6f7b); border-color: rgba(239, 111, 123, 0.45); }
 .reality-flight-caption.transit { border-color: #f472b6; color: #f9c8e0; }
 
 /* Machine Pre-Build (Faza 1) — nadbudowa nad reality-panel z osobnymi sekcjami

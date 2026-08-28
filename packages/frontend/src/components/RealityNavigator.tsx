@@ -4,6 +4,16 @@ import { buildOrbitalModelGraph } from '../core/modelGraph/orbitalGraph';
 import { OrbitalRealityScene } from '../core/reality/scenes/orbitalScene';
 import { RealityBranchStore, type RealityBranch } from '../core/reality/branches';
 import { HonestyBadge } from './HonestyBadge';
+import {
+  captureScene,
+  replaySceneCapture,
+  EPISTEMIC_STATUS_LABELS,
+  TIME_SCALES,
+  worldYearsFromDisplay,
+  type SceneCapture,
+  type SceneReplay,
+  type TimeScaleId,
+} from '../core/reality/sceneCapture';
 import type { NodeDerivation, PropagationStep } from '../core/modelGraph/graph';
 
 /**
@@ -32,6 +42,11 @@ const RADIUS_MAX = 5;
 const orbitalGraph = buildOrbitalModelGraph();
 const orbitalScene = new OrbitalRealityScene(orbitalGraph);
 const branchStore = new RealityBranchStore('Znajomy świat', orbitalGraph.getParameterSnapshot());
+
+/** Ile sekund ekranu bierzemy pod uwagę, licząc czas świata w podpisie skali. */
+const DISPLAY_WINDOW_SECONDS = 10;
+
+const TIME_SCALE_ORDER: TimeScaleId[] = ['realtime', 'hour', 'day', 'year', 'century'];
 
 const DERIVATION_LABEL: Record<NodeDerivation, string> = {
   direct: 'wyprowadzenie dokładne',
@@ -63,6 +78,10 @@ export function RealityNavigator() {
   const [branches, setBranches] = useState<RealityBranch[]>(branchStore.listBranches());
   const [activeBranchId, setActiveBranchId] = useState(branchStore.getActive().id);
   const [compareBranchId, setCompareBranchId] = useState<string | null>(null);
+  const [timeScale, setTimeScale] = useState<TimeScaleId>('year');
+  const [thresholdLayer, setThresholdLayer] = useState(false);
+  const [capture, setCapture] = useState<SceneCapture | null>(null);
+  const [replay, setReplay] = useState<SceneReplay | null>(null);
   useRealityPoll();
 
   // Ładowanie silnika 3D jest asynchroniczne (RealityCanvas.tsx). Bez ref-owego
@@ -137,6 +156,33 @@ export function RealityNavigator() {
       fromSceneId: orbitalScene.id,
       toSceneId: orbitalScene.id,
     });
+  }
+
+  /**
+   * Zapis sceny idzie przez ten sam graf, który napędza obraz — captureScene()
+   * przelicza go od nowa z migawki parametrów, więc zapisujemy wynik modelu,
+   * a nie to, co akurat widać na ekranie.
+   */
+  function handleCapture() {
+    const taken = captureScene(
+      {
+        sceneId: orbitalScene.id,
+        parameters: orbitalGraph.getParameterSnapshot(),
+        timeScale,
+        branchCount: compareBranchId ? 2 : 1,
+        visualLayers: thresholdLayer ? ['wormhole-threshold'] : [],
+        claims: [],
+      },
+      orbitalGraph,
+    );
+    setCapture(taken);
+    setReplay(null);
+  }
+
+  /** Odtworzenie liczy model ponownie i porównuje — nie odczytuje zapisanej odpowiedzi. */
+  function handleReplay() {
+    if (!capture) return;
+    setReplay(replaySceneCapture(capture, orbitalGraph));
   }
 
   function handleToggleCompare(id: string) {
@@ -256,6 +302,59 @@ export function RealityNavigator() {
                 </div>
               ))}
               <div className="reality-compare-hint">Druga rzeczywistość jest widoczna w scenie jako półprzezroczysty „duch".</div>
+            </div>
+          )}
+        </div>
+
+        <div className="reality-capture">
+          <div className="section-label">Skala czasu świata</div>
+          <div className="reality-branch-list">
+            {TIME_SCALE_ORDER.map((id) => (
+              <button key={id} className="chip-btn" aria-pressed={id === timeScale} onClick={() => setTimeScale(id)}>
+                {TIME_SCALES[id].label}
+              </button>
+            ))}
+          </div>
+          <div className="reality-compare-hint">
+            {DISPLAY_WINDOW_SECONDS} s na ekranie ={' '}
+            {worldYearsFromDisplay(DISPLAY_WINDOW_SECONDS, timeScale).toExponential(2)} lat czasu świata. Czas świata jest
+            liczony, nie przyspieszany — model nie wie, jak szybko rysuje ekran.
+          </div>
+
+          <label className="reality-compare-row">
+            <input type="checkbox" checked={thresholdLayer} onChange={(e) => setThresholdLayer(e.target.checked)} />
+            <span>Warstwa „próg/most" (bez zatwierdzonego solvera OTW)</span>
+          </label>
+
+          <div className="reality-branch-list">
+            <button className="chip-btn" onClick={handleCapture}>⌾ Zapisz scenę</button>
+            <button className="chip-btn" disabled={!capture} onClick={handleReplay}>↺ Odtwórz zapis</button>
+          </div>
+
+          {capture && (
+            <div className="reality-compare" aria-label="Zapis sceny">
+              <div className="reality-compare-row">
+                <span className="reality-log-node">Status</span>
+                <span className={`reality-deriv status-${capture.status.toLowerCase()}`}>{capture.status}</span>
+              </div>
+              <div className="reality-compare-hint">{EPISTEMIC_STATUS_LABELS[capture.status]} — {capture.statusReason}</div>
+              <div className="reality-compare-row">
+                <span className="reality-log-node">Odcisk sceny</span>
+                <span className="reality-log-val mono">{capture.sceneStateFingerprint}</span>
+              </div>
+              <div className="section-label">Czego ta scena NIE dowodzi</div>
+              {capture.doesNotProve.map((line) => (
+                <div key={line} className="reality-compare-hint">• {line}</div>
+              ))}
+              {replay && (
+                <>
+                  <div className="reality-compare-row">
+                    <span className="reality-log-node">Replay</span>
+                    <span className={`reality-deriv replay-${replay.verdict.toLowerCase()}`}>{replay.verdict}</span>
+                  </div>
+                  <div className="reality-compare-hint">{replay.message}</div>
+                </>
+              )}
             </div>
           )}
         </div>

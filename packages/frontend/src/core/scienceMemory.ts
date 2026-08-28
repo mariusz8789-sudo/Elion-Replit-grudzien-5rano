@@ -116,6 +116,11 @@ function validExecution(value: unknown): value is SavedExperimentExecution | und
   return execution.status !== 'completed' || execution.resultOrigin === 'real-engine';
 }
 
+function validContentHash(o: Record<string, unknown>): boolean {
+  if (typeof o.labId !== 'string' || typeof o.experimentId !== 'string' || typeof o.contentHash !== 'string' || !validParams(o.params)) return false;
+  return contentHash({ labId: o.labId, experimentId: o.experimentId, params: o.params }) === o.contentHash;
+}
+
 function isSavedExperiment(v: unknown): v is SavedExperiment {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;
@@ -125,7 +130,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     typeof o.labId === 'string' &&
     typeof o.experimentId === 'string' &&
     typeof o.experimentName === 'string' &&
-    typeof o.contentHash === 'string' &&
+    validContentHash(o) &&
     validStats(o.stats) &&
     validParams(o.params) &&
     validObservations(o.observations) &&

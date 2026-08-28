@@ -71,6 +71,19 @@ describe('scienceMemory: save / list / get / delete', () => {
     expect(listExperiments().length).toBe(0);
   });
 
+  it('ignores a tampered content hash instead of treating it as reproducible', async () => {
+    const fake = makeFakeStorage();
+    const { contentHash } = await import('../core/scienceMemory');
+    const params = { mass: 1 };
+    fake.setItem('genesis-os:science-memory/v1', JSON.stringify([{
+      id: 'tampered', createdAt: new Date().toISOString(), labId: 'universe', experimentId: 'threebody', experimentName: 'Tampered',
+      params: { mass: 2 }, stats: {}, honesty: 'exact', honestyNote: 'tampered', equations: [], assumptions: [], epistemicStatus: '', contentHash: contentHash({ labId: 'universe', experimentId: 'threebody', params }),
+    }]));
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: fake });
+    expect((await import('../core/scienceMemory')).listExperiments()).toEqual([]);
+  });
+
   it('ignores corrupted rows instead of throwing (defensive read)', async () => {
     const fake = makeFakeStorage();
     fake.setItem('genesis-os:science-memory/v1', JSON.stringify([{ garbage: true }, null, 42]));

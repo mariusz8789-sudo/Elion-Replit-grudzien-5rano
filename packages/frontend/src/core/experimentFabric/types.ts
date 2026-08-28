@@ -24,6 +24,8 @@ export function experimentObservableKind(value: ExperimentOutputValue): Experime
  * Validated data produced from user language. It never contains a computed
  * scientific result; parsing and execution are separate phases.
  */
+export type StructuredRequestExecutionStatus = 'NOT_EXECUTED' | 'BLOCKED';
+
 export interface StructuredExperimentRequest {
   contractVersion: string;
   /** Original human command is retained for audit, not evaluated as code. */
@@ -36,6 +38,8 @@ export interface StructuredExperimentRequest {
   parameters: Record<string, ExperimentValue>;
   requestedVisualization?: KnowledgeVisualization;
   seed?: number;
+  /** Explicit status for structured domains without an available executor. */
+  executionStatus?: StructuredRequestExecutionStatus;
 }
 
 /** The parser's explicit decision before planning or executing anything. */

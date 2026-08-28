@@ -1119,6 +1119,14 @@ describe('Genesis Experiment Fabric', () => {
     expect(run.provenance.engine).toBe('genesis-engineering-graph@1.0.0');
   });
 
+  it('parses natural-product discovery as biotechnology without execution', () => {
+    const request = parseScienceChatMessage('Znajdź naturalnych kandydatów dla targetu X.');
+    expect(request.domainId).toBe('biotechnology');
+    expect(request.modelId).toBeUndefined();
+    expect(request.parameters).toEqual({ targetQuery: 'X.' });
+    expect(request.executionStatus).toBe('NOT_EXECUTED');
+  });
+
   it('plans molecular weight for canonical backend Fabric without claiming a structural chemistry parser', () => {
     const request = parseScienceChatMessage('Oblicz masę molową wzór H2O.');
     const reviewed = planEvidenceGuidedExperiment(request);

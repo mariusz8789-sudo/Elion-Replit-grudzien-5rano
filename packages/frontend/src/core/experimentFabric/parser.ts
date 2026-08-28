@@ -163,6 +163,17 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     ...base, domainId, modelId, requestedVisualization, parameters: only(params, allowed),
   });
 
+  const biotechTarget = sourceText.match(/(?:dla|dla\s+określonego|dla\s+okreslonego)\s+(?:targetu|celu(?:\s+biologicznego)?)\s+(.+)$/i)?.[1]?.trim();
+  if (/(?:naturaln(?:y|ych|ego)|roślin(?:y|nych)|roslin(?:y|nych)|związk(?:i|ów)|zwiazk(?:i|ow)|kandydat(?:a|ów|y)?)\b/.test(normalized) && /\b(?:target(?:u|y)?|cel(?:u|em)? biologiczn(?:y|ego|ym)?|mechanizm(?:u|em)?)\b/.test(normalized)) {
+    return {
+      ...base,
+      domainId: 'biotechnology',
+      operation: 'compute',
+      parameters: { targetQuery: biotechTarget || sourceText },
+      executionStatus: 'NOT_EXECUTED',
+    };
+  }
+
   if (/(?:eksperyment\s+filadelf(?:ia|ijski)|philadelphia\s+experiment|uss\s+eldridge|\beldridge\b|legend[a-ząćęłńóśźż]*\s+filadelf[a-ząćęłńóśźż]*)/.test(normalized)) {
     params.viewMode = /(?:zgodne\s+ze\s+(?:znan[a-ząćęłńóśźż]*\s+)?fizyk[a-ząćęłńóśźż]*|porównaj\s+legend[a-ząćęłńóśźż]*\s+z\s+fizyk[a-ząćęłńóśźż]*|porownaj\s+legend[a-ząćęłńóśźż]*\s+z\s+fizyk[a-ząćęłńóśźż]*|czego\s+potrzeba)/.test(normalized) ? 'physics' : 'legend';
     return request('historical-legends', 'historical-philadelphia-legend', 'scene-3d', ['viewMode']);

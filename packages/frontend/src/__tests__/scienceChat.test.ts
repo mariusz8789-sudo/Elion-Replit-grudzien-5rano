@@ -425,6 +425,13 @@ describe('scienceChat: parameter contract validation', () => {
 describe('scienceChat: snapshot declaration integrity', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 
+  it('blocks malformed parameter definitions before validating values', () => {
+    const badSlider = { ...massDef, step: 0 };
+    const badSelect = { key: 'mode', label: 'Tryb', type: 'select' as const, default: 'unknown', options: [{ value: 'safe', label: 'Bezpieczny' }, { value: 'safe', label: 'Duplikat' }] };
+    expect(resolveCommand('zweryfikuj', ctx({ paramDefs: [badSlider] })).text).toContain('VERIFY BLOCKED');
+    expect(resolveCommand('zweryfikuj', ctx({ paramDefs: [badSelect], params: { mode: 'safe' } })).text).toContain('VERIFY BLOCKED');
+  });
+
   it('blocks toggle and select values that violate their declared contracts', () => {
     const toggle = { key: 'enabled', label: 'Włączone', type: 'toggle' as const, default: false };
     const select = { key: 'mode', label: 'Tryb', type: 'select' as const, default: 'safe', options: [{ value: 'safe', label: 'Bezpieczny' }] };

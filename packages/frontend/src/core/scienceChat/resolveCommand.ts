@@ -156,10 +156,22 @@ function verifySnapshot(ctx: ChatSimSnapshot): { status: 'PASS' | 'BLOCKED'; tex
       if (typeof def.default !== 'number' || !Number.isFinite(def.default)) issues.push(`${def.label}: domyślna wartość nie jest skończoną liczbą`);
       if (def.min !== undefined && !Number.isFinite(def.min)) issues.push(`${def.label}: minimum nie jest skończoną liczbą`);
       if (def.max !== undefined && !Number.isFinite(def.max)) issues.push(`${def.label}: maksimum nie jest skończoną liczbą`);
+      if (def.step !== undefined && (!Number.isFinite(def.step) || def.step <= 0)) issues.push(`${def.label}: krok musi być dodatnią skończoną liczbą`);
       if (typeof def.min === 'number' && typeof def.max === 'number' && def.min > def.max) issues.push(`${def.label}: minimum przekracza maksimum`);
       if (typeof def.default === 'number' && typeof def.min === 'number' && def.default < def.min) issues.push(`${def.label}: default poniżej minimum`);
       if (typeof def.default === 'number' && typeof def.max === 'number' && def.default > def.max) issues.push(`${def.label}: default powyżej maksimum`);
     }
+    if (def.type === 'select') {
+      const options = def.options ?? [];
+      const optionValues = options.map((option) => option.value);
+      if (options.length === 0 || optionValues.some((value) => !value) || new Set(optionValues).size !== optionValues.length) {
+        issues.push(`${def.label}: lista opcji jest pusta lub zawiera duplikaty/puste wartości`);
+      }
+      if (typeof def.default !== 'string' || !optionValues.includes(def.default)) {
+        issues.push(`${def.label}: default nie należy do zadeklarowanych opcji`);
+      }
+    }
+    if (def.type === 'toggle' && typeof def.default !== 'boolean') issues.push(`${def.label}: default toggle musi być logiczny`);
     const value = ctx.params[def.key];
     if (value === undefined) {
       issues.push(`${def.label}: brak wartości`);

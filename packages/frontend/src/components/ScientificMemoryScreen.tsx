@@ -70,12 +70,22 @@ export function ScientificMemoryScreen() {
               <p className="settings-hint">{formatDate(record.createdAt)} · {record.labId}/{record.experimentId}</p>
               <div className="stat-list">
                 <div className="stat-row"><span>Status epistemiczny</span><span className="val">{record.epistemicStatus || 'NOT_SPECIFIED'}</span></div>
+                {record.execution && <>
+                  <div className="stat-row"><span>Status runu</span><span className="val">{record.execution.status}</span></div>
+                  <div className="stat-row"><span>Origin</span><span className="val">{record.execution.resultOrigin}</span></div>
+                  <div className="stat-row"><span>Run / provenance</span><span className="val mono">{record.execution.runId} · {record.execution.runFingerprint}</span></div>
+                </>}
+                {record.biotech && <>
+                  <div className="stat-row"><span>Biotech target</span><span className="val">{record.biotech.candidateId}</span></div>
+                  <div className="stat-row"><span>Evidence IDs</span><span className="val mono">{record.biotech.evidenceIds.join(', ') || 'brak'}</span></div>
+                </>}
                 <div className="stat-row"><span>Honesty</span><span className="val">{record.honesty}</span></div>
                 <div className="stat-row"><span>Fingerprint treści</span><span className="val mono">#{record.contentHash}</span></div>
                 <div className="stat-row"><span>Parametry</span><span className="val">{Object.keys(record.params).length}</span></div>
                 {record.evidencePackId && <div className="stat-row"><span>Evidence Pack</span><span className="val mono">{record.evidencePackId}</span></div>}
               </div>
               <p className="settings-hint">{record.honestyNote}</p>
+              {record.execution?.summary && <p className="settings-hint">{record.execution.summary}</p>}
               {record.observations && (
                 <details className="settings-details">
                   <summary>Obserwacje ({Math.max(0, ...Object.values(record.observations).map((value) => Array.isArray(value) ? value.length : 1))} próbek, {Object.keys(record.observations).length} serii)</summary>

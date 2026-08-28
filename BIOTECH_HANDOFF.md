@@ -14,7 +14,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `092c6aa` — `feat(biotech): pin ChEMBL caffeine bioactivity`
 - `a1050ca` — `feat(biotech): expose ChEMBL evidence in fabric`
 - `076cb87` — `feat(memory): persist experiment fabric runs`
-- next checkpoint in this session — expose the source-bound result directly in Science Chat UI
+- `a3f0d79` — `feat(science-chat): surface biotech evidence`
+- next checkpoint in this session — show saved run identity in Scientific Memory UI
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -62,9 +63,17 @@ Changed file: `packages/frontend/src/components/ScienceChat.tsx`. Added coverage
 
 Chromium manual check completed on the local frontend: the query `Znajdź naturalnych kandydatów dla targetu A1: kofeina.` displayed `Status: knowledge_only; origin: knowledge-only`, `Adenosine receptor A1`, `chembl:activity:189031`, `LITERATURE_SUPPORTED` and a run provenance fingerprint.
 
+## Completed capability: Scientific Memory UI for Fabric and biotech runs
+
+The existing Scientific Memory screen now renders saved Fabric execution metadata when present: epistemic status, run status, result origin, run ID, run fingerprint, summary, and for biotech records the target candidate ID and evidence IDs. This is a read-only projection of the existing `SavedExperiment` record; it does not create a second memory system, infer efficacy/safety, or turn `knowledge_only` into biological execution.
+
+Changed file: `packages/frontend/src/components/ScientificMemoryScreen.tsx`.
+
+Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT GAP — next large logical piece
 
-Connect the saved Experiment Fabric run to the existing Scientific Memory screen/list so users can inspect the persisted result identity and status from the current UI, without inventing new physics or a second memory system. Prefer the smallest existing memory-screen integration point and add a targeted test. Preserve status distinctions and do not claim a result before execution. If UI integration is not semantically safe, park it and implement a minimal protocol/pre-registration contract gap instead.
+Connect the saved Experiment Fabric run to the current Science Chat “Pokaż zapisane” action so users can reach the enriched Scientific Memory view from the same conversation boundary, or park this if routing is already sufficient and move to the smallest safe preregistration/protocol contract gap. Preserve status distinctions and do not claim a result before execution.
 
 ## Next large gaps
 

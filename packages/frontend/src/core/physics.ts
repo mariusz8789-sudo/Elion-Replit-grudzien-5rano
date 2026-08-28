@@ -43,6 +43,83 @@ export function schwarzschildRadius(massKg: number): number {
 }
 
 /**
+ * INTERFERENCJA DWUSZCZELINOWA — |ψ|² na ekranie detekcyjnym.
+ *
+ * Ta funkcja jest WYODRĘBNIONA bez zmiany fizyki z prywatnej metody
+ * `DoubleSlitSim.prob()` w labs/quantum.ts. Równanie, stałe, jednostki i
+ * interpretacja są dokładnie te same — zmienił się wyłącznie adres: model
+ * przestał być własnością renderera i stał się częścią Scientific Core, więc
+ * da się go testować, odcisnąć i odtworzyć niezależnie od rysowania.
+ *
+ * Fizyka: obwiednia pojedynczej szczeliny sinc²(k·a·u) modulowana czynnikiem
+ * interferencyjnym cos²(k·d·u) — standardowe wzory optyki falowej, które dla
+ * pojedynczych cząstek daje mechanika kwantowa. Detektor drogi przy szczelinach
+ * usuwa człon interferencyjny: rozkład staje się sumą dwóch przesuniętych
+ * obwiedni, czyli tym, czego oczekujemy, gdy informacja o drodze istnieje.
+ *
+ * Jednostki są UMOWNE (jednostki wizualne Quantum Lab), a wynik jest
+ * względną gęstością prawdopodobieństwa nieunormowaną do 1 po całce — jest
+ * skalowana tak, by mieściła się w [0, 1] i mogła służyć jako
+ * prawdopodobieństwo akceptacji w losowaniu odrzucającym. To nie jest pomiar
+ * ani przewidywanie dla konkretnego układu laboratoryjnego.
+ */
+export interface DoubleSlitConfig {
+  /** Długość fali w jednostkach wizualnych (Quantum Lab: 400–700). */
+  wavelength: number;
+  /** Rozstaw szczelin w jednostkach wizualnych (Quantum Lab: 4–20). */
+  slitDistance: number;
+  /** Czy przy szczelinach stoi detektor drogi (pomiar which-way). */
+  measured: boolean;
+}
+
+/** Szerokość szczeliny w jednostkach wizualnych — stała modelu. */
+export const DOUBLE_SLIT_WIDTH = 0.35;
+/** Skala liczby falowej: k = DOUBLE_SLIT_WAVENUMBER_SCALE / λ. */
+export const DOUBLE_SLIT_WAVENUMBER_SCALE = 5200;
+/** Przesunięcie obu obwiedni przy zmierzonej drodze: off = d · ta stała. */
+export const DOUBLE_SLIT_MEASURED_OFFSET_SCALE = 0.02;
+/** Skala fazy interferencyjnej: φ = k · d · ta stała · u. */
+export const DOUBLE_SLIT_PHASE_SCALE = 0.06;
+
+/**
+ * |ψ|²(u) dla pozycji na ekranie u ∈ (−1, 1).
+ *
+ * Czysta i deterministyczna: bez DOM, bez Three.js, bez Date.now(), bez
+ * losowości i bez stanu globalnego. Losowanie trafień (rejection sampling)
+ * pozostaje w rendererze — to sampler, nie model.
+ */
+export function doubleSlitProbabilityDensity(u: number, config: DoubleSlitConfig): number {
+  const k = DOUBLE_SLIT_WAVENUMBER_SCALE / config.wavelength;
+  const envelope = (offset: number) => {
+    const b = k * DOUBLE_SLIT_WIDTH * (u - offset);
+    const s = b === 0 ? 1 : Math.sin(b) / b;
+    return s * s;
+  };
+  if (config.measured) {
+    const offset = config.slitDistance * DOUBLE_SLIT_MEASURED_OFFSET_SCALE;
+    return 0.5 * envelope(-offset) + 0.5 * envelope(offset);
+  }
+  const phase = k * config.slitDistance * DOUBLE_SLIT_PHASE_SCALE * u;
+  return envelope(0) * Math.cos(phase) ** 2;
+}
+
+/**
+ * Profil |ψ|² na równomiernej siatce u ∈ [−1, 1] — ta sama funkcja policzona
+ * w `samples` punktach. Nie wnosi nowej fizyki; daje deterministyczny,
+ * odciskalny wynik modelu, którego pojedyncze wywołanie punktowe nie daje.
+ */
+export function doubleSlitProfile(config: DoubleSlitConfig, samples: number): number[] {
+  if (!Number.isInteger(samples) || samples < 2) {
+    throw new Error('doubleSlitProfile: samples musi być liczbą całkowitą ≥ 2');
+  }
+  const out: number[] = new Array(samples);
+  for (let i = 0; i < samples; i++) {
+    out[i] = doubleSlitProbabilityDensity((i / (samples - 1)) * 2 - 1, config);
+  }
+  return out;
+}
+
+/**
  * Korelacja spinowa singletu: E(a,b) = −cos(a−b) — dokładny wynik MK
  * dla pomiarów spinu pod kątami a, b (radiany).
  */

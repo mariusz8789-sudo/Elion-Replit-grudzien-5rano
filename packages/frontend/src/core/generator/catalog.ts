@@ -32,7 +32,8 @@ export function registerCatalog(): void {
     experimentId: 'starlife',
     honesty: 'simplified',
     summary: 'Ścieżka gwiazdy na diagramie H-R zależnie od masy początkowej — od ciągu głównego do stanu końcowego.',
-    assumptions: ['Skalowania z modeli ewolucji gwiazd, nie pełna symulacja wnętrza'],
+    equations: ['L/L☉ = (M/M☉)^3.5', 't_MS ≈ 10·(M/M☉)^−2.5 Gyr'],
+    assumptions: ['Skalowania z modeli ewolucji gwiazd, nie pełna symulacja wnętrza', 'Los końcowy jest przypisany progami około 8 i 22 M☉ w tym modelu edukacyjnym'],
   });
   registerRecipe({
     id: 'universe-expansion',

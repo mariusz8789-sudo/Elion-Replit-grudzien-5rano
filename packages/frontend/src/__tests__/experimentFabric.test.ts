@@ -1463,6 +1463,15 @@ describe('Evidence Pack persisted contract boundary', () => {
     expect(getStoredEvidencePackReplayVerdict(malformed as never)).toBe('BLOCKED');
   });
 
+  it('rejects packs with blank identity fields', () => {
+    const base = { contractVersion: '1.0.0', evidencePackId: 'pack', evidenceChainId: 'chain', runCount: 1,
+      runs: [{ runId: 'run', status: 'completed', provenance: { runFingerprint: 'run-fp' } }], protocol: { protocolFingerprint: 'protocol-fp' },
+      reproducibility: { allArmsMatched: true, armsWithDrift: [], armsNotExecuted: [] }, disclaimer: 'x' };
+    expect(classifyStoredEvidencePack({ ...base, evidencePackId: ' ' })).toBe('INVALID_LOCAL_RECORD');
+    expect(classifyStoredEvidencePack({ ...base, evidenceChainId: '' })).toBe('INVALID_LOCAL_RECORD');
+    expect(classifyStoredEvidencePack({ ...base, protocol: { protocolFingerprint: '' } })).toBe('INVALID_LOCAL_RECORD');
+  });
+
   it('rejects packs without a protocol fingerprint', () => {
     expect(classifyStoredEvidencePack({
       contractVersion: '1.0.0', evidencePackId: 'pack', evidenceChainId: 'chain', runCount: 0,

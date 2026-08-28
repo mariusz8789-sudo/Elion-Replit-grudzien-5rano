@@ -20,9 +20,9 @@ function isPack(value: unknown): value is ScientificEvidencePack {
   const runCount = pack.runCount;
   const protocol = pack.protocol as Partial<ScientificEvidencePack['protocol']> | undefined;
   return typeof pack.contractVersion === 'string'
-    && typeof pack.evidencePackId === 'string'
-    && typeof pack.evidenceChainId === 'string'
-    && typeof protocol?.protocolFingerprint === 'string'
+    && typeof pack.evidencePackId === 'string' && pack.evidencePackId.trim().length > 0
+    && typeof pack.evidenceChainId === 'string' && pack.evidenceChainId.trim().length > 0
+    && typeof protocol?.protocolFingerprint === 'string' && protocol.protocolFingerprint.trim().length > 0
     && Number.isInteger(runCount)
     && typeof runCount === 'number' && runCount > 0
     && Array.isArray(runs)

@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { PLACE_EPOCHS, type PlaceEpoch } from '../data/placeTimeline';
 import { placeProgress, renderPlaceScene } from './placeTimelineScenes';
+import {
+  advancePlaceScene,
+  createPlaceSceneState,
+  resetPlaceScene,
+  seekPlaceScene,
+  setPlacePlayback,
+  setPlaceTimeScale,
+  type PlaceSceneState,
+} from '../core/reality/placeTimeState';
 import { CONFIRMATION_LABELS } from '../core/citation';
 import { HonestyBadge } from './HonestyBadge';
 import { NarratorPanel } from './NarratorPanel';
@@ -23,36 +32,23 @@ function yearForIndex(index: number): number {
 
 export function PlaceTimeline() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [year, setYear] = useState(MIN_YEAR);
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(10);
+  const [sceneState, setSceneState] = useState<PlaceSceneState>(() => createPlaceSceneState());
   const [displayEpoch, setDisplayEpoch] = useState<PlaceEpoch>(PLACE_EPOCHS[0]);
-  const yearRef = useRef(year);
-  const playingRef = useRef(playing);
-  const speedRef = useRef(speed);
+  const sceneStateRef = useRef(sceneState);
   const displayEpochIdRef = useRef(displayEpoch.id);
-  yearRef.current = year;
-  playingRef.current = playing;
-  speedRef.current = speed;
+  sceneStateRef.current = sceneState;
 
   useEffect(() => {
-    track('experiment_open', { lab: 'place-timeline', experiment: '__base' });
+    track('experiment_open', { lab: 'place-timeline', experiment: 'observer-at-the-junction' });
   }, []);
 
   useEffect(() => {
-    if (!playing) return;
+    if (sceneState.playback === 'paused') return;
     const id = window.setInterval(() => {
-      setYear((current) => {
-        const direction = speedRef.current < 0 ? -1 : 1;
-        const magnitude = Math.abs(speedRef.current);
-        const step = direction * Math.max(1, magnitude * (current < 10_000 ? 1 : current / 10_000));
-        const next = Math.max(MIN_YEAR, Math.min(MAX_YEAR, current + step));
-        if (next === MIN_YEAR || next === MAX_YEAR) setPlaying(false);
-        return next;
-      });
+      setSceneState((state) => advancePlaceScene(state, 32));
     }, 32);
     return () => window.clearInterval(id);
-  }, [playing]);
+  }, [sceneState.playback]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -82,10 +78,10 @@ export function PlaceTimeline() {
       const h = rect.height;
       ctx.fillStyle = '#050817';
       ctx.fillRect(0, 0, w, h);
-      const progress = placeProgress(yearRef.current, PLACE_EPOCHS);
-      renderPlaceScene(ctx, w, h, clock, progress);
+      const currentYear = sceneStateRef.current.displayTimeYears;
+      renderPlaceScene(ctx, w, h, clock, placeProgress(currentYear, PLACE_EPOCHS));
       const nearest = PLACE_EPOCHS.reduce((best, epoch) =>
-        Math.abs(epoch.year - yearRef.current) < Math.abs(best.year - yearRef.current) ? epoch : best,
+        Math.abs(epoch.year - currentYear) < Math.abs(best.year - currentYear) ? epoch : best,
       PLACE_EPOCHS[0]);
       if (nearest.id !== displayEpochIdRef.current) {
         displayEpochIdRef.current = nearest.id;
@@ -100,6 +96,14 @@ export function PlaceTimeline() {
     };
   }, []);
 
+  const setPlayback = (playback: PlaceSceneState['playback']) => {
+    setSceneState((state) => setPlacePlayback(state, playback));
+  };
+
+  const setSpeed = (timeScaleYearsPerSecond: number) => {
+    setSceneState((state) => setPlacePlayback(setPlaceTimeScale(state, timeScaleYearsPerSecond), 'playing'));
+  };
+
   return (
     <main className="timeline-view place-timeline-view" id="main-content" tabIndex={-1}>
       <div className="hero-canvas-wrap timeline-canvas-wrap">
@@ -111,25 +115,27 @@ export function PlaceTimeline() {
         </div>
         <div className="timeline-readout">
           <div className="obj" style={{ color: displayEpoch.color }}>CZAS SCENY</div>
-          <div className="val">{formatYear(year)}</div>
+          <div className="val">{formatYear(sceneState.displayTimeYears)}</div>
+          <div className="timeline-time-meta">{sceneState.playback === 'playing' ? 'PLAY' : 'PAUSE'} · {Math.abs(sceneState.timeScaleYearsPerSecond)} lat/s</div>
         </div>
       </div>
       <div className="timeline-controls">
         <div className="timeline-transport" role="group" aria-label="Sterowanie sceną czasu">
           {SPEED_PRESETS.map((preset) => (
-            <button key={preset} className="chip-btn" aria-pressed={playing && speed === preset} onClick={() => { setSpeed(preset); setPlaying(true); }}>
+            <button key={preset} className="chip-btn" aria-pressed={sceneState.playback === 'playing' && sceneState.timeScaleYearsPerSecond === preset} onClick={() => setSpeed(preset)}>
               {preset < 0 ? '◀' : '▶'} {Math.abs(preset)}×
             </button>
           ))}
-          <button className="chip-btn" aria-pressed={!playing} onClick={() => setPlaying(false)}>❚❚ Pauza</button>
+          <button className="chip-btn" aria-pressed={sceneState.playback === 'paused'} onClick={() => setPlayback('paused')}>❚❚ Pauza</button>
+          <button className="chip-btn" onClick={() => setSceneState((state) => resetPlaceScene(state))}>↺ Reset</button>
         </div>
         <div className="timeline-scrubber">
           <label htmlFor="place-time-slider">Oś czasu jednego miejsca: od punktu startowego do miliona lat</label>
-          <input id="place-time-slider" type="range" min={MIN_YEAR} max={MAX_YEAR} step={1} value={year} onChange={(event) => { setPlaying(false); setYear(Number(event.target.value)); }} />
+          <input id="place-time-slider" type="range" min={MIN_YEAR} max={MAX_YEAR} step={1} value={sceneState.displayTimeYears} onChange={(event) => setSceneState((state) => seekPlaceScene(state, Number(event.target.value)))} />
         </div>
         <div className="timeline-epochs" role="group" aria-label="Skocz do epoki miejsca">
           {PLACE_EPOCHS.map((epoch, index) => (
-            <button key={epoch.id} className="timeline-epoch-chip" style={{ ['--accent' as string]: epoch.color }} aria-pressed={displayEpoch.id === epoch.id} onClick={() => { setPlaying(false); setYear(yearForIndex(index)); }}>
+            <button key={epoch.id} className="timeline-epoch-chip" style={{ ['--accent' as string]: epoch.color }} aria-pressed={displayEpoch.id === epoch.id} onClick={() => setSceneState((state) => seekPlaceScene(state, yearForIndex(index)))}>
               {epoch.name}
             </button>
           ))}
@@ -141,7 +147,7 @@ export function PlaceTimeline() {
           <span className="honesty-note">SCENARIO/CINEMATIC — ta scena nie jest cyfrowym bliźniakiem konkretnego miejsca ani prognozą.</span>
         </div>
         <HonestyBadge level="cinematic" note="Kamera i proceduralne przemiany służą doświadczeniu narracyjnemu. Nie są pomiarem historii ani dowodem fizycznego multiwersum." />
-        <NarratorPanel blocks={[{ title: displayEpoch.name, body: displayEpoch.summary }]} askContext={{ labId: 'place-timeline', lab: 'Observer at the Junction', experiment: displayEpoch.name, honesty: 'SCENARIO/CINEMATIC', honestyNote: displayEpoch.teaser, params: { year }, stats: {}, narration: [{ title: displayEpoch.name, body: displayEpoch.summary }] }} />
+        <NarratorPanel blocks={[{ title: displayEpoch.name, body: displayEpoch.summary }]} askContext={{ labId: 'place-timeline', lab: 'Observer at the Junction', experiment: displayEpoch.name, honesty: 'SCENARIO/CINEMATIC', honestyNote: displayEpoch.teaser, params: { year: sceneState.displayTimeYears, timeScaleYearsPerSecond: sceneState.timeScaleYearsPerSecond }, stats: {}, narration: [{ title: displayEpoch.name, body: displayEpoch.summary }] }} />
       </div>
     </main>
   );

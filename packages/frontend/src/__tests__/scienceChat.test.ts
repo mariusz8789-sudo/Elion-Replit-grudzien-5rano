@@ -387,3 +387,15 @@ describe('scienceChat: qualitative task fallback', () => {
     expect(r.text).toContain('NOT_MODELED');
   });
 });
+
+
+describe('scienceChat: next experiment without numeric parameter', () => {
+  it('proposes a bounded observation instead of an unrelated simulation', () => {
+    const r = resolveCommand('zaproponuj kolejny eksperyment', ctx({ paramDefs: [], stats: { state: 1 } }));
+    expect(r.intent).toBe('PROPOSE_EXPERIMENT');
+    expect(r.tag).toBe('HIPOTEZA');
+    expect(r.text).toContain('obserwację bazową');
+    expect(r.text).toContain('NOT_MODELED');
+    expect(r.text).not.toContain('problem trzech ciał');
+  });
+});

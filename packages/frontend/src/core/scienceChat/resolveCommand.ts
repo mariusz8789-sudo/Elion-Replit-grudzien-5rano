@@ -487,9 +487,13 @@ function proposeExperiment(ctx: ChatSimSnapshot | null): ChatResponse {
       tag: 'HIPOTEZA', intent: 'PROPOSE_EXPERIMENT',
     };
   }
+  const stat = Object.keys(ctx.stats)[0];
   return {
-    text: `„${ctx.experimentName}" nie ma regulowanego parametru liczbowego. Kolejnym krokiem może być otwarcie powiązanego zjawiska — np. „pokaż problem trzech ciał".`,
-    tag: 'SYSTEM', intent: 'PROPOSE_EXPERIMENT',
+    text:
+      `Kolejny krok dla „${ctx.experimentName}": wykonaj obserwację bazową bez zmiany parametrów. ` +
+      (stat ? `Zapisz odczyt „${stat}" w dwóch chwilach i opisz różnicę. ` : 'Zapisz stan sceny w dwóch chwilach i opisz różnicę. ') +
+      'Oddziel obserwację od interpretacji modelu; automatyczny test hipotezy pozostaje NOT_MODELED.',
+    tag: 'HIPOTEZA', intent: 'PROPOSE_EXPERIMENT',
   };
 }
 

@@ -182,6 +182,15 @@ describe('scienceChat: wyjaśnienia, równania, założenia, zadania', () => {
     expect(r.text).toMatch(/nie są dowodem fizycznego multiwersum/i);
   });
 
+  it('most Asgard i wormhole kierują do tego samego scenariusza, nie do fikcyjnego solvera', () => {
+    for (const prompt of ['pokaż most Asgard', 'uruchom wormhole']) {
+      const r = resolveCommand(prompt, null);
+      expect(r.action).toEqual({ type: 'openRoute', hash: '#/reality' });
+      expect(r.text).toMatch(/scenariuszowego „mostu”/i);
+      expect(r.text).toMatch(/nie są dowodem fizycznego multiwersum/i);
+    }
+  });
+
   it('tesserakt 4D ujawnia rzut matematyczny i nie udaje fizycznego wymiaru', () => {
     const ctxSnapshot = ctx({ labId: 'multiverse', experimentId: 'tesseract', experimentName: 'Tesserakt 4D' });
     const equationResponse = resolveCommand('pokaż równanie', ctxSnapshot);

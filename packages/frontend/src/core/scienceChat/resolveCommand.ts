@@ -268,9 +268,9 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
 
   // --- Observer at the Junction — handoff do istniejącego Reality Navigatora.
   //     To interaktywny model/scenario, nie dowód fizycznego multiwersum.
-  if (has(norm, 'observer at the junction', 'obserwator na skrzyzowaniu', 'rownolegla rzeczywistosc', 'równoległa rzeczywistość', 'alternatywna rzeczywistosc', 'alternatywna rzeczywistość')) {
+  if (has(norm, 'observer at the junction', 'obserwator na skrzyzowaniu', 'rownolegla rzeczywistosc', 'równoległa rzeczywistość', 'alternatywna rzeczywistosc', 'alternatywna rzeczywistość', 'most asgard', 'most einsteina rosena', 'most einsteina-rosena', 'wormhole', 'tunel czasoprzestrzenny', 'portal do innego swiata', 'portal do innego świata', 'wieloswiat', 'wieloświat')) {
     return {
-      text: 'Otwieram „Observer at the Junction” w istniejącym Reality Navigatorze: interaktywny model wariantów i przejść między scenariuszami. Rozgałęzienia są oznaczone jako MODEL/SCENARIO — nie są dowodem fizycznego multiwersum ani podróży przez wormhole.',
+      text: 'Otwieram „Observer at the Junction” w istniejącym Reality Navigatorze: interaktywny model wariantów i przejść między scenariuszami, w tym scenariuszowego „mostu” między światami. Rozgałęzienia są oznaczone jako MODEL/SCENARIO — nie są dowodem fizycznego multiwersum ani podróży przez wormhole.',
       tag: 'MODEL',
       intent: 'OPEN_SIMULATION',
       action: { type: 'openRoute', hash: '#/reality' },

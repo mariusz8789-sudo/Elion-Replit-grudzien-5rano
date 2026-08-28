@@ -19,6 +19,23 @@ import type { ExperimentOutputValue } from './experimentFabric/types';
  * Dane są lokalne dla przeglądarki użytkownika — brak współdzielenia między
  * użytkownikami (sekcja O: separacja danych).
  */
+export interface SavedExperimentExecution {
+  status: string;
+  runId: string;
+  runFingerprint: string;
+  resultOrigin: string;
+  summary: string;
+  modelId?: string;
+  engine?: string;
+  modelVersion?: string;
+}
+
+export interface SavedExperimentReplayIdentity {
+  capsuleId: string;
+  planId: string;
+  confirmationId: string;
+}
+
 export interface SavedExperiment {
   id: string;
   createdAt: string;
@@ -29,6 +46,8 @@ export interface SavedExperiment {
   stats: Record<string, number>;
   /** Optional canonical Fabric observations; legacy memory rows may omit this. */
   observations?: Readonly<Record<string, ExperimentOutputValue>>;
+  execution?: SavedExperimentExecution;
+  replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
   equations: string[];
@@ -90,7 +109,9 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     typeof o.contentHash === 'string' &&
     validStats(o.stats) &&
     validParams(o.params) &&
-    validObservations(o.observations)
+    validObservations(o.observations) &&
+    (o.execution === undefined || (typeof o.execution === 'object' && typeof (o.execution as SavedExperimentExecution).status === 'string' && typeof (o.execution as SavedExperimentExecution).runId === 'string' && typeof (o.execution as SavedExperimentExecution).runFingerprint === 'string' && typeof (o.execution as SavedExperimentExecution).resultOrigin === 'string' && typeof (o.execution as SavedExperimentExecution).summary === 'string')) &&
+    (o.replayIdentity === undefined || (typeof o.replayIdentity === 'object' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).capsuleId === 'string' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).planId === 'string' && typeof (o.replayIdentity as SavedExperimentReplayIdentity).confirmationId === 'string'))
   );
 }
 
@@ -111,6 +132,8 @@ export interface SaveExperimentInput {
   equations?: string[];
   assumptions?: string[];
   epistemicStatus?: string;
+  execution?: SavedExperimentExecution;
+  replayIdentity?: SavedExperimentReplayIdentity;
 }
 
 export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
@@ -127,6 +150,8 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     params: input.params,
     stats: input.stats ?? {},
     ...(input.observations === undefined ? {} : { observations: input.observations }),
+    ...(input.execution === undefined ? {} : { execution: input.execution }),
+    ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
     equations: input.equations ?? [],

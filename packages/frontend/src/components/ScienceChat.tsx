@@ -209,7 +209,37 @@ export function ScienceChat() {
             : confirmEvidenceGuidedExperiment(reviewed);
         const run = confirmed.run;
         const hypothetical = run.result.status === 'hypothetical_visualization';
-        if (run.result.status === 'completed') setLastEvidenceCapsule(capsuleFromConfirmedExperiment(confirmed));
+        if (run.result.status === 'completed') {
+          const capsule = capsuleFromConfirmedExperiment(confirmed);
+          setLastEvidenceCapsule(capsule);
+          const labRoute = run.result.route.kind === 'lab' ? run.result.route : undefined;
+          const numericStats: Record<string, number> = {};
+          for (const [key, value] of Object.entries(run.result.outputs)) if (typeof value === 'number') numericStats[key] = value;
+          saveExperiment({
+            labId: labRoute?.labId ?? run.request.domainId,
+            experimentId: labRoute?.experimentId ?? run.request.modelId ?? run.request.domainId,
+            experimentName: run.request.modelId ?? run.request.domainId,
+            params: run.provenance.parameterSnapshot,
+            stats: numericStats,
+            observations: run.result.outputs,
+            execution: {
+              status: run.result.status,
+              runId: run.runId,
+              runFingerprint: run.provenance.runFingerprint,
+              resultOrigin: run.provenance.resultOrigin,
+              summary: run.result.summary,
+              ...(run.request.modelId === undefined ? {} : { modelId: run.request.modelId }),
+              ...(run.provenance.engine === null ? {} : { engine: run.provenance.engine }),
+              ...(run.provenance.modelVersion === undefined ? {} : { modelVersion: run.provenance.modelVersion }),
+            },
+            replayIdentity: { capsuleId: capsule.capsuleId, planId: capsule.planId, confirmationId: capsule.confirmationId },
+            honesty: run.provenance.resultOrigin === 'real-engine' ? 'simplified' : 'theoretical',
+            honestyNote: run.result.validity ?? 'Wynik zapisany z potwierdzonego przebiegu Fabric; niezależna walidacja pozostaje odrębna.',
+            equations: [],
+            assumptions: [...run.result.assumptions],
+            epistemicStatus: run.provenance.resultOrigin === 'real-engine' ? 'EXECUTED_REAL_ENGINE' : 'EXECUTED_WITH_LIMITATIONS',
+          });
+        }
         const handoff = hypothetical
           ? '\n\nStatus epistemiczny: HISTORICAL_LEGEND / HYPOTHETICAL_VISUALIZATION. Evidence Pack i A/B nie są tworzone, ponieważ nie wykonano modelu fizycznego.'
           : `\n\nEvidence Pack: ${confirmed.handoff.evidencePack.status} — ${confirmed.handoff.evidencePack.reason}\nA/B: ${confirmed.handoff.counterfactual.status} — ${confirmed.handoff.counterfactual.reason}`;

@@ -97,6 +97,22 @@ describe('scienceMemory: Fabric observations', () => {
     expect((await import('../core/scienceMemory')).listExperiments()[0].observations).toEqual(saved.observations);
   });
 
+  it('round-trips confirmed execution and replay identity', async () => {
+    const { saveExperiment } = await import('../core/scienceMemory');
+    const saved = saveExperiment({
+      labId: 'quantum', experimentId: 'double-slit', experimentName: 'Double slit',
+      params: { slitDistance: 1 }, stats: { peak: 0.5 }, observations: { profile: [0.1, 0.2] },
+      execution: { status: 'completed', runId: 'run-1', runFingerprint: 'fp-1', resultOrigin: 'real-engine', summary: 'completed', modelId: 'double-slit', engine: 'local' },
+      replayIdentity: { capsuleId: 'capsule-1', planId: 'plan-1', confirmationId: 'confirm-1' },
+      honesty: 'simplified', honestyNote: 'bounded model', assumptions: [],
+    });
+    vi.resetModules();
+    const loaded = (await import('../core/scienceMemory')).listExperiments()[0];
+    expect(loaded.execution).toEqual(saved.execution);
+    expect(loaded.replayIdentity).toEqual(saved.replayIdentity);
+    expect(loaded.observations).toEqual(saved.observations);
+  });
+
   it('rejects non-finite observation series before persisting', async () => {
     const { saveExperiment } = await import('../core/scienceMemory');
     const base = {

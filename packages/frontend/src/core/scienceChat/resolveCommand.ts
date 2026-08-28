@@ -266,6 +266,17 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Observer at the Junction — handoff do istniejącego Reality Navigatora.
+  //     To interaktywny model/scenario, nie dowód fizycznego multiwersum.
+  if (has(norm, 'observer at the junction', 'obserwator na skrzyzowaniu', 'rownolegla rzeczywistosc', 'równoległa rzeczywistość', 'alternatywna rzeczywistosc', 'alternatywna rzeczywistość')) {
+    return {
+      text: 'Otwieram „Observer at the Junction” w istniejącym Reality Navigatorze: interaktywny model wariantów i przejść między scenariuszami. Rozgałęzienia są oznaczone jako MODEL/SCENARIO — nie są dowodem fizycznego multiwersum ani podróży przez wormhole.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/reality' },
+    };
+  }
+
   // --- Film koncepcyjny 2030 (reżyserowany przejazd po żywym silniku). ---
   if (has(norm, 'film koncepcyjny', 'koncept', 'concept film', 'pokaz wizje', 'wizja 2030', 'genesis 2030', 'concept video', 'trailer')) {
     return {

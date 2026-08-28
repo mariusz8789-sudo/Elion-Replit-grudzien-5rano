@@ -139,6 +139,20 @@ export function registerCatalog(): void {
     assumptions: ['Dwa idealne wahadła w płaszczyźnie', 'm₁=m₂=1 kg, L₁=L₂=1 m', 'Brak tarcia', 'Całkowanie klasycznym RK4; metoda nie jest symplektyczna, więc energia może numerycznie dryfować'],
   });
 
+  // ---- Matematyka / alternatywne przestrzenie ----
+  registerRecipe({
+    id: 'tesseract-4d',
+    title: 'Tesserakt 4D',
+    category: 'math',
+    aliases: ['tesserakt', 'tesseract', 'hipersześcian', 'hiperszescian', 'obrót w 4D', 'obrot w 4d'],
+    labId: 'multiverse',
+    experimentId: 'tesseract',
+    honesty: 'exact',
+    summary: 'Dokładna algebra liniowa: obrót w płaszczyźnie 4D i rzut perspektywiczny 4D→3D.',
+    equations: ['Rₓw(θ), Rᵧz(φ): macierze obrotu w dwóch płaszczyznach 4D', 'x,y,z,w → x/(d−w), y/(d−w), z/(d−w): rzut perspektywiczny 4D→3D', '|V| = 2⁴ = 16, |E| = 4·2⁴/2 = 32'],
+    assumptions: ['To dokładny model matematycznego tesseraktu i jego rzutu', 'Kolor koduje współrzędną w, ponieważ ekran nie pokazuje czwartego wymiaru', 'Nie jest to dowód istnienia fizycznego piątego wymiaru ani równoległego świata'],
+  });
+
   // ---- Kwanty (Quantum) ----
   registerRecipe({
     id: 'double-slit',

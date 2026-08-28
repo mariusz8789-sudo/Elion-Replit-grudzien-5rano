@@ -174,6 +174,24 @@ describe('scienceChat: wyjaśnienia, równania, założenia, zadania', () => {
     expect((r.equations ?? []).join(' ')).toMatch(/P\(u\)|ψ|pomiar/i);
   });
 
+  it('Observer at the Junction otwiera istniejący Reality Navigator z granicą model/scenario', () => {
+    const r = resolveCommand('pokaż Observer at the Junction', null);
+    expect(r.intent).toBe('OPEN_SIMULATION');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/reality' });
+    expect(r.tag).toBe('MODEL');
+    expect(r.text).toMatch(/nie są dowodem fizycznego multiwersum/i);
+  });
+
+  it('tesserakt 4D ujawnia rzut matematyczny i nie udaje fizycznego wymiaru', () => {
+    const ctxSnapshot = ctx({ labId: 'multiverse', experimentId: 'tesseract', experimentName: 'Tesserakt 4D' });
+    const equationResponse = resolveCommand('pokaż równanie', ctxSnapshot);
+    const assumptionsResponse = resolveCommand('jakie są założenia modelu', ctxSnapshot);
+    expect(equationResponse.todo).toBeFalsy();
+    expect(equationResponse.tag).toBe('MODEL');
+    expect((equationResponse.equations ?? []).join(' ')).toMatch(/4D|4→3D|16/);
+    expect(assumptionsResponse.text).toMatch(/fizycznego piątego wymiaru/i);
+  });
+
   it('"założenia modelu" -> tag ZALOZENIE + honestyNote', () => {
     const r = resolveCommand('jakie są założenia modelu', ctx());
     expect(r.tag).toBe('ZALOZENIE');

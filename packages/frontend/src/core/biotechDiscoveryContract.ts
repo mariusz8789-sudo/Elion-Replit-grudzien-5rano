@@ -91,6 +91,43 @@ export interface BiologicalEvidence extends BiotechRecord {
   subjectIds: readonly string[];
 }
 
+export type CandidateRankingStatus = 'UNKNOWN' | 'PREDICTION';
+export type CandidateEvidenceQuality = 'UNKNOWN' | 'LOW' | 'MODERATE' | 'HIGH';
+
+export interface CandidateRanking {
+  candidateId: string;
+  score: number;
+  components: {
+    evidenceQuality: number;
+    targetRelevance: number;
+    safetyPenalty: number;
+    uncertaintyPenalty: number;
+  };
+  rationale: string;
+  uncertainty: string;
+  epistemicStatus: CandidateRankingStatus;
+}
+
+export function rankTherapeuticCandidate(input: {
+  candidate: TherapeuticCandidate;
+  evidenceQuality: CandidateEvidenceQuality;
+  targetRelevance: number;
+  safetySignals: readonly SafetySignal[];
+  uncertaintyPenalty: number;
+}): CandidateRanking {
+  if (!Number.isFinite(input.targetRelevance) || input.targetRelevance < 0 || input.targetRelevance > 1) throw new Error('Target relevance musi być w zakresie 0..1.');
+  if (!Number.isFinite(input.uncertaintyPenalty) || input.uncertaintyPenalty < 0 || input.uncertaintyPenalty > 1) throw new Error('Uncertainty penalty musi być w zakresie 0..1.');
+  const evidenceQuality = { UNKNOWN: 0, LOW: 0.33, MODERATE: 0.66, HIGH: 1 }[input.evidenceQuality];
+  const safetyPenalty = Math.min(1, input.safetySignals.length / Math.max(1, input.candidate.safetySignalIds.length));
+  const components = { evidenceQuality, targetRelevance: input.targetRelevance, safetyPenalty, uncertaintyPenalty: input.uncertaintyPenalty };
+  const score = Number((0.4 * evidenceQuality + 0.3 * input.targetRelevance - 0.2 * safetyPenalty - 0.1 * input.uncertaintyPenalty).toFixed(4));
+  return {
+    candidateId: input.candidate.id, score, components,
+    rationale: 'Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability.',
+    uncertainty: 'No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.', epistemicStatus: 'PREDICTION',
+  };
+}
+
 export interface CandidateDiscoveryReport {
   reportId: string;
   candidateId: string;

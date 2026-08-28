@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   biotechScientificFingerprint,
   createCandidateDiscoveryReport,
+  rankTherapeuticCandidate,
   isPredictiveBiotechStatus,
   type BiologicalEvidence,
   biologicalExperimentRequestFingerprint,
@@ -70,6 +71,20 @@ describe('biotech discovery contract', () => {
     } as const;
     expect(biologicalExperimentRequestFingerprint(request)).toMatch(/^[0-9a-f]{8}$/);
     expect({ ...request, targetIds: ['target-2'] }).not.toEqual(request);
+  });
+
+  it('ranks research priority with explicit components, not efficacy probability', () => {
+    const candidate: TherapeuticCandidate = {
+      kind: 'therapeutic-candidate', id: 'candidate-rank', namespace: 'synthetic-demo', label: 'Synthetic demo candidate', status: 'HYPOTHESIS',
+      materialId: 'material-demo', compoundIds: ['compound-demo'], targetIds: ['target-demo'], mechanismIds: ['mechanism-demo'],
+      supportingEvidenceIds: ['evidence-demo'], safetySignalIds: ['safety-demo'], hypothesisIds: ['hypothesis-demo'], provenance: [],
+    };
+    const ranked = rankTherapeuticCandidate({ candidate, evidenceQuality: 'HIGH', targetRelevance: 1, safetySignals: [], uncertaintyPenalty: 0.25 });
+    expect(ranked.candidateId).toBe(candidate.id);
+    expect(ranked.score).toBe(0.675);
+    expect(ranked.components).toEqual({ evidenceQuality: 1, targetRelevance: 1, safetyPenalty: 0, uncertaintyPenalty: 0.25 });
+    expect(ranked.epistemicStatus).toBe('PREDICTION');
+    expect(ranked.rationale).toContain('not efficacy or probability');
   });
 
   it('keeps safety signals explicit without inventing a safety score', () => {

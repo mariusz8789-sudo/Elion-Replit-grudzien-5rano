@@ -44,6 +44,8 @@ export function registerCatalog(): void {
     experimentId: 'shoes',
     honesty: 'exact',
     summary: 'Rozbieżność między lokalnym a wczesnym pomiarem stałej Hubble\'a — realne dane, realny konflikt.',
+    equations: ['ΔH₀ = H₀(SH0ES) − H₀(Planck)', 'σ_combined = √(σ_SH0ES² + σ_Planck² + σ_systematic²)', 'tension = ΔH₀ / σ_combined'],
+    assumptions: ['Porównanie opublikowanych estymat H₀ i niepewności', 'Napięcie jest opisem różnicy statystycznej, nie dowodem nowej fizyki'],
   });
   registerRecipe({
     id: 'black-hole',

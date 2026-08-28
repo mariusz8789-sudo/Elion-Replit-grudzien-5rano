@@ -349,3 +349,19 @@ describe('scienceChat: model provenance source response', () => {
     expect(r.text).toContain('Nie mogę uczciwie wskazać źródła');
   });
 });
+
+
+describe('scienceChat: Hubble tension model metadata', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('exposes the implemented delta and combined-uncertainty equations', () => {
+    const r = resolveCommand('pokaż równania', ctx({ labId: 'universe', experimentId: 'shoes', experimentName: 'Ekspansja Wszechświata (napięcie Hubble’a)' }));
+    expect(r.intent).toBe('SHOW_EQUATION');
+    expect(r.tag).toBe('MODEL');
+    expect(r.equations).toEqual(expect.arrayContaining([
+      expect.stringContaining('ΔH₀'),
+      expect.stringContaining('σ_combined'),
+      expect.stringContaining('tension'),
+    ]));
+  });
+});

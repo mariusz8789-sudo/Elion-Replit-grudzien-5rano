@@ -13,7 +13,8 @@ function reproductionVerdict(runs: readonly ExperimentRun[]): ReproductionVerdic
 
 function armEvidence(design: ScientificExperimentDesign, arm: ScientificExperimentDesign['arms'][number]): { evidence: ExperimentArmEvidence; runs: ExperimentRun[] } {
   const runs = Array.from({ length: design.repetitionsPerArm }, () => runExperiment(arm.request));
-  const numeric = runs.map((run) => run.result.outputs[design.primaryMetric]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  const observations = runs.map((run) => run.result.outputs[design.primaryMetric]).filter((value): value is NonNullable<typeof value> => value !== undefined);
+  const numeric = observations.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
   const firstWithUnit = runs.find((run) => Boolean(run.result.units[design.primaryMetric]));
   const flags: string[] = [];
   if (runs.some((run) => run.result.status !== 'completed')) flags.push('ARM_NOT_COMPLETED');
@@ -27,6 +28,7 @@ function armEvidence(design: ScientificExperimentDesign, arm: ScientificExperime
       runIds: runs.map((run) => run.runId),
       runFingerprints: runs.map((run) => run.provenance.runFingerprint),
       outputValues: numeric,
+      outputObservations: observations,
       units: firstWithUnit?.result.units[design.primaryMetric] ?? '',
       reproduction,
       anomalyFlags: flags,
@@ -105,7 +107,8 @@ export async function executeScientificBackendExperiment(design: ScientificExper
       const confirmed = await confirmBackendEvidenceGuidedExperiment(reviewedPlan);
       runs.push(confirmed.run);
     }
-    const numeric = runs.map((run) => run.result.outputs[design.primaryMetric]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    const observations = runs.map((run) => run.result.outputs[design.primaryMetric]).filter((value): value is NonNullable<typeof value> => value !== undefined);
+    const numeric = observations.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     const firstWithUnit = runs.find((run) => Boolean(run.result.units[design.primaryMetric]));
     const flags: string[] = [];
     if (numeric.length !== runs.length) flags.push('PRIMARY_METRIC_NOT_NUMERIC');
@@ -114,7 +117,7 @@ export async function executeScientificBackendExperiment(design: ScientificExper
     executed.push({
       evidence: {
         armId: arm.armId, kind: arm.kind, runIds: runs.map((run) => run.runId), runFingerprints: runs.map((run) => run.provenance.runFingerprint),
-        outputValues: numeric, units: firstWithUnit?.result.units[design.primaryMetric] ?? '', reproduction, anomalyFlags: flags,
+        outputValues: numeric, outputObservations: observations, units: firstWithUnit?.result.units[design.primaryMetric] ?? '', reproduction, anomalyFlags: flags,
       },
       runs,
     });

@@ -1,5 +1,5 @@
 import type { KnowledgeCorpusFile } from '../knowledge/registry';
-import type { ExperimentRun, ExperimentValue, StructuredExperimentRequest } from './types';
+import type { ExperimentOutputValue, ExperimentRun, ExperimentValue, StructuredExperimentRequest } from './types';
 
 export const SCIENTIFIC_DISCOVERY_VERSION = '1.0.0';
 
@@ -54,7 +54,10 @@ export interface ExperimentArmEvidence {
   kind: ExperimentArmKind;
   runIds: readonly string[];
   runFingerprints: readonly string[];
+  /** Scalar values retained for legacy numeric criteria. */
   outputValues: readonly number[];
+  /** All produced primary observations, including ordered series. */
+  outputObservations: readonly ExperimentOutputValue[];
   units: string;
   reproduction: ReproductionVerdict;
   anomalyFlags: readonly string[];

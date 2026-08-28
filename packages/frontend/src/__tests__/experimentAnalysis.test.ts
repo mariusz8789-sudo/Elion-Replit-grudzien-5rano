@@ -123,3 +123,18 @@ describe('paramRangeSummary', () => {
     expect(block.body).toContain('włączone');
   });
 });
+
+
+
+describe('analyzeRun: observation completeness', () => {
+  it('warns when a stat is missing from part of the recorded series', () => {
+    const samples: RunSample[] = [
+      { t: 0, stats: { x: 1 } },
+      { t: 1, stats: {} },
+      { t: 2, stats: { x: 3 } },
+      { t: 3, stats: { x: 4 } },
+    ];
+    const blocks = analyzeRun(samples);
+    expect(blocks.some((b) => b.title === 'Niespójność: niepełna seria obserwacji' && b.kind === 'warning')).toBe(true);
+  });
+});

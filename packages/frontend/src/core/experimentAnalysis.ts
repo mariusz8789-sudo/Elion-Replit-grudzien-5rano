@@ -128,6 +128,15 @@ export function analyzeRun(samples: RunSample[]): NarrationBlock[] {
     });
   }
 
+  const missingKeys = keys.filter((k) => samples.some((s) => s.stats[k] === undefined));
+  if (missingKeys.length > 0) {
+    blocks.push({
+      title: 'Niespójność: niepełna seria obserwacji',
+      body: `Statystyki ${missingKeys.join(', ')} nie występują w każdej próbce. Trendy liczone z niepełnej serii są częściowe i nie powinny być traktowane jako pełny przebieg; sprawdź źródło próbek przed porównaniem modeli.`,
+      kind: 'warning',
+    });
+  }
+
   const trends = keys.map((k) => analyzeTrend(samples, k)).filter((t): t is StatTrend => t !== null);
 
   // Niespójność #2: przebieg całkowicie płaski — nic się nie zmieniło.

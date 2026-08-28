@@ -34,6 +34,9 @@ export interface BiotechProvenance {
   evidenceType: string;
   status: BiotechEpistemicStatus;
   uncertainty?: string;
+  sourceUrl?: string;
+  sourceVersion?: string;
+  retrievedAt?: string;
 }
 
 export interface BiotechRecord extends BiotechIdentity {

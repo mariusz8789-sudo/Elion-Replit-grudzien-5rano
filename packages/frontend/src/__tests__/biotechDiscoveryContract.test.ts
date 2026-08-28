@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { mapPinnedPubChemCaffeine, PUBCHEM_CID_2519_SOURCE_URL } from '../core/biotechData/pubchem';
 import {
   biotechScientificFingerprint,
   createCandidateDiscoveryReport,
@@ -74,6 +75,16 @@ describe('biotech discovery contract', () => {
     } as const;
     expect(biologicalExperimentRequestFingerprint(request)).toMatch(/^[0-9a-f]{8}$/);
     expect({ ...request, targetIds: ['target-2'] }).not.toEqual(request);
+  });
+
+  it('maps the pinned PubChem compound with reproducible provenance only', () => {
+    const record = mapPinnedPubChemCaffeine();
+    expect(record.sourceId).toBe('pubchem:CID:2519');
+    expect(record.sourceUrl).toBe(PUBCHEM_CID_2519_SOURCE_URL);
+    expect(record.retrievedAt).toBe('2026-08-29');
+    expect(record.compound).toMatchObject({ id: 'pubchem:CID:2519', label: 'Caffeine', status: 'OBSERVED', parentMaterialIds: [] });
+    expect(record.compound.provenance[0]).toMatchObject({ sourceId: 'pubchem:CID:2519', sourceUrl: PUBCHEM_CID_2519_SOURCE_URL, sourceVersion: 'PubChem CID 2519', retrievedAt: '2026-08-29' });
+    expect(record.compound.provenance[0]?.uncertainty).toContain('does not establish biological activity or safety');
   });
 
   it('ranks research priority with explicit components, not efficacy probability', () => {

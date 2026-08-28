@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   biotechScientificFingerprint,
+  createCandidateDiscoveryReport,
   isPredictiveBiotechStatus,
   type BiologicalEvidence,
   biologicalExperimentRequestFingerprint,
@@ -40,6 +41,25 @@ describe('biotech discovery contract', () => {
     expect(candidate.supportingEvidenceIds).toContain(evidence.id);
     expect(hypothesis.candidateId).toBe(candidate.id);
     expect(hypothesis.supportingEvidenceIds).toEqual(candidate.supportingEvidenceIds);
+  });
+
+  it('builds a deterministic structured candidate discovery report', () => {
+    const candidate: TherapeuticCandidate = {
+      kind: 'therapeutic-candidate', id: 'candidate-1', namespace: 'example', label: 'Example candidate', status: 'HYPOTHESIS',
+      materialId: 'material-1', compoundIds: ['compound-1'], targetIds: ['target-1'], mechanismIds: ['mechanism-1'],
+      supportingEvidenceIds: ['evidence-1'], safetySignalIds: ['safety-1'], hypothesisIds: ['hypothesis-1'], provenance: [],
+    };
+    const hypothesis: TherapeuticHypothesis = {
+      kind: 'therapeutic-hypothesis', id: 'hypothesis-1', namespace: 'example', label: 'Example hypothesis', status: 'HYPOTHESIS',
+      claim: 'A bounded hypothesis.', candidateId: candidate.id, targetIds: candidate.targetIds, mechanismIds: candidate.mechanismIds,
+      supportingEvidenceIds: candidate.supportingEvidenceIds, safetySignalIds: candidate.safetySignalIds, provenance: [],
+    };
+    const report = createCandidateDiscoveryReport({ candidate, hypothesis, uncertainty: 'Synthetic demo; no biological validation.' });
+    expect(report.reportId).toBe(`report:${report.scientificFingerprint}`);
+    expect(report.evidenceIds).toEqual(['evidence-1']);
+    expect(report.safetySignalIds).toEqual(['safety-1']);
+    expect(report.epistemicStatus).toBe('HYPOTHESIS');
+    expect(report.uncertainty).toContain('no biological validation');
   });
 
   it('represents hypothesis to biological experiment without claiming execution', () => {

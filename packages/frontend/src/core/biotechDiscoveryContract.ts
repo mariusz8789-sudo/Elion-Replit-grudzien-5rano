@@ -87,6 +87,48 @@ export interface BiologicalEvidence extends BiotechRecord {
   subjectIds: readonly string[];
 }
 
+export interface CandidateDiscoveryReport {
+  reportId: string;
+  candidateId: string;
+  materialId: string;
+  compoundIds: readonly string[];
+  targetIds: readonly string[];
+  mechanismIds: readonly string[];
+  evidenceIds: readonly string[];
+  safetySignalIds: readonly string[];
+  hypothesisId: string;
+  experimentRequestId?: string;
+  epistemicStatus: BiotechEpistemicStatus;
+  uncertainty: string;
+  provenance: readonly BiotechProvenance[];
+  scientificFingerprint: string;
+}
+
+export function createCandidateDiscoveryReport(input: {
+  candidate: TherapeuticCandidate;
+  hypothesis: TherapeuticHypothesis;
+  experimentRequest?: BiologicalExperimentRequest;
+  uncertainty: string;
+}): CandidateDiscoveryReport {
+  if (input.hypothesis.candidateId !== input.candidate.id) throw new Error('Raport wymaga zgodności candidateId i hypothesis.candidateId.');
+  if (!input.uncertainty.trim()) throw new Error('Raport wymaga jawnej niepewności.');
+  const report = {
+    candidateId: input.candidate.id,
+    materialId: input.candidate.materialId,
+    compoundIds: input.candidate.compoundIds,
+    targetIds: input.candidate.targetIds,
+    mechanismIds: input.candidate.mechanismIds,
+    evidenceIds: input.hypothesis.supportingEvidenceIds,
+    safetySignalIds: input.hypothesis.safetySignalIds,
+    hypothesisId: input.hypothesis.id,
+    ...(input.experimentRequest === undefined ? {} : { experimentRequestId: input.experimentRequest.requestId }),
+    epistemicStatus: input.hypothesis.status,
+    uncertainty: input.uncertainty,
+  };
+  const scientificFingerprint = fnv1a(canonicalJson(report));
+  return { ...report, reportId: `report:${scientificFingerprint}`, provenance: [...input.candidate.provenance, ...input.hypothesis.provenance], scientificFingerprint };
+}
+
 export type BiologicalExperimentRequestStatus = 'NOT_EXECUTED' | 'BLOCKED';
 
 export interface BiologicalExperimentRequest {

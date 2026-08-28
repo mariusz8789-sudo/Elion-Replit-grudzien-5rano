@@ -149,6 +149,9 @@ function verifySnapshot(ctx: ChatSimSnapshot): { status: 'PASS' | 'BLOCKED'; tex
   for (const key of Object.keys(ctx.params)) {
     if (!declaredKeys.has(key)) issues.push(`${key}: wartość istnieje w snapshotcie, ale parametr nie jest zadeklarowany`);
   }
+  for (const [key, value] of Object.entries(ctx.stats)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) issues.push(`${key}: statystyka nie jest skończoną liczbą`);
+  }
   for (const def of ctx.paramDefs) {
     if (!def.key || seenKeys.has(def.key)) issues.push(`${def.label || 'parametr'}: zduplikowany lub pusty klucz`);
     seenKeys.add(def.key);

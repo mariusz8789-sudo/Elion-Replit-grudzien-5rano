@@ -425,6 +425,11 @@ describe('scienceChat: parameter contract validation', () => {
 describe('scienceChat: snapshot declaration integrity', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 
+  it('blocks non-finite snapshot statistics', () => {
+    expect(resolveCommand('zweryfikuj', ctx({ stats: { rs: Number.NaN } })).text).toContain('VERIFY BLOCKED');
+    expect(resolveCommand('zweryfikuj', ctx({ stats: { rs: Number.POSITIVE_INFINITY } })).text).toContain('VERIFY BLOCKED');
+  });
+
   it('blocks malformed parameter definitions before validating values', () => {
     const badSlider = { ...massDef, step: 0 };
     const badSelect = { key: 'mode', label: 'Tryb', type: 'select' as const, default: 'unknown', options: [{ value: 'safe', label: 'Bezpieczny' }, { value: 'safe', label: 'Duplikat' }] };

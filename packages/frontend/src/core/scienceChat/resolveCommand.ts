@@ -287,6 +287,16 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Oryginalny tryb Simulation Question (pytanie → model → obserwacja → Evidence). ---
+  if (has(norm, 'simulation question', 'pytanie o symulacje', 'pytanie o symulację', 'filozof symulacji', 'simulation void', 'dialog o rzeczywistosci', 'dialog o rzeczywistości')) {
+    return {
+      text: 'Otwieram „Simulation Question” — oryginalny, interaktywny przejazd po żywej symulacji: pytanie → model → równanie → obserwacja → Evidence. To SCENARIO/CINEMATIC oparty na istniejącym silniku, nie kopia filmu ani dowód filozoficznej tezy.',
+      tag: 'HIPOTEZA',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/concept?mode=philosopher' },
+    };
+  }
+
   // --- Film koncepcyjny 2030 (reżyserowany przejazd po żywym silniku). ---
   if (has(norm, 'film koncepcyjny', 'koncept', 'concept film', 'pokaz wizje', 'wizja 2030', 'genesis 2030', 'concept video', 'trailer')) {
     return {

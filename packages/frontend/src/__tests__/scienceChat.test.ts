@@ -365,3 +365,14 @@ describe('scienceChat: Hubble tension model metadata', () => {
     ]));
   });
 });
+
+
+describe('scienceChat: Simulation Question handoff', () => {
+  it('opens the original living-simulation concept mode with explicit scenario status', () => {
+    const r = resolveCommand('pokaż simulation question', ctx());
+    expect(r.intent).toBe('OPEN_SIMULATION');
+    expect(r.tag).toBe('HIPOTEZA');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/concept?mode=philosopher' });
+    expect(r.text).toContain('SCENARIO/CINEMATIC');
+  });
+});

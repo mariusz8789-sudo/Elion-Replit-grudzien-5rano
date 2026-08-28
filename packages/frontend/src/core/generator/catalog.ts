@@ -76,6 +76,8 @@ export function registerCatalog(): void {
     experimentId: 'chirp',
     honesty: 'simplified',
     summary: 'Sygnał „chirp" ze zlewających się mas — częstotliwość i amplituda rosną do koalescencji.',
+    equations: ['ℳ = (m₁m₂)^(3/5)/(m₁+m₂)^(1/5) (masa chirp)', 'f_ISCO = c³/(6^(3/2)πGM) (częstotliwość graniczna ISCO)', 't_c − t ∝ ℳ^(−5/3) f^(−8/3) (skalowanie czasu inspiralu)'],
+    assumptions: ['Model ograniczony do parametrów inspiralu i ISCO', 'Nie jest pełnym waveformem numerycznej teorii względności ani analizą detektora LIGO'],
   });
 
   // ---- Relatywistyka (Space-Time) ----

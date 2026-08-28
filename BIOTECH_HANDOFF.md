@@ -21,7 +21,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `429a3be` — `feat(core): surface honest result analysis`
 - `322a369` — `feat(core): carry provenance into world handoff`
 - `f2aec5f` — `feat(core): surface replay identity in memory`
-- next checkpoint in this session — confirm Evidence Pack → Replay boundary and move to observation comparison
+- `d749715` — `docs(core): confirm evidence replay boundary`
+- next checkpoint in this session — verify Protocol/A-B save path; if already wired, park and continue Core queue
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -147,9 +148,13 @@ This GAP is therefore parked as already satisfied by the current system. No code
 
 The existing `compareBridge` and `experimentComparison` cover model-vs-model or replay/comparison flows, not an independently measured observation. No trustworthy external observation fixture is currently available at this boundary. This is parked to avoid using model inputs, synthetic outputs or a second model as an alleged observation; no new contract was added.
 
+## Completed Core capability: Protocol/A-B → Evidence Pack → Replay persistence verified
+
+The existing Experiment Pilot already creates the multi-run `ScientificEvidencePack`, persists it through `saveScientificEvidencePack`, indexes it through `saveScientificEvidencePackToMemory`, builds the replay capsule, and exposes the replay verdict plus explicit rerun action. This path is not a single-run shortcut and retains the existing real-run validation. No code change was necessary; the result is documented here to avoid duplicating the system.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Choose the next low-cost existing integration gap after observation is parked: inspect the already implemented preregistered Protocol/A-B path in Experiment Pilot and verify that its multi-run Evidence Pack is saved and replayable end-to-end. Only change code if a real forwarding/rendering gap exists; otherwise document it as already satisfied and continue to the next queue item.
+Move to the next low-cost existing integration gap after the already-wired Protocol/A-B path. Prefer the model-selection/request boundary or another place where an existing typed artifact is produced but not forwarded. Keep observation comparison parked until an independent real source exists.
 
 ## Next large gaps
 

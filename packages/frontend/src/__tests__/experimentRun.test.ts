@@ -28,3 +28,19 @@ describe('experimentRun: ring buffer', () => {
     expect(next.length).toBe(2);
   });
 });
+
+
+describe('experimentRun: integrity gates', () => {
+  it('does not append non-finite timestamps or statistics', () => {
+    const initial = [{ t: 0, stats: { a: 1 } }];
+    expect(appendSample(initial, Number.NaN, { a: 2 })).toBe(initial);
+    expect(appendSample(initial, 1, { a: Number.POSITIVE_INFINITY })).toBe(initial);
+  });
+
+  it('snapshots stats so later source mutation cannot rewrite history', () => {
+    const stats = { a: 1 };
+    const samples = appendSample([], 0, stats);
+    stats.a = 99;
+    expect(samples[0].stats).toEqual({ a: 1 });
+  });
+});

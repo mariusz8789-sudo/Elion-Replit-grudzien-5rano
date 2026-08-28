@@ -39,6 +39,7 @@ import {
   serializeCapabilityAdmissionMatrix,
   compareScientificEvidencePacks,
   getStoredEvidencePackReplayVerdict,
+  experimentObservableKind,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -1464,5 +1465,13 @@ describe('Scenario Capsule replay contract boundary', () => {
     const replay = replayScenarioCapsule(broken);
     expect(replay.status).toBe('NOT_COMPARABLE');
     expect(replay.message).toContain('contractVersion=999.0.0');
+  });
+});
+
+describe('Experiment observable shape', () => {
+  it('preserves the explicit scalar/series observable shape', () => {
+    expect(experimentObservableKind(1.25)).toBe('scalar');
+    expect(experimentObservableKind([0.1, 0.2, 0.3])).toBe('series');
+    expect(experimentObservableKind([0.3, 0.2, 0.1])).toBe('series');
   });
 });

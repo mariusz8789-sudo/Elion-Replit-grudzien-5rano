@@ -5,7 +5,20 @@ export const EXPERIMENT_FABRIC_VERSION = '1.0.0';
 
 export type ExperimentOperation = 'compute' | 'simulate' | 'visualize' | 'explain';
 export type ExperimentRunStatus = 'completed' | 'hypothetical_visualization' | 'rejected' | 'knowledge_only' | 'capability_seam' | 'engine_not_available' | 'failed';
+export type ExperimentSeries = readonly number[];
 export type ExperimentValue = number | string | boolean;
+export type ExperimentOutputValue = ExperimentValue | ExperimentSeries;
+
+/**
+ * Observable shape is explicit so a trajectory/profile is never silently coerced
+ * into a scalar. Arrays are ordered: reordering or changing one sample changes
+ * the canonical value and therefore the run fingerprint.
+ */
+export type ExperimentObservableKind = 'scalar' | 'series';
+
+export function experimentObservableKind(value: ExperimentOutputValue): ExperimentObservableKind {
+  return Array.isArray(value) ? 'series' : 'scalar';
+}
 
 /**
  * Validated data produced from user language. It never contains a computed
@@ -98,7 +111,7 @@ export interface ExperimentResult {
   contractVersion: string;
   status: ExperimentRunStatus;
   summary: string;
-  outputs: Readonly<Record<string, ExperimentValue>>;
+  outputs: Readonly<Record<string, ExperimentOutputValue>>;
   units: Readonly<Record<string, string>>;
   warnings: readonly string[];
   validity?: string;

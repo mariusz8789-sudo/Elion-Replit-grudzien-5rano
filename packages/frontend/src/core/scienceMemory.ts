@@ -1,5 +1,6 @@
 import { readJSON, writeJSON } from './storage';
 import type { HonestyLevel, SimParams } from './types';
+import type { ExperimentOutputValue } from './experimentFabric/types';
 
 /**
  * Scientific Memory (sekcja O dyrektywy CTO) — trwały, lokalny zapis
@@ -26,6 +27,8 @@ export interface SavedExperiment {
   experimentName: string;
   params: SimParams;
   stats: Record<string, number>;
+  /** Optional canonical Fabric observations; legacy memory rows may omit this. */
+  observations?: Readonly<Record<string, ExperimentOutputValue>>;
   honesty: HonestyLevel;
   honestyNote: string;
   equations: string[];
@@ -52,6 +55,15 @@ export function contentHash(input: { labId: string; experimentId: string; params
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
+function validObservations(value: unknown): value is Readonly<Record<string, ExperimentOutputValue>> {
+  if (value === undefined) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.values(value as Record<string, unknown>).every((entry) => {
+    if (typeof entry === 'number' || typeof entry === 'string' || typeof entry === 'boolean') return true;
+    return Array.isArray(entry) && entry.every((sample) => typeof sample === 'number' && Number.isFinite(sample));
+  });
+}
+
 function isSavedExperiment(v: unknown): v is SavedExperiment {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;
@@ -62,7 +74,8 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     typeof o.experimentId === 'string' &&
     typeof o.experimentName === 'string' &&
     typeof o.contentHash === 'string' &&
-    o.params != null && typeof o.params === 'object'
+    o.params != null && typeof o.params === 'object' &&
+    validObservations(o.observations)
   );
 }
 
@@ -77,6 +90,7 @@ export interface SaveExperimentInput {
   experimentName: string;
   params: SimParams;
   stats?: Record<string, number>;
+  observations?: Readonly<Record<string, ExperimentOutputValue>>;
   honesty: HonestyLevel;
   honestyNote: string;
   equations?: string[];
@@ -85,6 +99,7 @@ export interface SaveExperimentInput {
 }
 
 export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
+  if (!validObservations(input.observations)) throw new Error('Obserwacje muszą zawierać wyłącznie skończone wartości lub serie liczbowe.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
     id: `${input.labId}:${input.experimentId}:${hash}:${Date.now()}`,
@@ -94,6 +109,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     experimentName: input.experimentName,
     params: input.params,
     stats: input.stats ?? {},
+    ...(input.observations === undefined ? {} : { observations: input.observations }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
     equations: input.equations ?? [],

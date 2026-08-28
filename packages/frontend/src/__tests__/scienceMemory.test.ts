@@ -79,3 +79,32 @@ describe('scienceMemory: save / list / get / delete', () => {
     expect(listExperiments()).toEqual([]);
   });
 });
+
+
+describe('scienceMemory: Fabric observations', () => {
+  beforeEach(() => { vi.resetModules(); vi.stubGlobal('window', { localStorage: makeFakeStorage() }); });
+
+  it('round-trips scalar and series observations through localStorage', async () => {
+    const { saveExperiment } = await import('../core/scienceMemory');
+    const saved = saveExperiment({
+      labId: 'universe', experimentId: 'series', experimentName: 'Series memory',
+      params: { mass: 1 }, stats: { energy: -0.5 },
+      honesty: 'exact', honestyNote: 'deterministic',
+      observations: { probability: 0.5, trajectory: [0.1, 0.2, 0.3] },
+    });
+    expect(saved.observations).toEqual({ probability: 0.5, trajectory: [0.1, 0.2, 0.3] });
+    vi.resetModules();
+    expect((await import('../core/scienceMemory')).listExperiments()[0].observations).toEqual(saved.observations);
+  });
+
+  it('rejects non-finite observation series before persisting', async () => {
+    const { saveExperiment } = await import('../core/scienceMemory');
+    const base = {
+      labId: 'universe', experimentId: 'series', experimentName: 'Series memory',
+      params: { mass: 1 }, stats: { energy: -0.5 },
+      honesty: 'exact' as const, honestyNote: 'deterministic',
+    };
+    expect(() => saveExperiment({ ...base, observations: { trajectory: [0, Number.NaN] } })).toThrow(/skończone/);
+    expect(() => saveExperiment({ ...base, observations: { trajectory: [0, Number.POSITIVE_INFINITY] } })).toThrow(/skończone/);
+  });
+});

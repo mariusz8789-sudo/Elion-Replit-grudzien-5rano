@@ -146,7 +146,7 @@ describe('scienceMemory: Fabric observations', () => {
 
   it('round-trips a structured biotech discovery report context', async () => {
     const { saveBiotechDiscoveryReportToMemory } = await import('../core/scienceMemory');
-    const { createCandidateDiscoveryReport } = await import('../core/biotechDiscoveryContract');
+    const { createCandidateDiscoveryReport, rankTherapeuticCandidate } = await import('../core/biotechDiscoveryContract');
     const candidate = {
       kind: 'therapeutic-candidate' as const, id: 'candidate-demo', namespace: 'synthetic-demo', label: 'Synthetic demo candidate', status: 'HYPOTHESIS' as const,
       materialId: 'material-demo', compoundIds: ['compound-demo'], targetIds: ['target-demo'], mechanismIds: ['mechanism-demo'],
@@ -157,12 +157,13 @@ describe('scienceMemory: Fabric observations', () => {
       claim: 'Synthetic demo only; not a biological claim.', candidateId: candidate.id, targetIds: candidate.targetIds, mechanismIds: candidate.mechanismIds,
       supportingEvidenceIds: candidate.supportingEvidenceIds, safetySignalIds: candidate.safetySignalIds, provenance: [],
     };
-    const report = createCandidateDiscoveryReport({ candidate, hypothesis, uncertainty: 'SYNTHETIC_DEMO; no biological validation.' });
+    const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'UNKNOWN', targetRelevance: 0, safetySignals: [], uncertaintyPenalty: 1 });
+    const report = createCandidateDiscoveryReport({ candidate, hypothesis, ranking, uncertainty: 'SYNTHETIC_DEMO; no biological validation.' });
     const saved = saveBiotechDiscoveryReportToMemory(report);
     expect(saved.biotech?.reportId).toBe(report.reportId);
     vi.resetModules();
     const loaded = (await import('../core/scienceMemory')).listExperiments()[0];
-    expect(loaded.biotech).toMatchObject({ reportId: report.reportId, candidateId: candidate.id, hypothesisId: hypothesis.id, evidenceIds: ['evidence-demo'], safetySignalIds: ['safety-demo'], scientificFingerprint: report.scientificFingerprint });
+    expect(loaded.biotech).toMatchObject({ reportId: report.reportId, candidateId: candidate.id, hypothesisId: hypothesis.id, evidenceIds: ['evidence-demo'], safetySignalIds: ['safety-demo'], scientificFingerprint: report.scientificFingerprint, ranking: { score: report.ranking?.score, epistemicStatus: 'PREDICTION' } });
   });
 
   it('round-trips confirmed execution and replay identity', async () => {

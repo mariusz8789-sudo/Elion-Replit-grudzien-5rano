@@ -1,6 +1,6 @@
 import { readJSON, writeJSON } from './storage';
 import type { HonestyLevel, SimParams } from './types';
-import { biotechScientificFingerprint, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateDiscoveryReport, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
+import { biotechScientificFingerprint, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateDiscoveryReport, type CandidateRanking, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
 import type { ExperimentOutputValue } from './experimentFabric/types';
 import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 
@@ -49,6 +49,7 @@ export interface SavedBiotechContext {
   safetySignalIds: readonly string[];
   provenance: readonly BiotechProvenance[];
   scientificFingerprint: string;
+  ranking?: CandidateRanking;
 }
 
 export interface SavedExperimentReplayIdentity {
@@ -154,6 +155,7 @@ function validBiotechContext(value: unknown): value is SavedBiotechContext | und
   const requestStatuses: readonly BiologicalExperimentRequestStatus[] = ['NOT_EXECUTED', 'BLOCKED'];
   const validIds = (ids: unknown): ids is readonly string[] => Array.isArray(ids) && ids.every((id) => nonEmptyString(id));
   const validProvenance = Array.isArray(context.provenance) && context.provenance.every((item) => item && typeof item === 'object' && nonEmptyString(item.source) && nonEmptyString(item.sourceId) && nonEmptyString(item.evidenceType) && statuses.includes(item.status));
+  const validRanking = context.ranking === undefined || (context.ranking && typeof context.ranking === 'object' && nonEmptyString(context.ranking.candidateId) && Number.isFinite(context.ranking.score) && Number.isFinite(context.ranking.components.evidenceQuality) && Number.isFinite(context.ranking.components.targetRelevance) && Number.isFinite(context.ranking.components.safetyPenalty) && Number.isFinite(context.ranking.components.uncertaintyPenalty) && nonEmptyString(context.ranking.rationale) && nonEmptyString(context.ranking.uncertainty) && ['UNKNOWN', 'PREDICTION'].includes(context.ranking.epistemicStatus));
   return nonEmptyString(context.candidateId)
     && nonEmptyString(context.hypothesisId)
     && (context.reportId === undefined || nonEmptyString(context.reportId))
@@ -163,6 +165,7 @@ function validBiotechContext(value: unknown): value is SavedBiotechContext | und
     && validIds(context.evidenceIds)
     && validIds(context.safetySignalIds)
     && validProvenance
+    && validRanking
     && nonEmptyString(context.scientificFingerprint);
 }
 
@@ -211,6 +214,7 @@ export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryRep
     safetySignalIds: report.safetySignalIds,
     provenance: report.provenance,
     scientificFingerprint: report.scientificFingerprint,
+    ...(report.ranking === undefined ? {} : { ranking: report.ranking }),
   };
   return saveExperiment({
     labId: 'biotechnology', experimentId: `report:${report.reportId}`, experimentName: `Candidate Discovery Report — ${report.candidateId}`,

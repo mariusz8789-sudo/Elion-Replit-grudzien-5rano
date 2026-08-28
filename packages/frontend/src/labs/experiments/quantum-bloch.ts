@@ -91,6 +91,73 @@ export const GATE_ROTATIONS: Record<string, { axis: [number, number, number]; an
   H: { axis: [1 / Math.SQRT2, 0, 1 / Math.SQRT2], angleRad: Math.PI },
 };
 
+/**
+ * DEKOHERENCJA — długość wektora Blocha |r⃗| w czasie.
+ *
+ * Wyodrębnione bez zmiany fizyki z prywatnego pola `shrink` i pętli update()
+ * renderera 3D (quantum-bloch-3d.ts). Docstring tego pliku opisywał ten model
+ * od początku („kurczenie wektora Blocha — model dephasing/depolaryzacji,
+ * fenomenologiczny"), ale implementacja mieszkała w warstwie rysującej, więc
+ * jedynej wielkości, którą interfejs pokazuje jako |r⃗|, nie dało się ani
+ * przetestować, ani odtworzyć.
+ *
+ * Model jest FENOMENOLOGICZNY: |r⃗| maleje liniowo w czasie przy włączonym
+ * sprzężeniu z otoczeniem i liniowo wraca do 1 po jego wyłączeniu. To nie jest
+ * rozwiązanie równania Lindblada ani dopasowanie do żadnego układu
+ * laboratoryjnego — tempa są stałymi wizualnymi, a nie zmierzonymi czasami T1/T2.
+ * |r⃗| = 1 to stan czysty, |r⃗| < 1 to mieszanina statystyczna.
+ */
+export const BLOCH_DECOHERENCE_RATE_PER_SECOND = 0.12;
+export const BLOCH_RECOHERENCE_RATE_PER_SECOND = 0.3;
+/** Dolna granica |r⃗| — model nie schodzi do zera, żeby kierunek wektora pozostał określony. */
+export const BLOCH_MIN_VECTOR_LENGTH = 0.02;
+
+/**
+ * Jeden krok długości wektora Blocha. Czysta funkcja: ten sam stan wejściowy i
+ * ten sam `dt` dają ten sam wynik, bez odczytu zegara i bez stanu modułu.
+ */
+export function stepBlochVectorLength(current: number, dt: number, decohering: boolean): number {
+  if (decohering) return Math.max(BLOCH_MIN_VECTOR_LENGTH, current - dt * BLOCH_DECOHERENCE_RATE_PER_SECOND);
+  if (current < 1) return Math.min(1, current + dt * BLOCH_RECOHERENCE_RATE_PER_SECOND);
+  return current;
+}
+
+/** Reguła Borna dla bazy obliczeniowej: P(|0⟩) = |α|². */
+export function probabilityOfZero(state: [C, C]): number {
+  const [a] = state;
+  return a[0] ** 2 + a[1] ** 2;
+}
+
+export interface BlochMeasurementOutcome {
+  /** Wynik rzutowania w bazie obliczeniowej. */
+  outcome: '|0⟩' | '|1⟩';
+  /** Stan PO kolapsie — bazowy, bo pomiar rzutuje, a nie obraca. */
+  state: [C, C];
+  /** P(|0⟩) użyte do rozstrzygnięcia — zwracane, żeby wynik dało się sprawdzić. */
+  probability0: number;
+}
+
+/**
+ * POMIAR RZUTOWY w bazie obliczeniowej.
+ *
+ * `draw` to gotowa liczba z [0, 1) — losowanie zostaje po stronie wywołującego,
+ * dokładnie tak, jak `sampleSingletPair(a, b, rnd)` w core/physics.ts. Dzięki
+ * temu sama reguła pomiaru (P(|0⟩) = |α|², kolaps do stanu bazowego) jest
+ * deterministyczna i testowalna, a losowość nie wchodzi do modelu.
+ *
+ * Kolaps jest NIECIĄGŁY: to rzutowanie, nie ewolucja unitarna, więc stan po
+ * pomiarze nie jest obrotem stanu sprzed pomiaru.
+ */
+export function collapseByMeasurement(state: [C, C], draw: number): BlochMeasurementOutcome {
+  const probability0 = probabilityOfZero(state);
+  const zero = draw < probability0;
+  return {
+    outcome: zero ? '|0⟩' : '|1⟩',
+    state: zero ? [[1, 0], [0, 0]] : [[0, 0], [1, 0]],
+    probability0,
+  };
+}
+
 export interface BlochCircuitScenarioResult {
   gates: readonly string[];
   finalAmplitude0: C;

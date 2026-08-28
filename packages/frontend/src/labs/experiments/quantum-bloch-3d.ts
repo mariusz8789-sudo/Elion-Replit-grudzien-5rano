@@ -1,7 +1,7 @@
 import type * as THREE from 'three';
 import type { ExperimentDef, SimParams } from '../../core/types';
 import type { PostProcessingModules, PostProcessor, Sim3D } from '../../core/three/types';
-import { applyGate, blochVector, GATE_ROTATIONS, GATES, rotateVector, type C } from './quantum-bloch';
+import { applyGate, blochVector, collapseByMeasurement, GATE_ROTATIONS, GATES, probabilityOfZero, rotateVector, stepBlochVectorLength, type C } from './quantum-bloch';
 import { makeSoftDotTexture } from '../../core/three/starfield';
 import { detectRenderTier, tierAllowsBloom } from '../../core/three/quality';
 import { createFadePass } from '../../core/three/postfx';
@@ -350,12 +350,12 @@ class BlochSim3D implements Sim3D {
 
   private apply(g: string) {
     if (g === 'M') {
-      const p0 = this.a[0] ** 2 + this.a[1] ** 2;
-      const zero = Math.random() < p0;
-      this.a = zero ? [1, 0] : [0, 0];
-      this.b = zero ? [0, 0] : [1, 0];
+      // Reguła pomiaru mieszka w quantum-bloch.ts; tu zostaje wyłącznie
+      // losowanie, tak jak sampler double-slit został przy rendererze.
+      const collapsed = collapseByMeasurement([this.a, this.b], Math.random());
+      [this.a, this.b] = collapsed.state;
       this.shrink = 1;
-      this.measured = zero ? '|0⟩' : '|1⟩';
+      this.measured = collapsed.outcome;
       this.measureTimer = 1.6;
       this.lastGate = 'pomiar';
       this.history.push('📏');
@@ -400,11 +400,7 @@ class BlochSim3D implements Sim3D {
   }
 
   update(dt: number, p: SimParams) {
-    if (p.decoherence) {
-      this.shrink = Math.max(0.02, this.shrink - dt * 0.12);
-    } else if (this.shrink < 1) {
-      this.shrink = Math.min(1, this.shrink + dt * 0.3);
-    }
+    this.shrink = stepBlochVectorLength(this.shrink, dt, Boolean(p.decoherence));
     if (this.measureTimer > 0) this.measureTimer -= dt;
     if (this.flashPulse > 0) this.flashPulse = Math.max(0, this.flashPulse - dt / 0.6);
     if (!getSettings().reducedMotion) this.introElapsed = Math.min(INTRO_DURATION, this.introElapsed + dt);
@@ -498,7 +494,7 @@ class BlochSim3D implements Sim3D {
   }
 
   getStats() {
-    const p0 = this.a[0] ** 2 + this.a[1] ** 2;
+    const p0 = probabilityOfZero([this.a, this.b]);
     return {
       p0: Math.round(p0 * 100),
       shrink: Math.round(this.shrink * 100) / 100,

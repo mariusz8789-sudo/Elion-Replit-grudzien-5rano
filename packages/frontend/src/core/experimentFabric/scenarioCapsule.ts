@@ -120,6 +120,26 @@ function spatialReplayAttachment(dataset: GenesisSpatialDataset | undefined): Sc
   };
 }
 
+function replayInputIssues(capsule: ReproducibleScenarioCapsule): string[] {
+  const issues: string[] = [];
+  if (capsule.contractVersion !== SCENARIO_CAPSULE_VERSION) issues.push(`contractVersion=${capsule.contractVersion || '(brak)'}`);
+  if (!capsule.capsuleId) issues.push('capsuleId');
+  if (!capsule.title?.trim()) issues.push('title');
+  if (!capsule.references?.baselineRunFingerprint) issues.push('references.baselineRunFingerprint');
+  if (capsule.variantRun && !capsule.references?.variantRunFingerprint) issues.push('references.variantRunFingerprint');
+  return issues;
+}
+
+function blockedReplay(capsule: ReproducibleScenarioCapsule, issues: string[]): ScenarioCapsuleReplay {
+  return {
+    contractVersion: SCENARIO_CAPSULE_VERSION,
+    capsuleId: capsule.capsuleId ?? '',
+    status: 'NOT_COMPARABLE',
+    checks: [],
+    message: `Replay BLOCKED — kapsuła nie spełnia kontraktu: ${issues.join(', ')}. Nie uruchomiono silnika.`,
+  };
+}
+
 function capsuleIdFor(input: ScenarioCapsuleInput): string {
   return `capsule_${fnv1a(canonicalJson({
     version: SCENARIO_CAPSULE_VERSION,
@@ -189,6 +209,8 @@ function replaySingle(capsule: ReproducibleScenarioCapsule): ScenarioCapsuleRepl
  * Re-executes only the stored canonical requests. Persisted outputs are not treated as replay output.
  */
 export function replayScenarioCapsule(capsule: ReproducibleScenarioCapsule): ScenarioCapsuleReplay {
+  const issues = replayInputIssues(capsule);
+  if (issues.length > 0) return blockedReplay(capsule, issues);
   if (!capsule.variantRun) return replaySingle(capsule);
   const comparison = compareCounterfactual({
     baseline: capsule.baselineRun.request,

@@ -1444,3 +1444,25 @@ describe('Genesis Experiment Fabric', () => {
     expect(planned.disclosure.limitations.join(' ')).toContain('backendowy adapter PyMeep');
   });
 });
+
+
+describe('Scenario Capsule replay contract boundary', () => {
+  it('blocks replay when the baseline fingerprint is missing', () => {
+    const baseline = runExperiment(parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'));
+    const capsule = createScenarioCapsule({ title: 'Replay boundary', baselineRun: baseline });
+    const broken = { ...capsule, references: { ...capsule.references, baselineRunFingerprint: '' } };
+    const replay = replayScenarioCapsule(broken);
+    expect(replay.status).toBe('NOT_COMPARABLE');
+    expect(replay.message).toContain('Replay BLOCKED');
+    expect(replay.message).toContain('references.baselineRunFingerprint');
+  });
+
+  it('blocks replay when the capsule contract version is unsupported', () => {
+    const baseline = runExperiment(parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'));
+    const capsule = createScenarioCapsule({ title: 'Version boundary', baselineRun: baseline });
+    const broken = { ...capsule, contractVersion: '999.0.0' };
+    const replay = replayScenarioCapsule(broken);
+    expect(replay.status).toBe('NOT_COMPARABLE');
+    expect(replay.message).toContain('contractVersion=999.0.0');
+  });
+});

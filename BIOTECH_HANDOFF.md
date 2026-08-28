@@ -1,67 +1,78 @@
-# GENESIS Biotech Handoff
+# GENESIS Biotech / Main Roadmap Handoff
 
 ## Checkpoint state
 
-- **CURRENT HEAD:** `1ccdf93` (feat(biotech): pin ChEMBL caffeine bioactivity)
+- **CURRENT HEAD:** update after commit below
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` (unchanged)
-- **Working tree before this session:** clean
+- **Working tree before this piece:** clean
 
-This handoff records the completed ChEMBL bioactivity continuation. Do not redo a broad audit; verify only the current Git state and continue from the next GAP below.
+Do not restart or perform a broad repository audit. Verify only the current branch, HEAD, status and the specific files named in the next GAP.
 
-## Completed in this session
+## Commits completed in this series
 
-Added a minimal, source-neutral ChEMBL adapter and replayable pinned fixture for one real public bioactivity record:
+- `092c6aa` — `feat(biotech): pin ChEMBL caffeine bioactivity`
+- next checkpoint in this session — integrate pinned biotech evidence into Experiment Fabric
+
+## Completed capability
+
+Genesis now has a controlled Science Chat → Experiment Fabric path for the one verified ChEMBL record:
 
 ```text
-PubChem CID 2519 / Caffeine
-→ ChEMBL CHEMBL113
-→ activity 189031
-→ target CHEMBL318 / Adenosine receptor A1
-→ assay CHEMBL876556
-→ Ki = 41000.0 nM
-→ BiologicalTarget + BiologicalEvidence
+Science Chat natural-language biotech request
+→ structured biotechnology request
+→ source-bound ChEMBL match when query names caffeine/A1/adenosine
+→ knowledge-only ExperimentResult
+→ BiologicalTarget + BiologicalEvidence + provenance
 ```
 
-The fixture is `packages/frontend/src/core/biotechData/chembl-activity-189031.json`. It preserves the molecule ID and PubChem CID, target ID/name/type, assay ID/context/type, activity ID/type/relation/value/unit, ChEMBL release `ChEMBL_37`, release date, source URL, retrieval date, document ID and raw response fields.
+The integration is intentionally not a biological executor. A matching query returns `status: knowledge_only`, `provenance.resultOrigin: knowledge-only`, the pinned activity/assay/value fields and the source-bound biological records. It never claims that a binding `Ki` is efficacy, therapeutic benefit or safety. An unrelated target query remains `engine_not_available` and receives no unrelated evidence.
 
-The mapper is `packages/frontend/src/core/biotechData/chembl.ts`. It validates the pinned identity/activity fields, maps only the target and binding evidence actually supported by ChEMBL, preserves provenance and raw fixture data, and produces a deterministic eight-character scientific fingerprint. It does not create efficacy, safety, candidate, executor or clinical claims.
+Changed files for this piece:
 
-Target provenance is `OBSERVED`; the curated activity evidence is `LITERATURE_SUPPORTED`. The evidence uncertainty explicitly states that an in vitro binding measurement does not establish clinical efficacy, therapeutic benefit or safety.
+- `packages/frontend/src/core/experimentFabric/types.ts` — optional source-bound biological target/evidence fields on `ExperimentResult`.
+- `packages/frontend/src/core/experimentFabric/executor.ts` — guarded ChEMBL knowledge-result branch before the generic unavailable fallback.
+- `packages/frontend/src/__tests__/biotechExperimentFabric.test.ts` — integration tests for match, non-match, status and provenance semantics.
 
 ## Validation
 
-The following commands completed successfully:
+The following completed successfully after this piece:
 
 ```text
-npm run test --workspace=packages/frontend -- --run src/__tests__/chembl.test.ts
+npm run test --workspace=packages/frontend -- --run src/__tests__/biotechExperimentFabric.test.ts
 npm test
 npm run build
 npm run lint
 git diff --check
 ```
 
-The build emitted only the pre-existing Vite large-chunk warning; no build failure occurred. Chromium was not needed because this change is data/core logic only.
+Build reports only the existing Vite large-chunk warning. No UI changed, so Chromium was not required. CI is not claimed green because no CI run was performed in this session.
 
-## Parked / do not do
+## Designed versus real
 
-- PubChem → target/evidence/safety remains parked; PubChem is chemical identity/properties only.
-- BiologicalEvidence → ScientificEvidencePack remains parked until real Fabric runs, arms, baseline/reference and replay semantics exist.
-- Biological executor remains `NOT_EXECUTED`/`BLOCKED`; never reuse a physics or chemistry executor as a biological adapter.
-- Canonical replay remains parked; do not cast `EvidenceGuidedExperimentCapsule` to `ReproducibleScenarioCapsule` or invent plan IDs.
-- Do not invent compounds, targets, DOI, toxicity, efficacy or synthesis instructions.
+The ChEMBL record is real and pinned: caffeine `CHEMBL113`, activity `189031`, target `CHEMBL318` Adenosine receptor A1, assay `CHEMBL876556`, `Ki = 41000.0 nM`, release `ChEMBL_37`. The Fabric integration is a deterministic local mapping of that pinned record, not a live biological execution and not a clinical or efficacy model.
+
+## Parked
+
+- Biological executor remains `NOT_EXECUTED`/`BLOCKED`.
+- Do not promote a single binding record into a full Evidence Pack without hypothesis, baseline/reference, arms, repetition policy, real runs and replay identity.
+- Do not create candidate efficacy/safety scores or infer safety from PubChem/ChEMBL identity/activity records.
+- Canonical replay remains parked; no casts or artificial plan IDs.
+- Real independent model ↔ observation comparison remains a larger future gap.
 - Double-Slit / Bloch / Atom-Bohr and G3/NIST remain unrelated/out of scope.
 
-## NEXT GAP
+## NEXT GAP — next large logical piece
 
-Wire the verified `BiologicalTarget` and `BiologicalEvidence` into the existing biotech discovery path without creating a biological executor. Prefer the smallest integration point that lets a discovery report or Science Chat response expose the evidence IDs and provenance while keeping execution `NOT_EXECUTED`/`BLOCKED`. Reuse existing candidate/report/memory contracts; do not invent candidate efficacy or safety scores. If this requires a broad architecture change, park it and choose a smaller contract/test/documentation gap.
+Complete the **result → analysis → Scientific Memory** integration for existing executable experiments, preserving `modelId`, `runId`, run fingerprint, outputs, analysis, provenance and execution status. Start by locating the smallest existing save-to-memory boundary and add a targeted test for one already executable model. Do not redesign Memory, Evidence or Replay. If the boundary cannot be wired without a broad semantic change, park it and take the next safe gap: expose the existing ExperimentResult/provenance in the current Science Chat response/UI without inventing new scientific claims.
+
+## Large roadmap priorities after the next piece
+
+1. Result → Analysis → Scientific Memory with complete identity/provenance.
+2. Result → existing World/3D visualization, only where a real result already maps semantically.
+3. Minimal preregistered protocol/A-B contract; park if hypothesis, baseline, arms, repetition and replay semantics cannot all be represented honestly.
+4. Infrastructure for the first genuine model ↔ independent real observation comparison; never use model inputs as observations.
+5. Continue real-source expansion through pinned records, provenance and evidence rather than live scraper sprawl.
 
 ## Exact continuation instruction
 
-1. Confirm branch, HEAD, `origin/main`, and clean/dirty status.
-2. Read this handoff and inspect only the existing biotech discovery/report/memory path plus the new ChEMBL mapper and tests.
-3. Implement the smallest safe mapping of the verified ChEMBL record into existing contracts, with targeted tests and provenance assertions.
-4. Run targeted tests, full tests as needed, typecheck/build, lint and `git diff --check`.
-5. Update this handoff with the resulting HEAD/branch/live state, commit and push.
-
-Never claim CI green without an actual CI result. If interrupted, first leave the current scope consistent, test it, update this handoff, commit and push.
+Confirm branch, HEAD, status and `origin/main`. Read this handoff. Inspect only the current result/memory boundary and its tests. Implement one large, logically complete GAP; run targeted tests, full tests as needed, typecheck/build, lint and `git diff --check`; update this handoff; commit; push; then continue to the next GAP. Never create ZIP files. If interrupted, first make the current scope consistent, test it, update this handoff, commit and push.

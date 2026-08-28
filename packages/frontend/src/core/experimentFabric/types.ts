@@ -1,3 +1,4 @@
+import type { BiologicalEvidence, BiologicalTarget } from '../biotechDiscoveryContract';
 import type { KnowledgeCapability, KnowledgeCorpusFile, KnowledgeVisualization } from '../knowledge/registry';
 
 /** Public contract version for the Genesis Experiment Fabric. */
@@ -124,6 +125,9 @@ export interface ExperimentResult {
   route: ExperimentRoute;
   /** A spatial run may expose count/IDs without duplicating the EventRegistry. */
   eventSummary?: { count: number; types: readonly string[] };
+  /** Optional source-bound biological records; present only for knowledge-only biotech results. */
+  biologicalTarget?: BiologicalTarget;
+  biologicalEvidence?: BiologicalEvidence;
 }
 
 /** Canonical record: request → plan → real engine/result → provenance. */

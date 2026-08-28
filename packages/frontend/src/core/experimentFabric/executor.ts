@@ -44,6 +44,7 @@ import { buildPhotonGraph } from '../modelGraph/photonGraph';
 import { kardashevPower, schwarzschildRadius } from '../physics';
 import { runIsingMetropolisScenario } from '../isingModel';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS } from '../simulation/epidemicCity';
+import { mapPinnedChEMBLCaffeineA1Activity } from '../biotechData/chembl';
 import { createExperimentProvenance, statusForCapability } from './provenance';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
 import { registerLiveExperimentWorld } from './worldHandoff';
@@ -66,6 +67,40 @@ type ExecutableGraph = {
 };
 
 function routeForUnavailable(): ExperimentRoute { return { kind: 'none' }; }
+
+function biotechKnowledgeResult(request: StructuredExperimentRequest): ExperimentResult | undefined {
+  if (request.domainId !== 'biotechnology') return undefined;
+  const targetQuery = String(request.parameters.targetQuery ?? '').toLocaleLowerCase('pl-PL');
+  if (!/(?:kofein|caffein|adenozyn|adenosine|a1)/.test(targetQuery)) return undefined;
+  const record = mapPinnedChEMBLCaffeineA1Activity();
+  return {
+    contractVersion: EXPERIMENT_FABRIC_VERSION,
+    status: 'knowledge_only',
+    summary: 'Znaleziono przypięty rekord bioaktywności ChEMBL; nie wykonano biologicznego eksperymentu.',
+    outputs: {
+      compoundId: record.compoundId,
+      targetId: record.biologicalTarget.id,
+      targetLabel: record.biologicalTarget.label,
+      activityId: record.activity.activityId,
+      assayId: record.activity.assayId,
+      activityType: record.activity.type,
+      activityRelation: record.activity.relation,
+      activityValue: record.activity.value,
+      activityUnits: record.activity.units,
+    },
+    units: { activityValue: record.activity.units },
+    warnings: [
+      'KNOWLEDGE_ONLY: wynik pochodzi z przypiętego źródła ChEMBL, nie z biological executora.',
+      'BINDING_RECORD_ONLY: Ki w tym assayu nie ustanawia skuteczności klinicznej, korzyści terapeutycznej ani bezpieczeństwa.',
+    ],
+    validity: record.activity.assayContext,
+    assumptions: ['Dopasowanie ograniczono do przypiętego rekordu kofeina–receptor adenozynowy A1.', 'Brak wykonania biologicznego; status pozostaje NOT_EXECUTED/knowledge_only.'],
+    visualization: [],
+    route: routeForUnavailable(),
+    biologicalTarget: record.biologicalTarget,
+    biologicalEvidence: record.biologicalEvidence,
+  };
+}
 
 function unavailableResult(status: Exclude<ExperimentResult['status'], 'completed' | 'rejected' | 'failed'>, summary: string, route: ExperimentRoute): ExperimentResult {
   return {
@@ -883,6 +918,7 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
         route: model?.route ?? routeForUnavailable(),
       };
     }
+    else if (request.domainId === 'biotechnology') result = biotechKnowledgeResult(request) ?? unavailableResult('engine_not_available', 'Biotechnology request nie pasuje do żadnego przypiętego rekordu źródłowego; biological executor pozostaje niedostępny.', routeForUnavailable());
     else if (status === 'knowledge_only') result = unavailableResult(status, `Corpus Genesis opisuje domenę „${request.domainId}”, ale nie ma dla niej wykonawczego solvera.`, routeForUnavailable());
     else if (status === 'capability_seam') result = unavailableResult(status, `${intent.rationale} Wymagany solver: ${intent.requiredSolver}.`, routeForUnavailable());
     else if (status === 'engine_not_available') result = unavailableResult(status, `${intent.rationale} Wymagany solver: ${intent.requiredSolver}.`, routeForUnavailable());

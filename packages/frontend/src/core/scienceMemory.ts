@@ -1,7 +1,7 @@
 import { readJSON, writeJSON } from './storage';
 import type { HonestyLevel, SimParams } from './types';
 import { biotechScientificFingerprint, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateDiscoveryReport, type CandidateRanking, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
-import type { ExperimentOutputValue } from './experimentFabric/types';
+import type { ExperimentOutputValue, ExperimentRun } from './experimentFabric/types';
 import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 
 /**
@@ -308,6 +308,45 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
 }
 
 /** Najnowsze pierwsze. */
+/**
+ * Persists a Fabric run without upgrading its scientific status. Numeric outputs are
+ * retained as observations; every run status and provenance origin remains explicit.
+ */
+export function saveExperimentRunToMemory(run: ExperimentRun): SavedExperiment {
+  const observations = Object.fromEntries(Object.entries(run.result.outputs).filter(([, value]) => {
+    if (typeof value === 'number') return Number.isFinite(value);
+    return Array.isArray(value) && value.length > 0 && value.every((sample) => Number.isFinite(sample));
+  })) as Readonly<Record<string, ExperimentOutputValue>>;
+  const stats: Record<string, number> = Object.fromEntries(Object.entries(run.result.outputs)
+    .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1])));
+  return saveExperiment({
+    labId: run.request.domainId,
+    experimentId: run.request.modelId ?? run.request.domainId,
+    experimentName: run.request.modelId ?? `Science Chat — ${run.request.domainId}`,
+    params: { ...run.request.parameters },
+    stats,
+    observations,
+    execution: {
+      status: run.result.status,
+      runId: run.runId,
+      runFingerprint: run.provenance.runFingerprint,
+      resultOrigin: run.provenance.resultOrigin,
+      summary: run.result.summary,
+      modelId: run.request.modelId,
+      engine: run.plan.engine ?? undefined,
+      modelVersion: run.plan.modelVersion ?? undefined,
+    },
+    analysis: [
+      { title: 'Genesis result', body: run.result.summary, kind: 'fabric-result' },
+      ...(run.result.warnings.length === 0 ? [] : [{ title: 'Jawne ostrzeżenia', body: run.result.warnings.join(' '), kind: 'fabric-warning' }]),
+    ],
+    honesty: run.result.status === 'completed' ? 'exact' : 'simplified',
+    honestyNote: `Fabric status=${run.result.status}; resultOrigin=${run.provenance.resultOrigin}.`,
+    assumptions: [...run.result.assumptions],
+    epistemicStatus: run.result.status === 'completed' ? 'OBSERVED' : 'UNKNOWN',
+  });
+}
+
 /**
  * Persists a faithful Memory index for a completed Scientific Evidence Pack.
  * The full typed result remains in the Evidence Pack store; Memory keeps the

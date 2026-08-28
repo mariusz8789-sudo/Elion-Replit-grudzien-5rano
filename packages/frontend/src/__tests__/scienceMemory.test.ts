@@ -110,5 +110,7 @@ describe('scienceMemory: Fabric observations', () => {
     expect(() => saveExperiment({ ...base, observations: {} })).toThrow(/skończone/);
     expect(() => saveExperiment({ ...base, stats: { energy: Number.NaN } })).toThrow(/Statystyki/);
     expect(() => saveExperiment({ ...base, stats: { energy: Number.POSITIVE_INFINITY } })).toThrow(/Statystyki/);
+    expect(() => saveExperiment({ ...base, params: { mass: Number.NaN } })).toThrow(/Parametry/);
+    expect(() => saveExperiment({ ...base, params: { mass: Number.POSITIVE_INFINITY } })).toThrow(/Parametry/);
   });
 });

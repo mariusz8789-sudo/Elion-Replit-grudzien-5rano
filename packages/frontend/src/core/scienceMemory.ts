@@ -55,6 +55,13 @@ export function contentHash(input: { labId: string; experimentId: string; params
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
+function validParams(value: unknown): value is SimParams {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.values(value as Record<string, unknown>).every((entry) =>
+    (typeof entry === 'number' && Number.isFinite(entry)) || typeof entry === 'string' || typeof entry === 'boolean',
+  );
+}
+
 function validStats(value: unknown): value is Record<string, number> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   return Object.values(value as Record<string, unknown>).every((entry) => typeof entry === 'number' && Number.isFinite(entry));
@@ -82,7 +89,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     typeof o.experimentName === 'string' &&
     typeof o.contentHash === 'string' &&
     validStats(o.stats) &&
-    o.params != null && typeof o.params === 'object' &&
+    validParams(o.params) &&
     validObservations(o.observations)
   );
 }
@@ -107,6 +114,7 @@ export interface SaveExperimentInput {
 }
 
 export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
+  if (!validParams(input.params)) throw new Error('Parametry muszą zawierać wyłącznie skończone liczby, teksty lub wartości logiczne.');
   if (!validStats(input.stats ?? {})) throw new Error('Statystyki muszą zawierać wyłącznie skończone liczby.');
   if (!validObservations(input.observations)) throw new Error('Obserwacje muszą zawierać wyłącznie skończone wartości lub serie liczbowe.');
   const hash = contentHash(input);

@@ -152,6 +152,14 @@ describe('scienceChat: wyjaśnienia, równania, założenia, zadania', () => {
     expect((r.equations ?? []).join(' ')).toMatch(/γ|gamma|v/i);
   });
 
+  it('tunelowanie pokazuje równanie istniejącego runnera i jego granice', () => {
+    const r = resolveCommand('pokaż równania', ctx({ labId: 'quantum', experimentId: 'tunneling', experimentName: 'Tunelowanie kwantowe' }));
+    expect(r.todo).toBeFalsy();
+    expect(r.tag).toBe('MODEL');
+    expect((r.equations ?? []).join(' ')).toMatch(/Schrödinger|ψ|split/i);
+    expect((r.equations ?? []).join(' ')).toMatch(/barierą/);
+  });
+
   it('"założenia modelu" -> tag ZALOZENIE + honestyNote', () => {
     const r = resolveCommand('jakie są założenia modelu', ctx());
     expect(r.tag).toBe('ZALOZENIE');

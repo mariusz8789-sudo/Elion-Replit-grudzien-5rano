@@ -156,6 +156,8 @@ export function registerCatalog(): void {
     experimentId: 'tunneling',
     honesty: 'educational',
     summary: 'Pakiet falowy częściowo przenika barierę potencjału — prawdopodobieństwo transmisji zależy od jej wysokości i szerokości.',
+    equations: ['i∂ψ/∂t = (−½∂²/∂x² + V(x))ψ (ħ=m=1)', 'T = ∫ za barierą |ψ(x,t)|² dx', 'R = ∫ przed barierą |ψ(x,t)|² dx'],
+    assumptions: ['1D split-step Fourier', 'Pakiet Gaussa i bariera prostokątna', 'Jednostki zredukowane ħ=m=1', 'Nie jest to ogólny solver Schrödingera ani model urządzenia'],
   });
 
   // ---- Kosmologia SETI (Civilization) ----

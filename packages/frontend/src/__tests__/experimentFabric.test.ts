@@ -254,6 +254,7 @@ describe('Genesis Experiment Fabric', () => {
     expect(evidence.createdFromRealRunsOnly).toBe(true);
     expect(evidence.arms.some((arm) => arm.kind === 'positive-control')).toBe(true);
     expect(evidence.arms.every((arm) => arm.reproduction === 'MATCH')).toBe(true);
+    expect(evidence.arms.every((arm) => arm.outputObservations.length === arm.runIds.length)).toBe(true);
     expect(evidence.assessment.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
     expect(evidence.assessment.message).toContain('nie jest odkrycie');
     const pack = createScientificEvidencePack(evidence);

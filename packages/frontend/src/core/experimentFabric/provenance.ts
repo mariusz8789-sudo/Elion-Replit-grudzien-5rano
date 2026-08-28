@@ -2,6 +2,7 @@ import { canonicalJson, fnv1a } from '../events/hash';
 import type { KnowledgeCapability, KnowledgeCorpusFile } from '../knowledge/registry';
 import {
   EXPERIMENT_FABRIC_VERSION,
+  type ExperimentOutputValue,
   type ExperimentPlan,
   type ExperimentProvenance,
   type ExperimentResult,
@@ -83,6 +84,15 @@ export function resultOriginForCapability(capability: KnowledgeCapability): Expe
   }
 }
 
+export function validateExperimentOutputs(outputs: Readonly<Record<string, ExperimentOutputValue>>): void {
+  for (const [key, value] of Object.entries(outputs)) {
+    if (!Array.isArray(value)) continue;
+    if (!value.every((sample) => Number.isFinite(sample))) {
+      throw new Error(`Output series „${key}" musi zawierać wyłącznie skończone liczby.`);
+    }
+  }
+}
+
 export function createExperimentProvenance(input: {
   request: StructuredExperimentRequest;
   plan: ExperimentPlan;
@@ -92,6 +102,7 @@ export function createExperimentProvenance(input: {
   deterministic: boolean;
   backendExecution?: ExperimentProvenance['backendExecution'];
 }): ExperimentProvenance {
+  validateExperimentOutputs(input.result.outputs);
   const requestFingerprint = fingerprintStructuredRequest(input.request);
   const runFingerprint = `run_${fnv1a(canonicalJson({
     requestFingerprint,

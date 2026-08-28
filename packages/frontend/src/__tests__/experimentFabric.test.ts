@@ -40,6 +40,7 @@ import {
   compareScientificEvidencePacks,
   getStoredEvidencePackReplayVerdict,
   experimentObservableKind,
+  validateExperimentOutputs,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -1473,5 +1474,16 @@ describe('Experiment observable shape', () => {
     expect(experimentObservableKind(1.25)).toBe('scalar');
     expect(experimentObservableKind([0.1, 0.2, 0.3])).toBe('series');
     expect(experimentObservableKind([0.3, 0.2, 0.1])).toBe('series');
+  });
+});
+
+describe('Experiment output validation', () => {
+  it('accepts finite ordered series', () => {
+    expect(() => validateExperimentOutputs({ profile: [0, 0.25, 1] })).not.toThrow();
+  });
+
+  it('rejects non-finite series samples before provenance can be fingerprinted', () => {
+    expect(() => validateExperimentOutputs({ profile: [0, Number.NaN, 1] })).toThrow(/skończone liczby/);
+    expect(() => validateExperimentOutputs({ profile: [0, Number.POSITIVE_INFINITY] })).toThrow(/skończone liczby/);
   });
 });

@@ -23,6 +23,7 @@ export {
   statusForCapability,
   resultOriginForCapability,
   createExperimentProvenance,
+  validateExperimentOutputs,
 } from './provenance';
 
 export { parseScienceChatMessage } from './parser';

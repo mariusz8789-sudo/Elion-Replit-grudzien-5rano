@@ -17,7 +17,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `a3f0d79` — `feat(science-chat): surface biotech evidence`
 - `97d0631` — `feat(memory-ui): expose fabric provenance`
 - `805e41b` — `feat(memory): route saved runs from science chat`
-- next checkpoint in this session — surface source/version/URL provenance in both UI boundaries
+- `0a740ab` — `feat(biotech): connect pinned record to discovery`
+- next checkpoint in this session — expose existing analysis beside Core typed results
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -109,9 +110,17 @@ Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run bu
 
 The remaining Biotech items are parked unless a very small, low-cost integration appears. In particular, safety needs a real source and explicit uncertainty, while preregistration needs an executable biological protocol; neither will be invented here. The additional ChEMBL relation search remains parked because available records are heterogeneous/duplicate and one candidate carries a data-validity warning.
 
+## Completed Core capability: typed result → honest analysis in Science Chat
+
+The existing `formatFabricRun` now renders `analyzeExperimentResult(run.result)` beside the typed result, status, origin, outputs and provenance. For a real completed run it states that the analysis covers one result and does not infer trends; for `knowledge_only` or other non-completed statuses it remains explicitly blocked. No new analysis contract or solver was added.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation completed: targeted formatter/memory tests, then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Stop expanding Biotech in this session. Select the highest-value existing Core integration gap in `Science Chat → Structured Request → Model Selection → Experiment Fabric → Existing Executor → Real Typed Result → Analysis → World/3D → Evidence → Scientific Memory → Replay`. Prefer an existing path where one of these artifacts is produced but not forwarded or rendered. Make one large logical integration piece, then test, typecheck/lint/build, update this handoff, commit and push before continuing to the next Core GAP.
+Continue with the highest-value existing Core integration gap after analysis: verify and strengthen the existing real result → `result.route` → World/3D handoff, then Evidence/Replay where semantics are complete. Prefer forwarding existing typed metadata over adding contracts. Make one logical piece, test, typecheck/lint/build, update this handoff, commit and push before continuing.
 
 ## Next large gaps
 

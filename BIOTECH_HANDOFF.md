@@ -13,7 +13,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 
 - `092c6aa` — `feat(biotech): pin ChEMBL caffeine bioactivity`
 - `a1050ca` — `feat(biotech): expose ChEMBL evidence in fabric`
-- next checkpoint in this session — persist Experiment Fabric runs in Scientific Memory
+- `076cb87` — `feat(memory): persist experiment fabric runs`
+- next checkpoint in this session — expose the source-bound result directly in Science Chat UI
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -53,9 +54,17 @@ Real source-backed data remains the pinned ChEMBL record: caffeine `CHEMBL113`, 
 - Real independent model ↔ observation comparison remains a larger future gap.
 - Double-Slit / Bloch / Atom-Bohr and G3/NIST remain unrelated/out of scope.
 
+## Completed capability: source-bound result in Science Chat UI
+
+The existing Science Chat now handles `biotechnology` requests through the pinned ChEMBL knowledge path instead of presenting an unusable confirmation plan. Matching caffeine/A1/adenosine queries are executed locally as a deterministic `knowledge_only` lookup, saved through `saveExperimentRunToMemory`, and displayed with status, result origin, target identity, evidence identity, evidence status and provenance. No biological executor is invoked. Unrelated biotech targets remain explicitly unavailable and do not receive unrelated evidence.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`. Added coverage: `packages/frontend/src/__tests__/scienceChatFabricFormat.test.ts`.
+
+Chromium manual check completed on the local frontend: the query `Znajdź naturalnych kandydatów dla targetu A1: kofeina.` displayed `Status: knowledge_only; origin: knowledge-only`, `Adenosine receptor A1`, `chembl:activity:189031`, `LITERATURE_SUPPORTED` and a run provenance fingerprint.
+
 ## NEXT GAP — next large logical piece
 
-Connect the saved Experiment Fabric run to the existing analysis/visualization handoff without inventing new physics: expose the persisted `ExperimentResult`, `ExperimentProvenance` and Memory record at the current Science Chat/UI boundary for one already executable model. Prefer the smallest existing response or screen integration point, and add a targeted test. Preserve status distinctions and do not claim a result before execution. If UI integration is not semantically safe, park it and implement a minimal protocol/pre-registration contract gap instead.
+Connect the saved Experiment Fabric run to the existing Scientific Memory screen/list so users can inspect the persisted result identity and status from the current UI, without inventing new physics or a second memory system. Prefer the smallest existing memory-screen integration point and add a targeted test. Preserve status distinctions and do not claim a result before execution. If UI integration is not semantically safe, park it and implement a minimal protocol/pre-registration contract gap instead.
 
 ## Next large gaps
 

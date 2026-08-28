@@ -5,10 +5,10 @@ import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
-import { saveExperiment, listExperiments } from '../core/scienceMemory';
+import { saveExperiment, saveExperimentRunToMemory, listExperiments } from '../core/scienceMemory';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
 import { track } from '../core/analytics';
-import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmEarthquakeEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
+import { parseScienceChatMessage, runExperiment, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmEarthquakeEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
 import { getToken } from '../core/backend/session';
 import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
@@ -71,7 +71,7 @@ function formatProjectKnowledgeSources(project: ActiveKnowledgeProject, material
   return `Źródła projektu „${project.name}” — materiał użytkownika, nie wynik solvera ani instrukcja wykonawcza:\n${entries.join('\n')}`;
 }
 
-function formatFabricRun(run: ExperimentRun): string {
+export function formatFabricRun(run: ExperimentRun): string {
   const entries = Object.entries(run.result.outputs).slice(0, 6).map(([key, value]) => {
     const unit = run.result.units[key] ? ` ${run.result.units[key]}` : '';
     return `${key}: ${typeof value === 'number' ? value.toPrecision(5) : String(value)}${unit}`;
@@ -85,7 +85,10 @@ function formatFabricRun(run: ExperimentRun): string {
     : run.result.route.kind === 'lab'
       ? `\nWizualizacja: laboratorium ${run.result.route.labId}.`
       : '';
-  return `${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}\nProvenance: ${run.provenance.runFingerprint}.`;
+  const biotech = run.result.biologicalTarget && run.result.biologicalEvidence
+    ? `\nBiotech target: ${run.result.biologicalTarget.label} (${run.result.biologicalTarget.id}). Evidence: ${run.result.biologicalEvidence.id}. Status evidence: ${run.result.biologicalEvidence.status}.`
+    : '';
+  return `${run.result.summary}\nStatus: ${run.result.status}; origin: ${run.provenance.resultOrigin}.${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}\nProvenance: ${run.provenance.runFingerprint}.`;
 }
 
 function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule }) {
@@ -273,6 +276,15 @@ export function ScienceChat() {
     const fabricRequest = parseScienceChatMessage(msg);
     const isFabricRequest = fabricRequest.modelId !== undefined || fabricRequest.domainId !== 'unknown';
     if (isFabricRequest) {
+      if (fabricRequest.domainId === 'biotechnology') {
+        const run = runExperiment(fabricRequest);
+        if (run.result.biologicalEvidence) saveExperimentRunToMemory(run);
+        setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatFabricRun(run), tag: 'SYSTEM' }]);
+        setInput('');
+        track('experiment_fabric_run', { model: 'biotechnology', status: run.result.status, confirmed: 'false' });
+        void appendProjectKnowledgeSources(msg);
+        return;
+      }
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
       setPendingGuidedPlan(reviewed.status === 'READY_FOR_CONFIRMATION' || reviewed.status === 'READY_FOR_HYPOTHETICAL_CONFIRMATION' ? reviewed : null);

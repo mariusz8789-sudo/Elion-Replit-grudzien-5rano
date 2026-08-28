@@ -44,11 +44,26 @@ const SHOTS: Shot[] = [
 ];
 const TOTAL = 80;
 
+// Oryginalna adaptacja języka filmu: pytanie → model → obserwacja → Evidence.
+// To nadal ten sam żywy silnik epidemiczny, nie gotowy klip ani kopia materiału.
+const PHILOSOPHER_SHOTS: Shot[] = [
+  { t: 0, caption: 'PYTANIE: Czy wynik świata wynika z modelu, danych i założeń?', target: whole, dayRate: 2 },
+  { t: 9, caption: 'MODEL: agenci, kontakty i transmisja — stan zmienia się w czasie rzeczywistym.', dayRate: 2, target: (s) => ({ ...buildingCenter(s, 'shop'), zoom: 3.4 }) },
+  { t: 18, caption: 'RÓWNANIE: parametr R₀ steruje oczekiwaną liczbą wtórnych transmisji.', dayRate: 6, target: (s) => ({ ...buildingCenter(s, 'park'), zoom: 2.6 }), apply: (s) => { s.setParam('r0', 3.6); } },
+  { t: 30, caption: 'OBSERWACJA MODELU: zdrowy · narażony · zakażony · odporny · izolacja · szpital.', dayRate: 6, target: (s) => ({ ...buildingCenter(s, 'hospital'), zoom: 2.4 }) },
+  { t: 40, caption: 'INTERWENCJA: zmień założenie i obserwuj, jak zmienia się trajektoria.', dayRate: 6, target: (s) => ({ ...buildingCenter(s, 'school'), zoom: 2.6 }), apply: (s) => { s.setParam('restrictions', 0.7); s.setParam('isolate', true); } },
+  { t: 52, caption: 'PYTANIE NASTĘPNE: który agent i które zdarzenie zmieniły wynik?', dayRate: 3, followId: 0, target: (s) => ({ ...whole(s), zoom: 3.6 }) },
+  { t: 60, caption: 'EVIDENCE: heatmapa wynika ze stanu symulacji, nie z wcześniej nagranego obrazu.', dayRate: 4, analysis: 'risk', target: (s) => ({ ...whole(s), zoom: 1.15 }) },
+  { t: 69, caption: 'WYNIK: model, założenia, ograniczenia i kolejny eksperyment.', dayRate: 1, target: (s) => ({ ...whole(s), zoom: 0.9 }), analysis: 'none', finale: true },
+];
+
 export function ConceptFilmScreen() {
+  const philosopherMode = typeof window !== 'undefined' && window.location.hash.includes('mode=philosopher');
+  const activeShots = philosopherMode ? PHILOSOPHER_SHOTS : SHOTS;
   const sim = useMemo(() => new EpidemicCitySimulation({ nAgents: 340, initialInfected: 3, r0: 2.4, severeRate: 0.22, restrictions: 0, isolate: false }), []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cam = useRef<Camera>({ zoom: 1, cx: sim.worldWidth / 2, cy: sim.worldHeight / 2 });
-  const [caption, setCaption] = useState(SHOTS[0].caption);
+  const [caption, setCaption] = useState(activeShots[0].caption);
   const [t, setT] = useState(0);
   const [running, setRunning] = useState(true);
   const runRef = useRef(running); runRef.current = running;
@@ -62,8 +77,8 @@ export function ConceptFilmScreen() {
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       if (runRef.current && time < TOTAL) time += dt;
       // Aktywna scena.
-      let i = 0; for (let k = 0; k < SHOTS.length; k++) if (time >= SHOTS[k].t) i = k;
-      const shot = SHOTS[i];
+        let i = 0; for (let k = 0; k < activeShots.length; k++) if (time >= activeShots[k].t) i = k;
+      const shot = activeShots[i];
       if (i !== shotIdx) { shotIdx = i; shot.apply?.(sim); setCaption(shot.caption); }
 
       // Symulacja pędzi tempem sceny.
@@ -96,12 +111,12 @@ export function ConceptFilmScreen() {
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [sim, replayKey]);
+  }, [sim, replayKey, activeShots]);
 
   return (
     <main id="main-content" tabIndex={-1} className="home concept-film">
       <div className="concept-stage">
-        <canvas ref={canvasRef} className="concept-canvas" aria-label="Genesis OS — film koncepcyjny (żywa symulacja)" />
+          <canvas ref={canvasRef} className="concept-canvas" aria-label={philosopherMode ? 'Genesis — Simulation Question, żywa symulacja' : 'Genesis OS — film koncepcyjny (żywa symulacja)'} />
       </div>
       <div className="concept-bar">
         <button className="chip-btn" onClick={() => setRunning((r) => !r)}>{running ? '⏸ Pauza' : '▶ Odtwórz'}</button>
@@ -109,7 +124,7 @@ export function ConceptFilmScreen() {
         <div className="concept-progress"><div className="concept-progress-fill" style={{ width: `${Math.min(100, (t / TOTAL) * 100)}%` }} /></div>
         <span className="concept-time">{Math.floor(t)}s / {TOTAL}s</span>
       </div>
-      <p className="footer-note">{caption || 'CONCEPT — TARGET VISUALIZATION FOR GENESIS OS 2030'}</p>
+      <p className="footer-note">{caption || (philosopherMode ? 'SCENARIO — SIMULATION QUESTION' : 'CONCEPT — TARGET VISUALIZATION FOR GENESIS OS 2030')}</p>
     </main>
   );
 }

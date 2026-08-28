@@ -18,6 +18,7 @@ export type BiotechRecordKind =
   | 'mechanism'
   | 'safety-signal'
   | 'biological-evidence'
+  | 'therapeutic-candidate'
   | 'therapeutic-hypothesis';
 
 export interface BiotechIdentity {
@@ -52,6 +53,17 @@ export interface Compound extends BiotechRecord {
   parentMaterialIds: readonly string[];
 }
 
+export interface TherapeuticCandidate extends BiotechRecord {
+  kind: 'therapeutic-candidate';
+  materialId: string;
+  compoundIds: readonly string[];
+  targetIds: readonly string[];
+  mechanismIds: readonly string[];
+  supportingEvidenceIds: readonly string[];
+  safetySignalIds: readonly string[];
+  hypothesisIds: readonly string[];
+}
+
 export interface BiologicalTarget extends BiotechRecord {
   kind: 'biological-target';
   targetType: string;
@@ -78,6 +90,9 @@ export interface BiologicalEvidence extends BiotechRecord {
 export interface TherapeuticHypothesis extends BiotechRecord {
   kind: 'therapeutic-hypothesis';
   claim: string;
+  candidateId: string;
+  targetIds: readonly string[];
+  mechanismIds: readonly string[];
   supportingEvidenceIds: readonly string[];
   safetySignalIds: readonly string[];
 }

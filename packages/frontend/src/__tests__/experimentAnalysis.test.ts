@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeTrend, analyzeRun, paramRangeSummary } from '../core/experimentAnalysis';
+import { analyzeTrend, analyzeRun, analyzeExperimentResult, paramRangeSummary } from '../core/experimentAnalysis';
+import type { ExperimentResult } from '../core/experimentFabric/types';
 import type { RunSample } from '../core/experimentRun';
 import type { ParamDef } from '../core/types';
 
@@ -52,6 +53,19 @@ describe('analyzeTrend', () => {
       { t: 100, stats: { x: 2 } },
     ];
     expect(analyzeTrend(samples, 'x')?.trend).toBe('rising');
+  });
+});
+
+describe('analyzeExperimentResult', () => {
+  it('records output coverage without inventing a trend from one real result', () => {
+    const result: ExperimentResult = {
+      contractVersion: '1.0.0', status: 'completed', summary: 'real result',
+      outputs: { transmission: 0.25, profile: [0.1, 0.2] }, units: {}, warnings: [], assumptions: [], visualization: ['graph'], route: { kind: 'none' },
+    };
+    const block = analyzeExperimentResult(result)[0];
+    expect(block.title).toBe('Analiza pojedynczego wyniku');
+    expect(block.body).toContain('1 skalarnych i 1 seryjnych');
+    expect(block.body).toContain('nie wyznaczono trendu');
   });
 });
 

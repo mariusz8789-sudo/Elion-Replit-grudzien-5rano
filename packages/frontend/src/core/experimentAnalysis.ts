@@ -1,5 +1,6 @@
 import type { NarrationBlock, ParamDef, SimParams } from './types';
 import type { RunSample } from './experimentRun';
+import type { ExperimentResult } from './experimentFabric/types';
 
 /**
  * Warstwa 0 dla trybu "Stwórz eksperyment" — dokładnie ta sama filozofia co
@@ -111,6 +112,28 @@ export function paramRangeSummary(defs: ParamDef[], params: SimParams): Narratio
  * "Zapytaj AI" (buildContext → askAI → backend grounding) działają bez
  * żadnych zmian.
  */
+/**
+ * Analiza pojedynczego canonical Fabric result. Nie wyprowadza trendu ani
+ * związku przyczynowego: opisuje wyłącznie rzeczywisty zakres outputs i jasno
+ * oznacza, że do analizy czasowej potrzebne są prerejestrowane powtórzenia.
+ */
+export function analyzeExperimentResult(result: ExperimentResult): NarrationBlock[] {
+  if (result.status !== 'completed') {
+    return [{ title: 'Analiza zablokowana', body: `Wynik ma status ${result.status}; nie analizuję go jako pomiaru.`, kind: 'warning' }];
+  }
+  const entries = Object.entries(result.outputs);
+  const numeric = entries.filter(([, value]) => typeof value === 'number');
+  const series = entries.filter(([, value]) => Array.isArray(value));
+  if (entries.length === 0) {
+    return [{ title: 'Brak obserwowalnych outputs', body: 'Canonical result nie zawiera outputs do analizy.', kind: 'warning' }];
+  }
+  return [{
+    title: 'Analiza pojedynczego wyniku',
+    body: `Zarejestrowano ${entries.length} outputs: ${numeric.length} skalarnych i ${series.length} seryjnych. To opis jednego realnego wyniku; nie wyznaczono trendu ani korelacji. Do takiej analizy potrzebne są prerejestrowane powtórzenia.`,
+    kind: 'insight',
+  }];
+}
+
 export function analyzeRun(samples: RunSample[]): NarrationBlock[] {
   if (samples.length < 3) {
     return [

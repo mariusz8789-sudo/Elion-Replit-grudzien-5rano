@@ -6,6 +6,7 @@ import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
 import { saveExperiment, listExperiments } from '../core/scienceMemory';
+import { analyzeExperimentResult } from '../core/experimentAnalysis';
 import { track } from '../core/analytics';
 import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmEarthquakeEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
@@ -222,6 +223,7 @@ export function ScienceChat() {
             params: run.provenance.parameterSnapshot,
             stats: numericStats,
             observations: run.result.outputs,
+            analysis: analyzeExperimentResult(run.result),
             execution: {
               status: run.result.status,
               runId: run.runId,

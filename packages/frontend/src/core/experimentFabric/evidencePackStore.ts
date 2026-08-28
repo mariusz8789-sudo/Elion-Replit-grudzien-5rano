@@ -24,7 +24,7 @@ function isPack(value: unknown): value is ScientificEvidencePack {
     && typeof pack.evidenceChainId === 'string'
     && typeof protocol?.protocolFingerprint === 'string'
     && Number.isInteger(runCount)
-    && typeof runCount === 'number' && runCount >= 0
+    && typeof runCount === 'number' && runCount > 0
     && Array.isArray(runs)
     && runCount === runs.length
     && runs.every((run) => typeof run?.runId === 'string' && (run.status === 'completed' || run.status === 'failed') && typeof run.provenance?.runFingerprint === 'string')

@@ -33,6 +33,7 @@ function isPack(value: unknown): value is ScientificEvidencePack {
 }
 
 export function saveScientificEvidencePack(pack: ScientificEvidencePack): StoredEvidencePack {
+  if (!isPack(pack)) throw new Error('Cannot persist an invalid Scientific Evidence Pack.');
   const entry = { savedAt: new Date().toISOString(), pack } satisfies StoredEvidencePack;
   const existing = listScientificEvidencePacks().filter((item) => item.pack.evidencePackId !== pack.evidencePackId);
   writeJSON(KEY, [...existing, entry].slice(-MAX_PACKS));

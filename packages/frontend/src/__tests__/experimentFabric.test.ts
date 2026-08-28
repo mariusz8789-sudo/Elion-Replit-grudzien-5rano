@@ -1452,6 +1452,11 @@ describe('Genesis Experiment Fabric', () => {
 
 
 describe('Evidence Pack persisted contract boundary', () => {
+  it('rejects malformed packs before persistence', async () => {
+    const { saveScientificEvidencePack } = await import('../core/experimentFabric/evidencePackStore');
+    expect(() => saveScientificEvidencePack({ runCount: 0, runs: [] } as never)).toThrow('invalid Scientific Evidence Pack');
+  });
+
   it('blocks public comparisons and verdicts for malformed packs', () => {
     const malformed = { runCount: 1, runs: [], reproducibility: {} };
     expect(compareScientificEvidencePacks(malformed as never, malformed as never)).toBe('BLOCKED');

@@ -501,6 +501,10 @@ export function createExperimentIntent(request: StructuredExperimentRequest): Ex
       ? `Domena zawiera działające modele, ale prośba nie wskazuje zarejestrowanego adaptera dla tego zjawiska. ${domain.assumptions[0] ?? ''}`
       : (domain.assumptions[0] ?? 'Domena jest zarejestrowana w corpus Genesis.');
     requiredSolver = domain.requiredSolver;
+  } else if (request.domainId === 'biotechnology') {
+    capability = 'ENGINE_NOT_AVAILABLE';
+    rationale = 'Biotechnology discovery request został ustrukturyzowany, ale Genesis nie posiada zwalidowanego biological executora ani źródła danych. Żaden wynik nie zostanie wygenerowany.';
+    requiredSolver = 'Zweryfikowane źródło biologiczne + biological executor';
   } else if (request.domainId === 'hazard-cascade') {
     capability = 'ENGINE_NOT_AVAILABLE';
     rationale = 'Kontrakt GenesisEvent deklaruje hazardy, ale repozytorium nie zawiera modelu powodzi, pożaru ani kaskady infrastruktury.';

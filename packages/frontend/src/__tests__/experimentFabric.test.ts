@@ -1125,6 +1125,10 @@ describe('Genesis Experiment Fabric', () => {
     expect(request.modelId).toBeUndefined();
     expect(request.parameters).toEqual({ targetQuery: 'X.' });
     expect(request.executionStatus).toBe('NOT_EXECUTED');
+    const reviewed = planEvidenceGuidedExperiment(request);
+    expect(reviewed.status).toBe('ENGINE_NOT_AVAILABLE');
+    expect(reviewed.plan.runnable).toBe(false);
+    expect(reviewed.disclosure.rationale).toContain('nie posiada zwalidowanego biological executora');
   });
 
   it('plans molecular weight for canonical backend Fabric without claiming a structural chemistry parser', () => {

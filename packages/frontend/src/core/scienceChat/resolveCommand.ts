@@ -169,6 +169,20 @@ function verifySnapshot(ctx: ChatSimSnapshot): { status: 'PASS' | 'BLOCKED'; tex
       issues.push(`${def.label}: oczekiwano liczby`);
       continue;
     }
+    if (def.type === 'toggle' && typeof value !== 'boolean') {
+      issues.push(`${def.label}: oczekiwano wartości logicznej`);
+      continue;
+    }
+    if (def.type === 'select') {
+      if (typeof value !== 'string') {
+        issues.push(`${def.label}: oczekiwano tekstowej opcji`);
+        continue;
+      }
+      if (def.options && !def.options.some((option) => option.value === value)) {
+        issues.push(`${def.label}: wartość nie należy do zadeklarowanych opcji`);
+        continue;
+      }
+    }
     if (typeof value === 'number') {
       if (!Number.isFinite(value)) issues.push(`${def.label}: wartość nie jest skończona`);
       if (def.min !== undefined && value < def.min) issues.push(`${def.label}: poniżej minimum ${def.min}${def.unit ?? ''}`);

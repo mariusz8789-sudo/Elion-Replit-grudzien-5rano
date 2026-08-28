@@ -425,6 +425,13 @@ describe('scienceChat: parameter contract validation', () => {
 describe('scienceChat: snapshot declaration integrity', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 
+  it('blocks toggle and select values that violate their declared contracts', () => {
+    const toggle = { key: 'enabled', label: 'Włączone', type: 'toggle' as const, default: false };
+    const select = { key: 'mode', label: 'Tryb', type: 'select' as const, default: 'safe', options: [{ value: 'safe', label: 'Bezpieczny' }] };
+    expect(resolveCommand('zweryfikuj', ctx({ paramDefs: [toggle], params: { enabled: 1 } as never })).text).toContain('VERIFY BLOCKED');
+    expect(resolveCommand('zweryfikuj', ctx({ paramDefs: [select], params: { mode: 'unknown' } })).text).toContain('VERIFY BLOCKED');
+  });
+
   it('blocks parameters present in the snapshot but absent from paramDefs', () => {
     const r = resolveCommand('zweryfikuj', ctx({ params: { mass: 10, speed: 0.5, hiddenCalibration: 42 } }));
     expect(r.intent).toBe('VERIFY');

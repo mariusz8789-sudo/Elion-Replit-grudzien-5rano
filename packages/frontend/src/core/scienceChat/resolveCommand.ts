@@ -538,7 +538,7 @@ function taskResponse(ctx: ChatSimSnapshot): ChatResponse {
       `1. Ustaw „${p.label}" = ${a}${p.unit ? ' ' + p.unit : ''}. ${observe}\n` +
       `2. Zmień „${p.label}" na ${b}${p.unit ? ' ' + p.unit : ''}. Ponów obserwację.\n` +
       `3. Wyjaśnij, dlaczego wynik się zmienił, odwołując się do modelu.\n` +
-      `Punktacja i auto-ocena wyniku liczbowego: fundament gotowy — TODO (Faza 4).`,
+      `Punktacja i auto-ocena wyniku liczbowego: NOT_MODELED — obecny kontrakt nie definiuje niezależnego scoringu.`,
     tag: 'SYSTEM',
     intent: 'CREATE_TASK',
     todo: true,

@@ -41,6 +41,7 @@ import {
   getStoredEvidencePackReplayVerdict,
   experimentObservableKind,
   validateExperimentOutputs,
+  createExperimentProvenance,
 } from '../core/experimentFabric';
 import {
   clearExperimentWorldHandoffs,
@@ -1485,5 +1486,32 @@ describe('Experiment output validation', () => {
   it('rejects non-finite series samples before provenance can be fingerprinted', () => {
     expect(() => validateExperimentOutputs({ profile: [0, Number.NaN, 1] })).toThrow(/skończone liczby/);
     expect(() => validateExperimentOutputs({ profile: [0, Number.POSITIVE_INFINITY] })).toThrow(/skończone liczby/);
+  });
+});
+
+describe('Experiment series provenance', () => {
+  it('fingerprints series content and order, not volatile backend run IDs', () => {
+    const run = runExperiment(parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'));
+    const make = (profile: readonly number[], backendRunId: string) => createExperimentProvenance({
+      request: run.request,
+      plan: run.plan,
+      result: { ...run.result, outputs: { ...run.result.outputs, profile } },
+      knowledgeSources: run.provenance.knowledgeSources,
+      supplementalKnowledgeIds: run.provenance.supplementalKnowledgeIds,
+      deterministic: true,
+      backendExecution: {
+        backendRunId,
+        backendEngine: 'test-engine',
+        backendModelVersion: 'test-1',
+        backendProvenance: { fixture: 'pinned' },
+      },
+    });
+    const first = make([0.1, 0.2, 0.3], 'run-a');
+    const sameScience = make([0.1, 0.2, 0.3], 'run-b');
+    const reordered = make([0.3, 0.2, 0.1], 'run-a');
+    const changed = make([0.1, 0.2, 0.4], 'run-a');
+    expect(sameScience.runFingerprint).toBe(first.runFingerprint);
+    expect(reordered.runFingerprint).not.toBe(first.runFingerprint);
+    expect(changed.runFingerprint).not.toBe(first.runFingerprint);
   });
 });

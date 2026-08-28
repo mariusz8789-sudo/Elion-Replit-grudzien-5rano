@@ -122,6 +122,8 @@ function spatialReplayAttachment(dataset: GenesisSpatialDataset | undefined): Sc
 
 function replayInputIssues(capsule: ReproducibleScenarioCapsule): string[] {
   const issues: string[] = [];
+  if (!capsule.baselineRun || typeof capsule.baselineRun !== 'object') issues.push('baselineRun');
+  if (!capsule.references || typeof capsule.references !== 'object') issues.push('references');
   if (capsule.contractVersion !== SCENARIO_CAPSULE_VERSION) issues.push(`contractVersion=${capsule.contractVersion || '(brak)'}`);
   if (!capsule.capsuleId) issues.push('capsuleId');
   if (!capsule.title?.trim()) issues.push('title');

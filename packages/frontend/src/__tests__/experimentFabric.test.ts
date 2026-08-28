@@ -1451,6 +1451,15 @@ describe('Genesis Experiment Fabric', () => {
 
 
 describe('Scenario Capsule replay contract boundary', () => {
+  it('blocks replay when baselineRun or references are missing instead of throwing', () => {
+    const malformed = { contractVersion: '1.0.0', capsuleId: 'broken', title: 'Broken replay' };
+    const replay = replayScenarioCapsule(malformed as never);
+    expect(replay.status).toBe('NOT_COMPARABLE');
+    expect(replay.message).toContain('Replay BLOCKED');
+    expect(replay.message).toContain('baselineRun');
+    expect(replay.message).toContain('references');
+  });
+
   it('blocks replay when the baseline fingerprint is missing', () => {
     const baseline = runExperiment(parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.'));
     const capsule = createScenarioCapsule({ title: 'Replay boundary', baselineRun: baseline });

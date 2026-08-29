@@ -648,3 +648,24 @@ The final gate remains: full tests green (`271 passed, 40 skipped, 0 failed`), p
 Remaining parked states are unchanged and intentional: biological executor `NOT_EXECUTED/BLOCKED`, clinical efficacy `UNKNOWN`, formal calibration accuracy limited by independent-observation count, and additional heterogeneous ChEMBL expansion parked without a reachable source response and declared assay-selection policy.
 
 - **HANDOFF STATUS:** updated by overnight validation; commit follows.
+
+## CONTINUATION BLOCK: smoke harness startup correctness
+
+The release gate exposed one real operational defect: `scripts/smoke-e2e.mjs` defaulted to port 8092 while the existing production backend defaults to port 8080. Running the harness against frontend-only Vite produced false API failures because Vite proxies `/api` and is not the complete E2E target. The harness default is now `http://127.0.0.1:8080`; the explicit `E2E_BASE` override remains available.
+
+Validation after this patch:
+
+- `node --check scripts/smoke-e2e.mjs` passed.
+- Desktop smoke passed: 27 routes, 13 laboratories, 242 interactions, zero runtime errors.
+- Mobile smoke passed: 27 routes, 13 laboratories, 242 interactions, zero runtime errors.
+- Full `npm test` passed: `271 passed, 40 skipped, 0 failed`.
+- `npm run build` passed, including `tsc -b`.
+- `npm run lint` passed.
+- `git diff --check` passed.
+
+The application architecture was not changed and no duplicate backend was introduced. The existing correct startup remains: backend `packages/backend/src/server.mjs` on 8080, frontend Vite/proxy on 5000 for development, or backend serving the production build for E2E/deploy.
+
+- **HEAD before this block:** `9470c0b`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **PARKED:** biological executor, clinical efficacy, insufficient independent-observation calibration, and heterogeneous ChEMBL expansion remain explicitly blocked/unknown.
+- **NEXT GAP:** no further high-value release blocker is currently evidenced; continue only if a real runtime or integration failure appears.

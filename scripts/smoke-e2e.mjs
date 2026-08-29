@@ -10,7 +10,7 @@
  *  - awarie renderowania Reacta (ErrorBoundary → „Coś poszło nie tak").
  *
  * Użycie: node scripts/smoke-e2e.mjs <desktop|mobile>
- * Wymaga działającego serwera pod E2E_BASE (domyślnie http://127.0.0.1:8092),
+ * Wymaga działającego serwera pod E2E_BASE (domyślnie http://127.0.0.1:8080),
  * który serwuje zbudowany frontend + API trwałości.
  *
  * Kod wyjścia 0 = zero błędów runtime na sprawdzonych ścieżkach; 2 = wykryto błędy.
@@ -18,7 +18,7 @@
 
 import { chromium } from 'playwright';
 
-const BASE = process.env.E2E_BASE ?? 'http://127.0.0.1:8092';
+const BASE = process.env.E2E_BASE ?? 'http://127.0.0.1:8080';
 const MODE = process.argv[2] === 'mobile' ? 'mobile' : 'desktop';
 const CHROME = process.env.CHROME ?? '/usr/bin/chromium';
 

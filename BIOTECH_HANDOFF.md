@@ -1256,3 +1256,10 @@ Science Chat now recognizes a single natural-discovery request containing a supp
 The chat response explicitly states that binding is not efficacy, prediction is not observation, and missing ADME/Tox/clinical evidence remains UNKNOWN. Saved artifacts retain report, comparison, candidate, activity, assay, provenance, ranking, uncertainty, and replay fingerprint fields through the existing memory contract.
 
 Validation passed: integrated natural/ChEMBL/memory tests `27 passed`; frontend typecheck/Vite build passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 220 interactions, and zero runtime errors.
+
+
+## FINAL INTEGRATION CHECKPOINT: Reference Resolution
+
+Added a bounded reference profile resolver for PubChem CID, name, SMILES, InChIKey, and ChEMBL molecule IDs. It preserves source identity, source URL, structure fields, and explicit `RESOLVED`, `PARTIAL`, `UNKNOWN`, or `BLOCKED` status. Science Chat uses it for non-pinned identifiers and refuses to fabricate a natural comparison when a resolved reference is outside the supported target-specific catalog; it reports a partial result instead. Supported named references continue through the full live PubChem → ChEMBL → assay → comparison → WHY → ranking → Scientific Memory path.
+
+Validation passed: integrated natural/ChEMBL/memory/reference tests `28 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; Chromium desktop smoke passed with 27 routes, 13 laboratories, 216 interactions, and zero runtime errors.

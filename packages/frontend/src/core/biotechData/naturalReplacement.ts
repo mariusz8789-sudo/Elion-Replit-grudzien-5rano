@@ -20,6 +20,14 @@ export interface NaturalFunctionalReplacementInput {
   structure?: string;
 }
 
+export type ReferenceProfileStatus = 'RESOLVED' | 'PARTIAL' | 'UNKNOWN' | 'BLOCKED';
+export interface ReferenceProfile {
+  status: ReferenceProfileStatus; query: string; source: 'PubChem' | 'ChEMBL';
+  sourceId?: string; title?: string; smiles?: string; inchiKey?: string;
+  formula?: string; molecularWeight?: string; sourceUrl?: string;
+  uncertainty: string;
+}
+
 export interface NaturalFunctionalReplacementResult {
   status: 'RESOLVED' | 'BLOCKED';
   reason: string;
@@ -28,6 +36,7 @@ export interface NaturalFunctionalReplacementResult {
   target?: string;
   liveActivities?: readonly LiveChEMBLActivityRecord[];
   candidateWhy?: readonly NaturalCandidateWhy[];
+  referenceProfile?: ReferenceProfile;
 }
 
 export interface NaturalSourceRecord {
@@ -96,6 +105,29 @@ export async function fetchNaturalPubChemRecords(fetchImpl: typeof fetch = fetch
     } catch { return null; /* bounded source failure remains visible to the caller */ }
   }));
   return results.filter((record): record is NaturalSourceRecord => record !== null);
+}
+
+export async function resolveReferenceProfile(query: string, fetchImpl: typeof fetch = fetch): Promise<ReferenceProfile> {
+  const value = query.trim();
+  if (!value) return { status: 'UNKNOWN', query: value, source: 'PubChem', uncertainty: 'Brak reference compound; nie wykonano wyszukiwania.' };
+  const isChEMBL = /^CHEMBL\d+$/i.test(value);
+  const isCid = /^\d+$/.test(value);
+  const isInchi = value.startsWith('InChI=') || /^[A-Z]{14}-[A-Z]{10}-[A-Z]$/.test(value);
+  const endpoint = isChEMBL ? `https://www.ebi.ac.uk/chembl/api/data/molecule/${encodeURIComponent(value.toUpperCase())}.json` : `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/${isCid ? 'cid' : isInchi ? 'inchikey' : value.includes('C') && /[()=#\x5b\x5d]/.test(value) ? 'smiles' : 'name'}/${encodeURIComponent(value)}/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON`;
+  try {
+    const response = await fetchImpl(endpoint, { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return { status: 'UNKNOWN', query: value, source: isChEMBL ? 'ChEMBL' : 'PubChem', sourceUrl: endpoint, uncertainty: `Źródło zwróciło HTTP ${response.status}; reference nie został rozstrzygnięty.` };
+    const payload = await response.json() as Record<string, unknown>;
+    const propertyTable = typeof payload.PropertyTable === 'object' && payload.PropertyTable ? payload.PropertyTable as Record<string, unknown> : undefined;
+    const properties = Array.isArray(propertyTable?.Properties) ? propertyTable.Properties : [];
+    const row = (isChEMBL ? payload : properties[0]) as Record<string, unknown> | undefined;
+    const structures = typeof row?.molecule_structures === 'object' && row.molecule_structures ? row.molecule_structures as Record<string, unknown> : undefined;
+    const sourceId = isChEMBL ? (typeof row?.molecule_chembl_id === 'string' ? `chembl:molecule:${row.molecule_chembl_id}` : undefined) : (typeof row?.CID === 'number' ? `pubchem:CID:${row.CID}` : undefined);
+    const smiles = isChEMBL ? structures?.canonical_smiles : row?.CanonicalSMILES;
+    const inchiKey = isChEMBL ? structures?.standard_inchi_key : row?.InChIKey;
+    if (!sourceId || typeof smiles !== 'string' || typeof inchiKey !== 'string') return { status: 'PARTIAL', query: value, source: isChEMBL ? 'ChEMBL' : 'PubChem', sourceId, smiles: typeof smiles === 'string' ? smiles : undefined, inchiKey: typeof inchiKey === 'string' ? inchiKey : undefined, sourceUrl: endpoint, uncertainty: 'Źródło rozpoznało część identity, ale nie dostarczyło kompletnego profilu strukturalnego.' };
+    return { status: 'RESOLVED', query: value, source: isChEMBL ? 'ChEMBL' : 'PubChem', sourceId, title: typeof row?.Title === 'string' ? row.Title : undefined, smiles, inchiKey, formula: typeof row?.MolecularFormula === 'string' ? row.MolecularFormula : undefined, molecularWeight: typeof row?.MolecularWeight === 'string' ? row.MolecularWeight : undefined, sourceUrl: endpoint, uncertainty: 'Identity/structure resolved; target, activity, safety, ADME, efficacy and clinical suitability require separate evidence.' };
+  } catch { return { status: 'BLOCKED', query: value, source: isChEMBL ? 'ChEMBL' : 'PubChem', sourceUrl: endpoint, uncertainty: 'Bounded reference lookup failed or timed out; no identity was guessed.' }; }
 }
 
 const allowedActivityTypes = new Set(['Ki', 'IC50', 'EC50']);

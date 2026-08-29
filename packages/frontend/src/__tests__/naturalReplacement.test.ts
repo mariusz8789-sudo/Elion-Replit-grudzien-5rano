@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fetchNaturalChEMBLActivities, resolveNaturalFunctionalReplacement, resolveNaturalFunctionalReplacementFromSources } from '../core/biotechData/naturalReplacement';
+import { fetchNaturalChEMBLActivities, resolveNaturalFunctionalReplacement, resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
 
 describe('Natural Functional Replacement resolver', () => {
   it('resolves a known A1 reference against the three real pinned reports', () => {
@@ -37,5 +37,10 @@ describe('Natural Functional Replacement resolver', () => {
     expect(activities.map((activity) => activity.type)).toEqual(['Ki', 'EC50']);
     expect(activities[0]?.assayQuality).toBe('HIGH');
     expect(activities[0]?.targetId).toBe('chembl:target:CHEMBL-TARGET');
+  });
+
+  it('resolves a PubChem CID without guessing a reference identity', async () => {
+    const profile = await resolveReferenceProfile('2519', async () => new Response(JSON.stringify({ PropertyTable: { Properties: [{ CID: 2519, CanonicalSMILES: 'CCO', InChIKey: 'KEY', MolecularFormula: 'C2H6O', MolecularWeight: '46.07' }] } }), { status: 200 }));
+    expect(profile).toMatchObject({ status: 'RESOLVED', sourceId: 'pubchem:CID:2519', smiles: 'CCO', inchiKey: 'KEY' });
   });
 });

@@ -15,7 +15,7 @@ import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backen
 import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
 import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
-import { resolveNaturalFunctionalReplacementFromSources } from '../core/biotechData/naturalReplacement';
+import { resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
 
 /**
  * Genesis Science Chat — inteligentna warstwa rozmowy NAD istniejącymi
@@ -76,6 +76,11 @@ function formatProjectKnowledgeSources(project: ActiveKnowledgeProject, material
 function naturalReferenceFromMessage(message: string): string | undefined {
   const known = ['caffeine', 'kofein', 'adenosine', 'adenozyn', 'theophylline', 'teofilin'];
   return known.find((name) => message.toLowerCase().includes(name));
+}
+
+function rawReferenceFromMessage(message: string): string | undefined {
+  const match = message.match(/(?:reference|referencyjnego|dla|względem)\s+(?:compound|związku|leku)?\s*[:=]?\s*([^,.;]+)/i);
+  return match?.[1]?.trim();
 }
 
 function formatNaturalDiscoveryResult(result: Awaited<ReturnType<typeof resolveNaturalFunctionalReplacementFromSources>>): string {
@@ -324,7 +329,19 @@ export function ScienceChat() {
     }
     const isNaturalDiscovery = /natural|naturalne|naturalnych|kandydat(ów|y)?/i.test(msg) && /reference|związk|lek|porówn|znajdź|wyszuk/i.test(msg);
     if (isNaturalDiscovery) {
-      const referenceCompound = naturalReferenceFromMessage(msg);
+      const namedReference = naturalReferenceFromMessage(msg);
+      const referenceCompound = namedReference ?? rawReferenceFromMessage(msg);
+      if (!namedReference) {
+        const profile = await resolveReferenceProfile(referenceCompound ?? '');
+        if (profile.status !== 'RESOLVED') {
+          setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `REFERENCE ${profile.status}: ${profile.query || 'brak wartości'}. ${profile.uncertainty}`, tag: 'SYSTEM' }]);
+          setInput('');
+          return;
+        }
+        setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `REFERENCE RESOLVED: ${profile.sourceId ?? profile.query}. ${profile.uncertainty}\nNatural candidate comparison pozostaje PARTIAL: brak kompatybilnego target-specific natural catalog dla tego reference; nie wykonano rankingu ani nie utworzono raportu.`, tag: 'SYSTEM' }]);
+        setInput('');
+        return;
+      }
       const targetMatch = msg.match(/(?:target|receptor|receptora)\s*[:=]?\s*([A-Za-z0-9-]+)/i);
       const result = await resolveNaturalFunctionalReplacementFromSources({ referenceCompound, target: targetMatch?.[1] ?? 'A1' });
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatNaturalDiscoveryResult(result), tag: result.status === 'RESOLVED' ? 'WYNIK' : 'SYSTEM' }]);

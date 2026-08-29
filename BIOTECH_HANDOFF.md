@@ -1040,3 +1040,15 @@ Validation completed: focused resolver test passed; full suite reports 271 passe
 - **CURRENT STATUS:** one additional real target/activity evidence record is now available in the 12-report bounded discovery set, increasing the resolved set to 12 reports with one richer ChEMBL profile.
 - **PARKED:** broader ChEMBL target/activity enrichment for the remaining records requires per-compound queries and evidence-quality review; live broad search, server-authoritative global ADMIN, biological execution, independent assays, efficacy and complete ADME/Tox remain blocked or unknown.
 - **NEXT GAP:** batch deterministic ChEMBL enrichment for the remaining known compounds, stopping quickly on missing or low-quality target evidence.
+
+## BATCH CHِEMBL CHECKPOINT: paraxanthine–A1 implemented, remaining records parked
+
+A short deterministic batch probe queried the remaining eight PubChem compounds against ChEMBL molecule lookup and A1 activity (`CHEMBL318`). One compatible record was found and integrated: paraxanthine (`CHEMBL1158`), activity `207399`, assay `CHEMBL643484`, Ki `21000 nM`, rat brain cortical membrane context. Its evidence is marked `LITERATURE_SUPPORTED`, ranking is low-confidence research priority, and safety/ADME/efficacy remain `UNKNOWN`.
+
+The remaining batch records had no usable A1 activity under the declared policy and were not enriched: hypoxanthine, xanthine, inosine, guanosine, adenine, guanine and uric acid. Theobromine remains the previously integrated ChEMBL record. The probe script is committed for reproducibility, but its results are not treated as live UI data.
+
+Focused resolver tests, build/typecheck, lint and diff-check pass after this block. Full suite and Chromium smoke remain green from the preceding checkpoint; no new UI contract was introduced beyond the existing bounded resolver.
+
+- **CURRENT STATUS:** 12-report bounded discovery set now contains two additional ChEMBL A1 target/activity profiles beyond the original three, plus PubChem identity-only records.
+- **PARKED:** seven batch candidates lack usable A1 activity under the current query policy; broader target search would require a new declared target-selection policy and separate quality review.
+- **NEXT GAP:** enrich a second therapeutically relevant target only if a deterministic target policy is declared; otherwise prioritize the existing Drug Discovery compound → properties → evidence → safety/ADME presentation gap.

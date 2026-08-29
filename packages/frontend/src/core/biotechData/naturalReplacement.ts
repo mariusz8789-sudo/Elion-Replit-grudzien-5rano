@@ -43,7 +43,7 @@ const PUBCHEM_IDENTITY_RECORDS = [
 ] as const;
 
 function identityOnlyReports(): CandidateDiscoveryReport[] {
-  return PUBCHEM_IDENTITY_RECORDS.filter(([name]) => name !== 'theobromine').map(([name, cid, formula, smiles, inchiKey, molecularWeight]) => {
+  return PUBCHEM_IDENTITY_RECORDS.filter(([name]) => !['theobromine', 'paraxanthine'].includes(name)).map(([name, cid, formula, smiles, inchiKey, molecularWeight]) => {
     const sourceUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON`;
     const provenance = { source: 'PubChem', sourceId: `pubchem:CID:${cid}`, evidenceType: 'compound identity and structure property record', status: 'LITERATURE_SUPPORTED' as const, uncertainty: 'Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.', sourceUrl, sourceVersion: `PubChem CID ${cid}`, retrievedAt: PUBCHEM_RETRIEVED_AT };
     const evidence: BiologicalEvidence = { kind: 'biological-evidence', id: `evidence:pubchem:${cid}`, namespace: 'pubchem', label: `${name} identity record`, status: 'LITERATURE_SUPPORTED', claim: `${name} is identified by the cited PubChem compound record; no biological target claim is made.`, subjectIds: [`compound:pubchem:${cid}`], provenance: [provenance] };
@@ -57,6 +57,17 @@ function identityOnlyReports(): CandidateDiscoveryReport[] {
 
 const candidateId = (cid: number): string => `candidate:pubchem:${cid}`;
 const hypothesisId = (cid: number): string => `hypothesis:pubchem:${cid}`;
+
+function buildChEMBLParaxanthineA1Report(): CandidateDiscoveryReport {
+  const sourceUrl = 'https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1158&target_chembl_id=CHEMBL318&limit=5';
+  const provenance = { source: 'ChEMBL', sourceId: 'chembl:activity:207399', evidenceType: 'curated A1 receptor binding activity', status: 'LITERATURE_SUPPORTED' as const, uncertainty: 'One rat brain cortical membrane binding record is an in vitro measurement and does not establish clinical efficacy, safety or functional replacement.', sourceUrl, sourceVersion: 'ChEMBL activity 207399 / assay CHEMBL643484', retrievedAt: PUBCHEM_RETRIEVED_AT };
+  const evidence: BiologicalEvidence = { kind: 'biological-evidence', id: 'evidence:chembl:207399', namespace: 'chembl', label: 'Paraxanthine A1 binding activity', status: 'LITERATURE_SUPPORTED', claim: 'Paraxanthine has a ChEMBL-recorded Ki of 21000 nM at Adenosine receptor A1 in rat brain cortical membrane assay.', subjectIds: ['compound:chembl:CHEMBL1158', 'target:chembl:CHEMBL318'], provenance: [provenance] };
+  const safety: SafetySignal = { kind: 'safety-signal', id: 'safety:unknown:chembl:1158', namespace: 'genesis-biotech', label: 'Paraxanthine safety/ADME unknown', status: 'UNKNOWN', signalType: 'uncertainty', description: 'This activity record does not supply a safety or ADME conclusion.', evidenceQuality: 'UNKNOWN', uncertainty: 'Safety and ADME require separate authoritative records.', provenance: [{ ...provenance, sourceId: 'safety:unknown:chembl:1158', evidenceType: 'explicit missing safety/ADME boundary', status: 'UNKNOWN' }] };
+  const candidate: TherapeuticCandidate = { kind: 'therapeutic-candidate', id: 'candidate:chembl:CHEMBL1158', namespace: 'genesis-biotech', label: 'Paraxanthine', status: 'HYPOTHESIS', materialId: 'material:chembl:CHEMBL1158', compoundIds: ['compound:chembl:CHEMBL1158'], targetIds: ['target:chembl:CHEMBL318'], mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], hypothesisIds: ['hypothesis:chembl:CHEMBL1158'], provenance: [provenance] };
+  const hypothesis: TherapeuticHypothesis = { kind: 'therapeutic-hypothesis', id: 'hypothesis:chembl:CHEMBL1158', namespace: 'genesis-biotech', label: 'Paraxanthine A1 follow-up', status: 'HYPOTHESIS', claim: 'Paraxanthine is a source-backed A1 binding candidate for follow-up; binding is not a functional replacement or efficacy claim.', candidateId: candidate.id, targetIds: candidate.targetIds, mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], provenance: [{ ...provenance, sourceId: hypothesisId(1158), evidenceType: 'bounded research hypothesis', status: 'HYPOTHESIS' }] };
+  const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'LOW', targetRelevance: 1, safetySignals: [safety], uncertaintyPenalty: 0.5 });
+  return createCandidateDiscoveryReport({ candidate, hypothesis, ranking, uncertainty: 'ChEMBL target/activity evidence is in vitro and does not establish mechanism, safety, ADME or clinical efficacy.' });
+}
 
 function buildChEMBLTheobromineA1Report(): CandidateDiscoveryReport {
   const sourceUrl = 'https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1114&target_chembl_id=CHEMBL318&limit=5';
@@ -88,6 +99,7 @@ export function resolveNaturalFunctionalReplacement(input: NaturalFunctionalRepl
     buildPinnedChEMBLAdenosineDiscovery().report,
     buildPinnedChEMBLTheophyllineDiscovery().report,
     buildChEMBLTheobromineA1Report(),
+    buildChEMBLParaxanthineA1Report(),
     ...identityOnlyReports(),
   ];
   return {

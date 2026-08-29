@@ -1178,3 +1178,12 @@ The result is `MODEL_ESTIMATE` software-pipeline evidence only. The small-molecu
 Focused runtime validation passed: 14 passed, 12 skipped, 0 failed across the heavy-engine, multi-fidelity and replay suites. The real campaign docking stage persisted Scientific Runs with artifacts, and seeded replay matched exactly. The Toolchain Registry marked Vina/Meeko `AVAILABLE` only after its passing reference case. The broader backend invocation still has an unrelated HTTP-test startup failure (`server.http.test.mjs` exits early); it is not a docking failure and remains parked for a later gap.
 
 Remaining absent runtimes after this checkpoint: Biopython, PyMeep and ADMET-AI. Next large gap: bounded Biopython availability/reference validation, then continue to PyMeep and ADMET-AI.
+
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: Biopython
+
+One bounded installation attempt activated `biopython==1.88` in the sandbox Python 3.12 runtime. The existing protein-structure adapter and Toolchain Registry executed the real reference case: a two-residue alanine PDB was parsed into one model and chain A with 2 residues, 2 amino acids, no hetero residues, no waters, no alternate locations, valid coordinates, and `status: READY`.
+
+The adapter’s safety boundary remains active: a PDB with missing backbone atoms or waters requires `ADDITIONAL_INPUT_REQUIRED` rather than silently editing or inventing structure. This is deterministic structure-ingestion evidence, not biological execution, binding, efficacy, safety, or clinical evidence.
+
+Focused runtime validation now passes: 16 passed, 10 skipped, 0 failed across heavy-engine, multi-fidelity and replay suites. AutoDock Vina/Meeko reference and deterministic replay continue to pass. Remaining absent runtimes are PyMeep and ADMET-AI. Next large gap: bounded PyMeep availability/reference validation, followed by ADMET-AI.

@@ -3,9 +3,9 @@ import { useSession, getToken } from '../core/backend/session';
 import {
   listProjects, listToolchain, listCampaigns, createCampaign, getCampaign, startCampaign, cancelCampaign,
   listCampaignCandidates, listCampaignDecisions, getDiscoveryGraph, askCampaignWhy,
-  listCampaignScienceRuns, listCampaignConflicts, runCampaignStage, getAdmetEndpoints, verifyScienceRun,
+  listCampaignScienceRuns, listCampaignConflicts, getScientificComputeReport, runCampaignStage, getAdmetEndpoints, verifyScienceRun,
   type Project, type ToolchainEntry, type Campaign, type CampaignCandidate, type CampaignDecision,
-  type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict, type ScienceRunVerification,
+  type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict, type ScienceRunVerification, type ScientificComputeReport,
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
 
@@ -55,6 +55,7 @@ function CampaignWorkspace() {
   const [decisions, setDecisions] = useState<CampaignDecision[]>([]);
   const [graph, setGraph] = useState<DiscoveryGraph | null>(null);
   const [scienceRuns, setScienceRuns] = useState<ScienceRun[]>([]);
+  const [computeReport, setComputeReport] = useState<ScientificComputeReport | null>(null);
   const [verifications, setVerifications] = useState<Record<string, ScienceRunVerification | 'loading' | 'error'>>({});
   const [conflicts, setConflicts] = useState<ModelConflict[]>([]);
   const [admetEndpointCount, setAdmetEndpointCount] = useState<number | null>(null);
@@ -94,13 +95,14 @@ function CampaignWorkspace() {
   const loadDetail = useCallback(async (campaignId: string) => {
     const token = getToken();
     if (!token || !projectId) return;
-    const [c, cands, decs, g, sr, cf] = await Promise.all([
+    const [c, cands, decs, g, sr, cf, report] = await Promise.all([
       getCampaign(token, projectId, campaignId),
       listCampaignCandidates(token, projectId, campaignId),
       listCampaignDecisions(token, projectId, campaignId),
       getDiscoveryGraph(token, projectId, campaignId),
       listCampaignScienceRuns(token, projectId, campaignId),
       listCampaignConflicts(token, projectId, campaignId),
+      getScientificComputeReport(token, projectId, campaignId),
     ]);
     if (c.ok) setSelected(c.data);
     if (cands.ok) setCandidates(cands.data);
@@ -108,6 +110,7 @@ function CampaignWorkspace() {
     if (g.ok) setGraph(g.data);
     if (sr.ok) setScienceRuns(sr.data);
     if (cf.ok) setConflicts(cf.data);
+    if (report.ok) setComputeReport(report.data);
     return c.ok ? c.data : null;
   }, [projectId]);
 
@@ -368,6 +371,22 @@ function CampaignWorkspace() {
               <button className="primary-btn" disabled={busy} onClick={() => void onRunStage(selected)}>
                 ▶ Uruchom ADMET + toksyczność + dokowanie + chemię kwantową
               </button>
+            </div>
+          )}
+
+          {/* Ciężkie Scientific Runs (realne artefakty + prowieniencja) */}
+          {computeReport && (
+            <div className="settings-subsection">
+              <h4>Unified Scientific Compute Report</h4>
+              <p className="muted small">
+                Report <code>{computeReport.reportId}</code> · {computeReport.compoundCount} unikalnych związków · evidence: <strong>{computeReport.evidence}</strong>
+              </p>
+              <ul className="plain-list small">
+                {computeReport.stages.map((stage) => (
+                  <li key={stage.capability}><strong>{stage.capability}</strong> — {stage.status} · {stage.runIds.length} run(s) · replay: {stage.runIds.map((id) => computeReport.replay.find((r) => r.runId === id)?.status ?? 'NOT_VERIFIED').join(', ') || '—'}</li>
+                ))}
+              </ul>
+              <p className="muted small">Źródło: {computeReport.provenance.source}. {computeReport.limitations.join(' ')}</p>
             </div>
           )}
 

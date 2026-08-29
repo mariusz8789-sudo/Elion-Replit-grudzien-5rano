@@ -643,6 +643,18 @@ export async function getDiscoveryGraph(token: string, projectId: string, campai
   return r.ok ? { ok: true, data: r.data.graph } : r;
 }
 
+export interface ScientificComputeReport {
+  reportId: string; campaignId: string; status: string; compoundCount: number; candidateIds: string[];
+  stages: { capability: string; status: string; runIds: string[]; evidenceClasses: string[] }[];
+  runs: ScienceRun[]; replay: { runId: string; status: string; verificationCount: number }[];
+  evidence: string; limitations: string[]; provenance: { source: string; reportVersion: string };
+}
+
+export async function getScientificComputeReport(token: string, projectId: string, campaignId: string): Promise<ApiResult<ScientificComputeReport>> {
+  const r = await request<{ report: ScientificComputeReport }>('GET', `/projects/${projectId}/campaigns/${campaignId}/report`, { token });
+  return r.ok ? { ok: true, data: r.data.report } : r;
+}
+
 export interface ScienceRun {
   id: string; campaignId: string | null; candidateId: string | null;
   engine: string; engineVersion: string | null; capability: string; method: string | null;

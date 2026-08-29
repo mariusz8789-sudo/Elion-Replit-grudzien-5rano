@@ -12,7 +12,7 @@
  * descriptors vs poor docking) becomes a MODEL_CONFLICT — never silently averaged.
  */
 import * as store from './persistence.mjs';
-import { saveScienceRun } from '../store.mjs';
+import { saveScienceRun, listScienceRuns, listScienceRunVerifications } from '../store.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
 import * as qm from '../compute/qmAdapter.mjs';
 import * as admet from '../compute/admetAdapter.mjs';
@@ -337,4 +337,48 @@ export function runMultiFidelityStage(db, campaignId, config = {}, { log = () =>
   }
 
   return report;
+}
+
+/**
+ * Builds the single user-facing scientific-compute report from persisted state.
+ * This is a projection, not a second persistence or executor system: campaign
+ * candidates/events and Scientific Runs remain the source of truth.
+ */
+export function buildScientificComputeReport(db, campaignId) {
+  const campaign = store.getCampaign(db, campaignId);
+  if (!campaign) return null;
+  const candidates = store.listCandidates(db, campaignId);
+  const runs = listScienceRuns(db, campaignId);
+  const stages = ['molecular-descriptors', 'quantum-chemistry', 'molecular-docking', 'admet-estimation', 'toxicity-risk-estimation']
+    .map((capability) => {
+      const stageRuns = runs.filter((r) => r.capability === capability);
+      return {
+        capability,
+        status: stageRuns.length ? 'EXECUTED' : 'NOT_EXECUTED',
+        runIds: stageRuns.map((r) => r.id),
+        evidenceClasses: [...new Set(stageRuns.map((r) => r.evidenceClass))],
+      };
+    });
+  const replay = runs.map((run) => {
+    const history = listScienceRunVerifications(db, run.id);
+    const latest = history.at(-1) ?? null;
+    return { runId: run.id, status: latest?.verdict ?? 'NOT_VERIFIED', verificationCount: history.length };
+  });
+  const reportId = sha16({ campaignId, runIds: runs.map((r) => r.id), outputHashes: runs.map((r) => r.outputHash) });
+  return {
+    reportId,
+    campaignId,
+    status: campaign.status,
+    compoundCount: new Set(candidates.map((c) => c.canonicalSmiles)).size,
+    candidateIds: candidates.map((c) => c.id),
+    stages,
+    runs,
+    replay,
+    evidence: 'MODEL_ESTIMATE',
+    limitations: [
+      'Computational predictions are not laboratory observations or clinical efficacy/safety evidence.',
+      'Biological execution remains NOT_EXECUTED / BLOCKED without a biological executor.',
+    ],
+    provenance: { source: 'Genesis persisted campaign + Scientific Runs', reportVersion: '1.0.0' },
+  };
 }

@@ -9,7 +9,7 @@ import { detect as admetDetect } from './compute/admetAdapter.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { createCampaign, listCandidates, listEvents } from './campaign/persistence.mjs';
 import { runCampaign } from './campaign/orchestrator.mjs';
-import { selectForStage, runMultiFidelityStage } from './campaign/multiFidelity.mjs';
+import { selectForStage, runMultiFidelityStage, buildScientificComputeReport } from './campaign/multiFidelity.mjs';
 
 /**
  * Multi-fidelity: RDKit (cheap) → ADMET/toxicity filter → docking/QM (expensive)
@@ -83,6 +83,12 @@ describe('docking stage on a real campaign', () => {
     const retained = listCandidates(db, id).filter((c) => c.status === 'retained');
     assert.equal(selEvents.length, retained.length);
     assert.ok(events.some((e) => e.type === 'STAGE_RESULT'));
+
+    const unified = buildScientificComputeReport(db, id);
+    assert.ok(unified && unified.reportId);
+    assert.ok(unified.stages.find((s) => s.capability === 'molecular-docking')?.runIds.includes(dr.id));
+    assert.equal(unified.evidence, 'MODEL_ESTIMATE');
+    assert.equal(unified.replay.find((r) => r.runId === dr.id)?.status, 'NOT_VERIFIED');
   });
 });
 

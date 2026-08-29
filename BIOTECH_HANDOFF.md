@@ -37,7 +37,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `f60694b` — `feat(drug-discovery): add pinned GHS safety signal`
 - `b314b68` — `feat(drug-discovery): surface safety provenance`
 - `f6a4e9d` — `feat(drug-discovery): add pinned adme properties`
-- next checkpoint in this session — commit multi-candidate comparison
+- `9c6ff74` — `feat(drug-discovery): compare candidate reports`
+- next checkpoint in this session — commit Drug Discovery UI integration
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -275,9 +276,17 @@ Changed files: `packages/frontend/src/core/biotechDiscoveryContract.ts`, `packag
 
 Validation: targeted contract test and build/typecheck passed; full `npm test` passed (271 passed, 40 skipped, 0 failed), `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
-## NEXT PRIORITY — real drug-discovery workflow
+## Completed drug-discovery capability: source-backed context in Drug Discovery workspace
 
-Next large block: connect this comparison capability to the existing `CandidateDiscoveryScreen` using the existing pinned discovery context, showing ranking/provenance and keeping single-candidate or incomplete inputs explicit. Do not create a second source, duplicate discovery contract, or infer efficacy/safety.
+The existing `DrugDiscoveryScreen` now shows a read-only pinned reference card above the project-owned backend workspace. It renders the real Caffeine → ChEMBL A1 binding record, PubChem computed ADME properties, deterministic research-priority score and source link. The card explicitly says `knowledge_only`, `LITERATURE_SUPPORTED` applies to the binding record, `PREDICTION` applies only to research priority, and no biological experiment was executed. Project candidates/pasports remain separate; no duplicate candidate contract or backend record was created.
+
+Changed file: `packages/frontend/src/components/DrugDiscoveryScreen.tsx`.
+
+Validation: targeted ChEMBL/contract tests (14 passed), initial build caught and corrected an incorrect `activity` access; corrected targeted tests and build passed, then full `npm test` (271 passed, 40 skipped, 0 failed), `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## NEXT PRIORITY — Genesis core integration
+
+Biotech discovery is now a source-backed foundation with UI exposure. Switch focus back to the main Genesis loop. The highest-value parked item is model → independent real observation comparison; inspect existing comparison contracts and identify a trustworthy observation boundary. Do not use model inputs, synthetic outputs or another model as an observation. If no source is available, park it with a precise blocker and take the next core integration GAP.
 
 ## Next large gaps
 

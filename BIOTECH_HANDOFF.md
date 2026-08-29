@@ -531,3 +531,24 @@ Focused and full validation passed. Build retains only the existing Vite large-c
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
 - **NEXT LARGE GAP:** add dedicated regression fixtures for Evidence Pack external-observation `MATCH`/`DRIFT`/`BLOCKED` verdicts, then continue the core end-to-end loop or park if the remaining semantics require a new real source.
+
+## Completed Core capability: external-observation replay regression coverage
+
+Added `evidencePackObservationReplay.test.ts` using the existing Evidence Pack and replay contracts. The regression fixtures prove that an intact pinned AME2020 comparison remains `MATCH`, a source-integrity `DRIFT` downgrades the overall pack verdict, and a `BLOCKED` external replay blocks the overall verdict. No new replay or evidence store was introduced.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/evidencePackObservationReplay.test.ts src/__tests__/evidenceReplayIntegration.test.ts src/__tests__/nuclearAme2020.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests: 13 passed. Full test suite, build, lint and diff check passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `109a100`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** continue the Genesis end-to-end observation path only where an existing contract can carry it honestly; otherwise move to the next real biotech evidence integration rather than inflating the nuclear panel with unsupported claims.

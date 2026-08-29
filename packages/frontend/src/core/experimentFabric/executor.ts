@@ -102,6 +102,13 @@ function biotechKnowledgeResult(request: StructuredExperimentRequest): Experimen
       hypothesisStatus: discovery.hypothesis.status,
       reportId: discovery.report.reportId,
       validationPath: 'NOT_EXECUTED / BLOCKED — biological executor unavailable',
+      safetySignalId: discovery.safety.id,
+      safetyStatus: discovery.safety.status,
+      safetyEvidenceQuality: discovery.safety.evidenceQuality,
+      safetyDescription: discovery.safety.description,
+      safetySource: discovery.safety.provenance[0]?.source,
+      safetySourceId: discovery.safety.provenance[0]?.sourceId,
+      safetySourceUrl: discovery.safety.provenance[0]?.sourceUrl ?? '',
     },
     units: { activityValue: record.activity.units },
     warnings: [

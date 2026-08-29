@@ -92,7 +92,9 @@ export function formatFabricRun(run: ExperimentRun): string {
     ? `\nŹródło evidence: ${run.result.biologicalEvidence.provenance[0].source} / ${run.result.biologicalEvidence.provenance[0].sourceId}${run.result.biologicalEvidence.provenance[0].sourceVersion ? ` · ${run.result.biologicalEvidence.provenance[0].sourceVersion}` : ''}${run.result.biologicalEvidence.provenance[0].sourceUrl ? ` · ${run.result.biologicalEvidence.provenance[0].sourceUrl}` : ''}.`
     : '';
   const safety = run.request.domainId === 'biotechnology'
-    ? '\nSafety / ADME-Tox: UNKNOWN — brak przypiętego źródła safety; binding record nie ustanawia bezpieczeństwa.'
+    ? (typeof run.result.outputs.safetySignalId === 'string'
+      ? `\nSafety signal: ${String(run.result.outputs.safetyStatus ?? 'UNKNOWN')} / ${String(run.result.outputs.safetyEvidenceQuality ?? 'UNKNOWN')} — ${String(run.result.outputs.safetyDescription ?? 'brak opisu')}. Source: ${String(run.result.outputs.safetySource ?? 'unknown')} / ${String(run.result.outputs.safetySourceId ?? 'unknown')}${typeof run.result.outputs.safetySourceUrl === 'string' ? ` · ${run.result.outputs.safetySourceUrl}` : ''}. To hazard classification, nie clinical safety conclusion.`
+      : '\nSafety / ADME-Tox: UNKNOWN — brak przypiętego źródła safety; binding record nie ustanawia bezpieczeństwa.')
     : '';
   const analysis = analyzeExperimentResult(run.result)
     .map((block) => `\nAnaliza — ${block.title}: ${block.body}`)

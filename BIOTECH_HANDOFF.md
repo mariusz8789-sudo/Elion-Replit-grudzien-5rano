@@ -34,7 +34,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `94aec37` — `feat(drug-discovery): mark safety as unknown`
 - `8455d34` — `feat(drug-discovery): expose candidate validation path`
 - `77c0d9f` — `feat(drug-discovery): persist discovery context`
-- next checkpoint in this session — connect real PubChem GHS safety to SafetySignal/ranking/report
+- `f60694b` — `feat(drug-discovery): add pinned GHS safety signal`
+- next checkpoint in this session — show attached SafetySignal/provenance in Science Chat report
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -248,9 +249,17 @@ Changed files: `packages/frontend/src/core/biotechData/pubchem-ghs-2519.json`, `
 
 Validation completed: targeted safety/ChEMBL tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed drug-discovery capability: SafetySignal in user-facing report
+
+The existing Fabric biotech result now carries the pinned PubChem GHS SafetySignal ID, status, evidence quality, hazard description and source provenance. Science Chat renders this as a safety section with source/source ID/URL and explicitly labels it as hazard classification rather than a clinical safety conclusion. The report falls back to `Safety / ADME-Tox: UNKNOWN` only when no signal is attached.
+
+Changed files: `packages/frontend/src/core/experimentFabric/executor.ts`, `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation: targeted ChEMBL/Science Chat tests (6 passed); the first full build exposed one optional-URL type error, fixed by normalizing the source URL; rerun full validation passed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — real drug-discovery workflow
 
-Next large block: expose attached SafetySignal and its provenance in the existing Discovery Report/Science Chat user flow, then add only a real ADME/Tox source or a minimal extension point if no suitable pinned source is available. Do not add arbitrary safety scores or clinical efficacy claims.
+Next large block: ADME/Tox. Inspect whether a real public source can be pinned cheaply; otherwise add only a minimal extension point and keep ADME/Tox `UNKNOWN`. Then continue to multi-candidate comparison. Do not infer safety from binding, add arbitrary scores or make clinical efficacy claims.
 
 ## Next large gaps
 

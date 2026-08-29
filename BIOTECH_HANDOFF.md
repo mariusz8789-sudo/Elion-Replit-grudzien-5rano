@@ -33,7 +33,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `1f44a79` — `feat(drug-discovery): expose pinned molecular properties`
 - `94aec37` — `feat(drug-discovery): mark safety as unknown`
 - `8455d34` — `feat(drug-discovery): expose candidate validation path`
-- next checkpoint in this session — persist candidate/ranking/hypothesis/report context in Scientific Memory
+- `77c0d9f` — `feat(drug-discovery): persist discovery context`
+- next checkpoint in this session — connect real PubChem GHS safety to SafetySignal/ranking/report
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -239,9 +240,17 @@ Changed file: `packages/frontend/src/core/scienceMemory.ts`.
 
 Validation completed: targeted Memory/ChEMBL tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed drug-discovery capability: real PubChem GHS SafetySignal
+
+Added a pinned PubChem PUG View GHS record for caffeine CID 2519 and mapped it through the existing `SafetySignal` contract. The record preserves PubChem source ID/reference, retrieval date, source URL, signal word `Danger`, hazard statements H301/H332/H360, `LITERATURE_SUPPORTED` status, `MODERATE` evidence quality and explicit uncertainty. The existing ChEMBL discovery chain now attaches that safety signal to the candidate, hypothesis and deterministic research-priority ranking; safety remains a hazard-classification signal, not a clinical safety conclusion or efficacy probability.
+
+Changed files: `packages/frontend/src/core/biotechData/pubchem-ghs-2519.json`, `packages/frontend/src/core/biotechData/safety.ts`, `packages/frontend/src/core/biotechData/chembl.ts`.
+
+Validation completed: targeted safety/ChEMBL tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — real drug-discovery workflow
 
-Next large block: connect this source-backed discovery context to the existing Candidate Discovery/Discovery Report user view if a focused reuse path exists. Safety/ADME-Tox remains `UNKNOWN` until a real source-backed record is available; do not add clinical efficacy claims or arbitrary safety scores.
+Next large block: expose attached SafetySignal and its provenance in the existing Discovery Report/Science Chat user flow, then add only a real ADME/Tox source or a minimal extension point if no suitable pinned source is available. Do not add arbitrary safety scores or clinical efficacy claims.
 
 ## Next large gaps
 

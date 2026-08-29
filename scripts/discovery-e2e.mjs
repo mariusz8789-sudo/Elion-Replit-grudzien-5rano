@@ -17,10 +17,9 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import pkg from '/opt/node22/lib/node_modules/playwright/index.js';
+import { chromium } from 'playwright';
 
-const { chromium } = pkg;
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const CHROME = process.env.GENESIS_CHROMIUM_PATH || '/usr/bin/chromium';
 const ROOT = new URL('..', import.meta.url).pathname;
 
 const failures = [];

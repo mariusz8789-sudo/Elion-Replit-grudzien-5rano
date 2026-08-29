@@ -1073,3 +1073,13 @@ Validation after the UI integration: focused naturalReplacement and biotech cont
 ## FRESH UI SMOKE CHECKPOINT: resolved reports → Memory
 
 After the resolved-report persistence change, production-style Chromium smoke passed on both desktop and mobile: 27 routes plus 13 laboratories and 242 interactions per profile, with zero runtime errors. Backend health was already `ok=true`, `static=true`, `knowledgeLabs=15`, `persistence=ready`.
+
+## MODEL ↔ OBSERVATION E2E CHECKPOINT
+
+The existing discovery E2E runner was blocked by a stale environment-specific Playwright import (`/opt/node22/...`) and a missing browser path. The runner now uses the repository Playwright package and the available system Chromium, with an override through `GENESIS_CHROMIUM_PATH` when needed. No scientific semantics or observation data were changed.
+
+`npm run e2e:discovery` now passes end-to-end: browser runtime has zero errors; the supported comparison, replay MATCH, evidence completeness, controlled intervention, follow-ups, sweeps, cohort/contact boundaries and all Node ↔ Chromium fingerprints agree. This closes a real release/verification gap in the Model ↔ Real Observation area without admitting new or synthetic observations.
+
+- **CURRENT STATUS:** AME2020 observation contracts plus the broader discovery engine have a reproducible browser verification path.
+- **PARKED:** additional compatible external observations still require independent authoritative measurements; no unrelated USGS or model-generated data is admitted.
+- **NEXT LARGE GAP:** continue with the strongest remaining Drug Discovery/Natural-Neuro capability that is implementable without a new source, prioritizing report completeness, explicit ADME/Tox boundaries and comparison explainability.

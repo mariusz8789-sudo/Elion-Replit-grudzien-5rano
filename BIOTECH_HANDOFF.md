@@ -710,3 +710,25 @@ git diff --check: passed
 - **HEAD before this handoff update:** `5ce7cc5`
 - **BRANCH:** `manus/next-gap-observation-analysis`
 - **NEXT LARGE GAP:** add Evidence Pack identity only if a confirmed persistence/replay break is found; otherwise move to the next real Natural/Neuro source-backed candidate or park due unavailable compatible data. Do not invent safety, efficacy, ADME/Tox or biological execution.
+
+## COMPLETED MAJOR BLOCK: three-candidate natural A1 comparison and memory loop
+
+The existing Drug Discovery workflow now presents and compares three real A1-target records through the same evidence/ranking/report boundary: caffeine (`CHEMBL113`, activity `189031`), adenosine (`CHEMBL477`, activity `71801`, assay `CHEMBL639739`) and theophylline (`CHEMBL1355736`, activity `109460`, assay `CHEMBL641038`). The new theophylline record is pinned from ChEMBL Web Services with exact Ki `= 700.0 nM`, assay context, target identity, confidence metadata, provenance, source URLs and deterministic fingerprint.
+
+The comparison is now user-facing and can be saved through the existing Scientific Memory store. Memory persists the comparison ID, all report IDs, candidate IDs, scientific fingerprint, `PREDICTION` epistemic status and explicit uncertainty; reload validation rejects malformed comparison metadata. The workflow still does not claim efficacy, safety, ADME/Tox or therapy. All three candidates retain `UNKNOWN` safety where no compatible safety source is present.
+
+Source limitation: ChEMBL lookups were reachable for these records. PubChem enrichment for adenosine/theophylline was not added because the PubChem endpoint returned HTTP 503 during retrieval; no PubChem properties or ADME values were inferred from that unavailable response.
+
+Validation completed:
+
+```text
+focused adenosine/ChEMBL/Scientific Memory tests: passed
+full npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this handoff update:** `f1efe8a`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **NEXT LARGE GAP:** add compatible safety/ADME/Tox evidence only from a reachable authoritative source, or park and move to another real end-to-end boundary. Biological execution and clinical efficacy remain blocked/unknown; no synthetic data is permitted.

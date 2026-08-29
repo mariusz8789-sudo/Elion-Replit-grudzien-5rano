@@ -24,7 +24,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `d749715` — `docs(core): confirm evidence replay boundary`
 - `22fd2f4` — `docs(core): verify protocol replay path`
 - `3579f64` — `docs(core): verify model request boundary`
-- next checkpoint in this session — complete user-facing scientific result report
+- `fe7491d` — `feat(core): unify scientific result report`
+- next checkpoint in this session — include confirmed Evidence Pack/A-B/Replay statuses in the same report
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -166,9 +167,17 @@ Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
 
 Validation completed: targeted report/ChEMBL tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed Core capability: confirmed report includes Evidence/A-B/Replay status
+
+The confirmed Science Chat flow now appends Evidence Pack status, A/B status and an explicit Replay status to the same `SCIENTIFIC RESULT REPORT` response. A hypothetical visualization is labeled `NOT_CREATED`/`NOT_AVAILABLE`; ordinary single-run confirmations remain `PROTOCOL_REQUIRED`, `VARIANT_REQUIRED` and `NOT_ESTABLISHED` rather than suggesting a completed Evidence Pack or replay. No second reporting system was created.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation completed: targeted Science Chat/Experiment Fabric tests (109 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Continue to the next high-value Core gap: verify the same report semantics on the confirmed Protocol/A-B path, ensuring Evidence Pack status and Replay verdict are presented in the report rather than only as a separate handoff string. Prefer a small formatter integration; do not create another reporting system.
+Proceed to the next high-value end-to-end consistency check: verify that the same canonical report semantics are preserved when a confirmed result is opened through World/3D and then revisited from Scientific Memory. Prefer a focused existing metadata projection; do not create a second report, Memory, Evidence or Replay system.
 
 ## Next large gaps
 

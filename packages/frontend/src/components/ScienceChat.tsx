@@ -262,8 +262,8 @@ export function ScienceChat() {
           });
         }
         const handoff = hypothetical
-          ? '\n\nStatus epistemiczny: HISTORICAL_LEGEND / HYPOTHETICAL_VISUALIZATION. Evidence Pack i A/B nie są tworzone, ponieważ nie wykonano modelu fizycznego.'
-          : `\n\nEvidence Pack: ${confirmed.handoff.evidencePack.status} — ${confirmed.handoff.evidencePack.reason}\nA/B: ${confirmed.handoff.counterfactual.status} — ${confirmed.handoff.counterfactual.reason}`;
+          ? '\n\nRaport — Evidence: NOT_CREATED (HISTORICAL_LEGEND / HYPOTHETICAL_VISUALIZATION). Raport — Replay: NOT_AVAILABLE; nie wykonano modelu fizycznego.'
+          : `\n\nRaport — Evidence Pack: ${confirmed.handoff.evidencePack.status} — ${confirmed.handoff.evidencePack.reason}\nRaport — A/B: ${confirmed.handoff.counterfactual.status} — ${confirmed.handoff.counterfactual.reason}\nRaport — Replay: NOT_ESTABLISHED — wymaga kompletnego preregistered Evidence Pack i jawnego rerun.`;
         const tag: EpistemicTag = run.result.status === 'completed' ? 'WYNIK' : hypothetical ? 'HIPOTEZA' : 'SYSTEM';
         setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `${formatFabricRun(run)}${handoff}`, tag }]);
         setPendingGuidedPlan(null);

@@ -1161,3 +1161,9 @@ A single bounded installation attempt activated `rdkit==2026.3.5` and `pyscf==2.
 The existing campaign executed a real non-clinical multi-fidelity run: RDKit generated 69 candidates, retained 60 and selected 10 Pareto candidates. PySCF then executed 2 real quantum reference calculations, returning HOMO-LUMO gaps of 13.5465 eV and 13.3920 eV and dipoles of 2.4962 D and 1.2503 D for the selected molecules. These are `MODEL_ESTIMATE` outputs with provenance, not observations, binding, efficacy, safety or clinical claims. The campaign ended `PASS` for the executed RDKit + quantum stages while docking remained blocked; overall multi-stage validation remains bounded by unavailable docking/MD/protein/ADMET runtimes.
 
 API and toolchain regressions now verify the runtime metadata contract. Full validation passed: 271 passed, 40 skipped, 0 failed; discovery E2E passed; build/typecheck, lint and diff-check passed. Remaining absent runtimes: OpenMM, AutoDock Vina/Meeko, Biopython, PyMeep and ADMET-AI.
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: OpenMM
+
+One bounded installation attempt activated `openmm==8.6.0.dev-c6173db` in the same Python 3.12 runtime. The existing Toolchain Registry validated OpenMM, and the existing reference benchmark executed a real water-box minimization plus NVT temperature check: initial-to-minimized potential energy decreased and the NVT temperature stayed within the reference range. The result is a non-clinical molecular-dynamics model estimate, not biological stability or therapeutic evidence.
+
+The same heavy-engine test also passed the PySCF H2 and water reference cases and RDKit/toolchain metadata checks: 8 passed, 4 skipped, 0 failed. Remaining absent runtimes are AutoDock Vina/Meeko, Biopython, PyMeep and ADMET-AI. No synthetic outputs were admitted.

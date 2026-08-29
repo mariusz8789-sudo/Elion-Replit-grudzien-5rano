@@ -68,9 +68,16 @@ export interface Ame2020Comparison {
 
 /** Fixed, source-pinned AME2020 records. No network access is used at runtime. */
 export const AME2020_OBSERVATIONS: readonly Ame2020Observation[] = [
+  { nuclide: 'C-12', protonNumber: 6, neutronNumber: 6, massNumber: 12, bindingEnergyPerNucleonMeV: 7.6801446, uncertaintyMeV: 0.0000002, estimated: false, sourceLine: 85 },
+  { nuclide: 'O-16', protonNumber: 8, neutronNumber: 8, massNumber: 16, bindingEnergyPerNucleonMeV: 7.9762072, uncertaintyMeV: 0.0000002, estimated: false, sourceLine: 112 },
+  { nuclide: 'Ca-40', protonNumber: 20, neutronNumber: 20, massNumber: 40, bindingEnergyPerNucleonMeV: 8.5513046, uncertaintyMeV: 0.0000006, estimated: false, sourceLine: 348 },
   { nuclide: 'Fe-56', protonNumber: 26, neutronNumber: 30, massNumber: 56, bindingEnergyPerNucleonMeV: 8.7903563, uncertaintyMeV: 0.0000048, estimated: false, sourceLine: 547 },
+  { nuclide: 'Co-59', protonNumber: 27, neutronNumber: 32, massNumber: 59, bindingEnergyPerNucleonMeV: 8.7680379, uncertaintyMeV: 0.0000067, estimated: false, sourceLine: 588 },
   { nuclide: 'Ni-62', protonNumber: 28, neutronNumber: 34, massNumber: 62, bindingEnergyPerNucleonMeV: 8.7945555, uncertaintyMeV: 0.0000069, estimated: false, sourceLine: 629 },
+  { nuclide: 'Sn-120', protonNumber: 50, neutronNumber: 70, massNumber: 120, bindingEnergyPerNucleonMeV: 8.504488, uncertaintyMeV: 0.0000077, estimated: false, sourceLine: 1484 },
+  { nuclide: 'Xe-132', protonNumber: 54, neutronNumber: 78, massNumber: 132, bindingEnergyPerNucleonMeV: 8.4276229, uncertaintyMeV: 0.0000003, estimated: false, sourceLine: 1689 },
   { nuclide: 'Pb-208', protonNumber: 82, neutronNumber: 126, massNumber: 208, bindingEnergyPerNucleonMeV: 7.867453, uncertaintyMeV: 0.0000055, estimated: false, sourceLine: 2878 },
+  { nuclide: 'U-238', protonNumber: 92, neutronNumber: 146, massNumber: 238, bindingEnergyPerNucleonMeV: 7.5701262, uncertaintyMeV: 0.0000063, estimated: false, sourceLine: 3224 },
 ] as const;
 
 const DEFAULT_TOLERANCE_MEV_PER_NUCLEON = 0.05;
@@ -148,7 +155,7 @@ export function compareAme2020Observations(
   const meanAbsoluteError = errors.reduce((sum, error) => sum + error, 0) / errors.length;
   const rootMeanSquareError = Math.sqrt(errors.reduce((sum, error) => sum + error ** 2, 0) / errors.length);
   const calibration = observations.length >= 10
-    ? { status: 'AVAILABLE' as const, reason: 'At least ten preregistered observations are available for a calibration analysis.' }
+    ? { status: 'AVAILABLE' as const, reason: 'A preregistered ten-nuclide panel is available for error-distribution analysis; no calibrated accuracy percentage is asserted.' }
     : { status: 'INSUFFICIENT_DATA' as const, reason: `Only ${observations.length} preregistered observations are available; no calibrated accuracy percentage is asserted.` };
   const provenance = {
     sourceUrl: AME2020_SOURCE_URL,

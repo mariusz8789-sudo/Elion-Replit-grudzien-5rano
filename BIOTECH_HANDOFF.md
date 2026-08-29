@@ -466,3 +466,26 @@ Focused tests, build, lint and diff check passed. Build retains only the existin
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
 - **NEXT LARGE GAP:** wire the structured external-observation comparison into the existing replay/export boundary only if the existing Evidence Pack semantics can preserve it without falsely treating external observations as model-run arms; otherwise keep the honest parked boundary and expand the preregistered AME2020 set with additional non-estimated records.
+
+## Completed Core capability: expanded AME2020 error-distribution panel
+
+The pinned AME2020 comparison panel now contains ten fixed, non-estimated records spanning light, mid-mass and heavy nuclei plus odd-A and shell-sensitive cases: C-12, O-16, Ca-40, Fe-56, Co-59, Ni-62, Sn-120, Xe-132, Pb-208 and U-238. The panel was selected under a fixed policy from the already pinned raw file; no values were fabricated and no model tuning was performed after seeing errors.
+
+The comparison now exposes an error-distribution analysis path and marks calibration as `AVAILABLE` only in the narrow sense that the preregistered panel is large enough for analysis. It still explicitly refuses to assert a calibrated accuracy percentage; model-error calibration methodology and uncertainty decomposition remain future work.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/nuclearAme2020.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests: 5 passed. Full test suite, build, lint and diff check passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `8b256d1`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** define and implement a formal, preregistered calibration method over the existing error distribution, or park calibration if the current SEMF model-error policy cannot be scientifically justified. Do not convert the ten-record panel into a probability or clinical-style accuracy claim.

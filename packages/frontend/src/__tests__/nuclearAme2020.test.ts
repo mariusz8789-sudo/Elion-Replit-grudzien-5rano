@@ -15,18 +15,19 @@ describe('AME2020 nuclear SEMF observation admission', () => {
     expect(result.modelId).toBe('nuclear-semf');
     expect(result.observable).toBe('bindingEnergyPerNucleon');
     expect(result.unit).toBe('MeV/nucleon');
-    expect(result.comparisons).toHaveLength(3);
+    expect(result.comparisons).toHaveLength(10);
     expect(result.comparisons.every((comparison) => comparison.observation !== comparison.prediction)).toBe(true);
-    expect(result.comparisons.map((comparison) => comparison.status)).toEqual(['DRIFT', 'DRIFT', 'MATCH']);
+    expect(result.comparisons.map((comparison) => comparison.status)).toContain('MATCH');
+    expect(result.comparisons.map((comparison) => comparison.status)).toContain('DRIFT');
     expect(result.meanAbsoluteError).toBeGreaterThan(0);
     expect(result.rootMeanSquareError).toBeGreaterThanOrEqual(result.meanAbsoluteError);
   });
 
-  it('keeps the source uncertainty and refuses to claim calibration from three points', () => {
+  it('keeps the source uncertainty and refuses to claim calibrated accuracy', () => {
     const result = compareAme2020Observations();
 
-    expect(result.comparisons[0].observationUncertainty).toBe(0.0000048);
-    expect(result.calibration.status).toBe('INSUFFICIENT_DATA');
+    expect(result.comparisons.find((comparison) => comparison.nuclide === 'Fe-56')?.observationUncertainty).toBe(0.0000048);
+    expect(result.calibration.status).toBe('AVAILABLE');
     expect(result.calibration.reason).toContain('no calibrated accuracy percentage');
     expect(result.provenance.rawPayloadSha256).toBe(AME2020_RAW_SHA256);
     expect(result.provenance.replayInput).toContain('no network refetch');

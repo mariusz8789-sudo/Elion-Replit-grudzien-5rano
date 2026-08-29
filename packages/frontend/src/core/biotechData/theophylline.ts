@@ -1,5 +1,5 @@
 import { canonicalJson, fnv1a } from '../events/hash';
-import { createCandidateDiscoveryReport, rankTherapeuticCandidate, type BiologicalEvidence, type BiologicalTarget, type CandidateDiscoveryReport, type CandidateRanking, type SafetySignal, type TherapeuticCandidate, type TherapeuticHypothesis } from '../biotechDiscoveryContract';
+import { buildBiologicalValidationRequest, createCandidateDiscoveryReport, rankTherapeuticCandidate, type BiologicalEvidence, type BiologicalTarget, type CandidateDiscoveryReport, type CandidateRanking, type SafetySignal, type TherapeuticCandidate, type TherapeuticHypothesis } from '../biotechDiscoveryContract';
 import record from './chembl-theophylline-activity-109460.json';
 import { mapDailyMedTheophyllineAdme, mapDailyMedTheophyllineSafety } from './dailymedSafety';
 
@@ -34,6 +34,7 @@ export function buildPinnedChEMBLTheophyllineDiscovery(): ChEMBLTheophyllineDisc
   const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'MODERATE', targetRelevance: 0.5, safetySignals: [safety], uncertaintyPenalty: 1 });
   const hypothesisBase: TherapeuticHypothesis = { kind: 'therapeutic-hypothesis', id: `hypothesis:${candidate.id}`, namespace: 'genesis-biotech', label: 'Theophylline–A1 interaction requires independent follow-up', status: 'HYPOTHESIS', claim: 'The pinned ChEMBL binding record supports research follow-up of the theophylline–A1 relationship; it does not establish mechanism, efficacy, therapeutic benefit or safety.', candidateId: candidate.id, targetIds: candidate.targetIds, mechanismIds: [], supportingEvidenceIds: candidate.supportingEvidenceIds, safetySignalIds: [safety.id], provenance: [provenance] };
   const hypothesis: TherapeuticHypothesis = { ...hypothesisBase, provenance: [...hypothesisBase.provenance, { ...provenance, sourceId: biologicalEvidence.id, evidenceType: 'hypothesis derived from curated binding record', status: 'HYPOTHESIS' }] };
-  const report = createCandidateDiscoveryReport({ candidate, hypothesis, ranking, admeProfile: mapDailyMedTheophyllineAdme(), uncertainty: ranking.uncertainty });
+  const experimentRequest = buildBiologicalValidationRequest({ hypothesisId: hypothesis.id, candidateId: candidate.id, targetIds: candidate.targetIds });
+  const report = createCandidateDiscoveryReport({ candidate, hypothesis, ranking, experimentRequest, admeProfile: mapDailyMedTheophyllineAdme(), uncertainty: ranking.uncertainty });
   return { record: { compoundId, biologicalTarget, biologicalEvidence, activity: { activityId: record.activity.activityId, assayId: record.assay.assayChemblId, type: record.activity.standardType, relation: record.activity.standardRelation, value: record.activity.standardValue, units: record.activity.standardUnits, assayContext: record.assay.description }, sourceUrl: record.sourceUrls.activity, sourceVersion: record.sourceVersion, retrievedAt: record.retrievedAt, fingerprint }, candidate, ranking, safety, hypothesis, report };
 }

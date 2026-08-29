@@ -260,6 +260,18 @@ export function biologicalExperimentRequestFingerprint(request: Omit<BiologicalE
   return fnv1a(canonicalJson(request));
 }
 
+export function buildBiologicalValidationRequest(input: Pick<BiologicalExperimentRequest, 'hypothesisId' | 'candidateId' | 'targetIds'>): BiologicalExperimentRequest {
+  const request = {
+    hypothesisId: input.hypothesisId,
+    candidateId: input.candidateId,
+    targetIds: input.targetIds,
+    researchQuestion: 'Does an independent biological assay reproduce the source-backed candidate–target relationship?',
+    primaryMetric: 'pre-registered binding or functional activity measurement with assay context',
+    constraints: { executor: 'biological', source: 'independent assay required', noClinicalInference: true },
+  } as const;
+  return { ...request, requestId: `request:${biologicalExperimentRequestFingerprint(request)}`, status: 'BLOCKED', blockedReason: 'No reliable biological executor is configured in this environment.' };
+}
+
 export interface TherapeuticHypothesis extends BiotechRecord {
   kind: 'therapeutic-hypothesis';
   claim: string;

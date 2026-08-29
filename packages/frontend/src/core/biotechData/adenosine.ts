@@ -9,6 +9,7 @@ import {
   type SafetySignal,
   type TherapeuticCandidate,
   type TherapeuticHypothesis,
+  buildBiologicalValidationRequest,
 } from '../biotechDiscoveryContract';
 import record from './chembl-adenosine-activity-71801.json';
 import { mapDailyMedAdenosineAdme, mapDailyMedAdenosineSafety } from './dailymedSafety';
@@ -106,7 +107,8 @@ export function buildPinnedChEMBLAdenosineDiscovery(): ChEMBLAdenosineDiscovery 
     targetIds: candidate.targetIds, mechanismIds: [], supportingEvidenceIds: candidate.supportingEvidenceIds, safetySignalIds: [safety.id], provenance: [provenance],
   };
   const hypothesis: TherapeuticHypothesis = { ...hypothesisBase, provenance: [...hypothesisBase.provenance, { ...provenance, sourceId: biologicalEvidence.id, evidenceType: 'hypothesis derived from curated binding record', status: 'HYPOTHESIS' }] };
-  const report = createCandidateDiscoveryReport({ candidate, hypothesis, ranking, admeProfile: mapDailyMedAdenosineAdme(), uncertainty: ranking.uncertainty });
+  const experimentRequest = buildBiologicalValidationRequest({ hypothesisId: hypothesis.id, candidateId: candidate.id, targetIds: candidate.targetIds });
+  const report = createCandidateDiscoveryReport({ candidate, hypothesis, ranking, experimentRequest, admeProfile: mapDailyMedAdenosineAdme(), uncertainty: ranking.uncertainty });
   return {
     record: { compoundId, biologicalTarget, biologicalEvidence, activity: { activityId: record.activity.activityId, assayId: record.assay.assayChemblId, type: record.activity.standardType, relation: record.activity.standardRelation, value: record.activity.standardValue, units: record.activity.standardUnits, assayContext: record.assay.description }, sourceUrl: record.sourceUrls.activity, sourceVersion: record.sourceVersion, retrievedAt: record.retrievedAt, fingerprint },
     candidate, ranking, safety, hypothesis, report,

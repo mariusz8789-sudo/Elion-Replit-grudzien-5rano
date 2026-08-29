@@ -669,3 +669,24 @@ The application architecture was not changed and no duplicate backend was introd
 - **BRANCH:** `manus/next-gap-observation-analysis`
 - **PARKED:** biological executor, clinical efficacy, insufficient independent-observation calibration, and heterogeneous ChEMBL expansion remain explicitly blocked/unknown.
 - **NEXT GAP:** no further high-value release blocker is currently evidenced; continue only if a real runtime or integration failure appears.
+
+## COMPLETED MAJOR BLOCK: real two-candidate ChEMBL comparison
+
+The existing Drug Discovery path now compares two real A1-target candidates through the same `CandidateDiscoveryReport` and deterministic research-priority comparison: PubChem/ChEMBL caffeine (`CHEMBL113`, activity `189031`) and ChEMBL adenosine (`CHEMBL477`, activity `71801`, assay `CHEMBL639739`, target `CHEMBL318`). The adenosine record is pinned with exact Ki `= 12.8 nM`, assay description, target confidence metadata, source URLs, ChEMBL release and retrieval date. It is a natural/endogenous compound record, but the UI and report do not infer safety, efficacy or therapeutic benefit.
+
+The block reuses the existing Evidence/Candidate/Ranking/Hypothesis/Report path and adds no second ranker or evidence system. Adenosine safety/ADME/Tox remains explicitly `UNKNOWN`; PubChem enrichment was not fabricated because the PubChem endpoint returned HTTP 503 during retrieval. The ChEMBL-only source boundary is visible in the candidate comparison.
+
+Validation completed:
+
+```text
+focused adenosine + ChEMBL + biotech contract tests: passed
+npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this handoff update:** `3623f33`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **PARKED:** real safety/ADME/Tox for adenosine, biological executor, clinical efficacy, formal accuracy calibration and further heterogeneous assay expansion.
+- **NEXT LARGE GAP:** expose this two-candidate comparison through the existing Scientific Memory / Evidence Pack persistence path, or park if the current report boundary already provides sufficient replay-safe persistence; do not create another report system.

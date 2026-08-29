@@ -7,6 +7,7 @@ import {
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
 import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
+import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
 import { compareCandidateDiscoveryReports } from '../core/biotechDiscoveryContract';
 import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
 
@@ -44,8 +45,9 @@ export function DrugDiscoveryScreen() {
 
 function DrugWorkspace() {
   const pinnedDiscovery = buildPinnedChEMBLCaffeineDiscovery();
+  const adenosineDiscovery = buildPinnedChEMBLAdenosineDiscovery();
   const pinnedCompound = mapPinnedPubChemCaffeine();
-  const pinnedComparison = compareCandidateDiscoveryReports([pinnedDiscovery.report]);
+  const pinnedComparison = compareCandidateDiscoveryReports([pinnedDiscovery.report, adenosineDiscovery.report]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -145,7 +147,8 @@ function DrugWorkspace() {
           <div className="cde-result"><span className="cde-result-label">Scientific evidence</span><span className="cde-result-actual">{pinnedDiscovery.report.scientificEvidenceStatus}</span><span className="cde-result-bound">binding record only · source-backed</span></div>
           <div className="cde-result"><span className="cde-result-label">Clinical efficacy</span><span className="cde-result-actual">{pinnedDiscovery.report.clinicalEfficacy}</span><span className="cde-result-bound">no clinical data in this workflow</span></div>
           <div className="cde-result"><span className="cde-result-label">Research priority</span><span className="cde-result-actual">{pinnedDiscovery.ranking.score.toFixed(4)}</span><span className="cde-result-bound">PREDICTION · nie efficacy/probability</span></div>
-          <div className="cde-result"><span className="cde-result-label">Comparison</span><span className="cde-result-actual">{pinnedComparison.rows.length} source-backed candidate</span><span className="cde-result-bound">NOT_ESTABLISHED · requires ≥2 comparable reports</span></div>
+          <div className="cde-result"><span className="cde-result-label">Comparison</span><span className="cde-result-actual">{pinnedComparison.rows.length} source-backed candidates</span><span className="cde-result-bound">research-priority ordering only · not efficacy</span></div>
+          <div className="cde-result"><span className="cde-result-label">Adenosine comparator</span><span className="cde-result-actual">{adenosineDiscovery.record.activity.type} {adenosineDiscovery.record.activity.relation} {adenosineDiscovery.record.activity.value} {adenosineDiscovery.record.activity.units}</span><span className="cde-result-bound">{adenosineDiscovery.record.activity.assayId} · ChEMBL-only · safety UNKNOWN</span></div>
         </div>
         <p className="settings-hint">Provenance: <a href={pinnedDiscovery.report.provenance[0]?.sourceUrl ?? '#'} target="_blank" rel="noreferrer">ChEMBL / PubChem source records</a>. Safety signal i toksykologia pozostają osobnymi, source-backed statusami.</p>
       </section>

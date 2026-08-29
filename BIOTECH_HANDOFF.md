@@ -1127,3 +1127,9 @@ After the UniProt target provenance block, full `npm test` passed with 271 passe
 The existing blocked biotech suggestion in Science Chat now carries the bounded `reference=caffeine&target=A1` context through the existing hash route. Drug Discovery reads these parameters to prefill the admin reference form, removing a manual data-transfer step while preserving `ENGINE_NOT_AVAILABLE`, source-backed-only resolution and all scientific boundaries.
 
 Focused Science Chat, Natural Replacement and biotech contract tests passed; full suite passed with 271 passed, 40 skipped and 0 failed. Build/typecheck, lint and diff-check passed. Fresh desktop/mobile smoke passed with 27 routes, 13 laboratories and 242 interactions per profile, zero runtime errors.
+
+## CAMPAIGN VALIDATION PARKED
+
+The existing multi-fidelity validation campaign was executed once. It correctly reported `RESULT: FAIL` because the runtime lacks RDKit, PySCF, OpenMM, AutoDock Vina/Meeko, Biopython, PyMeep and ADMET-AI; stage 1 retained zero candidates and docking/quantum stages were blocked. No synthetic candidate, descriptor, docking, ADMET or toxicity result was admitted.
+
+This is an external/runtime capability blocker, not a silent application failure. The block is parked after one bounded attempt and the sprint continues to other real repository capabilities. The campaign output explicitly preserves the boundary that no therapeutic or clinical claim is made.

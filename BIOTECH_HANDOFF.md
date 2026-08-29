@@ -1052,3 +1052,9 @@ Focused resolver tests, build/typecheck, lint and diff-check pass after this blo
 - **CURRENT STATUS:** 12-report bounded discovery set now contains two additional ChEMBL A1 target/activity profiles beyond the original three, plus PubChem identity-only records.
 - **PARKED:** seven batch candidates lack usable A1 activity under the current query policy; broader target search would require a new declared target-selection policy and separate quality review.
 - **NEXT GAP:** enrich a second therapeutically relevant target only if a deterministic target policy is declared; otherwise prioritize the existing Drug Discovery compound → properties → evidence → safety/ADME presentation gap.
+
+## PARKED QUICKLY: ChEMBL quantitative properties probe
+
+A bounded probe for additional ChEMBL molecule properties/quantitative ADME fields timed out during the single allowed attempt. No properties were admitted, no cached or inferred values were used, and the stable probe script was restored. This source path is parked rather than retried repeatedly.
+
+The next available large GAP is the existing model-observation user-facing integration: AME2020 already has prediction, independent observation, comparison, metrics, provenance, evidence, memory and replay contracts, so remaining work should target any missing persistent/report handoff rather than another source probe. If that path is already complete, the remaining quantitative ADME expansion requires a responsive authoritative endpoint.

@@ -41,6 +41,10 @@ describe('toolchain registry route', () => {
     const tox = r.body.toolchain.find((t) => t.toolId === 'toxicity');
     assert.ok(admet && tox);
     assert.equal(admet.evidenceClass, 'MODEL_ESTIMATE');
+    assert.ok(rdkit.package && rdkit.environment && rdkit.provenance);
+    assert.equal(typeof rdkit.availability, 'boolean');
+    assert.ok(['VALIDATED_REFERENCE_CASE', 'NOT_EXECUTED'].includes(rdkit.executionStatus));
+    assert.match(rdkit.fingerprint, /^[a-f0-9]{16}$/);
   });
 
   test('GET /api/compute/admet/endpoints exposes the 52-endpoint catalog with published TDC metrics (public)', (t) => {

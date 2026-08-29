@@ -27,6 +27,7 @@ export interface NaturalFunctionalReplacementResult {
   matchedReference?: string;
   target?: string;
   liveActivities?: readonly LiveChEMBLActivityRecord[];
+  candidateWhy?: readonly NaturalCandidateWhy[];
 }
 
 export interface NaturalSourceRecord {
@@ -35,10 +36,17 @@ export interface NaturalSourceRecord {
 }
 
 export interface LiveChEMBLActivityRecord {
-  compoundId: string; targetId: string; activityId: number; assayId: string;
+  pubchemCid: number; compoundId: string; targetId: string; activityId: number; assayId: string;
   type: 'Ki' | 'IC50' | 'EC50'; relation: string; value: string; units: string;
   assayContext: string; assayQuality: 'HIGH' | 'MODERATE' | 'LOW' | 'UNKNOWN';
   source: 'ChEMBL'; sourceVersion: string; retrievedAt: string; sourceUrl: string;
+}
+
+export interface NaturalCandidateWhy {
+  pubchemCid: number; activityCount: number; targetMatchedActivityCount: number;
+  assayQualityCounts: Readonly<Record<LiveChEMBLActivityRecord['assayQuality'], number>>;
+  measurementTypes: readonly LiveChEMBLActivityRecord['type'][];
+  rationale: string; uncertainty: string; provenanceIds: readonly string[];
 }
 
 const normalize = (value: string | undefined): string => (value ?? '').trim().toLowerCase();
@@ -114,11 +122,23 @@ export async function fetchNaturalChEMBLActivities(records: readonly NaturalSour
       if (!activityResponse.ok) return [];
       return ((await activityResponse.json() as { activities?: Record<string, unknown>[] }).activities ?? []).flatMap((row) => {
         if (!allowedActivityTypes.has(String(row.standard_type)) || typeof row.standard_value !== 'string' || typeof row.standard_units !== 'string' || typeof row.activity_id !== 'number' || typeof row.assay_chembl_id !== 'string' || typeof row.target_chembl_id !== 'string') return [];
-        return [{ compoundId, targetId: `chembl:target:${row.target_chembl_id}`, activityId: row.activity_id, assayId: row.assay_chembl_id, type: row.standard_type as LiveChEMBLActivityRecord['type'], relation: typeof row.standard_relation === 'string' ? row.standard_relation : 'UNKNOWN', value: row.standard_value, units: row.standard_units, assayContext: typeof row.assay_description === 'string' ? row.assay_description : 'UNKNOWN', assayQuality: classifyAssay(row), source: 'ChEMBL' as const, sourceVersion: 'ChEMBL Web Services', retrievedAt, sourceUrl: activityUrl }];
+        return [{ pubchemCid: record.cid, compoundId, targetId: `chembl:target:${row.target_chembl_id}`, activityId: row.activity_id, assayId: row.assay_chembl_id, type: row.standard_type as LiveChEMBLActivityRecord['type'], relation: typeof row.standard_relation === 'string' ? row.standard_relation : 'UNKNOWN', value: row.standard_value, units: row.standard_units, assayContext: typeof row.assay_description === 'string' ? row.assay_description : 'UNKNOWN', assayQuality: classifyAssay(row), source: 'ChEMBL' as const, sourceVersion: 'ChEMBL Web Services', retrievedAt, sourceUrl: activityUrl }];
       });
     } catch { return []; }
   }));
   return results.flat();
+}
+
+function buildCandidateWhy(activities: readonly LiveChEMBLActivityRecord[], target: string | undefined): NaturalCandidateWhy[] {
+  const token = normalize(target);
+  const grouped = new Map<number, LiveChEMBLActivityRecord[]>();
+  activities.forEach((activity) => grouped.set(activity.pubchemCid, [...(grouped.get(activity.pubchemCid) ?? []), activity]));
+  return [...grouped.entries()].sort(([a], [b]) => a - b).map(([pubchemCid, rows]) => {
+    const quality = { HIGH: 0, MODERATE: 0, LOW: 0, UNKNOWN: 0 } as Record<LiveChEMBLActivityRecord['assayQuality'], number>;
+    rows.forEach((row) => { quality[row.assayQuality] += 1; });
+    const matched = rows.filter((row) => !token || row.targetId.toLowerCase().includes(token) || (token === 'a1' && row.targetId.endsWith('CHEMBL318'))).length;
+    return { pubchemCid, activityCount: rows.length, targetMatchedActivityCount: matched, assayQualityCounts: quality, measurementTypes: [...new Set(rows.map((row) => row.type))], rationale: matched > 0 ? 'Wyżej: ChEMBL zawiera jawne activity dla żądanego targetu; typ pomiaru i jakość assay pozostają widoczne.' : 'Niżej: pobrane activity nie pasuje do żądanego targetu.', uncertainty: 'In vitro activity nie ustanawia efficacy, safety, mechanizmu ani przydatności klinicznej.', provenanceIds: rows.map((row) => `chembl:activity:${row.activityId}`) };
+  });
 }
 
 const candidateId = (cid: number): string => `candidate:pubchem:${cid}`;
@@ -189,5 +209,5 @@ export async function resolveNaturalFunctionalReplacementFromSources(
   const liveActivities = await fetchNaturalChEMBLActivities(sourceRecords, fetchImpl);
   const base = resolveNaturalFunctionalReplacement(input);
   if (base.status === 'BLOCKED') return base;
-  return { ...base, liveActivities, reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem oraz ${liveActivities.length} jawnych rekordów activity z ChEMBL. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
+  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem oraz ${liveActivities.length} jawnych rekordów activity z ChEMBL. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
 }

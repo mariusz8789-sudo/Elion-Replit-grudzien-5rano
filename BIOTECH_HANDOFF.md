@@ -1233,3 +1233,10 @@ The bounded PubChem natural-candidate retrieval now feeds a bounded ChEMBL looku
 The ADMIN UI now displays live ChEMBL activity evidence next to the existing explainable research-priority comparison. Binding remains literature-supported evidence, not efficacy; predictions remain predictions, not observations; no clinical safety or therapeutic replacement claim is created.
 
 Validation: natural replacement/ChEMBL contract tests `5 passed`; frontend build passed; ESLint passed; `git diff --check` passed; live ChEMBL probe resolved a real molecule lookup to CHEMBL113; desktop Chromium smoke passed with 27 routes, 13 laboratories, 206 interactions, and zero runtime errors.
+
+
+## NATURAL DISCOVERY CHECKPOINT: Activity-Aware WHY
+
+The live ChEMBL activity stream is now connected to a deterministic candidate WHY projection. For each PubChem candidate with retrieved activity, Genesis reports total activity count, requested-target match count, separate measurement types, assay-quality counts, ChEMBL activity provenance IDs, rationale, and explicit uncertainty. The projection does not merge Ki/IC50/EC50, does not convert binding into efficacy, and does not replace the existing ranking/evidence/memory architecture.
+
+Validation passed: natural replacement/ChEMBL tests `5 passed`; frontend typecheck/Vite build passed; ESLint passed; `git diff --check` passed; Chromium smoke passed with 27 routes, 13 laboratories, 210 interactions, and zero runtime errors.

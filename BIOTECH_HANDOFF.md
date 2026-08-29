@@ -1187,3 +1187,10 @@ One bounded installation attempt activated `biopython==1.88` in the sandbox Pyth
 The adapter’s safety boundary remains active: a PDB with missing backbone atoms or waters requires `ADDITIONAL_INPUT_REQUIRED` rather than silently editing or inventing structure. This is deterministic structure-ingestion evidence, not biological execution, binding, efficacy, safety, or clinical evidence.
 
 Focused runtime validation now passes: 16 passed, 10 skipped, 0 failed across heavy-engine, multi-fidelity and replay suites. AutoDock Vina/Meeko reference and deterministic replay continue to pass. Remaining absent runtimes are PyMeep and ADMET-AI. Next large gap: bounded PyMeep availability/reference validation, followed by ADMET-AI.
+
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: PyMeep — PARKED
+
+One bounded installation attempt was made for `meep>=1.0` via PyPI. The package resolved to unrelated `meep==1.0.6` (a Git/Hg API helper, not the MIT Meep electromagnetic solver); it installed but failed the worker contract because it has no `verbosity` API. The unrelated package and its transitive dependencies were removed immediately. A follow-up availability check correctly reports `pymeep_unavailable: No module named 'meep'`.
+
+PyMeep is therefore parked as `BLOCKED_BY_RUNTIME` / package-source mismatch. No fallback analytical Fresnel value was admitted as FDTD output, and the existing adapter remains honest. Continue to the next viable runtime: ADMET-AI.

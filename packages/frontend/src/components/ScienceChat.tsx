@@ -91,6 +91,9 @@ export function formatFabricRun(run: ExperimentRun): string {
   const biotechSource = run.result.biologicalEvidence?.provenance[0]
     ? `\nŹródło evidence: ${run.result.biologicalEvidence.provenance[0].source} / ${run.result.biologicalEvidence.provenance[0].sourceId}${run.result.biologicalEvidence.provenance[0].sourceVersion ? ` · ${run.result.biologicalEvidence.provenance[0].sourceVersion}` : ''}${run.result.biologicalEvidence.provenance[0].sourceUrl ? ` · ${run.result.biologicalEvidence.provenance[0].sourceUrl}` : ''}.`
     : '';
+  const adme = run.request.domainId === 'biotechnology' && typeof run.result.outputs.xLogP === 'number'
+    ? `\nADME properties (computed): xLogP ${run.result.outputs.xLogP}; TPSA ${String(run.result.outputs.tpsa)}; H-bond donors ${String(run.result.outputs.hydrogenBondDonorCount)}; acceptors ${String(run.result.outputs.hydrogenBondAcceptorCount)}; rotatable bonds ${String(run.result.outputs.rotatableBondCount)}. Source: ${String(run.result.outputs.admeSource ?? 'unknown')} / ${String(run.result.outputs.admeSourceId ?? 'unknown')} · ${String(run.result.outputs.admeSourceUrl ?? '')}. These properties are not ADME/Tox outcome or clinical prediction.`
+    : '';
   const safety = run.request.domainId === 'biotechnology'
     ? (typeof run.result.outputs.safetySignalId === 'string'
       ? `\nSafety signal: ${String(run.result.outputs.safetyStatus ?? 'UNKNOWN')} / ${String(run.result.outputs.safetyEvidenceQuality ?? 'UNKNOWN')} — ${String(run.result.outputs.safetyDescription ?? 'brak opisu')}. Source: ${String(run.result.outputs.safetySource ?? 'unknown')} / ${String(run.result.outputs.safetySourceId ?? 'unknown')}${typeof run.result.outputs.safetySourceUrl === 'string' ? ` · ${run.result.outputs.safetySourceUrl}` : ''}. To hazard classification, nie clinical safety conclusion.`
@@ -109,7 +112,7 @@ export function formatFabricRun(run: ExperimentRun): string {
   const reportHeader = `SCIENTIFIC RESULT REPORT\nPytanie: ${run.request.sourceText}\nModel: ${run.request.modelId ?? 'nie wybrano'}\nWykonanie: ${run.result.status} / ${run.provenance.resultOrigin}\nKlasyfikacja epistemiczna: ${epistemicReading}`;
   const evidence = run.result.biologicalEvidence ? '\nEvidence: LITERATURE_SUPPORTED binding record; nie jest computational Evidence Pack.' : '\nEvidence: status wynika z istniejącego handoffu/protokołu; pojedynczy run nie tworzy Evidence Pack.';
   const replay = '\nReplay: nieustanowiony dla tego pojedynczego wyniku; wymaga istniejącej capsule/protocol semantics.';
-  return `${reportHeader}\nWynik: ${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}${biotechSource}${safety}${analysis}${evidence}${replay}\nProvenance: ${run.provenance.runFingerprint}.`;
+  return `${reportHeader}\nWynik: ${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}${biotechSource}${adme}${safety}${analysis}${evidence}${replay}\nProvenance: ${run.provenance.runFingerprint}.`;
 }
 
 function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule }) {

@@ -35,7 +35,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `8455d34` — `feat(drug-discovery): expose candidate validation path`
 - `77c0d9f` — `feat(drug-discovery): persist discovery context`
 - `f60694b` — `feat(drug-discovery): add pinned GHS safety signal`
-- next checkpoint in this session — show attached SafetySignal/provenance in Science Chat report
+- `b314b68` — `feat(drug-discovery): surface safety provenance`
+- next checkpoint in this session — commit pinned ADME properties foundation
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -257,9 +258,17 @@ Changed files: `packages/frontend/src/core/experimentFabric/executor.ts`, `packa
 
 Validation: targeted ChEMBL/Science Chat tests (6 passed); the first full build exposed one optional-URL type error, fixed by normalizing the source URL; rerun full validation passed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed drug-discovery capability: pinned ADME properties foundation
+
+The existing PubChem mapper now carries a pinned PubChem PUG REST record for CID 2519 with XLogP, TPSA, H-bond donor/acceptor counts and rotatable-bond count. The existing biotech Fabric result exposes these fields and their independent source/source ID/source URL. Science Chat renders them as `ADME properties (computed)` and explicitly states they are not an ADME/Tox outcome or clinical prediction. Safety remains separately represented by the pinned GHS SafetySignal; no toxicity or efficacy inference was added.
+
+Changed files: `packages/frontend/src/core/biotechData/pubchem-adme-2519.json`, `packages/frontend/src/core/biotechData/pubchem.ts`, `packages/frontend/src/core/experimentFabric/executor.ts`, `packages/frontend/src/components/ScienceChat.tsx`, `packages/frontend/src/__tests__/chembl.test.ts`.
+
+Validation: `npm test` (272 passed, 40 skipped, 0 failed), `npm run build` (includes `tsc -b`), `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — real drug-discovery workflow
 
-Next large block: ADME/Tox. Inspect whether a real public source can be pinned cheaply; otherwise add only a minimal extension point and keep ADME/Tox `UNKNOWN`. Then continue to multi-candidate comparison. Do not infer safety from binding, add arbitrary scores or make clinical efficacy claims.
+Next large block: multi-candidate comparison using existing candidate/discovery contracts. Reuse the pinned caffeine chain and add a second candidate only if a complete, source-backed identity + activity + provenance chain can be established cheaply; otherwise implement comparison over available records without fabricating a second molecule. Keep ADME/Tox outcomes `UNKNOWN` unless independently sourced.
 
 ## Next large gaps
 

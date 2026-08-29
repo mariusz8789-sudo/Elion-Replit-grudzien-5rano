@@ -1,5 +1,6 @@
 import pubchemRecord from './pubchem-cid-2519.json';
 import type { Compound } from '../biotechDiscoveryContract';
+import admeRecord from './pubchem-adme-2519.json';
 
 export const PUBCHEM_CID_2519_SOURCE_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/2519/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON';
 export const PUBCHEM_CID_2519_RETRIEVED_AT = '2026-08-29';
@@ -24,9 +25,23 @@ export interface PubChemMolecularProperties {
   inchiKey: string;
 }
 
+export interface PubChemAdmeProperties {
+  xLogP: number;
+  tpsa: number;
+  hydrogenBondDonorCount: number;
+  hydrogenBondAcceptorCount: number;
+  rotatableBondCount: number;
+  source: string;
+  sourceUrl: string;
+  sourceId: string;
+  sourceVersion: string;
+  retrievedAt: string;
+}
+
 export interface PubChemCompoundRecord {
   compound: Compound;
   properties: PubChemMolecularProperties;
+  adme: PubChemAdmeProperties;
   sourceUrl: string;
   sourceId: string;
   retrievedAt: string;
@@ -39,6 +54,19 @@ export function mapPinnedPubChemCaffeine(): PubChemCompoundRecord {
     throw new Error('Pinned PubChem fixture is incomplete or has an unexpected CID.');
   }
   const sourceId = `pubchem:CID:${row.CID}`;
+  if (admeRecord.compoundId !== sourceId || admeRecord.xLogP === undefined || admeRecord.tpsa === undefined) throw new Error('Pinned PubChem ADME fixture is incomplete or has unexpected identity fields.');
+  const adme: PubChemAdmeProperties = {
+    xLogP: admeRecord.xLogP,
+    tpsa: admeRecord.tpsa,
+    hydrogenBondDonorCount: admeRecord.hydrogenBondDonorCount,
+    hydrogenBondAcceptorCount: admeRecord.hydrogenBondAcceptorCount,
+    rotatableBondCount: admeRecord.rotatableBondCount,
+    source: admeRecord.source,
+    sourceUrl: admeRecord.sourceUrl,
+    sourceId: admeRecord.sourceId,
+    sourceVersion: admeRecord.sourceVersion,
+    retrievedAt: admeRecord.retrievedAt,
+  };
   const properties: PubChemMolecularProperties = {
     molecularFormula: row.MolecularFormula,
     molecularWeight: row.MolecularWeight,
@@ -56,6 +84,7 @@ export function mapPinnedPubChemCaffeine(): PubChemCompoundRecord {
       }],
     },
     properties,
+    adme,
     sourceUrl: PUBCHEM_CID_2519_SOURCE_URL,
     sourceId,
     retrievedAt: PUBCHEM_CID_2519_RETRIEVED_AT,

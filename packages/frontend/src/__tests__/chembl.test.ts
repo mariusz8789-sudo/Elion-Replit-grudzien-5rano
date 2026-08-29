@@ -6,6 +6,7 @@ import {
   mapPinnedChEMBLCaffeineA1Activity,
   buildPinnedChEMBLCaffeineDiscovery,
 } from '../core/biotechData/chembl';
+import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
 
 describe('pinned ChEMBL bioactivity', () => {
   it('maps a real caffeine bioactivity record to target and evidence contracts', () => {
@@ -62,6 +63,21 @@ describe('pinned ChEMBL bioactivity', () => {
     expect(discovery.hypothesis).toMatchObject({ status: 'HYPOTHESIS', candidateId: discovery.candidate.id, supportingEvidenceIds: ['chembl:activity:189031'] });
     expect(discovery.report).toMatchObject({ candidateId: discovery.candidate.id, targetIds: ['chembl:target:CHEMBL318'], evidenceIds: ['chembl:activity:189031'], epistemicStatus: 'HYPOTHESIS' });
     expect(discovery.report.provenance.some((item) => item.sourceId === 'chembl:activity:189031')).toBe(true);
+  });
+
+  it('maps pinned PubChem ADME properties with independent provenance', () => {
+    const record = mapPinnedPubChemCaffeine();
+
+    expect(record.adme).toMatchObject({
+      xLogP: -0.1,
+      tpsa: 58.4,
+      hydrogenBondDonorCount: 0,
+      hydrogenBondAcceptorCount: 3,
+      rotatableBondCount: 0,
+      source: 'PubChem PUG REST',
+      sourceId: 'pubchem:CID:2519:properties:adme',
+    });
+    expect(record.adme.sourceUrl).toContain('/property/XLogP,HBondDonorCount');
   });
 
   it('does not turn the binding record into efficacy or safety claims', () => {

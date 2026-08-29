@@ -1,6 +1,7 @@
 import { canonicalJson, fnv1a } from '../events/hash';
 import type { ScientificEvidenceChain } from './scientificDiscovery';
 import type { ExperimentRun } from './types';
+import { compareAme2020Observations, type Ame2020Comparison } from '../observation/nuclearAme2020';
 
 export const EVIDENCE_PACK_VERSION = '1.0.0';
 
@@ -34,6 +35,8 @@ export interface ScientificEvidencePack {
     armsNotExecuted: readonly string[];
   };
   eventSummaries: readonly { runId: string; count: number; types: readonly string[] }[];
+  /** Optional external-observation projection; absent for protocols without a compatible source. */
+  externalObservationComparison?: Ame2020Comparison;
   disclaimer: string;
 }
 
@@ -71,6 +74,9 @@ export function createScientificEvidencePack(chain: ScientificEvidenceChain): Sc
       referenceRunIds: [],
     },
   };
+  const externalObservationComparison = chain.design.hypothesis.modelId === 'nuclear-semf'
+    ? compareAme2020Observations()
+    : undefined;
   return {
     contractVersion: EVIDENCE_PACK_VERSION,
     evidencePackId: `pack_${fnv1a(canonicalJson(seed))}`,
@@ -85,6 +91,7 @@ export function createScientificEvidencePack(chain: ScientificEvidenceChain): Sc
       armsNotExecuted,
     },
     eventSummaries,
+    ...(externalObservationComparison === undefined ? {} : { externalObservationComparison }),
     disclaimer: 'Evidence Pack rejestruje faktyczne runy, ich parametry i provenance. Ocena hipotezy jest ograniczona do prerejestrowanego protokołu oraz granic użytego modelu; nie stanowi odkrycia ani potwierdzenia świata rzeczywistego.',
   };
 }

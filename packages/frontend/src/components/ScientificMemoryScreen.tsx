@@ -164,8 +164,14 @@ export function ScientificMemoryScreen() {
               <div className="stat-row"><span>Snapshot schema</span><span className="val">{classifyStoredEvidencePack(record.pack)}</span></div>
               <div className="stat-row"><span>Persisted replay verdict</span><span className="val">{snapshotVerdict}</span></div>
               <div className="stat-row"><span>Source</span><span className="val">real runs only: {String(record.pack.runs.length > 0)}</span></div>
+              {record.pack.externalObservationComparison && <>
+                <div className="stat-row"><span>Independent observation</span><span className="val">{record.pack.externalObservationComparison.observable} · {record.pack.externalObservationComparison.comparisons.map((item) => `${item.nuclide}=${item.status}`).join(', ')}</span></div>
+                <div className="stat-row"><span>Observation error</span><span className="val">MAE {record.pack.externalObservationComparison.meanAbsoluteError.toPrecision(5)} · RMSE {record.pack.externalObservationComparison.rootMeanSquareError.toPrecision(5)} {record.pack.externalObservationComparison.unit}</span></div>
+                <div className="stat-row"><span>Calibration</span><span className="val">{record.pack.externalObservationComparison.calibration.status}</span></div>
+              </>}
             </div>
             <p className="settings-hint">{snapshotVerdict === 'MATCH' ? 'MATCH pochodzi z zapisanego snapshotu armów; nie oznacza nowego uruchomienia.' : snapshotVerdict === 'DRIFT' ? 'DRIFT zapisany w snapshotcie; wykonaj jawny rerun, aby porównać aktualny wynik.' : 'BLOCKED: zapis nie zawiera pełnego wykonanego replay; nie traktuj go jako potwierdzenia.'}</p>
+            {record.pack.externalObservationComparison && <p className="settings-hint">AME2020 source: {record.pack.externalObservationComparison.provenance.sourceUrl}; raw SHA-256: {record.pack.externalObservationComparison.provenance.rawPayloadSha256}. This is an independent observation comparison, not a calibrated accuracy claim.</p>}
             <div className="pilot-actions">
               <button className="chip-btn pilot-primary" onClick={() => { window.location.hash = `#/pilot?mode=protocol&replay=${encodeURIComponent(record.pack.evidencePackId)}`; }}>Otwórz do jawnego rerun</button>
               <button className="chip-btn" onClick={() => downloadEvidencePack(record)}>Eksportuj Evidence Pack JSON</button>

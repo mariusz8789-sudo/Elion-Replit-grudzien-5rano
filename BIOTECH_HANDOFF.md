@@ -388,3 +388,31 @@ Focused tests: 8 passed. Full test suite, build, lint and diff check passed. Bui
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
 - **NEXT LARGE GAP:** preserve the structured AME2020 comparison in the existing Evidence Pack / Replay data boundary and expose it in the existing Scientific Memory view, while keeping the comparison explicitly independent-observation data and calibration `INSUFFICIENT_DATA`.
+
+## Completed Core capability: structured external observation in Evidence Pack and Memory
+
+The existing `ScientificEvidencePack` now optionally carries the structured AME2020 comparison when its preregistered hypothesis uses the existing `nuclear-semf` model. The projection preserves per-nuclide prediction/observation/status, MAE/RMSE, calibration status, source URL, raw SHA-256, transform identity and replay input declaration. Protocols without a compatible observation remain unchanged and do not receive unrelated data.
+
+The existing `ScientificMemoryScreen` now renders the comparison status, error metrics, calibration boundary and AME2020 provenance inside the already persisted Evidence Pack view. Existing replay verdicts and explicit rerun actions are unchanged; this source comparison is not mislabeled as a replay or a calibrated accuracy claim. No second Evidence, Memory or Replay system was created.
+
+Changed files:
+
+- `packages/frontend/src/core/experimentFabric/evidencePack.ts`
+- `packages/frontend/src/components/ScientificMemoryScreen.tsx`
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/experimentFabric.test.ts src/__tests__/scienceMemoryFabric.test.ts src/__tests__/nuclearAme2020.test.ts src/__tests__/EvidenceReplayPanel.test.tsx
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests: 115 passed. Full test suite, build, lint and diff check passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `e2fde79`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** add a no-network replay verifier for the structured external-observation fixture and expose `MATCH / DRIFT / BLOCKED` for source-integrity changes without claiming a fresh measurement or calibrated accuracy.

@@ -983,3 +983,27 @@ git diff --check: passed
 - **CURRENT STATUS:** admin permission boundary plus request/timestamp/user/action provenance now exists for the source-backed comparison persistence action.
 - **PARKED:** server-authoritative global ADMIN role and tamper-resistant audit storage require a backend auth/schema decision; biological execution, independent assays, efficacy and full ADME/Tox remain blocked/unknown.
 - **NEXT GAP:** if server-level auditability is required, implement it in backend auth/persistence with explicit migration and RBAC tests; otherwise continue with reachable source-backed reference-profile expansion.
+
+## COMPLETED NATURAL DISCOVERY BLOCK: admin input → bounded reference profile resolution
+
+The admin-only Natural Functional Replacement workflow now accepts a reference compound and target/receptor input in the existing Drug Discovery screen. Resolution is deliberately bounded to the three already pinned, real-source A1 records: caffeine, adenosine and theophylline. A compatible input returns `RESOLVED` with the existing source-backed candidate reports; an unknown compound or target returns `BLOCKED` with no candidates, no prediction and no fabricated profile. The result explicitly states that research priority is not a functional substitute, efficacy or clinical recommendation.
+
+Changed files:
+
+- `packages/frontend/src/core/biotechData/naturalReplacement.ts`
+- `packages/frontend/src/components/DrugDiscoveryScreen.tsx`
+- `packages/frontend/src/__tests__/naturalReplacement.test.ts`
+
+Validation completed:
+
+```text
+focused resolver/biotech/memory tests: 15 passed
+npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b; existing Vite large-chunk warning remains
+npm run lint: passed
+git diff --check: passed
+```
+
+- **CURRENT STATUS:** ADMIN input → bounded reference profile → real pinned candidate set → existing comparison/ranking/evidence/memory/replay path is wired.
+- **PARKED:** arbitrary live natural-product search, global server-authoritative ADMIN role, biological execution, independent assays, clinical efficacy, complete ADME/Tox and unsupported replacement claims.
+- **NEXT GAP:** add live source expansion only when an authoritative endpoint is reachable and a deterministic selection policy is declared; otherwise continue with another integration break rather than inventing candidates.

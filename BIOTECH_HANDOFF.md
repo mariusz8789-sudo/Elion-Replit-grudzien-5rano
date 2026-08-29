@@ -750,3 +750,27 @@ git diff --check: passed
 - **BRANCH:** `manus/next-gap-observation-analysis`
 - **PARKED:** compatible safety/ADME/Tox for adenosine and theophylline, biological executor, clinical efficacy, formal calibration accuracy, and additional heterogeneous assay expansion.
 - **NEXT LARGE GAP:** only add safety/ADME/Tox when a reachable authoritative source provides compatible records; otherwise preserve `UNKNOWN` and continue with another confirmed end-to-end break rather than inventing data.
+
+## COMPLETED MAJOR BLOCK: official-label safety provenance
+
+The real adenosine and theophylline A1 candidates now carry official DailyMed label-derived safety signals through the existing `SafetySignal` and candidate ranking path. Adenosine uses the Sagent label set ID `546642f2-662f-46cf-9d82-5bb3bdcc7677`, including label-listed contraindication/warning categories. Theophylline uses the PD-Rx extended-release label set ID `5e64036a-ee3e-42e7-9e59-881f88a4e298`, including label-described concentration-related adverse-effect risk and pharmacokinetic monitoring variability. These are label-level evidence records, not individual clinical assessments.
+
+The Drug Discovery UI now discloses ChEMBL binding plus DailyMed label provenance and keeps `clinical efficacy = UNKNOWN`. No treatment recommendation, safety conclusion for an individual, efficacy claim, ADME inference or biological execution was added. Existing Evidence, Ranking, Hypothesis, Report and Scientific Memory boundaries were reused.
+
+Validation completed:
+
+```text
+focused DailyMed + candidate + memory tests: passed
+full npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+Chromium desktop: 27 routes, 13 labs, 242 interactions, zero runtime errors
+Chromium mobile: 27 routes, 13 labs, 242 interactions, zero runtime errors
+```
+
+- **HEAD before this handoff update:** `ec2626c`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **REAL SOURCES:** ChEMBL Web Services, DailyMed official human prescription labels, PubChem caffeine fixture, AME2020 raw mass table.
+- **PARKED:** clinical efficacy, biological executor, formal calibrated accuracy, PubChem enrichment for adenosine/theophylline after HTTP 503, and any safety/ADME/Tox claim not directly supported by a compatible source.
+- **NEXT LARGE GAP:** add compatible quantitative ADME/Tox data only if an authoritative reachable source provides it; otherwise continue with the next confirmed end-to-end persistence or replay break and do not fabricate data.

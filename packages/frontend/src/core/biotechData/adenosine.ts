@@ -11,6 +11,7 @@ import {
   type TherapeuticHypothesis,
 } from '../biotechDiscoveryContract';
 import record from './chembl-adenosine-activity-71801.json';
+import { mapDailyMedAdenosineSafety } from './dailymedSafety';
 
 type PinnedAdenosineRecord = typeof record;
 
@@ -92,11 +93,7 @@ export function buildPinnedChEMBLAdenosineDiscovery(): ChEMBLAdenosineDiscovery 
     sourceVersion: record.sourceVersion,
   };
   const fingerprint = fnv1a(canonicalJson(scientificRecord));
-  const safety: SafetySignal = {
-    kind: 'safety-signal', id: `safety:unknown:${compoundId}`, namespace: 'genesis-biotech', label: 'Adenosine safety evidence not assessed in this workflow',
-    status: 'UNKNOWN', signalType: 'uncertainty', description: 'The pinned ChEMBL binding record does not provide a safety or toxicity assessment for this discovery report.',
-    evidenceQuality: 'UNKNOWN', uncertainty: 'No safety/ADME/Tox source was incorporated for this candidate.', provenance: [],
-  };
+  const safety: SafetySignal = mapDailyMedAdenosineSafety();
   const candidate: TherapeuticCandidate = {
     kind: 'therapeutic-candidate', id: `candidate:${compoundId}:${targetId}`, namespace: 'genesis-biotech', label: 'Adenosine — A1 binding research candidate', status: 'UNKNOWN',
     materialId: compoundId, compoundIds: [compoundId], targetIds: [targetId], mechanismIds: [], supportingEvidenceIds: [activityId],

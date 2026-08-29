@@ -13,9 +13,9 @@ describe('pinned ChEMBL adenosine A1 comparator', () => {
     expect(discovery.record.sourceUrl).toBe(CHEMBL_ADENOSINE_ACTIVITY_71801_SOURCE_URL);
   });
 
-  it('preserves unknown safety and clinical efficacy boundaries', () => {
+  it('preserves label-level safety and unknown clinical efficacy boundaries', () => {
     const discovery = buildPinnedChEMBLAdenosineDiscovery();
-    expect(discovery.safety).toMatchObject({ status: 'UNKNOWN', evidenceQuality: 'UNKNOWN', signalType: 'uncertainty' });
+    expect(discovery.safety).toMatchObject({ status: 'LITERATURE_SUPPORTED', evidenceQuality: 'HIGH', signalType: 'adverse-effect' });
     expect(discovery.report).toMatchObject({ scientificEvidenceStatus: 'HYPOTHESIS', clinicalEfficacy: 'UNKNOWN' });
     expect(discovery.report.uncertainty).toMatch(/safety|uncertainty/i);
   });

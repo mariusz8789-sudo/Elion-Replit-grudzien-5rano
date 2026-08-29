@@ -1107,3 +1107,7 @@ Focused naturalReplacement and contract tests pass (11 tests); build/typecheck, 
 The resolved natural-product report panel now exposes, for every active report, candidate/report ID, deterministic research-priority score, epistemic evidence status, target IDs, safety status, ADME/PK/Tox status, validation request state and clinical efficacy state. The display is a report matrix only; it does not convert binding into efficacy or UNKNOWN into a positive finding.
 
 Focused tests passed (11 tests), build/typecheck passed, lint passed, diff-check passed, and fresh desktop/mobile Chromium smoke passed with 27 routes, 13 laboratories and 242 interactions per profile, zero runtime errors. The active resolved set continues to persist through the existing Scientific Memory and audit path.
+
+## FULL RELEASE VALIDATION CHECKPOINT
+
+Full validation after the latest report, evidence matrix and ADME boundary blocks passed: `npm test` reports 271 passed, 40 skipped and 0 failed; `npm run e2e:discovery` passes all browser/Node fingerprint checks; build/typecheck passed; lint passed; `git diff --check` passed; desktop and mobile smoke each cover 27 routes, 13 laboratories and 242 interactions with zero runtime errors. The branch remains clean after the upcoming handoff-only commit.

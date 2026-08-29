@@ -5,7 +5,7 @@ import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
-import { saveExperiment, listExperiments } from '../core/scienceMemory';
+import { saveExperiment, listExperiments, saveBiotechDiscoveryComparisonToMemory } from '../core/scienceMemory';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
 import { track } from '../core/analytics';
 import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmEarthquakeEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
@@ -15,6 +15,7 @@ import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backen
 import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
 import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
+import { resolveNaturalFunctionalReplacementFromSources } from '../core/biotechData/naturalReplacement';
 
 /**
  * Genesis Science Chat — inteligentna warstwa rozmowy NAD istniejącymi
@@ -70,6 +71,21 @@ function formatProjectKnowledgeSources(project: ActiveKnowledgeProject, material
     return `• ${material.title} v${material.currentVersion} — ${material.epistemicStatus ?? 'status nieznany'}; ${material.extractionStatus ?? 'brak ekstrakcji'}.${topics}${hash}${excerpt}`;
   });
   return `Źródła projektu „${project.name}” — materiał użytkownika, nie wynik solvera ani instrukcja wykonawcza:\n${entries.join('\n')}`;
+}
+
+function naturalReferenceFromMessage(message: string): string | undefined {
+  const known = ['caffeine', 'kofein', 'adenosine', 'adenozyn', 'theophylline', 'teofilin'];
+  return known.find((name) => message.toLowerCase().includes(name));
+}
+
+function formatNaturalDiscoveryResult(result: Awaited<ReturnType<typeof resolveNaturalFunctionalReplacementFromSources>>): string {
+  const top = [...result.reports].sort((a, b) => (b.ranking?.score ?? -1) - (a.ranking?.score ?? -1)).slice(0, 5);
+  const why = result.candidateWhy ?? [];
+  return [`NATURAL DISCOVERY — ${result.status}`, result.reason, `Kandydaci/raporty: ${result.reports.length}.`, ...top.map((report, index) => {
+    const cid = report.candidateId.match(/pubchem:(\d+)/)?.[1];
+    const explanation = cid ? why.find((item) => item.pubchemCid === Number(cid)) : undefined;
+    return `${index + 1}. ${report.candidateId} · research priority ${(report.ranking?.score ?? 0).toFixed(4)} · ${explanation?.rationale ?? 'brak live activity dla tego kandydata'} · uncertainty: ${explanation?.uncertainty ?? report.uncertainty}`;
+  }), 'Granice: binding ≠ efficacy; prediction ≠ observation; brakujące ADME/Tox i clinical efficacy pozostają UNKNOWN.'].join('\n');
 }
 
 export function formatFabricRun(run: ExperimentRun): string {
@@ -304,6 +320,20 @@ export function ScienceChat() {
       } finally {
         setBackendConfirmationPending(false);
       }
+      return;
+    }
+    const isNaturalDiscovery = /natural|naturalne|naturalnych|kandydat(ów|y)?/i.test(msg) && /reference|związk|lek|porówn|znajdź|wyszuk/i.test(msg);
+    if (isNaturalDiscovery) {
+      const referenceCompound = naturalReferenceFromMessage(msg);
+      const targetMatch = msg.match(/(?:target|receptor|receptora)\s*[:=]?\s*([A-Za-z0-9-]+)/i);
+      const result = await resolveNaturalFunctionalReplacementFromSources({ referenceCompound, target: targetMatch?.[1] ?? 'A1' });
+      setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatNaturalDiscoveryResult(result), tag: result.status === 'RESOLVED' ? 'WYNIK' : 'SYSTEM' }]);
+      if (result.reports.length >= 2) {
+        const saved = saveBiotechDiscoveryComparisonToMemory(result.reports, { activityIds: result.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`), assayIds: result.liveActivities?.map((activity) => `chembl:assay:${activity.assayId}`) });
+        setTurns((t) => [...t, { role: 'genesis', text: `Zapisano pełny comparison artifact w Scientific Memory. Report: ${saved.biotech?.reportId ?? 'UNKNOWN'} · comparison: ${saved.biotech?.comparison?.comparisonId ?? 'UNKNOWN'} · replay fingerprint: ${saved.biotech?.comparison?.scientificFingerprint ?? 'UNKNOWN'}.`, tag: 'SYSTEM' }]);
+      }
+      setInput('');
+      track('ask_ai_used', { via: 'science-chat-natural-discovery', status: result.status });
       return;
     }
     const fabricRequest = parseScienceChatMessage(msg);

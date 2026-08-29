@@ -1247,3 +1247,12 @@ Validation passed: natural replacement/ChEMBL tests `5 passed`; frontend typeche
 The existing Scientific Memory biotech context now persists live ChEMBL `activityIds` and `assayIds` alongside candidate/report/comparison IDs, provenance, ranking, uncertainty, and scientific fingerprint. The ADMIN save action supplies those IDs from the live activity stream; no parallel memory store was introduced. Existing comparison replay remains the integrity check over the stored comparison fingerprint and does not claim a biological rerun.
 
 Validation passed: integrated natural/ChEMBL/memory tests `27 passed`; frontend typecheck/Vite build passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 220 interactions, and zero runtime errors.
+
+
+## FINAL INTEGRATION CHECKPOINT: Science Chat → Natural Discovery → Memory
+
+Science Chat now recognizes a single natural-discovery request containing a supported reference name and routes it through the existing bounded natural workflow: live PubChem identity retrieval, live ChEMBL molecule/activity lookup, assay quality/context, deterministic comparison/ranking, WHY/uncertainty formatting, and existing Scientific Memory persistence with activity/assay lineage. The user no longer needs to copy IDs manually between the chat and Drug Discovery workspace. Unsupported or missing references remain BLOCKED; no synthetic candidate is created.
+
+The chat response explicitly states that binding is not efficacy, prediction is not observation, and missing ADME/Tox/clinical evidence remains UNKNOWN. Saved artifacts retain report, comparison, candidate, activity, assay, provenance, ranking, uncertainty, and replay fingerprint fields through the existing memory contract.
+
+Validation passed: integrated natural/ChEMBL/memory tests `27 passed`; frontend typecheck/Vite build passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 220 interactions, and zero runtime errors.

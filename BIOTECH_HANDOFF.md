@@ -1121,3 +1121,9 @@ Focused tests passed (11 tests), build/typecheck passed, lint passed and diff-ch
 ## POST-UNIPROT FULL VALIDATION
 
 After the UniProt target provenance block, full `npm test` passed with 271 passed, 40 skipped and 0 failed. `npm run e2e:discovery` passed all browser runtime, evidence, replay, boundary and Node ↔ Chromium fingerprint checks. `git diff --check` passed and the branch is clean.
+
+## SCIENCE CHAT → DRUG DISCOVERY HANDOFF CHECKPOINT
+
+The existing blocked biotech suggestion in Science Chat now carries the bounded `reference=caffeine&target=A1` context through the existing hash route. Drug Discovery reads these parameters to prefill the admin reference form, removing a manual data-transfer step while preserving `ENGINE_NOT_AVAILABLE`, source-backed-only resolution and all scientific boundaries.
+
+Focused Science Chat, Natural Replacement and biotech contract tests passed; full suite passed with 271 passed, 40 skipped and 0 failed. Build/typecheck, lint and diff-check passed. Fresh desktop/mobile smoke passed with 27 routes, 13 laboratories and 242 interactions per profile, zero runtime errors.

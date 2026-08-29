@@ -431,7 +431,7 @@ export function ScienceChat() {
       )}
       {biotechWorkspaceSuggested && (
         <div className="science-chat-suggest" aria-label="Przejście do Drug Discovery">
-          <button className="chip-btn primary" onClick={() => { window.location.hash = '#/drug'; setOpen(false); }}>Otwórz Drug Discovery workspace</button>
+          <button className="chip-btn primary" onClick={() => { window.location.hash = '#/drug?reference=caffeine&target=A1'; setOpen(false); }}>Otwórz Drug Discovery workspace</button>
           <span className="settings-hint">Request biotech pozostaje nieuruchomiony; workspace pokazuje wyłącznie source-backed dane i jawne blokady.</span>
         </div>
       )}

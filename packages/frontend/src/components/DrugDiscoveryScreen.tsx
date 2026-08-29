@@ -47,6 +47,7 @@ export function DrugDiscoveryScreen() {
 }
 
 function DrugWorkspace() {
+  const routeParams = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
   const pinnedDiscovery = buildPinnedChEMBLCaffeineDiscovery();
   const adenosineDiscovery = buildPinnedChEMBLAdenosineDiscovery();
   const theophyllineDiscovery = buildPinnedChEMBLTheophyllineDiscovery();
@@ -60,8 +61,8 @@ function DrugWorkspace() {
   const [passport, setPassport] = useState<CandidatePassport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastAuditRequestId, setLastAuditRequestId] = useState<string | null>(null);
-  const [referenceCompound, setReferenceCompound] = useState('');
-  const [referenceTarget, setReferenceTarget] = useState('A1');
+  const [referenceCompound, setReferenceCompound] = useState(() => routeParams.get('reference') ?? '');
+  const [referenceTarget, setReferenceTarget] = useState(() => routeParams.get('target') ?? 'A1');
   const [replacementResult, setReplacementResult] = useState<NaturalFunctionalReplacementResult | null>(null);
   const canUseAdminWorkflow = projects.some((project) => project.role === 'owner' || project.role === 'admin');
   const activeReplacementReports = replacementResult?.reports.length ? replacementResult.reports : [pinnedDiscovery.report, adenosineDiscovery.report, theophyllineDiscovery.report];

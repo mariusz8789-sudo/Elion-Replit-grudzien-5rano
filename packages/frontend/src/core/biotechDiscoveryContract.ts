@@ -131,6 +131,54 @@ export function rankTherapeuticCandidate(input: {
   };
 }
 
+export interface CandidateComparisonRow {
+  candidateId: string;
+  reportId: string;
+  rank: number;
+  score: number;
+  scoreDeltaFromTop: number;
+  epistemicStatus: 'PREDICTION';
+  provenanceIds: readonly string[];
+}
+
+export interface CandidateComparison {
+  comparisonId: string;
+  reportIds: readonly string[];
+  rows: readonly CandidateComparisonRow[];
+  epistemicStatus: 'PREDICTION';
+  uncertainty: string;
+  scientificFingerprint: string;
+}
+
+export function compareCandidateDiscoveryReports(reports: readonly CandidateDiscoveryReport[]): CandidateComparison {
+  if (reports.length === 0) throw new Error('Porównanie kandydatów wymaga co najmniej jednego raportu.');
+  const ids = new Set<string>();
+  for (const report of reports) {
+    if (ids.has(report.candidateId)) throw new Error(`Porównanie nie może zawierać duplikatu candidateId: ${report.candidateId}.`);
+    if (!report.ranking || report.ranking.candidateId !== report.candidateId) throw new Error(`Raport ${report.reportId} nie ma zgodnego research-priority ranking.`);
+    ids.add(report.candidateId);
+  }
+  const sorted = [...reports].sort((a, b) => (b.ranking!.score - a.ranking!.score) || a.candidateId.localeCompare(b.candidateId));
+  const topScore = sorted[0]!.ranking!.score;
+  const rows = sorted.map((report, index) => ({
+    candidateId: report.candidateId,
+    reportId: report.reportId,
+    rank: index + 1,
+    score: report.ranking!.score,
+    scoreDeltaFromTop: Number((report.ranking!.score - topScore).toFixed(4)),
+    epistemicStatus: 'PREDICTION' as const,
+    provenanceIds: report.provenance.map((item) => item.sourceId),
+  }));
+  const comparison = {
+    reportIds: reports.map((report) => report.reportId),
+    rows,
+    epistemicStatus: 'PREDICTION' as const,
+    uncertainty: 'Research-priority ordering only; not efficacy, safety, clinical suitability or probability. Reports retain their original provenance and epistemic statuses.',
+  };
+  const scientificFingerprint = fnv1a(canonicalJson(comparison));
+  return { ...comparison, comparisonId: `comparison:${scientificFingerprint}`, scientificFingerprint };
+}
+
 export interface CandidateDiscoveryReport {
   reportId: string;
   candidateId: string;

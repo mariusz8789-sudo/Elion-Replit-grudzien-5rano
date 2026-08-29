@@ -36,7 +36,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `77c0d9f` — `feat(drug-discovery): persist discovery context`
 - `f60694b` — `feat(drug-discovery): add pinned GHS safety signal`
 - `b314b68` — `feat(drug-discovery): surface safety provenance`
-- next checkpoint in this session — commit pinned ADME properties foundation
+- `f6a4e9d` — `feat(drug-discovery): add pinned adme properties`
+- next checkpoint in this session — commit multi-candidate comparison
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -266,9 +267,17 @@ Changed files: `packages/frontend/src/core/biotechData/pubchem-adme-2519.json`, 
 
 Validation: `npm test` (272 passed, 40 skipped, 0 failed), `npm run build` (includes `tsc -b`), `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed drug-discovery capability: multi-candidate comparison contract
+
+The existing candidate/discovery contract now exposes `compareCandidateDiscoveryReports(reports)`. It accepts multiple source-backed `CandidateDiscoveryReport` records with their existing deterministic research-priority rankings, rejects missing/mismatched rankings and duplicate candidate IDs, sorts by score with stable candidate-ID tie-break, computes delta-from-top, preserves provenance IDs, and fingerprints the comparison. The output is explicitly `PREDICTION` and states that ordering is research priority only—not efficacy, safety, clinical suitability or probability. No second molecule was fabricated and no biological execution was claimed.
+
+Changed files: `packages/frontend/src/core/biotechDiscoveryContract.ts`, `packages/frontend/src/__tests__/biotechDiscoveryContract.test.ts`.
+
+Validation: targeted contract test and build/typecheck passed; full `npm test` passed (271 passed, 40 skipped, 0 failed), `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — real drug-discovery workflow
 
-Next large block: multi-candidate comparison using existing candidate/discovery contracts. Reuse the pinned caffeine chain and add a second candidate only if a complete, source-backed identity + activity + provenance chain can be established cheaply; otherwise implement comparison over available records without fabricating a second molecule. Keep ADME/Tox outcomes `UNKNOWN` unless independently sourced.
+Next large block: connect this comparison capability to the existing `CandidateDiscoveryScreen` using the existing pinned discovery context, showing ranking/provenance and keeping single-candidate or incomplete inputs explicit. Do not create a second source, duplicate discovery contract, or infer efficacy/safety.
 
 ## Next large gaps
 

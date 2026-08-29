@@ -3,6 +3,7 @@ import { mapPinnedPubChemCaffeine, PUBCHEM_CID_2519_SOURCE_URL } from '../core/b
 import {
   biotechScientificFingerprint,
   createCandidateDiscoveryReport,
+  compareCandidateDiscoveryReports,
   rankTherapeuticCandidate,
   isPredictiveBiotechStatus,
   type BiologicalEvidence,
@@ -99,6 +100,23 @@ describe('biotech discovery contract', () => {
     expect(ranked.components).toEqual({ evidenceQuality: 1, targetRelevance: 1, safetyPenalty: 0, uncertaintyPenalty: 0.25 });
     expect(ranked.epistemicStatus).toBe('PREDICTION');
     expect(ranked.rationale).toContain('not efficacy or probability');
+  });
+
+  it('compares multiple discovery reports as research-priority predictions', () => {
+    const report = (candidateId: string, score: number) => ({
+      reportId: `report:${candidateId}`, candidateId, materialId: `material:${candidateId}`, compoundIds: [`compound:${candidateId}`],
+      targetIds: ['target-1'], mechanismIds: [], evidenceIds: [`evidence:${candidateId}`], safetySignalIds: [], hypothesisId: `hypothesis:${candidateId}`,
+      ranking: { candidateId, score, components: { evidenceQuality: score, targetRelevance: 1, safetyPenalty: 0, uncertaintyPenalty: 0 }, rationale: 'Research-priority only.', uncertainty: 'Not efficacy.', epistemicStatus: 'PREDICTION' as const },
+      epistemicStatus: 'HYPOTHESIS' as const, uncertainty: 'No biological validation.', provenance: [{ source: 'fixture', sourceId: `evidence:${candidateId}`, evidenceType: 'test', status: 'LITERATURE_SUPPORTED' as const }], scientificFingerprint: `fp-${candidateId}`,
+    });
+    const comparison = compareCandidateDiscoveryReports([report('candidate-b', 0.4), report('candidate-a', 0.8)]);
+
+    expect(comparison.rows.map((row) => row.candidateId)).toEqual(['candidate-a', 'candidate-b']);
+    expect(comparison.rows[0]).toMatchObject({ rank: 1, score: 0.8, scoreDeltaFromTop: 0, epistemicStatus: 'PREDICTION' });
+    expect(comparison.rows[1]).toMatchObject({ rank: 2, score: 0.4, scoreDeltaFromTop: -0.4, provenanceIds: ['evidence:candidate-b'] });
+    expect(comparison.uncertainty).toMatch(/not efficacy|clinical suitability/i);
+    expect(comparison.comparisonId).toBe(`comparison:${comparison.scientificFingerprint}`);
+    expect(() => compareCandidateDiscoveryReports([report('candidate-a', 0.8), report('candidate-a', 0.7)])).toThrow(/duplikatu candidateId/i);
   });
 
   it('keeps safety signals explicit without inventing a safety score', () => {

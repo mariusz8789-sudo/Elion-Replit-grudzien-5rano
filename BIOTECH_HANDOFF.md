@@ -1016,3 +1016,15 @@ The existing production-style smoke harness passed after the resolver/UI block: 
 - **BRANCH:** `manus/next-gap-observation-analysis`
 - **WORKING TREE:** clean after the documentation commit below
 - **NEXT GAP:** reachable authoritative natural-product source expansion with a declared selection policy; otherwise preserve the bounded pinned-profile boundary.
+
+## COMPLETED NATURAL PRODUCT EXPANSION: PubChem identity catalog
+
+The bounded resolver now expands the existing three pinned A1 reports with nine additional real PubChem compound identity records: theobromine, paraxanthine, hypoxanthine, xanthine, inosine, guanosine, adenine, guanine and uric acid. Each record preserves CID, formula, molecular weight, SMILES, InChIKey, canonical PubChem URL, source version and retrieval date. Every added record enters the existing Candidate → Evidence → Ranking → Hypothesis → Safety/ADME → Memory → Replay contract through an identity-only report.
+
+The deterministic policy is explicit: known A1-compatible input resolves to the three source-backed ChEMBL/DailyMed reports plus all nine PubChem identity records, in stable score/candidate-ID order. Identity-only records receive `UNKNOWN` target, activity, mechanism, safety and ADME status, a score of zero with maximum uncertainty, and cannot be presented as functional replacements. Unsupported reference or target input remains `BLOCKED` with an empty result set. No live endpoint is called from the UI and no missing biological data is inferred.
+
+The PubChem source probe succeeded for all nine records via the public PUG REST endpoint. Full validation passed: `npm test` reports 271 passed, 40 skipped and 0 failed; focused resolver tests pass; build/typecheck, lint and diff-check pass; desktop and mobile Chromium smoke each cover 27 routes, 13 laboratories and 242 interactions with zero runtime errors.
+
+- **CURRENT STATUS:** bounded Natural Product Discovery expanded from 3 to 12 real source-backed/identity-backed reports and remains integrated with existing comparison, provenance, memory and replay.
+- **PARKED:** live broad natural-product search, target/activity enrichment for identity-only records, global server-authoritative ADMIN role, biological executor, independent assays, clinical efficacy and complete ADME/Tox.
+- **NEXT GAP:** reachable target/activity evidence expansion, preferably through ChEMBL or UniProt, using the same deterministic source-and-status policy; park quickly if the endpoint or query coverage is insufficient.

@@ -5,7 +5,7 @@ describe('Natural Functional Replacement resolver', () => {
   it('resolves a known A1 reference against the three real pinned reports', () => {
     const result = resolveNaturalFunctionalReplacement({ referenceCompound: 'caffeine', target: 'A1' });
     expect(result.status).toBe('RESOLVED');
-    expect(result.reports).toHaveLength(3);
+    expect(result.reports).toHaveLength(12);
     expect(result.reports.every((report) => report.clinicalEfficacy === 'UNKNOWN')).toBe(true);
     expect(result.reason).toMatch(/not.*zamiennikiem|nie.*zamiennik/i);
   });

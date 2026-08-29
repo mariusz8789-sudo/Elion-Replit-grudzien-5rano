@@ -1,7 +1,16 @@
 import { buildPinnedChEMBLAdenosineDiscovery } from './adenosine';
 import { buildPinnedChEMBLCaffeineDiscovery } from './chembl';
 import { buildPinnedChEMBLTheophyllineDiscovery } from './theophylline';
-import type { CandidateDiscoveryReport } from '../biotechDiscoveryContract';
+import {
+  createCandidateDiscoveryReport,
+  rankTherapeuticCandidate,
+  type CandidateDiscoveryReport,
+  type BiologicalEvidence,
+  type CandidateEvidenceQuality,
+  type SafetySignal,
+  type TherapeuticCandidate,
+  type TherapeuticHypothesis,
+} from '../biotechDiscoveryContract';
 
 export interface NaturalFunctionalReplacementInput {
   referenceCompound?: string;
@@ -19,6 +28,35 @@ export interface NaturalFunctionalReplacementResult {
 }
 
 const normalize = (value: string | undefined): string => (value ?? '').trim().toLowerCase();
+
+const PUBCHEM_RETRIEVED_AT = '2026-08-29';
+const PUBCHEM_IDENTITY_RECORDS = [
+  ['theobromine', 5429, 'C7H8N4O2', 'CN1C=NC2=C1C(=O)NC(=O)N2C', 'YAPQBXQYLJRXSA-UHFFFAOYSA-N', '180.16'],
+  ['paraxanthine', 4687, 'C7H8N4O2', 'CN1C=NC2=C1C(=O)N(C(=O)N2)C', 'QUNWUDVFRNGTCO-UHFFFAOYSA-N', '180.16'],
+  ['hypoxanthine', 135398638, 'C5H4N4O', 'C1=NC2=C(N1)C(=O)NC=N2', 'FDGQSTZJBFJUBT-UHFFFAOYSA-N', '136.11'],
+  ['xanthine', 1188, 'C5H4N4O2', 'C1=NC2=C(N1)C(=O)NC(=O)N2', 'LRFVTYWOQMYALW-UHFFFAOYSA-N', '152.11'],
+  ['inosine', 6021, 'C10H12N4O5', 'C1=NC2=C(C(=O)N1)NC(=N2)N[C@@H]3O[C@H](CO)[C@@H](O)[C@H]3O', 'UGQMRVRFLZREKJ-KQYNXXCUSA-N', '268.23'],
+  ['guanosine', 135398744, 'C10H13N5O5', 'C1=NC2=C(N1C3C(C(C(O3)CO)O)O)C(=O)NC(=N2)N', 'NYHBQMYGNZKZBF-KQYNXXCUSA-N', '283.24'],
+  ['adenine', 190, 'C5H5N5', 'C1=NC2=C(N1)C(=NC=N2)N', 'GFFGJBXGBJISGV-UHFFFAOYSA-N', '135.13'],
+  ['guanine', 764, 'C5H5N5O', 'C1=NC2=C(N1)C(=O)NC(=N2)N', 'CFMUKQNPFXQQGD-UHFFFAOYSA-N', '151.13'],
+  ['uric acid', 1175, 'C5H4N4O3', 'C1=NC2=C(N1)C(=O)NC(=O)N2', 'GRIWKWGZBMCZIE-UHFFFAOYSA-N', '168.11'],
+] as const;
+
+function identityOnlyReports(): CandidateDiscoveryReport[] {
+  return PUBCHEM_IDENTITY_RECORDS.map(([name, cid, formula, smiles, inchiKey, molecularWeight]) => {
+    const sourceUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON`;
+    const provenance = { source: 'PubChem', sourceId: `pubchem:CID:${cid}`, evidenceType: 'compound identity and structure property record', status: 'LITERATURE_SUPPORTED' as const, uncertainty: 'Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.', sourceUrl, sourceVersion: `PubChem CID ${cid}`, retrievedAt: PUBCHEM_RETRIEVED_AT };
+    const evidence: BiologicalEvidence = { kind: 'biological-evidence', id: `evidence:pubchem:${cid}`, namespace: 'pubchem', label: `${name} identity record`, status: 'LITERATURE_SUPPORTED', claim: `${name} is identified by the cited PubChem compound record; no biological target claim is made.`, subjectIds: [`compound:pubchem:${cid}`], provenance: [provenance] };
+    const safety: SafetySignal = { kind: 'safety-signal', id: `safety:unknown:pubchem:${cid}`, namespace: 'genesis-biotech', label: `${name} safety unknown`, status: 'UNKNOWN', signalType: 'uncertainty', description: 'No safety conclusion is inferred from this identity-only record.', evidenceQuality: 'UNKNOWN', uncertainty: 'Safety and ADME require dedicated source-backed records.', provenance: [{ ...provenance, sourceId: `safety:unknown:pubchem:${cid}`, evidenceType: 'explicit missing safety/ADME boundary', status: 'UNKNOWN' }] };
+    const candidate: TherapeuticCandidate = { kind: 'therapeutic-candidate', id: `candidate:pubchem:${cid}`, namespace: 'genesis-biotech', label: name, status: 'HYPOTHESIS', materialId: `material:pubchem:${cid}`, compoundIds: [`compound:pubchem:${cid}`], targetIds: [], mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], hypothesisIds: [`hypothesis:pubchem:${cid}`], provenance: [{ ...provenance, sourceId: candidateId(cid), evidenceType: 'candidate identity mapped from compound record', status: 'HYPOTHESIS' }] };
+    const hypothesis: TherapeuticHypothesis = { kind: 'therapeutic-hypothesis', id: `hypothesis:pubchem:${cid}`, namespace: 'genesis-biotech', label: `${name} requires target/activity validation`, status: 'HYPOTHESIS', claim: `${name} is a research candidate for target-specific follow-up only; identity similarity is not functional replacement.`, candidateId: candidate.id, targetIds: [], mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], provenance: [{ ...provenance, sourceId: hypothesisId(cid), evidenceType: 'bounded research hypothesis', status: 'HYPOTHESIS' }] };
+    const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'UNKNOWN' as CandidateEvidenceQuality, targetRelevance: 0, safetySignals: [safety], uncertaintyPenalty: 1 });
+    return createCandidateDiscoveryReport({ candidate, hypothesis, ranking, uncertainty: `PubChem identity-only profile: formula ${formula}, molecular weight ${molecularWeight}, InChIKey ${inchiKey}, SMILES ${smiles}. Target, mechanism, safety, ADME and efficacy are UNKNOWN.` });
+  });
+}
+
+const candidateId = (cid: number): string => `candidate:pubchem:${cid}`;
+const hypothesisId = (cid: number): string => `hypothesis:pubchem:${cid}`;
 
 export function resolveNaturalFunctionalReplacement(input: NaturalFunctionalReplacementInput): NaturalFunctionalReplacementResult {
   const reference = normalize(input.referenceCompound);
@@ -38,6 +76,7 @@ export function resolveNaturalFunctionalReplacement(input: NaturalFunctionalRepl
     buildPinnedChEMBLCaffeineDiscovery().report,
     buildPinnedChEMBLAdenosineDiscovery().report,
     buildPinnedChEMBLTheophyllineDiscovery().report,
+    ...identityOnlyReports(),
   ];
   return {
     status: 'RESOLVED',

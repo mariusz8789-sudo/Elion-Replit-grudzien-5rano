@@ -1272,3 +1272,10 @@ Reference resolution is now source-backed and bounded for name, SMILES, InChIKey
 The supported named path remains one-command end-to-end through live PubChem, live ChEMBL, target/activity, assay context/quality, comparison, WHY, research-priority ranking, existing Scientific Memory, and replay fingerprint. Automatic expensive compute is not falsely claimed: it remains gated by compatible structured inputs and existing executor contracts; biological execution remains NOT_EXECUTED / BLOCKED.
 
 Validation passed: integrated natural/ChEMBL/memory/reference tests `28 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 216 interactions, and zero runtime errors.
+
+
+## FINAL INTEGRATION CHECKPOINT: Natural Discovery → Cheap Scientific Compute
+
+The live natural workflow now executes the existing Experiment Fabric `chem-molecular-weight` stage for every PubChem-admitted candidate after identity/evidence filtering. It is deterministic, preserves run ID, run fingerprint, result origin, outputs, and summary, and is surfaced in Science Chat as `CHEAP COMPUTE`. No expensive runtime is launched for rejected candidates. RDKit/PySCF/OpenMM/Vina/Meeko/ADMET-AI remain gated until their existing structured executor contracts receive compatible candidate/reference inputs; biological execution remains NOT_EXECUTED / BLOCKED.
+
+Validation passed: natural and memory tests `23 passed` in the focused run; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; Chromium desktop smoke passed with 27 routes, 13 laboratories, 220 interactions, and zero runtime errors.

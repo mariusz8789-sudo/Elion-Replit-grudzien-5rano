@@ -86,7 +86,8 @@ function rawReferenceFromMessage(message: string): string | undefined {
 function formatNaturalDiscoveryResult(result: Awaited<ReturnType<typeof resolveNaturalFunctionalReplacementFromSources>>): string {
   const top = [...result.reports].sort((a, b) => (b.ranking?.score ?? -1) - (a.ranking?.score ?? -1)).slice(0, 5);
   const why = result.candidateWhy ?? [];
-  return [`NATURAL DISCOVERY — ${result.status}`, result.reason, `Kandydaci/raporty: ${result.reports.length}.`, ...top.map((report, index) => {
+  const compute = (result.cheapCompute ?? []).slice(0, 5).map((run) => `compute CID ${run.pubchemCid}: ${run.status} · ${run.resultOrigin} · ${run.summary} · fingerprint ${run.runFingerprint}`);
+  return [`NATURAL DISCOVERY — ${result.status}`, result.reason, `Kandydaci/raporty: ${result.reports.length}.`, ...(compute.length ? ['CHEAP COMPUTE (existing Fabric):', ...compute] : []), ...top.map((report, index) => {
     const cid = report.candidateId.match(/pubchem:(\d+)/)?.[1];
     const explanation = cid ? why.find((item) => item.pubchemCid === Number(cid)) : undefined;
     return `${index + 1}. ${report.candidateId} · research priority ${(report.ranking?.score ?? 0).toFixed(4)} · ${explanation?.rationale ?? 'brak live activity dla tego kandydata'} · uncertainty: ${explanation?.uncertainty ?? report.uncertainty}`;

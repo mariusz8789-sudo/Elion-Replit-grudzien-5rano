@@ -1,6 +1,8 @@
 import { buildPinnedChEMBLAdenosineDiscovery } from './adenosine';
 import { buildPinnedChEMBLCaffeineDiscovery } from './chembl';
 import { buildPinnedChEMBLTheophyllineDiscovery } from './theophylline';
+import { runExperiment } from '../experimentFabric/executor';
+import { EXPERIMENT_FABRIC_VERSION, type ExperimentRun } from '../experimentFabric/types';
 import {
   createCandidateDiscoveryReport,
   rankTherapeuticCandidate,
@@ -37,6 +39,7 @@ export interface NaturalFunctionalReplacementResult {
   liveActivities?: readonly LiveChEMBLActivityRecord[];
   candidateWhy?: readonly NaturalCandidateWhy[];
   referenceProfile?: ReferenceProfile;
+  cheapCompute?: readonly NaturalCheapCompute[];
 }
 
 export interface NaturalSourceRecord {
@@ -56,6 +59,12 @@ export interface NaturalCandidateWhy {
   assayQualityCounts: Readonly<Record<LiveChEMBLActivityRecord['assayQuality'], number>>;
   measurementTypes: readonly LiveChEMBLActivityRecord['type'][];
   rationale: string; uncertainty: string; provenanceIds: readonly string[];
+}
+
+export interface NaturalCheapCompute {
+  pubchemCid: number; status: ExperimentRun['result']['status']; runId: string;
+  runFingerprint: string; outputs: ExperimentRun['result']['outputs'];
+  resultOrigin: ExperimentRun['provenance']['resultOrigin']; summary: string;
 }
 
 const normalize = (value: string | undefined): string => (value ?? '').trim().toLowerCase();
@@ -173,6 +182,13 @@ function buildCandidateWhy(activities: readonly LiveChEMBLActivityRecord[], targ
   });
 }
 
+function runCheapNaturalCompute(records: readonly NaturalSourceRecord[]): NaturalCheapCompute[] {
+  return records.map((record) => {
+    const run = runExperiment({ contractVersion: EXPERIMENT_FABRIC_VERSION, sourceText: `Natural candidate PubChem CID ${record.cid}: compute molecular formula descriptors`, domainId: 'chemistry', operation: 'compute', modelId: 'chem-molecular-weight', parameters: { formula: record.formula } });
+    return { pubchemCid: record.cid, status: run.result.status, runId: run.runId, runFingerprint: run.provenance.runFingerprint, outputs: run.result.outputs, resultOrigin: run.provenance.resultOrigin, summary: run.result.summary };
+  });
+}
+
 const candidateId = (cid: number): string => `candidate:pubchem:${cid}`;
 const unknownAdmeProfile = (provenance: { source: string; sourceId: string; sourceUrl: string; sourceVersion: string; retrievedAt: string; uncertainty: string }): BiotechAdmeProfile => ({ source: provenance.source === 'PubChem' ? 'PubChem' : 'RDKit', status: 'UNKNOWN', metrics: [{ name: 'ADME/PK/Tox', value: 'UNKNOWN', units: 'status', context: 'No compatible quantitative record admitted' }], uncertainty: provenance.uncertainty, provenance: [{ ...provenance, evidenceType: 'explicit missing ADME/PK/Tox boundary', status: 'UNKNOWN' }] });
 const hypothesisId = (cid: number): string => `hypothesis:pubchem:${cid}`;
@@ -241,5 +257,6 @@ export async function resolveNaturalFunctionalReplacementFromSources(
   const liveActivities = await fetchNaturalChEMBLActivities(sourceRecords, fetchImpl);
   const base = resolveNaturalFunctionalReplacement(input);
   if (base.status === 'BLOCKED') return base;
-  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem oraz ${liveActivities.length} jawnych rekordów activity z ChEMBL. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
+  const cheapCompute = runCheapNaturalCompute(sourceRecords);
+  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
 }

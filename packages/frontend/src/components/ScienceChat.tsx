@@ -107,7 +107,7 @@ export function formatFabricRun(run: ExperimentRun): string {
     ? (() => {
         const comparison = compareAme2020Observations();
         const statuses = comparison.comparisons.map((item) => `${item.nuclide}=${item.status}`).join(', ');
-        return `\nIndependent real observation: AME2020 binding energy per nucleon (${comparison.comparisons.length} pinned nuclides). Source: ${comparison.provenance.sourceUrl}; SHA-256: ${comparison.provenance.rawPayloadSha256}. Comparison: ${statuses}. MAE=${comparison.meanAbsoluteError.toPrecision(5)} MeV/nucleon; RMSE=${comparison.rootMeanSquareError.toPrecision(5)} MeV/nucleon. Calibration: ${comparison.calibration.status}.`;
+        return `\nIndependent real observation: AME2020 binding energy per nucleon (${comparison.comparisons.length} pinned nuclides). Source: ${comparison.provenance.sourceUrl}; SHA-256: ${comparison.provenance.rawPayloadSha256}. Comparison: ${statuses}. MAE=${comparison.meanAbsoluteError.toPrecision(5)} MeV/nucleon; RMSE=${comparison.rootMeanSquareError.toPrecision(5)} MeV/nucleon. Calibration: ${comparison.calibration.status}; path ${comparison.calibrationPath.method}, n=${comparison.calibrationPath.sampleCount}, mean residual=${comparison.calibrationPath.meanSignedError.toPrecision(5)}, residual SD=${comparison.calibrationPath.residualStandardDeviation.toPrecision(5)}, max |error|=${comparison.calibrationPath.maxAbsoluteError.toPrecision(5)}; claim=${comparison.calibrationPath.claim}.`;
       })()
     : '';
   const epistemicReading = run.provenance.resultOrigin === 'real-engine'

@@ -501,6 +501,7 @@ export function ExperimentPilotScreen() {
               <summary>Independent real observation — AME2020</summary>
               <p className="settings-hint">{comparison.comparisons.map((item) => `${item.nuclide}: prediction ${item.prediction.toPrecision(6)} vs observation ${item.observation.toPrecision(6)} ${item.unit} → ${item.status}`).join('; ')}</p>
               <p className="settings-hint">MAE {comparison.meanAbsoluteError.toPrecision(5)} · RMSE {comparison.rootMeanSquareError.toPrecision(5)} {comparison.unit} · calibration {comparison.calibration.status} · replay {comparison.replay.status}</p>
+              <p className="settings-hint">Calibration path: {comparison.calibrationPath.method}, n={comparison.calibrationPath.sampleCount}, mean residual {comparison.calibrationPath.meanSignedError.toPrecision(5)}, residual SD {comparison.calibrationPath.residualStandardDeviation.toPrecision(5)}, max |error| {comparison.calibrationPath.maxAbsoluteError.toPrecision(5)}; {comparison.calibrationPath.claim}.</p>
               <p className="settings-hint">Source: {comparison.provenance.sourceUrl} · raw SHA-256: {comparison.provenance.rawPayloadSha256}</p>
               <p className="pilot-disclaimer">Replay {comparison.replay.status}: {comparison.replay.reason} Nie jest to świeży pomiar ani skalibrowana skuteczność modelu.</p>
             </details>;

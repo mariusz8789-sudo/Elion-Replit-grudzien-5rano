@@ -43,6 +43,15 @@ export interface NuclearObservationComparison {
   readonly provenanceFingerprint: string;
 }
 
+export interface Ame2020CalibrationPath {
+  readonly method: 'SIGNED_RESIDUAL_DISTRIBUTION';
+  readonly sampleCount: number;
+  readonly meanSignedError: number;
+  readonly residualStandardDeviation: number;
+  readonly maxAbsoluteError: number;
+  readonly claim: 'NO_CALIBRATED_ACCURACY';
+}
+
 export interface Ame2020Comparison {
   readonly fixtureId: string;
   readonly modelId: 'nuclear-semf';
@@ -55,6 +64,7 @@ export interface Ame2020Comparison {
     readonly status: CalibrationStatus;
     readonly reason: string;
   };
+  readonly calibrationPath: Ame2020CalibrationPath;
   readonly replay: Ame2020ReplayResult;
   readonly provenance: {
     readonly sourceUrl: string;
@@ -154,8 +164,19 @@ export function compareAme2020Observations(
   const errors = comparisons.map((comparison) => comparison.absoluteError);
   const meanAbsoluteError = errors.reduce((sum, error) => sum + error, 0) / errors.length;
   const rootMeanSquareError = Math.sqrt(errors.reduce((sum, error) => sum + error ** 2, 0) / errors.length);
+  const signedErrors = comparisons.map((comparison) => comparison.prediction - comparison.observation);
+  const meanSignedError = signedErrors.reduce((sum, error) => sum + error, 0) / signedErrors.length;
+  const residualVariance = signedErrors.reduce((sum, error) => sum + (error - meanSignedError) ** 2, 0) / signedErrors.length;
+  const calibrationPath = {
+    method: 'SIGNED_RESIDUAL_DISTRIBUTION' as const,
+    sampleCount: observations.length,
+    meanSignedError,
+    residualStandardDeviation: Math.sqrt(residualVariance),
+    maxAbsoluteError: Math.max(...errors),
+    claim: 'NO_CALIBRATED_ACCURACY' as const,
+  };
   const calibration = observations.length >= 10
-    ? { status: 'AVAILABLE' as const, reason: 'A preregistered ten-nuclide panel is available for error-distribution analysis; no calibrated accuracy percentage is asserted.' }
+    ? { status: 'AVAILABLE' as const, reason: 'A preregistered ten-nuclide panel supports residual-distribution analysis; no calibrated accuracy percentage is asserted.' }
     : { status: 'INSUFFICIENT_DATA' as const, reason: `Only ${observations.length} preregistered observations are available; no calibrated accuracy percentage is asserted.` };
   const provenance = {
     sourceUrl: AME2020_SOURCE_URL,
@@ -174,8 +195,9 @@ export function compareAme2020Observations(
     meanAbsoluteError,
     rootMeanSquareError,
     calibration,
+    calibrationPath,
     replay,
     provenance,
-    fingerprint: fnv1a(canonicalJson({ comparisons, provenance, calibration })),
+    fingerprint: fnv1a(canonicalJson({ comparisons, provenance, calibration, calibrationPath })),
   };
 }

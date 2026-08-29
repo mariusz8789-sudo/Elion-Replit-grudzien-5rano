@@ -489,3 +489,24 @@ Focused tests: 5 passed. Full test suite, build, lint and diff check passed. Bui
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
 - **NEXT LARGE GAP:** define and implement a formal, preregistered calibration method over the existing error distribution, or park calibration if the current SEMF model-error policy cannot be scientifically justified. Do not convert the ten-record panel into a probability or clinical-style accuracy claim.
+
+## Completed Core capability: transparent AME2020 calibration path
+
+The AME2020 comparison now exposes a formal `SIGNED_RESIDUAL_DISTRIBUTION` path over the fixed ten-nuclide panel: sample count, mean signed residual, residual standard deviation and maximum absolute error. The result carries the explicit claim boundary `NO_CALIBRATED_ACCURACY`; no probability, accuracy percentage or clinical-style confidence was generated. Science Chat and Experiment Pilot now display this path alongside the existing MAE/RMSE, source provenance and replay status.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/nuclearAme2020.test.ts src/__tests__/experimentFabric.test.ts src/__tests__/experimentPilot.test.ts src/__tests__/scienceChatFabricFormat.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused and full validation passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `e7d0b93`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** decide and implement the existing Evidence Pack replay/export treatment for external observations only if its semantics remain distinct from model-run arms; otherwise keep the comparison as a source-backed validation attachment and move to the next high-value Genesis integration.

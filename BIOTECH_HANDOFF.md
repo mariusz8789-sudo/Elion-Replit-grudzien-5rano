@@ -29,7 +29,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `4fd50e6` — `feat(core): keep pilot report analysis consistent`
 - `1c4655f` — `feat(core): preserve saved result routes`
 - `83d41cc` — `feat(core): carry result summary into world`
-- next checkpoint in this session — choose source-backed drug-discovery expansion or park it if it requires contract sprawl
+- `9b8a772` — `feat(core): preserve world result continuity`
+- next checkpoint in this session — expose pinned PubChem molecular properties in ChEMBL drug-discovery workflow
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -203,9 +204,17 @@ Changed files: `packages/frontend/src/core/experimentFabric/worldHandoff.ts`, `p
 
 Validation completed: targeted World/Fabric tests (109 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed drug-discovery capability: PubChem molecular properties → ChEMBL discovery result
+
+The existing pinned PubChem CID 2519 fixture now exposes verified molecular formula `C8H10N4O2`, molecular weight `194.19`, canonical SMILES and InChIKey alongside the existing ChEMBL activity/target/evidence. The ChEMBL discovery mapper verifies PubChem/ChEMBL compound identity, and the existing Science Chat knowledge-only result presents the properties without upgrading them to efficacy, safety or biological execution claims.
+
+Changed files: `packages/frontend/src/core/biotechData/pubchem.ts`, `packages/frontend/src/core/biotechData/chembl.ts`, `packages/frontend/src/core/experimentFabric/executor.ts`.
+
+Validation completed: targeted PubChem/ChEMBL and Science Chat tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — real drug-discovery workflow
 
-The Core report and World/3D continuity are now connected. The next large area is real drug discovery: reuse the pinned PubChem/ChEMBL facts, expose molecular properties only from the existing pinned source, preserve explainable ranking and explicit `PREDICTION`/`UNKNOWN` boundaries, and keep biological execution `NOT_EXECUTED`/`BLOCKED`. Do not expand the Compound contract or add a new source unless it directly enables a user-facing capability; park the item if it becomes contract sprawl or requires unsupported safety/efficacy claims.
+Next large block: safety/ADME-Tox. First inspect whether an existing public, source-backed safety record can be pinned cheaply. Do not infer safety from PubChem identity or ChEMBL binding; if no semantically valid source exists, park safety rather than inventing a score or claim, then continue to candidate comparison/prediction boundaries.
 
 ## Next large gaps
 

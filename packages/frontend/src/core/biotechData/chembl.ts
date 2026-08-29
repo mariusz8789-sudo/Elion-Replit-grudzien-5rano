@@ -1,5 +1,6 @@
 import { canonicalJson, fnv1a } from '../events/hash';
 import { createCandidateDiscoveryReport, rankTherapeuticCandidate, type BiologicalEvidence, type BiologicalTarget, type CandidateDiscoveryReport, type CandidateRanking, type TherapeuticCandidate, type TherapeuticHypothesis } from '../biotechDiscoveryContract';
+import { mapPinnedPubChemCaffeine, type PubChemCompoundRecord } from './pubchem';
 import chemblRecord from './chembl-activity-189031.json';
 
 export const CHEMBL_ACTIVITY_189031_SOURCE_URL = 'https://www.ebi.ac.uk/chembl/api/data/activity/189031.json';
@@ -18,6 +19,7 @@ export interface ChEMBLCaffeineDiscovery {
 
 export interface ChEMBLBioactivityRecord {
   compoundId: string;
+  compound: PubChemCompoundRecord;
   biologicalTarget: BiologicalTarget;
   biologicalEvidence: BiologicalEvidence;
   activity: {
@@ -57,6 +59,8 @@ function assertPinnedRecord(record: PinnedChEMBLRecord): void {
 export function mapPinnedChEMBLCaffeineA1Activity(): ChEMBLBioactivityRecord {
   const record = chemblRecord as PinnedChEMBLRecord;
   assertPinnedRecord(record);
+  const compound = mapPinnedPubChemCaffeine();
+  if (compound.sourceId !== `pubchem:CID:${record.molecule.pubchemCid}`) throw new Error('PubChem/ChEMBL compound identity mismatch.');
 
   const compoundId = `pubchem:CID:${record.molecule.pubchemCid}`;
   const targetId = `chembl:target:${record.target.targetChemblId}`;
@@ -109,6 +113,7 @@ export function mapPinnedChEMBLCaffeineA1Activity(): ChEMBLBioactivityRecord {
 
   return {
     compoundId,
+    compound,
     biologicalTarget,
     biologicalEvidence,
     activity: scientificRecord.activity,

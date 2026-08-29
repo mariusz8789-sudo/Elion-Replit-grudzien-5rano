@@ -79,6 +79,10 @@ function biotechKnowledgeResult(request: StructuredExperimentRequest): Experimen
     summary: 'Znaleziono przypięty rekord bioaktywności ChEMBL; nie wykonano biologicznego eksperymentu.',
     outputs: {
       compoundId: record.compoundId,
+      molecularFormula: record.compound.properties.molecularFormula,
+      molecularWeight: record.compound.properties.molecularWeight,
+      canonicalSmiles: record.compound.properties.canonicalSmiles,
+      inchiKey: record.compound.properties.inchiKey,
       targetId: record.biologicalTarget.id,
       targetLabel: record.biologicalTarget.label,
       activityId: record.activity.activityId,

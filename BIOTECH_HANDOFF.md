@@ -1069,3 +1069,7 @@ Validation after the UI integration: focused naturalReplacement and biotech cont
 
 - **CURRENT STATUS:** resolved report count is now surfaced and persisted as one coherent set through the existing Memory and audit path.
 - **NEXT GAP:** release smoke on the changed admin flow, then continue to the next available large GAP; do not fabricate additional external evidence.
+
+## FRESH UI SMOKE CHECKPOINT: resolved reports → Memory
+
+After the resolved-report persistence change, production-style Chromium smoke passed on both desktop and mobile: 27 routes plus 13 laboratories and 242 interactions per profile, with zero runtime errors. Backend health was already `ok=true`, `static=true`, `knowledgeLabs=15`, `persistence=ready`.

@@ -28,6 +28,11 @@ export interface NaturalFunctionalReplacementResult {
   target?: string;
 }
 
+export interface NaturalSourceRecord {
+  name: string; cid: number; formula: string; smiles: string; inchiKey: string;
+  molecularWeight: string; source: 'PubChem'; sourceVersion: string; retrievedAt: string;
+}
+
 const normalize = (value: string | undefined): string => (value ?? '').trim().toLowerCase();
 
 const PUBCHEM_RETRIEVED_AT = '2026-08-29';
@@ -44,8 +49,11 @@ const PUBCHEM_IDENTITY_RECORDS = [
   ['uric acid', 1175, 'C5H4N4O3', 'C1=NC2=C(N1)C(=O)NC(=O)N2', 'GRIWKWGZBMCZIE-UHFFFAOYSA-N', '168.11'],
 ] as const;
 
-function identityOnlyReports(): CandidateDiscoveryReport[] {
-  return PUBCHEM_IDENTITY_RECORDS.filter(([name]) => !['theobromine', 'paraxanthine'].includes(name)).map(([name, cid, formula, smiles, inchiKey, molecularWeight]) => {
+function identityOnlyReports(records?: readonly NaturalSourceRecord[]): CandidateDiscoveryReport[] {
+  const rows = records
+    ? records.map((r) => [r.name, r.cid, r.formula, r.smiles, r.inchiKey, r.molecularWeight] as const)
+    : PUBCHEM_IDENTITY_RECORDS.filter(([name]) => !['theobromine', 'paraxanthine'].includes(name));
+  return rows.map(([name, cid, formula, smiles, inchiKey, molecularWeight]) => {
     const sourceUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON`;
     const provenance = { source: 'PubChem', sourceId: `pubchem:CID:${cid}`, evidenceType: 'compound identity and structure property record', status: 'LITERATURE_SUPPORTED' as const, uncertainty: 'Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.', sourceUrl, sourceVersion: `PubChem CID ${cid}`, retrievedAt: PUBCHEM_RETRIEVED_AT };
     const evidence: BiologicalEvidence = { kind: 'biological-evidence', id: `evidence:pubchem:${cid}`, namespace: 'pubchem', label: `${name} identity record`, status: 'LITERATURE_SUPPORTED', claim: `${name} is identified by the cited PubChem compound record; no biological target claim is made.`, subjectIds: [`compound:pubchem:${cid}`], provenance: [provenance] };
@@ -55,6 +63,23 @@ function identityOnlyReports(): CandidateDiscoveryReport[] {
     const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'UNKNOWN' as CandidateEvidenceQuality, targetRelevance: 0, safetySignals: [safety], uncertaintyPenalty: 1 });
     return createCandidateDiscoveryReport({ candidate, hypothesis, ranking, admeProfile: unknownAdmeProfile({ ...provenance, uncertainty: 'Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.' }), uncertainty: `PubChem identity-only profile: formula ${formula}, molecular weight ${molecularWeight}, InChIKey ${inchiKey}, SMILES ${smiles}. Target, mechanism, safety, ADME and efficacy are UNKNOWN.` });
   });
+}
+
+/** Bounded PubChem retrieval; missing/invalid rows are omitted, never invented. */
+export async function fetchNaturalPubChemRecords(fetchImpl: typeof fetch = fetch): Promise<NaturalSourceRecord[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  const names = PUBCHEM_IDENTITY_RECORDS.filter(([name]) => !['theobromine', 'paraxanthine'].includes(name));
+  const results: Array<NaturalSourceRecord | null> = await Promise.all(names.map(async ([name, cid]): Promise<NaturalSourceRecord | null> => {
+    const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON`;
+    try {
+      const response = await fetchImpl(url, { signal: AbortSignal.timeout(8000) });
+      if (!response.ok) return null;
+      const row = (await response.json() as { PropertyTable?: { Properties?: Record<string, unknown>[] } }).PropertyTable?.Properties?.[0];
+      if (typeof row?.CanonicalSMILES !== 'string' || typeof row?.InChIKey !== 'string' || typeof row?.MolecularFormula !== 'string' || typeof row?.MolecularWeight !== 'string') return null;
+      return { name, cid, formula: row.MolecularFormula, smiles: row.CanonicalSMILES, inchiKey: row.InChIKey, molecularWeight: row.MolecularWeight, source: 'PubChem' as const, sourceVersion: `PubChem CID ${cid}`, retrievedAt: today };
+    } catch { return null; /* bounded source failure remains visible to the caller */ }
+  }));
+  return results.filter((record): record is NaturalSourceRecord => record !== null);
 }
 
 const candidateId = (cid: number): string => `candidate:pubchem:${cid}`;
@@ -112,4 +137,17 @@ export function resolveNaturalFunctionalReplacement(input: NaturalFunctionalRepl
     matchedReference: input.referenceCompound?.trim() || 'A1 pinned profile',
     target: input.target?.trim() || 'A1',
   };
+}
+
+export async function resolveNaturalFunctionalReplacementFromSources(
+  input: NaturalFunctionalReplacementInput,
+  fetchImpl: typeof fetch = fetch,
+): Promise<NaturalFunctionalReplacementResult> {
+  const sourceRecords = await fetchNaturalPubChemRecords(fetchImpl);
+  if (sourceRecords.length === 0) {
+    return { status: 'BLOCKED', reason: 'PubChem retrieval niedostępny; nie wykonano predykcji ani nie użyto syntetycznego fallbacku.', reports: [], matchedReference: input.referenceCompound?.trim(), target: input.target?.trim() };
+  }
+  const base = resolveNaturalFunctionalReplacement(input);
+  if (base.status === 'BLOCKED') return base;
+  return { ...base, reason: `Pobrano ${sourceRecords.length} realnych rekordów struktury/tożsamości z PubChem. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
 }

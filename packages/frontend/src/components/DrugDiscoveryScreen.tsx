@@ -12,7 +12,7 @@ import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theo
 import { compareCandidateDiscoveryReports } from '../core/biotechDiscoveryContract';
 import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
 import { recordBiotechAdminAudit, saveBiotechDiscoveryComparisonToMemory } from '../core/scienceMemory';
-import { resolveNaturalFunctionalReplacement, type NaturalFunctionalReplacementResult } from '../core/biotechData/naturalReplacement';
+import { resolveNaturalFunctionalReplacementFromSources, type NaturalFunctionalReplacementResult } from '../core/biotechData/naturalReplacement';
 
 /**
  * Drug Discovery — reachable workspace (P6.9). Uczciwy przepływ na Backend
@@ -148,10 +148,10 @@ function DrugWorkspace() {
       {canUseAdminWorkflow ? <section className="settings-section">
         <h2>Natural Functional Replacement · ADMIN</h2>
         <p className="settings-hint">Granica uprawnień: workflow source-backed jest widoczny wyłącznie dla owner/admin projektu. Dane są read-only; ranking oznacza priorytet badań, nie skuteczność ani zamiennik terapeutyczny.</p>
-        <form className="account-form" onSubmit={(event) => { event.preventDefault(); setReplacementResult(resolveNaturalFunctionalReplacement({ referenceCompound, target: referenceTarget })); }}>
+          <form className="account-form" onSubmit={(event) => { event.preventDefault(); void resolveNaturalFunctionalReplacementFromSources({ referenceCompound, target: referenceTarget }).then(setReplacementResult); }}>
           <label className="account-field"><span>Reference compound / lek</span><input value={referenceCompound} onChange={(event) => setReferenceCompound(event.target.value)} placeholder="np. caffeine" /></label>
           <label className="account-field"><span>Target / receptor</span><input value={referenceTarget} onChange={(event) => setReferenceTarget(event.target.value)} placeholder="np. A1" /></label>
-          <button className="chip-btn primary" type="submit" disabled={!referenceCompound.trim()}>Analizuj pinned profile</button>
+          <button className="chip-btn primary" type="submit" disabled={!referenceCompound.trim()}>Pobierz źródła i analizuj</button>
         </form>
         {replacementResult && <div className="cde-verdict" role="status"><strong>{replacementResult.status}</strong> · {replacementResult.reason}{replacementResult.reports.length > 0 && <span> Kandidatów: {replacementResult.reports.length}.</span>}</div>}
         {replacementResult?.reports.length ? <div className="cde-results" aria-label="Resolved natural product reports">

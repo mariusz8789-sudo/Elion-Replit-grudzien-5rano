@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveNaturalFunctionalReplacement } from '../core/biotechData/naturalReplacement';
+import { resolveNaturalFunctionalReplacement, resolveNaturalFunctionalReplacementFromSources } from '../core/biotechData/naturalReplacement';
 
 describe('Natural Functional Replacement resolver', () => {
   it('resolves a known A1 reference against the three real pinned reports', () => {
@@ -21,5 +21,12 @@ describe('Natural Functional Replacement resolver', () => {
     expect(result.status).toBe('BLOCKED');
     expect(result.reports).toEqual([]);
     expect(result.reason).toMatch(/Brak kompatybilnego pinned reference profile/);
+  });
+
+  it('admits only schema-valid records returned by the bounded source probe', async () => {
+    const result = await resolveNaturalFunctionalReplacementFromSources({ referenceCompound: 'caffeine', target: 'A1' }, async () => new Response(JSON.stringify({ PropertyTable: { Properties: [{ CanonicalSMILES: 'C', InChIKey: 'X', MolecularFormula: 'CH4', MolecularWeight: '16.04' }] } }), { status: 200 }));
+    expect(result.status).toBe('RESOLVED');
+    expect(result.reason).toMatch(/realnych rekordów/);
+    expect(result.reports.some((report) => report.uncertainty.includes('formula CH4'))).toBe(true);
   });
 });

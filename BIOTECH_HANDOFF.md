@@ -27,7 +27,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `fe7491d` — `feat(core): unify scientific result report`
 - `7a9e016` — `feat(core): include evidence replay report status`
 - `4fd50e6` — `feat(core): keep pilot report analysis consistent`
-- next checkpoint in this session — preserve result route when reopening from Scientific Memory
+- `1c4655f` — `feat(core): preserve saved result routes`
+- next checkpoint in this session — preserve result summary in World/3D handoff
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -193,9 +194,17 @@ Changed files: `packages/frontend/src/core/scienceMemory.ts`, `packages/frontend
 
 Validation completed: targeted Memory tests (18 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed Core capability: result summary preserved in World/3D handoff
+
+The existing real `epidemic-city` handoff now carries the canonical run summary together with runId, fingerprint and `real-engine` origin. City3D displays that summary in the locked same-world provenance panel, so the World view does not silently detach from the user-facing scientific report. The scene and simulation mechanics remain unchanged.
+
+Changed files: `packages/frontend/src/core/experimentFabric/worldHandoff.ts`, `packages/frontend/src/core/experimentFabric/executor.ts`, `packages/frontend/src/components/visual-simulation/City3DWebGLScreen.tsx`.
+
+Validation completed: targeted World/Fabric tests (109 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Continue with the next end-to-end consistency gap: preserve the same canonical report metadata when a confirmed result enters World/3D and then returns to Scientific Memory. Prefer a focused existing metadata projection; do not create a second report, Memory, Evidence or Replay system.
+Continue with the next large, high-value workflow: complete the drug-discovery research path using existing PubChem/ChEMBL facts, explainable ranking and explicit `PREDICTION`/`UNKNOWN` boundaries. Do not add clinical efficacy or safety claims without real source-backed evidence; keep biological execution `NOT_EXECUTED`/`BLOCKED` where required.
 
 ## Next large gaps
 

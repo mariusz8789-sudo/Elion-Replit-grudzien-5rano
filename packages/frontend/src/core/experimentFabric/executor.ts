@@ -947,6 +947,6 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
     result,
     provenance,
   };
-  if (liveWorld && result.status === 'completed') registerLiveExperimentWorld(run.runId, liveWorld, { runFingerprint: run.provenance.runFingerprint, resultOrigin: 'real-engine' });
+  if (liveWorld && result.status === 'completed') registerLiveExperimentWorld(run.runId, liveWorld, { runFingerprint: run.provenance.runFingerprint, resultOrigin: 'real-engine', summary: result.summary });
   return run;
 }

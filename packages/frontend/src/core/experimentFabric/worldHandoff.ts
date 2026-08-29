@@ -11,6 +11,7 @@ export interface LiveWorldHandoff {
   runFingerprint: string;
   resultOrigin: 'real-engine';
   modelId: 'epidemic-city';
+  summary: string;
   simulation: EpidemicCitySimulation;
 }
 
@@ -18,7 +19,7 @@ const LIVE_WORLDS = new Map<string, LiveWorldHandoff>();
 let pendingRunId: string | null = null;
 const MAX_RETAINED_WORLDS = 8;
 
-export function registerLiveExperimentWorld(runId: string, simulation: EpidemicCitySimulation, metadata: { runFingerprint: string; resultOrigin: 'real-engine' }): void {
+export function registerLiveExperimentWorld(runId: string, simulation: EpidemicCitySimulation, metadata: { runFingerprint: string; resultOrigin: 'real-engine'; summary: string }): void {
   LIVE_WORLDS.set(runId, { runId, ...metadata, modelId: 'epidemic-city', simulation });
   while (LIVE_WORLDS.size > MAX_RETAINED_WORLDS) {
     const oldestId = LIVE_WORLDS.keys().next().value as string | undefined;

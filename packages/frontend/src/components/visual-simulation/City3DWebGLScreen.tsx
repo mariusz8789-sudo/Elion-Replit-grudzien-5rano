@@ -168,7 +168,7 @@ export function City3DWebGLScreen() {
             <strong>dzień {stats.dzien ?? 0}</strong>
             <small>{renderBudget}/{displayedAgentCount} widocznych agentów</small>
           </div>
-          <div className="city-world-provenance-mark"><span>PROVENANCE</span><strong>LOCKED</strong><small>same-world handoff</small></div>
+          <div className="city-world-provenance-mark"><span>PROVENANCE</span><strong>LOCKED</strong><small>same-world handoff</small>{experimentWorld && <small title={experimentWorld.summary}>{experimentWorld.summary}</small>}</div>
         </div>
       </header>
 

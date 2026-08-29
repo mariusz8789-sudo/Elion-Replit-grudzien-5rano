@@ -332,3 +332,38 @@ The current repo already contains the functioning Core and real PubChem + ChEMBL
 ## Exact continuation instruction
 
 Confirm branch, HEAD, status and `origin/main`. Read this handoff. Inspect only the current Science Chat/UI result boundary and relevant tests. Implement one large, logically complete GAP; run targeted tests, full tests as needed, typecheck/build, lint and `git diff --check`; update this handoff; commit; push; then continue to the next GAP. Never create ZIP files. If interrupted, first make the current scope consistent, test it, update this handoff, commit and push.
+
+## Completed Core capability: AME2020 → nuclear SEMF observation admission
+
+The existing `nuclear-semf` model now has a minimal source-backed observation adapter for the first compatible model/observation pair. The pinned official AME2020 `mass_1.mas20` raw file is stored at `docs/evidence/ame2020/mass_1.mas20.txt` with SHA-256 `e8599c6d7f724fac91934e59f1b9de8fb8f63e820f4b39456b790665ed2a3307`. The admission fixture selects Fe-56, Ni-62 and Pb-208 before comparison and preserves source units, uncertainty, source lines, transformation identity and estimated-value semantics.
+
+`packages/frontend/src/core/observation/nuclearAme2020.ts` reuses the existing `semfBindingPerNucleon`, `canonicalJson` and `fnv1a` utilities. It produces per-nuclide prediction, independent observation, absolute/relative error, declared model-error tolerance, `MATCH`/`DRIFT`/`INCONCLUSIVE`, provenance fingerprint, aggregate MAE/RMSE and an explicit `INSUFFICIENT_DATA` calibration status. Estimated records are never treated as measurements. No second Evidence, Memory or Replay system was created; no network refetch occurs at runtime.
+
+The three real records currently classify as `DRIFT`, `DRIFT`, `MATCH` under the preregistered 0.05 MeV/nucleon tolerance. This is a demonstrated comparison path, not a calibrated accuracy claim. Existing Evidence Pack/Memory/Replay integration remains the next wiring step; source terms are still marked `SOURCE_TERMS_REVIEW_REQUIRED`.
+
+Changed files:
+
+- `docs/evidence/ame2020/mass_1.mas20.txt`
+- `docs/evidence/ame2020/AME2020-NUCLEAR-SEMF-ADMISSION.json`
+- `packages/frontend/src/core/observation/nuclearAme2020.ts`
+- `packages/frontend/src/__tests__/nuclearAme2020.test.ts`
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/nuclearAme2020.test.ts
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests: 4 passed. Build and lint passed. Build retains only the existing Vite large-chunk warning. No UI changed, so Chromium was not required.
+
+## Updated continuation checkpoint
+
+- **CURRENT HEAD before this handoff update:** `7ccb8d6`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **CURRENT READINESS:** Model ↔ independent real observation increased from ~25% to an admission/comparison foundation; calibration and Evidence/Memory/Replay wiring remain incomplete.
+- **PARKED:** source terms review, full calibration, biological executor, USGS hydrology comparison, Atom-Bohr G3, live scraper expansion.
+- **NEXT LARGE GAP:** connect this existing comparison result to the existing Scientific Evidence Pack / Scientific Memory / Replay boundary, with explicit external-observation provenance and no-network replay, then expose the result in the existing user-facing scientific report. Do not claim calibration until the preregistered observation set is sufficiently large.

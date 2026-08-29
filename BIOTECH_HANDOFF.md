@@ -860,3 +860,17 @@ git diff --check: passed
 - **CURRENT STATUS:** three source-backed candidates now have explicit, provenance-carrying HYPOTHESIS-level binding mechanisms and user-facing disclosure.
 - **PARKED:** downstream biological mechanism validation, biological execution, clinical efficacy and mechanistic causal inference remain `UNKNOWN`/`BLOCKED` pending independent assays and a validated executor.
 - **NEXT LARGE GAP:** no additional mechanistic claim is admissible from the currently pinned binding records; proceed only with another compatible real source or an unrelated high-value unblocked integration.
+
+## RELEASE VERIFICATION AFTER MECHANISM BLOCK
+
+Full release verification completed after the user-facing mechanism disclosure:
+
+```text
+npm test: 271 passed, 40 skipped, 0 failed
+Chromium desktop: 27 routes, 13 labs, 242 interactions, zero runtime errors
+Chromium mobile: 27 routes, 13 labs, 242 interactions, zero runtime errors
+```
+
+- **CURRENT HEAD:** `0694f03` before this documentation checkpoint
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **WORKING TREE:** clean after push

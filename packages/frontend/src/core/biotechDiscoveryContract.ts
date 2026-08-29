@@ -179,6 +179,8 @@ export function compareCandidateDiscoveryReports(reports: readonly CandidateDisc
   return { ...comparison, comparisonId: `comparison:${scientificFingerprint}`, scientificFingerprint };
 }
 
+export type ClinicalEfficacyStatus = 'UNKNOWN' | 'SUPPORTED_BY_CLINICAL_DATA';
+
 export interface CandidateDiscoveryReport {
   reportId: string;
   candidateId: string;
@@ -192,6 +194,9 @@ export interface CandidateDiscoveryReport {
   experimentRequestId?: string;
   ranking?: CandidateRanking;
   epistemicStatus: BiotechEpistemicStatus;
+  /** Scientific evidence status is distinct from any human clinical efficacy claim. */
+  scientificEvidenceStatus: BiotechEpistemicStatus;
+  clinicalEfficacy: ClinicalEfficacyStatus;
   uncertainty: string;
   provenance: readonly BiotechProvenance[];
   scientificFingerprint: string;
@@ -218,6 +223,8 @@ export function createCandidateDiscoveryReport(input: {
     ...(input.experimentRequest === undefined ? {} : { experimentRequestId: input.experimentRequest.requestId }),
     ...(input.ranking === undefined ? {} : { ranking: input.ranking }),
     epistemicStatus: input.hypothesis.status,
+    scientificEvidenceStatus: input.hypothesis.status,
+    clinicalEfficacy: 'UNKNOWN' as const,
     uncertainty: input.uncertainty,
   };
   const scientificFingerprint = fnv1a(canonicalJson(report));

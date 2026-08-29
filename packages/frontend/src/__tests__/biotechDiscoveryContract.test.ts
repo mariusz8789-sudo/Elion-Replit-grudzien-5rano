@@ -107,7 +107,7 @@ describe('biotech discovery contract', () => {
       reportId: `report:${candidateId}`, candidateId, materialId: `material:${candidateId}`, compoundIds: [`compound:${candidateId}`],
       targetIds: ['target-1'], mechanismIds: [], evidenceIds: [`evidence:${candidateId}`], safetySignalIds: [], hypothesisId: `hypothesis:${candidateId}`,
       ranking: { candidateId, score, components: { evidenceQuality: score, targetRelevance: 1, safetyPenalty: 0, uncertaintyPenalty: 0 }, rationale: 'Research-priority only.', uncertainty: 'Not efficacy.', epistemicStatus: 'PREDICTION' as const },
-      epistemicStatus: 'HYPOTHESIS' as const, uncertainty: 'No biological validation.', provenance: [{ source: 'fixture', sourceId: `evidence:${candidateId}`, evidenceType: 'test', status: 'LITERATURE_SUPPORTED' as const }], scientificFingerprint: `fp-${candidateId}`,
+      epistemicStatus: 'HYPOTHESIS' as const, scientificEvidenceStatus: 'HYPOTHESIS' as const, clinicalEfficacy: 'UNKNOWN' as const, uncertainty: 'No biological validation.', provenance: [{ source: 'fixture', sourceId: `evidence:${candidateId}`, evidenceType: 'test', status: 'LITERATURE_SUPPORTED' as const }], scientificFingerprint: `fp-${candidateId}`,
     });
     const comparison = compareCandidateDiscoveryReports([report('candidate-b', 0.4), report('candidate-a', 0.8)]);
 

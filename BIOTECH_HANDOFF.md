@@ -573,3 +573,28 @@ Focused and full validation passed. Build retains only the existing Vite large-c
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
 - **NEXT LARGE GAP:** real biological execution remains correctly parked; do not infer efficacy or safety from the ChEMBL binding record. Continue only with another source-backed provenance/disclosure improvement or a genuinely available biological executor.
+
+## Completed Biotech Foundation capability: evidence versus clinical efficacy separation
+
+The existing `CandidateDiscoveryReport` now carries two explicit dimensions: `scientificEvidenceStatus` and `clinicalEfficacy`. The pinned ChEMBL caffeine/A1 report is `scientificEvidenceStatus=HYPOTHESIS` and `clinicalEfficacy=UNKNOWN`. The existing Drug Discovery UI displays both statuses. This prevents a source-backed in-vitro binding record or research-priority prediction from being read as a human clinical efficacy claim. No safety, efficacy or probability was invented.
+
+A targeted ChEMBL API discovery for an additional CHEMBL318 comparator was attempted but the public request exceeded two 30-second timeouts and was stopped. No new fixture was created from an unavailable response. The source-expansion blocker remains parked because additional records are heterogeneous and require an explicit relation/assay-selection policy.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/biotechDiscoveryContract.test.ts src/__tests__/chembl.test.ts src/__tests__/biotechExperimentFabric.test.ts src/__tests__/scienceChatFabricFormat.test.ts src/__tests__/experimentPilot.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused and full tests passed: `271 passed, 40 skipped, 0 failed`. TypeScript checking is included in `npm run build` (`tsc -b`); there is no standalone `npm run typecheck` script. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `b5bd51e`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **WORKING TREE before this handoff update:** clean
+- **PARKED:** biological executor, independent clinical efficacy, safety inference, and ChEMBL multi-record expansion pending a reachable source response and deliberate selection policy.
+- **NEXT LARGE GAP:** continue only with a real reachable source-backed multi-candidate relation or an available biological executor; otherwise preserve the explicit parked status and avoid fabricated neurotherapeutic claims.

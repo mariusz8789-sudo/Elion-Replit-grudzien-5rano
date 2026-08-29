@@ -1143,3 +1143,13 @@ A regression now asserts the property for the full 12-report real set. Focused t
 ## ADME MATRIX FULL VALIDATION
 
 Full `npm test` passed: 271 passed, 40 skipped, 0 failed. Discovery E2E passed all Node ↔ Chromium integrity checks. Build/typecheck, lint and diff-check passed. Desktop and mobile smoke each passed 27 routes, 13 laboratories and 242 interactions with zero runtime errors. Existing Vite large-chunk warning remains non-blocking.
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: RDKit
+
+Bounded capability discovery found the existing optional Python scientific stack absent except for the standard Python runtime. One installation attempt for the lightest high-value capability succeeded: `rdkit==2026.3.5` is now installed in the sandbox Python 3.12 environment.
+
+The existing Toolchain Registry validated RDKit through real reference cases (aspirin descriptors and benzene SMARTS methylation). `npm run campaign:validate` then executed the existing real RDKit stage: 69 candidates generated, 60 retained, 10 Pareto candidates, hypervolume 10.17 → 15.53, stop reason `STOP_RESOURCE_LIMIT`, wall clock 67181 ms. The campaign correctly blocked docking and quantum stages because their runtimes remain absent and exited `RESULT: FAIL` for the overall multi-stage campaign; no synthetic values were admitted.
+
+The Toolchain Registry now exposes package, availability, executionStatus, environment, provenance, deterministic fingerprint and failureReason for every registered scientific tool. The existing Fabric/compute path remains the executor; no second Fabric or report system was created. RDKit outputs remain model-estimate/cheminformatics results, not observations, efficacy, safety or clinical claims.
+
+Focused backend runtime/toolchain tests passed: 281 passed, 32 skipped, 0 failed. Build/typecheck and diff-check passed. Remaining runtime blockers are PySCF, OpenMM, AutoDock Vina/Meeko, Biopython, PyMeep and ADMET-AI.

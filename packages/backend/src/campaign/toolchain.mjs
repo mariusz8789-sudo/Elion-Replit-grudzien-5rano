@@ -9,6 +9,7 @@
  * wykonywalny model nie istnieje dla danej zdolności — CAPABILITY_GAP. NIGDY
  * nie wypełniamy luki LLM-em ani heurystyką udającą walidowany model.
  */
+import { createHash } from 'node:crypto';
 import { detect as rdkitDetect, descriptors, transform } from '../compute/rdkitAdapter.mjs';
 import * as qm from '../compute/qmAdapter.mjs';
 import * as md from '../compute/mdAdapter.mjs';
@@ -228,14 +229,31 @@ function runValidation(tool) {
 /** Do testów / odświeżenia: czyści cache walidacji. */
 export function _resetValidation() { validationCache.clear(); admetReferenceCache = null; }
 
+const PACKAGE_NAMES = {
+  rdkit: 'rdkit', pyscf: 'pyscf', openmm: 'openmm', vina: 'vina + meeko', biopython: 'biopython',
+  pymeep: 'meep', admet: 'admet-ai', toxicity: 'admet-ai',
+};
+
 function present(tool) {
   const v = runValidation(tool);
+  const environment = `linux/${process.arch}; node=${process.versions.node}; python=${process.env.GENESIS_RDKIT_PYTHON ?? 'python3'}`;
+  const provenance = {
+    source: tool.engineName,
+    validationCaseIds: (v.evidence ?? []).map((e) => e.id),
+    evidenceClass: tool.evidenceClass,
+  };
+  const fingerprint = createHash('sha256').update(JSON.stringify({
+    toolId: tool.toolId, capabilityId: tool.capabilityId, package: PACKAGE_NAMES[tool.toolId] ?? tool.toolId,
+    version: v.version ?? null, status: v.status, environment, provenance,
+  })).digest('hex').slice(0, 16);
   return {
     toolId: tool.toolId, capabilityId: tool.capabilityId, domain: tool.domain,
-    engineName: tool.engineName, license: tool.license, modelDomain: tool.modelDomain,
-    assumptions: tool.assumptions, evidenceClass: tool.evidenceClass,
-    status: v.status, version: v.version ?? null, engine: v.engine ?? null,
-    validation: v.evidence ?? null, reason: v.reason ?? null,
+    engineName: tool.engineName, package: PACKAGE_NAMES[tool.toolId] ?? tool.toolId,
+    license: tool.license, modelDomain: tool.modelDomain, assumptions: tool.assumptions,
+    evidenceClass: tool.evidenceClass, status: v.status, availability: v.status === TOOL_STATUS.AVAILABLE,
+    executionStatus: v.status === TOOL_STATUS.AVAILABLE ? 'VALIDATED_REFERENCE_CASE' : 'NOT_EXECUTED',
+    version: v.version ?? null, engine: v.engine ?? null, environment, provenance,
+    fingerprint, validation: v.evidence ?? null, reason: v.reason ?? null, failureReason: v.reason ?? null,
   };
 }
 

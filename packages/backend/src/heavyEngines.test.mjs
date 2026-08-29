@@ -139,6 +139,24 @@ describe('toolchain registry validates engines by real reference cases', () => {
       if (t.status === TOOL_STATUS.AVAILABLE) assert.ok(t.validation && t.validation.length >= 1, `${t.toolId} bez dowodu`);
     }
   });
+  test('every tool exposes runtime metadata and a deterministic fingerprint', () => {
+    _resetValidation();
+    const first = listToolchain();
+    _resetValidation();
+    const second = listToolchain();
+    assert.equal(first.length, second.length);
+    first.forEach((tool, index) => {
+      assert.ok(tool.package);
+      assert.equal(typeof tool.availability, 'boolean');
+      assert.ok(tool.executionStatus);
+      assert.ok(tool.environment);
+      assert.ok(tool.provenance);
+      assert.match(tool.fingerprint, /^[a-f0-9]{16}$/);
+      assert.equal(tool.fingerprint, second[index].fingerprint);
+      if (tool.status !== TOOL_STATUS.AVAILABLE) assert.ok(tool.failureReason === null || typeof tool.failureReason === 'string');
+    });
+  });
+
   test('getTool + capabilityAvailable reflect validated state', () => {
     assert.ok(getTool('rdkit'));
     assert.equal(getTool('nonexistent'), null);

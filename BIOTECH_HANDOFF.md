@@ -444,3 +444,25 @@ Focused and full validation passed. The AME2020 tests now cover MATCH, DRIFT and
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
 - **NEXT LARGE GAP:** complete the user-facing comparison/replay disclosure in the existing Experiment Pilot result boundary, then evaluate whether the preregistered AME2020 observation set can be expanded without weakening source semantics. Calibration remains `INSUFFICIENT_DATA`.
+
+## Completed Core capability: Experiment Pilot external-observation disclosure
+
+The existing Experiment Pilot confirmed-result boundary now renders the AME2020 prediction-versus-independent-observation comparison for `nuclear-semf`, including per-nuclide `MATCH`/`DRIFT`, MAE/RMSE, calibration status, no-network replay status, source URL and raw SHA-256. It explicitly states that this is not a fresh measurement or calibrated model accuracy. Other models and routes remain unchanged.
+
+Changed file: `packages/frontend/src/components/ExperimentPilotScreen.tsx`.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/experimentPilot.test.ts src/__tests__/nuclearAme2020.test.ts src/__tests__/experimentFabric.test.ts
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests, build, lint and diff check passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `6d0f53a`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** wire the structured external-observation comparison into the existing replay/export boundary only if the existing Evidence Pack semantics can preserve it without falsely treating external observations as model-run arms; otherwise keep the honest parked boundary and expand the preregistered AME2020 set with additional non-estimated records.

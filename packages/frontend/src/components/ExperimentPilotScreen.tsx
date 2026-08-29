@@ -38,6 +38,7 @@ import { saveScientificEvidencePackToMemory } from '../core/scienceMemory';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
+import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 
 /**
  * PILOT UI — Science Chat → eksperyment → wynik → provenance → Scenario
@@ -494,6 +495,16 @@ export function ExperimentPilotScreen() {
             <summary>Analiza wyniku</summary>
             {analyzeExperimentResult(confirmed.run.result).map((block) => <section key={`${block.title}:${block.body}`}><strong>{block.title}</strong><p className="settings-hint">{block.body}</p></section>)}
           </details>
+          {confirmed.run.request.modelId === 'nuclear-semf' && (() => {
+            const comparison = compareAme2020Observations();
+            return <details className="settings-details" open>
+              <summary>Independent real observation — AME2020</summary>
+              <p className="settings-hint">{comparison.comparisons.map((item) => `${item.nuclide}: prediction ${item.prediction.toPrecision(6)} vs observation ${item.observation.toPrecision(6)} ${item.unit} → ${item.status}`).join('; ')}</p>
+              <p className="settings-hint">MAE {comparison.meanAbsoluteError.toPrecision(5)} · RMSE {comparison.rootMeanSquareError.toPrecision(5)} {comparison.unit} · calibration {comparison.calibration.status} · replay {comparison.replay.status}</p>
+              <p className="settings-hint">Source: {comparison.provenance.sourceUrl} · raw SHA-256: {comparison.provenance.rawPayloadSha256}</p>
+              <p className="pilot-disclaimer">Replay {comparison.replay.status}: {comparison.replay.reason} Nie jest to świeży pomiar ani skalibrowana skuteczność modelu.</p>
+            </details>;
+          })()}
           {confirmed.run.result.warnings.length > 0 && (
             <ul className="pilot-limitations">
               {confirmed.run.result.warnings.map((w, i) => <li key={i}>⚠ {w}</li>)}

@@ -1111,3 +1111,9 @@ Focused tests passed (11 tests), build/typecheck passed, lint passed, diff-check
 ## FULL RELEASE VALIDATION CHECKPOINT
 
 Full validation after the latest report, evidence matrix and ADME boundary blocks passed: `npm test` reports 271 passed, 40 skipped and 0 failed; `npm run e2e:discovery` passes all browser/Node fingerprint checks; build/typecheck passed; lint passed; `git diff --check` passed; desktop and mobile smoke each cover 27 routes, 13 laboratories and 242 interactions with zero runtime errors. The branch remains clean after the upcoming handoff-only commit.
+
+## UNIPROT TARGET MAPPING CHECKPOINT
+
+The enriched ChEMBL A1 activity evidence for theobromine and paraxanthine now carries an additional target-identity provenance record from UniProtKB:P30542 (human adenosine A1 receptor). This is a target mapping only; it does not change the rat-brain assay context and does not establish efficacy, safety or clinical suitability.
+
+Focused tests passed (11 tests), build/typecheck passed, lint passed and diff-check passed. The prior full suite, discovery E2E and desktop/mobile smoke remain green; this change is contract-level provenance enrichment with no new route.

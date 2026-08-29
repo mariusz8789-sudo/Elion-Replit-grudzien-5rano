@@ -1240,3 +1240,10 @@ Validation: natural replacement/ChEMBL contract tests `5 passed`; frontend build
 The live ChEMBL activity stream is now connected to a deterministic candidate WHY projection. For each PubChem candidate with retrieved activity, Genesis reports total activity count, requested-target match count, separate measurement types, assay-quality counts, ChEMBL activity provenance IDs, rationale, and explicit uncertainty. The projection does not merge Ki/IC50/EC50, does not convert binding into efficacy, and does not replace the existing ranking/evidence/memory architecture.
 
 Validation passed: natural replacement/ChEMBL tests `5 passed`; frontend typecheck/Vite build passed; ESLint passed; `git diff --check` passed; Chromium smoke passed with 27 routes, 13 laboratories, 210 interactions, and zero runtime errors.
+
+
+## FINAL INTEGRATION CHECKPOINT: Activity/Assay Lineage → Scientific Memory
+
+The existing Scientific Memory biotech context now persists live ChEMBL `activityIds` and `assayIds` alongside candidate/report/comparison IDs, provenance, ranking, uncertainty, and scientific fingerprint. The ADMIN save action supplies those IDs from the live activity stream; no parallel memory store was introduced. Existing comparison replay remains the integrity check over the stored comparison fingerprint and does not claim a biological rerun.
+
+Validation passed: integrated natural/ChEMBL/memory tests `27 passed`; frontend typecheck/Vite build passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 220 interactions, and zero runtime errors.

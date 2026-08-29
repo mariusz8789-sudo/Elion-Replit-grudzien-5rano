@@ -173,7 +173,7 @@ describe('scienceMemory: Fabric observations', () => {
     const saved = saveBiotechDiscoveryComparisonToMemory([
       buildPinnedChEMBLCaffeineDiscovery().report,
       buildPinnedChEMBLAdenosineDiscovery().report,
-    ]);
+    ], { activityIds: ['chembl:activity:189031'], assayIds: ['chembl:assay:CHEMBL876556'] });
     expect(saved.biotech?.comparison).toMatchObject({
       reportIds: expect.arrayContaining([
         buildPinnedChEMBLCaffeineDiscovery().report.reportId,
@@ -184,6 +184,8 @@ describe('scienceMemory: Fabric observations', () => {
     vi.resetModules();
     const loaded = (await import('../core/scienceMemory')).listExperiments()[0];
     expect(loaded.biotech?.comparison).toEqual(saved.biotech?.comparison);
+    expect(loaded.biotech?.activityIds).toEqual(['chembl:activity:189031']);
+    expect(loaded.biotech?.assayIds).toEqual(['chembl:assay:CHEMBL876556']);
     expect(loaded.biotech?.comparison?.uncertainty).toMatch(/not efficacy|clinical suitability/i);
   });
 

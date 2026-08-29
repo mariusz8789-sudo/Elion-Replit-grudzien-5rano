@@ -154,6 +154,10 @@ function DrugWorkspace() {
           <button className="chip-btn primary" type="submit" disabled={!referenceCompound.trim()}>Pobierz źródła i analizuj</button>
         </form>
         {replacementResult && <div className="cde-verdict" role="status"><strong>{replacementResult.status}</strong> · {replacementResult.reason}{replacementResult.reports.length > 0 && <span> Kandidatów: {replacementResult.reports.length}.</span>}</div>}
+        {replacementResult?.liveActivities && <div className="cde-results" aria-label="Live ChEMBL activity evidence">
+          <div className="cde-result"><span className="cde-result-label">Live ChEMBL activity</span><span className="cde-result-actual">{replacementResult.liveActivities.length} rekordów</span><span className="cde-result-bound">Ki / IC50 / EC50 nie są agregowane; każdy rekord zachowuje własną metrykę.</span></div>
+          {replacementResult.liveActivities.slice(0, 12).map((activity) => <div className="cde-result" key={`${activity.activityId}:${activity.assayId}`}><span className="cde-result-label">{activity.compoundId} → {activity.targetId}</span><span className="cde-result-actual">{activity.type} {activity.relation} {activity.value} {activity.units}</span><span className="cde-result-bound">assay {activity.assayId} · {activity.assayQuality} · {activity.assayContext}</span></div>)}
+        </div>}
         {replacementResult?.reports.length ? <div className="cde-results" aria-label="Resolved natural product reports">
           {replacementResult.reports.map((report) => <div className="cde-result" key={report.reportId}><span className="cde-result-label">{report.candidateId}</span><span className="cde-result-actual">Research priority {(report.ranking?.score ?? 0).toFixed(4)} · {report.scientificEvidenceStatus} · target {report.targetIds.length ? report.targetIds.join(', ') : 'UNKNOWN'}</span><span className="cde-result-bound">safety {report.safetySignalIds.length ? 'SOURCE_STATUS' : 'UNKNOWN'} · ADME/PK/Tox {report.admeProfile?.status ?? 'UNKNOWN'} · validation {report.experimentRequestId ?? 'NOT_EXECUTED / BLOCKED'} · {report.clinicalEfficacy}</span></div>)}
         </div> : null}

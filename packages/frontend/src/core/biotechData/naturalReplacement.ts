@@ -26,11 +26,19 @@ export interface NaturalFunctionalReplacementResult {
   reports: readonly CandidateDiscoveryReport[];
   matchedReference?: string;
   target?: string;
+  liveActivities?: readonly LiveChEMBLActivityRecord[];
 }
 
 export interface NaturalSourceRecord {
   name: string; cid: number; formula: string; smiles: string; inchiKey: string;
   molecularWeight: string; source: 'PubChem'; sourceVersion: string; retrievedAt: string;
+}
+
+export interface LiveChEMBLActivityRecord {
+  compoundId: string; targetId: string; activityId: number; assayId: string;
+  type: 'Ki' | 'IC50' | 'EC50'; relation: string; value: string; units: string;
+  assayContext: string; assayQuality: 'HIGH' | 'MODERATE' | 'LOW' | 'UNKNOWN';
+  source: 'ChEMBL'; sourceVersion: string; retrievedAt: string; sourceUrl: string;
 }
 
 const normalize = (value: string | undefined): string => (value ?? '').trim().toLowerCase();
@@ -80,6 +88,37 @@ export async function fetchNaturalPubChemRecords(fetchImpl: typeof fetch = fetch
     } catch { return null; /* bounded source failure remains visible to the caller */ }
   }));
   return results.filter((record): record is NaturalSourceRecord => record !== null);
+}
+
+const allowedActivityTypes = new Set(['Ki', 'IC50', 'EC50']);
+function classifyAssay(row: Record<string, unknown>): LiveChEMBLActivityRecord['assayQuality'] {
+  if (typeof row.assay_description !== 'string' || !row.assay_description.trim()) return 'UNKNOWN';
+  if (row.assay_organism === 'Homo sapiens' && row.assay_type === 'B') return 'HIGH';
+  if (row.assay_type === 'B') return 'MODERATE';
+  return 'LOW';
+}
+
+/** Retrieves explicit ChEMBL activity rows; measurement types are kept separate. */
+export async function fetchNaturalChEMBLActivities(records: readonly NaturalSourceRecord[], fetchImpl: typeof fetch = fetch): Promise<LiveChEMBLActivityRecord[]> {
+  const retrievedAt = new Date().toISOString().slice(0, 10);
+  const results = await Promise.all(records.map(async (record) => {
+    const moleculeUrl = `https://www.ebi.ac.uk/chembl/api/data/molecule.json?molecule_structures__standard_inchi_key=${encodeURIComponent(record.inchiKey)}&limit=1`;
+    try {
+      const moleculeResponse = await fetchImpl(moleculeUrl, { signal: AbortSignal.timeout(8000) });
+      if (!moleculeResponse.ok) return [];
+      const molecule = (await moleculeResponse.json() as { molecules?: Record<string, unknown>[] }).molecules?.[0];
+      const compoundId = typeof molecule?.molecule_chembl_id === 'string' ? molecule.molecule_chembl_id : null;
+      if (!compoundId) return [];
+      const activityUrl = `https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=${encodeURIComponent(compoundId)}&limit=20`;
+      const activityResponse = await fetchImpl(activityUrl, { signal: AbortSignal.timeout(8000) });
+      if (!activityResponse.ok) return [];
+      return ((await activityResponse.json() as { activities?: Record<string, unknown>[] }).activities ?? []).flatMap((row) => {
+        if (!allowedActivityTypes.has(String(row.standard_type)) || typeof row.standard_value !== 'string' || typeof row.standard_units !== 'string' || typeof row.activity_id !== 'number' || typeof row.assay_chembl_id !== 'string' || typeof row.target_chembl_id !== 'string') return [];
+        return [{ compoundId, targetId: `chembl:target:${row.target_chembl_id}`, activityId: row.activity_id, assayId: row.assay_chembl_id, type: row.standard_type as LiveChEMBLActivityRecord['type'], relation: typeof row.standard_relation === 'string' ? row.standard_relation : 'UNKNOWN', value: row.standard_value, units: row.standard_units, assayContext: typeof row.assay_description === 'string' ? row.assay_description : 'UNKNOWN', assayQuality: classifyAssay(row), source: 'ChEMBL' as const, sourceVersion: 'ChEMBL Web Services', retrievedAt, sourceUrl: activityUrl }];
+      });
+    } catch { return []; }
+  }));
+  return results.flat();
 }
 
 const candidateId = (cid: number): string => `candidate:pubchem:${cid}`;
@@ -147,7 +186,8 @@ export async function resolveNaturalFunctionalReplacementFromSources(
   if (sourceRecords.length === 0) {
     return { status: 'BLOCKED', reason: 'PubChem retrieval niedostępny; nie wykonano predykcji ani nie użyto syntetycznego fallbacku.', reports: [], matchedReference: input.referenceCompound?.trim(), target: input.target?.trim() };
   }
+  const liveActivities = await fetchNaturalChEMBLActivities(sourceRecords, fetchImpl);
   const base = resolveNaturalFunctionalReplacement(input);
   if (base.status === 'BLOCKED') return base;
-  return { ...base, reason: `Pobrano ${sourceRecords.length} realnych rekordów struktury/tożsamości z PubChem. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
+  return { ...base, liveActivities, reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem oraz ${liveActivities.length} jawnych rekordów activity z ChEMBL. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveNaturalFunctionalReplacement, resolveNaturalFunctionalReplacementFromSources } from '../core/biotechData/naturalReplacement';
+import { fetchNaturalChEMBLActivities, resolveNaturalFunctionalReplacement, resolveNaturalFunctionalReplacementFromSources } from '../core/biotechData/naturalReplacement';
 
 describe('Natural Functional Replacement resolver', () => {
   it('resolves a known A1 reference against the three real pinned reports', () => {
@@ -28,5 +28,14 @@ describe('Natural Functional Replacement resolver', () => {
     expect(result.status).toBe('RESOLVED');
     expect(result.reason).toMatch(/realnych rekordów/);
     expect(result.reports.some((report) => report.uncertainty.includes('formula CH4'))).toBe(true);
+  });
+
+  it('keeps ChEMBL measurement types separate and records assay context/quality', async () => {
+    let call = 0;
+    const activities = await fetchNaturalChEMBLActivities([{ name: 'inosine', cid: 6021, formula: 'C10H12N4O5', smiles: 'C', inchiKey: 'KEY', molecularWeight: '268.23', source: 'PubChem', sourceVersion: 'PubChem CID 6021', retrievedAt: '2026-08-29' }], async () => new Response(JSON.stringify(call++ === 0 ? { molecules: [{ molecule_chembl_id: 'CHEMBL-X' }] } : { activities: [{ activity_id: 1, assay_chembl_id: 'CHEMBL-ASSAY', target_chembl_id: 'CHEMBL-TARGET', standard_type: 'Ki', standard_relation: '=', standard_value: '12.5', standard_units: 'nM', assay_description: 'human receptor binding', assay_organism: 'Homo sapiens', assay_type: 'B' }, { activity_id: 2, assay_chembl_id: 'CHEMBL-ASSAY-2', target_chembl_id: 'CHEMBL-TARGET', standard_type: 'EC50', standard_relation: '>', standard_value: '3', standard_units: 'uM', assay_description: 'cell response' }] }), { status: 200 }));
+    expect(activities).toHaveLength(2);
+    expect(activities.map((activity) => activity.type)).toEqual(['Ki', 'EC50']);
+    expect(activities[0]?.assayQuality).toBe('HIGH');
+    expect(activities[0]?.targetId).toBe('chembl:target:CHEMBL-TARGET');
   });
 });

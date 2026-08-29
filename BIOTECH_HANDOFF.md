@@ -31,7 +31,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `83d41cc` — `feat(core): carry result summary into world`
 - `9b8a772` — `feat(core): preserve world result continuity`
 - `1f44a79` — `feat(drug-discovery): expose pinned molecular properties`
-- next checkpoint in this session — expose explicit Safety UNKNOWN boundary in drug-discovery report
+- `94aec37` — `feat(drug-discovery): mark safety as unknown`
+- next checkpoint in this session — expose candidate/ranking/hypothesis/report/validation path in Fabric result
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -221,9 +222,17 @@ Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
 
 Validation completed: targeted ChEMBL/Science Chat tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed drug-discovery capability: candidate → ranking → hypothesis → report → validation path
+
+The existing pinned ChEMBL knowledge-only Fabric result now carries candidate identity/status, deterministic explainable ranking score/status/rationale/uncertainty, hypothesis identity/status, discovery report ID and an explicit `NOT_EXECUTED / BLOCKED — biological executor unavailable` validation path. This reuses the existing `buildPinnedChEMBLCaffeineDiscovery` chain and does not imply efficacy, safety or biological execution.
+
+Changed file: `packages/frontend/src/core/experimentFabric/executor.ts`.
+
+Validation completed: targeted ChEMBL/Science Chat tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — real drug-discovery workflow
 
-Next large block: candidate comparison and validation path. Reuse the existing explainable ranking and hypothesis/request contracts; expose ranking rationale, uncertainty and `NOT_EXECUTED`/`BLOCKED` experiment status in the same discovery report. Do not infer safety from PubChem identity or ChEMBL binding, and do not add clinical efficacy claims.
+Next large block: connect this source-backed discovery result to the existing Candidate Discovery/Discovery Report user view and Scientific Memory without creating a second report. Safety/ADME-Tox remains `UNKNOWN` until a real source-backed record is available; do not add clinical efficacy claims or arbitrary safety scores.
 
 ## Next large gaps
 

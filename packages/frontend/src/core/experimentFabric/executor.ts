@@ -44,7 +44,7 @@ import { buildPhotonGraph } from '../modelGraph/photonGraph';
 import { kardashevPower, schwarzschildRadius } from '../physics';
 import { runIsingMetropolisScenario } from '../isingModel';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS } from '../simulation/epidemicCity';
-import { mapPinnedChEMBLCaffeineA1Activity } from '../biotechData/chembl';
+import { buildPinnedChEMBLCaffeineDiscovery, mapPinnedChEMBLCaffeineA1Activity } from '../biotechData/chembl';
 import { createExperimentProvenance, statusForCapability } from './provenance';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
 import { registerLiveExperimentWorld } from './worldHandoff';
@@ -73,6 +73,7 @@ function biotechKnowledgeResult(request: StructuredExperimentRequest): Experimen
   const targetQuery = String(request.parameters.targetQuery ?? '').toLocaleLowerCase('pl-PL');
   if (!/(?:kofein|caffein|adenozyn|adenosine|a1)/.test(targetQuery)) return undefined;
   const record = mapPinnedChEMBLCaffeineA1Activity();
+  const discovery = buildPinnedChEMBLCaffeineDiscovery();
   return {
     contractVersion: EXPERIMENT_FABRIC_VERSION,
     status: 'knowledge_only',
@@ -91,6 +92,16 @@ function biotechKnowledgeResult(request: StructuredExperimentRequest): Experimen
       activityRelation: record.activity.relation,
       activityValue: record.activity.value,
       activityUnits: record.activity.units,
+      candidateId: discovery.candidate.id,
+      candidateStatus: discovery.candidate.status,
+      rankingScore: discovery.ranking.score,
+      rankingStatus: discovery.ranking.epistemicStatus,
+      rankingRationale: discovery.ranking.rationale,
+      rankingUncertainty: discovery.ranking.uncertainty,
+      hypothesisId: discovery.hypothesis.id,
+      hypothesisStatus: discovery.hypothesis.status,
+      reportId: discovery.report.reportId,
+      validationPath: 'NOT_EXECUTED / BLOCKED — biological executor unavailable',
     },
     units: { activityValue: record.activity.units },
     warnings: [

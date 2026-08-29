@@ -552,3 +552,24 @@ Focused tests: 13 passed. Full test suite, build, lint and diff check passed. Bu
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
 - **NEXT LARGE GAP:** continue the Genesis end-to-end observation path only where an existing contract can carry it honestly; otherwise move to the next real biotech evidence integration rather than inflating the nuclear panel with unsupported claims.
+
+## Completed Biotech Foundation capability: assay-level ChEMBL semantics
+
+The existing pinned caffeine/A1 card now displays the exact activity type (`Ki`), relation, value and units, ChEMBL activity identity, assay identity (`CHEMBL876556`) and the pinned assay description. The UI labels it as an in-vitro binding record and explicitly excludes efficacy, safety and clinical-outcome interpretation. This is a read-only projection of the existing source-backed record; no second evidence, ranking or biological-executor path was created.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/chembl.test.ts src/__tests__/biotechExperimentFabric.test.ts src/__tests__/scienceChatFabricFormat.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused and full validation passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `8a5771a`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** real biological execution remains correctly parked; do not infer efficacy or safety from the ChEMBL binding record. Continue only with another source-backed provenance/disclosure improvement or a genuinely available biological executor.

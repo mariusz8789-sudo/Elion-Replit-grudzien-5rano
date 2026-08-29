@@ -166,6 +166,27 @@ describe('scienceMemory: Fabric observations', () => {
     expect(loaded.biotech).toMatchObject({ reportId: report.reportId, candidateId: candidate.id, hypothesisId: hypothesis.id, evidenceIds: ['evidence-demo'], safetySignalIds: ['safety-demo'], scientificFingerprint: report.scientificFingerprint, ranking: { score: report.ranking?.score, epistemicStatus: 'PREDICTION' } });
   });
 
+  it('round-trips a real multi-candidate comparison through Scientific Memory', async () => {
+    const { saveBiotechDiscoveryComparisonToMemory } = await import('../core/scienceMemory');
+    const { buildPinnedChEMBLCaffeineDiscovery } = await import('../core/biotechData/chembl');
+    const { buildPinnedChEMBLAdenosineDiscovery } = await import('../core/biotechData/adenosine');
+    const saved = saveBiotechDiscoveryComparisonToMemory([
+      buildPinnedChEMBLCaffeineDiscovery().report,
+      buildPinnedChEMBLAdenosineDiscovery().report,
+    ]);
+    expect(saved.biotech?.comparison).toMatchObject({
+      reportIds: expect.arrayContaining([
+        buildPinnedChEMBLCaffeineDiscovery().report.reportId,
+        buildPinnedChEMBLAdenosineDiscovery().report.reportId,
+      ]),
+      epistemicStatus: 'PREDICTION',
+    });
+    vi.resetModules();
+    const loaded = (await import('../core/scienceMemory')).listExperiments()[0];
+    expect(loaded.biotech?.comparison).toEqual(saved.biotech?.comparison);
+    expect(loaded.biotech?.comparison?.uncertainty).toMatch(/not efficacy|clinical suitability/i);
+  });
+
   it('round-trips confirmed execution and replay identity', async () => {
     const { saveExperiment } = await import('../core/scienceMemory');
     const saved = saveExperiment({

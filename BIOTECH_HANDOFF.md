@@ -690,3 +690,23 @@ git diff --check: passed
 - **BRANCH:** `manus/next-gap-observation-analysis`
 - **PARKED:** real safety/ADME/Tox for adenosine, biological executor, clinical efficacy, formal accuracy calibration and further heterogeneous assay expansion.
 - **NEXT LARGE GAP:** expose this two-candidate comparison through the existing Scientific Memory / Evidence Pack persistence path, or park if the current report boundary already provides sufficient replay-safe persistence; do not create another report system.
+
+## COMPLETED MAJOR BLOCK: multi-candidate comparison persistence
+
+The real caffeine/adenosine A1 comparison now persists through the existing Scientific Memory boundary. The stored biotech context carries a validated comparison summary with comparison ID, all report IDs, candidate IDs, deterministic scientific fingerprint, `PREDICTION` epistemic status and explicit uncertainty. A single user-facing action in Drug Discovery saves the comparison and opens the existing Scientific Memory screen; no second report, ranking, memory or evidence system was created.
+
+The persistence path rejects fewer than two reports, validates IDs/fingerprint/status on reload, and preserves the existing boundary that research-priority ordering is not efficacy. Adenosine remains ChEMBL-only with safety/ADME/Tox `UNKNOWN`; no clinical claim is introduced.
+
+Validation completed:
+
+```text
+focused Science Memory + adenosine + ChEMBL tests: passed
+full npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this handoff update:** `5ce7cc5`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **NEXT LARGE GAP:** add Evidence Pack identity only if a confirmed persistence/replay break is found; otherwise move to the next real Natural/Neuro source-backed candidate or park due unavailable compatible data. Do not invent safety, efficacy, ADME/Tox or biological execution.

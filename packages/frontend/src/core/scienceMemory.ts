@@ -4,6 +4,7 @@ import { biotechScientificFingerprint, type BiologicalExperimentRequest, type Bi
 import type { ExperimentOutputValue, ExperimentRoute, ExperimentRun } from './experimentFabric/types';
 import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 import { compareAme2020Observations } from './observation/nuclearAme2020';
+import { compareCandidateDiscoveryReports, type CandidateComparison } from './biotechDiscoveryContract';
 
 /**
  * Scientific Memory (sekcja O dyrektywy CTO) — trwały, lokalny zapis
@@ -40,6 +41,15 @@ export interface SavedExperimentAnalysisBlock {
   kind?: string;
 }
 
+export interface SavedBiotechComparison {
+  comparisonId: string;
+  reportIds: readonly string[];
+  candidateIds: readonly string[];
+  scientificFingerprint: string;
+  epistemicStatus: 'PREDICTION';
+  uncertainty: string;
+}
+
 export interface SavedBiotechContext {
   candidateId: string;
   hypothesisId: string;
@@ -52,6 +62,7 @@ export interface SavedBiotechContext {
   provenance: readonly BiotechProvenance[];
   scientificFingerprint: string;
   ranking?: CandidateRanking;
+  comparison?: SavedBiotechComparison;
 }
 
 export interface SavedExperimentReplayIdentity {
@@ -158,6 +169,8 @@ function validBiotechContext(value: unknown): value is SavedBiotechContext | und
   const validIds = (ids: unknown): ids is readonly string[] => Array.isArray(ids) && ids.every((id) => nonEmptyString(id));
   const validProvenance = Array.isArray(context.provenance) && context.provenance.every((item) => item && typeof item === 'object' && nonEmptyString(item.source) && nonEmptyString(item.sourceId) && nonEmptyString(item.evidenceType) && statuses.includes(item.status));
   const validRanking = context.ranking === undefined || (context.ranking && typeof context.ranking === 'object' && nonEmptyString(context.ranking.candidateId) && Number.isFinite(context.ranking.score) && Number.isFinite(context.ranking.components.evidenceQuality) && Number.isFinite(context.ranking.components.targetRelevance) && Number.isFinite(context.ranking.components.safetyPenalty) && Number.isFinite(context.ranking.components.uncertaintyPenalty) && nonEmptyString(context.ranking.rationale) && nonEmptyString(context.ranking.uncertainty) && ['UNKNOWN', 'PREDICTION'].includes(context.ranking.epistemicStatus));
+  const comparison = context.comparison;
+  const validComparison = comparison === undefined || (comparison && typeof comparison === 'object' && nonEmptyString(comparison.comparisonId) && Array.isArray(comparison.reportIds) && comparison.reportIds.length >= 2 && comparison.reportIds.every(nonEmptyString) && Array.isArray(comparison.candidateIds) && comparison.candidateIds.length === comparison.reportIds.length && comparison.candidateIds.every(nonEmptyString) && nonEmptyString(comparison.scientificFingerprint) && comparison.epistemicStatus === 'PREDICTION' && nonEmptyString(comparison.uncertainty));
   return nonEmptyString(context.candidateId)
     && nonEmptyString(context.hypothesisId)
     && (context.reportId === undefined || nonEmptyString(context.reportId))
@@ -168,6 +181,7 @@ function validBiotechContext(value: unknown): value is SavedBiotechContext | und
     && validIds(context.safetySignalIds)
     && validProvenance
     && validRanking
+    && validComparison
     && nonEmptyString(context.scientificFingerprint);
 }
 
@@ -205,7 +219,7 @@ function readAll(): SavedExperiment[] {
   return Array.isArray(raw) ? raw.filter(isSavedExperiment) : [];
 }
 
-export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryReport): SavedExperiment {
+export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryReport, comparison?: CandidateComparison): SavedExperiment {
   const biotech: SavedBiotechContext = {
     candidateId: report.candidateId,
     hypothesisId: report.hypothesisId,
@@ -217,12 +231,19 @@ export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryRep
     provenance: report.provenance,
     scientificFingerprint: report.scientificFingerprint,
     ...(report.ranking === undefined ? {} : { ranking: report.ranking }),
+    ...(comparison === undefined ? {} : { comparison: { comparisonId: comparison.comparisonId, reportIds: comparison.reportIds, candidateIds: comparison.rows.map((row) => row.candidateId), scientificFingerprint: comparison.scientificFingerprint, epistemicStatus: comparison.epistemicStatus, uncertainty: comparison.uncertainty } }),
   };
   return saveExperiment({
     labId: 'biotechnology', experimentId: `report:${report.reportId}`, experimentName: `Candidate Discovery Report — ${report.candidateId}`,
     params: {}, stats: {}, biotech, honesty: 'simplified', honestyNote: 'Scientific context only; no biological execution performed.',
     assumptions: [], epistemicStatus: report.epistemicStatus,
   });
+}
+
+export function saveBiotechDiscoveryComparisonToMemory(reports: readonly CandidateDiscoveryReport[]): SavedExperiment {
+  if (reports.length < 2) throw new Error('Porównanie kandydatów do pamięci wymaga co najmniej dwóch raportów.');
+  const comparison = compareCandidateDiscoveryReports(reports);
+  return saveBiotechDiscoveryReportToMemory(reports[0]!, comparison);
 }
 
 export interface SaveExperimentInput {

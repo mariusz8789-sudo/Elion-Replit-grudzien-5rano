@@ -10,6 +10,7 @@ import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
 import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
 import { compareCandidateDiscoveryReports } from '../core/biotechDiscoveryContract';
 import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
+import { saveBiotechDiscoveryComparisonToMemory } from '../core/scienceMemory';
 
 /**
  * Drug Discovery — reachable workspace (P6.9). Uczciwy przepływ na Backend
@@ -150,6 +151,7 @@ function DrugWorkspace() {
           <div className="cde-result"><span className="cde-result-label">Comparison</span><span className="cde-result-actual">{pinnedComparison.rows.length} source-backed candidates</span><span className="cde-result-bound">research-priority ordering only · not efficacy</span></div>
           <div className="cde-result"><span className="cde-result-label">Adenosine comparator</span><span className="cde-result-actual">{adenosineDiscovery.record.activity.type} {adenosineDiscovery.record.activity.relation} {adenosineDiscovery.record.activity.value} {adenosineDiscovery.record.activity.units}</span><span className="cde-result-bound">{adenosineDiscovery.record.activity.assayId} · ChEMBL-only · safety UNKNOWN</span></div>
         </div>
+        <button className="chip-btn primary" type="button" onClick={() => { saveBiotechDiscoveryComparisonToMemory([pinnedDiscovery.report, adenosineDiscovery.report]); window.location.hash = '#/memory'; }}>Zapisz porównanie w Scientific Memory</button>
         <p className="settings-hint">Provenance: <a href={pinnedDiscovery.report.provenance[0]?.sourceUrl ?? '#'} target="_blank" rel="noreferrer">ChEMBL / PubChem source records</a>. Safety signal i toksykologia pozostają osobnymi, source-backed statusami.</p>
       </section>
 

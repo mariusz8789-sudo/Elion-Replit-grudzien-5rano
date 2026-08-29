@@ -7,6 +7,7 @@ import {
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
 import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
+import { compareCandidateDiscoveryReports } from '../core/biotechDiscoveryContract';
 import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
 
 /**
@@ -44,6 +45,7 @@ export function DrugDiscoveryScreen() {
 function DrugWorkspace() {
   const pinnedDiscovery = buildPinnedChEMBLCaffeineDiscovery();
   const pinnedCompound = mapPinnedPubChemCaffeine();
+  const pinnedComparison = compareCandidateDiscoveryReports([pinnedDiscovery.report]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -140,6 +142,7 @@ function DrugWorkspace() {
           <div className="cde-result pass"><span className="cde-result-label">Bioactivity</span><span className="cde-result-actual">{pinnedDiscovery.record.activity.value} {pinnedDiscovery.record.activity.units}</span><span className="cde-result-bound">ChEMBL {pinnedDiscovery.record.activity.activityId} · LITERATURE_SUPPORTED</span></div>
           <div className="cde-result pass"><span className="cde-result-label">ADME properties</span><span className="cde-result-actual">xLogP {pinnedCompound.adme.xLogP} · TPSA {pinnedCompound.adme.tpsa}</span><span className="cde-result-bound">computed · PubChem {pinnedCompound.adme.sourceId}</span></div>
           <div className="cde-result"><span className="cde-result-label">Research priority</span><span className="cde-result-actual">{pinnedDiscovery.ranking.score.toFixed(4)}</span><span className="cde-result-bound">PREDICTION · nie efficacy/probability</span></div>
+          <div className="cde-result"><span className="cde-result-label">Comparison</span><span className="cde-result-actual">{pinnedComparison.rows.length} source-backed candidate</span><span className="cde-result-bound">NOT_ESTABLISHED · requires ≥2 comparable reports</span></div>
         </div>
         <p className="settings-hint">Provenance: <a href={pinnedDiscovery.report.provenance[0]?.sourceUrl ?? '#'} target="_blank" rel="noreferrer">ChEMBL / PubChem source records</a>. Safety signal i toksykologia pozostają osobnymi, source-backed statusami.</p>
       </section>

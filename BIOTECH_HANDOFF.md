@@ -38,7 +38,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `b314b68` — `feat(drug-discovery): surface safety provenance`
 - `f6a4e9d` — `feat(drug-discovery): add pinned adme properties`
 - `9c6ff74` — `feat(drug-discovery): compare candidate reports`
-- next checkpoint in this session — commit Drug Discovery UI integration
+- `ba2ec82` — `feat(drug-discovery): surface pinned reference`
+- next checkpoint in this session — wire candidate comparison into the source-backed UI card
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -286,7 +287,17 @@ Validation: targeted ChEMBL/contract tests (14 passed), initial build caught and
 
 ## NEXT PRIORITY — Genesis core integration
 
+The source-backed UI card now calls the existing multi-candidate comparator with the one available pinned report and displays `NOT_ESTABLISHED · requires ≥2 comparable reports`; this is an honest one-candidate state, not a comparison claim.
+
 Biotech discovery is now a source-backed foundation with UI exposure. Switch focus back to the main Genesis loop. The highest-value parked item is model → independent real observation comparison. An existing pinned USGS public-real-data fixture is replayable and provenance-complete (`USGS-01646500`, discharge parameter `00060`, provisional, 10 observations), but its own contract marks `genesisModelComparisonStatus=VERIFY_REQUIRED`: the current Genesis models do not predict open-channel stream discharge, so the fixture cannot honestly be compared to them. Keep this parked rather than relabeling an exogenous input or model output as an observation. Next core work should target a truly compatible observation/model pair or another integration GAP.
+
+## Completed drug-discovery capability: comparator wired into UI boundary
+
+`DrugDiscoveryScreen` now invokes `compareCandidateDiscoveryReports` for the available pinned report and surfaces the resulting one-candidate state next to the research-priority prediction. The UI does not claim a two-candidate comparison until at least two comparable source-backed reports exist.
+
+Changed file: `packages/frontend/src/components/DrugDiscoveryScreen.tsx`.
+
+Validation: targeted tests and build/typecheck passed; full `npm test` (271 passed, 40 skipped, 0 failed), `npm run lint`, and `git diff --check` passed. Build retains only the existing Vite large-chunk warning.
 
 ## Observation investigation result
 

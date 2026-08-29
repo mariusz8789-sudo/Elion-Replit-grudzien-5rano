@@ -154,7 +154,7 @@ function DrugWorkspace() {
         </form>
         {replacementResult && <div className="cde-verdict" role="status"><strong>{replacementResult.status}</strong> · {replacementResult.reason}{replacementResult.reports.length > 0 && <span> Kandidatów: {replacementResult.reports.length}.</span>}</div>}
         {replacementResult?.reports.length ? <div className="cde-results" aria-label="Resolved natural product reports">
-          {replacementResult.reports.map((report) => <div className="cde-result" key={report.reportId}><span className="cde-result-label">{report.candidateId}</span><span className="cde-result-actual">Research priority {(report.ranking?.score ?? 0).toFixed(4)} · {report.scientificEvidenceStatus}</span><span className="cde-result-bound">{report.clinicalEfficacy} · safety/ADME pozostają osobną warstwą evidence</span></div>)}
+          {replacementResult.reports.map((report) => <div className="cde-result" key={report.reportId}><span className="cde-result-label">{report.candidateId}</span><span className="cde-result-actual">Research priority {(report.ranking?.score ?? 0).toFixed(4)} · {report.scientificEvidenceStatus} · target {report.targetIds.length ? report.targetIds.join(', ') : 'UNKNOWN'}</span><span className="cde-result-bound">safety {report.safetySignalIds.length ? 'SOURCE_STATUS' : 'UNKNOWN'} · ADME/PK/Tox {report.admeProfile?.status ?? 'UNKNOWN'} · validation {report.experimentRequestId ?? 'NOT_EXECUTED / BLOCKED'} · {report.clinicalEfficacy}</span></div>)}
         </div> : null}
         <h2>Źródłowy punkt odniesienia · pinned record</h2>
         <p className="settings-hint">

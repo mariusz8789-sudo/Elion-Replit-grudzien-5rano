@@ -1101,3 +1101,9 @@ Focused naturalReplacement and contract tests pass (11 tests); build/typecheck, 
 - **CURRENT STATUS:** 12-report discovery set has an explicit ADME/PK/Tox state on every report; resolved sets preserve that state through comparison and Memory.
 - **PARKED:** quantitative enrichment remains blocked by the timed-out ChEMBL properties probe; no quantitative values were admitted.
 - **NEXT LARGE GAP:** use the existing report matrix in the user-facing comparison to show target/evidence/safety/ADME/validation columns, or move to the next real external source only after a short bounded probe.
+
+## EVIDENCE MATRIX UI CHECKPOINT
+
+The resolved natural-product report panel now exposes, for every active report, candidate/report ID, deterministic research-priority score, epistemic evidence status, target IDs, safety status, ADME/PK/Tox status, validation request state and clinical efficacy state. The display is a report matrix only; it does not convert binding into efficacy or UNKNOWN into a positive finding.
+
+Focused tests passed (11 tests), build/typecheck passed, lint passed, diff-check passed, and fresh desktop/mobile Chromium smoke passed with 27 routes, 13 laboratories and 242 interactions per profile, zero runtime errors. The active resolved set continues to persist through the existing Scientific Memory and audit path.

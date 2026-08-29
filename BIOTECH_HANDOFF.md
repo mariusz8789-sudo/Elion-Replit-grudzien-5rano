@@ -286,7 +286,11 @@ Validation: targeted ChEMBL/contract tests (14 passed), initial build caught and
 
 ## NEXT PRIORITY — Genesis core integration
 
-Biotech discovery is now a source-backed foundation with UI exposure. Switch focus back to the main Genesis loop. The highest-value parked item is model → independent real observation comparison; inspect existing comparison contracts and identify a trustworthy observation boundary. Do not use model inputs, synthetic outputs or another model as an observation. If no source is available, park it with a precise blocker and take the next core integration GAP.
+Biotech discovery is now a source-backed foundation with UI exposure. Switch focus back to the main Genesis loop. The highest-value parked item is model → independent real observation comparison. An existing pinned USGS public-real-data fixture is replayable and provenance-complete (`USGS-01646500`, discharge parameter `00060`, provisional, 10 observations), but its own contract marks `genesisModelComparisonStatus=VERIFY_REQUIRED`: the current Genesis models do not predict open-channel stream discharge, so the fixture cannot honestly be compared to them. Keep this parked rather than relabeling an exogenous input or model output as an observation. Next core work should target a truly compatible observation/model pair or another integration GAP.
+
+## Observation investigation result
+
+The repository already contains `docs/evidence/usgs/USGS-01646500-00060-normalized-observation.json` plus raw payload and station metadata. Its tests verify real station/series identity, units, timestamps, quality fields, pinned hashes, deterministic replay drift detection and the explicit incompatibility reason. No new adapter was added because the existing comparison surface is epidemic model-vs-model, while the available USGS series is hydrology and the current pump-pipe model treats flow as an input rather than predicting stream discharge.
 
 ## Next large gaps
 

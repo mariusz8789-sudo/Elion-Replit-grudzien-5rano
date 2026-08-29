@@ -1,11 +1,13 @@
 import { canonicalJson, fnv1a } from '../events/hash';
 import {
+  createBindingMechanism,
   createCandidateDiscoveryReport,
   rankTherapeuticCandidate,
   type BiologicalEvidence,
   type BiologicalTarget,
   type CandidateDiscoveryReport,
   type CandidateRanking,
+  type Mechanism,
   type SafetySignal,
   type TherapeuticCandidate,
   type TherapeuticHypothesis,
@@ -44,6 +46,7 @@ export interface ChEMBLAdenosineDiscovery {
   safety: SafetySignal;
   hypothesis: TherapeuticHypothesis;
   report: CandidateDiscoveryReport;
+  mechanism: Mechanism;
 };
 
 function assertPinnedRecord(value: PinnedAdenosineRecord): void {
@@ -95,22 +98,23 @@ export function buildPinnedChEMBLAdenosineDiscovery(): ChEMBLAdenosineDiscovery 
   };
   const fingerprint = fnv1a(canonicalJson(scientificRecord));
   const safety: SafetySignal = mapDailyMedAdenosineSafety();
+  const mechanism = createBindingMechanism({ id: `mechanism:binding:${biologicalTarget.id}`, label: 'Adenosine–A1 binding interaction hypothesis', compoundLabel: 'Adenosine', target: biologicalTarget, provenance: biologicalEvidence.provenance[0]! });
   const candidate: TherapeuticCandidate = {
     kind: 'therapeutic-candidate', id: `candidate:${compoundId}:${targetId}`, namespace: 'genesis-biotech', label: 'Adenosine — A1 binding research candidate', status: 'UNKNOWN',
-    materialId: compoundId, compoundIds: [compoundId], targetIds: [targetId], mechanismIds: [], supportingEvidenceIds: [activityId],
+    materialId: compoundId, compoundIds: [compoundId],     targetIds: [targetId], mechanismIds: [mechanism.id], supportingEvidenceIds: [activityId],
     safetySignalIds: [safety.id], hypothesisIds: [`hypothesis:candidate:${compoundId}:${targetId}`], provenance: [provenance, ...safety.provenance],
   };
   const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'MODERATE', targetRelevance: 0.5, safetySignals: [safety], uncertaintyPenalty: 1 });
   const hypothesisBase: TherapeuticHypothesis = {
     kind: 'therapeutic-hypothesis', id: `hypothesis:${candidate.id}`, namespace: 'genesis-biotech', label: 'Adenosine–A1 interaction requires independent follow-up', status: 'HYPOTHESIS',
     claim: 'The pinned ChEMBL binding record supports research follow-up of the adenosine–A1 relationship; it does not establish mechanism, efficacy, therapeutic benefit or safety.', candidateId: candidate.id,
-    targetIds: candidate.targetIds, mechanismIds: [], supportingEvidenceIds: candidate.supportingEvidenceIds, safetySignalIds: [safety.id], provenance: [provenance],
+    targetIds: candidate.targetIds, mechanismIds: [mechanism.id], supportingEvidenceIds: candidate.supportingEvidenceIds, safetySignalIds: [safety.id], provenance: [provenance],
   };
   const hypothesis: TherapeuticHypothesis = { ...hypothesisBase, provenance: [...hypothesisBase.provenance, { ...provenance, sourceId: biologicalEvidence.id, evidenceType: 'hypothesis derived from curated binding record', status: 'HYPOTHESIS' }] };
   const experimentRequest = buildBiologicalValidationRequest({ hypothesisId: hypothesis.id, candidateId: candidate.id, targetIds: candidate.targetIds });
   const report = createCandidateDiscoveryReport({ candidate, hypothesis, ranking, experimentRequest, admeProfile: mapDailyMedAdenosineAdme(), uncertainty: ranking.uncertainty });
   return {
     record: { compoundId, biologicalTarget, biologicalEvidence, activity: { activityId: record.activity.activityId, assayId: record.assay.assayChemblId, type: record.activity.standardType, relation: record.activity.standardRelation, value: record.activity.standardValue, units: record.activity.standardUnits, assayContext: record.assay.description }, sourceUrl: record.sourceUrls.activity, sourceVersion: record.sourceVersion, retrievedAt: record.retrievedAt, fingerprint },
-    candidate, ranking, safety, hypothesis, report,
+    candidate, ranking, safety, hypothesis, report, mechanism,
   };
 }

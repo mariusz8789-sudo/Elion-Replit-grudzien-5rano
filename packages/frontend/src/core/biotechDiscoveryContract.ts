@@ -78,6 +78,28 @@ export interface Mechanism extends BiotechRecord {
   description: string;
 }
 
+export function createBindingMechanism(input: {
+  id: string;
+  label: string;
+  compoundLabel: string;
+  target: BiologicalTarget;
+  provenance: BiotechProvenance;
+}): Mechanism {
+  return {
+    kind: 'mechanism',
+    id: input.id,
+    namespace: 'genesis-biotech',
+    label: input.label,
+    status: 'HYPOTHESIS',
+    targetIds: [input.target.id],
+    description: `${input.compoundLabel}–${input.target.label} binding is a testable interaction hypothesis. The source-backed binding record does not establish downstream signaling, therapeutic mechanism or clinical efficacy.`,
+    provenance: [
+      input.provenance,
+      { ...input.provenance, sourceId: input.id, evidenceType: 'mechanism hypothesis derived from binding relationship', status: 'HYPOTHESIS' },
+    ],
+  };
+}
+
 export type SafetyEvidenceQuality = 'UNKNOWN' | 'LOW' | 'MODERATE' | 'HIGH';
 
 export interface SafetySignal extends BiotechRecord {

@@ -1,5 +1,5 @@
 import { canonicalJson, fnv1a } from '../events/hash';
-import { createCandidateDiscoveryReport, rankTherapeuticCandidate, type BiologicalEvidence, type BiologicalTarget, type CandidateDiscoveryReport, type CandidateRanking, type SafetySignal, type TherapeuticCandidate, type TherapeuticHypothesis } from '../biotechDiscoveryContract';
+import { createBindingMechanism, createCandidateDiscoveryReport, rankTherapeuticCandidate, type BiologicalEvidence, type BiologicalTarget, type CandidateDiscoveryReport, type CandidateRanking, type Mechanism, type SafetySignal, type TherapeuticCandidate, type TherapeuticHypothesis } from '../biotechDiscoveryContract';
 import { mapPinnedPubChemCaffeine, type PubChemCompoundRecord } from './pubchem';
 import chemblRecord from './chembl-activity-189031.json';
 import { mapPinnedPubChemCaffeineSafety } from './safety';
@@ -17,6 +17,7 @@ export interface ChEMBLCaffeineDiscovery {
   safety: SafetySignal;
   hypothesis: TherapeuticHypothesis;
   report: CandidateDiscoveryReport;
+  mechanism: Mechanism;
 }
 
 export interface ChEMBLBioactivityRecord {
@@ -134,6 +135,7 @@ export function mapPinnedChEMBLCaffeineA1Activity(): ChEMBLBioactivityRecord {
 export function buildPinnedChEMBLCaffeineDiscovery(): ChEMBLCaffeineDiscovery {
   const record = mapPinnedChEMBLCaffeineA1Activity();
   const safety = mapPinnedPubChemCaffeineSafety();
+  const mechanism = createBindingMechanism({ id: `mechanism:binding:${record.biologicalTarget.id}`, label: 'Caffeine–A1 binding interaction hypothesis', compoundLabel: 'Caffeine', target: record.biologicalTarget, provenance: record.biologicalEvidence.provenance[0]! });
   const candidate: TherapeuticCandidate = {
     kind: 'therapeutic-candidate',
     id: `candidate:${record.compoundId}:${record.biologicalTarget.id}`,
@@ -143,7 +145,7 @@ export function buildPinnedChEMBLCaffeineDiscovery(): ChEMBLCaffeineDiscovery {
     materialId: record.compoundId,
     compoundIds: [record.compoundId],
     targetIds: [record.biologicalTarget.id],
-    mechanismIds: [],
+    mechanismIds: [mechanism.id],
     supportingEvidenceIds: [record.biologicalEvidence.id],
     safetySignalIds: [safety.id],
     hypothesisIds: [`hypothesis:candidate:${record.compoundId}:${record.biologicalTarget.id}`],
@@ -165,7 +167,7 @@ export function buildPinnedChEMBLCaffeineDiscovery(): ChEMBLCaffeineDiscovery {
     claim: 'The pinned ChEMBL binding record supports research follow-up of the caffeine–A1 relationship; it does not establish mechanism, efficacy, therapeutic benefit or safety.',
     candidateId: candidate.id,
     targetIds: candidate.targetIds,
-    mechanismIds: [],
+    mechanismIds: [mechanism.id],
     supportingEvidenceIds: candidate.supportingEvidenceIds,
     safetySignalIds: [safety.id],
     provenance: [...record.biologicalEvidence.provenance, ...safety.provenance],
@@ -175,5 +177,5 @@ export function buildPinnedChEMBLCaffeineDiscovery(): ChEMBLCaffeineDiscovery {
     provenance: [...hypothesisBase.provenance, { ...record.biologicalEvidence.provenance[0], sourceId: record.biologicalEvidence.id, evidenceType: 'hypothesis derived from curated binding record', status: 'HYPOTHESIS' }],
   };
   const report = createCandidateDiscoveryReport({ candidate, hypothesis, uncertainty: ranking.uncertainty, ranking });
-  return { record, candidate, ranking, safety, hypothesis, report };
+  return { record, candidate, ranking, safety, hypothesis, report, mechanism };
 }

@@ -839,3 +839,24 @@ git diff --check: passed
 - **CURRENT STATUS:** candidate-specific discovery prompts now enter the same reviewed request boundary as other domains; biology remains `ENGINE_NOT_AVAILABLE`, `NOT_EXECUTED`, and no clinical efficacy is inferred.
 - **PARKED:** confirmation/execution and biological Evidence/Replay require an actual validated biological executor and independent assay data.
 - **NEXT LARGE GAP:** only proceed with another real, unblocked integration; otherwise maintain the biological executor blocker rather than inventing execution.
+
+## COMPLETED MAJOR BLOCK: Natural/Neuro mechanism boundary
+
+The existing real ChEMBL candidate graph now links caffeine, adenosine and theophylline to shared A1 binding-mechanism records. These records are explicitly `HYPOTHESIS`, retain source provenance, and state that an in-vitro binding record does not establish downstream signaling, therapeutic mechanism, clinical efficacy or safety. Candidate and hypothesis `mechanismIds` now point to the same reusable records; no second mechanism, evidence or ranking architecture was created.
+
+The Drug Discovery report card now exposes the mechanism status and boundary text to the user. This is a truthful Natural/Neuro workflow improvement: real compounds → real bioactivity/target → mechanism hypothesis → evidence/safety/ADME → ranking → validation path. It does not claim that natural origin is safe or that a candidate is a proven therapy.
+
+Validation completed:
+
+```text
+focused ChEMBL / adenosine / theophylline / biotech contract / Science Chat tests: passed
+npm run build: passed
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this block:** `ac98c0b`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT STATUS:** three source-backed candidates now have explicit, provenance-carrying HYPOTHESIS-level binding mechanisms and user-facing disclosure.
+- **PARKED:** downstream biological mechanism validation, biological execution, clinical efficacy and mechanistic causal inference remain `UNKNOWN`/`BLOCKED` pending independent assays and a validated executor.
+- **NEXT LARGE GAP:** no additional mechanistic claim is admissible from the currently pinned binding records; proceed only with another compatible real source or an unrelated high-value unblocked integration.

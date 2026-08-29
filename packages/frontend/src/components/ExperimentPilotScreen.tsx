@@ -37,6 +37,7 @@ import { track } from '../core/analytics';
 import { saveScientificEvidencePackToMemory } from '../core/scienceMemory';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
+import { analyzeExperimentResult } from '../core/experimentAnalysis';
 
 /**
  * PILOT UI — Science Chat → eksperyment → wynik → provenance → Scenario
@@ -489,6 +490,10 @@ export function ExperimentPilotScreen() {
               </div>
             ))}
           </dl>
+          <details className="settings-details" open>
+            <summary>Analiza wyniku</summary>
+            {analyzeExperimentResult(confirmed.run.result).map((block) => <section key={`${block.title}:${block.body}`}><strong>{block.title}</strong><p className="settings-hint">{block.body}</p></section>)}
+          </details>
           {confirmed.run.result.warnings.length > 0 && (
             <ul className="pilot-limitations">
               {confirmed.run.result.warnings.map((w, i) => <li key={i}>⚠ {w}</li>)}

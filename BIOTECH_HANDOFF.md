@@ -25,7 +25,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `22fd2f4` — `docs(core): verify protocol replay path`
 - `3579f64` — `docs(core): verify model request boundary`
 - `fe7491d` — `feat(core): unify scientific result report`
-- next checkpoint in this session — include confirmed Evidence Pack/A-B/Replay statuses in the same report
+- `7a9e016` — `feat(core): include evidence replay report status`
+- next checkpoint in this session — preserve report analysis in Experiment Pilot
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -175,9 +176,17 @@ Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
 
 Validation completed: targeted Science Chat/Experiment Fabric tests (109 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed Core capability: confirmed report analysis in Experiment Pilot
+
+The confirmed result view in Experiment Pilot now renders the same existing `analyzeExperimentResult` blocks used by Science Chat. This keeps summary, typed outputs, honest single-run analysis, warnings, provenance and route in one consistent user-facing flow after confirmation. Non-completed statuses remain blocked by the existing analysis helper. No second reporting system was created.
+
+Changed file: `packages/frontend/src/components/ExperimentPilotScreen.tsx`.
+
+Validation completed: targeted Pilot/Science Chat tests (7 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Proceed to the next high-value end-to-end consistency check: verify that the same canonical report semantics are preserved when a confirmed result is opened through World/3D and then revisited from Scientific Memory. Prefer a focused existing metadata projection; do not create a second report, Memory, Evidence or Replay system.
+Continue with the next high-value consistency gap: verify that the same canonical report semantics are preserved when a confirmed result is opened through World/3D and then revisited from Scientific Memory. Prefer a focused existing metadata projection; do not create a second report, Memory, Evidence or Replay system.
 
 ## Next large gaps
 

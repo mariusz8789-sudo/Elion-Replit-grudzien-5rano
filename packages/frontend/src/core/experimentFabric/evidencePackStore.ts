@@ -63,6 +63,9 @@ export function classifyStoredEvidencePack(value: unknown): StoredEvidencePackSt
 export function compareScientificEvidencePacks(reference: ScientificEvidencePack, replay: ScientificEvidencePack): ScientificEvidenceReplayVerdict {
   if (!isPack(reference) || !isPack(replay)) return 'BLOCKED';
   if (reference.runs.some((run) => run.status !== 'completed') || replay.runs.some((run) => run.status !== 'completed')) return 'BLOCKED';
+  if (reference.externalObservationComparison?.replay.status === 'BLOCKED' || replay.externalObservationComparison?.replay.status === 'BLOCKED') return 'BLOCKED';
+  if (reference.externalObservationComparison?.replay.status === 'DRIFT' || replay.externalObservationComparison?.replay.status === 'DRIFT') return 'DRIFT';
+  if (reference.externalObservationComparison?.replay.fingerprint !== replay.externalObservationComparison?.replay.fingerprint) return 'DRIFT';
   if (reference.protocol.protocolFingerprint !== replay.protocol.protocolFingerprint) return 'DRIFT';
   if (reference.runs.length !== replay.runs.length) return 'DRIFT';
   const referenceFingerprints = reference.runs.map((run) => run.provenance.runFingerprint);
@@ -77,5 +80,7 @@ export function compareScientificEvidencePacks(reference: ScientificEvidencePack
 export function getStoredEvidencePackReplayVerdict(pack: ScientificEvidencePack): ScientificEvidenceReplayVerdict {
   if (!isPack(pack)) return 'BLOCKED';
   if (pack.runCount <= 0 || pack.runs.length === 0 || pack.runs.some((run) => run.status !== 'completed') || pack.reproducibility.armsNotExecuted.length > 0) return 'BLOCKED';
+  if (pack.externalObservationComparison?.replay.status === 'BLOCKED') return 'BLOCKED';
+  if (pack.externalObservationComparison?.replay.status === 'DRIFT') return 'DRIFT';
   return pack.reproducibility.allArmsMatched ? 'MATCH' : 'DRIFT';
 }

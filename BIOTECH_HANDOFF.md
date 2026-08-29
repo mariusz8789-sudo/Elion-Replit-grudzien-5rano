@@ -510,3 +510,24 @@ Focused and full validation passed. Build retains only the existing Vite large-c
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
 - **NEXT LARGE GAP:** decide and implement the existing Evidence Pack replay/export treatment for external observations only if its semantics remain distinct from model-run arms; otherwise keep the comparison as a source-backed validation attachment and move to the next high-value Genesis integration.
+
+## Completed Core capability: Evidence Pack replay honors external-observation integrity
+
+The existing `compareScientificEvidencePacks` and `getStoredEvidencePackReplayVerdict` now inspect the structured external-observation replay result. A blocked external fixture yields `BLOCKED`, a source or transformation drift yields `DRIFT`, and an overall Evidence Pack cannot be reported as `MATCH` when its pinned external observation is not intact. Protocol arm replay semantics remain unchanged; no second replay system was created.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/experimentFabric.test.ts src/__tests__/evidenceReplayIntegration.test.ts src/__tests__/EvidenceReplayPanel.test.tsx src/__tests__/nuclearAme2020.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused and full validation passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `73ebf34`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** add dedicated regression fixtures for Evidence Pack external-observation `MATCH`/`DRIFT`/`BLOCKED` verdicts, then continue the core end-to-end loop or park if the remaining semantics require a new real source.

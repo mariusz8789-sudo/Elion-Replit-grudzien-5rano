@@ -961,3 +961,25 @@ Chromium mobile smoke: 27 routes, 13 laboratories, 242 interactions, zero runtim
 - **CURRENT STATUS:** ADMIN-only disclosure boundary is implemented for the existing source-backed Natural Functional Replacement workflow.
 - **PARKED:** global admin identity/role is not present in the current User contract; biological executor, independent assays, clinical efficacy, full ADME/Tox and unsupported natural-substitute claims remain blocked/unknown.
 - **NEXT GAP:** if a global ADMIN identity is required, extend the backend-auth role contract rather than relying on client-only role inference; otherwise proceed to the next reachable authoritative source-backed profile integration.
+
+## COMPLETED ADMIN AUDIT BLOCK: request provenance for comparison persistence
+
+The admin-only Natural Functional Replacement save action now records a lightweight local audit entry through the existing Scientific Memory storage boundary. Each entry carries a generated request ID, ISO timestamp, authenticated user ID, action name and workflow provenance. Scientific Memory remains local-first; this is an application audit trail for the current browser, not a claim of tamper-proof or server-authoritative compliance logging.
+
+Changed files:
+
+- `packages/frontend/src/core/scienceMemory.ts`
+- `packages/frontend/src/components/DrugDiscoveryScreen.tsx`
+
+Validation completed:
+
+```text
+focused scienceMemory / ChEMBL / biotech tests: passed
+npm run build: passed, including tsc -b; existing Vite large-chunk warning remains
+npm run lint: passed
+git diff --check: passed
+```
+
+- **CURRENT STATUS:** admin permission boundary plus request/timestamp/user/action provenance now exists for the source-backed comparison persistence action.
+- **PARKED:** server-authoritative global ADMIN role and tamper-resistant audit storage require a backend auth/schema decision; biological execution, independent assays, efficacy and full ADME/Tox remain blocked/unknown.
+- **NEXT GAP:** if server-level auditability is required, implement it in backend auth/persistence with explicit migration and RBAC tests; otherwise continue with reachable source-backed reference-profile expansion.

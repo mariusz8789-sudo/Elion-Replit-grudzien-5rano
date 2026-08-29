@@ -103,7 +103,34 @@ export interface SavedExperiment {
 }
 
 const KEY = 'science-memory/v1';
+const AUDIT_KEY = 'science-memory/admin-audit/v1';
 const MAX_TOTAL = 100;
+
+export interface BiotechAdminAuditEntry {
+  requestId: string;
+  timestamp: string;
+  userId: string;
+  action: string;
+  provenance: string;
+}
+
+function newRequestId(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `request-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function recordBiotechAdminAudit(input: { userId: string; action: string; provenance: string }): BiotechAdminAuditEntry {
+  const entry: BiotechAdminAuditEntry = { requestId: newRequestId(), timestamp: new Date().toISOString(), ...input };
+  const existing = readJSON<BiotechAdminAuditEntry[]>(AUDIT_KEY, []);
+  writeJSON(AUDIT_KEY, [...(Array.isArray(existing) ? existing : []), entry].slice(-MAX_TOTAL));
+  return entry;
+}
+
+export function listBiotechAdminAudit(): readonly BiotechAdminAuditEntry[] {
+  const entries = readJSON<BiotechAdminAuditEntry[]>(AUDIT_KEY, []);
+  return Array.isArray(entries) ? entries.filter((entry) => nonEmptyString(entry.requestId) && nonEmptyString(entry.timestamp) && nonEmptyString(entry.userId) && nonEmptyString(entry.action) && nonEmptyString(entry.provenance)) : [];
+}
 
 /** Deterministyczny, synchroniczny odcisk treści (FNV-1a 32-bit → hex). Nie kryptograficzny. */
 export function contentHash(input: { labId: string; experimentId: string; params: SimParams }): string {

@@ -28,7 +28,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `7a9e016` — `feat(core): include evidence replay report status`
 - `4fd50e6` — `feat(core): keep pilot report analysis consistent`
 - `1c4655f` — `feat(core): preserve saved result routes`
-- next checkpoint in this session — preserve result summary in World/3D handoff
+- `83d41cc` — `feat(core): carry result summary into world`
+- next checkpoint in this session — choose source-backed drug-discovery expansion or park it if it requires contract sprawl
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -202,9 +203,9 @@ Changed files: `packages/frontend/src/core/experimentFabric/worldHandoff.ts`, `p
 
 Validation completed: targeted World/Fabric tests (109 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
-## NEXT PRIORITY — main Genesis Core
+## NEXT PRIORITY — real drug-discovery workflow
 
-Continue with the next large, high-value workflow: complete the drug-discovery research path using existing PubChem/ChEMBL facts, explainable ranking and explicit `PREDICTION`/`UNKNOWN` boundaries. Do not add clinical efficacy or safety claims without real source-backed evidence; keep biological execution `NOT_EXECUTED`/`BLOCKED` where required.
+The Core report and World/3D continuity are now connected. The next large area is real drug discovery: reuse the pinned PubChem/ChEMBL facts, expose molecular properties only from the existing pinned source, preserve explainable ranking and explicit `PREDICTION`/`UNKNOWN` boundaries, and keep biological execution `NOT_EXECUTED`/`BLOCKED`. Do not expand the Compound contract or add a new source unless it directly enables a user-facing capability; park the item if it becomes contract sprawl or requires unsupported safety/efficacy claims.
 
 ## Next large gaps
 

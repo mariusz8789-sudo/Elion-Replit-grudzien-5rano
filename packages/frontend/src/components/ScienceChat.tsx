@@ -91,6 +91,9 @@ export function formatFabricRun(run: ExperimentRun): string {
   const biotechSource = run.result.biologicalEvidence?.provenance[0]
     ? `\nŹródło evidence: ${run.result.biologicalEvidence.provenance[0].source} / ${run.result.biologicalEvidence.provenance[0].sourceId}${run.result.biologicalEvidence.provenance[0].sourceVersion ? ` · ${run.result.biologicalEvidence.provenance[0].sourceVersion}` : ''}${run.result.biologicalEvidence.provenance[0].sourceUrl ? ` · ${run.result.biologicalEvidence.provenance[0].sourceUrl}` : ''}.`
     : '';
+  const safety = run.request.domainId === 'biotechnology'
+    ? '\nSafety / ADME-Tox: UNKNOWN — brak przypiętego źródła safety; binding record nie ustanawia bezpieczeństwa.'
+    : '';
   const analysis = analyzeExperimentResult(run.result)
     .map((block) => `\nAnaliza — ${block.title}: ${block.body}`)
     .join('');
@@ -104,7 +107,7 @@ export function formatFabricRun(run: ExperimentRun): string {
   const reportHeader = `SCIENTIFIC RESULT REPORT\nPytanie: ${run.request.sourceText}\nModel: ${run.request.modelId ?? 'nie wybrano'}\nWykonanie: ${run.result.status} / ${run.provenance.resultOrigin}\nKlasyfikacja epistemiczna: ${epistemicReading}`;
   const evidence = run.result.biologicalEvidence ? '\nEvidence: LITERATURE_SUPPORTED binding record; nie jest computational Evidence Pack.' : '\nEvidence: status wynika z istniejącego handoffu/protokołu; pojedynczy run nie tworzy Evidence Pack.';
   const replay = '\nReplay: nieustanowiony dla tego pojedynczego wyniku; wymaga istniejącej capsule/protocol semantics.';
-  return `${reportHeader}\nWynik: ${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}${biotechSource}${analysis}${evidence}${replay}\nProvenance: ${run.provenance.runFingerprint}.`;
+  return `${reportHeader}\nWynik: ${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}${biotechSource}${safety}${analysis}${evidence}${replay}\nProvenance: ${run.provenance.runFingerprint}.`;
 }
 
 function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule }) {

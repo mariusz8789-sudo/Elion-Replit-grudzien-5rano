@@ -30,7 +30,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `1c4655f` — `feat(core): preserve saved result routes`
 - `83d41cc` — `feat(core): carry result summary into world`
 - `9b8a772` — `feat(core): preserve world result continuity`
-- next checkpoint in this session — expose pinned PubChem molecular properties in ChEMBL drug-discovery workflow
+- `1f44a79` — `feat(drug-discovery): expose pinned molecular properties`
+- next checkpoint in this session — expose explicit Safety UNKNOWN boundary in drug-discovery report
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -212,9 +213,17 @@ Changed files: `packages/frontend/src/core/biotechData/pubchem.ts`, `packages/fr
 
 Validation completed: targeted PubChem/ChEMBL and Science Chat tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed drug-discovery capability: explicit Safety UNKNOWN boundary
+
+The existing user-facing biotech report now states `Safety / ADME-Tox: UNKNOWN` when the result is biotechnology knowledge-only. The report explicitly says that no source-backed safety record is attached and that the ChEMBL binding record does not establish safety. No arbitrary safety score or unsupported toxicity claim was added.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation completed: targeted ChEMBL/Science Chat tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — real drug-discovery workflow
 
-Next large block: safety/ADME-Tox. First inspect whether an existing public, source-backed safety record can be pinned cheaply. Do not infer safety from PubChem identity or ChEMBL binding; if no semantically valid source exists, park safety rather than inventing a score or claim, then continue to candidate comparison/prediction boundaries.
+Next large block: candidate comparison and validation path. Reuse the existing explainable ranking and hypothesis/request contracts; expose ranking rationale, uncertainty and `NOT_EXECUTED`/`BLOCKED` experiment status in the same discovery report. Do not infer safety from PubChem identity or ChEMBL binding, and do not add clinical efficacy claims.
 
 ## Next large gaps
 

@@ -1217,3 +1217,10 @@ Regression validation passed: campaign multi-fidelity suite `7 passed, 1 skipped
 ## FINAL VALIDATION: Chromium UI
 
 The first desktop smoke invocation was invalid because no server was listening on its default `127.0.0.1:8080`; it produced only `ERR_CONNECTION_REFUSED`. After starting the built Genesis backend/static server on port 8080, the same smoke suite passed: 27 routes plus 13 laboratories, 216 interactions, and zero runtime errors. The unified report surface is therefore build-validated and covered by the live desktop Chromium smoke environment.
+
+
+## NATURAL DISCOVERY CHECKPOINT: Bounded PubChem Retrieval
+
+The ADMIN Natural Functional Replacement flow now performs a bounded parallel retrieval against PubChem PUG for the closed, source-backed natural-product identity catalog. Each response must contain SMILES, InChIKey, molecular formula, and molecular weight; incomplete or failed records are omitted, never synthesized. The resolver returns `BLOCKED` when no valid records are retrieved and does not silently fall back to pinned or fictional records. Valid retrieved records are mapped into the existing candidate/evidence/hypothesis/ranking contracts, preserving the existing distinction between natural origin, bioactivity, ADME, toxicity, safety, and clinical evidence.
+
+A deterministic Vitest contract test covers schema admission and source failure behavior. Validation passed: natural replacement tests `4 passed`; frontend production build passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 216 interactions, and zero runtime errors. A live PubChem probe confirmed the source is reachable; records lacking a required canonical SMILES field are correctly rejected by the adapter.

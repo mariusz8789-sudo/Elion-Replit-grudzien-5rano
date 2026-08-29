@@ -1058,3 +1058,14 @@ Focused resolver tests, build/typecheck, lint and diff-check pass after this blo
 A bounded probe for additional ChEMBL molecule properties/quantitative ADME fields timed out during the single allowed attempt. No properties were admitted, no cached or inferred values were used, and the stable probe script was restored. This source path is parked rather than retried repeatedly.
 
 The next available large GAP is the existing model-observation user-facing integration: AME2020 already has prediction, independent observation, comparison, metrics, provenance, evidence, memory and replay contracts, so remaining work should target any missing persistent/report handoff rather than another source probe. If that path is already complete, the remaining quantitative ADME expansion requires a responsive authoritative endpoint.
+
+## USER-FACING REPORT HANDOFF CHECKPOINT
+
+The admin Natural Functional Replacement UI now renders every report returned by the bounded resolver, not only the three original pinned reports. The active resolved report set is also the exact set persisted through the existing `saveBiotechDiscoveryComparisonToMemory` path, with the audit provenance count reflecting the number of resolved ChEMBL/PubChem/DailyMed reports. This removes the manual-transfer gap between ADMIN input, comparison/report output and Scientific Memory while preserving the existing source and epistemic boundaries.
+
+Unknown inputs still return BLOCKED and persist nothing. Identity-only reports retain UNKNOWN target/activity/safety/ADME status; source-backed binding records remain research-priority candidates rather than efficacy claims.
+
+Validation after the UI integration: focused naturalReplacement and biotech contract tests pass; full suite is 271 passed, 40 skipped, 0 failed; build/typecheck passed; lint passed; git diff --check passed. The existing production-style desktop/mobile smoke remains the latest valid UI smoke checkpoint.
+
+- **CURRENT STATUS:** resolved report count is now surfaced and persisted as one coherent set through the existing Memory and audit path.
+- **NEXT GAP:** release smoke on the changed admin flow, then continue to the next available large GAP; do not fabricate additional external evidence.

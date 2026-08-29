@@ -26,7 +26,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `3579f64` — `docs(core): verify model request boundary`
 - `fe7491d` — `feat(core): unify scientific result report`
 - `7a9e016` — `feat(core): include evidence replay report status`
-- next checkpoint in this session — preserve report analysis in Experiment Pilot
+- `4fd50e6` — `feat(core): keep pilot report analysis consistent`
+- next checkpoint in this session — preserve result route when reopening from Scientific Memory
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -184,9 +185,17 @@ Changed file: `packages/frontend/src/components/ExperimentPilotScreen.tsx`.
 
 Validation completed: targeted Pilot/Science Chat tests (7 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed Core capability: saved result route preserved across Memory
+
+Scientific Memory now persists the existing `ExperimentRun.result.route` for canonical Fabric runs. Reopening a saved lab result uses the recorded lab route; hypothetical visualization uses its recorded hash; ephemeral `live-world` records are sent to the existing Pilot with an explicit notice instead of incorrectly opening a lab, because the session-bound World instance cannot be reconstructed from local memory alone. Legacy records without route retain the prior fallback. The UI displays the route kind.
+
+Changed files: `packages/frontend/src/core/scienceMemory.ts`, `packages/frontend/src/components/ScientificMemoryScreen.tsx`, `packages/frontend/src/__tests__/scienceMemoryFabric.test.ts`.
+
+Validation completed: targeted Memory tests (18 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Continue with the next high-value consistency gap: verify that the same canonical report semantics are preserved when a confirmed result is opened through World/3D and then revisited from Scientific Memory. Prefer a focused existing metadata projection; do not create a second report, Memory, Evidence or Replay system.
+Continue with the next end-to-end consistency gap: preserve the same canonical report metadata when a confirmed result enters World/3D and then returns to Scientific Memory. Prefer a focused existing metadata projection; do not create a second report, Memory, Evidence or Replay system.
 
 ## Next large gaps
 

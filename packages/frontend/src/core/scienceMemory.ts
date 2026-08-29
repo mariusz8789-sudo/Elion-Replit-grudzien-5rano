@@ -1,7 +1,7 @@
 import { readJSON, writeJSON } from './storage';
 import type { HonestyLevel, SimParams } from './types';
 import { biotechScientificFingerprint, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateDiscoveryReport, type CandidateRanking, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
-import type { ExperimentOutputValue, ExperimentRun } from './experimentFabric/types';
+import type { ExperimentOutputValue, ExperimentRoute, ExperimentRun } from './experimentFabric/types';
 import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 
 /**
@@ -30,6 +30,7 @@ export interface SavedExperimentExecution {
   modelId?: string;
   engine?: string;
   modelVersion?: string;
+  route?: ExperimentRoute;
 }
 
 export interface SavedExperimentAnalysisBlock {
@@ -335,6 +336,7 @@ export function saveExperimentRunToMemory(run: ExperimentRun): SavedExperiment {
       modelId: run.request.modelId,
       engine: run.plan.engine ?? undefined,
       modelVersion: run.plan.modelVersion ?? undefined,
+      route: run.result.route,
     },
     analysis: [
       { title: 'Genesis result', body: run.result.summary, kind: 'fabric-result' },

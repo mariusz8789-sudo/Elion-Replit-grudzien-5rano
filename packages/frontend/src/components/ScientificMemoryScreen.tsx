@@ -35,6 +35,21 @@ export function ScientificMemoryScreen() {
   const countLabel = useMemo(() => `${records.length} ${records.length === 1 ? 'zapis' : 'zapisów'}`, [records.length]);
 
   const openRecord = (record: SavedExperiment) => {
+    const route = record.execution?.route;
+    if (route?.kind === 'hypothetical-visualization') {
+      window.location.hash = route.hash;
+      return;
+    }
+    if (route?.kind === 'live-world') {
+      setNotice('Zapisany live-world jest wskaźnikiem historycznego runu; sesyjna instancja wygasła. Otwórz Pilota, aby wykonać jawny rerun.');
+      window.location.hash = '#/pilot';
+      return;
+    }
+    if (route?.kind === 'lab') {
+      setPendingScenario(route.labId, record.params, route.experimentId);
+      window.location.hash = `#/lab/${route.labId}`;
+      return;
+    }
     setPendingScenario(record.labId, record.params, record.experimentId);
     window.location.hash = `#/lab/${record.labId}`;
   };
@@ -82,6 +97,7 @@ export function ScientificMemoryScreen() {
                 <div className="stat-row"><span>Honesty</span><span className="val">{record.honesty}</span></div>
                 <div className="stat-row"><span>Fingerprint treści</span><span className="val mono">#{record.contentHash}</span></div>
                 <div className="stat-row"><span>Parametry</span><span className="val">{Object.keys(record.params).length}</span></div>
+                {record.execution?.route && <div className="stat-row"><span>Route</span><span className="val mono">{record.execution.route.kind}</span></div>}
                 {record.evidencePackId && <div className="stat-row"><span>Evidence Pack</span><span className="val mono">{record.evidencePackId}</span></div>}
                 {record.replayIdentity && <div className="stat-row"><span>Replay identity</span><span className="val mono">{record.replayIdentity.capsuleId} · {record.replayIdentity.planId} · {record.replayIdentity.confirmationId}</span></div>}
               </div>

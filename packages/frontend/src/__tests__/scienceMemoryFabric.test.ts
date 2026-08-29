@@ -32,6 +32,7 @@ describe('Experiment Fabric to Scientific Memory', () => {
       runFingerprint: run.provenance.runFingerprint,
       resultOrigin: 'real-engine',
       modelId: run.request.modelId,
+      route: run.result.route,
     });
     expect(saved.params).toEqual(run.request.parameters);
     expect(saved.observations).toEqual(run.result.outputs);

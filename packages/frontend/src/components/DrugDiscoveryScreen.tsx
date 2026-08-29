@@ -51,7 +51,6 @@ function DrugWorkspace() {
   const adenosineDiscovery = buildPinnedChEMBLAdenosineDiscovery();
   const theophyllineDiscovery = buildPinnedChEMBLTheophyllineDiscovery();
   const pinnedCompound = mapPinnedPubChemCaffeine();
-  const pinnedComparison = compareCandidateDiscoveryReports([pinnedDiscovery.report, adenosineDiscovery.report, theophyllineDiscovery.report]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -66,6 +65,7 @@ function DrugWorkspace() {
   const [replacementResult, setReplacementResult] = useState<NaturalFunctionalReplacementResult | null>(null);
   const canUseAdminWorkflow = projects.some((project) => project.role === 'owner' || project.role === 'admin');
   const activeReplacementReports = replacementResult?.reports.length ? replacementResult.reports : [pinnedDiscovery.report, adenosineDiscovery.report, theophyllineDiscovery.report];
+  const activeReplacementComparison = compareCandidateDiscoveryReports(activeReplacementReports);
 
   const [targetName, setTargetName] = useState('');
   const [targetIndication, setTargetIndication] = useState('');
@@ -172,7 +172,7 @@ function DrugWorkspace() {
           <div className="cde-result"><span className="cde-result-label">Clinical efficacy</span><span className="cde-result-actual">{pinnedDiscovery.report.clinicalEfficacy}</span><span className="cde-result-bound">no clinical data in this workflow</span></div>
           <div className="cde-result"><span className="cde-result-label">Validation path</span><span className="cde-result-actual">{pinnedDiscovery.report.experimentRequestId ?? 'request unavailable'}</span><span className="cde-result-bound">NOT_EXECUTED / BLOCKED · independent biological assay required</span></div>
           <div className="cde-result"><span className="cde-result-label">Research priority</span><span className="cde-result-actual">{pinnedDiscovery.ranking.score.toFixed(4)}</span><span className="cde-result-bound">PREDICTION · nie efficacy/probability</span></div>
-          <div className="cde-result"><span className="cde-result-label">Comparison</span><span className="cde-result-actual">{pinnedComparison.rows.length} source-backed candidates</span><span className="cde-result-bound">research-priority ordering only · not efficacy</span></div>
+          <div className="cde-result"><span className="cde-result-label">Comparison</span><span className="cde-result-actual">{activeReplacementComparison.rows.length} active resolved candidates</span><span className="cde-result-bound">deterministic research-priority ordering only · not efficacy</span></div>
           <div className="cde-result"><span className="cde-result-label">Adenosine comparator</span><span className="cde-result-actual">{adenosineDiscovery.record.activity.type} {adenosineDiscovery.record.activity.relation} {adenosineDiscovery.record.activity.value} {adenosineDiscovery.record.activity.units}</span><span className="cde-result-bound">{adenosineDiscovery.record.activity.assayId} · ChEMBL + DailyMed label · clinical efficacy UNKNOWN</span></div>
           <div className="cde-result"><span className="cde-result-label">Theophylline comparator</span><span className="cde-result-actual">{theophyllineDiscovery.record.activity.type} {theophyllineDiscovery.record.activity.relation} {theophyllineDiscovery.record.activity.value} {theophyllineDiscovery.record.activity.units}</span><span className="cde-result-bound">{theophyllineDiscovery.record.activity.assayId} · ChEMBL + DailyMed label · clinical efficacy UNKNOWN</span></div>
         </div>

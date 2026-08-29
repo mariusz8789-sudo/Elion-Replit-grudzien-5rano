@@ -1083,3 +1083,11 @@ The existing discovery E2E runner was blocked by a stale environment-specific Pl
 - **CURRENT STATUS:** AME2020 observation contracts plus the broader discovery engine have a reproducible browser verification path.
 - **PARKED:** additional compatible external observations still require independent authoritative measurements; no unrelated USGS or model-generated data is admitted.
 - **NEXT LARGE GAP:** continue with the strongest remaining Drug Discovery/Natural-Neuro capability that is implementable without a new source, prioritizing report completeness, explicit ADME/Tox boundaries and comparison explainability.
+
+## ACTIVE COMPARISON / E2E CHECKPOINT
+
+Drug Discovery now computes comparison count from the active resolved report set rather than the original three pinned reports. After an admin query resolves additional real reports, the UI shows their report IDs, deterministic research-priority score and epistemic status, and the same active set is persisted to Scientific Memory. This closes the report/comparison handoff gap without changing scientific claims.
+
+The existing discovery E2E runner was also made environment-portable by using the repository Playwright package and available system Chromium. `npm run e2e:discovery` passed all Node ↔ Chromium fingerprint and integrity checks with zero browser runtime errors.
+
+Targeted biotech tests passed (11 tests), build/typecheck passed, lint passed and `git diff --check` passed. Fresh UI smoke is the remaining checkpoint before push.

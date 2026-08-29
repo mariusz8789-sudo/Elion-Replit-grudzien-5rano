@@ -1007,3 +1007,12 @@ git diff --check: passed
 - **CURRENT STATUS:** ADMIN input → bounded reference profile → real pinned candidate set → existing comparison/ranking/evidence/memory/replay path is wired.
 - **PARKED:** arbitrary live natural-product search, global server-authoritative ADMIN role, biological execution, independent assays, clinical efficacy, complete ADME/Tox and unsupported replacement claims.
 - **NEXT GAP:** add live source expansion only when an authoritative endpoint is reachable and a deterministic selection policy is declared; otherwise continue with another integration break rather than inventing candidates.
+
+## RELEASE VERIFICATION AFTER REFERENCE-PROFILE BLOCK
+
+The existing production-style smoke harness passed after the resolver/UI block: desktop and mobile each covered 27 routes, 13 laboratories and 242 interactions with zero runtime errors. The attempted auxiliary backend start reported `EADDRINUSE` because port 8080 was already occupied; the smoke harness nevertheless completed against the existing backend process. This is an environment/process collision, not an application failure. No workaround or duplicate backend was added.
+
+- **CURRENT HEAD:** pending documentation checkpoint commit
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **WORKING TREE:** clean after the documentation commit below
+- **NEXT GAP:** reachable authoritative natural-product source expansion with a declared selection policy; otherwise preserve the bounded pinned-profile boundary.

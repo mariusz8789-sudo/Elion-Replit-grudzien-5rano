@@ -416,3 +416,31 @@ Focused tests: 115 passed. Full test suite, build, lint and diff check passed. B
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
 - **NEXT LARGE GAP:** add a no-network replay verifier for the structured external-observation fixture and expose `MATCH / DRIFT / BLOCKED` for source-integrity changes without claiming a fresh measurement or calibrated accuracy.
+
+## Completed Core capability: no-network AME2020 replay integrity
+
+The existing AME2020 observation adapter now exposes `replayAme2020ObservationFixture`, which verifies the pinned raw SHA-256, transformation identity, explicit no-network replay declaration and exact admitted observation records. It returns `MATCH` for the unchanged fixture, `DRIFT` for changed source values or transformation identity, and `BLOCKED` when the replay input is empty or requests a network source. The verifier is an integrity boundary, not a claim of fresh measurement or model calibration.
+
+The structured comparison now carries this replay result through the existing Evidence Pack serialization and Scientific Memory projection. Existing arm replay verdicts and rerun actions remain unchanged.
+
+Changed file:
+
+- `packages/frontend/src/core/observation/nuclearAme2020.ts`
+- `packages/frontend/src/__tests__/nuclearAme2020.test.ts`
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/nuclearAme2020.test.ts src/__tests__/experimentFabric.test.ts src/__tests__/scienceMemoryFabric.test.ts src/__tests__/scienceChatFabricFormat.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused and full validation passed. The AME2020 tests now cover MATCH, DRIFT and BLOCKED replay outcomes. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `cd436ca`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** complete the user-facing comparison/replay disclosure in the existing Experiment Pilot result boundary, then evaluate whether the preregistered AME2020 observation set can be expanded without weakening source semantics. Calibration remains `INSUFFICIENT_DATA`.

@@ -8,6 +8,13 @@ export const AME2020_TRANSFORM_VERSION = '1.0.0';
 
 export type NuclearObservationStatus = 'MATCH' | 'DRIFT' | 'INCONCLUSIVE';
 export type CalibrationStatus = 'INSUFFICIENT_DATA' | 'AVAILABLE';
+export type Ame2020ReplayStatus = 'MATCH' | 'DRIFT' | 'BLOCKED';
+
+export interface Ame2020ReplayResult {
+  readonly status: Ame2020ReplayStatus;
+  readonly reason: string;
+  readonly fingerprint: string;
+}
 
 export interface Ame2020Observation {
   readonly nuclide: string;
@@ -48,6 +55,7 @@ export interface Ame2020Comparison {
     readonly status: CalibrationStatus;
     readonly reason: string;
   };
+  readonly replay: Ame2020ReplayResult;
   readonly provenance: {
     readonly sourceUrl: string;
     readonly rawPayloadSha256: string;
@@ -66,6 +74,25 @@ export const AME2020_OBSERVATIONS: readonly Ame2020Observation[] = [
 ] as const;
 
 const DEFAULT_TOLERANCE_MEV_PER_NUCLEON = 0.05;
+
+export function replayAme2020ObservationFixture(
+  observations: readonly Ame2020Observation[],
+  provenance: Pick<Ame2020Comparison['provenance'], 'rawPayloadSha256' | 'transformId' | 'transformVersion' | 'replayInput'>,
+): Ame2020ReplayResult {
+  if (observations.length === 0 || !provenance.replayInput.includes('no network refetch')) {
+    return { status: 'BLOCKED', reason: 'Replay requires a non-empty pinned fixture and an explicit no-network replay declaration.', fingerprint: fnv1a(canonicalJson({ observations, provenance })) };
+  }
+  if (provenance.rawPayloadSha256 !== AME2020_RAW_SHA256 || provenance.transformId !== AME2020_TRANSFORM_ID || provenance.transformVersion !== AME2020_TRANSFORM_VERSION) {
+    return { status: 'DRIFT', reason: 'Pinned raw payload or transformation identity differs from the admitted AME2020 fixture.', fingerprint: fnv1a(canonicalJson({ observations, provenance })) };
+  }
+  const expected = AME2020_OBSERVATIONS;
+  const same = observations.length === expected.length && observations.every((observation, index) => canonicalJson(observation) === canonicalJson(expected[index]));
+  return {
+    status: same ? 'MATCH' : 'DRIFT',
+    reason: same ? 'Pinned AME2020 observations and transformation identity match without network access.' : 'Observation records differ from the pinned AME2020 admission fixture.',
+    fingerprint: fnv1a(canonicalJson({ observations, provenance })),
+  };
+}
 
 export function compareNuclearObservation(
   observation: Ame2020Observation,
@@ -120,6 +147,9 @@ export function compareAme2020Observations(
   const errors = comparisons.map((comparison) => comparison.absoluteError);
   const meanAbsoluteError = errors.reduce((sum, error) => sum + error, 0) / errors.length;
   const rootMeanSquareError = Math.sqrt(errors.reduce((sum, error) => sum + error ** 2, 0) / errors.length);
+  const calibration = observations.length >= 10
+    ? { status: 'AVAILABLE' as const, reason: 'At least ten preregistered observations are available for a calibration analysis.' }
+    : { status: 'INSUFFICIENT_DATA' as const, reason: `Only ${observations.length} preregistered observations are available; no calibrated accuracy percentage is asserted.` };
   const provenance = {
     sourceUrl: AME2020_SOURCE_URL,
     rawPayloadSha256: AME2020_RAW_SHA256,
@@ -127,9 +157,7 @@ export function compareAme2020Observations(
     transformVersion: AME2020_TRANSFORM_VERSION,
     replayInput: 'Pinned docs/evidence/ame2020/mass_1.mas20.txt only; no network refetch permitted',
   } as const;
-  const calibration = observations.length >= 10
-    ? { status: 'AVAILABLE' as const, reason: 'At least ten preregistered observations are available for a calibration analysis.' }
-    : { status: 'INSUFFICIENT_DATA' as const, reason: `Only ${observations.length} preregistered observations are available; no calibrated accuracy percentage is asserted.` };
+  const replay = replayAme2020ObservationFixture(observations, provenance);
   return {
     fixtureId: 'ame2020-nuclear-semf-admission',
     modelId: 'nuclear-semf',
@@ -139,6 +167,7 @@ export function compareAme2020Observations(
     meanAbsoluteError,
     rootMeanSquareError,
     calibration,
+    replay,
     provenance,
     fingerprint: fnv1a(canonicalJson({ comparisons, provenance, calibration })),
   };

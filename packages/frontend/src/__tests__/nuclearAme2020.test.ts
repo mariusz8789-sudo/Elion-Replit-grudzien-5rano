@@ -4,6 +4,7 @@ import {
   AME2020_RAW_SHA256,
   compareAme2020Observations,
   compareNuclearObservation,
+  replayAme2020ObservationFixture,
 } from '../core/observation/nuclearAme2020';
 
 
@@ -48,5 +49,20 @@ describe('AME2020 nuclear SEMF observation admission', () => {
 
     expect(estimated.status).toBe('INCONCLUSIVE');
     expect(estimated.reason).toContain('estimated');
+  });
+
+  it('replays the pinned fixture without network access and detects integrity drift', () => {
+    const comparison = compareAme2020Observations();
+    const match = replayAme2020ObservationFixture(AME2020_OBSERVATIONS, comparison.provenance);
+    const drift = replayAme2020ObservationFixture(
+      [{ ...AME2020_OBSERVATIONS[0], bindingEnergyPerNucleonMeV: AME2020_OBSERVATIONS[0].bindingEnergyPerNucleonMeV + 0.001 }, ...AME2020_OBSERVATIONS.slice(1)],
+      comparison.provenance,
+    );
+    const blocked = replayAme2020ObservationFixture(AME2020_OBSERVATIONS, { ...comparison.provenance, replayInput: 'network source' });
+
+    expect(match.status).toBe('MATCH');
+    expect(match.reason).toContain('without network access');
+    expect(drift.status).toBe('DRIFT');
+    expect(blocked.status).toBe('BLOCKED');
   });
 });

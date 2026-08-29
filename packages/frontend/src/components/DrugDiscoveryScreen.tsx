@@ -59,6 +59,7 @@ function DrugWorkspace() {
   const [ranking, setRanking] = useState<RankedCandidate[]>([]);
   const [passport, setPassport] = useState<CandidatePassport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const canUseAdminWorkflow = projects.some((project) => project.role === 'owner' || project.role === 'admin');
 
   const [targetName, setTargetName] = useState('');
   const [targetIndication, setTargetIndication] = useState('');
@@ -137,7 +138,9 @@ function DrugWorkspace() {
         {error && <div className="account-error" role="alert">{error}</div>}
       </section>
 
-      <section className="settings-section">
+      {canUseAdminWorkflow ? <section className="settings-section">
+        <h2>Natural Functional Replacement · ADMIN</h2>
+        <p className="settings-hint">Granica uprawnień: workflow source-backed jest widoczny wyłącznie dla owner/admin projektu. Dane są read-only; ranking oznacza priorytet badań, nie skuteczność ani zamiennik terapeutyczny.</p>
         <h2>Źródłowy punkt odniesienia · pinned record</h2>
         <p className="settings-hint">
           To jest read-only rekord z PubChem + ChEMBL, niezależny od kandydatów zapisanych w projekcie. Status wiedzy: `knowledge_only`; nie wykonano eksperymentu biologicznego.
@@ -160,7 +163,10 @@ function DrugWorkspace() {
         </div>
         <button className="chip-btn primary" type="button" onClick={() => { saveBiotechDiscoveryComparisonToMemory([pinnedDiscovery.report, adenosineDiscovery.report, theophyllineDiscovery.report]); window.location.hash = '#/memory'; }}>Zapisz porównanie w Scientific Memory</button>
         <p className="settings-hint">Provenance: <a href={pinnedDiscovery.report.provenance[0]?.sourceUrl ?? '#'} target="_blank" rel="noreferrer">ChEMBL / PubChem source records</a>. Safety signal i toksykologia pozostają osobnymi, source-backed statusami.</p>
-      </section>
+      </section> : <section className="settings-section" role="status">
+        <h2>Natural Functional Replacement · ADMIN</h2>
+        <p className="settings-hint">Brak uprawnień owner/admin dla projektu. Zaawansowany workflow pozostaje ukryty; nie wykonano wyszukiwania, rankingu ani walidacji biologicznej.</p>
+      </section>}
 
       <section className="settings-section">
         <h2>Cel biologiczny</h2>

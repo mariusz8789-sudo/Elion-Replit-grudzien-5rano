@@ -935,3 +935,29 @@ Production-style verification used the existing backend on port 8080. `/api/heal
 - **COMPLETED:** saved biotech comparison replay-integrity disclosure; blocked Science Chat biotech request → existing Drug Discovery workspace handoff
 - **PARKED:** biological executor, independent assays, clinical efficacy, complete ADME/Tox, unsupported Natural/Neuro causal claims and fabricated observations
 - **NEXT GAP:** continue only with another confirmed end-to-end break or reachable authoritative source-backed capability; current available workflows have no evidenced release blocker.
+
+## COMPLETED ADMIN BOUNDARY BLOCK: Natural Functional Replacement visibility
+
+The existing Drug Discovery source-backed workflow now exposes its advanced Natural Functional Replacement section only when the authenticated user has `owner` or `admin` role on at least one writable project. Editors and viewers receive an explicit status message and do not see the advanced pinned comparison workflow. The implementation reuses existing project RBAC data; it does not create a parallel permission system. The boundary is a UI disclosure gate, while backend project authorization remains the authority for project mutations.
+
+The admin-facing copy explicitly separates research-priority ranking from efficacy or therapeutic replacement and retains the existing no-synthesis/no-dosing/no-biological-execution boundary.
+
+Changed file:
+
+- `packages/frontend/src/components/DrugDiscoveryScreen.tsx`
+
+Validation completed:
+
+```text
+focused ChEMBL / adenosine / biotech Fabric tests: passed
+npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b; existing Vite large-chunk warning remains
+npm run lint: passed
+git diff --check: passed
+Chromium desktop smoke: 27 routes, 13 laboratories, 242 interactions, zero runtime errors
+Chromium mobile smoke: 27 routes, 13 laboratories, 242 interactions, zero runtime errors
+```
+
+- **CURRENT STATUS:** ADMIN-only disclosure boundary is implemented for the existing source-backed Natural Functional Replacement workflow.
+- **PARKED:** global admin identity/role is not present in the current User contract; biological executor, independent assays, clinical efficacy, full ADME/Tox and unsupported natural-substitute claims remain blocked/unknown.
+- **NEXT GAP:** if a global ADMIN identity is required, extend the backend-auth role contract rather than relying on client-only role inference; otherwise proceed to the next reachable authoritative source-backed profile integration.

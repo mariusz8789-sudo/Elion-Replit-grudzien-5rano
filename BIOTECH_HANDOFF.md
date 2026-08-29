@@ -634,3 +634,17 @@ The main Science Chat → Request → Model → Fabric → Execution → Result 
 **GENESIS IS READY FOR DEPLOY.**
 
 - **HANDOFF UPDATED:** pending commit below.
+
+## OVERNIGHT FINAL HARDENING CHECKPOINT
+
+The existing release checkpoint was revalidated without code changes or repository reset. `HEAD=12cb899` before this handoff append, branch `manus/next-gap-observation-analysis`, remote synchronized, and working tree clean.
+
+Backend/frontend integration was checked with the existing architecture: `packages/backend/src/server.mjs` on port 8080, frontend Vite on port 5000, and Vite `/api` proxy to `http://localhost:8080`. Backend `/api/health` reported `ok=true`, `static=true`, `knowledgeLabs=15`, and `persistence=ready`; frontend root returned HTTP 200. The production-style Chromium desktop and mobile smoke suites already passed with 27 routes, 13 laboratories and 242 interactions each, with zero runtime errors.
+
+The earlier HTTP 500s were caused by running the smoke harness against the frontend-only Vite server without the backend. The harness default is port 8092; the correct local validation target is the existing backend on 8080, or an explicitly supplied `E2E_BASE`. No application workaround or duplicate backend was added. All temporary validation servers were stopped; no listeners remain on ports 5000 or 8080.
+
+The final gate remains: full tests green (`271 passed, 40 skipped, 0 failed`), production build/typecheck green, lint green, diff check green, desktop Chromium green, mobile Chromium green, and narrow credential-hygiene scan clean. The only known non-blocking warning is the existing Vite large-chunk warning.
+
+Remaining parked states are unchanged and intentional: biological executor `NOT_EXECUTED/BLOCKED`, clinical efficacy `UNKNOWN`, formal calibration accuracy limited by independent-observation count, and additional heterogeneous ChEMBL expansion parked without a reachable source response and declared assay-selection policy.
+
+- **HANDOFF STATUS:** updated by overnight validation; commit follows.

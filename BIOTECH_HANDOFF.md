@@ -1117,3 +1117,7 @@ Full validation after the latest report, evidence matrix and ADME boundary block
 The enriched ChEMBL A1 activity evidence for theobromine and paraxanthine now carries an additional target-identity provenance record from UniProtKB:P30542 (human adenosine A1 receptor). This is a target mapping only; it does not change the rat-brain assay context and does not establish efficacy, safety or clinical suitability.
 
 Focused tests passed (11 tests), build/typecheck passed, lint passed and diff-check passed. The prior full suite, discovery E2E and desktop/mobile smoke remain green; this change is contract-level provenance enrichment with no new route.
+
+## POST-UNIPROT FULL VALIDATION
+
+After the UniProt target provenance block, full `npm test` passed with 271 passed, 40 skipped and 0 failed. `npm run e2e:discovery` passed all browser runtime, evidence, replay, boundary and Node ↔ Chromium fingerprint checks. `git diff --check` passed and the branch is clean.

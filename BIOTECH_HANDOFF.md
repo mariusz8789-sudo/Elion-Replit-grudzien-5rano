@@ -367,3 +367,24 @@ Focused tests: 4 passed. Build and lint passed. Build retains only the existing 
 - **CURRENT READINESS:** Model ↔ independent real observation increased from ~25% to an admission/comparison foundation; calibration and Evidence/Memory/Replay wiring remain incomplete.
 - **PARKED:** source terms review, full calibration, biological executor, USGS hydrology comparison, Atom-Bohr G3, live scraper expansion.
 - **NEXT LARGE GAP:** connect this existing comparison result to the existing Scientific Evidence Pack / Scientific Memory / Replay boundary, with explicit external-observation provenance and no-network replay, then expose the result in the existing user-facing scientific report. Do not claim calibration until the preregistered observation set is sufficiently large.
+
+## Completed Core capability: AME2020 comparison in report and Scientific Memory
+
+The existing `ScienceChat.formatFabricRun` now appends the source-backed AME2020 comparison when the selected model is `nuclear-semf`, including independent-observation source URL, raw SHA-256, per-nuclide `MATCH`/`DRIFT` statuses, MAE, RMSE and `INSUFFICIENT_DATA` calibration status. The existing `saveExperimentRunToMemory` path persists the same comparison as an `external-observation-comparison` analysis block in the existing Scientific Memory record. No second report, memory, evidence or replay system was introduced.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/nuclearAme2020.test.ts src/__tests__/scienceChatFabricFormat.test.ts src/__tests__/scienceMemoryFabric.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests: 8 passed. Full test suite, build, lint and diff check passed. Build retains only the existing Vite large-chunk warning. No UI layout changed, so Chromium was not required.
+
+- **CURRENT HEAD before this handoff update:** `1077f9b`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** preserve the structured AME2020 comparison in the existing Evidence Pack / Replay data boundary and expose it in the existing Scientific Memory view, while keeping the comparison explicitly independent-observation data and calibration `INSUFFICIENT_DATA`.

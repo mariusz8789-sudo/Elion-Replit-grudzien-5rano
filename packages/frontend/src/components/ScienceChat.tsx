@@ -13,6 +13,7 @@ import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff
 import { getToken } from '../core/backend/session';
 import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
 import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
+import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
 
 /**
@@ -102,6 +103,13 @@ export function formatFabricRun(run: ExperimentRun): string {
   const analysis = analyzeExperimentResult(run.result)
     .map((block) => `\nAnaliza — ${block.title}: ${block.body}`)
     .join('');
+  const externalObservation = run.request.modelId === 'nuclear-semf'
+    ? (() => {
+        const comparison = compareAme2020Observations();
+        const statuses = comparison.comparisons.map((item) => `${item.nuclide}=${item.status}`).join(', ');
+        return `\nIndependent real observation: AME2020 binding energy per nucleon (${comparison.comparisons.length} pinned nuclides). Source: ${comparison.provenance.sourceUrl}; SHA-256: ${comparison.provenance.rawPayloadSha256}. Comparison: ${statuses}. MAE=${comparison.meanAbsoluteError.toPrecision(5)} MeV/nucleon; RMSE=${comparison.rootMeanSquareError.toPrecision(5)} MeV/nucleon. Calibration: ${comparison.calibration.status}.`;
+      })()
+    : '';
   const epistemicReading = run.provenance.resultOrigin === 'real-engine'
     ? 'EXECUTED_REAL_ENGINE'
     : run.provenance.resultOrigin === 'knowledge-only'
@@ -112,7 +120,7 @@ export function formatFabricRun(run: ExperimentRun): string {
   const reportHeader = `SCIENTIFIC RESULT REPORT\nPytanie: ${run.request.sourceText}\nModel: ${run.request.modelId ?? 'nie wybrano'}\nWykonanie: ${run.result.status} / ${run.provenance.resultOrigin}\nKlasyfikacja epistemiczna: ${epistemicReading}`;
   const evidence = run.result.biologicalEvidence ? '\nEvidence: LITERATURE_SUPPORTED binding record; nie jest computational Evidence Pack.' : '\nEvidence: status wynika z istniejącego handoffu/protokołu; pojedynczy run nie tworzy Evidence Pack.';
   const replay = '\nReplay: nieustanowiony dla tego pojedynczego wyniku; wymaga istniejącej capsule/protocol semantics.';
-  return `${reportHeader}\nWynik: ${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}${biotechSource}${adme}${safety}${analysis}${evidence}${replay}\nProvenance: ${run.provenance.runFingerprint}.`;
+  return `${reportHeader}\nWynik: ${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}${biotechSource}${adme}${safety}${analysis}${externalObservation}${evidence}${replay}\nProvenance: ${run.provenance.runFingerprint}.`;
 }
 
 function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule }) {

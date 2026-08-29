@@ -3,6 +3,7 @@ import type { HonestyLevel, SimParams } from './types';
 import { biotechScientificFingerprint, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateDiscoveryReport, type CandidateRanking, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
 import type { ExperimentOutputValue, ExperimentRoute, ExperimentRun } from './experimentFabric/types';
 import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
+import { compareAme2020Observations } from './observation/nuclearAme2020';
 
 /**
  * Scientific Memory (sekcja O dyrektywy CTO) — trwały, lokalny zapis
@@ -338,6 +339,16 @@ export function saveExperimentRunToMemory(run: ExperimentRun): SavedExperiment {
   const biotechAnalysis = biotech
     ? [{ title: 'Discovery chain', body: `Candidate ${biotech.candidateId} → ranking ${outputString('rankingStatus') ?? 'UNKNOWN'} (${outputString('rankingScore') ?? 'unknown'}): ${outputString('rankingRationale') ?? 'brak rationale'}. Hypothesis ${biotech.hypothesisId}; validation ${outputString('validationPath') ?? 'UNKNOWN'}.`, kind: 'biotech-discovery' }]
     : [];
+  const observationAnalysis = run.request.modelId === 'nuclear-semf'
+    ? (() => {
+        const comparison = compareAme2020Observations();
+        return [{
+          title: 'Independent observation comparison',
+          body: `AME2020: ${comparison.comparisons.map((item) => `${item.nuclide}=${item.status}`).join(', ')}; MAE=${comparison.meanAbsoluteError.toPrecision(5)} MeV/nucleon; RMSE=${comparison.rootMeanSquareError.toPrecision(5)} MeV/nucleon; calibration=${comparison.calibration.status}; source=${comparison.provenance.sourceUrl}; raw SHA-256=${comparison.provenance.rawPayloadSha256}.`,
+          kind: 'external-observation-comparison',
+        }];
+      })()
+    : [];
   return saveExperiment({
     labId: run.request.domainId,
     experimentId: run.request.modelId ?? run.request.domainId,
@@ -358,6 +369,7 @@ export function saveExperimentRunToMemory(run: ExperimentRun): SavedExperiment {
     },
     analysis: [
       { title: 'Genesis result', body: run.result.summary, kind: 'fabric-result' },
+      ...observationAnalysis,
       ...biotechAnalysis,
       ...(run.result.warnings.length === 0 ? [] : [{ title: 'Jawne ostrzeżenia', body: run.result.warnings.join(' '), kind: 'fabric-warning' }]),
     ],

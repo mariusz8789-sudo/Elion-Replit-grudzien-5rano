@@ -774,3 +774,27 @@ Chromium mobile: 27 routes, 13 labs, 242 interactions, zero runtime errors
 - **REAL SOURCES:** ChEMBL Web Services, DailyMed official human prescription labels, PubChem caffeine fixture, AME2020 raw mass table.
 - **PARKED:** clinical efficacy, biological executor, formal calibrated accuracy, PubChem enrichment for adenosine/theophylline after HTTP 503, and any safety/ADME/Tox claim not directly supported by a compatible source.
 - **NEXT LARGE GAP:** add compatible quantitative ADME/Tox data only if an authoritative reachable source provides it; otherwise continue with the next confirmed end-to-end persistence or replay break and do not fabricate data.
+
+## COMPLETED MAJOR BLOCK: quantitative label ADME context
+
+The existing candidate report now carries a minimal source-backed `BiotechAdmeProfile` for the real adenosine and theophylline candidates. Adenosine includes the official-label whole-blood half-life context of `<10 seconds`. Theophylline includes the official-label serum concentration-effect range `5–20 mcg/mL`, mean steady-state half-life `8.3 hours`, and mean clearance `3.5 L/hour` from the label’s referenced study population. The Drug Discovery UI renders these metrics with explicit DailyMed product/population context and a non-clinical boundary.
+
+This is label-derived pharmacokinetic context, not an individual prediction, dose recommendation, complete ADME profile, efficacy claim or safety conclusion. No synthetic values were added. The existing PubChem/RDKit property path, SafetySignal, CandidateDiscoveryReport, comparison, Scientific Memory and provenance structures were reused.
+
+Validation completed:
+
+```text
+focused ADME + safety + candidate + memory tests: passed
+full npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+Chromium desktop: 27 routes, 13 labs, 242 interactions, zero runtime errors
+Chromium mobile: 27 routes, 13 labs, 242 interactions, zero runtime errors
+```
+
+- **HEAD before this handoff update:** `dcb1211`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **REAL SOURCE:** DailyMed official label pages for adenosine set ID `546642f2-662f-46cf-9d82-5bb3bdcc7677` and theophylline set ID `5e64036a-ee3e-42e7-9e59-881f88a4e298`.
+- **PARKED:** complete ADME/Tox, quantitative toxicity endpoints, biological execution, clinical efficacy, and any individual-level interpretation. PubChem enrichment for the new candidates remains unavailable after HTTP 503.
+- **NEXT LARGE GAP:** add compatible quantitative ADME/Tox endpoint data only from an authoritative reachable source; otherwise move to the next confirmed end-to-end break and preserve `UNKNOWN`.

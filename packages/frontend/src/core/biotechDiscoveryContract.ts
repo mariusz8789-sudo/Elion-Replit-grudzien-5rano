@@ -181,6 +181,14 @@ export function compareCandidateDiscoveryReports(reports: readonly CandidateDisc
 
 export type ClinicalEfficacyStatus = 'UNKNOWN' | 'SUPPORTED_BY_CLINICAL_DATA';
 
+export interface BiotechAdmeProfile {
+  source: 'DailyMed' | 'PubChem' | 'RDKit';
+  status: 'LITERATURE_SUPPORTED' | 'OBSERVED' | 'PREDICTION' | 'UNKNOWN';
+  metrics: readonly { name: string; value: number | string; units: string; context: string }[];
+  uncertainty: string;
+  provenance: readonly BiotechProvenance[];
+}
+
 export interface CandidateDiscoveryReport {
   reportId: string;
   candidateId: string;
@@ -197,6 +205,7 @@ export interface CandidateDiscoveryReport {
   /** Scientific evidence status is distinct from any human clinical efficacy claim. */
   scientificEvidenceStatus: BiotechEpistemicStatus;
   clinicalEfficacy: ClinicalEfficacyStatus;
+  admeProfile?: BiotechAdmeProfile;
   uncertainty: string;
   provenance: readonly BiotechProvenance[];
   scientificFingerprint: string;
@@ -207,6 +216,7 @@ export function createCandidateDiscoveryReport(input: {
   hypothesis: TherapeuticHypothesis;
   experimentRequest?: BiologicalExperimentRequest;
   ranking?: CandidateRanking;
+  admeProfile?: BiotechAdmeProfile;
   uncertainty: string;
 }): CandidateDiscoveryReport {
   if (input.hypothesis.candidateId !== input.candidate.id) throw new Error('Raport wymaga zgodności candidateId i hypothesis.candidateId.');
@@ -225,6 +235,7 @@ export function createCandidateDiscoveryReport(input: {
     epistemicStatus: input.hypothesis.status,
     scientificEvidenceStatus: input.hypothesis.status,
     clinicalEfficacy: 'UNKNOWN' as const,
+    ...(input.admeProfile === undefined ? {} : { admeProfile: input.admeProfile }),
     uncertainty: input.uncertainty,
   };
   const scientificFingerprint = fnv1a(canonicalJson(report));

@@ -32,7 +32,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `9b8a772` — `feat(core): preserve world result continuity`
 - `1f44a79` — `feat(drug-discovery): expose pinned molecular properties`
 - `94aec37` — `feat(drug-discovery): mark safety as unknown`
-- next checkpoint in this session — expose candidate/ranking/hypothesis/report/validation path in Fabric result
+- `8455d34` — `feat(drug-discovery): expose candidate validation path`
+- next checkpoint in this session — persist candidate/ranking/hypothesis/report context in Scientific Memory
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -230,9 +231,17 @@ Changed file: `packages/frontend/src/core/experimentFabric/executor.ts`.
 
 Validation completed: targeted ChEMBL/Science Chat tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
 
+## Completed drug-discovery capability: Candidate → Ranking → Hypothesis → Report → Memory
+
+`saveExperimentRunToMemory` now preserves the existing source-backed biotech chain in the same Scientific Memory record when a Fabric result carries the canonical IDs: candidate ID, hypothesis ID/status, discovery report ID, evidence ID, target/evidence provenance and a deterministic discovery-chain analysis containing ranking status/score/rationale plus the explicit validation path. No second report or memory system was created.
+
+Changed file: `packages/frontend/src/core/scienceMemory.ts`.
+
+Validation completed: targeted Memory/ChEMBL tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — real drug-discovery workflow
 
-Next large block: connect this source-backed discovery result to the existing Candidate Discovery/Discovery Report user view and Scientific Memory without creating a second report. Safety/ADME-Tox remains `UNKNOWN` until a real source-backed record is available; do not add clinical efficacy claims or arbitrary safety scores.
+Next large block: connect this source-backed discovery context to the existing Candidate Discovery/Discovery Report user view if a focused reuse path exists. Safety/ADME-Tox remains `UNKNOWN` until a real source-backed record is available; do not add clinical efficacy claims or arbitrary safety scores.
 
 ## Next large gaps
 

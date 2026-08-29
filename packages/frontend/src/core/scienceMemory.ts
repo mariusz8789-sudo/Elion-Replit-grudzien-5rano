@@ -320,6 +320,24 @@ export function saveExperimentRunToMemory(run: ExperimentRun): SavedExperiment {
   })) as Readonly<Record<string, ExperimentOutputValue>>;
   const stats: Record<string, number> = Object.fromEntries(Object.entries(run.result.outputs)
     .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1])));
+  const output = run.result.outputs as Record<string, ExperimentOutputValue>;
+  const outputString = (key: string): string | undefined => typeof output[key] === 'string' ? output[key] : undefined;
+  const biotech = run.request.domainId === 'biotechnology' && run.result.biologicalEvidence
+    && outputString('candidateId') && outputString('hypothesisId')
+    ? {
+        candidateId: outputString('candidateId')!,
+        hypothesisId: outputString('hypothesisId')!,
+        ...(outputString('reportId') ? { reportId: outputString('reportId') } : {}),
+        hypothesisStatus: (outputString('hypothesisStatus') === 'HYPOTHESIS' ? 'HYPOTHESIS' : 'UNKNOWN') as BiotechEpistemicStatus,
+        evidenceIds: [run.result.biologicalEvidence.id],
+        safetySignalIds: [],
+        provenance: [...(run.result.biologicalTarget?.provenance ?? []), ...run.result.biologicalEvidence.provenance],
+        scientificFingerprint: run.provenance.runFingerprint,
+      } satisfies SavedBiotechContext
+    : undefined;
+  const biotechAnalysis = biotech
+    ? [{ title: 'Discovery chain', body: `Candidate ${biotech.candidateId} → ranking ${outputString('rankingStatus') ?? 'UNKNOWN'} (${outputString('rankingScore') ?? 'unknown'}): ${outputString('rankingRationale') ?? 'brak rationale'}. Hypothesis ${biotech.hypothesisId}; validation ${outputString('validationPath') ?? 'UNKNOWN'}.`, kind: 'biotech-discovery' }]
+    : [];
   return saveExperiment({
     labId: run.request.domainId,
     experimentId: run.request.modelId ?? run.request.domainId,
@@ -340,12 +358,14 @@ export function saveExperimentRunToMemory(run: ExperimentRun): SavedExperiment {
     },
     analysis: [
       { title: 'Genesis result', body: run.result.summary, kind: 'fabric-result' },
+      ...biotechAnalysis,
       ...(run.result.warnings.length === 0 ? [] : [{ title: 'Jawne ostrzeżenia', body: run.result.warnings.join(' '), kind: 'fabric-warning' }]),
     ],
     honesty: run.result.status === 'completed' ? 'exact' : 'simplified',
     honestyNote: `Fabric status=${run.result.status}; resultOrigin=${run.provenance.resultOrigin}.`,
     assumptions: [...run.result.assumptions],
     epistemicStatus: run.result.status === 'completed' ? 'OBSERVED' : 'UNKNOWN',
+    ...(biotech === undefined ? {} : { biotech }),
   });
 }
 

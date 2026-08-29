@@ -1263,3 +1263,12 @@ Validation passed: integrated natural/ChEMBL/memory tests `27 passed`; frontend 
 Added a bounded reference profile resolver for PubChem CID, name, SMILES, InChIKey, and ChEMBL molecule IDs. It preserves source identity, source URL, structure fields, and explicit `RESOLVED`, `PARTIAL`, `UNKNOWN`, or `BLOCKED` status. Science Chat uses it for non-pinned identifiers and refuses to fabricate a natural comparison when a resolved reference is outside the supported target-specific catalog; it reports a partial result instead. Supported named references continue through the full live PubChem → ChEMBL → assay → comparison → WHY → ranking → Scientific Memory path.
 
 Validation passed: integrated natural/ChEMBL/memory/reference tests `28 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; Chromium desktop smoke passed with 27 routes, 13 laboratories, 216 interactions, and zero runtime errors.
+
+
+## MAXIMUM COMPLETION CHECKPOINT: Reference Resolution + Chat Boundary
+
+Reference resolution is now source-backed and bounded for name, SMILES, InChIKey, PubChem CID, and ChEMBL molecule ID. The resolver returns `RESOLVED`, `PARTIAL`, `UNKNOWN`, or `BLOCKED`, preserving source identity, structure fields, URL, and uncertainty. Science Chat uses the resolver for non-pinned identifiers and reports a truthful partial state when the current target-specific natural candidate catalog is not compatible; it does not invent a candidate set or ranking.
+
+The supported named path remains one-command end-to-end through live PubChem, live ChEMBL, target/activity, assay context/quality, comparison, WHY, research-priority ranking, existing Scientific Memory, and replay fingerprint. Automatic expensive compute is not falsely claimed: it remains gated by compatible structured inputs and existing executor contracts; biological execution remains NOT_EXECUTED / BLOCKED.
+
+Validation passed: integrated natural/ChEMBL/memory/reference tests `28 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 216 interactions, and zero runtime errors.

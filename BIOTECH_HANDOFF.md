@@ -2,10 +2,11 @@
 
 ## Checkpoint state
 
-- **CURRENT HEAD:** update immediately after this checkpoint commit
+- **CURRENT HEAD:** `5881521`
 - **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
 - **CURRENT LIVE:** `origin/main = 9ad75f3` (unchanged)
-- **Working tree before this piece:** clean
+- **WORKING TREE:** clean at handoff preparation; final verification required after this documentation update
+- **PUSH:** branch synchronized with `origin/manus/next-gap-observation-analysis`
 
 Do not restart or perform a broad repository audit. Verify only the current branch, HEAD, status and the specific files named in the next GAP.
 
@@ -39,7 +40,7 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `f6a4e9d` — `feat(drug-discovery): add pinned adme properties`
 - `9c6ff74` — `feat(drug-discovery): compare candidate reports`
 - `ba2ec82` — `feat(drug-discovery): surface pinned reference`
-- next checkpoint in this session — wire candidate comparison into the source-backed UI card
+- `5881521` — `feat(drug-discovery): wire comparison status`
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -303,12 +304,30 @@ Validation: targeted tests and build/typecheck passed; full `npm test` (271 pass
 
 The repository already contains `docs/evidence/usgs/USGS-01646500-00060-normalized-observation.json` plus raw payload and station metadata. Its tests verify real station/series identity, units, timestamps, quality fields, pinned hashes, deterministic replay drift detection and the explicit incompatibility reason. No new adapter was added because the existing comparison surface is epidemic model-vs-model, while the available USGS series is hydrology and the current pump-pipe model treats flow as an input rather than predicting stream discharge.
 
+## Conservative readiness levels (orientational)
+
+These are approximate readiness assessments, not measured coverage percentages: Knowledge **~85%**, Engines / Models **~75%**, Experiment Fabric **~85%**, Evidence / Replay **~80%**, World / 3D **~75%**, Science Chat **~85%**, End-to-End **~80%**, Biotech Foundation **~85%**, Real Drug Discovery **~70%**, and Model ↔ Real Observation **~25%**. The lower drug-discovery level reflects the absence of a validated biological executor and full ADME/Tox outcomes. The lower observation level reflects the absence of a semantically compatible model/independent observation pair.
+
+## What is actually working
+
+The working Genesis path is Science Chat → Structured Request → model selection → Experiment Fabric → existing executor → real typed result or explicit knowledge-only result → honest analysis → World/3D handoff where semantically valid → evidence/provenance → Scientific Memory → replay boundary. Protocol/A-B multi-run Evidence Pack creation, persisted replay verdicts and explicit rerun boundaries already exist. The biotech path is PubChem compound identity → ChEMBL bioactivity → BiologicalTarget/BiologicalEvidence → candidate → research-priority ranking → hypothesis/discovery report → PubChem GHS hazard signal → pinned ADME properties → multi-candidate comparison contract → user-facing Drug Discovery workspace.
+
+## Scientific integrity boundaries
+
+PubChem and ChEMBL are real pinned sources. Safety is a real hazard classification, not a complete clinical safety assessment. ADME currently means pinned molecular properties, not a full ADME/Tox outcome. Drug Discovery has a demonstrable source-backed workflow, but not a validated drug-discovery engine. Model ↔ independent real observation is not closed. The pinned USGS observation must remain `VERIFY_REQUIRED`; it is not ground truth for the current models because the semantic variables do not match.
+
 ## Next large gaps
 
 1. Result → existing World/3D visualization with a real result only where mapping is semantically valid.
 2. Minimal preregistered protocol/A-B contract with hypothesis, baseline/reference, arms, repetition policy, execution and replay; park if semantics are insufficient.
 3. Infrastructure for the first genuine model ↔ independent real observation comparison; never use model inputs as observations.
 4. Continue pinned real-source expansion with provenance rather than live scraper sprawl.
+
+## Final stop checkpoint for the next Manus
+
+Do not start from the beginning and do not repeat closed GAPs. Start with the current branch and this handoff. The next large GAP is **MODEL ↔ INDEPENDENT REAL OBSERVATION**: find a genuinely compatible pair, then implement `MODEL → PREDICTION ↔ INDEPENDENT REAL OBSERVATION → COMPARISON → MATCH / DRIFT / INCONCLUSIVE → CALIBRATION`. Do not use model inputs, synthetic outputs, unrelated USGS discharge, another model, invented observations, unsupported efficacy/safety, fictional DOIs or probabilities. If no compatible pair is found, park it with the exact semantic blocker and move to the next valuable core integration.
+
+The current repo already contains the functioning Core and real PubChem + ChEMBL chain. After the observation work, return to Biotech and move Real Drug Discovery toward ~90% through real demonstrable capability, not contract count. Work in large pieces: implement → test → commit → push → handoff → next.
 
 ## Exact continuation instruction
 

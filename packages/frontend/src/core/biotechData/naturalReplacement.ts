@@ -97,14 +97,14 @@ export function resolveNaturalFunctionalReplacement(input: NaturalFunctionalRepl
       ...(input.target?.trim() ? { target: input.target.trim() } : {}),
     };
   }
-  const reports = [
+  const reports = ([
     buildPinnedChEMBLCaffeineDiscovery().report,
     buildPinnedChEMBLAdenosineDiscovery().report,
     buildPinnedChEMBLTheophyllineDiscovery().report,
     buildChEMBLTheobromineA1Report(),
     buildChEMBLParaxanthineA1Report(),
     ...identityOnlyReports(),
-  ];
+  ]).map((report) => report.admeProfile ? report : { ...report, admeProfile: unknownAdmeProfile({ source: report.provenance[0]?.source ?? 'PubChem', sourceId: report.provenance[0]?.sourceId ?? report.reportId, sourceUrl: report.provenance[0]?.sourceUrl ?? 'https://pubchem.ncbi.nlm.nih.gov/', sourceVersion: report.provenance[0]?.sourceVersion ?? 'bounded report', retrievedAt: report.provenance[0]?.retrievedAt ?? PUBCHEM_RETRIEVED_AT, uncertainty: 'No compatible quantitative ADME/PK/Tox evidence admitted for this report.' }) });
   return {
     status: 'RESOLVED',
     reason: 'Dopasowano do istniejącego pinned A1 reference profile; wynik jest research-priority comparison, nie funkcjonalnym zamiennikiem ani dowodem skuteczności.',

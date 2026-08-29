@@ -10,6 +10,12 @@ describe('Natural Functional Replacement resolver', () => {
     expect(result.reason).toMatch(/not.*zamiennikiem|nie.*zamiennik/i);
   });
 
+  it('exposes an explicit ADME/PK/Tox state for every real report', () => {
+    const result = resolveNaturalFunctionalReplacement({ referenceCompound: 'caffeine', target: 'A1' });
+    expect(result.reports.every((report) => report.admeProfile?.status)).toBe(true);
+    expect(result.reports.every((report) => report.admeProfile?.metrics.some((metric) => metric.name === 'ADME/PK/Tox') || report.admeProfile?.metrics.length)).toBe(true);
+  });
+
   it('blocks an unsupported reference or target instead of inventing candidates', () => {
     const result = resolveNaturalFunctionalReplacement({ referenceCompound: 'unknown controlled compound', target: 'unknown receptor' });
     expect(result.status).toBe('BLOCKED');

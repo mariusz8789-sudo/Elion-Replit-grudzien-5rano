@@ -1133,3 +1133,13 @@ Focused Science Chat, Natural Replacement and biotech contract tests passed; ful
 The existing multi-fidelity validation campaign was executed once. It correctly reported `RESULT: FAIL` because the runtime lacks RDKit, PySCF, OpenMM, AutoDock Vina/Meeko, Biopython, PyMeep and ADMET-AI; stage 1 retained zero candidates and docking/quantum stages were blocked. No synthetic candidate, descriptor, docking, ADMET or toxicity result was admitted.
 
 This is an external/runtime capability blocker, not a silent application failure. The block is parked after one bounded attempt and the sprint continues to other real repository capabilities. The campaign output explicitly preserves the boundary that no therapeutic or clinical claim is made.
+
+## ADME MATRIX CONTRACT HARDENING CHECKPOINT
+
+The bounded Natural Functional Replacement resolver now guarantees that every resolved report carries an explicit `BiotechAdmeProfile`. Existing source-backed quantitative profiles are preserved; reports without compatible quantitative evidence receive a provenance-backed `UNKNOWN` profile with no invented metric. This closes the contract gap between resolver output and the user-facing ADME/PK/Tox matrix.
+
+A regression now asserts the property for the full 12-report real set. Focused test passed (3 tests); build/typecheck, lint and diff-check passed. Full suite and smoke remain the final validation for this checkpoint.
+
+## ADME MATRIX FULL VALIDATION
+
+Full `npm test` passed: 271 passed, 40 skipped, 0 failed. Discovery E2E passed all Node ↔ Chromium integrity checks. Build/typecheck, lint and diff-check passed. Desktop and mobile smoke each passed 27 routes, 13 laboratories and 242 interactions with zero runtime errors. Existing Vite large-chunk warning remains non-blocking.

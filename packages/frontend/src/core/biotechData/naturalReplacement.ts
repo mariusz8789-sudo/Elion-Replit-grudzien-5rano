@@ -5,6 +5,7 @@ import {
   createCandidateDiscoveryReport,
   rankTherapeuticCandidate,
   type CandidateDiscoveryReport,
+  type BiotechAdmeProfile,
   type BiologicalEvidence,
   type CandidateEvidenceQuality,
   type SafetySignal,
@@ -51,11 +52,12 @@ function identityOnlyReports(): CandidateDiscoveryReport[] {
     const candidate: TherapeuticCandidate = { kind: 'therapeutic-candidate', id: `candidate:pubchem:${cid}`, namespace: 'genesis-biotech', label: name, status: 'HYPOTHESIS', materialId: `material:pubchem:${cid}`, compoundIds: [`compound:pubchem:${cid}`], targetIds: [], mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], hypothesisIds: [`hypothesis:pubchem:${cid}`], provenance: [{ ...provenance, sourceId: candidateId(cid), evidenceType: 'candidate identity mapped from compound record', status: 'HYPOTHESIS' }] };
     const hypothesis: TherapeuticHypothesis = { kind: 'therapeutic-hypothesis', id: `hypothesis:pubchem:${cid}`, namespace: 'genesis-biotech', label: `${name} requires target/activity validation`, status: 'HYPOTHESIS', claim: `${name} is a research candidate for target-specific follow-up only; identity similarity is not functional replacement.`, candidateId: candidate.id, targetIds: [], mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], provenance: [{ ...provenance, sourceId: hypothesisId(cid), evidenceType: 'bounded research hypothesis', status: 'HYPOTHESIS' }] };
     const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'UNKNOWN' as CandidateEvidenceQuality, targetRelevance: 0, safetySignals: [safety], uncertaintyPenalty: 1 });
-    return createCandidateDiscoveryReport({ candidate, hypothesis, ranking, uncertainty: `PubChem identity-only profile: formula ${formula}, molecular weight ${molecularWeight}, InChIKey ${inchiKey}, SMILES ${smiles}. Target, mechanism, safety, ADME and efficacy are UNKNOWN.` });
+    return createCandidateDiscoveryReport({ candidate, hypothesis, ranking, admeProfile: unknownAdmeProfile({ ...provenance, uncertainty: 'Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.' }), uncertainty: `PubChem identity-only profile: formula ${formula}, molecular weight ${molecularWeight}, InChIKey ${inchiKey}, SMILES ${smiles}. Target, mechanism, safety, ADME and efficacy are UNKNOWN.` });
   });
 }
 
 const candidateId = (cid: number): string => `candidate:pubchem:${cid}`;
+const unknownAdmeProfile = (provenance: { source: string; sourceId: string; sourceUrl: string; sourceVersion: string; retrievedAt: string; uncertainty: string }): BiotechAdmeProfile => ({ source: provenance.source === 'PubChem' ? 'PubChem' : 'RDKit', status: 'UNKNOWN', metrics: [{ name: 'ADME/PK/Tox', value: 'UNKNOWN', units: 'status', context: 'No compatible quantitative record admitted' }], uncertainty: provenance.uncertainty, provenance: [{ ...provenance, evidenceType: 'explicit missing ADME/PK/Tox boundary', status: 'UNKNOWN' }] });
 const hypothesisId = (cid: number): string => `hypothesis:pubchem:${cid}`;
 
 function buildChEMBLParaxanthineA1Report(): CandidateDiscoveryReport {
@@ -66,7 +68,7 @@ function buildChEMBLParaxanthineA1Report(): CandidateDiscoveryReport {
   const candidate: TherapeuticCandidate = { kind: 'therapeutic-candidate', id: 'candidate:chembl:CHEMBL1158', namespace: 'genesis-biotech', label: 'Paraxanthine', status: 'HYPOTHESIS', materialId: 'material:chembl:CHEMBL1158', compoundIds: ['compound:chembl:CHEMBL1158'], targetIds: ['target:chembl:CHEMBL318'], mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], hypothesisIds: ['hypothesis:chembl:CHEMBL1158'], provenance: [provenance] };
   const hypothesis: TherapeuticHypothesis = { kind: 'therapeutic-hypothesis', id: 'hypothesis:chembl:CHEMBL1158', namespace: 'genesis-biotech', label: 'Paraxanthine A1 follow-up', status: 'HYPOTHESIS', claim: 'Paraxanthine is a source-backed A1 binding candidate for follow-up; binding is not a functional replacement or efficacy claim.', candidateId: candidate.id, targetIds: candidate.targetIds, mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], provenance: [{ ...provenance, sourceId: hypothesisId(1158), evidenceType: 'bounded research hypothesis', status: 'HYPOTHESIS' }] };
   const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'LOW', targetRelevance: 1, safetySignals: [safety], uncertaintyPenalty: 0.5 });
-  return createCandidateDiscoveryReport({ candidate, hypothesis, ranking, uncertainty: 'ChEMBL target/activity evidence is in vitro and does not establish mechanism, safety, ADME or clinical efficacy.' });
+  return createCandidateDiscoveryReport({ candidate, hypothesis, ranking, admeProfile: unknownAdmeProfile({ ...provenance, uncertainty: 'ChEMBL binding activity record supplies no quantitative ADME/PK/Tox evidence.' }), uncertainty: 'ChEMBL target/activity evidence is in vitro and does not establish mechanism, safety, ADME or clinical efficacy.' });
 }
 
 function buildChEMBLTheobromineA1Report(): CandidateDiscoveryReport {
@@ -77,7 +79,7 @@ function buildChEMBLTheobromineA1Report(): CandidateDiscoveryReport {
   const candidate: TherapeuticCandidate = { kind: 'therapeutic-candidate', id: 'candidate:chembl:CHEMBL1114', namespace: 'genesis-biotech', label: 'Theobromine', status: 'HYPOTHESIS', materialId: 'material:chembl:CHEMBL1114', compoundIds: ['compound:chembl:CHEMBL1114'], targetIds: ['target:chembl:CHEMBL318'], mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], hypothesisIds: ['hypothesis:chembl:CHEMBL1114'], provenance: [provenance] };
   const hypothesis: TherapeuticHypothesis = { kind: 'therapeutic-hypothesis', id: 'hypothesis:chembl:CHEMBL1114', namespace: 'genesis-biotech', label: 'Theobromine A1 follow-up', status: 'HYPOTHESIS', claim: 'Theobromine is a source-backed A1 binding candidate for follow-up; the record is weak/uncertain and is not a functional replacement claim.', candidateId: candidate.id, targetIds: candidate.targetIds, mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], provenance: [{ ...provenance, sourceId: hypothesisId(1114), evidenceType: 'bounded research hypothesis', status: 'HYPOTHESIS' }] };
   const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'LOW', targetRelevance: 1, safetySignals: [safety], uncertaintyPenalty: 0.75 });
-  return createCandidateDiscoveryReport({ candidate, hypothesis, ranking, uncertainty: 'ChEMBL source record is target/activity-backed but marked outside typical range; independent assay, mechanism, safety, ADME and clinical efficacy remain UNKNOWN.' });
+  return createCandidateDiscoveryReport({ candidate, hypothesis, ranking, admeProfile: unknownAdmeProfile({ ...provenance, uncertainty: 'ChEMBL binding activity record supplies no quantitative ADME/PK/Tox evidence.' }), uncertainty: 'ChEMBL source record is target/activity-backed but marked outside typical range; independent assay, mechanism, safety, ADME and clinical efficacy remain UNKNOWN.' });
 }
 
 export function resolveNaturalFunctionalReplacement(input: NaturalFunctionalReplacementInput): NaturalFunctionalReplacementResult {

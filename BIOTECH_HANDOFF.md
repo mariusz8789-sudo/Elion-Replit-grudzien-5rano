@@ -1091,3 +1091,13 @@ Drug Discovery now computes comparison count from the active resolved report set
 The existing discovery E2E runner was also made environment-portable by using the repository Playwright package and available system Chromium. `npm run e2e:discovery` passed all Node ↔ Chromium fingerprint and integrity checks with zero browser runtime errors.
 
 Targeted biotech tests passed (11 tests), build/typecheck passed, lint passed and `git diff --check` passed. Fresh UI smoke is the remaining checkpoint before push.
+
+## ADME/PK/TOX STATUS MATRIX CHECKPOINT
+
+Every report returned by the bounded Natural Product resolver now carries an explicit ADME/PK/Tox profile. For identity-only PubChem reports and ChEMBL binding-only reports the profile is `UNKNOWN` with a visible `No compatible quantitative record admitted` metric and provenance-backed uncertainty. This makes the missing layer reportable and comparable without inventing values or promoting binding to safety/efficacy.
+
+Focused naturalReplacement and contract tests pass (11 tests); build/typecheck, lint and diff-check pass. The prior full suite remains 271 passed, 40 skipped, 0 failed. The prior fresh desktop/mobile smoke and discovery Node ↔ Chromium E2E remain green; this change is bounded to report contracts/resolution and does not add a new route.
+
+- **CURRENT STATUS:** 12-report discovery set has an explicit ADME/PK/Tox state on every report; resolved sets preserve that state through comparison and Memory.
+- **PARKED:** quantitative enrichment remains blocked by the timed-out ChEMBL properties probe; no quantitative values were admitted.
+- **NEXT LARGE GAP:** use the existing report matrix in the user-facing comparison to show target/evidence/safety/ADME/validation columns, or move to the next real external source only after a short bounded probe.

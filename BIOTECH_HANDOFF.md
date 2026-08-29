@@ -820,3 +820,22 @@ Chromium mobile: 27 routes, 13 labs, 242 interactions, zero runtime errors
 - **HEAD before this handoff update:** `96e9056`
 - **BRANCH:** `manus/next-gap-observation-analysis`
 - **NEXT LARGE GAP:** biological execution remains externally blocked. Quantitative ADME/Tox beyond label-supported context remains `UNKNOWN/PARKED` unless a compatible authoritative endpoint becomes reachable. Continue with another confirmed end-to-end break only if it exists; do not fabricate execution or data.
+
+## COMPLETED MAJOR BLOCK: Science Chat → reviewed biotech request
+
+Science Chat no longer bypasses the reviewed Experiment Fabric path for biotechnology messages. Candidate discovery prompts now produce the existing `EvidenceGuidedExperimentPlan` with the original structured request, deterministic plan ID, disclosure, required solver, limitations and `ENGINE_NOT_AVAILABLE` status. Because no validated biological executor exists, the plan is not confirmable and no biological result is generated. Direct knowledge-only adapters remain available in the existing Experiment Fabric executor for explicit programmatic use and preserve their source-bound ChEMBL semantics.
+
+Focused validation completed:
+
+```text
+biotechExperimentFabric + experimentFabric + backendEvidenceExecution tests: passed
+npm run build: passed
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this block:** `83e3ed8`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT STATUS:** candidate-specific discovery prompts now enter the same reviewed request boundary as other domains; biology remains `ENGINE_NOT_AVAILABLE`, `NOT_EXECUTED`, and no clinical efficacy is inferred.
+- **PARKED:** confirmation/execution and biological Evidence/Replay require an actual validated biological executor and independent assay data.
+- **NEXT LARGE GAP:** only proceed with another real, unblocked integration; otherwise maintain the biological executor blocker rather than inventing execution.

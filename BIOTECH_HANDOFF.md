@@ -598,3 +598,39 @@ Focused and full tests passed: `271 passed, 40 skipped, 0 failed`. TypeScript ch
 - **WORKING TREE before this handoff update:** clean
 - **PARKED:** biological executor, independent clinical efficacy, safety inference, and ChEMBL multi-record expansion pending a reachable source response and deliberate selection policy.
 - **NEXT LARGE GAP:** continue only with a real reachable source-backed multi-candidate relation or an available biological executor; otherwise preserve the explicit parked status and avoid fabricated neurotherapeutic claims.
+
+## FINAL MAXIMUM COMPLETION / PRE-DEPLOY RELEASE GATE
+
+Checkpoint verified on the existing checkout without resetting or auditing the repository:
+
+- **HEAD:** `389a57b`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **REMOTE:** `origin/manus/next-gap-observation-analysis`
+- **WORKING TREE before this handoff update:** clean and synchronized
+
+### Release validation
+
+- **Focused workflow tests:** passed in prior blocks for Science Chat, Experiment Pilot, Evidence/Replay, AME2020, ChEMBL and biotech contracts.
+- **Full tests:** `npm test` passed: `271 passed, 40 skipped, 0 failed`.
+- **Build / TypeScript:** `npm run build` passed; this executes `tsc -b` followed by Vite production build.
+- **Lint:** `npm run lint` passed.
+- **Diff check:** `git diff --check` passed.
+- **Chromium desktop:** passed against the existing backend production server: 27 routes plus 13 laboratories, 242 interactions, zero runtime errors.
+- **Chromium mobile:** passed with the same coverage and zero runtime errors.
+- **Credential hygiene:** narrow tracked-file scan found no obvious hardcoded API keys, cloud access keys, private keys or Slack tokens.
+
+The first smoke attempt against Vite alone exposed the expected integration condition that Vite proxies `/api` to the backend and therefore cannot be used as the complete E2E target by itself. The corrected production-style run started `packages/backend/src/server.mjs` on port 8080 and passed both desktop and mobile smoke suites. This is documented as an operational setup requirement, not an application defect.
+
+### Release status
+
+The main Science Chat → Request → Model → Fabric → Execution → Result → Analysis → Report → Memory/ Evidence/ Replay path is stable and demonstrable for available executors. The ChEMBL/PubChem path is source-backed and explicitly separates binding evidence, safety/ADME status, research-priority prediction, hypothesis and clinical efficacy. The AME2020 path preserves independent observation provenance, comparison metrics, no-network replay integrity and source-aware Evidence Pack verdicts.
+
+**PARKED, intentionally not faked:** biological executor = `NOT_EXECUTED / BLOCKED`; clinical efficacy = `UNKNOWN`; additional heterogeneous ChEMBL relation expansion = parked after unavailable/slow API response and lack of a declared assay-selection policy; formal calibrated accuracy claims = not asserted; no laboratory measurement is implied.
+
+**KNOWN NON-BLOCKING WARNING:** Vite reports an existing large JavaScript chunk above 750 kB. No cosmetic redesign or risky code-splitting was introduced during the release gate.
+
+**CURRENT READINESS:** `READY` for the available, bounded workflows; not a claim of clinical readiness, biological execution, efficacy, safety or calibrated accuracy.
+
+**GENESIS IS READY FOR DEPLOY.**
+
+- **HANDOFF UPDATED:** pending commit below.

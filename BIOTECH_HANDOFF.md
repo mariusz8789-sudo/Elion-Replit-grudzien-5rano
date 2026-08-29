@@ -732,3 +732,21 @@ git diff --check: passed
 - **HEAD before this handoff update:** `f1efe8a`
 - **BRANCH:** `manus/next-gap-observation-analysis`
 - **NEXT LARGE GAP:** add compatible safety/ADME/Tox evidence only from a reachable authoritative source, or park and move to another real end-to-end boundary. Biological execution and clinical efficacy remain blocked/unknown; no synthetic data is permitted.
+
+## COMPLETED MAJOR BLOCK: saved comparison is visible on reopen
+
+Scientific Memory now renders the persisted multi-candidate comparison inside the existing biotech record card. Reopening a saved comparison shows candidate count, `PREDICTION` epistemic status, deterministic comparison fingerprint and the explicit uncertainty boundary. This completes the user-facing Drug Discovery path from real ChEMBL records through comparison, save, reopen and verification using the existing Memory system.
+
+Validation completed:
+
+```text
+focused Science Memory + adenosine + ChEMBL tests: passed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this handoff update:** `27885df`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **PARKED:** compatible safety/ADME/Tox for adenosine and theophylline, biological executor, clinical efficacy, formal calibration accuracy, and additional heterogeneous assay expansion.
+- **NEXT LARGE GAP:** only add safety/ADME/Tox when a reachable authoritative source provides compatible records; otherwise preserve `UNKNOWN` and continue with another confirmed end-to-end break rather than inventing data.

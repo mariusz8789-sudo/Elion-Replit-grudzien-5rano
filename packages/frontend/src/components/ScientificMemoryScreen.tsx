@@ -93,6 +93,11 @@ export function ScientificMemoryScreen() {
                 {record.biotech && <>
                   <div className="stat-row"><span>Biotech target</span><span className="val">{record.biotech.candidateId}</span></div>
                   <div className="stat-row"><span>Evidence IDs</span><span className="val mono">{record.biotech.evidenceIds.join(', ') || 'brak'}</span></div>
+                  {record.biotech.comparison && <>
+                    <div className="stat-row"><span>Candidate comparison</span><span className="val">{record.biotech.comparison.candidateIds.length} candidates · {record.biotech.comparison.epistemicStatus}</span></div>
+                    <div className="stat-row"><span>Comparison fingerprint</span><span className="val mono">{record.biotech.comparison.scientificFingerprint}</span></div>
+                    <div className="stat-row"><span>Comparison boundary</span><span className="val">PREDICTION · {record.biotech.comparison.uncertainty}</span></div>
+                  </>}
                 </>}
                 <div className="stat-row"><span>Honesty</span><span className="val">{record.honesty}</span></div>
                 <div className="stat-row"><span>Fingerprint treści</span><span className="val mono">#{record.contentHash}</span></div>

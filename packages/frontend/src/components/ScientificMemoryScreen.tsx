@@ -2,6 +2,10 @@ import { useMemo, useState } from 'react';
 import { deleteExperiment, listExperiments, type SavedExperiment } from '../core/scienceMemory';
 import { classifyStoredEvidencePack, getStoredEvidencePackReplayVerdict, listScientificEvidencePacks, serializeScientificEvidencePack, type StoredEvidencePack } from '../core/experimentFabric';
 import { setPendingScenario } from '../core/scenarioBridge';
+import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
+import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
+import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
+import { replaySavedBiotechComparison } from '../core/scienceMemory';
 
 function downloadJson(record: SavedExperiment): void {
   const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
@@ -79,7 +83,15 @@ export function ScientificMemoryScreen() {
         </section>
       ) : (
         <section className="settings-section" aria-label="Zapisane eksperymenty">
-          {records.map((record) => (
+          {records.map((record) => {
+            const biotechReplay = record.biotech?.comparison
+              ? replaySavedBiotechComparison(record.biotech.comparison, [
+                buildPinnedChEMBLCaffeineDiscovery().report,
+                buildPinnedChEMBLAdenosineDiscovery().report,
+                buildPinnedChEMBLTheophyllineDiscovery().report,
+              ])
+              : undefined;
+            return (
             <article className="settings-section" key={record.id}>
               <h2>{record.experimentName}</h2>
               <p className="settings-hint">{formatDate(record.createdAt)} · {record.labId}/{record.experimentId}</p>
@@ -97,6 +109,7 @@ export function ScientificMemoryScreen() {
                     <div className="stat-row"><span>Candidate comparison</span><span className="val">{record.biotech.comparison.candidateIds.length} candidates · {record.biotech.comparison.epistemicStatus}</span></div>
                     <div className="stat-row"><span>Comparison fingerprint</span><span className="val mono">{record.biotech.comparison.scientificFingerprint}</span></div>
                     <div className="stat-row"><span>Comparison boundary</span><span className="val">PREDICTION · {record.biotech.comparison.uncertainty}</span></div>
+                    {biotechReplay && <div className="stat-row"><span>Comparison replay integrity</span><span className="val">{biotechReplay.status}</span></div>}
                   </>}
                 </>}
                 <div className="stat-row"><span>Honesty</span><span className="val">{record.honesty}</span></div>
@@ -107,6 +120,7 @@ export function ScientificMemoryScreen() {
                 {record.replayIdentity && <div className="stat-row"><span>Replay identity</span><span className="val mono">{record.replayIdentity.capsuleId} · {record.replayIdentity.planId} · {record.replayIdentity.confirmationId}</span></div>}
               </div>
               <p className="settings-hint">{record.honestyNote}</p>
+              {biotechReplay && <p className="settings-hint">Replay comparison: {biotechReplay.status} — {biotechReplay.reason} Nie jest to biologiczne wykonanie ani świeży pomiar.</p>}
               {record.execution?.summary && <p className="settings-hint">{record.execution.summary}</p>}
               {record.biotech && record.biotech.provenance.length > 0 && (
                 <details className="settings-details">
@@ -149,7 +163,8 @@ export function ScientificMemoryScreen() {
                 <button className="chip-btn danger" onClick={() => removeRecord(record)}>Usuń lokalnie</button>
               </div>
             </article>
-          ))}
+            );
+          })}
         </section>
       )}
 

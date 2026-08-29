@@ -50,6 +50,13 @@ export interface SavedBiotechComparison {
   uncertainty: string;
 }
 
+export type SavedBiotechComparisonReplayStatus = 'MATCH' | 'DRIFT' | 'BLOCKED';
+
+export interface SavedBiotechComparisonReplay {
+  status: SavedBiotechComparisonReplayStatus;
+  reason: string;
+}
+
 export interface SavedBiotechContext {
   candidateId: string;
   hypothesisId: string;
@@ -244,6 +251,34 @@ export function saveBiotechDiscoveryComparisonToMemory(reports: readonly Candida
   if (reports.length < 2) throw new Error('Porównanie kandydatów do pamięci wymaga co najmniej dwóch raportów.');
   const comparison = compareCandidateDiscoveryReports(reports);
   return saveBiotechDiscoveryReportToMemory(reports[0]!, comparison);
+}
+
+/**
+ * Replays only the deterministic, source-backed comparison calculation from a
+ * saved record. This verifies persisted comparison identity; it is not a
+ * biological rerun, fresh assay, efficacy claim, or source refresh.
+ */
+export function replaySavedBiotechComparison(
+  saved: SavedBiotechComparison | undefined,
+  reports: readonly CandidateDiscoveryReport[],
+): SavedBiotechComparisonReplay {
+  if (!saved || reports.length < 2) {
+    return { status: 'BLOCKED', reason: 'Brak kompletnego zapisanego comparison albo mniej niż dwóch raportów.' };
+  }
+  try {
+    const current = compareCandidateDiscoveryReports(reports);
+    const sameIdentity = current.comparisonId === saved.comparisonId
+      && current.scientificFingerprint === saved.scientificFingerprint
+      && current.reportIds.length === saved.reportIds.length
+      && current.reportIds.every((id, index) => id === saved.reportIds[index])
+      && current.rows.length === saved.candidateIds.length
+      && current.rows.every((row, index) => row.candidateId === saved.candidateIds[index]);
+    return sameIdentity
+      ? { status: 'MATCH', reason: 'Deterministyczny comparison i jego fingerprint odtworzyły się identycznie.' }
+      : { status: 'DRIFT', reason: 'Odtworzony comparison różni się od zapisanego ID, fingerprintu albo kolejności kandydatów.' };
+  } catch (error) {
+    return { status: 'BLOCKED', reason: `Nie można odtworzyć comparison: ${error instanceof Error ? error.message : String(error)}` };
+  }
 }
 
 export interface SaveExperimentInput {

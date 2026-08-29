@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseScienceChatMessage } from '../core/experimentFabric/parser';
 import { runExperiment } from '../core/experimentFabric/executor';
+import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
+import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
+import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
 
 function makeFakeStorage() {
   const values = new Map<string, string>();
@@ -51,5 +54,34 @@ describe('Experiment Fabric to Scientific Memory', () => {
     expect(saved.execution).toMatchObject({ status: 'knowledge_only', resultOrigin: 'knowledge-only' });
     expect(saved.epistemicStatus).toBe('UNKNOWN');
     expect(saved.honestyNote).toContain('status=knowledge_only');
+  });
+});
+
+describe('Saved biotech comparison replay integrity', () => {
+  it('replays an intact source-backed comparison as MATCH', async () => {
+    const { saveBiotechDiscoveryComparisonToMemory, replaySavedBiotechComparison } = await import('../core/scienceMemory');
+    const reports = [
+      buildPinnedChEMBLCaffeineDiscovery().report,
+      buildPinnedChEMBLAdenosineDiscovery().report,
+      buildPinnedChEMBLTheophyllineDiscovery().report,
+    ];
+    const saved = saveBiotechDiscoveryComparisonToMemory(reports);
+    expect(replaySavedBiotechComparison(saved.biotech?.comparison, reports)).toEqual({
+      status: 'MATCH',
+      reason: expect.stringContaining('fingerprint'),
+    });
+  });
+
+  it('detects comparison fingerprint drift without claiming a biological rerun', async () => {
+    const { saveBiotechDiscoveryComparisonToMemory, replaySavedBiotechComparison } = await import('../core/scienceMemory');
+    const reports = [buildPinnedChEMBLCaffeineDiscovery().report, buildPinnedChEMBLAdenosineDiscovery().report];
+    const saved = saveBiotechDiscoveryComparisonToMemory(reports);
+    const drifted = { ...saved.biotech!.comparison!, scientificFingerprint: 'tampered-fingerprint' };
+    expect(replaySavedBiotechComparison(drifted, reports).status).toBe('DRIFT');
+  });
+
+  it('blocks replay when the saved comparison or report set is incomplete', async () => {
+    const { replaySavedBiotechComparison } = await import('../core/scienceMemory');
+    expect(replaySavedBiotechComparison(undefined, [buildPinnedChEMBLCaffeineDiscovery().report])).toMatchObject({ status: 'BLOCKED' });
   });
 });

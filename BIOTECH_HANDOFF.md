@@ -874,3 +874,29 @@ Chromium mobile: 27 routes, 13 labs, 242 interactions, zero runtime errors
 - **CURRENT HEAD:** `0694f03` before this documentation checkpoint
 - **BRANCH:** `manus/next-gap-observation-analysis`
 - **WORKING TREE:** clean after push
+
+## COMPLETED CORE/DRUG DISCOVERY BLOCK: deterministic biotech comparison replay integrity
+
+The existing source-backed caffeine/adenosine/theophylline comparison now has a narrow replay-integrity verifier in the existing Scientific Memory boundary. `replaySavedBiotechComparison` deterministically recomputes the existing candidate comparison and returns `MATCH` when comparison ID, report order, candidate order and scientific fingerprint are unchanged, `DRIFT` when persisted identity differs, and `BLOCKED` when the saved comparison/report set is incomplete or cannot be recomputed. This verifies the saved comparison calculation only; it is not a biological rerun, fresh assay, source refresh, efficacy claim or safety conclusion.
+
+Scientific Memory now renders the replay-integrity status and reason for saved biotech comparisons, with an explicit disclaimer that this is not biological execution or a fresh measurement. The implementation reuses the existing pinned source-backed builders and comparator; no second replay, evidence, memory or ranking system was introduced.
+
+Changed files:
+
+- `packages/frontend/src/core/scienceMemory.ts`
+- `packages/frontend/src/components/ScientificMemoryScreen.tsx`
+- `packages/frontend/src/__tests__/scienceMemoryFabric.test.ts`
+
+Validation completed:
+
+```text
+focused scienceMemoryFabric.test.ts: 5 passed
+npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b; existing Vite large-chunk warning remains
+npm run lint: passed
+git diff --check: passed
+```
+
+- **CURRENT STATUS:** comparison → Scientific Memory → deterministic replay-integrity disclosure is now complete for the pinned source-backed reports.
+- **PARKED:** biological execution, clinical efficacy, full ADME/Tox, new independent assays, and any claim of calibrated therapeutic accuracy remain blocked/unknown by source or executor limitations.
+- **NEXT GAP:** inspect only for another confirmed end-to-end break; otherwise prioritize a reachable authoritative source-backed capability rather than creating another contract or synthetic dataset.

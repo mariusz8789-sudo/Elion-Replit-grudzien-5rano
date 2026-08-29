@@ -185,6 +185,7 @@ export function ScienceChat() {
   }]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
   const [pendingGuidedPlan, setPendingGuidedPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
+  const [biotechWorkspaceSuggested, setBiotechWorkspaceSuggested] = useState(false);
   const [backendConfirmationPending, setBackendConfirmationPending] = useState(false);
   const [lastEvidenceCapsule, setLastEvidenceCapsule] = useState<EvidenceGuidedExperimentCapsule | null>(null);
   const [activeKnowledgeProject, setActiveKnowledgeProject] = useState<ActiveKnowledgeProject | null>(() => getActiveKnowledgeProject());
@@ -311,6 +312,7 @@ export function ScienceChat() {
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
       setPendingGuidedPlan(reviewed.status === 'READY_FOR_CONFIRMATION' || reviewed.status === 'READY_FOR_HYPOTHETICAL_CONFIRMATION' ? reviewed : null);
+      setBiotechWorkspaceSuggested(fabricRequest.domainId === 'biotechnology' && reviewed.status !== 'READY_FOR_CONFIRMATION' && reviewed.status !== 'READY_FOR_HYPOTHETICAL_CONFIRMATION');
       setInput('');
       track('ask_ai_used', { via: 'science-chat-plan', model: fabricRequest.modelId ?? fabricRequest.domainId, status: reviewed.status });
       void appendProjectKnowledgeSources(msg);
@@ -425,6 +427,12 @@ export function ScienceChat() {
         <div className="science-chat-suggest" aria-label="Potwierdzenie planu eksperymentu">
           <button className="primary-btn" disabled={backendConfirmationPending} onClick={() => void send('potwierdź')}>{backendConfirmationPending ? 'Uruchamianie realnego solvera…' : 'Uruchom potwierdzony plan'}</button>
           <button className="chip-btn" disabled={backendConfirmationPending} onClick={() => void send('anuluj plan')}>Anuluj plan</button>
+        </div>
+      )}
+      {biotechWorkspaceSuggested && (
+        <div className="science-chat-suggest" aria-label="Przejście do Drug Discovery">
+          <button className="chip-btn primary" onClick={() => { window.location.hash = '#/drug'; setOpen(false); }}>Otwórz Drug Discovery workspace</button>
+          <span className="settings-hint">Request biotech pozostaje nieuruchomiony; workspace pokazuje wyłącznie source-backed dane i jawne blokady.</span>
         </div>
       )}
 

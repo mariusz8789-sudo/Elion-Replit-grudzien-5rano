@@ -900,3 +900,25 @@ git diff --check: passed
 - **CURRENT STATUS:** comparison → Scientific Memory → deterministic replay-integrity disclosure is now complete for the pinned source-backed reports.
 - **PARKED:** biological execution, clinical efficacy, full ADME/Tox, new independent assays, and any claim of calibrated therapeutic accuracy remain blocked/unknown by source or executor limitations.
 - **NEXT GAP:** inspect only for another confirmed end-to-end break; otherwise prioritize a reachable authoritative source-backed capability rather than creating another contract or synthetic dataset.
+
+## COMPLETED END-TO-END BLOCK: Science Chat → Drug Discovery workspace handoff
+
+When a candidate-discovery request enters Science Chat and the reviewed Fabric plan is `ENGINE_NOT_AVAILABLE`/blocked because no validated biological executor is configured, Science Chat now offers a direct action to open the existing `#/drug` Drug Discovery workspace. The request remains unexecuted; the destination explicitly presents source-backed records, comparison, provenance and validation blockers. No direct bypass of the reviewed request boundary, biological executor, efficacy claim or synthetic observation was added.
+
+Changed file:
+
+- `packages/frontend/src/components/ScienceChat.tsx`
+
+Validation completed:
+
+```text
+focused Science Chat + biotech Fabric tests: passed
+npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b; existing Vite large-chunk warning remains
+npm run lint: passed
+git diff --check: passed
+```
+
+- **CURRENT STATUS:** Science Chat now hands blocked candidate-discovery intent into the existing source-backed Drug Discovery user flow instead of ending at a dead request boundary.
+- **PARKED:** biological executor, independent assays, clinical efficacy, complete ADME/Tox and unsupported Natural/Neuro causal claims remain blocked/unknown.
+- **NEXT GAP:** only pursue another confirmed end-to-end break or reachable authoritative source-backed capability; do not add another duplicate contract or synthetic data path.

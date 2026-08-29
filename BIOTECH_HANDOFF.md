@@ -1194,3 +1194,12 @@ Focused runtime validation now passes: 16 passed, 10 skipped, 0 failed across he
 One bounded installation attempt was made for `meep>=1.0` via PyPI. The package resolved to unrelated `meep==1.0.6` (a Git/Hg API helper, not the MIT Meep electromagnetic solver); it installed but failed the worker contract because it has no `verbosity` API. The unrelated package and its transitive dependencies were removed immediately. A follow-up availability check correctly reports `pymeep_unavailable: No module named 'meep'`.
 
 PyMeep is therefore parked as `BLOCKED_BY_RUNTIME` / package-source mismatch. No fallback analytical Fresnel value was admitted as FDTD output, and the existing adapter remains honest. Continue to the next viable runtime: ADMET-AI.
+
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: ADMET-AI
+
+One bounded installation attempt activated `admet-ai==2.0.1` in the sandbox Python 3.12 runtime. The existing ADMET adapter executed the real aspirin reference case with two repeated model calls, verified deterministic output, cross-checked RDKit molecular weight (`180.159`, expected `180.16`) and logP (`1.3101`, within the adapter’s documented reference tolerance), and confirmed all 52 published endpoints are present. The reference explicitly does not assert endpoint accuracy as ground truth: ADMET outputs are probabilistic `MODEL_ESTIMATE` values with endpoint-specific published TDC metrics, not observations or clinical evidence.
+
+The focused campaign validation passed the real ADMET + toxicity stages, both threshold directions, downstream docking selection after filtering, ADMET replay within the documented batch-composition tolerance, and append-only verification history. Runtime/toolchain validation passed with `21 passed, 5 skipped, 0 failed`. The five skips are PySCF and OpenMM tests because those runtimes are not available in this fresh sandbox despite their prior validated checkpoints being recorded in the branch handoff.
+
+Current runtime state for this continuation: validated in this session — RDKit, AutoDock Vina/Meeko, Biopython, ADMET-AI; parked — PyMeep due to the PyPI package-source mismatch documented above; prior branch checkpoints — PySCF and OpenMM. No synthetic outputs were admitted. Next large gap is a real-session revalidation of PySCF/OpenMM if their environment is restored, otherwise the remaining integration work is end-to-end reporting and UI/browser verification rather than another missing runtime.

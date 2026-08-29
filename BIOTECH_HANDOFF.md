@@ -23,7 +23,8 @@ Do not restart or perform a broad repository audit. Verify only the current bran
 - `f2aec5f` — `feat(core): surface replay identity in memory`
 - `d749715` — `docs(core): confirm evidence replay boundary`
 - `22fd2f4` — `docs(core): verify protocol replay path`
-- next checkpoint in this session — verify model selection → Structured Request boundary; if already wired, park and continue Core queue
+- `3579f64` — `docs(core): verify model request boundary`
+- next checkpoint in this session — complete user-facing scientific result report
 
 ## Completed capability: Result → Analysis → Scientific Memory
 
@@ -157,9 +158,17 @@ The existing Experiment Pilot already creates the multi-run `ScientificEvidenceP
 
 Experiment Pilot already uses the canonical `buildStructuredRequestFromModel` builder to fill declared defaults, preserve model identity and seed, and feed the resulting `StructuredExperimentRequest` into the existing plan/confirmation/Fabric flow. The builder is covered by the existing Experiment Pilot tests. No duplicate request path was introduced.
 
+## Completed Core capability: unified user-facing scientific result report
+
+Science Chat now presents one explicit `SCIENTIFIC RESULT REPORT` from the existing `ExperimentRun`: original question, selected model, execution status/origin, epistemic classification, typed outputs, existing analysis, route, warnings, source/provenance, Evidence interpretation and Replay boundary. The report distinguishes `EXECUTED_REAL_ENGINE`, `KNOWLEDGE_ONLY_NOT_EXECUTED`, `SCENARIO_OR_HYPOTHETICAL_NOT_MEASUREMENT` and `NOT_EXECUTED_OR_BLOCKED`. It states that a single run is not an Evidence Pack and that Replay requires existing capsule/protocol semantics.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation completed: targeted report/ChEMBL tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
 ## NEXT PRIORITY — main Genesis Core
 
-Continue with the next low-cost integration gap at the user-facing result boundary: verify that the existing real typed result, analysis, route, evidence status and replay identity are presented as one coherent report without implying execution where status is `knowledge_only`, `scenario` or `blocked`. Prefer a focused formatter/test change only where a field is actually missing.
+Continue to the next high-value Core gap: verify the same report semantics on the confirmed Protocol/A-B path, ensuring Evidence Pack status and Replay verdict are presented in the report rather than only as a separate handoff string. Prefer a small formatter integration; do not create another reporting system.
 
 ## Next large gaps
 

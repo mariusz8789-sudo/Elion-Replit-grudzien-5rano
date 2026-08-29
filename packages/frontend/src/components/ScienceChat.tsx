@@ -94,7 +94,17 @@ export function formatFabricRun(run: ExperimentRun): string {
   const analysis = analyzeExperimentResult(run.result)
     .map((block) => `\nAnaliza — ${block.title}: ${block.body}`)
     .join('');
-  return `${run.result.summary}\nStatus: ${run.result.status}; origin: ${run.provenance.resultOrigin}.${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}${biotechSource}${analysis}\nProvenance: ${run.provenance.runFingerprint}.`;
+  const epistemicReading = run.provenance.resultOrigin === 'real-engine'
+    ? 'EXECUTED_REAL_ENGINE'
+    : run.provenance.resultOrigin === 'knowledge-only'
+      ? 'KNOWLEDGE_ONLY_NOT_EXECUTED'
+      : run.provenance.resultOrigin === 'hypothetical-visualization'
+        ? 'SCENARIO_OR_HYPOTHETICAL_NOT_MEASUREMENT'
+        : 'NOT_EXECUTED_OR_BLOCKED';
+  const reportHeader = `SCIENTIFIC RESULT REPORT\nPytanie: ${run.request.sourceText}\nModel: ${run.request.modelId ?? 'nie wybrano'}\nWykonanie: ${run.result.status} / ${run.provenance.resultOrigin}\nKlasyfikacja epistemiczna: ${epistemicReading}`;
+  const evidence = run.result.biologicalEvidence ? '\nEvidence: LITERATURE_SUPPORTED binding record; nie jest computational Evidence Pack.' : '\nEvidence: status wynika z istniejącego handoffu/protokołu; pojedynczy run nie tworzy Evidence Pack.';
+  const replay = '\nReplay: nieustanowiony dla tego pojedynczego wyniku; wymaga istniejącej capsule/protocol semantics.';
+  return `${reportHeader}\nWynik: ${run.result.summary}${entries.length > 0 ? `\n${entries.join('\n')}` : ''}${run.result.warnings.length > 0 ? `\nUwaga: ${run.result.warnings.join(' ')}` : ''}${source}${backend}${route}${biotech}${biotechSource}${analysis}${evidence}${replay}\nProvenance: ${run.provenance.runFingerprint}.`;
 }
 
 function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule }) {

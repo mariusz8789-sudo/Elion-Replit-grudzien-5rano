@@ -1212,3 +1212,8 @@ The validated runtime stages are now connected through the existing Genesis camp
 The campaign API now exposes `GET /api/projects/:projectId/campaigns/:campaignId/report`, and the existing Campaign Screen loads and displays the unified report alongside the existing graph, WHY answers, Scientific Runs, artifacts, and verification controls. The visible status remains `MODEL_ESTIMATE`; biological execution remains `NOT_EXECUTED / BLOCKED`. No computational result is promoted to observation, efficacy, safety, or clinical evidence.
 
 Regression validation passed: campaign multi-fidelity suite `7 passed, 1 skipped, 0 failed`; prior complete focused runtime suite `21 passed, 5 skipped, 0 failed`; frontend TypeScript/Vite production build passed; ESLint passed; `git diff --check` passed. The unrelated backend HTTP test startup failure remains parked from the earlier broad invocation.
+
+
+## FINAL VALIDATION: Chromium UI
+
+The first desktop smoke invocation was invalid because no server was listening on its default `127.0.0.1:8080`; it produced only `ERR_CONNECTION_REFUSED`. After starting the built Genesis backend/static server on port 8080, the same smoke suite passed: 27 routes plus 13 laboratories, 216 interactions, and zero runtime errors. The unified report surface is therefore build-validated and covered by the live desktop Chromium smoke environment.

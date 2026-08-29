@@ -17,6 +17,8 @@ pyscf>=2.9
 # OpenMM — molecular dynamics (AMBER/TIP3P, minimization, NVT/NPT). MIT/LGPL.
 openmm>=8.1
 # AutoDock Vina + Meeko — molecular docking (ligand prep + empirical scoring).
+# SciPy is required by the Vina Python bindings at import time.
+scipy>=1.10
 vina>=1.2.5
 meeko>=0.6
 gemmi>=0.6

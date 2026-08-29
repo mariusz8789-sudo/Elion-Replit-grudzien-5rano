@@ -1167,3 +1167,14 @@ API and toolchain regressions now verify the runtime metadata contract. Full val
 One bounded installation attempt activated `openmm==8.6.0.dev-c6173db` in the same Python 3.12 runtime. The existing Toolchain Registry validated OpenMM, and the existing reference benchmark executed a real water-box minimization plus NVT temperature check: initial-to-minimized potential energy decreased and the NVT temperature stayed within the reference range. The result is a non-clinical molecular-dynamics model estimate, not biological stability or therapeutic evidence.
 
 The same heavy-engine test also passed the PySCF H2 and water reference cases and RDKit/toolchain metadata checks: 8 passed, 4 skipped, 0 failed. Remaining absent runtimes are AutoDock Vina/Meeko, Biopython, PyMeep and ADMET-AI. No synthetic outputs were admitted.
+
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: AutoDock Vina + Meeko
+
+One bounded installation attempt activated `vina==1.2.7`, `meeko==0.8.0`, `gemmi==0.7.5`, and the required numerical dependency `scipy==1.18.1` in the sandbox Python 3.12 runtime; `rdkit==2026.3.5` was already available from the preceding checkpoint. The existing Toolchain Registry and docking adapter now execute the real reference case: aspirin ligand preparation through Meeko followed by AutoDock Vina against the documented indole small-molecule rigid stand-in. The run produced 5 poses with a best score of `-2.226 kcal/mol`, deterministic seed `42`, input hash `493d2b6e6a80e00b`, and persisted receptor/ligand/docked PDBQT artifact hashes.
+
+The result is `MODEL_ESTIMATE` software-pipeline evidence only. The small-molecule receptor is explicitly not a protein target, the Vina score is not experimental affinity, and no efficacy, safety, or clinical claim is made. `requirements-compute.txt` now declares SciPy because the Vina Python bindings require it at import time.
+
+Focused runtime validation passed: 14 passed, 12 skipped, 0 failed across the heavy-engine, multi-fidelity and replay suites. The real campaign docking stage persisted Scientific Runs with artifacts, and seeded replay matched exactly. The Toolchain Registry marked Vina/Meeko `AVAILABLE` only after its passing reference case. The broader backend invocation still has an unrelated HTTP-test startup failure (`server.http.test.mjs` exits early); it is not a docking failure and remains parked for a later gap.
+
+Remaining absent runtimes after this checkpoint: Biopython, PyMeep and ADMET-AI. Next large gap: bounded Biopython availability/reference validation, then continue to PyMeep and ADMET-AI.

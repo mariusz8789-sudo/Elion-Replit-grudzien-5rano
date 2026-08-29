@@ -922,3 +922,16 @@ git diff --check: passed
 - **CURRENT STATUS:** Science Chat now hands blocked candidate-discovery intent into the existing source-backed Drug Discovery user flow instead of ending at a dead request boundary.
 - **PARKED:** biological executor, independent assays, clinical efficacy, complete ADME/Tox and unsupported Natural/Neuro causal claims remain blocked/unknown.
 - **NEXT GAP:** only pursue another confirmed end-to-end break or reachable authoritative source-backed capability; do not add another duplicate contract or synthetic data path.
+
+## RELEASE CHECKPOINT AFTER CONTINUATION SPRINT
+
+The continuation sprint is verified on the remote tip. The deterministic biotech comparison replay-integrity block and Science Chat → Drug Discovery handoff are committed on `manus/next-gap-observation-analysis`.
+
+Production-style verification used the existing backend on port 8080. `/api/health` returned `ok=true`, `static=true`, `knowledgeLabs=15` and `persistence=ready`. Desktop smoke passed with 27 routes, 13 laboratories and 242 interactions, zero runtime errors. Mobile smoke passed with the same coverage and zero runtime errors. Full tests remain `271 passed, 40 skipped, 0 failed`; build/typecheck, lint and `git diff --check` passed.
+
+- **CURRENT HEAD:** pending commit below
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **REMOTE:** synchronized after push
+- **COMPLETED:** saved biotech comparison replay-integrity disclosure; blocked Science Chat biotech request → existing Drug Discovery workspace handoff
+- **PARKED:** biological executor, independent assays, clinical efficacy, complete ADME/Tox, unsupported Natural/Neuro causal claims and fabricated observations
+- **NEXT GAP:** continue only with another confirmed end-to-end break or reachable authoritative source-backed capability; current available workflows have no evidenced release blocker.

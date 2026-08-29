@@ -1028,3 +1028,15 @@ The PubChem source probe succeeded for all nine records via the public PUG REST 
 - **CURRENT STATUS:** bounded Natural Product Discovery expanded from 3 to 12 real source-backed/identity-backed reports and remains integrated with existing comparison, provenance, memory and replay.
 - **PARKED:** live broad natural-product search, target/activity enrichment for identity-only records, global server-authoritative ADMIN role, biological executor, independent assays, clinical efficacy and complete ADME/Tox.
 - **NEXT GAP:** reachable target/activity evidence expansion, preferably through ChEMBL or UniProt, using the same deterministic source-and-status policy; park quickly if the endpoint or query coverage is insufficient.
+
+## COMPLETED TARGET EVIDENCE EXPANSION: ChEMBL theobromine–A1
+
+A reachable ChEMBL API query added one target/activity-backed record beyond the identity-only PubChem catalog: theobromine (`CHEMBL1114`) at Adenosine receptor A1 (`CHEMBL318`), activity `193161`, assay `CHEMBL643484`, Ki `105000 nM`, rat brain cortical membrane context. ChEMBL marks the value outside the typical range and potentially inaccurate; Genesis preserves that uncertainty and does not convert it into efficacy, mechanism, safety or ADME.
+
+The record is integrated into the existing candidate/evidence/ranking/hypothesis path with `LITERATURE_SUPPORTED` activity evidence, `UNKNOWN` safety/ADME, deterministic low evidence quality, target relevance 1, uncertainty penalty 0.75 and explicit research-priority-only ranking. The source query URL, ChEMBL activity/assay identifiers, version label and retrieval date are retained in provenance. No live source call was added to the UI and no synthetic activity value was created.
+
+Validation completed: focused resolver test passed; full suite reports 271 passed, 40 skipped and 0 failed; build/typecheck, lint and diff-check passed. Existing smoke coverage remains green from the immediately preceding UI checkpoint.
+
+- **CURRENT STATUS:** one additional real target/activity evidence record is now available in the 12-report bounded discovery set, increasing the resolved set to 12 reports with one richer ChEMBL profile.
+- **PARKED:** broader ChEMBL target/activity enrichment for the remaining records requires per-compound queries and evidence-quality review; live broad search, server-authoritative global ADMIN, biological execution, independent assays, efficacy and complete ADME/Tox remain blocked or unknown.
+- **NEXT GAP:** batch deterministic ChEMBL enrichment for the remaining known compounds, stopping quickly on missing or low-quality target evidence.

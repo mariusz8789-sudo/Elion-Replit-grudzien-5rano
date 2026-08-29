@@ -43,7 +43,7 @@ const PUBCHEM_IDENTITY_RECORDS = [
 ] as const;
 
 function identityOnlyReports(): CandidateDiscoveryReport[] {
-  return PUBCHEM_IDENTITY_RECORDS.map(([name, cid, formula, smiles, inchiKey, molecularWeight]) => {
+  return PUBCHEM_IDENTITY_RECORDS.filter(([name]) => name !== 'theobromine').map(([name, cid, formula, smiles, inchiKey, molecularWeight]) => {
     const sourceUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON`;
     const provenance = { source: 'PubChem', sourceId: `pubchem:CID:${cid}`, evidenceType: 'compound identity and structure property record', status: 'LITERATURE_SUPPORTED' as const, uncertainty: 'Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.', sourceUrl, sourceVersion: `PubChem CID ${cid}`, retrievedAt: PUBCHEM_RETRIEVED_AT };
     const evidence: BiologicalEvidence = { kind: 'biological-evidence', id: `evidence:pubchem:${cid}`, namespace: 'pubchem', label: `${name} identity record`, status: 'LITERATURE_SUPPORTED', claim: `${name} is identified by the cited PubChem compound record; no biological target claim is made.`, subjectIds: [`compound:pubchem:${cid}`], provenance: [provenance] };
@@ -57,6 +57,17 @@ function identityOnlyReports(): CandidateDiscoveryReport[] {
 
 const candidateId = (cid: number): string => `candidate:pubchem:${cid}`;
 const hypothesisId = (cid: number): string => `hypothesis:pubchem:${cid}`;
+
+function buildChEMBLTheobromineA1Report(): CandidateDiscoveryReport {
+  const sourceUrl = 'https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1114&target_chembl_id=CHEMBL318&limit=5';
+  const provenance = { source: 'ChEMBL', sourceId: 'chembl:activity:193161', evidenceType: 'curated A1 receptor binding activity', status: 'LITERATURE_SUPPORTED' as const, uncertainty: 'One rat brain cortical membrane binding record is outside the typical range and marked potentially inaccurate by ChEMBL; it does not establish clinical efficacy.', sourceUrl, sourceVersion: 'ChEMBL activity 193161 / assay CHEMBL643484', retrievedAt: PUBCHEM_RETRIEVED_AT };
+  const evidence: BiologicalEvidence = { kind: 'biological-evidence', id: 'evidence:chembl:193161', namespace: 'chembl', label: 'Theobromine A1 binding activity', status: 'LITERATURE_SUPPORTED', claim: 'Theobromine has a ChEMBL-recorded Ki of 105000 nM at Adenosine receptor A1 in rat brain cortical membrane assay.', subjectIds: ['compound:chembl:CHEMBL1114', 'target:chembl:CHEMBL318'], provenance: [provenance] };
+  const safety: SafetySignal = { kind: 'safety-signal', id: 'safety:unknown:chembl:1114', namespace: 'genesis-biotech', label: 'Theobromine safety/ADME unknown', status: 'UNKNOWN', signalType: 'uncertainty', description: 'This activity record does not supply a safety or ADME conclusion.', evidenceQuality: 'UNKNOWN', uncertainty: 'Safety and ADME require separate authoritative records.', provenance: [{ ...provenance, sourceId: 'safety:unknown:chembl:1114', evidenceType: 'explicit missing safety/ADME boundary', status: 'UNKNOWN' }] };
+  const candidate: TherapeuticCandidate = { kind: 'therapeutic-candidate', id: 'candidate:chembl:CHEMBL1114', namespace: 'genesis-biotech', label: 'Theobromine', status: 'HYPOTHESIS', materialId: 'material:chembl:CHEMBL1114', compoundIds: ['compound:chembl:CHEMBL1114'], targetIds: ['target:chembl:CHEMBL318'], mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], hypothesisIds: ['hypothesis:chembl:CHEMBL1114'], provenance: [provenance] };
+  const hypothesis: TherapeuticHypothesis = { kind: 'therapeutic-hypothesis', id: 'hypothesis:chembl:CHEMBL1114', namespace: 'genesis-biotech', label: 'Theobromine A1 follow-up', status: 'HYPOTHESIS', claim: 'Theobromine is a source-backed A1 binding candidate for follow-up; the record is weak/uncertain and is not a functional replacement claim.', candidateId: candidate.id, targetIds: candidate.targetIds, mechanismIds: [], supportingEvidenceIds: [evidence.id], safetySignalIds: [safety.id], provenance: [{ ...provenance, sourceId: hypothesisId(1114), evidenceType: 'bounded research hypothesis', status: 'HYPOTHESIS' }] };
+  const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'LOW', targetRelevance: 1, safetySignals: [safety], uncertaintyPenalty: 0.75 });
+  return createCandidateDiscoveryReport({ candidate, hypothesis, ranking, uncertainty: 'ChEMBL source record is target/activity-backed but marked outside typical range; independent assay, mechanism, safety, ADME and clinical efficacy remain UNKNOWN.' });
+}
 
 export function resolveNaturalFunctionalReplacement(input: NaturalFunctionalReplacementInput): NaturalFunctionalReplacementResult {
   const reference = normalize(input.referenceCompound);
@@ -76,6 +87,7 @@ export function resolveNaturalFunctionalReplacement(input: NaturalFunctionalRepl
     buildPinnedChEMBLCaffeineDiscovery().report,
     buildPinnedChEMBLAdenosineDiscovery().report,
     buildPinnedChEMBLTheophyllineDiscovery().report,
+    buildChEMBLTheobromineA1Report(),
     ...identityOnlyReports(),
   ];
   return {

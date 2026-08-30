@@ -14,6 +14,8 @@ import {
   type SafetySignal,
   type TherapeuticCandidate,
   type TherapeuticHypothesis,
+  canonicalJson,
+  fnv1a,
 } from '../biotechDiscoveryContract';
 
 export interface NaturalFunctionalReplacementInput {
@@ -76,6 +78,24 @@ export interface NaturalHeavyCompute {
   status: ComputeRun['status'] | 'blocked'; runId?: string; runFingerprint?: string;
   resultOrigin: string; outputs: Readonly<Record<string, string | number | boolean>>;
   summary: string; provenance?: ComputeRun['provenance'];
+}
+
+function enrichReportsWithCompute(reports: readonly CandidateDiscoveryReport[], cheap: readonly NaturalCheapCompute[], heavy: readonly NaturalHeavyCompute[], admet: readonly NaturalHeavyCompute[]): CandidateDiscoveryReport[] {
+  return reports.map((report) => {
+    const cid = Number(report.candidateId.split(':').pop());
+    const runs = [
+      ...cheap.filter((run) => run.pubchemCid === cid).map((run) => ({ runtime: 'Experiment Fabric cheap molecular weight', version: EXPERIMENT_FABRIC_VERSION, runId: run.runId, fingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, outputs: run.outputs as Readonly<Record<string, string | number | boolean>> })),
+      ...heavy.filter((run) => run.pubchemCid === cid).map((run) => ({ runtime: run.engine ?? run.modelId, version: run.modelVersion, runId: run.runId, fingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, outputs: run.outputs })),
+      ...admet.filter((run) => run.pubchemCid === cid).map((run) => ({ runtime: run.engine ?? run.modelId, version: run.modelVersion, runId: run.runId, fingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, outputs: run.outputs })),
+    ];
+    if (!Number.isFinite(cid) || !report.ranking || runs.length === 0) return report;
+    const support = Number((runs.filter((run) => run.status === 'completed' || run.status === 'ok').length / runs.length).toFixed(4));
+    const ranking = { ...report.ranking, score: Number((report.ranking.score + 0.05 * support).toFixed(4)), components: { ...report.ranking.components, computeSupport: support }, rationale: `${report.ranking.rationale} Compatible source-backed compute availability adds a bounded +0.05 support term; it is not efficacy or safety evidence.` };
+    const unsigned = { ...report, ranking, computeRuns: runs } as Record<string, unknown>;
+    delete unsigned.reportId; delete unsigned.provenance; delete unsigned.scientificFingerprint;
+    const scientificFingerprint = fnv1a(canonicalJson(unsigned));
+    return { ...report, ranking, computeRuns: runs, reportId: `report:${scientificFingerprint}`, scientificFingerprint };
+  });
 }
 
 const normalize = (value: string | undefined): string => (value ?? '').trim().toLowerCase();
@@ -293,5 +313,6 @@ export async function resolveNaturalFunctionalReplacementFromSources(
       else admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', status: 'blocked', resultOrigin: 'engine-unavailable', outputs: {}, summary: `BLOCKED: ${response.error}` }));
     } catch (error) { admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', status: 'blocked', resultOrigin: 'request-failed', outputs: {}, summary: `BLOCKED: ${error instanceof Error ? error.message : String(error)}` })); }
   }
-  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
+  const enrichedReports = enrichReportsWithCompute([...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)], cheapCompute, heavyCompute ?? [], admetCompute ?? []);
+  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. ${base.reason}`, reports: enrichedReports };
 }

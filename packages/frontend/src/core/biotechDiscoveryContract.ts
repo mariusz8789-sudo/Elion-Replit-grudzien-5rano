@@ -1,4 +1,5 @@
 import { canonicalJson, fnv1a } from './events/hash';
+export { canonicalJson, fnv1a } from './events/hash';
 
 /** Epistemic status is explicit; prediction and inference never become facts. */
 export type BiotechEpistemicStatus =
@@ -127,6 +128,8 @@ export interface CandidateRanking {
     targetRelevance: number;
     safetyPenalty: number;
     uncertaintyPenalty: number;
+    /** Availability of compatible, source-backed compute only; never efficacy or safety. */
+    computeSupport?: number;
   };
   rationale: string;
   uncertainty: string;
@@ -228,6 +231,15 @@ export interface CandidateDiscoveryReport {
   scientificEvidenceStatus: BiotechEpistemicStatus;
   clinicalEfficacy: ClinicalEfficacyStatus;
   admeProfile?: BiotechAdmeProfile;
+  computeRuns?: readonly {
+    runtime: string;
+    version?: string;
+    runId?: string;
+    fingerprint?: string;
+    status: string;
+    resultOrigin: string;
+    outputs: Readonly<Record<string, string | number | boolean>>;
+  }[];
   uncertainty: string;
   provenance: readonly BiotechProvenance[];
   scientificFingerprint: string;

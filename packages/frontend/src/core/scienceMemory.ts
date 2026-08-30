@@ -66,6 +66,7 @@ export interface SavedBiotechComputeRun {
 export interface SavedBiotechDiscoveryArtifact {
   requestId?: string; reference?: string; target?: string;
   neurobiology?: { targetId: string; receptor: string; receptorFamily: string; neurotransmitterSystem: string; pathway: { label: string; status: string; uncertainty: string }; mechanism: { label: string; status: string; uncertainty: string }; provenance: readonly { source: string; sourceId: string; sourceUrl?: string; sourceVersion?: string }[] };
+  validationRequestIds: readonly string[];
   reports: readonly CandidateDiscoveryReport[];
   candidateIds: readonly string[]; sourceIds: readonly string[];
   activityIds: readonly string[]; assayIds: readonly string[];
@@ -307,7 +308,7 @@ export function saveBiotechDiscoveryComparisonToMemory(reports: readonly Candida
   const comparison = compareCandidateDiscoveryReports(reports);
   const computeRuns = lineage?.computeRuns ?? [];
   const artifactBase = {
-    reports,
+    reports, validationRequestIds: reports.flatMap((report) => report.experimentRequestId ? [report.experimentRequestId] : []),
     candidateIds: reports.map((report) => report.candidateId),
     sourceIds: [...new Set(reports.flatMap((report) => report.provenance.map((item) => item.sourceId)))],
     activityIds: lineage?.activityIds ?? [], assayIds: lineage?.assayIds ?? [],
@@ -350,7 +351,7 @@ export function replaySavedBiotechComparison(
 export function replaySavedBiotechDiscoveryArtifact(saved: SavedBiotechDiscoveryArtifact | undefined, reports: readonly CandidateDiscoveryReport[], lineage: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[]; neurobiology?: SavedBiotechDiscoveryArtifact['neurobiology'] } = {}): SavedBiotechComparisonReplay {
   if (!saved || reports.length < 2) return { status: 'BLOCKED', reason: 'Brak kompletnego discovery artifact albo raportów do odtworzenia.' };
   const comparison = compareCandidateDiscoveryReports(reports);
-  const base = { reports, candidateIds: reports.map((report) => report.candidateId), sourceIds: [...new Set(reports.flatMap((report) => report.provenance.map((item) => item.sourceId)))], activityIds: lineage.activityIds ?? [], assayIds: lineage.assayIds ?? [], comparisonId: comparison.comparisonId, rankingScores: Object.fromEntries(reports.map((report) => [report.candidateId, report.ranking?.score ?? 0])), computeRuns: lineage.computeRuns ?? [], ...(lineage.neurobiology === undefined ? {} : { neurobiology: lineage.neurobiology }), limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'], combinationHypothesis: buildCandidateCombinationHypothesis(reports) };
+  const base = { reports, validationRequestIds: reports.flatMap((report) => report.experimentRequestId ? [report.experimentRequestId] : []), candidateIds: reports.map((report) => report.candidateId), sourceIds: [...new Set(reports.flatMap((report) => report.provenance.map((item) => item.sourceId)))], activityIds: lineage.activityIds ?? [], assayIds: lineage.assayIds ?? [], comparisonId: comparison.comparisonId, rankingScores: Object.fromEntries(reports.map((report) => [report.candidateId, report.ranking?.score ?? 0])), computeRuns: lineage.computeRuns ?? [], ...(lineage.neurobiology === undefined ? {} : { neurobiology: lineage.neurobiology }), limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'], combinationHypothesis: buildCandidateCombinationHypothesis(reports) };
   return fnv1a(canonicalJson(base)) === saved.artifactFingerprint ? { status: 'MATCH', reason: 'Cały deterministyczny discovery artifact odtworzył identyczny fingerprint.' } : { status: 'DRIFT', reason: 'Discovery artifact różni się w identity, źródłach, comparison, ranking, compute lub ograniczeniach.' };
 }
 

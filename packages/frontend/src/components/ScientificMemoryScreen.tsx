@@ -93,10 +93,10 @@ export function ScientificMemoryScreen() {
               ])
               : undefined;
             const artifact = record.biotech?.artifact;
-            const pinnedReports = [buildPinnedChEMBLCaffeineDiscovery().report, buildPinnedChEMBLAdenosineDiscovery().report, buildPinnedChEMBLTheophyllineDiscovery().report];
             const runArtifactReplay = (mode: 'match' | 'drift' | 'blocked') => {
               const lineage = { activityIds: record.biotech?.activityIds, assayIds: record.biotech?.assayIds, computeRuns: artifact?.computeRuns };
-              const result = mode === 'blocked' ? replaySavedBiotechDiscoveryArtifact(undefined, []) : replaySavedBiotechDiscoveryArtifact(artifact, pinnedReports, mode === 'drift' ? { ...lineage, activityIds: [...(lineage.activityIds ?? []), 'controlled-drift'] } : lineage);
+              const persistedReports = artifact?.reports ?? [];
+              const result = mode === 'blocked' ? replaySavedBiotechDiscoveryArtifact(undefined, []) : replaySavedBiotechDiscoveryArtifact(artifact, persistedReports, mode === 'drift' ? { ...lineage, activityIds: [...(lineage.activityIds ?? []), 'controlled-drift'] } : lineage);
               setArtifactReplay((current) => ({ ...current, [record.id]: `${result.status} — ${result.reason}` }));
             };
             return (
@@ -123,6 +123,12 @@ export function ScientificMemoryScreen() {
                     <div className="stat-row"><span>Unified Discovery Artifact</span><span className="val">{artifact.candidateIds.length} candidates · {artifact.computeRuns.length} compute runs</span></div>
                     <div className="stat-row"><span>Artifact fingerprint</span><span className="val mono">{artifact.artifactFingerprint}</span></div>
                     <div className="stat-row"><span>Artifact lineage</span><span className="val mono">{artifact.sourceIds.length} sources · {artifact.activityIds.length} activities · {artifact.assayIds.length} assays</span></div>
+                    {artifact.combinationHypothesis && <>
+                      <div className="stat-row"><span>Combination hypothesis</span><span className="val mono">{artifact.combinationHypothesis.combinationId} · {artifact.combinationHypothesis.status}</span></div>
+                      <div className="stat-row"><span>Combination coverage</span><span className="val">evidence {artifact.combinationHypothesis.coveredEvidenceIds.length} · targets {artifact.combinationHypothesis.coveredTargetIds.length} · mechanisms {artifact.combinationHypothesis.coveredMechanismIds.length} · missing evidence {artifact.combinationHypothesis.missingEvidenceIds.length}</span></div>
+                      <div className="stat-row"><span>Combination uncertainty</span><span className="val">{artifact.combinationHypothesis.uncertainty}</span></div>
+                      <details className="settings-details"><summary>Combination validation plan</summary>{artifact.combinationHypothesis.validationPlan.map((step) => <p className="settings-hint" key={step}>{step}</p>)}</details>
+                    </>}
                     {artifactReplay[record.id] && <div className="stat-row"><span>Full artifact replay</span><span className="val">{artifactReplay[record.id]}</span></div>}
                   </>}
                 </>}

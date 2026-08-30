@@ -319,9 +319,12 @@ export interface TherapeuticHypothesis extends BiotechRecord {
 export interface CandidateCombinationHypothesis {
   combinationId: string;
   candidateIds: readonly string[];
+  coveredEvidenceIds: readonly string[];
+  missingEvidenceIds: readonly string[];
   coveredTargetIds: readonly string[];
   coveredMechanismIds: readonly string[];
   uncoveredTargetIds: readonly string[];
+  researchPriority: number;
   validationPlan: readonly string[];
   status: 'HYPOTHESIS';
   uncertainty: string;
@@ -332,8 +335,11 @@ export function buildCandidateCombinationHypothesis(reports: readonly CandidateD
   const selected = [...reports].sort((a, b) => (b.ranking?.score ?? 0) - (a.ranking?.score ?? 0) || a.candidateId.localeCompare(b.candidateId)).slice(0, 2);
   const coveredTargetIds = [...new Set(selected.flatMap((report) => report.targetIds))];
   const coveredMechanismIds = [...new Set(selected.flatMap((report) => report.mechanismIds))];
+  const coveredEvidenceIds = [...new Set(selected.flatMap((report) => report.evidenceIds))];
+  const missingEvidenceIds = selected.flatMap((report) => report.evidenceIds.length === 0 ? [report.candidateId] : []);
   const uncoveredTargetIds = requestedTargetIds.filter((targetId) => !coveredTargetIds.includes(targetId));
-  const basis = { candidateIds: selected.map((report) => report.candidateId), coveredTargetIds, coveredMechanismIds, uncoveredTargetIds };
+  const researchPriority = Number((selected.reduce((sum, report) => sum + (report.ranking?.score ?? 0), 0) / selected.length).toFixed(4));
+  const basis = { candidateIds: selected.map((report) => report.candidateId), coveredEvidenceIds, missingEvidenceIds, coveredTargetIds, coveredMechanismIds, uncoveredTargetIds, researchPriority };
   return { combinationId: `combination:${fnv1a(canonicalJson(basis))}`, ...basis, validationPlan: ['Confirm each candidate independently in a target-specific assay.', 'Test the combination with a pre-registered additivity/synergy design.', 'Measure mechanism and toxicity endpoints separately; do not infer synergy from binding.'], status: 'HYPOTHESIS', uncertainty: 'Combination coverage is a research hypothesis derived from declared target/mechanism IDs; no synergy, efficacy or safety conclusion is established.' };
 }
 

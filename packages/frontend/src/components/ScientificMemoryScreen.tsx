@@ -85,12 +85,13 @@ export function ScientificMemoryScreen() {
       ) : (
         <section className="settings-section" aria-label="Zapisane eksperymenty">
           {records.map((record) => {
+            const biotechReplayReports = record.biotech?.artifact?.reports ?? [
+              buildPinnedChEMBLCaffeineDiscovery().report,
+              buildPinnedChEMBLAdenosineDiscovery().report,
+              buildPinnedChEMBLTheophyllineDiscovery().report,
+            ];
             const biotechReplay = record.biotech?.comparison
-              ? replaySavedBiotechComparison(record.biotech.comparison, [
-                buildPinnedChEMBLCaffeineDiscovery().report,
-                buildPinnedChEMBLAdenosineDiscovery().report,
-                buildPinnedChEMBLTheophyllineDiscovery().report,
-              ])
+              ? replaySavedBiotechComparison(record.biotech.comparison, biotechReplayReports)
               : undefined;
             const artifact = record.biotech?.artifact;
             const runArtifactReplay = (mode: 'match' | 'drift' | 'blocked') => {

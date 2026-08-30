@@ -1356,3 +1356,60 @@ The next implementation gap is therefore the smallest safe integration of this e
 The existing PySCF executor is now exposed through `/api/compute/qm/singlepoint` and the natural-discovery orchestration has a bounded PubChem `record_type=3d` adapter. For each cheap-filtered candidate it requests a real 3D conformer, validates element/coordinate array lengths and finite coordinates, then invokes the existing PySCF endpoint with RHF/STO-3G. Successful results are represented as `NaturalHeavyCompute` lineage with run ID, engine/version, output fingerprint, resultOrigin and an explicit MODEL_ESTIMATE limitation; candidates without valid 3D inputs or unavailable runtime remain BLOCKED and do not receive synthetic values. PySCF runs are included in `computeRuns`, so the existing report fingerprint and downstream Memory/Replay path can include them.
 
 Focused validation after the integration: TypeScript build passed; backend API syntax passed; naturalReplacement and scienceMemory tests passed (23/23). A fresh live acceptance attempt was intentionally not counted as success because PubChem returned the workflow's honest `PubChem retrieval niedostępny` blocker before candidate construction. The previously captured live PubChem 3D CID 2519 calculation remains independently verified: PySCF 2.14.0, RHF/STO-3G, converged energy `-667.72420427 Hartree`, HOMO–LUMO gap `12.2639 eV`, dipole `3.0446 Debye`. A later fresh PubChem availability run is required to certify the complete natural-discovery → PySCF → report → Memory → Replay path under live conditions.
+
+
+## CURRENT SOURCE OF TRUTH — HANDOFF LOCK CHECKPOINT
+
+Branch:
+`manus/next-gap-observation-analysis`
+
+HEAD:
+`c18e8b73bce017a0a3e3a6331f634b35f375be3c`
+
+Remote:
+`origin/manus/next-gap-observation-analysis`
+
+Main:
+`UNCHANGED` (no local `main` ref is present in this clone; no main files were modified)
+
+Working tree:
+`CLEAN`
+
+CURRENT PIPELINE:
+
+```text
+Science Chat
+→ PubChem
+→ ChEMBL
+→ Natural Discovery
+→ RDKit
+→ ADMET-AI
+→ PySCF
+→ ranking
+→ Report
+→ Discovery Artifact
+→ Memory
+→ Replay
+```
+
+REAL RUNTIMES:
+
+```text
+RDKit — AVAILABLE
+ADMET-AI — AVAILABLE
+PySCF — AVAILABLE / candidate integration
+Vina/Meeko — AVAILABLE / REVIEW_REQUIRED result
+OpenMM — BLOCKED
+Biological Executor — BLOCKED
+```
+
+NEXT REAL GAPS:
+
+```text
+1. Vina scientific validation
+2. OpenMM if valid structured input exists
+3. fresh full E2E including PySCF
+4. independent laboratory observation loop
+```
+
+No architecture, feature, refactor, cosmetic change or expensive runtime was added in this checkpoint. This block exists solely to lock the continuation state for the next Manus.

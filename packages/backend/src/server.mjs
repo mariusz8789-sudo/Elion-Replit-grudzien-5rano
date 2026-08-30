@@ -281,7 +281,7 @@ const server = http.createServer((req, res) => {
       static: staticAvailable,
       knowledgeLabs: knowledgeIndex.size,
       persistence: db ? 'ready' : 'unavailable',
-      toolchain: listToolchain().map((tool) => ({ id: tool.id, status: tool.status, version: tool.version ?? null })),
+      toolchain: listToolchain().map((tool) => ({ id: tool.id ?? tool.name ?? 'unknown', status: tool.status, version: tool.version ?? null })),
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);

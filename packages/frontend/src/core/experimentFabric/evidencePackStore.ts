@@ -60,6 +60,7 @@ export function classifyStoredEvidencePack(value: unknown): StoredEvidencePackSt
 }
 
 export function compareScientificEvidencePacks(reference: ScientificEvidencePack, replay: ScientificEvidencePack): ScientificEvidenceReplayVerdict {
+  if (!isPack(reference) || !isPack(replay)) return 'BLOCKED';
   if (reference.runs.some((run) => run.status !== 'completed') || replay.runs.some((run) => run.status !== 'completed')) return 'BLOCKED';
   if (reference.protocol.protocolFingerprint !== replay.protocol.protocolFingerprint) return 'DRIFT';
   if (reference.runs.length !== replay.runs.length) return 'DRIFT';

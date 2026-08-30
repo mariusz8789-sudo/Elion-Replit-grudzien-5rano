@@ -1495,3 +1495,11 @@ describe('Stored Evidence verdict fail-closed boundary', () => {
     expect(getStoredEvidencePackReplayVerdict({ reproducibility: { allArmsMatched: true, armsWithDrift: [], armsNotExecuted: [] } } as never)).toBe('BLOCKED');
   });
 });
+
+
+describe('Evidence Pack comparison validation boundary', () => {
+  it('blocks malformed reference or replay packs before fingerprint comparison', () => {
+    const malformed = { runs: [], reproducibility: { allArmsMatched: true, armsWithDrift: [], armsNotExecuted: [] } } as never;
+    expect(compareScientificEvidencePacks(malformed, malformed)).toBe('BLOCKED');
+  });
+});

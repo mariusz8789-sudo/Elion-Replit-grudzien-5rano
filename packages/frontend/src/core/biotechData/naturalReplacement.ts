@@ -82,7 +82,7 @@ export interface NaturalHeavyCompute {
   summary: string; provenance?: ComputeRun['provenance'];
 }
 
-function enrichReportsWithCompute(reports: readonly CandidateDiscoveryReport[], cheap: readonly NaturalCheapCompute[], heavy: readonly NaturalHeavyCompute[], admet: readonly NaturalHeavyCompute[]): CandidateDiscoveryReport[] {
+function enrichReportsWithCompute(reports: readonly CandidateDiscoveryReport[], cheap: readonly NaturalCheapCompute[], heavy: readonly NaturalHeavyCompute[], admet: readonly NaturalHeavyCompute[], activities: readonly LiveChEMBLActivityRecord[], target?: string): CandidateDiscoveryReport[] {
   return reports.map((report) => {
     const cid = Number(report.candidateId.split(':').pop());
     const runs = [
@@ -92,7 +92,13 @@ function enrichReportsWithCompute(reports: readonly CandidateDiscoveryReport[], 
     ];
     if (!Number.isFinite(cid) || !report.ranking || runs.length === 0) return report;
     const support = Number((runs.filter((run) => run.status === 'completed' || run.status === 'ok').length / runs.length).toFixed(4));
-    const ranking = { ...report.ranking, score: Number((report.ranking.score + 0.05 * support).toFixed(4)), components: { ...report.ranking.components, computeSupport: support }, rationale: `${report.ranking.rationale} Compatible source-backed compute availability adds a bounded +0.05 support term; it is not efficacy or safety evidence.` };
+    const candidateActivities = activities.filter((activity) => activity.pubchemCid === cid);
+    const bestAssay = candidateActivities.reduce((best, activity) => Math.max(best, ({ UNKNOWN: 0, LOW: 0.33, MODERATE: 0.66, HIGH: 1 }[activity.assayQuality])), 0);
+    const targetRelevance = candidateActivities.length > 0 ? (target && candidateActivities.some((activity) => activity.assayContext.toLowerCase().includes(target.toLowerCase())) ? 1 : 0.5) : 0;
+    const evidenceQuality = bestAssay;
+    const missingEvidencePenalty = candidateActivities.length === 0 ? 1 : (candidateActivities.some((activity) => activity.assayQuality === 'UNKNOWN') ? 0.5 : 0);
+    const score = Number((0.25 * evidenceQuality + 0.2 * targetRelevance + 0.05 * support - 0.1 * missingEvidencePenalty - 0.1 * report.ranking.components.uncertaintyPenalty).toFixed(4));
+    const ranking = { ...report.ranking, score, components: { ...report.ranking.components, evidenceQuality, targetRelevance, computeSupport: support, uncertaintyPenalty: Math.max(report.ranking.components.uncertaintyPenalty, missingEvidencePenalty) }, rationale: `${report.ranking.rationale} Score uses explicit ChEMBL assay quality (${bestAssay.toFixed(2)}), target-context relevance (${targetRelevance.toFixed(2)}) and compatible compute support (${support.toFixed(2)}); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.` };
     const unsigned = { ...report, ranking, computeRuns: runs } as Record<string, unknown>;
     delete unsigned.reportId; delete unsigned.provenance; delete unsigned.scientificFingerprint;
     const scientificFingerprint = fnv1a(canonicalJson(unsigned));
@@ -315,7 +321,7 @@ export async function resolveNaturalFunctionalReplacementFromSources(
       else admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', status: 'blocked', resultOrigin: 'engine-unavailable', outputs: {}, summary: `BLOCKED: ${response.error}` }));
     } catch (error) { admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', status: 'blocked', resultOrigin: 'request-failed', outputs: {}, summary: `BLOCKED: ${error instanceof Error ? error.message : String(error)}` })); }
   }
-  const enrichedReports = enrichReportsWithCompute([...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)], cheapCompute, heavyCompute ?? [], admetCompute ?? []);
+  const enrichedReports = enrichReportsWithCompute([...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)], cheapCompute, heavyCompute ?? [], admetCompute ?? [], liveActivities, input.target);
   const combinationHypothesis = buildCandidateCombinationHypothesis(enrichedReports, input.target ? [input.target] : []);
   return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), ...(combinationHypothesis === undefined ? {} : { combinationHypothesis }), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. ${base.reason}`, reports: enrichedReports };
 }

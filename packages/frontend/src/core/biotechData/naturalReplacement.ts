@@ -48,6 +48,7 @@ export interface NaturalFunctionalReplacementResult {
   heavyCompute?: readonly NaturalHeavyCompute[];
   admetCompute?: readonly NaturalHeavyCompute[];
   combinationHypothesis?: ReturnType<typeof buildCandidateCombinationHypothesis>;
+  neurobiology?: NaturalNeurobiologyProfile;
 }
 
 export interface NaturalSourceRecord {
@@ -67,6 +68,13 @@ export interface NaturalCandidateWhy {
   assayQualityCounts: Readonly<Record<LiveChEMBLActivityRecord['assayQuality'], number>>;
   measurementTypes: readonly LiveChEMBLActivityRecord['type'][];
   rationale: string; uncertainty: string; provenanceIds: readonly string[];
+}
+
+export interface NaturalNeurobiologyProfile {
+  targetId: string; receptor: string; receptorFamily: string; neurotransmitterSystem: string;
+  pathway: { label: string; status: 'LITERATURE_SUPPORTED' | 'UNKNOWN'; uncertainty: string };
+  mechanism: { label: string; status: 'HYPOTHESIS' | 'UNKNOWN'; uncertainty: string };
+  provenance: readonly { source: string; sourceId: string; sourceUrl?: string; sourceVersion?: string }[];
 }
 
 export interface NaturalCheapCompute {
@@ -110,6 +118,7 @@ const normalize = (value: string | undefined): string => (value ?? '').trim().to
 
 const PUBCHEM_RETRIEVED_AT = '2026-08-29';
 const UNIPROT_A1_PROVENANCE = { source: 'UniProt', sourceId: 'UniProtKB:P30542', evidenceType: 'human adenosine A1 receptor target mapping', status: 'LITERATURE_SUPPORTED' as const, uncertainty: 'Target identity mapping does not establish compound efficacy, safety or clinical suitability.', sourceUrl: 'https://rest.uniprot.org/uniprotkb/P30542.json', sourceVersion: 'UniProtKB:P30542', retrievedAt: PUBCHEM_RETRIEVED_AT };
+const A1_NEUROBIOLOGY_PROFILE: NaturalNeurobiologyProfile = { targetId: 'chembl:target:CHEMBL318', receptor: 'Adenosine receptor A1', receptorFamily: 'Adenosine receptor family', neurotransmitterSystem: 'Adenosinergic signaling', pathway: { label: 'Adenosinergic signaling pathway', status: 'LITERATURE_SUPPORTED', uncertainty: 'Target mapping does not establish a candidate-specific pathway effect.' }, mechanism: { label: 'Candidate–A1 binding interaction', status: 'HYPOTHESIS', uncertainty: 'Binding evidence does not establish functional mechanism, efficacy or clinical benefit.' }, provenance: [{ source: UNIPROT_A1_PROVENANCE.source, sourceId: UNIPROT_A1_PROVENANCE.sourceId, sourceUrl: UNIPROT_A1_PROVENANCE.sourceUrl, sourceVersion: UNIPROT_A1_PROVENANCE.sourceVersion }] };
 const PUBCHEM_IDENTITY_RECORDS = [
   ['theobromine', 5429, 'C7H8N4O2', 'CN1C=NC2=C1C(=O)NC(=O)N2C', 'YAPQBXQYLJRXSA-UHFFFAOYSA-N', '180.16'],
   ['paraxanthine', 4687, 'C7H8N4O2', 'CN1C=NC2=C1C(=O)N(C(=O)N2)C', 'QUNWUDVFRNGTCO-UHFFFAOYSA-N', '180.16'],
@@ -323,5 +332,5 @@ export async function resolveNaturalFunctionalReplacementFromSources(
   }
   const enrichedReports = enrichReportsWithCompute([...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)], cheapCompute, heavyCompute ?? [], admetCompute ?? [], liveActivities, input.target);
   const combinationHypothesis = buildCandidateCombinationHypothesis(enrichedReports, input.target ? [input.target] : []);
-  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), ...(combinationHypothesis === undefined ? {} : { combinationHypothesis }), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. ${base.reason}`, reports: enrichedReports };
+  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), ...(combinationHypothesis === undefined ? {} : { combinationHypothesis }), neurobiology: A1_NEUROBIOLOGY_PROFILE, reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. ${base.reason}`, reports: enrichedReports };
 }

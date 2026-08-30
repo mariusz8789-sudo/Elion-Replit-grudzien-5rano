@@ -1279,3 +1279,10 @@ Validation passed: integrated natural/ChEMBL/memory/reference tests `28 passed`;
 The live natural workflow now executes the existing Experiment Fabric `chem-molecular-weight` stage for every PubChem-admitted candidate after identity/evidence filtering. It is deterministic, preserves run ID, run fingerprint, result origin, outputs, and summary, and is surfaced in Science Chat as `CHEAP COMPUTE`. No expensive runtime is launched for rejected candidates. RDKit/PySCF/OpenMM/Vina/Meeko/ADMET-AI remain gated until their existing structured executor contracts receive compatible candidate/reference inputs; biological execution remains NOT_EXECUTED / BLOCKED.
 
 Validation passed: natural and memory tests `23 passed` in the focused run; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; Chromium desktop smoke passed with 27 routes, 13 laboratories, 220 interactions, and zero runtime errors.
+
+
+## FINAL INTEGRATION CHECKPOINT: Natural Discovery → Existing Experiment Fabric
+
+Natural discovery now executes the existing deterministic `chem-molecular-weight` Experiment Fabric stage for each PubChem-admitted candidate after source/evidence filtering. Science Chat displays the resulting Scientific Run status, run ID, result origin, summary, and fingerprint. This is a real cheap compute stage, not a fabricated biological observation. Expensive runtimes remain gated by compatible structured input; biological execution remains NOT_EXECUTED / BLOCKED.
+
+Validation passed after the compute wiring: focused natural/memory tests `23 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; Chromium desktop smoke passed with 27 routes, 13 laboratories, 208 interactions, and zero runtime errors.

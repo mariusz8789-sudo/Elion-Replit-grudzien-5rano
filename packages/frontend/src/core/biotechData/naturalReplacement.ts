@@ -123,6 +123,7 @@ const PUBCHEM_RETRIEVED_AT = '2026-08-29';
 const UNIPROT_A1_PROVENANCE = { source: 'UniProt', sourceId: 'UniProtKB:P30542', evidenceType: 'human adenosine A1 receptor target mapping', status: 'LITERATURE_SUPPORTED' as const, uncertainty: 'Target identity mapping does not establish compound efficacy, safety or clinical suitability.', sourceUrl: 'https://rest.uniprot.org/uniprotkb/P30542.json', sourceVersion: 'UniProtKB:P30542', retrievedAt: PUBCHEM_RETRIEVED_AT };
 const A1_NEUROBIOLOGY_PROFILE: NaturalNeurobiologyProfile = { targetId: 'chembl:target:CHEMBL318', receptor: 'Adenosine receptor A1', receptorFamily: 'Adenosine receptor family', neurotransmitterSystem: 'Adenosinergic signaling', pathway: { label: 'Adenosinergic signaling pathway', status: 'LITERATURE_SUPPORTED', uncertainty: 'Target mapping does not establish a candidate-specific pathway effect.' }, mechanism: { label: 'Candidate–A1 binding interaction', status: 'HYPOTHESIS', uncertainty: 'Binding evidence does not establish functional mechanism, efficacy or clinical benefit.' }, provenance: [{ source: UNIPROT_A1_PROVENANCE.source, sourceId: UNIPROT_A1_PROVENANCE.sourceId, sourceUrl: UNIPROT_A1_PROVENANCE.sourceUrl, sourceVersion: UNIPROT_A1_PROVENANCE.sourceVersion }] };
 const PUBCHEM_IDENTITY_RECORDS = [
+  ['caffeine', 2519, 'C8H10N4O2', 'CN1C=NC2=C1C(=O)N(C)C(=O)N2C', 'RYYVLZVUVIJVGH-UHFFFAOYSA-N', '194.19'],
   ['theobromine', 5429, 'C7H8N4O2', 'CN1C=NC2=C1C(=O)NC(=O)N2C', 'YAPQBXQYLJRXSA-UHFFFAOYSA-N', '180.16'],
   ['paraxanthine', 4687, 'C7H8N4O2', 'CN1C=NC2=C1C(=O)N(C(=O)N2)C', 'QUNWUDVFRNGTCO-UHFFFAOYSA-N', '180.16'],
   ['hypoxanthine', 135398638, 'C5H4N4O', 'C1=NC2=C(N1)C(=O)NC=N2', 'FDGQSTZJBFJUBT-UHFFFAOYSA-N', '136.11'],
@@ -179,8 +180,9 @@ export async function fetchNaturalPubChem3dRecord(record: NaturalSourceRecord, f
   try {
     const response = await fetchImpl(url, { signal: AbortSignal.timeout(8000) });
     if (!response.ok) return record;
-    const compound = (await response.json() as { PC_Compounds?: Array<{ atoms?: { element?: { number?: number[] } }; coords?: Array<{ conformers?: Array<{ x?: number[]; y?: number[]; z?: number[] }> }> }> }).PC_Compounds?.[0];
-    const numbers = compound?.atoms?.element?.number;
+    const compound = (await response.json() as { PC_Compounds?: Array<{ atoms?: { element?: { number?: number[] } | number[] }; coords?: Array<{ conformers?: Array<{ x?: number[]; y?: number[]; z?: number[] }> }> }> }).PC_Compounds?.[0];
+    const elementData = compound?.atoms?.element;
+    const numbers = Array.isArray(elementData) ? elementData : elementData?.number;
     const conformer = compound?.coords?.[0]?.conformers?.[0];
     if (!numbers || !conformer?.x || !conformer.y || !conformer.z || numbers.length !== conformer.x.length || numbers.length !== conformer.y.length || numbers.length !== conformer.z.length) return record;
     const atoms3d = numbers.map((number, index) => ({ element: ELEMENTS[number], x: conformer.x![index], y: conformer.y![index], z: conformer.z![index] })).filter((atom): atom is { element: string; x: number; y: number; z: number } => Boolean(atom.element) && [atom.x, atom.y, atom.z].every(Number.isFinite));

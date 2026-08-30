@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { fetchNaturalChEMBLActivities, resolveNaturalFunctionalReplacement, resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
+import { fetchNaturalChEMBLActivities, fetchNaturalPubChem3dRecord, resolveNaturalFunctionalReplacement, resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
 
 describe('Natural Functional Replacement resolver', () => {
-  it('resolves a known A1 reference against the three real pinned reports', () => {
+  it('resolves a known A1 reference against pinned reports and the PubChem catalog', () => {
     const result = resolveNaturalFunctionalReplacement({ referenceCompound: 'caffeine', target: 'A1' });
     expect(result.status).toBe('RESOLVED');
-    expect(result.reports).toHaveLength(12);
+    expect(result.reports).toHaveLength(13);
     expect(result.reports.every((report) => report.clinicalEfficacy === 'UNKNOWN')).toBe(true);
     expect(result.reason).toMatch(/not.*zamiennikiem|nie.*zamiennik/i);
   });
@@ -37,6 +37,11 @@ describe('Natural Functional Replacement resolver', () => {
     expect(activities.map((activity) => activity.type)).toEqual(['Ki', 'EC50']);
     expect(activities[0]?.assayQuality).toBe('HIGH');
     expect(activities[0]?.targetId).toBe('chembl:target:CHEMBL-TARGET');
+  });
+
+  it('parses the live PubChem 3D atom-array shape for PySCF input', async () => {
+    const record = await fetchNaturalPubChem3dRecord({ name: 'caffeine', cid: 2519, formula: 'C8H10N4O2', smiles: 'CN1C=NC2=C1C(=O)N(C)C(=O)N2C', inchiKey: 'RYYVLZVUVIJVGH-UHFFFAOYSA-N', molecularWeight: '194.19', source: 'PubChem', sourceVersion: 'PubChem CID 2519', retrievedAt: '2026-08-30' }, async () => new Response(JSON.stringify({ PC_Compounds: [{ atoms: { element: [8, 6] }, coords: [{ conformers: [{ x: [0.47, -3.1271], y: [2.5688, -0.4436], z: [0.0006, -0.0003] }] }] }] }), { status: 200 }));
+    expect(record.atoms3d).toEqual([{ element: 'O', x: 0.47, y: 2.5688, z: 0.0006 }, { element: 'C', x: -3.1271, y: -0.4436, z: -0.0003 }]);
   });
 
   it('resolves a PubChem CID without guessing a reference identity', async () => {

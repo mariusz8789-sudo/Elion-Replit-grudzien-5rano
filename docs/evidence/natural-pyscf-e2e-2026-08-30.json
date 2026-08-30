@@ -1,9 +1,9 @@
 {
-  "startedAt": "2026-08-30T15:59:03.065Z",
-  "finishedAt": "2026-08-30T15:59:25.577Z",
+  "startedAt": "2026-08-30T16:10:03.593Z",
+  "finishedAt": "2026-08-30T16:10:42.821Z",
   "value": {
     "status": "RESOLVED",
-    "reason": "Pobrano 7 realnych rekordów z PubChem, 37 jawnych rekordów activity z ChEMBL oraz wykonano 7 tanich obliczeń, 0 RDKit heavy runów i 0 ADMET-AI runów i 0 PySCF runów. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. Dopasowano do istniejącego pinned A1 reference profile; wynik jest research-priority comparison, nie funkcjonalnym zamiennikiem ani dowodem skuteczności.",
+    "reason": "Pobrano 8 realnych rekordów z PubChem, 39 jawnych rekordów activity z ChEMBL oraz wykonano 8 tanich obliczeń, 0 RDKit heavy runów i 0 ADMET-AI runów i 7 PySCF runów. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. Dopasowano do istniejącego pinned A1 reference profile; wynik jest research-priority comparison, nie funkcjonalnym zamiennikiem ani dowodem skuteczności.",
     "reports": [
       {
         "candidateId": "candidate:chembl:molecule:CHEMBL477:chembl:target:CHEMBL318",
@@ -396,6 +396,135 @@
         "scientificFingerprint": "c6902d20"
       },
       {
+        "candidateId": "candidate:pubchem:2519",
+        "materialId": "material:pubchem:2519",
+        "compoundIds": [
+          "compound:pubchem:2519"
+        ],
+        "targetIds": [],
+        "mechanismIds": [],
+        "evidenceIds": [
+          "evidence:pubchem:2519"
+        ],
+        "safetySignalIds": [
+          "safety:unknown:pubchem:2519"
+        ],
+        "hypothesisId": "hypothesis:pubchem:2519",
+        "ranking": {
+          "candidateId": "candidate:pubchem:2519",
+          "score": 0.29,
+          "components": {
+            "evidenceQuality": 0.66,
+            "targetRelevance": 1,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 1,
+            "computeSupport": 0.5
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (1.00) and compatible compute support (0.50); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "PubChem",
+          "status": "UNKNOWN",
+          "metrics": [
+            {
+              "name": "ADME/PK/Tox",
+              "value": "UNKNOWN",
+              "units": "status",
+              "context": "No compatible quantitative record admitted"
+            }
+          ],
+          "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+          "provenance": [
+            {
+              "source": "PubChem",
+              "sourceId": "pubchem:CID:2519",
+              "evidenceType": "explicit missing ADME/PK/Tox boundary",
+              "status": "UNKNOWN",
+              "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+              "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/2519/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+              "sourceVersion": "PubChem CID 2519",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "PubChem identity-only profile: formula C8H10N4O2, molecular weight 194.19, InChIKey RYYVLZVUVIJVGH-UHFFFAOYSA-N, SMILES CN1C=NC2=C1C(=O)N(C(=O)N2C)C. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
+        "reportId": "report:047de80e",
+        "provenance": [
+          {
+            "source": "PubChem",
+            "sourceId": "candidate:pubchem:2519",
+            "evidenceType": "candidate identity mapped from compound record",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/2519/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 2519",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "PubChem",
+            "sourceId": "hypothesis:pubchem:2519",
+            "evidenceType": "bounded research hypothesis",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/2519/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 2519",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "047de80e",
+        "computeRuns": [
+          {
+            "runtime": "Experiment Fabric cheap molecular weight",
+            "version": "1.0.0",
+            "runId": "run_df6c423d",
+            "fingerprint": "run_df6c423d",
+            "status": "completed",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "molarMassGmol": 194.194,
+              "atomCount": 24,
+              "degreeOfUnsaturation": 6
+            }
+          },
+          {
+            "runtime": "chem-rdkit-descriptors",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "admet-ai",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "PySCF 2.14.0",
+            "version": "2.14.0",
+            "runId": "pyscf:837bec0e4bbfe63479a19e0c",
+            "fingerprint": "e67a471b",
+            "status": "ok",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "energyHartree": -667.72420427,
+              "homoHartree": -0.224403,
+              "lumoHartree": 0.226288,
+              "homoLumoGapHartree": 0.450691,
+              "homoLumoGapEv": 12.2639,
+              "dipoleDebye": 3.0446,
+              "converged": true,
+              "nElectrons": 102,
+              "nBasisFunctions": 80
+            }
+          }
+        ]
+      },
+      {
         "candidateId": "candidate:pubchem:135398638",
         "materialId": "material:pubchem:135398638",
         "compoundIds": [
@@ -412,15 +541,15 @@
         "hypothesisId": "hypothesis:pubchem:135398638",
         "ranking": {
           "candidateId": "candidate:pubchem:135398638",
-          "score": 0.1775,
+          "score": 0.19,
           "components": {
             "evidenceQuality": 0.66,
             "targetRelevance": 0.5,
             "safetyPenalty": 1,
             "uncertaintyPenalty": 1,
-            "computeSupport": 0.25
+            "computeSupport": 0.5
           },
-          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.50); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
           "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
           "epistemicStatus": "PREDICTION"
         },
@@ -453,7 +582,7 @@
           ]
         },
         "uncertainty": "PubChem identity-only profile: formula C5H4N4O, molecular weight 136.11, InChIKey FDGQSTZJBFJUBT-UHFFFAOYSA-N, SMILES C1=NC2=C(N1)C(=O)NC=N2. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
-        "reportId": "report:b019f5ff",
+        "reportId": "report:b868a07d",
         "provenance": [
           {
             "source": "PubChem",
@@ -476,7 +605,7 @@
             "retrievedAt": "2026-08-29"
           }
         ],
-        "scientificFingerprint": "b019f5ff",
+        "scientificFingerprint": "b868a07d",
         "computeRuns": [
           {
             "runtime": "Experiment Fabric cheap molecular weight",
@@ -504,10 +633,23 @@
             "outputs": {}
           },
           {
-            "runtime": "pyscf-singlepoint",
-            "status": "blocked",
-            "resultOrigin": "missing-source-3d",
-            "outputs": {}
+            "runtime": "PySCF 2.14.0",
+            "version": "2.14.0",
+            "runId": "pyscf:007af1b907dc12f5bd411aa9",
+            "fingerprint": "dab62cbf",
+            "status": "ok",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "energyHartree": -478.12257499,
+              "homoHartree": -0.236979,
+              "lumoHartree": 0.219067,
+              "homoLumoGapHartree": 0.456046,
+              "homoLumoGapEv": 12.4096,
+              "dipoleDebye": 2.8121,
+              "converged": true,
+              "nElectrons": 70,
+              "nBasisFunctions": 54
+            }
           }
         ]
       },
@@ -528,15 +670,15 @@
         "hypothesisId": "hypothesis:pubchem:1188",
         "ranking": {
           "candidateId": "candidate:pubchem:1188",
-          "score": 0.2775,
+          "score": 0.29,
           "components": {
             "evidenceQuality": 0.66,
             "targetRelevance": 1,
             "safetyPenalty": 1,
             "uncertaintyPenalty": 1,
-            "computeSupport": 0.25
+            "computeSupport": 0.5
           },
-          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (1.00) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (1.00) and compatible compute support (0.50); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
           "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
           "epistemicStatus": "PREDICTION"
         },
@@ -569,7 +711,7 @@
           ]
         },
         "uncertainty": "PubChem identity-only profile: formula C5H4N4O2, molecular weight 152.11, InChIKey LRFVTYWOQMYALW-UHFFFAOYSA-N, SMILES C1=NC2=C(N1)C(=O)NC(=O)N2. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
-        "reportId": "report:4686b531",
+        "reportId": "report:113e879e",
         "provenance": [
           {
             "source": "PubChem",
@@ -592,7 +734,7 @@
             "retrievedAt": "2026-08-29"
           }
         ],
-        "scientificFingerprint": "4686b531",
+        "scientificFingerprint": "113e879e",
         "computeRuns": [
           {
             "runtime": "Experiment Fabric cheap molecular weight",
@@ -620,10 +762,23 @@
             "outputs": {}
           },
           {
-            "runtime": "pyscf-singlepoint",
-            "status": "blocked",
-            "resultOrigin": "missing-source-3d",
-            "outputs": {}
+            "runtime": "PySCF 2.14.0",
+            "version": "2.14.0",
+            "runId": "pyscf:d51962bca4169c8236374239",
+            "fingerprint": "535af243",
+            "status": "ok",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "energyHartree": -551.98438798,
+              "homoHartree": -0.237749,
+              "lumoHartree": 0.219777,
+              "homoLumoGapHartree": 0.457527,
+              "homoLumoGapEv": 12.4499,
+              "dipoleDebye": 3.1011,
+              "converged": true,
+              "nElectrons": 78,
+              "nBasisFunctions": 59
+            }
           }
         ]
       },
@@ -644,15 +799,15 @@
         "hypothesisId": "hypothesis:pubchem:6021",
         "ranking": {
           "candidateId": "candidate:pubchem:6021",
-          "score": 0.1775,
+          "score": 0.19,
           "components": {
             "evidenceQuality": 0.66,
             "targetRelevance": 0.5,
             "safetyPenalty": 1,
             "uncertaintyPenalty": 1,
-            "computeSupport": 0.25
+            "computeSupport": 0.5
           },
-          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.50); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
           "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
           "epistemicStatus": "PREDICTION"
         },
@@ -685,7 +840,7 @@
           ]
         },
         "uncertainty": "PubChem identity-only profile: formula C10H12N4O5, molecular weight 268.23, InChIKey UGQMRVRMYYASKQ-KQYNXXCUSA-N, SMILES C1=NC(=O)C2=C(N1)N(C=N2)C3C(C(C(O3)CO)O)O. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
-        "reportId": "report:ec41837b",
+        "reportId": "report:65206972",
         "provenance": [
           {
             "source": "PubChem",
@@ -708,7 +863,7 @@
             "retrievedAt": "2026-08-29"
           }
         ],
-        "scientificFingerprint": "ec41837b",
+        "scientificFingerprint": "65206972",
         "computeRuns": [
           {
             "runtime": "Experiment Fabric cheap molecular weight",
@@ -736,10 +891,23 @@
             "outputs": {}
           },
           {
-            "runtime": "pyscf-singlepoint",
-            "status": "blocked",
-            "resultOrigin": "missing-source-3d",
-            "outputs": {}
+            "runtime": "PySCF 2.14.0",
+            "version": "2.14.0",
+            "runId": "pyscf:4a9853d8b16696ab36621efd",
+            "fingerprint": "abbfb931",
+            "status": "ok",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "energyHartree": -965.15877327,
+              "homoHartree": -0.218018,
+              "lumoHartree": 0.233182,
+              "homoLumoGapHartree": 0.4512,
+              "homoLumoGapEv": 12.2778,
+              "dipoleDebye": 10.5003,
+              "converged": true,
+              "nElectrons": 140,
+              "nBasisFunctions": 107
+            }
           }
         ]
       },
@@ -801,7 +969,7 @@
           ]
         },
         "uncertainty": "PubChem identity-only profile: formula C22H30N6O4S, molecular weight 474.6, InChIKey BNRNXUUZRGQAQC-UHFFFAOYSA-N, SMILES CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
-        "reportId": "report:7192a4fc",
+        "reportId": "report:6f049dff",
         "provenance": [
           {
             "source": "PubChem",
@@ -824,7 +992,7 @@
             "retrievedAt": "2026-08-29"
           }
         ],
-        "scientificFingerprint": "7192a4fc",
+        "scientificFingerprint": "6f049dff",
         "computeRuns": [
           {
             "runtime": "Experiment Fabric cheap molecular weight",
@@ -854,7 +1022,7 @@
           {
             "runtime": "pyscf-singlepoint",
             "status": "blocked",
-            "resultOrigin": "missing-source-3d",
+            "resultOrigin": "engine-unavailable",
             "outputs": {}
           }
         ]
@@ -876,15 +1044,15 @@
         "hypothesisId": "hypothesis:pubchem:190",
         "ranking": {
           "candidateId": "candidate:pubchem:190",
-          "score": 0.1775,
+          "score": 0.19,
           "components": {
             "evidenceQuality": 0.66,
             "targetRelevance": 0.5,
             "safetyPenalty": 1,
             "uncertaintyPenalty": 1,
-            "computeSupport": 0.25
+            "computeSupport": 0.5
           },
-          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.50); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
           "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
           "epistemicStatus": "PREDICTION"
         },
@@ -917,7 +1085,7 @@
           ]
         },
         "uncertainty": "PubChem identity-only profile: formula C5H5N5, molecular weight 135.13, InChIKey GFFGJBXGBJISGV-UHFFFAOYSA-N, SMILES C1=NC2=NC=NC(=C2N1)N. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
-        "reportId": "report:ca728cac",
+        "reportId": "report:7ac12d02",
         "provenance": [
           {
             "source": "PubChem",
@@ -940,7 +1108,7 @@
             "retrievedAt": "2026-08-29"
           }
         ],
-        "scientificFingerprint": "ca728cac",
+        "scientificFingerprint": "7ac12d02",
         "computeRuns": [
           {
             "runtime": "Experiment Fabric cheap molecular weight",
@@ -968,10 +1136,23 @@
             "outputs": {}
           },
           {
-            "runtime": "pyscf-singlepoint",
-            "status": "blocked",
-            "resultOrigin": "missing-source-3d",
-            "outputs": {}
+            "runtime": "PySCF 2.14.0",
+            "version": "2.14.0",
+            "runId": "pyscf:4c00f21c62c97a9b47865929",
+            "fingerprint": "0fee3122",
+            "status": "ok",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "energyHartree": -458.59976871,
+              "homoHartree": -0.248022,
+              "lumoHartree": 0.210469,
+              "homoLumoGapHartree": 0.458492,
+              "homoLumoGapEv": 12.4762,
+              "dipoleDebye": 6.5587,
+              "converged": true,
+              "nElectrons": 70,
+              "nBasisFunctions": 55
+            }
           }
         ]
       },
@@ -992,15 +1173,15 @@
         "hypothesisId": "hypothesis:pubchem:764",
         "ranking": {
           "candidateId": "candidate:pubchem:764",
-          "score": 0.1775,
+          "score": 0.19,
           "components": {
             "evidenceQuality": 0.66,
             "targetRelevance": 0.5,
             "safetyPenalty": 1,
             "uncertaintyPenalty": 1,
-            "computeSupport": 0.25
+            "computeSupport": 0.5
           },
-          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.50); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
           "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
           "epistemicStatus": "PREDICTION"
         },
@@ -1033,7 +1214,7 @@
           ]
         },
         "uncertainty": "PubChem identity-only profile: formula C5H5N5O, molecular weight 151.13, InChIKey UYTPUPDQBNUYGX-UHFFFAOYSA-N, SMILES C1=NC2=C(N1)C(=O)N=C(N2)N. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
-        "reportId": "report:3375d662",
+        "reportId": "report:609ca9ce",
         "provenance": [
           {
             "source": "PubChem",
@@ -1056,7 +1237,7 @@
             "retrievedAt": "2026-08-29"
           }
         ],
-        "scientificFingerprint": "3375d662",
+        "scientificFingerprint": "609ca9ce",
         "computeRuns": [
           {
             "runtime": "Experiment Fabric cheap molecular weight",
@@ -1084,10 +1265,23 @@
             "outputs": {}
           },
           {
-            "runtime": "pyscf-singlepoint",
-            "status": "blocked",
-            "resultOrigin": "missing-source-3d",
-            "outputs": {}
+            "runtime": "PySCF 2.14.0",
+            "version": "2.14.0",
+            "runId": "pyscf:a3198a34c41aba0ea36a7e1a",
+            "fingerprint": "1c89e598",
+            "status": "ok",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "energyHartree": -532.4276406,
+              "homoHartree": -0.216106,
+              "lumoHartree": 0.238381,
+              "homoLumoGapHartree": 0.454487,
+              "homoLumoGapEv": 12.3672,
+              "dipoleDebye": 3.5485,
+              "converged": true,
+              "nElectrons": 78,
+              "nBasisFunctions": 60
+            }
           }
         ]
       },
@@ -1108,15 +1302,15 @@
         "hypothesisId": "hypothesis:pubchem:1175",
         "ranking": {
           "candidateId": "candidate:pubchem:1175",
-          "score": 0.1775,
+          "score": 0.19,
           "components": {
             "evidenceQuality": 0.66,
             "targetRelevance": 0.5,
             "safetyPenalty": 1,
             "uncertaintyPenalty": 1,
-            "computeSupport": 0.25
+            "computeSupport": 0.5
           },
-          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.50); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
           "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
           "epistemicStatus": "PREDICTION"
         },
@@ -1149,7 +1343,7 @@
           ]
         },
         "uncertainty": "PubChem identity-only profile: formula C5H4N4O3, molecular weight 168.11, InChIKey LEHOTFFKMJEONL-UHFFFAOYSA-N, SMILES C12=C(NC(=O)N1)NC(=O)NC2=O. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
-        "reportId": "report:495072b8",
+        "reportId": "report:0293d8a0",
         "provenance": [
           {
             "source": "PubChem",
@@ -1172,7 +1366,7 @@
             "retrievedAt": "2026-08-29"
           }
         ],
-        "scientificFingerprint": "495072b8",
+        "scientificFingerprint": "0293d8a0",
         "computeRuns": [
           {
             "runtime": "Experiment Fabric cheap molecular weight",
@@ -1200,10 +1394,23 @@
             "outputs": {}
           },
           {
-            "runtime": "pyscf-singlepoint",
-            "status": "blocked",
-            "resultOrigin": "missing-source-3d",
-            "outputs": {}
+            "runtime": "PySCF 2.14.0",
+            "version": "2.14.0",
+            "runId": "pyscf:daf0f3406c6227c662105e0a",
+            "fingerprint": "ed3046fe",
+            "status": "ok",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "energyHartree": -625.81713452,
+              "homoHartree": -0.197666,
+              "lumoHartree": 0.250355,
+              "homoLumoGapHartree": 0.448021,
+              "homoLumoGapEv": 12.1913,
+              "dipoleDebye": 2.4378,
+              "converged": true,
+              "nElectrons": 86,
+              "nBasisFunctions": 64
+            }
           }
         ]
       }
@@ -1211,6 +1418,40 @@
     "matchedReference": "kofeina",
     "target": "A1",
     "liveActivities": [
+      {
+        "pubchemCid": 2519,
+        "compoundId": "CHEMBL113",
+        "targetId": "chembl:target:CHEMBL2304404",
+        "activityId": 177278,
+        "assayId": "CHEMBL645212",
+        "type": "Ki",
+        "relation": "=",
+        "value": "100000.0",
+        "units": "nM",
+        "assayContext": "Binding affinity against adenosine A1 receptor in guinea pig forebrain membranes using N6-[3H]cyclohexyladenosine as radioligand",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL113&limit=20"
+      },
+      {
+        "pubchemCid": 2519,
+        "compoundId": "CHEMBL113",
+        "targetId": "chembl:target:CHEMBL2094117",
+        "activityId": 177279,
+        "assayId": "CHEMBL646483",
+        "type": "Ki",
+        "relation": "=",
+        "value": "27000.0",
+        "units": "nM",
+        "assayContext": "Binding affinity against adenosine A2 receptor in rat striatal membranes using N-[3H]-ethyladenosin-5''-uronamide as radioligand in the presence of 50 nM cyclopentyladenosine",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL113&limit=20"
+      },
       {
         "pubchemCid": 135398638,
         "compoundId": "CHEMBL1427",
@@ -1940,6 +2181,26 @@
         ]
       },
       {
+        "pubchemCid": 2519,
+        "activityCount": 2,
+        "targetMatchedActivityCount": 0,
+        "assayQualityCounts": {
+          "HIGH": 0,
+          "MODERATE": 2,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "measurementTypes": [
+          "Ki"
+        ],
+        "rationale": "Niżej: pobrane activity nie pasuje do żądanego targetu.",
+        "uncertainty": "In vitro activity nie ustanawia efficacy, safety, mechanizmu ani przydatności klinicznej.",
+        "provenanceIds": [
+          "chembl:activity:177278",
+          "chembl:activity:177279"
+        ]
+      },
+      {
         "pubchemCid": 6021,
         "activityCount": 4,
         "targetMatchedActivityCount": 0,
@@ -2015,6 +2276,19 @@
       }
     ],
     "cheapCompute": [
+      {
+        "pubchemCid": 2519,
+        "status": "completed",
+        "runId": "run_df6c423d",
+        "runFingerprint": "run_df6c423d",
+        "outputs": {
+          "molarMassGmol": 194.194,
+          "atomCount": 24,
+          "degreeOfUnsaturation": 6
+        },
+        "resultOrigin": "real-engine",
+        "summary": "Obliczono masę molową z istniejącego parsera wzoru sumarycznego."
+      },
       {
         "pubchemCid": 135398638,
         "status": "completed",
@@ -2109,6 +2383,14 @@
     ],
     "heavyCompute": [
       {
+        "pubchemCid": 2519,
+        "modelId": "chem-rdkit-descriptors",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: error"
+      },
+      {
         "pubchemCid": 135398638,
         "modelId": "chem-rdkit-descriptors",
         "status": "blocked",
@@ -2166,6 +2448,14 @@
       }
     ],
     "admetCompute": [
+      {
+        "pubchemCid": 2519,
+        "modelId": "admet-ai",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: BLOCKED_BY_RUNTIME"
+      },
       {
         "pubchemCid": 135398638,
         "modelId": "admet-ai",
@@ -2225,81 +2515,185 @@
     ],
     "quantumCompute": [
       {
+        "pubchemCid": 2519,
+        "modelId": "pyscf-singlepoint",
+        "modelVersion": "2.14.0",
+        "engine": "PySCF 2.14.0",
+        "status": "ok",
+        "runId": "pyscf:837bec0e4bbfe63479a19e0c",
+        "runFingerprint": "e67a471b",
+        "resultOrigin": "real-engine",
+        "outputs": {
+          "energyHartree": -667.72420427,
+          "homoHartree": -0.224403,
+          "lumoHartree": 0.226288,
+          "homoLumoGapHartree": 0.450691,
+          "homoLumoGapEv": 12.2639,
+          "dipoleDebye": 3.0446,
+          "converged": true,
+          "nElectrons": 102,
+          "nBasisFunctions": 80
+        },
+        "summary": "PySCF MODEL_ESTIMATE from a PubChem source-backed 3D conformer; not an observation."
+      },
+      {
         "pubchemCid": 135398638,
         "modelId": "pyscf-singlepoint",
-        "status": "blocked",
-        "resultOrigin": "missing-source-3d",
-        "outputs": {},
-        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+        "modelVersion": "2.14.0",
+        "engine": "PySCF 2.14.0",
+        "status": "ok",
+        "runId": "pyscf:007af1b907dc12f5bd411aa9",
+        "runFingerprint": "dab62cbf",
+        "resultOrigin": "real-engine",
+        "outputs": {
+          "energyHartree": -478.12257499,
+          "homoHartree": -0.236979,
+          "lumoHartree": 0.219067,
+          "homoLumoGapHartree": 0.456046,
+          "homoLumoGapEv": 12.4096,
+          "dipoleDebye": 2.8121,
+          "converged": true,
+          "nElectrons": 70,
+          "nBasisFunctions": 54
+        },
+        "summary": "PySCF MODEL_ESTIMATE from a PubChem source-backed 3D conformer; not an observation."
       },
       {
         "pubchemCid": 1188,
         "modelId": "pyscf-singlepoint",
-        "status": "blocked",
-        "resultOrigin": "missing-source-3d",
-        "outputs": {},
-        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+        "modelVersion": "2.14.0",
+        "engine": "PySCF 2.14.0",
+        "status": "ok",
+        "runId": "pyscf:d51962bca4169c8236374239",
+        "runFingerprint": "535af243",
+        "resultOrigin": "real-engine",
+        "outputs": {
+          "energyHartree": -551.98438798,
+          "homoHartree": -0.237749,
+          "lumoHartree": 0.219777,
+          "homoLumoGapHartree": 0.457527,
+          "homoLumoGapEv": 12.4499,
+          "dipoleDebye": 3.1011,
+          "converged": true,
+          "nElectrons": 78,
+          "nBasisFunctions": 59
+        },
+        "summary": "PySCF MODEL_ESTIMATE from a PubChem source-backed 3D conformer; not an observation."
       },
       {
         "pubchemCid": 6021,
         "modelId": "pyscf-singlepoint",
-        "status": "blocked",
-        "resultOrigin": "missing-source-3d",
-        "outputs": {},
-        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+        "modelVersion": "2.14.0",
+        "engine": "PySCF 2.14.0",
+        "status": "ok",
+        "runId": "pyscf:4a9853d8b16696ab36621efd",
+        "runFingerprint": "abbfb931",
+        "resultOrigin": "real-engine",
+        "outputs": {
+          "energyHartree": -965.15877327,
+          "homoHartree": -0.218018,
+          "lumoHartree": 0.233182,
+          "homoLumoGapHartree": 0.4512,
+          "homoLumoGapEv": 12.2778,
+          "dipoleDebye": 10.5003,
+          "converged": true,
+          "nElectrons": 140,
+          "nBasisFunctions": 107
+        },
+        "summary": "PySCF MODEL_ESTIMATE from a PubChem source-backed 3D conformer; not an observation."
       },
       {
         "pubchemCid": 135398744,
         "modelId": "pyscf-singlepoint",
         "status": "blocked",
-        "resultOrigin": "missing-source-3d",
+        "resultOrigin": "engine-unavailable",
         "outputs": {},
-        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+        "summary": "BLOCKED: qm_failed: too_many_atoms (limit 60)"
       },
       {
         "pubchemCid": 190,
         "modelId": "pyscf-singlepoint",
-        "status": "blocked",
-        "resultOrigin": "missing-source-3d",
-        "outputs": {},
-        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+        "modelVersion": "2.14.0",
+        "engine": "PySCF 2.14.0",
+        "status": "ok",
+        "runId": "pyscf:4c00f21c62c97a9b47865929",
+        "runFingerprint": "0fee3122",
+        "resultOrigin": "real-engine",
+        "outputs": {
+          "energyHartree": -458.59976871,
+          "homoHartree": -0.248022,
+          "lumoHartree": 0.210469,
+          "homoLumoGapHartree": 0.458492,
+          "homoLumoGapEv": 12.4762,
+          "dipoleDebye": 6.5587,
+          "converged": true,
+          "nElectrons": 70,
+          "nBasisFunctions": 55
+        },
+        "summary": "PySCF MODEL_ESTIMATE from a PubChem source-backed 3D conformer; not an observation."
       },
       {
         "pubchemCid": 764,
         "modelId": "pyscf-singlepoint",
-        "status": "blocked",
-        "resultOrigin": "missing-source-3d",
-        "outputs": {},
-        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+        "modelVersion": "2.14.0",
+        "engine": "PySCF 2.14.0",
+        "status": "ok",
+        "runId": "pyscf:a3198a34c41aba0ea36a7e1a",
+        "runFingerprint": "1c89e598",
+        "resultOrigin": "real-engine",
+        "outputs": {
+          "energyHartree": -532.4276406,
+          "homoHartree": -0.216106,
+          "lumoHartree": 0.238381,
+          "homoLumoGapHartree": 0.454487,
+          "homoLumoGapEv": 12.3672,
+          "dipoleDebye": 3.5485,
+          "converged": true,
+          "nElectrons": 78,
+          "nBasisFunctions": 60
+        },
+        "summary": "PySCF MODEL_ESTIMATE from a PubChem source-backed 3D conformer; not an observation."
       },
       {
         "pubchemCid": 1175,
         "modelId": "pyscf-singlepoint",
-        "status": "blocked",
-        "resultOrigin": "missing-source-3d",
-        "outputs": {},
-        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+        "modelVersion": "2.14.0",
+        "engine": "PySCF 2.14.0",
+        "status": "ok",
+        "runId": "pyscf:daf0f3406c6227c662105e0a",
+        "runFingerprint": "ed3046fe",
+        "resultOrigin": "real-engine",
+        "outputs": {
+          "energyHartree": -625.81713452,
+          "homoHartree": -0.197666,
+          "lumoHartree": 0.250355,
+          "homoLumoGapHartree": 0.448021,
+          "homoLumoGapEv": 12.1913,
+          "dipoleDebye": 2.4378,
+          "converged": true,
+          "nElectrons": 86,
+          "nBasisFunctions": 64
+        },
+        "summary": "PySCF MODEL_ESTIMATE from a PubChem source-backed 3D conformer; not an observation."
       }
     ],
     "combinationHypothesis": {
-      "combinationId": "combination:3bc680fb",
+      "combinationId": "combination:b9dc0978",
       "candidateIds": [
         "candidate:pubchem:1188",
-        "candidate:chembl:CHEMBL1158"
+        "candidate:pubchem:2519"
       ],
       "coveredEvidenceIds": [
         "evidence:pubchem:1188",
-        "evidence:chembl:207399"
+        "evidence:pubchem:2519"
       ],
       "missingEvidenceIds": [],
-      "coveredTargetIds": [
-        "target:chembl:CHEMBL318"
-      ],
+      "coveredTargetIds": [],
       "coveredMechanismIds": [],
       "uncoveredTargetIds": [
         "A1"
       ],
-      "researchPriority": 0.2298,
+      "researchPriority": 0.29,
       "validationPlan": [
         "Confirm each candidate independently in a target-specific assay.",
         "Test the combination with a pre-registered additivity/synergy design.",
@@ -2341,16 +2735,145 @@
     "Failed to load resource: the server responded with a status of 400 (Bad Request)",
     "Failed to load resource: the server responded with a status of 400 (Bad Request)",
     "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
     "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
   ],
-  "sourceRecords": 11,
-  "liveActivities": 37,
-  "cheapCompleted": 7,
+  "sourceRecords": 12,
+  "liveActivities": 39,
+  "cheapCompleted": 8,
   "rdkitOk": 0,
   "admetOk": 0,
-  "pyscfOk": 0,
-  "pyscfBlocked": 7,
-  "pyscfRuns": [],
+  "pyscfOk": 7,
+  "pyscfBlocked": 1,
+  "pyscfRuns": [
+    {
+      "pubchemCid": 2519,
+      "runId": "pyscf:837bec0e4bbfe63479a19e0c",
+      "engine": "PySCF 2.14.0",
+      "modelVersion": "2.14.0",
+      "outputs": {
+        "energyHartree": -667.72420427,
+        "homoHartree": -0.224403,
+        "lumoHartree": 0.226288,
+        "homoLumoGapHartree": 0.450691,
+        "homoLumoGapEv": 12.2639,
+        "dipoleDebye": 3.0446,
+        "converged": true,
+        "nElectrons": 102,
+        "nBasisFunctions": 80
+      },
+      "resultOrigin": "real-engine"
+    },
+    {
+      "pubchemCid": 135398638,
+      "runId": "pyscf:007af1b907dc12f5bd411aa9",
+      "engine": "PySCF 2.14.0",
+      "modelVersion": "2.14.0",
+      "outputs": {
+        "energyHartree": -478.12257499,
+        "homoHartree": -0.236979,
+        "lumoHartree": 0.219067,
+        "homoLumoGapHartree": 0.456046,
+        "homoLumoGapEv": 12.4096,
+        "dipoleDebye": 2.8121,
+        "converged": true,
+        "nElectrons": 70,
+        "nBasisFunctions": 54
+      },
+      "resultOrigin": "real-engine"
+    },
+    {
+      "pubchemCid": 1188,
+      "runId": "pyscf:d51962bca4169c8236374239",
+      "engine": "PySCF 2.14.0",
+      "modelVersion": "2.14.0",
+      "outputs": {
+        "energyHartree": -551.98438798,
+        "homoHartree": -0.237749,
+        "lumoHartree": 0.219777,
+        "homoLumoGapHartree": 0.457527,
+        "homoLumoGapEv": 12.4499,
+        "dipoleDebye": 3.1011,
+        "converged": true,
+        "nElectrons": 78,
+        "nBasisFunctions": 59
+      },
+      "resultOrigin": "real-engine"
+    },
+    {
+      "pubchemCid": 6021,
+      "runId": "pyscf:4a9853d8b16696ab36621efd",
+      "engine": "PySCF 2.14.0",
+      "modelVersion": "2.14.0",
+      "outputs": {
+        "energyHartree": -965.15877327,
+        "homoHartree": -0.218018,
+        "lumoHartree": 0.233182,
+        "homoLumoGapHartree": 0.4512,
+        "homoLumoGapEv": 12.2778,
+        "dipoleDebye": 10.5003,
+        "converged": true,
+        "nElectrons": 140,
+        "nBasisFunctions": 107
+      },
+      "resultOrigin": "real-engine"
+    },
+    {
+      "pubchemCid": 190,
+      "runId": "pyscf:4c00f21c62c97a9b47865929",
+      "engine": "PySCF 2.14.0",
+      "modelVersion": "2.14.0",
+      "outputs": {
+        "energyHartree": -458.59976871,
+        "homoHartree": -0.248022,
+        "lumoHartree": 0.210469,
+        "homoLumoGapHartree": 0.458492,
+        "homoLumoGapEv": 12.4762,
+        "dipoleDebye": 6.5587,
+        "converged": true,
+        "nElectrons": 70,
+        "nBasisFunctions": 55
+      },
+      "resultOrigin": "real-engine"
+    },
+    {
+      "pubchemCid": 764,
+      "runId": "pyscf:a3198a34c41aba0ea36a7e1a",
+      "engine": "PySCF 2.14.0",
+      "modelVersion": "2.14.0",
+      "outputs": {
+        "energyHartree": -532.4276406,
+        "homoHartree": -0.216106,
+        "lumoHartree": 0.238381,
+        "homoLumoGapHartree": 0.454487,
+        "homoLumoGapEv": 12.3672,
+        "dipoleDebye": 3.5485,
+        "converged": true,
+        "nElectrons": 78,
+        "nBasisFunctions": 60
+      },
+      "resultOrigin": "real-engine"
+    },
+    {
+      "pubchemCid": 1175,
+      "runId": "pyscf:daf0f3406c6227c662105e0a",
+      "engine": "PySCF 2.14.0",
+      "modelVersion": "2.14.0",
+      "outputs": {
+        "energyHartree": -625.81713452,
+        "homoHartree": -0.197666,
+        "lumoHartree": 0.250355,
+        "homoLumoGapHartree": 0.448021,
+        "homoLumoGapEv": 12.1913,
+        "dipoleDebye": 2.4378,
+        "converged": true,
+        "nElectrons": 86,
+        "nBasisFunctions": 64
+      },
+      "resultOrigin": "real-engine"
+    }
+  ],
   "reportComputeRunCounts": [
     {
       "candidateId": "candidate:chembl:molecule:CHEMBL477:chembl:target:CHEMBL318",
@@ -2373,39 +2896,44 @@
       "fingerprint": "c6902d20"
     },
     {
+      "candidateId": "candidate:pubchem:2519",
+      "computeRuns": 4,
+      "fingerprint": "047de80e"
+    },
+    {
       "candidateId": "candidate:pubchem:135398638",
       "computeRuns": 4,
-      "fingerprint": "b019f5ff"
+      "fingerprint": "b868a07d"
     },
     {
       "candidateId": "candidate:pubchem:1188",
       "computeRuns": 4,
-      "fingerprint": "4686b531"
+      "fingerprint": "113e879e"
     },
     {
       "candidateId": "candidate:pubchem:6021",
       "computeRuns": 4,
-      "fingerprint": "ec41837b"
+      "fingerprint": "65206972"
     },
     {
       "candidateId": "candidate:pubchem:135398744",
       "computeRuns": 4,
-      "fingerprint": "7192a4fc"
+      "fingerprint": "6f049dff"
     },
     {
       "candidateId": "candidate:pubchem:190",
       "computeRuns": 4,
-      "fingerprint": "ca728cac"
+      "fingerprint": "7ac12d02"
     },
     {
       "candidateId": "candidate:pubchem:764",
       "computeRuns": 4,
-      "fingerprint": "3375d662"
+      "fingerprint": "609ca9ce"
     },
     {
       "candidateId": "candidate:pubchem:1175",
       "computeRuns": 4,
-      "fingerprint": "495072b8"
+      "fingerprint": "0293d8a0"
     }
   ]
 }

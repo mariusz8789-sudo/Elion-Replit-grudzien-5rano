@@ -1431,3 +1431,37 @@ This is an environment-specific availability result, not a code failure and not 
 - **REMOTE:** synchronized with local HEAD
 - **WORKING TREE:** clean before this documentation append
 - **PARKED:** fresh Vina scientific validation, OpenMM execution, fresh PySCF E2E in this sandbox, and independent laboratory observation.
+
+## COMPLETED RUNTIME BLOCK: bounded Vina, OpenMM and PySCF validation
+
+The current sandbox was safely prepared using the repository-declared compute dependencies from `requirements-compute.txt`: RDKit 2026.3.5, SciPy 1.18.1, Vina 1.2.7, Meeko 0.8.0, OpenMM 8.6.0 and PySCF 2.14.0. No application code or dependency manifest was changed.
+
+A real RCSB PDB 1VII input was retrieved from `https://files.rcsb.org/download/1VII.pdb`, persisted at `docs/evidence/openmm/1VII.pdb`, and pinned with `docs/evidence/openmm/1VII.provenance.json`. Its SHA-256 is `ebecd3d6c0dd9c8b34bcbea9b57c73e4f73986cc674150f0aaa0687db66e77ef` and the raw payload is 62,694 bytes.
+
+Bounded runtime validation completed:
+
+```text
+Vina detector: AVAILABLE — AutoDock Vina 1.2.7 + Meeko 0.8.0
+Vina reference-case: PASS — 5 poses, best -2.226 kcal/mol
+Vina seeded determinism: PASS — -1.900 / -1.900 kcal/mol
+Vina search-effort invariant: PASS — -1.909 <= -1.904 + tolerance
+Vina affinity accuracy vs experimental co-crystal benchmark: BLOCKED_BY_RESOURCES
+
+OpenMM detector: AVAILABLE — OpenMM 8.6 CPU
+OpenMM reference: PASS — real 1VII, AMBER14 + implicit OBC2, 100 steps, seed 20260821
+OpenMM potential energy: -798.3844 before, -5084.1799 minimized, -4031.7106 after (kJ/mol)
+OpenMM simulated time: 0.2 ps; atom count after hydrogen addition: 596
+
+PySCF benchmark: PASS — 5/5 bounded cases
+PySCF H2 RHF/STO-3G literature anchor: -1.11675931 Ha vs -1.1168 expected
+PySCF variational, translation and permutation invariants: PASS
+```
+
+The Vina result is explicitly a software-integration/reference case using a rigid small-molecule stand-in, not a protein target and not an experimental affinity measurement. OpenMM is a bounded computational 1VII benchmark, not an equilibrium simulation, binding result or biological efficacy claim. PySCF remains a bounded computational model, not an experimental observation.
+
+Focused backend validation passed: `299 passed, 17 skipped, 0 failed`; OpenMM/Vina/PySCF syntax checks passed; `git diff --check` passed. The next real gap is fresh full Natural Discovery → PySCF → report → Memory → Replay E2E using the available runtime and real 3D input; the canonical Vina experimental-affinity validation remains blocked by the unavailable external co-crystal benchmark.
+
+- **CHECKPOINT BEFORE THIS BLOCK:** `893ae91`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **PARKED:** canonical protein-ligand affinity accuracy, independent laboratory observation, biological execution and clinical efficacy.
+- **NEXT LARGE GAP:** fresh full PySCF Natural Discovery E2E with actual reachable PubChem 3D input; if live source retrieval fails, preserve the exact source blocker and continue to the next software-only reproducibility gap.

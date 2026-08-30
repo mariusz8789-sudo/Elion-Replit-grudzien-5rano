@@ -113,7 +113,7 @@ function parseHash(): Route {
   if (h === '#/conflict') return { kind: 'conflict' };
   if (h === '#/projects') return { kind: 'projects' };
   if (h === '#/cde') return { kind: 'cde' };
-  if (h === '#/drug') return { kind: 'drug' };
+  if (h === '#/drug' || h.startsWith('#/drug?')) return { kind: 'drug' };
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };

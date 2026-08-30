@@ -181,6 +181,11 @@ describe('scienceMemory: Fabric observations', () => {
       ]),
       epistemicStatus: 'PREDICTION',
     });
+    expect(saved.biotech?.artifact).toMatchObject({
+      candidateIds: expect.arrayContaining(saved.biotech.comparison!.candidateIds),
+      comparisonId: saved.biotech.comparison!.comparisonId,
+      artifactFingerprint: expect.any(String),
+    });
     vi.resetModules();
     const loaded = (await import('../core/scienceMemory')).listExperiments()[0];
     expect(loaded.biotech?.comparison).toEqual(saved.biotech?.comparison);

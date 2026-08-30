@@ -5,6 +5,7 @@ import type { ExperimentOutputValue, ExperimentRoute, ExperimentRun } from './ex
 import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 import { compareAme2020Observations } from './observation/nuclearAme2020';
 import { compareCandidateDiscoveryReports, type CandidateComparison } from './biotechDiscoveryContract';
+import { canonicalJson, fnv1a } from './events/hash';
 
 /**
  * Scientific Memory (sekcja O dyrektywy CTO) — trwały, lokalny zapis
@@ -62,6 +63,15 @@ export interface SavedBiotechComputeRun {
   resultOrigin: string; summary: string; outputs: Readonly<Record<string, ExperimentOutputValue>>;
 }
 
+export interface SavedBiotechDiscoveryArtifact {
+  requestId?: string; reference?: string; target?: string;
+  candidateIds: readonly string[]; sourceIds: readonly string[];
+  activityIds: readonly string[]; assayIds: readonly string[];
+  comparisonId?: string; rankingScores: Readonly<Record<string, number>>;
+  computeRuns: readonly SavedBiotechComputeRun[]; limitations: readonly string[];
+  artifactFingerprint: string;
+}
+
 export interface SavedBiotechContext {
   candidateId: string;
   hypothesisId: string;
@@ -78,6 +88,7 @@ export interface SavedBiotechContext {
   ranking?: CandidateRanking;
   comparison?: SavedBiotechComparison;
   computeRuns?: readonly SavedBiotechComputeRun[];
+  artifact?: SavedBiotechDiscoveryArtifact;
 }
 
 export interface SavedExperimentReplayIdentity {
@@ -263,7 +274,7 @@ function readAll(): SavedExperiment[] {
   return Array.isArray(raw) ? raw.filter(isSavedExperiment) : [];
 }
 
-export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryReport, comparison?: CandidateComparison, lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[] }): SavedExperiment {
+export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryReport, comparison?: CandidateComparison, lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[]; artifact?: SavedBiotechDiscoveryArtifact }): SavedExperiment {
   const biotech: SavedBiotechContext = {
     candidateId: report.candidateId,
     hypothesisId: report.hypothesisId,
@@ -277,6 +288,7 @@ export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryRep
     ...(lineage?.activityIds?.length ? { activityIds: lineage.activityIds } : {}),
     ...(lineage?.assayIds?.length ? { assayIds: lineage.assayIds } : {}),
     ...(lineage?.computeRuns?.length ? { computeRuns: lineage.computeRuns } : {}),
+    ...(lineage?.artifact === undefined ? {} : { artifact: lineage.artifact }),
     ...(report.ranking === undefined ? {} : { ranking: report.ranking }),
     ...(comparison === undefined ? {} : { comparison: { comparisonId: comparison.comparisonId, reportIds: comparison.reportIds, candidateIds: comparison.rows.map((row) => row.candidateId), scientificFingerprint: comparison.scientificFingerprint, epistemicStatus: comparison.epistemicStatus, uncertainty: comparison.uncertainty } }),
   };
@@ -290,7 +302,17 @@ export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryRep
 export function saveBiotechDiscoveryComparisonToMemory(reports: readonly CandidateDiscoveryReport[], lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[] }): SavedExperiment {
   if (reports.length < 2) throw new Error('Porównanie kandydatów do pamięci wymaga co najmniej dwóch raportów.');
   const comparison = compareCandidateDiscoveryReports(reports);
-  return saveBiotechDiscoveryReportToMemory(reports[0]!, comparison, lineage);
+  const computeRuns = lineage?.computeRuns ?? [];
+  const artifactBase = {
+    candidateIds: reports.map((report) => report.candidateId),
+    sourceIds: [...new Set(reports.flatMap((report) => report.provenance.map((item) => item.sourceId)))],
+    activityIds: lineage?.activityIds ?? [], assayIds: lineage?.assayIds ?? [],
+    comparisonId: comparison.comparisonId,
+    rankingScores: Object.fromEntries(reports.map((report) => [report.candidateId, report.ranking?.score ?? 0])),
+    computeRuns, limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'],
+  };
+  const artifact: SavedBiotechDiscoveryArtifact = { ...artifactBase, artifactFingerprint: fnv1a(canonicalJson(artifactBase)) };
+  return saveBiotechDiscoveryReportToMemory(reports[0]!, comparison, { ...lineage, computeRuns, artifact });
 }
 
 /**
@@ -319,6 +341,13 @@ export function replaySavedBiotechComparison(
   } catch (error) {
     return { status: 'BLOCKED', reason: `Nie można odtworzyć comparison: ${error instanceof Error ? error.message : String(error)}` };
   }
+}
+
+export function replaySavedBiotechDiscoveryArtifact(saved: SavedBiotechDiscoveryArtifact | undefined, reports: readonly CandidateDiscoveryReport[], lineage: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[] } = {}): SavedBiotechComparisonReplay {
+  if (!saved || reports.length < 2) return { status: 'BLOCKED', reason: 'Brak kompletnego discovery artifact albo raportów do odtworzenia.' };
+  const comparison = compareCandidateDiscoveryReports(reports);
+  const base = { candidateIds: reports.map((report) => report.candidateId), sourceIds: [...new Set(reports.flatMap((report) => report.provenance.map((item) => item.sourceId)))], activityIds: lineage.activityIds ?? [], assayIds: lineage.assayIds ?? [], comparisonId: comparison.comparisonId, rankingScores: Object.fromEntries(reports.map((report) => [report.candidateId, report.ranking?.score ?? 0])), computeRuns: lineage.computeRuns ?? [], limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'] };
+  return fnv1a(canonicalJson(base)) === saved.artifactFingerprint ? { status: 'MATCH', reason: 'Cały deterministyczny discovery artifact odtworzył identyczny fingerprint.' } : { status: 'DRIFT', reason: 'Discovery artifact różni się w identity, źródłach, comparison, ranking, compute lub ograniczeniach.' };
 }
 
 export interface SaveExperimentInput {

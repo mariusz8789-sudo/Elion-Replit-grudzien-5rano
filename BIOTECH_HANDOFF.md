@@ -1297,3 +1297,10 @@ The requested legacy branches were fetched and compared against `manus/next-gap-
 Existing cheap Experiment Fabric runs are now persisted inside the existing `SavedBiotechContext.computeRuns` alongside report/comparison, candidate, activity, assay, provenance, ranking, uncertainty, and scientific fingerprint fields. Each run retains candidate ID, run ID, run fingerprint, status, result origin, summary, and outputs. This is lineage persistence, not a claim of biological execution. Full biological validation remains NOT_EXECUTED / BLOCKED, and heavy runtimes remain gated by compatible structured inputs.
 
 Validation passed: natural/ChEMBL/memory tests `28 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed. Legacy review found no safe, non-duplicating capability to cherry-pick.
+
+
+## FULL GAP CLOSURE CHECKPOINT: Discovery Artifact → Memory → Replay
+
+The existing biotech Scientific Memory contract now persists one complete deterministic discovery artifact together with the comparison: candidate IDs, source IDs, activity IDs, assay IDs, comparison ID, ranking scores, cheap compute runs (run IDs, fingerprints, outputs, status, result origin), explicit limitations, and an artifact fingerprint. `replaySavedBiotechDiscoveryArtifact` verifies the complete artifact identity and returns `MATCH` or `DRIFT`, while incomplete inputs return `BLOCKED`. This is an integrity check, not a fresh biological experiment.
+
+Validation passed: artifact/natural/memory tests `23 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed. The artifact fingerprint is created from the canonical persisted fields, so changes to source IDs, activity/assay lineage, ranking, compute identity, or limitations are detectable.

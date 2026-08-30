@@ -16,6 +16,7 @@ import {
   type TherapeuticHypothesis,
   canonicalJson,
   fnv1a,
+  buildCandidateCombinationHypothesis,
 } from '../biotechDiscoveryContract';
 
 export interface NaturalFunctionalReplacementInput {
@@ -46,6 +47,7 @@ export interface NaturalFunctionalReplacementResult {
   cheapCompute?: readonly NaturalCheapCompute[];
   heavyCompute?: readonly NaturalHeavyCompute[];
   admetCompute?: readonly NaturalHeavyCompute[];
+  combinationHypothesis?: ReturnType<typeof buildCandidateCombinationHypothesis>;
 }
 
 export interface NaturalSourceRecord {
@@ -314,5 +316,6 @@ export async function resolveNaturalFunctionalReplacementFromSources(
     } catch (error) { admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', status: 'blocked', resultOrigin: 'request-failed', outputs: {}, summary: `BLOCKED: ${error instanceof Error ? error.message : String(error)}` })); }
   }
   const enrichedReports = enrichReportsWithCompute([...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)], cheapCompute, heavyCompute ?? [], admetCompute ?? []);
-  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. ${base.reason}`, reports: enrichedReports };
+  const combinationHypothesis = buildCandidateCombinationHypothesis(enrichedReports, input.target ? [input.target] : []);
+  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), ...(combinationHypothesis === undefined ? {} : { combinationHypothesis }), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. ${base.reason}`, reports: enrichedReports };
 }

@@ -1,5 +1,5 @@
 import { readJSON, writeJSON } from '../storage';
-import type { ScientificEvidencePack } from './evidencePack';
+import { EVIDENCE_PACK_VERSION, type ScientificEvidencePack } from './evidencePack';
 
 const KEY = 'experiment-fabric/evidence-packs/v1';
 const MAX_PACKS = 50;
@@ -15,13 +15,23 @@ export interface StoredEvidencePack {
 function isPack(value: unknown): value is ScientificEvidencePack {
   if (!value || typeof value !== 'object') return false;
   const pack = value as Partial<ScientificEvidencePack>;
-  return typeof pack.contractVersion === 'string'
-    && typeof pack.evidencePackId === 'string'
-    && typeof pack.evidenceChainId === 'string'
-    && typeof pack.runCount === 'number'
-    && Array.isArray(pack.runs)
-    && typeof pack.reproducibility === 'object'
-    && typeof pack.disclaimer === 'string';
+  if (pack.contractVersion !== EVIDENCE_PACK_VERSION
+    || typeof pack.evidencePackId !== 'string' || !pack.evidencePackId
+    || typeof pack.evidenceChainId !== 'string' || !pack.evidenceChainId
+    || typeof pack.runCount !== 'number' || !Number.isInteger(pack.runCount) || pack.runCount < 1
+    || !Array.isArray(pack.runs) || pack.runs.length !== pack.runCount
+    || !pack.protocol || typeof pack.protocol !== 'object'
+    || typeof pack.protocol.protocolFingerprint !== 'string' || !pack.protocol.protocolFingerprint
+    || !pack.hypothesisAssessment || typeof pack.hypothesisAssessment !== 'object'
+    || !pack.reproducibility || typeof pack.reproducibility !== 'object'
+    || typeof pack.reproducibility.allArmsMatched !== 'boolean'
+    || !Array.isArray(pack.reproducibility.armsWithDrift)
+    || !Array.isArray(pack.reproducibility.armsNotExecuted)
+    || typeof pack.disclaimer !== 'string' || !pack.disclaimer.trim()) return false;
+  return pack.runs.every((run) => Boolean(run) && typeof run.runId === 'string' && run.runId.length > 0
+    && typeof run.status === 'string' && Boolean(run.result) && typeof run.result === 'object'
+    && Boolean(run.provenance) && typeof run.provenance === 'object'
+    && typeof run.provenance.runFingerprint === 'string' && run.provenance.runFingerprint.length > 0);
 }
 
 export function saveScientificEvidencePack(pack: ScientificEvidencePack): StoredEvidencePack {

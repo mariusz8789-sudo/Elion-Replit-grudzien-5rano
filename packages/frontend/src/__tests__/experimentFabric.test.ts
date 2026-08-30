@@ -38,6 +38,7 @@ import {
   assertCapabilityAdmissionMatrix,
   serializeCapabilityAdmissionMatrix,
   compareScientificEvidencePacks,
+  classifyStoredEvidencePack,
   getStoredEvidencePackReplayVerdict,
 } from '../core/experimentFabric';
 import {
@@ -1464,5 +1465,26 @@ describe('Scenario Capsule replay contract boundary', () => {
     const replay = replayScenarioCapsule(broken);
     expect(replay.status).toBe('NOT_COMPARABLE');
     expect(replay.message).toContain('contractVersion=999.0.0');
+  });
+});
+
+
+describe('Scientific Evidence Store validation boundary', () => {
+  it('accepts a canonical pack and rejects an empty or structurally inconsistent local record', () => {
+    const baselineRequest = parseScienceChatMessage('Oblicz promień Schwarzschilda dla 1 masy Słońca.');
+    const design = designScientificExperiment({
+      hypothesis: {
+        statement: 'Promień horyzontu jest dodatni w granicach modelu.',
+        domainId: 'spacetime-einstein', modelId: 'einstein-schwarzschild', declaredAssumptions: [],
+        falsification: { metric: 'radiusKm', relation: 'greater-than', expectedValue: 0, rationale: 'Wartość musi być dodatnia.' },
+      },
+      baselineRequest,
+      sweep: { parameter: 'massSolar', values: [1, 2], label: 'Masa M☉' },
+      repetitionsPerArm: 1,
+    });
+    const pack = createScientificEvidencePack(executeScientificExperiment(design));
+    expect(classifyStoredEvidencePack(pack)).toBe('VALID');
+    expect(classifyStoredEvidencePack({ ...pack, runs: [], runCount: 0 })).toBe('INVALID_LOCAL_RECORD');
+    expect(classifyStoredEvidencePack({ ...pack, runs: [{ ...pack.runs[0], provenance: { ...pack.runs[0].provenance, runFingerprint: '' } }] })).toBe('INVALID_LOCAL_RECORD');
   });
 });

@@ -176,14 +176,35 @@ function DrugWorkspace() {
             {passport.verdict}
           </div>
 
+          <div className="section-label">Tożsamość i struktura</div>
+          <div className="cde-results">
+            <div className="cde-result"><span className="cde-result-label">Candidate ID</span><span className="cde-result-actual">{passport.candidateId}</span></div>
+            <div className="cde-result"><span className="cde-result-label">Target ID</span><span className="cde-result-actual">{passport.targetId ?? 'NOT_AVAILABLE'}</span></div>
+            <div className="cde-result"><span className="cde-result-label">Formula</span><span className="cde-result-actual">{passport.representation.formula ?? 'NOT_AVAILABLE'}</span></div>
+            <div className="cde-result"><span className="cde-result-label">SMILES</span><span className="cde-result-actual">{passport.representation.smiles ?? 'NOT_AVAILABLE'}</span></div>
+            <div className="cde-result"><span className="cde-result-label">Charge</span><span className="cde-result-actual">{passport.representation.charge}</span></div>
+          </div>
+
+          <div className="section-label">Modele i źródło</div>
+          <div className="cde-results">
+            {passport.modelsExecuted.length > 0 ? passport.modelsExecuted.map((model) => (
+              <div className="cde-result" key={`${model.modelId}-${model.version ?? 'unknown'}`}>
+                <span className="project-role role-owner">{model.status}</span>
+                <span className="cde-result-label">{model.modelId}</span>
+                <span className="cde-result-actual">{model.version ?? 'VERSION_UNKNOWN'}</span>
+              </div>
+            )) : <div className="cde-reason">NOT_AVAILABLE — brak zarejestrowanego modelu wykonawczego.</div>}
+          </div>
+          <p className="settings-hint">Źródło zewnętrzne: NOT_AVAILABLE w tym paszporcie. Nie traktuj identyfikatora kandydata jako dowodu pochodzenia.</p>
+
           <div className="section-label">Policzone właściwości (realne)</div>
           <div className="cde-results">
-            {Object.entries(passport.calculatedProperties).map(([k, v]) => (
+            {Object.keys(passport.calculatedProperties).length > 0 ? Object.entries(passport.calculatedProperties).map(([k, v]) => (
               <div className="cde-result pass" key={k}>
                 <span className="cde-result-label">{k}</span>
                 <span className="cde-result-actual">{typeof v === 'number' ? v.toFixed(3) : String(v)}</span>
               </div>
-            ))}
+            )) : <div className="cde-reason">NOT_AVAILABLE — brak policzonych właściwości.</div>}
           </div>
 
           <div className="section-label">Składniki oceny</div>

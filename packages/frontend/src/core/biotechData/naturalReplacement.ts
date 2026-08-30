@@ -2,7 +2,7 @@ import { buildPinnedChEMBLAdenosineDiscovery } from './adenosine';
 import { buildPinnedChEMBLCaffeineDiscovery } from './chembl';
 import { buildPinnedChEMBLTheophyllineDiscovery } from './theophylline';
 import { runExperiment } from '../experimentFabric/executor';
-import { runFabricCompute, runAdmetPrediction, type ComputeRun } from '../backend/client';
+import { runFabricCompute, runAdmetPrediction, runQuantumSinglePoint, type ComputeRun } from '../backend/client';
 import { EXPERIMENT_FABRIC_VERSION, type ExperimentRun } from '../experimentFabric/types';
 import {
   createCandidateDiscoveryReport,
@@ -47,6 +47,7 @@ export interface NaturalFunctionalReplacementResult {
   cheapCompute?: readonly NaturalCheapCompute[];
   heavyCompute?: readonly NaturalHeavyCompute[];
   admetCompute?: readonly NaturalHeavyCompute[];
+  quantumCompute?: readonly NaturalHeavyCompute[];
   combinationHypothesis?: ReturnType<typeof buildCandidateCombinationHypothesis>;
   neurobiology?: NaturalNeurobiologyProfile;
 }
@@ -54,6 +55,7 @@ export interface NaturalFunctionalReplacementResult {
 export interface NaturalSourceRecord {
   name: string; cid: number; formula: string; smiles: string; inchiKey: string;
   molecularWeight: string; source: 'PubChem'; sourceVersion: string; retrievedAt: string;
+  atoms3d?: readonly { element: string; x: number; y: number; z: number }[];
 }
 
 export interface LiveChEMBLActivityRecord {
@@ -90,13 +92,14 @@ export interface NaturalHeavyCompute {
   summary: string; provenance?: ComputeRun['provenance'];
 }
 
-function enrichReportsWithCompute(reports: readonly CandidateDiscoveryReport[], cheap: readonly NaturalCheapCompute[], heavy: readonly NaturalHeavyCompute[], admet: readonly NaturalHeavyCompute[], activities: readonly LiveChEMBLActivityRecord[], target?: string): CandidateDiscoveryReport[] {
+function enrichReportsWithCompute(reports: readonly CandidateDiscoveryReport[], cheap: readonly NaturalCheapCompute[], heavy: readonly NaturalHeavyCompute[], admet: readonly NaturalHeavyCompute[], quantum: readonly NaturalHeavyCompute[], activities: readonly LiveChEMBLActivityRecord[], target?: string): CandidateDiscoveryReport[] {
   return reports.map((report) => {
     const cid = Number(report.candidateId.split(':').pop());
     const runs = [
       ...cheap.filter((run) => run.pubchemCid === cid).map((run) => ({ runtime: 'Experiment Fabric cheap molecular weight', version: EXPERIMENT_FABRIC_VERSION, runId: run.runId, fingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, outputs: run.outputs as Readonly<Record<string, string | number | boolean>> })),
       ...heavy.filter((run) => run.pubchemCid === cid).map((run) => ({ runtime: run.engine ?? run.modelId, version: run.modelVersion, runId: run.runId, fingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, outputs: run.outputs })),
       ...admet.filter((run) => run.pubchemCid === cid).map((run) => ({ runtime: run.engine ?? run.modelId, version: run.modelVersion, runId: run.runId, fingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, outputs: run.outputs })),
+      ...quantum.filter((run) => run.pubchemCid === cid).map((run) => ({ runtime: run.engine ?? run.modelId, version: run.modelVersion, runId: run.runId, fingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, outputs: run.outputs })),
     ];
     if (!Number.isFinite(cid) || !report.ranking || runs.length === 0) return report;
     const support = Number((runs.filter((run) => run.status === 'completed' || run.status === 'ok').length / runs.length).toFixed(4));
@@ -168,6 +171,21 @@ export async function fetchNaturalPubChemRecords(fetchImpl: typeof fetch = fetch
     } catch { results.push(null); /* bounded source failure remains visible to the caller */ }
   }
   return results.filter((record): record is NaturalSourceRecord => record !== null);
+}
+
+const ELEMENTS: Readonly<Record<number, string>> = { 1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F', 15: 'P', 16: 'S', 17: 'Cl' };
+export async function fetchNaturalPubChem3dRecord(record: NaturalSourceRecord, fetchImpl: typeof fetch = fetch): Promise<NaturalSourceRecord> {
+  const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${record.cid}/record/JSON?record_type=3d`;
+  try {
+    const response = await fetchImpl(url, { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return record;
+    const compound = (await response.json() as { PC_Compounds?: Array<{ atoms?: { element?: { number?: number[] } }; coords?: Array<{ conformers?: Array<{ x?: number[]; y?: number[]; z?: number[] }> }> }> }).PC_Compounds?.[0];
+    const numbers = compound?.atoms?.element?.number;
+    const conformer = compound?.coords?.[0]?.conformers?.[0];
+    if (!numbers || !conformer?.x || !conformer.y || !conformer.z || numbers.length !== conformer.x.length || numbers.length !== conformer.y.length || numbers.length !== conformer.z.length) return record;
+    const atoms3d = numbers.map((number, index) => ({ element: ELEMENTS[number], x: conformer.x![index], y: conformer.y![index], z: conformer.z![index] })).filter((atom): atom is { element: string; x: number; y: number; z: number } => Boolean(atom.element) && [atom.x, atom.y, atom.z].every(Number.isFinite));
+    return atoms3d.length === numbers.length ? { ...record, atoms3d } : record;
+  } catch { return record; }
 }
 
 export async function resolveReferenceProfile(query: string, fetchImpl: typeof fetch = fetch): Promise<ReferenceProfile> {
@@ -336,7 +354,24 @@ export async function resolveNaturalFunctionalReplacementFromSources(
       else admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', status: 'blocked', resultOrigin: 'engine-unavailable', outputs: {}, summary: `BLOCKED: ${response.error}` }));
     } catch (error) { admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', status: 'blocked', resultOrigin: 'request-failed', outputs: {}, summary: `BLOCKED: ${error instanceof Error ? error.message : String(error)}` })); }
   }
-  const enrichedReports = enrichReportsWithCompute([...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)], cheapCompute, heavyCompute ?? [], admetCompute ?? [], liveActivities, input.target);
+  const quantumCompute: NaturalHeavyCompute[] = [];
+  if (input.executeHeavyCompute) {
+    for (const record of eligible) {
+      const source3d = await fetchNaturalPubChem3dRecord(record, fetchImpl);
+      if (!source3d.atoms3d) {
+        quantumCompute.push({ pubchemCid: record.cid, modelId: 'pyscf-singlepoint', status: 'blocked', resultOrigin: 'missing-source-3d', outputs: {}, summary: 'BLOCKED: PubChem did not provide a valid 3D conformer.' });
+        continue;
+      }
+      const response = await runQuantumSinglePoint({ atoms: source3d.atoms3d, charge: 0, spin: 0, basis: 'sto-3g', method: 'RHF' });
+      if (response.ok) {
+        const outputs = response.data.data;
+        quantumCompute.push({ pubchemCid: record.cid, modelId: 'pyscf-singlepoint', modelVersion: String(response.data.meta?.engine ?? '').replace(/^PySCF /, ''), engine: response.data.meta?.engine ? String(response.data.meta.engine) : 'PySCF', status: 'ok', runId: response.data.runId, runFingerprint: fnv1a(canonicalJson(outputs)), resultOrigin: response.data.resultOrigin, outputs, summary: 'PySCF MODEL_ESTIMATE from a PubChem source-backed 3D conformer; not an observation.' });
+      } else {
+        quantumCompute.push({ pubchemCid: record.cid, modelId: 'pyscf-singlepoint', status: 'blocked', resultOrigin: 'engine-unavailable', outputs: {}, summary: `BLOCKED: ${response.error}` });
+      }
+    }
+  }
+  const enrichedReports = enrichReportsWithCompute([...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)], cheapCompute, heavyCompute ?? [], admetCompute ?? [], quantumCompute, liveActivities, input.target);
   const combinationHypothesis = buildCandidateCombinationHypothesis(enrichedReports, input.target ? [input.target] : []);
-  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), ...(combinationHypothesis === undefined ? {} : { combinationHypothesis }), neurobiology: A1_NEUROBIOLOGY_PROFILE, reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. ${base.reason}`, reports: enrichedReports };
+  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), ...(input.executeHeavyCompute ? { quantumCompute } : {}), ...(combinationHypothesis === undefined ? {} : { combinationHypothesis }), neurobiology: A1_NEUROBIOLOGY_PROFILE, reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}${input.executeHeavyCompute ? ` i ${quantumCompute.filter((run) => run.status === 'ok').length} PySCF runów` : ''}. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. ${base.reason}`, reports: enrichedReports };
 }

@@ -516,6 +516,11 @@ export async function runAdmetPrediction(smiles: readonly string[]): Promise<Api
   return request<{ predictions: Record<string, Record<string, number>>; version: string; runId: string; engine: string; resultOrigin: string }>('POST', '/compute/admet/predict', { body: { smiles } });
 }
 
+export interface QuantumAtom { element: string; x: number; y: number; z: number }
+export async function runQuantumSinglePoint(input: { atoms: readonly QuantumAtom[]; charge?: number; spin?: number; basis?: string; method?: string }): Promise<ApiResult<{ data: Record<string, string | number | boolean>; meta: Record<string, string | number> | null; runId: string; resultOrigin: string }>> {
+  return request<{ data: Record<string, string | number | boolean>; meta: Record<string, string | number> | null; runId: string; resultOrigin: string }>('POST', '/compute/qm/singlepoint', { body: input });
+}
+
 export async function listCapabilities(): Promise<ApiResult<Capability[]>> {
   const r = await request<{ capabilities: Capability[] }>('GET', '/compute/capabilities');
   return r.ok ? { ok: true, data: r.data.capabilities } : r;

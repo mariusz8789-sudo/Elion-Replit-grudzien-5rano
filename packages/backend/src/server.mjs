@@ -38,6 +38,7 @@ import {
 import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { handleApi } from './api.mjs';
 import { listToolchain } from './campaign/toolchain.mjs';
+import { fetchBiotechSource } from './biotechProxy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8080);
@@ -92,8 +93,12 @@ Twarde zasady (nie wolno ich łamać):
 
 /* ---------------- Rate limiting ---------------- */
 const limiter = createRateLimiter({ limit: 10, windowMs: 60_000 });
+const biotechSourceLimiter = createRateLimiter({ limit: 30, windowMs: 60_000 });
 // Sprzątanie wygasłych wpisów — pamięć nie rośnie z liczbą adresów IP.
-setInterval(() => limiter.cleanup(), 300_000).unref();
+setInterval(() => {
+  limiter.cleanup();
+  biotechSourceLimiter.cleanup();
+}, 300_000).unref();
 
 function json(res, status, body) {
   res.writeHead(status, {
@@ -182,6 +187,15 @@ async function handleAsk(req, res) {
       return json(res, 502, { error: 'upstream', message: 'Serwis AI chwilowo niedostępny — spróbuj ponownie.' });
     }
   });
+}
+
+/* ---------------- API: allowlisted live biotech sources ---------------- */
+async function handleBiotechSource(req, res, url) {
+  if (req.method !== 'GET') return json(res, 405, { error: 'method_not_allowed' });
+  const ip = req.socket.remoteAddress ?? 'unknown';
+  if (!biotechSourceLimiter.allow(ip)) return json(res, 429, { error: 'rate_limited', message: 'Za dużo odczytów źródeł — odczekaj chwilę.' });
+  const result = await fetchBiotechSource(url.searchParams.get('url'));
+  return json(res, result.status, result.body);
 }
 
 /* ---------------- API trwałości (/api/auth, /api/projects) ---------------- */
@@ -285,6 +299,8 @@ const server = http.createServer((req, res) => {
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);
+  const requestUrl = req.url ? new URL(req.url, 'http://x') : null;
+  if (requestUrl?.pathname === '/api/biotech/source') return handleBiotechSource(req, res, requestUrl);
   if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute')) {
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
   }

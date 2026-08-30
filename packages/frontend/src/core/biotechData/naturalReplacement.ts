@@ -121,6 +121,14 @@ function enrichReportsWithCompute(reports: readonly CandidateDiscoveryReport[], 
 const normalize = (value: string | undefined): string => (value ?? '').trim().toLowerCase();
 
 const PUBCHEM_RETRIEVED_AT = '2026-08-29';
+
+function sourceFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  if (typeof window === 'undefined') return fetch(input, init);
+  const rawUrl = input instanceof Request ? input.url : String(input);
+  const proxy = new URL('/api/biotech/source', window.location.origin);
+  proxy.searchParams.set('url', rawUrl);
+  return fetch(proxy, init);
+}
 const UNIPROT_A1_PROVENANCE = { source: 'UniProt', sourceId: 'UniProtKB:P30542', evidenceType: 'human adenosine A1 receptor target mapping', status: 'LITERATURE_SUPPORTED' as const, uncertainty: 'Target identity mapping does not establish compound efficacy, safety or clinical suitability.', sourceUrl: 'https://rest.uniprot.org/uniprotkb/P30542.json', sourceVersion: 'UniProtKB:P30542', retrievedAt: PUBCHEM_RETRIEVED_AT };
 const A1_NEUROBIOLOGY_PROFILE: NaturalNeurobiologyProfile = { targetId: 'chembl:target:CHEMBL318', receptor: 'Adenosine receptor A1', receptorFamily: 'Adenosine receptor family', neurotransmitterSystem: 'Adenosinergic signaling', pathway: { label: 'Adenosinergic signaling pathway', status: 'LITERATURE_SUPPORTED', uncertainty: 'Target mapping does not establish a candidate-specific pathway effect.' }, mechanism: { label: 'Candidate–A1 binding interaction', status: 'HYPOTHESIS', uncertainty: 'Binding evidence does not establish functional mechanism, efficacy or clinical benefit.' }, provenance: [{ source: UNIPROT_A1_PROVENANCE.source, sourceId: UNIPROT_A1_PROVENANCE.sourceId, sourceUrl: UNIPROT_A1_PROVENANCE.sourceUrl, sourceVersion: UNIPROT_A1_PROVENANCE.sourceVersion }] };
 const PUBCHEM_IDENTITY_RECORDS = [
@@ -153,7 +161,7 @@ function identityOnlyReports(records?: readonly NaturalSourceRecord[]): Candidat
 }
 
 /** Bounded PubChem retrieval; missing/invalid rows are omitted, never invented. */
-export async function fetchNaturalPubChemRecords(fetchImpl: typeof fetch = fetch): Promise<NaturalSourceRecord[]> {
+export async function fetchNaturalPubChemRecords(fetchImpl: typeof fetch = sourceFetch): Promise<NaturalSourceRecord[]> {
   const today = new Date().toISOString().slice(0, 10);
   const names = PUBCHEM_IDENTITY_RECORDS.filter(([name]) => !['theobromine', 'paraxanthine'].includes(name));
   const results: Array<NaturalSourceRecord | null> = [];
@@ -176,7 +184,7 @@ export async function fetchNaturalPubChemRecords(fetchImpl: typeof fetch = fetch
 }
 
 const ELEMENTS: Readonly<Record<number, string>> = { 1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F', 15: 'P', 16: 'S', 17: 'Cl' };
-export async function fetchNaturalPubChem3dRecord(record: NaturalSourceRecord, fetchImpl: typeof fetch = fetch): Promise<NaturalSourceRecord> {
+export async function fetchNaturalPubChem3dRecord(record: NaturalSourceRecord, fetchImpl: typeof fetch = sourceFetch): Promise<NaturalSourceRecord> {
   const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${record.cid}/record/JSON?record_type=3d`;
   try {
     const response = await fetchImpl(url, { signal: AbortSignal.timeout(8000) });
@@ -191,7 +199,7 @@ export async function fetchNaturalPubChem3dRecord(record: NaturalSourceRecord, f
   } catch { return record; }
 }
 
-export async function resolveReferenceProfile(query: string, fetchImpl: typeof fetch = fetch): Promise<ReferenceProfile> {
+export async function resolveReferenceProfile(query: string, fetchImpl: typeof fetch = sourceFetch): Promise<ReferenceProfile> {
   const value = query.trim();
   if (!value) return { status: 'UNKNOWN', query: value, source: 'PubChem', uncertainty: 'Brak reference compound; nie wykonano wyszukiwania.' };
   const isChEMBL = /^CHEMBL\d+$/i.test(value);
@@ -307,7 +315,8 @@ function buildChEMBLTheobromineA1Report(): CandidateDiscoveryReport {
 export function resolveNaturalFunctionalReplacement(input: NaturalFunctionalReplacementInput): NaturalFunctionalReplacementResult {
   const reference = normalize(input.referenceCompound);
   const target = normalize(input.target);
-  const knownReference = reference.includes('caffeine') || reference.includes('kofein') || reference.includes('adenosine') || reference.includes('adenozyn') || reference.includes('theophylline') || reference.includes('teofilin');
+  const referenceOmitted = reference.length === 0;
+  const knownReference = referenceOmitted || reference.includes('caffeine') || reference.includes('kofein') || reference.includes('adenosine') || reference.includes('adenozyn') || reference.includes('theophylline') || reference.includes('teofilin');
   const knownTarget = !target || target === 'a1' || target.includes('adenosine receptor a1') || target.includes('chembl318');
   if (!knownReference || !knownTarget) {
     return {
@@ -330,14 +339,14 @@ export function resolveNaturalFunctionalReplacement(input: NaturalFunctionalRepl
     status: 'RESOLVED',
     reason: 'Dopasowano do istniejącego pinned A1 reference profile; wynik jest research-priority comparison, nie funkcjonalnym zamiennikiem ani dowodem skuteczności.',
     reports,
-    matchedReference: input.referenceCompound?.trim() || 'A1 pinned profile',
+    matchedReference: input.referenceCompound?.trim() || 'A1 target-only bounded catalog',
     target: input.target?.trim() || 'A1',
   };
 }
 
 export async function resolveNaturalFunctionalReplacementFromSources(
   input: NaturalFunctionalReplacementInput,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = sourceFetch,
 ): Promise<NaturalFunctionalReplacementResult> {
   const sourceRecords = await fetchNaturalPubChemRecords(fetchImpl);
   if (sourceRecords.length === 0) {

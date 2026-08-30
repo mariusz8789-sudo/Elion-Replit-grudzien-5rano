@@ -73,13 +73,15 @@ function formatProjectKnowledgeSources(project: ActiveKnowledgeProject, material
   return `Źródła projektu „${project.name}” — materiał użytkownika, nie wynik solvera ani instrukcja wykonawcza:\n${entries.join('\n')}`;
 }
 
-function naturalReferenceFromMessage(message: string): string | undefined {
+export function naturalReferenceFromMessage(message: string): string | undefined {
   const known = ['caffeine', 'kofein', 'adenosine', 'adenozyn', 'theophylline', 'teofilin'];
   return known.find((name) => message.toLowerCase().includes(name));
 }
 
-function rawReferenceFromMessage(message: string): string | undefined {
-  const match = message.match(/(?:reference|referencyjnego|dla|względem)\s+(?:compound|związku|leku)?\s*[:=]?\s*([^,.;]+)/i);
+export function rawReferenceFromMessage(message: string): string | undefined {
+  // „dla receptora A1” is target context, not a reference compound. Only
+  // explicit reference/compound/medicine wording may supply this field.
+  const match = message.match(/(?:reference(?:\s+compound)?|referencyjnego|związku|leku)\s*[:=]?\s*([^,.;]+)/i);
   return match?.[1]?.trim();
 }
 
@@ -336,8 +338,8 @@ export function ScienceChat() {
     if (isNaturalDiscovery) {
       const namedReference = naturalReferenceFromMessage(msg);
       const referenceCompound = namedReference ?? rawReferenceFromMessage(msg);
-      if (!namedReference) {
-        const profile = await resolveReferenceProfile(referenceCompound ?? '');
+      if (!namedReference && referenceCompound) {
+        const profile = await resolveReferenceProfile(referenceCompound);
         if (profile.status !== 'RESOLVED') {
           setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `REFERENCE ${profile.status}: ${profile.query || 'brak wartości'}. ${profile.uncertainty}`, tag: 'SYSTEM' }]);
           setInput('');

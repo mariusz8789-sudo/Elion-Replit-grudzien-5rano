@@ -11,7 +11,7 @@ import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosi
 import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
 import { compareCandidateDiscoveryReports } from '../core/biotechDiscoveryContract';
 import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
-import { recordBiotechAdminAudit, saveBiotechDiscoveryComparisonToMemory } from '../core/scienceMemory';
+import { recordBiotechAdminAudit, replaySavedBiotechComparison, saveBiotechDiscoveryComparisonToMemory } from '../core/scienceMemory';
 import { resolveNaturalFunctionalReplacementFromSources, type NaturalFunctionalReplacementResult } from '../core/biotechData/naturalReplacement';
 
 /**
@@ -61,6 +61,7 @@ function DrugWorkspace() {
   const [passport, setPassport] = useState<CandidatePassport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastAuditRequestId, setLastAuditRequestId] = useState<string | null>(null);
+  const [biotechReplay, setBiotechReplay] = useState<ReturnType<typeof replaySavedBiotechComparison> | null>(null);
   const [referenceCompound, setReferenceCompound] = useState(() => routeParams.get('reference') ?? '');
   const [referenceTarget, setReferenceTarget] = useState(() => routeParams.get('target') ?? 'A1');
   const [replacementResult, setReplacementResult] = useState<NaturalFunctionalReplacementResult | null>(null);
@@ -184,7 +185,8 @@ function DrugWorkspace() {
           <div className="cde-result"><span className="cde-result-label">Adenosine comparator</span><span className="cde-result-actual">{adenosineDiscovery.record.activity.type} {adenosineDiscovery.record.activity.relation} {adenosineDiscovery.record.activity.value} {adenosineDiscovery.record.activity.units}</span><span className="cde-result-bound">{adenosineDiscovery.record.activity.assayId} · ChEMBL + DailyMed label · clinical efficacy UNKNOWN</span></div>
           <div className="cde-result"><span className="cde-result-label">Theophylline comparator</span><span className="cde-result-actual">{theophyllineDiscovery.record.activity.type} {theophyllineDiscovery.record.activity.relation} {theophyllineDiscovery.record.activity.value} {theophyllineDiscovery.record.activity.units}</span><span className="cde-result-bound">{theophyllineDiscovery.record.activity.assayId} · ChEMBL + DailyMed label · clinical efficacy UNKNOWN</span></div>
         </div>
-        <button className="chip-btn primary" type="button" onClick={() => { saveBiotechDiscoveryComparisonToMemory(activeReplacementReports, { activityIds: replacementResult?.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`), assayIds: replacementResult?.liveActivities?.map((activity) => `chembl:assay:${activity.assayId}`) }); const user = getSession()?.user; if (user) setLastAuditRequestId(recordBiotechAdminAudit({ userId: user.id, action: 'save-natural-functional-replacement-comparison', provenance: `DrugDiscoveryScreen · ${activeReplacementReports.length} resolved ChEMBL/PubChem/DailyMed records` }).requestId); window.location.hash = '#/memory'; }}>Zapisz {activeReplacementReports.length} raportów w Scientific Memory</button>
+        <button className="chip-btn primary" type="button" onClick={() => { const saved = saveBiotechDiscoveryComparisonToMemory(activeReplacementReports, { activityIds: replacementResult?.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`), assayIds: replacementResult?.liveActivities?.map((activity) => `chembl:assay:${activity.assayId}`) }); setBiotechReplay(replaySavedBiotechComparison(saved.biotech?.comparison, activeReplacementReports)); const user = getSession()?.user; if (user) setLastAuditRequestId(recordBiotechAdminAudit({ userId: user.id, action: 'save-natural-functional-replacement-comparison', provenance: `DrugDiscoveryScreen · ${activeReplacementReports.length} resolved ChEMBL/PubChem/DailyMed records` }).requestId); window.location.hash = '#/memory'; }}>Zapisz {activeReplacementReports.length} raportów w Scientific Memory</button>
+        {biotechReplay && <div className="cde-verdict" role="status"><strong>Replay {biotechReplay.status}</strong> · {biotechReplay.reason}</div>}
         {lastAuditRequestId && <p className="settings-hint" role="status">Audit request: {lastAuditRequestId}</p>}
         <p className="settings-hint">Provenance: <a href={pinnedDiscovery.report.provenance[0]?.sourceUrl ?? '#'} target="_blank" rel="noreferrer">ChEMBL / PubChem source records</a>. Safety signal i toksykologia pozostają osobnymi, source-backed statusami.</p>
       </section> : <section className="settings-section" role="status">
@@ -242,14 +244,35 @@ function DrugWorkspace() {
             {passport.verdict}
           </div>
 
+          <div className="section-label">Tożsamość i struktura</div>
+          <div className="cde-results">
+            <div className="cde-result"><span className="cde-result-label">Candidate ID</span><span className="cde-result-actual">{passport.candidateId}</span></div>
+            <div className="cde-result"><span className="cde-result-label">Target ID</span><span className="cde-result-actual">{passport.targetId ?? 'NOT_AVAILABLE'}</span></div>
+            <div className="cde-result"><span className="cde-result-label">Formula</span><span className="cde-result-actual">{passport.representation.formula ?? 'NOT_AVAILABLE'}</span></div>
+            <div className="cde-result"><span className="cde-result-label">SMILES</span><span className="cde-result-actual">{passport.representation.smiles ?? 'NOT_AVAILABLE'}</span></div>
+            <div className="cde-result"><span className="cde-result-label">Charge</span><span className="cde-result-actual">{passport.representation.charge}</span></div>
+          </div>
+
+          <div className="section-label">Modele i źródło</div>
+          <div className="cde-results">
+            {passport.modelsExecuted.length > 0 ? passport.modelsExecuted.map((model) => (
+              <div className="cde-result" key={`${model.modelId}-${model.version ?? 'unknown'}`}>
+                <span className="project-role role-owner">{model.status}</span>
+                <span className="cde-result-label">{model.modelId}</span>
+                <span className="cde-result-actual">{model.version ?? 'VERSION_UNKNOWN'}</span>
+              </div>
+            )) : <div className="cde-reason">NOT_AVAILABLE — brak zarejestrowanego modelu wykonawczego.</div>}
+          </div>
+          <p className="settings-hint">Źródło zewnętrzne: NOT_AVAILABLE w tym paszporcie. Nie traktuj identyfikatora kandydata jako dowodu pochodzenia.</p>
+
           <div className="section-label">Policzone właściwości (realne)</div>
           <div className="cde-results">
-            {Object.entries(passport.calculatedProperties).map(([k, v]) => (
+            {Object.keys(passport.calculatedProperties).length > 0 ? Object.entries(passport.calculatedProperties).map(([k, v]) => (
               <div className="cde-result pass" key={k}>
                 <span className="cde-result-label">{k}</span>
                 <span className="cde-result-actual">{typeof v === 'number' ? v.toFixed(3) : String(v)}</span>
               </div>
-            ))}
+            )) : <div className="cde-reason">NOT_AVAILABLE — brak policzonych właściwości.</div>}
           </div>
 
           <div className="section-label">Składniki oceny</div>

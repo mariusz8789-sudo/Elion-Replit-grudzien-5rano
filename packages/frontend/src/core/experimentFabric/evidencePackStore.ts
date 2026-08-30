@@ -73,6 +73,7 @@ export function compareScientificEvidencePacks(reference: ScientificEvidencePack
  * This is a snapshot disclosure, not proof of a fresh replay.
  */
 export function getStoredEvidencePackReplayVerdict(pack: ScientificEvidencePack): ScientificEvidenceReplayVerdict {
+  if (!isPack(pack)) return 'BLOCKED';
   if (pack.runCount <= 0 || pack.runs.length === 0 || pack.runs.some((run) => run.status !== 'completed') || pack.reproducibility.armsNotExecuted.length > 0) return 'BLOCKED';
   return pack.reproducibility.allArmsMatched ? 'MATCH' : 'DRIFT';
 }

@@ -1488,3 +1488,10 @@ describe('Scientific Evidence Store validation boundary', () => {
     expect(classifyStoredEvidencePack({ ...pack, runs: [{ ...pack.runs[0], provenance: { ...pack.runs[0].provenance, runFingerprint: '' } }] })).toBe('INVALID_LOCAL_RECORD');
   });
 });
+
+
+describe('Stored Evidence verdict fail-closed boundary', () => {
+  it('returns BLOCKED for a malformed pack instead of trusting reproducibility flags', () => {
+    expect(getStoredEvidencePackReplayVerdict({ reproducibility: { allArmsMatched: true, armsWithDrift: [], armsNotExecuted: [] } } as never)).toBe('BLOCKED');
+  });
+});

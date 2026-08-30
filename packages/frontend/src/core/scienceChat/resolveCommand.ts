@@ -377,7 +377,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   // --- Równania ---
   if (has(norm, 'rownanie', 'rownania', 'wzor', 'wzory', 'equation')) {
     const eqs = recipe?.equations ?? [];
-    if (eqs.length === 0) return { text: `Dla „${ctx.experimentName}" nie mam jeszcze zarejestrowanych równań w katalogu. TODO: uzupełnić metadane modelu.`, tag: 'MODEL', intent: 'SHOW_EQUATION', todo: true };
+    if (eqs.length === 0) return { text: `Dla „${ctx.experimentName}" nie mam jeszcze zarejestrowanych równań w katalogu. Status: MODEL_METADATA_UNAVAILABLE — nie uruchomiono dodatkowego solvera ani nie wyprowadzono równania.`, tag: 'MODEL', intent: 'SHOW_EQUATION', todo: true };
     return { text: `Równania modelu „${ctx.experimentName}":`, tag: 'MODEL', intent: 'SHOW_EQUATION', equations: eqs };
   }
 

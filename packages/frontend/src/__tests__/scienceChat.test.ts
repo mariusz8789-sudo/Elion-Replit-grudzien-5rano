@@ -420,3 +420,15 @@ describe('scienceChat: parameter contract validation', () => {
     expect(r.text).toContain('VERIFY BLOCKED');
   });
 });
+
+
+describe('scienceChat: missing equation metadata disclosure', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('labels missing equations as unavailable metadata without implying a solver', () => {
+    const r = resolveCommand('pokaż równanie', ctx({ labId: 'unknown', experimentId: 'unknown-model', experimentName: 'Nieznany model' }));
+    expect(r.todo).toBe(true);
+    expect(r.text).toContain('MODEL_METADATA_UNAVAILABLE');
+    expect(r.text).toContain('nie uruchomiono dodatkowego solvera');
+  });
+});

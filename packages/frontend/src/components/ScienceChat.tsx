@@ -87,7 +87,8 @@ function formatNaturalDiscoveryResult(result: Awaited<ReturnType<typeof resolveN
   const top = [...result.reports].sort((a, b) => (b.ranking?.score ?? -1) - (a.ranking?.score ?? -1)).slice(0, 5);
   const why = result.candidateWhy ?? [];
   const compute = (result.cheapCompute ?? []).slice(0, 5).map((run) => `compute CID ${run.pubchemCid}: ${run.status} · ${run.resultOrigin} · ${run.summary} · fingerprint ${run.runFingerprint}`);
-  return [`NATURAL DISCOVERY — ${result.status}`, result.reason, `Kandydaci/raporty: ${result.reports.length}.`, ...(compute.length ? ['CHEAP COMPUTE (existing Fabric):', ...compute] : []), ...top.map((report, index) => {
+  const heavy = (result.heavyCompute ?? []).map((run) => `heavy CID ${run.pubchemCid}: ${run.status} · ${run.resultOrigin} · ${run.summary}${run.runId ? ` · run ${run.runId}` : ''}`);
+  return [`NATURAL DISCOVERY — ${result.status}`, result.reason, `Kandydaci/raporty: ${result.reports.length}.`, ...(compute.length ? ['CHEAP COMPUTE (existing Fabric):', ...compute] : []), ...(heavy.length ? ['HEAVY COMPUTE (existing backend Fabric):', ...heavy] : []), ...top.map((report, index) => {
     const cid = report.candidateId.match(/pubchem:(\d+)/)?.[1];
     const explanation = cid ? why.find((item) => item.pubchemCid === Number(cid)) : undefined;
     return `${index + 1}. ${report.candidateId} · research priority ${(report.ranking?.score ?? 0).toFixed(4)} · ${explanation?.rationale ?? 'brak live activity dla tego kandydata'} · uncertainty: ${explanation?.uncertainty ?? report.uncertainty}`;
@@ -344,10 +345,11 @@ export function ScienceChat() {
         return;
       }
       const targetMatch = msg.match(/(?:target|receptor|receptora)\s*[:=]?\s*([A-Za-z0-9-]+)/i);
-      const result = await resolveNaturalFunctionalReplacementFromSources({ referenceCompound, target: targetMatch?.[1] ?? 'A1' });
+      const result = await resolveNaturalFunctionalReplacementFromSources({ referenceCompound, target: targetMatch?.[1] ?? 'A1', executeHeavyCompute: true });
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatNaturalDiscoveryResult(result), tag: result.status === 'RESOLVED' ? 'WYNIK' : 'SYSTEM' }]);
       if (result.reports.length >= 2) {
         const computeRuns: SavedBiotechComputeRun[] = (result.cheapCompute ?? []).map((run) => ({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs }));
+        for (const run of result.heavyCompute ?? []) if (run.runId) computeRuns.push({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint ?? run.runId, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs });
         const saved = saveBiotechDiscoveryComparisonToMemory(result.reports, { activityIds: result.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`), assayIds: result.liveActivities?.map((activity) => `chembl:assay:${activity.assayId}`), computeRuns });
         setTurns((t) => [...t, { role: 'genesis', text: `Zapisano pełny comparison artifact w Scientific Memory. Report: ${saved.biotech?.reportId ?? 'UNKNOWN'} · comparison: ${saved.biotech?.comparison?.comparisonId ?? 'UNKNOWN'} · replay fingerprint: ${saved.biotech?.comparison?.scientificFingerprint ?? 'UNKNOWN'}.`, tag: 'SYSTEM' }]);
       }

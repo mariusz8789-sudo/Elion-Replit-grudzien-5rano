@@ -2,6 +2,7 @@ import { buildPinnedChEMBLAdenosineDiscovery } from './adenosine';
 import { buildPinnedChEMBLCaffeineDiscovery } from './chembl';
 import { buildPinnedChEMBLTheophyllineDiscovery } from './theophylline';
 import { runExperiment } from '../experimentFabric/executor';
+import { runFabricCompute, type ComputeRun } from '../backend/client';
 import { EXPERIMENT_FABRIC_VERSION, type ExperimentRun } from '../experimentFabric/types';
 import {
   createCandidateDiscoveryReport,
@@ -20,6 +21,7 @@ export interface NaturalFunctionalReplacementInput {
   target?: string;
   mechanism?: string;
   structure?: string;
+  executeHeavyCompute?: boolean;
 }
 
 export type ReferenceProfileStatus = 'RESOLVED' | 'PARTIAL' | 'UNKNOWN' | 'BLOCKED';
@@ -40,6 +42,7 @@ export interface NaturalFunctionalReplacementResult {
   candidateWhy?: readonly NaturalCandidateWhy[];
   referenceProfile?: ReferenceProfile;
   cheapCompute?: readonly NaturalCheapCompute[];
+  heavyCompute?: readonly NaturalHeavyCompute[];
 }
 
 export interface NaturalSourceRecord {
@@ -65,6 +68,13 @@ export interface NaturalCheapCompute {
   pubchemCid: number; status: ExperimentRun['result']['status']; runId: string;
   runFingerprint: string; outputs: ExperimentRun['result']['outputs'];
   resultOrigin: ExperimentRun['provenance']['resultOrigin']; summary: string;
+}
+
+export interface NaturalHeavyCompute {
+  pubchemCid: number; modelId: string; modelVersion?: string; engine?: string;
+  status: ComputeRun['status'] | 'blocked'; runId?: string; runFingerprint?: string;
+  resultOrigin: string; outputs: Readonly<Record<string, string | number | boolean>>;
+  summary: string; provenance?: ComputeRun['provenance'];
 }
 
 const normalize = (value: string | undefined): string => (value ?? '').trim().toLowerCase();
@@ -189,6 +199,20 @@ function runCheapNaturalCompute(records: readonly NaturalSourceRecord[]): Natura
   });
 }
 
+async function runHeavyNaturalCompute(records: readonly NaturalSourceRecord[]): Promise<NaturalHeavyCompute[]> {
+  return Promise.all(records.map(async (record): Promise<NaturalHeavyCompute> => {
+    if (!record.smiles.trim()) return { pubchemCid: record.cid, modelId: 'chem-rdkit-descriptors', status: 'blocked', resultOrigin: 'not-executed', outputs: {}, summary: 'BLOCKED: brak poprawnego SMILES.' };
+    try {
+      const response = await runFabricCompute({ modelId: 'chem-rdkit-descriptors', inputs: { smiles: record.smiles }, domainId: 'chemistry', sourceText: `PubChem CID ${record.cid}` });
+      if (!response.ok) return { pubchemCid: record.cid, modelId: 'chem-rdkit-descriptors', status: 'blocked', resultOrigin: 'engine-unavailable', outputs: {}, summary: `BLOCKED: ${response.error}` };
+      const run = response.data.run;
+      return { pubchemCid: record.cid, modelId: run.modelId, modelVersion: run.modelVersion, engine: run.engine, status: run.status, runId: run.runId, runFingerprint: run.runId, resultOrigin: run.status === 'ok' ? 'real-engine' : 'engine-error', outputs: run.outputs ?? {}, summary: run.message ?? run.validity ?? `RDKit ${run.status}`, provenance: run.provenance };
+    } catch (error) {
+      return { pubchemCid: record.cid, modelId: 'chem-rdkit-descriptors', status: 'blocked', resultOrigin: 'request-failed', outputs: {}, summary: `BLOCKED: ${error instanceof Error ? error.message : String(error)}` };
+    }
+  }));
+}
+
 const candidateId = (cid: number): string => `candidate:pubchem:${cid}`;
 const unknownAdmeProfile = (provenance: { source: string; sourceId: string; sourceUrl: string; sourceVersion: string; retrievedAt: string; uncertainty: string }): BiotechAdmeProfile => ({ source: provenance.source === 'PubChem' ? 'PubChem' : 'RDKit', status: 'UNKNOWN', metrics: [{ name: 'ADME/PK/Tox', value: 'UNKNOWN', units: 'status', context: 'No compatible quantitative record admitted' }], uncertainty: provenance.uncertainty, provenance: [{ ...provenance, evidenceType: 'explicit missing ADME/PK/Tox boundary', status: 'UNKNOWN' }] });
 const hypothesisId = (cid: number): string => `hypothesis:pubchem:${cid}`;
@@ -258,5 +282,6 @@ export async function resolveNaturalFunctionalReplacementFromSources(
   const base = resolveNaturalFunctionalReplacement(input);
   if (base.status === 'BLOCKED') return base;
   const cheapCompute = runCheapNaturalCompute(sourceRecords);
-  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
+  const heavyCompute = input.executeHeavyCompute ? await runHeavyNaturalCompute(sourceRecords.filter((record) => cheapCompute.some((run) => run.pubchemCid === record.cid && run.status === 'completed'))) : undefined;
+  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : ` i ${heavyCompute.filter((run) => run.status === 'ok').length} heavy runów`}. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
 }

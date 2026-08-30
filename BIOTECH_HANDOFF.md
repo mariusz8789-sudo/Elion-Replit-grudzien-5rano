@@ -1311,3 +1311,12 @@ Validation passed: artifact/natural/memory tests `23 passed`; frontend build/typ
 Scientific Memory now exposes the persisted Discovery Artifact directly in the UI. Each biotech record shows artifact candidate/source/activity/assay lineage, compute-run count, artifact fingerprint, and limitations. The UI provides a real `Replay artifact` action plus controlled `Test DRIFT` and `Test BLOCKED` actions. Replay results are rendered as `MATCH`, `DRIFT`, or `BLOCKED` with the integrity reason. The action reuses the existing artifact and replay contracts; no second report, memory, or replay system was created.
 
 Validation: focused natural/memory tests `23 passed`; frontend build/typecheck passed after a test narrowing fix; ESLint passed; `git diff --check` passed. Chromium smoke is required after the UI change and is run in the next validation step.
+
+
+## HEAVY COMPUTE CHECKPOINT: Natural Candidate → Backend RDKit
+
+Science Chat natural discovery now opts into the existing backend Fabric only after PubChem structure resolution and successful cheap filtering. For each eligible candidate it submits the real `chem-rdkit-descriptors` model with the source-backed SMILES; no structure or target is invented. Successful runs retain model/version, engine provenance, run ID/fingerprint, outputs and status; unavailable/failing runs are returned as `BLOCKED` for that runtime and do not stop the rest of discovery.
+
+A real backend execution was verified for PubChem CID 190 (adenine structure): run ID `51935687-d77f-49f6-9e4f-fadede744e14`, model `chem-rdkit-descriptors`, RDKit engine `RDKit 2026.03.5`, status `ok`, deterministic `true`, with outputs including molecular weight `151.129`, Crippen logP `-0.7716`, TPSA `100.45`, Lipinski violations `0`, canonical SMILES and molecular formula. This is a chemical descriptor result only, not biological activity, efficacy, ADME/Tox, or clinical evidence.
+
+The heavy run is displayed in Science Chat and appended to the existing Discovery Artifact/Scientific Memory compute lineage for replay. PySCF, OpenMM, Vina/Meeko and ADMET-AI remain runtime/input-gated until their required structured inputs are genuinely available.

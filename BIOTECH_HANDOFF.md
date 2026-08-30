@@ -1413,3 +1413,21 @@ NEXT REAL GAPS:
 ```
 
 No architecture, feature, refactor, cosmetic change or expensive runtime was added in this checkpoint. This block exists solely to lock the continuation state for the next Manus.
+
+## CURRENT ENVIRONMENT RUNTIME RECHECK
+
+The synchronized repository checkpoint contains bounded Vina, OpenMM and PySCF adapters and prior commits documenting runtime-backed validation in another environment. A fresh detector run in this checkout's current sandbox reports:
+
+```text
+Vina: BLOCKED_BY_RUNTIME — docking_unavailable: No module named 'vina'
+OpenMM: BLOCKED_BY_RUNTIME — openmm_unavailable:No module named 'openmm'
+PySCF: BLOCKED_BY_RUNTIME — pyscf_unavailable: No module named 'pyscf'
+```
+
+This is an environment-specific availability result, not a code failure and not evidence that the adapters are invalid. No dependency installation, docking, molecular dynamics or quantum-chemistry run was attempted. The existing Vina/PySCF bounded workflows and honest failure paths remain in the repository; fresh execution must be repeated in an environment where the declared interpreter and dependencies are actually present. No scientific output or accuracy claim is promoted from the unavailable runtime.
+
+- **VERIFIED HEAD:** `273998b`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **REMOTE:** synchronized with local HEAD
+- **WORKING TREE:** clean before this documentation append
+- **PARKED:** fresh Vina scientific validation, OpenMM execution, fresh PySCF E2E in this sandbox, and independent laboratory observation.

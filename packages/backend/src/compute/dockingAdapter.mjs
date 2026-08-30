@@ -11,7 +11,7 @@
  * bywa zablokowana przez politykę egress — wtedy stan to BLOCKED_BY_RESOURCES.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -91,17 +91,23 @@ export function dock(spec) {
   if (!spec || !spec.ligandSmiles) return { ok: false, error: 'invalid_input', reason: 'ligandSmiles wymagane' };
   if (!spec.receptorSmiles && !spec.receptorPdbqt) return { ok: false, error: 'invalid_input', reason: 'receptorSmiles lub receptorPdbqt wymagane' };
   try {
+    const outDir = artifactDir('dock');
+    const receptorPdbqtPath = spec.receptorPdbqt && spec.receptorPdbqt.length > 32_000
+      ? path.join(outDir, 'input-receptor.pdbqt')
+      : undefined;
+    if (receptorPdbqtPath) writeFileSync(receptorPdbqtPath, spec.receptorPdbqt, 'utf8');
     const r = invoke({
       cmd: 'dock',
       ligandSmiles: spec.ligandSmiles,
-      receptorSmiles: spec.receptorSmiles,
-      receptorPdbqt: spec.receptorPdbqt,
+      receptorSmiles: receptorPdbqtPath ? undefined : spec.receptorSmiles,
+      receptorPdbqt: receptorPdbqtPath ? undefined : spec.receptorPdbqt,
+      receptorPdbqtPath,
       center: spec.center,
       boxSize: spec.boxSize ?? [22, 22, 22],
       exhaustiveness: spec.exhaustiveness ?? 8,
       nPoses: spec.nPoses ?? 5,
       seed: spec.seed ?? 42,
-      outDir: artifactDir('dock'),
+      outDir,
     });
     return r.ok ? { ok: true, data: r } : { ok: false, error: r.error };
   } catch (err) {

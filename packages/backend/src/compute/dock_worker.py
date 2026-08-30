@@ -79,7 +79,11 @@ def _run_dock(req, out_dir):
 
     # Receptor: prepared rigid PDBQT provided, or a small-molecule stand-in from SMILES.
     receptor_kind = "provided_pdbqt"
-    if req.get("receptorPdbqt"):
+    if req.get("receptorPdbqtPath"):
+        with open(str(req["receptorPdbqtPath"]), "r") as handle:
+            rec_pdbqt = handle.read()
+        rec_xyz = None
+    elif req.get("receptorPdbqt"):
         rec_pdbqt = str(req["receptorPdbqt"])
         rec_xyz = None
     elif req.get("receptorSmiles"):
@@ -134,7 +138,7 @@ def _run_dock(req, out_dir):
             {"kind": "ligand_pdbqt", "path": lig_path, "sha256_16": _sha(lig_pdbqt)},
             {"kind": "docked_pdbqt", "path": out_path, "sha256_16": _sha(open(out_path).read())},
         ],
-        "inputHash": _sha(json.dumps({"lig": lig_smiles, "rec": req.get("receptorSmiles") or "provided",
+        "inputHash": _sha(json.dumps({"lig": lig_smiles, "rec": req.get("receptorSmiles") or req.get("receptorPdbqtPath") or "provided",
                                       "center": center, "box": box, "ex": exhaustiveness, "seed": seed}, sort_keys=True)),
     }
 

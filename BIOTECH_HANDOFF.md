@@ -1465,3 +1465,12 @@ Focused backend validation passed: `299 passed, 17 skipped, 0 failed`; OpenMM/Vi
 - **BRANCH:** `manus/next-gap-observation-analysis`
 - **PARKED:** canonical protein-ligand affinity accuracy, independent laboratory observation, biological execution and clinical efficacy.
 - **NEXT LARGE GAP:** fresh full PySCF Natural Discovery E2E with actual reachable PubChem 3D input; if live source retrieval fails, preserve the exact source blocker and continue to the next software-only reproducibility gap.
+
+
+## FRESH E2E CHECKPOINT: Natural Discovery → PySCF boundary (2026-08-30)
+
+A fresh Chromium run executed the existing natural-discovery orchestration against the local Genesis backend with `executeHeavyCompute: true`. PubChem returned 7 source-backed identity records and ChEMBL returned 37 live activity records. Seven cheap candidate runs completed. The result remained `RESOLVED` and retained the existing explicit non-efficacy/non-safety research boundary.
+
+PySCF 2.14.0 was installed in the sandbox and its independent H2/water reference and Fabric API tests passed. In the natural-discovery run, all seven candidates were honestly marked `BLOCKED` with `resultOrigin=missing-source-3d`: the current live candidate catalog did not provide a valid PubChem 3D conformer for any eligible candidate, so no synthetic coordinates or quantum outputs were used. The report lineage remained deterministic and included the blocked PySCF entries; no false PySCF run was promoted.
+
+The complete raw E2E evidence is stored at `docs/evidence/natural-pyscf-e2e-2026-08-30.json`. Browser console logs also recorded seven HTTP 400 responses from the unavailable heavy-compute routes and one HTTP 503 response; these are recorded as environment/runtime evidence, not hidden. `rdkitOk=0`, `admetOk=0`, `pyscfOk=0`, `pyscfBlocked=7` in this run. The remaining gap is a fresh candidate whose live PubChem record supplies a valid 3D conformer, followed by the same report → Memory → Replay verification; the previously verified CID 2519 PySCF calculation remains a separate source-backed probe and is not silently substituted here.

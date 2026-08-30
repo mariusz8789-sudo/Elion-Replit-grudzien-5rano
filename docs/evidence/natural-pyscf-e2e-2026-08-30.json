@@ -1,0 +1,2411 @@
+{
+  "startedAt": "2026-08-30T15:59:03.065Z",
+  "finishedAt": "2026-08-30T15:59:25.577Z",
+  "value": {
+    "status": "RESOLVED",
+    "reason": "Pobrano 7 realnych rekordów z PubChem, 37 jawnych rekordów activity z ChEMBL oraz wykonano 7 tanich obliczeń, 0 RDKit heavy runów i 0 ADMET-AI runów i 0 PySCF runów. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. Dopasowano do istniejącego pinned A1 reference profile; wynik jest research-priority comparison, nie funkcjonalnym zamiennikiem ani dowodem skuteczności.",
+    "reports": [
+      {
+        "candidateId": "candidate:chembl:molecule:CHEMBL477:chembl:target:CHEMBL318",
+        "materialId": "chembl:molecule:CHEMBL477",
+        "compoundIds": [
+          "chembl:molecule:CHEMBL477"
+        ],
+        "targetIds": [
+          "chembl:target:CHEMBL318"
+        ],
+        "mechanismIds": [
+          "mechanism:binding:chembl:target:CHEMBL318"
+        ],
+        "evidenceIds": [
+          "chembl:activity:71801"
+        ],
+        "safetySignalIds": [
+          "safety:dailymed:adenosine:546642f2"
+        ],
+        "hypothesisId": "hypothesis:candidate:chembl:molecule:CHEMBL477:chembl:target:CHEMBL318",
+        "experimentRequestId": "request:8c90fe53",
+        "ranking": {
+          "candidateId": "candidate:chembl:molecule:CHEMBL477:chembl:target:CHEMBL318",
+          "score": 0.114,
+          "components": {
+            "evidenceQuality": 0.66,
+            "targetRelevance": 0.5,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 1
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "DailyMed",
+          "status": "LITERATURE_SUPPORTED",
+          "metrics": [
+            {
+              "name": "whole-blood half-life",
+              "value": "<10",
+              "units": "seconds",
+              "context": "official adenosine injection label; rapid cellular uptake in whole blood"
+            }
+          ],
+          "uncertainty": "Product-label pharmacokinetic context; not an individual prediction, dose recommendation, efficacy claim or complete ADME profile.",
+          "provenance": [
+            {
+              "source": "DailyMed",
+              "sourceId": "dailymed:setid:546642f2-662f-46cf-9d82-5bb3bdcc7677",
+              "evidenceType": "official label pharmacokinetic section",
+              "status": "LITERATURE_SUPPORTED",
+              "sourceUrl": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=546642f2-662f-46cf-9d82-5bb3bdcc7677",
+              "sourceVersion": "DailyMed label updated 2026-07",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+        "reportId": "report:77cf0724",
+        "provenance": [
+          {
+            "source": "ChEMBL Web Services",
+            "sourceId": "chembl:activity:71801",
+            "evidenceType": "curated binding bioactivity record",
+            "status": "LITERATURE_SUPPORTED",
+            "uncertainty": "This is an in vitro binding measurement on a rat-brain-membrane assay; it does not establish clinical efficacy, therapeutic benefit or safety.",
+            "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity/71801.json",
+            "sourceVersion": "ChEMBL_37",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "DailyMed",
+            "sourceId": "dailymed:setid:546642f2-662f-46cf-9d82-5bb3bdcc7677",
+            "evidenceType": "official human prescription drug label safety sections",
+            "status": "LITERATURE_SUPPORTED",
+            "sourceUrl": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=546642f2-662f-46cf-9d82-5bb3bdcc7677",
+            "sourceVersion": "DailyMed label updated 2026-07",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "ChEMBL Web Services",
+            "sourceId": "chembl:activity:71801",
+            "evidenceType": "curated binding bioactivity record",
+            "status": "LITERATURE_SUPPORTED",
+            "uncertainty": "This is an in vitro binding measurement on a rat-brain-membrane assay; it does not establish clinical efficacy, therapeutic benefit or safety.",
+            "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity/71801.json",
+            "sourceVersion": "ChEMBL_37",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "ChEMBL Web Services",
+            "sourceId": "chembl:activity:71801",
+            "evidenceType": "hypothesis derived from curated binding record",
+            "status": "HYPOTHESIS",
+            "uncertainty": "This is an in vitro binding measurement on a rat-brain-membrane assay; it does not establish clinical efficacy, therapeutic benefit or safety.",
+            "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity/71801.json",
+            "sourceVersion": "ChEMBL_37",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "77cf0724"
+      },
+      {
+        "candidateId": "candidate:chembl:molecule:CHEMBL1355736:chembl:target:CHEMBL318",
+        "materialId": "chembl:molecule:CHEMBL1355736",
+        "compoundIds": [
+          "chembl:molecule:CHEMBL1355736"
+        ],
+        "targetIds": [
+          "chembl:target:CHEMBL318"
+        ],
+        "mechanismIds": [
+          "mechanism:binding:chembl:target:CHEMBL318"
+        ],
+        "evidenceIds": [
+          "chembl:activity:109460"
+        ],
+        "safetySignalIds": [
+          "safety:dailymed:theophylline:5e64036a"
+        ],
+        "hypothesisId": "hypothesis:candidate:chembl:molecule:CHEMBL1355736:chembl:target:CHEMBL318",
+        "experimentRequestId": "request:1be4bcd7",
+        "ranking": {
+          "candidateId": "candidate:chembl:molecule:CHEMBL1355736:chembl:target:CHEMBL318",
+          "score": 0.114,
+          "components": {
+            "evidenceQuality": 0.66,
+            "targetRelevance": 0.5,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 1
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "DailyMed",
+          "status": "LITERATURE_SUPPORTED",
+          "metrics": [
+            {
+              "name": "serum concentration range",
+              "value": "5–20",
+              "units": "mcg/mL",
+              "context": "official extended-release theophylline label; concentration-effect relationship"
+            },
+            {
+              "name": "steady-state half-life",
+              "value": 8.3,
+              "units": "hours",
+              "context": "official label multiple-dose study in normal subjects; mean value"
+            },
+            {
+              "name": "clearance",
+              "value": 3.5,
+              "units": "L/hour",
+              "context": "official label multiple-dose study population; mean value"
+            }
+          ],
+          "uncertainty": "Product-label population context with wide intersubject variability; not an individual prediction, dose recommendation, efficacy claim or complete ADME profile.",
+          "provenance": [
+            {
+              "source": "DailyMed",
+              "sourceId": "dailymed:setid:5e64036a-ee3e-42e7-9e59-881f88a4e298",
+              "evidenceType": "official label pharmacokinetic section",
+              "status": "LITERATURE_SUPPORTED",
+              "sourceUrl": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=5e64036a-ee3e-42e7-9e59-881f88a4e298",
+              "sourceVersion": "DailyMed label updated 2026-07",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+        "reportId": "report:78cd9934",
+        "provenance": [
+          {
+            "source": "ChEMBL Web Services",
+            "sourceId": "chembl:activity:109460",
+            "evidenceType": "curated binding bioactivity record",
+            "status": "LITERATURE_SUPPORTED",
+            "uncertainty": "This is an in vitro binding measurement on rat brain membrane; it does not establish clinical efficacy, therapeutic benefit or safety.",
+            "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity/109460.json",
+            "sourceVersion": "ChEMBL_37",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "DailyMed",
+            "sourceId": "dailymed:setid:5e64036a-ee3e-42e7-9e59-881f88a4e298",
+            "evidenceType": "official human prescription drug label safety and pharmacokinetic sections",
+            "status": "LITERATURE_SUPPORTED",
+            "sourceUrl": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=5e64036a-ee3e-42e7-9e59-881f88a4e298",
+            "sourceVersion": "DailyMed label updated 2026-07",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "ChEMBL Web Services",
+            "sourceId": "chembl:activity:109460",
+            "evidenceType": "curated binding bioactivity record",
+            "status": "LITERATURE_SUPPORTED",
+            "uncertainty": "This is an in vitro binding measurement on rat brain membrane; it does not establish clinical efficacy, therapeutic benefit or safety.",
+            "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity/109460.json",
+            "sourceVersion": "ChEMBL_37",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "ChEMBL Web Services",
+            "sourceId": "chembl:activity:109460",
+            "evidenceType": "hypothesis derived from curated binding record",
+            "status": "HYPOTHESIS",
+            "uncertainty": "This is an in vitro binding measurement on rat brain membrane; it does not establish clinical efficacy, therapeutic benefit or safety.",
+            "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity/109460.json",
+            "sourceVersion": "ChEMBL_37",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "78cd9934"
+      },
+      {
+        "candidateId": "candidate:chembl:CHEMBL1114",
+        "materialId": "material:chembl:CHEMBL1114",
+        "compoundIds": [
+          "compound:chembl:CHEMBL1114"
+        ],
+        "targetIds": [
+          "target:chembl:CHEMBL318"
+        ],
+        "mechanismIds": [],
+        "evidenceIds": [
+          "evidence:chembl:193161"
+        ],
+        "safetySignalIds": [
+          "safety:unknown:chembl:1114"
+        ],
+        "hypothesisId": "hypothesis:chembl:CHEMBL1114",
+        "ranking": {
+          "candidateId": "candidate:chembl:CHEMBL1114",
+          "score": 0.157,
+          "components": {
+            "evidenceQuality": 0.33,
+            "targetRelevance": 1,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 0.75
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "RDKit",
+          "status": "UNKNOWN",
+          "metrics": [
+            {
+              "name": "ADME/PK/Tox",
+              "value": "UNKNOWN",
+              "units": "status",
+              "context": "No compatible quantitative record admitted"
+            }
+          ],
+          "uncertainty": "ChEMBL binding activity record supplies no quantitative ADME/PK/Tox evidence.",
+          "provenance": [
+            {
+              "source": "ChEMBL",
+              "sourceId": "chembl:activity:193161",
+              "evidenceType": "explicit missing ADME/PK/Tox boundary",
+              "status": "UNKNOWN",
+              "uncertainty": "ChEMBL binding activity record supplies no quantitative ADME/PK/Tox evidence.",
+              "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1114&target_chembl_id=CHEMBL318&limit=5",
+              "sourceVersion": "ChEMBL activity 193161 / assay CHEMBL643484",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "ChEMBL source record is target/activity-backed but marked outside typical range; independent assay, mechanism, safety, ADME and clinical efficacy remain UNKNOWN.",
+        "reportId": "report:5d1f5864",
+        "provenance": [
+          {
+            "source": "ChEMBL",
+            "sourceId": "chembl:activity:193161",
+            "evidenceType": "curated A1 receptor binding activity",
+            "status": "LITERATURE_SUPPORTED",
+            "uncertainty": "One rat brain cortical membrane binding record is outside the typical range and marked potentially inaccurate by ChEMBL; it does not establish clinical efficacy.",
+            "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1114&target_chembl_id=CHEMBL318&limit=5",
+            "sourceVersion": "ChEMBL activity 193161 / assay CHEMBL643484",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "ChEMBL",
+            "sourceId": "hypothesis:pubchem:1114",
+            "evidenceType": "bounded research hypothesis",
+            "status": "HYPOTHESIS",
+            "uncertainty": "One rat brain cortical membrane binding record is outside the typical range and marked potentially inaccurate by ChEMBL; it does not establish clinical efficacy.",
+            "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1114&target_chembl_id=CHEMBL318&limit=5",
+            "sourceVersion": "ChEMBL activity 193161 / assay CHEMBL643484",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "5d1f5864"
+      },
+      {
+        "candidateId": "candidate:chembl:CHEMBL1158",
+        "materialId": "material:chembl:CHEMBL1158",
+        "compoundIds": [
+          "compound:chembl:CHEMBL1158"
+        ],
+        "targetIds": [
+          "target:chembl:CHEMBL318"
+        ],
+        "mechanismIds": [],
+        "evidenceIds": [
+          "evidence:chembl:207399"
+        ],
+        "safetySignalIds": [
+          "safety:unknown:chembl:1158"
+        ],
+        "hypothesisId": "hypothesis:chembl:CHEMBL1158",
+        "ranking": {
+          "candidateId": "candidate:chembl:CHEMBL1158",
+          "score": 0.182,
+          "components": {
+            "evidenceQuality": 0.33,
+            "targetRelevance": 1,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 0.5
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "RDKit",
+          "status": "UNKNOWN",
+          "metrics": [
+            {
+              "name": "ADME/PK/Tox",
+              "value": "UNKNOWN",
+              "units": "status",
+              "context": "No compatible quantitative record admitted"
+            }
+          ],
+          "uncertainty": "ChEMBL binding activity record supplies no quantitative ADME/PK/Tox evidence.",
+          "provenance": [
+            {
+              "source": "ChEMBL",
+              "sourceId": "chembl:activity:207399",
+              "evidenceType": "explicit missing ADME/PK/Tox boundary",
+              "status": "UNKNOWN",
+              "uncertainty": "ChEMBL binding activity record supplies no quantitative ADME/PK/Tox evidence.",
+              "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1158&target_chembl_id=CHEMBL318&limit=5",
+              "sourceVersion": "ChEMBL activity 207399 / assay CHEMBL643484",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "ChEMBL target/activity evidence is in vitro and does not establish mechanism, safety, ADME or clinical efficacy.",
+        "reportId": "report:c6902d20",
+        "provenance": [
+          {
+            "source": "ChEMBL",
+            "sourceId": "chembl:activity:207399",
+            "evidenceType": "curated A1 receptor binding activity",
+            "status": "LITERATURE_SUPPORTED",
+            "uncertainty": "One rat brain cortical membrane binding record is an in vitro measurement and does not establish clinical efficacy, safety or functional replacement.",
+            "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1158&target_chembl_id=CHEMBL318&limit=5",
+            "sourceVersion": "ChEMBL activity 207399 / assay CHEMBL643484",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "ChEMBL",
+            "sourceId": "hypothesis:pubchem:1158",
+            "evidenceType": "bounded research hypothesis",
+            "status": "HYPOTHESIS",
+            "uncertainty": "One rat brain cortical membrane binding record is an in vitro measurement and does not establish clinical efficacy, safety or functional replacement.",
+            "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1158&target_chembl_id=CHEMBL318&limit=5",
+            "sourceVersion": "ChEMBL activity 207399 / assay CHEMBL643484",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "c6902d20"
+      },
+      {
+        "candidateId": "candidate:pubchem:135398638",
+        "materialId": "material:pubchem:135398638",
+        "compoundIds": [
+          "compound:pubchem:135398638"
+        ],
+        "targetIds": [],
+        "mechanismIds": [],
+        "evidenceIds": [
+          "evidence:pubchem:135398638"
+        ],
+        "safetySignalIds": [
+          "safety:unknown:pubchem:135398638"
+        ],
+        "hypothesisId": "hypothesis:pubchem:135398638",
+        "ranking": {
+          "candidateId": "candidate:pubchem:135398638",
+          "score": 0.1775,
+          "components": {
+            "evidenceQuality": 0.66,
+            "targetRelevance": 0.5,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 1,
+            "computeSupport": 0.25
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "PubChem",
+          "status": "UNKNOWN",
+          "metrics": [
+            {
+              "name": "ADME/PK/Tox",
+              "value": "UNKNOWN",
+              "units": "status",
+              "context": "No compatible quantitative record admitted"
+            }
+          ],
+          "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+          "provenance": [
+            {
+              "source": "PubChem",
+              "sourceId": "pubchem:CID:135398638",
+              "evidenceType": "explicit missing ADME/PK/Tox boundary",
+              "status": "UNKNOWN",
+              "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+              "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/135398638/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+              "sourceVersion": "PubChem CID 135398638",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "PubChem identity-only profile: formula C5H4N4O, molecular weight 136.11, InChIKey FDGQSTZJBFJUBT-UHFFFAOYSA-N, SMILES C1=NC2=C(N1)C(=O)NC=N2. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
+        "reportId": "report:b019f5ff",
+        "provenance": [
+          {
+            "source": "PubChem",
+            "sourceId": "candidate:pubchem:135398638",
+            "evidenceType": "candidate identity mapped from compound record",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/135398638/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 135398638",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "PubChem",
+            "sourceId": "hypothesis:pubchem:135398638",
+            "evidenceType": "bounded research hypothesis",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/135398638/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 135398638",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "b019f5ff",
+        "computeRuns": [
+          {
+            "runtime": "Experiment Fabric cheap molecular weight",
+            "version": "1.0.0",
+            "runId": "run_c38944c1",
+            "fingerprint": "run_c38944c1",
+            "status": "completed",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "molarMassGmol": 136.11399999999998,
+              "atomCount": 14,
+              "degreeOfUnsaturation": 6
+            }
+          },
+          {
+            "runtime": "chem-rdkit-descriptors",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "admet-ai",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "pyscf-singlepoint",
+            "status": "blocked",
+            "resultOrigin": "missing-source-3d",
+            "outputs": {}
+          }
+        ]
+      },
+      {
+        "candidateId": "candidate:pubchem:1188",
+        "materialId": "material:pubchem:1188",
+        "compoundIds": [
+          "compound:pubchem:1188"
+        ],
+        "targetIds": [],
+        "mechanismIds": [],
+        "evidenceIds": [
+          "evidence:pubchem:1188"
+        ],
+        "safetySignalIds": [
+          "safety:unknown:pubchem:1188"
+        ],
+        "hypothesisId": "hypothesis:pubchem:1188",
+        "ranking": {
+          "candidateId": "candidate:pubchem:1188",
+          "score": 0.2775,
+          "components": {
+            "evidenceQuality": 0.66,
+            "targetRelevance": 1,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 1,
+            "computeSupport": 0.25
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (1.00) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "PubChem",
+          "status": "UNKNOWN",
+          "metrics": [
+            {
+              "name": "ADME/PK/Tox",
+              "value": "UNKNOWN",
+              "units": "status",
+              "context": "No compatible quantitative record admitted"
+            }
+          ],
+          "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+          "provenance": [
+            {
+              "source": "PubChem",
+              "sourceId": "pubchem:CID:1188",
+              "evidenceType": "explicit missing ADME/PK/Tox boundary",
+              "status": "UNKNOWN",
+              "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+              "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/1188/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+              "sourceVersion": "PubChem CID 1188",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "PubChem identity-only profile: formula C5H4N4O2, molecular weight 152.11, InChIKey LRFVTYWOQMYALW-UHFFFAOYSA-N, SMILES C1=NC2=C(N1)C(=O)NC(=O)N2. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
+        "reportId": "report:4686b531",
+        "provenance": [
+          {
+            "source": "PubChem",
+            "sourceId": "candidate:pubchem:1188",
+            "evidenceType": "candidate identity mapped from compound record",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/1188/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 1188",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "PubChem",
+            "sourceId": "hypothesis:pubchem:1188",
+            "evidenceType": "bounded research hypothesis",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/1188/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 1188",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "4686b531",
+        "computeRuns": [
+          {
+            "runtime": "Experiment Fabric cheap molecular weight",
+            "version": "1.0.0",
+            "runId": "run_d7eb56c7",
+            "fingerprint": "run_d7eb56c7",
+            "status": "completed",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "molarMassGmol": 152.11299999999997,
+              "atomCount": 15,
+              "degreeOfUnsaturation": 6
+            }
+          },
+          {
+            "runtime": "chem-rdkit-descriptors",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "admet-ai",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "pyscf-singlepoint",
+            "status": "blocked",
+            "resultOrigin": "missing-source-3d",
+            "outputs": {}
+          }
+        ]
+      },
+      {
+        "candidateId": "candidate:pubchem:6021",
+        "materialId": "material:pubchem:6021",
+        "compoundIds": [
+          "compound:pubchem:6021"
+        ],
+        "targetIds": [],
+        "mechanismIds": [],
+        "evidenceIds": [
+          "evidence:pubchem:6021"
+        ],
+        "safetySignalIds": [
+          "safety:unknown:pubchem:6021"
+        ],
+        "hypothesisId": "hypothesis:pubchem:6021",
+        "ranking": {
+          "candidateId": "candidate:pubchem:6021",
+          "score": 0.1775,
+          "components": {
+            "evidenceQuality": 0.66,
+            "targetRelevance": 0.5,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 1,
+            "computeSupport": 0.25
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "PubChem",
+          "status": "UNKNOWN",
+          "metrics": [
+            {
+              "name": "ADME/PK/Tox",
+              "value": "UNKNOWN",
+              "units": "status",
+              "context": "No compatible quantitative record admitted"
+            }
+          ],
+          "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+          "provenance": [
+            {
+              "source": "PubChem",
+              "sourceId": "pubchem:CID:6021",
+              "evidenceType": "explicit missing ADME/PK/Tox boundary",
+              "status": "UNKNOWN",
+              "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+              "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/6021/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+              "sourceVersion": "PubChem CID 6021",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "PubChem identity-only profile: formula C10H12N4O5, molecular weight 268.23, InChIKey UGQMRVRMYYASKQ-KQYNXXCUSA-N, SMILES C1=NC(=O)C2=C(N1)N(C=N2)C3C(C(C(O3)CO)O)O. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
+        "reportId": "report:ec41837b",
+        "provenance": [
+          {
+            "source": "PubChem",
+            "sourceId": "candidate:pubchem:6021",
+            "evidenceType": "candidate identity mapped from compound record",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/6021/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 6021",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "PubChem",
+            "sourceId": "hypothesis:pubchem:6021",
+            "evidenceType": "bounded research hypothesis",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/6021/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 6021",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "ec41837b",
+        "computeRuns": [
+          {
+            "runtime": "Experiment Fabric cheap molecular weight",
+            "version": "1.0.0",
+            "runId": "run_55382955",
+            "fingerprint": "run_55382955",
+            "status": "completed",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "molarMassGmol": 268.229,
+              "atomCount": 31,
+              "degreeOfUnsaturation": 7
+            }
+          },
+          {
+            "runtime": "chem-rdkit-descriptors",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "admet-ai",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "pyscf-singlepoint",
+            "status": "blocked",
+            "resultOrigin": "missing-source-3d",
+            "outputs": {}
+          }
+        ]
+      },
+      {
+        "candidateId": "candidate:pubchem:135398744",
+        "materialId": "material:pubchem:135398744",
+        "compoundIds": [
+          "compound:pubchem:135398744"
+        ],
+        "targetIds": [],
+        "mechanismIds": [],
+        "evidenceIds": [
+          "evidence:pubchem:135398744"
+        ],
+        "safetySignalIds": [
+          "safety:unknown:pubchem:135398744"
+        ],
+        "hypothesisId": "hypothesis:pubchem:135398744",
+        "ranking": {
+          "candidateId": "candidate:pubchem:135398744",
+          "score": 0.1775,
+          "components": {
+            "evidenceQuality": 0.66,
+            "targetRelevance": 0.5,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 1,
+            "computeSupport": 0.25
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "PubChem",
+          "status": "UNKNOWN",
+          "metrics": [
+            {
+              "name": "ADME/PK/Tox",
+              "value": "UNKNOWN",
+              "units": "status",
+              "context": "No compatible quantitative record admitted"
+            }
+          ],
+          "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+          "provenance": [
+            {
+              "source": "PubChem",
+              "sourceId": "pubchem:CID:135398744",
+              "evidenceType": "explicit missing ADME/PK/Tox boundary",
+              "status": "UNKNOWN",
+              "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+              "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/135398744/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+              "sourceVersion": "PubChem CID 135398744",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "PubChem identity-only profile: formula C22H30N6O4S, molecular weight 474.6, InChIKey BNRNXUUZRGQAQC-UHFFFAOYSA-N, SMILES CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
+        "reportId": "report:7192a4fc",
+        "provenance": [
+          {
+            "source": "PubChem",
+            "sourceId": "candidate:pubchem:135398744",
+            "evidenceType": "candidate identity mapped from compound record",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/135398744/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 135398744",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "PubChem",
+            "sourceId": "hypothesis:pubchem:135398744",
+            "evidenceType": "bounded research hypothesis",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/135398744/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 135398744",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "7192a4fc",
+        "computeRuns": [
+          {
+            "runtime": "Experiment Fabric cheap molecular weight",
+            "version": "1.0.0",
+            "runId": "run_cde897e7",
+            "fingerprint": "run_cde897e7",
+            "status": "completed",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "molarMassGmol": 474.58,
+              "atomCount": 63,
+              "degreeOfUnsaturation": 11
+            }
+          },
+          {
+            "runtime": "chem-rdkit-descriptors",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "admet-ai",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "pyscf-singlepoint",
+            "status": "blocked",
+            "resultOrigin": "missing-source-3d",
+            "outputs": {}
+          }
+        ]
+      },
+      {
+        "candidateId": "candidate:pubchem:190",
+        "materialId": "material:pubchem:190",
+        "compoundIds": [
+          "compound:pubchem:190"
+        ],
+        "targetIds": [],
+        "mechanismIds": [],
+        "evidenceIds": [
+          "evidence:pubchem:190"
+        ],
+        "safetySignalIds": [
+          "safety:unknown:pubchem:190"
+        ],
+        "hypothesisId": "hypothesis:pubchem:190",
+        "ranking": {
+          "candidateId": "candidate:pubchem:190",
+          "score": 0.1775,
+          "components": {
+            "evidenceQuality": 0.66,
+            "targetRelevance": 0.5,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 1,
+            "computeSupport": 0.25
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "PubChem",
+          "status": "UNKNOWN",
+          "metrics": [
+            {
+              "name": "ADME/PK/Tox",
+              "value": "UNKNOWN",
+              "units": "status",
+              "context": "No compatible quantitative record admitted"
+            }
+          ],
+          "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+          "provenance": [
+            {
+              "source": "PubChem",
+              "sourceId": "pubchem:CID:190",
+              "evidenceType": "explicit missing ADME/PK/Tox boundary",
+              "status": "UNKNOWN",
+              "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+              "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/190/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+              "sourceVersion": "PubChem CID 190",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "PubChem identity-only profile: formula C5H5N5, molecular weight 135.13, InChIKey GFFGJBXGBJISGV-UHFFFAOYSA-N, SMILES C1=NC2=NC=NC(=C2N1)N. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
+        "reportId": "report:ca728cac",
+        "provenance": [
+          {
+            "source": "PubChem",
+            "sourceId": "candidate:pubchem:190",
+            "evidenceType": "candidate identity mapped from compound record",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/190/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 190",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "PubChem",
+            "sourceId": "hypothesis:pubchem:190",
+            "evidenceType": "bounded research hypothesis",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/190/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 190",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "ca728cac",
+        "computeRuns": [
+          {
+            "runtime": "Experiment Fabric cheap molecular weight",
+            "version": "1.0.0",
+            "runId": "run_abe1f9b4",
+            "fingerprint": "run_abe1f9b4",
+            "status": "completed",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "molarMassGmol": 135.13,
+              "atomCount": 15,
+              "degreeOfUnsaturation": 6
+            }
+          },
+          {
+            "runtime": "chem-rdkit-descriptors",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "admet-ai",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "pyscf-singlepoint",
+            "status": "blocked",
+            "resultOrigin": "missing-source-3d",
+            "outputs": {}
+          }
+        ]
+      },
+      {
+        "candidateId": "candidate:pubchem:764",
+        "materialId": "material:pubchem:764",
+        "compoundIds": [
+          "compound:pubchem:764"
+        ],
+        "targetIds": [],
+        "mechanismIds": [],
+        "evidenceIds": [
+          "evidence:pubchem:764"
+        ],
+        "safetySignalIds": [
+          "safety:unknown:pubchem:764"
+        ],
+        "hypothesisId": "hypothesis:pubchem:764",
+        "ranking": {
+          "candidateId": "candidate:pubchem:764",
+          "score": 0.1775,
+          "components": {
+            "evidenceQuality": 0.66,
+            "targetRelevance": 0.5,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 1,
+            "computeSupport": 0.25
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "PubChem",
+          "status": "UNKNOWN",
+          "metrics": [
+            {
+              "name": "ADME/PK/Tox",
+              "value": "UNKNOWN",
+              "units": "status",
+              "context": "No compatible quantitative record admitted"
+            }
+          ],
+          "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+          "provenance": [
+            {
+              "source": "PubChem",
+              "sourceId": "pubchem:CID:764",
+              "evidenceType": "explicit missing ADME/PK/Tox boundary",
+              "status": "UNKNOWN",
+              "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+              "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/764/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+              "sourceVersion": "PubChem CID 764",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "PubChem identity-only profile: formula C5H5N5O, molecular weight 151.13, InChIKey UYTPUPDQBNUYGX-UHFFFAOYSA-N, SMILES C1=NC2=C(N1)C(=O)N=C(N2)N. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
+        "reportId": "report:3375d662",
+        "provenance": [
+          {
+            "source": "PubChem",
+            "sourceId": "candidate:pubchem:764",
+            "evidenceType": "candidate identity mapped from compound record",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/764/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 764",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "PubChem",
+            "sourceId": "hypothesis:pubchem:764",
+            "evidenceType": "bounded research hypothesis",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/764/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 764",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "3375d662",
+        "computeRuns": [
+          {
+            "runtime": "Experiment Fabric cheap molecular weight",
+            "version": "1.0.0",
+            "runId": "run_dfa58cea",
+            "fingerprint": "run_dfa58cea",
+            "status": "completed",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "molarMassGmol": 151.129,
+              "atomCount": 16,
+              "degreeOfUnsaturation": 6
+            }
+          },
+          {
+            "runtime": "chem-rdkit-descriptors",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "admet-ai",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "pyscf-singlepoint",
+            "status": "blocked",
+            "resultOrigin": "missing-source-3d",
+            "outputs": {}
+          }
+        ]
+      },
+      {
+        "candidateId": "candidate:pubchem:1175",
+        "materialId": "material:pubchem:1175",
+        "compoundIds": [
+          "compound:pubchem:1175"
+        ],
+        "targetIds": [],
+        "mechanismIds": [],
+        "evidenceIds": [
+          "evidence:pubchem:1175"
+        ],
+        "safetySignalIds": [
+          "safety:unknown:pubchem:1175"
+        ],
+        "hypothesisId": "hypothesis:pubchem:1175",
+        "ranking": {
+          "candidateId": "candidate:pubchem:1175",
+          "score": 0.1775,
+          "components": {
+            "evidenceQuality": 0.66,
+            "targetRelevance": 0.5,
+            "safetyPenalty": 1,
+            "uncertaintyPenalty": 1,
+            "computeSupport": 0.25
+          },
+          "rationale": "Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability. Score uses explicit ChEMBL assay quality (0.66), target-context relevance (0.50) and compatible compute support (0.25); missing evidence is penalized. Ki/IC50/EC50 remain separate and this is not efficacy or safety.",
+          "uncertainty": "No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.",
+          "epistemicStatus": "PREDICTION"
+        },
+        "epistemicStatus": "HYPOTHESIS",
+        "scientificEvidenceStatus": "HYPOTHESIS",
+        "clinicalEfficacy": "UNKNOWN",
+        "admeProfile": {
+          "source": "PubChem",
+          "status": "UNKNOWN",
+          "metrics": [
+            {
+              "name": "ADME/PK/Tox",
+              "value": "UNKNOWN",
+              "units": "status",
+              "context": "No compatible quantitative record admitted"
+            }
+          ],
+          "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+          "provenance": [
+            {
+              "source": "PubChem",
+              "sourceId": "pubchem:CID:1175",
+              "evidenceType": "explicit missing ADME/PK/Tox boundary",
+              "status": "UNKNOWN",
+              "uncertainty": "Identity-only PubChem record supplies no quantitative ADME/PK/Tox evidence.",
+              "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/1175/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+              "sourceVersion": "PubChem CID 1175",
+              "retrievedAt": "2026-08-29"
+            }
+          ]
+        },
+        "uncertainty": "PubChem identity-only profile: formula C5H4N4O3, molecular weight 168.11, InChIKey LEHOTFFKMJEONL-UHFFFAOYSA-N, SMILES C12=C(NC(=O)N1)NC(=O)NC2=O. Target, mechanism, safety, ADME and efficacy are UNKNOWN.",
+        "reportId": "report:495072b8",
+        "provenance": [
+          {
+            "source": "PubChem",
+            "sourceId": "candidate:pubchem:1175",
+            "evidenceType": "candidate identity mapped from compound record",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/1175/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 1175",
+            "retrievedAt": "2026-08-29"
+          },
+          {
+            "source": "PubChem",
+            "sourceId": "hypothesis:pubchem:1175",
+            "evidenceType": "bounded research hypothesis",
+            "status": "HYPOTHESIS",
+            "uncertainty": "Identity/structure only. Target, activity, mechanism, safety and ADME are UNKNOWN for this bounded catalog entry.",
+            "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/1175/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON",
+            "sourceVersion": "PubChem CID 1175",
+            "retrievedAt": "2026-08-29"
+          }
+        ],
+        "scientificFingerprint": "495072b8",
+        "computeRuns": [
+          {
+            "runtime": "Experiment Fabric cheap molecular weight",
+            "version": "1.0.0",
+            "runId": "run_5f5b0d5f",
+            "fingerprint": "run_5f5b0d5f",
+            "status": "completed",
+            "resultOrigin": "real-engine",
+            "outputs": {
+              "molarMassGmol": 168.11199999999997,
+              "atomCount": 16,
+              "degreeOfUnsaturation": 6
+            }
+          },
+          {
+            "runtime": "chem-rdkit-descriptors",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "admet-ai",
+            "status": "blocked",
+            "resultOrigin": "engine-unavailable",
+            "outputs": {}
+          },
+          {
+            "runtime": "pyscf-singlepoint",
+            "status": "blocked",
+            "resultOrigin": "missing-source-3d",
+            "outputs": {}
+          }
+        ]
+      }
+    ],
+    "matchedReference": "kofeina",
+    "target": "A1",
+    "liveActivities": [
+      {
+        "pubchemCid": 135398638,
+        "compoundId": "CHEMBL1427",
+        "targetId": "chembl:target:CHEMBL2395",
+        "activityId": 1041002,
+        "assayId": "CHEMBL766675",
+        "type": "Ki",
+        "relation": "=",
+        "value": "17000.0",
+        "units": "nM",
+        "assayContext": "Tested for its ability to inhibit calf spleen purine nucleoside phosphorylase (PNP)",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1427&limit=20"
+      },
+      {
+        "pubchemCid": 135398638,
+        "compoundId": "CHEMBL1427",
+        "targetId": "chembl:target:CHEMBL364",
+        "activityId": 1796760,
+        "assayId": "CHEMBL911615",
+        "type": "IC50",
+        "relation": "=",
+        "value": "4200.0",
+        "units": "nM",
+        "assayContext": "Inhibition of [3H]hypoxanthine uptake in Plasmodium falciparum 3D7",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1427&limit=20"
+      },
+      {
+        "pubchemCid": 135398638,
+        "compoundId": "CHEMBL1427",
+        "targetId": "chembl:target:CHEMBL612545",
+        "activityId": 2174325,
+        "assayId": "CHEMBL1017495",
+        "type": "IC50",
+        "relation": ">",
+        "value": "100.0",
+        "units": "ug.mL-1",
+        "assayContext": "Inhibition of phosphatidylinositol 4-kinase in human A431 cell membrane by liquid scintillation counting",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1427&limit=20"
+      },
+      {
+        "pubchemCid": 135398638,
+        "compoundId": "CHEMBL1427",
+        "targetId": "chembl:target:CHEMBL612545",
+        "activityId": 2334592,
+        "assayId": "CHEMBL1012453",
+        "type": "IC50",
+        "relation": "=",
+        "value": "700000.0",
+        "units": "nM",
+        "assayContext": "Displacement of [3H]diazepam from benzodiazepine receptor in rat cerebral cortex membrane",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1427&limit=20"
+      },
+      {
+        "pubchemCid": 1188,
+        "compoundId": "CHEMBL1424",
+        "targetId": "chembl:target:CHEMBL251",
+        "activityId": 294171,
+        "assayId": "CHEMBL680424",
+        "type": "EC50",
+        "relation": ">",
+        "value": "100000.0",
+        "units": "nM",
+        "assayContext": "Relaxant activity on the spontaneous tone of isolated guinea pig tracheal ring chains.",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1424&limit=20"
+      },
+      {
+        "pubchemCid": 1188,
+        "compoundId": "CHEMBL1424",
+        "targetId": "chembl:target:CHEMBL2093863",
+        "activityId": 294174,
+        "assayId": "CHEMBL821509",
+        "type": "Ki",
+        "relation": ">",
+        "value": "200000.0",
+        "units": "nM",
+        "assayContext": "Inhibition of c-AMP phosphodiesterase activity in guinea pig tracheal muscle",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1424&limit=20"
+      },
+      {
+        "pubchemCid": 1188,
+        "compoundId": "CHEMBL1424",
+        "targetId": "chembl:target:CHEMBL2304404",
+        "activityId": 294175,
+        "assayId": "CHEMBL640345",
+        "type": "Ki",
+        "relation": ">",
+        "value": "200000.0",
+        "units": "nM",
+        "assayContext": "Affinity against adenosine A1 receptor in the brain membranes by the displacement of [3H]CPX.",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1424&limit=20"
+      },
+      {
+        "pubchemCid": 1188,
+        "compoundId": "CHEMBL1424",
+        "targetId": "chembl:target:CHEMBL2094117",
+        "activityId": 1034557,
+        "assayId": "CHEMBL789405",
+        "type": "Ki",
+        "relation": "=",
+        "value": "130000.0",
+        "units": "nM",
+        "assayContext": "Inhibition of adenosine stimulated accumulation of cyclic AMP at Adenosine A2 receptor of VA13 fibroblasts of rat",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1424&limit=20"
+      },
+      {
+        "pubchemCid": 1188,
+        "compoundId": "CHEMBL1424",
+        "targetId": "chembl:target:CHEMBL4756",
+        "activityId": 1084781,
+        "assayId": "CHEMBL677513",
+        "type": "IC50",
+        "relation": "=",
+        "value": "3600000.0",
+        "units": "nM",
+        "assayContext": "Inhibitory concentration against Enzymatic A chain of ricin (RTA) using Artemia salina ribosomes",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1424&limit=20"
+      },
+      {
+        "pubchemCid": 6021,
+        "compoundId": "CHEMBL1556",
+        "targetId": "chembl:target:CHEMBL2664",
+        "activityId": 112970,
+        "assayId": "CHEMBL803087",
+        "type": "Ki",
+        "relation": "=",
+        "value": "925000.0",
+        "units": "nM",
+        "assayContext": "Inhibitory activity against S-adenosyl-L-homocysteine hydrolase was determined",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1556&limit=20"
+      },
+      {
+        "pubchemCid": 6021,
+        "compoundId": "CHEMBL1556",
+        "targetId": "chembl:target:CHEMBL391",
+        "activityId": 124662,
+        "assayId": "CHEMBL815922",
+        "type": "IC50",
+        "relation": "=",
+        "value": "0.23",
+        "units": "nM",
+        "assayContext": "Anti-Herpes simplex virus type-1 activity in vero cells using plaque inhibition assay",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1556&limit=20"
+      },
+      {
+        "pubchemCid": 6021,
+        "compoundId": "CHEMBL1556",
+        "targetId": "chembl:target:CHEMBL2966",
+        "activityId": 243585,
+        "assayId": "CHEMBL645057",
+        "type": "Ki",
+        "relation": "=",
+        "value": "500000.0",
+        "units": "nM",
+        "assayContext": "Ability to inhibit adenosine deaminase",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1556&limit=20"
+      },
+      {
+        "pubchemCid": 6021,
+        "compoundId": "CHEMBL1556",
+        "targetId": "chembl:target:CHEMBL612545",
+        "activityId": 2334593,
+        "assayId": "CHEMBL1012453",
+        "type": "IC50",
+        "relation": "=",
+        "value": "900000.0",
+        "units": "nM",
+        "assayContext": "Displacement of [3H]diazepam from benzodiazepine receptor in rat cerebral cortex membrane",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1556&limit=20"
+      },
+      {
+        "pubchemCid": 135398744,
+        "compoundId": "CHEMBL192",
+        "targetId": "chembl:target:CHEMBL2111322",
+        "activityId": 212344,
+        "assayId": "CHEMBL758018",
+        "type": "IC50",
+        "relation": "=",
+        "value": "300.0",
+        "units": "nM",
+        "assayContext": "Inhibitory activity against rat heart Phosphodiesterase 1(PDE1)",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL192&limit=20"
+      },
+      {
+        "pubchemCid": 135398744,
+        "compoundId": "CHEMBL192",
+        "targetId": "chembl:target:CHEMBL2094125",
+        "activityId": 212345,
+        "assayId": "CHEMBL758020",
+        "type": "IC50",
+        "relation": ">",
+        "value": "10000.0",
+        "units": "nM",
+        "assayContext": "Inhibitory activity against canine heart Phosphodiesterase 3 (PDE3)",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL192&limit=20"
+      },
+      {
+        "pubchemCid": 135398744,
+        "compoundId": "CHEMBL192",
+        "targetId": "chembl:target:CHEMBL2304402",
+        "activityId": 212346,
+        "assayId": "CHEMBL757895",
+        "type": "IC50",
+        "relation": "=",
+        "value": "3.9",
+        "units": "nM",
+        "assayContext": "Inhibitory activity against canine lung Phosphodiesterase 5 (PDE5)",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL192&limit=20"
+      },
+      {
+        "pubchemCid": 135398744,
+        "compoundId": "CHEMBL192",
+        "targetId": "chembl:target:CHEMBL3477",
+        "activityId": 212347,
+        "assayId": "CHEMBL758019",
+        "type": "IC50",
+        "relation": ">",
+        "value": "10000.0",
+        "units": "nM",
+        "assayContext": "Inhibition of bovine adrenal gland Phosphodiesterase 2 (PDE2)",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL192&limit=20"
+      },
+      {
+        "pubchemCid": 135398744,
+        "compoundId": "CHEMBL192",
+        "targetId": "chembl:target:CHEMBL2093863",
+        "activityId": 212348,
+        "assayId": "CHEMBL757887",
+        "type": "IC50",
+        "relation": "=",
+        "value": "8300.0",
+        "units": "nM",
+        "assayContext": "Inhibition of canine lung Phosphodiesterase 4 (PDE4)",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL192&limit=20"
+      },
+      {
+        "pubchemCid": 135398744,
+        "compoundId": "CHEMBL192",
+        "targetId": "chembl:target:CHEMBL1827",
+        "activityId": 212349,
+        "assayId": "CHEMBL774072",
+        "type": "EC50",
+        "relation": "=",
+        "value": "8.7",
+        "units": "nM",
+        "assayContext": "Relaxant effect on isolated rabbit corpus cavernosum",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL192&limit=20"
+      },
+      {
+        "pubchemCid": 135398744,
+        "compoundId": "CHEMBL192",
+        "targetId": "chembl:target:CHEMBL1827",
+        "activityId": 268223,
+        "assayId": "CHEMBL762496",
+        "type": "Ki",
+        "relation": "=",
+        "value": "1.87",
+        "units": "nM",
+        "assayContext": "Phosphodiesterase 5 activity of human corpus cavernosum",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL192&limit=20"
+      },
+      {
+        "pubchemCid": 135398744,
+        "compoundId": "CHEMBL192",
+        "targetId": "chembl:target:CHEMBL1827",
+        "activityId": 280637,
+        "assayId": "CHEMBL760828",
+        "type": "Ki",
+        "relation": "=",
+        "value": "1.91",
+        "units": "nM",
+        "assayContext": "Inhibitory activity against Phosphodiesterase 5 (PDE5) was evaluated",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL192&limit=20"
+      },
+      {
+        "pubchemCid": 190,
+        "compoundId": "CHEMBL226345",
+        "targetId": "chembl:target:CHEMBL308",
+        "activityId": 336402,
+        "assayId": "CHEMBL657992",
+        "type": "IC50",
+        "relation": "=",
+        "value": "200000.0",
+        "units": "nM",
+        "assayContext": "Inhibitory activity against purified cdc2 p34/Cyclin B obtained from M phase oocytes of the starfish Marthasterias glacialis.",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL226345&limit=20"
+      },
+      {
+        "pubchemCid": 190,
+        "compoundId": "CHEMBL226345",
+        "targetId": "chembl:target:CHEMBL388",
+        "activityId": 341665,
+        "assayId": "CHEMBL706845",
+        "type": "IC50",
+        "relation": "=",
+        "value": "12000.0",
+        "units": "nM",
+        "assayContext": "Potency against non nucleoside reverse transcriptor was determined in MT-4 cells",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL226345&limit=20"
+      },
+      {
+        "pubchemCid": 764,
+        "compoundId": "CHEMBL219568",
+        "targetId": "chembl:target:CHEMBL612558",
+        "activityId": 427586,
+        "assayId": "CHEMBL757722",
+        "type": "IC50",
+        "relation": ">",
+        "value": "100000.0",
+        "units": "nM",
+        "assayContext": "Cytotoxicity was determined in PBM cells, relative to RVT",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL219568&limit=20"
+      },
+      {
+        "pubchemCid": 764,
+        "compoundId": "CHEMBL219568",
+        "targetId": "chembl:target:CHEMBL382",
+        "activityId": 427587,
+        "assayId": "CHEMBL656431",
+        "type": "IC50",
+        "relation": "=",
+        "value": "64300.0",
+        "units": "nM",
+        "assayContext": "Cytotoxicity was determined in CEM cells, relative to RVT",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL219568&limit=20"
+      },
+      {
+        "pubchemCid": 764,
+        "compoundId": "CHEMBL219568",
+        "targetId": "chembl:target:CHEMBL391",
+        "activityId": 427588,
+        "assayId": "CHEMBL818228",
+        "type": "IC50",
+        "relation": "=",
+        "value": "54900.0",
+        "units": "nM",
+        "assayContext": "Cytotoxicity was determined in Vero cells, relative to RVT",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL219568&limit=20"
+      },
+      {
+        "pubchemCid": 764,
+        "compoundId": "CHEMBL219568",
+        "targetId": "chembl:target:CHEMBL4338",
+        "activityId": 790074,
+        "assayId": "CHEMBL766696",
+        "type": "IC50",
+        "relation": "=",
+        "value": "5000.0",
+        "units": "nM",
+        "assayContext": "Compound was tested for inhibition of purine nucleoside phosphorylase using human erythro lysate",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL219568&limit=20"
+      },
+      {
+        "pubchemCid": 764,
+        "compoundId": "CHEMBL219568",
+        "targetId": "chembl:target:CHEMBL2395",
+        "activityId": 1058406,
+        "assayId": "CHEMBL766675",
+        "type": "Ki",
+        "relation": "=",
+        "value": "5000.0",
+        "units": "nM",
+        "assayContext": "Tested for its ability to inhibit calf spleen purine nucleoside phosphorylase (PNP)",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL219568&limit=20"
+      },
+      {
+        "pubchemCid": 764,
+        "compoundId": "CHEMBL219568",
+        "targetId": "chembl:target:CHEMBL4756",
+        "activityId": 1102636,
+        "assayId": "CHEMBL677513",
+        "type": "IC50",
+        "relation": "=",
+        "value": "900000.0",
+        "units": "nM",
+        "assayContext": "Inhibitory concentration against Enzymatic A chain of ricin (RTA) using Artemia salina ribosomes",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL219568&limit=20"
+      },
+      {
+        "pubchemCid": 764,
+        "compoundId": "CHEMBL219568",
+        "targetId": "chembl:target:CHEMBL364",
+        "activityId": 1796794,
+        "assayId": "CHEMBL911615",
+        "type": "IC50",
+        "relation": "=",
+        "value": "35300.0",
+        "units": "nM",
+        "assayContext": "Inhibition of [3H]hypoxanthine uptake in Plasmodium falciparum 3D7",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL219568&limit=20"
+      },
+      {
+        "pubchemCid": 764,
+        "compoundId": "CHEMBL219568",
+        "targetId": "chembl:target:CHEMBL364",
+        "activityId": 1796797,
+        "assayId": "CHEMBL910502",
+        "type": "IC50",
+        "relation": "=",
+        "value": "60000.0",
+        "units": "nM",
+        "assayContext": "Antiplasmodial activity against Plasmodium falciparum 3D7",
+        "assayQuality": "LOW",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL219568&limit=20"
+      },
+      {
+        "pubchemCid": 764,
+        "compoundId": "CHEMBL219568",
+        "targetId": "chembl:target:CHEMBL612545",
+        "activityId": 2174324,
+        "assayId": "CHEMBL1017495",
+        "type": "IC50",
+        "relation": ">",
+        "value": "100.0",
+        "units": "ug.mL-1",
+        "assayContext": "Inhibition of phosphatidylinositol 4-kinase in human A431 cell membrane by liquid scintillation counting",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL219568&limit=20"
+      },
+      {
+        "pubchemCid": 1175,
+        "compoundId": "CHEMBL792",
+        "targetId": "chembl:target:CHEMBL612545",
+        "activityId": 3084662,
+        "assayId": "CHEMBL1073916",
+        "type": "IC50",
+        "relation": "=",
+        "value": "113000.0",
+        "units": "nM",
+        "assayContext": "Inhibition of Escherichia coli recombinant N-terminal hexahistidine-tagged CTP synthetase expressed in Escherichia coli BL21 (DE3) assessed as inhibition of CTP formation in Hepes buffer at pH 8 by continuous spectrophotometric assay in presence of 150 mM NH4Cl",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL792&limit=20"
+      },
+      {
+        "pubchemCid": 1175,
+        "compoundId": "CHEMBL792",
+        "targetId": "chembl:target:CHEMBL612545",
+        "activityId": 3084663,
+        "assayId": "CHEMBL1073917",
+        "type": "IC50",
+        "relation": "=",
+        "value": "96000.0",
+        "units": "nM",
+        "assayContext": "Inhibition of Escherichia coli recombinant N-terminal hexahistidine-tagged CTP synthetase expressed in Escherichia coli BL21 (DE3) assessed as inhibition of CTP formation in TAPS buffer at pH 8.5 by continuous spectrophotometric assay in presence of 150 mM NH4Cl",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL792&limit=20"
+      },
+      {
+        "pubchemCid": 1175,
+        "compoundId": "CHEMBL792",
+        "targetId": "chembl:target:CHEMBL612545",
+        "activityId": 3084664,
+        "assayId": "CHEMBL1073919",
+        "type": "IC50",
+        "relation": "=",
+        "value": "60000.0",
+        "units": "nM",
+        "assayContext": "Inhibition of Escherichia coli recombinant N-terminal hexahistidine-tagged CTP synthetase expressed in Escherichia coli BL21 (DE3) assessed as inhibition of CTP formation in Hepes buffer at pH 8 by continuous spectrophotometric assay in presence of 10 mM L-glutamine and 0.15 mM GTP",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL792&limit=20"
+      },
+      {
+        "pubchemCid": 1175,
+        "compoundId": "CHEMBL792",
+        "targetId": "chembl:target:CHEMBL612545",
+        "activityId": 3084665,
+        "assayId": "CHEMBL1073920",
+        "type": "IC50",
+        "relation": "=",
+        "value": "101000.0",
+        "units": "nM",
+        "assayContext": "Inhibition of Escherichia coli recombinant N-terminal hexahistidine-tagged CTP synthetase expressed in Escherichia coli BL21 (DE3) assessed as inhibition of CTP formation in TAPS buffer at pH 8.5 by continuous spectrophotometric assay in presence of 10 mM L-glutamine and 0.15 mM GTP",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL792&limit=20"
+      },
+      {
+        "pubchemCid": 1175,
+        "compoundId": "CHEMBL792",
+        "targetId": "chembl:target:CHEMBL3129",
+        "activityId": 3410315,
+        "assayId": "CHEMBL1225633",
+        "type": "Ki",
+        "relation": "=",
+        "value": "4340.0",
+        "units": "nM",
+        "assayContext": "Inhibition of GDA by colorimetric assay",
+        "assayQuality": "MODERATE",
+        "source": "ChEMBL",
+        "sourceVersion": "ChEMBL Web Services",
+        "retrievedAt": "2026-08-30",
+        "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL792&limit=20"
+      }
+    ],
+    "candidateWhy": [
+      {
+        "pubchemCid": 190,
+        "activityCount": 2,
+        "targetMatchedActivityCount": 0,
+        "assayQualityCounts": {
+          "HIGH": 0,
+          "MODERATE": 1,
+          "LOW": 1,
+          "UNKNOWN": 0
+        },
+        "measurementTypes": [
+          "IC50"
+        ],
+        "rationale": "Niżej: pobrane activity nie pasuje do żądanego targetu.",
+        "uncertainty": "In vitro activity nie ustanawia efficacy, safety, mechanizmu ani przydatności klinicznej.",
+        "provenanceIds": [
+          "chembl:activity:336402",
+          "chembl:activity:341665"
+        ]
+      },
+      {
+        "pubchemCid": 764,
+        "activityCount": 9,
+        "targetMatchedActivityCount": 0,
+        "assayQualityCounts": {
+          "HIGH": 0,
+          "MODERATE": 4,
+          "LOW": 5,
+          "UNKNOWN": 0
+        },
+        "measurementTypes": [
+          "IC50",
+          "Ki"
+        ],
+        "rationale": "Niżej: pobrane activity nie pasuje do żądanego targetu.",
+        "uncertainty": "In vitro activity nie ustanawia efficacy, safety, mechanizmu ani przydatności klinicznej.",
+        "provenanceIds": [
+          "chembl:activity:427586",
+          "chembl:activity:427587",
+          "chembl:activity:427588",
+          "chembl:activity:790074",
+          "chembl:activity:1058406",
+          "chembl:activity:1102636",
+          "chembl:activity:1796794",
+          "chembl:activity:1796797",
+          "chembl:activity:2174324"
+        ]
+      },
+      {
+        "pubchemCid": 1175,
+        "activityCount": 5,
+        "targetMatchedActivityCount": 0,
+        "assayQualityCounts": {
+          "HIGH": 0,
+          "MODERATE": 5,
+          "LOW": 0,
+          "UNKNOWN": 0
+        },
+        "measurementTypes": [
+          "IC50",
+          "Ki"
+        ],
+        "rationale": "Niżej: pobrane activity nie pasuje do żądanego targetu.",
+        "uncertainty": "In vitro activity nie ustanawia efficacy, safety, mechanizmu ani przydatności klinicznej.",
+        "provenanceIds": [
+          "chembl:activity:3084662",
+          "chembl:activity:3084663",
+          "chembl:activity:3084664",
+          "chembl:activity:3084665",
+          "chembl:activity:3410315"
+        ]
+      },
+      {
+        "pubchemCid": 1188,
+        "activityCount": 5,
+        "targetMatchedActivityCount": 0,
+        "assayQualityCounts": {
+          "HIGH": 0,
+          "MODERATE": 3,
+          "LOW": 2,
+          "UNKNOWN": 0
+        },
+        "measurementTypes": [
+          "EC50",
+          "Ki",
+          "IC50"
+        ],
+        "rationale": "Niżej: pobrane activity nie pasuje do żądanego targetu.",
+        "uncertainty": "In vitro activity nie ustanawia efficacy, safety, mechanizmu ani przydatności klinicznej.",
+        "provenanceIds": [
+          "chembl:activity:294171",
+          "chembl:activity:294174",
+          "chembl:activity:294175",
+          "chembl:activity:1034557",
+          "chembl:activity:1084781"
+        ]
+      },
+      {
+        "pubchemCid": 6021,
+        "activityCount": 4,
+        "targetMatchedActivityCount": 0,
+        "assayQualityCounts": {
+          "HIGH": 0,
+          "MODERATE": 3,
+          "LOW": 1,
+          "UNKNOWN": 0
+        },
+        "measurementTypes": [
+          "Ki",
+          "IC50"
+        ],
+        "rationale": "Niżej: pobrane activity nie pasuje do żądanego targetu.",
+        "uncertainty": "In vitro activity nie ustanawia efficacy, safety, mechanizmu ani przydatności klinicznej.",
+        "provenanceIds": [
+          "chembl:activity:112970",
+          "chembl:activity:124662",
+          "chembl:activity:243585",
+          "chembl:activity:2334593"
+        ]
+      },
+      {
+        "pubchemCid": 135398638,
+        "activityCount": 4,
+        "targetMatchedActivityCount": 0,
+        "assayQualityCounts": {
+          "HIGH": 0,
+          "MODERATE": 3,
+          "LOW": 1,
+          "UNKNOWN": 0
+        },
+        "measurementTypes": [
+          "Ki",
+          "IC50"
+        ],
+        "rationale": "Niżej: pobrane activity nie pasuje do żądanego targetu.",
+        "uncertainty": "In vitro activity nie ustanawia efficacy, safety, mechanizmu ani przydatności klinicznej.",
+        "provenanceIds": [
+          "chembl:activity:1041002",
+          "chembl:activity:1796760",
+          "chembl:activity:2174325",
+          "chembl:activity:2334592"
+        ]
+      },
+      {
+        "pubchemCid": 135398744,
+        "activityCount": 8,
+        "targetMatchedActivityCount": 0,
+        "assayQualityCounts": {
+          "HIGH": 0,
+          "MODERATE": 7,
+          "LOW": 1,
+          "UNKNOWN": 0
+        },
+        "measurementTypes": [
+          "IC50",
+          "EC50",
+          "Ki"
+        ],
+        "rationale": "Niżej: pobrane activity nie pasuje do żądanego targetu.",
+        "uncertainty": "In vitro activity nie ustanawia efficacy, safety, mechanizmu ani przydatności klinicznej.",
+        "provenanceIds": [
+          "chembl:activity:212344",
+          "chembl:activity:212345",
+          "chembl:activity:212346",
+          "chembl:activity:212347",
+          "chembl:activity:212348",
+          "chembl:activity:212349",
+          "chembl:activity:268223",
+          "chembl:activity:280637"
+        ]
+      }
+    ],
+    "cheapCompute": [
+      {
+        "pubchemCid": 135398638,
+        "status": "completed",
+        "runId": "run_c38944c1",
+        "runFingerprint": "run_c38944c1",
+        "outputs": {
+          "molarMassGmol": 136.11399999999998,
+          "atomCount": 14,
+          "degreeOfUnsaturation": 6
+        },
+        "resultOrigin": "real-engine",
+        "summary": "Obliczono masę molową z istniejącego parsera wzoru sumarycznego."
+      },
+      {
+        "pubchemCid": 1188,
+        "status": "completed",
+        "runId": "run_d7eb56c7",
+        "runFingerprint": "run_d7eb56c7",
+        "outputs": {
+          "molarMassGmol": 152.11299999999997,
+          "atomCount": 15,
+          "degreeOfUnsaturation": 6
+        },
+        "resultOrigin": "real-engine",
+        "summary": "Obliczono masę molową z istniejącego parsera wzoru sumarycznego."
+      },
+      {
+        "pubchemCid": 6021,
+        "status": "completed",
+        "runId": "run_55382955",
+        "runFingerprint": "run_55382955",
+        "outputs": {
+          "molarMassGmol": 268.229,
+          "atomCount": 31,
+          "degreeOfUnsaturation": 7
+        },
+        "resultOrigin": "real-engine",
+        "summary": "Obliczono masę molową z istniejącego parsera wzoru sumarycznego."
+      },
+      {
+        "pubchemCid": 135398744,
+        "status": "completed",
+        "runId": "run_cde897e7",
+        "runFingerprint": "run_cde897e7",
+        "outputs": {
+          "molarMassGmol": 474.58,
+          "atomCount": 63,
+          "degreeOfUnsaturation": 11
+        },
+        "resultOrigin": "real-engine",
+        "summary": "Obliczono masę molową z istniejącego parsera wzoru sumarycznego."
+      },
+      {
+        "pubchemCid": 190,
+        "status": "completed",
+        "runId": "run_abe1f9b4",
+        "runFingerprint": "run_abe1f9b4",
+        "outputs": {
+          "molarMassGmol": 135.13,
+          "atomCount": 15,
+          "degreeOfUnsaturation": 6
+        },
+        "resultOrigin": "real-engine",
+        "summary": "Obliczono masę molową z istniejącego parsera wzoru sumarycznego."
+      },
+      {
+        "pubchemCid": 764,
+        "status": "completed",
+        "runId": "run_dfa58cea",
+        "runFingerprint": "run_dfa58cea",
+        "outputs": {
+          "molarMassGmol": 151.129,
+          "atomCount": 16,
+          "degreeOfUnsaturation": 6
+        },
+        "resultOrigin": "real-engine",
+        "summary": "Obliczono masę molową z istniejącego parsera wzoru sumarycznego."
+      },
+      {
+        "pubchemCid": 1175,
+        "status": "completed",
+        "runId": "run_5f5b0d5f",
+        "runFingerprint": "run_5f5b0d5f",
+        "outputs": {
+          "molarMassGmol": 168.11199999999997,
+          "atomCount": 16,
+          "degreeOfUnsaturation": 6
+        },
+        "resultOrigin": "real-engine",
+        "summary": "Obliczono masę molową z istniejącego parsera wzoru sumarycznego."
+      }
+    ],
+    "heavyCompute": [
+      {
+        "pubchemCid": 135398638,
+        "modelId": "chem-rdkit-descriptors",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: error"
+      },
+      {
+        "pubchemCid": 1188,
+        "modelId": "chem-rdkit-descriptors",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: error"
+      },
+      {
+        "pubchemCid": 6021,
+        "modelId": "chem-rdkit-descriptors",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: error"
+      },
+      {
+        "pubchemCid": 135398744,
+        "modelId": "chem-rdkit-descriptors",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: error"
+      },
+      {
+        "pubchemCid": 190,
+        "modelId": "chem-rdkit-descriptors",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: error"
+      },
+      {
+        "pubchemCid": 764,
+        "modelId": "chem-rdkit-descriptors",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: error"
+      },
+      {
+        "pubchemCid": 1175,
+        "modelId": "chem-rdkit-descriptors",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: error"
+      }
+    ],
+    "admetCompute": [
+      {
+        "pubchemCid": 135398638,
+        "modelId": "admet-ai",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: BLOCKED_BY_RUNTIME"
+      },
+      {
+        "pubchemCid": 1188,
+        "modelId": "admet-ai",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: BLOCKED_BY_RUNTIME"
+      },
+      {
+        "pubchemCid": 6021,
+        "modelId": "admet-ai",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: BLOCKED_BY_RUNTIME"
+      },
+      {
+        "pubchemCid": 135398744,
+        "modelId": "admet-ai",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: BLOCKED_BY_RUNTIME"
+      },
+      {
+        "pubchemCid": 190,
+        "modelId": "admet-ai",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: BLOCKED_BY_RUNTIME"
+      },
+      {
+        "pubchemCid": 764,
+        "modelId": "admet-ai",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: BLOCKED_BY_RUNTIME"
+      },
+      {
+        "pubchemCid": 1175,
+        "modelId": "admet-ai",
+        "status": "blocked",
+        "resultOrigin": "engine-unavailable",
+        "outputs": {},
+        "summary": "BLOCKED: BLOCKED_BY_RUNTIME"
+      }
+    ],
+    "quantumCompute": [
+      {
+        "pubchemCid": 135398638,
+        "modelId": "pyscf-singlepoint",
+        "status": "blocked",
+        "resultOrigin": "missing-source-3d",
+        "outputs": {},
+        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+      },
+      {
+        "pubchemCid": 1188,
+        "modelId": "pyscf-singlepoint",
+        "status": "blocked",
+        "resultOrigin": "missing-source-3d",
+        "outputs": {},
+        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+      },
+      {
+        "pubchemCid": 6021,
+        "modelId": "pyscf-singlepoint",
+        "status": "blocked",
+        "resultOrigin": "missing-source-3d",
+        "outputs": {},
+        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+      },
+      {
+        "pubchemCid": 135398744,
+        "modelId": "pyscf-singlepoint",
+        "status": "blocked",
+        "resultOrigin": "missing-source-3d",
+        "outputs": {},
+        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+      },
+      {
+        "pubchemCid": 190,
+        "modelId": "pyscf-singlepoint",
+        "status": "blocked",
+        "resultOrigin": "missing-source-3d",
+        "outputs": {},
+        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+      },
+      {
+        "pubchemCid": 764,
+        "modelId": "pyscf-singlepoint",
+        "status": "blocked",
+        "resultOrigin": "missing-source-3d",
+        "outputs": {},
+        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+      },
+      {
+        "pubchemCid": 1175,
+        "modelId": "pyscf-singlepoint",
+        "status": "blocked",
+        "resultOrigin": "missing-source-3d",
+        "outputs": {},
+        "summary": "BLOCKED: PubChem did not provide a valid 3D conformer."
+      }
+    ],
+    "combinationHypothesis": {
+      "combinationId": "combination:3bc680fb",
+      "candidateIds": [
+        "candidate:pubchem:1188",
+        "candidate:chembl:CHEMBL1158"
+      ],
+      "coveredEvidenceIds": [
+        "evidence:pubchem:1188",
+        "evidence:chembl:207399"
+      ],
+      "missingEvidenceIds": [],
+      "coveredTargetIds": [
+        "target:chembl:CHEMBL318"
+      ],
+      "coveredMechanismIds": [],
+      "uncoveredTargetIds": [
+        "A1"
+      ],
+      "researchPriority": 0.2298,
+      "validationPlan": [
+        "Confirm each candidate independently in a target-specific assay.",
+        "Test the combination with a pre-registered additivity/synergy design.",
+        "Measure mechanism and toxicity endpoints separately; do not infer synergy from binding."
+      ],
+      "status": "HYPOTHESIS",
+      "uncertainty": "Combination coverage is a research hypothesis derived from declared target/mechanism IDs; no synergy, efficacy or safety conclusion is established."
+    },
+    "neurobiology": {
+      "targetId": "chembl:target:CHEMBL318",
+      "receptor": "Adenosine receptor A1",
+      "receptorFamily": "Adenosine receptor family",
+      "neurotransmitterSystem": "Adenosinergic signaling",
+      "pathway": {
+        "label": "Adenosinergic signaling pathway",
+        "status": "LITERATURE_SUPPORTED",
+        "uncertainty": "Target mapping does not establish a candidate-specific pathway effect."
+      },
+      "mechanism": {
+        "label": "Candidate–A1 binding interaction",
+        "status": "HYPOTHESIS",
+        "uncertainty": "Binding evidence does not establish functional mechanism, efficacy or clinical benefit."
+      },
+      "provenance": [
+        {
+          "source": "UniProt",
+          "sourceId": "UniProtKB:P30542",
+          "sourceUrl": "https://rest.uniprot.org/uniprotkb/P30542.json",
+          "sourceVersion": "UniProtKB:P30542"
+        }
+      ]
+    }
+  },
+  "browserErrors": [
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "sourceRecords": 11,
+  "liveActivities": 37,
+  "cheapCompleted": 7,
+  "rdkitOk": 0,
+  "admetOk": 0,
+  "pyscfOk": 0,
+  "pyscfBlocked": 7,
+  "pyscfRuns": [],
+  "reportComputeRunCounts": [
+    {
+      "candidateId": "candidate:chembl:molecule:CHEMBL477:chembl:target:CHEMBL318",
+      "computeRuns": 0,
+      "fingerprint": "77cf0724"
+    },
+    {
+      "candidateId": "candidate:chembl:molecule:CHEMBL1355736:chembl:target:CHEMBL318",
+      "computeRuns": 0,
+      "fingerprint": "78cd9934"
+    },
+    {
+      "candidateId": "candidate:chembl:CHEMBL1114",
+      "computeRuns": 0,
+      "fingerprint": "5d1f5864"
+    },
+    {
+      "candidateId": "candidate:chembl:CHEMBL1158",
+      "computeRuns": 0,
+      "fingerprint": "c6902d20"
+    },
+    {
+      "candidateId": "candidate:pubchem:135398638",
+      "computeRuns": 4,
+      "fingerprint": "b019f5ff"
+    },
+    {
+      "candidateId": "candidate:pubchem:1188",
+      "computeRuns": 4,
+      "fingerprint": "4686b531"
+    },
+    {
+      "candidateId": "candidate:pubchem:6021",
+      "computeRuns": 4,
+      "fingerprint": "ec41837b"
+    },
+    {
+      "candidateId": "candidate:pubchem:135398744",
+      "computeRuns": 4,
+      "fingerprint": "7192a4fc"
+    },
+    {
+      "candidateId": "candidate:pubchem:190",
+      "computeRuns": 4,
+      "fingerprint": "ca728cac"
+    },
+    {
+      "candidateId": "candidate:pubchem:764",
+      "computeRuns": 4,
+      "fingerprint": "3375d662"
+    },
+    {
+      "candidateId": "candidate:pubchem:1175",
+      "computeRuns": 4,
+      "fingerprint": "495072b8"
+    }
+  ]
+}

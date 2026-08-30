@@ -1320,3 +1320,10 @@ Science Chat natural discovery now opts into the existing backend Fabric only af
 A real backend execution was verified for PubChem CID 190 (adenine structure): run ID `51935687-d77f-49f6-9e4f-fadede744e14`, model `chem-rdkit-descriptors`, RDKit engine `RDKit 2026.03.5`, status `ok`, deterministic `true`, with outputs including molecular weight `151.129`, Crippen logP `-0.7716`, TPSA `100.45`, Lipinski violations `0`, canonical SMILES and molecular formula. This is a chemical descriptor result only, not biological activity, efficacy, ADME/Tox, or clinical evidence.
 
 The heavy run is displayed in Science Chat and appended to the existing Discovery Artifact/Scientific Memory compute lineage for replay. PySCF, OpenMM, Vina/Meeko and ADMET-AI remain runtime/input-gated until their required structured inputs are genuinely available.
+
+
+## NEXT RUNTIME CHECKPOINT: ADMET-AI
+
+The existing ADMET-AI adapter is now exposed through `/api/compute/admet/predict` and called from the natural discovery path for candidates that pass cheap filtering and have source-backed SMILES. The response carries ADMET-AI version, deterministic input-derived run identity, engine identity and `real-engine` origin. Outputs are explicitly labeled `MODEL_ESTIMATE`; they are not observations, efficacy, safety conclusions or clinical recommendations. The same run lineage is shown in Science Chat and stored through the existing compute-run path in Scientific Memory.
+
+A bounded real probe executed ADMET-AI `2.0.1` on the PubChem CID 190 structure and returned 52 model outputs, including AMES `0.3614689`, BBB_Martins `0.7137449`, HIA_Hou `0.9788821`, DILI `0.9095106`, ClinTox `0.2486554` and hERG `0.0255394`. These are model estimates with published model-domain limitations, not biological observations.

@@ -88,7 +88,8 @@ function formatNaturalDiscoveryResult(result: Awaited<ReturnType<typeof resolveN
   const why = result.candidateWhy ?? [];
   const compute = (result.cheapCompute ?? []).slice(0, 5).map((run) => `compute CID ${run.pubchemCid}: ${run.status} · ${run.resultOrigin} · ${run.summary} · fingerprint ${run.runFingerprint}`);
   const heavy = (result.heavyCompute ?? []).map((run) => `heavy CID ${run.pubchemCid}: ${run.status} · ${run.resultOrigin} · ${run.summary}${run.runId ? ` · run ${run.runId}` : ''}`);
-  return [`NATURAL DISCOVERY — ${result.status}`, result.reason, `Kandydaci/raporty: ${result.reports.length}.`, ...(compute.length ? ['CHEAP COMPUTE (existing Fabric):', ...compute] : []), ...(heavy.length ? ['HEAVY COMPUTE (existing backend Fabric):', ...heavy] : []), ...top.map((report, index) => {
+  const admet = (result.admetCompute ?? []).map((run) => `ADMET CID ${run.pubchemCid}: ${run.status} · ${run.resultOrigin} · ${run.summary}${run.runId ? ` · run ${run.runId}` : ''}`);
+  return [`NATURAL DISCOVERY — ${result.status}`, result.reason, `Kandydaci/raporty: ${result.reports.length}.`, ...(compute.length ? ['CHEAP COMPUTE (existing Fabric):', ...compute] : []), ...(heavy.length ? ['HEAVY COMPUTE (existing backend Fabric):', ...heavy] : []), ...(admet.length ? ['ADMET-AI (MODEL_ESTIMATE):', ...admet] : []), ...top.map((report, index) => {
     const cid = report.candidateId.match(/pubchem:(\d+)/)?.[1];
     const explanation = cid ? why.find((item) => item.pubchemCid === Number(cid)) : undefined;
     return `${index + 1}. ${report.candidateId} · research priority ${(report.ranking?.score ?? 0).toFixed(4)} · ${explanation?.rationale ?? 'brak live activity dla tego kandydata'} · uncertainty: ${explanation?.uncertainty ?? report.uncertainty}`;
@@ -350,6 +351,7 @@ export function ScienceChat() {
       if (result.reports.length >= 2) {
         const computeRuns: SavedBiotechComputeRun[] = (result.cheapCompute ?? []).map((run) => ({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs }));
         for (const run of result.heavyCompute ?? []) if (run.runId) computeRuns.push({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint ?? run.runId, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs });
+        for (const run of result.admetCompute ?? []) if (run.runId) computeRuns.push({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint ?? run.runId, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs });
         const saved = saveBiotechDiscoveryComparisonToMemory(result.reports, { activityIds: result.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`), assayIds: result.liveActivities?.map((activity) => `chembl:assay:${activity.assayId}`), computeRuns });
         setTurns((t) => [...t, { role: 'genesis', text: `Zapisano pełny comparison artifact w Scientific Memory. Report: ${saved.biotech?.reportId ?? 'UNKNOWN'} · comparison: ${saved.biotech?.comparison?.comparisonId ?? 'UNKNOWN'} · replay fingerprint: ${saved.biotech?.comparison?.scientificFingerprint ?? 'UNKNOWN'}.`, tag: 'SYSTEM' }]);
       }

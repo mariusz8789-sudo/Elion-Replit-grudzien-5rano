@@ -2,7 +2,7 @@ import { buildPinnedChEMBLAdenosineDiscovery } from './adenosine';
 import { buildPinnedChEMBLCaffeineDiscovery } from './chembl';
 import { buildPinnedChEMBLTheophyllineDiscovery } from './theophylline';
 import { runExperiment } from '../experimentFabric/executor';
-import { runFabricCompute, type ComputeRun } from '../backend/client';
+import { runFabricCompute, runAdmetPrediction, type ComputeRun } from '../backend/client';
 import { EXPERIMENT_FABRIC_VERSION, type ExperimentRun } from '../experimentFabric/types';
 import {
   createCandidateDiscoveryReport,
@@ -43,6 +43,7 @@ export interface NaturalFunctionalReplacementResult {
   referenceProfile?: ReferenceProfile;
   cheapCompute?: readonly NaturalCheapCompute[];
   heavyCompute?: readonly NaturalHeavyCompute[];
+  admetCompute?: readonly NaturalHeavyCompute[];
 }
 
 export interface NaturalSourceRecord {
@@ -283,5 +284,14 @@ export async function resolveNaturalFunctionalReplacementFromSources(
   if (base.status === 'BLOCKED') return base;
   const cheapCompute = runCheapNaturalCompute(sourceRecords);
   const heavyCompute = input.executeHeavyCompute ? await runHeavyNaturalCompute(sourceRecords.filter((record) => cheapCompute.some((run) => run.pubchemCid === record.cid && run.status === 'completed'))) : undefined;
-  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : ` i ${heavyCompute.filter((run) => run.status === 'ok').length} heavy runów`}. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
+  const eligible = sourceRecords.filter((record) => cheapCompute.some((run) => run.pubchemCid === record.cid && run.status === 'completed'));
+  let admetCompute: NaturalHeavyCompute[] | undefined;
+  if (input.executeHeavyCompute) {
+    try {
+      const response = await runAdmetPrediction(eligible.map((record) => record.smiles));
+      if (response.ok) admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', modelVersion: response.data.version, engine: response.data.engine, status: 'ok', runId: response.data.runId, runFingerprint: response.data.runId, resultOrigin: response.data.resultOrigin, outputs: response.data.predictions[record.smiles] ?? {}, summary: 'ADMET-AI MODEL_ESTIMATE; nie jest obserwacją ani dowodem bezpieczeństwa.' }));
+      else admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', status: 'blocked', resultOrigin: 'engine-unavailable', outputs: {}, summary: `BLOCKED: ${response.error}` }));
+    } catch (error) { admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', status: 'blocked', resultOrigin: 'request-failed', outputs: {}, summary: `BLOCKED: ${error instanceof Error ? error.message : String(error)}` })); }
+  }
+  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}. ${base.reason}`, reports: [...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)] };
 }

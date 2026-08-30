@@ -58,6 +58,7 @@ import {
   listCandidates,
 } from './store.mjs';
 import { hashPassword, verifyPassword, generateToken, validateRegistration } from './auth.mjs';
+import { createHash } from 'node:crypto';
 import { listModels, getModel, modelMetadata, runModel } from './compute/engine.mjs';
 import { buildFabricContract, fabricRunEnvelope, validateFabricRunRequest } from './compute/experimentFabricContract.mjs';
 import { listCapabilities } from './compute/capabilities.mjs';
@@ -68,7 +69,7 @@ import { createJob, getJob, listJobs, updateJob } from './store.mjs';
 import * as campaignStore from './campaign/persistence.mjs';
 import { buildDiscoveryGraph } from './campaign/discoveryGraph.mjs';
 import { listToolchain, getTool } from './campaign/toolchain.mjs';
-import { listEndpoints } from './compute/admetAdapter.mjs';
+import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
@@ -150,6 +151,11 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'admet' && seg[2] === 'endpoints' && seg.length === 3 && method === 'GET') {
       const r = listEndpoints();
       return r.ok ? ok({ endpoints: r.endpoints }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+    }
+    if (seg[1] === 'admet' && seg[2] === 'predict' && seg.length === 3 && method === 'POST') {
+      const smiles = Array.isArray(body?.smiles) ? body.smiles : [];
+      const r = predictAdmet(smiles);
+      return r.ok ? ok({ predictions: r.predictions, version: r.version, runId: `admet:${createHash('sha256').update(JSON.stringify({ smiles, version: r.version })).digest('hex').slice(0, 24)}`, engine: `ADMET-AI ${r.version}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
     }
     return err(404, 'not_found');
   }

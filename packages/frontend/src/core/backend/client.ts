@@ -512,6 +512,10 @@ export async function runFabricCompute(input: {
   });
 }
 
+export async function runAdmetPrediction(smiles: readonly string[]): Promise<ApiResult<{ predictions: Record<string, Record<string, number>>; version: string; runId: string; engine: string; resultOrigin: string }>> {
+  return request<{ predictions: Record<string, Record<string, number>>; version: string; runId: string; engine: string; resultOrigin: string }>('POST', '/compute/admet/predict', { body: { smiles } });
+}
+
 export async function listCapabilities(): Promise<ApiResult<Capability[]>> {
   const r = await request<{ capabilities: Capability[] }>('GET', '/compute/capabilities');
   return r.ok ? { ok: true, data: r.data.capabilities } : r;

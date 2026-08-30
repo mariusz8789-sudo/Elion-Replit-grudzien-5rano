@@ -181,9 +181,10 @@ describe('scienceMemory: Fabric observations', () => {
       ]),
       epistemicStatus: 'PREDICTION',
     });
+    if (!saved.biotech?.comparison) throw new Error('Expected saved biotech comparison.');
     expect(saved.biotech?.artifact).toMatchObject({
-      candidateIds: expect.arrayContaining(saved.biotech.comparison!.candidateIds),
-      comparisonId: saved.biotech.comparison!.comparisonId,
+      candidateIds: expect.arrayContaining([...saved.biotech.comparison.candidateIds]),
+      comparisonId: saved.biotech.comparison.comparisonId,
       artifactFingerprint: expect.any(String),
     });
     vi.resetModules();

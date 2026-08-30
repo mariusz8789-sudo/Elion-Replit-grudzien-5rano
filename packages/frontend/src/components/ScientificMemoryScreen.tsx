@@ -5,7 +5,7 @@ import { setPendingScenario } from '../core/scenarioBridge';
 import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
 import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
 import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
-import { replaySavedBiotechComparison } from '../core/scienceMemory';
+import { replaySavedBiotechComparison, replaySavedBiotechDiscoveryArtifact } from '../core/scienceMemory';
 
 function downloadJson(record: SavedExperiment): void {
   const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
@@ -36,6 +36,7 @@ export function ScientificMemoryScreen() {
   const [records, setRecords] = useState(() => listExperiments());
   const [evidencePacks] = useState(() => listScientificEvidencePacks());
   const [notice, setNotice] = useState<string | null>(null);
+  const [artifactReplay, setArtifactReplay] = useState<Record<string, string>>({});
   const countLabel = useMemo(() => `${records.length} ${records.length === 1 ? 'zapis' : 'zapisów'}`, [records.length]);
 
   const openRecord = (record: SavedExperiment) => {
@@ -91,6 +92,13 @@ export function ScientificMemoryScreen() {
                 buildPinnedChEMBLTheophyllineDiscovery().report,
               ])
               : undefined;
+            const artifact = record.biotech?.artifact;
+            const pinnedReports = [buildPinnedChEMBLCaffeineDiscovery().report, buildPinnedChEMBLAdenosineDiscovery().report, buildPinnedChEMBLTheophyllineDiscovery().report];
+            const runArtifactReplay = (mode: 'match' | 'drift' | 'blocked') => {
+              const lineage = { activityIds: record.biotech?.activityIds, assayIds: record.biotech?.assayIds, computeRuns: artifact?.computeRuns };
+              const result = mode === 'blocked' ? replaySavedBiotechDiscoveryArtifact(undefined, []) : replaySavedBiotechDiscoveryArtifact(artifact, pinnedReports, mode === 'drift' ? { ...lineage, activityIds: [...(lineage.activityIds ?? []), 'controlled-drift'] } : lineage);
+              setArtifactReplay((current) => ({ ...current, [record.id]: `${result.status} — ${result.reason}` }));
+            };
             return (
             <article className="settings-section" key={record.id}>
               <h2>{record.experimentName}</h2>
@@ -110,6 +118,12 @@ export function ScientificMemoryScreen() {
                     <div className="stat-row"><span>Comparison fingerprint</span><span className="val mono">{record.biotech.comparison.scientificFingerprint}</span></div>
                     <div className="stat-row"><span>Comparison boundary</span><span className="val">PREDICTION · {record.biotech.comparison.uncertainty}</span></div>
                     {biotechReplay && <div className="stat-row"><span>Comparison replay integrity</span><span className="val">{biotechReplay.status}</span></div>}
+                  </>}
+                  {artifact && <>
+                    <div className="stat-row"><span>Unified Discovery Artifact</span><span className="val">{artifact.candidateIds.length} candidates · {artifact.computeRuns.length} compute runs</span></div>
+                    <div className="stat-row"><span>Artifact fingerprint</span><span className="val mono">{artifact.artifactFingerprint}</span></div>
+                    <div className="stat-row"><span>Artifact lineage</span><span className="val mono">{artifact.sourceIds.length} sources · {artifact.activityIds.length} activities · {artifact.assayIds.length} assays</span></div>
+                    {artifactReplay[record.id] && <div className="stat-row"><span>Full artifact replay</span><span className="val">{artifactReplay[record.id]}</span></div>}
                   </>}
                 </>}
                 <div className="stat-row"><span>Honesty</span><span className="val">{record.honesty}</span></div>
@@ -160,6 +174,11 @@ export function ScientificMemoryScreen() {
                 <button className="chip-btn pilot-primary" onClick={() => openRecord(record)}>Otwórz z parametrami</button>
                 {record.evidencePackId && <button className="chip-btn" onClick={() => { window.location.hash = `#/pilot?mode=protocol&replay=${encodeURIComponent(record.evidencePackId!)}`; }}>Otwórz Evidence replay</button>}
                 <button className="chip-btn" onClick={() => downloadJson(record)}>Eksportuj JSON</button>
+                {artifact && <>
+                  <button className="chip-btn pilot-primary" onClick={() => runArtifactReplay('match')}>Replay artifact</button>
+                  <button className="chip-btn" onClick={() => runArtifactReplay('drift')}>Test DRIFT</button>
+                  <button className="chip-btn" onClick={() => runArtifactReplay('blocked')}>Test BLOCKED</button>
+                </>}
                 <button className="chip-btn danger" onClick={() => removeRecord(record)}>Usuń lokalnie</button>
               </div>
             </article>

@@ -1304,3 +1304,10 @@ Validation passed: natural/ChEMBL/memory tests `28 passed`; frontend build/typec
 The existing biotech Scientific Memory contract now persists one complete deterministic discovery artifact together with the comparison: candidate IDs, source IDs, activity IDs, assay IDs, comparison ID, ranking scores, cheap compute runs (run IDs, fingerprints, outputs, status, result origin), explicit limitations, and an artifact fingerprint. `replaySavedBiotechDiscoveryArtifact` verifies the complete artifact identity and returns `MATCH` or `DRIFT`, while incomplete inputs return `BLOCKED`. This is an integrity check, not a fresh biological experiment.
 
 Validation passed: artifact/natural/memory tests `23 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed. The artifact fingerprint is created from the canonical persisted fields, so changes to source IDs, activity/assay lineage, ranking, compute identity, or limitations are detectable.
+
+
+## UI INTEGRATION CHECKPOINT: Unified Discovery Artifact + Full Replay
+
+Scientific Memory now exposes the persisted Discovery Artifact directly in the UI. Each biotech record shows artifact candidate/source/activity/assay lineage, compute-run count, artifact fingerprint, and limitations. The UI provides a real `Replay artifact` action plus controlled `Test DRIFT` and `Test BLOCKED` actions. Replay results are rendered as `MATCH`, `DRIFT`, or `BLOCKED` with the integrity reason. The action reuses the existing artifact and replay contracts; no second report, memory, or replay system was created.
+
+Validation: focused natural/memory tests `23 passed`; frontend build/typecheck passed after a test narrowing fix; ESLint passed; `git diff --check` passed. Chromium smoke is required after the UI change and is run in the next validation step.

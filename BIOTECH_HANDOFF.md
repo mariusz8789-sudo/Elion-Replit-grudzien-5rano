@@ -1286,3 +1286,14 @@ Validation passed: natural and memory tests `23 passed` in the focused run; fron
 Natural discovery now executes the existing deterministic `chem-molecular-weight` Experiment Fabric stage for each PubChem-admitted candidate after source/evidence filtering. Science Chat displays the resulting Scientific Run status, run ID, result origin, summary, and fingerprint. This is a real cheap compute stage, not a fabricated biological observation. Expensive runtimes remain gated by compatible structured input; biological execution remains NOT_EXECUTED / BLOCKED.
 
 Validation passed after the compute wiring: focused natural/memory tests `23 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; Chromium desktop smoke passed with 27 routes, 13 laboratories, 208 interactions, and zero runtime errors.
+
+
+## RECOVERY CHECKPOINT: Legacy Branch Review
+
+The requested legacy branches were fetched and compared against `manus/next-gap-observation-analysis`. `manus/current-genesis-continuation`, `manus/earthquake-damage-final-sprint`, `manus/high-fidelity-city-view`, `manus/high-fidelity-epidemic-digital-twin`, and `manus/scenario-engine-command-center` are already ancestors of the current branch; no recovery is needed. `manus/visual-p1-world` diverges with a large historical visual/scientific package; its candidate PySCF/OpenMM/RDKit discovery scripts are not absent runtime contracts in the current code and would add E2E-only material without improving the active natural-discovery path. `genesis/main` diverges with a very large historical documentation/campaign/citation package and was not merged because it duplicates or changes broad architecture. No cherry-pick, reset, force-push, branch deletion, or main modification was performed.
+
+## INTEGRATION CHECKPOINT: Cheap Compute → Scientific Memory
+
+Existing cheap Experiment Fabric runs are now persisted inside the existing `SavedBiotechContext.computeRuns` alongside report/comparison, candidate, activity, assay, provenance, ranking, uncertainty, and scientific fingerprint fields. Each run retains candidate ID, run ID, run fingerprint, status, result origin, summary, and outputs. This is lineage persistence, not a claim of biological execution. Full biological validation remains NOT_EXECUTED / BLOCKED, and heavy runtimes remain gated by compatible structured inputs.
+
+Validation passed: natural/ChEMBL/memory tests `28 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed. Legacy review found no safe, non-duplicating capability to cherry-pick.

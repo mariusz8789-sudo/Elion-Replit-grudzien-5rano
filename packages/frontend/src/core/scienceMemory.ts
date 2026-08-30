@@ -57,6 +57,11 @@ export interface SavedBiotechComparisonReplay {
   reason: string;
 }
 
+export interface SavedBiotechComputeRun {
+  candidateId: string; runId: string; runFingerprint: string; status: string;
+  resultOrigin: string; summary: string; outputs: Readonly<Record<string, ExperimentOutputValue>>;
+}
+
 export interface SavedBiotechContext {
   candidateId: string;
   hypothesisId: string;
@@ -72,6 +77,7 @@ export interface SavedBiotechContext {
   assayIds?: readonly string[];
   ranking?: CandidateRanking;
   comparison?: SavedBiotechComparison;
+  computeRuns?: readonly SavedBiotechComputeRun[];
 }
 
 export interface SavedExperimentReplayIdentity {
@@ -257,7 +263,7 @@ function readAll(): SavedExperiment[] {
   return Array.isArray(raw) ? raw.filter(isSavedExperiment) : [];
 }
 
-export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryReport, comparison?: CandidateComparison, lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[] }): SavedExperiment {
+export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryReport, comparison?: CandidateComparison, lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[] }): SavedExperiment {
   const biotech: SavedBiotechContext = {
     candidateId: report.candidateId,
     hypothesisId: report.hypothesisId,
@@ -270,6 +276,7 @@ export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryRep
     scientificFingerprint: report.scientificFingerprint,
     ...(lineage?.activityIds?.length ? { activityIds: lineage.activityIds } : {}),
     ...(lineage?.assayIds?.length ? { assayIds: lineage.assayIds } : {}),
+    ...(lineage?.computeRuns?.length ? { computeRuns: lineage.computeRuns } : {}),
     ...(report.ranking === undefined ? {} : { ranking: report.ranking }),
     ...(comparison === undefined ? {} : { comparison: { comparisonId: comparison.comparisonId, reportIds: comparison.reportIds, candidateIds: comparison.rows.map((row) => row.candidateId), scientificFingerprint: comparison.scientificFingerprint, epistemicStatus: comparison.epistemicStatus, uncertainty: comparison.uncertainty } }),
   };
@@ -280,7 +287,7 @@ export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryRep
   });
 }
 
-export function saveBiotechDiscoveryComparisonToMemory(reports: readonly CandidateDiscoveryReport[], lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[] }): SavedExperiment {
+export function saveBiotechDiscoveryComparisonToMemory(reports: readonly CandidateDiscoveryReport[], lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[] }): SavedExperiment {
   if (reports.length < 2) throw new Error('Porównanie kandydatów do pamięci wymaga co najmniej dwóch raportów.');
   const comparison = compareCandidateDiscoveryReports(reports);
   return saveBiotechDiscoveryReportToMemory(reports[0]!, comparison, lineage);

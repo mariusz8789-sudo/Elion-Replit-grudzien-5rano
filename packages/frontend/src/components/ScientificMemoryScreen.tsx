@@ -94,7 +94,7 @@ export function ScientificMemoryScreen() {
               : undefined;
             const artifact = record.biotech?.artifact;
             const runArtifactReplay = (mode: 'match' | 'drift' | 'blocked') => {
-              const lineage = { activityIds: record.biotech?.activityIds, assayIds: record.biotech?.assayIds, computeRuns: artifact?.computeRuns, neurobiology: artifact?.neurobiology };
+              const lineage = { activityIds: record.biotech?.activityIds, assayIds: record.biotech?.assayIds, computeRuns: artifact?.computeRuns, sourceRecords: artifact?.sourceRecords, activityRecords: artifact?.activityRecords, neurobiology: artifact?.neurobiology };
               const persistedReports = artifact?.reports ?? [];
               const result = mode === 'blocked' ? replaySavedBiotechDiscoveryArtifact(undefined, []) : replaySavedBiotechDiscoveryArtifact(artifact, persistedReports, mode === 'drift' ? { ...lineage, activityIds: [...(lineage.activityIds ?? []), 'controlled-drift'] } : lineage);
               setArtifactReplay((current) => ({ ...current, [record.id]: `${result.status} — ${result.reason}` }));
@@ -183,6 +183,7 @@ export function ScientificMemoryScreen() {
                 {record.evidencePackId && <button className="chip-btn" onClick={() => { window.location.hash = `#/pilot?mode=protocol&replay=${encodeURIComponent(record.evidencePackId!)}`; }}>Otwórz Evidence replay</button>}
                 <button className="chip-btn" onClick={() => downloadJson(record)}>Eksportuj JSON</button>
                 {artifact && <>
+                  <button className="chip-btn pilot-primary" onClick={() => { window.location.hash = `#/dossier?candidate=${encodeURIComponent(artifact.reports[0]?.candidateId ?? '')}`; }}>Open Candidate Dossier</button>
                   <button className="chip-btn pilot-primary" onClick={() => runArtifactReplay('match')}>Replay artifact</button>
                   <button className="chip-btn" onClick={() => runArtifactReplay('drift')}>Test DRIFT</button>
                   <button className="chip-btn" onClick={() => runArtifactReplay('blocked')}>Test BLOCKED</button>

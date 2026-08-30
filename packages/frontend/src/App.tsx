@@ -38,6 +38,7 @@ const ModelConflictPanel = lazy(() => import('./components/ModelConflictPanel').
 const CloudProjectsScreen = lazy(() => import('./components/CloudProjectsScreen').then((m) => ({ default: m.CloudProjectsScreen })));
 const CandidateDiscoveryScreen = lazy(() => import('./components/CandidateDiscoveryScreen').then((m) => ({ default: m.CandidateDiscoveryScreen })));
 const DrugDiscoveryScreen = lazy(() => import('./components/DrugDiscoveryScreen').then((m) => ({ default: m.DrugDiscoveryScreen })));
+const CandidateDossierScreen = lazy(() => import('./components/CandidateDossierScreen').then((m) => ({ default: m.CandidateDossierScreen })));
 const CampaignScreen = lazy(() => import('./components/CampaignScreen').then((m) => ({ default: m.CampaignScreen })));
 const SimulationGeneratorScreen = lazy(() => import('./components/SimulationGeneratorScreen').then((m) => ({ default: m.SimulationGeneratorScreen })));
 const ModelComparisonScreen = lazy(() => import('./components/ModelComparisonScreen').then((m) => ({ default: m.ModelComparisonScreen })));
@@ -72,6 +73,7 @@ type Route =
   | { kind: 'lab'; id: string }
   | { kind: 'settings' }
   | { kind: 'memory' }
+  | { kind: 'dossier' }
   | { kind: 'discovery-log' }
   | { kind: 'glossary' }
   | { kind: 'what-if' }
@@ -99,6 +101,7 @@ function parseHash(): Route {
   if (lab) return { kind: 'lab', id: lab[1] };
   if (h === '#/settings') return { kind: 'settings' };
   if (h === '#/memory') return { kind: 'memory' };
+  if (h === '#/dossier' || h.startsWith('#/dossier?')) return { kind: 'dossier' };
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
   if (h === '#/what-if') return { kind: 'what-if' };
@@ -268,6 +271,18 @@ export default function App() {
         <div className="app">
           <TopBar title="🧠 Pamięć Naukowa" onSearch={() => setSearchOpen(true)} />
           <ScientificMemoryScreen />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'dossier') {
+      return (
+        <div className="app">
+          <TopBar title="📋 Candidate Dossier" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <CandidateDossierScreen />
+          </HeavyRoute>
           {overlays}
         </div>
       );

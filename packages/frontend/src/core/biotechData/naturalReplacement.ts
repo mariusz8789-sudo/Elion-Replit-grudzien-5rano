@@ -42,6 +42,7 @@ export interface NaturalFunctionalReplacementResult {
   matchedReference?: string;
   target?: string;
   liveActivities?: readonly LiveChEMBLActivityRecord[];
+  sourceRecords?: readonly NaturalSourceRecord[];
   candidateWhy?: readonly NaturalCandidateWhy[];
   referenceProfile?: ReferenceProfile;
   cheapCompute?: readonly NaturalCheapCompute[];
@@ -357,6 +358,7 @@ export async function resolveNaturalFunctionalReplacementFromSources(
     } catch (error) { admetCompute = eligible.map((record) => ({ pubchemCid: record.cid, modelId: 'admet-ai', status: 'blocked', resultOrigin: 'request-failed', outputs: {}, summary: `BLOCKED: ${error instanceof Error ? error.message : String(error)}` })); }
   }
   const quantumCompute: NaturalHeavyCompute[] = [];
+  const sourceRecordsWith3d: NaturalSourceRecord[] = [...sourceRecords];
   if (input.executeHeavyCompute) {
     for (const record of eligible) {
       const source3d = await fetchNaturalPubChem3dRecord(record, fetchImpl);
@@ -364,6 +366,8 @@ export async function resolveNaturalFunctionalReplacementFromSources(
         quantumCompute.push({ pubchemCid: record.cid, modelId: 'pyscf-singlepoint', status: 'blocked', resultOrigin: 'missing-source-3d', outputs: {}, summary: 'BLOCKED: PubChem did not provide a valid 3D conformer.' });
         continue;
       }
+      const sourceIndex = sourceRecordsWith3d.findIndex((item) => item.cid === record.cid);
+      if (sourceIndex >= 0) sourceRecordsWith3d[sourceIndex] = source3d;
       const response = await runQuantumSinglePoint({ atoms: source3d.atoms3d, charge: 0, spin: 0, basis: 'sto-3g', method: 'RHF' });
       if (response.ok) {
         const outputs = response.data.data;
@@ -375,5 +379,5 @@ export async function resolveNaturalFunctionalReplacementFromSources(
   }
   const enrichedReports = enrichReportsWithCompute([...base.reports.filter((r) => !r.candidateId.startsWith('candidate:pubchem:')), ...identityOnlyReports(sourceRecords)], cheapCompute, heavyCompute ?? [], admetCompute ?? [], quantumCompute, liveActivities, input.target);
   const combinationHypothesis = buildCandidateCombinationHypothesis(enrichedReports, input.target ? [input.target] : []);
-  return { ...base, liveActivities, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), ...(input.executeHeavyCompute ? { quantumCompute } : {}), ...(combinationHypothesis === undefined ? {} : { combinationHypothesis }), neurobiology: A1_NEUROBIOLOGY_PROFILE, reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}${input.executeHeavyCompute ? ` i ${quantumCompute.filter((run) => run.status === 'ok').length} PySCF runów` : ''}. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. ${base.reason}`, reports: enrichedReports };
+  return { ...base, liveActivities, sourceRecords: sourceRecordsWith3d, candidateWhy: buildCandidateWhy(liveActivities, input.target), cheapCompute, ...(heavyCompute === undefined ? {} : { heavyCompute }), ...(admetCompute === undefined ? {} : { admetCompute }), ...(input.executeHeavyCompute ? { quantumCompute } : {}), ...(combinationHypothesis === undefined ? {} : { combinationHypothesis }), neurobiology: A1_NEUROBIOLOGY_PROFILE, reason: `Pobrano ${sourceRecords.length} realnych rekordów z PubChem, ${liveActivities.length} jawnych rekordów activity z ChEMBL oraz wykonano ${cheapCompute.filter((run) => run.status === 'completed').length} tanich obliczeń${heavyCompute === undefined ? '' : `, ${heavyCompute.filter((run) => run.status === 'ok').length} RDKit heavy runów`}${admetCompute === undefined ? '' : ` i ${admetCompute.filter((run) => run.status === 'ok').length} ADMET-AI runów`}${input.executeHeavyCompute ? ` i ${quantumCompute.filter((run) => run.status === 'ok').length} PySCF runów` : ''}. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. ${base.reason}`, reports: enrichedReports };
 }

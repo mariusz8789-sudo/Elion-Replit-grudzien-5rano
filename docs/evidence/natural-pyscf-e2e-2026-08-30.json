@@ -1,6 +1,6 @@
 {
-  "startedAt": "2026-08-30T16:10:03.593Z",
-  "finishedAt": "2026-08-30T16:10:42.821Z",
+  "startedAt": "2026-08-30T16:32:44.091Z",
+  "finishedAt": "2026-08-30T16:33:20.356Z",
   "value": {
     "status": "RESOLVED",
     "reason": "Pobrano 8 realnych rekordów z PubChem, 39 jawnych rekordów activity z ChEMBL oraz wykonano 8 tanich obliczeń, 0 RDKit heavy runów i 0 ADMET-AI runów i 7 PySCF runów. Ranking zawiera jawny, ograniczony compute-support term; nie jest to efficacy ani safety score. Dopasowano do istniejącego pinned A1 reference profile; wynik jest research-priority comparison, nie funkcjonalnym zamiennikiem ani dowodem skuteczności.",
@@ -2080,6 +2080,96 @@
         "sourceVersion": "ChEMBL Web Services",
         "retrievedAt": "2026-08-30",
         "sourceUrl": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL792&limit=20"
+      }
+    ],
+    "sourceRecords": [
+      {
+        "name": "caffeine",
+        "cid": 2519,
+        "formula": "C8H10N4O2",
+        "smiles": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+        "inchiKey": "RYYVLZVUVIJVGH-UHFFFAOYSA-N",
+        "molecularWeight": "194.19",
+        "source": "PubChem",
+        "sourceVersion": "PubChem CID 2519",
+        "retrievedAt": "2026-08-30"
+      },
+      {
+        "name": "hypoxanthine",
+        "cid": 135398638,
+        "formula": "C5H4N4O",
+        "smiles": "C1=NC2=C(N1)C(=O)NC=N2",
+        "inchiKey": "FDGQSTZJBFJUBT-UHFFFAOYSA-N",
+        "molecularWeight": "136.11",
+        "source": "PubChem",
+        "sourceVersion": "PubChem CID 135398638",
+        "retrievedAt": "2026-08-30"
+      },
+      {
+        "name": "xanthine",
+        "cid": 1188,
+        "formula": "C5H4N4O2",
+        "smiles": "C1=NC2=C(N1)C(=O)NC(=O)N2",
+        "inchiKey": "LRFVTYWOQMYALW-UHFFFAOYSA-N",
+        "molecularWeight": "152.11",
+        "source": "PubChem",
+        "sourceVersion": "PubChem CID 1188",
+        "retrievedAt": "2026-08-30"
+      },
+      {
+        "name": "inosine",
+        "cid": 6021,
+        "formula": "C10H12N4O5",
+        "smiles": "C1=NC(=O)C2=C(N1)N(C=N2)C3C(C(C(O3)CO)O)O",
+        "inchiKey": "UGQMRVRMYYASKQ-KQYNXXCUSA-N",
+        "molecularWeight": "268.23",
+        "source": "PubChem",
+        "sourceVersion": "PubChem CID 6021",
+        "retrievedAt": "2026-08-30"
+      },
+      {
+        "name": "guanosine",
+        "cid": 135398744,
+        "formula": "C22H30N6O4S",
+        "smiles": "CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C",
+        "inchiKey": "BNRNXUUZRGQAQC-UHFFFAOYSA-N",
+        "molecularWeight": "474.6",
+        "source": "PubChem",
+        "sourceVersion": "PubChem CID 135398744",
+        "retrievedAt": "2026-08-30"
+      },
+      {
+        "name": "adenine",
+        "cid": 190,
+        "formula": "C5H5N5",
+        "smiles": "C1=NC2=NC=NC(=C2N1)N",
+        "inchiKey": "GFFGJBXGBJISGV-UHFFFAOYSA-N",
+        "molecularWeight": "135.13",
+        "source": "PubChem",
+        "sourceVersion": "PubChem CID 190",
+        "retrievedAt": "2026-08-30"
+      },
+      {
+        "name": "guanine",
+        "cid": 764,
+        "formula": "C5H5N5O",
+        "smiles": "C1=NC2=C(N1)C(=O)N=C(N2)N",
+        "inchiKey": "UYTPUPDQBNUYGX-UHFFFAOYSA-N",
+        "molecularWeight": "151.13",
+        "source": "PubChem",
+        "sourceVersion": "PubChem CID 764",
+        "retrievedAt": "2026-08-30"
+      },
+      {
+        "name": "uric acid",
+        "cid": 1175,
+        "formula": "C5H4N4O3",
+        "smiles": "C12=C(NC(=O)N1)NC(=O)NC2=O",
+        "inchiKey": "LEHOTFFKMJEONL-UHFFFAOYSA-N",
+        "molecularWeight": "168.11",
+        "source": "PubChem",
+        "sourceVersion": "PubChem CID 1175",
+        "retrievedAt": "2026-08-30"
       }
     ],
     "candidateWhy": [

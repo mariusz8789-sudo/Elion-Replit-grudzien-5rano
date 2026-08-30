@@ -347,15 +347,18 @@ export function ScienceChat() {
         setInput('');
         return;
       }
-      const targetMatch = msg.match(/(?:target|receptor|receptora)\s*[:=]?\s*([A-Za-z0-9-]+)/i);
+      const targetMatch = msg.match(/(?:target(?:u)?|receptor(?:a)?|receptora)\s*[:=]?\s*([A-Za-z0-9-]+)/i);
       const result = await resolveNaturalFunctionalReplacementFromSources({ referenceCompound, target: targetMatch?.[1] ?? 'A1', executeHeavyCompute: true });
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatNaturalDiscoveryResult(result), tag: result.status === 'RESOLVED' ? 'WYNIK' : 'SYSTEM' }]);
       if (result.reports.length >= 2) {
         const computeRuns: SavedBiotechComputeRun[] = (result.cheapCompute ?? []).map((run) => ({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs }));
         for (const run of result.heavyCompute ?? []) if (run.runId) computeRuns.push({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint ?? run.runId, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs });
         for (const run of result.admetCompute ?? []) if (run.runId) computeRuns.push({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint ?? run.runId, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs });
-        const saved = saveBiotechDiscoveryComparisonToMemory(result.reports, { activityIds: result.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`), assayIds: result.liveActivities?.map((activity) => `chembl:assay:${activity.assayId}`), computeRuns, neurobiology: result.neurobiology });
-        setTurns((t) => [...t, { role: 'genesis', text: `Zapisano pełny comparison artifact w Scientific Memory. Report: ${saved.biotech?.reportId ?? 'UNKNOWN'} · comparison: ${saved.biotech?.comparison?.comparisonId ?? 'UNKNOWN'} · replay fingerprint: ${saved.biotech?.comparison?.scientificFingerprint ?? 'UNKNOWN'}.`, tag: 'SYSTEM' }]);
+        for (const run of result.quantumCompute ?? []) if (run.runId) computeRuns.push({ candidateId: `candidate:pubchem:${run.pubchemCid}`, runId: run.runId, runFingerprint: run.runFingerprint ?? run.runId, status: run.status, resultOrigin: run.resultOrigin, summary: run.summary, outputs: run.outputs });
+        const saved = saveBiotechDiscoveryComparisonToMemory(result.reports, { activityIds: result.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`), assayIds: result.liveActivities?.map((activity) => `chembl:assay:${activity.assayId}`), computeRuns, sourceRecords: result.sourceRecords, activityRecords: result.liveActivities, neurobiology: result.neurobiology });
+        setTurns((t) => [...t, { role: 'genesis', text: `Zapisano pełny comparison artifact w Scientific Memory. Report: ${saved.biotech?.reportId ?? 'UNKNOWN'} · comparison: ${saved.biotech?.comparison?.comparisonId ?? 'UNKNOWN'} · replay fingerprint: ${saved.biotech?.comparison?.scientificFingerprint ?? 'UNKNOWN'}. Otwieram Candidate Dossier.`, tag: 'SYSTEM' }]);
+        window.location.hash = '#/dossier';
+        setOpen(false);
       }
       setInput('');
       track('ask_ai_used', { via: 'science-chat-natural-discovery', status: result.status });

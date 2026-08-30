@@ -1,6 +1,6 @@
 import { readJSON, writeJSON } from './storage';
 import type { HonestyLevel, SimParams } from './types';
-import { biotechScientificFingerprint, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateDiscoveryReport, type CandidateRanking, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
+import { biotechScientificFingerprint, buildCandidateCombinationHypothesis, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateCombinationHypothesis, type CandidateDiscoveryReport, type CandidateRanking, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
 import type { ExperimentOutputValue, ExperimentRoute, ExperimentRun } from './experimentFabric/types';
 import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 import { compareAme2020Observations } from './observation/nuclearAme2020';
@@ -69,6 +69,7 @@ export interface SavedBiotechDiscoveryArtifact {
   activityIds: readonly string[]; assayIds: readonly string[];
   comparisonId?: string; rankingScores: Readonly<Record<string, number>>;
   computeRuns: readonly SavedBiotechComputeRun[]; limitations: readonly string[];
+  combinationHypothesis?: CandidateCombinationHypothesis;
   artifactFingerprint: string;
 }
 
@@ -309,7 +310,7 @@ export function saveBiotechDiscoveryComparisonToMemory(reports: readonly Candida
     activityIds: lineage?.activityIds ?? [], assayIds: lineage?.assayIds ?? [],
     comparisonId: comparison.comparisonId,
     rankingScores: Object.fromEntries(reports.map((report) => [report.candidateId, report.ranking?.score ?? 0])),
-    computeRuns, limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'],
+    computeRuns, limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'], combinationHypothesis: buildCandidateCombinationHypothesis(reports),
   };
   const artifact: SavedBiotechDiscoveryArtifact = { ...artifactBase, artifactFingerprint: fnv1a(canonicalJson(artifactBase)) };
   return saveBiotechDiscoveryReportToMemory(reports[0]!, comparison, { ...lineage, computeRuns, artifact });
@@ -346,7 +347,7 @@ export function replaySavedBiotechComparison(
 export function replaySavedBiotechDiscoveryArtifact(saved: SavedBiotechDiscoveryArtifact | undefined, reports: readonly CandidateDiscoveryReport[], lineage: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[] } = {}): SavedBiotechComparisonReplay {
   if (!saved || reports.length < 2) return { status: 'BLOCKED', reason: 'Brak kompletnego discovery artifact albo raportów do odtworzenia.' };
   const comparison = compareCandidateDiscoveryReports(reports);
-  const base = { candidateIds: reports.map((report) => report.candidateId), sourceIds: [...new Set(reports.flatMap((report) => report.provenance.map((item) => item.sourceId)))], activityIds: lineage.activityIds ?? [], assayIds: lineage.assayIds ?? [], comparisonId: comparison.comparisonId, rankingScores: Object.fromEntries(reports.map((report) => [report.candidateId, report.ranking?.score ?? 0])), computeRuns: lineage.computeRuns ?? [], limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'] };
+  const base = { candidateIds: reports.map((report) => report.candidateId), sourceIds: [...new Set(reports.flatMap((report) => report.provenance.map((item) => item.sourceId)))], activityIds: lineage.activityIds ?? [], assayIds: lineage.assayIds ?? [], comparisonId: comparison.comparisonId, rankingScores: Object.fromEntries(reports.map((report) => [report.candidateId, report.ranking?.score ?? 0])), computeRuns: lineage.computeRuns ?? [], limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'], combinationHypothesis: buildCandidateCombinationHypothesis(reports) };
   return fnv1a(canonicalJson(base)) === saved.artifactFingerprint ? { status: 'MATCH', reason: 'Cały deterministyczny discovery artifact odtworzył identyczny fingerprint.' } : { status: 'DRIFT', reason: 'Discovery artifact różni się w identity, źródłach, comparison, ranking, compute lub ograniczeniach.' };
 }
 

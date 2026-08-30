@@ -336,7 +336,7 @@ export function ScienceChat() {
           <div key={i} className={`sc-turn sc-${t.role}`}>
             {t.role === 'genesis' && t.tag && (
               <span className={`sc-tag sc-tag-${t.tag.toLowerCase()}`}>
-                {TAG_LABELS[t.tag]}{t.intent && t.intent !== 'UNKNOWN' ? ` · ${t.intent}` : ''}{t.todo ? ' · TODO' : ''}
+                {TAG_LABELS[t.tag]}{t.intent && t.intent !== 'UNKNOWN' ? ` · ${t.intent}` : ''}{t.todo ? ' · VERIFY_REQUIRED' : ''}
               </span>
             )}
             <div className="sc-text">{t.text}</div>

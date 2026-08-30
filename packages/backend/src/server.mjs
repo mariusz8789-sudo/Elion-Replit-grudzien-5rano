@@ -37,6 +37,7 @@ import {
 } from './lib.mjs';
 import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { handleApi } from './api.mjs';
+import { listToolchain } from './campaign/toolchain.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8080);
@@ -280,6 +281,7 @@ const server = http.createServer((req, res) => {
       static: staticAvailable,
       knowledgeLabs: knowledgeIndex.size,
       persistence: db ? 'ready' : 'unavailable',
+      toolchain: listToolchain().map((tool) => ({ id: tool.id, status: tool.status, version: tool.version ?? null })),
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);

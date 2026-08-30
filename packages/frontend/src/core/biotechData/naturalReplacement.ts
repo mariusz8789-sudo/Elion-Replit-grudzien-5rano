@@ -151,16 +151,22 @@ function identityOnlyReports(records?: readonly NaturalSourceRecord[]): Candidat
 export async function fetchNaturalPubChemRecords(fetchImpl: typeof fetch = fetch): Promise<NaturalSourceRecord[]> {
   const today = new Date().toISOString().slice(0, 10);
   const names = PUBCHEM_IDENTITY_RECORDS.filter(([name]) => !['theobromine', 'paraxanthine'].includes(name));
-  const results: Array<NaturalSourceRecord | null> = await Promise.all(names.map(async ([name, cid]): Promise<NaturalSourceRecord | null> => {
+  const results: Array<NaturalSourceRecord | null> = [];
+  for (const [name, cid] of names) {
     const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON`;
     try {
-      const response = await fetchImpl(url, { signal: AbortSignal.timeout(8000) });
-      if (!response.ok) return null;
+      let response = await fetchImpl(url, { signal: AbortSignal.timeout(8000) });
+      if ([429, 500, 502, 503, 504].includes(response.status)) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        response = await fetchImpl(url, { signal: AbortSignal.timeout(8000) });
+      }
+      if (!response.ok) { results.push(null); continue; }
       const row = (await response.json() as { PropertyTable?: { Properties?: Record<string, unknown>[] } }).PropertyTable?.Properties?.[0];
-      if (typeof row?.CanonicalSMILES !== 'string' || typeof row?.InChIKey !== 'string' || typeof row?.MolecularFormula !== 'string' || typeof row?.MolecularWeight !== 'string') return null;
-      return { name, cid, formula: row.MolecularFormula, smiles: row.CanonicalSMILES, inchiKey: row.InChIKey, molecularWeight: row.MolecularWeight, source: 'PubChem' as const, sourceVersion: `PubChem CID ${cid}`, retrievedAt: today };
-    } catch { return null; /* bounded source failure remains visible to the caller */ }
-  }));
+      const smiles = typeof row?.CanonicalSMILES === 'string' ? row.CanonicalSMILES : row?.ConnectivitySMILES;
+      if (typeof smiles !== 'string' || typeof row?.InChIKey !== 'string' || typeof row?.MolecularFormula !== 'string' || typeof row?.MolecularWeight !== 'string') { results.push(null); continue; }
+      results.push({ name, cid, formula: row.MolecularFormula, smiles, inchiKey: row.InChIKey, molecularWeight: row.MolecularWeight, source: 'PubChem' as const, sourceVersion: `PubChem CID ${cid}`, retrievedAt: today });
+    } catch { results.push(null); /* bounded source failure remains visible to the caller */ }
+  }
   return results.filter((record): record is NaturalSourceRecord => record !== null);
 }
 

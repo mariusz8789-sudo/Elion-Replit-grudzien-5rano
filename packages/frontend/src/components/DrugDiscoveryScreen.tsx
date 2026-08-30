@@ -125,6 +125,27 @@ function DrugWorkspace() {
 
   const rankByCandidate = new Map(ranking.map((r) => [r.candidateId, r]));
 
+  const saveComparison = (destination: 'memory' | 'dossier', candidateId?: string) => {
+    const saved = saveBiotechDiscoveryComparisonToMemory(activeReplacementReports, {
+      activityIds: replacementResult?.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`),
+      assayIds: replacementResult?.liveActivities?.map((activity) => `chembl:assay:${activity.assayId}`),
+    });
+    setBiotechReplay(replaySavedBiotechComparison(saved.biotech?.comparison, activeReplacementReports));
+    const user = getSession()?.user;
+    if (user) {
+      setLastAuditRequestId(recordBiotechAdminAudit({
+        userId: user.id,
+        action: 'save-natural-functional-replacement-comparison',
+        provenance: `DrugDiscoveryScreen · ${activeReplacementReports.length} resolved ChEMBL/PubChem/DailyMed records`,
+      }).requestId);
+    }
+    if (destination === 'dossier' && candidateId) {
+      window.location.hash = `#/dossier?candidate=${encodeURIComponent(candidateId)}`;
+    } else {
+      window.location.hash = '#/memory';
+    }
+  };
+
   return (
     <main className="settings-view cde-view" id="main-content" tabIndex={-1}>
       <section className="settings-section">
@@ -163,7 +184,7 @@ function DrugWorkspace() {
           {replacementResult.candidateWhy.map((why) => <div className="cde-result" key={why.pubchemCid}><span className="cde-result-label">WHY · PubChem CID {why.pubchemCid}</span><span className="cde-result-actual">{why.rationale}</span><span className="cde-result-bound">target match {why.targetMatchedActivityCount}/{why.activityCount} · types {why.measurementTypes.join(', ') || 'UNKNOWN'} · assay HIGH/MOD/LOW/UNK {why.assayQualityCounts.HIGH}/{why.assayQualityCounts.MODERATE}/{why.assayQualityCounts.LOW}/{why.assayQualityCounts.UNKNOWN} · {why.uncertainty}</span></div>)}
         </div> : null}
         {replacementResult?.reports.length ? <div className="cde-results" aria-label="Resolved natural product reports">
-          {replacementResult.reports.map((report) => <div className="cde-result" key={report.reportId}><span className="cde-result-label">{report.candidateId}</span><span className="cde-result-actual">Research priority {(report.ranking?.score ?? 0).toFixed(4)} · {report.scientificEvidenceStatus} · target {report.targetIds.length ? report.targetIds.join(', ') : 'UNKNOWN'}</span><span className="cde-result-bound">safety {report.safetySignalIds.length ? 'SOURCE_STATUS' : 'UNKNOWN'} · ADME/PK/Tox {report.admeProfile?.status ?? 'UNKNOWN'} · validation {report.experimentRequestId ?? 'NOT_EXECUTED / BLOCKED'} · {report.clinicalEfficacy}</span></div>)}
+          {replacementResult.reports.map((report) => <div className="cde-result" key={report.reportId}><span className="cde-result-label">{report.candidateId}</span><span className="cde-result-actual">Research priority {(report.ranking?.score ?? 0).toFixed(4)} · {report.scientificEvidenceStatus} · target {report.targetIds.length ? report.targetIds.join(', ') : 'UNKNOWN'}</span><span className="cde-result-bound">safety {report.safetySignalIds.length ? 'SOURCE_STATUS' : 'UNKNOWN'} · ADME/PK/Tox {report.admeProfile?.status ?? 'UNKNOWN'} · validation {report.experimentRequestId ?? 'NOT_EXECUTED / BLOCKED'} · {report.clinicalEfficacy}</span><button className="chip-btn" type="button" onClick={() => saveComparison('dossier', report.candidateId)}>Zapisz i otwórz dossier</button></div>)}
         </div> : null}
         <h2>Źródłowy punkt odniesienia · pinned record</h2>
         <p className="settings-hint">
@@ -185,7 +206,7 @@ function DrugWorkspace() {
           <div className="cde-result"><span className="cde-result-label">Adenosine comparator</span><span className="cde-result-actual">{adenosineDiscovery.record.activity.type} {adenosineDiscovery.record.activity.relation} {adenosineDiscovery.record.activity.value} {adenosineDiscovery.record.activity.units}</span><span className="cde-result-bound">{adenosineDiscovery.record.activity.assayId} · ChEMBL + DailyMed label · clinical efficacy UNKNOWN</span></div>
           <div className="cde-result"><span className="cde-result-label">Theophylline comparator</span><span className="cde-result-actual">{theophyllineDiscovery.record.activity.type} {theophyllineDiscovery.record.activity.relation} {theophyllineDiscovery.record.activity.value} {theophyllineDiscovery.record.activity.units}</span><span className="cde-result-bound">{theophyllineDiscovery.record.activity.assayId} · ChEMBL + DailyMed label · clinical efficacy UNKNOWN</span></div>
         </div>
-        <button className="chip-btn primary" type="button" onClick={() => { const saved = saveBiotechDiscoveryComparisonToMemory(activeReplacementReports, { activityIds: replacementResult?.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`), assayIds: replacementResult?.liveActivities?.map((activity) => `chembl:assay:${activity.assayId}`) }); setBiotechReplay(replaySavedBiotechComparison(saved.biotech?.comparison, activeReplacementReports)); const user = getSession()?.user; if (user) setLastAuditRequestId(recordBiotechAdminAudit({ userId: user.id, action: 'save-natural-functional-replacement-comparison', provenance: `DrugDiscoveryScreen · ${activeReplacementReports.length} resolved ChEMBL/PubChem/DailyMed records` }).requestId); window.location.hash = '#/memory'; }}>Zapisz {activeReplacementReports.length} raportów w Scientific Memory</button>
+        <button className="chip-btn primary" type="button" onClick={() => saveComparison('memory')}>Zapisz {activeReplacementReports.length} raportów w Scientific Memory</button>
         {biotechReplay && <div className="cde-verdict" role="status"><strong>Replay {biotechReplay.status}</strong> · {biotechReplay.reason}</div>}
         {lastAuditRequestId && <p className="settings-hint" role="status">Audit request: {lastAuditRequestId}</p>}
         <p className="settings-hint">Provenance: <a href={pinnedDiscovery.report.provenance[0]?.sourceUrl ?? '#'} target="_blank" rel="noreferrer">ChEMBL / PubChem source records</a>. Safety signal i toksykologia pozostają osobnymi, source-backed statusami.</p>

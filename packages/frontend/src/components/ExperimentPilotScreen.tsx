@@ -35,6 +35,9 @@ import { confirmBackendEvidenceGuidedExperiment } from '../core/experimentFabric
 import { buildStructuredRequestFromModel } from '../core/experimentFabric/structuredRequestBuilder';
 import { track } from '../core/analytics';
 import { saveScientificEvidencePackToMemory } from '../core/scienceMemory';
+import { buildExperimentGraph, executeNextExperiment, type ExperimentGraph } from '../core/experimentFabric/experimentGraph';
+import type { ExperimentRun } from '../core/experimentFabric/types';
+import { runExperiment } from '../core/experimentFabric/executor';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
@@ -94,6 +97,13 @@ export function ExperimentPilotScreen() {
   const [phase, setPhase] = useState<Phase>('draft');
   const [plan, setPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
   const [confirmed, setConfirmed] = useState<ConfirmedEvidenceGuidedExperiment | null>(null);
+  /**
+   * Historia REALNYCH przebiegów tej sesji Pilota. Graf eksperymentu jest
+   * odczytem tego stanu — nie osobnym magazynem i nie ilustracją.
+   */
+  const [runHistory, setRunHistory] = useState<ExperimentRun[]>([]);
+  const [graph, setGraph] = useState<ExperimentGraph | null>(null);
+  const [graphNotice, setGraphNotice] = useState<string | null>(null);
   const [capsule, setCapsule] = useState<ReproducibleScenarioCapsule | null>(null);
   const [replay, setReplay] = useState<ScenarioCapsuleReplay | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -268,6 +278,10 @@ export function ExperimentPilotScreen() {
           ? await confirmEarthquakeEvidenceGuidedExperiment(plan)
           : confirmEvidenceGuidedExperiment(plan);
       setConfirmed(result);
+      const history = [...runHistory, result.run];
+      setRunHistory(history);
+      setGraph(buildExperimentGraph({ question: plan.request.sourceText, runs: history }));
+      setGraphNotice(null);
       setPhase('ran');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -527,6 +541,74 @@ export function ExperimentPilotScreen() {
           {confirmed.run.provenance.backendExecution && <p className="pilot-disclaimer">Backend provenance pochodzi z kanonicznego Compute API; Pilot nie rekonstruuje formuły, wersji silnika ani klasyfikacji lokalnie.</p>}
           {confirmed.run.result.route.kind !== 'none' && <button className="chip-btn" onClick={handleOpenVisualization}>Otwórz wynik w wizualizacji</button>}
           <button className="chip-btn pilot-primary" onClick={handleGenerateCapsule}>Wygeneruj Scenario Capsule</button>
+        </section>
+      )}
+
+      {graph && (
+        <section className="pilot-step" aria-label="Graf eksperymentu naukowego">
+          <h2>3b · Graf eksperymentu — co wiemy, czego nie wiemy, co dalej</h2>
+          <p className="settings-hint">
+            Pytanie → eksperyment → wynik → niepewność → następny krok. Graf jest odczytem stanu tej sesji
+            ({runHistory.length} {runHistory.length === 1 ? 'wykonane żądanie' : 'wykonanych żądań'}), a nie ilustracją.
+            Hipoteza pojawia się tylko wtedy, gdy została prerejestrowana przed wykonaniem.
+          </p>
+          <dl className="pilot-provenance">
+            <div><dt>graphFingerprint</dt><dd className="mono">{graph.graphFingerprint}</dd></div>
+            <div><dt>węzły / krawędzie</dt><dd className="mono">{graph.nodes.length} / {graph.edges.length}</dd></div>
+          </dl>
+          <details className="settings-details" open>
+            <summary>Węzły ({graph.nodes.length})</summary>
+            <div className="stat-list">
+              {graph.nodes.map((node) => (
+                <div className="stat-row" key={node.nodeId}>
+                  <span>{node.kind} · {node.label}</span>
+                  <span className="val mono">{node.epistemicStatus}{node.runId ? ` · ${node.runId}` : ''}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+          <details className="settings-details" open>
+            <summary>Otwarte niepewności ({graph.uncertainties.length})</summary>
+            {graph.uncertainties.length === 0
+              ? <p className="settings-hint">Brak otwartych niepewności wyliczonych ze stanu tej sesji.</p>
+              : graph.uncertainties.map((uncertainty) => (
+                <section key={uncertainty.uncertaintyId}>
+                  <strong>{uncertainty.kind}</strong>
+                  <p className="settings-hint">{uncertainty.statement}</p>
+                  <p className="pilot-disclaimer">{uncertainty.blocksClaim}</p>
+                </section>
+              ))}
+          </details>
+          {graph.nextExperiment && (
+            <>
+              <h3>Następny najbardziej informacyjny eksperyment</h3>
+              <p className="pilot-summary">{graph.nextExperiment.action}</p>
+              <p className="settings-hint">DLACZEGO: {graph.nextExperiment.why}</p>
+              <p className="settings-hint">CO ROZSTRZYGNIE: {graph.nextExperiment.resolves}</p>
+              <p className="settings-hint">REGUŁA WARTOŚCI: {graph.nextExperiment.rule}</p>
+              <p className="pilot-disclaimer">Status: {graph.nextExperiment.status}. To propozycja kroku, nie jego wynik.</p>
+              <div className="pilot-actions">
+                <button
+                  className="chip-btn pilot-primary"
+                  disabled={graph.nextExperiment.status !== 'READY_TO_RUN'}
+                  onClick={() => {
+                    const execution = executeNextExperiment(graph, runExperiment);
+                    if (!execution.executed || execution.run === null) {
+                      setGraphNotice(execution.reason);
+                      return;
+                    }
+                    const history = [...runHistory, execution.run];
+                    setRunHistory(history);
+                    setGraph(buildExperimentGraph({ question: graph.question, runs: history }));
+                    setGraphNotice(`${execution.reason} Nowy przebieg: ${execution.run.runId} (${execution.run.result.status}).`);
+                  }}
+                >
+                  Wykonaj następny eksperyment
+                </button>
+              </div>
+              {graphNotice && <p className="settings-hint" role="status">{graphNotice}</p>}
+            </>
+          )}
         </section>
       )}
 

@@ -45,6 +45,7 @@ import { kardashevPower, schwarzschildRadius } from '../physics';
 import { runIsingMetropolisScenario } from '../isingModel';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS } from '../simulation/epidemicCity';
 import { runScenario, replayScenario, SCENARIOS, SCENARIO_ENGINE_VERSION, type ScenarioId, type ScenarioRun } from '../simulation/scenarioEngine';
+import { runScenarioCounterfactual, SCENARIO_COUNTERFACTUAL_CONTRACT_VERSION, type ScenarioCounterfactual } from '../simulation/scenarioCounterfactual';
 import { buildPinnedChEMBLCaffeineDiscovery, mapPinnedChEMBLCaffeineA1Activity } from '../biotechData/chembl';
 import { createExperimentProvenance, statusForCapability } from './provenance';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
@@ -178,7 +179,7 @@ function graphOutputs(
   return { outputs, units, assumptions };
 }
 
-function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (simulation: EpidemicCitySimulation) => void, onScenarioWorld?: (world: { run: ScenarioRun; scenarioId: ScenarioId; seed: number }) => void): ExperimentResult {
+function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (simulation: EpidemicCitySimulation) => void, onScenarioWorld?: (world: { run: ScenarioRun; scenarioId: ScenarioId; seed: number; counterfactual?: ScenarioCounterfactual }) => void): ExperimentResult {
   const model = request.modelId ? getRouterModel(request.modelId) : undefined;
   if (!model) throw new Error('Brak lokalnego adaptera realnego modelu.');
   const params = request.parameters;
@@ -979,6 +980,83 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         visualization: ['world-3d', 'graph'], route: model.route,
       };
     }
+    case 'scenario-counterfactual': {
+      // „A gdyby zamiast tego…" — odpowiedź pochodzi z DWÓCH realnych
+      // przebiegów. Adapter nie liczy niczego sam: składa istniejący
+      // runScenarioCounterfactual, który wykonuje oba ramiona i porównuje je
+      // istniejącym compareScenarios.
+      const baselineScenario = String(params.baselineScenarioId ?? 'BASELINE').toUpperCase();
+      const variantScenario = String(params.variantScenarioId ?? 'ISOLATION').toUpperCase();
+      for (const candidate of [baselineScenario, variantScenario]) {
+        if (!(candidate in SCENARIOS)) {
+          return unavailableResult('engine_not_available', `Nieznany scenariusz „${candidate}". Dostępne: ${Object.keys(SCENARIOS).join(', ')}.`, model.route);
+        }
+      }
+      const counterfactualSeed = request.seed ?? Math.round(numberParam(params, 'seed', 20260828));
+      const counterfactual = runScenarioCounterfactual({
+        baselineScenarioId: baselineScenario as ScenarioId,
+        variantScenarioId: variantScenario as ScenarioId,
+        days: Math.round(numberParam(params, 'days', 72)),
+        stepsPerDay: Math.round(numberParam(params, 'stepsPerDay', 4)),
+        baseParams: {
+          nAgents: Math.round(numberParam(params, 'nAgents', 400)),
+          initialInfected: Math.round(numberParam(params, 'initialInfected', 5)),
+          seed: counterfactualSeed,
+        },
+        baselineInterventionStartDay: Math.round(numberParam(params, 'baselineInterventionStartDay', 0)),
+        variantInterventionStartDay: Math.round(numberParam(params, 'variantInterventionStartDay', 0)),
+      });
+
+      if (counterfactual.comparison.status !== 'COMPLETED') {
+        // Bramka porównywalności jest wynikiem, nie awarią: Genesis mówi,
+        // dlaczego różnicy NIE WOLNO przypisać interwencji, zamiast ją podać.
+        return unavailableResult('engine_not_available', `Kontrfaktyk zablokowany (${counterfactual.comparison.status}): ${counterfactual.comparison.message}`, model.route);
+      }
+
+      const deltas: Record<string, number> = {};
+      for (const metric of counterfactual.comparison.metrics) {
+        deltas[`baseline_${metric.key}`] = metric.baseline;
+        deltas[`variant_${metric.key}`] = metric.variant;
+        deltas[`delta_${metric.key}`] = Number(metric.absoluteDelta.toFixed(6));
+        if (metric.relativeDeltaPercent !== null) deltas[`deltaPercent_${metric.key}`] = Number(metric.relativeDeltaPercent.toFixed(4));
+      }
+
+      // Do świata trafia ramię WARIANTU — to ono jest odpowiedzią na „a gdyby".
+      onScenarioWorld?.({ run: counterfactual.variant, scenarioId: counterfactual.variant.scenarioId, seed: counterfactualSeed, counterfactual });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Kontrfaktyk: „${SCENARIOS[counterfactual.baseline.scenarioId].label}" (dzień ${counterfactual.baseline.interventionStartDay}) vs „${SCENARIOS[counterfactual.variant.scenarioId].label}" (dzień ${counterfactual.variant.interventionStartDay}). ${counterfactual.comparison.message}`,
+        outputs: {
+          ...deltas,
+          firstDivergentDay: counterfactual.firstDivergentDay ?? -1,
+          daysSimulated: counterfactual.baseline.series.length,
+          changedParameters: counterfactual.comparison.changedParameters.join(', ') || 'brak',
+          changedTiming: counterfactual.comparison.changedTiming.join(', ') || 'brak',
+          changedCapacity: counterfactual.comparison.changedCapacity.join(', ') || 'brak',
+          counterfactualFingerprint: counterfactual.counterfactualFingerprint,
+          baselineResultFingerprint: counterfactual.baseline.resultFingerprint ?? 'brak',
+          variantResultFingerprint: counterfactual.variant.resultFingerprint ?? 'brak',
+        },
+        units: {
+          firstDivergentDay: 'dzień (-1 = brak rozjazdu)', daysSimulated: 'dni',
+          delta_totalDeaths: 'osób', delta_peakInfectious: 'osób', delta_attackRate: 'udział populacji',
+        },
+        warnings: [
+          'Model nie jest skalibrowany do żadnej rzeczywistej epidemii — to porównanie scenariuszowe, nie prognoza.',
+          'Różnica pochodzi z dwóch wykonanych przebiegów o wspólnym ziarnie, populacji i horyzoncie; przy różnicy tych wielkości porównanie zostałoby zablokowane.',
+          counterfactual.firstDivergentDay === null
+            ? 'Przebiegi epidemiczne nie rozeszły się ani razu — różnica wyniku, jeżeli jest, pochodzi wyłącznie z warstwy szpitalnej.'
+            : `Światy rozeszły się po raz pierwszy w dniu ${counterfactual.firstDivergentDay}; to pomiar na seriach, nie dzień wejścia interwencji.`,
+        ],
+        validity: `Scenario counterfactual ${SCENARIO_COUNTERFACTUAL_CONTRACT_VERSION} na Scenario Engine ${SCENARIO_ENGINE_VERSION}; oba ramiona deterministyczne przy zadanym ziarnie i odtwarzalne osobno.`,
+        assumptions: [
+          'Oba ramiona dzielą warunki startowe: populację, ziarno, horyzont, pojemność placówki i profil kohortowy przed interwencją.',
+          'Jedyne dozwolone różnice to scenariusz i moment jego wejścia.',
+          'Dzień rozjazdu jest mierzony na seriach obu przebiegów, nie zakładany.',
+        ],
+        visualization: ['world-3d', 'graph'], route: model.route,
+      };
+    }
     case 'earthquake-scenario': {
       // Earthquake wykonuje się wyłącznie przez istniejący command center
       // (confirmEarthquakeEvidenceGuidedExperiment), ponieważ wymaga asynchronicznego
@@ -1007,7 +1085,7 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
   let liveWorld: EpidemicCitySimulation | undefined;
   // Zakończony przebieg scenariusza wraca z executora osobno, bo World/3D
   // przewija jego serię, zamiast taktować żywy obiekt symulacji.
-  let scenarioWorld: { run: ScenarioRun; scenarioId: ScenarioId; seed: number } | undefined;
+  let scenarioWorld: { run: ScenarioRun; scenarioId: ScenarioId; seed: number; counterfactual?: ScenarioCounterfactual } | undefined;
   if (!validation.ok) result = rejectedResult(validation.errors);
   else {
     const status = statusForCapability(intent.capability);
@@ -1081,6 +1159,7 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
       scenarioRun: scenarioWorld.run,
       epistemicStatus: 'SIMULATION',
       origin: 'fabric-run',
+      ...(scenarioWorld.counterfactual === undefined ? {} : { counterfactual: scenarioWorld.counterfactual }),
     });
   }
   if (liveWorld && result.status === 'completed') registerLiveExperimentWorld(run.runId, liveWorld, { runFingerprint: run.provenance.runFingerprint, resultOrigin: 'real-engine', summary: result.summary });

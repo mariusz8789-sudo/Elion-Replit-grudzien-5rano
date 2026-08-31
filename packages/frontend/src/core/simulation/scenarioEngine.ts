@@ -615,6 +615,15 @@ export interface ScenarioComparison {
   variantScenario: ScenarioId;
   /** Które parametry faktycznie się różnią — dowód, że porównujemy politykę. */
   changedParameters: readonly string[];
+  /**
+   * Różnice w CZASIE wejścia interwencji. To osobny wymiar niż `params`: ta
+   * sama polityka wprowadzona w innym dniu ma identyczne parametry, więc bez
+   * tego pola kontrfaktyczne pytanie „a gdyby wejść 20 dni później" wyglądało
+   * jak porównanie dwóch identycznych układów.
+   */
+  changedTiming: readonly string[];
+  /** Różnice w pojemności placówki — dźwignia systemu opieki, nie epidemii. */
+  changedCapacity: readonly string[];
   metrics: readonly ScenarioMetricDelta[];
   message: string;
 }
@@ -646,6 +655,8 @@ export function compareScenarios(baseline: ScenarioRun, variant: ScenarioRun): S
       ...base,
       status: 'BLOCKED_NOT_MODELED',
       changedParameters: [],
+      changedTiming: [],
+      changedCapacity: [],
       metrics: [],
       message: 'Co najmniej jeden scenariusz nie jest modelowany — porównanie byłoby zmyśleniem różnicy.',
     };
@@ -655,14 +666,33 @@ export function compareScenarios(baseline: ScenarioRun, variant: ScenarioRun): S
     .filter((k) => baseline.params[k] !== variant.params[k])
     .map((k) => String(k))
     .sort();
+  const changedTiming = baseline.interventionStartDay === variant.interventionStartDay ? [] : ['interventionStartDay'];
+  const changedCapacity = (Object.keys(baseline.hospitalCapacity) as (keyof HospitalCapacityParams)[])
+    .filter((k) => baseline.hospitalCapacity[k] !== variant.hospitalCapacity[k])
+    .map((k) => String(k))
+    .sort();
+  const changed = { changedParameters, changedTiming, changedCapacity };
 
   if (baseline.params.seed !== variant.params.seed || baseline.params.nAgents !== variant.params.nAgents) {
     return {
       ...base,
+      ...changed,
       status: 'BLOCKED_NOT_COMPARABLE',
-      changedParameters,
       metrics: [],
       message: 'Przebiegi różnią się ziarnem lub populacją — różnicy nie da się przypisać interwencji.',
+    };
+  }
+
+  // Różny horyzont to różna liczba dni, w których cokolwiek mogło się wydarzyć.
+  // Bez tej bramki „mniej zgonów" w krótszym przebiegu wyglądałoby jak efekt
+  // polityki, a byłoby wyłącznie efektem wcześniejszego zatrzymania zegara.
+  if (baseline.days !== variant.days || baseline.stepsPerDay !== variant.stepsPerDay) {
+    return {
+      ...base,
+      ...changed,
+      status: 'BLOCKED_NOT_COMPARABLE',
+      metrics: [],
+      message: `Przebiegi mają różny horyzont (${baseline.days}×${baseline.stepsPerDay} vs ${variant.days}×${variant.stepsPerDay}) — różnicy nie da się przypisać interwencji.`,
     };
   }
 
@@ -670,8 +700,8 @@ export function compareScenarios(baseline: ScenarioRun, variant: ScenarioRun): S
   const v = variant.summary!;
   return {
     ...base,
+    ...changed,
     status: 'COMPLETED',
-    changedParameters,
     metrics: [
       delta('peakInfectious', b.peakInfectious, v.peakInfectious),
       delta('peakInfectiousDay', b.peakInfectiousDay, v.peakInfectiousDay),
@@ -681,8 +711,10 @@ export function compareScenarios(baseline: ScenarioRun, variant: ScenarioRun): S
       delta('totalUnmetCareDays', b.totalUnmetCareDays, v.totalUnmetCareDays),
     ],
     message:
-      changedParameters.length === 0
-        ? 'Parametry epidemii identyczne — różnice mogą pochodzić wyłącznie z warstwy szpitalnej.'
-        : `Różnica polityki: ${changedParameters.join(', ')}.`,
+      changedParameters.length > 0
+        ? `Różnica polityki: ${changedParameters.join(', ')}.${changedTiming.length > 0 ? ` Różnica czasu wejścia: dzień ${baseline.interventionStartDay} → ${variant.interventionStartDay}.` : ''}`
+        : changedTiming.length > 0
+          ? `Ta sama polityka, inny moment wejścia: dzień ${baseline.interventionStartDay} → ${variant.interventionStartDay}. Parametry epidemii identyczne, więc cała różnica pochodzi z czasu.`
+          : 'Parametry epidemii identyczne — różnice mogą pochodzić wyłącznie z warstwy szpitalnej.',
   };
 }

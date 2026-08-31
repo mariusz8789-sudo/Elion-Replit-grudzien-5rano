@@ -1,5 +1,6 @@
 import { EpidemicCitySimulation } from '../simulation/epidemicCity';
 import type { ScenarioDaySample, ScenarioId, ScenarioRun, ScenarioSummary } from '../simulation/scenarioEngine';
+import type { ScenarioCounterfactual } from '../simulation/scenarioCounterfactual';
 
 /**
  * Ephemeral pointer handoff for a single interactive Experiment Run.
@@ -89,6 +90,12 @@ export interface ScenarioTimelineHandoff {
    * jeżeli seria jest identyczna.
    */
   origin: 'fabric-run' | 'memory-replay';
+  /**
+   * Wypełnione, gdy ten świat jest ramieniem WARIANTU kontrfaktyku. Niesie oba
+   * przebiegi i policzoną różnicę, żeby dało się zapisać całe porównanie, a nie
+   * tylko pokazany świat.
+   */
+  counterfactual?: ScenarioCounterfactual;
   /**
    * Wypełnione wyłącznie dla `memory-replay`: werdykt, który dopuścił serię do
    * świata. Wyłącznie MATCH — DRIFT i BLOCKED nie mają tu wstępu.

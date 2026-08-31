@@ -8,6 +8,7 @@ import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theo
 import { replaySavedBiotechComparison, replaySavedBiotechDiscoveryArtifact } from '../core/scienceMemory';
 import { openSavedScenarioInWorld } from '../core/simulation/scenarioWorldReplay';
 import type { SavedScenarioReplay } from '../core/simulation/scenarioMemory';
+import { replaySavedScenarioCounterfactual, type SavedScenarioCounterfactualReplay } from '../core/simulation/scenarioCounterfactual';
 
 function downloadJson(record: SavedExperiment): void {
   const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
@@ -40,6 +41,7 @@ export function ScientificMemoryScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [artifactReplay, setArtifactReplay] = useState<Record<string, string>>({});
   const [scenarioReplay, setScenarioReplay] = useState<Record<string, SavedScenarioReplay>>({});
+  const [counterfactualReplay, setCounterfactualReplay] = useState<Record<string, SavedScenarioCounterfactualReplay>>({});
   const countLabel = useMemo(() => `${records.length} ${records.length === 1 ? 'zapis' : 'zapisów'}`, [records.length]);
 
   /**
@@ -60,6 +62,14 @@ export function ScientificMemoryScreen() {
     if (mode === 'open') {
       setNotice(`Świat 3D nie został otwarty: odtworzenie zakończyło się werdyktem ${result.replay.status}. Niezweryfikowany przebieg nie trafia do sceny.`);
     }
+  };
+
+  /** Odtwarza OBA ramiona kontrfaktyku i przelicza różnicę. Zapisane liczby są porównywane, nie odczytywane. */
+  const replayCounterfactualRecord = (record: SavedExperiment, tamper: boolean) => {
+    const saved = tamper && record.counterfactual
+      ? { ...record.counterfactual, metrics: record.counterfactual.metrics.map((metric, index) => index === 0 ? { ...metric, absoluteDelta: metric.absoluteDelta + 1 } : metric) }
+      : record.counterfactual;
+    setCounterfactualReplay((current) => ({ ...current, [record.id]: replaySavedScenarioCounterfactual(saved) }));
   };
 
   const openRecord = (record: SavedExperiment) => {
@@ -173,6 +183,22 @@ export function ScientificMemoryScreen() {
                     <div className="stat-row"><span>Odcisk oczekiwany / otrzymany</span><span className="val mono">{scenarioReplay[record.id]!.expectedResultFingerprint ?? 'brak'} · {scenarioReplay[record.id]!.actualResultFingerprint ?? 'brak'}</span></div>
                   </>}
                 </>}
+                {record.counterfactual && <>
+                  <div className="stat-row"><span>Kontrfaktyk</span><span className="val">{record.counterfactual.baseline.label} (dzień {record.counterfactual.baseline.interventionStartDay}) → {record.counterfactual.variant.label} (dzień {record.counterfactual.variant.interventionStartDay})</span></div>
+                  <div className="stat-row"><span>Zmienione wymiary</span><span className="val">parametry: {record.counterfactual.changedParameters.join(', ') || 'brak'} · czas: {record.counterfactual.changedTiming.join(', ') || 'brak'} · pojemność: {record.counterfactual.changedCapacity.join(', ') || 'brak'}</span></div>
+                  <div className="stat-row"><span>Dzień rozjazdu światów</span><span className="val">{record.counterfactual.firstDivergentDay === null ? 'brak rozjazdu epidemicznego' : `dzień ${record.counterfactual.firstDivergentDay}`}</span></div>
+                  <div className="stat-row"><span>Odcisk kontrfaktyku</span><span className="val mono">{record.counterfactual.counterfactualFingerprint}</span></div>
+                  {record.counterfactual.metrics.map((metric) => (
+                    <div className="stat-row" key={metric.key}>
+                      <span>Δ {metric.key}</span>
+                      <span className="val mono">{metric.baseline} → {metric.variant} ({metric.absoluteDelta >= 0 ? '+' : ''}{Number(metric.absoluteDelta.toFixed(4))}{metric.relativeDeltaPercent === null ? '' : `, ${metric.relativeDeltaPercent >= 0 ? '+' : ''}${metric.relativeDeltaPercent.toFixed(1)}%`})</span>
+                    </div>
+                  ))}
+                  {counterfactualReplay[record.id] && <>
+                    <div className="stat-row"><span>Werdykt odtworzenia kontrfaktyku</span><span className="val">{counterfactualReplay[record.id]!.status}</span></div>
+                    <div className="stat-row"><span>Ramiona</span><span className="val">baseline={counterfactualReplay[record.id]!.baselineStatus ?? 'brak'} · variant={counterfactualReplay[record.id]!.variantStatus ?? 'brak'}</span></div>
+                  </>}
+                </>}
                 <div className="stat-row"><span>Honesty</span><span className="val">{record.honesty}</span></div>
                 <div className="stat-row"><span>Fingerprint treści</span><span className="val mono">#{record.contentHash}</span></div>
                 <div className="stat-row"><span>Parametry</span><span className="val">{Object.keys(record.params).length}</span></div>
@@ -181,6 +207,27 @@ export function ScientificMemoryScreen() {
                 {record.replayIdentity && <div className="stat-row"><span>Replay identity</span><span className="val mono">{record.replayIdentity.capsuleId} · {record.replayIdentity.planId} · {record.replayIdentity.confirmationId}</span></div>}
               </div>
               <p className="settings-hint">{record.honestyNote}</p>
+              {counterfactualReplay[record.id] && (
+                <>
+                  <p className="settings-hint" role="status">
+                    Odtworzenie kontrfaktyku: {counterfactualReplay[record.id]!.status} — {counterfactualReplay[record.id]!.reason}{' '}
+                    Oba ramiona wykonano ponownie, a różnica została przeliczona.
+                  </p>
+                  {counterfactualReplay[record.id]!.differences.length > 0 && (
+                    <details className="settings-details" open>
+                      <summary>Różnice odtworzenia ({counterfactualReplay[record.id]!.differences.length})</summary>
+                      <div className="stat-list">
+                        {counterfactualReplay[record.id]!.differences.map((difference) => (
+                          <div className="stat-row" key={difference.field}>
+                            <span>{difference.field}</span>
+                            <span className="val mono">{String(difference.expected)} → {String(difference.actual)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
+              )}
               {scenarioReplay[record.id] && (
                 <>
                   <p className="settings-hint" role="status">
@@ -240,6 +287,10 @@ export function ScientificMemoryScreen() {
               )}
               <div className="pilot-actions">
                 <button className="chip-btn pilot-primary" onClick={() => openRecord(record)}>{record.scenario ? 'Odtwórz i otwórz w 3D' : 'Otwórz z parametrami'}</button>
+                {record.counterfactual && <>
+                  <button className="chip-btn pilot-primary" onClick={() => replayCounterfactualRecord(record, false)}>Odtwórz oba ramiona</button>
+                  <button className="chip-btn" onClick={() => replayCounterfactualRecord(record, true)}>Podmień różnicę → DRIFT</button>
+                </>}
                 {record.scenario && <>
                   <button className="chip-btn" onClick={() => replayScenarioRecord(record, 'verify')}>Sam werdykt odtworzenia</button>
                   <button className="chip-btn" onClick={() => replayScenarioRecord(record, 'drift')}>Zmień R₀ → pokaż DRIFT</button>

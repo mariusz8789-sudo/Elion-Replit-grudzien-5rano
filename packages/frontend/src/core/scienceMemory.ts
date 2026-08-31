@@ -8,6 +8,7 @@ import { compareCandidateDiscoveryReports, type CandidateComparison } from './bi
 import { canonicalJson, fnv1a } from './events/hash';
 import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
 import type { ScenarioRun } from './simulation/scenarioEngine';
+import { buildSavedScenarioCounterfactual, isSavedScenarioCounterfactual, type SavedScenarioCounterfactual, type ScenarioCounterfactual } from './simulation/scenarioCounterfactual';
 
 /**
  * Scientific Memory (sekcja O dyrektywy CTO) — trwały, lokalny zapis
@@ -145,6 +146,12 @@ export interface SavedExperiment {
    * zgodność odcisków dopuszcza ją do świata 3D.
    */
   scenario?: SavedScenarioRunContext;
+  /**
+   * Zapisany kontrfaktyk: OBA ramiona plus policzona różnica. Odtworzenie
+   * wykonuje oba przebiegi od nowa i przelicza różnicę — zapisane metryki są
+   * porównywane, nie odczytywane jako wynik.
+   */
+  counterfactual?: SavedScenarioCounterfactual;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -299,6 +306,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     validAnalysis(o.analysis) &&
     validBiotechContext(o.biotech) &&
     (o.scenario === undefined || isSavedScenarioRunContext(o.scenario)) &&
+    (o.counterfactual === undefined || isSavedScenarioCounterfactual(o.counterfactual)) &&
     validReplayIdentity(o.replayIdentity)
   );
 }
@@ -431,6 +439,7 @@ export interface SaveExperimentInput {
   analysis?: readonly SavedExperimentAnalysisBlock[];
   biotech?: SavedBiotechContext;
   scenario?: SavedScenarioRunContext;
+  counterfactual?: SavedScenarioCounterfactual;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -470,6 +479,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (!validReplayIdentity(input.replayIdentity)) throw new Error('Replay identity musi mieć niepuste identyfikatory.');
   if (!validBiotechContext(input.biotech)) throw new Error('Biotech context musi mieć kompletne identity, status i provenance.');
   if (input.scenario !== undefined && !isSavedScenarioRunContext(input.scenario)) throw new Error('Kontekst scenariusza musi zawierać komplet wejść i odcisków wystarczających do odtworzenia.');
+  if (input.counterfactual !== undefined && !isSavedScenarioCounterfactual(input.counterfactual)) throw new Error('Kontrfaktyk musi zawierać komplet obu ramion i policzoną, porównywalną różnicę.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -487,6 +497,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.analysis === undefined ? {} : { analysis: input.analysis }),
     ...(input.biotech === undefined ? {} : { biotech: input.biotech }),
     ...(input.scenario === undefined ? {} : { scenario: input.scenario }),
+    ...(input.counterfactual === undefined ? {} : { counterfactual: input.counterfactual }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -693,6 +704,52 @@ export function saveScenarioRunToMemory(run: ScenarioRun, execution?: SavedExper
       `Scenariusz "${scenario.label}" ze zdefiniowanej biblioteki scenariuszy.`,
       'Seria dobowa pochodzi z realnego przebiegu modelu, nie z osobnego timera.',
       'Profil kohortowy i pojemnosc szpitala sa czescia zapisanych wejsc.',
+    ],
+    epistemicStatus: 'SIMULATION',
+  });
+}
+
+/**
+ * Utrwala kontrfaktyk: oba ramiona i policzoną różnicę. Zapisane metryki nie
+ * są odpowiedzią — przy odtworzeniu oba przebiegi liczone są od nowa, a różnica
+ * przeliczana, więc podmieniona liczba w rekordzie kończy się DRIFT-em.
+ */
+export function saveScenarioCounterfactualToMemory(counterfactual: ScenarioCounterfactual, execution?: SavedExperimentExecution): SavedExperiment {
+  const saved = buildSavedScenarioCounterfactual(counterfactual);
+  const metricStats: Record<string, number> = {};
+  for (const metric of saved.metrics) {
+    metricStats[`baseline_${metric.key}`] = metric.baseline;
+    metricStats[`variant_${metric.key}`] = metric.variant;
+    metricStats[`delta_${metric.key}`] = metric.absoluteDelta;
+  }
+  return saveExperiment({
+    labId: 'biology',
+    experimentId: `counterfactual:${saved.baseline.scenarioId}->${saved.variant.scenarioId}`,
+    experimentName: `Kontrfaktyk — ${saved.baseline.label} (dzień ${saved.baseline.interventionStartDay}) vs ${saved.variant.label} (dzień ${saved.variant.interventionStartDay})`,
+    params: {
+      baselineScenarioId: saved.baseline.scenarioId,
+      variantScenarioId: saved.variant.scenarioId,
+      baselineInterventionStartDay: saved.baseline.interventionStartDay,
+      variantInterventionStartDay: saved.variant.interventionStartDay,
+      days: saved.baseline.days,
+      stepsPerDay: saved.baseline.stepsPerDay,
+      nAgents: saved.baseline.params.nAgents,
+      initialInfected: saved.baseline.params.initialInfected,
+      seed: saved.baseline.params.seed,
+    },
+    stats: { ...metricStats, firstDivergentDay: saved.firstDivergentDay ?? -1, daysSimulated: saved.baseline.seriesLength },
+    counterfactual: saved,
+    ...(execution === undefined ? {} : { execution }),
+    analysis: [
+      { title: 'Skad bierze sie roznica', body: `Dwa wykonane przebiegi o wspolnym ziarnie ${saved.baseline.params.seed}, populacji ${saved.baseline.params.nAgents} i horyzoncie ${saved.baseline.days} dni. Zmienione wymiary: parametry [${saved.changedParameters.join(', ') || 'brak'}], czas [${saved.changedTiming.join(', ') || 'brak'}], pojemnosc [${saved.changedCapacity.join(', ') || 'brak'}].`, kind: 'counterfactual-basis' },
+      { title: 'Dzien rozjazdu', body: saved.firstDivergentDay === null ? 'Przebiegi epidemiczne nie rozeszly sie ani razu — roznica wyniku pochodzi wylacznie z warstwy szpitalnej.' : `Swiaty rozeszly sie po raz pierwszy w dniu ${saved.firstDivergentDay}. To pomiar na seriach obu przebiegow, nie dzien wejscia interwencji.`, kind: 'counterfactual-divergence' },
+      { title: 'Granice modelu', body: 'Model nie jest skalibrowany do zadnej rzeczywistej epidemii. Roznica jest roznica dwoch symulacji (SIMULATION), nie zmierzonym efektem polityki w swiecie rzeczywistym.', kind: 'counterfactual-boundary' },
+    ],
+    honesty: 'simplified',
+    honestyNote: `Kontrfaktyk na Scenario Engine; odcisk ${saved.counterfactualFingerprint}. Roznica dwoch symulacji, nie obserwacja.`,
+    assumptions: [
+      'Oba ramiona dziela warunki startowe; jedyne roznice to scenariusz i moment jego wejscia.',
+      'Porownanie zostaloby zablokowane przy roznym ziarnie, populacji albo horyzoncie.',
     ],
     epistemicStatus: 'SIMULATION',
   });

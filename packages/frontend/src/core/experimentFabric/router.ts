@@ -296,6 +296,22 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Istniejący, nazwany Scenario Engine (BASELINE i warianty interwencji) wystawiony przez wspólny kontrakt Experiment Fabric: realny przebieg dobowy z własnym resultFingerprint i replayScenario. Nie jest skalibrowany do żadnej rzeczywistej epidemii, więc nie jest prognozą.',
   },
   {
+    id: 'scenario-counterfactual', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-scenario-engine@1.0.0',
+    parameters: [
+      text('baselineScenarioId', 'Scenariusz odniesienia', 'BASELINE'),
+      text('variantScenarioId', 'Scenariusz wariantu', 'ISOLATION'),
+      number('days', 'Horyzont symulacji', 'dni', 1, 365, 72),
+      number('stepsPerDay', 'Kroków na dobę', 'kroków', 1, 24, 4),
+      number('nAgents', 'Liczba agentów', 'osób', 20, 4000, 400),
+      number('initialInfected', 'Zakażeni na starcie', 'osób', 1, 500, 5),
+      number('seed', 'Seed', '', 0, 0xffff_ffff, 20260828),
+      number('baselineInterventionStartDay', 'Dzień wejścia interwencji — odniesienie', 'dzień', 0, 365, 0),
+      number('variantInterventionStartDay', 'Dzień wejścia interwencji — wariant', 'dzień', 0, 365, 0),
+    ],
+    route: { kind: 'live-world', target: 'epidemic-city', hash: '#/city3d' }, knowledgeSources: ['biology.md'],
+    rationale: 'Kontrfaktyk na istniejącym Scenario Engine: DWA realne przebiegi (odniesienie i wariant) o wspólnych warunkach startowych, porównane przez compareScenarios. Różnica pochodzi z wykonanych modeli, nie z doszacowania; wspólne ziarno, populacja i horyzont są warunkiem porównywalności.',
+  },
+  {
     id: 'biology-dna-helix', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-b-dna-wallace@1.0.0',
     parameters: [text('sequence', 'Preset sekwencji', 'mixed'), number('temperatureC', 'Temperatura', '°C', 0, 100, 37)],
     route: { kind: 'lab', labId: 'biology', experimentId: 'dna-helix' }, knowledgeSources: ['biology.md'],

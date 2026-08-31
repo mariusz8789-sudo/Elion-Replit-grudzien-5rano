@@ -120,8 +120,17 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     /\b(?:po|dopiero po|od)\s+(\d+(?:[.,]\d+)?)\s*(?:dni|dniach|dzień|dnia|days?)\b/,
   );
   if (interventionStartDay !== undefined) params.interventionStartDay = interventionStartDay;
-  const scenarioId = SCENARIO_PHRASES.find((entry) => entry.pattern.test(normalized))?.scenarioId;
+  // Kolejność WYSTĄPIENIA w zdaniu, nie kolejność w tabeli: „porównaj izolację
+  // z zamknięciem szkół" ma dać odniesienie=izolacja, wariant=szkoły.
+  const scenarioMatches = SCENARIO_PHRASES
+    .map((entry) => ({ scenarioId: entry.scenarioId, at: normalized.search(entry.pattern) }))
+    .filter((entry) => entry.at >= 0)
+    .sort((a, b) => a.at - b.at);
+  const distinctScenarios = [...new Set(scenarioMatches.map((entry) => entry.scenarioId))];
+  const scenarioId = distinctScenarios[0];
   if (scenarioId !== undefined) params.scenarioId = scenarioId;
+  // Pytanie kontrfaktyczne: „co jeśli", „a gdyby", „porównaj", „zamiast", „vs".
+  const counterfactualPhrasing = /(?:co\s+(?:by\s+)?(?:si[eę]\s+stało\s+)?je[zż]eli|co\s+je[sś]li|a\s+gdyby|gdyby(?:by)?m?\s|por[oó]wnaj|por[oó]wnanie|zamiast|\bvs\.?\b|versus|kontrfakt[a-ząćęłńóśźż]*|what\s+if)/.test(normalized);
   if (earthquakeMagnitude !== undefined) params.magnitude = earthquakeMagnitude;
   if (earthquakeDepthKm !== undefined) params.depthKm = earthquakeDepthKm;
   if (earthquakeEpicenterX !== undefined) params.epicenterX = earthquakeEpicenterX;
@@ -278,6 +287,16 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   // Pytanie o NAZWANY scenariusz albo o moment wejścia interwencji trafia do
   // Scenario Engine, bo tylko on umie porównywalne warianty i dzień wejścia.
   // Zwykłe „pokaż epidemię" zostaje przy agentowym epidemic-city.
+  // Kontrfaktyk wymaga DWÓCH ramion: albo dwóch nazwanych scenariuszy, albo
+  // tego samego scenariusza wprowadzonego w innym dniu. Bez drugiego ramienia
+  // nie ma czego porównywać i pytanie wraca do zwykłej osi czasu.
+  if (counterfactualPhrasing && (distinctScenarios.length >= 2 || (scenarioId !== undefined && interventionStartDay !== undefined && interventionStartDay > 0))) {
+    params.baselineScenarioId = distinctScenarios.length >= 2 ? distinctScenarios[0]! : scenarioId!;
+    params.variantScenarioId = distinctScenarios.length >= 2 ? distinctScenarios[1]! : scenarioId!;
+    params.baselineInterventionStartDay = 0;
+    params.variantInterventionStartDay = distinctScenarios.length >= 2 ? (interventionStartDay ?? 0) : interventionStartDay!;
+    return request('biology', 'scenario-counterfactual', 'world-3d', ['baselineScenarioId', 'variantScenarioId', 'days', 'stepsPerDay', 'nAgents', 'initialInfected', 'seed', 'baselineInterventionStartDay', 'variantInterventionStartDay']);
+  }
   if (scenarioId !== undefined || interventionStartDay !== undefined) {
     return request('biology', 'scenario-timeline', 'world-3d', ['scenarioId', 'days', 'stepsPerDay', 'nAgents', 'initialInfected', 'seed', 'interventionStartDay']);
   }

@@ -5,7 +5,7 @@ import { ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysi
 import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
 import { consumePendingExperimentWorld, consumePendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
-import { saveScenarioRunToMemory } from '../../core/scienceMemory';
+import { saveScenarioCounterfactualToMemory, saveScenarioRunToMemory } from '../../core/scienceMemory';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
@@ -265,6 +265,7 @@ export function City3DWebGLScreen() {
                   <span>seed {scenarioTimeline.seed}</span>
                   <span>{scenarioTimeline.series.length} dni</span>
                   <span>{scenarioTimeline.origin === 'memory-replay' ? `odtworzenie z Pamięci · ${scenarioTimeline.replayVerdict ?? 'MATCH'}` : 'świeże wykonanie'}</span>
+                  {scenarioTimeline.counterfactual && <span>ramię WARIANTU kontrfaktyku vs {scenarioTimeline.counterfactual.baseline.label}</span>}
                 </div>
                 <label className="scenario-run-scrubber">
                   <span>dzień {timelineSample.day} / {scenarioTimeline.series.length - 1}</span>
@@ -301,6 +302,22 @@ export function City3DWebGLScreen() {
                   >
                     Zapisz przebieg w Pamięci
                   </button>
+                  {scenarioTimeline.counterfactual && (
+                    <button
+                      type="button"
+                      className="chip-btn"
+                      onClick={() => {
+                        try {
+                          const record = saveScenarioCounterfactualToMemory(scenarioTimeline.counterfactual!);
+                          setTimelineSaved(`Zapisano kontrfaktyk (oba ramiona + różnica): #${record.contentHash}.`);
+                        } catch (error) {
+                          setTimelineSaved(`Nie zapisano kontrfaktyku: ${error instanceof Error ? error.message : String(error)}`);
+                        }
+                      }}
+                    >
+                      Zapisz kontrfaktyk w Pamięci
+                    </button>
+                  )}
                   <button type="button" className="chip-btn" onClick={() => { window.location.hash = '#/memory'; }}>Otwórz Pamięć Naukową</button>
                 </div>
                 {timelineSaved && <p className="scenario-run-note" role="status">{timelineSaved}</p>}

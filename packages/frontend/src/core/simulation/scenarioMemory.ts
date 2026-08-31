@@ -1,5 +1,6 @@
 import { AGE_BANDS, type AgeBand, type BandMultipliers, type CohortProfile } from '../agents/cohortModel';
 import { canonicalJson, fnv1a } from '../events/hash';
+import { describeScenarioEffects, type ScenarioEffectDisclosure } from './scenarioDisclosure';
 import type { EpidemicCityParams } from './epidemicCity';
 import type { HospitalCapacityParams } from './hospitalResource';
 import {
@@ -80,6 +81,17 @@ export interface SavedScenarioRunContext {
   epidemicFingerprint: string;
   seriesLength: number;
   summaryDigest: SavedScenarioSummaryDigest;
+  /**
+   * Rządzone pytanie, z którego przebieg powstał. Bez tego zapisany wynik
+   * odpowiada „na coś", a odtworzenie nie ma jak pokazać, na co.
+   */
+  preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string };
+  /**
+   * Co model policzył, a czego nie — w postaci pokazanej użytkownikowi. Zapis
+   * jest przeliczalny z przebiegu, więc odtworzenie porównuje go, zamiast mu
+   * wierzyć: podmieniona lista „czego nie modelujemy" kończy się DRIFT-em.
+   */
+  disclosure?: ScenarioEffectDisclosure;
   /** Model nie jest skalibrowany do żadnej rzeczywistej epidemii. */
   epistemicStatus: 'SIMULATION';
 }
@@ -127,7 +139,10 @@ export function summaryDigest(summary: ScenarioSummary): SavedScenarioSummaryDig
  * bez odcisku wyniku NIE JEST zapisywalny — pamięć nie przechowuje czegoś,
  * czego nie da się później odtworzyć i zweryfikować.
  */
-export function buildSavedScenarioRunContext(run: ScenarioRun): SavedScenarioRunContext {
+export function buildSavedScenarioRunContext(
+  run: ScenarioRun,
+  preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string },
+): SavedScenarioRunContext {
   if (run.status !== 'COMPLETED' || run.summary === null) {
     throw new Error(`Scenariusz ${run.scenarioId} nie został wykonany (${run.status}) — nie ma czego zapisać w pamięci.`);
   }
@@ -152,6 +167,8 @@ export function buildSavedScenarioRunContext(run: ScenarioRun): SavedScenarioRun
     epidemicFingerprint: run.epidemicFingerprint,
     seriesLength: run.series.length,
     summaryDigest: summaryDigest(run.summary),
+    ...(preparedness === undefined ? {} : { preparedness }),
+    disclosure: describeScenarioEffects(run),
     epistemicStatus: 'SIMULATION',
   };
 }
@@ -232,6 +249,15 @@ export function isSavedScenarioRunContext(value: unknown): value is SavedScenari
   if (!nonEmpty(value.inputFingerprint) || !nonEmpty(value.resultFingerprint) || !nonEmpty(value.epidemicFingerprint)) return false;
   if (!finite(value.seriesLength) || value.seriesLength <= 0) return false;
   if (!isSummaryDigest(value.summaryDigest)) return false;
+  if (value.preparedness !== undefined) {
+    const preparedness = value.preparedness as Record<string, unknown>;
+    if (!isRecord(preparedness) || !nonEmpty(preparedness.questionId) || !nonEmpty(preparedness.askedText) || !nonEmpty(preparedness.resolutionFingerprint)) return false;
+  }
+  if (value.disclosure !== undefined) {
+    const disclosure = value.disclosure as Record<string, unknown>;
+    if (!isRecord(disclosure) || !nonEmpty(disclosure.contractVersion) || !nonEmpty(disclosure.boundary) || !nonEmpty(disclosure.disclosureFingerprint)) return false;
+    if (!Array.isArray(disclosure.modeled) || !Array.isArray(disclosure.notModeled)) return false;
+  }
   return value.epistemicStatus === 'SIMULATION';
 }
 
@@ -301,6 +327,14 @@ export function replaySavedScenarioRun(saved: unknown, options: ReplaySavedScena
   compare(differences, 'seriesLength', saved.seriesLength, replayed.series.length);
   for (const key of Object.keys(actual) as (keyof SavedScenarioSummaryDigest)[]) {
     compare(differences, `summary.${key}`, saved.summaryDigest[key], actual[key]);
+  }
+  // Ujawnienie „co modelujemy / czego nie" jest przeliczalne z przebiegu, więc
+  // podlega temu samemu rygorowi co liczby: porównujemy, nie ufamy zapisowi.
+  if (saved.disclosure !== undefined) {
+    const recomputedDisclosure = describeScenarioEffects(replayed);
+    compare(differences, 'disclosure.fingerprint', saved.disclosure.disclosureFingerprint, recomputedDisclosure.disclosureFingerprint);
+    compare(differences, 'disclosure.notModeledCount', saved.disclosure.notModeled.length, recomputedDisclosure.notModeled.length);
+    compare(differences, 'disclosure.modeledCount', saved.disclosure.modeled.length, recomputedDisclosure.modeled.length);
   }
 
   if (differences.length > 0) {

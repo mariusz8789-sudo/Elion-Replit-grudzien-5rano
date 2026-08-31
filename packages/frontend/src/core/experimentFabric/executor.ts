@@ -46,6 +46,7 @@ import { runIsingMetropolisScenario } from '../isingModel';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS } from '../simulation/epidemicCity';
 import { runScenario, replayScenario, SCENARIOS, SCENARIO_ENGINE_VERSION, type ScenarioId, type ScenarioRun } from '../simulation/scenarioEngine';
 import { runScenarioCounterfactual, SCENARIO_COUNTERFACTUAL_CONTRACT_VERSION, type ScenarioCounterfactual } from '../simulation/scenarioCounterfactual';
+import { resolvePreparednessQuestion } from '../simulation/preparednessQuestions';
 import { buildPinnedChEMBLCaffeineDiscovery, mapPinnedChEMBLCaffeineA1Activity } from '../biotechData/chembl';
 import { createExperimentProvenance, statusForCapability } from './provenance';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
@@ -179,7 +180,7 @@ function graphOutputs(
   return { outputs, units, assumptions };
 }
 
-function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (simulation: EpidemicCitySimulation) => void, onScenarioWorld?: (world: { run: ScenarioRun; scenarioId: ScenarioId; seed: number; counterfactual?: ScenarioCounterfactual }) => void): ExperimentResult {
+function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (simulation: EpidemicCitySimulation) => void, onScenarioWorld?: (world: { run: ScenarioRun; scenarioId: ScenarioId; seed: number; counterfactual?: ScenarioCounterfactual; preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string } }) => void): ExperimentResult {
   const model = request.modelId ? getRouterModel(request.modelId) : undefined;
   if (!model) throw new Error('Brak lokalnego adaptera realnego modelu.');
   const params = request.parameters;
@@ -1022,7 +1023,19 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
       }
 
       // Do świata trafia ramię WARIANTU — to ono jest odpowiedzią na „a gdyby".
-      onScenarioWorld?.({ run: counterfactual.variant, scenarioId: counterfactual.variant.scenarioId, seed: counterfactualSeed, counterfactual });
+      // Rządzone pytanie przechodzi tym samym kanałem co świat, żeby zapis w
+      // Pamięci wiedział, NA CO ten przebieg odpowiada.
+      const preparednessQuestionId = String(params.preparednessQuestionId ?? '').trim();
+      const preparednessAskedText = String(params.preparednessAskedText ?? '').trim();
+      const preparedness = preparednessQuestionId.length > 0 && preparednessAskedText.length > 0
+        ? resolvePreparednessQuestion(preparednessAskedText, preparednessQuestionId)
+        : null;
+      onScenarioWorld?.({
+        run: counterfactual.variant, scenarioId: counterfactual.variant.scenarioId, seed: counterfactualSeed, counterfactual,
+        ...(preparedness === null || preparedness.question === null ? {} : {
+          preparedness: { questionId: preparedness.question.questionId, askedText: preparedness.askedText, resolutionFingerprint: preparedness.resolutionFingerprint },
+        }),
+      });
       return {
         contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
         summary: `Kontrfaktyk: „${SCENARIOS[counterfactual.baseline.scenarioId].label}" (dzień ${counterfactual.baseline.interventionStartDay}) vs „${SCENARIOS[counterfactual.variant.scenarioId].label}" (dzień ${counterfactual.variant.interventionStartDay}). ${counterfactual.comparison.message}`,
@@ -1085,7 +1098,7 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
   let liveWorld: EpidemicCitySimulation | undefined;
   // Zakończony przebieg scenariusza wraca z executora osobno, bo World/3D
   // przewija jego serię, zamiast taktować żywy obiekt symulacji.
-  let scenarioWorld: { run: ScenarioRun; scenarioId: ScenarioId; seed: number; counterfactual?: ScenarioCounterfactual } | undefined;
+  let scenarioWorld: { run: ScenarioRun; scenarioId: ScenarioId; seed: number; counterfactual?: ScenarioCounterfactual; preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string } } | undefined;
   if (!validation.ok) result = rejectedResult(validation.errors);
   else {
     const status = statusForCapability(intent.capability);
@@ -1160,6 +1173,7 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
       epistemicStatus: 'SIMULATION',
       origin: 'fabric-run',
       ...(scenarioWorld.counterfactual === undefined ? {} : { counterfactual: scenarioWorld.counterfactual }),
+      ...(scenarioWorld.preparedness === undefined ? {} : { preparedness: scenarioWorld.preparedness }),
     });
   }
   if (liveWorld && result.status === 'completed') registerLiveExperimentWorld(run.runId, liveWorld, { runFingerprint: run.provenance.runFingerprint, resultOrigin: 'real-engine', summary: result.summary });

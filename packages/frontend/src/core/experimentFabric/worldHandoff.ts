@@ -96,6 +96,8 @@ export interface ScenarioTimelineHandoff {
    * tylko pokazany świat.
    */
   counterfactual?: ScenarioCounterfactual;
+  /** Rządzone pytanie, z którego ten przebieg powstał. */
+  preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string };
   /**
    * Wypełnione wyłącznie dla `memory-replay`: werdykt, który dopuścił serię do
    * świata. Wyłącznie MATCH — DRIFT i BLOCKED nie mają tu wstępu.

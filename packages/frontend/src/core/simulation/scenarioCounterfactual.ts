@@ -135,6 +135,8 @@ export function runScenarioCounterfactual(spec: ScenarioCounterfactualSpec): Sce
  */
 export interface SavedScenarioCounterfactual {
   contractVersion: string;
+  /** Rządzone pytanie, na które ten kontrfaktyk odpowiada. */
+  preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string };
   baseline: SavedScenarioRunContext;
   variant: SavedScenarioRunContext;
   comparisonStatus: ScenarioComparison['status'];
@@ -147,14 +149,18 @@ export interface SavedScenarioCounterfactual {
   epistemicStatus: 'SIMULATION';
 }
 
-export function buildSavedScenarioCounterfactual(counterfactual: ScenarioCounterfactual): SavedScenarioCounterfactual {
+export function buildSavedScenarioCounterfactual(
+  counterfactual: ScenarioCounterfactual,
+  preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string },
+): SavedScenarioCounterfactual {
   if (counterfactual.comparison.status !== 'COMPLETED') {
     throw new Error(`Kontrfaktyk nie jest porównywalny (${counterfactual.comparison.status}): ${counterfactual.comparison.message}`);
   }
   return {
     contractVersion: SCENARIO_MEMORY_CONTRACT_VERSION,
-    baseline: buildSavedScenarioRunContext(counterfactual.baseline),
-    variant: buildSavedScenarioRunContext(counterfactual.variant),
+    ...(preparedness === undefined ? {} : { preparedness }),
+    baseline: buildSavedScenarioRunContext(counterfactual.baseline, preparedness),
+    variant: buildSavedScenarioRunContext(counterfactual.variant, preparedness),
     comparisonStatus: counterfactual.comparison.status,
     changedParameters: counterfactual.comparison.changedParameters,
     changedTiming: counterfactual.comparison.changedTiming,

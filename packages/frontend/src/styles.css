@@ -2446,4 +2446,8 @@ kbd {
 .scenario-run-metrics b { margin-left: 0.3rem; color: var(--text); }
 .scenario-run-note { margin: 0; font-size: 0.64rem; color: var(--text-faint); }
 .scenario-run-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.scenario-run-disclosure { font-size: 0.66rem; color: var(--text-dim); }
+.scenario-run-disclosure summary { cursor: pointer; color: var(--text); }
+.scenario-run-disclosure .scenario-run-note { margin-top: 0.25rem; }
+.governed-question-input { width: 100%; }
 .scenario-run-actions .chip-btn { font-size: 0.66rem; padding: 0.2rem 0.5rem; }

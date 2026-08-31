@@ -659,8 +659,8 @@ export function saveScientificEvidencePackToMemory(pack: ScientificEvidencePack)
  * `params` to płaskie, jawne dźwignie przebiegu — wchodzą do `contentHash`,
  * więc zmiana którejkolwiek daje inny rekord, a nie cichą nadpiskę.
  */
-export function saveScenarioRunToMemory(run: ScenarioRun, execution?: SavedExperimentExecution): SavedExperiment {
-  const scenario = buildSavedScenarioRunContext(run);
+export function saveScenarioRunToMemory(run: ScenarioRun, execution?: SavedExperimentExecution, preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string }): SavedExperiment {
+  const scenario = buildSavedScenarioRunContext(run, preparedness);
   const summary = run.summary!;
   const series = run.series;
   const observations: Record<string, ExperimentOutputValue> = {
@@ -729,8 +729,8 @@ export function saveScenarioRunToMemory(run: ScenarioRun, execution?: SavedExper
  * są odpowiedzią — przy odtworzeniu oba przebiegi liczone są od nowa, a różnica
  * przeliczana, więc podmieniona liczba w rekordzie kończy się DRIFT-em.
  */
-export function saveScenarioCounterfactualToMemory(counterfactual: ScenarioCounterfactual, execution?: SavedExperimentExecution): SavedExperiment {
-  const saved = buildSavedScenarioCounterfactual(counterfactual);
+export function saveScenarioCounterfactualToMemory(counterfactual: ScenarioCounterfactual, execution?: SavedExperimentExecution, preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string }): SavedExperiment {
+  const saved = buildSavedScenarioCounterfactual(counterfactual, preparedness);
   const metricStats: Record<string, number> = {};
   for (const metric of saved.metrics) {
     metricStats[`baseline_${metric.key}`] = metric.baseline;

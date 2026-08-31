@@ -182,6 +182,12 @@ export function ScientificMemoryScreen() {
                   <div className="stat-row"><span>Odcisk wyniku</span><span className="val mono">{record.scenario.resultFingerprint}</span></div>
                   <div className="stat-row"><span>Odcisk epidemii / wejścia</span><span className="val mono">{record.scenario.epidemicFingerprint} · {record.scenario.inputFingerprint}</span></div>
                   <div className="stat-row"><span>Status epistemiczny przebiegu</span><span className="val">{record.scenario.epistemicStatus} — model nieskalibrowany, nie prognoza</span></div>
+                  {record.scenario.preparedness && <div className="stat-row"><span>Rządzone pytanie</span><span className="val">{record.scenario.preparedness.questionId} · „{record.scenario.preparedness.askedText}" · {record.scenario.preparedness.resolutionFingerprint}</span></div>}
+                  {record.scenario.disclosure && <>
+                    <div className="stat-row"><span>Efekty modelowane</span><span className="val">{record.scenario.disclosure.modeled.length}</span></div>
+                    <div className="stat-row"><span>Efekty NOT_MODELED</span><span className="val">{record.scenario.disclosure.notModeled.map((entry) => entry.effect).join(', ')}</span></div>
+                    <div className="stat-row"><span>Odcisk ujawnienia</span><span className="val mono">{record.scenario.disclosure.disclosureFingerprint}</span></div>
+                  </>}
                   {scenarioReplay[record.id] && <>
                     <div className="stat-row"><span>Werdykt odtworzenia</span><span className="val">{scenarioReplay[record.id]!.status}</span></div>
                     <div className="stat-row"><span>Odcisk oczekiwany / otrzymany</span><span className="val mono">{scenarioReplay[record.id]!.expectedResultFingerprint ?? 'brak'} · {scenarioReplay[record.id]!.actualResultFingerprint ?? 'brak'}</span></div>
@@ -192,6 +198,8 @@ export function ScientificMemoryScreen() {
                   <div className="stat-row"><span>Zmienione wymiary</span><span className="val">parametry: {record.counterfactual.changedParameters.join(', ') || 'brak'} · czas: {record.counterfactual.changedTiming.join(', ') || 'brak'} · pojemność: {record.counterfactual.changedCapacity.join(', ') || 'brak'}</span></div>
                   <div className="stat-row"><span>Dzień rozjazdu światów</span><span className="val">{record.counterfactual.firstDivergentDay === null ? 'brak rozjazdu epidemicznego' : `dzień ${record.counterfactual.firstDivergentDay}`}</span></div>
                   <div className="stat-row"><span>Odcisk kontrfaktyku</span><span className="val mono">{record.counterfactual.counterfactualFingerprint}</span></div>
+                  {record.counterfactual.preparedness && <div className="stat-row"><span>Rządzone pytanie</span><span className="val">{record.counterfactual.preparedness.questionId} · „{record.counterfactual.preparedness.askedText}"</span></div>}
+                  {record.counterfactual.variant.disclosure && <div className="stat-row"><span>NOT_MODELED (ramię wariantu)</span><span className="val">{record.counterfactual.variant.disclosure.notModeled.map((entry) => entry.effect).join(', ')}</span></div>}
                   {record.counterfactual.metrics.map((metric) => (
                     <div className="stat-row" key={metric.key}>
                       <span>Δ {metric.key}</span>

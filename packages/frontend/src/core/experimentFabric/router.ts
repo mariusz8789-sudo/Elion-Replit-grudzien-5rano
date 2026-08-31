@@ -307,6 +307,8 @@ const ROUTER_MODELS: readonly RouterModel[] = [
       number('seed', 'Seed', '', 0, 0xffff_ffff, 20260828),
       number('baselineInterventionStartDay', 'Dzień wejścia interwencji — odniesienie', 'dzień', 0, 365, 0),
       number('variantInterventionStartDay', 'Dzień wejścia interwencji — wariant', 'dzień', 0, 365, 0),
+      text('preparednessQuestionId', 'Rządzone pytanie o gotowość', ''),
+      text('preparednessAskedText', 'Pytanie zadane przez użytkownika', ''),
     ],
     route: { kind: 'live-world', target: 'epidemic-city', hash: '#/city3d' }, knowledgeSources: ['biology.md'],
     rationale: 'Kontrfaktyk na istniejącym Scenario Engine: DWA realne przebiegi (odniesienie i wariant) o wspólnych warunkach startowych, porównane przez compareScenarios. Różnica pochodzi z wykonanych modeli, nie z doszacowania; wspólne ziarno, populacja i horyzont są warunkiem porównywalności.',

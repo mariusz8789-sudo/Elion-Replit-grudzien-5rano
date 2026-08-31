@@ -38,6 +38,7 @@ import { saveScientificEvidencePackToMemory } from '../core/scienceMemory';
 import { buildExperimentGraph, executeNextExperiment, type ExperimentGraph } from '../core/experimentFabric/experimentGraph';
 import type { ExperimentRun } from '../core/experimentFabric/types';
 import { runExperiment } from '../core/experimentFabric/executor';
+import { GOVERNED_PREPAREDNESS_QUESTIONS, governedCounterfactualParameters, resolvePreparednessQuestion, type PreparednessResolution } from '../core/simulation/preparednessQuestions';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
@@ -104,6 +105,10 @@ export function ExperimentPilotScreen() {
   const [runHistory, setRunHistory] = useState<ExperimentRun[]>([]);
   const [graph, setGraph] = useState<ExperimentGraph | null>(null);
   const [graphNotice, setGraphNotice] = useState<string | null>(null);
+  // Rządzone pytanie o gotowość: bramka między zdaniem użytkownika a tym, co
+  // Genesis wolno uruchomić. Brak dopasowania = NOT_AVAILABLE i zero runów.
+  const [preparednessText, setPreparednessText] = useState('');
+  const [preparedness, setPreparedness] = useState<PreparednessResolution | null>(null);
   const [capsule, setCapsule] = useState<ReproducibleScenarioCapsule | null>(null);
   const [replay, setReplay] = useState<ScenarioCapsuleReplay | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -347,6 +352,39 @@ export function ExperimentPilotScreen() {
     setReplay(replayScenarioCapsule(capsule));
   }
 
+  /**
+   * Rozstrzyga pytanie względem katalogu rządzonego i — tylko przy GOVERNED —
+   * buduje plan kontrfaktyku z zadeklarowanych dźwigni. Pytanie niedopasowane
+   * NIE uruchamia niczego: pokazujemy NOT_AVAILABLE i listę tego, co istnieje.
+   */
+  function handleResolvePreparedness(text: string, questionId?: string) {
+    const resolution = resolvePreparednessQuestion(text, questionId);
+    setPreparedness(resolution);
+    setError(null);
+    if (resolution.status !== 'GOVERNED' || resolution.question === null) {
+      setPlan(null);
+      resetDownstream();
+      return;
+    }
+    const model = getRouterModel('scenario-counterfactual');
+    if (model === undefined) {
+      setError('Model scenario-counterfactual nie jest zarejestrowany w routerze.');
+      return;
+    }
+    const request = buildStructuredRequestFromModel(model, {
+      ...governedCounterfactualParameters(resolution.question),
+      preparednessQuestionId: resolution.question.questionId,
+      preparednessAskedText: resolution.askedText,
+    }, { sourceText: resolution.askedText, seed: resolution.question.levers.seed });
+    try {
+      setPlan(planEvidenceGuidedExperiment(request));
+      resetDownstream();
+      setPhase('planned');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   function handleReset() {
     setPhase('draft');
     setPlan(null);
@@ -355,6 +393,67 @@ export function ExperimentPilotScreen() {
 
   return (
     <main className="pilot-view" id="main-content" tabIndex={-1}>
+      <section className="pilot-step" aria-label="Rządzone pytanie o gotowość">
+        <h2>0 · Pytanie o gotowość — rządzony scenariusz</h2>
+        <p className="settings-hint">
+          Wybierz pytanie albo wpisz je własnymi słowami. Pytanie mapuje się wyłącznie na ISTNIEJĄCY kontrakt
+          scenariusza. Pytanie spoza katalogu kończy się statusem NOT_AVAILABLE i nie uruchamia żadnego modelu —
+          scenariusz „zbliżony" odpowiadałby na inne pytanie niż zadane.
+        </p>
+        <p className="pilot-disclaimer">
+          SYNTHETIC · SCENARIO · NON_OPERATIONAL · NOT_CALIBRATED — dane i dźwignie są demonstracyjne, nie pochodzą
+          z żadnej rzeczywistej epidemii, miasta ani placówki i nie są wskazówką operacyjną.
+        </p>
+        <div className="pilot-actions">
+          {GOVERNED_PREPAREDNESS_QUESTIONS.map((entry) => (
+            <button
+              key={entry.questionId}
+              className="chip-btn"
+              onClick={() => { setPreparednessText(entry.question); handleResolvePreparedness(entry.question, entry.questionId); }}
+            >
+              {entry.question}
+            </button>
+          ))}
+        </div>
+        <label className="account-field">
+          <span>Albo zadaj pytanie własnymi słowami</span>
+          <input
+            className="pilot-input governed-question-input"
+            value={preparednessText}
+            onChange={(event) => setPreparednessText(event.target.value)}
+            placeholder="np. ile kosztuje opóźnienie izolacji objawowych o 20 dni?"
+          />
+        </label>
+        <div className="pilot-actions">
+          <button className="chip-btn pilot-primary" disabled={!preparednessText.trim()} onClick={() => handleResolvePreparedness(preparednessText)}>
+            Utwórz rządzony scenariusz
+          </button>
+        </div>
+        {preparedness && (
+          <>
+            <dl className="pilot-provenance">
+              <div><dt>status</dt><dd className="mono">{preparedness.status}</dd></div>
+              <div><dt>questionId</dt><dd className="mono">{preparedness.question?.questionId ?? 'brak'}</dd></div>
+              <div><dt>resolutionFingerprint</dt><dd className="mono">{preparedness.resolutionFingerprint}</dd></div>
+            </dl>
+            <p className="settings-hint" role="status">{preparedness.reason}</p>
+            {preparedness.status === 'GOVERNED' && preparedness.question && (
+              <p className="settings-hint">
+                RZĄDZONA RÓŻNICA: {preparedness.question.governedDifference} · odniesienie {preparedness.question.baselineScenarioId} (dzień {preparedness.question.levers.baselineInterventionStartDay})
+                {' '}vs wariant {preparedness.question.variantScenarioId} (dzień {preparedness.question.levers.variantInterventionStartDay}) · ziarno {preparedness.question.levers.seed}
+                {' '}· populacja {preparedness.question.levers.nAgents} · {preparedness.question.levers.days} dni
+              </p>
+            )}
+            {preparedness.status === 'NOT_AVAILABLE' && (
+              <details className="settings-details" open>
+                <summary>Pytania, które Genesis potrafi wykonać ({preparedness.available.length})</summary>
+                {preparedness.available.map((entry) => <p className="settings-hint" key={entry.questionId}>{entry.question}</p>)}
+              </details>
+            )}
+          </>
+        )}
+      </section>
+
       <div className="pilot-intro">
         <p>
           Reprodukowalny eksperyment krok po kroku: wybierz model (albo opisz go zwykłym zdaniem), zobacz jawny plan

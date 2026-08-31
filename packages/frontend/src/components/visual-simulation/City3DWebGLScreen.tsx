@@ -6,6 +6,7 @@ import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock'
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
 import { consumePendingExperimentWorld, consumePendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
 import { saveScenarioCounterfactualToMemory, saveScenarioRunToMemory } from '../../core/scienceMemory';
+import { describeScenarioEffects } from '../../core/simulation/scenarioDisclosure';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
@@ -283,6 +284,24 @@ export function City3DWebGLScreen() {
                   <span>ozdrowieńcy<b>{timelineSample.recovered}</b></span>
                   <span>obłożenie łóżek<b>{(timelineSample.hospital.bedOccupancy * 100).toFixed(1)}%</b></span>
                 </div>
+                <details className="scenario-run-disclosure">
+                  <summary>Co model liczy, a czego NIE liczy</summary>
+                  {(() => {
+                    const disclosure = describeScenarioEffects(scenarioTimeline.scenarioRun);
+                    return (
+                      <>
+                        <p className="scenario-run-note"><strong>MODELOWANE ({disclosure.modeled.length}):</strong> {disclosure.modeled.map((entry) => `${entry.effect} [${entry.evidenceField}] = ${entry.value}`).join(' · ')}</p>
+                        <p className="scenario-run-note"><strong>NOT_MODELED ({disclosure.notModeled.length}):</strong> {disclosure.notModeled.map((entry) => entry.effect).join(' · ')}</p>
+                        <p className="scenario-run-note">{disclosure.boundary}</p>
+                      </>
+                    );
+                  })()}
+                </details>
+                {scenarioTimeline.preparedness && (
+                  <p className="scenario-run-note">
+                    Pytanie rządzone: {scenarioTimeline.preparedness.questionId} — „{scenarioTimeline.preparedness.askedText}"
+                  </p>
+                )}
                 <p className="scenario-run-note">
                   Stan pochodzi wyłącznie z zapisanej serii tego przebiegu. Model nie jest skalibrowany do żadnej
                   rzeczywistej epidemii — to symulacja scenariuszowa, nie prognoza ani obserwacja.
@@ -293,7 +312,7 @@ export function City3DWebGLScreen() {
                     className="chip-btn"
                     onClick={() => {
                       try {
-                        const record = saveScenarioRunToMemory(scenarioTimeline.scenarioRun);
+                        const record = saveScenarioRunToMemory(scenarioTimeline.scenarioRun, undefined, scenarioTimeline.preparedness);
                         setTimelineSaved(`Zapisano w Pamięci Naukowej: #${record.contentHash}. Po przeładowaniu przebieg jest liczony od nowa i weryfikowany odciskiem.`);
                       } catch (error) {
                         setTimelineSaved(`Nie zapisano: ${error instanceof Error ? error.message : String(error)}`);
@@ -308,7 +327,7 @@ export function City3DWebGLScreen() {
                       className="chip-btn"
                       onClick={() => {
                         try {
-                          const record = saveScenarioCounterfactualToMemory(scenarioTimeline.counterfactual!);
+                          const record = saveScenarioCounterfactualToMemory(scenarioTimeline.counterfactual!, undefined, scenarioTimeline.preparedness);
                           setTimelineSaved(`Zapisano kontrfaktyk (oba ramiona + różnica): #${record.contentHash}.`);
                         } catch (error) {
                           setTimelineSaved(`Nie zapisano kontrfaktyku: ${error instanceof Error ? error.message : String(error)}`);

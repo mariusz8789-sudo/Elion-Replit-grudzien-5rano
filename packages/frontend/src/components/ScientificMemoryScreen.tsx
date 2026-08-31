@@ -6,7 +6,7 @@ import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
 import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
 import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
 import { replaySavedBiotechComparison, replaySavedBiotechDiscoveryArtifact } from '../core/scienceMemory';
-import { openSavedScenarioInWorld } from '../core/simulation/scenarioWorldReplay';
+import { openSavedCounterfactualInWorld, openSavedScenarioInWorld } from '../core/simulation/scenarioWorldReplay';
 import type { SavedScenarioReplay } from '../core/simulation/scenarioMemory';
 import { replaySavedScenarioCounterfactual, type SavedScenarioCounterfactualReplay } from '../core/simulation/scenarioCounterfactual';
 import { replaySavedCompositionCompute, type CompositionComputeReplay } from '../core/naturalCompositionCompute';
@@ -74,7 +74,25 @@ export function ScientificMemoryScreen() {
     setCounterfactualReplay((current) => ({ ...current, [record.id]: replaySavedScenarioCounterfactual(saved) }));
   };
 
+  /**
+   * Odtwarza OBA ramiona i — wyłącznie przy MATCH — otwiera ramię wariantu
+   * w świecie 3D. Werdykt inny niż MATCH nie ma czego przekazać.
+   */
+  const openCounterfactualInWorld = (record: SavedExperiment) => {
+    const result = openSavedCounterfactualInWorld(record.counterfactual, { recordId: record.contentHash });
+    setCounterfactualReplay((current) => ({ ...current, [record.id]: result.replay }));
+    if (result.opened) {
+      window.location.hash = '#/city3d';
+      return;
+    }
+    setNotice(`Świat 3D nie został otwarty: odtworzenie kontrfaktyku zakończyło się werdyktem ${result.replay.status}. Niezweryfikowany przebieg nie trafia do sceny.`);
+  };
+
   const openRecord = (record: SavedExperiment) => {
+    if (record.counterfactual) {
+      openCounterfactualInWorld(record);
+      return;
+    }
     if (record.scenario) {
       replayScenarioRecord(record, 'open');
       return;
@@ -299,7 +317,7 @@ export function ScientificMemoryScreen() {
                 </details>
               )}
               <div className="pilot-actions">
-                <button className="chip-btn pilot-primary" onClick={() => openRecord(record)}>{record.scenario ? 'Odtwórz i otwórz w 3D' : 'Otwórz z parametrami'}</button>
+                <button className="chip-btn pilot-primary" onClick={() => openRecord(record)}>{record.counterfactual ? 'Odtwórz oba ramiona i otwórz wariant w 3D' : record.scenario ? 'Odtwórz i otwórz w 3D' : 'Otwórz z parametrami'}</button>
                 {record.counterfactual && <>
                   <button className="chip-btn pilot-primary" onClick={() => replayCounterfactualRecord(record, false)}>Odtwórz oba ramiona</button>
                   <button className="chip-btn" onClick={() => replayCounterfactualRecord(record, true)}>Podmień różnicę → DRIFT</button>

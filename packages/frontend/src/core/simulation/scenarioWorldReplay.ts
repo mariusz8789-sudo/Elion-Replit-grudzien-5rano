@@ -2,6 +2,7 @@ import { registerScenarioTimeline, setPendingScenarioTimeline } from '../experim
 import type { EpidemicCityParams } from './epidemicCity';
 import { SCENARIOS } from './scenarioEngine';
 import { replaySavedScenarioRun, type SavedScenarioReplay } from './scenarioMemory';
+import { replaySavedScenarioCounterfactual, type SavedScenarioCounterfactualReplay } from './scenarioCounterfactual';
 
 /**
  * MOST PAMIĘĆ → ŚWIAT 3D.
@@ -54,6 +55,57 @@ export function openSavedScenarioInWorld(saved: unknown, options: OpenSavedScena
     epistemicStatus: 'SIMULATION',
     origin: 'memory-replay',
     replayVerdict: 'MATCH',
+  });
+  const opened = setPendingScenarioTimeline(handoffRunId);
+  return { replay, handoffRunId: opened ? handoffRunId : null, opened };
+}
+
+export interface SavedCounterfactualWorldHandoffResult {
+  replay: SavedScenarioCounterfactualReplay;
+  handoffRunId: string | null;
+  opened: boolean;
+}
+
+/**
+ * MOST PAMIĘĆ → ŚWIAT 3D DLA KONTRFAKTYKU.
+ *
+ * Ta sama, jedyna droga co dla pojedynczego przebiegu, tylko z dwoma
+ * ramionami: świat dostaje ramię WARIANTU — to ono jest odpowiedzią na „a
+ * gdyby" — ale dopiero po tym, jak OBA ramiona zostały policzone od nowa i
+ * cała różnica między nimi się odtworzyła. Zweryfikowany wariant przy
+ * niezweryfikowanym odniesieniu nie jest kontrfaktykiem, więc DRIFT albo
+ * BLOCKED nie rejestruje niczego i świat nie ma czego pokazać.
+ */
+export function openSavedCounterfactualInWorld(saved: unknown, options: { recordId: string }): SavedCounterfactualWorldHandoffResult {
+  const replay = replaySavedScenarioCounterfactual(saved);
+  const counterfactual = replay.counterfactual;
+  if (replay.status !== 'MATCH' || counterfactual === null) {
+    return { replay, handoffRunId: null, opened: false };
+  }
+  const variant = counterfactual.variant;
+  const scenarioSummary = variant.summary;
+  if (scenarioSummary === null || variant.resultFingerprint === null) {
+    return { replay, handoffRunId: null, opened: false };
+  }
+  const preparedness = (saved as { preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string } }).preparedness;
+  const handoffRunId = `replay:counterfactual:${options.recordId}`;
+  registerScenarioTimeline({
+    runId: handoffRunId,
+    runFingerprint: variant.resultFingerprint,
+    resultOrigin: 'real-engine',
+    modelId: 'scenario-timeline',
+    scenarioId: variant.scenarioId,
+    scenarioLabel: SCENARIOS[variant.scenarioId].label,
+    seed: variant.params.seed,
+    summary: `Odtworzony kontrfaktyk z Pamięci: ramię wariantu ${variant.label}, ${variant.series.length} dni, werdykt MATCH dla obu ramion.`,
+    series: variant.series,
+    scenarioSummary,
+    scenarioRun: variant,
+    epistemicStatus: 'SIMULATION',
+    origin: 'memory-replay',
+    replayVerdict: 'MATCH',
+    counterfactual,
+    ...(preparedness === undefined ? {} : { preparedness }),
   });
   const opened = setPendingScenarioTimeline(handoffRunId);
   return { replay, handoffRunId: opened ? handoffRunId : null, opened };

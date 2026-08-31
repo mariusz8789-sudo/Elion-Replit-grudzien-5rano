@@ -256,3 +256,56 @@ describe('Brak duplikatów silników i magazynów', () => {
     expect(Object.keys(preparednessModule).some((key) => /^run[A-Z]/.test(key))).toBe(false);
   });
 });
+
+describe('Konektor 3 — odtworzony kontrfaktyk trafia do świata 3D', () => {
+  beforeEach(() => { vi.resetModules(); vi.stubGlobal('window', { localStorage: makeFakeStorage() }); });
+
+  const counterfactual = () => runScenarioCounterfactual({
+    baselineScenarioId: 'ISOLATION', variantScenarioId: 'ISOLATION',
+    days: 18, stepsPerDay: 2, baseParams: { nAgents: 120, initialInfected: 4, seed: 20260831 },
+    baselineInterventionStartDay: 0, variantInterventionStartDay: 8,
+  });
+
+  it('MATCH przekazuje do świata ramię WARIANTU z PRZELICZENIA', async () => {
+    const { openSavedCounterfactualInWorld } = await import('../core/simulation/scenarioWorldReplay');
+    const { consumePendingScenarioTimeline } = await import('../core/experimentFabric/worldHandoff');
+    const source = counterfactual();
+    const preparedness = { questionId: 'prep:isolation-timing', askedText: 'a gdyby później?', resolutionFingerprint: 'fp123456' };
+    const result = openSavedCounterfactualInWorld(buildSavedScenarioCounterfactual(source, preparedness), { recordId: 'rec-cf' });
+
+    expect(result.replay.status).toBe('MATCH');
+    expect(result.opened).toBe(true);
+
+    const handoff = consumePendingScenarioTimeline();
+    expect(handoff!.origin).toBe('memory-replay');
+    expect(handoff!.replayVerdict).toBe('MATCH');
+    expect(handoff!.preparedness).toEqual(preparedness);
+    // Do świata idzie WARIANT, nie odniesienie.
+    expect(handoff!.series[handoff!.series.length - 1]).toEqual(source.variant.series[source.variant.series.length - 1]);
+    expect(handoff!.counterfactual?.baseline.resultFingerprint).toBe(source.baseline.resultFingerprint);
+  });
+
+  it('zweryfikowany wariant przy zepsutym odniesieniu NIE otwiera świata', async () => {
+    const { openSavedCounterfactualInWorld } = await import('../core/simulation/scenarioWorldReplay');
+    const { consumePendingScenarioTimeline } = await import('../core/experimentFabric/worldHandoff');
+    const saved = buildSavedScenarioCounterfactual(counterfactual());
+    const result = openSavedCounterfactualInWorld({
+      ...saved,
+      baseline: { ...saved.baseline, resultFingerprint: 'deadbeef' },
+    }, { recordId: 'rec-broken' });
+
+    expect(result.replay.status).toBe('DRIFT');
+    expect(result.opened).toBe(false);
+    expect(consumePendingScenarioTimeline()).toBeNull();
+  });
+
+  it('uszkodzony zapis kończy się BLOCKED i pustym światem', async () => {
+    const { openSavedCounterfactualInWorld } = await import('../core/simulation/scenarioWorldReplay');
+    const { consumePendingScenarioTimeline } = await import('../core/experimentFabric/worldHandoff');
+    const result = openSavedCounterfactualInWorld({ contractVersion: '1.0.0' }, { recordId: 'rec-bad' });
+
+    expect(result.replay.status).toBe('BLOCKED');
+    expect(result.opened).toBe(false);
+    expect(consumePendingScenarioTimeline()).toBeNull();
+  });
+});

@@ -2116,6 +2116,20 @@ kbd {
   .city-world-left { left: var(--sp-3); }
   .city-world-right { right: var(--sp-3); }
 
+  /*
+   * Oś czasu przebiegu w układzie pełnoekranowym: boczne panele leżą NA
+   * scenie (z-index 4), więc panel rozciągnięty na całą jej szerokość chowa
+   * swoje lewe i prawe krawędzie pod nimi. To nie była wada kosmetyczna —
+   * przyciski zapisu w tym pasie były niedosięgalne dla kliknięcia, co
+   * wychodzi dopiero w prawdziwej przeglądarce, nie w teście jednostkowym.
+   */
+  .scenario-run-timeline {
+    left: calc(250px + 2 * var(--sp-3));
+    right: calc(250px + 2 * var(--sp-3));
+    bottom: var(--sp-3);
+    z-index: 5;
+  }
+
   /* Panele stają się szkłem — ta sama powierzchnia co reszta Genesis. */
   .city-world-sidebar .world-panel {
     background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
@@ -2431,3 +2445,5 @@ kbd {
 .scenario-run-metrics { display: flex; flex-wrap: wrap; gap: 0.75rem; font-family: var(--font-mono); color: var(--text-dim); }
 .scenario-run-metrics b { margin-left: 0.3rem; color: var(--text); }
 .scenario-run-note { margin: 0; font-size: 0.64rem; color: var(--text-faint); }
+.scenario-run-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.scenario-run-actions .chip-btn { font-size: 0.66rem; padding: 0.2rem 0.5rem; }

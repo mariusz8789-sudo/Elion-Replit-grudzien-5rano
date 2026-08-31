@@ -90,3 +90,4 @@
 - [x] Perform the final bounded audit of the live Genesis persistence/replay, City3D, Earthquake and Scientific Core state after the current correction integration; repair only a demonstrated regression.
 - [x] Conduct source-backed Matrix/Agent World competition, differentiation, monetization, UAE-fit and 50–100-agent deterministic-POC feasibility research; make a BUILD/PARK/REJECT recommendation without implementing Matrix World or changing existing product boundaries.
 - [x] Re-run remote CI for the current live correction after GitHub canceled queued run `32985139976` without executing workflow steps; record the exact outcome before final research delivery.
+- [ ] Resolve the exact CI G3 security failure that detects an embedded access token in the official NIST/CODATA artifact payload; remove only the unsafe tracked payload or replace it with a verified token-free artifact, preserving scientific provenance and never exposing secrets.

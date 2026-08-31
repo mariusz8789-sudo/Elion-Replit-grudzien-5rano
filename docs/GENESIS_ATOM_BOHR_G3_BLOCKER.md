@@ -2,6 +2,8 @@
 
 **Status: `BLOCKED / REFERENCE_UNPINNED`**
 
+Until an approved token-free A4 artifact exists, the G3 workflow job is intentionally **manual-only** (`workflow_dispatch`). The normal Genesis quality gate does not claim G3 success; the fetch script still fails closed if the dynamic NIST page contains an embedded web token.
+
 The dedicated G3 job proved that the network path and the A1–A4 URLs are reachable from GitHub Actions. A1, A2, and A3 were downloaded and hash-verified in run `33120357769` for commit `cd0dd11`.
 
 G3 cannot be closed because the official NIST terms page selected for A4 returns an HTML snapshot containing an embedded Mapbox access token in page source. The payload is therefore unsafe to commit to the repository or retain as a distributable CI fixture. The captured CI artifact was deleted after detection, and the attempted local commit was never accepted by GitHub Push Protection.

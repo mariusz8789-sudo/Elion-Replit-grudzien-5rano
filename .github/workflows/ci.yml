@@ -4,6 +4,7 @@ on:
   push:
     branches: ['**']
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -64,7 +65,12 @@ jobs:
           path: packages/frontend/dist
           retention-days: 7
 
+  # G3 remains an explicitly blocked external-reference gate until A4 can be
+  # pinned without retaining the dynamic NIST page's embedded web token.
+  # Keep it manually invokable; do not turn a known blocked gate into a false
+  # product-green signal on every normal code push or pull request.
   nist-g3-pinned-artifacts:
+    if: github.event_name == 'workflow_dispatch'
     name: G3 pinned NIST/CODATA atom-bohr artifacts
     runs-on: ubuntu-latest
     timeout-minutes: 10

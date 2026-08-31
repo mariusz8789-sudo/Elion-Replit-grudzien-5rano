@@ -2459,3 +2459,28 @@ kbd {
 .scenario-run-disclosure .scenario-run-note { margin-top: 0.25rem; }
 .governed-question-input { width: 100%; }
 .scenario-run-actions .chip-btn { font-size: 0.66rem; padding: 0.2rem 0.5rem; }
+
+/* --- Temporal World WOW: read-only layer over the existing renderer --- */
+.temporal-world-hud { position: absolute; top: .78rem; left: 50%; z-index: 3; width: min(56rem, calc(100% - 1.56rem)); transform: translateX(-50%); padding: .62rem .78rem; border: 1px solid rgba(103, 213, 255, .44); border-radius: .72rem; background: linear-gradient(135deg, rgba(4, 18, 31, .92), rgba(8, 36, 54, .82)); box-shadow: 0 .7rem 2rem rgba(0, 0, 0, .28), 0 0 1.2rem rgba(54, 196, 255, .12); color: #dff5ff; font-family: var(--font-mono); pointer-events: none; }
+.temporal-world-hud-empty { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: .7rem; }
+.temporal-world-hud-topline, .temporal-world-hud-main { display: flex; align-items: center; justify-content: space-between; gap: .7rem; }
+.temporal-world-kicker { color: #71d9ff; font-size: .58rem; font-weight: 700; letter-spacing: .12em; }
+.temporal-world-phase, .temporal-world-status { color: #b6d2e3; font-size: .6rem; letter-spacing: .06em; }
+.temporal-world-status { color: #6de0b9; }
+.temporal-world-hud-main { margin-top: .38rem; }
+.temporal-world-hud-main > div:first-child { display: grid; gap: .12rem; min-width: 8rem; }
+.temporal-world-hud-main strong { color: #fff; font-size: 1.02rem; letter-spacing: .08em; }
+.temporal-world-hud-main small { color: #91b2c9; font-size: .59rem; }
+.temporal-world-rail { display: flex; align-items: center; justify-content: center; flex: 1; gap: .38rem; color: #91b2c9; font-size: .58rem; letter-spacing: .08em; }
+.temporal-world-rail i { display: block; width: 2.5rem; height: .16rem; border-radius: 999px; background: linear-gradient(90deg, #295a7b, #5bd9f4); }
+.temporal-world-rail b { color: #fff; }
+.temporal-world-identity { display: grid; justify-items: end; gap: .12rem; min-width: 7rem; color: #779ab3; font-size: .55rem; }
+.temporal-world-identity code { color: #c3ecff; font-size: .58rem; }
+.temporal-world-branches { display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: .55rem; margin-top: .52rem; padding-top: .45rem; border-top: 1px solid rgba(126, 197, 232, .18); }
+.temporal-world-branches > div:not(.temporal-world-divergence) { display: grid; gap: .14rem; }
+.temporal-world-branches b { color: #effaff; font-size: .68rem; }
+.temporal-branch { font-size: .56rem; letter-spacing: .05em; }
+.temporal-branch.baseline { color: #79c9ff; }
+.temporal-branch.counterfactual { color: #ffb477; }
+.temporal-world-divergence { color: #ffd27c; font-size: .57rem; font-weight: 700; text-align: right; white-space: nowrap; }
+@media (max-width: 760px) { .temporal-world-hud { top: .55rem; width: calc(100% - 1.1rem); padding: .52rem .58rem; } .temporal-world-hud-empty { grid-template-columns: 1fr; gap: .22rem; } .temporal-world-hud-main { align-items: flex-start; flex-wrap: wrap; } .temporal-world-rail { order: 3; flex-basis: 100%; justify-content: flex-start; } .temporal-world-identity { min-width: auto; } .temporal-world-branches { grid-template-columns: 1fr 1fr; } .temporal-world-divergence { grid-column: span 2; text-align: left; } }

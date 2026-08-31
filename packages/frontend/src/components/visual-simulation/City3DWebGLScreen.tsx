@@ -16,6 +16,7 @@ import { consumePendingEarthquakeOverlay } from '../../core/simulationRenderer/e
 import { EarthquakeScenarioPanel } from './EarthquakeScenarioPanel';
 import { EvidenceReplayPanel } from './EvidenceReplayPanel';
 import { ScenarioCommandCenterPanel } from './ScenarioCommandCenterPanel';
+import { TemporalWorldHud } from './TemporalWorldHud';
 
 /** Command Center reads existing model and World Engine state only; it does not generate epidemic data or agent routes. */
 /** Musi zgadzać się z EpidemicCity3DSim.hospitalStatusCode — indeks, nie liczba wyniku. */
@@ -255,6 +256,7 @@ export function City3DWebGLScreen() {
         <section className="city-world-center" aria-label="Żywa scena miasta 3D">
           <div className="city-3d-stage-wrap city-world-stage">
             <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
+            <TemporalWorldHud timeline={scenarioTimeline} day={timelineDay} />
             {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
             {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu Canvas 2D</button>.</div>}
             {scenarioTimeline && timelineSample && (

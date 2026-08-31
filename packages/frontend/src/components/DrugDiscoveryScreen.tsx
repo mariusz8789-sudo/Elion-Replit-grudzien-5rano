@@ -9,7 +9,7 @@ import { AccountPanel } from './AccountPanel';
 import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
 import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
 import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
-import { compareCandidateDiscoveryReports } from '../core/biotechDiscoveryContract';
+import { buildCandidateCombinationHypothesis, compareCandidateDiscoveryReports } from '../core/biotechDiscoveryContract';
 import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
 import { recordBiotechAdminAudit, replaySavedBiotechComparison, saveBiotechDiscoveryComparisonToMemory } from '../core/scienceMemory';
 import { resolveNaturalFunctionalReplacementFromSources, type NaturalFunctionalReplacementResult } from '../core/biotechData/naturalReplacement';
@@ -65,9 +65,17 @@ function DrugWorkspace() {
   const [referenceCompound, setReferenceCompound] = useState(() => routeParams.get('reference') ?? '');
   const [referenceTarget, setReferenceTarget] = useState(() => routeParams.get('target') ?? 'A1');
   const [replacementResult, setReplacementResult] = useState<NaturalFunctionalReplacementResult | null>(null);
+  const [selectedNaturalReportIds, setSelectedNaturalReportIds] = useState<string[]>([]);
   const canUseAdminWorkflow = projects.some((project) => project.role === 'owner' || project.role === 'admin');
   const activeReplacementReports = replacementResult?.reports.length ? replacementResult.reports : [pinnedDiscovery.report, adenosineDiscovery.report, theophyllineDiscovery.report];
   const activeReplacementComparison = compareCandidateDiscoveryReports(activeReplacementReports);
+  const selectedNaturalReports = activeReplacementReports.filter((report) => selectedNaturalReportIds.includes(report.reportId));
+  const selectedCombinationHypothesis = selectedNaturalReports.length === 2
+    ? buildCandidateCombinationHypothesis(selectedNaturalReports, referenceTarget ? [referenceTarget] : [])
+    : undefined;
+  const toggleNaturalReport = (reportId: string) => setSelectedNaturalReportIds((current) => current.includes(reportId)
+    ? current.filter((id) => id !== reportId)
+    : current.length < 2 ? [...current, reportId] : current);
 
   const [targetName, setTargetName] = useState('');
   const [targetIndication, setTargetIndication] = useState('');
@@ -184,8 +192,19 @@ function DrugWorkspace() {
           {replacementResult.candidateWhy.map((why) => <div className="cde-result" key={why.pubchemCid}><span className="cde-result-label">WHY · PubChem CID {why.pubchemCid}</span><span className="cde-result-actual">{why.rationale}</span><span className="cde-result-bound">target match {why.targetMatchedActivityCount}/{why.activityCount} · types {why.measurementTypes.join(', ') || 'UNKNOWN'} · assay HIGH/MOD/LOW/UNK {why.assayQualityCounts.HIGH}/{why.assayQualityCounts.MODERATE}/{why.assayQualityCounts.LOW}/{why.assayQualityCounts.UNKNOWN} · {why.uncertainty}</span></div>)}
         </div> : null}
         {replacementResult?.reports.length ? <div className="cde-results" aria-label="Resolved natural product reports">
-          {replacementResult.reports.map((report) => <div className="cde-result" key={report.reportId}><span className="cde-result-label">{report.candidateId}</span><span className="cde-result-actual">Research priority {(report.ranking?.score ?? 0).toFixed(4)} · {report.scientificEvidenceStatus} · target {report.targetIds.length ? report.targetIds.join(', ') : 'UNKNOWN'}</span><span className="cde-result-bound">safety {report.safetySignalIds.length ? 'SOURCE_STATUS' : 'UNKNOWN'} · ADME/PK/Tox {report.admeProfile?.status ?? 'UNKNOWN'} · validation {report.experimentRequestId ?? 'NOT_EXECUTED / BLOCKED'} · {report.clinicalEfficacy}</span><button className="chip-btn" type="button" onClick={() => saveComparison('dossier', report.candidateId)}>Zapisz i otwórz dossier</button></div>)}
+          {replacementResult.reports.map((report) => <div className="cde-result" key={report.reportId}><label className="cde-result-label"><input type="checkbox" checked={selectedNaturalReportIds.includes(report.reportId)} onChange={() => toggleNaturalReport(report.reportId)} disabled={!selectedNaturalReportIds.includes(report.reportId) && selectedNaturalReportIds.length >= 2} /> {report.candidateId}</label><span className="cde-result-actual">Research priority {(report.ranking?.score ?? 0).toFixed(4)} · {report.scientificEvidenceStatus} · target {report.targetIds.length ? report.targetIds.join(', ') : 'UNKNOWN'}</span><span className="cde-result-bound">safety {report.safetySignalIds.length ? 'SOURCE_STATUS' : 'UNKNOWN'} · ADME/PK/Tox {report.admeProfile?.status ?? 'UNKNOWN'} · validation {report.experimentRequestId ?? 'NOT_EXECUTED / BLOCKED'} · {report.clinicalEfficacy}</span><button className="chip-btn" type="button" onClick={() => saveComparison('dossier', report.candidateId)}>Zapisz i otwórz dossier</button></div>)}
         </div> : null}
+        {replacementResult?.reports.length ? <section className="settings-section dossier-card" aria-label="Natural composition analysis">
+          <h3>Natural Composition Discovery · top 2</h3>
+          <p className="settings-hint">Wybierz dokładnie dwa istniejące raporty źródłowe. To deterministyczna hipoteza badawcza, nie dowód synergii ani skuteczności.</p>
+          <p className="settings-hint" role="status">Wybrano {selectedNaturalReports.length}/2 · compute: NOT_EXECUTED</p>
+          {selectedCombinationHypothesis ? <div className="cde-results">
+            <div className="cde-result"><span className="cde-result-label">Combination ID</span><span className="cde-result-actual">{selectedCombinationHypothesis.combinationId}</span><span className="cde-result-bound">status {selectedCombinationHypothesis.status} · priority {selectedCombinationHypothesis.researchPriority.toFixed(4)}</span></div>
+            <div className="cde-result"><span className="cde-result-label">Evidence / targets</span><span className="cde-result-actual">{selectedCombinationHypothesis.coveredEvidenceIds.length} evidence · {selectedCombinationHypothesis.coveredTargetIds.join(', ') || 'UNKNOWN'}</span><span className="cde-result-bound">mechanisms {selectedCombinationHypothesis.coveredMechanismIds.join(', ') || 'UNKNOWN'} · missing {selectedCombinationHypothesis.missingEvidenceIds.join(', ') || 'none declared'}</span></div>
+            <div className="cde-result"><span className="cde-result-label">Uncertainty</span><span className="cde-result-actual">{selectedCombinationHypothesis.uncertainty}</span><span className="cde-result-bound">validation required; no synergy/efficacy/safety conclusion</span></div>
+            {selectedCombinationHypothesis.validationPlan.map((step) => <div className="cde-result" key={step}><span className="cde-result-label">NEXT VALIDATION</span><span className="cde-result-actual">{step}</span></div>)}
+          </div> : <div className="cde-verdict">Wybierz jeszcze {2 - selectedNaturalReports.length} raport(y), aby utworzyć composition hypothesis.</div>}
+        </section> : null}
         <h2>Źródłowy punkt odniesienia · pinned record</h2>
         <p className="settings-hint">
           To jest read-only rekord z PubChem + ChEMBL, niezależny od kandydatów zapisanych w projekcie. Status wiedzy: `knowledge_only`; nie wykonano eksperymentu biologicznego.

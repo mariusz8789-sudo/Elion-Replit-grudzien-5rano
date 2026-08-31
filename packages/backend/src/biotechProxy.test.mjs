@@ -1,4 +1,6 @@
 import test from 'node:test';
+/* global Response */
+
 import assert from 'node:assert/strict';
 import { allowlistedBiotechUrl, fetchBiotechSource } from './biotechProxy.mjs';
 

@@ -1,3 +1,5 @@
+/* global AbortSignal */
+
 const ALLOWED_PREFIXES = [
   { host: 'pubchem.ncbi.nlm.nih.gov', pathPrefix: '/rest/pug/compound/' },
   { host: 'www.ebi.ac.uk', pathPrefix: '/chembl/api/data/' },

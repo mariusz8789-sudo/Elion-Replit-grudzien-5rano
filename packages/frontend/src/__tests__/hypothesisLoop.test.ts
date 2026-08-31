@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   executePreregisteredHypotheses,
   generateCompetingHypotheses,
   HYPOTHESIS_LOOP_CONTRACT_VERSION,
   HYPOTHESIS_PROBLEMS,
   NEXT_EXPERIMENT_PRIORITY,
+  buildSavedHypothesisLoop,
+  isSavedHypothesisLoop,
   preregisterHypotheses,
+  replaySavedHypothesisLoop,
   selectNextHypothesisExperiment,
   verifyPreregistrationIntact,
   type HypothesisProblem,
@@ -268,11 +271,119 @@ describe('Brak duplikatów systemów', () => {
     expect(source).not.toMatch(/from '.*storage'/);
     expect(source).not.toMatch(/from '.*scienceMemory'/);
     expect(source).not.toMatch(/from '.*three\//);
-    expect(source).not.toMatch(/localStorage|writeJSON|new Renderer/);
+    // Szukamy UŻYCIA, nie słowa: komentarz wyjaśniający, dlaczego walidujemy
+    // rekord z localStorage, jest w porządku — sięganie po niego już nie.
+    expect(source).not.toMatch(/localStorage\s*\.|window\.localStorage|writeJSON\(|new Renderer/);
     expect(source).not.toMatch(/runScenario\(/);
     // Protokół, wykonanie i paczka pochodzą z istniejących modułów.
     expect(source).toMatch(/from '\.\/scientificPlanner'/);
     expect(source).toMatch(/from '\.\/scientificExecutor'/);
     expect(source).toMatch(/from '\.\/evidencePack'/);
+  });
+});
+
+describe('Pamięć i odtworzenie pętli', () => {
+  const makeFakeStorage = () => {
+    const map = new Map<string, string>();
+    return {
+      getItem: (key: string) => (map.has(key) ? map.get(key)! : null),
+      setItem: (key: string, value: string) => void map.set(key, value),
+      removeItem: (key: string) => void map.delete(key),
+      key: (index: number) => [...map.keys()][index] ?? null,
+      get length() { return map.size; },
+    };
+  };
+  const executed = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+
+  it('zapis niesie prerejestrację, hipotezy i statusy', () => {
+    const saved = buildSavedHypothesisLoop(executed());
+
+    expect(isSavedHypothesisLoop(saved)).toBe(true);
+    expect(saved.hypotheses).toHaveLength(SMALL.candidateValues.length);
+    expect(saved.outcomes).toHaveLength(saved.hypotheses.length);
+    expect(saved.loopFingerprint).toMatch(/^[0-9a-f]{8}$/);
+    for (const hypothesis of saved.hypotheses) expect(hypothesis.createdBeforeRun).toBe(true);
+  });
+
+  it('pętli z naruszoną prerejestracją nie da się zapisać', () => {
+    const result = executed();
+    expect(() => buildSavedHypothesisLoop({ ...result, preregistrationIntact: { intact: false, reason: 'test' } }))
+      .toThrow(/naruszoną prerejestracją/i);
+  });
+
+  it('niezmieniony zapis odtwarza się jako MATCH — przez PONOWNE wykonanie', () => {
+    const replay = replaySavedHypothesisLoop(buildSavedHypothesisLoop(executed()));
+
+    expect(replay.status).toBe('MATCH');
+    expect(replay.result).not.toBeNull();
+    expect(replay.reason).toMatch(/wykonano od nowa/i);
+    expect(replay.result!.allRuns.length).toBeGreaterThan(0);
+  });
+
+  it('podmieniony status w zapisie kończy się DRIFT ze wskazaniem pola', () => {
+    const saved = buildSavedHypothesisLoop(executed());
+    const tampered = {
+      ...saved,
+      outcomes: saved.outcomes.map((entry, index) => index !== 0 ? entry : { ...entry, status: 'SUPPORTED' as const, observedMetric: -1 }),
+    };
+    const replay = replaySavedHypothesisLoop(tampered);
+
+    expect(replay.status).toBe('DRIFT');
+    expect(replay.result).toBeNull();
+    expect(replay.differences.some((entry) => entry.field.endsWith('.observedMetric'))).toBe(true);
+  });
+
+  it('podmieniona prerejestracja w zapisie jest BLOCKED, nigdy MATCH', () => {
+    const saved = buildSavedHypothesisLoop(executed());
+    const tampered = {
+      ...saved,
+      hypotheses: saved.hypotheses.map((entry, index) => index !== 0 ? entry : { ...entry, statement: 'przepisane po wyniku' }),
+    };
+    const replay = replaySavedHypothesisLoop(tampered);
+
+    expect(replay.status).toBe('BLOCKED');
+    expect(replay.reason).toMatch(/nie zgadza się ze swoim odciskiem/i);
+  });
+
+  it('uszkodzony albo obcy zapis jest BLOCKED', () => {
+    expect(replaySavedHypothesisLoop(undefined).status).toBe('BLOCKED');
+    expect(replaySavedHypothesisLoop({}).status).toBe('BLOCKED');
+    expect(replaySavedHypothesisLoop({ contractVersion: '0.0.1' }).status).toBe('BLOCKED');
+  });
+
+  it('pełny łańcuch: zapis → przeładowanie → odtworzenie MATCH', async () => {
+    const storage = makeFakeStorage();
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: storage });
+    const memory = await import('../core/scienceMemory');
+    memory.saveHypothesisLoopToMemory(executed());
+
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: storage });
+    const reloaded = await import('../core/scienceMemory');
+    const record = reloaded.listExperiments()[0]!;
+
+    expect(record.hypothesisLoop?.preregistrationId).toMatch(/^prereg_/);
+    expect(record.stats.realRuns).toBeGreaterThan(0);
+    const { replaySavedHypothesisLoop: replayAfterReload } = await import('../core/experimentFabric/hypothesisLoop');
+    expect(replayAfterReload(record.hypothesisLoop).status).toBe('MATCH');
+  });
+
+  it('rekord z uszkodzoną pętlą nie jest wczytywany z pamięci', async () => {
+    const storage = makeFakeStorage();
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: storage });
+    const memory = await import('../core/scienceMemory');
+    memory.saveHypothesisLoopToMemory(executed());
+
+    const key = 'genesis-os:science-memory/v1';
+    const raw = JSON.parse(storage.getItem(key)!) as Record<string, Record<string, unknown>>[];
+    raw[0]!.hypothesisLoop!.outcomes = [];
+    storage.setItem(key, JSON.stringify(raw));
+
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: storage });
+    const reloaded = await import('../core/scienceMemory');
+    expect(reloaded.listExperiments()).toHaveLength(0);
   });
 });

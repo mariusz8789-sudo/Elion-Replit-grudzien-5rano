@@ -10,6 +10,7 @@ import { openSavedCounterfactualInWorld, openSavedScenarioInWorld } from '../cor
 import type { SavedScenarioReplay } from '../core/simulation/scenarioMemory';
 import { replaySavedScenarioCounterfactual, type SavedScenarioCounterfactualReplay } from '../core/simulation/scenarioCounterfactual';
 import { replaySavedCompositionCompute, type CompositionComputeReplay } from '../core/naturalCompositionCompute';
+import { replaySavedHypothesisLoop, type HypothesisLoopReplay } from '../core/experimentFabric/hypothesisLoop';
 
 function downloadJson(record: SavedExperiment): void {
   const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
@@ -44,6 +45,7 @@ export function ScientificMemoryScreen() {
   const [scenarioReplay, setScenarioReplay] = useState<Record<string, SavedScenarioReplay>>({});
   const [counterfactualReplay, setCounterfactualReplay] = useState<Record<string, SavedScenarioCounterfactualReplay>>({});
   const [computeReplay, setComputeReplay] = useState<Record<string, CompositionComputeReplay>>({});
+  const [loopReplay, setLoopReplay] = useState<Record<string, HypothesisLoopReplay>>({});
   const countLabel = useMemo(() => `${records.length} ${records.length === 1 ? 'zapis' : 'zapisów'}`, [records.length]);
 
   /**
@@ -229,6 +231,18 @@ export function ScientificMemoryScreen() {
                     <div className="stat-row"><span>Ramiona</span><span className="val">baseline={counterfactualReplay[record.id]!.baselineStatus ?? 'brak'} · variant={counterfactualReplay[record.id]!.variantStatus ?? 'brak'}</span></div>
                   </>}
                 </>}
+                {record.hypothesisLoop && <>
+                  <div className="stat-row"><span>Pętla hipotez</span><span className="val">{record.hypothesisLoop.hypotheses.length} prerejestrowanych hipotez · {record.hypothesisLoop.problem.primaryMetric}</span></div>
+                  <div className="stat-row"><span>Prerejestracja</span><span className="val mono">{record.hypothesisLoop.preregistrationId} · odcisk {record.hypothesisLoop.preregistrationFingerprint}</span></div>
+                  {record.hypothesisLoop.outcomes.map((outcome) => (
+                    <div className="stat-row" key={outcome.hypothesisId}>
+                      <span>{outcome.hypothesisId}</span>
+                      <span className="val mono">{outcome.status} · {record.hypothesisLoop!.problem.primaryMetric}={outcome.observedMetric ?? 'brak'} (odniesienie {outcome.baselineMetric ?? 'brak'}) · {outcome.evidencePackId ?? 'brak paczki'}</span>
+                    </div>
+                  ))}
+                  <div className="stat-row"><span>Rozstrzygnięcie</span><span className="val">{record.hypothesisLoop.discrimination.decisive ? `zwycięzca ${record.hypothesisLoop.discrimination.winnerHypothesisId}` : 'brak zwycięzcy — uporządkowanie nierozstrzygające'}</span></div>
+                  {loopReplay[record.id] && <div className="stat-row"><span>Odtworzenie pętli</span><span className="val">{loopReplay[record.id]!.status}</span></div>}
+                </>}
                 <div className="stat-row"><span>Honesty</span><span className="val">{record.honesty}</span></div>
                 <div className="stat-row"><span>Fingerprint treści</span><span className="val mono">#{record.contentHash}</span></div>
                 <div className="stat-row"><span>Parametry</span><span className="val">{Object.keys(record.params).length}</span></div>
@@ -281,6 +295,21 @@ export function ScientificMemoryScreen() {
               )}
               {biotechReplay && <p className="settings-hint">Replay comparison: {biotechReplay.status} — {biotechReplay.reason} Nie jest to biologiczne wykonanie ani świeży pomiar.</p>}
               {computeReplay[record.id] && <p className="settings-hint" role="status">Zapisane compute: {computeReplay[record.id]!.status} — {computeReplay[record.id]!.reason}</p>}
+              {loopReplay[record.id] && (
+                <>
+                  <p className="settings-hint" role="status">Odtworzenie pętli: {loopReplay[record.id]!.status} — {loopReplay[record.id]!.reason}</p>
+                  {loopReplay[record.id]!.differences.length > 0 && (
+                    <div className="stat-list">
+                      {loopReplay[record.id]!.differences.map((difference) => (
+                        <div className="stat-row" key={difference.field}>
+                          <span>{difference.field}</span>
+                          <span className="val mono">{String(difference.expected)} → {String(difference.actual)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
               {record.execution?.summary && <p className="settings-hint">{record.execution.summary}</p>}
               {record.biotech && record.biotech.provenance.length > 0 && (
                 <details className="settings-details">
@@ -321,6 +350,10 @@ export function ScientificMemoryScreen() {
                 {record.counterfactual && <>
                   <button className="chip-btn pilot-primary" onClick={() => replayCounterfactualRecord(record, false)}>Odtwórz oba ramiona</button>
                   <button className="chip-btn" onClick={() => replayCounterfactualRecord(record, true)}>Podmień różnicę → DRIFT</button>
+                </>}
+                {record.hypothesisLoop && <>
+                  <button className="chip-btn pilot-primary" onClick={() => setLoopReplay((current) => ({ ...current, [record.id]: replaySavedHypothesisLoop(record.hypothesisLoop) }))}>Odtwórz pętlę hipotez</button>
+                  <button className="chip-btn" onClick={() => setLoopReplay((current) => ({ ...current, [record.id]: replaySavedHypothesisLoop({ ...record.hypothesisLoop!, outcomes: record.hypothesisLoop!.outcomes.map((entry, index) => index !== 0 ? entry : { ...entry, observedMetric: (entry.observedMetric ?? 0) + 5 }) }) }))}>Podmień wynik → DRIFT</button>
                 </>}
                 {record.scenario && <>
                   <button className="chip-btn" onClick={() => replayScenarioRecord(record, 'verify')}>Sam werdykt odtworzenia</button>

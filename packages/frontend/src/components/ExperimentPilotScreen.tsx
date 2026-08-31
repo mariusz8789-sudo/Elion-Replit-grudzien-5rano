@@ -34,7 +34,7 @@ import {
 import { confirmBackendEvidenceGuidedExperiment } from '../core/experimentFabric/backendExecution';
 import { buildStructuredRequestFromModel } from '../core/experimentFabric/structuredRequestBuilder';
 import { track } from '../core/analytics';
-import { saveScientificEvidencePackToMemory } from '../core/scienceMemory';
+import { saveHypothesisLoopToMemory, saveScientificEvidencePackToMemory } from '../core/scienceMemory';
 import { buildExperimentGraph, executeNextExperiment, type ExperimentGraph } from '../core/experimentFabric/experimentGraph';
 import type { ExperimentRun } from '../core/experimentFabric/types';
 import { runExperiment } from '../core/experimentFabric/executor';
@@ -522,6 +522,20 @@ export function ExperimentPilotScreen() {
                   >
                     Wykonaj następny eksperyment
                   </button>
+                  <button
+                    className="chip-btn"
+                    onClick={() => {
+                      try {
+                        const record = saveHypothesisLoopToMemory(loopResult);
+                        setLoopNotice(`Pętla zapisana w Pamięci Naukowej: #${record.contentHash}. Po przeładowaniu zbiór jest wykonywany od nowa i porównywany.`);
+                      } catch (saveError) {
+                        setLoopNotice(`Nie zapisano pętli: ${saveError instanceof Error ? saveError.message : String(saveError)}`);
+                      }
+                    }}
+                  >
+                    Zapisz pętlę w Pamięci
+                  </button>
+                  <button className="chip-btn" onClick={() => { window.location.hash = '#/memory'; }}>Otwórz Pamięć Naukową</button>
                 </div>
               </>
             )}

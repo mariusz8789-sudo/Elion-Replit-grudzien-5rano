@@ -9,6 +9,7 @@ import { canonicalJson, fnv1a } from './events/hash';
 import type { CompositionComputeReport } from './naturalCompositionCompute';
 import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
 import type { ScenarioRun } from './simulation/scenarioEngine';
+import { buildSavedHypothesisLoop, isSavedHypothesisLoop, type HypothesisLoopResult, type SavedHypothesisLoop } from './experimentFabric/hypothesisLoop';
 import { buildSavedScenarioCounterfactual, isSavedScenarioCounterfactual, type SavedScenarioCounterfactual, type ScenarioCounterfactual } from './simulation/scenarioCounterfactual';
 
 /**
@@ -160,6 +161,11 @@ export interface SavedExperiment {
    * porównywane, nie odczytywane jako wynik.
    */
   counterfactual?: SavedScenarioCounterfactual;
+  /**
+   * Prerejestrowany zbiór hipotez wraz z tym, co z niego wyszło. Zapis niesie
+   * WEJŚCIA i statusy; odtworzenie wykonuje zbiór od nowa i je porównuje.
+   */
+  hypothesisLoop?: SavedHypothesisLoop;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -315,6 +321,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     validBiotechContext(o.biotech) &&
     (o.scenario === undefined || isSavedScenarioRunContext(o.scenario)) &&
     (o.counterfactual === undefined || isSavedScenarioCounterfactual(o.counterfactual)) &&
+    (o.hypothesisLoop === undefined || isSavedHypothesisLoop(o.hypothesisLoop)) &&
     validReplayIdentity(o.replayIdentity)
   );
 }
@@ -455,6 +462,7 @@ export interface SaveExperimentInput {
   biotech?: SavedBiotechContext;
   scenario?: SavedScenarioRunContext;
   counterfactual?: SavedScenarioCounterfactual;
+  hypothesisLoop?: SavedHypothesisLoop;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -495,6 +503,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (!validBiotechContext(input.biotech)) throw new Error('Biotech context musi mieć kompletne identity, status i provenance.');
   if (input.scenario !== undefined && !isSavedScenarioRunContext(input.scenario)) throw new Error('Kontekst scenariusza musi zawierać komplet wejść i odcisków wystarczających do odtworzenia.');
   if (input.counterfactual !== undefined && !isSavedScenarioCounterfactual(input.counterfactual)) throw new Error('Kontrfaktyk musi zawierać komplet obu ramion i policzoną, porównywalną różnicę.');
+  if (input.hypothesisLoop !== undefined && !isSavedHypothesisLoop(input.hypothesisLoop)) throw new Error('Zapis pętli hipotez musi zawierać prerejestrację, hipotezy i komplet wyników.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -513,6 +522,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.biotech === undefined ? {} : { biotech: input.biotech }),
     ...(input.scenario === undefined ? {} : { scenario: input.scenario }),
     ...(input.counterfactual === undefined ? {} : { counterfactual: input.counterfactual }),
+    ...(input.hypothesisLoop === undefined ? {} : { hypothesisLoop: input.hypothesisLoop }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -766,6 +776,47 @@ export function saveScenarioCounterfactualToMemory(counterfactual: ScenarioCount
       'Oba ramiona dziela warunki startowe; jedyne roznice to scenariusz i moment jego wejscia.',
       'Porownanie zostaloby zablokowane przy roznym ziarnie, populacji albo horyzoncie.',
     ],
+    epistemicStatus: 'SIMULATION',
+  });
+}
+
+/**
+ * Utrwala prerejestrowaną pętlę hipotez w istniejącej Pamięci Naukowej.
+ * Zapisujemy prerejestrację i statusy; przy odtworzeniu zbiór jest wykonywany
+ * od nowa, a zapisane liczby są porównywane, nie odczytywane jako wynik.
+ */
+export function saveHypothesisLoopToMemory(result: HypothesisLoopResult): SavedExperiment {
+  const loop = buildSavedHypothesisLoop(result);
+  const supported = loop.outcomes.filter((entry) => entry.status === 'SUPPORTED').length;
+  const falsified = loop.outcomes.filter((entry) => entry.status === 'FALSIFIED').length;
+  return saveExperiment({
+    labId: loop.problem.domainId,
+    experimentId: `hypothesis-loop:${loop.problem.problemId}`,
+    experimentName: `Pętla hipotez — ${loop.problem.statement}`,
+    params: {
+      problemId: loop.problem.problemId,
+      modelId: loop.problem.modelId,
+      primaryMetric: loop.problem.primaryMetric,
+      candidateVariable: loop.problem.candidateVariable,
+      hypotheses: loop.hypotheses.length,
+      ...Object.fromEntries(Object.entries(loop.problem.sharedLevers)),
+    },
+    stats: {
+      hypotheses: loop.hypotheses.length,
+      supported,
+      falsified,
+      realRuns: result.allRuns.length,
+      evidencePacks: result.packs.length,
+    },
+    hypothesisLoop: loop,
+    analysis: [
+      { title: 'Prerejestracja', body: `Zbiór ${loop.preregistrationId} zamrozono odciskiem ${loop.preregistrationFingerprint} PRZED wykonaniem. Kazda pozniejsza zmiana twierdzenia, przewidywania lub kryterium jest wykrywalna.`, kind: 'hypothesis-preregistration' },
+      { title: 'Rozstrzygniecie', body: loop.discrimination.decisive ? `Uporzadkowanie ${loop.problem.primaryMetric}: ${loop.discrimination.ranking.map((entry) => `${entry.candidate}=${entry.metric}`).join(' < ')}. Zwyciezca: ${loop.discrimination.winnerHypothesisId}.` : 'Uporzadkowanie nie wylonilo zwyciezcy; zaden kandydat nie moze sie na nie powolac.', kind: 'hypothesis-discrimination' },
+      { title: 'Granice', body: 'Genesis wygenerowal prerejestrowane hipotezy, wykonal istniejacy model obliczeniowy i porownal realne wyniki modelu w zadeklarowanym zakresie. To nie jest odkrycie naukowe, obserwacja swiata ani wskazowka operacyjna.', kind: 'hypothesis-boundary' },
+    ],
+    honesty: 'simplified',
+    honestyNote: `Model ${loop.problem.modelId}; wynik SIMULATION, nieskalibrowany. ${supported} hipotez wspartych, ${falsified} sfalsyfikowanych w granicach protokolu.`,
+    assumptions: [...loop.hypotheses[0]!.assumptions],
     epistemicStatus: 'SIMULATION',
   });
 }

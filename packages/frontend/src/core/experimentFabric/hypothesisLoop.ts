@@ -573,3 +573,142 @@ export function selectNextHypothesisExperiment(result: HypothesisLoopResult): Ne
     rule,
   };
 }
+
+/**
+ * TRWAŁA POSTAĆ PĘTLI.
+ *
+ * Zapisujemy PREREJESTRACJĘ i to, co z niej wyszło — a nie odpowiedź. Przy
+ * odtworzeniu zbiór jest wykonywany od nowa z zapisanych wejść i zestawiany z
+ * zapisanymi statusami; zapisane liczby są porównywane, nie odczytywane jako
+ * wynik. Podmieniony status albo dopisana hipoteza kończą się DRIFT-em.
+ */
+export interface SavedHypothesisLoop {
+  contractVersion: string;
+  preregistrationId: string;
+  preregistrationFingerprint: string;
+  problem: HypothesisProblem;
+  hypotheses: readonly PreregisteredHypothesis[];
+  outcomes: readonly {
+    hypothesisId: string;
+    status: HypothesisStatus;
+    observedMetric: number | null;
+    baselineMetric: number | null;
+    evidencePackId: string | null;
+    evidenceChainId: string | null;
+  }[];
+  discrimination: { ranking: HypothesisDiscrimination['ranking']; winnerHypothesisId: string | null; decisive: boolean };
+  loopFingerprint: string;
+}
+
+export function buildSavedHypothesisLoop(result: HypothesisLoopResult): SavedHypothesisLoop {
+  if (!result.preregistrationIntact.intact) {
+    throw new Error(`Nie zapisujemy pętli z naruszoną prerejestracją: ${result.preregistrationIntact.reason}`);
+  }
+  const base = {
+    contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
+    preregistrationId: result.preregistration.preregistrationId,
+    preregistrationFingerprint: result.preregistration.preregistrationFingerprint,
+    problem: result.preregistration.set.problem,
+    hypotheses: result.preregistration.hypotheses,
+    outcomes: result.outcomes.map((outcome) => ({
+      hypothesisId: outcome.hypothesisId,
+      status: outcome.status,
+      observedMetric: outcome.observedMetric,
+      baselineMetric: outcome.baselineMetric,
+      evidencePackId: outcome.evidencePackId,
+      evidenceChainId: outcome.evidenceChainId,
+    })),
+    discrimination: {
+      ranking: result.discrimination.ranking,
+      winnerHypothesisId: result.discrimination.winnerHypothesisId,
+      decisive: result.discrimination.decisive,
+    },
+  };
+  return { ...base, loopFingerprint: fnv1a(canonicalJson(base)) };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** localStorage jest edytowalne poza aplikacją — rekord walidujemy pole po polu. */
+export function isSavedHypothesisLoop(value: unknown): value is SavedHypothesisLoop {
+  if (!isRecord(value)) return false;
+  if (typeof value.contractVersion !== 'string' || typeof value.preregistrationId !== 'string') return false;
+  if (typeof value.preregistrationFingerprint !== 'string' || typeof value.loopFingerprint !== 'string') return false;
+  if (!isRecord(value.problem) || typeof value.problem.problemId !== 'string' || typeof value.problem.modelId !== 'string') return false;
+  if (!Array.isArray(value.hypotheses) || value.hypotheses.length === 0) return false;
+  if (!value.hypotheses.every((entry) => isRecord(entry) && typeof entry.hypothesisId === 'string' && entry.createdBeforeRun === true)) return false;
+  if (!Array.isArray(value.outcomes) || value.outcomes.length !== value.hypotheses.length) return false;
+  if (!isRecord(value.discrimination) || !Array.isArray(value.discrimination.ranking)) return false;
+  return typeof value.discrimination.decisive === 'boolean';
+}
+
+export type HypothesisLoopReplayStatus = 'MATCH' | 'DRIFT' | 'BLOCKED';
+
+export interface HypothesisLoopReplay {
+  status: HypothesisLoopReplayStatus;
+  reason: string;
+  differences: readonly { field: string; expected: string | number | null; actual: string | number | null }[];
+  /** Ponownie wykonana pętla — wyłącznie przy MATCH. */
+  result: HypothesisLoopResult | null;
+}
+
+/**
+ * Odtwarza pętlę, WYKONUJĄC prerejestrowany zbiór od nowa. Nie odczytuje
+ * zapisanych statusów: liczy je ponownie i porównuje. Naruszona prerejestracja
+ * albo uszkodzony rekord to BLOCKED, nigdy MATCH.
+ */
+export function replaySavedHypothesisLoop(saved: unknown): HypothesisLoopReplay {
+  if (!isSavedHypothesisLoop(saved)) {
+    return { status: 'BLOCKED', reason: 'Zapisana pętla jest niekompletna albo uszkodzona.', differences: [], result: null };
+  }
+  if (saved.contractVersion !== HYPOTHESIS_LOOP_CONTRACT_VERSION) {
+    return { status: 'BLOCKED', reason: `Zapis pochodzi z kontraktu ${saved.contractVersion}, a bieżący to ${HYPOTHESIS_LOOP_CONTRACT_VERSION} — porównanie nie byłoby miarodajne.`, differences: [], result: null };
+  }
+  const rebuilt: Preregistration = {
+    contractVersion: saved.contractVersion,
+    preregistrationId: saved.preregistrationId,
+    problemId: saved.problem.problemId,
+    createdAt: '',
+    hypotheses: saved.hypotheses,
+    preregistrationFingerprint: saved.preregistrationFingerprint,
+    set: generateCompetingHypotheses(saved.problem),
+  };
+  const intact = verifyPreregistrationIntact(rebuilt);
+  if (!intact.intact) {
+    return { status: 'BLOCKED', reason: `Prerejestracja w zapisie nie zgadza się ze swoim odciskiem: ${intact.reason}`, differences: [], result: null };
+  }
+
+  const replayed = executePreregisteredHypotheses(rebuilt);
+  const differences: { field: string; expected: string | number | null; actual: string | number | null }[] = [];
+  for (const savedOutcome of saved.outcomes) {
+    const actual = replayed.outcomes.find((entry) => entry.hypothesisId === savedOutcome.hypothesisId);
+    if (actual === undefined) {
+      differences.push({ field: `outcome.${savedOutcome.hypothesisId}`, expected: savedOutcome.status, actual: null });
+      continue;
+    }
+    if (actual.status !== savedOutcome.status) differences.push({ field: `${savedOutcome.hypothesisId}.status`, expected: savedOutcome.status, actual: actual.status });
+    if (actual.observedMetric !== savedOutcome.observedMetric) differences.push({ field: `${savedOutcome.hypothesisId}.observedMetric`, expected: savedOutcome.observedMetric, actual: actual.observedMetric });
+    if (actual.evidencePackId !== savedOutcome.evidencePackId) differences.push({ field: `${savedOutcome.hypothesisId}.evidencePackId`, expected: savedOutcome.evidencePackId, actual: actual.evidencePackId });
+  }
+  if (replayed.discrimination.winnerHypothesisId !== saved.discrimination.winnerHypothesisId) {
+    differences.push({ field: 'discrimination.winner', expected: saved.discrimination.winnerHypothesisId, actual: replayed.discrimination.winnerHypothesisId });
+  }
+  if (replayed.discrimination.decisive !== saved.discrimination.decisive) {
+    differences.push({ field: 'discrimination.decisive', expected: String(saved.discrimination.decisive), actual: String(replayed.discrimination.decisive) });
+  }
+
+  if (differences.length > 0) {
+    return {
+      status: 'DRIFT',
+      reason: `Odtworzona pętla różni się od zapisanej w ${differences.length} ${differences.length === 1 ? 'polu' : 'polach'}: ${differences.map((entry) => entry.field).join(', ')}.`,
+      differences, result: null,
+    };
+  }
+  return {
+    status: 'MATCH',
+    reason: 'Prerejestrowany zbiór wykonano od nowa i odtworzył te same statusy, te same metryki, te same paczki dowodowe i to samo rozstrzygnięcie.',
+    differences: [], result: replayed,
+  };
+}

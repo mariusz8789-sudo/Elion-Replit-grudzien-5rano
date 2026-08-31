@@ -9,7 +9,7 @@ import { saveExperiment, listExperiments, saveBiotechDiscoveryComparisonToMemory
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
 import { track } from '../core/analytics';
 import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmEarthquakeEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
-import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
+import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { getToken } from '../core/backend/session';
 import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
 import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
@@ -317,7 +317,11 @@ export function ScienceChat() {
           if (run.request.modelId === 'earthquake-scenario') {
             window.location.hash = run.result.route.hash;
             setOpen(false);
-          } else if (setPendingExperimentWorld(run.runId)) window.location.hash = run.result.route.hash;
+          } else if (setPendingScenarioTimeline(run.runId) || setPendingExperimentWorld(run.runId)) {
+            // Scenario Engine oddaje zakończoną serię, epidemic-city żywy świat —
+            // obie trasy prowadzą do tego samego renderera World/3D.
+            window.location.hash = run.result.route.hash;
+          }
         } else if (run.result.status === 'completed' && run.result.route.kind === 'lab') {
           setPendingScenario(run.result.route.labId, run.provenance.parameterSnapshot, run.result.route.experimentId);
           window.location.hash = `#/lab/${run.result.route.labId}`;

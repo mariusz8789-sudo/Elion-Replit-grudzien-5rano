@@ -36,7 +36,7 @@ import { buildStructuredRequestFromModel } from '../core/experimentFabric/struct
 import { track } from '../core/analytics';
 import { saveScientificEvidencePackToMemory } from '../core/scienceMemory';
 import { setPendingScenario } from '../core/scenarioBridge';
-import { setPendingExperimentWorld } from '../core/experimentFabric/worldHandoff';
+import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
 import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 
@@ -293,7 +293,7 @@ export function ExperimentPilotScreen() {
     if (!run) return;
     const route = run.result.route;
     if (route.kind === 'live-world') {
-      if (!setPendingExperimentWorld(run.runId)) {
+      if (!setPendingScenarioTimeline(run.runId) && !setPendingExperimentWorld(run.runId)) {
         setError('Wynik ma trasę World, ale live simulation nie jest dostępna w tej sesji. Replay nie został uruchomiony.');
         return;
       }

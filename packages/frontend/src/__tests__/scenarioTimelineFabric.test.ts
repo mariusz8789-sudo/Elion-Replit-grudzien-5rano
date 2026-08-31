@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { runExperiment } from '../core/experimentFabric/executor';
 import { buildStructuredRequestFromModel } from '../core/experimentFabric/structuredRequestBuilder';
 import { getRouterModel } from '../core/experimentFabric/router';
 import { parseScienceChatMessage } from '../core/experimentFabric/parser';
 import { SCENARIOS } from '../core/simulation/scenarioEngine';
+import { clearScenarioTimelineHandoffs, peekPendingScenarioTimeline, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import type { ExperimentValue } from '../core/experimentFabric/types';
 
 /**
@@ -172,5 +173,69 @@ describe('Pytanie w języku naturalnym → Scenario Engine', () => {
     expect(parseScienceChatMessage('Symulacja z zamknięciem szkół.').parameters.scenarioId).toBe('SCHOOL_CLOSURE');
     expect(parseScienceChatMessage('Co da ograniczenie kontaktów?').parameters.scenarioId).toBe('CONTACT_REDUCTION');
     expect(parseScienceChatMessage('Scenariusz bazowy epidemii.').parameters.scenarioId).toBe('BASELINE');
+  });
+});
+
+describe('Przekazanie przebiegu do World/3D', () => {
+  beforeEach(() => clearScenarioTimelineHandoffs());
+
+  it('zakończony przebieg rejestruje serię, którą World/3D może przewijać', () => {
+    const experiment = run({ scenarioId: 'ISOLATION' });
+
+    expect(setPendingScenarioTimeline(experiment.runId)).toBe(true);
+    const handoff = peekPendingScenarioTimeline()!;
+
+    expect(handoff.runId).toBe(experiment.runId);
+    expect(handoff.runFingerprint).toBe(experiment.provenance.runFingerprint);
+    expect(handoff.scenarioId).toBe('ISOLATION');
+    expect(handoff.resultOrigin).toBe('real-engine');
+    expect(handoff.epistemicStatus).toBe('SIMULATION');
+  });
+
+  it('przekazana seria to DOKŁADNIE seria przebiegu, dzień po dniu', () => {
+    const experiment = run({ scenarioId: 'BASELINE' });
+    setPendingScenarioTimeline(experiment.runId);
+    const handoff = peekPendingScenarioTimeline()!;
+
+    expect(handoff.series.length).toBe(Number(experiment.result.outputs.daysSimulated));
+    // Punkty czasowe w wyniku muszą zgadzać się z serią, po której przewija się świat.
+    for (const day of [0, 6, 24, 48]) {
+      expect(handoff.series[day]!.infectious).toBe(Number(experiment.result.outputs[`T+${day}h_infectious`]));
+      expect(handoff.series[day]!.deceased).toBe(Number(experiment.result.outputs[`T+${day}h_deceased`]));
+    }
+  });
+
+  it('świat nie ma dnia spoza horyzontu — brak ekstrapolacji', () => {
+    const experiment = run({ scenarioId: 'BASELINE', days: 10 });
+    setPendingScenarioTimeline(experiment.runId);
+    const handoff = peekPendingScenarioTimeline()!;
+
+    expect(handoff.series[handoff.series.length - 1]).toBeDefined();
+    expect(handoff.series[handoff.series.length]).toBeUndefined();
+  });
+
+  it('różne warianty przekazują różne serie pod różnymi runId', () => {
+    const baseline = run({ scenarioId: 'BASELINE' });
+    const isolation = run({ scenarioId: 'ISOLATION' });
+
+    setPendingScenarioTimeline(baseline.runId);
+    const baselineSeries = peekPendingScenarioTimeline()!.series;
+    setPendingScenarioTimeline(isolation.runId);
+    const isolationSeries = peekPendingScenarioTimeline()!.series;
+
+    expect(isolation.runId).not.toBe(baseline.runId);
+    expect(isolationSeries.map((s) => s.infectious)).not.toEqual(baselineSeries.map((s) => s.infectious));
+  });
+
+  it('nieznany runId nie uzbraja przekazania — świat nie dostaje cudzych danych', () => {
+    expect(setPendingScenarioTimeline('run_nie_istnieje')).toBe(false);
+    expect(peekPendingScenarioTimeline()).toBeNull();
+  });
+
+  it('odrzucony przebieg nie rejestruje żadnej serii', () => {
+    const experiment = run({ scenarioId: 'NIE_ISTNIEJE' });
+
+    expect(experiment.result.status).toBe('engine_not_available');
+    expect(setPendingScenarioTimeline(experiment.runId)).toBe(false);
   });
 });

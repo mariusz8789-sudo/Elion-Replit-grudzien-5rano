@@ -44,11 +44,11 @@ import { buildPhotonGraph } from '../modelGraph/photonGraph';
 import { kardashevPower, schwarzschildRadius } from '../physics';
 import { runIsingMetropolisScenario } from '../isingModel';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS } from '../simulation/epidemicCity';
-import { runScenario, replayScenario, SCENARIOS, SCENARIO_ENGINE_VERSION, type ScenarioId } from '../simulation/scenarioEngine';
+import { runScenario, replayScenario, SCENARIOS, SCENARIO_ENGINE_VERSION, type ScenarioId, type ScenarioRun } from '../simulation/scenarioEngine';
 import { buildPinnedChEMBLCaffeineDiscovery, mapPinnedChEMBLCaffeineA1Activity } from '../biotechData/chembl';
 import { createExperimentProvenance, statusForCapability } from './provenance';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
-import { registerLiveExperimentWorld } from './worldHandoff';
+import { registerLiveExperimentWorld, registerScenarioTimeline } from './worldHandoff';
 import {
   EXPERIMENT_FABRIC_VERSION,
   type ExperimentResult,
@@ -178,7 +178,7 @@ function graphOutputs(
   return { outputs, units, assumptions };
 }
 
-function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (simulation: EpidemicCitySimulation) => void): ExperimentResult {
+function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (simulation: EpidemicCitySimulation) => void, onScenarioWorld?: (world: { run: ScenarioRun; scenarioId: ScenarioId; seed: number }) => void): ExperimentResult {
   const model = request.modelId ? getRouterModel(request.modelId) : undefined;
   if (!model) throw new Error('Brak lokalnego adaptera realnego modelu.');
   const params = request.parameters;
@@ -910,13 +910,14 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
       const scenarioId = requestedScenario as ScenarioId;
       const days = Math.round(numberParam(params, 'days', 72));
       const stepsPerDay = Math.round(numberParam(params, 'stepsPerDay', 4));
+      const scenarioSeed = request.seed ?? Math.round(numberParam(params, 'seed', 20260828));
       const run = runScenario(scenarioId, {
         days,
         stepsPerDay,
         baseParams: {
           nAgents: Math.round(numberParam(params, 'nAgents', 400)),
           initialInfected: Math.round(numberParam(params, 'initialInfected', 5)),
-          seed: request.seed ?? Math.round(numberParam(params, 'seed', 20260828)),
+          seed: scenarioSeed,
         },
         // Realna dźwignia czasu: ta sama polityka uruchomiona później daje inny,
         // policzalny wynik. Zero = obowiązuje od początku przebiegu.
@@ -943,6 +944,9 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         timeline[`T+${day}h_bedOccupancy`] = Number(sample.hospital.bedOccupancy.toFixed(4));
       }
 
+      // Seria trafia do World/3D tym samym wzorcem, którym epidemic-city
+      // przekazuje żywy świat — jeden kanał na przebieg, zero duplikatu stanu.
+      onScenarioWorld?.({ run, scenarioId, seed: scenarioSeed });
       const replay = replayScenario(run);
       return {
         contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
@@ -1001,6 +1005,9 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
   const plan = createExperimentPlan(intent);
   let result: ExperimentResult;
   let liveWorld: EpidemicCitySimulation | undefined;
+  // Zakończony przebieg scenariusza wraca z executora osobno, bo World/3D
+  // przewija jego serię, zamiast taktować żywy obiekt symulacji.
+  let scenarioWorld: { run: ScenarioRun; scenarioId: ScenarioId; seed: number } | undefined;
   if (!validation.ok) result = rejectedResult(validation.errors);
   else {
     const status = statusForCapability(intent.capability);
@@ -1035,7 +1042,7 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
     else if (status === 'capability_seam') result = unavailableResult(status, `${intent.rationale} Wymagany solver: ${intent.requiredSolver}.`, routeForUnavailable());
     else if (status === 'engine_not_available') result = unavailableResult(status, `${intent.rationale} Wymagany solver: ${intent.requiredSolver}.`, routeForUnavailable());
     else {
-      try { result = executeRealModel(request, (simulation) => { liveWorld = simulation; }); }
+      try { result = executeRealModel(request, (simulation) => { liveWorld = simulation; }, (world) => { scenarioWorld = world; }); }
       catch (error) {
         result = {
           contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'failed', summary: 'Realny silnik zwrócił błąd wykonania.',
@@ -1059,6 +1066,21 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
     result,
     provenance,
   };
+  if (scenarioWorld && result.status === 'completed' && scenarioWorld.run.summary !== null) {
+    registerScenarioTimeline({
+      runId: run.runId,
+      runFingerprint: run.provenance.runFingerprint,
+      resultOrigin: 'real-engine',
+      modelId: 'scenario-timeline',
+      scenarioId: scenarioWorld.scenarioId,
+      scenarioLabel: SCENARIOS[scenarioWorld.scenarioId].label,
+      seed: scenarioWorld.seed,
+      summary: result.summary,
+      series: scenarioWorld.run.series,
+      scenarioSummary: scenarioWorld.run.summary,
+      epistemicStatus: 'SIMULATION',
+    });
+  }
   if (liveWorld && result.status === 'completed') registerLiveExperimentWorld(run.runId, liveWorld, { runFingerprint: run.provenance.runFingerprint, resultOrigin: 'real-engine', summary: result.summary });
   return run;
 }

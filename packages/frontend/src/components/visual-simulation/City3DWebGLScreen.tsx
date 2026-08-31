@@ -4,7 +4,7 @@ import { registerSimContext } from '../../core/simContext';
 import { ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
 import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
-import { consumePendingExperimentWorld } from '../../core/experimentFabric/worldHandoff';
+import { consumePendingExperimentWorld, consumePendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
@@ -58,6 +58,13 @@ export function City3DWebGLScreen() {
   // already-computed EpidemicCitySimulation instance here instead of City3D
   // silently starting a second, disconnected simulation.
   const [experimentWorld] = useState(() => consumePendingExperimentWorld());
+  // Drugi kanał przekazania: ZAKOŃCZONY przebieg Scenario Engine. Świat nie jest
+  // wtedy taktowany — jest PRZEWIJANY po rzeczywistej serii dobowej przebiegu.
+  const [scenarioTimeline] = useState(() => consumePendingScenarioTimeline());
+  const [timelineDay, setTimelineDay] = useState(0);
+  const timelineSample = scenarioTimeline
+    ? scenarioTimeline.series[Math.min(timelineDay, scenarioTimeline.series.length - 1)]
+    : undefined;
   const sim = useMemo(() => new EpidemicCity3DSim({}, {
     onAgentSelected: (id) => {
       setSelectedId(id);
@@ -247,6 +254,37 @@ export function City3DWebGLScreen() {
             <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
             {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
             {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu Canvas 2D</button>.</div>}
+            {scenarioTimeline && timelineSample && (
+              <div className="scenario-run-timeline" aria-label="Oś czasu zapisanego przebiegu scenariusza">
+                <div className="scenario-run-identity">
+                  <span className="scenario-run-badge">SIMULATION</span>
+                  <strong>{scenarioTimeline.scenarioLabel}</strong>
+                  <span className="mono" title={scenarioTimeline.runFingerprint}>run {scenarioTimeline.runId.slice(0, 14)}…</span>
+                  <span>seed {scenarioTimeline.seed}</span>
+                  <span>{scenarioTimeline.series.length} dni</span>
+                </div>
+                <label className="scenario-run-scrubber">
+                  <span>dzień {timelineSample.day} / {scenarioTimeline.series.length - 1}</span>
+                  <input
+                    type="range" min={0} max={scenarioTimeline.series.length - 1} step={1}
+                    value={Math.min(timelineDay, scenarioTimeline.series.length - 1)}
+                    onChange={(event) => setTimelineDay(Number(event.target.value))}
+                    aria-label="Przewiń przebieg scenariusza po dniach"
+                  />
+                </label>
+                <div className="scenario-run-metrics">
+                  <span>zakaźni<b>{timelineSample.infectious}</b></span>
+                  <span>zmarli<b>{timelineSample.deceased}</b></span>
+                  <span>podatni<b>{timelineSample.susceptible}</b></span>
+                  <span>ozdrowieńcy<b>{timelineSample.recovered}</b></span>
+                  <span>obłożenie łóżek<b>{(timelineSample.hospital.bedOccupancy * 100).toFixed(1)}%</b></span>
+                </div>
+                <p className="scenario-run-note">
+                  Stan pochodzi wyłącznie z zapisanej serii tego przebiegu. Model nie jest skalibrowany do żadnej
+                  rzeczywistej epidemii — to symulacja scenariuszowa, nie prognoza ani obserwacja.
+                </p>
+              </div>
+            )}
             <div className="city-scene-readout" aria-live="polite">
               <span>model aktywny</span><strong>dzień {stats.dzien ?? 0}</strong><span>widok: {cameraPreset}</span><span>{analysis === 'none' ? 'widok normalny' : `warstwa: ${analysisLabel}`}</span>{experimentWorld && <span title={experimentWorld.runFingerprint}>real run · {experimentWorld.resultOrigin} · {experimentWorld.runId.slice(0, 12)}…</span>}
             </div>

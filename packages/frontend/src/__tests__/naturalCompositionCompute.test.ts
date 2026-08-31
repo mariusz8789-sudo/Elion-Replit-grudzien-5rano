@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   COMPOSITION_COMPUTE_CONTRACT_VERSION,
   COMPOSITION_COMPUTE_RUNTIMES,
   executeCompositionCompute,
   fabricCompositionComputeExecutor,
   planCompositionCompute,
+  replaySavedCompositionCompute,
   type CompositionComputeExecutor,
 } from '../core/naturalCompositionCompute';
 import { naturalCandidateStructures } from '../core/biotechData/naturalReplacement';
@@ -289,5 +290,76 @@ describe('Compute i priorytet walidacji w dossier', () => {
     expect(entry.compute).toBeNull();
     expect(entry.computeStatus).toBe('MISSING_DATA');
     for (const component of entry.components) expect(component.hypothesisComputeRecords).toEqual([]);
+  });
+});
+
+describe('Zapisane compute w Pamięci Naukowej', () => {
+  it('weryfikacja nienaruszonego zapisu daje MATCH i mówi, czym NIE jest', async () => {
+    const compute = await executeCompositionCompute(planCompositionCompute(composition(), structures()), okExecutor);
+    const replay = replaySavedCompositionCompute([compute]);
+
+    expect(replay.status).toBe('MATCH');
+    expect(replay.verifiedRecordCount).toBe(4);
+    // MATCH nie wolno czytać jako „runtime uruchomiono ponownie".
+    expect(replay.reason).toMatch(/nie ponowne uruchomienie/i);
+  });
+
+  it('podmieniony wynik w zapisie kończy się DRIFT ze wskazaniem rekordu', async () => {
+    const compute = await executeCompositionCompute(planCompositionCompute(composition(), structures()), okExecutor);
+    const tampered = [{
+      ...compute,
+      runtimes: compute.runtimes.map((runtime, index) => index !== 0 ? runtime : {
+        ...runtime,
+        componentRecords: runtime.componentRecords.map((record, position) => position !== 0 ? record : { ...record, outputs: { ...record.outputs, echoedInputLength: 999 } }),
+      }),
+    }];
+    const replay = replaySavedCompositionCompute(tampered);
+
+    expect(replay.status).toBe('DRIFT');
+    expect(replay.differences).toHaveLength(1);
+    expect(replay.differences[0]!.field).toBe('fingerprint');
+    expect(replay.differences[0]!.candidateId).toBeTruthy();
+  });
+
+  it('brak wykonań albo obcy kształt zapisu jest BLOCKED, nigdy MATCH', async () => {
+    expect(replaySavedCompositionCompute([]).status).toBe('BLOCKED');
+    expect(replaySavedCompositionCompute(undefined).status).toBe('BLOCKED');
+    expect(replaySavedCompositionCompute([{ nieoczekiwane: true }]).status).toBe('BLOCKED');
+
+    const refused = await executeCompositionCompute(planCompositionCompute(composition(), structures()), async () => ({ ok: false, error: 'brak runtime' }));
+    const replay = replaySavedCompositionCompute([refused]);
+    expect(replay.status).toBe('BLOCKED');
+    expect(replay.reason).toMatch(/nie ma czego weryfikować/i);
+  });
+
+  it('compute przeżywa przeładowanie w istniejącym artefakcie pamięci', async () => {
+    const storage = (() => {
+      const map = new Map<string, string>();
+      return {
+        getItem: (key: string) => (map.has(key) ? map.get(key)! : null),
+        setItem: (key: string, value: string) => void map.set(key, value),
+        removeItem: (key: string) => void map.delete(key),
+        key: (index: number) => [...map.keys()][index] ?? null,
+        get length() { return map.size; },
+      };
+    })();
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: storage });
+    const memory = await import('../core/scienceMemory');
+    const { buildPinnedChEMBLCaffeineDiscovery } = await import('../core/biotechData/chembl');
+    const { buildPinnedChEMBLAdenosineDiscovery } = await import('../core/biotechData/adenosine');
+    const { buildPinnedChEMBLTheophyllineDiscovery } = await import('../core/biotechData/theophylline');
+    const compute = await executeCompositionCompute(planCompositionCompute(composition(), structures()), okExecutor);
+    const pinned = [buildPinnedChEMBLCaffeineDiscovery().report, buildPinnedChEMBLAdenosineDiscovery().report, buildPinnedChEMBLTheophyllineDiscovery().report];
+    memory.saveBiotechDiscoveryComparisonToMemory(pinned, { requestedTargetIds: ['CHEMBL318'], compositionCompute: [compute] });
+
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: storage });
+    const reloaded = await import('../core/scienceMemory');
+    const artifact = reloaded.listExperiments()[0]?.biotech?.artifact;
+
+    expect(artifact?.compositionCompute).toBeDefined();
+    expect(artifact!.compositionCompute![0]!.executedRunCount).toBe(4);
+    expect(replaySavedCompositionCompute(artifact!.compositionCompute).status).toBe('MATCH');
   });
 });

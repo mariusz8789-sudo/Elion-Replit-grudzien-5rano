@@ -194,6 +194,9 @@ function DrugWorkspace() {
       sourceRecords: replacementResult?.sourceRecords,
       activityRecords: replacementResult?.liveActivities,
       neurobiology: replacementResult?.neurobiology,
+      // Wykonane obliczenia idą do pamięci razem z raportami — inaczej realny
+      // run z jego runId znikał przy przeładowaniu.
+      compositionCompute: compositionCompute.length ? compositionCompute : undefined,
       // Bez tego zapisany artefakt liczył pokrycie targetów względem pustej
       // listy, więc `uncoveredTargetIds` zawsze wychodziło puste.
       requestedTargetIds: referenceTarget ? [referenceTarget] : [],

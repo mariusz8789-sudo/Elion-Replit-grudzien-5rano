@@ -9,6 +9,7 @@ import { replaySavedBiotechComparison, replaySavedBiotechDiscoveryArtifact } fro
 import { openSavedScenarioInWorld } from '../core/simulation/scenarioWorldReplay';
 import type { SavedScenarioReplay } from '../core/simulation/scenarioMemory';
 import { replaySavedScenarioCounterfactual, type SavedScenarioCounterfactualReplay } from '../core/simulation/scenarioCounterfactual';
+import { replaySavedCompositionCompute, type CompositionComputeReplay } from '../core/naturalCompositionCompute';
 
 function downloadJson(record: SavedExperiment): void {
   const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
@@ -42,6 +43,7 @@ export function ScientificMemoryScreen() {
   const [artifactReplay, setArtifactReplay] = useState<Record<string, string>>({});
   const [scenarioReplay, setScenarioReplay] = useState<Record<string, SavedScenarioReplay>>({});
   const [counterfactualReplay, setCounterfactualReplay] = useState<Record<string, SavedScenarioCounterfactualReplay>>({});
+  const [computeReplay, setComputeReplay] = useState<Record<string, CompositionComputeReplay>>({});
   const countLabel = useMemo(() => `${records.length} ${records.length === 1 ? 'zapis' : 'zapisów'}`, [records.length]);
 
   /**
@@ -170,6 +172,8 @@ export function ScientificMemoryScreen() {
                       <details className="settings-details"><summary>Combination validation plan</summary>{artifact.combinationHypothesis.validationPlan.map((step) => <p className="settings-hint" key={step}>{step}</p>)}</details>
                     </>}
                     {artifactReplay[record.id] && <div className="stat-row"><span>Full artifact replay</span><span className="val">{artifactReplay[record.id]}</span></div>}
+                    {artifact.compositionCompute && <div className="stat-row"><span>Per-hypothesis compute</span><span className="val">{artifact.compositionCompute.reduce((sum, entry) => sum + entry.executedRunCount, 0)} wykonanych runów w {artifact.compositionCompute.length} kompozycjach</span></div>}
+                    {computeReplay[record.id] && <div className="stat-row"><span>Integralność zapisanego compute</span><span className="val">{computeReplay[record.id]!.status} · zweryfikowano {computeReplay[record.id]!.verifiedRecordCount}</span></div>}
                   </>}
                 </>}
                 {record.scenario && <>
@@ -250,6 +254,7 @@ export function ScientificMemoryScreen() {
                 </>
               )}
               {biotechReplay && <p className="settings-hint">Replay comparison: {biotechReplay.status} — {biotechReplay.reason} Nie jest to biologiczne wykonanie ani świeży pomiar.</p>}
+              {computeReplay[record.id] && <p className="settings-hint" role="status">Zapisane compute: {computeReplay[record.id]!.status} — {computeReplay[record.id]!.reason}</p>}
               {record.execution?.summary && <p className="settings-hint">{record.execution.summary}</p>}
               {record.biotech && record.biotech.provenance.length > 0 && (
                 <details className="settings-details">
@@ -300,6 +305,10 @@ export function ScientificMemoryScreen() {
                 {artifact && <>
                   <button className="chip-btn pilot-primary" onClick={() => { window.location.hash = `#/dossier?candidate=${encodeURIComponent(artifact.reports[0]?.candidateId ?? '')}`; }}>Open Candidate Dossier</button>
                   <button className="chip-btn pilot-primary" onClick={() => runArtifactReplay('match')}>Replay artifact</button>
+                  {artifact.compositionCompute && <>
+                    <button className="chip-btn" onClick={() => setComputeReplay((current) => ({ ...current, [record.id]: replaySavedCompositionCompute(artifact.compositionCompute) }))}>Zweryfikuj zapisane compute</button>
+                    <button className="chip-btn" onClick={() => setComputeReplay((current) => ({ ...current, [record.id]: replaySavedCompositionCompute(artifact.compositionCompute!.map((entry) => ({ ...entry, runtimes: entry.runtimes.map((runtime) => ({ ...runtime, componentRecords: runtime.componentRecords.map((componentRecord) => componentRecord.status === 'EXECUTED' ? { ...componentRecord, outputs: { ...componentRecord.outputs, tampered: 1 } } : componentRecord) })) }))) }))}>Podmień wynik → DRIFT</button>
+                  </>}
                   <button className="chip-btn" onClick={() => runArtifactReplay('drift')}>Test DRIFT</button>
                   <button className="chip-btn" onClick={() => runArtifactReplay('blocked')}>Test BLOCKED</button>
                 </>}

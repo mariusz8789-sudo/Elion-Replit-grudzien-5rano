@@ -6,6 +6,7 @@ import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 import { compareAme2020Observations } from './observation/nuclearAme2020';
 import { compareCandidateDiscoveryReports, type CandidateComparison } from './biotechDiscoveryContract';
 import { canonicalJson, fnv1a } from './events/hash';
+import type { CompositionComputeReport } from './naturalCompositionCompute';
 import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
 import type { ScenarioRun } from './simulation/scenarioEngine';
 import { buildSavedScenarioCounterfactual, isSavedScenarioCounterfactual, type SavedScenarioCounterfactual, type ScenarioCounterfactual } from './simulation/scenarioCounterfactual';
@@ -97,6 +98,13 @@ export interface SavedBiotechDiscoveryArtifact {
   compositionHypotheses?: readonly RankedCompositionHypothesis[];
   /** Targety, względem których liczono pokrycie. Bez nich `uncoveredTargetIds` zawsze wychodzi puste. */
   requestedTargetIds?: readonly string[];
+  /**
+   * Per-hypothesis compute: realne przebiegi runtime'ów wykonane dla kompozycji,
+   * razem z runId, wejściem, wyjściem i odciskiem. Bez tego wykonane obliczenia
+   * znikały przy przeładowaniu, a dossier po powrocie mówiło MISSING_DATA o
+   * czymś, co realnie policzono.
+   */
+  compositionCompute?: readonly CompositionComputeReport[];
   artifactFingerprint: string;
 }
 
@@ -341,7 +349,7 @@ export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryRep
   });
 }
 
-export function saveBiotechDiscoveryComparisonToMemory(reports: readonly CandidateDiscoveryReport[], lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[]; sourceRecords?: readonly SavedBiotechSourceRecord[]; activityRecords?: readonly SavedBiotechActivityRecord[]; neurobiology?: SavedBiotechDiscoveryArtifact['neurobiology']; requestedTargetIds?: readonly string[] }): SavedExperiment {
+export function saveBiotechDiscoveryComparisonToMemory(reports: readonly CandidateDiscoveryReport[], lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[]; sourceRecords?: readonly SavedBiotechSourceRecord[]; activityRecords?: readonly SavedBiotechActivityRecord[]; neurobiology?: SavedBiotechDiscoveryArtifact['neurobiology']; requestedTargetIds?: readonly string[]; compositionCompute?: readonly CompositionComputeReport[] }): SavedExperiment {
   if (reports.length < 2) throw new Error('Porównanie kandydatów do pamięci wymaga co najmniej dwóch raportów.');
   const requestedTargetIds = lineage?.requestedTargetIds ?? [];
   const comparison = compareCandidateDiscoveryReports(reports);
@@ -359,6 +367,9 @@ export function saveBiotechDiscoveryComparisonToMemory(reports: readonly Candida
     combinationHypothesis: buildCandidateCombinationHypothesis(reports, requestedTargetIds),
     compositionHypotheses: rankNaturalCompositionHypotheses(reports, requestedTargetIds, 3),
     requestedTargetIds,
+    // Wykonane obliczenia są DANYMI, nie funkcją raportów: nie da się ich
+    // przeliczyć z raportów, więc wchodzą do odcisku jako zapisana treść.
+    ...(lineage?.compositionCompute === undefined ? {} : { compositionCompute: lineage.compositionCompute }),
   };
   const artifact: SavedBiotechDiscoveryArtifact = { ...artifactBase, artifactFingerprint: fnv1a(canonicalJson(artifactBase)) };
   return saveBiotechDiscoveryReportToMemory(reports[0]!, comparison, { ...lineage, computeRuns, artifact });
@@ -403,7 +414,11 @@ export function replaySavedBiotechDiscoveryArtifact(saved: SavedBiotechDiscovery
     // fingerprint rozjeżdża się bez żadnej realnej zmiany naukowej.
     combinationHypothesis: buildCandidateCombinationHypothesis(reports, saved.requestedTargetIds ?? []),
     compositionHypotheses: rankNaturalCompositionHypotheses(reports, saved.requestedTargetIds ?? [], 3),
-    requestedTargetIds: saved.requestedTargetIds ?? [] };
+    requestedTargetIds: saved.requestedTargetIds ?? [],
+    // Compute nie jest przeliczalny z raportów — jego integralność sprawdza
+    // osobno `replaySavedCompositionCompute`. Tutaj przechodzi jako zapisana
+    // treść, żeby odcisk artefaktu obejmował również ją.
+    ...(saved.compositionCompute === undefined ? {} : { compositionCompute: saved.compositionCompute }) };
   // Sam zgodny fingerprint nie wystarcza: rekord z pamięci może mieć podmienioną
   // TREŚĆ przy nienaruszonym odcisku. Porównujemy więc również to, co zapis
   // deklaruje, z tym, co przeliczenie daje — inaczej podmieniony ranking

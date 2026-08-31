@@ -307,3 +307,76 @@ export function fabricCompositionComputeExecutor(
     };
   };
 }
+
+export type CompositionComputeReplayStatus = 'MATCH' | 'DRIFT' | 'BLOCKED';
+
+export interface CompositionComputeReplayDifference {
+  candidateId: string;
+  runtimeModelId: string;
+  field: string;
+  expected: string;
+  actual: string;
+}
+
+export interface CompositionComputeReplay {
+  status: CompositionComputeReplayStatus;
+  reason: string;
+  verifiedRecordCount: number;
+  differences: readonly CompositionComputeReplayDifference[];
+}
+
+/**
+ * WERYFIKACJA ZAPISANEGO COMPUTE — i jasna deklaracja, czym ona NIE jest.
+ *
+ * Wykonany run backendowy ma własny, jednorazowy runId; ponowne wywołanie
+ * runtime'u dałoby inny run, nawet przy identycznym wyniku. Odtworzenie
+ * „bit w bit" jak przy Scenario Engine jest więc tutaj niemożliwe i udawanie
+ * go byłoby fałszem.
+ *
+ * Sprawdzamy zamiast tego SPÓJNOŚĆ WEWNĘTRZNĄ zapisu: czy odcisk każdego
+ * wykonania nadal odpowiada trójce {model, wejście, wyjście}. To wykrywa
+ * podmianę zapisanej liczby w localStorage — czyli dokładnie to, przed czym
+ * zapis ma chronić. MATCH oznacza „rekord jest nienaruszony", a NIE „runtime
+ * został uruchomiony ponownie", i tak jest opisany.
+ */
+export function replaySavedCompositionCompute(saved: unknown): CompositionComputeReplay {
+  if (!Array.isArray(saved) || saved.length === 0) {
+    return { status: 'BLOCKED', reason: 'Brak zapisanych rekordów compute do zweryfikowania.', verifiedRecordCount: 0, differences: [] };
+  }
+  const differences: CompositionComputeReplayDifference[] = [];
+  let verified = 0;
+  for (const entry of saved as CompositionComputeReport[]) {
+    if (!entry || typeof entry !== 'object' || !Array.isArray(entry.runtimes)) {
+      return { status: 'BLOCKED', reason: 'Zapisany raport compute ma nieoczekiwaną strukturę; weryfikacja wstrzymana.', verifiedRecordCount: verified, differences };
+    }
+    for (const runtime of entry.runtimes) {
+      for (const record of runtime.componentRecords ?? []) {
+        if (record.status !== 'EXECUTED') continue;
+        if (record.input === null || record.fingerprint === null) {
+          differences.push({ candidateId: record.candidateId, runtimeModelId: record.runtimeModelId, field: 'fingerprint', expected: 'odcisk wykonania', actual: 'brak' });
+          continue;
+        }
+        verified += 1;
+        const recomputed = fnv1a(canonicalJson({ modelId: record.runtimeModelId, inputs: record.input, outputs: record.outputs }));
+        if (recomputed !== record.fingerprint) {
+          differences.push({ candidateId: record.candidateId, runtimeModelId: record.runtimeModelId, field: 'fingerprint', expected: record.fingerprint, actual: recomputed });
+        }
+      }
+    }
+  }
+  if (verified === 0) {
+    return { status: 'BLOCKED', reason: 'Żaden zapisany rekord nie jest wykonaniem — nie ma czego weryfikować.', verifiedRecordCount: 0, differences };
+  }
+  if (differences.length > 0) {
+    return {
+      status: 'DRIFT',
+      reason: `Zapisane wykonania nie zgadzają się ze swoimi odciskami w ${differences.length} ${differences.length === 1 ? 'przypadku' : 'przypadkach'} — treść rekordu została zmieniona po zapisie.`,
+      verifiedRecordCount: verified, differences,
+    };
+  }
+  return {
+    status: 'MATCH',
+    reason: `${verified} zapisanych wykonań jest spójnych ze swoimi odciskami {model, wejście, wyjście}. To potwierdzenie NIENARUSZONEGO zapisu, nie ponowne uruchomienie runtime'u.`,
+    verifiedRecordCount: verified, differences: [],
+  };
+}

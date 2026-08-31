@@ -23,6 +23,21 @@ function only(parameters: Record<string, ExperimentValue>, allowed: readonly str
  * constrained router over registered real models, not an LLM. Unknown theory
  * or missing engines are returned explicitly and cannot generate a result.
  */
+/**
+ * Frazy → nazwany scenariusz w istniejącym Scenario Engine. Tabela zamiast
+ * rozsypanych regexów, żeby dodanie scenariusza było jedną linią i żeby dało
+ * się ją przetestować. Nie rozpoznaje scenariuszy, których silnik nie modeluje.
+ */
+const SCENARIO_PHRASES: readonly { pattern: RegExp; scenarioId: string }[] = [
+  { pattern: /(?:izolacj[a-ząćęłńóśźż]*|kwarantann[a-ząćęłńóśźż]*|odosobnieni[a-ząćęłńóśźż]*)/, scenarioId: 'ISOLATION' },
+  { pattern: /(?:zamkni[eę]ci[a-ząćęłńóśźż]*\s+szk[oó][łl]|szko[łl]y\s+zamkni|school closure)/, scenarioId: 'SCHOOL_CLOSURE' },
+  { pattern: /(?:ogranicz[a-ząćęłńóśźż]*\s+kontakt|redukcj[a-ząćęłńóśźż]*\s+kontakt|dystans[a-ząćęłńóśźż]*\s+spo[łl]eczn)/, scenarioId: 'CONTACT_REDUCTION' },
+  { pattern: /(?:ochron[a-ząćęłńóśźż]*\s+senior|ochron[a-ząćęłńóśźż]*\s+starsz|senior[a-ząćęłńóśźż]*\s+chro)/, scenarioId: 'PROTECT_SENIORS' },
+  { pattern: /(?:rozbudow[a-ząćęłńóśźż]*\s+(?:szpital|[łl][oó][zż]ek)|wi[eę]cej\s+[łl][oó][zż]ek|healthcare expansion)/, scenarioId: 'HEALTHCARE_EXPANSION' },
+  { pattern: /(?:ogranicz[a-ząćęłńóśźż]*\s+transport|transport publiczn[a-ząćęłńóśźż]*\s+ogranicz)/, scenarioId: 'TRANSPORT_REDUCTION' },
+  { pattern: /(?:scenariusz\s+bazow[a-ząćęłńóśźż]*|\bbaseline\b|bez interwencji|brak interwencji)/, scenarioId: 'BASELINE' },
+];
+
 export function parseScienceChatMessage(text: string): StructuredExperimentRequest {
   const sourceText = text.trim();
   const normalized = sourceText.toLocaleLowerCase('pl-PL');
@@ -97,6 +112,16 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (seed !== undefined) params.seed = seed;
   if (r0 !== undefined) params.r0 = r0;
   if (horizonDays !== undefined) params.horizonDays = horizonDays;
+  // Scenario Engine liczy w dniach i przyjmuje dzień wejścia interwencji jako
+  // realną dźwignię, więc oba wyciągamy z pytania, o ile użytkownik je poda.
+  if (horizonDays !== undefined) params.days = horizonDays;
+  const interventionStartDay = firstNumber(
+    normalized,
+    /\b(?:po|dopiero po|od)\s+(\d+(?:[.,]\d+)?)\s*(?:dni|dniach|dzień|dnia|days?)\b/,
+  );
+  if (interventionStartDay !== undefined) params.interventionStartDay = interventionStartDay;
+  const scenarioId = SCENARIO_PHRASES.find((entry) => entry.pattern.test(normalized))?.scenarioId;
+  if (scenarioId !== undefined) params.scenarioId = scenarioId;
   if (earthquakeMagnitude !== undefined) params.magnitude = earthquakeMagnitude;
   if (earthquakeDepthKm !== undefined) params.depthKm = earthquakeDepthKm;
   if (earthquakeEpicenterX !== undefined) params.epicenterX = earthquakeEpicenterX;
@@ -250,6 +275,12 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   }
   if (/\b(fałdowani[a-ząćęłńóśźż]* białk[a-ząćęłńóśźż]*|faldowani[a-ząćęłńóśźż]* bialk[a-ząćęłńóśźż]*|protein folding|model hp|hydrofobow[a-ząćęłńóśźż]* rdze[nń])\b/.test(normalized)) return request('biology', 'biology-protein-folding-hp', 'canvas-2d', ['sequenceKey', 'temperature', 'steps', 'seed']);
   if (/\b(dna|helis[a-ząćęłńóśźż]* dna|b[- ]?dna|temperatur[a-ząćęłńóśźż]* topnieni[a-ząćęłńóśźż]* dna|wallace)\b/.test(normalized)) return request('biology', 'biology-dna-helix', 'scene-3d', ['sequence', 'temperatureC']);
+  // Pytanie o NAZWANY scenariusz albo o moment wejścia interwencji trafia do
+  // Scenario Engine, bo tylko on umie porównywalne warianty i dzień wejścia.
+  // Zwykłe „pokaż epidemię" zostaje przy agentowym epidemic-city.
+  if (scenarioId !== undefined || interventionStartDay !== undefined) {
+    return request('biology', 'scenario-timeline', 'world-3d', ['scenarioId', 'days', 'stepsPerDay', 'nAgents', 'initialInfected', 'seed', 'interventionStartDay']);
+  }
   if (/(?:epidem[a-ząćęłńóśźż]*|seir|seird|\bsir\b|zakaż[a-ząćęłńóśźż]*|zakaz[a-ząćęłńóśźż]*|rozwój epidemii|rozwoj epidemii)/.test(normalized)) {
     return request('biology', 'epidemic-city', 'world-3d', ['r0', 'horizonDays', 'nAgents']);
   }

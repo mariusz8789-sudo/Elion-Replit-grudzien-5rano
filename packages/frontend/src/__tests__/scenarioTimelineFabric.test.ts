@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { runExperiment } from '../core/experimentFabric/executor';
 import { buildStructuredRequestFromModel } from '../core/experimentFabric/structuredRequestBuilder';
 import { getRouterModel } from '../core/experimentFabric/router';
+import { parseScienceChatMessage } from '../core/experimentFabric/parser';
 import { SCENARIOS } from '../core/simulation/scenarioEngine';
 import type { ExperimentValue } from '../core/experimentFabric/types';
 
@@ -133,5 +134,43 @@ describe('Scenario Engine w Experiment Fabric — uczciwość', () => {
 
     expect(experiment.result.status).toBe('engine_not_available');
     expect(experiment.result.summary).toMatch(/Nieznany scenariusz/i);
+  });
+});
+
+describe('Pytanie w języku naturalnym → Scenario Engine', () => {
+  it('pytanie o nazwany scenariusz trafia do Scenario Engine, nie w próżnię', () => {
+    const parsed = parseScienceChatMessage('Pokaż scenariusz izolacji objawowych w mieście przez 72 dni.');
+
+    expect(parsed.modelId).toBe('scenario-timeline');
+    expect(parsed.parameters.scenarioId).toBe('ISOLATION');
+    expect(parsed.parameters.days).toBe(72);
+  });
+
+  it('pytanie o moment wejścia interwencji wyciąga dzień z treści', () => {
+    const parsed = parseScienceChatMessage('Co się stanie, jeśli wprowadzimy izolację dopiero po 20 dniach?');
+
+    expect(parsed.modelId).toBe('scenario-timeline');
+    expect(parsed.parameters.interventionStartDay).toBe(20);
+  });
+
+  it('zwykłe pytanie o epidemię nadal idzie do agentowego epidemic-city', () => {
+    const parsed = parseScienceChatMessage('Zasymuluj rozwój epidemii przez 72 dni.');
+
+    expect(parsed.modelId).toBe('epidemic-city');
+  });
+
+  it('sparsowane pytanie wykonuje się od razu, bez ręcznego przepisywania parametrów', () => {
+    const parsed = parseScienceChatMessage('Pokaż scenariusz izolacji objawowych przez 72 dni.');
+    const experiment = runExperiment(parsed);
+
+    expect(experiment.result.status).toBe('completed');
+    expect(experiment.provenance.resultOrigin).toBe('real-engine');
+    expect(Number(experiment.result.outputs.daysSimulated)).toBeGreaterThan(60);
+  });
+
+  it('rozpoznaje pozostałe nazwane scenariusze', () => {
+    expect(parseScienceChatMessage('Symulacja z zamknięciem szkół.').parameters.scenarioId).toBe('SCHOOL_CLOSURE');
+    expect(parseScienceChatMessage('Co da ograniczenie kontaktów?').parameters.scenarioId).toBe('CONTACT_REDUCTION');
+    expect(parseScienceChatMessage('Scenariusz bazowy epidemii.').parameters.scenarioId).toBe('BASELINE');
   });
 });

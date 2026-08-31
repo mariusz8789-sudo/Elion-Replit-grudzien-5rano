@@ -387,3 +387,30 @@ describe('Pamięć i odtworzenie pętli', () => {
     expect(reloaded.listExperiments()).toHaveLength(0);
   });
 });
+
+describe('Graf eksperymentu z pętli', () => {
+  it('prerejestrowane łańcuchy dają węzły HYPOTHESIS z zachowaną kolejnością', async () => {
+    const { buildExperimentGraph } = await import('../core/experimentFabric/experimentGraph');
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+    const graph = buildExperimentGraph({
+      question: SMALL.statement,
+      runs: result.allRuns,
+      evidenceChains: result.chains,
+    });
+
+    const hypothesisNodes = graph.nodes.filter((node) => node.kind === 'HYPOTHESIS');
+    // Węzły hipotez powstają WYŁĄCZNIE z prerejestrowanych łańcuchów — to jest
+    // powód, dla którego wcześniej graf ich nie miał.
+    expect(hypothesisNodes.length).toBe(result.chains.length);
+    for (const node of hypothesisNodes) {
+      expect(node.dependsOn).toEqual([graph.questionId]);
+      expect(node.detail.join(' ')).toMatch(/kryterium falsyfikacji/i);
+      expect(node.detail.join(' ')).toMatch(/prerejestrowana przed wykonaniem/i);
+    }
+    // Kolejność czasowa: pytanie → eksperyment → wynik.
+    const experiment = graph.nodes.find((node) => node.kind === 'EXPERIMENT')!;
+    const resultNode = graph.nodes.find((node) => node.kind === 'RESULT')!;
+    expect(graph.edges).toContainEqual({ from: experiment.nodeId, to: resultNode.nodeId });
+    expect(graph.nodes.some((node) => node.kind === 'EVIDENCE')).toBe(true);
+  });
+});

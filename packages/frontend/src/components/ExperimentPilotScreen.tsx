@@ -481,6 +481,15 @@ export function ExperimentPilotScreen() {
                     const executed = executePreregisteredHypotheses(prereg);
                     setLoopResult(executed);
                     setNextStep(selectNextHypothesisExperiment(executed));
+                    // Ten sam graf co reszta Genesis — hipotezy wchodzą do niego
+                    // jako prerejestrowane łańcuchy, nie jako dopisane po fakcie.
+                    const history = [...runHistory, ...executed.allRuns];
+                    setRunHistory(history);
+                    setGraph(buildExperimentGraph({
+                      question: prereg.set.problem.statement,
+                      runs: history,
+                      evidenceChains: executed.chains,
+                    }));
                     setLoopNotice(executed.claim);
                   } catch (loopError) {
                     setLoopNotice(`Pętla nie wykonała się: ${loopError instanceof Error ? loopError.message : String(loopError)}`);

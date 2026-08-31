@@ -5,7 +5,9 @@ import {
   runScenarioCommandCenter,
   scenarioParamsFromCommandCenter,
   scenarioUiMetrics,
+  temporalTimelinesFor,
 } from '../core/simulation/scenarioCommandCenter';
+import { temporalStateAt } from '../core/simulation/temporalState';
 
 const params = {
   nAgents: 120, initialInfected: 4, r0: 2.5, infectiousDays: 6, incubationDays: 3, ifr: 0.02,
@@ -45,5 +47,38 @@ describe('Scenario Command Center adapter', () => {
     const normalized = scenarioParamsFromCommandCenter(params);
     expect(normalized.seed).toBe(params.seed);
     expect('clockSpeed' in normalized).toBe(false);
+  });
+
+  it('measures a real divergence day instead of assuming the intervention start', () => {
+    const run = runScenarioCommandCenter('ISOLATION', params);
+    // ISOLATION differs from BASELINE from day 0 here (no delayed-start control
+    // in this adapter), so the arms must diverge — the measured day comes from
+    // the same firstDivergentDay() the counterfactual engine already tests.
+    expect(run.firstDivergentDay).not.toBeNull();
+    expect(run.counterfactualFingerprint).toBeTruthy();
+  });
+
+  it('is deterministic: same inputs give the same measured divergence and fingerprint', () => {
+    const first = runScenarioCommandCenter('ISOLATION', params);
+    const second = runScenarioCommandCenter('ISOLATION', params);
+    expect(second.firstDivergentDay).toBe(first.firstDivergentDay);
+    expect(second.counterfactualFingerprint).toBe(first.counterfactualFingerprint);
+  });
+
+  it('builds a temporal timeline per arm that matches the real series', () => {
+    const run = runScenarioCommandCenter('ISOLATION', params);
+    const timelines = temporalTimelinesFor(run);
+    expect(timelines).not.toBeNull();
+    for (const sample of run.baseline.series) {
+      expect(temporalStateAt(timelines!.baseline, sample.day)?.sample).toEqual(sample);
+    }
+    for (const sample of run.intervention.series) {
+      expect(temporalStateAt(timelines!.variant, sample.day)?.sample).toEqual(sample);
+    }
+  });
+
+  it('has no timeline for a non-modelled intervention — nothing to scrub', () => {
+    const run = runScenarioCommandCenter('TRANSPORT_REDUCTION', params);
+    expect(temporalTimelinesFor(run)).toBeNull();
   });
 });

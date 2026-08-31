@@ -73,11 +73,61 @@ npm run smoke:desktop && npm run smoke:mobile
 
 A plain static server is not enough — the app posts to `/api`, which only the backend answers.
 
+## Stage completed: M2 + M4 — re-pointed timeline on the counterfactual engine
+
+`scenarioCommandCenter.ts` no longer calls `runScenario()` twice + `compareScenarios()` directly —
+it delegates to the existing `runScenarioCounterfactual()`, so `ScenarioCommandCenterRun` now carries
+a real, measured `firstDivergentDay` and `counterfactualFingerprint` instead of nothing. A new
+`temporalTimelinesFor()` builds both arms via `buildTemporalTimeline()` (M1) for the panel to scrub.
+No third comparison path was created — this is the duplicate-path risk from the previous stage,
+resolved by re-pointing rather than extending.
+
+`ScenarioCommandCenterPanel.tsx`: the single-arm day slider now drives two branch rows (`TIMELINE A —
+BASELINE`, `TIMELINE B — INTERVENTION`), each showing its `TemporalStateEnvelope`'s
+`observationStatus` (`SIMULATED` / `COUNTERFACTUAL` / `NOT_AVAILABLE`), plus a divergence marker
+showing the **measured** `firstDivergentDay` — never the declared intervention-start day.
+
+**Real Chromium proof (not just unit tests):** navigated to `#/city3d`, ran the existing scenario
+button, and confirmed live: divergence marker read `ROZJAZD (mierzony): DZIEŃ 1`; scrubbing to day 5
+showed `SIMULATED`/`COUNTERFACTUAL` rows with different real numbers (I 13 vs I 11); scrubbing to day
+0 showed `NOT_AVAILABLE` on both arms rather than a fabricated sample; the existing replay button
+still returned `BASELINE MATCH · INTERVENTION MATCH` — the re-point did not break the pre-existing
+replay machinery. Full regression: desktop smoke 27 routes/238 interactions zero errors, mobile 27
+routes/242 interactions zero errors (up from 219/242 before this stage — the new rows add
+interactive surface, not instability).
+
+| Item | Value |
+|---|---|
+| Files modified | `scenarioCommandCenter.ts`, `ScenarioCommandCenterPanel.tsx`, `styles.css`, `scenarioCommandCenter.test.ts` |
+| Files added | none |
+| Frontend tests | 163 files / 1744 passed / 1 skipped (previous stage: 163/1740 — +4 tests, 0 new files) |
+| Backend tests | 275 passed, unchanged |
+| Lint / tsc / build / `git diff --check` | all clean |
+| E2E desktop | 27 routes / 238 interactions — zero runtime errors |
+| E2E mobile | 27 routes / 242 interactions — zero runtime errors |
+| Targeted Temporal Engine E2E | divergence marker, branch labels, day-5 SIMULATED/COUNTERFACTUAL rows, day-0 NOT_AVAILABLE, replay MATCH — all confirmed live in Chromium |
+
+### Parked / carried forward
+
+- The status-vocabulary decision from the previous stage stands: `SIMULATED/COUNTERFACTUAL/…`, not
+  `VERIFIED/LIKELY/UNVERIFIED` — reaffirmed by the user.
+- Both arms in this adapter start at day 0 (no delayed-intervention control exists in this UI), so
+  `firstDivergentDay` is measured but typically very early. That is a correct, honest measurement of
+  *this* adapter's inputs, not a limitation of the engine — `scenarioCounterfactual.ts` already
+  supports `baselineInterventionStartDay`/`variantInterventionStartDay`, this UI just doesn't expose
+  them. Out of scope for M2/M4; a candidate for a later milestone if a delayed-intervention demo is
+  wanted.
+- `replayScenarioCommandCenter()` (per-arm `replayScenario()`, MATCH/DRIFT/NOT_COMPARABLE) was left
+  untouched — it is a different, lighter-weight replay concept than the memory-based
+  `replaySavedScenarioCounterfactual()`, and M4's scope was branching + the divergence marker, not
+  persistence/replay. That is M6/M7.
+
 ## Next gap
 
-**M2 + M4 together: re-point the Command Center timeline at the counterfactual engine.** Rather than
-generalizing the timeline on top of the duplicate pair-run path, make `scenarioCommandCenter.ts`
-delegate to `runScenarioCounterfactual()`, then render the timeline from
-`buildTemporalTimeline(baseline, 'BASELINE')` / `buildTemporalTimeline(variant, 'VARIANT')` and show
-the **measured** `firstDivergentDay` as the divergence marker — never the declared
-`interventionStartDay`, which may precede any actual divergence.
+**M6 + M7: evidence and replay-by-re-execution for the Command Center's counterfactual.** Persist the
+counterfactual this panel already runs via `buildSavedScenarioCounterfactual()` (existing, from
+`scenarioCounterfactual.ts`), wire a save action in the panel, and surface
+`replaySavedScenarioCounterfactual()`'s MATCH/DRIFT/BLOCKED verdict — reusing the existing memory and
+replay contracts rather than inventing a Command-Center-specific one. This is the natural next step
+because the panel now produces a real `ScenarioCounterfactual`-shaped result (via M2/M4) that already
+has everything `buildSavedScenarioCounterfactual` needs.

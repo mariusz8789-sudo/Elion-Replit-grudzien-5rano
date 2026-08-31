@@ -1,20 +1,28 @@
 import type { SimParams } from '../types';
 import type { EpidemicCityParams } from './epidemicCity';
 import {
-  compareScenarios,
+  DEFAULT_SCENARIO_RUN,
   replayScenario,
-  runScenario,
   type ScenarioComparison,
   type ScenarioId,
   type ScenarioReplay,
   type ScenarioRun,
-  type ScenarioRunOptions,
 } from './scenarioEngine';
+import { runScenarioCounterfactual } from './scenarioCounterfactual';
+import { buildTemporalTimeline, type TemporalTimeline } from './temporalState';
 
 /**
  * Scenario Command Center adapter: converts only the existing live City parameter
  * state into Scenario Engine inputs, then exposes read-only runs and comparisons.
  * It does not mutate EpidemicCitySimulation or create a second epidemiological model.
+ *
+ * BASELINE i INTERVENTION przechodzą przez ISTNIEJĄCY silnik kontrfaktyczny
+ * (`runScenarioCounterfactual`), a nie przez dwa osobne wywołania `runScenario`.
+ * Wcześniej ten adapter liczył różnicę tylko przez `compareScenarios` i nie miał
+ * pojęcia, KTÓREGO dnia światy faktycznie się rozeszły — `firstDivergentDay` był
+ * dostępny w silniku od dawna, po prostu ten adapter po niego nie sięgał. Nie
+ * powstaje żadna trzecia ścieżka porównania: to przepięcie na istniejącą, nie
+ * dodanie kolejnej.
  */
 const CITY_PARAMETER_KEYS: readonly (keyof EpidemicCityParams)[] = [
   'nAgents', 'initialInfected', 'r0', 'infectiousDays', 'incubationDays', 'ifr',
@@ -26,6 +34,9 @@ export interface ScenarioCommandCenterRun {
   baseline: ScenarioRun;
   intervention: ScenarioRun;
   comparison: ScenarioComparison;
+  /** Dzień MIERZONY na obu seriach — nie deklarowany dzień wejścia interwencji. */
+  firstDivergentDay: number | null;
+  counterfactualFingerprint: string;
 }
 
 export interface ScenarioUiMetric {
@@ -46,12 +57,41 @@ export function scenarioParamsFromCommandCenter(params: SimParams): Partial<Epid
   return out as Partial<EpidemicCityParams>;
 }
 
-/** Runs BASELINE and the chosen intervention through the one existing Scenario Engine. */
+/**
+ * Runs BASELINE and the chosen intervention through the one existing
+ * counterfactual engine. Both arms start at day 0 — this adapter has no UI
+ * control for a delayed intervention — so this is behaviourally identical to
+ * the two direct `runScenario` calls it replaces, plus a real measured
+ * divergence day the old adapter never exposed.
+ */
 export function runScenarioCommandCenter(intervention: ScenarioId, params: SimParams): ScenarioCommandCenterRun {
-  const options: ScenarioRunOptions = { baseParams: scenarioParamsFromCommandCenter(params) };
-  const baseline = runScenario('BASELINE', options);
-  const interventionRun = runScenario(intervention, options);
-  return { baseline, intervention: interventionRun, comparison: compareScenarios(baseline, interventionRun) };
+  const counterfactual = runScenarioCounterfactual({
+    baselineScenarioId: 'BASELINE',
+    variantScenarioId: intervention,
+    days: DEFAULT_SCENARIO_RUN.days,
+    stepsPerDay: DEFAULT_SCENARIO_RUN.stepsPerDay,
+    baseParams: scenarioParamsFromCommandCenter(params),
+  });
+  return {
+    baseline: counterfactual.baseline,
+    intervention: counterfactual.variant,
+    comparison: counterfactual.comparison,
+    firstDivergentDay: counterfactual.firstDivergentDay,
+    counterfactualFingerprint: counterfactual.counterfactualFingerprint,
+  };
+}
+
+/**
+ * Oś czasu obu ramion do przewijania w UI. `null`, kiedy którekolwiek ramię
+ * nie zostało wykonane (NOT_MODELED) — oś czasu bez realnego przebiegu nie
+ * miałaby czego pokazywać.
+ */
+export function temporalTimelinesFor(run: ScenarioCommandCenterRun): { baseline: TemporalTimeline; variant: TemporalTimeline } | null {
+  if (run.baseline.status !== 'COMPLETED' || run.intervention.status !== 'COMPLETED') return null;
+  return {
+    baseline: buildTemporalTimeline(run.baseline, 'BASELINE'),
+    variant: buildTemporalTimeline(run.intervention, 'VARIANT'),
+  };
 }
 
 function everHospitalized(run: ScenarioRun): number | null {

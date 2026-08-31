@@ -1999,6 +1999,14 @@ kbd {
 .scenario-timeline > div b { color: #e1f5ff; font: .59rem var(--font-mono); }
 .scenario-timeline input { width: 100%; margin: .38rem 0; accent-color: #4ac9dc; }
 .scenario-timeline p { margin: 0; color: #a4bfd2; font: .6rem/1.4 var(--font-mono); }
+.scenario-timeline-divergence { margin: 0 0 .4rem; font: 700 .58rem/1.3 var(--font-mono); letter-spacing: .03em; }
+.scenario-divergence-past { color: #f5c57c; }
+.scenario-divergence-future { color: #7696ad; }
+.scenario-timeline-branch { margin-top: .32rem; padding-top: .32rem; border-top: 1px dashed rgba(134, 182, 218, .2); }
+.scenario-timeline-branch:first-of-type { border-top: none; }
+.scenario-branch-label { display: block; margin-bottom: .12rem; font: 700 .56rem var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+.scenario-branch-label.baseline { color: #86b9dc; }
+.scenario-branch-label.variant { color: #4ac9dc; }
 .scenario-trace { margin: .2rem .68rem .5rem; padding-top: .5rem; border-top: 1px dashed rgba(134, 182, 218, .28); }
 .scenario-trace-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .28rem; }
 .scenario-trace-grid span { display: grid; gap: .08rem; min-width: 0; color: #7696ad; font: .55rem/1 var(--font-mono); text-transform: uppercase; }

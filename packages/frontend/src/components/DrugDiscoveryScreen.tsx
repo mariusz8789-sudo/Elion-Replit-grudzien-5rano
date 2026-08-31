@@ -148,6 +148,9 @@ function DrugWorkspace() {
       sourceRecords: replacementResult?.sourceRecords,
       activityRecords: replacementResult?.liveActivities,
       neurobiology: replacementResult?.neurobiology,
+      // Bez tego zapisany artefakt liczył pokrycie targetów względem pustej
+      // listy, więc `uncoveredTargetIds` zawsze wychodziło puste.
+      requestedTargetIds: referenceTarget ? [referenceTarget] : [],
     });
     setBiotechReplay(replaySavedBiotechComparison(saved.biotech?.comparison, activeReplacementReports));
     const user = getSession()?.user;

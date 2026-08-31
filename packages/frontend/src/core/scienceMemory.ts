@@ -1,6 +1,6 @@
 import { readJSON, writeJSON } from './storage';
 import type { HonestyLevel, SimParams } from './types';
-import { biotechScientificFingerprint, buildCandidateCombinationHypothesis, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateCombinationHypothesis, type CandidateDiscoveryReport, type CandidateRanking, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
+import { biotechScientificFingerprint, buildCandidateCombinationHypothesis, rankNaturalCompositionHypotheses, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateCombinationHypothesis, type CandidateDiscoveryReport, type CandidateRanking, type RankedCompositionHypothesis, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
 import type { ExperimentOutputValue, ExperimentRoute, ExperimentRun } from './experimentFabric/types';
 import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 import { compareAme2020Observations } from './observation/nuclearAme2020';
@@ -86,6 +86,14 @@ export interface SavedBiotechDiscoveryArtifact {
   comparisonId?: string; rankingScores: Readonly<Record<string, number>>;
   computeRuns: readonly SavedBiotechComputeRun[]; sourceRecords?: readonly SavedBiotechSourceRecord[]; activityRecords?: readonly SavedBiotechActivityRecord[]; limitations: readonly string[];
   combinationHypothesis?: CandidateCombinationHypothesis;
+  /**
+   * TOP N uszeregowanych hipotez kompozycji — to, co użytkownik realnie
+   * zobaczył. Bez tego zapis pamiętał jedną kompozycję, a odtworzenie nie
+   * miało jak wykryć, że ranking się zmienił.
+   */
+  compositionHypotheses?: readonly RankedCompositionHypothesis[];
+  /** Targety, względem których liczono pokrycie. Bez nich `uncoveredTargetIds` zawsze wychodzi puste. */
+  requestedTargetIds?: readonly string[];
   artifactFingerprint: string;
 }
 
@@ -316,8 +324,9 @@ export function saveBiotechDiscoveryReportToMemory(report: CandidateDiscoveryRep
   });
 }
 
-export function saveBiotechDiscoveryComparisonToMemory(reports: readonly CandidateDiscoveryReport[], lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[]; sourceRecords?: readonly SavedBiotechSourceRecord[]; activityRecords?: readonly SavedBiotechActivityRecord[]; neurobiology?: SavedBiotechDiscoveryArtifact['neurobiology'] }): SavedExperiment {
+export function saveBiotechDiscoveryComparisonToMemory(reports: readonly CandidateDiscoveryReport[], lineage?: { activityIds?: readonly string[]; assayIds?: readonly string[]; computeRuns?: readonly SavedBiotechComputeRun[]; sourceRecords?: readonly SavedBiotechSourceRecord[]; activityRecords?: readonly SavedBiotechActivityRecord[]; neurobiology?: SavedBiotechDiscoveryArtifact['neurobiology']; requestedTargetIds?: readonly string[] }): SavedExperiment {
   if (reports.length < 2) throw new Error('Porównanie kandydatów do pamięci wymaga co najmniej dwóch raportów.');
+  const requestedTargetIds = lineage?.requestedTargetIds ?? [];
   const comparison = compareCandidateDiscoveryReports(reports);
   const computeRuns = lineage?.computeRuns ?? [];
   const artifactBase = {
@@ -327,7 +336,12 @@ export function saveBiotechDiscoveryComparisonToMemory(reports: readonly Candida
     activityIds: lineage?.activityIds ?? [], assayIds: lineage?.assayIds ?? [],
     comparisonId: comparison.comparisonId,
     rankingScores: Object.fromEntries(reports.map((report) => [report.candidateId, report.ranking?.score ?? 0])),
-    computeRuns, ...(lineage?.sourceRecords === undefined ? {} : { sourceRecords: lineage.sourceRecords }), ...(lineage?.activityRecords === undefined ? {} : { activityRecords: lineage.activityRecords }), ...(lineage?.neurobiology === undefined ? {} : { neurobiology: lineage.neurobiology }), limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'], combinationHypothesis: buildCandidateCombinationHypothesis(reports),
+    computeRuns, ...(lineage?.sourceRecords === undefined ? {} : { sourceRecords: lineage.sourceRecords }), ...(lineage?.activityRecords === undefined ? {} : { activityRecords: lineage.activityRecords }), ...(lineage?.neurobiology === undefined ? {} : { neurobiology: lineage.neurobiology }), limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'],
+    // Żądane targety wchodzą do obu wyliczeń, więc zapisana kompozycja niesie
+    // realne `uncoveredTargetIds`, a nie pustą listę z braku argumentu.
+    combinationHypothesis: buildCandidateCombinationHypothesis(reports, requestedTargetIds),
+    compositionHypotheses: rankNaturalCompositionHypotheses(reports, requestedTargetIds, 3),
+    requestedTargetIds,
   };
   const artifact: SavedBiotechDiscoveryArtifact = { ...artifactBase, artifactFingerprint: fnv1a(canonicalJson(artifactBase)) };
   return saveBiotechDiscoveryReportToMemory(reports[0]!, comparison, { ...lineage, computeRuns, artifact });
@@ -366,8 +380,28 @@ export function replaySavedBiotechDiscoveryArtifact(saved: SavedBiotechDiscovery
   const comparison = compareCandidateDiscoveryReports(reports);
   const sourceRecords = lineage.sourceRecords ?? saved.sourceRecords;
   const activityRecords = lineage.activityRecords ?? saved.activityRecords;
-  const base = { reports, validationRequestIds: reports.flatMap((report) => report.experimentRequestId ? [report.experimentRequestId] : []), candidateIds: reports.map((report) => report.candidateId), sourceIds: [...new Set(reports.flatMap((report) => report.provenance.map((item) => item.sourceId)))], activityIds: lineage.activityIds ?? [], assayIds: lineage.assayIds ?? [], comparisonId: comparison.comparisonId, rankingScores: Object.fromEntries(reports.map((report) => [report.candidateId, report.ranking?.score ?? 0])), computeRuns: lineage.computeRuns ?? [], ...(sourceRecords === undefined ? {} : { sourceRecords }), ...(activityRecords === undefined ? {} : { activityRecords }), ...(lineage.neurobiology === undefined ? {} : { neurobiology: lineage.neurobiology }), limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'], combinationHypothesis: buildCandidateCombinationHypothesis(reports) };
-  return fnv1a(canonicalJson(base)) === saved.artifactFingerprint ? { status: 'MATCH', reason: 'Cały deterministyczny discovery artifact odtworzył identyczny fingerprint.' } : { status: 'DRIFT', reason: 'Discovery artifact różni się w identity, źródłach, comparison, ranking, compute lub ograniczeniach.' };
+  const base = { reports, validationRequestIds: reports.flatMap((report) => report.experimentRequestId ? [report.experimentRequestId] : []), candidateIds: reports.map((report) => report.candidateId), sourceIds: [...new Set(reports.flatMap((report) => report.provenance.map((item) => item.sourceId)))], activityIds: lineage.activityIds ?? [], assayIds: lineage.assayIds ?? [], comparisonId: comparison.comparisonId, rankingScores: Object.fromEntries(reports.map((report) => [report.candidateId, report.ranking?.score ?? 0])), computeRuns: lineage.computeRuns ?? [], ...(sourceRecords === undefined ? {} : { sourceRecords }), ...(activityRecords === undefined ? {} : { activityRecords }), ...(lineage.neurobiology === undefined ? {} : { neurobiology: lineage.neurobiology }), limitations: ['Binding is not efficacy.', 'No biological executor or clinical validation was executed.'],
+    // Odtworzenie musi policzyć DOKŁADNIE to, co zapis — łącznie z rankingiem
+    // kompozycji i żądanymi targetami, które zapis niesie ze sobą. Inaczej
+    // fingerprint rozjeżdża się bez żadnej realnej zmiany naukowej.
+    combinationHypothesis: buildCandidateCombinationHypothesis(reports, saved.requestedTargetIds ?? []),
+    compositionHypotheses: rankNaturalCompositionHypotheses(reports, saved.requestedTargetIds ?? [], 3),
+    requestedTargetIds: saved.requestedTargetIds ?? [] };
+  // Sam zgodny fingerprint nie wystarcza: rekord z pamięci może mieć podmienioną
+  // TREŚĆ przy nienaruszonym odcisku. Porównujemy więc również to, co zapis
+  // deklaruje, z tym, co przeliczenie daje — inaczej podmieniony ranking
+  // kompozycji przechodziłby jako MATCH.
+  const storedMatchesRecomputed =
+    canonicalJson(saved.compositionHypotheses ?? []) === canonicalJson(base.compositionHypotheses)
+    && canonicalJson(saved.requestedTargetIds ?? []) === canonicalJson(base.requestedTargetIds)
+    && canonicalJson(saved.combinationHypothesis ?? null) === canonicalJson(base.combinationHypothesis ?? null);
+  if (fnv1a(canonicalJson(base)) !== saved.artifactFingerprint) {
+    return { status: 'DRIFT', reason: 'Odtworzony discovery artifact ma inny fingerprint niż zapisany.' };
+  }
+  if (!storedMatchesRecomputed) {
+    return { status: 'DRIFT', reason: 'Zapisane hipotezy kompozycji lub żądane targety różnią się od przeliczonych z tych samych raportów.' };
+  }
+  return { status: 'MATCH', reason: 'Cały deterministyczny discovery artifact odtworzył identyczny fingerprint i identyczne hipotezy kompozycji.' };
 }
 
 export interface SaveExperimentInput {

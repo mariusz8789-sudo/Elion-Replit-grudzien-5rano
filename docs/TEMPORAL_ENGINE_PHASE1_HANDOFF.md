@@ -193,13 +193,63 @@ pick any intervention without a pre-registered hypothesis, so `buildCounterfactu
 correctly returns `NOT_AVAILABLE` for it (no criterion to evaluate against). That is the fail-closed
 gate working as designed, not a gap to close by inventing a criterion after the fact.
 
+## Stage completed: "many worlds" — N-branch temporal lineage from one shared T0
+
+**Context:** the user reframed the vision as a "Time Machine" (past/present/future/branch explorer)
+and explicitly split the work: Claude builds the mechanism (snapshots, branching, counterfactual,
+replay, evidence, lineage); Manus builds the experience (time slider, "GO TO TIME", 3D world,
+alternate-timeline visualization). This stage is the mechanism side of the vision's "V5 — wiele
+światów" requirement — branching into more than two futures from one decision point.
+
+**New module:** `core/simulation/temporalMultiverse.ts`. Not a new engine — a thin N-ary composition
+of the exact same primitives the binary counterfactual already uses (`runScenario` +
+`compareScenarios` + `firstDivergentDay` + `buildTemporalTimeline` + `buildSavedScenarioRunContext`).
+One shared baseline (T0) plus any number of named branches (`TemporalBranchSpec { branchId,
+scenarioId, interventionStartDay? }`), each a real, independent `runScenario()` call against the same
+starting parameters. Each branch's divergence from baseline is *measured*
+(`firstDivergentDayFromBaseline`), never assumed from the declared intervention day — same discipline
+as the binary counterfactual.
+
+Save/replay reuses `SavedScenarioRunContext` per branch — no second memory format.
+`replaySavedTemporalMultiverse()` re-executes the baseline and every branch and returns the
+**weakest** verdict across all of them (`BLOCKED` > `DRIFT` > `MATCH`): one drifted branch fails the
+whole multiverse's replay, matching how one unverified counterfactual arm blocks the pair. A branch
+whose run status is `NOT_MODELED` gets `timeline: null` rather than a thrown error or a fabricated
+timeline — verified this doesn't crash before shipping it (an actual bug caught by the test suite,
+fixed by making the field nullable).
+
+**Deliberately no new UI in this stage.** Per the stated division of labor, this is machine-only —
+bolting an ad-hoc "3 branches" panel onto an existing screen would likely conflict with whatever
+Manus designs for the actual Time Machine experience. Verified via a full regression pass instead
+(desktop 27 routes/242 interactions, mobile 27/242, both zero errors) to confirm the new module
+doesn't destabilize anything already shipped, plus a 12-test unit suite covering the same discipline
+every other Genesis contract enforces: fail-closed gates (empty/duplicate branch IDs rejected),
+determinism (same spec → same fingerprint), NOT_MODELED handling, save/replay MATCH, one-drifted-
+branch-fails-everything, tampered-divergence-value → DRIFT (not silent MATCH), and a "no duplicate
+system" check on the module's own imports (composes `scenarioEngine`/`scenarioCounterfactual`/
+`temporalState`/`scenarioMemory`; never calls `.tick()` or constructs a simulation itself).
+
+| Item | Value |
+|---|---|
+| Files added | `temporalMultiverse.ts`, `temporalMultiverse.test.ts` |
+| Files modified | none |
+| Frontend tests | 165 files / 1772 passed / 1 skipped (previous stage: 164/1760 — +1 file, +12 tests) |
+| Backend tests | 275 passed, unchanged |
+| Lint / tsc / build / `git diff --check` | all clean |
+| E2E desktop | 27 routes / 242 interactions — zero runtime errors (regression only; no new UI to prove) |
+| E2E mobile | 27 routes / 242 interactions — zero runtime errors |
+
 ## Next gap
 
-Candidates, not yet started: **M3 (temporal snapshots)** — a persisted, restorable
-`TemporalStateEnvelope` history beyond the current per-run reconstruction; **M5 (timeline
-comparison)** — a dedicated Timeline-A-vs-B comparison view reusing `compareScenarios()`'s existing
-output rather than the current inline branch rows; or extending the governed-question catalog with a
-delayed-intervention lever exposed in the Command Center UI itself (currently only reachable via
-`#/pilot`). Per the user's own stated ordering (Evidence/Replay → snapshots → comparison → UX →
-World/3D → real historical data → camera/4D → autonomous experiment selection), M3 or M5 is next —
-awaiting direction on which.
+**This machine-side thread is now feature-complete for the vision's stated primitives**: V1 (time
+slider) and V4 (what-if branching) were already live end-to-end with Evidence Pack (M2/M4/M6/M7); this
+stage adds V5 (many worlds, not just A/B). What's left on the machine side is smaller: **M3 (temporal
+snapshots)** — a persisted, restorable `TemporalStateEnvelope` history addressable by ID rather than
+only reachable by re-deriving it from a run (this is what would make a UI-side "GO TO TIME T3" a
+direct lookup instead of a recomputation) — or extending `TemporalBranchSpec` with a delayed-
+intervention lever exposed through a UI (currently only reachable via the governed-question catalog
+on `#/pilot`).
+
+**The larger remaining gap is entirely on the experience side** — the actual Time Machine UX (time
+slider with past/present/future zones, "GO TO TIME", multi-world switcher, 3D handoff, alternate-
+timeline reveal) is Manus's mandate per the stated division of labor, not scoped here.

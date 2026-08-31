@@ -282,6 +282,20 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny agentowy EpidemicCitySimulation; City3D Command Center (Hospital, Hotspot, WorldState) zachowuje się jako konsument read-only tego samego świata.',
   },
   {
+    id: 'scenario-timeline', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-scenario-engine@1.0.0',
+    parameters: [
+      text('scenarioId', 'Scenariusz', 'BASELINE'),
+      number('days', 'Horyzont symulacji', 'dni', 1, 365, 72),
+      number('stepsPerDay', 'Kroków na dobę', 'kroków', 1, 24, 4),
+      number('nAgents', 'Liczba agentów', 'osób', 20, 4000, 400),
+      number('initialInfected', 'Zakażeni na starcie', 'osób', 1, 500, 5),
+      number('seed', 'Seed', '', 0, 0xffff_ffff, 20260828),
+      number('interventionStartDay', 'Dzień wejścia interwencji', 'dzień', 0, 365, 0),
+    ],
+    route: { kind: 'live-world', target: 'epidemic-city', hash: '#/city3d' }, knowledgeSources: ['biology.md'],
+    rationale: 'Istniejący, nazwany Scenario Engine (BASELINE i warianty interwencji) wystawiony przez wspólny kontrakt Experiment Fabric: realny przebieg dobowy z własnym resultFingerprint i replayScenario. Nie jest skalibrowany do żadnej rzeczywistej epidemii, więc nie jest prognozą.',
+  },
+  {
     id: 'biology-dna-helix', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-b-dna-wallace@1.0.0',
     parameters: [text('sequence', 'Preset sekwencji', 'mixed'), number('temperatureC', 'Temperatura', '°C', 0, 100, 37)],
     route: { kind: 'lab', labId: 'biology', experimentId: 'dna-helix' }, knowledgeSources: ['biology.md'],

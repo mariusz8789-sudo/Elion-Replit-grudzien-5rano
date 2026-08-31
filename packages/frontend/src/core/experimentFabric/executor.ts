@@ -44,6 +44,7 @@ import { buildPhotonGraph } from '../modelGraph/photonGraph';
 import { kardashevPower, schwarzschildRadius } from '../physics';
 import { runIsingMetropolisScenario } from '../isingModel';
 import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS } from '../simulation/epidemicCity';
+import { runScenario, replayScenario, SCENARIOS, SCENARIO_ENGINE_VERSION, type ScenarioId } from '../simulation/scenarioEngine';
 import { buildPinnedChEMBLCaffeineDiscovery, mapPinnedChEMBLCaffeineA1Activity } from '../biotechData/chembl';
 import { createExperimentProvenance, statusForCapability } from './provenance';
 import { createExperimentIntent, createExperimentPlan, getRouterModel, validateStructuredExperimentRequest } from './router';
@@ -891,6 +892,87 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         assumptions: ['Jeden realny model EpidemicCitySimulation.', 'GenesisEvent powstaje wyłącznie z lastTransmissions().'],
         visualization: ['world-3d', 'graph'], route: model.route,
         eventSummary: { count: events.length, types: [...new Set(events.map((event) => event.type))] },
+      };
+    }
+    case 'scenario-timeline': {
+      // Scenario Engine ISTNIEJE i jest już odtwarzalny (resultFingerprint +
+      // replayScenario). Brakowało wyłącznie tego, żeby dało się go wywołać
+      // przez wspólny kontrakt Experiment Fabric — tu jest adapter, nie drugi
+      // silnik: cała fizyka i cały czas pochodzą z runScenario().
+      const requestedScenario = String(params.scenarioId ?? 'BASELINE').toUpperCase();
+      if (!(requestedScenario in SCENARIOS)) {
+        return unavailableResult(
+          'engine_not_available',
+          `Nieznany scenariusz „${requestedScenario}". Dostępne: ${Object.keys(SCENARIOS).join(', ')}.`,
+          model.route,
+        );
+      }
+      const scenarioId = requestedScenario as ScenarioId;
+      const days = Math.round(numberParam(params, 'days', 72));
+      const stepsPerDay = Math.round(numberParam(params, 'stepsPerDay', 4));
+      const run = runScenario(scenarioId, {
+        days,
+        stepsPerDay,
+        baseParams: {
+          nAgents: Math.round(numberParam(params, 'nAgents', 400)),
+          initialInfected: Math.round(numberParam(params, 'initialInfected', 5)),
+          seed: request.seed ?? Math.round(numberParam(params, 'seed', 20260828)),
+        },
+        // Realna dźwignia czasu: ta sama polityka uruchomiona później daje inny,
+        // policzalny wynik. Zero = obowiązuje od początku przebiegu.
+        interventionStartDay: Math.round(numberParam(params, 'interventionStartDay', 0)),
+      });
+
+      if (run.status === 'NOT_MODELED' || run.summary === null) {
+        return unavailableResult(
+          'engine_not_available',
+          `Scenariusz ${scenarioId} nie jest modelowany przez Scenario Engine: ${SCENARIOS[scenarioId].notModeledReason ?? 'brak wsparcia modelu'}.`,
+          model.route,
+        );
+      }
+
+      // Punkty czasowe pochodzą z REALNEGO przebiegu — bierzemy próbki dnia z
+      // wyliczonej serii, nie z osobnego timera. Dzień spoza horyzontu jest
+      // pomijany, a nie ekstrapolowany.
+      const checkpoints = [0, 1, 6, 12, 24, 48, 72].filter((day) => day < run.series.length);
+      const timeline: Record<string, number> = {};
+      for (const day of checkpoints) {
+        const sample = run.series[day]!;
+        timeline[`T+${day}h_infectious`] = sample.infectious;
+        timeline[`T+${day}h_deceased`] = sample.deceased;
+        timeline[`T+${day}h_bedOccupancy`] = Number(sample.hospital.bedOccupancy.toFixed(4));
+      }
+
+      const replay = replayScenario(run);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Scenario Engine „${SCENARIOS[scenarioId].label}": ${days} dni × ${stepsPerDay} kroków/dobę, ${run.series.length} próbek dobowych.`,
+        outputs: {
+          ...timeline,
+          peakInfectious: run.summary.peakInfectious,
+          peakInfectiousDay: run.summary.peakInfectiousDay,
+          totalDeaths: run.summary.totalDeaths,
+          attackRate: Number(run.summary.attackRate.toFixed(6)),
+          peakBedOccupancy: Number(run.summary.peakBedOccupancy.toFixed(4)),
+          totalUnmetCareDays: run.summary.totalUnmetCareDays,
+          daysSimulated: run.series.length,
+        },
+        units: {
+          peakInfectious: 'osób', peakInfectiousDay: 'dzień', totalDeaths: 'osób',
+          attackRate: 'udział populacji', peakBedOccupancy: 'udział łóżek',
+          totalUnmetCareDays: 'osobodni', daysSimulated: 'dni',
+        },
+        warnings: [
+          'Model nie jest skalibrowany do żadnej rzeczywistej epidemii — to przebieg scenariuszowy, nie prognoza.',
+          `Odtworzenie tego przebiegu: ${replay.status}.`,
+        ],
+        validity: `Scenario Engine ${SCENARIO_ENGINE_VERSION}; deterministyczny przy zadanym seedzie, z własnym resultFingerprint i replayScenario.`,
+        assumptions: [
+          `Scenariusz „${SCENARIOS[scenarioId].label}" ze zdefiniowanej biblioteki scenariuszy.`,
+          'Punkty czasowe są próbkami realnej serii dobowej, nie osobnym timerem.',
+          'Warstwa szpitalna i kohorty wiekowe pochodzą z tego samego przebiegu.',
+        ],
+        visualization: ['world-3d', 'graph'], route: model.route,
       };
     }
     case 'earthquake-scenario': {

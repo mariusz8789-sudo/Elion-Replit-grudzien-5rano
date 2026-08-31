@@ -344,6 +344,112 @@ export function buildCandidateCombinationHypothesis(reports: readonly CandidateD
 }
 
 /**
+ * Jawna podstawa uszeregowania kompozycji. Każda składowa jest policzalna z
+ * już zadeklarowanych pól raportów — nie ma tu wagi dobranej „na oko" ani
+ * jednej magicznej liczby podobieństwa.
+ */
+export interface CompositionRankingBasis {
+  /** Ile z żądanych targetów kompozycja NIE pokrywa. Mniej = lepiej. */
+  uncoveredTargetCount: number;
+  /** Liczba różnych rekordów evidence stojących za kompozycją. Więcej = lepiej. */
+  coveredEvidenceCount: number;
+  /** Ilu kandydatów w kompozycji nie ma ŻADNEGO evidence. Mniej = lepiej. */
+  missingEvidenceCount: number;
+  /** Średnia z istniejących ocen kandydatów (rankTherapeuticCandidate). Więcej = lepiej. */
+  researchPriority: number;
+}
+
+export interface RankedCompositionHypothesis extends CandidateCombinationHypothesis {
+  rank: number;
+  rankingBasis: CompositionRankingBasis;
+  /** Powód uszeregowania, kryterium po kryterium — do pokazania użytkownikowi jako WHY. */
+  rankingRationale: readonly string[];
+}
+
+/**
+ * Kolejność kryteriów jest LEKSYKOGRAFICZNA, nie ważona. Świadomie:
+ * ważenie wymagałoby wag, których nie da się uzasadnić danymi, a wtedy
+ * ranking byłby wymyśloną liczbą udającą pomiar. Porządek leksykograficzny
+ * da się przeczytać i zakwestionować kryterium po kryterium.
+ */
+export const COMPOSITION_RANKING_CRITERIA = [
+  'uncoveredTargetCount ascending — pokrycie żądanych targetów jest warunkiem wstępnym',
+  'coveredEvidenceCount descending — więcej niezależnych rekordów evidence',
+  'missingEvidenceCount ascending — kandydat bez evidence osłabia całą kompozycję',
+  'researchPriority descending — średnia z istniejących ocen kandydatów',
+  'candidateIds ascending — rozstrzygnięcie remisów, żeby wynik był deterministyczny',
+] as const;
+
+function compositionRankingBasis(hypothesis: CandidateCombinationHypothesis): CompositionRankingBasis {
+  return {
+    uncoveredTargetCount: hypothesis.uncoveredTargetIds.length,
+    coveredEvidenceCount: hypothesis.coveredEvidenceIds.length,
+    missingEvidenceCount: hypothesis.missingEvidenceIds.length,
+    researchPriority: hypothesis.researchPriority,
+  };
+}
+
+function compositionRationale(basis: CompositionRankingBasis, hypothesis: CandidateCombinationHypothesis): string[] {
+  return [
+    basis.uncoveredTargetCount === 0
+      ? 'Pokrywa wszystkie żądane targety.'
+      : `Nie pokrywa ${basis.uncoveredTargetCount} żądanych targetów: ${hypothesis.uncoveredTargetIds.join(', ')}.`,
+    `Opiera się na ${basis.coveredEvidenceCount} rekordach evidence.`,
+    basis.missingEvidenceCount === 0
+      ? 'Każdy kandydat ma przypisane evidence.'
+      : `${basis.missingEvidenceCount} kandydat(ów) bez żadnego evidence: ${hypothesis.missingEvidenceIds.join(', ')}.`,
+    `Średni priorytet badawczy kandydatów: ${basis.researchPriority.toFixed(4)}.`,
+  ];
+}
+
+/**
+ * TOP N hipotez kompozycji naturalnych.
+ *
+ * Buduje KAŻDĄ parę kandydatów przez istniejące
+ * `buildCandidateCombinationHypothesis` (żadnej drugiej implementacji) i
+ * szereguje je jawnymi kryteriami z `COMPOSITION_RANKING_CRITERIA`.
+ *
+ * Wynik to zbiór HIPOTEZ do sprawdzenia, a nie ranking skuteczności. Nie
+ * orzeka o równoważności klinicznej, synergii ani bezpieczeństwie — do tego
+ * potrzebne są badania wskazane w `validationPlan` każdej pozycji.
+ */
+export function rankNaturalCompositionHypotheses(
+  reports: readonly CandidateDiscoveryReport[],
+  requestedTargetIds: readonly string[] = [],
+  limit = 3,
+): RankedCompositionHypothesis[] {
+  if (reports.length < 2 || limit < 1) return [];
+
+  const hypotheses: CandidateCombinationHypothesis[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < reports.length; i++) {
+    for (let j = i + 1; j < reports.length; j++) {
+      const built = buildCandidateCombinationHypothesis([reports[i], reports[j]], requestedTargetIds);
+      if (built && !seen.has(built.combinationId)) {
+        seen.add(built.combinationId);
+        hypotheses.push(built);
+      }
+    }
+  }
+
+  return hypotheses
+    .map((hypothesis) => ({ hypothesis, basis: compositionRankingBasis(hypothesis) }))
+    .sort((a, b) =>
+      a.basis.uncoveredTargetCount - b.basis.uncoveredTargetCount
+      || b.basis.coveredEvidenceCount - a.basis.coveredEvidenceCount
+      || a.basis.missingEvidenceCount - b.basis.missingEvidenceCount
+      || b.basis.researchPriority - a.basis.researchPriority
+      || [...a.hypothesis.candidateIds].sort().join('|').localeCompare([...b.hypothesis.candidateIds].sort().join('|')))
+    .slice(0, limit)
+    .map(({ hypothesis, basis }, index) => ({
+      ...hypothesis,
+      rank: index + 1,
+      rankingBasis: basis,
+      rankingRationale: compositionRationale(basis, hypothesis),
+    }));
+}
+
+/**
  * Stable scientific fingerprint. It intentionally excludes timestamps,
  * backend run ids and volatile execution metadata, while including the full
  * scientific record so a changed claim/status/provenance is detectable.

@@ -9,7 +9,7 @@ import { AccountPanel } from './AccountPanel';
 import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
 import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
 import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
-import { buildCandidateCombinationHypothesis, compareCandidateDiscoveryReports } from '../core/biotechDiscoveryContract';
+import { buildCandidateCombinationHypothesis, compareCandidateDiscoveryReports, rankNaturalCompositionHypotheses, COMPOSITION_RANKING_CRITERIA } from '../core/biotechDiscoveryContract';
 import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
 import { recordBiotechAdminAudit, replaySavedBiotechComparison, saveBiotechDiscoveryComparisonToMemory } from '../core/scienceMemory';
 import { resolveNaturalFunctionalReplacementFromSources, type NaturalFunctionalReplacementResult } from '../core/biotechData/naturalReplacement';
@@ -73,6 +73,14 @@ function DrugWorkspace() {
   const selectedCombinationHypothesis = selectedNaturalReports.length === 2
     ? buildCandidateCombinationHypothesis(selectedNaturalReports, referenceTarget ? [referenceTarget] : [])
     : undefined;
+  // TOP 3 alternatywnych kompozycji ze WSZYSTKICH par dostępnych raportów —
+  // ręczny wybór dwóch pokazuje jedną parę, ten ranking pokazuje, czy istnieje
+  // lepsza. Kryteria są jawne (COMPOSITION_RANKING_CRITERIA), nie ważone.
+  const rankedCompositionHypotheses = rankNaturalCompositionHypotheses(
+    activeReplacementReports,
+    referenceTarget ? [referenceTarget] : [],
+    3,
+  );
   const toggleNaturalReport = (reportId: string) => setSelectedNaturalReportIds((current) => current.includes(reportId)
     ? current.filter((id) => id !== reportId)
     : current.length < 2 ? [...current, reportId] : current);
@@ -207,6 +215,30 @@ function DrugWorkspace() {
             <div className="cde-result"><span className="cde-result-label">Uncertainty</span><span className="cde-result-actual">{selectedCombinationHypothesis.uncertainty}</span><span className="cde-result-bound">validation required; no synergy/efficacy/safety conclusion</span></div>
             {selectedCombinationHypothesis.validationPlan.map((step) => <div className="cde-result" key={step}><span className="cde-result-label">NEXT VALIDATION</span><span className="cde-result-actual">{step}</span></div>)}
           </div> : <div className="cde-verdict">Wybierz jeszcze {2 - selectedNaturalReports.length} raport(y), aby utworzyć composition hypothesis.</div>}
+        </section> : null}
+        {rankedCompositionHypotheses.length ? <section className="settings-section dossier-card" aria-label="Top natural composition hypotheses">
+          <h3>Natural Composition Hypotheses · TOP {rankedCompositionHypotheses.length}</h3>
+          <p className="settings-hint">
+            Wszystkie pary dostępnych raportów, uszeregowane jawnymi kryteriami: {COMPOSITION_RANKING_CRITERIA.join(' → ')}.
+            Kolejność jest leksykograficzna, nie ważona — nie ma tu jednej wymyślonej liczby podobieństwa.
+          </p>
+          <p className="settings-hint">
+            Każda pozycja to HIPOTEZA BADAWCZA. Genesis nie twierdzi, że którakolwiek kompozycja jest zamiennikiem
+            leku ani że jest klinicznie równoważna — do tego potrzebne są badania z planu walidacji.
+          </p>
+          <div className="cde-results">
+            {rankedCompositionHypotheses.map((entry) => <div className="cde-result" key={entry.combinationId}>
+              <span className="cde-result-label">#{entry.rank} · {entry.candidateIds.join(' + ')}</span>
+              <span className="cde-result-actual">{entry.rankingRationale.join(' ')}</span>
+              <span className="cde-result-bound">
+                status {entry.status} · targets {entry.coveredTargetIds.join(', ') || 'UNKNOWN'} ·
+                evidence {entry.rankingBasis.coveredEvidenceCount} ·
+                bez evidence {entry.rankingBasis.missingEvidenceCount} ·
+                nie pokryte targety {entry.rankingBasis.uncoveredTargetCount} ·
+                priorytet {entry.rankingBasis.researchPriority.toFixed(4)} · compute NOT_EXECUTED
+              </span>
+            </div>)}
+          </div>
         </section> : null}
         <h2>Źródłowy punkt odniesienia · pinned record</h2>
         <p className="settings-hint">

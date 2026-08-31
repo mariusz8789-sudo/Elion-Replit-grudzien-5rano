@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runScenario, SCENARIOS_NOT_MODELED } from '../core/simulation/scenarioEngine';
+import { EpidemicCitySimulation } from '../core/simulation/epidemicCity';
 import {
   buildTemporalTimeline,
   claimsObservedReality,
@@ -113,5 +114,29 @@ describe('Koperta stanu czasowego', () => {
 
     expect(temporalStateAt(timeline, timeline.days + 1)).toBeNull();
     expect(temporalStateAt(timeline, -1)).toBeNull();
+  });
+
+  it('replays the existing agent world to a selected scenario day', () => {
+    const run = runScenario('ISOLATION', { ...OPTS, interventionStartDay: 6 });
+    const sim = new EpidemicCitySimulation();
+    const renderedDay = sim.replayToDay({
+      preInterventionParams: run.preInterventionParams,
+      params: run.params,
+      cohort: run.cohort,
+      stepsPerDay: run.stepsPerDay,
+      interventionStartDay: run.interventionStartDay,
+    }, 7);
+    const expected = run.series.find((sample) => sample.day === renderedDay)!;
+    expect(renderedDay).toBe(7);
+    expect(sim.stats()).toMatchObject({
+      dzien: expected.day,
+      S: expected.susceptible,
+      E: expected.exposed,
+      I: expected.infectious,
+      R: expected.recovered,
+      D: expected.deceased,
+      izolowani: expected.isolated,
+      hospitalizowani: expected.hospitalized,
+    });
   });
 });

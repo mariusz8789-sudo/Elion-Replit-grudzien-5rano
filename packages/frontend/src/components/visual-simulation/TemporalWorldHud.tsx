@@ -18,19 +18,21 @@ export function TemporalWorldHud({ timeline, day, enteredDay = null }: TemporalW
     );
   }
 
-  const maximumDay = Math.max(0, timeline.series.length - 1);
-  const selectedDay = Math.min(Math.max(day, 0), maximumDay);
-  const variant = timeline.counterfactual?.variant.series[selectedDay] ?? null;
-  const baseline = timeline.counterfactual?.baseline.series[selectedDay] ?? null;
+  const maximumIndex = Math.max(0, timeline.series.length - 1);
+  const selectedIndex = Math.min(Math.max(day, 0), maximumIndex);
+  const selectedSample = timeline.series[selectedIndex] ?? null;
+  const selectedDay = selectedSample?.day ?? selectedIndex;
+  const variant = timeline.counterfactual?.variant.series[selectedIndex] ?? null;
+  const baseline = timeline.counterfactual?.baseline.series[selectedIndex] ?? null;
   const divergence = timeline.counterfactual?.firstDivergentDay;
-  const phase = selectedDay === 0 ? 'PAST · T0' : selectedDay >= maximumDay ? 'FUTURE · HORIZON' : 'NOW · SELECTED';
+  const phase = selectedIndex === 0 ? 'PAST · T0' : selectedIndex >= maximumIndex ? 'FUTURE · HORIZON' : 'NOW · SELECTED';
 
   return (
     <div className="temporal-world-hud" aria-label="Temporal World status">
       <div className="temporal-world-hud-topline">
         <span className="temporal-world-kicker">GENESIS TEMPORAL WORLD</span>
         <span className="temporal-world-phase">{phase}</span>
-        <span className="temporal-world-status">{enteredDay === day ? 'ENTERED · ' : ''}{timeline.epistemicStatus}</span>
+        <span className="temporal-world-status">{enteredDay === selectedDay ? 'ENTERED · ' : ''}{timeline.epistemicStatus}</span>
       </div>
       <div className="temporal-world-hud-main">
         <div>

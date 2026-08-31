@@ -70,6 +70,7 @@ export function City3DWebGLScreen() {
   const timelineSample = scenarioTimeline
     ? scenarioTimeline.series[Math.min(timelineDay, scenarioTimeline.series.length - 1)]
     : undefined;
+  const timelineLogicalDay = timelineSample?.day ?? 0;
   const sim = useMemo(() => new EpidemicCity3DSim({}, {
     onAgentSelected: (id) => {
       setSelectedId(id);
@@ -93,6 +94,25 @@ export function City3DWebGLScreen() {
   const renderParams = useMemo<SimParams>(() => ({ ...params, clockSpeed: running ? speed : 0 }), [params, running, speed]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, renderParams, true, setStats);
 
+  // GO TO TIME / ENTER THIS MOMENT: replay the existing agent model to the
+  // selected Scenario Engine day. The canvas stays on the same renderer and
+  // reads the replayed agents; timeline aggregates are never painted as agents.
+  useEffect(() => {
+    if (!scenarioTimeline) return;
+    const run = scenarioTimeline.scenarioRun;
+    sim.getSim().replayToDay({
+      preInterventionParams: run.preInterventionParams,
+      params: run.params,
+      cohort: run.cohort,
+      stepsPerDay: run.stepsPerDay,
+      interventionStartDay: run.interventionStartDay,
+    }, timelineLogicalDay);
+    setRunning(false);
+    setSelectedId(null);
+    setWorldSelection(null);
+    setStats(sim.getStats());
+  }, [scenarioTimeline, timelineLogicalDay, sim]);
+
   useEffect(() => { sim.setAnalysisMode(analysis); }, [analysis, sim]);
   useEffect(() => { sim.setShowTransmissions(showTransmissions); }, [showTransmissions, sim]);
   useEffect(() => { sim.setEarthquakeScenarioOverlay(earthquakeOverlay); }, [earthquakeOverlay, sim]);
@@ -111,9 +131,9 @@ export function City3DWebGLScreen() {
     setParams((previous) => ({ ...previous, [key]: value }));
     setStats(sim.getStats());
   };
-  const play = () => setRunning(true);
+  const play = () => { if (!scenarioTimeline) setRunning(true); };
   const pause = () => setRunning(false);
-  const step = () => { sim.step(); setStats(sim.getStats()); };
+  const step = () => { if (!scenarioTimeline) { sim.step(); setStats(sim.getStats()); } };
   const reset = () => {
     sim.reset(); setRunning(false); setSelectedId(null); setWorldSelection(null); setCameraPreset('city');
     setParams(sim.getSim().getParams()); setStats(sim.getStats());
@@ -153,7 +173,7 @@ export function City3DWebGLScreen() {
   }, {}), [roadNetwork]);
   const percentageKeys = ['transmissionScale', 'restrictions', 'mobility', 'severeRate'];
   // Ta sama projekcja World Engine Contract, którą dostaje każdy zewnętrzny konsument (SC2) — brak drugiego liczenia hotspotów/klastrów.
-  const worldState = useMemo(() => projectWorldState(sim.getSim()), [sim, stats]);
+  const worldState = useMemo(() => projectWorldState(sim.getSim(), scenarioTimeline?.scenarioRun.hospitalCapacity), [sim, stats, scenarioTimeline]);
   useEffect(() => { sim.setWorldState(worldState); }, [sim, worldState]);
   const topHotspots = worldState.hotspots.slice(0, 3);
   const topClusters = [...worldState.clusters.household, ...worldState.clusters.location]
@@ -170,7 +190,7 @@ export function City3DWebGLScreen() {
           <div className="city-world-signal-row" aria-label="Stan epistemiczny świata">
             <span className="city-signal live"><i />REAL RUN</span>
             <span className="city-signal">SCENARIO: BASELINE</span>
-            <span className="city-signal">TIME: SIMULATION DAY</span>
+            <span className="city-signal">TIME: {scenarioTimeline ? 'REPLAYED MODEL DAY' : 'SIMULATION DAY'}</span>
             <span className="city-signal muted">FUTURE: NOT_MODELED</span>
           </div>
         </div>
@@ -255,7 +275,7 @@ export function City3DWebGLScreen() {
         </aside>
 
         <section className="city-world-center" aria-label="Żywa scena miasta 3D">
-          <div className={`city-3d-stage-wrap city-world-stage${enteredTimelineDay === timelineDay ? ' temporal-moment-entered' : ''}`} data-temporal-day={timelineDay} data-temporal-entered={enteredTimelineDay === timelineDay ? 'true' : 'false'}>
+          <div className={`city-3d-stage-wrap city-world-stage${enteredTimelineDay === timelineLogicalDay ? ' temporal-moment-entered' : ''}`} data-temporal-day={timelineLogicalDay} data-temporal-entered={enteredTimelineDay === timelineLogicalDay ? 'true' : 'false'}>
             <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
             <TemporalWorldHud timeline={scenarioTimeline} day={timelineDay} enteredDay={enteredTimelineDay} />
             {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
@@ -281,8 +301,8 @@ export function City3DWebGLScreen() {
                   />
                 </label>
                 <div className="scenario-run-time-actions">
-                  <button type="button" className="chip-btn" onClick={() => setEnteredTimelineDay(timelineSample.day)}>
-                    ENTER THIS MOMENT · DAY {timelineSample.day}
+                  <button type="button" className="chip-btn" onClick={() => setEnteredTimelineDay(timelineLogicalDay)}>
+                    ENTER THIS MOMENT · DAY {timelineLogicalDay}
                   </button>
                   {enteredTimelineDay !== null && <span className="scenario-run-entered">ENTERED · DAY {enteredTimelineDay}</span>}
                 </div>

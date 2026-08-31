@@ -137,6 +137,9 @@ function DrugWorkspace() {
     const saved = saveBiotechDiscoveryComparisonToMemory(activeReplacementReports, {
       activityIds: replacementResult?.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`),
       assayIds: replacementResult?.liveActivities?.map((activity) => `chembl:assay:${activity.assayId}`),
+      sourceRecords: replacementResult?.sourceRecords,
+      activityRecords: replacementResult?.liveActivities,
+      neurobiology: replacementResult?.neurobiology,
     });
     setBiotechReplay(replaySavedBiotechComparison(saved.biotech?.comparison, activeReplacementReports));
     const user = getSession()?.user;

@@ -97,8 +97,10 @@ describe('Candidate Dossier source lineage', () => {
     const { saveBiotechDiscoveryComparisonToMemory, replaySavedBiotechDiscoveryArtifact } = await import('../core/scienceMemory');
     const reports = [buildPinnedChEMBLCaffeineDiscovery().report, buildPinnedChEMBLAdenosineDiscovery().report];
     const sourceRecords = [{ name: 'caffeine', cid: 2519, formula: 'C8H10N4O2', smiles: 'CN1C=NC2=C1C(=O)N(C)C(=O)N2C', inchiKey: 'RYYVLZVUVIJVGH-UHFFFAOYSA-N', molecularWeight: '194.19', source: 'PubChem', sourceVersion: 'PubChem CID 2519', retrievedAt: '2026-08-30', atoms3d: [{ element: 'O', x: 0.47, y: 2.5688, z: 0.0006 }] }];
-    const saved = saveBiotechDiscoveryComparisonToMemory(reports, { sourceRecords });
+    const activityRecords = [{ pubchemCid: 2519, compoundId: 'chembl:compound:CHEMBL113', targetId: 'chembl:target:CHEMBL255', activityId: 123, assayId: 'chembl:assay:CHEMBL123', type: 'Ki' as const, relation: '=', value: '12.5', units: 'nM', assayContext: 'human A1 receptor binding', assayQuality: 'HIGH' as const, source: 'ChEMBL' as const, sourceVersion: 'ChEMBL API', retrievedAt: '2026-08-30', sourceUrl: 'https://www.ebi.ac.uk/chembl/explore/activities/CHEMBL123' }];
+    const saved = saveBiotechDiscoveryComparisonToMemory(reports, { sourceRecords, activityRecords });
     expect(saved.biotech?.artifact?.sourceRecords).toEqual(sourceRecords);
-    expect(replaySavedBiotechDiscoveryArtifact(saved.biotech?.artifact, saved.biotech?.artifact?.reports ?? [], { sourceRecords })).toMatchObject({ status: 'MATCH' });
+    expect(saved.biotech?.artifact?.activityRecords).toEqual(activityRecords);
+    expect(replaySavedBiotechDiscoveryArtifact(saved.biotech?.artifact, saved.biotech?.artifact?.reports ?? [], { sourceRecords, activityRecords })).toMatchObject({ status: 'MATCH' });
   });
 });

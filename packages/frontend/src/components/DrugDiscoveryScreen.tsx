@@ -10,6 +10,7 @@ import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
 import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
 import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
 import { buildCandidateCombinationHypothesis, compareCandidateDiscoveryReports, rankNaturalCompositionHypotheses, COMPOSITION_RANKING_CRITERIA } from '../core/biotechDiscoveryContract';
+import { buildNaturalFormulationDossier } from '../core/naturalFormulationDossier';
 import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
 import { recordBiotechAdminAudit, replaySavedBiotechComparison, saveBiotechDiscoveryComparisonToMemory } from '../core/scienceMemory';
 import { resolveNaturalFunctionalReplacementFromSources, type NaturalFunctionalReplacementResult } from '../core/biotechData/naturalReplacement';
@@ -81,6 +82,15 @@ function DrugWorkspace() {
     referenceTarget ? [referenceTarget] : [],
     3,
   );
+  // Ranking mówi, KTÓRA para jest wyżej. Dossier mówi, co z tym zrobić: skąd
+  // składnik, dlaczego akurat on, co wnosi sam, co jest policzone, czego
+  // brakuje i jaki eksperyment to rozstrzygnie.
+  const formulationDossier = buildNaturalFormulationDossier({
+    reports: activeReplacementReports,
+    requestedTargetIds: referenceTarget ? [referenceTarget] : [],
+    referenceLabel: pinnedDiscovery.candidate.label,
+    limit: 3,
+  });
   const toggleNaturalReport = (reportId: string) => setSelectedNaturalReportIds((current) => current.includes(reportId)
     ? current.filter((id) => id !== reportId)
     : current.length < 2 ? [...current, reportId] : current);
@@ -238,10 +248,72 @@ function DrugWorkspace() {
                 evidence {entry.rankingBasis.coveredEvidenceCount} ·
                 bez evidence {entry.rankingBasis.missingEvidenceCount} ·
                 nie pokryte targety {entry.rankingBasis.uncoveredTargetCount} ·
-                priorytet {entry.rankingBasis.researchPriority.toFixed(4)} · compute NOT_EXECUTED
+                priorytet {entry.rankingBasis.researchPriority.toFixed(4)}
               </span>
             </div>)}
           </div>
+        </section> : null}
+        {formulationDossier.hypotheses.length ? <section className="settings-section dossier-card" aria-label="Natural formulation hypothesis dossier">
+          <h3>Dossier hipotez kompozycji · {formulationDossier.hypotheses.length} kompozycje</h3>
+          <p className="settings-hint">
+            Referencja: {formulationDossier.referenceLabel}. Dla każdej kompozycji: składniki, źródło, dlaczego dany
+            składnik, pokrycie targetów i mechanizmów, własności, evidence, wykonane obliczenia, niepewność, braki
+            i eksperyment walidacyjny. Odcisk dossier: <span className="mono">{formulationDossier.dossierFingerprint}</span>.
+          </p>
+          <ul className="pilot-limitations">
+            {formulationDossier.exclusions.map((exclusion) => <li key={exclusion}>{exclusion}</li>)}
+          </ul>
+          {formulationDossier.unfilledFields.length > 0 && (
+            <details className="settings-details" open>
+              <summary>Pola, których NIE dało się wypełnić z danych ({formulationDossier.unfilledFields.length})</summary>
+              {formulationDossier.unfilledFields.map((field) => <p className="settings-hint" key={field}>{field}</p>)}
+            </details>
+          )}
+          {formulationDossier.hypotheses.map((hypothesis) => (
+            <details className="settings-details" key={hypothesis.combinationId} open={hypothesis.rank === 1}>
+              <summary>{hypothesis.label} · {hypothesis.status} · {hypothesis.clinicalClaim}</summary>
+              <p className="settings-hint"><strong>DLACZEGO:</strong> {hypothesis.why.join(' ')}</p>
+              <p className="settings-hint">
+                <strong>POKRYCIE:</strong> targety {hypothesis.coveredTargetIds.join(', ') || 'brak'} ·
+                mechanizmy {hypothesis.coveredMechanismIds.join(', ') || 'brak'} ·
+                niepokryte {hypothesis.uncoveredTargetIds.join(', ') || 'brak'}
+              </p>
+              <p className="settings-hint">
+                <strong>WŁASNOŚCI:</strong> {hypothesis.propertyStatus} · <strong>COMPUTE:</strong> {hypothesis.computeStatus}
+              </p>
+              <p className="settings-hint"><strong>NIEPEWNOŚĆ:</strong> {hypothesis.uncertainty}</p>
+              {hypothesis.components.map((component) => (
+                <section key={component.candidateId}>
+                  <strong>{component.candidateId}</strong>
+                  <p className="settings-hint">
+                    ŹRÓDŁO ({component.sourceStatus}): {component.sources.map((source) => `${source.source}/${source.sourceId}${source.sourceVersion ? ` v${source.sourceVersion}` : ''} · ${source.status}`).join(' · ') || 'brak przypiętego źródła'}
+                  </p>
+                  <p className="settings-hint">DLACZEGO TEN SKŁADNIK: {component.whyIncluded.join(' ')}</p>
+                  <p className="settings-hint">
+                    WNOSI: targety {component.contributedTargetIds.join(', ') || 'brak'} · mechanizmy {component.contributedMechanismIds.join(', ') || 'brak'} ·
+                    wyłącznie ten składnik: {component.uniquelyCoveredTargetIds.join(', ') || 'brak'}
+                  </p>
+                  <p className="settings-hint">
+                    WŁASNOŚCI ({component.propertyStatus}): {component.propertyMetrics.map((metric) => `${metric.name} ${metric.value} ${metric.units}`).join(' · ') || component.propertyUncertainty}
+                  </p>
+                  <p className="settings-hint">
+                    EVIDENCE ({component.evidenceStatus}): {component.evidenceIds.join(', ') || 'brak'} ·
+                    COMPUTE ({component.computeStatus}): {component.computeRuns.map((run) => `${run.runtime}${run.version ? `@${run.version}` : ''} ${run.status}/${run.resultOrigin}`).join(' · ') || 'nie wykonano żadnego przebiegu'}
+                  </p>
+                  <p className="settings-hint">NIEPEWNOŚĆ: {component.uncertainty}</p>
+                </section>
+              ))}
+              <details className="settings-details">
+                <summary>Eksperymenty walidacyjne ({hypothesis.validationExperiments.length})</summary>
+                {hypothesis.validationExperiments.map((experiment) => (
+                  <p className="settings-hint" key={`${experiment.scope}:${experiment.question}`}>
+                    [{experiment.scope}] {experiment.question}{' '}
+                    {experiment.request ? `→ ${experiment.request.requestId} (${experiment.request.status}: ${experiment.request.blockedReason ?? 'brak wykonawcy'})` : `→ ${experiment.blockedReason ?? 'BLOCKED'}`}
+                  </p>
+                ))}
+              </details>
+            </details>
+          ))}
         </section> : null}
         <h2>Źródłowy punkt odniesienia · pinned record</h2>
         <p className="settings-hint">

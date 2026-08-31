@@ -11,6 +11,9 @@ import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosi
 import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
 import { buildCandidateCombinationHypothesis, compareCandidateDiscoveryReports, rankNaturalCompositionHypotheses, COMPOSITION_RANKING_CRITERIA } from '../core/biotechDiscoveryContract';
 import { buildNaturalFormulationDossier } from '../core/naturalFormulationDossier';
+import { executeCompositionCompute, fabricCompositionComputeExecutor, planCompositionCompute, type CompositionComputeReport } from '../core/naturalCompositionCompute';
+import { naturalCandidateStructures } from '../core/biotechData/naturalReplacement';
+import { runFabricCompute } from '../core/backend/client';
 import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
 import { recordBiotechAdminAudit, replaySavedBiotechComparison, saveBiotechDiscoveryComparisonToMemory } from '../core/scienceMemory';
 import { resolveNaturalFunctionalReplacementFromSources, type NaturalFunctionalReplacementResult } from '../core/biotechData/naturalReplacement';
@@ -63,6 +66,11 @@ function DrugWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [lastAuditRequestId, setLastAuditRequestId] = useState<string | null>(null);
   const [biotechReplay, setBiotechReplay] = useState<ReturnType<typeof replaySavedBiotechComparison> | null>(null);
+  // Per-hypothesis compute: realne runy backendowego Fabric na wejściach, które
+  // kandydat faktycznie posiada. Pusty stan = compute nie był uruchamiany.
+  const [compositionCompute, setCompositionCompute] = useState<CompositionComputeReport[]>([]);
+  const [computeBusy, setComputeBusy] = useState(false);
+  const [computeNotice, setComputeNotice] = useState<string | null>(null);
   const [referenceCompound, setReferenceCompound] = useState(() => routeParams.get('reference') ?? '');
   const [referenceTarget, setReferenceTarget] = useState(() => routeParams.get('target') ?? 'A1');
   const [replacementResult, setReplacementResult] = useState<NaturalFunctionalReplacementResult | null>(null);
@@ -90,7 +98,35 @@ function DrugWorkspace() {
     requestedTargetIds: referenceTarget ? [referenceTarget] : [],
     referenceLabel: pinnedDiscovery.candidate.label,
     limit: 3,
+    computeReports: compositionCompute,
   });
+
+  /**
+   * Uruchamia dopuszczalne runtime'y dla KAŻDEJ z TOP 3 kompozycji. Nie liczy
+   * niczego lokalnie: każdy wynik pochodzi z backendowego Fabric razem z jego
+   * runId. Runtime bez wejścia albo nieskonfigurowany zostaje odnotowany ze
+   * swoim statusem, a nie pominięty.
+   */
+  const runCompositionCompute = async () => {
+    setComputeBusy(true);
+    setComputeNotice(null);
+    try {
+      const executor = fabricCompositionComputeExecutor(runFabricCompute);
+      const structures = naturalCandidateStructures();
+      const reports: CompositionComputeReport[] = [];
+      for (const hypothesis of rankedCompositionHypotheses) {
+        reports.push(await executeCompositionCompute(planCompositionCompute(hypothesis, structures), executor));
+      }
+      setCompositionCompute(reports);
+      const executed = reports.reduce((sum, entry) => sum + entry.executedRunCount, 0);
+      const planned = reports.reduce((sum, entry) => sum + entry.runtimes.reduce((inner, runtime) => inner + runtime.componentRecords.length, 0), 0);
+      setComputeNotice(`Wykonano ${executed} z ${planned} zaplanowanych obliczeń dla ${reports.length} kompozycji. Pozostałe niosą status MISSING_DATA albo BLOCKED wraz z powodem — żadna wartość nie została doszacowana.`);
+    } catch (computeError) {
+      setComputeNotice(`Per-hypothesis compute nie wykonał się: ${computeError instanceof Error ? computeError.message : String(computeError)}`);
+    } finally {
+      setComputeBusy(false);
+    }
+  };
   const toggleNaturalReport = (reportId: string) => setSelectedNaturalReportIds((current) => current.includes(reportId)
     ? current.filter((id) => id !== reportId)
     : current.length < 2 ? [...current, reportId] : current);
@@ -263,6 +299,12 @@ function DrugWorkspace() {
           <ul className="pilot-limitations">
             {formulationDossier.exclusions.map((exclusion) => <li key={exclusion}>{exclusion}</li>)}
           </ul>
+          <div className="pilot-actions">
+            <button className="chip-btn pilot-primary" disabled={computeBusy} onClick={() => { void runCompositionCompute(); }}>
+              {computeBusy ? 'Liczę…' : 'Uruchom compute dla każdej kompozycji'}
+            </button>
+          </div>
+          {computeNotice && <p className="settings-hint" role="status">{computeNotice}</p>}
           {formulationDossier.unfilledFields.length > 0 && (
             <details className="settings-details" open>
               <summary>Pola, których NIE dało się wypełnić z danych ({formulationDossier.unfilledFields.length})</summary>
@@ -280,7 +322,32 @@ function DrugWorkspace() {
               </p>
               <p className="settings-hint">
                 <strong>WŁASNOŚCI:</strong> {hypothesis.propertyStatus} · <strong>COMPUTE:</strong> {hypothesis.computeStatus}
+                {hypothesis.compute && <> · pokrycie {hypothesis.compute.coverage} · wykonanych runów {hypothesis.compute.executedRunCount} · odcisk <span className="mono">{hypothesis.compute.computeFingerprint}</span></>}
               </p>
+              {hypothesis.compute && (
+                <details className="settings-details">
+                  <summary>Per-hypothesis compute ({hypothesis.compute.runtimes.length} runtime’ów)</summary>
+                  {hypothesis.compute.runtimes.map((runtime) => (
+                    <section key={runtime.runtimeModelId}>
+                      <strong>{runtime.runtimeModelId} · {runtime.coverage} · {runtime.comparable ? 'zestawialne między składnikami' : 'ZESTAWIANIE ZABLOKOWANE'}</strong>
+                      <p className="settings-hint">{runtime.reason}</p>
+                      <div className="stat-list">
+                        {runtime.componentRecords.map((record) => (
+                          <div className="stat-row" key={`${record.runtimeModelId}:${record.candidateId}`}>
+                            <span>{record.candidateId} · {record.status}</span>
+                            <span className="val mono">
+                              {record.status === 'EXECUTED'
+                                ? `${Object.entries(record.outputs).map(([key, value]) => `${key}=${value}`).join(' · ')} · run ${record.runId} · ${record.fingerprint}`
+                                : record.reason}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                  {hypothesis.compute.limitations.map((limitation) => <p className="pilot-disclaimer" key={limitation}>{limitation}</p>)}
+                </details>
+              )}
               <p className="settings-hint"><strong>NIEPEWNOŚĆ:</strong> {hypothesis.uncertainty}</p>
               {hypothesis.components.map((component) => (
                 <section key={component.candidateId}>
@@ -304,10 +371,11 @@ function DrugWorkspace() {
                 </section>
               ))}
               <details className="settings-details">
-                <summary>Eksperymenty walidacyjne ({hypothesis.validationExperiments.length})</summary>
+                <summary>Plan walidacji — uporządkowany ({hypothesis.validationExperiments.length} kroków)</summary>
                 {hypothesis.validationExperiments.map((experiment) => (
                   <p className="settings-hint" key={`${experiment.scope}:${experiment.question}`}>
-                    [{experiment.scope}] {experiment.question}{' '}
+                    <strong>{experiment.order}.</strong> [{experiment.priority}] {experiment.question}{' '}
+                    <em>{experiment.resolves}</em>{' '}
                     {experiment.request ? `→ ${experiment.request.requestId} (${experiment.request.status}: ${experiment.request.blockedReason ?? 'brak wykonawcy'})` : `→ ${experiment.blockedReason ?? 'BLOCKED'}`}
                   </p>
                 ))}

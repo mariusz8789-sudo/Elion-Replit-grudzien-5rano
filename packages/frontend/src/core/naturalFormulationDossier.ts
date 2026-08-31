@@ -1,4 +1,5 @@
 import { canonicalJson, fnv1a } from './events/hash';
+import type { CompositionComputeReport, ComponentComputeRecord } from './naturalCompositionCompute';
 import {
   buildBiologicalValidationRequest,
   rankNaturalCompositionHypotheses,
@@ -86,14 +87,48 @@ export interface FormulationComponent {
   /** COMPUTE — realnie wykonane przebiegi obliczeniowe, nie deklaracja możliwości. */
   computeStatus: DossierFieldStatus;
   computeRuns: readonly DossierComputeRecord[];
+  /**
+   * Wykonania zamówione dla TEJ hipotezy, z rozróżnieniem EXECUTED /
+   * MISSING_DATA / BLOCKED / COMPUTE_NOT_AVAILABLE. Puste, gdy dla tej
+   * kompozycji nie uruchomiono per-hypothesis compute.
+   */
+  hypothesisComputeRecords: readonly ComponentComputeRecord[];
   ranking?: CandidateRanking;
   uncertainty: string;
   missingEvidence: readonly string[];
 }
 
+/**
+ * Kolejność WALIDACJI jest leksykograficzna i zadeklarowana wprost. Rozstrzyga
+ * pytanie „co warto zrobić najpierw", a odpowiedź brzmi: najpierw to, bez
+ * czego reszta nie ma sensu. Nie ma tu wagi ani wskaźnika informatywności,
+ * bo nie ma metodologii, która by je uzasadniła.
+ */
+export const VALIDATION_PRIORITY = [
+  // Składnik bez ŻADNEGO evidence — hipoteza nie ma podstawy, nie słabą podstawę.
+  'NO_EVIDENCE_COMPONENT',
+  // Żądany target, którego nie pokrywa nikt — hipoteza nie odpowiada na pytanie.
+  'UNCOVERED_TARGET',
+  // Runtime był dopuszczalny, ale nie policzył — luka usuwalna od razu, bez laboratorium.
+  'BLOCKED_COMPUTE',
+  // Brak wejścia dla dopuszczalnego runtime'u — brakuje danych, nie wykonania.
+  'MISSING_COMPUTE_INPUT',
+  // Brak profilu własności — ogranicza wniosek, nie unieważnia go.
+  'PROPERTY',
+  // Test addytywności pary — ma sens dopiero, gdy składniki się bronią.
+  'COMBINATION',
+] as const;
+
+export type ValidationPriorityKind = (typeof VALIDATION_PRIORITY)[number];
+
 export interface FormulationValidationExperiment {
   /** Czego dotyczy: pojedynczego składnika, pary, czy niepokrytego targetu. */
-  scope: 'COMPONENT' | 'COMBINATION' | 'UNCOVERED_TARGET' | 'PROPERTY';
+  scope: 'COMPONENT' | 'COMBINATION' | 'UNCOVERED_TARGET' | 'PROPERTY' | 'COMPUTE';
+  priority: ValidationPriorityKind;
+  /** Pozycja w kolejności walidacji, licząc od 1. */
+  order: number;
+  /** Co ten krok ROZSTRZYGNIE — nie co pokaże. */
+  resolves: string;
   question: string;
   /** Typowane żądanie eksperymentu tam, gdzie kontrakt je definiuje. */
   request?: BiologicalExperimentRequest;
@@ -114,7 +149,10 @@ export interface NaturalFormulationHypothesis {
   why: readonly string[];
   propertyStatus: DossierFieldStatus;
   computeStatus: DossierFieldStatus;
+  /** Pełny raport per-hypothesis compute, gdy został wykonany. */
+  compute: CompositionComputeReport | null;
   uncertainty: string;
+  /** Uporządkowane wg jawnych kryteriów: co blokuje najwięcej, idzie pierwsze. */
   validationExperiments: readonly FormulationValidationExperiment[];
   /** Status jest nazwany wprost i nie ma wariantu „lek". */
   status: 'NATURAL_COMPOSITION_HYPOTHESIS';
@@ -139,6 +177,7 @@ function componentFor(
   composition: RankedCompositionHypothesis,
   siblings: readonly CandidateDiscoveryReport[],
   requestedTargetIds: readonly string[],
+  compute: CompositionComputeReport | null,
 ): FormulationComponent {
   const otherTargets = new Set(siblings.filter((entry) => entry.candidateId !== report.candidateId).flatMap((entry) => entry.targetIds));
   const uniquelyCoveredTargetIds = report.targetIds.filter((targetId) => !otherTargets.has(targetId));
@@ -152,6 +191,10 @@ function componentFor(
     resultOrigin: run.resultOrigin,
     outputKeys: Object.keys(run.outputs).sort(),
   }));
+
+  const hypothesisComputeRecords = (compute?.runtimes ?? [])
+    .flatMap((runtime) => runtime.componentRecords)
+    .filter((record) => record.candidateId === report.candidateId);
 
   const whyIncluded: string[] = [];
   if (uniquelyCoveredTargetIds.length > 0) {
@@ -181,8 +224,11 @@ function componentFor(
       ?? 'Brak zadeklarowanego profilu własności dla tego kandydata; nie wolno przyjmować żadnych wartości domyślnych.',
     evidenceIds: report.evidenceIds,
     evidenceStatus: report.evidenceIds.length > 0 ? 'PRESENT' : 'MISSING_DATA',
-    computeStatus: computeRuns.length > 0 ? 'PRESENT' : 'MISSING_DATA',
+    computeStatus: computeRuns.length > 0 || hypothesisComputeRecords.some((record) => record.status === 'EXECUTED')
+      ? 'PRESENT'
+      : 'MISSING_DATA',
     computeRuns,
+    hypothesisComputeRecords,
     ...(report.ranking === undefined ? {} : { ranking: report.ranking }),
     uncertainty: report.uncertainty,
     missingEvidence: composition.missingEvidenceIds.filter((entry) => entry === report.candidateId),
@@ -193,39 +239,85 @@ function validationExperimentsFor(
   composition: RankedCompositionHypothesis,
   components: readonly FormulationComponent[],
   reports: readonly CandidateDiscoveryReport[],
+  compute: CompositionComputeReport | null,
 ): FormulationValidationExperiment[] {
-  const experiments: FormulationValidationExperiment[] = [];
+  const draft: Omit<FormulationValidationExperiment, 'order'>[] = [];
+
   for (const component of components) {
     const report = reports.find((entry) => entry.candidateId === component.candidateId);
     if (report === undefined) continue;
-    experiments.push({
+    const noEvidence = component.evidenceStatus !== 'PRESENT';
+    draft.push({
       scope: 'COMPONENT',
-      question: component.evidenceStatus === 'PRESENT'
-        ? `Czy niezależny assay odtwarza zależność ${component.candidateId} → ${component.contributedTargetIds.join(', ') || 'brak zadeklarowanego targetu'}?`
-        : `Czy ${component.candidateId} w ogóle wykazuje aktywność wobec ${component.contributedTargetIds.join(', ') || 'jakiegokolwiek zadeklarowanego targetu'}? Brak evidence oznacza brak podstawy, nie słabą podstawę.`,
+      priority: noEvidence ? 'NO_EVIDENCE_COMPONENT' : 'COMBINATION',
+      resolves: noEvidence
+        ? 'Rozstrzygnie, czy ten składnik ma jakąkolwiek podstawę w tej hipotezie — bez tego reszta kroków jest przedwczesna.'
+        : 'Rozstrzygnie, czy niezależny assay odtwarza zależność, na której opiera się obecność tego składnika.',
+      question: noEvidence
+        ? `Czy ${component.candidateId} w ogóle wykazuje aktywność wobec ${component.contributedTargetIds.join(', ') || 'jakiegokolwiek zadeklarowanego targetu'}? Brak evidence oznacza brak podstawy, nie słabą podstawę.`
+        : `Czy niezależny assay odtwarza zależność ${component.candidateId} → ${component.contributedTargetIds.join(', ') || 'brak zadeklarowanego targetu'}?`,
       request: buildBiologicalValidationRequest({ hypothesisId: report.hypothesisId, candidateId: report.candidateId, targetIds: report.targetIds }),
     });
     if (component.propertyStatus !== 'PRESENT') {
-      experiments.push({
+      draft.push({
         scope: 'PROPERTY',
+        priority: 'PROPERTY',
+        resolves: 'Rozstrzygnie zakres, w jakim wolno o tym składniku cokolwiek twierdzić poza tożsamością.',
         question: `Zmierz profil własności ${component.candidateId}; obecnie nie ma żadnego zadeklarowanego profilu.`,
         blockedReason: 'Brak danych o własnościach; wymaga pomiaru albo przypiętego źródła, nie oszacowania.',
       });
     }
   }
-  experiments.push({
+
+  // Luki obliczeniowe pochodzą z REALNEGO wyniku planowania i wykonania, nie z
+  // założenia „compute pewnie się nie udał".
+  for (const runtime of compute?.runtimes ?? []) {
+    for (const record of runtime.componentRecords) {
+      if (record.status === 'BLOCKED') {
+        draft.push({
+          scope: 'COMPUTE',
+          priority: 'BLOCKED_COMPUTE',
+          resolves: `Rozstrzygnie, czy ${record.runtimeModelId} jest w ogóle dostępny w tym środowisku — to luka konfiguracyjna, nie naukowa.`,
+          question: `Uruchom ${record.runtimeModelId} dla ${record.candidateId}: wejście istnieje, a runtime odmówił. ${record.reason}`,
+          blockedReason: record.reason,
+        });
+      }
+      if (record.status === 'MISSING_DATA') {
+        draft.push({
+          scope: 'COMPUTE',
+          priority: 'MISSING_COMPUTE_INPUT',
+          resolves: `Rozstrzygnie, czy ${record.candidateId} da się w ogóle policzyć runtime'em ${record.runtimeModelId}.`,
+          question: `Uzupełnij przypięte wejście dla ${record.candidateId} wymagane przez ${record.runtimeModelId}. ${record.reason}`,
+          blockedReason: record.reason,
+        });
+      }
+    }
+  }
+
+  draft.push({
     scope: 'COMBINATION',
+    priority: 'COMBINATION',
+    resolves: 'Rozstrzygnie, czy zestawienie tych składników wnosi cokolwiek ponad ich osobne działanie.',
     question: `Czy działanie kompozycji ${composition.candidateIds.join(' + ')} jest addytywne? Projekt musi być prerejestrowany, a addytywność mierzona, nie wnioskowana z wiązania.`,
     blockedReason: 'W tym środowisku nie ma wykonawcy biologicznego; to żądanie eksperymentu, nie wynik.',
   });
+
   for (const targetId of composition.uncoveredTargetIds) {
-    experiments.push({
+    draft.push({
       scope: 'UNCOVERED_TARGET',
+      priority: 'UNCOVERED_TARGET',
+      resolves: 'Rozstrzygnie, czy hipoteza w ogóle odpowiada na postawione pytanie o ten target.',
       question: `Żaden składnik tej kompozycji nie pokrywa ${targetId}; potrzebne jest wyszukanie kolejnego kandydata albo świadoma rezygnacja z tego targetu.`,
       blockedReason: 'Niepokryty target jest luką w hipotezie, a nie polem do uzupełnienia szacunkiem.',
     });
   }
-  return experiments;
+
+  return draft
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) =>
+      VALIDATION_PRIORITY.indexOf(a.entry.priority) - VALIDATION_PRIORITY.indexOf(b.entry.priority)
+      || a.index - b.index)
+    .map(({ entry }, position) => ({ ...entry, order: position + 1 }));
 }
 
 export function buildNaturalFormulationDossier(input: {
@@ -233,6 +325,12 @@ export function buildNaturalFormulationDossier(input: {
   requestedTargetIds?: readonly string[];
   referenceLabel?: string;
   limit?: number;
+  /**
+   * Wyniki per-hypothesis compute, po jednym na kompozycję (dopasowywane po
+   * `combinationId`). Pominięte = compute nie był uruchamiany; dossier mówi
+   * wtedy MISSING_DATA, a nie „nie da się policzyć".
+   */
+  computeReports?: readonly CompositionComputeReport[];
 }): NaturalFormulationDossier {
   const requestedTargetIds = input.requestedTargetIds ?? [];
   const referenceLabel = input.referenceLabel ?? 'nieokreślona referencja';
@@ -242,7 +340,8 @@ export function buildNaturalFormulationDossier(input: {
     const siblings = composition.candidateIds
       .map((candidateId) => input.reports.find((report) => report.candidateId === candidateId))
       .filter((report): report is CandidateDiscoveryReport => report !== undefined);
-    const components = siblings.map((report) => componentFor(report, composition, siblings, requestedTargetIds));
+    const compute = input.computeReports?.find((entry) => entry.combinationId === composition.combinationId) ?? null;
+    const components = siblings.map((report) => componentFor(report, composition, siblings, requestedTargetIds, compute));
     const complementarity = components.some((component) => component.uniquelyCoveredTargetIds.length > 0)
       ? `Składniki są komplementarne: ${components.filter((component) => component.uniquelyCoveredTargetIds.length > 0).map((component) => `${component.candidateId} wnosi ${component.uniquelyCoveredTargetIds.join(', ')}`).join('; ')}.`
       : 'Składniki nie są komplementarne pod względem targetów — każdy pokrywa to samo co drugi.';
@@ -250,9 +349,10 @@ export function buildNaturalFormulationDossier(input: {
     const propertyStatus: DossierFieldStatus = components.every((component) => component.propertyStatus === 'PRESENT')
       ? 'PRESENT'
       : 'MISSING_DATA';
-    const computeStatus: DossierFieldStatus = components.some((component) => component.computeStatus === 'PRESENT')
-      ? 'PRESENT'
-      : 'MISSING_DATA';
+    const computeStatus: DossierFieldStatus = compute === null
+      ? (components.some((component) => component.computeStatus === 'PRESENT') ? 'PRESENT' : 'MISSING_DATA')
+      : compute.coverage === 'COMPLETE' ? 'PRESENT'
+        : compute.coverage === 'PARTIAL' ? 'MISSING_DATA' : 'NOT_MODELED';
     const fingerprintBase = {
       combinationId: composition.combinationId,
       rank: composition.rank,
@@ -263,6 +363,7 @@ export function buildNaturalFormulationDossier(input: {
         unique: component.uniquelyCoveredTargetIds,
         evidence: component.evidenceIds,
         compute: component.computeRuns.map((run) => run.fingerprint ?? run.runtime),
+        hypothesisCompute: component.hypothesisComputeRecords.map((record) => `${record.runtimeModelId}:${record.status}:${record.fingerprint ?? 'brak'}`),
       })),
       why,
     };
@@ -280,7 +381,8 @@ export function buildNaturalFormulationDossier(input: {
       propertyStatus,
       computeStatus,
       uncertainty: composition.uncertainty,
-      validationExperiments: validationExperimentsFor(composition, components, input.reports),
+      compute,
+      validationExperiments: validationExperimentsFor(composition, components, input.reports, compute),
       status: 'NATURAL_COMPOSITION_HYPOTHESIS' as const,
       clinicalClaim: 'NONE_VALIDATION_REQUIRED' as const,
       hypothesisFingerprint: fnv1a(canonicalJson(fingerprintBase)),
@@ -292,7 +394,7 @@ export function buildNaturalFormulationDossier(input: {
     unfilledFields.push('PROPERTY COVERAGE — co najmniej jeden składnik nie ma zadeklarowanego profilu własności.');
   }
   if (hypotheses.some((hypothesis) => hypothesis.computeStatus !== 'PRESENT')) {
-    unfilledFields.push('COMPUTE — dla co najmniej jednej kompozycji żaden składnik nie ma wykonanego przebiegu obliczeniowego.');
+    unfilledFields.push('COMPUTE — co najmniej jedna kompozycja nie ma runtime\'u, który policzyłby WSZYSTKIE jej składniki; wyniku częściowego nie wolno zestawiać między składnikami.');
   }
   if (hypotheses.some((hypothesis) => hypothesis.missingEvidenceIds.length > 0)) {
     unfilledFields.push('EVIDENCE — co najmniej jeden składnik nie ma żadnego rekordu evidence.');

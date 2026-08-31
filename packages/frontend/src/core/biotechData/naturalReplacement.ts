@@ -144,6 +144,43 @@ const PUBCHEM_IDENTITY_RECORDS = [
   ['uric acid', 1175, 'C5H4N4O3', 'C1=NC2=C(N1)C(=O)NC(=O)N2', 'GRIWKWGZBMCZIE-UHFFFAOYSA-N', '168.11'],
 ] as const;
 
+/**
+ * Wejścia STRUKTURALNE kandydatów, w postaci wymaganej przez realne runtime'y
+ * chemiczne (`chem-molecular-weight` potrzebuje wzoru, `chem-rdkit-descriptors`
+ * SMILES). Ta sama przypięta tabela PubChem, z której powstają raporty — nie
+ * osobne źródło i nie wartości z pamięci modelu.
+ *
+ * Kandydat, którego tu nie ma, nie dostaje wartości domyślnej: po prostu nie ma
+ * wejścia, a compute dla niego kończy się statusem MISSING_DATA.
+ */
+export interface NaturalCandidateStructure {
+  candidateId: string;
+  name: string;
+  cid: number;
+  formula: string;
+  smiles: string;
+  sourceId: string;
+  sourceUrl: string;
+  sourceVersion: string;
+  retrievedAt: string;
+}
+
+export function naturalCandidateStructures(records?: readonly NaturalSourceRecord[]): readonly NaturalCandidateStructure[] {
+  const rows = records?.length
+    ? records.map((record) => [record.name, record.cid, record.formula, record.smiles] as const)
+    : PUBCHEM_IDENTITY_RECORDS.map(([name, cid, formula, smiles]) => [name, cid, formula, smiles] as const);
+  return rows
+    .filter(([, cid, formula, smiles]) => Number.isFinite(cid) && formula.trim().length > 0 && smiles.trim().length > 0)
+    .map(([name, cid, formula, smiles]) => ({
+      candidateId: `candidate:pubchem:${cid}`,
+      name, cid, formula, smiles,
+      sourceId: `pubchem:CID:${cid}`,
+      sourceUrl: `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON`,
+      sourceVersion: `PubChem CID ${cid}`,
+      retrievedAt: PUBCHEM_RETRIEVED_AT,
+    }));
+}
+
 function identityOnlyReports(records?: readonly NaturalSourceRecord[]): CandidateDiscoveryReport[] {
   const rows = records
     ? records.map((r) => [r.name, r.cid, r.formula, r.smiles, r.inchiKey, r.molecularWeight] as const)

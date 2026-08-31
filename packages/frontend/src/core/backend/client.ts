@@ -71,12 +71,19 @@ export interface Session {
 
 export type ApiResult<T> =
   | { ok: true; data: T }
-  | { ok: false; status: number; error: string; message: string };
+  /**
+   * `responseBody` niesie SUROWĄ odpowiedź nieudanego żądania. Bez tego
+   * odmowa, którą backend opisuje szczegółowo w ciele (np. „RDKit niedostępny
+   * — skonfiguruj GENESIS_RDKIT_PYTHON" w polu `run.message` przy HTTP 400),
+   * spłaszczała się do „Błąd serwera (400)". Powód odmowy jest wynikiem
+   * naukowym, a nie szumem transportowym, więc nie wolno go tracić.
+   */
+  | { ok: false; status: number; error: string; message: string; responseBody?: unknown };
 
 const API_BASE = '/api';
 
-function fail(status: number, error: string, message: string): { ok: false; status: number; error: string; message: string } {
-  return { ok: false, status, error, message };
+function fail(status: number, error: string, message: string, responseBody?: unknown): { ok: false; status: number; error: string; message: string; responseBody?: unknown } {
+  return { ok: false, status, error, message, ...(responseBody === undefined ? {} : { responseBody }) };
 }
 
 /** Jedno miejsce na fetch + parsowanie + mapowanie błędów sieci/serwera na wynik. */
@@ -107,8 +114,19 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    const d = (data ?? {}) as { error?: string; message?: string };
-    return fail(res.status, d.error ?? 'error', d.message ?? `Błąd serwera (${res.status}).`);
+    const d = (data ?? {}) as { error?: string; message?: string; run?: { error?: string; message?: string } };
+    // Ciało dołączamy tylko wtedy, gdy niesie WIĘCEJ niż {error, message} —
+    // czyli gdy spłaszczenie faktycznie coś gubi. Odpowiedź zawierająca
+    // wyłącznie te dwa pola jest już w całości odwzorowana w wyniku.
+    const extraDetail = data !== null && typeof data === 'object'
+      && Object.keys(data as Record<string, unknown>).some((key) => key !== 'error' && key !== 'message');
+    // Odmowa opisana wewnątrz `run` jest bardziej konkretna niż status HTTP.
+    return fail(
+      res.status,
+      d.error ?? d.run?.error ?? 'error',
+      d.message ?? d.run?.message ?? `Błąd serwera (${res.status}).`,
+      extraDetail ? data : undefined,
+    );
   }
   return { ok: true, data: data as T };
 }

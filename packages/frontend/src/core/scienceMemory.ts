@@ -6,6 +6,8 @@ import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 import { compareAme2020Observations } from './observation/nuclearAme2020';
 import { compareCandidateDiscoveryReports, type CandidateComparison } from './biotechDiscoveryContract';
 import { canonicalJson, fnv1a } from './events/hash';
+import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
+import type { ScenarioRun } from './simulation/scenarioEngine';
 
 /**
  * Scientific Memory (sekcja O dyrektywy CTO) — trwały, lokalny zapis
@@ -137,6 +139,12 @@ export interface SavedExperiment {
   evidenceChainId?: string;
   analysis?: readonly SavedExperimentAnalysisBlock[];
   biotech?: SavedBiotechContext;
+  /**
+   * Trwałe wejścia przebiegu Scenario Engine. Zapisujemy wejścia i odciski,
+   * nie odpowiedź: po przeładowaniu seria jest liczona od nowa i dopiero
+   * zgodność odcisków dopuszcza ją do świata 3D.
+   */
+  scenario?: SavedScenarioRunContext;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -290,6 +298,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     (o.evidenceChainId === undefined || nonEmptyString(o.evidenceChainId)) &&
     validAnalysis(o.analysis) &&
     validBiotechContext(o.biotech) &&
+    (o.scenario === undefined || isSavedScenarioRunContext(o.scenario)) &&
     validReplayIdentity(o.replayIdentity)
   );
 }
@@ -421,6 +430,7 @@ export interface SaveExperimentInput {
   evidenceChainId?: string;
   analysis?: readonly SavedExperimentAnalysisBlock[];
   biotech?: SavedBiotechContext;
+  scenario?: SavedScenarioRunContext;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -459,6 +469,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.evidenceChainId !== undefined && !nonEmptyString(input.evidenceChainId)) throw new Error('Evidence chain musi mieć niepusty identyfikator.');
   if (!validReplayIdentity(input.replayIdentity)) throw new Error('Replay identity musi mieć niepuste identyfikatory.');
   if (!validBiotechContext(input.biotech)) throw new Error('Biotech context musi mieć kompletne identity, status i provenance.');
+  if (input.scenario !== undefined && !isSavedScenarioRunContext(input.scenario)) throw new Error('Kontekst scenariusza musi zawierać komplet wejść i odcisków wystarczających do odtworzenia.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -475,6 +486,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.evidenceChainId === undefined ? {} : { evidenceChainId: input.evidenceChainId }),
     ...(input.analysis === undefined ? {} : { analysis: input.analysis }),
     ...(input.biotech === undefined ? {} : { biotech: input.biotech }),
+    ...(input.scenario === undefined ? {} : { scenario: input.scenario }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -607,6 +619,82 @@ export function saveScientificEvidencePackToMemory(pack: ScientificEvidencePack)
     equations: [],
     assumptions,
     epistemicStatus: pack.hypothesisAssessment.assessment,
+  });
+}
+
+/**
+ * Utrwala przebieg Scenario Engine w istniejącej Pamięci Naukowej.
+ *
+ * Świadomie NIE zapisujemy serii dobowej jako źródła prawdy. `observations`
+ * niosą krzywe wyłącznie do podglądu; po przeładowaniu świat 3D bierze serię
+ * z ponownego przeliczenia (`replaySavedScenarioRun`), a nie z tego zapisu.
+ * Dzięki temu podmieniona zawartość localStorage nie ma jak stać się światem.
+ *
+ * `params` to płaskie, jawne dźwignie przebiegu — wchodzą do `contentHash`,
+ * więc zmiana którejkolwiek daje inny rekord, a nie cichą nadpiskę.
+ */
+export function saveScenarioRunToMemory(run: ScenarioRun, execution?: SavedExperimentExecution): SavedExperiment {
+  const scenario = buildSavedScenarioRunContext(run);
+  const summary = run.summary!;
+  const series = run.series;
+  const observations: Record<string, ExperimentOutputValue> = {
+    seriesInfectious: series.map((sample) => sample.infectious),
+    seriesDeceased: series.map((sample) => sample.deceased),
+    seriesRecovered: series.map((sample) => sample.recovered),
+    seriesHospitalized: series.map((sample) => sample.hospitalized),
+    seriesBedOccupancy: series.map((sample) => Number(sample.hospital.bedOccupancy.toFixed(6))),
+  };
+  return saveExperiment({
+    labId: 'biology',
+    experimentId: `scenario:${scenario.scenarioId}`,
+    experimentName: `Scenario Engine — ${scenario.label}`,
+    params: {
+      scenarioId: scenario.scenarioId,
+      days: scenario.days,
+      stepsPerDay: scenario.stepsPerDay,
+      interventionStartDay: scenario.interventionStartDay,
+      nAgents: scenario.params.nAgents,
+      initialInfected: scenario.params.initialInfected,
+      seed: scenario.params.seed,
+      r0: scenario.params.r0,
+      restrictions: scenario.params.restrictions,
+      mobility: scenario.params.mobility,
+      isolate: scenario.params.isolate,
+      closeSchools: scenario.params.closeSchools,
+      transmissionScale: scenario.params.transmissionScale,
+      householdTransmissionScale: scenario.params.householdTransmissionScale,
+      severeRate: scenario.params.severeRate,
+      ifr: scenario.params.ifr,
+      totalBeds: scenario.hospitalCapacity.totalBeds,
+      icuBeds: scenario.hospitalCapacity.icuBeds,
+    },
+    stats: {
+      peakInfectious: summary.peakInfectious,
+      peakInfectiousDay: summary.peakInfectiousDay,
+      totalDeaths: summary.totalDeaths,
+      attackRate: summary.attackRate,
+      peakBedOccupancy: summary.peakBedOccupancy,
+      peakIcuOccupancy: summary.peakIcuOccupancy,
+      totalUnmetCareDays: summary.totalUnmetCareDays,
+      totalTransmissions: summary.totalTransmissions,
+      daysSimulated: series.length,
+    },
+    observations,
+    scenario,
+    ...(execution === undefined ? {} : { execution }),
+    analysis: [
+      { title: 'Przebieg scenariusza', body: `${scenario.label}: ${scenario.days} dni x ${scenario.stepsPerDay} krokow/dobe, interwencja od dnia ${scenario.interventionStartDay}. Szczyt zakazen ${summary.peakInfectious} w dniu ${summary.peakInfectiousDay}; zgony ${summary.totalDeaths}.`, kind: 'scenario-run' },
+      { title: 'Jak dziala odtworzenie', body: 'Pamiec przechowuje wejscia i odciski, nie wynik. Ponowne otwarcie przelicza model od nowa i porownuje odciski: MATCH dopuszcza serie do swiata 3D, DRIFT i BLOCKED jej nie udostepniaja.', kind: 'scenario-replay-contract' },
+      { title: 'Granice modelu', body: 'Model nie jest skalibrowany do zadnej rzeczywistej epidemii. To przebieg scenariuszowy (SIMULATION), nie prognoza i nie obserwacja.', kind: 'scenario-boundary' },
+    ],
+    honesty: 'simplified',
+    honestyNote: `Scenario Engine ${scenario.engineVersion}; deterministyczny przy zadanym seedzie. Wynik nie jest skalibrowana prognoza.`,
+    assumptions: [
+      `Scenariusz "${scenario.label}" ze zdefiniowanej biblioteki scenariuszy.`,
+      'Seria dobowa pochodzi z realnego przebiegu modelu, nie z osobnego timera.',
+      'Profil kohortowy i pojemnosc szpitala sa czescia zapisanych wejsc.',
+    ],
+    epistemicStatus: 'SIMULATION',
   });
 }
 

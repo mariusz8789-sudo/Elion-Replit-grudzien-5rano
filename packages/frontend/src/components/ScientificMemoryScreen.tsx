@@ -6,6 +6,8 @@ import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
 import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
 import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
 import { replaySavedBiotechComparison, replaySavedBiotechDiscoveryArtifact } from '../core/scienceMemory';
+import { openSavedScenarioInWorld } from '../core/simulation/scenarioWorldReplay';
+import type { SavedScenarioReplay } from '../core/simulation/scenarioMemory';
 
 function downloadJson(record: SavedExperiment): void {
   const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
@@ -37,9 +39,34 @@ export function ScientificMemoryScreen() {
   const [evidencePacks] = useState(() => listScientificEvidencePacks());
   const [notice, setNotice] = useState<string | null>(null);
   const [artifactReplay, setArtifactReplay] = useState<Record<string, string>>({});
+  const [scenarioReplay, setScenarioReplay] = useState<Record<string, SavedScenarioReplay>>({});
   const countLabel = useMemo(() => `${records.length} ${records.length === 1 ? 'zapis' : 'zapisów'}`, [records.length]);
 
+  /**
+   * Odtwarza zapisany przebieg PRZELICZAJĄC model od nowa i — wyłącznie przy
+   * MATCH — otwiera świat 3D. Werdykt inny niż MATCH nie ma czego przekazać,
+   * więc nawigacja po prostu się nie odbywa.
+   */
+  const replayScenarioRecord = (record: SavedExperiment, mode: 'open' | 'verify' | 'drift') => {
+    const result = openSavedScenarioInWorld(record.scenario, {
+      recordId: record.contentHash,
+      ...(mode === 'drift' ? { overrideParams: { r0: (record.scenario?.params.r0 ?? 2.5) + 1 } } : {}),
+    });
+    setScenarioReplay((current) => ({ ...current, [record.id]: result.replay }));
+    if (mode === 'open' && result.opened) {
+      window.location.hash = '#/city3d';
+      return;
+    }
+    if (mode === 'open') {
+      setNotice(`Świat 3D nie został otwarty: odtworzenie zakończyło się werdyktem ${result.replay.status}. Niezweryfikowany przebieg nie trafia do sceny.`);
+    }
+  };
+
   const openRecord = (record: SavedExperiment) => {
+    if (record.scenario) {
+      replayScenarioRecord(record, 'open');
+      return;
+    }
     const route = record.execution?.route;
     if (route?.kind === 'hypothetical-visualization') {
       window.location.hash = route.hash;
@@ -135,6 +162,17 @@ export function ScientificMemoryScreen() {
                     {artifactReplay[record.id] && <div className="stat-row"><span>Full artifact replay</span><span className="val">{artifactReplay[record.id]}</span></div>}
                   </>}
                 </>}
+                {record.scenario && <>
+                  <div className="stat-row"><span>Scenario Engine</span><span className="val">{record.scenario.label} · {record.scenario.days} dni × {record.scenario.stepsPerDay} kroków · interwencja od dnia {record.scenario.interventionStartDay}</span></div>
+                  <div className="stat-row"><span>Silnik / kontrakt pamięci</span><span className="val mono">{record.scenario.engineVersion} · {record.scenario.contractVersion}</span></div>
+                  <div className="stat-row"><span>Odcisk wyniku</span><span className="val mono">{record.scenario.resultFingerprint}</span></div>
+                  <div className="stat-row"><span>Odcisk epidemii / wejścia</span><span className="val mono">{record.scenario.epidemicFingerprint} · {record.scenario.inputFingerprint}</span></div>
+                  <div className="stat-row"><span>Status epistemiczny przebiegu</span><span className="val">{record.scenario.epistemicStatus} — model nieskalibrowany, nie prognoza</span></div>
+                  {scenarioReplay[record.id] && <>
+                    <div className="stat-row"><span>Werdykt odtworzenia</span><span className="val">{scenarioReplay[record.id]!.status}</span></div>
+                    <div className="stat-row"><span>Odcisk oczekiwany / otrzymany</span><span className="val mono">{scenarioReplay[record.id]!.expectedResultFingerprint ?? 'brak'} · {scenarioReplay[record.id]!.actualResultFingerprint ?? 'brak'}</span></div>
+                  </>}
+                </>}
                 <div className="stat-row"><span>Honesty</span><span className="val">{record.honesty}</span></div>
                 <div className="stat-row"><span>Fingerprint treści</span><span className="val mono">#{record.contentHash}</span></div>
                 <div className="stat-row"><span>Parametry</span><span className="val">{Object.keys(record.params).length}</span></div>
@@ -143,6 +181,27 @@ export function ScientificMemoryScreen() {
                 {record.replayIdentity && <div className="stat-row"><span>Replay identity</span><span className="val mono">{record.replayIdentity.capsuleId} · {record.replayIdentity.planId} · {record.replayIdentity.confirmationId}</span></div>}
               </div>
               <p className="settings-hint">{record.honestyNote}</p>
+              {scenarioReplay[record.id] && (
+                <>
+                  <p className="settings-hint" role="status">
+                    Odtworzenie przebiegu: {scenarioReplay[record.id]!.status} — {scenarioReplay[record.id]!.reason}{' '}
+                    Model policzono od nowa z zapisanych wejść; zapisana seria nie jest źródłem tego werdyktu.
+                  </p>
+                  {scenarioReplay[record.id]!.differences.length > 0 && (
+                    <details className="settings-details" open>
+                      <summary>Różnice ({scenarioReplay[record.id]!.differences.length})</summary>
+                      <div className="stat-list">
+                        {scenarioReplay[record.id]!.differences.map((difference) => (
+                          <div className="stat-row" key={difference.field}>
+                            <span>{difference.field}</span>
+                            <span className="val mono">{String(difference.expected)} → {String(difference.actual)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
+              )}
               {biotechReplay && <p className="settings-hint">Replay comparison: {biotechReplay.status} — {biotechReplay.reason} Nie jest to biologiczne wykonanie ani świeży pomiar.</p>}
               {record.execution?.summary && <p className="settings-hint">{record.execution.summary}</p>}
               {record.biotech && record.biotech.provenance.length > 0 && (
@@ -180,7 +239,11 @@ export function ScientificMemoryScreen() {
                 </details>
               )}
               <div className="pilot-actions">
-                <button className="chip-btn pilot-primary" onClick={() => openRecord(record)}>Otwórz z parametrami</button>
+                <button className="chip-btn pilot-primary" onClick={() => openRecord(record)}>{record.scenario ? 'Odtwórz i otwórz w 3D' : 'Otwórz z parametrami'}</button>
+                {record.scenario && <>
+                  <button className="chip-btn" onClick={() => replayScenarioRecord(record, 'verify')}>Sam werdykt odtworzenia</button>
+                  <button className="chip-btn" onClick={() => replayScenarioRecord(record, 'drift')}>Zmień R₀ → pokaż DRIFT</button>
+                </>}
                 {record.evidencePackId && <button className="chip-btn" onClick={() => { window.location.hash = `#/pilot?mode=protocol&replay=${encodeURIComponent(record.evidencePackId!)}`; }}>Otwórz Evidence replay</button>}
                 <button className="chip-btn" onClick={() => downloadJson(record)}>Eksportuj JSON</button>
                 {artifact && <>

@@ -1078,7 +1078,9 @@ export function runExperiment(request: StructuredExperimentRequest): ExperimentR
       summary: result.summary,
       series: scenarioWorld.run.series,
       scenarioSummary: scenarioWorld.run.summary,
+      scenarioRun: scenarioWorld.run,
       epistemicStatus: 'SIMULATION',
+      origin: 'fabric-run',
     });
   }
   if (liveWorld && result.status === 'completed') registerLiveExperimentWorld(run.runId, liveWorld, { runFingerprint: run.provenance.runFingerprint, resultOrigin: 'real-engine', summary: result.summary });

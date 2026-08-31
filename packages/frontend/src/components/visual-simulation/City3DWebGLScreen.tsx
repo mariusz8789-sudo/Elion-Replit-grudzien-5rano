@@ -5,6 +5,7 @@ import { ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysi
 import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
 import { consumePendingExperimentWorld, consumePendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
+import { saveScenarioRunToMemory } from '../../core/scienceMemory';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
 import { DEFAULT_HOSPITAL_CAPACITY } from '../../core/simulation/hospitalResource';
@@ -62,6 +63,7 @@ export function City3DWebGLScreen() {
   // wtedy taktowany — jest PRZEWIJANY po rzeczywistej serii dobowej przebiegu.
   const [scenarioTimeline] = useState(() => consumePendingScenarioTimeline());
   const [timelineDay, setTimelineDay] = useState(0);
+  const [timelineSaved, setTimelineSaved] = useState<string | null>(null);
   const timelineSample = scenarioTimeline
     ? scenarioTimeline.series[Math.min(timelineDay, scenarioTimeline.series.length - 1)]
     : undefined;
@@ -262,6 +264,7 @@ export function City3DWebGLScreen() {
                   <span className="mono" title={scenarioTimeline.runFingerprint}>run {scenarioTimeline.runId.slice(0, 14)}…</span>
                   <span>seed {scenarioTimeline.seed}</span>
                   <span>{scenarioTimeline.series.length} dni</span>
+                  <span>{scenarioTimeline.origin === 'memory-replay' ? `odtworzenie z Pamięci · ${scenarioTimeline.replayVerdict ?? 'MATCH'}` : 'świeże wykonanie'}</span>
                 </div>
                 <label className="scenario-run-scrubber">
                   <span>dzień {timelineSample.day} / {scenarioTimeline.series.length - 1}</span>
@@ -283,6 +286,24 @@ export function City3DWebGLScreen() {
                   Stan pochodzi wyłącznie z zapisanej serii tego przebiegu. Model nie jest skalibrowany do żadnej
                   rzeczywistej epidemii — to symulacja scenariuszowa, nie prognoza ani obserwacja.
                 </p>
+                <div className="scenario-run-actions">
+                  <button
+                    type="button"
+                    className="chip-btn"
+                    onClick={() => {
+                      try {
+                        const record = saveScenarioRunToMemory(scenarioTimeline.scenarioRun);
+                        setTimelineSaved(`Zapisano w Pamięci Naukowej: #${record.contentHash}. Po przeładowaniu przebieg jest liczony od nowa i weryfikowany odciskiem.`);
+                      } catch (error) {
+                        setTimelineSaved(`Nie zapisano: ${error instanceof Error ? error.message : String(error)}`);
+                      }
+                    }}
+                  >
+                    Zapisz przebieg w Pamięci
+                  </button>
+                  <button type="button" className="chip-btn" onClick={() => { window.location.hash = '#/memory'; }}>Otwórz Pamięć Naukową</button>
+                </div>
+                {timelineSaved && <p className="scenario-run-note" role="status">{timelineSaved}</p>}
               </div>
             )}
             <div className="city-scene-readout" aria-live="polite">

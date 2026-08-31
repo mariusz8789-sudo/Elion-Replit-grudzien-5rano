@@ -75,6 +75,13 @@ describe('Artefakt pamięci — hipotezy kompozycji', () => {
     expect(() => saveBiotechDiscoveryComparisonToMemory([reports()[0]!], { requestedTargetIds: ['A1'] })).toThrow();
   });
 
+  /** Zapisany artefakt; brak artefaktu to błąd zapisu, nie przypadek do obsłużenia w teście. */
+  function savedArtifact() {
+    const artifact = saveBiotechDiscoveryComparisonToMemory(reports(), { requestedTargetIds: ['A1'] }).biotech?.artifact;
+    expect(artifact).toBeDefined();
+    return artifact as NonNullable<typeof artifact>;
+  }
+
   it('replay odtwarza zapisany ranking — MATCH, gdy nic się nie zmieniło', () => {
     const saved = saveBiotechDiscoveryComparisonToMemory(reports(), { requestedTargetIds: ['A1'] }).biotech?.artifact;
 
@@ -82,7 +89,7 @@ describe('Artefakt pamięci — hipotezy kompozycji', () => {
   });
 
   it('replay zgłasza DRIFT, gdy zapisany ranking kompozycji zostanie podmieniony', () => {
-    const saved = saveBiotechDiscoveryComparisonToMemory(reports(), { requestedTargetIds: ['A1'] }).biotech?.artifact!;
+    const saved = savedArtifact();
     const tampered = {
       ...saved,
       compositionHypotheses: [...(saved.compositionHypotheses ?? [])].reverse(),
@@ -94,14 +101,14 @@ describe('Artefakt pamięci — hipotezy kompozycji', () => {
   });
 
   it('replay zgłasza DRIFT, gdy podmieniono żądane targety', () => {
-    const saved = saveBiotechDiscoveryComparisonToMemory(reports(), { requestedTargetIds: ['A1'] }).biotech?.artifact!;
+    const saved = savedArtifact();
 
     expect(replaySavedBiotechDiscoveryArtifact({ ...saved, requestedTargetIds: ['A2B'] }, saved.reports ?? [], {}))
       .toMatchObject({ status: 'DRIFT' });
   });
 
   it('replay bez artefaktu albo poniżej dwóch raportów jest BLOCKED, nigdy MATCH', () => {
-    const saved = saveBiotechDiscoveryComparisonToMemory(reports(), { requestedTargetIds: ['A1'] }).biotech?.artifact!;
+    const saved = savedArtifact();
 
     expect(replaySavedBiotechDiscoveryArtifact(undefined, saved.reports ?? [], {})).toMatchObject({ status: 'BLOCKED' });
     expect(replaySavedBiotechDiscoveryArtifact(saved, [saved.reports[0]!], {})).toMatchObject({ status: 'BLOCKED' });

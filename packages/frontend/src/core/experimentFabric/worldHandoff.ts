@@ -1,5 +1,5 @@
 import { EpidemicCitySimulation } from '../simulation/epidemicCity';
-import type { ScenarioDaySample, ScenarioId, ScenarioSummary } from '../simulation/scenarioEngine';
+import type { ScenarioDaySample, ScenarioId, ScenarioRun, ScenarioSummary } from '../simulation/scenarioEngine';
 
 /**
  * Ephemeral pointer handoff for a single interactive Experiment Run.
@@ -74,8 +74,26 @@ export interface ScenarioTimelineHandoff {
   /** Rzeczywista seria dobowa przebiegu — jedyne źródło stanu świata w czasie. */
   series: readonly ScenarioDaySample[];
   scenarioSummary: ScenarioSummary;
+  /**
+   * Pełny przebieg wraz z rozwiązanymi wejściami. To ta sama instancja, z
+   * której pochodzą `series` i `scenarioSummary` — nie kopia i nie drugi stan.
+   * Potrzebna, bo utrwalenie w Pamięci Naukowej wymaga WEJŚĆ (parametry sprzed
+   * i po interwencji, kohorta, pojemność szpitala), a nie samego wyniku.
+   */
+  scenarioRun: ScenarioRun;
   /** Model nie jest skalibrowany do żadnej rzeczywistej epidemii. */
   epistemicStatus: 'SIMULATION';
+  /**
+   * Skąd wziął się ten przebieg. Świat MUSI to pokazywać: świeże wykonanie w
+   * Experiment Fabric i odtworzenie z Pamięci Naukowej to nie to samo, nawet
+   * jeżeli seria jest identyczna.
+   */
+  origin: 'fabric-run' | 'memory-replay';
+  /**
+   * Wypełnione wyłącznie dla `memory-replay`: werdykt, który dopuścił serię do
+   * świata. Wyłącznie MATCH — DRIFT i BLOCKED nie mają tu wstępu.
+   */
+  replayVerdict?: 'MATCH';
 }
 
 const SCENARIO_TIMELINES = new Map<string, ScenarioTimelineHandoff>();

@@ -89,7 +89,7 @@ function Traceability({ run, replays }: { run: ScenarioCommandCenterRun; replays
   </div>;
 }
 
-export function ScenarioCommandCenterPanel({ params }: { params: SimParams }) {
+export function ScenarioCommandCenterPanel({ params, temporalDay = null }: { params: SimParams; temporalDay?: number | null }) {
   const [intervention, setIntervention] = useState<ScenarioId>('ISOLATION');
   const [run, setRun] = useState<ScenarioCommandCenterRun | null>(null);
   const [chartMetric, setChartMetric] = useState<ChartMetric>('infectious');
@@ -108,7 +108,7 @@ export function ScenarioCommandCenterPanel({ params }: { params: SimParams }) {
   const variantState = timelines ? temporalStateAt(timelines.variant, timelineDay) : null;
   const lastDay = run?.intervention.days ?? 0;
   const execute = () => {
-    const next = runScenarioCommandCenter(intervention, params);
+    const next = runScenarioCommandCenter(intervention, params, temporalDay === null ? {} : { variantInterventionStartDay: temporalDay });
     setRun(next); setTimelineDay(0); setReplays(null);
   };
 
@@ -127,7 +127,7 @@ export function ScenarioCommandCenterPanel({ params }: { params: SimParams }) {
       {parameterEntries.length > 0 ? parameterEntries.map(([key, value]) => <div key={key}><b>{PARAMETER_LABELS[key] ?? key}</b><code>{Array.isArray(value) ? value.join(', ') : String(value)}</code></div>) : <p>Brak nadpisań parametrów modelu.</p>}
     </div>
     {definition.notModeledReason && <p className="scenario-not-modeled">NOT_MODELED — {definition.notModeledReason}</p>}
-    <button className="world-action accent scenario-run-button" onClick={execute}>▶ Uruchom istniejący scenariusz</button>
+    <button className="world-action accent scenario-run-button" onClick={execute}>▶ {temporalDay === null ? 'Uruchom istniejący scenariusz' : `WHAT IF? · od dnia ${temporalDay}`}</button>
 
     {!run && <p className="scenario-empty">NOT_AVAILABLE — uruchom BASELINE i INTERVENTION, aby zobaczyć wyniki.</p>}
     {run && <>

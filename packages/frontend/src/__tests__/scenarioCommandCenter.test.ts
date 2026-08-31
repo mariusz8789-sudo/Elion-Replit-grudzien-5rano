@@ -49,6 +49,13 @@ describe('Scenario Command Center adapter', () => {
     expect('clockSpeed' in normalized).toBe(false);
   });
 
+  it('passes a selected temporal day as the existing variant intervention start', () => {
+    const run = runScenarioCommandCenter('ISOLATION', params, { variantInterventionStartDay: 7 });
+    expect(run.baseline.interventionStartDay).toBe(0);
+    expect(run.intervention.interventionStartDay).toBe(7);
+    expect(run.intervention.series.slice(0, 6)).toEqual(run.baseline.series.slice(0, 6));
+  });
+
   it('measures a real divergence day instead of assuming the intervention start', () => {
     const run = runScenarioCommandCenter('ISOLATION', params);
     // ISOLATION differs from BASELINE from day 0 here (no delayed-start control

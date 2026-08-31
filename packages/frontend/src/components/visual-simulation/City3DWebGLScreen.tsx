@@ -459,7 +459,7 @@ export function City3DWebGLScreen() {
             <p className="hospital-panel-note">Topologia pochodzi z tego samego układu miasta co renderer. Przypisanie agentów do tras i segmentów kontaktu pozostaje <code>NOT_MODELED</code>.</p>
           </div>
           <EarthquakeScenarioPanel onOverlayChange={setEarthquakeOverlay} />
-          <ScenarioCommandCenterPanel params={params} />
+          <ScenarioCommandCenterPanel params={params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
           <div className="world-panel event-feed-panel">
             <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>
             {latestTransmission ? (

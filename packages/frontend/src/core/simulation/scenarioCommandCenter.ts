@@ -64,13 +64,21 @@ export function scenarioParamsFromCommandCenter(params: SimParams): Partial<Epid
  * the two direct `runScenario` calls it replaces, plus a real measured
  * divergence day the old adapter never exposed.
  */
-export function runScenarioCommandCenter(intervention: ScenarioId, params: SimParams): ScenarioCommandCenterRun {
+export function runScenarioCommandCenter(
+  intervention: ScenarioId,
+  params: SimParams,
+  options: { variantInterventionStartDay?: number } = {},
+): ScenarioCommandCenterRun {
+  const variantInterventionStartDay = options.variantInterventionStartDay === undefined
+    ? 0
+    : Math.max(0, Math.floor(options.variantInterventionStartDay));
   const counterfactual = runScenarioCounterfactual({
     baselineScenarioId: 'BASELINE',
     variantScenarioId: intervention,
     days: DEFAULT_SCENARIO_RUN.days,
     stepsPerDay: DEFAULT_SCENARIO_RUN.stepsPerDay,
     baseParams: scenarioParamsFromCommandCenter(params),
+    variantInterventionStartDay,
   });
   return {
     baseline: counterfactual.baseline,

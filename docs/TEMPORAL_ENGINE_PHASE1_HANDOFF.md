@@ -122,12 +122,84 @@ interactive surface, not instability).
   `replaySavedScenarioCounterfactual()`, and M4's scope was branching + the divergence marker, not
   persistence/replay. That is M6/M7.
 
+## Stage completed: M6 + M7 — Evidence Pack + replay-by-re-execution for the counterfactual
+
+**Git-is-source-of-truth finding that shaped this stage:** a complete, already-tested bridge from a
+saved counterfactual to the **existing** Evidence Pack protocol
+(`designScientificExperiment` → `executeScientificExperiment` → `createScientificEvidencePack`)
+already existed, written and passing, on the unmerged branch `claude/evidence-pack-connector`
+(`b723535`, `core/experimentFabric/counterfactualEvidence.ts` + its test file). Rebuilding it would
+have been exactly the duplicate-evidence-system risk the standing instructions forbid. Cherry-picked
+`b723535` instead (`git cherry-pick -n`), resolved two conflicts by hand — `registry.ts` (both
+branches had independently declared `scenario-timeline`; net diff zero) and `ScientificMemoryScreen.tsx`
+(my branch's hypothesis-loop UI and the incoming evidence-pack UI touch adjacent but non-overlapping
+sections; both kept side by side) — and ported the `preparednessQuestions.ts` prerequisite
+(`primaryMetric` + `falsification` per governed question, validated in `assertGovernedCatalog`),
+which merged cleanly with no conflict.
+
+**What landed, all reused, nothing new invented:**
+- `core/experimentFabric/counterfactualEvidence.ts` — `buildCounterfactualEvidencePack()`. A
+  counterfactual is a one-parameter sweep, so this composes the *existing* scientific-experiment
+  protocol rather than adding a second evidence/replay system. Four fail-closed gates: both arms
+  must replay MATCH; the difference must be exactly one declared lever (`scenarioId` or
+  `interventionStartDay`); the falsification criterion must come from a pre-registered
+  `GOVERNED_PREPAREDNESS_QUESTIONS` entry (no question attached → `NOT_AVAILABLE`, never a
+  criterion invented after the fact); the real re-executed runs must match the saved summary
+  digest (mismatch → `NOT_REPRODUCIBLE`).
+- `ScientificMemoryScreen.tsx` — "Utwórz Evidence Pack" / "Odtwórz paczkę" / "Zmień dźwignię →
+  nie-MATCH" buttons on any saved counterfactual record, wired to the same `evidencePackStore.ts`
+  every other Evidence Pack already uses.
+- `preparednessQuestions.ts` — each governed question now carries its pre-registered
+  `primaryMetric` + `FalsificationCriterion` (reusing the existing `scientificDiscovery.ts` type),
+  with a catalog-level check that the criterion's metric matches the declared primary metric.
+
+**Real Chromium proof of the full required flow** (`#/pilot` → governed question → plan → confirm
+→ World handoff → `#/memory` → Evidence Pack → replay), not just unit tests:
+
+1. Picked a governed question ("Ile kosztuje opóźnienie izolacji objawowych o 20 dni?"), built the
+   plan, executed it for real.
+2. "Otwórz wynik w wizualizacji" → real MATCH-gated handoff into City3D.
+3. "Zapisz kontrfaktyk w Pamięci" → `Zapisano kontrfaktyk (oba ramiona + różnica): #af620e7b.`
+4. On `#/memory`, "Utwórz Evidence Pack" → `CREATED — ... 4 realnych przebiegów; ocena
+   prerejestrowanego kryterium: FALSIFIED_WITHIN_PROTOCOL.` (An honest falsification, not a
+   massaged support — the pre-registered criterion said the delayed arm should have fewer deaths;
+   the real run said otherwise, and the pack reports that plainly.)
+5. "Odtwórz paczkę" → `MATCH · pack pack_cbfc6fce`.
+6. "Zmień dźwignię → nie-MATCH" (mutates the variant's `interventionStartDay` by +4, forcing a real
+   re-execution with different inputs) → `BLOCKED_REPLAY — ... odtworzenie obu ramion zakończyło
+   się werdyktem DRIFT` — the failure propagates correctly from the scenario-arm level up through
+   the Evidence Pack gate, never silently downgraded to a softer status.
+
+Full regression: desktop 27 routes/240 interactions zero errors, mobile 27/242 zero errors.
+
+| Item | Value |
+|---|---|
+| Files added | `counterfactualEvidence.ts`, `counterfactualEvidence.test.ts` |
+| Files modified | `ScientificMemoryScreen.tsx`, `preparednessQuestions.ts` |
+| Files with zero net change | `registry.ts` (both branches already declared `scenario-timeline`) |
+| Frontend tests | 164 files / 1760 passed / 1 skipped (previous stage: 163/1744 — +1 file, +16 tests) |
+| Backend tests | 275 passed, unchanged |
+| Lint / tsc / build / `git diff --check` | all clean |
+| E2E desktop | 27 routes / 240 interactions — zero runtime errors |
+| E2E mobile | 27 routes / 242 interactions — zero runtime errors |
+| Targeted M6/M7 E2E | full pilot→World→memory→Evidence Pack→replay flow confirmed live, including a real BLOCKED_REPLAY on a mutated lever |
+
+### Important scope note
+
+This wires the Evidence Pack to counterfactuals built through the **governed preparedness
+question** flow (`#/pilot`), which already carries a pre-registered falsification criterion. It does
+**not** wire it to the Command Center panel's ad-hoc comparison from M2/M4 — that panel lets a user
+pick any intervention without a pre-registered hypothesis, so `buildCounterfactualEvidencePack`
+correctly returns `NOT_AVAILABLE` for it (no criterion to evaluate against). That is the fail-closed
+gate working as designed, not a gap to close by inventing a criterion after the fact.
+
 ## Next gap
 
-**M6 + M7: evidence and replay-by-re-execution for the Command Center's counterfactual.** Persist the
-counterfactual this panel already runs via `buildSavedScenarioCounterfactual()` (existing, from
-`scenarioCounterfactual.ts`), wire a save action in the panel, and surface
-`replaySavedScenarioCounterfactual()`'s MATCH/DRIFT/BLOCKED verdict — reusing the existing memory and
-replay contracts rather than inventing a Command-Center-specific one. This is the natural next step
-because the panel now produces a real `ScenarioCounterfactual`-shaped result (via M2/M4) that already
-has everything `buildSavedScenarioCounterfactual` needs.
+Candidates, not yet started: **M3 (temporal snapshots)** — a persisted, restorable
+`TemporalStateEnvelope` history beyond the current per-run reconstruction; **M5 (timeline
+comparison)** — a dedicated Timeline-A-vs-B comparison view reusing `compareScenarios()`'s existing
+output rather than the current inline branch rows; or extending the governed-question catalog with a
+delayed-intervention lever exposed in the Command Center UI itself (currently only reachable via
+`#/pilot`). Per the user's own stated ordering (Evidence/Replay → snapshots → comparison → UX →
+World/3D → real historical data → camera/4D → autonomous experiment selection), M3 or M5 is next —
+awaiting direction on which.

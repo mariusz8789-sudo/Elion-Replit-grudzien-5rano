@@ -39,6 +39,16 @@ import { buildExperimentGraph, executeNextExperiment, type ExperimentGraph } fro
 import type { ExperimentRun } from '../core/experimentFabric/types';
 import { runExperiment } from '../core/experimentFabric/executor';
 import { GOVERNED_PREPAREDNESS_QUESTIONS, governedCounterfactualParameters, resolvePreparednessQuestion, type PreparednessResolution } from '../core/simulation/preparednessQuestions';
+import {
+  executePreregisteredHypotheses,
+  generateCompetingHypotheses,
+  HYPOTHESIS_PROBLEMS,
+  preregisterHypotheses,
+  selectNextHypothesisExperiment,
+  type HypothesisLoopResult,
+  type NextHypothesisExperiment,
+  type Preregistration,
+} from '../core/experimentFabric/hypothesisLoop';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
@@ -109,6 +119,14 @@ export function ExperimentPilotScreen() {
   // Genesis wolno uruchomić. Brak dopasowania = NOT_AVAILABLE i zero runów.
   const [preparednessText, setPreparednessText] = useState('');
   const [preparedness, setPreparedness] = useState<PreparednessResolution | null>(null);
+  // Autonomiczna pętla hipotez: prerejestracja przed wykonaniem, wykonanie na
+  // istniejącym silniku, status z prerejestrowanego kryterium, następny krok
+  // ze stanu — nic z tego nie jest tekstem wygenerowanym po fakcie.
+  const [prereg, setPrereg] = useState<Preregistration | null>(null);
+  const [loopResult, setLoopResult] = useState<HypothesisLoopResult | null>(null);
+  const [nextStep, setNextStep] = useState<NextHypothesisExperiment | null>(null);
+  const [loopBusy, setLoopBusy] = useState(false);
+  const [loopNotice, setLoopNotice] = useState<string | null>(null);
   const [capsule, setCapsule] = useState<ReproducibleScenarioCapsule | null>(null);
   const [replay, setReplay] = useState<ScenarioCapsuleReplay | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -393,6 +411,125 @@ export function ExperimentPilotScreen() {
 
   return (
     <main className="pilot-view" id="main-content" tabIndex={-1}>
+      <section className="pilot-step" aria-label="Autonomiczna pętla hipotez">
+        <h2>0a · Problem → konkurencyjne hipotezy → prerejestracja → wykonanie</h2>
+        <p className="settings-hint">
+          Genesis stawia hipotezy z WŁASNEJ zadeklarowanej powierzchni modelu, zamraża je razem z kryteriami
+          falsyfikacji PRZED jakimkolwiek przebiegiem, wykonuje je istniejącym silnikiem i przypisuje status
+          z prerejestrowanego kryterium. Zmiana hipotezy po zobaczeniu wyniku jest wykrywana, nie dopuszczana.
+        </p>
+        <p className="pilot-disclaimer">
+          SYNTHETIC · SCENARIO · NON_OPERATIONAL · NOT_CALIBRATED — to nie jest odkrycie naukowe,
+          obserwacja świata ani wskazówka operacyjna.
+        </p>
+        <div className="pilot-actions">
+          {HYPOTHESIS_PROBLEMS.map((problem) => (
+            <button
+              key={problem.problemId}
+              className="chip-btn"
+              disabled={loopBusy}
+              onClick={() => {
+                const registered = preregisterHypotheses(generateCompetingHypotheses(problem));
+                setPrereg(registered);
+                setLoopResult(null);
+                setNextStep(null);
+                setLoopNotice(`Prerejestrowano ${registered.hypotheses.length} konkurencyjnych hipotez. Nic jeszcze nie zostało uruchomione.`);
+              }}
+            >
+              {problem.statement}
+            </button>
+          ))}
+        </div>
+        {prereg && (
+          <>
+            <dl className="pilot-provenance">
+              <div><dt>preregistrationId</dt><dd className="mono">{prereg.preregistrationId}</dd></div>
+              <div><dt>fingerprint</dt><dd className="mono">{prereg.preregistrationFingerprint}</dd></div>
+              <div><dt>createdAt</dt><dd className="mono">{prereg.createdAt}</dd></div>
+            </dl>
+            <details className="settings-details" open>
+              <summary>Prerejestrowane hipotezy ({prereg.hypotheses.length})</summary>
+              {prereg.hypotheses.map((hypothesis) => {
+                const outcome = loopResult?.outcomes.find((entry) => entry.hypothesisId === hypothesis.hypothesisId);
+                return (
+                  <section key={hypothesis.hypothesisId}>
+                    <strong>{outcome?.status ?? hypothesis.status} · {hypothesis.statement}</strong>
+                    <p className="settings-hint">PRZEWIDYWANIE: {hypothesis.predictedOutcome}</p>
+                    <p className="settings-hint">CO JĄ OBALI: {hypothesis.falsificationCriteria.metric} {hypothesis.falsificationCriteria.relation} — {hypothesis.falsificationCriteria.rationale}</p>
+                    <p className="settings-hint">CO JĄ ODRÓŻNIA: {hypothesis.expectedDiscriminator}</p>
+                    <p className="settings-hint">DLACZEGO: {hypothesis.rationale}</p>
+                    <p className="settings-hint mono">
+                      {hypothesis.hypothesisId} · createdBeforeRun={String(hypothesis.createdBeforeRun)}
+                      {outcome ? ` · ${hypothesis.falsificationCriteria.metric}=${outcome.observedMetric ?? 'brak'} (odniesienie ${outcome.baselineMetric ?? 'brak'}) · ${outcome.evidencePackId ?? 'brak paczki'}` : ' · nie uruchomiono'}
+                    </p>
+                    {outcome && outcome.runIds.length > 0 && (
+                      <p className="settings-hint mono">
+                        runIds: {[...new Set(outcome.runIds)].join(', ')} · odciski: {[...new Set(outcome.runFingerprints)].join(', ')} · chain {outcome.evidenceChainId ?? 'brak'}
+                      </p>
+                    )}
+                  </section>
+                );
+              })}
+            </details>
+            <div className="pilot-actions">
+              <button
+                className="chip-btn pilot-primary"
+                disabled={loopBusy || loopResult !== null}
+                onClick={() => {
+                  setLoopBusy(true);
+                  try {
+                    const executed = executePreregisteredHypotheses(prereg);
+                    setLoopResult(executed);
+                    setNextStep(selectNextHypothesisExperiment(executed));
+                    setLoopNotice(executed.claim);
+                  } catch (loopError) {
+                    setLoopNotice(`Pętla nie wykonała się: ${loopError instanceof Error ? loopError.message : String(loopError)}`);
+                  } finally {
+                    setLoopBusy(false);
+                  }
+                }}
+              >
+                {loopBusy ? 'Wykonuję…' : 'Wykonaj prerejestrowane hipotezy'}
+              </button>
+            </div>
+          </>
+        )}
+        {loopResult && (
+          <>
+            <dl className="pilot-provenance">
+              <div><dt>prerejestracja nienaruszona</dt><dd className="mono">{String(loopResult.preregistrationIntact.intact)}</dd></div>
+              <div><dt>realne przebiegi</dt><dd className="mono">{loopResult.allRuns.length}</dd></div>
+              <div><dt>Evidence Packs</dt><dd className="mono">{loopResult.packs.map((pack) => pack.evidencePackId).join(', ')}</dd></div>
+            </dl>
+            <p className="pilot-summary">ROZSTRZYGNIĘCIE: {loopResult.discrimination.reason}</p>
+            <p className="settings-hint">{loopResult.preregistrationIntact.reason}</p>
+            {nextStep && (
+              <>
+                <h3>Następny eksperyment</h3>
+                <p className="settings-hint">STATUS: {nextStep.status}</p>
+                <p className="settings-hint">DLACZEGO: {nextStep.why}</p>
+                <p className="settings-hint">CO ROZSTRZYGNIE: {nextStep.resolves}</p>
+                <p className="settings-hint">REGUŁA: {nextStep.rule}</p>
+                <div className="pilot-actions">
+                  <button
+                    className="chip-btn pilot-primary"
+                    disabled={nextStep.status !== 'READY_TO_RUN' || nextStep.request === null}
+                    onClick={() => {
+                      if (nextStep.request === null) return;
+                      const executed = runExperiment(nextStep.request);
+                      setLoopNotice(`Wykonano następny eksperyment: ${executed.runId} (${executed.result.status}); ${nextStep.request.modelId} · ${executed.result.summary}`);
+                    }}
+                  >
+                    Wykonaj następny eksperyment
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+        {loopNotice && <p className="settings-hint" role="status">{loopNotice}</p>}
+      </section>
+
       <section className="pilot-step" aria-label="Rządzone pytanie o gotowość">
         <h2>0 · Pytanie o gotowość — rządzony scenariusz</h2>
         <p className="settings-hint">

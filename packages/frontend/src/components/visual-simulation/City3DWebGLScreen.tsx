@@ -65,6 +65,7 @@ export function City3DWebGLScreen() {
   // wtedy taktowany — jest PRZEWIJANY po rzeczywistej serii dobowej przebiegu.
   const [scenarioTimeline] = useState(() => consumePendingScenarioTimeline());
   const [timelineDay, setTimelineDay] = useState(0);
+  const [enteredTimelineDay, setEnteredTimelineDay] = useState<number | null>(null);
   const [timelineSaved, setTimelineSaved] = useState<string | null>(null);
   const timelineSample = scenarioTimeline
     ? scenarioTimeline.series[Math.min(timelineDay, scenarioTimeline.series.length - 1)]
@@ -254,9 +255,9 @@ export function City3DWebGLScreen() {
         </aside>
 
         <section className="city-world-center" aria-label="Żywa scena miasta 3D">
-          <div className="city-3d-stage-wrap city-world-stage">
+          <div className={`city-3d-stage-wrap city-world-stage${enteredTimelineDay === timelineDay ? ' temporal-moment-entered' : ''}`} data-temporal-day={timelineDay} data-temporal-entered={enteredTimelineDay === timelineDay ? 'true' : 'false'}>
             <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
-            <TemporalWorldHud timeline={scenarioTimeline} day={timelineDay} />
+            <TemporalWorldHud timeline={scenarioTimeline} day={timelineDay} enteredDay={enteredTimelineDay} />
             {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
             {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu Canvas 2D</button>.</div>}
             {scenarioTimeline && timelineSample && (
@@ -271,14 +272,20 @@ export function City3DWebGLScreen() {
                   {scenarioTimeline.counterfactual && <span>ramię WARIANTU kontrfaktyku vs {scenarioTimeline.counterfactual.baseline.label}</span>}
                 </div>
                 <label className="scenario-run-scrubber">
-                  <span>dzień {timelineSample.day} / {scenarioTimeline.series.length - 1}</span>
+                  <span>GO TO TIME · dzień {timelineSample.day} / {scenarioTimeline.series.length - 1}</span>
                   <input
                     type="range" min={0} max={scenarioTimeline.series.length - 1} step={1}
                     value={Math.min(timelineDay, scenarioTimeline.series.length - 1)}
-                    onChange={(event) => setTimelineDay(Number(event.target.value))}
-                    aria-label="Przewiń przebieg scenariusza po dniach"
+                    onChange={(event) => { setTimelineDay(Number(event.target.value)); setEnteredTimelineDay(null); }}
+                    aria-label="GO TO TIME — wybierz dzień dostępnego przebiegu"
                   />
                 </label>
+                <div className="scenario-run-time-actions">
+                  <button type="button" className="chip-btn" onClick={() => setEnteredTimelineDay(timelineSample.day)}>
+                    ENTER THIS MOMENT · DAY {timelineSample.day}
+                  </button>
+                  {enteredTimelineDay !== null && <span className="scenario-run-entered">ENTERED · DAY {enteredTimelineDay}</span>}
+                </div>
                 <div className="scenario-run-metrics">
                   <span>zakaźni<b>{timelineSample.infectious}</b></span>
                   <span>zmarli<b>{timelineSample.deceased}</b></span>

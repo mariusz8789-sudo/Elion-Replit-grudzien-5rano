@@ -3,10 +3,11 @@ import type { ScenarioTimelineHandoff } from '../../core/experimentFabric/worldH
 interface TemporalWorldHudProps {
   timeline: ScenarioTimelineHandoff | null;
   day: number;
+  enteredDay?: number | null;
 }
 
 /** Read-only WOW layer over the existing World/3D renderer. It never creates or advances a simulation. */
-export function TemporalWorldHud({ timeline, day }: TemporalWorldHudProps) {
+export function TemporalWorldHud({ timeline, day, enteredDay = null }: TemporalWorldHudProps) {
   if (!timeline) {
     return (
       <div className="temporal-world-hud temporal-world-hud-empty" aria-label="Temporal World status">
@@ -29,7 +30,7 @@ export function TemporalWorldHud({ timeline, day }: TemporalWorldHudProps) {
       <div className="temporal-world-hud-topline">
         <span className="temporal-world-kicker">GENESIS TEMPORAL WORLD</span>
         <span className="temporal-world-phase">{phase}</span>
-        <span className="temporal-world-status">{timeline.epistemicStatus}</span>
+        <span className="temporal-world-status">{enteredDay === day ? 'ENTERED · ' : ''}{timeline.epistemicStatus}</span>
       </div>
       <div className="temporal-world-hud-main">
         <div>

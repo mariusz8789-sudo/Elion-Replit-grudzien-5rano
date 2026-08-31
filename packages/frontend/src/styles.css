@@ -2484,3 +2484,8 @@ kbd {
 .temporal-branch.counterfactual { color: #ffb477; }
 .temporal-world-divergence { color: #ffd27c; font-size: .57rem; font-weight: 700; text-align: right; white-space: nowrap; }
 @media (max-width: 760px) { .temporal-world-hud { top: .55rem; width: calc(100% - 1.1rem); padding: .52rem .58rem; } .temporal-world-hud-empty { grid-template-columns: 1fr; gap: .22rem; } .temporal-world-hud-main { align-items: flex-start; flex-wrap: wrap; } .temporal-world-rail { order: 3; flex-basis: 100%; justify-content: flex-start; } .temporal-world-identity { min-width: auto; } .temporal-world-branches { grid-template-columns: 1fr 1fr; } .temporal-world-divergence { grid-column: span 2; text-align: left; } }
+
+.scenario-run-time-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .42rem; margin-top: .42rem; }
+.scenario-run-time-actions .chip-btn { border-color: rgba(102, 218, 255, .52); color: #dff8ff; }
+.scenario-run-entered { color: #6de0b9; font: 700 .58rem/1 var(--font-mono); letter-spacing: .06em; }
+.temporal-moment-entered { box-shadow: 0 1.1rem 3.6rem rgba(0, 0, 0, .42), 0 0 2.2rem rgba(80, 222, 193, .18); }

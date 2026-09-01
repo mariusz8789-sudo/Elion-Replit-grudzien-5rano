@@ -270,7 +270,7 @@ Validation completed: targeted `scenarioCommandCenter.test.ts` passed; `npm run 
 Do not rebuild Claude's temporal core. The next experience-side gap is a single coherent end-to-end demo entry path if the current route composition still requires manual navigation: `GO TO TIME → ENTER THIS MOMENT → WORLD/3D → WHAT IF? → WORLD A/B/C/D → PLAY ALL → FIRST DIVERGENCE → JUMP TO DIVERGENCE → PLAY FROM HERE → COMPARE → VERIFY → REPLAY`. Any missing world state must remain `NOT_AVAILABLE`; any divergence must come only from `firstDivergentDay` or `firstDivergentDayFromBaseline`.
 
 **Checkpoint prepared on:** 2026-09-01
-**Current HEAD:** `acaef98`
+**Current HEAD:** `79688f4`
 **Current live:** `origin/main` must be checked at continuation time.
 
 
@@ -287,3 +287,14 @@ Validation completed: targeted temporal bookmark and scenario-command-center tes
 The next large experience gap remains the single coherent entry flow, not another engine: `GO TO TIME → ENTER THIS MOMENT → SAVE THIS MOMENT → OPEN BOOKMARK → REPLAY MATCH → WHAT IF? → WORLD A/B/C/D → PLAY ALL → FIRST DIVERGENCE → JUMP TO DIVERGENCE → PLAY FROM HERE → COMPARE → VERIFY`. Preserve `SIMULATED`, `COUNTERFACTUAL`, `NOT_AVAILABLE`, `MATCH`, `DRIFT` and `BLOCKED` semantics exactly; never use labels as execution.
 
 **Current HEAD after this stage:** to be set after the checkpoint commit.
+
+
+## Experience stage completed: COMPARE WORLDS
+
+The existing `TemporalMultiversePanel` now renders a same-day comparison table for WORLD A/B/C/D using only metrics present in each existing `TemporalStateEnvelope.sample`: infectious, hospitalized and deceased. Missing or non-modelled states render `NOT_AVAILABLE`. The panel explicitly labels this as a comparison of computed model-state metrics, not a measurement, probability, confidence or real-world observation. No second WorldState, renderer or solver was created.
+
+Changed file: `packages/frontend/src/components/visual-simulation/TemporalMultiversePanel.tsx`.
+
+Validation completed: targeted `scenarioCommandCenter.test.ts` and `temporalMultiverse.test.ts`; `npm run build` including `tsc -b`; full `npm test` (**275 passed, 40 skipped, 0 failed**); `npm run lint`; and `git diff --check`. Build retains only the existing Vite large-chunk advisory.
+
+**Current HEAD after this stage:** `9dacf97`.

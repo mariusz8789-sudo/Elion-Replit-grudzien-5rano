@@ -20,13 +20,17 @@ const DEFAULT_BRANCHES: ScenarioId[] = ['ISOLATION', 'CONTACT_REDUCTION', 'HEALT
 const WORLD_IDS = ['A', 'B', 'C', 'D'] as const;
 type WorldId = (typeof WORLD_IDS)[number];
 
-function worldReadout(multiverse: TemporalMultiverse, worldId: WorldId, day: number): string {
+function worldStateAt(multiverse: TemporalMultiverse, worldId: WorldId, day: number) {
   const timeline = worldId === 'A'
     ? multiverse.baselineTimeline
     : multiverse.branches.find((branch) => branch.branchId === worldId)?.timeline ?? null;
-  if (!timeline) return 'NOT_MODELED';
-  const state = temporalStateAt(timeline, day);
-  if (!state) return 'NOT_AVAILABLE';
+  if (!timeline) return null;
+  return temporalStateAt(timeline, day);
+}
+
+function worldReadout(multiverse: TemporalMultiverse, worldId: WorldId, day: number): string {
+  const state = worldStateAt(multiverse, worldId, day);
+  if (!state) return 'NOT_MODELED';
   if (!state.sample) return `${state.observationStatus} · DAY ${state.logicalDay}`;
   return `I ${state.sample.infectious} · hosp. ${state.sample.hospitalized} · D ${state.sample.deceased}`;
 }
@@ -142,6 +146,26 @@ export function TemporalMultiversePanel({ params, temporalDay = null }: { params
           </button>;
         })}
       </div>
+      <div className="section-label">COMPARE WORLDS · DAY {timelineDay}</div>
+      <div className="compare-table-wrap">
+        <table className="compare-table">
+          <thead><tr><th>Metric</th>{WORLD_IDS.map((worldId) => <th key={worldId}>WORLD {worldId}</th>)}</tr></thead>
+          <tbody>
+            {([
+              ['Infectious', (sample: NonNullable<ReturnType<typeof worldStateAt>>['sample']) => sample?.infectious],
+              ['Hospitalized', (sample: NonNullable<ReturnType<typeof worldStateAt>>['sample']) => sample?.hospitalized],
+              ['Deceased', (sample: NonNullable<ReturnType<typeof worldStateAt>>['sample']) => sample?.deceased],
+            ] as const).map(([label, readMetric]) => (
+              <tr key={label}><td>{label}</td>{WORLD_IDS.map((worldId) => {
+                const state = worldStateAt(multiverse, worldId, timelineDay);
+                const value = state?.sample ? readMetric(state.sample) : undefined;
+                return <td key={worldId}>{typeof value === 'number' ? value : 'NOT_AVAILABLE'}</td>;
+              })}</tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="scenario-rationale">Porównanie pokazuje wyłącznie policzone metryki stanu modelu dla wspólnego dnia. To nie jest pomiar rzeczywistości, probability ani confidence.</p>
       <div className="temporal-multiverse-footer">
         <span>SELECTED · WORLD {selectedWorld}</span>
         {selectedWorld !== 'A' && <button className="world-action scenario-replay-button" onClick={jumpToDivergence} disabled={selectedDivergence === null}>↗ JUMP TO DIVERGENCE</button>}

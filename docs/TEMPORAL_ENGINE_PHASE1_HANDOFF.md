@@ -309,3 +309,15 @@ Validation: targeted scenario-command-center and temporal-multiverse tests passe
 **Current HEAD after this stage:** `bc82e68`.
 
 Next large GAP remains a single coherent entry flow across existing screens, only where the necessary handoff data exists. Do not fabricate a timeline when City3D is opened directly; retain `NOT_AVAILABLE` and require a real Fabric/Memory handoff.
+
+
+## Current continuation checkpoint
+
+**CURRENT HEAD:** `8feb2a8`
+**CURRENT BRANCH:** `manus/temporal-world-wow`
+**CURRENT LIVE:** `origin/manus/temporal-world-wow = 8feb2a8`
+**WORKING TREE:** clean before this documentation update
+
+The branch currently contains the verified temporal experience chain: GO TO TIME, ENTER THIS MOMENT, SAVE/OPEN BOOKMARK through replay MATCH, WHAT IF multiverse, WORLD A/B/C/D, PLAY ALL, measured divergence, JUMP TO DIVERGENCE, PLAY FROM HERE, COMPARE WORLDS, OPEN IN WORLD/3D, and VERIFY/REPLAY. The WHAT IF panel receives the handed-off ScenarioRun parameters rather than unrelated live defaults.
+
+The reported `4e832ae` Decision Lineage commit was not present in the fetched Git history during continuation; do not assume it exists or recreate it from memory. Evidence-for-multiverse remains parked unless a real preregistered hypothesis and falsification criterion can be reused. Never manufacture a criterion after inspecting results.

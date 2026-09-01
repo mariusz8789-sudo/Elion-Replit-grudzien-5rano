@@ -418,19 +418,77 @@ preregistration-carrier stage.
 | Lint / tsc / build / `git diff --check` | all clean |
 | New RO-Crate format / evidence engine / replay engine | none — one optional field, one additive projection, one verifier over existing exports |
 
+## Stage completed: NEXT EXPERIMENT loop — RESULT → PROPOSE → CONSTRUCT → PRE-REGISTER → RUN
+
+**Closes the previously deferred gap.** `graph.nextExperiment` already proposed a next step from real
+runs; nothing threaded that proposal back into a new pre-registered `TemporalMultiverseSpec`.
+`proposeNextMultiverseExperiment(multiverse, branchId)` (`multiverseEvidence.ts`) closes that loop by
+calling — never rewriting — two existing mechanisms: `buildExperimentGraph`'s `proposeNext`/
+`executeNextExperiment` machinery (via `buildMultiverseBranchScientificLineage`) for the concrete,
+executable proposal, and `whyNextExperiment.ts`'s `explainScientificEvidence` for the advisory "why"
+narrative. Both are only ever *called*.
+
+**A real subtlety surfaced immediately and had to be designed around, not worked around.**
+`graph.nextExperiment`'s uncertainties are computed *per model* (`scenario-timeline`), pooling baseline
+and variant runs together — existing, correct, unchanged behavior used elsewhere (`ExperimentPilotScreen.tsx`).
+So `proposal.request` can be reconstructed from *either* arm's parameter snapshot, not necessarily the
+branch being asked about. A first, naive implementation that trusted the whole reconstructed request
+produced a **degenerate** next branch — identical to its own new baseline — because both `scenarioId`
+and `interventionStartDay` sometimes came from the baseline arm's snapshot. The fix: extract *only* the
+one field the proposal's own rule names (`seed` for `SINGLE_SEED`, the specific parameter id from the
+`uncertaintyId` for `SINGLE_PARAMETER_POINT`) and apply *that single delta* onto the branch's **own**
+current parameters — never the whole reconstructed request. This guarantees exactly one changed lever
+relative to the branch being followed up on, matching the same one-lever discipline
+`resolveSweptLever`/`SWEEPABLE_LEVERS` already enforce elsewhere. Proposal kinds with no single
+attributable lever (`REPRODUCIBILITY_DRIFT` and any future kind) correctly yield `BLOCKED` rather than
+a guessed spec.
+
+**Pre-registration is carried, never invented.** `nextSpec.preparedness` is literally
+`multiverse.spec.preparedness` — the same governed question, copied before the child multiverse is
+executed. A parent with no pre-registration yields `NOT_AVAILABLE` immediately; nothing attaches a
+criterion after the fact.
+
+**Parent → child lineage uses real, existing identifiers**, not invented ones:
+`sourceMultiverseFingerprint` + `sourceBranchId` (the parent's own identity) and `sourceQuestionId`
+(from the real governed catalogue). The full `NextExperimentProposal` and `WhyNextExperimentAdvice`
+objects are embedded whole rather than flattened into new ad-hoc field names, so nothing is
+re-described — reuse means reuse.
+
+Verified end to end (the requested integration shape): pre-registered question → run multiverse →
+Evidence Pack `CREATED` → propose next → construct + pre-register the next spec → run it → Evidence
+Pack `CREATED` again with the **same** falsification criterion → save → reload → replay → `MATCH` →
+tamper a saved field → `DRIFT`. Also verified: doing this twice from the same parent produces an
+identical next spec (determinism), the parent multiverse is never mutated, and proposing again on the
+*replayed* child still resolves to the same governed question (the loop survives persistence).
+
+| Item | Value |
+|---|---|
+| Files modified | `multiverseEvidence.ts` (+`proposeNextMultiverseExperiment` and helpers) |
+| Files added | `nextMultiverseExperiment.test.ts` (14 tests + 1 integration test) |
+| Frontend tests | 172 files / 1843 passed / 1 skipped |
+| Backend tests | 275 passed, 40 skipped, 0 failed |
+| Lint / tsc / build / `git diff --check` | all clean |
+| New planner / graph engine / evidence engine / replay engine | none — calls `experimentGraph.ts` and `whyNextExperiment.ts` as-is |
+
+**Known, honest limitation of this stage — not a bug, a consequence of not touching `proposeNext`:**
+because uncertainty detection pools baseline and variant runs, which arm supplies the *value* for the
+one changed lever is decided by `proposeNext`'s own existing run-selection order, not by this bridge.
+The single-lever-onto-current-branch design above absorbs that without producing a degenerate result,
+but callers should not assume the proposed value has any particular provenance beyond "a real value
+`proposeNext` found among this model's real runs."
+
 ## Next gap
 
-**NEXT EXPERIMENT bridge (FAZA 3/7/8) was intentionally not attempted this stage**, per the sprint's
-own fallback rule ("if the full NEXT EXPERIMENT bridge is bigger than one reasonable milestone, close
-RO-Crate + replay round-trip first"). `buildMultiverseBranchScientificLineage`'s `graph.nextExperiment`
-already proposes a next step from real runs (previous stage), but nothing yet threads a *chosen* next
-experiment back into a new pre-registered `TemporalMultiverseSpec` automatically — that composition
-(propose → construct next spec → pre-register → run) is real remaining work, not done here.
+**Smaller machine-side item, unchanged:** the whole scientific-lineage/RO-Crate/next-experiment chain
+built across these stages is still reachable only through tests and the governed-question catalogue on
+`#/pilot`, not through a general UI — no call site yet declares a `preparedness` question at
+multiverse-spec time in the app, and nothing renders `proposeNextMultiverseExperiment`'s output.
 
-**Smaller machine-side item, unchanged:** `TemporalBranchSpec`'s delayed-intervention lever and the
-whole scientific-lineage/RO-Crate chain built across these stages are still reachable only through
-tests and the governed-question catalogue on `#/pilot`, not through a general UI — no call site yet
-declares a `preparedness` question at multiverse-spec time in the app.
+**Not attempted:** actually *executing* `executeNextExperiment` end-to-end against a live World/Scientific
+Memory screen, and persisting the parent→child link in Scientific Memory itself (today the link exists
+only as long as the caller holds both `TemporalMultiverse` objects in memory — reloading from storage
+recovers each multiverse independently, but nothing yet stores "child of X" as a Scientific Memory
+record). That is real remaining work for whichever stage wires this into a UI-reachable flow.
 
 **The larger remaining gap is entirely on the experience side** — the actual Time Machine UX (time
 slider with past/present/future zones, "GO TO TIME", multi-world switcher, 3D handoff, alternate-

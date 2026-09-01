@@ -8,6 +8,7 @@ import {
   type ScenarioRun,
 } from '../../core/simulation/scenarioEngine';
 import {
+  openScenarioVariantInWorld,
   replayScenarioCommandCenter,
   runScenarioCommandCenter,
   scenarioUiMetrics,
@@ -164,6 +165,10 @@ export function ScenarioCommandCenterPanel({ params, temporalDay = null }: { par
       </>}
       <Traceability run={run} replays={replays} />
       <button className="world-action scenario-replay-button" onClick={() => setReplays(replayScenarioCommandCenter(run))}>↻ Zweryfikuj replay</button>
+      <button className="world-action scenario-replay-button" disabled={run.intervention.status !== 'COMPLETED'} onClick={() => {
+        const handoffRunId = openScenarioVariantInWorld(run);
+        if (handoffRunId) window.location.hash = '#/city3d';
+      }}>↗ Otwórz wariant w World/3D</button>
     </>}
   </div>;
 }

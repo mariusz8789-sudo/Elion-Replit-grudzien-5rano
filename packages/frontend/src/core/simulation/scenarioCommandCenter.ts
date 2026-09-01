@@ -1,6 +1,7 @@
 import type { SimParams } from '../types';
 import type { EpidemicCityParams } from './epidemicCity';
 import {
+  SCENARIOS,
   DEFAULT_SCENARIO_RUN,
   replayScenario,
   type ScenarioComparison,
@@ -8,8 +9,9 @@ import {
   type ScenarioReplay,
   type ScenarioRun,
 } from './scenarioEngine';
-import { runScenarioCounterfactual } from './scenarioCounterfactual';
+import { runScenarioCounterfactual, type ScenarioCounterfactual } from './scenarioCounterfactual';
 import { buildTemporalTimeline, type TemporalTimeline } from './temporalState';
+import { registerScenarioTimeline, setPendingScenarioTimeline } from '../experimentFabric/worldHandoff';
 
 /**
  * Scenario Command Center adapter: converts only the existing live City parameter
@@ -34,6 +36,7 @@ export interface ScenarioCommandCenterRun {
   baseline: ScenarioRun;
   intervention: ScenarioRun;
   comparison: ScenarioComparison;
+  counterfactual: ScenarioCounterfactual;
   /** Dzień MIERZONY na obu seriach — nie deklarowany dzień wejścia interwencji. */
   firstDivergentDay: number | null;
   counterfactualFingerprint: string;
@@ -84,9 +87,33 @@ export function runScenarioCommandCenter(
     baseline: counterfactual.baseline,
     intervention: counterfactual.variant,
     comparison: counterfactual.comparison,
+    counterfactual,
     firstDivergentDay: counterfactual.firstDivergentDay,
     counterfactualFingerprint: counterfactual.counterfactualFingerprint,
   };
+}
+
+/** Opens the measured variant in the existing World/3D timeline handoff. */
+export function openScenarioVariantInWorld(run: ScenarioCommandCenterRun): string | null {
+  if (run.intervention.status !== 'COMPLETED' || run.intervention.summary === null || run.intervention.resultFingerprint === null) return null;
+  const handoffRunId = `what-if:${run.counterfactualFingerprint}`;
+  registerScenarioTimeline({
+    runId: handoffRunId,
+    runFingerprint: run.intervention.resultFingerprint,
+    resultOrigin: 'real-engine',
+    modelId: 'scenario-timeline',
+    scenarioId: run.intervention.scenarioId,
+    scenarioLabel: SCENARIOS[run.intervention.scenarioId].label,
+    seed: run.intervention.params.seed,
+    summary: `Wariant WHAT IF: ${run.intervention.label}, od dnia ${run.intervention.interventionStartDay}, wynik z istniejącego counterfactual engine.`,
+    series: run.intervention.series,
+    scenarioSummary: run.intervention.summary,
+    scenarioRun: run.intervention,
+    epistemicStatus: 'SIMULATION',
+    origin: 'fabric-run',
+    counterfactual: run.counterfactual,
+  });
+  return setPendingScenarioTimeline(handoffRunId) ? handoffRunId : null;
 }
 
 /**

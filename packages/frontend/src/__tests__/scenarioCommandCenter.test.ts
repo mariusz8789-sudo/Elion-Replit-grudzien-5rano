@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { SCENARIOS } from '../core/simulation/scenarioEngine';
 import {
+  openScenarioVariantInWorld,
   replayScenarioCommandCenter,
   runScenarioCommandCenter,
   scenarioParamsFromCommandCenter,
   scenarioUiMetrics,
   temporalTimelinesFor,
 } from '../core/simulation/scenarioCommandCenter';
+import { clearScenarioTimelineHandoffs, peekPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { temporalStateAt } from '../core/simulation/temporalState';
 
 const params = {
@@ -25,6 +27,19 @@ describe('Scenario Command Center adapter', () => {
     expect(run.comparison.status).toBe('COMPLETED');
     expect(run.comparison.baselineScenario).toBe('BASELINE');
     expect(run.comparison.variantScenario).toBe('ISOLATION');
+  });
+
+  it('opens a completed WHAT IF variant through the existing World timeline handoff', () => {
+    clearScenarioTimelineHandoffs();
+    const run = runScenarioCommandCenter('ISOLATION', params, { variantInterventionStartDay: 7 });
+    const handoffRunId = openScenarioVariantInWorld(run);
+    const pending = peekPendingScenarioTimeline();
+    expect(handoffRunId).toBe(`what-if:${run.counterfactualFingerprint}`);
+    expect(pending?.origin).toBe('fabric-run');
+    expect(pending?.epistemicStatus).toBe('SIMULATION');
+    expect(pending?.scenarioRun).toBe(run.intervention);
+    expect(pending?.counterfactual?.counterfactualFingerprint).toBe(run.counterfactualFingerprint);
+    clearScenarioTimelineHandoffs();
   });
 
   it('exposes only real summary values and preserves replay determinism', () => {

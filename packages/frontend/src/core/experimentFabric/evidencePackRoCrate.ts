@@ -138,6 +138,10 @@ export function exportEvidencePackRoCrate(pack: ScientificEvidencePack): Genesis
     'genesis:reproducibility': pack.reproducibility,
     'genesis:eventSummaries': pack.eventSummaries,
     'genesis:hypothesisAssessment': pack.hypothesisAssessment,
+    // Obecne wyłącznie dla paczek zbudowanych z gałęzi multiverse
+    // (buildMultiverseBranchEvidencePack) — branch/decyzja/rozjazd/replay,
+    // czyli dokładnie to, czego generyczna paczka kontrfaktyczna nie niesie.
+    ...(pack.multiverseBranchContext === undefined ? {} : { 'genesis:multiverseBranch': pack.multiverseBranchContext }),
     'genesis:disclaimer': pack.disclaimer,
   });
 
@@ -170,4 +174,95 @@ export function exportEvidencePackRoCrate(pack: ScientificEvidencePack): Genesis
 
 export function serializeEvidencePackRoCrate(pack: ScientificEvidencePack): string {
   return canonicalJson(exportEvidencePackRoCrate(pack));
+}
+
+export interface RoCrateRoundTripResult {
+  status: 'MATCH' | 'BLOCKED';
+  reason: string;
+  /** Elementy, których RO-Crate nie odtworzyło identycznie; puste przy MATCH. */
+  missing: readonly string[];
+}
+
+/**
+ * BUILD EVIDENCE → EXPORT RO-CRATE → RELOAD → VERIFY IDENTITY.
+ *
+ * `reloadedJson` domyślnie to `serializeEvidencePackRoCrate(pack)` — czysty
+ * round-trip przez ten sam eksport. Ale realny "SAVE → RELOAD" oznacza
+ * przejście przez zewnętrzny magazyn (plik, localStorage, sieć); dlatego
+ * `reloadedJson` MOŻNA podać jawnie — np. string faktycznie odczytany z
+ * dysku — żeby zweryfikować DOKŁADNIE to, co wróciło, a nie to, co funkcja
+ * sama właśnie wyeksportowała. Niesparsowalny albo okrojony JSON kończy się
+ * `BLOCKED`, nigdy zgadniętym dopasowaniem.
+ *
+ * Weryfikacja NIE ufa samemu istnieniu węzłów: dla każdego elementu z listy
+ * audytu (pytanie/hipoteza, ocena hipotezy, odtwarzalność-jako-proxy werdyktu
+ * replay, opcjonalny kontekst gałęzi multiverse, każdy run źródłowy)
+ * porównuje wartość odtworzoną z JSON-LD z wartością na oryginalnej paczce
+ * przez `canonicalJson` — brak albo rozjazd trafia na listę `missing`.
+ */
+export function verifyEvidencePackRoCrateRoundTrip(pack: ScientificEvidencePack, reloadedJson?: string): RoCrateRoundTripResult {
+  const json = reloadedJson ?? serializeEvidencePackRoCrate(pack);
+  let reloaded: GenesisRoCrate;
+  try {
+    reloaded = JSON.parse(json) as GenesisRoCrate;
+  } catch (error) {
+    return {
+      status: 'BLOCKED',
+      reason: `Odtworzony RO-Crate nie jest poprawnym JSON: ${error instanceof Error ? error.message : String(error)}.`,
+      missing: ['<cały dokument — błąd parsowania>'],
+    };
+  }
+  if (!Array.isArray(reloaded?.['@graph'])) {
+    return { status: 'BLOCKED', reason: 'Odtworzony dokument nie ma tablicy `@graph` — nie ma czego zweryfikować.', missing: ['@graph'] };
+  }
+  const byId = new Map(reloaded['@graph'].map((node) => [node['@id'], node] as const));
+
+  const packId = `#evidence-pack/${stableId(pack.evidencePackId)}`;
+  const protocolId = `#protocol/${stableId(pack.protocol.designId)}`;
+  const packNode = byId.get(packId);
+  const protocolNode = byId.get(protocolId);
+  const missing: string[] = [];
+
+  const sameAs = (a: unknown, b: unknown) => canonicalJson(a) === canonicalJson(b);
+
+  if (protocolNode === undefined) missing.push('protocol entity (question/experiment design)');
+  else if (!sameAs(protocolNode['genesis:hypothesis'], pack.protocol.hypothesis)) missing.push('hypothesis (statement/falsification)');
+
+  if (packNode === undefined) {
+    missing.push('evidence-pack entity');
+  } else {
+    if (!sameAs(packNode['genesis:hypothesisAssessment'], pack.hypothesisAssessment)) missing.push('hypothesisAssessment');
+    if (!sameAs(packNode['genesis:reproducibility'], pack.reproducibility)) missing.push('reproducibility (replay-verdict proxy)');
+    if (pack.multiverseBranchContext !== undefined && !sameAs(packNode['genesis:multiverseBranch'], pack.multiverseBranchContext)) {
+      missing.push('multiverseBranchContext (branch/decision/divergence/replay)');
+    }
+  }
+
+  for (const run of pack.runs) {
+    const activity = byId.get(activityId(run.runId));
+    const result = byId.get(outputEntityId(run.runId));
+    const input = byId.get(inputEntityId(run.runId));
+    if (activity === undefined || activity['genesis:runFingerprint'] !== run.provenance.runFingerprint) {
+      missing.push(`run ${run.runId}: activity/runFingerprint`);
+    }
+    if (input === undefined || !sameAs(input['genesis:requestFingerprint'], run.provenance.requestFingerprint)) {
+      missing.push(`run ${run.runId}: input/requestFingerprint`);
+    }
+    if (result === undefined || !sameAs(result['genesis:outputs'], run.result.outputs)) {
+      missing.push(`run ${run.runId}: result/outputs`);
+    }
+  }
+
+  if (missing.length > 0) {
+    return {
+      status: 'BLOCKED',
+      reason: `RO-Crate nie odtworzyło ${missing.length} ${missing.length === 1 ? 'elementu' : 'elementów'} identycznie z zapisaną paczką: ${missing.join('; ')}.`,
+      missing,
+    };
+  }
+  return {
+    status: 'MATCH',
+    reason: 'RO-Crate odtworzyło pytanie, hipotezę, ocenę dowodową, źródłowe runy i (jeśli był) kontekst gałęzi multiverse identycznie z zapisaną paczką.',
+    missing: [],
+  };
 }

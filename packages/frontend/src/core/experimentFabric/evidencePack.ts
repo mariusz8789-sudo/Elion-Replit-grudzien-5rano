@@ -2,8 +2,34 @@ import { canonicalJson, fnv1a } from '../events/hash';
 import type { ScientificEvidenceChain } from './scientificDiscovery';
 import type { ExperimentRun } from './types';
 import { compareAme2020Observations, type Ame2020Comparison } from '../observation/nuclearAme2020';
+import type { SavedScenarioReplayStatus } from '../simulation/scenarioMemory';
+import type { TemporalBranchRole } from '../simulation/temporalState';
 
 export const EVIDENCE_PACK_VERSION = '1.0.0';
+
+/**
+ * Kontekst pochodzenia z gałęzi multiverse. Obecny WYŁĄCZNIE, gdy paczka
+ * powstała z `buildMultiverseBranchEvidencePack` (`experimentFabric/
+ * multiverseEvidence.ts`) — zwykła paczka z pojedynczego kontrfaktyku go nie
+ * ma. Nic tu nie jest liczone drugi raz: każde pole jest przeniesione z
+ * `TemporalMultiverse`/`TemporalDecisionLineage`, które multiverse już
+ * policzył.
+ */
+export interface MultiverseEvidenceBranchContext {
+  contractVersion: string;
+  sourceMultiverseFingerprint: string;
+  branchId: string;
+  /** Deklarowany dzień wejścia interwencji tej gałęzi — nigdy zmierzony. */
+  declaredInterventionStartDay: number;
+  /** Stan baseline w dniu decyzji; `null`, gdy dzień leży poza osią baseline. */
+  decisionState: { logicalDay: number; timelineId: string; stateFingerprint: string; branchRole: TemporalBranchRole } | null;
+  /** Dzień MIERZONY, w którym ta gałąź faktycznie rozeszła się z baseline. */
+  firstDivergentDayFromBaseline: number | null;
+  /** Stan tej gałęzi w dniu zmierzonego rozjazdu; `null` bez rozjazdu albo bez osi czasu. */
+  branchState: { logicalDay: number; temporalStateId: string; stateFingerprint: string; branchRole: TemporalBranchRole } | null;
+  /** Werdykt odtworzenia KONTRFAKTYKU (baseline + ta gałąź), z którego ta paczka powstała. */
+  replayVerdict: SavedScenarioReplayStatus;
+}
 
 export interface EvidencePackRun {
   runId: string;
@@ -37,6 +63,8 @@ export interface ScientificEvidencePack {
   eventSummaries: readonly { runId: string; count: number; types: readonly string[] }[];
   /** Optional external-observation projection; absent for protocols without a compatible source. */
   externalObservationComparison?: Ame2020Comparison;
+  /** Obecne wyłącznie dla paczek zbudowanych z gałęzi multiverse; `createScientificEvidencePack` go nigdy nie ustawia. */
+  multiverseBranchContext?: MultiverseEvidenceBranchContext;
   disclaimer: string;
 }
 

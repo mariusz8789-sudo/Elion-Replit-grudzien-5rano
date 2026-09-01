@@ -1,4 +1,5 @@
 import { buildSavedScenarioCounterfactual } from '../simulation/scenarioCounterfactual';
+import type { SavedScenarioReplayStatus } from '../simulation/scenarioMemory';
 import {
   multiverseBranchAsCounterfactual,
   temporalDecisionLineage,
@@ -6,7 +7,42 @@ import {
   type TemporalMultiverse,
 } from '../simulation/temporalMultiverse';
 import { buildCounterfactualEvidencePack, COUNTERFACTUAL_EVIDENCE_CONTRACT_VERSION, type CounterfactualEvidenceResult } from './counterfactualEvidence';
+import { EVIDENCE_PACK_VERSION, type MultiverseEvidenceBranchContext } from './evidencePack';
 import { buildExperimentGraph, type ExperimentGraph } from './experimentGraph';
+
+/**
+ * Kontekst pochodzenia z gałęzi multiverse dla Evidence Pack (FAZA 5 —
+ * BRANCH-BY-BRANCH EVIDENCE). Każde pole jest PRZENIESIONE z `multiverse`/
+ * `decision`, które multiverse już policzył — nic tu nie jest liczone drugi
+ * raz ani zgadywane.
+ */
+function multiverseBranchContext(
+  multiverse: TemporalMultiverse,
+  branchId: string,
+  decision: TemporalDecisionLineage,
+  replayVerdict: SavedScenarioReplayStatus,
+): MultiverseEvidenceBranchContext {
+  return {
+    contractVersion: EVIDENCE_PACK_VERSION,
+    sourceMultiverseFingerprint: multiverse.multiverseFingerprint,
+    branchId,
+    declaredInterventionStartDay: decision.declaredInterventionStartDay,
+    decisionState: decision.decisionState === null ? null : {
+      logicalDay: decision.decisionState.logicalDay,
+      timelineId: decision.decisionState.timelineId,
+      stateFingerprint: decision.decisionState.stateFingerprint,
+      branchRole: decision.decisionState.branchRole,
+    },
+    firstDivergentDayFromBaseline: decision.firstDivergentDayFromBaseline,
+    branchState: decision.branchState === null ? null : {
+      logicalDay: decision.branchState.logicalDay,
+      temporalStateId: decision.branchState.temporalStateId,
+      stateFingerprint: decision.branchState.stateFingerprint,
+      branchRole: decision.branchState.branchRole,
+    },
+    replayVerdict,
+  };
+}
 
 /**
  * MULTIVERSE → EVIDENCE PACK, PRZEZ ISTNIEJĄCY MOST KONTRFAKTYCZNY.
@@ -43,7 +79,16 @@ export function buildMultiverseBranchEvidencePack(multiverse: TemporalMultiverse
     };
   }
   const saved = buildSavedScenarioCounterfactual(counterfactual, multiverse.spec.preparedness);
-  return buildCounterfactualEvidencePack(saved);
+  const result = buildCounterfactualEvidencePack(saved);
+  if (result.status !== 'CREATED' || result.pack === null || result.replay === null) return result;
+
+  // FAZA 5: paczka z gałęzi multiverse musi wskazywać źródłowy multiverse,
+  // deklarowaną decyzję, zmierzony rozjazd i werdykt odtworzenia — nie tylko
+  // sam wynik dwuramiennego porównania. `decision` istnieje z definicji, bo
+  // `multiverseBranchAsCounterfactual` już zweryfikował, że ta gałąź istnieje.
+  const decision = temporalDecisionLineage(multiverse).find((entry) => entry.branchId === branchId)!;
+  const context = multiverseBranchContext(multiverse, branchId, decision, result.replay.status);
+  return { ...result, pack: { ...result.pack, multiverseBranchContext: context } };
 }
 
 /**

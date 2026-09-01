@@ -367,22 +367,70 @@ incomplete lineage stays visibly incomplete rather than partially fabricated.
 | Lint / tsc / build / `git diff --check` | all clean |
 | New UI / new graph / new hypothesis / evidence / replay / memory engine | none |
 
+## Stage completed: RO-Crate audit + branch context + round-trip verification
+
+**The audit (FAZA 1), done by reading code, not assuming.** `evidencePackRoCrate.ts` projected
+question/hypothesis/runs/provenance/reproducibility fine, but had ZERO notion of "this evidence came
+from multiverse branch X" — no `branchId`, no decision day, no divergence day, no per-branch replay
+verdict anywhere in `ScientificEvidencePack` or its RO-Crate export. That data existed (in
+`TemporalDecisionLineage`) but had never been attached to an evidence pack — a real, confirmed gap,
+not a guess.
+
+**The minimal fix.** One new optional field, `ScientificEvidencePack.multiverseBranchContext`
+(`evidencePack.ts`) — `undefined` for every existing pack shape, so `createScientificEvidencePack`
+itself is untouched and old semantics don't change. `buildMultiverseBranchEvidencePack`
+(`multiverseEvidence.ts`) now attaches it automatically whenever a pack is `CREATED` from a multiverse
+branch: `sourceMultiverseFingerprint`, `branchId`, the declared decision day and its baseline state,
+the measured divergence day and the branch's own state there, and the replay verdict of the
+counterfactual that produced this pack — every field copied from data the multiverse already computed,
+nothing re-derived. `evidencePackRoCrate.ts` projects it as one additional property
+(`genesis:multiverseBranch`) on the existing evidence-pack node when present — no new RO-Crate entity
+type, no format change for packs that don't have it.
+
+**The round-trip (FAZA 2).** `verifyEvidencePackRoCrateRoundTrip(pack, reloadedJson?)` is a real
+SAVE → RELOAD → VERIFY IDENTITY check, not a self-referential no-op: it defaults to the pack's own
+`serializeEvidencePackRoCrate(pack)` output, but accepts an explicit `reloadedJson` string standing in
+for whatever actually came back from a store — so a test can hand it a truncated or hand-corrupted
+string and get a real `BLOCKED`, not a guessed pass. It checks, field by field, that the hypothesis,
+the hypothesis assessment, the reproducibility record, the (optional) multiverse branch context, and
+every source run's fingerprint survive the round trip byte-for-byte via `canonicalJson` comparison —
+any miss goes on `missing` and the whole result is `BLOCKED`. Writing this caught a real subtlety in
+its own first test: `ExperimentRun.runId` often equals `provenance.runFingerprint`, so a naive
+single-occurrence string tamper in a test landed on the wrong node's `@id` instead of the checked
+field — fixed by replacing all occurrences, a small proof the round-trip is actually looking at real
+JSON structure rather than trusting appearances.
+
+**FAZA 6 (weakest-link, 3-branch)** turned out to already be covered: `temporalMultiverse.test.ts`
+already runs a 3-branch spec (A/B/C) and asserts that one drifted or one blocked branch fails the whole
+multiverse's replay (never a silent `MATCH`) — verified by re-reading it, not duplicated.
+
+**FAZA 4 (preregistration identity)** — added one test confirming the same `questionId` under different
+`askedText` produces a different `multiverseFingerprint` (different experiment, not a relabelling); the
+"fake questionId rejected" and "incomplete carrier rejected" cases were already covered by the
+preregistration-carrier stage.
+
+| Item | Value |
+|---|---|
+| Files modified | `evidencePack.ts` (+`MultiverseEvidenceBranchContext`), `evidencePackRoCrate.ts` (+`verifyEvidencePackRoCrateRoundTrip`), `multiverseEvidence.ts` (branch context wiring) |
+| Files added | `multiverseEvidenceRoCrate.test.ts` (11 tests) |
+| Frontend tests | 171 files / 1829 passed / 1 skipped |
+| Backend tests | 275 passed, 40 skipped, 0 failed |
+| Lint / tsc / build / `git diff --check` | all clean |
+| New RO-Crate format / evidence engine / replay engine | none — one optional field, one additive projection, one verifier over existing exports |
+
 ## Next gap
 
-**Smaller machine-side item:** `TemporalBranchSpec`'s delayed-intervention lever, and now
-`buildMultiverseBranchScientificLineage`, are still reachable only through tests and the
-governed-question catalogue on `#/pilot`, not through a general UI. There is no call site yet that
-declares a `preparedness` question at multiverse-spec time in the app, and no screen renders the
-unified lineage this stage produces — the machine-side chain is complete and tested, but nothing in
-the UI wires "ask a governed question" to "run a multiverse and show me the whole chain" yet.
+**NEXT EXPERIMENT bridge (FAZA 3/7/8) was intentionally not attempted this stage**, per the sprint's
+own fallback rule ("if the full NEXT EXPERIMENT bridge is bigger than one reasonable milestone, close
+RO-Crate + replay round-trip first"). `buildMultiverseBranchScientificLineage`'s `graph.nextExperiment`
+already proposes a next step from real runs (previous stage), but nothing yet threads a *chosen* next
+experiment back into a new pre-registered `TemporalMultiverseSpec` automatically — that composition
+(propose → construct next spec → pre-register → run) is real remaining work, not done here.
 
-**Not attempted in this stage, and why:** the mega-prompt's RO-Crate/export section asks whether the
-existing Evidence Pack export can already carry question+model+input+execution+result+branch+
-evidence+replay. `evidencePackRoCrate.ts` was not touched or audited this stage — it exports a
-`ScientificEvidencePack`, which now (via this bridge) can originate from a multiverse branch, but
-nothing was verified about whether the RO-Crate representation surfaces the *branch/divergence*
-context specifically. That audit is real remaining work, not done here to keep this stage to one
-verified, tested unit rather than a wide unverified sweep.
+**Smaller machine-side item, unchanged:** `TemporalBranchSpec`'s delayed-intervention lever and the
+whole scientific-lineage/RO-Crate chain built across these stages are still reachable only through
+tests and the governed-question catalogue on `#/pilot`, not through a general UI — no call site yet
+declares a `preparedness` question at multiverse-spec time in the app.
 
 **The larger remaining gap is entirely on the experience side** — the actual Time Machine UX (time
 slider with past/present/future zones, "GO TO TIME", multi-world switcher, 3D handoff, alternate-

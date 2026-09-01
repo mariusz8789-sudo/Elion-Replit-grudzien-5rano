@@ -4,6 +4,7 @@ import type { EpidemicCityParams } from './epidemicCity';
 import type { HospitalCapacityParams } from './hospitalResource';
 import { compareScenarios, runScenario, SCENARIO_ENGINE_VERSION, type ScenarioComparison, type ScenarioId, type ScenarioRun } from './scenarioEngine';
 import { firstDivergentDay } from './scenarioCounterfactual';
+import { GOVERNED_PREPAREDNESS_QUESTIONS } from './preparednessQuestions';
 import { buildTemporalTimeline, temporalStateAt, type TemporalStateEnvelope, type TemporalTimeline } from './temporalState';
 import {
   buildSavedScenarioRunContext,
@@ -53,6 +54,16 @@ export interface TemporalMultiverseSpec {
   baseCohort?: CohortProfile;
   /** Przynajmniej jedna gałąź poza baseline — inaczej nie ma czego rozgałęziać. */
   branches: readonly TemporalBranchSpec[];
+  /**
+   * Rządzone pytanie, na które ten multiverse odpowiada — DEKLAROWANE W SPECU,
+   * czyli PRZED wykonaniem czegokolwiek. To jedyne uczciwe miejsce na
+   * prerejestrację: kryterium falsyfikacji dobrane po zobaczeniu wyników nie
+   * jest prerejestracją, tylko HARK-owaniem, a istniejący most dowodowy
+   * (`counterfactualEvidence.ts`) właśnie dlatego odmawia paczki artefaktowi
+   * bez tego pola. Samo pole NIE tworzy dowodu — otwiera jedynie drogę, żeby
+   * kryterium z katalogu mogło zostać zapisane zanim padnie pierwszy wynik.
+   */
+  preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string };
 }
 
 export interface TemporalBranchResult {
@@ -103,6 +114,12 @@ export function runTemporalMultiverse(spec: TemporalMultiverseSpec): TemporalMul
   if (new Set(branchIds).size !== branchIds.length) {
     throw new Error(`Identyfikatory gałęzi muszą być unikalne: ${branchIds.join(', ')}.`);
   }
+  // Prerejestracja musi wskazywać pytanie, które ISTNIEJE w katalogu przed
+  // wykonaniem. Wymyślony identyfikator nie jest prerejestracją, więc nie
+  // wchodzi cicho do przebiegu — kończy się błędem, nie polem-ozdobnikiem.
+  if (spec.preparedness !== undefined && !GOVERNED_PREPAREDNESS_QUESTIONS.some((entry) => entry.questionId === spec.preparedness!.questionId)) {
+    throw new Error(`Pytanie ${spec.preparedness.questionId} nie istnieje w katalogu rządzonych pytań — prerejestracja musi wskazywać istniejące kryterium.`);
+  }
 
   const baseline = runScenario(spec.baselineScenarioId, armOptions(spec, spec.baselineInterventionStartDay ?? 0));
   const baselineTimeline = buildTemporalTimeline(baseline, 'BASELINE');
@@ -123,6 +140,9 @@ export function runTemporalMultiverse(spec: TemporalMultiverseSpec): TemporalMul
   const fingerprintBase = {
     v: TEMPORAL_MULTIVERSE_CONTRACT_VERSION,
     baselineResult: baseline.resultFingerprint,
+    // Prerejestracja wchodzi do odcisku: ten sam zestaw przebiegów zadeklarowany
+    // pod innym pytaniem to inny eksperyment, nie ten sam z inną etykietą.
+    preparedness: spec.preparedness ?? null,
     branches: branches.map((branch) => ({
       branchId: branch.branchId,
       resultFingerprint: branch.run.resultFingerprint,
@@ -150,6 +170,8 @@ export function runTemporalMultiverse(spec: TemporalMultiverseSpec): TemporalMul
  */
 export interface SavedTemporalMultiverse {
   contractVersion: string;
+  /** Prerejestrowane pytanie z chwili SPECU — bez niego zapis nie ma czego udowodnić. */
+  preparedness?: { questionId: string; askedText: string; resolutionFingerprint: string };
   baseline: SavedScenarioRunContext;
   branches: readonly {
     branchId: string;
@@ -162,12 +184,17 @@ export interface SavedTemporalMultiverse {
 }
 
 export function buildSavedTemporalMultiverse(multiverse: TemporalMultiverse): SavedTemporalMultiverse {
+  const preparedness = multiverse.spec.preparedness;
   return {
     contractVersion: TEMPORAL_MULTIVERSE_CONTRACT_VERSION,
-    baseline: buildSavedScenarioRunContext(multiverse.baseline),
+    ...(preparedness === undefined ? {} : { preparedness }),
+    // Prerejestracja schodzi też do KAŻDEGO ramienia — dokładnie tak, jak robi
+    // to `buildSavedScenarioCounterfactual`, żeby pojedynczy zapisany przebieg
+    // niósł pytanie, z którego powstał, a nie tylko multiverse jako całość.
+    baseline: buildSavedScenarioRunContext(multiverse.baseline, preparedness),
     branches: multiverse.branches.map((branch) => ({
       branchId: branch.branchId,
-      saved: buildSavedScenarioRunContext(branch.run),
+      saved: buildSavedScenarioRunContext(branch.run, preparedness),
       comparisonStatus: branch.comparisonToBaseline.status,
       firstDivergentDayFromBaseline: branch.firstDivergentDayFromBaseline,
     })),
@@ -191,6 +218,16 @@ export function isSavedTemporalMultiverse(value: unknown): value is SavedTempora
       && (branch.firstDivergentDayFromBaseline === null || Number.isFinite(branch.firstDivergentDayFromBaseline));
   });
   if (!branchesValid) return false;
+  // Prerejestracja jest opcjonalna, ale jeżeli jest — musi być kompletna.
+  // Ułomny nośnik pytania byłby gorszy niż jego brak: udawałby, że kryterium
+  // istnieje, a nie dałoby się go rozstrzygnąć wobec katalogu.
+  if (saved.preparedness !== undefined) {
+    const preparedness = saved.preparedness as Record<string, unknown> | null;
+    if (!preparedness || typeof preparedness !== 'object') return false;
+    const complete = ['questionId', 'askedText', 'resolutionFingerprint']
+      .every((key) => typeof preparedness[key] === 'string' && (preparedness[key] as string).trim().length > 0);
+    if (!complete) return false;
+  }
   return typeof saved.multiverseFingerprint === 'string' && saved.epistemicStatus === 'SIMULATION';
 }
 
@@ -299,6 +336,9 @@ export function replaySavedTemporalMultiverse(saved: unknown): TemporalMultivers
         scenarioId: branch.saved.scenarioId,
         interventionStartDay: branch.saved.interventionStartDay,
       })),
+      // Prerejestracja przeżywa odtworzenie — inaczej odtworzony multiverse
+      // przestawałby wiedzieć, na jakie pytanie w ogóle odpowiadał.
+      ...(saved.preparedness === undefined ? {} : { preparedness: saved.preparedness }),
     },
     baseline,
     baselineTimeline: buildTemporalTimeline(baseline, 'BASELINE'),

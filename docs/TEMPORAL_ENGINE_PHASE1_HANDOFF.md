@@ -239,16 +239,71 @@ system" check on the module's own imports (composes `scenarioEngine`/`scenarioCo
 | E2E desktop | 27 routes / 242 interactions — zero runtime errors (regression only; no new UI to prove) |
 | E2E mobile | 27 routes / 242 interactions — zero runtime errors |
 
+## Stage completed: M3 (`fb6e46a`) + decision lineage (`4e832ae`)
+
+**M3 — `core/simulation/temporalStateBookmark.ts`.** A portable address for one temporal state:
+`createTemporalStateBookmark(source, logicalDay)` produces a deterministic `moment_<hash>` ID over
+five source kinds (`run`, `counterfactual-baseline`, `counterfactual-variant`, `multiverse-baseline`,
+`multiverse-branch`). Not a second memory and not a second replay — the bookmark is a *label* over an
+already-saved context, and `resolveTemporalStateBookmark` always goes back through the existing
+replay of that context. MATCH is the only path to a `TemporalStateEnvelope`; a tampered save, a
+missing branch or a day off the axis returns an explicit reason, never a guessed state. A test asserts
+the module's own source never calls `runScenario`/`runTemporalMultiverse` or touches storage, so the
+"no duplicate system" rule is enforced mechanically rather than by convention.
+
+**Decision lineage — `temporalDecisionLineage(multiverse)`.** For each branch it returns the baseline
+envelope at the branch's *declared* decision day (`decisionState`) and the branch envelope at the
+*measured* first divergent day (`branchState`) as two separate fields. This is the declared-vs-measured
+discipline made structural: a declared `interventionStartDay` can never stand in for measured
+divergence, because they are read from different sources. A declared day off the baseline axis yields
+`null` (NOT_AVAILABLE), not a nearest-neighbour guess.
+
+## Stage completed: pre-registration carrier on the multiverse
+
+**Why this and not the Evidence Pack.** Evidence-for-multiverse is the obvious next large gap, but it
+was blocked on a real precondition, not on missing plumbing: `experimentFabric/counterfactualEvidence.ts`
+refuses to build a pack for an artifact whose `preparedness` does not resolve in
+`GOVERNED_PREPAREDNESS_QUESTIONS`, and `TemporalMultiverseSpec` / `SavedTemporalMultiverse` had no
+field to carry one. Attaching a falsification criterion to runs that had *already executed* would be
+HARKing, so the honest move was to build the carrier that lets the criterion be declared **before**
+execution — not to bolt a criterion onto finished results.
+
+**What changed** (one file, `temporalMultiverse.ts`): optional
+`preparedness { questionId, askedText, resolutionFingerprint }` on both the spec and the saved form.
+`runTemporalMultiverse` rejects a `questionId` absent from the governed catalogue, so an invented
+identifier fails loudly instead of becoming a decorative field. The declaration enters the multiverse
+fingerprint — the same set of runs declared under a different question is a *different experiment*,
+not the same one relabelled. It descends to every arm via `buildSavedScenarioRunContext(run, preparedness)`,
+exactly as `buildSavedScenarioCounterfactual` already does, so each saved run carries the question it
+came from. It survives replay. `isSavedTemporalMultiverse` rejects a partial carrier: a half-filled
+question object is worse than none, because it would claim a criterion exists that cannot be resolved
+against the catalogue.
+
+**What this deliberately does NOT do:** the field is not evidence. A test pins that explicitly — a
+declared question does not rescue a drifted branch; the replay verdict is unchanged by its presence.
+
+| Item | Value |
+|---|---|
+| Files modified | `temporalMultiverse.ts` |
+| Files added | `temporalMultiversePreregistration.test.ts` (7 tests) |
+| Frontend tests | 168 files / 1798 passed / 1 skipped |
+| Backend tests | 275 passed, 40 skipped, 0 failed |
+| Lint / tsc / build / `git diff --check` | all clean |
+| New UI | none — contract-level only |
+
 ## Next gap
 
-**This machine-side thread is now feature-complete for the vision's stated primitives**: V1 (time
-slider) and V4 (what-if branching) were already live end-to-end with Evidence Pack (M2/M4/M6/M7); this
-stage adds V5 (many worlds, not just A/B). What's left on the machine side is smaller: **M3 (temporal
-snapshots)** — a persisted, restorable `TemporalStateEnvelope` history addressable by ID rather than
-only reachable by re-deriving it from a run (this is what would make a UI-side "GO TO TIME T3" a
-direct lookup instead of a recomputation) — or extending `TemporalBranchSpec` with a delayed-
-intervention lever exposed through a UI (currently only reachable via the governed-question catalog
-on `#/pilot`).
+**Evidence Pack for a multiverse — now unblocked at the contract level, still not honestly buildable.**
+The carrier exists, so a multiverse can now be declared under a governed question before it runs. What
+is still missing is the only thing that makes a pack legitimate: **multiverse runs actually executed
+with a pre-registration attached**. Until such runs exist, there is nothing to build a pack from that
+would not be a criterion chosen after the fact. The remaining work is therefore (a) a call site that
+declares the question at spec time, and (b) the bridge from `SavedTemporalMultiverse` into the
+existing `buildCounterfactualEvidencePack` shape — reusing that function, not writing a second
+evidence system.
+
+**Smaller machine-side item:** `TemporalBranchSpec`'s delayed-intervention lever is still reachable
+only through the governed-question catalogue on `#/pilot`, not through a general UI.
 
 **The larger remaining gap is entirely on the experience side** — the actual Time Machine UX (time
 slider with past/present/future zones, "GO TO TIME", multi-world switcher, 3D handoff, alternate-

@@ -76,6 +76,22 @@ export function TemporalMultiversePanel({ params, temporalDay = null }: { params
     setReplay(replaySavedTemporalMultiverse(buildSavedTemporalMultiverse(multiverse)));
   };
 
+  const selectedDivergence = selectedWorld === 'A'
+    ? null
+    : multiverse?.branches.find((candidate) => candidate.branchId === selectedWorld)?.firstDivergentDayFromBaseline ?? null;
+
+  const jumpToDivergence = () => {
+    if (selectedDivergence === null) return;
+    setTimelineDay(selectedDivergence);
+    setPlaying(false);
+  };
+
+  const playFromDivergence = () => {
+    if (selectedDivergence === null) return;
+    setTimelineDay(selectedDivergence);
+    setPlaying(true);
+  };
+
   const openSelectedWorld = () => {
     if (!multiverse || selectedWorld === 'A') return;
     const handoffRunId = openTemporalMultiverseBranchInWorld(multiverse, selectedWorld);
@@ -128,12 +144,8 @@ export function TemporalMultiversePanel({ params, temporalDay = null }: { params
       </div>
       <div className="temporal-multiverse-footer">
         <span>SELECTED · WORLD {selectedWorld}</span>
-        {selectedWorld !== 'A' && <button className="world-action scenario-replay-button" onClick={() => {
-          if (multiverse) {
-            const branch = multiverse.branches.find((candidate) => candidate.branchId === selectedWorld);
-            if (branch?.firstDivergentDayFromBaseline !== null && branch?.firstDivergentDayFromBaseline !== undefined) setTimelineDay(branch.firstDivergentDayFromBaseline);
-          }
-        }}>↗ JUMP TO DIVERGENCE</button>}
+        {selectedWorld !== 'A' && <button className="world-action scenario-replay-button" onClick={jumpToDivergence} disabled={selectedDivergence === null}>↗ JUMP TO DIVERGENCE</button>}
+        {selectedWorld !== 'A' && <button className="world-action scenario-replay-button" onClick={playFromDivergence} disabled={selectedDivergence === null}>▶ PLAY FROM HERE</button>}
         <button className="world-action scenario-replay-button" onClick={openSelectedWorld} disabled={selectedWorld === 'A'}>↗ OPEN IN WORLD/3D</button>
         <button className="world-action scenario-replay-button" onClick={verify}>✓ VERIFY · REPLAY</button>
       </div>

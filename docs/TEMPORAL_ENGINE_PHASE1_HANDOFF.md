@@ -253,3 +253,22 @@ on `#/pilot`).
 **The larger remaining gap is entirely on the experience side** — the actual Time Machine UX (time
 slider with past/present/future zones, "GO TO TIME", multi-world switcher, 3D handoff, alternate-
 timeline reveal) is Manus's mandate per the stated division of labor, not scoped here.
+
+
+## Experience stage completed: JUMP TO DIVERGENCE → PLAY FROM HERE
+
+**Branch:** `manus/temporal-world-wow`
+
+The existing `TemporalMultiversePanel` now exposes the complete measured-divergence interaction: `JUMP TO DIVERGENCE` moves the shared timeline to the branch's actual `firstDivergentDayFromBaseline`, while `PLAY FROM HERE` starts the existing playback interval from that measured day. Both actions are disabled when no measured divergence exists. No new temporal engine, renderer, canvas, storage or state model was created; the change reuses `TemporalMultiverse`, `temporalStateAt` and the existing `playing`/timeline state.
+
+This closes the missing experience link between first divergence and continued exploration. `VERIFY · REPLAY`, `OPEN IN WORLD/3D`, WORLD A/B/C/D and the existing fail-closed statuses remain unchanged.
+
+Validation completed: targeted `scenarioCommandCenter.test.ts` passed; `npm run build` passed including `tsc -b`; full `npm test` passed (**275 passed, 40 skipped, 0 failed**); `npm run lint`; and `git diff --check`. Build retains only the existing Vite large-chunk advisory.
+
+### Next large gap
+
+Do not rebuild Claude's temporal core. The next experience-side gap is a single coherent end-to-end demo entry path if the current route composition still requires manual navigation: `GO TO TIME → ENTER THIS MOMENT → WORLD/3D → WHAT IF? → WORLD A/B/C/D → PLAY ALL → FIRST DIVERGENCE → JUMP TO DIVERGENCE → PLAY FROM HERE → COMPARE → VERIFY → REPLAY`. Any missing world state must remain `NOT_AVAILABLE`; any divergence must come only from `firstDivergentDay` or `firstDivergentDayFromBaseline`.
+
+**Checkpoint prepared on:** 2026-09-01
+**Current HEAD:** `acaef98`
+**Current live:** `origin/main` must be checked at continuation time.

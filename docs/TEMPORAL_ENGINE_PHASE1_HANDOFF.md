@@ -272,3 +272,18 @@ Do not rebuild Claude's temporal core. The next experience-side gap is a single 
 **Checkpoint prepared on:** 2026-09-01
 **Current HEAD:** `acaef98`
 **Current live:** `origin/main` must be checked at continuation time.
+
+
+## Experience stage completed: SAVE THIS MOMENT → OPEN BOOKMARK → REPLAY MATCH
+
+**Branch:** `manus/temporal-world-wow`
+
+Reused Claude's existing `temporalStateBookmark.ts` API (`createTemporalStateBookmark` / `resolveTemporalStateBookmark`) through the City3D scenario timeline UI. `SAVE THIS MOMENT` builds a deterministic bookmark from the existing `SavedScenarioRunContext` at the selected logical day. `OPEN BOOKMARK · REPLAY` resolves it only through the existing replay path; the UI enters the day only on `MATCH` and displays `DRIFT`/`BLOCKED` reasons otherwise. No second storage, snapshot engine, renderer, WorldState or replay system was added.
+
+Changed files: `packages/frontend/src/components/visual-simulation/City3DWebGLScreen.tsx`, plus the reused Claude core commit `08b1694` (`temporalStateBookmark.ts` and its tests).
+
+Validation completed: targeted temporal bookmark and scenario-command-center tests; `npm run build` including `tsc -b`; full `npm test` (**275 passed, 40 skipped, 0 failed**); `npm run lint`; and `git diff --check`. Build retains only the existing Vite large-chunk advisory.
+
+The next large experience gap remains the single coherent entry flow, not another engine: `GO TO TIME → ENTER THIS MOMENT → SAVE THIS MOMENT → OPEN BOOKMARK → REPLAY MATCH → WHAT IF? → WORLD A/B/C/D → PLAY ALL → FIRST DIVERGENCE → JUMP TO DIVERGENCE → PLAY FROM HERE → COMPARE → VERIFY`. Preserve `SIMULATED`, `COUNTERFACTUAL`, `NOT_AVAILABLE`, `MATCH`, `DRIFT` and `BLOCKED` semantics exactly; never use labels as execution.
+
+**Current HEAD after this stage:** to be set after the checkpoint commit.

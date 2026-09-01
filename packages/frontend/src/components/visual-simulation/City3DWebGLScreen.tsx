@@ -6,6 +6,8 @@ import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock'
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
 import { consumePendingExperimentWorld, consumePendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
 import { saveScenarioCounterfactualToMemory, saveScenarioRunToMemory } from '../../core/scienceMemory';
+import { buildSavedScenarioRunContext } from '../../core/simulation/scenarioMemory';
+import { createTemporalStateBookmark, resolveTemporalStateBookmark, type TemporalStateBookmark } from '../../core/simulation/temporalStateBookmark';
 import { describeScenarioEffects } from '../../core/simulation/scenarioDisclosure';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
@@ -68,6 +70,7 @@ export function City3DWebGLScreen() {
   const [timelineDay, setTimelineDay] = useState(0);
   const [enteredTimelineDay, setEnteredTimelineDay] = useState<number | null>(null);
   const [timelineSaved, setTimelineSaved] = useState<string | null>(null);
+  const [timelineBookmark, setTimelineBookmark] = useState<TemporalStateBookmark | null>(null);
   const timelineSample = scenarioTimeline
     ? scenarioTimeline.series[Math.min(timelineDay, scenarioTimeline.series.length - 1)]
     : undefined;
@@ -337,6 +340,38 @@ export function City3DWebGLScreen() {
                   rzeczywistej epidemii — to symulacja scenariuszowa, nie prognoza ani obserwacja.
                 </p>
                 <div className="scenario-run-actions">
+                  <button
+                    type="button"
+                    className="chip-btn"
+                    onClick={() => {
+                      try {
+                        const source = { kind: 'run' as const, saved: buildSavedScenarioRunContext(scenarioTimeline.scenarioRun, scenarioTimeline.preparedness) };
+                        const bookmark = createTemporalStateBookmark(source, timelineLogicalDay);
+                        setTimelineBookmark(bookmark);
+                        setTimelineSaved(`BOOKMARK CREATED · ${bookmark.bookmarkId} · DAY ${bookmark.logicalDay}`);
+                      } catch (error) {
+                        setTimelineSaved(`Nie utworzono bookmarka: ${error instanceof Error ? error.message : String(error)}`);
+                      }
+                    }}
+                  >
+                    SAVE THIS MOMENT
+                  </button>
+                  {timelineBookmark && <button
+                    type="button"
+                    className="chip-btn"
+                    onClick={() => {
+                      const resolved = resolveTemporalStateBookmark(timelineBookmark);
+                      if (resolved.status === 'MATCH') {
+                        setTimelineDay(resolved.envelope.logicalDay);
+                        setEnteredTimelineDay(resolved.envelope.logicalDay);
+                        setTimelineSaved(`OPEN BOOKMARK · ${timelineBookmark.bookmarkId} · MATCH · DAY ${resolved.envelope.logicalDay}`);
+                      } else {
+                        setTimelineSaved(`OPEN BOOKMARK · ${timelineBookmark.bookmarkId} · ${resolved.status} · ${resolved.reason}`);
+                      }
+                    }}
+                  >
+                    OPEN BOOKMARK · REPLAY
+                  </button>}
                   <button
                     type="button"
                     className="chip-btn"

@@ -297,4 +297,4 @@ Changed file: `packages/frontend/src/components/visual-simulation/TemporalMultiv
 
 Validation completed: targeted `scenarioCommandCenter.test.ts` and `temporalMultiverse.test.ts`; `npm run build` including `tsc -b`; full `npm test` (**275 passed, 40 skipped, 0 failed**); `npm run lint`; and `git diff --check`. Build retains only the existing Vite large-chunk advisory.
 
-**Current HEAD after this stage:** `9dacf97`.
+**Current HEAD after this stage:** `c074460`.

@@ -306,6 +306,6 @@ Fixed a real provenance disconnect in `City3DWebGLScreen`: when a completed `Sce
 
 Validation: targeted scenario-command-center and temporal-multiverse tests passed; `npm run build` including `tsc -b` passed; full `npm test` passed (**275 passed, 40 skipped, 0 failed**); `npm run lint`; and `git diff --check`. The only build output remains the existing Vite large-chunk advisory.
 
-**Current HEAD after this stage:** to be set after the checkpoint commit.
+**Current HEAD after this stage:** `bc82e68`.
 
 Next large GAP remains a single coherent entry flow across existing screens, only where the necessary handoff data exists. Do not fabricate a timeline when City3D is opened directly; retain `NOT_AVAILABLE` and require a real Fabric/Memory handoff.

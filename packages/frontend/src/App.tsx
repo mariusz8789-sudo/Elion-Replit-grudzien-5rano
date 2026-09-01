@@ -48,6 +48,7 @@ const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/Conc
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
+const AutomotiveClaimAuditorScreen = lazy(() => import('./components/AutomotiveClaimAuditorScreen').then((m) => ({ default: m.AutomotiveClaimAuditorScreen })));
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
@@ -93,7 +94,8 @@ type Route =
   | { kind: 'concept' }
   | { kind: 'character' }
   | { kind: 'hf-slice' }
-  | { kind: 'pilot' };
+  | { kind: 'pilot' }
+  | { kind: 'automotive-audit' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -123,6 +125,7 @@ function parseHash(): Route {
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
+  if (h === '#/automotive-audit') return { kind: 'automotive-audit' };
   return { kind: 'home' };
 }
 
@@ -494,6 +497,18 @@ export default function App() {
           <TopBar title="🧪 Pilot eksperymentu — plan → wynik → Scenario Capsule" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <ExperimentPilotScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'automotive-audit') {
+      return (
+        <div className="app">
+          <TopBar title="🚗 Automotive Claim Auditor — spike" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <AutomotiveClaimAuditorScreen />
           </HeavyRoute>
           {overlays}
         </div>

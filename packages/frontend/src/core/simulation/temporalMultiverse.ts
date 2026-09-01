@@ -3,7 +3,12 @@ import type { CohortProfile } from '../agents/cohortModel';
 import type { EpidemicCityParams } from './epidemicCity';
 import type { HospitalCapacityParams } from './hospitalResource';
 import { compareScenarios, runScenario, SCENARIO_ENGINE_VERSION, type ScenarioComparison, type ScenarioId, type ScenarioRun } from './scenarioEngine';
-import { firstDivergentDay } from './scenarioCounterfactual';
+import {
+  firstDivergentDay,
+  SCENARIO_COUNTERFACTUAL_CONTRACT_VERSION,
+  type ScenarioCounterfactual,
+  type ScenarioCounterfactualSpec,
+} from './scenarioCounterfactual';
 import { GOVERNED_PREPAREDNESS_QUESTIONS } from './preparednessQuestions';
 import { buildTemporalTimeline, temporalStateAt, type TemporalStateEnvelope, type TemporalTimeline } from './temporalState';
 import {
@@ -398,4 +403,64 @@ export function temporalDecisionLineage(multiverse: TemporalMultiverse): readonl
       : null;
     return { branchId: branch.branchId, declaredInterventionStartDay, decisionState, firstDivergentDayFromBaseline: branch.firstDivergentDayFromBaseline, branchState };
   });
+}
+
+/**
+ * GAŁĄŹ MULTIVERSE JAKO KONTRFAKTYK.
+ *
+ * Gałąź multiverse względem wspólnego baseline JEST kontrfaktykiem z
+ * definicji: dzieli `baseParams`/`baseHospital`/`baseCohort` z baseline i
+ * różni się dokładnie zadeklarowanym scenariuszem i/lub dniem jego wejścia —
+ * dokładnie to, co `ScenarioCounterfactual` opisuje. Ta funkcja nie liczy
+ * porównania drugi raz: bierze `ScenarioComparison`, który multiverse już
+ * policzył (`branch.comparisonToBaseline`), i przekłada go w kontrakt, który
+ * istniejący Evidence Pack już rozumie. Odcisk jest liczony od nowa tym samym
+ * wzorem co `runScenarioCounterfactual` — to nie jest podrobiony fingerprint,
+ * to dokładnie ten fingerprint, jaki dałby bezpośredni run tej samej pary.
+ *
+ * Zwraca `null`, gdy gałęzi nie ma albo jej porównanie z baseline nie jest
+ * COMPLETED (np. gałąź NOT_MODELED) — niekompletnego porównania nie da się
+ * uczciwie przedstawić jako kontrfaktyk.
+ */
+export function multiverseBranchAsCounterfactual(multiverse: TemporalMultiverse, branchId: string): ScenarioCounterfactual | null {
+  const branch = multiverse.branches.find((entry) => entry.branchId === branchId);
+  const branchSpec = multiverse.spec.branches.find((entry) => entry.branchId === branchId);
+  if (branch === undefined || branchSpec === undefined || branch.comparisonToBaseline.status !== 'COMPLETED') return null;
+
+  const spec: ScenarioCounterfactualSpec = {
+    baselineScenarioId: multiverse.spec.baselineScenarioId,
+    variantScenarioId: branchSpec.scenarioId,
+    days: multiverse.spec.days,
+    stepsPerDay: multiverse.spec.stepsPerDay,
+    baseParams: multiverse.spec.baseParams,
+    ...(multiverse.spec.baseHospital === undefined ? {} : { baseHospital: multiverse.spec.baseHospital }),
+    ...(multiverse.spec.baseCohort === undefined ? {} : { baseCohort: multiverse.spec.baseCohort }),
+    baselineInterventionStartDay: multiverse.spec.baselineInterventionStartDay ?? 0,
+    variantInterventionStartDay: branchSpec.interventionStartDay ?? 0,
+  };
+
+  const fingerprintBase = {
+    contractVersion: SCENARIO_COUNTERFACTUAL_CONTRACT_VERSION,
+    engineVersion: SCENARIO_ENGINE_VERSION,
+    baselineResult: multiverse.baseline.resultFingerprint,
+    variantResult: branch.run.resultFingerprint,
+    comparisonStatus: branch.comparisonToBaseline.status,
+    metrics: branch.comparisonToBaseline.metrics,
+    changedParameters: branch.comparisonToBaseline.changedParameters,
+    changedTiming: branch.comparisonToBaseline.changedTiming,
+    changedCapacity: branch.comparisonToBaseline.changedCapacity,
+    firstDivergentDay: branch.firstDivergentDayFromBaseline,
+  };
+
+  return {
+    contractVersion: SCENARIO_COUNTERFACTUAL_CONTRACT_VERSION,
+    engineVersion: SCENARIO_ENGINE_VERSION,
+    spec,
+    baseline: multiverse.baseline,
+    variant: branch.run,
+    comparison: branch.comparisonToBaseline,
+    firstDivergentDay: branch.firstDivergentDayFromBaseline,
+    counterfactualFingerprint: fnv1a(canonicalJson(fingerprintBase)),
+    epistemicStatus: 'SIMULATION',
+  };
 }

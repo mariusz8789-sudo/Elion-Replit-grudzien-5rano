@@ -291,19 +291,47 @@ declared question does not rescue a drifted branch; the replay verdict is unchan
 | Lint / tsc / build / `git diff --check` | all clean |
 | New UI | none — contract-level only |
 
+## Stage completed: Multiverse → Evidence Pack bridge
+
+**Why a branch-vs-baseline pair is a counterfactual by construction.** A multiverse branch shares
+`baseParams`/`baseHospital`/`baseCohort` with the baseline by definition and differs by exactly the
+declared `scenarioId` and/or `interventionStartDay` — which is precisely what `ScenarioCounterfactual`
+already describes. So the bridge does not compare anything a second time: `multiverseBranchAsCounterfactual`
+(`temporalMultiverse.ts`) takes the `ScenarioComparison` the multiverse already computed
+(`branch.comparisonToBaseline`) and re-expresses it as a `ScenarioCounterfactual`, with a fingerprint
+computed by the same formula `runScenarioCounterfactual` uses — not a fabricated one, the actual
+fingerprint a direct two-armed run of that same pair would produce.
+
+**The bridge itself** (`experimentFabric/multiverseEvidence.ts`, one function,
+`buildMultiverseBranchEvidencePack(multiverse, branchId)`) does nothing but wire three existing
+functions together: `multiverseBranchAsCounterfactual` → the existing `buildSavedScenarioCounterfactual`
+→ the existing `buildCounterfactualEvidencePack`. All four fail-closed gates from M6/M7 apply
+unchanged: both arms must replay MATCH, the difference must be exactly one declared lever, the
+criterion must come from a pre-registered governed question (absent → `NOT_AVAILABLE`, never invented
+after the fact), and real re-executed runs must match the saved digest. An N-branch multiverse yields
+N independent evidence packs — one per branch-vs-baseline comparison — never one pack for the whole
+multiverse, matching how Evidence Pack already resolves exactly one testable difference at a time.
+
+Works identically on a freshly run `TemporalMultiverse` and on one recovered through a MATCH-verified
+`replaySavedTemporalMultiverse` — verified by a test, since both are the same type by construction
+(the type is reachable only via a real run or a verified replay, never a guess).
+
+| Item | Value |
+|---|---|
+| Files added | `experimentFabric/multiverseEvidence.ts`, `multiverseEvidence.test.ts` (9 tests) |
+| Files modified | `temporalMultiverse.ts` (+`multiverseBranchAsCounterfactual`) |
+| Frontend tests | 169 files / 1807 passed / 1 skipped |
+| Backend tests | 275 passed, 40 skipped, 0 failed |
+| Lint / tsc / build / `git diff --check` | all clean |
+| New UI | none — contract-level only |
+
 ## Next gap
 
-**Evidence Pack for a multiverse — now unblocked at the contract level, still not honestly buildable.**
-The carrier exists, so a multiverse can now be declared under a governed question before it runs. What
-is still missing is the only thing that makes a pack legitimate: **multiverse runs actually executed
-with a pre-registration attached**. Until such runs exist, there is nothing to build a pack from that
-would not be a criterion chosen after the fact. The remaining work is therefore (a) a call site that
-declares the question at spec time, and (b) the bridge from `SavedTemporalMultiverse` into the
-existing `buildCounterfactualEvidencePack` shape — reusing that function, not writing a second
-evidence system.
-
 **Smaller machine-side item:** `TemporalBranchSpec`'s delayed-intervention lever is still reachable
-only through the governed-question catalogue on `#/pilot`, not through a general UI.
+only through the governed-question catalogue on `#/pilot`, not through a general UI. There is also no
+call site yet that actually declares a `preparedness` question at multiverse-spec time in the app —
+the bridge and the carrier exist end to end, but nothing in the UI wires "ask a governed question" to
+"run a multiverse" yet, so today this is only exercised by tests, not reachable by a user.
 
 **The larger remaining gap is entirely on the experience side** — the actual Time Machine UX (time
 slider with past/present/future zones, "GO TO TIME", multi-world switcher, 3D handoff, alternate-

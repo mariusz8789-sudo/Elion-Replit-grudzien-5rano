@@ -325,13 +325,64 @@ Works identically on a freshly run `TemporalMultiverse` and on one recovered thr
 | Lint / tsc / build / `git diff --check` | all clean |
 | New UI | none — contract-level only |
 
+## Stage completed: unified scientific lineage for a multiverse branch
+
+**Where the lineage actually broke.** `experimentGraph.ts` already builds a full QUESTION → HYPOTHESIS
+→ EXPERIMENT → RESULT → UNCERTAINTY → NEXT_EXPERIMENT graph, but only from `ExperimentRun[]` +
+`ScientificEvidenceChain[]` — a shape with no notion of a temporal branch, a divergence day, or a
+declared decision. `temporalDecisionLineage()` already answers "which decision produced this branch,
+and when did it actually diverge" — but only inside the temporal/multiverse world, with no path to a
+hypothesis or a graph. The two halves were both complete and both correct; nothing connected them by
+`branchId`.
+
+**The connection turned out to require zero new computation.** `CounterfactualEvidenceResult.chain`
+(produced by `buildMultiverseBranchEvidencePack`, previous stage) is already a real
+`ScientificEvidenceChain`, and `chain.allRuns` is already typed as exactly the `ExperimentRun[]` that
+`buildExperimentGraph` consumes. So `buildMultiverseBranchScientificLineage(multiverse, branchId)`
+(`experimentFabric/multiverseEvidence.ts`) does nothing but call three already-existing functions and
+return their results keyed by the same `branchId`: `temporalDecisionLineage` for the decision/divergence
+pair, `buildMultiverseBranchEvidencePack` for the evidence/replay verdict, and `buildExperimentGraph`
+fed `evidence.chain.allRuns` + `[evidence.chain]` for the full question-to-next-experiment graph. The
+graph is `null` exactly when there is no evidence chain to show — never a hypothesis dorobiona to a
+pack that doesn't exist.
+
+`graph.nextExperiment` is untouched `experimentGraph.ts` machinery (`proposeNext`/
+`executeNextExperiment`) — this stage does not add a second planner, it only ever hands that existing
+mechanism the real runs a branch already produced. `whyNextExperiment.ts`'s `explainScientificEvidence`
+also accepts `evidence.chain` directly with no adapter, confirmed by a test — it was already the right
+shape.
+
+Verified end to end: pre-register → run multiverse → build lineage → save → replay → MATCH → rebuild
+lineage on the replayed multiverse → same evidence status and same falsification criterion as the
+original (persistence-safe). A tampered saved branch fails replay (never a silent MATCH); a
+nonexistent branch id yields `decision: null`, `evidence: BLOCKED_NOT_COMPARABLE`, `graph: null` —
+incomplete lineage stays visibly incomplete rather than partially fabricated.
+
+| Item | Value |
+|---|---|
+| Files added | `multiverseScientificLineage.test.ts` (11 tests) |
+| Files modified | `experimentFabric/multiverseEvidence.ts` (+`buildMultiverseBranchScientificLineage`) |
+| Frontend tests | 170 files / 1818 passed / 1 skipped |
+| Backend tests | 275 passed, 40 skipped, 0 failed |
+| Lint / tsc / build / `git diff --check` | all clean |
+| New UI / new graph / new hypothesis / evidence / replay / memory engine | none |
+
 ## Next gap
 
-**Smaller machine-side item:** `TemporalBranchSpec`'s delayed-intervention lever is still reachable
-only through the governed-question catalogue on `#/pilot`, not through a general UI. There is also no
-call site yet that actually declares a `preparedness` question at multiverse-spec time in the app —
-the bridge and the carrier exist end to end, but nothing in the UI wires "ask a governed question" to
-"run a multiverse" yet, so today this is only exercised by tests, not reachable by a user.
+**Smaller machine-side item:** `TemporalBranchSpec`'s delayed-intervention lever, and now
+`buildMultiverseBranchScientificLineage`, are still reachable only through tests and the
+governed-question catalogue on `#/pilot`, not through a general UI. There is no call site yet that
+declares a `preparedness` question at multiverse-spec time in the app, and no screen renders the
+unified lineage this stage produces — the machine-side chain is complete and tested, but nothing in
+the UI wires "ask a governed question" to "run a multiverse and show me the whole chain" yet.
+
+**Not attempted in this stage, and why:** the mega-prompt's RO-Crate/export section asks whether the
+existing Evidence Pack export can already carry question+model+input+execution+result+branch+
+evidence+replay. `evidencePackRoCrate.ts` was not touched or audited this stage — it exports a
+`ScientificEvidencePack`, which now (via this bridge) can originate from a multiverse branch, but
+nothing was verified about whether the RO-Crate representation surfaces the *branch/divergence*
+context specifically. That audit is real remaining work, not done here to keep this stage to one
+verified, tested unit rather than a wide unverified sweep.
 
 **The larger remaining gap is entirely on the experience side** — the actual Time Machine UX (time
 slider with past/present/future zones, "GO TO TIME", multi-world switcher, 3D handoff, alternate-

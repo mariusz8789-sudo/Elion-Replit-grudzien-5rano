@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { SCENARIOS } from '../core/simulation/scenarioEngine';
 import {
   openScenarioVariantInWorld,
+  openTemporalMultiverseBranchInWorld,
   replayScenarioCommandCenter,
   runScenarioCommandCenter,
+  runTemporalMultiverseCommandCenter,
   scenarioParamsFromCommandCenter,
   scenarioUiMetrics,
   temporalTimelinesFor,
@@ -102,5 +104,19 @@ describe('Scenario Command Center adapter', () => {
   it('has no timeline for a non-modelled intervention — nothing to scrub', () => {
     const run = runScenarioCommandCenter('TRANSPORT_REDUCTION', params);
     expect(temporalTimelinesFor(run)).toBeNull();
+  });
+
+  it('runs three real branches from one T0 and opens a selected branch in World/3D', () => {
+    clearScenarioTimelineHandoffs();
+    const multiverse = runTemporalMultiverseCommandCenter(['ISOLATION', 'CONTACT_REDUCTION', 'HEALTHCARE_EXPANSION'], params);
+    expect(multiverse.baseline.status).toBe('COMPLETED');
+    expect(multiverse.branches.map((branch) => branch.branchId)).toEqual(['B', 'C', 'D']);
+    expect(multiverse.branches.every((branch) => branch.run.status === 'COMPLETED')).toBe(true);
+    expect(multiverse.branches.every((branch) => branch.timeline !== null)).toBe(true);
+    expect(multiverse.branches.every((branch) => branch.firstDivergentDayFromBaseline === null || Number.isFinite(branch.firstDivergentDayFromBaseline))).toBe(true);
+    const handoffRunId = openTemporalMultiverseBranchInWorld(multiverse, 'C');
+    expect(handoffRunId).toBe(`multiverse:${multiverse.multiverseFingerprint}:C`);
+    expect(peekPendingScenarioTimeline()?.scenarioId).toBe('CONTACT_REDUCTION');
+    clearScenarioTimelineHandoffs();
   });
 });

@@ -11,6 +11,7 @@ import {
 } from './scenarioEngine';
 import { runScenarioCounterfactual, type ScenarioCounterfactual } from './scenarioCounterfactual';
 import { buildTemporalTimeline, type TemporalTimeline } from './temporalState';
+import { runTemporalMultiverse, type TemporalMultiverse } from './temporalMultiverse';
 import { registerScenarioTimeline, setPendingScenarioTimeline } from '../experimentFabric/worldHandoff';
 
 /**
@@ -153,4 +154,50 @@ export function scenarioUiMetrics(baseline: ScenarioRun, intervention: ScenarioR
 /** Replay is a separate existing API call, retained as traceability evidence. */
 export function replayScenarioCommandCenter(run: ScenarioCommandCenterRun): readonly [ScenarioReplay, ScenarioReplay] {
   return [replayScenario(run.baseline), replayScenario(run.intervention)];
+}
+
+
+/** Runs the existing many-worlds core from the live City parameter state. */
+export function runTemporalMultiverseCommandCenter(
+  branchScenarioIds: readonly ScenarioId[],
+  params: SimParams,
+  options: { branchInterventionStartDay?: number } = {},
+): TemporalMultiverse {
+  const interventionStartDay = options.branchInterventionStartDay === undefined
+    ? 0
+    : Math.max(0, Math.floor(options.branchInterventionStartDay));
+  return runTemporalMultiverse({
+    baselineScenarioId: 'BASELINE',
+    days: DEFAULT_SCENARIO_RUN.days,
+    stepsPerDay: DEFAULT_SCENARIO_RUN.stepsPerDay,
+    baseParams: scenarioParamsFromCommandCenter(params),
+    branches: branchScenarioIds.map((scenarioId, index) => ({
+      branchId: String.fromCharCode('B'.charCodeAt(0) + index),
+      scenarioId,
+      interventionStartDay,
+    })),
+  });
+}
+
+/** Hands one verified multiverse branch to the existing single-world renderer. */
+export function openTemporalMultiverseBranchInWorld(multiverse: TemporalMultiverse, branchId: string): string | null {
+  const branch = multiverse.branches.find((candidate) => candidate.branchId === branchId);
+  if (!branch || branch.run.status !== 'COMPLETED' || branch.run.summary === null || branch.run.resultFingerprint === null) return null;
+  const handoffRunId = `multiverse:${multiverse.multiverseFingerprint}:${branchId}`;
+  registerScenarioTimeline({
+    runId: handoffRunId,
+    runFingerprint: branch.run.resultFingerprint,
+    resultOrigin: 'real-engine',
+    modelId: 'scenario-timeline',
+    scenarioId: branch.run.scenarioId,
+    scenarioLabel: branch.run.label,
+    seed: branch.run.params.seed,
+    summary: `Multiverse ${branchId}: ${branch.run.label}; first divergence from baseline: ${branch.firstDivergentDayFromBaseline === null ? 'NOT_AVAILABLE' : `day ${branch.firstDivergentDayFromBaseline}`}.`,
+    series: branch.run.series,
+    scenarioSummary: branch.run.summary,
+    scenarioRun: branch.run,
+    epistemicStatus: 'SIMULATION',
+    origin: 'fabric-run',
+  });
+  return setPendingScenarioTimeline(handoffRunId) ? handoffRunId : null;
 }

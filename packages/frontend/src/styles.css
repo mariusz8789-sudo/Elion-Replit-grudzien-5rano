@@ -2489,3 +2489,23 @@ kbd {
 .scenario-run-time-actions .chip-btn { border-color: rgba(102, 218, 255, .52); color: #dff8ff; }
 .scenario-run-entered { color: #6de0b9; font: 700 .58rem/1 var(--font-mono); letter-spacing: .06em; }
 .temporal-moment-entered { box-shadow: 0 1.1rem 3.6rem rgba(0, 0, 0, .42), 0 0 2.2rem rgba(80, 222, 193, .18); }
+
+
+.temporal-multiverse-panel { border-top: 1px solid rgba(74, 201, 220, .28); }
+.temporal-multiverse-selectors { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.temporal-multiverse-selectors label { min-width: 0; }
+.temporal-multiverse-selectors select { font-size: .58rem; }
+.temporal-multiverse-timeline { border-left-color: #55d5c3; }
+.temporal-multiverse-actions, .temporal-multiverse-footer { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+.temporal-multiverse-actions { justify-content: space-between; }
+.temporal-multiverse-actions span, .temporal-multiverse-footer > span { color: #dff5ff; font: 700 .59rem var(--font-mono); }
+.temporal-multiverse-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .32rem; margin: 0 .68rem .58rem; }
+.temporal-world-card { min-width: 0; padding: .42rem; border: 1px solid rgba(128, 190, 232, .2); border-radius: .38rem; background: rgba(10, 29, 45, .66); color: #a4bfd2; text-align: left; cursor: pointer; }
+.temporal-world-card.selected { border-color: #55d5c3; background: rgba(66, 215, 192, .1); box-shadow: inset 2px 0 #55d5c3; }
+.temporal-world-card strong, .temporal-world-card small, .temporal-world-card em { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.temporal-world-card strong { margin: .2rem 0; color: #70e1a4; font: 700 .61rem var(--font-mono); }
+.temporal-world-card small, .temporal-world-card em { color: #a4bfd2; font: .56rem/1.35 var(--font-mono); font-style: normal; }
+.temporal-world-card em { margin-top: .2rem; color: #f5c57c; }
+.temporal-multiverse-footer { margin: 0 .68rem .5rem; }
+.temporal-multiverse-footer .world-action { margin: 0; font-size: .55rem; }
+.temporal-multiverse-footer .scenario-replay-button:disabled { opacity: .45; cursor: not-allowed; }

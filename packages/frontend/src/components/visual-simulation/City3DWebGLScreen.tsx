@@ -17,6 +17,7 @@ import { EarthquakeScenarioPanel } from './EarthquakeScenarioPanel';
 import { EvidenceReplayPanel } from './EvidenceReplayPanel';
 import { ScenarioCommandCenterPanel } from './ScenarioCommandCenterPanel';
 import { TemporalWorldHud } from './TemporalWorldHud';
+import { TemporalMultiversePanel } from './TemporalMultiversePanel';
 
 /** Command Center reads existing model and World Engine state only; it does not generate epidemic data or agent routes. */
 /** Musi zgadzać się z EpidemicCity3DSim.hospitalStatusCode — indeks, nie liczba wyniku. */
@@ -460,6 +461,7 @@ export function City3DWebGLScreen() {
           </div>
           <EarthquakeScenarioPanel onOverlayChange={setEarthquakeOverlay} />
           <ScenarioCommandCenterPanel params={params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
+          <TemporalMultiversePanel params={params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
           <div className="world-panel event-feed-panel">
             <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>
             {latestTransmission ? (

@@ -4,7 +4,7 @@ import type { EpidemicCityParams } from './epidemicCity';
 import type { HospitalCapacityParams } from './hospitalResource';
 import { compareScenarios, runScenario, SCENARIO_ENGINE_VERSION, type ScenarioComparison, type ScenarioId, type ScenarioRun } from './scenarioEngine';
 import { firstDivergentDay } from './scenarioCounterfactual';
-import { buildTemporalTimeline, type TemporalTimeline } from './temporalState';
+import { buildTemporalTimeline, temporalStateAt, type TemporalStateEnvelope, type TemporalTimeline } from './temporalState';
 import {
   buildSavedScenarioRunContext,
   isSavedScenarioRunContext,
@@ -308,4 +308,54 @@ export function replaySavedTemporalMultiverse(saved: unknown): TemporalMultivers
   };
 
   return { status: 'MATCH', reason: 'Baseline i wszystkie gałęzie policzono od nowa; multiverse odtworzył się co do rozjazdu każdej z nich.', baselineStatus: 'MATCH', branches, multiverse: rebuiltMultiverse };
+}
+
+/**
+ * DECYZYJNE POCHODZENIE GAŁĘZI.
+ *
+ * `TemporalMultiverse` już niesie wszystko potrzebne, żeby odpowiedzieć „z
+ * jakiego stanu i której decyzji powstał ten świat" — `spec.branches[].
+ * interventionStartDay` (dzień DEKLAROWANY) przeżywa nawet odtworzenie
+ * (`replaySavedTemporalMultiverse` odbudowuje go z zapisu). Tej informacji
+ * po prostu nie było czym połączyć z konkretnym `TemporalStateEnvelope` w
+ * jednym miejscu — więc każdy konsument musiałby sam zestawiać `spec` z
+ * `baselineTimeline`. Ta funkcja nie liczy nic nowego i niczego nie zapisuje:
+ * to czysty odczyt istniejącego multiverse, żadna druga struktura pamięci.
+ *
+ * Rozróżnienie jest celowe: `decisionState` to dzień, w którym decyzja
+ * ZOSTAŁA PODJĘTA (deklarowany `interventionStartDay`); `branchState` to
+ * dzień, w którym światy FAKTYCZNIE zaczęły się różnić (zmierzony
+ * `firstDivergentDayFromBaseline`) — a w tym modelu polityka wprowadzona
+ * dzisiaj może nie zmienić stanu świata natychmiast, więc te dwa dni nie
+ * muszą się pokrywać.
+ */
+export interface TemporalDecisionLineage {
+  branchId: string;
+  /** Dzień, w którym ta gałąź DEKLARUJE wejście interwencji — nie zmierzony. */
+  declaredInterventionStartDay: number;
+  /** Stan baseline w dniu decyzji; `null`, gdy dzień leży poza osią baseline. */
+  decisionState: TemporalStateEnvelope | null;
+  /** Dzień MIERZONY, w którym ta gałąź faktycznie rozeszła się z baseline. */
+  firstDivergentDayFromBaseline: number | null;
+  /** Stan tej gałęzi w dniu zmierzonego rozjazdu; `null` bez rozjazdu, bez osi czasu (NOT_MODELED) albo dnia poza zasięgiem. */
+  branchState: TemporalStateEnvelope | null;
+}
+
+/**
+ * Buduje pochodzenie dla każdej gałęzi multiverse. Funkcja jest czystym
+ * odczytem — nie mutuje `multiverse` i nie wymaga ponownego replay-u, bo
+ * `TemporalMultiverse` w tym kształcie istnieje wyłącznie jako wynik
+ * `runTemporalMultiverse()` albo zweryfikowanego MATCH-em `replay.multiverse`
+ * z `replaySavedTemporalMultiverse()` — nieodtworzona/sfałszowana gałąź nigdy
+ * nie ma tu wstępu, bo nigdy nie staje się tym typem.
+ */
+export function temporalDecisionLineage(multiverse: TemporalMultiverse): readonly TemporalDecisionLineage[] {
+  return multiverse.branches.map((branch) => {
+    const declaredInterventionStartDay = multiverse.spec.branches.find((entry) => entry.branchId === branch.branchId)?.interventionStartDay ?? 0;
+    const decisionState = temporalStateAt(multiverse.baselineTimeline, declaredInterventionStartDay);
+    const branchState = branch.timeline && branch.firstDivergentDayFromBaseline !== null
+      ? temporalStateAt(branch.timeline, branch.firstDivergentDayFromBaseline)
+      : null;
+    return { branchId: branch.branchId, declaredInterventionStartDay, decisionState, firstDivergentDayFromBaseline: branch.firstDivergentDayFromBaseline, branchState };
+  });
 }

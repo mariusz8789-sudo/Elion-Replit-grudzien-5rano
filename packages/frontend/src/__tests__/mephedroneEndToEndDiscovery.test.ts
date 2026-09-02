@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createNodeAdmetTransport } from '../core/discovery/molecular/admetTransport.node';
 import { createNodeRdkitTransport } from '../core/discovery/molecular/rdkitTransport.node';
@@ -139,8 +140,15 @@ function printDossier(r: EndToEndDiscoveryResult): void {
   push('============================================================');
   push('');
 
+  const text = lines.join('\n');
   // eslint-disable-next-line no-console
-  console.log(lines.join('\n'));
+  console.log(text);
+  // Vitest hides stdout for passing tests, so the dossier is also written to
+  // a file. GENESIS_DOSSIER_OUT lets a caller choose where.
+  const target = process.env.GENESIS_DOSSIER_OUT;
+  if (target !== undefined && target.length > 0) {
+    writeFileSync(target, text, 'utf8');
+  }
 }
 
 describe('4-MMC end-to-end discovery: REAL execution', () => {

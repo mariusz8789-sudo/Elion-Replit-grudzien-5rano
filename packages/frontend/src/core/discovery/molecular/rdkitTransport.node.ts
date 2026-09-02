@@ -192,7 +192,7 @@ export function createNodeRdkitTransport(options: NodeRdkitTransportOptions = {}
     similarity(smiles: string, reference: string): RdkitSimilarity {
       const detected = detect();
       if (!detected.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: detected.reason };
-      const key = `${smiles} ${reference}`;
+      const key = `${smiles}\u0000${reference}`;
       const cached = similarityCache.get(key);
       if (cached !== undefined) return cached;
       const computed = runSimilarity(smiles, reference);

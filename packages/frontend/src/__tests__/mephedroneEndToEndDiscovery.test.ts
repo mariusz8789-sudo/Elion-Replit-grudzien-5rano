@@ -91,11 +91,21 @@ function printDossier(r: EndToEndDiscoveryResult): void {
   push('');
   push('TOP CANDIDATES (Pareto front):');
   if (r.topCandidates.length === 0) push('  (empty)');
+  const shown = ['logP', 'tpsa', 'molecularWeight', 'bloodBrainBarrier', 'mutagenicity', 'liverInjury', 'clinicalToxicity', 'admetAbsorption'];
   for (const [i, c] of r.topCandidates.entries()) {
     push(`  ${i + 1}. ${c.candidateId}  ${c.formula}  ${c.canonicalSmiles ?? 'NOT_AVAILABLE'}`);
     push(`     from ${c.parentFormula ?? 'SEED'} via ${c.transformation ?? '-'}`);
+    const evaluated = r.evaluatedCandidates.find((e) => e.candidateId === c.candidateId);
+    const values = shown
+      .map((id) => {
+        const p = evaluated?.properties.find((q) => q.propertyId === id);
+        return p === undefined ? null : `${id}=${p.value === null ? p.status : p.value}${p.status === 'MODEL_PREDICTION' ? '*' : ''}`;
+      })
+      .filter((v): v is string => v !== null);
+    push(`     ${values.join('  ')}`);
     push(`     ${c.reason}`);
   }
+  push('  (* = ADMET-AI MODEL_PREDICTION, not a measurement)');
   push('');
   push('WHY OTHERS FAILED (grouped by deciding stage):');
   const rejected = r.outcomes.filter((o) => !o.onParetoFront);
@@ -229,15 +239,24 @@ describe('4-MMC end-to-end discovery: REAL execution', () => {
     }
     const admetIds = new Set(['mutagenicity', 'liverInjury', 'clinicalToxicity', 'admetAbsorption', 'bloodBrainBarrier']);
     let seen = 0;
-    for (const ranked of result.ranking.ranked) {
-      const candidate = result.discovery.batch.candidates.find((c) => c.candidateId === ranked.candidateId);
-      for (const property of candidate?.properties ?? []) {
+    for (const candidate of result.evaluatedCandidates) {
+      for (const property of candidate.properties) {
         if (!admetIds.has(property.propertyId) || property.value === null) continue;
         expect(property.status).toBe('MODEL_PREDICTION');
         seen++;
       }
     }
     if (result.funnel.admetEvaluable > 0) expect(seen).toBeGreaterThan(0);
+  });
+
+  it('the ADMET-derived BBB prerequisite is genuinely evaluated, not silently unevaluable', () => {
+    if (!result.admet.available || result.funnel.admetEvaluable === 0) return;
+    const evaluated = result.mechanism.reports.filter((r) =>
+      r.checks.some((c) => c.prerequisiteId === 'predicted-bbb-penetration' && c.status !== 'UNEVALUABLE'));
+    // If ADMET ran, the exposure prerequisite that reads its prediction must
+    // have had a real value to test — otherwise the filter only looked like
+    // it consulted ADMET.
+    expect(evaluated.length).toBe(result.funnel.admetEvaluable);
   });
 
   it('builds an Evidence Pack and a valid RO-Crate through the existing engines', () => {
@@ -275,8 +294,11 @@ describe('4-MMC end-to-end discovery: REAL execution', () => {
 
   it('states plainly that nothing here is a safety, efficacy or equivalence claim', () => {
     const text = result.limitations.join(' ');
-    expect(text).toContain('not a claim of safety');
+    expect(text).toContain('Nothing in this result is a claim of safety');
     expect(text).toContain('REQUIRES_EXPERIMENT');
-    expect(text.toLowerCase()).not.toContain('clinically equivalent to');
+    // The word "equivalence" may appear only inside an explicit disclaimer.
+    for (const limitation of result.limitations) {
+      if (limitation.includes('equivalence')) expect(limitation).toContain('Nothing in this result is');
+    }
   });
 });

@@ -144,11 +144,19 @@ function functionalComparability(
     };
   }
 
-  if (subject.measurements.length === 0) {
+  // "No data on one side" and "data on both sides that will not pair up" are
+  // different facts and get different verdicts. NOT_ESTABLISHED means the
+  // comparison was never possible; NOT_COMPARABLE means it was attempted
+  // against real measurements and they answer different questions.
+  const emptySide = subject.measurements.length === 0
+    ? subject.compound
+    : reference.measurements.length === 0 ? reference.compound : null;
+
+  if (emptySide !== null) {
     return {
       verdict: 'NOT_ESTABLISHED',
       pairs,
-      statement: `No functional comparison is possible: the ingested evidence contains no measurement for ${subject.compound} at all.`,
+      statement: `No functional comparison is possible: the ingested evidence contains no measurement for ${emptySide} at all.`,
     };
   }
 

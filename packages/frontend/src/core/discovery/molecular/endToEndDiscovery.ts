@@ -163,6 +163,13 @@ export interface EndToEndDiscoveryResult {
   referenceComparisons: ReferenceComparisonSet;
   discovery: ProviderDiscoveryResult;
   admet: AdmetBatchResult;
+  /**
+   * The candidates as they existed when they were filtered and ranked — i.e.
+   * WITH their real ADMET predictions attached. `discovery.batch.candidates`
+   * holds the pre-ADMET originals, so without this a reader could not inspect
+   * the values that actually drove the mechanism filter and the Pareto front.
+   */
+  evaluatedCandidates: readonly MoleculeCandidate[];
   mechanism: MechanismPrerequisiteBatch;
   falsification: BatchFalsification;
   ranking: MultiObjectiveResult;
@@ -261,6 +268,7 @@ export function runEndToEndDiscovery(
     referenceComparisons,
     discovery,
     admet,
+    evaluatedCandidates: enriched,
     mechanism,
     falsification,
     ranking,

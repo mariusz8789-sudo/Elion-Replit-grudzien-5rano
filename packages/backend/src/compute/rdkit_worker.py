@@ -196,6 +196,16 @@ def main():
             "lipinskiViolations": violations,
             "lipinskiPass": violations <= 1,
         }
+        # InChI/InChIKey: real RDKit computation, degrades to null rather than
+        # failing the whole descriptors call — some structures (e.g. undefined
+        # stereo, exotic valence) can't be normalised into InChI.
+        try:
+            from rdkit.Chem import inchi as rdkit_inchi
+            data["inchi"] = rdkit_inchi.MolToInchi(mol) or None
+            data["inchiKey"] = rdkit_inchi.MolToInchiKey(mol) or None
+        except Exception:  # noqa: BLE001
+            data["inchi"] = None
+            data["inchiKey"] = None
         print(json.dumps({"ok": True, "data": data, "engine": "RDKit " + rdkit.__version__}))
         return
 

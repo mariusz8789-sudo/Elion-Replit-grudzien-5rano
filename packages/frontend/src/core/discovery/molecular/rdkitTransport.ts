@@ -32,6 +32,9 @@ export interface RdkitDescriptorData {
   molecularFormula: string;
   /** Numeric descriptors actually returned by the worker for this molecule. */
   values: Readonly<Partial<Record<RdkitDescriptorKey, number>>>;
+  /** Real RDKit InChI/InChIKey, when the structure normalises into one — null otherwise, never omitted. */
+  inchi: string | null;
+  inchiKey: string | null;
 }
 
 export type RdkitDetect =
@@ -103,7 +106,9 @@ export function readDescriptorPayload(payload: unknown): RdkitDescriptorData | n
     const value = record[key];
     if (typeof value === 'number' && Number.isFinite(value)) values[key] = value;
   }
-  return { canonicalSmiles, molecularFormula, values };
+  const inchi = typeof record.inchi === 'string' && record.inchi.length > 0 ? record.inchi : null;
+  const inchiKey = typeof record.inchiKey === 'string' && record.inchiKey.length > 0 ? record.inchiKey : null;
+  return { canonicalSmiles, molecularFormula, values, inchi, inchiKey };
 }
 
 /**

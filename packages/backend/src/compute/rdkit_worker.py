@@ -9,6 +9,7 @@ Commands:
   detect                 -> { ok, version }
   descriptors {smiles}   -> { ok, data: {...real descriptors...} }
   validate {smiles}      -> { ok, valid, canonicalSmiles? }
+  similarity {smiles, reference} -> { ok, tanimoto, sameScaffold, ... } (structural ONLY, never affinity)
 """
 import sys
 import json
@@ -77,6 +78,45 @@ def main():
 
     if cmd == "validate":
         print(json.dumps({"ok": True, "valid": True, "canonicalSmiles": Chem.MolToSmiles(mol)}))
+        return
+
+    if cmd == "similarity":
+        # REAL Tanimoto similarity on Morgan fingerprints (radius 2, 2048 bits),
+        # plus a real Bemis-Murcko scaffold comparison. Both are structural
+        # measures ONLY: a high value says two molecules share substructure,
+        # never that they share biological activity. Callers must not use this
+        # as a proxy for affinity — see structuralSimilarity.ts.
+        from rdkit.Chem.Scaffolds import MurckoScaffold
+
+        reference_smiles = req.get("reference", "")
+        ref_mol = Chem.MolFromSmiles(reference_smiles) if isinstance(reference_smiles, str) else None
+        if ref_mol is None:
+            print(json.dumps({"ok": False, "error": "invalid_reference_smiles"}))
+            return
+
+        fp_a = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048)
+        fp_b = AllChem.GetMorganFingerprintAsBitVect(ref_mol, 2, nBits=2048)
+        tanimoto = DataStructs.TanimotoSimilarity(fp_a, fp_b)
+
+        def scaffold_of(m):
+            try:
+                scaffold = MurckoScaffold.GetScaffoldForMol(m)
+                return Chem.MolToSmiles(scaffold) if scaffold is not None else ""
+            except Exception:  # noqa: BLE001
+                return ""
+
+        scaffold_candidate = scaffold_of(mol)
+        scaffold_reference = scaffold_of(ref_mol)
+        print(json.dumps({
+            "ok": True,
+            "tanimoto": round(tanimoto, 5),
+            "fingerprint": "morgan_r2_2048",
+            "candidateCanonical": Chem.MolToSmiles(mol),
+            "referenceCanonical": Chem.MolToSmiles(ref_mol),
+            "scaffoldCandidate": scaffold_candidate,
+            "scaffoldReference": scaffold_reference,
+            "sameScaffold": scaffold_candidate != "" and scaffold_candidate == scaffold_reference,
+        }))
         return
 
     if cmd == "transform":

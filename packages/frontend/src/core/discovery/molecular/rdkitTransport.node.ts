@@ -4,6 +4,7 @@ import {
   readDescriptorPayload,
   type RdkitDescribe,
   type RdkitDetect,
+  type RdkitSimilarity,
   type RdkitTransform,
   type RdkitTransformations,
   type RdkitTransport,
@@ -63,6 +64,7 @@ export function createNodeRdkitTransport(options: NodeRdkitTransportOptions = {}
    */
   const describeCache = new Map<string, RdkitDescribe>();
   const transformCache = new Map<string, RdkitTransform>();
+  const similarityCache = new Map<string, RdkitSimilarity>();
 
   function detect(): RdkitDetect {
     if (detectCache !== null) return detectCache;
@@ -109,6 +111,43 @@ export function createNodeRdkitTransport(options: NodeRdkitTransportOptions = {}
     }
   }
 
+  function runSimilarity(smiles: string, reference: string): RdkitSimilarity {
+    try {
+      const reply = invoke({ cmd: 'similarity', smiles: String(smiles ?? ''), reference: String(reference ?? '') }, timeoutMs) as {
+        ok?: boolean;
+        tanimoto?: number;
+        fingerprint?: string;
+        candidateCanonical?: string;
+        referenceCanonical?: string;
+        scaffoldCandidate?: string;
+        scaffoldReference?: string;
+        sameScaffold?: boolean;
+        error?: string;
+      };
+      if (
+        reply?.ok !== true
+        || typeof reply.tanimoto !== 'number'
+        || typeof reply.candidateCanonical !== 'string'
+        || typeof reply.referenceCanonical !== 'string'
+      ) {
+        return { ok: false, error: 'INVALID_SMILES', reason: reply?.error ?? 'rdkit_rejected_similarity_input' };
+      }
+      return {
+        ok: true,
+        tanimoto: reply.tanimoto,
+        fingerprint: reply.fingerprint ?? 'morgan_r2_2048',
+        candidateCanonical: reply.candidateCanonical,
+        referenceCanonical: reply.referenceCanonical,
+        scaffoldCandidate: reply.scaffoldCandidate ?? '',
+        scaffoldReference: reply.scaffoldReference ?? '',
+        sameScaffold: reply.sameScaffold === true,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message.split('\n')[0] : String(error);
+      return { ok: false, error: 'EXECUTION_FAILED', reason: message.slice(0, 160) };
+    }
+  }
+
   return {
     transportId: 'node-child-process',
 
@@ -148,6 +187,17 @@ export function createNodeRdkitTransport(options: NodeRdkitTransportOptions = {}
         const message = error instanceof Error ? error.message.split('\n')[0] : String(error);
         return { ok: false, error: 'EXECUTION_FAILED', reason: message.slice(0, 160) };
       }
+    },
+
+    similarity(smiles: string, reference: string): RdkitSimilarity {
+      const detected = detect();
+      if (!detected.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: detected.reason };
+      const key = `${smiles} ${reference}`;
+      const cached = similarityCache.get(key);
+      if (cached !== undefined) return cached;
+      const computed = runSimilarity(smiles, reference);
+      similarityCache.set(key, computed);
+      return computed;
     },
   };
 }

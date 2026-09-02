@@ -50,6 +50,25 @@ export type RdkitTransformations =
   | { ok: true; transformations: readonly string[] }
   | { ok: false; error: 'BLOCKED_BY_RUNTIME' | 'EXECUTION_FAILED'; reason: string };
 
+/**
+ * Real Tanimoto similarity (Morgan fingerprints) plus a real Bemis-Murcko
+ * scaffold comparison between two structures. STRUCTURAL ONLY — see
+ * `structuralSimilarity.ts` for the guard that stops this being read as
+ * biological similarity.
+ */
+export type RdkitSimilarity =
+  | {
+    ok: true;
+    tanimoto: number;
+    fingerprint: string;
+    candidateCanonical: string;
+    referenceCanonical: string;
+    scaffoldCandidate: string;
+    scaffoldReference: string;
+    sameScaffold: boolean;
+  }
+  | { ok: false; error: 'BLOCKED_BY_RUNTIME' | 'INVALID_SMILES' | 'EXECUTION_FAILED'; reason: string };
+
 export interface RdkitTransport {
   transportId: string;
   detect(): RdkitDetect;
@@ -61,6 +80,8 @@ export interface RdkitTransport {
   transform(smiles: string, transformation: string): RdkitTransform;
   /** Transformation ids the engine really implements. */
   transformations(): RdkitTransformations;
+  /** Real structural similarity between `smiles` and `reference`. */
+  similarity(smiles: string, reference: string): RdkitSimilarity;
 }
 
 /**
@@ -97,4 +118,5 @@ export const unavailableRdkitTransport: RdkitTransport = {
   describe: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
   transform: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
   transformations: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
+  similarity: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
 };

@@ -52,6 +52,7 @@ describe('transport bez silnika nigdy nie udaje wyniku', () => {
       describe: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transform: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transformations: () => ({ ok: true, transformations: [] }),
+      similarity: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
     };
     const batch = describeSmilesBatch(fake, ['a', 'b', 'c', 'd'], { maxCalls: 2 });
 

@@ -7,7 +7,7 @@ import {
   rdkitStructuralProperties,
   rdkitStructure,
 } from '../core/discovery/molecular/rdkitStructuralProvider';
-import { unavailableRdkitTransport } from '../core/discovery/molecular/rdkitTransport';
+import { unavailableRdkitTransport, type RdkitTransport } from '../core/discovery/molecular/rdkitTransport';
 
 /**
  * ETAP 1 — REAL RDKit BRIDGE.
@@ -46,10 +46,12 @@ describe('transport bez silnika nigdy nie udaje wyniku', () => {
   });
 
   it('budżet wywołań jest twardy, a pominięte wejścia są raportowane', () => {
-    const fake = {
+    const fake: RdkitTransport = {
       transportId: 'test-fixture',
-      detect: () => ({ available: true as const, engine: 'TEST_FIXTURE', version: '0' }),
-      describe: () => ({ ok: false as const, error: 'INVALID_SMILES' as const, reason: 'fixture' }),
+      detect: () => ({ available: true, engine: 'TEST_FIXTURE', version: '0' }),
+      describe: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
+      transform: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
+      transformations: () => ({ ok: true, transformations: [] }),
     };
     const batch = describeSmilesBatch(fake, ['a', 'b', 'c', 'd'], { maxCalls: 2 });
 

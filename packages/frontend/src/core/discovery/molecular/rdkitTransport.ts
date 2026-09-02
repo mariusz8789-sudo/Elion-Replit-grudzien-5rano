@@ -42,10 +42,25 @@ export type RdkitDescribe =
   | { ok: true; data: RdkitDescriptorData; engine: string }
   | { ok: false; error: 'BLOCKED_BY_RUNTIME' | 'INVALID_SMILES' | 'EXECUTION_FAILED'; reason: string };
 
+export type RdkitTransform =
+  | { ok: true; parentCanonical: string; products: readonly string[]; transformation: string }
+  | { ok: false; error: 'BLOCKED_BY_RUNTIME' | 'INVALID_SMILES' | 'EXECUTION_FAILED'; reason: string };
+
+export type RdkitTransformations =
+  | { ok: true; transformations: readonly string[] }
+  | { ok: false; error: 'BLOCKED_BY_RUNTIME' | 'EXECUTION_FAILED'; reason: string };
+
 export interface RdkitTransport {
   transportId: string;
   detect(): RdkitDetect;
   describe(smiles: string): RdkitDescribe;
+  /**
+   * Applies a declared SMARTS reaction. This is a real structural
+   * transformation performed by RDKit, not string surgery on SMILES text.
+   */
+  transform(smiles: string, transformation: string): RdkitTransform;
+  /** Transformation ids the engine really implements. */
+  transformations(): RdkitTransformations;
 }
 
 /**
@@ -74,8 +89,12 @@ export function readDescriptorPayload(payload: unknown): RdkitDescriptorData | n
  * A transport with no engine behind it. Used as the default so that forgetting
  * to wire one up produces an explicit BLOCKED, not a silent absence of data.
  */
+const NO_TRANSPORT = 'no RDKit transport configured for this runtime';
+
 export const unavailableRdkitTransport: RdkitTransport = {
   transportId: 'none',
-  detect: () => ({ available: false, reason: 'no RDKit transport configured for this runtime' }),
-  describe: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: 'no RDKit transport configured for this runtime' }),
+  detect: () => ({ available: false, reason: NO_TRANSPORT }),
+  describe: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
+  transform: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
+  transformations: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
 };

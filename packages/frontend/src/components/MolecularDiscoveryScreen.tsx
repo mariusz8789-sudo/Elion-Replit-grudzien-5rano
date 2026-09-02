@@ -132,7 +132,7 @@ export function MolecularDiscoveryScreen() {
             <div style={rowStyle}><span>Seeds</span><span style={monoStyle}>{result.request.seeds.join(', ')}</span></div>
             <div style={rowStyle}><span>Transformations</span><span style={monoStyle}>{result.request.transformations.join(', ')}</span></div>
             <div style={rowStyle}><span>Enumerated</span><span style={monoStyle}>{result.candidates.length}</span></div>
-            
+
             <div style={rowStyle}><span>Batch fingerprint</span><span style={monoStyle}>{result.runFingerprint}</span></div>
           </div>
 

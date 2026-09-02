@@ -151,16 +151,43 @@ export interface StructuralCrossValidation {
   reason: string;
 }
 
+export interface SmilesFormulaCrossValidation {
+  status: 'CONFIRMED' | 'MISMATCH' | 'ENGINE_UNAVAILABLE';
+  observedFormula: string | null;
+  reason: string;
+}
+
 /**
- * Re-derives each SMILES-bearing candidate's molecular formula with the REAL
- * RDKit worker and compares it against the formula this file claims. A
- * mismatch means this file's SMILES does not encode the compound its
- * citations describe — that candidate must not proceed as if it did.
+ * Re-derives a molecular formula with the REAL RDKit worker and compares it
+ * against a claimed formula. A mismatch means the stored SMILES does not
+ * encode the compound its citation describes and must not proceed as if it
+ * did — this is deliberately NOT "trust the SMILES because a human wrote it".
  *
- * This is deliberately NOT "trust the SMILES because a human wrote it": it is
- * the same discipline as the campaign's confidence ladder — a claim is only
- * as good as the check that was actually run against it.
+ * Standalone so the SAME check applies to the reference compound's fallback
+ * SMILES (see naturalAnalogueCampaign.ts) — a hardcoded structure gets no
+ * less scrutiny for being the reference than for being a candidate.
  */
+export function crossValidateSmilesFormula(transport: RdkitTransport, smiles: string, expectedFormula: string): SmilesFormulaCrossValidation {
+  const detected = transport.detect();
+  if (!detected.available) {
+    return { status: 'ENGINE_UNAVAILABLE', observedFormula: null, reason: `RDKit is not available to cross-validate this structure: ${detected.reason}` };
+  }
+  const result = transport.describe(smiles);
+  if (!result.ok) {
+    return { status: 'MISMATCH', observedFormula: null, reason: `RDKit rejected the stored SMILES as invalid: ${result.reason}` };
+  }
+  const observedFormula = result.data.molecularFormula;
+  const confirmed = observedFormula === expectedFormula;
+  return {
+    status: confirmed ? 'CONFIRMED' : 'MISMATCH',
+    observedFormula,
+    reason: confirmed
+      ? `RDKit-derived formula ${observedFormula} matches the expected formula.`
+      : `RDKit-derived formula ${observedFormula} does NOT match the expected formula ${expectedFormula}. This structure is not trustworthy and must not proceed.`,
+  };
+}
+
+/** Same check, applied to one candidate from the pool. */
 export function crossValidateCandidate(transport: RdkitTransport, candidate: CuratedNaturalCandidate): StructuralCrossValidation {
   if (candidate.structure.kind === 'STRUCTURE_DECLINED') {
     return {
@@ -169,34 +196,13 @@ export function crossValidateCandidate(transport: RdkitTransport, candidate: Cur
     };
   }
 
-  const detected = transport.detect();
-  if (!detected.available) {
-    return {
-      candidateKey: candidate.candidateKey, status: 'ENGINE_UNAVAILABLE', smiles: candidate.structure.smiles,
-      expectedFormula: candidate.structure.expectedFormula, observedFormula: null,
-      reason: `RDKit is not available to cross-validate this structure: ${detected.reason}`,
-    };
-  }
-
-  const result = transport.describe(candidate.structure.smiles);
-  if (!result.ok) {
-    return {
-      candidateKey: candidate.candidateKey, status: 'MISMATCH', smiles: candidate.structure.smiles,
-      expectedFormula: candidate.structure.expectedFormula, observedFormula: null,
-      reason: `RDKit rejected the stored SMILES: ${result.reason}`,
-    };
-  }
-
-  const observedFormula = result.data.molecularFormula;
-  const confirmed = observedFormula === candidate.structure.expectedFormula;
+  const result = crossValidateSmilesFormula(transport, candidate.structure.smiles, candidate.structure.expectedFormula);
   return {
     candidateKey: candidate.candidateKey,
-    status: confirmed ? 'CONFIRMED' : 'MISMATCH',
+    status: result.status,
     smiles: candidate.structure.smiles,
     expectedFormula: candidate.structure.expectedFormula,
-    observedFormula,
-    reason: confirmed
-      ? `RDKit-derived formula ${observedFormula} matches the expected formula from this candidate's own literature.`
-      : `RDKit-derived formula ${observedFormula} does NOT match the expected formula ${candidate.structure.expectedFormula}. This candidate's stored SMILES is not trustworthy and must not proceed.`,
+    observedFormula: result.observedFormula,
+    reason: result.reason,
   };
 }

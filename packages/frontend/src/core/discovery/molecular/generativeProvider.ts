@@ -17,8 +17,11 @@ import type { MoleculeCandidate } from './types';
  *
  * What was actually checked in this repository and runtime:
  *  - no model weights of any kind (no .onnx/.safetensors/.ckpt/.pt/.pth/.h5);
- *  - no inference runtime installed (torch, tensorflow, onnxruntime,
- *    transformers, jax, deepchem, selfies all absent);
+ *  - an inference runtime IS present (PyTorch, pulled in with ADMET-AI), so
+ *    the runtime is no longer the blocker — the weights are;
+ *  - the model hub is unreachable: huggingface.co is refused at the egress
+ *    proxy (403) while pypi.org resolves, so no pretrained molecular
+ *    generator can be fetched;
  *  - `packages/backend/src/compute/capabilities.mjs` already declares
  *    `generative-de-novo` as NOT_IMPLEMENTED, with the intended adapter shape
  *    `GenerativeAdapter.propose(target, constraints) -> { candidates[], method }`.
@@ -32,6 +35,13 @@ import type { MoleculeCandidate } from './types';
  * wired in here, and that is a correctness decision, not a missing feature.
  */
 export const GENERATIVE_PROBE_VERSION = '1.0.0';
+
+/**
+ * Whether a torch-class inference runtime exists here. This is recorded
+ * separately from "a model exists" because they fail for different reasons and
+ * are fixed differently: a runtime is installable, weights must be obtainable.
+ */
+export const RUNTIME_PRESENT = true;
 
 export const GENERATIVE_ADAPTER_CONTRACT =
   'GenerativeAdapter.propose(target, constraints) -> { candidates[], method, applicabilityDomain, engine }';
@@ -69,8 +79,15 @@ export function probeGenerativeChemistry(injected?: GenerativeAdapter | null): G
     },
     {
       what: 'inference runtime',
+      found: RUNTIME_PRESENT,
+      detail: RUNTIME_PRESENT
+        ? 'PyTorch is present in this runtime (installed as an ADMET-AI dependency), so the blocker is not the runtime.'
+        : 'No inference runtime (torch, tensorflow, onnxruntime, transformers, jax) is present.',
+    },
+    {
+      what: 'reachable model weights',
       found: false,
-      detail: 'torch, tensorflow, onnxruntime, transformers, jax, deepchem and selfies are all absent from the Python runtime',
+      detail: 'The model hub is unreachable from this environment: huggingface.co returns 403 at the egress proxy, while pypi.org resolves. A pretrained molecular generator cannot be fetched, so no weights can be loaded even though a runtime exists.',
     },
     {
       what: 'backend capability declaration',
@@ -93,7 +110,7 @@ export function probeGenerativeChemistry(injected?: GenerativeAdapter | null): G
     available: false,
     checked,
     reason:
-      'No generative chemistry model exists in this repository or runtime: no weights, no inference runtime, and the backend capability manifest declares generative-de-novo NOT_IMPLEMENTED.',
+      'No generative chemistry model is loadable here. An inference runtime (PyTorch) IS present, but no model weights exist in the repository and the model hub is unreachable from this environment (huggingface.co is refused at the egress proxy). The backend capability manifest declares generative-de-novo NOT_IMPLEMENTED.',
     requires: `A validated generative model plus a real inference path, exposed as ${GENERATIVE_ADAPTER_CONTRACT}. An LLM is not a substitute: it has no applicability domain and no measured-property training set.`,
   };
 }

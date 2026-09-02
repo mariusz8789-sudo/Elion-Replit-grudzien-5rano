@@ -32,8 +32,10 @@ describe('sonda zdolności generatywnej', () => {
     expect(probe.available).toBe(false);
     expect(probe.reason.length).toBeGreaterThan(0);
     // Werdykt jest sprawdzalny: sonda wylicza, co obejrzała.
-    expect(probe.checked.length).toBeGreaterThanOrEqual(4);
-    expect(probe.checked.every((c) => c.found === false)).toBe(true);
+    expect(probe.checked.length).toBeGreaterThanOrEqual(5);
+    expect(probe.checked.filter((c) => c.what !== 'inference runtime').every((c) => c.found === false)).toBe(true);
+    // Runtime jest obecny — blokadą są WAGI, nie środowisko uruchomieniowe.
+    expect(probe.checked.map((c) => c.what)).toContain('reachable model weights');
     expect(probe.checked.map((c) => c.what)).toContain('model weights in repository');
     expect(probe.checked.map((c) => c.what)).toContain('inference runtime');
     expect(probe.requires).toContain('GenerativeAdapter.propose');

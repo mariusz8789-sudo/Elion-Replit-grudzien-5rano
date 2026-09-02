@@ -7,11 +7,13 @@ import {
 } from '../core/discovery/molecular/knowledgePack3';
 
 describe('Knowledge Pack #3 ingestion', () => {
-  it('keeps the supplied records source-attributed and not silently verified', () => {
+  it('keeps source attribution and makes validation status explicit', () => {
     expect(KNOWLEDGE_PACK_3_VERSION).toBe('3.0.0-excerpt');
     expect(KNOWLEDGE_PACK_3_RECORDS.length).toBe(9);
     expect(KNOWLEDGE_PACK_3_RECORDS.every((record) => record.sourceType === 'Primary')).toBe(true);
-    expect(KNOWLEDGE_PACK_3_RECORDS.every((record) => record.validationStatus === 'NOT_YET_VERIFIED')).toBe(true);
+    expect(KNOWLEDGE_PACK_3_RECORDS.filter((record) => record.validationStatus === 'VERIFIED')).toHaveLength(3);
+    expect(KNOWLEDGE_PACK_3_RECORDS.filter((record) => record.validationStatus === 'NOT_AVAILABLE')).toHaveLength(2);
+    expect(KNOWLEDGE_PACK_3_RECORDS.filter((record) => record.validationStatus === 'NOT_EXTRACTED')).toHaveLength(4);
   });
 
   it('preserves negative and mechanistic distinction records without changing parameters', () => {
@@ -21,6 +23,8 @@ describe('Knowledge Pack #3 ingestion', () => {
     expect(butylone.parameter).toBe('Release');
     expect(ketamine.value).toBe('ACCELERATES');
     expect(ketamine.parameter).toBe('Desensitization effect');
+    expect(KNOWLEDGE_PACK_3_RECORDS.filter((record) => record.comparability === 'SAME_ASSAY_COMPARABLE')).toHaveLength(2);
+    expect(KNOWLEDGE_PACK_3_RECORDS.filter((record) => record.comparability === 'STANDALONE')).toHaveLength(7);
   });
 
   it('filters by compound and emits only real DOI/PMID references', () => {

@@ -25,7 +25,7 @@ export function TemporalWorldHud({ timeline, day, enteredDay = null }: TemporalW
   const variant = timeline.counterfactual?.variant.series[selectedIndex] ?? null;
   const baseline = timeline.counterfactual?.baseline.series[selectedIndex] ?? null;
   const divergence = timeline.counterfactual?.firstDivergentDay;
-  const phase = selectedIndex === 0 ? 'PAST · T0' : selectedIndex >= maximumIndex ? 'FUTURE · HORIZON' : 'NOW · SELECTED';
+  const phase = selectedDay <= 0 ? 'PAST · T0' : selectedIndex >= maximumIndex ? 'FUTURE · HORIZON' : 'NOW · SELECTED';
 
   return (
     <div className="temporal-world-hud" aria-label="Temporal World status">

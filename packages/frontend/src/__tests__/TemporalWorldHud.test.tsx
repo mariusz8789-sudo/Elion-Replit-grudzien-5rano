@@ -10,6 +10,20 @@ describe('Temporal World HUD honesty boundary', () => {
     expect(markup).not.toContain('TIMELINE A');
   });
 
+  it('does not label a day-one handoff as T0', () => {
+    const timeline = {
+      epistemicStatus: 'SIMULATION',
+      scenarioLabel: 'Izolacja',
+      origin: 'fabric-run',
+      runFingerprint: 'abcdef1234567890',
+      series: [{ day: 1 }, { day: 2 }],
+    } as never;
+    const markup = renderToStaticMarkup(<TemporalWorldHud timeline={timeline} day={0} />);
+    expect(markup).toContain('DAY 1');
+    expect(markup).toContain('NOW · SELECTED');
+    expect(markup).not.toContain('PAST · T0');
+  });
+
   it('renders measured counterfactual branch data from the existing handoff', () => {
     const timeline = {
       epistemicStatus: 'SIMULATION',

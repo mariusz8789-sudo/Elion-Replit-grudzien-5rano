@@ -12,6 +12,7 @@ import {
   type TransporterEvidenceRecord,
   type TransporterId,
 } from './transporterEvidence';
+import { knowledgePack3RecordsFor, type KnowledgePack3Record } from './knowledgePack3';
 
 /**
  * PRECISION REFERENCE ANALYSIS — 3-MMC vs 4-CMC.
@@ -164,6 +165,8 @@ export interface PrecisionReferenceAnalysisResult {
   similarity: StructuralSimilarityResult;
   transporterEvidenceA: readonly TransporterEvidenceRecord[];
   transporterEvidenceB: readonly TransporterEvidenceRecord[];
+  /** Supplied Pack #3 records relevant to either named compound; not silently VERIFIED. */
+  knowledgePack3Evidence: readonly KnowledgePack3Record[];
   comparisonTable: readonly ComparisonRow[];
   claims: readonly EvidenceLinkedClaim[];
   falsification: PrecisionFalsificationReport;
@@ -220,6 +223,7 @@ export function runPrecisionReferenceAnalysis(
 
   const transporterEvidenceA = buildTransporterEvidenceForCathinone(identityA.name);
   const transporterEvidenceB = buildTransporterEvidenceForCathinone(identityB.name);
+  const knowledgePack3Evidence = knowledgePack3RecordsFor([identityA.name, identityB.name]);
 
   const falsification = runPrecisionFalsification({
     compoundAName: identityA.name,
@@ -286,6 +290,7 @@ export function runPrecisionReferenceAnalysis(
     a: { name: identityA.name, smiles: identityA.canonicalSmiles, source: identityA.identitySource },
     b: { name: identityB.name, smiles: identityB.canonicalSmiles, source: identityB.identitySource },
     similarity: similarity.available ? similarity.tanimoto : null,
+    knowledgePack3Evidence: knowledgePack3Evidence.map((record) => [record.compound, record.target, record.parameter, record.value, record.validationStatus]),
     falsificationConcernCount: falsification.concernCount,
   }));
 
@@ -297,6 +302,7 @@ export function runPrecisionReferenceAnalysis(
     similarity,
     transporterEvidenceA,
     transporterEvidenceB,
+    knowledgePack3Evidence,
     comparisonTable,
     claims,
     falsification,

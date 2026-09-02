@@ -7,6 +7,7 @@ import {
   type PrecisionReferenceAnalysisResult,
 } from './precisionReferenceAnalysis';
 import type { TargetEvidenceRef } from './targetHypothesis';
+import type { KnowledgePack3Record } from './knowledgePack3';
 
 /**
  * 3MMC_4CMC_PRECISION_EVIDENCE_PACK — assembly, replay, Scientific Memory.
@@ -29,6 +30,7 @@ export interface PrecisionEvidencePack {
   structures: { compoundA: PrecisionReferenceAnalysisResult['compoundAStructure']; compoundB: PrecisionReferenceAnalysisResult['compoundBStructure'] };
   computedDescriptors: { similarity: PrecisionReferenceAnalysisResult['similarity'] };
   mechanismEvidence: { compoundA: PrecisionReferenceAnalysisResult['transporterEvidenceA']; compoundB: PrecisionReferenceAnalysisResult['transporterEvidenceB'] };
+  knowledgePack3Evidence: readonly KnowledgePack3Record[];
   literatureEvidence: readonly TargetEvidenceRef[];
   comparison: PrecisionReferenceAnalysisResult['comparisonTable'];
   claims: PrecisionReferenceAnalysisResult['claims'];
@@ -58,7 +60,8 @@ export function buildPrecisionEvidencePack(
     structures: { compoundA: result.compoundAStructure, compoundB: result.compoundBStructure },
     computedDescriptors: { similarity: result.similarity },
     mechanismEvidence: { compoundA: result.transporterEvidenceA, compoundB: result.transporterEvidenceB },
-    literatureEvidence,
+    knowledgePack3Evidence: result.knowledgePack3Evidence,
+    literatureEvidence: [...literatureEvidence, ...result.knowledgePack3Evidence.map((record) => ({ source: 'LITERATURE' as const, identifier: record.doi ? `doi:${record.doi}` : `pmid:${record.pmid}`, establishes: `${record.compound} ${record.target} ${record.parameter}=${record.value}; ${record.assay}. Validation: ${record.validationStatus}.` }))],
     comparison: result.comparisonTable,
     claims: result.claims,
     falsification: result.falsification,

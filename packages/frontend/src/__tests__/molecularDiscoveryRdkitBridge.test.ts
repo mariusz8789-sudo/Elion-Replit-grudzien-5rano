@@ -49,6 +49,7 @@ describe('transport bez silnika nigdy nie udaje wyniku', () => {
     const fake: RdkitTransport = {
       transportId: 'test-fixture',
       detect: () => ({ available: true, engine: 'TEST_FIXTURE', version: '0' }),
+      match: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       describe: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transform: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transformations: () => ({ ok: true, transformations: [] }),

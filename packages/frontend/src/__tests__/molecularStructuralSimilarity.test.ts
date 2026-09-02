@@ -46,6 +46,7 @@ describe('brak silnika nigdy nie wygląda jak wynik podobieństwa', () => {
     const fake: RdkitTransport = {
       transportId: 'test-fixture',
       detect: () => ({ available: true, engine: 'TEST_FIXTURE', version: '0' }),
+      match: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       describe: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transform: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transformations: () => ({ ok: true, transformations: [] }),
@@ -64,6 +65,7 @@ describe('oświadczenie o podobieństwie NIGDY nie brzmi jak dowód biologiczny'
     const fake: RdkitTransport = {
       transportId: 'test-fixture',
       detect: () => ({ available: true, engine: 'TEST_FIXTURE', version: '0' }),
+      match: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       describe: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transform: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transformations: () => ({ ok: true, transformations: [] }),
@@ -84,6 +86,7 @@ describe('oświadczenie o podobieństwie NIGDY nie brzmi jak dowód biologiczny'
     const fake: RdkitTransport = {
       transportId: 'test-fixture',
       detect: () => ({ available: true, engine: 'TEST_FIXTURE', version: '0' }),
+      match: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       describe: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transform: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transformations: () => ({ ok: true, transformations: [] }),

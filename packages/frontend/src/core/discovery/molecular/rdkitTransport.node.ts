@@ -4,7 +4,10 @@ import {
   readDescriptorPayload,
   type RdkitDescribe,
   type RdkitDetect,
+  type RdkitMatch,
+  type RdkitPatternMatch,
   type RdkitSimilarity,
+  type RdkitSmartsPattern,
   type RdkitTransform,
   type RdkitTransformations,
   type RdkitTransport,
@@ -65,6 +68,7 @@ export function createNodeRdkitTransport(options: NodeRdkitTransportOptions = {}
   const describeCache = new Map<string, RdkitDescribe>();
   const transformCache = new Map<string, RdkitTransform>();
   const similarityCache = new Map<string, RdkitSimilarity>();
+  const matchCache = new Map<string, RdkitMatch>();
 
   function detect(): RdkitDetect {
     if (detectCache !== null) return detectCache;
@@ -89,6 +93,45 @@ export function createNodeRdkitTransport(options: NodeRdkitTransportOptions = {}
       const data = readDescriptorPayload(reply.data);
       if (data === null) return { ok: false, error: 'EXECUTION_FAILED', reason: 'worker returned an unreadable descriptor payload' };
       return { ok: true, data, engine: reply.engine ?? fallbackEngine };
+    } catch (error) {
+      const message = error instanceof Error ? error.message.split('\n')[0] : String(error);
+      return { ok: false, error: 'EXECUTION_FAILED', reason: message.slice(0, 160) };
+    }
+  }
+
+  function runMatch(smiles: string, patterns: readonly RdkitSmartsPattern[]): RdkitMatch {
+    try {
+      const reply = invoke({
+        cmd: 'match',
+        smiles: String(smiles ?? ''),
+        patterns: patterns.map((p) => ({ id: p.patternId, smarts: p.smarts })),
+      }, timeoutMs) as { ok?: boolean; canonicalSmiles?: string; matches?: unknown; error?: string };
+
+      if (reply?.ok !== true || typeof reply.canonicalSmiles !== 'string' || !Array.isArray(reply.matches)) {
+        return { ok: false, error: 'INVALID_SMILES', reason: reply?.error ?? 'rdkit_rejected_input' };
+      }
+
+      const byId = new Map<string, { matched: boolean | null; count: number; reason: string }>();
+      for (const raw of reply.matches) {
+        if (typeof raw !== 'object' || raw === null) continue;
+        const entry = raw as { id?: unknown; matched?: unknown; count?: unknown; error?: unknown };
+        if (typeof entry.id !== 'string') continue;
+        byId.set(entry.id, typeof entry.matched === 'boolean'
+          ? { matched: entry.matched, count: typeof entry.count === 'number' ? entry.count : 0, reason: '' }
+          // An unparseable pattern is NOT an absent feature — it stays null.
+          : { matched: null, count: 0, reason: typeof entry.error === 'string' ? entry.error : 'no_result_for_pattern' });
+      }
+
+      // Every requested pattern gets a row, so a pattern the worker silently
+      // dropped surfaces as unknown rather than vanishing from the result.
+      const matches: RdkitPatternMatch[] = patterns.map((p) => {
+        const found = byId.get(p.patternId);
+        return found === undefined
+          ? { patternId: p.patternId, matched: null, count: 0, reason: 'worker returned no row for this pattern' }
+          : { patternId: p.patternId, ...found };
+      });
+
+      return { ok: true, canonicalSmiles: reply.canonicalSmiles, matches };
     } catch (error) {
       const message = error instanceof Error ? error.message.split('\n')[0] : String(error);
       return { ok: false, error: 'EXECUTION_FAILED', reason: message.slice(0, 160) };
@@ -160,6 +203,17 @@ export function createNodeRdkitTransport(options: NodeRdkitTransportOptions = {}
       if (cached !== undefined) return cached;
       const computed = runDescribe(smiles, detected.engine);
       describeCache.set(smiles, computed);
+      return computed;
+    },
+
+    match(smiles: string, patterns: readonly RdkitSmartsPattern[]): RdkitMatch {
+      const detected = detect();
+      if (!detected.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: detected.reason };
+      const key = `${smiles} ${patterns.map((p) => `${p.patternId}${p.smarts}`).sort().join('')}`;
+      const cached = matchCache.get(key);
+      if (cached !== undefined) return cached;
+      const computed = runMatch(smiles, patterns);
+      matchCache.set(key, computed);
       return computed;
     },
 

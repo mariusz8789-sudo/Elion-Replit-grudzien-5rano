@@ -10,6 +10,7 @@ Commands:
   descriptors {smiles}   -> { ok, data: {...real descriptors...} }
   validate {smiles}      -> { ok, valid, canonicalSmiles? }
   similarity {smiles, reference} -> { ok, tanimoto, sameScaffold, ... } (structural ONLY, never affinity)
+  match {smiles, patterns:[{id,smarts}]} -> { ok, matches: [{id, matched, count}] } (substructure ONLY)
 """
 import sys
 import json
@@ -78,6 +79,33 @@ def main():
 
     if cmd == "validate":
         print(json.dumps({"ok": True, "valid": True, "canonicalSmiles": Chem.MolToSmiles(mol)}))
+        return
+
+    if cmd == "match":
+        # REAL SMARTS substructure matching. This answers ONLY "is this
+        # structural feature present", which is a necessary-condition test —
+        # a match is never evidence of binding, affinity or activity. A pattern
+        # RDKit cannot parse is reported as an error for that pattern, never
+        # silently as "no match", because those are different facts.
+        patterns = req.get("patterns", [])
+        if not isinstance(patterns, list):
+            print(json.dumps({"ok": False, "error": "patterns_must_be_a_list"}))
+            return
+        matches = []
+        for entry in patterns:
+            if not isinstance(entry, dict):
+                continue
+            pattern_id = entry.get("id")
+            smarts = entry.get("smarts")
+            if not isinstance(pattern_id, str) or not isinstance(smarts, str):
+                continue
+            query = Chem.MolFromSmarts(smarts)
+            if query is None:
+                matches.append({"id": pattern_id, "error": "invalid_smarts"})
+                continue
+            hits = mol.GetSubstructMatches(query)
+            matches.append({"id": pattern_id, "matched": len(hits) > 0, "count": len(hits)})
+        print(json.dumps({"ok": True, "canonicalSmiles": Chem.MolToSmiles(mol), "matches": matches}))
         return
 
     if cmd == "similarity":

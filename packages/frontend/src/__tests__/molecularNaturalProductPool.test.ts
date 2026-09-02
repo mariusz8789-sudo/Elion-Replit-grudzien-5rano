@@ -80,6 +80,7 @@ describe('crossValidateCandidate: niezgodność formuły jest wykrywana, nie ukr
     const fake: RdkitTransport = {
       transportId: 'test-fixture',
       detect: () => ({ available: true, engine: 'TEST_FIXTURE', version: '0' }),
+      match: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       describe: () => ({ ok: true, engine: 'TEST_FIXTURE', data: { canonicalSmiles: 'NCCCCNC(=N)N', molecularFormula: 'C5H14N4', values: {}, inchi: null, inchiKey: null } }),
       transform: () => ({ ok: false, error: 'INVALID_SMILES', reason: 'fixture' }),
       transformations: () => ({ ok: true, transformations: [] }),

@@ -72,10 +72,39 @@ export type RdkitSimilarity =
   }
   | { ok: false; error: 'BLOCKED_BY_RUNTIME' | 'INVALID_SMILES' | 'EXECUTION_FAILED'; reason: string };
 
+/** One named structural feature to look for, as a real SMARTS pattern. */
+export interface RdkitSmartsPattern {
+  patternId: string;
+  smarts: string;
+}
+
+/**
+ * Result of one substructure query. `matched: null` means RDKit could not
+ * parse the pattern — which is NOT the same fact as "the feature is absent",
+ * and is deliberately not collapsed into `false`.
+ */
+export interface RdkitPatternMatch {
+  patternId: string;
+  matched: boolean | null;
+  count: number;
+  reason: string;
+}
+
+/**
+ * REAL SMARTS substructure matching. Presence of a structural feature is a
+ * NECESSARY-CONDITION test only: a match never establishes binding, affinity
+ * or activity, and callers must not read it as any of those.
+ */
+export type RdkitMatch =
+  | { ok: true; canonicalSmiles: string; matches: readonly RdkitPatternMatch[] }
+  | { ok: false; error: 'BLOCKED_BY_RUNTIME' | 'INVALID_SMILES' | 'EXECUTION_FAILED'; reason: string };
+
 export interface RdkitTransport {
   transportId: string;
   detect(): RdkitDetect;
   describe(smiles: string): RdkitDescribe;
+  /** Real SMARTS substructure matching — structural presence only, never activity. */
+  match(smiles: string, patterns: readonly RdkitSmartsPattern[]): RdkitMatch;
   /**
    * Applies a declared SMARTS reaction. This is a real structural
    * transformation performed by RDKit, not string surgery on SMILES text.
@@ -121,6 +150,7 @@ export const unavailableRdkitTransport: RdkitTransport = {
   transportId: 'none',
   detect: () => ({ available: false, reason: NO_TRANSPORT }),
   describe: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
+  match: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
   transform: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
   transformations: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),
   similarity: () => ({ ok: false, error: 'BLOCKED_BY_RUNTIME', reason: NO_TRANSPORT }),

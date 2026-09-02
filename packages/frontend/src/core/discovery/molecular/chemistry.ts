@@ -25,6 +25,19 @@ export const FORMULA_PROPERTY_IDS = ['molecularWeight', 'heavyAtomCount', 'degre
  */
 export const STRUCTURAL_PROPERTY_IDS = ['logP', 'tpsa', 'hbd', 'hba', 'rotatableBonds'] as const;
 
+/**
+ * The full set a REAL RDKit run can resolve — every id here is backed by a
+ * descriptor `rdkit_worker.py` actually computes (see RDKIT_PROPERTY_MAP in
+ * `rdkitStructuralProvider.ts`). It is a superset of STRUCTURAL_PROPERTY_IDS:
+ * the extra ids are only reachable with RDKit connected, and are reported
+ * unavailable rather than omitted when it is not, so the gap stays visible.
+ */
+export const RDKIT_STRUCTURAL_PROPERTY_IDS = [
+  ...STRUCTURAL_PROPERTY_IDS,
+  'ringCount', 'aromaticRings', 'fractionCsp3', 'formalCharge', 'heteroatomCount',
+  'lipinskiViolations', 'exactMolecularWeight',
+] as const;
+
 /** Properties with no engine at all in this repository for this path. */
 export const EXPERIMENTAL_PROPERTY_IDS = ['targetAffinity', 'admetAbsorption', 'toxicity', 'safety'] as const;
 

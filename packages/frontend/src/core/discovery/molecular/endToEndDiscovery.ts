@@ -6,6 +6,7 @@ import {
   type CandidateEpistemicState,
   type EpistemicSummary,
 } from './candidateEpistemicState';
+import { bindResultsToCandidates, type ExperimentalResult, type ResultProvenanceKind } from './experimentalResult';
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { compareToReferences, type ComparisonProfile, type ReferenceComparisonSet } from './referenceComparison';
 import { falsifyBatch, type BatchFalsification } from './falsification';
@@ -63,6 +64,13 @@ export interface EndToEndDiscoveryRequest {
   depth: number;
   maxCandidates: number;
   objectives: readonly Objective[];
+  /**
+   * Measurements already known about these structures. They are attached to
+   * candidates BEFORE mechanism filtering and ranking, so a real result can
+   * actually change the outcome — binding them afterwards would make the loop
+   * decorative.
+   */
+  ingestedResults?: readonly ExperimentalResult[];
 }
 
 export interface EndToEndDiscoveryEngines {
@@ -227,6 +235,9 @@ export interface EndToEndDiscoveryResult {
    * the values that actually drove the mechanism filter and the Pareto front.
    */
   evaluatedCandidates: readonly MoleculeCandidate[];
+  /** Measurements that bound to a candidate in this run, and those that did not. */
+  boundResults: readonly { resultId: string; candidateId: string; kind: ResultProvenanceKind }[];
+  unboundResults: readonly { resultId: string; reason: string }[];
   mechanism: MechanismPrerequisiteBatch;
   falsification: BatchFalsification;
   ranking: MultiObjectiveResult;
@@ -273,7 +284,15 @@ export function runEndToEndDiscovery(
   // screening. Candidates the model could not run on keep no ADMET value at
   // all rather than a placeholder.
   const admet = runAdmetBatch(engines.admet, screeningSurvivors, { maxCandidates: request.maxCandidates });
-  const enriched = withAdmetProperties(screeningSurvivors, admet);
+  const admetEnriched = withAdmetProperties(screeningSurvivors, admet);
+
+  // MEASUREMENTS ENTER HERE — after prediction, before any filtering or
+  // ranking. A measurement is bound only to the structure it was taken on
+  // (by canonical SMILES) and becomes an ordinary property, so the existing
+  // ranker treats it like any other value; there is no separate experimental
+  // pathway that could be weighted or tuned.
+  const binding = bindResultsToCandidates(admetEnriched, request.ingestedResults ?? []);
+  const enriched = binding.enriched;
 
   // 5. TARGET / MECHANISM FILTERING — after ADMET, because exposure
   // prerequisites read predicted values off the candidate.
@@ -350,6 +369,7 @@ export function runEndToEndDiscovery(
     question: request.question.questionId,
     subject: request.subject.compound,
     discovery: discovery.resultFingerprint,
+    boundResultIds: binding.bound.map((b) => b.resultId).sort(),
     mechanism: { notExcluded: [...mechanism.notExcluded].sort(), excluded: [...mechanism.excluded].sort() },
     front: [...frontIds].sort(),
   }));
@@ -362,6 +382,8 @@ export function runEndToEndDiscovery(
     discovery,
     admet,
     evaluatedCandidates: enriched,
+    boundResults: binding.bound,
+    unboundResults: binding.unbound,
     mechanism,
     falsification,
     ranking,

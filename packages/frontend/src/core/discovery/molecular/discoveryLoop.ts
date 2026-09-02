@@ -3,7 +3,6 @@ import { canonicalJson, fnv1a } from '../../events/hash';
 import { proposeDiscriminatingExperiments, type ProposedExperiment } from './discriminatingExperiment';
 import { runEndToEndDiscovery, type EndToEndDiscoveryRequest, type EndToEndDiscoveryEngines, type EndToEndDiscoveryResult } from './endToEndDiscovery';
 import { runRequirementEvaluation, type Requirement, type RequirementBatch } from './discoveryRequirements';
-import type { MoleculeCandidate } from './types';
 
 /**
  * CLOSED-LOOP DISCOVERY.
@@ -72,73 +71,6 @@ export interface RoundDelta {
   explanation: string;
 }
 
-/**
- * Attaches ingested results to the candidates they were measured on.
- *
- * Binding is by CANONICAL SMILES, never by name: a result naming
- * "candidate 3" would bind to whatever happened to be third, which is exactly
- * the kind of silent mis-association this engine must not permit.
- */
-export function bindResultsToCandidates(
-  candidates: readonly MoleculeCandidate[],
-  results: readonly ExperimentalResult[],
-): {
-  enriched: readonly MoleculeCandidate[];
-  bound: { resultId: string; candidateId: string; kind: ResultProvenanceKind }[];
-  unbound: { resultId: string; reason: string }[];
-} {
-  const bound: { resultId: string; candidateId: string; kind: ResultProvenanceKind }[] = [];
-  const unbound: { resultId: string; reason: string }[] = [];
-  const bySmiles = new Map<string, MoleculeCandidate>();
-  for (const candidate of candidates) {
-    if (candidate.structure.canonicalSmiles !== null) bySmiles.set(candidate.structure.canonicalSmiles, candidate);
-  }
-
-  const additions = new Map<string, { propertyId: string; value: number | null; unit: string; kind: ResultProvenanceKind; source: string }[]>();
-
-  for (const result of results) {
-    if (result.canonicalSmiles === null) {
-      unbound.push({ resultId: result.resultId, reason: 'Result carries no canonical SMILES, so it cannot be bound to a candidate without guessing.' });
-      continue;
-    }
-    const candidate = bySmiles.get(result.canonicalSmiles);
-    if (candidate === undefined) {
-      unbound.push({ resultId: result.resultId, reason: `No candidate in this round has the structure ${result.canonicalSmiles}; the measurement is kept as evidence but changes no ranking.` });
-      continue;
-    }
-    bound.push({ resultId: result.resultId, candidateId: candidate.candidateId, kind: result.provenance.kind });
-    // Property id encodes target and parameter so it can never collide with a
-    // predicted endpoint or be mistaken for one.
-    const propertyId = `measured_${result.target}_${result.parameter}`.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-    additions.set(candidate.candidateId, [
-      ...(additions.get(candidate.candidateId) ?? []),
-      { propertyId, value: result.value, unit: result.unit, kind: result.provenance.kind, source: result.provenance.source },
-    ]);
-  }
-
-  const enriched = candidates.map((candidate) => {
-    const extra = additions.get(candidate.candidateId);
-    if (extra === undefined) return candidate;
-    return {
-      ...candidate,
-      properties: [
-        ...candidate.properties,
-        ...extra.map((e) => ({
-          propertyId: e.propertyId,
-          // A fixture is TEST_FIXTURE, a real measurement is ACTUAL_SOURCE.
-          // There is no path by which a fixture becomes ACTUAL_SOURCE.
-          status: e.kind === 'REAL_MEASUREMENT' ? ('ACTUAL_SOURCE' as const) : ('TEST_FIXTURE' as const),
-          value: e.value,
-          unit: e.unit,
-          engine: e.kind === 'REAL_MEASUREMENT' ? e.source : `TEST_FIXTURE:${e.source}`,
-        })),
-      ],
-    };
-  });
-
-  return { enriched, bound, unbound };
-}
-
 export interface DiscoveryLoopEngines extends EndToEndDiscoveryEngines {}
 
 /**
@@ -147,10 +79,13 @@ export interface DiscoveryLoopEngines extends EndToEndDiscoveryEngines {}
  * hypothesis assessment and the next-experiment proposal around it.
  */
 export function runDiscoveryRound(input: DiscoveryRoundInput, engines: DiscoveryLoopEngines): DiscoveryRound {
-  const result = runEndToEndDiscovery(input.discovery, engines);
-
-  // Bind any results ingested before this round to the evaluated candidates.
-  const { enriched, bound, unbound } = bindResultsToCandidates(result.evaluatedCandidates, input.ingestedResults);
+  // Results are handed to the discovery run itself, which binds them BEFORE
+  // mechanism filtering and ranking — that is what makes a measurement able to
+  // change the outcome rather than merely annotate it.
+  const result = runEndToEndDiscovery({ ...input.discovery, ingestedResults: input.ingestedResults }, engines);
+  const enriched = result.evaluatedCandidates;
+  const bound = result.boundResults;
+  const unbound = result.unboundResults;
 
   // Reference values for REDUCE_VS_REFERENCE come from the seed candidate —
   // the reference compound's own real computed values, not a declared guess.

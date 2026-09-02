@@ -282,7 +282,7 @@ describe('closed-loop discovery: three real rounds', () => {
 
   it('the loop never claims safety, efficacy or clinical equivalence', () => {
     const text = [round1, round2, round3].flatMap((r) => r.result.limitations).join(' ').toLowerCase();
-    expect(text).toContain('not a claim of safety');
+    expect(text).toContain('nothing in this result is a claim of safety');
     expect(text).toContain('requires_experiment');
   });
 

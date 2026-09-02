@@ -16,6 +16,7 @@ import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type Active
 import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
 import { resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
+import { ketamineNaturalDiscoverySummary, runKetamineNaturalDiscovery } from '../core/biotechData/ketamineNaturalDiscovery';
 
 /**
  * Genesis Science Chat — inteligentna warstwa rozmowy NAD istniejącymi
@@ -74,7 +75,7 @@ function formatProjectKnowledgeSources(project: ActiveKnowledgeProject, material
 }
 
 export function naturalReferenceFromMessage(message: string): string | undefined {
-  const known = ['caffeine', 'kofein', 'adenosine', 'adenozyn', 'theophylline', 'teofilin'];
+  const known = ['ketamine', 'ketamin', 'ketamina', 'caffeine', 'kofein', 'adenosine', 'adenozyn', 'theophylline', 'teofilin'];
   return known.find((name) => message.toLowerCase().includes(name));
 }
 
@@ -375,6 +376,17 @@ export function ScienceChat() {
         }
         setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `REFERENCE RESOLVED: ${profile.sourceId ?? profile.query}. ${profile.uncertainty}\nNatural candidate comparison pozostaje PARTIAL: brak kompatybilnego target-specific natural catalog dla tego reference; nie wykonano rankingu ani nie utworzono raportu.`, tag: 'SYSTEM' }]);
         setInput('');
+        return;
+      }
+      if (/ketamine|ketamin|ketamina/i.test(referenceCompound ?? '')) {
+        const ketamineResult = runKetamineNaturalDiscovery();
+        setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: ketamineNaturalDiscoverySummary(ketamineResult), tag: ketamineResult.status === 'RESOLVED' ? 'WYNIK' : 'SYSTEM' }]);
+        if (ketamineResult.reports.length >= 2) {
+          const saved = saveBiotechDiscoveryComparisonToMemory(ketamineResult.reports);
+          setTurns((t) => [...t, { role: 'genesis', text: `Zapisano ketamine-like comparison artifact w Scientific Memory. Report: ${saved.biotech?.reportId ?? 'UNKNOWN'} · comparison: ${saved.biotech?.comparison?.comparisonId ?? 'UNKNOWN'} · replay fingerprint: ${saved.biotech?.comparison?.scientificFingerprint ?? 'UNKNOWN'}.`, tag: 'SYSTEM' }]);
+        }
+        setInput('');
+        track('ask_ai_used', { via: 'science-chat-ketamine-natural-discovery', status: ketamineResult.status });
         return;
       }
       const targetMatch = msg.match(/(?:target(?:u)?|receptor(?:a)?|receptora)\s*[:=]?\s*([A-Za-z0-9-]+)/i);

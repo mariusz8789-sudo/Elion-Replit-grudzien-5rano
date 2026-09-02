@@ -4,6 +4,7 @@ import {
   type DockingTransport,
   type ReceptorSpec,
 } from './dockingTransport';
+import { affinityIsAboutTarget, type ReceptorStructure, type TargetHypothesis } from './targetHypothesis';
 import { unavailableProperty, type MoleculeCandidate, type MoleculeProperty } from './types';
 
 /**
@@ -41,6 +42,12 @@ export interface DockingBatchResult {
   skipped: readonly { candidateId: string; reason: string }[];
   receptorKind: ReceptorSpec['kind'] | null;
   receptorProvenance: string | null;
+  /**
+   * Whether scores from this batch describe the hypothesised target. Decided
+   * by `affinityIsAboutTarget` when a target is supplied, and by receptor kind
+   * alone when it is not.
+   */
+  aboutTarget: { meaningful: boolean; reason: string };
 }
 
 export interface DockingBatchOptions {
@@ -48,6 +55,13 @@ export interface DockingBatchOptions {
   maxDocks?: number;
   seed?: number;
   exhaustiveness?: number;
+  /**
+   * Target hypothesis and the structure actually docked into. When BOTH say
+   * this is the hypothesised target, scores are reported as targetAffinity;
+   * otherwise they remain a pipeline score. Supplying neither keeps the older
+   * receptor-kind-only behaviour.
+   */
+  target?: { hypothesis: TargetHypothesis; structure: ReceptorStructure };
 }
 
 /**
@@ -66,8 +80,12 @@ export function runDockingBatch(
   const detected = transport.detect();
   const engineId = detected.available ? detected.engine : `vina:unavailable:${transport.transportId}`;
 
+  const gate = options.target !== undefined
+    ? affinityIsAboutTarget(options.target.hypothesis, options.target.structure)
+    : { meaningful: false, reason: 'No target hypothesis was supplied, so no score can be attributed to a target.' };
+
   if (!detected.available) {
-    return { engineId, available: false, reason: detected.reason, byCandidate: {}, skipped: [], receptorKind: null, receptorProvenance: null };
+    return { engineId, available: false, reason: detected.reason, byCandidate: {}, skipped: [], receptorKind: null, receptorProvenance: null, aboutTarget: gate };
   }
   if (receptor === null) {
     return {
@@ -78,6 +96,7 @@ export function runDockingBatch(
       skipped: candidates.map((c) => ({ candidateId: c.candidateId, reason: 'No receptor declared for this question.' })),
       receptorKind: null,
       receptorProvenance: null,
+      aboutTarget: gate,
     };
   }
 
@@ -107,7 +126,7 @@ export function runDockingBatch(
     });
   }
 
-  return { engineId, available: true, reason: '', byCandidate, skipped, receptorKind: receptor.kind, receptorProvenance: receptor.provenance };
+  return { engineId, available: true, reason: '', byCandidate, skipped, receptorKind: receptor.kind, receptorProvenance: receptor.provenance, aboutTarget: gate };
 }
 
 /**
@@ -129,7 +148,11 @@ export function dockingPropertiesFor(candidate: MoleculeCandidate, batch: Dockin
   const result = batch.byCandidate[candidate.candidateId];
   if (result === undefined || !result.ok) return blocked('NOT_AVAILABLE');
 
-  const meaningful = isTargetAffinityMeaningful(result.receptorKind);
+  // The target gate is authoritative when a hypothesis was supplied: a real
+  // protein is still the wrong protein unless it IS the hypothesised target.
+  const meaningful = batch.aboutTarget.reason.startsWith('No target hypothesis')
+    ? isTargetAffinityMeaningful(result.receptorKind)
+    : batch.aboutTarget;
   const score: MoleculeProperty = {
     propertyId: meaningful.meaningful ? 'targetAffinity' : 'dockingPipelineScore',
     status: 'MODEL_PREDICTION',
@@ -169,6 +192,9 @@ export function dockingLimitations(batch: DockingBatchResult): readonly string[]
   const notes = [
     'Docking scores are MODEL_PREDICTIONS from an empirical scoring function. A score is not a measured binding constant and is not evidence that binding occurs.',
   ];
+  if (!batch.aboutTarget.meaningful) {
+    notes.push(`These scores do not describe a target: ${batch.aboutTarget.reason}`);
+  }
   if (batch.receptorKind === 'SMALL_MOLECULE_STANDIN') {
     notes.push(
       'This run used a SMALL-MOLECULE STAND-IN receptor, not a biological target. The resulting scores exercise the docking pipeline and are reported as dockingPipelineScore; targetAffinity remains unavailable.',

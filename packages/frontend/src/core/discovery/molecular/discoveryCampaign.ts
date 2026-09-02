@@ -54,6 +54,10 @@ export interface CampaignEngines {
 }
 
 export interface CampaignOptions {
+  /** Target hypothesis, so docking scores can be attributed or refused. */
+  target?: import('./targetHypothesis').TargetHypothesis;
+  /** The structure actually docked into, with its relevance to that target. */
+  receptorStructure?: import('./targetHypothesis').ReceptorStructure | null;
   /** Maximum search rounds. One means a single batch. */
   maxGenerations?: number;
   /** Hard ceiling on distinct candidates across the whole campaign. */
@@ -238,6 +242,9 @@ export function runDiscoveryCampaign(
   const dockingBatch: DockingBatchResult = runDockingBatch(dockingTransport, enriched, receptor, {
     maxDocks: options.maxDockingCalls ?? 5,
     seed: options.seed ?? 42,
+    target: options.target !== undefined && options.receptorStructure
+      ? { hypothesis: options.target, structure: options.receptorStructure }
+      : undefined,
   });
   enriched = [...withDockingProperties(enriched, dockingBatch)];
 

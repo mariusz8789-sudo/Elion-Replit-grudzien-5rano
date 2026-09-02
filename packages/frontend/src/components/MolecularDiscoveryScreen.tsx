@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
+import { buildCampaignEvidencePack, buildSavedCampaign, replaySavedCampaign, verifyCampaignRoCrate } from '../core/discovery/molecular/campaignEvidence';
 import { buildDemoDiscoveryQuestion, buildDemoGenerationSpec } from '../core/discovery/molecular/demoFixture';
-import { runMolecularDiscovery } from '../core/discovery/molecular/discoveryRun';
-import { buildDiscoveryEvidencePack } from '../core/discovery/molecular/evidence';
-import { explainDiscoveryEvidence, proposeNextDiscoverySteps } from '../core/discovery/molecular/nextStep';
-import { buildSavedDiscoveryRun, replaySavedDiscoveryRun } from '../core/discovery/molecular/replay';
-import { verifyEvidencePackRoCrateRoundTrip } from '../core/experimentFabric/evidencePackRoCrate';
-import type { DiscoveryResult, PropertyStatus } from '../core/discovery/molecular/types';
+import { runDiscoveryCampaign, type DiscoveryRun } from '../core/discovery/molecular/discoveryCampaign';
+import { compositionEnumeratorProvider } from '../core/discovery/molecular/enumeratorProviders';
+import type { Objective } from '../core/discovery/molecular/multiObjective';
+import type { PropertyStatus } from '../core/discovery/molecular/types';
 
 /**
  * MINIMUM DEMO SURFACE (§20) — a functional proof of the discovery loop, not a
@@ -44,28 +43,51 @@ function ValueCell({ value, unit, status }: { value: number | null; unit: string
   );
 }
 
+/**
+ * Objectives declared for the demo campaign, before any candidate exists.
+ */
+const DEMO_OBJECTIVES: readonly Objective[] = [
+  { objectiveId: 'low-mw', propertyId: 'molecularWeight', direction: 'minimise', rationale: 'Prefer smaller compositions.' },
+  { objectiveId: 'low-unsaturation', propertyId: 'degreeOfUnsaturation', direction: 'minimise', rationale: 'Prefer less unsaturated compositions.' },
+];
+
 export function MolecularDiscoveryScreen() {
-  const [result, setResult] = useState<DiscoveryResult | null>(null);
+  const [result, setResult] = useState<DiscoveryRun | null>(null);
   const [replayStatus, setReplayStatus] = useState<string | null>(null);
   const [roCrateStatus, setRoCrateStatus] = useState<string | null>(null);
 
-  const nextSteps = useMemo(() => (result ? proposeNextDiscoverySteps(result) : []), [result]);
-  const advice = useMemo(() => (result ? explainDiscoveryEvidence(result) : null), [result]);
+  const nextSteps = useMemo(() => result?.nextExperiment ?? [], [result]);
 
   function runDiscovery() {
-    setResult(runMolecularDiscovery(buildDemoDiscoveryQuestion(), buildDemoGenerationSpec()));
+    const question = buildDemoDiscoveryQuestion();
+    const spec = buildDemoGenerationSpec();
+    // The browser has no RDKit/ADMET/Vina transport: those engines run
+    // server-side through Node workers. The composition enumerator is pure
+    // TypeScript and genuinely runs here, so the browser gets real computed
+    // composition properties and an HONEST report that the structural and
+    // predictive engines are unavailable in this runtime — not a blank screen
+    // and not a pretence that they ran.
+    setResult(runDiscoveryCampaign(
+      question,
+      compositionEnumeratorProvider(),
+      { seeds: spec.seedFormulas, transformations: spec.transformations, depth: spec.depth, maxCandidates: spec.maxCandidates, constraints: question.constraints },
+      DEMO_OBJECTIVES,
+      {},
+      { maxGenerations: 2, survivorsPerGeneration: 3 },
+    ));
     setReplayStatus(null);
     setRoCrateStatus(null);
   }
 
   function runReplayCheck() {
-    const saved = buildSavedDiscoveryRun(buildDemoDiscoveryQuestion(), buildDemoGenerationSpec());
-    setReplayStatus(replaySavedDiscoveryRun(saved).status);
+    if (!result) return;
+    setReplayStatus(replaySavedCampaign(buildSavedCampaign(result), result).status);
   }
 
   function runRoCrateCheck() {
     if (!result) return;
-    setRoCrateStatus(verifyEvidencePackRoCrateRoundTrip(buildDiscoveryEvidencePack(result)).status);
+    void buildCampaignEvidencePack(result);
+    setRoCrateStatus(verifyCampaignRoCrate(result).status);
   }
 
   return (
@@ -107,20 +129,20 @@ export function MolecularDiscoveryScreen() {
 
           <div style={cardStyle}>
             <div style={labelStyle}>Candidates — deterministic composition enumeration</div>
-            <div style={rowStyle}><span>Seeds</span><span style={monoStyle}>{result.batch.seedFormulas.join(', ')}</span></div>
-            <div style={rowStyle}><span>Transformations</span><span style={monoStyle}>{result.batch.transformations.join(', ')}</span></div>
-            <div style={rowStyle}><span>Enumerated</span><span style={monoStyle}>{result.batch.candidates.length}</span></div>
-            <div style={rowStyle}><span>Discarded before screening</span><span style={monoStyle}>{result.batch.discarded.length}</span></div>
-            <div style={rowStyle}><span>Batch fingerprint</span><span style={monoStyle}>{result.batch.batchFingerprint}</span></div>
+            <div style={rowStyle}><span>Seeds</span><span style={monoStyle}>{result.request.seeds.join(', ')}</span></div>
+            <div style={rowStyle}><span>Transformations</span><span style={monoStyle}>{result.request.transformations.join(', ')}</span></div>
+            <div style={rowStyle}><span>Enumerated</span><span style={monoStyle}>{result.candidates.length}</span></div>
+            
+            <div style={rowStyle}><span>Batch fingerprint</span><span style={monoStyle}>{result.runFingerprint}</span></div>
           </div>
 
           <div style={cardStyle}>
             <div style={labelStyle}>First candidate — every property with its real status</div>
-            {result.batch.candidates[0] && (
+            {result.candidates[0] && (
               <>
-                <div style={rowStyle}><span>Formula</span><span style={monoStyle}>{result.batch.candidates[0].formula}</span></div>
-                <div style={rowStyle}><span>Structure (canonical SMILES)</span><StatusBadge status={result.batch.candidates[0].structure.status} /></div>
-                {result.batch.candidates[0].properties.map((p) => (
+                <div style={rowStyle}><span>Formula</span><span style={monoStyle}>{result.candidates[0].formula}</span></div>
+                <div style={rowStyle}><span>Structure (canonical SMILES)</span><StatusBadge status={result.candidates[0].structure.status} /></div>
+                {result.candidates[0].properties.map((p) => (
                   <div key={p.propertyId} style={rowStyle}>
                     <span>{p.propertyId}</span>
                     <ValueCell value={p.value} unit={p.unit} status={p.status} />
@@ -141,12 +163,12 @@ export function MolecularDiscoveryScreen() {
 
           <div style={cardStyle}>
             <div style={labelStyle}>Ranking — retained candidates only</div>
-            {result.ranking.length === 0
+            {result.ranking.retained.length === 0
               ? <p style={{ fontSize: 13, opacity: 0.7 }}>No candidate was retained. This is not evidence that the candidates are bad — see the capability gaps below.</p>
-              : result.ranking.slice(0, 10).map((a, i) => (
+              : result.ranking.retained.slice(0, 10).map((a, i) => (
                 <div key={a.candidateId} style={rowStyle}>
                   <span>{i + 1}. <span style={monoStyle}>{a.formula}</span></span>
-                  <span><span style={monoStyle}>{a.rankScore === null ? '—' : a.rankScore.toFixed(3)}</span> <StatusBadge status={a.verdict} /></span>
+                  <span>{a.onParetoFront ? 'Pareto front' : 'dominated'} <StatusBadge status={a.outcome} /></span>
                 </div>
               ))}
           </div>
@@ -161,27 +183,45 @@ export function MolecularDiscoveryScreen() {
           </div>
 
           <div style={cardStyle}>
+            <div style={labelStyle}>Engines — what actually ran in this runtime</div>
+            {result.capabilities.map((engine) => (
+              <div key={engine.engine} style={rowStyle}>
+                <span>{engine.engine}</span>
+                <span>
+                  <StatusBadge status={engine.available ? 'AVAILABLE' : 'NOT_AVAILABLE'} />
+                  {engine.contributed.length > 0 && <span style={{ opacity: 0.6 }}> — {engine.contributed.length} propert(ies)</span>}
+                </span>
+              </div>
+            ))}
+            <p style={{ fontSize: 12, opacity: 0.6, marginTop: 8 }}>
+              RDKit, ADMET-AI and AutoDock Vina run server-side through Node workers and are not
+              reachable from the browser. This page runs the composition enumerator, which is real
+              and genuinely executes here — the structural and predictive engines are reported
+              unavailable rather than simulated.
+            </p>
+          </div>
+
+          <div style={cardStyle}>
+            <div style={labelStyle}>Limitations — what this run does NOT establish</div>
+            {result.limitations.map((limitation, i) => (
+              <p key={i} style={{ fontSize: 13, opacity: 0.85, margin: '0 0 8px' }}>{limitation}</p>
+            ))}
+          </div>
+
+          <div style={cardStyle}>
             <div style={labelStyle}>Evidence &amp; reproducibility</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
               <button onClick={runRoCrateCheck}>Verify RO-Crate round trip</button>
               <button onClick={runReplayCheck}>Replay saved run</button>
             </div>
-            <div style={rowStyle}><span>Result fingerprint</span><span style={monoStyle}>{result.resultFingerprint}</span></div>
+            <div style={rowStyle}><span>Result fingerprint</span><span style={monoStyle}>{result.runFingerprint}</span></div>
             <div style={rowStyle}><span>RO-Crate round trip</span>{roCrateStatus === null ? <span style={{ opacity: 0.5, fontSize: 13 }}>not run</span> : <StatusBadge status={roCrateStatus} />}</div>
             <div style={rowStyle}><span>Replay</span>{replayStatus === null ? <span style={{ opacity: 0.5, fontSize: 13 }}>not run</span> : <StatusBadge status={replayStatus} />}</div>
           </div>
 
           <div style={cardStyle}>
             <div style={labelStyle}>Next experiment</div>
-            {advice && (
-              <>
-                <div style={rowStyle}><span>Assessment</span><StatusBadge status={advice.assessment} /></div>
-                <p style={{ fontSize: 13, opacity: 0.8 }}>{advice.why}</p>
-                <p style={{ fontSize: 12, opacity: 0.6 }}>
-                  {advice.nextExperiment.action} — {advice.nextExperiment.rationale} (auto-run: {String(advice.nextExperiment.autoRun)})
-                </p>
-              </>
-            )}
+            <div style={rowStyle}><span>Search stopped because</span><StatusBadge status={result.stopReason} /></div>
             {nextSteps.map((s, i) => (
               <div key={`${s.kind}:${s.resolves}:${i}`} style={{ padding: '8px 0', borderBottom: '1px solid #262626' }}>
                 <div style={{ fontSize: 13 }}><StatusBadge status={s.kind} /> <span style={{ opacity: 0.5 }}>→ {s.resolves}</span></div>

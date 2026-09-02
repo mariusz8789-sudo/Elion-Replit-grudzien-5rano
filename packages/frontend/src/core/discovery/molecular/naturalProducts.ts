@@ -1,7 +1,11 @@
 import { canonicalJson, fnv1a } from '../../events/hash';
 import type { CompoundLookupTransport, CompoundResolution } from './compoundResolver';
 import { resolveCompound } from './compoundResolver';
-import type { NaturalProductContext } from './dossier';
+export interface NaturalProductContext {
+  knownNaturalProduct: boolean | null;
+  sourceOrganism: string | null;
+  references: readonly string[];
+}
 
 /**
  * ETAP 8 — NATURAL PRODUCTS AS A FIRST-CLASS DISCOVERY PATH.

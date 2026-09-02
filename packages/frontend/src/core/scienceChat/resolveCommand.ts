@@ -285,7 +285,7 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       text: 'Otwieram istniejący panel Evidence & Replay. Uruchomienie, replay i eksport są jawne; brak protokołu pozostaje PROTOCOL_REQUIRED, a brak drugiego wariantu VARIANT_REQUIRED.',
       tag: 'SYSTEM',
       intent: 'OPEN_SIMULATION',
-      action: { type: 'openRoute', hash: '#/discovery-log' },
+      action: { type: 'openRoute', hash: '#/city3d' },
     };
   }
 

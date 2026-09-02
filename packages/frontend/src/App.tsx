@@ -48,8 +48,6 @@ const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/Conc
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
-const AutomotiveClaimAuditorScreen = lazy(() => import('./components/AutomotiveClaimAuditorScreen').then((m) => ({ default: m.AutomotiveClaimAuditorScreen })));
-const MolecularDiscoveryScreen = lazy(() => import('./components/MolecularDiscoveryScreen').then((m) => ({ default: m.MolecularDiscoveryScreen })));
 const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 
@@ -97,8 +95,6 @@ type Route =
   | { kind: 'character' }
   | { kind: 'hf-slice' }
   | { kind: 'pilot' }
-  | { kind: 'automotive-audit' }
-  | { kind: 'molecular-discovery' }
   | { kind: 'molecular-reference-analysis' };
 
 function parseHash(): Route {
@@ -129,8 +125,6 @@ function parseHash(): Route {
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
-  if (h === '#/automotive-audit') return { kind: 'automotive-audit' };
-  if (h === '#/molecular-discovery') return { kind: 'molecular-discovery' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   return { kind: 'home' };
 }
@@ -503,30 +497,6 @@ export default function App() {
           <TopBar title="🧪 Pilot eksperymentu — plan → wynik → Scenario Capsule" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <ExperimentPilotScreen />
-          </HeavyRoute>
-          {overlays}
-        </div>
-      );
-    }
-
-    if (route.kind === 'automotive-audit') {
-      return (
-        <div className="app">
-          <TopBar title="🚗 Automotive Claim Auditor — spike" onSearch={() => setSearchOpen(true)} />
-          <HeavyRoute>
-            <AutomotiveClaimAuditorScreen />
-          </HeavyRoute>
-          {overlays}
-        </div>
-      );
-    }
-
-    if (route.kind === 'molecular-discovery') {
-      return (
-        <div className="app">
-          <TopBar title="🧪 Molecular Discovery — spike" onSearch={() => setSearchOpen(true)} />
-          <HeavyRoute>
-            <MolecularDiscoveryScreen />
           </HeavyRoute>
           {overlays}
         </div>

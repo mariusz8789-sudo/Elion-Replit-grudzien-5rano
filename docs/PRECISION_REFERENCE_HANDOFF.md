@@ -19,4 +19,4 @@ The runtime still has no reachable, citable compound-specific DAT/NET/SERT poten
 
 Only attempt compound-specific transporter evidence when a real reachable source adapter or citable primary source is available. Otherwise improve evidence-aware comparison/falsification/replay using the existing Precision contracts; do not create a parallel system. Verify Git before assuming report commit `4e832ae` exists.
 
-**Current continuation HEAD:** to be set after checkpoint commit.
+**Current continuation HEAD:** `e94dae9`.

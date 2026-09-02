@@ -206,7 +206,7 @@ export function City3DWebGLScreen() {
           <p>Żywy model agentowy · dane syntetyczne · WebGL</p>
           <div className="city-world-signal-row" aria-label="Stan epistemiczny świata">
             <span className="city-signal live"><i />REAL RUN</span>
-            <span className="city-signal">SCENARIO: BASELINE</span>
+            <span className="city-signal">SCENARIO: {scenarioTimeline?.scenarioLabel ?? 'BASELINE'}</span>
             <span className="city-signal">TIME: {scenarioTimeline ? 'REPLAYED MODEL DAY' : 'SIMULATION DAY'}</span>
             <span className="city-signal muted">FUTURE: NOT_MODELED</span>
           </div>

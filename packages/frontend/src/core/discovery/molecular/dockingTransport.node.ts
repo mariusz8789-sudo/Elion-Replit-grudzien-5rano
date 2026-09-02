@@ -74,6 +74,12 @@ export function createNodeDockingTransport(options: NodeDockingTransportOptions 
       if (receptor.kind === 'REAL_RECEPTOR' && (receptor.pdbqt ?? '').length === 0) {
         return { ok: false, error: 'INVALID_INPUT', reason: 'A receptor declared REAL_RECEPTOR must carry PDBQT content.' };
       }
+      if (receptor.kind === 'REAL_RECEPTOR' && receptor.center === undefined) {
+        // Vina needs a search volume. Guessing one would point the search at an
+        // arbitrary region of the protein and produce a real-looking number for
+        // a site nobody chose.
+        return { ok: false, error: 'INVALID_INPUT', reason: 'A real receptor must carry a docking box centre derived from its structure.' };
+      }
       if (receptor.kind === 'SMALL_MOLECULE_STANDIN' && (receptor.smiles ?? '').length === 0) {
         return { ok: false, error: 'INVALID_INPUT', reason: 'A stand-in receptor must carry SMILES.' };
       }
@@ -81,7 +87,8 @@ export function createNodeDockingTransport(options: NodeDockingTransportOptions 
       const seed = request.seed ?? 42;
       const exhaustiveness = Math.min(request.exhaustiveness ?? 8, 32);
       const nPoses = Math.min(request.nPoses ?? 5, 20);
-      const cacheKey = JSON.stringify([request.ligandSmiles, receptor.kind, receptor.pdbqt ?? receptor.smiles, seed, exhaustiveness, nPoses]);
+      const boxSize = receptor.boxSize ?? [22, 22, 22];
+      const cacheKey = JSON.stringify([request.ligandSmiles, receptor.kind, receptor.pdbqt ?? receptor.smiles, receptor.center ?? null, boxSize, seed, exhaustiveness, nPoses]);
 
       const cached = dockCache.get(cacheKey);
       if (cached !== undefined) return cached;
@@ -93,7 +100,8 @@ export function createNodeDockingTransport(options: NodeDockingTransportOptions 
           ligandSmiles: request.ligandSmiles,
           receptorSmiles: receptor.kind === 'SMALL_MOLECULE_STANDIN' ? receptor.smiles : undefined,
           receptorPdbqt: receptor.kind === 'REAL_RECEPTOR' ? receptor.pdbqt : undefined,
-          boxSize: [22, 22, 22],
+          center: receptor.center,
+          boxSize,
           exhaustiveness,
           nPoses,
           seed,

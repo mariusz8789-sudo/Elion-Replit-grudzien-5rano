@@ -29,6 +29,14 @@ export interface ReceptorSpec {
   smiles?: string;
   /** Where the receptor came from. Never blank for a real receptor. */
   provenance: string;
+  /**
+   * Docking box centre in the receptor's own coordinates. REQUIRED for a real
+   * receptor: without it there is no defined search volume, and Vina would be
+   * pointed at an arbitrary region of the protein. Derived from the structure
+   * by `receptorPreparation.node.ts`, never typed in.
+   */
+  center?: readonly [number, number, number];
+  boxSize?: readonly [number, number, number];
 }
 
 export type DockingDetect =

@@ -50,6 +50,7 @@ const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulatio
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
 const AutomotiveClaimAuditorScreen = lazy(() => import('./components/AutomotiveClaimAuditorScreen').then((m) => ({ default: m.AutomotiveClaimAuditorScreen })));
 const MolecularDiscoveryScreen = lazy(() => import('./components/MolecularDiscoveryScreen').then((m) => ({ default: m.MolecularDiscoveryScreen })));
+const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
@@ -97,7 +98,8 @@ type Route =
   | { kind: 'hf-slice' }
   | { kind: 'pilot' }
   | { kind: 'automotive-audit' }
-  | { kind: 'molecular-discovery' };
+  | { kind: 'molecular-discovery' }
+  | { kind: 'molecular-reference-analysis' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -129,6 +131,7 @@ function parseHash(): Route {
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/automotive-audit') return { kind: 'automotive-audit' };
   if (h === '#/molecular-discovery') return { kind: 'molecular-discovery' };
+  if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   return { kind: 'home' };
 }
 
@@ -524,6 +527,18 @@ export default function App() {
           <TopBar title="🧪 Molecular Discovery — spike" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <MolecularDiscoveryScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'molecular-reference-analysis') {
+      return (
+        <div className="app">
+          <TopBar title="🧪 Precision Reference Analysis" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <PrecisionReferenceAnalysisScreen />
           </HeavyRoute>
           {overlays}
         </div>

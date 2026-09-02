@@ -103,7 +103,17 @@ describe(`LINEAGE kampanii (rdkit=${rdkitAvailable})`, () => {
 });
 
 describe('kontrakt DiscoveryRun realnie zawiera evidence i replay', () => {
-  if (!rdkitAvailable) return;
+  if (!rdkitAvailable) {
+    // Bez RDKit nie ma kandydatów, ale kontrakt musi ISTNIEĆ — akcesory są
+    // obecne i wołalne niezależnie od tego, czy jakikolwiek silnik działa.
+    it('akcesory evidence/replay istnieją nawet bez silników', () => {
+      const empty = runDiscoveryCampaign(question, rdkitSmartsEnumeratorProvider(rdkit), request, objectives);
+      expect(typeof empty.evidence).toBe('function');
+      expect(typeof empty.replay).toBe('function');
+      expect(isSavedCampaign(empty.replay())).toBe(true);
+    });
+    return;
+  }
   const run = runDiscoveryCampaign(question, rdkitSmartsEnumeratorProvider(rdkit), request, objectives);
 
   it('run.evidence() zwraca realną paczkę dowodową', () => {

@@ -82,7 +82,11 @@ export function proposeNextDiscoverySteps(result: DiscoveryResult): readonly Nex
     addCapabilityStep(property.propertyId, property.status, `Property "${property.propertyId}" is ${property.status} for every candidate in this batch; no criterion in the current question depends on it.`);
   }
 
-  if (result.question.target.affinityCapability !== undefined && !result.capabilityGaps.some((g) => g.propertyId === 'targetAffinity')) {
+  // The target itself is named separately from the generic `targetAffinity`
+  // property scan above, because a target-specific step is more actionable —
+  // but only when that scan has not already claimed the same gap.
+  if (!covered.has('targetAffinity')) {
+    covered.add('targetAffinity');
     steps.push({
       kind: result.question.target.affinityCapability === 'REQUIRES_EXPERIMENT' ? 'REQUIRES_EXTERNAL_EXPERIMENT' : 'REQUIRES_EXTERNAL_ENGINE',
       action: `Obtain target-specific evidence for "${result.question.target.label}".`,

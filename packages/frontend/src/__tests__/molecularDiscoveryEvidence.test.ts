@@ -159,6 +159,13 @@ describe('S — następny eksperyment', () => {
     // Nic, czego Genesis nie potrafi, nie jest oznaczone jako wykonywalne.
     expect(steps.filter((s) => s.kind === 'RUNNABLE_IN_GENESIS').every((s) => s.resolves === 'candidateSpace')).toBe(true);
   });
+
+  it('ta sama brakująca zdolność nie jest zgłaszana dwa razy', () => {
+    // Regresja: targetAffinity trafiał i do skanu właściwości, i do osobnego
+    // kroku celu — lista wyglądała na dłuższą, niż jest realnych luk.
+    const resolved = proposeNextDiscoverySteps(result).filter((s) => s.kind !== 'RUNNABLE_IN_GENESIS').map((s) => s.resolves);
+    expect(resolved).toEqual([...new Set(resolved)]);
+  });
 });
 
 describe('T — pełny przebieg odkrywczy end-to-end', () => {

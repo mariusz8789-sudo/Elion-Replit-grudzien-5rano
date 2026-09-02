@@ -31,6 +31,7 @@ function worldStateAt(multiverse: TemporalMultiverse, worldId: WorldId, day: num
 function worldReadout(multiverse: TemporalMultiverse, worldId: WorldId, day: number): string {
   const state = worldStateAt(multiverse, worldId, day);
   if (!state) return 'NOT_MODELED';
+  if (!state.sample && state.logicalDay === 0) return 'INITIAL INPUT · DAY 0';
   if (!state.sample) return `${state.observationStatus} · DAY ${state.logicalDay}`;
   return `I ${state.sample.infectious} · hosp. ${state.sample.hospitalized} · D ${state.sample.deceased}`;
 }

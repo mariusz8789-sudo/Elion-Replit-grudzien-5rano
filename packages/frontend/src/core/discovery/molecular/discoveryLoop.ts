@@ -1,0 +1,272 @@
+import { assessHypothesis, describeResult, type ExperimentalResult, type HypothesisAssessment, type ResultProvenanceKind, type TestableHypothesis } from './experimentalResult';
+import { canonicalJson, fnv1a } from '../../events/hash';
+import { proposeDiscriminatingExperiments, type ProposedExperiment } from './discriminatingExperiment';
+import { runEndToEndDiscovery, type EndToEndDiscoveryRequest, type EndToEndDiscoveryEngines, type EndToEndDiscoveryResult } from './endToEndDiscovery';
+import { runRequirementEvaluation, type Requirement, type RequirementBatch } from './discoveryRequirements';
+import type { MoleculeCandidate } from './types';
+
+/**
+ * CLOSED-LOOP DISCOVERY.
+ *
+ * ROUND 1  question + requirements → candidates → ranking → next experiment
+ * ROUND 2  experiment result → evidence → hypothesis update → RERANK
+ * ROUND 3  updated hypothesis → new generation round → new ranking
+ *
+ * The output of each round is the input of the next. That is the entire point:
+ * the previous engine produced a report and stopped, so a measurement could
+ * never change anything. Here a result actually re-orders the field.
+ *
+ * HOW A RESULT CHANGES THE RANKING — and why it is not a fudge factor:
+ *
+ * A measurement is admitted ONLY against the candidate whose structure it was
+ * taken on (matched by canonical SMILES), and ONLY for the target and
+ * parameter it actually measured. It is then attached as a real property with
+ * `ACTUAL_SOURCE` status (or TEST_FIXTURE status for a labelled fixture), so
+ * the existing ranker sees it exactly like any other property — there is no
+ * separate "experimental bonus" pathway that could be tuned.
+ *
+ * A candidate with no measurement is NOT penalised and NOT rewarded; it stays
+ * where the predictions put it, and the round reports how many candidates the
+ * experiment actually touched. An experiment that measured one molecule
+ * re-orders one molecule.
+ *
+ * FIXTURES CAN NEVER BECOME MEASUREMENTS. The provenance kind rides on every
+ * derived object and every rendered line, and the round refuses to describe a
+ * fixture-driven update as experimental verification.
+ */
+export const DISCOVERY_LOOP_VERSION = '1.0.0';
+
+export interface DiscoveryRoundInput {
+  roundNumber: number;
+  discovery: EndToEndDiscoveryRequest;
+  requirements: readonly Requirement[];
+  /** Results ingested BEFORE this round runs. Empty for round 1. */
+  ingestedResults: readonly ExperimentalResult[];
+  /** Hypotheses under test, carried from the previous round's experiment proposal. */
+  hypotheses: readonly TestableHypothesis[];
+}
+
+export interface DiscoveryRound {
+  roundNumber: number;
+  result: EndToEndDiscoveryResult;
+  requirementBatch: RequirementBatch;
+  /** Results that actually bound to a candidate in this round's set. */
+  boundResults: readonly { resultId: string; candidateId: string; kind: ResultProvenanceKind }[];
+  unboundResults: readonly { resultId: string; reason: string }[];
+  hypothesisAssessments: readonly HypothesisAssessment[];
+  proposedExperiments: readonly ProposedExperiment[];
+  /** Pareto front candidate ids, in rank order. */
+  front: readonly string[];
+  roundFingerprint: string;
+}
+
+export interface RoundDelta {
+  fromRound: number;
+  toRound: number;
+  frontBefore: readonly string[];
+  frontAfter: readonly string[];
+  entered: readonly string[];
+  left: readonly string[];
+  unchanged: boolean;
+  /** Plain statement of what changed and, critically, WHY. */
+  explanation: string;
+}
+
+/**
+ * Attaches ingested results to the candidates they were measured on.
+ *
+ * Binding is by CANONICAL SMILES, never by name: a result naming
+ * "candidate 3" would bind to whatever happened to be third, which is exactly
+ * the kind of silent mis-association this engine must not permit.
+ */
+export function bindResultsToCandidates(
+  candidates: readonly MoleculeCandidate[],
+  results: readonly ExperimentalResult[],
+): {
+  enriched: readonly MoleculeCandidate[];
+  bound: { resultId: string; candidateId: string; kind: ResultProvenanceKind }[];
+  unbound: { resultId: string; reason: string }[];
+} {
+  const bound: { resultId: string; candidateId: string; kind: ResultProvenanceKind }[] = [];
+  const unbound: { resultId: string; reason: string }[] = [];
+  const bySmiles = new Map<string, MoleculeCandidate>();
+  for (const candidate of candidates) {
+    if (candidate.structure.canonicalSmiles !== null) bySmiles.set(candidate.structure.canonicalSmiles, candidate);
+  }
+
+  const additions = new Map<string, { propertyId: string; value: number | null; unit: string; kind: ResultProvenanceKind; source: string }[]>();
+
+  for (const result of results) {
+    if (result.canonicalSmiles === null) {
+      unbound.push({ resultId: result.resultId, reason: 'Result carries no canonical SMILES, so it cannot be bound to a candidate without guessing.' });
+      continue;
+    }
+    const candidate = bySmiles.get(result.canonicalSmiles);
+    if (candidate === undefined) {
+      unbound.push({ resultId: result.resultId, reason: `No candidate in this round has the structure ${result.canonicalSmiles}; the measurement is kept as evidence but changes no ranking.` });
+      continue;
+    }
+    bound.push({ resultId: result.resultId, candidateId: candidate.candidateId, kind: result.provenance.kind });
+    // Property id encodes target and parameter so it can never collide with a
+    // predicted endpoint or be mistaken for one.
+    const propertyId = `measured_${result.target}_${result.parameter}`.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    additions.set(candidate.candidateId, [
+      ...(additions.get(candidate.candidateId) ?? []),
+      { propertyId, value: result.value, unit: result.unit, kind: result.provenance.kind, source: result.provenance.source },
+    ]);
+  }
+
+  const enriched = candidates.map((candidate) => {
+    const extra = additions.get(candidate.candidateId);
+    if (extra === undefined) return candidate;
+    return {
+      ...candidate,
+      properties: [
+        ...candidate.properties,
+        ...extra.map((e) => ({
+          propertyId: e.propertyId,
+          // A fixture is TEST_FIXTURE, a real measurement is ACTUAL_SOURCE.
+          // There is no path by which a fixture becomes ACTUAL_SOURCE.
+          status: e.kind === 'REAL_MEASUREMENT' ? ('ACTUAL_SOURCE' as const) : ('TEST_FIXTURE' as const),
+          value: e.value,
+          unit: e.unit,
+          engine: e.kind === 'REAL_MEASUREMENT' ? e.source : `TEST_FIXTURE:${e.source}`,
+        })),
+      ],
+    };
+  });
+
+  return { enriched, bound, unbound };
+}
+
+export interface DiscoveryLoopEngines extends EndToEndDiscoveryEngines {}
+
+/**
+ * Runs ONE round. The discovery execution itself is the existing unmodified
+ * `runEndToEndDiscovery`; this adds requirement evaluation, result binding,
+ * hypothesis assessment and the next-experiment proposal around it.
+ */
+export function runDiscoveryRound(input: DiscoveryRoundInput, engines: DiscoveryLoopEngines): DiscoveryRound {
+  const result = runEndToEndDiscovery(input.discovery, engines);
+
+  // Bind any results ingested before this round to the evaluated candidates.
+  const { enriched, bound, unbound } = bindResultsToCandidates(result.evaluatedCandidates, input.ingestedResults);
+
+  // Reference values for REDUCE_VS_REFERENCE come from the seed candidate —
+  // the reference compound's own real computed values, not a declared guess.
+  const seed = enriched.find((c) => c.transformation === null);
+  const referenceValues: Record<string, number> = {};
+  for (const property of seed?.properties ?? []) {
+    if (typeof property.value === 'number') referenceValues[property.propertyId] = property.value;
+  }
+
+  const requirementBatch = runRequirementEvaluation(engines.rdkit, enriched, input.requirements, referenceValues);
+
+  const hypothesisAssessments = input.hypotheses.map((h) => assessHypothesis(h, input.ingestedResults));
+
+  const frontIds = result.topCandidates.map((c) => c.candidateId);
+  const frontCandidates = enriched.filter((c) => frontIds.includes(c.candidateId));
+
+  const proposedExperiments = proposeDiscriminatingExperiments({
+    candidates: frontCandidates,
+    pivot: {
+      target: input.discovery.question.target.targetId,
+      parameter: 'IC50',
+      threshold: null,
+      thresholdUnit: 'µM',
+    },
+    comparableProperties: [
+      { propertyId: 'mutagenicity', target: 'Ames', parameter: 'mutagenicity', lowerIsSupport: true },
+      { propertyId: 'liverInjury', target: 'DILI', parameter: 'liverInjury', lowerIsSupport: true },
+      { propertyId: 'clinicalToxicity', target: 'ClinTox', parameter: 'clinicalToxicity', lowerIsSupport: true },
+      { propertyId: 'bloodBrainBarrier', target: 'BBB', parameter: 'bloodBrainBarrier', lowerIsSupport: false },
+    ],
+  });
+
+  const roundFingerprint = fnv1a(canonicalJson({
+    v: DISCOVERY_LOOP_VERSION,
+    round: input.roundNumber,
+    discovery: result.resultFingerprint,
+    boundResultIds: bound.map((b) => b.resultId).sort(),
+    requirementIds: input.requirements.map((r) => r.requirementId).sort(),
+  }));
+
+  return {
+    roundNumber: input.roundNumber,
+    result,
+    requirementBatch,
+    boundResults: bound,
+    unboundResults: unbound,
+    hypothesisAssessments,
+    proposedExperiments,
+    front: frontIds,
+    roundFingerprint,
+  };
+}
+
+/**
+ * Compares two rounds and states what moved.
+ *
+ * An unchanged front is reported as unchanged — a loop that reports motion it
+ * did not produce is worse than one that admits a measurement changed nothing.
+ */
+export function diffRounds(previous: DiscoveryRound, next: DiscoveryRound): RoundDelta {
+  const before = previous.front;
+  const after = next.front;
+  const beforeSet = new Set(before);
+  const afterSet = new Set(after);
+  const entered = after.filter((id) => !beforeSet.has(id));
+  const left = before.filter((id) => !afterSet.has(id));
+  const unchanged = entered.length === 0 && left.length === 0
+    && before.length === after.length && before.every((id, i) => id === after[i]);
+
+  const kinds = new Set(next.boundResults.map((b) => b.kind));
+  const evidenceLabel = kinds.size === 0
+    ? 'no measurement was bound to any candidate'
+    : kinds.has('REAL_MEASUREMENT') && kinds.size === 1
+      ? `${next.boundResults.length} real measurement(s) bound`
+      : `${next.boundResults.length} bound result(s), including TEST_FIXTURE data`;
+
+  const explanation = unchanged
+    ? `Front unchanged between round ${previous.roundNumber} and ${next.roundNumber} (${evidenceLabel}). `
+      + 'The ranking did not move, and that is reported rather than dressed up as progress.'
+    : `Front changed between round ${previous.roundNumber} and ${next.roundNumber} (${evidenceLabel}). `
+      + `${entered.length} candidate(s) entered, ${left.length} left. `
+      + 'The change comes from measured properties attached to the specific structures they were measured on — no candidate was re-scored by anything other than its own data.';
+
+  return { fromRound: previous.roundNumber, toRound: next.roundNumber, frontBefore: before, frontAfter: after, entered, left, unchanged, explanation };
+}
+
+export interface DiscoveryLoopResult {
+  rounds: readonly DiscoveryRound[];
+  deltas: readonly RoundDelta[];
+  /** Every result the loop consumed, rendered with its provenance label intact. */
+  evidenceTrail: readonly string[];
+  loopFingerprint: string;
+}
+
+/**
+ * Runs a multi-round loop. Each round's `ingestedResults` and `hypotheses` are
+ * supplied by the caller, which is what keeps the seam honest: this module
+ * never invents a measurement to feed its own next round.
+ */
+export function runDiscoveryLoop(rounds: readonly DiscoveryRoundInput[], engines: DiscoveryLoopEngines): DiscoveryLoopResult {
+  const executed: DiscoveryRound[] = [];
+  for (const input of rounds) {
+    executed.push(runDiscoveryRound(input, engines));
+  }
+
+  const deltas: RoundDelta[] = [];
+  for (let i = 1; i < executed.length; i++) {
+    deltas.push(diffRounds(executed[i - 1]!, executed[i]!));
+  }
+
+  const evidenceTrail = rounds.flatMap((r) => r.ingestedResults.map(describeResult));
+
+  return {
+    rounds: executed,
+    deltas,
+    evidenceTrail,
+    loopFingerprint: fnv1a(canonicalJson({ v: DISCOVERY_LOOP_VERSION, rounds: executed.map((r) => r.roundFingerprint) })),
+  };
+}

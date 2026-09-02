@@ -1,5 +1,11 @@
 import { admetLimitations, runAdmetBatch, withAdmetProperties, type AdmetBatchResult } from './admetProvider';
 import type { AdmetTransport } from './admetTransport';
+import {
+  buildCandidateEpistemicState,
+  summariseEpistemicStates,
+  type CandidateEpistemicState,
+  type EpistemicSummary,
+} from './candidateEpistemicState';
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { compareToReferences, type ComparisonProfile, type ReferenceComparisonSet } from './referenceComparison';
 import { falsifyBatch, type BatchFalsification } from './falsification';
@@ -131,6 +137,15 @@ export function resolveReferenceIdentity(transport: RdkitTransport, profile: Com
  * stage of this run — see `runEndToEndDiscovery` for where each is taken.
  */
 export interface DiscoveryFunnel {
+  /**
+   * Every structure the generator actually produced or touched, INCLUDING the
+   * ones it threw away. Without this the funnel starts at "generated" and
+   * silently hides duplicates, failed transforms and over-limit products —
+   * i.e. it would not conserve.
+   */
+  attempted: number;
+  /** Structures the generator discarded, with the reasons preserved separately. */
+  discardedByGenerator: number;
   generated: number;
   rdkitValid: number;
   screeningRetained: number;
@@ -141,6 +156,48 @@ export interface DiscoveryFunnel {
   mechanismExcluded: number;
   mechanismUnevaluable: number;
   paretoFront: number;
+  /**
+   * True when every attempted structure is accounted for at every stage and
+   * no stage exceeds the one above it. A false value is a real accounting bug
+   * and is surfaced, never smoothed over.
+   */
+  conserved: boolean;
+  conservationNotes: readonly string[];
+}
+
+/** Generator discard reasons, counted. Kept out of `generated` but never dropped. */
+export interface GeneratorDiscards {
+  total: number;
+  byReason: Readonly<Record<string, number>>;
+}
+
+/**
+ * Checks the funnel actually conserves. Each stage must account for exactly
+ * the population handed to it — a candidate may not appear in two terminal
+ * buckets, and may not disappear between stages.
+ */
+function checkConservation(funnel: Omit<DiscoveryFunnel, 'conserved' | 'conservationNotes'>): { conserved: boolean; notes: string[] } {
+  const notes: string[] = [];
+
+  if (funnel.attempted !== funnel.generated + funnel.discardedByGenerator) {
+    notes.push(`attempted (${funnel.attempted}) != generated (${funnel.generated}) + discarded (${funnel.discardedByGenerator}).`);
+  }
+  const screened = funnel.screeningRetained + funnel.screeningRejected + funnel.screeningNotResolved;
+  if (screened !== funnel.generated) {
+    notes.push(`screening buckets (${screened}) do not account for all generated candidates (${funnel.generated}).`);
+  }
+  const mechanism = funnel.mechanismNotExcluded + funnel.mechanismExcluded + funnel.mechanismUnevaluable;
+  if (mechanism !== funnel.screeningRetained) {
+    notes.push(`mechanism buckets (${mechanism}) do not account for all screening survivors (${funnel.screeningRetained}).`);
+  }
+  if (funnel.paretoFront > funnel.mechanismNotExcluded) {
+    notes.push(`Pareto front (${funnel.paretoFront}) exceeds the population it was computed over (${funnel.mechanismNotExcluded}).`);
+  }
+  if (funnel.rdkitValid > funnel.generated) {
+    notes.push(`RDKit-valid (${funnel.rdkitValid}) exceeds generated (${funnel.generated}).`);
+  }
+
+  return { conserved: notes.length === 0, notes };
 }
 
 export interface CandidateOutcome {
@@ -174,6 +231,10 @@ export interface EndToEndDiscoveryResult {
   falsification: BatchFalsification;
   ranking: MultiObjectiveResult;
   funnel: DiscoveryFunnel;
+  generatorDiscards: GeneratorDiscards;
+  /** One per GENERATED candidate, rejected ones included. */
+  epistemicStates: readonly CandidateEpistemicState[];
+  epistemicSummary: EpistemicSummary;
   outcomes: readonly CandidateOutcome[];
   topCandidates: readonly CandidateOutcome[];
   limitations: readonly string[];
@@ -236,7 +297,21 @@ export function runEndToEndDiscovery(
       && admet.result.bySmiles[c.structure.canonicalSmiles] !== undefined).length
     : 0;
 
-  const funnel: DiscoveryFunnel = {
+  const discardedByReason: Record<string, number> = {};
+  for (const discard of discovery.batch.discarded) {
+    // Reasons carry a payload after the first colon (a SMILES, a count); the
+    // prefix is the actual category, so counts stay meaningful.
+    const category = discard.reason.split(':')[0] ?? 'unknown';
+    discardedByReason[category] = (discardedByReason[category] ?? 0) + 1;
+  }
+  const generatorDiscards: GeneratorDiscards = {
+    total: discovery.batch.discarded.length,
+    byReason: discardedByReason,
+  };
+
+  const rawFunnel = {
+    attempted: generatedCandidates.length + discovery.batch.discarded.length,
+    discardedByGenerator: discovery.batch.discarded.length,
     generated: generatedCandidates.length,
     rdkitValid: discovery.structuralValidation.filter((v) => v.valid === true).length,
     screeningRetained: screeningSurvivors.length,
@@ -249,7 +324,25 @@ export function runEndToEndDiscovery(
     paretoFront: ranking.ranked.filter((r) => r.onParetoFront).length,
   };
 
+  const conservation = checkConservation(rawFunnel);
+  const funnel: DiscoveryFunnel = { ...rawFunnel, conserved: conservation.conserved, conservationNotes: conservation.notes };
+
   const outcomes = buildOutcomes(generatedCandidates, discovery, mechanism, ranking);
+
+  // PER-CANDIDATE EPISTEMIC STATE — built for EVERY generated candidate, not
+  // only survivors, so a rejected candidate still carries a full account of
+  // what was and was not established about it.
+  const mechanismById = new Map(mechanism.reports.map((r) => [r.candidateId, r]));
+  const outcomeById = new Map(outcomes.map((o) => [o.candidateId, o]));
+  const epistemicStates = generatedCandidates.map((candidate) => {
+    const outcome = outcomeById.get(candidate.candidateId);
+    const enrichedCandidate = enriched.find((e) => e.candidateId === candidate.candidateId) ?? candidate;
+    return buildCandidateEpistemicState(enrichedCandidate, mechanismById.get(candidate.candidateId), {
+      excluded: outcome !== undefined && !outcome.retained && outcome.stage !== 'RANKING',
+      exclusionReason: outcome?.reason ?? '',
+    });
+  });
+  const epistemicSummary = summariseEpistemicStates(epistemicStates);
   const frontIds = new Set(ranking.ranked.filter((r) => r.onParetoFront).map((r) => r.candidateId));
 
   const resultFingerprint = fnv1a(canonicalJson({
@@ -273,12 +366,16 @@ export function runEndToEndDiscovery(
     falsification,
     ranking,
     funnel,
+    generatorDiscards,
+    epistemicStates,
+    epistemicSummary,
     outcomes,
     topCandidates: outcomes.filter((o) => o.onParetoFront),
     limitations: [
       ...mechanism.limitations,
       ...admetLimitations(admet),
       ranking.frontCaveat,
+      epistemicSummary.headline,
       `Every candidate in this run was GENERATED by ${discovery.generationCapability.methodId} — a deterministic SMARTS enumerator, not a generative model and not a database search. None of them has any literature, any measured affinity, or any experimental record.`,
       'No candidate here has been shown to act at any target. The strongest statement this run supports about any candidate is that no declared prerequisite excluded it, and that its predicted properties sit on the Pareto front of the declared objectives.',
       'Nothing in this result is a claim of safety, efficacy, clinical equivalence to any reference compound, or fitness for human use.',

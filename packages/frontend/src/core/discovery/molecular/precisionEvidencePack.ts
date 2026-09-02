@@ -8,6 +8,7 @@ import {
 } from './precisionReferenceAnalysis';
 import type { TargetEvidenceRef } from './targetHypothesis';
 import type { KnowledgePack3Record } from './knowledgePack3';
+import type { KnowledgePack4Record } from './knowledgePack4';
 
 /**
  * 3MMC_4CMC_PRECISION_EVIDENCE_PACK — assembly, replay, Scientific Memory.
@@ -31,6 +32,7 @@ export interface PrecisionEvidencePack {
   computedDescriptors: { similarity: PrecisionReferenceAnalysisResult['similarity'] };
   mechanismEvidence: { compoundA: PrecisionReferenceAnalysisResult['transporterEvidenceA']; compoundB: PrecisionReferenceAnalysisResult['transporterEvidenceB'] };
   knowledgePack3Evidence: readonly KnowledgePack3Record[];
+  knowledgePack4Evidence: readonly KnowledgePack4Record[];
   literatureEvidence: readonly TargetEvidenceRef[];
   comparison: PrecisionReferenceAnalysisResult['comparisonTable'];
   claims: PrecisionReferenceAnalysisResult['claims'];
@@ -61,7 +63,8 @@ export function buildPrecisionEvidencePack(
     computedDescriptors: { similarity: result.similarity },
     mechanismEvidence: { compoundA: result.transporterEvidenceA, compoundB: result.transporterEvidenceB },
     knowledgePack3Evidence: result.knowledgePack3Evidence,
-    literatureEvidence: [...literatureEvidence, ...result.knowledgePack3Evidence.map((record) => ({ source: 'LITERATURE' as const, identifier: record.doi ? `doi:${record.doi}` : `pmid:${record.pmid}`, establishes: `${record.compound} ${record.target} ${record.parameter}=${record.value}; ${record.assay}. Validation: ${record.validationStatus}.` }))],
+    knowledgePack4Evidence: result.knowledgePack4Evidence,
+    literatureEvidence: [...literatureEvidence, ...result.knowledgePack3Evidence.map((record) => ({ source: 'LITERATURE' as const, identifier: record.doi ? `doi:${record.doi}` : `pmid:${record.pmid}`, establishes: `${record.compound} ${record.target} ${record.parameter}=${record.value}; ${record.assay}. Validation: ${record.validationStatus}.` })), ...result.knowledgePack4Evidence.map((record) => ({ source: 'LITERATURE' as const, identifier: `pmid:${record.pmid}`, establishes: `${record.compound} ${record.target} ${record.parameter}=${record.value} ${record.unit}; ${record.assay}. Validation: ${record.validationStatus}.` }))],
     comparison: result.comparisonTable,
     claims: result.claims,
     falsification: result.falsification,

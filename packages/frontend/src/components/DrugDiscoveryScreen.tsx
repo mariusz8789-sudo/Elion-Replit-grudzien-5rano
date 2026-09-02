@@ -75,6 +75,7 @@ function DrugWorkspace() {
   const [referenceCompound, setReferenceCompound] = useState(() => routeParams.get('reference') ?? '');
   const [referenceTarget, setReferenceTarget] = useState(() => routeParams.get('target') ?? 'A1');
   const [replacementResult, setReplacementResult] = useState<NaturalFunctionalReplacementResult | null>(null);
+  const [naturalDiscoveryBusy, setNaturalDiscoveryBusy] = useState(false);
   const [selectedNaturalReportIds, setSelectedNaturalReportIds] = useState<string[]>([]);
   const canUseAdminWorkflow = projects.some((project) => project.role === 'owner' || project.role === 'admin');
   const activeReplacementReports = replacementResult?.reports.length ? replacementResult.reports : [pinnedDiscovery.report, adenosineDiscovery.report, theophyllineDiscovery.report];
@@ -188,6 +189,17 @@ function DrugWorkspace() {
 
   const rankByCandidate = new Map(ranking.map((r) => [r.candidateId, r]));
 
+  async function runNaturalDiscovery() {
+    if (!referenceCompound.trim() || naturalDiscoveryBusy) return;
+    setNaturalDiscoveryBusy(true);
+    try {
+      const result = await resolveNaturalFunctionalReplacementFromSources({ referenceCompound, target: referenceTarget });
+      setReplacementResult(result);
+    } finally {
+      setNaturalDiscoveryBusy(false);
+    }
+  }
+
   const saveComparison = (destination: 'memory' | 'dossier', candidateId?: string) => {
     const saved = saveBiotechDiscoveryComparisonToMemory(activeReplacementReports, {
       activityIds: replacementResult?.liveActivities?.map((activity) => `chembl:activity:${activity.activityId}`),
@@ -242,12 +254,12 @@ function DrugWorkspace() {
       {canUseAdminWorkflow ? <section className="settings-section">
         <h2>Natural Functional Replacement · ADMIN</h2>
         <p className="settings-hint">Granica uprawnień: workflow source-backed jest widoczny wyłącznie dla owner/admin projektu. Dane są read-only; ranking oznacza priorytet badań, nie skuteczność ani zamiennik terapeutyczny.</p>
-          <form className="account-form" onSubmit={(event) => { event.preventDefault(); void resolveNaturalFunctionalReplacementFromSources({ referenceCompound, target: referenceTarget }).then(setReplacementResult); }}>
+          <form className="account-form" onSubmit={(event) => { event.preventDefault(); void runNaturalDiscovery(); }}>
           <label className="account-field"><span>Reference compound / lek</span><input value={referenceCompound} onChange={(event) => setReferenceCompound(event.target.value)} placeholder="np. caffeine" /></label>
           <label className="account-field"><span>Target / receptor</span><input value={referenceTarget} onChange={(event) => setReferenceTarget(event.target.value)} placeholder="np. A1" /></label>
-          <button className="chip-btn primary" type="submit" disabled={!referenceCompound.trim()}>Pobierz źródła i analizuj</button>
+          <button className="chip-btn primary" type="submit" disabled={!referenceCompound.trim() || naturalDiscoveryBusy}>{naturalDiscoveryBusy ? 'Pobieram źródła…' : 'Pobierz źródła i analizuj'}</button>
         </form>
-        {replacementResult && <div className="cde-verdict" role="status"><strong>{replacementResult.status}</strong> · {replacementResult.reason}{replacementResult.reports.length > 0 && <span> Kandidatów: {replacementResult.reports.length}.</span>}</div>}
+        {replacementResult && <div className="cde-verdict" role="status"><strong>{replacementResult.status}</strong> · {replacementResult.reason}{replacementResult.reports.length > 0 && <span> Kandidatów: {replacementResult.reports.length}.</span>}{replacementResult.status === 'BLOCKED' && <button className="chip-btn" type="button" onClick={() => void runNaturalDiscovery()} disabled={naturalDiscoveryBusy}>{naturalDiscoveryBusy ? 'Ponawiam…' : 'Ponów retrieval'}</button>}</div>}
         {replacementResult?.liveActivities && <div className="cde-results" aria-label="Live ChEMBL activity evidence">
           <div className="cde-result"><span className="cde-result-label">Live ChEMBL activity</span><span className="cde-result-actual">{replacementResult.liveActivities.length} rekordów</span><span className="cde-result-bound">Ki / IC50 / EC50 nie są agregowane; każdy rekord zachowuje własną metrykę.</span></div>
           {replacementResult.liveActivities.slice(0, 12).map((activity) => <div className="cde-result" key={`${activity.activityId}:${activity.assayId}`}><span className="cde-result-label">{activity.compoundId} → {activity.targetId}</span><span className="cde-result-actual">{activity.type} {activity.relation} {activity.value} {activity.units}</span><span className="cde-result-bound">assay {activity.assayId} · {activity.assayQuality} · {activity.assayContext}</span></div>)}

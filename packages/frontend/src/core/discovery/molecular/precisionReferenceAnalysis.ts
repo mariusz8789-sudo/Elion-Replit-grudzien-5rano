@@ -12,6 +12,9 @@ import {
   type TransporterEvidenceRecord,
   type TransporterId,
 } from './transporterEvidence';
+import { knowledgePack3RecordsFor, type KnowledgePack3Record } from './knowledgePack3';
+import { listKnowledgePack4Records, type KnowledgePack4Record } from './knowledgePack4';
+import { KNOWLEDGE_PACK_4_CONFLICTS, listAllKnowledgePack4ExtendedRecords, type KnowledgePack4ConflictRecord, type KnowledgePack4ExtendedRecord } from './knowledgePack4Extended';
 
 /**
  * PRECISION REFERENCE ANALYSIS — 3-MMC vs 4-CMC.
@@ -164,6 +167,11 @@ export interface PrecisionReferenceAnalysisResult {
   similarity: StructuralSimilarityResult;
   transporterEvidenceA: readonly TransporterEvidenceRecord[];
   transporterEvidenceB: readonly TransporterEvidenceRecord[];
+  /** Supplied Pack #3 records relevant to either named compound; not silently VERIFIED. */
+  knowledgePack3Evidence: readonly KnowledgePack3Record[];
+  knowledgePack4Evidence: readonly KnowledgePack4Record[];
+  knowledgePack4ExtendedEvidence: readonly KnowledgePack4ExtendedRecord[];
+  knowledgePack4Conflicts: readonly KnowledgePack4ConflictRecord[];
   comparisonTable: readonly ComparisonRow[];
   claims: readonly EvidenceLinkedClaim[];
   falsification: PrecisionFalsificationReport;
@@ -178,6 +186,18 @@ export interface PrecisionAnalysisEngines {
 
 function fmt(value: number | null, digits = 2): string {
   return value === null ? 'NOT_AVAILABLE' : value.toFixed(digits);
+}
+
+function transporterDisplay(record: TransporterEvidenceRecord): string {
+  if (record.status === 'VERIFIED') return record.claim;
+  if (record.status === 'INFERRED') return 'INFERRED (class-level)';
+  return record.status;
+}
+
+function transporterStatus(a: TransporterEvidenceRecord, b: TransporterEvidenceRecord): string {
+  if (a.status === 'INFERRED' && b.status === 'INFERRED') return 'INFERRED, NOT compound-specific';
+  if (a.status === b.status) return a.status;
+  return `${a.status} / ${b.status}`;
 }
 
 export function runPrecisionReferenceAnalysis(
@@ -208,6 +228,9 @@ export function runPrecisionReferenceAnalysis(
 
   const transporterEvidenceA = buildTransporterEvidenceForCathinone(identityA.name);
   const transporterEvidenceB = buildTransporterEvidenceForCathinone(identityB.name);
+  const knowledgePack3Evidence = knowledgePack3RecordsFor([identityA.name, identityB.name]);
+  const knowledgePack4Evidence = listKnowledgePack4Records();
+  const knowledgePack4ExtendedEvidence = listAllKnowledgePack4ExtendedRecords();
 
   const falsification = runPrecisionFalsification({
     compoundAName: identityA.name,
@@ -224,9 +247,16 @@ export function runPrecisionReferenceAnalysis(
     { property: 'Molecular weight (g/mol)', compoundA: fmt(identityA.molecularWeight, 2), compoundB: fmt(identityB.molecularWeight, 2), evidenceStatus: identityA.molecularWeight !== null && identityB.molecularWeight !== null ? 'COMPUTED (RDKit)' : 'NOT_AVAILABLE' },
     { property: 'InChIKey', compoundA: identityA.inchiKey ?? 'NOT_AVAILABLE', compoundB: identityB.inchiKey ?? 'NOT_AVAILABLE', evidenceStatus: identityA.inchiKey !== null && identityB.inchiKey !== null ? 'COMPUTED (RDKit)' : 'NOT_AVAILABLE' },
     { property: 'Structural similarity (Tanimoto)', compoundA: '—', compoundB: similarity.available ? `${(similarity.tanimoto! * 100).toFixed(1)}% (${similarity.band})` : 'NOT_AVAILABLE', evidenceStatus: similarity.available ? 'COMPUTED (RDKit)' : 'NOT_AVAILABLE' },
-    { property: 'DAT activity', compoundA: 'INFERRED (class-level)', compoundB: 'INFERRED (class-level)', evidenceStatus: 'INFERRED, NOT compound-specific' },
-    { property: 'NET activity', compoundA: 'INFERRED (class-level)', compoundB: 'INFERRED (class-level)', evidenceStatus: 'INFERRED, NOT compound-specific' },
-    { property: 'SERT activity', compoundA: 'INFERRED (class-level)', compoundB: 'INFERRED (class-level)', evidenceStatus: 'INFERRED, NOT compound-specific' },
+    ...TRANSPORTER_IDS.map((transporter) => {
+      const evidenceA = transporterEvidenceA.find((record) => record.transporter === transporter)!;
+      const evidenceB = transporterEvidenceB.find((record) => record.transporter === transporter)!;
+      return {
+        property: `${transporter} activity`,
+        compoundA: transporterDisplay(evidenceA),
+        compoundB: transporterDisplay(evidenceB),
+        evidenceStatus: transporterStatus(evidenceA, evidenceB),
+      };
+    }),
     { property: 'Relative transporter selectivity / release vs. blockade', compoundA: 'UNKNOWN', compoundB: 'UNKNOWN', evidenceStatus: 'UNKNOWN — no compound-specific data reachable' },
     { property: 'Mechanism (named target)', compoundA: 'NOT_AVAILABLE', compoundB: 'NOT_AVAILABLE', evidenceStatus: 'BLOCKED_BY_RUNTIME (ChEMBL unreachable)' },
   ];
@@ -267,6 +297,10 @@ export function runPrecisionReferenceAnalysis(
     a: { name: identityA.name, smiles: identityA.canonicalSmiles, source: identityA.identitySource },
     b: { name: identityB.name, smiles: identityB.canonicalSmiles, source: identityB.identitySource },
     similarity: similarity.available ? similarity.tanimoto : null,
+    knowledgePack3Evidence: knowledgePack3Evidence.map((record) => [record.compound, record.target, record.parameter, record.value, record.validationStatus]),
+    knowledgePack4Evidence: knowledgePack4Evidence.map((record) => [record.compound, record.parameter, record.value, record.unit, record.pmid, record.validationStatus]),
+    knowledgePack4ExtendedEvidence: knowledgePack4ExtendedEvidence.map((record) => [record.compound, record.target, record.parameter, record.value, record.unit, record.validationStatus]),
+    knowledgePack4Conflicts: KNOWLEDGE_PACK_4_CONFLICTS,
     falsificationConcernCount: falsification.concernCount,
   }));
 
@@ -278,6 +312,10 @@ export function runPrecisionReferenceAnalysis(
     similarity,
     transporterEvidenceA,
     transporterEvidenceB,
+    knowledgePack3Evidence,
+    knowledgePack4Evidence,
+    knowledgePack4ExtendedEvidence,
+    knowledgePack4Conflicts: KNOWLEDGE_PACK_4_CONFLICTS,
     comparisonTable,
     claims,
     falsification,

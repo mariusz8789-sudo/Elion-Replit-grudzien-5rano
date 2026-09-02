@@ -1,4 +1,5 @@
 import { canonicalJson, fnv1a } from '../../events/hash';
+import { buildCampaignEvidencePack, buildSavedCampaign } from './campaignEvidence';
 import { admetLimitations, runAdmetBatch, withAdmetProperties, type AdmetBatchResult } from './admetProvider';
 import { unavailableAdmetTransport, type AdmetTransport } from './admetTransport';
 import { buildLeadCandidateDossier, type CandidateDossier, type NaturalProductContext, type RegulatoryContext } from './dossier';
@@ -111,6 +112,15 @@ export interface DiscoveryRun {
 
   dossier: CandidateDossier | null;
   nextExperiment: readonly NextDiscoveryStep[];
+
+  /**
+   * Lineage handles. These are lazy on purpose: building an Evidence Pack and
+   * an RO-Crate is real work, and a caller that only wants the ranking should
+   * not pay for it. Calling them is what proves the run is documentable — see
+   * `campaignEvidence.ts`, which uses only existing, unmodified engines.
+   */
+  evidence: () => import('../../experimentFabric/evidencePack').ScientificEvidencePack;
+  replay: () => import('./campaignEvidence').SavedCampaign;
 
   capabilities: readonly EngineCapabilityReport[];
   capabilityGaps: readonly { propertyId: string; status: PropertyStatus; detail: string }[];
@@ -307,7 +317,7 @@ export function runDiscoveryCampaign(
     decision,
   }));
 
-  return {
+  const runSurface: DiscoveryRun = {
     runId: `run_${runFingerprint}`,
     campaignVersion: DISCOVERY_CAMPAIGN_VERSION,
     question,
@@ -321,6 +331,8 @@ export function runDiscoveryCampaign(
     generations,
     stopReason,
     dossier,
+    evidence: () => buildCampaignEvidencePack(runSurface),
+    replay: () => buildSavedCampaign(runSurface),
     nextExperiment: proposeNextDiscoverySteps({
       contractVersion: DISCOVERY_CAMPAIGN_VERSION,
       question,
@@ -336,4 +348,6 @@ export function runDiscoveryCampaign(
     limitations,
     runFingerprint,
   };
+
+  return runSurface;
 }

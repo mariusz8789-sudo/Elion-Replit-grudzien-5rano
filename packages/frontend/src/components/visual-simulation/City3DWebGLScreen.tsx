@@ -66,11 +66,24 @@ export function City3DWebGLScreen() {
   const [experimentWorld] = useState(() => consumePendingExperimentWorld());
   // Drugi kanał przekazania: ZAKOŃCZONY przebieg Scenario Engine. Świat nie jest
   // wtedy taktowany — jest PRZEWIJANY po rzeczywistej serii dobowej przebiegu.
-  const [scenarioTimeline] = useState(() => consumePendingScenarioTimeline());
+  const [scenarioTimeline, setScenarioTimeline] = useState(() => consumePendingScenarioTimeline());
   const [timelineDay, setTimelineDay] = useState(0);
   const [enteredTimelineDay, setEnteredTimelineDay] = useState<number | null>(null);
   const [timelineSaved, setTimelineSaved] = useState<string | null>(null);
   const [timelineBookmark, setTimelineBookmark] = useState<TemporalStateBookmark | null>(null);
+  useEffect(() => {
+    const applyPendingScenarioTimeline = () => {
+      const pending = consumePendingScenarioTimeline();
+      if (!pending) return;
+      setScenarioTimeline(pending);
+      setTimelineDay(0);
+      setEnteredTimelineDay(null);
+      setTimelineBookmark(null);
+      setTimelineSaved(null);
+    };
+    window.addEventListener('genesis:scenario-timeline-ready', applyPendingScenarioTimeline);
+    return () => window.removeEventListener('genesis:scenario-timeline-ready', applyPendingScenarioTimeline);
+  }, []);
   const timelineSample = scenarioTimeline
     ? scenarioTimeline.series[Math.min(timelineDay, scenarioTimeline.series.length - 1)]
     : undefined;

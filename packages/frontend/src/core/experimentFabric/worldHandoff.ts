@@ -120,6 +120,7 @@ export function registerScenarioTimeline(handoff: ScenarioTimelineHandoff): void
 export function setPendingScenarioTimeline(runId: string): boolean {
   if (!SCENARIO_TIMELINES.has(runId)) return false;
   pendingScenarioRunId = runId;
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('genesis:scenario-timeline-ready'));
   return true;
 }
 

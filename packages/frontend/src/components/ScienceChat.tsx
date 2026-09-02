@@ -85,6 +85,20 @@ export function rawReferenceFromMessage(message: string): string | undefined {
   return match?.[1]?.trim();
 }
 
+export interface PrecisionQuestionContext {
+  question: string;
+  compound: string;
+  target: string;
+}
+
+/** Detects a compound/target question without claiming that a result exists. */
+export function precisionQuestionFromMessage(message: string): PrecisionQuestionContext | undefined {
+  if (!/(?:sprawdź|sprawdz|porównaj|porownaj|analizuj|zbadaj|compare|check|analyse|analyze)/i.test(message)) return undefined;
+  const match = message.match(/(?:sprawdź|sprawdz|porównaj|porownaj|analizuj|zbadaj|compare|check|analyse|analyze)\s+([A-Za-z0-9][A-Za-z0-9-]*)[\s\S]*?(?:względem|wzgledem|against|target(?:u)?|receptor(?:a)?|receptora)\s*[:=]?\s*([A-Za-z0-9][A-Za-z0-9-]*)/i);
+  if (!match) return undefined;
+  return { question: message.trim(), compound: match[1], target: match[2] };
+}
+
 function formatNaturalDiscoveryResult(result: Awaited<ReturnType<typeof resolveNaturalFunctionalReplacementFromSources>>): string {
   const top = [...result.reports].sort((a, b) => (b.ranking?.score ?? -1) - (a.ranking?.score ?? -1)).slice(0, 5);
   const why = result.candidateWhy ?? [];
@@ -336,6 +350,16 @@ export function ScienceChat() {
       } finally {
         setBackendConfirmationPending(false);
       }
+      return;
+    }
+    const precisionQuestion = precisionQuestionFromMessage(msg);
+    if (precisionQuestion) {
+      const query = new URLSearchParams({ question: precisionQuestion.question, compound: precisionQuestion.compound, target: precisionQuestion.target });
+      setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `PRECISION REFERENCE ANALYSIS — ${precisionQuestion.compound} względem ${precisionQuestion.target}. Otwieram istniejący workflow. Brakujące źródła, compute i statusy pozostaną jawne jako NOT_AVAILABLE/BLOCKED; pytanie zostało zachowane w kontekście route.`, tag: 'SYSTEM' }]);
+      window.location.hash = `#/molecular-reference-analysis?${query.toString()}`;
+      setInput('');
+      setOpen(false);
+      track('ask_ai_used', { via: 'science-chat-precision-reference', compound: precisionQuestion.compound, target: precisionQuestion.target });
       return;
     }
     const isNaturalDiscovery = /natural|naturalne|naturalnych|kandydat(ów|y)?/i.test(msg) && /reference|związk|lek|porówn|znajdź|wyszuk/i.test(msg);

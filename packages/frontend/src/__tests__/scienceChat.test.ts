@@ -458,3 +458,16 @@ describe('scienceChat: snapshot declaration integrity', () => {
     expect(r.text).toContain('VERIFY BLOCKED');
   });
 });
+
+
+describe('scienceChat: precision reference handoff', () => {
+  it('rozpoznaje compound/target i zachowuje pytanie bez udawania wyniku', async () => {
+    const { precisionQuestionFromMessage } = await import('../components/ScienceChat');
+    expect(precisionQuestionFromMessage('Sprawdź 3-MMC względem DAT')).toEqual({
+      question: 'Sprawdź 3-MMC względem DAT',
+      compound: '3-MMC',
+      target: 'DAT',
+    });
+    expect(precisionQuestionFromMessage('Pokaż mi pogodę jutro')).toBeUndefined();
+  });
+});

@@ -47,7 +47,18 @@ function StatusBadge({ status }: { status: string }) {
 const THREE_MMC: PrecisionCompoundRequest = { name: '3-MMC', fallbackSmiles: 'CNC(C)C(=O)c1cccc(C)c1', fallbackFormula: 'C11H15NO' };
 const FOUR_CMC: PrecisionCompoundRequest = { name: '4-CMC', fallbackSmiles: 'CNC(C)C(=O)c1ccc(Cl)cc1', fallbackFormula: 'C10H12ClNO' };
 
+function precisionRouteContext(): { question: string; compound: string; target: string } | null {
+  const query = window.location.hash.split('?')[1];
+  if (!query) return null;
+  const params = new URLSearchParams(query);
+  const question = params.get('question');
+  const compound = params.get('compound');
+  const target = params.get('target');
+  return question && compound && target ? { question, compound, target } : null;
+}
+
 export function PrecisionReferenceAnalysisScreen() {
+  const context = precisionRouteContext();
   const [result, setResult] = useState<PrecisionReferenceAnalysisResult | null>(null);
   const [savedRun, setSavedRun] = useState<SavedPrecisionAnalysisRun | null>(null);
   const [replayStatus, setReplayStatus] = useState<string | null>(null);
@@ -74,6 +85,15 @@ export function PrecisionReferenceAnalysisScreen() {
       <p style={{ fontSize: 13, opacity: 0.7, marginBottom: 16 }}>
         Scientific reference comparison only. No synthesis route, quantity, temperature, or production procedure is computed here.
       </p>
+      {context !== null && (
+        <section style={cardStyle} aria-label="Science Chat question context">
+          <div style={labelStyle}>Science Chat question context</div>
+          <div style={rowStyle}><span>Question</span><span>{context.question}</span></div>
+          <div style={rowStyle}><span>Compound</span><span>{context.compound}</span></div>
+          <div style={rowStyle}><span>Target</span><span>{context.target}</span></div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>Context preserved from Science Chat. It does not assert that evidence or compute is available.</div>
+        </section>
+      )}
       <button onClick={runAnalysis} style={{ padding: '8px 16px', marginBottom: 16 }}>Run analysis</button>
 
       {result !== null && (

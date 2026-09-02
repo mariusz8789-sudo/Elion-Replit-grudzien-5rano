@@ -1493,3 +1493,19 @@ Added regression coverage for the real `atoms.element` array shape. Focused natu
 - **Natural Composition:** Drug Discovery admin UI now lets an authorized user select exactly two resolved source-backed reports. It deterministically renders the existing `CandidateCombinationHypothesis` contract, evidence/target coverage, research priority, uncertainty, and validation plan. It explicitly reports `compute: NOT_EXECUTED`; no synergy, efficacy, safety, or clinical claim is made.
 - **Verification:** full monorepo test passed (`317 passed, 0 failed, 2 skipped` in the Node backend suite; frontend suite/build passed), lint passed after explicit Fetch globals were declared in the allowlisted biotech proxy files, and focused proxy tests passed 3/3.
 - **Next largest gap:** fresh browser-authenticated natural discovery execution with top-two selection through Memory/Replay, followed by candidate-specific docking promotion only if a scientifically interpretable receptor/ligand contract exists. Independent experimental validation remains external.
+
+## COMPLETED COHERENT BLOCK: Natural ketamine-like mechanism discovery
+
+The actual active branch now contains a bounded source-backed ketamine-like natural discovery path in `packages/frontend/src/core/biotechData/ketamineNaturalDiscovery.ts`, reusing the existing biotech candidate/report/comparison, provenance, Biological Validation Request and Scientific Memory infrastructure.
+
+The path constructs a literature-supported ketamine reference profile (PubChem CID 3821; NMDAR noncompetitive/use-dependent open-channel block), evaluates five natural candidates with separate structural, target, functional, mechanistic, physicochemical, ADMET and evidence-quality axes, includes explicit falsification criteria, and creates a `REQUIRES_EXPERIMENT` next-step protocol. The bounded deterministic result ranks Trodusquemine first for direct functional NMDAR evidence, followed by Agmatine and Isoliquiritigenin. Every report keeps clinical efficacy `UNKNOWN`, and no candidate is labeled a confirmed ketamine substitute.
+
+Science Chat recognizes English and Polish ketamine inflections, including `ketaminy`, and routes the request through the existing user-facing path. Targeted Chromium smoke verified the visible result, Trodusquemine ranking, `REQUIRES_EXPERIMENT` disclosure, explicit limitations and Scientific Memory write with comparison/replay fingerprint. No biological experiment is launched.
+
+Validation: ketamine discovery tests 3 passed; Scientific Memory tests 17 passed; full repository tests 299 passed, 17 skipped, 0 failed; frontend build and root lint passed; targeted Chromium smoke passed with zero page/console errors. The remaining limitation is external: no independent shared-condition NMDAR assay has been executed, so the claim ceiling remains a bounded functionally-supported research candidate and protocol-level discriminator.
+
+- **CHECKPOINT BEFORE THIS BLOCK:** `7198e67`
+- **ACTIVE BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT STATUS:** ketamine-like natural discovery is user-reachable, deterministic, source-backed and memory-persisted; biological validation remains `REQUIRES_EXPERIMENT`.
+- **PARKED:** independent NMDAR assay, clinical efficacy, CNS exposure, safety conclusion and experimental equivalence to ketamine.
+- **NEXT LARGE GAP:** bounded replay verification of the ketamine discovery artifact through the existing Scientific Memory comparison replay path.

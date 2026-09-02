@@ -180,6 +180,18 @@ function fmt(value: number | null, digits = 2): string {
   return value === null ? 'NOT_AVAILABLE' : value.toFixed(digits);
 }
 
+function transporterDisplay(record: TransporterEvidenceRecord): string {
+  if (record.status === 'VERIFIED') return record.claim;
+  if (record.status === 'INFERRED') return 'INFERRED (class-level)';
+  return record.status;
+}
+
+function transporterStatus(a: TransporterEvidenceRecord, b: TransporterEvidenceRecord): string {
+  if (a.status === 'INFERRED' && b.status === 'INFERRED') return 'INFERRED, NOT compound-specific';
+  if (a.status === b.status) return a.status;
+  return `${a.status} / ${b.status}`;
+}
+
 export function runPrecisionReferenceAnalysis(
   requestA: PrecisionCompoundRequest,
   requestB: PrecisionCompoundRequest,
@@ -224,9 +236,16 @@ export function runPrecisionReferenceAnalysis(
     { property: 'Molecular weight (g/mol)', compoundA: fmt(identityA.molecularWeight, 2), compoundB: fmt(identityB.molecularWeight, 2), evidenceStatus: identityA.molecularWeight !== null && identityB.molecularWeight !== null ? 'COMPUTED (RDKit)' : 'NOT_AVAILABLE' },
     { property: 'InChIKey', compoundA: identityA.inchiKey ?? 'NOT_AVAILABLE', compoundB: identityB.inchiKey ?? 'NOT_AVAILABLE', evidenceStatus: identityA.inchiKey !== null && identityB.inchiKey !== null ? 'COMPUTED (RDKit)' : 'NOT_AVAILABLE' },
     { property: 'Structural similarity (Tanimoto)', compoundA: '—', compoundB: similarity.available ? `${(similarity.tanimoto! * 100).toFixed(1)}% (${similarity.band})` : 'NOT_AVAILABLE', evidenceStatus: similarity.available ? 'COMPUTED (RDKit)' : 'NOT_AVAILABLE' },
-    { property: 'DAT activity', compoundA: 'INFERRED (class-level)', compoundB: 'INFERRED (class-level)', evidenceStatus: 'INFERRED, NOT compound-specific' },
-    { property: 'NET activity', compoundA: 'INFERRED (class-level)', compoundB: 'INFERRED (class-level)', evidenceStatus: 'INFERRED, NOT compound-specific' },
-    { property: 'SERT activity', compoundA: 'INFERRED (class-level)', compoundB: 'INFERRED (class-level)', evidenceStatus: 'INFERRED, NOT compound-specific' },
+    ...TRANSPORTER_IDS.map((transporter) => {
+      const evidenceA = transporterEvidenceA.find((record) => record.transporter === transporter)!;
+      const evidenceB = transporterEvidenceB.find((record) => record.transporter === transporter)!;
+      return {
+        property: `${transporter} activity`,
+        compoundA: transporterDisplay(evidenceA),
+        compoundB: transporterDisplay(evidenceB),
+        evidenceStatus: transporterStatus(evidenceA, evidenceB),
+      };
+    }),
     { property: 'Relative transporter selectivity / release vs. blockade', compoundA: 'UNKNOWN', compoundB: 'UNKNOWN', evidenceStatus: 'UNKNOWN — no compound-specific data reachable' },
     { property: 'Mechanism (named target)', compoundA: 'NOT_AVAILABLE', compoundB: 'NOT_AVAILABLE', evidenceStatus: 'BLOCKED_BY_RUNTIME (ChEMBL unreachable)' },
   ];

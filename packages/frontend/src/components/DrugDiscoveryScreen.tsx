@@ -28,6 +28,7 @@ import { resolveNaturalFunctionalReplacementFromSources, type NaturalFunctionalR
 const STATUS_LABEL: Record<string, string> = {
   AVAILABLE: 'dostępne', NOT_IMPLEMENTED: 'niezaimplementowane',
   EXTERNAL_ENGINE_REQUIRED: 'wymaga zewn. silnika', MODEL_NOT_VALID_FOR_DOMAIN: 'model poza dziedziną',
+  BLOCKED_BY_RUNTIME: 'zablokowane przez runtime',
 };
 
 export function DrugDiscoveryScreen() {

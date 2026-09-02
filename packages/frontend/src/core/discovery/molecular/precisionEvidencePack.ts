@@ -9,7 +9,7 @@ import {
 import type { TargetEvidenceRef } from './targetHypothesis';
 import type { KnowledgePack3Record } from './knowledgePack3';
 import type { KnowledgePack4Record } from './knowledgePack4';
-import type { KnowledgePack4ExtendedRecord } from './knowledgePack4Extended';
+import type { KnowledgePack4ConflictRecord, KnowledgePack4ExtendedRecord } from './knowledgePack4Extended';
 
 /**
  * 3MMC_4CMC_PRECISION_EVIDENCE_PACK — assembly, replay, Scientific Memory.
@@ -35,6 +35,7 @@ export interface PrecisionEvidencePack {
   knowledgePack3Evidence: readonly KnowledgePack3Record[];
   knowledgePack4Evidence: readonly KnowledgePack4Record[];
   knowledgePack4ExtendedEvidence: readonly KnowledgePack4ExtendedRecord[];
+  knowledgePack4Conflicts: readonly KnowledgePack4ConflictRecord[];
   literatureEvidence: readonly TargetEvidenceRef[];
   comparison: PrecisionReferenceAnalysisResult['comparisonTable'];
   claims: PrecisionReferenceAnalysisResult['claims'];
@@ -67,6 +68,7 @@ export function buildPrecisionEvidencePack(
     knowledgePack3Evidence: result.knowledgePack3Evidence,
     knowledgePack4Evidence: result.knowledgePack4Evidence,
     knowledgePack4ExtendedEvidence: result.knowledgePack4ExtendedEvidence,
+    knowledgePack4Conflicts: result.knowledgePack4Conflicts,
     literatureEvidence: [...literatureEvidence, ...result.knowledgePack3Evidence.map((record) => ({ source: 'LITERATURE' as const, identifier: record.doi ? `doi:${record.doi}` : `pmid:${record.pmid}`, establishes: `${record.compound} ${record.target} ${record.parameter}=${record.value}; ${record.assay}. Validation: ${record.validationStatus}.` })), ...result.knowledgePack4Evidence.map((record) => ({ source: 'LITERATURE' as const, identifier: `pmid:${record.pmid}`, establishes: `${record.compound} ${record.target} ${record.parameter}=${record.value} ${record.unit}; ${record.assay}. Validation: ${record.validationStatus}.` })), ...result.knowledgePack4ExtendedEvidence.map((record) => ({ source: 'LITERATURE' as const, identifier: record.pmid ? `pmid:${record.pmid}` : `source:${record.source}`, establishes: `${record.compound} ${record.target} ${record.parameter}=${record.value} ${record.unit}; ${record.assay}. Validation: ${record.validationStatus}.` }))],
     comparison: result.comparisonTable,
     claims: result.claims,

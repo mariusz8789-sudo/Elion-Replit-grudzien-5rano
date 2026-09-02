@@ -14,7 +14,7 @@ import {
 } from './transporterEvidence';
 import { knowledgePack3RecordsFor, type KnowledgePack3Record } from './knowledgePack3';
 import { listKnowledgePack4Records, type KnowledgePack4Record } from './knowledgePack4';
-import { listKnowledgePack4ExtendedRecords, type KnowledgePack4ExtendedRecord } from './knowledgePack4Extended';
+import { KNOWLEDGE_PACK_4_CONFLICTS, listAllKnowledgePack4ExtendedRecords, type KnowledgePack4ConflictRecord, type KnowledgePack4ExtendedRecord } from './knowledgePack4Extended';
 
 /**
  * PRECISION REFERENCE ANALYSIS — 3-MMC vs 4-CMC.
@@ -171,6 +171,7 @@ export interface PrecisionReferenceAnalysisResult {
   knowledgePack3Evidence: readonly KnowledgePack3Record[];
   knowledgePack4Evidence: readonly KnowledgePack4Record[];
   knowledgePack4ExtendedEvidence: readonly KnowledgePack4ExtendedRecord[];
+  knowledgePack4Conflicts: readonly KnowledgePack4ConflictRecord[];
   comparisonTable: readonly ComparisonRow[];
   claims: readonly EvidenceLinkedClaim[];
   falsification: PrecisionFalsificationReport;
@@ -229,7 +230,7 @@ export function runPrecisionReferenceAnalysis(
   const transporterEvidenceB = buildTransporterEvidenceForCathinone(identityB.name);
   const knowledgePack3Evidence = knowledgePack3RecordsFor([identityA.name, identityB.name]);
   const knowledgePack4Evidence = listKnowledgePack4Records();
-  const knowledgePack4ExtendedEvidence = listKnowledgePack4ExtendedRecords();
+  const knowledgePack4ExtendedEvidence = listAllKnowledgePack4ExtendedRecords();
 
   const falsification = runPrecisionFalsification({
     compoundAName: identityA.name,
@@ -299,6 +300,7 @@ export function runPrecisionReferenceAnalysis(
     knowledgePack3Evidence: knowledgePack3Evidence.map((record) => [record.compound, record.target, record.parameter, record.value, record.validationStatus]),
     knowledgePack4Evidence: knowledgePack4Evidence.map((record) => [record.compound, record.parameter, record.value, record.unit, record.pmid, record.validationStatus]),
     knowledgePack4ExtendedEvidence: knowledgePack4ExtendedEvidence.map((record) => [record.compound, record.target, record.parameter, record.value, record.unit, record.validationStatus]),
+    knowledgePack4Conflicts: KNOWLEDGE_PACK_4_CONFLICTS,
     falsificationConcernCount: falsification.concernCount,
   }));
 
@@ -313,6 +315,7 @@ export function runPrecisionReferenceAnalysis(
     knowledgePack3Evidence,
     knowledgePack4Evidence,
     knowledgePack4ExtendedEvidence,
+    knowledgePack4Conflicts: KNOWLEDGE_PACK_4_CONFLICTS,
     comparisonTable,
     claims,
     falsification,

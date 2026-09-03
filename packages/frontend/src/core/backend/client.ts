@@ -523,9 +523,19 @@ export interface AccessAuditEntry {
   workflow: string; sourceIds: string[]; runId: string | null; resultStatus: string | null; details: Record<string, unknown>; createdAt: number;
 }
 
+export interface ResearchAccessStatus {
+  projectId: string;
+  sources: { id: string; label: string; access: ProjectAccess['accessLevel']; status: 'AVAILABLE' | 'REQUIRES_AUTH'; credentialEnv: string | null }[];
+  policy: string;
+}
+
 export async function getProjectAccess(token: string, projectId: string): Promise<ApiResult<ProjectAccess>> {
   const r = await request<ProjectAccess>('GET', `/projects/${projectId}/access`, { token });
   return r;
+}
+
+export async function getResearchAccessStatus(token: string, projectId: string): Promise<ApiResult<ResearchAccessStatus>> {
+  return request<ResearchAccessStatus>('GET', `/projects/${projectId}/research-access`, { token });
 }
 
 export async function listProjectAccessAudit(token: string, projectId: string, limit = 40): Promise<ApiResult<AccessAuditEntry[]>> {

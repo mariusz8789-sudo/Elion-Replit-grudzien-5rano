@@ -22,8 +22,8 @@ describe('blind discovery benchmark — genuinely executed, not fixtures', () =>
       expect(result.correct).toBe(true);
     }
 
-    // Replay: 3 real cases (2 physics self-replays + 1 epidemiology re-execution).
-    expect(report.replay.cases).toHaveLength(3);
+    // Replay: 5 real cases (2 physics self-replays + 1 epidemiology re-execution + 2 generated-hypothesis re-generations).
+    expect(report.replay.cases).toHaveLength(5);
     expect(report.replay.matchRate).toBe(1);
     expect(report.replay.driftCount).toBe(0);
     expect(report.replay.blockedCount).toBe(0);
@@ -32,6 +32,13 @@ describe('blind discovery benchmark — genuinely executed, not fixtures', () =>
     // falsification criterion, discriminates something, fabricates no burden).
     expect(report.nextActionQuality.cases).toBeGreaterThan(0);
     expect(report.nextActionQuality.defensibleRate).toBe(1);
+
+    // Hypothesis generation: real candidates from both generation strategies, with real falsification.
+    expect(report.hypothesisGeneration.candidatesGenerated).toBeGreaterThan(2);
+    expect(report.hypothesisGeneration.provenanceCompleteness).toBe(1);
+    expect(report.hypothesisGeneration.formalizationSuccessRate).toBe(1);
+    expect(report.hypothesisGeneration.falsificationSuccessRate).toBeGreaterThan(0);
+    expect(report.hypothesisGeneration.unsupportedClaimRate).toBe(0);
 
     expect(report.summary).toMatch(/none is an estimate or a fixture/);
   }, RUN_TIMEOUT_MS);

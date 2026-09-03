@@ -1,6 +1,7 @@
 import type { RetrievalOutcome } from '../sources/scientificSourceAccess';
 import type { DatasetIngestionResult } from '../sources/datasetEvidenceIngestion';
 import type { HypothesisCompetitionResult } from './competingHypotheses';
+import type { GeneratedHypothesis } from '../hypothesisGeneration';
 
 /**
  * BLIND SCIENTIFIC DISCOVERY BENCHMARK — foundation.
@@ -151,6 +152,47 @@ export interface VerdictCaseResult extends VerdictCase {
 export function scoreVerdictCases(cases: readonly VerdictCase[]): { results: readonly VerdictCaseResult[]; accuracy: number } {
   const results = cases.map((c) => ({ ...c, correct: c.expected === c.actual }));
   return { results, accuracy: cases.length === 0 ? 0 : results.filter((r) => r.correct).length / cases.length };
+}
+
+export interface HypothesisGenerationScore {
+  candidatesGenerated: number;
+  /** Fraction with a non-empty provenance trail, generation rationale, and at least one real dependency. */
+  provenanceCompleteness: number;
+  /** Fraction that passed the real structural formalization gate (formalizeGeneratedHypothesis). */
+  formalizationSuccessRate: number;
+  /** Fraction that declares a non-empty falsification criterion — a candidate with none cannot honestly be called testable. */
+  testabilityRate: number;
+  /** Among candidates that reached TESTED, the fraction actually FALSIFIED — a real measure of whether falsification was attempted AND succeeded at least sometimes, not just attempted. */
+  falsificationSuccessRate: number;
+  /** Fraction verdicted SUPPORTED despite a failed or missing CHECKED-stage outcome — should always be 0 by construction; reporting it real, not assuming it. */
+  unsupportedClaimRate: number;
+}
+
+/**
+ * Scores a real batch of `GeneratedHypothesis` candidates — never a count
+ * typed in by hand. An empty batch scores 0 across the board, not NaN and
+ * not a default "good" score.
+ */
+export function scoreHypothesisGeneration(candidates: readonly GeneratedHypothesis[]): HypothesisGenerationScore {
+  const n = candidates.length;
+  if (n === 0) {
+    return { candidatesGenerated: 0, provenanceCompleteness: 0, formalizationSuccessRate: 0, testabilityRate: 0, falsificationSuccessRate: 0, unsupportedClaimRate: 0 };
+  }
+  const provenanceComplete = candidates.filter((c) => c.provenance.length > 0 && c.generationRationale.trim().length > 0 && c.dependencyIds.length > 0).length;
+  const formalized = candidates.filter((c) => c.formalization.ok).length;
+  const testable = candidates.filter((c) => c.falsificationCriteria.trim().length > 0).length;
+  const tested = candidates.filter((c) => c.status === 'TESTED');
+  const falsified = tested.filter((c) => c.verdict === 'FALSIFIED').length;
+  const unsupportedClaims = candidates.filter((c) => c.verdict === 'SUPPORTED' && !(c.check?.ok ?? false)).length;
+
+  return {
+    candidatesGenerated: n,
+    provenanceCompleteness: provenanceComplete / n,
+    formalizationSuccessRate: formalized / n,
+    testabilityRate: testable / n,
+    falsificationSuccessRate: tested.length === 0 ? 0 : falsified / tested.length,
+    unsupportedClaimRate: unsupportedClaims / n,
+  };
 }
 
 export interface ReplayConsistencyCase {

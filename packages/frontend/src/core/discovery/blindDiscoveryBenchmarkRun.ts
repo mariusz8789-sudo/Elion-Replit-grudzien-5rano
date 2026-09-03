@@ -27,11 +27,13 @@
  */
 import {
   scoreExtraction,
+  scoreHypothesisGeneration,
   scoreNextExperimentQuality,
   scoreRetrieval,
   scoreReplayConsistency,
   scoreVerdictCases,
   type EvidenceExtractionScore,
+  type HypothesisGenerationScore,
   type NextExperimentQualityCase,
   type ReplayConsistencyCase,
   type VerdictCaseResult,
@@ -43,7 +45,14 @@ import { replayGravitationalRedshiftCase, runGravitationalRedshiftCase, toStanda
 import { toNextScientificAction } from './physics/physicsCaseContract';
 import type { NextScientificAction } from './nextScientificAction';
 import { buildNextActionsFromSpacetimeInquiry, runSpacetimeStructureInquiry } from './physics/spacetimeStructureInquiry';
+import { generateSpacetimeHypotheses, replayGeneratedSpacetimeHypotheses } from './physics/generatedSpacetimeHypotheses';
+import { generatePhysicsModelCandidates, replayGeneratedPhysicsModelCandidates } from './physics/generatedPhysicsModelCandidates';
 import { executePreregisteredHypotheses, generateCompetingHypotheses, HYPOTHESIS_PROBLEMS, preregisterHypotheses, buildSavedHypothesisLoop, replaySavedHypothesisLoop } from '../experimentFabric/hypothesisLoop';
+
+/** scoreReplayConsistency's case type has no NOT_COMPARABLE bucket; mapping it to BLOCKED is conservative and honest — it is never counted as a match. */
+function toReplayConsistencyStatus(status: 'MATCH' | 'DRIFT' | 'NOT_COMPARABLE' | 'BLOCKED'): 'MATCH' | 'DRIFT' | 'BLOCKED' {
+  return status === 'NOT_COMPARABLE' ? 'BLOCKED' : status;
+}
 
 export const BLIND_DISCOVERY_BENCHMARK_RUN_VERSION = '1.0.0';
 
@@ -76,6 +85,7 @@ export interface BlindDiscoveryBenchmarkRunReport {
   hypothesisVerdicts: { accuracy: number; cases: number; results: readonly VerdictCaseResult[] };
   replay: { matchRate: number; driftCount: number; blockedCount: number; cases: readonly ReplayConsistencyCase[] };
   nextActionQuality: { defensibleRate: number; cases: number };
+  hypothesisGeneration: HypothesisGenerationScore;
   summary: string;
 }
 
@@ -127,10 +137,21 @@ export function runBlindDiscoveryBenchmark(connector: BenchmarkConnector): Blind
   const epidemiologySaved = buildSavedHypothesisLoop(epidemiologyResult);
   const epidemiologyReplay = replaySavedHypothesisLoop(epidemiologySaved);
 
+  // --- Hypothesis generation: both real generation strategies, scored and replayed. ---
+  const temporalGeneration = generateSpacetimeHypotheses(
+    'Are there mathematically consistent structures that could relate different temporal states without introducing an additional physical dimension?',
+  );
+  const physicsGeneration = generatePhysicsModelCandidates();
+  const temporalGenerationReplay = replayGeneratedSpacetimeHypotheses(temporalGeneration);
+  const physicsGenerationReplay = replayGeneratedPhysicsModelCandidates(physicsGeneration);
+  const hypothesisGeneration = scoreHypothesisGeneration([...temporalGeneration.candidates, ...physicsGeneration.candidates]);
+
   const replay = scoreReplayConsistency([
     { caseId: 'GPS_TIME_DILATION', status: gpsReplay.status },
     { caseId: 'GRAVITATIONAL_REDSHIFT', status: redshiftReplay.status },
     { caseId: 'EPIDEMIOLOGY_HYPOTHESIS_LOOP', status: epidemiologyReplay.status },
+    { caseId: 'GENERATED_SPACETIME_HYPOTHESES', status: toReplayConsistencyStatus(temporalGenerationReplay.status) },
+    { caseId: 'GENERATED_PHYSICS_MODEL_CANDIDATES', status: toReplayConsistencyStatus(physicsGenerationReplay.status) },
   ]);
 
   // --- Next-action quality: every physics + temporal next action this run actually produced. ---
@@ -151,13 +172,19 @@ export function runBlindDiscoveryBenchmark(connector: BenchmarkConnector): Blind
       { caseId: 'GPS_TIME_DILATION', status: gpsReplay.status },
       { caseId: 'GRAVITATIONAL_REDSHIFT', status: redshiftReplay.status },
       { caseId: 'EPIDEMIOLOGY_HYPOTHESIS_LOOP', status: epidemiologyReplay.status },
+      { caseId: 'GENERATED_SPACETIME_HYPOTHESES', status: toReplayConsistencyStatus(temporalGenerationReplay.status) },
+      { caseId: 'GENERATED_PHYSICS_MODEL_CANDIDATES', status: toReplayConsistencyStatus(physicsGenerationReplay.status) },
     ] },
     nextActionQuality: { defensibleRate: nextActionQuality.defensibleRate, cases: nextActions.length },
+    hypothesisGeneration,
     summary: `retrieval ${(retrieval.accuracy * 100).toFixed(0)}% (${retrieval.results.length} case), `
       + `extraction rate ${(extraction.extractionRate * 100).toFixed(0)}% / provenance completeness ${(extraction.provenanceCompleteness * 100).toFixed(0)}% (${extraction.checkedRecords} records), `
       + `physics hypothesis-verdict accuracy ${(hypothesisVerdicts.accuracy * 100).toFixed(0)}% (${hypothesisVerdicts.results.length} cases), `
-      + `replay match rate ${(replay.matchRate * 100).toFixed(0)}% across ${3} case(s) (physics x2 self-replay, epidemiology hypothesis-loop re-execution), `
-      + `next-action defensible rate ${(nextActionQuality.defensibleRate * 100).toFixed(0)}% (${nextActions.length} actions). `
+      + `replay match rate ${(replay.matchRate * 100).toFixed(0)}% across 5 case(s) (physics x2 self-replay, epidemiology hypothesis-loop re-execution, 2x generated-hypothesis re-generation), `
+      + `next-action defensible rate ${(nextActionQuality.defensibleRate * 100).toFixed(0)}% (${nextActions.length} actions), `
+      + `hypothesis generation: ${hypothesisGeneration.candidatesGenerated} candidate(s), provenance completeness ${(hypothesisGeneration.provenanceCompleteness * 100).toFixed(0)}%, `
+      + `formalization success ${(hypothesisGeneration.formalizationSuccessRate * 100).toFixed(0)}%, testability ${(hypothesisGeneration.testabilityRate * 100).toFixed(0)}%, `
+      + `falsification success ${(hypothesisGeneration.falsificationSuccessRate * 100).toFixed(0)}%, unsupported-claim rate ${(hypothesisGeneration.unsupportedClaimRate * 100).toFixed(0)}%. `
       + 'Every figure is computed from a real call this run made; none is an estimate or a fixture.',
   };
 }

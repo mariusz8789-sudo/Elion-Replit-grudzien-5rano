@@ -12,10 +12,13 @@ import {
   scoreHypothesisCompetition,
   scoreNextExperimentQuality,
   scoreReplayConsistency,
+  scoreHypothesisGeneration,
   scoreRetrieval,
   scoreVerdictCases,
   type BlindBenchmarkReport,
 } from '../core/discovery/molecular/scientificBenchmark';
+import { generateSpacetimeHypotheses } from '../core/discovery/physics/generatedSpacetimeHypotheses';
+import { generatePhysicsModelCandidates } from '../core/discovery/physics/generatedPhysicsModelCandidates';
 import type { ExperimentalResult, TestableHypothesis } from '../core/discovery/molecular/experimentalResult';
 
 /**
@@ -165,5 +168,30 @@ describe('scoreVerdictCases — the non-molecular generalisation of scoreHypothe
 
   it('accuracy is 0 for an empty case list, never NaN or a fabricated default', () => {
     expect(scoreVerdictCases([]).accuracy).toBe(0);
+  });
+});
+
+describe('scoreHypothesisGeneration — real measurements from real generated candidates', () => {
+  it('scores an empty batch as 0 across the board, never NaN', () => {
+    const score = scoreHypothesisGeneration([]);
+    expect(score).toEqual({ candidatesGenerated: 0, provenanceCompleteness: 0, formalizationSuccessRate: 0, testabilityRate: 0, falsificationSuccessRate: 0, unsupportedClaimRate: 0 });
+  });
+
+  it('scores the REAL temporal generator output: full provenance and formalization, zero unsupported claims', () => {
+    const result = generateSpacetimeHypotheses('Are there mathematically consistent structures that could relate different temporal states without introducing an additional physical dimension?');
+    const score = scoreHypothesisGeneration(result.candidates);
+    expect(score.candidatesGenerated).toBe(result.candidates.length);
+    expect(score.provenanceCompleteness).toBe(1);
+    expect(score.formalizationSuccessRate).toBe(1);
+    expect(score.testabilityRate).toBe(1);
+    expect(score.unsupportedClaimRate).toBe(0);
+  });
+
+  it('scores the REAL physics generator output: falsification genuinely attempted and succeeded at least once', () => {
+    const result = generatePhysicsModelCandidates();
+    const score = scoreHypothesisGeneration(result.candidates);
+    expect(score.candidatesGenerated).toBe(2);
+    expect(score.falsificationSuccessRate).toBeGreaterThan(0);
+    expect(score.unsupportedClaimRate).toBe(0);
   });
 });

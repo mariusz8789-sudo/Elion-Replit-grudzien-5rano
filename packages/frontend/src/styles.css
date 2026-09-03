@@ -2535,3 +2535,9 @@ body:has(.fp-lab) .science-chat-fab { display: none; }
 .research-panel { animation: research-panel-in .18s ease-out; }
 @keyframes research-panel-in { from { opacity: .25; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .research-panel, .research-inline-action { animation: none; transition: none; } }
+
+.research-audit-list { display: grid; gap: .3rem; margin: 0; padding: 0; list-style: none; }
+.research-audit-list li { display: grid; grid-template-columns: 1fr auto; gap: .16rem .45rem; padding: .35rem .4rem; border-left: 2px solid var(--cyan); background: rgba(255,255,255,.018); }
+.research-audit-list strong { overflow: hidden; text-overflow: ellipsis; color: var(--text); font: 700 .6rem/1.2 var(--font-mono); }
+.research-audit-list span { color: var(--text-faint); font: .55rem/1.2 var(--font-mono); text-align: right; }
+.research-audit-list code { grid-column: 1 / -1; overflow-wrap: anywhere; color: var(--green); font: .56rem/1.2 var(--font-mono); }

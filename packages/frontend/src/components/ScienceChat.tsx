@@ -11,7 +11,7 @@ import { track } from '../core/analytics';
 import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmEarthquakeEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { getToken } from '../core/backend/session';
-import { searchKnowledgeMaterials, getProjectAccess, type KnowledgeMaterial, type ProjectAccess } from '../core/backend/client';
+import { searchKnowledgeMaterials, getProjectAccess, listProjectAccessAudit, type KnowledgeMaterial, type ProjectAccess, type AccessAuditEntry } from '../core/backend/client';
 import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
 import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
@@ -42,6 +42,15 @@ const NEXT_MOVES = [
 
 function latestUserQuestion(turns: readonly ChatTurn[]): string | null {
   return [...turns].reverse().find((turn) => turn.role === 'user')?.text ?? null;
+}
+
+function AuditPanel({ entries }: { entries: readonly AccessAuditEntry[] }) {
+  return (
+    <section className="research-panel" aria-label="Access audit">
+      <div className="research-panel-title"><span>AUDIT TRAIL</span><small>odczyt z backendu</small></div>
+      {entries.length === 0 ? <p>Brak wpisów audytu dla aktywnego projektu.</p> : <ol className="research-audit-list">{entries.slice(0, 6).map((entry) => <li key={entry.id}><strong>{entry.action}</strong><span>{entry.accessLevel} · {entry.resultStatus ?? 'policy'} · {new Date(entry.createdAt).toLocaleString('pl-PL')}</span>{entry.runId && <code>{entry.runId}</code>}</li>)}</ol>}
+    </section>
+  );
 }
 
 function ResearchMemory({ turns, capsule }: { turns: readonly ChatTurn[]; capsule: EvidenceGuidedExperimentCapsule | null }) {
@@ -316,6 +325,8 @@ export function ScienceChat() {
   const [lastEvidenceCapsule, setLastEvidenceCapsule] = useState<EvidenceGuidedExperimentCapsule | null>(null);
   const [activeKnowledgeProject, setActiveKnowledgeProject] = useState<ActiveKnowledgeProject | null>(() => getActiveKnowledgeProject());
   const [projectAccess, setProjectAccess] = useState<ProjectAccess | null>(null);
+  const [accessAudit, setAccessAudit] = useState<AccessAuditEntry[]>([]);
+  const [lastHypothesisPlan, setLastHypothesisPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
   const [researchPanel, setResearchPanel] = useState<ResearchPanel>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -338,9 +349,11 @@ export function ScienceChat() {
   useEffect(() => {
     let cancelled = false;
     const token = getToken();
-    if (!token || !activeKnowledgeProject) { setProjectAccess(null); return () => { cancelled = true; }; }
-    void getProjectAccess(token, activeKnowledgeProject.id).then((result) => {
-      if (!cancelled) setProjectAccess(result.ok ? result.data : null);
+    if (!token || !activeKnowledgeProject) { setProjectAccess(null); setAccessAudit([]); return () => { cancelled = true; }; }
+    void Promise.all([getProjectAccess(token, activeKnowledgeProject.id), listProjectAccessAudit(token, activeKnowledgeProject.id)]).then(([access, audit]) => {
+      if (cancelled) return;
+      setProjectAccess(access.ok ? access.data : null);
+      setAccessAudit(audit.ok ? audit.data : []);
     });
     return () => { cancelled = true; };
   }, [activeKnowledgeProject]);
@@ -508,6 +521,7 @@ export function ScienceChat() {
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
       setResearchPanel('hypotheses');
+      setLastHypothesisPlan(reviewed);
       setPendingGuidedPlan(reviewed.status === 'READY_FOR_CONFIRMATION' || reviewed.status === 'READY_FOR_HYPOTHETICAL_CONFIRMATION' ? reviewed : null);
       setBiotechWorkspaceSuggested(fabricRequest.domainId === 'biotechnology' && reviewed.status !== 'READY_FOR_CONFIRMATION' && reviewed.status !== 'READY_FOR_HYPOTHETICAL_CONFIRMATION');
       setInput('');
@@ -604,10 +618,11 @@ export function ScienceChat() {
       <DiscoveryStageRail stage={stage} />
 
       <div className="research-tools" aria-label="Research workspace tools">
-        {(['why', 'evidence', 'hypotheses', 'memory', 'timeline'] as const).map((panel) => <button key={panel} className={`research-tool${researchPanel === panel ? ' active' : ''}`} onClick={() => setResearchPanel(researchPanel === panel ? null : panel)}>{panel === 'why' ? 'WHY?' : panel.toUpperCase()}</button>)}
+        {(['why', 'evidence', 'hypotheses', 'memory', 'timeline', 'audit'] as const).map((panel) => <button key={panel} className={`research-tool${researchPanel === panel ? ' active' : ''}`} onClick={() => setResearchPanel(researchPanel === panel ? null : panel)}>{panel === 'why' ? 'WHY?' : panel.toUpperCase()}</button>)}
       </div>
       {researchPanel === 'why' && <WhyPanel plan={pendingGuidedPlan} capsule={lastEvidenceCapsule} />}
-      {researchPanel === 'hypotheses' && <HypothesesPanel plan={pendingGuidedPlan} onAction={(prompt) => void send(prompt)} />}
+      {researchPanel === 'hypotheses' && <HypothesesPanel plan={pendingGuidedPlan ?? lastHypothesisPlan} onAction={(prompt) => void send(prompt)} />}
+      {researchPanel === 'audit' && <AuditPanel entries={accessAudit} />}
       {researchPanel === 'evidence' && <EvidencePanel capsule={lastEvidenceCapsule} />}
       {researchPanel === 'memory' && <ResearchMemory turns={turns} capsule={lastEvidenceCapsule} />}
       {researchPanel === 'timeline' && <ResearchTimeline turns={turns} stage={stage} />}

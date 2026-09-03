@@ -28,7 +28,7 @@ import { resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile
 
 interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean }
 
-type ResearchPanel = 'why' | 'evidence' | 'memory' | 'timeline' | null;
+type ResearchPanel = 'why' | 'evidence' | 'hypotheses' | 'memory' | 'timeline' | null;
 
 const NEXT_MOVES = [
   { label: 'TEST THIS', prompt: 'Zaproponuj test dla ostatniej hipotezy.' },
@@ -75,6 +75,20 @@ function ResearchTimeline({ turns, stage }: { turns: readonly ChatTurn[]; stage:
         ))}
         <li className="current"><strong>NEXT MOVE</strong><span>Aktualny etap: {DISCOVERY_STAGE_LABELS[stage]}.</span></li>
       </ol>
+    </section>
+  );
+}
+
+function HypothesesPanel({ plan, onAction }: { plan: EvidenceGuidedExperimentPlan | null; onAction: (prompt: string) => void }) {
+  return (
+    <section className="research-panel" aria-label="Hypotheses">
+      <div className="research-panel-title"><span>HYPOTHESES</span><small>bez udawanej pewności</small></div>
+      {plan ? <article className="hypothesis-card">
+        <div className="hypothesis-card-head"><strong>HYPOTHESIS / PLAN</strong><span>{plan.status}</span></div>
+        <p>{plan.request.sourceText}</p>
+        <div className="hypothesis-meta"><span>DOMAIN <b>{plan.request.domainId}</b></span><span>MODEL <b>{plan.request.modelId ?? 'NOT_SELECTED'}</b></span><span>CONFIDENCE <b>NOT_ASSIGNED</b></span></div>
+        <div className="hypothesis-actions"><button className="research-inline-action" onClick={() => onAction('Zaproponuj test dla ostatniej hipotezy.')}>TEST</button><button className="research-inline-action" onClick={() => onAction('Spróbuj obalić ostatnią hipotezę.')}>CHALLENGE</button><button className="research-inline-action" onClick={() => onAction('Idź głębiej: pokaż założenia, niepewności i ograniczenia.')}>GO DEEPER</button></div>
+      </article> : <p>Hipoteza pojawi się po sformułowaniu pytania i utworzeniu planu przez istniejący core. Brak planu nie jest hipotezą.</p>}
     </section>
   );
 }
@@ -457,7 +471,7 @@ export function ScienceChat() {
     if (isFabricRequest) {
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
-      setResearchPanel('why');
+      setResearchPanel('hypotheses');
       setPendingGuidedPlan(reviewed.status === 'READY_FOR_CONFIRMATION' || reviewed.status === 'READY_FOR_HYPOTHETICAL_CONFIRMATION' ? reviewed : null);
       setBiotechWorkspaceSuggested(fabricRequest.domainId === 'biotechnology' && reviewed.status !== 'READY_FOR_CONFIRMATION' && reviewed.status !== 'READY_FOR_HYPOTHETICAL_CONFIRMATION');
       setInput('');
@@ -554,9 +568,10 @@ export function ScienceChat() {
       <DiscoveryStageRail stage={stage} />
 
       <div className="research-tools" aria-label="Research workspace tools">
-        {(['why', 'evidence', 'memory', 'timeline'] as const).map((panel) => <button key={panel} className={`research-tool${researchPanel === panel ? ' active' : ''}`} onClick={() => setResearchPanel(researchPanel === panel ? null : panel)}>{panel === 'why' ? 'WHY?' : panel.toUpperCase()}</button>)}
+        {(['why', 'evidence', 'hypotheses', 'memory', 'timeline'] as const).map((panel) => <button key={panel} className={`research-tool${researchPanel === panel ? ' active' : ''}`} onClick={() => setResearchPanel(researchPanel === panel ? null : panel)}>{panel === 'why' ? 'WHY?' : panel.toUpperCase()}</button>)}
       </div>
       {researchPanel === 'why' && <WhyPanel plan={pendingGuidedPlan} capsule={lastEvidenceCapsule} />}
+      {researchPanel === 'hypotheses' && <HypothesesPanel plan={pendingGuidedPlan} onAction={(prompt) => void send(prompt)} />}
       {researchPanel === 'evidence' && <EvidencePanel capsule={lastEvidenceCapsule} />}
       {researchPanel === 'memory' && <ResearchMemory turns={turns} capsule={lastEvidenceCapsule} />}
       {researchPanel === 'timeline' && <ResearchTimeline turns={turns} stage={stage} />}

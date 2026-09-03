@@ -511,6 +511,18 @@ export interface FabricComputeResponse {
 }
 
 /** Public, typed access to the model-first Fabric contract; external capability seams never execute through this endpoint. */
+export interface ProjectAccess {
+  projectId: string;
+  accessLevel: 'PUBLIC' | 'RESEARCH' | 'RESTRICTED';
+  role: ProjectRole;
+  canRun: boolean;
+}
+
+export async function getProjectAccess(token: string, projectId: string): Promise<ApiResult<ProjectAccess>> {
+  const r = await request<ProjectAccess>('GET', `/projects/${projectId}/access`, { token });
+  return r;
+}
+
 export async function getFabricComputeContract(): Promise<ApiResult<FabricComputeContract>> {
   const r = await request<{ contract: FabricComputeContract }>('GET', '/compute/fabric/contract');
   return r.ok ? { ok: true, data: r.data.contract } : r;

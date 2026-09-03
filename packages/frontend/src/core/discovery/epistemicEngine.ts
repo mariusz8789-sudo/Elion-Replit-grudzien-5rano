@@ -22,20 +22,37 @@
  *
  *   `applyEpistemicUpdates` takes REAL, externally-established status
  *   changes (the caller already ran the real computation — a hypothesis
- *   test, a model validation, an experiment) and propagates them through
- *   exactly two relations this engine can interpret without guessing:
- *   DEPENDS_ON and BLOCKS. If X depends on Y and Y ends up FALSIFIED (or
- *   already BLOCKED), X becomes BLOCKED — to a fixed point, transitively.
+ *   test, a model validation, an experiment) and propagates them through a
+ *   small, explicit set of relations this engine can interpret without
+ *   guessing, each to a fixed point:
  *
- *   Every other relation (SUPPORTS, CONTRADICTS, PREDICTS, TESTS,
- *   DERIVED_FROM, FALSIFIES, DISTINGUISHES) is stored and queryable — the
- *   graph structure is real and complete — but does NOT trigger automatic
- *   propagation here. Deciding the general consequence of "X contradicts Y"
- *   requires domain understanding this engine does not have; inventing
- *   that inference would be exactly the kind of fabricated reasoning this
- *   project refuses to produce. A future, domain-aware layer can read these
- *   edges and decide more; this core only acts where the rule is
- *   unambiguous.
+ *   - DEPENDS_ON / BLOCKS: if X depends on Y (or Y blocks X) and Y ends up
+ *     FALSIFIED (or already BLOCKED), X becomes BLOCKED.
+ *   - FALSIFIES / SUPPORTS: if a node whose status is already "affirmative"
+ *     (ESTABLISHED or SUPPORTED — i.e. real, executed evidence, not a mere
+ *     assertion) has an outgoing FALSIFIES edge to a target, the target
+ *     becomes FALSIFIED; an outgoing SUPPORTS edge makes the target
+ *     SUPPORTED. If a target receives BOTH an affirmative FALSIFIES edge
+ *     AND an affirmative SUPPORTS edge at once, that is genuinely
+ *     conflicting evidence — the target is set to UNRESOLVED (never
+ *     silently picks a side) with a reason naming both sources.
+ *   - CONTRADICTS: deliberately asymmetric and weaker than FALSIFIES. If A
+ *     CONTRADICTS B and A is SUPPORTED while B is still UNRESOLVED, B
+ *     becomes WEAKENED — not FALSIFIED, because two hypotheses being framed
+ *     as mutually exclusive does not itself constitute a computed
+ *     falsification of the other; it is a real but softer signal, and this
+ *     engine never overstates it. A node already at a stronger, decided
+ *     status (SUPPORTED/FALSIFIED/BLOCKED) is left alone.
+ *
+ *   PREDICTS, TESTS, DERIVED_FROM and DISTINGUISHES remain stored and
+ *   queryable — the graph structure is real and complete — but trigger NO
+ *   automatic propagation here. Each names a real structural fact (which
+ *   experiment tests which hypothesis, what a model predicts, what an
+ *   experiment can distinguish, what a claim was derived from) that a
+ *   downstream layer (see experimentSelection.ts) reads to REASON about
+ *   what to do next; none of them, alone, tells this engine what a node's
+ *   new STATUS should be, so inventing that inference here would be exactly
+ *   the kind of fabricated reasoning this project refuses to produce.
  */
 import { canonicalJson, fnv1a } from '../events/hash';
 import { saveExperiment, type SavedExperiment } from '../scienceMemory';
@@ -202,11 +219,15 @@ function withUpdatedStatus(node: EpistemicNode, newStatus: EpistemicStatus, reas
 
 const BLOCKING_STATUSES: ReadonlySet<EpistemicStatus> = new Set(['FALSIFIED', 'BLOCKED']);
 
+/** A node whose status reflects real, executed evidence (not a mere unconfirmed assertion) — the only kind of source this engine will propagate FALSIFIES/SUPPORTS/CONTRADICTS from. */
+const AFFIRMATIVE_STATUSES: ReadonlySet<EpistemicStatus> = new Set(['ESTABLISHED', 'SUPPORTED']);
+
 /**
  * Applies real, externally-established status updates, then deterministically
- * propagates DEPENDS_ON / BLOCKS to a fixed point (repeats until no further
- * node changes). A node already at its target status is left untouched — no
- * update is ever recorded as a "change" when nothing actually changed.
+ * propagates DEPENDS_ON / BLOCKS / FALSIFIES / SUPPORTS / CONTRADICTS to a
+ * fixed point (repeats until no further node changes). A node already at its
+ * target status is left untouched — no update is ever recorded as a "change"
+ * when nothing actually changed.
  */
 export function applyEpistemicUpdates(graph: EpistemicGraph, updates: readonly StatusUpdate[]): PropagationResult {
   const nodesById = new Map(graph.nodes.map((n) => [n.nodeId, n]));
@@ -216,12 +237,13 @@ export function applyEpistemicUpdates(graph: EpistemicGraph, updates: readonly S
 
   const changes: EpistemicChange[] = [];
 
-  function setStatus(nodeId: string, newStatus: EpistemicStatus, reason: string, triggeredBy: string | null, extraProvenance: readonly string[] = []): void {
+  function setStatus(nodeId: string, newStatus: EpistemicStatus, reason: string, triggeredBy: string | null, extraProvenance: readonly string[] = []): boolean {
     const node = nodesById.get(nodeId)!;
-    if (node.status === newStatus) return;
+    if (node.status === newStatus) return false;
     const updated = withUpdatedStatus(node, newStatus, reason, extraProvenance);
     nodesById.set(nodeId, updated);
     changes.push({ nodeId, previousStatus: node.status, newStatus, reason, triggeredBy });
+    return true;
   }
 
   for (const u of updates) {
@@ -231,20 +253,52 @@ export function applyEpistemicUpdates(graph: EpistemicGraph, updates: readonly S
   let progressed = true;
   while (progressed) {
     progressed = false;
+
     for (const edge of graph.edges) {
       if (edge.relation === 'DEPENDS_ON') {
         const dependedOn = nodesById.get(edge.to)!;
         const dependent = nodesById.get(edge.from)!;
         if (BLOCKING_STATUSES.has(dependedOn.status) && dependent.status !== 'BLOCKED') {
-          setStatus(edge.from, 'BLOCKED', `Depends on "${edge.to}" (${edge.rationale}), which is ${dependedOn.status}.`, edge.to);
-          progressed = true;
+          if (setStatus(edge.from, 'BLOCKED', `Depends on "${edge.to}" (${edge.rationale}), which is ${dependedOn.status}.`, edge.to)) progressed = true;
         }
       } else if (edge.relation === 'BLOCKS') {
         const blocker = nodesById.get(edge.from)!;
         const blocked = nodesById.get(edge.to)!;
         if (BLOCKING_STATUSES.has(blocker.status) && blocked.status !== 'BLOCKED') {
-          setStatus(edge.to, 'BLOCKED', `Blocked by "${edge.from}" (${edge.rationale}), which is ${blocker.status}.`, edge.from);
-          progressed = true;
+          if (setStatus(edge.to, 'BLOCKED', `Blocked by "${edge.from}" (${edge.rationale}), which is ${blocker.status}.`, edge.from)) progressed = true;
+        }
+      }
+    }
+
+    // FALSIFIES / SUPPORTS: decided per TARGET node, considering every
+    // incoming edge at once, so genuinely conflicting evidence (both an
+    // affirmative FALSIFIES and an affirmative SUPPORTS pointing at the same
+    // node) is detected and reported as UNRESOLVED rather than one relation
+    // arbitrarily winning a race.
+    for (const node of graph.nodes) {
+      const incomingFalsifies = graph.edges.filter((e) => e.relation === 'FALSIFIES' && e.to === node.nodeId && AFFIRMATIVE_STATUSES.has(nodesById.get(e.from)!.status));
+      const incomingSupports = graph.edges.filter((e) => e.relation === 'SUPPORTS' && e.to === node.nodeId && AFFIRMATIVE_STATUSES.has(nodesById.get(e.from)!.status));
+      if (incomingFalsifies.length > 0 && incomingSupports.length > 0) {
+        const reason = `Conflicting evidence: FALSIFIES from "${incomingFalsifies[0]!.from}" and SUPPORTS from "${incomingSupports[0]!.from}" are both currently affirmative — this engine will not silently pick a side.`;
+        if (setStatus(node.nodeId, 'UNRESOLVED', reason, null)) progressed = true;
+      } else if (incomingFalsifies.length > 0) {
+        const source = incomingFalsifies[0]!;
+        if (setStatus(node.nodeId, 'FALSIFIED', `Falsified by "${source.from}" (${source.rationale}), which is ${nodesById.get(source.from)!.status}.`, source.from)) progressed = true;
+      } else if (incomingSupports.length > 0) {
+        const source = incomingSupports[0]!;
+        if (setStatus(node.nodeId, 'SUPPORTED', `Supported by "${source.from}" (${source.rationale}), which is ${nodesById.get(source.from)!.status}.`, source.from)) progressed = true;
+      }
+    }
+
+    // CONTRADICTS: asymmetric and weaker than FALSIFIES/SUPPORTS — a
+    // SUPPORTED source only WEAKENS a still-UNRESOLVED contradicted target,
+    // never falsifies it and never overrides an already-decided status.
+    for (const edge of graph.edges) {
+      if (edge.relation === 'CONTRADICTS') {
+        const from = nodesById.get(edge.from)!;
+        const to = nodesById.get(edge.to)!;
+        if (from.status === 'SUPPORTED' && to.status === 'UNRESOLVED') {
+          if (setStatus(edge.to, 'WEAKENED', `Contradicted by "${edge.from}" (${edge.rationale}), which is SUPPORTED.`, edge.from)) progressed = true;
         }
       }
     }
@@ -277,6 +331,53 @@ export function replayEpistemicUpdates(initialGraph: EpistemicGraph, updates: re
 /** Nodes still genuinely open — the hook a future experiment-selection engine reads. */
 export function listUnresolved(graph: EpistemicGraph): readonly EpistemicNode[] {
   return graph.nodes.filter((n) => n.status === 'UNRESOLVED' || n.status === 'UNKNOWN');
+}
+
+export interface UnknownExplanation {
+  nodeId: string;
+  whatIsUnknown: string;
+  whyUnknown: string;
+  missingEvidence: readonly string[];
+  /** Competing explanations, resolved to their CURRENT status — never a static snapshot from when the unknown was declared. */
+  competingHypotheses: readonly { hypothesisId: string; statement: string; status: EpistemicStatus }[];
+  /** Nodes that DEPENDS_ON this unknown, read live from the graph's edges — not a declared, possibly-stale list. */
+  dependentNodeIds: readonly string[];
+  potentialResolution: string;
+  status: EpistemicStatus;
+  provenance: readonly string[];
+}
+
+/**
+ * Upgrades a stored `UnknownDetail` into an ACTIONABLE explanation: answers
+ * "what don't we know?" and "why don't we know it?" by combining the node's
+ * own declared detail with a live read of the graph's structure (which
+ * hypotheses currently depend on this unknown, and what their CURRENT
+ * status is) — not merely echoing back the static fields it was built with.
+ */
+export function explainUnknown(graph: EpistemicGraph, nodeId: string): UnknownExplanation {
+  const node = graph.nodes.find((n) => n.nodeId === nodeId);
+  if (!node) throw new Error(`Cannot explain unknown node "${nodeId}": no such node in graph "${graph.graphId}".`);
+  if (node.unknownDetail === null) throw new Error(`Node "${nodeId}" has no unknownDetail — there is nothing to explain.`);
+
+  const nodesById = new Map(graph.nodes.map((n) => [n.nodeId, n]));
+  const competingHypotheses = node.unknownDetail.competingHypothesisIds.map((id) => {
+    const h = nodesById.get(id);
+    if (!h) throw new Error(`Node "${nodeId}" declares competing hypothesis "${id}", which does not exist in graph "${graph.graphId}".`);
+    return { hypothesisId: id, statement: h.statement, status: h.status };
+  });
+  const dependentNodeIds = graph.edges.filter((e) => e.relation === 'DEPENDS_ON' && e.to === nodeId).map((e) => e.from);
+
+  return {
+    nodeId,
+    whatIsUnknown: node.unknownDetail.whatIsUnknown,
+    whyUnknown: node.unknownDetail.whyUnknown,
+    missingEvidence: node.unknownDetail.missingEvidence,
+    competingHypotheses,
+    dependentNodeIds,
+    potentialResolution: node.unknownDetail.potentialResolution,
+    status: node.status,
+    provenance: node.provenance,
+  };
 }
 
 /**
@@ -328,9 +429,13 @@ export function saveEpistemicGraphToMemory(graph: EpistemicGraph, changes: reado
     ],
     honesty: 'simplified',
     honestyNote:
-      'Every node status was either directly established by real computation performed elsewhere in this engine, or deterministically propagated through a DEPENDS_ON/BLOCKS edge — this module performs no independent scientific reasoning of its own. '
+      'Every node status was either directly established by real computation performed elsewhere in this engine, or deterministically propagated through a DEPENDS_ON/BLOCKS/FALSIFIES/SUPPORTS/CONTRADICTS edge — this module performs no independent scientific reasoning of its own. '
       + 'UNKNOWN nodes are never silently converted to a resolved status without a real update supplying one.',
     epistemicStatus: `NODES=${graph.nodes.length};SUPPORTED=${byStatus('SUPPORTED')};FALSIFIED=${byStatus('FALSIFIED')};UNRESOLVED=${byStatus('UNRESOLVED')};UNKNOWN=${byStatus('UNKNOWN')};BLOCKED=${byStatus('BLOCKED')}`,
-    assumptions: ['This engine automatically propagates only DEPENDS_ON and BLOCKS relations; SUPPORTS/CONTRADICTS/PREDICTS/TESTS/DERIVED_FROM/FALSIFIES/DISTINGUISHES are stored and queryable but do not trigger automatic status changes in this version.'],
+    assumptions: [
+      'This engine automatically propagates DEPENDS_ON, BLOCKS, FALSIFIES, SUPPORTS and CONTRADICTS; PREDICTS/TESTS/DERIVED_FROM/DISTINGUISHES are stored and queryable but do not trigger automatic status changes in this version.',
+      'FALSIFIES/SUPPORTS only propagate from a source node whose OWN status is already ESTABLISHED or SUPPORTED (real, executed evidence) — never from a merely UNRESOLVED or WEAKENED source.',
+      'CONTRADICTS only ever WEAKENS a still-UNRESOLVED target from a SUPPORTED source; it never FALSIFIES and never overrides an already-decided status.',
+    ],
   });
 }

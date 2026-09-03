@@ -1,3 +1,5 @@
+import { saveExperiment, type SavedExperiment } from '../../scienceMemory';
+
 /**
  * RELATIVISTIC TIME DILATION — the first real, non-molecular physics case.
  *
@@ -240,4 +242,46 @@ export function replayRelativisticTimeDilationCase(saved: RelativisticTimeDilati
     return { status: 'DRIFT', reason: 'Recomputing from the same declared constants produced a different fingerprint — a constant or a formula changed since the run was saved.' };
   }
   return { status: 'MATCH', reason: '' };
+}
+
+/**
+ * Closes the loop for this domain the same way every other domain in this
+ * engine closes it: RESULT → EVIDENCE/MEMORY, with a replay-checkable
+ * fingerprint as the sole identity key (no wall-clock timestamp in the
+ * experimentId — this case is a pure derivation, so re-running it later must
+ * resolve to the SAME memory entry, not a new one).
+ */
+export function savePhysicsCaseToMemory(result: RelativisticTimeDilationResult): SavedExperiment {
+  const leading = result.hypotheses.find((h) => h.verdict === 'SUPPORTED') ?? null;
+  return saveExperiment({
+    labId: 'physics-relativistic-time-dilation',
+    experimentId: `gps-orbit-time-dilation:${result.resultFingerprint}`,
+    experimentName: 'GPS-orbit relativistic time dilation — SR vs GR',
+    params: {
+      orbitalSpeed: result.orbitalSpeed,
+      specialRelativisticFractionalDeficit: result.specialRelativisticFractionalDeficit,
+      gravitationalFractionalExcess: result.gravitationalFractionalExcess,
+      netFractionalRate: result.netFractionalRate,
+      netMicrosecondsPerDay: result.netMicrosecondsPerDay,
+    },
+    stats: {
+      hypothesisCount: result.hypotheses.length,
+      supportedCount: result.hypotheses.filter((h) => h.verdict === 'SUPPORTED').length,
+      falsifiedCount: result.hypotheses.filter((h) => h.verdict === 'FALSIFIED').length,
+    },
+    analysis: [
+      { title: 'Question', kind: 'question', body: result.question },
+      { title: 'Leading hypothesis', kind: 'hypotheses', body: leading ? `${leading.hypothesisId} — ${leading.reasoning}` : 'none supported' },
+      { title: 'Fact', kind: 'fact', body: result.fact.join(' ') },
+      { title: 'Theory', kind: 'theory', body: result.theory.join(' ') },
+      { title: 'Assumptions', kind: 'assumptions', body: result.assumptions.join(' ') },
+      { title: 'Next experiment', kind: 'next-experiment', body: result.nextExperiment },
+    ],
+    honesty: 'simplified',
+    honestyNote:
+      'Every number here is either a declared, cited constant (exact-by-definition or a standard literature value) or computed from those constants by real SR/GR weak-field formulas. '
+      + 'No external "measured" dataset was consulted or asserted; the hypothesis verdicts are DERIVATION_FROM_ESTABLISHED_PHYSICS, never an empirical fit.',
+    epistemicStatus: `HYPOTHESES=${result.hypotheses.length};LEADING=${leading?.hypothesisId ?? 'NONE'};BASIS=DERIVATION_FROM_ESTABLISHED_PHYSICS`,
+    assumptions: [...result.assumptions],
+  });
 }

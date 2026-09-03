@@ -6,6 +6,7 @@ import {
   PHYSICAL_CONSTANTS,
   replayRelativisticTimeDilationCase,
   runRelativisticTimeDilationCase,
+  savePhysicsCaseToMemory,
   specialRelativisticFractionalDeficit,
   SPEED_OF_LIGHT_M_PER_S,
 } from '../core/discovery/physics/relativisticTimeDilation';
@@ -119,5 +120,21 @@ describe('relativistic time dilation — replay', () => {
     const tampered = { ...saved, resultFingerprint: `${saved.resultFingerprint}0` };
     const replay = replayRelativisticTimeDilationCase(tampered);
     expect(replay.status).toBe('DRIFT');
+  });
+});
+
+describe('relativistic time dilation — Scientific Memory', () => {
+  it('saves to memory with an experimentId keyed on the result fingerprint, never a timestamp', () => {
+    const result = runRelativisticTimeDilationCase();
+    const saved = savePhysicsCaseToMemory(result);
+    expect(saved.experimentId).toContain(result.resultFingerprint);
+    expect(saved.epistemicStatus).toContain('BASIS=DERIVATION_FROM_ESTABLISHED_PHYSICS');
+    expect(saved.honestyNote).toMatch(/never an empirical fit/);
+  });
+
+  it('re-running the identical derivation saves to the SAME experiment identity', () => {
+    const a = savePhysicsCaseToMemory(runRelativisticTimeDilationCase());
+    const b = savePhysicsCaseToMemory(runRelativisticTimeDilationCase());
+    expect(a.experimentId).toBe(b.experimentId);
   });
 });

@@ -97,6 +97,18 @@ export const ESTABLISHED_SPACETIME_CONSTRAINTS: readonly EstablishedPhysicsConst
     status: 'THEORY',
     source: 'Penrose, R. — the Weyl curvature hypothesis, as one proposed (unconfirmed) resolution; general cosmology literature on the "past hypothesis".',
   },
+  {
+    constraintId: 'WORMHOLE_SOLUTIONS_EXIST_MATHEMATICALLY',
+    statement: 'The maximally extended Schwarzschild solution (the Einstein-Rosen bridge, 1935) mathematically connects two asymptotic regions of spacetime, and Morris-Thorne (1988) constructed static, spherically symmetric solutions of the Einstein field equations that are, in principle, traversable.',
+    status: 'FACT',
+    source: 'Einstein, A. and Rosen, N. (1935) Phys. Rev. 48, 73; Morris, M.S. and Thorne, K.S. (1988) Am. J. Phys. 56, 395.',
+  },
+  {
+    constraintId: 'NO_CONFIRMED_QUANTUM_GRAVITY_THEORY',
+    statement: 'No candidate theory of quantum gravity (e.g. loop quantum gravity, string/M-theory, causal set theory) has been experimentally confirmed or is uniquely selected by data; reconciling general relativity with quantum mechanics remains an open problem in fundamental physics.',
+    status: 'FACT',
+    source: 'Standard physics literature surveying the problem of quantum gravity (e.g. Rovelli, C. — Quantum Gravity, 2004; Wald, R.M. — General Relativity, 1984, ch. on open problems).',
+  },
 ];
 
 export type ConstraintRelation = 'SUPPORTS' | 'CONTRADICTS' | 'DEPENDS_ON_UNRESOLVED';
@@ -116,6 +128,20 @@ export interface SpacetimeHypothesisCandidate {
   assertsTimeTravelIsPhysicallyPossible: boolean;
   /** Must be false. Set true only to demonstrate the guard rejects it. */
   claimsEinsteinRosenOmission: boolean;
+  /** Real, citable results (by constraint id or direct citation) that support this hypothesis, stated plainly. */
+  knownSupportingResults: readonly string[];
+  /** Real, citable results that count against this hypothesis, if any. Empty when none is known — never omitted to look stronger. */
+  counterevidence: readonly string[];
+  /** Known unphysical or pathological conditions this hypothesis's supporting solutions require, stated honestly rather than glossed over. */
+  pathologicalOrUnphysicalRequirements: readonly string[];
+  /** What remains genuinely open even if every dependency here is accepted. */
+  unresolvedPoints: readonly string[];
+  /** What this hypothesis, if true, would predict — stated as consequences, not as additional claims of fact. */
+  predictedConsequences: readonly string[];
+  /** The single clearest observation that would weaken or falsify this hypothesis. */
+  falsifyingObservation: string;
+  /** The experiment or computation that would best discriminate this hypothesis from its competitors. */
+  discriminatingTest: string;
 }
 
 /**
@@ -205,9 +231,12 @@ export function evaluateSpacetimeHypothesis(candidate: SpacetimeHypothesisCandid
 }
 
 /**
- * The three candidate positions this first pass holds up against the
- * registry. None assumes its own conclusion; each is checkable against the
- * same constraint table, and a fourth position could be added later without
+ * The five candidate positions this pass holds up against the registry —
+ * spanning the range the mission asked for (sufficiency of standard
+ * spacetime, CTC solutions, wormhole traversability, extra-DOF proposals,
+ * and the open reconciliation of causal structure/gravity/QM/the arrow of
+ * time). None assumes its own conclusion; each is checkable against the
+ * same constraint table, and a sixth position could be added later without
  * touching this evaluator.
  */
 export const SPACETIME_DEGREE_OF_FREEDOM_HYPOTHESES: readonly SpacetimeHypothesisCandidate[] = [
@@ -221,6 +250,20 @@ export const SPACETIME_DEGREE_OF_FREEDOM_HYPOTHESES: readonly SpacetimeHypothesi
     assertsExtraDimensionExists: false,
     assertsTimeTravelIsPhysicallyPossible: false,
     claimsEinsteinRosenOmission: false,
+    knownSupportingResults: [
+      'Every confirmed gravitational-wave detection (LIGO/Virgo) is quantitatively consistent with standard 4D GR waveforms.',
+      'Solar-system and binary-pulsar tests of GR (perihelion precession, Shapiro delay, pulsar timing) show no confirmed deviation attributable to an extra dimension.',
+    ],
+    counterevidence: [],
+    pathologicalOrUnphysicalRequirements: [],
+    unresolvedPoints: [
+      'Absence of a confirmed detection is not a proof of absence; a sufficiently small or weakly coupled extra dimension could remain undetected at current experimental sensitivity.',
+    ],
+    predictedConsequences: [
+      'Continued null results in short-range gravity tests and collider missing-energy searches as sensitivity improves.',
+    ],
+    falsifyingObservation: 'A confirmed, reproducible detection of a deviation from 4D GR/QFT predictions attributable to an additional spacetime dimension.',
+    discriminatingTest: 'Sub-millimeter torsion-balance tests of the Newtonian inverse-square law at ever-smaller length scales.',
   }),
   registerSpacetimeHypothesis({
     hypothesisId: 'H_EXTRA_DOF_THEORETICALLY_POSSIBLE_NOT_CONFIRMED',
@@ -232,6 +275,24 @@ export const SPACETIME_DEGREE_OF_FREEDOM_HYPOTHESES: readonly SpacetimeHypothesi
     assertsExtraDimensionExists: false,
     assertsTimeTravelIsPhysicallyPossible: false,
     claimsEinsteinRosenOmission: false,
+    knownSupportingResults: [
+      'Kaluza-Klein theory (1921/1926) shows a 5D general-relativistic framework can reproduce 4D gravity plus electromagnetism, as an existence proof that extra dimensions are mathematically consistent, not that nature uses one.',
+      'String/M-theory requires additional dimensions for mathematical consistency (typically 10 or 11 total) in its own formalism.',
+    ],
+    counterevidence: [
+      'No collider or astrophysical missing-energy signature consistent with Kaluza-Klein graviton production has been confirmed.',
+    ],
+    pathologicalOrUnphysicalRequirements: [
+      'Compactification to an unobserved extra dimension requires a specific, currently unconstrained compactification scale and mechanism — a free parameter, not a prediction.',
+    ],
+    unresolvedPoints: [
+      'No experiment currently distinguishes between "no extra dimension" and "an extra dimension too small or weakly coupled to have been detected yet".',
+    ],
+    predictedConsequences: [
+      'If realized at an accessible scale, would predict deviations from the inverse-square law at that scale, and Kaluza-Klein excitations of known particles at colliders.',
+    ],
+    falsifyingObservation: 'This hypothesis is not falsified by absence of evidence; it would be substantially disfavoured by a confirmed null result across all currently proposed compactification scales, without ever being fully excluded for arbitrarily small scales.',
+    discriminatingTest: 'LHC (or a future higher-energy collider) missing-transverse-energy searches for Kaluza-Klein graviton production, combined with continued short-range gravity tests.',
   }),
   registerSpacetimeHypothesis({
     hypothesisId: 'H_CHRONOLOGY_PROTECTION_HOLDS',
@@ -244,6 +305,79 @@ export const SPACETIME_DEGREE_OF_FREEDOM_HYPOTHESES: readonly SpacetimeHypothesi
     assertsExtraDimensionExists: false,
     assertsTimeTravelIsPhysicallyPossible: false,
     claimsEinsteinRosenOmission: false,
+    knownSupportingResults: [
+      'No closed timelike curve has ever been observed in nature.',
+      'Every known exact CTC-admitting solution requires a condition not observed in nature (eternal uniform rotation of all matter in the universe, or an infinite, unbounded rotating mass).',
+    ],
+    counterevidence: [
+      'Godel (1949), van Stockum (1937) and Tipler (1974) show CTCs are not excluded by the Einstein field equations themselves — the prohibition, if real, must come from something beyond classical GR.',
+    ],
+    pathologicalOrUnphysicalRequirements: [
+      'The Godel solution requires the entire universe to be filled with a uniformly rotating dust and is not a model of the observed (non-rotating, expanding) universe.',
+      'The Tipler cylinder requires an infinite length; realistic finite-cylinder analyses have not established that CTCs form.',
+    ],
+    unresolvedPoints: [
+      'Hawking\'s chronology protection conjecture has never been proven or disproven from a complete theory of quantum gravity, which does not yet exist (see NO_CONFIRMED_QUANTUM_GRAVITY_THEORY).',
+    ],
+    predictedConsequences: [
+      'If chronology protection holds, any attempt to engineer conditions approaching a CTC should encounter divergent quantum vacuum-fluctuation effects that prevent it, per Hawking\'s original argument.',
+    ],
+    falsifyingObservation: 'A theoretically consistent, complete quantum-gravity calculation showing vacuum fluctuations do NOT diverge near a would-be CTC, or (far beyond current capability) direct observation of causality violation.',
+    discriminatingTest: 'No experiment currently exists at this energy/curvature regime; the discriminating test is theoretical — a completed theory of quantum gravity capable of evaluating vacuum-fluctuation behaviour near a closed causal curve.',
+  }),
+  registerSpacetimeHypothesis({
+    hypothesisId: 'H_WORMHOLE_GEOMETRY_MATHEMATICALLY_POSSIBLE_NOT_TRAVERSABLE_IN_PRACTICE',
+    statement: 'Wormhole geometries (the Einstein-Rosen bridge; Morris-Thorne traversable solutions) can mathematically connect distant regions of spacetime within general relativity, but physical traversability requires exotic matter violating the null energy condition, which is not known to exist in the macroscopic, stable form the solutions require.',
+    dependencies: [
+      { constraintId: 'WORMHOLE_SOLUTIONS_EXIST_MATHEMATICALLY', relation: 'SUPPORTS' },
+      { constraintId: 'TRAVERSABLE_WORMHOLES_REQUIRE_EXOTIC_MATTER', relation: 'SUPPORTS' },
+    ],
+    assertsExtraDimensionExists: false,
+    assertsTimeTravelIsPhysicallyPossible: false,
+    claimsEinsteinRosenOmission: false,
+    knownSupportingResults: [
+      'The maximally extended Schwarzschild solution is an exact, well-studied solution of the Einstein field equations.',
+      'Morris-Thorne (1988) is a peer-reviewed, mathematically consistent traversable-wormhole solution, explicitly constructed to make the exotic-matter requirement precise and quantifiable.',
+    ],
+    counterevidence: [],
+    pathologicalOrUnphysicalRequirements: [
+      'The original Einstein-Rosen/Schwarzschild bridge is non-traversable: it pinches off before any observer could cross it.',
+      'Morris-Thorne traversability requires a stress-energy distribution violating the null energy condition, with no known macroscopic, stable source.',
+    ],
+    unresolvedPoints: [
+      'Whether any physical mechanism (quantum effects, e.g. Casimir-like negative energy densities) could ever supply exotic matter in the required macroscopic, stable, non-perturbative form is unresolved.',
+    ],
+    predictedConsequences: [
+      'If a stable macroscopic exotic-matter source were ever found, Morris-Thorne-type geometries provide a concrete, falsifiable target for what a traversable wormhole would have to look like.',
+    ],
+    falsifyingObservation: 'This hypothesis, as stated, would be falsified only by showing the null-energy-condition requirement itself is wrong for these solutions — a mathematical, not observational, check that has already been extensively verified in the literature; it is not currently in question.',
+    discriminatingTest: 'No observational test exists at this stage; the open question is theoretical — whether any known or new quantum field can source the required negative-energy stress tensor macroscopically and stably.',
+  }),
+  registerSpacetimeHypothesis({
+    hypothesisId: 'H_DEEPER_RECONCILING_MODEL_UNRESOLVED',
+    statement: 'A deeper model reconciling causal structure, gravity, quantum theory and the thermodynamic arrow of time may exist, but no such model is currently confirmed, uniquely selected by data, or even uniquely proposed — this names an open research direction, not a candidate theory.',
+    dependencies: [
+      { constraintId: 'NO_CONFIRMED_QUANTUM_GRAVITY_THEORY', relation: 'DEPENDS_ON_UNRESOLVED' },
+      { constraintId: 'ARROW_OF_TIME_ORIGIN_OPEN', relation: 'DEPENDS_ON_UNRESOLVED' },
+    ],
+    assertsExtraDimensionExists: false,
+    assertsTimeTravelIsPhysicallyPossible: false,
+    claimsEinsteinRosenOmission: false,
+    knownSupportingResults: [
+      'Multiple independent open problems (quantum gravity, the origin of the arrow of time, the interpretation of quantum measurement in relativistic settings) are each individually well documented as unresolved in the physics literature.',
+    ],
+    counterevidence: [],
+    pathologicalOrUnphysicalRequirements: [],
+    unresolvedPoints: [
+      'No candidate quantum-gravity theory is experimentally confirmed.',
+      'The origin of the universe\'s low initial entropy (and thus the arrow of time\'s direction) has no confirmed resolution.',
+      'Whether these open problems are even connected by a single deeper structure, as opposed to being independent open problems, is itself unresolved.',
+    ],
+    predictedConsequences: [
+      'None can be honestly stated: this hypothesis names a research direction, not a model with computable predictions.',
+    ],
+    falsifyingObservation: 'Not applicable in its current form — a hypothesis with no specific proposed structure cannot be falsified; it can only be superseded once a specific candidate model is proposed and THAT model is tested.',
+    discriminatingTest: 'None currently exists; the actionable next step is theoretical model-building, not observation — see the NEXT ACTION this inquiry proposes.',
   }),
 ];
 
@@ -285,7 +419,9 @@ export function runSpacetimeStructureInquiry(): SpacetimeStructureInquiryResult 
       'General relativity and quantum field theory in 3+1 dimensions account for every gravitational and spacetime observation confirmed to date.',
       'No experiment has confirmed an additional spacetime dimension.',
       'Certain exact GR solutions (Godel, van Stockum, Tipler) admit closed timelike curves mathematically, under conditions not observed in nature.',
+      'The maximally extended Schwarzschild solution and Morris-Thorne solutions mathematically connect distant spacetime regions; traversability requires exotic matter not known to exist macroscopically and stably.',
       'The thermodynamic arrow of time is a universal, confirmed observation.',
+      'No candidate theory of quantum gravity is experimentally confirmed.',
     ],
     theory: [
       'Extra-dimensional frameworks (Kaluza-Klein, string/M-theory, braneworld models) are proposed extensions to established physics, not conclusions drawn from confirmed data.',
@@ -302,6 +438,7 @@ export function runSpacetimeStructureInquiry(): SpacetimeStructureInquiryResult 
       'Collider searches for missing-transverse-energy signatures consistent with Kaluza-Klein graviton production, at increasing energy reach.',
       'Gravitational-wave polarization content: standard 4D GR predicts exactly two tensor polarizations; confirmed detection of additional polarization modes would be evidence for extended gravity theories (including some higher-dimensional ones).',
       'A working theory of quantum gravity that either proves or disproves Hawking\'s chronology protection conjecture from first principles, which does not yet exist.',
+      'Any theoretical or experimental progress toward a macroscopic, stable exotic-matter source, which would move wormhole traversability from "mathematically defined but unmet requirement" to an actual candidate physical scenario.',
     ],
     resultFingerprint: fingerprintOf(fingerprintInput),
   };

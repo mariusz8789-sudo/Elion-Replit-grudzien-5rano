@@ -17,6 +17,13 @@ const BASE: SpacetimeHypothesisCandidate = {
   assertsExtraDimensionExists: false,
   assertsTimeTravelIsPhysicallyPossible: false,
   claimsEinsteinRosenOmission: false,
+  knownSupportingResults: [],
+  counterevidence: [],
+  pathologicalOrUnphysicalRequirements: [],
+  unresolvedPoints: [],
+  predictedConsequences: [],
+  falsifyingObservation: 'not applicable to this test fixture',
+  discriminatingTest: 'not applicable to this test fixture',
 };
 
 describe('spacetime structure inquiry — forbidden-premise guard', () => {
@@ -80,25 +87,37 @@ describe('spacetime structure inquiry — constraint-driven evaluation', () => {
       expect(['FACT', 'THEORY', 'CONJECTURE']).toContain(c.status);
     }
   });
+
+  it('declares the wormhole and quantum-gravity constraints used by the newer hypotheses', () => {
+    const ids = ESTABLISHED_SPACETIME_CONSTRAINTS.map((c) => c.constraintId);
+    expect(ids).toContain('WORMHOLE_SOLUTIONS_EXIST_MATHEMATICALLY');
+    expect(ids).toContain('NO_CONFIRMED_QUANTUM_GRAVITY_THEORY');
+  });
 });
 
-describe('spacetime structure inquiry — the three named candidate positions', () => {
-  it('registers exactly three hypotheses, none asserting a forbidden premise', () => {
-    expect(SPACETIME_DEGREE_OF_FREEDOM_HYPOTHESES).toHaveLength(3);
+describe('spacetime structure inquiry — the five named candidate positions', () => {
+  it('registers exactly five hypotheses, none asserting a forbidden premise, each carrying a full research profile', () => {
+    expect(SPACETIME_DEGREE_OF_FREEDOM_HYPOTHESES).toHaveLength(5);
     for (const h of SPACETIME_DEGREE_OF_FREEDOM_HYPOTHESES) {
       expect(h.assertsExtraDimensionExists).toBe(false);
       expect(h.assertsTimeTravelIsPhysicallyPossible).toBe(false);
       expect(h.claimsEinsteinRosenOmission).toBe(false);
+      expect(h.falsifyingObservation.length).toBeGreaterThan(0);
+      expect(h.discriminatingTest.length).toBeGreaterThan(0);
+      expect(Array.isArray(h.knownSupportingResults)).toBe(true);
+      expect(Array.isArray(h.unresolvedPoints)).toBe(true);
     }
   });
 
   it('runs a full inquiry with one verdict per hypothesis, never a fabricated conclusion', () => {
     const result = runSpacetimeStructureInquiry();
-    expect(result.evaluations).toHaveLength(3);
+    expect(result.evaluations).toHaveLength(5);
     const byId = new Map(result.evaluations.map((e) => [e.hypothesisId, e.verdict]));
     expect(byId.get('H_NO_EXTRA_DOF_REQUIRED')).toBe('CONSISTENT_WITH_ALL_CONFIRMED_OBSERVATIONS');
     expect(byId.get('H_EXTRA_DOF_THEORETICALLY_POSSIBLE_NOT_CONFIRMED')).toBe('SPECULATIVE_NOT_EXCLUDED');
     expect(byId.get('H_CHRONOLOGY_PROTECTION_HOLDS')).toBe('UNRESOLVED_OPEN_QUESTION');
+    expect(byId.get('H_WORMHOLE_GEOMETRY_MATHEMATICALLY_POSSIBLE_NOT_TRAVERSABLE_IN_PRACTICE')).toBe('CONSISTENT_WITH_ALL_CONFIRMED_OBSERVATIONS');
+    expect(byId.get('H_DEEPER_RECONCILING_MODEL_UNRESOLVED')).toBe('UNRESOLVED_OPEN_QUESTION');
   });
 
   it('never claims a fifth dimension or time travel exists in its own conclusion text', () => {

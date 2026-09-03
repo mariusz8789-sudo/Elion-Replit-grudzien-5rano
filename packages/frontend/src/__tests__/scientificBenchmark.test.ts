@@ -13,6 +13,7 @@ import {
   scoreNextExperimentQuality,
   scoreReplayConsistency,
   scoreRetrieval,
+  scoreVerdictCases,
   type BlindBenchmarkReport,
 } from '../core/discovery/molecular/scientificBenchmark';
 import type { ExperimentalResult, TestableHypothesis } from '../core/discovery/molecular/experimentalResult';
@@ -146,5 +147,23 @@ describe('Blind scientific discovery benchmark — real execution', () => {
     const description = describeCompetitiveBenchmark([genesisEntry, noBaseline]);
     expect(description).toContain('1 of 2');
     expect(description).toContain('genesis');
+  });
+});
+
+describe('scoreVerdictCases — the non-molecular generalisation of scoreHypothesisCompetition', () => {
+  it('scores a correct verdict as correct', () => {
+    const scored = scoreVerdictCases([{ caseId: 'c1', expected: 'SUPPORTED', actual: 'SUPPORTED' }]);
+    expect(scored.accuracy).toBe(1);
+    expect(scored.results[0]!.correct).toBe(true);
+  });
+
+  it('scores a mismatched verdict as incorrect, never silently passing', () => {
+    const scored = scoreVerdictCases([{ caseId: 'c1', expected: 'SUPPORTED', actual: 'FALSIFIED' }]);
+    expect(scored.accuracy).toBe(0);
+    expect(scored.results[0]!.correct).toBe(false);
+  });
+
+  it('accuracy is 0 for an empty case list, never NaN or a fabricated default', () => {
+    expect(scoreVerdictCases([]).accuracy).toBe(0);
   });
 });

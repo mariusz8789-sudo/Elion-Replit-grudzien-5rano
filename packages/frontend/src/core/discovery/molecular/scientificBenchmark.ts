@@ -129,6 +129,30 @@ export function scoreHypothesisCompetition(
   };
 }
 
+export interface VerdictCase {
+  caseId: string;
+  /** Declared BEFORE the run — from established, independently-derivable facts, never from looking at the output first. */
+  expected: string;
+  actual: string;
+}
+
+export interface VerdictCaseResult extends VerdictCase {
+  correct: boolean;
+}
+
+/**
+ * A domain-agnostic generalisation of `scoreHypothesisCompetition`'s
+ * expected-vs-actual discipline, for callers outside the molecular domain
+ * (e.g. a physics case's derivation verdict) whose result type is not a
+ * `HypothesisCompetitionResult`. `scoreHypothesisCompetition` itself is left
+ * untouched — this does not replace it, it covers the cases it structurally
+ * cannot (no `competitionStatus` field to read).
+ */
+export function scoreVerdictCases(cases: readonly VerdictCase[]): { results: readonly VerdictCaseResult[]; accuracy: number } {
+  const results = cases.map((c) => ({ ...c, correct: c.expected === c.actual }));
+  return { results, accuracy: cases.length === 0 ? 0 : results.filter((r) => r.correct).length / cases.length };
+}
+
 export interface ReplayConsistencyCase {
   caseId: string;
   status: 'MATCH' | 'DRIFT' | 'BLOCKED';

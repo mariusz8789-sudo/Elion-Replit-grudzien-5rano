@@ -131,7 +131,7 @@ export interface CandidateCampaignRecord {
   redTeam: RedTeamReport | null;
   admetToxicitySignals: readonly { endpoint: string; probability: number }[];
   admetInDomain: boolean | null;
-  status: 'RETAINED_RANKED' | 'REJECTED_MECHANISM' | 'REJECTED_SCREENING' | 'UNEVALUABLE_NO_STRUCTURE';
+  status: 'RETAINED_RANKED' | 'REJECTED_MECHANISM' | 'REJECTED_SCREENING' | 'BLOCKED_ADMET' | 'UNEVALUABLE_NO_STRUCTURE';
   moleculeCandidateId: string | null;
 }
 
@@ -328,7 +328,7 @@ export function runNaturalAnalogueCampaign(
     ? runProviderMolecularDiscovery(request.question, externalPoolProvider(withAdmet), generationRequest)
     : null;
 
-  const ranking = providerResult !== null
+  const ranking = providerResult !== null && admetBatch.available
     ? rankMultiObjective(providerResult.batch.candidates, providerResult.assessments, request.objectives)
     : null;
 
@@ -400,7 +400,7 @@ export function runNaturalAnalogueCampaign(
       mechanismFalsification, similarityToReference, independentEvidence, confidence,
       confidenceStatement: describeConfidence(confidence),
       redTeam, admetToxicitySignals: toxicitySignals, admetInDomain: applicability.inDomain,
-      status: mechanismFalsification.verdict !== 'RETAINED' ? 'REJECTED_MECHANISM' : screeningRetained ? 'RETAINED_RANKED' : 'REJECTED_SCREENING',
+      status: mechanismFalsification.verdict !== 'RETAINED' ? 'REJECTED_MECHANISM' : !admetBatch.available ? 'BLOCKED_ADMET' : screeningRetained ? 'RETAINED_RANKED' : 'REJECTED_SCREENING',
       moleculeCandidateId: moleculeCandidate.candidateId,
     });
   }
@@ -416,7 +416,7 @@ export function runNaturalAnalogueCampaign(
       rank: index + 1,
       candidateKey: record.candidateKey,
       whyIncluded: `Passed mechanism falsification (target family overlaps the reference's resolved target), has a cross-validated real structure, and ${record.independentEvidence.independentAxisCount} independent evidence axis/axes (${record.independentEvidence.evidenceQuality}).`,
-      whyNotOthers: others.map((o) => `${o.candidateKey}: ${o.status === 'REJECTED_MECHANISM' ? o.mechanismFalsification.reason : o.status === 'UNEVALUABLE_NO_STRUCTURE' ? 'no cross-validated structure available' : o.status === 'REJECTED_SCREENING' ? 'failed physicochemical screening' : 'ranked lower'}`).join(' | '),
+      whyNotOthers: others.map((o) => `${o.candidateKey}: ${o.status === 'REJECTED_MECHANISM' ? o.mechanismFalsification.reason : o.status === 'UNEVALUABLE_NO_STRUCTURE' ? 'no cross-validated structure available' : o.status === 'BLOCKED_ADMET' ? 'ADMET runtime unavailable; no ranking allowed' : o.status === 'REJECTED_SCREENING' ? 'failed physicochemical screening' : 'ranked lower'}`).join(' | '),
       whatWeKnow: [
         `Independent, cited literature reports ${record.input.compoundName} acting on: ${record.input.reportedTargetFamily}.`,
         `Real RDKit-derived structure and descriptors (formula ${record.structuralValidation.observedFormula}).`,

@@ -42,7 +42,7 @@ import type { TargetEvidenceRef } from './targetHypothesis';
  * count — a pool of four well-evidenced candidates is worth more here than
  * one of forty asserted without citation.
  */
-export const NATURAL_PRODUCT_POOL_VERSION = '1.0.0';
+export const NATURAL_PRODUCT_POOL_VERSION = '1.1.0';
 
 export type CandidateStructure =
   | { kind: 'SMILES_CROSS_VALIDATED'; smiles: string; expectedFormula: string }
@@ -139,6 +139,36 @@ export const NATURAL_PRODUCT_CANDIDATE_POOL: readonly CuratedNaturalCandidate[] 
       kind: 'STRUCTURE_DECLINED',
       reason: 'Harmaline is a fused tetracyclic beta-carboline alkaloid. Genesis declines to supply its SMILES from memory without independent verification (PubChem is unreachable in this runtime): a subtly wrong ring fusion or substitution would misrepresent real chemistry, and this candidate is rejected at the mechanism stage regardless of structure (see mechanismFalsification.ts) — a structure is not required to reach that decision honestly.',
     },
+  },
+  {
+    candidateKey: 'd-serine',
+    compoundName: 'D-serine',
+    sourceOrganismOrOrigin: 'Endogenous amino acid reported in mammalian CNS tissue.',
+    naturalOccurrenceEvidence: [{ kind: 'PEER_REVIEWED_LITERATURE', reference: 'Mothet et al. 2000, PMID 10662802; KP6-005', establishes: 'D-serine reported as an endogenous ligand at the NMDAR glycine site.' }],
+    mechanismEvidence: [{ source: 'LITERATURE', identifier: 'Mothet et al. 2000; PMCID PMC18334', establishes: 'Endogenous NMDAR glycine-site co-agonist; this is opposite-direction evidence to ketamine-like antagonism.' }],
+    mechanismSummary: 'NMDAR glycine-site co-agonist control; target-relevant but not an antagonist analogue.',
+    reportedTargetFamily: 'NMDA receptor (glycine site)',
+    structure: { kind: 'SMILES_CROSS_VALIDATED', smiles: 'N[C@@H](C(=O)O)CO', expectedFormula: 'C3H7NO3' },
+  },
+  {
+    candidateKey: 'glycine',
+    compoundName: 'Glycine',
+    sourceOrganismOrOrigin: 'Endogenous amino acid and NMDAR assay co-agonist.',
+    naturalOccurrenceEvidence: [{ kind: 'PEER_REVIEWED_LITERATURE', reference: 'KP6-006; PMID 8973795', establishes: 'Glycine is required with NMDA for normal channel opening in the cited neuronal recordings.' }],
+    mechanismEvidence: [{ source: 'LITERATURE', identifier: 'PMID 8973795', establishes: 'Glycine-site co-agonist/activation control for NMDAR.' }],
+    mechanismSummary: 'NMDAR glycine-site co-agonist control; not a ketamine-like antagonist.',
+    reportedTargetFamily: 'NMDA receptor (glycine site)',
+    structure: { kind: 'SMILES_CROSS_VALIDATED', smiles: 'NCC(=O)O', expectedFormula: 'C2H5NO2' },
+  },
+  {
+    candidateKey: 'quinolinic-acid',
+    compoundName: 'Quinolinic acid',
+    sourceOrganismOrOrigin: 'Endogenous kynurenine-pathway metabolite in mammalian CNS.',
+    naturalOccurrenceEvidence: [{ kind: 'PEER_REVIEWED_LITERATURE', reference: 'Stone & Perkins 1981; PMID 6268428; KP6-007', establishes: 'Quinolinic acid reported as an endogenous CNS excitant.' }],
+    mechanismEvidence: [{ source: 'LITERATURE', identifier: 'PMID 6268428; DOI 10.1016/0014-2999(81)90587-2', establishes: 'NMDAR agonist/excitatory activity, opposite direction to ketamine antagonism; retained as negative-direction control.' }],
+    mechanismSummary: 'NMDAR agonist/excitotoxin control; target-relevant but directionally incompatible with ketamine antagonism.',
+    reportedTargetFamily: 'NMDA receptor (population NMDA-sensitive receptors)',
+    structure: { kind: 'SMILES_CROSS_VALIDATED', smiles: 'O=C(O)c1cccc(C(=O)O)n1', expectedFormula: 'C7H5NO4' },
   },
 ];
 

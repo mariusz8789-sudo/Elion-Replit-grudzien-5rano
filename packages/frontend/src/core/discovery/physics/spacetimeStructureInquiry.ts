@@ -182,25 +182,30 @@ export interface SpacetimeHypothesisEvaluation {
 }
 
 /**
- * Deterministic, constraint-table-driven classification — never free-text
- * inference. Priority order: a CONTRADICTS relation to a FACT is decisive
- * (falsified); next, any dependency whose relation is explicitly
- * DEPENDS_ON_UNRESOLVED or whose constraint is itself a CONJECTURE makes the
- * hypothesis's truth genuinely unresolved; next, resting on a THEORY-level
- * constraint (with no contradiction) is speculative but not excluded;
- * otherwise the hypothesis is supported only by confirmed facts.
+ * THE SHARED CLASSIFICATION RULE — deterministic, constraint-table-driven,
+ * never free-text inference. Priority order: a CONTRADICTS relation to a
+ * FACT is decisive (falsified); next, any dependency whose relation is
+ * explicitly DEPENDS_ON_UNRESOLVED or whose constraint is itself a
+ * CONJECTURE makes the hypothesis's truth genuinely unresolved; next,
+ * resting on a THEORY-level constraint (with no contradiction) is
+ * speculative but not excluded; otherwise the hypothesis is supported only
+ * by confirmed facts.
+ *
+ * Exported (not just used by `evaluateSpacetimeHypothesis` below) because
+ * `generatedSpacetimeHypotheses.ts` classifies AUTO-GENERATED candidates
+ * with this exact same rule — one source of truth for what these four
+ * verdicts mean, whether a hypothesis was hand-authored or generated.
  */
-export function evaluateSpacetimeHypothesis(candidate: SpacetimeHypothesisCandidate): SpacetimeHypothesisEvaluation {
-  const resolved = candidate.dependencies.map((dep) => {
+export function classifyConstraintDependencies(dependencies: readonly ConstraintDependency[]): { verdict: SpacetimeHypothesisVerdict; reasoning: string } {
+  const resolved = dependencies.map((dep) => {
     const constraint = ESTABLISHED_SPACETIME_CONSTRAINTS.find((c) => c.constraintId === dep.constraintId);
-    if (!constraint) throw new Error(`Unknown constraint "${dep.constraintId}" — this should have been caught by registerSpacetimeHypothesis.`);
+    if (!constraint) throw new Error(`Unknown constraint "${dep.constraintId}".`);
     return { dep, constraint };
   });
 
   const contradicted = resolved.filter((r) => r.dep.relation === 'CONTRADICTS' && r.constraint.status === 'FACT');
   if (contradicted.length > 0) {
     return {
-      hypothesisId: candidate.hypothesisId,
       verdict: 'CONTRADICTS_ESTABLISHED_PHYSICS',
       reasoning: `Contradicts established fact(s): ${contradicted.map((r) => r.constraint.constraintId).join(', ')}.`,
     };
@@ -209,7 +214,6 @@ export function evaluateSpacetimeHypothesis(candidate: SpacetimeHypothesisCandid
   const unresolved = resolved.find((r) => r.dep.relation === 'DEPENDS_ON_UNRESOLVED' || r.constraint.status === 'CONJECTURE');
   if (unresolved) {
     return {
-      hypothesisId: candidate.hypothesisId,
       verdict: 'UNRESOLVED_OPEN_QUESTION',
       reasoning: `Its truth hinges on "${unresolved.constraint.constraintId}", a ${unresolved.constraint.status.toLowerCase()}, not an established fact: "${unresolved.constraint.statement}"`,
     };
@@ -218,17 +222,20 @@ export function evaluateSpacetimeHypothesis(candidate: SpacetimeHypothesisCandid
   const theoryDependencies = resolved.filter((r) => r.constraint.status === 'THEORY');
   if (theoryDependencies.length > 0) {
     return {
-      hypothesisId: candidate.hypothesisId,
       verdict: 'SPECULATIVE_NOT_EXCLUDED',
       reasoning: `Rests on theoretical, unconfirmed proposals: ${theoryDependencies.map((r) => r.constraint.constraintId).join(', ')}. Not contradicted by any confirmed fact, but not required by one either.`,
     };
   }
 
   return {
-    hypothesisId: candidate.hypothesisId,
     verdict: 'CONSISTENT_WITH_ALL_CONFIRMED_OBSERVATIONS',
     reasoning: `Supported only by confirmed facts: ${resolved.map((r) => r.constraint.constraintId).join(', ')}.`,
   };
+}
+
+export function evaluateSpacetimeHypothesis(candidate: SpacetimeHypothesisCandidate): SpacetimeHypothesisEvaluation {
+  const { verdict, reasoning } = classifyConstraintDependencies(candidate.dependencies);
+  return { hypothesisId: candidate.hypothesisId, verdict, reasoning };
 }
 
 /**

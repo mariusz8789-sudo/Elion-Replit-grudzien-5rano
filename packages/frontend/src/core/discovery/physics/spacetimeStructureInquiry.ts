@@ -29,6 +29,7 @@
  * traceable to a specific, citable line.
  */
 import { saveExperiment, type SavedExperiment } from '../../scienceMemory';
+import { buildNextScientificAction, rankNextScientificActions, type ActionAvailability, type NextScientificAction } from '../nextScientificAction';
 
 export const SPACETIME_STRUCTURE_INQUIRY_VERSION = '1.0.0';
 
@@ -480,4 +481,70 @@ export function saveSpacetimeStructureInquiryToMemory(result: SpacetimeStructure
     epistemicStatus: `CONSISTENT=${result.evaluations.filter((e) => e.verdict === 'CONSISTENT_WITH_ALL_CONFIRMED_OBSERVATIONS').length};SPECULATIVE=${result.evaluations.filter((e) => e.verdict === 'SPECULATIVE_NOT_EXCLUDED').length};UNRESOLVED=${result.evaluations.filter((e) => e.verdict === 'UNRESOLVED_OPEN_QUESTION').length}`,
     assumptions: [...result.assumptions],
   });
+}
+
+/**
+ * What kind of progress each hypothesis's discriminating test actually
+ * needs, declared explicitly per hypothesis rather than guessed from its
+ * text — an experimental test (sub-mm gravity, collider searches) is a
+ * different kind of gap from a missing theory (chronology protection,
+ * quantum gravity), and collapsing them would misrepresent both.
+ */
+const HYPOTHESIS_ACTION_AVAILABILITY: Readonly<Record<string, ActionAvailability>> = {
+  H_NO_EXTRA_DOF_REQUIRED: 'REQUIRES_EXTERNAL_EXPERIMENT',
+  H_EXTRA_DOF_THEORETICALLY_POSSIBLE_NOT_CONFIRMED: 'REQUIRES_EXTERNAL_EXPERIMENT',
+  H_CHRONOLOGY_PROTECTION_HOLDS: 'REQUIRES_THEORETICAL_ADVANCE',
+  H_WORMHOLE_GEOMETRY_MATHEMATICALLY_POSSIBLE_NOT_TRAVERSABLE_IN_PRACTICE: 'REQUIRES_THEORETICAL_ADVANCE',
+  H_DEEPER_RECONCILING_MODEL_UNRESOLVED: 'REQUIRES_THEORETICAL_ADVANCE',
+};
+
+/**
+ * A genuinely UNRESOLVED hypothesis has the highest expected discriminating
+ * power: resolving it would change what Genesis believes the most, because
+ * nothing is settled yet. A hypothesis already CONSISTENT with everything
+ * confirmed, or already CONTRADICTED, has the least — further work there
+ * confirms what is already known rather than discriminating between live
+ * possibilities. This is a stated, defensible qualitative rule, not a
+ * probability model.
+ */
+function discriminatingPowerForVerdict(verdict: SpacetimeHypothesisVerdict): 'HIGH' | 'MODERATE' | 'LOW' {
+  if (verdict === 'UNRESOLVED_OPEN_QUESTION') return 'HIGH';
+  if (verdict === 'SPECULATIVE_NOT_EXCLUDED') return 'MODERATE';
+  return 'LOW';
+}
+
+/**
+ * Projects every hypothesis in this inquiry into the domain-agnostic
+ * NextScientificAction shape, using ONLY each hypothesis's own declared
+ * discriminatingTest/falsifyingObservation — never inventing a new test.
+ * Ranked, so the caller gets an actual priority order, not just a list.
+ */
+export function buildNextActionsFromSpacetimeInquiry(result: SpacetimeStructureInquiryResult): readonly NextScientificAction[] {
+  const actions = SPACETIME_DEGREE_OF_FREEDOM_HYPOTHESES.map((candidate) => {
+    const evaluation = result.evaluations.find((e) => e.hypothesisId === candidate.hypothesisId);
+    if (!evaluation) throw new Error(`No evaluation found for hypothesis "${candidate.hypothesisId}" in this inquiry result.`);
+    const dependencyIds = candidate.dependencies.map((d) => d.constraintId);
+
+    return buildNextScientificAction({
+      actionId: `${candidate.hypothesisId}:discriminating-test`,
+      question: `Does "${candidate.discriminatingTest}" support, weaken, or resolve: ${candidate.statement}`,
+      targetHypothesisIds: [candidate.hypothesisId],
+      requiredInputs: [...dependencyIds, 'discriminating-test-result'],
+      availableInputs: dependencyIds,
+      method: candidate.discriminatingTest,
+      expectedDiscriminatingPower: discriminatingPowerForVerdict(evaluation.verdict),
+      discriminatingPowerReasoning: evaluation.verdict === 'UNRESOLVED_OPEN_QUESTION'
+        ? 'This hypothesis is genuinely unresolved; a result either way would change what Genesis currently reports.'
+        : `This hypothesis is already ${evaluation.verdict}; further work here mainly confirms the existing classification rather than discriminating between live possibilities.`,
+      constraints: candidate.pathologicalOrUnphysicalRequirements,
+      expectedOutputs: candidate.predictedConsequences,
+      successCriteria: `Observation or theoretical result consistent with: ${candidate.statement}`,
+      falsificationCriteria: candidate.falsifyingObservation,
+      availability: HYPOTHESIS_ACTION_AVAILABILITY[candidate.hypothesisId] ?? 'BLOCKED',
+      estimatedBurden: 'UNKNOWN',
+      burdenReasoning: 'Genesis has no basis to estimate cost, duration, or feasibility for a theoretical advance or an experiment it does not control.',
+    });
+  });
+
+  return rankNextScientificActions(actions);
 }

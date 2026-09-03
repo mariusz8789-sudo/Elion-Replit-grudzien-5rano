@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildNextActionsFromSpacetimeInquiry,
   ESTABLISHED_SPACETIME_CONSTRAINTS,
   evaluateSpacetimeHypothesis,
   registerSpacetimeHypothesis,
@@ -149,5 +150,30 @@ describe('spacetime structure inquiry — replay and memory', () => {
     const saved = saveSpacetimeStructureInquiryToMemory(result);
     expect(saved.experimentId).toContain(result.resultFingerprint);
     expect(saved.honestyNote).toMatch(/asserts neither/);
+  });
+});
+
+describe('spacetime structure inquiry — next scientific actions', () => {
+  it('produces one ranked action per hypothesis, with the UNRESOLVED hypothesis ranked for highest discriminating power among its own tier', () => {
+    const result = runSpacetimeStructureInquiry();
+    const actions = buildNextActionsFromSpacetimeInquiry(result);
+    expect(actions).toHaveLength(5);
+
+    const chronologyAction = actions.find((a) => a.targetHypothesisIds.includes('H_CHRONOLOGY_PROTECTION_HOLDS'))!;
+    expect(chronologyAction.expectedDiscriminatingPower).toBe('HIGH');
+    expect(chronologyAction.availability).toBe('REQUIRES_THEORETICAL_ADVANCE');
+
+    const noExtraDofAction = actions.find((a) => a.targetHypothesisIds.includes('H_NO_EXTRA_DOF_REQUIRED'))!;
+    expect(noExtraDofAction.expectedDiscriminatingPower).toBe('LOW');
+    expect(noExtraDofAction.availability).toBe('REQUIRES_EXTERNAL_EXPERIMENT');
+  });
+
+  it('every action fails closed: none is RUNNABLE_IN_GENESIS, and every one declares a real missing input', () => {
+    const result = runSpacetimeStructureInquiry();
+    const actions = buildNextActionsFromSpacetimeInquiry(result);
+    for (const action of actions) {
+      expect(action.availability).not.toBe('RUNNABLE_IN_GENESIS');
+      expect(action.missingInputs).toContain('discriminating-test-result');
+    }
   });
 });

@@ -11,6 +11,7 @@ import {
   SPEED_OF_LIGHT_M_PER_S,
   toStandardScientificResult,
 } from '../core/discovery/physics/relativisticTimeDilation';
+import { toNextScientificAction } from '../core/discovery/physics/physicsCaseContract';
 
 describe('relativistic time dilation — pure formulas', () => {
   it('circularOrbitSpeed refuses a non-positive radius', () => {
@@ -151,5 +152,13 @@ describe('relativistic time dilation — StandardScientificResult projection', (
     expect(standard.calculation.length).toBeGreaterThan(0);
     expect(standard.falsificationCriteria).toHaveLength(2);
     expect(standard.epistemicTag).toBe('DERIVED');
+  });
+
+  it('projects into a NextScientificAction that fails closed (requires external data, missing input declared)', () => {
+    const standard = toStandardScientificResult(runRelativisticTimeDilationCase());
+    const action = toNextScientificAction(standard);
+    expect(action.availability).toBe('REQUIRES_EXTERNAL_DATA');
+    expect(action.missingInputs).toContain('independently-measured-comparison-value');
+    expect(action.targetHypothesisIds).toContain('GPS_TIME_DILATION');
   });
 });

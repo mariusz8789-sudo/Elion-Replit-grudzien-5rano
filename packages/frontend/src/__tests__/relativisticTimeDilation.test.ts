@@ -1,0 +1,123 @@
+import { describe, expect, it } from 'vitest';
+import {
+  circularOrbitSpeed,
+  gravitationalFractionalExcess,
+  lorentzFactor,
+  PHYSICAL_CONSTANTS,
+  replayRelativisticTimeDilationCase,
+  runRelativisticTimeDilationCase,
+  specialRelativisticFractionalDeficit,
+  SPEED_OF_LIGHT_M_PER_S,
+} from '../core/discovery/physics/relativisticTimeDilation';
+
+describe('relativistic time dilation — pure formulas', () => {
+  it('circularOrbitSpeed refuses a non-positive radius', () => {
+    expect(() => circularOrbitSpeed(1, 0)).toThrow(/positive/);
+    expect(() => circularOrbitSpeed(1, -1)).toThrow(/positive/);
+  });
+
+  it('circularOrbitSpeed matches GM/r^2 = v^2/r for a real Earth-orbit case', () => {
+    const gm = PHYSICAL_CONSTANTS.earthGravitationalParameter!.value;
+    const r = PHYSICAL_CONSTANTS.gpsOrbitalRadius!.value;
+    const v = circularOrbitSpeed(gm, r);
+    expect(v).toBeCloseTo(Math.sqrt(gm / r), 6);
+    expect(v).toBeGreaterThan(3000);
+    expect(v).toBeLessThan(4000);
+  });
+
+  it('lorentzFactor throws once speed reaches or exceeds c', () => {
+    expect(() => lorentzFactor(SPEED_OF_LIGHT_M_PER_S, SPEED_OF_LIGHT_M_PER_S)).toThrow(/less than the speed of light/);
+    expect(() => lorentzFactor(SPEED_OF_LIGHT_M_PER_S * 1.1, SPEED_OF_LIGHT_M_PER_S)).toThrow(/less than the speed of light/);
+  });
+
+  it('lorentzFactor is 1 at rest and grows with speed', () => {
+    expect(lorentzFactor(0, SPEED_OF_LIGHT_M_PER_S)).toBeCloseTo(1, 12);
+    const slow = lorentzFactor(1000, SPEED_OF_LIGHT_M_PER_S);
+    const fast = lorentzFactor(1e7, SPEED_OF_LIGHT_M_PER_S);
+    expect(fast).toBeGreaterThan(slow);
+    expect(slow).toBeGreaterThan(1);
+  });
+
+  it('specialRelativisticFractionalDeficit is the low-speed limit of (gamma - 1)/gamma', () => {
+    const v = 3874; // ~GPS orbital speed
+    const deficit = specialRelativisticFractionalDeficit(v, SPEED_OF_LIGHT_M_PER_S);
+    const gamma = lorentzFactor(v, SPEED_OF_LIGHT_M_PER_S);
+    const exact = 1 - 1 / gamma;
+    expect(deficit).toBeCloseTo(exact, 9);
+  });
+
+  it('gravitationalFractionalExcess requires rHigh strictly above rLow', () => {
+    expect(() => gravitationalFractionalExcess(1, 100, 100, SPEED_OF_LIGHT_M_PER_S)).toThrow(/rHigh must exceed rLow/);
+    expect(() => gravitationalFractionalExcess(1, 100, 50, SPEED_OF_LIGHT_M_PER_S)).toThrow(/rHigh must exceed rLow/);
+  });
+
+  it('gravitationalFractionalExcess is positive whenever rHigh > rLow', () => {
+    const excess = gravitationalFractionalExcess(
+      PHYSICAL_CONSTANTS.earthGravitationalParameter!.value,
+      PHYSICAL_CONSTANTS.earthEquatorialRadius!.value,
+      PHYSICAL_CONSTANTS.gpsOrbitalRadius!.value,
+      SPEED_OF_LIGHT_M_PER_S,
+    );
+    expect(excess).toBeGreaterThan(0);
+  });
+});
+
+describe('relativistic time dilation — the GPS case, derived not fabricated', () => {
+  it('produces a self-consistent result: exactly one hypothesis SUPPORTED, matching the sign of the net rate', () => {
+    const result = runRelativisticTimeDilationCase();
+    const supported = result.hypotheses.filter((h) => h.verdict === 'SUPPORTED');
+    const falsified = result.hypotheses.filter((h) => h.verdict === 'FALSIFIED');
+    expect(supported).toHaveLength(1);
+    expect(falsified).toHaveLength(1);
+
+    if (result.netDirection === 'SATELLITE_CLOCK_NET_FASTER') {
+      expect(supported[0]!.hypothesisId).toBe('H_GR_DOMINATES');
+      expect(result.netFractionalRate).toBeGreaterThan(0);
+    } else {
+      expect(supported[0]!.hypothesisId).toBe('H_SR_DOMINATES');
+      expect(result.netFractionalRate).toBeLessThan(0);
+    }
+  });
+
+  it('for the real GPS orbit, GR dominates and the satellite clock runs net faster, on the order of tens of microseconds/day', () => {
+    const result = runRelativisticTimeDilationCase();
+    expect(result.netDirection).toBe('SATELLITE_CLOCK_NET_FASTER');
+    expect(result.netMicrosecondsPerDay).toBeGreaterThan(10);
+    expect(result.netMicrosecondsPerDay).toBeLessThan(100);
+  });
+
+  it('never asserts EMPIRICAL_FIT — every hypothesis is decided by derivation from established physics', () => {
+    const result = runRelativisticTimeDilationCase();
+    for (const h of result.hypotheses) {
+      expect(h.basis).toBe('DERIVATION_FROM_ESTABLISHED_PHYSICS');
+    }
+  });
+
+  it('separates FACT, THEORY and ASSUMPTIONS as distinct, non-empty arrays', () => {
+    const result = runRelativisticTimeDilationCase();
+    expect(result.fact.length).toBeGreaterThan(0);
+    expect(result.theory.length).toBeGreaterThan(0);
+    expect(result.assumptions.length).toBeGreaterThan(0);
+  });
+
+  it('is deterministic: two independent runs produce the identical fingerprint', () => {
+    const a = runRelativisticTimeDilationCase();
+    const b = runRelativisticTimeDilationCase();
+    expect(a.resultFingerprint).toBe(b.resultFingerprint);
+  });
+});
+
+describe('relativistic time dilation — replay', () => {
+  it('replays MATCH against its own freshly recomputed result', () => {
+    const saved = runRelativisticTimeDilationCase();
+    const replay = replayRelativisticTimeDilationCase(saved);
+    expect(replay.status).toBe('MATCH');
+  });
+
+  it('replays DRIFT when the saved fingerprint has been tampered with', () => {
+    const saved = runRelativisticTimeDilationCase();
+    const tampered = { ...saved, resultFingerprint: `${saved.resultFingerprint}0` };
+    const replay = replayRelativisticTimeDilationCase(tampered);
+    expect(replay.status).toBe('DRIFT');
+  });
+});

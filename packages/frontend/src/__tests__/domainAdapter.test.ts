@@ -17,15 +17,33 @@ describe('cross-domain discovery core — foundation', () => {
     if (!availability.ok) expect(availability.reason.length).toBeGreaterThan(0);
   }, 60_000);
 
-  it('every other domain is honestly UNAVAILABLE, never a fake working adapter', () => {
+  it('every domain without a real executor is honestly UNAVAILABLE, never a fake working adapter', () => {
     const rdkit = createNodeRdkitTransport();
     const admet = createNodeAdmetTransport();
     const registry = buildDomainRegistry({ rdkit, admet });
-    for (const domainId of ['PHYSICS', 'ENVIRONMENT_WATER', 'EPIDEMIOLOGY', 'ENGINEERING'] as const) {
+    for (const domainId of ['ENVIRONMENT_WATER', 'EPIDEMIOLOGY', 'ENGINEERING'] as const) {
       const adapter = registry.adapters.get(domainId)!;
       expect(adapter.available().ok).toBe(false);
       expect(() => adapter.execute({})).toThrow(/no executor/i);
     }
+  });
+
+  it('the physics adapter is the SECOND real executor: always available, produces a real derived result', () => {
+    const rdkit = createNodeRdkitTransport();
+    const admet = createNodeAdmetTransport();
+    const registry = buildDomainRegistry({ rdkit, admet });
+    const physics = registry.adapters.get('PHYSICS')!;
+    expect(physics.available().ok).toBe(true);
+    const result = physics.execute({}) as import('../core/discovery/physics/relativisticTimeDilation').RelativisticTimeDilationResult;
+    expect(Number.isFinite(result.netMicrosecondsPerDay)).toBe(true);
+    expect(result.hypotheses).toHaveLength(2);
+    const supported = result.hypotheses.filter((h) => h.verdict === 'SUPPORTED');
+    const falsified = result.hypotheses.filter((h) => h.verdict === 'FALSIFIED');
+    expect(supported).toHaveLength(1);
+    expect(falsified).toHaveLength(1);
+    expect(result.fact.length).toBeGreaterThan(0);
+    expect(result.theory.length).toBeGreaterThan(0);
+    expect(result.assumptions.length).toBeGreaterThan(0);
   });
 
   it('describeDomainRegistry names every domain with a real status string', () => {

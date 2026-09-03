@@ -1,5 +1,6 @@
 import { runScientificDiscoveryFlow, type ScientificDiscoveryFlowInput, type ScientificDiscoveryFlowResult } from './scientificDiscoveryFlow';
 import type { NaturalAnalogueCampaignEngines } from './naturalAnalogueCampaign';
+import { runRelativisticTimeDilationCase, type RelativisticTimeDilationResult } from '../physics/relativisticTimeDilation';
 
 /**
  * CROSS-DOMAIN DISCOVERY CORE — foundation.
@@ -63,6 +64,23 @@ export function buildChemistryBiologyAdapter(
 }
 
 /**
+ * The physics adapter — the SECOND real executor, proving the core
+ * generalises beyond chemistry. It is pure computation (real SR/GR weak-field
+ * formulas over declared, cited constants), so it needs no external engine
+ * and is ALWAYS available, unlike the chemistry adapter's real RDKit/ADMET
+ * dependency — that difference is itself worth stating honestly rather than
+ * hiding behind a uniform "available" check.
+ */
+export function buildPhysicsAdapter(): DomainAdapter<Record<string, never>, RelativisticTimeDilationResult> {
+  return {
+    domainId: 'PHYSICS',
+    description: 'Relativistic time dilation (SR vs GR) for a circular Earth orbit, derived from established physics and declared constants — no external engine, no measured dataset.',
+    available: () => ({ ok: true, reason: '' }),
+    execute: () => runRelativisticTimeDilationCase(),
+  };
+}
+
+/**
  * An honestly unavailable domain: the contract exists, no executor does. This
  * is the correct state for every domain this session did not implement — it
  * is NOT a placeholder pretending to be a working adapter.
@@ -85,7 +103,7 @@ export interface DomainRegistry {
 export function buildDomainRegistry(engines: NaturalAnalogueCampaignEngines): DomainRegistry {
   const adapters = new Map<DomainId, DomainAdapter<unknown, unknown>>();
   adapters.set('CHEMISTRY_BIOLOGY', buildChemistryBiologyAdapter(engines) as DomainAdapter<unknown, unknown>);
-  adapters.set('PHYSICS', buildUnavailableDomainAdapter('PHYSICS', 'No physics executor exists in this codebase yet; the contract is declared so one can be added without touching the core.'));
+  adapters.set('PHYSICS', buildPhysicsAdapter() as DomainAdapter<unknown, unknown>);
   adapters.set('ENVIRONMENT_WATER', buildUnavailableDomainAdapter('ENVIRONMENT_WATER', 'No environmental/water-quality executor exists yet.'));
   adapters.set('EPIDEMIOLOGY', buildUnavailableDomainAdapter('EPIDEMIOLOGY', 'A real epidemic simulation model and its own hypothesis loop exist (experimentFabric/hypothesisLoop.ts) but are not yet wired to this shared contract.'));
   adapters.set('ENGINEERING', buildUnavailableDomainAdapter('ENGINEERING', 'No engineering executor exists yet.'));

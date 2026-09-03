@@ -255,7 +255,11 @@ export function fitModelParameters(
 
   let best: { values: readonly number[]; mae: number } | null = null;
   function* cartesian(idx: number, acc: number[]): Generator<readonly number[]> {
-    if (idx === grids.length) { yield acc; return; }
+    // `acc` is mutated in place across the whole recursion (push/pop), so a
+    // caller storing a yielded combination (e.g. as the current best) must
+    // get an independent snapshot — yielding `acc` itself would hand back a
+    // reference that later un-pops back to empty.
+    if (idx === grids.length) { yield [...acc]; return; }
     for (const v of grids[idx]!) {
       acc.push(v);
       yield* cartesian(idx + 1, acc);

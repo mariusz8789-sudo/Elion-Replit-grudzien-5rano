@@ -164,3 +164,124 @@ export function validateModel(
 
   return { ...model, status: verdict === 'VALIDATED' ? 'VALIDATED' : 'REJECTED', validation };
 }
+
+/**
+ * PARAMETER FITTING — the piece this module never had: a way to go from an
+ * UNFITTED model (parameters with `value: null`) to a FITTED one, from
+ * TRAINING data only.
+ *
+ * Deterministic grid search over caller-declared search ranges — not a
+ * black-box optimizer, not gradient descent with an opaque stopping rule.
+ * Every candidate parameter combination the search considers is one
+ * concrete, reproducible point; the result is whichever point minimises
+ * mean absolute error on the SUPPLIED training data. This is bounded,
+ * auditable, and — because the grid is declared, not adaptive — exactly
+ * reproducible from the same inputs.
+ *
+ * DATA-LEAKAGE DISCIPLINE: this function only ever sees `trainingData`. It
+ * has no parameter for holdout data and cannot be called with any — the
+ * caller (parameterizedModelFamily.ts) is responsible for the split, and
+ * evaluating the FITTED result on held-out data is `validateModel` above,
+ * unchanged, called separately.
+ */
+export interface ParameterSearchRange {
+  symbol: string;
+  min: number;
+  max: number;
+  /** Grid resolution along this parameter — must be >= 2 (a single-point "range" is a fixed value, not a search). */
+  steps: number;
+}
+
+export interface ModelFitResult {
+  /** The model with searched parameters now FITTED_TO_EVIDENCE; any parameter not in `searchRanges` is left untouched. */
+  model: ScientificModel;
+  trainingPointsUsed: number;
+  trainingMeanAbsoluteError: number;
+  searchRanges: readonly ParameterSearchRange[];
+  method: 'GRID_SEARCH';
+}
+
+/**
+ * Fits ONLY the parameters named in `searchRanges`, over the declared grid,
+ * to minimise mean absolute error on `trainingData`. Throws (never returns
+ * a fabricated fit) when there is no training data, a declared range names
+ * a parameter the model does not have, a range has fewer than 2 steps, or
+ * no training point produced a finite prediction anywhere on the grid.
+ */
+export function fitModelParameters(
+  model: ScientificModel,
+  trainingData: readonly ModelDataPoint[],
+  searchRanges: readonly ParameterSearchRange[],
+  evaluate: (parameters: Readonly<Record<string, number>>, inputs: Readonly<Record<string, number>>) => number | null,
+): ModelFitResult {
+  if (trainingData.length === 0) {
+    throw new Error(`Cannot fit model "${model.modelId}": no training data points were supplied.`);
+  }
+  if (searchRanges.length === 0) {
+    throw new Error(`Cannot fit model "${model.modelId}": no parameter search ranges were declared.`);
+  }
+  for (const range of searchRanges) {
+    if (!model.parameters.some((p) => p.symbol === range.symbol)) {
+      throw new Error(`Search range declared for "${range.symbol}", which is not a parameter of model "${model.modelId}".`);
+    }
+    if (range.steps < 2) {
+      throw new Error(`Search range for "${range.symbol}" must have at least 2 steps (got ${range.steps}).`);
+    }
+    if (range.max <= range.min) {
+      throw new Error(`Search range for "${range.symbol}" must have max > min (got min=${range.min}, max=${range.max}).`);
+    }
+  }
+
+  const fixedValues: Record<string, number> = {};
+  for (const p of model.parameters) {
+    if (!searchRanges.some((r) => r.symbol === p.symbol) && p.value !== null) fixedValues[p.symbol] = p.value;
+  }
+
+  const grids = searchRanges.map((r) => Array.from({ length: r.steps }, (_, i) => r.min + (r.max - r.min) * (i / (r.steps - 1))));
+
+  function meanAbsoluteErrorFor(values: readonly number[]): number {
+    const parameterValues: Record<string, number> = { ...fixedValues };
+    searchRanges.forEach((r, idx) => { parameterValues[r.symbol] = values[idx]!; });
+    let sum = 0;
+    let count = 0;
+    for (const point of trainingData) {
+      const prediction = evaluate(parameterValues, point.inputs);
+      if (prediction === null || !Number.isFinite(prediction)) continue;
+      sum += Math.abs(prediction - point.measuredOutput);
+      count++;
+    }
+    return count === 0 ? Number.POSITIVE_INFINITY : sum / count;
+  }
+
+  let best: { values: readonly number[]; mae: number } | null = null;
+  function* cartesian(idx: number, acc: number[]): Generator<readonly number[]> {
+    if (idx === grids.length) { yield acc; return; }
+    for (const v of grids[idx]!) {
+      acc.push(v);
+      yield* cartesian(idx + 1, acc);
+      acc.pop();
+    }
+  }
+  for (const combo of cartesian(0, [])) {
+    const mae = meanAbsoluteErrorFor(combo);
+    if (best === null || mae < best.mae) best = { values: combo, mae };
+  }
+
+  if (best === null || !Number.isFinite(best.mae)) {
+    throw new Error(`Fitting model "${model.modelId}" failed: no point on the declared search grid produced a finite prediction for any training point.`);
+  }
+
+  const fittedParameters: ModelParameter[] = model.parameters.map((p) => {
+    const idx = searchRanges.findIndex((r) => r.symbol === p.symbol);
+    if (idx === -1) return p;
+    return { ...p, value: best!.values[idx]!, source: 'FITTED_TO_EVIDENCE' };
+  });
+
+  return {
+    model: { ...model, parameters: fittedParameters, status: 'FITTED', validation: null },
+    trainingPointsUsed: trainingData.length,
+    trainingMeanAbsoluteError: best.mae,
+    searchRanges,
+    method: 'GRID_SEARCH',
+  };
+}

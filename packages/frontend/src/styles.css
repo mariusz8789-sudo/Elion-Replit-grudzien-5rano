@@ -2521,3 +2521,17 @@ body:has(.fp-lab) .science-chat-fab { display: none; }
 .next-move-btn strong { color: var(--gold); font: 700 .57rem/1.15 var(--font-mono); letter-spacing: .04em; }
 .next-move-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .61rem; }
 @media (max-width: 380px) { .research-memory-grid, .research-evidence-grid { grid-template-columns: 1fr; } .research-timeline li { grid-template-columns: 5.4rem 1fr; } .next-move-grid { grid-template-columns: 1fr; } }
+
+/* Research artifacts: quiet, premium emphasis without dashboard noise. */
+.hypothesis-card { display: grid; gap: .45rem; padding: .55rem; border: 1px solid rgba(240,179,92,.35); border-radius: .55rem; background: rgba(240,179,92,.045); }
+.hypothesis-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: .45rem; color: var(--gold); font: 700 .59rem/1 var(--font-mono); letter-spacing: .06em; }
+.hypothesis-card-head span { color: var(--text-faint); font-size: .54rem; letter-spacing: 0; }
+.hypothesis-card > p { color: var(--text); }
+.hypothesis-meta { display: flex; flex-wrap: wrap; gap: .28rem .55rem; color: var(--text-faint); font: .56rem/1.25 var(--font-mono); }
+.hypothesis-meta b { color: var(--text-dim); font-weight: 600; }
+.hypothesis-actions { display: flex; flex-wrap: wrap; gap: .28rem; }
+.research-inline-action { border: 1px solid rgba(240,179,92,.32); border-radius: 999px; padding: .24rem .42rem; background: transparent; color: var(--gold); font: 700 .55rem/1 var(--font-mono); cursor: pointer; transition: background .16s ease, border-color .16s ease, transform .16s ease; }
+.research-inline-action:hover { border-color: var(--gold); background: rgba(240,179,92,.1); transform: translateY(-1px); }
+.research-panel { animation: research-panel-in .18s ease-out; }
+@keyframes research-panel-in { from { opacity: .25; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .research-panel, .research-inline-action { animation: none; transition: none; } }

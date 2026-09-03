@@ -43,9 +43,10 @@ function latestUserQuestion(turns: readonly ChatTurn[]): string | null {
   return [...turns].reverse().find((turn) => turn.role === 'user')?.text ?? null;
 }
 
-function ResearchAccessPanel({ status }: { status: ResearchAccessStatus | null }) {
+function ResearchAccessPanel({ status, loading }: { status: ResearchAccessStatus | null; loading: boolean }) {
   return (
-    <section className="research-panel" aria-label="Research Access">
+    <section className="research-panel" aria-label="Research Access" aria-busy={loading}>
+      {loading && <div className="research-loading" role="status">Sprawdzam dostęp do źródeł…</div>}
       <div className="research-panel-title"><span>RESEARCH ACCESS</span><small>credentials backend-only</small></div>
       {status ? <><div className="research-access-list">{status.sources.map((source) => <div className="research-access-row" key={source.id}><strong>{source.label}</strong><span className={source.status === 'AVAILABLE' ? 'available' : 'requires-auth'}>{source.status}</span><small>{source.access}{source.credentialEnv ? ` · ${source.credentialEnv}` : ' · no credential'}</small></div>)}</div><p className="research-access-policy">{status.policy}</p></> : <p>Status Research Access jest dostępny po zalogowaniu i wybraniu projektu.</p>}
     </section>
@@ -321,6 +322,7 @@ export function ScienceChat() {
   const [projectAccess, setProjectAccess] = useState<ProjectAccess | null>(null);
   const [accessAudit, setAccessAudit] = useState<AccessAuditEntry[]>([]);
   const [researchAccess, setResearchAccess] = useState<ResearchAccessStatus | null>(null);
+  const [researchAccessLoading, setResearchAccessLoading] = useState(false);
   const [lastHypothesisPlan, setLastHypothesisPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
   const [researchPanel, setResearchPanel] = useState<ResearchPanel>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -344,13 +346,15 @@ export function ScienceChat() {
   useEffect(() => {
     let cancelled = false;
     const token = getToken();
-    if (!token || !activeKnowledgeProject) { setProjectAccess(null); setAccessAudit([]); setResearchAccess(null); return () => { cancelled = true; }; }
+    if (!token || !activeKnowledgeProject) { setProjectAccess(null); setAccessAudit([]); setResearchAccess(null); setResearchAccessLoading(false); return () => { cancelled = true; }; }
+    setResearchAccessLoading(true);
     void Promise.all([getProjectAccess(token, activeKnowledgeProject.id), getResearchAccessStatus(token, activeKnowledgeProject.id), listProjectAccessAudit(token, activeKnowledgeProject.id)]).then(([access, research, audit]) => {
       if (cancelled) return;
       setProjectAccess(access.ok ? access.data : null);
       setResearchAccess(research.ok ? research.data : null);
       setAccessAudit(audit.ok ? audit.data : []);
-    });
+      setResearchAccessLoading(false);
+    }).catch(() => { if (!cancelled) setResearchAccessLoading(false); });
     return () => { cancelled = true; };
   }, [activeKnowledgeProject]);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [turns, open]);
@@ -598,7 +602,7 @@ export function ScienceChat() {
       {researchPanel === 'why' && <WhyPanel plan={pendingGuidedPlan} capsule={lastEvidenceCapsule} />}
       {researchPanel === 'hypotheses' && <HypothesesPanel plan={pendingGuidedPlan ?? lastHypothesisPlan} onAction={(prompt) => void send(prompt)} />}
       {researchPanel === 'audit' && <AuditPanel entries={accessAudit} />}
-      {researchPanel === 'access' && <ResearchAccessPanel status={researchAccess} />}
+      {researchPanel === 'access' && <ResearchAccessPanel status={researchAccess} loading={researchAccessLoading} />}
       {researchPanel === 'evidence' && <EvidencePanel capsule={lastEvidenceCapsule} />}
       {researchPanel === 'memory' && <ResearchMemory turns={turns} capsule={lastEvidenceCapsule} />}
       {researchPanel === 'timeline' && <ResearchTimeline turns={turns} stage={stage} />}

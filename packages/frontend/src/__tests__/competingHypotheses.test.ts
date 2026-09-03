@@ -13,15 +13,15 @@ function result(overrides: Partial<ExperimentalResult>): ExperimentalResult {
 }
 
 const openChannel: TestableHypothesis = {
-  hypothesisId: 'h-open-channel', statement: 'Open-channel block', target: 'NMDAR', parameter: 'IC50',
+  hypothesisId: 'h-open-channel', statement: 'Open-channel block', compound: null, target: 'NMDAR', parameter: 'IC50',
   supportedIf: 'low IC50', falsifiedIf: 'no engagement', threshold: 10, thresholdUnit: 'uM', lowerIsSupport: true,
 };
 const competitiveAntagonist: TestableHypothesis = {
-  hypothesisId: 'h-competitive', statement: 'Competitive antagonism', target: 'NMDAR', parameter: 'Ki',
+  hypothesisId: 'h-competitive', statement: 'Competitive antagonism', compound: null, target: 'NMDAR', parameter: 'Ki',
   supportedIf: 'low Ki', falsifiedIf: 'no binding', threshold: 10, thresholdUnit: 'uM', lowerIsSupport: true,
 };
 const unrelated: TestableHypothesis = {
-  hypothesisId: 'h-unrelated', statement: 'Acts at GABA-A instead', target: 'GABA-A', parameter: 'IC50',
+  hypothesisId: 'h-unrelated', statement: 'Acts at GABA-A instead', compound: null, target: 'GABA-A', parameter: 'IC50',
   supportedIf: 'low IC50', falsifiedIf: 'no engagement', threshold: 10, thresholdUnit: 'uM', lowerIsSupport: true,
 };
 

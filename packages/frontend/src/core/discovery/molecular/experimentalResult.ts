@@ -122,6 +122,19 @@ export function describeResult(result: ExperimentalResult): string {
 export interface TestableHypothesis {
   hypothesisId: string;
   statement: string;
+  /**
+   * The compound this hypothesis is about, or `null` when it is deliberately
+   * compound-agnostic — "at least one candidate in this pool engages target
+   * X" (used by the discriminating-experiment engine, which tests a SET of
+   * candidates against one target/parameter, not one named compound).
+   *
+   * When set, this is load-bearing: two compounds sharing a target and
+   * parameter (e.g. ketamine and agmatine both reported at "NMDAR"/"IC50")
+   * are NOT interchangeable evidence for each other's hypothesis. A real
+   * measurement of ketamine must never be read as support for a claim about
+   * agmatine just because the target and parameter match.
+   */
+  compound: string | null;
   target: string;
   parameter: string;
   /** A result meeting this is support. */
@@ -156,7 +169,10 @@ export interface HypothesisAssessment {
  *
  * Only results measuring the SAME target and parameter can decide it —
  * a measurement of something else is not weak evidence, it is no evidence,
- * and is excluded rather than downweighted.
+ * and is excluded rather than downweighted. When the hypothesis names a
+ * specific compound, only results about THAT compound may decide it: a real
+ * measurement of one compound is never read as evidence for a claim about a
+ * different one, however closely the target and parameter match.
  */
 export function assessHypothesis(
   hypothesis: TestableHypothesis,
@@ -164,14 +180,16 @@ export function assessHypothesis(
 ): HypothesisAssessment {
   const deciding = results.filter((r) =>
     r.target.trim().toUpperCase() === hypothesis.target.trim().toUpperCase()
-    && r.parameter.trim().toLowerCase() === hypothesis.parameter.trim().toLowerCase());
+    && r.parameter.trim().toLowerCase() === hypothesis.parameter.trim().toLowerCase()
+    && (hypothesis.compound === null || r.compound.trim().toLowerCase() === hypothesis.compound.trim().toLowerCase()));
 
   if (deciding.length === 0) {
+    const compoundClause = hypothesis.compound === null ? '' : ` for ${hypothesis.compound}`;
     return {
       hypothesisId: hypothesis.hypothesisId,
       status: 'UNTESTED',
       decidingResultIds: [],
-      reasoning: `No ingested result measures ${hypothesis.parameter} at ${hypothesis.target}. Results about other targets or parameters do not bear on this hypothesis and were not counted as weak evidence.`,
+      reasoning: `No ingested result measures ${hypothesis.parameter} at ${hypothesis.target}${compoundClause}. Results about other targets, parameters, or (when this hypothesis names a compound) other compounds do not bear on this hypothesis and were not counted as weak evidence.`,
       evidenceKind: 'NONE',
     };
   }

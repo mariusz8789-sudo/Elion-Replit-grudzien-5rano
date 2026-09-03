@@ -29,6 +29,7 @@ const REFERENCE_VMAT2_IC50_UM = 223;
 const VMAT2_HYPOTHESIS: TestableHypothesis = {
   hypothesisId: 'h-vmat2-ic50',
   statement: 'At least one front candidate engages VMAT2 with an IC50 at or below 4-MMC\'s own measured 223 µM.',
+  compound: null,
   target: 'VMAT2',
   parameter: 'IC50',
   supportedIf: 'A measured IC50 at or below 223 µM would support extrapolating the reference mechanism to that candidate.',

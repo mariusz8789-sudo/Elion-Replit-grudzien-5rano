@@ -101,6 +101,7 @@ function pivotExperiment(
     hypothesis: {
       hypothesisId: `h_${target}_${parameter}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       statement: `At least one front candidate engages ${target} with a ${parameter} at least as favourable as the reference compound's measured value.`,
+      compound: null,
       target,
       parameter,
       supportedIf: `A measured ${parameter} at or below the reference threshold would support extrapolating the reference's mechanism to that candidate.`,
@@ -185,6 +186,7 @@ export function proposeDiscriminatingExperiments(request: DiscriminationRequest)
         hypothesis: {
           hypothesisId: `h_${property.propertyId}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
           statement: `Measured ${property.parameter} separates the front candidates in the direction the model predicts.`,
+          compound: null,
           target: property.target,
           parameter: property.parameter,
           supportedIf: `Measured values preserve the predicted ordering between the higher and lower groups.`,
@@ -220,6 +222,7 @@ export function proposeDiscriminatingExperiments(request: DiscriminationRequest)
       hypothesis: {
         hypothesisId: 'h_none',
         statement: 'No testable hypothesis could be formed from this candidate set.',
+        compound: null,
         target: request.pivot.target,
         parameter: request.pivot.parameter,
         supportedIf: 'Not applicable.',

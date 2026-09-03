@@ -9,6 +9,7 @@ import {
   savePhysicsCaseToMemory,
   specialRelativisticFractionalDeficit,
   SPEED_OF_LIGHT_M_PER_S,
+  toStandardScientificResult,
 } from '../core/discovery/physics/relativisticTimeDilation';
 
 describe('relativistic time dilation — pure formulas', () => {
@@ -136,5 +137,19 @@ describe('relativistic time dilation — Scientific Memory', () => {
     const a = savePhysicsCaseToMemory(runRelativisticTimeDilationCase());
     const b = savePhysicsCaseToMemory(runRelativisticTimeDilationCase());
     expect(a.experimentId).toBe(b.experimentId);
+  });
+});
+
+describe('relativistic time dilation — StandardScientificResult projection', () => {
+  it('projects into the generic contract with a matching fingerprint and non-empty derivation trail', () => {
+    const result = runRelativisticTimeDilationCase();
+    const standard = toStandardScientificResult(result);
+    expect(standard.domainId).toBe('PHYSICS');
+    expect(standard.caseId).toBe('GPS_TIME_DILATION');
+    expect(standard.resultFingerprint).toBe(result.resultFingerprint);
+    expect(standard.equations.length).toBeGreaterThan(0);
+    expect(standard.calculation.length).toBeGreaterThan(0);
+    expect(standard.falsificationCriteria).toHaveLength(2);
+    expect(standard.epistemicTag).toBe('DERIVED');
   });
 });

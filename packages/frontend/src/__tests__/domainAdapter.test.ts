@@ -28,13 +28,15 @@ describe('cross-domain discovery core — foundation', () => {
     }
   });
 
-  it('the physics adapter is the SECOND real executor: always available, produces a real derived result', () => {
+  it('the physics adapter is the SECOND real executor: always available, defaults to the GPS case, produces a real derived result', () => {
     const rdkit = createNodeRdkitTransport();
     const admet = createNodeAdmetTransport();
     const registry = buildDomainRegistry({ rdkit, admet });
     const physics = registry.adapters.get('PHYSICS')!;
     expect(physics.available().ok).toBe(true);
-    const result = physics.execute({}) as import('../core/discovery/physics/relativisticTimeDilation').RelativisticTimeDilationResult;
+    const outcome = physics.execute({}) as import('../core/discovery/molecular/domainAdapter').PhysicsAdapterResult;
+    expect(outcome.caseId).toBe('GPS_TIME_DILATION');
+    const result = outcome.raw as import('../core/discovery/physics/relativisticTimeDilation').RelativisticTimeDilationResult;
     expect(Number.isFinite(result.netMicrosecondsPerDay)).toBe(true);
     expect(result.hypotheses).toHaveLength(2);
     const supported = result.hypotheses.filter((h) => h.verdict === 'SUPPORTED');
@@ -44,6 +46,21 @@ describe('cross-domain discovery core — foundation', () => {
     expect(result.fact.length).toBeGreaterThan(0);
     expect(result.theory.length).toBeGreaterThan(0);
     expect(result.assumptions.length).toBeGreaterThan(0);
+    expect(outcome.standard.domainId).toBe('PHYSICS');
+    expect(outcome.standard.resultFingerprint).toBe(result.resultFingerprint);
+  });
+
+  it('the physics adapter accepts a structured request selecting the gravitational-redshift case', () => {
+    const rdkit = createNodeRdkitTransport();
+    const admet = createNodeAdmetTransport();
+    const registry = buildDomainRegistry({ rdkit, admet });
+    const physics = registry.adapters.get('PHYSICS')!;
+    const outcome = physics.execute({ caseId: 'GRAVITATIONAL_REDSHIFT' }) as import('../core/discovery/molecular/domainAdapter').PhysicsAdapterResult;
+    expect(outcome.caseId).toBe('GRAVITATIONAL_REDSHIFT');
+    const result = outcome.raw as import('../core/discovery/physics/gravitationalRedshift').GravitationalRedshiftResult;
+    expect(result.direction).toBe('REDSHIFT');
+    expect(outcome.standard.caseId).toBe('GRAVITATIONAL_REDSHIFT');
+    expect(outcome.standard.resultFingerprint).toBe(result.resultFingerprint);
   });
 
   it('describeDomainRegistry names every domain with a real status string', () => {

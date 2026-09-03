@@ -1,6 +1,8 @@
 import { runScientificDiscoveryFlow, type ScientificDiscoveryFlowInput, type ScientificDiscoveryFlowResult } from './scientificDiscoveryFlow';
 import type { NaturalAnalogueCampaignEngines } from './naturalAnalogueCampaign';
-import { runRelativisticTimeDilationCase, type RelativisticTimeDilationResult } from '../physics/relativisticTimeDilation';
+import { runRelativisticTimeDilationCase, toStandardScientificResult as gpsCaseToStandardResult, type RelativisticTimeDilationResult } from '../physics/relativisticTimeDilation';
+import { runGravitationalRedshiftCase, toStandardScientificResult as redshiftCaseToStandardResult, type GravitationalRedshiftResult } from '../physics/gravitationalRedshift';
+import type { StandardScientificResult } from '../physics/physicsCaseContract';
 
 /**
  * CROSS-DOMAIN DISCOVERY CORE — foundation.
@@ -63,6 +65,21 @@ export function buildChemistryBiologyAdapter(
   };
 }
 
+/** Which real physics case a structured request selects. Defaults to the GPS case when omitted. */
+export type PhysicsCaseId = 'GPS_TIME_DILATION' | 'GRAVITATIONAL_REDSHIFT';
+
+export interface PhysicsStructuredRequest {
+  caseId?: PhysicsCaseId;
+}
+
+export interface PhysicsAdapterResult {
+  caseId: PhysicsCaseId;
+  /** The case's own rich, case-specific result — never discarded in favour of the generic view. */
+  raw: RelativisticTimeDilationResult | GravitationalRedshiftResult;
+  /** The domain-generic projection (see physicsCaseContract.ts). */
+  standard: StandardScientificResult;
+}
+
 /**
  * The physics adapter — the SECOND real executor, proving the core
  * generalises beyond chemistry. It is pure computation (real SR/GR weak-field
@@ -70,13 +87,26 @@ export function buildChemistryBiologyAdapter(
  * and is ALWAYS available, unlike the chemistry adapter's real RDKit/ADMET
  * dependency — that difference is itself worth stating honestly rather than
  * hiding behind a uniform "available" check.
+ *
+ * `execute` now takes a STRUCTURED REQUEST (not a fixed, single hard-coded
+ * demonstration) and dispatches to one of two genuinely different real cases
+ * — this is what proves the adapter is a real domain entry point, not a
+ * special-cased GPS-only shim.
  */
-export function buildPhysicsAdapter(): DomainAdapter<Record<string, never>, RelativisticTimeDilationResult> {
+export function buildPhysicsAdapter(): DomainAdapter<PhysicsStructuredRequest, PhysicsAdapterResult> {
   return {
     domainId: 'PHYSICS',
-    description: 'Relativistic time dilation (SR vs GR) for a circular Earth orbit, derived from established physics and declared constants — no external engine, no measured dataset.',
+    description: 'Real deterministic physics cases (relativistic time dilation, gravitational redshift) derived from established physics and declared, cited constants — no external engine, no measured dataset.',
     available: () => ({ ok: true, reason: '' }),
-    execute: () => runRelativisticTimeDilationCase(),
+    execute: (input) => {
+      const caseId = input.caseId ?? 'GPS_TIME_DILATION';
+      if (caseId === 'GRAVITATIONAL_REDSHIFT') {
+        const raw = runGravitationalRedshiftCase();
+        return { caseId, raw, standard: redshiftCaseToStandardResult(raw) };
+      }
+      const raw = runRelativisticTimeDilationCase();
+      return { caseId, raw, standard: gpsCaseToStandardResult(raw) };
+    },
   };
 }
 

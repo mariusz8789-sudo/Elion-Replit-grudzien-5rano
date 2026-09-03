@@ -1,4 +1,5 @@
 import { saveExperiment, type SavedExperiment } from '../../scienceMemory';
+import type { StandardScientificResult } from './physicsCaseContract';
 
 /**
  * RELATIVISTIC TIME DILATION — the first real, non-molecular physics case.
@@ -236,6 +237,66 @@ export function runRelativisticTimeDilationCase(): RelativisticTimeDilationResul
  * expected always — DRIFT would mean the constants or formulas themselves
  * changed, which this function reports rather than hides.
  */
+/**
+ * Projects this case into the domain-generic StandardScientificResult shape
+ * (see physicsCaseContract.ts). This is a VIEW, not a recomputation — every
+ * number is read straight from `result`, and the fingerprint is the SAME
+ * fingerprint, never rehashed, so a caller cannot get two different
+ * "correct" fingerprints for one run.
+ */
+export function toStandardScientificResult(result: RelativisticTimeDilationResult): StandardScientificResult {
+  const c = PHYSICAL_CONSTANTS.speedOfLight!;
+  const gm = PHYSICAL_CONSTANTS.earthGravitationalParameter!;
+  const rGround = PHYSICAL_CONSTANTS.earthEquatorialRadius!;
+  const rSat = PHYSICAL_CONSTANTS.gpsOrbitalRadius!;
+
+  return {
+    domainId: 'PHYSICS',
+    caseId: 'GPS_TIME_DILATION',
+    contractVersion: RELATIVISTIC_TIME_DILATION_VERSION,
+    question: result.question,
+    assumptions: result.assumptions,
+    inputs: [
+      { symbol: 'r_ground', meaning: 'Ground clock radial distance from Earth\'s center', value: rGround.value, unit: rGround.unit },
+      { symbol: 'r_sat', meaning: 'Satellite orbital radius from Earth\'s center', value: rSat.value, unit: rSat.unit },
+    ],
+    constants: [
+      { symbol: 'c', meaning: 'Speed of light in vacuum', value: c.value, unit: c.unit, source: c.source, status: c.status },
+      { symbol: 'GM', meaning: 'Earth\'s standard gravitational parameter', value: gm.value, unit: gm.unit, source: gm.source, status: gm.status },
+    ],
+    equations: [
+      'v = sqrt(GM / r_sat)  (Newtonian circular-orbit speed)',
+      'deficit_SR = v^2 / (2 c^2)  (weak-field special-relativistic fractional rate deficit)',
+      'excess_GR = (GM / c^2) * (1/r_ground - 1/r_sat)  (weak-field general-relativistic fractional rate excess)',
+      'net = excess_GR - deficit_SR',
+    ],
+    calculation: [
+      `v = sqrt(${gm.value} / ${rSat.value}) = ${result.orbitalSpeed.toExponential(6)} m/s`,
+      `deficit_SR = ${result.orbitalSpeed.toExponential(6)}^2 / (2 * ${c.value}^2) = ${result.specialRelativisticFractionalDeficit.toExponential(6)}`,
+      `excess_GR = (${gm.value} / ${c.value}^2) * (1/${rGround.value} - 1/${rSat.value}) = ${result.gravitationalFractionalExcess.toExponential(6)}`,
+      `net = ${result.gravitationalFractionalExcess.toExponential(6)} - ${result.specialRelativisticFractionalDeficit.toExponential(6)} = ${result.netFractionalRate.toExponential(6)}`,
+    ],
+    result: [
+      { symbol: 'v', meaning: 'Orbital speed', value: result.orbitalSpeed, unit: 'm/s' },
+      { symbol: 'net', meaning: 'Net fractional clock-rate difference (satellite vs ground)', value: result.netFractionalRate, unit: 'dimensionless' },
+      { symbol: 'net_us_per_day', meaning: 'Net clock-rate difference expressed as microseconds/day', value: result.netMicrosecondsPerDay, unit: 'microseconds/day' },
+    ],
+    uncertaintyNote: 'No error bars are computed: every input is either exact by definition or a standard literature value declared without a stated uncertainty; the weak-field approximation error is far smaller than the effect itself for this orbit.',
+    falsificationCriteria: result.hypotheses.map((h) => ({
+      statement: h.statement,
+      wouldFalsifyIf: h.hypothesisId === 'H_GR_DOMINATES'
+        ? 'A recomputation from the same declared constants and formulas yields gravitationalFractionalExcess <= specialRelativisticFractionalDeficit.'
+        : 'A recomputation from the same declared constants and formulas yields specialRelativisticFractionalDeficit <= gravitationalFractionalExcess.',
+    })),
+    epistemicTag: 'DERIVED',
+    nextQuestion: {
+      question: 'Obtain an independently measured, published GPS on-orbit clock comparison to check this derivation against real data, not merely against itself.',
+      kind: 'REQUIRES_EXTERNAL_DATA',
+    },
+    resultFingerprint: result.resultFingerprint,
+  };
+}
+
 export function replayRelativisticTimeDilationCase(saved: RelativisticTimeDilationResult): { status: 'MATCH' | 'DRIFT'; reason: string } {
   const recomputed = runRelativisticTimeDilationCase();
   if (recomputed.resultFingerprint !== saved.resultFingerprint) {

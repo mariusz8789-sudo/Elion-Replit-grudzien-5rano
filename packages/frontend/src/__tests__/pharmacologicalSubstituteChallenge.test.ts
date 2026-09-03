@@ -65,7 +65,7 @@ describe('pharmacologicalSubstituteChallenge — BEFORE state', () => {
   it('2. every pool candidate becomes a competing hypothesis, all UNRESOLVED', () => {
     const graph = buildInitialSubstituteChallengeGraph(ALPRAZOLAM_SUBSTITUTE_CHALLENGE);
     const hyps = graph.nodes.filter((n) => n.kind === 'HYPOTHESIS');
-    expect(hyps).toHaveLength(GABA_BENZODIAZEPINE_CANDIDATE_POOL.length);
+    expect(hyps).toHaveLength(ALPRAZOLAM_SUBSTITUTE_CHALLENGE.pool.length);
     expect(hyps.every((h) => h.status === 'UNRESOLVED')).toBe(true);
   });
 
@@ -85,7 +85,7 @@ describe('pharmacologicalSubstituteChallenge — BEFORE state', () => {
 describe('pharmacologicalSubstituteChallenge — the real iterative loop', () => {
   it('4. candidate experiments are generated depending on the current state', () => {
     const result = run();
-    expect(result.loopResult.steps[0]!.selection.candidates.length).toBe(GABA_BENZODIAZEPINE_CANDIDATE_POOL.length + 1);
+    expect(result.loopResult.steps[0]!.selection.candidates.length).toBe(ALPRAZOLAM_SUBSTITUTE_CHALLENGE.pool.length + 1);
   });
 
   it('5. real computation executes: cross-validation and mechanism falsification run for every candidate', () => {
@@ -159,8 +159,8 @@ describe('pharmacologicalSubstituteChallenge — final result and report', () =>
     const report = buildSubstituteChallengeReport(result);
     expect(report.question.length).toBeGreaterThan(0);
     expect(report.referenceProfile.name).toBe('alprazolam');
-    expect(report.hypothesesConsidered.length).toBe(GABA_BENZODIAZEPINE_CANDIDATE_POOL.length);
-    expect(report.candidatesEvaluated.length).toBe(GABA_BENZODIAZEPINE_CANDIDATE_POOL.length);
+    expect(report.hypothesesConsidered.length).toBe(ALPRAZOLAM_SUBSTITUTE_CHALLENGE.pool.length);
+    expect(report.candidatesEvaluated.length).toBe(ALPRAZOLAM_SUBSTITUTE_CHALLENGE.pool.length);
     expect(report.candidatesAbove95).toHaveLength(0);
     expect(report.candidatesFalsified.some((c) => c.candidateKey === 'curcumin')).toBe(true);
     expect(report.experimentsExecuted.length).toBeGreaterThan(0);

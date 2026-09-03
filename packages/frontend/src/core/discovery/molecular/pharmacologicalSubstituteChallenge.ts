@@ -55,6 +55,18 @@ import {
   type StructuralCrossValidation,
 } from './naturalProductCandidatePool';
 import { GABA_BENZODIAZEPINE_CANDIDATE_POOL } from './gabaBenzodiazepineCandidatePool';
+import {
+  deriveAssayComparabilityGrade,
+  deriveQuantitativeComparabilityGrade,
+  KNOWLEDGE_PACK_5_VERSION,
+  knowledgePack5RecordsFor,
+} from './knowledgePack5';
+import {
+  ALPRAZOLAM_RAT_KD_NM,
+  KNOWLEDGE_PACK_6_VERSION,
+  knowledgePack6RecordsFor,
+  ratioToAlprazolamBaseline,
+} from './knowledgePack6';
 import { falsifyCandidateMechanism, type MechanismFalsificationReport } from './mechanismFalsification';
 import { assessIndependentEvidence, type EvidenceAxisEntry, type IndependentEvidenceAssessment } from './independentEvidence';
 import { deriveConfidence, type ComputationalConfidenceLevel } from './confidenceLadder';
@@ -159,13 +171,266 @@ const DECLARED_AXES: Readonly<Record<string, DeclaredMechanisticAxes>> = {
   },
 };
 
+/**
+ * BEFORE-INGESTION pool snapshot: `GABA_BENZODIAZEPINE_CANDIDATE_POOL` now
+ * also holds `baicalein`, which only entered the pool because of Knowledge
+ * Pack #5 ingestion (see gabaBenzodiazepineCandidatePool.ts). Filtering it
+ * back out here reproduces EXACTLY the 5-candidate pool this challenge ran
+ * against before that ingestion — so `ALPRAZOLAM_SUBSTITUTE_CHALLENGE`
+ * below keeps its original, already-tested meaning and output unchanged.
+ */
+const POOL_BEFORE_KNOWLEDGE_PACK_5: readonly CuratedNaturalCandidate[] =
+  GABA_BENZODIAZEPINE_CANDIDATE_POOL.filter((c) => c.candidateKey !== 'baicalein');
+
 export const ALPRAZOLAM_SUBSTITUTE_CHALLENGE: MechanisticSubstituteChallengeConfig = {
   reference: ALPRAZOLAM_REFERENCE,
-  pool: GABA_BENZODIAZEPINE_CANDIDATE_POOL,
+  pool: POOL_BEFORE_KNOWLEDGE_PACK_5,
   axisInputsByCandidateKey: DECLARED_AXES,
   question:
     'Which natural compounds in the curated GABA-A pool reach a Mechanistic Match Score of at least 95% against alprazolam\'s GABA-A benzodiazepine-site positive-allosteric-modulator mechanism (used strictly as a reference), as a step toward identifying a potentially lower-harm natural alternative — never a claim of clinical equivalence?',
 };
+
+// ---------------------------------------------------------------------------
+// KNOWLEDGE PACK #5 INGESTION — real before/after comparison.
+//
+// This section demonstrates that ingesting new, source-attributed evidence
+// (see knowledgePack5.ts for its exact, honestly-limited provenance) changes
+// a REAL run of this challenge — both a candidate's score AND, for apigenin,
+// its epistemic status — never a re-declared or hand-typed "improved" score.
+// Every override below traces to a specific transmitted record; nothing is
+// invented to make the after-state look better.
+// ---------------------------------------------------------------------------
+
+const apigeninPack5 = knowledgePack5RecordsFor('Apigenin')[0]!;
+const baicaleinPack5 = knowledgePack5RecordsFor('Baicalein')[0]!;
+
+/**
+ * apigenin's axes AFTER ingesting Knowledge Pack #5's record: the pack
+ * reports THREE different functional directions for apigenin at GABA-A
+ * depending on species/system (mouse = agonist-like, rat = sedative/
+ * proconvulsant, in vitro = antagonist). That is new, real, conflicting
+ * evidence this module did not have before — it must move mechanismMatch,
+ * directionMatch AND safetyAdvantage to a CONFLICTING basis (the rat
+ * sedative/proconvulsant finding directly contradicts the original "no
+ * sedation" safety claim), while assayMatch is upgraded from UNKNOWN using
+ * the pack's own stated HIGH comparability tier. quantitativeComparability
+ * stays UNKNOWN: the pack gives an absolute Ki (4 µM) but no explicit
+ * ratio-to-alprazolam, and Genesis will not compute one itself without an
+ * independently confirmed reference potency.
+ */
+const apigeninAxesAfterKnowledgePack5: DeclaredMechanisticAxes = {
+  ...DECLARED_AXES.apigenin,
+  mechanismMatch: { grade: 'PARTIAL', basis: 'CONFLICTING', rationale: `Knowledge Pack #5 (${KNOWLEDGE_PACK_5_VERSION}) reports apigenin's functional direction at GABA-A as species/system-dependent: ${apigeninPack5.species}. ${apigeninPack5.conflicts} This value has NOT been independently checked against a primary paper.` },
+  directionMatch: { grade: 'PARTIAL', basis: 'CONFLICTING', rationale: `Three reported directions across species/system (see mechanismMatch); this is a genuine, disclosed directional conflict, not a clean single-direction match. Source: Knowledge Pack #5, ${apigeninPack5.validationReason}` },
+  assayMatch: { grade: deriveAssayComparabilityGrade(apigeninPack5.reportedComparability), basis: 'LITERATURE_SUPPORTED', rationale: `Knowledge Pack #5 reports this candidate's assay/target/mechanism comparability to alprazolam as ${apigeninPack5.reportedComparability} (Ki=${apigeninPack5.value} ${apigeninPack5.unit}); mapped to a ${deriveAssayComparabilityGrade(apigeninPack5.reportedComparability)} grade under the documented HIGH/MEDIUM->PARTIAL, LOW/NOT_COMPARABLE->MISMATCH rule. ${apigeninPack5.validationReason}` },
+  safetyAdvantage: { grade: 'PARTIAL', basis: 'CONFLICTING', rationale: `The original safety claim (anxiolysis without sedation) was based on mouse data only. Knowledge Pack #5 reports rat data describing apigenin as sedative/proconvulsant at GABA-A — a real, conflicting safety signal that must lower confidence in a blanket safety-advantage claim. ${apigeninPack5.validationReason}` },
+};
+
+/**
+ * baicalein's axes: this candidate exists in the pool ONLY because of
+ * Knowledge Pack #5 ingestion (see gabaBenzodiazepineCandidatePool.ts) — it
+ * has no "before" axis declaration at all, so there is nothing to override,
+ * only a fresh declaration built entirely from the pack's transmitted
+ * record.
+ */
+const baicaleinAxesAfterKnowledgePack5: DeclaredMechanisticAxes = {
+  mechanismMatch: { grade: 'PARTIAL', basis: 'LITERATURE_SUPPORTED', rationale: `Knowledge Pack #5 (${KNOWLEDGE_PACK_5_VERSION}) reports baicalein as a positive modulator at a benzodiazepine-related GABA-A site (Ki=${baicaleinPack5.value} ${baicaleinPack5.unit}), sourced only from a transmitted summary with no PMID/DOI. ${baicaleinPack5.validationReason}` },
+  directionMatch: { grade: 'MATCH', basis: 'LITERATURE_SUPPORTED', rationale: `Reported positive (facilitatory) direction, consistent with the reference. ${baicaleinPack5.validationReason}` },
+  assayMatch: { grade: deriveAssayComparabilityGrade(baicaleinPack5.reportedComparability), basis: 'LITERATURE_SUPPORTED', rationale: `Knowledge Pack #5 reports ${baicaleinPack5.reportedComparability} comparability (same assay/target/mechanism family as the reference); mapped to a ${deriveAssayComparabilityGrade(baicaleinPack5.reportedComparability)} grade under the documented mapping rule. ${baicaleinPack5.validationReason}` },
+  quantitativeComparability: { grade: deriveQuantitativeComparabilityGrade(baicaleinPack5.reportedRatioToReference), basis: 'LITERATURE_SUPPORTED', rationale: `Knowledge Pack #5 explicitly states baicalein is reported as ~${baicaleinPack5.reportedRatioToReference}x weaker than alprazolam at this site; under the disclosed <=10x -> PARTIAL rule this grades ${deriveQuantitativeComparabilityGrade(baicaleinPack5.reportedRatioToReference)}. ${baicaleinPack5.validationReason}` },
+  selectivity: { grade: 'UNKNOWN', basis: 'NOT_AVAILABLE', rationale: 'Knowledge Pack #5 does not report any off-target/selectivity data for baicalein.' },
+  safetyAdvantage: { grade: 'UNKNOWN', basis: 'NOT_AVAILABLE', rationale: 'Knowledge Pack #5 does not report any comparative safety data for baicalein against alprazolam; natural origin is never treated as a safety claim on its own.' },
+};
+
+const DECLARED_AXES_AFTER_KNOWLEDGE_PACK_5: Readonly<Record<string, DeclaredMechanisticAxes>> = {
+  ...DECLARED_AXES,
+  apigenin: apigeninAxesAfterKnowledgePack5,
+  baicalein: baicaleinAxesAfterKnowledgePack5,
+};
+
+/** Same reference, same question, same reasoning loop — the ONLY thing that changed is the ingested evidence (pool now includes baicalein; apigenin's axes reflect the newly ingested conflicting evidence). */
+export const ALPRAZOLAM_SUBSTITUTE_CHALLENGE_AFTER_KNOWLEDGE_PACK_5: MechanisticSubstituteChallengeConfig = {
+  reference: ALPRAZOLAM_REFERENCE,
+  pool: GABA_BENZODIAZEPINE_CANDIDATE_POOL,
+  axisInputsByCandidateKey: DECLARED_AXES_AFTER_KNOWLEDGE_PACK_5,
+  question: ALPRAZOLAM_SUBSTITUTE_CHALLENGE.question,
+};
+
+// ---------------------------------------------------------------------------
+// KNOWLEDGE PACK #6 INGESTION — a real self-correction, not just an addition.
+//
+// Pack #6 ("Verification Pack v3") carries real PMID/DOI citations Pack #5
+// did not have, and one of them CONTRADICTS a Pack #5 claim: baicalein's
+// Ki against alprazolam was recorded (from an uncited chat summary) as 7.5
+// nM. Two independently-cited primary papers here (Hui 2000, PMID 10705749;
+// Wang 2003 via Çiçek 2018, DOI 10.3390/molecules23071512) place it at
+// 5.69-10.1 µM instead — roughly 1000x weaker. Genesis does not average the
+// old and new numbers or quietly drop the old one: this section supersedes
+// the erroneous Pack #5 value explicitly, and the resulting score genuinely
+// drops. Pack #6 also supplies the first real, cited alprazolam-side number
+// (4.6 nM rat Kd, PMID 1964224), which lets apigenin's quantitativeComparability
+// axis move from UNKNOWN to a real, computed MISMATCH — an UNKNOWN resolved
+// by ingestion, not simply left alone or guessed.
+// ---------------------------------------------------------------------------
+
+const baicaleinPack6IC50 = knowledgePack6RecordsFor('baicalein').find((r) => r.measurementType === 'IC50')!;
+const baicaleinPack6Ki = knowledgePack6RecordsFor('baicalein').find((r) => r.measurementType === 'Ki')!;
+const apigeninPack6Values = knowledgePack6RecordsFor('apigenin');
+
+const baicaleinAxesAfterKnowledgePack6: DeclaredMechanisticAxes = {
+  ...baicaleinAxesAfterKnowledgePack5,
+  mechanismMatch: { grade: 'PARTIAL', basis: 'CONFLICTING', rationale: `Knowledge Pack #6 (${KNOWLEDGE_PACK_6_VERSION}) SUPERSEDES the Pack #5 claim (Ki=7.5 nM, no citation) with two independently-cited primary papers that disagree with each other by ~2x but agree the real potency is in the low-micromolar range: Hui et al. 2000 (PMID ${baicaleinPack6Ki.pmid}, Ki=${baicaleinPack6Ki.value} nM) and Wang et al. 2003 via Çiçek 2018 (DOI ${baicaleinPack6IC50.doi}, IC50=${baicaleinPack6IC50.value} nM). Mechanism (positive modulation at the benzodiazepine site) is confirmed; exact potency remains genuinely disputed between two real sources.` },
+  assayMatch: { grade: deriveAssayComparabilityGrade(baicaleinPack6Ki.comparability), basis: 'LITERATURE_SUPPORTED', rationale: `Knowledge Pack #6 reports ${baicaleinPack6Ki.comparability} comparability (radioligand displacement, same site) from two independently-cited primary papers, correcting Pack #5's uncited HIGH claim.` },
+  quantitativeComparability: {
+    grade: deriveQuantitativeComparabilityGrade(ratioToAlprazolamBaseline(baicaleinPack6Ki.value)),
+    basis: 'LITERATURE_SUPPORTED',
+    rationale: `SUPERSEDES Knowledge Pack #5's baicalein ratio (~3x, from an uncited claim). Knowledge Pack #6's own real, cited alprazolam baseline is ${ALPRAZOLAM_RAT_KD_NM} nM (rat Kd, PMID 1964224); baicalein's best (most potent) real, cited value is Ki=${baicaleinPack6Ki.value} nM (PMID ${baicaleinPack6Ki.pmid}) — a ratio of ~${ratioToAlprazolamBaseline(baicaleinPack6Ki.value).toFixed(0)}x weaker, not ~3x. Under the disclosed <=10x -> PARTIAL rule this now genuinely grades MISMATCH.`,
+  },
+};
+
+const apigeninQuantitativeRatios = apigeninPack6Values.map((r) => ratioToAlprazolamBaseline(r.value));
+const apigeninBestRatio = Math.min(...apigeninQuantitativeRatios);
+
+const apigeninAxesAfterKnowledgePack6: DeclaredMechanisticAxes = {
+  ...apigeninAxesAfterKnowledgePack5,
+  quantitativeComparability: {
+    grade: deriveQuantitativeComparabilityGrade(apigeninBestRatio),
+    basis: 'LITERATURE_SUPPORTED',
+    rationale: `Resolved from UNKNOWN (Pack #5 gave no ratio) using Knowledge Pack #6's real, cited values: apigenin Ki=${apigeninPack6Values.map((r) => `${r.value} nM (${r.doi ?? r.pmid})`).join(' or ')} vs alprazolam's real, cited ${ALPRAZOLAM_RAT_KD_NM} nM rat Kd (PMID 1964224) — a best-case ratio of ~${apigeninBestRatio.toFixed(0)}x weaker. Under the disclosed <=10x -> PARTIAL rule this grades MISMATCH, not PARTIAL.`,
+  },
+};
+
+const DECLARED_AXES_AFTER_KNOWLEDGE_PACK_6: Readonly<Record<string, DeclaredMechanisticAxes>> = {
+  ...DECLARED_AXES_AFTER_KNOWLEDGE_PACK_5,
+  apigenin: apigeninAxesAfterKnowledgePack6,
+  baicalein: baicaleinAxesAfterKnowledgePack6,
+};
+
+/** Same pool as the Pack #5 after-state; only the axis DATA for apigenin/baicalein is corrected/resolved by Pack #6. */
+export const ALPRAZOLAM_SUBSTITUTE_CHALLENGE_AFTER_KNOWLEDGE_PACK_6: MechanisticSubstituteChallengeConfig = {
+  reference: ALPRAZOLAM_REFERENCE,
+  pool: GABA_BENZODIAZEPINE_CANDIDATE_POOL,
+  axisInputsByCandidateKey: DECLARED_AXES_AFTER_KNOWLEDGE_PACK_6,
+  question: ALPRAZOLAM_SUBSTITUTE_CHALLENGE.question,
+};
+
+export interface KnowledgeIngestionCandidateDelta {
+  candidateKey: string;
+  before: { mechanisticMatchPercent: number; status: EpistemicStatus } | null;
+  after: { mechanisticMatchPercent: number; status: EpistemicStatus } | null;
+}
+
+export interface KnowledgeIngestionComparison {
+  before: MechanisticSubstituteChallengeResult;
+  after: MechanisticSubstituteChallengeResult;
+  beforeVerdict: { result: FinalDiscoveryResult; reasoning: string };
+  afterVerdict: { result: FinalDiscoveryResult; reasoning: string };
+  perCandidate: readonly KnowledgeIngestionCandidateDelta[];
+}
+
+/**
+ * Runs the SAME challenge twice — once against the pre-ingestion pool/axes,
+ * once against the post-ingestion pool/axes — and reports the real diff.
+ * Neither run's score or status is asserted ahead of time; both come from
+ * actually executing `runMechanisticSubstituteChallenge`.
+ */
+export function runKnowledgeIngestionBeforeAfterComparison(
+  engines: { rdkit: RdkitTransport; admet: AdmetTransport },
+): KnowledgeIngestionComparison {
+  const before = runMechanisticSubstituteChallenge(ALPRAZOLAM_SUBSTITUTE_CHALLENGE, engines);
+  const after = runMechanisticSubstituteChallenge(ALPRAZOLAM_SUBSTITUTE_CHALLENGE_AFTER_KNOWLEDGE_PACK_5, engines);
+
+  const beforeByKey = new Map(before.loopResult.finalGraph.nodes.filter((n) => n.kind === 'HYPOTHESIS').map((n) => {
+    const key = n.nodeId.replace('hyp-', '');
+    const finding = before.findings.get(key);
+    return [key, finding !== undefined ? { mechanisticMatchPercent: finding.mechanisticMatch.totalScorePercent, status: n.status } : null] as const;
+  }));
+  const afterByKey = new Map(after.loopResult.finalGraph.nodes.filter((n) => n.kind === 'HYPOTHESIS').map((n) => {
+    const key = n.nodeId.replace('hyp-', '');
+    const finding = after.findings.get(key);
+    return [key, finding !== undefined ? { mechanisticMatchPercent: finding.mechanisticMatch.totalScorePercent, status: n.status } : null] as const;
+  }));
+
+  const allKeys = new Set([...beforeByKey.keys(), ...afterByKey.keys()]);
+  const perCandidate: KnowledgeIngestionCandidateDelta[] = [...allKeys].sort().map((candidateKey) => ({
+    candidateKey,
+    before: beforeByKey.get(candidateKey) ?? null,
+    after: afterByKey.get(candidateKey) ?? null,
+  }));
+
+  return {
+    before,
+    after,
+    beforeVerdict: deriveFinalDiscoveryResult(before),
+    afterVerdict: deriveFinalDiscoveryResult(after),
+    perCandidate,
+  };
+}
+
+interface CandidateSnapshot { mechanisticMatchPercent: number; status: EpistemicStatus }
+
+function hypothesisSnapshotByKey(result: MechanisticSubstituteChallengeResult): Map<string, CandidateSnapshot> {
+  return new Map(result.loopResult.finalGraph.nodes.filter((n) => n.kind === 'HYPOTHESIS').map((n) => {
+    const key = n.nodeId.replace('hyp-', '');
+    const finding = result.findings.get(key);
+    return [key, finding !== undefined ? { mechanisticMatchPercent: finding.mechanisticMatch.totalScorePercent, status: n.status } : { mechanisticMatchPercent: 0, status: n.status }] as const;
+  }));
+}
+
+export interface KnowledgeIngestionThreeStageCandidateDelta {
+  candidateKey: string;
+  before: CandidateSnapshot | null;
+  afterPack5: CandidateSnapshot | null;
+  afterPack6: CandidateSnapshot | null;
+}
+
+export interface KnowledgeIngestionThreeStageComparison {
+  before: MechanisticSubstituteChallengeResult;
+  afterPack5: MechanisticSubstituteChallengeResult;
+  afterPack6: MechanisticSubstituteChallengeResult;
+  beforeVerdict: { result: FinalDiscoveryResult; reasoning: string };
+  afterPack5Verdict: { result: FinalDiscoveryResult; reasoning: string };
+  afterPack6Verdict: { result: FinalDiscoveryResult; reasoning: string };
+  perCandidate: readonly KnowledgeIngestionThreeStageCandidateDelta[];
+}
+
+/**
+ * BEFORE -> AFTER Pack #5 -> AFTER Pack #6. The middle stage is deliberately
+ * preserved (not skipped or silently corrected in place) even though it
+ * turns out to contain an error (baicalein's Ki): the mission asks Genesis
+ * to show what changed at each step, and "we believed X, then better
+ * evidence corrected it to Y" is itself a real, honestly-reportable
+ * scientific event — not something to erase from the record.
+ */
+export function runKnowledgeIngestionThreeStageComparison(
+  engines: { rdkit: RdkitTransport; admet: AdmetTransport },
+): KnowledgeIngestionThreeStageComparison {
+  const before = runMechanisticSubstituteChallenge(ALPRAZOLAM_SUBSTITUTE_CHALLENGE, engines);
+  const afterPack5 = runMechanisticSubstituteChallenge(ALPRAZOLAM_SUBSTITUTE_CHALLENGE_AFTER_KNOWLEDGE_PACK_5, engines);
+  const afterPack6 = runMechanisticSubstituteChallenge(ALPRAZOLAM_SUBSTITUTE_CHALLENGE_AFTER_KNOWLEDGE_PACK_6, engines);
+
+  const beforeByKey = hypothesisSnapshotByKey(before);
+  const pack5ByKey = hypothesisSnapshotByKey(afterPack5);
+  const pack6ByKey = hypothesisSnapshotByKey(afterPack6);
+  const allKeys = new Set([...beforeByKey.keys(), ...pack5ByKey.keys(), ...pack6ByKey.keys()]);
+
+  const perCandidate: KnowledgeIngestionThreeStageCandidateDelta[] = [...allKeys].sort().map((candidateKey) => ({
+    candidateKey,
+    before: beforeByKey.get(candidateKey) ?? null,
+    afterPack5: pack5ByKey.get(candidateKey) ?? null,
+    afterPack6: pack6ByKey.get(candidateKey) ?? null,
+  }));
+
+  return {
+    before,
+    afterPack5,
+    afterPack6,
+    beforeVerdict: deriveFinalDiscoveryResult(before),
+    afterPack5Verdict: deriveFinalDiscoveryResult(afterPack5),
+    afterPack6Verdict: deriveFinalDiscoveryResult(afterPack6),
+    perCandidate,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // GENERIC MACHINERY — parameterised over ANY PharmacologicalReference + pool.

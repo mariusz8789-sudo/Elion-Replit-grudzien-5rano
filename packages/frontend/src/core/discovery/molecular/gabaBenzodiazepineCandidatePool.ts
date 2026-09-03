@@ -10,19 +10,23 @@ import type { CuratedNaturalCandidate } from './naturalProductCandidatePool';
  * pool for a different reference pharmacology (GABA-A / benzodiazepine
  * site, e.g. alprazolam), not a new schema.
  *
- * SCOPE HONESTLY DISCLOSED: this pool holds 5 real, named, individually
+ * SCOPE HONESTLY DISCLOSED: this pool holds 6 real, named, individually
  * cited natural candidates, not 20. Every SMILES below was cross-checked
  * against this repository's real RDKit worker before being written here
  * (verified in this session; canonical output and formula match recorded).
- * Every citation is a real, well-documented publication to the best of
- * Genesis's training knowledge — but PubMed/PMID live lookup is blocked in
- * this runtime (the same disclosed limitation as PubChem/ChEMBL elsewhere
- * in this codebase), so citation text here has NOT been independently
- * re-verified against a live bibliographic database in this run. A
- * scientist using this pool should independently confirm each citation
- * before relying on it. "A pool of five well-evidenced candidates is worth
- * more here than one of twenty asserted without citation" — the same
- * discipline the ketamine/NMDA pool already applies.
+ * Five candidates (apigenin, chrysin, honokiol, valerenic-acid, curcumin)
+ * cite a real, well-documented publication to the best of Genesis's
+ * training knowledge — but PubMed/PMID live lookup is blocked in this
+ * runtime (the same disclosed limitation as PubChem/ChEMBL elsewhere in
+ * this codebase), so citation text has NOT been independently re-verified
+ * against a live bibliographic database in this run. The sixth (baicalein)
+ * was added via Knowledge Pack #5 ingestion — a transmitted conversation
+ * summary with NO PMID/DOI at all, weaker provenance than the other five;
+ * see knowledgePack5.ts for that exact limitation. A scientist using this
+ * pool should independently confirm every citation before relying on it.
+ * "A pool of a handful of well-evidenced candidates is worth more here than
+ * one of twenty asserted without citation" — the same discipline the
+ * ketamine/NMDA pool already applies.
  *
  * WHAT THIS POOL DELIBERATELY INCLUDES:
  *  - three small-molecule flavonoids/lignans with real, published evidence
@@ -116,6 +120,24 @@ export const GABA_BENZODIAZEPINE_CANDIDATE_POOL: readonly CuratedNaturalCandidat
       kind: 'STRUCTURE_DECLINED',
       reason: 'Valerenic acid is a bicyclic sesquiterpene carboxylic acid with defined stereocentres. Genesis attempted to recall its SMILES and cross-validated the attempt against the real RDKit worker in this session: the recalled structure returned formula C13H20O2, not the correct C15H22O2 — Genesis will not assert an uncorrected, self-contradicted structure. PubChem/ChEMBL live lookup (which would supply a verified structure) is blocked in this runtime. This is a declared capability gap, not an assumed absence of structure.',
     },
+  },
+  {
+    candidateKey: 'baicalein',
+    compoundName: 'Baicalein',
+    sourceOrganismOrOrigin: 'Flavone from Scutellaria baicalensis (Chinese/Baikal skullcap) root.',
+    naturalOccurrenceEvidence: [{
+      kind: 'PEER_REVIEWED_LITERATURE',
+      reference: 'Added via Knowledge Pack #5 ingestion (transmitted conversation summary, no PMID/DOI attached): Scutellaria baicalensis named as the natural origin of baicalein and its reported GABA-A benzodiazepine-site activity.',
+      establishes: 'Identification of baicalein as a Scutellaria baicalensis root constituent with reported GABA-A benzodiazepine-site activity. NOT independently checked against a primary paper — see knowledgePack5.ts for the exact provenance limitation.',
+    } as SourceEvidence],
+    mechanismEvidence: [{
+      source: 'LITERATURE',
+      identifier: 'knowledgePack5:Baicalein (transmitted summary, no PMID/DOI)',
+      establishes: 'Reported Ki = 7.5 nM at a benzodiazepine-related GABA-A site, described by the source summary as HIGH comparability (same assay/target/mechanism family) and ~3x weaker than alprazolam. This value has NOT been independently checked against a primary paper in this runtime.',
+    } as TargetEvidenceRef],
+    mechanismSummary: 'Reported positive modulator at a benzodiazepine-related GABA-A site with a specific, transmitted Ki value — but sourced only from an unverified conversation summary (Knowledge Pack #5), not a checked primary citation, unlike apigenin/chrysin/honokiol above.',
+    reportedTargetFamily: 'GABA-A receptor (benzodiazepine-related site)',
+    structure: { kind: 'SMILES_CROSS_VALIDATED', smiles: 'O=c1cc(-c2ccccc2)oc2cc(O)c(O)c(O)c12', expectedFormula: 'C15H10O5' },
   },
   {
     candidateKey: 'curcumin',

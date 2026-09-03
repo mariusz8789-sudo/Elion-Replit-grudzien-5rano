@@ -18,7 +18,7 @@
  *   inventing one would be a fabricated number dressed as science. The name
  *   says exactly what it is.
  *
- * TWO SCORING MODES, BOTH DRIVEN BY THE GRAPH'S CURRENT STATE:
+ * SCORING MODES, ALL DRIVEN BY THE GRAPH'S CURRENT STATE:
  *
  *   - >= 2 open (UNRESOLVED) target hypotheses: discriminationScore is the
  *     spread among THEIR predictions only — "how much would this experiment
@@ -31,6 +31,18 @@
  *     state-dependent: once a hypothesis leaves the open set (by real
  *     computation elsewhere), the candidates that best serve the REMAINING
  *     question can rank differently than they did before.
+ *   - exactly 1 open target hypothesis and NO established reference exists
+ *     to compare it against: the domain may instead declare a raw
+ *     PRIORITY_SCORE for that single open hypothesis (e.g. how much
+ *     existing, already-declared evidence there is to computationally
+ *     verify) — an explicitly disclosed, weaker proxy than a real
+ *     discrimination, used only when no comparison is possible at all.
+ *   - `scoringMode: 'COVERAGE'`: for an experiment that does not discriminate
+ *     between its targets but advances ALL of them at once via one real,
+ *     batched computation (e.g. a single batched external-engine call) —
+ *     scored by how many targets are still open, since running it teaches
+ *     Genesis something about every one of them, not by how much they
+ *     disagree.
  *   - 0 open target hypotheses: nothing left to learn from re-running this
  *     experiment; scored 0 and excluded from ranking.
  *
@@ -53,6 +65,8 @@ export interface CandidateExperimentSpec {
   /** Explicit, declared cost (defaults to 1 — "no basis to differentiate"). Must be > 0. */
   cost: number;
   costReasoning: string;
+  /** 'DISCRIMINATE' (default): score by disagreement/deviation, as above. 'COVERAGE': this experiment advances every open target at once via one batched real computation — score by how many are still open. */
+  scoringMode?: 'DISCRIMINATE' | 'COVERAGE';
 }
 
 export interface ScoredCandidateExperiment {
@@ -60,7 +74,7 @@ export interface ScoredCandidateExperiment {
   targetHypothesisIds: readonly string[];
   openHypothesisIds: readonly string[];
   discriminationScore: number;
-  scoreBasis: 'SPREAD_AMONG_OPEN' | 'DEVIATION_FROM_SUPPORTED_REFERENCE' | 'NO_OPEN_TARGETS' | 'INSUFFICIENT_PREDICTIONS';
+  scoreBasis: 'SPREAD_AMONG_OPEN' | 'DEVIATION_FROM_SUPPORTED_REFERENCE' | 'PRIORITY_SCORE' | 'COVERAGE_COUNT' | 'NO_OPEN_TARGETS' | 'INSUFFICIENT_PREDICTIONS';
   cost: number;
   value: number;
   rationale: string;
@@ -91,6 +105,15 @@ function scoreCandidate(spec: CandidateExperimentSpec, graph: EpistemicGraph): S
     return { experimentId: spec.experimentId, targetHypothesisIds: spec.targetHypothesisIds, openHypothesisIds, discriminationScore: 0, scoreBasis: 'NO_OPEN_TARGETS', cost: spec.cost, value: 0, rationale: 'Every target hypothesis is already resolved — re-running this experiment would teach Genesis nothing new.' };
   }
 
+  if ((spec.scoringMode ?? 'DISCRIMINATE') === 'COVERAGE') {
+    const count = openHypothesisIds.length;
+    return {
+      experimentId: spec.experimentId, targetHypothesisIds: spec.targetHypothesisIds, openHypothesisIds,
+      discriminationScore: count, scoreBasis: 'COVERAGE_COUNT', cost: spec.cost, value: count / spec.cost,
+      rationale: `Advances ${count} still-open hypothesis(es) (${openHypothesisIds.join(', ')}) at once via one batched real computation.`,
+    };
+  }
+
   if (openHypothesisIds.length >= 2) {
     const values = openHypothesisIds.map((id) => spec.predictions[id]).filter((v): v is number => v !== null && v !== undefined);
     if (values.length < 2) {
@@ -110,8 +133,16 @@ function scoreCandidate(spec: CandidateExperimentSpec, graph: EpistemicGraph): S
   const referenceIds = spec.targetHypothesisIds.filter((id) => id !== soleOpenId && SUPPORTED_STATUSES.has(nodesById.get(id)!.status));
   const referencePredictions = referenceIds.map((id) => spec.predictions[id]).filter((v): v is number => v !== null && v !== undefined);
 
-  if (soleOpenPrediction === null || soleOpenPrediction === undefined || referencePredictions.length === 0) {
-    return { experimentId: spec.experimentId, targetHypothesisIds: spec.targetHypothesisIds, openHypothesisIds, discriminationScore: 0, scoreBasis: 'INSUFFICIENT_PREDICTIONS', cost: spec.cost, value: 0, rationale: `Only one open hypothesis ("${soleOpenId}") remains, and no already-SUPPORTED reference prediction is available to test it against here.` };
+  if (soleOpenPrediction === null || soleOpenPrediction === undefined) {
+    return { experimentId: spec.experimentId, targetHypothesisIds: spec.targetHypothesisIds, openHypothesisIds, discriminationScore: 0, scoreBasis: 'INSUFFICIENT_PREDICTIONS', cost: spec.cost, value: 0, rationale: `Only one open hypothesis ("${soleOpenId}") remains, and it declares no prediction to score by.` };
+  }
+  if (referencePredictions.length === 0) {
+    // No established reference to compare against at all — fall back to the domain's own declared priority for this sole open hypothesis (e.g. how much existing evidence there already is to computationally verify). A disclosed, weaker proxy than a real discrimination or deviation.
+    return {
+      experimentId: spec.experimentId, targetHypothesisIds: spec.targetHypothesisIds, openHypothesisIds,
+      discriminationScore: soleOpenPrediction, scoreBasis: 'PRIORITY_SCORE', cost: spec.cost, value: soleOpenPrediction / spec.cost,
+      rationale: `Only one open hypothesis ("${soleOpenId}") remains, and no established reference exists to compare it against; scored by its own declared priority (${soleOpenPrediction}).`,
+    };
   }
   const deviation = Math.max(...referencePredictions.map((r) => Math.abs(soleOpenPrediction - r)));
   return {

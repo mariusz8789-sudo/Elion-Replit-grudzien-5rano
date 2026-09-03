@@ -103,6 +103,24 @@ describe('experimentSelection — candidate generation and discrimination scorin
     expect(() => selectNextExperiment(graph, [c])).toThrow(/non-positive cost/);
   });
 
+  it('falls back to a declared PRIORITY_SCORE when exactly one hypothesis is open and no reference exists', () => {
+    const graph = buildEpistemicGraph('g', [hyp('a')], []);
+    const c = candidate('e1', ['a'], { a: 7 });
+    const result = selectNextExperiment(graph, [c]);
+    expect(result.candidates[0]!.scoreBasis).toBe('PRIORITY_SCORE');
+    expect(result.candidates[0]!.discriminationScore).toBe(7);
+  });
+
+  it('COVERAGE mode scores by how many targets are still open, not by their disagreement', () => {
+    const graph = buildEpistemicGraph('g', [hyp('a'), hyp('b', 'SUPPORTED'), hyp('c')], []);
+    const c: CandidateExperimentSpec = { experimentId: 'batch', targetHypothesisIds: ['a', 'b', 'c'], predictions: {}, cost: 2, costReasoning: 'test', scoringMode: 'COVERAGE' };
+    const result = selectNextExperiment(graph, [c]);
+    expect(result.candidates[0]!.scoreBasis).toBe('COVERAGE_COUNT');
+    expect([...result.candidates[0]!.openHypothesisIds].sort()).toEqual(['a', 'c']);
+    expect(result.candidates[0]!.discriminationScore).toBe(2);
+    expect(result.candidates[0]!.value).toBe(1);
+  });
+
   it('is deterministic across repeated calls on the same graph and candidates', () => {
     const graph = buildEpistemicGraph('g', [hyp('a'), hyp('b')], []);
     const c1 = candidate('e1', ['a', 'b'], { a: 0, b: 5 });

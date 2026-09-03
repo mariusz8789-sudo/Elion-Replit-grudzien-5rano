@@ -199,7 +199,8 @@ function externalPoolProvider(candidates: readonly MoleculeCandidate[]): Molecul
   };
 }
 
-function candidateFromCrossValidated(candidateKey: string, smiles: string, rdkit: RdkitTransport): MoleculeCandidate | null {
+/** Exported so other real-computation callers (e.g. the epistemic reasoning-loop natural-compound adapter) can build the same real MoleculeCandidate from a cross-validated SMILES without duplicating this logic. */
+export function candidateFromCrossValidated(candidateKey: string, smiles: string, rdkit: RdkitTransport): MoleculeCandidate | null {
   const described = rdkit.describe(smiles);
   if (!described.ok) return null;
   const parsed = validateFormula(described.data.molecularFormula);

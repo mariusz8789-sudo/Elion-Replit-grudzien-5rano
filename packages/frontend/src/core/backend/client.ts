@@ -518,9 +518,19 @@ export interface ProjectAccess {
   canRun: boolean;
 }
 
+export interface AccessAuditEntry {
+  id: string; projectId: string; userId: string | null; action: string; accessLevel: ProjectAccess['accessLevel'];
+  workflow: string; sourceIds: string[]; runId: string | null; resultStatus: string | null; details: Record<string, unknown>; createdAt: number;
+}
+
 export async function getProjectAccess(token: string, projectId: string): Promise<ApiResult<ProjectAccess>> {
   const r = await request<ProjectAccess>('GET', `/projects/${projectId}/access`, { token });
   return r;
+}
+
+export async function listProjectAccessAudit(token: string, projectId: string, limit = 40): Promise<ApiResult<AccessAuditEntry[]>> {
+  const r = await request<{ entries: AccessAuditEntry[] }>('GET', `/projects/${projectId}/audit?limit=${encodeURIComponent(String(limit))}`, { token });
+  return r.ok ? { ok: true, data: r.data.entries } : r;
 }
 
 export async function getFabricComputeContract(): Promise<ApiResult<FabricComputeContract>> {

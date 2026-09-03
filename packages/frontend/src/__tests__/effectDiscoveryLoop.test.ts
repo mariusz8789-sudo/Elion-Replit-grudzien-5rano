@@ -47,7 +47,7 @@ const request: NaturalAnalogueCampaignRequest = {
 describe('effect-first discovery loop', () => {
   it('runs desired effect through the existing real campaign seam', () => {
     const result = runEffectDiscovery({
-      effectId: 'cns-nmda-modulation',
+      effectId: 'nmda-antagonism',
       desiredEffect: 'CNS NMDA-receptor modulation under bounded property constraints',
       domain: 'neurobiology',
       targetClasses: ['NMDA receptor'],
@@ -56,8 +56,11 @@ describe('effect-first discovery loop', () => {
       candidateClass: 'MIXED',
     }, request, { rdkit: createNodeRdkitTransport(), admet: createNodeAdmetTransport() });
 
-    expect(result.effect.effectId).toBe('cns-nmda-modulation');
+    expect(result.effect.effectId).toBe('nmda-antagonism');
     expect(result.interpretation.targetHypotheses).toContain('NMDA receptor');
+    expect(result.sourceRecords.length).toBeGreaterThan(0);
+    expect(result.sourceRecords.some((record) => record.compoundId === 'agmatine')).toBe(true);
+    expect(result.interpretation.mechanismHypotheses).toContain('open-channel antagonism');
     expect(result.campaign.candidates.length).toBe(NATURAL_PRODUCT_CANDIDATE_POOL.length);
     expect(result.resultFingerprint).toMatch(/^[0-9a-f]{8}$/);
     expect(result.nextExperiment.length).toBeGreaterThan(0);

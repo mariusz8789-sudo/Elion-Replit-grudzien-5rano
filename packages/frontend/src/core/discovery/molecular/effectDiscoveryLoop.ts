@@ -6,6 +6,7 @@ import {
   type NaturalAnalogueCampaignRequest,
   type NaturalAnalogueCampaignResult,
 } from './naturalAnalogueCampaign';
+import { sourceBackedKnowledgeForEffect, sourceBackedRegistryFingerprint } from './sourceBackedKnowledgeRegistry';
 
 export const EFFECT_DISCOVERY_LOOP_VERSION = '1.0.0';
 
@@ -27,6 +28,7 @@ export interface EffectDiscoveryResult {
     mechanismHypotheses: readonly string[];
   };
   campaign: NaturalAnalogueCampaignResult;
+  sourceRecords: readonly ReturnType<typeof sourceBackedKnowledgeForEffect>[number][];
   evidenceStatus: 'SOURCE_BACKED' | 'PARTIAL' | 'NOT_AVAILABLE';
   nextExperiment: string;
   resultFingerprint: string;
@@ -43,6 +45,9 @@ export function runEffectDiscovery(
   engines: NaturalAnalogueCampaignEngines,
 ): EffectDiscoveryResult {
   const campaign = runNaturalAnalogueCampaign(campaignRequest, engines);
+  const sourceRecords = sourceBackedKnowledgeForEffect(effect.effectId);
+  const registryTargets = sourceRecords.map((record) => record.targetId).filter((target): target is string => target !== null);
+  const registryMechanisms = sourceRecords.map((record) => record.mechanism).filter((mechanism): mechanism is string => mechanism !== null);
   const retained = campaign.candidates.filter((candidate) => candidate.status === 'RETAINED_RANKED').length;
   const evidenceStatus = campaign.candidates.length === 0
     ? 'NOT_AVAILABLE'
@@ -54,16 +59,18 @@ export function runEffectDiscovery(
     effect,
     interpretation: {
       measurableProperties: ['target engagement', 'functional activity', 'mechanistic direction', 'exposure/property constraints'],
-      targetHypotheses: [...effect.targetClasses],
-      mechanismHypotheses: [...effect.mechanismClasses],
+      targetHypotheses: [...new Set([...effect.targetClasses, ...registryTargets])],
+      mechanismHypotheses: [...new Set([...effect.mechanismClasses, ...registryMechanisms])],
     },
     campaign,
+    sourceRecords,
     evidenceStatus,
     nextExperiment,
     resultFingerprint: fnv1a(canonicalJson({
       v: EFFECT_DISCOVERY_LOOP_VERSION,
       effect,
       campaign: naturalAnalogueCampaignFingerprint(campaign),
+      registry: sourceBackedRegistryFingerprint(sourceRecords),
     })),
   };
 }

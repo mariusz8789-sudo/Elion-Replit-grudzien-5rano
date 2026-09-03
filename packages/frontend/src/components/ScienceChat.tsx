@@ -11,7 +11,7 @@ import { track } from '../core/analytics';
 import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmEarthquakeEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { getToken } from '../core/backend/session';
-import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
+import { searchKnowledgeMaterials, getProjectAccess, type KnowledgeMaterial, type ProjectAccess } from '../core/backend/client';
 import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
 import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
@@ -217,6 +217,7 @@ export function ScienceChat() {
   const [backendConfirmationPending, setBackendConfirmationPending] = useState(false);
   const [lastEvidenceCapsule, setLastEvidenceCapsule] = useState<EvidenceGuidedExperimentCapsule | null>(null);
   const [activeKnowledgeProject, setActiveKnowledgeProject] = useState<ActiveKnowledgeProject | null>(() => getActiveKnowledgeProject());
+  const [projectAccess, setProjectAccess] = useState<ProjectAccess | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Etap procesu badawczego wyliczony z REALNEGO stanu rozmowy (typowane
@@ -235,6 +236,15 @@ export function ScienceChat() {
   }, []);
   useEffect(() => subscribeSimContext((c) => setCtxName(c?.experimentName ?? null)), []);
   useEffect(() => subscribeActiveKnowledgeProject(setActiveKnowledgeProject), []);
+  useEffect(() => {
+    let cancelled = false;
+    const token = getToken();
+    if (!token || !activeKnowledgeProject) { setProjectAccess(null); return () => { cancelled = true; }; }
+    void getProjectAccess(token, activeKnowledgeProject.id).then((result) => {
+      if (!cancelled) setProjectAccess(result.ok ? result.data : null);
+    });
+    return () => { cancelled = true; };
+  }, [activeKnowledgeProject]);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [turns, open]);
 
   const appendProjectKnowledgeSources = async (query: string) => {
@@ -463,6 +473,7 @@ export function ScienceChat() {
         <div>
           <strong>💬 Science Chat</strong>
           <span className="science-chat-ctx">{ctxName ? `kontekst: ${ctxName}` : 'brak otwartej symulacji'}</span>
+          {projectAccess && <span className="science-chat-ctx" title="Poziom egzekwowany przez backend">dostęp: {projectAccess.accessLevel} · {projectAccess.canRun ? 'run dozwolony' : 'run zablokowany'}</span>}
         </div>
         <button className="back" aria-label="Zamknij Science Chat" onClick={() => setOpen(false)}>✕</button>
       </header>

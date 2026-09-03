@@ -87,6 +87,7 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
+import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit } from './access.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -148,6 +149,7 @@ export function handleApi(db, ctx) {
     }
     // Runtime scientific-environment audit (Priority 1): realna sonda + persystencja.
     if (seg[1] === 'environment' && seg.length === 2 && method === 'GET') return environmentHandler(db);
+    if (seg[1] === 'access' && seg.length === 2 && method === 'GET') return ok({ levels: ['PUBLIC', 'RESEARCH', 'RESTRICTED'], semantics: { PUBLIC: 'read and bounded runs', RESEARCH: 'authenticated project research', RESTRICTED: 'approved research roles' } });
     // Katalog 52 endpointów ADMET-AI (kategoria, typ zadania, opublikowana metryka TDC).
     if (seg[1] === 'admet' && seg[2] === 'endpoints' && seg.length === 3 && method === 'GET') {
       const r = listEndpoints();
@@ -183,7 +185,25 @@ export function handleApi(db, ctx) {
     if (!project || !role) return err(404, 'not_found');
 
     // /api/projects/:id
-    if (seg.length === 2 && method === 'GET') return ok({ project: { ...project, role } });
+    if (seg.length === 2 && method === 'GET') return ok({ project: { ...project, role, accessLevel: accessLevelForProject(db, projectId, project.visibility) } });
+
+    // Product access policy and append-only audit trail.
+    if (seg[2] === 'access' && seg.length === 3) {
+      const accessLevel = accessLevelForProject(db, projectId, project.visibility);
+      if (method === 'GET') return ok({ projectId, accessLevel, role, canRun: canUseAccessLevel(accessLevel, role, 'run') });
+      if (method === 'PUT') {
+        if (!atLeast(role, 'admin')) return err(403, 'forbidden', 'Zmiana poziomu dostępu wymaga roli admin lub owner.');
+        const result = setProjectAccess(db, { projectId, level: body.level, userId: user.id });
+        if (!result.ok) return err(400, result.error, 'Poziom dostępu musi być PUBLIC, RESEARCH albo RESTRICTED.');
+        appendAccessAudit(db, { projectId, userId: user.id, action: 'access_policy_changed', accessLevel: result.level, workflow: 'access-control', details: { previous: accessLevel, next: result.level } });
+        return ok({ projectId, accessLevel: result.level, updatedAt: result.updatedAt });
+      }
+      return err(405, 'method_not_allowed');
+    }
+    if (seg[2] === 'audit' && seg.length === 3 && method === 'GET') {
+      if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Wgląd do audytu wymaga roli editor, admin albo owner.');
+      return ok({ entries: listAccessAudit(db, projectId, ctx.query?.limit) });
+    }
 
     // /api/projects/:id/members
     if (seg[2] === 'members' && seg.length === 3) {
@@ -775,13 +795,25 @@ const RUN_STATUS_TO_HTTP = { ok: 200, rejected: 400, error: 500 };
 function runFabricHandler(db, ctx, body) {
   const validation = validateFabricRunRequest(body);
   if (!validation.ok) return err(400, 'invalid_fabric_request', validation.errors.join(' '));
+  if (body.projectId) {
+    const user = getUserByToken(db, ctx.token);
+    const project = getProject(db, body.projectId);
+    const role = project && user ? getRole(db, body.projectId, user.id) : null;
+    const accessLevel = project ? accessLevelForProject(db, body.projectId, project.visibility) : 'RESTRICTED';
+    if (!user || !project || !role) return err(404, 'not_found');
+    if (!canUseAccessLevel(accessLevel, role, 'run')) return err(403, 'access_denied', `Uruchomienie z poziomu ${accessLevel} wymaga zatwierdzonego dostępu.`);
+  }
   const delegated = runComputeHandler(db, ctx, body);
   // Preserve authentication / RBAC errors from the established compute route.
   if (!delegated.body?.run) return delegated;
-  return {
-    status: delegated.status,
-    body: fabricRunEnvelope(body, delegated.body.run, delegated.body.persisted),
-  };
+  const envelope = fabricRunEnvelope(body, delegated.body.run, delegated.body.persisted);
+  if (body.projectId) {
+    const user = getUserByToken(db, ctx.token);
+    const project = getProject(db, body.projectId);
+    const accessLevel = project ? accessLevelForProject(db, body.projectId, project.visibility) : 'RESTRICTED';
+    appendAccessAudit(db, { projectId: body.projectId, userId: user?.id ?? null, action: 'scientific_run', accessLevel, workflow: 'genesis-chat-core-handoff', runId: envelope.run?.runId ?? null, resultStatus: envelope.run?.status ?? null, details: { modelId: body.modelId, domainId: body.domainId ?? null, sourceText: String(body.sourceText ?? '').slice(0, 500) } });
+  }
+  return { status: delegated.status, body: envelope };
 }
 
 function runComputeHandler(db, ctx, body) {

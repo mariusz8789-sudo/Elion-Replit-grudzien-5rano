@@ -1,6 +1,7 @@
 import { runFabricCompute, type ComputeRun } from '../backend/client';
 import { canonicalJson } from '../events/hash';
 import { getRouterModel } from './router';
+import { getActiveKnowledgeProject } from '../backend/knowledgeProjectContext';
 import { createExperimentProvenance } from './provenance';
 import { planEvidenceGuidedExperiment, type ConfirmedEvidenceGuidedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedOutcomeHandoff } from './evidenceGuidedChat';
 import { EXPERIMENT_FABRIC_VERSION, type ExperimentResult, type ExperimentRun, type ExperimentValue } from './types';
@@ -107,6 +108,7 @@ export async function confirmBackendEvidenceGuidedExperiment(
     domainId: plan.request.domainId,
     requestedVisualization: plan.request.requestedVisualization,
     ...(plan.request.seed === undefined ? {} : { seed: plan.request.seed }),
+    ...(getActiveKnowledgeProject()?.id ? { projectId: getActiveKnowledgeProject()!.id } : {}),
   });
   if (!response.ok) {
     throw new Error(`Backend Fabric nie uruchomił modelu: ${response.error}. ${response.message}`);

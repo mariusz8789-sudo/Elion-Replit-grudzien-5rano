@@ -21,6 +21,7 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { newId } from './auth.mjs';
+import { ensureAccessSchema } from './access.mjs';
 
 /* ---------------- Role i uprawnienia (RBAC) ---------------- */
 
@@ -443,6 +444,7 @@ export function openDatabase(filename = ':memory:') {
   if (filename !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
   migrate(db);
+  ensureAccessSchema(db);
   return db;
 }
 

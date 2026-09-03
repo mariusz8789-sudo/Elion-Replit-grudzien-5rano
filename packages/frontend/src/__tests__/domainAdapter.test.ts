@@ -21,7 +21,7 @@ describe('cross-domain discovery core — foundation', () => {
     const rdkit = createNodeRdkitTransport();
     const admet = createNodeAdmetTransport();
     const registry = buildDomainRegistry({ rdkit, admet });
-    for (const domainId of ['ENVIRONMENT_WATER', 'EPIDEMIOLOGY', 'ENGINEERING'] as const) {
+    for (const domainId of ['ENVIRONMENT_WATER', 'ENGINEERING'] as const) {
       const adapter = registry.adapters.get(domainId)!;
       expect(adapter.available().ok).toBe(false);
       expect(() => adapter.execute({})).toThrow(/no executor/i);
@@ -61,6 +61,32 @@ describe('cross-domain discovery core — foundation', () => {
     expect(result.direction).toBe('REDSHIFT');
     expect(outcome.standard.caseId).toBe('GRAVITATIONAL_REDSHIFT');
     expect(outcome.standard.resultFingerprint).toBe(result.resultFingerprint);
+  });
+
+  it('the epidemiology adapter is the THIRD real executor: preregistered hypothesis loop over a real simulation, never RUNNABLE_IN_GENESIS by accident', () => {
+    const rdkit = createNodeRdkitTransport();
+    const admet = createNodeAdmetTransport();
+    const registry = buildDomainRegistry({ rdkit, admet });
+    const epi = registry.adapters.get('EPIDEMIOLOGY')!;
+    expect(epi.available().ok).toBe(true);
+    const result = epi.execute({}) as import('../core/experimentFabric/hypothesisLoop').HypothesisLoopResult;
+    expect(result.preregistrationIntact.intact).toBe(true);
+    expect(result.outcomes.length).toBeGreaterThan(0);
+    expect(result.preregistration.hypotheses.every((h) => h.createdBeforeRun)).toBe(true);
+    // Every outcome traces to a real, executed run — never a fabricated status with no run behind it.
+    for (const outcome of result.outcomes) {
+      if (outcome.status !== 'BLOCKED') {
+        expect(outcome.runIds.length).toBeGreaterThan(0);
+      }
+    }
+  }, 30_000);
+
+  it('the epidemiology adapter rejects an unknown problemId rather than silently falling back', () => {
+    const rdkit = createNodeRdkitTransport();
+    const admet = createNodeAdmetTransport();
+    const registry = buildDomainRegistry({ rdkit, admet });
+    const epi = registry.adapters.get('EPIDEMIOLOGY')!;
+    expect(() => epi.execute({ problemId: 'does-not-exist' })).toThrow(/Unknown epidemiology problemId/);
   });
 
   it('describeDomainRegistry names every domain with a real status string', () => {

@@ -3,6 +3,14 @@ import type { NaturalAnalogueCampaignEngines } from './naturalAnalogueCampaign';
 import { runRelativisticTimeDilationCase, toStandardScientificResult as gpsCaseToStandardResult, type RelativisticTimeDilationResult } from '../physics/relativisticTimeDilation';
 import { runGravitationalRedshiftCase, toStandardScientificResult as redshiftCaseToStandardResult, type GravitationalRedshiftResult } from '../physics/gravitationalRedshift';
 import type { StandardScientificResult } from '../physics/physicsCaseContract';
+import {
+  executePreregisteredHypotheses,
+  generateCompetingHypotheses,
+  HYPOTHESIS_PROBLEMS,
+  preregisterHypotheses,
+  type HypothesisLoopResult,
+  type HypothesisProblem,
+} from '../../experimentFabric/hypothesisLoop';
 
 /**
  * CROSS-DOMAIN DISCOVERY CORE — foundation.
@@ -110,6 +118,45 @@ export function buildPhysicsAdapter(): DomainAdapter<PhysicsStructuredRequest, P
   };
 }
 
+export interface EpidemiologyStructuredRequest {
+  /** Defaults to the first declared problem when omitted. */
+  problemId?: string;
+}
+
+/**
+ * The epidemiology adapter — the THIRD real executor, and the first one to
+ * reuse a PRE-EXISTING domain engine wholesale rather than compute fresh
+ * formulas: `generateCompetingHypotheses` / `preregisterHypotheses` /
+ * `executePreregisteredHypotheses` (experimentFabric/hypothesisLoop.ts) are
+ * unchanged. This adapter is only the missing wiring the code already
+ * described honestly ("not yet wired to this shared contract") — composing
+ * three real, pre-registered, deterministic-simulation functions is not a
+ * second engine, it is the same engine this codebase already runs from the
+ * Experiment Pilot screen, now also reachable through the generic contract.
+ *
+ * Real inputs are the declared `HypothesisProblem`'s `sharedLevers` — the
+ * module's own docs mark these SIMULATED/SCENARIO values, never a real
+ * epidemic's measured parameters, and this adapter changes nothing about
+ * that discipline.
+ */
+export function buildEpidemiologyAdapter(): DomainAdapter<EpidemiologyStructuredRequest, HypothesisLoopResult> {
+  return {
+    domainId: 'EPIDEMIOLOGY',
+    description: 'Preregistered competing-hypothesis loop over a real, deterministic agent-based epidemic simulation (scenario-timeline model) — simulated inputs, real computed outcomes, structural HARKing protection via preregistration fingerprinting.',
+    available: () => ({ ok: true, reason: '' }),
+    execute: (input) => {
+      const problemId = input.problemId ?? HYPOTHESIS_PROBLEMS[0]!.problemId;
+      const problem: HypothesisProblem | undefined = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === problemId);
+      if (problem === undefined) {
+        throw new Error(`Unknown epidemiology problemId "${problemId}". Declared problems: ${HYPOTHESIS_PROBLEMS.map((p) => p.problemId).join(', ')}.`);
+      }
+      const set = generateCompetingHypotheses(problem);
+      const prereg = preregisterHypotheses(set);
+      return executePreregisteredHypotheses(prereg);
+    },
+  };
+}
+
 /**
  * An honestly unavailable domain: the contract exists, no executor does. This
  * is the correct state for every domain this session did not implement — it
@@ -135,7 +182,7 @@ export function buildDomainRegistry(engines: NaturalAnalogueCampaignEngines): Do
   adapters.set('CHEMISTRY_BIOLOGY', buildChemistryBiologyAdapter(engines) as DomainAdapter<unknown, unknown>);
   adapters.set('PHYSICS', buildPhysicsAdapter() as DomainAdapter<unknown, unknown>);
   adapters.set('ENVIRONMENT_WATER', buildUnavailableDomainAdapter('ENVIRONMENT_WATER', 'No environmental/water-quality executor exists yet.'));
-  adapters.set('EPIDEMIOLOGY', buildUnavailableDomainAdapter('EPIDEMIOLOGY', 'A real epidemic simulation model and its own hypothesis loop exist (experimentFabric/hypothesisLoop.ts) but are not yet wired to this shared contract.'));
+  adapters.set('EPIDEMIOLOGY', buildEpidemiologyAdapter() as DomainAdapter<unknown, unknown>);
   adapters.set('ENGINEERING', buildUnavailableDomainAdapter('ENGINEERING', 'No engineering executor exists yet.'));
   return { adapters };
 }

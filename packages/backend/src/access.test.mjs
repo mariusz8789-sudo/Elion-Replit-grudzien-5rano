@@ -14,6 +14,23 @@ function setup() {
   return { db, token: registered.token, project };
 }
 
+test('research access exposes status without secret values', () => {
+  const { db, token, project } = setup();
+  const secret = 'test-secret-value';
+  const previous = process.env.GENESIS_RESEARCH_API_KEY;
+  process.env.GENESIS_RESEARCH_API_KEY = secret;
+  try {
+    const response = call(db, 'GET', `/api/projects/${project.id}/research-access`, { token });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.sources.find((source) => source.id === 'authenticated-research-api').status, 'AVAILABLE');
+    assert.equal(JSON.stringify(response.body).includes(secret), false);
+    assert.equal(response.body.sources.find((source) => source.id === 'authenticated-research-api').credentialEnv, 'GENESIS_RESEARCH_API_KEY');
+  } finally {
+    if (previous === undefined) delete process.env.GENESIS_RESEARCH_API_KEY;
+    else process.env.GENESIS_RESEARCH_API_KEY = previous;
+  }
+});
+
 test('project access policy is backend-enforced and auditable', () => {
   const { db, token, project } = setup();
   const initial = call(db, 'GET', `/api/projects/${project.id}/access`, { token });

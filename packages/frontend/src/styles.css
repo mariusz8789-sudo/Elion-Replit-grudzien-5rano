@@ -2541,3 +2541,12 @@ body:has(.fp-lab) .science-chat-fab { display: none; }
 .research-audit-list strong { overflow: hidden; text-overflow: ellipsis; color: var(--text); font: 700 .6rem/1.2 var(--font-mono); }
 .research-audit-list span { color: var(--text-faint); font: .55rem/1.2 var(--font-mono); text-align: right; }
 .research-audit-list code { grid-column: 1 / -1; overflow-wrap: anywhere; color: var(--green); font: .56rem/1.2 var(--font-mono); }
+
+.research-access-list { display: grid; gap: .3rem; }
+.research-access-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .16rem .45rem; padding: .38rem .42rem; border-left: 2px solid var(--border-strong); background: rgba(255,255,255,.018); }
+.research-access-row strong { overflow: hidden; text-overflow: ellipsis; color: var(--text); font-size: .63rem; }
+.research-access-row span { font: 700 .56rem/1 var(--font-mono); }
+.research-access-row span.available { color: var(--green); }
+.research-access-row span.requires-auth { color: var(--gold); }
+.research-access-row small { grid-column: 1 / -1; color: var(--text-faint); font: .55rem/1.2 var(--font-mono); }
+.research-access-policy { margin-top: .48rem !important; color: var(--text-faint) !important; font-size: .59rem !important; }

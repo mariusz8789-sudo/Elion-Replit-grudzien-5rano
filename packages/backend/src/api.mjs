@@ -87,7 +87,7 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
-import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit } from './access.mjs';
+import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
@@ -186,6 +186,11 @@ export function handleApi(db, ctx) {
 
     // /api/projects/:id
     if (seg.length === 2 && method === 'GET') return ok({ project: { ...project, role, accessLevel: accessLevelForProject(db, projectId, project.visibility) } });
+
+    // Research credentials/status: never returns secret values.
+    if (seg[2] === 'research-access' && seg.length === 3 && method === 'GET') {
+      return ok({ projectId, ...researchAccessStatus() });
+    }
 
     // Product access policy and append-only audit trail.
     if (seg[2] === 'access' && seg.length === 3) {

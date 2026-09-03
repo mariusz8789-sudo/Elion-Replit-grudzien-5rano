@@ -72,4 +72,15 @@ export function listAccessAudit(db, projectId, limit = 100) {
   }));
 }
 
+export function researchAccessStatus() {
+  return {
+    sources: [
+      { id: 'public-scientific-http', label: 'Public scientific HTTP sources', access: 'PUBLIC', status: 'AVAILABLE', credentialEnv: null },
+      { id: 'authenticated-research-api', label: 'Authenticated research APIs', access: 'RESEARCH', status: process.env.GENESIS_RESEARCH_API_KEY ? 'AVAILABLE' : 'REQUIRES_AUTH', credentialEnv: 'GENESIS_RESEARCH_API_KEY' },
+      { id: 'restricted-institutional-source', label: 'Institutional / restricted sources', access: 'RESTRICTED', status: process.env.GENESIS_INSTITUTIONAL_API_KEY ? 'AVAILABLE' : 'REQUIRES_AUTH', credentialEnv: 'GENESIS_INSTITUTIONAL_API_KEY' },
+    ],
+    policy: 'Credentials are backend-only. Missing credentials remain REQUIRES_AUTH; no CAPTCHA, MFA, paywall or rate-limit bypass is attempted.',
+  };
+}
+
 export { LEVELS };

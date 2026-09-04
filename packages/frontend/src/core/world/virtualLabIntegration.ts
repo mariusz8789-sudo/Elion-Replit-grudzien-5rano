@@ -20,13 +20,20 @@ export function createVirtualLabIntegration(scene: WorldScene, onCameraDecision:
   const bridge = new DeterministicWorldEventBridge();
   const runtime = new ScientificWorldRuntime(scene);
   const camera = new ObservationCameraPolicy(bridge, onCameraDecision);
+  const publishedEventIds = new Set<string>();
   camera.connect();
-  const publishStateEvents = (state: WorldState) => { for (const event of state.events) bridge.publish(event); };
+  const publishStateEvents = (state: WorldState) => {
+    for (const event of state.events) {
+      if (publishedEventIds.has(event.id)) continue;
+      publishedEventIds.add(event.id);
+      bridge.publish(event);
+    }
+  };
   return {
     runtime, bridge, camera,
     load: (state) => { const snapshot = runtime.load(state); publishStateEvents(state); return snapshot; },
     sync: (state) => { const snapshot = runtime.sync(state); publishStateEvents(state); return snapshot; },
     capture: (run, states) => captureWorldTimeline(run, states),
-    dispose: () => { camera.disconnect(); runtime.dispose(); bridge.clear(); },
+    dispose: () => { camera.disconnect(); runtime.dispose(); bridge.clear(); publishedEventIds.clear(); },
   };
 }

@@ -11,6 +11,9 @@ import { createSpatialWorldOverlay, type SpatialWorldOverlay } from '../../core/
 import { getToken } from '../../core/backend/session';
 import { getProjectSpatialDataset } from '../../core/backend/client';
 import { getActiveSpatialOverlay, subscribeActiveSpatialOverlay } from '../../core/backend/spatialOverlayContext';
+import { projectWorldState } from '../../core/simulation/worldEngineContract';
+import { projectEpidemicScreenState } from '../../core/world/epidemicVirtualLabAdapter';
+import { createVirtualLabIntegration } from '../../core/world/virtualLabIntegration';
 
 /**
  * VISUAL SIMULATION SCREEN — żywa scena „Epidemia w małym mieście" z warstwą
@@ -47,6 +50,13 @@ export function VisualSimulationScreen() {
   const cam = useRef<Camera>(defaultCamera(sim.worldWidth, sim.worldHeight));
   const followId = useRef<number>(-1);
   const drag = useRef<{ x: number; y: number } | null>(null);
+  const labIntegration = useMemo(() => createVirtualLabIntegration({
+    createEntity: () => {}, updateEntity: () => {}, removeEntity: () => {}, reset: () => {}, dispose: () => {},
+  }, (decision) => {
+    const zoomByMode = { MACRO: 1.8, SCIENTIFIC: 1.35, WIDE: 0.8, CINEMATIC: 1.1, HUMAN_EYE: 1 } as const;
+    cam.current.zoom = zoomByMode[decision.mode];
+    setZoomLabel(Math.round(cam.current.zoom * 10) / 10);
+  }), [sim]);
 
   const [params, setParams] = useState<EpidemicCityParams>(() => sim.getParams() as unknown as EpidemicCityParams);
   const [speed, setSpeedState] = useState<ClockSpeed>(1);
@@ -100,6 +110,7 @@ export function VisualSimulationScreen() {
     const frame = (now: number) => {
       const dtSec = Math.min(0.1, (now - last) / 1000); last = now;
       clock.advance(dtSec, (dtDays) => sim.tick(dtDays));
+      labIntegration.sync(projectEpidemicScreenState(projectWorldState(sim)));
       const canvas = sceneRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
@@ -130,8 +141,8 @@ export function VisualSimulationScreen() {
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-  }, [sim, clock]);
+    return () => { cancelAnimationFrame(raf); labIntegration.dispose(); };
+  }, [sim, clock, labIntegration]);
 
   const applySpeed = (s: ClockSpeed) => { clock.setSpeed(s); setSpeedState(s); setRunning(clock.running); };
   const play = () => { clock.play(); if (clock.speed === 0) applySpeed(1); setRunning(true); };

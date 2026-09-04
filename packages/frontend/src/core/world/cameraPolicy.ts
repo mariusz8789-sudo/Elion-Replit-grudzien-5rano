@@ -7,6 +7,7 @@ export type CameraPolicyListener = (decision: CameraPolicyDecision) => void;
 
 const EVENT_MODES: Readonly<Record<string, WorldCameraMode>> = {
   'experiment.complete': 'WIDE',
+  'infection.transmission': 'MACRO',
   'observation.threshold-crossed': 'MACRO',
   'observation.anomaly': 'SCIENTIFIC',
   'prediction.divergence': 'SCIENTIFIC',

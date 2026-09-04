@@ -4,7 +4,7 @@ import { createScientificEvidencePack, type ScientificEvidencePack } from './evi
 import { getRouterModel } from './router';
 import type { FalsificationCriterion, ScientificEvidenceChain } from './scientificDiscovery';
 import { designScientificExperiment } from './scientificPlanner';
-import { executeScientificExperiment } from './scientificExecutor';
+import { executeScientificBackendExperiment, executeScientificExperiment } from './scientificExecutor';
 import { buildStructuredRequestFromModel } from './structuredRequestBuilder';
 import type { ExperimentRun, StructuredExperimentRequest } from './types';
 
@@ -97,6 +97,18 @@ export const HYPOTHESIS_PROBLEMS: readonly HypothesisProblem[] = [
     baselineValue: 0,
     candidateValues: [10, 20, 30],
     sharedLevers: { scenarioId: 'ISOLATION', days: 72, stepsPerDay: 4, nAgents: 400, initialInfected: 5, seed: 20260828 },
+    objective: 'minimize',
+  },
+  {
+    problemId: 'problem:pyscf-h2-bond-length-stability',
+    statement: 'Który z zadeklarowanych kandydatów długości wiązania H–H daje NAJNIŻSZĄ (najbardziej stabilną) rzeczywistą obliczoną energię RHF/STO-3G cząsteczki H₂ (realny backend PySCF)?',
+    domainId: 'chemistry',
+    modelId: 'quantum-chemistry-pyscf-h2-rhf',
+    primaryMetric: 'energyHartree',
+    candidateVariable: 'bondLengthAngstrom',
+    baselineValue: 3,
+    candidateValues: [0.74, 1.5],
+    sharedLevers: { basis: 'sto-3g' },
     objective: 'minimize',
   },
 ] as const;
@@ -450,6 +462,140 @@ export function executePreregisteredHypotheses(prereg: Preregistration): Hypothe
   };
 }
 
+/**
+ * ASYNC / BACKEND-AWARE TWIN OF `executePreregisteredHypotheses`.
+ *
+ * The sync version above can only execute LOCAL models through
+ * `executeScientificExperiment` (`executor.ts::runExperiment`) — a
+ * BACKEND_REAL_ENGINE model (e.g. `quantum-chemistry-pyscf-h2-rhf`, a real
+ * PySCF process behind the Fabric HTTP endpoint) throws inside that path,
+ * because the sync executor's adapter switch has no case for a network
+ * call. This is the missing connection Manus flagged: the SAME
+ * preregistration/discrimination/next-experiment/replay machinery below
+ * did not yet reach backend-executed hypotheses.
+ *
+ * This function changes NOTHING about the hypothesis ontology, the
+ * falsification/discrimination logic, or the evidence chain shape — it is
+ * `executePreregisteredHypotheses` with exactly one difference: per
+ * hypothesis, when the declared model's capability is `BACKEND_REAL_ENGINE`,
+ * it awaits the existing `executeScientificBackendExperiment` (which itself
+ * already calls the real, unmodified Fabric backend endpoint) instead of the
+ * synchronous local executor. Local-model hypotheses keep using the
+ * synchronous path unchanged, so nothing about existing (biology/scenario)
+ * callers of the sync function is altered.
+ */
+export async function executePreregisteredHypothesesAsync(prereg: Preregistration): Promise<HypothesisLoopResult> {
+  const problem = prereg.set.problem;
+  const backend = getRouterModel(problem.modelId)?.capability === 'BACKEND_REAL_ENGINE';
+  const chains: ScientificEvidenceChain[] = [];
+  const packs: ScientificEvidencePack[] = [];
+  const allRuns: ExperimentRun[] = [];
+  const outcomes: HypothesisOutcome[] = [];
+
+  for (const hypothesis of prereg.hypotheses) {
+    if (hypothesis.proposedExperiment === null) {
+      outcomes.push({
+        hypothesisId: hypothesis.hypothesisId, status: 'BLOCKED', criterionAssessment: null,
+        observedMetric: null, baselineMetric: null,
+        reason: hypothesis.blockedReason ?? 'Brak wykonywalnego requestu dla tej hipotezy.',
+        runIds: [], runFingerprints: [], evidenceChainId: null, evidencePackId: null,
+      });
+      continue;
+    }
+    const candidate = hypothesis.proposedExperiment.parameters[problem.candidateVariable];
+    const baselineRequest = requestFor(problem, problem.baselineValue);
+    if (baselineRequest === null || candidate === undefined) {
+      outcomes.push({
+        hypothesisId: hypothesis.hypothesisId, status: 'BLOCKED', criterionAssessment: null,
+        observedMetric: null, baselineMetric: null,
+        reason: 'Nie da się zbudować wspólnego ramienia odniesienia dla tej hipotezy.',
+        runIds: [], runFingerprints: [], evidenceChainId: null, evidencePackId: null,
+      });
+      continue;
+    }
+    let chain: ScientificEvidenceChain;
+    try {
+      const design = designScientificExperiment({
+        hypothesis: {
+          statement: hypothesis.statement,
+          domainId: problem.domainId,
+          modelId: problem.modelId,
+          declaredAssumptions: [...hypothesis.assumptions],
+          falsification: hypothesis.falsificationCriteria,
+        },
+        baselineRequest,
+        sweep: { parameter: problem.candidateVariable, values: [candidate], label: problem.candidateVariable },
+        repetitionsPerArm: 2,
+      });
+      chain = backend ? await executeScientificBackendExperiment(design) : executeScientificExperiment(design);
+    } catch (error) {
+      outcomes.push({
+        hypothesisId: hypothesis.hypothesisId, status: 'BLOCKED', criterionAssessment: null,
+        observedMetric: null, baselineMetric: null,
+        reason: `Istniejący protokół albo backend odrzucił tę hipotezę: ${error instanceof Error ? error.message : String(error)}`,
+        runIds: [], runFingerprints: [], evidenceChainId: null, evidencePackId: null,
+      });
+      continue;
+    }
+    chains.push(chain);
+    allRuns.push(...chain.allRuns);
+    const pack = createScientificEvidencePack(chain);
+    packs.push(pack);
+    const assessment = chain.assessment.assessment;
+    const status: HypothesisStatus = assessment === 'SUPPORTED_WITHIN_PROTOCOL' ? 'SUPPORTED'
+      : assessment === 'FALSIFIED_WITHIN_PROTOCOL' ? 'FALSIFIED'
+        : assessment === 'INCONCLUSIVE' ? 'INCONCLUSIVE' : 'UNKNOWN';
+    outcomes.push({
+      hypothesisId: hypothesis.hypothesisId,
+      status,
+      criterionAssessment: assessment,
+      observedMetric: metricFromArm(chain, 'variant'),
+      baselineMetric: metricFromArm(chain, 'baseline'),
+      reason: chain.assessment.message,
+      runIds: chain.allRuns.map((run) => run.runId),
+      runFingerprints: chain.allRuns.map((run) => run.provenance.runFingerprint),
+      evidenceChainId: chain.evidenceId,
+      evidencePackId: pack.evidencePackId,
+    });
+  }
+
+  const measured = outcomes
+    .map((outcome) => {
+      const hypothesis = prereg.hypotheses.find((entry) => entry.hypothesisId === outcome.hypothesisId);
+      const candidate = hypothesis?.proposedExperiment?.parameters[problem.candidateVariable];
+      return outcome.observedMetric === null || candidate === undefined
+        ? null
+        : { hypothesisId: outcome.hypothesisId, candidate: String(candidate), metric: outcome.observedMetric };
+    })
+    .filter((entry): entry is { hypothesisId: string; candidate: string; metric: number } => entry !== null)
+    .sort((a, b) => (problem.objective === 'minimize' ? a.metric - b.metric : b.metric - a.metric) || a.candidate.localeCompare(b.candidate));
+
+  const best = measured[0];
+  const tied = best !== undefined && measured.filter((entry) => entry.metric === best.metric).length > 1;
+  const discrimination: HypothesisDiscrimination = {
+    ranking: measured,
+    winnerHypothesisId: best !== undefined && !tied ? best.hypothesisId : null,
+    decisive: best !== undefined && !tied && measured.length >= 2,
+    reason: measured.length < 2
+      ? 'Mniej niż dwie hipotezy dostarczyły liczbową wartość metryki — zbiór nie został rozstrzygnięty.'
+      : tied
+        ? `Remis na metryce ${problem.primaryMetric} (${best!.metric}); uporządkowanie nie wyłania zwycięzcy i żadna hipoteza nie może się na nie powołać.`
+        : `Uporządkowanie ${problem.primaryMetric} jest rozstrzygające: ${measured.map((entry) => `${entry.candidate}=${entry.metric}`).join(' < ')}.`,
+  };
+
+  return {
+    contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
+    preregistration: prereg,
+    preregistrationIntact: verifyPreregistrationIntact(prereg),
+    outcomes,
+    discrimination,
+    chains,
+    packs,
+    allRuns,
+    claim: 'Genesis wygenerował prerejestrowane hipotezy, wykonał istniejący model obliczeniowy (lokalny albo realny backend) i porównał realne wyniki modelu w zadeklarowanym zakresie. To nie jest odkrycie naukowe, obserwacja świata ani wskazówka operacyjna.',
+  };
+}
+
 export interface NextHypothesisExperiment {
   status: 'READY_TO_RUN' | 'VALIDATION_REQUIRED' | 'BLOCKED' | 'RESOLVED';
   /** Dlaczego akurat ten krok — z nierozstrzygniętego stanu, nie z narracji. */
@@ -709,6 +855,68 @@ export function replaySavedHypothesisLoop(saved: unknown): HypothesisLoopReplay 
   return {
     status: 'MATCH',
     reason: 'Prerejestrowany zbiór wykonano od nowa i odtworzył te same statusy, te same metryki, te same paczki dowodowe i to samo rozstrzygnięcie.',
+    differences: [], result: replayed,
+  };
+}
+
+/**
+ * ASYNC / BACKEND-AWARE TWIN OF `replaySavedHypothesisLoop`. Identical
+ * verification logic (recompute from the saved, still-intact
+ * preregistration and diff every recorded field) — the only difference is
+ * that it re-executes via `executePreregisteredHypothesesAsync`, so a saved
+ * loop over a BACKEND_REAL_ENGINE model (PySCF) can actually be replayed
+ * instead of failing inside the sync-only executor.
+ */
+export async function replaySavedHypothesisLoopAsync(saved: unknown): Promise<HypothesisLoopReplay> {
+  if (!isSavedHypothesisLoop(saved)) {
+    return { status: 'BLOCKED', reason: 'Zapisana pętla jest niekompletna albo uszkodzona.', differences: [], result: null };
+  }
+  if (saved.contractVersion !== HYPOTHESIS_LOOP_CONTRACT_VERSION) {
+    return { status: 'BLOCKED', reason: `Zapis pochodzi z kontraktu ${saved.contractVersion}, a bieżący to ${HYPOTHESIS_LOOP_CONTRACT_VERSION} — porównanie nie byłoby miarodajne.`, differences: [], result: null };
+  }
+  const rebuilt: Preregistration = {
+    contractVersion: saved.contractVersion,
+    preregistrationId: saved.preregistrationId,
+    problemId: saved.problem.problemId,
+    createdAt: '',
+    hypotheses: saved.hypotheses,
+    preregistrationFingerprint: saved.preregistrationFingerprint,
+    set: generateCompetingHypotheses(saved.problem),
+  };
+  const intact = verifyPreregistrationIntact(rebuilt);
+  if (!intact.intact) {
+    return { status: 'BLOCKED', reason: `Prerejestracja w zapisie nie zgadza się ze swoim odciskiem: ${intact.reason}`, differences: [], result: null };
+  }
+
+  const replayed = await executePreregisteredHypothesesAsync(rebuilt);
+  const differences: { field: string; expected: string | number | null; actual: string | number | null }[] = [];
+  for (const savedOutcome of saved.outcomes) {
+    const actual = replayed.outcomes.find((entry) => entry.hypothesisId === savedOutcome.hypothesisId);
+    if (actual === undefined) {
+      differences.push({ field: `outcome.${savedOutcome.hypothesisId}`, expected: savedOutcome.status, actual: null });
+      continue;
+    }
+    if (actual.status !== savedOutcome.status) differences.push({ field: `${savedOutcome.hypothesisId}.status`, expected: savedOutcome.status, actual: actual.status });
+    if (actual.observedMetric !== savedOutcome.observedMetric) differences.push({ field: `${savedOutcome.hypothesisId}.observedMetric`, expected: savedOutcome.observedMetric, actual: actual.observedMetric });
+    if (actual.evidencePackId !== savedOutcome.evidencePackId) differences.push({ field: `${savedOutcome.hypothesisId}.evidencePackId`, expected: savedOutcome.evidencePackId, actual: actual.evidencePackId });
+  }
+  if (replayed.discrimination.winnerHypothesisId !== saved.discrimination.winnerHypothesisId) {
+    differences.push({ field: 'discrimination.winner', expected: saved.discrimination.winnerHypothesisId, actual: replayed.discrimination.winnerHypothesisId });
+  }
+  if (replayed.discrimination.decisive !== saved.discrimination.decisive) {
+    differences.push({ field: 'discrimination.decisive', expected: String(saved.discrimination.decisive), actual: String(replayed.discrimination.decisive) });
+  }
+
+  if (differences.length > 0) {
+    return {
+      status: 'DRIFT',
+      reason: `Odtworzona pętla różni się od zapisanej w ${differences.length} ${differences.length === 1 ? 'polu' : 'polach'}: ${differences.map((entry) => entry.field).join(', ')}.`,
+      differences, result: null,
+    };
+  }
+  return {
+    status: 'MATCH',
+    reason: 'Prerejestrowany zbiór wykonano od nowa (backend-aware) i odtworzył te same statusy, te same metryki, te same paczki dowodowe i to samo rozstrzygnięcie.',
     differences: [], result: replayed,
   };
 }

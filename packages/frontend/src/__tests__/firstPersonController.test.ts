@@ -92,4 +92,27 @@ describe('FirstPersonController — pure headless movement math', () => {
     expect(s.yaw).toBeCloseTo(Math.PI / 2, 5);
     expect(s.speed).toBeCloseTo(0, 5);
   });
+
+  it('10. head bob is a presentation-only oscillation that grows while walking and never moves position', () => {
+    const c = new FirstPersonController({ room: ROOM, startPosition: { x: 0, z: 0 }, moveSpeed: 2, acceleration: 100 });
+    c.setKey('forward', true);
+    let sawNonZeroBob = false;
+    for (let i = 0; i < 30; i++) {
+      const s = c.update(0.05);
+      if (Math.abs(s.bobOffset) > 1e-6) sawNonZeroBob = true;
+      expect(Math.abs(s.bobOffset)).toBeLessThan(0.05); // bounded, subtle — never a large camera jump
+    }
+    expect(sawNonZeroBob).toBe(true);
+  });
+
+  it('11. head bob fades toward zero once the player stops (never freezes mid-swing)', () => {
+    const c = new FirstPersonController({ room: ROOM, startPosition: { x: 0, z: 0 }, moveSpeed: 2, acceleration: 100, deceleration: 100 });
+    c.setKey('forward', true);
+    for (let i = 0; i < 20; i++) c.update(0.05);
+    c.setKey('forward', false);
+    let s = c.update(0.05);
+    for (let i = 0; i < 40; i++) s = c.update(0.05);
+    expect(s.speed).toBeCloseTo(0, 3);
+    expect(Math.abs(s.bobOffset)).toBeCloseTo(0, 3);
+  });
 });

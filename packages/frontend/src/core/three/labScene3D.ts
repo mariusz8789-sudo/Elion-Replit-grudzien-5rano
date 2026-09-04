@@ -82,6 +82,7 @@ export class LabScene3D implements Sim3D {
   private raycaster: THREE_NS.Raycaster | null = null;
   private consoleMesh: THREE_NS.Mesh | null = null;
   private consolePanel: THREE_NS.Mesh | null = null;
+  private monitorScreen: THREE_NS.Mesh | null = null;
   private fluidMesh: THREE_NS.Mesh | null = null;
   private icuLight: THREE_NS.PointLight | null = null;
   private vesselLight: THREE_NS.PointLight | null = null;
@@ -207,58 +208,105 @@ export class LabScene3D implements Sim3D {
     const roomHeight = 3.2;
     const shell = new THREE.Mesh(
       new THREE.BoxGeometry(roomWidth, roomHeight, roomDepth),
-      new THREE.MeshStandardMaterial({ color: 0x1b2233, roughness: 0.92, metalness: 0.05, side: THREE.BackSide }),
+      new THREE.MeshStandardMaterial({ color: 0x333f59, roughness: 0.8, metalness: 0.08, side: THREE.BackSide }),
     );
     shell.position.set(0, roomHeight / 2, 0);
     scene.add(shell);
 
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(roomWidth - 0.05, roomDepth - 0.05),
-      new THREE.MeshStandardMaterial({ color: 0x232b3f, roughness: 0.85 }),
+      new THREE.MeshStandardMaterial({ color: 0x1e2536, roughness: 0.35, metalness: 0.25 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = 0.01;
     scene.add(floor);
-    const grid = new THREE.GridHelper(Math.max(roomWidth, roomDepth), 20, 0x2f3a54, 0x1c2336);
-    grid.position.y = 0.02;
-    scene.add(grid);
-
-    // "Okno" na ścianie — czysto dekoracyjna głębia/parallax, nie dane naukowe.
-    const window_ = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.2, 1.1),
-      new THREE.MeshBasicMaterial({ color: 0x1c2f4a }),
+    // Cienka listwa świetlna wzdłuż podstawy ścian zamiast siatki-debug —
+    // czysto dekoracyjna głębia, nie dane naukowe.
+    const baseGlow = new THREE.Mesh(
+      new THREE.RingGeometry(Math.min(roomWidth, roomDepth) / 2 - 0.04, Math.min(roomWidth, roomDepth) / 2, 48),
+      new THREE.MeshBasicMaterial({ color: 0x2f5a8f, transparent: true, opacity: 0.25, side: THREE.DoubleSide }),
     );
-    window_.position.set(-roomWidth / 2 + 0.02, 1.9, -0.6);
-    window_.rotation.y = Math.PI / 2;
-    scene.add(window_);
+    baseGlow.rotation.x = -Math.PI / 2;
+    baseGlow.position.y = 0.015;
+    scene.add(baseGlow);
 
-    // Oświetlenie: miękkie wypełnienie + ciepłe światło robocze nad stanowiskiem.
-    scene.add(new THREE.HemisphereLight(0x9fb3e0, 0x141824, 0.55));
-    const skyLight = new THREE.DirectionalLight(0xcfe0ff, 0.35);
+    // "Okno" świecące — realistyczne źródło światła dziennego + głębia/parallax (czysto dekoracyjne).
+    const windowMat = new THREE.MeshStandardMaterial({ color: 0x3a6fb5, emissive: 0x4d86d6, emissiveIntensity: 0.9, roughness: 0.4 });
+    const windowPane = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.15), windowMat);
+    windowPane.position.set(-roomWidth / 2 + 0.02, 1.95, -0.6);
+    windowPane.rotation.y = Math.PI / 2;
+    scene.add(windowPane);
+    const windowLight = new THREE.PointLight(0x6ea6e8, 0.6, 6, 2);
+    windowLight.position.set(-roomWidth / 2 + 0.6, 1.95, -0.6);
+    scene.add(windowLight);
+
+    // Oświetlenie: miękkie wypełnienie z DWÓCH stron (żeby ściany nie ginęły w czerni)
+    // + ciepłe światło robocze nad stanowiskiem + wisząca oprawa.
+    // Uwaga: ściany/sufit renderowane od wewnątrz (BackSide) mają odwrócone
+    // normalne, więc HemisphereLight przypisuje sufitowi kolor "gruntu", a
+    // podłodze kolor "nieba" — oba ustawione podobnie jasno, żeby to
+    // odwrócenie nie gasiło sufitu.
+    scene.add(new THREE.HemisphereLight(0xb9cbf0, 0xaebbe0, 1.1));
+    const skyLight = new THREE.DirectionalLight(0xcfe0ff, 0.7);
     skyLight.position.set(-2, 3, -1);
     scene.add(skyLight);
-    const workLight = new THREE.PointLight(0xfff1d6, 1.5, 7, 2);
+    const fillLight = new THREE.DirectionalLight(0x8fa8d6, 0.45);
+    fillLight.position.set(2.5, 2.2, 2);
+    scene.add(fillLight);
+    const workLight = new THREE.PointLight(0xfff1d6, 1.6, 8, 2);
     workLight.position.set(0, 2.7, 0.1);
     scene.add(workLight);
+    // Oprawa wisząca (widoczna geometria + realne źródło światła) — wzmacnia głębię sufitu.
+    const pendantCable = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.012, 0.9, 8),
+      new THREE.MeshStandardMaterial({ color: 0x11151f, roughness: 0.8 }),
+    );
+    pendantCable.position.set(0, 2.75, 0.1);
+    scene.add(pendantCable);
+    const pendantShade = new THREE.Mesh(
+      new THREE.ConeGeometry(0.22, 0.16, 20, 1, true),
+      new THREE.MeshStandardMaterial({ color: 0x0e1220, emissive: 0xfff1d6, emissiveIntensity: 0.25, roughness: 0.5, side: THREE.DoubleSide }),
+    );
+    pendantShade.position.set(0, 2.28, 0.1);
+    scene.add(pendantShade);
 
-    // Stanowisko: podest.
+    // Stanowisko: podest + trzy nóżki (czyta się jak realna aparatura, nie geometria placeholder).
     const platform = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.1, 1.15, 0.15, 24),
-      new THREE.MeshStandardMaterial({ color: 0x2c3650, roughness: 0.6, metalness: 0.2 }),
+      new THREE.CylinderGeometry(1.1, 1.15, 0.15, 28),
+      new THREE.MeshStandardMaterial({ color: 0x2c3650, roughness: 0.45, metalness: 0.35 }),
     );
     platform.position.set(VESSEL_POSITION[0], 0.075, VESSEL_POSITION[2]);
     scene.add(platform);
+    const legGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.42, 10);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x40485f, roughness: 0.4, metalness: 0.5 });
+    for (const angle of [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]) {
+      const leg = new THREE.Mesh(legGeo, legMat);
+      leg.position.set(VESSEL_POSITION[0] + Math.cos(angle) * 0.85, 0.21, VESSEL_POSITION[2] + Math.sin(angle) * 0.85);
+      scene.add(leg);
+    }
 
-    // Naczynie: zewnętrzna "szklana" powłoka (statyczna) + wewnętrzny "płyn" skalowany realnym obłożeniem.
+    // Naczynie: zewnętrzna "szklana" powłoka (statyczna) + metalowe pierścienie góra/dół
+    // (czyta się jak realny bioreaktor/aparat, nie goły cylinder) + wewnętrzny
+    // "płyn" skalowany realnym obłożeniem.
     this.vesselOuterMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0xbfd6ff, roughness: 0.08, metalness: 0, transmission: 0.85, transparent: true, opacity: 0.35, thickness: 0.3,
+      color: 0xbfd6ff, roughness: 0.06, metalness: 0, transmission: 0.85, transparent: true, opacity: 0.35, thickness: 0.3,
     });
-    const outer = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.58, 1.3, 28, 1, true), this.vesselOuterMaterial);
+    const outer = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.58, 1.3, 32, 1, true), this.vesselOuterMaterial);
     outer.position.set(...VESSEL_POSITION);
     scene.add(outer);
+    const ringMat = new THREE.MeshStandardMaterial({ color: 0x4b5773, roughness: 0.3, metalness: 0.7 });
+    const ringGeo = new THREE.TorusGeometry(0.565, 0.03, 12, 32);
+    const topRing = new THREE.Mesh(ringGeo, ringMat);
+    topRing.rotation.x = Math.PI / 2;
+    topRing.position.set(VESSEL_POSITION[0], VESSEL_POSITION[1] + 0.65, VESSEL_POSITION[2]);
+    scene.add(topRing);
+    const bottomRing = new THREE.Mesh(ringGeo, ringMat);
+    bottomRing.rotation.x = Math.PI / 2;
+    bottomRing.position.set(VESSEL_POSITION[0], VESSEL_POSITION[1] - 0.65, VESSEL_POSITION[2]);
+    scene.add(bottomRing);
 
-    const fluidMaterial = new THREE.MeshStandardMaterial({ color: STATUS_COLOR.NORMAL, emissive: STATUS_COLOR.NORMAL, emissiveIntensity: 0.4, roughness: 0.3 });
-    this.fluidMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1, 24), fluidMaterial);
+    const fluidMaterial = new THREE.MeshStandardMaterial({ color: STATUS_COLOR.NORMAL, emissive: STATUS_COLOR.NORMAL, emissiveIntensity: 0.45, roughness: 0.25 });
+    this.fluidMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1, 28), fluidMaterial);
     this.fluidMesh.position.set(VESSEL_POSITION[0], 0.15, VESSEL_POSITION[2]);
     this.fluidMesh.scale.y = 0.001;
     scene.add(this.fluidMesh);
@@ -270,25 +318,30 @@ export class LabScene3D implements Sim3D {
     // Konsola — cel interakcji.
     const consoleBody = new THREE.Mesh(
       new THREE.BoxGeometry(0.6, 0.55, 0.4),
-      new THREE.MeshStandardMaterial({ color: 0x2a3450, roughness: 0.5, metalness: 0.3 }),
+      new THREE.MeshStandardMaterial({ color: 0x2a3450, roughness: 0.4, metalness: 0.4 }),
     );
     consoleBody.position.set(CONSOLE_POSITION[0], CONSOLE_POSITION[1] - 0.15, CONSOLE_POSITION[2]);
     scene.add(consoleBody);
-    const panelMaterial = new THREE.MeshStandardMaterial({ color: 0x2f6fb0, emissive: 0x2f6fb0, emissiveIntensity: 0.5, roughness: 0.4 });
+    const panelMaterial = new THREE.MeshStandardMaterial({ color: 0x2f6fb0, emissive: 0x2f6fb0, emissiveIntensity: 0.5, roughness: 0.35 });
     this.consolePanel = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.32), panelMaterial);
     this.consolePanel.position.set(CONSOLE_POSITION[0], CONSOLE_POSITION[1] + 0.12, CONSOLE_POSITION[2] - 0.18);
     this.consolePanel.rotation.x = -0.5;
     scene.add(this.consolePanel);
     this.consoleMesh = consoleBody;
 
-    // Dwa instrumenty flankujące — czysto wizualne, nie niosą osobnych danych.
-    const instrumentGeo = new THREE.CylinderGeometry(0.22, 0.26, 1.05, 16);
-    const leftInstrument = new THREE.Mesh(instrumentGeo, new THREE.MeshStandardMaterial({ color: 0x394465, roughness: 0.55, metalness: 0.25 }));
-    leftInstrument.position.set(-1.7, 0.525, -0.7);
-    scene.add(leftInstrument);
-    const rightInstrument = new THREE.Mesh(instrumentGeo, new THREE.MeshStandardMaterial({ color: 0x394465, roughness: 0.55, metalness: 0.25 }));
-    rightInstrument.position.set(1.7, 0.525, -0.7);
-    scene.add(rightInstrument);
+    // Dwa instrumenty flankujące z górną opaską (czytelniejszy fokalny detal) — czysto wizualne.
+    const instrumentGeo = new THREE.CylinderGeometry(0.22, 0.26, 1.05, 20);
+    const bandGeo = new THREE.CylinderGeometry(0.235, 0.235, 0.08, 20);
+    const instrumentMat = new THREE.MeshStandardMaterial({ color: 0x394465, roughness: 0.45, metalness: 0.4 });
+    const bandMat = new THREE.MeshStandardMaterial({ color: 0x5ad1ff, emissive: 0x5ad1ff, emissiveIntensity: 0.6, roughness: 0.3 });
+    for (const x of [-1.7, 1.7]) {
+      const body = new THREE.Mesh(instrumentGeo, instrumentMat);
+      body.position.set(x, 0.525, -0.7);
+      scene.add(body);
+      const band = new THREE.Mesh(bandGeo, bandMat);
+      band.position.set(x, 0.98, -0.7);
+      scene.add(band);
+    }
     const accentA = new THREE.PointLight(0x5ad1ff, 0.5, 2.5, 2);
     accentA.position.set(-1.7, 1.05, -0.7);
     scene.add(accentA);
@@ -297,9 +350,28 @@ export class LabScene3D implements Sim3D {
     scene.add(accentB);
     this.icuLight = accentA;
 
+    // Mały monitor obok konsoli — ekran jaśnieje TYLKO gdy realnie coś się odtwarza
+    // (patrz syncScene: sygnał "playing", nie zmyślony wskaźnik).
+    const monitorBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.24, 0.05),
+      new THREE.MeshStandardMaterial({ color: 0x1c2334, roughness: 0.5, metalness: 0.3 }),
+    );
+    monitorBody.position.set(-0.55, 1.0, -0.85);
+    monitorBody.rotation.y = 0.35;
+    scene.add(monitorBody);
+    const monitorMat = new THREE.MeshStandardMaterial({ color: 0x1c3a52, emissive: 0x3fc7ff, emissiveIntensity: 0.15, roughness: 0.3 });
+    this.monitorScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.18), monitorMat);
+    this.monitorScreen.position.set(-0.55 + Math.sin(0.35) * 0.03, 1.0, -0.85 + Math.cos(0.35) * 0.03 - 0.02);
+    this.monitorScreen.rotation.y = 0.35;
+    scene.add(this.monitorScreen);
+
     const state = this.controller.getState();
     camera.position.set(state.position.x, state.position.y, state.position.z);
     camera.lookAt(state.position.x, state.position.y, state.position.z - 1);
+    // FOV szerszy niż domyślne 50° useThreeLoop — 50° czyta się jak teleobiektyw i
+    // ściska pokój; w pierwszej osobie 62° daje poczucie fizycznej obecności.
+    camera.fov = 62;
+    camera.updateProjectionMatrix();
   }
 
   update(dt: number, params: SimParams): void {
@@ -331,7 +403,13 @@ export class LabScene3D implements Sim3D {
       if (nextIndex !== this.playDayIndex) {
         this.playDayIndex = nextIndex;
         this.applyDay(this.playSeriesData[nextIndex]!);
-        if (nextIndex >= this.playSeriesData.length - 1) this.playbackDone = true;
+        if (nextIndex >= this.playSeriesData.length - 1) {
+          this.playbackDone = true;
+          // REALNE zakończenie eksperymentu — jeśli anomalia nie zabrała już
+          // kamery, dajemy "ujęcie rozstrzygnięcia" na tym samym stanowisku.
+          // To reakcja na PRAWDZIWE zdarzenie (koniec serii), nie zmyślony dramat.
+          if (this.playTag !== 'REPLAY' && this.cameraPhase === 'FREE') this.focusScientific('SCIENTIFIC');
+        }
       }
     }
   }
@@ -343,6 +421,9 @@ export class LabScene3D implements Sim3D {
       const state = this.controller.getState();
       const euler = new THREE.Euler(state.pitch, state.yaw, 0, 'YXZ');
       camera.quaternion.setFromEuler(euler);
+      // Chód (head bob): wyłącznie prezentacyjne przesunięcie oka — patrz
+      // firstPersonController.ts. Nigdy nie dotyka pozycji użytej do kolizji/interakcji.
+      camera.position.y += state.bobOffset;
     } else {
       camera.lookAt(this.liveCameraLookAt[0], this.liveCameraLookAt[1], this.liveCameraLookAt[2]);
     }
@@ -363,6 +444,13 @@ export class LabScene3D implements Sim3D {
     }
     // Drugi realny sygnał (obłożenie ICU) na akcentowym świetle instrumentu — nic wizualnego ponad to nie jest zmyślone.
     if (this.icuLight) this.icuLight.intensity = 0.3 + this.vesselIcuFraction * 1.4;
+    // Ekran monitora jaśnieje wyłącznie wtedy, gdy realnie coś się właśnie odtwarza
+    // (playSeriesData obecne i nie zakończone) — prawdziwy sygnał stanu, nie ozdoba.
+    if (this.monitorScreen) {
+      const isPlaying = this.playSeriesData.length > 0 && !this.playbackDone;
+      const material = this.monitorScreen.material as THREE_NS.MeshStandardMaterial;
+      material.emissiveIntensity = isPlaying ? 0.85 : 0.15;
+    }
 
     // Interakcja: promień z kamery na konsolę, w zasięgu i mniej więcej naprzeciw niej.
     if (this.raycaster && this.consoleMesh && this.cameraPhase === 'FREE') {

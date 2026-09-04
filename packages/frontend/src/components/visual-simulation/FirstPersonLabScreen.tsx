@@ -67,6 +67,8 @@ export function FirstPersonLabScreen() {
   const [replay, setReplay] = useState<ScenarioReplay | null>(null);
   const [saved, setSaved] = useState<SavedExperiment | null>(null);
   const [paused, setPaused] = useState(false);
+  const [hudHidden, setHudHidden] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const runARef = useRef(runA);
@@ -113,7 +115,9 @@ export function FirstPersonLabScreen() {
       }
       if (e.code === 'Escape') {
         if (document.pointerLockElement) document.exitPointerLock();
+        return;
       }
+      if (e.code === 'KeyH') { setHudHidden((h) => !h); }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       const move = MOVE_KEYS[e.code];
@@ -184,17 +188,30 @@ export function FirstPersonLabScreen() {
   const isRunning = phase === 'RUNNING_A' || phase === 'RUNNING_B' || phase === 'REPLAYING';
   const cameraTaken = stats.cameraPhase !== 0;
 
+  // JEDNA aktualna linia zamiast rosnącej listy — "less is more" (sekcja 6 misji).
+  // Priorytet: najnowsze/najważniejsze realne zdarzenie wygrywa, starsze znikają.
+  const caption: { label: string; text: string } | null = saved
+    ? { label: 'ZAPISANO', text: `Rekord ${saved.id} w Pamięci Naukowej.` }
+    : replay
+      ? { label: 'ODTWORZENIE', text: `${replay.message} (${replay.status})` }
+      : phase === 'COMPARED' && comparison
+        ? { label: 'PORÓWNANIE', text: `${comparison.message} Zmiana zgonów: ${comparison.metrics.find((m) => m.key === 'totalDeaths')?.absoluteDelta}.` }
+        : (phase === 'COMPLETE_A' || phase === 'COMPLETE_B') && runA
+          ? {
+            label: 'WYNIK',
+            text: `Przebieg ${phase === 'COMPLETE_A' ? 'A' : 'B'}: szczyt obłożenia łóżek ${(((phase === 'COMPLETE_A' ? runA : runB)!.summary!.peakBedOccupancy) * 100).toFixed(0)}%, zgony ${(phase === 'COMPLETE_A' ? runA : runB)!.summary!.totalDeaths}.`,
+          }
+          : isRunning
+            ? {
+              label: 'OBSERWACJA',
+              text: `Dzień ${stats.dayIndex + 1}/${stats.totalDays || 60} · łóżka ${(stats.vesselFraction * 100).toFixed(0)}% · ICU ${(stats.vesselIcuFraction * 100).toFixed(0)}% · status ${STATUS_LABEL[stats.vesselStatusCode]}`,
+            }
+            : phase === 'IDLE'
+              ? { label: 'PRZEWIDYWANIE', text: `Podejdź do konsoli i uruchom eksperyment (dzień izolacji: ${interventionDay}).` }
+              : null;
+
   return (
     <main id="main-content" tabIndex={-1} className="fp-lab">
-      <div className="honesty-row">
-        <span className="honesty educational">Pierwszoosobowa scena laboratoryjna</span>
-        <span className="honesty-note">
-          Naczynie pokazuje REALNE obłożenie łóżek/ICU z istniejącego Scenario Engine (scenariusz IZOLACJA) —
-          nie jest to symulacja płynów, organizmów ani żadnej biologii poza obłożeniem szpitalnym.
-          Niemodelowane: {LAB_NOT_MODELED.join(', ')}.
-        </span>
-      </div>
-
       <div className="fp-lab-stage">
         <canvas ref={canvasRef} className="fp-lab-canvas" aria-label="Pierwszoosobowa scena laboratoryjna (Three.js)" />
         {loading && <div className="route-loading" role="status">Ładowanie silnika 3D…</div>}
@@ -220,31 +237,42 @@ export function FirstPersonLabScreen() {
         {cameraTaken && (
           <div className="fp-lab-camera-badge">{FIXED_KIND_LABEL[stats.fixedKind] || 'KAMERA NAUKOWA'}</div>
         )}
+
+        {!hudHidden && caption && (
+          <div className="fp-lab-caption">
+            <strong>{caption.label}</strong> — {caption.text}
+          </div>
+        )}
+
+        <button
+          type="button"
+          className={`fp-lab-info-toggle${infoOpen ? ' open' : ''}`}
+          onClick={() => setInfoOpen((v) => !v)}
+          aria-expanded={infoOpen}
+          aria-label="Co jest realne, co jest wizualizacją"
+        >
+          ℹ
+        </button>
+        {infoOpen && (
+          <div className="fp-lab-info-panel">
+            Naczynie pokazuje REALNE obłożenie łóżek/ICU z istniejącego Scenario Engine (scenariusz IZOLACJA) — to
+            nie jest symulacja płynów, organizmów ani żadnej biologii poza obłożeniem szpitalnym.
+            Niemodelowane: {LAB_NOT_MODELED.join(', ')}.
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="fp-lab-hide-toggle"
+          onClick={() => setHudHidden((v) => !v)}
+          title="H — pokaż/ukryj interfejs (tryb do nagrywania)"
+        >
+          {hudHidden ? 'Pokaż UI' : 'Ukryj UI'}
+        </button>
       </div>
 
-      <div className="fp-lab-hud">
-        <div className="fp-lab-hud-science">
-          <p><strong>PYTANIE</strong> — Czy wcześniejsze wejście izolacji zmienia szczytowe obłożenie szpitala i liczbę zgonów?</p>
-          {phase === 'IDLE' && <p><strong>PRZEWIDYWANIE</strong> — Podejdź do konsoli i uruchom eksperyment A (dzień wejścia izolacji: {interventionDay}).</p>}
-          {isRunning && (
-            <p><strong>OBSERWACJA</strong> — Dzień {stats.dayIndex + 1}/{stats.totalDays || 60} · obłożenie łóżek {(stats.vesselFraction * 100).toFixed(0)}%
-              {' · '}ICU {(stats.vesselIcuFraction * 100).toFixed(0)}% · status {STATUS_LABEL[stats.vesselStatusCode]}</p>
-          )}
-          {(phase === 'COMPLETE_A' || phase === 'COMPLETE_B') && runA && (
-            <p><strong>WYNIK</strong> — Przebieg {phase === 'COMPLETE_A' ? 'A' : 'B'}: szczyt obłożenia łóżek {(( (phase==='COMPLETE_A'?runA:runB)!.summary!.peakBedOccupancy)*100).toFixed(0)}%,
-              {' '}zgony {(phase==='COMPLETE_A'?runA:runB)!.summary!.totalDeaths}. <strong>DALEJ</strong> — zmień dzień interwencji i uruchom ponownie, albo porównaj.</p>
-          )}
-          {phase === 'COMPARED' && comparison && (
-            <p><strong>WYNIK PORÓWNANIA</strong> — {comparison.message} Zmiana zgonów: {comparison.metrics.find((m) => m.key === 'totalDeaths')?.absoluteDelta}.
-              {' '}<strong>DALEJ</strong> — odtwórz przebieg albo zapisz w Pamięci Naukowej.</p>
-          )}
-          {replay && (
-            <p><strong>ODTWORZENIE</strong> — {replay.message} ({replay.status})</p>
-          )}
-          {saved && <p><strong>ZAPISANO</strong> — rekord {saved.id} w Pamięci Naukowej.</p>}
-        </div>
-
-        <div className="fp-lab-hud-controls">
+      {!hudHidden && (
+        <div className="fp-lab-hud">
           <label className="fp-lab-slider">
             Dzień wejścia izolacji: {interventionDay}
             <input type="range" min={LAB_INTERVENTION_DAY_RANGE.min} max={LAB_INTERVENTION_DAY_RANGE.max} value={interventionDay}
@@ -263,13 +291,7 @@ export function FirstPersonLabScreen() {
             {(runA || runB) && <button className="chip-btn danger" onClick={handleReset}>Reset</button>}
           </div>
         </div>
-      </div>
-
-      <p className="footer-note">
-        Silnik naukowy: core/experimentFabric/labSession.ts nad istniejącym core/simulation/scenarioEngine.ts
-        (scenariusz ISOLATION) i scenarioCounterfactual.ts — bez drugiego silnika ani drugiej pamięci.
-        Scena: Sim3D + useThreeLoop (ta sama infrastruktura co Character Lab / High-Fidelity Slice).
-      </p>
+      )}
     </main>
   );
 }

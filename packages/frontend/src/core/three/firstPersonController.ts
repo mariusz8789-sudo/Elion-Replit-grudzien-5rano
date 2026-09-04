@@ -58,8 +58,15 @@ export interface FirstPersonState {
   position: Vec3;
   yaw: number;
   pitch: number;
-  /** Prędkość poziomą zwracamy też wprost — przydatne np. do lekkiego bobbingu kamery w warstwie prezentacji. */
+  /** Prędkość pozioma. */
   speed: number;
+  /**
+   * Pionowe przesunięcie oka od chodu (metry) — WYŁĄCZNIE prezentacyjne:
+   * zanika do ~0 w spoczynku (skalowane realną prędkością), nigdy nie
+   * wpływa na `position`/kolizje. Warstwa prezentacji (labScene3D.ts) dodaje
+   * je do wysokości kamery przy renderze; to jedyny efekt tej wartości.
+   */
+  bobOffset: number;
 }
 
 const DEFAULTS = {
@@ -71,6 +78,8 @@ const DEFAULTS = {
   mouseSensitivity: 0.0022,
   pitchLimit: 1.45,
   collisionRadius: 0.4,
+  bobFrequency: 7.2,
+  bobAmplitude: 0.028,
 } as const;
 
 function clamp(value: number, min: number, max: number): number {
@@ -111,6 +120,8 @@ export class FirstPersonController {
   private readonly mouseSensitivity: number;
   private readonly pitchLimit: number;
   private readonly collisionRadius: number;
+  private readonly bobFrequency: number;
+  private readonly bobAmplitude: number;
 
   private keys: Record<MoveKey, boolean> = { forward: false, back: false, left: false, right: false };
   private pendingDx = 0;
@@ -120,6 +131,8 @@ export class FirstPersonController {
   private position: Vec3;
   private yaw: number;
   private pitch = 0;
+  private bobPhase = 0;
+  private bobOffset = 0;
 
   constructor(options: FirstPersonControllerOptions) {
     this.room = options.room;
@@ -132,6 +145,8 @@ export class FirstPersonController {
     this.mouseSensitivity = options.mouseSensitivity ?? DEFAULTS.mouseSensitivity;
     this.pitchLimit = options.pitchLimit ?? DEFAULTS.pitchLimit;
     this.collisionRadius = options.collisionRadius ?? DEFAULTS.collisionRadius;
+    this.bobFrequency = DEFAULTS.bobFrequency;
+    this.bobAmplitude = DEFAULTS.bobAmplitude;
     const start = options.startPosition ?? { x: 0, z: (this.room.minZ + this.room.maxZ) / 2 };
     this.position = { x: start.x, y: this.eyeHeight, z: start.z };
     this.yaw = options.startYaw ?? 0;
@@ -154,6 +169,8 @@ export class FirstPersonController {
     this.position = { x: position.x, y: this.eyeHeight, z: position.z };
     this.velocity = { x: 0, z: 0 };
     this.verticalVelocity = 0;
+    this.bobPhase = 0;
+    this.bobOffset = 0;
     if (yaw !== undefined) this.yaw = yaw;
   }
 
@@ -163,6 +180,7 @@ export class FirstPersonController {
       yaw: this.yaw,
       pitch: this.pitch,
       speed: Math.hypot(this.velocity.x, this.velocity.z),
+      bobOffset: this.bobOffset,
     };
   }
 
@@ -232,6 +250,15 @@ export class FirstPersonController {
     }
 
     this.position = { x: nextX, y: nextY, z: nextZ };
+
+    // Chód (head bob): WYŁĄCZNIE prezentacyjne — amplituda skalowana bieżącą
+    // prędkością względem docelowej, więc zanika do ~0 w spoczynku zamiast
+    // zamrażać się w dowolnej fazie. Nie dotyka `position`.
+    const speedNow = Math.hypot(this.velocity.x, this.velocity.z);
+    const speedRatio = this.moveSpeed > 0 ? clamp(speedNow / this.moveSpeed, 0, 1) : 0;
+    this.bobPhase += dt * this.bobFrequency * speedRatio;
+    this.bobOffset = Math.sin(this.bobPhase) * this.bobAmplitude * speedRatio;
+
     return this.getState();
   }
 }

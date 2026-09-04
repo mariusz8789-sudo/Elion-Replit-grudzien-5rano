@@ -511,6 +511,38 @@ export interface FabricComputeResponse {
 }
 
 /** Public, typed access to the model-first Fabric contract; external capability seams never execute through this endpoint. */
+export interface ProjectAccess {
+  projectId: string;
+  accessLevel: 'PUBLIC' | 'RESEARCH' | 'RESTRICTED';
+  role: ProjectRole;
+  canRun: boolean;
+}
+
+export interface AccessAuditEntry {
+  id: string; projectId: string; userId: string | null; action: string; accessLevel: ProjectAccess['accessLevel'];
+  workflow: string; sourceIds: string[]; runId: string | null; resultStatus: string | null; details: Record<string, unknown>; createdAt: number;
+}
+
+export interface ResearchAccessStatus {
+  projectId: string;
+  sources: { id: string; label: string; access: ProjectAccess['accessLevel']; status: 'AVAILABLE' | 'REQUIRES_AUTH'; credentialEnv: string | null }[];
+  policy: string;
+}
+
+export async function getProjectAccess(token: string, projectId: string): Promise<ApiResult<ProjectAccess>> {
+  const r = await request<ProjectAccess>('GET', `/projects/${projectId}/access`, { token });
+  return r;
+}
+
+export async function getResearchAccessStatus(token: string, projectId: string): Promise<ApiResult<ResearchAccessStatus>> {
+  return request<ResearchAccessStatus>('GET', `/projects/${projectId}/research-access`, { token });
+}
+
+export async function listProjectAccessAudit(token: string, projectId: string, limit = 40): Promise<ApiResult<AccessAuditEntry[]>> {
+  const r = await request<{ entries: AccessAuditEntry[] }>('GET', `/projects/${projectId}/audit?limit=${encodeURIComponent(String(limit))}`, { token });
+  return r.ok ? { ok: true, data: r.data.entries } : r;
+}
+
 export async function getFabricComputeContract(): Promise<ApiResult<FabricComputeContract>> {
   const r = await request<{ contract: FabricComputeContract }>('GET', '/compute/fabric/contract');
   return r.ok ? { ok: true, data: r.data.contract } : r;

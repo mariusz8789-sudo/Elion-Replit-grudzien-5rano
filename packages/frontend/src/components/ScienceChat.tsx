@@ -11,7 +11,7 @@ import { track } from '../core/analytics';
 import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmEarthquakeEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
 import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { getToken } from '../core/backend/session';
-import { searchKnowledgeMaterials, type KnowledgeMaterial } from '../core/backend/client';
+import { searchKnowledgeMaterials, getProjectAccess, getResearchAccessStatus, listProjectAccessAudit, type KnowledgeMaterial, type ProjectAccess, type AccessAuditEntry, type ResearchAccessStatus } from '../core/backend/client';
 import { getActiveKnowledgeProject, subscribeActiveKnowledgeProject, type ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
 import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
@@ -28,6 +28,108 @@ import { ketamineNaturalDiscoverySummary, runKetamineNaturalDiscovery } from '..
  */
 
 interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean }
+
+type ResearchPanel = 'why' | 'evidence' | 'hypotheses' | 'memory' | 'timeline' | 'audit' | 'access' | null;
+
+const NEXT_MOVES = [
+  { label: 'TEST THIS', prompt: 'Zaproponuj test dla ostatniej hipotezy.' },
+  { label: 'CHALLENGE IT', prompt: 'Spróbuj obalić ostatnią hipotezę.' },
+  { label: 'FIND COUNTEREVIDENCE', prompt: 'Znajdź kontrdowody dla ostatniego wyniku.' },
+  { label: 'BUILD MODEL', prompt: 'Zbuduj jawny model dla tego pytania.' },
+  { label: 'COMPARE HYPOTHESES', prompt: 'Porównaj konkurencyjne hipotezy dla tego pytania.' },
+  { label: 'GO DEEPER', prompt: 'Idź głębiej: pokaż założenia, niepewności i ograniczenia.' },
+] as const;
+
+function latestUserQuestion(turns: readonly ChatTurn[]): string | null {
+  return [...turns].reverse().find((turn) => turn.role === 'user')?.text ?? null;
+}
+
+function ResearchAccessPanel({ status, loading }: { status: ResearchAccessStatus | null; loading: boolean }) {
+  return (
+    <section className="research-panel" aria-label="Research Access" aria-busy={loading}>
+      {loading && <div className="research-loading" role="status">Sprawdzam dostęp do źródeł…</div>}
+      <div className="research-panel-title"><span>RESEARCH ACCESS</span><small>credentials backend-only</small></div>
+      {status ? <><div className="research-access-list">{status.sources.map((source) => <div className="research-access-row" key={source.id}><strong>{source.label}</strong><span className={source.status === 'AVAILABLE' ? 'available' : 'requires-auth'}>{source.status}</span><small>{source.access}{source.credentialEnv ? ` · ${source.credentialEnv}` : ' · no credential'}</small></div>)}</div><p className="research-access-policy">{status.policy}</p></> : <p>Status Research Access jest dostępny po zalogowaniu i wybraniu projektu.</p>}
+    </section>
+  );
+}
+
+function AuditPanel({ entries }: { entries: readonly AccessAuditEntry[] }) {
+  return (
+    <section className="research-panel" aria-label="Access audit">
+      <div className="research-panel-title"><span>AUDIT TRAIL</span><small>odczyt z backendu</small></div>
+      {entries.length === 0 ? <p>Brak wpisów audytu dla aktywnego projektu.</p> : <ol className="research-audit-list">{entries.slice(0, 6).map((entry) => <li key={entry.id}><strong>{entry.action}</strong><span>{entry.accessLevel} · {entry.resultStatus ?? 'policy'} · {new Date(entry.createdAt).toLocaleString('pl-PL')}</span>{entry.runId && <code>{entry.runId}</code>}</li>)}</ol>}
+    </section>
+  );
+}
+
+function ResearchMemory({ turns, capsule }: { turns: readonly ChatTurn[]; capsule: EvidenceGuidedExperimentCapsule | null }) {
+  const question = latestUserQuestion(turns);
+  const findings = turns.filter((turn) => turn.role === 'genesis' && turn.tag === 'WYNIK').slice(-3);
+  const openQuestions = turns.filter((turn) => turn.role === 'genesis' && turn.tag === 'MODEL').slice(-2);
+  return (
+    <section className="research-panel" aria-label="Research Memory">
+      <div className="research-panel-title"><span>RESEARCH MEMORY</span><small>stan z bieżącej sesji</small></div>
+      <div className="research-memory-grid">
+        <div><span>CURRENT QUESTION</span><p>{question ?? 'Jeszcze nie wybrano pytania.'}</p></div>
+        <div><span>KEY FINDINGS</span><p>{findings.length ? findings.map((turn) => turn.text.split('\n')[0]).join(' · ') : 'Brak potwierdzonego wyniku w tej sesji.'}</p></div>
+        <div><span>OPEN QUESTIONS</span><p>{openQuestions.length ? openQuestions.map((turn) => turn.text.split('\n')[0]).join(' · ') : 'Plan eksperymentu pojawi się po sformułowaniu pytania.'}</p></div>
+        <div><span>SUPPORTED ARTIFACT</span><p>{capsule ? `${capsule.capsuleId} · ${capsule.resultOrigin}` : 'Brak zapisanego artefaktu runu.'}</p></div>
+      </div>
+    </section>
+  );
+}
+
+function ResearchTimeline({ turns, stage }: { turns: readonly ChatTurn[]; stage: DiscoveryStage }) {
+  const events = turns.filter((turn) => turn.role === 'user' || turn.tag === 'MODEL' || turn.tag === 'WYNIK').slice(-6);
+  return (
+    <section className="research-panel" aria-label="Research Timeline">
+      <div className="research-panel-title"><span>RESEARCH TIMELINE</span><small>kliknij ruch Next Move, aby kontynuować</small></div>
+      <ol className="research-timeline">
+        {events.length === 0 && <li><strong>QUESTION</strong><span>Sesja czeka na pytanie naukowe.</span></li>}
+        {events.map((turn, index) => (
+          <li key={`${index}-${turn.text.slice(0, 20)}`} className={turn.tag === 'WYNIK' ? 'complete' : ''}>
+            <strong>{turn.role === 'user' ? 'QUESTION' : turn.tag === 'MODEL' ? 'HYPOTHESIS / PLAN' : 'RESULT'}</strong>
+            <span>{turn.text.split('\n')[0].slice(0, 180)}</span>
+          </li>
+        ))}
+        <li className="current"><strong>NEXT MOVE</strong><span>Aktualny etap: {DISCOVERY_STAGE_LABELS[stage]}.</span></li>
+      </ol>
+    </section>
+  );
+}
+
+function HypothesesPanel({ plan, onAction }: { plan: EvidenceGuidedExperimentPlan | null; onAction: (prompt: string) => void }) {
+  return (
+    <section className="research-panel" aria-label="Hypotheses">
+      <div className="research-panel-title"><span>HYPOTHESES</span><small>bez udawanej pewności</small></div>
+      {plan ? <article className="hypothesis-card">
+        <div className="hypothesis-card-head"><strong>HYPOTHESIS / PLAN</strong><span>{plan.status}</span></div>
+        <p>{plan.request.sourceText}</p>
+        <div className="hypothesis-meta"><span>DOMAIN <b>{plan.request.domainId}</b></span><span>MODEL <b>{plan.request.modelId ?? 'NOT_SELECTED'}</b></span><span>CONFIDENCE <b>NOT_ASSIGNED</b></span></div>
+        <div className="hypothesis-actions"><button className="research-inline-action" onClick={() => onAction('Zaproponuj test dla ostatniej hipotezy.')}>TEST</button><button className="research-inline-action" onClick={() => onAction('Spróbuj obalić ostatnią hipotezę.')}>CHALLENGE</button><button className="research-inline-action" onClick={() => onAction('Idź głębiej: pokaż założenia, niepewności i ograniczenia.')}>GO DEEPER</button></div>
+      </article> : <p>Hipoteza pojawi się po sformułowaniu pytania i utworzeniu planu przez istniejący core. Brak planu nie jest hipotezą.</p>}
+    </section>
+  );
+}
+
+function WhyPanel({ plan, capsule }: { plan: EvidenceGuidedExperimentPlan | null; capsule: EvidenceGuidedExperimentCapsule | null }) {
+  return (
+    <section className="research-panel" aria-label="Why this step">
+      <div className="research-panel-title"><span>WHY?</span><small>jawne uzasadnienie decyzji</small></div>
+      <p>{plan ? `Genesis pokazał plan, ponieważ request został rozpoznany jako ${plan.request.domainId} i wymaga potwierdzenia przed uruchomieniem. Nie wykonano runu bez akcji użytkownika.` : capsule ? `Genesis pokazuje ten artefakt, ponieważ pochodzi z potwierdzonego runu ${capsule.runId}. Wynik jest oznaczony jako ${capsule.resultOrigin}; ograniczenia modelu pozostają częścią artefaktu.` : 'Wybierz pytanie naukowe albo uruchom istniejący plan, aby zobaczyć konkretne uzasadnienie.'}</p>
+    </section>
+  );
+}
+
+function EvidencePanel({ capsule }: { capsule: EvidenceGuidedExperimentCapsule | null }) {
+  return (
+    <section className="research-panel" aria-label="Evidence and provenance">
+      <div className="research-panel-title"><span>EVIDENCE</span><small>provenance obok wyniku</small></div>
+      {capsule ? <div className="research-evidence-grid"><div><span>RUN / HASH</span><code>{capsule.runId}<br />{capsule.runFingerprint}</code></div><div><span>ORIGIN</span><p>{capsule.resultOrigin}<br />{capsule.engine}</p></div><div><span>LIMITATIONS</span><p>{capsule.limitations.join(' ')}</p></div><div><span>STATUS</span><p>Evidence Pack: {capsule.evidencePack.status}<br />A/B: {capsule.counterfactual.status}</p></div></div> : <p>Evidence pojawi się wraz z realnym, potwierdzonym runem. Genesis nie przedstawia predykcji jako pomiaru.</p>}
+    </section>
+  );
+}
 
 const TAG_LABELS: Record<EpistemicTag, string> = {
   FAKT: 'FAKT', MODEL: 'MODEL', ZALOZENIE: 'ZAŁOŻENIE', HIPOTEZA: 'HIPOTEZA',
@@ -232,6 +334,12 @@ export function ScienceChat() {
   const [backendConfirmationPending, setBackendConfirmationPending] = useState(false);
   const [lastEvidenceCapsule, setLastEvidenceCapsule] = useState<EvidenceGuidedExperimentCapsule | null>(null);
   const [activeKnowledgeProject, setActiveKnowledgeProject] = useState<ActiveKnowledgeProject | null>(() => getActiveKnowledgeProject());
+  const [projectAccess, setProjectAccess] = useState<ProjectAccess | null>(null);
+  const [accessAudit, setAccessAudit] = useState<AccessAuditEntry[]>([]);
+  const [researchAccess, setResearchAccess] = useState<ResearchAccessStatus | null>(null);
+  const [researchAccessLoading, setResearchAccessLoading] = useState(false);
+  const [lastHypothesisPlan, setLastHypothesisPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
+  const [researchPanel, setResearchPanel] = useState<ResearchPanel>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Etap procesu badawczego wyliczony z REALNEGO stanu rozmowy (typowane
@@ -250,6 +358,20 @@ export function ScienceChat() {
   }, []);
   useEffect(() => subscribeSimContext((c) => setCtxName(c?.experimentName ?? null)), []);
   useEffect(() => subscribeActiveKnowledgeProject(setActiveKnowledgeProject), []);
+  useEffect(() => {
+    let cancelled = false;
+    const token = getToken();
+    if (!token || !activeKnowledgeProject) { setProjectAccess(null); setAccessAudit([]); setResearchAccess(null); setResearchAccessLoading(false); return () => { cancelled = true; }; }
+    setResearchAccessLoading(true);
+    void Promise.all([getProjectAccess(token, activeKnowledgeProject.id), getResearchAccessStatus(token, activeKnowledgeProject.id), listProjectAccessAudit(token, activeKnowledgeProject.id)]).then(([access, research, audit]) => {
+      if (cancelled) return;
+      setProjectAccess(access.ok ? access.data : null);
+      setResearchAccess(research.ok ? research.data : null);
+      setAccessAudit(audit.ok ? audit.data : []);
+      setResearchAccessLoading(false);
+    }).catch(() => { if (!cancelled) setResearchAccessLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeKnowledgeProject]);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [turns, open]);
 
   const appendProjectKnowledgeSources = async (query: string) => {
@@ -267,6 +389,7 @@ export function ScienceChat() {
     const isConfirmation = /^(?:potwierdź|potwierdz|uruchom potwierdzony plan)$/i.test(msg);
     const isCancellation = /^(?:anuluj|anuluj plan)$/i.test(msg);
     if (isCancellation && pendingGuidedPlan) {
+      setResearchPanel('timeline');
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `Plan ${pendingGuidedPlan.plan.planId} anulowano. Żaden model nie został uruchomiony.`, tag: 'SYSTEM' }]);
       setPendingGuidedPlan(null);
       setInput('');
@@ -326,6 +449,7 @@ export function ScienceChat() {
           : `\n\nRaport — Evidence Pack: ${confirmed.handoff.evidencePack.status} — ${confirmed.handoff.evidencePack.reason}\nRaport — A/B: ${confirmed.handoff.counterfactual.status} — ${confirmed.handoff.counterfactual.reason}\nRaport — Replay: NOT_ESTABLISHED — wymaga kompletnego preregistered Evidence Pack i jawnego rerun.`;
         const tag: EpistemicTag = run.result.status === 'completed' ? 'WYNIK' : hypothetical ? 'HIPOTEZA' : 'SYSTEM';
         setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: `${formatFabricRun(run)}${handoff}`, tag }]);
+        setResearchPanel(run.result.status === 'completed' ? 'evidence' : 'why');
         setPendingGuidedPlan(null);
         track('experiment_fabric_run', { model: run.request.modelId ?? run.request.domainId, status: run.result.status, confirmed: 'true' });
         if (run.result.status === 'completed' && run.result.route.kind === 'live-world') {
@@ -411,6 +535,8 @@ export function ScienceChat() {
     if (isFabricRequest) {
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
+      setResearchPanel('hypotheses');
+      setLastHypothesisPlan(reviewed);
       setPendingGuidedPlan(reviewed.status === 'READY_FOR_CONFIRMATION' || reviewed.status === 'READY_FOR_HYPOTHETICAL_CONFIRMATION' ? reviewed : null);
       setBiotechWorkspaceSuggested(fabricRequest.domainId === 'biotechnology' && reviewed.status !== 'READY_FOR_CONFIRMATION' && reviewed.status !== 'READY_FOR_HYPOTHETICAL_CONFIRMATION');
       setInput('');
@@ -499,11 +625,23 @@ export function ScienceChat() {
         <div>
           <strong>💬 Science Chat</strong>
           <span className="science-chat-ctx">{ctxName ? `kontekst: ${ctxName}` : 'brak otwartej symulacji'}</span>
+          {projectAccess && <span className="science-chat-ctx" title="Poziom egzekwowany przez backend">dostęp: {projectAccess.accessLevel} · {projectAccess.canRun ? 'run dozwolony' : 'run zablokowany'}</span>}
         </div>
         <button className="back" aria-label="Zamknij Science Chat" onClick={() => setOpen(false)}>✕</button>
       </header>
 
       <DiscoveryStageRail stage={stage} />
+
+      <div className="research-tools" aria-label="Research workspace tools">
+        {(['why', 'evidence', 'hypotheses', 'memory', 'timeline', 'audit', 'access'] as const).map((panel) => <button key={panel} className={`research-tool${researchPanel === panel ? ' active' : ''}`} onClick={() => setResearchPanel(researchPanel === panel ? null : panel)}>{panel === 'why' ? 'WHY?' : panel.toUpperCase()}</button>)}
+      </div>
+      {researchPanel === 'why' && <WhyPanel plan={pendingGuidedPlan} capsule={lastEvidenceCapsule} />}
+      {researchPanel === 'hypotheses' && <HypothesesPanel plan={pendingGuidedPlan ?? lastHypothesisPlan} onAction={(prompt) => void send(prompt)} />}
+      {researchPanel === 'audit' && <AuditPanel entries={accessAudit} />}
+      {researchPanel === 'access' && <ResearchAccessPanel status={researchAccess} loading={researchAccessLoading} />}
+      {researchPanel === 'evidence' && <EvidencePanel capsule={lastEvidenceCapsule} />}
+      {researchPanel === 'memory' && <ResearchMemory turns={turns} capsule={lastEvidenceCapsule} />}
+      {researchPanel === 'timeline' && <ResearchTimeline turns={turns} stage={stage} />}
 
       <div className="science-chat-log" ref={scrollRef}>
         {turns.map((t, i) => (
@@ -529,6 +667,11 @@ export function ScienceChat() {
           <button className="chip-btn" disabled={backendConfirmationPending} onClick={() => void send('anuluj plan')}>Anuluj plan</button>
         </div>
       )}
+      <div className="next-move-panel" aria-label="Next Move">
+        <div className="next-move-head"><strong>NEXT MOVE</strong><span>Nie kończymy na odpowiedzi — wybierz kierunek badania.</span></div>
+        <div className="next-move-grid">{NEXT_MOVES.map((move) => <button key={move.label} className="next-move-btn" onClick={() => void send(move.prompt)} disabled={backendConfirmationPending}><strong>{move.label}</strong><span>{move.prompt}</span></button>)}</div>
+      </div>
+
       {biotechWorkspaceSuggested && (
         <div className="science-chat-suggest" aria-label="Przejście do Drug Discovery">
           <button className="chip-btn primary" onClick={() => { window.location.hash = '#/drug?reference=caffeine&target=A1'; setOpen(false); }}>Otwórz Drug Discovery workspace</button>

@@ -8,6 +8,9 @@ import {
 } from '../../core/experimentFabric/labSession';
 import type { ScenarioComparison, ScenarioReplay, ScenarioRun } from '../../core/simulation/scenarioEngine';
 import type { SavedExperiment } from '../../core/scienceMemory';
+import { extractObservations } from '../../core/observationAnalysis/observationExtraction';
+import { analyzeExperiment } from '../../core/observationAnalysis/analysis';
+import { deriveFindings } from '../../core/observationAnalysis/findings';
 
 /**
  * FIRST-PERSON SCIENTIST — jedna spójna, grywalna scena łącząca ISTNIEJĄCE
@@ -187,6 +190,16 @@ export function FirstPersonLabScreen() {
   const canInteract = stats.nearStation === 1 && canInteractInPhase(phase);
   const isRunning = phase === 'RUNNING_A' || phase === 'RUNNING_B' || phase === 'REPLAYING';
   const cameraTaken = stats.cameraPhase !== 0;
+  const completedRun = runB ?? runA;
+  const observationLayer = useMemo(() => {
+    if (!completedRun || completedRun.status !== 'COMPLETED' || completedRun.summary === null) return null;
+    const analysis = analyzeExperiment(completedRun, runB && runA ? runA : undefined);
+    return {
+      observations: extractObservations(completedRun),
+      analysis,
+      findings: deriveFindings(completedRun, analysis),
+    };
+  }, [completedRun, runA, runB]);
 
   // JEDNA aktualna linia zamiast rosnącej listy — "less is more" (sekcja 6 misji).
   // Priorytet: najnowsze/najważniejsze realne zdarzenie wygrywa, starsze znikają.
@@ -270,6 +283,35 @@ export function FirstPersonLabScreen() {
           {hudHidden ? 'Pokaż UI' : 'Ukryj UI'}
         </button>
       </div>
+
+      {!hudHidden && observationLayer && (phase === 'COMPLETE_A' || phase === 'COMPLETE_B' || phase === 'COMPARED' || phase === 'REPLAY_DONE') && (
+        <section className="fp-observation-panel" aria-label="Observation and Analysis Layer">
+          <div className="fp-observation-section">
+            <h2>OBSERVATIONS</h2>
+            <p>{observationLayer.observations.length} obserwacji z przebiegu {completedRun?.scenarioId}.</p>
+            <div className="fp-observation-chips">
+              {observationLayer.observations.slice(0, 6).map((observation) => (
+                <span key={`${observation.observationType}-${observation.day}-${observation.inputParameter}`} className={`fp-observation-chip ${observation.severity.toLowerCase()}`}>
+                  D{observation.day} · {observation.inputParameter} · {String(observation.observedValue)}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="fp-observation-section">
+            <h2>ANALYSIS</h2>
+            <p>{observationLayer.analysis.summary}</p>
+            <p className="fp-observation-meta">Trend infectious: {observationLayer.analysis.trends.find((trend) => trend.metric === 'infectious')?.direction ?? '—'} · wydarzenia: {observationLayer.analysis.significantEvents.length}</p>
+          </div>
+          <div className="fp-observation-section">
+            <h2>KEY FINDINGS</h2>
+            {observationLayer.findings.slice(0, 5).map((finding) => (
+              <p key={finding.id} className="fp-finding">
+                <strong>{finding.metric}</strong>: {String(finding.observedValue)}{finding.delta === null ? '' : ` · Δ ${finding.delta}`} · dzień {finding.sourceSnapshot.day}
+              </p>
+            ))}
+          </div>
+        </section>
+      )}
 
       {!hudHidden && (
         <div className="fp-lab-hud">

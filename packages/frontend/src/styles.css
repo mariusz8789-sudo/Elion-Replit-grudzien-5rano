@@ -2477,3 +2477,16 @@ body:has(.fp-lab) .science-chat-fab { display: none; }
 .scenario-run-disclosure .scenario-run-note { margin-top: 0.25rem; }
 .governed-question-input { width: 100%; }
 .scenario-run-actions .chip-btn { font-size: 0.66rem; padding: 0.2rem 0.5rem; }
+
+.fp-observation-panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; padding: 0.75rem 0.85rem; border: 1px solid var(--border); border-radius: 0.8rem; background: rgba(10, 16, 28, 0.68); }
+.fp-observation-section { min-width: 0; }
+.fp-observation-section h2 { margin: 0 0 0.35rem; color: #7eb3ff; font: 700 0.7rem/1 var(--font-mono); letter-spacing: 0.08em; }
+.fp-observation-section p { margin: 0.25rem 0; color: var(--text-dim); font-size: 0.76rem; line-height: 1.35; }
+.fp-observation-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.fp-observation-chip { padding: 0.2rem 0.35rem; border-radius: 0.35rem; background: rgba(126, 179, 255, 0.12); color: #dce8ff; font: 600 0.64rem/1.2 var(--font-mono); }
+.fp-observation-chip.notable { background: rgba(245, 180, 70, 0.16); color: #ffe0a1; }
+.fp-observation-chip.critical { background: rgba(240, 90, 60, 0.18); color: #ffd0c4; }
+.fp-observation-meta { font-family: var(--font-mono); }
+.fp-finding { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-finding strong { color: #eaf1ff; }
+@media (max-width: 800px) { .fp-observation-panel { grid-template-columns: 1fr; } }

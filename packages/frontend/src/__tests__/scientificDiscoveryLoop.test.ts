@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { runScientificDiscoveryLoop, buildEvidenceChain } from '../core/experimentFabric/scientificDiscoveryLoop';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { runScientificDiscoveryLoop, runScientificDiscoveryLoopAsync, buildEvidenceChain } from '../core/experimentFabric/scientificDiscoveryLoop';
 import {
   executePreregisteredHypotheses, generateCompetingHypotheses, HYPOTHESIS_PROBLEMS, preregisterHypotheses,
 } from '../core/experimentFabric/hypothesisLoop';
@@ -105,5 +105,78 @@ describe('Scientific Discovery Loop — one real epidemiological question, close
     runScientificDiscoveryLoop(QUESTION_ID);
     const after = JSON.stringify(HYPOTHESIS_PROBLEMS.find((p) => p.problemId === QUESTION_ID));
     expect(after).toBe(before);
+  });
+});
+
+/**
+ * GENERALITY — proves `runScientificDiscoveryLoop*` is a reusable entry
+ * point over the whole declared `HYPOTHESIS_PROBLEMS` catalog, not a
+ * function that only happens to work for `problem:intervention-timing`.
+ */
+describe('Scientific Discovery Loop — reusable across domains, not a single hardcoded demo', () => {
+  it('11. the SAME sync entry point closes a second, different local-model problem outside epidemiology (particle physics), honestly reporting notModeled for a domain Observation/Analysis does not cover', () => {
+    const result = runScientificDiscoveryLoop('problem:particle-relativistic-kinetic-energy-velocity');
+    expect(result.problem.domainId).toBe('particle');
+    expect(result.loop.outcomes.length).toBeGreaterThan(0);
+    // Real falsification/comparison ran (not BLOCKED-by-construction like the chemistry case).
+    expect(result.loop.outcomes.some((o) => o.status !== 'BLOCKED')).toBe(true);
+    // This domain has no registered Scenario Engine timeline, so Observation/Analysis
+    // must never fabricate a result for it — same honesty boundary as the chemistry case.
+    for (const link of result.evidenceChain) {
+      expect(link.observations).toEqual([]);
+      expect(link.analysis).toBeNull();
+      expect(link.notModeled).toBeDefined();
+    }
+    expect(result.nextExperiment).toBeDefined();
+  });
+
+  it('12. runScientificDiscoveryLoopAsync genuinely closes a BACKEND_REAL_ENGINE problem (real RDKit via mocked HTTP transport) instead of reporting a foregone BLOCKED', async () => {
+    // Real RDKit 2026.03.5 descriptor outputs captured for ethanol (baseline) and
+    // aspirin (candidate) — same fixture values as moleculeWorldAdapter.test.ts,
+    // mocking only the HTTP transport per this codebase's established convention.
+    const REAL_OUTPUTS: Record<string, Record<string, unknown>> = {
+      CCO: { molWt: 46.069, exactMolWt: 46.04186, crippenLogP: -0.0014, hbd: 1, hba: 1, rotatableBonds: 0, ringCount: 0, aromaticRings: 0, fractionCsp3: 1, tpsa: 20.23, heavyAtomCount: 3, heteroatomCount: 1, formalCharge: 0, lipinskiViolations: 0, canonicalSmiles: 'CCO', molecularFormula: 'C2H6O' },
+      'CC(=O)Oc1ccccc1C(=O)O': { molWt: 180.159, exactMolWt: 180.04226, crippenLogP: 1.3101, hbd: 1, hba: 3, rotatableBonds: 2, ringCount: 1, aromaticRings: 1, fractionCsp3: 0.1111, tpsa: 63.6, heavyAtomCount: 13, heteroatomCount: 4, formalCharge: 0, lipinskiViolations: 0, canonicalSmiles: 'CC(=O)Oc1ccccc1C(=O)O', molecularFormula: 'C9H8O4' },
+    };
+    let seq = 0;
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      seq += 1;
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      const smiles = String(body.inputs?.smiles);
+      const outputs = REAL_OUTPUTS[smiles];
+      if (!outputs) throw new Error(`No captured real RDKit output for smiles=${smiles}`);
+      return {
+        ok: true, status: 200,
+        json: async () => ({
+          contractVersion: '1.0.0', request: body,
+          run: {
+            runId: `chem-run-${seq}`, modelId: 'chem-rdkit-descriptors', modelVersion: '1.0.0', domain: 'chemistry',
+            engine: 'genesis-compute@1.0.0', status: 'ok', deterministic: true, inputs: body.inputs, outputs, units: {},
+            warnings: [], assumptions: [],
+            provenance: { source: 'compute/rdkitAdapter.mjs', formula: 'RDKit Descriptors', honesty: 'real_external_engine', engine: 'RDKit 2026.03.5', requiredEnvironmentVariable: 'GENESIS_RDKIT_PYTHON' },
+          },
+          persisted: false,
+        }),
+      } as Response;
+    }));
+
+    const result = await runScientificDiscoveryLoopAsync('problem:chem-rdkit-molecular-weight-comparison');
+    expect(result.problem.domainId).toBe('chemistry');
+    expect(result.loop.outcomes.length).toBeGreaterThan(0);
+    // The sync path (test 8) can only ever report BLOCKED here; the async path must
+    // genuinely execute and reach a real falsification assessment.
+    expect(result.loop.outcomes.every((o) => o.status !== 'BLOCKED')).toBe(true);
+    expect(result.loop.outcomes[0]!.observedMetric).toBeCloseTo(180.159, 2);
+    expect(result.loop.outcomes[0]!.baselineMetric).toBeCloseTo(46.069, 2);
+    // RDKit runs are not registered Scenario Engine timelines — Observation/Analysis
+    // still must not fabricate a result for them.
+    for (const link of result.evidenceChain) {
+      expect(link.observations).toEqual([]);
+      expect(link.notModeled).toBeDefined();
+    }
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 });

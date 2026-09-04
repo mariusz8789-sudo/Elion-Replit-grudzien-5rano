@@ -171,3 +171,99 @@ export function exportEvidencePackRoCrate(pack: ScientificEvidencePack): Genesis
 export function serializeEvidencePackRoCrate(pack: ScientificEvidencePack): string {
   return canonicalJson(exportEvidencePackRoCrate(pack));
 }
+
+/**
+ * MULTI-DOMAIN INVESTIGATION EXPORT — the smallest possible extension of
+ * this existing exporter to cover a real investigation spanning several
+ * domains (epidemiology, particle physics, molecular chemistry, ...).
+ *
+ * This is NOT a second export architecture. It calls the UNCHANGED
+ * `exportEvidencePackRoCrate` once per domain and merges the results: each
+ * per-domain sub-crate's own root Dataset node (normally `'@id': './'`)
+ * is renamed to a domain-qualified id (`#domain/<domainId>`) so multiple
+ * domains can coexist in one JSON-LD graph without an `@id` collision,
+ * and one overall `'./'` root node is added that lists every domain root
+ * as a part. Every other node keeps the id `exportEvidencePackRoCrate`
+ * already gave it (protocol/run/result ids are content-hash-derived and
+ * therefore already collision-safe across independently executed real
+ * runs from unrelated models).
+ *
+ * `worldStateFingerprints` / `replayStatus` / `notModeled` / `question` are
+ * OPTIONAL, CALLER-SUPPLIED cross-references to real values the caller's
+ * own domain adapter (e.g. `world/epidemiologyWorldAdapter.ts`) already
+ * computed — this function never derives or recomputes them itself, and
+ * never invents a value the caller did not supply.
+ */
+export interface DomainEvidenceEntry {
+  domainId: string;
+  /** The real, already-answered investigation question for this domain (e.g. the HypothesisProblem's own statement). */
+  question?: string;
+  pack: ScientificEvidencePack;
+  /** Real WorldState fingerprint(s) this domain's own adapter already produced — informational cross-reference only. */
+  worldStateFingerprints?: readonly string[];
+  /** Real replay status this domain's own investigation already computed (e.g. 'MATCH' | 'DRIFT' | 'BLOCKED'). */
+  replayStatus?: string;
+  /** Real NOT_MODELED / UNKNOWN declarations this domain's own adapter already made — passed through verbatim, never re-derived. */
+  notModeled?: readonly string[];
+}
+
+function domainRootId(domainId: string): string {
+  return `#domain/${stableId(domainId)}`;
+}
+
+/**
+ * Merges one `GenesisRoCrate` per domain entry into a single deterministic
+ * multi-domain bundle. Domain order in `entries` is preserved exactly —
+ * this function does not sort or deduplicate domains, so a caller supplying
+ * the same domain list in the same order always gets the same bundle.
+ */
+export function combineEvidencePackRoCrates(entries: readonly DomainEvidenceEntry[]): GenesisRoCrate {
+  const contextKeys = new Map<string, string | Readonly<Record<string, string>>>();
+  const graph: RoCrateGraphNode[] = [];
+  const overallRootParts: { '@id': string }[] = [];
+
+  for (const entry of entries) {
+    const sub = exportEvidencePackRoCrate(entry.pack);
+    for (const ctx of sub['@context']) {
+      const key = typeof ctx === 'string' ? ctx : canonicalJson(ctx);
+      if (!contextKeys.has(key)) contextKeys.set(key, ctx);
+    }
+
+    const thisDomainRootId = domainRootId(entry.domainId);
+    overallRootParts.push(entityRef(thisDomainRootId));
+
+    for (const node of sub['@graph']) {
+      if (node['@id'] !== './') {
+        graph.push(node);
+        continue;
+      }
+      graph.push({
+        ...node,
+        '@id': thisDomainRootId,
+        'genesis:domainId': entry.domainId,
+        ...(entry.question === undefined ? {} : { 'genesis:investigationQuestion': entry.question }),
+        ...(entry.worldStateFingerprints === undefined ? {} : { 'genesis:worldStateFingerprints': entry.worldStateFingerprints }),
+        ...(entry.replayStatus === undefined ? {} : { 'genesis:replayStatus': entry.replayStatus }),
+        ...(entry.notModeled === undefined ? {} : { 'genesis:notModeled': entry.notModeled }),
+      });
+    }
+  }
+
+  const overallRoot: RoCrateGraphNode = {
+    '@id': './',
+    '@type': 'Dataset',
+    name: `Genesis multi-domain scientific investigation (${entries.map((e) => e.domainId).join(', ')})`,
+    hasPart: overallRootParts,
+    'genesis:roCrateProfileVersion': RO_CRATE_EVIDENCE_PACK_VERSION,
+    'genesis:domainCount': entries.length,
+  };
+
+  return {
+    '@context': [...contextKeys.values()],
+    '@graph': [overallRoot, ...graph],
+  };
+}
+
+export function serializeCombinedEvidencePackRoCrate(entries: readonly DomainEvidenceEntry[]): string {
+  return canonicalJson(combineEvidencePackRoCrates(entries));
+}

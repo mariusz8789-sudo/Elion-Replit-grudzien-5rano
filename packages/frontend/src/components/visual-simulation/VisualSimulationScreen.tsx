@@ -14,6 +14,7 @@ import { getActiveSpatialOverlay, subscribeActiveSpatialOverlay } from '../../co
 import { projectWorldState } from '../../core/simulation/worldEngineContract';
 import { projectEpidemicScreenState } from '../../core/world/epidemicVirtualLabAdapter';
 import { createVirtualLabIntegration } from '../../core/world/virtualLabIntegration';
+import type { WorldCaptureTimeline } from '../../core/world/worldCapture';
 
 /**
  * VISUAL SIMULATION SCREEN — żywa scena „Epidemia w małym mieście" z warstwą
@@ -50,6 +51,9 @@ export function VisualSimulationScreen() {
   const cam = useRef<Camera>(defaultCamera(sim.worldWidth, sim.worldHeight));
   const followId = useRef<number>(-1);
   const drag = useRef<{ x: number; y: number } | null>(null);
+  const worldStatesRef = useRef<ReturnType<typeof projectEpidemicScreenState>[]>([]);
+  const completedRunsRef = useRef<ReturnType<typeof projectEpidemicScreenState>[][]>([]);
+  const lastWorldTickRef = useRef(-1);
   const labIntegration = useMemo(() => createVirtualLabIntegration({
     createEntity: () => {}, updateEntity: () => {}, removeEntity: () => {}, reset: () => {}, dispose: () => {},
   }, (decision) => {
@@ -68,6 +72,9 @@ export function VisualSimulationScreen() {
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('none');
   const [stats, setStats] = useState<Record<string, number>>(() => sim.stats());
   const [spatialOverlayLabel, setSpatialOverlayLabel] = useState<string | null>(null);
+  const [captureTimeline, setCaptureTimeline] = useState<WorldCaptureTimeline | null>(null);
+  const [replayActive, setReplayActive] = useState(false);
+  const [compareText, setCompareText] = useState<string | null>(null);
   const spatialOverlayRef = useRef<SpatialWorldOverlay | null>(null);
 
   const debugRef = useRef(debug); debugRef.current = debug;
@@ -110,7 +117,13 @@ export function VisualSimulationScreen() {
     const frame = (now: number) => {
       const dtSec = Math.min(0.1, (now - last) / 1000); last = now;
       clock.advance(dtSec, (dtDays) => sim.tick(dtDays));
-      labIntegration.sync(projectEpidemicScreenState(projectWorldState(sim)));
+      const worldState = projectEpidemicScreenState(projectWorldState(sim));
+      labIntegration.sync(worldState);
+      if (worldState.tick !== lastWorldTickRef.current) {
+        lastWorldTickRef.current = worldState.tick;
+        worldStatesRef.current = [...worldStatesRef.current, worldState];
+        setCaptureTimeline(labIntegration.capture(null, worldStatesRef.current));
+      }
       const canvas = sceneRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
@@ -148,7 +161,19 @@ export function VisualSimulationScreen() {
   const play = () => { clock.play(); if (clock.speed === 0) applySpeed(1); setRunning(true); };
   const pause = () => { clock.pause(); setRunning(false); };
   const step = () => { clock.singleStep((dt) => sim.tick(dt)); setStats(sim.stats()); };
-  const restart = () => { sim.reset(); clock.reset(); setRunning(false); followId.current = -1; setSelectedId(-1); setStats(sim.stats()); setParams(sim.getParams() as unknown as EpidemicCityParams); };
+  const restart = () => {
+    if (worldStatesRef.current.length > 0) completedRunsRef.current = [...completedRunsRef.current, worldStatesRef.current];
+    sim.reset(); clock.reset(); setRunning(false); followId.current = -1; setSelectedId(-1); setStats(sim.stats()); setParams(sim.getParams() as unknown as EpidemicCityParams);
+    worldStatesRef.current = []; lastWorldTickRef.current = -1; setCaptureTimeline(null); setReplayActive(false); setCompareText(null);
+  };
+  const replayCaptured = () => { if (worldStatesRef.current.length === 0) return; labIntegration.replay(worldStatesRef.current); setReplayActive(true); };
+  const compareCaptured = () => {
+    const previous = completedRunsRef.current.at(-1);
+    const current = worldStatesRef.current;
+    if (!previous || current.length === 0) { setCompareText('Brak dwóch rzeczywistych przebiegów do porównania.'); return; }
+    const a = labIntegration.capture(null, previous), b = labIntegration.capture(null, current);
+    setCompareText(a.snapshots.at(-1)?.fingerprint === b.snapshots.at(-1)?.fingerprint ? 'MATCH: fingerprinty przebiegów są identyczne.' : 'DRIFT: fingerprinty przebiegów różnią się.');
+  };
 
   const onSlider = (key: keyof EpidemicCityParams, raw: number, scale?: number) => {
     const value = scale ? raw / scale : raw;
@@ -216,6 +241,8 @@ export function VisualSimulationScreen() {
         <button className="chip-btn" onClick={running ? pause : play}>{running ? '⏸ Pauza' : '▶ Start'}</button>
         <button className="chip-btn" onClick={step}>⏭ Krok</button>
         <button className="chip-btn" onClick={restart}>↺ Restart</button>
+        <button className="chip-btn" onClick={replayCaptured} disabled={!captureTimeline}>↻ Replay</button>
+        <button className="chip-btn" onClick={compareCaptured}>⇄ Compare</button>
         <span className="sim-speed" role="group" aria-label="Prędkość symulacji">
           {CLOCK_SPEEDS.map((s) => (
             <button key={s} className="chip-btn" aria-pressed={speed === s} onClick={() => applySpeed(s)}>{s}×</button>
@@ -242,6 +269,13 @@ export function VisualSimulationScreen() {
         <div className="sim-timeline-fill" style={{ width: `${Math.min(100, ((stats.dzien ?? 0) / 120) * 100)}%` }} />
         <span className="sim-timeline-label">DZIEŃ {stats.dzien ?? 0} / ~120 · szczyt zakażeń w dniu, gdy I było najwyższe</span>
       </div>
+      {captureTimeline && (
+        <div className="sim-capture" aria-label="Timeline eksperymentu">
+          <span>Capture: {captureTimeline.snapshots.length} snapshotów · {captureTimeline.events.length} eventów · {captureTimeline.observations.length} obserwacji</span>
+          {replayActive && <span> · Replay aktywny</span>}
+          {compareText && <span> · {compareText}</span>}
+        </div>
+      )}
 
       <div className="sim-stage-wrap">
         <canvas

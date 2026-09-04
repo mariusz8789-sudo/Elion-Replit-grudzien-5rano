@@ -11,7 +11,8 @@ export interface VirtualLabIntegration {
   readonly camera: ObservationCameraPolicy;
   load(state: WorldState): WorldSnapshot;
   sync(state: WorldState): WorldSnapshot;
-  capture(run: ExperimentRun, states: readonly WorldState[]): WorldCaptureTimeline;
+  replay(states: readonly WorldState[]): readonly WorldSnapshot[];
+  capture(run: ExperimentRun | null, states: readonly WorldState[]): WorldCaptureTimeline;
   dispose(): void;
 }
 
@@ -33,6 +34,11 @@ export function createVirtualLabIntegration(scene: WorldScene, onCameraDecision:
     runtime, bridge, camera,
     load: (state) => { const snapshot = runtime.load(state); publishStateEvents(state); return snapshot; },
     sync: (state) => { const snapshot = runtime.sync(state); publishStateEvents(state); return snapshot; },
+    replay: (states) => states.map((state, index) => {
+      const snapshot = index === 0 ? runtime.load(state) : runtime.sync(state);
+      publishStateEvents(state);
+      return snapshot;
+    }),
     capture: (run, states) => captureWorldTimeline(run, states),
     dispose: () => { camera.disconnect(); runtime.dispose(); bridge.clear(); publishedEventIds.clear(); },
   };

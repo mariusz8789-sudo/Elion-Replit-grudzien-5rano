@@ -30,6 +30,7 @@ import {
 } from './knowledgePack6';
 import type { UnknownExplanation } from '../epistemicEngine';
 import type { SubstituteChallengeReport } from './pharmacologicalSubstituteChallenge';
+import { listExperiments } from '../../scienceMemory';
 
 export interface ChatRetrievalAnswer {
   query: string;
@@ -168,5 +169,47 @@ export function answerNextExperimentRecommendation(
     answer,
     provenance: unknown.provenance,
     recordCount: 1,
+  };
+}
+
+/**
+ * "What did you try to research about <query>, and what happened?" — reads
+ * real `unknown-driven-acquisition` runs back from Scientific Memory. This is
+ * the one answer in this module that depends on something Genesis actually
+ * DID in this session (a real search attempt), not on a pre-loaded knowledge
+ * pack — so unlike the other functions here, an empty result is expected and
+ * correct whenever no acquisition attempt has been made or saved yet (e.g.
+ * `window.localStorage` unavailable in this run, or nothing searched for this
+ * query before). No manual re-import is involved: this reads back whatever a
+ * prior `saveUnknownAcquisitionAttemptToMemory` call persisted.
+ */
+export function answerResearchAttemptFor(queryFragment: string): ChatRetrievalAnswer {
+  const wanted = queryFragment.toLowerCase();
+  const matches = listExperiments().filter((e) => e.labId === 'unknown-driven-acquisition' && String(e.params.query ?? '').toLowerCase().includes(wanted));
+
+  if (matches.length === 0) {
+    return {
+      query: `What did you try to research about "${queryFragment}", and what happened?`,
+      answer: `Genesis has no saved real-search attempt matching "${queryFragment}" in Scientific Memory for this session.`,
+      provenance: [],
+      recordCount: 0,
+    };
+  }
+
+  const lines: string[] = [];
+  const provenance: string[] = [];
+  for (const experiment of matches) {
+    lines.push(`Attempted real search "${experiment.params.query}" (${experiment.createdAt}): ${experiment.honestyNote}`);
+    for (const block of experiment.analysis ?? []) {
+      if (block.kind === 'retrieval-outcome') lines.push(`  - ${block.title}: ${block.body}`);
+    }
+    provenance.push(`scientific-memory:${experiment.id}`);
+  }
+
+  return {
+    query: `What did you try to research about "${queryFragment}", and what happened?`,
+    answer: lines.join(' '),
+    provenance,
+    recordCount: matches.length,
   };
 }

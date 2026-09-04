@@ -39,6 +39,7 @@ import { buildLogisticGrowthGraph } from '../modelGraph/logisticGrowthGraph';
 import { buildNuclearModelGraph } from '../modelGraph/nuclearGraph';
 import { buildOrbitalModelGraph } from '../modelGraph/orbitalGraph';
 import { buildRelativisticEnergyGraph } from '../modelGraph/relativisticEnergyGraph';
+import { buildNewtonianEnergyGraph } from '../modelGraph/newtonianEnergyGraph';
 import { buildSpecialRelativityGraph } from '../modelGraph/specialRelativityGraph';
 import { buildPhotonGraph } from '../modelGraph/photonGraph';
 import { kardashevPower, schwarzschildRadius } from '../physics';
@@ -602,6 +603,14 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący model energii relatywistycznej cząstki.',
         outputs: details.outputs, units: details.units, warnings: [], validity: 'Cząstka swobodna w próżni; β < 1.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'particle-newtonian-energy': {
+      const details = graphOutputs(buildNewtonianEnergyGraph(), params, ['kineticEnergyMeV']);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący klasyczny (newtonowski) model energii kinetycznej cząstki.',
+        outputs: details.outputs, units: details.units, warnings: ['Model klasyczny (nierelatywistyczny): E_kin=½mβ² jest poprawny wyłącznie w granicy β≪1 i celowo NIE zgadza się z modelem relatywistycznym przy dużych β.'], validity: 'Poprawny w granicy nierelatywistycznej β≪1; przy dużych β rozbiega się od realnej fizyki.',
+        assumptions: details.assumptions, visualization: ['numeric', 'graph'], route: model.route,
       };
     }
     case 'chemistry-titration': {

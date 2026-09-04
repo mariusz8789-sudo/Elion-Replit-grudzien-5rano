@@ -87,7 +87,7 @@ function labelsFor(input: CounterfactualComparisonInput): { baseline: string; va
   return { baseline: input.labels?.baseline ?? 'Wariant A', variant: input.labels?.variant ?? 'Wariant B' };
 }
 
-function seedControlFor(baseline: ExperimentRun, variant: ExperimentRun): CounterfactualComparison['seedControl'] {
+export function seedControlFor(baseline: ExperimentRun, variant: ExperimentRun): CounterfactualComparison['seedControl'] {
   const baselineSeed = baseline.provenance.seed;
   const variantSeed = variant.provenance.seed;
   if (baselineSeed !== undefined && variantSeed !== undefined) {
@@ -142,7 +142,7 @@ function sharedNumericMetricsFor(baseline: ExperimentRun, variant: ExperimentRun
   return metrics;
 }
 
-function modelFor(run: ExperimentRun): CounterfactualModelIdentity {
+export function modelFor(run: ExperimentRun): CounterfactualModelIdentity {
   return {
     domainId: run.provenance.domainId,
     modelId: run.provenance.modelId ?? run.request.modelId ?? 'unknown-model',

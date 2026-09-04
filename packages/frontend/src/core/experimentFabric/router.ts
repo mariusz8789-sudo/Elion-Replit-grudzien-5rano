@@ -370,6 +370,12 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf energii relatywistycznej cząstki swobodnej.',
   },
   {
+    id: 'particle-newtonian-energy', domainId: 'particle', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
+    parameters: [number('restMassMeV', 'Masa spoczynkowa', 'MeV/c²', 0, 1e6, 0.511), number('velocityFraction', 'Prędkość β = v/c', '', 0, 0.999999, 0.866)],
+    route: { kind: 'lab', labId: 'particle' }, knowledgeSources: ['particle.md', 'classical-mechanics.md'],
+    rationale: 'Realny graf klasycznej (newtonowskiej) energii kinetycznej E_kin=½mβ² — Model A w Counterfactual Model Tournament przeciwko particle-relativistic-energy (Model B); ten sam wejściowy węzeł, ten sam wyjściowy węzeł kineticEnergyMeV, celowo inna teoria.',
+  },
+  {
     id: 'chemistry-arrhenius', domainId: 'chemistry', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('temperatureK', 'Temperatura', 'K', 200, 1000, 350), number('activationEnergyKJ', 'Energia aktywacji', 'kJ/mol', 0, 300, 60), number('preExponentialLog10', 'log₁₀ A', 'log₁₀(1/s)', -10, 25, 11)],
     route: { kind: 'lab', labId: 'chemistry' }, knowledgeSources: ['chemistry.md', 'thermodynamics.md'],

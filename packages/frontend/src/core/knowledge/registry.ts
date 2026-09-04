@@ -181,10 +181,10 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'particle', title: 'Fizyka cząstek', sourceFile: 'particle.md', scale: 'micro',
-    capability: 'REAL_ENGINE', realModels: ['particle-relativistic-energy'],
-    concepts: ['Model Standardowy', 'kwarki', 'leptony', 'bozony', 'kinematyka relatywistyczna'], parameters: ['restMassMeV', 'velocityFraction'], units: ['MeV', 'MeV/c'],
-    assumptions: ['Pełna nieperturbacyjna QCD i hadronizacja nie są obliczane.'],
-    possibleExperiments: ['oblicz energię relatywistyczną cząstki'], requiredSolver: 'particle-relativistic-energy',
+    capability: 'REAL_ENGINE', realModels: ['particle-relativistic-energy', 'particle-newtonian-energy'],
+    concepts: ['Model Standardowy', 'kwarki', 'leptony', 'bozony', 'kinematyka relatywistyczna', 'mechanika klasyczna'], parameters: ['restMassMeV', 'velocityFraction'], units: ['MeV', 'MeV/c'],
+    assumptions: ['Pełna nieperturbacyjna QCD i hadronizacja nie są obliczane.', 'particle-newtonian-energy jest celowo NIErelatywistycznym modelem konkurencyjnym — poprawnym tylko dla β≪1 — używanym do Counterfactual Model Tournament, nie do rekomendacji.'],
+    possibleExperiments: ['oblicz energię relatywistyczną cząstki', 'porównaj klasyczną i relatywistyczną energię kinetyczną tej samej cząstki'], requiredSolver: 'particle-relativistic-energy / particle-newtonian-energy',
     visualization: ['numeric', 'graph', 'scene-3d'], dependencies: ['spacetime-einstein', 'quantum'], keywords: ['cząstka', 'czastka', 'kwark', 'lepton', 'bozon', 'relatywistyczna energia', 'detektor'],
   },
   {

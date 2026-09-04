@@ -128,6 +128,19 @@ export function peekPendingScenarioTimeline(): ScenarioTimelineHandoff | null {
   return pendingScenarioRunId ? SCENARIO_TIMELINES.get(pendingScenarioRunId) ?? null : null;
 }
 
+/**
+ * Direct, read-only lookup by `runId` — no consumption, no pending-pointer
+ * side effect. Added for `core/world/scientificWorldState.ts`'s
+ * epidemiology adapter, which needs the real per-day series behind an
+ * already-produced `ExperimentRun` (by its `runId`) to project a
+ * `WorldState` timeline. Reuses the SAME retained-world map `runExperiment`
+ * already populates for every real scenario-timeline run — no second
+ * world-state store.
+ */
+export function getScenarioTimelineByRunId(runId: string): ScenarioTimelineHandoff | null {
+  return SCENARIO_TIMELINES.get(runId) ?? null;
+}
+
 export function consumePendingScenarioTimeline(): ScenarioTimelineHandoff | null {
   if (!pendingScenarioRunId) return null;
   const runId = pendingScenarioRunId;

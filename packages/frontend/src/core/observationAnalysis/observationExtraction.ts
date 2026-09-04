@@ -57,6 +57,8 @@ export function extractObservations(run: ScenarioRun): readonly Observation[] {
   }
 
   const lastIndex = run.series.length - 1;
+  add(lastIndex, 'totalDeaths', run.summary.totalDeaths, 'METRIC_VALUE', run.summary.totalDeaths > 0 ? 'NOTABLE' : 'INFO');
+  add(lastIndex, 'attackRate', run.summary.attackRate, 'METRIC_VALUE', 'INFO');
   add(lastIndex, 'experiment.status', run.status, 'EXPERIMENT_COMPLETED', 'INFO');
   return observations;
 }

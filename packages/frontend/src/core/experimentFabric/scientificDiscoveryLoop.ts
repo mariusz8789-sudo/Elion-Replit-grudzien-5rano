@@ -1,6 +1,6 @@
 import {
-  executePreregisteredHypotheses, generateCompetingHypotheses, HYPOTHESIS_PROBLEMS, preregisterHypotheses,
-  selectNextHypothesisExperiment,
+  executePreregisteredHypotheses, executePreregisteredHypothesesAsync, generateCompetingHypotheses,
+  HYPOTHESIS_PROBLEMS, preregisterHypotheses, selectNextHypothesisExperiment,
   type HypothesisLoopResult, type HypothesisOutcome, type HypothesisProblem, type HypothesisStatus,
   type NextHypothesisExperiment,
 } from './hypothesisLoop';
@@ -143,12 +143,45 @@ export interface ScientificDiscoveryLoopResult {
  * computed by execution) → Comparison (`discrimination`) → Next Experiment
  * (`selectNextHypothesisExperiment`).
  */
-export function runScientificDiscoveryLoop(problemId: string): ScientificDiscoveryLoopResult {
+function resolveProblem(problemId: string): HypothesisProblem {
   const problem = HYPOTHESIS_PROBLEMS.find((entry) => entry.problemId === problemId);
   if (problem === undefined) {
     throw new Error(`Nieznany problem badawczy: ${problemId}. Dostępne: ${HYPOTHESIS_PROBLEMS.map((entry) => entry.problemId).join(', ')}.`);
   }
+  return problem;
+}
+
+export function runScientificDiscoveryLoop(problemId: string): ScientificDiscoveryLoopResult {
+  const problem = resolveProblem(problemId);
   const loop = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  return {
+    contractVersion: SCIENTIFIC_DISCOVERY_LOOP_VERSION,
+    problem,
+    loop,
+    evidenceChain: buildEvidenceChain(loop),
+    nextExperiment: selectNextHypothesisExperiment(loop),
+  };
+}
+
+/**
+ * ASYNC / BACKEND-AWARE TWIN OF `runScientificDiscoveryLoop`.
+ *
+ * `HYPOTHESIS_PROBLEMS` already declares questions whose model is
+ * `BACKEND_REAL_ENGINE` (real RDKit, real PySCF) rather than a local
+ * synchronous model — the sync loop above can only report BLOCKED for
+ * those, because `executePreregisteredHypotheses` has no path to the
+ * network. This function changes nothing about the loop's shape: it
+ * calls the already-existing `executePreregisteredHypothesesAsync`
+ * (`hypothesisLoop.ts`), which itself already routes BACKEND_REAL_ENGINE
+ * hypotheses through the real Fabric backend and leaves local models on
+ * the synchronous path unchanged. This is what makes
+ * `runScientificDiscoveryLoop*` a general entry point over the WHOLE
+ * declared `HYPOTHESIS_PROBLEMS` catalog, not only its local-model
+ * subset — no new executor was added.
+ */
+export async function runScientificDiscoveryLoopAsync(problemId: string): Promise<ScientificDiscoveryLoopResult> {
+  const problem = resolveProblem(problemId);
+  const loop = await executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem)));
   return {
     contractVersion: SCIENTIFIC_DISCOVERY_LOOP_VERSION,
     problem,

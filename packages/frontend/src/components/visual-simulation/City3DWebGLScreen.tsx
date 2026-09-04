@@ -16,6 +16,7 @@ import { consumePendingEarthquakeOverlay } from '../../core/simulationRenderer/e
 import { EarthquakeScenarioPanel } from './EarthquakeScenarioPanel';
 import { EvidenceReplayPanel } from './EvidenceReplayPanel';
 import { ScenarioCommandCenterPanel } from './ScenarioCommandCenterPanel';
+import { describeCameraPresetLabel, runLiveExperimentSession, type LiveExperimentSessionResult } from '../../core/virtualLab/liveExperimentSession';
 
 /** Command Center reads existing model and World Engine state only; it does not generate epidemic data or agent routes. */
 /** Musi zgadzać się z EpidemicCity3DSim.hospitalStatusCode — indeks, nie liczba wyniku. */
@@ -122,6 +123,34 @@ export function City3DWebGLScreen() {
     setStats(sim.getStats());
   };
 
+  // LIVE SCIENCE MODE — a real `runScenario()` (existing Scenario Engine,
+  // unchanged) is played back step by step: each observation event calls the
+  // SAME `changeCamera` above. Nothing here renders anything that is not
+  // already in `liveSession`, and `liveSession` itself is one real,
+  // deterministic run — see core/virtualLab/liveExperimentSession.ts.
+  const [liveSession, setLiveSession] = useState<LiveExperimentSessionResult | null>(null);
+  const [liveSessionStep, setLiveSessionStep] = useState(0);
+  const [liveSessionPlaying, setLiveSessionPlaying] = useState(false);
+  const startLiveScience = () => {
+    const session = runLiveExperimentSession('BASELINE', { days: 90, stepsPerDay: 4, baseHospital: { totalBeds: 5, icuBeds: 1, icuShareOfAdmissions: 0.2 } });
+    setLiveSession(session);
+    setLiveSessionStep(0);
+    setLiveSessionPlaying(true);
+    changeCamera(session.cameraTimeline[0]!.preset);
+  };
+  useEffect(() => {
+    if (!liveSessionPlaying || liveSession === null) return;
+    if (liveSessionStep >= liveSession.cameraTimeline.length - 1) { setLiveSessionPlaying(false); return; }
+    const timer = window.setTimeout(() => {
+      const next = liveSessionStep + 1;
+      setLiveSessionStep(next);
+      changeCamera(liveSession.cameraTimeline[next]!.preset);
+    }, 1400);
+    return () => window.clearTimeout(timer);
+  }, [liveSessionPlaying, liveSessionStep, liveSession]);
+  const liveEvent = liveSession?.events[liveSessionStep] ?? null;
+  const liveIsFinal = liveSession !== null && liveSessionStep === liveSession.events.length - 1;
+
   useEffect(() => registerActiveSimControls({ toggleRunning: () => setRunning((value) => !value), reset }), [sim]);
   useEffect(() => registerSimContext({
     labId: 'visual-city',
@@ -194,10 +223,41 @@ export function City3DWebGLScreen() {
         <span className="city-camera-control" role="group" aria-label="Poziom obserwacji świata">
           {CAMERA_PRESETS.map((preset) => <button key={preset.id} className="world-speed" aria-pressed={cameraPreset === preset.id} onClick={() => changeCamera(preset.id)}>{preset.label}</button>)}
         </span>
+        <button className="world-action accent" onClick={startLiveScience}>🎬 LIVE SCIENCE</button>
         <button className="world-action accent" onClick={() => { sim.focusFirstInfected(); setCameraPreset(sim.getCameraPreset()); setStats(sim.getStats()); }}>◉ Śledź zakażonego</button>
         <button className="world-action" onClick={() => { sim.focusLatestTransmission(); setCameraPreset(sim.getCameraPreset()); setStats(sim.getStats()); }}>↗ Ostatnia transmisja</button>
         <button className="world-action ghost" onClick={() => { window.location.hash = '#/city'; }}>Tryb 2D</button>
       </section>
+
+      {liveSession && liveEvent && (
+        <section className="city-world-transport" aria-label="Live Science — obserwacja eksperymentu" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
+          <div className="city-world-signal-row">
+            <span className="city-signal">PYTANIE: {liveSession.question}</span>
+          </div>
+          <div className="city-world-signal-row">
+            <span className="city-signal">HIPOTEZA A: {liveSession.capture.hypotheses[0]}</span>
+          </div>
+          <div className="city-world-signal-row">
+            <span className="city-signal">HIPOTEZA B: {liveSession.capture.hypotheses[1]}</span>
+          </div>
+          <div className="city-world-signal-row">
+            <span className={`city-signal ${liveEvent.type === 'ANOMALY' ? 'live' : ''}`}>
+              OBSERWACJA (dzień {liveEvent.tick}, {describeCameraPresetLabel(liveSession.cameraTimeline[liveSessionStep]!.preset)}): {liveEvent.statement}
+            </span>
+          </div>
+          {liveIsFinal && (
+            <div className="city-world-signal-row">
+              <span className="city-signal live">WYNIK: hipoteza „{liveSession.verdict === 'HOLDS' ? 'capacity holds' : 'capacity exceeded'}" — SUPPORTED (realny przebieg, replay MATCH sprawdzony testem).</span>
+              <button className="world-action" onClick={startLiveScience}>↺ Uruchom ponownie</button>
+            </div>
+          )}
+          {!liveIsFinal && (
+            <div className="city-world-signal-row">
+              <button className="world-action" onClick={() => setLiveSessionPlaying((value) => !value)}>{liveSessionPlaying ? '⏸ Pauza obserwacji' : '▶ Wznów obserwację'}</button>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="city-world-layout">
         <aside className="city-world-sidebar city-world-left" aria-label="Model i parametry epidemii">

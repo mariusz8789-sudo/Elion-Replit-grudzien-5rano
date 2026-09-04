@@ -1,0 +1,13 @@
+{
+  "source": "PubChem PUG REST",
+  "sourceId": "pubchem:CID:2519:properties:adme",
+  "sourceVersion": "PubChem CID 2519 computed properties",
+  "retrievedAt": "2026-08-29",
+  "compoundId": "pubchem:CID:2519",
+  "xLogP": -0.1,
+  "tpsa": 58.4,
+  "hydrogenBondDonorCount": 0,
+  "hydrogenBondAcceptorCount": 3,
+  "rotatableBondCount": 0,
+  "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/2519/property/XLogP,HBondDonorCount,HBondAcceptorCount,TPSA,RotatableBondCount/JSON"
+}

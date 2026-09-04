@@ -1,0 +1,12 @@
+{
+  "title": "Genesis OS",
+  "canvasCount": 2,
+  "cityCanvas": true,
+  "rail": "HOTSPOTY\n4\nkomórki z zakaźnymi\nKLASTRY\n0\nrealne transmisje\nHOSPITAL\nNORMAL\n0 bez opieki\nMOBILITY\n85%\nefektywna mobilność\nROUTES\nNOT_MODELED\natrybucja kontaktów",
+  "scenario": true,
+  "hospital": true,
+  "loading": null,
+  "failed": null,
+  "metrics": null,
+  "consoleEntries": []
+}

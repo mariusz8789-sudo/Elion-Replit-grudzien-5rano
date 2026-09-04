@@ -1,0 +1,123 @@
+{
+  "generatedAt": "2026-08-26T01:27:35.592Z",
+  "methodology": "Real nAgents control; three post-settle readings from existing WebGLRenderer.info observability values.",
+  "rows": [
+    {
+      "population": 260,
+      "samples": [
+        {
+          "text": "OBSERWOWALNOŚĆ\nrenderer\nFPS\n20\nframe\n50.00 ms\nrender\n12.80 ms\ndraw calls\n1504\ntriangles\n583018",
+          "fps": 20,
+          "frameMs": 50,
+          "renderMs": 12.8,
+          "drawCalls": 1504,
+          "triangles": 583018,
+          "canvasCount": 1
+        },
+        {
+          "text": "OBSERWOWALNOŚĆ\nrenderer\nFPS\n20\nframe\n50.00 ms\nrender\n13.40 ms\ndraw calls\n1504\ntriangles\n583018",
+          "fps": 20,
+          "frameMs": 50,
+          "renderMs": 13.4,
+          "drawCalls": 1504,
+          "triangles": 583018,
+          "canvasCount": 1
+        },
+        {
+          "text": "OBSERWOWALNOŚĆ\nrenderer\nFPS\n20\nframe\n50.00 ms\nrender\n13.40 ms\ndraw calls\n1504\ntriangles\n583018",
+          "fps": 20,
+          "frameMs": 50,
+          "renderMs": 13.4,
+          "drawCalls": 1504,
+          "triangles": 583018,
+          "canvasCount": 1
+        }
+      ],
+      "mean": {
+        "frameMs": 50,
+        "renderMs": 13.2,
+        "drawCalls": 1504,
+        "triangles": 583018,
+        "fps": 20
+      }
+    },
+    {
+      "population": 500,
+      "samples": [
+        {
+          "text": "OBSERWOWALNOŚĆ\nrenderer\nFPS\n20\nframe\n50.00 ms\nrender\n13.60 ms\ndraw calls\n1500\ntriangles\n1074546",
+          "fps": 20,
+          "frameMs": 50,
+          "renderMs": 13.6,
+          "drawCalls": 1500,
+          "triangles": 1074546,
+          "canvasCount": 1
+        },
+        {
+          "text": "OBSERWOWALNOŚĆ\nrenderer\nFPS\n20\nframe\n50.00 ms\nrender\n13.50 ms\ndraw calls\n1500\ntriangles\n1074546",
+          "fps": 20,
+          "frameMs": 50,
+          "renderMs": 13.5,
+          "drawCalls": 1500,
+          "triangles": 1074546,
+          "canvasCount": 1
+        },
+        {
+          "text": "OBSERWOWALNOŚĆ\nrenderer\nFPS\n20\nframe\n50.00 ms\nrender\n13.40 ms\ndraw calls\n1500\ntriangles\n1074546",
+          "fps": 20,
+          "frameMs": 50,
+          "renderMs": 13.4,
+          "drawCalls": 1500,
+          "triangles": 1074546,
+          "canvasCount": 1
+        }
+      ],
+      "mean": {
+        "frameMs": 50,
+        "renderMs": 13.5,
+        "drawCalls": 1500,
+        "triangles": 1074546,
+        "fps": 20
+      }
+    },
+    {
+      "population": 1000,
+      "samples": [
+        {
+          "text": "OBSERWOWALNOŚĆ\nrenderer\nFPS\n20\nframe\n50.00 ms\nrender\n14.30 ms\ndraw calls\n1504\ntriangles\n2100018",
+          "fps": 20,
+          "frameMs": 50,
+          "renderMs": 14.3,
+          "drawCalls": 1504,
+          "triangles": 2100018,
+          "canvasCount": 1
+        },
+        {
+          "text": "OBSERWOWALNOŚĆ\nrenderer\nFPS\n20\nframe\n50.00 ms\nrender\n13.20 ms\ndraw calls\n1504\ntriangles\n2100018",
+          "fps": 20,
+          "frameMs": 50,
+          "renderMs": 13.2,
+          "drawCalls": 1504,
+          "triangles": 2100018,
+          "canvasCount": 1
+        },
+        {
+          "text": "OBSERWOWALNOŚĆ\nrenderer\nFPS\n20\nframe\n50.00 ms\nrender\n12.50 ms\ndraw calls\n1504\ntriangles\n2100018",
+          "fps": 20,
+          "frameMs": 50,
+          "renderMs": 12.5,
+          "drawCalls": 1504,
+          "triangles": 2100018,
+          "canvasCount": 1
+        }
+      ],
+      "mean": {
+        "frameMs": 50,
+        "renderMs": 13.33,
+        "drawCalls": 1504,
+        "triangles": 2100018,
+        "fps": 20
+      }
+    }
+  ]
+}

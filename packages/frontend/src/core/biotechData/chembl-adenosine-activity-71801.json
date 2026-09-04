@@ -1,0 +1,44 @@
+{
+  "source": "ChEMBL Web Services",
+  "sourceVersion": "ChEMBL_37",
+  "retrievedAt": "2026-08-29",
+  "molecule": {
+    "moleculeChemblId": "CHEMBL477",
+    "preferredName": "ADENOSINE",
+    "molecularFormula": "C10H13N5O4",
+    "molecularWeight": "267.25",
+    "canonicalSmiles": "Nc1ncnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1O",
+    "inchiKey": "OIRDTQYFTABQOQ-KQYNXXCUSA-N",
+    "alogp": "-1.98",
+    "psa": "139.54",
+    "npLikenessScore": "1.31"
+  },
+  "target": {
+    "targetChemblId": "CHEMBL318",
+    "prefName": "Adenosine receptor A1",
+    "targetType": "SINGLE PROTEIN"
+  },
+  "assay": {
+    "assayChemblId": "CHEMBL639739",
+    "assayType": "B",
+    "description": "Inhibition of binding of [3H]N6-cyclohexyladenosine to adenosine A1 receptor of rat whole brain membranes.",
+    "targetChemblId": "CHEMBL318",
+    "confidenceScore": 8,
+    "confidenceDescription": "Homologous single protein target assigned",
+    "documentChemblId": "CHEMBL1124694"
+  },
+  "activity": {
+    "activityId": 71801,
+    "standardType": "Ki",
+    "standardRelation": "=",
+    "standardValue": "12.8",
+    "standardUnits": "nM",
+    "pchemblValue": "7.89",
+    "documentChemblId": "CHEMBL1124694"
+  },
+  "sourceUrls": {
+    "activity": "https://www.ebi.ac.uk/chembl/api/data/activity/71801.json",
+    "molecule": "https://www.ebi.ac.uk/chembl/api/data/molecule/CHEMBL477.json",
+    "assay": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL639739.json"
+  }
+}

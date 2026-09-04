@@ -1,0 +1,123 @@
+name: Genesis quality gate
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalacja zależności
+        run: npm ci
+
+      - name: Audyt zależności (high/critical)
+        run: npm audit --audit-level=high
+
+      - name: Sprawdzenie białych znaków w zmianie
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="$PUSH_BEFORE"
+          if [ "$EVENT_NAME" = "pull_request" ]; then base="$PR_BASE"; fi
+          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+            git diff --check "$base" "$GITHUB_SHA" -- . ':(exclude,glob)**/*.md' ':(exclude,glob)**/*.markdown'
+          elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^ HEAD -- . ':(exclude,glob)**/*.md' ':(exclude,glob)**/*.markdown'
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testy frontend (single worker)
+        run: npm run test --workspace=packages/frontend -- --maxWorkers=1
+
+      - name: Testy backend
+        run: npm run test --workspace=packages/backend
+
+      - name: Typecheck frontend
+        run: npm exec --workspace=packages/frontend -- tsc --noEmit
+
+      - name: Build produkcyjny frontend
+        run: npm run build
+
+      - name: Artefakt buildu (podgląd PR)
+        uses: actions/upload-artifact@v7
+        with:
+          name: genesis-os-dist
+          path: packages/frontend/dist
+          retention-days: 7
+
+  nist-g3-pinned-artifacts:
+    name: G3 pinned NIST/CODATA atom-bohr artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch and hash official NIST/CODATA artifacts
+        env:
+          GENESIS_NIST_FIXTURE_DIR: artifacts/atom-bohr-nist
+        run: node scripts/fetch-atom-bohr-nist-fixtures.mjs
+      - name: Verify manifest and raw payload hashes
+        env:
+          GENESIS_NIST_FIXTURE_DIR: artifacts/atom-bohr-nist
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          import { join } from 'node:path';
+          const dir = process.env.GENESIS_NIST_FIXTURE_DIR;
+          const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
+          if (manifest.artifacts.length !== 4) throw new Error('G3 requires exactly A1-A4');
+          for (const artifact of manifest.artifacts) {
+            const raw = await readFile(join(dir, artifact.file));
+            const actual = createHash('sha256').update(raw).digest('hex');
+            if (actual !== artifact.sha256) throw new Error(`${artifact.id}: SHA-256 mismatch`);
+            console.log(`G3 VERIFIED ${artifact.id} bytes=${raw.byteLength} sha256=${actual}`);
+          }
+          NODE
+      - name: Upload immutable G3 candidate fixture
+        uses: actions/upload-artifact@v7
+        with:
+          name: atom-bohr-nist-g3-${{ github.sha }}
+          path: artifacts/atom-bohr-nist
+          retention-days: 90
+
+  pyscf-real:
+    name: Real PySCF benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12.3'
+          cache: pip
+          cache-dependency-path: packages/backend/requirements-pyscf.txt
+      - name: Install pinned PySCF runtime
+        run: python -m pip install --disable-pip-version-check -r packages/backend/requirements-pyscf.txt
+      - name: Run real Fabric PySCF contract tests
+        env:
+          GENESIS_PYSCF_PYTHON: python
+        run: node --test packages/backend/src/pyscfFabricApi.test.mjs

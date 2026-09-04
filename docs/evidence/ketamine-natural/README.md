@@ -1,0 +1,22 @@
+# Natural ketamine-like discovery sources
+
+This evidence note records the external sources used by `packages/frontend/src/core/biotechData/ketamineNaturalDiscovery.ts`. It is a provenance aid, not an experimental result.
+
+| Source | Use in GENESIS | Epistemic boundary |
+|---|---|---|
+| [Zorumski, Izumi & Mennerick, *Ketamine: NMDA Receptors and Beyond*, J Neurosci 2016, PMCID: PMC5148235](https://pmc.ncbi.nlm.nih.gov/articles/PMC5148235/) | Ketamine reference profile: unequivocal uncompetitive NMDAR inhibition and use-dependent open-channel block; discussion of subtype/context dependence and competing mechanisms. | Literature-supported reference mechanism only; does not define universal mechanistic equivalence or prove clinical efficacy for any natural candidate. |
+| [Fani et al., *Natural aminosterols inhibit NMDA receptors with low nanomolar potency*, FEBS J 2025, PMCID: PMC12220853](https://pmc.ncbi.nlm.nih.gov/articles/PMC12220853/) | Trodusquemine natural occurrence and direct functional NMDAR evidence: membrane pre-incubation and patch-clamp inhibition of NMDA-induced currents, reported IC50 about 5 nM. | Candidate-specific functional evidence is not ketamine-equivalence, CNS exposure, safety or clinical efficacy. Squalamine is retained as natural/structural context only in this bounded case. |
+| [Liang et al., *Current Evidence of Chinese Herbal Constituents with Effects on NMDA Receptor Blockade*, Pharmaceuticals 2013, PMCID: PMC3817734](https://pmc.ncbi.nlm.nih.gov/articles/PMC3817734/) | Reviewed natural-compound evidence for curcumin and isoliquiritigenin, including NMDA-related calcium/current and binding observations in the cited literature. | Review-level evidence and heterogeneous assays do not establish a shared receptor construct, channel kinetics or therapeutic equivalence. |
+| [Peterson et al., *Agmatine requires GluN2B-containing NMDA receptors...*, PMCID: PMC8255568](https://pmc.ncbi.nlm.nih.gov/articles/PMC8255568/) | Agmatine target/function evidence and GluN2B-dependent preclinical pharmacology. | Preclinical NMDAR evidence does not establish ketamine-like kinetics, antidepressant efficacy or clinical substitutability. |
+| [PubChem CID 3821](https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/3821/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON) | Ketamine identity and structure. | Identity/structure source; no claim about mechanism beyond the literature sources above. |
+| [PubChem CID 9917968](https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/9917968/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON) | Trodusquemine identity and structure. | Identity/structure source; biological claims come from the cited FEBS study. |
+| [PubChem CID 199](https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/199/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON) | Agmatine identity and structure. | Identity/structure source; biological claims come from the cited study. |
+| [PubChem CID 969516](https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/969516/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON) | Curcumin identity and structure. | Identity/structure source; biological claims come from the cited review. |
+| [PubChem CID 638278](https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/638278/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON) | Isoliquiritigenin identity and structure. | Identity/structure source; biological claims come from the cited review. |
+| [PubChem CID 72495](https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/72495/property/Title,CanonicalSMILES,InChIKey,MolecularFormula,MolecularWeight/JSON) | Squalamine identity and structure. | Identity/structure source; candidate-specific NMDAR target/function remains `UNKNOWN` in the bounded comparison. |
+
+## Claim ceiling
+
+The bounded comparison is a deterministic **research-priority prediction** over declared evidence axes. The current result does not establish a natural ketamine substitute, clinical efficacy, clinical safety, CNS exposure, or experimental validation. The next discriminating step remains `REQUIRES_EXPERIMENT`: a pre-registered shared-condition NMDAR functional comparison against ketamine with receptor/selectivity controls and independent replicates.
+
+Retrieved/source review date used in the implementation: `2026-08-30`.

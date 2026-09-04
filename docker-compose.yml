@@ -1,17 +1,19 @@
-version: '3.8'
-
+# Genesis OS — uruchomienie produkcyjne jednym poleceniem:
+#   docker compose up --build
+# Aplikacja: http://localhost:8080 (PWA + /api). Klucz AI: plik .env.
 services:
-  postgres:
-    image: postgres:16-alpine
-    restart: always
-    environment:
-      POSTGRES_USER: elion_user
-      POSTGRES_PASSWORD: elion_password
-      POSTGRES_DB: elion_omega_db
+  genesis:
+    build: .
     ports:
-      - "5432:5432"
+      - '8080:8080'
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GENESIS_AI_MODEL=${GENESIS_AI_MODEL:-claude-opus-4-8}
+      - GENESIS_DB_PATH=/app/packages/backend/data/genesis.db
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - genesis-data:/app/packages/backend/data
+    restart: unless-stopped
 
 volumes:
-  postgres_data:
+  genesis-data:
+    name: genesis-data

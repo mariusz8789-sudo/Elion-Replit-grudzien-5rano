@@ -1,0 +1,10 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.env
+*.log
+*.tsbuildinfo
+**/*.test.ts
+**/*.test.mjs
+**/__tests__

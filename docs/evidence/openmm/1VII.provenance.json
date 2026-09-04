@@ -1,0 +1,16 @@
+{
+  "artifactId": "rcsb-pdb-1VII",
+  "artifactType": "protein-structure-input",
+  "pdbId": "1VII",
+  "sourceProvider": "RCSB Protein Data Bank",
+  "sourceUrl": "https://files.rcsb.org/download/1VII.pdb",
+  "retrievedAt": "2026-08-30",
+  "rawPayloadSha256": "ebecd3d6c0dd9c8b34bcbea9b57c73e4f73986cc674150f0aaa0687db66e77ef",
+  "rawPayloadBytes": 62694,
+  "license": "RCSB PDB data use subject to wwPDB/RCSB PDB policies",
+  "consumer": "packages/backend/src/compute/openmm_worker.py",
+  "runtime": "OpenMM 8.6 CPU",
+  "forceField": "amber14-all.xml + implicit/obc2.xml",
+  "scope": "Bounded 100-1000 step CPU benchmark for runtime, input integrity and reproducibility; not an equilibrium simulation, binding-affinity measurement, biological efficacy claim or clinical result.",
+  "classification": "COMPUTATIONAL_RESULT"
+}

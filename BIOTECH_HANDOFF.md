@@ -1,0 +1,1511 @@
+# GENESIS Main Roadmap Handoff
+
+## Checkpoint state
+
+- **CURRENT HEAD:** `5881521`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` (unchanged)
+- **WORKING TREE:** clean at handoff preparation; final verification required after this documentation update
+- **PUSH:** branch synchronized with `origin/manus/next-gap-observation-analysis`
+
+Do not restart or perform a broad repository audit. Verify only the current branch, HEAD, status and the specific files named in the next GAP.
+
+## Completed commits in this series
+
+- `092c6aa` — `feat(biotech): pin ChEMBL caffeine bioactivity`
+- `a1050ca` — `feat(biotech): expose ChEMBL evidence in fabric`
+- `076cb87` — `feat(memory): persist experiment fabric runs`
+- `a3f0d79` — `feat(science-chat): surface biotech evidence`
+- `97d0631` — `feat(memory-ui): expose fabric provenance`
+- `805e41b` — `feat(memory): route saved runs from science chat`
+- `0a740ab` — `feat(biotech): connect pinned record to discovery`
+- `429a3be` — `feat(core): surface honest result analysis`
+- `322a369` — `feat(core): carry provenance into world handoff`
+- `f2aec5f` — `feat(core): surface replay identity in memory`
+- `d749715` — `docs(core): confirm evidence replay boundary`
+- `22fd2f4` — `docs(core): verify protocol replay path`
+- `3579f64` — `docs(core): verify model request boundary`
+- `fe7491d` — `feat(core): unify scientific result report`
+- `7a9e016` — `feat(core): include evidence replay report status`
+- `4fd50e6` — `feat(core): keep pilot report analysis consistent`
+- `1c4655f` — `feat(core): preserve saved result routes`
+- `83d41cc` — `feat(core): carry result summary into world`
+- `9b8a772` — `feat(core): preserve world result continuity`
+- `1f44a79` — `feat(drug-discovery): expose pinned molecular properties`
+- `94aec37` — `feat(drug-discovery): mark safety as unknown`
+- `8455d34` — `feat(drug-discovery): expose candidate validation path`
+- `77c0d9f` — `feat(drug-discovery): persist discovery context`
+- `f60694b` — `feat(drug-discovery): add pinned GHS safety signal`
+- `b314b68` — `feat(drug-discovery): surface safety provenance`
+- `f6a4e9d` — `feat(drug-discovery): add pinned adme properties`
+- `9c6ff74` — `feat(drug-discovery): compare candidate reports`
+- `ba2ec82` — `feat(drug-discovery): surface pinned reference`
+- `5881521` — `feat(drug-discovery): wire comparison status`
+
+## Completed capability: Result → Analysis → Scientific Memory
+
+The existing `Scientific Memory` now exposes `saveExperimentRunToMemory(run)`. It persists an existing `ExperimentRun` through the existing `saveExperiment` contract, preserving request parameters, finite numeric/series outputs, run status, run ID, run fingerprint, result origin, model ID, engine, model version, summary, warnings and assumptions.
+
+The helper writes two explicit analysis blocks: the Fabric result summary and, when present, the warnings. It does not upgrade status: a completed real engine run remains `completed`/`real-engine`, while a biotech knowledge result remains `knowledge_only`/`knowledge-only` and `epistemicStatus=UNKNOWN`. No new Memory, Evidence or Replay system was created.
+
+Changed files for this piece:
+
+- `packages/frontend/src/core/scienceMemory.ts` — `saveExperimentRunToMemory`.
+- `packages/frontend/src/__tests__/scienceMemoryFabric.test.ts` — round-trip tests for a real executable model and a knowledge-only biotech run.
+
+## Validation
+
+The following completed successfully after this piece:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/scienceMemoryFabric.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Build reports only the existing Vite large-chunk warning. No UI changed, so Chromium was not required. CI is not claimed green because no CI run was performed in this session.
+
+## Real and designed
+
+Real source-backed data remains the pinned ChEMBL record: caffeine `CHEMBL113`, activity `189031`, target `CHEMBL318` Adenosine receptor A1, assay `CHEMBL876556`, `Ki = 41000.0 nM`, release `ChEMBL_37`. The Fabric and Memory changes are deterministic local mappings; they are not biological execution, clinical efficacy, safety assessment or independent observation.
+
+## Parked
+
+- Biological executor remains `NOT_EXECUTED`/`BLOCKED`.
+- Do not promote a single binding record into a full Evidence Pack without hypothesis, baseline/reference, arms, repetition policy, real runs and replay identity.
+- Do not create candidate efficacy/safety scores or infer safety from PubChem/ChEMBL activity.
+- Canonical replay remains parked; no casts or artificial plan IDs.
+- Real independent model ↔ observation comparison remains a larger future gap.
+- Double-Slit / Bloch / Atom-Bohr and G3/NIST remain unrelated/out of scope.
+
+## Completed capability: source-bound result in Science Chat UI
+
+The existing Science Chat now handles `biotechnology` requests through the pinned ChEMBL knowledge path instead of presenting an unusable confirmation plan. Matching caffeine/A1/adenosine queries are executed locally as a deterministic `knowledge_only` lookup, saved through `saveExperimentRunToMemory`, and displayed with status, result origin, target identity, evidence identity, evidence status and provenance. No biological executor is invoked. Unrelated biotech targets remain explicitly unavailable and do not receive unrelated evidence.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`. Added coverage: `packages/frontend/src/__tests__/scienceChatFabricFormat.test.ts`.
+
+Chromium manual check completed on the local frontend: the query `Znajdź naturalnych kandydatów dla targetu A1: kofeina.` displayed `Status: knowledge_only; origin: knowledge-only`, `Adenosine receptor A1`, `chembl:activity:189031`, `LITERATURE_SUPPORTED` and a run provenance fingerprint.
+
+## Completed capability: Scientific Memory UI for Fabric and biotech runs
+
+The existing Scientific Memory screen now renders saved Fabric execution metadata when present: epistemic status, run status, result origin, run ID, run fingerprint, summary, and for biotech records the target candidate ID and evidence IDs. This is a read-only projection of the existing `SavedExperiment` record; it does not create a second memory system, infer efficacy/safety, or turn `knowledge_only` into biological execution.
+
+Changed file: `packages/frontend/src/components/ScientificMemoryScreen.tsx`.
+
+Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed capability: Science Chat → Scientific Memory route
+
+The existing `Pokaż zapisane` action now includes each saved record’s execution status and result origin in the chat list, then routes to `#/memory` when records exist. This gives the user access to the enriched Scientific Memory projection from the same conversation boundary. Empty memory behavior remains in-chat. No new route or storage layer was created.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed capability: source provenance visibility
+
+The pinned biotech provenance is now visible at both user-facing boundaries. Science Chat shows source, source ID, source version and source URL beside the target/evidence identity. Scientific Memory provides a `Provenance źródeł` disclosure with the same fields and an external source link. This remains read-only provenance; it does not upgrade evidence status or imply efficacy, safety or execution.
+
+Changed files: `packages/frontend/src/components/ScienceChat.tsx`, `packages/frontend/src/components/ScientificMemoryScreen.tsx`.
+
+Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Parked semantic blocker: biotech preregistration
+
+The current scientific protocol contract requires executable model requests, baseline/variant arms, repetition policy and real runs. A literature-backed ChEMBL binding record cannot honestly populate those fields. This is parked rather than represented as a false biological protocol.
+
+## Parked source-expansion check
+
+A limited ChEMBL check found additional caffeine/A1 activities with different assay contexts and measures, including duplicate/heterogeneous Ki and IC50 records; one candidate carries a ChEMBL data-validity warning. No second fixture was added because selecting it without a deliberate relation policy would weaken provenance semantics. Source expansion is parked until a clear relation-selection rule and fixture schema exist.
+
+## Completed capability: ChEMBL → Candidate Discovery chain
+
+The pinned caffeine/A1 ChEMBL record now flows through existing contracts into a `TherapeuticCandidate` with `UNKNOWN` status, an explainable research-priority `CandidateRanking` with `PREDICTION` status, a `TherapeuticHypothesis` with `HYPOTHESIS` status, and a `CandidateDiscoveryReport` carrying target/evidence/provenance identities. The chain explicitly does not create efficacy, safety or mechanism claims. No new contract system was introduced.
+
+Changed files: `packages/frontend/src/core/biotechData/chembl.ts`, `packages/frontend/src/__tests__/chembl.test.ts`.
+
+Validation completed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Biotech status: pause for this session
+
+The remaining Biotech items are parked unless a very small, low-cost integration appears. In particular, safety needs a real source and explicit uncertainty, while preregistration needs an executable biological protocol; neither will be invented here. The additional ChEMBL relation search remains parked because available records are heterogeneous/duplicate and one candidate carries a data-validity warning.
+
+## Completed Core capability: typed result → honest analysis in Science Chat
+
+The existing `formatFabricRun` now renders `analyzeExperimentResult(run.result)` beside the typed result, status, origin, outputs and provenance. For a real completed run it states that the analysis covers one result and does not infer trends; for `knowledge_only` or other non-completed statuses it remains explicitly blocked. No new analysis contract or solver was added.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation completed: targeted formatter/memory tests, then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed Core capability: real result → World/3D provenance handoff
+
+The existing `epidemic-city` World handoff now carries the original run fingerprint and explicit `real-engine` origin together with the original simulation reference. City3D renders a compact real-run provenance readout, so the scene cannot silently appear as a disconnected second simulation. No new solver or World state was created.
+
+Changed files: `packages/frontend/src/core/experimentFabric/worldHandoff.ts`, `packages/frontend/src/core/experimentFabric/executor.ts`, `packages/frontend/src/components/visual-simulation/City3DWebGLScreen.tsx`.
+
+Validation completed: targeted Experiment Fabric tests (107 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed Core capability: Evidence/Replay identity → Scientific Memory
+
+Scientific Memory now shows the existing replay identity (`capsuleId`, `planId`, `confirmationId`) alongside an Evidence Pack ID when those fields are present. This is a read-only projection of persisted metadata; it does not create an Evidence Pack from a single run and does not claim replayability where protocol semantics are incomplete.
+
+Changed file: `packages/frontend/src/components/ScientificMemoryScreen.tsx`.
+
+Validation completed: targeted memory tests (18 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed Core capability: Evidence Pack → Replay user boundary confirmed
+
+The existing Scientific Memory already lists local multi-run Evidence Packs, classifies their persisted replay verdict (`MATCH`, `DRIFT` or `BLOCKED`), exposes the stored run count and model identity, and routes `Otwórz do jawnego rerun` back to the existing Experiment Pilot. It also states that a snapshot is not a new backend execution. No additional UI or contract was added because this integration already exists.
+
+This GAP is therefore parked as already satisfied by the current system. No code change was necessary beyond documenting the decision.
+
+## Parked Core GAP: model → independent real observation
+
+The existing `compareBridge` and `experimentComparison` cover model-vs-model or replay/comparison flows, not an independently measured observation. No trustworthy external observation fixture is currently available at this boundary. This is parked to avoid using model inputs, synthetic outputs or a second model as an alleged observation; no new contract was added.
+
+## Completed Core capability: Protocol/A-B → Evidence Pack → Replay persistence verified
+
+The existing Experiment Pilot already creates the multi-run `ScientificEvidencePack`, persists it through `saveScientificEvidencePack`, indexes it through `saveScientificEvidencePackToMemory`, builds the replay capsule, and exposes the replay verdict plus explicit rerun action. This path is not a single-run shortcut and retains the existing real-run validation. No code change was necessary; the result is documented here to avoid duplicating the system.
+
+## Completed Core capability: model selection → Structured Request verified
+
+Experiment Pilot already uses the canonical `buildStructuredRequestFromModel` builder to fill declared defaults, preserve model identity and seed, and feed the resulting `StructuredExperimentRequest` into the existing plan/confirmation/Fabric flow. The builder is covered by the existing Experiment Pilot tests. No duplicate request path was introduced.
+
+## Completed Core capability: unified user-facing scientific result report
+
+Science Chat now presents one explicit `SCIENTIFIC RESULT REPORT` from the existing `ExperimentRun`: original question, selected model, execution status/origin, epistemic classification, typed outputs, existing analysis, route, warnings, source/provenance, Evidence interpretation and Replay boundary. The report distinguishes `EXECUTED_REAL_ENGINE`, `KNOWLEDGE_ONLY_NOT_EXECUTED`, `SCENARIO_OR_HYPOTHETICAL_NOT_MEASUREMENT` and `NOT_EXECUTED_OR_BLOCKED`. It states that a single run is not an Evidence Pack and that Replay requires existing capsule/protocol semantics.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation completed: targeted report/ChEMBL tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed Core capability: confirmed report includes Evidence/A-B/Replay status
+
+The confirmed Science Chat flow now appends Evidence Pack status, A/B status and an explicit Replay status to the same `SCIENTIFIC RESULT REPORT` response. A hypothetical visualization is labeled `NOT_CREATED`/`NOT_AVAILABLE`; ordinary single-run confirmations remain `PROTOCOL_REQUIRED`, `VARIANT_REQUIRED` and `NOT_ESTABLISHED` rather than suggesting a completed Evidence Pack or replay. No second reporting system was created.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation completed: targeted Science Chat/Experiment Fabric tests (109 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed Core capability: confirmed report analysis in Experiment Pilot
+
+The confirmed result view in Experiment Pilot now renders the same existing `analyzeExperimentResult` blocks used by Science Chat. This keeps summary, typed outputs, honest single-run analysis, warnings, provenance and route in one consistent user-facing flow after confirmation. Non-completed statuses remain blocked by the existing analysis helper. No second reporting system was created.
+
+Changed file: `packages/frontend/src/components/ExperimentPilotScreen.tsx`.
+
+Validation completed: targeted Pilot/Science Chat tests (7 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed Core capability: saved result route preserved across Memory
+
+Scientific Memory now persists the existing `ExperimentRun.result.route` for canonical Fabric runs. Reopening a saved lab result uses the recorded lab route; hypothetical visualization uses its recorded hash; ephemeral `live-world` records are sent to the existing Pilot with an explicit notice instead of incorrectly opening a lab, because the session-bound World instance cannot be reconstructed from local memory alone. Legacy records without route retain the prior fallback. The UI displays the route kind.
+
+Changed files: `packages/frontend/src/core/scienceMemory.ts`, `packages/frontend/src/components/ScientificMemoryScreen.tsx`, `packages/frontend/src/__tests__/scienceMemoryFabric.test.ts`.
+
+Validation completed: targeted Memory tests (18 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed Core capability: result summary preserved in World/3D handoff
+
+The existing real `epidemic-city` handoff now carries the canonical run summary together with runId, fingerprint and `real-engine` origin. City3D displays that summary in the locked same-world provenance panel, so the World view does not silently detach from the user-facing scientific report. The scene and simulation mechanics remain unchanged.
+
+Changed files: `packages/frontend/src/core/experimentFabric/worldHandoff.ts`, `packages/frontend/src/core/experimentFabric/executor.ts`, `packages/frontend/src/components/visual-simulation/City3DWebGLScreen.tsx`.
+
+Validation completed: targeted World/Fabric tests (109 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed drug-discovery capability: PubChem molecular properties → ChEMBL discovery result
+
+The existing pinned PubChem CID 2519 fixture now exposes verified molecular formula `C8H10N4O2`, molecular weight `194.19`, canonical SMILES and InChIKey alongside the existing ChEMBL activity/target/evidence. The ChEMBL discovery mapper verifies PubChem/ChEMBL compound identity, and the existing Science Chat knowledge-only result presents the properties without upgrading them to efficacy, safety or biological execution claims.
+
+Changed files: `packages/frontend/src/core/biotechData/pubchem.ts`, `packages/frontend/src/core/biotechData/chembl.ts`, `packages/frontend/src/core/experimentFabric/executor.ts`.
+
+Validation completed: targeted PubChem/ChEMBL and Science Chat tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed drug-discovery capability: explicit Safety UNKNOWN boundary
+
+The existing user-facing biotech report now states `Safety / ADME-Tox: UNKNOWN` when the result is biotechnology knowledge-only. The report explicitly says that no source-backed safety record is attached and that the ChEMBL binding record does not establish safety. No arbitrary safety score or unsupported toxicity claim was added.
+
+Changed file: `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation completed: targeted ChEMBL/Science Chat tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed drug-discovery capability: candidate → ranking → hypothesis → report → validation path
+
+The existing pinned ChEMBL knowledge-only Fabric result now carries candidate identity/status, deterministic explainable ranking score/status/rationale/uncertainty, hypothesis identity/status, discovery report ID and an explicit `NOT_EXECUTED / BLOCKED — biological executor unavailable` validation path. This reuses the existing `buildPinnedChEMBLCaffeineDiscovery` chain and does not imply efficacy, safety or biological execution.
+
+Changed file: `packages/frontend/src/core/experimentFabric/executor.ts`.
+
+Validation completed: targeted ChEMBL/Science Chat tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed drug-discovery capability: Candidate → Ranking → Hypothesis → Report → Memory
+
+`saveExperimentRunToMemory` now preserves the existing source-backed biotech chain in the same Scientific Memory record when a Fabric result carries the canonical IDs: candidate ID, hypothesis ID/status, discovery report ID, evidence ID, target/evidence provenance and a deterministic discovery-chain analysis containing ranking status/score/rationale plus the explicit validation path. No second report or memory system was created.
+
+Changed file: `packages/frontend/src/core/scienceMemory.ts`.
+
+Validation completed: targeted Memory/ChEMBL tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed drug-discovery capability: real PubChem GHS SafetySignal
+
+Added a pinned PubChem PUG View GHS record for caffeine CID 2519 and mapped it through the existing `SafetySignal` contract. The record preserves PubChem source ID/reference, retrieval date, source URL, signal word `Danger`, hazard statements H301/H332/H360, `LITERATURE_SUPPORTED` status, `MODERATE` evidence quality and explicit uncertainty. The existing ChEMBL discovery chain now attaches that safety signal to the candidate, hypothesis and deterministic research-priority ranking; safety remains a hazard-classification signal, not a clinical safety conclusion or efficacy probability.
+
+Changed files: `packages/frontend/src/core/biotechData/pubchem-ghs-2519.json`, `packages/frontend/src/core/biotechData/safety.ts`, `packages/frontend/src/core/biotechData/chembl.ts`.
+
+Validation completed: targeted safety/ChEMBL tests (6 passed), then `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed drug-discovery capability: SafetySignal in user-facing report
+
+The existing Fabric biotech result now carries the pinned PubChem GHS SafetySignal ID, status, evidence quality, hazard description and source provenance. Science Chat renders this as a safety section with source/source ID/URL and explicitly labels it as hazard classification rather than a clinical safety conclusion. The report falls back to `Safety / ADME-Tox: UNKNOWN` only when no signal is attached.
+
+Changed files: `packages/frontend/src/core/experimentFabric/executor.ts`, `packages/frontend/src/components/ScienceChat.tsx`.
+
+Validation: targeted ChEMBL/Science Chat tests (6 passed); the first full build exposed one optional-URL type error, fixed by normalizing the source URL; rerun full validation passed: `npm test` (271 passed, 40 skipped, 0 failed), `npm run build`, `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed drug-discovery capability: pinned ADME properties foundation
+
+The existing PubChem mapper now carries a pinned PubChem PUG REST record for CID 2519 with XLogP, TPSA, H-bond donor/acceptor counts and rotatable-bond count. The existing biotech Fabric result exposes these fields and their independent source/source ID/source URL. Science Chat renders them as `ADME properties (computed)` and explicitly states they are not an ADME/Tox outcome or clinical prediction. Safety remains separately represented by the pinned GHS SafetySignal; no toxicity or efficacy inference was added.
+
+Changed files: `packages/frontend/src/core/biotechData/pubchem-adme-2519.json`, `packages/frontend/src/core/biotechData/pubchem.ts`, `packages/frontend/src/core/experimentFabric/executor.ts`, `packages/frontend/src/components/ScienceChat.tsx`, `packages/frontend/src/__tests__/chembl.test.ts`.
+
+Validation: `npm test` (272 passed, 40 skipped, 0 failed), `npm run build` (includes `tsc -b`), `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed drug-discovery capability: multi-candidate comparison contract
+
+The existing candidate/discovery contract now exposes `compareCandidateDiscoveryReports(reports)`. It accepts multiple source-backed `CandidateDiscoveryReport` records with their existing deterministic research-priority rankings, rejects missing/mismatched rankings and duplicate candidate IDs, sorts by score with stable candidate-ID tie-break, computes delta-from-top, preserves provenance IDs, and fingerprints the comparison. The output is explicitly `PREDICTION` and states that ordering is research priority only—not efficacy, safety, clinical suitability or probability. No second molecule was fabricated and no biological execution was claimed.
+
+Changed files: `packages/frontend/src/core/biotechDiscoveryContract.ts`, `packages/frontend/src/__tests__/biotechDiscoveryContract.test.ts`.
+
+Validation: targeted contract test and build/typecheck passed; full `npm test` passed (271 passed, 40 skipped, 0 failed), `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## Completed drug-discovery capability: source-backed context in Drug Discovery workspace
+
+The existing `DrugDiscoveryScreen` now shows a read-only pinned reference card above the project-owned backend workspace. It renders the real Caffeine → ChEMBL A1 binding record, PubChem computed ADME properties, deterministic research-priority score and source link. The card explicitly says `knowledge_only`, `LITERATURE_SUPPORTED` applies to the binding record, `PREDICTION` applies only to research priority, and no biological experiment was executed. Project candidates/pasports remain separate; no duplicate candidate contract or backend record was created.
+
+Changed file: `packages/frontend/src/components/DrugDiscoveryScreen.tsx`.
+
+Validation: targeted ChEMBL/contract tests (14 passed), initial build caught and corrected an incorrect `activity` access; corrected targeted tests and build passed, then full `npm test` (271 passed, 40 skipped, 0 failed), `npm run lint`, and `git diff --check`. Build retains only the existing Vite large-chunk warning.
+
+## NEXT PRIORITY — Genesis core integration
+
+The source-backed UI card now calls the existing multi-candidate comparator with the one available pinned report and displays `NOT_ESTABLISHED · requires ≥2 comparable reports`; this is an honest one-candidate state, not a comparison claim.
+
+Biotech discovery is now a source-backed foundation with UI exposure. Switch focus back to the main Genesis loop. The highest-value parked item is model → independent real observation comparison. An existing pinned USGS public-real-data fixture is replayable and provenance-complete (`USGS-01646500`, discharge parameter `00060`, provisional, 10 observations), but its own contract marks `genesisModelComparisonStatus=VERIFY_REQUIRED`: the current Genesis models do not predict open-channel stream discharge, so the fixture cannot honestly be compared to them. Keep this parked rather than relabeling an exogenous input or model output as an observation. Next core work should target a truly compatible observation/model pair or another integration GAP.
+
+## Completed drug-discovery capability: comparator wired into UI boundary
+
+`DrugDiscoveryScreen` now invokes `compareCandidateDiscoveryReports` for the available pinned report and surfaces the resulting one-candidate state next to the research-priority prediction. The UI does not claim a two-candidate comparison until at least two comparable source-backed reports exist.
+
+Changed file: `packages/frontend/src/components/DrugDiscoveryScreen.tsx`.
+
+Validation: targeted tests and build/typecheck passed; full `npm test` (271 passed, 40 skipped, 0 failed), `npm run lint`, and `git diff --check` passed. Build retains only the existing Vite large-chunk warning.
+
+## Observation investigation result
+
+The repository already contains `docs/evidence/usgs/USGS-01646500-00060-normalized-observation.json` plus raw payload and station metadata. Its tests verify real station/series identity, units, timestamps, quality fields, pinned hashes, deterministic replay drift detection and the explicit incompatibility reason. No new adapter was added because the existing comparison surface is epidemic model-vs-model, while the available USGS series is hydrology and the current pump-pipe model treats flow as an input rather than predicting stream discharge.
+
+## Conservative readiness levels (orientational)
+
+These are approximate readiness assessments, not measured coverage percentages: Knowledge **~85%**, Engines / Models **~75%**, Experiment Fabric **~85%**, Evidence / Replay **~80%**, World / 3D **~75%**, Science Chat **~85%**, End-to-End **~80%**, Biotech Foundation **~85%**, Real Drug Discovery **~70%**, and Model ↔ Real Observation **~25%**. The lower drug-discovery level reflects the absence of a validated biological executor and full ADME/Tox outcomes. The lower observation level reflects the absence of a semantically compatible model/independent observation pair.
+
+## What is actually working
+
+The working Genesis path is Science Chat → Structured Request → model selection → Experiment Fabric → existing executor → real typed result or explicit knowledge-only result → honest analysis → World/3D handoff where semantically valid → evidence/provenance → Scientific Memory → replay boundary. Protocol/A-B multi-run Evidence Pack creation, persisted replay verdicts and explicit rerun boundaries already exist. The biotech path is PubChem compound identity → ChEMBL bioactivity → BiologicalTarget/BiologicalEvidence → candidate → research-priority ranking → hypothesis/discovery report → PubChem GHS hazard signal → pinned ADME properties → multi-candidate comparison contract → user-facing Drug Discovery workspace.
+
+## Scientific integrity boundaries
+
+PubChem and ChEMBL are real pinned sources. Safety is a real hazard classification, not a complete clinical safety assessment. ADME currently means pinned molecular properties, not a full ADME/Tox outcome. Drug Discovery has a demonstrable source-backed workflow, but not a validated drug-discovery engine. Model ↔ independent real observation is not closed. The pinned USGS observation must remain `VERIFY_REQUIRED`; it is not ground truth for the current models because the semantic variables do not match.
+
+## Next large gaps
+
+1. Result → existing World/3D visualization with a real result only where mapping is semantically valid.
+2. Minimal preregistered protocol/A-B contract with hypothesis, baseline/reference, arms, repetition policy, execution and replay; park if semantics are insufficient.
+3. Infrastructure for the first genuine model ↔ independent real observation comparison; never use model inputs as observations.
+4. Continue pinned real-source expansion with provenance rather than live scraper sprawl.
+
+## Final stop checkpoint for the next Manus
+
+Do not start from the beginning and do not repeat closed GAPs. Start with the current branch and this handoff. The next large GAP is **MODEL ↔ INDEPENDENT REAL OBSERVATION**: find a genuinely compatible pair, then implement `MODEL → PREDICTION ↔ INDEPENDENT REAL OBSERVATION → COMPARISON → MATCH / DRIFT / INCONCLUSIVE → CALIBRATION`. Do not use model inputs, synthetic outputs, unrelated USGS discharge, another model, invented observations, unsupported efficacy/safety, fictional DOIs or probabilities. If no compatible pair is found, park it with the exact semantic blocker and move to the next valuable core integration.
+
+The current repo already contains the functioning Core and real PubChem + ChEMBL chain. After the observation work, return to Biotech and move Real Drug Discovery toward ~90% through real demonstrable capability, not contract count. Work in large pieces: implement → test → commit → push → handoff → next.
+
+## Exact continuation instruction
+
+Confirm branch, HEAD, status and `origin/main`. Read this handoff. Inspect only the current Science Chat/UI result boundary and relevant tests. Implement one large, logically complete GAP; run targeted tests, full tests as needed, typecheck/build, lint and `git diff --check`; update this handoff; commit; push; then continue to the next GAP. Never create ZIP files. If interrupted, first make the current scope consistent, test it, update this handoff, commit and push.
+
+## Completed Core capability: AME2020 → nuclear SEMF observation admission
+
+The existing `nuclear-semf` model now has a minimal source-backed observation adapter for the first compatible model/observation pair. The pinned official AME2020 `mass_1.mas20` raw file is stored at `docs/evidence/ame2020/mass_1.mas20.txt` with SHA-256 `e8599c6d7f724fac91934e59f1b9de8fb8f63e820f4b39456b790665ed2a3307`. The admission fixture selects Fe-56, Ni-62 and Pb-208 before comparison and preserves source units, uncertainty, source lines, transformation identity and estimated-value semantics.
+
+`packages/frontend/src/core/observation/nuclearAme2020.ts` reuses the existing `semfBindingPerNucleon`, `canonicalJson` and `fnv1a` utilities. It produces per-nuclide prediction, independent observation, absolute/relative error, declared model-error tolerance, `MATCH`/`DRIFT`/`INCONCLUSIVE`, provenance fingerprint, aggregate MAE/RMSE and an explicit `INSUFFICIENT_DATA` calibration status. Estimated records are never treated as measurements. No second Evidence, Memory or Replay system was created; no network refetch occurs at runtime.
+
+The three real records currently classify as `DRIFT`, `DRIFT`, `MATCH` under the preregistered 0.05 MeV/nucleon tolerance. This is a demonstrated comparison path, not a calibrated accuracy claim. Existing Evidence Pack/Memory/Replay integration remains the next wiring step; source terms are still marked `SOURCE_TERMS_REVIEW_REQUIRED`.
+
+Changed files:
+
+- `docs/evidence/ame2020/mass_1.mas20.txt`
+- `docs/evidence/ame2020/AME2020-NUCLEAR-SEMF-ADMISSION.json`
+- `packages/frontend/src/core/observation/nuclearAme2020.ts`
+- `packages/frontend/src/__tests__/nuclearAme2020.test.ts`
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/nuclearAme2020.test.ts
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests: 4 passed. Build and lint passed. Build retains only the existing Vite large-chunk warning. No UI changed, so Chromium was not required.
+
+## Updated continuation checkpoint
+
+- **CURRENT HEAD before this handoff update:** `7ccb8d6`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **CURRENT READINESS:** Model ↔ independent real observation increased from ~25% to an admission/comparison foundation; calibration and Evidence/Memory/Replay wiring remain incomplete.
+- **PARKED:** source terms review, full calibration, biological executor, USGS hydrology comparison, Atom-Bohr G3, live scraper expansion.
+- **NEXT LARGE GAP:** connect this existing comparison result to the existing Scientific Evidence Pack / Scientific Memory / Replay boundary, with explicit external-observation provenance and no-network replay, then expose the result in the existing user-facing scientific report. Do not claim calibration until the preregistered observation set is sufficiently large.
+
+## Completed Core capability: AME2020 comparison in report and Scientific Memory
+
+The existing `ScienceChat.formatFabricRun` now appends the source-backed AME2020 comparison when the selected model is `nuclear-semf`, including independent-observation source URL, raw SHA-256, per-nuclide `MATCH`/`DRIFT` statuses, MAE, RMSE and `INSUFFICIENT_DATA` calibration status. The existing `saveExperimentRunToMemory` path persists the same comparison as an `external-observation-comparison` analysis block in the existing Scientific Memory record. No second report, memory, evidence or replay system was introduced.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/nuclearAme2020.test.ts src/__tests__/scienceChatFabricFormat.test.ts src/__tests__/scienceMemoryFabric.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests: 8 passed. Full test suite, build, lint and diff check passed. Build retains only the existing Vite large-chunk warning. No UI layout changed, so Chromium was not required.
+
+- **CURRENT HEAD before this handoff update:** `1077f9b`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** preserve the structured AME2020 comparison in the existing Evidence Pack / Replay data boundary and expose it in the existing Scientific Memory view, while keeping the comparison explicitly independent-observation data and calibration `INSUFFICIENT_DATA`.
+
+## Completed Core capability: structured external observation in Evidence Pack and Memory
+
+The existing `ScientificEvidencePack` now optionally carries the structured AME2020 comparison when its preregistered hypothesis uses the existing `nuclear-semf` model. The projection preserves per-nuclide prediction/observation/status, MAE/RMSE, calibration status, source URL, raw SHA-256, transform identity and replay input declaration. Protocols without a compatible observation remain unchanged and do not receive unrelated data.
+
+The existing `ScientificMemoryScreen` now renders the comparison status, error metrics, calibration boundary and AME2020 provenance inside the already persisted Evidence Pack view. Existing replay verdicts and explicit rerun actions are unchanged; this source comparison is not mislabeled as a replay or a calibrated accuracy claim. No second Evidence, Memory or Replay system was created.
+
+Changed files:
+
+- `packages/frontend/src/core/experimentFabric/evidencePack.ts`
+- `packages/frontend/src/components/ScientificMemoryScreen.tsx`
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/experimentFabric.test.ts src/__tests__/scienceMemoryFabric.test.ts src/__tests__/nuclearAme2020.test.ts src/__tests__/EvidenceReplayPanel.test.tsx
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests: 115 passed. Full test suite, build, lint and diff check passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `e2fde79`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** add a no-network replay verifier for the structured external-observation fixture and expose `MATCH / DRIFT / BLOCKED` for source-integrity changes without claiming a fresh measurement or calibrated accuracy.
+
+## Completed Core capability: no-network AME2020 replay integrity
+
+The existing AME2020 observation adapter now exposes `replayAme2020ObservationFixture`, which verifies the pinned raw SHA-256, transformation identity, explicit no-network replay declaration and exact admitted observation records. It returns `MATCH` for the unchanged fixture, `DRIFT` for changed source values or transformation identity, and `BLOCKED` when the replay input is empty or requests a network source. The verifier is an integrity boundary, not a claim of fresh measurement or model calibration.
+
+The structured comparison now carries this replay result through the existing Evidence Pack serialization and Scientific Memory projection. Existing arm replay verdicts and rerun actions remain unchanged.
+
+Changed file:
+
+- `packages/frontend/src/core/observation/nuclearAme2020.ts`
+- `packages/frontend/src/__tests__/nuclearAme2020.test.ts`
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/nuclearAme2020.test.ts src/__tests__/experimentFabric.test.ts src/__tests__/scienceMemoryFabric.test.ts src/__tests__/scienceChatFabricFormat.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused and full validation passed. The AME2020 tests now cover MATCH, DRIFT and BLOCKED replay outcomes. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `cd436ca`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** complete the user-facing comparison/replay disclosure in the existing Experiment Pilot result boundary, then evaluate whether the preregistered AME2020 observation set can be expanded without weakening source semantics. Calibration remains `INSUFFICIENT_DATA`.
+
+## Completed Core capability: Experiment Pilot external-observation disclosure
+
+The existing Experiment Pilot confirmed-result boundary now renders the AME2020 prediction-versus-independent-observation comparison for `nuclear-semf`, including per-nuclide `MATCH`/`DRIFT`, MAE/RMSE, calibration status, no-network replay status, source URL and raw SHA-256. It explicitly states that this is not a fresh measurement or calibrated model accuracy. Other models and routes remain unchanged.
+
+Changed file: `packages/frontend/src/components/ExperimentPilotScreen.tsx`.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/experimentPilot.test.ts src/__tests__/nuclearAme2020.test.ts src/__tests__/experimentFabric.test.ts
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests, build, lint and diff check passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `6d0f53a`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** wire the structured external-observation comparison into the existing replay/export boundary only if the existing Evidence Pack semantics can preserve it without falsely treating external observations as model-run arms; otherwise keep the honest parked boundary and expand the preregistered AME2020 set with additional non-estimated records.
+
+## Completed Core capability: expanded AME2020 error-distribution panel
+
+The pinned AME2020 comparison panel now contains ten fixed, non-estimated records spanning light, mid-mass and heavy nuclei plus odd-A and shell-sensitive cases: C-12, O-16, Ca-40, Fe-56, Co-59, Ni-62, Sn-120, Xe-132, Pb-208 and U-238. The panel was selected under a fixed policy from the already pinned raw file; no values were fabricated and no model tuning was performed after seeing errors.
+
+The comparison now exposes an error-distribution analysis path and marks calibration as `AVAILABLE` only in the narrow sense that the preregistered panel is large enough for analysis. It still explicitly refuses to assert a calibrated accuracy percentage; model-error calibration methodology and uncertainty decomposition remain future work.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/nuclearAme2020.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests: 5 passed. Full test suite, build, lint and diff check passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `8b256d1`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** define and implement a formal, preregistered calibration method over the existing error distribution, or park calibration if the current SEMF model-error policy cannot be scientifically justified. Do not convert the ten-record panel into a probability or clinical-style accuracy claim.
+
+## Completed Core capability: transparent AME2020 calibration path
+
+The AME2020 comparison now exposes a formal `SIGNED_RESIDUAL_DISTRIBUTION` path over the fixed ten-nuclide panel: sample count, mean signed residual, residual standard deviation and maximum absolute error. The result carries the explicit claim boundary `NO_CALIBRATED_ACCURACY`; no probability, accuracy percentage or clinical-style confidence was generated. Science Chat and Experiment Pilot now display this path alongside the existing MAE/RMSE, source provenance and replay status.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/nuclearAme2020.test.ts src/__tests__/experimentFabric.test.ts src/__tests__/experimentPilot.test.ts src/__tests__/scienceChatFabricFormat.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused and full validation passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `e7d0b93`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** decide and implement the existing Evidence Pack replay/export treatment for external observations only if its semantics remain distinct from model-run arms; otherwise keep the comparison as a source-backed validation attachment and move to the next high-value Genesis integration.
+
+## Completed Core capability: Evidence Pack replay honors external-observation integrity
+
+The existing `compareScientificEvidencePacks` and `getStoredEvidencePackReplayVerdict` now inspect the structured external-observation replay result. A blocked external fixture yields `BLOCKED`, a source or transformation drift yields `DRIFT`, and an overall Evidence Pack cannot be reported as `MATCH` when its pinned external observation is not intact. Protocol arm replay semantics remain unchanged; no second replay system was created.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/experimentFabric.test.ts src/__tests__/evidenceReplayIntegration.test.ts src/__tests__/EvidenceReplayPanel.test.tsx src/__tests__/nuclearAme2020.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused and full validation passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `73ebf34`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** add dedicated regression fixtures for Evidence Pack external-observation `MATCH`/`DRIFT`/`BLOCKED` verdicts, then continue the core end-to-end loop or park if the remaining semantics require a new real source.
+
+## Completed Core capability: external-observation replay regression coverage
+
+Added `evidencePackObservationReplay.test.ts` using the existing Evidence Pack and replay contracts. The regression fixtures prove that an intact pinned AME2020 comparison remains `MATCH`, a source-integrity `DRIFT` downgrades the overall pack verdict, and a `BLOCKED` external replay blocks the overall verdict. No new replay or evidence store was introduced.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/evidencePackObservationReplay.test.ts src/__tests__/evidenceReplayIntegration.test.ts src/__tests__/nuclearAme2020.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused tests: 13 passed. Full test suite, build, lint and diff check passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `109a100`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** continue the Genesis end-to-end observation path only where an existing contract can carry it honestly; otherwise move to the next real biotech evidence integration rather than inflating the nuclear panel with unsupported claims.
+
+## Completed Biotech Foundation capability: assay-level ChEMBL semantics
+
+The existing pinned caffeine/A1 card now displays the exact activity type (`Ki`), relation, value and units, ChEMBL activity identity, assay identity (`CHEMBL876556`) and the pinned assay description. The UI labels it as an in-vitro binding record and explicitly excludes efficacy, safety and clinical-outcome interpretation. This is a read-only projection of the existing source-backed record; no second evidence, ranking or biological-executor path was created.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/chembl.test.ts src/__tests__/biotechExperimentFabric.test.ts src/__tests__/scienceChatFabricFormat.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused and full validation passed. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `8a5771a`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **NEXT LARGE GAP:** real biological execution remains correctly parked; do not infer efficacy or safety from the ChEMBL binding record. Continue only with another source-backed provenance/disclosure improvement or a genuinely available biological executor.
+
+## Completed Biotech Foundation capability: evidence versus clinical efficacy separation
+
+The existing `CandidateDiscoveryReport` now carries two explicit dimensions: `scientificEvidenceStatus` and `clinicalEfficacy`. The pinned ChEMBL caffeine/A1 report is `scientificEvidenceStatus=HYPOTHESIS` and `clinicalEfficacy=UNKNOWN`. The existing Drug Discovery UI displays both statuses. This prevents a source-backed in-vitro binding record or research-priority prediction from being read as a human clinical efficacy claim. No safety, efficacy or probability was invented.
+
+A targeted ChEMBL API discovery for an additional CHEMBL318 comparator was attempted but the public request exceeded two 30-second timeouts and was stopped. No new fixture was created from an unavailable response. The source-expansion blocker remains parked because additional records are heterogeneous and require an explicit relation/assay-selection policy.
+
+Validation completed:
+
+```text
+npm run test --workspace=packages/frontend -- --run src/__tests__/biotechDiscoveryContract.test.ts src/__tests__/chembl.test.ts src/__tests__/biotechExperimentFabric.test.ts src/__tests__/scienceChatFabricFormat.test.ts src/__tests__/experimentPilot.test.ts
+npm test
+npm run build
+npm run lint
+git diff --check
+```
+
+Focused and full tests passed: `271 passed, 40 skipped, 0 failed`. TypeScript checking is included in `npm run build` (`tsc -b`); there is no standalone `npm run typecheck` script. Build retains only the existing Vite large-chunk warning.
+
+- **CURRENT HEAD before this handoff update:** `b5bd51e`
+- **CURRENT BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT LIVE:** `origin/main = 9ad75f3` unchanged
+- **WORKING TREE before this handoff update:** clean
+- **PARKED:** biological executor, independent clinical efficacy, safety inference, and ChEMBL multi-record expansion pending a reachable source response and deliberate selection policy.
+- **NEXT LARGE GAP:** continue only with a real reachable source-backed multi-candidate relation or an available biological executor; otherwise preserve the explicit parked status and avoid fabricated neurotherapeutic claims.
+
+## FINAL MAXIMUM COMPLETION / PRE-DEPLOY RELEASE GATE
+
+Checkpoint verified on the existing checkout without resetting or auditing the repository:
+
+- **HEAD:** `389a57b`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **REMOTE:** `origin/manus/next-gap-observation-analysis`
+- **WORKING TREE before this handoff update:** clean and synchronized
+
+### Release validation
+
+- **Focused workflow tests:** passed in prior blocks for Science Chat, Experiment Pilot, Evidence/Replay, AME2020, ChEMBL and biotech contracts.
+- **Full tests:** `npm test` passed: `271 passed, 40 skipped, 0 failed`.
+- **Build / TypeScript:** `npm run build` passed; this executes `tsc -b` followed by Vite production build.
+- **Lint:** `npm run lint` passed.
+- **Diff check:** `git diff --check` passed.
+- **Chromium desktop:** passed against the existing backend production server: 27 routes plus 13 laboratories, 242 interactions, zero runtime errors.
+- **Chromium mobile:** passed with the same coverage and zero runtime errors.
+- **Credential hygiene:** narrow tracked-file scan found no obvious hardcoded API keys, cloud access keys, private keys or Slack tokens.
+
+The first smoke attempt against Vite alone exposed the expected integration condition that Vite proxies `/api` to the backend and therefore cannot be used as the complete E2E target by itself. The corrected production-style run started `packages/backend/src/server.mjs` on port 8080 and passed both desktop and mobile smoke suites. This is documented as an operational setup requirement, not an application defect.
+
+### Release status
+
+The main Science Chat → Request → Model → Fabric → Execution → Result → Analysis → Report → Memory/ Evidence/ Replay path is stable and demonstrable for available executors. The ChEMBL/PubChem path is source-backed and explicitly separates binding evidence, safety/ADME status, research-priority prediction, hypothesis and clinical efficacy. The AME2020 path preserves independent observation provenance, comparison metrics, no-network replay integrity and source-aware Evidence Pack verdicts.
+
+**PARKED, intentionally not faked:** biological executor = `NOT_EXECUTED / BLOCKED`; clinical efficacy = `UNKNOWN`; additional heterogeneous ChEMBL relation expansion = parked after unavailable/slow API response and lack of a declared assay-selection policy; formal calibrated accuracy claims = not asserted; no laboratory measurement is implied.
+
+**KNOWN NON-BLOCKING WARNING:** Vite reports an existing large JavaScript chunk above 750 kB. No cosmetic redesign or risky code-splitting was introduced during the release gate.
+
+**CURRENT READINESS:** `READY` for the available, bounded workflows; not a claim of clinical readiness, biological execution, efficacy, safety or calibrated accuracy.
+
+**GENESIS IS READY FOR DEPLOY.**
+
+- **HANDOFF UPDATED:** pending commit below.
+
+## OVERNIGHT FINAL HARDENING CHECKPOINT
+
+The existing release checkpoint was revalidated without code changes or repository reset. `HEAD=12cb899` before this handoff append, branch `manus/next-gap-observation-analysis`, remote synchronized, and working tree clean.
+
+Backend/frontend integration was checked with the existing architecture: `packages/backend/src/server.mjs` on port 8080, frontend Vite on port 5000, and Vite `/api` proxy to `http://localhost:8080`. Backend `/api/health` reported `ok=true`, `static=true`, `knowledgeLabs=15`, and `persistence=ready`; frontend root returned HTTP 200. The production-style Chromium desktop and mobile smoke suites already passed with 27 routes, 13 laboratories and 242 interactions each, with zero runtime errors.
+
+The earlier HTTP 500s were caused by running the smoke harness against the frontend-only Vite server without the backend. The harness default is port 8092; the correct local validation target is the existing backend on 8080, or an explicitly supplied `E2E_BASE`. No application workaround or duplicate backend was added. All temporary validation servers were stopped; no listeners remain on ports 5000 or 8080.
+
+The final gate remains: full tests green (`271 passed, 40 skipped, 0 failed`), production build/typecheck green, lint green, diff check green, desktop Chromium green, mobile Chromium green, and narrow credential-hygiene scan clean. The only known non-blocking warning is the existing Vite large-chunk warning.
+
+Remaining parked states are unchanged and intentional: biological executor `NOT_EXECUTED/BLOCKED`, clinical efficacy `UNKNOWN`, formal calibration accuracy limited by independent-observation count, and additional heterogeneous ChEMBL expansion parked without a reachable source response and declared assay-selection policy.
+
+- **HANDOFF STATUS:** updated by overnight validation; commit follows.
+
+## CONTINUATION BLOCK: smoke harness startup correctness
+
+The release gate exposed one real operational defect: `scripts/smoke-e2e.mjs` defaulted to port 8092 while the existing production backend defaults to port 8080. Running the harness against frontend-only Vite produced false API failures because Vite proxies `/api` and is not the complete E2E target. The harness default is now `http://127.0.0.1:8080`; the explicit `E2E_BASE` override remains available.
+
+Validation after this patch:
+
+- `node --check scripts/smoke-e2e.mjs` passed.
+- Desktop smoke passed: 27 routes, 13 laboratories, 242 interactions, zero runtime errors.
+- Mobile smoke passed: 27 routes, 13 laboratories, 242 interactions, zero runtime errors.
+- Full `npm test` passed: `271 passed, 40 skipped, 0 failed`.
+- `npm run build` passed, including `tsc -b`.
+- `npm run lint` passed.
+- `git diff --check` passed.
+
+The application architecture was not changed and no duplicate backend was introduced. The existing correct startup remains: backend `packages/backend/src/server.mjs` on 8080, frontend Vite/proxy on 5000 for development, or backend serving the production build for E2E/deploy.
+
+- **HEAD before this block:** `9470c0b`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **PARKED:** biological executor, clinical efficacy, insufficient independent-observation calibration, and heterogeneous ChEMBL expansion remain explicitly blocked/unknown.
+- **NEXT GAP:** no further high-value release blocker is currently evidenced; continue only if a real runtime or integration failure appears.
+
+## COMPLETED MAJOR BLOCK: real two-candidate ChEMBL comparison
+
+The existing Drug Discovery path now compares two real A1-target candidates through the same `CandidateDiscoveryReport` and deterministic research-priority comparison: PubChem/ChEMBL caffeine (`CHEMBL113`, activity `189031`) and ChEMBL adenosine (`CHEMBL477`, activity `71801`, assay `CHEMBL639739`, target `CHEMBL318`). The adenosine record is pinned with exact Ki `= 12.8 nM`, assay description, target confidence metadata, source URLs, ChEMBL release and retrieval date. It is a natural/endogenous compound record, but the UI and report do not infer safety, efficacy or therapeutic benefit.
+
+The block reuses the existing Evidence/Candidate/Ranking/Hypothesis/Report path and adds no second ranker or evidence system. Adenosine safety/ADME/Tox remains explicitly `UNKNOWN`; PubChem enrichment was not fabricated because the PubChem endpoint returned HTTP 503 during retrieval. The ChEMBL-only source boundary is visible in the candidate comparison.
+
+Validation completed:
+
+```text
+focused adenosine + ChEMBL + biotech contract tests: passed
+npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this handoff update:** `3623f33`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **PARKED:** real safety/ADME/Tox for adenosine, biological executor, clinical efficacy, formal accuracy calibration and further heterogeneous assay expansion.
+- **NEXT LARGE GAP:** expose this two-candidate comparison through the existing Scientific Memory / Evidence Pack persistence path, or park if the current report boundary already provides sufficient replay-safe persistence; do not create another report system.
+
+## COMPLETED MAJOR BLOCK: multi-candidate comparison persistence
+
+The real caffeine/adenosine A1 comparison now persists through the existing Scientific Memory boundary. The stored biotech context carries a validated comparison summary with comparison ID, all report IDs, candidate IDs, deterministic scientific fingerprint, `PREDICTION` epistemic status and explicit uncertainty. A single user-facing action in Drug Discovery saves the comparison and opens the existing Scientific Memory screen; no second report, ranking, memory or evidence system was created.
+
+The persistence path rejects fewer than two reports, validates IDs/fingerprint/status on reload, and preserves the existing boundary that research-priority ordering is not efficacy. Adenosine remains ChEMBL-only with safety/ADME/Tox `UNKNOWN`; no clinical claim is introduced.
+
+Validation completed:
+
+```text
+focused Science Memory + adenosine + ChEMBL tests: passed
+full npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this handoff update:** `5ce7cc5`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **NEXT LARGE GAP:** add Evidence Pack identity only if a confirmed persistence/replay break is found; otherwise move to the next real Natural/Neuro source-backed candidate or park due unavailable compatible data. Do not invent safety, efficacy, ADME/Tox or biological execution.
+
+## COMPLETED MAJOR BLOCK: three-candidate natural A1 comparison and memory loop
+
+The existing Drug Discovery workflow now presents and compares three real A1-target records through the same evidence/ranking/report boundary: caffeine (`CHEMBL113`, activity `189031`), adenosine (`CHEMBL477`, activity `71801`, assay `CHEMBL639739`) and theophylline (`CHEMBL1355736`, activity `109460`, assay `CHEMBL641038`). The new theophylline record is pinned from ChEMBL Web Services with exact Ki `= 700.0 nM`, assay context, target identity, confidence metadata, provenance, source URLs and deterministic fingerprint.
+
+The comparison is now user-facing and can be saved through the existing Scientific Memory store. Memory persists the comparison ID, all report IDs, candidate IDs, scientific fingerprint, `PREDICTION` epistemic status and explicit uncertainty; reload validation rejects malformed comparison metadata. The workflow still does not claim efficacy, safety, ADME/Tox or therapy. All three candidates retain `UNKNOWN` safety where no compatible safety source is present.
+
+Source limitation: ChEMBL lookups were reachable for these records. PubChem enrichment for adenosine/theophylline was not added because the PubChem endpoint returned HTTP 503 during retrieval; no PubChem properties or ADME values were inferred from that unavailable response.
+
+Validation completed:
+
+```text
+focused adenosine/ChEMBL/Scientific Memory tests: passed
+full npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this handoff update:** `f1efe8a`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **NEXT LARGE GAP:** add compatible safety/ADME/Tox evidence only from a reachable authoritative source, or park and move to another real end-to-end boundary. Biological execution and clinical efficacy remain blocked/unknown; no synthetic data is permitted.
+
+## COMPLETED MAJOR BLOCK: saved comparison is visible on reopen
+
+Scientific Memory now renders the persisted multi-candidate comparison inside the existing biotech record card. Reopening a saved comparison shows candidate count, `PREDICTION` epistemic status, deterministic comparison fingerprint and the explicit uncertainty boundary. This completes the user-facing Drug Discovery path from real ChEMBL records through comparison, save, reopen and verification using the existing Memory system.
+
+Validation completed:
+
+```text
+focused Science Memory + adenosine + ChEMBL tests: passed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this handoff update:** `27885df`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **PARKED:** compatible safety/ADME/Tox for adenosine and theophylline, biological executor, clinical efficacy, formal calibration accuracy, and additional heterogeneous assay expansion.
+- **NEXT LARGE GAP:** only add safety/ADME/Tox when a reachable authoritative source provides compatible records; otherwise preserve `UNKNOWN` and continue with another confirmed end-to-end break rather than inventing data.
+
+## COMPLETED MAJOR BLOCK: official-label safety provenance
+
+The real adenosine and theophylline A1 candidates now carry official DailyMed label-derived safety signals through the existing `SafetySignal` and candidate ranking path. Adenosine uses the Sagent label set ID `546642f2-662f-46cf-9d82-5bb3bdcc7677`, including label-listed contraindication/warning categories. Theophylline uses the PD-Rx extended-release label set ID `5e64036a-ee3e-42e7-9e59-881f88a4e298`, including label-described concentration-related adverse-effect risk and pharmacokinetic monitoring variability. These are label-level evidence records, not individual clinical assessments.
+
+The Drug Discovery UI now discloses ChEMBL binding plus DailyMed label provenance and keeps `clinical efficacy = UNKNOWN`. No treatment recommendation, safety conclusion for an individual, efficacy claim, ADME inference or biological execution was added. Existing Evidence, Ranking, Hypothesis, Report and Scientific Memory boundaries were reused.
+
+Validation completed:
+
+```text
+focused DailyMed + candidate + memory tests: passed
+full npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+Chromium desktop: 27 routes, 13 labs, 242 interactions, zero runtime errors
+Chromium mobile: 27 routes, 13 labs, 242 interactions, zero runtime errors
+```
+
+- **HEAD before this handoff update:** `ec2626c`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **REAL SOURCES:** ChEMBL Web Services, DailyMed official human prescription labels, PubChem caffeine fixture, AME2020 raw mass table.
+- **PARKED:** clinical efficacy, biological executor, formal calibrated accuracy, PubChem enrichment for adenosine/theophylline after HTTP 503, and any safety/ADME/Tox claim not directly supported by a compatible source.
+- **NEXT LARGE GAP:** add compatible quantitative ADME/Tox data only if an authoritative reachable source provides it; otherwise continue with the next confirmed end-to-end persistence or replay break and do not fabricate data.
+
+## COMPLETED MAJOR BLOCK: quantitative label ADME context
+
+The existing candidate report now carries a minimal source-backed `BiotechAdmeProfile` for the real adenosine and theophylline candidates. Adenosine includes the official-label whole-blood half-life context of `<10 seconds`. Theophylline includes the official-label serum concentration-effect range `5–20 mcg/mL`, mean steady-state half-life `8.3 hours`, and mean clearance `3.5 L/hour` from the label’s referenced study population. The Drug Discovery UI renders these metrics with explicit DailyMed product/population context and a non-clinical boundary.
+
+This is label-derived pharmacokinetic context, not an individual prediction, dose recommendation, complete ADME profile, efficacy claim or safety conclusion. No synthetic values were added. The existing PubChem/RDKit property path, SafetySignal, CandidateDiscoveryReport, comparison, Scientific Memory and provenance structures were reused.
+
+Validation completed:
+
+```text
+focused ADME + safety + candidate + memory tests: passed
+full npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+Chromium desktop: 27 routes, 13 labs, 242 interactions, zero runtime errors
+Chromium mobile: 27 routes, 13 labs, 242 interactions, zero runtime errors
+```
+
+- **HEAD before this handoff update:** `dcb1211`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **REAL SOURCE:** DailyMed official label pages for adenosine set ID `546642f2-662f-46cf-9d82-5bb3bdcc7677` and theophylline set ID `5e64036a-ee3e-42e7-9e59-881f88a4e298`.
+- **PARKED:** complete ADME/Tox, quantitative toxicity endpoints, biological execution, clinical efficacy, and any individual-level interpretation. PubChem enrichment for the new candidates remains unavailable after HTTP 503.
+- **NEXT LARGE GAP:** add compatible quantitative ADME/Tox endpoint data only from an authoritative reachable source; otherwise move to the next confirmed end-to-end break and preserve `UNKNOWN`.
+
+## COMPLETED MAJOR BLOCK: explicit biological validation path
+
+The real adenosine and theophylline reports now include a deterministic `BiologicalExperimentRequest` generated by the shared biotech contract. It preserves candidate ID, hypothesis ID, target IDs, a pre-registered binding/functional activity primary metric and the requirement for an independent assay. The request is explicitly `BLOCKED` with `No reliable biological executor is configured in this environment`; no biological run or measured result is claimed.
+
+Drug Discovery now displays the validation request ID and `NOT_EXECUTED / BLOCKED` status in the existing report card. This closes the available knowledge-only → validation-path boundary without inventing executor output, efficacy, safety or assay measurements.
+
+Validation completed:
+
+```text
+focused validation-request + candidate + safety + memory tests: passed
+full npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b
+npm run lint: passed
+git diff --check: passed
+Chromium desktop: 27 routes, 13 labs, 235 interactions, zero runtime errors
+Chromium mobile: 27 routes, 13 labs, 242 interactions, zero runtime errors
+```
+
+- **HEAD before this handoff update:** `96e9056`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **NEXT LARGE GAP:** biological execution remains externally blocked. Quantitative ADME/Tox beyond label-supported context remains `UNKNOWN/PARKED` unless a compatible authoritative endpoint becomes reachable. Continue with another confirmed end-to-end break only if it exists; do not fabricate execution or data.
+
+## COMPLETED MAJOR BLOCK: Science Chat → reviewed biotech request
+
+Science Chat no longer bypasses the reviewed Experiment Fabric path for biotechnology messages. Candidate discovery prompts now produce the existing `EvidenceGuidedExperimentPlan` with the original structured request, deterministic plan ID, disclosure, required solver, limitations and `ENGINE_NOT_AVAILABLE` status. Because no validated biological executor exists, the plan is not confirmable and no biological result is generated. Direct knowledge-only adapters remain available in the existing Experiment Fabric executor for explicit programmatic use and preserve their source-bound ChEMBL semantics.
+
+Focused validation completed:
+
+```text
+biotechExperimentFabric + experimentFabric + backendEvidenceExecution tests: passed
+npm run build: passed
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this block:** `83e3ed8`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT STATUS:** candidate-specific discovery prompts now enter the same reviewed request boundary as other domains; biology remains `ENGINE_NOT_AVAILABLE`, `NOT_EXECUTED`, and no clinical efficacy is inferred.
+- **PARKED:** confirmation/execution and biological Evidence/Replay require an actual validated biological executor and independent assay data.
+- **NEXT LARGE GAP:** only proceed with another real, unblocked integration; otherwise maintain the biological executor blocker rather than inventing execution.
+
+## COMPLETED MAJOR BLOCK: Natural/Neuro mechanism boundary
+
+The existing real ChEMBL candidate graph now links caffeine, adenosine and theophylline to shared A1 binding-mechanism records. These records are explicitly `HYPOTHESIS`, retain source provenance, and state that an in-vitro binding record does not establish downstream signaling, therapeutic mechanism, clinical efficacy or safety. Candidate and hypothesis `mechanismIds` now point to the same reusable records; no second mechanism, evidence or ranking architecture was created.
+
+The Drug Discovery report card now exposes the mechanism status and boundary text to the user. This is a truthful Natural/Neuro workflow improvement: real compounds → real bioactivity/target → mechanism hypothesis → evidence/safety/ADME → ranking → validation path. It does not claim that natural origin is safe or that a candidate is a proven therapy.
+
+Validation completed:
+
+```text
+focused ChEMBL / adenosine / theophylline / biotech contract / Science Chat tests: passed
+npm run build: passed
+npm run lint: passed
+git diff --check: passed
+```
+
+- **HEAD before this block:** `ac98c0b`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT STATUS:** three source-backed candidates now have explicit, provenance-carrying HYPOTHESIS-level binding mechanisms and user-facing disclosure.
+- **PARKED:** downstream biological mechanism validation, biological execution, clinical efficacy and mechanistic causal inference remain `UNKNOWN`/`BLOCKED` pending independent assays and a validated executor.
+- **NEXT LARGE GAP:** no additional mechanistic claim is admissible from the currently pinned binding records; proceed only with another compatible real source or an unrelated high-value unblocked integration.
+
+## RELEASE VERIFICATION AFTER MECHANISM BLOCK
+
+Full release verification completed after the user-facing mechanism disclosure:
+
+```text
+npm test: 271 passed, 40 skipped, 0 failed
+Chromium desktop: 27 routes, 13 labs, 242 interactions, zero runtime errors
+Chromium mobile: 27 routes, 13 labs, 242 interactions, zero runtime errors
+```
+
+- **CURRENT HEAD:** `0694f03` before this documentation checkpoint
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **WORKING TREE:** clean after push
+
+## COMPLETED CORE/DRUG DISCOVERY BLOCK: deterministic biotech comparison replay integrity
+
+The existing source-backed caffeine/adenosine/theophylline comparison now has a narrow replay-integrity verifier in the existing Scientific Memory boundary. `replaySavedBiotechComparison` deterministically recomputes the existing candidate comparison and returns `MATCH` when comparison ID, report order, candidate order and scientific fingerprint are unchanged, `DRIFT` when persisted identity differs, and `BLOCKED` when the saved comparison/report set is incomplete or cannot be recomputed. This verifies the saved comparison calculation only; it is not a biological rerun, fresh assay, source refresh, efficacy claim or safety conclusion.
+
+Scientific Memory now renders the replay-integrity status and reason for saved biotech comparisons, with an explicit disclaimer that this is not biological execution or a fresh measurement. The implementation reuses the existing pinned source-backed builders and comparator; no second replay, evidence, memory or ranking system was introduced.
+
+Changed files:
+
+- `packages/frontend/src/core/scienceMemory.ts`
+- `packages/frontend/src/components/ScientificMemoryScreen.tsx`
+- `packages/frontend/src/__tests__/scienceMemoryFabric.test.ts`
+
+Validation completed:
+
+```text
+focused scienceMemoryFabric.test.ts: 5 passed
+npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b; existing Vite large-chunk warning remains
+npm run lint: passed
+git diff --check: passed
+```
+
+- **CURRENT STATUS:** comparison → Scientific Memory → deterministic replay-integrity disclosure is now complete for the pinned source-backed reports.
+- **PARKED:** biological execution, clinical efficacy, full ADME/Tox, new independent assays, and any claim of calibrated therapeutic accuracy remain blocked/unknown by source or executor limitations.
+- **NEXT GAP:** inspect only for another confirmed end-to-end break; otherwise prioritize a reachable authoritative source-backed capability rather than creating another contract or synthetic dataset.
+
+## COMPLETED END-TO-END BLOCK: Science Chat → Drug Discovery workspace handoff
+
+When a candidate-discovery request enters Science Chat and the reviewed Fabric plan is `ENGINE_NOT_AVAILABLE`/blocked because no validated biological executor is configured, Science Chat now offers a direct action to open the existing `#/drug` Drug Discovery workspace. The request remains unexecuted; the destination explicitly presents source-backed records, comparison, provenance and validation blockers. No direct bypass of the reviewed request boundary, biological executor, efficacy claim or synthetic observation was added.
+
+Changed file:
+
+- `packages/frontend/src/components/ScienceChat.tsx`
+
+Validation completed:
+
+```text
+focused Science Chat + biotech Fabric tests: passed
+npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b; existing Vite large-chunk warning remains
+npm run lint: passed
+git diff --check: passed
+```
+
+- **CURRENT STATUS:** Science Chat now hands blocked candidate-discovery intent into the existing source-backed Drug Discovery user flow instead of ending at a dead request boundary.
+- **PARKED:** biological executor, independent assays, clinical efficacy, complete ADME/Tox and unsupported Natural/Neuro causal claims remain blocked/unknown.
+- **NEXT GAP:** only pursue another confirmed end-to-end break or reachable authoritative source-backed capability; do not add another duplicate contract or synthetic data path.
+
+## RELEASE CHECKPOINT AFTER CONTINUATION SPRINT
+
+The continuation sprint is verified on the remote tip. The deterministic biotech comparison replay-integrity block and Science Chat → Drug Discovery handoff are committed on `manus/next-gap-observation-analysis`.
+
+Production-style verification used the existing backend on port 8080. `/api/health` returned `ok=true`, `static=true`, `knowledgeLabs=15` and `persistence=ready`. Desktop smoke passed with 27 routes, 13 laboratories and 242 interactions, zero runtime errors. Mobile smoke passed with the same coverage and zero runtime errors. Full tests remain `271 passed, 40 skipped, 0 failed`; build/typecheck, lint and `git diff --check` passed.
+
+- **CURRENT HEAD:** pending commit below
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **REMOTE:** synchronized after push
+- **COMPLETED:** saved biotech comparison replay-integrity disclosure; blocked Science Chat biotech request → existing Drug Discovery workspace handoff
+- **PARKED:** biological executor, independent assays, clinical efficacy, complete ADME/Tox, unsupported Natural/Neuro causal claims and fabricated observations
+- **NEXT GAP:** continue only with another confirmed end-to-end break or reachable authoritative source-backed capability; current available workflows have no evidenced release blocker.
+
+## COMPLETED ADMIN BOUNDARY BLOCK: Natural Functional Replacement visibility
+
+The existing Drug Discovery source-backed workflow now exposes its advanced Natural Functional Replacement section only when the authenticated user has `owner` or `admin` role on at least one writable project. Editors and viewers receive an explicit status message and do not see the advanced pinned comparison workflow. The implementation reuses existing project RBAC data; it does not create a parallel permission system. The boundary is a UI disclosure gate, while backend project authorization remains the authority for project mutations.
+
+The admin-facing copy explicitly separates research-priority ranking from efficacy or therapeutic replacement and retains the existing no-synthesis/no-dosing/no-biological-execution boundary.
+
+Changed file:
+
+- `packages/frontend/src/components/DrugDiscoveryScreen.tsx`
+
+Validation completed:
+
+```text
+focused ChEMBL / adenosine / biotech Fabric tests: passed
+npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b; existing Vite large-chunk warning remains
+npm run lint: passed
+git diff --check: passed
+Chromium desktop smoke: 27 routes, 13 laboratories, 242 interactions, zero runtime errors
+Chromium mobile smoke: 27 routes, 13 laboratories, 242 interactions, zero runtime errors
+```
+
+- **CURRENT STATUS:** ADMIN-only disclosure boundary is implemented for the existing source-backed Natural Functional Replacement workflow.
+- **PARKED:** global admin identity/role is not present in the current User contract; biological executor, independent assays, clinical efficacy, full ADME/Tox and unsupported natural-substitute claims remain blocked/unknown.
+- **NEXT GAP:** if a global ADMIN identity is required, extend the backend-auth role contract rather than relying on client-only role inference; otherwise proceed to the next reachable authoritative source-backed profile integration.
+
+## COMPLETED ADMIN AUDIT BLOCK: request provenance for comparison persistence
+
+The admin-only Natural Functional Replacement save action now records a lightweight local audit entry through the existing Scientific Memory storage boundary. Each entry carries a generated request ID, ISO timestamp, authenticated user ID, action name and workflow provenance. Scientific Memory remains local-first; this is an application audit trail for the current browser, not a claim of tamper-proof or server-authoritative compliance logging.
+
+Changed files:
+
+- `packages/frontend/src/core/scienceMemory.ts`
+- `packages/frontend/src/components/DrugDiscoveryScreen.tsx`
+
+Validation completed:
+
+```text
+focused scienceMemory / ChEMBL / biotech tests: passed
+npm run build: passed, including tsc -b; existing Vite large-chunk warning remains
+npm run lint: passed
+git diff --check: passed
+```
+
+- **CURRENT STATUS:** admin permission boundary plus request/timestamp/user/action provenance now exists for the source-backed comparison persistence action.
+- **PARKED:** server-authoritative global ADMIN role and tamper-resistant audit storage require a backend auth/schema decision; biological execution, independent assays, efficacy and full ADME/Tox remain blocked/unknown.
+- **NEXT GAP:** if server-level auditability is required, implement it in backend auth/persistence with explicit migration and RBAC tests; otherwise continue with reachable source-backed reference-profile expansion.
+
+## COMPLETED NATURAL DISCOVERY BLOCK: admin input → bounded reference profile resolution
+
+The admin-only Natural Functional Replacement workflow now accepts a reference compound and target/receptor input in the existing Drug Discovery screen. Resolution is deliberately bounded to the three already pinned, real-source A1 records: caffeine, adenosine and theophylline. A compatible input returns `RESOLVED` with the existing source-backed candidate reports; an unknown compound or target returns `BLOCKED` with no candidates, no prediction and no fabricated profile. The result explicitly states that research priority is not a functional substitute, efficacy or clinical recommendation.
+
+Changed files:
+
+- `packages/frontend/src/core/biotechData/naturalReplacement.ts`
+- `packages/frontend/src/components/DrugDiscoveryScreen.tsx`
+- `packages/frontend/src/__tests__/naturalReplacement.test.ts`
+
+Validation completed:
+
+```text
+focused resolver/biotech/memory tests: 15 passed
+npm test: 271 passed, 40 skipped, 0 failed
+npm run build: passed, including tsc -b; existing Vite large-chunk warning remains
+npm run lint: passed
+git diff --check: passed
+```
+
+- **CURRENT STATUS:** ADMIN input → bounded reference profile → real pinned candidate set → existing comparison/ranking/evidence/memory/replay path is wired.
+- **PARKED:** arbitrary live natural-product search, global server-authoritative ADMIN role, biological execution, independent assays, clinical efficacy, complete ADME/Tox and unsupported replacement claims.
+- **NEXT GAP:** add live source expansion only when an authoritative endpoint is reachable and a deterministic selection policy is declared; otherwise continue with another integration break rather than inventing candidates.
+
+## RELEASE VERIFICATION AFTER REFERENCE-PROFILE BLOCK
+
+The existing production-style smoke harness passed after the resolver/UI block: desktop and mobile each covered 27 routes, 13 laboratories and 242 interactions with zero runtime errors. The attempted auxiliary backend start reported `EADDRINUSE` because port 8080 was already occupied; the smoke harness nevertheless completed against the existing backend process. This is an environment/process collision, not an application failure. No workaround or duplicate backend was added.
+
+- **CURRENT HEAD:** pending documentation checkpoint commit
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **WORKING TREE:** clean after the documentation commit below
+- **NEXT GAP:** reachable authoritative natural-product source expansion with a declared selection policy; otherwise preserve the bounded pinned-profile boundary.
+
+## COMPLETED NATURAL PRODUCT EXPANSION: PubChem identity catalog
+
+The bounded resolver now expands the existing three pinned A1 reports with nine additional real PubChem compound identity records: theobromine, paraxanthine, hypoxanthine, xanthine, inosine, guanosine, adenine, guanine and uric acid. Each record preserves CID, formula, molecular weight, SMILES, InChIKey, canonical PubChem URL, source version and retrieval date. Every added record enters the existing Candidate → Evidence → Ranking → Hypothesis → Safety/ADME → Memory → Replay contract through an identity-only report.
+
+The deterministic policy is explicit: known A1-compatible input resolves to the three source-backed ChEMBL/DailyMed reports plus all nine PubChem identity records, in stable score/candidate-ID order. Identity-only records receive `UNKNOWN` target, activity, mechanism, safety and ADME status, a score of zero with maximum uncertainty, and cannot be presented as functional replacements. Unsupported reference or target input remains `BLOCKED` with an empty result set. No live endpoint is called from the UI and no missing biological data is inferred.
+
+The PubChem source probe succeeded for all nine records via the public PUG REST endpoint. Full validation passed: `npm test` reports 271 passed, 40 skipped and 0 failed; focused resolver tests pass; build/typecheck, lint and diff-check pass; desktop and mobile Chromium smoke each cover 27 routes, 13 laboratories and 242 interactions with zero runtime errors.
+
+- **CURRENT STATUS:** bounded Natural Product Discovery expanded from 3 to 12 real source-backed/identity-backed reports and remains integrated with existing comparison, provenance, memory and replay.
+- **PARKED:** live broad natural-product search, target/activity enrichment for identity-only records, global server-authoritative ADMIN role, biological executor, independent assays, clinical efficacy and complete ADME/Tox.
+- **NEXT GAP:** reachable target/activity evidence expansion, preferably through ChEMBL or UniProt, using the same deterministic source-and-status policy; park quickly if the endpoint or query coverage is insufficient.
+
+## COMPLETED TARGET EVIDENCE EXPANSION: ChEMBL theobromine–A1
+
+A reachable ChEMBL API query added one target/activity-backed record beyond the identity-only PubChem catalog: theobromine (`CHEMBL1114`) at Adenosine receptor A1 (`CHEMBL318`), activity `193161`, assay `CHEMBL643484`, Ki `105000 nM`, rat brain cortical membrane context. ChEMBL marks the value outside the typical range and potentially inaccurate; Genesis preserves that uncertainty and does not convert it into efficacy, mechanism, safety or ADME.
+
+The record is integrated into the existing candidate/evidence/ranking/hypothesis path with `LITERATURE_SUPPORTED` activity evidence, `UNKNOWN` safety/ADME, deterministic low evidence quality, target relevance 1, uncertainty penalty 0.75 and explicit research-priority-only ranking. The source query URL, ChEMBL activity/assay identifiers, version label and retrieval date are retained in provenance. No live source call was added to the UI and no synthetic activity value was created.
+
+Validation completed: focused resolver test passed; full suite reports 271 passed, 40 skipped and 0 failed; build/typecheck, lint and diff-check passed. Existing smoke coverage remains green from the immediately preceding UI checkpoint.
+
+- **CURRENT STATUS:** one additional real target/activity evidence record is now available in the 12-report bounded discovery set, increasing the resolved set to 12 reports with one richer ChEMBL profile.
+- **PARKED:** broader ChEMBL target/activity enrichment for the remaining records requires per-compound queries and evidence-quality review; live broad search, server-authoritative global ADMIN, biological execution, independent assays, efficacy and complete ADME/Tox remain blocked or unknown.
+- **NEXT GAP:** batch deterministic ChEMBL enrichment for the remaining known compounds, stopping quickly on missing or low-quality target evidence.
+
+## BATCH CHِEMBL CHECKPOINT: paraxanthine–A1 implemented, remaining records parked
+
+A short deterministic batch probe queried the remaining eight PubChem compounds against ChEMBL molecule lookup and A1 activity (`CHEMBL318`). One compatible record was found and integrated: paraxanthine (`CHEMBL1158`), activity `207399`, assay `CHEMBL643484`, Ki `21000 nM`, rat brain cortical membrane context. Its evidence is marked `LITERATURE_SUPPORTED`, ranking is low-confidence research priority, and safety/ADME/efficacy remain `UNKNOWN`.
+
+The remaining batch records had no usable A1 activity under the declared policy and were not enriched: hypoxanthine, xanthine, inosine, guanosine, adenine, guanine and uric acid. Theobromine remains the previously integrated ChEMBL record. The probe script is committed for reproducibility, but its results are not treated as live UI data.
+
+Focused resolver tests, build/typecheck, lint and diff-check pass after this block. Full suite and Chromium smoke remain green from the preceding checkpoint; no new UI contract was introduced beyond the existing bounded resolver.
+
+- **CURRENT STATUS:** 12-report bounded discovery set now contains two additional ChEMBL A1 target/activity profiles beyond the original three, plus PubChem identity-only records.
+- **PARKED:** seven batch candidates lack usable A1 activity under the current query policy; broader target search would require a new declared target-selection policy and separate quality review.
+- **NEXT GAP:** enrich a second therapeutically relevant target only if a deterministic target policy is declared; otherwise prioritize the existing Drug Discovery compound → properties → evidence → safety/ADME presentation gap.
+
+## PARKED QUICKLY: ChEMBL quantitative properties probe
+
+A bounded probe for additional ChEMBL molecule properties/quantitative ADME fields timed out during the single allowed attempt. No properties were admitted, no cached or inferred values were used, and the stable probe script was restored. This source path is parked rather than retried repeatedly.
+
+The next available large GAP is the existing model-observation user-facing integration: AME2020 already has prediction, independent observation, comparison, metrics, provenance, evidence, memory and replay contracts, so remaining work should target any missing persistent/report handoff rather than another source probe. If that path is already complete, the remaining quantitative ADME expansion requires a responsive authoritative endpoint.
+
+## USER-FACING REPORT HANDOFF CHECKPOINT
+
+The admin Natural Functional Replacement UI now renders every report returned by the bounded resolver, not only the three original pinned reports. The active resolved report set is also the exact set persisted through the existing `saveBiotechDiscoveryComparisonToMemory` path, with the audit provenance count reflecting the number of resolved ChEMBL/PubChem/DailyMed reports. This removes the manual-transfer gap between ADMIN input, comparison/report output and Scientific Memory while preserving the existing source and epistemic boundaries.
+
+Unknown inputs still return BLOCKED and persist nothing. Identity-only reports retain UNKNOWN target/activity/safety/ADME status; source-backed binding records remain research-priority candidates rather than efficacy claims.
+
+Validation after the UI integration: focused naturalReplacement and biotech contract tests pass; full suite is 271 passed, 40 skipped, 0 failed; build/typecheck passed; lint passed; git diff --check passed. The existing production-style desktop/mobile smoke remains the latest valid UI smoke checkpoint.
+
+- **CURRENT STATUS:** resolved report count is now surfaced and persisted as one coherent set through the existing Memory and audit path.
+- **NEXT GAP:** release smoke on the changed admin flow, then continue to the next available large GAP; do not fabricate additional external evidence.
+
+## FRESH UI SMOKE CHECKPOINT: resolved reports → Memory
+
+After the resolved-report persistence change, production-style Chromium smoke passed on both desktop and mobile: 27 routes plus 13 laboratories and 242 interactions per profile, with zero runtime errors. Backend health was already `ok=true`, `static=true`, `knowledgeLabs=15`, `persistence=ready`.
+
+## MODEL ↔ OBSERVATION E2E CHECKPOINT
+
+The existing discovery E2E runner was blocked by a stale environment-specific Playwright import (`/opt/node22/...`) and a missing browser path. The runner now uses the repository Playwright package and the available system Chromium, with an override through `GENESIS_CHROMIUM_PATH` when needed. No scientific semantics or observation data were changed.
+
+`npm run e2e:discovery` now passes end-to-end: browser runtime has zero errors; the supported comparison, replay MATCH, evidence completeness, controlled intervention, follow-ups, sweeps, cohort/contact boundaries and all Node ↔ Chromium fingerprints agree. This closes a real release/verification gap in the Model ↔ Real Observation area without admitting new or synthetic observations.
+
+- **CURRENT STATUS:** AME2020 observation contracts plus the broader discovery engine have a reproducible browser verification path.
+- **PARKED:** additional compatible external observations still require independent authoritative measurements; no unrelated USGS or model-generated data is admitted.
+- **NEXT LARGE GAP:** continue with the strongest remaining Drug Discovery/Natural-Neuro capability that is implementable without a new source, prioritizing report completeness, explicit ADME/Tox boundaries and comparison explainability.
+
+## ACTIVE COMPARISON / E2E CHECKPOINT
+
+Drug Discovery now computes comparison count from the active resolved report set rather than the original three pinned reports. After an admin query resolves additional real reports, the UI shows their report IDs, deterministic research-priority score and epistemic status, and the same active set is persisted to Scientific Memory. This closes the report/comparison handoff gap without changing scientific claims.
+
+The existing discovery E2E runner was also made environment-portable by using the repository Playwright package and available system Chromium. `npm run e2e:discovery` passed all Node ↔ Chromium fingerprint and integrity checks with zero browser runtime errors.
+
+Targeted biotech tests passed (11 tests), build/typecheck passed, lint passed and `git diff --check` passed. Fresh UI smoke is the remaining checkpoint before push.
+
+## ADME/PK/TOX STATUS MATRIX CHECKPOINT
+
+Every report returned by the bounded Natural Product resolver now carries an explicit ADME/PK/Tox profile. For identity-only PubChem reports and ChEMBL binding-only reports the profile is `UNKNOWN` with a visible `No compatible quantitative record admitted` metric and provenance-backed uncertainty. This makes the missing layer reportable and comparable without inventing values or promoting binding to safety/efficacy.
+
+Focused naturalReplacement and contract tests pass (11 tests); build/typecheck, lint and diff-check pass. The prior full suite remains 271 passed, 40 skipped, 0 failed. The prior fresh desktop/mobile smoke and discovery Node ↔ Chromium E2E remain green; this change is bounded to report contracts/resolution and does not add a new route.
+
+- **CURRENT STATUS:** 12-report discovery set has an explicit ADME/PK/Tox state on every report; resolved sets preserve that state through comparison and Memory.
+- **PARKED:** quantitative enrichment remains blocked by the timed-out ChEMBL properties probe; no quantitative values were admitted.
+- **NEXT LARGE GAP:** use the existing report matrix in the user-facing comparison to show target/evidence/safety/ADME/validation columns, or move to the next real external source only after a short bounded probe.
+
+## EVIDENCE MATRIX UI CHECKPOINT
+
+The resolved natural-product report panel now exposes, for every active report, candidate/report ID, deterministic research-priority score, epistemic evidence status, target IDs, safety status, ADME/PK/Tox status, validation request state and clinical efficacy state. The display is a report matrix only; it does not convert binding into efficacy or UNKNOWN into a positive finding.
+
+Focused tests passed (11 tests), build/typecheck passed, lint passed, diff-check passed, and fresh desktop/mobile Chromium smoke passed with 27 routes, 13 laboratories and 242 interactions per profile, zero runtime errors. The active resolved set continues to persist through the existing Scientific Memory and audit path.
+
+## FULL RELEASE VALIDATION CHECKPOINT
+
+Full validation after the latest report, evidence matrix and ADME boundary blocks passed: `npm test` reports 271 passed, 40 skipped and 0 failed; `npm run e2e:discovery` passes all browser/Node fingerprint checks; build/typecheck passed; lint passed; `git diff --check` passed; desktop and mobile smoke each cover 27 routes, 13 laboratories and 242 interactions with zero runtime errors. The branch remains clean after the upcoming handoff-only commit.
+
+## UNIPROT TARGET MAPPING CHECKPOINT
+
+The enriched ChEMBL A1 activity evidence for theobromine and paraxanthine now carries an additional target-identity provenance record from UniProtKB:P30542 (human adenosine A1 receptor). This is a target mapping only; it does not change the rat-brain assay context and does not establish efficacy, safety or clinical suitability.
+
+Focused tests passed (11 tests), build/typecheck passed, lint passed and diff-check passed. The prior full suite, discovery E2E and desktop/mobile smoke remain green; this change is contract-level provenance enrichment with no new route.
+
+## POST-UNIPROT FULL VALIDATION
+
+After the UniProt target provenance block, full `npm test` passed with 271 passed, 40 skipped and 0 failed. `npm run e2e:discovery` passed all browser runtime, evidence, replay, boundary and Node ↔ Chromium fingerprint checks. `git diff --check` passed and the branch is clean.
+
+## SCIENCE CHAT → DRUG DISCOVERY HANDOFF CHECKPOINT
+
+The existing blocked biotech suggestion in Science Chat now carries the bounded `reference=caffeine&target=A1` context through the existing hash route. Drug Discovery reads these parameters to prefill the admin reference form, removing a manual data-transfer step while preserving `ENGINE_NOT_AVAILABLE`, source-backed-only resolution and all scientific boundaries.
+
+Focused Science Chat, Natural Replacement and biotech contract tests passed; full suite passed with 271 passed, 40 skipped and 0 failed. Build/typecheck, lint and diff-check passed. Fresh desktop/mobile smoke passed with 27 routes, 13 laboratories and 242 interactions per profile, zero runtime errors.
+
+## CAMPAIGN VALIDATION PARKED
+
+The existing multi-fidelity validation campaign was executed once. It correctly reported `RESULT: FAIL` because the runtime lacks RDKit, PySCF, OpenMM, AutoDock Vina/Meeko, Biopython, PyMeep and ADMET-AI; stage 1 retained zero candidates and docking/quantum stages were blocked. No synthetic candidate, descriptor, docking, ADMET or toxicity result was admitted.
+
+This is an external/runtime capability blocker, not a silent application failure. The block is parked after one bounded attempt and the sprint continues to other real repository capabilities. The campaign output explicitly preserves the boundary that no therapeutic or clinical claim is made.
+
+## ADME MATRIX CONTRACT HARDENING CHECKPOINT
+
+The bounded Natural Functional Replacement resolver now guarantees that every resolved report carries an explicit `BiotechAdmeProfile`. Existing source-backed quantitative profiles are preserved; reports without compatible quantitative evidence receive a provenance-backed `UNKNOWN` profile with no invented metric. This closes the contract gap between resolver output and the user-facing ADME/PK/Tox matrix.
+
+A regression now asserts the property for the full 12-report real set. Focused test passed (3 tests); build/typecheck, lint and diff-check passed. Full suite and smoke remain the final validation for this checkpoint.
+
+## ADME MATRIX FULL VALIDATION
+
+Full `npm test` passed: 271 passed, 40 skipped, 0 failed. Discovery E2E passed all Node ↔ Chromium integrity checks. Build/typecheck, lint and diff-check passed. Desktop and mobile smoke each passed 27 routes, 13 laboratories and 242 interactions with zero runtime errors. Existing Vite large-chunk warning remains non-blocking.
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: RDKit
+
+Bounded capability discovery found the existing optional Python scientific stack absent except for the standard Python runtime. One installation attempt for the lightest high-value capability succeeded: `rdkit==2026.3.5` is now installed in the sandbox Python 3.12 environment.
+
+The existing Toolchain Registry validated RDKit through real reference cases (aspirin descriptors and benzene SMARTS methylation). `npm run campaign:validate` then executed the existing real RDKit stage: 69 candidates generated, 60 retained, 10 Pareto candidates, hypervolume 10.17 → 15.53, stop reason `STOP_RESOURCE_LIMIT`, wall clock 67181 ms. The campaign correctly blocked docking and quantum stages because their runtimes remain absent and exited `RESULT: FAIL` for the overall multi-stage campaign; no synthetic values were admitted.
+
+The Toolchain Registry now exposes package, availability, executionStatus, environment, provenance, deterministic fingerprint and failureReason for every registered scientific tool. The existing Fabric/compute path remains the executor; no second Fabric or report system was created. RDKit outputs remain model-estimate/cheminformatics results, not observations, efficacy, safety or clinical claims.
+
+Focused backend runtime/toolchain tests passed: 281 passed, 32 skipped, 0 failed. Build/typecheck and diff-check passed. Remaining runtime blockers are PySCF, OpenMM, AutoDock Vina/Meeko, Biopython, PyMeep and ADMET-AI.
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: RDKit + PySCF
+
+A single bounded installation attempt activated `rdkit==2026.3.5` and `pyscf==2.14.0` in the sandbox Python 3.12 runtime. The existing Toolchain Registry now validates and exposes both with runtime metadata, availability, execution status, provenance and deterministic fingerprints.
+
+The existing campaign executed a real non-clinical multi-fidelity run: RDKit generated 69 candidates, retained 60 and selected 10 Pareto candidates. PySCF then executed 2 real quantum reference calculations, returning HOMO-LUMO gaps of 13.5465 eV and 13.3920 eV and dipoles of 2.4962 D and 1.2503 D for the selected molecules. These are `MODEL_ESTIMATE` outputs with provenance, not observations, binding, efficacy, safety or clinical claims. The campaign ended `PASS` for the executed RDKit + quantum stages while docking remained blocked; overall multi-stage validation remains bounded by unavailable docking/MD/protein/ADMET runtimes.
+
+API and toolchain regressions now verify the runtime metadata contract. Full validation passed: 271 passed, 40 skipped, 0 failed; discovery E2E passed; build/typecheck, lint and diff-check passed. Remaining absent runtimes: OpenMM, AutoDock Vina/Meeko, Biopython, PyMeep and ADMET-AI.
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: OpenMM
+
+One bounded installation attempt activated `openmm==8.6.0.dev-c6173db` in the same Python 3.12 runtime. The existing Toolchain Registry validated OpenMM, and the existing reference benchmark executed a real water-box minimization plus NVT temperature check: initial-to-minimized potential energy decreased and the NVT temperature stayed within the reference range. The result is a non-clinical molecular-dynamics model estimate, not biological stability or therapeutic evidence.
+
+The same heavy-engine test also passed the PySCF H2 and water reference cases and RDKit/toolchain metadata checks: 8 passed, 4 skipped, 0 failed. Remaining absent runtimes are AutoDock Vina/Meeko, Biopython, PyMeep and ADMET-AI. No synthetic outputs were admitted.
+
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: AutoDock Vina + Meeko
+
+One bounded installation attempt activated `vina==1.2.7`, `meeko==0.8.0`, `gemmi==0.7.5`, and the required numerical dependency `scipy==1.18.1` in the sandbox Python 3.12 runtime; `rdkit==2026.3.5` was already available from the preceding checkpoint. The existing Toolchain Registry and docking adapter now execute the real reference case: aspirin ligand preparation through Meeko followed by AutoDock Vina against the documented indole small-molecule rigid stand-in. The run produced 5 poses with a best score of `-2.226 kcal/mol`, deterministic seed `42`, input hash `493d2b6e6a80e00b`, and persisted receptor/ligand/docked PDBQT artifact hashes.
+
+The result is `MODEL_ESTIMATE` software-pipeline evidence only. The small-molecule receptor is explicitly not a protein target, the Vina score is not experimental affinity, and no efficacy, safety, or clinical claim is made. `requirements-compute.txt` now declares SciPy because the Vina Python bindings require it at import time.
+
+Focused runtime validation passed: 14 passed, 12 skipped, 0 failed across the heavy-engine, multi-fidelity and replay suites. The real campaign docking stage persisted Scientific Runs with artifacts, and seeded replay matched exactly. The Toolchain Registry marked Vina/Meeko `AVAILABLE` only after its passing reference case. The broader backend invocation still has an unrelated HTTP-test startup failure (`server.http.test.mjs` exits early); it is not a docking failure and remains parked for a later gap.
+
+Remaining absent runtimes after this checkpoint: Biopython, PyMeep and ADMET-AI. Next large gap: bounded Biopython availability/reference validation, then continue to PyMeep and ADMET-AI.
+
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: Biopython
+
+One bounded installation attempt activated `biopython==1.88` in the sandbox Python 3.12 runtime. The existing protein-structure adapter and Toolchain Registry executed the real reference case: a two-residue alanine PDB was parsed into one model and chain A with 2 residues, 2 amino acids, no hetero residues, no waters, no alternate locations, valid coordinates, and `status: READY`.
+
+The adapter’s safety boundary remains active: a PDB with missing backbone atoms or waters requires `ADDITIONAL_INPUT_REQUIRED` rather than silently editing or inventing structure. This is deterministic structure-ingestion evidence, not biological execution, binding, efficacy, safety, or clinical evidence.
+
+Focused runtime validation now passes: 16 passed, 10 skipped, 0 failed across heavy-engine, multi-fidelity and replay suites. AutoDock Vina/Meeko reference and deterministic replay continue to pass. Remaining absent runtimes are PyMeep and ADMET-AI. Next large gap: bounded PyMeep availability/reference validation, followed by ADMET-AI.
+
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: PyMeep — PARKED
+
+One bounded installation attempt was made for `meep>=1.0` via PyPI. The package resolved to unrelated `meep==1.0.6` (a Git/Hg API helper, not the MIT Meep electromagnetic solver); it installed but failed the worker contract because it has no `verbosity` API. The unrelated package and its transitive dependencies were removed immediately. A follow-up availability check correctly reports `pymeep_unavailable: No module named 'meep'`.
+
+PyMeep is therefore parked as `BLOCKED_BY_RUNTIME` / package-source mismatch. No fallback analytical Fresnel value was admitted as FDTD output, and the existing adapter remains honest. Continue to the next viable runtime: ADMET-AI.
+
+
+## SCIENTIFIC RUNTIME CAPABILITY CHECKPOINT: ADMET-AI
+
+One bounded installation attempt activated `admet-ai==2.0.1` in the sandbox Python 3.12 runtime. The existing ADMET adapter executed the real aspirin reference case with two repeated model calls, verified deterministic output, cross-checked RDKit molecular weight (`180.159`, expected `180.16`) and logP (`1.3101`, within the adapter’s documented reference tolerance), and confirmed all 52 published endpoints are present. The reference explicitly does not assert endpoint accuracy as ground truth: ADMET outputs are probabilistic `MODEL_ESTIMATE` values with endpoint-specific published TDC metrics, not observations or clinical evidence.
+
+The focused campaign validation passed the real ADMET + toxicity stages, both threshold directions, downstream docking selection after filtering, ADMET replay within the documented batch-composition tolerance, and append-only verification history. Runtime/toolchain validation passed with `21 passed, 5 skipped, 0 failed`. The five skips are PySCF and OpenMM tests because those runtimes are not available in this fresh sandbox despite their prior validated checkpoints being recorded in the branch handoff.
+
+Current runtime state for this continuation: validated in this session — RDKit, AutoDock Vina/Meeko, Biopython, ADMET-AI; parked — PyMeep due to the PyPI package-source mismatch documented above; prior branch checkpoints — PySCF and OpenMM. No synthetic outputs were admitted. Next large gap is a real-session revalidation of PySCF/OpenMM if their environment is restored, otherwise the remaining integration work is end-to-end reporting and UI/browser verification rather than another missing runtime.
+
+
+## FINAL SCIENTIFIC COMPUTE INTEGRATION CHECKPOINT: Unified Report Projection
+
+The validated runtime stages are now connected through the existing Genesis campaign path rather than exposed only as isolated demos. `buildScientificComputeReport()` projects one typed user-facing report from the existing persisted campaign candidates and Scientific Runs; it does not introduce a second executor, evidence store, memory store, or replay system. The report carries a stable report ID, compound/candidate lineage, ordered stage status, run IDs, evidence classes, complete persisted runs, provenance, explicit computational limitations, and the latest append-only replay verdict for each run.
+
+The campaign API now exposes `GET /api/projects/:projectId/campaigns/:campaignId/report`, and the existing Campaign Screen loads and displays the unified report alongside the existing graph, WHY answers, Scientific Runs, artifacts, and verification controls. The visible status remains `MODEL_ESTIMATE`; biological execution remains `NOT_EXECUTED / BLOCKED`. No computational result is promoted to observation, efficacy, safety, or clinical evidence.
+
+Regression validation passed: campaign multi-fidelity suite `7 passed, 1 skipped, 0 failed`; prior complete focused runtime suite `21 passed, 5 skipped, 0 failed`; frontend TypeScript/Vite production build passed; ESLint passed; `git diff --check` passed. The unrelated backend HTTP test startup failure remains parked from the earlier broad invocation.
+
+
+## FINAL VALIDATION: Chromium UI
+
+The first desktop smoke invocation was invalid because no server was listening on its default `127.0.0.1:8080`; it produced only `ERR_CONNECTION_REFUSED`. After starting the built Genesis backend/static server on port 8080, the same smoke suite passed: 27 routes plus 13 laboratories, 216 interactions, and zero runtime errors. The unified report surface is therefore build-validated and covered by the live desktop Chromium smoke environment.
+
+
+## NATURAL DISCOVERY CHECKPOINT: Bounded PubChem Retrieval
+
+The ADMIN Natural Functional Replacement flow now performs a bounded parallel retrieval against PubChem PUG for the closed, source-backed natural-product identity catalog. Each response must contain SMILES, InChIKey, molecular formula, and molecular weight; incomplete or failed records are omitted, never synthesized. The resolver returns `BLOCKED` when no valid records are retrieved and does not silently fall back to pinned or fictional records. Valid retrieved records are mapped into the existing candidate/evidence/hypothesis/ranking contracts, preserving the existing distinction between natural origin, bioactivity, ADME, toxicity, safety, and clinical evidence.
+
+A deterministic Vitest contract test covers schema admission and source failure behavior. Validation passed: natural replacement tests `4 passed`; frontend production build passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 216 interactions, and zero runtime errors. A live PubChem probe confirmed the source is reachable; records lacking a required canonical SMILES field are correctly rejected by the adapter.
+
+
+## NATURAL DISCOVERY CHECKPOINT: Live ChEMBL Activity Evidence
+
+The bounded PubChem natural-candidate retrieval now feeds a bounded ChEMBL lookup by InChIKey. For each matched molecule, Genesis retrieves explicit activity rows and preserves ChEMBL molecule/compound ID, target ID, activity ID, assay ID, relation, value, units, assay description/context, source/version, retrieval date, and source URL. Only Ki, IC50, and EC50 rows are admitted; the implementation does not aggregate or numerically mix measurement types. Missing IDs, values, units, or assay identifiers are omitted. Assay quality is classified conservatively from available context (`HIGH` only for human binding assay rows, `MODERATE` for other binding rows, `LOW` for non-binding rows, `UNKNOWN` when context is absent).
+
+The ADMIN UI now displays live ChEMBL activity evidence next to the existing explainable research-priority comparison. Binding remains literature-supported evidence, not efficacy; predictions remain predictions, not observations; no clinical safety or therapeutic replacement claim is created.
+
+Validation: natural replacement/ChEMBL contract tests `5 passed`; frontend build passed; ESLint passed; `git diff --check` passed; live ChEMBL probe resolved a real molecule lookup to CHEMBL113; desktop Chromium smoke passed with 27 routes, 13 laboratories, 206 interactions, and zero runtime errors.
+
+
+## NATURAL DISCOVERY CHECKPOINT: Activity-Aware WHY
+
+The live ChEMBL activity stream is now connected to a deterministic candidate WHY projection. For each PubChem candidate with retrieved activity, Genesis reports total activity count, requested-target match count, separate measurement types, assay-quality counts, ChEMBL activity provenance IDs, rationale, and explicit uncertainty. The projection does not merge Ki/IC50/EC50, does not convert binding into efficacy, and does not replace the existing ranking/evidence/memory architecture.
+
+Validation passed: natural replacement/ChEMBL tests `5 passed`; frontend typecheck/Vite build passed; ESLint passed; `git diff --check` passed; Chromium smoke passed with 27 routes, 13 laboratories, 210 interactions, and zero runtime errors.
+
+
+## FINAL INTEGRATION CHECKPOINT: Activity/Assay Lineage → Scientific Memory
+
+The existing Scientific Memory biotech context now persists live ChEMBL `activityIds` and `assayIds` alongside candidate/report/comparison IDs, provenance, ranking, uncertainty, and scientific fingerprint. The ADMIN save action supplies those IDs from the live activity stream; no parallel memory store was introduced. Existing comparison replay remains the integrity check over the stored comparison fingerprint and does not claim a biological rerun.
+
+Validation passed: integrated natural/ChEMBL/memory tests `27 passed`; frontend typecheck/Vite build passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 220 interactions, and zero runtime errors.
+
+
+## FINAL INTEGRATION CHECKPOINT: Science Chat → Natural Discovery → Memory
+
+Science Chat now recognizes a single natural-discovery request containing a supported reference name and routes it through the existing bounded natural workflow: live PubChem identity retrieval, live ChEMBL molecule/activity lookup, assay quality/context, deterministic comparison/ranking, WHY/uncertainty formatting, and existing Scientific Memory persistence with activity/assay lineage. The user no longer needs to copy IDs manually between the chat and Drug Discovery workspace. Unsupported or missing references remain BLOCKED; no synthetic candidate is created.
+
+The chat response explicitly states that binding is not efficacy, prediction is not observation, and missing ADME/Tox/clinical evidence remains UNKNOWN. Saved artifacts retain report, comparison, candidate, activity, assay, provenance, ranking, uncertainty, and replay fingerprint fields through the existing memory contract.
+
+Validation passed: integrated natural/ChEMBL/memory tests `27 passed`; frontend typecheck/Vite build passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 220 interactions, and zero runtime errors.
+
+
+## FINAL INTEGRATION CHECKPOINT: Reference Resolution
+
+Added a bounded reference profile resolver for PubChem CID, name, SMILES, InChIKey, and ChEMBL molecule IDs. It preserves source identity, source URL, structure fields, and explicit `RESOLVED`, `PARTIAL`, `UNKNOWN`, or `BLOCKED` status. Science Chat uses it for non-pinned identifiers and refuses to fabricate a natural comparison when a resolved reference is outside the supported target-specific catalog; it reports a partial result instead. Supported named references continue through the full live PubChem → ChEMBL → assay → comparison → WHY → ranking → Scientific Memory path.
+
+Validation passed: integrated natural/ChEMBL/memory/reference tests `28 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; Chromium desktop smoke passed with 27 routes, 13 laboratories, 216 interactions, and zero runtime errors.
+
+
+## MAXIMUM COMPLETION CHECKPOINT: Reference Resolution + Chat Boundary
+
+Reference resolution is now source-backed and bounded for name, SMILES, InChIKey, PubChem CID, and ChEMBL molecule ID. The resolver returns `RESOLVED`, `PARTIAL`, `UNKNOWN`, or `BLOCKED`, preserving source identity, structure fields, URL, and uncertainty. Science Chat uses the resolver for non-pinned identifiers and reports a truthful partial state when the current target-specific natural candidate catalog is not compatible; it does not invent a candidate set or ranking.
+
+The supported named path remains one-command end-to-end through live PubChem, live ChEMBL, target/activity, assay context/quality, comparison, WHY, research-priority ranking, existing Scientific Memory, and replay fingerprint. Automatic expensive compute is not falsely claimed: it remains gated by compatible structured inputs and existing executor contracts; biological execution remains NOT_EXECUTED / BLOCKED.
+
+Validation passed: integrated natural/ChEMBL/memory/reference tests `28 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; desktop Chromium smoke passed with 27 routes, 13 laboratories, 216 interactions, and zero runtime errors.
+
+
+## FINAL INTEGRATION CHECKPOINT: Natural Discovery → Cheap Scientific Compute
+
+The live natural workflow now executes the existing Experiment Fabric `chem-molecular-weight` stage for every PubChem-admitted candidate after identity/evidence filtering. It is deterministic, preserves run ID, run fingerprint, result origin, outputs, and summary, and is surfaced in Science Chat as `CHEAP COMPUTE`. No expensive runtime is launched for rejected candidates. RDKit/PySCF/OpenMM/Vina/Meeko/ADMET-AI remain gated until their existing structured executor contracts receive compatible candidate/reference inputs; biological execution remains NOT_EXECUTED / BLOCKED.
+
+Validation passed: natural and memory tests `23 passed` in the focused run; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; Chromium desktop smoke passed with 27 routes, 13 laboratories, 220 interactions, and zero runtime errors.
+
+
+## FINAL INTEGRATION CHECKPOINT: Natural Discovery → Existing Experiment Fabric
+
+Natural discovery now executes the existing deterministic `chem-molecular-weight` Experiment Fabric stage for each PubChem-admitted candidate after source/evidence filtering. Science Chat displays the resulting Scientific Run status, run ID, result origin, summary, and fingerprint. This is a real cheap compute stage, not a fabricated biological observation. Expensive runtimes remain gated by compatible structured input; biological execution remains NOT_EXECUTED / BLOCKED.
+
+Validation passed after the compute wiring: focused natural/memory tests `23 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed; Chromium desktop smoke passed with 27 routes, 13 laboratories, 208 interactions, and zero runtime errors.
+
+
+## RECOVERY CHECKPOINT: Legacy Branch Review
+
+The requested legacy branches were fetched and compared against `manus/next-gap-observation-analysis`. `manus/current-genesis-continuation`, `manus/earthquake-damage-final-sprint`, `manus/high-fidelity-city-view`, `manus/high-fidelity-epidemic-digital-twin`, and `manus/scenario-engine-command-center` are already ancestors of the current branch; no recovery is needed. `manus/visual-p1-world` diverges with a large historical visual/scientific package; its candidate PySCF/OpenMM/RDKit discovery scripts are not absent runtime contracts in the current code and would add E2E-only material without improving the active natural-discovery path. `genesis/main` diverges with a very large historical documentation/campaign/citation package and was not merged because it duplicates or changes broad architecture. No cherry-pick, reset, force-push, branch deletion, or main modification was performed.
+
+## INTEGRATION CHECKPOINT: Cheap Compute → Scientific Memory
+
+Existing cheap Experiment Fabric runs are now persisted inside the existing `SavedBiotechContext.computeRuns` alongside report/comparison, candidate, activity, assay, provenance, ranking, uncertainty, and scientific fingerprint fields. Each run retains candidate ID, run ID, run fingerprint, status, result origin, summary, and outputs. This is lineage persistence, not a claim of biological execution. Full biological validation remains NOT_EXECUTED / BLOCKED, and heavy runtimes remain gated by compatible structured inputs.
+
+Validation passed: natural/ChEMBL/memory tests `28 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed. Legacy review found no safe, non-duplicating capability to cherry-pick.
+
+
+## FULL GAP CLOSURE CHECKPOINT: Discovery Artifact → Memory → Replay
+
+The existing biotech Scientific Memory contract now persists one complete deterministic discovery artifact together with the comparison: candidate IDs, source IDs, activity IDs, assay IDs, comparison ID, ranking scores, cheap compute runs (run IDs, fingerprints, outputs, status, result origin), explicit limitations, and an artifact fingerprint. `replaySavedBiotechDiscoveryArtifact` verifies the complete artifact identity and returns `MATCH` or `DRIFT`, while incomplete inputs return `BLOCKED`. This is an integrity check, not a fresh biological experiment.
+
+Validation passed: artifact/natural/memory tests `23 passed`; frontend build/typecheck passed; ESLint passed; `git diff --check` passed. The artifact fingerprint is created from the canonical persisted fields, so changes to source IDs, activity/assay lineage, ranking, compute identity, or limitations are detectable.
+
+
+## UI INTEGRATION CHECKPOINT: Unified Discovery Artifact + Full Replay
+
+Scientific Memory now exposes the persisted Discovery Artifact directly in the UI. Each biotech record shows artifact candidate/source/activity/assay lineage, compute-run count, artifact fingerprint, and limitations. The UI provides a real `Replay artifact` action plus controlled `Test DRIFT` and `Test BLOCKED` actions. Replay results are rendered as `MATCH`, `DRIFT`, or `BLOCKED` with the integrity reason. The action reuses the existing artifact and replay contracts; no second report, memory, or replay system was created.
+
+Validation: focused natural/memory tests `23 passed`; frontend build/typecheck passed after a test narrowing fix; ESLint passed; `git diff --check` passed. Chromium smoke is required after the UI change and is run in the next validation step.
+
+
+## HEAVY COMPUTE CHECKPOINT: Natural Candidate → Backend RDKit
+
+Science Chat natural discovery now opts into the existing backend Fabric only after PubChem structure resolution and successful cheap filtering. For each eligible candidate it submits the real `chem-rdkit-descriptors` model with the source-backed SMILES; no structure or target is invented. Successful runs retain model/version, engine provenance, run ID/fingerprint, outputs and status; unavailable/failing runs are returned as `BLOCKED` for that runtime and do not stop the rest of discovery.
+
+A real backend execution was verified for PubChem CID 190 (adenine structure): run ID `51935687-d77f-49f6-9e4f-fadede744e14`, model `chem-rdkit-descriptors`, RDKit engine `RDKit 2026.03.5`, status `ok`, deterministic `true`, with outputs including molecular weight `151.129`, Crippen logP `-0.7716`, TPSA `100.45`, Lipinski violations `0`, canonical SMILES and molecular formula. This is a chemical descriptor result only, not biological activity, efficacy, ADME/Tox, or clinical evidence.
+
+The heavy run is displayed in Science Chat and appended to the existing Discovery Artifact/Scientific Memory compute lineage for replay. PySCF, OpenMM, Vina/Meeko and ADMET-AI remain runtime/input-gated until their required structured inputs are genuinely available.
+
+
+## NEXT RUNTIME CHECKPOINT: ADMET-AI
+
+The existing ADMET-AI adapter is now exposed through `/api/compute/admet/predict` and called from the natural discovery path for candidates that pass cheap filtering and have source-backed SMILES. The response carries ADMET-AI version, deterministic input-derived run identity, engine identity and `real-engine` origin. Outputs are explicitly labeled `MODEL_ESTIMATE`; they are not observations, efficacy, safety conclusions or clinical recommendations. The same run lineage is shown in Science Chat and stored through the existing compute-run path in Scientific Memory.
+
+A bounded real probe executed ADMET-AI `2.0.1` on the PubChem CID 190 structure and returned 52 model outputs, including AMES `0.3614689`, BBB_Martins `0.7137449`, HIA_Hou `0.9788821`, DILI `0.9095106`, ClinTox `0.2486554` and hERG `0.0255394`. These are model estimates with published model-domain limitations, not biological observations.
+
+
+## LONG-RUN MATURATION: fresh E2E, authoritative A1 structure, and runtime boundaries
+
+The fresh live acceptance workflow now passes with current PubChem payloads. PubChem returned 7 real candidate identity records, ChEMBL returned 37 activity records, and the existing backend executed 7 cheap runs, 7 RDKit heavy runs, and 7 ADMET-AI runs. The persisted discovery artifact replayed as MATCH; controlled lineage mutation returned DRIFT; incomplete artifact input returned BLOCKED. The bounded acceptance harness was temporary and removed after execution.
+
+A live RCSB check confirmed entry 5N2S: “Crystal structure of stabilized A1 receptor in complex with PSB36 at 3.3A resolution”. The PDB was downloaded and prepared through Meeko 0.8.0. AutoDock Vina 1.2.7 then executed against the prepared receptor with a PubChem caffeine ligand. The large receptor transport path is now file-backed rather than passed through JSON argv, avoiding E2BIG. The docking output is a computational MODEL_ESTIMATE only; it is not experimental affinity. This run is not yet promoted into the natural-discovery artifact because the current natural orchestration has no source-backed receptor-selection and docking-lineage contract for candidate-specific docking, and the observed probe score was 0 kcal/mol for all returned poses, requiring review before scientific promotion.
+
+PubChem record_type=3d for CID 2519 is reachable and provides a 24-atom source-backed conformer. A PySCF probe confirmed that the input contract can be populated from this real geometry, but the configured PySCF runtime is unavailable (`No module named pyscf`), so the candidate-specific calculation remains BLOCKED_BY_RUNTIME. This is not counted as a PySCF natural-candidate execution. OpenMM remains blocked for natural candidates because no validated ligand–receptor topology, force field setup and simulation configuration exist in the current workflow.
+
+Validation for the docking transport change: backend suite 305 passed, 0 failed, 9 skipped; molecular docking benchmark passed, including deterministic candidate docking. The source payload compatibility fix passed frontend TypeScript, focused natural-discovery and memory tests (23/23), build, lint and diff-check. Recent commits: `5f32b16` (PubChem structure payload compatibility), `a36ae3a` (large prepared docking receptor transport).
+
+The first pilot shortlist identifies IF PAN Laboratory of Neuropharmacology and Epigenetics in Kraków as the strongest initial laboratory fit, with LJMU Centre for Natural Products Discovery and Nencki Laboratory of Neurobiology as complementary candidates. No external outreach has been sent.
+
+
+## FOLLOW-UP: docking investigation and PySCF candidate execution
+
+The A1 RCSB 5N2S receptor was re-prepared after removing the crystallographic 8K8 ligand, sulfate and waters. Meeko generated a 282 KB rigid PDBQT with source/cleaned/prepared hashes retained. Vina 1.2.7 + Meeko 0.8.0 executed caffeine (PubChem CID 2519) in the box centered on the deposited ligand coordinates `[129.202, 46.429, 1.000]`, size `[22,22,22]`, exhaustiveness 8, nPoses 5, seed 42. It returned five poses with affinity `0 kcal/mol` in both the ligand-present and cleaned-receptor runs. This is not a parser truncation: the worker emitted five parsed pose energies and a valid docked PDBQT, but the zero score is not scientifically interpretable for promotion. The result remains `REVIEW_REQUIRED`, `MODEL_ESTIMATE`, and excluded from ranking. No manual score adjustment was made.
+
+The PySCF environment was safely installed in the existing user environment as PySCF 2.14.0. A source-backed PubChem CID 2519 record_type=3d conformer (24 atoms) was converted directly to the existing PySCF geometry contract and executed successfully with RHF/STO-3G, charge 0, multiplicity 1. Result: converged energy `-667.72420427 Hartree`, HOMO `-0.224403 Hartree`, LUMO `0.226288 Hartree`, HOMO–LUMO gap `12.2639 eV`, dipole `3.0446 Debye`, 102 electrons and 80 basis functions. This is a real candidate-specific computational result and remains `MODEL_ESTIMATE`; it is not an experimental observation or clinical claim. It is not yet automatically included in the natural-discovery artifact because the frontend natural orchestration still needs a proper PubChem-3D-to-PySCF adapter and lineage fields rather than a one-off probe.
+
+The next implementation gap is therefore the smallest safe integration of this existing PySCF adapter into natural discovery: fetch/validate PubChem 3D conformers, execute only for candidates with valid coordinates, capture the run metadata, include it in the unified report and artifact, persist it in Memory, and verify it in Replay. Docking remains separately gated until the zero-score behavior is understood and the receptor/box workflow has a scientifically interpretable result.
+
+
+## PYSCF NATURAL-DISCOVERY INTEGRATION
+
+The existing PySCF executor is now exposed through `/api/compute/qm/singlepoint` and the natural-discovery orchestration has a bounded PubChem `record_type=3d` adapter. For each cheap-filtered candidate it requests a real 3D conformer, validates element/coordinate array lengths and finite coordinates, then invokes the existing PySCF endpoint with RHF/STO-3G. Successful results are represented as `NaturalHeavyCompute` lineage with run ID, engine/version, output fingerprint, resultOrigin and an explicit MODEL_ESTIMATE limitation; candidates without valid 3D inputs or unavailable runtime remain BLOCKED and do not receive synthetic values. PySCF runs are included in `computeRuns`, so the existing report fingerprint and downstream Memory/Replay path can include them.
+
+Focused validation after the integration: TypeScript build passed; backend API syntax passed; naturalReplacement and scienceMemory tests passed (23/23). A fresh live acceptance attempt was intentionally not counted as success because PubChem returned the workflow's honest `PubChem retrieval niedostępny` blocker before candidate construction. The previously captured live PubChem 3D CID 2519 calculation remains independently verified: PySCF 2.14.0, RHF/STO-3G, converged energy `-667.72420427 Hartree`, HOMO–LUMO gap `12.2639 eV`, dipole `3.0446 Debye`. A later fresh PubChem availability run is required to certify the complete natural-discovery → PySCF → report → Memory → Replay path under live conditions.
+
+
+## CURRENT SOURCE OF TRUTH — HANDOFF LOCK CHECKPOINT
+
+Branch:
+`manus/next-gap-observation-analysis`
+
+HEAD:
+`c18e8b73bce017a0a3e3a6331f634b35f375be3c`
+
+Remote:
+`origin/manus/next-gap-observation-analysis`
+
+Main:
+`UNCHANGED` (no local `main` ref is present in this clone; no main files were modified)
+
+Working tree:
+`CLEAN`
+
+CURRENT PIPELINE:
+
+```text
+Science Chat
+→ PubChem
+→ ChEMBL
+→ Natural Discovery
+→ RDKit
+→ ADMET-AI
+→ PySCF
+→ ranking
+→ Report
+→ Discovery Artifact
+→ Memory
+→ Replay
+```
+
+REAL RUNTIMES:
+
+```text
+RDKit — AVAILABLE
+ADMET-AI — AVAILABLE
+PySCF — AVAILABLE / candidate integration
+Vina/Meeko — AVAILABLE / REVIEW_REQUIRED result
+OpenMM — BLOCKED
+Biological Executor — BLOCKED
+```
+
+NEXT REAL GAPS:
+
+```text
+1. Vina scientific validation
+2. OpenMM if valid structured input exists
+3. fresh full E2E including PySCF
+4. independent laboratory observation loop
+```
+
+No architecture, feature, refactor, cosmetic change or expensive runtime was added in this checkpoint. This block exists solely to lock the continuation state for the next Manus.
+
+## CURRENT ENVIRONMENT RUNTIME RECHECK
+
+The synchronized repository checkpoint contains bounded Vina, OpenMM and PySCF adapters and prior commits documenting runtime-backed validation in another environment. A fresh detector run in this checkout's current sandbox reports:
+
+```text
+Vina: BLOCKED_BY_RUNTIME — docking_unavailable: No module named 'vina'
+OpenMM: BLOCKED_BY_RUNTIME — openmm_unavailable:No module named 'openmm'
+PySCF: BLOCKED_BY_RUNTIME — pyscf_unavailable: No module named 'pyscf'
+```
+
+This is an environment-specific availability result, not a code failure and not evidence that the adapters are invalid. No dependency installation, docking, molecular dynamics or quantum-chemistry run was attempted. The existing Vina/PySCF bounded workflows and honest failure paths remain in the repository; fresh execution must be repeated in an environment where the declared interpreter and dependencies are actually present. No scientific output or accuracy claim is promoted from the unavailable runtime.
+
+- **VERIFIED HEAD:** `273998b`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **REMOTE:** synchronized with local HEAD
+- **WORKING TREE:** clean before this documentation append
+- **PARKED:** fresh Vina scientific validation, OpenMM execution, fresh PySCF E2E in this sandbox, and independent laboratory observation.
+
+## COMPLETED RUNTIME BLOCK: bounded Vina, OpenMM and PySCF validation
+
+The current sandbox was safely prepared using the repository-declared compute dependencies from `requirements-compute.txt`: RDKit 2026.3.5, SciPy 1.18.1, Vina 1.2.7, Meeko 0.8.0, OpenMM 8.6.0 and PySCF 2.14.0. No application code or dependency manifest was changed.
+
+A real RCSB PDB 1VII input was retrieved from `https://files.rcsb.org/download/1VII.pdb`, persisted at `docs/evidence/openmm/1VII.pdb`, and pinned with `docs/evidence/openmm/1VII.provenance.json`. Its SHA-256 is `ebecd3d6c0dd9c8b34bcbea9b57c73e4f73986cc674150f0aaa0687db66e77ef` and the raw payload is 62,694 bytes.
+
+Bounded runtime validation completed:
+
+```text
+Vina detector: AVAILABLE — AutoDock Vina 1.2.7 + Meeko 0.8.0
+Vina reference-case: PASS — 5 poses, best -2.226 kcal/mol
+Vina seeded determinism: PASS — -1.900 / -1.900 kcal/mol
+Vina search-effort invariant: PASS — -1.909 <= -1.904 + tolerance
+Vina affinity accuracy vs experimental co-crystal benchmark: BLOCKED_BY_RESOURCES
+
+OpenMM detector: AVAILABLE — OpenMM 8.6 CPU
+OpenMM reference: PASS — real 1VII, AMBER14 + implicit OBC2, 100 steps, seed 20260821
+OpenMM potential energy: -798.3844 before, -5084.1799 minimized, -4031.7106 after (kJ/mol)
+OpenMM simulated time: 0.2 ps; atom count after hydrogen addition: 596
+
+PySCF benchmark: PASS — 5/5 bounded cases
+PySCF H2 RHF/STO-3G literature anchor: -1.11675931 Ha vs -1.1168 expected
+PySCF variational, translation and permutation invariants: PASS
+```
+
+The Vina result is explicitly a software-integration/reference case using a rigid small-molecule stand-in, not a protein target and not an experimental affinity measurement. OpenMM is a bounded computational 1VII benchmark, not an equilibrium simulation, binding result or biological efficacy claim. PySCF remains a bounded computational model, not an experimental observation.
+
+Focused backend validation passed: `299 passed, 17 skipped, 0 failed`; OpenMM/Vina/PySCF syntax checks passed; `git diff --check` passed. The next real gap is fresh full Natural Discovery → PySCF → report → Memory → Replay E2E using the available runtime and real 3D input; the canonical Vina experimental-affinity validation remains blocked by the unavailable external co-crystal benchmark.
+
+- **CHECKPOINT BEFORE THIS BLOCK:** `893ae91`
+- **BRANCH:** `manus/next-gap-observation-analysis`
+- **PARKED:** canonical protein-ligand affinity accuracy, independent laboratory observation, biological execution and clinical efficacy.
+- **NEXT LARGE GAP:** fresh full PySCF Natural Discovery E2E with actual reachable PubChem 3D input; if live source retrieval fails, preserve the exact source blocker and continue to the next software-only reproducibility gap.
+
+
+## FRESH E2E CHECKPOINT: Natural Discovery → PySCF boundary (2026-08-30)
+
+A fresh Chromium run executed the existing natural-discovery orchestration against the local Genesis backend with `executeHeavyCompute: true`. PubChem returned 7 source-backed identity records and ChEMBL returned 37 live activity records. Seven cheap candidate runs completed. The result remained `RESOLVED` and retained the existing explicit non-efficacy/non-safety research boundary.
+
+PySCF 2.14.0 was installed in the sandbox and its independent H2/water reference and Fabric API tests passed. In the natural-discovery run, all seven candidates were honestly marked `BLOCKED` with `resultOrigin=missing-source-3d`: the current live candidate catalog did not provide a valid PubChem 3D conformer for any eligible candidate, so no synthetic coordinates or quantum outputs were used. The report lineage remained deterministic and included the blocked PySCF entries; no false PySCF run was promoted.
+
+The complete raw E2E evidence is stored at `docs/evidence/natural-pyscf-e2e-2026-08-30.json`. Browser console logs also recorded seven HTTP 400 responses from the unavailable heavy-compute routes and one HTTP 503 response; these are recorded as environment/runtime evidence, not hidden. `rdkitOk=0`, `admetOk=0`, `pyscfOk=0`, `pyscfBlocked=7` in this run. The remaining gap is a fresh candidate whose live PubChem record supplies a valid 3D conformer, followed by the same report → Memory → Replay verification; the previously verified CID 2519 PySCF calculation remains a separate source-backed probe and is not silently substituted here.
+
+
+## COMPLETED GAP: Natural Discovery → PubChem 3D → PySCF E2E (2026-08-30)
+
+The live PubChem 3D response for CID 2519 was inspected and confirmed to contain 24 atom numbers in `PC_Compounds[0].atoms.element` plus 24-value `x`, `y`, and `z` conformer arrays. The natural-discovery adapter previously expected the obsolete/object-shaped `atoms.element.number` form, which silently converted valid source geometry into `missing-source-3d`. The adapter now accepts the actual PubChem atom-array shape while preserving strict length, element and finite-coordinate validation.
+
+Caffeine CID 2519 was added to the existing source-backed natural-discovery catalog. A fresh Chromium E2E then completed with 12 PubChem identity records, 39 live ChEMBL activity records, 8 cheap runs and 7 real PySCF runs. CID 2519 completed with PySCF 2.14.0, run ID `pyscf:837bec0e4bbfe63479a19e0c`, converged energy `-667.72420427 Hartree`, HOMO–LUMO gap `12.2639 eV`, dipole `3.0446 Debye`, 102 electrons and 80 basis functions. The result is `real-engine`/`MODEL_ESTIMATE` computational output only; it is not an observation, efficacy, safety or clinical claim. One candidate remained blocked because it had no valid source 3D conformer.
+
+Added regression coverage for the real `atoms.element` array shape. Focused natural-discovery tests passed (`7 passed` including the new regression), the frontend TypeScript/Vite build passed, and `git diff --check` passed. RDKit/ADMET routes still report independent HTTP 400/503 runtime blockers in this sandbox and were not represented as successful runs. Evidence is in `docs/evidence/natural-pyscf-e2e-2026-08-30.json` and the PubChem source note is in `docs/evidence/pubchem-cid-2519-3d-source-2026-08-30.md`.
+
+
+## CHECKPOINT: maximum capability sprint continuation (2026-08-31)
+
+- **HEAD:** `7da5fff` on `manus/next-gap-observation-analysis`; pushed and synchronized with origin. `main` untouched.
+- **Real benchmark:** 6 engines executed; 44/44 cases executed successfully and 43/43 scored cases passed. RDKit, PySCF, OpenMM, ADMET-AI 2.0.1, AutoDock Vina 1.2.7 + Meeko, and Biopython 1.88 are available in this sandbox. Vina experimental-affinity accuracy remains `BLOCKED_BY_RESOURCES`, honestly retained as a gap.
+- **Investor WOW:** existing `scripts/discovery-e2e.mjs` passed with live-source/discovery lineage checks; no authentication bypass was added.
+- **Natural Composition:** Drug Discovery admin UI now lets an authorized user select exactly two resolved source-backed reports. It deterministically renders the existing `CandidateCombinationHypothesis` contract, evidence/target coverage, research priority, uncertainty, and validation plan. It explicitly reports `compute: NOT_EXECUTED`; no synergy, efficacy, safety, or clinical claim is made.
+- **Verification:** full monorepo test passed (`317 passed, 0 failed, 2 skipped` in the Node backend suite; frontend suite/build passed), lint passed after explicit Fetch globals were declared in the allowlisted biotech proxy files, and focused proxy tests passed 3/3.
+- **Next largest gap:** fresh browser-authenticated natural discovery execution with top-two selection through Memory/Replay, followed by candidate-specific docking promotion only if a scientifically interpretable receptor/ligand contract exists. Independent experimental validation remains external.
+
+## COMPLETED COHERENT BLOCK: Natural ketamine-like mechanism discovery
+
+The actual active branch now contains a bounded source-backed ketamine-like natural discovery path in `packages/frontend/src/core/biotechData/ketamineNaturalDiscovery.ts`, reusing the existing biotech candidate/report/comparison, provenance, Biological Validation Request and Scientific Memory infrastructure.
+
+The path constructs a literature-supported ketamine reference profile (PubChem CID 3821; NMDAR noncompetitive/use-dependent open-channel block), evaluates five natural candidates with separate structural, target, functional, mechanistic, physicochemical, ADMET and evidence-quality axes, includes explicit falsification criteria, and creates a `REQUIRES_EXPERIMENT` next-step protocol. The bounded deterministic result ranks Trodusquemine first for direct functional NMDAR evidence, followed by Agmatine and Isoliquiritigenin. Every report keeps clinical efficacy `UNKNOWN`, and no candidate is labeled a confirmed ketamine substitute.
+
+Science Chat recognizes English and Polish ketamine inflections, including `ketaminy`, and routes the request through the existing user-facing path. Targeted Chromium smoke verified the visible result, Trodusquemine ranking, `REQUIRES_EXPERIMENT` disclosure, explicit limitations and Scientific Memory write with comparison/replay fingerprint. No biological experiment is launched.
+
+Validation: ketamine discovery tests 3 passed; Scientific Memory tests 17 passed; full repository tests 299 passed, 17 skipped, 0 failed; frontend build and root lint passed; targeted Chromium smoke passed with zero page/console errors. The remaining limitation is external: no independent shared-condition NMDAR assay has been executed, so the claim ceiling remains a bounded functionally-supported research candidate and protocol-level discriminator.
+
+- **CHECKPOINT BEFORE THIS BLOCK:** `7198e67`
+- **ACTIVE BRANCH:** `manus/next-gap-observation-analysis`
+- **CURRENT STATUS:** ketamine-like natural discovery is user-reachable, deterministic, source-backed and memory-persisted; biological validation remains `REQUIRES_EXPERIMENT`.
+- **PARKED:** independent NMDAR assay, clinical efficacy, CNS exposure, safety conclusion and experimental equivalence to ketamine.
+- **NEXT LARGE GAP:** bounded replay verification of the ketamine discovery artifact through the existing Scientific Memory comparison replay path.

@@ -1,0 +1,90 @@
+import { describe, expect, it } from 'vitest';
+import {
+  CHEMBL_ACTIVITY_189031_RELEASE,
+  CHEMBL_ACTIVITY_189031_RETRIEVED_AT,
+  CHEMBL_ACTIVITY_189031_SOURCE_URL,
+  mapPinnedChEMBLCaffeineA1Activity,
+  buildPinnedChEMBLCaffeineDiscovery,
+} from '../core/biotechData/chembl';
+import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
+
+describe('pinned ChEMBL bioactivity', () => {
+  it('maps a real caffeine bioactivity record to target and evidence contracts', () => {
+    const record = mapPinnedChEMBLCaffeineA1Activity();
+
+    expect(record.compoundId).toBe('pubchem:CID:2519');
+    expect(record.biologicalTarget).toMatchObject({
+      id: 'chembl:target:CHEMBL318',
+      label: 'Adenosine receptor A1',
+      targetType: 'SINGLE PROTEIN',
+      status: 'OBSERVED',
+    });
+    expect(record.biologicalEvidence).toMatchObject({
+      id: 'chembl:activity:189031',
+      status: 'LITERATURE_SUPPORTED',
+      subjectIds: ['pubchem:CID:2519', 'chembl:target:CHEMBL318'],
+    });
+    expect(record.activity).toEqual({
+      activityId: 189031,
+      assayId: 'CHEMBL876556',
+      type: 'Ki',
+      relation: '=',
+      value: '41000.0',
+      units: 'nM',
+      assayContext: 'Ability to inhibit binding of [3H]R-PIA to Adenosine A1 receptor in rat brain cortical membranes',
+    });
+  });
+
+  it('preserves source release, retrieval context, raw response and replay fingerprint', () => {
+    const first = mapPinnedChEMBLCaffeineA1Activity();
+    const second = mapPinnedChEMBLCaffeineA1Activity();
+
+    expect(first.sourceUrl).toBe(CHEMBL_ACTIVITY_189031_SOURCE_URL);
+    expect(first.sourceVersion).toBe(CHEMBL_ACTIVITY_189031_RELEASE);
+    expect(first.retrievedAt).toBe(CHEMBL_ACTIVITY_189031_RETRIEVED_AT);
+    expect(first.rawResponse.activity.activityId).toBe(189031);
+    expect(first.rawResponse.target.targetChemblId).toBe('CHEMBL318');
+    expect(first.rawResponse.assay.assayChemblId).toBe('CHEMBL876556');
+    expect(first.fingerprint).toMatch(/^[0-9a-f]{8}$/);
+    expect(first.fingerprint).toBe(second.fingerprint);
+  });
+
+  it('connects the pinned record to candidate, ranking, hypothesis and report', () => {
+    const discovery = buildPinnedChEMBLCaffeineDiscovery();
+
+    expect(discovery.candidate).toMatchObject({
+      id: 'candidate:pubchem:CID:2519:chembl:target:CHEMBL318',
+      status: 'UNKNOWN',
+      supportingEvidenceIds: ['chembl:activity:189031'],
+      hypothesisIds: ['hypothesis:candidate:pubchem:CID:2519:chembl:target:CHEMBL318'],
+    });
+    expect(discovery.ranking.epistemicStatus).toBe('PREDICTION');
+    expect(discovery.ranking.rationale).toMatch(/not efficacy|probability/i);
+    expect(discovery.hypothesis).toMatchObject({ status: 'HYPOTHESIS', candidateId: discovery.candidate.id, supportingEvidenceIds: ['chembl:activity:189031'] });
+    expect(discovery.report).toMatchObject({ candidateId: discovery.candidate.id, targetIds: ['chembl:target:CHEMBL318'], evidenceIds: ['chembl:activity:189031'], epistemicStatus: 'HYPOTHESIS' });
+    expect(discovery.report.provenance.some((item) => item.sourceId === 'chembl:activity:189031')).toBe(true);
+  });
+
+  it('maps pinned PubChem ADME properties with independent provenance', () => {
+    const record = mapPinnedPubChemCaffeine();
+
+    expect(record.adme).toMatchObject({
+      xLogP: -0.1,
+      tpsa: 58.4,
+      hydrogenBondDonorCount: 0,
+      hydrogenBondAcceptorCount: 3,
+      rotatableBondCount: 0,
+      source: 'PubChem PUG REST',
+      sourceId: 'pubchem:CID:2519:properties:adme',
+    });
+    expect(record.adme.sourceUrl).toContain('/property/XLogP,HBondDonorCount');
+  });
+
+  it('does not turn the binding record into efficacy or safety claims', () => {
+    const record = mapPinnedChEMBLCaffeineA1Activity();
+
+    expect(record.biologicalEvidence.claim).not.toMatch(/efficacy|safety|therapeutic benefit/i);
+    expect(record.biologicalEvidence.provenance[0]?.uncertainty).toMatch(/clinical efficacy|safety/i);
+    expect(record.biologicalTarget.provenance[0]?.sourceId).toBe('chembl:target:CHEMBL318');
+  });
+});

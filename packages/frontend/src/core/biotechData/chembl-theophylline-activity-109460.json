@@ -1,0 +1,44 @@
+{
+  "source": "ChEMBL Web Services",
+  "sourceVersion": "ChEMBL_37",
+  "retrievedAt": "2026-08-29",
+  "molecule": {
+    "moleculeChemblId": "CHEMBL1355736",
+    "preferredName": "THEOPHYLLINE",
+    "molecularFormula": "C7H10N4O3",
+    "molecularWeight": "198.18",
+    "canonicalSmiles": "Cn1c(=O)c2nc[nH]c2n(C)c1=O.O",
+    "inchiKey": "INQSMEFCAIHTJG-UHFFFAOYSA-N",
+    "alogp": "-1.04",
+    "psa": "72.68",
+    "npLikenessScore": "-0.75"
+  },
+  "target": {
+    "targetChemblId": "CHEMBL318",
+    "prefName": "Adenosine receptor A1",
+    "targetType": "SINGLE PROTEIN"
+  },
+  "assay": {
+    "assayChemblId": "CHEMBL641038",
+    "assayType": "B",
+    "description": "Inhibition of [3H]-CHA binding to rat brain membrane Adenosine A1 receptor",
+    "targetChemblId": "CHEMBL318",
+    "confidenceScore": 9,
+    "confidenceDescription": "Direct single protein target assigned",
+    "documentChemblId": "CHEMBL1125020"
+  },
+  "activity": {
+    "activityId": 109460,
+    "standardType": "Ki",
+    "standardRelation": "=",
+    "standardValue": "700.0",
+    "standardUnits": "nM",
+    "pchemblValue": "6.16",
+    "documentChemblId": "CHEMBL1125020"
+  },
+  "sourceUrls": {
+    "activity": "https://www.ebi.ac.uk/chembl/api/data/activity/109460.json",
+    "molecule": "https://www.ebi.ac.uk/chembl/api/data/molecule/CHEMBL1355736.json",
+    "assay": "https://www.ebi.ac.uk/chembl/api/data/assay/CHEMBL641038.json"
+  }
+}

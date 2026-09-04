@@ -1,0 +1,139 @@
+import { describe, expect, it } from 'vitest';
+import { mapPinnedPubChemCaffeine, PUBCHEM_CID_2519_SOURCE_URL } from '../core/biotechData/pubchem';
+import {
+  biotechScientificFingerprint,
+  createCandidateDiscoveryReport,
+  compareCandidateDiscoveryReports,
+  rankTherapeuticCandidate,
+  isPredictiveBiotechStatus,
+  type BiologicalEvidence,
+  biologicalExperimentRequestFingerprint,
+  type TherapeuticCandidate,
+  type TherapeuticHypothesis,
+  type SafetySignal,
+} from '../core/biotechDiscoveryContract';
+
+const evidence: BiologicalEvidence = {
+  kind: 'biological-evidence',
+  id: 'evidence-1',
+  namespace: 'example',
+  label: 'Example evidence',
+  status: 'LITERATURE_SUPPORTED',
+  claim: 'A bounded biological claim.',
+  subjectIds: ['compound-1'],
+  provenance: [{ source: 'UNSPECIFIED', sourceId: 'UNSPECIFIED', evidenceType: 'UNSPECIFIED', status: 'UNKNOWN' }],
+};
+
+describe('biotech discovery contract', () => {
+  it('fingerprints scientific identity and is stable under object key order', () => {
+    const reordered = { ...evidence, provenance: [{ ...evidence.provenance[0] }], subjectIds: ['compound-1'] };
+    expect(biotechScientificFingerprint(evidence)).toBe(biotechScientificFingerprint(reordered));
+    expect(biotechScientificFingerprint({ ...evidence, claim: 'A changed biological claim.' } as BiologicalEvidence)).not.toBe(biotechScientificFingerprint(evidence));
+  });
+
+  it('represents candidate to evidence, target, safety and hypothesis by stable IDs', () => {
+    const candidate: TherapeuticCandidate = {
+      kind: 'therapeutic-candidate', id: 'candidate-1', namespace: 'example', label: 'Example candidate', status: 'HYPOTHESIS',
+      materialId: 'material-1', compoundIds: ['compound-1'], targetIds: ['target-1'], mechanismIds: ['mechanism-1'],
+      supportingEvidenceIds: ['evidence-1'], safetySignalIds: ['safety-1'], hypothesisIds: ['hypothesis-1'], provenance: [],
+    };
+    const hypothesis: TherapeuticHypothesis = {
+      kind: 'therapeutic-hypothesis', id: 'hypothesis-1', namespace: 'example', label: 'Example hypothesis', status: 'HYPOTHESIS',
+      claim: 'A bounded hypothesis.', candidateId: candidate.id, targetIds: candidate.targetIds, mechanismIds: candidate.mechanismIds,
+      supportingEvidenceIds: candidate.supportingEvidenceIds, safetySignalIds: candidate.safetySignalIds, provenance: [],
+    };
+    expect(candidate.supportingEvidenceIds).toContain(evidence.id);
+    expect(hypothesis.candidateId).toBe(candidate.id);
+    expect(hypothesis.supportingEvidenceIds).toEqual(candidate.supportingEvidenceIds);
+  });
+
+  it('builds a deterministic structured candidate discovery report', () => {
+    const candidate: TherapeuticCandidate = {
+      kind: 'therapeutic-candidate', id: 'candidate-1', namespace: 'example', label: 'Example candidate', status: 'HYPOTHESIS',
+      materialId: 'material-1', compoundIds: ['compound-1'], targetIds: ['target-1'], mechanismIds: ['mechanism-1'],
+      supportingEvidenceIds: ['evidence-1'], safetySignalIds: ['safety-1'], hypothesisIds: ['hypothesis-1'], provenance: [],
+    };
+    const hypothesis: TherapeuticHypothesis = {
+      kind: 'therapeutic-hypothesis', id: 'hypothesis-1', namespace: 'example', label: 'Example hypothesis', status: 'HYPOTHESIS',
+      claim: 'A bounded hypothesis.', candidateId: candidate.id, targetIds: candidate.targetIds, mechanismIds: candidate.mechanismIds,
+      supportingEvidenceIds: candidate.supportingEvidenceIds, safetySignalIds: candidate.safetySignalIds, provenance: [],
+    };
+    const ranking = rankTherapeuticCandidate({ candidate, evidenceQuality: 'UNKNOWN', targetRelevance: 0, safetySignals: [], uncertaintyPenalty: 1 });
+    const report = createCandidateDiscoveryReport({ candidate, hypothesis, ranking, uncertainty: 'Synthetic demo; no biological validation.' });
+    expect(report.reportId).toBe(`report:${report.scientificFingerprint}`);
+    expect(report.evidenceIds).toEqual(['evidence-1']);
+    expect(report.safetySignalIds).toEqual(['safety-1']);
+    expect(report.epistemicStatus).toBe('HYPOTHESIS');
+    expect(report.uncertainty).toContain('no biological validation');
+    expect(report.ranking?.candidateId).toBe(candidate.id);
+    expect(report.ranking?.epistemicStatus).toBe('PREDICTION');
+  });
+
+  it('represents hypothesis to biological experiment without claiming execution', () => {
+    const request = {
+      hypothesisId: 'hypothesis-1', candidateId: 'candidate-1', targetIds: ['target-1'],
+      researchQuestion: 'What should be measured?', primaryMetric: 'defined-metric', constraints: { assay: 'example' },
+    } as const;
+    expect(biologicalExperimentRequestFingerprint(request)).toMatch(/^[0-9a-f]{8}$/);
+    expect({ ...request, targetIds: ['target-2'] }).not.toEqual(request);
+  });
+
+  it('maps the pinned PubChem compound with reproducible provenance only', () => {
+    const record = mapPinnedPubChemCaffeine();
+    expect(record.sourceId).toBe('pubchem:CID:2519');
+    expect(record.sourceUrl).toBe(PUBCHEM_CID_2519_SOURCE_URL);
+    expect(record.retrievedAt).toBe('2026-08-29');
+    expect(record.compound).toMatchObject({ id: 'pubchem:CID:2519', label: 'Caffeine', status: 'OBSERVED', parentMaterialIds: [] });
+    expect(record.compound.provenance[0]).toMatchObject({ sourceId: 'pubchem:CID:2519', sourceUrl: PUBCHEM_CID_2519_SOURCE_URL, sourceVersion: 'PubChem CID 2519', retrievedAt: '2026-08-29' });
+    expect(record.compound.provenance[0]?.uncertainty).toContain('does not establish biological activity or safety');
+  });
+
+  it('ranks research priority with explicit components, not efficacy probability', () => {
+    const candidate: TherapeuticCandidate = {
+      kind: 'therapeutic-candidate', id: 'candidate-rank', namespace: 'synthetic-demo', label: 'Synthetic demo candidate', status: 'HYPOTHESIS',
+      materialId: 'material-demo', compoundIds: ['compound-demo'], targetIds: ['target-demo'], mechanismIds: ['mechanism-demo'],
+      supportingEvidenceIds: ['evidence-demo'], safetySignalIds: ['safety-demo'], hypothesisIds: ['hypothesis-demo'], provenance: [],
+    };
+    const ranked = rankTherapeuticCandidate({ candidate, evidenceQuality: 'HIGH', targetRelevance: 1, safetySignals: [], uncertaintyPenalty: 0.25 });
+    expect(ranked.candidateId).toBe(candidate.id);
+    expect(ranked.score).toBe(0.675);
+    expect(ranked.components).toEqual({ evidenceQuality: 1, targetRelevance: 1, safetyPenalty: 0, uncertaintyPenalty: 0.25 });
+    expect(ranked.epistemicStatus).toBe('PREDICTION');
+    expect(ranked.rationale).toContain('not efficacy or probability');
+  });
+
+  it('compares multiple discovery reports as research-priority predictions', () => {
+    const report = (candidateId: string, score: number) => ({
+      reportId: `report:${candidateId}`, candidateId, materialId: `material:${candidateId}`, compoundIds: [`compound:${candidateId}`],
+      targetIds: ['target-1'], mechanismIds: [], evidenceIds: [`evidence:${candidateId}`], safetySignalIds: [], hypothesisId: `hypothesis:${candidateId}`,
+      ranking: { candidateId, score, components: { evidenceQuality: score, targetRelevance: 1, safetyPenalty: 0, uncertaintyPenalty: 0 }, rationale: 'Research-priority only.', uncertainty: 'Not efficacy.', epistemicStatus: 'PREDICTION' as const },
+      epistemicStatus: 'HYPOTHESIS' as const, scientificEvidenceStatus: 'HYPOTHESIS' as const, clinicalEfficacy: 'UNKNOWN' as const, uncertainty: 'No biological validation.', provenance: [{ source: 'fixture', sourceId: `evidence:${candidateId}`, evidenceType: 'test', status: 'LITERATURE_SUPPORTED' as const }], scientificFingerprint: `fp-${candidateId}`,
+    });
+    const comparison = compareCandidateDiscoveryReports([report('candidate-b', 0.4), report('candidate-a', 0.8)]);
+
+    expect(comparison.rows.map((row) => row.candidateId)).toEqual(['candidate-a', 'candidate-b']);
+    expect(comparison.rows[0]).toMatchObject({ rank: 1, score: 0.8, scoreDeltaFromTop: 0, epistemicStatus: 'PREDICTION' });
+    expect(comparison.rows[1]).toMatchObject({ rank: 2, score: 0.4, scoreDeltaFromTop: -0.4, provenanceIds: ['evidence:candidate-b'] });
+    expect(comparison.uncertainty).toMatch(/not efficacy|clinical suitability/i);
+    expect(comparison.comparisonId).toBe(`comparison:${comparison.scientificFingerprint}`);
+    expect(() => compareCandidateDiscoveryReports([report('candidate-a', 0.8), report('candidate-a', 0.7)])).toThrow(/duplikatu candidateId/i);
+  });
+
+  it('keeps safety signals explicit without inventing a safety score', () => {
+    const signal: SafetySignal = {
+      kind: 'safety-signal', id: 'safety-demo', namespace: 'synthetic-demo', label: 'Synthetic demo safety signal', status: 'UNKNOWN',
+      signalType: 'uncertainty', description: 'Synthetic demo only.', evidenceQuality: 'UNKNOWN', uncertainty: 'Not assessed.', provenance: [],
+    };
+    expect(signal.evidenceQuality).toBe('UNKNOWN');
+    expect(signal.uncertainty).toBe('Not assessed.');
+    expect(signal).not.toHaveProperty('score');
+  });
+
+  it('keeps predictive statuses distinct from established fact', () => {
+    expect(isPredictiveBiotechStatus('PREDICTION')).toBe(true);
+    expect(isPredictiveBiotechStatus('INFERENCE')).toBe(true);
+    expect(isPredictiveBiotechStatus('HYPOTHESIS')).toBe(true);
+    expect(isPredictiveBiotechStatus('FACT')).toBe(false);
+    expect(isPredictiveBiotechStatus('UNKNOWN')).toBe(false);
+  });
+});

@@ -1,0 +1,39 @@
+{
+  "observationStatus": "PUBLIC_REAL_DATA",
+  "source": {
+    "provider": "USGS",
+    "monitoringLocationId": "USGS-01646500",
+    "timeSeriesId": "66a4e3fb8abe42fcb0942b5c0fe98f68",
+    "parameterCode": "00060",
+    "statisticId": "00011",
+    "sourceUnit": "ft^3/s",
+    "normalizedUnit": "m^3/s",
+    "conversion": "1 ft^3/s = 0.028316846592 m^3/s",
+    "approvalStatus": "Provisional",
+    "rawPayload": "USGS-01646500-00060-2026-08-20.json",
+    "metadata": "USGS-01646500-monitoring-location.json",
+    "rawPayloadSha256": "df142e9ebbee2c82d73ae2f1b0c3fd749e6d9f74336f8bc1b1d616bc0e51776f",
+    "metadataSha256": "252094dd79c6527e3ea14cde454a82cf27d9d78f7426f2e74570348f9a95b034"
+  },
+  "observations": [
+    {"time":"2026-08-20T00:00:00+00:00","sourceValue":"2850","normalizedValueM3PerS":80.7030127872,"qualifier":null},
+    {"time":"2026-08-20T00:05:00+00:00","sourceValue":"2900","normalizedValueM3PerS":82.1188551168,"qualifier":null},
+    {"time":"2026-08-20T00:10:00+00:00","sourceValue":"2900","normalizedValueM3PerS":82.1188551168,"qualifier":null},
+    {"time":"2026-08-20T00:15:00+00:00","sourceValue":"2900","normalizedValueM3PerS":82.1188551168,"qualifier":null},
+    {"time":"2026-08-20T00:20:00+00:00","sourceValue":"2900","normalizedValueM3PerS":82.1188551168,"qualifier":null},
+    {"time":"2026-08-20T00:25:00+00:00","sourceValue":"2850","normalizedValueM3PerS":80.7030127872,"qualifier":null},
+    {"time":"2026-08-20T00:30:00+00:00","sourceValue":"2850","normalizedValueM3PerS":80.7030127872,"qualifier":null},
+    {"time":"2026-08-20T00:35:00+00:00","sourceValue":"2850","normalizedValueM3PerS":80.7030127872,"qualifier":null},
+    {"time":"2026-08-20T00:40:00+00:00","sourceValue":"2850","normalizedValueM3PerS":80.7030127872,"qualifier":null},
+    {"time":"2026-08-20T00:45:00+00:00","sourceValue":"2850","normalizedValueM3PerS":80.7030127872,"qualifier":null}
+  ],
+  "provenance": {
+    "transformId": "usgs-discharge-ft3s-to-m3s",
+    "transformVersion": "1.0.0",
+    "normalization": "Decimal source strings converted using the exact declared factor; source values remain preserved.",
+    "replayInput": "Pinned raw payload only; no network refetch permitted.",
+    "fingerprintScope": ["rawPayloadSha256","metadataSha256","transformId","transformVersion","stationId","parameterCode","observationWindow"],
+    "genesisModelComparisonStatus": "VERIFY_REQUIRED",
+    "genesisModelComparisonReason": "USGS 00060 is open-channel stream discharge; existing Genesis pump-pipe model accepts volumetricFlow as an exogenous closed-pipe design input and does not predict stream discharge."
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "fixtureVersion": "1.0.0",
+  "fixtureOnly": true,
+  "status": "MANUAL_REVIEW",
+  "campaign": {
+    "campaignId": "campaign_fixture_reference_001",
+    "projectId": "project_fixture_reference_001",
+    "domain": "bounded-chemistry-search",
+    "objective": "Reference only: verify contract shape and lineage preservation.",
+    "engine": "genesis-campaign-reference",
+    "engineVersion": "fixture-1.0.0",
+    "deterministic": true
+  },
+  "candidate": {
+    "candidateId": "candidate_fixture_001",
+    "generation": 0,
+    "canonicalSmiles": "CCO",
+    "parentId": null,
+    "parentSmiles": null,
+    "transformation": null,
+    "runIds": ["science_run_fixture_001"],
+    "status": "retained",
+    "pareto": false
+  },
+  "scienceRun": {
+    "runId": "science_run_fixture_001",
+    "capability": "admet-estimation",
+    "method": "reference-fixture-only",
+    "status": "ok",
+    "evidenceClass": "MODEL_ESTIMATE",
+    "inputs": {"smiles": "CCO"},
+    "outputs": {"fixtureValue": "NOT_PROVIDED"},
+    "units": {},
+    "warnings": ["Fixture does not execute a scientific engine and contains no scientific output."],
+    "provenance": {
+      "fixtureId": "campaign-evidence-reference-001",
+      "source": "contract-fixture",
+      "resultOrigin": "NOT_EXECUTED",
+      "replay": "NOT_EXECUTED",
+      "inputHash": "FIXTURE_ONLY",
+      "outputHash": "NOT_PROVIDED"
+    }
+  },
+  "lineage": {
+    "eventOrder": ["campaign_created", "candidate_retained", "science_run_recorded"],
+    "decisionId": "NOT_PROVIDED",
+    "jobId": "NOT_PROVIDED",
+    "cancellationState": "NOT_PROVIDED",
+    "authContext": "NOT_PROVIDED"
+  },
+  "lossReportForFabricEvidencePack": {
+    "status": "BLOCKED",
+    "lossless": false,
+    "missingOrIncompatible": [
+      "Campaign/project RBAC context is not represented by ScientificEvidenceChain.",
+      "Campaign job identity and cancellation state are not represented by ScientificEvidenceChain.",
+      "Campaign event ordering and candidate lineage are not losslessly represented by the Fabric chain.",
+      "Campaign MODEL_ESTIMATE evidence class is not equivalent to a completed Fabric real-engine run.",
+      "Replay semantics are capability-specific and cannot be inferred from a generic Fabric run.",
+      "Fixture intentionally has no scientific output and must not be exported as an Evidence Pack."
+    ],
+    "requiredBeforeManualReview": [
+      "Versioned CampaignEvidenceProjection schema.",
+      "Explicit authorization and project-scope mapping.",
+      "Loss policy and compatibility tests.",
+      "Replay and cancellation semantics.",
+      "A real deterministic reference case with non-fixture outputs.",
+      "Independent review that the mapping does not imply validation beyond the Campaign model."
+    ]
+  }
+}

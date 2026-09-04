@@ -1,0 +1,463 @@
+import { canonicalJson, fnv1a } from './events/hash';
+export { canonicalJson, fnv1a } from './events/hash';
+
+/** Epistemic status is explicit; prediction and inference never become facts. */
+export type BiotechEpistemicStatus =
+  | 'FACT'
+  | 'OBSERVED'
+  | 'LITERATURE_SUPPORTED'
+  | 'PREDICTION'
+  | 'INFERENCE'
+  | 'HYPOTHESIS'
+  | 'UNKNOWN'
+  | 'BLOCKED';
+
+export type BiotechRecordKind =
+  | 'natural-material'
+  | 'compound'
+  | 'biological-target'
+  | 'mechanism'
+  | 'safety-signal'
+  | 'biological-evidence'
+  | 'therapeutic-candidate'
+  | 'therapeutic-hypothesis';
+
+export interface BiotechIdentity {
+  kind: BiotechRecordKind;
+  /** Stable local or external identifier; no timestamp or runtime id. */
+  id: string;
+  namespace: string;
+}
+
+export interface BiotechProvenance {
+  source: string;
+  sourceId: string;
+  evidenceType: string;
+  status: BiotechEpistemicStatus;
+  uncertainty?: string;
+  sourceUrl?: string;
+  sourceVersion?: string;
+  retrievedAt?: string;
+}
+
+export interface BiotechRecord extends BiotechIdentity {
+  label: string;
+  status: BiotechEpistemicStatus;
+  provenance: readonly BiotechProvenance[];
+}
+
+export interface NaturalMaterial extends BiotechRecord {
+  kind: 'natural-material';
+  sourceDescription: string;
+}
+
+export interface Compound extends BiotechRecord {
+  kind: 'compound';
+  structureRef?: string;
+  parentMaterialIds: readonly string[];
+}
+
+export interface TherapeuticCandidate extends BiotechRecord {
+  kind: 'therapeutic-candidate';
+  materialId: string;
+  compoundIds: readonly string[];
+  targetIds: readonly string[];
+  mechanismIds: readonly string[];
+  supportingEvidenceIds: readonly string[];
+  safetySignalIds: readonly string[];
+  hypothesisIds: readonly string[];
+}
+
+export interface BiologicalTarget extends BiotechRecord {
+  kind: 'biological-target';
+  targetType: string;
+}
+
+export interface Mechanism extends BiotechRecord {
+  kind: 'mechanism';
+  targetIds: readonly string[];
+  description: string;
+}
+
+export function createBindingMechanism(input: {
+  id: string;
+  label: string;
+  compoundLabel: string;
+  target: BiologicalTarget;
+  provenance: BiotechProvenance;
+}): Mechanism {
+  return {
+    kind: 'mechanism',
+    id: input.id,
+    namespace: 'genesis-biotech',
+    label: input.label,
+    status: 'HYPOTHESIS',
+    targetIds: [input.target.id],
+    description: `${input.compoundLabel}–${input.target.label} binding is a testable interaction hypothesis. The source-backed binding record does not establish downstream signaling, therapeutic mechanism or clinical efficacy.`,
+    provenance: [
+      input.provenance,
+      { ...input.provenance, sourceId: input.id, evidenceType: 'mechanism hypothesis derived from binding relationship', status: 'HYPOTHESIS' },
+    ],
+  };
+}
+
+export type SafetyEvidenceQuality = 'UNKNOWN' | 'LOW' | 'MODERATE' | 'HIGH';
+
+export interface SafetySignal extends BiotechRecord {
+  kind: 'safety-signal';
+  signalType: 'toxicity' | 'adverse-effect' | 'interaction' | 'uncertainty';
+  description: string;
+  evidenceQuality: SafetyEvidenceQuality;
+  uncertainty: string;
+}
+
+export interface BiologicalEvidence extends BiotechRecord {
+  kind: 'biological-evidence';
+  claim: string;
+  subjectIds: readonly string[];
+}
+
+export type CandidateRankingStatus = 'UNKNOWN' | 'PREDICTION';
+export type CandidateEvidenceQuality = 'UNKNOWN' | 'LOW' | 'MODERATE' | 'HIGH';
+
+export interface CandidateRanking {
+  candidateId: string;
+  score: number;
+  components: {
+    evidenceQuality: number;
+    targetRelevance: number;
+    safetyPenalty: number;
+    uncertaintyPenalty: number;
+    /** Availability of compatible, source-backed compute only; never efficacy or safety. */
+    computeSupport?: number;
+  };
+  rationale: string;
+  uncertainty: string;
+  epistemicStatus: CandidateRankingStatus;
+}
+
+export function rankTherapeuticCandidate(input: {
+  candidate: TherapeuticCandidate;
+  evidenceQuality: CandidateEvidenceQuality;
+  targetRelevance: number;
+  safetySignals: readonly SafetySignal[];
+  uncertaintyPenalty: number;
+}): CandidateRanking {
+  if (!Number.isFinite(input.targetRelevance) || input.targetRelevance < 0 || input.targetRelevance > 1) throw new Error('Target relevance musi być w zakresie 0..1.');
+  if (!Number.isFinite(input.uncertaintyPenalty) || input.uncertaintyPenalty < 0 || input.uncertaintyPenalty > 1) throw new Error('Uncertainty penalty musi być w zakresie 0..1.');
+  const evidenceQuality = { UNKNOWN: 0, LOW: 0.33, MODERATE: 0.66, HIGH: 1 }[input.evidenceQuality];
+  const safetyPenalty = Math.min(1, input.safetySignals.length / Math.max(1, input.candidate.safetySignalIds.length));
+  const components = { evidenceQuality, targetRelevance: input.targetRelevance, safetyPenalty, uncertaintyPenalty: input.uncertaintyPenalty };
+  const score = Number((0.4 * evidenceQuality + 0.3 * input.targetRelevance - 0.2 * safetyPenalty - 0.1 * input.uncertaintyPenalty).toFixed(4));
+  return {
+    candidateId: input.candidate.id, score, components,
+    rationale: 'Deterministic research-priority heuristic: evidence and target relevance increase priority; safety signals and uncertainty reduce it. Score is not efficacy or probability.',
+    uncertainty: 'No clinical efficacy or safety conclusion; source quality and target relevance require independent evidence.', epistemicStatus: 'PREDICTION',
+  };
+}
+
+export interface CandidateComparisonRow {
+  candidateId: string;
+  reportId: string;
+  rank: number;
+  score: number;
+  scoreDeltaFromTop: number;
+  epistemicStatus: 'PREDICTION';
+  provenanceIds: readonly string[];
+}
+
+export interface CandidateComparison {
+  comparisonId: string;
+  reportIds: readonly string[];
+  rows: readonly CandidateComparisonRow[];
+  epistemicStatus: 'PREDICTION';
+  uncertainty: string;
+  scientificFingerprint: string;
+}
+
+export function compareCandidateDiscoveryReports(reports: readonly CandidateDiscoveryReport[]): CandidateComparison {
+  if (reports.length === 0) throw new Error('Porównanie kandydatów wymaga co najmniej jednego raportu.');
+  const ids = new Set<string>();
+  for (const report of reports) {
+    if (ids.has(report.candidateId)) throw new Error(`Porównanie nie może zawierać duplikatu candidateId: ${report.candidateId}.`);
+    if (!report.ranking || report.ranking.candidateId !== report.candidateId) throw new Error(`Raport ${report.reportId} nie ma zgodnego research-priority ranking.`);
+    ids.add(report.candidateId);
+  }
+  const sorted = [...reports].sort((a, b) => (b.ranking!.score - a.ranking!.score) || a.candidateId.localeCompare(b.candidateId));
+  const topScore = sorted[0]!.ranking!.score;
+  const rows = sorted.map((report, index) => ({
+    candidateId: report.candidateId,
+    reportId: report.reportId,
+    rank: index + 1,
+    score: report.ranking!.score,
+    scoreDeltaFromTop: Number((report.ranking!.score - topScore).toFixed(4)),
+    epistemicStatus: 'PREDICTION' as const,
+    provenanceIds: report.provenance.map((item) => item.sourceId),
+  }));
+  const comparison = {
+    reportIds: reports.map((report) => report.reportId),
+    rows,
+    epistemicStatus: 'PREDICTION' as const,
+    uncertainty: 'Research-priority ordering only; not efficacy, safety, clinical suitability or probability. Reports retain their original provenance and epistemic statuses.',
+  };
+  const scientificFingerprint = fnv1a(canonicalJson(comparison));
+  return { ...comparison, comparisonId: `comparison:${scientificFingerprint}`, scientificFingerprint };
+}
+
+export type ClinicalEfficacyStatus = 'UNKNOWN' | 'SUPPORTED_BY_CLINICAL_DATA';
+
+export interface BiotechAdmeProfile {
+  source: 'DailyMed' | 'PubChem' | 'RDKit';
+  status: 'LITERATURE_SUPPORTED' | 'OBSERVED' | 'PREDICTION' | 'UNKNOWN';
+  metrics: readonly { name: string; value: number | string; units: string; context: string }[];
+  uncertainty: string;
+  provenance: readonly BiotechProvenance[];
+}
+
+export interface CandidateDiscoveryReport {
+  reportId: string;
+  candidateId: string;
+  materialId: string;
+  compoundIds: readonly string[];
+  targetIds: readonly string[];
+  mechanismIds: readonly string[];
+  evidenceIds: readonly string[];
+  safetySignalIds: readonly string[];
+  hypothesisId: string;
+  experimentRequestId?: string;
+  ranking?: CandidateRanking;
+  epistemicStatus: BiotechEpistemicStatus;
+  /** Scientific evidence status is distinct from any human clinical efficacy claim. */
+  scientificEvidenceStatus: BiotechEpistemicStatus;
+  clinicalEfficacy: ClinicalEfficacyStatus;
+  admeProfile?: BiotechAdmeProfile;
+  computeRuns?: readonly {
+    runtime: string;
+    version?: string;
+    runId?: string;
+    fingerprint?: string;
+    status: string;
+    resultOrigin: string;
+    outputs: Readonly<Record<string, string | number | boolean>>;
+  }[];
+  uncertainty: string;
+  provenance: readonly BiotechProvenance[];
+  scientificFingerprint: string;
+}
+
+export function createCandidateDiscoveryReport(input: {
+  candidate: TherapeuticCandidate;
+  hypothesis: TherapeuticHypothesis;
+  experimentRequest?: BiologicalExperimentRequest;
+  ranking?: CandidateRanking;
+  admeProfile?: BiotechAdmeProfile;
+  uncertainty: string;
+}): CandidateDiscoveryReport {
+  if (input.hypothesis.candidateId !== input.candidate.id) throw new Error('Raport wymaga zgodności candidateId i hypothesis.candidateId.');
+  if (!input.uncertainty.trim()) throw new Error('Raport wymaga jawnej niepewności.');
+  const report = {
+    candidateId: input.candidate.id,
+    materialId: input.candidate.materialId,
+    compoundIds: input.candidate.compoundIds,
+    targetIds: input.candidate.targetIds,
+    mechanismIds: input.candidate.mechanismIds,
+    evidenceIds: input.hypothesis.supportingEvidenceIds,
+    safetySignalIds: input.hypothesis.safetySignalIds,
+    hypothesisId: input.hypothesis.id,
+    ...(input.experimentRequest === undefined ? {} : { experimentRequestId: input.experimentRequest.requestId }),
+    ...(input.ranking === undefined ? {} : { ranking: input.ranking }),
+    epistemicStatus: input.hypothesis.status,
+    scientificEvidenceStatus: input.hypothesis.status,
+    clinicalEfficacy: 'UNKNOWN' as const,
+    ...(input.admeProfile === undefined ? {} : { admeProfile: input.admeProfile }),
+    uncertainty: input.uncertainty,
+  };
+  const scientificFingerprint = fnv1a(canonicalJson(report));
+  return { ...report, reportId: `report:${scientificFingerprint}`, provenance: [...input.candidate.provenance, ...input.hypothesis.provenance], scientificFingerprint };
+}
+
+export type BiologicalExperimentRequestStatus = 'NOT_EXECUTED' | 'BLOCKED';
+
+export interface BiologicalExperimentRequest {
+  requestId: string;
+  hypothesisId: string;
+  candidateId: string;
+  targetIds: readonly string[];
+  researchQuestion: string;
+  primaryMetric: string;
+  constraints: Readonly<Record<string, string | number | boolean>>;
+  status: BiologicalExperimentRequestStatus;
+  blockedReason?: string;
+}
+
+export function biologicalExperimentRequestFingerprint(request: Omit<BiologicalExperimentRequest, 'requestId' | 'status' | 'blockedReason'>): string {
+  return fnv1a(canonicalJson(request));
+}
+
+export function buildBiologicalValidationRequest(input: Pick<BiologicalExperimentRequest, 'hypothesisId' | 'candidateId' | 'targetIds'>): BiologicalExperimentRequest {
+  const request = {
+    hypothesisId: input.hypothesisId,
+    candidateId: input.candidateId,
+    targetIds: input.targetIds,
+    researchQuestion: 'Does an independent biological assay reproduce the source-backed candidate–target relationship?',
+    primaryMetric: 'pre-registered binding or functional activity measurement with assay context',
+    constraints: { executor: 'biological', source: 'independent assay required', noClinicalInference: true },
+  } as const;
+  return { ...request, requestId: `request:${biologicalExperimentRequestFingerprint(request)}`, status: 'BLOCKED', blockedReason: 'No reliable biological executor is configured in this environment.' };
+}
+
+export interface TherapeuticHypothesis extends BiotechRecord {
+  kind: 'therapeutic-hypothesis';
+  claim: string;
+  candidateId: string;
+  targetIds: readonly string[];
+  mechanismIds: readonly string[];
+  supportingEvidenceIds: readonly string[];
+  safetySignalIds: readonly string[];
+}
+
+export interface CandidateCombinationHypothesis {
+  combinationId: string;
+  candidateIds: readonly string[];
+  coveredEvidenceIds: readonly string[];
+  missingEvidenceIds: readonly string[];
+  coveredTargetIds: readonly string[];
+  coveredMechanismIds: readonly string[];
+  uncoveredTargetIds: readonly string[];
+  researchPriority: number;
+  validationPlan: readonly string[];
+  status: 'HYPOTHESIS';
+  uncertainty: string;
+}
+
+export function buildCandidateCombinationHypothesis(reports: readonly CandidateDiscoveryReport[], requestedTargetIds: readonly string[] = []): CandidateCombinationHypothesis | undefined {
+  if (reports.length < 2) return undefined;
+  const selected = [...reports].sort((a, b) => (b.ranking?.score ?? 0) - (a.ranking?.score ?? 0) || a.candidateId.localeCompare(b.candidateId)).slice(0, 2);
+  const coveredTargetIds = [...new Set(selected.flatMap((report) => report.targetIds))];
+  const coveredMechanismIds = [...new Set(selected.flatMap((report) => report.mechanismIds))];
+  const coveredEvidenceIds = [...new Set(selected.flatMap((report) => report.evidenceIds))];
+  const missingEvidenceIds = selected.flatMap((report) => report.evidenceIds.length === 0 ? [report.candidateId] : []);
+  const uncoveredTargetIds = requestedTargetIds.filter((targetId) => !coveredTargetIds.includes(targetId));
+  const researchPriority = Number((selected.reduce((sum, report) => sum + (report.ranking?.score ?? 0), 0) / selected.length).toFixed(4));
+  const basis = { candidateIds: selected.map((report) => report.candidateId), coveredEvidenceIds, missingEvidenceIds, coveredTargetIds, coveredMechanismIds, uncoveredTargetIds, researchPriority };
+  return { combinationId: `combination:${fnv1a(canonicalJson(basis))}`, ...basis, validationPlan: ['Confirm each candidate independently in a target-specific assay.', 'Test the combination with a pre-registered additivity/synergy design.', 'Measure mechanism and toxicity endpoints separately; do not infer synergy from binding.'], status: 'HYPOTHESIS', uncertainty: 'Combination coverage is a research hypothesis derived from declared target/mechanism IDs; no synergy, efficacy or safety conclusion is established.' };
+}
+
+/**
+ * Jawna podstawa uszeregowania kompozycji. Każda składowa jest policzalna z
+ * już zadeklarowanych pól raportów — nie ma tu wagi dobranej „na oko" ani
+ * jednej magicznej liczby podobieństwa.
+ */
+export interface CompositionRankingBasis {
+  /** Ile z żądanych targetów kompozycja NIE pokrywa. Mniej = lepiej. */
+  uncoveredTargetCount: number;
+  /** Liczba różnych rekordów evidence stojących za kompozycją. Więcej = lepiej. */
+  coveredEvidenceCount: number;
+  /** Ilu kandydatów w kompozycji nie ma ŻADNEGO evidence. Mniej = lepiej. */
+  missingEvidenceCount: number;
+  /** Średnia z istniejących ocen kandydatów (rankTherapeuticCandidate). Więcej = lepiej. */
+  researchPriority: number;
+}
+
+export interface RankedCompositionHypothesis extends CandidateCombinationHypothesis {
+  rank: number;
+  rankingBasis: CompositionRankingBasis;
+  /** Powód uszeregowania, kryterium po kryterium — do pokazania użytkownikowi jako WHY. */
+  rankingRationale: readonly string[];
+}
+
+/**
+ * Kolejność kryteriów jest LEKSYKOGRAFICZNA, nie ważona. Świadomie:
+ * ważenie wymagałoby wag, których nie da się uzasadnić danymi, a wtedy
+ * ranking byłby wymyśloną liczbą udającą pomiar. Porządek leksykograficzny
+ * da się przeczytać i zakwestionować kryterium po kryterium.
+ */
+export const COMPOSITION_RANKING_CRITERIA = [
+  'uncoveredTargetCount ascending — pokrycie żądanych targetów jest warunkiem wstępnym',
+  'coveredEvidenceCount descending — więcej niezależnych rekordów evidence',
+  'missingEvidenceCount ascending — kandydat bez evidence osłabia całą kompozycję',
+  'researchPriority descending — średnia z istniejących ocen kandydatów',
+  'candidateIds ascending — rozstrzygnięcie remisów, żeby wynik był deterministyczny',
+] as const;
+
+function compositionRankingBasis(hypothesis: CandidateCombinationHypothesis): CompositionRankingBasis {
+  return {
+    uncoveredTargetCount: hypothesis.uncoveredTargetIds.length,
+    coveredEvidenceCount: hypothesis.coveredEvidenceIds.length,
+    missingEvidenceCount: hypothesis.missingEvidenceIds.length,
+    researchPriority: hypothesis.researchPriority,
+  };
+}
+
+function compositionRationale(basis: CompositionRankingBasis, hypothesis: CandidateCombinationHypothesis): string[] {
+  return [
+    basis.uncoveredTargetCount === 0
+      ? 'Pokrywa wszystkie żądane targety.'
+      : `Nie pokrywa ${basis.uncoveredTargetCount} żądanych targetów: ${hypothesis.uncoveredTargetIds.join(', ')}.`,
+    `Opiera się na ${basis.coveredEvidenceCount} rekordach evidence.`,
+    basis.missingEvidenceCount === 0
+      ? 'Każdy kandydat ma przypisane evidence.'
+      : `${basis.missingEvidenceCount} kandydat(ów) bez żadnego evidence: ${hypothesis.missingEvidenceIds.join(', ')}.`,
+    `Średni priorytet badawczy kandydatów: ${basis.researchPriority.toFixed(4)}.`,
+  ];
+}
+
+/**
+ * TOP N hipotez kompozycji naturalnych.
+ *
+ * Buduje KAŻDĄ parę kandydatów przez istniejące
+ * `buildCandidateCombinationHypothesis` (żadnej drugiej implementacji) i
+ * szereguje je jawnymi kryteriami z `COMPOSITION_RANKING_CRITERIA`.
+ *
+ * Wynik to zbiór HIPOTEZ do sprawdzenia, a nie ranking skuteczności. Nie
+ * orzeka o równoważności klinicznej, synergii ani bezpieczeństwie — do tego
+ * potrzebne są badania wskazane w `validationPlan` każdej pozycji.
+ */
+export function rankNaturalCompositionHypotheses(
+  reports: readonly CandidateDiscoveryReport[],
+  requestedTargetIds: readonly string[] = [],
+  limit = 3,
+): RankedCompositionHypothesis[] {
+  if (reports.length < 2 || limit < 1) return [];
+
+  const hypotheses: CandidateCombinationHypothesis[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < reports.length; i++) {
+    for (let j = i + 1; j < reports.length; j++) {
+      const built = buildCandidateCombinationHypothesis([reports[i], reports[j]], requestedTargetIds);
+      if (built && !seen.has(built.combinationId)) {
+        seen.add(built.combinationId);
+        hypotheses.push(built);
+      }
+    }
+  }
+
+  return hypotheses
+    .map((hypothesis) => ({ hypothesis, basis: compositionRankingBasis(hypothesis) }))
+    .sort((a, b) =>
+      a.basis.uncoveredTargetCount - b.basis.uncoveredTargetCount
+      || b.basis.coveredEvidenceCount - a.basis.coveredEvidenceCount
+      || a.basis.missingEvidenceCount - b.basis.missingEvidenceCount
+      || b.basis.researchPriority - a.basis.researchPriority
+      || [...a.hypothesis.candidateIds].sort().join('|').localeCompare([...b.hypothesis.candidateIds].sort().join('|')))
+    .slice(0, limit)
+    .map(({ hypothesis, basis }, index) => ({
+      ...hypothesis,
+      rank: index + 1,
+      rankingBasis: basis,
+      rankingRationale: compositionRationale(basis, hypothesis),
+    }));
+}
+
+/**
+ * Stable scientific fingerprint. It intentionally excludes timestamps,
+ * backend run ids and volatile execution metadata, while including the full
+ * scientific record so a changed claim/status/provenance is detectable.
+ */
+export function biotechScientificFingerprint(record: BiotechRecord): string {
+  return fnv1a(canonicalJson(record));
+}
+
+export function isPredictiveBiotechStatus(status: BiotechEpistemicStatus): boolean {
+  return status === 'PREDICTION' || status === 'INFERENCE' || status === 'HYPOTHESIS';
+}

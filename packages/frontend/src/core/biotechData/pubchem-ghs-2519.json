@@ -1,0 +1,15 @@
+{
+  "source": "PubChem PUG View",
+  "sourceId": "pubchem:compound:2519:ghs:257",
+  "sourceVersion": "PubChem CID 2519 GHS record",
+  "retrievedAt": "2026-08-29",
+  "compoundId": "pubchem:CID:2519",
+  "referenceNumber": 257,
+  "signalWord": "Danger",
+  "hazardStatements": [
+    "H301: Toxic if swallowed",
+    "H332: Harmful if inhaled",
+    "H360: May damage fertility or the unborn child"
+  ],
+  "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/2519/JSON"
+}

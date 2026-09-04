@@ -1,0 +1,1287 @@
+/**
+ * Genesis OS — backend: trwały magazyn danych (Milestone 1: Backend Persistence).
+ *
+ * Wybór technologii: `node:sqlite` (wbudowany w Node 22, zero zewnętrznych
+ * zależności). To realna, transakcyjna baza SQL — nie atrapa. Schemat jest
+ * przenośnym, standardowym SQL, więc migracja do PostgreSQL dla dużych
+ * instytucji (uczelnie, projekty typu ESA/NASA) będzie zmianą sterownika, a
+ * nie przepisaniem modelu danych. Cały dostęp do danych przechodzi przez ten
+ * jeden moduł — server.mjs nigdy nie sięga do SQL bezpośrednio.
+ *
+ * Projekt pod skalę, ale implementujemy WYŁĄCZNIE zweryfikowaną funkcjonalność:
+ *  - użytkownicy + sesje (uwierzytelnianie),
+ *  - projekty + członkostwa z ROLAMI (RBAC: owner > admin > editor > viewer),
+ *  - trwałe, REPRODUKOWALNE Serie Prób (zamrożone parametry, wyjścia, wersja
+ *    modelu i autor — pełna prowieniencja każdej próby).
+ *
+ * `openDatabase(':memory:')` daje izolowaną bazę na test (node --test), bez
+ * dotykania dysku. Wszystkie funkcje są synchroniczne (taki jest node:sqlite),
+ * co upraszcza logikę API i testy.
+ */
+
+import { DatabaseSync } from 'node:sqlite';
+import { newId } from './auth.mjs';
+
+/* ---------------- Role i uprawnienia (RBAC) ---------------- */
+
+/** Ranga roli — wyższa liczba obejmuje wszystkie uprawnienia niższych. */
+export const ROLE_RANK = { viewer: 1, editor: 2, admin: 3, owner: 4 };
+export const ROLES = Object.keys(ROLE_RANK);
+
+/** Czy `role` ma co najmniej uprawnienia `min` (np. atLeast('admin','editor')===true). */
+export function atLeast(role, min) {
+  return (ROLE_RANK[role] ?? 0) >= (ROLE_RANK[min] ?? Infinity);
+}
+
+/* ---------------- Schemat ---------------- */
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS users (
+  id            TEXT PRIMARY KEY,
+  email         TEXT NOT NULL UNIQUE,
+  display_name  TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  token      TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE TABLE IF NOT EXISTS projects (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  owner_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  visibility  TEXT NOT NULL DEFAULT 'private',
+  created_at  INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS memberships (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role       TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (project_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS trials (
+  id            TEXT PRIMARY KEY,
+  project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  experiment_id TEXT NOT NULL,
+  author_id     TEXT NOT NULL REFERENCES users(id),
+  idx           INTEGER NOT NULL,
+  label         TEXT NOT NULL,
+  params_json   TEXT NOT NULL,
+  outputs_json  TEXT NOT NULL,
+  status        TEXT NOT NULL,
+  note          TEXT NOT NULL DEFAULT '',
+  parent_id     TEXT,
+  model_version TEXT NOT NULL DEFAULT '',
+  created_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trials_project ON trials(project_id, experiment_id, idx);
+`;
+
+/**
+ * Migracje schematu do wersji 2 (Milestone 2: Scientific Git). Realny mechanizm
+ * migracji „w przód" oparty o PRAGMA user_version — potrzebny, gdy baza z
+ * Milestone 1 (bez gałęzi) ma już dane instytucji. Dodaje:
+ *  - branches: nazwane linie pracy w projekcie (git-style),
+ *  - trials.branch_id: przynależność próby do gałęzi,
+ *  - merge_requests: recenzja i scalanie gałęzi (RBAC),
+ * a każdemu istniejącemu projektowi zakłada gałąź 'main' i przypisuje do niej
+ * dotychczasowe próby (backfill), więc żadna próba nie zostaje osierocona.
+ */
+const SCHEMA_V2 = `
+CREATE TABLE IF NOT EXISTS branches (
+  id             TEXT PRIMARY KEY,
+  project_id     TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name           TEXT NOT NULL,
+  base_branch_id TEXT,
+  created_by     TEXT NOT NULL REFERENCES users(id),
+  created_at     INTEGER NOT NULL,
+  UNIQUE (project_id, name)
+);
+CREATE TABLE IF NOT EXISTS merge_requests (
+  id               TEXT PRIMARY KEY,
+  project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  source_branch_id TEXT NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+  target_branch_id TEXT NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+  title            TEXT NOT NULL,
+  description      TEXT NOT NULL DEFAULT '',
+  status           TEXT NOT NULL DEFAULT 'open',
+  created_by       TEXT NOT NULL REFERENCES users(id),
+  created_at       INTEGER NOT NULL,
+  decided_by       TEXT,
+  decided_at       INTEGER,
+  review_note      TEXT NOT NULL DEFAULT '',
+  merged_count     INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_branches_project ON branches(project_id);
+CREATE INDEX IF NOT EXISTS idx_mr_project ON merge_requests(project_id, status);
+`;
+
+/**
+ * Migracja do wersji 3 (Backend Compute Engine): trwałe, audytowalne przebiegi
+ * obliczeń naukowych (Scientific Runs). Każdy wiersz to jeden odtwarzalny run z
+ * pełną prowieniencją. Opcjonalnie dowiązany do użytkownika i/lub projektu.
+ */
+const SCHEMA_V3 = `
+CREATE TABLE IF NOT EXISTS runs (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT REFERENCES users(id) ON DELETE SET NULL,
+  project_id     TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  model_id       TEXT NOT NULL,
+  model_version  TEXT NOT NULL,
+  domain         TEXT NOT NULL,
+  status         TEXT NOT NULL,
+  inputs_json    TEXT NOT NULL,
+  outputs_json   TEXT NOT NULL,
+  units_json     TEXT NOT NULL DEFAULT '{}',
+  warnings_json  TEXT NOT NULL DEFAULT '[]',
+  provenance_json TEXT NOT NULL DEFAULT '{}',
+  seed           INTEGER,
+  deterministic  INTEGER NOT NULL DEFAULT 1,
+  duration_ms    INTEGER NOT NULL DEFAULT 0,
+  created_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_runs_model ON runs(model_id, created_at);
+`;
+
+/**
+ * Migracja do wersji 4 (Drug Discovery, P6): cele biologiczne i kandydaci
+ * molekularni. Reużywa projekty (kontener) i przebiegi obliczeń (paszporty).
+ */
+const SCHEMA_V4 = `
+CREATE TABLE IF NOT EXISTS targets (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name            TEXT NOT NULL,
+  target_type     TEXT NOT NULL DEFAULT '',
+  gene_protein    TEXT NOT NULL DEFAULT '',
+  organism        TEXT NOT NULL DEFAULT '',
+  indication      TEXT NOT NULL DEFAULT '',
+  mechanism       TEXT NOT NULL DEFAULT '',
+  constraints     TEXT NOT NULL DEFAULT '',
+  evidence_status TEXT NOT NULL DEFAULT 'unverified',
+  provenance      TEXT NOT NULL DEFAULT '',
+  created_by      TEXT REFERENCES users(id),
+  created_at      INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS candidates (
+  id                TEXT PRIMARY KEY,
+  project_id        TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  target_id         TEXT REFERENCES targets(id) ON DELETE SET NULL,
+  label             TEXT NOT NULL,
+  formula           TEXT NOT NULL DEFAULT '',
+  smiles            TEXT NOT NULL DEFAULT '',
+  composition_json  TEXT NOT NULL DEFAULT '{}',
+  molecular_weight  REAL,
+  charge            INTEGER NOT NULL DEFAULT 0,
+  parent_id         TEXT,
+  generation_method TEXT NOT NULL DEFAULT 'manual',
+  provenance        TEXT NOT NULL DEFAULT '',
+  created_by        TEXT REFERENCES users(id),
+  created_at        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_targets_project ON targets(project_id);
+CREATE INDEX IF NOT EXISTS idx_candidates_project ON candidates(project_id, target_id);
+`;
+
+/**
+ * Migracja do wersji 5 (P5: system zadań obliczeniowych). Lekka abstrakcja
+ * zadań w procesie — bez Redis/Kubernetes. Rekord zadania jest gotowy pod
+ * przyszłych workerów (kolejka = wiersze 'queued').
+ */
+const SCHEMA_V5 = `
+CREATE TABLE IF NOT EXISTS jobs (
+  id           TEXT PRIMARY KEY,
+  project_id   TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  type         TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'queued',
+  progress     REAL NOT NULL DEFAULT 0,
+  params_json  TEXT NOT NULL DEFAULT '{}',
+  result_json  TEXT,
+  run_ids_json TEXT NOT NULL DEFAULT '[]',
+  error        TEXT,
+  created_by   TEXT REFERENCES users(id),
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_jobs_project ON jobs(project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+`;
+
+/**
+ * Migracja do wersji 6 (Scientific Acceleration Engine): trwałe kampanie
+ * naukowe. Historia decyzji/zdarzeń jest APPEND-ONLY. Reużywa projekty i
+ * Scientific Runs (prowieniencja).
+ */
+const SCHEMA_V6 = `
+CREATE TABLE IF NOT EXISTS campaigns (
+  id                TEXT PRIMARY KEY,
+  project_id        TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  objective         TEXT NOT NULL,
+  domain            TEXT NOT NULL,
+  objective_vector_json TEXT NOT NULL DEFAULT '[]',
+  constraints_json  TEXT NOT NULL DEFAULT '[]',
+  budget_json       TEXT NOT NULL DEFAULT '{}',
+  stopping_json     TEXT NOT NULL DEFAULT '{}',
+  strategy_json     TEXT NOT NULL DEFAULT '{}',
+  seed              INTEGER,
+  status            TEXT NOT NULL DEFAULT 'created',
+  current_generation INTEGER NOT NULL DEFAULT 0,
+  stop_reason       TEXT,
+  final_json        TEXT,
+  created_by        TEXT REFERENCES users(id),
+  created_at        INTEGER NOT NULL,
+  updated_at        INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS campaign_candidates (
+  id                 TEXT PRIMARY KEY,
+  campaign_id        TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  generation         INTEGER NOT NULL,
+  parent_id          TEXT,
+  parent_smiles      TEXT,
+  transformation     TEXT,
+  canonical_smiles   TEXT NOT NULL,
+  valid              INTEGER NOT NULL DEFAULT 1,
+  descriptors_json   TEXT NOT NULL DEFAULT '{}',
+  objective_vector_json TEXT NOT NULL DEFAULT '{}',
+  constraint_violations_json TEXT NOT NULL DEFAULT '[]',
+  pareto             INTEGER NOT NULL DEFAULT 0,
+  status             TEXT NOT NULL DEFAULT 'retained',
+  rejected_reason    TEXT,
+  run_ids_json       TEXT NOT NULL DEFAULT '[]',
+  created_at         INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS campaign_decisions (
+  id            TEXT PRIMARY KEY,
+  campaign_id   TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  generation    INTEGER NOT NULL,
+  state_hash    TEXT NOT NULL,
+  evidence_json TEXT NOT NULL DEFAULT '{}',
+  metrics_json  TEXT NOT NULL DEFAULT '{}',
+  algorithm     TEXT NOT NULL,
+  decision      TEXT NOT NULL,
+  params_json   TEXT NOT NULL DEFAULT '{}',
+  purpose       TEXT NOT NULL DEFAULT '',
+  created_at    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS campaign_events (
+  id          TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  generation  INTEGER NOT NULL DEFAULT 0,
+  type        TEXT NOT NULL,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_camp_project ON campaigns(project_id);
+CREATE INDEX IF NOT EXISTS idx_cand_campaign ON campaign_candidates(campaign_id, generation);
+CREATE INDEX IF NOT EXISTS idx_dec_campaign ON campaign_decisions(campaign_id, generation);
+CREATE INDEX IF NOT EXISTS idx_evt_campaign ON campaign_events(campaign_id, created_at);
+`;
+
+// Heavy scientific engines (docking/MD/QM/...): persisted runtime env audits and
+// external-engine scientific runs (raw artifacts, hashes, provenance).
+const SCHEMA_V7 = `
+CREATE TABLE IF NOT EXISTS env_audits (
+  id           TEXT PRIMARY KEY,
+  runtime_json TEXT NOT NULL DEFAULT '{}',
+  engines_json TEXT NOT NULL DEFAULT '{}',
+  created_at   INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS science_runs (
+  id             TEXT PRIMARY KEY,
+  project_id     TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  campaign_id    TEXT,
+  candidate_id   TEXT,
+  engine         TEXT NOT NULL,
+  engine_version TEXT,
+  capability     TEXT NOT NULL,
+  method         TEXT,
+  status         TEXT NOT NULL,
+  evidence_class TEXT NOT NULL DEFAULT 'MODEL_ESTIMATE',
+  inputs_json    TEXT NOT NULL DEFAULT '{}',
+  outputs_json   TEXT NOT NULL DEFAULT '{}',
+  units_json     TEXT NOT NULL DEFAULT '{}',
+  warnings_json  TEXT NOT NULL DEFAULT '[]',
+  provenance_json TEXT NOT NULL DEFAULT '{}',
+  input_hash     TEXT,
+  output_hash    TEXT,
+  artifacts_json TEXT NOT NULL DEFAULT '[]',
+  duration_ms    INTEGER NOT NULL DEFAULT 0,
+  created_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_science_runs_campaign ON science_runs(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_science_runs_candidate ON science_runs(candidate_id);
+`;
+
+// Scientific Reproducibility (Priority B): an environment fingerprint per run, plus an append-only
+// audit trail of replay-verification attempts (a run may be re-verified after an engine upgrade —
+// history is kept, never overwritten).
+const SCHEMA_V8 = `
+CREATE TABLE IF NOT EXISTS science_run_verifications (
+  id                       TEXT PRIMARY KEY,
+  science_run_id           TEXT NOT NULL REFERENCES science_runs(id) ON DELETE CASCADE,
+  verdict                  TEXT NOT NULL,
+  original_output_hash     TEXT,
+  replay_output_hash       TEXT,
+  original_engine_version  TEXT,
+  replay_engine_version    TEXT,
+  detail_json              TEXT NOT NULL DEFAULT '{}',
+  created_at               INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_science_run_verifications_run ON science_run_verifications(science_run_id);
+`;
+
+// Knowledge Ingestion: material is a project-scoped identity, while every uploaded
+// original is immutable in a numbered version row. This reuses the central store;
+// no second Knowledge Registry or implicit solver configuration is introduced.
+const SCHEMA_V9 = `
+CREATE TABLE IF NOT EXISTS knowledge_materials (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  material_key    TEXT NOT NULL,
+  title           TEXT NOT NULL,
+  current_version INTEGER NOT NULL DEFAULT 0,
+  created_by      TEXT NOT NULL REFERENCES users(id),
+  created_at      INTEGER NOT NULL,
+  updated_at      INTEGER NOT NULL,
+  UNIQUE (project_id, material_key)
+);
+CREATE TABLE IF NOT EXISTS knowledge_material_versions (
+  id                TEXT PRIMARY KEY,
+  material_id       TEXT NOT NULL REFERENCES knowledge_materials(id) ON DELETE CASCADE,
+  version           INTEGER NOT NULL,
+  file_name         TEXT NOT NULL,
+  mime_type         TEXT NOT NULL,
+  original_blob     BLOB NOT NULL,
+  byte_size         INTEGER NOT NULL,
+  content_sha256    TEXT NOT NULL,
+  topics_json       TEXT NOT NULL DEFAULT '[]',
+  source_url        TEXT,
+  extracted_text    TEXT NOT NULL DEFAULT '',
+  extraction_status TEXT NOT NULL,
+  epistemic_status  TEXT NOT NULL,
+  provenance_json   TEXT NOT NULL DEFAULT '{}',
+  uploaded_by       TEXT NOT NULL REFERENCES users(id),
+  created_at        INTEGER NOT NULL,
+  UNIQUE (material_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_knowledge_materials_project ON knowledge_materials(project_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_knowledge_versions_material ON knowledge_material_versions(material_id, version);
+`;
+
+// GIS artifacts are immutable project-scoped source data. They never store agents,
+// a simulation clock or a parallel World State; normalized JSON is preserved solely
+// for provenance-carrying, read-only renderer overlays.
+const SCHEMA_V10 = `
+CREATE TABLE IF NOT EXISTS project_spatial_datasets (
+  id                  TEXT PRIMARY KEY,
+  project_id          TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  dataset_id          TEXT NOT NULL,
+  label               TEXT NOT NULL,
+  normalized_json     TEXT NOT NULL,
+  original_blob       BLOB NOT NULL,
+  original_sha256     TEXT NOT NULL,
+  created_by          TEXT NOT NULL REFERENCES users(id),
+  created_at          INTEGER NOT NULL,
+  UNIQUE (project_id, dataset_id)
+);
+CREATE INDEX IF NOT EXISTS idx_project_spatial_datasets_project ON project_spatial_datasets(project_id, created_at DESC);
+`;
+
+function migrate(db) {
+  const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version < 9) db.exec(SCHEMA_V9);
+  if (version < 10) db.exec(SCHEMA_V10);
+  if (version < 7) db.exec(SCHEMA_V7);
+  if (version < 8) {
+    db.exec(SCHEMA_V8);
+    const cols = db.prepare('PRAGMA table_info(science_runs)').all();
+    if (!cols.some((c) => c.name === 'environment_hash')) {
+      db.exec('ALTER TABLE science_runs ADD COLUMN environment_hash TEXT');
+    }
+  }
+  if (version < 6) db.exec(SCHEMA_V6);
+  if (version < 5) db.exec(SCHEMA_V5);
+  if (version < 4) db.exec(SCHEMA_V4);
+  if (version < 3) db.exec(SCHEMA_V3);
+  if (version < 2) {
+    db.exec(SCHEMA_V2);
+    // Dodaj kolumnę branch_id do trials, jeśli jej nie ma (baza z M1).
+    const cols = db.prepare('PRAGMA table_info(trials)').all();
+    if (!cols.some((c) => c.name === 'branch_id')) {
+      db.exec('ALTER TABLE trials ADD COLUMN branch_id TEXT');
+    }
+    // Backfill: każdemu projektowi gałąź 'main' + przypisz istniejące próby.
+    const projects = db.prepare('SELECT id, owner_id FROM projects').all();
+    for (const p of projects) {
+      let main = db.prepare('SELECT id FROM branches WHERE project_id = ? AND name = ?').get(p.id, 'main');
+      if (!main) {
+        const id = newId();
+        db.prepare('INSERT INTO branches (id, project_id, name, base_branch_id, created_by, created_at) VALUES (?, ?, ?, NULL, ?, ?)').run(
+          id, p.id, 'main', p.owner_id, Date.now(),
+        );
+        main = { id };
+      }
+      db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
+    }
+  }
+  if (version < 8) db.exec('PRAGMA user_version = 8');
+  if (version < 9) db.exec('PRAGMA user_version = 9');
+  if (version < 10) db.exec('PRAGMA user_version = 10');
+}
+
+/** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
+export function openDatabase(filename = ':memory:') {
+  const db = new DatabaseSync(filename);
+  db.exec('PRAGMA foreign_keys = ON;');
+  if (filename !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
+  db.exec(SCHEMA);
+  migrate(db);
+  return db;
+}
+
+/* ---------------- Mapowanie wierszy → obiekty (camelCase, bez pól wrażliwych) ---------------- */
+
+function toUser(row) {
+  if (!row) return null;
+  return { id: row.id, email: row.email, displayName: row.display_name, createdAt: row.created_at };
+}
+function toProject(row, role) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    ownerId: row.owner_id,
+    visibility: row.visibility,
+    createdAt: row.created_at,
+    ...(role ? { role } : {}),
+  };
+}
+function toTrial(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    experimentId: row.experiment_id,
+    authorId: row.author_id,
+    index: row.idx,
+    label: row.label,
+    params: JSON.parse(row.params_json),
+    outputs: JSON.parse(row.outputs_json),
+    status: row.status,
+    note: row.note,
+    parentId: row.parent_id ?? null,
+    modelVersion: row.model_version,
+    branchId: row.branch_id ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+function toBranch(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    baseBranchId: row.base_branch_id ?? null,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+function toMergeRequest(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    sourceBranchId: row.source_branch_id,
+    targetBranchId: row.target_branch_id,
+    title: row.title,
+    description: row.description,
+    status: row.status,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    decidedBy: row.decided_by ?? null,
+    decidedAt: row.decided_at ?? null,
+    reviewNote: row.review_note,
+    mergedCount: row.merged_count,
+  };
+}
+
+/* ---------------- Użytkownicy ---------------- */
+
+/** Tworzy użytkownika. Rzuca Error('email_taken') przy duplikacie adresu. */
+export function createUser(db, { email, displayName, passwordHash }) {
+  const id = newId();
+  const now = Date.now();
+  try {
+    db.prepare(
+      'INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
+    ).run(id, email, displayName, passwordHash, now);
+  } catch (err) {
+    if (String(err?.message ?? '').includes('UNIQUE')) throw new Error('email_taken', { cause: err });
+    throw err;
+  }
+  return { id, email, displayName, createdAt: now };
+}
+
+export function getUserByEmail(db, email) {
+  return toUser(db.prepare('SELECT * FROM users WHERE email = ?').get(String(email).toLowerCase()));
+}
+export function getUserById(db, id) {
+  return toUser(db.prepare('SELECT * FROM users WHERE id = ?').get(id));
+}
+/** Zwraca surowy hash hasła (tylko do weryfikacji logowania — nie wychodzi poza API). */
+export function getPasswordHash(db, userId) {
+  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId);
+  return row?.password_hash ?? null;
+}
+
+/* ---------------- Sesje ---------------- */
+
+export function createSession(db, { userId, token, ttlMs }) {
+  const now = Date.now();
+  const expiresAt = now + ttlMs;
+  db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(
+    token,
+    userId,
+    now,
+    expiresAt,
+  );
+  return { token, userId, createdAt: now, expiresAt };
+}
+
+/** Zwraca użytkownika powiązanego z ważnym tokenem (albo null). Wygasłą sesję kasuje. */
+export function getUserByToken(db, token) {
+  if (!token) return null;
+  const s = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+  if (!s) return null;
+  if (Date.now() > s.expires_at) {
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    return null;
+  }
+  return getUserById(db, s.user_id);
+}
+
+export function deleteSession(db, token) {
+  db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+}
+
+/** Sprząta wygasłe sesje (wołane okresowo przez serwer). Zwraca liczbę usuniętych. */
+export function purgeExpiredSessions(db, now = Date.now()) {
+  return db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now).changes;
+}
+
+/* ---------------- Projekty i członkostwa (RBAC) ---------------- */
+
+/** Tworzy projekt i nadaje twórcy rolę 'owner' (jedna transakcja). */
+export function createProject(db, { name, description = '', ownerId, visibility = 'private' }) {
+  const id = newId();
+  const now = Date.now();
+  const tx = db.prepare('BEGIN');
+  tx.run();
+  try {
+    db.prepare(
+      'INSERT INTO projects (id, name, description, owner_id, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(id, name, description, ownerId, visibility, now);
+    db.prepare('INSERT INTO memberships (project_id, user_id, role, created_at) VALUES (?, ?, ?, ?)').run(
+      id,
+      ownerId,
+      'owner',
+      now,
+    );
+    // Każdy projekt startuje z gałęzią 'main' (Scientific Git).
+    db.prepare('INSERT INTO branches (id, project_id, name, base_branch_id, created_by, created_at) VALUES (?, ?, ?, NULL, ?, ?)').run(
+      newId(), id, 'main', ownerId, now,
+    );
+    db.prepare('COMMIT').run();
+  } catch (err) {
+    db.prepare('ROLLBACK').run();
+    throw err;
+  }
+  return toProject({ id, name, description, owner_id: ownerId, visibility, created_at: now }, 'owner');
+}
+
+export function getProject(db, id) {
+  return toProject(db.prepare('SELECT * FROM projects WHERE id = ?').get(id));
+}
+
+/** Projekty, których użytkownik jest członkiem — z jego rolą, najnowsze pierwsze. */
+export function listProjectsForUser(db, userId) {
+  const rows = db
+    .prepare(
+      `SELECT p.*, m.role AS role FROM projects p
+       JOIN memberships m ON m.project_id = p.id
+       WHERE m.user_id = ? ORDER BY p.created_at DESC`,
+    )
+    .all(userId);
+  return rows.map((r) => toProject(r, r.role));
+}
+
+/** Rola użytkownika w projekcie (albo null, jeśli nie jest członkiem). */
+export function getRole(db, projectId, userId) {
+  const row = db.prepare('SELECT role FROM memberships WHERE project_id = ? AND user_id = ?').get(projectId, userId);
+  return row?.role ?? null;
+}
+
+/** Dodaje/aktualizuje członka z rolą. Nie pozwala zdegradować jedynego właściciela. */
+export function setMember(db, { projectId, userId, role }) {
+  if (!ROLES.includes(role)) throw new Error('invalid_role');
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO memberships (project_id, user_id, role, created_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(project_id, user_id) DO UPDATE SET role = excluded.role`,
+  ).run(projectId, userId, role, now);
+  return { projectId, userId, role, createdAt: now };
+}
+
+export function listMembers(db, projectId) {
+  const rows = db
+    .prepare(
+      `SELECT m.user_id, m.role, m.created_at, u.email, u.display_name FROM memberships m
+       JOIN users u ON u.id = m.user_id
+       WHERE m.project_id = ? ORDER BY m.created_at ASC`,
+    )
+    .all(projectId);
+  return rows.map((r) => ({
+    userId: r.user_id,
+    role: r.role,
+    email: r.email,
+    displayName: r.display_name,
+    createdAt: r.created_at,
+  }));
+}
+
+/* ---------------- Knowledge Ingestion (materiały projektu) ---------------- */
+
+function toKnowledgeMaterial(row, { includeText = false, includeOriginal = false } = {}) {
+  if (!row) return null;
+  return {
+    id: row.material_id ?? row.id,
+    projectId: row.project_id,
+    title: row.title,
+    materialKey: row.material_key,
+    currentVersion: row.current_version,
+    createdBy: row.created_by,
+    createdAt: row.material_created_at ?? row.created_at,
+    updatedAt: row.updated_at,
+    versionId: row.version_id ?? null,
+    version: row.version ?? null,
+    fileName: row.file_name ?? null,
+    mimeType: row.mime_type ?? null,
+    byteSize: row.byte_size ?? null,
+    contentSha256: row.content_sha256 ?? null,
+    topics: row.topics_json ? JSON.parse(row.topics_json) : [],
+    sourceUrl: row.source_url ?? null,
+    extractionStatus: row.extraction_status ?? null,
+    epistemicStatus: row.epistemic_status ?? null,
+    provenance: row.provenance_json ? JSON.parse(row.provenance_json) : {},
+    ...(includeText ? { extractedText: row.extracted_text ?? '' } : {}),
+    ...(includeOriginal ? { originalBase64: Buffer.from(row.original_blob ?? []).toString('base64') } : {}),
+  };
+}
+
+const KNOWLEDGE_LATEST_SELECT = `
+  SELECT km.id AS material_id, km.project_id, km.material_key, km.title, km.current_version,
+         km.created_by, km.created_at AS material_created_at, km.updated_at,
+         kmv.id AS version_id, kmv.version, kmv.file_name, kmv.mime_type, kmv.original_blob,
+         kmv.byte_size, kmv.content_sha256, kmv.topics_json, kmv.source_url, kmv.extracted_text,
+         kmv.extraction_status, kmv.epistemic_status, kmv.provenance_json
+  FROM knowledge_materials km
+  JOIN knowledge_material_versions kmv ON kmv.material_id = km.id AND kmv.version = km.current_version`;
+
+/** Zapisuje oryginalny artefakt jako nową, niezmienną wersję tego samego materiału. */
+export function ingestKnowledgeMaterial(db, { projectId, uploadedBy, material }) {
+  const now = Date.now();
+  const existing = db.prepare('SELECT * FROM knowledge_materials WHERE project_id = ? AND material_key = ?').get(projectId, material.stableKey);
+  const materialId = existing?.id ?? newId();
+  const nextVersion = (existing?.current_version ?? 0) + 1;
+  const versionId = newId();
+  db.exec('BEGIN');
+  try {
+    if (!existing) {
+      db.prepare(`INSERT INTO knowledge_materials (id, project_id, material_key, title, current_version, created_by, created_at, updated_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(materialId, projectId, material.stableKey, material.title, nextVersion, uploadedBy, now, now);
+    } else {
+      db.prepare('UPDATE knowledge_materials SET title = ?, current_version = ?, updated_at = ? WHERE id = ?')
+        .run(material.title, nextVersion, now, materialId);
+    }
+    db.prepare(`INSERT INTO knowledge_material_versions
+      (id, material_id, version, file_name, mime_type, original_blob, byte_size, content_sha256, topics_json, source_url, extracted_text, extraction_status, epistemic_status, provenance_json, uploaded_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(versionId, materialId, nextVersion, material.fileName, material.mimeType, material.bytes, material.byteSize,
+        material.contentSha256, JSON.stringify(material.topics), material.sourceUrl, material.extractedText,
+        material.extractionStatus, material.epistemicStatus, JSON.stringify(material.provenance), uploadedBy, now);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+  return getKnowledgeMaterial(db, projectId, materialId, { includeText: true });
+}
+
+export function listKnowledgeMaterials(db, projectId) {
+  return db.prepare(`${KNOWLEDGE_LATEST_SELECT} WHERE km.project_id = ? ORDER BY km.updated_at DESC`).all(projectId)
+    .map((row) => toKnowledgeMaterial(row));
+}
+
+export function getKnowledgeMaterial(db, projectId, materialId, options = {}) {
+  const row = db.prepare(`${KNOWLEDGE_LATEST_SELECT} WHERE km.project_id = ? AND km.id = ?`).get(projectId, materialId);
+  return toKnowledgeMaterial(row, options);
+}
+
+/** Wyszukiwanie leksykalne w aktualnej wersji każdego materiału — bez wektorowej atrapy. */
+export function searchKnowledgeMaterials(db, projectId, tokens) {
+  const clean = Array.isArray(tokens) ? tokens.filter((token) => typeof token === 'string' && token.length >= 2).slice(0, 12) : [];
+  if (clean.length === 0) return [];
+  const clauses = clean.map(() => '(lower(km.title) LIKE ? OR lower(kmv.topics_json) LIKE ? OR lower(kmv.extracted_text) LIKE ?)');
+  const values = [projectId];
+  for (const token of clean) {
+    const needle = `%${token.toLocaleLowerCase('pl-PL')}%`;
+    values.push(needle, needle, needle);
+  }
+  // Pytania w Science Chat zawierają także słowa funkcyjne i czasowniki. Wystarczy
+  // deterministyczne trafienie co najmniej jednego terminu w tytule, tematach lub
+  // wyekstrahowanej treści; nie udajemy dopasowania semantycznego ani nie
+  // przekazujemy materiału jako instrukcji dla solvera.
+  const rows = db.prepare(`${KNOWLEDGE_LATEST_SELECT} WHERE km.project_id = ? AND (${clauses.join(' OR ')}) ORDER BY km.updated_at DESC LIMIT 12`).all(...values);
+  return rows.map((row) => toKnowledgeMaterial(row, { includeText: true }));
+}
+
+/* ---------------- Project-scoped GIS artifacts ---------------- */
+
+function toProjectSpatialDataset(row, { includeOriginal = false } = {}) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    datasetId: row.dataset_id,
+    label: row.label,
+    dataset: JSON.parse(row.normalized_json),
+    originalSha256: row.original_sha256,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    ...(includeOriginal ? { originalBase64: Buffer.from(row.original_blob).toString('base64') } : {}),
+  };
+}
+
+/** Persists an immutable source artifact; duplicate dataset fingerprints are reused per project. */
+export function saveProjectSpatialDataset(db, { projectId, createdBy, spatial }) {
+  const existing = db.prepare('SELECT * FROM project_spatial_datasets WHERE project_id = ? AND dataset_id = ?').get(projectId, spatial.dataset.datasetId);
+  if (existing) return toProjectSpatialDataset(existing);
+  const id = newId();
+  const now = Date.now();
+  db.prepare(`INSERT INTO project_spatial_datasets
+    (id, project_id, dataset_id, label, normalized_json, original_blob, original_sha256, created_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, projectId, spatial.dataset.datasetId, spatial.label, JSON.stringify(spatial.dataset), spatial.original,
+      spatial.originalSha256, createdBy, now);
+  return getProjectSpatialDataset(db, projectId, id);
+}
+
+export function listProjectSpatialDatasets(db, projectId) {
+  return db.prepare('SELECT * FROM project_spatial_datasets WHERE project_id = ? ORDER BY created_at DESC').all(projectId)
+    .map((row) => toProjectSpatialDataset(row));
+}
+
+export function getProjectSpatialDataset(db, projectId, id, options = {}) {
+  return toProjectSpatialDataset(db.prepare('SELECT * FROM project_spatial_datasets WHERE project_id = ? AND id = ?').get(projectId, id), options);
+}
+
+/* ---------------- Serie Prób (trwałe, reprodukowalne) ---------------- */
+
+/**
+ * Zapisuje próbę z pełną prowieniencją. Numer kolejny (idx) liczony w ramach
+ * (projekt, eksperyment), więc każdy eksperyment ma własną serię 001, 002…
+ * Zamrażamy: parametry wejściowe, policzone wyjścia, wersję modelu i autora —
+ * to czyni próbę REPRODUKOWALNĄ (można odtworzyć dokładnie ten sam przebieg).
+ */
+export function createTrial(db, { projectId, experimentId, authorId, label, params, outputs, status, note = '', parentId = null, modelVersion = '', branchId = null }) {
+  const id = newId();
+  const now = Date.now();
+  // Domyślnie gałąź 'main' projektu; numeracja jest per (gałąź, eksperyment).
+  const branch = branchId ?? getMainBranch(db, projectId)?.id ?? null;
+  const row = db
+    .prepare('SELECT MAX(idx) AS maxIdx FROM trials WHERE branch_id = ? AND experiment_id = ?')
+    .get(branch, experimentId);
+  const index = (row?.maxIdx ?? 0) + 1;
+  db.prepare(
+    `INSERT INTO trials (id, project_id, experiment_id, author_id, idx, label, params_json, outputs_json, status, note, parent_id, model_version, branch_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    projectId,
+    experimentId,
+    authorId,
+    index,
+    label || `Próba ${String(index).padStart(3, '0')}`,
+    JSON.stringify(params ?? {}),
+    JSON.stringify(outputs ?? {}),
+    status,
+    note,
+    parentId,
+    modelVersion,
+    branch,
+    now,
+  );
+  return getTrial(db, id);
+}
+
+export function getTrial(db, id) {
+  return toTrial(db.prepare('SELECT * FROM trials WHERE id = ?').get(id));
+}
+
+/**
+ * Próby projektu; opcjonalnie zawężone do eksperymentu i/lub gałęzi. Rosnąco po
+ * numerze. Filtr gałęzi realizuje „historię wersji tej linii pracy" (Scientific Git).
+ */
+export function listTrials(db, projectId, experimentId = null, branchId = null) {
+  const clauses = ['project_id = ?'];
+  const args = [projectId];
+  if (experimentId) { clauses.push('experiment_id = ?'); args.push(experimentId); }
+  if (branchId) { clauses.push('branch_id = ?'); args.push(branchId); }
+  const rows = db
+    .prepare(`SELECT * FROM trials WHERE ${clauses.join(' AND ')} ORDER BY experiment_id ASC, idx ASC`)
+    .all(...args);
+  return rows.map(toTrial);
+}
+
+/** Aktualizuje wyłącznie pola opisowe (etykieta/status/notatka) — dane naukowe są niezmienne. */
+export function updateTrial(db, id, patch = {}) {
+  const cur = db.prepare('SELECT * FROM trials WHERE id = ?').get(id);
+  if (!cur) return null;
+  const label = patch.label !== undefined ? String(patch.label).slice(0, 200) : cur.label;
+  const status = patch.status !== undefined ? String(patch.status).slice(0, 40) : cur.status;
+  const note = patch.note !== undefined ? String(patch.note).slice(0, 2000) : cur.note;
+  db.prepare('UPDATE trials SET label = ?, status = ?, note = ? WHERE id = ?').run(label, status, note, id);
+  return getTrial(db, id);
+}
+
+export function deleteTrial(db, id) {
+  return db.prepare('DELETE FROM trials WHERE id = ?').run(id).changes > 0;
+}
+
+/* ---------------- Scientific Git: gałęzie ---------------- */
+
+export function getMainBranch(db, projectId) {
+  return toBranch(db.prepare('SELECT * FROM branches WHERE project_id = ? AND name = ?').get(projectId, 'main'));
+}
+
+export function getBranch(db, id) {
+  return toBranch(db.prepare('SELECT * FROM branches WHERE id = ?').get(id));
+}
+
+export function listBranches(db, projectId) {
+  const rows = db.prepare('SELECT * FROM branches WHERE project_id = ? ORDER BY created_at ASC').all(projectId);
+  return rows.map(toBranch);
+}
+
+/** Tworzy nazwaną gałąź. Rzuca Error('branch_exists') przy duplikacie nazwy w projekcie. */
+export function createBranch(db, { projectId, name, baseBranchId = null, createdBy }) {
+  const id = newId();
+  const now = Date.now();
+  try {
+    db.prepare('INSERT INTO branches (id, project_id, name, base_branch_id, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+      id, projectId, name, baseBranchId, createdBy, now,
+    );
+  } catch (err) {
+    if (String(err?.message ?? '').includes('UNIQUE')) throw new Error('branch_exists', { cause: err });
+    throw err;
+  }
+  return toBranch({ id, project_id: projectId, name, base_branch_id: baseBranchId, created_by: createdBy, created_at: now });
+}
+
+/**
+ * Odgałęzienie: tworzy nową gałąź i KOPIUJE do niej bieżące próby gałęzi bazowej,
+ * zachowując prowieniencję (parametry, wyjścia, wersja modelu, autor) i wiążąc
+ * każdą kopię z oryginałem przez parent_id. To realny „fork" linii pracy — nowe
+ * próby są niezależne, ale ich rodowód pozostaje jawny.
+ */
+export function forkBranch(db, { projectId, name, baseBranchId, createdBy }) {
+  const tx = db.prepare('BEGIN');
+  tx.run();
+  try {
+    const branch = createBranch(db, { projectId, name, baseBranchId, createdBy });
+    const source = db.prepare('SELECT * FROM trials WHERE branch_id = ? ORDER BY experiment_id ASC, idx ASC').all(baseBranchId);
+    for (const t of source) {
+      db.prepare(
+        `INSERT INTO trials (id, project_id, experiment_id, author_id, idx, label, params_json, outputs_json, status, note, parent_id, model_version, branch_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        newId(), projectId, t.experiment_id, t.author_id, t.idx, t.label, t.params_json, t.outputs_json,
+        t.status, t.note, t.id, t.model_version, branch.id, Date.now(),
+      );
+    }
+    db.prepare('COMMIT').run();
+    return branch;
+  } catch (err) {
+    db.prepare('ROLLBACK').run();
+    throw err;
+  }
+}
+
+/* ---------------- Scientific Git: recenzja i scalanie (merge requests) ---------------- */
+
+export function createMergeRequest(db, { projectId, sourceBranchId, targetBranchId, title, description = '', createdBy }) {
+  const id = newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO merge_requests (id, project_id, source_branch_id, target_branch_id, title, description, status, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
+  ).run(id, projectId, sourceBranchId, targetBranchId, title, description, createdBy, now);
+  return getMergeRequest(db, id);
+}
+
+export function getMergeRequest(db, id) {
+  return toMergeRequest(db.prepare('SELECT * FROM merge_requests WHERE id = ?').get(id));
+}
+
+export function listMergeRequests(db, projectId) {
+  const rows = db.prepare('SELECT * FROM merge_requests WHERE project_id = ? ORDER BY created_at DESC').all(projectId);
+  return rows.map(toMergeRequest);
+}
+
+/**
+ * Recenzja: odrzuca albo zatwierdza+scala. Scalanie KOPIUJE próby gałęzi
+ * źródłowej do docelowej jako nowe próby (z parent_id → oryginał), zachowując
+ * pełną prowieniencję. Nic nie jest nadpisywane — historia obu gałęzi zostaje.
+ * Zwraca zaktualizowany merge request albo null, jeśli nie jest 'open'.
+ */
+export function decideMergeRequest(db, id, { approve, deciderId, reviewNote = '' }) {
+  const mr = db.prepare('SELECT * FROM merge_requests WHERE id = ?').get(id);
+  if (!mr || mr.status !== 'open') return null;
+  const now = Date.now();
+  if (!approve) {
+    db.prepare('UPDATE merge_requests SET status = ?, decided_by = ?, decided_at = ?, review_note = ? WHERE id = ?').run(
+      'rejected', deciderId, now, reviewNote, id,
+    );
+    return getMergeRequest(db, id);
+  }
+  const tx = db.prepare('BEGIN');
+  tx.run();
+  try {
+    const source = db.prepare('SELECT * FROM trials WHERE branch_id = ? ORDER BY experiment_id ASC, idx ASC').all(mr.source_branch_id);
+    let merged = 0;
+    for (const t of source) {
+      const maxRow = db.prepare('SELECT MAX(idx) AS m FROM trials WHERE branch_id = ? AND experiment_id = ?').get(mr.target_branch_id, t.experiment_id);
+      const idx = (maxRow?.m ?? 0) + 1;
+      db.prepare(
+        `INSERT INTO trials (id, project_id, experiment_id, author_id, idx, label, params_json, outputs_json, status, note, parent_id, model_version, branch_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        newId(), mr.project_id, t.experiment_id, t.author_id, idx, t.label, t.params_json, t.outputs_json,
+        t.status, t.note, t.id, t.model_version, mr.target_branch_id, now,
+      );
+      merged += 1;
+    }
+    db.prepare('UPDATE merge_requests SET status = ?, decided_by = ?, decided_at = ?, review_note = ?, merged_count = ? WHERE id = ?').run(
+      'merged', deciderId, now, reviewNote, merged, id,
+    );
+    db.prepare('COMMIT').run();
+  } catch (err) {
+    db.prepare('ROLLBACK').run();
+    throw err;
+  }
+  return getMergeRequest(db, id);
+}
+
+/* ---------------- Scientific Git: graf kontrybucji ---------------- */
+
+/**
+ * Graf kontrybucji: KTO i ILE prób wniósł oraz aktywność dzienna. Liczone z
+ * realnych wierszy trials (author_id, created_at) — zero wymyślonych metryk.
+ */
+export function contributionGraph(db, projectId) {
+  const perAuthor = db.prepare(
+    `SELECT t.author_id AS userId, u.display_name AS displayName, u.email AS email,
+            COUNT(*) AS trials, MIN(t.created_at) AS firstAt, MAX(t.created_at) AS lastAt
+     FROM trials t JOIN users u ON u.id = t.author_id
+     WHERE t.project_id = ? GROUP BY t.author_id ORDER BY trials DESC`,
+  ).all(projectId);
+
+  // Dzienne kubełki (UTC) — realna aktywność w czasie.
+  const rows = db.prepare('SELECT created_at FROM trials WHERE project_id = ?').all(projectId);
+  const perDay = {};
+  for (const r of rows) {
+    const day = new Date(r.created_at).toISOString().slice(0, 10);
+    perDay[day] = (perDay[day] ?? 0) + 1;
+  }
+  return {
+    contributors: perAuthor.map((r) => ({
+      userId: r.userId, displayName: r.displayName, email: r.email,
+      trials: r.trials, firstAt: r.firstAt, lastAt: r.lastAt,
+    })),
+    perDay,
+    totalTrials: rows.length,
+  };
+}
+
+/* ---------------- Przebiegi obliczeń (Scientific Runs, trwałe/audytowalne) ---------------- */
+
+function toRun(row) {
+  if (!row) return null;
+  return {
+    runId: row.id,
+    userId: row.user_id ?? null,
+    projectId: row.project_id ?? null,
+    modelId: row.model_id,
+    modelVersion: row.model_version,
+    domain: row.domain,
+    status: row.status,
+    inputs: JSON.parse(row.inputs_json),
+    outputs: JSON.parse(row.outputs_json),
+    units: JSON.parse(row.units_json),
+    warnings: JSON.parse(row.warnings_json),
+    provenance: JSON.parse(row.provenance_json),
+    seed: row.seed ?? null,
+    deterministic: row.deterministic === 1,
+    durationMs: row.duration_ms,
+    createdAt: row.created_at,
+  };
+}
+
+/** Zapisuje przebieg obliczeń (wynik engine.runModel) z pełną prowieniencją. */
+export function saveRun(db, run, { userId = null, projectId = null } = {}) {
+  db.prepare(
+    `INSERT INTO runs (id, user_id, project_id, model_id, model_version, domain, status, inputs_json, outputs_json, units_json, warnings_json, provenance_json, seed, deterministic, duration_ms, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    run.runId, userId, projectId, run.modelId, run.modelVersion ?? '', run.domain ?? '', run.status,
+    JSON.stringify(run.inputs ?? {}), JSON.stringify(run.outputs ?? {}), JSON.stringify(run.units ?? {}),
+    JSON.stringify(run.warnings ?? []), JSON.stringify(run.provenance ?? {}),
+    run.seed ?? null, run.deterministic === false ? 0 : 1, run.durationMs ?? 0, run.startedAt ?? Date.now(),
+  );
+  return getRun(db, run.runId);
+}
+
+export function getRun(db, id) {
+  return toRun(db.prepare('SELECT * FROM runs WHERE id = ?').get(id));
+}
+
+/** Przebiegi projektu (najnowsze pierwsze), do audytu i odtwarzalności. */
+export function listRuns(db, projectId, limit = 100) {
+  const rows = db.prepare('SELECT * FROM runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?').all(projectId, limit);
+  return rows.map(toRun);
+}
+
+/* ---------------- Drug Discovery: cele biologiczne i kandydaci ---------------- */
+
+function toTarget(row) {
+  if (!row) return null;
+  return {
+    id: row.id, projectId: row.project_id, name: row.name, targetType: row.target_type,
+    geneProtein: row.gene_protein, organism: row.organism, indication: row.indication,
+    mechanism: row.mechanism, constraints: row.constraints, evidenceStatus: row.evidence_status,
+    provenance: row.provenance, createdBy: row.created_by ?? null, createdAt: row.created_at,
+  };
+}
+function toCandidate(row) {
+  if (!row) return null;
+  return {
+    id: row.id, projectId: row.project_id, targetId: row.target_id ?? null, label: row.label,
+    formula: row.formula, smiles: row.smiles, composition: JSON.parse(row.composition_json),
+    molecularWeight: row.molecular_weight ?? null, charge: row.charge, parentId: row.parent_id ?? null,
+    generationMethod: row.generation_method, provenance: row.provenance,
+    createdBy: row.created_by ?? null, createdAt: row.created_at,
+  };
+}
+
+export function createTarget(db, t) {
+  const id = newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO targets (id, project_id, name, target_type, gene_protein, organism, indication, mechanism, constraints, evidence_status, provenance, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, t.projectId, t.name, t.targetType ?? '', t.geneProtein ?? '', t.organism ?? '', t.indication ?? '',
+    t.mechanism ?? '', t.constraints ?? '', t.evidenceStatus ?? 'unverified', t.provenance ?? '', t.createdBy ?? null, now,
+  );
+  return getTarget(db, id);
+}
+export function getTarget(db, id) {
+  return toTarget(db.prepare('SELECT * FROM targets WHERE id = ?').get(id));
+}
+export function listTargets(db, projectId) {
+  return db.prepare('SELECT * FROM targets WHERE project_id = ? ORDER BY created_at DESC').all(projectId).map(toTarget);
+}
+
+export function createCandidate(db, c) {
+  const id = newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO candidates (id, project_id, target_id, label, formula, smiles, composition_json, molecular_weight, charge, parent_id, generation_method, provenance, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, c.projectId, c.targetId ?? null, c.label, c.formula ?? '', c.smiles ?? '',
+    JSON.stringify(c.composition ?? {}), c.molecularWeight ?? null, c.charge ?? 0,
+    c.parentId ?? null, c.generationMethod ?? 'manual', c.provenance ?? '', c.createdBy ?? null, now,
+  );
+  return getCandidate(db, id);
+}
+export function getCandidate(db, id) {
+  return toCandidate(db.prepare('SELECT * FROM candidates WHERE id = ?').get(id));
+}
+export function listCandidates(db, projectId, targetId = null) {
+  const rows = targetId
+    ? db.prepare('SELECT * FROM candidates WHERE project_id = ? AND target_id = ? ORDER BY created_at ASC').all(projectId, targetId)
+    : db.prepare('SELECT * FROM candidates WHERE project_id = ? ORDER BY created_at ASC').all(projectId);
+  return rows.map(toCandidate);
+}
+
+/* ---------------- Zadania obliczeniowe (Compute Jobs, P5) ---------------- */
+
+function toJob(row) {
+  if (!row) return null;
+  return {
+    id: row.id, projectId: row.project_id ?? null, type: row.type, status: row.status,
+    progress: row.progress, params: JSON.parse(row.params_json),
+    result: row.result_json ? JSON.parse(row.result_json) : null,
+    runIds: JSON.parse(row.run_ids_json), error: row.error ?? null,
+    createdBy: row.created_by ?? null, createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+export function createJob(db, { projectId = null, type, params = {}, createdBy = null }) {
+  const id = newId();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO jobs (id, project_id, type, status, progress, params_json, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, 'queued', 0, ?, ?, ?, ?)`,
+  ).run(id, projectId, type, JSON.stringify(params), createdBy, now, now);
+  return getJob(db, id);
+}
+export function getJob(db, id) {
+  return toJob(db.prepare('SELECT * FROM jobs WHERE id = ?').get(id));
+}
+export function listJobs(db, projectId, limit = 50) {
+  return db.prepare('SELECT * FROM jobs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?').all(projectId, limit).map(toJob);
+}
+export function updateJob(db, id, patch = {}) {
+  const cur = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id);
+  if (!cur) return null;
+  const status = patch.status ?? cur.status;
+  const progress = patch.progress ?? cur.progress;
+  const result = patch.result !== undefined ? JSON.stringify(patch.result) : cur.result_json;
+  const runIds = patch.runIds !== undefined ? JSON.stringify(patch.runIds) : cur.run_ids_json;
+  const error = patch.error !== undefined ? patch.error : cur.error;
+  db.prepare('UPDATE jobs SET status = ?, progress = ?, result_json = ?, run_ids_json = ?, error = ?, updated_at = ? WHERE id = ?')
+    .run(status, progress, result, runIds, error, Date.now(), id);
+  return getJob(db, id);
+}
+
+/* ---------------- Heavy scientific engines: env audits + external Scientific Runs ---------------- */
+
+/** Persists a runtime scientific-environment audit (append-only). */
+export function saveEnvAudit(db, { runtime, engines }) {
+  const id = newId();
+  db.prepare('INSERT INTO env_audits (id, runtime_json, engines_json, created_at) VALUES (?, ?, ?, ?)')
+    .run(id, JSON.stringify(runtime ?? {}), JSON.stringify(engines ?? {}), Date.now());
+  return getEnvAudit(db, id);
+}
+
+export function getEnvAudit(db, id) {
+  const r = db.prepare('SELECT * FROM env_audits WHERE id = ?').get(id);
+  return r ? { id: r.id, runtime: JSON.parse(r.runtime_json), engines: JSON.parse(r.engines_json), createdAt: r.created_at } : null;
+}
+
+/** Latest persisted environment audit (or null). */
+export function latestEnvAudit(db) {
+  const r = db.prepare('SELECT id FROM env_audits ORDER BY created_at DESC LIMIT 1').get();
+  return r ? getEnvAudit(db, r.id) : null;
+}
+
+/**
+ * Persists a heavy-engine Scientific Run (docking/MD/QM/...). Raw artifacts,
+ * hashes and provenance are stored; results are MODEL_ESTIMATE unless stated.
+ * `environmentHash` (Priority B, Scientific Reproducibility) is captured
+ * automatically by the caller (see campaign/multiFidelity.mjs) via
+ * provenance.mjs#snapshotEnvironment — a fingerprint of the exact engine
+ * versions/runtime that produced this run, so a later replay can tell
+ * whether the environment changed.
+ */
+export function saveScienceRun(db, run) {
+  const id = run.id ?? newId();
+  db.prepare(
+    `INSERT INTO science_runs (id, project_id, campaign_id, candidate_id, engine, engine_version, capability, method, status, evidence_class, inputs_json, outputs_json, units_json, warnings_json, provenance_json, input_hash, output_hash, artifacts_json, duration_ms, created_at, environment_hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, run.projectId ?? null, run.campaignId ?? null, run.candidateId ?? null,
+    run.engine, run.engineVersion ?? null, run.capability, run.method ?? null,
+    run.status, run.evidenceClass ?? 'MODEL_ESTIMATE',
+    JSON.stringify(run.inputs ?? {}), JSON.stringify(run.outputs ?? {}), JSON.stringify(run.units ?? {}),
+    JSON.stringify(run.warnings ?? []), JSON.stringify(run.provenance ?? {}),
+    run.inputHash ?? null, run.outputHash ?? null, JSON.stringify(run.artifacts ?? []),
+    run.durationMs ?? 0, Date.now(), run.environmentHash ?? null,
+  );
+  return getScienceRun(db, id);
+}
+
+function toScienceRun(r) {
+  if (!r) return null;
+  return {
+    id: r.id, projectId: r.project_id ?? null, campaignId: r.campaign_id ?? null, candidateId: r.candidate_id ?? null,
+    engine: r.engine, engineVersion: r.engine_version ?? null, capability: r.capability, method: r.method ?? null,
+    status: r.status, evidenceClass: r.evidence_class, inputs: JSON.parse(r.inputs_json), outputs: JSON.parse(r.outputs_json),
+    units: JSON.parse(r.units_json), warnings: JSON.parse(r.warnings_json), provenance: JSON.parse(r.provenance_json),
+    inputHash: r.input_hash ?? null, outputHash: r.output_hash ?? null, artifacts: JSON.parse(r.artifacts_json),
+    durationMs: r.duration_ms, createdAt: r.created_at, environmentHash: r.environment_hash ?? null,
+  };
+}
+
+export function getScienceRun(db, id) {
+  return toScienceRun(db.prepare('SELECT * FROM science_runs WHERE id = ?').get(id));
+}
+
+export function listScienceRuns(db, campaignId) {
+  return db.prepare('SELECT * FROM science_runs WHERE campaign_id = ? ORDER BY created_at ASC').all(campaignId).map(toScienceRun);
+}
+
+/**
+ * Append-only audit trail of replay-verification attempts (Priority B). A
+ * Scientific Run may be re-verified more than once (e.g. after an engine
+ * upgrade) — history is preserved, never overwritten, so credibility claims
+ * can point at a full record rather than a single mutable status flag.
+ */
+export function saveScienceRunVerification(db, v) {
+  const id = v.id ?? newId();
+  db.prepare(
+    `INSERT INTO science_run_verifications (id, science_run_id, verdict, original_output_hash, replay_output_hash, original_engine_version, replay_engine_version, detail_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, v.scienceRunId, v.verdict,
+    v.originalOutputHash ?? null, v.replayOutputHash ?? null,
+    v.originalEngineVersion ?? null, v.replayEngineVersion ?? null,
+    JSON.stringify(v.detail ?? {}), Date.now(),
+  );
+  return getScienceRunVerification(db, id);
+}
+
+function toScienceRunVerification(r) {
+  if (!r) return null;
+  return {
+    id: r.id, scienceRunId: r.science_run_id, verdict: r.verdict,
+    originalOutputHash: r.original_output_hash ?? null, replayOutputHash: r.replay_output_hash ?? null,
+    originalEngineVersion: r.original_engine_version ?? null, replayEngineVersion: r.replay_engine_version ?? null,
+    detail: JSON.parse(r.detail_json), createdAt: r.created_at,
+  };
+}
+
+export function getScienceRunVerification(db, id) {
+  return toScienceRunVerification(db.prepare('SELECT * FROM science_run_verifications WHERE id = ?').get(id));
+}
+
+export function listScienceRunVerifications(db, scienceRunId) {
+  return db.prepare('SELECT * FROM science_run_verifications WHERE science_run_id = ? ORDER BY created_at ASC').all(scienceRunId).map(toScienceRunVerification);
+}
+
+export function listScienceRunsForCandidate(db, candidateId) {
+  return db.prepare('SELECT * FROM science_runs WHERE candidate_id = ? ORDER BY created_at ASC').all(candidateId).map(toScienceRun);
+}

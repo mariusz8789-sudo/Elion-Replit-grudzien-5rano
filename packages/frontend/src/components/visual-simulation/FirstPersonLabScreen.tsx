@@ -11,6 +11,7 @@ import type { SavedExperiment } from '../../core/scienceMemory';
 import { extractObservations } from '../../core/observationAnalysis/observationExtraction';
 import { analyzeExperiment } from '../../core/observationAnalysis/analysis';
 import { deriveFindings } from '../../core/observationAnalysis/findings';
+import { runScientificDiscoveryLoop, type ScientificDiscoveryLoopResult } from '../../core/experimentFabric/scientificDiscoveryLoop';
 
 /**
  * FIRST-PERSON SCIENTIST — jedna spójna, grywalna scena łącząca ISTNIEJĄCE
@@ -72,6 +73,8 @@ export function FirstPersonLabScreen() {
   const [paused, setPaused] = useState(false);
   const [hudHidden, setHudHidden] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [discoveryLoop, setDiscoveryLoop] = useState<ScientificDiscoveryLoopResult | null>(null);
+  const [discoveryLoopError, setDiscoveryLoopError] = useState<string | null>(null);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const runARef = useRef(runA);
@@ -185,6 +188,21 @@ export function FirstPersonLabScreen() {
     if (!runA || !runB) return;
     const cf = buildLabCounterfactual(runA.interventionStartDay, runB.interventionStartDay);
     setSaved(saveLabCounterfactualToMemory(cf));
+  };
+
+  // Ta sama pytanie badawcze co suwak powyżej ("dzień wejścia izolacji"), ale
+  // rozstrzygana automatycznie przez pełną pętlę: konkurencyjne hipotezy →
+  // realne przebiegi Scenario Engine → falsyfikacja → porównanie → następny
+  // eksperyment. Nic nowego naukowo — istniejący `runScientificDiscoveryLoop`
+  // (core/experimentFabric/scientificDiscoveryLoop.ts) w jednym wywołaniu.
+  const handleRunDiscoveryLoop = () => {
+    try {
+      setDiscoveryLoop(runScientificDiscoveryLoop('problem:intervention-timing'));
+      setDiscoveryLoopError(null);
+    } catch (error) {
+      setDiscoveryLoop(null);
+      setDiscoveryLoopError(error instanceof Error ? error.message : String(error));
+    }
   };
 
   const canInteract = stats.nearStation === 1 && canInteractInPhase(phase);
@@ -331,8 +349,53 @@ export function FirstPersonLabScreen() {
             {comparison && !saved && <button className="chip-btn primary" onClick={handleSave}>Zapisz w Pamięci Naukowej</button>}
             {cameraTaken && <button className="chip-btn" onClick={handleReturnToFirstPerson}>Powrót do pierwszej osoby</button>}
             {(runA || runB) && <button className="chip-btn danger" onClick={handleReset}>Reset</button>}
+            {!isRunning && <button className="chip-btn" onClick={handleRunDiscoveryLoop}>Uruchom Pętlę Odkrycia Naukowego</button>}
           </div>
         </div>
+      )}
+
+      {!hudHidden && discoveryLoopError && (
+        <section className="fp-observation-panel" aria-label="Scientific Discovery Loop error">
+          <div className="fp-observation-section">
+            <h2>PĘTLA ODKRYCIA — BLOKADA</h2>
+            <p>{discoveryLoopError}</p>
+          </div>
+        </section>
+      )}
+
+      {!hudHidden && discoveryLoop && (
+        <section className="fp-observation-panel" aria-label="Scientific Discovery Loop">
+          <div className="fp-observation-section">
+            <h2>KONKURENCYJNE HIPOTEZY</h2>
+            <p>{discoveryLoop.problem.statement}</p>
+            <div className="fp-observation-chips">
+              {discoveryLoop.loop.preregistration.hypotheses.map((hypothesis) => {
+                const outcome = discoveryLoop.loop.outcomes.find((entry) => entry.hypothesisId === hypothesis.hypothesisId);
+                const value = hypothesis.proposedExperiment?.parameters[discoveryLoop.problem.candidateVariable];
+                const chipClass = outcome?.status === 'FALSIFIED' ? 'critical' : outcome?.status === 'SUPPORTED' ? 'supported' : outcome?.status === 'INCONCLUSIVE' || outcome?.status === 'BLOCKED' ? 'notable' : '';
+                return (
+                  <span key={hypothesis.hypothesisId} className={`fp-observation-chip ${chipClass}`}>
+                    {discoveryLoop.problem.candidateVariable}={String(value)} · {outcome?.status ?? 'UNKNOWN'}
+                    {outcome?.observedMetric !== null && outcome?.observedMetric !== undefined ? ` · ${discoveryLoop.problem.primaryMetric}=${outcome.observedMetric}` : ''}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+          <div className="fp-observation-section">
+            <h2>PORÓWNANIE I FALSYFIKACJA</h2>
+            <p>{discoveryLoop.loop.discrimination.reason}</p>
+            {discoveryLoop.evidenceChain.filter((link) => link.findings.length > 0)[0] && (
+              <p className="fp-observation-meta">
+                Dowód: finding {discoveryLoop.evidenceChain.filter((link) => link.findings.length > 0)[0]!.findings[0]!.id} · resultFingerprint {discoveryLoop.evidenceChain.filter((link) => link.findings.length > 0)[0]!.findings[0]!.sourceSnapshot.resultFingerprint.slice(0, 12)}… · dzień {discoveryLoop.evidenceChain.filter((link) => link.findings.length > 0)[0]!.findings[0]!.sourceSnapshot.day}.
+              </p>
+            )}
+          </div>
+          <div className="fp-observation-section">
+            <h2>NASTĘPNY EKSPERYMENT</h2>
+            <p><strong>{discoveryLoop.nextExperiment.status}</strong>: {discoveryLoop.nextExperiment.why}</p>
+          </div>
+        </section>
       )}
     </main>
   );

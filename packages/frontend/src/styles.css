@@ -2486,6 +2486,7 @@ body:has(.fp-lab) .science-chat-fab { display: none; }
 .fp-observation-chip { padding: 0.2rem 0.35rem; border-radius: 0.35rem; background: rgba(126, 179, 255, 0.12); color: #dce8ff; font: 600 0.64rem/1.2 var(--font-mono); }
 .fp-observation-chip.notable { background: rgba(245, 180, 70, 0.16); color: #ffe0a1; }
 .fp-observation-chip.critical { background: rgba(240, 90, 60, 0.18); color: #ffd0c4; }
+.fp-observation-chip.supported { background: rgba(90, 200, 120, 0.16); color: #b8f5c9; }
 .fp-observation-meta { font-family: var(--font-mono); }
 .fp-finding { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fp-finding strong { color: #eaf1ff; }

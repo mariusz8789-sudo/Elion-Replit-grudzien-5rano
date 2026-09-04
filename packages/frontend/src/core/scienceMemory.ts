@@ -10,9 +10,14 @@ import type { CompositionComputeReport } from './naturalCompositionCompute';
 import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
 import type { ScenarioRun } from './simulation/scenarioEngine';
 import {
-  buildSavedHypothesisLoop, isSavedHypothesisLoop, replaySavedHypothesisLoopAsync,
-  type HypothesisLoopReplay, type HypothesisLoopReplayStatus, type HypothesisLoopResult, type SavedHypothesisLoop,
+  buildSavedHypothesisLoop, isSavedHypothesisLoop, replaySavedHypothesisLoopAsync, selectNextHypothesisExperiment,
+  type HypothesisLoopReplay, type HypothesisLoopReplayStatus, type HypothesisLoopResult, type HypothesisStatus,
+  type NextHypothesisExperiment, type SavedHypothesisLoop,
 } from './experimentFabric/hypothesisLoop';
+import {
+  buildEvidenceChain, SCIENTIFIC_DISCOVERY_LOOP_VERSION,
+  type HypothesisEvidenceChainLink, type ScientificDiscoveryLoopResult,
+} from './experimentFabric/scientificDiscoveryLoop';
 import { buildSavedScenarioCounterfactual, isSavedScenarioCounterfactual, type SavedScenarioCounterfactual, type ScenarioCounterfactual } from './simulation/scenarioCounterfactual';
 import { combineEvidencePackRoCrates, type DomainEvidenceEntry, type GenesisRoCrate } from './experimentFabric/evidencePackRoCrate';
 
@@ -170,6 +175,12 @@ export interface SavedExperiment {
    * WEJŚCIA i statusy; odtworzenie wykonuje zbiór od nowa i je porównuje.
    */
   hypothesisLoop?: SavedHypothesisLoop;
+  /**
+   * Warstwa Obserwacja/Analiza/Znalezisko/Dowód i Następny Eksperyment NAD
+   * powyższym `hypothesisLoop` (ten sam przebieg, `hypothesisLoopFingerprint`
+   * wskazuje na `hypothesisLoop.loopFingerprint`) — nie drugi zapis pętli.
+   */
+  discoveryLoop?: SavedScientificDiscoveryLoop;
   /**
    * Jedna trwała pozycja obejmująca CAŁE dochodzenie wielodomenowe (np.
    * epidemiologia + fizyka cząstek + chemia). Niesie CAŁY skombinowany
@@ -335,6 +346,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     (o.scenario === undefined || isSavedScenarioRunContext(o.scenario)) &&
     (o.counterfactual === undefined || isSavedScenarioCounterfactual(o.counterfactual)) &&
     (o.hypothesisLoop === undefined || isSavedHypothesisLoop(o.hypothesisLoop)) &&
+    (o.discoveryLoop === undefined || isSavedScientificDiscoveryLoop(o.discoveryLoop)) &&
     (o.investigation === undefined || isSavedInvestigation(o.investigation)) &&
     validReplayIdentity(o.replayIdentity)
   );
@@ -477,6 +489,7 @@ export interface SaveExperimentInput {
   scenario?: SavedScenarioRunContext;
   counterfactual?: SavedScenarioCounterfactual;
   hypothesisLoop?: SavedHypothesisLoop;
+  discoveryLoop?: SavedScientificDiscoveryLoop;
   investigation?: SavedInvestigation;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
@@ -519,6 +532,12 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.scenario !== undefined && !isSavedScenarioRunContext(input.scenario)) throw new Error('Kontekst scenariusza musi zawierać komplet wejść i odcisków wystarczających do odtworzenia.');
   if (input.counterfactual !== undefined && !isSavedScenarioCounterfactual(input.counterfactual)) throw new Error('Kontrfaktyk musi zawierać komplet obu ramion i policzoną, porównywalną różnicę.');
   if (input.hypothesisLoop !== undefined && !isSavedHypothesisLoop(input.hypothesisLoop)) throw new Error('Zapis pętli hipotez musi zawierać prerejestrację, hipotezy i komplet wyników.');
+  if (input.discoveryLoop !== undefined) {
+    if (!isSavedScientificDiscoveryLoop(input.discoveryLoop)) throw new Error('Zapis pętli odkrycia naukowego musi zawierać pytanie, łańcuch dowodowy i następny eksperyment.');
+    if (input.hypothesisLoop === undefined || input.discoveryLoop.hypothesisLoopFingerprint !== input.hypothesisLoop.loopFingerprint) {
+      throw new Error('Pętla odkrycia naukowego musi wskazywać ten sam loopFingerprint co zapisana pętla hipotez.');
+    }
+  }
   if (input.investigation !== undefined && !isSavedInvestigation(input.investigation)) throw new Error('Zapis dochodzenia wielodomenowego musi zawierać co najmniej jedną domenę z kompletną pętlą hipotez oraz RO-Crate.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
@@ -539,6 +558,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.scenario === undefined ? {} : { scenario: input.scenario }),
     ...(input.counterfactual === undefined ? {} : { counterfactual: input.counterfactual }),
     ...(input.hypothesisLoop === undefined ? {} : { hypothesisLoop: input.hypothesisLoop }),
+    ...(input.discoveryLoop === undefined ? {} : { discoveryLoop: input.discoveryLoop }),
     ...(input.investigation === undefined ? {} : { investigation: input.investigation }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
@@ -836,6 +856,210 @@ export function saveHypothesisLoopToMemory(result: HypothesisLoopResult): SavedE
     assumptions: [...loop.hypotheses[0]!.assumptions],
     epistemicStatus: 'SIMULATION',
   });
+}
+
+/**
+ * Jeden ogniwo łańcucha dowodowego (Hipoteza -> Eksperyment -> Run ->
+ * Obserwacja -> Analiza -> Znalezisko -> Dowód) w postaci nadającej się do
+ * zapisu: nie kopiuje wszystkich obserwacji/znalezisk, tylko ich liczbę i
+ * JEDEN reprezentatywny dowód (resultFingerprint + dzień) — wystarczający,
+ * by wskazać palcem konkretny realny przebieg bez duplikowania Evidence Pack.
+ */
+export interface SavedDiscoveryEvidenceLink {
+  hypothesisId: string;
+  status: HypothesisStatus;
+  evidenceChainId: string | null;
+  evidencePackId: string | null;
+  findingsCount: number;
+  representativeFinding: { id: string; metric: string; resultFingerprint: string; day: number } | null;
+  notModeled?: string;
+}
+
+export interface SavedNextExperiment {
+  status: NextHypothesisExperiment['status'];
+  why: string;
+  resolves: string;
+  rule: string;
+  aboutHypothesisIds: readonly string[];
+}
+
+/**
+ * Warstwa Obserwacja/Analiza/Dowód + Następny Eksperyment NAD prerejestrowaną
+ * pętlą hipotez. `hypothesisLoopFingerprint` wiąże ją do DOKŁADNIE tej pętli
+ * (`SavedHypothesisLoop.loopFingerprint`) — to nie jest niezależny zapis,
+ * tylko rozszerzenie tego samego przebiegu o to, co zbudował
+ * `scientificDiscoveryLoop.ts` NAD istniejącą pętlą (obserwacje/analiza z PR
+ * Manusa + `selectNextHypothesisExperiment`).
+ */
+export interface SavedScientificDiscoveryLoop {
+  contractVersion: string;
+  problemId: string;
+  statement: string;
+  hypothesisLoopFingerprint: string;
+  evidenceChain: readonly SavedDiscoveryEvidenceLink[];
+  nextExperiment: SavedNextExperiment;
+  /** Odcisk TYLKO tej warstwy (dowody + następny eksperyment) — wykrywa dryf niezależnie od loopFingerprint. */
+  discoveryLoopFingerprint: string;
+}
+
+function savedDiscoveryEvidenceLink(link: HypothesisEvidenceChainLink): SavedDiscoveryEvidenceLink {
+  const first = link.findings[0];
+  return {
+    hypothesisId: link.hypothesisId,
+    status: link.status,
+    evidenceChainId: link.evidenceChainId,
+    evidencePackId: link.evidencePackId,
+    findingsCount: link.findings.length,
+    representativeFinding: first === undefined ? null : {
+      id: first.id, metric: first.metric, resultFingerprint: first.sourceSnapshot.resultFingerprint, day: first.sourceSnapshot.day,
+    },
+    ...(link.notModeled === undefined ? {} : { notModeled: link.notModeled }),
+  };
+}
+
+function savedNextExperiment(next: NextHypothesisExperiment): SavedNextExperiment {
+  return { status: next.status, why: next.why, resolves: next.resolves, rule: next.rule, aboutHypothesisIds: next.aboutHypothesisIds };
+}
+
+/**
+ * Buduje zapisywalną postać `ScientificDiscoveryLoopResult`. Ponownie używa
+ * `buildSavedHypothesisLoop` (dziedziczy jego walidację nienaruszonej
+ * prerejestracji) wyłącznie po `loopFingerprint` — reszta pętli hipotez jest
+ * już zapisana osobno w `hypothesisLoop`, więc tu nie jest duplikowana.
+ */
+export function buildSavedScientificDiscoveryLoop(result: ScientificDiscoveryLoopResult): SavedScientificDiscoveryLoop {
+  const loop = buildSavedHypothesisLoop(result.loop);
+  const base = {
+    contractVersion: SCIENTIFIC_DISCOVERY_LOOP_VERSION,
+    problemId: result.problem.problemId,
+    statement: result.problem.statement,
+    hypothesisLoopFingerprint: loop.loopFingerprint,
+    evidenceChain: result.evidenceChain.map(savedDiscoveryEvidenceLink),
+    nextExperiment: savedNextExperiment(result.nextExperiment),
+  };
+  return { ...base, discoveryLoopFingerprint: fnv1a(canonicalJson(base)) };
+}
+
+function isSavedDiscoveryEvidenceLink(value: unknown): value is SavedDiscoveryEvidenceLink {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.hypothesisId !== 'string' || typeof value.status !== 'string') return false;
+  if (typeof value.findingsCount !== 'number') return false;
+  if (value.representativeFinding !== null) {
+    if (!isRecordLike(value.representativeFinding)) return false;
+    if (typeof value.representativeFinding.resultFingerprint !== 'string') return false;
+    if (typeof value.representativeFinding.day !== 'number') return false;
+  }
+  return true;
+}
+
+/** localStorage jest edytowalne poza aplikacją — rekord walidujemy pole po polu. */
+export function isSavedScientificDiscoveryLoop(value: unknown): value is SavedScientificDiscoveryLoop {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string' || typeof value.problemId !== 'string') return false;
+  if (typeof value.hypothesisLoopFingerprint !== 'string' || typeof value.discoveryLoopFingerprint !== 'string') return false;
+  if (!Array.isArray(value.evidenceChain) || !value.evidenceChain.every(isSavedDiscoveryEvidenceLink)) return false;
+  if (!isRecordLike(value.nextExperiment) || typeof value.nextExperiment.status !== 'string') return false;
+  return true;
+}
+
+/**
+ * Utrwala PEŁNĄ Pętlę Odkrycia Naukowego (Pytanie -> Konkurencyjne Hipotezy ->
+ * Projekt Eksperymentu -> Wykonanie -> Obserwacja -> Analiza -> Falsyfikacja ->
+ * Porównanie -> Następny Eksperyment) w istniejącej Pamięci Naukowej.
+ * Ponownie używa `saveExperiment` i `buildSavedHypothesisLoop` — jedyna nowa
+ * treść to warstwa Obserwacja/Analiza/Dowód + Następny Eksperyment, której
+ * `saveHypothesisLoopToMemory` nie niosło.
+ */
+export function saveScientificDiscoveryLoopToMemory(result: ScientificDiscoveryLoopResult): SavedExperiment {
+  const loop = buildSavedHypothesisLoop(result.loop);
+  const discoveryLoop = buildSavedScientificDiscoveryLoop(result);
+  const supported = loop.outcomes.filter((entry) => entry.status === 'SUPPORTED').length;
+  const falsified = loop.outcomes.filter((entry) => entry.status === 'FALSIFIED').length;
+  const totalFindings = discoveryLoop.evidenceChain.reduce((sum, link) => sum + link.findingsCount, 0);
+  return saveExperiment({
+    labId: loop.problem.domainId,
+    experimentId: `discovery-loop:${loop.problem.problemId}`,
+    experimentName: `Pętla odkrycia naukowego — ${loop.problem.statement}`,
+    params: {
+      problemId: loop.problem.problemId,
+      modelId: loop.problem.modelId,
+      primaryMetric: loop.problem.primaryMetric,
+      candidateVariable: loop.problem.candidateVariable,
+      hypotheses: loop.hypotheses.length,
+      ...Object.fromEntries(Object.entries(loop.problem.sharedLevers)),
+    },
+    stats: {
+      hypotheses: loop.hypotheses.length,
+      supported,
+      falsified,
+      realRuns: result.loop.allRuns.length,
+      evidencePacks: result.loop.packs.length,
+      findings: totalFindings,
+    },
+    hypothesisLoop: loop,
+    discoveryLoop,
+    analysis: [
+      { title: 'Prerejestracja', body: `Zbiór ${loop.preregistrationId} zamrozono odciskiem ${loop.preregistrationFingerprint} PRZED wykonaniem.`, kind: 'hypothesis-preregistration' },
+      { title: 'Rozstrzygniecie', body: loop.discrimination.decisive ? `Uporzadkowanie ${loop.problem.primaryMetric}: ${loop.discrimination.ranking.map((entry) => `${entry.candidate}=${entry.metric}`).join(' < ')}. Zwyciezca: ${loop.discrimination.winnerHypothesisId}.` : 'Uporzadkowanie nie wylonilo zwyciezcy.', kind: 'hypothesis-discrimination' },
+      { title: 'Dowod', body: `${totalFindings} znalezisk z ${discoveryLoop.evidenceChain.filter((link) => link.evidenceChainId !== null).length} wykonanych hipotez, kazde z realnym resultFingerprint i dniem.`, kind: 'discovery-evidence' },
+      { title: 'Nastepny eksperyment', body: `${discoveryLoop.nextExperiment.status}: ${discoveryLoop.nextExperiment.why}`, kind: 'discovery-next-experiment' },
+      { title: 'Granice', body: 'Genesis wygenerowal prerejestrowane hipotezy, wykonal istniejacy model obliczeniowy, powiazal realne obserwacje/analize i porownal wyniki w zadeklarowanym zakresie. To nie jest odkrycie naukowe, obserwacja swiata ani wskazowka operacyjna.', kind: 'hypothesis-boundary' },
+    ],
+    honesty: 'simplified',
+    honestyNote: `Model ${loop.problem.modelId}; wynik SIMULATION, nieskalibrowany. ${supported} hipotez wspartych, ${falsified} sfalsyfikowanych, ${totalFindings} znalezisk dowodowych.`,
+    assumptions: [...loop.hypotheses[0]!.assumptions],
+    epistemicStatus: 'SIMULATION',
+  });
+}
+
+export type SavedScientificDiscoveryLoopReplayStatus = 'MATCH' | 'DRIFT' | 'BLOCKED';
+
+export interface SavedScientificDiscoveryLoopReplay {
+  status: SavedScientificDiscoveryLoopReplayStatus;
+  reason: string;
+}
+
+/**
+ * Odtwarza zapisaną Pętlę Odkrycia Naukowego, WYKONUJĄC ją od nowa — ponownie
+ * używa `replaySavedHypothesisLoopAsync` (realne przebiegi, nie odczyt
+ * zapisanych statusów) i dopiero na jego realnym, świeżym wyniku ponownie
+ * liczy `buildEvidenceChain`/`selectNextHypothesisExperiment` (te same
+ * funkcje co `runScientificDiscoveryLoopAsync`), porównując świeży
+ * `discoveryLoopFingerprint` z zapisanym.
+ */
+export async function replaySavedScientificDiscoveryLoop(saved: SavedExperiment): Promise<SavedScientificDiscoveryLoopReplay> {
+  if (saved.hypothesisLoop === undefined || saved.discoveryLoop === undefined) {
+    return { status: 'BLOCKED', reason: 'Zapis nie zawiera pętli hipotez i pętli odkrycia naukowego.' };
+  }
+  if (!isSavedScientificDiscoveryLoop(saved.discoveryLoop)) {
+    return { status: 'BLOCKED', reason: 'Zapisana pętla odkrycia naukowego jest niekompletna albo uszkodzona.' };
+  }
+  // Samospójność NAJPIERW: czy zapisana treść wciąż odpowiada WŁASNEMU zapisanemu
+  // odciskowi? To wykrywa podmianę pola (np. statusu następnego eksperymentu) PO
+  // zapisie, zanim w ogóle dojdzie do realnego ponownego wykonania.
+  const { discoveryLoopFingerprint, ...storedBase } = saved.discoveryLoop;
+  if (fnv1a(canonicalJson(storedBase)) !== discoveryLoopFingerprint) {
+    return { status: 'DRIFT', reason: 'Zapisana pętla odkrycia naukowego została zmieniona po zapisie: jej treść nie odpowiada już własnemu zapisanemu odciskowi.' };
+  }
+  if (saved.discoveryLoop.hypothesisLoopFingerprint !== saved.hypothesisLoop.loopFingerprint) {
+    return { status: 'BLOCKED', reason: 'Pętla odkrycia naukowego wskazuje na inny loopFingerprint niż zapisana pętla hipotez.' };
+  }
+  const replayed = await replaySavedHypothesisLoopAsync(saved.hypothesisLoop);
+  if (replayed.status !== 'MATCH' || replayed.result === null) {
+    return { status: replayed.status, reason: replayed.reason };
+  }
+  const freshResult: ScientificDiscoveryLoopResult = {
+    contractVersion: SCIENTIFIC_DISCOVERY_LOOP_VERSION,
+    problem: saved.hypothesisLoop.problem,
+    loop: replayed.result,
+    evidenceChain: buildEvidenceChain(replayed.result),
+    nextExperiment: selectNextHypothesisExperiment(replayed.result),
+  };
+  const fresh = buildSavedScientificDiscoveryLoop(freshResult);
+  if (fresh.discoveryLoopFingerprint !== saved.discoveryLoop.discoveryLoopFingerprint) {
+    return { status: 'DRIFT', reason: `Odtworzona warstwa dowodowa różni się od zapisanej (odcisk ${saved.discoveryLoop.discoveryLoopFingerprint} → ${fresh.discoveryLoopFingerprint}).` };
+  }
+  return { status: 'MATCH', reason: 'Pętla hipotez i warstwa Obserwacja/Analiza/Dowód/Następny Eksperyment odtworzyły się identycznie po realnym ponownym wykonaniu.' };
 }
 
 export const INVESTIGATION_CONTRACT_VERSION = '1.0.0';

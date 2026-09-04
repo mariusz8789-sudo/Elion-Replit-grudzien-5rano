@@ -3,7 +3,7 @@ import { EpidemicCitySimulation, DEFAULT_CITY_PARAMS, type EpidemicCityParams } 
 import { SimulationClock, CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
 import { renderCity } from '../../core/simulationRenderer/cityRenderer';
 import {
-  defaultCamera, computeTransform, screenToWorld, zoomAt, panBy, type Camera,
+  defaultCamera, computeTransform, screenToWorld, worldToScreen, zoomAt, panBy, type Camera,
 } from '../../core/simulationRenderer/camera';
 import { consumePendingComparison } from '../../core/compareBridge';
 import { computeField, ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
@@ -11,6 +11,10 @@ import { createSpatialWorldOverlay, type SpatialWorldOverlay } from '../../core/
 import { getToken } from '../../core/backend/session';
 import { getProjectSpatialDataset } from '../../core/backend/client';
 import { getActiveSpatialOverlay, subscribeActiveSpatialOverlay } from '../../core/backend/spatialOverlayContext';
+import { projectWorldState } from '../../core/simulation/worldEngineContract';
+import { projectEpidemicScreenState } from '../../core/world/epidemicVirtualLabAdapter';
+import { createVirtualLabIntegration } from '../../core/world/virtualLabIntegration';
+import type { WorldCaptureTimeline } from '../../core/world/worldCapture';
 
 /**
  * VISUAL SIMULATION SCREEN — żywa scena „Epidemia w małym mieście" z warstwą
@@ -47,6 +51,16 @@ export function VisualSimulationScreen() {
   const cam = useRef<Camera>(defaultCamera(sim.worldWidth, sim.worldHeight));
   const followId = useRef<number>(-1);
   const drag = useRef<{ x: number; y: number } | null>(null);
+  const worldStatesRef = useRef<ReturnType<typeof projectEpidemicScreenState>[]>([]);
+  const completedRunsRef = useRef<ReturnType<typeof projectEpidemicScreenState>[][]>([]);
+  const lastWorldTickRef = useRef(-1);
+  const labIntegration = useMemo(() => createVirtualLabIntegration({
+    createEntity: () => {}, updateEntity: () => {}, removeEntity: () => {}, reset: () => {}, dispose: () => {},
+  }, (decision) => {
+    const zoomByMode = { MACRO: 1.8, SCIENTIFIC: 1.35, WIDE: 0.8, CINEMATIC: 1.1, HUMAN_EYE: 1 } as const;
+    cam.current.zoom = zoomByMode[decision.mode];
+    setZoomLabel(Math.round(cam.current.zoom * 10) / 10);
+  }), [sim]);
 
   const [params, setParams] = useState<EpidemicCityParams>(() => sim.getParams() as unknown as EpidemicCityParams);
   const [speed, setSpeedState] = useState<ClockSpeed>(1);
@@ -58,12 +72,18 @@ export function VisualSimulationScreen() {
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('none');
   const [stats, setStats] = useState<Record<string, number>>(() => sim.stats());
   const [spatialOverlayLabel, setSpatialOverlayLabel] = useState<string | null>(null);
+  const [captureTimeline, setCaptureTimeline] = useState<WorldCaptureTimeline | null>(null);
+  const [replayActive, setReplayActive] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [compareText, setCompareText] = useState<string | null>(null);
   const spatialOverlayRef = useRef<SpatialWorldOverlay | null>(null);
 
   const debugRef = useRef(debug); debugRef.current = debug;
   const showChartRef = useRef(showChart); showChartRef.current = showChart;
   const selectedRef = useRef(selectedId); selectedRef.current = selectedId;
   const analysisRef = useRef(analysisMode); analysisRef.current = analysisMode;
+  const replayActiveRef = useRef(replayActive); replayActiveRef.current = replayActive;
+  const replayIndexRef = useRef(replayIndex); replayIndexRef.current = replayIndex;
 
   useEffect(() => {
     let cancelled = false;
@@ -99,7 +119,14 @@ export function VisualSimulationScreen() {
     let raf = 0; let last = performance.now(); let statAcc = 0;
     const frame = (now: number) => {
       const dtSec = Math.min(0.1, (now - last) / 1000); last = now;
-      clock.advance(dtSec, (dtDays) => sim.tick(dtDays));
+      if (!replayActiveRef.current) clock.advance(dtSec, (dtDays) => sim.tick(dtDays));
+      const worldState = projectEpidemicScreenState(projectWorldState(sim));
+      if (!replayActiveRef.current) labIntegration.sync(worldState);
+      if (!replayActiveRef.current && worldState.tick !== lastWorldTickRef.current) {
+        lastWorldTickRef.current = worldState.tick;
+        worldStatesRef.current = [...worldStatesRef.current, worldState];
+        setCaptureTimeline(labIntegration.capture(null, worldStatesRef.current));
+      }
       const canvas = sceneRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
@@ -122,6 +149,7 @@ export function VisualSimulationScreen() {
             contactRadius: Number(sim.getParams().contactRadius), analysis,
             spatialOverlay: spatialOverlayRef.current,
           });
+          if (replayActiveRef.current) drawReplaySnapshot(ctx, worldStatesRef.current[replayIndexRef.current], transform);
         }
       }
       if (showChartRef.current) drawChart(chartRef.current, sim);
@@ -130,14 +158,28 @@ export function VisualSimulationScreen() {
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-  }, [sim, clock]);
+    return () => { cancelAnimationFrame(raf); labIntegration.dispose(); };
+  }, [sim, clock, labIntegration]);
 
   const applySpeed = (s: ClockSpeed) => { clock.setSpeed(s); setSpeedState(s); setRunning(clock.running); };
   const play = () => { clock.play(); if (clock.speed === 0) applySpeed(1); setRunning(true); };
   const pause = () => { clock.pause(); setRunning(false); };
   const step = () => { clock.singleStep((dt) => sim.tick(dt)); setStats(sim.stats()); };
-  const restart = () => { sim.reset(); clock.reset(); setRunning(false); followId.current = -1; setSelectedId(-1); setStats(sim.stats()); setParams(sim.getParams() as unknown as EpidemicCityParams); };
+  const restart = () => {
+    if (worldStatesRef.current.length > 0) completedRunsRef.current = [...completedRunsRef.current, worldStatesRef.current];
+    sim.reset(); clock.reset(); setRunning(false); followId.current = -1; setSelectedId(-1); setStats(sim.stats()); setParams(sim.getParams() as unknown as EpidemicCityParams);
+    worldStatesRef.current = []; lastWorldTickRef.current = -1; setCaptureTimeline(null); setReplayActive(false); setReplayIndex(0); setCompareText(null);
+  };
+  const replayCaptured = () => { if (worldStatesRef.current.length === 0) return; labIntegration.replay([worldStatesRef.current[0]!]); setReplayIndex(0); setReplayActive(true); setRunning(false); clock.pause(); };
+  const scrubReplay = (index: number) => { const state = worldStatesRef.current[index]; if (!state) return; labIntegration.replay([state]); setReplayIndex(index); };
+  const exitReplay = () => { setReplayActive(false); setReplayIndex(0); };
+  const compareCaptured = () => {
+    const previous = completedRunsRef.current.at(-1);
+    const current = worldStatesRef.current;
+    if (!previous || current.length === 0) { setCompareText('Brak dwóch rzeczywistych przebiegów do porównania.'); return; }
+    const a = labIntegration.capture(null, previous), b = labIntegration.capture(null, current);
+    setCompareText(a.snapshots.at(-1)?.fingerprint === b.snapshots.at(-1)?.fingerprint ? 'MATCH: fingerprinty przebiegów są identyczne.' : 'DRIFT: fingerprinty przebiegów różnią się.');
+  };
 
   const onSlider = (key: keyof EpidemicCityParams, raw: number, scale?: number) => {
     const value = scale ? raw / scale : raw;
@@ -205,6 +247,8 @@ export function VisualSimulationScreen() {
         <button className="chip-btn" onClick={running ? pause : play}>{running ? '⏸ Pauza' : '▶ Start'}</button>
         <button className="chip-btn" onClick={step}>⏭ Krok</button>
         <button className="chip-btn" onClick={restart}>↺ Restart</button>
+        <button className="chip-btn" onClick={replayCaptured} disabled={!captureTimeline}>↻ Replay</button>
+        <button className="chip-btn" onClick={compareCaptured}>⇄ Compare</button>
         <span className="sim-speed" role="group" aria-label="Prędkość symulacji">
           {CLOCK_SPEEDS.map((s) => (
             <button key={s} className="chip-btn" aria-pressed={speed === s} onClick={() => applySpeed(s)}>{s}×</button>
@@ -231,6 +275,17 @@ export function VisualSimulationScreen() {
         <div className="sim-timeline-fill" style={{ width: `${Math.min(100, ((stats.dzien ?? 0) / 120) * 100)}%` }} />
         <span className="sim-timeline-label">DZIEŃ {stats.dzien ?? 0} / ~120 · szczyt zakażeń w dniu, gdy I było najwyższe</span>
       </div>
+      {captureTimeline && (
+        <div className="sim-capture" aria-label="Timeline eksperymentu">
+          <span>Capture: {captureTimeline.snapshots.length} snapshotów · {captureTimeline.events.length} eventów · {captureTimeline.observations.length} obserwacji</span>
+          {replayActive && <>
+            <span> · Replay klatka {replayIndex + 1}/{worldStatesRef.current.length}</span>
+            <input type="range" min="0" max={Math.max(0, worldStatesRef.current.length - 1)} step="1" value={replayIndex} onChange={(e) => scrubReplay(Number(e.target.value))} aria-label="Pozycja replay" />
+            <button className="chip-btn" onClick={exitReplay}>Wyjdź z replay</button>
+          </>}
+          {compareText && <span> · {compareText}</span>}
+        </div>
+      )}
 
       <div className="sim-stage-wrap">
         <canvas
@@ -292,6 +347,23 @@ export function VisualSimulationScreen() {
       </p>
     </main>
   );
+}
+
+function drawReplaySnapshot(
+  ctx: CanvasRenderingContext2D,
+  state: ReturnType<typeof projectEpidemicScreenState> | undefined,
+  transform: ReturnType<typeof computeTransform>,
+): void {
+  if (!state) return;
+  for (const entity of state.entities) {
+    if (entity.ref.kind !== 'agent') continue;
+    const x = Number(entity.properties.find((p) => p.key === 'x')?.value);
+    const y = Number(entity.properties.find((p) => p.key === 'y')?.value);
+    const health = String(entity.properties.find((p) => p.key === 'health')?.value ?? 'S');
+    const point = worldToScreen(transform, x, y);
+    ctx.fillStyle = ({ S: '#54d98c', E: '#e8b34a', I: '#f05555', R: '#5aa2ff', D: '#6b7280' } as Record<string, string>)[health] ?? '#fff';
+    ctx.beginPath(); ctx.arc(point.x, point.y, Math.max(2, transform.scale * 2.2), 0, Math.PI * 2); ctx.fill();
+  }
 }
 
 function drawChart(canvas: HTMLCanvasElement | null, sim: EpidemicCitySimulation): void {

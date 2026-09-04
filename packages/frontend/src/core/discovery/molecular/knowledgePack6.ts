@@ -33,6 +33,8 @@ export type Pack6ConflictStatus = 'NONE' | 'CONFLICTING';
 
 export interface KnowledgePack6Record {
   compound: string;
+  /** Short names the compound is also known by (e.g. an isolation code like "K36" for a compound whose systematic name is long) — used so chat/memory lookup finds the record however a user names it. */
+  aliases: readonly string[];
   referenceCompound: string | null;
   targetSubtype: string;
   bindingSite: string;
@@ -60,16 +62,17 @@ export interface KnowledgePack6Record {
 
 const VALIDATION_REASON = 'A real PMID/DOI was supplied by the source report, but Genesis has not independently re-fetched and re-checked the primary text in this runtime (PubMed/DOI live lookup is blocked here, the same disclosed limitation as elsewhere in this codebase).';
 
-const record = (r: Omit<KnowledgePack6Record, 'validationStatus' | 'validationReason'>): KnowledgePack6Record => ({
+const record = (r: Omit<KnowledgePack6Record, 'validationStatus' | 'validationReason' | 'aliases'> & { aliases?: readonly string[] }): KnowledgePack6Record => ({
   ...r,
+  aliases: r.aliases ?? [],
   validationStatus: 'NOT_EXTRACTED',
   validationReason: VALIDATION_REASON,
 });
 
 export const KNOWLEDGE_PACK_6_RECORDS: readonly KnowledgePack6Record[] = [
   record({ compound: 'alprazolam', referenceCompound: null, targetSubtype: 'native (α1β2γ2-like)', bindingSite: 'benzodiazepine', mechanism: 'positive allosteric modulator', measurementType: 'Kd', value: 4.6, unit: 'nM', assayType: 'radioligand binding, direct', assaySystem: 'rat brain membrane homogenate', species: 'rat', sourceTitle: 'Characterization of [3H]alprazolam binding to central benzodiazepine receptors', journal: 'Pharmacol Biochem Behav', year: 1990, pmid: '1964224', doi: null, primaryOrSecondary: 'PRIMARY', comparability: 'MEDIUM', conflictStatus: 'NONE', limitations: 'Rat native membranes, direct [3H]alprazolam binding — NOT human recombinant. No human recombinant alprazolam Ki/Kd/IC50 exists anywhere in this pack; this remains the reference baseline used for every ratio below.', supersedes: null }),
-  record({ compound: 'K36 (5,7,2\'-trihydroxy-6,8-dimethoxyflavone)', referenceCompound: 'diazepam', targetSubtype: 'native BDZR', bindingSite: 'benzodiazepine', mechanism: 'positive allosteric modulator (competitive BZD-site ligand)', measurementType: 'Ki', value: 6.05, unit: 'nM', assayType: 'radioligand displacement', assaySystem: 'rat brain membrane homogenate', species: 'rat', sourceTitle: 'Naturally occurring 2′-hydroxyl-substituted flavonoids as high-affinity benzodiazepine site ligands', journal: 'Biochem Pharmacol', year: 2003, pmid: '14637197', doi: '10.1016/S0006-2952(03)00534-5', primaryOrSecondary: 'PRIMARY', comparability: 'MEDIUM', conflictStatus: 'NONE', limitations: 'Comparable to diazepam Ki 6.4 nM in the same paper; NOT alprazolam directly. No cross-validated SMILES exists for this candidate in this runtime — the structure has not been independently confirmed here, so Genesis does not add it to the structural candidate pool yet.', supersedes: null }),
-  record({ compound: 'K36 (5,7,2\'-trihydroxy-6,8-dimethoxyflavone)', referenceCompound: 'diazepam', targetSubtype: 'α1β2γ2', bindingSite: 'benzodiazepine', mechanism: 'positive allosteric modulator, functional confirmation (blocked by flumazenil)', measurementType: 'EC50', value: 24, unit: 'nM', assayType: 'electrophysiology (two-electrode voltage clamp)', assaySystem: 'Xenopus oocyte, recombinant rat receptor', species: 'rat', sourceTitle: 'Naturally occurring 2′-hydroxyl-substituted flavonoids as high-affinity benzodiazepine site ligands', journal: 'Biochem Pharmacol', year: 2003, pmid: '14637197', doi: '10.1016/S0006-2952(03)00534-5', primaryOrSecondary: 'PRIMARY', comparability: 'LOW', conflictStatus: 'NONE', limitations: 'Functional confirmation of BZD-site mechanism (Ro15-1788/flumazenil-blockable); recombinant RAT, not human.', supersedes: null }),
+  record({ compound: 'K36 (5,7,2\'-trihydroxy-6,8-dimethoxyflavone)', aliases: ['K36'], referenceCompound: 'diazepam', targetSubtype: 'native BDZR', bindingSite: 'benzodiazepine', mechanism: 'positive allosteric modulator (competitive BZD-site ligand)', measurementType: 'Ki', value: 6.05, unit: 'nM', assayType: 'radioligand displacement', assaySystem: 'rat brain membrane homogenate', species: 'rat', sourceTitle: 'Naturally occurring 2′-hydroxyl-substituted flavonoids as high-affinity benzodiazepine site ligands', journal: 'Biochem Pharmacol', year: 2003, pmid: '14637197', doi: '10.1016/S0006-2952(03)00534-5', primaryOrSecondary: 'PRIMARY', comparability: 'MEDIUM', conflictStatus: 'NONE', limitations: 'Comparable to diazepam Ki 6.4 nM in the same paper; NOT alprazolam directly. No cross-validated SMILES exists for this candidate in this runtime — the structure has not been independently confirmed here, so Genesis does not add it to the structural candidate pool yet.', supersedes: null }),
+  record({ compound: 'K36 (5,7,2\'-trihydroxy-6,8-dimethoxyflavone)', aliases: ['K36'], referenceCompound: 'diazepam', targetSubtype: 'α1β2γ2', bindingSite: 'benzodiazepine', mechanism: 'positive allosteric modulator, functional confirmation (blocked by flumazenil)', measurementType: 'EC50', value: 24, unit: 'nM', assayType: 'electrophysiology (two-electrode voltage clamp)', assaySystem: 'Xenopus oocyte, recombinant rat receptor', species: 'rat', sourceTitle: 'Naturally occurring 2′-hydroxyl-substituted flavonoids as high-affinity benzodiazepine site ligands', journal: 'Biochem Pharmacol', year: 2003, pmid: '14637197', doi: '10.1016/S0006-2952(03)00534-5', primaryOrSecondary: 'PRIMARY', comparability: 'LOW', conflictStatus: 'NONE', limitations: 'Functional confirmation of BZD-site mechanism (Ro15-1788/flumazenil-blockable); recombinant RAT, not human.', supersedes: null }),
   record({ compound: 'amentoflavone', referenceCompound: 'diazepam', targetSubtype: 'native', bindingSite: 'benzodiazepine', mechanism: 'positive allosteric modulator', measurementType: 'IC50', value: 14.9, unit: 'nM', assayType: 'radioligand displacement', assaySystem: 'membrane homogenate', species: null, sourceTitle: 'Structure-Dependent Activity of Natural GABA(A) Receptor Modulators', journal: 'Molecules', year: 2018, pmid: null, doi: '10.3390/molecules23071512', primaryOrSecondary: 'SECONDARY', comparability: 'MEDIUM', conflictStatus: 'NONE', limitations: 'Secondary review citing original ref [74] (Nielsen 1988); species not specified in the table.', supersedes: null }),
   record({ compound: 'isoliquiritigenin', referenceCompound: 'diazepam', targetSubtype: 'native', bindingSite: 'benzodiazepine', mechanism: 'positive allosteric modulator', measurementType: 'Ki', value: 453, unit: 'nM', assayType: 'radioligand displacement', assaySystem: 'membrane homogenate', species: null, sourceTitle: 'Structure-Dependent Activity of Natural GABA(A) Receptor Modulators', journal: 'Molecules', year: 2018, pmid: null, doi: '10.3390/molecules23071512', primaryOrSecondary: 'SECONDARY', comparability: 'MEDIUM', conflictStatus: 'NONE', limitations: 'Secondary review citing original ref [84] (Cho 2011).', supersedes: 'Confirms Knowledge Pack #5\'s isoliquiritigenin value (Ki 453 nM) exactly — same number, now with a real DOI.' }),
   record({ compound: 'wogonin', referenceCompound: 'diazepam', targetSubtype: 'native', bindingSite: 'benzodiazepine', mechanism: 'positive allosteric modulator', measurementType: 'Ki', value: 640, unit: 'nM', assayType: 'radioligand displacement', assaySystem: 'membrane homogenate', species: null, sourceTitle: 'Structure-Dependent Activity of Natural GABA(A) Receptor Modulators', journal: 'Molecules', year: 2018, pmid: null, doi: '10.3390/molecules23071512', primaryOrSecondary: 'PRIMARY', comparability: 'MEDIUM', conflictStatus: 'CONFLICTING', limitations: 'Conflicts with the Hui et al. 2000 primary isolation paper (Ki 2030 nM, below) — kept as a genuine, disclosed conflict, not averaged.', supersedes: null }),
@@ -88,8 +91,90 @@ export function listKnowledgePack6Records(): readonly KnowledgePack6Record[] { r
 
 export function knowledgePack6RecordsFor(compound: string): readonly KnowledgePack6Record[] {
   const wanted = compound.toLowerCase();
-  return KNOWLEDGE_PACK_6_RECORDS.filter((r) => r.compound.toLowerCase() === wanted);
+  return KNOWLEDGE_PACK_6_RECORDS.filter((r) => r.compound.toLowerCase() === wanted || r.aliases.some((a) => a.toLowerCase() === wanted));
 }
+
+// ---------------------------------------------------------------------------
+// SECTION G — NEGATIVE EVIDENCE (from the transmitted verification-pack v3
+// report). Genesis must remember "what does not work" as carefully as "what
+// does" — a candidate's real in vivo failure or a real absence-of-effect
+// finding is evidence, not something to omit because it complicates a story.
+// ---------------------------------------------------------------------------
+
+export interface KnowledgePack6NegativeEvidenceRecord {
+  compound: string;
+  finding: string;
+  source: string;
+  implication: string;
+}
+
+export const KNOWLEDGE_PACK_6_NEGATIVE_EVIDENCE: readonly KnowledgePack6NegativeEvidenceRecord[] = [
+  { compound: 'baicalein', finding: 'Anxiolytic-like effect blocked by PTZ but NOT by flumazenil in some studies.', source: 'de Carvalho 2011 (cited in Çiçek 2018)', implication: 'Suggests a NON-benzodiazepine-site mechanism for baicalein\'s in vivo effects at higher doses — the binding-site data above does not fully explain the behavioural effect.' },
+  { compound: 'baicalin', finding: 'No displacement in [3H]flunitrazepam binding at concentrations above 100 µM.', source: 'Çiçek 2018, ref [41]', implication: 'The glucuronide form (baicalin) is essentially inactive at the benzodiazepine site, unlike its aglycone baicalein — metabolism/conjugation matters, not just the parent structure.' },
+  { compound: 'apigenin', finding: 'No anxiolytic-like effect in the elevated plus maze at 0.5-10 mg/kg; sedative effect only appeared at 25-50 mg/kg.', source: 'Avallone et al. (cited in Çiçek 2018, refs [55])', implication: 'In vivo anxiolysis requires doses far above what the binding affinity alone would predict — poor blood-brain-barrier penetration or rapid metabolism are plausible, undetermined explanations.' },
+  { compound: 'valerenic acid', finding: 'No significant potentiation of β1-subunit-containing GABA-A receptors.', source: 'Khom 2007 / Luger 2015', implication: 'Confirms selectivity for β2/β3 over β1 — α1β1γ2 receptors are essentially insensitive to valerenic acid.' },
+];
+
+export function knowledgePack6NegativeEvidenceFor(compound: string): readonly KnowledgePack6NegativeEvidenceRecord[] {
+  const wanted = compound.toLowerCase();
+  return KNOWLEDGE_PACK_6_NEGATIVE_EVIDENCE.filter((r) => r.compound.toLowerCase() === wanted);
+}
+
+// ---------------------------------------------------------------------------
+// SECTION F — NATURAL OCCURRENCE (organism/part). Lightweight by design —
+// this is provenance-of-origin metadata, not a quantitative claim.
+// ---------------------------------------------------------------------------
+
+export interface KnowledgePack6NaturalOccurrenceRecord {
+  compound: string;
+  organism: string;
+  part: string | null;
+}
+
+export const KNOWLEDGE_PACK_6_NATURAL_OCCURRENCE: readonly KnowledgePack6NaturalOccurrenceRecord[] = [
+  { compound: 'K36 (5,7,2\'-trihydroxy-6,8-dimethoxyflavone)', organism: 'Scutellaria baicalensis', part: 'root' },
+  { compound: 'amentoflavone', organism: 'Hypericum perforatum', part: null },
+  { compound: 'apigenin', organism: 'Matricaria recutita, Passiflora, Salvia and others', part: 'various' },
+  { compound: 'hispidulin', organism: 'Artemisia herba-alba, Salvia officinalis', part: 'aerial parts' },
+  { compound: 'baicalein', organism: 'Scutellaria baicalensis', part: 'root' },
+  { compound: 'wogonin', organism: 'Scutellaria baicalensis', part: 'root' },
+  { compound: '6-methylapigenin', organism: 'Valeriana wallichii (jatamansi)', part: 'root/rhizome' },
+  { compound: 'isoliquiritigenin', organism: 'Glycyrrhiza glabra', part: 'root' },
+  { compound: 'honokiol', organism: 'Magnolia officinalis', part: 'bark' },
+  { compound: 'magnolol', organism: 'Magnolia officinalis', part: 'bark' },
+  { compound: 'valerenic acid', organism: 'Valeriana officinalis', part: 'root' },
+  { compound: 'oroxylin A', organism: 'Scutellaria baicalensis', part: 'root' },
+];
+
+export function knowledgePack6NaturalOccurrenceFor(compound: string): KnowledgePack6NaturalOccurrenceRecord | null {
+  const wanted = compound.toLowerCase();
+  return KNOWLEDGE_PACK_6_NATURAL_OCCURRENCE.find((r) => r.compound.toLowerCase() === wanted) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// SECTION UNK — UNIDENTIFIED HIGH-AFFINITY LEADS. These are named only by an
+// isolation/compound number in the transmitted report, with NO structure, no
+// full citation metadata, and no independent verification of any kind — the
+// weakest-provenance entries in this pack, kept anyway because a real Ki
+// value with an unknown structure is a genuine, actionable "resolve this
+// structure next" lead, not something to discard for being incomplete.
+// ---------------------------------------------------------------------------
+
+export interface UnidentifiedLead {
+  label: string;
+  kiNm: number;
+  sourceOrganism: string;
+  structureStatus: 'UNKNOWN_STRUCTURE';
+  note: string;
+}
+
+export const KNOWLEDGE_PACK_6_UNIDENTIFIED_LEADS: readonly UnidentifiedLead[] = [
+  { label: 'compound 38 (S. baicalensis)', kiNm: 27, sourceOrganism: 'Scutellaria baicalensis', structureStatus: 'UNKNOWN_STRUCTURE', note: 'Named only by table position in the transmitted report; no structure, full citation, or independent check exists in this runtime. Cannot be scored or added to the candidate pool until identified.' },
+  { label: 'compound 40 (S. baicalensis)', kiNm: 7.5, sourceOrganism: 'Scutellaria baicalensis', structureStatus: 'UNKNOWN_STRUCTURE', note: 'Same limitation as compound 38. If this Ki is real, it would be the second-most-potent natural lead in this pack after K36 — but Genesis cannot act on an unidentified structure.' },
+  { label: 'compound 43 (S. baicalensis)', kiNm: 34, sourceOrganism: 'Scutellaria baicalensis', structureStatus: 'UNKNOWN_STRUCTURE', note: 'Same limitation as compound 38.' },
+  { label: 'compound 47 (S. baicalensis)', kiNm: 200, sourceOrganism: 'Scutellaria baicalensis', structureStatus: 'UNKNOWN_STRUCTURE', note: 'Same limitation as compound 38.' },
+  { label: 'compound 50 (S. baicalensis)', kiNm: 3.8, sourceOrganism: 'Scutellaria baicalensis', structureStatus: 'UNKNOWN_STRUCTURE', note: 'Same limitation as compound 38. If this Ki is real, it would be the MOST potent natural lead in this entire pack, including K36 — but again, cannot be scored without a structure.' },
+];
 
 export function knowledgePack6EvidenceRefs(): readonly TargetEvidenceRef[] {
   return KNOWLEDGE_PACK_6_RECORDS.map((r) => ({

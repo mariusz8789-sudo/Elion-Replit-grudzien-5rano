@@ -9,8 +9,12 @@ import { canonicalJson, fnv1a } from './events/hash';
 import type { CompositionComputeReport } from './naturalCompositionCompute';
 import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
 import type { ScenarioRun } from './simulation/scenarioEngine';
-import { buildSavedHypothesisLoop, isSavedHypothesisLoop, type HypothesisLoopResult, type SavedHypothesisLoop } from './experimentFabric/hypothesisLoop';
+import {
+  buildSavedHypothesisLoop, isSavedHypothesisLoop, replaySavedHypothesisLoopAsync,
+  type HypothesisLoopReplay, type HypothesisLoopReplayStatus, type HypothesisLoopResult, type SavedHypothesisLoop,
+} from './experimentFabric/hypothesisLoop';
 import { buildSavedScenarioCounterfactual, isSavedScenarioCounterfactual, type SavedScenarioCounterfactual, type ScenarioCounterfactual } from './simulation/scenarioCounterfactual';
+import { combineEvidencePackRoCrates, type DomainEvidenceEntry, type GenesisRoCrate } from './experimentFabric/evidencePackRoCrate';
 
 /**
  * Scientific Memory (sekcja O dyrektywy CTO) — trwały, lokalny zapis
@@ -166,6 +170,15 @@ export interface SavedExperiment {
    * WEJŚCIA i statusy; odtworzenie wykonuje zbiór od nowa i je porównuje.
    */
   hypothesisLoop?: SavedHypothesisLoop;
+  /**
+   * Jedna trwała pozycja obejmująca CAŁE dochodzenie wielodomenowe (np.
+   * epidemiologia + fizyka cząstek + chemia). Niesie CAŁY skombinowany
+   * RO-Crate (`combineEvidencePackRoCrates`, bez zmian) oraz wejścia
+   * potrzebne do odtworzenia każdej domeny osobno przez istniejące
+   * `replaySavedHypothesisLoopAsync` — nie duplikuje żadnego z tych
+   * mechanizmów, tylko je zestawia.
+   */
+  investigation?: SavedInvestigation;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -322,6 +335,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     (o.scenario === undefined || isSavedScenarioRunContext(o.scenario)) &&
     (o.counterfactual === undefined || isSavedScenarioCounterfactual(o.counterfactual)) &&
     (o.hypothesisLoop === undefined || isSavedHypothesisLoop(o.hypothesisLoop)) &&
+    (o.investigation === undefined || isSavedInvestigation(o.investigation)) &&
     validReplayIdentity(o.replayIdentity)
   );
 }
@@ -463,6 +477,7 @@ export interface SaveExperimentInput {
   scenario?: SavedScenarioRunContext;
   counterfactual?: SavedScenarioCounterfactual;
   hypothesisLoop?: SavedHypothesisLoop;
+  investigation?: SavedInvestigation;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -504,6 +519,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.scenario !== undefined && !isSavedScenarioRunContext(input.scenario)) throw new Error('Kontekst scenariusza musi zawierać komplet wejść i odcisków wystarczających do odtworzenia.');
   if (input.counterfactual !== undefined && !isSavedScenarioCounterfactual(input.counterfactual)) throw new Error('Kontrfaktyk musi zawierać komplet obu ramion i policzoną, porównywalną różnicę.');
   if (input.hypothesisLoop !== undefined && !isSavedHypothesisLoop(input.hypothesisLoop)) throw new Error('Zapis pętli hipotez musi zawierać prerejestrację, hipotezy i komplet wyników.');
+  if (input.investigation !== undefined && !isSavedInvestigation(input.investigation)) throw new Error('Zapis dochodzenia wielodomenowego musi zawierać co najmniej jedną domenę z kompletną pętlą hipotez oraz RO-Crate.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -523,6 +539,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.scenario === undefined ? {} : { scenario: input.scenario }),
     ...(input.counterfactual === undefined ? {} : { counterfactual: input.counterfactual }),
     ...(input.hypothesisLoop === undefined ? {} : { hypothesisLoop: input.hypothesisLoop }),
+    ...(input.investigation === undefined ? {} : { investigation: input.investigation }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -819,6 +836,161 @@ export function saveHypothesisLoopToMemory(result: HypothesisLoopResult): SavedE
     assumptions: [...loop.hypotheses[0]!.assumptions],
     epistemicStatus: 'SIMULATION',
   });
+}
+
+export const INVESTIGATION_CONTRACT_VERSION = '1.0.0';
+
+/**
+ * Jedna domena wewnątrz zapisanego dochodzenia wielodomenowego. Niesie
+ * dokładnie to, co niósłby samodzielny `SavedHypothesisLoop` tej domeny
+ * (żadna nowa ontologia) plus opcjonalne, dostarczone przez wywołującego
+ * odniesienia (pytanie, odciski WorldState, status odtworzenia, listę
+ * NOT_MODELED) — dokładnie te same pola co `DomainEvidenceEntry` w
+ * `evidencePackRoCrate.ts`, bez duplikowania ich znaczenia.
+ */
+export interface SavedInvestigationDomain {
+  domainId: string;
+  question?: string;
+  notModeled?: readonly string[];
+  worldStateFingerprints?: readonly string[];
+  replayStatus?: string;
+  hypothesisLoop: SavedHypothesisLoop;
+}
+
+/**
+ * JEDNA trwała pozycja obejmująca CAŁE dochodzenie wielodomenowe. `roCrate`
+ * to dokładnie to, co zwraca istniejący `combineEvidencePackRoCrates`
+ * (wołany raz, tu, z tych samych domen) — nie osobno zrekonstruowana kopia.
+ * Odtworzenie każdej domeny idzie przez istniejący, niezmieniony
+ * `replaySavedHypothesisLoopAsync`; ten plik nie dodaje drugiego silnika
+ * odtwarzania.
+ */
+export interface SavedInvestigation {
+  contractVersion: string;
+  domains: readonly SavedInvestigationDomain[];
+  roCrate: GenesisRoCrate;
+  investigationFingerprint: string;
+}
+
+function isRecordLike(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isSavedInvestigationDomain(value: unknown): value is SavedInvestigationDomain {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.domainId !== 'string' || value.domainId.length === 0) return false;
+  if (value.question !== undefined && typeof value.question !== 'string') return false;
+  if (value.notModeled !== undefined && !(Array.isArray(value.notModeled) && value.notModeled.every((entry) => typeof entry === 'string'))) return false;
+  if (value.worldStateFingerprints !== undefined && !(Array.isArray(value.worldStateFingerprints) && value.worldStateFingerprints.every((entry) => typeof entry === 'string'))) return false;
+  if (value.replayStatus !== undefined && typeof value.replayStatus !== 'string') return false;
+  return isSavedHypothesisLoop(value.hypothesisLoop);
+}
+
+/** localStorage jest edytowalne poza aplikacją — rekord walidujemy pole po polu. */
+export function isSavedInvestigation(value: unknown): value is SavedInvestigation {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string' || typeof value.investigationFingerprint !== 'string') return false;
+  if (!Array.isArray(value.domains) || value.domains.length === 0) return false;
+  if (!value.domains.every(isSavedInvestigationDomain)) return false;
+  const roCrate = value.roCrate as GenesisRoCrate | undefined;
+  return isRecordLike(roCrate) && Array.isArray(roCrate['@context']) && Array.isArray(roCrate['@graph']);
+}
+
+export interface SavedInvestigationDomainInput {
+  domainId: string;
+  loopResult: HypothesisLoopResult;
+  question?: string;
+  notModeled?: readonly string[];
+  worldStateFingerprints?: readonly string[];
+  replayStatus?: string;
+}
+
+/**
+ * Buduje `SavedInvestigation` z realnych, już wykonanych pętli hipotez —
+ * po jednej na domenę. RO-Crate powstaje JEDNYM wołaniem istniejącego,
+ * niezmienionego `combineEvidencePackRoCrates` (dokładnie tych samych
+ * wejść), więc to, co trafia do Pamięci Naukowej, jest tym samym bytem,
+ * który dochodzenie już wyeksportowało — nie osobno przeliczoną kopią.
+ */
+export function buildSavedInvestigation(domains: readonly SavedInvestigationDomainInput[]): SavedInvestigation {
+  if (domains.length === 0) throw new Error('Dochodzenie wielodomenowe musi zawierać co najmniej jedną domenę.');
+  const entries: DomainEvidenceEntry[] = domains.map((domain) => {
+    const pack = domain.loopResult.packs[0];
+    if (pack === undefined) throw new Error(`Domena ${domain.domainId} nie wyprodukowała żadnej paczki dowodowej — pętla hipotez musi zawierać co najmniej jeden realny przebieg.`);
+    return {
+      domainId: domain.domainId,
+      pack,
+      ...(domain.question === undefined ? {} : { question: domain.question }),
+      ...(domain.worldStateFingerprints === undefined ? {} : { worldStateFingerprints: domain.worldStateFingerprints }),
+      ...(domain.replayStatus === undefined ? {} : { replayStatus: domain.replayStatus }),
+      ...(domain.notModeled === undefined ? {} : { notModeled: domain.notModeled }),
+    };
+  });
+  const roCrate = combineEvidencePackRoCrates(entries);
+  const savedDomains: SavedInvestigationDomain[] = domains.map((domain) => ({
+    domainId: domain.domainId,
+    ...(domain.question === undefined ? {} : { question: domain.question }),
+    ...(domain.notModeled === undefined ? {} : { notModeled: domain.notModeled }),
+    ...(domain.worldStateFingerprints === undefined ? {} : { worldStateFingerprints: domain.worldStateFingerprints }),
+    ...(domain.replayStatus === undefined ? {} : { replayStatus: domain.replayStatus }),
+    hypothesisLoop: buildSavedHypothesisLoop(domain.loopResult),
+  }));
+  const base = { contractVersion: INVESTIGATION_CONTRACT_VERSION, domains: savedDomains, roCrate };
+  return { ...base, investigationFingerprint: fnv1a(canonicalJson(base)) };
+}
+
+/**
+ * Utrwala CAŁE dochodzenie wielodomenowe jako JEDEN rekord w istniejącej
+ * Pamięci Naukowej — dokładnie ten sam mechanizm zapisu co
+ * `saveHypothesisLoopToMemory`, tylko na poziomie całego dochodzenia.
+ */
+export function saveInvestigationToMemory(domains: readonly SavedInvestigationDomainInput[], investigationName?: string): SavedExperiment {
+  const investigation = buildSavedInvestigation(domains);
+  const domainIds = investigation.domains.map((domain) => domain.domainId);
+  return saveExperiment({
+    labId: 'cross-domain-investigation',
+    experimentId: `investigation:${investigation.investigationFingerprint}`,
+    experimentName: investigationName ?? `Dochodzenie wielodomenowe — ${domainIds.join(' + ')}`,
+    params: { domains: domainIds.join(','), domainCount: domainIds.length },
+    stats: {
+      domainCount: domainIds.length,
+      totalHypotheses: investigation.domains.reduce((sum, domain) => sum + domain.hypothesisLoop.hypotheses.length, 0),
+    },
+    investigation,
+    analysis: [
+      { title: 'Domeny', body: `Jedno dochodzenie obejmuje ${domainIds.length} niezależnie wykonanych domen: ${domainIds.join(', ')}. Każda niesie własną prerejestrację, własne realne przebiegi i własny odcisk pętli.`, kind: 'investigation-domains' },
+      { title: 'Granice', body: 'RO-Crate zapisany tu jest tym samym bytem, który wyeksportował istniejący combineEvidencePackRoCrates — Pamięć Naukowa go przechowuje, nie przelicza od nowa.', kind: 'investigation-boundary' },
+    ],
+    honesty: 'simplified',
+    honestyNote: `Dochodzenie wielodomenowe (${domainIds.join(' + ')}); odcisk ${investigation.investigationFingerprint}. Każda domena to osobny, realny wynik obliczeniowy — nie jest to jedno zunifikowane odkrycie.`,
+    assumptions: ['Każda domena zachowuje własne założenia zapisane w swojej pętli hipotez; to pole je nie scala.'],
+    epistemicStatus: 'SIMULATION',
+  });
+}
+
+export interface SavedInvestigationReplay {
+  status: HypothesisLoopReplayStatus;
+  domains: readonly { domainId: string; replay: HypothesisLoopReplay }[];
+}
+
+/**
+ * Odtwarza CAŁE dochodzenie wielodomenowe: dla każdej domeny WYKONUJE od
+ * nowa jej prerejestrowany zbiór przez istniejący, niezmieniony
+ * `replaySavedHypothesisLoopAsync` (wspiera modele lokalne i
+ * BACKEND_REAL_ENGINE) i zestawia statusy. Całość jest MATCH tylko, gdy
+ * KAŻDA domena jest MATCH; jedna zablokowana domena blokuje całość, jedna
+ * rozjechana — rozjeżdża całość. Żaden status nie jest tu liczony od nowa
+ * inną logiką niż już istniejąca.
+ */
+export async function replaySavedInvestigation(saved: SavedInvestigation): Promise<SavedInvestigationReplay> {
+  const domainReplays = await Promise.all(saved.domains.map(async (domain) => ({
+    domainId: domain.domainId,
+    replay: await replaySavedHypothesisLoopAsync(domain.hypothesisLoop),
+  })));
+  const status: HypothesisLoopReplayStatus = domainReplays.some((entry) => entry.replay.status === 'BLOCKED')
+    ? 'BLOCKED'
+    : domainReplays.some((entry) => entry.replay.status === 'DRIFT') ? 'DRIFT' : 'MATCH';
+  return { status, domains: domainReplays };
 }
 
 export function listExperiments(): SavedExperiment[] {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareModelVsModel, sweepModelDivergence } from '../core/experimentFabric/modelVsModelCompare';
+import { compareModelVsModel, sweepModelDivergence, verdictOf } from '../core/experimentFabric/modelVsModelCompare';
 import type { StructuredExperimentRequest } from '../core/experimentFabric/types';
 
 /**
@@ -34,7 +34,7 @@ describe('Model-vs-Model Tournament (Newtonian vs relativistic kinetic energy)',
     expect(cmp.metric?.unit).toBe('MeV');
   });
 
-  it('the two models converge (near-zero divergence) at low velocity, exactly as physics predicts', () => {
+  it('the two models converge (near-zero divergence) at low velocity, exactly as physics predicts, and are verdicted MODELS_AGREE', () => {
     const cmp = compareModelVsModel({
       observableKey: 'kineticEnergyMeV',
       modelA: requestFor('particle-newtonian-energy', 0.01),
@@ -42,9 +42,11 @@ describe('Model-vs-Model Tournament (Newtonian vs relativistic kinetic energy)',
     });
     expect(cmp.status).toBe('COMPLETED');
     expect(cmp.metric!.relativeDivergence).toBeLessThan(0.01);
+    expect(cmp.metric!.verdict).toBe('MODELS_AGREE');
+    expect(verdictOf(cmp)).toBe('MODELS_AGREE');
   });
 
-  it('the two models diverge sharply at high velocity — a real, computed disagreement, not asserted', () => {
+  it('the two models diverge sharply at high velocity — a real, computed disagreement, verdicted MODELS_DIVERGE, not asserted', () => {
     const cmp = compareModelVsModel({
       observableKey: 'kineticEnergyMeV',
       modelA: requestFor('particle-newtonian-energy', 0.99),
@@ -52,6 +54,17 @@ describe('Model-vs-Model Tournament (Newtonian vs relativistic kinetic energy)',
     });
     expect(cmp.status).toBe('COMPLETED');
     expect(cmp.metric!.relativeDivergence).toBeGreaterThan(0.5);
+    expect(cmp.metric!.verdict).toBe('MODELS_DIVERGE');
+    expect(cmp.metric!.verdictReasoning).toContain('not calibrated');
+  });
+
+  it('an untested comparison (blocked/incomplete/unshared) reports UNTESTED via verdictOf, never a fabricated agreement', () => {
+    const blocked = compareModelVsModel({
+      observableKey: 'kineticEnergyMeV',
+      modelA: requestFor('particle-relativistic-energy', 0.5),
+      modelB: requestFor('particle-relativistic-energy', 0.5),
+    });
+    expect(verdictOf(blocked)).toBe('UNTESTED');
   });
 
   it('refuses to compare a model against itself — Model-vs-Model requires two different models', () => {

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  runBeliefChangeRun, replayBeliefChangeRun, saveBeliefChangeRunToMemory, type BeliefChangeRun,
+  runBeliefChangeRun, replayBeliefChangeRun, saveBeliefChangeRunToMemory, explainWhyBeliefChanged, type BeliefChangeRun,
 } from '../core/experimentFabric/beliefChangeRun';
-import { HYPOTHESIS_PROBLEMS } from '../core/experimentFabric/hypothesisLoop';
+import {
+  executePreregisteredHypotheses, generateCompetingHypotheses, HYPOTHESIS_PROBLEMS, preregisterHypotheses,
+} from '../core/experimentFabric/hypothesisLoop';
 
 /**
  * These tests mock only the HTTP transport (`fetch`), exactly like the
@@ -284,6 +286,28 @@ describe('Belief-Change Run — PySCF H2 A/B vertical slice', () => {
       vi.stubGlobal('fetch', fetchMock);
       const run = await runBeliefChangeRun(PROBLEM_ID);
       expect(run.hypotheses.every((h) => h.statusAfter === 'BLOCKED')).toBe(true);
+    });
+  });
+
+  describe('explainWhyBeliefChanged — Phase F standalone (works on any real HypothesisLoopResult, no BeliefChangeRun needed)', () => {
+    it('explains a real, purely local (sync, no backend) epidemiology hypothesis loop', () => {
+      const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === 'problem:lowest-modeled-deaths')!;
+      const loopResult = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+      const why = explainWhyBeliefChanged(loopResult);
+      expect(why.question).toBe(problem.statement);
+      expect(why.before.every((b) => b.status === 'PRE_REGISTERED')).toBe(true);
+      expect(why.after.length).toBe(loopResult.outcomes.length);
+      if (loopResult.discrimination.decisive) {
+        const winner = loopResult.preregistration.hypotheses.find((h) => h.hypothesisId === loopResult.discrimination.winnerHypothesisId)!;
+        expect(why.reason).toContain(winner.statement);
+      }
+    });
+
+    it('a custom question overrides the default (derived from the problem statement)', () => {
+      const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === 'problem:lowest-modeled-deaths')!;
+      const loopResult = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+      const why = explainWhyBeliefChanged(loopResult, 'custom question text');
+      expect(why.question).toBe('custom question text');
     });
   });
 });

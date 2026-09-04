@@ -47,6 +47,7 @@ const City3DWebGLScreen = lazy(() => import('./components/visual-simulation/City
 const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/ConceptFilmScreen').then((m) => ({ default: m.ConceptFilmScreen })));
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
+const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
 const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
@@ -94,6 +95,7 @@ type Route =
   | { kind: 'concept' }
   | { kind: 'character' }
   | { kind: 'hf-slice' }
+  | { kind: 'first-person-lab' }
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' };
 
@@ -124,6 +126,7 @@ function parseHash(): Route {
   if (h === '#/concept') return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
+  if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   return { kind: 'home' };
@@ -491,6 +494,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'first-person-lab') {
+      return (
+        <div className="app">
+          <TopBar title="🔬 Laboratorium pierwszoosobowe" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <FirstPersonLabScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
     if (route.kind === 'pilot') {
       return (
         <div className="app">
@@ -557,6 +572,14 @@ export default function App() {
             <span className="timeline-cta-text">
               <span className="timeline-cta-title">Generator symulacji</span>
               <span className="timeline-cta-sub">Opisz zjawisko jednym zdaniem — Genesis dobierze realny model, uruchomi go i pozwoli zmieniać parametry na żywo. „Zasymuluj dylatację czasu", „zwiększ masę gwiazdy 2×"…</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
+          <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/first-person-lab'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true">🔬</span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Wejdź do laboratorium — pierwsza osoba</span>
+              <span className="timeline-cta-sub">Chodzisz po pokoju, podchodzisz do stanowiska i uruchamiasz realny eksperyment (Scenario Engine: izolacja vs obłożenie szpitala). Zmień dzień wejścia interwencji, uruchom ponownie, porównaj i odtwórz.</span>
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>

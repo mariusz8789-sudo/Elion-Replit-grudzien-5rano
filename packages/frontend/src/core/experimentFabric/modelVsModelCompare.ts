@@ -32,6 +32,17 @@ export type ModelVsModelStatus =
   | 'INCOMPLETE_RUN'
   | 'OBSERVABLE_NOT_SHARED';
 
+/**
+ * Phase E explicit verdict. NOT a calibrated statistical test: `AGREEMENT_THRESHOLD`
+ * below is a disclosed, arbitrary-but-stated cutoff on the plain normalized
+ * distance `relativeDivergence` — never a p-value, confidence interval, or
+ * probability. `UNTESTED` covers every status other than `COMPLETED`
+ * (`BLOCKED_*`, `INCOMPLETE_RUN`, `OBSERVABLE_NOT_SHARED`): the models were
+ * never actually compared, so no agreement/divergence claim is made.
+ */
+export type ModelAgreementVerdict = 'MODELS_AGREE' | 'MODELS_DIVERGE' | 'UNTESTED';
+export const MODEL_AGREEMENT_THRESHOLD = 0.05;
+
 export interface ModelVsModelMetric {
   key: string;
   modelAValue: number;
@@ -40,6 +51,9 @@ export interface ModelVsModelMetric {
   /** |A-B| relative to the larger magnitude of the two — 0 = models agree exactly, 1 = maximal divergence on this scale. Never called "information gain" or a probability: it is a plain normalized distance. */
   relativeDivergence: number;
   unit: string;
+  /** MODELS_AGREE iff relativeDivergence <= MODEL_AGREEMENT_THRESHOLD — a disclosed cutoff, not a calibrated test. */
+  verdict: ModelAgreementVerdict;
+  verdictReasoning: string;
 }
 
 export interface ModelVsModelComparison {
@@ -76,6 +90,11 @@ function blocked(input: ModelVsModelComparisonInput, status: ModelVsModelStatus,
     status, labels: labelsFor(input), modelA: null, modelB: null, observableKey: input.observableKey,
     metric: null, seedControl: null, validationErrors, disclaimer,
   };
+}
+
+/** Flattened verdict for callers who don't want to null-check `.metric` themselves: UNTESTED covers every non-COMPLETED status. */
+export function verdictOf(comparison: ModelVsModelComparison): ModelAgreementVerdict {
+  return comparison.metric?.verdict ?? 'UNTESTED';
 }
 
 function relativeDivergence(a: number, b: number): number {
@@ -133,9 +152,13 @@ export function compareModelVsModel(input: ModelVsModelComparisonInput): ModelVs
     };
   }
 
+  const divergence = relativeDivergence(valueA, valueB);
+  const verdict: ModelAgreementVerdict = divergence <= MODEL_AGREEMENT_THRESHOLD ? 'MODELS_AGREE' : 'MODELS_DIVERGE';
   const metric: ModelVsModelMetric = {
     key: input.observableKey, modelAValue: valueA, modelBValue: valueB,
-    absoluteDelta: valueB - valueA, relativeDivergence: relativeDivergence(valueA, valueB), unit: unitA,
+    absoluteDelta: valueB - valueA, relativeDivergence: divergence, unit: unitA,
+    verdict,
+    verdictReasoning: `relativeDivergence=${divergence.toFixed(4)} ${verdict === 'MODELS_AGREE' ? '<=' : '>'} disclosed threshold ${MODEL_AGREEMENT_THRESHOLD} (not calibrated; a plain normalized-distance cutoff).`,
   };
   return {
     contractVersion: MODEL_VS_MODEL_COMPARE_VERSION, comparisonId, status: 'COMPLETED',

@@ -151,6 +151,21 @@ function buildWhy(question: string, preregistration: Preregistration, loopResult
   return { question, before: beforeView, predictions, observation, comparison: loopResult.discrimination.reason, after: afterView, reason };
 }
 
+/**
+ * PHASE F — standalone "why did my belief change?" (`explainWhyBeliefChanged`).
+ *
+ * `buildWhy` above already computes this for a `BeliefChangeRun`, but that
+ * requires running the full async orchestrator. Any REAL, already-executed
+ * `HypothesisLoopResult` — sync or async, from any domain that uses this
+ * branch's real hypothesis loop (epidemiology's `ExperimentPilotScreen.tsx`
+ * included) — can ask this question directly, without going through
+ * `runBeliefChangeRun`. Same fields, same rule: every value is read from
+ * the already-recorded loop result, nothing is inferred.
+ */
+export function explainWhyBeliefChanged(loopResult: HypothesisLoopResult, question?: string): BeliefChangeWhy {
+  return buildWhy(question ?? loopResult.preregistration.set.problem.statement, loopResult.preregistration, loopResult);
+}
+
 function statusOf(loopResult: HypothesisLoopResult, nextExperiment: NextHypothesisExperiment): BeliefChangeStatus {
   if (!loopResult.preregistrationIntact.intact) return 'BLOCKED';
   if (loopResult.outcomes.some((entry) => entry.status === 'BLOCKED')) return 'BLOCKED';

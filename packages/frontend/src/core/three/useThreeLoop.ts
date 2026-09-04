@@ -153,7 +153,7 @@ export function useThreeLoop(
               } else orbitControls.target.copy(target);
             }
           }
-          controls?.update();
+          if (!sim.disableOrbitControls) controls?.update();
           // OrbitControls aktualizuje pozycję w swojej pętli; finalny focus jest nakładany
           // po update, aby wybrany obiekt rzeczywiście otrzymał drugi poziom kamery.
           if (sim.getOrbitTarget) {

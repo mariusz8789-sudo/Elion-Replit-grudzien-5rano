@@ -111,6 +111,30 @@ export const HYPOTHESIS_PROBLEMS: readonly HypothesisProblem[] = [
     sharedLevers: { basis: 'sto-3g' },
     objective: 'minimize',
   },
+  {
+    problemId: 'problem:chem-rdkit-molecular-weight-comparison',
+    statement: 'Który z zadeklarowanych kandydatów SMILES ma NAJWYŻSZĄ rzeczywistą obliczoną masę cząsteczkową (realny backend RDKit)?',
+    domainId: 'chemistry',
+    modelId: 'chem-rdkit-descriptors',
+    primaryMetric: 'molWt',
+    candidateVariable: 'smiles',
+    baselineValue: 'CCO',
+    candidateValues: ['CC(=O)Oc1ccccc1C(=O)O'],
+    sharedLevers: {},
+    objective: 'maximize',
+  },
+  {
+    problemId: 'problem:particle-relativistic-kinetic-energy-velocity',
+    statement: 'Który z zadeklarowanych kandydatów prędkości β daje NAJWYŻSZĄ rzeczywistą obliczoną relatywistyczną energię kinetyczną cząstki (E_kin=(γ−1)mc²)?',
+    domainId: 'particle',
+    modelId: 'particle-relativistic-energy',
+    primaryMetric: 'kineticEnergyMeV',
+    candidateVariable: 'velocityFraction',
+    baselineValue: 0.1,
+    candidateValues: [0.9],
+    sharedLevers: { restMassMeV: 0.511 },
+    objective: 'maximize',
+  },
 ] as const;
 
 export interface PreregisteredHypothesis {

@@ -72,6 +72,15 @@ export interface Sim3D {
   getOrbitFocusDistance?(): number | null;
   /** Opcjonalny kierunek obserwacji dla presetów tej samej kamery OrbitControls. */
   getOrbitCameraDirection?(): THREE.Vector3 | null;
+  /**
+   * Gdy true, useThreeLoop.ts NIGDY nie wywołuje `controls.update()` —
+   * OrbitControls trzyma swój WŁASNY, nieaktualizowany stan sferyczny, więc
+   * jego wywołanie nadpisałoby camera.position ustawione ręcznie przez Sim3D
+   * (patrz labScene3D.ts: kamera pierwszoosobowa/loty kinowe w pełni
+   * właścicielskie wobec `camera`). Domyślnie false — każda dotychczasowa
+   * scena z OrbitControls (przeciąganie/zoom) działa bez zmian.
+   */
+  disableOrbitControls?: boolean;
   /** Budowa sceny — wywoływane raz przy montażu (i przy zmianie eksperymentu). */
   init(three: typeof THREE, scene: THREE.Scene, camera: THREE.PerspectiveCamera, w: number, h: number): void;
   /** Krok fizyki/animacji — CZYSTE dane, bez efektów ubocznych na WebGL (testowalne bez GPU). */

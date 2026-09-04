@@ -1791,6 +1791,25 @@ kbd {
 .character-stage { position: relative; width: 100%; }
 .character-canvas { width: 100%; aspect-ratio: 16 / 10; display: block; background: #0b1220; border: 1px solid var(--border); border-radius: 12px; touch-action: none; }
 
+/* --- First-Person Lab (WebGL, pointer-lock walking scientist) --- */
+.fp-lab { display: flex; flex-direction: column; gap: 0.6rem; height: 100%; }
+.fp-lab-stage { position: relative; width: 100%; flex: 1; min-height: clamp(24rem, 62vh, 46rem); border-radius: 12px; overflow: hidden; background: #090c14; }
+.fp-lab-canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: none; }
+.fp-lab-enter { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; background: rgba(5, 8, 14, 0.72); color: #eaf1ff; cursor: pointer; text-align: center; padding: 1rem; }
+.fp-lab-enter-title { font-size: 1.1rem; font-weight: 700; margin: 0; }
+.fp-lab-enter-hint { font: 500 0.78rem/1.4 var(--font-mono); color: #b7c6e6; margin: 0; }
+.fp-lab-crosshair { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); pointer-events: none; }
+.fp-lab-prompt { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); padding: 0.35rem 0.8rem; border-radius: 999px; background: rgba(10, 16, 28, 0.85); border: 1px solid rgba(126, 179, 255, 0.4); color: #eaf1ff; font: 600 0.78rem/1 var(--font-mono); pointer-events: none; }
+.fp-lab-camera-badge { position: absolute; top: 0.8rem; left: 50%; transform: translateX(-50%); padding: 0.3rem 0.75rem; border-radius: 999px; background: rgba(240, 90, 60, 0.18); border: 1px solid rgba(245, 148, 63, 0.55); color: #ffd8b0; font: 700 0.72rem/1 var(--font-mono); letter-spacing: 0.04em; pointer-events: none; }
+.fp-lab-hud { display: flex; flex-wrap: wrap; gap: 0.6rem 1.2rem; align-items: flex-start; justify-content: space-between; padding: 0.7rem 0.85rem; border-radius: 0.8rem; background: rgba(10, 16, 28, 0.55); border: 1px solid var(--border); }
+.fp-lab-hud-science { flex: 1 1 20rem; display: grid; gap: 0.3rem; font-size: 0.82rem; line-height: 1.45; color: var(--text-dim); }
+.fp-lab-hud-science strong { color: var(--text); margin-right: 0.3rem; }
+.fp-lab-hud-controls { display: flex; flex-direction: column; gap: 0.5rem; min-width: 15rem; }
+.fp-lab-slider { display: flex; flex-direction: column; gap: 0.25rem; font: 600 0.78rem/1 var(--font-mono); color: var(--text-dim); }
+.fp-lab-slider input { width: 100%; }
+.fp-lab-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.fp-lab-mouse-hint { margin: 0; font: 600 0.72rem/1 var(--font-mono); color: #ffd18a; }
+
 /* --- Żywe miasto WebGL: model → SimAgent → humanoid 3D --- */
 .city-3d-screen .honesty-note { max-width: 80rem; }
 .city-3d-stage-wrap { position: relative; min-height: clamp(27rem, 64vh, 44rem); margin-top: .8rem; overflow: hidden; border: 1px solid rgba(126, 179, 255, .28); border-radius: 1rem; background: #07111d; box-shadow: 0 1.25rem 4rem rgba(0, 0, 0, .35); }

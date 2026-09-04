@@ -111,6 +111,18 @@ export const HYPOTHESIS_PROBLEMS: readonly HypothesisProblem[] = [
     sharedLevers: { basis: 'sto-3g' },
     objective: 'minimize',
   },
+  {
+    problemId: 'problem:chem-rdkit-molecular-weight-comparison',
+    statement: 'Który z zadeklarowanych kandydatów SMILES ma NAJWYŻSZĄ rzeczywistą obliczoną masę cząsteczkową (realny backend RDKit)?',
+    domainId: 'chemistry',
+    modelId: 'chem-rdkit-descriptors',
+    primaryMetric: 'molWt',
+    candidateVariable: 'smiles',
+    baselineValue: 'CCO',
+    candidateValues: ['CC(=O)Oc1ccccc1C(=O)O'],
+    sharedLevers: {},
+    objective: 'maximize',
+  },
 ] as const;
 
 export interface PreregisteredHypothesis {

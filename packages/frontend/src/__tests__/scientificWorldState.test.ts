@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  executePreregisteredHypotheses, generateCompetingHypotheses, HYPOTHESIS_PROBLEMS, preregisterHypotheses,
+  executePreregisteredHypotheses, executePreregisteredHypothesesAsync, generateCompetingHypotheses,
+  HYPOTHESIS_PROBLEMS, preregisterHypotheses,
 } from '../core/experimentFabric/hypothesisLoop';
 import { sweepModelDivergence } from '../core/experimentFabric/modelVsModelCompare';
 import { projectEpidemiologyWorldStates } from '../core/world/epidemiologyWorldAdapter';
 import { projectParticleDivergenceWorldStates } from '../core/world/particleWorldAdapter';
+import { projectMoleculeWorldStates } from '../core/world/moleculeWorldAdapter';
 import {
   buildWorldState, listUnknowns, traceWorldChange, type WorldState,
 } from '../core/world/scientificWorldState';
@@ -133,5 +135,43 @@ describe('Scientific World State (Phase B) — generic contract, two real domain
         expect(event.experimentId).toBe(state.experiment.runs[0]!.runId);
       }
     }
+  });
+
+  describe('13. THREE-DOMAIN proof (epidemiology + particle physics + molecular chemistry)', () => {
+    function fakeResponse(body: unknown): Response {
+      return { ok: true, status: 200, json: async () => body } as Response;
+    }
+    const RDKIT_OUTPUTS: Record<string, Record<string, unknown>> = {
+      CCO: { molWt: 46.069, canonicalSmiles: 'CCO', molecularFormula: 'C2H6O' },
+      'CC(=O)Oc1ccccc1C(=O)O': { molWt: 180.159, canonicalSmiles: 'CC(=O)Oc1ccccc1C(=O)O', molecularFormula: 'C9H8O4' },
+    };
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('the identical WorldState shape holds across all three independently-executed real domains', async () => {
+      const epi = projectEpidemiologyWorldStates(runEpiLoop('problem:lowest-modeled-deaths'))[0]!;
+      const sweep = sweepModelDivergence(PARTICLE_A, PARTICLE_B, 'velocityFraction', [0.5], 'kineticEnergyMeV');
+      const phys = projectParticleDivergenceWorldStates(sweep)[0]!;
+
+      let seq = 0;
+      vi.stubGlobal('fetch', vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+        seq += 1;
+        const body = JSON.parse(String(init?.body ?? '{}'));
+        const outputs = RDKIT_OUTPUTS[String(body.inputs?.smiles)];
+        return fakeResponse({
+          contractVersion: '1.0.0', request: body,
+          run: { runId: `r${seq}`, modelId: 'chem-rdkit-descriptors', modelVersion: '1.0.0', domain: 'chemistry', engine: 'genesis-compute@1.0.0', status: 'ok', deterministic: true, inputs: body.inputs, outputs, units: {}, warnings: [], assumptions: [], provenance: { source: 'x', formula: 'x', honesty: 'real_external_engine', engine: 'RDKit 2026.03.5' } },
+          persisted: false,
+        });
+      }));
+      const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === 'problem:chem-rdkit-molecular-weight-comparison')!;
+      const chemLoop = await executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem)));
+      const chem = projectMoleculeWorldStates(chemLoop)[0]!;
+
+      const shapes = [epi, phys, chem].map((s) => Object.keys(s).sort());
+      expect(shapes[0]).toEqual(shapes[1]);
+      expect(shapes[1]).toEqual(shapes[2]);
+      expect(new Set([epi.domainId, phys.domainId, chem.domainId]).size).toBe(3);
+    });
   });
 });

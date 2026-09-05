@@ -51,6 +51,7 @@ const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/F
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
 const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
+const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -558,6 +559,9 @@ export default function App() {
         <main className="home" id="main-content" tabIndex={-1}>
           <HeavyRoute>
             <GenesisCommandCenterHero />
+          </HeavyRoute>
+          <HeavyRoute>
+            <GenesisCapabilityShowcase />
           </HeavyRoute>
           <div style={{ position: 'relative' }}>
             <ScaleJourney />

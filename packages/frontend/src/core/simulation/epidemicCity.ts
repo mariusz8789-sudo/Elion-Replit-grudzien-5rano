@@ -94,6 +94,14 @@ const COLORS: Record<string, string> = {
   D: '#6b7280', // zgon (szary)
 };
 
+export interface ScenarioWorldReplayPlan {
+  preInterventionParams: EpidemicCityParams;
+  params: EpidemicCityParams;
+  cohort: CohortProfile;
+  stepsPerDay: number;
+  interventionStartDay: number;
+}
+
 export class EpidemicCitySimulation implements VisualSimulation {
   readonly worldWidth: number;
   readonly worldHeight: number;
@@ -161,6 +169,31 @@ export class EpidemicCitySimulation implements VisualSimulation {
   }
 
   reset(): void { this.seed(); }
+
+  /**
+   * Replays this existing agent model to a selected Scenario Engine day.
+   * The renderer continues reading this same simulation instance, so no
+   * aggregate timeline value is substituted for agent state.
+   */
+  replayToDay(plan: ScenarioWorldReplayPlan, targetDay: number): number {
+    if (!Number.isFinite(targetDay) || !Number.isFinite(plan.stepsPerDay) || plan.stepsPerDay <= 0) {
+      throw new Error('Nieprawidłowy dzień albo stepsPerDay dla temporal world replay.');
+    }
+    const day = Math.max(0, Math.floor(targetDay));
+    this.params = { ...plan.preInterventionParams };
+    this.cohort = plan.cohort;
+    this.seed();
+    const dt = 1 / plan.stepsPerDay;
+    let interventionApplied = plan.interventionStartDay <= 0;
+    for (let logicalDay = 1; logicalDay <= day; logicalDay++) {
+      if (!interventionApplied && logicalDay >= plan.interventionStartDay) {
+        this.params = { ...plan.params };
+        interventionApplied = true;
+      }
+      for (let step = 0; step < plan.stepsPerDay; step++) this.tick(dt);
+    }
+    return Math.floor(this.time);
+  }
 
   private beta(): number { return this.params.r0 / Math.max(1e-6, this.params.infectiousDays); }
 

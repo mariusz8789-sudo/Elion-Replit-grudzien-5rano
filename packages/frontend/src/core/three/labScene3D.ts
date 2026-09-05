@@ -84,7 +84,7 @@ function scientificFraming(kind: 'SCIENTIFIC' | 'ANOMALY' | 'REPLAY' | 'WIDE'): 
   if (kind === 'REPLAY') return { position: [-2.0, 2.5, 2.6], lookAt };
   // WIDE: kadr otwierający — cała hala z antresolą i drugą wieżą w kadrze,
   // aparatura jako punkt centralny, a nie szkło tuż przy obiektywie.
-  if (kind === 'WIDE') return { position: [3.4, 2.6, 4.3], lookAt: [VESSEL_POSITION[0] - 0.2, VESSEL_POSITION[1] + 0.2, VESSEL_POSITION[2]] };
+  if (kind === 'WIDE') return { position: [2.5, 2.05, 3.1], lookAt: [VESSEL_POSITION[0] - 0.15, VESSEL_POSITION[1] + 0.35, VESSEL_POSITION[2] - 0.4] };
   return { position: [2.2, 2.3, 3.0], lookAt };
 }
 
@@ -405,13 +405,13 @@ export class LabScene3D implements Sim3D {
     scene.add(workLight);
     // KEY: ciepłe, skierowane światło z przodu-boku naczynia — główne
     // źródło modelunku na szkle/metalu bioreaktora.
-    const keyLight = new THREE.SpotLight(0xffd9a8, 6.5, 9, Math.PI / 5, 0.55, 1.4);
-    keyLight.position.set(2.4, 3.0, 1.8);
+    const keyLight = new THREE.SpotLight(0xfff0d8, 14, 12, Math.PI / 4.5, 0.5, 1.2);
+    keyLight.position.set(2.6, 3.3, 2.6);
     keyLight.target.position.set(VESSEL_POSITION[0], VESSEL_POSITION[1], VESSEL_POSITION[2]);
     scene.add(keyLight, keyLight.target);
     // RIM: chłodne światło zza naczynia — odcina jego sylwetkę od tła,
     // dokładnie ten efekt, którego brakowało przy płaskim wypełnieniu.
-    const rimLight = new THREE.PointLight(0x5ad1ff, 2.2, 6, 2);
+    const rimLight = new THREE.PointLight(0x7fdcff, 4.5, 7, 2);
     rimLight.position.set(VESSEL_POSITION[0] - 0.3, VESSEL_POSITION[1] + 1.4, VESSEL_POSITION[2] - 1.6);
     scene.add(rimLight);
 
@@ -499,7 +499,7 @@ export class LabScene3D implements Sim3D {
     outer.position.set(...VESSEL_POSITION);
     scene.add(outer);
 
-    const ringMat = new THREE.MeshStandardMaterial({ color: 0x4b5773, roughness: 0.22, metalness: 0.85, roughnessMap: brushedFor(6, 1) });
+    const ringMat = new THREE.MeshStandardMaterial({ color: 0x99a6bd, roughness: 0.16, metalness: 0.96, roughnessMap: brushedFor(6, 1), envMapIntensity: 1.5 });
     const ringGeo = new THREE.TorusGeometry(0.87, 0.045, 14, 40);
     for (const offset of [VESSEL_HALF_HEIGHT - 0.07, 0, -(VESSEL_HALF_HEIGHT - 0.07)]) {
       const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -529,12 +529,12 @@ export class LabScene3D implements Sim3D {
     // sylwetką realnego, złożonego instrumentu, nie gołej rury. Dwa pierścienie
     // zaworów pod kopułą dodają detal "prawdziwej aparatury" bez żadnych
     // zmyślonych odczytów.
-    const domeMat = new THREE.MeshStandardMaterial({ color: 0x5a677f, roughness: 0.25, metalness: 0.8, roughnessMap: brushedFor(5, 3) });
+    const domeMat = new THREE.MeshStandardMaterial({ color: 0xaebccd, roughness: 0.11, metalness: 1, roughnessMap: brushedFor(5, 3), envMapIntensity: 1.9 });
     const dome = new THREE.Mesh(new THREE.SphereGeometry(0.87, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), domeMat);
     dome.position.set(VESSEL_POSITION[0], VESSEL_POSITION[1] + VESSEL_HALF_HEIGHT, VESSEL_POSITION[2]);
     scene.add(dome);
     const valveGeo = new THREE.BoxGeometry(0.1, 0.14, 0.1);
-    const valveMat = new THREE.MeshStandardMaterial({ color: 0x394465, roughness: 0.4, metalness: 0.55 });
+    const valveMat = new THREE.MeshStandardMaterial({ color: 0xb8623a, roughness: 0.46, metalness: 0.7 });
     for (const angle of [Math.PI / 4, (Math.PI * 3) / 4, (Math.PI * 5) / 4, (Math.PI * 7) / 4]) {
       const vx = VESSEL_POSITION[0] + Math.cos(angle) * 0.55;
       const vz = VESSEL_POSITION[2] + Math.sin(angle) * 0.55;
@@ -659,7 +659,7 @@ export class LabScene3D implements Sim3D {
     // Dwa instrumenty flankujące z górną opaską (czytelniejszy fokalny detal) — czysto wizualne.
     const instrumentGeo = new THREE.CylinderGeometry(0.22, 0.26, 1.05, 20);
     const bandGeo = new THREE.CylinderGeometry(0.235, 0.235, 0.08, 20);
-    const instrumentMat = new THREE.MeshStandardMaterial({ color: 0x394465, roughness: 0.45, metalness: 0.4 });
+    const instrumentMat = new THREE.MeshStandardMaterial({ color: 0x5e6b8c, roughness: 0.55, metalness: 0.3 });
     const bandMat = new THREE.MeshStandardMaterial({ color: 0x5ad1ff, emissive: 0x5ad1ff, emissiveIntensity: 0.6, roughness: 0.3 });
     for (const x of [-1.7, 1.7]) {
       const body = new THREE.Mesh(instrumentGeo, instrumentMat);
@@ -729,7 +729,7 @@ export class LabScene3D implements Sim3D {
     scene.add(tankPlatform);
     const tankBody = new THREE.Mesh(
       new THREE.CylinderGeometry(0.5, 0.54, 2.3, 28),
-      new THREE.MeshStandardMaterial({ color: 0x2f3a52, roughness: 0.3, metalness: 0.6, roughnessMap: brushedFor(4, 4) }),
+      new THREE.MeshStandardMaterial({ color: 0x7e8ba3, roughness: 0.24, metalness: 0.9, roughnessMap: brushedFor(4, 4), envMapIntensity: 1.4 }),
     );
     tankBody.position.set(tankPos[0], 1.3, tankPos[2]);
     scene.add(tankBody);
@@ -749,7 +749,7 @@ export class LabScene3D implements Sim3D {
     // pionowymi paskami LED. Jasność pasków rośnie WYŁĄCZNIE z realnym
     // sygnałem "playing" (dokładnie ta sama zasada co mały monitor obok
     // konsoli) — nigdy zmyślone dane na wyświetlaczu.
-    const rackBodyMat = new THREE.MeshStandardMaterial({ color: 0x232b40, roughness: 0.5, metalness: 0.35 });
+    const rackBodyMat = new THREE.MeshStandardMaterial({ color: 0x39435e, roughness: 0.66, metalness: 0.28 });
     const rackScreenMat = new THREE.MeshStandardMaterial({ color: 0x123044, emissive: 0x5ad1ff, emissiveIntensity: 0.2, roughness: 0.3 });
     for (let i = 0; i < 4; i++) {
       const rz = -2.0 + i * 0.62;
@@ -1063,6 +1063,15 @@ export class LabScene3D implements Sim3D {
         scene.add(housing);
       }
     }
+    // Wash ścian: bez tego obwód hali (ściany, szafy, stoły) gubił się w czerni,
+    // bo wszystkie źródła świeciły do środka. Cztery miękkie światła obrysowe
+    // odsłaniają zabudowę peryferyjną, nie rozjaśniając środka kadru.
+    for (const [wx, wz] of [[-5.2, 0], [5.2, 0], [0, -4.0], [0, 3.6]] as const) {
+      const wallWash = new THREE.PointLight(0xaec6ea, 4.2, 8, 2);
+      wallWash.position.set(wx, 2.5, wz);
+      scene.add(wallWash);
+    }
+
     // Materiał emisyjny sam NIE oświetla sceny w Three.js — bez tych źródeł
     // panele sufitowe świeciły, a hala zostawała czarna. Sześć realnych świateł
     // (co drugi panel) daje równomierne oświetlenie robocze całej zabudowy.
@@ -1363,6 +1372,12 @@ export class LabScene3D implements Sim3D {
     // zamiast płaskiej, jednolicie oświetlonej sceny.
     renderer.toneMappingExposure = 1.32;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Mapa środowiska generowana PROCEDURALNIE ze sceny studyjnej (jasny sufit,
+    // ciemna podłoga) — metal musi mieć co odbijać, inaczej chrom i stal czytają
+    // się jak matowy plastik niezależnie od roughness/metalness. Ustawiana
+    // natychmiast, bez czekania na asynchroniczne HDRI (które i tak tylko ją
+    // zastąpi, gdy się załaduje).
+    this.applyStudioEnvironment(renderer, scene);
     void this.loadHdri(renderer);
     const composer = new modules.EffectComposer(renderer);
     composer.addPass(new modules.RenderPass(scene, camera));
@@ -1381,6 +1396,42 @@ export class LabScene3D implements Sim3D {
    * jedyny zatwierdzony w assetGovernance.ts asset środowiskowy CC0, nie
    * dodaje żadnego nowego pliku.
    */
+  /**
+   * Otoczenie studyjne bez żadnego assetu: mała scena z jasnym „sufitem",
+   * ciemną „podłogą" i dwoma świetlówkami, przepuszczona przez PMREMGenerator.
+   * To ona daje metalowi/szkłu realne odbicia — bez niej chrom, stal i szyba
+   * reaktora wyglądają jak jednolity plastik, niezależnie od parametrów PBR.
+   */
+  private applyStudioEnvironment(renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene): void {
+    const THREE = this.THREE!;
+    const envScene = new THREE.Scene();
+    const shell = new THREE.Mesh(
+      new THREE.BoxGeometry(12, 8, 12),
+      new THREE.MeshBasicMaterial({ color: 0x35415c, side: THREE.BackSide }),
+    );
+    envScene.add(shell);
+    // Jasny „sufit" i dwie świetlówki: to one dają metalowi ostre, wydłużone
+    // refleksy, po których czyta się szczotkowana stal i chrom.
+    const envCeiling = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({ color: 0xdfeaff }));
+    envCeiling.rotation.x = Math.PI / 2;
+    envCeiling.position.y = 3.9;
+    envScene.add(envCeiling);
+    const envFloor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({ color: 0x0d1220 }));
+    envFloor.rotation.x = -Math.PI / 2;
+    envFloor.position.y = -3.9;
+    envScene.add(envFloor);
+    for (const ex of [-2.4, 2.4]) {
+      const strip = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 9), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      strip.rotation.x = Math.PI / 2;
+      strip.position.set(ex, 3.85, 0);
+      envScene.add(strip);
+    }
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(envScene, 0.06).texture;
+    scene.environmentIntensity = 1.15;
+    pmrem.dispose();
+  }
+
   private async loadHdri(renderer: THREE_NS.WebGLRenderer): Promise<void> {
     const hdriPath = '/assets/genesis-hf/hdr/braustuble_alley_1k.hdr';
     if (!isWorldAssetApproved(hdriPath)) return;
@@ -1394,7 +1445,7 @@ export class LabScene3D implements Sim3D {
         this.scene.environment = environment;
         // Podniesione z 0.35: przy obniżonym świetle ambientowym to teraz
         // IBL niesie większość odbić na szkle/metalu, więc musi być czytelne.
-        this.scene.environmentIntensity = 0.65;
+        this.scene.environmentIntensity = 1.45;
         texture.dispose();
         pmrem.dispose();
       }, undefined, () => pmrem.dispose());

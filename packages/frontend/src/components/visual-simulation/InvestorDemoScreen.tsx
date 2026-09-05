@@ -42,7 +42,7 @@ const MOVE_KEYS: Record<string, MoveKey> = {
 };
 
 const STATUS_LABEL = ['NORMALNY', 'PODWYŻSZONY', 'WYSOKI', 'KRYTYCZNY'];
-const CAMERA_LABEL = ['SWOBODNA', 'NAUKOWA', 'NAUKOWA — ANOMALIA', 'ODTWORZENIE'];
+const CAMERA_LABEL = ['SWOBODNA', 'NAUKOWA', 'NAUKOWA — ANOMALIA', 'ODTWORZENIE', 'HALA'];
 const QUESTION_ID = 'problem:intervention-timing';
 
 function canInteractInPhase(phase: ExperimentPhase): boolean {
@@ -278,6 +278,9 @@ export function InvestorDemoScreen() {
         <aside className="gid-rail-left" aria-label="Kamery i obserwacja na żywo">
           <h2>KAMERY</h2>
           <div className="gid-cam-list">
+            <button type="button" className={`gid-cam-slot ${stats.fixedKind === 4 ? 'active' : ''}`} onClick={() => sim.focusScientific('WIDE')}>
+              <span className="gid-cam-dot" />Hala<small>Kadr otwierający</small>
+            </button>
             <button type="button" className={`gid-cam-slot ${!cameraTaken ? 'active' : ''}`} disabled={!cameraTaken} onClick={() => sim.returnToFirstPerson()}>
               <span className="gid-cam-dot" />Swobodna<small>Pierwsza osoba</small>
             </button>

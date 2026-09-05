@@ -108,6 +108,12 @@ export class LabScene3D implements Sim3D {
   private agitatorGroup: THREE_NS.Group | null = null;
   private hologramRing: THREE_NS.Mesh | null = null;
   private hologramMaterial: THREE_NS.MeshBasicMaterial | null = null;
+  // Wewnętrzna "kolonia" wewnątrz płynu: czysto wizualna tekstura gęstości —
+  // WIDOCZNA LICZBA punktów (drawRange) jest wprost proporcjonalna do
+  // realnego vesselFraction, nigdy do zmyślonego pomiaru "liczby komórek".
+  private colonyPoints: THREE_NS.Points | null = null;
+  private colonyMaterial: THREE_NS.PointsMaterial | null = null;
+  private colonyMaxCount = 0;
   // Szafy aparaturowe w tle: świecą jaśniej WYŁĄCZNIE gdy realnie coś się
   // odtwarza (ten sam sygnał "playing" co mały monitor) — dekoracja
   // sterowana prawdziwym stanem, nie ozdobny placeholder.
@@ -225,8 +231,25 @@ export class LabScene3D implements Sim3D {
     this.THREE = THREE;
     this.scene = scene;
     this.raycaster = new THREE.Raycaster();
-    scene.background = new THREE.Color(0x090c14);
-    scene.fog = new THREE.Fog(0x090c14, 6, 16);
+    // Tło: pionowy gradient (płótno->tekstura) zamiast płaskiego koloru —
+    // tani, standardowy trik dający wrażenie atmosfery/głębi zamiast
+    // jednolitej "ściany koloru" za sprzętem. Nadal żaden nowy asset/loader.
+    const gradientCanvas = document.createElement('canvas');
+    gradientCanvas.width = 8;
+    gradientCanvas.height = 256;
+    const gradientCtx = gradientCanvas.getContext('2d')!;
+    const gradient = gradientCtx.createLinearGradient(0, 0, 0, 256);
+    gradient.addColorStop(0, '#04060c');
+    gradient.addColorStop(0.55, '#0a0f1d');
+    gradient.addColorStop(1, '#141d30');
+    gradientCtx.fillStyle = gradient;
+    gradientCtx.fillRect(0, 0, 8, 256);
+    const backgroundTexture = new THREE.CanvasTexture(gradientCanvas);
+    backgroundTexture.colorSpace = THREE.SRGBColorSpace;
+    scene.background = backgroundTexture;
+    // Mgła ciaśniej dobrana do rzeczywistych rozmiarów sali (przekątna ~7.8 m) —
+    // realny spadek widoczności w głąb, zamiast dekoracji, która nigdy się nie uruchamia.
+    scene.fog = new THREE.Fog(0x0a0f1d, 3.5, 12.5);
 
     // Ściany + sufit: jeden box renderowany od wewnątrz (BackSide) — tanie i wystarczające.
     const roomWidth = ROOM.maxX - ROOM.minX;
@@ -278,22 +301,34 @@ export class LabScene3D implements Sim3D {
     windowLight.position.set(-roomWidth / 2 + 0.6, 1.95, -0.6);
     scene.add(windowLight);
 
-    // Oświetlenie: miękkie wypełnienie z DWÓCH stron (żeby ściany nie ginęły w czerni)
-    // + ciepłe światło robocze nad stanowiskiem + wisząca oprawa.
+    // Oświetlenie warstwowe (key/fill/rim), nie płaskie wypełnienie ze
+    // wszystkich stron: wypełnienie ambientowe ZREDUKOWANE, żeby światła
+    // kierunkowe/punktowe dawały realny kontrast i cienie zamiast
+    // jednolicie oświetlonej sceny bez głębi.
     // Uwaga: ściany/sufit renderowane od wewnątrz (BackSide) mają odwrócone
     // normalne, więc HemisphereLight przypisuje sufitowi kolor "gruntu", a
-    // podłodze kolor "nieba" — oba ustawione podobnie jasno, żeby to
-    // odwrócenie nie gasiło sufitu.
-    scene.add(new THREE.HemisphereLight(0xb9cbf0, 0xaebbe0, 1.1));
-    const skyLight = new THREE.DirectionalLight(0xcfe0ff, 0.7);
+    // podłodze kolor "nieba".
+    scene.add(new THREE.HemisphereLight(0x6f84ad, 0x5c6684, 0.55));
+    const skyLight = new THREE.DirectionalLight(0xcfe0ff, 0.35);
     skyLight.position.set(-2, 3, -1);
     scene.add(skyLight);
-    const fillLight = new THREE.DirectionalLight(0x8fa8d6, 0.45);
+    const fillLight = new THREE.DirectionalLight(0x8fa8d6, 0.22);
     fillLight.position.set(2.5, 2.2, 2);
     scene.add(fillLight);
-    const workLight = new THREE.PointLight(0xfff1d6, 1.6, 9, 2);
+    const workLight = new THREE.PointLight(0xfff1d6, 1.4, 9, 2);
     workLight.position.set(0, roomHeight - 0.5, 0.1);
     scene.add(workLight);
+    // KEY: ciepłe, skierowane światło z przodu-boku naczynia — główne
+    // źródło modelunku na szkle/metalu bioreaktora.
+    const keyLight = new THREE.SpotLight(0xffd9a8, 6.5, 9, Math.PI / 5, 0.55, 1.4);
+    keyLight.position.set(2.4, 3.0, 1.8);
+    keyLight.target.position.set(VESSEL_POSITION[0], VESSEL_POSITION[1], VESSEL_POSITION[2]);
+    scene.add(keyLight, keyLight.target);
+    // RIM: chłodne światło zza naczynia — odcina jego sylwetkę od tła,
+    // dokładnie ten efekt, którego brakowało przy płaskim wypełnieniu.
+    const rimLight = new THREE.PointLight(0x5ad1ff, 2.2, 6, 2);
+    rimLight.position.set(VESSEL_POSITION[0] - 0.3, VESSEL_POSITION[1] + 1.4, VESSEL_POSITION[2] - 1.6);
+    scene.add(rimLight);
 
     // Belka technologiczna (gantry) pod sufitem — niesie trzy oprawy wiszące
     // zamiast jednej pojedynczej lampy, wzmacnia poczucie przemysłowej hali
@@ -424,6 +459,28 @@ export class LabScene3D implements Sim3D {
     this.fluidMesh.position.set(VESSEL_POSITION[0], 0.15, VESSEL_POSITION[2]);
     this.fluidMesh.scale.y = 0.001;
     scene.add(this.fluidMesh);
+
+    // "Kolonia" wewnątrz płynu: rozproszone świecące punkty, DZIECKO fluidMesh
+    // (dziedziczy jego pozycję/skalę, więc żyje dokładnie w realnej objętości
+    // płynu). Liczba WIDOCZNYCH punktów = realny vesselFraction * pula — to
+    // wizualizacja gęstości z realnego sygnału, nie fikcyjny licznik komórek.
+    this.colonyMaxCount = 220;
+    const colonyPositions = new Float32Array(this.colonyMaxCount * 3);
+    for (let i = 0; i < this.colonyMaxCount; i++) {
+      const r = Math.sqrt(Math.random()) * 0.6;
+      const theta = Math.random() * Math.PI * 2;
+      colonyPositions[i * 3] = Math.cos(theta) * r;
+      colonyPositions[i * 3 + 1] = Math.random() - 0.5;
+      colonyPositions[i * 3 + 2] = Math.sin(theta) * r;
+    }
+    const colonyGeometry = new THREE.BufferGeometry();
+    colonyGeometry.setAttribute('position', new THREE.BufferAttribute(colonyPositions, 3));
+    colonyGeometry.setDrawRange(0, 0);
+    this.colonyMaterial = new THREE.PointsMaterial({
+      color: STATUS_COLOR.NORMAL, size: 0.045, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+    });
+    this.colonyPoints = new THREE.Points(colonyGeometry, this.colonyMaterial);
+    this.fluidMesh.add(this.colonyPoints);
 
     // Agitator: wirujący wewnątrz naczynia trzon + dwie łopatki — prędkość
     // obrotu sterowana REALNYM vesselFraction w update(), nigdy zmyśloną liczbą.
@@ -654,8 +711,9 @@ export class LabScene3D implements Sim3D {
     camera.position.set(state.position.x, state.position.y, state.position.z);
     camera.lookAt(state.position.x, state.position.y, state.position.z - 1);
     // FOV szerszy niż domyślne 50° useThreeLoop — 50° czyta się jak teleobiektyw i
-    // ściska pokój; w pierwszej osobie 62° daje poczucie fizycznej obecności.
-    camera.fov = 62;
+    // ściska pokój; 68° w pierwszej osobie mieści całą powiększoną aparaturę
+    // nawet z bliska, zamiast kadrować sam środek kopuły/klatki.
+    camera.fov = 68;
     camera.updateProjectionMatrix();
   }
 
@@ -686,6 +744,7 @@ export class LabScene3D implements Sim3D {
     // PRĘDKOŚĆ jest funkcją REALNEGO obłożenia — nigdy stała/zmyślona liczba.
     if (this.agitatorGroup) this.agitatorGroup.rotation.y += dt * (0.6 + this.vesselFraction * 5.2);
     if (this.hologramRing) this.hologramRing.rotation.z += dt * (0.25 + this.vesselIcuFraction * 1.6);
+    if (this.colonyPoints) this.colonyPoints.rotation.y += dt * (0.3 + this.vesselFraction * 1.8);
 
     if (this.playSeriesData.length > 0 && !this.playbackDone && !this.playbackPaused) {
       this.playElapsed += dt;
@@ -731,6 +790,10 @@ export class LabScene3D implements Sim3D {
       if (this.vesselLight) {
         this.vesselLight.color.setHex(vesselColor);
         this.vesselLight.intensity = 0.2 + this.vesselFraction * 1.1;
+      }
+      if (this.colonyMaterial && this.colonyPoints) {
+        this.colonyMaterial.color.setHex(vesselColor);
+        this.colonyPoints.geometry.setDrawRange(0, Math.round(this.colonyMaxCount * this.vesselFraction));
       }
     }
     // Drugi realny sygnał (obłożenie ICU) na akcentowym świetle instrumentu — nic wizualnego ponad to nie jest zmyślone.
@@ -790,12 +853,18 @@ export class LabScene3D implements Sim3D {
   ): PostProcessor {
     const THREE = this.THREE!;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    // Ekspozycja podniesiona razem z obniżonym wypełnieniem ambientowym:
+    // ciemniejsze tło + jaśniejsze źródła kierunkowe dają filmowy kontrast
+    // zamiast płaskiej, jednolicie oświetlonej sceny.
+    renderer.toneMappingExposure = 1.18;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     void this.loadHdri(renderer);
     const composer = new modules.EffectComposer(renderer);
     composer.addPass(new modules.RenderPass(scene, camera));
-    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.5, 0.6, 0.8);
+    // Bloom niżej progowany i mocniejszy: wspiera światło (poświata na
+    // krawędziach szkła/emisyjnych elementach), ale go nie zastępuje —
+    // ciemniejsze materiały bazowe (patrz init()) robią resztę kontrastu.
+    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.75, 0.55, 0.65);
     composer.addPass(bloom);
     composer.addPass(new modules.OutputPass());
     return { render: () => composer.render(), setSize: (width, height) => composer.setSize(width, height), dispose: () => composer.dispose() };
@@ -818,7 +887,9 @@ export class LabScene3D implements Sim3D {
         if (!this.scene) { texture.dispose(); pmrem.dispose(); return; }
         const environment = pmrem.fromEquirectangular(texture).texture;
         this.scene.environment = environment;
-        this.scene.environmentIntensity = 0.35;
+        // Podniesione z 0.35: przy obniżonym świetle ambientowym to teraz
+        // IBL niesie większość odbić na szkle/metalu, więc musi być czytelne.
+        this.scene.environmentIntensity = 0.65;
         texture.dispose();
         pmrem.dispose();
       }, undefined, () => pmrem.dispose());

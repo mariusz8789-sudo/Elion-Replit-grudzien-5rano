@@ -2578,9 +2578,12 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   background: linear-gradient(90deg, transparent, rgba(93, 214, 255, 0.5), transparent);
 }
 .gid-flow-step {
-  min-width: 9.5rem; padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 0.6rem;
+  flex: 1 1 0; min-width: 8.5rem; max-width: 15rem; padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border); border-top: 2px solid rgba(93, 214, 255, 0.35); border-radius: 0.6rem;
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.03), var(--bg-panel));
+  transition: border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
+.gid-flow-step:hover { border-top-color: var(--cyan); transform: translateY(-1px); }
 .gid-flow-step span { display: block; margin-bottom: 0.2rem; color: var(--cyan); font: 700 0.6rem/1 var(--font-mono); letter-spacing: 0.07em; }
 .gid-flow-step p { margin: 0; color: var(--text-dim); font-size: 0.68rem; line-height: 1.3; }
 .gid-flow-step-next { border-color: rgba(240, 179, 92, 0.4); }
@@ -2637,6 +2640,27 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 
 .gid-stage-col { display: grid; grid-template-rows: 1fr auto; min-width: 0; min-height: 0; }
 .gid-stage { position: relative; min-width: 0; min-height: 0; background: #000; }
+
+/* Nagłówek sceny — jedna linia: co obserwujesz, który dzień, jaki status.
+   Dockowany nad centralną wizualizacją, nie konkuruje z nią kontrastem. */
+.gid-stage-head {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.55rem 0.85rem;
+  background: linear-gradient(180deg, rgba(4, 7, 14, 0.88), rgba(4, 7, 14, 0));
+  pointer-events: none;
+}
+.gid-stage-scenario { color: var(--text); font: 700 0.78rem/1 var(--font-mono); letter-spacing: 0.06em; }
+.gid-stage-day { color: var(--text-dim); font: 600 0.68rem/1 var(--font-mono); letter-spacing: 0.05em; }
+.gid-stage-status {
+  margin-left: auto; padding: 0.2rem 0.55rem; border-radius: 999px;
+  border: 1px solid currentColor; font: 700 0.6rem/1.3 var(--font-mono); letter-spacing: 0.07em;
+}
+.gid-stage-status.s0 { color: var(--cyan); }
+.gid-stage-status.s1 { color: var(--gold); }
+.gid-stage-status.s2 { color: #f5943f; }
+.gid-stage-status.s3 { color: var(--red); }
+.gid-stage-status.idle { color: var(--text-faint); }
 .gid-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; }
 .gid-enter {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem;
@@ -2689,7 +2713,23 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .gid-instrument-head { display: flex; justify-content: space-between; margin-bottom: 0.15rem; }
 .gid-instrument-head span { color: var(--text-faint); font: 700 0.58rem/1 var(--font-mono); letter-spacing: 0.06em; }
 .gid-instrument-head em { color: var(--green); font: 700 0.52rem/1 var(--font-mono); font-style: normal; }
-.gid-instrument-value { display: block; margin-bottom: 0.15rem; color: var(--text); font: 700 1.1rem/1 var(--font-mono); text-shadow: 0 0 12px rgba(93, 214, 255, 0.25); }
+.gid-instrument-value { display: flex; align-items: baseline; gap: 0.4rem; margin-bottom: 0.15rem; color: var(--text); font: 700 1.25rem/1 var(--font-mono); text-shadow: 0 0 12px rgba(93, 214, 255, 0.25); }
+.gid-instrument-value small { color: var(--text-faint); font: 500 0.55rem/1 var(--font-mono); letter-spacing: 0.05em; text-shadow: none; }
+
+/* Legenda statusów — małe etykiety uppercase, jeden kolor na znaczenie. */
+.gid-legend { display: grid; gap: 0.3rem; margin: 0; padding: 0; list-style: none; }
+.gid-legend li { display: flex; align-items: center; gap: 0.4rem; color: var(--text-dim); font-size: 0.6rem; line-height: 1.35; }
+.gid-legend-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; flex-shrink: 0; }
+.gid-legend-dot.measured { background: var(--green); }
+.gid-legend-dot.supported { background: var(--cyan); }
+.gid-legend-dot.blocked { background: var(--red); }
+.gid-legend-dot.notmodeled { background: var(--gold); }
+
+/* Hierarchia akcji: primary = jedno główne CTA, secondary = obramowane,
+   quiet = akcje porządkowe, które nie mogą wyglądać jak CTA. */
+.gid-buttons .chip-btn.gid-secondary { border-color: rgba(93, 214, 255, 0.45); color: var(--cyan); }
+.gid-buttons .chip-btn.gid-quiet { border-color: transparent; background: transparent; color: var(--text-faint); }
+.gid-buttons .chip-btn.gid-quiet:hover { color: var(--text-dim); border-color: var(--border); }
 
 .gid-controls {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem;

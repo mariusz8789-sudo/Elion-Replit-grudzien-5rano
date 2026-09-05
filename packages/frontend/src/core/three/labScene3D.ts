@@ -81,6 +81,59 @@ function scientificFraming(kind: 'SCIENTIFIC' | 'ANOMALY' | 'REPLAY'): { positio
   return { position: [2.2, 2.3, 3.0], lookAt };
 }
 
+/**
+ * Teksturę "szczotkowanego metalu" generujemy proceduralnie (canvas, bez
+ * żadnego pliku/asseta) — tysiące cienkich, poziomych pasm o losowej
+ * jasności dają anizotropowe rozproszenie światła zamiast płaskiego,
+ * jednolitego koloru PBR. Reużywana jako roughnessMap na kilku metalowych
+ * materiałach (różne .repeat na klonach), więc jeden canvas wystarcza.
+ */
+function makeBrushedMetalTexture(THREE: typeof THREE_NS): THREE_NS.Texture {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#8c8c8c';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 1400; i++) {
+    const y = Math.random() * size;
+    const shade = 90 + Math.random() * 110;
+    ctx.strokeStyle = `rgba(${shade},${shade},${shade},${0.04 + Math.random() * 0.1})`;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(size, y + (Math.random() - 0.5) * 3);
+    ctx.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+/** Drobny szum kropkowy — "polerowany beton" na podłodze, ta sama zasada co szczotkowany metal. */
+function makeFloorNoiseTexture(THREE: typeof THREE_NS): THREE_NS.Texture {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#3a4258';
+  ctx.fillRect(0, 0, size, size);
+  const image = ctx.getImageData(0, 0, size, size);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const speck = Math.random() < 0.12 ? (Math.random() * 40 - 20) : (Math.random() * 14 - 7);
+    image.data[i] = Math.max(0, Math.min(255, image.data[i] + speck));
+    image.data[i + 1] = Math.max(0, Math.min(255, image.data[i + 1] + speck));
+    image.data[i + 2] = Math.max(0, Math.min(255, image.data[i + 2] + speck));
+  }
+  ctx.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
 export class LabScene3D implements Sim3D {
   disableOrbitControls = true;
 
@@ -118,6 +171,9 @@ export class LabScene3D implements Sim3D {
   // odtwarza (ten sam sygnał "playing" co mały monitor) — dekoracja
   // sterowana prawdziwym stanem, nie ozdobny placeholder.
   private rackScreens: THREE_NS.Mesh[] = [];
+  // Subtelny "oddech" kamery w kadrze FIXED — czysto kosmetyczny drift,
+  // nigdy nie dotyka liveCameraPosition/liveCameraLookAt używanych do lotów.
+  private fixedBreatheT = 0;
 
   private nearStation = false;
 
@@ -231,6 +287,17 @@ export class LabScene3D implements Sim3D {
     this.THREE = THREE;
     this.scene = scene;
     this.raycaster = new THREE.Raycaster();
+    // Tekstury proceduralne (canvas, zero nowych plików/assetów) — jedyny
+    // sposób na detal materiału metalu/podłogi dostępny bez zatwierdzonego
+    // w assetGovernance.ts zestawu PBR dla wnętrza laboratorium.
+    const brushedMetalTex = makeBrushedMetalTexture(THREE);
+    const floorNoiseTex = makeFloorNoiseTexture(THREE);
+    const brushedFor = (repeatX: number, repeatY: number): THREE_NS.Texture => {
+      const tex = brushedMetalTex.clone();
+      tex.needsUpdate = true;
+      tex.repeat.set(repeatX, repeatY);
+      return tex;
+    };
     // Tło: pionowy gradient (płótno->tekstura) zamiast płaskiego koloru —
     // tani, standardowy trik dający wrażenie atmosfery/głębi zamiast
     // jednolitej "ściany koloru" za sprzętem. Nadal żaden nowy asset/loader.
@@ -264,9 +331,10 @@ export class LabScene3D implements Sim3D {
     shell.position.set(roomCenterX, roomHeight / 2, roomCenterZ);
     scene.add(shell);
 
+    floorNoiseTex.repeat.set(roomWidth / 1.4, roomDepth / 1.4);
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(roomWidth - 0.05, roomDepth - 0.05),
-      new THREE.MeshStandardMaterial({ color: 0x1e2536, roughness: 0.35, metalness: 0.25 }),
+      new THREE.MeshStandardMaterial({ color: 0x1e2536, roughness: 0.35, metalness: 0.25, roughnessMap: floorNoiseTex }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(roomCenterX, 0.01, roomCenterZ);
@@ -372,7 +440,7 @@ export class LabScene3D implements Sim3D {
     // Stanowisko: podest + trzy nóżki (czyta się jak realna aparatura, nie geometria placeholder).
     const platform = new THREE.Mesh(
       new THREE.CylinderGeometry(1.1, 1.15, 0.15, 28),
-      new THREE.MeshStandardMaterial({ color: 0x2c3650, roughness: 0.45, metalness: 0.35 }),
+      new THREE.MeshStandardMaterial({ color: 0x2c3650, roughness: 0.45, metalness: 0.35, roughnessMap: brushedFor(8, 1) }),
     );
     platform.position.set(VESSEL_POSITION[0], 0.075, VESSEL_POSITION[2]);
     scene.add(platform);
@@ -410,7 +478,7 @@ export class LabScene3D implements Sim3D {
     outer.position.set(...VESSEL_POSITION);
     scene.add(outer);
 
-    const ringMat = new THREE.MeshStandardMaterial({ color: 0x4b5773, roughness: 0.22, metalness: 0.85 });
+    const ringMat = new THREE.MeshStandardMaterial({ color: 0x4b5773, roughness: 0.22, metalness: 0.85, roughnessMap: brushedFor(6, 1) });
     const ringGeo = new THREE.TorusGeometry(0.87, 0.045, 14, 40);
     for (const offset of [VESSEL_HALF_HEIGHT - 0.07, 0, -(VESSEL_HALF_HEIGHT - 0.07)]) {
       const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -422,7 +490,7 @@ export class LabScene3D implements Sim3D {
     // Cztery pionowe wsporniki (klatka reaktora) + sensor-pady ze świecącymi
     // końcówkami — czysto dekoracyjny detal otoczenia aparatury.
     const strutGeo = new THREE.CylinderGeometry(0.035, 0.035, VESSEL_HALF_HEIGHT * 2 + 0.05, 10);
-    const strutMat = new THREE.MeshStandardMaterial({ color: 0x3d4760, roughness: 0.25, metalness: 0.8 });
+    const strutMat = new THREE.MeshStandardMaterial({ color: 0x3d4760, roughness: 0.25, metalness: 0.8, roughnessMap: brushedFor(1, 6) });
     const podGeo = new THREE.BoxGeometry(0.09, 0.09, 0.09);
     const podMat = new THREE.MeshStandardMaterial({ color: 0x0e1220, emissive: 0x5ad1ff, emissiveIntensity: 0.9, roughness: 0.4 });
     for (const angle of [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2]) {
@@ -440,7 +508,7 @@ export class LabScene3D implements Sim3D {
     // sylwetką realnego, złożonego instrumentu, nie gołej rury. Dwa pierścienie
     // zaworów pod kopułą dodają detal "prawdziwej aparatury" bez żadnych
     // zmyślonych odczytów.
-    const domeMat = new THREE.MeshStandardMaterial({ color: 0x5a677f, roughness: 0.25, metalness: 0.8 });
+    const domeMat = new THREE.MeshStandardMaterial({ color: 0x5a677f, roughness: 0.25, metalness: 0.8, roughnessMap: brushedFor(5, 3) });
     const dome = new THREE.Mesh(new THREE.SphereGeometry(0.87, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), domeMat);
     dome.position.set(VESSEL_POSITION[0], VESSEL_POSITION[1] + VESSEL_HALF_HEIGHT, VESSEL_POSITION[2]);
     scene.add(dome);
@@ -621,7 +689,7 @@ export class LabScene3D implements Sim3D {
     scene.add(tankPlatform);
     const tankBody = new THREE.Mesh(
       new THREE.CylinderGeometry(0.5, 0.54, 2.3, 28),
-      new THREE.MeshStandardMaterial({ color: 0x2f3a52, roughness: 0.3, metalness: 0.6 }),
+      new THREE.MeshStandardMaterial({ color: 0x2f3a52, roughness: 0.3, metalness: 0.6, roughnessMap: brushedFor(4, 4) }),
     );
     tankBody.position.set(tankPos[0], 1.3, tankPos[2]);
     scene.add(tankBody);
@@ -673,6 +741,12 @@ export class LabScene3D implements Sim3D {
     const railFar = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.05, 0.05), railMat);
     railFar.position.set(4.9, mezzY + 0.55, 1.55);
     scene.add(railFar);
+    // Podświetlenie krawędzi antresoli — architektoniczny akcent (jak w
+    // realnych halach przemysłowych), czysto dekoracyjne, stałe natężenie.
+    const railGlowMat = new THREE.MeshBasicMaterial({ color: 0x5ad1ff, transparent: true, opacity: 0.55 });
+    const railGlow = new THREE.Mesh(new THREE.BoxGeometry(1.44, 0.012, 4.42), railGlowMat);
+    railGlow.position.set(4.9, mezzY + 0.06, -0.6);
+    scene.add(railGlow);
     const pillarGeo = new THREE.CylinderGeometry(0.05, 0.05, mezzY, 10);
     for (const pz of [-2.6, -1.0, 0.6, 2.2]) {
       const pillar = new THREE.Mesh(pillarGeo, metalDarkMat);
@@ -697,6 +771,14 @@ export class LabScene3D implements Sim3D {
     const partitionFrame = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.06, 0.06), metalMidMat);
     partitionFrame.position.set(-0.5, 2.46, -3.3);
     scene.add(partitionFrame);
+    // Cienka linia LED wzdłuż górnej ramy ścianki — odcina jej krawędź od
+    // ciemnego tła, ten sam architektoniczny akcent co antresola.
+    const partitionEdge = new THREE.Mesh(
+      new THREE.BoxGeometry(4.42, 0.015, 0.015),
+      new THREE.MeshBasicMaterial({ color: 0x5ad1ff, transparent: true, opacity: 0.6 }),
+    );
+    partitionEdge.position.set(-0.5, 2.43, -3.28);
+    scene.add(partitionEdge);
     const beyondGlow = new THREE.Mesh(
       new THREE.PlaneGeometry(3.6, 1.6),
       new THREE.MeshBasicMaterial({ color: 0x2a4f7a, transparent: true, opacity: 0.5 }),
@@ -739,6 +821,8 @@ export class LabScene3D implements Sim3D {
       this.liveCameraLookAt = [state.position.x + forward.x, state.position.y + Math.sin(state.pitch), state.position.z + forward.z];
     }
     // W stałym kadrze (FIXED) kamera nie potrzebuje aktualizacji co klatkę — pozostaje tam, gdzie zakończył się lot.
+    // Poza samą pozycją: licznik "oddechu" narasta tylko w FIXED (patrz syncScene) — subtelny drift kamery, żeby ujęcie nie było martwym stopklatka-kadrem.
+    if (this.cameraPhase === 'FIXED') this.fixedBreatheT += dt;
 
     // Agitator i pierścień holograficzny: czysto wizualna animacja, ale jej
     // PRĘDKOŚĆ jest funkcją REALNEGO obłożenia — nigdy stała/zmyślona liczba.
@@ -774,6 +858,13 @@ export class LabScene3D implements Sim3D {
       // firstPersonController.ts. Nigdy nie dotyka pozycji użytej do kolizji/interakcji.
       camera.position.y += state.bobOffset;
     } else {
+      if (this.cameraPhase === 'FIXED') {
+        // Kinowy "oddech": mikroskopijny, ciągły drift — tak jak przy statywie
+        // z operatorem, nie martwa stopklatka. Amplituda celowo mała, żeby
+        // nigdy nie psuć kompozycji ustawionej w scientificFraming().
+        camera.position.x += Math.sin(this.fixedBreatheT * 0.35) * 0.035;
+        camera.position.y += Math.sin(this.fixedBreatheT * 0.5 + 1.3) * 0.02;
+      }
       camera.lookAt(this.liveCameraLookAt[0], this.liveCameraLookAt[1], this.liveCameraLookAt[2]);
     }
 

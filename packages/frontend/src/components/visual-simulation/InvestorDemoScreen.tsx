@@ -300,11 +300,34 @@ export function InvestorDemoScreen() {
           ) : (
             <p className="gid-empty-note">{completedRun ? 'Przebieg zakończony — patrz panel stanu naukowego.' : 'Brak aktywnego przebiegu.'}</p>
           )}
+          {/* Legenda statusów, których ten ekran realnie używa — żeby „zmierzone"
+              nigdy nie było mylone z „oszacowane przez model" ani z „zablokowane". */}
+          <h2>STATUSY</h2>
+          <ul className="gid-legend">
+            <li><span className="gid-legend-dot measured" />ZMIERZONE — wartość z realnego przebiegu</li>
+            <li><span className="gid-legend-dot supported" />SUPPORTED / FALSIFIED — wynik hipotezy</li>
+            <li><span className="gid-legend-dot blocked" />BLOCKED — brak przesłanek do wykonania</li>
+            <li><span className="gid-legend-dot notmodeled" />NOT_MODELED — poza zakresem modelu</li>
+          </ul>
         </aside>
 
         <section className="gid-stage-col">
           <div className="gid-stage">
             <canvas ref={canvasRef} className="gid-canvas" aria-label="Żywa scena laboratoryjna (Three.js, realne dane Scenario Engine)" />
+            {/* Nagłówek sceny: wyłącznie realny stan (scenariusz z przebiegu, dzień z
+                odtwarzania, status szpitala) — nic tu nie jest zmyślone ani stylizowane
+                na wynik, którego Genesis nie policzył. */}
+            <div className="gid-stage-head">
+              <span className="gid-stage-scenario">{completedRun?.scenarioId ?? runA?.scenarioId ?? 'BRAK PRZEBIEGU'}</span>
+              {isRunning ? (
+                <>
+                  <span className="gid-stage-day">DZIEŃ {stats.dayIndex + 1}/{stats.totalDays || 60}</span>
+                  <span className={`gid-stage-status s${stats.vesselStatusCode}`}>{STATUS_LABEL[stats.vesselStatusCode]}</span>
+                </>
+              ) : (
+                <span className="gid-stage-status idle">{completedRun ? 'PRZEBIEG ZAKOŃCZONY' : 'NOT_EXECUTED'}</span>
+              )}
+            </div>
             {loading && <div className="route-loading" role="status">Ładowanie silnika 3D…</div>}
             {failed && <div className="empty-state">Nie udało się uruchomić WebGL na tym urządzeniu.</div>}
             {!locked && phase === 'IDLE' && !loading && !failed && (
@@ -371,7 +394,7 @@ export function InvestorDemoScreen() {
                 return (
                   <div className="gid-instrument" key={key}>
                     <div className="gid-instrument-head"><span>{key.toUpperCase()}</span><em>ZMIERZONE</em></div>
-                    <strong className="gid-instrument-value">{latest}</strong>
+                    <strong className="gid-instrument-value">{latest}<small>ostatni dzień</small></strong>
                     {spark ? <svg viewBox="0 0 100 32" className="gid-spark"><path d={spark} /></svg> : <p className="gid-empty-note">NOT_MODELED</p>}
                   </div>
                 );
@@ -392,13 +415,13 @@ export function InvestorDemoScreen() {
         <div className="gid-buttons">
           {!isRunning && canInteractInPhase(phase) && phase === 'IDLE' && <button className="chip-btn primary" onClick={handleRunExperiment}>Start</button>}
           {isRunning && <button className="chip-btn" onClick={handleTogglePause}>{paused ? 'Wznów' : 'Pauza'}</button>}
-          {(runA || runB) && <button className="chip-btn danger" onClick={handleRestart}>Restart</button>}
-          {!isRunning && canInteractInPhase(phase) && phase !== 'IDLE' && <button className="chip-btn" onClick={handleRunExperiment}>Uruchom ponownie</button>}
+          {(runA || runB) && <button className="chip-btn gid-quiet" onClick={handleRestart}>Restart</button>}
+          {!isRunning && canInteractInPhase(phase) && phase !== 'IDLE' && <button className="chip-btn primary" onClick={handleRunExperiment}>Uruchom ponownie</button>}
           {runA && runB && phase !== 'COMPARED' && !isRunning && <button className="chip-btn" onClick={handleCompare}>Porównaj</button>}
           {runA && !isRunning && <button className="chip-btn" onClick={handleReplay}>Odtwórz</button>}
           {comparison && !saved && <button className="chip-btn" onClick={handleSave}>Zapisz w Pamięci</button>}
-          {completedRun && <button className="chip-btn" onClick={handleExport}>Eksportuj dane</button>}
-          {!isRunning && <button className="chip-btn" onClick={handleRunDiscoveryLoop}>Uruchom Pętlę Odkrycia Naukowego</button>}
+          {completedRun && <button className="chip-btn gid-quiet" onClick={handleExport}>Eksportuj dane</button>}
+          {!isRunning && <button className="chip-btn gid-secondary" onClick={handleRunDiscoveryLoop}>Uruchom Pętlę Odkrycia Naukowego</button>}
         </div>
         {replay && <p className={`gid-replay-status ${replay.status.toLowerCase()}`}>{replay.status}: {replay.message}</p>}
         {saved && <p className="gid-saved-status">Zapisano: {saved.id}</p>}

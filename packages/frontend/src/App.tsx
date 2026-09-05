@@ -48,6 +48,7 @@ const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/Conc
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
+const InvestorDemoScreen = lazy(() => import('./components/visual-simulation/InvestorDemoScreen').then((m) => ({ default: m.InvestorDemoScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
 const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
@@ -96,6 +97,7 @@ type Route =
   | { kind: 'character' }
   | { kind: 'hf-slice' }
   | { kind: 'first-person-lab' }
+  | { kind: 'investor-demo' }
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' };
 
@@ -127,6 +129,7 @@ function parseHash(): Route {
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
+  if (h === '#/investor-demo') return { kind: 'investor-demo' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   return { kind: 'home' };
@@ -500,6 +503,18 @@ export default function App() {
           <TopBar title="🔬 Laboratorium pierwszoosobowe" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <FirstPersonLabScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'investor-demo') {
+      return (
+        <div className="app">
+          <TopBar title="🔬 GENESIS — Investor Demo" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <InvestorDemoScreen />
           </HeavyRoute>
           {overlays}
         </div>

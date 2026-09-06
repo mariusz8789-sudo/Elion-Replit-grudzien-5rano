@@ -33,7 +33,7 @@ never the reverse.
 
 | Concern | Module | Entry points |
 |---|---|---|
-| Materials | `materials.ts` | `createGenesisMaterialPalette(THREE)`, `createPBRMaterial`, `createScientificGlass`, `createDoubleWalledGlass`, `createEmissiveInstrumentMaterial`, `createScreenMaterial`, plus the procedural texture generators |
+| Materials | `materials.ts` | `createGenesisMaterialPalette(THREE)`, `createPBRMaterial`, `createScientificGlass`, `createDoubleWalledGlass`, `createEmissiveInstrumentMaterial`, `createScreenMaterial`, plus the procedural texture generators. 13 static categories: interior (`SCIENCE_GLASS`/`BRUSHED_METAL`/`POLISHED_METAL`/`TECH_COMPOSITE`/`RUBBER`/`CERAMIC`/`PAINTED_METAL`/`LAB_FLOOR`/`LAB_WALL`) and exterior/urban (`CONCRETE`/`ASPHALT`/`BRICK`/`GROUND`, generalized out of and now used by the epidemiology city scene) |
 | Lighting roles | `lighting.ts` | `createKeyLight`, `createRimLight`, `createPracticalLight`, `createHeroLight`, `createBackgroundFill`, `applyAmbientIBL`, `captureRoomReflectionProbe` |
 | Shadows | `shadowPolicy.ts` | `applyShadowPolicy(THREE, scene, options?)`, `SHADOW_SIZE_TIERS` |
 | Instancing | `instancing.ts` | `InstanceBatch` |
@@ -442,6 +442,14 @@ That second integration is what `skipAmbientIBL` and
 `captureRoomReflectionProbe`'s generalization (out of what was originally
 lab-only code) exist to make possible — a real, different-domain scene
 consuming this engine without copy-pasting or forking any of its logic.
+
+The city scene also runs `applyShadowPolicy` (previously lab-only in
+practice) over its hundreds of building/road/street-furniture meshes, and
+its four exterior materials (`asphalt`/`concrete`/`ground`/`brick`) are now
+built via `createPBRMaterial`'s `CONCRETE`/`ASPHALT`/`BRICK`/`GROUND`
+categories instead of duplicating the same roughness/metalness tuning
+in-file — the same palette, shadow policy, and post-processing pipeline
+now genuinely serve two unrelated worlds, not one plus an untested example.
 
 ## Verification performed on this branch
 

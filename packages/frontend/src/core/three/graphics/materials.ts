@@ -152,21 +152,27 @@ export function createFacilityGeometry(THREE: typeof THREE_NS): FacilityGeometry
  * GENESIS CANONICAL MATERIAL PALETTE
  * ==================================
  *
- * Ten kategorii pokrywających całe słownictwo materiałowe świata Genesis —
- * generic, bez wiedzy o konkretnej scenie/obiekcie (żaden `worktop`, żaden
- * `amberLed`: nazwy opisują RODZAJ powierzchni, nie to, na czym akurat
- * siedzi w tej hali). World-builder wybiera kategorię wg tego, CZYM fizycznie
- * jest powierzchnia — reaktor, poręcz, panel — nie wg tego, gdzie stoi.
+ * A vocabulary of material CATEGORIES covering both interior/lab surfaces
+ * and exterior/urban ones — generic, with no knowledge of a specific scene
+ * or object (no `worktop`, no `amberLed`, no `cityAsphalt`: names describe
+ * WHAT KIND of surface something is, not which world it happens to sit in).
+ * A world-builder picks a category by what the surface physically IS — a
+ * reactor vessel, a handrail, a sidewalk — never by which world it's for;
+ * `LAB_FLOOR`/`LAB_WALL` and `ASPHALT`/`CONCRETE`/`BRICK`/`GROUND` sit in the
+ * same palette because a future natural-hazard or molecular world is just
+ * as likely to need weathered exterior surfaces as the lab is interior ones.
  *
- * Dziewięć z dziesięciu to gotowe, współdzielone instancje (`GenesisMaterialPalette`)
- * — jeden `MeshStandardMaterial`/`MeshPhysicalMaterial` per kategoria, bezpieczny do
- * przypisania wielu mesh'om naraz. `SCREEN` jest wyjątkiem: każdy ekran pokazuje
- * inną treść (inny `texture`), więc jest FABRYKĄ (`createScreenMaterial`), nie
- * współdzieloną instancją — patrz jej komentarz.
+ * Every category except `SCREEN`/`EMISSIVE_INSTRUMENT` is a ready-made,
+ * shared instance (`GenesisMaterialPalette`) — one `MeshStandardMaterial`/
+ * `MeshPhysicalMaterial` per category, safe to assign to many meshes at
+ * once. `SCREEN` is the exception: every screen shows different content
+ * (a different `texture`), so it's a FACTORY (`createScreenMaterial`), not
+ * a shared instance — see its own comment.
  */
 export type GenesisMaterialId =
   | 'SCIENCE_GLASS' | 'BRUSHED_METAL' | 'POLISHED_METAL' | 'TECH_COMPOSITE'
-  | 'RUBBER' | 'CERAMIC' | 'PAINTED_METAL' | 'EMISSIVE_INSTRUMENT' | 'LAB_FLOOR' | 'LAB_WALL' | 'SCREEN';
+  | 'RUBBER' | 'CERAMIC' | 'PAINTED_METAL' | 'EMISSIVE_INSTRUMENT' | 'LAB_FLOOR' | 'LAB_WALL'
+  | 'CONCRETE' | 'ASPHALT' | 'BRICK' | 'GROUND' | 'SCREEN';
 
 /** The statically-shareable categories — everything in `GenesisMaterialId` except `SCREEN` and
  * `EMISSIVE_INSTRUMENT` (both per-instance factories; see `createScreenMaterial`/
@@ -223,6 +229,22 @@ const MATERIAL_BUILDERS: {
   }),
   LAB_WALL: (THREE, overrides) => new THREE.MeshStandardMaterial({
     color: overrides.color ?? 0x232c40, roughness: 0.9, metalness: 0.05,
+  }),
+  // Exterior/urban categories below — real-world-plausible roughness/metalness for a paved,
+  // built environment, proven in the epidemiology city scene before being generalized here.
+  CONCRETE: (THREE, overrides) => new THREE.MeshStandardMaterial({
+    color: overrides.color ?? 0x87919a, roughness: 0.88, metalness: 0.02,
+  }),
+  ASPHALT: (THREE, overrides) => new THREE.MeshStandardMaterial({
+    color: overrides.color ?? 0x2b3034, roughness: 0.82, metalness: 0.03,
+  }),
+  BRICK: (THREE, overrides) => new THREE.MeshStandardMaterial({
+    color: overrides.color ?? 0x835a4b, roughness: 0.80, metalness: 0.01,
+  }),
+  // Terrain/foliage-adjacent ground plane — a dark, near-fully-rough green so grass/dirt reads
+  // correctly under directional light without any per-blade geometry.
+  GROUND: (THREE, overrides) => new THREE.MeshStandardMaterial({
+    color: overrides.color ?? 0x42534b, roughness: 0.96, metalness: 0.01,
   }),
 };
 

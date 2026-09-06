@@ -53,10 +53,11 @@ import {
 
 const STATIC_PALETTE_IDS: readonly Exclude<GenesisMaterialId, 'SCREEN' | 'EMISSIVE_INSTRUMENT'>[] = [
   'SCIENCE_GLASS', 'BRUSHED_METAL', 'POLISHED_METAL', 'TECH_COMPOSITE', 'RUBBER', 'CERAMIC', 'PAINTED_METAL', 'LAB_FLOOR', 'LAB_WALL',
+  'CONCRETE', 'ASPHALT', 'BRICK', 'GROUND',
 ];
 
 describe('createGenesisMaterialPalette', () => {
-  it('builds all 9 statically-shareable categories as real three.js materials', () => {
+  it('builds all 13 statically-shareable categories as real three.js materials', () => {
     const palette = createGenesisMaterialPalette(THREE);
     for (const id of STATIC_PALETTE_IDS) {
       expect(palette[id]).toBeInstanceOf(THREE.Material);
@@ -82,10 +83,23 @@ describe('createGenesisMaterialPalette', () => {
 
   it('keeps non-metals at (near-)zero metalness', () => {
     const palette = createGenesisMaterialPalette(THREE);
-    for (const id of ['TECH_COMPOSITE', 'RUBBER', 'CERAMIC', 'PAINTED_METAL', 'LAB_FLOOR', 'LAB_WALL'] as const) {
+    for (const id of ['TECH_COMPOSITE', 'RUBBER', 'CERAMIC', 'PAINTED_METAL', 'LAB_FLOOR', 'LAB_WALL', 'CONCRETE', 'ASPHALT', 'BRICK', 'GROUND'] as const) {
       const material = palette[id] as THREE.MeshStandardMaterial;
       expect(material.metalness).toBeLessThan(0.35);
     }
+  });
+
+  it('exterior/urban categories (CONCRETE/ASPHALT/BRICK/GROUND) are plausible paved/terrain surfaces — high roughness, matte', () => {
+    const palette = createGenesisMaterialPalette(THREE);
+    for (const id of ['CONCRETE', 'ASPHALT', 'BRICK', 'GROUND'] as const) {
+      const material = palette[id] as THREE.MeshStandardMaterial;
+      expect(material.roughness).toBeGreaterThan(0.7);
+    }
+  });
+
+  it('supports a color override on the new exterior categories, same as the existing ones', () => {
+    const custom = createPBRMaterial(THREE, 'ASPHALT', { color: 0x112233 }) as THREE.MeshStandardMaterial;
+    expect(custom.color.getHex()).toBe(0x112233);
   });
 
   it('SCIENCE_GLASS is reflective-not-transmissive by default (opacity+clearcoat, transmission 0)', () => {

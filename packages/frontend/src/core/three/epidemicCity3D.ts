@@ -13,6 +13,7 @@ import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } 
 import { isWorldAssetApproved, isWorldAssetPathApproved } from './assetGovernance';
 import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
 import { applyShadowPolicy } from './graphics/shadowPolicy';
+import { createPBRMaterial } from './graphics/materials';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -570,15 +571,20 @@ export class EpidemicCity3DSim implements Sim3D {
     this.cameraOccluders = [];
   }
 
-  /** Materiały są ładowane tylko po przejściu istniejącej bramki Asset Governance. */
+  /**
+   * Bazowe strojenie (kolor/roughness/metalness) pochodzi teraz z GENESIS GRAPHICS ENGINE —
+   * `createPBRMaterial`'s CONCRETE/ASPHALT/BRICK/GROUND kategorie (generalizowane z tych właśnie
+   * wartości) — jedno źródło prawdy zamiast duplikatu w tym pliku. Materiały są ładowane tylko po
+   * przejściu istniejącej bramki Asset Governance.
+   */
   private createApprovedCityMaterials(): void {
     if (!this.THREE) return;
     const THREE = this.THREE;
     this.cityMaterials = {
-      asphalt: new THREE.MeshStandardMaterial({ color: 0x2b3034, roughness: 0.82, metalness: 0.03 }),
-      concrete: new THREE.MeshStandardMaterial({ color: 0x87919a, roughness: 0.88, metalness: 0.02 }),
-      ground: new THREE.MeshStandardMaterial({ color: 0x42534b, roughness: 0.96, metalness: 0.01 }),
-      brick: new THREE.MeshStandardMaterial({ color: 0x835a4b, roughness: 0.80, metalness: 0.01 }),
+      asphalt: createPBRMaterial(THREE, 'ASPHALT') as THREE_NS.MeshStandardMaterial,
+      concrete: createPBRMaterial(THREE, 'CONCRETE') as THREE_NS.MeshStandardMaterial,
+      ground: createPBRMaterial(THREE, 'GROUND') as THREE_NS.MeshStandardMaterial,
+      brick: createPBRMaterial(THREE, 'BRICK') as THREE_NS.MeshStandardMaterial,
     };
     const loader = new THREE.TextureLoader();
     this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/diffuse.jpg', this.cityMaterials.asphalt, 'map', true, 5, 2);

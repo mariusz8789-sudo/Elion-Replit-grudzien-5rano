@@ -57,6 +57,35 @@ any scene that enables both, not a lab-specific quirk. This is still not a
 frame-time claim — verify actual GPU-bound cost on real target hardware
 before shipping a performance guarantee.
 
+## Render-loop allocation audit: what was actually found and fixed
+
+Per this project's "zero unnecessary per-frame allocations" rule, every `syncScene()`/`update()`
+hot path across all three shipped scenes plus their shared crowd/character rigs was read end to
+end looking for allocation inside a per-frame or per-instance loop. These are exact counts of what
+the code allocated before each fix — not measured GC pause time (this sandbox has no real GPU to
+profile that on), but the allocation COUNT itself is an exact, hardware-independent fact about the
+code, same epistemic status as `diagnostics.ts`'s draw-call counts.
+
+| Location | Was allocating | Frequency | Fix |
+|---|---|---|---|
+| `InstancedHumanoidCrowd.update()` | 6 `THREE.Color` per instance | up to 1024 instances (`MAX_CROWD_HUMANOIDS`) × every frame = **up to 6,144/frame** | 5 named scratch Colors + 1 true constant |
+| `epidemicCity3D.ts`/`highFidelitySlice3D.ts`'s `syncAnalysis()` | 1 `THREE.Color` per heatmap grid cell | 864/frame (city, 36×24) or 748/frame (street, 34×22), only while the overlay is on | 1 reused scratch `Color`, `.setRGB()` instead of `new Color()` |
+| `setEpidemicTint()` (`characterRig.ts`) | 2 `THREE.Color` (`.clone()`) | once per DETAILED agent (LOD0/LOD1, a few dozen at most) × every frame | 2 scratch Colors, `.copy()` instead of `.clone()` |
+| `useThreeLoop.ts`'s orbit-focus fallback, `epidemicCity3D.ts`'s `getOrbitCameraDirection()`/`syncScene()`, `highFidelitySlice3D.ts`'s `syncScene()` camera lerps | 1 `THREE.Vector3` each | every frame any orbit-focus/composed-shot camera path is active | reused scratch `Vector3` fields |
+| `labScene3D.ts`'s `syncScene()` (fixed earlier this project) | 3 `THREE.Vector3` | every frame | reused scratch `Vector3` fields |
+
+**Why this matters more than it looks**: `THREE.Color`/`THREE.Vector3` are small objects, but V8
+still has to allocate, initialize, and eventually garbage-collect every one of them. The crowd fix
+alone removes over 6,000 short-lived object allocations *per frame* at full population — sustained
+indefinitely for as long as the city scene renders, not a one-off setup cost. None of these fixes
+changed behavior: every mutated site was verified to either (a) have its value copied out
+immediately by the three.js API it feeds (`InstancedMesh.setColorAt`, `Vector3.lerp`/`copy`, all of
+which read then discard, never retain a reference), or (b) need the scratch's value only within the
+same synchronous call before the next overwrite. New tests were added specifically to catch the
+failure mode this kind of refactor risks — one instance's/frame's value bleeding into the next —
+not just "it runs without throwing" (see `graphicsInstancedHumanoidCrowd.test.ts` and
+`graphicsCharacterRig.test.ts`).
+
 ## Cost drivers, in the order they'll bite you
 
 ### 1. Device pixel ratio — the biggest lever, by far

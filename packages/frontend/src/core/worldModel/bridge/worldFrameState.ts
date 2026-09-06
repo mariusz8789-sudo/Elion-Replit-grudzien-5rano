@@ -1,8 +1,17 @@
-import type { EntityRef } from '../../events/genesisEvent';
-import { buildWorldState, type WorldEntity, type WorldRelation, type WorldState } from '../../world/scientificWorldState';
+import type { EntityRef, GenesisEvent } from '../../events/genesisEvent';
+import { canonicalJson } from '../../events/hash';
+import {
+  buildWorldState,
+  traceWorldChange,
+  type Observation,
+  type WorldChangeTrace,
+  type WorldEntity,
+  type WorldRelation,
+  type WorldState,
+} from '../../world/scientificWorldState';
 import type { WorldInteraction, WorldInteractionHandler, WorldInteractionResult } from '../../world/worldContracts';
 import { entityId, type EntityId, type GroundingLevel, type ScaleDomain, type Vector3, type WorldModelEntity, type WorldModelEntityPatch } from '../ecs/types';
-import type { WorldGraph } from '../ecs/worldGraph';
+import type { ScaleZoomResult, WorldGraph } from '../ecs/worldGraph';
 import type { TemporalBranchInfo, TemporalBranchRegistry, TemporalEngine } from '../temporal/temporalEngine';
 
 /**
@@ -18,6 +27,13 @@ import type { TemporalBranchInfo, TemporalBranchRegistry, TemporalEngine } from 
  * built by ecs/temporal/solvers.
  */
 
+/**
+ * Render-ready projection of one entity. `scalars` is a flat, domain-agnostic
+ * numeric map (temperature, concentration fraction, epidemic compartments,
+ * flow speed, ...) so C2 never needs to know chemistry, epidemiology, or
+ * hydraulics to decide what a number means for a shader/UI — it only needs
+ * to know *that* a named scalar changed.
+ */
 export interface WorldFrameEntity {
   readonly id: EntityId;
   readonly ref: EntityRef;
@@ -26,15 +42,43 @@ export interface WorldFrameEntity {
   readonly transform: { position: Vector3; rotation: Vector3; scale: Vector3 };
   readonly grounding: GroundingLevel;
   readonly domainId?: string;
+  readonly scalars: Readonly<Record<string, number>>;
+  /** Solver-set, human-readable qualitative state (e.g. "largely intact (92.3%)") — display-only. */
+  readonly statusLabel?: string;
 }
 
 export interface WorldFrameState {
   readonly tick: number;
+  readonly simulatedTime: number;
+  readonly branchId: string;
   readonly entities: readonly WorldFrameEntity[];
+  /** Events recorded at exactly this tick — the timeline's "what just happened" feed. */
+  readonly events: readonly GenesisEvent[];
 }
 
 const ZERO: Vector3 = { x: 0, y: 0, z: 0 };
 const ONE: Vector3 = { x: 1, y: 1, z: 1 };
+
+function collectScalars(entity: WorldModelEntity): Record<string, number> {
+  const scalars: Record<string, number> = {};
+  if (entity.physics) {
+    const p = entity.physics;
+    if (p.massKg !== undefined) scalars.massKg = p.massKg;
+    if (p.densityKgM3 !== undefined) scalars.densityKgM3 = p.densityKgM3;
+    if (p.temperatureK !== undefined) scalars.temperatureK = p.temperatureK;
+    if (p.pressurePa !== undefined) scalars.pressurePa = p.pressurePa;
+    if (p.viscosityPaS !== undefined) scalars.viscosityPaS = p.viscosityPaS;
+    if (p.velocityMS) scalars.speedMS = Math.hypot(p.velocityMS.x, p.velocityMS.y, p.velocityMS.z);
+  }
+  if (entity.chemical) {
+    const c = entity.chemical;
+    if (c.concentrationFraction !== undefined) scalars.concentrationFraction = c.concentrationFraction;
+    if (c.charge !== undefined) scalars.charge = c.charge;
+    if (c.energyStateEv !== undefined) scalars.energyStateEv = c.energyStateEv;
+  }
+  if (entity.domainState) Object.assign(scalars, entity.domainState);
+  return scalars;
+}
 
 function toFrameEntity(entity: WorldModelEntity): WorldFrameEntity {
   return {
@@ -49,6 +93,8 @@ function toFrameEntity(entity: WorldModelEntity): WorldFrameEntity {
     },
     grounding: entity.grounding,
     domainId: entity.domainBinding?.domainId,
+    scalars: collectScalars(entity),
+    statusLabel: entity.statusLabel,
   };
 }
 
@@ -56,10 +102,18 @@ function graphAt(engine: TemporalEngine, timestamp?: number): WorldGraph {
   return timestamp === undefined ? engine.graph : engine.scrubTo(timestamp);
 }
 
+/** Simulated time this branch had reached as of `tick` (branch-local: a fork's clock starts at 0 at its own keyframe). */
+function simulatedTimeAt(engine: TemporalEngine, tick: number): number {
+  if (tick === engine.tick) return engine.simulatedTime;
+  return engine.frames.find((f) => f.tick === tick)?.simulatedTime ?? 0;
+}
+
 /** For C2: one frame of render-ready state, at the live head or scrubbed to `timestamp`. */
 export function getFrameState(engine: TemporalEngine, timestamp?: number): WorldFrameState {
+  const tick = timestamp ?? engine.tick;
   const graph = graphAt(engine, timestamp);
-  return { tick: timestamp ?? engine.tick, entities: graph.listEntities().map(toFrameEntity) };
+  const events = engine.journal.allEvents().filter((e) => e.timestamp === tick);
+  return { tick, simulatedTime: simulatedTimeAt(engine, tick), branchId: engine.branchId, entities: graph.listEntities().map(toFrameEntity), events };
 }
 
 /** Flat Float32Array of [x,y,z] per entity, in frame order — droppable straight into a WebGPU vertex/instance buffer. */
@@ -160,11 +214,11 @@ export function toWorldInteractionHandler(
     if (!engine.graph.has(id)) return { accepted: false, reason: `Unknown entity: ${id}` };
 
     if (request.action === 'INSPECT') {
-      return { accepted: true, state: projectToWorldState(engine.graph, meta.worldId, meta.domainId, engine.tick) };
+      return { accepted: true, state: projectToWorldState(engine.graph, meta.worldId, meta.domainId, engine.tick, engine.journal.upToTick(engine.tick)) };
     }
     if (request.action === 'CHANGE_PARAMETER') {
       executeIntervention(engine, id, request.parameters ?? {});
-      return { accepted: true, state: projectToWorldState(engine.graph, meta.worldId, meta.domainId, engine.tick) };
+      return { accepted: true, state: projectToWorldState(engine.graph, meta.worldId, meta.domainId, engine.tick, engine.journal.upToTick(engine.tick)) };
     }
     return { accepted: false, reason: `Genesis World Model (C3) does not handle action ${request.action}` };
   };
@@ -177,7 +231,13 @@ export function toWorldInteractionHandler(
  * and everything built on `worldContracts.ts` (C1) need no C3-specific
  * code path.
  */
-export function projectToWorldState(graph: WorldGraph, worldId: string, domainId: string, tick: number): WorldState {
+export function projectToWorldState(
+  graph: WorldGraph,
+  worldId: string,
+  domainId: string,
+  tick: number,
+  journalSlice: { observations: readonly Observation[]; events: readonly GenesisEvent[] } = { observations: [], events: [] },
+): WorldState {
   const entities = graph.listEntities();
   const worldEntities: WorldEntity[] = entities.map((entity) => ({
     ref: entity.ref,
@@ -195,8 +255,8 @@ export function projectToWorldState(graph: WorldGraph, worldId: string, domainId
     tick,
     entities: worldEntities,
     relations,
-    observations: [],
-    events: [],
+    observations: journalSlice.observations,
+    events: journalSlice.events,
     experiment: { experimentId: `${worldId}:${tick}`, status: 'RUNNING', runs: [] },
     epistemic: null,
     evidence: [],
@@ -213,6 +273,10 @@ function toScientificProperties(entity: WorldModelEntity): WorldEntity['properti
 
   push('scale.level', entity.scale.level);
   push('grounding', entity.grounding);
+  push('statusLabel', entity.statusLabel);
+  if (entity.domainState) {
+    for (const [key, value] of Object.entries(entity.domainState)) push(`domainState.${key}`, value);
+  }
   if (entity.domainBinding) {
     push('domainBinding.domainId', entity.domainBinding.domainId);
     push('domainBinding.solverId', entity.domainBinding.solverId ?? 'none');
@@ -241,6 +305,115 @@ function toScientificProperties(entity: WorldModelEntity): WorldEntity['properti
     push('chemical.formula', entity.chemical.formula);
     push('chemical.charge', entity.chemical.charge);
     push('chemical.energyStateEv', entity.chemical.energyStateEv, 'eV');
+    push('chemical.concentrationFraction', entity.chemical.concentrationFraction);
   }
   return props;
+}
+
+/**
+ * For C1: "what is happening here?" — the current tick, the entity's real
+ * state, the most recent observation/event that actually touched it, which
+ * solver/model produced that state, its grounding, the branch it lives on,
+ * and whether replay is available. Every field is read from C3 state or the
+ * journal — never an invented narrative.
+ */
+export interface WorldMomentSummary {
+  readonly tick: number;
+  readonly branchId: string;
+  readonly entity: WorldModelEntity;
+  readonly latestObservation: Observation | null;
+  readonly latestEvent: GenesisEvent | null;
+  readonly solverId: string | null;
+  readonly domainId: string | null;
+  readonly grounding: GroundingLevel;
+  readonly canReplay: boolean;
+}
+
+function affects(ref: EntityRef, id: EntityId): boolean {
+  return entityId(ref) === id;
+}
+
+export function describeWorldMoment(engine: TemporalEngine, id: EntityId, atTick?: number): WorldMomentSummary {
+  const tick = atTick ?? engine.tick;
+  const entity = graphAt(engine, atTick).getEntity(id);
+  const slice = engine.journal.upToTick(tick);
+  const latestObservation = [...slice.observations].reverse().find((o) => o.measurements.some((m) => m.entity && affects(m.entity, id))) ?? null;
+  const latestEvent = [...slice.events].reverse().find((e) => e.affectedEntities.some((r) => affects(r, id))) ?? null;
+  return {
+    tick,
+    branchId: engine.branchId,
+    entity,
+    latestObservation,
+    latestEvent,
+    solverId: entity.domainBinding?.solverId ?? null,
+    domainId: entity.domainBinding?.domainId ?? null,
+    grounding: entity.grounding,
+    canReplay: engine.historyLength > 0,
+  };
+}
+
+/**
+ * For C1: "why did this state change?" — finds the most recent recorded
+ * event that touched `id` and traces it through the existing
+ * `traceWorldChange` (core/world/scientificWorldState.ts), which reads the
+ * event's real causal lineage (affected entities, related hypotheses,
+ * parent event) straight from the projected `WorldState`. Returns `null`
+ * when nothing in the journal ever touched this entity — never a guess.
+ */
+export function explainEntityChange(engine: TemporalEngine, id: EntityId, atTick?: number): WorldChangeTrace | null {
+  const tick = atTick ?? engine.tick;
+  const slice = engine.journal.upToTick(tick);
+  const latestEvent = [...slice.events].reverse().find((e) => e.affectedEntities.some((r) => affects(r, id)));
+  if (!latestEvent) return null;
+  const state = projectToWorldState(graphAt(engine, atTick), 'world-model', 'world-model', tick, slice);
+  return traceWorldChange(state, latestEvent.id);
+}
+
+/** Multi-scale zoom for C1: reports the honest boundary (see `WorldGraph.zoomInto`) rather than fabricating a deeper representation. */
+export function zoomInto(
+  engine: TemporalEngine,
+  parentId: EntityId,
+  targetScale: ScaleDomain,
+  timestamp?: number,
+): ScaleZoomResult {
+  return graphAt(engine, timestamp).zoomInto(parentId, targetScale);
+}
+
+export interface EntityStateDiff {
+  readonly id: EntityId;
+  readonly worldA: WorldModelEntity | undefined;
+  readonly worldB: WorldModelEntity | undefined;
+  readonly equal: boolean;
+}
+
+export interface BranchComparison {
+  readonly branchA: TemporalBranchInfo;
+  readonly branchB: TemporalBranchInfo;
+  readonly tick: number;
+  readonly entityDiffs: readonly EntityStateDiff[];
+}
+
+/**
+ * For C1: "show me WORLD A / WORLD B / the difference." Compares two real
+ * branches at the same tick by scrubbing each independently — the
+ * difference reported is whatever the two branches' own solver executions
+ * actually produced, not a relabeled clone.
+ */
+export function compareBranches(
+  registry: TemporalBranchRegistry,
+  branchIdA: string,
+  branchIdB: string,
+  atTick: number,
+): BranchComparison {
+  const engineA = registry.get(branchIdA);
+  const engineB = registry.get(branchIdB);
+  const graphA = engineA.scrubTo(atTick);
+  const graphB = engineB.scrubTo(atTick);
+  const ids = new Set([...graphA.listEntities().map((e) => e.id), ...graphB.listEntities().map((e) => e.id)]);
+  const entityDiffs: EntityStateDiff[] = [...ids].map((id) => {
+    const worldA = graphA.tryGetEntity(id);
+    const worldB = graphB.tryGetEntity(id);
+    return { id, worldA, worldB, equal: canonicalJson(worldA) === canonicalJson(worldB) };
+  });
+  return { branchA: engineA.describe(), branchB: engineB.describe(), tick: atTick, entityDiffs };
 }

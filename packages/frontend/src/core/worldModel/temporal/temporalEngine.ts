@@ -1,6 +1,9 @@
+import type { GenesisEvent } from '../../events/genesisEvent';
 import { canonicalJson } from '../../events/hash';
+import type { Observation } from '../../world/scientificWorldState';
 import type { EntityId, WorldModelEntity, WorldModelEntityPatch } from '../ecs/types';
 import { WorldGraph } from '../ecs/worldGraph';
+import { WorldJournal } from './worldJournal';
 
 /**
  * TEMPORAL & DELTA ENGINE.
@@ -20,6 +23,14 @@ export interface TemporalFrame {
   simulatedTime: number;
   deltas: readonly EntityDelta[];
 }
+
+/** What a real solver step hands back to be recorded as evidence/provenance for that tick. */
+export interface TemporalUpdateResult {
+  observations?: readonly Observation[];
+  events?: readonly GenesisEvent[];
+}
+
+export type TemporalUpdater = (graph: WorldGraph, dt: number, tick: number) => TemporalUpdateResult | void;
 
 export interface TemporalBranchInfo {
   branchId: string;
@@ -65,8 +76,9 @@ export class TemporalEngine {
   private readonly keyframeTick: number;
   private current: WorldGraph;
   private currentTick: number;
-  private simulatedTime: number;
+  private currentSimulatedTime: number;
   private readonly history: TemporalFrame[] = [];
+  private readonly worldJournal: WorldJournal;
 
   constructor(
     initialGraph: WorldGraph,
@@ -77,6 +89,7 @@ export class TemporalEngine {
       forkedAtTick?: number | null;
       startTick?: number;
       registry?: TemporalBranchRegistry;
+      journal?: WorldJournal;
     } = {},
   ) {
     this.branchId = options.branchId ?? nextBranchId();
@@ -87,7 +100,8 @@ export class TemporalEngine {
     this.keyframeGraph = initialGraph.clone();
     this.current = initialGraph.clone();
     this.currentTick = this.keyframeTick;
-    this.simulatedTime = 0;
+    this.currentSimulatedTime = 0;
+    this.worldJournal = options.journal ?? new WorldJournal();
     this.registry = options.registry ?? null;
     this.registry?.register(this);
   }
@@ -96,8 +110,17 @@ export class TemporalEngine {
     return this.currentTick;
   }
 
+  get simulatedTime(): number {
+    return this.currentSimulatedTime;
+  }
+
   get graph(): WorldGraph {
     return this.current;
+  }
+
+  /** Evidence/provenance recorded by real solvers on this branch (own entries after the fork point, shared before it). */
+  get journal(): WorldJournal {
+    return this.worldJournal;
   }
 
   /** Read-only access to the recorded delta log, e.g. for delta-serialization inspection or export. */
@@ -120,19 +143,24 @@ export class TemporalEngine {
   }
 
   /**
-   * Advances the world by `dt`: `advance` receives the live graph to mutate
-   * in place (typically `SolverRouter.routeTick`). The resulting frame is
-   * stored as a component-level delta against the pre-tick state, not a
-   * full snapshot.
+   * Advances the world by `dt`: `updater` receives the live graph to mutate
+   * in place (typically `SolverRouter.routeTick`) plus the absolute tick
+   * this step produces, so a real solver can stamp its `Observation`s and
+   * `GenesisEvent`s correctly. The resulting frame is stored as a
+   * component-level delta against the pre-tick state, not a full snapshot;
+   * anything the updater returns is appended to this branch's journal.
    */
-  advance(dt: number, updater: (graph: WorldGraph, dt: number) => void): WorldGraph {
+  advance(dt: number, updater: TemporalUpdater): WorldGraph {
     const before = this.current;
     const after = before.clone();
-    updater(after, dt);
+    const nextTick = this.currentTick + 1;
+    const result = updater(after, dt, nextTick) ?? undefined;
     const deltas = diffGraphs(before, after);
-    this.currentTick += 1;
-    this.simulatedTime += dt;
-    this.history.push({ tick: this.currentTick, simulatedTime: this.simulatedTime, deltas });
+    this.currentTick = nextTick;
+    this.currentSimulatedTime += dt;
+    this.history.push({ tick: this.currentTick, simulatedTime: this.currentSimulatedTime, deltas });
+    for (const observation of result?.observations ?? []) this.worldJournal.recordObservation(observation);
+    for (const event of result?.events ?? []) this.worldJournal.recordEvent(event);
     this.current = after;
     return this.current;
   }
@@ -164,6 +192,7 @@ export class TemporalEngine {
       forkedAtTick: atTick,
       startTick: atTick,
       registry: this.registry ?? undefined,
+      journal: this.worldJournal.cloneUpToTick(atTick),
     });
   }
 }
@@ -189,6 +218,8 @@ function diffGraphs(before: WorldGraph, after: WorldGraph): EntityDelta[] {
           physics: entity.physics,
           chemical: entity.chemical,
           domainBinding: entity.domainBinding,
+          domainState: entity.domainState,
+          statusLabel: entity.statusLabel,
           grounding: entity.grounding,
         },
       });

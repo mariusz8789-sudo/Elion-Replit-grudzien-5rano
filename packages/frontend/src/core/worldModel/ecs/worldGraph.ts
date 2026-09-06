@@ -1,6 +1,12 @@
 import type { EntityRef } from '../../events/genesisEvent';
 import { entityId, type EntityId, type WorldModelEntity, type WorldModelEntityPatch } from './types';
 
+export interface ScaleZoomResult {
+  supported: boolean;
+  children: readonly WorldModelEntity[];
+  reason?: string;
+}
+
 /**
  * WORLD STATE GRAPH — the persistent ECS registry C3 owns. It never depends
  * on whether C1/C2 are currently observing an entity: removal is only ever
@@ -75,6 +81,23 @@ export class WorldGraph {
   }
 
   /**
+   * Multi-scale zoom, honestly bounded: if `targetScale` children already
+   * exist, returns them (still the same world/graph — never a second,
+   * unrelated simulation). If none exist, this explicitly reports that no
+   * deeper-scale representation is modeled, rather than fabricating one.
+   */
+  zoomInto(parentId: EntityId, targetScale: WorldModelEntity['scale']['level']): ScaleZoomResult {
+    this.getEntity(parentId); // throws if unknown
+    const children = this.listChildren(parentId).filter((child) => child.scale.level === targetScale);
+    if (children.length > 0) return { supported: true, children };
+    return {
+      supported: false,
+      children: [],
+      reason: `No ${targetScale} representation exists for "${parentId}" — Genesis has no executable solver at this scale yet.`,
+    };
+  }
+
+  /**
    * Linear-scan spatial query (a correct baseline; swap for a real octree
    * index behind this same signature once entity counts demand it — the
    * ECS contract above does not change).
@@ -140,6 +163,7 @@ function structuredCloneEntity(entity: WorldModelEntity): WorldModelEntity {
     physics: entity.physics ? { ...entity.physics, velocityMS: entity.physics.velocityMS ? { ...entity.physics.velocityMS } : undefined } : undefined,
     chemical: entity.chemical ? { ...entity.chemical } : undefined,
     domainBinding: entity.domainBinding ? { ...entity.domainBinding } : undefined,
+    domainState: entity.domainState ? { ...entity.domainState } : undefined,
   };
 }
 

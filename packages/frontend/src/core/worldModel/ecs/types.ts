@@ -68,6 +68,11 @@ export interface ChemicalComponent {
   formula?: string;
   charge?: number;
   energyStateEv?: number;
+  /** Fraction (0..1) of the original substance remaining — the real, solver-computed molecular state (e.g. first-order decay). */
+  concentrationFraction?: number;
+  /** Reaction kinetics parameters (Arrhenius law) — optional per-substance override of a solver's baseline. */
+  activationEnergyKJ?: number;
+  preExponentialLog10?: number;
 }
 
 /** Linkage to a real Genesis solver (see solvers/solverRouter.ts). `solverId: null` is a declared, honest "no solver exists yet". */
@@ -101,13 +106,22 @@ export interface WorldModelEntity {
   physics?: MaterialPhysicsComponent;
   chemical?: ChemicalComponent;
   domainBinding?: DomainBindingComponent;
+  /**
+   * Generic numeric ledger for real solver output that does not fit the
+   * fixed physical components above (e.g. epidemiological compartments
+   * S/E/I/R/D). Same role as `ScientificProperty` bags elsewhere in Genesis
+   * — a deliberate escape hatch, not a second ontology per domain.
+   */
+  domainState?: Record<string, number>;
+  /** Human-readable, solver-set description of the entity's current qualitative state (e.g. "largely intact"). Display-only — C2/C1 never compute it themselves. */
+  statusLabel?: string;
   grounding: GroundingLevel;
   /** Tick this entity's state was last advanced at. */
   updatedAtTick: number;
 }
 
 export type WorldModelEntityPatch = Partial<
-  Pick<WorldModelEntity, 'label' | 'spatial' | 'physics' | 'chemical' | 'domainBinding' | 'grounding'>
+  Pick<WorldModelEntity, 'label' | 'spatial' | 'physics' | 'chemical' | 'domainBinding' | 'domainState' | 'statusLabel' | 'grounding'>
 > & { scale?: Partial<ScaleComponent> };
 
 export function locationOf(entity: WorldModelEntity): GenesisLocation | undefined {

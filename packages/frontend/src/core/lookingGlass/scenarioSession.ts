@@ -7,6 +7,7 @@ import { registerScenarioTimeline, setPendingScenarioTimeline } from '../experim
 import { projectEpidemiologyWorldStates } from '../world/epidemiologyWorldAdapter';
 import { buildAnchoredSequence, type AnchoredTemporalSequence, type TemporalAnchor } from './anchoredTemporal';
 import { buildShotPlan, type ShotPlan } from './shotPlan';
+import { setPendingLookingGlassExperience } from './sessionHandoff';
 import { parseScenarioRequest, type StructuredScenarioRequest } from './scenarioRequest';
 import { resolveScenarioRequest, type ScenarioResolution, type ScenarioRunPlan } from './scenarioResolution';
 
@@ -239,6 +240,20 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
     worldRoute: built.worldRoute,
     // Arming is separate from opening so the caller decides when to navigate,
     // and so a world that failed to register cannot be silently entered.
-    enterWorld: () => (built.handoffRunId ? setPendingScenarioTimeline(built.handoffRunId) : built.worldRoute !== null),
+    enterWorld: () => {
+      if (built.worldRoute === null) return false;
+      // The vantage travels on its own channel: a world that cannot honour
+      // it still shows the right run, just from its default viewpoint.
+      setPendingLookingGlassExperience({
+        requestText: request.sourceText,
+        requestId: request.requestId,
+        kind: plan.kind,
+        viewpoint: plan.viewpoint.kind,
+        anchorLabel: anchor?.label ?? null,
+        autoPlay: anchored !== null,
+        secondsPerStep: anchored?.secondsPerStep ?? 1,
+      });
+      return built.handoffRunId ? setPendingScenarioTimeline(built.handoffRunId) : true;
+    },
   };
 }

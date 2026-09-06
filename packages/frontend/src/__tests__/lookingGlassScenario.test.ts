@@ -244,3 +244,45 @@ describe('Looking Glass — handing a world over to the 3D city', () => {
     expect(session.enterWorld()).toBe(false);
   });
 });
+
+describe('Looking Glass — the vantage travels on its own channel', () => {
+  it('publishes an anchored street vantage that a world screen can honour', async () => {
+    const { peekPendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    expect(peekPendingLookingGlassExperience()).toBeNull();
+    session.enterWorld();
+
+    const vantage = peekPendingLookingGlassExperience();
+    expect(vantage?.viewpoint).toBe('ANCHORED_HUMAN');
+    expect(vantage?.anchorLabel).toBe('street');
+    // Standing still while the world changes is the premise, so time runs.
+    expect(vantage?.autoPlay).toBe(true);
+    expect(vantage?.requestText).toContain('epidemię');
+    clearLookingGlassExperience();
+  });
+
+  it('does not ask a world to auto-play when the user never asked to stand in it', async () => {
+    const { peekPendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+    openLookingGlass('Show a quarantine scenario over 90 days from above').enterWorld();
+    const vantage = peekPendingLookingGlassExperience();
+    expect(vantage?.viewpoint).toBe('WIDE');
+    expect(vantage?.autoPlay).toBe(false);
+    clearLookingGlassExperience();
+  });
+
+  it('stays readable across repeated peeks and clears exactly once', async () => {
+    const { peekPendingLookingGlassExperience, consumePendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+    openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy').enterWorld();
+    expect(peekPendingLookingGlassExperience()).not.toBeNull();
+    expect(peekPendingLookingGlassExperience()).not.toBeNull();
+    expect(consumePendingLookingGlassExperience()).not.toBeNull();
+    expect(peekPendingLookingGlassExperience()).toBeNull();
+  });
+});

@@ -167,6 +167,30 @@ export class TemporalEngine {
     return this.current;
   }
 
+  /**
+   * Applies `patch` to `id` OUTSIDE of a normal `advance()` tick — e.g. an
+   * explicit user/experimenter intervention (see
+   * `bridge/worldFrameState.ts::executeIntervention`) — and records a real
+   * delta for it, exactly like `advance()` does for a solver step.
+   *
+   * A direct `engine.graph.updateEntity(...)` call bypasses the delta log
+   * entirely: the change is real on the live graph but invisible to
+   * `scrubTo`, since `history` is only ever appended to here and in
+   * `advance()`. Worse, it can silently stay invisible forever — the next
+   * `advance()` only records a NEW delta for an entity whose before/after
+   * canonical JSON actually differs, and an untouched-since-intervention
+   * entity's before/after are identical (both already reflecting the
+   * un-recorded change), so no catch-up delta is ever produced either. This
+   * is the one correct way to mutate the live graph outside a tick.
+   */
+  applyExternalPatch(id: EntityId, patch: WorldModelEntityPatch): WorldModelEntity {
+    const before = this.current.clone();
+    const updated = this.current.updateEntity(id, patch, this.currentTick);
+    const deltas = diffGraphs(before, this.current);
+    if (deltas.length > 0) this.history.push({ tick: this.currentTick, simulatedTime: this.currentSimulatedTime, deltas });
+    return updated;
+  }
+
   /** Rebuilds the graph as of `targetTick` by replaying the keyframe forward. Does not mutate `current`. */
   scrubTo(targetTick: number): WorldGraph {
     if (targetTick < this.keyframeTick) {

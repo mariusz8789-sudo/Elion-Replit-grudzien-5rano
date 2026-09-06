@@ -163,7 +163,15 @@ export function getAvailableBranches(registry: TemporalBranchRegistry): readonly
   return registry.list();
 }
 
-/** For C1: apply an experimenter/user change to the live world (not a past timestamp — interventions only ever act on the head). */
+/**
+ * For C1: apply an experimenter/user change to the live world (not a past
+ * timestamp — interventions only ever act on the head). Goes through
+ * `TemporalEngine.applyExternalPatch`, never a direct `graph.updateEntity`
+ * call, so the change is recorded as a real delta — `scrubTo` (and
+ * therefore replay, branch comparison, and evidence) stays consistent with
+ * the live graph immediately, not only once some later tick happens to
+ * touch the same entity again.
+ */
 export function executeIntervention(
   engine: TemporalEngine,
   id: EntityId,
@@ -171,7 +179,7 @@ export function executeIntervention(
 ): WorldModelEntity {
   const current = engine.graph.getEntity(id);
   const patch = parametersToPatch(current, parameters);
-  return engine.graph.updateEntity(id, patch);
+  return engine.applyExternalPatch(id, patch);
 }
 
 /**

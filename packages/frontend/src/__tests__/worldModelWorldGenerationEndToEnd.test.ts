@@ -60,6 +60,7 @@ describe('World Generation 1.0 — one true end-to-end chain', () => {
     // 7. INTERVENTION (fork only) -> DIFFERENT OUTCOME: a real flow-rate cut, re-solved by the
     // SAME real hydraulics model, cascading into a real (non-fabricated) hospital service flag.
     executeIntervention(fork, world.pumpPipeId, { 'domainState.volumetricFlow': 0 });
+    const forkPumpAtForkTick = fork.graph.getEntity(world.pumpPipeId); // snapshot right after the intervention, before any further ticking
     fork.advance(3600, world.updater);
     root.advance(3600, world.updater); // root keeps running unperturbed, for comparison
 
@@ -85,8 +86,15 @@ describe('World Generation 1.0 — one true end-to-end chain', () => {
     const hospitalDiff = comparison.entityDiffs.find((d) => d.id === world.hospitalBuildingId)!;
     expect(hospitalDiff.equal).toBe(false);
 
-    // Ancestry before the fork is untouched by anything that happened afterward, on either branch.
+    // The ROOT's own ancestry before the fork point is untouched by anything done to the fork.
     expect(canonicalJson(root.scrubTo(forkTick).getEntity(world.pumpPipeId))).toBe(canonicalJson(pumpPipeBefore));
-    expect(canonicalJson(fork.scrubTo(forkTick).getEntity(world.pumpPipeId))).toBe(canonicalJson(pumpPipeBefore));
+
+    // The FORK's own history at forkTick correctly includes the intervention applied at that same
+    // tick (via `executeIntervention` -> `TemporalEngine.applyExternalPatch`, which records a real
+    // delta) — replay stays consistent with the live graph, exactly like `forkBranch`'s own
+    // `mutate` argument already bakes its declared divergence into the fork's keyframe. It would be
+    // a real bug for `scrubTo` to show a DIFFERENT value here than the fork's actual state at this
+    // tick ever showed.
+    expect(canonicalJson(fork.scrubTo(forkTick).getEntity(world.pumpPipeId))).toBe(canonicalJson(forkPumpAtForkTick));
   });
 });

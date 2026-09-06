@@ -108,6 +108,64 @@ export class TemporalEngine {
     this.registry?.register(this);
   }
 
+  /**
+   * WORLD PERSISTENCE (Genesis Scientific World Model 4.0, section 6):
+   * reconstructs a live, tickable `TemporalEngine` from a plain-data
+   * snapshot — `initialGraph` (this branch's own keyframe, e.g. via
+   * `WorldGraph.fromSnapshot`), its recorded delta log (`options.frames`,
+   * the exact same `TemporalFrame[]` `.frames` already exposes), and its
+   * recorded evidence (`options.events`/`options.observations`, the exact
+   * same data `WorldJournal.allEvents()`/`allObservations()` already
+   * expose). `options.startTick`/`startSimulatedTime` should be the values
+   * this branch's OWN keyframe had (its `.tick`/`.simulatedTime` at the
+   * moment it was saved, before any frame is replayed) — when `frames` is
+   * non-empty this is immediately overwritten by the replay below, so
+   * passing the pre-save `.tick`/`.simulatedTime` is always correct
+   * regardless of whether `frames` is empty.
+   *
+   * Reuses `applyDeltas` — the SAME mechanism `scrubTo` already replays
+   * with — never a second replay implementation.
+   */
+  static restore(
+    initialGraph: WorldGraph,
+    options: {
+      frames: readonly TemporalFrame[];
+      events?: readonly GenesisEvent[];
+      observations?: readonly Observation[];
+      branchId?: string;
+      label?: string;
+      parentBranchId?: string | null;
+      forkedAtTick?: number | null;
+      startTick?: number;
+      startSimulatedTime?: number;
+      registry?: TemporalBranchRegistry;
+    },
+  ): TemporalEngine {
+    const engine = new TemporalEngine(initialGraph, {
+      branchId: options.branchId,
+      label: options.label,
+      parentBranchId: options.parentBranchId,
+      forkedAtTick: options.forkedAtTick,
+      startTick: options.startTick,
+      startSimulatedTime: options.startSimulatedTime,
+      registry: options.registry,
+    });
+    engine.restoreFrames(options.frames);
+    for (const observation of options.observations ?? []) engine.worldJournal.recordObservation(observation);
+    for (const event of options.events ?? []) engine.worldJournal.recordEvent(event);
+    return engine;
+  }
+
+  /** Replays a previously-recorded delta log onto `current`/`history` — never invokes an updater, since the deltas are already the real, historical result of one. */
+  private restoreFrames(frames: readonly TemporalFrame[]): void {
+    for (const frame of frames) {
+      applyDeltas(this.current, frame.deltas, frame.tick);
+      this.history.push(frame);
+      this.currentTick = frame.tick;
+      this.currentSimulatedTime = frame.simulatedTime;
+    }
+  }
+
   get tick(): number {
     return this.currentTick;
   }

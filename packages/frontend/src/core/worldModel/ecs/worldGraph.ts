@@ -255,6 +255,23 @@ export class WorldGraph {
     return copy;
   }
 
+  /**
+   * WORLD PERSISTENCE (Genesis Scientific World Model 4.0, section 6):
+   * reconstructs a `WorldGraph` from a plain-data snapshot (`listEntities()`
+   * + `listRelationships()`, e.g. read back from a durable store after a
+   * process restart) — the exact inverse of those two getters. Entities
+   * MUST be in parent-before-child order (guaranteed by `listEntities()`
+   * itself, since `addEntity` never accepts an entity before its own
+   * parent, and Map iteration preserves insertion order) — same ordering
+   * requirement `addEntity` already enforces, not a new one.
+   */
+  static fromSnapshot(entities: readonly WorldModelEntity[], relationships: readonly EntityRelationship[]): WorldGraph {
+    const graph = new WorldGraph();
+    for (const entity of entities) graph.addEntity(structuredCloneEntity(entity));
+    for (const relationship of relationships) graph.addRelationship(relationship.from, relationship.to, relationship.kind);
+    return graph;
+  }
+
   private childOf(parentId: EntityId): Set<EntityId> {
     let set = this.childrenByParent.get(parentId);
     if (!set) {

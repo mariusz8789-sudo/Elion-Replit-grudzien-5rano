@@ -551,8 +551,20 @@ export class EpidemicCity3DSim implements Sim3D {
     }
     for (const object of this.buildingMeshes) disposeSceneResources(object);
     this.buildingMeshes = [];
-    for (const asset of this.approvedAssetRoots) this.scene?.remove(asset);
+    // Resource-lifecycle audit finding: the approved-asset clones (facade/lamp GLTF instances
+    // actually placed in the scene via .clone(true)) were only ever removed from the scene graph
+    // here, never disposed — their geometry/materials/textures leaked on every teardown. The raw
+    // templates they're cloned from (never themselves added to the scene) were never disposed
+    // either.
+    for (const asset of this.approvedAssetRoots) {
+      this.scene?.remove(asset);
+      disposeSceneResources(asset);
+    }
     this.approvedAssetRoots = [];
+    if (this.approvedFacadeTemplate) disposeSceneResources(this.approvedFacadeTemplate);
+    if (this.approvedLampTemplate) disposeSceneResources(this.approvedLampTemplate);
+    this.approvedFacadeTemplate = null;
+    this.approvedLampTemplate = null;
     this.semanticBuildingSlots = [];
     this.cameraOccluders = [];
   }

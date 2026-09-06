@@ -507,6 +507,13 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.lod2 = null;
     this.heroMixer?.stopAllAction();
     this.heroMixer = null;
+    // Resource-lifecycle audit finding: the loaded GLTF hero character (loadHeroAsset() — a real
+    // network-fetched, GPU-uploaded model, not cheap procedural geometry) was never disposed here
+    // at all, on any scene teardown. It's added directly to `this.scene`, not through
+    // `addSceneObject`/`this.sceneObjects`, so the disposal loop further down never reached it.
+    if (this.hero) disposeSceneResources(this.hero);
+    this.hero = null;
+    this.heroEpidemicMaterial = null;
     this.philadelphiaLegend?.dispose();
     this.philadelphiaLegend = null;
     this.analysisMesh?.geometry.dispose();
@@ -522,6 +529,18 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     for (const marker of this.eventMarkers.values()) this.disposeObject(marker.group);
     this.sceneObjects = [];
     this.eventMarkers.clear();
+    // Resource-lifecycle audit finding: the real-human GLTF clones (syncRealHumans) were only ever
+    // disposed when an individual agent walked out of range — never as a group on full scene
+    // teardown, so any clones still tracked at dispose() time leaked. The raw template they're
+    // cloned from (never itself added to the scene, so never GPU-uploaded, but still worth freeing
+    // its CPU-side geometry/material data) was never disposed at all.
+    for (const entry of this.realHumans.values()) {
+      entry.mixer?.stopAllAction();
+      disposeSceneResources(entry.root);
+    }
+    this.realHumans.clear();
+    if (this.humanTemplate) disposeSceneResources(this.humanTemplate);
+    this.humanTemplate = null;
   }
 
   private addLighting(): void {

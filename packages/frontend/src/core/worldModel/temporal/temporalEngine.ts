@@ -88,6 +88,8 @@ export class TemporalEngine {
       parentBranchId?: string | null;
       forkedAtTick?: number | null;
       startTick?: number;
+      /** World Generation 1.0: a `WorldBlueprint`'s declared initial simulated time — see generation/worldBlueprint.ts. Defaults to 0 (the pre-existing behavior). */
+      startSimulatedTime?: number;
       registry?: TemporalBranchRegistry;
       journal?: WorldJournal;
     } = {},
@@ -100,7 +102,7 @@ export class TemporalEngine {
     this.keyframeGraph = initialGraph.clone();
     this.current = initialGraph.clone();
     this.currentTick = this.keyframeTick;
-    this.currentSimulatedTime = 0;
+    this.currentSimulatedTime = options.startSimulatedTime ?? 0;
     this.worldJournal = options.journal ?? new WorldJournal();
     this.registry = options.registry ?? null;
     this.registry?.register(this);

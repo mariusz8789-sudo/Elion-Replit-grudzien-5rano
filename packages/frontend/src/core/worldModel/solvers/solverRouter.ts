@@ -73,7 +73,11 @@ export class SolverRouter {
     for (const entity of graph.listEntities()) {
       const binding = entity.domainBinding;
       if (!binding) {
-        graph.updateEntity(entity.id, { grounding: 'UNGROUNDED_APPROXIMATION' });
+        // Explicit `tick` (never the default-increment fallback): an entity untouched for several
+        // ticks must still carry the ACTUAL current tick once touched, not current+1 — otherwise
+        // updatedAtTick understates how stale/fresh the entity is, and replay (which re-applies
+        // deltas keyed by their real tick) would disagree with what a live run just produced.
+        graph.updateEntity(entity.id, { grounding: 'UNGROUNDED_APPROXIMATION' }, tick);
         ungrounded.push(entity.id);
         continue;
       }
@@ -82,7 +86,7 @@ export class SolverRouter {
       const ctx: SolverContext = { dt: effectiveDt, tick, graph };
       const solver = binding.solverId ? this.solvers.get(binding.solverId) : undefined;
       const result = solver ? solver(entity, ctx) : proceduralFallback(entity, ctx);
-      graph.updateEntity(entity.id, { ...result.patch, grounding: result.grounding });
+      graph.updateEntity(entity.id, { ...result.patch, grounding: result.grounding }, tick);
       updated.push(entity.id);
       if (result.observation) observations.push(result.observation);
       if (result.event) events.push(result.event);

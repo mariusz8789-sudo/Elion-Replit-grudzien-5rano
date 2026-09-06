@@ -63,8 +63,8 @@ describe('worldModel bridge', () => {
     const engine = buildEngine();
     const router = new SolverRouter();
     router.register(NEWTONIAN_KINEMATICS_SOLVER_ID, newtonianKinematicsSolver);
-    engine.advance(1, (g, dt) => router.routeTick(g, dt));
-    engine.advance(1, (g, dt) => router.routeTick(g, dt));
+    engine.advance(1, (g, dt, tick) => router.routeTick(g, dt, tick));
+    engine.advance(1, (g, dt, tick) => router.routeTick(g, dt, tick));
 
     const past = getFrameState(engine, 1);
     const head = getFrameState(engine);

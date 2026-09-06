@@ -185,8 +185,14 @@ export function executeIntervention(
  * be carried forward. `domainState` is included here because it is the
  * generic ledger real domain solvers read their own intervention-tunable
  * parameters from (epidemic R0, hydraulic flow rate, ...).
+ *
+ * Exported (Generative Scientific World Model 2.0) so
+ * `specification/compiler.ts` can apply a `WorldSpecification`'s
+ * `initialConditions` (the same dotted-path vocabulary, applied once at
+ * generation time rather than via a live `executeIntervention` call)
+ * without a second patch-building implementation.
  */
-function parametersToPatch(
+export function parametersToPatch(
   entity: WorldModelEntity,
   parameters: Readonly<Record<string, string | number | boolean>>,
 ): WorldModelEntityPatch {
@@ -273,9 +279,12 @@ export function projectToWorldState(
     label: entity.label,
     properties: toScientificProperties(entity),
   }));
-  const relations: WorldRelation[] = entities
-    .filter((entity) => entity.scale.parentEntityId !== undefined)
-    .map((entity) => ({ from: graph.getEntity(entity.scale.parentEntityId!).ref, to: entity.ref, kind: 'contains' }));
+  const relations: WorldRelation[] = [
+    ...entities
+      .filter((entity) => entity.scale.parentEntityId !== undefined)
+      .map((entity) => ({ from: graph.getEntity(entity.scale.parentEntityId!).ref, to: entity.ref, kind: 'contains' })),
+    ...graph.listRelationships().map((r) => ({ from: graph.getEntity(r.from).ref, to: graph.getEntity(r.to).ref, kind: r.kind })),
+  ];
   const notModeled = entities.filter((e) => e.grounding === 'UNGROUNDED_APPROXIMATION').map((e) => e.id);
 
   return buildWorldState({

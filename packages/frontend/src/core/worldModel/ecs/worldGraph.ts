@@ -8,6 +8,22 @@ export interface ScaleZoomResult {
 }
 
 /**
+ * A generic, non-hierarchical edge between two entities (e.g. "pipe-A
+ * feedsInto pipe-B", "sensor-1 monitors reactor-1"). Distinct from the
+ * strict tree parent/child containment `ScaleComponent.parentEntityId`
+ * already provides for scale nesting (lab -> substance) — this is for
+ * relationships that are NOT "contained within," which the schema calls
+ * out as its own concept. Kept intentionally minimal: a labeled edge, no
+ * relationship-specific state of its own (attach that to the entities the
+ * edge connects, same as everywhere else in this ECS).
+ */
+export interface EntityRelationship {
+  from: EntityId;
+  to: EntityId;
+  kind: string;
+}
+
+/**
  * WORLD STATE GRAPH — the persistent ECS registry C3 owns. It never depends
  * on whether C1/C2 are currently observing an entity: removal is only ever
  * an explicit `removeEntity` call (destruction), never a side effect of a
@@ -16,6 +32,7 @@ export interface ScaleZoomResult {
 export class WorldGraph {
   private readonly entities = new Map<EntityId, WorldModelEntity>();
   private readonly childrenByParent = new Map<EntityId, Set<EntityId>>();
+  private readonly relationships: EntityRelationship[] = [];
 
   addEntity(entity: WorldModelEntity): void {
     if (this.entities.has(entity.id)) throw new Error(`Entity already exists: ${entity.id}`);
@@ -64,6 +81,45 @@ export class WorldGraph {
     if (parentId !== undefined) this.childOf(parentId).delete(id);
     this.entities.delete(id);
     this.childrenByParent.delete(id);
+    this.removeRelationshipsFor(id);
+  }
+
+  /**
+   * Records a generic, non-hierarchical edge between two ALREADY-EXISTING
+   * entities. Throws for an unknown endpoint, same as `addEntity`'s parent
+   * check — a relationship never dangles at creation time (it can only
+   * later dangle if an endpoint is removed, which `removeEntity` already
+   * prevents from happening silently by stripping the entity's own edges).
+   *
+   * Same scope as `ScaleComponent.parentEntityId`: world TOPOLOGY, set up
+   * at world-construction time (or between ticks by a caller that owns the
+   * graph directly), not tracked as a per-tick temporal delta the way
+   * entity STATE is. `WorldGraph.clone()` (the basis for every keyframe and
+   * branch fork) carries relationships forward correctly; a relationship
+   * added mid-tick by a solver would not itself be replayed by `scrubTo`,
+   * exactly like reparenting an entity mid-tick wouldn't be either — solver
+   * ticks are expected to evolve entity STATE, not the graph's topology.
+   */
+  addRelationship(from: EntityId, to: EntityId, kind: string): void {
+    this.getEntity(from);
+    this.getEntity(to);
+    this.relationships.push({ from, to, kind });
+  }
+
+  listRelationships(): readonly EntityRelationship[] {
+    return this.relationships;
+  }
+
+  /** Every relationship touching `id` (as either endpoint), optionally filtered to one `kind`. */
+  relationshipsFor(id: EntityId, kind?: string): readonly EntityRelationship[] {
+    return this.relationships.filter((r) => (r.from === id || r.to === id) && (kind === undefined || r.kind === kind));
+  }
+
+  private removeRelationshipsFor(id: EntityId): void {
+    for (let i = this.relationships.length - 1; i >= 0; i--) {
+      const r = this.relationships[i];
+      if (r.from === id || r.to === id) this.relationships.splice(i, 1);
+    }
   }
 
   listEntities(): readonly WorldModelEntity[] {
@@ -140,6 +196,7 @@ export class WorldGraph {
     for (const [parentId, children] of this.childrenByParent) {
       copy.childrenByParent.set(parentId, new Set(children));
     }
+    copy.relationships.push(...this.relationships.map((r) => ({ ...r })));
     return copy;
   }
 

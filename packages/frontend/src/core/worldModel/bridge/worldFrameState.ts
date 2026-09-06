@@ -264,9 +264,12 @@ export function projectToWorldState(
     label: entity.label,
     properties: toScientificProperties(entity),
   }));
-  const relations: WorldRelation[] = entities
-    .filter((entity) => entity.scale.parentEntityId !== undefined)
-    .map((entity) => ({ from: graph.getEntity(entity.scale.parentEntityId!).ref, to: entity.ref, kind: 'contains' }));
+  const relations: WorldRelation[] = [
+    ...entities
+      .filter((entity) => entity.scale.parentEntityId !== undefined)
+      .map((entity) => ({ from: graph.getEntity(entity.scale.parentEntityId!).ref, to: entity.ref, kind: 'contains' })),
+    ...graph.listRelationships().map((r) => ({ from: graph.getEntity(r.from).ref, to: graph.getEntity(r.to).ref, kind: r.kind })),
+  ];
   const notModeled = entities.filter((e) => e.grounding === 'UNGROUNDED_APPROXIMATION').map((e) => e.id);
 
   return buildWorldState({

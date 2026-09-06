@@ -5,7 +5,7 @@ import { FirstPersonController, type MoveKey } from './firstPersonController';
 import { CameraFlight, flightBetween } from '../reality/cameraSequencer';
 import type { HospitalStatus } from '../simulation/hospitalResource';
 import type { ScenarioDaySample } from '../simulation/scenarioEngine';
-import { isWorldAssetApproved } from './assetGovernance';
+import { setupGraphicsPipeline } from './graphics/postProcessing';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -193,7 +193,6 @@ export class LabScene3D implements Sim3D {
     startYaw: 0,
   });
 
-  private scene: THREE_NS.Scene | null = null;
   private raycaster: THREE_NS.Raycaster | null = null;
   private consoleMesh: THREE_NS.Mesh | null = null;
   private consolePanel: THREE_NS.Mesh | null = null;
@@ -393,7 +392,6 @@ export class LabScene3D implements Sim3D {
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
     this.THREE = THREE;
-    this.scene = scene;
     this.raycaster = new THREE.Raycaster();
     // Tekstury proceduralne (canvas, zero nowych plików/assetów) — jedyny
     // sposób na detal materiału metalu/podłogi dostępny bez zatwierdzonego
@@ -1995,11 +1993,15 @@ export class LabScene3D implements Sim3D {
   }
 
   /**
-   * Postprocessing kinowy: tone mapping ACES + delikatny bloom na źródłach
-   * światła (naczynie/hologram/pady) — WYŁĄCZNIE przez już wstrzyknięte przez
-   * useThreeLoop.ts moduły EffectComposer/UnrealBloomPass (patrz types.ts).
-   * Żaden nowy silnik renderujący, żaden nowy loader poza już zatwierdzonym
-   * (assetGovernance.ts) HDRI reużytym z highFidelitySlice3D.ts.
+   * Postprocessing kinowy: tone mapping ACES + AO (GTAO) + delikatny bloom —
+   * delegowane do `graphics/postProcessing.ts` (Genesis Graphics Runtime —
+   * reusable rendering layer), które wstrzykuje AO poprawnie uporządkowane
+   * względem tone mappingu (patrz komentarz w tamtym module: poprzedni
+   * SSAOPass walczył z ACES/OutputPass i wypuszczał prześwietlony kadr —
+   * GTAOPass blenduje się przez CustomBlending WEWNĄTRZ liniowego łańcucha
+   * compositora, więc już nie wygrywa wyścigu z tone-mapperem). Środowisko/
+   * IBL (`applyStudioEnvironment`/`loadHdriEnvironment`) i tier-gating AO/
+   * bloomu żyją w tym samym module — ta metoda tylko go woła.
    */
   setupPostProcessing(
     modules: PostProcessingModules,
@@ -2009,109 +2011,7 @@ export class LabScene3D implements Sim3D {
     w: number,
     h: number,
   ): PostProcessor {
-    const THREE = this.THREE!;
-    // Mapa cieni: fundament głębi przestrzennej (OBIEKT -> CIEŃ -> PODŁOGA ->
-    // PRZESŁONIĘCIE -> GŁĘBIA). Bez niej aparatura "unosiła się" nad podłogą
-    // niezależnie od liczby świateł. PCFSoft: miękka krawędź bez kosztu VSM.
-    // Cień rzuca WYŁĄCZNIE reflektor KEY (jedna mapa 1024²) — patrz init().
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // Ekspozycja podniesiona razem z obniżonym wypełnieniem ambientowym:
-    // ciemniejsze tło + jaśniejsze źródła kierunkowe dają filmowy kontrast
-    // zamiast płaskiej, jednolicie oświetlonej sceny.
-    renderer.toneMappingExposure = 1.05;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    // Mapa środowiska generowana PROCEDURALNIE ze sceny studyjnej (jasny sufit,
-    // ciemna podłoga) — metal musi mieć co odbijać, inaczej chrom i stal czytają
-    // się jak matowy plastik niezależnie od roughness/metalness. Ustawiana
-    // natychmiast, bez czekania na asynchroniczne HDRI (które i tak tylko ją
-    // zastąpi, gdy się załaduje).
-    this.applyStudioEnvironment(renderer, scene);
-    void this.loadHdri(renderer);
-    const composer = new modules.EffectComposer(renderer);
-    composer.addPass(new modules.RenderPass(scene, camera));
-    // SSAO ŚWIADOMIE POMINIĘTE. `SSAOPass` z three/examples renderuje scenę
-    // własnym przebiegiem, poza tone mappingiem ACES i przestrzenią barw
-    // renderera — w tym potoku (ACES + OutputPass) wypuszczał prześwietlony,
-    // biały kadr niezależnie od parametrów okluzji. Rolę "brudu na stykach"
-    // pełnią tu realne mapy cieni (KEY + workLight) oraz cienie kontaktowe
-    // pod sprzętem (patrz init()). Wpięcie SSAO wymagałoby przebudowy
-    // kolejności potoku postprocessingu, a nie zmiany jednego parametru.
-    // Bloom niżej progowany i mocniejszy: wspiera światło (poświata na
-    // krawędziach szkła/emisyjnych elementach), ale go nie zastępuje —
-    // ciemniejsze materiały bazowe (patrz init()) robią resztę kontrastu.
-    // Bloom mocniejszy i niżej progowany: przy ciemnych powierzchniach bazowych
-    // to listwy świetlne, ekrany i szkło reaktora niosą jasność kadru — mają
-    // się rozlewać jak realne źródła, nie być płaskimi jasnymi plamami.
-    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.34, 0.5, 0.92);
-    composer.addPass(bloom);
-    composer.addPass(new modules.OutputPass());
-    return { render: () => composer.render(), setSize: (width, height) => composer.setSize(width, height), dispose: () => composer.dispose() };
-  }
-
-  /**
-   * HDRI TYLKO jako mapa środowiska (reflections/IBL na szkle i metalu) —
-   * BEZ podmiany tła, żeby zachować nastrój ciemnego laboratorium. Reużywa
-   * jedyny zatwierdzony w assetGovernance.ts asset środowiskowy CC0, nie
-   * dodaje żadnego nowego pliku.
-   */
-  /**
-   * Otoczenie studyjne bez żadnego assetu: mała scena z jasnym „sufitem",
-   * ciemną „podłogą" i dwoma świetlówkami, przepuszczona przez PMREMGenerator.
-   * To ona daje metalowi/szkłu realne odbicia — bez niej chrom, stal i szyba
-   * reaktora wyglądają jak jednolity plastik, niezależnie od parametrów PBR.
-   */
-  private applyStudioEnvironment(renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene): void {
-    const THREE = this.THREE!;
-    const envScene = new THREE.Scene();
-    const shell = new THREE.Mesh(
-      new THREE.BoxGeometry(12, 8, 12),
-      new THREE.MeshBasicMaterial({ color: 0x35415c, side: THREE.BackSide }),
-    );
-    envScene.add(shell);
-    // Jasny „sufit" i dwie świetlówki: to one dają metalowi ostre, wydłużone
-    // refleksy, po których czyta się szczotkowana stal i chrom.
-    const envCeiling = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({ color: 0xdfeaff }));
-    envCeiling.rotation.x = Math.PI / 2;
-    envCeiling.position.y = 3.9;
-    envScene.add(envCeiling);
-    const envFloor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({ color: 0x0d1220 }));
-    envFloor.rotation.x = -Math.PI / 2;
-    envFloor.position.y = -3.9;
-    envScene.add(envFloor);
-    for (const ex of [-2.4, 2.4]) {
-      const strip = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 9), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      strip.rotation.x = Math.PI / 2;
-      strip.position.set(ex, 3.85, 0);
-      envScene.add(strip);
-    }
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(envScene, 0.06).texture;
-    scene.environmentIntensity = 1.15;
-    pmrem.dispose();
-  }
-
-  private async loadHdri(renderer: THREE_NS.WebGLRenderer): Promise<void> {
-    const hdriPath = '/assets/genesis-hf/hdr/braustuble_alley_1k.hdr';
-    if (!isWorldAssetApproved(hdriPath)) return;
-    try {
-      const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
-      if (!this.THREE || !this.scene) return;
-      const pmrem = new this.THREE.PMREMGenerator(renderer);
-      new RGBELoader().load(hdriPath, (texture) => {
-        if (!this.scene) { texture.dispose(); pmrem.dispose(); return; }
-        const environment = pmrem.fromEquirectangular(texture).texture;
-        this.scene.environment = environment;
-        // Podniesione z 0.35: przy obniżonym świetle ambientowym to teraz
-        // IBL niesie większość odbić na szkle/metalu, więc musi być czytelne.
-        this.scene.environmentIntensity = 1.45;
-        texture.dispose();
-        pmrem.dispose();
-      }, undefined, () => pmrem.dispose());
-    } catch {
-      // Materiały PBR i światła sceny pozostają pełnym fallbackiem bez HDRI.
-    }
+    return setupGraphicsPipeline(this.THREE!, modules, renderer, { scene, camera, width: w, height: h });
   }
 
   onResize(): void { /* kamera pierwszoosobowa: brak dodatkowej logiki poza domyślnym aspect z useThreeLoop */ }

@@ -37,3 +37,9 @@ export function tierDpr(tier: RenderTier): number {
 export function tierAllowsBloom(tier: RenderTier): boolean {
   return tier !== 'low';
 }
+
+/** Ambient occlusion (GTAO) renderuje dodatkowy przebieg normal/depth per klatkę — kosztowniejszy
+ * niż bloom, więc dopuszczony tylko na najwyższym poziomie jakości. */
+export function tierAllowsAO(tier: RenderTier): boolean {
+  return tier === 'high';
+}

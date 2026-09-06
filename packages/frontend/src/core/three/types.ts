@@ -4,6 +4,8 @@ import type { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js
 import type { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import type { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import type { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import type { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import type { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import type { SimParams } from '../types';
 
 /**
@@ -21,6 +23,8 @@ export interface PostProcessingModules {
   ShaderPass: typeof ShaderPass;
   UnrealBloomPass: typeof UnrealBloomPass;
   OutputPass: typeof OutputPass;
+  GTAOPass: typeof GTAOPass;
+  BokehPass: typeof BokehPass;
 }
 
 /** Zwracane przez Sim3D.setupPostProcessing — cienki interfejs nad EffectComposer. */

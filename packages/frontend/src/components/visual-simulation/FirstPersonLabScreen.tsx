@@ -10,8 +10,10 @@ import type { ScenarioComparison, ScenarioReplay, ScenarioRun } from '../../core
 import type { SavedExperiment } from '../../core/scienceMemory';
 import { extractObservations } from '../../core/observationAnalysis/observationExtraction';
 import { analyzeExperiment } from '../../core/observationAnalysis/analysis';
-import { deriveFindings } from '../../core/observationAnalysis/findings';
+import { deriveFindings, type Finding } from '../../core/observationAnalysis/findings';
 import { runScientificDiscoveryLoop, type ScientificDiscoveryLoopResult } from '../../core/experimentFabric/scientificDiscoveryLoop';
+import { explainScientificEvidence, type WhyNextExperimentAdvice } from '../../core/experimentFabric/whyNextExperiment';
+import { seriesSparkline } from './InvestorDemoScreen';
 
 /**
  * FIRST-PERSON SCIENTIST — jedna spójna, grywalna scena łącząca ISTNIEJĄCE
@@ -33,7 +35,8 @@ const MOVE_KEYS: Record<string, MoveKey> = {
 };
 
 const STATUS_LABEL = ['NORMALNY', 'PODWYŻSZONY', 'WYSOKI', 'KRYTYCZNY'];
-const FIXED_KIND_LABEL = ['', 'WIDOK NAUKOWY', 'WIDOK NAUKOWY — ANOMALIA', 'ODTWORZENIE'];
+const FIXED_KIND_LABEL = ['', 'WIDOK NAUKOWY', 'WIDOK NAUKOWY — ANOMALIA', 'ODTWORZENIE', 'HALA — KADR OTWIERAJĄCY'];
+const CAMERA_LABEL = ['SWOBODNA', 'NAUKOWA', 'NAUKOWA — ANOMALIA', 'ODTWORZENIE', 'HALA'];
 
 function canInteractInPhase(phase: ExperimentPhase): boolean {
   return phase === 'IDLE' || phase === 'COMPLETE_A' || phase === 'COMPLETE_B' || phase === 'COMPARED' || phase === 'REPLAY_DONE';
@@ -61,6 +64,15 @@ export function FirstPersonLabScreen() {
     ));
   }, []);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, onStats);
+
+  // Hero establishing shot: the scene opens on the SAME cinematic "WIDE"
+  // framing the Investor Demo uses (scientificFraming('WIDE') in labScene3D.ts —
+  // no new camera, no fabricated state), not the raw first-person spawn point.
+  // Entering the lab (pointer lock) hands control back to free first-person
+  // movement exactly like it already does when leaving any other fixed camera.
+  useEffect(() => {
+    if (!loading) sim.focusScientific('WIDE');
+  }, [loading, sim]);
 
   const [locked, setLocked] = useState(false);
   const [phase, setPhase] = useState<ExperimentPhase>('IDLE');
@@ -205,6 +217,14 @@ export function FirstPersonLabScreen() {
     }
   };
 
+  // Wejście do laboratorium: przejmuje kontrolę pierwszoosobową z dowolnego
+  // stałego kadru (domyślnie "HALA" — patrz useEffect powyżej). Nie dotyka
+  // kamery, jeśli gracz jest już w trybie FREE (returnToFirstPerson no-op).
+  const enterLab = () => {
+    sim.returnToFirstPerson();
+    canvasRef.current?.requestPointerLock();
+  };
+
   const canInteract = stats.nearStation === 1 && canInteractInPhase(phase);
   const isRunning = phase === 'RUNNING_A' || phase === 'RUNNING_B' || phase === 'REPLAYING';
   const cameraTaken = stats.cameraPhase !== 0;
@@ -218,6 +238,36 @@ export function FirstPersonLabScreen() {
       findings: deriveFindings(completedRun, analysis),
     };
   }, [completedRun, runA, runB]);
+
+  // Ten sam realny odczyt co prawa szyna Investor Demo — trzy metryki dzień po
+  // dniu z ukończonego przebiegu, nigdy zmyślony punkt.
+  const instrumentSeries = useMemo(() => (completedRun ? {
+    infectious: completedRun.series.map((s) => s.infectious),
+    hospitalized: completedRun.series.map((s) => s.hospitalized),
+    deceased: completedRun.series.map((s) => s.deceased),
+  } : null), [completedRun]);
+
+  const notModeledCount = discoveryLoop ? discoveryLoop.evidenceChain.filter((link) => link.notModeled !== undefined).length : 0;
+
+  // "Dlaczego ta obserwacja?" + łańcuch przyczynowy — identyczna konstrukcja co
+  // Investor Demo (ten sam realny finding/run/event/hypothesis), dostępna od
+  // razu po jednym ukończonym przebiegu, niezależnie od Pętli Odkrycia.
+  const causalLineage = useMemo(() => {
+    const finding: Finding | undefined = observationLayer?.findings[0];
+    if (!finding || !completedRun) return null;
+    const event = observationLayer?.analysis.significantEvents[0] ?? null;
+    const hypothesis = discoveryLoop?.evidenceChain.find((link) => link.findings.some((f) => f.id === finding.id));
+    return { finding, event, run: completedRun, hypothesis: hypothesis ?? null };
+  }, [observationLayer, completedRun, discoveryLoop]);
+
+  // Formalne "dlaczego" NAD tym samym łańcuchem, ale z realnej,
+  // prerejestrowanej pętli hipotez (`explainScientificEvidence`,
+  // `whyNextExperiment.ts`) — ta sama funkcja, której już używa
+  // ExperimentPilotScreen, tu po raz pierwszy pokazana w scenie 3D.
+  const whyAdvice: WhyNextExperimentAdvice | null = useMemo(() => {
+    const chain = discoveryLoop?.loop.chains[0];
+    return chain ? explainScientificEvidence(chain) : null;
+  }, [discoveryLoop]);
 
   // JEDNA aktualna linia zamiast rosnącej listy — "less is more" (sekcja 6 misji).
   // Priorytet: najnowsze/najważniejsze realne zdarzenie wygrywa, starsze znikają.
@@ -241,65 +291,223 @@ export function FirstPersonLabScreen() {
               ? { label: 'PRZEWIDYWANIE', text: `Podejdź do konsoli i uruchom eksperyment (dzień izolacji: ${interventionDay}).` }
               : null;
 
+  // Discovery Process strip — reuses the SAME `.gid-flow` design language as the
+  // Investor Demo screen (one visual system, not a second dashboard). It never
+  // invents a stage: when the formal, falsifiable HYPOTHESIS_PROBLEMS loop has
+  // been run, it shows the SAME real SUPPORTED/FALSIFIED verdicts as that panel
+  // below; otherwise it reflects the real A/B console state that already drives
+  // the vessel — the direct metric comparison stays labeled as a comparison,
+  // never dressed up as a falsification it isn't.
+  const flowStrip = discoveryLoop ? (
+    <>
+      <div className="gid-flow-step"><span>PYTANIE</span><p>{discoveryLoop.problem.statement}</p></div>
+      <div className="gid-flow-arrow">→</div>
+      <div className="gid-flow-step">
+        <span>HIPOTEZY · {discoveryLoop.loop.preregistration.hypotheses.length}</span>
+        {discoveryLoop.loop.outcomes.slice(0, 3).map((outcome) => (
+          <p key={outcome.hypothesisId} className={`gid-hyp-row gid-hyp-${outcome.status.toLowerCase()}`}>
+            {outcome.status}{outcome.observedMetric !== null ? ` · ${discoveryLoop.problem.primaryMetric}=${outcome.observedMetric}` : ''}
+          </p>
+        ))}
+      </div>
+      <div className="gid-flow-arrow">→</div>
+      <div className="gid-flow-step"><span>WYKONANIE</span><p>{discoveryLoop.loop.allRuns.length} realnych przebiegów</p></div>
+      <div className="gid-flow-arrow">→</div>
+      <div className="gid-flow-step"><span>OBSERWACJA</span><p>{discoveryLoop.evidenceChain.reduce((sum, l) => sum + l.observations.length, 0)} realnych obserwacji</p></div>
+      <div className="gid-flow-arrow">→</div>
+      <div className="gid-flow-step"><span>ANALIZA I FALSYFIKACJA</span><p>{discoveryLoop.loop.discrimination.reason.slice(0, 70)}</p></div>
+      <div className="gid-flow-arrow">→</div>
+      <div className="gid-flow-step gid-flow-step-next"><span>NASTĘPNY EKSPERYMENT</span><p>{discoveryLoop.nextExperiment.status}: {discoveryLoop.nextExperiment.why.slice(0, 50)}</p></div>
+    </>
+  ) : phase !== 'IDLE' || runA ? (
+    <>
+      <div className="gid-flow-step"><span>PYTANIE</span><p>Czy izolacja objawowych od dnia {interventionDay} zmienia modelowany przebieg względem braku interwencji?</p></div>
+      <div className="gid-flow-arrow">→</div>
+      <div className="gid-flow-step"><span>EKSPERYMENT A/B</span><p>{runB ? 'Ramiona A i B wykonane' : runA ? 'Ramię A wykonane · B w toku lub oczekuje' : 'Zaprojektowany, oczekuje wykonania'}</p></div>
+      <div className="gid-flow-arrow">→</div>
+      <div className="gid-flow-step"><span>WYKONANIE</span><p>{isRunning ? `dzień ${stats.dayIndex + 1}/${stats.totalDays || 60} w toku` : 'zakończone'}</p></div>
+      <div className="gid-flow-arrow">→</div>
+      <div className="gid-flow-step"><span>OBSERWACJA</span><p>{observationLayer ? `${observationLayer.observations.length} realnych obserwacji` : 'oczekuje na zakończony przebieg'}</p></div>
+      <div className="gid-flow-arrow">→</div>
+      <div className="gid-flow-step"><span>PORÓWNANIE</span><p>{comparison ? comparison.message.slice(0, 70) : 'bezpośrednie porównanie metryk, nie test hipotezy — oczekuje ramienia B'}</p></div>
+      <div className="gid-flow-arrow">→</div>
+      <div className="gid-flow-step gid-flow-step-next"><span>NASTĘPNY KROK</span><p>{saved ? `Zapisano jako ${saved.id}` : comparison ? 'Zapisz w Pamięci Naukowej lub uruchom formalną Pętlę Odkrycia' : 'Dokończ oba ramiona, aby porównać'}</p></div>
+    </>
+  ) : (
+    <div className="gid-flow-empty">Pytanie → Eksperyment → Wykonanie → Obserwacja → Porównanie → Następny krok — podejdź do konsoli (E) albo uruchom „Pętlę Odkrycia Naukowego" poniżej.</div>
+  );
+
   return (
-    <main id="main-content" tabIndex={-1} className="fp-lab">
-      <div className="fp-lab-stage">
-        <canvas ref={canvasRef} className="fp-lab-canvas" aria-label="Pierwszoosobowa scena laboratoryjna (Three.js)" />
-        {loading && <div className="route-loading" role="status">Ładowanie silnika 3D…</div>}
-        {failed && <div className="empty-state">Nie udało się uruchomić WebGL na tym urządzeniu.</div>}
+    <main id="main-content" tabIndex={-1} className="gid-shell fp-lab">
+      <section className="gid-flow" aria-label="Przepływ naukowy: Pytanie -> Eksperyment -> Wykonanie -> Obserwacja -> Porównanie -> Następny krok">
+        {flowStrip}
+      </section>
 
-        {!locked && !loading && !failed && (
-          <div className="fp-lab-enter" role="button" tabIndex={0}
-            onClick={() => canvasRef.current?.requestPointerLock()}
-            onKeyDown={(e) => { if (e.key === 'Enter') canvasRef.current?.requestPointerLock(); }}>
-            <p className="fp-lab-enter-title">Kliknij, aby wejść do laboratorium</p>
-            <p className="fp-lab-enter-hint">WASD — chód · mysz — rozglądanie · E — interakcja · Esc — wyjście</p>
+      <div className="gid-body">
+        <aside className="gid-rail-left" aria-label="Kamery i obserwacja na żywo">
+          <h2>KAMERY</h2>
+          <div className="gid-cam-list">
+            <button type="button" className={`gid-cam-slot ${stats.fixedKind === 4 ? 'active' : ''}`} onClick={() => sim.focusScientific('WIDE')}>
+              <span className="gid-cam-dot" />Hala<small>Kadr otwierający</small>
+            </button>
+            <button type="button" className={`gid-cam-slot ${!cameraTaken ? 'active' : ''}`} disabled={!cameraTaken} onClick={enterLab}>
+              <span className="gid-cam-dot" />Swobodna<small>Pierwsza osoba</small>
+            </button>
+            <button type="button" className={`gid-cam-slot ${stats.fixedKind === 1 ? 'active' : ''}`} disabled={!completedRun} onClick={() => sim.focusScientific('SCIENTIFIC')}>
+              <span className="gid-cam-dot" />Naukowa<small>Widok wyniku</small>
+            </button>
+            <button type="button" className={`gid-cam-slot ${stats.fixedKind === 3 ? 'active' : ''}`} disabled={replay?.status !== 'MATCH'} onClick={() => sim.focusScientific('REPLAY')}>
+              <span className="gid-cam-dot" />Odtworzenie<small>Tylko po MATCH</small>
+            </button>
           </div>
-        )}
+          <p className="gid-cam-current">Aktualna: <strong>{CAMERA_LABEL[stats.fixedKind] ?? CAMERA_LABEL[0]}</strong></p>
+          <h2>OBSERWACJA NA ŻYWO</h2>
+          {isRunning ? (
+            <dl className="gid-live-metrics">
+              <div><dt>Dzień</dt><dd>{stats.dayIndex + 1}/{stats.totalDays || 60}</dd></div>
+              <div><dt>Obłożenie łóżek</dt><dd>{(stats.vesselFraction * 100).toFixed(0)}%</dd></div>
+              <div><dt>Obłożenie ICU</dt><dd>{(stats.vesselIcuFraction * 100).toFixed(0)}%</dd></div>
+              <div><dt>Status</dt><dd>{STATUS_LABEL[stats.vesselStatusCode]}</dd></div>
+            </dl>
+          ) : (
+            <p className="gid-empty-note">{completedRun ? 'Przebieg zakończony — patrz panel stanu naukowego.' : 'Brak aktywnego przebiegu.'}</p>
+          )}
+          <h2>STATUSY</h2>
+          <ul className="gid-legend">
+            <li><span className="gid-legend-dot measured" />ZMIERZONE — wartość z realnego przebiegu</li>
+            <li><span className="gid-legend-dot supported" />SUPPORTED / FALSIFIED — wynik hipotezy</li>
+            <li><span className="gid-legend-dot blocked" />BLOCKED — brak przesłanek do wykonania</li>
+            <li><span className="gid-legend-dot notmodeled" />NOT_MODELED — poza zakresem modelu</li>
+          </ul>
+        </aside>
 
-        {locked && !cameraTaken && <div className="fp-lab-crosshair" aria-hidden="true" />}
+        <section className="gid-stage-col">
+          <div className="gid-stage">
+            <canvas ref={canvasRef} className="gid-canvas" aria-label="Pierwszoosobowa scena laboratoryjna (Three.js)" />
+            {loading && <div className="route-loading" role="status">Ładowanie silnika 3D…</div>}
+            {failed && <div className="empty-state">Nie udało się uruchomić WebGL na tym urządzeniu.</div>}
 
-        {locked && canInteract && !cameraTaken && (
-          <div className="fp-lab-prompt">
-            {phase === 'IDLE' ? 'E — uruchom eksperyment' : 'E — uruchom ponownie ze zmienionym parametrem'}
+            {!locked && !loading && !failed && (
+              <div className="fp-lab-enter" role="button" tabIndex={0}
+                onClick={enterLab}
+                onKeyDown={(e) => { if (e.key === 'Enter') enterLab(); }}>
+                <p className="fp-lab-enter-title">Kliknij, aby wejść do laboratorium</p>
+                <p className="fp-lab-enter-hint">WASD — chód · mysz — rozglądanie · E — interakcja · Esc — wyjście. Kamera „Hala" powyżej to kadr otwierający.</p>
+              </div>
+            )}
+
+            {locked && !cameraTaken && <div className="fp-lab-crosshair" aria-hidden="true" />}
+
+            {locked && canInteract && !cameraTaken && (
+              <div className="fp-lab-prompt">
+                {phase === 'IDLE' ? 'E — uruchom eksperyment' : 'E — uruchom ponownie ze zmienionym parametrem'}
+              </div>
+            )}
+
+            {cameraTaken && (
+              <div className="fp-lab-camera-badge">{FIXED_KIND_LABEL[stats.fixedKind] || 'KAMERA NAUKOWA'}</div>
+            )}
+
+            {!hudHidden && caption && (
+              <div className="fp-lab-caption">
+                <strong>{caption.label}</strong> — {caption.text}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className={`fp-lab-info-toggle${infoOpen ? ' open' : ''}`}
+              onClick={() => setInfoOpen((v) => !v)}
+              aria-expanded={infoOpen}
+              aria-label="Co jest realne, co jest wizualizacją"
+            >
+              ℹ
+            </button>
+            {infoOpen && (
+              <div className="fp-lab-info-panel">
+                Naczynie pokazuje REALNE obłożenie łóżek/ICU z istniejącego Scenario Engine (scenariusz IZOLACJA) — to
+                nie jest symulacja płynów, organizmów ani żadnej biologii poza obłożeniem szpitalnym.
+                Niemodelowane: {LAB_NOT_MODELED.join(', ')}.
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="fp-lab-hide-toggle"
+              onClick={() => setHudHidden((v) => !v)}
+              title="H — pokaż/ukryj interfejs (tryb do nagrywania)"
+            >
+              {hudHidden ? 'Pokaż UI' : 'Ukryj UI'}
+            </button>
           </div>
-        )}
 
-        {cameraTaken && (
-          <div className="fp-lab-camera-badge">{FIXED_KIND_LABEL[stats.fixedKind] || 'KAMERA NAUKOWA'}</div>
-        )}
-
-        {!hudHidden && caption && (
-          <div className="fp-lab-caption">
-            <strong>{caption.label}</strong> — {caption.text}
+          <div className="gid-stage-footer">
+            <div className="gid-why-panel">
+              <h3>DLACZEGO TA OBSERWACJA?</h3>
+              {whyAdvice ? (
+                <>
+                  <p>{whyAdvice.why} <strong>{whyAdvice.assessment}</strong></p>
+                  <p className="fp-observation-meta">Baza dowodu: {whyAdvice.evidenceBasis.join(' · ')}.</p>
+                </>
+              ) : causalLineage ? (
+                <p>Znalezisko <strong>{causalLineage.finding.metric}</strong> (dzień {causalLineage.finding.sourceSnapshot.day}) pochodzi z przebiegu {causalLineage.run.scenarioId}
+                  {causalLineage.event ? ` po zdarzeniu ${causalLineage.event.type} tego samego dnia` : ''}. Realny resultFingerprint: <code>{causalLineage.finding.evidence.resultFingerprint.slice(0, 16)}…</code></p>
+              ) : (
+                <p className="gid-empty-note">Dostępne po zakończeniu pierwszego przebiegu.</p>
+              )}
+            </div>
+            <div className="gid-lineage-panel">
+              <h3>ŁAŃCUCH PRZYCZYNOWY</h3>
+              {causalLineage ? (
+                <div className="gid-lineage-chain">
+                  <span className="gid-lineage-node">PRZEBIEG<small>{causalLineage.run.scenarioId}</small></span>
+                  <span className="gid-lineage-arrow">→</span>
+                  <span className="gid-lineage-node">ZDARZENIE<small>{causalLineage.event ? `d${causalLineage.event.day} ${causalLineage.event.type}` : 'brak'}</small></span>
+                  <span className="gid-lineage-arrow">→</span>
+                  <span className="gid-lineage-node">OBSERWACJA<small>{causalLineage.finding.evidence.resultFingerprint.slice(0, 8)}…</small></span>
+                  <span className="gid-lineage-arrow">→</span>
+                  <span className="gid-lineage-node">DOWÓD<small>{causalLineage.finding.id.slice(0, 12)}…</small></span>
+                  <span className="gid-lineage-arrow">→</span>
+                  <span className="gid-lineage-node">HIPOTEZA<small>{causalLineage.hypothesis ? causalLineage.hypothesis.status : 'nie uruchomiono'}</small></span>
+                </div>
+              ) : (
+                <p className="gid-empty-note">Dostępne po zakończeniu pierwszego przebiegu.</p>
+              )}
+            </div>
           </div>
-        )}
+        </section>
 
-        <button
-          type="button"
-          className={`fp-lab-info-toggle${infoOpen ? ' open' : ''}`}
-          onClick={() => setInfoOpen((v) => !v)}
-          aria-expanded={infoOpen}
-          aria-label="Co jest realne, co jest wizualizacją"
-        >
-          ℹ
-        </button>
-        {infoOpen && (
-          <div className="fp-lab-info-panel">
-            Naczynie pokazuje REALNE obłożenie łóżek/ICU z istniejącego Scenario Engine (scenariusz IZOLACJA) — to
-            nie jest symulacja płynów, organizmów ani żadnej biologii poza obłożeniem szpitalnym.
-            Niemodelowane: {LAB_NOT_MODELED.join(', ')}.
-          </div>
-        )}
-
-        <button
-          type="button"
-          className="fp-lab-hide-toggle"
-          onClick={() => setHudHidden((v) => !v)}
-          title="H — pokaż/ukryj interfejs (tryb do nagrywania)"
-        >
-          {hudHidden ? 'Pokaż UI' : 'Ukryj UI'}
-        </button>
+        <aside className="gid-rail-right" aria-label="Stan naukowy i instrumenty">
+          <h2>STAN NAUKOWY</h2>
+          <dl className="gid-state-grid">
+            <div><dt>Hipotezy</dt><dd>{discoveryLoop?.loop.preregistration.hypotheses.length ?? 0}</dd></div>
+            <div><dt>Obserwacje</dt><dd>{observationLayer?.observations.length ?? 0}</dd></div>
+            <div><dt>Znaleziska</dt><dd>{observationLayer?.findings.length ?? 0}</dd></div>
+            <div><dt>Zdarzenia</dt><dd>{observationLayer?.analysis.significantEvents.length ?? 0}</dd></div>
+            <div><dt>Przebiegi</dt><dd>{(runA ? 1 : 0) + (runB ? 1 : 0)}</dd></div>
+            <div><dt>Nie zamodelowane</dt><dd className={notModeledCount > 0 ? 'gid-warn' : ''}>{notModeledCount}</dd></div>
+          </dl>
+          {observationLayer && <p className="gid-summary">{observationLayer.analysis.summary}</p>}
+          <h3>INSTRUMENTY <span className="gid-measured-tag">TYLKO POMIARY REALNE</span></h3>
+          {instrumentSeries ? (
+            <div className="gid-instruments">
+              {(['infectious', 'hospitalized', 'deceased'] as const).map((key) => {
+                const values = instrumentSeries[key];
+                const spark = seriesSparkline(values);
+                const latest = values[values.length - 1];
+                return (
+                  <div className="gid-instrument" key={key}>
+                    <div className="gid-instrument-head"><span>{key.toUpperCase()}</span><em>ZMIERZONE</em></div>
+                    <strong className="gid-instrument-value">{latest}<small>ostatni dzień</small></strong>
+                    {spark ? <svg viewBox="0 0 100 32" className="gid-spark"><path d={spark} /></svg> : <p className="gid-empty-note">NOT_MODELED</p>}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="gid-empty-note">Dostępne po zakończeniu pierwszego przebiegu.</p>
+          )}
+        </aside>
       </div>
 
       {!hudHidden && observationLayer && (phase === 'COMPLETE_A' || phase === 'COMPLETE_B' || phase === 'COMPARED' || phase === 'REPLAY_DONE') && (

@@ -141,6 +141,21 @@ function makeFloorNoiseTexture(THREE: typeof THREE_NS): THREE_NS.Texture {
   return texture;
 }
 
+/** Canvas + texture for the monitor's live readout — content is drawn by `drawReadout`, never here. */
+function makeReadoutSurface(THREE: typeof THREE_NS): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; texture: THREE_NS.CanvasTexture } {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 176;
+  const ctx = canvas.getContext('2d')!;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return { canvas, ctx, texture };
+}
+
+const STATUS_LABEL_EN: Record<HospitalStatus | 'IDLE', string> = {
+  IDLE: 'STANDBY', NORMAL: 'NORMAL', WARNING: 'WARNING', HIGH: 'HIGH', CRITICAL: 'CRITICAL',
+};
+
 export class LabScene3D implements Sim3D {
   disableOrbitControls = true;
 
@@ -157,6 +172,13 @@ export class LabScene3D implements Sim3D {
   private consoleMesh: THREE_NS.Mesh | null = null;
   private consolePanel: THREE_NS.Mesh | null = null;
   private monitorScreen: THREE_NS.Mesh | null = null;
+  // Prawdziwy odczyt danych na małym monitorze — canvas przerysowywany WYŁĄCZNIE
+  // z wartości już śledzonych przez tę klasę (vesselFraction/vesselIcuFraction/
+  // vesselStatus/playDayIndex), nigdy ze zmyślonej liczby. Przerysowywany tylko
+  // gdy treść faktycznie się zmieniła (readoutLastDrawn), nie co klatkę.
+  private readoutCtx: CanvasRenderingContext2D | null = null;
+  private readoutTexture: THREE_NS.CanvasTexture | null = null;
+  private readoutLastDrawn = '';
   private fluidMesh: THREE_NS.Mesh | null = null;
   private icuLight: THREE_NS.PointLight | null = null;
   private vesselLight: THREE_NS.PointLight | null = null;
@@ -291,6 +313,56 @@ export class LabScene3D implements Sim3D {
       this.anomalyTriggeredForRun = true;
       this.focusScientific('ANOMALY');
     }
+  }
+
+  /**
+   * Rysuje realny odczyt na canvasie monitora: status naczynia, obłożenie
+   * łóżek/ICU (procenty z tych samych `vesselFraction`/`vesselIcuFraction`
+   * co reaktor) i pozycję w serii (dzień/liczba dni). `force` pomija
+   * porównanie z `readoutLastDrawn` — używane tylko przy pierwszym rysowaniu
+   * w `init()`, zanim jest jakikolwiek stan do porównania.
+   */
+  private drawReadout(force = false): void {
+    const ctx = this.readoutCtx;
+    const texture = this.readoutTexture;
+    if (!ctx || !texture) return;
+    const status = STATUS_LABEL_EN[this.vesselStatus];
+    const occupancyPct = Math.round(this.vesselFraction * 100);
+    const icuPct = Math.round(this.vesselIcuFraction * 100);
+    const dayLabel = this.playDayIndex >= 0 ? `${this.playDayIndex + 1}/${this.playSeriesData.length}` : '—';
+    const key = `${status}|${occupancyPct}|${icuPct}|${dayLabel}`;
+    if (!force && key === this.readoutLastDrawn) return;
+    this.readoutLastDrawn = key;
+
+    const w = ctx.canvas.width;
+    const h = ctx.canvas.height;
+    const color = `#${STATUS_COLOR[this.vesselStatus === 'IDLE' ? 'NORMAL' : this.vesselStatus].toString(16).padStart(6, '0')}`;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#050a14';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, w - 4, h - 4);
+
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#7fa3c9';
+    ctx.font = '600 18px "Courier New", monospace';
+    ctx.fillText('SCIENTIFIC WORLD STATE', 14, 30);
+
+    ctx.fillStyle = color;
+    ctx.font = 'bold 30px "Courier New", monospace';
+    ctx.fillText(status, 14, 74);
+
+    ctx.font = '600 20px "Courier New", monospace';
+    ctx.fillStyle = '#cfe8ff';
+    ctx.fillText(`BEDS  ${occupancyPct}%`, 14, 110);
+    ctx.fillText(`ICU   ${icuPct}%`, 14, 136);
+
+    ctx.fillStyle = '#7fa3c9';
+    ctx.font = '600 18px "Courier New", monospace';
+    ctx.fillText(`DAY ${dayLabel}`, 14, 164);
+
+    texture.needsUpdate = true;
   }
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
@@ -686,11 +758,21 @@ export class LabScene3D implements Sim3D {
     monitorBody.position.set(-0.55, 1.0, -0.85);
     monitorBody.rotation.y = 0.35;
     scene.add(monitorBody);
-    const monitorMat = new THREE.MeshStandardMaterial({ color: 0x1c3a52, emissive: 0x3fc7ff, emissiveIntensity: 0.15, roughness: 0.3 });
+    // Ekran monitora niesie REALNY odczyt (status/obłożenie/dzień) rysowany na
+    // canvasie z tych samych pól, które już napędzają naczynie — nigdy osobno
+    // zmyślona liczba. `map` niesie treść, `emissive`+`emissiveIntensity` (patrz
+    // syncScene) nadal steruje jasnością ekranu tym samym sygnałem "playing".
+    const readout = makeReadoutSurface(THREE);
+    this.readoutCtx = readout.ctx;
+    this.readoutTexture = readout.texture;
+    const monitorMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, emissive: 0x3fc7ff, emissiveIntensity: 0.15, emissiveMap: readout.texture, map: readout.texture, roughness: 0.3,
+    });
     this.monitorScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.18), monitorMat);
     this.monitorScreen.position.set(-0.55 + Math.sin(0.35) * 0.03, 1.0, -0.85 + Math.cos(0.35) * 0.03 - 0.02);
     this.monitorScreen.rotation.y = 0.35;
     scene.add(this.monitorScreen);
+    this.drawReadout(true);
 
     // === OTOCZENIE: druga wieża zbiornika, szafy aparaturowe, antresola,
     // przeszklona ścianka i okablowanie — hala wygląda jak kompleks
@@ -1325,6 +1407,7 @@ export class LabScene3D implements Sim3D {
       const material = this.monitorScreen.material as THREE_NS.MeshStandardMaterial;
       material.emissiveIntensity = isPlaying ? 0.85 : 0.15;
     }
+    this.drawReadout();
     // Szafy aparaturowe w tle: ten sam realny sygnał "playing" co mały monitor
     // — infrastruktura "budzi się" podczas prawdziwego przebiegu, nic więcej.
     for (const strip of this.rackScreens) {

@@ -45,6 +45,17 @@ describe('Looking Glass — parseObservationIntent: the mission\'s own example s
     expect(intent.time).toEqual({ kind: 'RELATIVE', direction: 'FORWARD', amount: 6, unit: 'HOUR' });
   });
 
+  it('REGRESSION: "zoom into"/"zoom in on"/"take me to" are recognised target triggers', () => {
+    // Found live in Chromium (Looking Glass 2.1): "Zoom into the hospital"
+    // fell all the way through to an honest "no target was named" refusal,
+    // even though the sentence plainly named one — TARGET_TRIGGERS simply
+    // never listed "zoom into" as a trigger phrase.
+    expect(parseObservationIntent('Zoom into the hospital.').target).toBe('hospital');
+    expect(parseObservationIntent('Zoom in on the substance.').scale).toBe('MACRO');
+    expect(parseObservationIntent('Zoom in on the substance.').target).toBe('substance');
+    expect(parseObservationIntent('Take me to the laboratory.').target).toBe('laboratory');
+  });
+
   it('REGRESSION: "go back 3 hours" (direction word BEFORE the amount) is not silently truncated to 1', () => {
     // Found live in Chromium: the bare GO_BACK fallback matched "go back"
     // first and discarded "3 hours" entirely, moving the world by 1 tick

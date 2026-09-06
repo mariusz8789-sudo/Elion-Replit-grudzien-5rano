@@ -72,7 +72,7 @@ export interface ObservationIntent {
 // and effect view" would capture "substance in cause and effect view" as
 // one (unmatchable) entity name instead of "substance".
 const TARGET_STOP = 'after|before|at|from|over|while|during|as|in\\s+(?:the\\s+)?(?:cause|system|incident|citizen|scientist|engineer|operator)|po\\b|przed\\b|w\\s+chwili|podczas|jako';
-const TARGET_TRIGGERS = new RegExp(`\\b(show me|show|go to|focus on|look at|follow|pokaż|pokaz|idź do|skup się na|śledź|sledz)\\s+(?:the\\s+|a\\s+|an\\s+)?([a-ząćęłńóśźż][a-ząćęłńóśźż0-9\\s-]{1,40}?)(?=\\s+(?:${TARGET_STOP})\\b|[.?!,;]|$)`, 'i');
+const TARGET_TRIGGERS = new RegExp(`\\b(show me|show|go to|take me to|focus on|zoom into|zoom in on|zoom on|look at|follow|pokaż|pokaz|idź do|skup się na|przybliż|śledź|sledz)\\s+(?:the\\s+|a\\s+|an\\s+)?([a-ząćęłńóśźż][a-ząćęłńóśźż0-9\\s-]{1,40}?)(?=\\s+(?:${TARGET_STOP})\\b|[.?!,;]|$)`, 'i');
 const FOLLOW_TRIGGER = new RegExp(`\\b(follow|śledź|sledz|track)\\s+(?:the\\s+)?([a-ząćęłńóśźż][a-ząćęłńóśźż0-9\\s-]{1,40}?)(?=\\s+(?:${TARGET_STOP})\\b|[.?!,;]|$)`, 'i');
 
 // Generic nouns that name a QUESTION, not an entity — resolving them against

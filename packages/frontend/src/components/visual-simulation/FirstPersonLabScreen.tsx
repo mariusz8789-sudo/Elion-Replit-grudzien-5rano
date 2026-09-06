@@ -308,8 +308,13 @@ export function FirstPersonLabScreen() {
     const trimmed = sentence.trim();
     if (!trimmed) return;
     const intent = parseObservationIntent(trimmed);
-    const query = intent.target ?? intent.focus;
     const namesLab = /\b(lab|laborator|hala)/i.test(trimmed);
+    // The lab has exactly ONE real addressable object, so a bare pronoun
+    // ("show IT from the scientist perspective") unambiguously refers to it —
+    // not a guess among candidates, since there is only ever one candidate.
+    // A city with several real objects must NOT apply this shortcut.
+    const rawQuery = intent.target ?? intent.focus;
+    const query = rawQuery && /^(it|this|that|to)$/i.test(rawQuery) ? 'the reaction vessel' : rawQuery;
     if (!query && !namesLab) {
       setObsResult({ status: 'FAILED', narration: 'No target was named — try "the reaction vessel" or "the laboratory".' });
       setObsText('');

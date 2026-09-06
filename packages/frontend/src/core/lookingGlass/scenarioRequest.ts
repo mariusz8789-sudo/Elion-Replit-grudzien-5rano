@@ -66,7 +66,17 @@ export type ScenarioKind =
    * engine (`core/worldModel/domains/chemistryKinetics.ts`), not a second
    * kinetics implementation.
    */
-  | 'CHEMICAL_KINETICS';
+  | 'CHEMICAL_KINETICS'
+  /**
+   * A real pump/pipe engineering system — Darcy-Weisbach head loss,
+   * Swamee-Jain friction, hydraulic/shaft power. Backed by the real C3
+   * World Model engine over the existing `engineeringGraph/pumpPipe.ts`
+   * model (`core/worldModel/domains/hydraulicsPumpPipe.ts`), not a second
+   * hydraulics implementation. Steady-state by nature — see that module's
+   * own documentation — so nothing changes tick to tick without a real
+   * parameter intervention.
+   */
+  | 'HYDRAULIC_SYSTEM';
 
 export type TemporalUnit = 'HOUR' | 'DAY' | 'YEAR';
 
@@ -187,6 +197,7 @@ const KIND_KEYWORDS: Readonly<Record<ScenarioKind, readonly string[]>> = {
   PARTICLE_SYSTEM: ['particle', 'cząstk', 'czastk', 'quantum', 'kwant', 'ising', 'spin', 'lattice'],
   URBAN_TRANSFORMATION: ['city change', 'urban transformation', 'zmiana miasta', 'city over', 'miasto przez', 'city grow', 'rozwój miasta'],
   CHEMICAL_KINETICS: ['kinetics', 'kinetyk', 'decay', 'rozpad chemiczn', 'rozkład chemiczn', 'rozklad chemiczn', 'arrhenius', 'first-order decay', 'first order decay'],
+  HYDRAULIC_SYSTEM: ['hydraulic', 'hydraulik', 'pump-pipe', 'pump pipe', 'pump and pipe', 'darcy-weisbach', 'darcy weisbach', 'swamee-jain', 'pompa i rurociąg', 'sieć hydraulicz'],
 };
 
 const KIND_FAMILY: Readonly<Record<ScenarioKind, ScenarioFamily>> = {
@@ -206,6 +217,7 @@ const KIND_FAMILY: Readonly<Record<ScenarioKind, ScenarioFamily>> = {
   CHEMICAL_REACTION: 'MOLECULAR', PARTICLE_SYSTEM: 'MOLECULAR',
   URBAN_TRANSFORMATION: 'URBAN_CHANGE',
   CHEMICAL_KINETICS: 'MOLECULAR',
+  HYDRAULIC_SYSTEM: 'INDUSTRIAL_ENVIRONMENTAL',
 };
 
 /**

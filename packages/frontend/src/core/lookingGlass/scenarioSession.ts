@@ -1,5 +1,4 @@
 import type { ReplayState, WorldState } from '../world/scientificWorldState';
-import { canonicalJson } from '../events/hash';
 import { captureWorldTimeline, type WorldCaptureTimeline } from '../world/worldCapture';
 import { projectCellWorldStates } from '../world/cellWorldAdapter';
 import { executePreregisteredHypotheses, preregisterHypotheses, generateCompetingHypotheses, HYPOTHESIS_PROBLEMS } from '../experimentFabric/hypothesisLoop';
@@ -23,10 +22,15 @@ import { resolveScenarioRequest, type ScenarioResolution, type ScenarioRunPlan }
 import {
   buildChemistryExperimentWorld, CHEMISTRY_KINETICS_DOMAIN_ID, CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver,
 } from '../worldModel/domains/chemistryKinetics';
+import {
+  buildHydraulicsWorld, HYDRAULICS_DOMAIN_ID, HYDRAULICS_PUMP_PIPE_SOLVER_ID, makeHydraulicsPumpPipeSolver,
+} from '../worldModel/domains/hydraulicsPumpPipe';
+import { PUMP_PIPE_DEFAULTS } from '../engineeringGraph/pumpPipe';
 import { TemporalBranchRegistry, TemporalEngine } from '../worldModel/temporal/temporalEngine';
 import { SolverRouter, type SolverRouteReport } from '../worldModel/solvers/solverRouter';
-import { collectScalars, compareBranches, projectToWorldState } from '../worldModel/bridge/worldFrameState';
+import { compareBranches, projectToWorldState } from '../worldModel/bridge/worldFrameState';
 import { describeMoment, type WorldModelMoment } from './worldModelMoment';
+import { verifiedReplayAt } from './worldModelReplay';
 
 /**
  * LOOKING GLASS — THE VERTICAL SLICE.
@@ -371,17 +375,8 @@ function buildChemistrySession(plan: ScenarioRunPlan): SessionBuild {
   const verifyRouter = new SolverRouter();
   verifyRouter.register(CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver());
 
-  const replayAt = (tick: number): ReplayState => {
-    const primary = collectScalars(engine.graph.getEntity(world.substanceId));
-    const verify = collectScalars(verifyEngine.graph.getEntity(verifyWorld.substanceId));
-    const match = canonicalJson(primary) === canonicalJson(verify);
-    return {
-      status: match ? 'MATCH' : 'DRIFT',
-      message: match
-        ? `Independently rebuilt (same construction, same solver) and re-executed to tick ${tick}; scalars matched exactly.`
-        : `Independently rebuilt run diverged from the original at tick ${tick} — this is a real reproducibility failure, not reported as a match.`,
-    };
-  };
+  const replayAt = (tick: number): ReplayState =>
+    verifiedReplayAt(engine, world.substanceId, verifyEngine, verifyWorld.substanceId, tick);
 
   // Tick 0: the substance before any solver step — nothing has happened yet,
   // so this state carries no event, honestly. Both engines start from the
@@ -449,6 +444,93 @@ function buildChemistrySession(plan: ScenarioRunPlan): SessionBuild {
 }
 
 /**
+ * HYDRAULICS / PUMP-PIPE — the same real C3 engine family as chemistry, a
+ * different real domain solver (`hydraulicsPumpPipe.ts`, wrapping the
+ * existing Darcy-Weisbach/Swamee-Jain `engineeringGraph/pumpPipe.ts`
+ * model). Genuinely different physics from chemistry: this system is
+ * STEADY-STATE, so a tick with no intervention produces the IDENTICAL
+ * state as the one before it — that flatness is the honest, correct answer
+ * for this domain, not a bug to paper over with an invented demand curve.
+ */
+const HYDRAULICS_DT_SECONDS = 1;
+/** Halves the flow rate at the fork point — a real operational intervention, not a relabeled clone. */
+const HYDRAULICS_FORK_FLOW_FRACTION = 0.5;
+
+function buildHydraulicsSession(plan: ScenarioRunPlan): SessionBuild {
+  const world = buildHydraulicsWorld();
+  const registry = new TemporalBranchRegistry();
+  const engine = new TemporalEngine(world.graph, { label: 'baseline', registry });
+  const router = new SolverRouter();
+  router.register(HYDRAULICS_PUMP_PIPE_SOLVER_ID, makeHydraulicsPumpPipeSolver());
+  const worldId = `hydraulics:${plan.kind}`;
+
+  // REPLAY INTEGRITY — the same real, independent-rebuild-and-compare check
+  // chemistry uses (see worldModelReplay.ts), not a second verification
+  // mechanism.
+  const verifyWorld = buildHydraulicsWorld();
+  const verifyEngine = new TemporalEngine(verifyWorld.graph, { label: 'replay-verify' });
+  const verifyRouter = new SolverRouter();
+  verifyRouter.register(HYDRAULICS_PUMP_PIPE_SOLVER_ID, makeHydraulicsPumpPipeSolver());
+  const replayAt = (tick: number): ReplayState =>
+    verifiedReplayAt(engine, world.pumpPipeId, verifyEngine, verifyWorld.pumpPipeId, tick);
+
+  const states: WorldState[] = [
+    projectToWorldState(engine.graph, worldId, HYDRAULICS_DOMAIN_ID, 0, undefined, replayAt(0)),
+  ];
+  for (let tick = 1; tick <= plan.ticks; tick++) {
+    const captured: { report: SolverRouteReport | null } = { report: null };
+    engine.advance(HYDRAULICS_DT_SECONDS, (graph, dt, t) => {
+      captured.report = router.routeTick(graph, dt, t);
+      return captured.report;
+    });
+    verifyEngine.advance(HYDRAULICS_DT_SECONDS, (graph, dt, t) => verifyRouter.routeTick(graph, dt, t));
+    states.push(projectToWorldState(engine.graph, worldId, HYDRAULICS_DOMAIN_ID, engine.tick, {
+      observations: captured.report?.observations ?? [],
+      events: captured.report?.events ?? [],
+    }, replayAt(engine.tick)));
+  }
+
+  // A real fork/intervention: halving the flow rate partway through, then
+  // continuing both branches to the same final tick.
+  let comparison: ScenarioComparisonView | null = null;
+  if (plan.comparison && plan.ticks >= 2) {
+    const forkTick = Math.floor(plan.ticks / 2);
+    const reducedFlow = PUMP_PIPE_DEFAULTS.volumetricFlow * HYDRAULICS_FORK_FLOW_FRACTION;
+    const throttled = engine.forkBranch(forkTick, 'throttled', (graph) => {
+      const current = graph.getEntity(world.pumpPipeId);
+      graph.updateEntity(world.pumpPipeId, {
+        domainState: { ...current.domainState, volumetricFlow: reducedFlow },
+      });
+    });
+    for (let tick = forkTick + 1; tick <= plan.ticks; tick++) {
+      throttled.advance(HYDRAULICS_DT_SECONDS, (graph, dt, t) => router.routeTick(graph, dt, t));
+    }
+    const branchComparison = compareBranches(registry, engine.branchId, throttled.branchId, plan.ticks);
+    comparison = compareWorldModelBranches(branchComparison, world.pumpPipeId, {
+      baseline: `${PUMP_PIPE_DEFAULTS.volumetricFlow.toFixed(3)} m³/s throughout`,
+      variant: `throttled to ${reducedFlow.toFixed(3)} m³/s at tick ${forkTick}`,
+    });
+  }
+
+  return {
+    states,
+    comparison,
+    // No ScenarioCounterfactual/Scientific-Memory artifact exists for this
+    // engine yet — same honest gap as chemistry, not a fabricated one.
+    counterfactual: null,
+    producedBy: `worldModel.TemporalEngine(${HYDRAULICS_PUMP_PIPE_SOLVER_ID}, ${plan.ticks} ticks)`,
+    temporalTicks: states.map((state) => state.tick),
+    temporalSource: `worldModel.TemporalEngine.advance(dt=${HYDRAULICS_DT_SECONDS}s)`,
+    // No 3D rendering surface exists for this domain yet.
+    handoffRunId: null,
+    worldRoute: null,
+    problemId: null,
+    bounds: { min: [-1, 0, -1], max: [1, 2, 1] },
+    worldModel: { engine, focalEntityId: world.pumpPipeId },
+  };
+}
+
+/**
  * Opens a Looking Glass session from a sentence.
  *
  * Returns a session even when the scenario cannot run: `resolution.status`
@@ -486,7 +568,9 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
     ? buildEpidemicSession(plan)
     : plan.binding === 'WORLD_MODEL_CHEMISTRY'
       ? buildChemistrySession(plan)
-      : buildLaboratorySession(plan);
+      : plan.binding === 'WORLD_MODEL_HYDRAULICS'
+        ? buildHydraulicsSession(plan)
+        : buildLaboratorySession(plan);
 
   const timeline = captureWorldTimeline(null, [...built.states]);
   const shotPlan = buildShotPlan(timeline, plan, { hasComparison: built.comparison !== null });

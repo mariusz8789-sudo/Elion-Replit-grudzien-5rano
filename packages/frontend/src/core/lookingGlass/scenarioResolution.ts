@@ -43,7 +43,9 @@ export type ScenarioEngineBinding =
   | 'MOLECULE_WORLD_ADAPTER'
   | 'PARTICLE_WORLD_ADAPTER'
   /** The real C3 World Model engine (core/worldModel/*) — WorldGraph + TemporalEngine + a real domain solver, not scenarioEngine/hypothesisLoop. */
-  | 'WORLD_MODEL_CHEMISTRY';
+  | 'WORLD_MODEL_CHEMISTRY'
+  /** Same C3 engine family as WORLD_MODEL_CHEMISTRY, a different real domain solver (hydraulicsPumpPipe.ts). */
+  | 'WORLD_MODEL_HYDRAULICS';
 
 export interface ScenarioCapability {
   readonly binding: ScenarioEngineBinding;
@@ -160,6 +162,25 @@ export const SCENARIO_CAPABILITIES: Readonly<Partial<Record<ScenarioKind, Scenar
     notModelled: [
       'a human-scale world a person can stand in — no 3D rendering surface exists for this domain yet',
       'reaction products or multi-step mechanisms — this is single-substance first-order decay only',
+    ],
+  },
+  /**
+   * Backed by the real C3 World Model engine over the existing
+   * engineeringGraph/pumpPipe.ts model — Darcy-Weisbach head loss,
+   * Swamee-Jain friction. Steady-state: a tick re-evaluates the same real
+   * model against current parameters rather than integrating an ODE, so
+   * nothing changes across ticks unless a real intervention is applied
+   * (see buildHydraulicsSession's fork/compare path).
+   */
+  HYDRAULIC_SYSTEM: {
+    binding: 'WORLD_MODEL_HYDRAULICS',
+    units: ['HOUR'],
+    maxSpan: { HOUR: 24 },
+    viewpoints: ['OPERATOR_POV', 'SCIENTIST_POV', 'OBSERVER', 'MACRO'],
+    ticksPerUnit: { HOUR: 1, DAY: 24, YEAR: 8760 },
+    notModelled: [
+      'a human-scale world a person can stand in — no 3D rendering surface exists for this domain yet',
+      'transient/water-hammer behaviour — this model is steady-state only',
     ],
   },
 };

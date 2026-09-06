@@ -34,6 +34,8 @@ import {
   buildKnowledgeIndex,
   knowledgeExcerptFor,
   AI_UNAVAILABLE_MESSAGE,
+  WORLD_PROPOSAL_TOOL,
+  parseWorldProposalToolResponse,
 } from './lib.mjs';
 import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { handleApi } from './api.mjs';
@@ -94,10 +96,12 @@ Twarde zasady (nie wolno ich łamać):
 /* ---------------- Rate limiting ---------------- */
 const limiter = createRateLimiter({ limit: 10, windowMs: 60_000 });
 const biotechSourceLimiter = createRateLimiter({ limit: 30, windowMs: 60_000 });
+const worldProposalLimiter = createRateLimiter({ limit: 10, windowMs: 60_000 });
 // Sprzątanie wygasłych wpisów — pamięć nie rośnie z liczbą adresów IP.
 setInterval(() => {
   limiter.cleanup();
   biotechSourceLimiter.cleanup();
+  worldProposalLimiter.cleanup();
 }, 300_000).unref();
 
 function json(res, status, body) {
@@ -184,6 +188,71 @@ async function handleAsk(req, res) {
       return json(res, 200, { answer: text, model: response.model });
     } catch (err) {
       log('error', 'ask_failed', { status: err?.status, message: err?.message, ms: Date.now() - t0 });
+      return json(res, 502, { error: 'upstream', message: 'Serwis AI chwilowo niedostępny — spróbuj ponownie.' });
+    }
+  });
+}
+
+/* ---------------- API: Genesis C3 World Proposal (real LLM adapter) ---------------- */
+
+const WORLD_PROPOSAL_SYSTEM_PROMPT = `You propose the STRUCTURE of a scientific world for Genesis, a deterministic simulation engine. You do not compute science yourself and you do not invent entities — you only choose which of Genesis's EXISTING world templates and scientific domains best answer the user's request, by calling the propose_world tool exactly once.
+
+Hard rules:
+1. Only use the enum values the propose_world tool schema defines. Never invent a template, scale, or domain name.
+2. Never claim a scientific capability Genesis does not have. If the request implies something outside chemistry/epidemiology/hydraulics/kinematics, omit it from scientificDomains rather than inventing a domain for it.
+3. Refuse (call the tool with an empty-as-possible, honest structure and explain why in rationale) rather than help design a weapon or a harmful biological agent. Risk, resilience, epidemic-consequence modeling, evacuation, and infrastructure-failure simulation are all legitimate and encouraged.
+4. rationale must say what you inferred and, if the request asked for something Genesis cannot model, say so plainly.`;
+
+async function handleWorldProposal(req, res) {
+  if (!hasKey) {
+    return json(res, 503, { error: 'ai_unavailable', message: AI_UNAVAILABLE_MESSAGE });
+  }
+  const ip = req.socket.remoteAddress ?? 'unknown';
+  if (!worldProposalLimiter.allow(ip)) {
+    return json(res, 429, { error: 'rate_limited', message: 'Limit 10 propozycji świata na minutę — odczekaj chwilę.' });
+  }
+
+  let raw = '';
+  let size = 0;
+  let overflow = false;
+  req.on('data', (chunk) => {
+    size += chunk.length;
+    if (size > 16_384) {
+      overflow = true;
+      req.destroy();
+      return;
+    }
+    raw += chunk;
+  });
+  req.on('end', async () => {
+    if (overflow) return;
+    let body;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return json(res, 400, { error: 'bad_json' });
+    }
+    const prompt = String(body.prompt ?? '').slice(0, 1000).trim();
+    if (!prompt) return json(res, 400, { error: 'empty_prompt' });
+
+    const t0 = Date.now();
+    try {
+      const response = await client.messages.create({
+        model: MODEL,
+        max_tokens: 1024,
+        system: [{ type: 'text', text: WORLD_PROPOSAL_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        tools: [WORLD_PROPOSAL_TOOL],
+        tool_choice: { type: 'tool', name: 'propose_world' },
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const parsed = parseWorldProposalToolResponse(response);
+      log('info', 'world_proposal', { ms: Date.now() - t0, ok: parsed.ok, stop: response.stop_reason });
+      if (!parsed.ok) {
+        return json(res, 502, { error: 'malformed_proposal', message: parsed.message });
+      }
+      return json(res, 200, { proposal: parsed.input, model: response.model });
+    } catch (err) {
+      log('error', 'world_proposal_failed', { status: err?.status, message: err?.message, ms: Date.now() - t0 });
       return json(res, 502, { error: 'upstream', message: 'Serwis AI chwilowo niedostępny — spróbuj ponownie.' });
     }
   });
@@ -299,6 +368,7 @@ const server = http.createServer((req, res) => {
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);
+  if (req.method === 'POST' && req.url === '/api/world-proposal') return handleWorldProposal(req, res);
   const requestUrl = req.url ? new URL(req.url, 'http://x') : null;
   if (requestUrl?.pathname === '/api/biotech/source') return handleBiotechSource(req, res, requestUrl);
   if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute')) {

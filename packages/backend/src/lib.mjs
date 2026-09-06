@@ -174,3 +174,88 @@ export const SECURITY_HEADERS = {
   // aktywny, gdy wdrożenie stoi za reverse proxy terminującym TLS.
   'strict-transport-security': 'max-age=63072000; includeSubDomains',
 };
+
+/* ---------------- Genesis C3: World Proposal (real LLM adapter) ---------------- */
+
+/**
+ * Genesis C3 — GENERATIVE SCIENTIFIC WORLD MODEL 3.0: the LLM's ONLY job is
+ * to propose the STRUCTURE of a world (which templates, roughly what scale/
+ * population/domains) — never to invent entities, run solvers, or touch a
+ * WorldGraph directly. This tool's `input_schema` is the enforced contract:
+ * Anthropic's tool-use forces the model to return JSON matching this shape
+ * (or the API surfaces a usable error), so the frontend's Scientific
+ * Validation Gate (core/worldModel/specification/validation.ts) always has
+ * well-typed input to actually validate — this schema is a syntax fence,
+ * not a substitute for that real validation.
+ */
+export const WORLD_PROPOSAL_TOOL = {
+  name: 'propose_world',
+  description:
+    "Propose a structured scientific world specification for Genesis, composed from Genesis's existing world templates (CITY, LABORATORY, WATER_SYSTEM, EPIDEMIOLOGY, INDUSTRIAL_SITE). Never invent a template, scale, or scientific domain outside the given enums.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      worldType: {
+        type: 'array',
+        items: { type: 'string', enum: ['CITY', 'LABORATORY', 'WATER_SYSTEM', 'EPIDEMIOLOGY', 'INDUSTRIAL_SITE'] },
+        minItems: 1,
+      },
+      scale: {
+        type: 'string',
+        enum: ['PLANET', 'REGION', 'MACRO_CITY', 'BUILDING', 'ROOM', 'MESO_LAB', 'MICRO_MOLECULAR', 'NANO_ATOMIC'],
+      },
+      geography: {
+        type: 'object',
+        properties: {
+          hasRiver: { type: 'boolean' },
+          coastal: { type: 'boolean' },
+          regionCount: { type: 'integer', minimum: 0 },
+          districtCount: { type: 'integer', minimum: 0 },
+          buildingsPerDistrict: { type: 'integer', minimum: 0 },
+        },
+      },
+      population: {
+        type: 'object',
+        properties: { count: { type: 'integer', minimum: 0 } },
+      },
+      scientificDomains: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            domain: { type: 'string', enum: ['chemistry', 'epidemiology', 'hydraulics', 'kinematics'] },
+            required: { type: 'boolean' },
+          },
+          required: ['domain', 'required'],
+        },
+      },
+      levelOfDetail: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH'] },
+      rationale: { type: 'string', description: 'One or two sentences explaining why this structure answers the user request.' },
+    },
+    required: ['worldType', 'rationale'],
+  },
+};
+
+const KNOWN_WORLD_TEMPLATES = new Set(['CITY', 'LABORATORY', 'WATER_SYSTEM', 'EPIDEMIOLOGY', 'INDUSTRIAL_SITE']);
+
+/**
+ * Pure, network-free extraction + shape validation of the tool_use block an
+ * Anthropic `messages.create` response carries when `propose_world` was
+ * invoked. Never trusts the model: re-checks the shape independently of
+ * whatever the API itself enforced, and REJECTS (never silently repairs) a
+ * malformed or missing tool call.
+ */
+export function parseWorldProposalToolResponse(response) {
+  const block = Array.isArray(response?.content) ? response.content.find((b) => b?.type === 'tool_use' && b?.name === 'propose_world') : null;
+  if (!block || typeof block.input !== 'object' || block.input === null) {
+    return { ok: false, reason: 'malformed', message: 'Model did not return a propose_world tool call.' };
+  }
+  const input = block.input;
+  if (!Array.isArray(input.worldType) || input.worldType.length === 0 || !input.worldType.every((t) => KNOWN_WORLD_TEMPLATES.has(t))) {
+    return { ok: false, reason: 'malformed', message: 'worldType must be a non-empty array of known template names.' };
+  }
+  if (typeof input.rationale !== 'string' || input.rationale.trim().length === 0) {
+    return { ok: false, reason: 'malformed', message: 'rationale must be a non-empty string.' };
+  }
+  return { ok: true, input };
+}

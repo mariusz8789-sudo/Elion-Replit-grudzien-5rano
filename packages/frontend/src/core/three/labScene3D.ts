@@ -3123,6 +3123,10 @@ export class LabScene3D implements Sim3D {
       const auxPump = createPump(THREE, {
         position: [1.7, 0, auxUtilityZ], housingMaterial: MAT.darkSteel, pipeMaterial: MAT.copper, state: 'NORMAL',
       });
+      // No real C1/C3 hydraulic entity backs this pump (see waterInfrastructureBridge.ts's own
+      // doc for the same boundary at the WorldFrame-integration level) — tagged so "no fake C3
+      // state is generated" is machine-checkable, not just documented in prose.
+      auxPump.group.userData.notModeled = true;
       scene.add(auxPump.group);
       const auxValve = createValve(THREE, { position: [1.9, 0.12, auxUtilityZ + 0.14], material: MAT.chrome });
       scene.add(auxValve);

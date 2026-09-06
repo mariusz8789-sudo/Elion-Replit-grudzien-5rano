@@ -25,6 +25,10 @@ import { createRooftopEquipment, createAmbulanceBay, createIndustrialBuilding } 
 import { createHydrant, createUtilityBox } from './graphics/streetKit';
 import { createVehicle } from './graphics/vehicleKit';
 import { createTreeField, createGroundClutter } from './graphics/vegetation';
+import { createPipeNetwork } from './graphics/waterInfrastructure';
+import { WorldFrameRenderer } from './graphics/worldFrameRenderer';
+import type { WorldFrame } from './graphics/worldFrame';
+import { createWaterInfrastructureAdapter, type WaterInfrastructureAdapter } from './graphics/waterInfrastructureBridge';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -147,6 +151,15 @@ export class EpidemicCity3DSim implements Sim3D {
   private earthquakeOverlayFingerprint = '';
   private worldInteractive: THREE_NS.Object3D[] = [];
   private selectedWorld: CityWorldSelection | null = null;
+  // GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 2.0: the C3 water-infrastructure integration seam
+  // (see graphics/waterInfrastructureBridge.ts's own doc). No real C1/C3 water/pump entity exists
+  // yet — this renders exactly ONE placeholder entity with `grounding: 'NOT_MODELED'`, proving the
+  // WorldFrame -> adapter -> waterInfrastructure.ts pathway works end to end in this real production
+  // scene, without fabricating any pump id, position provenance, or state. Deliberately NOT added to
+  // `worldInteractive`/tagged with `userData.worldSelection`: it is not a queryable CityWorld
+  // location, only a visual placeholder pending a real C3 producer.
+  private infrastructureAdapter: WaterInfrastructureAdapter | null = null;
+  private infrastructureRenderer: WorldFrameRenderer | null = null;
   private worldOverlayFingerprint = '';
   /** Efemeryczne ślady są tworzone wyłącznie z `lastTransmissions()` silnika. */
   private transmissionMarkers = new Map<string, { group: THREE_NS.Group; born: number; material: THREE_NS.MeshBasicMaterial }>();
@@ -318,6 +331,7 @@ export class EpidemicCity3DSim implements Sim3D {
     void this.loadApprovedCityAssets();
     this.addAnalysisLayer();
     this.addCityExtras();
+    this.initWaterInfrastructureSeam();
     this.worldOverlayGroup = new THREE.Group();
     this.worldOverlayGroup.name = 'read-only-worldstate-overlays';
     scene.add(this.worldOverlayGroup);
@@ -425,6 +439,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.syncEarthquakeScenarioVisuals();
     this.animateWorldMarkers();
     this.syncApprovedAssetLod();
+    this.syncWaterInfrastructureSeam();
     this.syncFollowTarget(states);
     if (this.resetCityCameraPending) {
       camera.position.set(CITY_CAMERA_POSITION.x, CITY_CAMERA_POSITION.y, CITY_CAMERA_POSITION.z);
@@ -590,6 +605,10 @@ export class EpidemicCity3DSim implements Sim3D {
     }
     for (const object of this.buildingMeshes) disposeSceneResources(object);
     this.buildingMeshes = [];
+    this.infrastructureRenderer?.dispose();
+    this.infrastructureRenderer = null;
+    this.infrastructureAdapter?.dispose();
+    this.infrastructureAdapter = null;
     // Resource-lifecycle audit finding: the approved-asset clones (facade/lamp GLTF instances
     // actually placed in the scene via .clone(true)) were only ever removed from the scene graph
     // here, never disposed — their geometry/materials/textures leaked on every teardown. The raw
@@ -1458,6 +1477,74 @@ export class EpidemicCity3DSim implements Sim3D {
     });
     this.scene.add(extras);
     this.buildingMeshes.push(extras);
+  }
+
+  /**
+   * GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 2.0: sets up the water-infrastructure C3
+   * integration seam (`graphics/waterInfrastructureBridge.ts`) in this real production scene. See
+   * that module's doc and this class's `infrastructureAdapter` field comment for the full honesty
+   * contract — in short: no real C1/C3 pump/valve entity exists yet, so this renders exactly one
+   * placeholder `WorldFrame` entity with no `status`, which the adapter renders as a real,
+   * correctly-positioned pump WITHOUT any dynamic status — never a fabricated NORMAL/WARNING/
+   * FAILED/OFFLINE reading (the object is tagged `userData.notModeled = true` instead). A short decorative pipe run
+   * connects it toward the hospital wall, same status as this file's own `createContextBuilding`/
+   * street furniture: real geometry, explicitly not a WorldFrame/C3 entity.
+   */
+  private initWaterInfrastructureSeam(): void {
+    if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
+    const brushedMetal = createPBRMaterial(THREE, 'BRUSHED_METAL') as THREE_NS.MeshStandardMaterial;
+    const copper = new THREE.MeshStandardMaterial({ color: 0xb87a4a, roughness: 0.35, metalness: 0.85 });
+    this.infrastructureAdapter = createWaterInfrastructureAdapter(THREE, { housingMaterial: brushedMetal, pipeMaterial: copper });
+    this.infrastructureRenderer = new WorldFrameRenderer(THREE, this.scene, {
+      resolveVisual: this.infrastructureAdapter.resolveVisual,
+      updateVisual: this.infrastructureAdapter.updateVisual,
+    });
+    this.syncWaterInfrastructureSeam();
+
+    const hospitalSlot = this.semanticBuildingSlots.find((slot) => slot.building.kind === 'hospital');
+    if (hospitalSlot) {
+      const dims = hospitalSlot.group.userData.cityBuilding as { width: number; depth: number; height: number };
+      const hx = hospitalSlot.group.position.x;
+      const hz = hospitalSlot.group.position.z;
+      const pumpPosition = this.infrastructurePlaceholderPosition(hospitalSlot.group.position, dims);
+      const pipe = createPipeNetwork(THREE, {
+        waypoints: [[pumpPosition[0], 0.1, pumpPosition[2]], [hx, 0.1, hz - dims.depth / 2 - 0.05]],
+        radius: 0.014, material: copper,
+      });
+      pipe.userData.visualOnlyContext = true;
+      this.scene.add(pipe);
+      this.buildingMeshes.push(pipe);
+    }
+  }
+
+  /** Placeholder position for the not-yet-real water/pump entity: beside the real hospital
+   * building's own service-yard side (opposite its entrance facade), so it reads as plausible
+   * infrastructure rather than a marker floating in open ground. */
+  private infrastructurePlaceholderPosition(hospitalPosition: THREE_NS.Vector3, dims: { width: number; depth: number }): THREE_NS.Vector3Tuple {
+    return [hospitalPosition.x + dims.width * 0.42, 0, hospitalPosition.z - dims.depth / 2 - 0.30];
+  }
+
+  private syncWaterInfrastructureSeam(): void {
+    if (!this.infrastructureRenderer) return;
+    const hospitalSlot = this.semanticBuildingSlots.find((slot) => slot.building.kind === 'hospital');
+    const frame: WorldFrame = { time: this.timeSeconds, entities: [] };
+    if (hospitalSlot) {
+      const dims = hospitalSlot.group.userData.cityBuilding as { width: number; depth: number; height: number };
+      frame.entities = [{
+        id: 'infrastructure:city-water-pump-placeholder',
+        position: this.infrastructurePlaceholderPosition(hospitalSlot.group.position, dims),
+        visualHint: 'object:water-pump',
+        // Deliberately NOT `grounding: 'NOT_MODELED'` — that field is about VISUAL identity ("do we
+        // know what this looks like"), not scientific truth, and would make WorldFrameRenderer
+        // itself swap in its own generic abstract placeholder sphere instead of a real pump (see
+        // worldFrameRenderer.ts's own doc). A pump's appearance IS known; its STATE is not — so
+        // `status` stays omitted, and the adapter's own honesty check (see
+        // waterInfrastructureBridge.ts) is what actually prevents a fabricated NORMAL/WARNING/
+        // FAILED/OFFLINE reading, tagging `userData.notModeled = true` instead.
+      }];
+    }
+    this.infrastructureRenderer.sync(frame);
   }
 
   private createBuilding(building: WorldObject): THREE_NS.Group {

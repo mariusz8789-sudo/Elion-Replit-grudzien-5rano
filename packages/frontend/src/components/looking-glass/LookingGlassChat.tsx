@@ -240,7 +240,15 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
               still needs a place to answer "what happened / why / what was
               it before". One inspector component, three screens. */}
           {inspectableEvents.length > 0 && (
-            <div className="lg-rail">
+            // .lg-rail-inline: the base .lg-rail is `position: absolute`,
+            // pinned to the bottom-left of the two 3D screens' fixed-height
+            // viewport. The chat card is a tall, normal-flow element with
+            // no such viewport — left as position:absolute here, the rail
+            // pinned itself to the CARD's bottom edge and sat on top of the
+            // "Wejdź do świata" button below it (found visually in
+            // Chromium, not by reading the CSS). This override is layout
+            // only; the rail/inspector logic and markup stay identical.
+            <div className="lg-rail lg-rail-inline">
               <span className="lg-rail-title">zdarzenia przebiegu ({inspectableEvents.length})</span>
               <div className="lg-rail-items">
                 {inspectableEvents.slice(0, 8).map((event) => (

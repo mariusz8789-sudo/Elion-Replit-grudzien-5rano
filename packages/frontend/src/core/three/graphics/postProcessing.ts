@@ -159,6 +159,15 @@ export interface GraphicsPipelineOptions {
    * better environment. Omit for the common case (no such upgrade); the HDRI always applies.
    */
   ambientHdriGuard?: () => boolean;
+  /**
+   * Skips this pipeline's own `applyAmbientIBL` call entirely. For a caller that already manages
+   * its own environment/atmosphere (a tuned HDRI intensity, a scene background color, exponential
+   * fog — things a generic "give metal something to reflect" helper has no business overriding),
+   * forcing the studio-box + default-intensity HDRI on top would fight that scene's own tuning
+   * rather than help it. Default `false` preserves the original all-in-one behavior for callers
+   * with no environment story of their own.
+   */
+  skipAmbientIBL?: boolean;
 }
 
 /** `PostProcessor` plus hooks for retuning DOF at runtime — a strict superset, so it still
@@ -199,8 +208,9 @@ export function setupGraphicsPipeline(
 
   // AMBIENT/IBL role (graphics/lighting.ts): procedural studio env immediately + optional
   // approved HDRI upgrade in the background — metal must have something to reflect, or chrome
-  // and steel read as flat plastic regardless of roughness/metalness.
-  applyAmbientIBL(THREE, renderer, scene, opts.ambientHdriGuard);
+  // and steel read as flat plastic regardless of roughness/metalness. Skippable for a caller that
+  // already runs its own environment/atmosphere (see `skipAmbientIBL`'s doc above).
+  if (!opts.skipAmbientIBL) applyAmbientIBL(THREE, renderer, scene, opts.ambientHdriGuard);
 
   const composer = new modules.EffectComposer(renderer);
   composer.addPass(new modules.RenderPass(scene, camera));

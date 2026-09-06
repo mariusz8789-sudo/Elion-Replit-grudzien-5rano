@@ -11,6 +11,7 @@ import type { EarthquakeCityOverlayProjection } from '../simulationRenderer/eart
 import { resolveSafeFocusDirection, type CameraOccluder } from './cityCameraSafety';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { isWorldAssetApproved, isWorldAssetPathApproved } from './assetGovernance';
+import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -293,7 +294,19 @@ export class EpidemicCity3DSim implements Sim3D {
     this.crowd.addTo(scene);
   }
 
-  /** Delikatny bloom wzmacnia rzeczywiste światła, okna i epidemiologiczne akcenty bez efektu "neonowej gry". */
+  /**
+   * GENESIS GRAPHICS ENGINE — the same shared `graphics/postProcessing.ts` pipeline the lab scene
+   * uses (`setupGraphicsPipeline`), not a second, independently-maintained bloom-only chain. Real
+   * upgrade over the previous RenderPass→Bloom→Output chain: this tier-gates in `GTAOPass`, which
+   * gives street-level contact shadows (buildings meeting the sidewalk, agents meeting the
+   * street) that a plain directional-light shadow map alone doesn't produce — see
+   * `graphics/PERFORMANCE.md` for the cost this adds at the `'high'` tier only.
+   *
+   * `skipAmbientIBL: true` because this scene already runs its OWN environment story
+   * (`loadApprovedHdri`, below) — a specific low `environmentIntensity` tuned for a night city, a
+   * solid background color, and exponential fog for depth — none of which the shared pipeline's
+   * generic "studio box" IBL role knows about or should override.
+   */
   setupPostProcessing(
     modules: PostProcessingModules,
     renderer: THREE_NS.WebGLRenderer,
@@ -302,25 +315,16 @@ export class EpidemicCity3DSim implements Sim3D {
     w: number,
     h: number,
   ): PostProcessor {
-    const THREE = this.THREE!;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // Odrobinę niższa ekspozycja zachowuje szczegół PBR w jasnych oknach,
-    // a bogatszy IBL/fill poniżej wyciąga materiał fasad z czerni bez neonów.
-    renderer.toneMappingExposure = 1.00;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     void this.loadApprovedHdri(renderer);
-    const composer = new modules.EffectComposer(renderer);
-    composer.addPass(new modules.RenderPass(scene, camera));
-    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.20, 0.46, 0.90);
-    composer.addPass(bloom);
-    composer.addPass(new modules.OutputPass());
-    return {
-      render: () => composer.render(),
-      setSize: (width, height) => composer.setSize(width, height),
-      dispose: () => composer.dispose(),
-    };
+    const pipeline: GraphicsPipeline = setupGraphicsPipeline(this.THREE!, modules, renderer, {
+      scene, camera, width: w, height: h,
+      // Odrobinę niższa ekspozycja zachowuje szczegół PBR w jasnych oknach,
+      // a bogatszy IBL/fill poniżej wyciąga materiał fasad z czerni bez neonów.
+      toneMappingExposure: 1.00,
+      bloom: { strength: 0.20, radius: 0.46, threshold: 0.90 },
+      skipAmbientIBL: true,
+    });
+    return pipeline;
   }
 
   update(dt: number, params: SimParams): void {

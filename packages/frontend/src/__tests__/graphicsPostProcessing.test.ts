@@ -25,6 +25,7 @@ vi.mock('../core/three/quality', async (importOriginal) => {
 });
 
 import { setupGraphicsPipeline, resolveBokehUniforms, configureDOF, type DepthOfFieldSettings } from '../core/three/graphics/postProcessing';
+import { applyAmbientIBL } from '../core/three/graphics/lighting';
 import { detectRenderTier } from '../core/three/quality';
 import type { PostProcessingModules } from '../core/three/types';
 
@@ -132,6 +133,24 @@ describe('setupGraphicsPipeline — renderer configuration', () => {
     const renderer = fakeRenderer();
     setupGraphicsPipeline(fakeThree(), modules, renderer, { ...baseOpts, toneMappingExposure: 1.3 });
     expect(renderer.toneMappingExposure).toBe(1.3);
+  });
+});
+
+describe('setupGraphicsPipeline — skipAmbientIBL', () => {
+  beforeEach(() => {
+    vi.mocked(applyAmbientIBL).mockClear();
+  });
+
+  it('applies the AMBIENT/IBL role by default', () => {
+    const { modules } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(applyAmbientIBL).toHaveBeenCalled();
+  });
+
+  it('skips it for a caller that manages its own environment/atmosphere (e.g. a city scene with tuned HDRI + fog + background)', () => {
+    const { modules } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, skipAmbientIBL: true });
+    expect(applyAmbientIBL).not.toHaveBeenCalled();
   });
 });
 

@@ -4,23 +4,32 @@ import { isWorldAssetApproved } from '../assetGovernance';
 /**
  * GENESIS GRAPHICS RUNTIME — Lighting Roles
  *
- * Six reusable lighting roles cover the vocabulary a world-builder needs
+ * Seven reusable lighting roles cover the vocabulary a world-builder needs
  * without rebuilding a lighting rig from scratch per object:
  *
- *   KEY         `createKeyLight`       — the shadow-casting light that models an object's form.
- *   RIM         `createRimLight`       — a cool light behind/above a subject that separates its
- *                                        silhouette from the background.
- *   PRACTICAL   `createPracticalLight` — a small, non-shadow-casting light that reads as coming
- *                                        from a visible fixture (a lamp, an LED strip, a monitor).
- *   HERO        `createHeroLight`      — "this is the hero apparatus": bundles KEY+RIM into one
- *                                        coherent, already-tuned treatment aimed at a target.
- *   BACKGROUND  `createBackgroundFill` — the low-level wash that keeps the room's periphery from
- *                                        reading as pure black while every KEY/RIM light aims at
- *                                        a subject.
- *   AMBIENT/IBL `applyAmbientIBL`      — image-based reflections (procedural studio env + optional
- *                                        approved HDRI) so metal and glass have something to
- *                                        reflect. Pure rendering-layer technique — it doesn't know
- *                                        or care what geometry it's lighting.
+ *   KEY         `createKeyLight`             — the shadow-casting light that models an object's form.
+ *   RIM         `createRimLight`             — a cool light behind/above a subject that separates
+ *                                              its silhouette from the background.
+ *   PRACTICAL   `createPracticalLight`       — a small, non-shadow-casting light that reads as
+ *                                              coming from a visible fixture (a lamp, an LED
+ *                                              strip, a monitor).
+ *   HERO        `createHeroLight`            — "this is the hero apparatus": bundles KEY+RIM into
+ *                                              one coherent, already-tuned treatment aimed at a
+ *                                              target.
+ *   BACKGROUND  `createBackgroundFill`       — the low-level wash that keeps the room's periphery
+ *                                              from reading as pure black while every KEY/RIM
+ *                                              light aims at a subject.
+ *   AMBIENT/IBL `applyAmbientIBL`            — image-based reflections (procedural studio env +
+ *                                              optional approved HDRI) so metal and glass have
+ *                                              SOMETHING to reflect, with zero scene-specific
+ *                                              setup — the baseline every world gets for free.
+ *   ROOM PROBE  `captureRoomReflectionProbe` — an upgrade over AMBIENT/IBL's generic studio env:
+ *                                              captures the scene's OWN geometry into the
+ *                                              reflection instead of a generic box. Opt-in (one
+ *                                              extra call, one extra frame's wait) because it
+ *                                              needs the scene already lit and built — worth it
+ *                                              for any world where polished metal/glass is a
+ *                                              focal point.
  *
  * Every factory takes `THREE`+`scene` and adds its own light(s) — it never
  * places fixture geometry (a lamp mesh, a gantry beam): that's facility/
@@ -102,6 +111,101 @@ export async function loadHdriEnvironment(
 export function applyAmbientIBL(THREE: typeof THREE_NS, renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene, shouldApplyHdri?: () => boolean): void {
   applyStudioEnvironment(THREE, renderer, scene);
   void loadHdriEnvironment(THREE, renderer, scene, shouldApplyHdri);
+}
+
+export interface RoomReflectionProbeOptions {
+  /** World-space position for the capture — usually near the hero object at roughly eye height,
+   * so what ends up in metal/glass reflections is what's actually near the subject. */
+  position: [number, number, number];
+  /** Cube map face resolution. Default 256 — a ONE-TIME cost (six renders at capture time), not a
+   * per-frame one; raise only if a large, sharply polished surface shows visible banding. */
+  resolution?: number;
+  near?: number;
+  far?: number;
+  /** How strongly the captured environment reads on metal/glass afterwards. Default 1.85, tuned
+   * for a room-scale interior — a larger or brighter world may want less. */
+  environmentIntensity?: number;
+  /** Extra per-mesh exclusion beyond the automatic transmissive/near-transparent detection below
+   * (see the module doc). First-person view-model geometry doesn't need this — it's excluded by
+   * being on render layer 1 while the probe only sees layer 0 — this hook is for anything else a
+   * caller's own scene wants left out of its own reflection of itself. */
+  exclude?: (mesh: THREE_NS.Mesh) => boolean;
+}
+
+/**
+ * ROOM-REFLECTION PROBE — a scene reflecting ITSELF instead of a generic procedural studio box.
+ *
+ * `applyAmbientIBL`'s procedural studio gives metal/glass a plausible reflection immediately, but
+ * always the SAME one (a bright ceiling + two light strips) regardless of what's actually in the
+ * scene — chrome and glass read as generic because they reflect a room that isn't there. This
+ * captures a real one-time environment instead: six faces of a cube map rendered from `position`,
+ * passed through `PMREMGenerator`, so polished surfaces show the actual gear, walls, and light
+ * fixtures around them.
+ *
+ * Cost is ONE-TIME (six renders at call time, zero per frame afterwards) — call this once, after
+ * the first full frame (so lights/shadows/emissive materials are already settled, not a blank
+ * scene), not every frame.
+ *
+ * Three things are handled automatically so the capture itself doesn't come out wrong:
+ *  - tone mapping is temporarily disabled (the environment map must be captured LINEAR — ACES
+ *    would otherwise bake in and then get applied a second time every time it's sampled),
+ *  - transmissive/near-transparent meshes (checked via `MeshPhysicalMaterial.transmission` and
+ *    low-opacity `transparent` materials) are hidden for the capture — glass reflecting itself
+ *    creates a feedback loop and a milky, wrong-looking haze,
+ *  - render layer 1 is excluded via the probe's own `layers.set(0)` — the convention this engine
+ *    (and its callers) use for first-person view-model geometry that shouldn't appear in a
+ *    reflection of the room it's being held in front of.
+ */
+export function captureRoomReflectionProbe(
+  THREE: typeof THREE_NS,
+  renderer: THREE_NS.WebGLRenderer,
+  scene: THREE_NS.Scene,
+  options: RoomReflectionProbeOptions,
+): void {
+  const hidden: THREE_NS.Object3D[] = [];
+  scene.traverse((object) => {
+    const mesh = object as THREE_NS.Mesh;
+    if (!mesh.isMesh) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const refractive = materials.some((material) => {
+      const physical = material as THREE_NS.MeshPhysicalMaterial;
+      if (physical.transmission > 0) return true;
+      return Boolean(material.transparent) && (material as THREE_NS.Material & { opacity: number }).opacity < 0.4;
+    });
+    if ((refractive || options.exclude?.(mesh)) && mesh.visible) {
+      hidden.push(mesh);
+      mesh.visible = false;
+    }
+  });
+
+  const previousToneMapping = renderer.toneMapping;
+  const previousExposure = renderer.toneMappingExposure;
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.toneMappingExposure = 1;
+
+  let target: THREE_NS.WebGLCubeRenderTarget | null = null;
+  try {
+    target = new THREE.WebGLCubeRenderTarget(options.resolution ?? 256, { type: THREE.HalfFloatType });
+    const probe = new THREE.CubeCamera(options.near ?? 0.3, options.far ?? 45, target);
+    probe.layers.set(0);
+    probe.position.set(...options.position);
+    probe.update(renderer, scene);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const environment = pmrem.fromCubemap(target.texture).texture;
+    const previousEnvironment = scene.environment;
+    scene.environment = environment;
+    scene.environmentIntensity = options.environmentIntensity ?? 1.85;
+    previousEnvironment?.dispose();
+    pmrem.dispose();
+  } catch {
+    // Without the probe, whatever environment was set before (typically the procedural studio
+    // from applyAmbientIBL) stays — the scene looks worse, but keeps working.
+  } finally {
+    target?.dispose();
+    renderer.toneMapping = previousToneMapping;
+    renderer.toneMappingExposure = previousExposure;
+    for (const mesh of hidden) mesh.visible = true;
+  }
 }
 
 // ============================================================================

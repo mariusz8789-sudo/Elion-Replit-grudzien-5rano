@@ -34,10 +34,10 @@ never the reverse.
 | Concern | Module | Entry points |
 |---|---|---|
 | Materials | `materials.ts` | `createGenesisMaterialPalette(THREE)`, `createPBRMaterial`, `createScientificGlass`, `createDoubleWalledGlass`, `createEmissiveInstrumentMaterial`, `createScreenMaterial`, plus the procedural texture generators |
-| Lighting roles | `lighting.ts` | `createKeyLight`, `createRimLight`, `createPracticalLight`, `createHeroLight`, `createBackgroundFill`, `applyAmbientIBL` |
+| Lighting roles | `lighting.ts` | `createKeyLight`, `createRimLight`, `createPracticalLight`, `createHeroLight`, `createBackgroundFill`, `applyAmbientIBL`, `captureRoomReflectionProbe` |
 | Shadows | `shadowPolicy.ts` | `applyShadowPolicy(THREE, scene, options?)`, `SHADOW_SIZE_TIERS` |
 | Instancing | `instancing.ts` | `InstanceBatch` |
-| Post-processing (AO/reflections/bloom/DOF/tone-mapping) | `postProcessing.ts` | `setupGraphicsPipeline`, `configureDOF`, `resolveBokehUniforms`, types `GraphicsPipelineOptions`/`DepthOfFieldSettings`/`ScreenSpaceReflectionSettings`/`GraphicsPipeline` |
+| Post-processing (AO/reflections/bloom/DOF/tone-mapping) | `postProcessing.ts` | `setupGraphicsPipeline`, `configureDOF`, `resolveBokehUniforms`, types `GraphicsPipelineOptions`/`DepthOfFieldSettings`/`ScreenSpaceReflectionSettings`/`GraphicsPipeline` — `GraphicsPipelineOptions.skipAmbientIBL` opts out of the AMBIENT/IBL role for a scene that manages its own environment/atmosphere (tuned HDRI intensity, background color, fog) |
 | Cinematic camera | `cinematicCamera.ts` | `configureCinematicCamera`, `recommendedDofForProfile`, `FocusPuller` |
 | Quality tiers | `../quality.ts` | `detectRenderTier`, `configureGraphicsQuality`, `tierDpr`, `tierAllowsBloom`, `tierAllowsAO`, `tierAtLeast`, `recommendedShadowMapSize`, `maxShadowCasterBudget` |
 | Integration pattern | `examples/heroApparatusExample.ts` | `buildExampleHeroApparatus` — READ this, don't import it into a real scene |
@@ -424,6 +424,25 @@ follow that *pattern*, not import that *file*. Its smoke test
 (`src/__tests__/graphicsHeroApparatusExample.test.ts`) is a working,
 executable reference for "does my composition actually run."
 
+## Proven across more than one world
+
+This isn't a single-scene abstraction with one caller — two independently-
+built `Sim3D` scenes, of genuinely different shapes, both delegate their
+`setupPostProcessing` to `setupGraphicsPipeline` today:
+
+- `labScene3D.ts` (First Person Lab, an interior, GTAO+DOF enabled, a
+  scene-specific room-reflection probe via `captureRoomReflectionProbe`).
+- `epidemicCity3D.ts` (the epidemiology city, an exterior night scene with
+  its own HDRI intensity/background/fog — `skipAmbientIBL: true` so this
+  engine's generic AMBIENT/IBL role doesn't fight that scene's own
+  atmosphere, while still getting the shared tone-mapping/AO/bloom pipeline
+  and its tier gating).
+
+That second integration is what `skipAmbientIBL` and
+`captureRoomReflectionProbe`'s generalization (out of what was originally
+lab-only code) exist to make possible — a real, different-domain scene
+consuming this engine without copy-pasting or forking any of its logic.
+
 ## Verification performed on this branch
 
 - `npx tsc -b --force` — clean, no errors.
@@ -441,7 +460,10 @@ executable reference for "does my composition actually run."
   (`graphicsHeroApparatusExample.test.ts`).
 - Manual headless run (Playwright + SwiftShader): `#/first-person-lab`
   renders correctly with GTAO active, no console errors, no visual
-  regression versus the pre-existing lighting/materials.
+  regression versus the pre-existing lighting/materials. `#/city3d`
+  (the epidemiology city, a second, independent `Sim3D` scene) also renders
+  correctly through the same shared pipeline — no console errors, its own
+  tuned night atmosphere (HDRI/background/fog) intact.
 - A genuine `window is not defined` bug in `quality.ts`'s `tierDpr` (it
   never guarded for a non-browser environment, unlike `detectRenderTier`)
   was found and fixed while writing this session's tests — see

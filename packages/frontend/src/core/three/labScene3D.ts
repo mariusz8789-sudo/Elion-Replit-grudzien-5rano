@@ -7,6 +7,7 @@ import type { HospitalStatus } from '../simulation/hospitalResource';
 import type { ScenarioDaySample } from '../simulation/scenarioEngine';
 import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
 import { FocusPuller } from './graphics/cinematicCamera';
+import { captureRoomReflectionProbe } from './graphics/lighting';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -3457,71 +3458,18 @@ export class LabScene3D implements Sim3D {
   }
 
   /**
-   * ODBICIA Z PRAWDZIWEJ HALI, nie z pudełka studyjnego.
-   *
-   * Proceduralne „studio" (jasny sufit + dwie świetlówki) dawało metalowi
-   * jakikolwiek refleks, ale zawsze ten sam: dwie białe smugi, niezależnie od
-   * tego, co faktycznie stoi obok. Dlatego chrom, stal i szkło czytały się
-   * tanio — odbijały scenografię, której w kadrze nie ma.
-   *
-   * Tu scena odbija SAMĄ SIEBIE: raz, po pierwszej pełnej klatce, sześć ścian
-   * cube-mapy 256 px z punktu przy aparaturze, przepuszczone przez PMREM.
-   * Koszt jest jednorazowy (sześć renderów przy starcie, zero na klatkę), a
-   * w zamian w szkle i polerowanym metalu widać rzędy szaf, świetlne listwy
-   * i jasną ścianę drugiej nawy.
-   *
-   * Trzy rzeczy muszą być wyłączone na czas zdjęcia, inaczej mapa jest błędna:
-   *  - tone mapping (mapa środowiska ŻYJE LINIOWO, ACES nałożyłby się dwa razy),
-   *  - powierzchnie transmisyjne/prawie przezroczyste (szkło odbijające samo
-   *    siebie robi pętlę sprzężenia i mleczną poświatę),
-   *  - warstwa 1, czyli rękawy i rękawice pierwszej osoby tuż przy obiektywie.
+   * ODBICIA Z PRAWDZIWEJ HALI, nie z pudełka studyjnego — teraz przez wspólną,
+   * generyczną `graphics/lighting.ts::captureRoomReflectionProbe` (ta sama
+   * technika, ta sama domyślna detekcja szkła/warstwy 1, ale reużywalna przez
+   * KAŻDY świat Genesis, nie tylko tę halę). Ta metoda zna już tylko WŁASNĄ
+   * pozycję sondy (obok naczynia, na wysokości oczu).
    */
   private captureRoomEnvironment(renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene): void {
     const THREE = this.THREE;
     if (!THREE) return;
-    const hidden: THREE_NS.Object3D[] = [];
-    scene.traverse((object) => {
-      const mesh = object as THREE_NS.Mesh;
-      if (!mesh.isMesh) return;
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      const refractive = materials.some((material) => {
-        const physical = material as THREE_NS.MeshPhysicalMaterial;
-        if (physical.transmission > 0) return true;
-        return Boolean(material.transparent) && (material as THREE_NS.Material & { opacity: number }).opacity < 0.4;
-      });
-      if (refractive && mesh.visible) {
-        hidden.push(mesh);
-        mesh.visible = false;
-      }
+    captureRoomReflectionProbe(THREE, renderer, scene, {
+      position: [VESSEL_POSITION[0] + 0.9, 1.75, VESSEL_POSITION[2] + 1.1],
     });
-
-    const previousToneMapping = renderer.toneMapping;
-    const previousExposure = renderer.toneMappingExposure;
-    renderer.toneMapping = THREE.NoToneMapping;
-    renderer.toneMappingExposure = 1;
-
-    let target: THREE_NS.WebGLCubeRenderTarget | null = null;
-    try {
-      target = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType });
-      const probe = new THREE.CubeCamera(0.3, 45, target);
-      probe.layers.set(0);
-      probe.position.set(VESSEL_POSITION[0] + 0.9, 1.75, VESSEL_POSITION[2] + 1.1);
-      probe.update(renderer, scene);
-      const pmrem = new THREE.PMREMGenerator(renderer);
-      const environment = pmrem.fromCubemap(target.texture).texture;
-      const previousEnvironment = scene.environment;
-      scene.environment = environment;
-      scene.environmentIntensity = 1.85;
-      previousEnvironment?.dispose();
-      pmrem.dispose();
-    } catch {
-      // Bez sondy zostaje otoczenie studyjne — scena wygląda gorzej, ale działa.
-    } finally {
-      target?.dispose();
-      renderer.toneMapping = previousToneMapping;
-      renderer.toneMappingExposure = previousExposure;
-      for (const mesh of hidden) mesh.visible = true;
-    }
   }
 
   onResize(): void { /* kamera pierwszoosobowa: brak dodatkowej logiki poza domyślnym aspect z useThreeLoop */ }

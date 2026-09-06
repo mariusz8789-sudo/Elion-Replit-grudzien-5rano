@@ -3,6 +3,7 @@ import { parseScenarioRequest, spanToTicks } from '../core/lookingGlass/scenario
 import { nearestSupportedAlternative, resolveScenarioRequest } from '../core/lookingGlass/scenarioResolution';
 import { openLookingGlass } from '../core/lookingGlass/scenarioSession';
 import { anchoredSequenceDuration, buildAnchoredSequence, sampleAnchoredSequence, scrubToSeconds } from '../core/lookingGlass/anchoredTemporal';
+import { ExperiencePlayer, frameAt } from '../core/lookingGlass/experienceOrchestrator';
 
 describe('Looking Glass — natural language to structured scenario', () => {
   it('reads a Polish epidemic sentence: kind, span and anchored street viewpoint', () => {
@@ -146,10 +147,15 @@ describe('Looking Glass — one experience layer, many domains', () => {
       .toEqual(expect.arrayContaining(['ESTABLISH', 'RESULT']));
   });
 
-  it('keeps marker shots on the state axis, not the world clock', () => {
+  it('puts each shot on the clock its marker is actually measured against', () => {
     const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
     for (const shot of session.shotPlan.shots) {
-      expect(shot.axis).toBe(shot.sourceMarkerId === null ? 'WORLD_TIME' : 'STATE_INDEX');
+      // An observation is recorded against the state it belongs to; a
+      // canonical event carries a real timestamp in the world's own clock.
+      // Reading an event's day-72 timestamp as "state 72" addressed a state
+      // that never existed, so the axis is per marker, not per shot kind.
+      const expected = shot.kind === 'OBSERVATION' ? 'STATE_INDEX' : 'WORLD_TIME';
+      expect(shot.axis).toBe(expected);
     }
   });
 
@@ -306,5 +312,111 @@ describe('Looking Glass — the world answers the question that was asked', () =
     openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy').enterWorld();
     expect(peekPendingLookingGlassExperience()?.problemId).toMatch(/lowest-modeled-deaths/);
     clearLookingGlassExperience();
+  });
+});
+
+describe('Looking Glass — the Experience Orchestrator', () => {
+  const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+
+  it('lays the shot plan on a real clock, holding the anchored pass for its true length', () => {
+    const timeline = session.experience;
+    expect(timeline.shots.length).toBe(session.shotPlan.shots.length);
+    expect(timeline.durationSeconds).toBeGreaterThan(60);
+    const temporal = timeline.shots.find((scheduled) => scheduled.shot.kind === 'TEMPORAL');
+    // Shortening it would skip states the model computed; lengthening it
+    // would hold on states that do not exist.
+    expect(temporal!.endSeconds - temporal!.startSeconds)
+      .toBeCloseTo((session.anchored!.keyframes.length - 1) * session.anchored!.secondsPerStep);
+  });
+
+  it('is pure: the same instant always resolves to the same frame', () => {
+    const a = frameAt(session.experience, 31.5);
+    const b = frameAt(session.experience, 31.5);
+    expect(a).toEqual(b);
+  });
+
+  it('never runs off either end of the sequence', () => {
+    expect(frameAt(session.experience, -50)?.elapsedSeconds).toBe(0);
+    const past = frameAt(session.experience, 99999);
+    expect(past?.finished).toBe(true);
+    expect(past?.elapsedSeconds).toBe(session.experience.durationSeconds);
+  });
+
+  it('resolves a state index only where one really exists', () => {
+    for (const scheduled of session.experience.shots) {
+      const frame = frameAt(session.experience, scheduled.startSeconds + 0.1)!;
+      if (frame.stateIndex !== null) {
+        // A rendered state index must address a state the run produced.
+        expect(frame.stateIndex).toBeLessThan(session.states.length);
+        expect(frame.stateIndex).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('gives a world-time marker no state index rather than inventing one', () => {
+    const eventShot = session.experience.shots.find((s) => s.shot.kind === 'EVENT');
+    if (!eventShot) return;
+    const frame = frameAt(session.experience, eventShot.startSeconds + 0.1)!;
+    expect(frame.shot.axis).toBe('WORLD_TIME');
+    expect(frame.stateIndex).toBeNull();
+  });
+
+  it('never holds a marker shot on a tick range that runs backwards', () => {
+    for (const shot of session.shotPlan.shots) expect(shot.toTick).toBeGreaterThanOrEqual(shot.fromTick);
+  });
+
+  it('cites only real markers, and flags the cut on a shot boundary', () => {
+    const markerIds = new Set(session.timeline.markers.map((m) => m.id));
+    for (const scheduled of session.experience.shots) {
+      const frame = frameAt(session.experience, scheduled.startSeconds)!;
+      expect(frame.isCut).toBe(true);
+      for (const id of frame.activeMarkerIds) expect(markerIds.has(id)).toBe(true);
+    }
+  });
+
+  it('plays, pauses, scrubs, changes speed and replays over the same real sequence', () => {
+    const player = new ExperiencePlayer(session.experience);
+    expect(player.playbackStatus).toBe('IDLE');
+    player.play();
+    player.advance(10);
+    expect(player.elapsedSeconds).toBeCloseTo(10);
+
+    player.setSpeed(4);
+    player.advance(10);
+    expect(player.elapsedSeconds).toBeCloseTo(50);
+
+    player.pause();
+    player.advance(10);
+    expect(player.elapsedSeconds).toBeCloseTo(50);
+
+    // Scrubbing pauses, as every video control does.
+    player.play();
+    player.seek(0.5);
+    expect(player.playbackStatus).toBe('PAUSED');
+    expect(player.elapsedSeconds).toBeCloseTo(session.experience.durationSeconds / 2);
+
+    player.setSpeed(1);
+    player.play();
+    player.advance(99999);
+    expect(player.playbackStatus).toBe('FINISHED');
+    expect(player.currentFrame?.finished).toBe(true);
+
+    player.replay();
+    expect(player.playbackStatus).toBe('PLAYING');
+    expect(player.elapsedSeconds).toBe(0);
+  });
+
+  it('clamps speed to a sane range instead of letting a caller skip the run', () => {
+    const player = new ExperiencePlayer(session.experience);
+    player.setSpeed(1000);
+    expect(player.playbackSpeed).toBe(16);
+    player.setSpeed(0);
+    expect(player.playbackSpeed).toBe(0.1);
+  });
+
+  it('produces no timeline for a refused scenario', () => {
+    const refused = openLookingGlass('Design a bomb that maximises casualties in this city');
+    expect(refused.experience.shots).toEqual([]);
+    expect(frameAt(refused.experience, 1)).toBeNull();
   });
 });

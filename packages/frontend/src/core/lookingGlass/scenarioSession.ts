@@ -7,6 +7,7 @@ import { registerScenarioTimeline, setPendingScenarioTimeline } from '../experim
 import { projectEpidemiologyWorldStates } from '../world/epidemiologyWorldAdapter';
 import { buildAnchoredSequence, type AnchoredTemporalSequence, type TemporalAnchor } from './anchoredTemporal';
 import { buildShotPlan, type ShotPlan } from './shotPlan';
+import { buildExperienceTimeline, type ExperienceTimeline } from './experienceOrchestrator';
 import { setPendingLookingGlassExperience } from './sessionHandoff';
 import { parseScenarioRequest, type StructuredScenarioRequest } from './scenarioRequest';
 import { resolveScenarioRequest, type ScenarioResolution, type ScenarioRunPlan } from './scenarioResolution';
@@ -48,6 +49,11 @@ export interface LookingGlassSession {
   readonly shotPlan: ShotPlan;
   /** Present when the viewpoint is one a person occupies. */
   readonly anchored: AnchoredTemporalSequence | null;
+  /**
+   * The shot plan laid out on a real clock — what the viewer sees at any
+   * instant. Empty when the scenario did not resolve.
+   */
+  readonly experience: ExperienceTimeline;
   /** The engine that produced `states`, for provenance in the UI. */
   readonly producedBy: string;
   /** The engine that produced the temporal progression the anchor plays. */
@@ -70,6 +76,9 @@ const ANCHORS: Readonly<Record<string, TemporalAnchor>> = {
   window: { position: [-4, 3, 8], yaw: Math.PI * 0.9, pitch: -0.15, eyeHeight: 1.6, label: 'window' },
   coast: { position: [0, 1, 14], yaw: Math.PI, pitch: -0.05, eyeHeight: 1.7, label: 'coast' },
   room: { position: [0, 0, 3.3], yaw: 0, pitch: 0, eyeHeight: 1.7, label: 'room' },
+  // Seated in a vehicle: lower eye height, and off the pavement centre line.
+  car: { position: [1.4, 0, 5.5], yaw: Math.PI * 0.94, pitch: -0.02, eyeHeight: 1.15, label: 'car' },
+  vehicle: { position: [-1.2, 0, 5.5], yaw: Math.PI * 1.05, pitch: -0.02, eyeHeight: 1.45, label: 'vehicle' },
 };
 
 const DEFAULT_ANCHOR: TemporalAnchor = ANCHORS.room;
@@ -78,7 +87,8 @@ function anchorFor(plan: ScenarioRunPlan): TemporalAnchor | null {
   const embodied = plan.viewpoint.kind === 'ANCHORED_HUMAN'
     || plan.viewpoint.kind === 'SCIENTIST_POV'
     || plan.viewpoint.kind === 'OPERATOR_POV'
-    || plan.viewpoint.kind === 'RESPONDER_POV';
+    || plan.viewpoint.kind === 'RESPONDER_POV'
+    || plan.viewpoint.kind === 'DRIVER_POV';
   if (!embodied) return null;
   const hint = plan.viewpoint.anchorHint;
   return (hint && ANCHORS[hint]) || DEFAULT_ANCHOR;
@@ -214,6 +224,7 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
       timeline: emptyTimeline,
       shotPlan: { planId: 'sp-none', runId: emptyTimeline.runId, worldId: emptyTimeline.worldId, shots: [], markersUsed: 0, markersAvailable: 0 },
       anchored: null,
+      experience: { requestId: request.requestId, viewpoint: request.viewpoint.kind, shots: [], durationSeconds: 0, anchored: null },
       producedBy: 'none',
       temporalSource: 'none',
       worldRoute: null,
@@ -238,8 +249,10 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
     })
     : null;
 
+  const experience = buildExperienceTimeline(shotPlan, plan.viewpoint.kind, anchored);
+
   return {
-    request, resolution, states: built.states, timeline, shotPlan, anchored,
+    request, resolution, states: built.states, timeline, shotPlan, anchored, experience,
     producedBy: built.producedBy, temporalSource: built.temporalSource,
     worldRoute: built.worldRoute,
     // Arming is separate from opening so the caller decides when to navigate,

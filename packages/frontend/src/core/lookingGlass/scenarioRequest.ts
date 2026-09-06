@@ -77,6 +77,10 @@ export interface TemporalSpan {
  */
 export type ViewpointKind =
   | 'ANCHORED_HUMAN' | 'SCIENTIST_POV' | 'OPERATOR_POV' | 'RESPONDER_POV'
+  /** Inside a vehicle — anchored like a seated human, but moving through the
+   * world rather than fixed to one spot, which is a different experience even
+   * though the science behind it is identical. */
+  | 'DRIVER_POV'
   | 'OBSERVER' | 'WIDE' | 'MACRO';
 
 export interface Viewpoint {
@@ -215,6 +219,7 @@ const VIEWPOINT_MODE: Readonly<Record<ViewpointKind, WorldCameraMode>> = {
   SCIENTIST_POV: 'HUMAN_EYE',
   OPERATOR_POV: 'HUMAN_EYE',
   RESPONDER_POV: 'HUMAN_EYE',
+  DRIVER_POV: 'HUMAN_EYE',
   OBSERVER: 'CINEMATIC',
   WIDE: 'WIDE',
   MACRO: 'MACRO',
@@ -227,9 +232,12 @@ const ANCHOR_PHRASES: readonly { readonly pattern: RegExp; readonly hint: string
   { pattern: /\b(street level|street|ulicy|ulicę|ulice|chodniku)\b/i, hint: 'street' },
   { pattern: /\b(window|oknie|okna)\b/i, hint: 'window' },
   { pattern: /\b(rooftop|dachu|balcony|balkonie)\b/i, hint: 'rooftop' },
+  { pattern: /\b(car|vehicle|samochodzie|samochodu|aucie|auta|behind the wheel|za kierownic)\w*/i, hint: 'car' },
+  { pattern: /\b(bus|tram|train|autobusie|tramwaju|pociągu)\w*/i, hint: 'vehicle' },
   { pattern: /\b(room|pokoju|sali|hali|laboratorium)\b/i, hint: 'room' },
 ];
 
+const DRIVER_PHRASES = /\b(driver|driving|kierowc|prowadz[ąa]c|samochodzie|samochodu|aucie|auta|za kierownic)\w*/i;
 const SCIENTIST_PHRASES = /\b(scientist|naukow|researcher|badacz|chemist|chemik|biolog|physicist|fizyk)\w*/i;
 const OPERATOR_PHRASES = /\b(operator|dispatcher|control room|dyspozytor|centrum sterowania)\w*/i;
 const RESPONDER_PHRASES = /\b(responder|rescuer|paramedic|firefighter|ratownik|straż|straz|służby ratunkow)\w*/i;
@@ -292,6 +300,7 @@ function detectViewpoint(text: string): { viewpoint: Viewpoint; resolved: boolea
   // Named professional roles beat a generic human: each has a genuinely
   // different presentation (PPE and instruments; a console; a response unit).
   if (SCIENTIST_PHRASES.test(text)) return make('SCIENTIST_POV', anchor?.hint ?? 'room');
+  if (DRIVER_PHRASES.test(text)) return make('DRIVER_POV', anchor?.hint ?? 'car');
   if (RESPONDER_PHRASES.test(text)) return make('RESPONDER_POV', anchor?.hint ?? null);
   if (OPERATOR_PHRASES.test(text)) return make('OPERATOR_POV', anchor?.hint ?? 'room');
 

@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openLookingGlass, type LookingGlassSession } from '../../core/lookingGlass/scenarioSession';
 import { nearestSupportedAlternative } from '../../core/lookingGlass/scenarioResolution';
 import { anchoredSequenceDuration, sampleAnchoredSequence, scrubToSeconds } from '../../core/lookingGlass/anchoredTemporal';
+import { ExperiencePlayer, frameAt, type ExperienceFrame } from '../../core/lookingGlass/experienceOrchestrator';
 
 /**
  * LOOKING GLASS — THE CHAT THAT ANSWERS WITH A WORLD.
@@ -48,6 +49,81 @@ const STATUS_LABEL: Readonly<Record<string, string>> = {
   NOT_MODELLED: 'NIE ZAMODELOWANE',
   REFUSED: 'POZA ZAKRESEM',
 };
+
+/**
+ * Plays the experience timeline. Holds a clock and nothing else: what the
+ * clock MEANS at any instant is `frameAt`, so this control, a scrub bar and
+ * an offline capture cannot disagree.
+ */
+function SequencePlayer({ session }: { session: LookingGlassSession }): JSX.Element | null {
+  const player = useMemo(() => new ExperiencePlayer(session.experience), [session]);
+  const [frame, setFrame] = useState<ExperienceFrame | null>(() => frameAt(session.experience, 0));
+  const [, forceStatus] = useState(0);
+
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const delta = (now - last) / 1000;
+      last = now;
+      setFrame(player.advance(delta));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [player]);
+
+  if (!frame || session.experience.durationSeconds <= 0) return null;
+  const playing = player.playbackStatus === 'PLAYING';
+
+  return (
+    <div className="lg-seq">
+      <div className="lg-seq-head">
+        <span className={`lg-seq-kind lg-seq-kind-${frame.shot.kind.toLowerCase()}`}>{frame.shot.kind}</span>
+        <span className="lg-seq-cam">{frame.cameraMode}</span>
+        <span className="lg-seq-reason">{frame.shot.reason}</span>
+      </div>
+      <input
+        className="lg-scrub"
+        type="range"
+        min={0}
+        max={1}
+        step={0.001}
+        value={frame.progress}
+        aria-label="Przewiń sekwencję"
+        onChange={(event) => { player.seek(Number(event.target.value)); setFrame(player.currentFrame); forceStatus((n) => n + 1); }}
+      />
+      <div className="lg-seq-controls">
+        <button
+          type="button"
+          className="lg-seq-btn"
+          onClick={() => { player.toggle(); forceStatus((n) => n + 1); }}
+        >
+          {playing ? '❚❚ Pauza' : '▶ Odtwórz'}
+        </button>
+        <button type="button" className="lg-seq-btn" onClick={() => { player.replay(); forceStatus((n) => n + 1); }}>↻ Od nowa</button>
+        {[1, 2, 4, 8].map((speed) => (
+          <button
+            key={speed}
+            type="button"
+            className={`lg-seq-speed${player.playbackSpeed === speed ? ' is-active' : ''}`}
+            onClick={() => { player.setSpeed(speed); forceStatus((n) => n + 1); }}
+          >
+            {speed}×
+          </button>
+        ))}
+        <span className="lg-seq-time">
+          {frame.elapsedSeconds.toFixed(1)} / {session.experience.durationSeconds.toFixed(1)} s
+          {' · '}
+          {/* Only stated where a state index really exists — a world-time
+              marker has none, and inventing one would name a state the run
+              never produced. */}
+          {frame.stateIndex !== null ? `stan ${frame.stateIndex}` : `czas świata ${Math.round(frame.worldTick)}`}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
   const { session } = turn;
@@ -110,6 +186,12 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
               </div>
             </div>
           ) : null}
+
+          {/* THE SEQUENCE, PLAYED. The shot list below says what the director
+              chose; this plays it, so the edit can be judged as an edit
+              rather than read as a table. Every frame is resolved by the
+              orchestrator from the same real markers. */}
+          <SequencePlayer session={session} />
 
           <ol className="lg-shots">
             {session.shotPlan.shots.map((shot) => (

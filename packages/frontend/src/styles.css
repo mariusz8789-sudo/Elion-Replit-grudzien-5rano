@@ -2941,3 +2941,34 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   .lg-shot-src { text-align: left; }
   .lg-ask { max-width: 100%; }
 }
+
+/* Sekwencja kinowa: odtwarzacz montażu wybranego przez Reżysera. */
+.lg-seq {
+  display: flex; flex-direction: column; gap: 0.45rem;
+  padding: 0.7rem 0.8rem; border-radius: 0.6rem;
+  background: #0a0f18; border: 1px solid #1d2739;
+}
+.lg-seq-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.lg-seq-kind {
+  font: 600 0.66rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em; color: #8ecbff;
+}
+.lg-seq-kind-temporal { color: #4fd18b; }
+.lg-seq-kind-event { color: #ffc061; }
+.lg-seq-cam { font: 0.66rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6f83a0; }
+.lg-seq-reason { color: #cfe0f2; font-size: 0.82rem; flex: 1 1 12rem; }
+.lg-seq-controls { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.lg-seq-btn {
+  padding: 0.3rem 0.65rem; border-radius: 0.45rem; border: 1px solid #2b3a52;
+  background: #16283c; color: #cfe6ff; font-size: 0.78rem; cursor: pointer;
+}
+.lg-seq-btn:hover { border-color: #3d7fbf; }
+.lg-seq-speed {
+  padding: 0.28rem 0.5rem; border-radius: 0.4rem; border: 1px solid #24314a;
+  background: transparent; color: #7f93ad;
+  font: 0.72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; cursor: pointer;
+}
+.lg-seq-speed.is-active { border-color: #4fd18b; color: #b8f2d2; }
+.lg-seq-time {
+  margin-left: auto; font: 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6f83a0;
+}

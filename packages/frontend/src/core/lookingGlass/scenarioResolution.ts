@@ -67,7 +67,7 @@ export const SCENARIO_CAPABILITIES: Readonly<Partial<Record<ScenarioKind, Scenar
     binding: 'SCENARIO_ENGINE_EPIDEMIC',
     units: ['DAY'],
     maxSpan: { DAY: 365 },
-    viewpoints: ['ANCHORED_HUMAN', 'RESPONDER_POV', 'OPERATOR_POV', 'OBSERVER', 'WIDE', 'MACRO'],
+    viewpoints: ['ANCHORED_HUMAN', 'DRIVER_POV', 'RESPONDER_POV', 'OPERATOR_POV', 'OBSERVER', 'WIDE', 'MACRO'],
     ticksPerUnit: { HOUR: 1, DAY: 1, YEAR: 365 },
     notModelled: [
       'urban transformation — buildings, infrastructure and vegetation do not change over years',
@@ -78,7 +78,7 @@ export const SCENARIO_CAPABILITIES: Readonly<Partial<Record<ScenarioKind, Scenar
     binding: 'SCENARIO_ENGINE_EPIDEMIC',
     units: ['DAY'],
     maxSpan: { DAY: 365 },
-    viewpoints: ['ANCHORED_HUMAN', 'RESPONDER_POV', 'OPERATOR_POV', 'OBSERVER', 'WIDE'],
+    viewpoints: ['ANCHORED_HUMAN', 'DRIVER_POV', 'RESPONDER_POV', 'OPERATOR_POV', 'OBSERVER', 'WIDE'],
     ticksPerUnit: { HOUR: 1, DAY: 1, YEAR: 365 },
     notModelled: ['enforcement behaviour and compliance dynamics'],
   },

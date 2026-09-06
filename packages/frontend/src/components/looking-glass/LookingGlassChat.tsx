@@ -3,6 +3,7 @@ import { openLookingGlass, type LookingGlassSession } from '../../core/lookingGl
 import { nearestSupportedAlternative } from '../../core/lookingGlass/scenarioResolution';
 import { anchoredSequenceDuration, sampleAnchoredSequence, scrubToSeconds } from '../../core/lookingGlass/anchoredTemporal';
 import { ExperiencePlayer, frameAt, type ExperienceFrame } from '../../core/lookingGlass/experienceOrchestrator';
+import type { SavedExperiment } from '../../core/scienceMemory';
 import { ComparisonPanel } from './ComparisonPanel';
 
 /**
@@ -130,6 +131,34 @@ function SequencePlayer({ session }: { session: LookingGlassSession }): JSX.Elem
   );
 }
 
+/**
+ * The one real write path from a Looking Glass session into Genesis's
+ * durable, replay-verified Scientific Memory — `saveScenarioCounterfactualToMemory`,
+ * the same store the first-person lab and `ScientificMemoryScreen` already
+ * use. Rendered only when `comparison.evidence` says a real counterfactual
+ * artifact exists behind the comparison (see `scenarioComparison.ts`); a
+ * comparison without one — the laboratory's hypothesis ranking — has nothing
+ * honest to persist here, so no button appears at all rather than one that
+ * fails on click.
+ */
+function ComparisonCommit({ session }: { session: LookingGlassSession }): JSX.Element | null {
+  const [saved, setSaved] = useState<SavedExperiment | null>(null);
+  if (session.comparison?.status !== 'READY' || session.comparison.evidence === null) return null;
+  return (
+    <div className="lg-cmp-commit">
+      {saved ? (
+        <p className="lg-cmp-committed">
+          Zapisano w Pamięci Naukowej jako <code>{saved.experimentId}</code> — odtworzenie obu ramion zweryfikowane (MATCH).
+        </p>
+      ) : (
+        <button type="button" className="lg-cmp-commit-btn" onClick={() => setSaved(session.commitComparisonToMemory())}>
+          Zapisz porównanie w Pamięci Naukowej
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
   const { session } = turn;
   const { request, resolution } = session;
@@ -199,6 +228,7 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
           <SequencePlayer session={session} />
 
           <ComparisonPanel comparison={session.comparison} requestedButMissing={session.request.comparison} />
+          <ComparisonCommit session={session} />
 
           <ol className="lg-shots">
             {session.shotPlan.shots.map((shot) => (

@@ -3111,6 +3111,18 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .lg-cmp-table td.is-up { color: #f0a4a4; }
 .lg-cmp-produced { margin: 0; font-size: 0.68rem; color: #5c6b80; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .lg-cmp-blocked { margin: 0; color: #f0c542; font-size: 0.82rem; line-height: 1.5; }
+.lg-cmp-evidence { margin: 0; font-size: 0.74rem; color: #9fb6d4; line-height: 1.5; }
+.lg-cmp-fingerprint { color: #5c6b80; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.66rem; }
+
+/* Realny zapis do istniejącej Pamięci Naukowej — nigdy druga pamięć. */
+.lg-cmp-commit { display: flex; }
+.lg-cmp-commit-btn {
+  border: 1px solid #2a3a56; border-radius: 0.4rem; background: #101825; color: #8ecbff;
+  font-size: 0.72rem; padding: 0.35rem 0.7rem; cursor: pointer;
+}
+.lg-cmp-commit-btn:hover { background: #16243a; }
+.lg-cmp-committed { margin: 0; font-size: 0.72rem; color: #7fe3ab; line-height: 1.5; }
+.lg-cmp-committed code { color: #cfe0f2; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 /* Panel porównania osadzony W ŚWIECIE (nie w czacie) — ta sama karta, inna pozycja. */
 .lg-world-cmp {

@@ -826,6 +826,93 @@ C3's actual scientific solvers (epidemiology/chemistry/hydraulics/Newtonian) —
 integration test uses C1's real `buildShotPlan`, but no equivalent real-C3-WorldFrame fixture was
 available to test against beyond this engine's own `worldFrame.ts` stand-in contract.
 
+## 24. Visual World Build 1.0 — engine modules actually wired into production scenes
+
+The explicit quality gate for this pass: **ENGINE MODULE → PRODUCTION SCENE → VISIBLE RESULT**, never
+"ENGINE MODULE → README → DONE." Everything below is wired into `epidemicCity3D.ts` and/or
+`labScene3D.ts` themselves (see each file's `addCityExtras()`/STREFA E furniture block), proven by
+`epidemicCity3DExtras.test.ts` and `labScene3DExtras.test.ts` (which call the real scene `init()` and
+assert the new objects exist in the actual scene graph — not just that the example file compiles).
+
+**New reusable kits, DONE and adopted**: `buildingKit.ts` (`createRooftopEquipment`,
+`createAmbulanceBay`, `createIndustrialBuilding` — additive detail layered onto/next to
+`epidemicCity3D.ts`'s existing hand-tuned `createBuilding`, never replacing it), `streetKit.ts`
+(`createStreetBench`/`createTrashBin`/`createHydrant`/`createPlanter`/`createBollardBarrier`/
+`createUtilityBox`), `vehicleKit.ts` (`createVehicle`: car/van/bus/truck/ambulance, deterministic
+per-instance variation, PARKED/MOVING/STOPPED/EMERGENCY/OFFLINE states via `visualState.ts`),
+`waterInfrastructure.ts` (`createPump`/`createValve`/`createStorageTank`/`createPipeNetwork`,
+NORMAL/WARNING/FAILED/OFFLINE via the same `visualState.ts` vocabulary). `vegetation.ts`'s
+`createTreeField`/`createGroundClutter` — previously PARTIAL (§23) — are now also adopted in
+`epidemicCity3D.ts`'s `addCityExtras()`, closing that gap.
+
+**Production-scene results**: `epidemicCity3D.ts`'s hospital building now gets a real ambulance bay,
+a parked ambulance, rooftop HVAC, a small service building, and frontage trees, all anchored to the
+REAL CityWorld hospital `WorldObject` (not an invented location); sparser rooftop equipment appears
+on ~1/3 of other real buildings; decorative parked cars/vans, hydrants, and utility boxes populate
+the streets; extra ground clutter surrounds the park. `labScene3D.ts`'s STREFA E (the deep background
+bay) gains a real bench/cabinet/shelf/monitor cluster and a pump/valve/pipe-run utility cluster.
+
+**Honest boundary on the water/pump state**: the lab's pump defaults to (and stays at) `NORMAL` —
+this scene has no real pressure/flow/failure feed to back a WARNING/FAILED reading, so it is never
+fabricated (see `waterInfrastructure.ts`'s own module doc and `labScene3DExtras.test.ts`'s explicit
+test for this). A pump tied to a REAL C3 water-system feed is future work gated on that feed existing.
+
+**Decorative vs. real, kept honest**: rooftop equipment on non-hospital buildings, parked vehicles,
+street furniture, and the industrial service building are explicitly decorative population/context
+(`userData.visualOnlyContext = true` / `userData.visualOnlyVehicle` / `userData.visualOnlyInfrastructure`)
+— same documented status as this file's own pre-existing `createContextBuilding`/`addUrbanCadence`
+output. None of it is presented as a WorldFrame/C3 entity, and none of it carries `worldSelection`.
+
+**Still DEFERRED / NOT_MODELED after this pass**: a population-visual-diversity kit (roles/clothing/
+animation states beyond the existing `InstancedHumanoidCrowd`); a `createStreet`/`createCityDistrict`
+world-authoring API generalized beyond `epidemicCity3D.ts`'s own scene-specific `addCityExtras()`;
+`environment.ts`/`water.ts`/`animation.ts`/`assetPipeline.ts` production adoption (still PARTIAL per
+§23 — this pass closed the vehicle/street/building/vegetation gap, not all of §23's list); real C3
+water-system integration (see above); day/sunset/night lighting variants for the city scene (it
+remains a fixed night scene, as before this pass); a `WATER_SYSTEM`/counterfactual-comparison
+reference scene (no such C3 world model exists yet in this codebase to render honestly).
+
+## 25. Visual World Build 2.0 — the water-infrastructure C3 integration seam (`waterInfrastructureBridge.ts`)
+
+**Finding, stated plainly**: there is no real, city-spatial, stateful water/pump entity anywhere in
+C1/C3 today. The only "pump" in this codebase (`core/engineeringGraph/pumpPipe.ts`) is an isolated,
+static engineering-sensitivity demo (Darcy–Weisbach/Swamee–Jain over fixed parameters) with no id, no
+position, no failure state, and no connection to the epidemic city or its hospital. `core/events/
+domains/urbanCascade.ts` (the power→water→hospital cascade a mission brief once assumed existed) is,
+by its own file header, type declarations only — "there are no physical models, solvers, or fake
+simulation here." C1's own `scenarioResolution.ts` says the same thing for its `INDUSTRIAL_
+ENVIRONMENTAL` family: "Genesis has no plume dispersion, hydraulic network or power-grid solver."
+
+Given that, this pass deliberately does NOT invent a pump entity, a failure state, or a cascade rule
+— doing so from C2 would be exactly the fabricated Trinity integration this engine's rules forbid.
+Instead it builds the **seam**: `graphics/waterInfrastructureBridge.ts` is a `WorldFrameRenderer`
+resolver/updater pair that a REAL future C3 water-system WorldFrame producer plugs into directly, with
+one hard rule proven by `graphicsWaterInfrastructureBridge.test.ts` (8 tests): an entity with no real
+grounding/status is rendered as real geometry (via the existing `waterInfrastructure.ts` kit) but
+NEVER shown with a fabricated NORMAL/WARNING/FAILED/OFFLINE reading — it is tagged
+`userData.notModeled = true` instead. A `status` is only ever honored when it is one of
+`waterInfrastructure.ts`'s own four real states AND the entity's `grounding !== 'NOT_MODELED'`.
+
+**Wired into the real production city** (`epidemicCity3D.ts`'s `initWaterInfrastructureSeam()`/
+`syncWaterInfrastructureSeam()`, proven by `epidemicCity3DWaterInfrastructureSeam.test.ts`, 7 tests):
+exactly one placeholder pump renders near the real hospital building through this seam, with no
+`status` supplied — so it looks like a real pump but never drives a state it doesn't have. It
+deliberately carries **no** `userData.worldSelection` and is never added to the click-selectable set:
+it is not a queryable CityWorld location, only a visual placeholder pending a real C3 producer. A
+short decorative pipe run connects it toward the hospital wall, tagged `visualOnlyContext` like this
+file's own `createContextBuilding`/street furniture. `labScene3D.ts`'s own VWB1.0 pump (§24) is now
+also tagged `userData.notModeled = true` for the same reason, machine-checkable rather than only
+documented in prose.
+
+**The integration seam this leaves for C3**, verbatim from the bridge module's own doc: `C3 real pump
+entity → WorldFrame → C2 adapter (waterInfrastructureBridge.ts) → existing waterInfrastructure.ts
+renderer`. The day C3 publishes a real pump/valve/tank entity with a stable id, a real position, and a
+real status, wiring it into a production scene is "route its WorldFrame entities through this
+adapter" — not "write a new renderer." Until then, hydraulic failure, hospital-cascade consequences,
+NL commands ("fail the pump"), replay/branch comparison of pump state, and rainfall/flood extensions
+are all **NOT_MODELED** — none of it can be built honestly without that real C3 entity existing first,
+and this file will not pretend otherwise.
+
 ## Example usage
 
 See `examples/heroApparatusExample.ts` in full — it wires every subsystem

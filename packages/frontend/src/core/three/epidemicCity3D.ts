@@ -20,6 +20,16 @@ import { resolveCameraFraming, type CameraIntent } from './graphics/cameraRig';
 import { createDustMotes, type DustMotesHandle } from './graphics/atmosphere';
 import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
 import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
+// GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 1.0: reusable kits, actually wired into this
+// production scene (not just proven in an isolated graphics/examples/*.ts file) via addCityExtras().
+import { createRooftopEquipment, createAmbulanceBay, createIndustrialBuilding } from './graphics/buildingKit';
+import { createHydrant, createUtilityBox } from './graphics/streetKit';
+import { createVehicle } from './graphics/vehicleKit';
+import { createTreeField, createGroundClutter } from './graphics/vegetation';
+import { createPipeNetwork } from './graphics/waterInfrastructure';
+import { WorldFrameRenderer } from './graphics/worldFrameRenderer';
+import type { WorldFrame } from './graphics/worldFrame';
+import { createWaterInfrastructureAdapter, type WaterInfrastructureAdapter } from './graphics/waterInfrastructureBridge';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -149,6 +159,15 @@ export class EpidemicCity3DSim implements Sim3D {
   private earthquakeOverlayFingerprint = '';
   private worldInteractive: THREE_NS.Object3D[] = [];
   private selectedWorld: CityWorldSelection | null = null;
+  // GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 2.0: the C3 water-infrastructure integration seam
+  // (see graphics/waterInfrastructureBridge.ts's own doc). No real C1/C3 water/pump entity exists
+  // yet — this renders exactly ONE placeholder entity with `grounding: 'NOT_MODELED'`, proving the
+  // WorldFrame -> adapter -> waterInfrastructure.ts pathway works end to end in this real production
+  // scene, without fabricating any pump id, position provenance, or state. Deliberately NOT added to
+  // `worldInteractive`/tagged with `userData.worldSelection`: it is not a queryable CityWorld
+  // location, only a visual placeholder pending a real C3 producer.
+  private infrastructureAdapter: WaterInfrastructureAdapter | null = null;
+  private infrastructureRenderer: WorldFrameRenderer | null = null;
   private worldOverlayFingerprint = '';
   /** Efemeryczne ślady są tworzone wyłącznie z `lastTransmissions()` silnika. */
   private transmissionMarkers = new Map<string, { group: THREE_NS.Group; born: number; material: THREE_NS.MeshBasicMaterial }>();
@@ -437,6 +456,8 @@ export class EpidemicCity3DSim implements Sim3D {
     applyShadowPolicy(THREE, scene);
     void this.loadApprovedCityAssets();
     this.addAnalysisLayer();
+    this.addCityExtras();
+    this.initWaterInfrastructureSeam();
     this.worldOverlayGroup = new THREE.Group();
     this.worldOverlayGroup.name = 'read-only-worldstate-overlays';
     scene.add(this.worldOverlayGroup);
@@ -544,6 +565,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.syncEarthquakeScenarioVisuals();
     this.animateWorldMarkers();
     this.syncApprovedAssetLod();
+    this.syncWaterInfrastructureSeam();
     this.syncFollowTarget(states);
     if (this.resetCityCameraPending) {
       camera.position.set(CITY_CAMERA_POSITION.x, CITY_CAMERA_POSITION.y, CITY_CAMERA_POSITION.z);
@@ -713,6 +735,10 @@ export class EpidemicCity3DSim implements Sim3D {
     }
     for (const object of this.buildingMeshes) disposeSceneResources(object);
     this.buildingMeshes = [];
+    this.infrastructureRenderer?.dispose();
+    this.infrastructureRenderer = null;
+    this.infrastructureAdapter?.dispose();
+    this.infrastructureAdapter = null;
     // Resource-lifecycle audit finding: the approved-asset clones (facade/lamp GLTF instances
     // actually placed in the scene via .clone(true)) were only ever removed from the scene graph
     // here, never disposed — their geometry/materials/textures leaked on every teardown. The raw
@@ -1437,6 +1463,218 @@ export class EpidemicCity3DSim implements Sim3D {
     });
     this.scene.add(context);
     this.buildingMeshes.push(context);
+  }
+
+  /**
+   * GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 1.0: real production use of the new
+   * building/street/vehicle/vegetation kits (`graphics/buildingKit.ts`, `graphics/streetKit.ts`,
+   * `graphics/vehicleKit.ts`, `graphics/vegetation.ts`) — purely ADDITIVE on top of the existing,
+   * proven `createBuilding`/`addRoadsAndBuildings`/`addUrbanCadence` output, never replacing it.
+   *
+   * Two categories of content, kept honest about which is which:
+   *  - Hospital detailing (ambulance bay, rooftop HVAC, a parked ambulance, hospital-frontage
+   *    trees, a service building) is anchored to the REAL hospital `WorldObject` CityWorld already
+   *    placed (`this.semanticBuildingSlots`) — it decorates a real location, it doesn't invent one.
+   *  - Rooftop equipment on other real buildings, street furniture (hydrants/utility boxes), extra
+   *    parked vehicles, and park ground clutter are DECORATIVE population/context — same documented
+   *    status as this file's own `createContextBuilding`/`addUrbanCadence` output: never a
+   *    WorldFrame/C3 entity, never a location, never an agent target.
+   */
+  private addCityExtras(): void {
+    if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
+    const streets = this.simulation.streets;
+    const worldWidth = this.simulation.worldWidth;
+    const worldHeight = this.simulation.worldHeight;
+
+    const brushedMetal = createPBRMaterial(THREE, 'BRUSHED_METAL') as THREE_NS.MeshStandardMaterial;
+    const paintedMetal = createPBRMaterial(THREE, 'PAINTED_METAL') as THREE_NS.MeshStandardMaterial;
+    const concreteMaterial: THREE_NS.Material = this.cityMaterials?.concrete ?? paintedMetal;
+    const canopyMaterial = paintedMetal.clone();
+    canopyMaterial.color.setHex(0xd9e1e8);
+
+    const extras = new THREE.Group();
+    extras.name = 'visual-world-build-city-extras';
+    extras.userData.visualOnlyContext = true;
+
+    // --- Hospital detail: anchored to the REAL hospital building CityWorld placed. ---
+    const hospitalSlot = this.semanticBuildingSlots.find((slot) => slot.building.kind === 'hospital');
+    if (hospitalSlot) {
+      const dims = hospitalSlot.group.userData.cityBuilding as { width: number; depth: number; height: number };
+      const hx = hospitalSlot.group.position.x;
+      const hz = hospitalSlot.group.position.z;
+      const bayDepth = 0.34;
+      const bayWidth = Math.min(dims.depth * 0.62, 0.5);
+      const bayCenterX = hx + dims.width / 2 + bayDepth / 2 + 0.03;
+      extras.add(createAmbulanceBay(THREE, {
+        position: [bayCenterX, 0, hz],
+        width: bayDepth, depth: bayWidth,
+        canopyMaterial, padMaterial: concreteMaterial,
+      }));
+      extras.add(createRooftopEquipment(THREE, {
+        position: [hx, dims.height, hz], footprintWidth: dims.width, footprintDepth: dims.depth,
+        unitCount: 4, seed: 17, material: brushedMetal,
+      }));
+      const ambulance = createVehicle(THREE, {
+        kind: 'ambulance',
+        position: [bayCenterX, 0, hz],
+        headingRadians: Math.PI / 2,
+        bodyMaterial: new THREE.MeshStandardMaterial({ color: 0xf2f4f6, roughness: 0.35, metalness: 0.2 }),
+        state: 'PARKED',
+        seed: 3,
+      });
+      extras.add(ambulance.group);
+      // Small service/utility building behind the hospital (opposite the entrance facade) — the
+      // "service access" the mission's hospital composition asks for, using the new industrial
+      // building kit rather than hand-inlined geometry.
+      extras.add(createIndustrialBuilding(THREE, {
+        position: [hx, 0, hz - dims.depth / 2 - 0.32],
+        width: dims.width * 0.5, depth: 0.3, kind: 'industrial', seed: 29,
+        wallMaterial: brushedMetal, roofMaterial: paintedMetal,
+      }));
+      const hospitalTrees = createTreeField(THREE, {
+        count: 6, width: dims.width * 0.5, depth: 0.3, center: [hx - dims.width / 2 - 0.22, hz],
+        // `vegetation.ts`'s default scaleRange assumes a normal outdoor-scene scale (trunk ~1.6m).
+        // This city renders at CITY_WORLD_SCALE-compressed units (buildings are ~1-2 units tall,
+        // the park's own hand-placed trees are a 0.55-unit ConeGeometry) — matching that scale here,
+        // not the module's own generic default, is what keeps a tree a tree instead of a landmark.
+        scaleRange: [0.22, 0.32],
+        seed: 0x4841a, trunkMaterial: brushedMetal, canopyMaterial: new THREE.MeshStandardMaterial({ color: 0x3d6b3f, roughness: 0.92 }),
+      });
+      extras.add(hospitalTrees.group);
+    }
+
+    // --- Sparse rooftop equipment on other real buildings — every roof reads as serviced, without
+    // touching `createBuilding` itself. ---
+    for (const slot of this.semanticBuildingSlots) {
+      if (slot.building.kind === 'park' || slot.building.kind === 'hospital') continue;
+      const seed = Math.abs(Math.round(slot.building.x * 13 + slot.building.y * 17));
+      if (seed % 3 !== 0) continue;
+      const dims = slot.group.userData.cityBuilding as { width: number; depth: number; height: number };
+      extras.add(createRooftopEquipment(THREE, {
+        position: [slot.group.position.x, dims.height, slot.group.position.z],
+        footprintWidth: dims.width, footprintDepth: dims.depth,
+        unitCount: 1 + (seed % 2), seed, material: brushedMetal, antenna: seed % 6 === 0,
+      }));
+    }
+
+    // --- Street furniture: real hydrant/utility-box silhouettes at a subset of intersections,
+    // distinct from `addUrbanCadence`'s own instanced bench/bin/planter cadence above. ---
+    streets.v.forEach((x, col) => streets.h.forEach((y, row) => {
+      const slot = row * streets.v.length + col;
+      const px = (x - worldWidth / 2) * CITY_WORLD_SCALE;
+      const pz = (y - worldHeight / 2) * CITY_WORLD_SCALE;
+      if (slot % 4 === 1) extras.add(createHydrant(THREE, { position: [px + 0.62, 0, pz - 0.62], material: brushedMetal }));
+      if (slot % 4 === 3) extras.add(createUtilityBox(THREE, { position: [px - 0.62, 0, pz + 0.62], headingRadians: Math.PI / 4, material: paintedMetal }));
+    }));
+
+    // --- Decorative parked vehicles along one real street — visible city population, never a
+    // WorldFrame/C3 entity (see this method's own doc). ---
+    if (streets.h.length > 0) {
+      const y = streets.h[0]!;
+      const z = (y - worldHeight / 2) * CITY_WORLD_SCALE + 0.30;
+      const worldW = worldWidth * CITY_WORLD_SCALE;
+      const kinds: Array<'car' | 'van'> = ['car', 'van', 'car', 'car', 'van', 'car'];
+      kinds.forEach((kind, index) => {
+        const x = -worldW / 2 + 1.1 + index * 1.35;
+        if (x > worldW / 2 - 0.6) return;
+        const vehicle = createVehicle(THREE, {
+          kind, position: [x, 0, z], headingRadians: 0,
+          bodyMaterial: new THREE.MeshStandardMaterial({ color: [0x8a3d3d, 0x3d5a8a, 0x6b6b6b, 0x3d8a5e, 0x8a7a3d][index % 5], roughness: 0.4, metalness: 0.25 }),
+          state: 'PARKED', seed: index + 1,
+        });
+        extras.add(vehicle.group);
+      });
+    }
+
+    // --- Extra ground clutter around the park — real production use of `vegetation.ts` beyond its
+    // own isolated example file. ---
+    const parkSlot = this.semanticBuildingSlots.find((slot) => slot.building.kind === 'park');
+    if (parkSlot) {
+      const clutter = createGroundClutter(THREE, {
+        count: 14, width: 0.9, depth: 0.9, center: [parkSlot.group.position.x, parkSlot.group.position.z], seed: 0x7ee1a, material: concreteMaterial,
+        // See the hospitalTrees scaleRange comment above — matching this city's compressed scale.
+        scaleRange: [0.25, 0.45],
+      });
+      extras.add(clutter.group);
+    }
+
+    extras.traverse((node) => {
+      const mesh = node as THREE_NS.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    });
+    this.scene.add(extras);
+    this.buildingMeshes.push(extras);
+  }
+
+  /**
+   * GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 2.0: sets up the water-infrastructure C3
+   * integration seam (`graphics/waterInfrastructureBridge.ts`) in this real production scene. See
+   * that module's doc and this class's `infrastructureAdapter` field comment for the full honesty
+   * contract — in short: no real C1/C3 pump/valve entity exists yet, so this renders exactly one
+   * placeholder `WorldFrame` entity with no `status`, which the adapter renders as a real,
+   * correctly-positioned pump WITHOUT any dynamic status — never a fabricated NORMAL/WARNING/
+   * FAILED/OFFLINE reading (the object is tagged `userData.notModeled = true` instead). A short decorative pipe run
+   * connects it toward the hospital wall, same status as this file's own `createContextBuilding`/
+   * street furniture: real geometry, explicitly not a WorldFrame/C3 entity.
+   */
+  private initWaterInfrastructureSeam(): void {
+    if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
+    const brushedMetal = createPBRMaterial(THREE, 'BRUSHED_METAL') as THREE_NS.MeshStandardMaterial;
+    const copper = new THREE.MeshStandardMaterial({ color: 0xb87a4a, roughness: 0.35, metalness: 0.85 });
+    this.infrastructureAdapter = createWaterInfrastructureAdapter(THREE, { housingMaterial: brushedMetal, pipeMaterial: copper });
+    this.infrastructureRenderer = new WorldFrameRenderer(THREE, this.scene, {
+      resolveVisual: this.infrastructureAdapter.resolveVisual,
+      updateVisual: this.infrastructureAdapter.updateVisual,
+    });
+    this.syncWaterInfrastructureSeam();
+
+    const hospitalSlot = this.semanticBuildingSlots.find((slot) => slot.building.kind === 'hospital');
+    if (hospitalSlot) {
+      const dims = hospitalSlot.group.userData.cityBuilding as { width: number; depth: number; height: number };
+      const hx = hospitalSlot.group.position.x;
+      const hz = hospitalSlot.group.position.z;
+      const pumpPosition = this.infrastructurePlaceholderPosition(hospitalSlot.group.position, dims);
+      const pipe = createPipeNetwork(THREE, {
+        waypoints: [[pumpPosition[0], 0.1, pumpPosition[2]], [hx, 0.1, hz - dims.depth / 2 - 0.05]],
+        radius: 0.014, material: copper,
+      });
+      pipe.userData.visualOnlyContext = true;
+      this.scene.add(pipe);
+      this.buildingMeshes.push(pipe);
+    }
+  }
+
+  /** Placeholder position for the not-yet-real water/pump entity: beside the real hospital
+   * building's own service-yard side (opposite its entrance facade), so it reads as plausible
+   * infrastructure rather than a marker floating in open ground. */
+  private infrastructurePlaceholderPosition(hospitalPosition: THREE_NS.Vector3, dims: { width: number; depth: number }): THREE_NS.Vector3Tuple {
+    return [hospitalPosition.x + dims.width * 0.42, 0, hospitalPosition.z - dims.depth / 2 - 0.30];
+  }
+
+  private syncWaterInfrastructureSeam(): void {
+    if (!this.infrastructureRenderer) return;
+    const hospitalSlot = this.semanticBuildingSlots.find((slot) => slot.building.kind === 'hospital');
+    const frame: WorldFrame = { time: this.timeSeconds, entities: [] };
+    if (hospitalSlot) {
+      const dims = hospitalSlot.group.userData.cityBuilding as { width: number; depth: number; height: number };
+      frame.entities = [{
+        id: 'infrastructure:city-water-pump-placeholder',
+        position: this.infrastructurePlaceholderPosition(hospitalSlot.group.position, dims),
+        visualHint: 'object:water-pump',
+        // Deliberately NOT `grounding: 'NOT_MODELED'` — that field is about VISUAL identity ("do we
+        // know what this looks like"), not scientific truth, and would make WorldFrameRenderer
+        // itself swap in its own generic abstract placeholder sphere instead of a real pump (see
+        // worldFrameRenderer.ts's own doc). A pump's appearance IS known; its STATE is not — so
+        // `status` stays omitted, and the adapter's own honesty check (see
+        // waterInfrastructureBridge.ts) is what actually prevents a fabricated NORMAL/WARNING/
+        // FAILED/OFFLINE reading, tagging `userData.notModeled = true` instead.
+      }];
+    }
+    this.infrastructureRenderer.sync(frame);
   }
 
   private createBuilding(building: WorldObject): THREE_NS.Group {

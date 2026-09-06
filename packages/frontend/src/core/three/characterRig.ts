@@ -53,6 +53,10 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
   const baseShirt = M.shirt.color.clone();
   const basePants = M.pants.color.clone();
   const targetTint = new THREE.Color();
+  // Render-loop allocation audit finding: setEpidemicTint() used to allocate two fresh Colors
+  // (baseShirt.clone()/basePants.clone()) every call — once per detailed agent per frame.
+  const scratchShirtTarget = new THREE.Color();
+  const scratchPantsTarget = new THREE.Color();
 
   const root = new THREE.Group(); root.name = 'character';
 
@@ -171,8 +175,8 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
     setFacing: (a: number) => { root.rotation.y = a; },
     setEpidemicTint: (color: number, intensity: number) => {
       targetTint.setHex(color);
-      const shirtTarget = baseShirt.clone().lerp(targetTint, Math.max(0, Math.min(0.78, intensity)));
-      const pantsTarget = basePants.clone().lerp(targetTint, Math.max(0, Math.min(0.45, intensity * 0.55)));
+      const shirtTarget = scratchShirtTarget.copy(baseShirt).lerp(targetTint, Math.max(0, Math.min(0.78, intensity)));
+      const pantsTarget = scratchPantsTarget.copy(basePants).lerp(targetTint, Math.max(0, Math.min(0.45, intensity * 0.55)));
       // Przejście jest płynne między kolejnymi stanami modelu, nie skok materiału.
       M.shirt.color.lerp(shirtTarget, 0.14);
       M.pants.color.lerp(pantsTarget, 0.12);

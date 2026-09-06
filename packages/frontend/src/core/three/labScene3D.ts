@@ -146,6 +146,95 @@ function makeFloorNoiseTexture(THREE: typeof THREE_NS): THREE_NS.Texture {
 }
 
 /**
+ * Proceduralna mapa normalnych: drobna, nieregularna falistość powierzchni.
+ * Płaskie materiały PBR o stałym roughness czytają się jak plastik, bo światło
+ * odbija się od nich idealnie równomiernie. Mikrorelief łamie ten odbłysk i
+ * dopiero on sprawia, że lakierowana blacha wygląda jak blacha.
+ */
+function makeSurfaceNormalTexture(THREE: typeof THREE_NS): THREE_NS.Texture {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const image = ctx.createImageData(size, size);
+  // Wysokość z sumy dwóch częstotliwości szumu wartościowego, potem gradient
+  // liczony różnicami skończonymi -> wektor normalnej zapisany w RGB.
+  const height = new Float32Array(size * size);
+  const noise = (x: number, y: number, seed: number): number => {
+    const n = Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  const sampleSmooth = (x: number, y: number, scale: number, seed: number): number => {
+    const sx = x / scale;
+    const sy = y / scale;
+    const x0 = Math.floor(sx);
+    const y0 = Math.floor(sy);
+    const fx = sx - x0;
+    const fy = sy - y0;
+    const ease = (t: number): number => t * t * (3 - 2 * t);
+    const a = noise(x0, y0, seed);
+    const b = noise(x0 + 1, y0, seed);
+    const c = noise(x0, y0 + 1, seed);
+    const d = noise(x0 + 1, y0 + 1, seed);
+    return (a + (b - a) * ease(fx)) + ((c + (d - c) * ease(fx)) - (a + (b - a) * ease(fx))) * ease(fy);
+  };
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      height[y * size + x] = sampleSmooth(x, y, 9, 1.7) * 0.65 + sampleSmooth(x, y, 3, 5.1) * 0.35;
+    }
+  }
+  const at = (x: number, y: number): number => height[((y + size) % size) * size + ((x + size) % size)]!;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = at(x + 1, y) - at(x - 1, y);
+      const dy = at(x, y + 1) - at(x, y - 1);
+      const nx = -dx * 2.2;
+      const ny = -dy * 2.2;
+      const nz = 1;
+      const length = Math.hypot(nx, ny, nz);
+      const index = (y * size + x) * 4;
+      image.data[index] = ((nx / length) * 0.5 + 0.5) * 255;
+      image.data[index + 1] = ((ny / length) * 0.5 + 0.5) * 255;
+      image.data[index + 2] = ((nz / length) * 0.5 + 0.5) * 255;
+      image.data[index + 3] = 255;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+/**
+ * Pasy ostrzegawcze — skośne żółto-czarne pasy stref technicznych. Jeden z
+ * najsilniejszych "czytników" hali przemysłowej: natychmiast komunikuje, że
+ * podłoga jest strefą pracy maszyn, a nie po prostu szarym tłem.
+ */
+function makeHazardStripeTexture(THREE: typeof THREE_NS): THREE_NS.Texture {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#1d222e';
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = '#c8a23c';
+  ctx.lineWidth = size / 7;
+  for (let i = -size; i < size * 2; i += size / 3.5) {
+    ctx.beginPath();
+    ctx.moveTo(i, -10);
+    ctx.lineTo(i + size, size + 10);
+    ctx.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+/**
  * Miękki "contact shadow" — radialny gradient (czarny środek -> przezroczyste
  * brzegi) nakładany tuż nad podłogą pod ciężkim sprzętem. Mapa cieni z
  * reflektora modeluje bryłę, ale styk z podłożem musi być czytelny ZAWSZE,
@@ -197,6 +286,16 @@ export class LabScene3D implements Sim3D {
   private raycaster: THREE_NS.Raycaster | null = null;
   private consoleMesh: THREE_NS.Mesh | null = null;
   private consolePanel: THREE_NS.Mesh | null = null;
+  // WIDOK PIERWSZOOSOBOWY NAUKOWCA — przedramiona w kombinezonie i rękawice
+  // przypięte do kadru kamery. Bez nich pierwsza osoba jest bezcielesną
+  // kamerą lecącą przez halę; z nimi widz JEST w laboratorium. Rysowane
+  // wyłącznie w trybie FREE (w kadrach kamer naukowych ręce nie istnieją).
+  private viewModel: THREE_NS.Group | null = null;
+  private leftArmPivot: THREE_NS.Group | null = null;
+  private rightArmPivot: THREE_NS.Group | null = null;
+  /** 0 = ręce swobodnie, 1 = prawa ręka wyciągnięta do konsoli. Wygładzane w czasie. */
+  private reachAmount = 0;
+  private viewModelBobT = 0;
   private monitorScreen: THREE_NS.Mesh | null = null;
   // Prawdziwy odczyt danych na małym monitorze — canvas przerysowywany WYŁĄCZNIE
   // z wartości już śledzonych przez tę klasę (vesselFraction/vesselIcuFraction/
@@ -400,6 +499,14 @@ export class LabScene3D implements Sim3D {
     // w assetGovernance.ts zestawu PBR dla wnętrza laboratorium.
     const brushedMetalTex = makeBrushedMetalTexture(THREE);
     const floorNoiseTex = makeFloorNoiseTexture(THREE);
+    const surfaceNormalTex = makeSurfaceNormalTexture(THREE);
+    /** Klon mapy normalnych o własnym powtórzeniu — jedna tekstura, wiele skal. */
+    const normalFor = (repeatX: number, repeatY: number): THREE_NS.Texture => {
+      const tex = surfaceNormalTex.clone();
+      tex.needsUpdate = true;
+      tex.repeat.set(repeatX, repeatY);
+      return tex;
+    };
     const brushedFor = (repeatX: number, repeatY: number): THREE_NS.Texture => {
       const tex = brushedMetalTex.clone();
       tex.needsUpdate = true;
@@ -444,7 +551,7 @@ export class LabScene3D implements Sim3D {
     floorNoiseTex.repeat.set(roomWidth / 1.4, roomDepth / 1.4);
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(roomWidth - 0.05, roomDepth - 0.05),
-      new THREE.MeshStandardMaterial({ color: 0x1b2233, roughness: 0.38, metalness: 0.3, roughnessMap: floorNoiseTex }),
+      new THREE.MeshStandardMaterial({ color: 0x1b2233, roughness: 0.38, metalness: 0.3, roughnessMap: floorNoiseTex, normalMap: normalFor(14, 11), normalScale: new THREE.Vector2(0.28, 0.28) }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(roomCenterX, 0.01, roomCenterZ);
@@ -491,16 +598,16 @@ export class LabScene3D implements Sim3D {
     // kontrast, mimo że każde z osobna było skromne. Ciepły KEY musi wyraźnie
     // dominować nad chłodnym wypełnieniem, żeby hala miała hierarchię
     // światło/cień zamiast równomiernej jasności wszędzie.
-    scene.add(new THREE.HemisphereLight(0x8ea4cc, 0x6b7593, 0.4));
-    const skyLight = new THREE.DirectionalLight(0xcfe0ff, 0.3);
+    scene.add(new THREE.HemisphereLight(0x8ea4cc, 0x6b7593, 0.16));
+    const skyLight = new THREE.DirectionalLight(0xcfe0ff, 0.14);
     skyLight.position.set(-2, 3, -1);
     scene.add(skyLight);
-    const fillLight = new THREE.DirectionalLight(0x8fa8d6, 0.2);
+    const fillLight = new THREE.DirectionalLight(0x8fa8d6, 0.1);
     fillLight.position.set(2.5, 2.2, 2);
     scene.add(fillLight);
     // Światło od strony kadru otwierającego (WIDE stoi przy +X/+Z): bez niego
     // szeroki plan pokazywał wyłącznie nieoświetloną stronę aparatury.
-    const cameraSideLight = new THREE.DirectionalLight(0xbcd4ff, 0.28);
+    const cameraSideLight = new THREE.DirectionalLight(0xbcd4ff, 0.13);
     cameraSideLight.position.set(4, 3, 5);
     scene.add(cameraSideLight);
     // Światło robocze wprost nad stanowiskiem — DRUGI (i ostatni) emiter z
@@ -974,11 +1081,11 @@ export class LabScene3D implements Sim3D {
     // sceny rośnie bez proporcjonalnego wzrostu liczby draw calls.
     // ==================================================================
     const MAT = {
-      steel: new THREE.MeshStandardMaterial({ color: 0x8a93a6, roughness: 0.32, metalness: 0.92, roughnessMap: brushedFor(3, 3) }),
-      darkSteel: new THREE.MeshStandardMaterial({ color: 0x39415a, roughness: 0.5, metalness: 0.75, roughnessMap: brushedFor(2, 2) }),
+      steel: new THREE.MeshStandardMaterial({ color: 0x8a93a6, roughness: 0.32, metalness: 0.92, roughnessMap: brushedFor(3, 3), normalMap: normalFor(3, 3), normalScale: new THREE.Vector2(0.22, 0.22) }),
+      darkSteel: new THREE.MeshStandardMaterial({ color: 0x39415a, roughness: 0.5, metalness: 0.75, roughnessMap: brushedFor(2, 2), normalMap: normalFor(2, 2), normalScale: new THREE.Vector2(0.3, 0.3) }),
       chrome: new THREE.MeshStandardMaterial({ color: 0xc8d4e6, roughness: 0.08, metalness: 1, envMapIntensity: 1.6 }),
-      worktop: new THREE.MeshStandardMaterial({ color: 0x22283a, roughness: 0.62, metalness: 0.15 }),
-      plastic: new THREE.MeshStandardMaterial({ color: 0x2a3350, roughness: 0.78, metalness: 0.05 }),
+      worktop: new THREE.MeshStandardMaterial({ color: 0x22283a, roughness: 0.62, metalness: 0.15, normalMap: normalFor(4, 2), normalScale: new THREE.Vector2(0.2, 0.2) }),
+      plastic: new THREE.MeshStandardMaterial({ color: 0x2a3350, roughness: 0.78, metalness: 0.05, normalMap: normalFor(2, 2), normalScale: new THREE.Vector2(0.16, 0.16) }),
       rubber: new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.95, metalness: 0 }),
       ceramic: new THREE.MeshStandardMaterial({ color: 0xd8e2ee, roughness: 0.42, metalness: 0.04 }),
       copper: new THREE.MeshStandardMaterial({ color: 0xb87a4a, roughness: 0.3, metalness: 0.95 }),
@@ -1188,7 +1295,7 @@ export class LabScene3D implements Sim3D {
     for (let bx = -4.4; bx <= 4.4; bx += 1.6) addIBeam(bx, roomHeight - 0.62, -0.6, 4.2, false);
 
     // --- Panele świetlne w suficie (emisyjne prostokąty w regularnej siatce) ---
-    const ceilingPanelMat = new THREE.MeshStandardMaterial({ color: 0xcddcf0, emissive: 0xdcecff, emissiveIntensity: 0.6, roughness: 0.9 });
+    const ceilingPanelMat = new THREE.MeshStandardMaterial({ color: 0xcddcf0, emissive: 0xdcecff, emissiveIntensity: 0.22, roughness: 0.9 });
     for (const px of [-3.6, -1.2, 1.2, 3.6]) {
       for (const pz of [-3.2, -1.0, 1.2]) {
         const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.42), ceilingPanelMat);
@@ -1204,7 +1311,7 @@ export class LabScene3D implements Sim3D {
     // bo wszystkie źródła świeciły do środka. Cztery miękkie światła obrysowe
     // odsłaniają zabudowę peryferyjną, nie rozjaśniając środka kadru.
     for (const [wx, wz] of [[-5.2, 0], [5.2, 0], [0, -4.0], [0, 3.6]] as const) {
-      const wallWash = new THREE.PointLight(0xaec6ea, 2.4, 8, 2);
+      const wallWash = new THREE.PointLight(0xaec6ea, 1.1, 7, 2);
       wallWash.position.set(wx, 2.5, wz);
       scene.add(wallWash);
     }
@@ -1217,7 +1324,7 @@ export class LabScene3D implements Sim3D {
     // rzucany przez KEY/workLight. Cień jest widoczny tylko wtedy, gdy źródła
     // rzucające cień mają realny udział w oświetleniu sceny.
     for (const [lx, lz] of [[-3.6, -3.2], [1.2, -3.2], [-1.2, -1.0], [3.6, -1.0], [-3.6, 1.2], [1.2, 1.2]] as const) {
-      const panelLight = new THREE.PointLight(0xeaf3ff, 4, 13, 2);
+      const panelLight = new THREE.PointLight(0xeaf3ff, 1.15, 11, 2);
       panelLight.position.set(lx, roomHeight - 0.35, lz);
       scene.add(panelLight);
     }
@@ -1681,6 +1788,90 @@ export class LabScene3D implements Sim3D {
 
     // --- Aparatura centralna jako SYSTEM, nie pojedynczy walec ---
     addContainmentFrame(VESSEL_POSITION[0], VESSEL_POSITION[2], 1.28, 3.0);
+
+    // ==================================================================
+    // OŚWIETLENIE WŁASNE APARATURY + WYPOSAŻENIE WNĘTRZA KOMORY.
+    //
+    // Dwa problemy, które sprawiały, że reaktor czytał się jak "szklana rura":
+    //  1. Nie był najjaśniejszym obiektem kadru — konkurował z sufitem.
+    //     Prawdziwe aparaty mają WŁASNĄ oprawę wpuszczoną w ramę, świecącą
+    //     w dół, w komorę. To ona robi z instrumentu bohatera ujęcia.
+    //  2. Wnętrze było PUSTE, dopóki nie ruszył eksperyment (drawRange
+    //     kolonii = 0 w spoczynku), więc w stanie spoczynku patrzyło się
+    //     na przezroczystą pustkę. Sprzęt wewnętrzny (maszt sondy, tace,
+    //     wężownica, deflektory) jest KONSTRUKCJĄ, nie danymi — istnieje
+    //     zawsze i nie udaje żadnego pomiaru.
+    // ==================================================================
+    {
+      const rigY = VESSEL_POSITION[1] + VESSEL_HALF_HEIGHT + 1.02;
+      const housing = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 0.26), MAT.darkSteel);
+      housing.position.set(VESSEL_POSITION[0], rigY, VESSEL_POSITION[2]);
+      scene.add(housing);
+      const tube = new THREE.Mesh(
+        new THREE.BoxGeometry(1.74, 0.05, 0.14),
+        new THREE.MeshBasicMaterial({ color: 0xf4faff }),
+      );
+      tube.position.set(VESSEL_POSITION[0], rigY - 0.08, VESSEL_POSITION[2]);
+      scene.add(tube);
+      for (const hx of [-0.8, 0.8]) {
+        const hanger = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.05), MAT.steel);
+        hanger.position.set(VESSEL_POSITION[0] + hx, rigY + 0.3, VESSEL_POSITION[2]);
+        scene.add(hanger);
+      }
+      // Realne źródło skierowane w komorę — aparatura oświetla samą siebie.
+      const chamberLight = new THREE.SpotLight(0xf2f8ff, 42, 6.0, Math.PI / 3.2, 0.6, 1.3);
+      chamberLight.position.set(VESSEL_POSITION[0], rigY - 0.12, VESSEL_POSITION[2]);
+      chamberLight.target.position.set(VESSEL_POSITION[0], 0.2, VESSEL_POSITION[2]);
+      scene.add(chamberLight, chamberLight.target);
+
+      // Maszt sondy w osi komory: trzon + pierścienie czujników.
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, VESSEL_HALF_HEIGHT * 1.85, 12), MAT.chrome);
+      mast.position.set(VESSEL_POSITION[0] + 0.34, VESSEL_POSITION[1], VESSEL_POSITION[2] - 0.3);
+      scene.add(mast);
+      for (let r = 0; r < 4; r++) {
+        const collar = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.011, 6, 14), MAT.steel);
+        collar.rotation.x = Math.PI / 2;
+        collar.position.set(VESSEL_POSITION[0] + 0.34, VESSEL_POSITION[1] - 0.62 + r * 0.42, VESSEL_POSITION[2] - 0.3);
+        scene.add(collar);
+      }
+      // Dwie perforowane tace procesowe wewnątrz komory.
+      for (const trayY of [VESSEL_POSITION[1] - 0.32, VESSEL_POSITION[1] + 0.36]) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.018, 8, 36), MAT.steel);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.set(VESSEL_POSITION[0], trayY, VESSEL_POSITION[2]);
+        scene.add(ring);
+        for (let s = 0; s < 8; s++) {
+          const a = (s / 8) * Math.PI * 2;
+          const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.01, 0.022), MAT.steel);
+          spoke.position.set(VESSEL_POSITION[0] + Math.cos(a) * 0.3, trayY, VESSEL_POSITION[2] + Math.sin(a) * 0.3);
+          spoke.rotation.y = -a;
+          scene.add(spoke);
+        }
+      }
+      // Wężownica wymiennika przy ścianie komory — czytelny detal bioreaktora.
+      const coilCurve: THREE_NS.Vector3[] = [];
+      for (let i = 0; i <= 150; i++) {
+        const t = i / 150;
+        const a = t * Math.PI * 2 * 5;
+        coilCurve.push(new THREE.Vector3(
+          VESSEL_POSITION[0] + Math.cos(a) * 0.68,
+          0.32 + t * (VESSEL_HALF_HEIGHT * 1.5),
+          VESSEL_POSITION[2] + Math.sin(a) * 0.68,
+        ));
+      }
+      const coil = new THREE.Mesh(
+        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(coilCurve), 190, 0.017, 6, false),
+        MAT.chrome,
+      );
+      scene.add(coil);
+      // Deflektory (baffles) — cztery pionowe płyty przy ścianie.
+      for (const a of [0.6, 2.2, 3.8, 5.4]) {
+        const baffle = new THREE.Mesh(new THREE.BoxGeometry(0.04, VESSEL_HALF_HEIGHT * 1.5, 0.16), MAT.steel);
+        baffle.position.set(VESSEL_POSITION[0] + Math.cos(a) * 0.74, VESSEL_POSITION[1], VESSEL_POSITION[2] + Math.sin(a) * 0.74);
+        baffle.rotation.y = -a;
+        scene.add(baffle);
+      }
+    }
     addValveManifold(VESSEL_POSITION[0] + 1.18, 1.12, VESSEL_POSITION[2] + 0.95, -0.62, 4);
     addPumpSkid(VESSEL_POSITION[0] - 1.35, VESSEL_POSITION[2] + 1.05, 0.5);
     addPumpSkid(VESSEL_POSITION[0] + 1.5, VESSEL_POSITION[2] - 1.3, -2.1);
@@ -1782,6 +1973,31 @@ export class LabScene3D implements Sim3D {
     // Listwa wzdłuż antresoli (już istniejącej) — spójny język w całej hali.
     addLightStrip(4.86, 1.82, -0.6, 4.3, 'z', stripCyan, 0.016);
 
+    // --- Oznakowanie strefy technicznej: pasy ostrzegawcze wokół reaktora ---
+    // Naklejone na podłodze obrysowanie strefy pracy maszyn. Bardzo tani
+    // element, a natychmiast komunikuje "hala przemysłowa", nie "szary pokój".
+    {
+      const hazardTex = makeHazardStripeTexture(THREE);
+      hazardTex.repeat.set(10, 1);
+      const hazardMat = new THREE.MeshStandardMaterial({
+        map: hazardTex, roughness: 0.72, metalness: 0.1, transparent: true, opacity: 0.85, depthWrite: false,
+      });
+      const bandWidth = 0.3;
+      const zoneHalf = 2.62;
+      for (const [bx, bz, lengthX, lengthZ] of [
+        [VESSEL_POSITION[0], VESSEL_POSITION[2] - zoneHalf, zoneHalf * 2, bandWidth],
+        [VESSEL_POSITION[0], VESSEL_POSITION[2] + zoneHalf, zoneHalf * 2, bandWidth],
+        [VESSEL_POSITION[0] - zoneHalf, VESSEL_POSITION[2], bandWidth, zoneHalf * 2],
+        [VESSEL_POSITION[0] + zoneHalf, VESSEL_POSITION[2], bandWidth, zoneHalf * 2],
+      ] as const) {
+        const band = new THREE.Mesh(new THREE.PlaneGeometry(lengthX, lengthZ), hazardMat);
+        band.rotation.x = -Math.PI / 2;
+        band.position.set(bx, 0.019, bz);
+        band.renderOrder = 2;
+        scene.add(band);
+      }
+    }
+
     // --- Styk z podłożem: miękkie cienie kontaktowe pod ciężkim sprzętem ---
     const contactShadowMat = new THREE.MeshBasicMaterial({
       map: makeContactShadowTexture(THREE), transparent: true, depthWrite: false, opacity: 0.95,
@@ -1844,6 +2060,88 @@ export class LabScene3D implements Sim3D {
       mesh.castShadow = !transparent && largestExtent > 0.18;
       mesh.receiveShadow = largestExtent > 0.3;
     });
+
+    // ==================================================================
+    // NAUKOWIEC W PIERWSZEJ OSOBIE — przedramiona w rękawie kombinezonu PPE
+    // i rękawice nitrylowe, przypięte do kadru kamery. To nie jest ozdoba:
+    // bez ciała pierwsza osoba czyta się jak bezcielesna kamera, a cel tego
+    // laboratorium brzmi "JESTEM naukowcem w środku". Ręce reagują na realny
+    // stan: przy konsoli (nearStation) prawa ręka wyciąga się do pulpitu.
+    // Nie rzucają cienia (byłby to cień "unoszącej się" geometrii tuż przy
+    // obiektywie) i nie istnieją w kadrach kamer naukowych.
+    // ==================================================================
+    {
+      const suitMat = new THREE.MeshStandardMaterial({ color: 0x9fb0c6, roughness: 0.94, metalness: 0.0, envMapIntensity: 0.25, normalMap: normalFor(6, 6), normalScale: new THREE.Vector2(0.5, 0.5) });
+      const cuffMat = new THREE.MeshStandardMaterial({ color: 0x243149, roughness: 0.7, metalness: 0.15, envMapIntensity: 0.3 });
+      const gloveMat = new THREE.MeshStandardMaterial({ color: 0x2f5fae, roughness: 0.52, metalness: 0.02, envMapIntensity: 0.4 });
+
+      /** Jedno przedramię: rękaw + mankiet + dłoń w rękawicy + kciuk. */
+      const buildArm = (side: 1 | -1): THREE_NS.Group => {
+        const pivot = new THREE.Group();
+        // Bark poza kadrem, z boku i poniżej obiektywu.
+        pivot.position.set(side * 0.26, -0.235, -0.06);
+
+        const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.046, 0.34, 6, 14), suitMat);
+        sleeve.position.set(0, -0.035, -0.24);
+        sleeve.rotation.x = Math.PI / 2;
+        pivot.add(sleeve);
+
+        const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.049, 0.047, 0.042, 16), cuffMat);
+        cuff.position.set(0, -0.052, -0.4);
+        cuff.rotation.x = Math.PI / 2;
+        pivot.add(cuff);
+
+        const hand = new THREE.Mesh(new THREE.CapsuleGeometry(0.042, 0.075, 5, 14), gloveMat);
+        hand.position.set(0, -0.06, -0.475);
+        hand.rotation.x = Math.PI / 2;
+        pivot.add(hand);
+
+        const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.014, 0.038, 3, 8), gloveMat);
+        thumb.position.set(-side * 0.034, -0.045, -0.5);
+        thumb.rotation.set(Math.PI / 2, 0, side * 0.5);
+        pivot.add(thumb);
+
+        // Lekko rozchylone na zewnątrz i do środka kadru — pozycja spoczynkowa.
+        pivot.rotation.set(0.26, side * 0.3, side * 0.16);
+        return pivot;
+      };
+
+      this.viewModel = new THREE.Group();
+      this.leftArmPivot = buildArm(-1);
+      this.rightArmPivot = buildArm(1);
+      this.viewModel.add(this.leftArmPivot, this.rightArmPivot);
+      this.viewModel.visible = false;
+      // Ręce przy obiektywie nie mogą wpadać w mapę cieni ani być przez nią
+      // przecinane — to geometria kadru, nie element sceny.
+      //
+      // WŁASNA WARSTWA OŚWIETLENIA (layer 1). Rękawy stoją ~0.4 m od
+      // obiektywu, czyli tuż pod punktowymi światłami hali z decay=2 —
+      // przy takiej odległości dostawały wielokrotnie więcej energii niż
+      // cokolwiek w scenie i wypalały się na biało niezależnie od koloru
+      // materiału. Standardowe rozwiązanie dla modelu widoku: własna
+      // warstwa, do której NIE sięgają światła sceny, plus jedno dedykowane,
+      // miękkie światło o kontrolowanym natężeniu.
+      this.viewModel.traverse((object) => {
+        const mesh = object as THREE_NS.Mesh;
+        if (mesh.isMesh) {
+          mesh.castShadow = false;
+          mesh.receiveShadow = false;
+          mesh.frustumCulled = false;
+          mesh.renderOrder = 5;
+        }
+        object.layers.set(1);
+      });
+      const viewModelKey = new THREE.DirectionalLight(0xdce8fb, 1.5);
+      viewModelKey.position.set(0.4, 0.9, 1);
+      viewModelKey.layers.set(1);
+      this.viewModel.add(viewModelKey);
+      const viewModelFill = new THREE.HemisphereLight(0x9fb4d4, 0x1a2130, 0.9);
+      viewModelFill.layers.set(1);
+      this.viewModel.add(viewModelFill);
+      // Kamera musi widzieć obie warstwy: świat (0) i model widoku (1).
+      camera.layers.enable(1);
+      scene.add(this.viewModel);
+    }
 
     // KADR OTWIERAJĄCY: scena startuje w szerokim, skomponowanym ujęciu całej
     // hali (FIXED/WIDE), a nie tuż przy szkle naczynia. Pierwszą rzeczą, którą
@@ -1976,6 +2274,37 @@ export class LabScene3D implements Sim3D {
       material.emissiveIntensity = isPlaying ? 0.75 : 0.2;
     }
 
+    // WIDOK NAUKOWCA: ręce podążają za kamerą (pozycja + orientacja), więc są
+    // częścią kadru, nie obiektem w hali. Widoczne tylko w pierwszej osobie —
+    // kamery naukowe pokazują aparaturę, nie rękawice operatora.
+    if (this.viewModel) {
+      const firstPerson = this.cameraPhase === 'FREE';
+      this.viewModel.visible = firstPerson;
+      if (firstPerson) {
+        this.viewModel.position.copy(camera.position);
+        this.viewModel.quaternion.copy(camera.quaternion);
+        // Kołysanie zsynchronizowane z realnym krokiem kontrolera (ten sam
+        // bobOffset, którym już porusza się oko) — ręce nie mogą stać w
+        // miejscu, gdy postać idzie.
+        const walkState = this.controller.getState();
+        this.viewModelBobT += 0.016;
+        const sway = walkState.bobOffset * 2.4;
+        const idle = Math.sin(this.viewModelBobT * 1.3) * 0.004;
+        // Sięgnięcie do pulpitu: wygładzone dążenie do pozy interakcji, gdy
+        // gracz realnie stoi przy konsoli (ten sam sygnał, który odblokowuje "E").
+        const reachTarget = this.nearStation ? 1 : 0;
+        this.reachAmount += (reachTarget - this.reachAmount) * 0.12;
+        if (this.rightArmPivot) {
+          this.rightArmPivot.position.set(0.26 - this.reachAmount * 0.09, -0.235 + sway + idle + this.reachAmount * 0.07, -0.06 - this.reachAmount * 0.2);
+          this.rightArmPivot.rotation.set(0.26 - this.reachAmount * 0.4, 0.3 - this.reachAmount * 0.22, 0.16 - this.reachAmount * 0.1);
+        }
+        if (this.leftArmPivot) {
+          this.leftArmPivot.position.set(-0.26, -0.235 + sway * 0.7 - idle, -0.06);
+          this.leftArmPivot.rotation.set(0.26 - this.reachAmount * 0.06, -0.3, -0.16);
+        }
+      }
+    }
+
     // Interakcja: promień z kamery na konsolę, w zasięgu i mniej więcej naprzeciw niej.
     if (this.raycaster && this.consoleMesh && this.cameraPhase === 'FREE') {
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -2031,23 +2360,212 @@ export class LabScene3D implements Sim3D {
     void this.loadHdri(renderer);
     const composer = new modules.EffectComposer(renderer);
     composer.addPass(new modules.RenderPass(scene, camera));
-    // SSAO ŚWIADOMIE POMINIĘTE. `SSAOPass` z three/examples renderuje scenę
-    // własnym przebiegiem, poza tone mappingiem ACES i przestrzenią barw
-    // renderera — w tym potoku (ACES + OutputPass) wypuszczał prześwietlony,
-    // biały kadr niezależnie od parametrów okluzji. Rolę "brudu na stykach"
-    // pełnią tu realne mapy cieni (KEY + workLight) oraz cienie kontaktowe
-    // pod sprzętem (patrz init()). Wpięcie SSAO wymagałoby przebudowy
-    // kolejności potoku postprocessingu, a nie zmiany jednego parametru.
+
+    // ==================================================================
+    // SSAO WŁASNY, WPIĘTY W ISTNIEJĄCY POTOK — nie `SSAOPass`.
+    //
+    // DLACZEGO NIE SSAOPass: ten potok to RenderPass -> Bloom -> OutputPass,
+    // czyli cały łańcuch pracuje LINIOWO, a tone mapping ACES i konwersję do
+    // sRGB robi dopiero OutputPass na końcu. `SSAOPass` renderuje scenę
+    // WŁASNYM przebiegiem i oddaje kolor już zakodowany — OutputPass
+    // mapował go i kodował DRUGI RAZ, stąd biała klatka. To nie był błąd
+    // parametrów okluzji, tylko podwójne kodowanie barw.
+    //
+    // TO ROZWIĄZANIE: pełnoekranowy ShaderPass (klasa już wstrzykiwana przez
+    // useThreeLoop) wpięty MIĘDZY RenderPass a Bloom. Czyta liniowy bufor
+    // koloru i MNOŻY go przez współczynnik okluzji — nie dotyka tone
+    // mappingu ani przestrzeni barw, więc z definicji nie może zepsuć
+    // ekspozycji. Bloom widzi już przyciemnione zagłębienia, więc światło
+    // nie rozlewa się ze szczelin, które powinny być ciemne.
+    //
+    // GŁĘBIA: osobny, PÓŁROZDZIELCZY render target z DepthTexture, zapisywany
+    // tanim prepassem (scene.overrideMaterial = materiał bez oświetlenia).
+    // Półrozdzielczość jest tu zaletą: AO to sygnał niskiej częstotliwości,
+    // a rozmycie przy próbkowaniu w pełnej rozdzielczości wychodzi za darmo.
+    // ==================================================================
+    const aoScale = 0.5;
+    const depthTexture = new THREE.DepthTexture(Math.max(1, Math.floor(w * aoScale)), Math.max(1, Math.floor(h * aoScale)));
+    depthTexture.type = THREE.UnsignedIntType;
+    const depthTarget = new THREE.WebGLRenderTarget(
+      Math.max(1, Math.floor(w * aoScale)),
+      Math.max(1, Math.floor(h * aoScale)),
+      { depthTexture, depthBuffer: true },
+    );
+    // Prepass rysuje TYLKO głębię — materiał bez świateł i tekstur, żeby
+    // drugi przebieg sceny kosztował ułamek pełnego cieniowania.
+    const depthOnlyMaterial = new THREE.MeshBasicMaterial();
+
+    const aoPass = new modules.ShaderPass({
+      name: 'GenesisGroundedAO',
+      uniforms: {
+        tDiffuse: { value: null },
+        tDepth: { value: depthTexture },
+        uProjectionInverse: { value: new THREE.Matrix4() },
+        uResolution: { value: new THREE.Vector2(w, h) },
+        uCameraNear: { value: camera.near },
+        uCameraFar: { value: camera.far },
+        uRadius: { value: 0.75 },
+        uIntensity: { value: 2.4 },
+        uBias: { value: 0.014 },
+      },
+      vertexShader: /* glsl */`
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */`
+        precision highp float;
+        varying vec2 vUv;
+        uniform sampler2D tDiffuse;
+        uniform sampler2D tDepth;
+        uniform mat4 uProjectionInverse;
+        uniform vec2 uResolution;
+        uniform float uCameraNear;
+        uniform float uCameraFar;
+        uniform float uRadius;
+        uniform float uIntensity;
+        uniform float uBias;
+
+        // Pozycja w przestrzeni widoku odtworzona z bufora głębi — bez niej
+        // okluzja liczyłaby się w pikselach, a nie w metrach sceny, więc
+        // zależałaby od odległości kamery.
+        vec3 viewPosition(vec2 uv, float depth) {
+          vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+          vec4 view = uProjectionInverse * clip;
+          return view.xyz / view.w;
+        }
+
+        // Obrót kernela z uporządkowanej macierzy Bayera 4x4, NIE z hasha:
+        // losowy obrót daje szum stochastyczny, który na dużych płaskich
+        // powierzchniach (podłoga hali) czyta się jak brud na obiektywie.
+        // Wzór uporządkowany rozkłada błąd regularnie i przy próbkowaniu
+        // głębi w połowie rozdzielczości sam się uśrednia — bez osobnego
+        // przebiegu rozmycia.
+        float orderedRotation(vec2 fragCoord) {
+          const mat4 bayer = mat4(
+            0.0,  8.0,  2.0, 10.0,
+            12.0, 4.0, 14.0,  6.0,
+            3.0, 11.0,  1.0,  9.0,
+            15.0, 7.0, 13.0,  5.0
+          );
+          int x = int(mod(fragCoord.x, 4.0));
+          int y = int(mod(fragCoord.y, 4.0));
+          return bayer[x][y] / 16.0;
+        }
+
+        void main() {
+          vec4 color = texture2D(tDiffuse, vUv);
+          float depth = texture2D(tDepth, vUv).x;
+          // Tło (nic nie narysowane) zostaje nietknięte — inaczej AO
+          // przyciemniałoby pustkę za oknem i krawędzie kadru.
+          if (depth >= 0.9999) {
+            gl_FragColor = color;
+            return;
+          }
+
+          vec3 origin = viewPosition(vUv, depth);
+          // Normalna z pochodnych odtworzonej pozycji — nie wymaga osobnego
+          // bufora normalnych, a wystarcza dla okluzji niskiej częstotliwości.
+          vec3 normal = normalize(cross(dFdx(origin), dFdy(origin)));
+
+          // Promień w pikselach maleje z odległością: ta sama okluzja w metrach
+          // niezależnie od tego, jak daleko stoi kamera.
+          float pixelRadius = uRadius / max(0.0001, -origin.z);
+          float rotation = orderedRotation(gl_FragCoord.xy) * 6.2831853;
+          float cosR = cos(rotation);
+          float sinR = sin(rotation);
+
+          const int SAMPLES = 16;
+          float occlusion = 0.0;
+          for (int i = 0; i < SAMPLES; i++) {
+            float fi = float(i);
+            // Spirala Vogela: równomierne pokrycie dysku bez tablicy kernela.
+            float angle = fi * 2.39996323 + rotation;
+            float radius = sqrt((fi + 0.5) / float(SAMPLES));
+            vec2 dir = vec2(cos(angle), sin(angle)) * radius;
+            dir = vec2(dir.x * cosR - dir.y * sinR, dir.x * sinR + dir.y * cosR);
+            vec2 sampleUv = vUv + dir * pixelRadius;
+            if (sampleUv.x < 0.0 || sampleUv.x > 1.0 || sampleUv.y < 0.0 || sampleUv.y > 1.0) continue;
+
+            float sampleDepth = texture2D(tDepth, sampleUv).x;
+            if (sampleDepth >= 0.9999) continue;
+            vec3 samplePos = viewPosition(sampleUv, sampleDepth);
+            vec3 delta = samplePos - origin;
+            float distance = length(delta);
+            if (distance < 0.0001) continue;
+
+            // Zasłania tylko to, co leży PRZED powierzchnią (dodatni rzut na
+            // normalną) i mieści się w promieniu — reszta to nie okluzja.
+            float occluded = max(0.0, dot(normal, delta / distance) - uBias);
+            float falloff = 1.0 / (1.0 + distance * distance / (uRadius * uRadius));
+            occlusion += occluded * falloff;
+          }
+
+          float ao = clamp(1.0 - uIntensity * occlusion / float(SAMPLES), 0.0, 1.0);
+          // Mnożenie w przestrzeni LINIOWEJ, przed bloomem i przed
+          // OutputPass — żadnego tone mappingu ani konwersji barw tutaj.
+          gl_FragColor = vec4(color.rgb * ao, color.a);
+        }
+      `,
+    });
+    composer.addPass(aoPass);
+
     // Bloom niżej progowany i mocniejszy: wspiera światło (poświata na
     // krawędziach szkła/emisyjnych elementach), ale go nie zastępuje —
     // ciemniejsze materiały bazowe (patrz init()) robią resztę kontrastu.
-    // Bloom mocniejszy i niżej progowany: przy ciemnych powierzchniach bazowych
-    // to listwy świetlne, ekrany i szkło reaktora niosą jasność kadru — mają
-    // się rozlewać jak realne źródła, nie być płaskimi jasnymi plamami.
     const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.34, 0.5, 0.92);
     composer.addPass(bloom);
     composer.addPass(new modules.OutputPass());
-    return { render: () => composer.render(), setSize: (width, height) => composer.setSize(width, height), dispose: () => composer.dispose() };
+
+    // Sceny są statyczne (światła i geometria się nie ruszają), więc mapy
+    // cieni liczymy raz. Bez tego prepass głębi wymuszałby ich przeliczenie
+    // DRUGI RAZ w każdej klatce — czysty koszt bez żadnej zmiany obrazu.
+    let shadowsPrimed = false;
+
+    const renderDepthPrepass = (): void => {
+      const previousOverride = scene.overrideMaterial;
+      const previousTarget = renderer.getRenderTarget();
+      // Ręce naukowca są geometrią KADRU, nie sceny — gdyby trafiły do bufora
+      // głębi, AO liczyłoby okluzję "od rękawa" i przyciemniało dolną część
+      // obrazu wokół nich. Na czas prepassu znikają.
+      const viewModelWasVisible = this.viewModel?.visible ?? false;
+      if (this.viewModel) this.viewModel.visible = false;
+      scene.overrideMaterial = depthOnlyMaterial;
+      renderer.setRenderTarget(depthTarget);
+      renderer.clear();
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(previousTarget);
+      scene.overrideMaterial = previousOverride;
+      if (this.viewModel) this.viewModel.visible = viewModelWasVisible;
+    };
+
+    return {
+      render: () => {
+        renderDepthPrepass();
+        aoPass.uniforms.uProjectionInverse.value.copy(camera.projectionMatrixInverse);
+        aoPass.uniforms.uCameraNear.value = camera.near;
+        aoPass.uniforms.uCameraFar.value = camera.far;
+        composer.render();
+        if (!shadowsPrimed) {
+          shadowsPrimed = true;
+          renderer.shadowMap.autoUpdate = false;
+        }
+      },
+      setSize: (width, height) => {
+        composer.setSize(width, height);
+        depthTarget.setSize(Math.max(1, Math.floor(width * aoScale)), Math.max(1, Math.floor(height * aoScale)));
+        aoPass.uniforms.uResolution.value.set(width, height);
+      },
+      dispose: () => {
+        composer.dispose();
+        depthTarget.dispose();
+        depthTexture.dispose();
+        depthOnlyMaterial.dispose();
+        renderer.shadowMap.autoUpdate = true;
+      },
+    };
   }
 
   /**

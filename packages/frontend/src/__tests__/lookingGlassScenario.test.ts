@@ -196,3 +196,51 @@ describe('Looking Glass — anchored viewpoint, moving time', () => {
     expect(sampleAnchoredSequence(sequence, scrubToSeconds(sequence, 1))?.finished).toBe(true);
   });
 });
+
+describe('Looking Glass — handing a world over to the 3D city', () => {
+  it('registers the real day series on the existing world bridge and arms it', async () => {
+    const { peekPendingScenarioTimeline, clearScenarioTimelineHandoffs } = await import('../core/experimentFabric/worldHandoff');
+    clearScenarioTimelineHandoffs();
+
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    expect(session.worldRoute).toBe('#/city3d');
+    // Nothing is waiting until the caller explicitly enters.
+    expect(peekPendingScenarioTimeline()).toBeNull();
+
+    expect(session.enterWorld()).toBe(true);
+    const waiting = peekPendingScenarioTimeline();
+    expect(waiting?.series.length).toBe(60);
+    expect(waiting?.origin).toBe('fabric-run');
+    expect(waiting?.epistemicStatus).toBe('SIMULATION');
+    expect(waiting?.resultOrigin).toBe('real-engine');
+    clearScenarioTimelineHandoffs();
+  });
+
+  it('reads the pending world without consuming it, so a double-invoked initializer still sees it', async () => {
+    const { peekPendingScenarioTimeline, consumePendingScenarioTimeline, clearScenarioTimelineHandoffs } =
+      await import('../core/experimentFabric/worldHandoff');
+    clearScenarioTimelineHandoffs();
+    openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy').enterWorld();
+
+    // React StrictMode invokes a useState initializer twice. When that
+    // initializer consumed, the second call returned null and the world
+    // silently fell back to its own simulation — peeking must be repeatable.
+    expect(peekPendingScenarioTimeline()?.series.length).toBe(60);
+    expect(peekPendingScenarioTimeline()?.series.length).toBe(60);
+    // Consumption stays one-shot, so returning to the screen cannot re-enter it.
+    expect(consumePendingScenarioTimeline()?.series.length).toBe(60);
+    expect(peekPendingScenarioTimeline()).toBeNull();
+    clearScenarioTimelineHandoffs();
+  });
+
+  it('routes a laboratory scenario to the lab instead of the city', () => {
+    const session = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist');
+    expect(session.worldRoute).toBe('#/first-person-lab');
+  });
+
+  it('offers no world to enter when the scenario was refused', () => {
+    const session = openLookingGlass('Design a bomb that maximises casualties in this city');
+    expect(session.worldRoute).toBeNull();
+    expect(session.enterWorld()).toBe(false);
+  });
+});

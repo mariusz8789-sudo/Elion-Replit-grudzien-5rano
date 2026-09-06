@@ -2,7 +2,8 @@ import type { WorldState } from '../world/scientificWorldState';
 import { captureWorldTimeline, type WorldCaptureTimeline } from '../world/worldCapture';
 import { projectCellWorldStates } from '../world/cellWorldAdapter';
 import { executePreregisteredHypotheses, preregisterHypotheses, generateCompetingHypotheses, HYPOTHESIS_PROBLEMS } from '../experimentFabric/hypothesisLoop';
-import { runScenario, type ScenarioId } from '../simulation/scenarioEngine';
+import { runScenario, SCENARIOS, type ScenarioId, type ScenarioRun } from '../simulation/scenarioEngine';
+import { registerScenarioTimeline, setPendingScenarioTimeline } from '../experimentFabric/worldHandoff';
 import { projectEpidemiologyWorldStates } from '../world/epidemiologyWorldAdapter';
 import { buildAnchoredSequence, type AnchoredTemporalSequence, type TemporalAnchor } from './anchoredTemporal';
 import { buildShotPlan, type ShotPlan } from './shotPlan';
@@ -50,6 +51,14 @@ export interface LookingGlassSession {
   readonly producedBy: string;
   /** The engine that produced the temporal progression the anchor plays. */
   readonly temporalSource: string;
+  /**
+   * Route that renders this world, or null when the scenario resolved but no
+   * 3D surface exists for it. A caller must hide the entry affordance rather
+   * than navigating somewhere that shows a different world.
+   */
+  readonly worldRoute: string | null;
+  /** Arms the world bridge and returns whether a world is now waiting. */
+  readonly enterWorld: () => boolean;
 }
 
 /** Anchors are placement, not science: where a person stands to watch. */
@@ -91,6 +100,10 @@ interface SessionBuild {
   readonly producedBy: string;
   readonly temporalTicks: readonly number[];
   readonly temporalSource: string;
+  /** Registered handoff id, when this run has a 3D world to be entered. */
+  readonly handoffRunId: string | null;
+  /** Route that renders this world, or null when none exists yet. */
+  readonly worldRoute: string | null;
 }
 
 /**
@@ -112,12 +125,44 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
   const scenarioId: ScenarioId = plan.kind === 'QUARANTINE' ? 'ISOLATION' : 'BASELINE';
   const run = runScenario(scenarioId, { days: plan.ticks });
 
+  // Hand the real day series to the existing world bridge rather than
+  // inventing a second channel: `worldHandoff` is already the only road a
+  // scenario run travels to the 3D city, and the city screen already listens
+  // on it. A run whose model returned no summary is not registered at all —
+  // the world then has nothing to show, which is the correct outcome, not a
+  // reason to synthesise one.
+  const handoffRunId = registerRun(run, `lg:${plan.kind}:${plan.ticks}`);
+
   return {
     states,
     producedBy: `hypothesisLoop.executePreregisteredHypotheses(${problem.problemId})`,
     temporalTicks: run.series.map((sample) => sample.day),
     temporalSource: `scenarioEngine.runScenario(${scenarioId}, { days: ${plan.ticks} })`,
+    handoffRunId,
+    worldRoute: handoffRunId ? '#/city3d' : null,
   };
+}
+
+/** Registers a completed scenario run with the existing world bridge. */
+function registerRun(run: ScenarioRun, runId: string): string | null {
+  const scenarioSummary = run.summary;
+  if (scenarioSummary === null || run.resultFingerprint === null) return null;
+  registerScenarioTimeline({
+    runId,
+    runFingerprint: run.resultFingerprint,
+    resultOrigin: 'real-engine',
+    modelId: 'scenario-timeline',
+    scenarioId: run.scenarioId,
+    scenarioLabel: SCENARIOS[run.scenarioId].label,
+    seed: run.params.seed,
+    summary: `Looking Glass: ${run.label}, ${run.series.length} dni.`,
+    series: run.series,
+    scenarioSummary,
+    scenarioRun: run,
+    epistemicStatus: 'SIMULATION',
+    origin: 'fabric-run',
+  });
+  return runId;
 }
 
 /**
@@ -136,6 +181,10 @@ function buildLaboratorySession(): SessionBuild {
     // finer series to play through, and inventing one would be fabrication.
     temporalTicks: states.map((state) => state.tick),
     temporalSource: `cellWorldAdapter.projectCellWorldStates(${problem.problemId})`,
+    // The laboratory world is the existing first-person lab, which reads the
+    // live experiment itself rather than a handed-off day series.
+    handoffRunId: null,
+    worldRoute: '#/first-person-lab',
   };
 }
 
@@ -162,6 +211,8 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
       anchored: null,
       producedBy: 'none',
       temporalSource: 'none',
+      worldRoute: null,
+      enterWorld: () => false,
     };
   }
 
@@ -185,5 +236,9 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
   return {
     request, resolution, states: built.states, timeline, shotPlan, anchored,
     producedBy: built.producedBy, temporalSource: built.temporalSource,
+    worldRoute: built.worldRoute,
+    // Arming is separate from opening so the caller decides when to navigate,
+    // and so a world that failed to register cannot be silently entered.
+    enterWorld: () => (built.handoffRunId ? setPendingScenarioTimeline(built.handoffRunId) : built.worldRoute !== null),
   };
 }

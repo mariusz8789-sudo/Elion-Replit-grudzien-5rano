@@ -127,13 +127,23 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
           </ol>
 
           <div className="lg-actions">
-            <button
-              type="button"
-              className="lg-enter"
-              onClick={() => { window.location.hash = '#/first-person-lab'; }}
-            >
-              Wejdź do świata
-            </button>
+            {session.worldRoute ? (
+              <button
+                type="button"
+                className="lg-enter"
+                onClick={() => {
+                  // Arm the world bridge FIRST: navigating to a world that has
+                  // nothing waiting would show a different, unrelated run.
+                  if (session.enterWorld()) window.location.hash = session.worldRoute!;
+                }}
+              >
+                Wejdź do świata
+              </button>
+            ) : (
+              <span className="lg-actions-note">
+                Ten scenariusz policzył się, ale nie ma jeszcze świata 3D, który by go pokazał.
+              </span>
+            )}
             <span className="lg-actions-note">
               {session.shotPlan.markersUsed}/{session.shotPlan.markersAvailable} realnych znaczników użytych w montażu
             </span>

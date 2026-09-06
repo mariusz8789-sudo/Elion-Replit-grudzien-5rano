@@ -4,7 +4,7 @@ import { registerSimContext } from '../../core/simContext';
 import { ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
 import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
-import { consumePendingExperimentWorld, consumePendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
+import { consumePendingExperimentWorld, consumePendingScenarioTimeline, peekPendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
 import { saveScenarioCounterfactualToMemory, saveScenarioRunToMemory } from '../../core/scienceMemory';
 import { buildSavedScenarioRunContext } from '../../core/simulation/scenarioMemory';
 import { createTemporalStateBookmark, resolveTemporalStateBookmark, type TemporalStateBookmark } from '../../core/simulation/temporalStateBookmark';
@@ -66,11 +66,23 @@ export function City3DWebGLScreen() {
   const [experimentWorld] = useState(() => consumePendingExperimentWorld());
   // Drugi kanał przekazania: ZAKOŃCZONY przebieg Scenario Engine. Świat nie jest
   // wtedy taktowany — jest PRZEWIJANY po rzeczywistej serii dobowej przebiegu.
-  const [scenarioTimeline, setScenarioTimeline] = useState(() => consumePendingScenarioTimeline());
+  // PEEK, nie consume. `useState` z inicjalizatorem, który KONSUMUJE, jest
+  // nieczysty, a React w StrictMode celowo wywołuje inicjalizator dwa razy:
+  // pierwsze wywołanie zabierało przekazany świat, drugie zastawało już pustą
+  // skrzynkę i to jego wynik trafiał do stanu. Efekt był taki, że świat
+  // otwarty z czatu/Pamięci pokazywał własną symulację zamiast przekazanej
+  // serii. Odczyt jest teraz czysty, a wskaźnik kasuje efekt po zamontowaniu.
+  const [scenarioTimeline, setScenarioTimeline] = useState(() => peekPendingScenarioTimeline());
   const [timelineDay, setTimelineDay] = useState(0);
   const [enteredTimelineDay, setEnteredTimelineDay] = useState<number | null>(null);
   const [timelineSaved, setTimelineSaved] = useState<string | null>(null);
   const [timelineBookmark, setTimelineBookmark] = useState<TemporalStateBookmark | null>(null);
+  useEffect(() => {
+    // Skasowanie wskaźnika po tym, jak stan początkowy już go odczytał —
+    // przekazanie jest jednorazowe, więc powrót na ten ekran nie może
+    // ponownie wciągnąć tej samej serii.
+    consumePendingScenarioTimeline();
+  }, []);
   useEffect(() => {
     const applyPendingScenarioTimeline = () => {
       const pending = consumePendingScenarioTimeline();

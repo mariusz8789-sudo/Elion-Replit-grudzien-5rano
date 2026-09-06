@@ -84,4 +84,31 @@ describe('SolverRouter', () => {
     expect(after.physics!.velocityMS!.x).toBeGreaterThan(0);
     expect(after.spatial!.position.x).toBeCloseTo(0.5, 5);
   });
+
+  it('stamps updatedAtTick with the EXACT tick given, never a stale current+1 default — correct even after a multi-tick gap since the last touch', () => {
+    const graph = new WorldGraph();
+    const e = baseEntity('particle', 'p4');
+    e.domainBinding = { solverId: NEWTONIAN_KINEMATICS_SOLVER_ID, domainId: 'kinematics' };
+    e.updatedAtTick = 1;
+    graph.addEntity(e);
+    const router = new SolverRouter();
+    router.register(NEWTONIAN_KINEMATICS_SOLVER_ID, newtonianKinematicsSolver);
+
+    // Simulates an entity that was last touched at tick 1 and is only touched again at tick 5
+    // (e.g. a future LOD/priority scheduler that skips distant entities some ticks) — the
+    // router must record the REAL tick, not current.updatedAtTick + 1 (= 2).
+    router.routeTick(graph, 1, 5);
+    expect(graph.getEntity(e.id).updatedAtTick).toBe(5);
+  });
+
+  it('stamps the exact tick for the UNGROUNDED_APPROXIMATION branch too', () => {
+    const graph = new WorldGraph();
+    const e = baseEntity('particle', 'p5'); // no domainBinding
+    e.updatedAtTick = 1;
+    graph.addEntity(e);
+    const router = new SolverRouter();
+
+    router.routeTick(graph, 1, 5);
+    expect(graph.getEntity(e.id).updatedAtTick).toBe(5);
+  });
 });

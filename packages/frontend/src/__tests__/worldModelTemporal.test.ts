@@ -32,7 +32,7 @@ describe('TemporalEngine', () => {
     const engine = new TemporalEngine(graph);
     const solverRouter = router();
 
-    engine.advance(1, (g, dt) => solverRouter.routeTick(g, dt));
+    engine.advance(1, (g, dt, tick) => solverRouter.routeTick(g, dt, tick));
     expect(engine.tick).toBe(1);
     expect(engine.graph.getEntity('particle:1').spatial?.position.x).toBe(2);
   });
@@ -60,9 +60,9 @@ describe('TemporalEngine', () => {
     const engine = new TemporalEngine(graph);
     const solverRouter = router();
 
-    engine.advance(1, (g, dt) => solverRouter.routeTick(g, dt));
-    engine.advance(1, (g, dt) => solverRouter.routeTick(g, dt));
-    engine.advance(1, (g, dt) => solverRouter.routeTick(g, dt));
+    engine.advance(1, (g, dt, tick) => solverRouter.routeTick(g, dt, tick));
+    engine.advance(1, (g, dt, tick) => solverRouter.routeTick(g, dt, tick));
+    engine.advance(1, (g, dt, tick) => solverRouter.routeTick(g, dt, tick));
 
     expect(engine.graph.getEntity('particle:1').spatial?.position.x).toBe(9);
     expect(engine.scrubTo(0).getEntity('particle:1').spatial?.position.x).toBe(0);
@@ -77,8 +77,8 @@ describe('TemporalEngine', () => {
     const root = new TemporalEngine(graph, { label: 'root', registry });
     const solverRouter = router();
 
-    root.advance(1, (g, dt) => solverRouter.routeTick(g, dt)); // tick 1: x=1
-    root.advance(1, (g, dt) => solverRouter.routeTick(g, dt)); // tick 2: x=2
+    root.advance(1, (g, dt, tick) => solverRouter.routeTick(g, dt, tick)); // tick 1: x=1
+    root.advance(1, (g, dt, tick) => solverRouter.routeTick(g, dt, tick)); // tick 2: x=2
 
     const fork = root.forkBranch(2, 'faster-branch', (g) => {
       g.updateEntity('particle:1', { physics: { massKg: 1, velocityMS: { x: 10, y: 0, z: 0 } } });
@@ -88,8 +88,8 @@ describe('TemporalEngine', () => {
     expect(fork.forkedAtTick).toBe(2);
     expect(fork.graph.getEntity('particle:1').spatial?.position.x).toBe(2); // inherited, unmoved yet
 
-    fork.advance(1, (g, dt) => solverRouter.routeTick(g, dt));
-    root.advance(1, (g, dt) => solverRouter.routeTick(g, dt));
+    fork.advance(1, (g, dt, tick) => solverRouter.routeTick(g, dt, tick));
+    root.advance(1, (g, dt, tick) => solverRouter.routeTick(g, dt, tick));
 
     expect(fork.graph.getEntity('particle:1').spatial?.position.x).toBe(12); // 2 + 10*1
     expect(root.graph.getEntity('particle:1').spatial?.position.x).toBe(3); // 2 + 1*1 — untouched by the fork

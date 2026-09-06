@@ -117,6 +117,10 @@ export class EpidemicCity3DSim implements Sim3D {
   private semanticBuildingSlots: Array<{ group: THREE_NS.Group; building: WorldObject }> = [];
   /** Renderer-only visual volumes used to keep agent-focus shots outside building geometry. */
   private cameraOccluders: CameraOccluder[] = [];
+  // Render-loop allocation audit finding: getOrbitCameraDirection() and syncScene's own fallback
+  // each allocated a fresh Vector3 every frame. Safe to reuse — every real consumer
+  // (useThreeLoop.ts's render loop) already .clone()s the returned vector before use.
+  private scratchOrbitDirection: THREE_NS.Vector3 | null = null;
   private approvedFacadeTemplate: THREE_NS.Object3D | null = null;
   private approvedLampTemplate: THREE_NS.Object3D | null = null;
   private approvedAssetRoots: THREE_NS.Object3D[] = [];
@@ -275,6 +279,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.camera = camera;
     this.viewport = { w, h };
     this.raycaster = new THREE.Raycaster();
+    this.scratchOrbitDirection = new THREE.Vector3();
     scene.background = new THREE.Color(0x0d1b2a);
     scene.fog = new THREE.Fog(0x0d1b2a, 18, 42);
     camera.fov = 44;
@@ -389,7 +394,7 @@ export class EpidemicCity3DSim implements Sim3D {
     }
     if (this.followTarget) {
       const focusDistance = this.getOrbitFocusDistance() ?? 4.2;
-      const focusDirection = this.getOrbitCameraDirection() ?? new this.THREE.Vector3(1, 0.72, 1).normalize();
+      const focusDirection = this.getOrbitCameraDirection() ?? this.scratchOrbitDirection?.set(1, 0.72, 1).normalize() ?? new this.THREE.Vector3(1, 0.72, 1).normalize();
       if (this.cameraPreset === 'agent') {
         const safe = resolveSafeFocusDirection(
           this.followTarget,
@@ -420,9 +425,9 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   getOrbitCameraDirection(): THREE_NS.Vector3 | null {
-    if (!this.THREE || !this.followTarget || this.cameraPreset !== 'street') return null;
+    if (!this.THREE || !this.followTarget || this.cameraPreset !== 'street' || !this.scratchOrbitDirection) return null;
     // Niski, stabilny kierunek uliczny: nadal jedna kamera OrbitControls, bez fikcyjnego ruchu lub danych agenta.
-    return new this.THREE.Vector3(1.35, 0.62, 2.6).normalize();
+    return this.scratchOrbitDirection.set(1.35, 0.62, 2.6).normalize();
   }
 
   onResize(w: number, h: number): void {

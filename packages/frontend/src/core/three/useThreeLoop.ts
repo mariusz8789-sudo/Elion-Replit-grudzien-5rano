@@ -135,6 +135,11 @@ export function useThreeLoop(
         canvas.addEventListener('pointermove', move);
         canvas.addEventListener('pointerup', up);
 
+        // Render-loop allocation audit finding: the default orbit-focus direction below used to
+        // allocate a fresh Vector3 every single frame for any Sim3D with an orbit target but no
+        // getOrbitCameraDirection() opinion — reused here instead, matching the scratch-vector
+        // pattern already applied to labScene3D.ts's own per-frame math.
+        const scratchDefaultOrbitDirection = new THREE.Vector3();
         let last = performance.now();
         let statsAt = 0;
         const loop = (now: number) => {
@@ -165,8 +170,8 @@ export function useThreeLoop(
             if (target && focusDistance && focusDistance > 0) {
               const presetDirection = sim.getOrbitCameraDirection?.();
               const direction = presetDirection
-                ? presetDirection.clone().normalize()
-                : new THREE.Vector3(1, 0.72, 1).normalize();
+                ? scratchDefaultOrbitDirection.copy(presetDirection).normalize()
+                : scratchDefaultOrbitDirection.set(1, 0.72, 1).normalize();
               camera.position.copy(target).addScaledVector(direction, focusDistance);
               camera.lookAt(target);
             }

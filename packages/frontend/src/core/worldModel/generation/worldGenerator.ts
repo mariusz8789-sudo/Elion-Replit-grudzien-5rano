@@ -97,6 +97,7 @@ function spawnNode(graph: WorldGraph, node: WorldBlueprintNode, parentEntityId: 
         parentEntityId: id,
         spatial: jitter ? { position: { x: jitter.base.x + dx, y: jitter.base.y, z: jitter.base.z + dz } } : undefined,
         domainBinding: generated.domainBinding,
+        physics: generated.physics,
         grounding: generated.grounding,
       });
       entityIds.push(childId);

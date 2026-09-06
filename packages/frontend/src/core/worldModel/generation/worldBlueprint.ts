@@ -58,6 +58,8 @@ export interface WorldBlueprintGeneratedChildren {
   label: string;
   scaleLevel: ScaleDomain;
   domainBinding?: DomainBindingComponent;
+  /** Shared physics TEMPLATE applied identically to every generated child (e.g. a starting velocity for a kinematics-bound population) — not per-child randomized; use `positionJitter` for the one thing that does vary per child. */
+  physics?: MaterialPhysicsComponent;
   grounding?: GroundingLevel;
   /** Deterministic seeded jitter around `base`, on x/z, within `radius` — omit for a fixed, unjittered `base` position for every generated child. */
   positionJitter?: { base: Vector3; radius: number };

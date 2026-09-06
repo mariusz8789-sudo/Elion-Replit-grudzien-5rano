@@ -49,9 +49,13 @@ Poisson-denoise pass over the result. That's roughly:
 - 1 extra full-scene render (normals).
 - 2 full-screen shader passes (raw AO + denoise).
 
-Gated to `'high'` tier only (`tierAllowsAO`) for exactly this reason — it's
-meaningfully pricier than bloom, which is a pure post-process with no extra
-scene render.
+Gated to `'high'` tier by default (`tierAllowsAO`) for exactly this reason —
+it's meaningfully pricier than bloom, which is a pure post-process with no
+extra scene render. `GraphicsPipelineOptions.ambientOcclusion.minTier` lets a
+specific scene loosen this after profiling its own cost (the flagship lab
+does, down to `'medium'`, because AO is what grounds its metre-scale hero
+machinery) — treat that as a per-scene, measured exception, not a reason to
+change the global default.
 
 ### 4. Depth of Field (`BokehPass`)
 

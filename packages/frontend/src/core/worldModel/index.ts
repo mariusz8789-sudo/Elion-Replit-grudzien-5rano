@@ -22,4 +22,5 @@ export * from './specification/compiler';
 export * from './specification/worldInvariants';
 export * from './crossDomain/crossDomainCoupling';
 export * from './generation/worldModelProposal';
+export * from './generation/llmWorldProposalAdapter';
 export * from './domains/genesisScientificCity3';

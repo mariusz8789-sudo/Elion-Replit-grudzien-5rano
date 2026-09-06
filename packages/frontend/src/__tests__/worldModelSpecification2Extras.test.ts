@@ -150,7 +150,9 @@ describe('Event history and causal chain queries (22.M)', () => {
 describe('Learned/generative model interface (section 15)', () => {
   it("today's deterministic proposer composes requested templates into a valid, real specification", () => {
     const proposal = proposeWorldDeterministically({ worldId: 'proposed-1', seed: 1, wantsCity: true, wantsWaterSystem: true, populationCount: 10_000 });
-    expect(proposal.source).toBe('deterministic-rules');
+    expect(proposal.source).toBe('SCRIPT');
+    expect(proposal.schemaVersion).toBe('2.0.0');
+    expect(proposal.provenance.createdAt).toBeTruthy();
     expect(proposal.specification.worldType).toEqual(['CITY', 'WATER_SYSTEM']);
 
     const { validation } = validateProposal(proposal);
@@ -162,9 +164,11 @@ describe('Learned/generative model interface (section 15)', () => {
 
   it('a proposal never bypasses validation, regardless of its declared source', () => {
     const invalidProposal = {
+      schemaVersion: '2.0.0',
       proposalId: 'bad-1',
-      source: 'neural-world-model' as const,
+      source: 'LLM' as const,
       specification: { worldId: 'bad', seed: 1, worldType: [] } as WorldSpecification,
+      provenance: { createdAt: new Date().toISOString() },
     };
     expect(validateProposal(invalidProposal).validation.ok).toBe(false);
     expect(() => realizeProposal(invalidProposal)).toThrow(/failed validation/);

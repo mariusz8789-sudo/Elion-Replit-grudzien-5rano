@@ -3,40 +3,103 @@ import { validateSpecification, type SpecificationValidationResult } from '../sp
 import type { WorldSpecification, WorldTemplateId } from '../specification/worldSpecification';
 
 /**
- * LEARNED / GENERATIVE MODEL INTERFACE (Generative Scientific World Model
- * 2.0, section 15).
+ * LEARNED / GENERATIVE MODEL INTERFACE — WorldModelProposal 2.0 (Genesis
+ * Scientific World Model 3.0, sections 1-2).
  *
- * `WorldModelProposal` is the architecture for a FUTURE learned/generative
- * proposer (an LLM, a neural world model, an external service) to hand
- * Genesis a candidate `WorldSpecification` — NOT a trained model, and this
- * file does not build one. `proposeWorldDeterministically` below is
- * TODAY's implementation: a small, honest, deterministic rules function
- * standing in for that future `source`. The architectural property that
- * matters is that `validateProposal`/`realizeProposal` are the ONLY way a
- * proposal ever reaches a real graph, regardless of `source` — a
- * `'neural-world-model'` proposal goes through the EXACT SAME
- * `validateSpecification`/`compileSpecification` gate as a hand-authored
- * one. A proposal can never bypass scientific validation.
+ * `WorldModelProposal` is a stable, VERSIONED contract for how ANY proposer
+ * — a real LLM (generation/llmWorldProposalAdapter.ts), a deterministic
+ * script (`proposeWorldDeterministically` below), a human-authored request,
+ * or a future system-generated one — hands Genesis a candidate
+ * `WorldSpecification`. The architectural property that matters, regardless
+ * of `source`: `validateProposal`/`realizeProposal` are the ONLY way a
+ * proposal ever reaches a real graph. An `'LLM'` proposal goes through the
+ * EXACT SAME `validateSpecification`/`compileSpecification` gate as a
+ * hand-authored one — a proposal can never bypass scientific validation,
+ * and an invalid one is REJECTED with clear, machine-readable violations,
+ * never silently repaired.
  */
-export type WorldModelProposalSource = 'deterministic-rules' | 'llm' | 'neural-world-model' | 'external-model';
+export const WORLD_MODEL_PROPOSAL_SCHEMA_VERSION = '2.0.0';
+
+/** Who produced this proposal — an LLM, a deterministic script, a human request, or another system component. */
+export type WorldModelProposalSource = 'LLM' | 'SCRIPT' | 'USER' | 'SYSTEM';
+
+export interface WorldModelProposalProvenance {
+  /** ISO 8601 timestamp of when the proposal was produced. */
+  createdAt: string;
+  /** The exact model id that produced this proposal, when `source === 'LLM'` (e.g. `claude-opus-4-8`). */
+  model?: string;
+  /** The original natural-language request this proposal was derived from, when one exists. */
+  requestText?: string;
+  notes?: string;
+}
 
 export interface WorldModelProposal {
+  schemaVersion: string;
   proposalId: string;
   source: WorldModelProposalSource;
   specification: WorldSpecification;
   /** 0..1 — only meaningful for a probabilistic proposer; the deterministic proposer below always reports 1 (fully confident in its own structural composition, which says nothing about scientific accuracy — that is `validateSpecification`'s job). */
   confidence?: number;
   rationale?: string;
+  provenance: WorldModelProposalProvenance;
 }
 
 export interface ProposalValidationResult {
   proposal: WorldModelProposal;
   validation: SpecificationValidationResult;
+  /** When this validation pass ran — mission's "validation metadata" requirement, kept minimal rather than inventing a larger audit record. */
+  validatedAt: string;
+}
+
+/**
+ * Structural (shape) validation of a proposal BEFORE it is safe to read as
+ * a `WorldModelProposal` at all — distinct from `validateProposal`, which
+ * validates the SCIENTIFIC content of an already well-shaped proposal's
+ * `specification`. This exists because a proposal may originate from an
+ * external source (an LLM's JSON, a network payload) that TypeScript's
+ * static types cannot protect against at runtime.
+ */
+export interface ProposalShapeIssue {
+  path: string;
+  message: string;
+}
+
+export function validateProposalShape(value: unknown): { ok: true; proposal: WorldModelProposal } | { ok: false; issues: readonly ProposalShapeIssue[] } {
+  const issues: ProposalShapeIssue[] = [];
+  const err = (path: string, message: string) => issues.push({ path, message });
+
+  if (!value || typeof value !== 'object') {
+    return { ok: false, issues: [{ path: '', message: 'proposal must be an object' }] };
+  }
+  const p = value as Partial<WorldModelProposal>;
+
+  if (typeof p.schemaVersion !== 'string' || !p.schemaVersion) err('schemaVersion', 'schemaVersion must be a non-empty string');
+  if (typeof p.proposalId !== 'string' || !p.proposalId) err('proposalId', 'proposalId must be a non-empty string');
+  if (!p.source || !(['LLM', 'SCRIPT', 'USER', 'SYSTEM'] as const).includes(p.source)) {
+    err('source', 'source must be one of LLM, SCRIPT, USER, SYSTEM');
+  }
+  if (!p.specification || typeof p.specification !== 'object') {
+    err('specification', 'specification must be an object');
+  } else {
+    const spec = p.specification;
+    if (typeof spec.worldId !== 'string' || !spec.worldId) err('specification.worldId', 'worldId must be a non-empty string');
+    if (typeof spec.seed !== 'number' || !Number.isFinite(spec.seed)) err('specification.seed', 'seed must be a finite number');
+    if (!Array.isArray(spec.worldType) || spec.worldType.length === 0) err('specification.worldType', 'worldType must be a non-empty array');
+  }
+  if (!p.provenance || typeof p.provenance !== 'object' || typeof p.provenance.createdAt !== 'string') {
+    err('provenance.createdAt', 'provenance.createdAt must be a non-empty ISO timestamp string');
+  }
+  if (p.confidence !== undefined && (typeof p.confidence !== 'number' || p.confidence < 0 || p.confidence > 1)) {
+    err('confidence', 'confidence, when present, must be a number in [0,1]');
+  }
+
+  if (issues.length > 0) return { ok: false, issues };
+  return { ok: true, proposal: value as WorldModelProposal };
 }
 
 /** Validates a proposal's specification through the SAME gate any hand-authored specification goes through. */
 export function validateProposal(proposal: WorldModelProposal): ProposalValidationResult {
-  return { proposal, validation: validateSpecification(proposal.specification) };
+  return { proposal, validation: validateSpecification(proposal.specification), validatedAt: new Date().toISOString() };
 }
 
 /**
@@ -49,14 +112,16 @@ export function realizeProposal(proposal: WorldModelProposal): SpecifiedWorld {
 }
 
 /**
- * TODAY's deterministic proposer: turns a small set of explicit request
- * flags into a real `WorldSpecification` composed from existing templates.
- * This is intentionally NOT natural-language understanding — it is the
- * simplest possible real implementation of the `WorldModelProposal`
- * interface, so the pipeline downstream of it (`validateProposal` ->
- * `realizeProposal`) is exercised by something real today, ready to be
- * swapped for an actual learned proposer later without changing anything
- * downstream.
+ * TODAY's deterministic proposer (`source: 'SCRIPT'`): turns a small set of
+ * explicit request flags into a real `WorldSpecification` composed from
+ * existing templates. This is intentionally NOT natural-language
+ * understanding — it is the simplest possible real implementation of the
+ * `WorldModelProposal` interface, so the pipeline downstream of it
+ * (`validateProposal` -> `realizeProposal`) is exercised by something real
+ * today, and remains available as a deterministic fallback/test path
+ * alongside the real `source: 'LLM'` adapter (generation/
+ * llmWorldProposalAdapter.ts) — never a silent substitute for it in
+ * production.
  */
 export interface DeterministicProposalRequest {
   worldId: string;
@@ -94,10 +159,12 @@ export function proposeWorldDeterministically(request: DeterministicProposalRequ
   };
 
   return {
+    schemaVersion: WORLD_MODEL_PROPOSAL_SCHEMA_VERSION,
     proposalId: `proposal:${request.worldId}:${request.seed}`,
-    source: 'deterministic-rules',
+    source: 'SCRIPT',
     specification,
     confidence: 1,
     rationale: `Composed templates [${worldType.join(', ')}] from explicit request flags; extremeRainfall=${request.extremeRainfall ?? false} is descriptive only and must be realized by a scenario's own event/cascade rules, not fabricated here.`,
+    provenance: { createdAt: new Date().toISOString(), notes: 'Deterministic rules proposer — not natural-language understanding.' },
   };
 }

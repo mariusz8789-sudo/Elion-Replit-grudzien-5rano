@@ -46,7 +46,9 @@ never the reverse.
 | Diagnostics | `diagnostics.ts` | `readFrameCounters`, `FrameProfiler`, `RollingFrameStats` — exact draw-call/triangle/geometry/texture/program counts from `renderer.info` (valid on any GPU, including software rendering) plus frame-time sampling (explicitly NOT a hardware performance claim — see the module doc). Wired into every pipeline as `GraphicsPipeline.getFrameCounters()`. See `PERFORMANCE.md`'s "Measured, not fabricated" section for real numbers this produced. |
 | Picking / interaction | `picking.ts` | `screenToNDC`, `raycastFromScreenPoint`, `findTaggedAncestor`, `ClickDragTracker` — the mechanical half of "what did the user point at" (screen→NDC, click-vs-drag, walking up to a tagged ancestor). Never decides what a pick MEANS — that stays the caller's `selectAgent`/`selectWorld`-shaped logic. Found duplicated byte-for-byte across `epidemicCity3D.ts` and `highFidelitySlice3D.ts`'s own `pointer()` methods before this existed; both now delegate to it. |
 | Resource lifecycle | `lifecycle.ts` | `disposeSceneResources(root, options?)` — traverses an `Object3D` subtree (typically your whole `Sim3D.scene`) disposing every geometry, material, and each material's own textures in one call. Call it from your `Sim3D.dispose()`, storing `scene` from `init()` first (see `labScene3D.ts`). `options.excludeMaterials`/`excludeTextures` skip anything owned/disposed elsewhere (a shared registry, the pipeline's own environment map). |
+| WorldFrame render pathway | `worldFrame.ts` + `worldFrameRenderer.ts` | The first generic WorldFrame → scene graph → rendering pathway — see §13 below for the full contract, boundary, and why it exists. `WorldFrameRenderer.sync(frame)` reconciles a scene to match a frame of generic entities (appear/move/rescale/reparent/disappear); `.dispose()` tears the whole thing down. `worldFrame.ts`'s types are deliberately isolated and NOT the final C1/C3 contract — see its own doc comment. |
 | Integration pattern | `examples/heroApparatusExample.ts` | `buildExampleHeroApparatus` — READ this, don't import it into a real scene |
+| Integration pattern | `examples/worldFrameExample.ts` | `buildExampleWorld` — the WorldFrame pathway's own reference pattern: a synthetic world with a scalar-driven hub, an instanced population, and an honest-boundary entity, plus the SAME `CameraRig` framing a shot on it. READ this, don't import it. |
 
 ## 2. What NOT to duplicate
 
@@ -81,6 +83,12 @@ never the reverse.
   `ClickDragTracker` already do — `epidemicCity3D.ts` and
   `highFidelitySlice3D.ts` had independently duplicated all three before
   this existed.
+- **Don't hand-roll entity appear/move/disappear reconciliation for a generic
+  frame of world entities.** `worldFrameRenderer.ts`'s `WorldFrameRenderer`
+  already diffs frames, manages lifecycle, and disposes removed entities —
+  see §13. A scene with its OWN bespoke, hand-authored geometry (the three
+  shipped scenes) still owns its own `syncScene()`; this is for the
+  different case of rendering entities the engine never hand-authored.
 - **Don't hand-roll a per-scene camera intent→coordinate preset table** (the
   exact anti-pattern that motivated `cameraRig.ts`). Resolve a
   `CameraFrameRequest` (`intent` + `target` + `targetRadius`) through
@@ -441,6 +449,72 @@ The six that matter most:
 4. Repeated small parts (bolts, LEDs, knobs) go through `InstanceBatch` once the count exceeds ~15-20 — one draw call regardless of instance count.
 5. `applyShadowPolicy` runs exactly once, after the scene is fully built.
 6. `'cinematic'` tier is for a captured frame/short clip, not sustained interactive frame rate — never auto-selected, always an explicit `qualityTier` override.
+
+## 13. WorldFrame → Scene: the generic render pathway
+
+Every scene documented above (lab/city/street) hand-writes its own `syncScene()` mapping simulation
+state directly onto specific meshes it built itself. That's correct for those three — they're each
+one bespoke world with one bespoke renderer. `worldFrame.ts` + `worldFrameRenderer.ts` exist for the
+different, newer case: rendering a world whose entities the ENGINE never hand-authored, supplied
+instead as a generic frame of transforms/hierarchy/scalars — the shape a future C1/C3 "show me an
+evolving scientific world" pipeline needs, once that contract exists.
+
+**Neither C1 nor C3 has published a real `WorldFrame` contract as of this writing** — checked their
+current branch before writing either file. `worldFrame.ts`'s types are this engine's own MINIMAL,
+ISOLATED stand-in, kept in one small file specifically so they're cheap to replace (delete it and
+re-point the renderer at the real contract, or — more likely — write a thin adapter from the real
+shape onto this one, since this shape only asks for what any reasonable contract already has: a
+transform, a hierarchy, generic scalar/status channels, and an honesty flag).
+
+**The one rule this whole pathway exists to enforce**: `worldFrameRenderer.ts` never branches on
+what an entity IS. Grep it — there is no `if (entity.visualHint === 'hospital')` and there must
+never be one added. Domain knowledge enters at exactly one point, a caller-supplied
+`resolveVisual(entity)` function, and nowhere else.
+
+```ts
+import { WorldFrameRenderer } from './worldFrameRenderer';
+
+const renderer = new WorldFrameRenderer(THREE, scene, {
+  resolveVisual: (entity) => {
+    if (entity.visualHint === 'instanced:tree') {
+      return { kind: 'instanced', batchKey: 'trees', geometry: treeGeo, material: treeMat };
+    }
+    return { kind: 'object', object: buildWhateverThisEntityLooksLike(entity) };
+  },
+  updateVisual: (entity, object) => {
+    const risk = entity.scalars?.risk;
+    if (risk !== undefined) applyValueToEmissive(object.material, THREE, risk); // stateVisualization.ts, unchanged
+  },
+});
+
+// Every time a new frame is available:
+renderer.sync({ time, entities });
+// On scene teardown:
+renderer.dispose();
+```
+
+Two entity lifecycles, both generic:
+- **`'object'`** — one `Object3D` per entity: created once, transformed every `sync()`, disposed on
+  disappearance. Individual identity, individual pick/inspect.
+- **`'instanced'`** — every entity sharing a `batchKey` becomes ONE `InstancedMesh` via
+  `instancing.ts`'s `InstanceBatch`, **rebuilt from scratch every `sync()`** (the old batch disposed,
+  a fresh one built from the current frame). Correct and simple for large populations today; NOT
+  yet the most GPU-optimal path — incremental per-instance updates (reusing `setInstanceColor`/
+  `setInstanceTransform`'s already-proven partial-buffer-upload technique) is real, valuable,
+  clearly-identified follow-up work, not yet done without a measured need to justify it.
+
+**Honest boundaries, not fabricated detail**: an entity with `grounding: 'NOT_MODELED'` never
+reaches your `resolveVisual` at all — it always renders as a generic, domain-blind placeholder (a
+translucent wireframe sphere by default, overridable via `resolveBoundaryPlaceholder`), so a viewer
+sees that something exists conceptually without this engine inventing what it looks like.
+
+**Multi-scale, without new engine code**: `WorldFrameEntity.scale` is exactly `CameraRig`'s
+`targetRadius` — frame a shot on any entity with `resolveCameraFraming({ intent, target: entity.
+position, targetRadius: entity.scale })` and the SAME camera system already covers city-scale wide
+shots and molecule-scale macro shots, by composition of two already-shipped pieces, not a third new
+"scale tier" concept. See `examples/worldFrameExample.ts`'s `cameraRig`/`shootCameraAtHub` for this
+composition proven end to end (a WIDE shot and a MICRO shot on the literal same entity, same code
+path, different intent).
 
 ## Example usage
 

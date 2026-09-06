@@ -5,7 +5,7 @@ import { createGenesisMaterialPalette, createEmissiveInstrumentMaterial } from '
 import { applyEnvironmentPreset, type EnvironmentHandle } from '../environment';
 import { createWaterSurface, type WaterSurfaceHandle } from '../water';
 import { createTreeField, createGroundClutter, type VegetationFieldHandle } from '../vegetation';
-import { InteractionController } from '../interaction';
+import { InteractionController, applyHighlight, clearHighlight } from '../interaction';
 import { createSunLight } from '../lighting';
 
 /**
@@ -25,7 +25,10 @@ import { createSunLight } from '../lighting';
  * `vegetation.ts`'s tree field + ground clutter, and `interaction.ts`'s `InteractionController`
  * wired to the SAME `WorldFrameRenderer` instance driving one generic "sensor" entity — clicking it
  * resolves back to its WorldFrame entity id via `resolveEntityId`, proving the interaction layer
- * reaches all the way from a raw pointer event to a world entity, not just to a raw mesh.
+ * reaches all the way from a raw pointer event to a world entity, not just to a raw mesh. The
+ * `onHoverChange`/`onSelect` callbacks then use `WorldFrameRenderer.getObjectForEntity` +
+ * `applyHighlight`/`clearHighlight` to make that resolved id VISIBLE — the full pointer-event ->
+ * entity-id -> visual-highlight pipeline, not just the id-resolution half of it.
  */
 
 export interface ExampleEnvironmentHandles {
@@ -84,10 +87,22 @@ export function buildExampleEnvironmentWorld(THREE: typeof THREE_NS, scene: THRE
     return { time, entities: [{ id: 'sensor', position: SENSOR_POSITION }] };
   }
 
+  let highlightedHoverObject: THREE_NS.Object3D | null = null;
+  let highlightedSelectObject: THREE_NS.Object3D | null = null;
   const interaction = new InteractionController(THREE, {
     camera,
     resolver: renderer,
     getTargets: () => [scene],
+    onHoverChange: (id) => {
+      if (highlightedHoverObject) clearHighlight(highlightedHoverObject);
+      highlightedHoverObject = id ? renderer.getObjectForEntity(id) : null;
+      if (highlightedHoverObject) applyHighlight(THREE, highlightedHoverObject, 'hover');
+    },
+    onSelect: (id) => {
+      if (highlightedSelectObject) clearHighlight(highlightedSelectObject);
+      highlightedSelectObject = id ? renderer.getObjectForEntity(id) : null;
+      if (highlightedSelectObject) applyHighlight(THREE, highlightedSelectObject, 'select');
+    },
   });
 
   return {

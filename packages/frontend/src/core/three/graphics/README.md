@@ -47,10 +47,14 @@ never the reverse.
 | LOD / culling | `lod.ts` | `FrustumCuller` (per-instance frustum test, reusable/allocation-free — see its module doc for why this exists instead of `InstancedMesh.frustumCulled`), `PopulationLod` (frustum + distance + projected-size LOD in one per-frame pass over a whole population), `projectedScreenSizePx`, `selectLodTier`. Wired into `InstancedHumanoidCrowd.update()`'s optional `cull` argument — see `PERFORMANCE.md`. |
 | Diagnostics | `diagnostics.ts` | `readFrameCounters`, `FrameProfiler`, `RollingFrameStats` — exact draw-call/triangle/geometry/texture/program counts from `renderer.info` (valid on any GPU, including software rendering) plus frame-time sampling (explicitly NOT a hardware performance claim — see the module doc). Wired into every pipeline as `GraphicsPipeline.getFrameCounters()`. See `PERFORMANCE.md`'s "Measured, not fabricated" section for real numbers this produced. |
 | Picking / interaction (mechanics) | `picking.ts` | `screenToNDC`, `raycastFromScreenPoint`, `findTaggedAncestor`, `ClickDragTracker` — the mechanical half of "what did the user point at" (screen→NDC, click-vs-drag, walking up to a tagged ancestor). Never decides what a pick MEANS — that stays the caller's `selectAgent`/`selectWorld`-shaped logic. Found duplicated byte-for-byte across `epidemicCity3D.ts` and `highFidelitySlice3D.ts`'s own `pointer()` methods before this existed; both now delegate to it. |
-| Interaction (WorldFrame-aware) | `interaction.ts` | `InteractionController` — composes `picking.ts` + `WorldFrameRenderer.resolveEntityId` into hover/select state expressed as WorldFrame entity ids, not raw meshes. `pointerDown`/`pointerMove`/`pointerUp`/`clearHover`, `onHoverChange`/`onSelect` callbacks. No business logic — see §21 below. |
+| Interaction (WorldFrame-aware) | `interaction.ts` | `InteractionController` — composes `picking.ts` + `WorldFrameRenderer.resolveEntityId` into hover/select state expressed as WorldFrame entity ids, not raw meshes. `pointerDown`/`pointerMove`/`pointerUp`/`clearHover`, `onHoverChange`/`onSelect` callbacks. `applyHighlight`/`clearHighlight` turn a resolved id into an actual visible highlight on its `Object3D` (get one via `WorldFrameRenderer.getObjectForEntity`) — the "actual visual interaction," not just id-resolution. No business logic — see §16 below. |
+| Visual state (discrete) | `visualState.ts` | `applyVisualState`, `resolveVisualStatePresentation`, `VISUAL_STATE_PRESETS` — the discrete-state counterpart to `stateVisualization.ts`'s continuous-value scales: 12 canonical named states (`NORMAL`/`WARNING`/`CRITICAL`/`OFFLINE`/`DAMAGED`/`ACTIVE`/`INACTIVE`/`CONTAMINATED`/`INFECTED`/`OVERFLOW`/`FAILURE`/`UNDER_OBSERVATION`) → tuned color/emissive presentation, several marked `pulses: true` for a `stateVisualization.ts` `AttentionPulse`/`animation.ts` oscillator to drive. Never computes the state itself. |
 | Environment (sky/fog/time-of-day) | `environment.ts` | `computeSunState(THREE, hourOfDay)` (pure, testable — sun direction/color/intensity + matching sky/fog tones), `createSkyDome`, `applyEnvironmentPreset(THREE, scene, {mode, hourOfDay?})` — `'OUTDOOR'` adds a sky dome + fog and hands back `SunState` for a caller's own `createSunLight` call; `'INDOOR'` is a deliberate near-no-op. See §17 below. |
 | Water | `water.ts` | `createWaterSurface` (a horizontal plane with real `MeshPhysicalMaterial` transmission + a scrolling ripple normal map reusing `materials.ts`'s `surfaceNormalFactory`), `captureDryLook`/`applyWetLook` (cheaply wets an existing opaque material). See §18 below. |
 | Vegetation | `vegetation.ts` | `createTreeField`, `createGroundClutter` — seeded, instanced (2 draw calls / 1 draw call respectively, any count) scattered nature fields with position/rotation/scale variation. See §19 below. |
+| Laboratory furniture kit | `labKit.ts` | `createBench`, `createCabinet`, `createShelfUnit`, `createMonitor` — ordinary interior furniture composed from `primitives.ts`'s `createColumn`/`createPlatform`, for a NEW interior scene that doesn't want to re-derive `labScene3D.ts`'s own bespoke hero-furniture geometry. See §21. |
+| Animation (non-skeletal) | `animation.ts` | `createOscillator`, `createRotator`, `createSway` — a continuous, allocation-free motion foundation (machinery spin, gentle sway/bob) generalizing the flagship lab's own `rotation.y += dt * speed` pattern. Takes no dependency on `three` (pure math over plain `{rotation}`-shaped objects). See §21. |
+| Asset pipeline | `assetPipeline.ts` | `KeyedResourceCache<T>` (generic get-or-create-by-key cache with bulk disposal), `assignTextureSlot` (dispose-then-overwrite a material's texture slot — the exact fix for a real leak this pass found in `epidemicCity3D.ts`/`highFidelitySlice3D.ts`'s governed-asset loaders, generalized), `createAssetSlot` (fallback-now/real-asset-later `Object3D` swap with correct disposal, loader-agnostic). See §21. |
 | Resource lifecycle | `lifecycle.ts` | `disposeSceneResources(root, options?)` — traverses an `Object3D` subtree (typically your whole `Sim3D.scene`) disposing every geometry, material, and each material's own textures in one call. Call it from your `Sim3D.dispose()`, storing `scene` from `init()` first (see `labScene3D.ts`). `options.excludeMaterials`/`excludeTextures` skip anything owned/disposed elsewhere (a shared registry, the pipeline's own environment map). |
 | WorldFrame render pathway | `worldFrame.ts` + `worldFrameRenderer.ts` | The first generic WorldFrame → scene graph → rendering pathway — see §13 below for the full contract, boundary, and why it exists. `WorldFrameRenderer.sync(frame)` reconciles a scene to match a frame of generic entities (appear/move/rescale/reparent/disappear/retune-in-place for an unchanged instanced population — see §13's incremental-update update); `.dispose()` tears the whole thing down; `.resolveEntityId(intersection)` maps a raycast hit back to an entity id (feeds `interaction.ts`). `worldFrame.ts`'s types are deliberately isolated and NOT the final C1/C3 contract — see its own doc comment. |
 | Integration pattern | `examples/heroApparatusExample.ts` | `buildExampleHeroApparatus` — READ this, don't import it into a real scene |
@@ -593,6 +597,29 @@ interaction.pointerMove(x, y, viewportWidth, viewportHeight);
 interaction.pointerUp(x, y, viewportWidth, viewportHeight);
 ```
 
+To make a resolved id actually VISIBLE (not just known), pair it with `getObjectForEntity` +
+`applyHighlight`/`clearHighlight`:
+
+```ts
+import { applyHighlight, clearHighlight } from './graphics/interaction';
+
+let highlighted: THREE.Object3D | null = null;
+onHoverChange: (id) => {
+  if (highlighted) clearHighlight(highlighted);
+  highlighted = id ? worldFrameRenderer.getObjectForEntity(id) : null;
+  if (highlighted) applyHighlight(THREE, highlighted, 'hover');
+}
+```
+
+`applyHighlight` boosts `emissive`/`emissiveIntensity` on every emissive-capable material in the
+object's subtree, remembering each one's ORIGINAL values (once) so `clearHighlight` restores them
+exactly — safe to call repeatedly (hover promoted to select never compounds). `getObjectForEntity`
+only returns something for an `'object'`-kind entity; an `'instanced'`-kind entity has no individual
+`Object3D` — highlighting one means `instancing.ts`'s `setInstanceColor` against its batch directly.
+
+See `graphicsWorldEnvironmentExample.test.ts`'s "selecting the sensor makes it visibly highlighted"
+test for this whole pipeline (pointer event → entity id → visible highlight) proven end to end.
+
 `WorldFrameRenderer.resolveEntityId(intersection)` is what makes this work for BOTH entity
 lifecycles: an object-kind hit walks up the intersected mesh's ancestor chain (via `picking.ts`'s
 `findTaggedAncestor`) to the tagged root `resolveVisual` returned; an instanced hit resolves via
@@ -696,6 +723,108 @@ if (tierAllowsAtmosphereParticles(tier)) {
 
 The same pattern generalizes to any future density-scaled effect (vegetation instance counts
 included) — one gate check, one count call, instead of each scene re-deriving its own tier logic.
+
+## 21. Laboratory kit, animation, and asset pipeline
+
+`labKit.ts` gives a new interior scene ordinary furniture without hand-deriving geometry:
+
+```ts
+import { createBench, createCabinet, createShelfUnit, createMonitor } from './graphics/labKit';
+
+scene.add(createBench(THREE, { position: [0, 0, 2], width: 1.4, depth: 0.7, height: 0.9, topMaterial: palette.LAB_FLOOR }));
+scene.add(createCabinet(THREE, { position: [-2, 0, 0], width: 0.6, height: 1.4, depth: 0.5, bodyMaterial: palette.PAINTED_METAL }));
+```
+
+`animation.ts` gives any of the above (or anything else) continuous, non-skeletal motion without a
+per-object `Math.sin` reimplementation:
+
+```ts
+import { createRotator } from './graphics/animation';
+const fanSpin = createRotator('y', () => 0.6 + realFlowRate * 2); // rate from REAL state, never decorative
+// every frame: fanSpin.update(dt, fanBlade);
+```
+
+`assetPipeline.ts`'s `createAssetSlot` is the correct fallback-then-real-asset pattern (this pass
+found and fixed the exact leak `assignTextureSlot` now generalizes — see the module doc):
+
+```ts
+import { createAssetSlot } from './graphics/assetPipeline';
+const slot = createAssetSlot(buildProceduralFallback());
+scene.add(slot.current);
+loadRealGltf(url).then((gltf) => slot.replace(gltf.scene)); // fallback disposed automatically
+```
+
+## 22. The C1 → C2 camera bridge lives OUTSIDE `graphics/` — `core/three/shotPlanPlayer.ts`
+
+`core/lookingGlass/shotPlan.ts` (C1) produces a real, tested `ShotPlan`: an ordered list of shots,
+each with a `WorldCameraMode` and a tick range, motivated by a real event/observation. Before this
+pass, NOTHING in `core/three/` consumed it — C1 could plan a cinematic edit with no way to execute
+it. `shotPlanPlayer.ts` is that bridge, built entirely from already-canonical `CameraRig`/
+`CameraSequence` (no second camera system):
+
+```ts
+import { buildCameraSequenceFromShotPlan } from './shotPlanPlayer'; // core/three/, not graphics/
+
+const sequence = buildCameraSequenceFromShotPlan(cameraRig, shotPlan, {
+  resolveTarget: (shot) => ({ target: resolveWorldPositionFor(shot.sourceMarkerId), targetRadius: 2 }),
+}, { secondsPerWorldTick: 0.5 });
+```
+
+**Why it lives outside `graphics/`**: `graphicsArchitectureBoundary.test.ts` forbids anything under
+`core/three/graphics/` from importing `lookingGlass` (or any simulation/world-domain module) — that
+is exactly what keeps the graphics engine reusable independent of Genesis science. This file is the
+composition point ABOVE that boundary, importing both C1's `ShotPlan` type and C2's canonical camera
+classes, and nothing else — no camera transform math of its own.
+
+**The one real gap, by design**: `ShotPlan` carries no spatial data — a shot says WHEN and WHICH
+camera mode, never WHERE. Resolving "where is the thing this shot's `sourceMarkerId` refers to" is
+real domain knowledge only the world-composition layer has, so it's a required
+`ShotTargetResolver` — the same "domain knowledge enters through exactly one caller-supplied
+function" pattern `WorldFrameRenderer.resolveVisual` already establishes.
+
+**A real bug this bridge's own tests found** (not fixed here — not this file's contract to fix):
+`shotPlan.ts`'s `rankMarkers()` falls back to the literal `'OBSERVER'` (cast `as WorldCameraMode`)
+for an event type its camera policy has no configured opinion about — but `'OBSERVER'` is a member
+of neither `WorldCameraMode` nor `CameraIntent`. `shotPlanPlayer.ts`'s `coerceCameraIntent` guards
+against it (falls back to `'WIDE'`, matching `shotPlan.ts`'s own stated intent for that case), but
+the underlying cast in `shotPlan.ts` is still there and worth a fix on the C1 side.
+
+## 23. Engine 2.0 status — what's DONE, PARTIAL, or DEFERRED
+
+Per this engine's own "no fake completion" rule — everything below is a real, currently-true
+statement, not a target.
+
+**DONE** (built, tested, and either wired into a production scene or proven via a reference
+example/real-C1-integration test): materials (15 categories incl. procedural surface detail),
+lighting roles, shadow policy, post-processing (AO/bloom/DOF/reflections/tone-mapping),
+`CameraRig`/`CameraSequence` (intent-based, scale-aware), LOD/culling (`lod.ts`), instancing
+(`InstanceBatch` + incremental WorldFrame updates), `WorldFrameRenderer` (object + instanced
+lifecycles, hierarchy, honest-boundary placeholders, `resolveEntityId`/`getObjectForEntity`),
+atmosphere (dust/light-shafts, tier-gated), quality tiers + `QualityLevel` presets, resource
+lifecycle (`disposeSceneResources`), the C1→C2 shot-plan camera bridge (`shotPlanPlayer.ts`,
+tested against C1's real `buildShotPlan`), interaction (id-resolution + visible hover/select
+highlight), discrete visual-state mapping (`visualState.ts`).
+
+**PARTIAL** (real, tested, generically reusable — but NOT yet adopted by the three production
+benchmark scenes, which still use their own hand-tuned equivalents): `environment.ts` (sky/fog/
+time-of-day), `water.ts`, `vegetation.ts` (`createTreeField`/`createGroundClutter`), `labKit.ts`
+(bench/cabinet/shelf/monitor), `animation.ts` (oscillator/rotator/sway), `assetPipeline.ts`
+(fallback-to-real-asset slot, keyed cache, texture-slot disposal fix — the disposal fix itself IS
+live in `epidemicCity3D.ts`/`highFidelitySlice3D.ts`; the reusable module wrapping it is not).
+Retrofitting these into the hand-tuned city/lab/HF scenes is real, valuable, NOT YET DONE work —
+deliberately deferred each time to avoid regressing already-shipped, hand-tuned geometry without a
+dedicated verification pass for that specific scene.
+
+**DEFERRED / NOT_MODELED** (genuinely absent, not disguised as present): a vehicle rendering kit; a
+generalized building/infrastructure kit (city/HF scenes still hand-roll facades/windows/HVAC/
+streetlights); GLTF-loader-specific integration (`assetPipeline.ts` is intentionally loader-agnostic
+architecture, not a working GLTF pipeline); population visual diversity beyond what
+`InstancedHumanoidCrowd`/`characterRig.ts` already had before this pass; any physically-based sky
+model (the sky dome is a tuned gradient, explicitly documented as such); screen-space reflections
+beyond the existing opt-in, unverified-on-real-hardware `SSRPass` wiring; deep validation against
+C3's actual scientific solvers (epidemiology/chemistry/hydraulics/Newtonian) — this session's C1
+integration test uses C1's real `buildShotPlan`, but no equivalent real-C3-WorldFrame fixture was
+available to test against beyond this engine's own `worldFrame.ts` stand-in contract.
 
 ## Example usage
 

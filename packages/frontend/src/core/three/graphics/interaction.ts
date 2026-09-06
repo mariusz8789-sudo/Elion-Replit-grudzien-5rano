@@ -126,3 +126,71 @@ export class InteractionController {
     return this.options.resolver.resolveEntityId(hits[0]!);
   }
 }
+
+// ============================================================================
+// Visual highlight — the "actual visual interaction" half of this module: turning a hover/select
+// STATE (above) into something the viewer can actually see, for an individual OBJECT-kind entity's
+// Object3D (get one via `WorldFrameRenderer.getObjectForEntity`). An instanced-kind entity has no
+// individual Object3D to highlight this way — see that function's own doc for the
+// `setInstanceColor`-based alternative a caller needs for that case instead.
+// ============================================================================
+
+export type HighlightKind = 'hover' | 'select';
+
+/** Tuned per-kind highlight tint/strength — select reads stronger than hover, matching the
+ * convention every UI hover/select pair uses (a light touch on hover, a confident one on select). */
+const HIGHLIGHT_PRESET: Record<HighlightKind, { color: number; minIntensity: number }> = {
+  hover: { color: 0xffffff, minIntensity: 0.28 },
+  select: { color: 0xffd166, minIntensity: 0.6 },
+};
+
+interface HighlightableMaterial {
+  emissive: THREE_NS.Color;
+  emissiveIntensity?: number;
+  userData: Record<string, unknown>;
+}
+
+const HIGHLIGHT_ORIGINAL_KEY = '__genesisHighlightOriginal';
+
+function forEachHighlightableMaterial(object: THREE_NS.Object3D, fn: (material: HighlightableMaterial) => void): void {
+  object.traverse((node) => {
+    const mesh = node as THREE_NS.Mesh;
+    if (!mesh.isMesh) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      if (material && typeof material === 'object' && 'emissive' in material) fn(material as unknown as HighlightableMaterial);
+    }
+  });
+}
+
+/**
+ * Applies a hover/select highlight to every material in `object`'s subtree that has an `emissive`
+ * channel (anything else — a `MeshBasicMaterial`, say — is silently skipped, since it has no
+ * emissive channel to boost). Boosts `emissive`/`emissiveIntensity` toward the kind's preset,
+ * remembering each material's ORIGINAL emissive/intensity (once, in `userData`) so `clearHighlight`
+ * restores it exactly rather than guessing a baseline. Calling this again on an already-highlighted
+ * object (a hover promoted to a select) re-applies from the SAME remembered original, so it never
+ * compounds.
+ */
+export function applyHighlight(THREE: typeof THREE_NS, object: THREE_NS.Object3D, kind: HighlightKind): void {
+  const preset = HIGHLIGHT_PRESET[kind];
+  forEachHighlightableMaterial(object, (material) => {
+    const original = (material.userData[HIGHLIGHT_ORIGINAL_KEY] as { color: number; intensity: number } | undefined)
+      ?? { color: material.emissive.getHex(), intensity: material.emissiveIntensity ?? 0 };
+    material.userData[HIGHLIGHT_ORIGINAL_KEY] = original;
+    material.emissive.copy(new THREE.Color(original.color)).lerp(new THREE.Color(preset.color), 0.6);
+    material.emissiveIntensity = Math.max(original.intensity, preset.minIntensity);
+  });
+}
+
+/** Restores every material `applyHighlight` touched in `object`'s subtree to its remembered
+ * original emissive/intensity. A safe no-op for a material that was never highlighted. */
+export function clearHighlight(object: THREE_NS.Object3D): void {
+  forEachHighlightableMaterial(object, (material) => {
+    const original = material.userData[HIGHLIGHT_ORIGINAL_KEY] as { color: number; intensity: number } | undefined;
+    if (!original) return;
+    material.emissive.setHex(original.color);
+    material.emissiveIntensity = original.intensity;
+    delete material.userData[HIGHLIGHT_ORIGINAL_KEY];
+  });
+}

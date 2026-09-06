@@ -111,9 +111,14 @@ export class GenesisScientificCitySim implements Sim3D {
   private lastSelectedId: EntityId | null = null;
 
   constructor() {
+    // waterSystemBuildingId is deliberately EXCLUDED: it's a generic UNGROUNDED_APPROXIMATION
+    // container box (4x3.6x4) generated one unit away from the real pump-pipe-system entity
+    // (z=20 vs z=19 — see WATER_SYSTEM_TEMPLATE in specification/templates.ts) and, at that scale,
+    // fully engulfs the much smaller real pump assembly. The pump's own composite visual already
+    // represents the water-system infrastructure honestly; rendering the generic containing shell
+    // on top of it would only hide the one entity this whole mission is about.
     this.renderedIds = new Set<EntityId>([
-      this.city.pumpPipeId, this.city.hospitalBuildingId, this.city.waterSystemBuildingId,
-      this.city.labBuildingId, this.city.populationId,
+      this.city.pumpPipeId, this.city.hospitalBuildingId, this.city.labBuildingId, this.city.populationId,
     ]);
   }
 

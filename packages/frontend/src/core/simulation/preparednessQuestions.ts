@@ -1,4 +1,5 @@
 import { canonicalJson, fnv1a } from '../events/hash';
+import type { FalsificationCriterion } from '../experimentFabric/scientificDiscovery';
 import { SCENARIOS, type ScenarioId } from './scenarioEngine';
 
 /**
@@ -43,6 +44,15 @@ export interface GovernedPreparednessQuestion {
   /** Co dokładnie różni oba ramiona — widoczne dla użytkownika przed uruchomieniem. */
   governedDifference: string;
   rationale: string;
+  /**
+   * Metryka pierwotna i KRYTERIUM FALSYFIKACJI, zapisane w katalogu PRZED
+   * jakimkolwiek uruchomieniem. To jest prerejestracja: bez niej ocena
+   * hipotezy byłaby dobrana po zobaczeniu liczb, czyli HARK-owaniem.
+   * Kryterium celowo nie podaje spodziewanej WARTOŚCI — porównanie idzie
+   * względem zmierzonego ramienia odniesienia, bo to ono jest kontrolą.
+   */
+  primaryMetric: string;
+  falsification: FalsificationCriterion;
 }
 
 /**
@@ -62,6 +72,11 @@ export const GOVERNED_PREPAREDNESS_QUESTIONS: readonly GovernedPreparednessQuest
     levers: { days: 72, stepsPerDay: 4, nAgents: 400, initialInfected: 5, seed: 20260828, baselineInterventionStartDay: 0, variantInterventionStartDay: 20 },
     governedDifference: 'Ta sama polityka, inny moment wejścia: dzień 0 wobec dnia 20. Parametry epidemii identyczne.',
     rationale: 'Czas wejścia interwencji jest realną dźwignią Scenario Engine i jedyną różnicą między ramionami.',
+    primaryMetric: 'totalDeaths',
+    falsification: {
+      metric: 'totalDeaths', relation: 'less-than',
+      rationale: 'Hipoteza sprawdzana: opóźnione wejście izolacji NIE daje wyższej liczby zgonów niż wejście natychmiastowe. Kryterium jest spełnione, gdy wariant ma mniej zgonów niż odniesienie; w przeciwnym razie hipoteza zostaje sfalsyfikowana w granicach tego protokołu.',
+    },
   },
   {
     questionId: 'prep:isolation-vs-contact-reduction',
@@ -72,6 +87,11 @@ export const GOVERNED_PREPAREDNESS_QUESTIONS: readonly GovernedPreparednessQuest
     levers: { days: 72, stepsPerDay: 4, nAgents: 400, initialInfected: 5, seed: 20260828, baselineInterventionStartDay: 0, variantInterventionStartDay: 0 },
     governedDifference: 'Dwie różne polityki wprowadzone w tym samym dniu, na tej samej populacji i tym samym ziarnie.',
     rationale: 'Oba scenariusze istnieją w bibliotece i są porównywalne przy wspólnych warunkach startowych.',
+    primaryMetric: 'totalDeaths',
+    falsification: {
+      metric: 'totalDeaths', relation: 'less-than',
+      rationale: 'Hipoteza sprawdzana: ograniczenie kontaktów daje mniej zgonów niż izolacja objawowych przy tych samych warunkach startowych.',
+    },
   },
   {
     questionId: 'prep:hospital-expansion',
@@ -82,6 +102,11 @@ export const GOVERNED_PREPAREDNESS_QUESTIONS: readonly GovernedPreparednessQuest
     levers: { days: 72, stepsPerDay: 4, nAgents: 400, initialInfected: 5, seed: 20260828, baselineInterventionStartDay: 0, variantInterventionStartDay: 0 },
     governedDifference: 'Zmieniona wyłącznie pojemność placówki; parametry epidemii pozostają bez zmian.',
     rationale: 'Pozwala pokazać różnicę, która NIE dotyczy epidemii — sprzężenie śmiertelności jest domyślnie wyłączone.',
+    primaryMetric: 'totalDeaths',
+    falsification: {
+      metric: 'totalDeaths', relation: 'less-than',
+      rationale: 'Hipoteza sprawdzana: rozbudowa szpitala zmniejsza liczbę zgonów. Przy wyłączonym sprzężeniu śmiertelności oczekiwanym wynikiem jest FALSYFIKACJA — i tak ma to zostać zaraportowane, a nie ukryte.',
+    },
   },
   {
     questionId: 'prep:protect-seniors',
@@ -92,6 +117,11 @@ export const GOVERNED_PREPAREDNESS_QUESTIONS: readonly GovernedPreparednessQuest
     levers: { days: 72, stepsPerDay: 4, nAgents: 400, initialInfected: 5, seed: 20260828, baselineInterventionStartDay: 0, variantInterventionStartDay: 0 },
     governedDifference: 'Włączona ochrona priorytetowa pasma seniorów; pozostałe warunki startowe wspólne.',
     rationale: 'Warstwa kohortowa istnieje w modelu i wystawia wyniki per pasmo wieku.',
+    primaryMetric: 'totalDeaths',
+    falsification: {
+      metric: 'totalDeaths', relation: 'less-than',
+      rationale: 'Hipoteza sprawdzana: priorytetowa ochrona seniorów daje mniej zgonów niż brak takiej ochrony.',
+    },
   },
 ] as const;
 
@@ -184,6 +214,12 @@ export function assertGovernedCatalog(catalog: readonly GovernedPreparednessQues
     }
     if (entry.levers.days <= 0 || entry.levers.stepsPerDay <= 0 || entry.levers.nAgents <= 0) {
       throw new Error(`Pytanie ${entry.questionId} ma niepoprawne dźwignie.`);
+    }
+    if (entry.falsification.metric !== entry.primaryMetric) {
+      throw new Error(`Pytanie ${entry.questionId}: kryterium falsyfikacji musi dotyczyć metryki pierwotnej.`);
+    }
+    if (entry.falsification.rationale.trim().length === 0) {
+      throw new Error(`Pytanie ${entry.questionId}: kryterium falsyfikacji bez uzasadnienia nie jest prerejestracją.`);
     }
   }
 }

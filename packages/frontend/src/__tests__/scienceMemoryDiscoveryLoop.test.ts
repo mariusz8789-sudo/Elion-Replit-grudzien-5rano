@@ -89,6 +89,20 @@ describe('Scientific Discovery Loop -> Scientific Memory', () => {
     expect(replay.status).toBe('DRIFT');
   });
 
+  it('6b. tampering with the saved cross-hypothesis analysis after save is caught as DRIFT on replay — this field is evidence-grade too, not a display-only extra', async () => {
+    const { saveScientificDiscoveryLoopToMemory, replaySavedScientificDiscoveryLoop } = await import('../core/scienceMemory');
+    const saved = saveScientificDiscoveryLoopToMemory(runLoop());
+    const tampered = {
+      ...saved,
+      discoveryLoop: {
+        ...saved.discoveryLoop!,
+        crossHypothesisAnalysis: { ...saved.discoveryLoop!.crossHypothesisAnalysis, findings: [] },
+      },
+    };
+    const replay = await replaySavedScientificDiscoveryLoop(tampered);
+    expect(replay.status).toBe('DRIFT');
+  });
+
   it('7. saveExperiment fails closed when discoveryLoop points at a different hypothesisLoop fingerprint', async () => {
     const { saveScientificDiscoveryLoopToMemory, saveExperiment } = await import('../core/scienceMemory');
     const first = saveScientificDiscoveryLoopToMemory(runLoop());
@@ -122,5 +136,14 @@ describe('Scientific Discovery Loop -> Scientific Memory', () => {
     const a = saveScientificDiscoveryLoopToMemory(runLoop());
     const b = saveScientificDiscoveryLoopToMemory(runLoop());
     expect(a.discoveryLoop!.discoveryLoopFingerprint).toBe(b.discoveryLoop!.discoveryLoopFingerprint);
+  });
+
+  it('11. a fourth domain (cell population biology, local model) round-trips through Scientific Memory and replays MATCH — the same generic machinery, no domain-specific persistence code', async () => {
+    const { saveScientificDiscoveryLoopToMemory, replaySavedScientificDiscoveryLoop, listExperiments } = await import('../core/scienceMemory');
+    const saved = saveScientificDiscoveryLoopToMemory(runLoop('problem:cell-population-growth-rate-fastest-to-capacity'));
+    const loaded = listExperiments().find((entry) => entry.id === saved.id)!;
+    expect(loaded.discoveryLoop!.problemId).toBe('problem:cell-population-growth-rate-fastest-to-capacity');
+    const replay = await replaySavedScientificDiscoveryLoop(saved);
+    expect(replay.status).toBe('MATCH');
   });
 });

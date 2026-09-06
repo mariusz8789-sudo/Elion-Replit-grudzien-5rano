@@ -4,6 +4,7 @@ import {
   type HypothesisLoopResult, type HypothesisOutcome, type HypothesisProblem, type HypothesisStatus,
   type NextHypothesisExperiment,
 } from './hypothesisLoop';
+import { analyseExperimentSeries, type DiscoveryAnalysis } from './discovery';
 import type { ScientificEvidenceChain } from './scientificDiscovery';
 import { getScenarioTimelineByRunId } from './worldHandoff';
 import { analyzeExperiment, type ExperimentAnalysis } from '../observationAnalysis/analysis';
@@ -28,15 +29,30 @@ import type { ScenarioRun } from '../simulation/scenarioEngine';
  *    `HypothesisLoopResult.discrimination` — unchanged.
  *  - Next Experiment: `selectNextHypothesisExperiment` — unchanged.
  *
- * This file adds EXACTLY ONE new thing: the bridge from a hypothesis's real
- * evidence chain (`ScientificEvidenceChain`, keyed by run IDs) to the real
- * `ScenarioRun` behind each run (via the existing `getScenarioTimelineByRunId`
- * — the same lookup `world/epidemiologyWorldAdapter.ts` already uses), so
- * Observation/Analysis/Findings can be computed per hypothesis. No new
- * simulator, no new replay engine, no new evidence store, no new epistemic
- * ontology, no new renderer.
+ * This file adds TWO things, both bridges over existing systems, never a
+ * second one:
+ *  1. The bridge from a hypothesis's real evidence chain
+ *     (`ScientificEvidenceChain`, keyed by run IDs) to the real
+ *     `ScenarioRun` behind each run (via the existing
+ *     `getScenarioTimelineByRunId` — the same lookup
+ *     `world/epidemiologyWorldAdapter.ts` already uses), so
+ *     Observation/Analysis/Findings can be computed per hypothesis for
+ *     Scenario Engine domains.
+ *  2. `crossHypothesisAnalysis`: for EVERY domain, scenario-timelined or not
+ *     (chemistry, particle, cell biology, ...), the existing
+ *     domain-agnostic `analyseExperimentSeries` (`discovery.ts`, unchanged)
+ *     is run once per loop over `problem.candidateVariable` vs
+ *     `problem.primaryMetric` across all executed runs. This is what makes
+ *     Observation/Analysis genuinely domain-extensible rather than scoped
+ *     to the Scenario Engine: a domain with no scenario timeline no longer
+ *     gets ONLY `notModeled` — it gets the same real, generic
+ *     correlation/outlier analysis every domain already gets, and reports
+ *     `INSUFFICIENT_DATA` honestly (never a fabricated finding) when its
+ *     candidate variable isn't numeric or there aren't enough comparable
+ *     runs. No new simulator, no new replay engine, no new evidence store,
+ *     no new epistemic ontology, no new renderer.
  */
-export const SCIENTIFIC_DISCOVERY_LOOP_VERSION = '1.0.0';
+export const SCIENTIFIC_DISCOVERY_LOOP_VERSION = '1.1.0';
 
 /**
  * One hypothesis's link in the full evidence chain:
@@ -131,6 +147,17 @@ export interface ScientificDiscoveryLoopResult {
   loop: HypothesisLoopResult;
   evidenceChain: readonly HypothesisEvidenceChainLink[];
   nextExperiment: NextHypothesisExperiment;
+  /**
+   * Domain-agnostic Observation/Analysis over the whole run set
+   * (`problem.candidateVariable` vs `problem.primaryMetric`), computed the
+   * SAME way regardless of domain. See file header — this is what proves
+   * Observation/Analysis is not hard-coded to the Scenario Engine timeline.
+   */
+  crossHypothesisAnalysis: DiscoveryAnalysis;
+}
+
+export function buildCrossHypothesisAnalysis(problem: HypothesisProblem, loop: HypothesisLoopResult): DiscoveryAnalysis {
+  return analyseExperimentSeries(loop.allRuns, problem.candidateVariable, problem.primaryMetric);
 }
 
 /**
@@ -160,6 +187,7 @@ export function runScientificDiscoveryLoop(problemId: string): ScientificDiscove
     loop,
     evidenceChain: buildEvidenceChain(loop),
     nextExperiment: selectNextHypothesisExperiment(loop),
+    crossHypothesisAnalysis: buildCrossHypothesisAnalysis(problem, loop),
   };
 }
 
@@ -188,5 +216,6 @@ export async function runScientificDiscoveryLoopAsync(problemId: string): Promis
     loop,
     evidenceChain: buildEvidenceChain(loop),
     nextExperiment: selectNextHypothesisExperiment(loop),
+    crossHypothesisAnalysis: buildCrossHypothesisAnalysis(problem, loop),
   };
 }

@@ -4,8 +4,11 @@ import { registerSimContext } from '../../core/simContext';
 import { ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
 import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
-import { consumePendingExperimentWorld, consumePendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
+import { consumePendingExperimentWorld, consumePendingScenarioTimeline, peekPendingExperimentWorld, peekPendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
+import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
 import { saveScenarioCounterfactualToMemory, saveScenarioRunToMemory } from '../../core/scienceMemory';
+import { buildSavedScenarioRunContext } from '../../core/simulation/scenarioMemory';
+import { createTemporalStateBookmark, resolveTemporalStateBookmark, type TemporalStateBookmark } from '../../core/simulation/temporalStateBookmark';
 import { describeScenarioEffects } from '../../core/simulation/scenarioDisclosure';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import type { ParamDef, SimParams } from '../../core/types';
@@ -16,6 +19,8 @@ import { consumePendingEarthquakeOverlay } from '../../core/simulationRenderer/e
 import { EarthquakeScenarioPanel } from './EarthquakeScenarioPanel';
 import { EvidenceReplayPanel } from './EvidenceReplayPanel';
 import { ScenarioCommandCenterPanel } from './ScenarioCommandCenterPanel';
+import { TemporalWorldHud } from './TemporalWorldHud';
+import { TemporalMultiversePanel } from './TemporalMultiversePanel';
 
 /** Command Center reads existing model and World Engine state only; it does not generate epidemic data or agent routes. */
 /** Musi zgadzać się z EpidemicCity3DSim.hospitalStatusCode — indeks, nie liczba wyniku. */
@@ -59,15 +64,68 @@ export function City3DWebGLScreen() {
   // handoff pattern: a Science-Chat-confirmed epidemic-city run hands off its
   // already-computed EpidemicCitySimulation instance here instead of City3D
   // silently starting a second, disconnected simulation.
-  const [experimentWorld] = useState(() => consumePendingExperimentWorld());
+  // Peek, not consume — see the note on `scenarioTimeline` below: a state
+  // initializer that consumes loses the handoff to StrictMode's deliberate
+  // double invocation, and this channel additionally DELETES the world on
+  // consumption, so the loss was permanent.
+  const [experimentWorld] = useState(() => peekPendingExperimentWorld());
+  // How the user asked to experience this world (Looking Glass). Independent
+  // of the scientific handoff above: ignoring it would still show the right
+  // run, only from the default city vantage.
+  const [lookingGlass] = useState(() => peekPendingLookingGlassExperience());
   // Drugi kanał przekazania: ZAKOŃCZONY przebieg Scenario Engine. Świat nie jest
   // wtedy taktowany — jest PRZEWIJANY po rzeczywistej serii dobowej przebiegu.
-  const [scenarioTimeline] = useState(() => consumePendingScenarioTimeline());
+  // PEEK, nie consume. `useState` z inicjalizatorem, który KONSUMUJE, jest
+  // nieczysty, a React w StrictMode celowo wywołuje inicjalizator dwa razy:
+  // pierwsze wywołanie zabierało przekazany świat, drugie zastawało już pustą
+  // skrzynkę i to jego wynik trafiał do stanu. Efekt był taki, że świat
+  // otwarty z czatu/Pamięci pokazywał własną symulację zamiast przekazanej
+  // serii. Odczyt jest teraz czysty, a wskaźnik kasuje efekt po zamontowaniu.
+  const [scenarioTimeline, setScenarioTimeline] = useState(() => peekPendingScenarioTimeline());
   const [timelineDay, setTimelineDay] = useState(0);
+  const [enteredTimelineDay, setEnteredTimelineDay] = useState<number | null>(null);
   const [timelineSaved, setTimelineSaved] = useState<string | null>(null);
+  const [timelineBookmark, setTimelineBookmark] = useState<TemporalStateBookmark | null>(null);
+  useEffect(() => {
+    // Skasowanie wskaźnika po tym, jak stan początkowy już go odczytał —
+    // przekazanie jest jednorazowe, więc powrót na ten ekran nie może
+    // ponownie wciągnąć tej samej serii.
+    consumePendingScenarioTimeline();
+    consumePendingExperimentWorld();
+    consumePendingLookingGlassExperience();
+  }, []);
+  // Time moves on its own for an anchored viewpoint. It advances the SAME
+  // `timelineDay` the scrub bar drives, so this is playback of the real
+  // series and not a second clock — and it stops at the last real day rather
+  // than looping, because there is no day 61 in the run.
+  const autoPlay = Boolean(lookingGlass?.autoPlay) && Boolean(scenarioTimeline);
+  useEffect(() => {
+    if (!autoPlay || !scenarioTimeline) return;
+    const lastDay = scenarioTimeline.series.length - 1;
+    const stepMs = Math.max(120, (lookingGlass?.secondsPerStep ?? 1) * 1000);
+    const timer = window.setInterval(() => {
+      setTimelineDay((day) => (day >= lastDay ? lastDay : day + 1));
+    }, stepMs);
+    return () => window.clearInterval(timer);
+  }, [autoPlay, scenarioTimeline, lookingGlass]);
+
+  useEffect(() => {
+    const applyPendingScenarioTimeline = () => {
+      const pending = consumePendingScenarioTimeline();
+      if (!pending) return;
+      setScenarioTimeline(pending);
+      setTimelineDay(0);
+      setEnteredTimelineDay(null);
+      setTimelineBookmark(null);
+      setTimelineSaved(null);
+    };
+    window.addEventListener('genesis:scenario-timeline-ready', applyPendingScenarioTimeline);
+    return () => window.removeEventListener('genesis:scenario-timeline-ready', applyPendingScenarioTimeline);
+  }, []);
   const timelineSample = scenarioTimeline
     ? scenarioTimeline.series[Math.min(timelineDay, scenarioTimeline.series.length - 1)]
     : undefined;
+  const timelineLogicalDay = timelineSample?.day ?? 0;
   const sim = useMemo(() => new EpidemicCity3DSim({}, {
     onAgentSelected: (id) => {
       setSelectedId(id);
@@ -91,6 +149,25 @@ export function City3DWebGLScreen() {
   const renderParams = useMemo<SimParams>(() => ({ ...params, clockSpeed: running ? speed : 0 }), [params, running, speed]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, renderParams, true, setStats);
 
+  // GO TO TIME / ENTER THIS MOMENT: replay the existing agent model to the
+  // selected Scenario Engine day. The canvas stays on the same renderer and
+  // reads the replayed agents; timeline aggregates are never painted as agents.
+  useEffect(() => {
+    if (!scenarioTimeline) return;
+    const run = scenarioTimeline.scenarioRun;
+    sim.getSim().replayToDay({
+      preInterventionParams: run.preInterventionParams,
+      params: run.params,
+      cohort: run.cohort,
+      stepsPerDay: run.stepsPerDay,
+      interventionStartDay: run.interventionStartDay,
+    }, timelineLogicalDay);
+    setRunning(false);
+    setSelectedId(null);
+    setWorldSelection(null);
+    setStats(sim.getStats());
+  }, [scenarioTimeline, timelineLogicalDay, sim]);
+
   useEffect(() => { sim.setAnalysisMode(analysis); }, [analysis, sim]);
   useEffect(() => { sim.setShowTransmissions(showTransmissions); }, [showTransmissions, sim]);
   useEffect(() => { sim.setEarthquakeScenarioOverlay(earthquakeOverlay); }, [earthquakeOverlay, sim]);
@@ -109,13 +186,26 @@ export function City3DWebGLScreen() {
     setParams((previous) => ({ ...previous, [key]: value }));
     setStats(sim.getStats());
   };
-  const play = () => setRunning(true);
+  const play = () => { if (!scenarioTimeline) setRunning(true); };
   const pause = () => setRunning(false);
-  const step = () => { sim.step(); setStats(sim.getStats()); };
+  const step = () => { if (!scenarioTimeline) { sim.step(); setStats(sim.getStats()); } };
   const reset = () => {
     sim.reset(); setRunning(false); setSelectedId(null); setWorldSelection(null); setCameraPreset('city');
     setParams(sim.getSim().getParams()); setStats(sim.getStats());
   };
+  // ANCHORED VIEWPOINT: the user asked to stand in the world rather than look
+  // down on it, so the city opens at street level and time starts moving by
+  // itself — standing still while the world changes is the entire premise.
+  // The scrub bar stays live, so this is a starting vantage, not a lock.
+  useEffect(() => {
+    if (!lookingGlass) return;
+    const streetLevel = lookingGlass.viewpoint === 'ANCHORED_HUMAN' || lookingGlass.viewpoint === 'RESPONDER_POV';
+    if (streetLevel) {
+      sim.setCameraPreset('street');
+      setCameraPreset('street');
+    }
+  }, [lookingGlass, sim]);
+
   const changeCamera = (preset: CityCameraPreset) => {
     sim.setCameraPreset(preset);
     setCameraPreset(preset);
@@ -151,7 +241,7 @@ export function City3DWebGLScreen() {
   }, {}), [roadNetwork]);
   const percentageKeys = ['transmissionScale', 'restrictions', 'mobility', 'severeRate'];
   // Ta sama projekcja World Engine Contract, którą dostaje każdy zewnętrzny konsument (SC2) — brak drugiego liczenia hotspotów/klastrów.
-  const worldState = useMemo(() => projectWorldState(sim.getSim()), [sim, stats]);
+  const worldState = useMemo(() => projectWorldState(sim.getSim(), scenarioTimeline?.scenarioRun.hospitalCapacity), [sim, stats, scenarioTimeline]);
   useEffect(() => { sim.setWorldState(worldState); }, [sim, worldState]);
   const topHotspots = worldState.hotspots.slice(0, 3);
   const topClusters = [...worldState.clusters.household, ...worldState.clusters.location]
@@ -167,8 +257,8 @@ export function City3DWebGLScreen() {
           <p>Żywy model agentowy · dane syntetyczne · WebGL</p>
           <div className="city-world-signal-row" aria-label="Stan epistemiczny świata">
             <span className="city-signal live"><i />REAL RUN</span>
-            <span className="city-signal">SCENARIO: BASELINE</span>
-            <span className="city-signal">TIME: SIMULATION DAY</span>
+            <span className="city-signal">SCENARIO: {scenarioTimeline?.scenarioLabel ?? 'BASELINE'}</span>
+            <span className="city-signal">TIME: {scenarioTimeline ? 'REPLAYED MODEL DAY' : 'SIMULATION DAY'}</span>
             <span className="city-signal muted">FUTURE: NOT_MODELED</span>
           </div>
         </div>
@@ -253,8 +343,9 @@ export function City3DWebGLScreen() {
         </aside>
 
         <section className="city-world-center" aria-label="Żywa scena miasta 3D">
-          <div className="city-3d-stage-wrap city-world-stage">
+          <div className={`city-3d-stage-wrap city-world-stage${enteredTimelineDay === timelineLogicalDay ? ' temporal-moment-entered' : ''}`} data-temporal-day={timelineLogicalDay} data-temporal-entered={enteredTimelineDay === timelineLogicalDay ? 'true' : 'false'}>
             <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
+            <TemporalWorldHud timeline={scenarioTimeline} day={timelineDay} enteredDay={enteredTimelineDay} />
             {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
             {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu Canvas 2D</button>.</div>}
             {scenarioTimeline && timelineSample && (
@@ -269,14 +360,20 @@ export function City3DWebGLScreen() {
                   {scenarioTimeline.counterfactual && <span>ramię WARIANTU kontrfaktyku vs {scenarioTimeline.counterfactual.baseline.label}</span>}
                 </div>
                 <label className="scenario-run-scrubber">
-                  <span>dzień {timelineSample.day} / {scenarioTimeline.series.length - 1}</span>
+                  <span>GO TO TIME · dzień {timelineSample.day} / {scenarioTimeline.series.length - 1}</span>
                   <input
                     type="range" min={0} max={scenarioTimeline.series.length - 1} step={1}
                     value={Math.min(timelineDay, scenarioTimeline.series.length - 1)}
-                    onChange={(event) => setTimelineDay(Number(event.target.value))}
-                    aria-label="Przewiń przebieg scenariusza po dniach"
+                    onChange={(event) => { setTimelineDay(Number(event.target.value)); setEnteredTimelineDay(null); }}
+                    aria-label="GO TO TIME — wybierz dzień dostępnego przebiegu"
                   />
                 </label>
+                <div className="scenario-run-time-actions">
+                  <button type="button" className="chip-btn" onClick={() => setEnteredTimelineDay(timelineLogicalDay)}>
+                    ENTER THIS MOMENT · DAY {timelineLogicalDay}
+                  </button>
+                  {enteredTimelineDay !== null && <span className="scenario-run-entered">ENTERED · DAY {enteredTimelineDay}</span>}
+                </div>
                 <div className="scenario-run-metrics">
                   <span>zakaźni<b>{timelineSample.infectious}</b></span>
                   <span>zmarli<b>{timelineSample.deceased}</b></span>
@@ -307,6 +404,38 @@ export function City3DWebGLScreen() {
                   rzeczywistej epidemii — to symulacja scenariuszowa, nie prognoza ani obserwacja.
                 </p>
                 <div className="scenario-run-actions">
+                  <button
+                    type="button"
+                    className="chip-btn"
+                    onClick={() => {
+                      try {
+                        const source = { kind: 'run' as const, saved: buildSavedScenarioRunContext(scenarioTimeline.scenarioRun, scenarioTimeline.preparedness) };
+                        const bookmark = createTemporalStateBookmark(source, timelineLogicalDay);
+                        setTimelineBookmark(bookmark);
+                        setTimelineSaved(`BOOKMARK CREATED · ${bookmark.bookmarkId} · DAY ${bookmark.logicalDay}`);
+                      } catch (error) {
+                        setTimelineSaved(`Nie utworzono bookmarka: ${error instanceof Error ? error.message : String(error)}`);
+                      }
+                    }}
+                  >
+                    SAVE THIS MOMENT
+                  </button>
+                  {timelineBookmark && <button
+                    type="button"
+                    className="chip-btn"
+                    onClick={() => {
+                      const resolved = resolveTemporalStateBookmark(timelineBookmark);
+                      if (resolved.status === 'MATCH') {
+                        setTimelineDay(resolved.envelope.logicalDay);
+                        setEnteredTimelineDay(resolved.envelope.logicalDay);
+                        setTimelineSaved(`OPEN BOOKMARK · ${timelineBookmark.bookmarkId} · MATCH · DAY ${resolved.envelope.logicalDay}`);
+                      } else {
+                        setTimelineSaved(`OPEN BOOKMARK · ${timelineBookmark.bookmarkId} · ${resolved.status} · ${resolved.reason}`);
+                      }
+                    }}
+                  >
+                    OPEN BOOKMARK · REPLAY
+                  </button>}
                   <button
                     type="button"
                     className="chip-btn"
@@ -430,7 +559,8 @@ export function City3DWebGLScreen() {
             <p className="hospital-panel-note">Topologia pochodzi z tego samego układu miasta co renderer. Przypisanie agentów do tras i segmentów kontaktu pozostaje <code>NOT_MODELED</code>.</p>
           </div>
           <EarthquakeScenarioPanel onOverlayChange={setEarthquakeOverlay} />
-          <ScenarioCommandCenterPanel params={params} />
+          <ScenarioCommandCenterPanel params={scenarioTimeline ? { ...scenarioTimeline.scenarioRun.params } : params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
+          <TemporalMultiversePanel params={scenarioTimeline ? { ...scenarioTimeline.scenarioRun.params } : params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
           <div className="world-panel event-feed-panel">
             <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>
             {latestTransmission ? (

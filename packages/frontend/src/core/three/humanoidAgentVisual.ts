@@ -1,6 +1,7 @@
 import type * as THREE_NS from 'three';
 import type { SimAgent } from '../simulation/types';
 import { buildCharacter, paletteFromSeed, type Character, type PoseMode } from './characterRig';
+import { FrustumCuller } from './graphics/lod';
 
 /**
  * MOST MODELU → HUMANOID 3D.
@@ -202,9 +203,26 @@ export class InstancedHumanoidCrowd {
   private readonly meshes: THREE_NS.InstancedMesh[];
   private readonly yAxis: THREE_NS.Vector3;
   private readonly xAxis: THREE_NS.Vector3;
+  // Render-loop allocation audit finding: update() allocated 6 fresh THREE.Color objects PER
+  // INSTANCE, every frame — at MAX_CROWD_HUMANOIDS = 1024 (epidemicCity3D.ts's crowd capacity),
+  // that's up to 6,144 Color allocations/frame, the largest per-frame allocation hotspot found in
+  // this codebase this session. InstancedMesh.setColorAt() copies r/g/b immediately and never
+  // retains the Color reference, so reused scratch instances are exactly as correct.
+  private readonly scratchShirt: THREE_NS.Color;
+  private readonly scratchSkin: THREE_NS.Color;
+  private readonly scratchHair: THREE_NS.Color;
+  private readonly scratchPants: THREE_NS.Color;
+  private readonly scratchHealth: THREE_NS.Color;
+  /** Never varies per-instance or per-frame, so this one is a true constant, not a per-call
+   * scratch — computed once here instead of once per instance per frame. */
+  private readonly groundShadowColor: THREE_NS.Color;
   private count = 0;
+  /** Owns its own scratch Frustum/Matrix4/Sphere — see `update()`'s `cull` option and PERFORMANCE.md's "crowd frustum culling is disabled" finding, which this addresses at the application level instead of relying on `InstancedMesh`'s own broken per-batch bounding-sphere check. */
+  private readonly frustumCuller: FrustumCuller;
+  private readonly visibleStates: HumanoidAgentState[] = [];
 
-  constructor(private readonly THREE: typeof THREE_NS, readonly capacity: number) {
+  constructor(THREE: typeof THREE_NS, readonly capacity: number) {
+    this.frustumCuller = new FrustumCuller(THREE);
     const clothingMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.72, metalness: 0.02, emissive: 0xffffff, emissiveIntensity: 0.18 });
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.86, emissive: 0xffffff, emissiveIntensity: 0.10 });
     const hairMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92, emissive: 0xffffff, emissiveIntensity: 0.06 });
@@ -244,6 +262,12 @@ export class InstancedHumanoidCrowd {
     this.scale = new THREE.Vector3(1, 1, 1);
     this.yAxis = new THREE.Vector3(0, 1, 0);
     this.xAxis = new THREE.Vector3(1, 0, 0);
+    this.scratchShirt = new THREE.Color();
+    this.scratchSkin = new THREE.Color();
+    this.scratchHair = new THREE.Color();
+    this.scratchPants = new THREE.Color();
+    this.scratchHealth = new THREE.Color();
+    this.groundShadowColor = new THREE.Color(0x152331);
   }
 
   addTo(scene: THREE_NS.Scene): void {
@@ -254,19 +278,50 @@ export class InstancedHumanoidCrowd {
     return this.meshes;
   }
 
-  update(states: readonly HumanoidAgentState[]): void {
-    this.count = Math.min(states.length, this.capacity);
+  /**
+   * `cull`, when given, hides agents outside the camera's view frustum
+   * and/or beyond `maxDistance` by excluding them from the batch entirely
+   * — `mesh.count` (every one of the ten meshes) shrinks to the actually-
+   * visible agent count, so an off-screen/far crowd genuinely submits
+   * fewer instances per draw call, not just zero-scaled-but-still-
+   * submitted ones. Omit `cull` to keep the previous behavior exactly
+   * (every agent up to `capacity` always rendered).
+   */
+  update(states: readonly HumanoidAgentState[], cull?: { camera: THREE_NS.PerspectiveCamera; maxDistance?: number }): void {
+    const capped = states.length > this.capacity ? states.slice(0, this.capacity) : states;
+    let ordered: readonly HumanoidAgentState[] = capped;
+    if (cull) {
+      this.frustumCuller.update(cull.camera);
+      const cameraX = cull.camera.position.x;
+      const cameraZ = cull.camera.position.z;
+      const cullRadius = HUMAN_VISUAL_HEIGHT * 2; // a generous silhouette bound — coarser than exact, never wrong-direction (under-culls, never over-culls)
+      let visibleCount = 0;
+      for (const state of capped) {
+        if (cull.maxDistance !== undefined) {
+          const dx = state.worldX - cameraX;
+          const dz = state.worldZ - cameraZ;
+          if (Math.sqrt(dx * dx + dz * dz) > cull.maxDistance) continue;
+        }
+        if (!this.frustumCuller.isVisibleXYZ(state.worldX, HUMAN_VISUAL_HEIGHT, state.worldZ, cullRadius)) continue;
+        this.visibleStates[visibleCount] = state;
+        visibleCount += 1;
+      }
+      this.visibleStates.length = visibleCount;
+      ordered = this.visibleStates;
+    }
+
+    this.count = ordered.length;
     this.ids.length = this.count;
     for (let i = 0; i < this.count; i++) {
-      const state = states[i];
+      const state = ordered[i];
       this.ids[i] = state.id;
       this.facing.setFromAxisAngle(this.yAxis, state.facing);
       const palette = paletteFromSeed(state.id + 1);
-      const shirt = new this.THREE.Color(palette.shirt);
-      const skin = new this.THREE.Color(palette.skin);
-      const hair = new this.THREE.Color(palette.hair);
-      const pants = new this.THREE.Color(palette.pants);
-      const health = new this.THREE.Color(HEALTH_COLORS[state.health]);
+      const shirt = this.scratchShirt.set(palette.shirt);
+      const skin = this.scratchSkin.set(palette.skin);
+      const hair = this.scratchHair.set(palette.hair);
+      const pants = this.scratchPants.set(palette.pants);
+      const health = this.scratchHealth.set(HEALTH_COLORS[state.health]);
       const pulse = state.health === 'I' ? 0.5 + 0.5 * Math.sin(state.gait * 2.2) : state.health === 'E' ? 0.5 + 0.5 * Math.sin(state.gait * 1.2) : 0;
       const tint = state.health === 'S' ? 0.24 : state.health === 'E' ? 0.46 + pulse * 0.10 : state.health === 'I' ? 0.68 + pulse * 0.14 : state.health === 'R' ? 0.52 + (1 - Math.min(1, state.stateSince / 4)) * 0.12 : state.health === 'D' ? 0.88 : 0.20;
       shirt.lerp(health, tint);
@@ -299,7 +354,7 @@ export class InstancedHumanoidCrowd {
 
       this.compose(i, this.status, state.worldX, scale * 1.95, state.worldZ, this.facing, statusScale, health);
       this.compose(i, this.aura, state.worldX, 0.018, state.worldZ, this.facing, 1 + pulse * 0.12, health);
-      this.compose(i, this.groundShadow, state.worldX, 0.012, state.worldZ, this.facing, 1 + state.speed * 0.14, new this.THREE.Color(0x152331));
+      this.compose(i, this.groundShadow, state.worldX, 0.012, state.worldZ, this.facing, 1 + state.speed * 0.14, this.groundShadowColor);
     }
     for (const mesh of this.meshes) {
       mesh.count = this.count;

@@ -408,7 +408,7 @@ export function FirstPersonLabScreen() {
               <div className="fp-lab-camera-badge">{FIXED_KIND_LABEL[stats.fixedKind] || 'KAMERA NAUKOWA'}</div>
             )}
 
-            {!hudHidden && caption && (
+            {locked && !hudHidden && caption && (
               <div className="fp-lab-caption">
                 <strong>{caption.label}</strong> — {caption.text}
               </div>

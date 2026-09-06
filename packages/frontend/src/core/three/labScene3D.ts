@@ -82,9 +82,13 @@ function scientificFraming(kind: 'SCIENTIFIC' | 'ANOMALY' | 'REPLAY' | 'WIDE'): 
   const lookAt: [number, number, number] = [VESSEL_POSITION[0], VESSEL_POSITION[1] + 0.5, VESSEL_POSITION[2]];
   if (kind === 'ANOMALY') return { position: [1.5, 1.9, 1.7], lookAt };
   if (kind === 'REPLAY') return { position: [-2.0, 2.5, 2.6], lookAt };
-  // WIDE: kadr otwierający — cała hala z antresolą i drugą wieżą w kadrze,
-  // aparatura jako punkt centralny, a nie szkło tuż przy obiektywie.
-  if (kind === 'WIDE') return { position: [2.5, 2.05, 3.1], lookAt: [VESSEL_POSITION[0] - 0.15, VESSEL_POSITION[1] + 0.35, VESSEL_POSITION[2] - 0.4] };
+  // WIDE: kadr otwierający — musi faktycznie objąć całą halę (kratownica
+  // sufitowa, stoły i szafy pod ścianami, butle gazowe, antresola, druga
+  // wieża), nie tylko naczynie z bliska. Poprzednia pozycja (odległość
+  // ~4.6 m przy FOV 50°) kadrowała ułamek 12x9,5 m hali — stąd wrażenie
+  // pustego pokoju mimo gęstej zabudowy: sprzęt istniał, ale nigdy nie
+  // wchodził w kadr. Podniesiony róg hali, spojrzenie po przekątnej.
+  if (kind === 'WIDE') return { position: [4.1, 2.5, 3.7], lookAt: [-0.1, 1.15, -0.4] };
   return { position: [2.2, 2.3, 3.0], lookAt };
 }
 
@@ -139,6 +143,28 @@ function makeFloorNoiseTexture(THREE: typeof THREE_NS): THREE_NS.Texture {
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   return texture;
+}
+
+/**
+ * Miękki "contact shadow" — radialny gradient (czarny środek -> przezroczyste
+ * brzegi) nakładany tuż nad podłogą pod ciężkim sprzętem. Mapa cieni z
+ * reflektora modeluje bryłę, ale styk z podłożem musi być czytelny ZAWSZE,
+ * niezależnie od tego, ile światła wypełniającego pada akurat w to miejsce —
+ * bez tego sprzęt wizualnie "unosi się" nad posadzką.
+ */
+function makeContactShadowTexture(THREE: typeof THREE_NS): THREE_NS.Texture {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gradient.addColorStop(0, 'rgba(0,0,0,0.62)');
+  gradient.addColorStop(0.45, 'rgba(0,0,0,0.36)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
 }
 
 /** Canvas + texture for the monitor's live readout — content is drawn by `drawReadout`, never here. */
@@ -400,7 +426,7 @@ export class LabScene3D implements Sim3D {
     // realny spadek widoczności w głąb, zamiast dekoracji, która nigdy się nie uruchamia.
     // Mgła zaczyna się DALEKO za aparaturą: ma oddzielać plany (ściany, antresola,
     // druga wieża), a nie zamulać pierwszego planu — przy 3.5 m zjadała samo naczynie.
-    scene.fog = new THREE.Fog(0x0a1526, 7.5, 26);
+    scene.fog = new THREE.Fog(0x0a1526, 9.5, 28);
 
     // Ściany + sufit: jeden box renderowany od wewnątrz (BackSide) — tanie i wystarczające.
     const roomWidth = ROOM.maxX - ROOM.minX;
@@ -410,7 +436,7 @@ export class LabScene3D implements Sim3D {
     const roomCenterZ = (ROOM.minZ + ROOM.maxZ) / 2;
     const shell = new THREE.Mesh(
       new THREE.BoxGeometry(roomWidth, roomHeight, roomDepth),
-      new THREE.MeshStandardMaterial({ color: 0x4d5871, roughness: 0.86, metalness: 0.06, side: THREE.BackSide }),
+      new THREE.MeshStandardMaterial({ color: 0x232c40, roughness: 0.9, metalness: 0.05, side: THREE.BackSide }),
     );
     shell.position.set(roomCenterX, roomHeight / 2, roomCenterZ);
     scene.add(shell);
@@ -418,7 +444,7 @@ export class LabScene3D implements Sim3D {
     floorNoiseTex.repeat.set(roomWidth / 1.4, roomDepth / 1.4);
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(roomWidth - 0.05, roomDepth - 0.05),
-      new THREE.MeshStandardMaterial({ color: 0x333d55, roughness: 0.42, metalness: 0.22, roughnessMap: floorNoiseTex }),
+      new THREE.MeshStandardMaterial({ color: 0x1b2233, roughness: 0.38, metalness: 0.3, roughnessMap: floorNoiseTex }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(roomCenterX, 0.01, roomCenterZ);
@@ -428,7 +454,7 @@ export class LabScene3D implements Sim3D {
     // kontrast materiału, nie tylko przez geometrię.
     const walkway = new THREE.Mesh(
       new THREE.RingGeometry(1.3, 2.6, 48),
-      new THREE.MeshStandardMaterial({ color: 0x2a3552, roughness: 0.28, metalness: 0.45 }),
+      new THREE.MeshStandardMaterial({ color: 0x27314b, roughness: 0.24, metalness: 0.55 }),
     );
     walkway.rotation.x = -Math.PI / 2;
     walkway.position.set(VESSEL_POSITION[0], 0.012, VESSEL_POSITION[2]);
@@ -460,26 +486,55 @@ export class LabScene3D implements Sim3D {
     // Uwaga: ściany/sufit renderowane od wewnątrz (BackSide) mają odwrócone
     // normalne, więc HemisphereLight przypisuje sufitowi kolor "gruntu", a
     // podłodze kolor "nieba".
-    scene.add(new THREE.HemisphereLight(0x8ea4cc, 0x6b7593, 0.9));
-    const skyLight = new THREE.DirectionalLight(0xcfe0ff, 0.6);
+    // Wypełnienie ambientowe DALEJ obniżone: cztery chłodne źródła (hemisphere +
+    // 3x directional) sumowały się do płaskiego wypełnienia, które gasiło
+    // kontrast, mimo że każde z osobna było skromne. Ciepły KEY musi wyraźnie
+    // dominować nad chłodnym wypełnieniem, żeby hala miała hierarchię
+    // światło/cień zamiast równomiernej jasności wszędzie.
+    scene.add(new THREE.HemisphereLight(0x8ea4cc, 0x6b7593, 0.4));
+    const skyLight = new THREE.DirectionalLight(0xcfe0ff, 0.3);
     skyLight.position.set(-2, 3, -1);
     scene.add(skyLight);
-    const fillLight = new THREE.DirectionalLight(0x8fa8d6, 0.4);
+    const fillLight = new THREE.DirectionalLight(0x8fa8d6, 0.2);
     fillLight.position.set(2.5, 2.2, 2);
     scene.add(fillLight);
     // Światło od strony kadru otwierającego (WIDE stoi przy +X/+Z): bez niego
     // szeroki plan pokazywał wyłącznie nieoświetloną stronę aparatury.
-    const cameraSideLight = new THREE.DirectionalLight(0xbcd4ff, 0.55);
+    const cameraSideLight = new THREE.DirectionalLight(0xbcd4ff, 0.28);
     cameraSideLight.position.set(4, 3, 5);
     scene.add(cameraSideLight);
-    const workLight = new THREE.PointLight(0xfff1d6, 1.4, 9, 2);
-    workLight.position.set(0, roomHeight - 0.5, 0.1);
+    // Światło robocze wprost nad stanowiskiem — DRUGI (i ostatni) emiter z
+    // cieniem. Pada pionowo, więc daje cień ZAKOTWICZAJĄCY: aparatura, rama i
+    // agregaty kładą się na podłodze zamiast nad nią wisieć. Reflektor KEY
+    // modeluje bryłę z boku, ten wiąże ją z podłożem.
+    const workLight = new THREE.PointLight(0xfff1d6, 8.5, 12, 2);
+    workLight.position.set(0.15, roomHeight - 0.5, 0.1);
+    workLight.castShadow = true;
+    workLight.shadow.mapSize.set(1024, 1024);
+    workLight.shadow.bias = -0.0022;
+    workLight.shadow.camera.near = 0.4;
+    workLight.shadow.camera.far = 11;
     scene.add(workLight);
     // KEY: ciepłe, skierowane światło z przodu-boku naczynia — główne
-    // źródło modelunku na szkle/metalu bioreaktora.
-    const keyLight = new THREE.SpotLight(0xfff0d8, 14, 12, Math.PI / 4.5, 0.5, 1.2);
-    keyLight.position.set(2.6, 3.3, 2.6);
+    // źródło modelunku na szkle/metalu bioreaktora. Wzmocniony, żeby wyraźnie
+    // wygrywał z chłodnym wypełnieniem zamiast się w nim rozmywać.
+    // Pozycja przesunięta z osi kamery (kadr WIDE stoi przy +X/+Z): światło
+    // padające niemal równolegle do spojrzenia chowa własne cienie ZA
+    // obiektami. Ustawione bardziej z boku (-Z), rzuca je w poprzek podłogi,
+    // czyli tam, gdzie kamera je widzi.
+    const keyLight = new THREE.SpotLight(0xfff0d8, 22, 13, Math.PI / 4.5, 0.5, 1.1);
+    keyLight.position.set(3.2, 3.4, -1.7);
     keyLight.target.position.set(VESSEL_POSITION[0], VESSEL_POSITION[1], VESSEL_POSITION[2]);
+    // Realny rzucany cień — dotąd BRAK shadowMap w całej scenie było prawdziwą
+    // przyczyną płaskiego wrażenia: żadne światło nic nie zasłaniało, więc
+    // sprzęt "unosił się" bez zakotwiczenia w podłodze niezależnie od
+    // natężenia świateł. Tylko KEY rzuca cień (koszt jednej shadow mapy),
+    // reszta świateł zostaje bez cienia — kontrolowany koszt wydajności.
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    keyLight.shadow.bias = -0.0018;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 13;
     scene.add(keyLight, keyLight.target);
     // RIM: chłodne światło zza naczynia — odcina jego sylwetkę od tła,
     // dokładnie ten efekt, którego brakowało przy płaskim wypełnieniu.
@@ -1133,7 +1188,7 @@ export class LabScene3D implements Sim3D {
     for (let bx = -4.4; bx <= 4.4; bx += 1.6) addIBeam(bx, roomHeight - 0.62, -0.6, 4.2, false);
 
     // --- Panele świetlne w suficie (emisyjne prostokąty w regularnej siatce) ---
-    const ceilingPanelMat = new THREE.MeshStandardMaterial({ color: 0xe8f2ff, emissive: 0xdcecff, emissiveIntensity: 1.5, roughness: 0.9 });
+    const ceilingPanelMat = new THREE.MeshStandardMaterial({ color: 0xcddcf0, emissive: 0xdcecff, emissiveIntensity: 0.6, roughness: 0.9 });
     for (const px of [-3.6, -1.2, 1.2, 3.6]) {
       for (const pz of [-3.2, -1.0, 1.2]) {
         const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.42), ceilingPanelMat);
@@ -1149,7 +1204,7 @@ export class LabScene3D implements Sim3D {
     // bo wszystkie źródła świeciły do środka. Cztery miękkie światła obrysowe
     // odsłaniają zabudowę peryferyjną, nie rozjaśniając środka kadru.
     for (const [wx, wz] of [[-5.2, 0], [5.2, 0], [0, -4.0], [0, 3.6]] as const) {
-      const wallWash = new THREE.PointLight(0xaec6ea, 4.2, 8, 2);
+      const wallWash = new THREE.PointLight(0xaec6ea, 2.4, 8, 2);
       wallWash.position.set(wx, 2.5, wz);
       scene.add(wallWash);
     }
@@ -1157,8 +1212,12 @@ export class LabScene3D implements Sim3D {
     // Materiał emisyjny sam NIE oświetla sceny w Three.js — bez tych źródeł
     // panele sufitowe świeciły, a hala zostawała czarna. Sześć realnych świateł
     // (co drugi panel) daje równomierne oświetlenie robocze całej zabudowy.
+    // Natężenie mocno obniżone (11 -> 4): sześć punktówek BEZ cienia sumowało
+    // się do ~66 jednostek światła wypełniającego, które zasypywało każdy cień
+    // rzucany przez KEY/workLight. Cień jest widoczny tylko wtedy, gdy źródła
+    // rzucające cień mają realny udział w oświetleniu sceny.
     for (const [lx, lz] of [[-3.6, -3.2], [1.2, -3.2], [-1.2, -1.0], [3.6, -1.0], [-3.6, 1.2], [1.2, 1.2]] as const) {
-      const panelLight = new THREE.PointLight(0xeaf3ff, 11, 14, 2);
+      const panelLight = new THREE.PointLight(0xeaf3ff, 4, 13, 2);
       panelLight.position.set(lx, roomHeight - 0.35, lz);
       scene.add(panelLight);
     }
@@ -1283,6 +1342,508 @@ export class LabScene3D implements Sim3D {
         }
       }
     }
+
+    // ==================================================================
+    // ZESPOŁY INŻYNIERSKIE — aparatura centralna przestaje być "szklanym
+    // walcem z ramą", a staje się SYSTEMEM: rama nośna → przyłącza
+    // procesowe → sondy → manifold zaworowy → agregat pompowy → szafa
+    // sterownicza → manipulator próbkujący. Każdy zespół jest funkcją
+    // parametryczną (jak addBench/addPipeRun wyżej), a nie pojedynczym
+    // rekwizytem, więc rozbudowa hali nie oznacza sypania prymitywami.
+    // ==================================================================
+
+    /**
+     * Ciężka rama nośna reaktora: cztery słupy skrzynkowe + rygle górne/dolne.
+     * Słupy stoją na PRZEKĄTNYCH (obrót 45°), nie na wprost kamery — inaczej
+     * przedni słup przecinał sylwetkę naczynia dokładnie na środku kadru
+     * otwierającego i zasłaniał to, co ma być bohaterem ujęcia.
+     */
+    const addContainmentFrame = (cx: number, cz: number, half: number, height: number): void => {
+      const colGeo = new THREE.BoxGeometry(0.11, height, 0.11);
+      const d = half * Math.SQRT1_2 * 1.35;
+      const corners: Array<[number, number]> = [[-d, 0], [0, -d], [d, 0], [0, d]];
+      for (const [ox, oz] of corners) {
+        const col = new THREE.Mesh(colGeo, MAT.darkSteel);
+        col.position.set(cx + ox, height / 2, cz + oz);
+        scene.add(col);
+        const foot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.04, 0.26), MAT.steel);
+        foot.position.set(cx + ox, 0.02, cz + oz);
+        scene.add(foot);
+        addBoltRing(cx + ox, 0.05, cz + oz, 0.085, 4);
+      }
+      // Rygle: górny pierścień ramy + stężenie w połowie wysokości.
+      for (const gy of [height - 0.08, height * 0.52]) {
+        for (let i = 0; i < 4; i++) {
+          const a = corners[i]!;
+          const b = corners[(i + 1) % 4]!;
+          const dx = b[0] - a[0];
+          const dz = b[1] - a[1];
+          const len = Math.hypot(dx, dz);
+          const beam = new THREE.Mesh(new THREE.BoxGeometry(len, 0.075, 0.075), MAT.darkSteel);
+          beam.position.set(cx + (a[0] + b[0]) / 2, gy, cz + (a[1] + b[1]) / 2);
+          beam.rotation.y = Math.atan2(-dz, dx);
+          scene.add(beam);
+        }
+      }
+    };
+
+    /** Manifold zaworowy: blok rozdzielacza, kołnierze, koła zaworów, manometry, króćce. */
+    const addValveManifold = (x: number, y: number, z: number, rotY: number, ports: number): void => {
+      const g = new THREE.Group();
+      g.position.set(x, y, z);
+      g.rotation.y = rotY;
+      const block = new THREE.Mesh(new THREE.BoxGeometry(ports * 0.19, 0.26, 0.18), MAT.steel);
+      g.add(block);
+      for (let i = 0; i < ports; i++) {
+        const px = -((ports - 1) * 0.19) / 2 + i * 0.19;
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.16, 8), MAT.chrome);
+        stem.position.set(px, 0.2, 0);
+        g.add(stem);
+        const wheel = new THREE.Mesh(GEO.handWheel, i % 2 === 0 ? MAT.chrome : MAT.copper);
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(px, 0.28, 0);
+        g.add(wheel);
+        const outlet = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.22, 8), MAT.steel);
+        outlet.rotation.x = Math.PI / 2;
+        outlet.position.set(px, -0.04, 0.16);
+        g.add(outlet);
+        const flange = new THREE.Mesh(GEO.flange, MAT.steel);
+        flange.rotation.x = Math.PI / 2;
+        flange.position.set(px, -0.04, 0.26);
+        g.add(flange);
+      }
+      scene.add(g);
+    };
+
+    /** Agregat pompowy na ramie: silnik, korpus pompy, sprzęgło, ssanie/tłoczenie. */
+    const addPumpSkid = (x: number, z: number, rotY: number): void => {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      g.rotation.y = rotY;
+      const skid = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.09, 0.5), MAT.darkSteel);
+      skid.position.y = 0.045;
+      g.add(skid);
+      const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.44, 18), MAT.steel);
+      motor.rotation.z = Math.PI / 2;
+      motor.position.set(-0.2, 0.28, 0);
+      g.add(motor);
+      for (let f = 0; f < 7; f++) {
+        const fin = new THREE.Mesh(new THREE.TorusGeometry(0.152, 0.008, 5, 14), MAT.darkSteel);
+        fin.rotation.y = Math.PI / 2;
+        fin.position.set(-0.38 + f * 0.06, 0.28, 0);
+        g.add(fin);
+      }
+      const coupling = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.1, 12), MAT.copper);
+      coupling.rotation.z = Math.PI / 2;
+      coupling.position.set(0.06, 0.28, 0);
+      g.add(coupling);
+      const volute = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.2, 20), MAT.steel);
+      volute.rotation.z = Math.PI / 2;
+      volute.position.set(0.26, 0.28, 0);
+      g.add(volute);
+      const suction = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.5, 10), MAT.steel);
+      suction.position.set(0.26, 0.53, 0);
+      g.add(suction);
+      const discharge = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.34, 10), MAT.steel);
+      discharge.rotation.x = Math.PI / 2;
+      discharge.position.set(0.26, 0.28, 0.25);
+      g.add(discharge);
+      scene.add(g);
+    };
+
+    /** Sonda pomiarowa wpuszczana w komorę: głowica ze złączem, trzon, kabel. */
+    const addProbe = (angle: number, radius: number, topY: number, depth: number): void => {
+      const px = VESSEL_POSITION[0] + Math.cos(angle) * radius;
+      const pz = VESSEL_POSITION[2] + Math.sin(angle) * radius;
+      const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.09, 12), MAT.steel);
+      boss.position.set(px, topY, pz);
+      scene.add(boss);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.08), MAT.darkSteel);
+      head.position.set(px, topY + 0.11, pz);
+      scene.add(head);
+      const led = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.012, 0.012), MAT.amberLed);
+      led.position.set(px, topY + 0.13, pz + 0.042);
+      scene.add(led);
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, depth, 8), MAT.chrome);
+      shaft.position.set(px, topY - depth / 2, pz);
+      scene.add(shaft);
+      addCable([px, topY + 0.15, pz], [px + Math.cos(angle) * 0.55, topY + 0.05, pz + Math.sin(angle) * 0.55], 0.12, 0.009);
+    };
+
+    /** Szafa sterownicza: korpus, pochylony pulpit z ekranem, rząd diod, klamka. */
+    const addControlUnit = (x: number, z: number, rotY: number): void => {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      g.rotation.y = rotY;
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.66, 1.28, 0.46), MAT.darkSteel);
+      body.position.y = 0.64;
+      g.add(body);
+      const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 0.5), MAT.steel);
+      plinth.position.y = 0.03;
+      g.add(plinth);
+      const desk = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.04, 0.3), MAT.steel);
+      desk.position.set(0, 1.3, 0.16);
+      desk.rotation.x = -0.42;
+      g.add(desk);
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.24), MAT.display);
+      screen.position.set(0, 1.33, 0.175);
+      screen.rotation.x = -0.42;
+      g.add(screen);
+      for (let i = 0; i < 5; i++) {
+        const led = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.02, 0.008), i < 2 ? MAT.amberLed : MAT.display);
+        led.position.set(-0.2 + i * 0.1, 1.09, 0.232);
+        g.add(led);
+      }
+      for (let r = 0; r < 3; r++) {
+        const vent = new THREE.Mesh(GEO.vent, MAT.steel);
+        vent.scale.x = 1.6;
+        vent.position.set(0, 0.42 + r * 0.1, 0.232);
+        g.add(vent);
+      }
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.22, 0.02), MAT.chrome);
+      handle.position.set(0.26, 0.72, 0.235);
+      g.add(handle);
+      scene.add(g);
+    };
+
+    /** Manipulator próbkujący: cokół, obrotnica, ramię, przedramię, chwytak. */
+    const addManipulator = (x: number, z: number, baseRot: number): void => {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      g.rotation.y = baseRot;
+      const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.21, 0.62, 16), MAT.darkSteel);
+      pedestal.position.y = 0.31;
+      g.add(pedestal);
+      const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.16, 16), MAT.steel);
+      turret.position.y = 0.7;
+      g.add(turret);
+      const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), MAT.chrome);
+      shoulder.position.y = 0.82;
+      g.add(shoulder);
+      const upper = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.62, 0.13), MAT.steel);
+      upper.position.set(0, 1.12, 0.06);
+      upper.rotation.x = 0.32;
+      g.add(upper);
+      const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), MAT.chrome);
+      elbow.position.set(0, 1.42, 0.25);
+      g.add(elbow);
+      const fore = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.1), MAT.steel);
+      fore.position.set(0, 1.5, 0.55);
+      fore.rotation.x = 1.15;
+      g.add(fore);
+      const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 12), MAT.darkSteel);
+      wrist.rotation.x = Math.PI / 2;
+      wrist.position.set(0, 1.55, 0.79);
+      g.add(wrist);
+      for (const fx of [-0.035, 0.035]) {
+        const finger = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.13, 0.03), MAT.chrome);
+        finger.position.set(fx, 1.52, 0.87);
+        finger.rotation.x = 0.25;
+        g.add(finger);
+      }
+      const statusLed = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.02), MAT.amberLed);
+      statusLed.position.set(0, 0.78, 0.15);
+      g.add(statusLed);
+      scene.add(g);
+    };
+
+    /** Dygestorium: obudowa, szyba podnoszona, wnętrze z podświetleniem, przyłącza. */
+    const addFumeHood = (x: number, z: number, rotY: number): void => {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      g.rotation.y = rotY;
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.9, 0.72), MAT.plastic);
+      base.position.y = 0.45;
+      g.add(base);
+      const hood = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.05, 0.78), MAT.darkSteel);
+      hood.position.y = 1.45;
+      g.add(hood);
+      const interior = new THREE.Mesh(new THREE.BoxGeometry(1.26, 0.9, 0.02), MAT.display);
+      interior.position.set(0, 1.42, -0.34);
+      g.add(interior);
+      const sash = new THREE.Mesh(new THREE.PlaneGeometry(1.24, 0.6), MAT.panelGlass);
+      sash.position.set(0, 1.32, 0.4);
+      g.add(sash);
+      const sashRail = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.04, 0.04), MAT.chrome);
+      sashRail.position.set(0, 1.02, 0.4);
+      g.add(sashRail);
+      const duct = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.6, 14), MAT.steel);
+      duct.position.set(0, 2.75, -0.2);
+      g.add(duct);
+      for (let i = 0; i < 2; i++) {
+        const tap = new THREE.Mesh(GEO.handWheel, MAT.copper);
+        tap.rotation.x = Math.PI / 2;
+        tap.position.set(-0.45 + i * 0.9, 1.0, 0.36);
+        g.add(tap);
+      }
+      scene.add(g);
+    };
+
+    /** Regał techniczny: rama, półki, pojemniki — zaplecze magazynowe hali. */
+    const addStorageRack = (x: number, z: number, rotY: number, bays: number): void => {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      g.rotation.y = rotY;
+      const width = bays * 0.62;
+      for (const sx of [-width / 2, width / 2]) {
+        for (const sz of [-0.22, 0.22]) {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.1, 0.05), MAT.darkSteel);
+          post.position.set(sx, 1.05, sz);
+          g.add(post);
+        }
+      }
+      for (let s = 0; s < 4; s++) {
+        const shelf = new THREE.Mesh(new THREE.BoxGeometry(width, 0.035, 0.5), MAT.steel);
+        shelf.position.y = 0.35 + s * 0.55;
+        g.add(shelf);
+        for (let b = 0; b < bays; b++) {
+          if ((s + b) % 3 === 2) continue;
+          const crate = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 0.3, 0.4),
+            (s + b) % 2 === 0 ? MAT.plastic : MAT.worktop,
+          );
+          crate.position.set(-width / 2 + 0.31 + b * 0.62, 0.52 + s * 0.55, 0);
+          g.add(crate);
+          const label = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.08), MAT.ceramic);
+          label.position.set(-width / 2 + 0.31 + b * 0.62, 0.54 + s * 0.55, 0.201);
+          g.add(label);
+        }
+      }
+      scene.add(g);
+    };
+
+    /** Stojak aparatury 19": rząd modułów z panelami czołowymi i diodami. */
+    const addInstrumentStack = (x: number, y: number, z: number, rotY: number, units: number): void => {
+      const g = new THREE.Group();
+      g.position.set(x, y, z);
+      g.rotation.y = rotY;
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.56, units * 0.14 + 0.05, 0.42), MAT.darkSteel);
+      g.add(frame);
+      for (let u = 0; u < units; u++) {
+        const uy = -((units - 1) * 0.14) / 2 + u * 0.14;
+        const face = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.115, 0.02), MAT.steel);
+        face.position.set(0, uy, 0.211);
+        g.add(face);
+        const readout = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.06), MAT.display);
+        readout.position.set(-0.14, uy, 0.223);
+        g.add(readout);
+        for (let d = 0; d < 4; d++) {
+          const dot = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.016, 0.008), d === u % 4 ? MAT.amberLed : MAT.display);
+          dot.position.set(0.04 + d * 0.035, uy, 0.224);
+          g.add(dot);
+        }
+        const knob = new THREE.Mesh(GEO.knob, MAT.chrome);
+        knob.rotation.x = Math.PI / 2;
+        knob.position.set(0.2, uy, 0.226);
+        g.add(knob);
+      }
+      scene.add(g);
+    };
+
+    /** Prostokątny kanał wentylacyjny z segmentami i kołnierzami — infrastruktura sufitowa. */
+    const addDuctRun = (y: number, z: number, x1: number, x2: number, size: number): void => {
+      const length = Math.abs(x2 - x1);
+      const duct = new THREE.Mesh(new THREE.BoxGeometry(length, size, size), MAT.steel);
+      duct.position.set((x1 + x2) / 2, y, z);
+      scene.add(duct);
+      const joints = Math.max(2, Math.floor(length / 1.8));
+      for (let i = 0; i <= joints; i++) {
+        const jx = x1 + (i / joints) * (x2 - x1);
+        const collar = new THREE.Mesh(new THREE.BoxGeometry(0.04, size * 1.14, size * 1.14), MAT.darkSteel);
+        collar.position.set(jx, y, z);
+        scene.add(collar);
+        const hanger = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.3, 0.02), MAT.darkSteel);
+        hanger.position.set(jx, y + size / 2 + 0.15, z);
+        scene.add(hanger);
+      }
+    };
+
+    /** Szyna serwisowa na ścianie: ceownik + skrzynki przyłączeniowe + peszle. */
+    const addServiceRail = (y: number, z: number, x1: number, x2: number): void => {
+      const length = Math.abs(x2 - x1);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(length, 0.09, 0.06), MAT.darkSteel);
+      rail.position.set((x1 + x2) / 2, y, z);
+      scene.add(rail);
+      const boxes = Math.max(2, Math.floor(length / 2.2));
+      for (let i = 0; i <= boxes; i++) {
+        const bx = x1 + (i / boxes) * (x2 - x1);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.22, 0.1), MAT.plastic);
+        box.position.set(bx, y - 0.16, z + 0.02);
+        scene.add(box);
+        const led = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.014, 0.008), MAT.display);
+        led.position.set(bx, y - 0.09, z + 0.072);
+        scene.add(led);
+        const conduit = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.34, 8), MAT.steel);
+        conduit.position.set(bx, y - 0.38, z + 0.02);
+        scene.add(conduit);
+      }
+    };
+
+    // --- Aparatura centralna jako SYSTEM, nie pojedynczy walec ---
+    addContainmentFrame(VESSEL_POSITION[0], VESSEL_POSITION[2], 1.28, 3.0);
+    addValveManifold(VESSEL_POSITION[0] + 1.18, 1.12, VESSEL_POSITION[2] + 0.95, -0.62, 4);
+    addPumpSkid(VESSEL_POSITION[0] - 1.35, VESSEL_POSITION[2] + 1.05, 0.5);
+    addPumpSkid(VESSEL_POSITION[0] + 1.5, VESSEL_POSITION[2] - 1.3, -2.1);
+    for (const [pAngle, pRadius] of [[0.6, 0.42], [2.4, 0.5], [4.2, 0.45]] as const) {
+      addProbe(pAngle, pRadius, VESSEL_POSITION[1] + VESSEL_HALF_HEIGHT + 0.86, 0.72);
+    }
+    addControlUnit(VESSEL_POSITION[0] - 1.95, VESSEL_POSITION[2] - 0.5, 1.15);
+    addManipulator(VESSEL_POSITION[0] + 1.28, VESSEL_POSITION[2] + 0.05, -1.75);
+
+    // --- Rurociągi łączące agregaty z reaktorem (system, nie dekoracja) ---
+    addPipeRun(0.62, VESSEL_POSITION[2] + 1.05, VESSEL_POSITION[0] - 1.35, VESSEL_POSITION[0] - 0.6, 0.045, MAT.steel);
+    addPipeRun(2.55, VESSEL_POSITION[2] + 0.95, VESSEL_POSITION[0] + 0.5, VESSEL_POSITION[0] + 1.18, 0.04, MAT.copper);
+
+    // --- Zaplecze: dygestoria, regały, stojaki aparatury (drugi plan) ---
+    addFumeHood(-3.15, 3.55, Math.PI);
+    addFumeHood(-1.55, 3.55, Math.PI);
+    addStorageRack(-5.4, 0.9, Math.PI / 2, 3);
+    addStorageRack(3.05, -4.0, 0, 3);
+    addInstrumentStack(-4.35, 1.55, 2.4, Math.PI / 2, 5);
+    addInstrumentStack(1.6, 1.6, 3.62, Math.PI, 4);
+
+    // --- Infrastruktura sufitowa: kanały wentylacyjne wzdłuż hali ---
+    addDuctRun(roomHeight - 1.05, -2.1, -5.6, 5.6, 0.34);
+    addDuctRun(roomHeight - 1.05, 2.3, -5.6, 2.4, 0.26);
+
+    // --- Szyny serwisowe na ścianach (spójny system, ta sama wysokość) ---
+    addServiceRail(2.42, -4.42, -5.4, 5.4);
+    addServiceRail(2.42, 4.32, -5.4, 3.2);
+
+    // --- Pierwszy plan przy kadrze otwierającym: barierka + stojak aparatury,
+    //     które dają paralaksę i skalę zamiast pustej podłogi na dole kadru. ---
+    const foreRailMat = MAT.steel;
+    for (let i = 0; i < 4; i++) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 1.05, 10), foreRailMat);
+      post.position.set(2.35 + i * 0.78, 0.52, 2.75 - i * 0.12);
+      scene.add(post);
+    }
+    const foreRailTop = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.045, 0.045), foreRailMat);
+    foreRailTop.position.set(3.5, 1.03, 2.57);
+    foreRailTop.rotation.y = 0.153;
+    scene.add(foreRailTop);
+    const foreRailMid = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.03, 0.03), foreRailMat);
+    foreRailMid.position.set(3.5, 0.68, 2.57);
+    foreRailMid.rotation.y = 0.153;
+    scene.add(foreRailMid);
+    addInstrumentStack(4.35, 1.0, 1.35, -1.15, 4);
+
+    // ==================================================================
+    // JĘZYK ŚWIATŁA LINIOWEGO — listwy LED wpisane w konstrukcję: wzdłuż
+    // słupów ramy reaktora, po obwodzie podestu, wzdłuż blatów, w kratownicy
+    // sufitowej i na krawędziach szaf. To one, razem z bloomem, dają czytelny
+    // rysunek inżynierski hali w ciemnych partiach — dokładnie tam, gdzie
+    // wcześniej była płaska, jednolita szarość. Materiały są emisyjne
+    // (MeshBasic), więc nie kosztują żadnego dodatkowego światła w scenie.
+    // ==================================================================
+    const stripCyan = new THREE.MeshBasicMaterial({ color: 0x74e4ff, transparent: true, opacity: 0.92 });
+    const stripWarm = new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.8 });
+    const stripDim = new THREE.MeshBasicMaterial({ color: 0x3f9fd4, transparent: true, opacity: 0.6 });
+
+    /** Listwa LED: cienki, świecący prostopadłościan o zadanej osi i długości. */
+    const addLightStrip = (
+      x: number, y: number, z: number, length: number,
+      axis: 'x' | 'y' | 'z', material: THREE_NS.Material, thickness = 0.022,
+    ): void => {
+      const size: [number, number, number] = axis === 'x'
+        ? [length, thickness, thickness]
+        : axis === 'y' ? [thickness, length, thickness] : [thickness, thickness, length];
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+      strip.position.set(x, y, z);
+      scene.add(strip);
+    };
+
+    // Pionowe listwy na słupach ramy reaktora (rysują wysokość aparatury).
+    {
+      const d = 1.28 * Math.SQRT1_2 * 1.35;
+      for (const [ox, oz] of [[-d, 0], [0, -d], [d, 0], [0, d]] as const) {
+        addLightStrip(VESSEL_POSITION[0] + ox + (ox === 0 ? 0 : Math.sign(ox) * 0.058), 1.5,
+          VESSEL_POSITION[2] + oz + (oz === 0 ? 0 : Math.sign(oz) * 0.058), 2.5, 'y', stripCyan, 0.018);
+      }
+      // Obwód podestu — pierścień z czterech odcinków (styk aparatury z podłogą).
+      for (let i = 0; i < 28; i++) {
+        const a = (i / 28) * Math.PI * 2;
+        const seg = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.016, 0.03), stripCyan);
+        seg.position.set(VESSEL_POSITION[0] + Math.cos(a) * 1.16, 0.16, VESSEL_POSITION[2] + Math.sin(a) * 1.16);
+        seg.rotation.y = -a;
+        scene.add(seg);
+      }
+    }
+    // Listwy pod blatami stołów laboratoryjnych (drugi plan zyskuje rysunek).
+    addLightStrip(-4.4, 0.86, 2.4, 2.5, 'z', stripDim, 0.016);
+    addLightStrip(-4.4, 0.86, -0.4, 1.9, 'z', stripDim, 0.016);
+    addLightStrip(1.6, 0.86, 3.66, 2.7, 'x', stripDim, 0.016);
+    addLightStrip(-1.9, 0.86, -4.31, 2.3, 'x', stripDim, 0.016);
+    // Listwy w kratownicy sufitowej — rytm konstrukcyjny nad halą.
+    for (const bz of [-2.6, 1.4]) addLightStrip(0, roomHeight - 0.74, bz, roomWidth - 0.6, 'x', stripWarm, 0.026);
+    // Krawędzie szaf/regałów w tle.
+    addLightStrip(-5.4, 2.14, 0.9, 1.8, 'z', stripDim, 0.014);
+    addLightStrip(3.05, 2.14, -4.0, 1.8, 'x', stripDim, 0.014);
+    // Listwa wzdłuż antresoli (już istniejącej) — spójny język w całej hali.
+    addLightStrip(4.86, 1.82, -0.6, 4.3, 'z', stripCyan, 0.016);
+
+    // --- Styk z podłożem: miękkie cienie kontaktowe pod ciężkim sprzętem ---
+    const contactShadowMat = new THREE.MeshBasicMaterial({
+      map: makeContactShadowTexture(THREE), transparent: true, depthWrite: false, opacity: 0.95,
+    });
+    const contactShadowGeo = new THREE.PlaneGeometry(1, 1);
+    const addContactShadow = (x: number, z: number, radius: number, strength = 1): void => {
+      const decal = new THREE.Mesh(contactShadowGeo, strength === 1 ? contactShadowMat : contactShadowMat.clone());
+      if (strength !== 1) (decal.material as THREE_NS.MeshBasicMaterial).opacity = 0.95 * strength;
+      decal.rotation.x = -Math.PI / 2;
+      decal.scale.set(radius * 2, radius * 2, 1);
+      decal.position.set(x, 0.022, z);
+      decal.renderOrder = 1;
+      scene.add(decal);
+    };
+    addContactShadow(VESSEL_POSITION[0], VESSEL_POSITION[2], 1.55);
+    addContactShadow(VESSEL_POSITION[0] - 1.35, VESSEL_POSITION[2] + 1.05, 0.62, 0.85);
+    addContactShadow(VESSEL_POSITION[0] + 1.5, VESSEL_POSITION[2] - 1.3, 0.62, 0.85);
+    addContactShadow(VESSEL_POSITION[0] - 1.95, VESSEL_POSITION[2] - 0.5, 0.55, 0.8);
+    addContactShadow(VESSEL_POSITION[0] + 1.28, VESSEL_POSITION[2] + 0.05, 0.5, 0.8);
+    addContactShadow(-3.4, -2.0, 0.95, 0.9);
+    addContactShadow(3.15, -0.8, 1.3, 0.75);
+    addContactShadow(-1.9, 1.15, 0.4, 0.7);
+    addContactShadow(-1.75, -1.5, 0.75, 0.7);
+    addContactShadow(-3.15, 3.55, 0.85, 0.8);
+    addContactShadow(-1.55, 3.55, 0.85, 0.8);
+    addContactShadow(-5.4, 0.9, 1.0, 0.7);
+    addContactShadow(3.05, -4.0, 1.0, 0.7);
+    addContactShadow(-5.5, -3.6, 0.5, 0.7);
+    addContactShadow(5.4, 2.9, 0.45, 0.7);
+    addContactShadow(-4.4, 2.4, 1.3, 0.6);
+    addContactShadow(-4.4, -0.4, 1.1, 0.6);
+    addContactShadow(1.6, 3.7, 1.4, 0.6);
+    addContactShadow(-1.9, -4.35, 1.2, 0.6);
+    addContactShadow(0, 0.75, 0.45, 0.8);
+
+    // ==================================================================
+    // CIENIE: włączane raz, po zbudowaniu całej sceny, wg trzech reguł —
+    // nie "wszystko rzuca cień" (setki śrub/diod/gałek to czysty koszt
+    // shadow-mapy bez żadnego widocznego cienia):
+    //  1. Przezroczyste (szkło reaktora, hologram, przegrody, szyby szaf)
+    //     tylko ODBIERAJĄ cień — szkło rzucające czarną plamę zamiast
+    //     refleksu wyglądałoby gorzej niż brak cienia.
+    //  2. Drobnica poniżej progu (śruby, diody, gałki, listwy) nie rzuca —
+    //     jej cień i tak zginąłby w rozdzielczości mapy.
+    //  3. Cień ODBIERAJĄ tylko powierzchnie, na których faktycznie coś
+    //     widać: podłoga, podesty, blaty, ściany — nie każdy drobiazg.
+    // ==================================================================
+    const shadowBox = new THREE.Box3();
+    const shadowSize = new THREE.Vector3();
+    scene.traverse((object) => {
+      const mesh = object as THREE_NS.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      const material = mesh.material as THREE_NS.Material | THREE_NS.Material[];
+      const transparent = Array.isArray(material) ? material.some((m) => m.transparent) : material.transparent;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      shadowBox.copy(mesh.geometry.boundingBox!);
+      shadowBox.getSize(shadowSize);
+      const scale = mesh.getWorldScale(new THREE.Vector3());
+      const largestExtent = Math.max(shadowSize.x * scale.x, shadowSize.y * scale.y, shadowSize.z * scale.z);
+      mesh.castShadow = !transparent && largestExtent > 0.18;
+      mesh.receiveShadow = largestExtent > 0.3;
+    });
 
     // KADR OTWIERAJĄCY: scena startuje w szerokim, skomponowanym ujęciu całej
     // hali (FIXED/WIDE), a nie tuż przy szkle naczynia. Pierwszą rzeczą, którą
@@ -1449,11 +2010,17 @@ export class LabScene3D implements Sim3D {
     h: number,
   ): PostProcessor {
     const THREE = this.THREE!;
+    // Mapa cieni: fundament głębi przestrzennej (OBIEKT -> CIEŃ -> PODŁOGA ->
+    // PRZESŁONIĘCIE -> GŁĘBIA). Bez niej aparatura "unosiła się" nad podłogą
+    // niezależnie od liczby świateł. PCFSoft: miękka krawędź bez kosztu VSM.
+    // Cień rzuca WYŁĄCZNIE reflektor KEY (jedna mapa 1024²) — patrz init().
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     // Ekspozycja podniesiona razem z obniżonym wypełnieniem ambientowym:
     // ciemniejsze tło + jaśniejsze źródła kierunkowe dają filmowy kontrast
     // zamiast płaskiej, jednolicie oświetlonej sceny.
-    renderer.toneMappingExposure = 1.32;
+    renderer.toneMappingExposure = 1.05;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     // Mapa środowiska generowana PROCEDURALNIE ze sceny studyjnej (jasny sufit,
     // ciemna podłoga) — metal musi mieć co odbijać, inaczej chrom i stal czytają
@@ -1464,10 +2031,20 @@ export class LabScene3D implements Sim3D {
     void this.loadHdri(renderer);
     const composer = new modules.EffectComposer(renderer);
     composer.addPass(new modules.RenderPass(scene, camera));
+    // SSAO ŚWIADOMIE POMINIĘTE. `SSAOPass` z three/examples renderuje scenę
+    // własnym przebiegiem, poza tone mappingiem ACES i przestrzenią barw
+    // renderera — w tym potoku (ACES + OutputPass) wypuszczał prześwietlony,
+    // biały kadr niezależnie od parametrów okluzji. Rolę "brudu na stykach"
+    // pełnią tu realne mapy cieni (KEY + workLight) oraz cienie kontaktowe
+    // pod sprzętem (patrz init()). Wpięcie SSAO wymagałoby przebudowy
+    // kolejności potoku postprocessingu, a nie zmiany jednego parametru.
     // Bloom niżej progowany i mocniejszy: wspiera światło (poświata na
     // krawędziach szkła/emisyjnych elementach), ale go nie zastępuje —
     // ciemniejsze materiały bazowe (patrz init()) robią resztę kontrastu.
-    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.28, 0.42, 0.86);
+    // Bloom mocniejszy i niżej progowany: przy ciemnych powierzchniach bazowych
+    // to listwy świetlne, ekrany i szkło reaktora niosą jasność kadru — mają
+    // się rozlewać jak realne źródła, nie być płaskimi jasnymi plamami.
+    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.34, 0.5, 0.92);
     composer.addPass(bloom);
     composer.addPass(new modules.OutputPass());
     return { render: () => composer.render(), setSize: (width, height) => composer.setSize(width, height), dispose: () => composer.dispose() };

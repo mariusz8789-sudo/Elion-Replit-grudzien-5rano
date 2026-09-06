@@ -42,6 +42,7 @@ never the reverse.
 | Quality tiers | `../quality.ts` | `detectRenderTier`, `configureGraphicsQuality`, `tierDpr`, `tierAllowsBloom`, `tierAllowsAO`, `tierAtLeast`, `recommendedShadowMapSize`, `maxShadowCasterBudget` |
 | State-driven visualization | `stateVisualization.ts` | `sampleColorScale`, `severityColor`, `SEVERITY_COLOR_SCALE`, `applyValueToEmissive`, `applyFractionToScale`, `AttentionPulse` — turns an already-computed real value into a color/glow/fill-height/event-flash; never computes or interprets the value itself (see its module doc) |
 | Diagnostics | `diagnostics.ts` | `readFrameCounters`, `FrameProfiler`, `RollingFrameStats` — exact draw-call/triangle/geometry/texture/program counts from `renderer.info` (valid on any GPU, including software rendering) plus frame-time sampling (explicitly NOT a hardware performance claim — see the module doc). Wired into every pipeline as `GraphicsPipeline.getFrameCounters()`. See `PERFORMANCE.md`'s "Measured, not fabricated" section for real numbers this produced. |
+| Resource lifecycle | `lifecycle.ts` | `disposeSceneResources(root, options?)` — traverses an `Object3D` subtree (typically your whole `Sim3D.scene`) disposing every geometry, material, and each material's own textures in one call. Call it from your `Sim3D.dispose()`, storing `scene` from `init()` first (see `labScene3D.ts`). `options.excludeMaterials`/`excludeTextures` skip anything owned/disposed elsewhere (a shared registry, the pipeline's own environment map). |
 | Integration pattern | `examples/heroApparatusExample.ts` | `buildExampleHeroApparatus` — READ this, don't import it into a real scene |
 
 ## 2. What NOT to duplicate
@@ -71,6 +72,11 @@ never the reverse.
   rendering decision needs to know WHY a value changed (not just what it
   is), that reasoning belongs upstream in `ScientificWorldState` — this
   layer only ever reads a value it's handed.
+- **Don't hand-roll a traverse-and-dispose loop in your `Sim3D.dispose()`.**
+  `epidemicCity3D.ts` and `highFidelitySlice3D.ts` each independently wrote
+  one before `lifecycle.ts` existed; `labScene3D.ts` had none at all and
+  relied on GC alone (a real resource leak — see `lifecycle.ts`'s module
+  doc). Call `disposeSceneResources(this.scene)` instead.
 
 ## 3. The rendering pipeline contract
 
@@ -489,8 +495,10 @@ calling the shared function — now consolidated onto the one implementation.
   lighting roles (`graphicsLighting.test.ts`), the shadow policy
   (`graphicsShadowPolicy.test.ts`), quality-tier helpers including
   `'cinematic'` (`graphicsQualityTiers.test.ts`), the cinematic camera
-  module (`graphicsCinematicCamera.test.ts`), and the integration example
-  (`graphicsHeroApparatusExample.test.ts`).
+  module (`graphicsCinematicCamera.test.ts`), the integration example
+  (`graphicsHeroApparatusExample.test.ts`), the frame-counter diagnostics
+  (`graphicsDiagnostics.test.ts`), and the resource-lifecycle disposal
+  utility (`graphicsLifecycle.test.ts`).
 - Manual headless run (Playwright + SwiftShader): `#/first-person-lab`
   renders correctly with GTAO active, no console errors, no visual
   regression versus the pre-existing lighting/materials. `#/city3d`
@@ -501,3 +509,28 @@ calling the shared function — now consolidated onto the one implementation.
   never guarded for a non-browser environment, unlike `detectRenderTier`)
   was found and fixed while writing this session's tests — see
   `graphicsQualityTiers.test.ts`.
+- A resource-lifecycle audit (reading three.js's own `EffectComposer`
+  source, not assuming) found four genuine GPU-resource leaks across the
+  engine, all now fixed and tested:
+  1. `EffectComposer.dispose()` never disposed `UnrealBloomPass`/
+     `BokehPass`/`OutputPass` — only its own two ping-pong render targets
+     — so `setupGraphicsPipeline`'s `dispose()` now disposes all five
+     passes explicitly (`graphicsPostProcessing.test.ts`'s
+     `'setupGraphicsPipeline — dispose'` block).
+  2. `labScene3D.ts` had **no scene-level disposal at all**, on the
+     mistaken assumption that GC of the scene graph frees GPU memory (it
+     doesn't — see `lifecycle.ts`'s module doc) — now calls
+     `disposeSceneResources(this.scene)`.
+  3. `highFidelitySlice3D.ts`'s hand-rolled `disposeObject` only disposed
+     4 of its 7 `MaterialBundle` registry materials, never touched any of
+     their own loaded PBR textures (`map`/`normalMap`/`roughnessMap`/
+     `aoMap` — real loaded images), and left `glass`/`metal`/`markings`
+     leaking entirely.
+  4. `epidemicCity3D.ts`'s `cityMaterials` registry (asphalt/concrete/
+     ground/brick, same shape of real loaded PBR textures) was **never
+     disposed at all** — 0 of 4, not even the materials themselves.
+
+  Both scene files now delegate to `lifecycle.ts`'s
+  `disposeSceneResources`/`disposeMaterials` instead of their own
+  hand-rolled, incomplete traversal — one tested implementation instead of
+  three independently-drifted ones. See `graphicsLifecycle.test.ts`.

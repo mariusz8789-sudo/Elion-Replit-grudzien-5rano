@@ -11,6 +11,7 @@ import { createPhiladelphiaLegendVisual, type PhiladelphiaLegendViewMode, type P
 import { approvedWorldAssetCount, isWorldAssetApproved, isWorldAssetPathApproved, unverifiedWorldAssetCount } from './assetGovernance';
 import { setupGraphicsPipeline } from './graphics/postProcessing';
 import { createSunLight, createBackgroundFill } from './graphics/lighting';
+import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
 
 /**
  * Wysokość kamery ulicznej. Ponad najwyższą koroną (4,91 jednostki ≈ 9,8 m),
@@ -507,10 +508,13 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.philadelphiaLegend = null;
     this.analysisMesh?.geometry.dispose();
     this.analysisMaterial?.dispose();
-    this.materials?.asphalt.dispose();
-    this.materials?.concrete.dispose();
-    this.materials?.ground.dispose();
-    this.materials?.brick.dispose();
+    // Resource-lifecycle audit finding: the previous version of this method only ever disposed 4
+    // of this bundle's 7 materials (asphalt/concrete/ground/brick), never touched any of their own
+    // loaded textures (map/normalMap/roughnessMap/aoMap — real loaded images, not cheap procedural
+    // canvases), and left glass/metal/markings leaking entirely since the per-mesh disposal loop
+    // below deliberately skips anything in this registry. `disposeMaterials` fixes all three at
+    // once — see graphics/lifecycle.ts's own doc comment on this exact bug.
+    if (this.materials) disposeMaterials(Object.values(this.materials));
     for (const object of this.sceneObjects) this.disposeObject(object);
     for (const marker of this.eventMarkers.values()) this.disposeObject(marker.group);
     this.sceneObjects = [];
@@ -1820,12 +1824,12 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   private disposeObject(object: THREE_NS.Object3D): void {
-    object.traverse((node) => {
-      const mesh = node as THREE_NS.Mesh;
-      if (mesh.geometry) mesh.geometry.dispose();
-      const material = mesh.material;
-      if (material && !Array.isArray(material) && !Object.values(this.materials ?? {}).includes(material as never)) material.dispose();
-    });
+    // Delegates to the engine's generic resource-lifecycle utility (graphics/lifecycle.ts) instead
+    // of a hand-rolled traversal — the previous version here only handled a single (non-array)
+    // material and never disposed a mesh's own textures. `this.materials` registry entries are
+    // excluded: they're disposed once, up front, via `disposeMaterials` in `dispose()` above, not
+    // per mesh that happens to reference them.
+    disposeSceneResources(object, { excludeMaterials: Object.values(this.materials ?? {}) });
   }
 
   private async loadHeroAsset(): Promise<void> {

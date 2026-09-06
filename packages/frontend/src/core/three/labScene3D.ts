@@ -8,6 +8,7 @@ import type { ScenarioDaySample } from '../simulation/scenarioEngine';
 import { configureDOF, setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
 import { configureCinematicCamera, type CinematicCameraProfile } from './graphics/cinematicCamera';
 import { applyShadowPolicy } from './graphics/shadowPolicy';
+import { disposeSceneResources } from './graphics/lifecycle';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -407,6 +408,13 @@ export class LabScene3D implements Sim3D {
   disableOrbitControls = true;
 
   private THREE: typeof THREE_NS | null = null;
+  // GENESIS GRAPHICS ENGINE — resource-lifecycle audit finding: this class used to have a
+  // one-line no-op `dispose()` on the (mistaken) assumption that "the canvas's GC" frees a torn-
+  // down scene's geometries/materials/textures. It doesn't — `WebGLRenderer.dispose()` (called by
+  // useThreeLoop.ts right after `sim.dispose()`) never frees them either, since three.js treats
+  // them as scene-owned, not renderer-owned. Stored here purely so `dispose()` can hand the whole
+  // subtree to `graphics/lifecycle.ts`'s `disposeSceneResources` — see that module's doc comment.
+  private scene: THREE_NS.Scene | null = null;
   private controller = new FirstPersonController({
     room: ROOM,
     obstacles: [STATION_OBSTACLE],
@@ -636,6 +644,7 @@ export class LabScene3D implements Sim3D {
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
     this.THREE = THREE;
+    this.scene = scene;
     this.raycaster = new THREE.Raycaster();
     this.scratchVecA = new THREE.Vector3();
     this.scratchVecB = new THREE.Vector3();
@@ -3468,5 +3477,14 @@ export class LabScene3D implements Sim3D {
 
   onResize(): void { /* kamera pierwszoosobowa: brak dodatkowej logiki poza domyślnym aspect z useThreeLoop */ }
 
-  dispose(): void { /* geometrie/materiały tej krótkotrwałej sceny zwalnia GC canvasa przy odmontowaniu */ }
+  dispose(): void {
+    // See the `scene` field's own comment and graphics/lifecycle.ts's module doc: GC of the scene
+    // graph does not free GPU-side geometry/material/texture memory, and `WebGLRenderer.dispose()`
+    // (called right after this by useThreeLoop.ts) doesn't either. `scene.environment`/
+    // `scene.background` (the studio/HDRI IBL) are deliberately left alone here — they're owned
+    // and disposed by the graphics pipeline itself, via `setupPostProcessing`'s own `dispose()`
+    // above, not by this per-mesh traversal.
+    if (this.scene) disposeSceneResources(this.scene);
+    this.scene = null;
+  }
 }

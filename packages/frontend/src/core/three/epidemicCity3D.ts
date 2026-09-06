@@ -15,6 +15,7 @@ import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postPro
 import { applyShadowPolicy } from './graphics/shadowPolicy';
 import { createPBRMaterial } from './graphics/materials';
 import { createSunLight, createBackgroundFill } from './graphics/lighting';
+import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -535,36 +536,22 @@ export class EpidemicCity3DSim implements Sim3D {
     this.analysisMaterial?.dispose();
     this.analysisMesh = null;
     this.analysisMaterial = null;
-    for (const marker of this.transmissionMarkers.values()) {
-      marker.group.traverse((node) => {
-        const mesh = node as THREE_NS.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const material = mesh.material;
-        if (material && !Array.isArray(material)) material.dispose();
-      });
-    }
+    // Resource-lifecycle audit finding: `this.cityMaterials` (asphalt/concrete/ground/brick, each
+    // carrying real loaded textures — map/normalMap/roughnessMap/aoMap from
+    // `createApprovedCityMaterials`) was never disposed at all — not the materials, not their
+    // textures. Some building/road meshes below reference these same instances directly (not
+    // cloned), so this call and the per-mesh traversal below can both reach the same material;
+    // three.js's `.dispose()` is idempotent, so that's harmless, not a double-free bug.
+    if (this.cityMaterials) disposeMaterials(Object.values(this.cityMaterials));
+    for (const marker of this.transmissionMarkers.values()) disposeSceneResources(marker.group);
     this.transmissionMarkers.clear();
     if (this.worldOverlayGroup) {
-      for (const marker of this.worldOverlayGroup.children) {
-        marker.traverse((node) => {
-          const mesh = node as THREE_NS.Mesh;
-          mesh.geometry?.dispose();
-          const material = mesh.material;
-          if (material && !Array.isArray(material)) material.dispose();
-        });
-      }
+      for (const marker of this.worldOverlayGroup.children) disposeSceneResources(marker);
       this.scene?.remove(this.worldOverlayGroup);
       this.worldOverlayGroup = null;
       this.worldInteractive = [];
     }
-    for (const object of this.buildingMeshes) {
-      object.traverse((node) => {
-        const mesh = node as THREE_NS.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const material = mesh.material;
-        if (material && !Array.isArray(material)) material.dispose();
-      });
-    }
+    for (const object of this.buildingMeshes) disposeSceneResources(object);
     this.buildingMeshes = [];
     for (const asset of this.approvedAssetRoots) this.scene?.remove(asset);
     this.approvedAssetRoots = [];

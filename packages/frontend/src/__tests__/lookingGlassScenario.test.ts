@@ -911,3 +911,37 @@ describe('Looking Glass — COMPARE is real, or it says why not', () => {
     expect(wrapped.message).toBe(direct.message);
   });
 });
+
+describe('Looking Glass — comparison travels with the world handoff', () => {
+  it('carries the real comparison into the vantage handoff, for a world screen to render', async () => {
+    const { peekPendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+    const session = openLookingGlass('Compare the epidemic over 40 days from street level');
+    session.enterWorld();
+    const handoff = peekPendingLookingGlassExperience();
+    expect(handoff?.comparison?.status).toBe('READY');
+    expect(handoff?.comparison?.producedBy).toMatch(/compareScenarios/);
+    clearLookingGlassExperience();
+  });
+
+  it('carries null when nothing was compared, never a stale or invented one', async () => {
+    const { peekPendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+    openLookingGlass('Pokaż epidemię przez 40 dni z perspektywy człowieka na ulicy').enterWorld();
+    expect(peekPendingLookingGlassExperience()?.comparison).toBeNull();
+    clearLookingGlassExperience();
+  });
+
+  it('carries the laboratory comparison into its own handoff', async () => {
+    const { peekPendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+    openLookingGlass('Compare the bioreactor cell culture over 12 hours from the perspective of a scientist').enterWorld();
+    const handoff = peekPendingLookingGlassExperience();
+    expect(handoff?.comparison?.status).toBe('READY');
+    expect(handoff?.comparison?.producedBy).toMatch(/discrimination/);
+    clearLookingGlassExperience();
+  });
+});

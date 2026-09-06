@@ -3,6 +3,7 @@ import { openLookingGlass, type LookingGlassSession } from '../../core/lookingGl
 import { nearestSupportedAlternative } from '../../core/lookingGlass/scenarioResolution';
 import { anchoredSequenceDuration, sampleAnchoredSequence, scrubToSeconds } from '../../core/lookingGlass/anchoredTemporal';
 import { ExperiencePlayer, frameAt, type ExperienceFrame } from '../../core/lookingGlass/experienceOrchestrator';
+import { ComparisonPanel } from './ComparisonPanel';
 
 /**
  * LOOKING GLASS — THE CHAT THAT ANSWERS WITH A WORLD.
@@ -197,47 +198,7 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
               orchestrator from the same real markers. */}
           <SequencePlayer session={session} />
 
-          {/* REAL COMPARISON, when the sentence asked for one and the engine
-              actually produced it — never rendered on intent alone. A
-              blocked comparison (a tie, a mismatched horizon) says why
-              instead of picking a side. */}
-          {session.request.comparison && (
-            <div className={`lg-cmp lg-cmp-${session.comparison ? session.comparison.status.toLowerCase() : 'none'}`}>
-              <span className="lg-cmp-title">PORÓWNANIE</span>
-              {session.comparison ? (
-                session.comparison.status === 'READY' ? (
-                  <>
-                    <div className="lg-cmp-sides">
-                      <span>{session.comparison.baselineLabel}</span>
-                      <span className="lg-cmp-vs">vs</span>
-                      <span>{session.comparison.variantLabel}</span>
-                    </div>
-                    <table className="lg-cmp-table">
-                      <tbody>
-                        {session.comparison.metrics.map((metric) => (
-                          <tr key={metric.key}>
-                            <td>{metric.key}</td>
-                            <td>{metric.baseline.toFixed(2)}</td>
-                            <td>→</td>
-                            <td>{metric.variant.toFixed(2)}</td>
-                            <td className={metric.absoluteDelta < 0 ? 'is-down' : metric.absoluteDelta > 0 ? 'is-up' : ''}>
-                              {metric.absoluteDelta > 0 ? '+' : ''}{metric.absoluteDelta.toFixed(2)}
-                              {metric.relativeDeltaPercent !== null ? ` (${metric.relativeDeltaPercent > 0 ? '+' : ''}${metric.relativeDeltaPercent.toFixed(0)}%)` : ''}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <p className="lg-cmp-produced">{session.comparison.producedBy}</p>
-                  </>
-                ) : (
-                  <p className="lg-cmp-blocked">{session.comparison.message}</p>
-                )
-              ) : (
-                <p className="lg-cmp-blocked">Poproszono o porównanie, ale ten świat nie ma z czym porównać.</p>
-              )}
-            </div>
-          )}
+          <ComparisonPanel comparison={session.comparison} requestedButMissing={session.request.comparison} />
 
           <ol className="lg-shots">
             {session.shotPlan.shots.map((shot) => (

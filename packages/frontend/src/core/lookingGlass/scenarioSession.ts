@@ -359,6 +359,7 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
         problemId: built.problemId,
         experience,
         world,
+        comparison: built.comparison,
       });
       return built.handoffRunId ? setPendingScenarioTimeline(built.handoffRunId) : true;
     },

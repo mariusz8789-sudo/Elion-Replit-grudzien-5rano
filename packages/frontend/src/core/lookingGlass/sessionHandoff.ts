@@ -1,6 +1,7 @@
 import type { ScenarioKind, ViewpointKind } from './scenarioRequest';
 import type { ExperienceTimeline } from './experienceOrchestrator';
 import type { ScenarioWorld } from './scenarioWorld';
+import type { ScenarioComparisonView } from './scenarioComparison';
 
 /**
  * LOOKING GLASS — HANDING THE *EXPERIENCE* TO A WORLD SCREEN.
@@ -44,6 +45,12 @@ export interface LookingGlassExperienceHandoff {
    */
   readonly experience: ExperienceTimeline | null;
   readonly world: ScenarioWorld | null;
+  /**
+   * A REAL comparison, only when one was actually computed for this
+   * session (see `scenarioComparison.ts`). Carried here so a world screen
+   * can show it without re-deriving it — never recomputed by a screen.
+   */
+  readonly comparison: ScenarioComparisonView | null;
 }
 
 let pending: LookingGlassExperienceHandoff | null = null;

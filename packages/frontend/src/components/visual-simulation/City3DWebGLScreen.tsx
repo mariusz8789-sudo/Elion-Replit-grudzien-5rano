@@ -10,6 +10,7 @@ import { ExperiencePlayer } from '../../core/lookingGlass/experienceOrchestrator
 import { cityPresetFor, directionForFrame, type WorldDirection } from '../../core/lookingGlass/worldDirector';
 import { closeInspection, initialExperienceState, inspect, replay as enterReplay, timeIsFrozen, MODE_LABEL, type ExperienceState } from '../../core/lookingGlass/experienceMode';
 import { EventInspector } from '../looking-glass/EventInspector';
+import { ComparisonPanel } from '../looking-glass/ComparisonPanel';
 import { saveScenarioCounterfactualToMemory, saveScenarioRunToMemory } from '../../core/scienceMemory';
 import { buildSavedScenarioRunContext } from '../../core/simulation/scenarioMemory';
 import { createTemporalStateBookmark, resolveTemporalStateBookmark, type TemporalStateBookmark } from '../../core/simulation/temporalStateBookmark';
@@ -443,6 +444,11 @@ export function City3DWebGLScreen() {
               />
             )}
             <span className="lg-mode-badge">{MODE_LABEL[experience.mode]}</span>
+            {experience.mode !== 'INSPECT' && lookingGlass?.comparison && (
+              <div className="lg-world-cmp">
+                <ComparisonPanel comparison={lookingGlass.comparison} requestedButMissing={false} />
+              </div>
+            )}
             {direction && (
               <div className="lg-world-shot">
                 <div className="lg-world-shot-head">

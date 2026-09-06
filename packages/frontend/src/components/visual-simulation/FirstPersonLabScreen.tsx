@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
+import { ExperiencePlayer } from '../../core/lookingGlass/experienceOrchestrator';
+import { directionForFrame, type WorldDirection } from '../../core/lookingGlass/worldDirector';
+import {
+  closeInspection, initialExperienceState, inspect, replay as enterReplay, timeIsFrozen, MODE_LABEL,
+  type ExperienceState,
+} from '../../core/lookingGlass/experienceMode';
+import { EventInspector } from '../looking-glass/EventInspector';
+import { ComparisonPanel } from '../looking-glass/ComparisonPanel';
 import { LabScene3D } from '../../core/three/labScene3D';
 import type { MoveKey } from '../../core/three/firstPersonController';
 import {
@@ -227,6 +235,45 @@ export function FirstPersonLabScreen() {
     // answer the question the sentence asked.
     handleRunDiscoveryLoop(lookingGlass.problemId ?? undefined);
   }, [lookingGlass]);
+
+  // THE SAME LOOKING GLASS MACHINERY THE CITY USES, proof that it is a
+  // platform and not an epidemic-shaped one-off: event inspection, the mode
+  // machine, and a real comparison, unmodified from worldDirector.ts /
+  // experienceMode.ts / scenarioComparison.ts. The one thing this world does
+  // NOT do that the city does is move the camera from `direction` — there is
+  // no camera-preset system here to drive (the lab is fully player-walked),
+  // and inventing one would be exactly the kind of engine-shaped hack this
+  // seam is meant to avoid. `direction` is therefore read-only here: an
+  // honest readout of what a future camera rig would receive, not a control.
+  const [lgMode, setLgMode] = useState<ExperienceState>(
+    () => initialExperienceState(0, Boolean(lookingGlass?.autoPlay)),
+  );
+  const inspectableEvents = useMemo(() => lookingGlass?.world?.getInspectableEvents() ?? [], [lookingGlass]);
+  const frozenRef = useRef(false);
+  useEffect(() => { frozenRef.current = timeIsFrozen(lgMode); }, [lgMode]);
+  const cinematic = useMemo(
+    () => (lookingGlass?.experience && lookingGlass.world ? new ExperiencePlayer(lookingGlass.experience) : null),
+    [lookingGlass],
+  );
+  const [direction, setDirection] = useState<WorldDirection | null>(null);
+  useEffect(() => {
+    const world = lookingGlass?.world;
+    if (!cinematic || !world) return;
+    cinematic.play();
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      // Capped at 100 ms — see the identical guard in City3DWebGLScreen: one
+      // slow frame must slow playback, not skip states nobody saw.
+      const delta = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      const frame = frozenRef.current ? cinematic.currentFrame : cinematic.advance(delta);
+      if (frame) setDirection(directionForFrame(frame, world, lookingGlass!.viewpoint));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [cinematic, lookingGlass]);
 
   const handleRunDiscoveryLoop = (problemId = 'problem:intervention-timing') => {
     try {
@@ -460,6 +507,53 @@ export function FirstPersonLabScreen() {
             >
               {hudHidden ? 'Pokaż UI' : 'Ukryj UI'}
             </button>
+
+            {/* THE SAME EVENT/EVIDENCE/COMPARE APPARATUS THE CITY USES —
+                proof by reuse rather than by claim that Looking Glass is a
+                platform. Hidden while the player is walking freely and
+                nothing was opened from a sentence, so it never intrudes on
+                the pre-existing, independently-working discovery-loop flow. */}
+            {lookingGlass && inspectableEvents.length > 0 && lgMode.mode !== 'INSPECT' && (
+              <div className="lg-rail">
+                <span className="lg-rail-title">zdarzenia przebiegu ({inspectableEvents.length})</span>
+                <div className="lg-rail-items">
+                  {inspectableEvents.slice(0, 8).map((event) => (
+                    <button
+                      key={event.id}
+                      type="button"
+                      className="lg-rail-item"
+                      onClick={() => setLgMode((current) => inspect(current, event, cinematic?.elapsedSeconds ?? null, lookingGlass.world?.clock))}
+                    >
+                      {event.semanticKind.replace(/_/g, ' ').toLowerCase()} · {event.time.tick}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {lgMode.selectedEvent && (
+              <EventInspector
+                event={lgMode.selectedEvent}
+                allEvents={inspectableEvents}
+                unit={(lookingGlass?.world?.getTemporalRange().unit ?? 'HOUR').toLowerCase()}
+                onClose={() => setLgMode(closeInspection)}
+                onReplay={() => setLgMode(enterReplay)}
+              />
+            )}
+            {lookingGlass && <span className="lg-mode-badge">{MODE_LABEL[lgMode.mode]}</span>}
+            {lgMode.mode !== 'INSPECT' && lookingGlass?.comparison && (
+              <div className="lg-world-cmp">
+                <ComparisonPanel comparison={lookingGlass.comparison} requestedButMissing={false} />
+              </div>
+            )}
+            {direction && lgMode.mode !== 'INSPECT' && (
+              <div className="lg-world-shot">
+                <div className="lg-world-shot-head">
+                  <span className={`lg-world-shot-kind lg-world-shot-${direction.shotKind.toLowerCase()}`}>{direction.shotKind}</span>
+                  <span className="lg-world-shot-cam">{direction.cameraIntent}</span>
+                </div>
+                <p className="lg-world-shot-reason">{direction.reason}</p>
+              </div>
+            )}
           </div>
 
           <div className="gid-stage-footer">

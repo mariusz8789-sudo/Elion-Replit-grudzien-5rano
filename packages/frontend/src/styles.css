@@ -2975,8 +2975,10 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 
 /* Montaż widoczny w świecie: co reżyser wybrał, dlaczego i na jakim dowodzie. */
 .lg-world-shot {
-  position: absolute; left: 50%; top: 1rem; transform: translateX(-50%);
-  z-index: 6; max-width: 30rem; min-width: 20rem;
+  /* Top-left, not centred: the comparison panel owns top-right, and a
+     centred overlay collided with it whenever both were showing at once. */
+  position: absolute; left: 1rem; top: 1rem;
+  z-index: 6; max-width: 26rem; min-width: 18rem;
   padding: 0.6rem 0.75rem; border-radius: 0.55rem;
   background: rgba(8, 13, 22, 0.86); border: 1px solid #24314a; border-left: 3px solid #4fd18b;
   backdrop-filter: blur(6px);
@@ -3109,3 +3111,10 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .lg-cmp-table td.is-up { color: #f0a4a4; }
 .lg-cmp-produced { margin: 0; font-size: 0.68rem; color: #5c6b80; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .lg-cmp-blocked { margin: 0; color: #f0c542; font-size: 0.82rem; line-height: 1.5; }
+
+/* Panel porównania osadzony W ŚWIECIE (nie w czacie) — ta sama karta, inna pozycja. */
+.lg-world-cmp {
+  position: absolute; right: 1rem; top: 1rem; z-index: 6; max-width: 24rem;
+  max-height: calc(100% - 2rem); overflow-y: auto;
+}
+.lg-world-cmp .lg-cmp { background: rgba(8, 13, 22, 0.94); backdrop-filter: blur(8px); }

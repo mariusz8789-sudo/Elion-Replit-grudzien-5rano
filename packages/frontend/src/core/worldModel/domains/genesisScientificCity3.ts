@@ -8,6 +8,7 @@ import type { WorldBlueprint } from '../generation/worldBlueprint';
 import { generateWorld, type GeneratedWorld } from '../generation/worldGenerator';
 import { compileSpecification } from '../specification/compiler';
 import { computeEpidemicParamsFor } from '../specification/templates';
+import { validateWorldInvariants } from '../specification/worldInvariants';
 import type { WorldSpecification } from '../specification/worldSpecification';
 import type { TemporalUpdater } from '../temporal/temporalEngine';
 import { makeGenesisCityRouter, makeGenesisCityUpdater } from './genesisCityWorld';
@@ -264,6 +265,12 @@ export function buildGenesisScientificCity3(options: GenesisScientificCity3Optio
   const wrapped = wrapUnderPlanetAndRegion(compiled.blueprint, 'earth', 'r1');
   const generated = generateWorld(wrapped);
   for (const step of compiled.postGenerate) step(generated.graph);
+
+  const invariants = validateWorldInvariants(generated.graph);
+  if (!invariants.ok) {
+    const summary = invariants.violations.map((v) => (v.entityId ? `${v.entityId}: ${v.message}` : v.message)).join('; ');
+    throw new Error(`Genesis Scientific City 3.0 failed structural invariants: ${summary}`);
+  }
 
   const pumpPipeId: EntityId = 'pump-pipe-system:pump-pipe-1';
   const router = makeGenesisCityRouter(computeEpidemicParamsFor(specification));

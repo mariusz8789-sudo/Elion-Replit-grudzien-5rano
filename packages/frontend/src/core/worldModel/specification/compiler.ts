@@ -5,6 +5,7 @@ import { mulberry32, type WorldBlueprint, type WorldBlueprintNode, type WorldBlu
 import { generateWorld, type GeneratedWorld } from '../generation/worldGenerator';
 import { WORLD_TEMPLATES, type TemplateResult } from './templates';
 import { validateSpecification } from './validation';
+import { validateWorldInvariants } from './worldInvariants';
 import type { WorldSpecification, WorldTemplateId } from './worldSpecification';
 
 /**
@@ -119,11 +120,21 @@ export interface SpecifiedWorld {
  * Convenience end-to-end entry point: compile, generate, and run every
  * `postGenerate` step against the SAME real graph — the same two-phase
  * pattern `domains/genesisCityWorld2.ts` already established by hand, now
- * driven declaratively from a `WorldSpecification`.
+ * driven declaratively from a `WorldSpecification`. Validates the
+ * resulting graph's structural invariants (specification/worldInvariants.ts)
+ * before returning — "fail fast if structurally invalid," never silently
+ * hand back a malformed world.
  */
 export function generateSpecifiedWorld(spec: WorldSpecification): SpecifiedWorld {
   const compiled = compileSpecification(spec);
   const generated = generateWorld(compiled.blueprint);
   for (const step of compiled.postGenerate) step(generated.graph);
+
+  const invariants = validateWorldInvariants(generated.graph);
+  if (!invariants.ok) {
+    const summary = invariants.violations.map((v) => (v.entityId ? `${v.entityId}: ${v.message}` : v.message)).join('; ');
+    throw new Error(`Generated world "${spec.worldId}" failed structural invariants: ${summary}`);
+  }
+
   return { graph: generated.graph, generated, compiled };
 }

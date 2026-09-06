@@ -19,6 +19,7 @@ export * from './specification/worldSpecification';
 export * from './specification/validation';
 export * from './specification/templates';
 export * from './specification/compiler';
+export * from './specification/worldInvariants';
 export * from './crossDomain/crossDomainCoupling';
 export * from './generation/worldModelProposal';
 export * from './domains/genesisScientificCity3';

@@ -286,3 +286,25 @@ describe('Looking Glass — the vantage travels on its own channel', () => {
     expect(peekPendingLookingGlassExperience()).toBeNull();
   });
 });
+
+describe('Looking Glass — the world answers the question that was asked', () => {
+  it('hands the laboratory the problem this session actually ran, not a default', async () => {
+    const { peekPendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+    openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist').enterWorld();
+    // Without this the bench starts its own default problem and answers about
+    // intervention timing while the sentence asked about a cell culture.
+    expect(peekPendingLookingGlassExperience()?.problemId).toBe('problem:cell-population-growth-rate-fastest-to-capacity');
+    clearLookingGlassExperience();
+  });
+
+  it('hands an epidemic session its own epidemiological problem instead', async () => {
+    const { peekPendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+    openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy').enterWorld();
+    expect(peekPendingLookingGlassExperience()?.problemId).toMatch(/lowest-modeled-deaths/);
+    clearLookingGlassExperience();
+  });
+});

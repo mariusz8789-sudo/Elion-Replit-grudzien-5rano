@@ -105,6 +105,8 @@ interface SessionBuild {
   readonly handoffRunId: string | null;
   /** Route that renders this world, or null when none exists yet. */
   readonly worldRoute: string | null;
+  /** Pre-registered problem behind `states`, so a lab can run the same one. */
+  readonly problemId: string | null;
 }
 
 /**
@@ -141,6 +143,7 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
     temporalSource: `scenarioEngine.runScenario(${scenarioId}, { days: ${plan.ticks} })`,
     handoffRunId,
     worldRoute: handoffRunId ? '#/city3d' : null,
+    problemId: problem.problemId,
   };
 }
 
@@ -186,6 +189,7 @@ function buildLaboratorySession(): SessionBuild {
     // live experiment itself rather than a handed-off day series.
     handoffRunId: null,
     worldRoute: '#/first-person-lab',
+    problemId: problem.problemId,
   };
 }
 
@@ -252,6 +256,7 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
         anchorLabel: anchor?.label ?? null,
         autoPlay: anchored !== null,
         secondsPerStep: anchored?.secondsPerStep ?? 1,
+        problemId: built.problemId,
       });
       return built.handoffRunId ? setPendingScenarioTimeline(built.handoffRunId) : true;
     },

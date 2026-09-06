@@ -27,6 +27,13 @@ export interface LookingGlassExperienceHandoff {
   readonly autoPlay: boolean;
   /** Real seconds per world step during playback. */
   readonly secondsPerStep: number;
+  /**
+   * The pre-registered problem this session actually ran, when the world is
+   * a laboratory. Without it the lab starts its own default problem and
+   * shows a different experiment than the sentence asked for — the request
+   * said bioreactor culture, the bench answered about intervention timing.
+   */
+  readonly problemId: string | null;
 }
 
 let pending: LookingGlassExperienceHandoff | null = null;

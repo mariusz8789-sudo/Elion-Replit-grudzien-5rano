@@ -56,7 +56,15 @@ export class SolverRouter {
     return this.solvers.has(solverId);
   }
 
-  routeTick(graph: WorldGraph, dt: number, tick = 0): SolverRouteReport {
+  /**
+   * `dtBySolverId` lets ONE tick over ONE shared world drive several real
+   * solvers that each expect `dt` in their own natural unit (chemistry:
+   * seconds; epidemiology: days; hydraulics: irrelevant, steady-state) —
+   * a per-solver-id override of the outer `dt`, never a unit change to any
+   * solver's own contract. Omit it and every entity gets the same `dt`,
+   * exactly as before (single-domain callers are unaffected).
+   */
+  routeTick(graph: WorldGraph, dt: number, tick = 0, dtBySolverId?: Readonly<Record<string, number>>): SolverRouteReport {
     const updated: EntityId[] = [];
     const ungrounded: EntityId[] = [];
     const observations: Observation[] = [];
@@ -70,7 +78,8 @@ export class SolverRouter {
         continue;
       }
 
-      const ctx: SolverContext = { dt, tick, graph };
+      const effectiveDt = (binding.solverId ? dtBySolverId?.[binding.solverId] : undefined) ?? dt;
+      const ctx: SolverContext = { dt: effectiveDt, tick, graph };
       const solver = binding.solverId ? this.solvers.get(binding.solverId) : undefined;
       const result = solver ? solver(entity, ctx) : proceduralFallback(entity, ctx);
       graph.updateEntity(entity.id, { ...result.patch, grounding: result.grounding });

@@ -5,4 +5,6 @@ export * from './temporal/temporalEngine';
 export * from './solvers/solverRouter';
 export * from './domains/chemistryKinetics';
 export * from './domains/epidemicSEIR';
+export * from './domains/hydraulicsPumpPipe';
+export * from './domains/genesisCityWorld';
 export * from './bridge/worldFrameState';

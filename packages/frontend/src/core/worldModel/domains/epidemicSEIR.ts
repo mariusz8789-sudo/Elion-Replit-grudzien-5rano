@@ -34,9 +34,24 @@ function compartmentsFromState(state: Record<string, number> | undefined, fallba
   };
 }
 
-/** One reusable solver bound to fixed epidemic parameters (R0, infectious period, etc.) — each entity carries its own compartments in `domainState`. */
-export function makeEpidemicSEIRSolver(params: EpidemicParams): DomainSolver {
+/** Epidemic parameters an intervention may legitimately change at runtime (a real contact/infection-control lever, not a structural setting like total population). */
+const OVERRIDABLE_PARAM_KEYS = ['r0', 'infectiousDays', 'incubationDays', 'ifr', 'interventionDay', 'interventionEffect'] as const;
+
+/** Merges any per-entity overrides (set via `executeIntervention`, e.g. `{'domainState.r0': 1.0}` for a real contact-reduction intervention) onto this solver's base parameters. Absent overrides leave the base parameters untouched — no behavior change for entities that never intervened. */
+function effectiveParams(base: EpidemicParams, state: Record<string, number> | undefined): EpidemicParams {
+  if (!state) return base;
+  let params = base;
+  for (const key of OVERRIDABLE_PARAM_KEYS) {
+    const override = state[key];
+    if (override !== undefined && override !== base[key]) params = { ...params, [key]: override };
+  }
+  return params;
+}
+
+/** One reusable solver bound to base epidemic parameters (R0, infectious period, etc.) — each entity carries its own compartments AND any live intervention overrides in `domainState`. */
+export function makeEpidemicSEIRSolver(baseParams: EpidemicParams): DomainSolver {
   return (entity, ctx): SolverResult => {
+    const params = effectiveParams(baseParams, entity.domainState);
     const t = entity.domainState?.t ?? 0;
     const compartments = compartmentsFromState(entity.domainState, initialState(params));
     const dtDays = ctx.dt;
@@ -66,6 +81,7 @@ export function makeEpidemicSEIRSolver(params: EpidemicParams): DomainSolver {
         { key: 'recovered', value: clipped.R, tick: ctx.tick, entity: entity.ref, provenance: ['core/epidemic/sir.ts#rk4Step'] },
         { key: 'dead', value: clipped.D, tick: ctx.tick, entity: entity.ref, provenance: ['core/epidemic/sir.ts#rk4Step'] },
         { key: 'beta', value: beta, tick: ctx.tick, entity: entity.ref, provenance: ['core/epidemic/sir.ts#betaAt'] },
+        { key: 'r0', value: params.r0, tick: ctx.tick, entity: entity.ref, provenance: ['core/epidemic/sir.ts#EpidemicParams.r0'] },
       ],
       provenance: ['core/epidemic/sir.ts', `model:${params.model}`],
     };
@@ -78,7 +94,7 @@ export function makeEpidemicSEIRSolver(params: EpidemicParams): DomainSolver {
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'rk4-integration',
-      parameters: { ...clipped, t: nextT, beta },
+      parameters: { ...clipped, t: nextT, beta, r0: params.r0 },
       provenance: { origin: 'model', modelId: EPIDEMIC_SEIR_SOLVER_ID, paramsHash },
     };
 
@@ -105,16 +121,22 @@ export interface EpidemicWorld {
   params: EpidemicParams;
 }
 
-export function buildEpidemicWorld(options: EpidemicWorldOptions = {}): EpidemicWorld {
+export interface AddPopulationOptions extends EpidemicWorldOptions {
+  parentEntityId?: EntityId;
+  scale?: WorldModelEntity['scale']['level'];
+  label?: string;
+}
+
+/** Adds a population entity bound to the real RK4 SEIR solver — composable: pass `parentEntityId` to nest it (e.g. under a hospital). */
+export function addPopulation(graph: WorldGraph, options: AddPopulationOptions = {}): EntityId {
   const params = options.params ?? DEFAULT_EPIDEMIC;
-  const graph = new WorldGraph();
   const ref = { kind: 'population', id: options.populationId ?? 'city-1' };
   const init = initialState(params);
   const entity: WorldModelEntity = {
     id: entityId(ref),
     ref,
-    label: 'City Population',
-    scale: { level: 'MACRO_CITY' },
+    label: options.label ?? 'City Population',
+    scale: { level: options.scale ?? 'MACRO_CITY', parentEntityId: options.parentEntityId },
     spatial: { position: { x: 0, y: 0, z: 0 } },
     domainState: { S: init.S, E: init.E, I: init.I, R: init.R, D: init.D, t: 0, beta: betaAt(params, 0) },
     domainBinding: { solverId: EPIDEMIC_SEIR_SOLVER_ID, domainId: EPIDEMIC_DOMAIN_ID },
@@ -122,5 +144,12 @@ export function buildEpidemicWorld(options: EpidemicWorldOptions = {}): Epidemic
     updatedAtTick: 0,
   };
   graph.addEntity(entity);
-  return { graph, populationId: entity.id, params };
+  return entity.id;
+}
+
+export function buildEpidemicWorld(options: EpidemicWorldOptions = {}): EpidemicWorld {
+  const params = options.params ?? DEFAULT_EPIDEMIC;
+  const graph = new WorldGraph();
+  const populationId = addPopulation(graph, options);
+  return { graph, populationId, params };
 }

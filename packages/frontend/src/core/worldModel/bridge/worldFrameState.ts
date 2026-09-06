@@ -36,6 +36,8 @@ import type { TemporalBranchInfo, TemporalBranchRegistry, TemporalEngine } from 
  */
 export interface WorldFrameEntity {
   readonly id: EntityId;
+  /** Containment parent (e.g. lab -> substance, hospital -> population) — lets C2 build hierarchy without parsing scale/domain strings. Undefined for a root entity. */
+  readonly parentId?: EntityId;
   readonly ref: EntityRef;
   readonly label: string;
   readonly scaleLevel: ScaleDomain;
@@ -83,6 +85,7 @@ function collectScalars(entity: WorldModelEntity): Record<string, number> {
 function toFrameEntity(entity: WorldModelEntity): WorldFrameEntity {
   return {
     id: entity.id,
+    parentId: entity.scale.parentEntityId,
     ref: entity.ref,
     label: entity.label,
     scaleLevel: entity.scale.level,
@@ -114,6 +117,19 @@ export function getFrameState(engine: TemporalEngine, timestamp?: number): World
   const graph = graphAt(engine, timestamp);
   const events = engine.journal.allEvents().filter((e) => e.timestamp === tick);
   return { tick, simulatedTime: simulatedTimeAt(engine, tick), branchId: engine.branchId, entities: graph.listEntities().map(toFrameEntity), events };
+}
+
+export interface WorldClock {
+  readonly tick: number;
+  readonly simulatedTime: number;
+  readonly branchId: string;
+  readonly canReplay: boolean;
+}
+
+/** For C1: "what time / branch am I observing?" — a one-call summary, optionally at a scrubbed `timestamp`. */
+export function getWorldClock(engine: TemporalEngine, timestamp?: number): WorldClock {
+  const tick = timestamp ?? engine.tick;
+  return { tick, simulatedTime: simulatedTimeAt(engine, tick), branchId: engine.branchId, canReplay: engine.historyLength > 0 };
 }
 
 /** Flat Float32Array of [x,y,z] per entity, in frame order — droppable straight into a WebGPU vertex/instance buffer. */
@@ -160,9 +176,13 @@ export function executeIntervention(
 
 /**
  * Builds a component patch from dotted parameter paths (e.g.
- * `{'spatial.position.x': 5}`) without discarding sibling fields already on
- * the entity — `WorldGraph.updateEntity` replaces a whole component object
- * when present in the patch, so untouched siblings must be carried forward.
+ * `{'spatial.position.x': 5}`, `{'domainState.r0': 1.0}`,
+ * `{'chemical.activationEnergyKJ': 140}`) without discarding sibling fields
+ * already on the entity — `WorldGraph.updateEntity` replaces a whole
+ * component object when present in the patch, so untouched siblings must
+ * be carried forward. `domainState` is included here because it is the
+ * generic ledger real domain solvers read their own intervention-tunable
+ * parameters from (epidemic R0, hydraulic flow rate, ...).
  */
 function parametersToPatch(
   entity: WorldModelEntity,
@@ -175,7 +195,7 @@ function parametersToPatch(
       patch[root] = value;
       continue;
     }
-    if (root === 'spatial' || root === 'physics' || root === 'chemical' || root === 'scale') {
+    if (root === 'spatial' || root === 'physics' || root === 'chemical' || root === 'scale' || root === 'domainState') {
       if (!(root in patch)) patch[root] = deepClone((entity as unknown as Record<string, unknown>)[root] ?? {});
       setPath(patch, [root, ...rest], value);
     }

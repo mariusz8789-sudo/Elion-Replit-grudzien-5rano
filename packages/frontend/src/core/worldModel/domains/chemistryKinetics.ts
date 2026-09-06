@@ -137,34 +137,37 @@ export interface ChemistryExperimentWorld {
   substanceId: EntityId;
 }
 
-/**
- * The first real vertical-slice scenario: a lab (MESO_LAB) containing one
- * substance (MICRO_MOLECULAR) bound to the Arrhenius kinetics solver. Both
- * entities live in the same `WorldGraph` — zooming from lab to substance is
- * a `listChildren`/`zoomInto` read of this one world, never a second
- * simulation.
- */
-export function buildChemistryExperimentWorld(options: ChemistryExperimentOptions = {}): ChemistryExperimentWorld {
-  const graph = new WorldGraph();
+export interface AddChemistryLabOptions {
+  labId?: string;
+  label?: string;
+  parentEntityId?: EntityId;
+  position?: { x: number; y: number; z: number };
+}
 
+/** Adds a lab container (MESO_LAB) to an existing graph — a pure container, not something any solver advances directly. Composable: pass `parentEntityId` to nest it (e.g. under a city). */
+export function addChemistryLab(graph: WorldGraph, options: AddChemistryLabOptions = {}): EntityId {
   const labRef = { kind: 'lab', id: options.labId ?? 'lab-1' };
   const lab: WorldModelEntity = {
     id: entityId(labRef),
     ref: labRef,
-    label: 'Chemistry Lab',
-    scale: { level: 'MESO_LAB' },
-    spatial: { position: { x: 0, y: 0, z: 0 } },
-    grounding: 'UNGROUNDED_APPROXIMATION', // a container, not something any solver advances directly
+    label: options.label ?? 'Chemistry Lab',
+    scale: { level: 'MESO_LAB', parentEntityId: options.parentEntityId },
+    spatial: { position: options.position ?? { x: 0, y: 0, z: 0 } },
+    grounding: 'UNGROUNDED_APPROXIMATION', // NOT_MODELLED: a container, not something any solver advances directly
     updatedAtTick: 0,
   };
   graph.addEntity(lab);
+  return lab.id;
+}
 
+/** Adds a substance (MICRO_MOLECULAR) bound to the real Arrhenius solver as a child of `parentLabId`. */
+export function addChemistrySubstance(graph: WorldGraph, parentLabId: EntityId, options: ChemistryExperimentOptions = {}): EntityId {
   const substanceRef = { kind: 'substance', id: options.substanceId ?? 'substance-1' };
   const substance: WorldModelEntity = {
     id: entityId(substanceRef),
     ref: substanceRef,
     label: options.substanceLabel ?? 'Substance',
-    scale: { level: 'MICRO_MOLECULAR', parentEntityId: lab.id },
+    scale: { level: 'MICRO_MOLECULAR', parentEntityId: parentLabId },
     spatial: { position: { x: 1, y: 0, z: 0 } },
     physics: { massKg: 1, temperatureK: options.initialTemperatureK ?? BASELINE_TEMPERATURE_K },
     chemical: {
@@ -178,6 +181,19 @@ export function buildChemistryExperimentWorld(options: ChemistryExperimentOption
     updatedAtTick: 0,
   };
   graph.addEntity(substance);
+  return substance.id;
+}
 
-  return { graph, labId: lab.id, substanceId: substance.id };
+/**
+ * The first real vertical-slice scenario: a lab (MESO_LAB) containing one
+ * substance (MICRO_MOLECULAR) bound to the Arrhenius kinetics solver. Both
+ * entities live in the same `WorldGraph` — zooming from lab to substance is
+ * a `listChildren`/`zoomInto` read of this one world, never a second
+ * simulation.
+ */
+export function buildChemistryExperimentWorld(options: ChemistryExperimentOptions = {}): ChemistryExperimentWorld {
+  const graph = new WorldGraph();
+  const labId = addChemistryLab(graph, { labId: options.labId });
+  const substanceId = addChemistrySubstance(graph, labId, options);
+  return { graph, labId, substanceId };
 }

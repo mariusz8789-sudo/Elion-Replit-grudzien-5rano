@@ -8,6 +8,7 @@ export * from './domains/chemistryKinetics';
 export * from './domains/epidemicSEIR';
 export * from './domains/hydraulicsPumpPipe';
 export * from './domains/genesisCityWorld';
+export * from './domains/genesisCityWorld2';
 export * from './bridge/worldFrameState';
 export * from './generation/worldBlueprint';
 export * from './generation/worldGenerator';

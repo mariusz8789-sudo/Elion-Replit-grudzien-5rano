@@ -6,7 +6,7 @@ import { CameraFlight, flightBetween } from '../reality/cameraSequencer';
 import type { HospitalStatus } from '../simulation/hospitalResource';
 import type { ScenarioDaySample } from '../simulation/scenarioEngine';
 import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
-import { FocusPuller } from './graphics/cinematicCamera';
+import { FocusPuller, configureCinematicCamera, type CinematicCameraProfile } from './graphics/cinematicCamera';
 import { captureRoomReflectionProbe } from './graphics/lighting';
 
 /**
@@ -446,6 +446,10 @@ export class LabScene3D implements Sim3D {
   // skonfigurowana wewnątrz setupPostProcessing i nie wymaga dalszego dotyku.
   private graphicsPipeline: GraphicsPipeline | null = null;
   private focusPuller: FocusPuller | null = null;
+  // GENESIS GRAPHICS ENGINE — lens/optics per shot (see `graphics/cinematicCamera.ts`). Tracks the
+  // last-applied profile so `syncScene` only touches `camera.fov`/near/far/`updateProjectionMatrix`
+  // on an actual shot change, not every frame.
+  private appliedCinematicProfile: CinematicCameraProfile | null = null;
   // Agitator wewnątrz naczynia i pierścień holograficzny nad nim — czysto
   // dekoracyjne, ale ich prędkość obrotu/intensywność są sterowane REALNYMI
   // wartościami (vesselFraction/vesselIcuFraction), nigdy zmyśloną liczbą
@@ -3262,6 +3266,26 @@ export class LabScene3D implements Sim3D {
         camera.position.y += Math.sin(this.fixedBreatheT * 0.5 + 1.3) * 0.02;
       }
       camera.lookAt(this.liveCameraLookAt[0], this.liveCameraLookAt[1], this.liveCameraLookAt[2]);
+    }
+
+    // GENESIS GRAPHICS ENGINE — obiektyw (FOV/near/far) dobrany do bieżącego
+    // kadru przez `configureCinematicCamera`, nie jeden stały kąt na cały
+    // czas: WIDE (kadr otwierający) i FREE (pierwsza osoba) zostają na
+    // szerokim 68° (patrz profile WIDE_ESTABLISHING/SCIENTIST_POV — obie
+    // celowo bez zmiany dotychczasowego zachowania), ale SCIENTIFIC/ANOMALY/
+    // REPLAY dostają realny ciaśniejszy obiektyw (HERO_CLOSE_UP, 40°) zamiast
+    // tego samego szerokiego kadru co scena otwierająca — dopiero to razem z
+    // DOF poniżej robi z tych ujęć faktyczne zbliżenie kinowe, nie tylko
+    // rozmycie tła w niezmienionym kadrze. Zastosowywane WYŁĄCZNIE przy
+    // zmianie ujęcia (nie co klatkę) przez `appliedCinematicProfile`.
+    const desiredProfile: CinematicCameraProfile = this.cameraPhase === 'FREE' || this.flightGoingToFree
+      ? 'SCIENTIST_POV'
+      : this.fixedKind === 'WIDE'
+        ? 'WIDE_ESTABLISHING'
+        : 'HERO_CLOSE_UP';
+    if (desiredProfile !== this.appliedCinematicProfile) {
+      configureCinematicCamera(camera, desiredProfile);
+      this.appliedCinematicProfile = desiredProfile;
     }
 
     // GENESIS GRAPHICS ENGINE — DOF włączone TYLKO na kadrach zbliżenia na

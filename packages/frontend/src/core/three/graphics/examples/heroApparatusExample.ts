@@ -4,6 +4,7 @@ import { InstanceBatch } from '../instancing';
 import { createHeroLight } from '../lighting';
 import { applyShadowPolicy } from '../shadowPolicy';
 import type { DepthOfFieldSettings } from '../postProcessing';
+import { applyValueToEmissive, applyFractionToScale } from '../stateVisualization';
 
 /**
  * GENESIS GRAPHICS RUNTIME — Integration Example: a hero apparatus
@@ -20,7 +21,9 @@ import type { DepthOfFieldSettings } from '../postProcessing';
  *   Shadow policy         → `applyShadowPolicy` (with a `forceCast` override)
  *   Optional DOF          → a `DepthOfFieldSettings` value the caller can hand to
  *                           `setupGraphicsPipeline` when they know the shot's focus distance
- *   Scientific state hook → `updateVisualState(fraction, status)`
+ *   Scientific state hook → `updateVisualState(fraction, status)`, itself built on
+ *                           `stateVisualization.ts`'s `applyFractionToScale`/`applyValueToEmissive`
+ *                           instead of hand-rolled `.setHex()`/`.scale.y =` calls
  *
  * The geometry here (a cylinder chamber, a box frame, some bolts) is
  * deliberately generic filler — it is NOT the flagship reactor vessel, and
@@ -31,11 +34,15 @@ import type { DepthOfFieldSettings } from '../postProcessing';
 
 export type ExampleVisualStatus = 'idle' | 'nominal' | 'warning' | 'critical';
 
-const STATUS_COLOR: Record<ExampleVisualStatus, number> = {
-  idle: 0x5a6786,
-  nominal: 0x3fa9f5,
-  warning: 0xf0c542,
-  critical: 0xf24444,
+/** Maps the discrete status vocabulary onto `stateVisualization.ts`'s continuous 0..1 severity
+ * scale — the same "how concerning is this" axis a numeric value (an Rt, an occupancy fraction)
+ * would use directly, so a status enum and a raw measurement can share one color language instead
+ * of each scene inventing its own status→color table by hand. */
+const STATUS_SEVERITY: Record<ExampleVisualStatus, number> = {
+  idle: 0,
+  nominal: 0.15,
+  warning: 0.6,
+  critical: 1,
 };
 
 export interface ExampleHeroApparatusOptions {
@@ -102,7 +109,8 @@ export function buildExampleHeroApparatus(
 
   // The "fill" — a simple standard-material cylinder inside the chamber, scaled/colored by
   // updateVisualState exactly like the real vessel's fluid mesh.
-  const fillMaterial = new THREE.MeshStandardMaterial({ color: STATUS_COLOR.idle, emissive: STATUS_COLOR.idle, emissiveIntensity: 0.4, roughness: 0.3 });
+  const fillMaterial = new THREE.MeshStandardMaterial({ roughness: 0.3 });
+  applyValueToEmissive(fillMaterial, THREE, STATUS_SEVERITY.idle, { updateBaseColor: true, minIntensity: 0.25, maxIntensity: 0.6 });
   const fill = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 1, 24), fillMaterial);
   fill.position.y = 0.2;
   fill.scale.y = 0.001;
@@ -123,7 +131,7 @@ export function buildExampleHeroApparatus(
 
   // --- INSTRUMENTATION: a small but functionally important status light. Deliberately BELOW the
   // shadow policy's size threshold — this is exactly the case `forceCast` exists for. ---
-  const statusLightMaterial = createEmissiveInstrumentMaterial(THREE, { color: STATUS_COLOR.idle, intensity: 0.9 });
+  const statusLightMaterial = createEmissiveInstrumentMaterial(THREE, { color: 0x5a6786, intensity: 0.9 });
   const statusLight = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), statusLightMaterial);
   statusLight.position.set(0, 1.35, 0.42);
   group.add(statusLight);
@@ -146,12 +154,16 @@ export function buildExampleHeroApparatus(
     group,
     updateVisualState(fraction, status) {
       const clamped = Math.max(0, Math.min(1, fraction));
-      const color = STATUS_COLOR[status];
-      fill.scale.y = Math.max(0.001, clamped);
+      // stateVisualization.ts's applyFractionToScale only owns the scale half of "fill grows from
+      // a fixed base" — it has no opinion on keeping the mesh anchored to that base as it grows,
+      // since not every fraction-driven scale is a bottom-anchored fill (a gauge needle, a bar
+      // chart column growing from its own center wouldn't want this). That positioning stays this
+      // example's own domain knowledge, same as the real vessel's fluid mesh.
+      applyFractionToScale(fill, clamped, { axis: 'y', min: 0.001 });
       fill.position.y = 0.2 + (clamped * 1) / 2;
-      fillMaterial.color.setHex(color);
-      fillMaterial.emissive.setHex(color);
-      statusLightMaterial.emissive.setHex(color);
+      const severity = STATUS_SEVERITY[status];
+      applyValueToEmissive(fillMaterial, THREE, severity, { updateBaseColor: true, minIntensity: 0.25, maxIntensity: 0.6 });
+      applyValueToEmissive(statusLightMaterial, THREE, severity, { minIntensity: 0.6, maxIntensity: 1.1 });
     },
     suggestedDofSettings(cameraDistance) {
       return { enabled: true, focusDistance: cameraDistance, blurStrength: 0.3 };

@@ -21,6 +21,7 @@ beforeAll(() => {
 });
 
 import { buildExampleHeroApparatus } from '../core/three/graphics/examples/heroApparatusExample';
+import { severityColor } from '../core/three/graphics/stateVisualization';
 
 describe('buildExampleHeroApparatus — integration smoke test', () => {
   it('builds without throwing and adds a group to the scene', () => {
@@ -59,7 +60,7 @@ describe('buildExampleHeroApparatus — integration smoke test', () => {
     expect(instancedMeshes[0]!.count).toBe(16);
   });
 
-  it('scientific-state hook drives fill scale and color, never a fabricated value', () => {
+  it('scientific-state hook drives fill scale and color (via stateVisualization.ts), never a fabricated value', () => {
     const scene = new THREE.Scene();
     const handles = buildExampleHeroApparatus(THREE, scene, { position: [0, 0, 0] });
     const fill = handles.group.children.find((c) => c.name === 'exampleApparatusFill') as THREE.Mesh | undefined;
@@ -68,11 +69,11 @@ describe('buildExampleHeroApparatus — integration smoke test', () => {
     handles.updateVisualState(0.75, 'warning');
     expect(fill!.scale.y).toBeCloseTo(0.75);
     const material = fill!.material as THREE.MeshStandardMaterial;
-    expect(material.emissive.getHex()).toBe(0xf0c542);
+    expect(material.emissive.getHex()).toBe(severityColor(THREE, 0.6).getHex());
 
     handles.updateVisualState(0.1, 'critical');
     expect(fill!.scale.y).toBeCloseTo(0.1);
-    expect(material.emissive.getHex()).toBe(0xf24444);
+    expect(material.emissive.getHex()).toBe(severityColor(THREE, 1).getHex());
   });
 
   it('clamps fraction to [0, 1] rather than trusting out-of-range input', () => {

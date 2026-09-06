@@ -11,6 +11,8 @@ import type { SavedScenarioReplay } from '../core/simulation/scenarioMemory';
 import { replaySavedScenarioCounterfactual, type SavedScenarioCounterfactualReplay } from '../core/simulation/scenarioCounterfactual';
 import { replaySavedCompositionCompute, type CompositionComputeReplay } from '../core/naturalCompositionCompute';
 import { replaySavedHypothesisLoop, type HypothesisLoopReplay } from '../core/experimentFabric/hypothesisLoop';
+import { buildCounterfactualEvidencePack, type CounterfactualEvidenceResult } from '../core/experimentFabric/counterfactualEvidence';
+import { compareScientificEvidencePacks, saveScientificEvidencePack } from '../core/experimentFabric/evidencePackStore';
 
 function downloadJson(record: SavedExperiment): void {
   const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
@@ -46,6 +48,9 @@ export function ScientificMemoryScreen() {
   const [counterfactualReplay, setCounterfactualReplay] = useState<Record<string, SavedScenarioCounterfactualReplay>>({});
   const [computeReplay, setComputeReplay] = useState<Record<string, CompositionComputeReplay>>({});
   const [loopReplay, setLoopReplay] = useState<Record<string, HypothesisLoopReplay>>({});
+  // Evidence Pack budowany z zapisanego kontrfaktyku przez ISTNIEJĄCY protokół.
+  const [evidenceResult, setEvidenceResult] = useState<Record<string, CounterfactualEvidenceResult>>({});
+  const [evidenceVerdict, setEvidenceVerdict] = useState<Record<string, string>>({});
   const countLabel = useMemo(() => `${records.length} ${records.length === 1 ? 'zapis' : 'zapisów'}`, [records.length]);
 
   /**
@@ -88,6 +93,41 @@ export function ScientificMemoryScreen() {
       return;
     }
     setNotice(`Świat 3D nie został otwarty: odtworzenie kontrfaktyku zakończyło się werdyktem ${result.replay.status}. Niezweryfikowany przebieg nie trafia do sceny.`);
+  };
+
+  /**
+   * Buduje Evidence Pack z zapisanego artefaktu i — tylko przy CREATED —
+   * utrwala go w istniejącym Evidence Store. Każdy inny status jest
+   * pokazywany z prawdziwym powodem i niczego nie zapisuje.
+   */
+  const createEvidencePack = (record: SavedExperiment) => {
+    const result = buildCounterfactualEvidencePack(record.counterfactual);
+    setEvidenceResult((current) => ({ ...current, [record.id]: result }));
+    if (result.status === 'CREATED' && result.pack !== null) {
+      saveScientificEvidencePack(result.pack);
+      setNotice(`Evidence Pack ${result.pack.evidencePackId} zapisany w istniejącym Evidence Store (${result.pack.runCount} realnych przebiegów).`);
+    } else {
+      setNotice(`Evidence Pack nie powstał (${result.status}). ${result.reason}`);
+    }
+  };
+
+  /** Odtwarza paczkę z tego samego artefaktu i porównuje ją z pierwszą. */
+  const replayEvidencePack = (record: SavedExperiment, mutateLever: boolean) => {
+    const reference = evidenceResult[record.id]?.pack;
+    if (!reference || !record.counterfactual) return;
+    const source = mutateLever
+      ? {
+          ...record.counterfactual,
+          variant: { ...record.counterfactual.variant, interventionStartDay: record.counterfactual.variant.interventionStartDay + 4 },
+        }
+      : record.counterfactual;
+    const replayed = buildCounterfactualEvidencePack(source);
+    setEvidenceVerdict((current) => ({
+      ...current,
+      [record.id]: replayed.pack === null
+        ? `${replayed.status} — ${replayed.reason}`
+        : `${compareScientificEvidencePacks(reference, replayed.pack)} · pack ${replayed.pack.evidencePackId}`,
+    }));
   };
 
   const openRecord = (record: SavedExperiment) => {
@@ -220,6 +260,19 @@ export function ScientificMemoryScreen() {
                   <div className="stat-row"><span>Odcisk kontrfaktyku</span><span className="val mono">{record.counterfactual.counterfactualFingerprint}</span></div>
                   {record.counterfactual.preparedness && <div className="stat-row"><span>Rządzone pytanie</span><span className="val">{record.counterfactual.preparedness.questionId} · „{record.counterfactual.preparedness.askedText}"</span></div>}
                   {record.counterfactual.variant.disclosure && <div className="stat-row"><span>NOT_MODELED (ramię wariantu)</span><span className="val">{record.counterfactual.variant.disclosure.notModeled.map((entry) => entry.effect).join(', ')}</span></div>}
+                  {evidenceResult[record.id] && <>
+                    <div className="stat-row"><span>Evidence Pack</span><span className="val">{evidenceResult[record.id]!.status}{evidenceResult[record.id]!.pack ? ` · ${evidenceResult[record.id]!.pack!.evidencePackId}` : ''}</span></div>
+                    {evidenceResult[record.id]!.pack && <>
+                      <div className="stat-row"><span>Pack ↔ scenariusz</span><span className="val mono">chain {evidenceResult[record.id]!.pack!.evidenceChainId} · protokół {evidenceResult[record.id]!.pack!.protocol.protocolFingerprint}</span></div>
+                      <div className="stat-row"><span>Realne przebiegi w paczce</span><span className="val mono">{evidenceResult[record.id]!.pack!.runs.map((run) => run.runId).join(', ')}</span></div>
+                      <div className="stat-row"><span>Odciski przebiegów</span><span className="val mono">{evidenceResult[record.id]!.pack!.runs.map((run) => run.provenance.runFingerprint).join(', ')}</span></div>
+                      <div className="stat-row"><span>Prerejestrowane kryterium</span><span className="val">{evidenceResult[record.id]!.pack!.protocol.hypothesis.falsification.metric} {evidenceResult[record.id]!.pack!.protocol.hypothesis.falsification.relation}</span></div>
+                      <div className="stat-row"><span>Ocena hipotezy</span><span className="val">{evidenceResult[record.id]!.pack!.hypothesisAssessment.assessment}</span></div>
+                      <div className="stat-row"><span>Reprodukowalność armów</span><span className="val">allArmsMatched={String(evidenceResult[record.id]!.pack!.reproducibility.allArmsMatched)} · drift {evidenceResult[record.id]!.pack!.reproducibility.armsWithDrift.length}</span></div>
+                      <div className="stat-row"><span>Zmieniona dźwignia</span><span className="val mono">{evidenceResult[record.id]!.sweptLever ?? 'brak'}</span></div>
+                    </>}
+                    {evidenceVerdict[record.id] && <div className="stat-row"><span>Odtworzenie paczki</span><span className="val">{evidenceVerdict[record.id]}</span></div>}
+                  </>}
                   {record.counterfactual.metrics.map((metric) => (
                     <div className="stat-row" key={metric.key}>
                       <span>Δ {metric.key}</span>
@@ -310,6 +363,13 @@ export function ScientificMemoryScreen() {
                   )}
                 </>
               )}
+              {evidenceResult[record.id] && (
+                <p className="settings-hint" role="status">
+                  Evidence Pack: {evidenceResult[record.id]!.status} — {evidenceResult[record.id]!.reason}{' '}
+                  Paczka powstaje wyłącznie po odtworzeniu OBU ramion i zawiera realne przebiegi Experiment Fabric,
+                  nie migawkę zapisanego artefaktu.
+                </p>
+              )}
               {record.execution?.summary && <p className="settings-hint">{record.execution.summary}</p>}
               {record.biotech && record.biotech.provenance.length > 0 && (
                 <details className="settings-details">
@@ -350,6 +410,11 @@ export function ScientificMemoryScreen() {
                 {record.counterfactual && <>
                   <button className="chip-btn pilot-primary" onClick={() => replayCounterfactualRecord(record, false)}>Odtwórz oba ramiona</button>
                   <button className="chip-btn" onClick={() => replayCounterfactualRecord(record, true)}>Podmień różnicę → DRIFT</button>
+                  <button className="chip-btn pilot-primary" onClick={() => createEvidencePack(record)}>Utwórz Evidence Pack</button>
+                  {evidenceResult[record.id]?.pack && <>
+                    <button className="chip-btn" onClick={() => replayEvidencePack(record, false)}>Odtwórz paczkę</button>
+                    <button className="chip-btn" onClick={() => replayEvidencePack(record, true)}>Zmień dźwignię → nie-MATCH</button>
+                  </>}
                 </>}
                 {record.hypothesisLoop && <>
                   <button className="chip-btn pilot-primary" onClick={() => setLoopReplay((current) => ({ ...current, [record.id]: replaySavedHypothesisLoop(record.hypothesisLoop) }))}>Odtwórz pętlę hipotez</button>

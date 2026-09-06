@@ -2,6 +2,8 @@ import type { WorldCameraMode } from '../world/cameraPolicy';
 import { frameAt, type ExperienceFrame, type ExperienceTimeline } from './experienceOrchestrator';
 import type { EvidenceRef, ScenarioWorld } from './scenarioWorld';
 import type { ShotKind } from './shotPlan';
+import { PERSPECTIVES, perspectiveRequest, type PerspectiveRequest } from './perspective';
+import type { ViewpointKind } from './scenarioRequest';
 
 /**
  * LOOKING GLASS — DIRECTING THE ACTUAL WORLD.
@@ -46,6 +48,13 @@ export interface WorldDirection {
 
   /** Camera intent in the existing vocabulary. The screen maps it to its own presets. */
   readonly cameraIntent: WorldCameraMode;
+  /**
+   * The full payload the Graphics Engine camera rig consumes: vantage,
+   * target and world extent, with no scientific semantics. Emitted now so a
+   * screen passes it straight through the moment the rig exists, instead of
+   * each world keeping its own intent-to-preset table forever.
+   */
+  readonly cameraRequest: PerspectiveRequest;
 
   /**
    * The world time to display, or null when it must not be moved. A screen
@@ -73,11 +82,28 @@ export function directionAt(
 ): WorldDirection | null {
   const frame = frameAt(timeline, seconds);
   if (!frame) return null;
-  return directionForFrame(frame, world);
+  return directionForFrame(frame, world, timeline.viewpoint);
 }
 
-export function directionForFrame(frame: ExperienceFrame, world: ScenarioWorld): WorldDirection {
+export function directionForFrame(
+  frame: ExperienceFrame,
+  world: ScenarioWorld,
+  viewpoint: ViewpointKind = 'OBSERVER',
+): WorldDirection {
   const range = world.getTemporalRange();
+  const bounds = world.getBounds();
+  const centre: readonly [number, number, number] = [
+    (bounds.min[0] + bounds.max[0]) / 2,
+    bounds.min[1] + (PERSPECTIVES[viewpoint].eyeHeight ?? (bounds.max[1] - bounds.min[1]) * 0.4),
+    (bounds.min[2] + bounds.max[2]) / 2,
+  ];
+  // A shot that cuts to a different vantage than the viewer's own (the
+  // establishing wide, the closing wide) requests that vantage, not theirs.
+  const shotViewpoint: ViewpointKind = frame.cameraMode === 'WIDE' ? 'WIDE'
+    : frame.cameraMode === 'MACRO' ? 'MACRO'
+    : frame.cameraMode === 'CINEMATIC' ? 'OBSERVER'
+    : viewpoint;
+  const cameraRequest = perspectiveRequest(shotViewpoint, centre, bounds);
   const evidence = frame.activeMarkerIds
     .map((id) => world.getEvidence(id))
     .filter((entry): entry is EvidenceRef => entry !== null);
@@ -87,14 +113,25 @@ export function directionForFrame(frame: ExperienceFrame, world: ScenarioWorld):
 
   if (frame.shot.sourceMarkerId === null) {
     // Structural shot: its ticks are the plan's own span, which IS the
-    // viewer's clock, so it may drive the timeline — clamped to what exists.
-    worldTime = Math.max(range.from, Math.min(range.to, frame.worldTick));
+    // viewer's clock. The clock decides what may be shown — a run with gaps
+    // snaps to a real tick rather than landing on a state nobody computed.
+    const resolved = world.clock.resolve({
+      source: 'SEQUENCE',
+      tick: frame.worldTick,
+      current: range.from,
+    });
+    worldTime = resolved.granted ? resolved.worldTime : null;
     worldTimeSource = frame.shot.kind === 'TEMPORAL' ? 'VIEWER_CLOCK' : 'SHOT_SPAN';
   } else {
     const marker = [...world.getEvents(frame.worldTick, frame.worldTick)]
       .find((event) => event.id === frame.shot.sourceMarkerId);
-    if (marker?.time.onViewerClock) {
-      worldTime = marker.time.tick;
+    const resolved = marker
+      ? world.clock.resolveForeign({
+        source: 'EVENT_JUMP', tick: marker.time.tick, current: range.from, onViewerClock: marker.time.onViewerClock,
+      })
+      : null;
+    if (resolved?.granted) {
+      worldTime = resolved.worldTime;
       worldTimeSource = 'VIEWER_CLOCK';
     } else {
       // Either an observation (indexed by state, not by day) or an event from
@@ -112,6 +149,7 @@ export function directionForFrame(frame: ExperienceFrame, world: ScenarioWorld):
     isCut: frame.isCut,
     finished: frame.finished,
     cameraIntent: frame.cameraMode,
+    cameraRequest,
     worldTime,
     worldTimeSource,
     stateIndex: frame.stateIndex,
@@ -128,10 +166,16 @@ export function directionForFrame(frame: ExperienceFrame, world: ScenarioWorld):
 export type CityStylePreset = 'city' | 'district' | 'street' | 'agent';
 
 /**
- * Camera INTENT to a city-style world's presets. Generic by construction —
- * it reads the intent, never the domain, so a second world with the same
- * four vantages reuses it and a world with different ones writes its own
- * mapping without touching the director.
+ * STAND-IN, TO BE DELETED. Maps a camera intent onto the four presets a
+ * city-style world happens to expose.
+ *
+ * This is camera realization, which belongs to the Graphics Engine, not
+ * here — the product layer should say "a person standing on the street" and
+ * the engine should decide where that camera physically goes. It survives
+ * only because the engine's camera rig does not exist yet, and it is
+ * deliberately the whole of the duplication rather than a scattering of it:
+ * one function, one call site, driven by `WorldDirection.cameraRequest`'s
+ * intent, so removing it is a single deletion once the rig lands.
  */
 export function cityPresetFor(intent: WorldCameraMode): CityStylePreset {
   switch (intent) {

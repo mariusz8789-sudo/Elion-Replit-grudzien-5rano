@@ -6,9 +6,11 @@ import { runScenario, SCENARIOS, type ScenarioId, type ScenarioRun } from '../si
 import { registerScenarioTimeline, setPendingScenarioTimeline } from '../experimentFabric/worldHandoff';
 import { projectEpidemiologyWorldStates } from '../world/epidemiologyWorldAdapter';
 import { buildAnchoredSequence, type AnchoredTemporalSequence, type TemporalAnchor } from './anchoredTemporal';
+import type { WorldBounds as ScenarioWorldBounds } from './scenarioWorld';
 import { buildShotPlan, type ShotPlan } from './shotPlan';
 import { buildExperienceTimeline, type ExperienceTimeline } from './experienceOrchestrator';
 import { buildScenarioWorld, type PerspectiveOption, type ScenarioWorld } from './scenarioWorld';
+import { PERSPECTIVES, perspectiveRequest, placeCamera, type PerspectiveRequest } from './perspective';
 import { DOMAIN_PERSPECTIVE_SOURCE } from './scenarioResolution';
 import { setPendingLookingGlassExperience } from './sessionHandoff';
 import { parseScenarioRequest, type StructuredScenarioRequest } from './scenarioRequest';
@@ -84,30 +86,44 @@ function perspectivesFor(kind: Parameters<typeof DOMAIN_PERSPECTIVE_SOURCE>[0]):
   return DOMAIN_PERSPECTIVE_SOURCE(kind);
 }
 
-/** Anchors are placement, not science: where a person stands to watch. */
-const ANCHORS: Readonly<Record<string, TemporalAnchor>> = {
-  street: { position: [0, 0, 6], yaw: Math.PI, pitch: -0.05, eyeHeight: 1.7, label: 'street' },
-  bench: { position: [2.5, 0, 7], yaw: Math.PI * 0.85, pitch: -0.08, eyeHeight: 1.25, label: 'bench' },
-  rooftop: { position: [0, 12, 10], yaw: Math.PI, pitch: -0.35, eyeHeight: 1.7, label: 'rooftop' },
-  window: { position: [-4, 3, 8], yaw: Math.PI * 0.9, pitch: -0.15, eyeHeight: 1.6, label: 'window' },
-  coast: { position: [0, 1, 14], yaw: Math.PI, pitch: -0.05, eyeHeight: 1.7, label: 'coast' },
-  room: { position: [0, 0, 3.3], yaw: 0, pitch: 0, eyeHeight: 1.7, label: 'room' },
-  // Seated in a vehicle: lower eye height, and off the pavement centre line.
-  car: { position: [1.4, 0, 5.5], yaw: Math.PI * 0.94, pitch: -0.02, eyeHeight: 1.15, label: 'car' },
-  vehicle: { position: [-1.2, 0, 5.5], yaw: Math.PI * 1.05, pitch: -0.02, eyeHeight: 1.45, label: 'vehicle' },
-};
+/**
+ * Where the vantage stands, DERIVED rather than looked up. The old table of
+ * hardcoded coordinates per hint string meant each world needed its own
+ * positions and each new vantage meant editing a switch; a placement is now
+ * computed from the perspective definition and the world's real extent, so
+ * the same CITIZEN vantage works in a twelve-metre laboratory and a
+ * sixty-metre city without either knowing it exists.
+ */
+function anchorFor(plan: ScenarioRunPlan, bounds: ScenarioWorldBounds): TemporalAnchor | null {
+  const definition = PERSPECTIVES[plan.viewpoint.kind];
+  if (definition.eyeHeight === null) return null;
 
-const DEFAULT_ANCHOR: TemporalAnchor = ANCHORS.room;
+  const target: [number, number, number] = [
+    (bounds.min[0] + bounds.max[0]) / 2,
+    bounds.min[1] + definition.eyeHeight,
+    (bounds.min[2] + bounds.max[2]) / 2,
+  ];
+  const placement = placeCamera(perspectiveRequest(plan.viewpoint.kind, target, bounds));
+  const [px, , pz] = placement.position;
+  return {
+    position: placement.position,
+    // Face the subject from wherever the placement put us.
+    yaw: Math.atan2(target[0] - px, target[2] - pz),
+    pitch: definition.elevation * -1,
+    eyeHeight: definition.eyeHeight,
+    label: plan.viewpoint.anchorHint ?? definition.label.toLowerCase(),
+  };
+}
 
-function anchorFor(plan: ScenarioRunPlan): TemporalAnchor | null {
-  const embodied = plan.viewpoint.kind === 'ANCHORED_HUMAN'
-    || plan.viewpoint.kind === 'SCIENTIST_POV'
-    || plan.viewpoint.kind === 'OPERATOR_POV'
-    || plan.viewpoint.kind === 'RESPONDER_POV'
-    || plan.viewpoint.kind === 'DRIVER_POV';
-  if (!embodied) return null;
-  const hint = plan.viewpoint.anchorHint;
-  return (hint && ANCHORS[hint]) || DEFAULT_ANCHOR;
+/** The request handed to the Graphics Engine camera rig once it exists. */
+export function cameraRequestFor(plan: ScenarioRunPlan, bounds: ScenarioWorldBounds): PerspectiveRequest {
+  const definition = PERSPECTIVES[plan.viewpoint.kind];
+  const target: [number, number, number] = [
+    (bounds.min[0] + bounds.max[0]) / 2,
+    bounds.min[1] + (definition.eyeHeight ?? (bounds.max[1] - bounds.min[1]) * 0.4),
+    (bounds.min[2] + bounds.max[2]) / 2,
+  ];
+  return perspectiveRequest(plan.viewpoint.kind, target, bounds);
 }
 
 /**
@@ -262,7 +278,7 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
 
   const timeline = captureWorldTimeline(null, [...built.states]);
   const shotPlan = buildShotPlan(timeline, plan);
-  const anchor = anchorFor(plan);
+  const anchor = anchorFor(plan, built.bounds);
   const anchored = anchor
     ? buildAnchoredSequence(anchor, built.temporalTicks, plan.unit, {
       // One real second per world step keeps 60 days at roughly a minute —

@@ -3,6 +3,7 @@ import type { WorldCaptureTimeline } from '../world/worldCapture';
 import type { TemporalUnit, ViewpointKind } from './scenarioRequest';
 import type { ShotAxis } from './shotPlan';
 import { collectInspectableEvents, type InspectableEvent } from './eventInspection';
+import { WorldClock } from './worldClock';
 
 /**
  * LOOKING GLASS — THE UNIVERSAL SCENARIO CONTRACT.
@@ -103,6 +104,12 @@ export interface ScenarioWorld {
   getInspectableEvents(): readonly InspectableEvent[];
   inspectEvent(eventId: string): InspectableEvent | null;
   getAvailablePerspectives(): readonly PerspectiveOption[];
+  /**
+   * The one authority on what time this world may be shown at. Every path
+   * that moves the clock — sequence, scrub, event jump, replay — resolves
+   * through it, so the rule cannot drift apart across call sites again.
+   */
+  readonly clock: WorldClock;
   getBounds(): WorldBounds;
 }
 
@@ -174,6 +181,7 @@ export function buildScenarioWorld(input: ScenarioWorldInput): ScenarioWorld {
   });
   const inspectableById = new Map(inspectable.map((event) => [event.id, event]));
 
+  const clock = new WorldClock(input.viewerTicks);
   const first = input.viewerTicks[0] ?? 0;
   const last = input.viewerTicks[input.viewerTicks.length - 1] ?? first;
 
@@ -186,6 +194,7 @@ export function buildScenarioWorld(input: ScenarioWorldInput): ScenarioWorld {
     getEvents: (fromTick, toTick) => events.filter((event) => event.time.tick >= fromTick && event.time.tick <= toTick),
     getObservables: (fromTick, toTick) => observables.filter((o) => o.time.tick >= fromTick && o.time.tick <= toTick),
     getEvidence: (markerId) => evidenceById.get(markerId) ?? null,
+    clock,
     getInspectableEvents: () => inspectable,
     inspectEvent: (eventId) => inspectableById.get(eventId) ?? null,
     getAvailablePerspectives: () => input.perspectives,

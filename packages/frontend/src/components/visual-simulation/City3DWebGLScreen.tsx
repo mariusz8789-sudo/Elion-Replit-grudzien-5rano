@@ -240,10 +240,16 @@ export function City3DWebGLScreen() {
       // merely hiding it.
       const frame = frozenRef.current ? cinematic.currentFrame : cinematic.advance(delta);
       if (frame) {
-        const next = directionForFrame(frame, world);
+        const next = directionForFrame(frame, world, lookingGlass?.viewpoint);
         setDirection(next);
         if (next.worldTime !== null) {
-          setTimelineDay(Math.max(0, Math.min(lastDay, Math.round(next.worldTime))));
+          // No local clamp: the director already resolved this through the
+          // world's clock, which knows which ticks the run really produced.
+          // A second, different rule here is how these paths drifted apart
+          // before. The index is looked up rather than assumed equal to the
+          // day, so a run with gaps still addresses the right sample.
+          const index = world.clock.allTicks.indexOf(next.worldTime);
+          setTimelineDay(index >= 0 ? Math.min(index, lastDay) : Math.min(Math.round(next.worldTime), lastDay));
         }
         const preset = cityPresetFor(next.cameraIntent);
         // Only on an actual change: re-applying a preset every frame would
@@ -419,7 +425,7 @@ export function City3DWebGLScreen() {
                       key={event.id}
                       type="button"
                       className="lg-rail-item"
-                      onClick={() => setExperience((current) => inspect(current, event, cinematic?.elapsedSeconds ?? null))}
+                      onClick={() => setExperience((current) => inspect(current, event, cinematic?.elapsedSeconds ?? null, lookingGlass?.world?.clock))}
                     >
                       {event.semanticKind.replace(/_/g, ' ').toLowerCase()} · {event.time.tick}
                     </button>

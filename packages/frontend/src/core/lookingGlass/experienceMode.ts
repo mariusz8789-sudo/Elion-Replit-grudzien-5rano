@@ -1,4 +1,5 @@
 import type { InspectableEvent } from './eventInspection';
+import type { WorldClock } from './worldClock';
 
 /**
  * LOOKING GLASS — WHAT THE USER IS DOING RIGHT NOW.
@@ -61,12 +62,23 @@ export function inspect(
   state: ExperienceState,
   event: InspectableEvent,
   atSeconds: number | null,
+  clock?: WorldClock,
 ): ExperienceState {
+  // The clock is the only thing allowed to decide whether the world may move
+  // here. An event on a foreign run has no position on this timeline, and a
+  // tick this run never produced is not made real by an event referencing it.
+  const resolved = clock?.resolveForeign({
+    source: 'EVENT_JUMP',
+    tick: event.time.tick,
+    current: state.worldTime,
+    onViewerClock: event.time.onViewerClock,
+  });
+  const worldTime = resolved
+    ? resolved.worldTime
+    : (event.time.onViewerClock ? event.time.tick : state.worldTime);
   return {
     mode: 'INSPECT',
-    // An event on a foreign run has no position on this clock, so the time
-    // the user was already at is kept rather than jumping somewhere false.
-    worldTime: event.time.onViewerClock ? event.time.tick : state.worldTime,
+    worldTime,
     selectedEvent: event,
     resumeSeconds: state.mode === 'WATCH' ? atSeconds : state.resumeSeconds,
   };

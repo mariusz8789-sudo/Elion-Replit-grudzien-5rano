@@ -1,0 +1,229 @@
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { openLookingGlass, type LookingGlassSession } from '../../core/lookingGlass/scenarioSession';
+import { nearestSupportedAlternative } from '../../core/lookingGlass/scenarioResolution';
+import { anchoredSequenceDuration, sampleAnchoredSequence, scrubToSeconds } from '../../core/lookingGlass/anchoredTemporal';
+
+/**
+ * LOOKING GLASS — THE CHAT THAT ANSWERS WITH A WORLD.
+ *
+ * The deliberate product difference: a reply here is never a paragraph of
+ * prose that sounds authoritative. Every turn resolves to one of exactly
+ * four things, and each is a claim the user can check.
+ *
+ *  READY         a real world, with the engine that produced it named, the
+ *                keyframes it actually computed, and a door into it.
+ *  NEEDS_INPUT   the sentence was too thin, and it says which part.
+ *  NOT_MODELLED  understood, and no Genesis model produces it. It names the
+ *                missing solver instead of rendering a convincing fiction.
+ *  REFUSED       the safety boundary — consequences and response yes,
+ *                weapon design no.
+ *
+ * The parse strip showing KIND / SPAN / VIEWPOINT is not decoration: it is
+ * the system showing its work, so a user can see it was misread rather than
+ * discovering it downstream in a world that quietly answered a different
+ * question. That is the whole reason the parser is a deterministic grammar
+ * and reports what it could not resolve.
+ *
+ * This component renders no 3D and owns no state of its own beyond the
+ * transcript and the scrub position — the science is entirely
+ * `openLookingGlass`, and entering a world hands off to the existing lab.
+ */
+
+interface Turn {
+  readonly id: string;
+  readonly text: string;
+  readonly session: LookingGlassSession;
+}
+
+const EXAMPLES: readonly string[] = [
+  'Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy',
+  'Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist',
+  'Show a quarantine scenario over 90 days from the control room operator',
+  'Pokaż powódź w tym mieście przez 72 godziny',
+];
+
+const STATUS_LABEL: Readonly<Record<string, string>> = {
+  READY: 'ŚWIAT GOTOWY',
+  NEEDS_INPUT: 'BRAKUJE DANYCH',
+  NOT_MODELLED: 'NIE ZAMODELOWANE',
+  REFUSED: 'POZA ZAKRESEM',
+};
+
+function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
+  const { session } = turn;
+  const { request, resolution } = session;
+  const [scrub, setScrub] = useState(0);
+
+  const duration = session.anchored ? anchoredSequenceDuration(session.anchored) : 0;
+  const sample = session.anchored ? sampleAnchoredSequence(session.anchored, scrubToSeconds(session.anchored, scrub)) : null;
+  const alternative = nearestSupportedAlternative(resolution);
+
+  return (
+    <div className={`lg-card lg-card-${resolution.status.toLowerCase()}`}>
+      <div className="lg-card-status">{STATUS_LABEL[resolution.status] ?? resolution.status}</div>
+
+      {/* Showing its work: exactly what was read out of the sentence. */}
+      <div className="lg-chips">
+        <span className={`lg-chip ${request.kind ? '' : 'lg-chip-missing'}`}>
+          <b>zjawisko</b>{request.kind ? request.kind.replace(/_/g, ' ').toLowerCase() : 'nie rozpoznano'}
+        </span>
+        <span className={`lg-chip ${request.span ? '' : 'lg-chip-missing'}`}>
+          <b>czas</b>{request.span ? `${request.span.amount} ${request.span.unit.toLowerCase()}` : 'nie podano'}
+        </span>
+        <span className="lg-chip">
+          <b>perspektywa</b>{request.viewpoint.kind.replace(/_/g, ' ').toLowerCase()}
+          {request.viewpoint.anchorHint ? ` · ${request.viewpoint.anchorHint}` : ''}
+        </span>
+        {request.location ? <span className="lg-chip"><b>miejsce</b>{request.location}</span> : null}
+        {request.comparison ? <span className="lg-chip lg-chip-mode">porównanie</span> : null}
+        {request.cinematic ? <span className="lg-chip lg-chip-mode">sekwencja</span> : null}
+      </div>
+
+      {resolution.status === 'READY' && resolution.plan ? (
+        <>
+          <div className="lg-provenance">
+            <div><b>silnik</b> <code>{session.producedBy}</code></div>
+            <div><b>przebieg czasu</b> <code>{session.temporalSource}</code></div>
+          </div>
+
+          {session.anchored && sample ? (
+            <div className="lg-timeline">
+              <div className="lg-timeline-head">
+                <span className="lg-timeline-now">{sample.from.label}</span>
+                <span className="lg-timeline-meta">
+                  {session.anchored.keyframes.length} realnych stanów · widok z: {session.anchored.anchor.label}
+                </span>
+              </div>
+              <input
+                className="lg-scrub"
+                type="range"
+                min={0}
+                max={1}
+                step={0.001}
+                value={scrub}
+                aria-label="Przewiń czas świata"
+                onChange={(event) => setScrub(Number(event.target.value))}
+              />
+              <div className="lg-timeline-foot">
+                <span>0</span>
+                <span>{duration.toFixed(0)} s odtwarzania</span>
+              </div>
+            </div>
+          ) : null}
+
+          <ol className="lg-shots">
+            {session.shotPlan.shots.map((shot) => (
+              <li key={shot.index} className={`lg-shot lg-shot-${shot.kind.toLowerCase()}`}>
+                <span className="lg-shot-kind">{shot.kind}</span>
+                <span className="lg-shot-cam">{shot.cameraMode}</span>
+                <span className="lg-shot-reason">{shot.reason}</span>
+                {/* A shot with no marker is structural, and says so rather
+                    than posing as a discovery. */}
+                <span className="lg-shot-src">
+                  {shot.sourceMarkerId ? `← ${shot.sourceMarkerId}` : 'bez zdarzenia (kadr techniczny)'}
+                </span>
+              </li>
+            ))}
+          </ol>
+
+          <div className="lg-actions">
+            <button
+              type="button"
+              className="lg-enter"
+              onClick={() => { window.location.hash = '#/first-person-lab'; }}
+            >
+              Wejdź do świata
+            </button>
+            <span className="lg-actions-note">
+              {session.shotPlan.markersUsed}/{session.shotPlan.markersAvailable} realnych znaczników użytych w montażu
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className="lg-refusal">
+          {resolution.refusal ? <p className="lg-refusal-text">{resolution.refusal}</p> : null}
+          {resolution.notModelled.map((reason) => <p key={reason} className="lg-refusal-text">{reason}</p>)}
+          {resolution.missing.length > 0 ? (
+            <p className="lg-refusal-text">
+              Nie odczytano z pytania: {resolution.missing.map((aspect) => aspect.toLowerCase().replace(/_/g, ' ')).join(', ')}.
+            </p>
+          ) : null}
+          {alternative ? <p className="lg-alternative"><b>Możliwe teraz:</b> {alternative}</p> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function LookingGlassChat(): JSX.Element {
+  const [turns, setTurns] = useState<readonly Turn[]>([]);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const submit = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    // Synchronous by construction: the models are deterministic, so there is
+    // no spinner to fake and no streamed prose to wait for.
+    const session = openLookingGlass(trimmed);
+    setTurns((previous) => [...previous, { id: `${session.request.requestId}-${previous.length}`, text: trimmed, session }]);
+    setDraft('');
+  }, []);
+
+  const empty = turns.length === 0;
+  const placeholder = useMemo(
+    () => 'Opisz świat, który chcesz zobaczyć — zjawisko, czas i perspektywę…',
+    [],
+  );
+
+  return (
+    <div className={`lg-root ${empty ? 'lg-root-empty' : ''}`}>
+      {empty ? (
+        <header className="lg-hero">
+          <h1 className="lg-hero-title">Genesis Looking Glass</h1>
+          <p className="lg-hero-sub">
+            Nie odpowiadamy akapitem. Odpowiadamy światem, w który można wejść —
+            albo uczciwym „tego nie umiemy policzyć”.
+          </p>
+        </header>
+      ) : null}
+
+      <div className="lg-thread">
+        {turns.map((turn) => (
+          <article key={turn.id} className="lg-turn">
+            <p className="lg-ask">{turn.text}</p>
+            <ScenarioCard turn={turn} />
+          </article>
+        ))}
+      </div>
+
+      <form
+        className="lg-composer"
+        onSubmit={(event) => { event.preventDefault(); submit(draft); }}
+      >
+        <textarea
+          ref={inputRef}
+          className="lg-input"
+          rows={empty ? 3 : 2}
+          value={draft}
+          placeholder={placeholder}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(draft); }
+          }}
+        />
+        <button type="submit" className="lg-send" disabled={draft.trim().length === 0}>Uruchom</button>
+      </form>
+
+      {empty ? (
+        <div className="lg-examples">
+          {EXAMPLES.map((example) => (
+            <button key={example} type="button" className="lg-example" onClick={() => submit(example)}>
+              {example}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}

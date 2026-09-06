@@ -124,7 +124,19 @@ function rankMarkers(timeline: WorldCaptureTimeline): readonly { tick: number; i
     });
   }
 
+  // Distinct content first. Several experiment runs legitimately produce the
+  // identical observation statement, and six cuts to the same sentence reads
+  // as padding even though every one of them is real. Repeats are kept, but
+  // ranked below anything the viewer has not already been shown, so a short
+  // plan spends its cuts on different things.
+  const seenLabels = new Set<string>();
   return ranked
+    .sort((a, b) => a.weight - b.weight || a.tick - b.tick || a.id.localeCompare(b.id))
+    .map((entry) => {
+      const repeated = seenLabels.has(entry.label);
+      seenLabels.add(entry.label);
+      return { ...entry, weight: entry.weight + (repeated ? 10 : 0) };
+    })
     .sort((a, b) => a.weight - b.weight || a.tick - b.tick || a.id.localeCompare(b.id))
     .map(({ weight: _weight, ...rest }) => rest);
 }

@@ -11,20 +11,31 @@ import type * as THREE_NS from 'three';
  * `InstancedMesh` on `.build()`, so a hundred bolts cost exactly one draw
  * call instead of a hundred.
  *
- * Not a general scene-graph replacement: instances share one material and
- * cannot be moved individually afterward. That's the right trade for static
- * greebles (bolts/LEDs/knobs) that never move once placed — anything the
- * simulation needs to update per-frame (fluid level, hologram) stays a
- * regular `Mesh`.
+ * Not a general scene-graph replacement: instances share one geometry and one
+ * material. That's the right trade for a large population (bolts/LEDs/
+ * knobs, or hundreds of live agents/sensors) that would otherwise cost one
+ * draw call each for identical geometry — anything that needs genuinely
+ * different geometry/material per element stays a regular `Mesh`.
  *
- * Per-instance COLOR is the one exception `InstanceBatch` does support after
- * `.build()` — many identical parts (sensor markers, hotspot beacons, a rack
- * of status LEDs) that share geometry/material but each need to read a
- * different, live value (see `stateVisualization.ts`'s `severityColor`) are
- * exactly instancing's best use case, not a reason to fall back to one
- * `Mesh` per instance. Pass a `color` to `.add()` and retune it later with
- * `setInstanceColor` — see both for the one caveat this requires of the
- * material.
+ * Both COLOR and TRANSFORM can be retuned per-instance after `.build()` via
+ * `setInstanceColor`/`setInstanceTransform` — many identical parts (sensor
+ * markers, hotspot beacons, a rack of status LEDs, a crowd of agents) that
+ * share geometry/material but each need to move or read a different, live
+ * value (see `stateVisualization.ts`'s `severityColor`) are exactly
+ * instancing's best use case, not a reason to fall back to one `Mesh` per
+ * instance. Both use three.js's partial buffer-upload API
+ * (`BufferAttribute.addUpdateRange`, see `setInstanceColor`'s own doc) so
+ * retuning a handful of instances out of a large population costs GPU
+ * upload bytes proportional to the instances actually touched, not the
+ * whole population — see `setInstanceColor`/`setInstanceTransform` for the
+ * one caveat colored instances require of the material.
+ *
+ * No native per-instance visibility toggle exists in three.js's
+ * `InstancedMesh` — the standard technique is scaling an instance to 0 via
+ * `setInstanceTransform` (and remembering its real transform yourself if you
+ * need to restore it later). Not built as a stateful show/hide API here
+ * because nothing in this engine currently needs restore-after-hide; add one
+ * if and when a real consumer does, rather than speculatively.
  */
 export class InstanceBatch {
   private readonly THREE: typeof THREE_NS;
@@ -100,11 +111,63 @@ export class InstanceBatch {
  * `stateVisualization.ts`'s `severityColor`/`sampleColorScale`. Requires the mesh to have been
  * built with at least one instance colored (an `instanceColor` attribute must already exist) —
  * throws with a clear message otherwise rather than silently doing nothing.
+ *
+ * Uses `BufferAttribute.addUpdateRange` (three.js's partial-upload API — see
+ * `WebGLAttributes.updateBuffer`, which `gl.bufferSubData`s only the ranges named there instead of
+ * the whole attribute array when at least one range was added) so retuning one instance out of a
+ * population of thousands re-uploads exactly that instance's 3 floats to the GPU, not the entire
+ * color buffer. This is a structural fact about which bytes get uploaded — exact, not a timing
+ * measurement — verified by reading `WebGLAttributes.js`, the same way `postProcessing.ts`'s pass
+ * ordering was verified against `WebGLRenderer.js` (see `README.md` §3).
  */
 export function setInstanceColor(mesh: THREE_NS.InstancedMesh, index: number, color: THREE_NS.Color): void {
   if (!mesh.instanceColor) {
     throw new Error('setInstanceColor: this InstancedMesh has no instanceColor attribute — build the InstanceBatch with at least one colored instance first');
   }
+  if (index < 0 || index >= mesh.count) {
+    throw new Error(`setInstanceColor: index ${index} out of range for a mesh with ${mesh.count} instances`);
+  }
   mesh.setColorAt(index, color);
+  mesh.instanceColor.addUpdateRange(index * 3, 3);
   mesh.instanceColor.needsUpdate = true;
+}
+
+// Reused across every setInstanceTransform() call instead of constructing a fresh Object3D per
+// call — see PERFORMANCE.md's "zero unnecessary per-frame allocations" rule; a population of
+// thousands of state-driven instances retuning transforms every frame is exactly the pattern that
+// rule exists for.
+let transformScratch: THREE_NS.Object3D | null = null;
+
+/**
+ * Updates one instance's transform after `.build()` — the per-instance-transform capability
+ * `InstanceBatch` didn't have at all before this: `.add()` only records a transform before
+ * `.build()`, with no way to move a single already-built instance afterward. Necessary for any
+ * large, state-driven population (agents, sensors, particles) where the whole point of instancing
+ * is to keep the population at one draw call while individual members still move/resize.
+ *
+ * Same partial-upload technique as `setInstanceColor`: `mesh.instanceMatrix.addUpdateRange` scopes
+ * the GPU upload to exactly this instance's 16 floats, not the whole matrix buffer — updating 1 of
+ * 10,000 instances costs O(1) upload bytes, not O(n). `rotation` is Euler radians (matching
+ * `InstanceBatch.add`'s own convention); `scale` defaults to uniform 1.
+ */
+export function setInstanceTransform(
+  THREE: typeof THREE_NS,
+  mesh: THREE_NS.InstancedMesh,
+  index: number,
+  position: THREE_NS.Vector3Tuple,
+  rotation: THREE_NS.Vector3Tuple = [0, 0, 0],
+  scale: THREE_NS.Vector3Tuple | number = 1,
+): void {
+  if (index < 0 || index >= mesh.count) {
+    throw new Error(`setInstanceTransform: index ${index} out of range for a mesh with ${mesh.count} instances`);
+  }
+  if (!transformScratch) transformScratch = new THREE.Object3D();
+  transformScratch.position.set(...position);
+  transformScratch.rotation.set(...rotation);
+  if (typeof scale === 'number') transformScratch.scale.set(scale, scale, scale);
+  else transformScratch.scale.set(...scale);
+  transformScratch.updateMatrix();
+  mesh.setMatrixAt(index, transformScratch.matrix);
+  mesh.instanceMatrix.addUpdateRange(index * 16, 16);
+  mesh.instanceMatrix.needsUpdate = true;
 }

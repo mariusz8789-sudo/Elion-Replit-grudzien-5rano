@@ -7,6 +7,7 @@ import type { HospitalStatus } from '../simulation/hospitalResource';
 import type { ScenarioDaySample } from '../simulation/scenarioEngine';
 import { configureDOF, setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
 import { configureCinematicCamera, type CinematicCameraProfile } from './graphics/cinematicCamera';
+import { applyShadowPolicy } from './graphics/shadowPolicy';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -3064,33 +3065,14 @@ export class LabScene3D implements Sim3D {
     }
     addContactShadow(-5.28, 3.62, 0.4, 0.8);
 
-    // ==================================================================
-    // CIENIE: włączane raz, po zbudowaniu całej sceny, wg trzech reguł —
-    // nie "wszystko rzuca cień" (setki śrub/diod/gałek to czysty koszt
-    // shadow-mapy bez żadnego widocznego cienia):
-    //  1. Przezroczyste (szkło reaktora, hologram, przegrody, szyby szaf)
-    //     tylko ODBIERAJĄ cień — szkło rzucające czarną plamę zamiast
-    //     refleksu wyglądałoby gorzej niż brak cienia.
-    //  2. Drobnica poniżej progu (śruby, diody, gałki, listwy) nie rzuca —
-    //     jej cień i tak zginąłby w rozdzielczości mapy.
-    //  3. Cień ODBIERAJĄ tylko powierzchnie, na których faktycznie coś
-    //     widać: podłoga, podesty, blaty, ściany — nie każdy drobiazg.
-    // ==================================================================
-    const shadowBox = new THREE.Box3();
-    const shadowSize = new THREE.Vector3();
-    scene.traverse((object) => {
-      const mesh = object as THREE_NS.Mesh;
-      if (!mesh.isMesh || !mesh.geometry) return;
-      const material = mesh.material as THREE_NS.Material | THREE_NS.Material[];
-      const transparent = Array.isArray(material) ? material.some((m) => m.transparent) : material.transparent;
-      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-      shadowBox.copy(mesh.geometry.boundingBox!);
-      shadowBox.getSize(shadowSize);
-      const scale = mesh.getWorldScale(new THREE.Vector3());
-      const largestExtent = Math.max(shadowSize.x * scale.x, shadowSize.y * scale.y, shadowSize.z * scale.z);
-      mesh.castShadow = !transparent && largestExtent > 0.18;
-      mesh.receiveShadow = largestExtent > 0.3;
-    });
+    // GENESIS GRAPHICS ENGINE — one shadow-policy pass over the scene built so far (the view-model
+    // hands below are added afterward and get their own explicit castShadow=false, so running this
+    // first doesn't miss or mis-tag them). This used to be an inline copy of exactly
+    // `graphics/shadowPolicy.ts::applyShadowPolicy`'s own algorithm (same 0.18/0.3 thresholds,
+    // same transparent-only-receives rule) — duplicated logic with no behavior difference, now
+    // consolidated onto the one shared implementation instead of two copies that could silently
+    // drift apart.
+    applyShadowPolicy(THREE, scene);
 
     // ==================================================================
     // NAUKOWIEC W PIERWSZEJ OSOBIE — przedramiona w rękawie kombinezonu PPE

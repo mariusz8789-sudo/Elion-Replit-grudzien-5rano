@@ -237,3 +237,35 @@ Before shipping a new facility/hero-object scene, check:
 - [ ] `qualityTier: 'cinematic'` is only ever used for an explicit capture
       (a screenshot/video request), never wired into normal interactive
       rendering.
+
+## Known limitation, not fixed here: crowd frustum culling is disabled
+
+`humanoidAgentVisual.ts`'s `InstancedHumanoidCrowd` sets `frustumCulled = false`
+on all ten of its `InstancedMesh`es (torso/head/hair/limbs/status/aura/ground-
+shadow), with no comment explaining why. The likely reason, verified by
+reading three.js's own `InstancedMesh` source rather than assumed: its
+default frustum-culling check uses the *base geometry's* bounding sphere —
+which does not account for where each instance's transform actually places
+it — so with `frustumCulled` left at its default `true`, three.js could
+incorrectly cull the ENTIRE instanced batch (hide potentially hundreds of
+agents scattered across the city) whenever that undersized bounding sphere
+alone falls outside the frustum, even while individual instances are still
+plainly on-screen. Disabling culling entirely avoids that visible bug at
+the cost of always submitting the full batch regardless of camera framing.
+
+The documented, but NOT applied, three.js-supported fix: call
+`mesh.computeBoundingSphere()` after `setMatrixAt`-ing every instance (three.js
+computes it from the actual instance transforms in that case), then leave
+`frustumCulled` at its default. This would let the whole batch be culled
+correctly when every instance is genuinely off-screen (e.g. a tight
+`'agent'`/`'street'` camera framing looking away from most of the city) —
+still all-or-nothing per `InstancedMesh` (three.js has no built-in
+per-instance frustum culling), not a full culling system. **Not applied in
+this branch**: this sandbox cannot render on a real GPU, so there is no way
+to verify the fix doesn't introduce a worse regression (a stale bounding
+sphere as agents keep moving frame to frame, if `computeBoundingSphere()`
+isn't re-run often enough, causing agents to incorrectly vanish) — exactly
+the class of visual bug that must be checked on real hardware before
+shipping, per this project's own "never fabricate/never guess a performance
+fix" rule. Flagging this precisely so whoever next has real-GPU access can
+verify and apply it, rather than leaving it undocumented.

@@ -340,6 +340,29 @@ describe('setupGraphicsPipeline — dispose', () => {
     expect(bokehInstances[0]!.instance.dispose).toHaveBeenCalledOnce();
     expect(outputPassInstances[0]!.dispose).toHaveBeenCalledOnce();
   });
+
+  // Resource-lifecycle audit finding: the AMBIENT/IBL environment texture this pipeline itself
+  // creates (via applyAmbientIBL's studio-box+HDRI, or captureRoomEnvironment's room probe) was
+  // never disposed on pipeline teardown at all.
+  it('disposes scene.environment on teardown when this pipeline owns it (default ambient mode)', () => {
+    const { modules } = fakeModules();
+    const fakeEnvironmentTexture = { dispose: vi.fn() };
+    const scene = { environment: fakeEnvironmentTexture } as unknown as import('three').Scene;
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, scene });
+    pipeline.dispose?.();
+    expect(fakeEnvironmentTexture.dispose).toHaveBeenCalledOnce();
+    expect(scene.environment).toBeNull();
+  });
+
+  it('leaves scene.environment untouched on teardown in "none" mode — that caller owns it entirely', () => {
+    const { modules } = fakeModules();
+    const fakeEnvironmentTexture = { dispose: vi.fn() };
+    const scene = { environment: fakeEnvironmentTexture } as unknown as import('three').Scene;
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, scene, ambient: { mode: 'none' } });
+    pipeline.dispose?.();
+    expect(fakeEnvironmentTexture.dispose).not.toHaveBeenCalled();
+    expect(scene.environment).toBe(fakeEnvironmentTexture);
+  });
 });
 
 describe('setupGraphicsPipeline — qualityTier override', () => {

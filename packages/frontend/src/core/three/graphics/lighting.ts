@@ -78,9 +78,15 @@ export async function loadHdriEnvironment(THREE: typeof THREE_NS, renderer: THRE
     const pmrem = new THREE.PMREMGenerator(renderer);
     new RGBELoader().load(hdriPath, (texture) => {
       const environment = pmrem.fromEquirectangular(texture).texture;
+      // Resource-lifecycle audit finding: this used to overwrite scene.environment without
+      // disposing the studio-box fallback applyStudioEnvironment set moments earlier — a real leak
+      // on every successful HDRI load. captureRoomEnvironment already gets this right (see its own
+      // previousEnvironment?.dispose() below); this now matches that pattern.
+      const previousEnvironment = scene.environment;
       scene.environment = environment;
       // Podniesione: przy obniżonym świetle ambientowym to IBL niesie większość odbić.
       scene.environmentIntensity = 1.45;
+      previousEnvironment?.dispose();
       texture.dispose();
       pmrem.dispose();
     }, undefined, () => pmrem.dispose());

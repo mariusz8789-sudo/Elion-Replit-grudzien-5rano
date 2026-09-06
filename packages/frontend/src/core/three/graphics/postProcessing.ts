@@ -351,6 +351,15 @@ export function setupGraphicsPipeline(
       dof?.dispose();
       outputPass.dispose();
       composer.dispose();
+      // Resource-lifecycle audit finding: this pipeline's own AMBIENT/IBL environment texture
+      // (a real PMREM-convolved WebGLRenderTarget, from applyAmbientIBL's studio-box+HDRI or
+      // captureRoomEnvironment's room probe) was never disposed on teardown. Only touched when this
+      // pipeline actually owns `scene.environment` (not 'none' mode — that caller manages its own
+      // environment entirely outside this pipeline and must not have it swept here).
+      if (ambient?.mode !== 'none') {
+        scene.environment?.dispose();
+        scene.environment = null;
+      }
     },
   };
 }

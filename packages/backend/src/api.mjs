@@ -83,6 +83,10 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   saveProjectSpatialDataset,
   listProjectSpatialDatasets,
   getProjectSpatialDataset,
+  saveWorldSnapshot,
+  updateWorldSnapshot,
+  getWorldSnapshot,
+  listWorldSnapshots,
 } from './store.mjs';
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
@@ -163,6 +167,24 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'qm' && seg[2] === 'singlepoint' && seg.length === 3 && method === 'POST') {
       const r = runQuantumSinglePoint(body ?? {});
       return r.ok ? ok({ data: r.data, meta: r.meta, runId: `pyscf:${createHash('sha256').update(JSON.stringify({ atoms: body.atoms, charge: body.charge ?? 0, spin: body.spin ?? 0, basis: body.basis ?? 'sto-3g', method: body.method ?? 'RHF' })).digest('hex').slice(0, 24)}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+    }
+    return err(404, 'not_found');
+  }
+
+  // ---- Genesis C3 World Model: saved world snapshots (WorldRegistry persistence, public — no project/user concept today) ----
+  if (seg[0] === 'worlds') {
+    if (seg.length === 1) {
+      if (method === 'GET') return ok({ worlds: listWorldSnapshots(db) });
+      if (method === 'POST') return saveWorldSnapshotHandler(db, body);
+      return err(405, 'method_not_allowed');
+    }
+    if (seg.length === 2) {
+      if (method === 'GET') {
+        const snapshot = getWorldSnapshot(db, seg[1]);
+        return snapshot ? ok({ world: snapshot }) : err(404, 'not_found');
+      }
+      if (method === 'PUT') return updateWorldSnapshotHandler(db, seg[1], body);
+      return err(405, 'method_not_allowed');
     }
     return err(404, 'not_found');
   }
@@ -501,6 +523,36 @@ function addMemberHandler(db, role, projectId, body) {
   if (targetRole === 'owner' && role !== 'owner') return err(403, 'forbidden', 'Tylko właściciel może nadać rolę owner.');
   setMember(db, { projectId, userId: target.id, role: targetRole });
   return ok({ members: listMembers(db, projectId) });
+}
+
+/* ---------------- Handlery Genesis C3 World Model (saved world snapshots) ---------------- */
+
+/** Minimal, honest shape validation — the frontend's own `WorldSnapshot` (worldSnapshot.ts) is the real contract; this only guards against a malformed/incomplete body reaching SQLite. */
+function validateWorldSnapshotBody(body) {
+  if (!body || typeof body !== 'object') return 'body must be an object';
+  if (typeof body.worldId !== 'string' || !body.worldId) return 'worldId must be a non-empty string';
+  if (typeof body.seed !== 'number' || !Number.isFinite(body.seed)) return 'seed must be a finite number';
+  if (typeof body.branchId !== 'string' || !body.branchId) return 'branchId must be a non-empty string';
+  if (!body.specification || typeof body.specification !== 'object') return 'specification must be an object';
+  if (!Array.isArray(body.keyframeEntities)) return 'keyframeEntities must be an array';
+  if (typeof body.keyframeTick !== 'number') return 'keyframeTick must be a number';
+  return null;
+}
+
+function saveWorldSnapshotHandler(db, body) {
+  const issue = validateWorldSnapshotBody(body);
+  if (issue) return err(400, 'invalid_world_snapshot', issue);
+  if (getWorldSnapshot(db, body.worldId)) return err(409, 'already_exists', `World "${body.worldId}" is already saved — use PUT /api/worlds/${body.worldId} to update it.`);
+  const saved = saveWorldSnapshot(db, { ...body, createdAt: body.createdAt ?? new Date().toISOString() });
+  return ok({ world: saved }, 201);
+}
+
+function updateWorldSnapshotHandler(db, worldId, body) {
+  const issue = validateWorldSnapshotBody({ ...body, worldId: body.worldId ?? worldId });
+  if (issue) return err(400, 'invalid_world_snapshot', issue);
+  if (body.worldId && body.worldId !== worldId) return err(400, 'world_id_mismatch');
+  const updated = updateWorldSnapshot(db, { ...body, worldId });
+  return updated ? ok({ world: updated }) : err(404, 'not_found');
 }
 
 /* ---------------- Handlery Knowledge Ingestion ---------------- */

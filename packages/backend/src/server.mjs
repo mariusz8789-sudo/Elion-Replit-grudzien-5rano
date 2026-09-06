@@ -288,13 +288,18 @@ function handlePersistApi(req, res, url) {
   }
   const isKnowledgeUpload = req.method === 'POST' && /^\/api\/projects\/[^/]+\/knowledge-materials\/?$/.test(url.pathname);
   const isSpatialUpload = req.method === 'POST' && /^\/api\/projects\/[^/]+\/spatial-datasets\/?$/.test(url.pathname);
+  // A saved world's keyframe entity/relationship snapshot can legitimately exceed the default
+  // request-body budget (large scale-tests aside, even a modest reference city's entity list is
+  // bigger than a typical trial/run's small parameter vectors) — same size class as the other two
+  // upload routes above, not the default 64 kB meant for small JSON payloads.
+  const isWorldUpload = (req.method === 'POST' || req.method === 'PUT') && /^\/api\/worlds(\/[^/]+)?\/?$/.test(url.pathname);
   if (isKnowledgeUpload && !knowledgeUploadLimiter.allow(ip)) {
     return json(res, 429, { error: 'knowledge_upload_rate_limited', message: 'Limit uploadu materiałów: 6 na minutę.' });
   }
   if (isSpatialUpload && !spatialUploadLimiter.allow(ip)) {
     return json(res, 429, { error: 'spatial_upload_rate_limited', message: 'Limit uploadu artefaktów GIS: 6 na minutę.' });
   }
-  const maxBodyBytes = (isKnowledgeUpload || isSpatialUpload) ? 7 * 1024 * 1024 : 65_536;
+  const maxBodyBytes = (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
   const declaredLength = Number(req.headers['content-length'] ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes) {
     return json(res, 413, { error: 'payload_too_large', message: 'Przesłany materiał przekracza limit transportu.' });
@@ -371,7 +376,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/api/world-proposal') return handleWorldProposal(req, res);
   const requestUrl = req.url ? new URL(req.url, 'http://x') : null;
   if (requestUrl?.pathname === '/api/biotech/source') return handleBiotechSource(req, res, requestUrl);
-  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute')) {
+  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute') || req.url?.startsWith('/api/worlds')) {
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
   }
   if (req.url?.startsWith('/api/')) return json(res, 404, { error: 'not_found' });

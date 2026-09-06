@@ -28,3 +28,5 @@ export * from './domains/genesisScientificCity3';
 export * from './domains/genesisScientificCity4';
 export * from './orchestration/createScientificWorld';
 export * from './persistence/worldRegistry';
+export * from './persistence/worldSnapshot';
+export * from './persistence/worldPersistenceClient';

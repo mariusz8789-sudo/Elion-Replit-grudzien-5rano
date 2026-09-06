@@ -395,10 +395,39 @@ CREATE TABLE IF NOT EXISTS project_spatial_datasets (
 CREATE INDEX IF NOT EXISTS idx_project_spatial_datasets_project ON project_spatial_datasets(project_id, created_at DESC);
 `;
 
+// Genesis C3 World Model persistence (Scientific World Model 4.0, Priority 1.1):
+// a saved world/branch snapshot from `worldSnapshot.ts` (frontend) — worldId is
+// the whole world's identity across its branch tree, branch_id/parent_world_id
+// distinguish forks. Deliberately NOT project/user-scoped (WorldRegistry has no
+// such concept today): a standalone table, same as `runs` already allows a NULL
+// project_id.
+const SCHEMA_V11 = `
+CREATE TABLE IF NOT EXISTS worlds (
+  world_id            TEXT PRIMARY KEY,
+  parent_world_id     TEXT,
+  seed                INTEGER NOT NULL,
+  branch_id           TEXT NOT NULL,
+  parent_branch_id    TEXT,
+  forked_at_tick      INTEGER,
+  specification_json  TEXT NOT NULL,
+  provenance_json     TEXT,
+  keyframe_tick       INTEGER NOT NULL,
+  keyframe_simulated_time REAL NOT NULL,
+  keyframe_entities_json TEXT NOT NULL,
+  keyframe_relationships_json TEXT NOT NULL,
+  events_json         TEXT NOT NULL,
+  observations_json   TEXT NOT NULL,
+  created_at          TEXT NOT NULL,
+  updated_at          INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_worlds_parent ON worlds(parent_world_id);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
   if (version < 9) db.exec(SCHEMA_V9);
   if (version < 10) db.exec(SCHEMA_V10);
+  if (version < 11) db.exec(SCHEMA_V11);
   if (version < 7) db.exec(SCHEMA_V7);
   if (version < 8) {
     db.exec(SCHEMA_V8);
@@ -435,6 +464,7 @@ function migrate(db) {
   if (version < 8) db.exec('PRAGMA user_version = 8');
   if (version < 9) db.exec('PRAGMA user_version = 9');
   if (version < 10) db.exec('PRAGMA user_version = 10');
+  if (version < 11) db.exec('PRAGMA user_version = 11');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1286,4 +1316,79 @@ export function listScienceRunVerifications(db, scienceRunId) {
 
 export function listScienceRunsForCandidate(db, candidateId) {
   return db.prepare('SELECT * FROM science_runs WHERE candidate_id = ? ORDER BY created_at ASC').all(candidateId).map(toScienceRun);
+}
+
+/* ---------------- Genesis C3 World Model: saved world snapshots ---------------- */
+
+function toWorldSnapshotRow(row) {
+  if (!row) return null;
+  return {
+    worldId: row.world_id,
+    parentWorldId: row.parent_world_id ?? undefined,
+    seed: row.seed,
+    branchId: row.branch_id,
+    parentBranchId: row.parent_branch_id ?? null,
+    forkedAtTick: row.forked_at_tick ?? null,
+    specification: JSON.parse(row.specification_json),
+    provenance: row.provenance_json ? JSON.parse(row.provenance_json) : undefined,
+    keyframeTick: row.keyframe_tick,
+    keyframeSimulatedTime: row.keyframe_simulated_time,
+    keyframeEntities: JSON.parse(row.keyframe_entities_json),
+    keyframeRelationships: JSON.parse(row.keyframe_relationships_json),
+    events: JSON.parse(row.events_json),
+    observations: JSON.parse(row.observations_json),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** Inserts a NEW world snapshot. Throws (SQLite UNIQUE constraint) if `worldId` already exists — a caller updating an already-saved world uses `updateWorldSnapshot` instead, same "never silently overwrite" discipline as `WorldGraph.addEntity`/`WorldRegistry.save`. */
+export function saveWorldSnapshot(db, s) {
+  db.prepare(
+    `INSERT INTO worlds (world_id, parent_world_id, seed, branch_id, parent_branch_id, forked_at_tick, specification_json, provenance_json, keyframe_tick, keyframe_simulated_time, keyframe_entities_json, keyframe_relationships_json, events_json, observations_json, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    s.worldId, s.parentWorldId ?? null, s.seed, s.branchId, s.parentBranchId ?? null, s.forkedAtTick ?? null,
+    JSON.stringify(s.specification), s.provenance ? JSON.stringify(s.provenance) : null,
+    s.keyframeTick, s.keyframeSimulatedTime, JSON.stringify(s.keyframeEntities), JSON.stringify(s.keyframeRelationships),
+    JSON.stringify(s.events ?? []), JSON.stringify(s.observations ?? []),
+    s.createdAt, Date.now(),
+  );
+  return getWorldSnapshot(db, s.worldId);
+}
+
+/** Replaces an already-saved world's snapshot in place (e.g. re-saving after further ticks/interventions) — same worldId, fresh state. */
+export function updateWorldSnapshot(db, s) {
+  const existing = getWorldSnapshot(db, s.worldId);
+  if (!existing) return null;
+  db.prepare(
+    `UPDATE worlds SET branch_id = ?, parent_branch_id = ?, forked_at_tick = ?, keyframe_tick = ?, keyframe_simulated_time = ?, keyframe_entities_json = ?, keyframe_relationships_json = ?, events_json = ?, observations_json = ?, updated_at = ?
+     WHERE world_id = ?`,
+  ).run(
+    s.branchId, s.parentBranchId ?? null, s.forkedAtTick ?? null, s.keyframeTick, s.keyframeSimulatedTime,
+    JSON.stringify(s.keyframeEntities), JSON.stringify(s.keyframeRelationships),
+    JSON.stringify(s.events ?? []), JSON.stringify(s.observations ?? []), Date.now(), s.worldId,
+  );
+  return getWorldSnapshot(db, s.worldId);
+}
+
+export function getWorldSnapshot(db, worldId) {
+  return toWorldSnapshotRow(db.prepare('SELECT * FROM worlds WHERE world_id = ?').get(worldId));
+}
+
+/** Every saved world, newest first — metadata only (no keyframe/journal payload) for a cheap listing; fetch a full snapshot via `getWorldSnapshot`. */
+export function listWorldSnapshots(db, limit = 100) {
+  const rows = db.prepare('SELECT world_id, parent_world_id, seed, branch_id, parent_branch_id, forked_at_tick, specification_json, provenance_json, created_at, updated_at FROM worlds ORDER BY updated_at DESC LIMIT ?').all(limit);
+  return rows.map((row) => ({
+    worldId: row.world_id,
+    parentWorldId: row.parent_world_id ?? undefined,
+    seed: row.seed,
+    branchId: row.branch_id,
+    parentBranchId: row.parent_branch_id ?? null,
+    forkedAtTick: row.forked_at_tick ?? null,
+    specification: JSON.parse(row.specification_json),
+    provenance: row.provenance_json ? JSON.parse(row.provenance_json) : undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
 }

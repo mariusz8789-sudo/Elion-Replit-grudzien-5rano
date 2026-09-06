@@ -3004,3 +3004,87 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .lg-world-shot-replay.is-match { background: #12291f; color: #7fe3ab; border: 1px solid #2c6b48; }
 .lg-world-shot-replay.is-drift { background: #2c2413; color: #f0c542; border: 1px solid #6b5a2c; }
 .lg-world-shot-replay.is-blocked { background: #2c1616; color: #f28a8a; border: 1px solid #6b2c2c; }
+
+/* Inspekcja zdarzenia: panel NAD światem, nie zamiast świata. */
+.lg-insp {
+  position: absolute; right: 1rem; top: 1rem; z-index: 8; width: min(26rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem); overflow-y: auto;
+  padding: 0.85rem 0.95rem; border-radius: 0.7rem;
+  background: rgba(8, 13, 22, 0.94); border: 1px solid #2b3a52; border-left: 3px solid #8ecbff;
+  backdrop-filter: blur(8px); display: flex; flex-direction: column; gap: 0.4rem;
+}
+.lg-insp-head { display: flex; align-items: baseline; gap: 0.5rem; }
+.lg-insp-kind {
+  font: 600 0.62rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.1em; color: #8ecbff;
+}
+.lg-insp-kind-anomaly, .lg-insp-kind-failure, .lg-insp-kind-alert { color: #ff9d7a; }
+.lg-insp-kind-intervention { color: #4fd18b; }
+.lg-insp-kind-threshold_crossing { color: #ffc061; }
+.lg-insp-type { font-size: 0.7rem; color: #6f83a0; flex: 1; word-break: break-all; }
+.lg-insp-close {
+  background: transparent; border: none; color: #7f93ad; font-size: 1.2rem;
+  line-height: 1; cursor: pointer; padding: 0 0.2rem;
+}
+.lg-insp-close:hover { color: #e6eefa; }
+.lg-insp-row { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.5rem; align-items: baseline; }
+.lg-insp-label {
+  font: 600 0.6rem/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.09em; text-transform: uppercase; color: #64748b;
+}
+.lg-insp-value { color: #cfe0f2; font-size: 0.82rem; }
+.lg-insp-value code { color: #9fd0ff; font-size: 0.76rem; }
+/* Brak danych ma wyglądać jak brak danych — nie jak wartość. */
+.lg-insp-absent { color: #6b7280; font-style: italic; font-size: 0.78rem; }
+.lg-insp-warn { color: #f0c542; font-size: 0.76rem; }
+.lg-insp-entities, .lg-insp-origin { color: #7f93ad; font-size: 0.76rem; }
+.lg-insp-block { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.35rem; }
+.lg-insp-obs { margin: 0; color: #cfe0f2; font-size: 0.8rem; line-height: 1.45; }
+.lg-insp-obs code { color: #9fd0ff; font-size: 0.72rem; word-break: break-all; }
+.lg-insp-replaybadge {
+  margin-left: 0.4rem; padding: 0.1rem 0.3rem; border-radius: 0.25rem;
+  font: 600 0.58rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.lg-insp-replaybadge.is-match { background: #12291f; color: #7fe3ab; }
+.lg-insp-replaybadge.is-drift { background: #2c2413; color: #f0c542; }
+.lg-insp-replaybadge.is-blocked { background: #2c1616; color: #f28a8a; }
+.lg-insp-chain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.lg-insp-chain li {
+  display: flex; justify-content: space-between; gap: 0.5rem;
+  font: 0.7rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #7f93ad;
+  padding-left: 0.5rem; border-left: 2px solid #24314a;
+}
+.lg-insp-chain li.is-current { color: #cfe6ff; border-left-color: #8ecbff; }
+.lg-insp-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.lg-insp-replay {
+  padding: 0.4rem 0.8rem; border-radius: 0.5rem; border: 1px solid #4fd18b60;
+  background: #12291f; color: #b8f2d2; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+}
+.lg-insp-replay:hover { border-color: #4fd18b; }
+.lg-insp-seed { font: 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6f83a0; }
+.lg-insp-noreplay { color: #8b9ab0; font-size: 0.76rem; line-height: 1.4; }
+
+/* Szyna zdarzeń: realne zdarzenia przebiegu, wybieralne. */
+.lg-rail {
+  position: absolute; left: 1rem; bottom: 1rem; z-index: 7; display: flex; flex-direction: column; gap: 0.3rem;
+  max-width: 20rem;
+}
+.lg-rail-title {
+  font: 600 0.6rem/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.09em; color: #64748b;
+}
+.lg-rail-items { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.lg-rail-item {
+  padding: 0.25rem 0.5rem; border-radius: 0.35rem; border: 1px solid #24314a;
+  background: rgba(8, 13, 22, 0.86); color: #9fb4cd;
+  font: 0.68rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; cursor: pointer;
+}
+.lg-rail-item:hover { border-color: #8ecbff; color: #cfe6ff; }
+.lg-rail-item.is-selected { border-color: #8ecbff; color: #cfe6ff; background: #16283c; }
+.lg-mode-badge {
+  position: absolute; right: 1rem; bottom: 1rem; z-index: 7;
+  padding: 0.3rem 0.65rem; border-radius: 999px;
+  background: rgba(8, 13, 22, 0.9); border: 1px solid #2b3a52;
+  font: 600 0.62rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.1em; color: #8ecbff;
+}

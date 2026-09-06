@@ -5,6 +5,8 @@ import { openLookingGlass } from '../core/lookingGlass/scenarioSession';
 import { anchoredSequenceDuration, buildAnchoredSequence, sampleAnchoredSequence, scrubToSeconds } from '../core/lookingGlass/anchoredTemporal';
 import { ExperiencePlayer, frameAt } from '../core/lookingGlass/experienceOrchestrator';
 import { cityPresetFor, directionAt } from '../core/lookingGlass/worldDirector';
+import { causalChainOf, classifyEvent } from '../core/lookingGlass/eventInspection';
+import { closeInspection, initialExperienceState, inspect, replay as replayMode, timeIsFrozen } from '../core/lookingGlass/experienceMode';
 
 describe('Looking Glass — natural language to structured scenario', () => {
   it('reads a Polish epidemic sentence: kind, span and anchored street viewpoint', () => {
@@ -524,5 +526,133 @@ describe('Looking Glass — directing the actual world', () => {
     const refused = openLookingGlass('Design a bomb that maximises casualties in this city');
     expect(refused.world).toBeNull();
     expect(refused.experience.shots).toEqual([]);
+  });
+});
+
+describe('Looking Glass — events you can interrogate', () => {
+  const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+
+  it('reads the full event, not the flattened marker', () => {
+    const events = session.world!.getInspectableEvents();
+    expect(events.length).toBeGreaterThan(0);
+    const event = events[0];
+    expect(event.type).toBeTruthy();
+    expect(event.modelId).toBeTruthy();
+    expect(event.origin).toBe('model');
+    expect(event.affectedEntities.length).toBeGreaterThan(0);
+    expect(event.evidence).not.toBeNull();
+  });
+
+  it('reports absent fields as null rather than inventing plausible ones', () => {
+    // The epidemiological run-completed event genuinely has no coordinates.
+    // A confident "Street sector A" would survive a demo, which is exactly
+    // what makes inventing one dangerous.
+    for (const event of session.world!.getInspectableEvents()) {
+      expect(event.location).toBeNull();
+      expect(event.severity).toBeNull();
+    }
+  });
+
+  it('classifies events from the dotted suffix, never the domain prefix', () => {
+    // Same suffix, different domains, identical classification — this is the
+    // "no if-epidemic-then" rule expressed as a test.
+    expect(classifyEvent('infection.transmission')).toBe(classifyEvent('reaction.transmission'));
+    expect(classifyEvent('epidemiology.run.completed')).toBe('TRANSITION');
+    expect(classifyEvent('anything.observation.threshold-crossed')).toBe('THRESHOLD_CROSSING');
+    expect(classifyEvent('flood.levee.failure')).toBe('FAILURE');
+    expect(classifyEvent('lab.sample.anomaly')).toBe('ANOMALY');
+    expect(classifyEvent('cell.population.simulated')).toBe('STATE_CHANGE');
+    // An unknown suffix stays honestly unclassified instead of guessing.
+    expect(classifyEvent('some.brand.new.thing')).toBe('UNCLASSIFIED');
+  });
+
+  it('offers replay only on a verified MATCH, and explains a refusal', () => {
+    for (const event of session.world!.getInspectableEvents()) {
+      if (event.replay.available) {
+        expect(event.replay.status).toBe('MATCH');
+        expect(event.replay.seed).not.toBeNull();
+      } else {
+        expect(event.replay.reason).toBeTruthy();
+      }
+    }
+  });
+
+  it('withholds replay where the run carries no verdict', () => {
+    const lab = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist');
+    for (const event of lab.world!.getInspectableEvents()) {
+      if (!event.replay.available) expect(event.replay.reason).toMatch(/verdict|reproducible/i);
+    }
+  });
+
+  it('reports the recorded causal chain without inferring links', () => {
+    const events = session.world!.getInspectableEvents();
+    const chain = causalChainOf(events[events.length - 1].id, events);
+    expect(chain.length).toBeGreaterThan(1);
+    // Each link is the recorded parent of the one before it.
+    for (let i = 1; i < chain.length; i++) expect(chain[i - 1].parentEventId).toBe(chain[i].id);
+    // An unknown id yields nothing rather than a fabricated chain.
+    expect(causalChainOf('does-not-exist', events)).toEqual([]);
+  });
+
+  it('marks an event from a different run as off the viewer clock', () => {
+    const offClock = session.world!.getInspectableEvents().filter((e) => !e.time.onViewerClock);
+    expect(offClock.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Looking Glass — experience modes and world continuity', () => {
+  const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+  const events = session.world!.getInspectableEvents();
+
+  it('opens in the mode the vantage implies', () => {
+    expect(initialExperienceState(0, true).mode).toBe('WATCH');
+    expect(initialExperienceState(0, false).mode).toBe('EXPLORE');
+  });
+
+  it('freezes time while an event is held open', () => {
+    const watching = initialExperienceState(12, true);
+    const inspecting = inspect(watching, events[0], 42);
+    expect(inspecting.mode).toBe('INSPECT');
+    expect(timeIsFrozen(inspecting)).toBe(true);
+    expect(timeIsFrozen(watching)).toBe(false);
+  });
+
+  it('keeps the viewer where they were for an event on a foreign run', () => {
+    const watching = initialExperienceState(12, true);
+    const foreign = events.find((e) => !e.time.onViewerClock)!;
+    // Jumping to that event's own tick would show a day this series never had.
+    expect(inspect(watching, foreign, 42).worldTime).toBe(12);
+  });
+
+  it('resumes the sequence where it was interrupted rather than restarting', () => {
+    const inspecting = inspect(initialExperienceState(12, true), events[0], 42);
+    const resumed = closeInspection(inspecting);
+    expect(resumed.mode).toBe('WATCH');
+    expect(resumed.resumeSeconds).toBe(42);
+    expect(resumed.worldTime).toBe(12);
+    expect(resumed.selectedEvent).toBeNull();
+  });
+
+  it('returns to exploration when the inspection did not come from a sequence', () => {
+    const inspecting = inspect(initialExperienceState(5, false), events[0], null);
+    expect(closeInspection(inspecting).mode).toBe('EXPLORE');
+  });
+
+  it('refuses to enter replay for an event that was never verified', () => {
+    const lab = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist');
+    const unverified = lab.world!.getInspectableEvents().find((e) => !e.replay.available);
+    if (!unverified) return;
+    const held = inspect(initialExperienceState(0, false), unverified, null);
+    // The availability check lives on the event; the mode machine will not
+    // override it.
+    expect(replayMode(held).mode).toBe('INSPECT');
+  });
+
+  it('enters replay for a verified event', () => {
+    const verified = events.find((e) => e.replay.available);
+    if (!verified) return;
+    const held = inspect(initialExperienceState(0, true), verified, 10);
+    expect(replayMode(held).mode).toBe('REPLAY');
+    expect(timeIsFrozen(replayMode(held))).toBe(true);
   });
 });

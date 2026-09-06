@@ -64,7 +64,11 @@ function SequencePlayer({ session }: { session: LookingGlassSession }): JSX.Elem
     let raf = 0;
     let last = performance.now();
     const tick = (now: number) => {
-      const delta = (now - last) / 1000;
+      // A stalled frame must not teleport the world. Without a cap, one
+      // slow frame — a backgrounded tab, a software renderer, a GC pause —
+      // advances the sequence by however long it took, skipping states the
+      // viewer never saw. Capped at 100 ms, playback simply slows instead.
+      const delta = Math.min(0.1, (now - last) / 1000);
       last = now;
       setFrame(player.advance(delta));
       raf = requestAnimationFrame(tick);

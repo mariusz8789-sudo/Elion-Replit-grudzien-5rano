@@ -1,0 +1,152 @@
+import { causalChainOf, type InspectableEvent } from '../../core/lookingGlass/eventInspection';
+
+/**
+ * LOOKING GLASS — INTERROGATING AN EVENT IN THE WORLD.
+ *
+ * Answers the questions §2 asks — what happened, when, where, from which
+ * state, which model, what evidence, can it be replayed — and answers them
+ * with nulls where the model genuinely has nothing to say.
+ *
+ * That last part is the whole design. It would be trivial to print a
+ * confident "Street sector A" for an event that carries no coordinates, and
+ * it would survive a demo, because nobody checks a plausible-looking street
+ * name. Printing "nie zamodelowane dla tego zdarzenia" instead is the entire
+ * difference between an experience layer over a model and a convincing
+ * fiction wearing one.
+ *
+ * The world stays visible behind this: it is a panel over a world, not a
+ * screen that replaces one.
+ */
+
+const KIND_LABEL: Readonly<Record<string, string>> = {
+  STATE_CHANGE: 'ZMIANA STANU',
+  THRESHOLD_CROSSING: 'PRZEKROCZENIE PROGU',
+  OBSERVATION: 'OBSERWACJA',
+  INTERVENTION: 'INTERWENCJA',
+  FAILURE: 'NIEPOWODZENIE',
+  ANOMALY: 'ANOMALIA',
+  TRANSITION: 'PRZEJŚCIE',
+  ALERT: 'ALERT',
+  UNCLASSIFIED: 'NIESKLASYFIKOWANE',
+};
+
+interface Props {
+  readonly event: InspectableEvent;
+  readonly allEvents: readonly InspectableEvent[];
+  readonly unit: string;
+  readonly onClose: () => void;
+  readonly onReplay: () => void;
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
+  return (
+    <div className="lg-insp-row">
+      <span className="lg-insp-label">{label}</span>
+      <span className="lg-insp-value">{children}</span>
+    </div>
+  );
+}
+
+/** Renders a value the model does not provide as an explicit absence. */
+function NotModelled({ what }: { what: string }): JSX.Element {
+  return <span className="lg-insp-absent">nie zamodelowane {what}</span>;
+}
+
+export function EventInspector({ event, allEvents, unit, onClose, onReplay }: Props): JSX.Element {
+  const chain = causalChainOf(event.id, allEvents);
+
+  return (
+    <div className="lg-insp" role="dialog" aria-label="Inspekcja zdarzenia">
+      <div className="lg-insp-head">
+        <span className={`lg-insp-kind lg-insp-kind-${event.semanticKind.toLowerCase()}`}>
+          {KIND_LABEL[event.semanticKind] ?? event.semanticKind}
+        </span>
+        <code className="lg-insp-type">{event.type}</code>
+        <button type="button" className="lg-insp-close" onClick={onClose} aria-label="Zamknij inspekcję">×</button>
+      </div>
+
+      <Row label="czas">
+        {unit} {event.time.tick}
+        {!event.time.onViewerClock && (
+          <span className="lg-insp-warn"> — z innego przebiegu niż oglądana seria</span>
+        )}
+      </Row>
+
+      <Row label="miejsce">
+        {event.location
+          ? `x ${event.location.x.toFixed(1)} · y ${event.location.y.toFixed(1)}${event.location.z !== undefined ? ` · z ${event.location.z.toFixed(1)}` : ''}`
+          : <NotModelled what="dla tego zdarzenia" />}
+      </Row>
+
+      <Row label="dotkliwość">
+        {event.severity !== null ? event.severity.toFixed(2) : <NotModelled what="— model nie stopniuje tego zdarzenia" />}
+      </Row>
+
+      <Row label="przyczyna">{event.cause ?? <NotModelled what="— brak zapisanej przyczyny" />}</Row>
+
+      <Row label="stan świata">
+        {event.stateIndex !== null ? `stan #${event.stateIndex}` : <NotModelled what="— zdarzenie nie mapuje się na stan" />}
+        {event.affectedEntities.length > 0 && (
+          <span className="lg-insp-entities">
+            {' · '}{event.affectedEntities.map((entity) => entity.id ?? entity.kind).join(', ')}
+          </span>
+        )}
+      </Row>
+
+      <Row label="model">
+        <code>{event.modelId ?? 'nieznany'}</code>
+        {event.origin ? <span className="lg-insp-origin"> · {event.origin}</span> : null}
+      </Row>
+
+      {event.observations.length > 0 && (
+        <div className="lg-insp-block">
+          <span className="lg-insp-label">obserwacje</span>
+          {event.observations.map((observation) => (
+            <p key={observation.id} className="lg-insp-obs">{observation.statement}</p>
+          ))}
+        </div>
+      )}
+
+      <div className="lg-insp-block">
+        <span className="lg-insp-label">dowód</span>
+        {event.evidence ? (
+          <p className="lg-insp-obs">
+            <code>{event.evidence.id}</code>
+            {event.evidence.replayStatus && (
+              <span className={`lg-insp-replaybadge is-${event.evidence.replayStatus.toLowerCase()}`}>
+                {event.evidence.replayStatus}
+              </span>
+            )}
+          </p>
+        ) : <NotModelled what="— brak powiązanego dowodu" />}
+      </div>
+
+      {chain.length > 1 && (
+        <div className="lg-insp-block">
+          <span className="lg-insp-label">łańcuch przyczynowy ({chain.length})</span>
+          {/* Recorded by the models via parentEventId — reported, not inferred. */}
+          <ol className="lg-insp-chain">
+            {chain.map((link) => (
+              <li key={link.id} className={link.id === event.id ? 'is-current' : ''}>
+                <code>{link.type}</code> <span>{unit} {link.time.tick}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      <div className="lg-insp-actions">
+        {event.replay.available ? (
+          <>
+            <button type="button" className="lg-insp-replay" onClick={onReplay}>↻ Odtwórz ten moment</button>
+            {event.replay.seed !== null && <span className="lg-insp-seed">ziarno {String(event.replay.seed)}</span>}
+          </>
+        ) : (
+          // A replay button that silently produced different numbers would be
+          // worse than none, so an unverified run says why instead.
+          <span className="lg-insp-noreplay">Odtworzenie niedostępne — {event.replay.reason}</span>
+        )}
+      </div>
+    </div>
+  );
+}

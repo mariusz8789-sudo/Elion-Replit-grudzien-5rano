@@ -8,6 +8,8 @@ import { consumePendingExperimentWorld, consumePendingScenarioTimeline, peekPend
 import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
 import { ExperiencePlayer } from '../../core/lookingGlass/experienceOrchestrator';
 import { cityPresetFor, directionForFrame, type WorldDirection } from '../../core/lookingGlass/worldDirector';
+import { closeInspection, initialExperienceState, inspect, replay as enterReplay, timeIsFrozen, MODE_LABEL, type ExperienceState } from '../../core/lookingGlass/experienceMode';
+import { EventInspector } from '../looking-glass/EventInspector';
 import { saveScenarioCounterfactualToMemory, saveScenarioRunToMemory } from '../../core/scienceMemory';
 import { buildSavedScenarioRunContext } from '../../core/simulation/scenarioMemory';
 import { createTemporalStateBookmark, resolveTemporalStateBookmark, type TemporalStateBookmark } from '../../core/simulation/temporalStateBookmark';
@@ -208,6 +210,12 @@ export function City3DWebGLScreen() {
   // and holding is the honest response — jumping to "day 72" of a 60-day
   // series would render a day this run never had.
   const [direction, setDirection] = useState<WorldDirection | null>(null);
+  // Read inside the animation frame, so freezing takes effect without
+  // tearing down and rebuilding the loop on every mode change.
+  const frozenRef = useRef(false);
+  const [experience, setExperience] = useState<ExperienceState>(() => initialExperienceState(0, Boolean(lookingGlass?.autoPlay)));
+  const inspectableEvents = useMemo(() => lookingGlass?.world?.getInspectableEvents() ?? [], [lookingGlass]);
+  useEffect(() => { frozenRef.current = timeIsFrozen(experience); }, [experience]);
   const cinematic = useMemo(
     () => (lookingGlass?.experience && lookingGlass.world ? new ExperiencePlayer(lookingGlass.experience) : null),
     [lookingGlass],
@@ -221,9 +229,16 @@ export function City3DWebGLScreen() {
     let last = performance.now();
     let appliedPreset: string | null = null;
     const tick = (now: number) => {
-      const delta = (now - last) / 1000;
+      // A stalled frame must not teleport the world. Without a cap, one
+      // slow frame — a backgrounded tab, a software renderer, a GC pause —
+      // advances the sequence by however long it took, skipping states the
+      // viewer never saw. Capped at 100 ms, playback simply slows instead.
+      const delta = Math.min(0.1, (now - last) / 1000);
       last = now;
-      const frame = cinematic.advance(delta);
+      // A moment being interrogated must not move underneath the person
+      // interrogating it, so INSPECT/REPLAY stop the clock rather than
+      // merely hiding it.
+      const frame = frozenRef.current ? cinematic.currentFrame : cinematic.advance(delta);
       if (frame) {
         const next = directionForFrame(frame, world);
         setDirection(next);
@@ -390,6 +405,38 @@ export function City3DWebGLScreen() {
                 watching a pretty animation with no provenance. The time source
                 is stated plainly: a marker from another run says so instead of
                 showing a day this series never had. */}
+            {/* THE EVENTS OF THIS RUN, SELECTABLE. They are listed rather than
+                clicked in 3D because these events genuinely carry no
+                coordinates — placing a marker somewhere plausible would be
+                inventing a location. When a domain does provide one, the
+                same record drives a spatial marker with no change here. */}
+            {inspectableEvents.length > 0 && experience.mode !== 'INSPECT' && (
+              <div className="lg-rail">
+                <span className="lg-rail-title">zdarzenia przebiegu ({inspectableEvents.length})</span>
+                <div className="lg-rail-items">
+                  {inspectableEvents.slice(0, 8).map((event) => (
+                    <button
+                      key={event.id}
+                      type="button"
+                      className="lg-rail-item"
+                      onClick={() => setExperience((current) => inspect(current, event, cinematic?.elapsedSeconds ?? null))}
+                    >
+                      {event.semanticKind.replace(/_/g, ' ').toLowerCase()} · {event.time.tick}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {experience.selectedEvent && (
+              <EventInspector
+                event={experience.selectedEvent}
+                allEvents={inspectableEvents}
+                unit={(lookingGlass?.world?.getTemporalRange().unit ?? 'DAY').toLowerCase()}
+                onClose={() => setExperience(closeInspection)}
+                onReplay={() => setExperience(enterReplay)}
+              />
+            )}
+            <span className="lg-mode-badge">{MODE_LABEL[experience.mode]}</span>
             {direction && (
               <div className="lg-world-shot">
                 <div className="lg-world-shot-head">

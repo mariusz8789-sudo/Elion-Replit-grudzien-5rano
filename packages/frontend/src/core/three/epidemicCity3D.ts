@@ -12,6 +12,7 @@ import { resolveSafeFocusDirection, type CameraOccluder } from './cityCameraSafe
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { isWorldAssetApproved, isWorldAssetPathApproved } from './assetGovernance';
 import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
+import { applyShadowPolicy } from './graphics/shadowPolicy';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -282,6 +283,14 @@ export class EpidemicCity3DSim implements Sim3D {
     this.addLightsAndGround();
     this.addRoadsAndBuildings();
     this.addStreetAtmosphere();
+    // GENESIS GRAPHICS ENGINE — one shadow-policy pass over the finished scene, superseding every
+    // per-builder castShadow/receiveShadow guess above (see graphics/shadowPolicy.ts's own doc:
+    // that's the intended pattern, not a bug — a single caster budget can't afford every curb,
+    // window pane and bench casting into the one shadow map). Buildings/roads/masses stay casters
+    // (they're well above the size threshold); thin street furniture (curbs, benches, window
+    // instances) stops costing shadow-map time for a shadow no one would see anyway. Run again
+    // after the async approved-asset facades/lamps attach, below, since they arrive later.
+    applyShadowPolicy(THREE, scene);
     void this.loadApprovedCityAssets();
     this.addAnalysisLayer();
     this.worldOverlayGroup = new THREE.Group();
@@ -647,6 +656,10 @@ export class EpidemicCity3DSim implements Sim3D {
         this.approvedLampTemplate = lamp.scene;
         this.attachApprovedLamps();
       }
+      // These GLTF assets attach after init()'s own shadow-policy pass already ran (they're
+      // loaded async) — re-run it so they get the same size-based cast/receive decision instead
+      // of keeping whatever the loader's own traverse() forced.
+      if (this.THREE && this.scene) applyShadowPolicy(this.THREE, this.scene);
     } catch {
       // Brak pliku lub błąd WebGL nie zastępuje assetu niezweryfikowanym fallbackiem.
     }

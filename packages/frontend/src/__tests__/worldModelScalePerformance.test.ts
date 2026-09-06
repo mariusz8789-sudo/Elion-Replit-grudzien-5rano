@@ -78,8 +78,8 @@ describe('Performance at scale (Priority 9): large entity count', () => {
     engine.scrubTo(Math.floor(TICKS / 2));
     const scrubMs = performance.now() - scrubStart;
 
-    // `WorldGraph.querySpatialContext` is documented as a linear scan (see worldGraph.ts) —
-    // measure it honestly at this scale rather than assuming it is free.
+    // `WorldGraph.querySpatialContext` is now backed by Spatial Index 1.0 (ecs/spatialIndex.ts)
+    // rather than a linear scan — measure it honestly at this scale rather than assuming it is free.
     const spatialStart = performance.now();
     const nearby = engine.graph.querySpatialContext({ x: ENTITY_COUNT / 2, y: 0, z: 0 }, 5);
     const spatialMs = performance.now() - spatialStart;
@@ -95,7 +95,7 @@ describe('Performance at scale (Priority 9): large entity count', () => {
         `  packTransformBuffer: ${packMs.toFixed(3)}ms\n` +
         `  forkBranch (clone ${ENTITY_COUNT} entities): ${forkMs.toFixed(3)}ms\n` +
         `  scrubTo (replay ${Math.floor(TICKS / 2)} ticks): ${scrubMs.toFixed(3)}ms\n` +
-        `  querySpatialContext (linear scan, documented as such): ${spatialMs.toFixed(3)}ms\n` +
+        `  querySpatialContext (Spatial Index 1.0): ${spatialMs.toFixed(3)}ms\n` +
         `  Node heap sample: ${heapMB.toFixed(2)}MB (GC-dependent, indicative only)\n` +
         `  GPU / rendering throughput: NOT VERIFIED ON HARDWARE (no GPU attached to this environment; out of C3's scope regardless)`,
     );

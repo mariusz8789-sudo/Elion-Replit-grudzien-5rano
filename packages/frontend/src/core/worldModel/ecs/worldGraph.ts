@@ -1,4 +1,5 @@
 import type { EntityRef } from '../../events/genesisEvent';
+import { SpatialIndex } from './spatialIndex';
 import { entityId, type EntityId, type WorldModelEntity, type WorldModelEntityPatch } from './types';
 
 export interface ScaleZoomResult {
@@ -33,6 +34,7 @@ export class WorldGraph {
   private readonly entities = new Map<EntityId, WorldModelEntity>();
   private readonly childrenByParent = new Map<EntityId, Set<EntityId>>();
   private readonly relationships: EntityRelationship[] = [];
+  private readonly spatialIndex = new SpatialIndex();
 
   addEntity(entity: WorldModelEntity): void {
     if (this.entities.has(entity.id)) throw new Error(`Entity already exists: ${entity.id}`);
@@ -42,6 +44,7 @@ export class WorldGraph {
       if (!this.entities.has(parentId)) throw new Error(`Unknown parent entity: ${parentId}`);
       this.childOf(parentId).add(entity.id);
     }
+    this.spatialIndex.markDirty();
   }
 
   getEntity(id: EntityId): WorldModelEntity {
@@ -68,6 +71,10 @@ export class WorldGraph {
       updatedAtTick: tick ?? current.updatedAtTick + 1,
     };
     this.entities.set(id, next);
+    // `spatial` is replaced wholesale when present in a patch (never merged) — see the spread
+    // above — so any patch touching it can move the entity to a different cell; mark dirty
+    // rather than trying to detect whether the position value actually changed.
+    if ('spatial' in patch) this.spatialIndex.markDirty();
     return next;
   }
 
@@ -82,6 +89,7 @@ export class WorldGraph {
     this.entities.delete(id);
     this.childrenByParent.delete(id);
     this.removeRelationshipsFor(id);
+    this.spatialIndex.markDirty();
   }
 
   /**
@@ -154,19 +162,32 @@ export class WorldGraph {
   }
 
   /**
-   * Linear-scan spatial query (a correct baseline; swap for a real octree
-   * index behind this same signature once entity counts demand it — the
-   * ECS contract above does not change).
+   * SPATIAL INDEX 1.0: backed by `SpatialIndex`, an adaptive uniform grid
+   * (see ecs/spatialIndex.ts) — but the CONTRACT is unchanged and always
+   * will be checked directly here: every candidate the index returns is
+   * re-filtered by the exact same real-distance formula the previous
+   * linear-scan implementation used, so this can only ever change
+   * performance, never which entities are returned.
    */
   querySpatialContext(point: { x: number; y: number; z: number }, radius: number): readonly WorldModelEntity[] {
-    return this.listEntities().filter((entity) => {
-      if (!entity.spatial) return false;
+    if (this.spatialIndex.isDirty()) {
+      this.spatialIndex.rebuild(
+        this.listEntities()
+          .filter((entity): entity is WorldModelEntity & { spatial: NonNullable<WorldModelEntity['spatial']> } => entity.spatial !== undefined)
+          .map((entity) => ({ id: entity.id, position: entity.spatial.position })),
+      );
+    }
+    const result: WorldModelEntity[] = [];
+    for (const id of this.spatialIndex.candidatesNear(point, radius)) {
+      const entity = this.getEntity(id);
+      if (!entity.spatial) continue;
       const p = entity.spatial.position;
       const dx = p.x - point.x;
       const dy = p.y - point.y;
       const dz = p.z - point.z;
-      return Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius;
-    });
+      if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= radius) result.push(entity);
+    }
+    return result;
   }
 
   /** Total mass of an entity's declared children, for cross-scale conservation checks. */

@@ -9,6 +9,7 @@ import { HEALTH_COLORS, HumanoidAgentVisual, mapSimAgentToHumanoid, type AgentHe
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { createPhiladelphiaLegendVisual, type PhiladelphiaLegendViewMode, type PhiladelphiaLegendVisual } from './philadelphiaLegendVisual';
 import { approvedWorldAssetCount, isWorldAssetApproved, isWorldAssetPathApproved, unverifiedWorldAssetCount } from './assetGovernance';
+import { setupGraphicsPipeline } from './graphics/postProcessing';
 
 /**
  * Wysokość kamery ulicznej. Ponad najwyższą koroną (4,91 jednostki ≈ 9,8 m),
@@ -281,6 +282,16 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     if ((this.cameraMode === 'agent' || this.cameraMode === 'event') && !this.hero && !this.heroLoadFailed) void this.loadHeroAsset();
   }
 
+  /**
+   * GENESIS GRAPHICS ENGINE — same shared `setupGraphicsPipeline` the lab and epidemiology-city
+   * scenes use, replacing this scene's own bloom-only `EffectComposer` chain. Real upgrade: this
+   * scene already bakes AO into `uv2`/`aoMap` (see `enableAo`) for STATIC per-texel occlusion —
+   * `GTAOPass` (tier-gated to `'high'`) adds real-time, geometry-aware contact occlusion on top of
+   * that (a car under a fire escape, a bench against a facade), which a baked texture map can't
+   * express since it doesn't know what else is nearby. `skipAmbientIBL: true` because this scene
+   * runs its OWN atmosphere (`loadHdri`, below — background/backgroundBlurriness/fog specific to
+   * this bright daytime street), which the shared pipeline's generic studio-box IBL would fight.
+   */
   setupPostProcessing(
     modules: PostProcessingModules,
     renderer: THREE_NS.WebGLRenderer,
@@ -289,23 +300,17 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     w: number,
     h: number,
   ): PostProcessor {
-    const THREE = this.THREE!;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     // HDRI ładuje się asynchronicznie po pierwszym kadrze; podstawą pozostają PBR + światła.
     if (this.hdriEnabled) void this.loadHdri(renderer);
-    // Ekspozycja poniżej 1: ACES ma wtedy zapas w światłach zamiast ścinać je
-    // do bieli. Razem z obniżonym budżetem świateł to jest właśnie ta zmiana,
-    // która przywraca kolor gruntowi i listowiu.
-    renderer.toneMappingExposure = 0.86;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    const composer = new modules.EffectComposer(renderer);
-    composer.addPass(new modules.RenderPass(scene, camera));
-    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.17, 0.55, 0.92);
-    composer.addPass(bloom);
-    composer.addPass(new modules.OutputPass());
-    return { render: () => composer.render(), setSize: (width, height) => composer.setSize(width, height), dispose: () => composer.dispose() };
+    return setupGraphicsPipeline(this.THREE!, modules, renderer, {
+      scene, camera, width: w, height: h,
+      // Ekspozycja poniżej 1: ACES ma wtedy zapas w światłach zamiast ścinać je
+      // do bieli. Razem z obniżonym budżetem świateł to jest właśnie ta zmiana,
+      // która przywraca kolor gruntowi i listowiu.
+      toneMappingExposure: 0.86,
+      bloom: { strength: 0.17, radius: 0.55, threshold: 0.92 },
+      skipAmbientIBL: true,
+    });
   }
 
   update(dt: number, params: SimParams): void {

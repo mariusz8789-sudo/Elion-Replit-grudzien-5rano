@@ -426,9 +426,9 @@ executable reference for "does my composition actually run."
 
 ## Proven across more than one world
 
-This isn't a single-scene abstraction with one caller — two independently-
-built `Sim3D` scenes, of genuinely different shapes, both delegate their
-`setupPostProcessing` to `setupGraphicsPipeline` today:
+This isn't a single-scene abstraction with one caller — three
+independently-built `Sim3D` scenes, of genuinely different shapes, all
+delegate their `setupPostProcessing` to `setupGraphicsPipeline` today:
 
 - `labScene3D.ts` (First Person Lab, an interior, GTAO+DOF enabled, a
   scene-specific room-reflection probe via `captureRoomReflectionProbe`).
@@ -437,6 +437,13 @@ built `Sim3D` scenes, of genuinely different shapes, both delegate their
   engine's generic AMBIENT/IBL role doesn't fight that scene's own
   atmosphere, while still getting the shared tone-mapping/AO/bloom pipeline
   and its tier gating).
+- `highFidelitySlice3D.ts` (a bright daytime street-level view of the same
+  epidemic model, `skipAmbientIBL: true` again for its own HDRI/fog/
+  background). This scene already bakes AO into `uv2`/`aoMap` textures for
+  static per-texel occlusion — `GTAOPass` adds real-time, geometry-aware
+  contact occlusion on top, which a baked map can't express (it doesn't
+  know what else is nearby at runtime). The two techniques are
+  complementary, not redundant.
 
 That second integration is what `skipAmbientIBL` and
 `captureRoomReflectionProbe`'s generalization (out of what was originally

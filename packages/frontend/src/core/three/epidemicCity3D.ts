@@ -1483,7 +1483,12 @@ export class EpidemicCity3DSim implements Sim3D {
       this.detailVisuals.delete(id);
     }
 
-    this.crowd.update(liveStates.filter((state) => !detailedIds.has(state.id)).slice(0, MAX_CROWD_HUMANOIDS));
+    const crowdStates = liveStates.filter((state) => !detailedIds.has(state.id)).slice(0, MAX_CROWD_HUMANOIDS);
+    // Frustum-only cull (no distance cutoff — this scene's camera standoff varies too much across
+    // presets to guess a safe distance without real-hardware verification; the frustum test itself
+    // is exact regardless of scale, unlike InstancedMesh's own broken per-batch bounding sphere —
+    // see PERFORMANCE.md's "crowd frustum culling is disabled" finding).
+    this.crowd.update(crowdStates, this.camera ? { camera: this.camera } : undefined);
     this.syncFocusOcclusion(selected);
     this.lastDetailCount = this.detailVisuals.size;
     this.lastCrowdCount = Math.min(Math.max(0, liveStates.length - this.lastDetailCount), MAX_CROWD_HUMANOIDS);

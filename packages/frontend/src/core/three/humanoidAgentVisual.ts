@@ -1,6 +1,7 @@
 import type * as THREE_NS from 'three';
 import type { SimAgent } from '../simulation/types';
 import { buildCharacter, paletteFromSeed, type Character, type PoseMode } from './characterRig';
+import { FrustumCuller } from './graphics/lod';
 
 /**
  * MOST MODELU → HUMANOID 3D.
@@ -216,8 +217,12 @@ export class InstancedHumanoidCrowd {
    * scratch — computed once here instead of once per instance per frame. */
   private readonly groundShadowColor: THREE_NS.Color;
   private count = 0;
+  /** Owns its own scratch Frustum/Matrix4/Sphere — see `update()`'s `cull` option and PERFORMANCE.md's "crowd frustum culling is disabled" finding, which this addresses at the application level instead of relying on `InstancedMesh`'s own broken per-batch bounding-sphere check. */
+  private readonly frustumCuller: FrustumCuller;
+  private readonly visibleStates: HumanoidAgentState[] = [];
 
   constructor(THREE: typeof THREE_NS, readonly capacity: number) {
+    this.frustumCuller = new FrustumCuller(THREE);
     const clothingMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.72, metalness: 0.02, emissive: 0xffffff, emissiveIntensity: 0.18 });
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.86, emissive: 0xffffff, emissiveIntensity: 0.10 });
     const hairMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92, emissive: 0xffffff, emissiveIntensity: 0.06 });
@@ -273,11 +278,42 @@ export class InstancedHumanoidCrowd {
     return this.meshes;
   }
 
-  update(states: readonly HumanoidAgentState[]): void {
-    this.count = Math.min(states.length, this.capacity);
+  /**
+   * `cull`, when given, hides agents outside the camera's view frustum
+   * and/or beyond `maxDistance` by excluding them from the batch entirely
+   * — `mesh.count` (every one of the ten meshes) shrinks to the actually-
+   * visible agent count, so an off-screen/far crowd genuinely submits
+   * fewer instances per draw call, not just zero-scaled-but-still-
+   * submitted ones. Omit `cull` to keep the previous behavior exactly
+   * (every agent up to `capacity` always rendered).
+   */
+  update(states: readonly HumanoidAgentState[], cull?: { camera: THREE_NS.PerspectiveCamera; maxDistance?: number }): void {
+    const capped = states.length > this.capacity ? states.slice(0, this.capacity) : states;
+    let ordered: readonly HumanoidAgentState[] = capped;
+    if (cull) {
+      this.frustumCuller.update(cull.camera);
+      const cameraX = cull.camera.position.x;
+      const cameraZ = cull.camera.position.z;
+      const cullRadius = HUMAN_VISUAL_HEIGHT * 2; // a generous silhouette bound — coarser than exact, never wrong-direction (under-culls, never over-culls)
+      let visibleCount = 0;
+      for (const state of capped) {
+        if (cull.maxDistance !== undefined) {
+          const dx = state.worldX - cameraX;
+          const dz = state.worldZ - cameraZ;
+          if (Math.sqrt(dx * dx + dz * dz) > cull.maxDistance) continue;
+        }
+        if (!this.frustumCuller.isVisibleXYZ(state.worldX, HUMAN_VISUAL_HEIGHT, state.worldZ, cullRadius)) continue;
+        this.visibleStates[visibleCount] = state;
+        visibleCount += 1;
+      }
+      this.visibleStates.length = visibleCount;
+      ordered = this.visibleStates;
+    }
+
+    this.count = ordered.length;
     this.ids.length = this.count;
     for (let i = 0; i < this.count; i++) {
-      const state = states[i];
+      const state = ordered[i];
       this.ids[i] = state.id;
       this.facing.setFromAxisAngle(this.yAxis, state.facing);
       const palette = paletteFromSeed(state.id + 1);

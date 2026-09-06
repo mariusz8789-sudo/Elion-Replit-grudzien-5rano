@@ -109,5 +109,5 @@ describe('Specification pipeline performance at scale (Priority 21)', () => {
     expect(tickMs).toBeLessThan(20_000);
     expect(branchMs).toBeLessThan(10_000);
     expect(replayMs).toBeLessThan(10_000);
-  });
+  }, 60_000); // 50k entities can legitimately take several real seconds under shared-machine load — well below the sanity ceilings above, just past vitest's 5s default test timeout.
 });

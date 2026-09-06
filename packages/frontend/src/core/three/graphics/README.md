@@ -43,6 +43,7 @@ never the reverse.
 | Quality tiers | `../quality.ts` | `detectRenderTier`, `configureGraphicsQuality`, `tierDpr`, `tierAllowsBloom`, `tierAllowsAO`, `tierAtLeast`, `recommendedShadowMapSize`, `maxShadowCasterBudget` |
 | State-driven visualization | `stateVisualization.ts` | `sampleColorScale`, `severityColor`, `SEVERITY_COLOR_SCALE`, `applyValueToEmissive`, `applyFractionToScale`, `AttentionPulse` — turns an already-computed real value into a color/glow/fill-height/event-flash; never computes or interprets the value itself (see its module doc) |
 | Diagnostics | `diagnostics.ts` | `readFrameCounters`, `FrameProfiler`, `RollingFrameStats` — exact draw-call/triangle/geometry/texture/program counts from `renderer.info` (valid on any GPU, including software rendering) plus frame-time sampling (explicitly NOT a hardware performance claim — see the module doc). Wired into every pipeline as `GraphicsPipeline.getFrameCounters()`. See `PERFORMANCE.md`'s "Measured, not fabricated" section for real numbers this produced. |
+| Picking / interaction | `picking.ts` | `screenToNDC`, `raycastFromScreenPoint`, `findTaggedAncestor`, `ClickDragTracker` — the mechanical half of "what did the user point at" (screen→NDC, click-vs-drag, walking up to a tagged ancestor). Never decides what a pick MEANS — that stays the caller's `selectAgent`/`selectWorld`-shaped logic. Found duplicated byte-for-byte across `epidemicCity3D.ts` and `highFidelitySlice3D.ts`'s own `pointer()` methods before this existed; both now delegate to it. |
 | Resource lifecycle | `lifecycle.ts` | `disposeSceneResources(root, options?)` — traverses an `Object3D` subtree (typically your whole `Sim3D.scene`) disposing every geometry, material, and each material's own textures in one call. Call it from your `Sim3D.dispose()`, storing `scene` from `init()` first (see `labScene3D.ts`). `options.excludeMaterials`/`excludeTextures` skip anything owned/disposed elsewhere (a shared registry, the pipeline's own environment map). |
 | Integration pattern | `examples/heroApparatusExample.ts` | `buildExampleHeroApparatus` — READ this, don't import it into a real scene |
 
@@ -73,6 +74,12 @@ never the reverse.
   rendering decision needs to know WHY a value changed (not just what it
   is), that reasoning belongs upstream in `ScientificWorldState` — this
   layer only ever reads a value it's handed.
+- **Don't hand-roll screen→NDC conversion, click-vs-drag detection, or a
+  "walk up to the tagged ancestor" raycast-hit loop in your `Sim3D.pointer()`.**
+  `picking.ts`'s `raycastFromScreenPoint`/`findTaggedAncestor`/
+  `ClickDragTracker` already do — `epidemicCity3D.ts` and
+  `highFidelitySlice3D.ts` had independently duplicated all three before
+  this existed.
 - **Don't hand-derive a column/platform/glass-chamber/pipe's `CylinderGeometry`/
   `BoxGeometry` args, or the orientation quaternion for a pipe between two
   points.** `primitives.ts`'s `createColumn`/`createPlatform`/

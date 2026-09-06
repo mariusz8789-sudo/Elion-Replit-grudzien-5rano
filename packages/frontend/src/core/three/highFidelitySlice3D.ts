@@ -12,6 +12,7 @@ import { approvedWorldAssetCount, isWorldAssetApproved, isWorldAssetPathApproved
 import { setupGraphicsPipeline } from './graphics/postProcessing';
 import { createSunLight, createBackgroundFill } from './graphics/lighting';
 import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
+import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
 
 /**
  * Wysokość kamery ulicznej. Ponad najwyższą koroną (4,91 jednostki ≈ 9,8 m),
@@ -187,8 +188,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private followTarget: THREE_NS.Vector3 | null = null;
   private lastTickMs = 0;
   private metrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
-  private pointerDown: { x: number; y: number } | null = null;
-  private pointerDragged = false;
+  private readonly clickDragTracker = new ClickDragTracker();
   /** Opcjonalna scenografia legendy; nie zawiera World State ani solvera. */
   private readonly philadelphiaLegendMode: PhiladelphiaLegendViewMode | null;
   private philadelphiaLegend: PhiladelphiaLegendVisual | null = null;
@@ -478,23 +478,17 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
-    if (type === 'down') { this.pointerDown = { x, y }; this.pointerDragged = false; return; }
-    if (type === 'move') {
-      if (this.pointerDown && Math.hypot(x - this.pointerDown.x, y - this.pointerDown.y) > 6) this.pointerDragged = true;
+    if (type === 'down' || type === 'move') {
+      this.clickDragTracker.track(x, y, type);
       return;
     }
-    const dragged = this.pointerDragged;
-    this.pointerDown = null;
-    this.pointerDragged = false;
-    if (dragged || !this.THREE || !this.camera || !this.raycaster) return;
-    const ndc = new this.THREE.Vector2((x / this.viewport.w) * 2 - 1, -(y / this.viewport.h) * 2 + 1);
-    this.raycaster.setFromCamera(ndc, this.camera);
+    const dragged = this.clickDragTracker.finish();
+    if (dragged || !this.THREE || !this.camera || !this.raycaster || this.viewport.w <= 0 || this.viewport.h <= 0) return;
     const roots = [...this.lod1.values()].map((visual) => visual.root);
     if (this.hero) roots.push(this.hero);
-    const hit = this.raycaster.intersectObjects(roots, true)[0];
-    let node: THREE_NS.Object3D | null = hit?.object ?? null;
-    while (node && typeof node.userData.agentId !== 'number') node = node.parent;
-    if (node && typeof node.userData.agentId === 'number') this.selectAgent(node.userData.agentId as number);
+    const hit = raycastFromScreenPoint(this.THREE, this.raycaster, this.camera, x, y, this.viewport.w, this.viewport.h, roots)[0];
+    const node = findTaggedAncestor(hit?.object ?? null, (d) => typeof d.agentId === 'number');
+    if (node) this.selectAgent(node.userData.agentId as number);
   }
 
   dispose(): void {

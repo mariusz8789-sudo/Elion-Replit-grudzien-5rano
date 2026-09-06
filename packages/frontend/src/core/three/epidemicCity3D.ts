@@ -16,6 +16,7 @@ import { applyShadowPolicy } from './graphics/shadowPolicy';
 import { createPBRMaterial } from './graphics/materials';
 import { createSunLight, createBackgroundFill } from './graphics/lighting';
 import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
+import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -101,8 +102,7 @@ export class EpidemicCity3DSim implements Sim3D {
   /** Cel jest ustawiany wyłącznie podczas odczytu prawdziwego TransmissionEvent. */
   private latestTransmissionTarget: number | null = null;
   private latestTransmissionView: CityTransmissionView | null = null;
-  private pointerDown: { x: number; y: number } | null = null;
-  private pointerDragged = false;
+  private readonly clickDragTracker = new ClickDragTracker();
   private followTarget: THREE_NS.Vector3 | null = null;
   private cameraPreset: CityCameraPreset = 'city';
   private resetCityCameraPending = false;
@@ -476,29 +476,18 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
-    if (type === 'down') {
-      this.pointerDown = { x, y };
-      this.pointerDragged = false;
+    if (type === 'down' || type === 'move') {
+      this.clickDragTracker.track(x, y, type);
       return;
     }
-    if (type === 'move') {
-      if (this.pointerDown && Math.hypot(x - this.pointerDown.x, y - this.pointerDown.y) > 6) this.pointerDragged = true;
-      return;
-    }
-    const wasDrag = this.pointerDragged;
-    this.pointerDown = null;
-    this.pointerDragged = false;
+    const wasDrag = this.clickDragTracker.finish();
     if (wasDrag || !this.THREE || !this.camera || !this.raycaster || this.viewport.w <= 0 || this.viewport.h <= 0) return;
 
-    const ndc = new this.THREE.Vector2((x / this.viewport.w) * 2 - 1, -(y / this.viewport.h) * 2 + 1);
-    this.raycaster.setFromCamera(ndc, this.camera);
-
     const detailedTargets = [...this.detailVisuals.values()].map((visual) => visual.root);
-    const detailedHits = this.raycaster.intersectObjects(detailedTargets, true);
+    const detailedHits = raycastFromScreenPoint(this.THREE, this.raycaster, this.camera, x, y, this.viewport.w, this.viewport.h, detailedTargets);
     if (detailedHits.length) {
-      let node: THREE_NS.Object3D | null = detailedHits[0].object;
-      while (node && typeof node.userData.agentId !== 'number') node = node.parent;
-      if (node && typeof node.userData.agentId === 'number') {
+      const node = findTaggedAncestor(detailedHits[0].object, (d) => typeof d.agentId === 'number');
+      if (node) {
         this.selectAgent(node.userData.agentId as number);
         return;
       }
@@ -516,9 +505,8 @@ export class EpidemicCity3DSim implements Sim3D {
     }
     const worldHits = this.raycaster.intersectObjects([...this.worldInteractive, ...this.buildingMeshes], true);
     if (worldHits.length) {
-      let node: THREE_NS.Object3D | null = worldHits[0].object;
-      while (node && !node.userData.worldSelection) node = node.parent;
-      if (node?.userData.worldSelection) {
+      const node = findTaggedAncestor(worldHits[0].object, (d) => d.worldSelection !== undefined);
+      if (node) {
         this.selectWorld(node.userData.worldSelection as CityWorldSelection);
         return;
       }

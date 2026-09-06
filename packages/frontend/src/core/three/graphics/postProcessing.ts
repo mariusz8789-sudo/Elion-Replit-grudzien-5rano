@@ -298,8 +298,9 @@ export function setupGraphicsPipeline(
     composer.addPass(ssr);
   }
 
+  let bloom: InstanceType<typeof modules.UnrealBloomPass> | null = null;
   if (tierAllowsBloom(tier)) {
-    const bloom = new modules.UnrealBloomPass(
+    bloom = new modules.UnrealBloomPass(
       new THREE.Vector2(width, height), bloomTuning.strength, bloomTuning.radius, bloomTuning.threshold,
     );
     composer.addPass(bloom);
@@ -316,7 +317,8 @@ export function setupGraphicsPipeline(
     composer.addPass(dof);
   }
 
-  composer.addPass(new modules.OutputPass());
+  const outputPass = new modules.OutputPass();
+  composer.addPass(outputPass);
 
   let roomProbeCaptured = false;
   return {
@@ -336,9 +338,18 @@ export function setupGraphicsPipeline(
       if (dof) dof.enabled = enabled;
     },
     getFrameCounters: () => readFrameCounters(renderer),
+    // Resource-lifecycle audit finding: `EffectComposer.dispose()` only frees its OWN two ping-pong
+    // render targets and copy pass — it does not iterate `this.passes` and dispose each one (see
+    // three.js's own EffectComposer source). Every pass that owns GPU resources must be disposed
+    // explicitly here, or they leak on every scene teardown/remount: UnrealBloomPass alone owns 11
+    // WebGLRenderTargets (its downsample/blur chain), BokehPass owns a depth render target plus two
+    // materials, OutputPass owns one material — none of that was being freed before this fix.
     dispose: () => {
       gtao?.dispose();
       ssr?.dispose();
+      bloom?.dispose();
+      dof?.dispose();
+      outputPass.dispose();
       composer.dispose();
     },
   };

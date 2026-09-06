@@ -45,7 +45,7 @@ function fakeThree() {
 function fakeModules() {
   const addedPasses: PassLabel[] = [];
   const gtaoInstances: Array<{ updateGtaoMaterial: ReturnType<typeof vi.fn>; blendIntensity: number; dispose: ReturnType<typeof vi.fn> }> = [];
-  const bokehInstances: Array<{ ctorArgs: unknown[]; uniforms: { focus: { value: number }; aperture: { value: number }; maxblur: { value: number } }; instance: { enabled: boolean } }> = [];
+  const bokehInstances: Array<{ ctorArgs: unknown[]; uniforms: { focus: { value: number }; aperture: { value: number }; maxblur: { value: number } }; instance: { enabled: boolean; dispose: ReturnType<typeof vi.fn> } }> = [];
   const composerCalls = { render: vi.fn(), setSize: vi.fn(), dispose: vi.fn(), addPass: vi.fn() };
 
   class EffectComposer {
@@ -64,10 +64,18 @@ function fakeModules() {
       gtaoInstances.push(this);
     }
   }
-  class UnrealBloomPass { constructor(public resolution: unknown, public strength: number, public radius: number, public threshold: number) { addedPasses.push('UnrealBloomPass'); } }
+  const bloomInstances: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
+  class UnrealBloomPass {
+    dispose = vi.fn();
+    constructor(public resolution: unknown, public strength: number, public radius: number, public threshold: number) {
+      addedPasses.push('UnrealBloomPass');
+      bloomInstances.push(this);
+    }
+  }
   class BokehPass {
     uniforms = { focus: { value: 0 }, aperture: { value: 0 }, maxblur: { value: 0 } };
     enabled = true;
+    dispose = vi.fn();
     constructor(public scene: unknown, public camera: unknown, params: { focus: number; aperture: number; maxblur: number }) {
       addedPasses.push('BokehPass');
       this.uniforms.focus.value = params.focus;
@@ -76,7 +84,14 @@ function fakeModules() {
       bokehInstances.push({ ctorArgs: [scene, camera, params], uniforms: this.uniforms, instance: this });
     }
   }
-  class OutputPass { constructor() { addedPasses.push('OutputPass'); } }
+  const outputPassInstances: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
+  class OutputPass {
+    dispose = vi.fn();
+    constructor() {
+      addedPasses.push('OutputPass');
+      outputPassInstances.push(this);
+    }
+  }
   const ssrInstances: Array<{ opacity: number; maxDistance: number; dispose: ReturnType<typeof vi.fn> }> = [];
   class SSRPass {
     opacity = 0;
@@ -89,7 +104,7 @@ function fakeModules() {
   }
 
   const modules = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, BokehPass, OutputPass, SSRPass } as unknown as PostProcessingModules;
-  return { modules, addedPasses, gtaoInstances, bokehInstances, ssrInstances, composerCalls };
+  return { modules, addedPasses, gtaoInstances, bokehInstances, bloomInstances, outputPassInstances, ssrInstances, composerCalls };
 }
 
 function fakeRenderer() {
@@ -306,6 +321,24 @@ describe('setupGraphicsPipeline — dispose', () => {
     });
     pipeline.dispose?.();
     expect(ssrInstances[0]!.dispose).toHaveBeenCalledOnce();
+  });
+
+  // Resource-lifecycle audit finding: EffectComposer.dispose() only frees its own two ping-pong
+  // render targets and copy pass — it does not iterate its passes and dispose each one (see
+  // three.js's own EffectComposer source). Every pass owning GPU resources must be disposed
+  // explicitly by the pipeline's own dispose(), or it leaks on every scene teardown/remount:
+  // UnrealBloomPass alone owns 11 WebGLRenderTargets, BokehPass owns a depth render target plus
+  // two materials, OutputPass owns one material.
+  it('disposes bloom, DOF (BokehPass) and OutputPass — not just GTAO and the composer', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('high');
+    const { modules, bloomInstances, bokehInstances, outputPassInstances } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts, depthOfField: { enabled: true, focusDistance: 3 },
+    });
+    pipeline.dispose?.();
+    expect(bloomInstances[0]!.dispose).toHaveBeenCalledOnce();
+    expect(bokehInstances[0]!.instance.dispose).toHaveBeenCalledOnce();
+    expect(outputPassInstances[0]!.dispose).toHaveBeenCalledOnce();
   });
 });
 

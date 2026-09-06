@@ -33,7 +33,39 @@ describe('Looking Glass — chemistry kinetics resolves through the real C3 engi
     expect(kinetics.request.kind).toBe('CHEMICAL_KINETICS');
     expect(reaction.request.kind).toBe('CHEMICAL_REACTION');
   });
+});
 
+describe('Looking Glass — REGRESSION: CHEMICAL_REACTION no longer claims a route it cannot deliver', () => {
+  // The real bug: SCENARIO_CAPABILITIES said READY (binding:
+  // MOLECULE_WORLD_ADAPTER), but openLookingGlass's dispatch had no branch
+  // for it — every such sentence silently fell into buildLaboratorySession
+  // and rendered biology-logistic cell-culture data under a chemistry label.
+  // The fix removes the false capability entry rather than fake-routing it,
+  // since the real model (moleculeWorldAdapter.ts / RDKit) is backend-only
+  // and openLookingGlass is synchronous end to end.
+  const reaction = openLookingGlass('Show a chemical reaction with a catalyst and a compound over 24 hours');
+
+  it('resolves NOT_MODELLED, honestly, rather than a false READY', () => {
+    expect(reaction.request.kind).toBe('CHEMICAL_REACTION');
+    expect(reaction.resolution.status).toBe('NOT_MODELLED');
+  });
+
+  it('the refusal names the REAL, specific architectural reason — not the generic family gap', () => {
+    expect(reaction.resolution.notModelled.join(' ')).toMatch(/backend network call/);
+    expect(reaction.resolution.notModelled.join(' ')).toMatch(/RDKit/);
+  });
+
+  it('carries no states, no world, and no producedBy claim of any kind — never the laboratory session in disguise', () => {
+    expect(reaction.states).toEqual([]);
+    expect(reaction.world).toBeNull();
+    expect(reaction.producedBy).toBe('none');
+    // The historical bug's signature: this string would appear if the
+    // request had silently fallen through to biology-logistic.
+    expect(reaction.producedBy).not.toMatch(/biology-logistic/);
+  });
+});
+
+describe('Looking Glass — chemistry kinetics states and grounding', () => {
   it('produces real, monotonically decaying states — not a curve drawn for the camera', () => {
     const session = openLookingGlass(KINETICS_SENTENCE);
     expect(session.states.length).toBe(13); // tick 0 through 12
@@ -73,13 +105,21 @@ describe('Looking Glass — chemistry kinetics resolves through the real C3 engi
     expect(events.every((event) => event.semanticKind !== undefined)).toBe(true);
   });
 
-  it('honestly reports replay as unavailable — this engine has no replay-verification pipeline wired yet', () => {
+  it('reports a REAL, verified MATCH replay verdict — checked by independently re-executing, not assumed from determinism', () => {
     const session = openLookingGlass(KINETICS_SENTENCE);
     const events = session.world!.getInspectableEvents();
     expect(events.length).toBeGreaterThan(0);
     for (const event of events) {
-      expect(event.replay.available).toBe(false);
-      expect(event.replay.reason).toMatch(/no replay verdict/);
+      expect(event.replay.available).toBe(true);
+      expect(event.replay.status).toBe('MATCH');
+    }
+  });
+
+  it('every state carries the same real MATCH verdict, at every tick — not just the endpoint', () => {
+    const session = openLookingGlass(KINETICS_SENTENCE);
+    for (const state of session.states) {
+      expect(state.replay?.status).toBe('MATCH');
+      expect(state.replay?.message).toMatch(/Independently rebuilt/);
     }
   });
 });

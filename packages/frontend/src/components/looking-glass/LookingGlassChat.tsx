@@ -263,13 +263,12 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
               unit={(session.world?.getTemporalRange().unit ?? 'DAY').toLowerCase()}
               onClose={() => setSelectedEvent(null)}
               // The chat has no live world clock to seek — unlike the two 3D
-              // screens, there is nothing here for "replay" to DO. Every
-              // domain reachable through this rail today reports
-              // replay.available === false anyway (no adapter here sets a
-              // MATCH verdict before a world is entered), so this button is
-              // provably unreachable; closing is the honest fallback if that
-              // ever changes, not a fabricated seek.
+              // screens, there is nothing here for "replay" to DO, even for a
+              // domain (chemistry) whose replay IS now verified. allowReplay
+              // tells the inspector to say so honestly instead of offering a
+              // button with nothing real behind it.
               onReplay={() => setSelectedEvent(null)}
+              allowReplay={false}
               moment={session.describeEntityMoment(selectedEvent.time.tick)}
             />
           )}

@@ -45,6 +45,13 @@ interface Props {
    * from `event.affectedEntities` alone.
    */
   readonly moment?: WorldModelMoment | null;
+  /**
+   * Whether THIS screen has somewhere real for `onReplay` to seek to. The
+   * two 3D world screens do (a live clock/camera); the chat card does not,
+   * so it passes false rather than wiring a button that would just close
+   * the panel while claiming to "replay". Defaults to true.
+   */
+  readonly allowReplay?: boolean;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
@@ -61,7 +68,7 @@ function NotModelled({ what }: { what: string }): JSX.Element {
   return <span className="lg-insp-absent">nie zamodelowane {what}</span>;
 }
 
-export function EventInspector({ event, allEvents, unit, onClose, onReplay, moment }: Props): JSX.Element {
+export function EventInspector({ event, allEvents, unit, onClose, onReplay, moment, allowReplay = true }: Props): JSX.Element {
   const chain = causalChainOf(event.id, allEvents);
   const deltas = moment ? scalarDeltasOf(moment) : [];
 
@@ -194,11 +201,16 @@ export function EventInspector({ event, allEvents, unit, onClose, onReplay, mome
       )}
 
       <div className="lg-insp-actions">
-        {event.replay.available ? (
+        {event.replay.available && allowReplay ? (
           <>
             <button type="button" className="lg-insp-replay" onClick={onReplay}>↻ Odtwórz ten moment</button>
             {event.replay.seed !== null && <span className="lg-insp-seed">ziarno {String(event.replay.seed)}</span>}
           </>
+        ) : event.replay.available ? (
+          // Verified reproducible, but this screen has no live world/clock to
+          // seek to — saying so honestly beats offering a button with nothing
+          // real behind it, or claiming the moment is unverified when it isn't.
+          <span className="lg-insp-noreplay">Zweryfikowano ({event.replay.status}) — odtwarzanie dostępne po wejściu do świata</span>
         ) : (
           // A replay button that silently produced different numbers would be
           // worse than none, so an unverified run says why instead.

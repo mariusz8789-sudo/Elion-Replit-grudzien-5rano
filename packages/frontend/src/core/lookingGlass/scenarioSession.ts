@@ -1,4 +1,5 @@
-import type { WorldState } from '../world/scientificWorldState';
+import type { ReplayState, WorldState } from '../world/scientificWorldState';
+import { canonicalJson } from '../events/hash';
 import { captureWorldTimeline, type WorldCaptureTimeline } from '../world/worldCapture';
 import { projectCellWorldStates } from '../world/cellWorldAdapter';
 import { executePreregisteredHypotheses, preregisterHypotheses, generateCompetingHypotheses, HYPOTHESIS_PROBLEMS } from '../experimentFabric/hypothesisLoop';
@@ -24,7 +25,7 @@ import {
 } from '../worldModel/domains/chemistryKinetics';
 import { TemporalBranchRegistry, TemporalEngine } from '../worldModel/temporal/temporalEngine';
 import { SolverRouter, type SolverRouteReport } from '../worldModel/solvers/solverRouter';
-import { compareBranches, projectToWorldState } from '../worldModel/bridge/worldFrameState';
+import { collectScalars, compareBranches, projectToWorldState } from '../worldModel/bridge/worldFrameState';
 import { describeMoment, type WorldModelMoment } from './worldModelMoment';
 
 /**
@@ -357,19 +358,49 @@ function buildChemistrySession(plan: ScenarioRunPlan): SessionBuild {
   router.register(CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver());
   const worldId = `chemistry:${plan.kind}`;
 
+  // REPLAY INTEGRITY: an independent second engine, rebuilt from the same
+  // declared construction and re-executed in lockstep. There is no saved
+  // artifact to replay FROM for this engine yet (see commitComparisonToMemory
+  // below) — this is what a genuine replay claim means before one exists:
+  // does re-running the same construction actually reproduce the same
+  // scalars, checked at every tick, not assumed from "the solver has no
+  // randomness". A real DRIFT here would mean a real bug, and would be
+  // reported as one — MATCH is never asserted without the comparison.
+  const verifyWorld = buildChemistryExperimentWorld({ initialTemperatureK: CHEMISTRY_INITIAL_TEMPERATURE_K });
+  const verifyEngine = new TemporalEngine(verifyWorld.graph, { label: 'replay-verify' });
+  const verifyRouter = new SolverRouter();
+  verifyRouter.register(CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver());
+
+  const replayAt = (tick: number): ReplayState => {
+    const primary = collectScalars(engine.graph.getEntity(world.substanceId));
+    const verify = collectScalars(verifyEngine.graph.getEntity(verifyWorld.substanceId));
+    const match = canonicalJson(primary) === canonicalJson(verify);
+    return {
+      status: match ? 'MATCH' : 'DRIFT',
+      message: match
+        ? `Independently rebuilt (same construction, same solver) and re-executed to tick ${tick}; scalars matched exactly.`
+        : `Independently rebuilt run diverged from the original at tick ${tick} — this is a real reproducibility failure, not reported as a match.`,
+    };
+  };
+
   // Tick 0: the substance before any solver step — nothing has happened yet,
-  // so this state carries no event, honestly.
-  const states: WorldState[] = [projectToWorldState(engine.graph, worldId, CHEMISTRY_KINETICS_DOMAIN_ID, 0)];
+  // so this state carries no event, honestly. Both engines start from the
+  // same construction, so tick 0's replay check is a real (if trivial)
+  // confirmation that construction itself is reproducible.
+  const states: WorldState[] = [
+    projectToWorldState(engine.graph, worldId, CHEMISTRY_KINETICS_DOMAIN_ID, 0, undefined, replayAt(0)),
+  ];
   for (let hour = 1; hour <= plan.ticks; hour++) {
     const captured: { report: SolverRouteReport | null } = { report: null };
     engine.advance(CHEMISTRY_DT_SECONDS, (graph, dt, tick) => {
       captured.report = router.routeTick(graph, dt, tick);
       return captured.report;
     });
+    verifyEngine.advance(CHEMISTRY_DT_SECONDS, (graph, dt, tick) => verifyRouter.routeTick(graph, dt, tick));
     states.push(projectToWorldState(engine.graph, worldId, CHEMISTRY_KINETICS_DOMAIN_ID, engine.tick, {
       observations: captured.report?.observations ?? [],
       events: captured.report?.events ?? [],
-    }));
+    }, replayAt(engine.tick)));
   }
 
   // A real fork/counterfactual, only when the sentence actually asked for

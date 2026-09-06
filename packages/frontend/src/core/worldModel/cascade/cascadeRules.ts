@@ -113,6 +113,10 @@ export function relationshipCascadeRule(options: {
         affectedEntities: [related.ref],
         cause: effect.cause,
         parameters: { triggerEventId: triggerEvent.id, triggerEntity: sourceId },
+        // CAUSAL GRAPH FOUNDATION: the real cause->effect chain, via the GenesisEvent contract's
+        // own `parentEventId` field (core/events/genesisEvent.ts) — never a second causality
+        // representation. See queries/worldQueries.ts::getCausalAncestry/getCausalDescendants.
+        parentEventId: triggerEvent.id,
         provenance: {
           origin: 'consequence-rule',
           ruleId: `${options.triggerEventType}->${options.relationshipKind}`,

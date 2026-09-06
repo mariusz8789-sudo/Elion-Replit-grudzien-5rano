@@ -1,7 +1,8 @@
 import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
-import type { WorldModelEntity } from '../ecs/types';
+import { executeIntervention } from '../bridge/worldFrameState';
+import type { EntityId, WorldModelEntity } from '../ecs/types';
 import type { WorldGraph } from '../ecs/worldGraph';
-import type { TemporalUpdateResult, TemporalUpdater } from '../temporal/temporalEngine';
+import type { TemporalEngine, TemporalUpdateResult, TemporalUpdater } from '../temporal/temporalEngine';
 
 /**
  * WORLD GENERATION 1.0 — GENERIC WORLD EVENTS.
@@ -104,4 +105,96 @@ export function thresholdCrossingRule(options: {
       },
     };
   };
+}
+
+/**
+ * WORLD EVENTS 2.0 — STATE-TRANSITION EVENT: generalizes
+ * `thresholdCrossingRule` to any real before/after value change, not just a
+ * numeric threshold (e.g. a qualitative `statusLabel` moving from
+ * `'operational'` to `'failed'`, or a `domainState` flag flipping). Kept as
+ * a SEPARATE, additional primitive rather than a refactor of
+ * `thresholdCrossingRule` — that existing, tested function is left exactly
+ * as it is.
+ */
+export function stateTransitionRule<T>(options: {
+  eventType: string;
+  read: (entity: WorldModelEntity) => T | undefined;
+  isTransition: (previous: T, next: T) => boolean;
+  cause?: string;
+}): WorldEventRule {
+  return (before, after, ctx) => {
+    const previousValue = options.read(before);
+    const newValue = options.read(after);
+    if (previousValue === undefined || newValue === undefined) return undefined;
+    if (!options.isTransition(previousValue, newValue)) return undefined;
+    return {
+      contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
+      id: `world-event:${after.id}:${ctx.tick}:${options.eventType}`,
+      type: options.eventType,
+      timestamp: ctx.tick,
+      source: after.ref,
+      affectedEntities: [after.ref],
+      cause: options.cause ?? 'state-transition',
+      parameters: { previousValue, newValue },
+      provenance: {
+        origin: 'consequence-rule',
+        ruleId: options.eventType,
+        notes: `Derived from a real ${before.id} state transition, not fabricated for display.`,
+      },
+    };
+  };
+}
+
+/**
+ * WORLD EVENTS 2.0 — SCHEDULED EVENT: fires `build` exactly once, at
+ * `atTick`, regardless of any entity's own state (a calendar/plan trigger,
+ * e.g. "extreme rainfall begins at tick 5" — the rainfall's actual
+ * hydrological consequence is still whatever a real solver/cascade derives
+ * afterward, this only marks WHEN the scripted condition itself starts).
+ * Composes into the same `TemporalUpdater` contract as `withEventRules` —
+ * a second, parallel decorator, not a second loop.
+ */
+export interface ScheduledEvent {
+  atTick: number;
+  build: (ctx: WorldEventRuleContext) => GenesisEvent;
+}
+
+export function withScheduledEvents(updater: TemporalUpdater, schedule: readonly ScheduledEvent[]): TemporalUpdater {
+  return (graph, dt, tick): TemporalUpdateResult | void => {
+    const result = updater(graph, dt, tick) ?? undefined;
+    const due = schedule.filter((entry) => entry.atTick === tick).map((entry) => entry.build({ tick, graph }));
+    if (due.length === 0) return result;
+    return { observations: result?.observations, events: [...(result?.events ?? []), ...due] };
+  };
+}
+
+/**
+ * WORLD EVENTS 2.0 — INTERVENTION EVENT: wraps the existing
+ * `executeIntervention` (bridge/worldFrameState.ts) so an explicit user/
+ * experimenter change is ALSO recorded as real, traceable evidence in the
+ * branch's own journal — never a second intervention mechanism, just
+ * making the ALREADY-REAL state change visible as an event too (previously
+ * `executeIntervention` changed state silently as far as the journal was
+ * concerned).
+ */
+export function applyInterventionWithEvent(
+  engine: TemporalEngine,
+  targetId: EntityId,
+  parameters: Readonly<Record<string, string | number | boolean>>,
+  options: { eventType?: string; cause?: string } = {},
+): WorldModelEntity {
+  const updated = executeIntervention(engine, targetId, parameters);
+  const event: GenesisEvent = {
+    contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
+    id: `intervention:${targetId}:${engine.tick}:${Object.keys(parameters).sort().join(',')}`,
+    type: options.eventType ?? 'world.intervention.applied',
+    timestamp: engine.tick,
+    source: updated.ref,
+    affectedEntities: [updated.ref],
+    cause: options.cause ?? 'user-intervention',
+    parameters: { ...parameters },
+    provenance: { origin: 'experiment-action', notes: 'Explicit user/experimenter intervention, not derived from a solver.' },
+  };
+  engine.journal.recordEvent(event);
+  return updated;
 }

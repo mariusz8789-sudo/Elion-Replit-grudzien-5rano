@@ -9,6 +9,40 @@ export interface ScaleZoomResult {
 }
 
 /**
+ * CAUSAL GRAPH FOUNDATION (Generative Scientific World Model 2.0): a
+ * relationship is one of several distinct kinds of edge, never collapsed
+ * into "parent/child" the way `contains` alone would suggest:
+ *  - `hierarchy`: containment, e.g. the same relationship
+ *    `ScaleComponent.parentEntityId` already models (recorded here mainly
+ *    when a caller wants it explicit and queryable alongside others).
+ *  - `spatial`: proximity/adjacency with no functional meaning of its own.
+ *  - `functional`: one entity feeds/monitors/supplies another operationally.
+ *  - `dependency`: one entity's correct operation requires another's.
+ *  - `causal`: one entity's state change is understood to cause another's.
+ * `classifyRelationshipKind` below provides an honest DEFAULT category for
+ * a free-form `kind` string; a caller may always override it explicitly.
+ */
+export type RelationshipCategory = 'hierarchy' | 'spatial' | 'functional' | 'dependency' | 'causal';
+
+const KNOWN_RELATIONSHIP_KIND_CATEGORIES: Readonly<Record<string, RelationshipCategory>> = {
+  contains: 'hierarchy',
+  nearBy: 'spatial',
+  adjacentTo: 'spatial',
+  feedsInto: 'functional',
+  suppliesTo: 'functional',
+  monitors: 'functional',
+  dependsOn: 'dependency',
+  requires: 'dependency',
+  causes: 'causal',
+  triggeredBy: 'causal',
+};
+
+/** Best-effort default classification for a `kind` string not given an explicit category — defaults to `'functional'` (the most common real-world case: "X feeds/serves/operates Y") rather than silently guessing `'causal'`, which is a stronger claim this alone cannot support. */
+export function classifyRelationshipKind(kind: string): RelationshipCategory {
+  return KNOWN_RELATIONSHIP_KIND_CATEGORIES[kind] ?? 'functional';
+}
+
+/**
  * A generic, non-hierarchical edge between two entities (e.g. "pipe-A
  * feedsInto pipe-B", "sensor-1 monitors reactor-1"). Distinct from the
  * strict tree parent/child containment `ScaleComponent.parentEntityId`

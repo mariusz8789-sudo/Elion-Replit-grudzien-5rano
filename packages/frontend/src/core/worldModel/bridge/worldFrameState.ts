@@ -183,8 +183,14 @@ export function executeIntervention(
  * be carried forward. `domainState` is included here because it is the
  * generic ledger real domain solvers read their own intervention-tunable
  * parameters from (epidemic R0, hydraulic flow rate, ...).
+ *
+ * Exported (Generative Scientific World Model 2.0) so
+ * `specification/compiler.ts` can apply a `WorldSpecification`'s
+ * `initialConditions` (the same dotted-path vocabulary, applied once at
+ * generation time rather than via a live `executeIntervention` call)
+ * without a second patch-building implementation.
  */
-function parametersToPatch(
+export function parametersToPatch(
   entity: WorldModelEntity,
   parameters: Readonly<Record<string, string | number | boolean>>,
 ): WorldModelEntityPatch {

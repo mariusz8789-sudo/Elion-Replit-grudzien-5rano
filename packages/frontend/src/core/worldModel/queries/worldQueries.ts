@@ -1,4 +1,4 @@
-import type { EntityRef } from '../../events/genesisEvent';
+import type { EntityRef, GenesisEvent } from '../../events/genesisEvent';
 import type { WorldChangeTrace } from '../../world/scientificWorldState';
 import {
   describeWorldMoment,
@@ -9,7 +9,8 @@ import {
   type WorldFrameState,
   type WorldMomentSummary,
 } from '../bridge/worldFrameState';
-import type { EntityId, ScaleDomain, WorldModelEntity } from '../ecs/types';
+import { classifyRelationshipKind, type RelationshipCategory } from '../ecs/worldGraph';
+import { entityId, type EntityId, type ScaleDomain, type WorldModelEntity } from '../ecs/types';
 import type { TemporalBranchRegistry, TemporalEngine } from '../temporal/temporalEngine';
 
 /**
@@ -90,6 +91,41 @@ export function getRelated(engine: TemporalEngine, id: EntityId, kind?: string, 
   });
 }
 
+/** `getRelated`, filtered to relationships whose `kind` classifies (see `classifyRelationshipKind`) as `category` — e.g. every `'dependency'` edge touching `id`, regardless of its exact `kind` string. */
+export function getRelatedByCategory(engine: TemporalEngine, id: EntityId, category: RelationshipCategory, timestamp?: number): readonly RelatedEntity[] {
+  return getRelated(engine, id, undefined, timestamp).filter((related) => classifyRelationshipKind(related.relationshipKind) === category);
+}
+
+function transitiveClosure(engine: TemporalEngine, id: EntityId, direction: 'outgoing' | 'incoming', timestamp?: number): readonly WorldModelEntity[] {
+  const graph = graphAt(engine, timestamp);
+  const visited = new Set<EntityId>([id]);
+  const result: WorldModelEntity[] = [];
+  const stack = [id];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    for (const relationship of graph.relationshipsFor(current)) {
+      const isOutgoing = relationship.from === current;
+      if ((direction === 'outgoing') !== isOutgoing) continue;
+      const nextId = isOutgoing ? relationship.to : relationship.from;
+      if (visited.has(nextId)) continue; // cycle guard — a relationship graph is not guaranteed to be acyclic
+      visited.add(nextId);
+      result.push(graph.getEntity(nextId));
+      stack.push(nextId);
+    }
+  }
+  return result;
+}
+
+/** Every entity transitively reachable by following relationships FROM `id` outward — "what does this affect, directly or indirectly." */
+export function getDownstream(engine: TemporalEngine, id: EntityId, timestamp?: number): readonly WorldModelEntity[] {
+  return transitiveClosure(engine, id, 'outgoing', timestamp);
+}
+
+/** Every entity transitively reachable by following relationships INTO `id` — "what, directly or indirectly, affects this." */
+export function getUpstream(engine: TemporalEngine, id: EntityId, timestamp?: number): readonly WorldModelEntity[] {
+  return transitiveClosure(engine, id, 'incoming', timestamp);
+}
+
 export interface CausalDependencies {
   /** Entities `id` points AT via a relationship — what it depends on. */
   readonly dependsOn: readonly EntityRef[];
@@ -137,4 +173,51 @@ export function getBranchState(registry: TemporalBranchRegistry, branchId: strin
 /** C1's standard "what is this entity, right now, and why" question — re-exported here for a single query-layer import surface. */
 export function getWorldMoment(engine: TemporalEngine, id: EntityId, atTick?: number): WorldMomentSummary {
   return describeWorldMoment(engine, id, atTick);
+}
+
+/** Every event recorded (at ANY tick, not just one) whose `affectedEntities` includes `id` — "what events affected this entity, over its whole recorded history." */
+export function getEventHistoryFor(engine: TemporalEngine, id: EntityId): readonly GenesisEvent[] {
+  return engine.journal.allEvents().filter((event) => event.affectedEntities.some((ref) => entityId(ref) === id));
+}
+
+/**
+ * CAUSAL GRAPH FOUNDATION: walks `GenesisEvent.parentEventId` BACKWARD from
+ * `eventId` to its root cause — e.g. a cascade-derived
+ * `building.waterservice.interrupted` event's ancestry leads back to the
+ * real `hydraulics.pumppipe.step` event that triggered it (see
+ * cascade/cascadeRules.ts's `relationshipCascadeRule`, which sets
+ * `parentEventId`). Returns `[eventId's own event, ..., the root cause]` —
+ * empty if `eventId` is not found. Guards against a malformed cycle rather
+ * than looping forever.
+ */
+export function getCausalAncestry(engine: TemporalEngine, eventId: string): readonly GenesisEvent[] {
+  const byId = new Map(engine.journal.allEvents().map((event) => [event.id, event] as const));
+  const chain: GenesisEvent[] = [];
+  const visited = new Set<string>();
+  let current = byId.get(eventId);
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+    chain.push(current);
+    current = current.parentEventId ? byId.get(current.parentEventId) : undefined;
+  }
+  return chain;
+}
+
+/** The reverse of `getCausalAncestry`: every event (transitively) CAUSED by `eventId`, via `parentEventId` chains forward. */
+export function getCausalDescendants(engine: TemporalEngine, eventId: string): readonly GenesisEvent[] {
+  const byParent = new Map<string, GenesisEvent[]>();
+  for (const event of engine.journal.allEvents()) {
+    if (!event.parentEventId) continue;
+    const siblings = byParent.get(event.parentEventId) ?? [];
+    siblings.push(event);
+    byParent.set(event.parentEventId, siblings);
+  }
+  const result: GenesisEvent[] = [];
+  const stack = [...(byParent.get(eventId) ?? [])];
+  while (stack.length > 0) {
+    const next = stack.pop()!;
+    result.push(next);
+    stack.push(...(byParent.get(next.id) ?? []));
+  }
+  return result;
 }

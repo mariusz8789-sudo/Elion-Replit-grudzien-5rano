@@ -123,4 +123,13 @@ describe('Scientific Discovery Loop -> Scientific Memory', () => {
     const b = saveScientificDiscoveryLoopToMemory(runLoop());
     expect(a.discoveryLoop!.discoveryLoopFingerprint).toBe(b.discoveryLoop!.discoveryLoopFingerprint);
   });
+
+  it('11. a fourth domain (cell population biology, local model) round-trips through Scientific Memory and replays MATCH — the same generic machinery, no domain-specific persistence code', async () => {
+    const { saveScientificDiscoveryLoopToMemory, replaySavedScientificDiscoveryLoop, listExperiments } = await import('../core/scienceMemory');
+    const saved = saveScientificDiscoveryLoopToMemory(runLoop('problem:cell-population-growth-rate-fastest-to-capacity'));
+    const loaded = listExperiments().find((entry) => entry.id === saved.id)!;
+    expect(loaded.discoveryLoop!.problemId).toBe('problem:cell-population-growth-rate-fastest-to-capacity');
+    const replay = await replaySavedScientificDiscoveryLoop(saved);
+    expect(replay.status).toBe('MATCH');
+  });
 });

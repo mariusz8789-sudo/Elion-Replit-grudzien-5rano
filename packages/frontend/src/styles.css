@@ -3204,3 +3204,27 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .lg-obs-nodelta { margin: 0; color: #6f83a0; font-size: 0.78rem; font-style: italic; }
 .lg-obs-cause, .lg-obs-consequence, .lg-obs-grounding { margin: 0; color: #9fb4cd; font-size: 0.76rem; }
 .lg-obs-grounding code { color: #f0c542; }
+
+/* CITY INFRASTRUCTURE INTEGRATION 1.0 — the real pump/hospital 3D screen. */
+.gsc-stage { position: relative; width: 100%; height: 100vh; background: #0c1420; }
+.gsc-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.gsc-panel {
+  position: absolute; right: 1rem; top: 1rem; z-index: 8; max-width: 24rem;
+  display: flex; flex-direction: column; gap: 0.6rem;
+  border: 1px solid #24314a; border-radius: 0.7rem; padding: 0.7rem 0.85rem;
+  background: rgba(8, 13, 22, 0.92); backdrop-filter: blur(8px); color: #cfe0f2; font-size: 0.82rem;
+}
+.gsc-panel-row { display: flex; gap: 0.5rem; align-items: center; }
+.gsc-panel button { border: 1px solid #2b3a52; background: #16283c; color: #cfe6ff; border-radius: 0.4rem; padding: 0.3rem 0.6rem; cursor: pointer; }
+.gsc-panel button:hover { border-color: #8ecbff; }
+.gsc-panel button:disabled { opacity: 0.5; cursor: default; }
+.gsc-fail-btn { background: #2c1616; border-color: #6b2c2c; color: #f28a8a; }
+.gsc-outcome { display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid #1c2637; padding-top: 0.5rem; }
+.gsc-branch-toggle { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.gsc-caption { color: #9fb4cd; font-size: 0.76rem; }
+.gsc-causal, .gsc-comparison { border-top: 1px solid #1c2637; padding-top: 0.5rem; }
+.gsc-causal ol { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+.gsc-causal li { color: #cfe0f2; font-size: 0.78rem; line-height: 1.5; }
+.gsc-comparison table { width: 100%; border-collapse: collapse; margin-top: 0.3rem; font-size: 0.7rem; }
+.gsc-comparison td { padding: 0.2rem 0.3rem; border-top: 1px solid #1c2637; color: #9fb4cd; word-break: break-all; }
+.gsc-comparison td:first-child { color: #cfe6ff; font-weight: 600; white-space: nowrap; }

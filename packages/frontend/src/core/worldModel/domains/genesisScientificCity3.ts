@@ -68,8 +68,11 @@ export const POPULATION_ACCESS_IMPAIRED_EVENT_TYPE = 'population.hospitalaccess.
  * the latter (a real trip once rainfall raises the load).
  */
 const PUMP_OVERLOAD_HEAD_LOSS_THRESHOLD_M = 100;
-/** Scripted assumption for how much an "extreme rainfall" scenario raises inflow demand — not derived from any real hydrology model. */
-const RAINFALL_LOAD_MULTIPLIER = 4;
+/** Scripted assumption for how much an "extreme rainfall" scenario raises inflow demand — not
+ * derived from any real hydrology model. Exported so a caller driving an on-demand "what if the
+ * pump fails" fork (City Infrastructure Integration 1.0) can reuse the EXACT same real load-increase
+ * magnitude this file's own scripted rainfall coupling applies, rather than inventing a second one. */
+export const RAINFALL_LOAD_MULTIPLIER = 4;
 
 export interface GenesisScientificCity3Options {
   seed?: number;

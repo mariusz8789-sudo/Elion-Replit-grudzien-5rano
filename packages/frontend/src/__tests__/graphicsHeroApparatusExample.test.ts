@@ -13,6 +13,7 @@ beforeAll(() => {
     createLinearGradient: () => ({ addColorStop: () => {} }) as unknown as CanvasGradient,
     getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h, colorSpace: 'srgb' }) as ImageData,
     putImageData: () => {},
+    createImageData: ((w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h, colorSpace: 'srgb' })) as unknown as CanvasRenderingContext2D['createImageData'],
   };
   const fakeCanvas = { width: 0, height: 0, getContext: () => fakeContext as CanvasRenderingContext2D };
   (globalThis as { document?: unknown }).document = {
@@ -21,6 +22,7 @@ beforeAll(() => {
 });
 
 import { buildExampleHeroApparatus } from '../core/three/graphics/examples/heroApparatusExample';
+import { severityColor } from '../core/three/graphics/stateVisualization';
 
 describe('buildExampleHeroApparatus — integration smoke test', () => {
   it('builds without throwing and adds a group to the scene', () => {
@@ -59,7 +61,7 @@ describe('buildExampleHeroApparatus — integration smoke test', () => {
     expect(instancedMeshes[0]!.count).toBe(16);
   });
 
-  it('scientific-state hook drives fill scale and color, never a fabricated value', () => {
+  it('scientific-state hook drives fill scale and color (via stateVisualization.ts), never a fabricated value', () => {
     const scene = new THREE.Scene();
     const handles = buildExampleHeroApparatus(THREE, scene, { position: [0, 0, 0] });
     const fill = handles.group.children.find((c) => c.name === 'exampleApparatusFill') as THREE.Mesh | undefined;
@@ -68,11 +70,11 @@ describe('buildExampleHeroApparatus — integration smoke test', () => {
     handles.updateVisualState(0.75, 'warning');
     expect(fill!.scale.y).toBeCloseTo(0.75);
     const material = fill!.material as THREE.MeshStandardMaterial;
-    expect(material.emissive.getHex()).toBe(0xf0c542);
+    expect(material.emissive.getHex()).toBe(severityColor(THREE, 0.6).getHex());
 
     handles.updateVisualState(0.1, 'critical');
     expect(fill!.scale.y).toBeCloseTo(0.1);
-    expect(material.emissive.getHex()).toBe(0xf24444);
+    expect(material.emissive.getHex()).toBe(severityColor(THREE, 1).getHex());
   });
 
   it('clamps fraction to [0, 1] rather than trusting out-of-range input', () => {
@@ -83,6 +85,35 @@ describe('buildExampleHeroApparatus — integration smoke test', () => {
     expect(fill.scale.y).toBeCloseTo(1);
     handles.updateVisualState(-3, 'nominal');
     expect(fill.scale.y).toBeGreaterThan(0); // never collapses to exactly 0 (matches the real vessel's Math.max(0.02, ...) pattern)
+  });
+
+  it('cameraRig starts framed on this specific apparatus (WIDE shot, scaled to its own footprint)', () => {
+    const scene = new THREE.Scene();
+    const handles = buildExampleHeroApparatus(THREE, scene, { position: [2, 0, -3], scale: 1.5 });
+    const transform = handles.cameraRig.update(0);
+    // lookAt tracks the apparatus's own chamber-center target, not a hardcoded world coordinate.
+    expect(transform.lookAt[0]).toBeCloseTo(2);
+    expect(transform.lookAt[2]).toBeCloseTo(-3);
+  });
+
+  it('shootCamera(intent) reframes toward a different named shot on the SAME apparatus', () => {
+    const scene = new THREE.Scene();
+    const handles = buildExampleHeroApparatus(THREE, scene, { position: [0, 0, 0] });
+    const wideTransform = handles.cameraRig.update(0);
+    handles.shootCamera('MACRO', true); // hard cut, no transition to wait out
+    const macroTransform = handles.cameraRig.update(0);
+    expect(handles.cameraRig.isSettled).toBe(true);
+    // MACRO frames closer than the initial WIDE shot on the same subject.
+    const wideDistance = Math.hypot(...wideTransform.position.map((v, i) => v - wideTransform.lookAt[i]) as [number, number, number]);
+    const macroDistance = Math.hypot(...macroTransform.position.map((v, i) => v - macroTransform.lookAt[i]) as [number, number, number]);
+    expect(macroDistance).toBeLessThan(wideDistance);
+  });
+
+  it('shootCamera(intent) without cut eases smoothly instead of snapping', () => {
+    const scene = new THREE.Scene();
+    const handles = buildExampleHeroApparatus(THREE, scene, { position: [0, 0, 0] });
+    handles.shootCamera('MACRO'); // smooth transition, default
+    expect(handles.cameraRig.isSettled).toBe(false);
   });
 
   it('suggestedDofSettings hands back an enabled, opt-in DOF config at the given distance', () => {

@@ -66,6 +66,18 @@ export function tierAllowsBloom(tier: RenderTier): boolean {
   return tierAtLeast(tier, 'medium');
 }
 
+/**
+ * Gates `atmosphere.ts`'s dust motes/light shafts (and any future particle-driven atmosphere
+ * effect) — same `'medium'`+ floor as bloom, since a low-end device's real budget goes to holding a
+ * stable frame rate on the geometry/materials/lighting it's already drawing, not an ambient-depth
+ * cue nobody will notice is missing. `'low'` tier scenes should skip these effects entirely rather
+ * than render a token few — see `quality.ts`'s own module doc: "the system must remain functional
+ * on normal hardware," not "every effect always runs, just smaller."
+ */
+export function tierAllowsAtmosphereParticles(tier: RenderTier): boolean {
+  return tierAtLeast(tier, 'medium');
+}
+
 /** Ambient occlusion (GTAO) renderuje dodatkowy przebieg normal/depth per klatkę — kosztowniejszy
  * niż bloom, więc dopuszczony dopiero od `'high'` w górę (`'high'` i `'cinematic'`). */
 export function tierAllowsAO(tier: RenderTier): boolean {
@@ -114,6 +126,21 @@ export interface GraphicsQualityProfile {
    * it shares AO's gate by default. `setupGraphicsPipeline`'s `DepthOfFieldSettings.minTier` can
    * still loosen this per-call once profiled. */
   allowsDof: boolean;
+  /** Whether `atmosphere.ts` effects (dust motes, light shafts) should run at all this tier — see
+   * `tierAllowsAtmosphereParticles`. `false` at `'low'`: skip creating the effect entirely, not
+   * create-it-but-tiny. */
+  allowsAtmosphereParticles: boolean;
+}
+
+/**
+ * Scales an atmosphere-effect's base particle/instance count for this tier, gated by
+ * `tierAllowsAtmosphereParticles` — the one call a scene needs to go from "how many dust motes did
+ * I hand-pick for my own scene" to "how many should THIS device actually get," combining
+ * `scaleCount`'s density scaling with the all-or-nothing tier gate in one step. Returns 0 at a tier
+ * the gate excludes, so a caller can use the result directly as `count` without a separate `if`.
+ */
+export function atmosphereParticleCount(base: number, tier: RenderTier): number {
+  return tierAllowsAtmosphereParticles(tier) ? scaleCount(base, tier) : 0;
 }
 
 /** Resolves every tier-dependent rendering decision at once. Prefer this over calling the
@@ -127,5 +154,44 @@ export function configureGraphicsQuality(tier: RenderTier): GraphicsQualityProfi
     allowsBloom: tierAllowsBloom(tier),
     allowsAO: tierAllowsAO(tier),
     allowsDof: tierAllowsAO(tier),
+    allowsAtmosphereParticles: tierAllowsAtmosphereParticles(tier),
   };
+}
+
+/**
+ * A user-facing quality PRESET — three named choices for a settings menu, distinct from
+ * `RenderTier`'s four internal, device-detected/capture tiers above. The two vocabularies exist for
+ * different audiences: `RenderTier` is what `detectRenderTier()`/`setupGraphicsPipeline` reason
+ * about internally (a heuristic guess, plus the offline-capture-only `'cinematic'` tier a person
+ * never picks directly); `QualityLevel` is the three choices worth actually showing a user who wants
+ * to override that guess — "make it faster," "the normal default," "I want it to look as good as
+ * this device can sustain in real time." This is a thin, additive naming layer: it does not change
+ * what any `RenderTier` means or gates, it only maps a friendly preset onto one.
+ *
+ * `'CINEMATIC'` here is real-time-safe (interactive, expected to hold a frame rate) and maps to
+ * `RenderTier`'s `'high'` — NOT to `RenderTier`'s own `'cinematic'` tier, which is explicitly for
+ * offline/capture rendering that doesn't need to sustain 60fps (see this module's own tier doc
+ * above). A caller that genuinely wants offline-capture quality (a hero screenshot, a recorded
+ * video) should keep passing `'cinematic'` (the `RenderTier`) to `setupGraphicsPipeline`'s
+ * `qualityTier` directly, not go through this preset layer.
+ */
+export type QualityLevel = 'PERFORMANCE' | 'BALANCED' | 'CINEMATIC';
+
+const QUALITY_LEVEL_TIER: Record<QualityLevel, InteractiveRenderTier> = {
+  PERFORMANCE: 'low',
+  BALANCED: 'medium',
+  CINEMATIC: 'high',
+};
+
+/** Maps a user-facing `QualityLevel` preset to the `RenderTier` the rest of the pipeline actually
+ * reasons about. */
+export function resolveQualityLevel(level: QualityLevel): InteractiveRenderTier {
+  return QUALITY_LEVEL_TIER[level];
+}
+
+/** `configureGraphicsQuality`, addressed by the friendly `QualityLevel` preset instead of a raw
+ * `RenderTier` — the one call a settings menu needs for "the user picked BALANCED, give me every
+ * quality knob for that." */
+export function configureGraphicsQualityForLevel(level: QualityLevel): GraphicsQualityProfile {
+  return configureGraphicsQuality(resolveQualityLevel(level));
 }

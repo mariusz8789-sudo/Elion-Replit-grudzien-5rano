@@ -1,4 +1,5 @@
 import type * as THREE_NS from 'three';
+import { disposeSceneResources } from './graphics/lifecycle';
 
 /**
  * Warstwa prezentacyjna legendy Filadelfii. Nie jest silnikiem fizycznym,
@@ -177,12 +178,7 @@ export function createPhiladelphiaLegendVisual(
       staff.rotation.y = Math.sin(elapsedSeconds * 0.22) * 0.018;
     },
     dispose() {
-      root.traverse((node) => {
-        const mesh = node as THREE_NS.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const material = mesh.material;
-        if (material && !Array.isArray(material)) material.dispose();
-      });
+      disposeSceneResources(root);
     },
   };
 }

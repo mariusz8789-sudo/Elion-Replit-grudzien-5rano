@@ -79,6 +79,7 @@ export function applyShadowPolicy(THREE: typeof THREE_NS, scene: THREE_NS.Scene,
 
   const box = new THREE.Box3();
   const size = new THREE.Vector3();
+  const scale = new THREE.Vector3();
   scene.traverse((object) => {
     const mesh = object as THREE_NS.Mesh;
     if (!mesh.isMesh || !mesh.geometry) return;
@@ -89,7 +90,7 @@ export function applyShadowPolicy(THREE: typeof THREE_NS, scene: THREE_NS.Scene,
     if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
     box.copy(mesh.geometry.boundingBox!);
     box.getSize(size);
-    const scale = mesh.getWorldScale(new THREE.Vector3());
+    mesh.getWorldScale(scale);
     const largestExtent = Math.max(size.x * scale.x, size.y * scale.y, size.z * scale.z);
 
     const forced = isForcedCast(mesh);

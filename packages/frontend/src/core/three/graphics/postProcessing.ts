@@ -2,6 +2,7 @@ import type * as THREE_NS from 'three';
 import type { PostProcessingModules, PostProcessor } from '../types';
 import { detectRenderTier, tierAllowsAO, tierAllowsBloom, tierAtLeast, type RenderTier } from '../quality';
 import { applyAmbientIBL, applyStudioEnvironment, captureRoomEnvironment, type RoomEnvironmentProbeOptions } from './lighting';
+import { readFrameCounters, type FrameCounters } from './diagnostics';
 
 /**
  * GENESIS GRAPHICS RUNTIME — Screen-Space Reflections (investigation + opt-in pass)
@@ -165,10 +166,14 @@ export interface AmbientOcclusionSettings {
  * reflecting — it keeps the studio box only as the frame-0 fallback, skips the HDRI load
  * entirely (which would otherwise asynchronously overwrite the probe), and hands the caller a
  * `captureRoomProbe()` to fire once the first full frame has been rendered. See
- * `captureRoomEnvironment` in `lighting.ts` for why the timing matters.
+ * `captureRoomEnvironment` in `lighting.ts` for why the timing matters. `'none'` is for a scene
+ * that already runs its OWN environment/atmosphere entirely outside this module (a tuned HDRI
+ * intensity, a specific background color, exponential fog) — forcing the generic studio box on
+ * top would fight that scene's own tuning rather than help it, so this skips the AMBIENT/IBL role
+ * completely and leaves `scene.environment`/`scene.background`/`scene.fog` untouched.
  */
 export interface AmbientEnvironmentSettings {
-  mode: 'studio+hdri' | 'room-probe';
+  mode: 'studio+hdri' | 'room-probe' | 'none';
   /** Required for `'room-probe'` — where the probe sits and how bright its map reads. */
   probe?: RoomEnvironmentProbeOptions;
 }
@@ -201,11 +206,29 @@ export interface GraphicsPipelineOptions {
 export interface GraphicsPipeline extends PostProcessor {
   setFocusDistance(distance: number): void;
   /**
+   * Toggles the Bokeh blur on/off per shot without rebuilding the composer — a no-op when DOF
+   * wasn't enabled at setup. For a camera that cuts between framings (a wide establishing shot, a
+   * tight hero close-up, a first-person POV), only SOME of those framings want shallow depth of
+   * field: cinematography convention (and this engine's own `cinematicCamera.ts` profiles) keeps
+   * wide/establishing and POV shots sharp end-to-end, reserving DOF for close/hero framings where
+   * it reads as intentional rather than as a rendering glitch blurring the room the viewer is
+   * trying to read.
+   */
+  setDepthOfFieldEnabled(enabled: boolean): void;
+  /**
    * Captures the room reflection probe, when `ambient.mode` is `'room-probe'` — a no-op
    * otherwise, and a no-op on every call after the first. Call it from the render loop once the
    * first full frame has been drawn.
    */
   captureRoomProbe(): void;
+  /**
+   * Reads the renderer's draw-call/triangle/geometry/texture/program counters for the frame(s)
+   * rendered since the last read (see `diagnostics.ts` — `renderer.info.autoReset` clears these at
+   * the start of every frame, so call this right after `.render()`, not on some later tick). Exact
+   * CPU-side counts, valid on any GPU including software rendering — not a hardware performance
+   * claim; see `diagnostics.ts`'s own module doc for what is and isn't verified here.
+   */
+  getFrameCounters(): FrameCounters;
 }
 
 export function setupGraphicsPipeline(
@@ -232,7 +255,9 @@ export function setupGraphicsPipeline(
   // approved HDRI upgrade in the background — metal must have something to reflect, or chrome
   // and steel read as flat plastic regardless of roughness/metalness.
   const ambient = opts.ambient;
-  if (ambient?.mode === 'room-probe') {
+  if (ambient?.mode === 'none') {
+    // The caller runs its own environment/atmosphere entirely — nothing to do here.
+  } else if (ambient?.mode === 'room-probe') {
     // Studio box only as the frame-0 fallback — no HDRI load, since it would land
     // asynchronously and overwrite the probe some seconds into the session.
     applyStudioEnvironment(THREE, renderer, scene);
@@ -273,8 +298,9 @@ export function setupGraphicsPipeline(
     composer.addPass(ssr);
   }
 
+  let bloom: InstanceType<typeof modules.UnrealBloomPass> | null = null;
   if (tierAllowsBloom(tier)) {
-    const bloom = new modules.UnrealBloomPass(
+    bloom = new modules.UnrealBloomPass(
       new THREE.Vector2(width, height), bloomTuning.strength, bloomTuning.radius, bloomTuning.threshold,
     );
     composer.addPass(bloom);
@@ -291,7 +317,8 @@ export function setupGraphicsPipeline(
     composer.addPass(dof);
   }
 
-  composer.addPass(new modules.OutputPass());
+  const outputPass = new modules.OutputPass();
+  composer.addPass(outputPass);
 
   let roomProbeCaptured = false;
   return {
@@ -307,10 +334,32 @@ export function setupGraphicsPipeline(
     setFocusDistance: (distance: number) => {
       if (dof) (dof.uniforms as { focus: { value: number } }).focus.value = distance;
     },
+    setDepthOfFieldEnabled: (enabled: boolean) => {
+      if (dof) dof.enabled = enabled;
+    },
+    getFrameCounters: () => readFrameCounters(renderer),
+    // Resource-lifecycle audit finding: `EffectComposer.dispose()` only frees its OWN two ping-pong
+    // render targets and copy pass — it does not iterate `this.passes` and dispose each one (see
+    // three.js's own EffectComposer source). Every pass that owns GPU resources must be disposed
+    // explicitly here, or they leak on every scene teardown/remount: UnrealBloomPass alone owns 11
+    // WebGLRenderTargets (its downsample/blur chain), BokehPass owns a depth render target plus two
+    // materials, OutputPass owns one material — none of that was being freed before this fix.
     dispose: () => {
       gtao?.dispose();
       ssr?.dispose();
+      bloom?.dispose();
+      dof?.dispose();
+      outputPass.dispose();
       composer.dispose();
+      // Resource-lifecycle audit finding: this pipeline's own AMBIENT/IBL environment texture
+      // (a real PMREM-convolved WebGLRenderTarget, from applyAmbientIBL's studio-box+HDRI or
+      // captureRoomEnvironment's room probe) was never disposed on teardown. Only touched when this
+      // pipeline actually owns `scene.environment` (not 'none' mode — that caller manages its own
+      // environment entirely outside this pipeline and must not have it swept here).
+      if (ambient?.mode !== 'none') {
+        scene.environment?.dispose();
+        scene.environment = null;
+      }
     },
   };
 }

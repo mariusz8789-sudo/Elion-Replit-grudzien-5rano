@@ -4,10 +4,15 @@ import { isWorldAssetApproved } from '../assetGovernance';
 /**
  * GENESIS GRAPHICS RUNTIME — Lighting Roles
  *
- * Six reusable lighting roles cover the vocabulary a world-builder needs
- * without rebuilding a lighting rig from scratch per object:
+ * Reusable lighting roles cover the vocabulary a world-builder needs without
+ * rebuilding a lighting rig from scratch per object:
  *
- *   KEY         `createKeyLight`       — the shadow-casting light that models an object's form.
+ *   KEY         `createKeyLight`       — the shadow-casting light that models an interior
+ *                                        object's form (a `SpotLight`, falls off with distance).
+ *   SUN         `createSunLight`       — the exterior counterpart to KEY: a shadow-casting
+ *                                        `DirectionalLight` with an orthographic shadow frustum,
+ *                                        for a scene lit by sunlight/moonlight rather than one
+ *                                        practical fixture.
  *   RIM         `createRimLight`       — a cool light behind/above a subject that separates its
  *                                        silhouette from the background.
  *   PRACTICAL   `createPracticalLight` — a small, non-shadow-casting light that reads as coming
@@ -21,12 +26,16 @@ import { isWorldAssetApproved } from '../assetGovernance';
  *                                        approved HDRI) so metal and glass have something to
  *                                        reflect. Pure rendering-layer technique — it doesn't know
  *                                        or care what geometry it's lighting.
+ *   ROOM PROBE  `captureRoomEnvironment` — an upgrade over AMBIENT/IBL's generic studio env: an
+ *                                        interior scene reflecting its own real geometry instead
+ *                                        of a generic box. See its own doc below.
  *
  * Every factory takes `THREE`+`scene` and adds its own light(s) — it never
  * places fixture geometry (a lamp mesh, a gantry beam): that's facility/
- * world composition and lives with that layer instead. Tuning defaults are
- * generalized from the values already proven in the flagship lab scene
- * (warm KEY dominant over cool fill/rim, one shadow-casting light).
+ * world composition and lives with that layer instead. Interior tuning
+ * defaults are generalized from the flagship lab scene (warm KEY dominant
+ * over cool fill/rim, one shadow-casting light); SUN's defaults are
+ * generalized from the epidemiology city and high-fidelity street slice.
  */
 
 /**
@@ -69,9 +78,15 @@ export async function loadHdriEnvironment(THREE: typeof THREE_NS, renderer: THRE
     const pmrem = new THREE.PMREMGenerator(renderer);
     new RGBELoader().load(hdriPath, (texture) => {
       const environment = pmrem.fromEquirectangular(texture).texture;
+      // Resource-lifecycle audit finding: this used to overwrite scene.environment without
+      // disposing the studio-box fallback applyStudioEnvironment set moments earlier — a real leak
+      // on every successful HDRI load. captureRoomEnvironment already gets this right (see its own
+      // previousEnvironment?.dispose() below); this now matches that pattern.
+      const previousEnvironment = scene.environment;
       scene.environment = environment;
       // Podniesione: przy obniżonym świetle ambientowym to IBL niesie większość odbić.
       scene.environmentIntensity = 1.45;
+      previousEnvironment?.dispose();
       texture.dispose();
       pmrem.dispose();
     }, undefined, () => pmrem.dispose());
@@ -103,6 +118,11 @@ export interface RoomEnvironmentProbeOptions {
    * 1.85 compensates. */
   intensity?: number;
   far?: number;
+  /** Extra per-mesh exclusion beyond the automatic transmissive/near-transparent detection below
+   * (see the module doc). First-person view-model geometry doesn't need this — it's excluded by
+   * being on render layer 1 while the probe only sees layer 0 — this hook is for anything else a
+   * caller's own scene wants left out of its own reflection of itself. */
+  exclude?: (mesh: THREE_NS.Mesh) => boolean;
 }
 
 /**
@@ -142,7 +162,7 @@ export function captureRoomEnvironment(
       if (physical.transmission > 0) return true;
       return Boolean(material.transparent) && (material as THREE_NS.Material & { opacity: number }).opacity < 0.4;
     });
-    if (refractive) {
+    if (refractive || options.exclude?.(mesh)) {
       hidden.push(mesh);
       mesh.visible = false;
     }
@@ -224,6 +244,60 @@ export function createKeyLight(THREE: typeof THREE_NS, scene: THREE_NS.Scene, op
     light.shadow.camera.far = opts.shadowFar ?? 13;
   }
   scene.add(light, light.target);
+  return light;
+}
+
+export interface SunLightOptions {
+  /** Direction the light sits at, relative to the scene origin — a `DirectionalLight`'s own
+   * position doesn't affect where its parallel rays fall, only the direction from position toward
+   * (0,0,0), so this is really "which way is the sun," not a placement in world space. */
+  position: THREE_NS.Vector3Tuple;
+  color?: THREE_NS.ColorRepresentation;
+  intensity?: number;
+  /** Default true — the SUN is the canonical single shadow-casting light for an exterior scene,
+   * same role KEY plays for an interior one. */
+  castShadow?: boolean;
+  shadowMapSize?: number;
+  /**
+   * Half-extent of the orthographic shadow camera's frustum on each side, in world units. A
+   * `DirectionalLight`'s rays are parallel — there's no perspective falloff to exploit the way
+   * `createKeyLight`'s near/far does, so the frustum must be sized to cover the whole
+   * shadow-casting scene explicitly. Too small clips shadows at the frustum edge; too large wastes
+   * shadow-map resolution on empty space outside the scene. Default 12 (room/block scale) — an
+   * exterior scene spanning tens of units needs a proportionally larger value.
+   */
+  shadowFrustumHalfExtent?: number;
+  shadowBias?: number;
+  /** Reduces shadow-acne on nearly-parallel surfaces (a ground plane lit at a grazing sun angle)
+   * without the peter-panning a larger `shadowBias` alone would cause. Omit for three.js's default
+   * (0) — only set this after seeing acne on your own ground plane. */
+  shadowNormalBias?: number;
+}
+
+/**
+ * SUN role: the exterior counterpart to `createKeyLight` — a shadow-casting `DirectionalLight` for
+ * a scene lit by sunlight/moonlight/an overcast sky rather than a single practical fixture (an
+ * interior scene's `SpotLight` KEY has a cone and falls off with distance; a sun does neither).
+ * Generalized from the near-identical rig two exterior Genesis scenes (the epidemiology city, the
+ * high-fidelity street slice) independently built by hand.
+ */
+export function createSunLight(THREE: typeof THREE_NS, scene: THREE_NS.Scene, opts: SunLightOptions): THREE_NS.DirectionalLight {
+  const light = new THREE.DirectionalLight(opts.color ?? 0xffd9a0, opts.intensity ?? 2);
+  light.position.set(...opts.position);
+  const castShadow = opts.castShadow ?? true;
+  light.castShadow = castShadow;
+  if (castShadow) {
+    const mapSize = opts.shadowMapSize ?? 1024;
+    light.shadow.mapSize.set(mapSize, mapSize);
+    const half = opts.shadowFrustumHalfExtent ?? 12;
+    light.shadow.camera.left = -half;
+    light.shadow.camera.right = half;
+    light.shadow.camera.top = half;
+    light.shadow.camera.bottom = -half;
+    light.shadow.bias = opts.shadowBias ?? -0.0003;
+    if (opts.shadowNormalBias !== undefined) light.shadow.normalBias = opts.shadowNormalBias;
+  }
+  scene.add(light);
   return light;
 }
 

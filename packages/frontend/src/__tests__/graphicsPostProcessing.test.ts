@@ -17,6 +17,7 @@ vi.mock('../core/three/graphics/lighting', () => ({
   applyStudioEnvironment: vi.fn(),
   loadHdriEnvironment: vi.fn(async () => {}),
   applyAmbientIBL: vi.fn(),
+  captureRoomEnvironment: vi.fn(),
 }));
 
 vi.mock('../core/three/quality', async (importOriginal) => {
@@ -25,6 +26,7 @@ vi.mock('../core/three/quality', async (importOriginal) => {
 });
 
 import { setupGraphicsPipeline, resolveBokehUniforms, configureDOF, type DepthOfFieldSettings } from '../core/three/graphics/postProcessing';
+import { applyAmbientIBL, applyStudioEnvironment, captureRoomEnvironment } from '../core/three/graphics/lighting';
 import { detectRenderTier } from '../core/three/quality';
 import type { PostProcessingModules } from '../core/three/types';
 
@@ -43,7 +45,7 @@ function fakeThree() {
 function fakeModules() {
   const addedPasses: PassLabel[] = [];
   const gtaoInstances: Array<{ updateGtaoMaterial: ReturnType<typeof vi.fn>; blendIntensity: number; dispose: ReturnType<typeof vi.fn> }> = [];
-  const bokehInstances: Array<{ ctorArgs: unknown[]; uniforms: { focus: { value: number }; aperture: { value: number }; maxblur: { value: number } } }> = [];
+  const bokehInstances: Array<{ ctorArgs: unknown[]; uniforms: { focus: { value: number }; aperture: { value: number }; maxblur: { value: number } }; instance: { enabled: boolean; dispose: ReturnType<typeof vi.fn> } }> = [];
   const composerCalls = { render: vi.fn(), setSize: vi.fn(), dispose: vi.fn(), addPass: vi.fn() };
 
   class EffectComposer {
@@ -62,18 +64,34 @@ function fakeModules() {
       gtaoInstances.push(this);
     }
   }
-  class UnrealBloomPass { constructor(public resolution: unknown, public strength: number, public radius: number, public threshold: number) { addedPasses.push('UnrealBloomPass'); } }
+  const bloomInstances: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
+  class UnrealBloomPass {
+    dispose = vi.fn();
+    constructor(public resolution: unknown, public strength: number, public radius: number, public threshold: number) {
+      addedPasses.push('UnrealBloomPass');
+      bloomInstances.push(this);
+    }
+  }
   class BokehPass {
     uniforms = { focus: { value: 0 }, aperture: { value: 0 }, maxblur: { value: 0 } };
+    enabled = true;
+    dispose = vi.fn();
     constructor(public scene: unknown, public camera: unknown, params: { focus: number; aperture: number; maxblur: number }) {
       addedPasses.push('BokehPass');
       this.uniforms.focus.value = params.focus;
       this.uniforms.aperture.value = params.aperture;
       this.uniforms.maxblur.value = params.maxblur;
-      bokehInstances.push({ ctorArgs: [scene, camera, params], uniforms: this.uniforms });
+      bokehInstances.push({ ctorArgs: [scene, camera, params], uniforms: this.uniforms, instance: this });
     }
   }
-  class OutputPass { constructor() { addedPasses.push('OutputPass'); } }
+  const outputPassInstances: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
+  class OutputPass {
+    dispose = vi.fn();
+    constructor() {
+      addedPasses.push('OutputPass');
+      outputPassInstances.push(this);
+    }
+  }
   const ssrInstances: Array<{ opacity: number; maxDistance: number; dispose: ReturnType<typeof vi.fn> }> = [];
   class SSRPass {
     opacity = 0;
@@ -86,7 +104,7 @@ function fakeModules() {
   }
 
   const modules = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, BokehPass, OutputPass, SSRPass } as unknown as PostProcessingModules;
-  return { modules, addedPasses, gtaoInstances, bokehInstances, ssrInstances, composerCalls };
+  return { modules, addedPasses, gtaoInstances, bokehInstances, bloomInstances, outputPassInstances, ssrInstances, composerCalls };
 }
 
 function fakeRenderer() {
@@ -95,6 +113,11 @@ function fakeRenderer() {
     toneMapping: null as unknown,
     toneMappingExposure: 1,
     outputColorSpace: null as unknown,
+    info: {
+      render: { calls: 3, triangles: 500, points: 0, lines: 0, frame: 1 },
+      memory: { geometries: 2, textures: 1 },
+      programs: [null, null],
+    },
   } as unknown as import('three').WebGLRenderer;
 }
 
@@ -215,6 +238,33 @@ describe('setupGraphicsPipeline — DOF default-off regression guard', () => {
     const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
     expect(() => pipeline.setFocusDistance(5)).not.toThrow();
   });
+
+  it('setDepthOfFieldEnabled is a safe no-op when DOF was never enabled', () => {
+    const { modules } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(() => pipeline.setDepthOfFieldEnabled(true)).not.toThrow();
+  });
+
+  it('getFrameCounters reads through to the renderer.info counters (see diagnostics.ts)', () => {
+    const { modules } = fakeModules();
+    const renderer = fakeRenderer();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, renderer, baseOpts);
+    const counters = pipeline.getFrameCounters();
+    expect(counters).toEqual({ drawCalls: 3, triangles: 500, points: 0, lines: 0, geometries: 2, textures: 1, programs: 2 });
+  });
+
+  it('setDepthOfFieldEnabled toggles the BokehPass without rebuilding the composer', () => {
+    const { modules, bokehInstances } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts,
+      depthOfField: { enabled: true, focusDistance: 3 },
+    });
+    expect(bokehInstances[0]!.instance.enabled).toBe(true);
+    pipeline.setDepthOfFieldEnabled(false);
+    expect(bokehInstances[0]!.instance.enabled).toBe(false);
+    pipeline.setDepthOfFieldEnabled(true);
+    expect(bokehInstances[0]!.instance.enabled).toBe(true);
+  });
 });
 
 describe('setupGraphicsPipeline — DOF uniform resolution', () => {
@@ -271,6 +321,47 @@ describe('setupGraphicsPipeline — dispose', () => {
     });
     pipeline.dispose?.();
     expect(ssrInstances[0]!.dispose).toHaveBeenCalledOnce();
+  });
+
+  // Resource-lifecycle audit finding: EffectComposer.dispose() only frees its own two ping-pong
+  // render targets and copy pass — it does not iterate its passes and dispose each one (see
+  // three.js's own EffectComposer source). Every pass owning GPU resources must be disposed
+  // explicitly by the pipeline's own dispose(), or it leaks on every scene teardown/remount:
+  // UnrealBloomPass alone owns 11 WebGLRenderTargets, BokehPass owns a depth render target plus
+  // two materials, OutputPass owns one material.
+  it('disposes bloom, DOF (BokehPass) and OutputPass — not just GTAO and the composer', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('high');
+    const { modules, bloomInstances, bokehInstances, outputPassInstances } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts, depthOfField: { enabled: true, focusDistance: 3 },
+    });
+    pipeline.dispose?.();
+    expect(bloomInstances[0]!.dispose).toHaveBeenCalledOnce();
+    expect(bokehInstances[0]!.instance.dispose).toHaveBeenCalledOnce();
+    expect(outputPassInstances[0]!.dispose).toHaveBeenCalledOnce();
+  });
+
+  // Resource-lifecycle audit finding: the AMBIENT/IBL environment texture this pipeline itself
+  // creates (via applyAmbientIBL's studio-box+HDRI, or captureRoomEnvironment's room probe) was
+  // never disposed on pipeline teardown at all.
+  it('disposes scene.environment on teardown when this pipeline owns it (default ambient mode)', () => {
+    const { modules } = fakeModules();
+    const fakeEnvironmentTexture = { dispose: vi.fn() };
+    const scene = { environment: fakeEnvironmentTexture } as unknown as import('three').Scene;
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, scene });
+    pipeline.dispose?.();
+    expect(fakeEnvironmentTexture.dispose).toHaveBeenCalledOnce();
+    expect(scene.environment).toBeNull();
+  });
+
+  it('leaves scene.environment untouched on teardown in "none" mode — that caller owns it entirely', () => {
+    const { modules } = fakeModules();
+    const fakeEnvironmentTexture = { dispose: vi.fn() };
+    const scene = { environment: fakeEnvironmentTexture } as unknown as import('three').Scene;
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, scene, ambient: { mode: 'none' } });
+    pipeline.dispose?.();
+    expect(fakeEnvironmentTexture.dispose).not.toHaveBeenCalled();
+    expect(scene.environment).toBe(fakeEnvironmentTexture);
   });
 });
 
@@ -347,6 +438,87 @@ describe('setupGraphicsPipeline — screen-space reflections (opt-in, off by def
     const { modules, addedPasses } = fakeModules();
     setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, qualityTier: 'cinematic', reflections: { enabled: true } });
     expect(addedPasses).toEqual(['RenderPass', 'GTAOPass', 'SSRPass', 'UnrealBloomPass', 'OutputPass']);
+  });
+});
+
+describe('setupGraphicsPipeline — ambient environment modes', () => {
+  beforeEach(() => {
+    vi.mocked(applyAmbientIBL).mockClear();
+    vi.mocked(applyStudioEnvironment).mockClear();
+    vi.mocked(captureRoomEnvironment).mockClear();
+  });
+
+  it('defaults to studio+hdri (applyAmbientIBL) when ambient is omitted', () => {
+    const { modules } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(applyAmbientIBL).toHaveBeenCalledOnce();
+    expect(applyStudioEnvironment).not.toHaveBeenCalled();
+  });
+
+  it('room-probe mode applies only the studio-box fallback, never the HDRI role, up front', () => {
+    const { modules } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts,
+      ambient: { mode: 'room-probe', probe: { position: [0, 1, 0] } },
+    });
+    expect(applyStudioEnvironment).toHaveBeenCalledOnce();
+    expect(applyAmbientIBL).not.toHaveBeenCalled();
+  });
+
+  it('room-probe mode captures the probe on the first captureRoomProbe() call, and never again', () => {
+    const { modules } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts,
+      ambient: { mode: 'room-probe', probe: { position: [1, 2, 3] } },
+    });
+    pipeline.captureRoomProbe();
+    pipeline.captureRoomProbe();
+    expect(captureRoomEnvironment).toHaveBeenCalledOnce();
+  });
+
+  it('captureRoomProbe is a safe no-op outside room-probe mode', () => {
+    const { modules } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(() => pipeline.captureRoomProbe()).not.toThrow();
+    expect(captureRoomEnvironment).not.toHaveBeenCalled();
+  });
+
+  it('none mode skips the AMBIENT/IBL role entirely, for a scene managing its own atmosphere', () => {
+    const { modules } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, ambient: { mode: 'none' } });
+    expect(applyAmbientIBL).not.toHaveBeenCalled();
+    expect(applyStudioEnvironment).not.toHaveBeenCalled();
+  });
+});
+
+describe('setupGraphicsPipeline — ambientOcclusion tuning', () => {
+  it('uses the high-tier default gate and default radius/blendIntensity when omitted', () => {
+    const { modules, gtaoInstances } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(gtaoInstances[0]!.updateGtaoMaterial).toHaveBeenCalledWith(expect.objectContaining({ radius: 0.42 }));
+    expect(gtaoInstances[0]!.blendIntensity).toBe(0.85);
+  });
+
+  it('honors an explicit radius/blendIntensity override', () => {
+    const { modules, gtaoInstances } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts, ambientOcclusion: { radius: 1.1, blendIntensity: 0.5 },
+    });
+    expect(gtaoInstances[0]!.updateGtaoMaterial).toHaveBeenCalledWith(expect.objectContaining({ radius: 1.1 }));
+    expect(gtaoInstances[0]!.blendIntensity).toBe(0.5);
+  });
+
+  it('enabled: false skips AO regardless of tier', () => {
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, ambientOcclusion: { enabled: false } });
+    expect(addedPasses).not.toContain('GTAOPass');
+  });
+
+  it('a per-scene minTier can loosen AO onto a lower tier than the global default', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('medium');
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, ambientOcclusion: { minTier: 'medium' } });
+    expect(addedPasses).toContain('GTAOPass');
   });
 });
 

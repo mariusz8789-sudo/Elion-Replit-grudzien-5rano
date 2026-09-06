@@ -6,6 +6,11 @@ import { CameraFlight, flightBetween } from '../reality/cameraSequencer';
 import type { HospitalStatus } from '../simulation/hospitalResource';
 import type { ScenarioDaySample } from '../simulation/scenarioEngine';
 import { configureDOF, setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
+import { configureCinematicCamera, type CinematicCameraProfile } from './graphics/cinematicCamera';
+import { applyShadowPolicy } from './graphics/shadowPolicy';
+import { disposeSceneResources } from './graphics/lifecycle';
+import { createDustMotes, createLightShaft, type DustMotesHandle } from './graphics/atmosphere';
+import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -405,6 +410,13 @@ export class LabScene3D implements Sim3D {
   disableOrbitControls = true;
 
   private THREE: typeof THREE_NS | null = null;
+  // GENESIS GRAPHICS ENGINE — resource-lifecycle audit finding: this class used to have a
+  // one-line no-op `dispose()` on the (mistaken) assumption that "the canvas's GC" frees a torn-
+  // down scene's geometries/materials/textures. It doesn't — `WebGLRenderer.dispose()` (called by
+  // useThreeLoop.ts right after `sim.dispose()`) never frees them either, since three.js treats
+  // them as scene-owned, not renderer-owned. Stored here purely so `dispose()` can hand the whole
+  // subtree to `graphics/lifecycle.ts`'s `disposeSceneResources` — see that module's doc comment.
+  private scene: THREE_NS.Scene | null = null;
   private controller = new FirstPersonController({
     room: ROOM,
     obstacles: [STATION_OBSTACLE],
@@ -438,6 +450,18 @@ export class LabScene3D implements Sim3D {
   private vesselLight: THREE_NS.PointLight | null = null;
   private vesselOuterMaterial: THREE_NS.MeshPhysicalMaterial | null = null;
   private pipeline: GraphicsPipeline | null = null;
+  // GENESIS GRAPHICS ENGINE — lens/optics per shot (see `graphics/cinematicCamera.ts`). Tracks the
+  // last-applied profile so `syncScene` only touches `camera.fov`/near/far/`updateProjectionMatrix`
+  // on an actual shot change, not every frame.
+  private appliedCinematicProfile: CinematicCameraProfile | null = null;
+  // GENESIS GRAPHICS ENGINE — scratch vectors reused every frame in syncScene's focus/interaction
+  // math instead of allocating three new THREE.Vector3 per frame forever. Render-loop allocation
+  // audit finding (per the engine's own PERFORMANCE.md rule: no avoidable per-frame allocations) —
+  // three Vector3s/frame is small on its own, but it's exactly the pattern that compounds badly
+  // once a scene has many per-frame consumers, and the fix costs nothing in readability.
+  private scratchVecA: THREE_NS.Vector3 | null = null;
+  private scratchVecB: THREE_NS.Vector3 | null = null;
+  private scratchVecC: THREE_NS.Vector3 | null = null;
   // Agitator wewnątrz naczynia i pierścień holograficzny nad nim — czysto
   // dekoracyjne, ale ich prędkość obrotu/intensywność są sterowane REALNYMI
   // wartościami (vesselFraction/vesselIcuFraction), nigdy zmyśloną liczbą
@@ -445,6 +469,10 @@ export class LabScene3D implements Sim3D {
   private agitatorGroup: THREE_NS.Group | null = null;
   private hologramRing: THREE_NS.Mesh | null = null;
   private hologramMaterial: THREE_NS.MeshBasicMaterial | null = null;
+  // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): ambient dust drifting through
+  // the window's light shaft. Purely a depth/realism cue — its drift speed is a fixed constant,
+  // never derived from any scientific/hospital state.
+  private dustMotes: DustMotesHandle | null = null;
   // Wewnętrzna "kolonia" wewnątrz płynu: czysto wizualna tekstura gęstości —
   // WIDOCZNA LICZBA punktów (drawRange) jest wprost proporcjonalna do
   // realnego vesselFraction, nigdy do zmyślonego pomiaru "liczby komórek".
@@ -622,7 +650,11 @@ export class LabScene3D implements Sim3D {
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
     this.THREE = THREE;
+    this.scene = scene;
     this.raycaster = new THREE.Raycaster();
+    this.scratchVecA = new THREE.Vector3();
+    this.scratchVecB = new THREE.Vector3();
+    this.scratchVecC = new THREE.Vector3();
     // Tekstury proceduralne (canvas, zero nowych plików/assetów) — jedyny
     // sposób na detal materiału metalu/podłogi dostępny bez zatwierdzonego
     // w assetGovernance.ts zestawu PBR dla wnętrza laboratorium.
@@ -759,6 +791,33 @@ export class LabScene3D implements Sim3D {
     const windowLight = new THREE.PointLight(0x6ea6e8, 0.6, 6, 2);
     windowLight.position.set(-roomWidth / 2 + 0.6, 1.95, -0.6);
     scene.add(windowLight);
+
+    // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): the window now reads as an
+    // actual aperture light is streaming through, not just an emissive pane, and the room air reads
+    // as a real occupied volume instead of a vacuum. Both generic, reusable primitives — no
+    // lab-specific logic lives in atmosphere.ts itself. Quality-gated (quality.ts's
+    // tierAllowsAtmosphereParticles): skipped entirely at 'low' tier rather than rendered smaller —
+    // a low-end device's budget goes to the geometry/materials it's already drawing.
+    const atmosphereTier = detectRenderTier();
+    if (tierAllowsAtmosphereParticles(atmosphereTier)) {
+      const windowLightShaft = createLightShaft(THREE, {
+        origin: [-roomWidth / 2 + 0.05, 2.05, -0.6],
+        direction: [1, -0.55, 0.12],
+        length: 4.6,
+        width: 1.5,
+        color: 0xfff2cf,
+        opacity: 0.32,
+      });
+      scene.add(windowLightShaft);
+      this.dustMotes = createDustMotes(THREE, {
+        bounds: [3.2, 1.1, 2.6],
+        center: [-2.6, 1.5, -0.6],
+        count: atmosphereParticleCount(140, atmosphereTier),
+        size: 0.009,
+        opacity: 0.26,
+      });
+      scene.add(this.dustMotes.points);
+    }
 
     // Oświetlenie warstwowe (key/fill/rim), nie płaskie wypełnienie ze
     // wszystkich stron: wypełnienie ambientowe ZREDUKOWANE, żeby światła
@@ -3059,33 +3118,14 @@ export class LabScene3D implements Sim3D {
     }
     addContactShadow(-5.28, 3.62, 0.4, 0.8);
 
-    // ==================================================================
-    // CIENIE: włączane raz, po zbudowaniu całej sceny, wg trzech reguł —
-    // nie "wszystko rzuca cień" (setki śrub/diod/gałek to czysty koszt
-    // shadow-mapy bez żadnego widocznego cienia):
-    //  1. Przezroczyste (szkło reaktora, hologram, przegrody, szyby szaf)
-    //     tylko ODBIERAJĄ cień — szkło rzucające czarną plamę zamiast
-    //     refleksu wyglądałoby gorzej niż brak cienia.
-    //  2. Drobnica poniżej progu (śruby, diody, gałki, listwy) nie rzuca —
-    //     jej cień i tak zginąłby w rozdzielczości mapy.
-    //  3. Cień ODBIERAJĄ tylko powierzchnie, na których faktycznie coś
-    //     widać: podłoga, podesty, blaty, ściany — nie każdy drobiazg.
-    // ==================================================================
-    const shadowBox = new THREE.Box3();
-    const shadowSize = new THREE.Vector3();
-    scene.traverse((object) => {
-      const mesh = object as THREE_NS.Mesh;
-      if (!mesh.isMesh || !mesh.geometry) return;
-      const material = mesh.material as THREE_NS.Material | THREE_NS.Material[];
-      const transparent = Array.isArray(material) ? material.some((m) => m.transparent) : material.transparent;
-      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-      shadowBox.copy(mesh.geometry.boundingBox!);
-      shadowBox.getSize(shadowSize);
-      const scale = mesh.getWorldScale(new THREE.Vector3());
-      const largestExtent = Math.max(shadowSize.x * scale.x, shadowSize.y * scale.y, shadowSize.z * scale.z);
-      mesh.castShadow = !transparent && largestExtent > 0.18;
-      mesh.receiveShadow = largestExtent > 0.3;
-    });
+    // GENESIS GRAPHICS ENGINE — one shadow-policy pass over the scene built so far (the view-model
+    // hands below are added afterward and get their own explicit castShadow=false, so running this
+    // first doesn't miss or mis-tag them). This used to be an inline copy of exactly
+    // `graphics/shadowPolicy.ts::applyShadowPolicy`'s own algorithm (same 0.18/0.3 thresholds,
+    // same transparent-only-receives rule) — duplicated logic with no behavior difference, now
+    // consolidated onto the one shared implementation instead of two copies that could silently
+    // drift apart.
+    applyShadowPolicy(THREE, scene);
 
     // ==================================================================
     // NAUKOWIEC W PIERWSZEJ OSOBIE — przedramiona w rękawie kombinezonu PPE
@@ -3217,6 +3257,7 @@ export class LabScene3D implements Sim3D {
     if (this.agitatorGroup) this.agitatorGroup.rotation.y += dt * (0.6 + this.vesselFraction * 5.2);
     if (this.hologramRing) this.hologramRing.rotation.z += dt * (0.25 + this.vesselIcuFraction * 1.6);
     if (this.colonyPoints) this.colonyPoints.rotation.y += dt * (0.3 + this.vesselFraction * 1.8);
+    this.dustMotes?.update(dt);
 
     if (this.playSeriesData.length > 0 && !this.playbackDone && !this.playbackPaused) {
       this.playElapsed += dt;
@@ -3254,6 +3295,26 @@ export class LabScene3D implements Sim3D {
         camera.position.y += Math.sin(this.fixedBreatheT * 0.5 + 1.3) * 0.02;
       }
       camera.lookAt(this.liveCameraLookAt[0], this.liveCameraLookAt[1], this.liveCameraLookAt[2]);
+    }
+
+    // GENESIS GRAPHICS ENGINE — obiektyw (FOV/near/far) dobrany do bieżącego
+    // kadru przez `configureCinematicCamera`, nie jeden stały kąt na cały
+    // czas: WIDE (kadr otwierający) i FREE (pierwsza osoba) zostają na
+    // szerokim 68° (profile WIDE_ESTABLISHING/SCIENTIST_POV), ale SCIENTIFIC/
+    // ANOMALY/REPLAY dostają realny ciaśniejszy obiektyw (HERO_CLOSE_UP, 40°)
+    // zamiast tego samego szerokiego kadru co scena otwierająca — razem z
+    // ostrością DOF, którą `setupPostProcessing`/`this.pipeline.setFocusDistance`
+    // już przestraja poniżej, to robi z tych ujęć faktyczne zbliżenie kinowe.
+    // Zastosowywane WYŁĄCZNIE przy zmianie ujęcia (nie co klatkę) przez
+    // `appliedCinematicProfile`.
+    const desiredCinematicProfile: CinematicCameraProfile = this.cameraPhase === 'FREE' || this.flightGoingToFree
+      ? 'SCIENTIST_POV'
+      : this.fixedKind === 'WIDE'
+        ? 'WIDE_ESTABLISHING'
+        : 'HERO_CLOSE_UP';
+    if (desiredCinematicProfile !== this.appliedCinematicProfile) {
+      configureCinematicCamera(camera, desiredCinematicProfile);
+      this.appliedCinematicProfile = desiredCinematicProfile;
     }
 
     // Naczynie: wysokość = realne obłożenie łóżek, kolor = realny status (uwzględnia też ICU/unmetCare).
@@ -3335,15 +3396,15 @@ export class LabScene3D implements Sim3D {
     // kamera przeskakuje między kadrem otwierającym (~5.5 m od naczynia) a
     // pierwszą osobą przy konsoli (~1.5 m). Stała wartość rozmywałaby hero w
     // jednym z tych ujęć, więc przestrajamy ją realną odległością do naczynia.
-    if (this.pipeline) {
-      const toVessel = new THREE.Vector3(...VESSEL_POSITION).sub(camera.position).length();
+    if (this.pipeline && this.scratchVecA) {
+      const toVessel = this.scratchVecA.set(...VESSEL_POSITION).sub(camera.position).length();
       this.pipeline.setFocusDistance(Math.max(0.6, toVessel));
     }
 
     // Interakcja: promień z kamery na konsolę, w zasięgu i mniej więcej naprzeciw niej.
-    if (this.raycaster && this.consoleMesh && this.cameraPhase === 'FREE') {
-      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-      const toConsole = new THREE.Vector3(...CONSOLE_POSITION).sub(camera.position);
+    if (this.raycaster && this.consoleMesh && this.cameraPhase === 'FREE' && this.scratchVecB && this.scratchVecC) {
+      const forward = this.scratchVecB.set(0, 0, -1).applyQuaternion(camera.quaternion);
+      const toConsole = this.scratchVecC.set(...CONSOLE_POSITION).sub(camera.position);
       const distance = toConsole.length();
       const facing = distance > 1e-6 ? forward.dot(toConsole.normalize()) : 0;
       this.nearStation = distance < INTERACT_MAX_DISTANCE && facing > INTERACT_MIN_FACING_DOT;
@@ -3450,5 +3511,15 @@ export class LabScene3D implements Sim3D {
 
   onResize(): void { /* kamera pierwszoosobowa: brak dodatkowej logiki poza domyślnym aspect z useThreeLoop */ }
 
-  dispose(): void { /* geometrie/materiały tej krótkotrwałej sceny zwalnia GC canvasa przy odmontowaniu */ }
+  dispose(): void {
+    // See the `scene` field's own comment and graphics/lifecycle.ts's module doc: GC of the scene
+    // graph does not free GPU-side geometry/material/texture memory, and `WebGLRenderer.dispose()`
+    // (called right after this by useThreeLoop.ts) doesn't either. `scene.environment`/
+    // `scene.background` (the studio/HDRI IBL) are deliberately left alone here — they're owned
+    // and disposed by the graphics pipeline itself, via `setupPostProcessing`'s own `dispose()`
+    // above, not by this per-mesh traversal.
+    if (this.scene) disposeSceneResources(this.scene);
+    this.scene = null;
+    this.dustMotes = null;
+  }
 }

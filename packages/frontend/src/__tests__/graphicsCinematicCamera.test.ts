@@ -79,7 +79,7 @@ describe('FocusPuller', () => {
   it('never overshoots or goes negative for a sane forward pull', () => {
     const puller = new FocusPuller(1);
     puller.pullTo(4);
-    let value = 1;
+    let value: number;
     for (let i = 0; i < 50; i++) {
       value = puller.update(0.05);
       expect(value).toBeGreaterThanOrEqual(1);

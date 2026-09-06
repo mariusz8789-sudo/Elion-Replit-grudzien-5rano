@@ -5,7 +5,8 @@ import { FirstPersonController, type MoveKey } from './firstPersonController';
 import { CameraFlight, flightBetween } from '../reality/cameraSequencer';
 import type { HospitalStatus } from '../simulation/hospitalResource';
 import type { ScenarioDaySample } from '../simulation/scenarioEngine';
-import { isWorldAssetApproved } from './assetGovernance';
+import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
+import { FocusPuller } from './graphics/cinematicCamera';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -412,7 +413,6 @@ export class LabScene3D implements Sim3D {
     startYaw: 0,
   });
 
-  private scene: THREE_NS.Scene | null = null;
   private raycaster: THREE_NS.Raycaster | null = null;
   private consoleMesh: THREE_NS.Mesh | null = null;
   private consolePanel: THREE_NS.Mesh | null = null;
@@ -439,6 +439,12 @@ export class LabScene3D implements Sim3D {
   private vesselLight: THREE_NS.PointLight | null = null;
   private vesselOuterMaterial: THREE_NS.MeshPhysicalMaterial | null = null;
   private roomProbeCaptured = false;
+  // GENESIS GRAPHICS ENGINE — GTAOPass/BokehPass żyją w graphics/postProcessing.ts;
+  // handle trzymany tu wyłącznie po to, by co klatkę doregulować ostrość DOF
+  // (patrz syncScene) — reszta łańcucha (AO/bloom/tone mapping) jest już
+  // skonfigurowana wewnątrz setupPostProcessing i nie wymaga dalszego dotyku.
+  private graphicsPipeline: GraphicsPipeline | null = null;
+  private focusPuller: FocusPuller | null = null;
   // Agitator wewnątrz naczynia i pierścień holograficzny nad nim — czysto
   // dekoracyjne, ale ich prędkość obrotu/intensywność są sterowane REALNYMI
   // wartościami (vesselFraction/vesselIcuFraction), nigdy zmyśloną liczbą
@@ -623,7 +629,6 @@ export class LabScene3D implements Sim3D {
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
     this.THREE = THREE;
-    this.scene = scene;
     this.raycaster = new THREE.Raycaster();
     // Tekstury proceduralne (canvas, zero nowych plików/assetów) — jedyny
     // sposób na detal materiału metalu/podłogi dostępny bez zatwierdzonego
@@ -3258,6 +3263,27 @@ export class LabScene3D implements Sim3D {
       camera.lookAt(this.liveCameraLookAt[0], this.liveCameraLookAt[1], this.liveCameraLookAt[2]);
     }
 
+    // GENESIS GRAPHICS ENGINE — DOF włączone TYLKO na kadrach zbliżenia na
+    // aparaturę (SCIENTIFIC/ANOMALY/REPLAY), wyłączone na kadrze otwierającym
+    // (WIDE — ma objąć całą halę czytelnie, nic nie może być rozmyte) i w
+    // pierwszej osobie (FREE — wzrok naukowca nie jest selektywnie rozmywany;
+    // patrz `graphics/cinematicCamera.ts`, profile WIDE_ESTABLISHING i
+    // SCIENTIST_POV celowo nie mają opinii o DOF). Ostrość na kadrach, które
+    // je chcą, to odległość do punktu kadrowania z scientificFraming(),
+    // wygładzona przez FocusPuller, żeby zmiana kadru wyglądała jak "rack
+    // focus", nie jak skok.
+    if (this.graphicsPipeline && this.focusPuller) {
+      const wantsDof = this.cameraPhase === 'FIXED' && this.fixedKind !== 'WIDE';
+      this.graphicsPipeline.setDepthOfFieldEnabled(wantsDof);
+      if (wantsDof) {
+        const targetFocus = camera.position.distanceTo(
+          new THREE.Vector3(this.liveCameraLookAt[0], this.liveCameraLookAt[1], this.liveCameraLookAt[2]),
+        );
+        this.focusPuller.pullTo(targetFocus);
+        this.graphicsPipeline.setFocusDistance(this.focusPuller.update(1 / 60));
+      }
+    }
+
     // Naczynie: wysokość = realne obłożenie łóżek, kolor = realny status (uwzględnia też ICU/unmetCare).
     let vesselColor = STATUS_COLOR.NORMAL;
     if (this.fluidMesh) {
@@ -3358,6 +3384,26 @@ export class LabScene3D implements Sim3D {
    * Żaden nowy silnik renderujący, żaden nowy loader poza już zatwierdzonym
    * (assetGovernance.ts) HDRI reużytym z highFidelitySlice3D.ts.
    */
+  /**
+   * GENESIS GRAPHICS ENGINE — kinowy postprocessing (tone mapping ACES,
+   * prawdziwe GTAOPass, BokehPass) wpięty przez jedno wspólne
+   * `graphics/postProcessing.ts::setupGraphicsPipeline`, zamiast osobnego,
+   * ręcznie pisanego łańcucha shaderów w tym pliku. Cienie/tone mapping/
+   * przestrzeń barw i tak trafiały tu identycznie — ta metoda teraz TYLKO
+   * je zleca (jedno źródło prawdy dla całego Genesis, nie duplikat na każdą
+   * scenę), a sama zajmuje się wyłącznie wiedzą TEJ sceny: kiedy zdjąć sondę
+   * odbić hali i jaka jest bieżąca odległość ostrości (patrz `syncScene`).
+   *
+   * Poprzedni własny SSAO/DOF (shared depth-prepass, ostrość próbkowana ze
+   * środka ekranu) był poprawnym, działającym rozwiązaniem — zastąpienie go
+   * `GTAOPass`/`BokehPass` nie jest poprawką błędu, tylko konsolidacją: jeden
+   * przetestowany potok post-processingu (patrz
+   * `src/__tests__/graphicsPostProcessing.test.ts`) używany przez KAŻDĄ
+   * scenę Sim3D zamiast dwóch niezależnie utrzymywanych implementacji tego
+   * samego efektu w dwóch gałęziach. Adaptacyjną ostrość "na to, na co
+   * naukowiec patrzy" replikuje `syncScene()` przez `FocusPuller`, żeby ta
+   * właściwość UX się nie zgubiła przy konsolidacji.
+   */
   setupPostProcessing(
     modules: PostProcessingModules,
     renderer: THREE_NS.WebGLRenderer,
@@ -3366,312 +3412,29 @@ export class LabScene3D implements Sim3D {
     w: number,
     h: number,
   ): PostProcessor {
-    const THREE = this.THREE!;
-    // Mapa cieni: fundament głębi przestrzennej (OBIEKT -> CIEŃ -> PODŁOGA ->
-    // PRZESŁONIĘCIE -> GŁĘBIA). Bez niej aparatura "unosiła się" nad podłogą
-    // niezależnie od liczby świateł. PCFSoft: miękka krawędź bez kosztu VSM.
-    // Cień rzuca WYŁĄCZNIE reflektor KEY (jedna mapa 1024²) — patrz init().
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // Ekspozycja podniesiona razem z obniżonym wypełnieniem ambientowym:
-    // ciemniejsze tło + jaśniejsze źródła kierunkowe dają filmowy kontrast
-    // zamiast płaskiej, jednolicie oświetlonej sceny.
-    renderer.toneMappingExposure = 1.12;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    // Mapa środowiska generowana PROCEDURALNIE ze sceny studyjnej (jasny sufit,
-    // ciemna podłoga) — metal musi mieć co odbijać, inaczej chrom i stal czytają
-    // się jak matowy plastik niezależnie od roughness/metalness. Ustawiana
-    // natychmiast, bez czekania na asynchroniczne HDRI (które i tak tylko ją
-    // zastąpi, gdy się załaduje).
-    this.applyStudioEnvironment(renderer, scene);
-    void this.loadHdri(renderer);
-    const composer = new modules.EffectComposer(renderer);
-    composer.addPass(new modules.RenderPass(scene, camera));
-
-    // ==================================================================
-    // SSAO WŁASNY, WPIĘTY W ISTNIEJĄCY POTOK — nie `SSAOPass`.
-    //
-    // DLACZEGO NIE SSAOPass: ten potok to RenderPass -> Bloom -> OutputPass,
-    // czyli cały łańcuch pracuje LINIOWO, a tone mapping ACES i konwersję do
-    // sRGB robi dopiero OutputPass na końcu. `SSAOPass` renderuje scenę
-    // WŁASNYM przebiegiem i oddaje kolor już zakodowany — OutputPass
-    // mapował go i kodował DRUGI RAZ, stąd biała klatka. To nie był błąd
-    // parametrów okluzji, tylko podwójne kodowanie barw.
-    //
-    // TO ROZWIĄZANIE: pełnoekranowy ShaderPass (klasa już wstrzykiwana przez
-    // useThreeLoop) wpięty MIĘDZY RenderPass a Bloom. Czyta liniowy bufor
-    // koloru i MNOŻY go przez współczynnik okluzji — nie dotyka tone
-    // mappingu ani przestrzeni barw, więc z definicji nie może zepsuć
-    // ekspozycji. Bloom widzi już przyciemnione zagłębienia, więc światło
-    // nie rozlewa się ze szczelin, które powinny być ciemne.
-    //
-    // GŁĘBIA: osobny, PÓŁROZDZIELCZY render target z DepthTexture, zapisywany
-    // tanim prepassem (scene.overrideMaterial = materiał bez oświetlenia).
-    // Półrozdzielczość jest tu zaletą: AO to sygnał niskiej częstotliwości,
-    // a rozmycie przy próbkowaniu w pełnej rozdzielczości wychodzi za darmo.
-    // ==================================================================
-    const aoScale = 0.5;
-    const depthTexture = new THREE.DepthTexture(Math.max(1, Math.floor(w * aoScale)), Math.max(1, Math.floor(h * aoScale)));
-    depthTexture.type = THREE.UnsignedIntType;
-    const depthTarget = new THREE.WebGLRenderTarget(
-      Math.max(1, Math.floor(w * aoScale)),
-      Math.max(1, Math.floor(h * aoScale)),
-      { depthTexture, depthBuffer: true },
-    );
-    // Prepass rysuje TYLKO głębię — materiał bez świateł i tekstur, żeby
-    // drugi przebieg sceny kosztował ułamek pełnego cieniowania.
-    const depthOnlyMaterial = new THREE.MeshBasicMaterial();
-
-    const aoPass = new modules.ShaderPass({
-      name: 'GenesisGroundedAO',
-      uniforms: {
-        tDiffuse: { value: null },
-        tDepth: { value: depthTexture },
-        uProjectionInverse: { value: new THREE.Matrix4() },
-        uResolution: { value: new THREE.Vector2(w, h) },
-        uCameraNear: { value: camera.near },
-        uCameraFar: { value: camera.far },
-        uRadius: { value: 0.75 },
-        uIntensity: { value: 2.4 },
-        uBias: { value: 0.014 },
-      },
-      vertexShader: /* glsl */`
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: /* glsl */`
-        precision highp float;
-        varying vec2 vUv;
-        uniform sampler2D tDiffuse;
-        uniform sampler2D tDepth;
-        uniform mat4 uProjectionInverse;
-        uniform vec2 uResolution;
-        uniform float uCameraNear;
-        uniform float uCameraFar;
-        uniform float uRadius;
-        uniform float uIntensity;
-        uniform float uBias;
-
-        // Pozycja w przestrzeni widoku odtworzona z bufora głębi — bez niej
-        // okluzja liczyłaby się w pikselach, a nie w metrach sceny, więc
-        // zależałaby od odległości kamery.
-        vec3 viewPosition(vec2 uv, float depth) {
-          vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
-          vec4 view = uProjectionInverse * clip;
-          return view.xyz / view.w;
-        }
-
-        // Obrót kernela z uporządkowanej macierzy Bayera 4x4, NIE z hasha:
-        // losowy obrót daje szum stochastyczny, który na dużych płaskich
-        // powierzchniach (podłoga hali) czyta się jak brud na obiektywie.
-        // Wzór uporządkowany rozkłada błąd regularnie i przy próbkowaniu
-        // głębi w połowie rozdzielczości sam się uśrednia — bez osobnego
-        // przebiegu rozmycia.
-        float orderedRotation(vec2 fragCoord) {
-          const mat4 bayer = mat4(
-            0.0,  8.0,  2.0, 10.0,
-            12.0, 4.0, 14.0,  6.0,
-            3.0, 11.0,  1.0,  9.0,
-            15.0, 7.0, 13.0,  5.0
-          );
-          int x = int(mod(fragCoord.x, 4.0));
-          int y = int(mod(fragCoord.y, 4.0));
-          return bayer[x][y] / 16.0;
-        }
-
-        void main() {
-          vec4 color = texture2D(tDiffuse, vUv);
-          float depth = texture2D(tDepth, vUv).x;
-          // Tło (nic nie narysowane) zostaje nietknięte — inaczej AO
-          // przyciemniałoby pustkę za oknem i krawędzie kadru.
-          if (depth >= 0.9999) {
-            gl_FragColor = color;
-            return;
-          }
-
-          vec3 origin = viewPosition(vUv, depth);
-          // Pierwszy plan modelu widoku (rękawy/rękawice ~0.4 m od obiektywu)
-          // nie bierze udziału w okluzji — to geometria kadru, nie sceny.
-          if (-origin.z < 0.75) {
-            gl_FragColor = color;
-            return;
-          }
-          // Normalna z pochodnych odtworzonej pozycji — nie wymaga osobnego
-          // bufora normalnych, a wystarcza dla okluzji niskiej częstotliwości.
-          vec3 normal = normalize(cross(dFdx(origin), dFdy(origin)));
-
-          // Promień w pikselach maleje z odległością: ta sama okluzja w metrach
-          // niezależnie od tego, jak daleko stoi kamera.
-          float pixelRadius = uRadius / max(0.0001, -origin.z);
-          float rotation = orderedRotation(gl_FragCoord.xy) * 6.2831853;
-          float cosR = cos(rotation);
-          float sinR = sin(rotation);
-
-          const int SAMPLES = 16;
-          float occlusion = 0.0;
-          for (int i = 0; i < SAMPLES; i++) {
-            float fi = float(i);
-            // Spirala Vogela: równomierne pokrycie dysku bez tablicy kernela.
-            float angle = fi * 2.39996323 + rotation;
-            float radius = sqrt((fi + 0.5) / float(SAMPLES));
-            vec2 dir = vec2(cos(angle), sin(angle)) * radius;
-            dir = vec2(dir.x * cosR - dir.y * sinR, dir.x * sinR + dir.y * cosR);
-            vec2 sampleUv = vUv + dir * pixelRadius;
-            if (sampleUv.x < 0.0 || sampleUv.x > 1.0 || sampleUv.y < 0.0 || sampleUv.y > 1.0) continue;
-
-            float sampleDepth = texture2D(tDepth, sampleUv).x;
-            if (sampleDepth >= 0.9999) continue;
-            vec3 samplePos = viewPosition(sampleUv, sampleDepth);
-            vec3 delta = samplePos - origin;
-            float distance = length(delta);
-            if (distance < 0.0001) continue;
-
-            // Zasłania tylko to, co leży PRZED powierzchnią (dodatni rzut na
-            // normalną) i mieści się w promieniu — reszta to nie okluzja.
-            float occluded = max(0.0, dot(normal, delta / distance) - uBias);
-            float falloff = 1.0 / (1.0 + distance * distance / (uRadius * uRadius));
-            occlusion += occluded * falloff;
-          }
-
-          float ao = clamp(1.0 - uIntensity * occlusion / float(SAMPLES), 0.0, 1.0);
-          // Mnożenie w przestrzeni LINIOWEJ, przed bloomem i przed
-          // OutputPass — żadnego tone mappingu ani konwersji barw tutaj.
-          gl_FragColor = vec4(color.rgb * ao, color.a);
-        }
-      `,
+    const pipeline = setupGraphicsPipeline(this.THREE!, modules, renderer, {
+      scene, camera, width: w, height: h,
+      // Ekspozycja/próg bloomu dostrojone do materiałów TEJ hali (patrz init()) —
+      // te same wartości, które obowiązywały przed przejściem na wspólny pipeline.
+      toneMappingExposure: 1.12,
+      bloom: { strength: 0.22, radius: 0.55, threshold: 0.95 },
+      depthOfField: { enabled: true, focusDistance: 3, blurStrength: 0.32 },
+      // Sonda odbić hali (captureRoomEnvironment, poniżej) zastępuje generyczne HDRI raz, po
+      // pierwszej klatce — bez tej straży asynchroniczny loader HDRI mógłby dokończyć się PO
+      // sondzie i po cichu ją nadpisać uliczną panoramą zamiast prawdziwej hali.
+      ambientHdriGuard: () => !this.roomProbeCaptured,
     });
-    composer.addPass(aoPass);
-
-    // ==================================================================
-    // GŁĘBIA OSTROŚCI — dokładnie ten sam bufor głębi co AO, więc DOF nie
-    // kosztuje ani jednego dodatkowego przebiegu sceny.
-    //
-    // OSTROŚĆ JEST DYNAMICZNA: szejder próbkuje głębię w ŚRODKU KADRU i to
-    // ona wyznacza płaszczyznę ostrości. Dzięki temu ostre jest zawsze to,
-    // na co naukowiec patrzy — przy podejściu do reaktora ostrość
-    // przechodzi na aparaturę bez żadnego sterowania z zewnątrz.
-    //
-    // POWŚCIĄGLIWIE: rozmycie za płaszczyzną ostrości jest wyraźnie silniejsze
-    // niż przed nią (asymetryczne CoC). Tło opada naturalnie, ale pierwszy
-    // plan i sam instrument zostają czytelne — to ma być kadr filmowy, a nie
-    // efekt, przez który nie da się chodzić po hali.
-    // ==================================================================
-    const dofPass = new modules.ShaderPass({
-      name: 'GenesisDepthOfField',
-      uniforms: {
-        tDiffuse: { value: null },
-        tDepth: { value: depthTexture },
-        uProjectionInverse: { value: new THREE.Matrix4() },
-        uResolution: { value: new THREE.Vector2(w, h) },
-        uMaxBlurPixels: { value: 3.4 },
-        uFarRange: { value: 6.5 },
-        uNearRange: { value: 1.6 },
-      },
-      vertexShader: /* glsl */`
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: /* glsl */`
-        precision highp float;
-        varying vec2 vUv;
-        uniform sampler2D tDiffuse;
-        uniform sampler2D tDepth;
-        uniform mat4 uProjectionInverse;
-        uniform vec2 uResolution;
-        uniform float uMaxBlurPixels;
-        uniform float uFarRange;
-        uniform float uNearRange;
-
-        float viewDepth(vec2 uv) {
-          float d = texture2D(tDepth, uv).x;
-          vec4 clip = vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
-          vec4 view = uProjectionInverse * clip;
-          return -(view.z / view.w);
-        }
-
-        void main() {
-          float focus = viewDepth(vec2(0.5, 0.5));
-          float here = viewDepth(vUv);
-          // Za ostrością rozmywamy mocniej niż przed nią — pierwszy plan ma
-          // pozostać użyteczny w pierwszej osobie.
-          float signedDistance = here - focus;
-          float coc = signedDistance > 0.0
-            ? clamp(signedDistance / uFarRange, 0.0, 1.0)
-            : clamp(-signedDistance / uNearRange, 0.0, 1.0) * 0.45;
-          float radius = coc * uMaxBlurPixels;
-          if (radius < 0.35) {
-            gl_FragColor = texture2D(tDiffuse, vUv);
-            return;
-          }
-
-          vec2 texel = 1.0 / uResolution;
-          vec4 sum = texture2D(tDiffuse, vUv);
-          float weight = 1.0;
-          const int TAPS = 10;
-          for (int i = 0; i < TAPS; i++) {
-            float fi = float(i);
-            float angle = fi * 2.39996323;
-            float r = sqrt((fi + 0.5) / float(TAPS)) * radius;
-            vec2 offset = vec2(cos(angle), sin(angle)) * r * texel;
-            vec2 sampleUv = vUv + offset;
-            // Próbka bliższa od punktu ostrości nie może "wylewać się" na
-            // ostry obiekt — inaczej sylwetka aparatury dostałaby aureolę.
-            float sampleDepth = viewDepth(sampleUv);
-            float sampleCoc = sampleDepth > focus
-              ? clamp((sampleDepth - focus) / uFarRange, 0.0, 1.0)
-              : clamp((focus - sampleDepth) / uNearRange, 0.0, 1.0) * 0.45;
-            float accept = step(coc * 0.45, sampleCoc);
-            sum += texture2D(tDiffuse, sampleUv) * accept;
-            weight += accept;
-          }
-          gl_FragColor = sum / weight;
-        }
-      `,
-    });
-    composer.addPass(dofPass);
-
-    // Bloom niżej progowany i mocniejszy: wspiera światło (poświata na
-    // krawędziach szkła/emisyjnych elementach), ale go nie zastępuje —
-    // ciemniejsze materiały bazowe (patrz init()) robią resztę kontrastu.
-    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.22, 0.55, 0.95);
-    composer.addPass(bloom);
-    composer.addPass(new modules.OutputPass());
+    this.graphicsPipeline = pipeline;
+    this.focusPuller = new FocusPuller(3);
 
     // Sceny są statyczne (światła i geometria się nie ruszają), więc mapy
-    // cieni liczymy raz. Bez tego prepass głębi wymuszałby ich przeliczenie
-    // DRUGI RAZ w każdej klatce — czysty koszt bez żadnej zmiany obrazu.
+    // cieni liczymy raz. Bez tego GTAOPass/BokehPass wymuszałyby ich
+    // przeliczenie w każdej klatce — czysty koszt bez żadnej zmiany obrazu.
     let shadowsPrimed = false;
-
-    const renderDepthPrepass = (): void => {
-      const previousOverride = scene.overrideMaterial;
-      const previousTarget = renderer.getRenderTarget();
-      // Ręce naukowca ZOSTAJĄ w buforze głębi: potrzebuje ich głębia ostrości
-      // (bez nich rękawy miałyby głębię tła i rozmywały się jak horyzont).
-      // Z okluzji wypada je szejder AO — pomija piksele bliższe niż próg
-      // NEAR_FIELD, więc rękaw nie rzuca okluzji na kadr.
-      scene.overrideMaterial = depthOnlyMaterial;
-      renderer.setRenderTarget(depthTarget);
-      renderer.clear();
-      renderer.render(scene, camera);
-      renderer.setRenderTarget(previousTarget);
-      scene.overrideMaterial = previousOverride;
-    };
 
     return {
       render: () => {
-        renderDepthPrepass();
-        aoPass.uniforms.uProjectionInverse.value.copy(camera.projectionMatrixInverse);
-        aoPass.uniforms.uCameraNear.value = camera.near;
-        aoPass.uniforms.uCameraFar.value = camera.far;
-        dofPass.uniforms.uProjectionInverse.value.copy(camera.projectionMatrixInverse);
-        composer.render();
+        pipeline.render();
         if (!shadowsPrimed) {
           shadowsPrimed = true;
           renderer.shadowMap.autoUpdate = false;
@@ -3684,62 +3447,13 @@ export class LabScene3D implements Sim3D {
           this.captureRoomEnvironment(renderer, scene);
         }
       },
-      setSize: (width, height) => {
-        composer.setSize(width, height);
-        depthTarget.setSize(Math.max(1, Math.floor(width * aoScale)), Math.max(1, Math.floor(height * aoScale)));
-        aoPass.uniforms.uResolution.value.set(width, height);
-        dofPass.uniforms.uResolution.value.set(width, height);
-      },
+      setSize: (width, height) => pipeline.setSize(width, height),
       dispose: () => {
-        composer.dispose();
-        depthTarget.dispose();
-        depthTexture.dispose();
-        depthOnlyMaterial.dispose();
+        pipeline.dispose?.();
+        this.graphicsPipeline = null;
         renderer.shadowMap.autoUpdate = true;
       },
     };
-  }
-
-  /**
-   * HDRI TYLKO jako mapa środowiska (reflections/IBL na szkle i metalu) —
-   * BEZ podmiany tła, żeby zachować nastrój ciemnego laboratorium. Reużywa
-   * jedyny zatwierdzony w assetGovernance.ts asset środowiskowy CC0, nie
-   * dodaje żadnego nowego pliku.
-   */
-  /**
-   * Otoczenie studyjne bez żadnego assetu: mała scena z jasnym „sufitem",
-   * ciemną „podłogą" i dwoma świetlówkami, przepuszczona przez PMREMGenerator.
-   * To ona daje metalowi/szkłu realne odbicia — bez niej chrom, stal i szyba
-   * reaktora wyglądają jak jednolity plastik, niezależnie od parametrów PBR.
-   */
-  private applyStudioEnvironment(renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene): void {
-    const THREE = this.THREE!;
-    const envScene = new THREE.Scene();
-    const shell = new THREE.Mesh(
-      new THREE.BoxGeometry(12, 8, 12),
-      new THREE.MeshBasicMaterial({ color: 0x35415c, side: THREE.BackSide }),
-    );
-    envScene.add(shell);
-    // Jasny „sufit" i dwie świetlówki: to one dają metalowi ostre, wydłużone
-    // refleksy, po których czyta się szczotkowana stal i chrom.
-    const envCeiling = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({ color: 0xdfeaff }));
-    envCeiling.rotation.x = Math.PI / 2;
-    envCeiling.position.y = 3.9;
-    envScene.add(envCeiling);
-    const envFloor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({ color: 0x0d1220 }));
-    envFloor.rotation.x = -Math.PI / 2;
-    envFloor.position.y = -3.9;
-    envScene.add(envFloor);
-    for (const ex of [-2.4, 2.4]) {
-      const strip = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 9), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      strip.rotation.x = Math.PI / 2;
-      strip.position.set(ex, 3.85, 0);
-      envScene.add(strip);
-    }
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(envScene, 0.06).texture;
-    scene.environmentIntensity = 1.15;
-    pmrem.dispose();
   }
 
   /**
@@ -3807,30 +3521,6 @@ export class LabScene3D implements Sim3D {
       renderer.toneMapping = previousToneMapping;
       renderer.toneMappingExposure = previousExposure;
       for (const mesh of hidden) mesh.visible = true;
-    }
-  }
-
-  private async loadHdri(renderer: THREE_NS.WebGLRenderer): Promise<void> {
-    const hdriPath = '/assets/genesis-hf/hdr/braustuble_alley_1k.hdr';
-    if (!isWorldAssetApproved(hdriPath)) return;
-    try {
-      const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
-      if (!this.THREE || !this.scene) return;
-      const pmrem = new this.THREE.PMREMGenerator(renderer);
-      new RGBELoader().load(hdriPath, (texture) => {
-        // Sonda pokojowa jest lepszym źródłem odbić niż zewnętrzne HDRI ulicy:
-        // jeśli zdążyła się zapiąć, HDRI jej nie zastępuje.
-        if (!this.scene || this.roomProbeCaptured) { texture.dispose(); pmrem.dispose(); return; }
-        const environment = pmrem.fromEquirectangular(texture).texture;
-        this.scene.environment = environment;
-        // Podniesione z 0.35: przy obniżonym świetle ambientowym to teraz
-        // IBL niesie większość odbić na szkle/metalu, więc musi być czytelne.
-        this.scene.environmentIntensity = 1.45;
-        texture.dispose();
-        pmrem.dispose();
-      }, undefined, () => pmrem.dispose());
-    } catch {
-      // Materiały PBR i światła sceny pozostają pełnym fallbackiem bez HDRI.
     }
   }
 

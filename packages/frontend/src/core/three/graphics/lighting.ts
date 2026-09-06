@@ -60,14 +60,26 @@ export function applyStudioEnvironment(THREE: typeof THREE_NS, renderer: THREE_N
 }
 
 /** HDRI TYLKO jako mapa środowiska (reflections/IBL) — BEZ podmiany tła, żeby zachować nastrój
- * ciemnego laboratorium. Reużywa jedyny zatwierdzony w assetGovernance.ts asset środowiskowy. */
-export async function loadHdriEnvironment(THREE: typeof THREE_NS, renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene): Promise<void> {
+ * ciemnego laboratorium. Reużywa jedyny zatwierdzony w assetGovernance.ts asset środowiskowy.
+ *
+ * `shouldApply` (default: always) is checked right before the loaded HDRI is actually applied,
+ * not just before the load starts — the load is async, so a caller that later installs a better,
+ * scene-specific environment (e.g. a room-reflection probe captured after the first frame) needs
+ * a way to stop this generic HDRI from clobbering it on a race where the HDRI finishes loading
+ * afterwards. Most callers have no such upgrade and can omit the parameter entirely. */
+export async function loadHdriEnvironment(
+  THREE: typeof THREE_NS,
+  renderer: THREE_NS.WebGLRenderer,
+  scene: THREE_NS.Scene,
+  shouldApply: () => boolean = () => true,
+): Promise<void> {
   const hdriPath = '/assets/genesis-hf/hdr/braustuble_alley_1k.hdr';
   if (!isWorldAssetApproved(hdriPath)) return;
   try {
     const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
     const pmrem = new THREE.PMREMGenerator(renderer);
     new RGBELoader().load(hdriPath, (texture) => {
+      if (!shouldApply()) { texture.dispose(); pmrem.dispose(); return; }
       const environment = pmrem.fromEquirectangular(texture).texture;
       scene.environment = environment;
       // Podniesione: przy obniżonym świetle ambientowym to IBL niesie większość odbić.
@@ -85,10 +97,11 @@ export async function loadHdriEnvironment(THREE: typeof THREE_NS, renderer: THRE
  * off the optional approved-HDRI upgrade in the background. This is exactly what
  * `graphics/postProcessing.ts`'s `setupGraphicsPipeline` already does internally — exposed here
  * too so a caller assembling their own pipeline (bypassing `setupGraphicsPipeline`) still gets the
- * one-call version instead of having to know both functions exist and must run in this order. */
-export function applyAmbientIBL(THREE: typeof THREE_NS, renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene): void {
+ * one-call version instead of having to know both functions exist and must run in this order.
+ * `shouldApplyHdri` forwards to `loadHdriEnvironment`'s race guard — see its doc above. */
+export function applyAmbientIBL(THREE: typeof THREE_NS, renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene, shouldApplyHdri?: () => boolean): void {
   applyStudioEnvironment(THREE, renderer, scene);
-  void loadHdriEnvironment(THREE, renderer, scene);
+  void loadHdriEnvironment(THREE, renderer, scene, shouldApplyHdri);
 }
 
 // ============================================================================

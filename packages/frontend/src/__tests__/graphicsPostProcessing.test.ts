@@ -43,7 +43,7 @@ function fakeThree() {
 function fakeModules() {
   const addedPasses: PassLabel[] = [];
   const gtaoInstances: Array<{ updateGtaoMaterial: ReturnType<typeof vi.fn>; blendIntensity: number; dispose: ReturnType<typeof vi.fn> }> = [];
-  const bokehInstances: Array<{ ctorArgs: unknown[]; uniforms: { focus: { value: number }; aperture: { value: number }; maxblur: { value: number } } }> = [];
+  const bokehInstances: Array<{ ctorArgs: unknown[]; uniforms: { focus: { value: number }; aperture: { value: number }; maxblur: { value: number } }; instance: { enabled: boolean } }> = [];
   const composerCalls = { render: vi.fn(), setSize: vi.fn(), dispose: vi.fn(), addPass: vi.fn() };
 
   class EffectComposer {
@@ -65,12 +65,13 @@ function fakeModules() {
   class UnrealBloomPass { constructor(public resolution: unknown, public strength: number, public radius: number, public threshold: number) { addedPasses.push('UnrealBloomPass'); } }
   class BokehPass {
     uniforms = { focus: { value: 0 }, aperture: { value: 0 }, maxblur: { value: 0 } };
+    enabled = true;
     constructor(public scene: unknown, public camera: unknown, params: { focus: number; aperture: number; maxblur: number }) {
       addedPasses.push('BokehPass');
       this.uniforms.focus.value = params.focus;
       this.uniforms.aperture.value = params.aperture;
       this.uniforms.maxblur.value = params.maxblur;
-      bokehInstances.push({ ctorArgs: [scene, camera, params], uniforms: this.uniforms });
+      bokehInstances.push({ ctorArgs: [scene, camera, params], uniforms: this.uniforms, instance: this });
     }
   }
   class OutputPass { constructor() { addedPasses.push('OutputPass'); } }
@@ -214,6 +215,25 @@ describe('setupGraphicsPipeline — DOF default-off regression guard', () => {
     const { modules } = fakeModules();
     const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
     expect(() => pipeline.setFocusDistance(5)).not.toThrow();
+  });
+
+  it('setDepthOfFieldEnabled is a safe no-op when DOF was never enabled', () => {
+    const { modules } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(() => pipeline.setDepthOfFieldEnabled(true)).not.toThrow();
+  });
+
+  it('setDepthOfFieldEnabled toggles the BokehPass without rebuilding the composer', () => {
+    const { modules, bokehInstances } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts,
+      depthOfField: { enabled: true, focusDistance: 3 },
+    });
+    expect(bokehInstances[0]!.instance.enabled).toBe(true);
+    pipeline.setDepthOfFieldEnabled(false);
+    expect(bokehInstances[0]!.instance.enabled).toBe(false);
+    pipeline.setDepthOfFieldEnabled(true);
+    expect(bokehInstances[0]!.instance.enabled).toBe(true);
   });
 });
 

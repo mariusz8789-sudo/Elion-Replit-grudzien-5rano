@@ -151,12 +151,30 @@ export interface GraphicsPipelineOptions {
    * the interactive device signals suggest. Omit for normal interactive rendering.
    */
   qualityTier?: RenderTier;
+  /**
+   * Forwarded to `graphics/lighting.ts`'s `applyAmbientIBL`/`loadHdriEnvironment` as their race
+   * guard. Only needed when the caller installs its OWN, better environment map after this
+   * pipeline is set up (e.g. a scene-specific room-reflection probe captured after the first
+   * frame) — without it, the generic HDRI load could finish later and silently clobber that
+   * better environment. Omit for the common case (no such upgrade); the HDRI always applies.
+   */
+  ambientHdriGuard?: () => boolean;
 }
 
-/** `PostProcessor` plus a hook for retuning DOF focus at runtime — a strict superset, so it still
+/** `PostProcessor` plus hooks for retuning DOF at runtime — a strict superset, so it still
  * satisfies `Sim3D.setupPostProcessing`'s declared `PostProcessor` return type. */
 export interface GraphicsPipeline extends PostProcessor {
   setFocusDistance(distance: number): void;
+  /**
+   * Toggles the Bokeh blur on/off per shot without rebuilding the composer — a no-op when DOF
+   * wasn't enabled at setup. For a camera that cuts between framings (a wide establishing shot,
+   * a tight hero close-up, a first-person POV), only SOME of those framings want shallow depth of
+   * field: cinematography convention (and this engine's own `cinematicCamera.ts` profiles) keeps
+   * wide/establishing and POV shots sharp end-to-end, reserving DOF for close/hero framings where
+   * it reads as intentional rather than as a rendering glitch blurring the room the viewer is
+   * trying to read.
+   */
+  setDepthOfFieldEnabled(enabled: boolean): void;
 }
 
 export function setupGraphicsPipeline(
@@ -182,7 +200,7 @@ export function setupGraphicsPipeline(
   // AMBIENT/IBL role (graphics/lighting.ts): procedural studio env immediately + optional
   // approved HDRI upgrade in the background — metal must have something to reflect, or chrome
   // and steel read as flat plastic regardless of roughness/metalness.
-  applyAmbientIBL(THREE, renderer, scene);
+  applyAmbientIBL(THREE, renderer, scene, opts.ambientHdriGuard);
 
   const composer = new modules.EffectComposer(renderer);
   composer.addPass(new modules.RenderPass(scene, camera));
@@ -240,6 +258,9 @@ export function setupGraphicsPipeline(
      * shot) — a no-op when DOF wasn't enabled. Reusable hook for the scene-composition layer. */
     setFocusDistance: (distance: number) => {
       if (dof) (dof.uniforms as { focus: { value: number } }).focus.value = distance;
+    },
+    setDepthOfFieldEnabled: (enabled: boolean) => {
+      if (dof) dof.enabled = enabled;
     },
     dispose: () => {
       gtao?.dispose();

@@ -10,6 +10,7 @@ import { WorldClock } from '../core/lookingGlass/worldClock';
 import { PERSPECTIVES, perspectiveRequest, placeCamera } from '../core/lookingGlass/perspective';
 import { compareEpidemicRuns } from '../core/lookingGlass/scenarioComparison';
 import { compareScenarios, runScenario } from '../core/simulation/scenarioEngine';
+import { runScenarioCounterfactual } from '../core/simulation/scenarioCounterfactual';
 import { closeInspection, initialExperienceState, inspect, replay as replayMode, timeIsFrozen } from '../core/lookingGlass/experienceMode';
 
 describe('Looking Glass — natural language to structured scenario', () => {
@@ -866,10 +867,24 @@ describe('Looking Glass — COMPARE is real, or it says why not', () => {
     expect(session.request.comparison).toBe(true);
     expect(session.comparison).not.toBeNull();
     expect(session.comparison!.status).toBe('READY');
-    expect(session.comparison!.producedBy).toMatch(/compareScenarios\(BASELINE, ISOLATION\)/);
+    expect(session.comparison!.producedBy).toMatch(/runScenarioCounterfactual\(BASELINE->ISOLATION\)/);
     const deaths = session.comparison!.metrics.find((m) => m.key === 'totalDeaths')!;
     expect(deaths.baseline).toBeGreaterThanOrEqual(deaths.variant);
     expect(deaths.absoluteDelta).toBe(deaths.variant - deaths.baseline);
+  });
+
+  it('carries real counterfactual evidence: a measured divergence day and a stable fingerprint', () => {
+    const session = openLookingGlass('Compare the epidemic over 40 days from street level');
+    expect(session.comparison!.evidence).not.toBeNull();
+    expect(session.comparison!.evidence!.counterfactualFingerprint.length).toBeGreaterThan(0);
+    // ISOLATION only diverges from BASELINE once the intervention has had time
+    // to act — the day is measured on the real series, never assumed to be 0.
+    expect(session.comparison!.evidence!.firstDivergentDay).not.toBeNull();
+  });
+
+  it('the laboratory comparison carries no counterfactual evidence — honest, not a fabricated one', () => {
+    const session = openLookingGlass('Compare the bioreactor cell culture over 12 hours from the scientist');
+    expect(session.comparison!.evidence).toBeNull();
   });
 
   it('produces a real laboratory comparison from the discrimination the loop already ran', () => {
@@ -902,13 +917,35 @@ describe('Looking Glass — COMPARE is real, or it says why not', () => {
     expect(refused.comparison).toBeNull();
   });
 
-  it('wraps compareScenarios directly: identical result to calling it by hand', () => {
+  it('wraps runScenarioCounterfactual directly: identical result to calling it by hand', () => {
     const baseline = runScenario('BASELINE', { days: 30 });
     const variant = runScenario('ISOLATION', { days: 30 });
     const direct = compareScenarios(baseline, variant);
-    const wrapped = compareEpidemicRuns(baseline, variant);
+    const counterfactual = runScenarioCounterfactual({
+      baselineScenarioId: 'BASELINE', variantScenarioId: 'ISOLATION', days: 30, stepsPerDay: 4, baseParams: {},
+    });
+    const wrapped = compareEpidemicRuns(counterfactual);
     expect(wrapped.metrics).toEqual(direct.metrics);
     expect(wrapped.message).toBe(direct.message);
+  });
+
+  it('commits a real epidemic comparison into the existing Scientific Memory, MATCH-verified on replay', async () => {
+    const { isSavedScenarioCounterfactual, replaySavedScenarioCounterfactual } =
+      await import('../core/simulation/scenarioCounterfactual');
+    const session = openLookingGlass('Compare the epidemic over 30 days from street level');
+    const saved = session.commitComparisonToMemory();
+    expect(saved).not.toBeNull();
+    expect(isSavedScenarioCounterfactual(saved!.counterfactual)).toBe(true);
+    const replay = replaySavedScenarioCounterfactual(saved!.counterfactual);
+    expect(replay.status).toBe('MATCH');
+  });
+
+  it('never commits when there is nothing to commit, or when the domain has no counterfactual artifact', () => {
+    const noComparison = openLookingGlass('Pokaż epidemię przez 30 dni z perspektywy człowieka na ulicy');
+    expect(noComparison.commitComparisonToMemory()).toBeNull();
+    const labCompared = openLookingGlass('Compare the bioreactor cell culture over 12 hours from the scientist');
+    expect(labCompared.comparison).not.toBeNull();
+    expect(labCompared.commitComparisonToMemory()).toBeNull();
   });
 });
 
@@ -921,7 +958,7 @@ describe('Looking Glass — comparison travels with the world handoff', () => {
     session.enterWorld();
     const handoff = peekPendingLookingGlassExperience();
     expect(handoff?.comparison?.status).toBe('READY');
-    expect(handoff?.comparison?.producedBy).toMatch(/compareScenarios/);
+    expect(handoff?.comparison?.producedBy).toMatch(/runScenarioCounterfactual/);
     clearLookingGlassExperience();
   });
 

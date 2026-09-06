@@ -2,7 +2,10 @@ import type { WorldState } from '../world/scientificWorldState';
 import { captureWorldTimeline, type WorldCaptureTimeline } from '../world/worldCapture';
 import { projectCellWorldStates } from '../world/cellWorldAdapter';
 import { executePreregisteredHypotheses, preregisterHypotheses, generateCompetingHypotheses, HYPOTHESIS_PROBLEMS } from '../experimentFabric/hypothesisLoop';
-import { runScenario, SCENARIOS, type ScenarioId, type ScenarioRun } from '../simulation/scenarioEngine';
+import { DEFAULT_SCENARIO_RUN, runScenario, SCENARIOS, type ScenarioId, type ScenarioRun } from '../simulation/scenarioEngine';
+import { runScenarioCounterfactual, type ScenarioCounterfactual } from '../simulation/scenarioCounterfactual';
+import { saveScenarioCounterfactualToMemory } from '../scienceMemory';
+import type { SavedExperiment } from '../scienceMemory';
 import { registerScenarioTimeline, setPendingScenarioTimeline } from '../experimentFabric/worldHandoff';
 import { projectEpidemiologyWorldStates } from '../world/epidemiologyWorldAdapter';
 import { buildAnchoredSequence, type AnchoredTemporalSequence, type TemporalAnchor } from './anchoredTemporal';
@@ -84,6 +87,17 @@ export interface LookingGlassSession {
    * comparison (different seed, a tie between candidates, and so on).
    */
   readonly comparison: ScenarioComparisonView | null;
+  /**
+   * Persists `comparison` into the existing Scientific Memory — the same
+   * store the first-person lab session and `ScientificMemoryScreen` already
+   * write to and replay from (`saveScenarioCounterfactualToMemory`). This is
+   * the real bridge from a Looking Glass session to Genesis's durable,
+   * replay-verified scientific record: no second memory, no second replay
+   * protocol. Returns `null` when there is no comparison, or when this
+   * domain's comparison has no counterfactual artifact behind it to save
+   * (see `buildLaboratorySession`) — never a fabricated record.
+   */
+  readonly commitComparisonToMemory: () => SavedExperiment | null;
 }
 
 /**
@@ -154,6 +168,13 @@ interface SessionBuild {
   readonly temporalSource: string;
   /** A REAL comparison, only when one was actually computed. */
   readonly comparison: ScenarioComparisonView | null;
+  /**
+   * The real counterfactual behind `comparison`, when the domain's engine
+   * produces a savable one. Kept out of `ScenarioComparisonView` because that
+   * type is a plain, domain-independent shape — this is the actual engine
+   * artifact underneath it, present only for the epidemic path today.
+   */
+  readonly counterfactual: ScenarioCounterfactual | null;
   /** Registered handoff id, when this run has a 3D world to be entered. */
   readonly handoffRunId: string | null;
   /** Route that renders this world, or null when none exists yet. */
@@ -181,20 +202,31 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
   // means sixty days the model actually computed — not sixty frames drawn
   // over a shorter run.
   const scenarioId: ScenarioId = plan.kind === 'QUARANTINE' ? 'ISOLATION' : 'BASELINE';
-  const run = runScenario(scenarioId, { days: plan.ticks });
 
   // A real comparison, computed only when the sentence actually asked for
   // one — never assumed from the word "compare" alone. ISOLATION is the
   // model's own canonical intervention: comparing it against BASELINE is
   // "what does isolation change", which is what a bare "compare" without a
-  // named second scenario can honestly mean. Both runs share the engine's
-  // default seed and population (see scenarioEngine.ts), which is exactly
-  // what compareScenarios requires to attribute the difference to policy.
-  const comparison = plan.comparison && scenarioId !== 'ISOLATION'
-    ? compareEpidemicRuns(run, runScenario('ISOLATION', { days: plan.ticks }))
-    : plan.comparison
-      ? compareEpidemicRuns(runScenario('BASELINE', { days: plan.ticks }), run)
-      : null;
+  // named second scenario can honestly mean. Both arms go through the SAME
+  // counterfactual engine `buildLabCounterfactual` uses and Scientific
+  // Memory persists — not a second, Looking-Glass-only pairing of two raw
+  // runs — so the comparison also carries a measured divergence day and a
+  // fingerprint a saved copy can be replayed against.
+  const counterfactual = plan.comparison
+    ? runScenarioCounterfactual({
+      baselineScenarioId: 'BASELINE',
+      variantScenarioId: 'ISOLATION',
+      days: plan.ticks,
+      stepsPerDay: DEFAULT_SCENARIO_RUN.stepsPerDay,
+      baseParams: {},
+    })
+    : null;
+  const comparison = counterfactual ? compareEpidemicRuns(counterfactual) : null;
+  // Reuse the counterfactual's own arm instead of running the model a third
+  // time when a comparison was already computed.
+  const run = counterfactual
+    ? (scenarioId === 'ISOLATION' ? counterfactual.variant : counterfactual.baseline)
+    : runScenario(scenarioId, { days: plan.ticks });
 
   // Hand the real day series to the existing world bridge rather than
   // inventing a second channel: `worldHandoff` is already the only road a
@@ -215,6 +247,7 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
     // The city grid the epidemic runs on, in metres.
     bounds: { min: [-30, 0, -30], max: [30, 20, 30] },
     comparison,
+    counterfactual,
   };
 }
 
@@ -258,6 +291,11 @@ function buildLaboratorySession(plan: ScenarioRunPlan): SessionBuild {
   return {
     states,
     comparison,
+    // The hypothesis ranking has no counterfactual-engine artifact behind it
+    // — it is not a saved baseline/variant pair, so there is nothing honest
+    // to commit to Scientific Memory. `commitComparisonToMemory` on the
+    // session reports this domain as unsupported rather than fabricating one.
+    counterfactual: null,
     producedBy: `hypothesisLoop.executePreregisteredHypotheses(${problem.problemId})`,
     // The laboratory world advances per projected state; there is no separate
     // finer series to play through, and inventing one would be fabrication.
@@ -301,6 +339,7 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
       temporalSource: 'none',
       worldRoute: null,
       enterWorld: () => false,
+      commitComparisonToMemory: () => null,
     };
   }
 
@@ -362,6 +401,14 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
         comparison: built.comparison,
       });
       return built.handoffRunId ? setPendingScenarioTimeline(built.handoffRunId) : true;
+    },
+    // Writes into Scientific Memory only when a real counterfactual artifact
+    // exists behind `comparison` — the same gate `buildSavedScenarioCounterfactual`
+    // itself enforces (COMPLETED comparisons only), so this can never persist
+    // a blocked or fabricated pair.
+    commitComparisonToMemory: () => {
+      if (built.counterfactual === null || built.counterfactual.comparison.status !== 'COMPLETED') return null;
+      return saveScenarioCounterfactualToMemory(built.counterfactual);
     },
   };
 }

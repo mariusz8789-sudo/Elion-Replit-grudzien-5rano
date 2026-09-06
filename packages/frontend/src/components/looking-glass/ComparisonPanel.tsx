@@ -49,6 +49,15 @@ export function ComparisonPanel({
               ))}
             </tbody>
           </table>
+          {comparison.evidence !== null ? (
+            <p className="lg-cmp-evidence">
+              {comparison.evidence.firstDivergentDay !== null
+                ? `Światy rozeszły się w dniu ${comparison.evidence.firstDivergentDay}.`
+                : 'Światy nigdy się nie rozeszły — różnica wyniku pochodzi z innej warstwy modelu.'}
+              {' '}
+              <span className="lg-cmp-fingerprint">odcisk {comparison.evidence.counterfactualFingerprint}</span>
+            </p>
+          ) : null}
           <p className="lg-cmp-produced">{comparison.producedBy}</p>
         </>
       ) : (

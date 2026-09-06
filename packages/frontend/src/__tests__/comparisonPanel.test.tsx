@@ -10,7 +10,8 @@ const READY: ScenarioComparisonView = {
   changedFactors: ['isolate'],
   metrics: [{ key: 'totalDeaths', baseline: 8, variant: 0, absoluteDelta: -8, relativeDeltaPercent: -100 }],
   message: 'ok',
-  producedBy: 'scenarioEngine.compareScenarios(BASELINE, ISOLATION)',
+  producedBy: 'scenarioCounterfactual.runScenarioCounterfactual(BASELINE->ISOLATION)',
+  evidence: { firstDivergentDay: 12, counterfactualFingerprint: 'fp-test-1' },
 };
 
 const BLOCKED: ScenarioComparisonView = {
@@ -19,6 +20,7 @@ const BLOCKED: ScenarioComparisonView = {
   changedFactors: [], metrics: [],
   message: 'Uporządkowanie nie jest rozstrzygające.',
   producedBy: 'hypothesisLoop.discrimination(x)',
+  evidence: null,
 };
 
 describe('ComparisonPanel — renders only what is real', () => {
@@ -38,7 +40,13 @@ describe('ComparisonPanel — renders only what is real', () => {
     expect(markup).toContain('Izolacja objawowych');
     expect(markup).toContain('totalDeaths');
     expect(markup).toContain('8.00');
-    expect(markup).toContain('scenarioEngine.compareScenarios(BASELINE, ISOLATION)');
+    expect(markup).toContain('scenarioCounterfactual.runScenarioCounterfactual(BASELINE-&gt;ISOLATION)');
+  });
+
+  it('renders the measured divergence day and fingerprint when the comparison carries evidence', () => {
+    const markup = renderToStaticMarkup(<ComparisonPanel comparison={READY} requestedButMissing />);
+    expect(markup).toContain('rozeszły się w dniu 12');
+    expect(markup).toContain('fp-test-1');
   });
 
   it('renders the engine refusal message for a blocked comparison, never a fabricated metric', () => {

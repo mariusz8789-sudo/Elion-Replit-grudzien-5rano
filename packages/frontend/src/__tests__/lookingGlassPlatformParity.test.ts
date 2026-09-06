@@ -122,7 +122,7 @@ describe('Looking Glass — platform parity between city and laboratory', () => 
     }
     // Different engines, visible in provenance — parity is in the SHAPE, not
     // in pretending the two domains compute comparison identically.
-    expect(comparedCity.comparison!.producedBy).toMatch(/compareScenarios/);
+    expect(comparedCity.comparison!.producedBy).toMatch(/runScenarioCounterfactual/);
     expect(comparedLab.comparison!.producedBy).toMatch(/discrimination/);
   });
 

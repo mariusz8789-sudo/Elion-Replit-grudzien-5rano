@@ -1,5 +1,6 @@
 import type { HypothesisDiscrimination, HypothesisProblem } from '../experimentFabric/hypothesisLoop';
-import { compareScenarios, SCENARIOS, type ScenarioRun } from '../simulation/scenarioEngine';
+import { SCENARIOS } from '../simulation/scenarioEngine';
+import type { ScenarioCounterfactual } from '../simulation/scenarioCounterfactual';
 
 /**
  * LOOKING GLASS — COMPARE, WITHOUT PRETENDING.
@@ -16,9 +17,13 @@ import { compareScenarios, SCENARIOS, type ScenarioRun } from '../simulation/sce
  * comparison itself. The two domains here already have comparison, and
  * they compare different things for different reasons:
  *
- *  - EPIDEMIC uses `compareScenarios`, which BLOCKS when a difference could
- *    not be attributed to policy (different seed, different population,
- *    different horizon). That refusal is preserved verbatim.
+ *  - EPIDEMIC uses `scenarioCounterfactual.runScenarioCounterfactual`, the
+ *    same counterfactual engine already used by the first-person lab session
+ *    and by Scientific Memory — not a second, Looking-Glass-only pairing of
+ *    two raw runs. It BLOCKS (via the same `compareScenarios` underneath)
+ *    when a difference could not be attributed to policy, and it additionally
+ *    carries `firstDivergentDay` and a `counterfactualFingerprint` — real
+ *    evidence this module does not compute, only relays.
  *  - LABORATORY already runs multiple candidate hypotheses every time —
  *    `discrimination` is the real ranking between them, computed whether or
  *    not the user asked to "compare". A tie (`decisive: false`) means no
@@ -40,6 +45,18 @@ export interface ComparisonMetric {
   readonly relativeDeltaPercent: number | null;
 }
 
+/**
+ * Evidence a comparison carries beyond the metric table, when the engine
+ * that produced it tracks such a thing. `null` for a comparison whose engine
+ * does not compute this — never filled in by guessing.
+ */
+export interface ComparisonEvidence {
+  /** First tick the two arms actually diverged, measured on the real series — not the intervention day. */
+  readonly firstDivergentDay: number | null;
+  /** Fingerprint a saved counterfactual is checked against on replay. */
+  readonly counterfactualFingerprint: string;
+}
+
 export interface ScenarioComparisonView {
   readonly status: ComparisonStatus;
   readonly baselineLabel: string;
@@ -50,11 +67,19 @@ export interface ScenarioComparisonView {
   readonly message: string;
   /** The real function that produced this, for provenance in the UI. */
   readonly producedBy: string;
+  readonly evidence: ComparisonEvidence | null;
 }
 
-/** Wraps the epidemic engine's own `compareScenarios` — no reinterpretation. */
-export function compareEpidemicRuns(baseline: ScenarioRun, variant: ScenarioRun): ScenarioComparisonView {
-  const result = compareScenarios(baseline, variant);
+/**
+ * Wraps a real `ScenarioCounterfactual` — the same counterfactual engine the
+ * first-person lab session and Scientific Memory already use to run and save
+ * baseline/variant pairs. This function computes nothing: `counterfactual`
+ * already carries both real runs, `compareScenarios`'s verdict, the measured
+ * divergence day, and a stable fingerprint a saved copy can be replayed
+ * against.
+ */
+export function compareEpidemicRuns(counterfactual: ScenarioCounterfactual): ScenarioComparisonView {
+  const result = counterfactual.comparison;
   const status: ComparisonStatus = result.status === 'COMPLETED' ? 'READY'
     : result.status === 'BLOCKED_NOT_MODELED' ? 'BLOCKED_NOT_MODELLED'
     : 'BLOCKED_NOT_COMPARABLE';
@@ -65,7 +90,10 @@ export function compareEpidemicRuns(baseline: ScenarioRun, variant: ScenarioRun)
     changedFactors: [...result.changedParameters, ...result.changedTiming, ...result.changedCapacity],
     metrics: result.metrics,
     message: result.message,
-    producedBy: `scenarioEngine.compareScenarios(${result.baselineScenario}, ${result.variantScenario})`,
+    producedBy: `scenarioCounterfactual.runScenarioCounterfactual(${result.baselineScenario}->${result.variantScenario})`,
+    evidence: status === 'READY'
+      ? { firstDivergentDay: counterfactual.firstDivergentDay, counterfactualFingerprint: counterfactual.counterfactualFingerprint }
+      : null,
   };
 }
 
@@ -84,7 +112,7 @@ export function compareHypothesisRanking(
     return {
       status: 'BLOCKED_NOT_COMPARABLE',
       baselineLabel: problem.candidateVariable, variantLabel: problem.candidateVariable,
-      changedFactors: [], metrics: [], producedBy,
+      changedFactors: [], metrics: [], producedBy, evidence: null,
       message: 'Fewer than two candidates ran — there is nothing to compare.',
     };
   }
@@ -92,7 +120,7 @@ export function compareHypothesisRanking(
     return {
       status: 'BLOCKED_NOT_COMPARABLE',
       baselineLabel: problem.candidateVariable, variantLabel: problem.candidateVariable,
-      changedFactors: [problem.candidateVariable], metrics: [], producedBy,
+      changedFactors: [problem.candidateVariable], metrics: [], producedBy, evidence: null,
       message: discrimination.reason,
     };
   }
@@ -116,5 +144,6 @@ export function compareHypothesisRanking(
     }],
     message: discrimination.reason,
     producedBy,
+    evidence: null,
   };
 }

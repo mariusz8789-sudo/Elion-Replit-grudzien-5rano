@@ -264,6 +264,23 @@ mechanism (an application-level test) rather than the never-applied
 per-`InstancedMesh` is cached across frames; every agent is re-tested fresh
 each `update()` call.
 
+## Fixed: highFidelitySlice3D.ts's getOrbitCameraDirection() allocated a fresh Vector3 every frame
+
+`useThreeLoop.ts`'s render loop calls `sim.getOrbitCameraDirection?.()`
+every single frame whenever an orbit target with a focus distance is
+active (see its own "Render-loop allocation audit finding" comment — the
+caller-side fix for this was already applied there, copying the result
+into a scratch vector immediately). The callee side wasn't: all three
+branches of `highFidelitySlice3D.ts`'s `getOrbitCameraDirection()` returned
+`new this.THREE.Vector3(...).normalize()`, allocating on every call even
+though the caller never retains the reference. `epidemicCity3D.ts`'s own
+version of this method already used a scratch vector
+(`this.scratchOrbitDirection`) — `highFidelitySlice3D.ts` now does too
+(same field name, same pattern). Verified in
+`highFidelitySlice3DOrbitDirection.test.ts`: repeated calls return the
+identical object reference, and the returned direction is still correct
+per camera mode.
+
 ## Known limitation of `InstancedMesh` itself, worked around above (not fixed via `frustumCulled`)
 
 `humanoidAgentVisual.ts`'s `InstancedHumanoidCrowd` sets `frustumCulled = false`

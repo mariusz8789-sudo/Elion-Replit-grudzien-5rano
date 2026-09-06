@@ -193,7 +193,10 @@ export class GenesisScientificCitySim implements Sim3D {
     if (!match) return { found: false, label: null };
     const entity = this.activeEngine.graph.getEntity(match.id);
     const position = entity.spatial?.position ?? { x: 0, y: 0, z: 0 };
-    const radius = match.kind === 'pump-pipe-system' ? 1.4 : 5;
+    // Radius roughly matching each real object's own visual footprint (see createPumpAssembly's
+    // body/motor/gauge extents) so MACRO framing stands just outside the geometry rather than
+    // clipping into it.
+    const radius = match.kind === 'pump-pipe-system' ? 2.2 : 5;
     this.lastSelectedId = match.id;
     if (!this.followTarget && this.THREE) this.followTarget = new this.THREE.Vector3();
     this.followTarget?.set(position.x, position.y + radius * 0.4, position.z);
@@ -333,15 +336,23 @@ export class GenesisScientificCitySim implements Sim3D {
   private resolveVisual(entity: C2Entity): EntityVisualSpec {
     const THREE = this.THREE!;
     if (entity.visualHint === 'pump-pipe-system' && this.pumpMaterials) {
+      // WorldFrameRenderer.applyTransform ALWAYS does `object.position.set(...entity.position)` —
+      // an absolute overwrite of the returned object's own position, applied AFTER this resolver
+      // runs (see its own module doc: "transform re-applied every sync()"). Every sub-part this
+      // assembly builds must therefore be positioned RELATIVE TO THE ENTITY'S OWN ORIGIN (0,0,0
+      // here), never at the entity's real absolute world position — passing the absolute position
+      // in as this local origin would double-apply it once the renderer sets the group's own
+      // position on top of already-absolute child coordinates.
+      const hospital = this.hospitalPosition();
+      const relativeHospital: THREE_NS.Vector3Tuple = [hospital[0] - entity.position[0], hospital[1] - entity.position[1], hospital[2] - entity.position[2]];
       const assembly = createPumpAssembly(THREE, {
-        position: entity.position,
+        position: [0, 0, 0],
         bodyMaterial: this.pumpMaterials.body, motorMaterial: this.pumpMaterials.motor,
         plinthMaterial: this.pumpMaterials.plinth, valveMaterial: this.pumpMaterials.valve, pipeMaterial: this.pumpMaterials.pipe,
-        pipeRuns: [{ to: this.hospitalPosition(), radius: 0.1 }],
+        pipeRuns: [{ to: relativeHospital, radius: 0.1 }],
       });
       const valve = createValveAssembly(THREE, {
-        position: [entity.position[0] + 1.4, entity.position[1] + 0.7, entity.position[2] - 0.4],
-        axis: [1, 0, 0], bodyMaterial: this.pumpMaterials.valve, handleMaterial: this.pumpMaterials.pipe,
+        position: [1.4, 0.7, -0.4], axis: [1, 0, 0], bodyMaterial: this.pumpMaterials.valve, handleMaterial: this.pumpMaterials.pipe,
       });
       assembly.group.add(valve.group);
       assembly.group.traverse((node) => { const mesh = node as THREE_NS.Mesh; if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; } });
@@ -349,8 +360,12 @@ export class GenesisScientificCitySim implements Sim3D {
     }
     if (entity.visualHint === 'building' && this.buildingMaterial) {
       const size = entity.id === this.city.hospitalBuildingId ? 6 : 4;
-      const box = new THREE.Mesh(new THREE.BoxGeometry(size, size * 0.9, size), this.buildingMaterial.clone());
-      box.position.y += (size * 0.9) / 2;
+      const geometry = new THREE.BoxGeometry(size, size * 0.9, size);
+      // Same "relative to the entity's own origin" rule as the pump assembly above — bake the
+      // base-vs-center offset into the GEOMETRY (translate once, at construction) rather than the
+      // mesh's own .position, since WorldFrameRenderer overwrites .position outright every sync.
+      geometry.translate(0, (size * 0.9) / 2, 0);
+      const box = new THREE.Mesh(geometry, this.buildingMaterial.clone());
       box.castShadow = true; box.receiveShadow = true;
       return { kind: 'object', object: box };
     }

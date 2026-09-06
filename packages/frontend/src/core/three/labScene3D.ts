@@ -88,7 +88,7 @@ function scientificFraming(kind: 'SCIENTIFIC' | 'ANOMALY' | 'REPLAY' | 'WIDE'): 
   // ~4.6 m przy FOV 50°) kadrowała ułamek 12x9,5 m hali — stąd wrażenie
   // pustego pokoju mimo gęstej zabudowy: sprzęt istniał, ale nigdy nie
   // wchodził w kadr. Podniesiony róg hali, spojrzenie po przekątnej.
-  if (kind === 'WIDE') return { position: [4.1, 2.5, 3.7], lookAt: [-0.1, 1.15, -0.4] };
+  if (kind === 'WIDE') return { position: [3.42, 1.72, 3.62], lookAt: [-0.22, 2.15, -1.15] };
   return { position: [2.2, 2.3, 3.0], lookAt };
 }
 
@@ -143,6 +143,136 @@ function makeFloorNoiseTexture(THREE: typeof THREE_NS): THREE_NS.Texture {
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   return texture;
+}
+
+/**
+ * WSPÓLNY SZUM WARTOŚCIOWY dla generatorów tekstur — jedna implementacja
+ * zamiast kopii w każdej funkcji. Interpolacja wygładzona (smoothstep), więc
+ * daje miękkie plamy, a nie kwadratową kratę.
+ */
+function valueNoise2D(x: number, y: number, scale: number, seed: number): number {
+  const raw = (px: number, py: number): number => {
+    const n = Math.sin(px * 12.9898 + py * 78.233 + seed) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  const sx = x / scale;
+  const sy = y / scale;
+  const x0 = Math.floor(sx);
+  const y0 = Math.floor(sy);
+  const fx = sx - x0;
+  const fy = sy - y0;
+  const ease = (t: number): number => t * t * (3 - 2 * t);
+  const ex = ease(fx);
+  const ey = ease(fy);
+  const top = raw(x0, y0) + (raw(x0 + 1, y0) - raw(x0, y0)) * ex;
+  const bottom = raw(x0, y0 + 1) + (raw(x0 + 1, y0 + 1) - raw(x0, y0 + 1)) * ex;
+  return top + (bottom - top) * ey;
+}
+
+interface WornSurfaceOptions {
+  /** Bazowa szorstkość materiału — mapa moduluje ją w górę i w dół. */
+  roughness: number;
+  /** Siła zabrudzeń/przetarć w albedo (0 = czysto, 1 = mocno zużyte). */
+  wear: number;
+  /** Pionowe zacieki — charakterystyczne dla metalu w hali przemysłowej. */
+  streaks?: boolean;
+  /** Ziarno, żeby dwa materiały o tym samym kolorze nie miały identycznego wzoru. */
+  seed?: number;
+}
+
+/**
+ * ALBEDO + ROUGHNESS JEDNEGO MATERIAŁU, wygenerowane razem i SKORELOWANE.
+ *
+ * To jest sedno różnicy między "proceduralną bryłą" a materiałem: prawdziwa
+ * powierzchnia nigdy nie ma jednego koloru ani jednej szorstkości. Ma plamy,
+ * przetarcia na krawędziach, osad w zagłębieniach i zacieki. Co ważne, te
+ * dwie mapy MUSZĄ być skorelowane — tam, gdzie osiadł brud, powierzchnia jest
+ * ciemniejsza I bardziej matowa; tam, gdzie jest wytarta, jaśniejsza I
+ * gładsza. Rozjechane mapy czytają się jak naklejka na plastiku.
+ *
+ * Generujemy jedną teksturę albedo w kolorze bazowym (a nie szarą maskę),
+ * więc materiał dostaje `map` zamiast płaskiego `color` — stąd bierze się
+ * zróżnicowanie, którego nie da żaden `MeshStandardMaterial({ color })`.
+ */
+function makeWornSurface(
+  THREE: typeof THREE_NS,
+  baseColor: number,
+  options: WornSurfaceOptions,
+): { map: THREE_NS.Texture; roughnessMap: THREE_NS.Texture } {
+  const size = 256;
+  const seed = options.seed ?? 1;
+  const albedoCanvas = document.createElement('canvas');
+  albedoCanvas.width = size;
+  albedoCanvas.height = size;
+  const roughCanvas = document.createElement('canvas');
+  roughCanvas.width = size;
+  roughCanvas.height = size;
+  const albedoCtx = albedoCanvas.getContext('2d')!;
+  const roughCtx = roughCanvas.getContext('2d')!;
+  const albedo = albedoCtx.createImageData(size, size);
+  const rough = roughCtx.createImageData(size, size);
+
+  const baseR = (baseColor >> 16) & 0xff;
+  const baseG = (baseColor >> 8) & 0xff;
+  const baseB = baseColor & 0xff;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      // Trzy skale: duże plamy (nierównomierność lakieru/osadu), średnie
+      // przetarcia, drobne ziarno. Suma daje wzór bez widocznej powtarzalności.
+      const broad = valueNoise2D(x, y, 74, seed);
+      const mid = valueNoise2D(x, y, 21, seed + 13);
+      const fine = valueNoise2D(x, y, 5, seed + 41);
+      let variation = broad * 0.55 + mid * 0.3 + fine * 0.15;
+
+      if (options.streaks) {
+        // Zacieki: szum mocno rozciągnięty w pionie, widoczny tylko miejscami.
+        const streak = valueNoise2D(x, y * 0.12, 17, seed + 77);
+        variation = variation * 0.72 + streak * 0.28;
+      }
+
+      // Zużycie jest NIESYMETRYCZNE: brud potrafi przyciemnić powierzchnię
+      // mocno, natomiast przetarcie nigdy jej nie rozjaśnia w tym samym
+      // stopniu — wypolerowany metal robi się JAŚNIEJSZY W ODBICIU (niższy
+      // roughness), a nie jaśniejszy w albedo. Symetryczny tint rozmywał
+      // materiały w jasną, mydlaną szarość; ta krzywa trzyma je w tonacji.
+      const signed = (variation - 0.5) * 2;
+      const tint = 1 + (signed < 0 ? signed * options.wear * 0.5 : signed * options.wear * 0.16);
+      // Wytarte miejsca tracą nasycenie (pigment schodzi pierwszy), więc
+      // przetarcie ściąga kolor do luminancji zamiast podbijać jego odcień.
+      const luma = (baseR * 0.299 + baseG * 0.587 + baseB * 0.114) * tint;
+      const desat = Math.max(0, signed) * options.wear * 0.35;
+      const mix = (channel: number): number => {
+        const tinted = channel * tint;
+        return Math.max(0, Math.min(255, tinted + (luma - tinted) * desat));
+      };
+      const index = (y * size + x) * 4;
+      albedo.data[index] = mix(baseR);
+      albedo.data[index + 1] = mix(baseG);
+      albedo.data[index + 2] = mix(baseB);
+      albedo.data[index + 3] = 255;
+
+      // Roughness ODWROTNIE skorelowany z jasnością albedo: ciemniejszy osad
+      // = bardziej matowo, jaśniejsze przetarcie = gładziej.
+      const roughValue = Math.max(0, Math.min(1, options.roughness + (0.5 - variation) * 0.55 * options.wear));
+      const roughByte = roughValue * 255;
+      rough.data[index] = roughByte;
+      rough.data[index + 1] = roughByte;
+      rough.data[index + 2] = roughByte;
+      rough.data[index + 3] = 255;
+    }
+  }
+  albedoCtx.putImageData(albedo, 0, 0);
+  roughCtx.putImageData(rough, 0, 0);
+
+  const map = new THREE.CanvasTexture(albedoCanvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+  const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+  roughnessMap.wrapS = THREE.RepeatWrapping;
+  roughnessMap.wrapT = THREE.RepeatWrapping;
+  return { map, roughnessMap };
 }
 
 /**
@@ -500,6 +630,23 @@ export class LabScene3D implements Sim3D {
     const brushedMetalTex = makeBrushedMetalTexture(THREE);
     const floorNoiseTex = makeFloorNoiseTexture(THREE);
     const surfaceNormalTex = makeSurfaceNormalTexture(THREE);
+    /**
+     * Albedo + roughness dla jednego materiału, z zadanym powtórzeniem.
+     * Zwraca gotowy fragment opisu materiału (`map`, `roughnessMap`,
+     * `roughness`), który rozpakowujemy do `MeshStandardMaterial`.
+     */
+    const wornFor = (
+      hex: number,
+      options: WornSurfaceOptions,
+      repeatX: number,
+      repeatY: number,
+    ): { map: THREE_NS.Texture; roughnessMap: THREE_NS.Texture; roughness: number } => {
+      const worn = makeWornSurface(THREE, hex, options);
+      worn.map.repeat.set(repeatX, repeatY);
+      worn.roughnessMap.repeat.set(repeatX, repeatY);
+      return { map: worn.map, roughnessMap: worn.roughnessMap, roughness: 1 };
+    };
+
     /** Klon mapy normalnych o własnym powtórzeniu — jedna tekstura, wiele skal. */
     const normalFor = (repeatX: number, repeatY: number): THREE_NS.Texture => {
       const tex = surfaceNormalTex.clone();
@@ -541,17 +688,45 @@ export class LabScene3D implements Sim3D {
     const roomHeight = 4.6;
     const roomCenterX = (ROOM.minX + ROOM.maxX) / 2;
     const roomCenterZ = (ROOM.minZ + ROOM.maxZ) / 2;
+    // Hala nie kończy się na ścianie za reaktorem. Za przegrodą ciągnie się
+    // druga, głębsza nawa (STREFA E) — to ona sprawia, że widz czyta OBIEKT,
+    // a nie pokój: przez przeszklenie widać rząd maszyn uciekający w mgłę.
+    const DEEP_BAY_DEPTH = 8.4;
+    const PARTITION_Z = ROOM.minZ - 0.05;
+    const shellDepth = roomDepth + DEEP_BAY_DEPTH;
+    const shellCenterZ = roomCenterZ - DEEP_BAY_DEPTH / 2;
     const shell = new THREE.Mesh(
-      new THREE.BoxGeometry(roomWidth, roomHeight, roomDepth),
-      new THREE.MeshStandardMaterial({ color: 0x232c40, roughness: 0.9, metalness: 0.05, side: THREE.BackSide }),
+      new THREE.BoxGeometry(roomWidth, roomHeight, shellDepth),
+      new THREE.MeshStandardMaterial({
+        ...(() => {
+          // Ściany to największa powierzchnia w kadrze — jednolity kolor od razu
+          // czyta się jak pudełko. Duże, miękkie plamy zabrudzenia rozbijają ją
+          // na płaszczyzny o różnej jasności, tak jak malowany beton w hali.
+          const worn = makeWornSurface(THREE, 0x232c40, { roughness: 0.92, wear: 0.7, streaks: true, seed: 5 });
+          worn.map.repeat.set(4, 2);
+          worn.roughnessMap.repeat.set(4, 2);
+          return { map: worn.map, roughnessMap: worn.roughnessMap, roughness: 1 };
+        })(),
+        metalness: 0.04, side: THREE.BackSide,
+      }),
     );
-    shell.position.set(roomCenterX, roomHeight / 2, roomCenterZ);
+    shell.position.set(roomCenterX, roomHeight / 2, shellCenterZ);
     scene.add(shell);
 
     floorNoiseTex.repeat.set(roomWidth / 1.4, roomDepth / 1.4);
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(roomWidth - 0.05, roomDepth - 0.05),
-      new THREE.MeshStandardMaterial({ color: 0x1b2233, roughness: 0.38, metalness: 0.3, roughnessMap: floorNoiseTex, normalMap: normalFor(14, 11), normalScale: new THREE.Vector2(0.28, 0.28) }),
+      new THREE.MeshStandardMaterial({
+        ...(() => {
+          // Posadzka żywiczna: przetarcia na ciągach komunikacyjnych, ciemniejszy
+          // osad przy krawędziach. Bez tego jest to jedna szara tafla.
+          const worn = makeWornSurface(THREE, 0x1b2233, { roughness: 0.42, wear: 0.62, seed: 17 });
+          worn.map.repeat.set(7, 6);
+          worn.roughnessMap.repeat.set(7, 6);
+          return { map: worn.map, roughnessMap: worn.roughnessMap, roughness: 1 };
+        })(),
+        metalness: 0.26, normalMap: normalFor(14, 11), normalScale: new THREE.Vector2(0.32, 0.32),
+      }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(roomCenterX, 0.01, roomCenterZ);
@@ -718,7 +893,7 @@ export class LabScene3D implements Sim3D {
       // ostre refleksy na krawędziach i czytelną sylwetkę aparatury.
       transmission: 0,
       transparent: true,
-      opacity: 0.26,
+      opacity: 0.12,
       ior: 1.5,
       clearcoat: 1,
       clearcoatRoughness: 0.03,
@@ -751,7 +926,7 @@ export class LabScene3D implements Sim3D {
       roughness: 0.04,
       metalness: 0,
       transparent: true,
-      opacity: 0.16,
+      opacity: 0.06,
       ior: 1.52,
       clearcoat: 0.8,
       clearcoatRoughness: 0.06,
@@ -768,7 +943,7 @@ export class LabScene3D implements Sim3D {
 
     // Czoła szczeliny: widoczny PRZEKRÓJ szkła u góry i u dołu płaszcza.
     const glassEdgeMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0xcfe6f7, roughness: 0.12, metalness: 0, transparent: true, opacity: 0.5,
+      color: 0xcfe6f7, roughness: 0.12, metalness: 0, transparent: true, opacity: 0.34,
       clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.8, side: THREE.DoubleSide,
     });
     for (const edgeY of [VESSEL_HALF_HEIGHT - 0.015, -(VESSEL_HALF_HEIGHT - 0.015)]) {
@@ -787,7 +962,7 @@ export class LabScene3D implements Sim3D {
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         side: THREE.DoubleSide,
-        uniforms: { uColor: { value: new THREE.Color(0xbfe4ff) }, uPower: { value: 2.6 }, uStrength: { value: 0.5 } },
+        uniforms: { uColor: { value: new THREE.Color(0xbfe4ff) }, uPower: { value: 3.8 }, uStrength: { value: 0.34 } },
         vertexShader: /* glsl */`
           varying vec3 vNormalView;
           varying vec3 vPositionView;
@@ -1166,14 +1341,39 @@ export class LabScene3D implements Sim3D {
     // sceny rośnie bez proporcjonalnego wzrostu liczby draw calls.
     // ==================================================================
     const MAT = {
-      steel: new THREE.MeshStandardMaterial({ color: 0x8a93a6, roughness: 0.32, metalness: 0.92, roughnessMap: brushedFor(3, 3), normalMap: normalFor(3, 3), normalScale: new THREE.Vector2(0.22, 0.22) }),
-      darkSteel: new THREE.MeshStandardMaterial({ color: 0x39415a, roughness: 0.5, metalness: 0.75, roughnessMap: brushedFor(2, 2), normalMap: normalFor(2, 2), normalScale: new THREE.Vector2(0.3, 0.3) }),
-      chrome: new THREE.MeshStandardMaterial({ color: 0xc8d4e6, roughness: 0.08, metalness: 1, envMapIntensity: 1.6 }),
-      worktop: new THREE.MeshStandardMaterial({ color: 0x22283a, roughness: 0.62, metalness: 0.15, normalMap: normalFor(4, 2), normalScale: new THREE.Vector2(0.2, 0.2) }),
-      plastic: new THREE.MeshStandardMaterial({ color: 0x2a3350, roughness: 0.78, metalness: 0.05, normalMap: normalFor(2, 2), normalScale: new THREE.Vector2(0.16, 0.16) }),
-      rubber: new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.95, metalness: 0 }),
-      ceramic: new THREE.MeshStandardMaterial({ color: 0xd8e2ee, roughness: 0.42, metalness: 0.04 }),
-      copper: new THREE.MeshStandardMaterial({ color: 0xb87a4a, roughness: 0.3, metalness: 0.95 }),
+      // Każdy materiał dostaje WŁASNE albedo + skorelowany roughness zamiast
+      // jednego płaskiego koloru — to jest różnica między "bryłą w kolorze
+      // stali" a stalą. `wear` steruje tym, jak zużyta jest powierzchnia:
+      // konstrukcja i podłoga są brudne, chrom i ceramika prawie czyste.
+      steel: new THREE.MeshStandardMaterial({
+        ...wornFor(0x8a93a6, { roughness: 0.34, wear: 0.55, streaks: true, seed: 3 }, 3, 3),
+        metalness: 0.9, normalMap: normalFor(3, 3), normalScale: new THREE.Vector2(0.26, 0.26),
+      }),
+      darkSteel: new THREE.MeshStandardMaterial({
+        ...wornFor(0x39415a, { roughness: 0.52, wear: 0.6, streaks: true, seed: 9 }, 2, 2),
+        metalness: 0.72, normalMap: normalFor(2, 2), normalScale: new THREE.Vector2(0.34, 0.34),
+      }),
+      chrome: new THREE.MeshStandardMaterial({
+        ...wornFor(0xc8d4e6, { roughness: 0.1, wear: 0.18, seed: 21 }, 2, 2),
+        metalness: 1, envMapIntensity: 1.6,
+      }),
+      worktop: new THREE.MeshStandardMaterial({
+        ...wornFor(0x22283a, { roughness: 0.62, wear: 0.5, seed: 33 }, 4, 2),
+        metalness: 0.14, normalMap: normalFor(4, 2), normalScale: new THREE.Vector2(0.24, 0.24),
+      }),
+      plastic: new THREE.MeshStandardMaterial({
+        ...wornFor(0x2a3350, { roughness: 0.78, wear: 0.32, seed: 47 }, 2, 2),
+        metalness: 0.04, normalMap: normalFor(2, 2), normalScale: new THREE.Vector2(0.18, 0.18),
+      }),
+      rubber: new THREE.MeshStandardMaterial({
+        ...wornFor(0x14181f, { roughness: 0.95, wear: 0.4, seed: 59 }, 3, 3), metalness: 0,
+      }),
+      ceramic: new THREE.MeshStandardMaterial({
+        ...wornFor(0xd8e2ee, { roughness: 0.44, wear: 0.16, seed: 71 }, 2, 2), metalness: 0.04,
+      }),
+      copper: new THREE.MeshStandardMaterial({
+        ...wornFor(0xb87a4a, { roughness: 0.32, wear: 0.45, streaks: true, seed: 83 }, 2, 2), metalness: 0.92,
+      }),
       display: new THREE.MeshStandardMaterial({ color: 0x0d2233, emissive: 0x3fc7ff, emissiveIntensity: 0.55, roughness: 0.24 }),
       amberLed: new THREE.MeshStandardMaterial({ color: 0x100c06, emissive: 0xffb545, emissiveIntensity: 1.1, roughness: 0.4 }),
       panelGlass: new THREE.MeshPhysicalMaterial({ color: 0x9fc4e8, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.18, clearcoat: 1, envMapIntensity: 1.8, depthWrite: false }),
@@ -1833,9 +2033,9 @@ export class LabScene3D implements Sim3D {
     };
 
     /** Prostokątny kanał wentylacyjny z segmentami i kołnierzami — infrastruktura sufitowa. */
-    const addDuctRun = (y: number, z: number, x1: number, x2: number, size: number): void => {
+    const addDuctRun = (y: number, z: number, x1: number, x2: number, size: number, material: THREE_NS.Material = MAT.steel): void => {
       const length = Math.abs(x2 - x1);
-      const duct = new THREE.Mesh(new THREE.BoxGeometry(length, size, size), MAT.steel);
+      const duct = new THREE.Mesh(new THREE.BoxGeometry(length, size, size), material);
       duct.position.set((x1 + x2) / 2, y, z);
       scene.add(duct);
       const joints = Math.max(2, Math.floor(length / 1.8));
@@ -1904,7 +2104,7 @@ export class LabScene3D implements Sim3D {
         scene.add(hanger);
       }
       // Realne źródło skierowane w komorę — aparatura oświetla samą siebie.
-      const chamberLight = new THREE.SpotLight(0xf2f8ff, 42, 6.0, Math.PI / 3.2, 0.6, 1.3);
+      const chamberLight = new THREE.SpotLight(0xf2f8ff, 19, 5.2, Math.PI / 3.6, 0.7, 1.5);
       chamberLight.position.set(VESSEL_POSITION[0], rigY - 0.12, VESSEL_POSITION[2]);
       chamberLight.target.position.set(VESSEL_POSITION[0], 0.2, VESSEL_POSITION[2]);
       scene.add(chamberLight, chamberLight.target);
@@ -1979,29 +2179,34 @@ export class LabScene3D implements Sim3D {
     addInstrumentStack(1.6, 1.6, 3.62, Math.PI, 4);
 
     // --- Infrastruktura sufitowa: kanały wentylacyjne wzdłuż hali ---
-    addDuctRun(roomHeight - 1.05, -2.1, -5.6, 5.6, 0.34);
-    addDuctRun(roomHeight - 1.05, 2.3, -5.6, 2.4, 0.26);
+    addDuctRun(roomHeight - 1.05, -2.1, -5.6, 5.6, 0.34, MAT.darkSteel);
+    addDuctRun(roomHeight - 1.05, 2.3, -5.6, 2.4, 0.26, MAT.darkSteel);
 
     // --- Szyny serwisowe na ścianach (spójny system, ta sama wysokość) ---
-    addServiceRail(2.42, -4.42, -5.4, 5.4);
+    addServiceRail(2.42, PARTITION_Z + 0.08, -5.5, -3.75);
+    addServiceRail(2.42, PARTITION_Z + 0.08, 3.75, 5.5);
     addServiceRail(2.42, 4.32, -5.4, 3.2);
 
     // --- Pierwszy plan przy kadrze otwierającym: barierka + stojak aparatury,
     //     które dają paralaksę i skalę zamiast pustej podłogi na dole kadru. ---
     const foreRailMat = MAT.steel;
-    for (let i = 0; i < 4; i++) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 1.05, 10), foreRailMat);
-      post.position.set(2.35 + i * 0.78, 0.52, 2.75 - i * 0.12);
+    for (let i = 0; i < 6; i++) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.08, 10), foreRailMat);
+      post.position.set(0.9 + i * 0.76, 0.54, 3.42 - i * 0.11);
       scene.add(post);
     }
-    const foreRailTop = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.045, 0.045), foreRailMat);
-    foreRailTop.position.set(3.5, 1.03, 2.57);
-    foreRailTop.rotation.y = 0.153;
+    const foreRailTop = new THREE.Mesh(new THREE.BoxGeometry(3.95, 0.05, 0.05), foreRailMat);
+    foreRailTop.position.set(2.8, 1.06, 3.15);
+    foreRailTop.rotation.y = 0.145;
     scene.add(foreRailTop);
-    const foreRailMid = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.03, 0.03), foreRailMat);
-    foreRailMid.position.set(3.5, 0.68, 2.57);
-    foreRailMid.rotation.y = 0.153;
+    const foreRailMid = new THREE.Mesh(new THREE.BoxGeometry(3.95, 0.032, 0.032), foreRailMat);
+    foreRailMid.position.set(2.8, 0.7, 3.15);
+    foreRailMid.rotation.y = 0.145;
     scene.add(foreRailMid);
+    const foreKick = new THREE.Mesh(new THREE.BoxGeometry(3.95, 0.14, 0.03), MAT.darkSteel);
+    foreKick.position.set(2.8, 0.13, 3.15);
+    foreKick.rotation.y = 0.145;
+    scene.add(foreKick);
     addInstrumentStack(4.35, 1.0, 1.35, -1.15, 4);
 
     // ==================================================================
@@ -2171,8 +2376,10 @@ export class LabScene3D implements Sim3D {
       addTechPanel(-5.92, 1.9, -3.2 + i * 1.9, Math.PI / 2, 0.72, 0.5, i);
       addTechPanel(5.92, 1.9, -3.4 + i * 1.9, -Math.PI / 2, 0.72, 0.5, i + 3);
     }
-    for (let i = 0; i < 5; i++) {
-      addTechPanel(-4.4 + i * 2.2, 2.05, -4.46, 0, 0.66, 0.46, i + 1);
+    // Na tylnej ścianie zostaje tylko to, co mieści się OBOK przeszklenia
+    // strefy E — inaczej panele wisiałyby w świetle otworu.
+    for (const [pi, px] of [-5.3, -4.45, 4.45, 5.3].entries()) {
+      addTechPanel(px, 2.05, PARTITION_Z + 0.06, 0, 0.66, 0.46, pi + 1);
     }
     for (let i = 0; i < 3; i++) {
       addTechPanel(-3.4 + i * 2.6, 2.05, 4.36, Math.PI, 0.66, 0.46, i + 4);
@@ -2182,7 +2389,7 @@ export class LabScene3D implements Sim3D {
       addJunctionBox(-5.86, 1.15, -3.2 + i * 1.9, Math.PI / 2, i);
       addJunctionBox(5.86, 1.15, -3.4 + i * 1.9, -Math.PI / 2, i + 2);
     }
-    for (let i = 0; i < 4; i++) addJunctionBox(-3.8 + i * 2.4, 1.2, -4.4, 0, i + 1);
+    for (const [ji, jx] of [-5.25, -4.5, 4.5, 5.25].entries()) addJunctionBox(jx, 1.2, PARTITION_Z + 0.06, 0, ji + 1);
     // --- Zawory na rurociągach przy ścianach ---
     for (let i = 0; i < 5; i++) addWallValve(-4.6 + i * 2.3, roomHeight - 0.95, -3.9, 0);
     for (let i = 0; i < 3; i++) addWallValve(-2.4 + i * 2.6, roomHeight - 1.35, 3.9, Math.PI);
@@ -2288,6 +2495,525 @@ export class LabScene3D implements Sim3D {
     addContactShadow(0, 0.75, 0.45, 0.8);
 
     // ==================================================================
+    // PRZEBUDOWA HERO + STREFA E: z "pokoju ze szklanym walcem" na OBIEKT.
+    //
+    // Dwa braki decydowały o tym, że kadr czytał się jak makieta, a nie jak
+    // instalacja badawcza:
+    //  1. Aparatura centralna była JEDNYM naczyniem. Prawdziwy reaktor to
+    //     zespół: cokół, płaszcz, głowica z napędem, kolektor, szafa
+    //     zasilania, pomost serwisowy, wiązka kabli. Sylwetka musi mieć
+    //     kilka pięter, nie jedno.
+    //  2. Hala kończyła się ścianą tuż za aparaturą. Referencyjne wnętrza
+    //     są głębokie: za pierwszą nawą widać drugą, uciekającą w mgłę.
+    //     Dopiero to daje wrażenie OBIEKTU większego niż kadr.
+    // ==================================================================
+
+    /** Element konstrukcyjny między dwoma punktami — ukosy, stężenia, cięgna. */
+    const addStrut = (
+      from: THREE_NS.Vector3Tuple, to: THREE_NS.Vector3Tuple,
+      thickness: number, material: THREE_NS.Material,
+    ): void => {
+      const a = new THREE.Vector3(...from);
+      const b = new THREE.Vector3(...to);
+      const length = a.distanceTo(b);
+      const strut = new THREE.Mesh(new THREE.BoxGeometry(thickness, length, thickness), material);
+      strut.position.copy(a).add(b).multiplyScalar(0.5);
+      strut.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        b.clone().sub(a).normalize(),
+      );
+      scene.add(strut);
+    };
+
+    const VX = VESSEL_POSITION[0];
+    const VZ = VESSEL_POSITION[2];
+    const VESSEL_TOP = VESSEL_POSITION[1] + VESSEL_HALF_HEIGHT;
+
+    // --- Światło konturowe zza aparatury: bez niego reaktor zlewa się z tłem ---
+    const heroRimLight = new THREE.SpotLight(0x9fd0ff, 26, 11, Math.PI / 5, 0.55, 1.2);
+    heroRimLight.position.set(VESSEL_POSITION[0] - 2.9, 3.5, VESSEL_POSITION[2] - 3.4);
+    heroRimLight.target.position.set(VESSEL_POSITION[0], 1.6, VESSEL_POSITION[2]);
+    scene.add(heroRimLight.target);
+    scene.add(heroRimLight);
+
+    // --- Cokół schodkowy: maszyna stoi NA CZYMŚ, nie unosi się nad podłogą ---
+    for (const [tierRadius, tierY, tierHeight, tierMat] of [
+      [1.74, 0.03, 0.06, MAT.darkSteel], [1.62, 0.09, 0.06, MAT.steel], [1.5, 0.15, 0.06, MAT.darkSteel],
+    ] as const) {
+      const tier = new THREE.Mesh(new THREE.CylinderGeometry(tierRadius, tierRadius + 0.02, tierHeight, 40), tierMat);
+      tier.position.set(VX, tierY, VZ);
+      scene.add(tier);
+    }
+    addBoltRing(VX, 0.19, VZ, 1.44, 24);
+
+    // --- Głowica reaktora: kołnierz, dennica, napęd mieszadła, przekładnia ---
+    const headFlange = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 1.02, 0.14, 40), MAT.steel);
+    headFlange.position.set(VX, VESSEL_TOP + 0.07, VZ);
+    scene.add(headFlange);
+    addBoltRing(VX, VESSEL_TOP + 0.15, VZ, 0.93, 20);
+    const headDome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.86, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2),
+      MAT.steel,
+    );
+    headDome.scale.y = 0.52;
+    headDome.position.set(VX, VESSEL_TOP + 0.13, VZ);
+    scene.add(headDome);
+    const gearbox = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.3, 0.38), MAT.darkSteel);
+    gearbox.position.set(VX, VESSEL_TOP + 0.72, VZ);
+    scene.add(gearbox);
+    const driveMotor = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.46, 20), MAT.steel);
+    driveMotor.position.set(VX, VESSEL_TOP + 1.11, VZ);
+    scene.add(driveMotor);
+    for (let f = 0; f < 12; f++) {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.4, 0.012), MAT.darkSteel);
+      const fa = (f / 12) * Math.PI * 2;
+      fin.position.set(VX + Math.cos(fa) * 0.2, VESSEL_TOP + 1.11, VZ + Math.sin(fa) * 0.2);
+      fin.rotation.y = -fa;
+      scene.add(fin);
+    }
+    const motorCap = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.19, 0.06, 20), MAT.chrome);
+    motorCap.position.set(VX, VESSEL_TOP + 1.37, VZ);
+    scene.add(motorCap);
+
+    // --- Sześć króćców z głowicy: w bok, w dół, do kolektora obwodowego ---
+    const manifoldY = 0.62;
+    const manifold = new THREE.Mesh(new THREE.TorusGeometry(1.46, 0.05, 10, 44), MAT.steel);
+    manifold.rotation.x = Math.PI / 2;
+    manifold.position.set(VX, manifoldY, VZ);
+    scene.add(manifold);
+    for (let n = 0; n < 6; n++) {
+      const na = (n / 6) * Math.PI * 2 + 0.26;
+      const cos = Math.cos(na);
+      const sin = Math.sin(na);
+      const nozzleY = VESSEL_TOP + 0.07;
+      const run = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.56, 10), n % 2 === 0 ? MAT.steel : MAT.copper);
+      run.rotation.z = Math.PI / 2;
+      run.rotation.y = -na;
+      run.position.set(VX + cos * 1.2, nozzleY, VZ + sin * 1.2);
+      scene.add(run);
+      const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), MAT.chrome);
+      elbow.position.set(VX + cos * 1.46, nozzleY, VZ + sin * 1.46);
+      scene.add(elbow);
+      const dropHeight = nozzleY - manifoldY;
+      const drop = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.042, 0.042, dropHeight, 10),
+        n % 2 === 0 ? MAT.steel : MAT.copper,
+      );
+      drop.position.set(VX + cos * 1.46, manifoldY + dropHeight / 2, VZ + sin * 1.46);
+      scene.add(drop);
+      const tap = new THREE.Mesh(GEO.flange, MAT.chrome);
+      tap.position.set(VX + cos * 1.46, manifoldY + dropHeight * 0.55, VZ + sin * 1.46);
+      scene.add(tap);
+      const nozzleLed = new THREE.Mesh(ledGeo, ledPalette[n % ledPalette.length]);
+      nozzleLed.position.set(VX + cos * 1.52, manifoldY + 0.34, VZ + sin * 1.52);
+      nozzleLed.rotation.y = -na;
+      scene.add(nozzleLed);
+    }
+
+    // --- Osiem zbiorników procesowych wokół cokołu (media, bufory, próbki) ---
+    for (let c = 0; c < 8; c++) {
+      const ca = (c / 8) * Math.PI * 2 + 0.39;
+      const cx = VX + Math.cos(ca) * 1.34;
+      const cz = VZ + Math.sin(ca) * 1.34;
+      const canister = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.6, 14), c % 3 === 0 ? MAT.copper : MAT.steel);
+      canister.position.set(cx, 0.5, cz);
+      scene.add(canister);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.095, 0.05, 14), MAT.darkSteel);
+      cap.position.set(cx, 0.82, cz);
+      scene.add(cap);
+      const sight = new THREE.Mesh(
+        new THREE.BoxGeometry(0.03, 0.34, 0.012),
+        new THREE.MeshBasicMaterial({ color: c % 2 === 0 ? 0x63e0b4 : 0x63b4e0, transparent: true, opacity: 0.9 }),
+      );
+      sight.position.set(cx + Math.cos(ca) * 0.098, 0.5, cz + Math.sin(ca) * 0.098);
+      sight.rotation.y = -ca;
+      scene.add(sight);
+    }
+
+    // --- Stężenia krzyżowe ramy nośnej: konstrukcja, nie cztery patyki ---
+    {
+      const d = 1.28 * Math.SQRT1_2 * 1.35;
+      const feet: THREE_NS.Vector3Tuple[] = [[-d, 0, 0], [0, 0, -d], [d, 0, 0], [0, 0, d]];
+      for (let i = 0; i < 4; i++) {
+        const a = feet[i];
+        const b = feet[(i + 1) % 4];
+        const ax = VX + a[0];
+        const az = VZ + a[2];
+        const bx = VX + b[0];
+        const bz = VZ + b[2];
+        addStrut([ax, 0.95, az], [bx, 2.35, bz], 0.05, MAT.darkSteel);
+        addStrut([ax, 2.35, az], [bx, 0.95, bz], 0.05, MAT.darkSteel);
+        // Belka obwodowa u góry ramy — domyka konstrukcję.
+        addStrut([ax, 2.98, az], [bx, 2.98, bz], 0.075, MAT.steel);
+        addStrut([ax, 0.92, az], [bx, 0.92, bz], 0.055, MAT.darkSteel);
+      }
+    }
+
+    // --- Pomost serwisowy wokół aparatury: skala człowieka na wysokości ---
+    const platformY = 2.42;
+    // Pomost jest OTWARTY od strony kadru otwierającego (ćwiartka bez podestu
+    // i bez barierki): pełny pierścień zasłaniał komorę poziomą kreską dokładnie
+    // na wysokości oczu. Realne pomosty i tak mają wycięcie na dostęp.
+    const PLATFORM_GAP_CENTER = Math.PI / 4;
+    const PLATFORM_GAP_HALF = 0.98;
+    const inPlatformGap = (worldAngle: number): boolean => {
+      let delta = worldAngle - PLATFORM_GAP_CENTER;
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      return Math.abs(delta) < PLATFORM_GAP_HALF;
+    };
+    const grating = new THREE.Mesh(
+      new THREE.RingGeometry(1.3, 2.02, 44, 1, 0, Math.PI * 1.5),
+      new THREE.MeshStandardMaterial({
+        ...wornFor(0x4a5568, { roughness: 0.68, wear: 0.6, seed: 101 }, 6, 6),
+        metalness: 0.85, side: THREE.DoubleSide,
+        normalMap: normalFor(8, 8), normalScale: new THREE.Vector2(0.5, 0.5),
+      }),
+    );
+    grating.rotation.x = -Math.PI / 2;
+    grating.position.set(VX, platformY, VZ);
+    scene.add(grating);
+    const kickPlate = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.02, 2.02, 0.09, 44, 1, true, Math.PI / 2, Math.PI * 1.5),
+      MAT.darkSteel,
+    );
+    kickPlate.position.set(VX, platformY + 0.045, VZ);
+    scene.add(kickPlate);
+    for (let r = 0; r < 20; r++) {
+      const ra = (r / 20) * Math.PI * 2;
+      if (inPlatformGap(ra)) continue;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.0, 8), MAT.steel);
+      post.position.set(VX + Math.cos(ra) * 1.98, platformY + 0.5, VZ + Math.sin(ra) * 1.98);
+      scene.add(post);
+    }
+    for (const railY of [platformY + 0.98, platformY + 0.6]) {
+      const rail = new THREE.Mesh(
+        new THREE.TorusGeometry(1.98, railY > platformY + 0.8 ? 0.026 : 0.018, 8, 44, Math.PI * 1.5),
+        MAT.steel,
+      );
+      rail.rotation.x = Math.PI / 2;
+      rail.position.set(VX, railY, VZ);
+      scene.add(rail);
+    }
+    // Drabina serwisowa z podłogi na pomost.
+    for (const side of [-0.22, 0.22]) {
+      const stringer = new THREE.Mesh(new THREE.BoxGeometry(0.035, platformY + 0.5, 0.035), MAT.steel);
+      stringer.position.set(VX - 2.0 + side * 0.0, (platformY + 0.5) / 2, VZ + 1.32 + side);
+      scene.add(stringer);
+    }
+    for (let rung = 0; rung < 8; rung++) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.46), MAT.chrome);
+      bar.position.set(VX - 2.0, 0.3 + rung * 0.29, VZ + 1.32);
+      scene.add(bar);
+    }
+    // Listwa LED wzdłuż krawędzi pomostu — rysuje jego okrąg w ciemności.
+    for (let i = 0; i < 40; i++) {
+      const a = (i / 40) * Math.PI * 2;
+      if (inPlatformGap(a)) continue;
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.014, 0.024), stripCyan);
+      seg.position.set(VX + Math.cos(a) * 2.03, platformY - 0.02, VZ + Math.sin(a) * 2.03);
+      seg.rotation.y = -a;
+      scene.add(seg);
+    }
+
+    // --- Wiązka kabli z głowicy do szafy zasilania: masa i ciężar instalacji ---
+    for (let k = 0; k < 6; k++) {
+      const ka = 2.1 + k * 0.09;
+      addCable(
+        [VX + Math.cos(ka) * 0.95, VESSEL_TOP + 0.2, VZ + Math.sin(ka) * 0.95],
+        [-2.42, 1.35 + k * 0.045, VZ - 0.42],
+        0.32 + k * 0.03,
+        0.017,
+      );
+    }
+    for (let k = 0; k < 4; k++) {
+      addCable(
+        [VX + 1.46, manifoldY + 0.5, VZ + (k - 1.5) * 0.06],
+        [3.0, 1.1 + k * 0.05, VZ - 1.1],
+        0.24,
+        0.015,
+      );
+    }
+
+    // --- Wnętrze komory: nie ma być pustej rury ---
+    const chamberLed = new THREE.MeshBasicMaterial({ color: 0x8ff0ff, transparent: true, opacity: 0.85 });
+    for (const ringY of [-0.55, 0.05, 0.62]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.009, 6, 36), chamberLed);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(VX, VESSEL_POSITION[1] + ringY, VZ);
+      scene.add(ring);
+    }
+    // Trzecia taca hodowlana + fiolki na tacach: wnętrze ma zawartość naukową.
+    const cultureTrayMat = new THREE.MeshStandardMaterial({ color: 0x9fb4cc, roughness: 0.3, metalness: 0.85, side: THREE.DoubleSide });
+    const vialMat = new THREE.MeshPhysicalMaterial({
+      color: 0xc9e6ff, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.45, clearcoat: 1,
+    });
+    const vialFill = new THREE.MeshBasicMaterial({ color: 0x57d8a8, transparent: true, opacity: 0.75 });
+    for (const [trayY, vials] of [[-0.55, 8], [0.05, 8], [0.62, 6]] as const) {
+      const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.014, 32), cultureTrayMat);
+      tray.position.set(VX, VESSEL_POSITION[1] + trayY, VZ);
+      scene.add(tray);
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.012, 6, 32), cultureTrayMat);
+      lip.rotation.x = Math.PI / 2;
+      lip.position.set(VX, VESSEL_POSITION[1] + trayY + 0.02, VZ);
+      scene.add(lip);
+      for (let v = 0; v < vials; v++) {
+        const va = (v / vials) * Math.PI * 2 + trayY;
+        const vx = VX + Math.cos(va) * 0.42;
+        const vz = VZ + Math.sin(va) * 0.42;
+        const vial = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.1, 10), vialMat);
+        vial.position.set(vx, VESSEL_POSITION[1] + trayY + 0.06, vz);
+        scene.add(vial);
+        const fill = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.055, 10), vialFill);
+        fill.position.set(vx, VESSEL_POSITION[1] + trayY + 0.038, vz);
+        scene.add(fill);
+      }
+    }
+    // Wiązka sond zwieszona z głowicy na różne głębokości.
+    for (let p = 0; p < 5; p++) {
+      const pa = (p / 5) * Math.PI * 2 + 0.7;
+      const depth = 0.5 + p * 0.22;
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, depth, 8), MAT.chrome);
+      rod.position.set(VX + Math.cos(pa) * 0.55, VESSEL_TOP - depth / 2 - 0.05, VZ + Math.sin(pa) * 0.55);
+      scene.add(rod);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), ledPalette[p % ledPalette.length]);
+      tip.position.set(VX + Math.cos(pa) * 0.55, VESSEL_TOP - depth - 0.05, VZ + Math.sin(pa) * 0.55);
+      scene.add(tip);
+    }
+
+    // ==================================================================
+    // STREFA E — DRUGA NAWA ZA PRZESZKLONĄ PRZEGRODĄ.
+    // Przegroda ma realną stolarkę (rygle, słupki, szyby), a za nią hala
+    // ciągnie się jeszcze osiem metrów: rzędy szaf, słupy konstrukcyjne,
+    // suwnica i drugi, odległy reaktor. Nic z tego nie jest interaktywne —
+    // to warstwa GŁĘBI, która ma się czytać jako reszta obiektu.
+    // ==================================================================
+    const bayFrameMat = MAT.darkSteel;
+    const partitionGlass = new THREE.MeshPhysicalMaterial({
+      color: 0x8fb8dd, roughness: 0.09, metalness: 0, transparent: true, opacity: 0.14,
+      clearcoat: 1, clearcoatRoughness: 0.06, ior: 1.5, envMapIntensity: 1.6,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const OPENING_HALF = 4.05;
+    // Pełne fragmenty ściany po bokach otworu.
+    for (const sideSign of [-1, 1]) {
+      const solidWidth = ROOM.maxX - OPENING_HALF;
+      const solid = new THREE.Mesh(new THREE.BoxGeometry(solidWidth, roomHeight, 0.16), bayFrameMat);
+      solid.position.set(sideSign * (OPENING_HALF + solidWidth / 2), roomHeight / 2, PARTITION_Z);
+      scene.add(solid);
+    }
+    // Rygiel dolny i nadproże.
+    const sillHeight = 0.62;
+    const lintelHeight = 0.55;
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(OPENING_HALF * 2, sillHeight, 0.2), bayFrameMat);
+    sill.position.set(0, sillHeight / 2, PARTITION_Z);
+    scene.add(sill);
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(OPENING_HALF * 2, lintelHeight, 0.2), bayFrameMat);
+    lintel.position.set(0, roomHeight - lintelHeight / 2, PARTITION_Z);
+    scene.add(lintel);
+    const glazedHeight = roomHeight - sillHeight - lintelHeight;
+    const glazedCenterY = sillHeight + glazedHeight / 2;
+    // Słupki podziału + szyby między nimi.
+    for (let m = 0; m <= 4; m++) {
+      const mx = -OPENING_HALF + (m / 4) * OPENING_HALF * 2;
+      const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.1, glazedHeight, 0.18), bayFrameMat);
+      mullion.position.set(mx, glazedCenterY, PARTITION_Z);
+      scene.add(mullion);
+    }
+    const transom = new THREE.Mesh(new THREE.BoxGeometry(OPENING_HALF * 2, 0.08, 0.16), bayFrameMat);
+    transom.position.set(0, sillHeight + glazedHeight * 0.66, PARTITION_Z);
+    scene.add(transom);
+    const glazing = new THREE.Mesh(new THREE.PlaneGeometry(OPENING_HALF * 2 - 0.1, glazedHeight - 0.06), partitionGlass);
+    glazing.position.set(0, glazedCenterY, PARTITION_Z);
+    scene.add(glazing);
+    // Listwa ostrzegawcza na ryglu — ten sam język, co przy reaktorze.
+    addLightStrip(0, sillHeight + 0.04, PARTITION_Z + 0.11, OPENING_HALF * 2, 'x', stripWarm, 0.02);
+
+    // Posadzka drugiej nawy — ciemniejsza, bardziej matowa niż strefa robocza.
+    const deepFloor = new THREE.Mesh(
+      new THREE.PlaneGeometry(roomWidth - 0.05, DEEP_BAY_DEPTH),
+      new THREE.MeshStandardMaterial({
+        ...wornFor(0x141a28, { roughness: 0.6, wear: 0.5, seed: 133 }, 6, 6),
+        metalness: 0.2, normalMap: normalFor(10, 8), normalScale: new THREE.Vector2(0.28, 0.28),
+      }),
+    );
+    deepFloor.rotation.x = -Math.PI / 2;
+    deepFloor.position.set(roomCenterX, 0.008, ROOM.minZ - DEEP_BAY_DEPTH / 2);
+    scene.add(deepFloor);
+
+    // Rytm konstrukcyjny: słupy i belki uciekające w głąb — to one budują
+    // perspektywę, bez nich druga nawa byłaby płaskim tłem.
+    const deepStripMat = new THREE.MeshBasicMaterial({ color: 0xe6f1ff });
+    for (let b = 0; b < 5; b++) {
+      const bz = ROOM.minZ - 1.5 - b * 1.72;
+      for (const cx of [-4.3, 4.3]) {
+        const column = new THREE.Mesh(new THREE.BoxGeometry(0.24, roomHeight, 0.24), MAT.darkSteel);
+        column.position.set(cx, roomHeight / 2, bz);
+        scene.add(column);
+      }
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(8.9, 0.3, 0.16), MAT.darkSteel);
+      beam.position.set(0, roomHeight - 0.42, bz);
+      scene.add(beam);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.09, 0.2), deepStripMat);
+      bar.position.set(0, roomHeight - 0.72, bz);
+      scene.add(bar);
+      // Dwa światła na całą nawę — reszta rytmu to emisja, nie koszt świateł.
+      if (b === 0 || b === 2 || b === 4) {
+        const deepLamp = new THREE.PointLight(0xcfe2ff, 20, 13, 2);
+        deepLamp.position.set(0, roomHeight - 1.0, bz);
+        scene.add(deepLamp);
+      }
+    }
+    // Szyna suwnicy przez całą drugą nawę + wózek.
+    for (const rx of [-4.0, 4.0]) {
+      const craneRail = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.22, DEEP_BAY_DEPTH), MAT.steel);
+      craneRail.position.set(rx, roomHeight - 0.95, ROOM.minZ - DEEP_BAY_DEPTH / 2);
+      scene.add(craneRail);
+    }
+    const craneBridge = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.3, 0.42), MAT.steel);
+    craneBridge.position.set(0, roomHeight - 1.05, ROOM.minZ - 3.4);
+    scene.add(craneBridge);
+    const craneTrolley = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.42, 0.6), MAT.darkSteel);
+    craneTrolley.position.set(1.3, roomHeight - 1.42, ROOM.minZ - 3.4);
+    scene.add(craneTrolley);
+    const craneHook = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.6, 6), MAT.chrome);
+    craneHook.position.set(1.3, roomHeight - 2.42, ROOM.minZ - 3.4);
+    scene.add(craneHook);
+
+    // Rzędy szaf aparaturowych po obu stronach nawy — masa i informacja.
+    const deepPanelMat = new THREE.MeshBasicMaterial({ color: 0x4fb9e8, transparent: true, opacity: 0.55 });
+    for (let r = 0; r < 6; r++) {
+      const rz = ROOM.minZ - 1.1 - r * 1.45;
+      for (const sideSign of [-1, 1]) {
+        const rx = sideSign * (4.05 + (r % 2) * 0.35);
+        const cabinet = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.15 + (r % 3) * 0.22, 0.8), MAT.darkSteel);
+        cabinet.position.set(rx, (2.15 + (r % 3) * 0.22) / 2, rz);
+        cabinet.rotation.y = sideSign * Math.PI / 2;
+        scene.add(cabinet);
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.3), deepPanelMat);
+        face.position.set(rx - sideSign * 0.42, 1.55, rz);
+        face.rotation.y = -sideSign * Math.PI / 2;
+        scene.add(face);
+        const edge = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 1.4), stripDim);
+        edge.position.set(rx - sideSign * 0.41, 0.35, rz);
+        scene.add(edge);
+      }
+    }
+    // Drugi, odległy reaktor — dowód, że eksperyment nie jest jedyny w obiekcie.
+    {
+      const farZ = ROOM.minZ - 5.6;
+      const farX = -1.5;
+      const farBase = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.25, 0.3, 28), MAT.darkSteel);
+      farBase.position.set(farX, 0.15, farZ);
+      scene.add(farBase);
+      const farShell = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.92, 0.96, 2.3, 28, 1, true),
+        new THREE.MeshPhysicalMaterial({
+          color: 0xa9d8f0, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.22,
+          clearcoat: 1, envMapIntensity: 2.0, side: THREE.DoubleSide, depthWrite: false,
+        }),
+      );
+      farShell.position.set(farX, 1.45, farZ);
+      scene.add(farShell);
+      const farCore = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.6, 0.6, 1.5, 20),
+        new THREE.MeshBasicMaterial({ color: 0x2f7fa8, transparent: true, opacity: 0.5 }),
+      );
+      farCore.position.set(farX, 1.2, farZ);
+      scene.add(farCore);
+      const farHead = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 1.02, 0.16, 28), MAT.steel);
+      farHead.position.set(farX, 2.68, farZ);
+      scene.add(farHead);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        const col = new THREE.Mesh(new THREE.BoxGeometry(0.1, 3.1, 0.1), MAT.darkSteel);
+        col.position.set(farX + Math.cos(a) * 1.24, 1.55, farZ + Math.sin(a) * 1.24);
+        scene.add(col);
+      }
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * Math.PI * 2;
+        const seg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.014, 0.022), stripCyan);
+        seg.position.set(farX + Math.cos(a) * 1.3, 0.32, farZ + Math.sin(a) * 1.3);
+        seg.rotation.y = -a;
+        scene.add(seg);
+      }
+      const farGlow = new THREE.PointLight(0x63c8ff, 7, 6, 2);
+      farGlow.position.set(farX, 1.5, farZ);
+      scene.add(farGlow);
+    }
+    // Świetlna ściana czołowa drugiej nawy. Sylwetki maszyn na jasnym tle
+    // czytają się jako plany w głąb nawet wtedy, gdy same są prawie czarne —
+    // to działa mocniej niż doświetlanie każdej maszyny z osobna.
+    {
+      const backZ = ROOM.minZ - DEEP_BAY_DEPTH + 0.25;
+      const lightWall = new THREE.Mesh(
+        new THREE.PlaneGeometry(roomWidth - 0.6, 3.1),
+        new THREE.MeshBasicMaterial({ color: 0x8fb6d8 }),
+      );
+      lightWall.position.set(roomCenterX, 1.9, backZ);
+      scene.add(lightWall);
+      const wallFrame = new THREE.Mesh(
+        new THREE.BoxGeometry(roomWidth - 0.4, 0.16, 0.14),
+        MAT.darkSteel,
+      );
+      wallFrame.position.set(roomCenterX, 3.53, backZ + 0.1);
+      scene.add(wallFrame);
+      for (let i = 1; i < 6; i++) {
+        const mull = new THREE.Mesh(new THREE.BoxGeometry(0.13, 3.1, 0.12), MAT.darkSteel);
+        mull.position.set(-4.6 + i * 1.85, 1.9, backZ + 0.1);
+        scene.add(mull);
+      }
+      const wallGlow = new THREE.PointLight(0xa8c8e8, 22, 11, 2);
+      wallGlow.position.set(roomCenterX, 2.2, backZ + 1.6);
+      scene.add(wallGlow);
+      // Sylwetki tuż przed świetlną ścianą — to one robią kontrast planów.
+      for (let i = 0; i < 7; i++) {
+        const sx = -4.6 + i * 1.55;
+        const sh = 1.5 + ((i * 7) % 5) * 0.32;
+        const silhouette = new THREE.Mesh(
+          new THREE.BoxGeometry(0.9 + (i % 3) * 0.25, sh, 0.7),
+          MAT.darkSteel,
+        );
+        silhouette.position.set(sx, sh / 2, backZ + 1.05 + (i % 2) * 0.5);
+        scene.add(silhouette);
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.5, 0.24), MAT.darkSteel);
+        cap.position.set(sx, sh + 0.25, backZ + 1.05 + (i % 2) * 0.5);
+        scene.add(cap);
+      }
+    }
+
+    // Ciąg komunikacyjny w osi nawy — perspektywa czytana z samej podłogi.
+    for (let i = 0; i < 10; i++) {
+      const gz = ROOM.minZ - 0.8 - i * 0.82;
+      for (const gx of [-2.5, 2.5]) {
+        const marker = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.012, 0.07), stripWarm);
+        marker.position.set(gx, 0.02, gz);
+        scene.add(marker);
+      }
+    }
+
+    // --- PIERWSZY PLAN: instalacja tuż przy obiektywie kadru otwierającego ---
+    // Ciemna, nieostra masa na krawędzi kadru natychmiast buduje głębię —
+    // bez niej scena zaczyna się dopiero przy aparaturze.
+    for (let i = 0; i < 7; i++) {
+      addCable(
+        [5.86, roomHeight - 0.7 - i * 0.06, 1.1 + i * 0.12],
+        [5.86, 1.15, 2.55 + i * 0.1],
+        0.18 + (i % 3) * 0.04,
+        0.019,
+      );
+    }
+    const foreConduit = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, roomHeight - 0.6, 14), MAT.darkSteel);
+    foreConduit.position.set(-5.28, (roomHeight - 0.6) / 2, 3.62);
+    scene.add(foreConduit);
+    for (let i = 0; i < 5; i++) {
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.165, 0.06, 14), MAT.steel);
+      collar.position.set(-5.28, 0.5 + i * 0.85, 3.62);
+      scene.add(collar);
+    }
+    addContactShadow(-5.28, 3.62, 0.4, 0.8);
+
+    // ==================================================================
     // CIENIE: włączane raz, po zbudowaniu całej sceny, wg trzech reguł —
     // nie "wszystko rzuca cień" (setki śrub/diod/gałek to czysty koszt
     // shadow-mapy bez żadnego widocznego cienia):
@@ -2385,11 +3111,11 @@ export class LabScene3D implements Sim3D {
         }
         object.layers.set(1);
       });
-      const viewModelKey = new THREE.DirectionalLight(0xdce8fb, 1.5);
+      const viewModelKey = new THREE.DirectionalLight(0xdce8fb, 0.95);
       viewModelKey.position.set(0.4, 0.9, 1);
       viewModelKey.layers.set(1);
       this.viewModel.add(viewModelKey);
-      const viewModelFill = new THREE.HemisphereLight(0x9fb4d4, 0x1a2130, 0.9);
+      const viewModelFill = new THREE.HemisphereLight(0x9fb4d4, 0x1a2130, 0.55);
       viewModelFill.layers.set(1);
       this.viewModel.add(viewModelFill);
       // Kamera musi widzieć obie warstwy: świat (0) i model widoku (1).
@@ -2603,7 +3329,7 @@ export class LabScene3D implements Sim3D {
     // Ekspozycja podniesiona razem z obniżonym wypełnieniem ambientowym:
     // ciemniejsze tło + jaśniejsze źródła kierunkowe dają filmowy kontrast
     // zamiast płaskiej, jednolicie oświetlonej sceny.
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.16;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     // Mapa środowiska generowana PROCEDURALNIE ze sceny studyjnej (jasny sufit,
     // ciemna podłoga) — metal musi mieć co odbijać, inaczej chrom i stal czytają

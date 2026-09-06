@@ -88,7 +88,10 @@ export interface ObservationResult {
   readonly narration: string;
 }
 
-const MODE_VIEWPOINT: Readonly<Record<ObservationMode, ViewpointKind>> = {
+/** Exported for `observationExecution.ts`: the same mode->vantage mapping this director already
+ * uses for the chat-only narration path, reused rather than re-derived for the live 3D screens'
+ * CameraIntent resolution — one mode->vantage table, not two. */
+export const MODE_VIEWPOINT: Readonly<Record<ObservationMode, ViewpointKind>> = {
   SCIENTIST: 'SCIENTIST_POV',
   ENGINEER: 'OPERATOR_POV',
   CITIZEN: 'ANCHORED_HUMAN',

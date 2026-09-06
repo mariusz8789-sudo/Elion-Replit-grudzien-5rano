@@ -16,6 +16,7 @@ import { applyShadowPolicy } from './graphics/shadowPolicy';
 import { createPBRMaterial } from './graphics/materials';
 import { createSunLight, createBackgroundFill } from './graphics/lighting';
 import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
+import { resolveCameraFraming, type CameraIntent } from './graphics/cameraRig';
 import { createDustMotes, type DustMotesHandle } from './graphics/atmosphere';
 import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
 import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
@@ -108,6 +109,13 @@ export class EpidemicCity3DSim implements Sim3D {
   private followTarget: THREE_NS.Vector3 | null = null;
   private cameraPreset: CityCameraPreset = 'city';
   private resetCityCameraPending = false;
+  /** Looking Glass 2.1 observation-directed standoff distance, from the real C2 CameraRig's
+   * `resolveCameraFraming` for the requested CameraIntent+target radius — set only while an
+   * observation request is directing the view; `getOrbitFocusDistance()` prefers it over the
+   * hardcoded per-preset distances below. Cleared by any manual preset/selection change, so
+   * the user's own OrbitControls drag (already the existing "hand control back" mechanism —
+   * see useThreeLoop.ts) is never fought once an observation shot has settled. */
+  private observationStandoff: number | null = null;
   /** Punkt kamery ulicznej pochodzi z istniejącej siatki ulic CityWorld; to cecha widoku, nie ruch ani cel agenta. */
   private streetLayoutFocus: { x: number; y: number } | null = null;
   private cameraTrackId: number | null = null;
@@ -211,6 +219,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.cameraPreset = 'city';
     this.cameraTrackId = null;
     this.streetLayoutFocus = null;
+    this.observationStandoff = null;
     this.selectAgent(null);
     this.selectWorld(null);
   }
@@ -222,6 +231,7 @@ export class EpidemicCity3DSim implements Sim3D {
   /** Jeden mechanizm kamery dla świata, dzielnicy, ulicy i modelowego agenta. */
   setCameraPreset(preset: CityCameraPreset): number | null {
     this.cameraPreset = preset;
+    this.observationStandoff = null;
     if (preset === 'city') {
       this.cameraTrackId = null;
       this.streetLayoutFocus = null;
@@ -261,6 +271,122 @@ export class EpidemicCity3DSim implements Sim3D {
       ?? null;
     this.selectAgent(agent?.id ?? null);
     return agent?.id ?? null;
+  }
+
+  /**
+   * Looking Glass 2.1 — deterministic, bilingual name match against every REAL
+   * addressable object this city currently has: the semantic CityWorld
+   * buildings (hospital/shop/school/isolation/park), the model's own live
+   * hotspots/clusters (when a `WorldStateView` has been set). Returns `null`
+   * — never a guess, never the nearest unrelated object — when nothing in
+   * THIS run matches, e.g. "the pump": there is no pump in the epidemic
+   * city, and this method will never invent one.
+   */
+  resolveNamedWorldTarget(query: string): CityWorldSelection | null {
+    return this.resolveNamedWorldTargetWithRadius(query)?.selection ?? null;
+  }
+
+  private resolveNamedWorldTargetWithRadius(query: string): { selection: CityWorldSelection; radius: number } | null {
+    const needle = query.trim().toLowerCase();
+    if (needle.length === 0) return null;
+
+    const BUILDING_SYNONYMS: Record<string, WorldObject['kind']> = {
+      hospital: 'hospital', szpital: 'hospital',
+      shop: 'shop', sklep: 'shop',
+      school: 'school', szkoła: 'school', szkola: 'school',
+      isolation: 'isolation', izolacja: 'isolation',
+      park: 'park',
+    };
+    const synonym = Object.keys(BUILDING_SYNONYMS).find((word) => needle.includes(word));
+    if (synonym) {
+      const kind = BUILDING_SYNONYMS[synonym];
+      const match = this.semanticBuildingSlots.find((slot) => slot.building.kind === kind);
+      if (match) {
+        const { building } = match;
+        const selection: CityWorldSelection = {
+          kind: kind === 'hospital' ? 'hospital' : 'location',
+          label: building.kind.toUpperCase(),
+          detail: 'Resolved from the city\'s own semantic CityWorld location.',
+          x: building.x + building.w / 2,
+          y: building.y + building.h / 2,
+        };
+        return { selection, radius: Math.max(building.w, building.h) * CITY_WORLD_SCALE * 0.5 };
+      }
+    }
+    if ((needle.includes('hotspot') || needle.includes('ognisko')) && this.worldState && this.worldState.hotspots.length > 0) {
+      const hotspot = [...this.worldState.hotspots].sort((a, b) => b.infectious - a.infectious)[0]!;
+      const selection: CityWorldSelection = {
+        kind: 'hotspot',
+        label: `Hotspot · ${hotspot.infectious} infectious`,
+        detail: 'The city\'s own most active infection hotspot right now.',
+        x: hotspot.x,
+        y: hotspot.y,
+      };
+      return { selection, radius: 1.4 };
+    }
+    if ((needle.includes('cluster') || needle.includes('klaster')) && this.worldState) {
+      const clusters = [...this.worldState.clusters.household, ...this.worldState.clusters.location];
+      const best = [...clusters].sort((a, b) => b.transmissions - a.transmissions)[0];
+      const location = best ? this.worldState.locations[best.locationIndex] : undefined;
+      if (best && location) {
+        const selection: CityWorldSelection = {
+          kind: 'cluster',
+          label: `${best.kind} cluster · ${best.transmissions} transmission(s)`,
+          detail: `Cluster ${best.clusterId}.`,
+          x: location.x + location.w / 2,
+          y: location.y + location.h / 2,
+        };
+        return { selection, radius: 1.2 };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Looking Glass 2.1 — the real observation-execution boundary for the city.
+   * Resolves `query` against every real addressable object (buildings,
+   * hotspots, clusters, or a real infected/exposed agent), and — when found —
+   * actually moves the camera there through the real C2 CameraRig math
+   * (`resolveCameraFraming`) riding the SAME OrbitControls target/distance
+   * seam every existing preset already uses (`getOrbitTarget`/
+   * `getOrbitFocusDistance`, eased by `useThreeLoop.ts`'s own damped lerp) —
+   * no second camera system, no per-frame override of this file's own render
+   * loop, and the user's own drag still takes over exactly as it already
+   * does for every other preset once the shot settles. `found: false` is an
+   * honest report, not a silent fallback.
+   */
+  applyObservationTarget(query: string, cameraIntent: CameraIntent): { found: boolean; label: string | null } {
+    const needle = query.trim().toLowerCase();
+    if (/\b(infected|zaka[żz]on|exposed|nara[żz]on)/i.test(needle)) {
+      const id = this.focusFirstInfected();
+      if (id === null) return { found: false, label: null };
+      const agent = this.simulation.agents().find((candidate) => candidate.id === id);
+      if (!agent) return { found: false, label: null };
+      this.applyObservationFraming(cameraIntent, agent.x, agent.y, 0.85, 0.6);
+      return { found: true, label: `Agent #${id}` };
+    }
+    const resolved = this.resolveNamedWorldTargetWithRadius(query);
+    if (!resolved) return { found: false, label: null };
+    this.selectWorld(resolved.selection);
+    this.applyObservationFraming(cameraIntent, resolved.selection.x, resolved.selection.y, 0.26, resolved.radius);
+    return { found: true, label: resolved.selection.label };
+  }
+
+  /** Computes the CameraRig-resolved standoff for a real world position and stores it for
+   * `getOrbitFocusDistance()` — see that method's own doc for why this never touches
+   * `camera.position` directly (the existing OrbitControls/lerp seam already does that). */
+  private applyObservationFraming(cameraIntent: CameraIntent, worldGridX: number, worldGridY: number, height: number, targetRadius: number): void {
+    const target: [number, number, number] = [
+      (worldGridX - this.simulation.worldWidth / 2) * CITY_WORLD_SCALE,
+      height,
+      (worldGridY - this.simulation.worldHeight / 2) * CITY_WORLD_SCALE,
+    ];
+    const framing = resolveCameraFraming({ intent: cameraIntent, target, targetRadius });
+    this.observationStandoff = Math.hypot(
+      framing.position[0] - framing.lookAt[0],
+      framing.position[1] - framing.lookAt[1],
+      framing.position[2] - framing.lookAt[2],
+    );
   }
 
   /** Fokus ma sens tylko dla celu prawdziwego zdarzenia odczytanego z modelu. */
@@ -448,6 +574,10 @@ export class EpidemicCity3DSim implements Sim3D {
 
   getOrbitFocusDistance(): number | null {
     if (!this.followTarget) return null;
+    // Looking Glass 2.1: an active observation request's own CameraRig-resolved standoff
+    // (see applyObservationTarget) takes priority over every hardcoded preset distance below —
+    // it is the real answer to "how far should the camera stand for THIS CameraIntent", not a guess.
+    if (this.observationStandoff !== null) return this.observationStandoff;
     if (this.selectedWorld) return 4.6;
     if (this.cameraPreset === 'district') return 7.2;
     // Ten sam rig i OrbitControls: STREET zachowuje wysokość obserwatora, ale

@@ -3092,6 +3092,18 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
    the base .lg-rail's absolute bottom-left pin would sit on top of
    whatever the card renders last (the "Wejdź do świata" action row). */
 .lg-rail-inline { position: static; max-width: none; margin: 0.2rem 0; }
+/* LOOKING GLASS 2.1 — the live observation console overlaid on a 3D world screen (city/lab): same
+   .lg-obs internals as the chat's console, positioned as a HUD panel since these screens are fixed-
+   height viewports, not normal document flow (see .lg-rail-inline's own note above). */
+.lg-obs-live { position: absolute; left: 1rem; top: 1rem; z-index: 8; max-width: 22rem; }
+.lg-obs-live .lg-obs { background: rgba(8, 13, 22, 0.92); backdrop-filter: blur(8px); }
+.lg-obs-status {
+  align-self: flex-start; padding: 0.15rem 0.5rem; border-radius: 999px;
+  font: 600 0.6rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.08em;
+  border: 1px solid #2b3a52; color: #8ecbff;
+}
+.lg-obs-status.is-failed { color: #f28a8a; border-color: #6b2c2c; }
+.lg-obs-status.is-executed { color: #7fe3ab; border-color: #2c6b48; }
 .lg-mode-badge {
   position: absolute; right: 1rem; bottom: 1rem; z-index: 7;
   padding: 0.3rem 0.65rem; border-radius: 999px;

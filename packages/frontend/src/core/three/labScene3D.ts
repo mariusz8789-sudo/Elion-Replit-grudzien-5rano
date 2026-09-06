@@ -11,6 +11,7 @@ import { applyShadowPolicy } from './graphics/shadowPolicy';
 import { disposeSceneResources } from './graphics/lifecycle';
 import { createDustMotes, createLightShaft, type DustMotesHandle } from './graphics/atmosphere';
 import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
+import type { CameraIntent } from './graphics/cameraRig';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -570,6 +571,48 @@ export class LabScene3D implements Sim3D {
     this.cameraPhase = 'FLIGHT';
     this.flightGoingToFree = true;
     this.fixedKind = 'NONE';
+  }
+
+  /**
+   * Looking Glass 2.1 — maps a resolved `CameraIntent` (`core/three/graphics/
+   * cameraRig.ts`) onto this lab's existing four hand-composed fixed shots
+   * (`scientificFraming`), then drives the camera through the EXISTING,
+   * already-tested `focusScientific` eased flight — not a second camera
+   * system. The lab has a small, closed set of camera positions rather than
+   * CameraRig's continuous intent+target+scale framing (see the module-level
+   * `flightBetween`/`CameraFlight` import from `../reality/cameraSequencer`,
+   * predating this change): WIDE/CINEMATIC read as the establishing "HALA"
+   * shot, everything else as the vessel-facing "NAUKOWA" shot — a real,
+   * honest boundary, documented rather than papered over with a 5th
+   * hand-tuned position this file's own camera model doesn't have.
+   */
+  applyObservationCameraIntent(cameraIntent: CameraIntent): void {
+    const kind = cameraIntent === 'WIDE' || cameraIntent === 'CINEMATIC' ? 'WIDE' : 'SCIENTIFIC';
+    this.focusScientific(kind);
+  }
+
+  /**
+   * Looking Glass 2.1 — the lab's only real addressable object today is the
+   * reaction vessel/substance/apparatus at `VESSEL_POSITION` (all synonyms
+   * for the same physical instrument). Anything else honestly resolves to
+   * `false` — never a guessed camera move onto an unrelated part of the room.
+   */
+  resolveNamedLabTarget(query: string): boolean {
+    return /\b(vessel|substance|apparatus|reaction|naczyni|substancj|aparatur|reakcj)/i.test(query.trim());
+  }
+
+  /**
+   * Looking Glass 2.1 — exposes the existing per-day application (`applyDay`)
+   * for a completed run's own series, so a resolved observation time can
+   * show a specific past day without restarting playback. `false` when no
+   * run has produced a series yet, or the index is out of range — an honest
+   * NOT_MODELLED, never a fabricated day.
+   */
+  showDay(dayIndex: number): boolean {
+    if (dayIndex < 0 || dayIndex >= this.playSeriesData.length) return false;
+    this.applyDay(this.playSeriesData[dayIndex]!);
+    this.playDayIndex = dayIndex;
+    return true;
   }
 
   getStats(): Record<string, number> {

@@ -3,6 +3,8 @@ import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
 import { ExperiencePlayer } from '../../core/lookingGlass/experienceOrchestrator';
 import { directionForFrame, type WorldDirection } from '../../core/lookingGlass/worldDirector';
+import { parseObservationIntent } from '../../core/lookingGlass/observationIntent';
+import { resolveCameraIntent, type ObservationExecutionStatus } from '../../core/lookingGlass/observationExecution';
 import {
   closeInspection, initialExperienceState, inspect, replay as enterReplay, timeIsFrozen, MODE_LABEL,
   type ExperienceState,
@@ -293,6 +295,46 @@ export function FirstPersonLabScreen() {
     canvasRef.current?.requestPointerLock();
   };
 
+  // LOOKING GLASS 2.1 — LIVE OBSERVATION DIRECTOR (lab). Same intent parser
+  // and CameraIntent resolution as the city (`observationIntent.ts`/
+  // `observationExecution.ts`), dispatched onto THIS lab's own real,
+  // already-tested camera mechanism (`focusScientific`/`returnToFirstPerson`
+  // — see LabScene3D.applyObservationCameraIntent's own doc for why this is
+  // reuse, not a second camera system) and its one real addressable object,
+  // the reaction vessel (`resolveNamedLabTarget`).
+  const [obsText, setObsText] = useState('');
+  const [obsResult, setObsResult] = useState<{ status: ObservationExecutionStatus; narration: string } | null>(null);
+  const askObservation = (sentence: string) => {
+    const trimmed = sentence.trim();
+    if (!trimmed) return;
+    const intent = parseObservationIntent(trimmed);
+    const query = intent.target ?? intent.focus;
+    const namesLab = /\b(lab|laborator|hala)/i.test(trimmed);
+    if (!query && !namesLab) {
+      setObsResult({ status: 'FAILED', narration: 'No target was named — try "the reaction vessel" or "the laboratory".' });
+      setObsText('');
+      return;
+    }
+    if (query && !namesLab && !sim.resolveNamedLabTarget(query)) {
+      setObsResult({ status: 'FAILED', narration: `Nothing in this lab answers to "${query}" — the only real instrument here is the reaction vessel.` });
+      setObsText('');
+      return;
+    }
+    const cameraIntent = resolveCameraIntent(intent);
+    sim.applyObservationCameraIntent(cameraIntent);
+    let timeNote = '';
+    if (intent.time) {
+      if (intent.time.kind === 'ABSOLUTE' && intent.time.unit === 'DAY') {
+        const ok = sim.showDay(intent.time.amount);
+        timeNote = ok ? ` Showing day ${intent.time.amount}.` : ' No experiment has produced a day that far yet.';
+      } else if (intent.time.kind !== 'NOW') {
+        timeNote = ' This lab only shows day-level detail from a completed run — finer time resolution is not modelled here.';
+      }
+    }
+    setObsResult({ status: 'EXECUTED', narration: `Showing ${query ?? 'the laboratory'} — ${cameraIntent}.${timeNote}` });
+    setObsText('');
+  };
+
   const canInteract = stats.nearStation === 1 && canInteractInPhase(phase);
   const isRunning = phase === 'RUNNING_A' || phase === 'RUNNING_B' || phase === 'REPLAYING';
   const cameraTaken = stats.cameraPhase !== 0;
@@ -454,6 +496,30 @@ export function FirstPersonLabScreen() {
             <canvas ref={canvasRef} className="gid-canvas" aria-label="Pierwszoosobowa scena laboratoryjna (Three.js)" />
             {loading && <div className="route-loading" role="status">Ładowanie silnika 3D…</div>}
             {failed && <div className="empty-state">Nie udało się uruchomić WebGL na tym urządzeniu.</div>}
+
+            {!loading && !failed && (
+              <div className="lg-obs-live">
+                <div className="lg-obs">
+                  <span className="lg-obs-title">ASK GENESIS</span>
+                  <form className="lg-obs-form" onSubmit={(event) => { event.preventDefault(); askObservation(obsText); }}>
+                    <input
+                      className="lg-obs-input"
+                      type="text"
+                      value={obsText}
+                      placeholder="np. „Show me the reaction vessel” / „Take me to the laboratory”"
+                      onChange={(event) => setObsText(event.target.value)}
+                    />
+                    <button type="submit" className="lg-obs-send" disabled={obsText.trim().length === 0}>Go</button>
+                  </form>
+                  {obsResult && (
+                    <div className="lg-obs-result">
+                      <span className={`lg-obs-status is-${obsResult.status.toLowerCase()}`}>{obsResult.status}</span>
+                      <p className="lg-obs-narration">{obsResult.narration}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {!locked && !loading && !failed && (
               <div className="fp-lab-enter" role="button" tabIndex={0}

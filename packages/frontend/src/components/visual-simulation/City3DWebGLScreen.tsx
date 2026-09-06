@@ -8,6 +8,8 @@ import { consumePendingExperimentWorld, consumePendingScenarioTimeline, peekPend
 import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
 import { ExperiencePlayer } from '../../core/lookingGlass/experienceOrchestrator';
 import { cityPresetFor, directionForFrame, type WorldDirection } from '../../core/lookingGlass/worldDirector';
+import { parseObservationIntent } from '../../core/lookingGlass/observationIntent';
+import { resolveCameraIntent, resolveTransitionKind, type ObservationExecutionStatus } from '../../core/lookingGlass/observationExecution';
 import { closeInspection, initialExperienceState, inspect, replay as enterReplay, timeIsFrozen, MODE_LABEL, type ExperienceState } from '../../core/lookingGlass/experienceMode';
 import { EventInspector } from '../looking-glass/EventInspector';
 import { ComparisonPanel } from '../looking-glass/ComparisonPanel';
@@ -135,6 +137,44 @@ export function City3DWebGLScreen() {
   const statsRef = useRef(stats);
   paramsRef.current = params;
   statsRef.current = stats;
+
+  // LOOKING GLASS 2.1 — LIVE OBSERVATION DIRECTOR. Parses a sentence into an
+  // ObservationIntent (reused from the chat console, `observationIntent.ts`),
+  // resolves it onto the real C2 CameraIntent vocabulary (`observationExecution.
+  // ts`, itself composed from the EXISTING mode->vantage and vantage->camera
+  // tables — no new mapping invented), and hands the target NAME to
+  // `sim.applyObservationTarget`, which alone knows the city's real objects
+  // and alone touches the camera (through the existing OrbitControls target/
+  // distance seam every preset already uses). This component never computes
+  // a position or a transform.
+  const [obsText, setObsText] = useState('');
+  const [obsResult, setObsResult] = useState<{ status: ObservationExecutionStatus; narration: string; cameraIntent: string; transition: string } | null>(null);
+  const askObservation = (sentence: string) => {
+    const trimmed = sentence.trim();
+    if (!trimmed) return;
+    const intent = parseObservationIntent(trimmed);
+    const query = intent.target ?? intent.focus;
+    if (!query) {
+      setObsResult({ status: 'FAILED', narration: 'No target was named in that sentence — say what to look at (e.g. "the hospital").', cameraIntent: '', transition: '' });
+      setObsText('');
+      return;
+    }
+    const cameraIntent = resolveCameraIntent(intent);
+    const transition = resolveTransitionKind(intent);
+    const outcome = sim.applyObservationTarget(query, cameraIntent);
+    const timeNote = intent.time && intent.time.kind !== 'NOW'
+      ? ' Time travel for the live city view is not yet supported — showing the current moment.'
+      : '';
+    setObsResult({
+      status: outcome.found ? 'EXECUTED' : 'FAILED',
+      narration: outcome.found
+        ? `Showing ${outcome.label} — ${cameraIntent} · ${transition.toLowerCase()} move.${timeNote}`
+        : `Nothing in this run answers to "${query}" — no such object exists here.`,
+      cameraIntent,
+      transition,
+    });
+    setObsText('');
+  };
 
   const renderParams = useMemo<SimParams>(() => ({ ...params, clockSpeed: running ? speed : 0 }), [params, running, speed]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, renderParams, true, setStats);
@@ -407,6 +447,29 @@ export function City3DWebGLScreen() {
           <div className={`city-3d-stage-wrap city-world-stage${enteredTimelineDay === timelineLogicalDay ? ' temporal-moment-entered' : ''}`} data-temporal-day={timelineLogicalDay} data-temporal-entered={enteredTimelineDay === timelineLogicalDay ? 'true' : 'false'}>
             <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
             <TemporalWorldHud timeline={scenarioTimeline} day={timelineDay} enteredDay={enteredTimelineDay} />
+            {/* LOOKING GLASS 2.1 — the live observation console: tell Genesis
+                what to look at, in one sentence, and the REAL camera moves. */}
+            <div className="lg-obs-live">
+              <div className="lg-obs">
+                <span className="lg-obs-title">ASK GENESIS</span>
+                <form className="lg-obs-form" onSubmit={(event) => { event.preventDefault(); askObservation(obsText); }}>
+                  <input
+                    className="lg-obs-input"
+                    type="text"
+                    value={obsText}
+                    placeholder="np. „Go to the hospital” / „Focus on the pump”"
+                    onChange={(event) => setObsText(event.target.value)}
+                  />
+                  <button type="submit" className="lg-obs-send" disabled={obsText.trim().length === 0}>Go</button>
+                </form>
+                {obsResult && (
+                  <div className="lg-obs-result">
+                    <span className={`lg-obs-status is-${obsResult.status.toLowerCase()}`}>{obsResult.status}</span>
+                    <p className="lg-obs-narration">{obsResult.narration}</p>
+                  </div>
+                )}
+              </div>
+            </div>
             {/* THE EDIT, VISIBLE IN THE WORLD. What the director chose, why it
                 chose it, and the evidence behind it — so the viewer is never
                 watching a pretty animation with no provenance. The time source

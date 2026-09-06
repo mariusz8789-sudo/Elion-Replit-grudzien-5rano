@@ -24,6 +24,16 @@ import type * as THREE_NS from 'three';
  * The per-intent multiplier/elevation defaults below are a reasonable, tunable STARTING POINT for
  * readable framing — not a claim of "correct" cinematography. Override via
  * `standoffMultiplier`/`elevationDeg` once a real scene's own scale/composition needs differ.
+ *
+ * MOBILITY: each intent also carries a default `CameraMobility` (`STATIC`/`FOLLOW`/`ORBIT`/`FREE`)
+ * — a hint for how the rig behaves over time once framed, not a new positioning concept:
+ *  - `STATIC`/`FREE` just hold the last `frame()`/`cut()` shot (`FREE` additionally signals "an
+ *    external controller, e.g. first-person input, may be driving the real camera instead — don't
+ *    assume this rig's output is authoritative every frame").
+ *  - `FOLLOW` re-resolves the shot against a live-tracked target every `update()` (see `setTarget`)
+ *    and eases toward it, for "keep this moving subject nicely framed."
+ *  - `ORBIT` auto-advances azimuth over time (see `setOrbitSpeed`) for a turntable-style reveal,
+ *    optionally also around a live-tracked moving target.
  */
 
 /**
@@ -37,24 +47,33 @@ export type CameraIntent =
   | 'WIDE' | 'HUMAN_EYE' | 'SCIENTIST_POV' | 'MACRO' | 'MICRO'
   | 'SCIENTIFIC' | 'CINEMATIC' | 'DRIVER' | 'ORBITAL';
 
+export type CameraMobility = 'STATIC' | 'FOLLOW' | 'ORBIT' | 'FREE';
+
 interface IntentFraming {
   /** Standoff distance as a multiple of `targetRadius`. */
   standoffMultiplier: number;
   /** Degrees above the horizontal plane through the target. */
   elevationDeg: number;
+  /** See the module doc's "MOBILITY" section. */
+  mobility: CameraMobility;
 }
 
 const INTENT_FRAMING: Record<CameraIntent, IntentFraming> = {
-  WIDE: { standoffMultiplier: 4.5, elevationDeg: 32 },
-  HUMAN_EYE: { standoffMultiplier: 2.4, elevationDeg: 8 },
-  SCIENTIST_POV: { standoffMultiplier: 1.15, elevationDeg: 3 },
-  MACRO: { standoffMultiplier: 0.55, elevationDeg: 18 },
-  MICRO: { standoffMultiplier: 0.12, elevationDeg: 12 },
-  SCIENTIFIC: { standoffMultiplier: 2.8, elevationDeg: 28 },
-  CINEMATIC: { standoffMultiplier: 3.2, elevationDeg: 22 },
-  DRIVER: { standoffMultiplier: 0.35, elevationDeg: 1 },
-  ORBITAL: { standoffMultiplier: 5.5, elevationDeg: 55 },
+  WIDE: { standoffMultiplier: 4.5, elevationDeg: 32, mobility: 'STATIC' },
+  HUMAN_EYE: { standoffMultiplier: 2.4, elevationDeg: 8, mobility: 'FREE' },
+  SCIENTIST_POV: { standoffMultiplier: 1.15, elevationDeg: 3, mobility: 'FREE' },
+  MACRO: { standoffMultiplier: 0.55, elevationDeg: 18, mobility: 'ORBIT' },
+  MICRO: { standoffMultiplier: 0.12, elevationDeg: 12, mobility: 'ORBIT' },
+  SCIENTIFIC: { standoffMultiplier: 2.8, elevationDeg: 28, mobility: 'STATIC' },
+  CINEMATIC: { standoffMultiplier: 3.2, elevationDeg: 22, mobility: 'FOLLOW' },
+  DRIVER: { standoffMultiplier: 0.35, elevationDeg: 1, mobility: 'FOLLOW' },
+  ORBITAL: { standoffMultiplier: 5.5, elevationDeg: 55, mobility: 'ORBIT' },
 };
+
+/** The mobility an intent defaults to — exposed so a caller can decide up front whether it needs to drive `setTarget`/`setOrbitSpeed` itself. */
+export function defaultMobilityFor(intent: CameraIntent): CameraMobility {
+  return INTENT_FRAMING[intent].mobility;
+}
 
 export interface CameraFrameRequest {
   intent: CameraIntent;
@@ -119,6 +138,9 @@ export function resolveCameraFraming(request: CameraFrameRequest): CameraTransfo
  * `frame()` eases toward a new shot (a "reposition" cut with continuous motion — e.g. a tracking
  * shot retargeting smoothly); `cut()` snaps immediately (a hard edit between two unrelated shots).
  * Same `frame`-eases/`cut`-snaps split as `FocusPuller`'s `pullTo`/`snapTo`.
+ *
+ * `setTarget`/`setOrbitSpeed` add live motion on top of a framed shot for `FOLLOW`/`ORBIT`
+ * mobility (see the module doc) — `STATIC`/`FREE` intents ignore both and simply hold.
  */
 export class CameraRig {
   private readonly currentPosition: THREE_NS.Vector3;
@@ -126,7 +148,15 @@ export class CameraRig {
   private readonly targetPosition: THREE_NS.Vector3;
   private readonly targetLookAt: THREE_NS.Vector3;
 
+  private request: CameraFrameRequest;
+  private mobility: CameraMobility;
+  private liveTarget: THREE_NS.Vector3Tuple | null = null;
+  private orbitAzimuthDeg = 0;
+  private orbitSpeedDegPerS = 8;
+
   constructor(THREE: typeof THREE_NS, initial: CameraFrameRequest) {
+    this.request = initial;
+    this.mobility = defaultMobilityFor(initial.intent);
     const transform = resolveCameraFraming(initial);
     this.currentPosition = new THREE.Vector3(...transform.position);
     this.currentLookAt = new THREE.Vector3(...transform.lookAt);
@@ -134,8 +164,16 @@ export class CameraRig {
     this.targetLookAt = this.currentLookAt.clone();
   }
 
-  /** Sets a new target shot — the rig eases toward it over subsequent `update()` calls. */
+  get currentMobility(): CameraMobility {
+    return this.mobility;
+  }
+
+  /** Sets a new target shot — the rig eases toward it over subsequent `update()` calls. Clears any live-tracked target from a previous shot (call `setTarget` again to re-establish tracking for the new one). */
   frame(request: CameraFrameRequest): void {
+    this.request = request;
+    this.mobility = defaultMobilityFor(request.intent);
+    this.orbitAzimuthDeg = request.azimuthDeg ?? 0;
+    this.liveTarget = null;
     const transform = resolveCameraFraming(request);
     this.targetPosition.set(...transform.position);
     this.targetLookAt.set(...transform.lookAt);
@@ -148,11 +186,47 @@ export class CameraRig {
     this.currentLookAt.copy(this.targetLookAt);
   }
 
-  /** Advances the transition by `dt` seconds. `speed` controls how quickly the rig catches up
-   * (higher = snappier); default suits a deliberate, readable move rather than an instant snap or
-   * an unnaturally slow drift — same shape as `FocusPuller.update`'s own default. Returns the
-   * current transform for convenience. */
+  /**
+   * Live target position for `FOLLOW`/`ORBIT` mobility — call every frame with the tracked
+   * entity's current position; takes effect starting the next `update()`. No effect for
+   * `STATIC`/`FREE` mobility.
+   */
+  setTarget(target: THREE_NS.Vector3Tuple): void {
+    this.liveTarget = target;
+  }
+
+  /** Sets how fast `ORBIT` mobility auto-rotates (degrees/second). */
+  setOrbitSpeed(degreesPerSecond: number): void {
+    this.orbitSpeedDegPerS = degreesPerSecond;
+  }
+
+  /** Advances the transition by `dt` seconds. `speed` controls how quickly `FOLLOW`/settling
+   * catches up (higher = snappier); default suits a deliberate, readable move rather than an
+   * instant snap or an unnaturally slow drift — same shape as `FocusPuller.update`'s own default.
+   * `ORBIT` mobility ignores `speed` — it always sits exactly on its circle, never lagging.
+   * Returns the current transform for convenience. */
   update(dt: number, speed = 2.5): CameraTransform {
+    if (this.mobility === 'ORBIT') {
+      this.orbitAzimuthDeg += this.orbitSpeedDegPerS * dt;
+      const effective: CameraFrameRequest = {
+        ...this.request,
+        target: this.liveTarget ?? this.request.target,
+        azimuthDeg: (this.request.azimuthDeg ?? 0) + this.orbitAzimuthDeg,
+      };
+      const transform = resolveCameraFraming(effective);
+      this.currentPosition.set(...transform.position);
+      this.currentLookAt.set(...transform.lookAt);
+      this.targetPosition.copy(this.currentPosition);
+      this.targetLookAt.copy(this.currentLookAt);
+      return { position: this.currentPosition.toArray(), lookAt: this.currentLookAt.toArray() };
+    }
+
+    if (this.mobility === 'FOLLOW' && this.liveTarget) {
+      const transform = resolveCameraFraming({ ...this.request, target: this.liveTarget });
+      this.targetPosition.set(...transform.position);
+      this.targetLookAt.set(...transform.lookAt);
+    }
+
     const t = Math.min(1, Math.max(0, dt) * speed);
     this.currentPosition.lerp(this.targetPosition, t);
     this.currentLookAt.lerp(this.targetLookAt, t);

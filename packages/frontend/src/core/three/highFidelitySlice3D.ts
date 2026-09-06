@@ -193,6 +193,12 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   // Same audit finding as epidemicCity3D.ts's own syncAnalysis(): a fresh THREE.Color was allocated
   // per grid cell (HF_ANALYSIS_COLS * HF_ANALYSIS_ROWS = 748) every frame the heatmap overlay is on.
   private scratchAnalysisColor: THREE_NS.Color | null = null;
+  // Render-loop allocation audit finding: getOrbitCameraDirection() is called every frame by
+  // useThreeLoop.ts's render loop whenever an orbit target with a focus distance is active, and
+  // allocated a fresh THREE.Vector3 on every one of those calls (three branches, all `new
+  // this.THREE.Vector3(...)`) even though the caller immediately copies the result into its own
+  // scratch — see epidemicCity3D.ts's own `scratchOrbitDirection`, the same fix applied here.
+  private scratchOrbitDirection: THREE_NS.Vector3 | null = null;
   private lastTickMs = 0;
   private metrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
   private readonly clickDragTracker = new ClickDragTracker();
@@ -273,6 +279,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.viewport = { w, h };
     this.raycaster = new THREE.Raycaster();
     this.scratchCameraTarget = new THREE.Vector3();
+    this.scratchOrbitDirection = new THREE.Vector3();
     this.scratchAnalysisColor = new THREE.Color();
     scene.background = new THREE.Color(0xc8d9e7);
     scene.fog = new THREE.FogExp2(0xd7e2e7, 0.016);
@@ -442,10 +449,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   getOrbitCameraDirection(): THREE_NS.Vector3 | null {
-    if (!this.THREE || !this.followTarget) return null;
-    if (this.cameraMode === 'street') return new this.THREE.Vector3(1.35, 0.012, 2.6).normalize();
-    if (this.cameraMode === 'event') return new this.THREE.Vector3(3.2, 0.46, 3.8).normalize();
-    return new this.THREE.Vector3(1.9, 0.75, 2.3).normalize();
+    if (!this.THREE || !this.followTarget || !this.scratchOrbitDirection) return null;
+    if (this.cameraMode === 'street') return this.scratchOrbitDirection.set(1.35, 0.012, 2.6).normalize();
+    if (this.cameraMode === 'event') return this.scratchOrbitDirection.set(3.2, 0.46, 3.8).normalize();
+    return this.scratchOrbitDirection.set(1.9, 0.75, 2.3).normalize();
   }
 
   onResize(w: number, h: number): void { this.viewport = { w, h }; }

@@ -238,7 +238,50 @@ Before shipping a new facility/hero-object scene, check:
       (a screenshot/video request), never wired into normal interactive
       rendering.
 
-## Known limitation, not fixed here: crowd frustum culling is disabled
+## Update: crowd culling — fixed at the application level, not via `frustumCulled`
+
+The finding below (three.js's own per-`InstancedMesh` bounding-sphere check
+is unsafe for a scattered crowd) is still accurate, and `frustumCulled`
+stays `false` on all ten meshes — that part is NOT changed. What's new is
+`graphics/lod.ts`'s `FrustumCuller`: a correct, real-instance-position
+frustum test computed on the CPU, independent of three.js's own (broken)
+per-batch shortcut. `InstancedHumanoidCrowd.update()` now takes an optional
+second argument, `{ camera, maxDistance? }` — when given, each agent's
+OWN world position is tested against the camera's actual frustum (and
+optionally a max distance) BEFORE it's added to the batch at all, so
+`mesh.count` on every one of the ten meshes shrinks to the true visible
+count. This is a real, structural reduction in submitted instances (an
+exact, CPU-computed number, verifiable without a GPU — see
+`graphicsInstancedHumanoidCrowd.test.ts`'s culling tests), not a
+GPU-timing claim. `epidemicCity3D.ts` now passes its camera through
+(frustum-only — no `maxDistance`, since this scene's camera standoff varies
+too much across presets to guess a safe cutoff without real-hardware
+verification; the frustum test itself is exact at any distance/scale).
+This closes the "not fixed here" gap below with a genuinely different
+mechanism (an application-level test) rather than the never-applied
+`computeBoundingSphere()` idea, which is why that idea's own risk analysis
+(stale bounding sphere as agents move) never even arises here — nothing
+per-`InstancedMesh` is cached across frames; every agent is re-tested fresh
+each `update()` call.
+
+## Fixed: highFidelitySlice3D.ts's getOrbitCameraDirection() allocated a fresh Vector3 every frame
+
+`useThreeLoop.ts`'s render loop calls `sim.getOrbitCameraDirection?.()`
+every single frame whenever an orbit target with a focus distance is
+active (see its own "Render-loop allocation audit finding" comment — the
+caller-side fix for this was already applied there, copying the result
+into a scratch vector immediately). The callee side wasn't: all three
+branches of `highFidelitySlice3D.ts`'s `getOrbitCameraDirection()` returned
+`new this.THREE.Vector3(...).normalize()`, allocating on every call even
+though the caller never retains the reference. `epidemicCity3D.ts`'s own
+version of this method already used a scratch vector
+(`this.scratchOrbitDirection`) — `highFidelitySlice3D.ts` now does too
+(same field name, same pattern). Verified in
+`highFidelitySlice3DOrbitDirection.test.ts`: repeated calls return the
+identical object reference, and the returned direction is still correct
+per camera mode.
+
+## Known limitation of `InstancedMesh` itself, worked around above (not fixed via `frustumCulled`)
 
 `humanoidAgentVisual.ts`'s `InstancedHumanoidCrowd` sets `frustumCulled = false`
 on all ten of its `InstancedMesh`es (torso/head/hair/limbs/status/aura/ground-

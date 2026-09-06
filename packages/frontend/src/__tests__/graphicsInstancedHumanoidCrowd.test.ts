@@ -83,3 +83,65 @@ describe('InstancedHumanoidCrowd — per-instance color correctness after the sc
     expect(crowd.torso.count).toBe(1);
   });
 });
+
+/**
+ * Coverage for the LOD/culling wiring (graphics/lod.ts's FrustumCuller):
+ * an off-screen or too-far agent is excluded from the batch entirely, so
+ * `mesh.count` genuinely shrinks — not merely zeroed-but-still-submitted.
+ * Omitting `cull` must reproduce the pre-existing behavior exactly.
+ */
+describe('InstancedHumanoidCrowd — camera-aware culling (optional, backward-compatible)', () => {
+  function cameraLookingDownNegZ(fov = 50): THREE.PerspectiveCamera {
+    const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 1000);
+    camera.position.set(0, 0, 10);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld(true);
+    return camera;
+  }
+
+  it('without `cull`, every agent up to capacity is still rendered — unchanged default behavior', () => {
+    const crowd = new InstancedHumanoidCrowd(THREE, 8);
+    crowd.update([state({ id: 1, worldX: 0, worldZ: 0 }), state({ id: 2, worldX: 500, worldZ: 500 })]);
+    expect(crowd.torso.count).toBe(2);
+  });
+
+  it('excludes an agent far outside maxDistance, shrinking mesh.count on every mesh', () => {
+    const crowd = new InstancedHumanoidCrowd(THREE, 8);
+    const camera = cameraLookingDownNegZ();
+    crowd.update(
+      [state({ id: 1, worldX: 0, worldZ: 0 }), state({ id: 2, worldX: 500, worldZ: 0 })],
+      { camera, maxDistance: 50 },
+    );
+    expect(crowd.torso.count).toBe(1);
+    expect(crowd.head.count).toBe(1);
+    expect(crowd.groundShadow.count).toBe(1);
+    expect(crowd.agentIdForInstance(0)).toBe(1);
+  });
+
+  it('excludes an agent outside the camera frustum even within maxDistance', () => {
+    const crowd = new InstancedHumanoidCrowd(THREE, 8);
+    const camera = cameraLookingDownNegZ(20); // narrow lens
+    crowd.update(
+      [state({ id: 1, worldX: 0, worldZ: 0 }), state({ id: 2, worldX: 300, worldZ: 0 })], // far to the side, outside the narrow FOV
+      { camera, maxDistance: 1000 },
+    );
+    expect(crowd.torso.count).toBe(1);
+    expect(crowd.agentIdForInstance(0)).toBe(1);
+  });
+
+  it('re-culling after the camera moves reflects the new view, not a stale one', () => {
+    const crowd = new InstancedHumanoidCrowd(THREE, 8);
+    const camera = cameraLookingDownNegZ();
+    const agents = [state({ id: 1, worldX: 0, worldZ: 0 }), state({ id: 2, worldX: 0, worldZ: -200 })];
+
+    crowd.update(agents, { camera, maxDistance: 50 });
+    expect(crowd.torso.count).toBe(1); // only agent 1 is within 50 units
+
+    camera.position.set(0, 0, -190);
+    camera.lookAt(0, 0, -200);
+    camera.updateMatrixWorld(true);
+    crowd.update(agents, { camera, maxDistance: 50 });
+    expect(crowd.torso.count).toBe(1);
+    expect(crowd.agentIdForInstance(0)).toBe(2); // now only agent 2 is within range
+  });
+});

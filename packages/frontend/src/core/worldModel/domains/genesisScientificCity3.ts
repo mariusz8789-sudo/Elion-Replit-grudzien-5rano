@@ -99,7 +99,8 @@ export interface GenesisScientificCity3 {
   environmentId: EntityId;
 }
 
-function buildSpecification(options: GenesisScientificCity3Options): WorldSpecification {
+/** Exported so `genesisScientificCity4.ts` can build the exact same reference specification and drive it through the Trinity `createScientificWorld` entry point instead of this module's own manual compile/generate/wrap pipeline — proving the two paths are equivalent, not duplicating the specification. */
+export function buildGenesisScientificCity3Specification(options: GenesisScientificCity3Options): WorldSpecification {
   return {
     worldId: 'genesis-scientific-city-3',
     seed: options.seed ?? 1,
@@ -257,8 +258,31 @@ function rainfallSchedule(atTick: number): readonly ScheduledEvent[] {
   ];
 }
 
+/** The `pump-pipe-system:pump-pipe-1` id `WATER_SYSTEM_TEMPLATE` always produces for this specification — independent of the PLANET/REGION wrap, so it's the same id whether a graph came from this module's manual pipeline or the generic `generateSpecifiedWorld` path (see `genesisScientificCity4.ts`). */
+export const GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID: EntityId = 'pump-pipe-system:pump-pipe-1';
+
+/**
+ * Builds the real, tickable updater for the extreme-rainfall cross-domain
+ * scenario over an ALREADY-GENERATED graph. Extracted from
+ * `buildGenesisScientificCity3` so `genesisScientificCity4.ts` can attach
+ * the exact same scenario logic to a graph generated through the Trinity
+ * `createScientificWorld` entry point instead — never a second scenario
+ * implementation, only a second caller of this one.
+ */
+export function buildGenesisScientificCity3Updater(specification: WorldSpecification, options: Pick<GenesisScientificCity3Options, 'rainfallAtTick'> = {}): TemporalUpdater {
+  const router = makeGenesisCityRouter(computeEpidemicParamsFor(specification));
+  let updater: TemporalUpdater = makeGenesisCityUpdater(router);
+  if (options.rainfallAtTick !== undefined) updater = withScheduledEvents(updater, rainfallSchedule(options.rainfallAtTick));
+  const couplings = buildCouplings();
+  updater = withCrossDomainCouplings(updater, [couplings[0]]); // rainfall -> hydraulic load
+  updater = withCascades(updater, [pumpOverloadTripRule(GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID)]); // real headLoss -> trip
+  updater = withCrossDomainCouplings(updater, [couplings[1]]); // trip -> hospital service
+  updater = withCrossDomainCouplings(updater, [couplings[2]]); // hospital service -> population access
+  return updater;
+}
+
 export function buildGenesisScientificCity3(options: GenesisScientificCity3Options = {}): GenesisScientificCity3 {
-  const specification = buildSpecification(options);
+  const specification = buildGenesisScientificCity3Specification(options);
   const compiled = compileSpecification(specification);
   const planetId: EntityId = 'planet:earth';
   const regionId: EntityId = 'region:r1';
@@ -272,16 +296,9 @@ export function buildGenesisScientificCity3(options: GenesisScientificCity3Optio
     throw new Error(`Genesis Scientific City 3.0 failed structural invariants: ${summary}`);
   }
 
-  const pumpPipeId: EntityId = 'pump-pipe-system:pump-pipe-1';
-  const router = makeGenesisCityRouter(computeEpidemicParamsFor(specification));
-
-  let updater: TemporalUpdater = makeGenesisCityUpdater(router);
-  if (options.rainfallAtTick !== undefined) updater = withScheduledEvents(updater, rainfallSchedule(options.rainfallAtTick));
+  const pumpPipeId = GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID;
+  const updater = buildGenesisScientificCity3Updater(specification, options);
   const couplings = buildCouplings();
-  updater = withCrossDomainCouplings(updater, [couplings[0]]); // rainfall -> hydraulic load
-  updater = withCascades(updater, [pumpOverloadTripRule(pumpPipeId)]); // real headLoss -> trip
-  updater = withCrossDomainCouplings(updater, [couplings[1]]); // trip -> hospital service
-  updater = withCrossDomainCouplings(updater, [couplings[2]]); // hospital service -> population access
 
   return {
     specification,

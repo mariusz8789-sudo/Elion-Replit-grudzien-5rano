@@ -25,5 +25,6 @@ export * from './crossDomain/crossDomainCoupling';
 export * from './generation/worldModelProposal';
 export * from './generation/llmWorldProposalAdapter';
 export * from './domains/genesisScientificCity3';
+export * from './domains/genesisScientificCity4';
 export * from './orchestration/createScientificWorld';
 export * from './persistence/worldRegistry';

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
+import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
 import { LabScene3D } from '../../core/three/labScene3D';
 import type { MoveKey } from '../../core/three/firstPersonController';
 import {
@@ -207,9 +208,29 @@ export function FirstPersonLabScreen() {
   // realne przebiegi Scenario Engine → falsyfikacja → porównanie → następny
   // eksperyment. Nic nowego naukowo — istniejący `runScientificDiscoveryLoop`
   // (core/experimentFabric/scientificDiscoveryLoop.ts) w jednym wywołaniu.
-  const handleRunDiscoveryLoop = () => {
+  // Opened from the Looking Glass? Then the sentence already said what to
+  // look at and from where. Peek (never consume) in the initializer: React
+  // invokes it twice in StrictMode, and consuming there would drop the
+  // vantage on the second call — the same defect already fixed in the city.
+  const [lookingGlass] = useState(() => peekPendingLookingGlassExperience());
+  useEffect(() => { consumePendingLookingGlassExperience(); }, []);
+
+  // A request for the scientist's perspective on a running experiment should
+  // arrive with the experiment running. This starts the SAME discovery loop
+  // the button starts — no second entry point, no results computed here.
+  const discoveryLoopStarted = useRef(false);
+  useEffect(() => {
+    if (!lookingGlass || discoveryLoopStarted.current) return;
+    if (lookingGlass.viewpoint !== 'SCIENTIST_POV' && lookingGlass.viewpoint !== 'OPERATOR_POV') return;
+    discoveryLoopStarted.current = true;
+    // The problem comes from the session, not a default: the bench must
+    // answer the question the sentence asked.
+    handleRunDiscoveryLoop(lookingGlass.problemId ?? undefined);
+  }, [lookingGlass]);
+
+  const handleRunDiscoveryLoop = (problemId = 'problem:intervention-timing') => {
     try {
-      setDiscoveryLoop(runScientificDiscoveryLoop('problem:intervention-timing'));
+      setDiscoveryLoop(runScientificDiscoveryLoop(problemId));
       setDiscoveryLoopError(null);
     } catch (error) {
       setDiscoveryLoop(null);
@@ -557,7 +578,7 @@ export function FirstPersonLabScreen() {
             {comparison && !saved && <button className="chip-btn primary" onClick={handleSave}>Zapisz w Pamięci Naukowej</button>}
             {cameraTaken && <button className="chip-btn" onClick={handleReturnToFirstPerson}>Powrót do pierwszej osoby</button>}
             {(runA || runB) && <button className="chip-btn danger" onClick={handleReset}>Reset</button>}
-            {!isRunning && <button className="chip-btn" onClick={handleRunDiscoveryLoop}>Uruchom Pętlę Odkrycia Naukowego</button>}
+            {!isRunning && <button className="chip-btn" onClick={() => handleRunDiscoveryLoop()}>Uruchom Pętlę Odkrycia Naukowego</button>}
           </div>
         </div>
       )}

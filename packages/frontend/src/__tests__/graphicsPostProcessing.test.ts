@@ -17,6 +17,7 @@ vi.mock('../core/three/graphics/lighting', () => ({
   applyStudioEnvironment: vi.fn(),
   loadHdriEnvironment: vi.fn(async () => {}),
   applyAmbientIBL: vi.fn(),
+  captureRoomEnvironment: vi.fn(),
 }));
 
 vi.mock('../core/three/quality', async (importOriginal) => {
@@ -25,7 +26,7 @@ vi.mock('../core/three/quality', async (importOriginal) => {
 });
 
 import { setupGraphicsPipeline, resolveBokehUniforms, configureDOF, type DepthOfFieldSettings } from '../core/three/graphics/postProcessing';
-import { applyAmbientIBL } from '../core/three/graphics/lighting';
+import { applyAmbientIBL, applyStudioEnvironment, captureRoomEnvironment } from '../core/three/graphics/lighting';
 import { detectRenderTier } from '../core/three/quality';
 import type { PostProcessingModules } from '../core/three/types';
 
@@ -133,24 +134,6 @@ describe('setupGraphicsPipeline — renderer configuration', () => {
     const renderer = fakeRenderer();
     setupGraphicsPipeline(fakeThree(), modules, renderer, { ...baseOpts, toneMappingExposure: 1.3 });
     expect(renderer.toneMappingExposure).toBe(1.3);
-  });
-});
-
-describe('setupGraphicsPipeline — skipAmbientIBL', () => {
-  beforeEach(() => {
-    vi.mocked(applyAmbientIBL).mockClear();
-  });
-
-  it('applies the AMBIENT/IBL role by default', () => {
-    const { modules } = fakeModules();
-    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
-    expect(applyAmbientIBL).toHaveBeenCalled();
-  });
-
-  it('skips it for a caller that manages its own environment/atmosphere (e.g. a city scene with tuned HDRI + fog + background)', () => {
-    const { modules } = fakeModules();
-    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, skipAmbientIBL: true });
-    expect(applyAmbientIBL).not.toHaveBeenCalled();
   });
 });
 
@@ -386,6 +369,87 @@ describe('setupGraphicsPipeline — screen-space reflections (opt-in, off by def
     const { modules, addedPasses } = fakeModules();
     setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, qualityTier: 'cinematic', reflections: { enabled: true } });
     expect(addedPasses).toEqual(['RenderPass', 'GTAOPass', 'SSRPass', 'UnrealBloomPass', 'OutputPass']);
+  });
+});
+
+describe('setupGraphicsPipeline — ambient environment modes', () => {
+  beforeEach(() => {
+    vi.mocked(applyAmbientIBL).mockClear();
+    vi.mocked(applyStudioEnvironment).mockClear();
+    vi.mocked(captureRoomEnvironment).mockClear();
+  });
+
+  it('defaults to studio+hdri (applyAmbientIBL) when ambient is omitted', () => {
+    const { modules } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(applyAmbientIBL).toHaveBeenCalledOnce();
+    expect(applyStudioEnvironment).not.toHaveBeenCalled();
+  });
+
+  it('room-probe mode applies only the studio-box fallback, never the HDRI role, up front', () => {
+    const { modules } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts,
+      ambient: { mode: 'room-probe', probe: { position: [0, 1, 0] } },
+    });
+    expect(applyStudioEnvironment).toHaveBeenCalledOnce();
+    expect(applyAmbientIBL).not.toHaveBeenCalled();
+  });
+
+  it('room-probe mode captures the probe on the first captureRoomProbe() call, and never again', () => {
+    const { modules } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts,
+      ambient: { mode: 'room-probe', probe: { position: [1, 2, 3] } },
+    });
+    pipeline.captureRoomProbe();
+    pipeline.captureRoomProbe();
+    expect(captureRoomEnvironment).toHaveBeenCalledOnce();
+  });
+
+  it('captureRoomProbe is a safe no-op outside room-probe mode', () => {
+    const { modules } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(() => pipeline.captureRoomProbe()).not.toThrow();
+    expect(captureRoomEnvironment).not.toHaveBeenCalled();
+  });
+
+  it('none mode skips the AMBIENT/IBL role entirely, for a scene managing its own atmosphere', () => {
+    const { modules } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, ambient: { mode: 'none' } });
+    expect(applyAmbientIBL).not.toHaveBeenCalled();
+    expect(applyStudioEnvironment).not.toHaveBeenCalled();
+  });
+});
+
+describe('setupGraphicsPipeline — ambientOcclusion tuning', () => {
+  it('uses the high-tier default gate and default radius/blendIntensity when omitted', () => {
+    const { modules, gtaoInstances } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(gtaoInstances[0]!.updateGtaoMaterial).toHaveBeenCalledWith(expect.objectContaining({ radius: 0.42 }));
+    expect(gtaoInstances[0]!.blendIntensity).toBe(0.85);
+  });
+
+  it('honors an explicit radius/blendIntensity override', () => {
+    const { modules, gtaoInstances } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts, ambientOcclusion: { radius: 1.1, blendIntensity: 0.5 },
+    });
+    expect(gtaoInstances[0]!.updateGtaoMaterial).toHaveBeenCalledWith(expect.objectContaining({ radius: 1.1 }));
+    expect(gtaoInstances[0]!.blendIntensity).toBe(0.5);
+  });
+
+  it('enabled: false skips AO regardless of tier', () => {
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, ambientOcclusion: { enabled: false } });
+    expect(addedPasses).not.toContain('GTAOPass');
+  });
+
+  it('a per-scene minTier can loosen AO onto a lower tier than the global default', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('medium');
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, ambientOcclusion: { minTier: 'medium' } });
+    expect(addedPasses).toContain('GTAOPass');
   });
 });
 

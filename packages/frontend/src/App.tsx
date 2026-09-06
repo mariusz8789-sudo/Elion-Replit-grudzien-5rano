@@ -47,6 +47,7 @@ const City3DWebGLScreen = lazy(() => import('./components/visual-simulation/City
 const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/ConceptFilmScreen').then((m) => ({ default: m.ConceptFilmScreen })));
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
+const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
 const InvestorDemoScreen = lazy(() => import('./components/visual-simulation/InvestorDemoScreen').then((m) => ({ default: m.InvestorDemoScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
@@ -98,6 +99,7 @@ type Route =
   | { kind: 'character' }
   | { kind: 'hf-slice' }
   | { kind: 'first-person-lab' }
+  | { kind: 'looking-glass' }
   | { kind: 'investor-demo' }
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' };
@@ -129,6 +131,7 @@ function parseHash(): Route {
   if (h === '#/concept') return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
+  if (h === '#/looking-glass' || h === '#/lg') return { kind: 'looking-glass' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
   if (h === '#/investor-demo') return { kind: 'investor-demo' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
@@ -492,6 +495,18 @@ export default function App() {
           <TopBar title="Genesis — High-Fidelity Street Slice" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <HighFidelitySliceScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'looking-glass') {
+      return (
+        <div className="app">
+          <TopBar title="🔭 Looking Glass" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <LookingGlassChat />
           </HeavyRoute>
           {overlays}
         </div>

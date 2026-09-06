@@ -312,7 +312,7 @@ export class EpidemicCity3DSim implements Sim3D {
    * street) that a plain directional-light shadow map alone doesn't produce — see
    * `graphics/PERFORMANCE.md` for the cost this adds at the `'high'` tier only.
    *
-   * `skipAmbientIBL: true` because this scene already runs its OWN environment story
+   * `ambient: { mode: 'none' }` because this scene already runs its OWN environment story
    * (`loadApprovedHdri`, below) — a specific low `environmentIntensity` tuned for a night city, a
    * solid background color, and exponential fog for depth — none of which the shared pipeline's
    * generic "studio box" IBL role knows about or should override.
@@ -332,7 +332,7 @@ export class EpidemicCity3DSim implements Sim3D {
       // a bogatszy IBL/fill poniżej wyciąga materiał fasad z czerni bez neonów.
       toneMappingExposure: 1.00,
       bloom: { strength: 0.20, radius: 0.46, threshold: 0.90 },
-      skipAmbientIBL: true,
+      ambient: { mode: 'none' },
     });
     return pipeline;
   }

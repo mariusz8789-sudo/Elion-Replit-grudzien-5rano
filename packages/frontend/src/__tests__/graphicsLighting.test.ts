@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
   createKeyLight, createRimLight, createPracticalLight, createBackgroundFill, createHeroLight,
-  captureRoomReflectionProbe,
+  captureRoomEnvironment,
 } from '../core/three/graphics/lighting';
 import type * as THREE_NS from 'three';
 
@@ -85,14 +85,14 @@ describe('createHeroLight', () => {
 });
 
 /**
- * `captureRoomReflectionProbe` needs a real WebGLRenderer for `CubeCamera.update`/
+ * `captureRoomEnvironment` needs a real WebGLRenderer for `CubeCamera.update`/
  * `PMREMGenerator` — unavailable in this jsdom-free test environment (see
  * graphicsPostProcessing.test.ts's file doc for the same constraint on `setupGraphicsPipeline`).
  * These tests fake the handful of THREE/renderer entry points the function actually calls, so they
  * verify its own logic — which meshes get hidden and why, tone-mapping save/restore, the
  * finally-block safety net — without needing a real GPU context.
  */
-describe('captureRoomReflectionProbe', () => {
+describe('captureRoomEnvironment', () => {
   function fakeMesh(overrides: Partial<{ isMesh: boolean; visible: boolean; material: unknown }> = {}) {
     return { isMesh: true, visible: true, material: { transparent: false, opacity: 1, transmission: 0 }, ...overrides } as unknown as THREE_NS.Mesh;
   }
@@ -135,7 +135,7 @@ describe('captureRoomReflectionProbe', () => {
     let visibleDuringCapture: boolean | undefined;
     const THREE_FAKE = fakeThreeNS(() => { visibleDuringCapture = glass.visible; });
     const scene = fakeScene([glass]);
-    captureRoomReflectionProbe(THREE_FAKE, fakeRenderer(), scene, { position: [0, 1, 0] });
+    captureRoomEnvironment(THREE_FAKE, fakeRenderer(), scene, { position: [0, 1, 0] });
     expect(visibleDuringCapture).toBe(false);
     expect(glass.visible).toBe(true);
   });
@@ -144,7 +144,7 @@ describe('captureRoomReflectionProbe', () => {
     const faintGlass = fakeMesh({ material: { transparent: true, opacity: 0.2, transmission: 0 } });
     let visibleDuringCapture: boolean | undefined;
     const THREE_FAKE = fakeThreeNS(() => { visibleDuringCapture = faintGlass.visible; });
-    captureRoomReflectionProbe(THREE_FAKE, fakeRenderer(), fakeScene([faintGlass]), { position: [0, 1, 0] });
+    captureRoomEnvironment(THREE_FAKE, fakeRenderer(), fakeScene([faintGlass]), { position: [0, 1, 0] });
     expect(visibleDuringCapture).toBe(false);
   });
 
@@ -152,7 +152,7 @@ describe('captureRoomReflectionProbe', () => {
     const opaque = fakeMesh();
     let visibleDuringCapture: boolean | undefined;
     const THREE_FAKE = fakeThreeNS(() => { visibleDuringCapture = opaque.visible; });
-    captureRoomReflectionProbe(THREE_FAKE, fakeRenderer(), fakeScene([opaque]), { position: [0, 1, 0] });
+    captureRoomEnvironment(THREE_FAKE, fakeRenderer(), fakeScene([opaque]), { position: [0, 1, 0] });
     expect(visibleDuringCapture).toBe(true);
     expect(opaque.visible).toBe(true);
   });
@@ -161,7 +161,7 @@ describe('captureRoomReflectionProbe', () => {
     const hud = fakeMesh();
     let visibleDuringCapture: boolean | undefined;
     const THREE_FAKE = fakeThreeNS(() => { visibleDuringCapture = hud.visible; });
-    captureRoomReflectionProbe(THREE_FAKE, fakeRenderer(), fakeScene([hud]), {
+    captureRoomEnvironment(THREE_FAKE, fakeRenderer(), fakeScene([hud]), {
       position: [0, 1, 0],
       exclude: (mesh) => mesh === hud,
     });
@@ -173,7 +173,7 @@ describe('captureRoomReflectionProbe', () => {
     const renderer = fakeRenderer();
     let toneMappingDuringCapture: unknown;
     const THREE_FAKE = fakeThreeNS(() => { toneMappingDuringCapture = renderer.toneMapping; });
-    captureRoomReflectionProbe(THREE_FAKE, renderer, fakeScene([]), { position: [0, 1, 0] });
+    captureRoomEnvironment(THREE_FAKE, renderer, fakeScene([]), { position: [0, 1, 0] });
     expect(toneMappingDuringCapture).toBe('none');
     expect(renderer.toneMapping).toBe('ACESFilmic');
     expect(renderer.toneMappingExposure).toBe(1.1);
@@ -182,19 +182,19 @@ describe('captureRoomReflectionProbe', () => {
   it('sets scene.environment from the captured cubemap, with the default/overridden intensity', () => {
     const THREE_FAKE = fakeThreeNS();
     const scene = fakeScene([]);
-    captureRoomReflectionProbe(THREE_FAKE, fakeRenderer(), scene, { position: [0, 1, 0] });
+    captureRoomEnvironment(THREE_FAKE, fakeRenderer(), scene, { position: [0, 1, 0] });
     expect(scene.environment).toBe('captured-env');
     expect(scene.environmentIntensity).toBe(1.85);
 
     const scene2 = fakeScene([]);
-    captureRoomReflectionProbe(fakeThreeNS(), fakeRenderer(), scene2, { position: [0, 1, 0], environmentIntensity: 1.2 });
+    captureRoomEnvironment(fakeThreeNS(), fakeRenderer(), scene2, { position: [0, 1, 0], intensity: 1.2 });
     expect(scene2.environmentIntensity).toBe(1.2);
   });
 
   it('restricts the probe to render layer 0, excluding first-person view-model geometry by convention', () => {
     const cubeCameraInstances: Array<{ layers: { set: ReturnType<typeof vi.fn> } }> = [];
     const THREE_FAKE = fakeThreeNS(undefined, cubeCameraInstances);
-    captureRoomReflectionProbe(THREE_FAKE, fakeRenderer(), fakeScene([]), { position: [0, 1, 0] });
+    captureRoomEnvironment(THREE_FAKE, fakeRenderer(), fakeScene([]), { position: [0, 1, 0] });
     expect(cubeCameraInstances).toHaveLength(1);
     expect(cubeCameraInstances[0]!.layers.set).toHaveBeenCalledWith(0);
   });
@@ -203,7 +203,7 @@ describe('captureRoomReflectionProbe', () => {
     const glass = fakeMesh({ material: { transparent: false, opacity: 1, transmission: 0.9 } });
     const renderer = fakeRenderer();
     const THREE_FAKE = fakeThreeNS(() => { throw new Error('capture failed'); });
-    expect(() => captureRoomReflectionProbe(THREE_FAKE, renderer, fakeScene([glass]), { position: [0, 1, 0] })).not.toThrow();
+    expect(() => captureRoomEnvironment(THREE_FAKE, renderer, fakeScene([glass]), { position: [0, 1, 0] })).not.toThrow();
     expect(glass.visible).toBe(true);
     expect(renderer.toneMapping).toBe('ACESFilmic');
   });

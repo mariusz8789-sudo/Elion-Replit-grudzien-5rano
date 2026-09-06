@@ -4,7 +4,8 @@ import { registerSimContext } from '../../core/simContext';
 import { ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
 import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
-import { consumePendingExperimentWorld, consumePendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
+import { consumePendingExperimentWorld, consumePendingScenarioTimeline, peekPendingExperimentWorld, peekPendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
+import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
 import { saveScenarioCounterfactualToMemory, saveScenarioRunToMemory } from '../../core/scienceMemory';
 import { buildSavedScenarioRunContext } from '../../core/simulation/scenarioMemory';
 import { createTemporalStateBookmark, resolveTemporalStateBookmark, type TemporalStateBookmark } from '../../core/simulation/temporalStateBookmark';
@@ -63,14 +64,51 @@ export function City3DWebGLScreen() {
   // handoff pattern: a Science-Chat-confirmed epidemic-city run hands off its
   // already-computed EpidemicCitySimulation instance here instead of City3D
   // silently starting a second, disconnected simulation.
-  const [experimentWorld] = useState(() => consumePendingExperimentWorld());
+  // Peek, not consume — see the note on `scenarioTimeline` below: a state
+  // initializer that consumes loses the handoff to StrictMode's deliberate
+  // double invocation, and this channel additionally DELETES the world on
+  // consumption, so the loss was permanent.
+  const [experimentWorld] = useState(() => peekPendingExperimentWorld());
+  // How the user asked to experience this world (Looking Glass). Independent
+  // of the scientific handoff above: ignoring it would still show the right
+  // run, only from the default city vantage.
+  const [lookingGlass] = useState(() => peekPendingLookingGlassExperience());
   // Drugi kanał przekazania: ZAKOŃCZONY przebieg Scenario Engine. Świat nie jest
   // wtedy taktowany — jest PRZEWIJANY po rzeczywistej serii dobowej przebiegu.
-  const [scenarioTimeline, setScenarioTimeline] = useState(() => consumePendingScenarioTimeline());
+  // PEEK, nie consume. `useState` z inicjalizatorem, który KONSUMUJE, jest
+  // nieczysty, a React w StrictMode celowo wywołuje inicjalizator dwa razy:
+  // pierwsze wywołanie zabierało przekazany świat, drugie zastawało już pustą
+  // skrzynkę i to jego wynik trafiał do stanu. Efekt był taki, że świat
+  // otwarty z czatu/Pamięci pokazywał własną symulację zamiast przekazanej
+  // serii. Odczyt jest teraz czysty, a wskaźnik kasuje efekt po zamontowaniu.
+  const [scenarioTimeline, setScenarioTimeline] = useState(() => peekPendingScenarioTimeline());
   const [timelineDay, setTimelineDay] = useState(0);
   const [enteredTimelineDay, setEnteredTimelineDay] = useState<number | null>(null);
   const [timelineSaved, setTimelineSaved] = useState<string | null>(null);
   const [timelineBookmark, setTimelineBookmark] = useState<TemporalStateBookmark | null>(null);
+  useEffect(() => {
+    // Skasowanie wskaźnika po tym, jak stan początkowy już go odczytał —
+    // przekazanie jest jednorazowe, więc powrót na ten ekran nie może
+    // ponownie wciągnąć tej samej serii.
+    consumePendingScenarioTimeline();
+    consumePendingExperimentWorld();
+    consumePendingLookingGlassExperience();
+  }, []);
+  // Time moves on its own for an anchored viewpoint. It advances the SAME
+  // `timelineDay` the scrub bar drives, so this is playback of the real
+  // series and not a second clock — and it stops at the last real day rather
+  // than looping, because there is no day 61 in the run.
+  const autoPlay = Boolean(lookingGlass?.autoPlay) && Boolean(scenarioTimeline);
+  useEffect(() => {
+    if (!autoPlay || !scenarioTimeline) return;
+    const lastDay = scenarioTimeline.series.length - 1;
+    const stepMs = Math.max(120, (lookingGlass?.secondsPerStep ?? 1) * 1000);
+    const timer = window.setInterval(() => {
+      setTimelineDay((day) => (day >= lastDay ? lastDay : day + 1));
+    }, stepMs);
+    return () => window.clearInterval(timer);
+  }, [autoPlay, scenarioTimeline, lookingGlass]);
+
   useEffect(() => {
     const applyPendingScenarioTimeline = () => {
       const pending = consumePendingScenarioTimeline();
@@ -155,6 +193,19 @@ export function City3DWebGLScreen() {
     sim.reset(); setRunning(false); setSelectedId(null); setWorldSelection(null); setCameraPreset('city');
     setParams(sim.getSim().getParams()); setStats(sim.getStats());
   };
+  // ANCHORED VIEWPOINT: the user asked to stand in the world rather than look
+  // down on it, so the city opens at street level and time starts moving by
+  // itself — standing still while the world changes is the entire premise.
+  // The scrub bar stays live, so this is a starting vantage, not a lock.
+  useEffect(() => {
+    if (!lookingGlass) return;
+    const streetLevel = lookingGlass.viewpoint === 'ANCHORED_HUMAN' || lookingGlass.viewpoint === 'RESPONDER_POV';
+    if (streetLevel) {
+      sim.setCameraPreset('street');
+      setCameraPreset('street');
+    }
+  }, [lookingGlass, sim]);
+
   const changeCamera = (preset: CityCameraPreset) => {
     sim.setCameraPreset(preset);
     setCameraPreset(preset);

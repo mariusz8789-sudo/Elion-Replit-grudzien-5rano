@@ -14,9 +14,20 @@ const EVENT_MODES: Readonly<Record<string, WorldCameraMode>> = {
   'prediction.match': 'MACRO',
 };
 
+/**
+ * The camera mode a canonical event type asks for, or null when that event
+ * type has no presentation opinion. Exposed separately from
+ * `cameraDecisionFor` so an offline planner (the Looking Glass shot plan)
+ * can reuse the SAME table from a stored event type, without having to
+ * fabricate a whole `GenesisEvent` just to look one value up.
+ */
+export function cameraModeForEventType(type: string): WorldCameraMode | null {
+  return EVENT_MODES[type] ?? null;
+}
+
 /** Maps canonical Genesis events to presentation intent; it never infers results. */
 export function cameraDecisionFor(event: GenesisEvent): CameraPolicyDecision | null {
-  const mode = EVENT_MODES[event.type];
+  const mode = cameraModeForEventType(event.type);
   if (!mode) return null;
   return { mode, eventId: event.id, timestamp: event.timestamp, reason: `Camera response to ${event.type} (${event.id})` };
 }

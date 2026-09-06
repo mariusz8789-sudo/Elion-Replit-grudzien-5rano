@@ -5,9 +5,8 @@ import { FirstPersonController, type MoveKey } from './firstPersonController';
 import { CameraFlight, flightBetween } from '../reality/cameraSequencer';
 import type { HospitalStatus } from '../simulation/hospitalResource';
 import type { ScenarioDaySample } from '../simulation/scenarioEngine';
-import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
-import { FocusPuller, configureCinematicCamera, type CinematicCameraProfile } from './graphics/cinematicCamera';
-import { captureRoomReflectionProbe } from './graphics/lighting';
+import { configureDOF, setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
+import { configureCinematicCamera, type CinematicCameraProfile } from './graphics/cinematicCamera';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -439,13 +438,7 @@ export class LabScene3D implements Sim3D {
   private icuLight: THREE_NS.PointLight | null = null;
   private vesselLight: THREE_NS.PointLight | null = null;
   private vesselOuterMaterial: THREE_NS.MeshPhysicalMaterial | null = null;
-  private roomProbeCaptured = false;
-  // GENESIS GRAPHICS ENGINE — GTAOPass/BokehPass żyją w graphics/postProcessing.ts;
-  // handle trzymany tu wyłącznie po to, by co klatkę doregulować ostrość DOF
-  // (patrz syncScene) — reszta łańcucha (AO/bloom/tone mapping) jest już
-  // skonfigurowana wewnątrz setupPostProcessing i nie wymaga dalszego dotyku.
-  private graphicsPipeline: GraphicsPipeline | null = null;
-  private focusPuller: FocusPuller | null = null;
+  private pipeline: GraphicsPipeline | null = null;
   // GENESIS GRAPHICS ENGINE — lens/optics per shot (see `graphics/cinematicCamera.ts`). Tracks the
   // last-applied profile so `syncScene` only touches `camera.fov`/near/far/`updateProjectionMatrix`
   // on an actual shot change, not every frame.
@@ -3271,42 +3264,21 @@ export class LabScene3D implements Sim3D {
     // GENESIS GRAPHICS ENGINE — obiektyw (FOV/near/far) dobrany do bieżącego
     // kadru przez `configureCinematicCamera`, nie jeden stały kąt na cały
     // czas: WIDE (kadr otwierający) i FREE (pierwsza osoba) zostają na
-    // szerokim 68° (patrz profile WIDE_ESTABLISHING/SCIENTIST_POV — obie
-    // celowo bez zmiany dotychczasowego zachowania), ale SCIENTIFIC/ANOMALY/
-    // REPLAY dostają realny ciaśniejszy obiektyw (HERO_CLOSE_UP, 40°) zamiast
-    // tego samego szerokiego kadru co scena otwierająca — dopiero to razem z
-    // DOF poniżej robi z tych ujęć faktyczne zbliżenie kinowe, nie tylko
-    // rozmycie tła w niezmienionym kadrze. Zastosowywane WYŁĄCZNIE przy
-    // zmianie ujęcia (nie co klatkę) przez `appliedCinematicProfile`.
-    const desiredProfile: CinematicCameraProfile = this.cameraPhase === 'FREE' || this.flightGoingToFree
+    // szerokim 68° (profile WIDE_ESTABLISHING/SCIENTIST_POV), ale SCIENTIFIC/
+    // ANOMALY/REPLAY dostają realny ciaśniejszy obiektyw (HERO_CLOSE_UP, 40°)
+    // zamiast tego samego szerokiego kadru co scena otwierająca — razem z
+    // ostrością DOF, którą `setupPostProcessing`/`this.pipeline.setFocusDistance`
+    // już przestraja poniżej, to robi z tych ujęć faktyczne zbliżenie kinowe.
+    // Zastosowywane WYŁĄCZNIE przy zmianie ujęcia (nie co klatkę) przez
+    // `appliedCinematicProfile`.
+    const desiredCinematicProfile: CinematicCameraProfile = this.cameraPhase === 'FREE' || this.flightGoingToFree
       ? 'SCIENTIST_POV'
       : this.fixedKind === 'WIDE'
         ? 'WIDE_ESTABLISHING'
         : 'HERO_CLOSE_UP';
-    if (desiredProfile !== this.appliedCinematicProfile) {
-      configureCinematicCamera(camera, desiredProfile);
-      this.appliedCinematicProfile = desiredProfile;
-    }
-
-    // GENESIS GRAPHICS ENGINE — DOF włączone TYLKO na kadrach zbliżenia na
-    // aparaturę (SCIENTIFIC/ANOMALY/REPLAY), wyłączone na kadrze otwierającym
-    // (WIDE — ma objąć całą halę czytelnie, nic nie może być rozmyte) i w
-    // pierwszej osobie (FREE — wzrok naukowca nie jest selektywnie rozmywany;
-    // patrz `graphics/cinematicCamera.ts`, profile WIDE_ESTABLISHING i
-    // SCIENTIST_POV celowo nie mają opinii o DOF). Ostrość na kadrach, które
-    // je chcą, to odległość do punktu kadrowania z scientificFraming(),
-    // wygładzona przez FocusPuller, żeby zmiana kadru wyglądała jak "rack
-    // focus", nie jak skok.
-    if (this.graphicsPipeline && this.focusPuller) {
-      const wantsDof = this.cameraPhase === 'FIXED' && this.fixedKind !== 'WIDE';
-      this.graphicsPipeline.setDepthOfFieldEnabled(wantsDof);
-      if (wantsDof) {
-        const targetFocus = camera.position.distanceTo(
-          new THREE.Vector3(this.liveCameraLookAt[0], this.liveCameraLookAt[1], this.liveCameraLookAt[2]),
-        );
-        this.focusPuller.pullTo(targetFocus);
-        this.graphicsPipeline.setFocusDistance(this.focusPuller.update(1 / 60));
-      }
+    if (desiredCinematicProfile !== this.appliedCinematicProfile) {
+      configureCinematicCamera(camera, desiredCinematicProfile);
+      this.appliedCinematicProfile = desiredCinematicProfile;
     }
 
     // Naczynie: wysokość = realne obłożenie łóżek, kolor = realny status (uwzględnia też ICU/unmetCare).
@@ -3384,6 +3356,15 @@ export class LabScene3D implements Sim3D {
       }
     }
 
+    // OSTROŚĆ PODĄŻA ZA APARATURĄ. BokehPass ma jedną płaszczyznę ostrości, a
+    // kamera przeskakuje między kadrem otwierającym (~5.5 m od naczynia) a
+    // pierwszą osobą przy konsoli (~1.5 m). Stała wartość rozmywałaby hero w
+    // jednym z tych ujęć, więc przestrajamy ją realną odległością do naczynia.
+    if (this.pipeline) {
+      const toVessel = new THREE.Vector3(...VESSEL_POSITION).sub(camera.position).length();
+      this.pipeline.setFocusDistance(Math.max(0.6, toVessel));
+    }
+
     // Interakcja: promień z kamery na konsolę, w zasięgu i mniej więcej naprzeciw niej.
     if (this.raycaster && this.consoleMesh && this.cameraPhase === 'FREE') {
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -3403,31 +3384,31 @@ export class LabScene3D implements Sim3D {
   }
 
   /**
-   * Postprocessing kinowy: tone mapping ACES + delikatny bloom na źródłach
-   * światła (naczynie/hologram/pady) — WYŁĄCZNIE przez już wstrzyknięte przez
-   * useThreeLoop.ts moduły EffectComposer/UnrealBloomPass (patrz types.ts).
-   * Żaden nowy silnik renderujący, żaden nowy loader poza już zatwierdzonym
-   * (assetGovernance.ts) HDRI reużytym z highFidelitySlice3D.ts.
-   */
-  /**
-   * GENESIS GRAPHICS ENGINE — kinowy postprocessing (tone mapping ACES,
-   * prawdziwe GTAOPass, BokehPass) wpięty przez jedno wspólne
-   * `graphics/postProcessing.ts::setupGraphicsPipeline`, zamiast osobnego,
-   * ręcznie pisanego łańcucha shaderów w tym pliku. Cienie/tone mapping/
-   * przestrzeń barw i tak trafiały tu identycznie — ta metoda teraz TYLKO
-   * je zleca (jedno źródło prawdy dla całego Genesis, nie duplikat na każdą
-   * scenę), a sama zajmuje się wyłącznie wiedzą TEJ sceny: kiedy zdjąć sondę
-   * odbić hali i jaka jest bieżąca odległość ostrości (patrz `syncScene`).
+   * POTOK RENDERUJĄCY: delegowany w całości do Genesis Graphics Runtime
+   * (`core/three/graphics/postProcessing.ts`), zamiast trzeciej z rzędu
+   * ręcznej implementacji tych samych efektów w tym pliku.
    *
-   * Poprzedni własny SSAO/DOF (shared depth-prepass, ostrość próbkowana ze
-   * środka ekranu) był poprawnym, działającym rozwiązaniem — zastąpienie go
-   * `GTAOPass`/`BokehPass` nie jest poprawką błędu, tylko konsolidacją: jeden
-   * przetestowany potok post-processingu (patrz
-   * `src/__tests__/graphicsPostProcessing.test.ts`) używany przez KAŻDĄ
-   * scenę Sim3D zamiast dwóch niezależnie utrzymywanych implementacji tego
-   * samego efektu w dwóch gałęziach. Adaptacyjną ostrość "na to, na co
-   * naukowiec patrzy" replikuje `syncScene()` przez `FocusPuller`, żeby ta
-   * właściwość UX się nie zgubiła przy konsolidacji.
+   * CO ZNIKA I DLACZEGO. Ta metoda niosła wcześniej własne AO i własne DOF
+   * napisane jako ShaderPass, razem z prepassem głębi i materiałem
+   * depth-only. Powstały z konieczności: `SSAOPass` z three/examples
+   * renderuje scenę własnym przebiegiem, poza ACES i przestrzenią barw
+   * renderera, więc w tym łańcuchu wypuszczał biały kadr. Ale `GTAOPass`
+   * rozwiązuje dokładnie ten problem poprawnie — blenduje człon okluzji
+   * przez CustomBlending WEWNĄTRZ liniowego łańcucha compositora, czyli
+   * ściśle przed `OutputPass`. Utrzymywanie własnego shadera AO obok
+   * gotowego, utrzymywanego w upstreamie passu było kosztem bez zysku.
+   *
+   * CO ZOSTAJE PO STRONIE ŚWIATA. Mapa środowiska: Graphics Runtime ustawia
+   * proceduralne „studio" (jasny sufit, dwie świetlówki), ale ta scena ma
+   * lepsze źródło odbić — jednorazową sondę CubeCamera z PRAWDZIWEJ hali
+   * (`captureRoomEnvironment`), zdejmowaną po pierwszej pełnej klatce.
+   * Zostaje więc studio jako natychmiastowy fallback na starcie, a sonda
+   * podmienia je, gdy scena jest już oświetlona.
+   *
+   * PRÓG JAKOŚCI. AO i DOF mają w Runtime domyślny próg `'high'`. Ta hala
+   * świadomie schodzi z nim do `'medium'`: to AO daje aparaturze kontakt z
+   * posadzką (bez niego maszyny unoszą się nad podłogą), więc jest tu
+   * ważniejsze niż kilka klatek. Na `'low'` (telefon) oba nadal odpadają.
    */
   setupPostProcessing(
     modules: PostProcessingModules,
@@ -3437,64 +3418,60 @@ export class LabScene3D implements Sim3D {
     w: number,
     h: number,
   ): PostProcessor {
-    const pipeline = setupGraphicsPipeline(this.THREE!, modules, renderer, {
-      scene, camera, width: w, height: h,
-      // Ekspozycja/próg bloomu dostrojone do materiałów TEJ hali (patrz init()) —
-      // te same wartości, które obowiązywały przed przejściem na wspólny pipeline.
+    const THREE = this.THREE!;
+    const pipeline = setupGraphicsPipeline(THREE, modules, renderer, {
+      scene,
+      camera,
+      width: w,
+      height: h,
+      // Ekspozycja i bloom dostrojone do TEJ hali: ciemne tło, jasny hero.
       toneMappingExposure: 1.12,
       bloom: { strength: 0.22, radius: 0.55, threshold: 0.95 },
-      depthOfField: { enabled: true, focusDistance: 3, blurStrength: 0.32 },
-      // Sonda odbić hali (captureRoomEnvironment, poniżej) zastępuje generyczne HDRI raz, po
-      // pierwszej klatce — bez tej straży asynchroniczny loader HDRI mógłby dokończyć się PO
-      // sondzie i po cichu ją nadpisać uliczną panoramą zamiast prawdziwej hali.
-      ambientHdriGuard: () => !this.roomProbeCaptured,
+      // Promień AO dobrany do skali hali (maszyny metrowe, nie laboratoryjne
+      // szkło na blacie) — domyślne 0.42 gubi się przy tej aparaturze.
+      ambientOcclusion: { minTier: 'medium', radius: 0.75, blendIntensity: 1 },
+      // Odbicia z PRAWDZIWEJ hali, nie z pudełka studyjnego. Sonda stoi przy
+      // aparaturze, na wysokości oczu — to ten punkt widzenia widz ogląda.
+      ambient: {
+        mode: 'room-probe',
+        probe: { position: [VESSEL_POSITION[0] + 0.9, 1.75, VESSEL_POSITION[2] + 1.1], intensity: 1.85 },
+      },
+      // Ostrość na aparaturze centralnej w kadrze otwierającym; `setFocusDistance`
+      // przestraja ją przy cięciach kamery (patrz syncScene).
+      // `aperture`/`maxBlur` jawnie zamiast proxy `blurStrength`: przy proxy
+      // pas ostrości był węższy niż sama aparatura, więc rozmywały się jej
+      // własne krawędzie. Mała apertura = szeroki pas ostrości (cały hero
+      // ostry), umiarkowany maxBlur = czytelne oddzielenie dalekich planów.
+      depthOfField: configureDOF({ focusDistance: 5.4, aperture: 0.0045, maxBlur: 0.006, minTier: 'medium' }),
     });
-    this.graphicsPipeline = pipeline;
-    this.focusPuller = new FocusPuller(3);
+    this.pipeline = pipeline;
 
-    // Sceny są statyczne (światła i geometria się nie ruszają), więc mapy
-    // cieni liczymy raz. Bez tego GTAOPass/BokehPass wymuszałyby ich
-    // przeliczenie w każdej klatce — czysty koszt bez żadnej zmiany obrazu.
     let shadowsPrimed = false;
-
     return {
       render: () => {
         pipeline.render();
+        // Cienie liczone raz: scena jest statyczna poza aparaturą, więc
+        // przeliczanie mapy co klatkę było czystym kosztem.
         if (!shadowsPrimed) {
           shadowsPrimed = true;
           renderer.shadowMap.autoUpdate = false;
         }
         // Sonda odbić zdejmowana z PIERWSZEJ pełnej klatki: dopiero wtedy
         // światła, cienie i emisja są już policzone, więc mapa środowiska
-        // niesie prawdziwą halę, a nie pustą scenę.
-        if (!this.roomProbeCaptured) {
-          this.roomProbeCaptured = true;
-          this.captureRoomEnvironment(renderer, scene);
-        }
+        // niesie prawdziwą halę, a nie pustą scenę. Sama technika żyje teraz
+        // w graphics/lighting.ts — każda kolejna scena wnętrzowa dostaje ją
+        // za darmo, zamiast kopiować tę metodę do siebie.
+        pipeline.captureRoomProbe();
       },
-      setSize: (width, height) => pipeline.setSize(width, height),
+      setSize: (width, height) => pipeline.setSize?.(width, height),
       dispose: () => {
+        this.pipeline = null;
         pipeline.dispose?.();
-        this.graphicsPipeline = null;
         renderer.shadowMap.autoUpdate = true;
       },
     };
   }
 
-  /**
-   * ODBICIA Z PRAWDZIWEJ HALI, nie z pudełka studyjnego — teraz przez wspólną,
-   * generyczną `graphics/lighting.ts::captureRoomReflectionProbe` (ta sama
-   * technika, ta sama domyślna detekcja szkła/warstwy 1, ale reużywalna przez
-   * KAŻDY świat Genesis, nie tylko tę halę). Ta metoda zna już tylko WŁASNĄ
-   * pozycję sondy (obok naczynia, na wysokości oczu).
-   */
-  private captureRoomEnvironment(renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene): void {
-    const THREE = this.THREE;
-    if (!THREE) return;
-    captureRoomReflectionProbe(THREE, renderer, scene, {
-      position: [VESSEL_POSITION[0] + 0.9, 1.75, VESSEL_POSITION[2] + 1.1],
-    });
-  }
 
   onResize(): void { /* kamera pierwszoosobowa: brak dodatkowej logiki poza domyślnym aspect z useThreeLoop */ }
 

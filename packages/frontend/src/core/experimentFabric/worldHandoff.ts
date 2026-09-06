@@ -36,6 +36,16 @@ export function setPendingExperimentWorld(runId: string): boolean {
   return true;
 }
 
+/**
+ * Read WITHOUT consuming. Needed because a React state initializer must be
+ * pure: StrictMode invokes it twice on purpose, so an initializer that
+ * consumed would take the world on the first call and store the second
+ * call's empty result. Renderers peek here and consume in an effect.
+ */
+export function peekPendingExperimentWorld(): LiveWorldHandoff | null {
+  return pendingRunId ? LIVE_WORLDS.get(pendingRunId) ?? null : null;
+}
+
 /** Consumption transfers the original simulation reference once to the renderer. */
 export function consumePendingExperimentWorld(): LiveWorldHandoff | null {
   if (!pendingRunId) return null;

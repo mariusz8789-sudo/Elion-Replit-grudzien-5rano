@@ -288,9 +288,9 @@ export class HighFidelityStreetSlice3D implements Sim3D {
    * scene already bakes AO into `uv2`/`aoMap` (see `enableAo`) for STATIC per-texel occlusion —
    * `GTAOPass` (tier-gated to `'high'`) adds real-time, geometry-aware contact occlusion on top of
    * that (a car under a fire escape, a bench against a facade), which a baked texture map can't
-   * express since it doesn't know what else is nearby. `skipAmbientIBL: true` because this scene
-   * runs its OWN atmosphere (`loadHdri`, below — background/backgroundBlurriness/fog specific to
-   * this bright daytime street), which the shared pipeline's generic studio-box IBL would fight.
+   * express since it doesn't know what else is nearby. `ambient: { mode: 'none' }` because this
+   * scene runs its OWN atmosphere (`loadHdri`, below — background/backgroundBlurriness/fog specific
+   * to this bright daytime street), which the shared pipeline's generic studio-box IBL would fight.
    */
   setupPostProcessing(
     modules: PostProcessingModules,
@@ -309,7 +309,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       // która przywraca kolor gruntowi i listowiu.
       toneMappingExposure: 0.86,
       bloom: { strength: 0.17, radius: 0.55, threshold: 0.92 },
-      skipAmbientIBL: true,
+      ambient: { mode: 'none' },
     });
   }
 

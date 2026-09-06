@@ -1,7 +1,7 @@
 import type * as THREE_NS from 'three';
 import type { PostProcessingModules, PostProcessor } from '../types';
 import { detectRenderTier, tierAllowsAO, tierAllowsBloom, tierAtLeast, type RenderTier } from '../quality';
-import { applyAmbientIBL } from './lighting';
+import { applyAmbientIBL, applyStudioEnvironment, captureRoomEnvironment, type RoomEnvironmentProbeOptions } from './lighting';
 
 /**
  * GENESIS GRAPHICS RUNTIME — Screen-Space Reflections (investigation + opt-in pass)
@@ -135,6 +135,48 @@ export function configureDOF(opts: {
   };
 }
 
+/**
+ * Ambient-occlusion tuning. AO's default tier floor is `'high'` because GTAO's normal/depth
+ * pre-pass is meaningfully pricier than bloom — but "can this device afford AO" is a judgement
+ * about a SPECIFIC scene's budget, not a universal constant, and the caller is the only one who
+ * knows how heavy its own scene is. The flagship lab, for instance, deliberately spends its
+ * budget on grounding the hero apparatus (AO is what makes machinery sit ON the floor instead of
+ * hovering above it) and lowers this floor to `'medium'` — the same per-effect override
+ * `DepthOfFieldSettings.minTier` already gives DOF.
+ */
+export interface AmbientOcclusionSettings {
+  /** Default true. `false` skips the pass entirely regardless of tier. */
+  enabled?: boolean;
+  /** Tier floor for the pass. Default `'high'` — the previous hard-coded behavior. */
+  minTier?: RenderTier;
+  /** GTAO sampling radius in world units. Default 0.42 (tight contact darkening). Larger values
+   * read as broader, softer occlusion between separate objects — a room-scale facility with big
+   * machinery wants more than a tabletop scene does. */
+  radius?: number;
+  /** How strongly the AO term multiplies into the beauty buffer, 0..1. Default 0.85. */
+  blendIntensity?: number;
+}
+
+/**
+ * Which image-based lighting source the scene reflects.
+ *
+ * `'studio+hdri'` (default) is the general case: a procedural studio box immediately, upgraded in
+ * the background to the approved HDRI. `'room-probe'` is for a scene that IS an interior worth
+ * reflecting — it keeps the studio box only as the frame-0 fallback, skips the HDRI load
+ * entirely (which would otherwise asynchronously overwrite the probe), and hands the caller a
+ * `captureRoomProbe()` to fire once the first full frame has been rendered. See
+ * `captureRoomEnvironment` in `lighting.ts` for why the timing matters. `'none'` is for a scene
+ * that already runs its OWN environment/atmosphere entirely outside this module (a tuned HDRI
+ * intensity, a specific background color, exponential fog) — forcing the generic studio box on
+ * top would fight that scene's own tuning rather than help it, so this skips the AMBIENT/IBL role
+ * completely and leaves `scene.environment`/`scene.background`/`scene.fog` untouched.
+ */
+export interface AmbientEnvironmentSettings {
+  mode: 'studio+hdri' | 'room-probe' | 'none';
+  /** Required for `'room-probe'` — where the probe sits and how bright its map reads. */
+  probe?: RoomEnvironmentProbeOptions;
+}
+
 export interface GraphicsPipelineOptions {
   scene: THREE_NS.Scene;
   camera: THREE_NS.PerspectiveCamera;
@@ -143,6 +185,11 @@ export interface GraphicsPipelineOptions {
   toneMappingExposure?: number;
   bloom?: { strength: number; radius: number; threshold: number };
   depthOfField?: DepthOfFieldSettings;
+  /** Ambient occlusion tuning / tier floor — see `AmbientOcclusionSettings`. Omit for the
+   * default: enabled, `'high'` floor, contact-scale radius. */
+  ambientOcclusion?: AmbientOcclusionSettings;
+  /** Image-based lighting source. Omit for `'studio+hdri'`, the previous behavior. */
+  ambient?: AmbientEnvironmentSettings;
   /** Screen-space reflections — see the module doc above. Opt-in, off by default. */
   reflections?: ScreenSpaceReflectionSettings;
   /**
@@ -151,39 +198,28 @@ export interface GraphicsPipelineOptions {
    * the interactive device signals suggest. Omit for normal interactive rendering.
    */
   qualityTier?: RenderTier;
-  /**
-   * Forwarded to `graphics/lighting.ts`'s `applyAmbientIBL`/`loadHdriEnvironment` as their race
-   * guard. Only needed when the caller installs its OWN, better environment map after this
-   * pipeline is set up (e.g. a scene-specific room-reflection probe captured after the first
-   * frame) — without it, the generic HDRI load could finish later and silently clobber that
-   * better environment. Omit for the common case (no such upgrade); the HDRI always applies.
-   */
-  ambientHdriGuard?: () => boolean;
-  /**
-   * Skips this pipeline's own `applyAmbientIBL` call entirely. For a caller that already manages
-   * its own environment/atmosphere (a tuned HDRI intensity, a scene background color, exponential
-   * fog — things a generic "give metal something to reflect" helper has no business overriding),
-   * forcing the studio-box + default-intensity HDRI on top would fight that scene's own tuning
-   * rather than help it. Default `false` preserves the original all-in-one behavior for callers
-   * with no environment story of their own.
-   */
-  skipAmbientIBL?: boolean;
 }
 
-/** `PostProcessor` plus hooks for retuning DOF at runtime — a strict superset, so it still
+/** `PostProcessor` plus a hook for retuning DOF focus at runtime — a strict superset, so it still
  * satisfies `Sim3D.setupPostProcessing`'s declared `PostProcessor` return type. */
 export interface GraphicsPipeline extends PostProcessor {
   setFocusDistance(distance: number): void;
   /**
    * Toggles the Bokeh blur on/off per shot without rebuilding the composer — a no-op when DOF
-   * wasn't enabled at setup. For a camera that cuts between framings (a wide establishing shot,
-   * a tight hero close-up, a first-person POV), only SOME of those framings want shallow depth of
+   * wasn't enabled at setup. For a camera that cuts between framings (a wide establishing shot, a
+   * tight hero close-up, a first-person POV), only SOME of those framings want shallow depth of
    * field: cinematography convention (and this engine's own `cinematicCamera.ts` profiles) keeps
    * wide/establishing and POV shots sharp end-to-end, reserving DOF for close/hero framings where
    * it reads as intentional rather than as a rendering glitch blurring the room the viewer is
    * trying to read.
    */
   setDepthOfFieldEnabled(enabled: boolean): void;
+  /**
+   * Captures the room reflection probe, when `ambient.mode` is `'room-probe'` — a no-op
+   * otherwise, and a no-op on every call after the first. Call it from the render loop once the
+   * first full frame has been drawn.
+   */
+  captureRoomProbe(): void;
 }
 
 export function setupGraphicsPipeline(
@@ -208,22 +244,34 @@ export function setupGraphicsPipeline(
 
   // AMBIENT/IBL role (graphics/lighting.ts): procedural studio env immediately + optional
   // approved HDRI upgrade in the background — metal must have something to reflect, or chrome
-  // and steel read as flat plastic regardless of roughness/metalness. Skippable for a caller that
-  // already runs its own environment/atmosphere (see `skipAmbientIBL`'s doc above).
-  if (!opts.skipAmbientIBL) applyAmbientIBL(THREE, renderer, scene, opts.ambientHdriGuard);
+  // and steel read as flat plastic regardless of roughness/metalness.
+  const ambient = opts.ambient;
+  if (ambient?.mode === 'none') {
+    // The caller runs its own environment/atmosphere entirely — nothing to do here.
+  } else if (ambient?.mode === 'room-probe') {
+    // Studio box only as the frame-0 fallback — no HDRI load, since it would land
+    // asynchronously and overwrite the probe some seconds into the session.
+    applyStudioEnvironment(THREE, renderer, scene);
+  } else {
+    applyAmbientIBL(THREE, renderer, scene);
+  }
 
   const composer = new modules.EffectComposer(renderer);
   composer.addPass(new modules.RenderPass(scene, camera));
 
   const tier = opts.qualityTier ?? detectRenderTier();
+  const ao = opts.ambientOcclusion;
+  // `tierAllowsAO` stays the DEFAULT floor, not the only one — a caller that has profiled its own
+  // scene can lower it (see `AmbientOcclusionSettings`).
+  const aoAllowed = ao?.minTier ? tierAtLeast(tier, ao.minTier) : tierAllowsAO(tier);
   let gtao: InstanceType<typeof modules.GTAOPass> | null = null;
-  if (tierAllowsAO(tier)) {
+  if ((ao?.enabled ?? true) && aoAllowed) {
     gtao = new modules.GTAOPass(scene, camera, width, height);
     // The installed @types/three GTAOPass constructor typing doesn't expose the AO-tuning
     // (aoParameters) argument the runtime supports, so it's applied via `updateGtaoMaterial`
     // instead — same effect, one call later.
-    gtao.updateGtaoMaterial({ radius: 0.42, distanceExponent: 1.4, thickness: 0.9, scale: 1.1 });
-    gtao.blendIntensity = 0.85;
+    gtao.updateGtaoMaterial({ radius: ao?.radius ?? 0.42, distanceExponent: 1.4, thickness: 0.9, scale: 1.1 });
+    gtao.blendIntensity = ao?.blendIntensity ?? 0.85;
     composer.addPass(gtao);
   }
 
@@ -261,9 +309,15 @@ export function setupGraphicsPipeline(
 
   composer.addPass(new modules.OutputPass());
 
+  let roomProbeCaptured = false;
   return {
     render: () => composer.render(),
     setSize: (w, h) => composer.setSize(w, h),
+    captureRoomProbe: () => {
+      if (roomProbeCaptured || ambient?.mode !== 'room-probe' || !ambient.probe) return;
+      roomProbeCaptured = true;
+      captureRoomEnvironment(THREE, renderer, scene, ambient.probe);
+    },
     /** Retunes the DOF focus distance at runtime (e.g. when a cinematic camera cuts to a new
      * shot) — a no-op when DOF wasn't enabled. Reusable hook for the scene-composition layer. */
     setFocusDistance: (distance: number) => {

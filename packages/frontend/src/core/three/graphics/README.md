@@ -34,10 +34,10 @@ never the reverse.
 | Concern | Module | Entry points |
 |---|---|---|
 | Materials | `materials.ts` | `createGenesisMaterialPalette(THREE)`, `createPBRMaterial`, `createScientificGlass`, `createDoubleWalledGlass`, `createEmissiveInstrumentMaterial`, `createScreenMaterial`, plus the procedural texture generators. 13 static categories: interior (`SCIENCE_GLASS`/`BRUSHED_METAL`/`POLISHED_METAL`/`TECH_COMPOSITE`/`RUBBER`/`CERAMIC`/`PAINTED_METAL`/`LAB_FLOOR`/`LAB_WALL`) and exterior/urban (`CONCRETE`/`ASPHALT`/`BRICK`/`GROUND`, generalized out of and now used by the epidemiology city scene) |
-| Lighting roles | `lighting.ts` | `createKeyLight`, `createRimLight`, `createPracticalLight`, `createHeroLight`, `createBackgroundFill`, `applyAmbientIBL`, `captureRoomReflectionProbe` |
+| Lighting roles | `lighting.ts` | `createKeyLight`, `createRimLight`, `createPracticalLight`, `createHeroLight`, `createBackgroundFill`, `applyAmbientIBL`, `captureRoomEnvironment` (real interior reflections — see `RoomEnvironmentProbeOptions`) |
 | Shadows | `shadowPolicy.ts` | `applyShadowPolicy(THREE, scene, options?)`, `SHADOW_SIZE_TIERS` |
 | Instancing | `instancing.ts` | `InstanceBatch` |
-| Post-processing (AO/reflections/bloom/DOF/tone-mapping) | `postProcessing.ts` | `setupGraphicsPipeline`, `configureDOF`, `resolveBokehUniforms`, types `GraphicsPipelineOptions`/`DepthOfFieldSettings`/`ScreenSpaceReflectionSettings`/`GraphicsPipeline` — `GraphicsPipelineOptions.skipAmbientIBL` opts out of the AMBIENT/IBL role for a scene that manages its own environment/atmosphere (tuned HDRI intensity, background color, fog) |
+| Post-processing (AO/reflections/bloom/DOF/tone-mapping) | `postProcessing.ts` | `setupGraphicsPipeline`, `configureDOF`, `resolveBokehUniforms`, types `GraphicsPipelineOptions`/`DepthOfFieldSettings`/`ScreenSpaceReflectionSettings`/`AmbientOcclusionSettings`/`AmbientEnvironmentSettings`/`GraphicsPipeline`. `GraphicsPipelineOptions.ambient.mode` picks the AMBIENT/IBL source: `'studio+hdri'` (default), `'room-probe'` (an interior scene reflecting itself — pair with `GraphicsPipeline.captureRoomProbe()`, called once after the first full frame), or `'none'` (the caller manages its own environment/background/fog entirely — see the epidemiology city and high-fidelity street slice). `GraphicsPipelineOptions.ambientOcclusion` retunes AO's tier floor/radius/blend per scene instead of the fixed default. `GraphicsPipeline.setDepthOfFieldEnabled(bool)` toggles DOF per shot without rebuilding the composer. |
 | Cinematic camera | `cinematicCamera.ts` | `configureCinematicCamera`, `recommendedDofForProfile`, `FocusPuller` |
 | Quality tiers | `../quality.ts` | `detectRenderTier`, `configureGraphicsQuality`, `tierDpr`, `tierAllowsBloom`, `tierAllowsAO`, `tierAtLeast`, `recommendedShadowMapSize`, `maxShadowCasterBudget` |
 | Integration pattern | `examples/heroApparatusExample.ts` | `buildExampleHeroApparatus` — READ this, don't import it into a real scene |
@@ -430,25 +430,32 @@ This isn't a single-scene abstraction with one caller — three
 independently-built `Sim3D` scenes, of genuinely different shapes, all
 delegate their `setupPostProcessing` to `setupGraphicsPipeline` today:
 
-- `labScene3D.ts` (First Person Lab, an interior, GTAO+DOF enabled, a
-  scene-specific room-reflection probe via `captureRoomReflectionProbe`).
+- `labScene3D.ts` (First Person Lab, an interior): `ambient: { mode: 'room-probe' }`
+  for a scene-specific reflection of the room itself (via
+  `captureRoomEnvironment`, called from the render loop through
+  `GraphicsPipeline.captureRoomProbe()` once the first frame is drawn), a
+  per-scene `ambientOcclusion` radius tuned for its metre-scale machinery,
+  and a per-shot lens via `configureCinematicCamera` (wide 68° for the
+  establishing/first-person framings, a tighter 40° `HERO_CLOSE_UP` for the
+  vessel close-ups) driven by the same camera-phase state machine that
+  retunes DOF's focus distance every frame.
 - `epidemicCity3D.ts` (the epidemiology city, an exterior night scene with
-  its own HDRI intensity/background/fog — `skipAmbientIBL: true` so this
+  its own HDRI intensity/background/fog): `ambient: { mode: 'none' }` so this
   engine's generic AMBIENT/IBL role doesn't fight that scene's own
   atmosphere, while still getting the shared tone-mapping/AO/bloom pipeline
-  and its tier gating).
+  and its tier gating.
 - `highFidelitySlice3D.ts` (a bright daytime street-level view of the same
-  epidemic model, `skipAmbientIBL: true` again for its own HDRI/fog/
-  background). This scene already bakes AO into `uv2`/`aoMap` textures for
+  epidemic model): `ambient: { mode: 'none' }` again for its own HDRI/fog/
+  background. This scene already bakes AO into `uv2`/`aoMap` textures for
   static per-texel occlusion — `GTAOPass` adds real-time, geometry-aware
   contact occlusion on top, which a baked map can't express (it doesn't
   know what else is nearby at runtime). The two techniques are
   complementary, not redundant.
 
-That second integration is what `skipAmbientIBL` and
-`captureRoomReflectionProbe`'s generalization (out of what was originally
-lab-only code) exist to make possible — a real, different-domain scene
-consuming this engine without copy-pasting or forking any of its logic.
+The `'none'`/`'room-probe'` split is what makes that possible — a real,
+different-domain scene consuming this engine's tone-mapping/AO/bloom/DOF
+pipeline without forking it or fighting its own environment/atmosphere
+handling.
 
 The city scene also runs `applyShadowPolicy` (previously lab-only in
 practice) over its hundreds of building/road/street-furniture meshes, and

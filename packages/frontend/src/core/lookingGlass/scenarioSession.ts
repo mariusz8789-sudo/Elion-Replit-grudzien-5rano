@@ -111,6 +111,14 @@ export interface LookingGlassSession {
    */
   readonly commitComparisonToMemory: () => SavedExperiment | null;
   /**
+   * The same real comparison mechanism as `comparison`, callable ON DEMAND
+   * for a later "what if"/"compare" observation rather than only at open
+   * time — the exact same fork/ranking each domain already knows how to
+   * make (memoized where computing it is non-trivial), never a second
+   * comparison mechanism built for follow-up questions.
+   */
+  readonly requestComparison: () => ScenarioComparisonView | null;
+  /**
    * Before/after/why for this session's own focal entity, at a tick on this
    * session's own clock — powered by the real C3 bridge
    * (`describeWorldMoment`/`explainEntityChange`, `worldModelMoment.ts`).
@@ -189,6 +197,15 @@ interface SessionBuild {
   /** A REAL comparison, only when one was actually computed. */
   readonly comparison: ScenarioComparisonView | null;
   /**
+   * Computes (or re-returns, memoized) the same real comparison — the
+   * on-demand path for a later "what if"/"compare" observation, reusing
+   * the exact fork this domain already knows how to make. For a domain
+   * with no live engine to re-fork (epidemic, laboratory), this can only
+   * ever return what was already computed at open time — never a new one
+   * built outside `buildEpidemicSession`/`buildLaboratorySession`.
+   */
+  readonly requestComparison: () => ScenarioComparisonView | null;
+  /**
    * The real counterfactual behind `comparison`, when the domain's engine
    * produces a savable one. Kept out of `ScenarioComparisonView` because that
    * type is a plain, domain-independent shape — this is the actual engine
@@ -238,15 +255,22 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
   // Memory persists — not a second, Looking-Glass-only pairing of two raw
   // runs — so the comparison also carries a measured divergence day and a
   // fingerprint a saved copy can be replayed against.
-  const counterfactual = plan.comparison
-    ? runScenarioCounterfactual({
+  // Extracted as a memoized closure so a LATER "what if"/"compare"
+  // observation can trigger the exact same counterfactual on demand
+  // (`requestComparison`) without a second run when it was already
+  // computed here, and without building a second counterfactual mechanism.
+  let memoizedCounterfactual: ScenarioCounterfactual | null | undefined;
+  const computeCounterfactual = (): ScenarioCounterfactual | null => {
+    if (memoizedCounterfactual !== undefined) return memoizedCounterfactual;
+    return (memoizedCounterfactual = runScenarioCounterfactual({
       baselineScenarioId: 'BASELINE',
       variantScenarioId: 'ISOLATION',
       days: plan.ticks,
       stepsPerDay: DEFAULT_SCENARIO_RUN.stepsPerDay,
       baseParams: {},
-    })
-    : null;
+    }));
+  };
+  const counterfactual = plan.comparison ? computeCounterfactual() : null;
   const comparison = counterfactual ? compareEpidemicRuns(counterfactual) : null;
   // Reuse the counterfactual's own arm instead of running the model a third
   // time when a comparison was already computed.
@@ -273,6 +297,10 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
     // The city grid the epidemic runs on, in metres.
     bounds: { min: [-30, 0, -30], max: [30, 20, 30] },
     comparison,
+    requestComparison: () => {
+      const cf = computeCounterfactual();
+      return cf ? compareEpidemicRuns(cf) : null;
+    },
     counterfactual,
     worldModel: null,
   };
@@ -318,6 +346,10 @@ function buildLaboratorySession(plan: ScenarioRunPlan): SessionBuild {
   return {
     states,
     comparison,
+    // The loop already ran every candidate hypothesis regardless of whether
+    // comparison was requested — a later "what if" observation can read the
+    // SAME ranking on demand, computing nothing new.
+    requestComparison: () => compareHypothesisRanking(problem, result.discrimination),
     // The hypothesis ranking has no counterfactual-engine artifact behind it
     // — it is not a saved baseline/variant pair, so there is nothing honest
     // to commit to Scientific Memory. `commitComparisonToMemory` on the
@@ -398,12 +430,17 @@ function buildChemistrySession(plan: ScenarioRunPlan): SessionBuild {
     }, replayAt(engine.tick)));
   }
 
-  // A real fork/counterfactual, only when the sentence actually asked for
-  // one: halfway through the run, a second branch diverges by a genuine
-  // temperature intervention (not a relabeled clone), then both branches run
-  // to the same final tick so `compareBranches` compares like with like.
-  let comparison: ScenarioComparisonView | null = null;
-  if (plan.comparison && plan.ticks >= 2) {
+  // A real fork/counterfactual: halfway through the run, a second branch
+  // diverges by a genuine temperature intervention (not a relabeled clone),
+  // then both branches run to the same final tick so `compareBranches`
+  // compares like with like. Extracted as a closure — computed eagerly when
+  // the sentence asked for it, and callable again ON DEMAND (memoized) by
+  // `requestComparison`, e.g. from a later "what if" observation — the
+  // SAME fork, never a second one built for the follow-up question.
+  let memoizedComparison: ScenarioComparisonView | null | undefined;
+  const computeComparison = (): ScenarioComparisonView | null => {
+    if (memoizedComparison !== undefined) return memoizedComparison;
+    if (plan.ticks < 2) return (memoizedComparison = null);
     const forkTick = Math.floor(plan.ticks / 2);
     const cooled = engine.forkBranch(forkTick, 'cooled', (graph) => {
       const current = graph.getEntity(world.substanceId);
@@ -415,15 +452,17 @@ function buildChemistrySession(plan: ScenarioRunPlan): SessionBuild {
       cooled.advance(CHEMISTRY_DT_SECONDS, (graph, dt, tick) => router.routeTick(graph, dt, tick));
     }
     const branchComparison = compareBranches(registry, engine.branchId, cooled.branchId, plan.ticks);
-    comparison = compareWorldModelBranches(branchComparison, world.substanceId, {
+    return (memoizedComparison = compareWorldModelBranches(branchComparison, world.substanceId, {
       baseline: `${CHEMISTRY_INITIAL_TEMPERATURE_K}K throughout`,
       variant: `cooled to ${CHEMISTRY_INITIAL_TEMPERATURE_K + CHEMISTRY_FORK_TEMPERATURE_DELTA_K}K at hour ${forkTick}`,
-    });
-  }
+    }));
+  };
+  const comparison = plan.comparison ? computeComparison() : null;
 
   return {
     states,
     comparison,
+    requestComparison: computeComparison,
     // No ScenarioCounterfactual/Scientific-Memory artifact exists for this
     // engine yet — commitComparisonToMemory honestly reports this domain as
     // unsupported rather than inventing one.
@@ -491,9 +530,13 @@ function buildHydraulicsSession(plan: ScenarioRunPlan): SessionBuild {
   }
 
   // A real fork/intervention: halving the flow rate partway through, then
-  // continuing both branches to the same final tick.
-  let comparison: ScenarioComparisonView | null = null;
-  if (plan.comparison && plan.ticks >= 2) {
+  // continuing both branches to the same final tick. Same extract-as-closure
+  // pattern as chemistry, for the same reason: `requestComparison` can call
+  // this again later (memoized) without building a second fork mechanism.
+  let memoizedComparison: ScenarioComparisonView | null | undefined;
+  const computeComparison = (): ScenarioComparisonView | null => {
+    if (memoizedComparison !== undefined) return memoizedComparison;
+    if (plan.ticks < 2) return (memoizedComparison = null);
     const forkTick = Math.floor(plan.ticks / 2);
     const reducedFlow = PUMP_PIPE_DEFAULTS.volumetricFlow * HYDRAULICS_FORK_FLOW_FRACTION;
     const throttled = engine.forkBranch(forkTick, 'throttled', (graph) => {
@@ -506,15 +549,17 @@ function buildHydraulicsSession(plan: ScenarioRunPlan): SessionBuild {
       throttled.advance(HYDRAULICS_DT_SECONDS, (graph, dt, t) => router.routeTick(graph, dt, t));
     }
     const branchComparison = compareBranches(registry, engine.branchId, throttled.branchId, plan.ticks);
-    comparison = compareWorldModelBranches(branchComparison, world.pumpPipeId, {
+    return (memoizedComparison = compareWorldModelBranches(branchComparison, world.pumpPipeId, {
       baseline: `${PUMP_PIPE_DEFAULTS.volumetricFlow.toFixed(3)} m³/s throughout`,
       variant: `throttled to ${reducedFlow.toFixed(3)} m³/s at tick ${forkTick}`,
-    });
-  }
+    }));
+  };
+  const comparison = plan.comparison ? computeComparison() : null;
 
   return {
     states,
     comparison,
+    requestComparison: computeComparison,
     // No ScenarioCounterfactual/Scientific-Memory artifact exists for this
     // engine yet — same honest gap as chemistry, not a fabricated one.
     counterfactual: null,
@@ -559,6 +604,7 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
       worldRoute: null,
       enterWorld: () => false,
       commitComparisonToMemory: () => null,
+      requestComparison: () => null,
       describeEntityMoment: () => null,
     };
   }
@@ -634,6 +680,7 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
       if (built.counterfactual === null || built.counterfactual.comparison.status !== 'COMPLETED') return null;
       return saveScenarioCounterfactualToMemory(built.counterfactual);
     },
+    requestComparison: built.requestComparison,
     // Live C3 query, only for a domain that runs on a TemporalEngine. atTick
     // addresses THIS branch's own clock — never a foreign run's tick.
     describeEntityMoment: (atTick) => (built.worldModel

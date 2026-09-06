@@ -3156,3 +3156,39 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .lg-insp-delta-values { color: #cfe0f2; font: 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .lg-insp-delta-values .is-down { color: #7fe3ab; }
 .lg-insp-delta-values .is-up { color: #f0a4a4; }
+
+/* LOOKING GLASS 2.0 — the observation console: one field, one answer. */
+.lg-obs {
+  border: 1px solid #24314a; border-radius: 0.7rem; padding: 0.7rem 0.85rem;
+  display: flex; flex-direction: column; gap: 0.5rem; background: #0a0f18;
+}
+.lg-obs-title {
+  font: 600 0.64rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.12em; color: #7f93ad;
+}
+.lg-obs-form { display: flex; gap: 0.5rem; }
+.lg-obs-input {
+  flex: 1; background: #0d1420; border: 1px solid #2a3a56; border-radius: 0.4rem;
+  color: #e7edf6; padding: 0.4rem 0.6rem; font-size: 0.82rem;
+}
+.lg-obs-send {
+  border: 1px solid #2a3a56; border-radius: 0.4rem; background: #16243a; color: #8ecbff;
+  padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer;
+}
+.lg-obs-send:disabled { opacity: 0.5; cursor: default; }
+.lg-obs-examples { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.lg-obs-example {
+  border: 1px solid #24314a; border-radius: 0.4rem; background: transparent; color: #7f93ad;
+  padding: 0.3rem 0.55rem; font-size: 0.72rem; cursor: pointer; text-align: left;
+}
+.lg-obs-example:hover { border-color: #8ecbff; color: #cfe6ff; }
+.lg-obs-result { display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid #1c2637; padding-top: 0.5rem; }
+.lg-obs-narration { margin: 0; color: #cfe0f2; font-size: 0.84rem; line-height: 1.5; }
+.lg-obs-reasons { margin: 0; padding-left: 1.1rem; color: #f0c542; font-size: 0.76rem; line-height: 1.5; }
+.lg-obs-camera { margin: 0; color: #6f83a0; font-size: 0.7rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lg-obs-camera code { color: #9fd0ff; }
+.lg-obs-explain { display: flex; flex-direction: column; gap: 0.2rem; }
+.lg-obs-deltas { margin: 0; padding-left: 1.1rem; color: #cfe0f2; font-size: 0.78rem; line-height: 1.5; }
+.lg-obs-nodelta { margin: 0; color: #6f83a0; font-size: 0.78rem; font-style: italic; }
+.lg-obs-cause, .lg-obs-consequence, .lg-obs-grounding { margin: 0; color: #9fb4cd; font-size: 0.76rem; }
+.lg-obs-grounding code { color: #f0c542; }

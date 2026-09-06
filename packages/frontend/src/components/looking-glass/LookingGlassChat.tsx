@@ -5,6 +5,8 @@ import { anchoredSequenceDuration, sampleAnchoredSequence, scrubToSeconds } from
 import { ExperiencePlayer, frameAt, type ExperienceFrame } from '../../core/lookingGlass/experienceOrchestrator';
 import type { SavedExperiment } from '../../core/scienceMemory';
 import type { InspectableEvent } from '../../core/lookingGlass/eventInspection';
+import { parseObservationIntent } from '../../core/lookingGlass/observationIntent';
+import { resolveObservation, type ObservationResult } from '../../core/lookingGlass/observationDirector';
 import { ComparisonPanel } from './ComparisonPanel';
 import { EventInspector } from './EventInspector';
 
@@ -156,6 +158,97 @@ function ComparisonCommit({ session }: { session: LookingGlassSession }): JSX.El
         <button type="button" className="lg-cmp-commit-btn" onClick={() => setSaved(session.commitComparisonToMemory())}>
           Zapisz porównanie w Pamięci Naukowej
         </button>
+      )}
+    </div>
+  );
+}
+
+const OBSERVATION_EXAMPLES: readonly string[] = [
+  'Follow the substance. Why did this change happen?',
+  'Go back 3 hours.',
+  'Compare with the intervention branch.',
+  'Show me this as an operator.',
+];
+
+/**
+ * LOOKING GLASS 2.0 — THE OBSERVATION CONSOLE.
+ *
+ * "User speaks → Genesis understands → Genesis moves to the right moment/
+ * place/state → Genesis explains what is happening." One text field, one
+ * answer — never a dashboard of controls. Everything below is read off
+ * `resolveObservation`, which itself reads only what the session already
+ * computed; this component computes nothing and owns no world state beyond
+ * "which tick am I asking follow-ups relative to right now".
+ */
+function ObservationConsole({ session }: { session: LookingGlassSession }): JSX.Element | null {
+  const [text, setText] = useState('');
+  const [currentTick, setCurrentTick] = useState(0);
+  const [result, setResult] = useState<ObservationResult | null>(null);
+
+  if (!session.world) return null;
+
+  const ask = (sentence: string) => {
+    const trimmed = sentence.trim();
+    if (!trimmed) return;
+    const intent = parseObservationIntent(trimmed);
+    const resolved = resolveObservation(intent, session, currentTick);
+    setResult(resolved);
+    if (resolved.time?.granted) setCurrentTick(resolved.time.worldTime);
+    setText('');
+  };
+
+  return (
+    <div className="lg-obs">
+      <span className="lg-obs-title">ZAPYTAJ O ŚWIAT</span>
+      <form className="lg-obs-form" onSubmit={(event) => { event.preventDefault(); ask(text); }}>
+        <input
+          className="lg-obs-input"
+          type="text"
+          value={text}
+          placeholder="np. „Follow the substance. Why did this change happen?”"
+          onChange={(event) => setText(event.target.value)}
+        />
+        <button type="submit" className="lg-obs-send" disabled={text.trim().length === 0}>Zapytaj</button>
+      </form>
+      {!result && (
+        <div className="lg-obs-examples">
+          {OBSERVATION_EXAMPLES.map((example) => (
+            <button key={example} type="button" className="lg-obs-example" onClick={() => ask(example)}>{example}</button>
+          ))}
+        </div>
+      )}
+      {result && (
+        <div className={`lg-obs-result lg-obs-${result.status.toLowerCase()}`}>
+          <p className="lg-obs-narration">{result.narration}</p>
+          {result.reasons.length > 0 && (
+            <ul className="lg-obs-reasons">
+              {result.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+            </ul>
+          )}
+          {result.cameraRequest && (
+            <p className="lg-obs-camera">
+              director request → <code>{result.cameraRequest.kind}</code> · <code>{result.cameraRequest.cameraIntent}</code>
+              {result.focusEntity ? <> · target: <code>{result.focusEntity.label}</code></> : null}
+            </p>
+          )}
+          {result.explanation && (
+            <div className="lg-obs-explain">
+              {result.explanation.byHowMuch.length > 0 ? (
+                <ul className="lg-obs-deltas">
+                  {result.explanation.byHowMuch.map((delta) => (
+                    <li key={delta.key}>
+                      {delta.key}: {delta.before.toFixed(2)} → {delta.after.toFixed(2)}{delta.unit ? ` ${delta.unit}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="lg-obs-nodelta">Nic mierzalnego nie zmieniło się w tym momencie.</p>}
+              <p className="lg-obs-cause">przyczyna: {result.explanation.cause ?? 'brak zapisanej przyczyny'}</p>
+              <p className="lg-obs-consequence">skutek: {result.explanation.consequence ?? 'brak zapisanego późniejszego efektu'}</p>
+              <p className="lg-obs-grounding">grounding: <code>{result.explanation.grounding}</code> — wynik modelu, nie obserwacja rzeczywistości.</p>
+            </div>
+          )}
+          {result.comparison && <ComparisonPanel comparison={result.comparison} requestedButMissing={false} />}
+        </div>
       )}
     </div>
   );
@@ -318,6 +411,8 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
               {session.shotPlan.markersUsed}/{session.shotPlan.markersAvailable} realnych znaczników użytych w montażu
             </span>
           </div>
+
+          <ObservationConsole session={session} />
         </>
       ) : (
         <div className="lg-refusal">

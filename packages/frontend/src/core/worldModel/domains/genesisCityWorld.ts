@@ -1,6 +1,7 @@
 import { DEFAULT_EPIDEMIC, type EpidemicParams } from '../../epidemic/sir';
 import type { PumpPipeDefaults } from '../../engineeringGraph/pumpPipe';
-import { entityId, type EntityId, type WorldModelEntity } from '../ecs/types';
+import { spawnEntity } from '../ecs/entityFactory';
+import type { EntityId } from '../ecs/types';
 import { WorldGraph } from '../ecs/worldGraph';
 import { SolverRouter } from '../solvers/solverRouter';
 import type { TemporalUpdater } from '../temporal/temporalEngine';
@@ -52,47 +53,32 @@ export interface GenesisCityWorld {
   epidemicParams: EpidemicParams;
 }
 
+/** A pure container — no solver advances it directly, so it stays `UNGROUNDED_APPROXIMATION` (NOT_MODELLED), same honest default `spawnEntity` already applies. */
 function addContainer(graph: WorldGraph, kind: string, id: string, label: string, parentEntityId: EntityId | undefined, position: { x: number; y: number; z: number }): EntityId {
-  const ref = { kind, id };
-  const entity: WorldModelEntity = {
-    id: entityId(ref),
-    ref,
-    label,
-    scale: { level: 'MESO_LAB', parentEntityId },
-    spatial: { position },
-    grounding: 'UNGROUNDED_APPROXIMATION', // NOT_MODELLED: a pure container — no solver advances it directly
-    updatedAtTick: 0,
-  };
-  graph.addEntity(entity);
-  return entity.id;
+  return spawnEntity(graph, { ref: { kind, id }, label, scaleLevel: 'MESO_LAB', parentEntityId, spatial: { position } });
 }
 
 export function buildGenesisCityWorld(options: GenesisCityWorldOptions = {}): GenesisCityWorld {
   const graph = new WorldGraph();
   const epidemicParams = options.epidemicParams ?? DEFAULT_EPIDEMIC;
 
-  const cityRef = { kind: 'city', id: options.cityId ?? 'city-1' };
-  const city: WorldModelEntity = {
-    id: entityId(cityRef),
-    ref: cityRef,
+  const cityId = spawnEntity(graph, {
+    ref: { kind: 'city', id: options.cityId ?? 'city-1' },
     label: 'Genesis City',
-    scale: { level: 'MACRO_CITY' },
+    scaleLevel: 'MACRO_CITY',
     spatial: { position: { x: 0, y: 0, z: 0 } },
-    grounding: 'UNGROUNDED_APPROXIMATION', // NOT_MODELLED: root container
-    updatedAtTick: 0,
-  };
-  graph.addEntity(city);
+  });
 
-  const hospitalId = addContainer(graph, 'hospital', 'hospital-1', 'City Hospital', city.id, { x: -10, y: 0, z: 0 });
+  const hospitalId = addContainer(graph, 'hospital', 'hospital-1', 'City Hospital', cityId, { x: -10, y: 0, z: 0 });
   const populationId = addPopulation(graph, { parentEntityId: hospitalId, scale: 'MESO_LAB', params: epidemicParams });
 
-  const labId = addChemistryLab(graph, { parentEntityId: city.id, position: { x: 10, y: 0, z: 0 } });
+  const labId = addChemistryLab(graph, { parentEntityId: cityId, position: { x: 10, y: 0, z: 0 } });
   const substanceId = addChemistrySubstance(graph, labId, options.chemistry);
 
-  const waterSystemId = addContainer(graph, 'water-system', 'water-system-1', 'City Water System', city.id, { x: 0, y: 10, z: 0 });
+  const waterSystemId = addContainer(graph, 'water-system', 'water-system-1', 'City Water System', cityId, { x: 0, y: 10, z: 0 });
   const pumpPipeId = addPumpPipeSystem(graph, { parentEntityId: waterSystemId, params: options.hydraulicsParams });
 
-  return { graph, cityId: city.id, hospitalId, populationId, labId, substanceId, waterSystemId, pumpPipeId, epidemicParams };
+  return { graph, cityId, hospitalId, populationId, labId, substanceId, waterSystemId, pumpPipeId, epidemicParams };
 }
 
 /** Registers all three real domain solvers on one router — the same `SolverRouter` used for a single domain, just with more entries. */

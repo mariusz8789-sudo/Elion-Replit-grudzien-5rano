@@ -51,6 +51,9 @@ never the reverse.
 | Environment (sky/fog/time-of-day) | `environment.ts` | `computeSunState(THREE, hourOfDay)` (pure, testable — sun direction/color/intensity + matching sky/fog tones), `createSkyDome`, `applyEnvironmentPreset(THREE, scene, {mode, hourOfDay?})` — `'OUTDOOR'` adds a sky dome + fog and hands back `SunState` for a caller's own `createSunLight` call; `'INDOOR'` is a deliberate near-no-op. See §17 below. |
 | Water | `water.ts` | `createWaterSurface` (a horizontal plane with real `MeshPhysicalMaterial` transmission + a scrolling ripple normal map reusing `materials.ts`'s `surfaceNormalFactory`), `captureDryLook`/`applyWetLook` (cheaply wets an existing opaque material). See §18 below. |
 | Vegetation | `vegetation.ts` | `createTreeField`, `createGroundClutter` — seeded, instanced (2 draw calls / 1 draw call respectively, any count) scattered nature fields with position/rotation/scale variation. See §19 below. |
+| Laboratory furniture kit | `labKit.ts` | `createBench`, `createCabinet`, `createShelfUnit`, `createMonitor` — ordinary interior furniture composed from `primitives.ts`'s `createColumn`/`createPlatform`, for a NEW interior scene that doesn't want to re-derive `labScene3D.ts`'s own bespoke hero-furniture geometry. See §21. |
+| Animation (non-skeletal) | `animation.ts` | `createOscillator`, `createRotator`, `createSway` — a continuous, allocation-free motion foundation (machinery spin, gentle sway/bob) generalizing the flagship lab's own `rotation.y += dt * speed` pattern. Takes no dependency on `three` (pure math over plain `{rotation}`-shaped objects). See §21. |
+| Asset pipeline | `assetPipeline.ts` | `KeyedResourceCache<T>` (generic get-or-create-by-key cache with bulk disposal), `assignTextureSlot` (dispose-then-overwrite a material's texture slot — the exact fix for a real leak this pass found in `epidemicCity3D.ts`/`highFidelitySlice3D.ts`'s governed-asset loaders, generalized), `createAssetSlot` (fallback-now/real-asset-later `Object3D` swap with correct disposal, loader-agnostic). See §21. |
 | Resource lifecycle | `lifecycle.ts` | `disposeSceneResources(root, options?)` — traverses an `Object3D` subtree (typically your whole `Sim3D.scene`) disposing every geometry, material, and each material's own textures in one call. Call it from your `Sim3D.dispose()`, storing `scene` from `init()` first (see `labScene3D.ts`). `options.excludeMaterials`/`excludeTextures` skip anything owned/disposed elsewhere (a shared registry, the pipeline's own environment map). |
 | WorldFrame render pathway | `worldFrame.ts` + `worldFrameRenderer.ts` | The first generic WorldFrame → scene graph → rendering pathway — see §13 below for the full contract, boundary, and why it exists. `WorldFrameRenderer.sync(frame)` reconciles a scene to match a frame of generic entities (appear/move/rescale/reparent/disappear/retune-in-place for an unchanged instanced population — see §13's incremental-update update); `.dispose()` tears the whole thing down; `.resolveEntityId(intersection)` maps a raycast hit back to an entity id (feeds `interaction.ts`). `worldFrame.ts`'s types are deliberately isolated and NOT the final C1/C3 contract — see its own doc comment. |
 | Integration pattern | `examples/heroApparatusExample.ts` | `buildExampleHeroApparatus` — READ this, don't import it into a real scene |
@@ -696,6 +699,36 @@ if (tierAllowsAtmosphereParticles(tier)) {
 
 The same pattern generalizes to any future density-scaled effect (vegetation instance counts
 included) — one gate check, one count call, instead of each scene re-deriving its own tier logic.
+
+## 21. Laboratory kit, animation, and asset pipeline
+
+`labKit.ts` gives a new interior scene ordinary furniture without hand-deriving geometry:
+
+```ts
+import { createBench, createCabinet, createShelfUnit, createMonitor } from './graphics/labKit';
+
+scene.add(createBench(THREE, { position: [0, 0, 2], width: 1.4, depth: 0.7, height: 0.9, topMaterial: palette.LAB_FLOOR }));
+scene.add(createCabinet(THREE, { position: [-2, 0, 0], width: 0.6, height: 1.4, depth: 0.5, bodyMaterial: palette.PAINTED_METAL }));
+```
+
+`animation.ts` gives any of the above (or anything else) continuous, non-skeletal motion without a
+per-object `Math.sin` reimplementation:
+
+```ts
+import { createRotator } from './graphics/animation';
+const fanSpin = createRotator('y', () => 0.6 + realFlowRate * 2); // rate from REAL state, never decorative
+// every frame: fanSpin.update(dt, fanBlade);
+```
+
+`assetPipeline.ts`'s `createAssetSlot` is the correct fallback-then-real-asset pattern (this pass
+found and fixed the exact leak `assignTextureSlot` now generalizes — see the module doc):
+
+```ts
+import { createAssetSlot } from './graphics/assetPipeline';
+const slot = createAssetSlot(buildProceduralFallback());
+scene.add(slot.current);
+loadRealGltf(url).then((gltf) => slot.replace(gltf.scene)); // fallback disposed automatically
+```
 
 ## Example usage
 

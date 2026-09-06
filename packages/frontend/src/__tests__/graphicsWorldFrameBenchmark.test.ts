@@ -43,9 +43,9 @@ function makeBenchResolver(): () => EntityVisualSpec {
   return () => ({ kind: 'instanced', batchKey: 'agents', geometry, material });
 }
 
-const SCALES = [1000, 5000, 10000];
+const SCALES = [1000, 5000, 10000, 25000, 50000];
 
-describe('WorldFrameRenderer — population-scale characterization (1k/5k/10k synthetic entities)', () => {
+describe('WorldFrameRenderer — population-scale characterization (1k/5k/10k/25k/50k synthetic entities)', () => {
   for (const count of SCALES) {
     it(`builds exactly one InstancedMesh with ${count} instances (first sync — full rebuild path)`, () => {
       const scene = new THREE.Scene();
@@ -84,7 +84,7 @@ describe('WorldFrameRenderer — population-scale characterization (1k/5k/10k sy
   it('disposes a large population cleanly (no leaked geometry/material/textures) at the largest tested scale', () => {
     const scene = new THREE.Scene();
     const renderer = new WorldFrameRenderer(THREE, scene, { resolveVisual: makeBenchResolver() });
-    renderer.sync(buildFrame(10000, 0));
+    renderer.sync(buildFrame(50000, 0));
     const mesh = scene.children.find((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh;
     const disposeSpy = mesh.geometry.dispose.bind(mesh.geometry);
     let disposed = false;

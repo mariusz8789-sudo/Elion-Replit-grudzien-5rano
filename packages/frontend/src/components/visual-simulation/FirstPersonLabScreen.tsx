@@ -552,6 +552,13 @@ export function FirstPersonLabScreen() {
                   <span className="lg-world-shot-cam">{direction.cameraIntent}</span>
                 </div>
                 <p className="lg-world-shot-reason">{direction.reason}</p>
+                {/* Same platform-parity clock note as the city world: the
+                    clock's own reason, shown only when it says something the
+                    editorial shot reason above does not — a snapped-over gap
+                    or a marker held because it belongs to a different run. */}
+                {(direction.worldTimeSnapped || direction.worldTime === null) && (
+                  <p className="lg-world-shot-clock">{direction.worldTimeReason}</p>
+                )}
               </div>
             )}
           </div>

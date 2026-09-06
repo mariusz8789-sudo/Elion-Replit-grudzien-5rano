@@ -69,6 +69,18 @@ export interface WorldDirection {
   readonly markerIds: readonly string[];
   /** Provenance for those markers, resolved through the scenario contract. */
   readonly evidence: readonly EvidenceRef[];
+
+  /**
+   * The clock's own reason for `worldTime` — WHY this tick and not the one
+   * asked for, in words a screen can show. Previously computed by
+   * `WorldClock.resolve`/`resolveForeign` and then discarded here; now
+   * carried through so "why did the world just freeze" or "why did it jump
+   * to a different day than expected" has a real answer instead of a
+   * screen guessing from `worldTimeSource` alone.
+   */
+  readonly worldTimeReason: string;
+  /** True when the requested tick did not exist and the clock snapped to the nearest real one — a genuine gap in the run, not a rendering choice. */
+  readonly worldTimeSnapped: boolean;
 }
 
 /**
@@ -110,6 +122,8 @@ export function directionForFrame(
 
   let worldTime: number | null;
   let worldTimeSource: WorldTimeSource;
+  let worldTimeReason: string;
+  let worldTimeSnapped: boolean;
 
   if (frame.shot.sourceMarkerId === null) {
     // Structural shot: its ticks are the plan's own span, which IS the
@@ -122,6 +136,8 @@ export function directionForFrame(
     });
     worldTime = resolved.granted ? resolved.worldTime : null;
     worldTimeSource = frame.shot.kind === 'TEMPORAL' ? 'VIEWER_CLOCK' : 'SHOT_SPAN';
+    worldTimeReason = resolved.reason;
+    worldTimeSnapped = resolved.snapped;
   } else {
     const marker = [...world.getEvents(frame.worldTick, frame.worldTick)]
       .find((event) => event.id === frame.shot.sourceMarkerId);
@@ -133,11 +149,16 @@ export function directionForFrame(
     if (resolved?.granted) {
       worldTime = resolved.worldTime;
       worldTimeSource = 'VIEWER_CLOCK';
+      worldTimeReason = resolved.reason;
+      worldTimeSnapped = resolved.snapped;
     } else {
       // Either an observation (indexed by state, not by day) or an event from
       // a run of a different length. Both would produce a fabricated date.
       worldTime = null;
       worldTimeSource = 'FOREIGN_RUN';
+      worldTimeReason = resolved?.reason
+        ?? `no event with id "${frame.shot.sourceMarkerId}" exists on this run's clock at this tick`;
+      worldTimeSnapped = false;
     }
   }
 
@@ -152,6 +173,8 @@ export function directionForFrame(
     cameraRequest,
     worldTime,
     worldTimeSource,
+    worldTimeReason,
+    worldTimeSnapped,
     stateIndex: frame.stateIndex,
     markerIds: frame.activeMarkerIds,
     evidence,

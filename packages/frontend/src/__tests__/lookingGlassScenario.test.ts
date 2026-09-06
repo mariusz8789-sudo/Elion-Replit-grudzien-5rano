@@ -503,6 +503,24 @@ describe('Looking Glass — directing the actual world', () => {
     // The cut still carries its provenance — the viewer sees the observation,
     // they are simply not told a false date for it.
     expect(direction.evidence.length).toBeGreaterThan(0);
+    // WHY the clock froze must be a real answer a screen can show, not
+    // something a screen guesses on its own from worldTimeSource alone.
+    expect(direction.worldTimeReason.length).toBeGreaterThan(0);
+  });
+
+  it('carries the clock\'s own reason and snap flag through for every real world tick', () => {
+    // Not just the FOREIGN_RUN case — a granted, on-clock tick also carries
+    // the clock's real reason ("the run produced this tick"), and never
+    // silently drops it.
+    const range = session.world!.getTemporalRange();
+    for (let seconds = 0; seconds <= session.experience.durationSeconds; seconds += 2) {
+      const direction = directionAt(session.experience, session.world!, seconds)!;
+      expect(direction.worldTimeReason.length).toBeGreaterThan(0);
+      if (direction.worldTime !== null) {
+        expect(direction.worldTime).toBeGreaterThanOrEqual(range.from);
+        expect(direction.worldTime).toBeLessThanOrEqual(range.to);
+      }
+    }
   });
 
   it('maps camera intent onto a city world without knowing the domain', () => {

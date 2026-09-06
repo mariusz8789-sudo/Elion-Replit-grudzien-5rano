@@ -455,12 +455,18 @@ export function City3DWebGLScreen() {
                   <span className={`lg-world-shot-kind lg-world-shot-${direction.shotKind.toLowerCase()}`}>{direction.shotKind}</span>
                   <span className="lg-world-shot-cam">{direction.cameraIntent}</span>
                   <span className="lg-world-shot-time">
-                    {direction.worldTime !== null
-                      ? `dzień ${Math.round(direction.worldTime)}`
-                      : 'czas wstrzymany — znacznik z innego przebiegu'}
+                    {direction.worldTime !== null ? `dzień ${Math.round(direction.worldTime)}` : 'czas wstrzymany'}
                   </span>
                 </div>
                 <p className="lg-world-shot-reason">{direction.reason}</p>
+                {/* The clock's OWN reason for the time shown — not the shot's
+                    editorial reason above. Surfaced only when it says
+                    something the day number alone does not: the clock
+                    snapped over a real gap in the run, or froze because a
+                    marker belongs to a different run's clock entirely. */}
+                {(direction.worldTimeSnapped || direction.worldTime === null) && (
+                  <p className="lg-world-shot-clock">{direction.worldTimeReason}</p>
+                )}
                 {direction.evidence.map((entry) => (
                   <p key={entry.id} className="lg-world-shot-evidence">
                     <span className="lg-world-shot-evid-id">{entry.id}</span>

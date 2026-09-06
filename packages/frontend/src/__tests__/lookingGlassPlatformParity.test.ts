@@ -94,6 +94,10 @@ describe('Looking Glass — platform parity between city and laboratory', () => 
       const direction = directionAt(session.experience, session.world!, 1)!;
       expect(direction).not.toBeNull();
       expect(direction.cameraRequest.bounds).toBe(session.world!.getBounds());
+      // The clock's own reason for the time shown — real for both domains,
+      // through the same WorldClock.resolve/resolveForeign, never a
+      // screen-side guess.
+      expect(direction.worldTimeReason.length).toBeGreaterThan(0);
       // The payload sent toward a future camera rig carries no domain words —
       // proven per-session, not just for the city, in worldDirector tests.
       expect(JSON.stringify(direction.cameraRequest)).not.toMatch(/epidemi|cell|infection|hypothesis/i);

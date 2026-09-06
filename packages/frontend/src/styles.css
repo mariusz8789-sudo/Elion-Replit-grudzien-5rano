@@ -2995,6 +2995,7 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 }
 .lg-world-shot-time { margin-left: auto; }
 .lg-world-shot-reason { margin: 0.3rem 0 0; color: #cfe0f2; font-size: 0.8rem; line-height: 1.45; }
+.lg-world-shot-clock { margin: 0.25rem 0 0; color: #f0c542; font-size: 0.7rem; line-height: 1.4; }
 .lg-world-shot-evidence { margin: 0.25rem 0 0; display: flex; gap: 0.5rem; align-items: baseline; }
 .lg-world-shot-evid-id {
   font: 0.64rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #5c6b80; word-break: break-all;

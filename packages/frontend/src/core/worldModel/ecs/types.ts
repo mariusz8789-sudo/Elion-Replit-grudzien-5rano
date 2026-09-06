@@ -13,11 +13,26 @@ import type { EntityRef, GenesisLocation } from '../../events/genesisEvent';
  * multi-scale, temporal state that produces them.
  */
 
-/** Level of spatial/physical detail an entity is currently modeled at. */
-export type ScaleDomain = 'MACRO_CITY' | 'MESO_LAB' | 'MICRO_MOLECULAR' | 'NANO_ATOMIC';
+/**
+ * Level of spatial/physical detail an entity is currently modeled at.
+ *
+ * `PLANET`/`REGION`/`BUILDING`/`ROOM` were added for World Generation 1.0
+ * (see generation/worldBlueprint.ts) to let a generated world's STRUCTURE
+ * span more scales than any one solver covers — e.g. a `BUILDING` or `ROOM`
+ * container commonly has no executable solver at all, exactly like the
+ * pre-existing `MESO_LAB`/`MACRO_CITY` containers never claimed one. Adding
+ * a scale level here never implies a new solver exists for it — see
+ * `GroundingLevel` and `WorldGraph.zoomInto`'s honest-boundary reporting.
+ */
+export type ScaleDomain = 'PLANET' | 'REGION' | 'MACRO_CITY' | 'BUILDING' | 'ROOM' | 'MESO_LAB' | 'MICRO_MOLECULAR' | 'NANO_ATOMIC';
 
+/** Coarsest-to-finest ordering — informational (e.g. for a scale picker UI); nothing in C3 currently enforces monotonic parent/child scale ordering. */
 export const SCALE_DOMAIN_ORDER: readonly ScaleDomain[] = [
+  'PLANET',
+  'REGION',
   'MACRO_CITY',
+  'BUILDING',
+  'ROOM',
   'MESO_LAB',
   'MICRO_MOLECULAR',
   'NANO_ATOMIC',

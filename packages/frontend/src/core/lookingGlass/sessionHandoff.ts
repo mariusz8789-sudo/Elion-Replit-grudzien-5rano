@@ -1,4 +1,6 @@
 import type { ScenarioKind, ViewpointKind } from './scenarioRequest';
+import type { ExperienceTimeline } from './experienceOrchestrator';
+import type { ScenarioWorld } from './scenarioWorld';
 
 /**
  * LOOKING GLASS — HANDING THE *EXPERIENCE* TO A WORLD SCREEN.
@@ -34,6 +36,14 @@ export interface LookingGlassExperienceHandoff {
    * said bioreactor culture, the bench answered about intervention timing.
    */
   readonly problemId: string | null;
+  /**
+   * The cinematic sequence and the world it directs. Passed as live objects
+   * rather than serialised, the same ephemeral pointer handoff the existing
+   * world bridge uses for a simulation instance: they are read once by the
+   * screen that opens next and never persisted.
+   */
+  readonly experience: ExperienceTimeline | null;
+  readonly world: ScenarioWorld | null;
 }
 
 let pending: LookingGlassExperienceHandoff | null = null;

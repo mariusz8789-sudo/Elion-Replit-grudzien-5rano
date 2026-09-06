@@ -6,6 +6,8 @@ import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock'
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
 import { consumePendingExperimentWorld, consumePendingScenarioTimeline, peekPendingExperimentWorld, peekPendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
 import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
+import { ExperiencePlayer } from '../../core/lookingGlass/experienceOrchestrator';
+import { cityPresetFor, directionForFrame, type WorldDirection } from '../../core/lookingGlass/worldDirector';
 import { saveScenarioCounterfactualToMemory, saveScenarioRunToMemory } from '../../core/scienceMemory';
 import { buildSavedScenarioRunContext } from '../../core/simulation/scenarioMemory';
 import { createTemporalStateBookmark, resolveTemporalStateBookmark, type TemporalStateBookmark } from '../../core/simulation/temporalStateBookmark';
@@ -94,21 +96,6 @@ export function City3DWebGLScreen() {
     consumePendingExperimentWorld();
     consumePendingLookingGlassExperience();
   }, []);
-  // Time moves on its own for an anchored viewpoint. It advances the SAME
-  // `timelineDay` the scrub bar drives, so this is playback of the real
-  // series and not a second clock — and it stops at the last real day rather
-  // than looping, because there is no day 61 in the run.
-  const autoPlay = Boolean(lookingGlass?.autoPlay) && Boolean(scenarioTimeline);
-  useEffect(() => {
-    if (!autoPlay || !scenarioTimeline) return;
-    const lastDay = scenarioTimeline.series.length - 1;
-    const stepMs = Math.max(120, (lookingGlass?.secondsPerStep ?? 1) * 1000);
-    const timer = window.setInterval(() => {
-      setTimelineDay((day) => (day >= lastDay ? lastDay : day + 1));
-    }, stepMs);
-    return () => window.clearInterval(timer);
-  }, [autoPlay, scenarioTimeline, lookingGlass]);
-
   useEffect(() => {
     const applyPendingScenarioTimeline = () => {
       const pending = consumePendingScenarioTimeline();
@@ -205,6 +192,58 @@ export function City3DWebGLScreen() {
       setCameraPreset('street');
     }
   }, [lookingGlass, sim]);
+
+  // THE CINEMATIC SEQUENCE DRIVES THIS WORLD.
+  //
+  // Previously an interval just incremented the day, which played the series
+  // but ignored the edit entirely: the shot plan chose a camera and a moment
+  // and the world never heard about it. Now the director resolves each
+  // instant and this applies it to the two levers the world actually has —
+  // its day and its camera. It writes the SAME `timelineDay` the scrub bar
+  // writes, so it remains playback of the real series rather than a second
+  // clock, and the user can still grab the scrub bar at any point.
+  //
+  // The day is only moved when the director says the time is on this
+  // viewer's clock. A marker from a run of a different length reports null,
+  // and holding is the honest response — jumping to "day 72" of a 60-day
+  // series would render a day this run never had.
+  const [direction, setDirection] = useState<WorldDirection | null>(null);
+  const cinematic = useMemo(
+    () => (lookingGlass?.experience && lookingGlass.world ? new ExperiencePlayer(lookingGlass.experience) : null),
+    [lookingGlass],
+  );
+  useEffect(() => {
+    const world = lookingGlass?.world;
+    if (!cinematic || !world || !scenarioTimeline) return;
+    cinematic.play();
+    const lastDay = scenarioTimeline.series.length - 1;
+    let raf = 0;
+    let last = performance.now();
+    let appliedPreset: string | null = null;
+    const tick = (now: number) => {
+      const delta = (now - last) / 1000;
+      last = now;
+      const frame = cinematic.advance(delta);
+      if (frame) {
+        const next = directionForFrame(frame, world);
+        setDirection(next);
+        if (next.worldTime !== null) {
+          setTimelineDay(Math.max(0, Math.min(lastDay, Math.round(next.worldTime))));
+        }
+        const preset = cityPresetFor(next.cameraIntent);
+        // Only on an actual change: re-applying a preset every frame would
+        // fight the user's own camera and burn work for no visible result.
+        if (preset !== appliedPreset) {
+          appliedPreset = preset;
+          sim.setCameraPreset(preset);
+          setCameraPreset(preset);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [cinematic, lookingGlass, scenarioTimeline, sim]);
 
   const changeCamera = (preset: CityCameraPreset) => {
     sim.setCameraPreset(preset);
@@ -346,6 +385,31 @@ export function City3DWebGLScreen() {
           <div className={`city-3d-stage-wrap city-world-stage${enteredTimelineDay === timelineLogicalDay ? ' temporal-moment-entered' : ''}`} data-temporal-day={timelineLogicalDay} data-temporal-entered={enteredTimelineDay === timelineLogicalDay ? 'true' : 'false'}>
             <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
             <TemporalWorldHud timeline={scenarioTimeline} day={timelineDay} enteredDay={enteredTimelineDay} />
+            {/* THE EDIT, VISIBLE IN THE WORLD. What the director chose, why it
+                chose it, and the evidence behind it — so the viewer is never
+                watching a pretty animation with no provenance. The time source
+                is stated plainly: a marker from another run says so instead of
+                showing a day this series never had. */}
+            {direction && (
+              <div className="lg-world-shot">
+                <div className="lg-world-shot-head">
+                  <span className={`lg-world-shot-kind lg-world-shot-${direction.shotKind.toLowerCase()}`}>{direction.shotKind}</span>
+                  <span className="lg-world-shot-cam">{direction.cameraIntent}</span>
+                  <span className="lg-world-shot-time">
+                    {direction.worldTime !== null
+                      ? `dzień ${Math.round(direction.worldTime)}`
+                      : 'czas wstrzymany — znacznik z innego przebiegu'}
+                  </span>
+                </div>
+                <p className="lg-world-shot-reason">{direction.reason}</p>
+                {direction.evidence.map((entry) => (
+                  <p key={entry.id} className="lg-world-shot-evidence">
+                    <span className="lg-world-shot-evid-id">{entry.id}</span>
+                    {entry.replayStatus ? <span className={`lg-world-shot-replay is-${entry.replayStatus.toLowerCase()}`}>{entry.replayStatus}</span> : null}
+                  </p>
+                ))}
+              </div>
+            )}
             {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
             {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu Canvas 2D</button>.</div>}
             {scenarioTimeline && timelineSample && (

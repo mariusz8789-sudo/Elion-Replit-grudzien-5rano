@@ -8,6 +8,8 @@ import { projectEpidemiologyWorldStates } from '../world/epidemiologyWorldAdapte
 import { buildAnchoredSequence, type AnchoredTemporalSequence, type TemporalAnchor } from './anchoredTemporal';
 import { buildShotPlan, type ShotPlan } from './shotPlan';
 import { buildExperienceTimeline, type ExperienceTimeline } from './experienceOrchestrator';
+import { buildScenarioWorld, type PerspectiveOption, type ScenarioWorld } from './scenarioWorld';
+import { DOMAIN_PERSPECTIVE_SOURCE } from './scenarioResolution';
 import { setPendingLookingGlassExperience } from './sessionHandoff';
 import { parseScenarioRequest, type StructuredScenarioRequest } from './scenarioRequest';
 import { resolveScenarioRequest, type ScenarioResolution, type ScenarioRunPlan } from './scenarioResolution';
@@ -59,6 +61,11 @@ export interface LookingGlassSession {
   /** The engine that produced the temporal progression the anchor plays. */
   readonly temporalSource: string;
   /**
+   * The domain-independent view every layer above this one talks to. Null
+   * only when the scenario did not resolve.
+   */
+  readonly world: ScenarioWorld | null;
+  /**
    * Route that renders this world, or null when the scenario resolved but no
    * 3D surface exists for it. A caller must hide the entry affordance rather
    * than navigating somewhere that shows a different world.
@@ -66,6 +73,15 @@ export interface LookingGlassSession {
   readonly worldRoute: string | null;
   /** Arms the world bridge and returns whether a world is now waiting. */
   readonly enterWorld: () => boolean;
+}
+
+/**
+ * Which perspectives this scenario really offers, and why not for the rest.
+ * Read straight off the capability table so a UI cannot advertise a vantage
+ * the world has no place to stand in.
+ */
+function perspectivesFor(kind: Parameters<typeof DOMAIN_PERSPECTIVE_SOURCE>[0]): readonly PerspectiveOption[] {
+  return DOMAIN_PERSPECTIVE_SOURCE(kind);
 }
 
 /** Anchors are placement, not science: where a person stands to watch. */
@@ -117,6 +133,8 @@ interface SessionBuild {
   readonly worldRoute: string | null;
   /** Pre-registered problem behind `states`, so a lab can run the same one. */
   readonly problemId: string | null;
+  /** Extent of the world a perspective can be placed in, in metres. */
+  readonly bounds: { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] };
 }
 
 /**
@@ -154,6 +172,8 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
     handoffRunId,
     worldRoute: handoffRunId ? '#/city3d' : null,
     problemId: problem.problemId,
+    // The city grid the epidemic runs on, in metres.
+    bounds: { min: [-30, 0, -30], max: [30, 20, 30] },
   };
 }
 
@@ -200,6 +220,8 @@ function buildLaboratorySession(): SessionBuild {
     handoffRunId: null,
     worldRoute: '#/first-person-lab',
     problemId: problem.problemId,
+    // The laboratory hall, in metres — see labScene3D's ROOM.
+    bounds: { min: [-6, 0, -13.4], max: [6, 4.6, 4.5] },
   };
 }
 
@@ -224,6 +246,7 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
       timeline: emptyTimeline,
       shotPlan: { planId: 'sp-none', runId: emptyTimeline.runId, worldId: emptyTimeline.worldId, shots: [], markersUsed: 0, markersAvailable: 0 },
       anchored: null,
+      world: null,
       experience: { requestId: request.requestId, viewpoint: request.viewpoint.kind, shots: [], durationSeconds: 0, anchored: null },
       producedBy: 'none',
       temporalSource: 'none',
@@ -251,8 +274,22 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
 
   const experience = buildExperienceTimeline(shotPlan, plan.viewpoint.kind, anchored);
 
+  // The universal contract over what the adapters produced. Every layer
+  // above — orchestrator, director, renderer — reads this and never a domain.
+  const world = buildScenarioWorld({
+    worldId: timeline.worldId,
+    domainId: plan.family,
+    producedBy: built.producedBy,
+    states: built.states,
+    timeline,
+    viewerTicks: built.temporalTicks,
+    unit: plan.unit,
+    perspectives: perspectivesFor(plan.kind),
+    bounds: built.bounds,
+  });
+
   return {
-    request, resolution, states: built.states, timeline, shotPlan, anchored, experience,
+    request, resolution, states: built.states, timeline, shotPlan, anchored, experience, world,
     producedBy: built.producedBy, temporalSource: built.temporalSource,
     worldRoute: built.worldRoute,
     // Arming is separate from opening so the caller decides when to navigate,
@@ -270,6 +307,8 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
         autoPlay: anchored !== null,
         secondsPerStep: anchored?.secondsPerStep ?? 1,
         problemId: built.problemId,
+        experience,
+        world,
       });
       return built.handoffRunId ? setPendingScenarioTimeline(built.handoffRunId) : true;
     },

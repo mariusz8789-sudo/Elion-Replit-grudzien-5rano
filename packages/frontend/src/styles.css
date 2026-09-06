@@ -2972,3 +2972,35 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .lg-seq-time {
   margin-left: auto; font: 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6f83a0;
 }
+
+/* Montaż widoczny w świecie: co reżyser wybrał, dlaczego i na jakim dowodzie. */
+.lg-world-shot {
+  position: absolute; left: 50%; top: 1rem; transform: translateX(-50%);
+  z-index: 6; max-width: 30rem; min-width: 20rem;
+  padding: 0.6rem 0.75rem; border-radius: 0.55rem;
+  background: rgba(8, 13, 22, 0.86); border: 1px solid #24314a; border-left: 3px solid #4fd18b;
+  backdrop-filter: blur(6px);
+}
+.lg-world-shot-head { display: flex; gap: 0.55rem; align-items: baseline; flex-wrap: wrap; }
+.lg-world-shot-kind {
+  font: 600 0.64rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em; color: #8ecbff;
+}
+.lg-world-shot-temporal { color: #4fd18b; }
+.lg-world-shot-event { color: #ffc061; }
+.lg-world-shot-cam, .lg-world-shot-time {
+  font: 0.64rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #7f93ad;
+}
+.lg-world-shot-time { margin-left: auto; }
+.lg-world-shot-reason { margin: 0.3rem 0 0; color: #cfe0f2; font-size: 0.8rem; line-height: 1.45; }
+.lg-world-shot-evidence { margin: 0.25rem 0 0; display: flex; gap: 0.5rem; align-items: baseline; }
+.lg-world-shot-evid-id {
+  font: 0.64rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #5c6b80; word-break: break-all;
+}
+.lg-world-shot-replay {
+  font: 600 0.6rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0.15rem 0.35rem; border-radius: 0.25rem; letter-spacing: 0.06em;
+}
+.lg-world-shot-replay.is-match { background: #12291f; color: #7fe3ab; border: 1px solid #2c6b48; }
+.lg-world-shot-replay.is-drift { background: #2c2413; color: #f0c542; border: 1px solid #6b5a2c; }
+.lg-world-shot-replay.is-blocked { background: #2c1616; color: #f28a8a; border: 1px solid #6b2c2c; }

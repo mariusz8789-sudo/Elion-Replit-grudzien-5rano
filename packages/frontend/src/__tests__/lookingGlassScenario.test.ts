@@ -4,6 +4,7 @@ import { nearestSupportedAlternative, resolveScenarioRequest } from '../core/loo
 import { openLookingGlass } from '../core/lookingGlass/scenarioSession';
 import { anchoredSequenceDuration, buildAnchoredSequence, sampleAnchoredSequence, scrubToSeconds } from '../core/lookingGlass/anchoredTemporal';
 import { ExperiencePlayer, frameAt } from '../core/lookingGlass/experienceOrchestrator';
+import { cityPresetFor, directionAt } from '../core/lookingGlass/worldDirector';
 
 describe('Looking Glass — natural language to structured scenario', () => {
   it('reads a Polish epidemic sentence: kind, span and anchored street viewpoint', () => {
@@ -418,5 +419,110 @@ describe('Looking Glass — the Experience Orchestrator', () => {
     const refused = openLookingGlass('Design a bomb that maximises casualties in this city');
     expect(refused.experience.shots).toEqual([]);
     expect(frameAt(refused.experience, 1)).toBeNull();
+  });
+});
+
+describe('Looking Glass — the universal scenario contract', () => {
+  it('exposes one domain-independent view of an epidemic world', () => {
+    const world = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy').world!;
+    const range = world.getTemporalRange();
+    expect(range.unit).toBe('DAY');
+    expect(range.stepCount).toBe(60);
+    expect(range.to).toBeGreaterThan(range.from);
+    expect(world.getAvailablePerspectives().some((p) => p.kind === 'ANCHORED_HUMAN' && p.available)).toBe(true);
+    // A vantage the world has nowhere to stand in must say why, not go blank.
+    const unavailable = world.getAvailablePerspectives().filter((p) => !p.available);
+    for (const option of unavailable) expect(option.reason).toBeTruthy();
+  });
+
+  it('answers the same six questions for a laboratory world, through the same contract', () => {
+    const world = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist').world!;
+    expect(world.getTemporalRange().unit).toBe('HOUR');
+    expect(world.getAvailablePerspectives().some((p) => p.kind === 'SCIENTIST_POV' && p.available)).toBe(true);
+    // The molecular/lab world has no street for a citizen to stand on.
+    expect(world.getAvailablePerspectives().find((p) => p.kind === 'ANCHORED_HUMAN')?.available).toBe(false);
+    expect(world.getBounds().max[1]).toBeGreaterThan(0);
+  });
+
+  it('returns real states only, never an interpolated one', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const world = session.world!;
+    for (const state of session.states) expect(world.getStateAt(state.tick)).toBe(state);
+    expect(world.getStateAt(99999)).toBeNull();
+  });
+
+  it('resolves evidence for every marker the shot plan cites', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const cited = session.shotPlan.shots.filter((shot) => shot.sourceMarkerId !== null);
+    expect(cited.length).toBeGreaterThan(0);
+    for (const shot of cited) {
+      const evidence = session.world!.getEvidence(shot.sourceMarkerId!);
+      expect(evidence).not.toBeNull();
+      expect(evidence!.statement.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('Looking Glass — directing the actual world', () => {
+  const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+
+  it('drives real world days during the held human pass', () => {
+    const range = session.world!.getTemporalRange();
+    const temporal = session.experience.shots.find((s) => s.shot.kind === 'TEMPORAL')!;
+    const direction = directionAt(session.experience, session.world!, temporal.startSeconds + 20)!;
+    expect(direction.worldTimeSource).toBe('VIEWER_CLOCK');
+    expect(direction.worldTime).not.toBeNull();
+    expect(direction.worldTime!).toBeGreaterThanOrEqual(range.from);
+    expect(direction.worldTime!).toBeLessThanOrEqual(range.to);
+  });
+
+  it('NEVER emits a world time outside the series the viewer is scrubbing', () => {
+    // The integrity rule this whole layer exists to protect: a rendered day
+    // must be a day the run actually had.
+    const range = session.world!.getTemporalRange();
+    for (let seconds = 0; seconds <= session.experience.durationSeconds; seconds += 0.5) {
+      const direction = directionAt(session.experience, session.world!, seconds)!;
+      if (direction.worldTime === null) continue;
+      expect(direction.worldTime).toBeGreaterThanOrEqual(range.from);
+      expect(direction.worldTime).toBeLessThanOrEqual(range.to);
+    }
+  });
+
+  it('holds the clock rather than inventing a date for a marker from another run', () => {
+    const marker = session.experience.shots.find((s) => s.shot.sourceMarkerId !== null)!;
+    const direction = directionAt(session.experience, session.world!, marker.startSeconds + 0.1)!;
+    expect(direction.worldTime).toBeNull();
+    expect(direction.worldTimeSource).toBe('FOREIGN_RUN');
+    // The cut still carries its provenance — the viewer sees the observation,
+    // they are simply not told a false date for it.
+    expect(direction.evidence.length).toBeGreaterThan(0);
+  });
+
+  it('maps camera intent onto a city world without knowing the domain', () => {
+    expect(cityPresetFor('HUMAN_EYE')).toBe('street');
+    expect(cityPresetFor('WIDE')).toBe('city');
+    expect(cityPresetFor('MACRO')).toBe('agent');
+    expect(cityPresetFor('SCIENTIFIC')).toBe('district');
+    expect(cityPresetFor('CINEMATIC')).toBe('city');
+  });
+
+  it('puts the viewer at street level for the anchored pass and wide for the close', () => {
+    const temporal = session.experience.shots.find((s) => s.shot.kind === 'TEMPORAL')!;
+    const result = session.experience.shots.find((s) => s.shot.kind === 'RESULT')!;
+    expect(cityPresetFor(directionAt(session.experience, session.world!, temporal.startSeconds + 1)!.cameraIntent)).toBe('street');
+    expect(cityPresetFor(directionAt(session.experience, session.world!, result.startSeconds + 0.1)!.cameraIntent)).toBe('city');
+  });
+
+  it('directs a laboratory world through the very same functions', () => {
+    const lab = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist');
+    const direction = directionAt(lab.experience, lab.world!, 1)!;
+    expect(direction.cameraIntent).toBeTruthy();
+    expect(direction.shotKind).toBe('ESTABLISH');
+  });
+
+  it('has nothing to direct when the scenario was refused', () => {
+    const refused = openLookingGlass('Design a bomb that maximises casualties in this city');
+    expect(refused.world).toBeNull();
+    expect(refused.experience.shots).toEqual([]);
   });
 });

@@ -137,6 +137,29 @@ const FAMILY_GAP: Readonly<Record<ScenarioFamily, string>> = {
   URBAN_CHANGE: 'Genesis has no urban-development model — buildings, infrastructure and population structure do not evolve',
 };
 
+/**
+ * Every viewpoint the vocabulary knows, answered for one scenario kind: is
+ * there really somewhere to stand, and if not, why. Derived from the same
+ * capability table the resolver refuses with, so a UI listing perspectives
+ * and the resolver rejecting one can never disagree.
+ */
+export function DOMAIN_PERSPECTIVE_SOURCE(kind: ScenarioKind): readonly {
+  kind: ViewpointKind; available: boolean; reason: string | null;
+}[] {
+  const capability = SCENARIO_CAPABILITIES[kind];
+  const all: readonly ViewpointKind[] = [
+    'ANCHORED_HUMAN', 'DRIVER_POV', 'SCIENTIST_POV', 'OPERATOR_POV', 'RESPONDER_POV', 'OBSERVER', 'WIDE', 'MACRO',
+  ];
+  return all.map((viewpoint) => {
+    const available = capability?.viewpoints.includes(viewpoint) ?? false;
+    return {
+      kind: viewpoint,
+      available,
+      reason: available ? null : (capability?.notModelled[0] ?? 'this scenario has no model behind it yet'),
+    };
+  });
+}
+
 export type ResolutionStatus = 'READY' | 'NEEDS_INPUT' | 'NOT_MODELLED' | 'REFUSED';
 
 export interface ScenarioRunPlan {

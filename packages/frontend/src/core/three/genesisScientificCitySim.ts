@@ -11,7 +11,8 @@ import type { EntityId, WorldModelEntity } from '../worldModel/ecs/types';
 import type { GenesisEvent } from '../events/genesisEvent';
 import { WorldFrameRenderer, type EntityVisualSpec } from './graphics/worldFrameRenderer';
 import type { WorldFrame, WorldFrameEntity as C2Entity, EntityGrounding } from './graphics/worldFrame';
-import { createPumpAssembly, createValveAssembly } from './graphics/infrastructure';
+import { createWaterInfrastructureAdapter, type WaterInfrastructureAdapter } from './graphics/waterInfrastructureBridge';
+import { createPipeNetwork, createValve, type WaterInfrastructureState } from './graphics/waterInfrastructure';
 import { createPBRMaterial } from './graphics/materials';
 import { applyVisualState, type CanonicalVisualState } from './graphics/visualState';
 import { createSunLight, createBackgroundFill } from './graphics/lighting';
@@ -31,15 +32,27 @@ import { resolveCameraFraming, type CameraIntent } from './graphics/cameraRig';
  * here.
  *
  * WHAT THIS FILE ADDS (and nothing more): a `WorldFrame` adapter from C3's real `WorldFrameState`
- * (`bridge/worldFrameState.ts`) to C2's generic `WorldFrame` (`graphics/worldFrame.ts`); real-object
- * visuals for the pump/hospital via C2's own `createPumpAssembly`/`createValveAssembly`/
- * `createPBRMaterial`/`applyVisualState`; real-graph target resolution (`resolveNamedWorldTarget` —
- * a live scan of `graph.listEntities()`, never a hardcoded id); real camera framing via C2's
- * `resolveCameraFraming`, riding the SAME OrbitControls target/distance seam every other Genesis
- * city scene (`epidemicCity3D.ts`) already uses; and an on-demand "what if the pump fails" fork,
- * built with the EXACT same `TemporalEngine.forkBranch` + `compareBranches` pattern
- * `scenarioSession.ts`'s own hydraulics session already uses for its own fork — not a second fork
- * mechanism.
+ * (`bridge/worldFrameState.ts`) to C2's generic `WorldFrame` (`graphics/worldFrame.ts`); real-graph
+ * target resolution (`resolveNamedWorldTarget` — a live scan of `graph.listEntities()`, never a
+ * hardcoded id); real camera framing via C2's `resolveCameraFraming`, riding the SAME OrbitControls
+ * target/distance seam every other Genesis city scene (`epidemicCity3D.ts`) already uses; and an
+ * on-demand "what if the pump fails" fork, built with the EXACT same `TemporalEngine.forkBranch` +
+ * `compareBranches` pattern `scenarioSession.ts`'s own hydraulics session already uses for its own
+ * fork — not a second fork mechanism.
+ *
+ * TRINITY INTEGRATION 3.0: the pump's own visual is now C2's `createWaterInfrastructureAdapter`
+ * (`graphics/waterInfrastructureBridge.ts`) — the honest `WorldFrameRenderer` seam C2 built
+ * specifically to receive a real C3 pump entity, superseding this file's own earlier
+ * `createPumpAssembly`/`createValveAssembly` (deleted; see `graphics/infrastructure.ts`'s removal in
+ * this same mission). One real gap found in that bridge and worked around by calling C2's OWN
+ * separately-exported `createPipeNetwork`/`createValve` (`graphics/waterInfrastructure.ts`) directly
+ * rather than through the adapter: `WaterInfrastructureAdapter` has no notion of a pipe run to a
+ * SECOND entity's position (the pump's real `feedsInto` connection to the hospital) — its `resolveVisual`
+ * always builds at local origin `[0,0,0]`, by design, since `WorldFrameRenderer.applyTransform`
+ * repositions the returned object to the entity's own absolute position every sync. The pipe/valve
+ * connecting pump to hospital are therefore built ONCE in `init()` as static scene decoration (their
+ * real endpoints never move), not as WorldFrame entities — this is reuse of C2's own exported kit
+ * functions, not a second visual system.
  *
  * SCOPED RENDERING (an honest limitation, not a general policy): `CITY_TEMPLATE`'s own generic
  * district/road/city-grid buildings are structural filler this scenario has no reason to visualize —
@@ -100,6 +113,7 @@ export class GenesisScientificCitySim implements Sim3D {
 
   private THREE: typeof THREE_NS | null = null;
   private renderer: WorldFrameRenderer | null = null;
+  private waterAdapter: WaterInfrastructureAdapter | null = null;
   private pumpMaterials: {
     body: THREE_NS.Material; motor: THREE_NS.Material; plinth: THREE_NS.Material; pipe: THREE_NS.Material; valve: THREE_NS.Material;
   } | null = null;
@@ -198,10 +212,13 @@ export class GenesisScientificCitySim implements Sim3D {
     if (!match) return { found: false, label: null };
     const entity = this.activeEngine.graph.getEntity(match.id);
     const position = entity.spatial?.position ?? { x: 0, y: 0, z: 0 };
-    // Radius roughly matching each real object's own visual footprint (see createPumpAssembly's
-    // body/motor/gauge extents) so MACRO framing stands just outside the geometry rather than
-    // clipping into it.
-    const radius = match.kind === 'pump-pipe-system' ? 2.2 : 5;
+    // Radius roughly matching each real object's own visual footprint so MACRO framing stands just
+    // outside the geometry rather than clipping into it (or, the opposite failure mode found live
+    // after switching to C2's real createPump geometry: a radius left over from this file's own
+    // much larger deleted createPumpAssembly made the camera stand absurdly far from C2's genuinely
+    // small ~0.12-0.24m pump housing). C2's real pump/inlet/outlet/status-light footprint is roughly
+    // 0.25m across — see graphics/waterInfrastructure.ts's own createPump dimensions.
+    const radius = match.kind === 'pump-pipe-system' ? 0.25 : 5;
     this.lastSelectedId = match.id;
     if (!this.followTarget && this.THREE) this.followTarget = new this.THREE.Vector3();
     this.followTarget?.set(position.x, position.y + radius * 0.4, position.z);
@@ -320,15 +337,36 @@ export class GenesisScientificCitySim implements Sim3D {
     this.buildingMaterial = createPBRMaterial(THREE, 'TECH_COMPOSITE');
     this.landmarkMaterial = createPBRMaterial(THREE, 'CERAMIC');
 
+    // C2's real, tested, honest WorldFrame seam for the pump — see the module doc's "TRINITY
+    // INTEGRATION 3.0" note. `resolveVisual`/`updateVisual` below delegate to it for the one
+    // entity whose visualHint is 'object:water-pump'; every other entity keeps this file's own
+    // fallback visuals.
+    this.waterAdapter = createWaterInfrastructureAdapter(THREE, {
+      housingMaterial: this.pumpMaterials.body,
+      pipeMaterial: this.pumpMaterials.pipe,
+      valveMaterial: this.pumpMaterials.valve,
+    });
+
     this.renderer = new WorldFrameRenderer(THREE, scene, {
       resolveVisual: (entity) => this.resolveVisual(entity),
       updateVisual: (entity, object) => this.updateVisual(entity, object),
     });
 
-    const hospital = this.city.graph.getEntity(this.city.hospitalBuildingId).spatial?.position ?? { x: 0, y: 0, z: 0 };
-    const pump = this.city.graph.getEntity(this.city.pumpPipeId).spatial?.position ?? { x: 0, y: 0, z: 0 };
-    const midX = (hospital.x + pump.x) / 2;
-    const midZ = (hospital.z + pump.z) / 2;
+    const hospital = this.hospitalPosition();
+    const pumpEntityPos = this.city.graph.getEntity(this.city.pumpPipeId).spatial?.position ?? { x: 0, y: 0, z: 0 };
+    const pump: THREE_NS.Vector3Tuple = [pumpEntityPos.x, pumpEntityPos.y + 0.5, pumpEntityPos.z];
+
+    // The pump -> hospital pipe run: a REAL connection (the entity's own `feedsInto` relationship
+    // in genesisScientificCity3.ts), rendered with C2's OWN exported `createPipeNetwork`/`createValve`
+    // (graphics/waterInfrastructure.ts) directly, since `WaterInfrastructureAdapter` itself has no
+    // pipe-to-a-second-position concept (see module doc). Built once here — the real endpoints are
+    // static generated-world positions that never move — not resynced every frame.
+    scene.add(createPipeNetwork(THREE, { waypoints: [pump, hospital], radius: 0.1, material: this.pumpMaterials.pipe }));
+    const midpoint: THREE_NS.Vector3Tuple = [(pump[0] + hospital[0]) / 2, (pump[1] + hospital[1]) / 2, (pump[2] + hospital[2]) / 2];
+    scene.add(createValve(THREE, { position: midpoint, material: this.pumpMaterials.valve }));
+
+    const midX = (hospital[0] + pump[0]) / 2;
+    const midZ = (hospital[2] + pump[2]) / 2;
     camera.position.set(midX + 18, 16, midZ + 24);
     camera.lookAt(midX, 1, midZ);
   }
@@ -340,28 +378,8 @@ export class GenesisScientificCitySim implements Sim3D {
 
   private resolveVisual(entity: C2Entity): EntityVisualSpec {
     const THREE = this.THREE!;
-    if (entity.visualHint === 'pump-pipe-system' && this.pumpMaterials) {
-      // WorldFrameRenderer.applyTransform ALWAYS does `object.position.set(...entity.position)` —
-      // an absolute overwrite of the returned object's own position, applied AFTER this resolver
-      // runs (see its own module doc: "transform re-applied every sync()"). Every sub-part this
-      // assembly builds must therefore be positioned RELATIVE TO THE ENTITY'S OWN ORIGIN (0,0,0
-      // here), never at the entity's real absolute world position — passing the absolute position
-      // in as this local origin would double-apply it once the renderer sets the group's own
-      // position on top of already-absolute child coordinates.
-      const hospital = this.hospitalPosition();
-      const relativeHospital: THREE_NS.Vector3Tuple = [hospital[0] - entity.position[0], hospital[1] - entity.position[1], hospital[2] - entity.position[2]];
-      const assembly = createPumpAssembly(THREE, {
-        position: [0, 0, 0],
-        bodyMaterial: this.pumpMaterials.body, motorMaterial: this.pumpMaterials.motor,
-        plinthMaterial: this.pumpMaterials.plinth, valveMaterial: this.pumpMaterials.valve, pipeMaterial: this.pumpMaterials.pipe,
-        pipeRuns: [{ to: relativeHospital, radius: 0.1 }],
-      });
-      const valve = createValveAssembly(THREE, {
-        position: [1.4, 0.7, -0.4], axis: [1, 0, 0], bodyMaterial: this.pumpMaterials.valve, handleMaterial: this.pumpMaterials.pipe,
-      });
-      assembly.group.add(valve.group);
-      assembly.group.traverse((node) => { const mesh = node as THREE_NS.Mesh; if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; } });
-      return { kind: 'object', object: assembly.group };
+    if (entity.visualHint === 'object:water-pump' && this.waterAdapter) {
+      return this.waterAdapter.resolveVisual(entity);
     }
     if (entity.visualHint === 'building' && this.buildingMaterial) {
       const size = entity.id === this.city.hospitalBuildingId ? 6 : 4;
@@ -378,11 +396,10 @@ export class GenesisScientificCitySim implements Sim3D {
     return { kind: 'object', object: fallback };
   }
 
+  /** The pump's own canonical state now lives in C2's `waterInfrastructureBridge.ts` (driven off
+   * this same `WorldFrameEntity.status`/`.grounding` — see `updateVisual` below); this function only
+   * ever runs for the entities that DON'T go through that bridge. */
   private toCanonicalState(entity: C2Entity): CanonicalVisualState {
-    if (entity.visualHint === 'pump-pipe-system') {
-      if (typeof entity.scalars?.volumetricFlow === 'number' && entity.scalars.volumetricFlow === 0) return 'FAILURE';
-      return 'NORMAL';
-    }
     if (entity.id === this.city.hospitalBuildingId) {
       if (entity.scalars?.waterServiceInterrupted === 1) return 'CRITICAL';
       return 'NORMAL';
@@ -391,6 +408,10 @@ export class GenesisScientificCitySim implements Sim3D {
   }
 
   private updateVisual(entity: C2Entity, object: THREE_NS.Object3D): void {
+    if (entity.visualHint === 'object:water-pump' && this.waterAdapter) {
+      this.waterAdapter.updateVisual(entity, object);
+      return;
+    }
     const THREE = this.THREE!;
     const state = this.toCanonicalState(entity);
     object.traverse((node) => {
@@ -413,18 +434,29 @@ export class GenesisScientificCitySim implements Sim3D {
       time: state.tick,
       entities: state.entities
         .filter((entity) => this.renderedIds.has(entity.id))
-        .map((entity) => ({
-          id: entity.id,
-          // Every rendered entity is placed at its own REAL absolute city-space position, treated
-          // as a root (no parentId) — see the module doc's "SCOPED RENDERING" note on why this
-          // deliberately does not compose C3's containment hierarchy into relative offsets.
-          position: [entity.transform.position.x, entity.transform.position.y, entity.transform.position.z],
-          scalars: entity.scalars,
-          status: entity.statusLabel,
-          grounding: groundingToC2(entity.grounding),
-          visualHint: entity.ref.kind,
-          visible: true,
-        })),
+        .map((entity) => {
+          const isPump = entity.id === this.city.pumpPipeId;
+          // C2's waterInfrastructureBridge.ts recognizes exactly 'object:water-pump' (its own
+          // documented visual-hint contract) and a `status` of one of its own
+          // WaterInfrastructureState values — a real domain fact (WHAT changed, C1's job) computed
+          // here from the pump's own real solver output, never a fabricated label. Every other
+          // entity keeps its real domainBinding kind as its hint.
+          const status: WaterInfrastructureState | string | undefined = isPump
+            ? (typeof entity.scalars.volumetricFlow === 'number' && entity.scalars.volumetricFlow === 0 ? 'FAILED' : 'NORMAL')
+            : entity.statusLabel;
+          return {
+            id: entity.id,
+            // Every rendered entity is placed at its own REAL absolute city-space position, treated
+            // as a root (no parentId) — see the module doc's "SCOPED RENDERING" note on why this
+            // deliberately does not compose C3's containment hierarchy into relative offsets.
+            position: [entity.transform.position.x, entity.transform.position.y, entity.transform.position.z],
+            scalars: entity.scalars,
+            status,
+            grounding: groundingToC2(entity.grounding),
+            visualHint: isPump ? 'object:water-pump' : entity.ref.kind,
+            visible: true,
+          };
+        }),
     };
     this.renderer.sync(frame);
   }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { GenesisScientificCitySim } from '../core/three/genesisScientificCitySim';
+import { createWaterInfrastructureAdapter } from '../core/three/graphics/waterInfrastructureBridge';
+import type { WorldFrameEntity } from '../core/three/graphics/worldFrame';
+import type { EntityVisualSpec } from '../core/three/graphics/worldFrameRenderer';
 
 /**
  * CITY INFRASTRUCTURE INTEGRATION 1.0 — the real pump-pipe-system -> hospital cross-domain object.
@@ -154,6 +157,51 @@ describe('GenesisScientificCitySim.getComparison — WORLD A vs WORLD B, the rea
     expect(hospitalRow.equal).toBe(false);
     expect(hospitalRow.failure?.waterServiceInterrupted).toBe(1);
   });
+});
+
+describe('GenesisScientificCitySim — TRINITY INTEGRATION 3.0: the pump renders through C2\'s real bridge, not a duplicate system', () => {
+  function simWithWaterAdapter(): GenesisScientificCitySim {
+    const sim = initializedSim();
+    const adapter = createWaterInfrastructureAdapter(THREE, { housingMaterial: new THREE.MeshStandardMaterial() });
+    Object.assign(sim as unknown as Record<string, unknown>, { waterAdapter: adapter });
+    return sim;
+  }
+
+  it('resolveVisual for the pump\'s own visualHint delegates to C2\'s createWaterInfrastructureAdapter — the returned object is literally C2\'s createPump group', () => {
+    const sim = simWithWaterAdapter();
+    const pumpEntity: WorldFrameEntity = {
+      id: sim.getIds().pumpPipeId, position: [0, 0, 0], status: 'NORMAL', grounding: 'MODELED', visualHint: 'object:water-pump',
+    };
+    const spec: EntityVisualSpec = (sim as unknown as { resolveVisual(entity: WorldFrameEntity): EntityVisualSpec }).resolveVisual(pumpEntity);
+    expect(spec.kind).toBe('object');
+    // 'genesis-water-pump' is the exact name C2's own createPump() (graphics/waterInfrastructure.ts)
+    // assigns its group — proof this is really their object, not a look-alike built independently.
+    expect(spec.kind === 'object' ? spec.object.name : null).toBe('genesis-water-pump');
+  });
+
+  it('a real FAILED status (from the real solver output) drives the bridge\'s own visual state, not this file\'s own mapping', () => {
+    const sim = simWithWaterAdapter();
+    const pumpEntity: WorldFrameEntity = {
+      id: sim.getIds().pumpPipeId, position: [0, 0, 0], status: 'NORMAL', grounding: 'MODELED', visualHint: 'object:water-pump',
+    };
+    const spec = (sim as unknown as { resolveVisual(entity: WorldFrameEntity): EntityVisualSpec }).resolveVisual(pumpEntity);
+    const object = spec.kind === 'object' ? spec.object : null;
+    expect(object).not.toBeNull();
+    const failedEntity: WorldFrameEntity = { ...pumpEntity, status: 'FAILED' };
+    (sim as unknown as { updateVisual(entity: WorldFrameEntity, object: THREE.Object3D): void }).updateVisual(failedEntity, object!);
+    // The bridge tags notModeled itself; a real recognized status on a MODELED entity must clear it.
+    expect(object!.userData.notModeled).toBe(false);
+  });
+
+  it('an entity with NOT_MODELED grounding never gets a fabricated status through the bridge', () => {
+    const sim = simWithWaterAdapter();
+    const pumpEntity: WorldFrameEntity = {
+      id: sim.getIds().pumpPipeId, position: [0, 0, 0], status: 'FAILED', grounding: 'NOT_MODELED', visualHint: 'object:water-pump',
+    };
+    const spec = (sim as unknown as { resolveVisual(entity: WorldFrameEntity): EntityVisualSpec }).resolveVisual(pumpEntity);
+    expect(spec.kind === 'object' ? spec.object.userData.notModeled : null).toBe(true);
+  });
+
 });
 
 describe('GenesisScientificCitySim — replay determinism (mission section 11)', () => {

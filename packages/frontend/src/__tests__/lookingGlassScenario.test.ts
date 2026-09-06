@@ -8,6 +8,8 @@ import { cityPresetFor, directionAt } from '../core/lookingGlass/worldDirector';
 import { causalChainOf, classifyEvent } from '../core/lookingGlass/eventInspection';
 import { WorldClock } from '../core/lookingGlass/worldClock';
 import { PERSPECTIVES, perspectiveRequest, placeCamera } from '../core/lookingGlass/perspective';
+import { compareEpidemicRuns } from '../core/lookingGlass/scenarioComparison';
+import { compareScenarios, runScenario } from '../core/simulation/scenarioEngine';
 import { closeInspection, initialExperienceState, inspect, replay as replayMode, timeIsFrozen } from '../core/lookingGlass/experienceMode';
 
 describe('Looking Glass — natural language to structured scenario', () => {
@@ -855,5 +857,57 @@ describe('Looking Glass — LEVEL 3: perspectives are data, not presets', () => 
     expect(city9.anchored!.anchor.position).not.toEqual(labSession.anchored!.anchor.position);
     expect(city9.anchored!.anchor.eyeHeight).toBe(1.7);
     expect(labSession.anchored!.anchor.eyeHeight).toBe(1.7);
+  });
+});
+
+describe('Looking Glass — COMPARE is real, or it says why not', () => {
+  it('produces a real epidemic comparison with real metric deltas, not a claim on intent alone', () => {
+    const session = openLookingGlass('Compare the epidemic over 40 days from street level');
+    expect(session.request.comparison).toBe(true);
+    expect(session.comparison).not.toBeNull();
+    expect(session.comparison!.status).toBe('READY');
+    expect(session.comparison!.producedBy).toMatch(/compareScenarios\(BASELINE, ISOLATION\)/);
+    const deaths = session.comparison!.metrics.find((m) => m.key === 'totalDeaths')!;
+    expect(deaths.baseline).toBeGreaterThanOrEqual(deaths.variant);
+    expect(deaths.absoluteDelta).toBe(deaths.variant - deaths.baseline);
+  });
+
+  it('produces a real laboratory comparison from the discrimination the loop already ran', () => {
+    const session = openLookingGlass('Compare the bioreactor cell culture over 12 hours from the scientist');
+    expect(session.comparison).not.toBeNull();
+    expect(session.comparison!.status).toBe('READY');
+    expect(session.comparison!.producedBy).toMatch(/hypothesisLoop\.discrimination/);
+    expect(session.comparison!.changedFactors).toContain('growthRate');
+  });
+
+  it('THE BUG THIS FIXES: a session with no comparison intent has no comparison and does not claim one', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    expect(session.request.comparison).toBe(false);
+    expect(session.comparison).toBeNull();
+    const result = session.shotPlan.shots.find((s) => s.kind === 'RESULT')!;
+    expect(result.reason).toBe('Closing on the final state of the run');
+  });
+
+  it('the RESULT shot claims a comparison only when one was actually computed', () => {
+    const compared = openLookingGlass('Compare the epidemic over 40 days from street level');
+    const notCompared = openLookingGlass('Pokaż epidemię przez 40 dni z perspektywy człowieka na ulicy');
+    expect(compared.comparison).not.toBeNull();
+    expect(compared.shotPlan.shots.find((s) => s.kind === 'RESULT')!.reason).toMatch(/comparison/i);
+    expect(notCompared.comparison).toBeNull();
+    expect(notCompared.shotPlan.shots.find((s) => s.kind === 'RESULT')!.reason).not.toMatch(/comparison/i);
+  });
+
+  it('never fabricates a comparison for a request the engine could not compare', () => {
+    const refused = openLookingGlass('Design a bomb that maximises casualties in this city');
+    expect(refused.comparison).toBeNull();
+  });
+
+  it('wraps compareScenarios directly: identical result to calling it by hand', () => {
+    const baseline = runScenario('BASELINE', { days: 30 });
+    const variant = runScenario('ISOLATION', { days: 30 });
+    const direct = compareScenarios(baseline, variant);
+    const wrapped = compareEpidemicRuns(baseline, variant);
+    expect(wrapped.metrics).toEqual(direct.metrics);
+    expect(wrapped.message).toBe(direct.message);
   });
 });

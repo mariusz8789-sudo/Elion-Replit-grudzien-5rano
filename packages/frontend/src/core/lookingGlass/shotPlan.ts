@@ -88,6 +88,14 @@ export interface ShotPlanOptions {
   readonly maxEventShots?: number;
   /** Ticks a held shot covers when the marker is a single instant. Default 8. */
   readonly holdTicks?: number;
+  /**
+   * Whether a REAL comparison was computed for this session — never the
+   * user's mere intent to compare. The RESULT shot's wording depends on
+   * this, not on `plan.comparison`: a sentence containing "compare" that
+   * produced only one run must not close by claiming a comparison that was
+   * never made. Default false.
+   */
+  readonly hasComparison?: boolean;
 }
 
 /**
@@ -159,6 +167,7 @@ export function buildShotPlan(
 ): ShotPlan {
   const maxEventShots = options.maxEventShots ?? 6;
   const holdTicks = options.holdTicks ?? 8;
+  const hasComparison = options.hasComparison ?? false;
   const ticks = Math.max(1, plan.ticks);
   const shots: Shot[] = [];
 
@@ -217,10 +226,10 @@ export function buildShotPlan(
     index: shots.length,
     kind: 'RESULT',
     axis: 'WORLD_TIME',
-    cameraMode: plan.comparison ? 'SCIENTIFIC' : 'WIDE',
+    cameraMode: hasComparison ? 'SCIENTIFIC' : 'WIDE',
     fromTick: ticks,
     toTick: ticks,
-    reason: plan.comparison ? 'Closing on the comparison of the two runs' : 'Closing on the final state of the run',
+    reason: hasComparison ? 'Closing on the comparison of the two runs' : 'Closing on the final state of the run',
     sourceMarkerId: null,
   });
 

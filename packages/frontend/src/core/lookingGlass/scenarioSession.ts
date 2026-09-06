@@ -8,6 +8,7 @@ import { projectEpidemiologyWorldStates } from '../world/epidemiologyWorldAdapte
 import { buildAnchoredSequence, type AnchoredTemporalSequence, type TemporalAnchor } from './anchoredTemporal';
 import type { WorldBounds as ScenarioWorldBounds } from './scenarioWorld';
 import { buildShotPlan, type ShotPlan } from './shotPlan';
+import { compareEpidemicRuns, compareHypothesisRanking, type ScenarioComparisonView } from './scenarioComparison';
 import { buildExperienceTimeline, type ExperienceTimeline } from './experienceOrchestrator';
 import { buildScenarioWorld, type PerspectiveOption, type ScenarioWorld } from './scenarioWorld';
 import { PERSPECTIVES, perspectiveRequest, placeCamera, type PerspectiveRequest } from './perspective';
@@ -75,6 +76,14 @@ export interface LookingGlassSession {
   readonly worldRoute: string | null;
   /** Arms the world bridge and returns whether a world is now waiting. */
   readonly enterWorld: () => boolean;
+  /**
+   * A REAL comparison, computed by the same engine that computed the rest of
+   * the session — never true merely because the sentence said "compare".
+   * Null whenever no second run or ranking was actually produced, whether
+   * because the user did not ask, or because the engine itself blocked the
+   * comparison (different seed, a tie between candidates, and so on).
+   */
+  readonly comparison: ScenarioComparisonView | null;
 }
 
 /**
@@ -143,6 +152,8 @@ interface SessionBuild {
   readonly producedBy: string;
   readonly temporalTicks: readonly number[];
   readonly temporalSource: string;
+  /** A REAL comparison, only when one was actually computed. */
+  readonly comparison: ScenarioComparisonView | null;
   /** Registered handoff id, when this run has a 3D world to be entered. */
   readonly handoffRunId: string | null;
   /** Route that renders this world, or null when none exists yet. */
@@ -172,6 +183,19 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
   const scenarioId: ScenarioId = plan.kind === 'QUARANTINE' ? 'ISOLATION' : 'BASELINE';
   const run = runScenario(scenarioId, { days: plan.ticks });
 
+  // A real comparison, computed only when the sentence actually asked for
+  // one — never assumed from the word "compare" alone. ISOLATION is the
+  // model's own canonical intervention: comparing it against BASELINE is
+  // "what does isolation change", which is what a bare "compare" without a
+  // named second scenario can honestly mean. Both runs share the engine's
+  // default seed and population (see scenarioEngine.ts), which is exactly
+  // what compareScenarios requires to attribute the difference to policy.
+  const comparison = plan.comparison && scenarioId !== 'ISOLATION'
+    ? compareEpidemicRuns(run, runScenario('ISOLATION', { days: plan.ticks }))
+    : plan.comparison
+      ? compareEpidemicRuns(runScenario('BASELINE', { days: plan.ticks }), run)
+      : null;
+
   // Hand the real day series to the existing world bridge rather than
   // inventing a second channel: `worldHandoff` is already the only road a
   // scenario run travels to the 3D city, and the city screen already listens
@@ -190,6 +214,7 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
     problemId: problem.problemId,
     // The city grid the epidemic runs on, in metres.
     bounds: { min: [-30, 0, -30], max: [30, 20, 30] },
+    comparison,
   };
 }
 
@@ -220,12 +245,19 @@ function registerRun(run: ScenarioRun, runId: string): string | null {
  * the states carry genuine epistemic status (SUPPORTED/FALSIFIED/...) rather
  * than a curve drawn for the camera.
  */
-function buildLaboratorySession(): SessionBuild {
+function buildLaboratorySession(plan: ScenarioRunPlan): SessionBuild {
   const problem = HYPOTHESIS_PROBLEMS.find((candidate) => candidate.modelId === 'biology-logistic') ?? HYPOTHESIS_PROBLEMS[0];
   const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
   const states = projectCellWorldStates(result);
+  // The loop already ran every candidate hypothesis — the ranking between
+  // them exists whether or not comparison was requested. It is exposed only
+  // when the sentence actually asked for it, so `session.comparison` stays a
+  // read of intent-matched-to-reality rather than "whatever happened to be
+  // lying around".
+  const comparison = plan.comparison ? compareHypothesisRanking(problem, result.discrimination) : null;
   return {
     states,
+    comparison,
     producedBy: `hypothesisLoop.executePreregisteredHypotheses(${problem.problemId})`,
     // The laboratory world advances per projected state; there is no separate
     // finer series to play through, and inventing one would be fabrication.
@@ -263,6 +295,7 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
       shotPlan: { planId: 'sp-none', runId: emptyTimeline.runId, worldId: emptyTimeline.worldId, shots: [], markersUsed: 0, markersAvailable: 0 },
       anchored: null,
       world: null,
+      comparison: null,
       experience: { requestId: request.requestId, viewpoint: request.viewpoint.kind, shots: [], durationSeconds: 0, anchored: null },
       producedBy: 'none',
       temporalSource: 'none',
@@ -274,10 +307,10 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
   const plan = resolution.plan;
   const built: SessionBuild = plan.binding === 'SCENARIO_ENGINE_EPIDEMIC'
     ? buildEpidemicSession(plan)
-    : buildLaboratorySession();
+    : buildLaboratorySession(plan);
 
   const timeline = captureWorldTimeline(null, [...built.states]);
-  const shotPlan = buildShotPlan(timeline, plan);
+  const shotPlan = buildShotPlan(timeline, plan, { hasComparison: built.comparison !== null });
   const anchor = anchorFor(plan, built.bounds);
   const anchored = anchor
     ? buildAnchoredSequence(anchor, built.temporalTicks, plan.unit, {
@@ -308,6 +341,7 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
     request, resolution, states: built.states, timeline, shotPlan, anchored, experience, world,
     producedBy: built.producedBy, temporalSource: built.temporalSource,
     worldRoute: built.worldRoute,
+    comparison: built.comparison,
     // Arming is separate from opening so the caller decides when to navigate,
     // and so a world that failed to register cannot be silently entered.
     enterWorld: () => {

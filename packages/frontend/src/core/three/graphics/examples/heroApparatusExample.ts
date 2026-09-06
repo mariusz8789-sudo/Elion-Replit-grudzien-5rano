@@ -5,6 +5,7 @@ import { createHeroLight } from '../lighting';
 import { applyShadowPolicy } from '../shadowPolicy';
 import type { DepthOfFieldSettings } from '../postProcessing';
 import { applyValueToEmissive, applyFractionToScale } from '../stateVisualization';
+import { createColumn, createPlatform, createGlassChamber, createPipe } from '../primitives';
 
 /**
  * GENESIS GRAPHICS RUNTIME — Integration Example: a hero apparatus
@@ -16,6 +17,11 @@ import { applyValueToEmissive, applyFractionToScale } from '../stateVisualizatio
  * compose:
  *
  *   Genesis PBR material  → `createGenesisMaterialPalette` / `createEmissiveInstrumentMaterial`
+ *   Scene primitives      → `primitives.ts`'s `createColumn`/`createPlatform`/`createGlassChamber`/
+ *                           `createPipe` — the base, frame posts, chamber, and the conduit run
+ *                           between them, instead of each builder hand-deriving the same
+ *                           `CylinderGeometry`/`BoxGeometry` args and (for the pipe) the
+ *                           orientation quaternion between two arbitrary points.
  *   Instance batching     → `InstanceBatch` (the bolt ring)
  *   Hero lighting role    → `createHeroLight`
  *   Shadow policy         → `applyShadowPolicy` (with a `forceCast` override)
@@ -88,24 +94,29 @@ export function buildExampleHeroApparatus(
   // that's physically that kind of surface. ---
   const materials = createGenesisMaterialPalette(THREE);
 
-  // --- STRUCTURE: a frame + base built from the shared metal/composite categories. ---
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.12, 24), materials.TECH_COMPOSITE);
-  base.position.y = 0.06;
+  // --- STRUCTURE: a frame + base, via `primitives.ts` instead of hand-derived CylinderGeometry/
+  // BoxGeometry args — one call each states the actual intent (a platform, four columns). ---
+  const base = createPlatform(THREE, materials.TECH_COMPOSITE, { shape: 'disc', radius: 0.58, thickness: 0.12, position: [0, 0.06, 0] });
   group.add(base);
 
-  const frameGeo = new THREE.BoxGeometry(0.06, 1.4, 0.06);
-  const framePositions: THREE_NS.Vector3Tuple[] = [[0.45, 0.7, 0], [-0.45, 0.7, 0], [0, 0.7, 0.45], [0, 0.7, -0.45]];
+  const framePositions: THREE_NS.Vector3Tuple[] = [[0.45, 0, 0], [-0.45, 0, 0], [0, 0, 0.45], [0, 0, -0.45]];
+  const postHeight = 1.4;
   for (const pos of framePositions) {
-    const post = new THREE.Mesh(frameGeo, materials.BRUSHED_METAL);
-    post.position.set(...pos);
-    group.add(post);
+    group.add(createColumn(THREE, materials.BRUSHED_METAL, { position: pos, height: postHeight, radius: 0.03 }));
   }
 
   // --- CORE / CHAMBER: the Genesis science-glass look — reflective by default, exactly the
-  // treatment proven on the flagship reactor vessel. ---
-  const chamber = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.42, 1.1, 32, 1, true), materials.SCIENCE_GLASS);
-  chamber.position.y = 0.75;
+  // treatment proven on the flagship reactor vessel. `createGlassChamber` owns the "open-ended
+  // cylinder" convention so this line reads as intent, not geometry trivia. ---
+  const chamber = createGlassChamber(THREE, materials.SCIENCE_GLASS, { position: [0, 0.2, 0], height: 1.1, radiusBottom: 0.42, radiusTop: 0.4 });
   group.add(chamber);
+
+  // --- CONDUIT: a pipe run from the base to the chamber's shoulder — a real consumer for
+  // `createPipe`'s from/to orientation math, and the kind of physical detail ("where do the
+  // services connect") a hand-placed CylinderGeometry run would rarely bother deriving correctly
+  // for more than one straight vertical case. ---
+  const conduit = createPipe(THREE, materials.BRUSHED_METAL, { from: [0.5, 0.06, 0.5], to: [0.42, 1.1, 0.3], radius: 0.025 });
+  group.add(conduit);
 
   // The "fill" — a simple standard-material cylinder inside the chamber, scaled/colored by
   // updateVisualState exactly like the real vessel's fluid mesh.

@@ -826,6 +826,52 @@ C3's actual scientific solvers (epidemiology/chemistry/hydraulics/Newtonian) —
 integration test uses C1's real `buildShotPlan`, but no equivalent real-C3-WorldFrame fixture was
 available to test against beyond this engine's own `worldFrame.ts` stand-in contract.
 
+## 24. Visual World Build 1.0 — engine modules actually wired into production scenes
+
+The explicit quality gate for this pass: **ENGINE MODULE → PRODUCTION SCENE → VISIBLE RESULT**, never
+"ENGINE MODULE → README → DONE." Everything below is wired into `epidemicCity3D.ts` and/or
+`labScene3D.ts` themselves (see each file's `addCityExtras()`/STREFA E furniture block), proven by
+`epidemicCity3DExtras.test.ts` and `labScene3DExtras.test.ts` (which call the real scene `init()` and
+assert the new objects exist in the actual scene graph — not just that the example file compiles).
+
+**New reusable kits, DONE and adopted**: `buildingKit.ts` (`createRooftopEquipment`,
+`createAmbulanceBay`, `createIndustrialBuilding` — additive detail layered onto/next to
+`epidemicCity3D.ts`'s existing hand-tuned `createBuilding`, never replacing it), `streetKit.ts`
+(`createStreetBench`/`createTrashBin`/`createHydrant`/`createPlanter`/`createBollardBarrier`/
+`createUtilityBox`), `vehicleKit.ts` (`createVehicle`: car/van/bus/truck/ambulance, deterministic
+per-instance variation, PARKED/MOVING/STOPPED/EMERGENCY/OFFLINE states via `visualState.ts`),
+`waterInfrastructure.ts` (`createPump`/`createValve`/`createStorageTank`/`createPipeNetwork`,
+NORMAL/WARNING/FAILED/OFFLINE via the same `visualState.ts` vocabulary). `vegetation.ts`'s
+`createTreeField`/`createGroundClutter` — previously PARTIAL (§23) — are now also adopted in
+`epidemicCity3D.ts`'s `addCityExtras()`, closing that gap.
+
+**Production-scene results**: `epidemicCity3D.ts`'s hospital building now gets a real ambulance bay,
+a parked ambulance, rooftop HVAC, a small service building, and frontage trees, all anchored to the
+REAL CityWorld hospital `WorldObject` (not an invented location); sparser rooftop equipment appears
+on ~1/3 of other real buildings; decorative parked cars/vans, hydrants, and utility boxes populate
+the streets; extra ground clutter surrounds the park. `labScene3D.ts`'s STREFA E (the deep background
+bay) gains a real bench/cabinet/shelf/monitor cluster and a pump/valve/pipe-run utility cluster.
+
+**Honest boundary on the water/pump state**: the lab's pump defaults to (and stays at) `NORMAL` —
+this scene has no real pressure/flow/failure feed to back a WARNING/FAILED reading, so it is never
+fabricated (see `waterInfrastructure.ts`'s own module doc and `labScene3DExtras.test.ts`'s explicit
+test for this). A pump tied to a REAL C3 water-system feed is future work gated on that feed existing.
+
+**Decorative vs. real, kept honest**: rooftop equipment on non-hospital buildings, parked vehicles,
+street furniture, and the industrial service building are explicitly decorative population/context
+(`userData.visualOnlyContext = true` / `userData.visualOnlyVehicle` / `userData.visualOnlyInfrastructure`)
+— same documented status as this file's own pre-existing `createContextBuilding`/`addUrbanCadence`
+output. None of it is presented as a WorldFrame/C3 entity, and none of it carries `worldSelection`.
+
+**Still DEFERRED / NOT_MODELED after this pass**: a population-visual-diversity kit (roles/clothing/
+animation states beyond the existing `InstancedHumanoidCrowd`); a `createStreet`/`createCityDistrict`
+world-authoring API generalized beyond `epidemicCity3D.ts`'s own scene-specific `addCityExtras()`;
+`environment.ts`/`water.ts`/`animation.ts`/`assetPipeline.ts` production adoption (still PARTIAL per
+§23 — this pass closed the vehicle/street/building/vegetation gap, not all of §23's list); real C3
+water-system integration (see above); day/sunset/night lighting variants for the city scene (it
+remains a fixed night scene, as before this pass); a `WATER_SYSTEM`/counterfactual-comparison
+reference scene (no such C3 world model exists yet in this codebase to render honestly).
+
 ## Example usage
 
 See `examples/heroApparatusExample.ts` in full — it wires every subsystem

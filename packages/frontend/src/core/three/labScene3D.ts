@@ -11,6 +11,10 @@ import { applyShadowPolicy } from './graphics/shadowPolicy';
 import { disposeSceneResources } from './graphics/lifecycle';
 import { createDustMotes, createLightShaft, type DustMotesHandle } from './graphics/atmosphere';
 import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
+// GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 1.0: reusable kits, actually wired into this
+// production scene's STREFA E (not just proven in an isolated graphics/examples/*.ts file).
+import { createBench, createCabinet, createShelfUnit, createMonitor } from './graphics/labKit';
+import { createPump, createValve, createPipeNetwork } from './graphics/waterInfrastructure';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -3085,6 +3089,48 @@ export class LabScene3D implements Sim3D {
         cap.position.set(sx, sh + 0.25, backZ + 1.05 + (i % 2) * 0.5);
         scene.add(cap);
       }
+    }
+
+    // GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 1.0: real production use of the reusable lab
+    // furniture kit (`graphics/labKit.ts`) and water/fluid infrastructure kit
+    // (`graphics/waterInfrastructure.ts`) — not just proven in their own isolated example files.
+    // Placed in STREFA E's open central corridor (|x| < ~3, clear of the side cabinet rows at
+    // |x| > 4, the crane trolley at x=1.3/z=ROOM.minZ-3.4, and the far reactor at x=-1.5) as
+    // ADDITIONAL background equipment — purely additive, every hand-tuned object above is untouched.
+    // The pump defaults to NORMAL and is never driven to WARNING/FAILED here: this scene has no real
+    // pressure/flow feed to back that claim (see waterInfrastructure.ts's own "never fabricate a
+    // state" rule) — it reads as installed lab plumbing, not a monitored, currently-failing asset.
+    {
+      const auxBenchZ = ROOM.minZ - 2.2;
+      const auxBench = createBench(THREE, {
+        position: [-1.7, 0, auxBenchZ], width: 1.3, depth: 0.6, height: 0.9, topMaterial: MAT.worktop, legMaterial: MAT.darkSteel,
+      });
+      scene.add(auxBench);
+      const auxCabinet = createCabinet(THREE, {
+        position: [-1.7, 0, auxBenchZ + 0.75], width: 0.7, depth: 0.5, height: 1.1, bodyMaterial: MAT.darkSteel, doorMaterial: MAT.steel,
+      });
+      scene.add(auxCabinet);
+      const auxShelf = createShelfUnit(THREE, {
+        position: [-2.6, 0, auxBenchZ], width: 0.55, depth: 0.32, height: 1.7, material: MAT.steel, shelfCount: 4,
+      });
+      scene.add(auxShelf);
+      const auxMonitor = createMonitor(THREE, {
+        position: [-1.7, 0.9, auxBenchZ - 0.28], width: 0.34, height: 0.22, frameMaterial: MAT.darkSteel, screenMaterial: MAT.display,
+      });
+      scene.add(auxMonitor);
+
+      const auxUtilityZ = ROOM.minZ - 6.4;
+      const auxPump = createPump(THREE, {
+        position: [1.7, 0, auxUtilityZ], housingMaterial: MAT.darkSteel, pipeMaterial: MAT.copper, state: 'NORMAL',
+      });
+      scene.add(auxPump.group);
+      const auxValve = createValve(THREE, { position: [1.9, 0.12, auxUtilityZ + 0.14], material: MAT.chrome });
+      scene.add(auxValve);
+      const auxPipeRun = createPipeNetwork(THREE, {
+        waypoints: [[1.7, 0.12, auxUtilityZ - 0.06], [1.7, 0.12, auxUtilityZ - 0.5], [2.3, 0.12, auxUtilityZ - 0.5]],
+        radius: 0.02, material: MAT.copper,
+      });
+      scene.add(auxPipeRun);
     }
 
     // Ciąg komunikacyjny w osi nawy — perspektywa czytana z samej podłogi.

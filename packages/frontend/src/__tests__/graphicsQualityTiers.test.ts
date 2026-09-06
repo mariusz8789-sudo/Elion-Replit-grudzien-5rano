@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   tierAtLeast, recommendedShadowMapSize, maxShadowCasterBudget, tierAllowsAO, tierAllowsBloom,
+  tierAllowsAtmosphereParticles, atmosphereParticleCount, scaleCount,
   configureGraphicsQuality, detectRenderTier, resolveQualityLevel, configureGraphicsQualityForLevel,
   type QualityLevel,
 } from '../core/three/quality';
@@ -137,5 +138,29 @@ describe('QualityLevel preset layer', () => {
     expect(perf.shadowMapSize).toBe(0);
     expect(perf.allowsAO).toBe(false);
     expect(perf.allowsDof).toBe(false);
+  });
+});
+
+describe('atmosphere feature gating', () => {
+  it('tierAllowsAtmosphereParticles matches tierAtLeast(tier, "medium"), same floor as bloom', () => {
+    for (const tier of ALL_TIERS) {
+      expect(tierAllowsAtmosphereParticles(tier)).toBe(tierAllowsBloom(tier));
+    }
+  });
+
+  it('atmosphereParticleCount is 0 at "low" (the effect is skipped entirely, not just shrunk)', () => {
+    expect(atmosphereParticleCount(200, 'low')).toBe(0);
+  });
+
+  it('atmosphereParticleCount matches scaleCount at every tier the gate allows', () => {
+    for (const tier of ['medium', 'high', 'cinematic'] as const) {
+      expect(atmosphereParticleCount(200, tier)).toBe(scaleCount(200, tier));
+    }
+  });
+
+  it('configureGraphicsQuality exposes allowsAtmosphereParticles consistently with the tier gate', () => {
+    for (const tier of ALL_TIERS) {
+      expect(configureGraphicsQuality(tier).allowsAtmosphereParticles).toBe(tierAllowsAtmosphereParticles(tier));
+    }
   });
 });

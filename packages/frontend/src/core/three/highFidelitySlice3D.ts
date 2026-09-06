@@ -13,6 +13,7 @@ import { setupGraphicsPipeline } from './graphics/postProcessing';
 import { createSunLight, createBackgroundFill } from './graphics/lighting';
 import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
 import { createDustMotes, type DustMotesHandle } from './graphics/atmosphere';
+import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
 import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
 
 /**
@@ -798,17 +799,22 @@ export class HighFidelityStreetSlice3D implements Sim3D {
 
     // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): faint street-level haze for
     // depth in the bright daytime slice — deliberately very low opacity, this is a depth cue, not a
-    // fog effect competing with the scene's own tuned `FogExp2`.
-    this.streetHaze = createDustMotes(THREE, {
-      bounds: [worldW * 0.5, 1.1, worldH * 0.5],
-      center: [0, 1.1, 0],
-      count: 200,
-      size: 0.045,
-      color: 0xf2ead8,
-      opacity: 0.07,
-      driftSpeed: 0.07,
-    });
-    this.addSceneObject(this.streetHaze.points);
+    // fog effect competing with the scene's own tuned `FogExp2`. Quality-gated (quality.ts's
+    // tierAllowsAtmosphereParticles/atmosphereParticleCount): skipped entirely at 'low' tier, scaled
+    // by device tier otherwise.
+    const atmosphereTier = detectRenderTier();
+    if (tierAllowsAtmosphereParticles(atmosphereTier)) {
+      this.streetHaze = createDustMotes(THREE, {
+        bounds: [worldW * 0.5, 1.1, worldH * 0.5],
+        center: [0, 1.1, 0],
+        count: atmosphereParticleCount(200, atmosphereTier),
+        size: 0.045,
+        color: 0xf2ead8,
+        opacity: 0.07,
+        driftSpeed: 0.07,
+      });
+      this.addSceneObject(this.streetHaze.points);
+    }
 
     const roadWidth = 1.35;
     const walkWidth = 1.12;

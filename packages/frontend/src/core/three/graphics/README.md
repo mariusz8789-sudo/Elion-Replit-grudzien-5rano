@@ -46,11 +46,16 @@ never the reverse.
 | State-driven visualization | `stateVisualization.ts` | `sampleColorScale`, `severityColor`, `SEVERITY_COLOR_SCALE`, `applyValueToEmissive`, `applyFractionToScale`, `AttentionPulse` — turns an already-computed real value into a color/glow/fill-height/event-flash; never computes or interprets the value itself (see its module doc) |
 | LOD / culling | `lod.ts` | `FrustumCuller` (per-instance frustum test, reusable/allocation-free — see its module doc for why this exists instead of `InstancedMesh.frustumCulled`), `PopulationLod` (frustum + distance + projected-size LOD in one per-frame pass over a whole population), `projectedScreenSizePx`, `selectLodTier`. Wired into `InstancedHumanoidCrowd.update()`'s optional `cull` argument — see `PERFORMANCE.md`. |
 | Diagnostics | `diagnostics.ts` | `readFrameCounters`, `FrameProfiler`, `RollingFrameStats` — exact draw-call/triangle/geometry/texture/program counts from `renderer.info` (valid on any GPU, including software rendering) plus frame-time sampling (explicitly NOT a hardware performance claim — see the module doc). Wired into every pipeline as `GraphicsPipeline.getFrameCounters()`. See `PERFORMANCE.md`'s "Measured, not fabricated" section for real numbers this produced. |
-| Picking / interaction | `picking.ts` | `screenToNDC`, `raycastFromScreenPoint`, `findTaggedAncestor`, `ClickDragTracker` — the mechanical half of "what did the user point at" (screen→NDC, click-vs-drag, walking up to a tagged ancestor). Never decides what a pick MEANS — that stays the caller's `selectAgent`/`selectWorld`-shaped logic. Found duplicated byte-for-byte across `epidemicCity3D.ts` and `highFidelitySlice3D.ts`'s own `pointer()` methods before this existed; both now delegate to it. |
+| Picking / interaction (mechanics) | `picking.ts` | `screenToNDC`, `raycastFromScreenPoint`, `findTaggedAncestor`, `ClickDragTracker` — the mechanical half of "what did the user point at" (screen→NDC, click-vs-drag, walking up to a tagged ancestor). Never decides what a pick MEANS — that stays the caller's `selectAgent`/`selectWorld`-shaped logic. Found duplicated byte-for-byte across `epidemicCity3D.ts` and `highFidelitySlice3D.ts`'s own `pointer()` methods before this existed; both now delegate to it. |
+| Interaction (WorldFrame-aware) | `interaction.ts` | `InteractionController` — composes `picking.ts` + `WorldFrameRenderer.resolveEntityId` into hover/select state expressed as WorldFrame entity ids, not raw meshes. `pointerDown`/`pointerMove`/`pointerUp`/`clearHover`, `onHoverChange`/`onSelect` callbacks. No business logic — see §21 below. |
+| Environment (sky/fog/time-of-day) | `environment.ts` | `computeSunState(THREE, hourOfDay)` (pure, testable — sun direction/color/intensity + matching sky/fog tones), `createSkyDome`, `applyEnvironmentPreset(THREE, scene, {mode, hourOfDay?})` — `'OUTDOOR'` adds a sky dome + fog and hands back `SunState` for a caller's own `createSunLight` call; `'INDOOR'` is a deliberate near-no-op. See §17 below. |
+| Water | `water.ts` | `createWaterSurface` (a horizontal plane with real `MeshPhysicalMaterial` transmission + a scrolling ripple normal map reusing `materials.ts`'s `surfaceNormalFactory`), `captureDryLook`/`applyWetLook` (cheaply wets an existing opaque material). See §18 below. |
+| Vegetation | `vegetation.ts` | `createTreeField`, `createGroundClutter` — seeded, instanced (2 draw calls / 1 draw call respectively, any count) scattered nature fields with position/rotation/scale variation. See §19 below. |
 | Resource lifecycle | `lifecycle.ts` | `disposeSceneResources(root, options?)` — traverses an `Object3D` subtree (typically your whole `Sim3D.scene`) disposing every geometry, material, and each material's own textures in one call. Call it from your `Sim3D.dispose()`, storing `scene` from `init()` first (see `labScene3D.ts`). `options.excludeMaterials`/`excludeTextures` skip anything owned/disposed elsewhere (a shared registry, the pipeline's own environment map). |
-| WorldFrame render pathway | `worldFrame.ts` + `worldFrameRenderer.ts` | The first generic WorldFrame → scene graph → rendering pathway — see §13 below for the full contract, boundary, and why it exists. `WorldFrameRenderer.sync(frame)` reconciles a scene to match a frame of generic entities (appear/move/rescale/reparent/disappear); `.dispose()` tears the whole thing down. `worldFrame.ts`'s types are deliberately isolated and NOT the final C1/C3 contract — see its own doc comment. |
+| WorldFrame render pathway | `worldFrame.ts` + `worldFrameRenderer.ts` | The first generic WorldFrame → scene graph → rendering pathway — see §13 below for the full contract, boundary, and why it exists. `WorldFrameRenderer.sync(frame)` reconciles a scene to match a frame of generic entities (appear/move/rescale/reparent/disappear/retune-in-place for an unchanged instanced population — see §13's incremental-update update); `.dispose()` tears the whole thing down; `.resolveEntityId(intersection)` maps a raycast hit back to an entity id (feeds `interaction.ts`). `worldFrame.ts`'s types are deliberately isolated and NOT the final C1/C3 contract — see its own doc comment. |
 | Integration pattern | `examples/heroApparatusExample.ts` | `buildExampleHeroApparatus` — READ this, don't import it into a real scene |
 | Integration pattern | `examples/worldFrameExample.ts` | `buildExampleWorld` — the WorldFrame pathway's own reference pattern: a synthetic world with a scalar-driven hub, an instanced population, and an honest-boundary entity, plus the SAME `CameraRig` framing a shot on it. READ this, don't import it. |
+| Integration pattern | `examples/worldEnvironmentExample.ts` | `buildExampleEnvironmentWorld` — proves `environment.ts`/`water.ts`/`vegetation.ts`/`interaction.ts` compose with the WorldFrame pathway AND with each other in one scene (the sun light it places comes from the SAME `SunState` the sky/fog were built from). READ this, don't import it. |
 
 ## 2. What NOT to duplicate
 
@@ -515,11 +520,14 @@ Two entity lifecycles, both generic:
 - **`'object'`** — one `Object3D` per entity: created once, transformed every `sync()`, disposed on
   disappearance. Individual identity, individual pick/inspect.
 - **`'instanced'`** — every entity sharing a `batchKey` becomes ONE `InstancedMesh` via
-  `instancing.ts`'s `InstanceBatch`, **rebuilt from scratch every `sync()`** (the old batch disposed,
-  a fresh one built from the current frame). Correct and simple for large populations today; NOT
-  yet the most GPU-optimal path — incremental per-instance updates (reusing `setInstanceColor`/
-  `setInstanceTransform`'s already-proven partial-buffer-upload technique) is real, valuable,
-  clearly-identified follow-up work, not yet done without a measured need to justify it.
+  `instancing.ts`'s `InstanceBatch`. When the batch's membership is UNCHANGED from the previous
+  `sync()` (same entity ids, same order, same geometry/material identity) — the common steady-state
+  case for a population that stays the same size frame to frame — every instance's transform/color
+  is retuned IN PLACE via `setInstanceColor`/`setInstanceTransform`'s partial-buffer-upload
+  technique, with zero new GPU allocation. Only a genuine STRUCTURAL change (population count/order/
+  geometry/material) triggers the full rebuild (old batch disposed, fresh one built). See
+  `graphicsWorldFrameBenchmark.test.ts` for real (Node CPU-side) timing numbers at 1k/5k/10k
+  synthetic entities, both paths.
 
 **Honest boundaries, not fabricated detail**: an entity with `grounding: 'NOT_MODELED'` never
 reaches your `resolveVisual` at all — it always renders as a generic, domain-blind placeholder (a
@@ -562,6 +570,132 @@ offline-capture tier; see that file's own doc). `QualityLevel` (`'PERFORMANCE' |
 PERFORMANCE→low, BALANCED→medium, CINEMATIC→high`) rather than adding a second, parallel
 configuration path. Note the naming collision is deliberate and documented: `QualityLevel`'s
 `'CINEMATIC'` is real-time (`high` tier), NOT `RenderTier`'s own `'cinematic'` capture-only tier.
+
+## 16. Interaction — mapping a click/hover back to a WorldFrame entity id
+
+`interaction.ts`'s `InteractionController` is the mechanical pipeline for "what did the user just
+point at," expressed as a WorldFrame entity id:
+
+```ts
+import { InteractionController } from './graphics/interaction';
+
+const interaction = new InteractionController(THREE, {
+  camera,
+  resolver: worldFrameRenderer, // satisfies EntityResolver via its own .resolveEntityId(intersection)
+  getTargets: () => [scene],
+  onHoverChange: (id) => { /* your own hover-highlight logic */ },
+  onSelect: (id) => { /* your own selection/inspector logic */ },
+});
+
+// Wire into your Sim3D.pointer(...):
+interaction.pointerDown(x, y);
+interaction.pointerMove(x, y, viewportWidth, viewportHeight);
+interaction.pointerUp(x, y, viewportWidth, viewportHeight);
+```
+
+`WorldFrameRenderer.resolveEntityId(intersection)` is what makes this work for BOTH entity
+lifecycles: an object-kind hit walks up the intersected mesh's ancestor chain (via `picking.ts`'s
+`findTaggedAncestor`) to the tagged root `resolveVisual` returned; an instanced hit resolves via
+`intersection.instanceId` against the batch's recorded entity order — correct even after an
+incremental (non-rebuilt) update, since that path never disturbs index-to-entity correspondence.
+
+**Caveat** (inherent to any `THREE.Raycaster` use, not specific to this module): raycasting reads
+`matrixWorld`, which only `WebGLRenderer.render()` keeps current automatically. A normal `Sim3D`
+scene is fine (a pointer event always lands after a real frame rendered); a caller driving this
+OUTSIDE a render loop (a test, a pointer handler that can fire before the first frame) must call
+`scene.updateMatrixWorld(true)` itself first.
+
+## 17. Environment — sky, fog, time-of-day
+
+`environment.ts`'s `applyEnvironmentPreset` is the one call for "what should the sky/fog/sun look
+like right now":
+
+```ts
+import { applyEnvironmentPreset } from './graphics/environment';
+import { createSunLight } from './graphics/lighting';
+
+const env = applyEnvironmentPreset(THREE, scene, { mode: 'OUTDOOR', hourOfDay: 8 });
+// env.sunState: { direction, altitude01, color, intensity, skyZenithColor, skyHorizonColor, fogColor, timeOfDay }
+createSunLight(THREE, scene, {
+  position: env.sunState!.direction.map((v) => v * 40) as THREE.Vector3Tuple,
+  color: env.sunState!.color,
+  intensity: env.sunState!.intensity,
+});
+```
+
+This module NEVER creates or retunes a light itself — it only computes what a matching sun/sky/fog
+setup should look like and hands back the numbers, so `lighting.ts` stays the one place an actual
+light gets created. `'INDOOR'` mode is a deliberate near-no-op (no sky dome, no fog) — an interior
+scene's atmosphere is `atmosphere.ts`'s job. `computeSunState` is a pure function (no THREE
+dependency beyond color math), fully unit-testable without a renderer — see `graphicsEnvironment.
+test.ts`.
+
+Deliberately NOT a physically-based sky (no Rayleigh/Mie scattering simulation) — a plausible,
+cheap, artist-tunable day/night curve, not a claim of physical accuracy.
+
+## 18. Water
+
+`water.ts`'s `createWaterSurface` builds a horizontal water plane — a river, lake, reservoir, pool,
+or lab container's fill surface — with real `MeshPhysicalMaterial` transmission (the same three.js
+feature `createScientificGlass` already uses) and a scrolling ripple normal map (reusing
+`materials.ts`'s `surfaceNormalFactory` — composition, not a second bump-map generator):
+
+```ts
+import { createWaterSurface } from './graphics/water';
+
+const water = createWaterSurface(THREE, { width: 12, depth: 8, color: 0x1c4f63 });
+water.mesh.position.set(x, waterLevelY, z); // caller positions it — this module owns no container
+scene.add(water.mesh);
+// every frame:
+water.update(dt); // scrolls the ripple; a no-op for still water (flowSpeed [0,0])
+```
+
+`thicknessMeters` is the one "depth coloration" knob — a thicker body of water tints its transmitted
+light more strongly (the real optical effect behind a pool's deep end reading bluer), without
+simulating an actual depth field. This module has NO model of real water state (level, flow,
+temperature) — C3 remains authoritative; a caller with a real fill fraction sets `mesh.position.y`
+itself from its own known container bounds. `captureDryLook`/`applyWetLook` separately handle a
+"wet surface" look for existing opaque materials (ground, roads, facades) reacting to a weather
+state, without swapping materials.
+
+## 19. Vegetation
+
+`vegetation.ts` adds seeded, instanced nature fields — generalized out of the high-fidelity street
+slice's own hand-placed, non-reusable tree code:
+
+```ts
+import { createTreeField, createGroundClutter } from './graphics/vegetation';
+
+const trees = createTreeField(THREE, {
+  count: 60, width: 40, depth: 40, center: [0, 0],
+  trunkMaterial: palette.PAINTED_METAL, canopyMaterial: myLeafMaterial,
+});
+scene.add(trees.group); // exactly 2 InstancedMeshes (trunks, canopies), any count
+```
+
+Every field shares one seeded placement primitive (position/rotation/scale all vary per instance),
+so "avoid obvious repetition" is structural, not left to each caller to re-derive. `createGroundClutter`
+is the same technique for small rocks/low bushes/urban planting (one `InstancedMesh`, squashed
+vertically so it reads as low clutter, not a field of spheres).
+
+## 20. Quality gating — atmosphere/vegetation density by tier
+
+`quality.ts`'s `tierAllowsAtmosphereParticles(tier)` (same `'medium'`+ floor as bloom) and
+`atmosphereParticleCount(base, tier)` (0 below that floor, `scaleCount`-scaled otherwise) are the
+real feature-gating this engine's atmosphere effects now go through — `labScene3D.ts`,
+`epidemicCity3D.ts`, and `highFidelitySlice3D.ts` all skip their dust motes/light shaft/haze
+entirely at `'low'` tier rather than rendering a smaller version nobody asked to pay for:
+
+```ts
+const tier = detectRenderTier();
+if (tierAllowsAtmosphereParticles(tier)) {
+  const dust = createDustMotes(THREE, { ...opts, count: atmosphereParticleCount(200, tier) });
+  scene.add(dust.points);
+}
+```
+
+The same pattern generalizes to any future density-scaled effect (vegetation instance counts
+included) — one gate check, one count call, instead of each scene re-deriving its own tier logic.
 
 ## Example usage
 

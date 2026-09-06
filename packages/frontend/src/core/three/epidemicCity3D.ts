@@ -17,6 +17,7 @@ import { createPBRMaterial } from './graphics/materials';
 import { createSunLight, createBackgroundFill } from './graphics/lighting';
 import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
 import { createDustMotes, type DustMotesHandle } from './graphics/atmosphere';
+import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
 import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
 import {
   HumanoidAgentVisual,
@@ -321,19 +322,24 @@ export class EpidemicCity3DSim implements Sim3D {
 
     // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): low, warm-tinted ground haze
     // (streetlamp-lit night air) for street-level atmospheric depth. Generic/reusable primitive —
-    // no city-specific logic lives in atmosphere.ts itself.
-    const worldW = this.simulation.worldWidth * CITY_WORLD_SCALE;
-    const worldH = this.simulation.worldHeight * CITY_WORLD_SCALE;
-    this.cityHaze = createDustMotes(THREE, {
-      bounds: [worldW * 0.5, 0.9, worldH * 0.5],
-      center: [0, 0.9, 0],
-      count: 260,
-      size: 0.05,
-      color: 0xd9b57a,
-      opacity: 0.1,
-      driftSpeed: 0.09,
-    });
-    scene.add(this.cityHaze.points);
+    // no city-specific logic lives in atmosphere.ts itself. Quality-gated (quality.ts's
+    // tierAllowsAtmosphereParticles/atmosphereParticleCount): skipped entirely at 'low' tier, scaled
+    // by device tier otherwise, instead of a fixed count regardless of hardware.
+    const atmosphereTier = detectRenderTier();
+    if (tierAllowsAtmosphereParticles(atmosphereTier)) {
+      const worldW = this.simulation.worldWidth * CITY_WORLD_SCALE;
+      const worldH = this.simulation.worldHeight * CITY_WORLD_SCALE;
+      this.cityHaze = createDustMotes(THREE, {
+        bounds: [worldW * 0.5, 0.9, worldH * 0.5],
+        center: [0, 0.9, 0],
+        count: atmosphereParticleCount(260, atmosphereTier),
+        size: 0.05,
+        color: 0xd9b57a,
+        opacity: 0.1,
+        driftSpeed: 0.09,
+      });
+      scene.add(this.cityHaze.points);
+    }
   }
 
   /**

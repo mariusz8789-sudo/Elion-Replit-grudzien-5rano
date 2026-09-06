@@ -209,6 +209,93 @@ describe('WorldFrameRenderer — instanced-kind large populations', () => {
   });
 });
 
+describe('WorldFrameRenderer — instanced-kind incremental updates (same membership, no rebuild)', () => {
+  it('reuses the SAME InstancedMesh instance when the population/order is unchanged across syncs', () => {
+    const root = new THREE.Scene();
+    const geometry = new THREE.BoxGeometry();
+    const material = new THREE.MeshStandardMaterial();
+    const renderer = new WorldFrameRenderer(THREE, root, {
+      resolveVisual: () => ({ kind: 'instanced', batchKey: 'crowd', geometry, material }),
+    });
+    renderer.sync(frame([entity({ id: '1', position: [0, 0, 0] }), entity({ id: '2', position: [1, 0, 0] })]));
+    const firstMesh = root.children.find((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh;
+    const disposeSpy = vi.spyOn(firstMesh.geometry, 'dispose');
+
+    renderer.sync(frame([entity({ id: '1', position: [5, 0, 0] }), entity({ id: '2', position: [6, 0, 0] })]));
+    const meshes = root.children.filter((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh[];
+    expect(meshes).toHaveLength(1);
+    expect(meshes[0]).toBe(firstMesh); // same GPU object, not rebuilt
+    expect(disposeSpy).not.toHaveBeenCalled();
+  });
+
+  it('still moves every instance to its new position via the incremental path', () => {
+    const root = new THREE.Scene();
+    const geometry = new THREE.BoxGeometry();
+    const material = new THREE.MeshStandardMaterial();
+    const renderer = new WorldFrameRenderer(THREE, root, {
+      resolveVisual: () => ({ kind: 'instanced', batchKey: 'crowd', geometry, material }),
+    });
+    renderer.sync(frame([entity({ id: '1', position: [0, 0, 0] }), entity({ id: '2', position: [1, 0, 0] })]));
+    renderer.sync(frame([entity({ id: '1', position: [5, 0, 0] }), entity({ id: '2', position: [6, 0, 0] })]));
+    const mesh = root.children.find((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh;
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    mesh.getMatrixAt(0, matrix);
+    matrix.decompose(position, new THREE.Quaternion(), new THREE.Vector3());
+    expect(position.toArray()).toEqual([5, 0, 0]);
+    mesh.getMatrixAt(1, matrix);
+    matrix.decompose(position, new THREE.Quaternion(), new THREE.Vector3());
+    expect(position.toArray()).toEqual([6, 0, 0]);
+  });
+
+  it('retunes per-instance color via the incremental path when the batch was built with colors', () => {
+    const root = new THREE.Scene();
+    const healthById: Record<string, number> = { '1': 0xff0000, '2': 0x00ff00 };
+    const geometry = new THREE.BoxGeometry();
+    const material = new THREE.MeshStandardMaterial();
+    const renderer = new WorldFrameRenderer(THREE, root, {
+      resolveVisual: (e) => ({ kind: 'instanced', batchKey: 'crowd', geometry, material, color: healthById[e.id] }),
+    });
+    renderer.sync(frame([entity({ id: '1' }), entity({ id: '2' })]));
+    healthById['1'] = 0x0000ff;
+    renderer.sync(frame([entity({ id: '1' }), entity({ id: '2' })]));
+    const mesh = root.children.find((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh;
+    const color = new THREE.Color();
+    mesh.getColorAt(0, color);
+    expect(color.getHex()).toBe(new THREE.Color(0x0000ff).getHex());
+  });
+
+  it('falls back to a full rebuild when the population count changes (still correct, just not incremental)', () => {
+    const root = new THREE.Scene();
+    const geometry = new THREE.BoxGeometry();
+    const material = new THREE.MeshStandardMaterial();
+    const renderer = new WorldFrameRenderer(THREE, root, {
+      resolveVisual: () => ({ kind: 'instanced', batchKey: 'crowd', geometry, material }),
+    });
+    renderer.sync(frame([entity({ id: '1' }), entity({ id: '2' })]));
+    const firstMesh = root.children.find((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh;
+    renderer.sync(frame([entity({ id: '1' }), entity({ id: '2' }), entity({ id: '3' })]));
+    const meshes = root.children.filter((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh[];
+    expect(meshes).toHaveLength(1);
+    expect(meshes[0]).not.toBe(firstMesh); // genuinely rebuilt
+    expect(meshes[0]!.count).toBe(3);
+  });
+
+  it('falls back to a full rebuild when the same ids appear in a different order', () => {
+    const root = new THREE.Scene();
+    const geometry = new THREE.BoxGeometry();
+    const material = new THREE.MeshStandardMaterial();
+    const renderer = new WorldFrameRenderer(THREE, root, {
+      resolveVisual: () => ({ kind: 'instanced', batchKey: 'crowd', geometry, material }),
+    });
+    renderer.sync(frame([entity({ id: '1', position: [1, 0, 0] }), entity({ id: '2', position: [2, 0, 0] })]));
+    const firstMesh = root.children.find((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh;
+    renderer.sync(frame([entity({ id: '2', position: [2, 0, 0] }), entity({ id: '1', position: [1, 0, 0] })]));
+    const meshes = root.children.filter((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh[];
+    expect(meshes[0]).not.toBe(firstMesh);
+  });
+});
+
 describe('WorldFrameRenderer — default visual (no resolver supplied)', () => {
   it('produces a working mesh sized by the entity\'s own scale', () => {
     const root = new THREE.Group();

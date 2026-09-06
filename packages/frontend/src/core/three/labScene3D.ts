@@ -10,6 +10,7 @@ import { configureCinematicCamera, type CinematicCameraProfile } from './graphic
 import { applyShadowPolicy } from './graphics/shadowPolicy';
 import { disposeSceneResources } from './graphics/lifecycle';
 import { createDustMotes, createLightShaft, type DustMotesHandle } from './graphics/atmosphere';
+import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -794,24 +795,29 @@ export class LabScene3D implements Sim3D {
     // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): the window now reads as an
     // actual aperture light is streaming through, not just an emissive pane, and the room air reads
     // as a real occupied volume instead of a vacuum. Both generic, reusable primitives — no
-    // lab-specific logic lives in atmosphere.ts itself.
-    const windowLightShaft = createLightShaft(THREE, {
-      origin: [-roomWidth / 2 + 0.05, 2.05, -0.6],
-      direction: [1, -0.55, 0.12],
-      length: 4.6,
-      width: 1.5,
-      color: 0xfff2cf,
-      opacity: 0.32,
-    });
-    scene.add(windowLightShaft);
-    this.dustMotes = createDustMotes(THREE, {
-      bounds: [3.2, 1.1, 2.6],
-      center: [-2.6, 1.5, -0.6],
-      count: 140,
-      size: 0.009,
-      opacity: 0.26,
-    });
-    scene.add(this.dustMotes.points);
+    // lab-specific logic lives in atmosphere.ts itself. Quality-gated (quality.ts's
+    // tierAllowsAtmosphereParticles): skipped entirely at 'low' tier rather than rendered smaller —
+    // a low-end device's budget goes to the geometry/materials it's already drawing.
+    const atmosphereTier = detectRenderTier();
+    if (tierAllowsAtmosphereParticles(atmosphereTier)) {
+      const windowLightShaft = createLightShaft(THREE, {
+        origin: [-roomWidth / 2 + 0.05, 2.05, -0.6],
+        direction: [1, -0.55, 0.12],
+        length: 4.6,
+        width: 1.5,
+        color: 0xfff2cf,
+        opacity: 0.32,
+      });
+      scene.add(windowLightShaft);
+      this.dustMotes = createDustMotes(THREE, {
+        bounds: [3.2, 1.1, 2.6],
+        center: [-2.6, 1.5, -0.6],
+        count: atmosphereParticleCount(140, atmosphereTier),
+        size: 0.009,
+        opacity: 0.26,
+      });
+      scene.add(this.dustMotes.points);
+    }
 
     // Oświetlenie warstwowe (key/fill/rim), nie płaskie wypełnienie ze
     // wszystkich stron: wypełnienie ambientowe ZREDUKOWANE, żeby światła

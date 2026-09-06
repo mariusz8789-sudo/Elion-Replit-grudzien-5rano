@@ -1,7 +1,16 @@
 import type * as THREE_NS from 'three';
 import type { WorldFrame, WorldFrameEntity, WorldFrameEntityId } from './worldFrame';
 import { disposeSceneResources } from './lifecycle';
-import { InstanceBatch } from './instancing';
+import { InstanceBatch, setInstanceColor, setInstanceTransform } from './instancing';
+import { findTaggedAncestor } from './picking';
+
+/** `userData` key this renderer tags every 'object'-kind entity's `Object3D` with, and every
+ * instanced batch's `InstancedMesh` with (a batch key, not an entity id — see
+ * `WORLD_FRAME_BATCH_KEY`) — the mechanism `resolveEntityId` and `graphics/interaction.ts`'s
+ * `InteractionController` use to map a raw raycast hit back to a WorldFrame entity id, without the
+ * renderer needing to know anything about clicking/hovering/selection itself. */
+const WORLD_FRAME_ENTITY_ID = 'worldFrameEntityId';
+const WORLD_FRAME_BATCH_KEY = 'worldFrameBatchKey';
 
 /**
  * GENESIS GRAPHICS RUNTIME — WorldFrame → Scene (the generic render pathway)
@@ -25,14 +34,15 @@ import { InstanceBatch } from './instancing';
  *    `sync()`, disposed on disappearance. Use for anything that needs individual identity
  *    (a hero object, a small population, anything a caller picks/inspects individually).
  *  - `'instanced'` — entities sharing the same `visualHint` are combined into ONE `InstancedMesh`
- *    via `instancing.ts`'s `InstanceBatch`, REBUILT FROM SCRATCH every `sync()` call (the previous
- *    batch is disposed, a fresh one built from the current frame's matching entities). This is a
- *    correct, simple, generic large-population path — not yet the most GPU-optimal one. The
- *    already-proven partial-buffer-update primitives (`setInstanceColor`/`setInstanceTransform` —
- *    see `instancing.ts`) target INCREMENTAL updates to an already-built batch; wiring THIS
- *    renderer to detect "only N of 1000 instances changed" and use those instead of a full rebuild
- *    is real, valuable, NOT YET DONE follow-up work — see this module's own "next task" note in
- *    the engine README, not invented here without a measured need.
+ *    via `instancing.ts`'s `InstanceBatch`. When a batch's MEMBERSHIP is unchanged from the
+ *    previous sync (same set of entity ids, same order, same geometry/material identity), this
+ *    renderer reuses the existing `InstancedMesh` and retunes every instance's transform/color in
+ *    place via `setInstanceTransform`/`setInstanceColor` (`instancing.ts`'s partial-buffer-upload
+ *    primitives) — the steady-state case for any population that stays the same size frame to
+ *    frame (an already-spawned crowd, a fixed sensor grid) never re-allocates a GPU buffer just to
+ *    move. Only a STRUCTURAL change (population count/order/geometry/material) triggers a full
+ *    rebuild (the old batch disposed, a fresh one built) — correct and simple, same as before, now
+ *    reserved for when it's actually needed instead of running on every single `sync()`.
  *
  * HONEST BOUNDARIES, NOT FABRICATED DETAIL: an entity with `grounding: 'NOT_MODELED'` never reaches
  * the caller's resolver at all — it always renders as `createBoundaryPlaceholder`'s generic,
@@ -89,6 +99,18 @@ interface TrackedObjectEntity {
   isPlaceholder: boolean;
 }
 
+/** One reconciled instanced batch's identity — everything needed to decide, on the NEXT sync,
+ * whether its membership is unchanged (retune in place) or structurally different (rebuild). */
+interface TrackedInstancedBatch {
+  mesh: THREE_NS.InstancedMesh;
+  geometry: THREE_NS.BufferGeometry;
+  material: THREE_NS.Material;
+  /** Entity ids, in the exact order they were baked into instance indices — index `i`'s entity is
+   * `order[i]`. Both the SET and the ORDER must match next sync for the incremental path to apply,
+   * since an instance index has no identity of its own beyond "whatever is at this position now." */
+  order: WorldFrameEntityId[];
+}
+
 /**
  * Reconciles a sequence of `WorldFrame`s into a THREE scene. One instance per world/scene — call
  * `sync(frame)` whenever a new frame is available (typically once per `Sim3D.syncScene`), and
@@ -96,13 +118,16 @@ interface TrackedObjectEntity {
  */
 export class WorldFrameRenderer {
   private readonly tracked = new Map<WorldFrameEntityId, TrackedObjectEntity>();
-  private readonly instancedBatches = new Map<string, THREE_NS.Object3D>();
+  private readonly instancedBatches = new Map<string, TrackedInstancedBatch>();
+  private readonly colorScratch: THREE_NS.Color;
 
   constructor(
     private readonly THREE: typeof THREE_NS,
     private readonly root: THREE_NS.Object3D,
     private readonly options: WorldFrameRendererOptions = {},
-  ) {}
+  ) {
+    this.colorScratch = new THREE.Color();
+  }
 
   /** Reconciles the scene to match `frame`: entities present now but not before are created;
    * entities present before but not now (or with `visible: false`) are removed and disposed;
@@ -122,6 +147,7 @@ export class WorldFrameRenderer {
 
       if (entity.grounding === 'NOT_MODELED') {
         const object = (this.options.resolveBoundaryPlaceholder ?? defaultBoundaryPlaceholder)(this.THREE, entity);
+        object.userData[WORLD_FRAME_ENTITY_ID] = entity.id;
         this.tracked.set(entity.id, { kind: 'object', object, parentId: entity.parentId ?? null, isPlaceholder: true });
         continue;
       }
@@ -133,6 +159,7 @@ export class WorldFrameRenderer {
         instancedGroups.set(spec.batchKey, group);
         continue;
       }
+      spec.object.userData[WORLD_FRAME_ENTITY_ID] = entity.id;
       this.tracked.set(entity.id, { kind: 'object', object: spec.object, parentId: entity.parentId ?? null, isPlaceholder: false });
     }
 
@@ -150,7 +177,7 @@ export class WorldFrameRenderer {
       if (!tracked.isPlaceholder) this.options.updateVisual?.(entity, tracked.object);
     }
 
-    this.rebuildInstancedBatches(instancedGroups);
+    this.reconcileInstancedBatches(instancedGroups);
 
     // Remove anything tracked that's no longer present (or now invisible) in this frame.
     for (const [id, tracked] of [...this.tracked]) {
@@ -178,39 +205,94 @@ export class WorldFrameRenderer {
     if (tracked.object.parent !== desiredParent) desiredParent.add(tracked.object);
   }
 
-  private rebuildInstancedBatches(groups: Map<string, WorldFrameEntity[]>): void {
-    // Every batch key seen THIS sync gets rebuilt fresh; any batch key from a PREVIOUS sync that no
-    // longer has any entities is torn down entirely (its population dropped to zero).
-    for (const [batchKey, previous] of [...this.instancedBatches]) {
+  private reconcileInstancedBatches(groups: Map<string, WorldFrameEntity[]>): void {
+    // Every batch key from a PREVIOUS sync that no longer has any entities this sync is torn down
+    // entirely (its population dropped to zero) — unrelated to the incremental-vs-rebuild decision
+    // below, which only applies to keys still present in `groups`.
+    for (const [batchKey, tracked] of [...this.instancedBatches]) {
       if (!groups.has(batchKey)) {
-        previous.parent?.remove(previous);
-        disposeSceneResources(previous);
+        tracked.mesh.parent?.remove(tracked.mesh);
+        disposeSceneResources(tracked.mesh);
         this.instancedBatches.delete(batchKey);
       }
     }
 
     for (const [batchKey, entities] of groups) {
-      const previous = this.instancedBatches.get(batchKey);
-      if (previous) {
-        previous.parent?.remove(previous);
-        disposeSceneResources(previous);
-        this.instancedBatches.delete(batchKey);
-      }
       if (entities.length === 0) continue;
       const firstSpec = this.resolveVisual(entities[0]!);
       if (firstSpec.kind !== 'instanced') continue; // defensive: a resolver must be stable per batchKey
+
+      const existing = this.instancedBatches.get(batchKey);
+      const sameMembership = existing !== undefined
+        && existing.geometry === firstSpec.geometry
+        && existing.material === firstSpec.material
+        && existing.order.length === entities.length
+        && existing.order.every((id, i) => id === entities[i]!.id);
+
+      if (sameMembership) {
+        // INCREMENTAL PATH: identical population/order/geometry/material as last sync — retune
+        // every instance's transform (always) and color (only if this batch was originally built
+        // with per-instance color support) in place, with zero new GPU allocation.
+        const mesh = existing.mesh;
+        const hasColors = mesh.instanceColor !== null;
+        for (let i = 0; i < entities.length; i++) {
+          const entity = entities[i]!;
+          setInstanceTransform(this.THREE, mesh, i, entity.position, entity.rotation ?? [0, 0, 0], entity.scale ?? 1);
+          if (!hasColors) continue;
+          const spec = this.resolveVisual(entity);
+          if (spec.kind === 'instanced' && spec.color !== undefined) {
+            setInstanceColor(mesh, i, this.colorScratch.set(spec.color));
+          }
+        }
+        continue;
+      }
+
+      // STRUCTURAL CHANGE (or first appearance of this batch key) — full rebuild.
+      if (existing) {
+        existing.mesh.parent?.remove(existing.mesh);
+        disposeSceneResources(existing.mesh);
+        this.instancedBatches.delete(batchKey);
+      }
       const batch = new InstanceBatch(this.THREE, firstSpec.geometry, firstSpec.material);
+      const order: WorldFrameEntityId[] = [];
       for (const entity of entities) {
         const spec = this.resolveVisual(entity);
         if (spec.kind !== 'instanced') continue;
         batch.add(entity.position, entity.rotation, entity.scale ?? 1, spec.color);
+        order.push(entity.id);
       }
       // InstanceBatch.build() only ever calls the generic Object3D `.add()` on what it's given —
       // it never needs anything Scene-specific — so a Group root works exactly as well as a real
       // THREE.Scene despite the narrower parameter type.
       const mesh = batch.build(this.root as THREE_NS.Scene, firstSpec.castShadow ?? false);
-      if (mesh) this.instancedBatches.set(batchKey, mesh);
+      if (mesh) {
+        mesh.userData[WORLD_FRAME_BATCH_KEY] = batchKey;
+        this.instancedBatches.set(batchKey, { mesh, geometry: firstSpec.geometry, material: firstSpec.material, order });
+      }
     }
+  }
+
+  /**
+   * Maps a raw `THREE.Raycaster` hit back to the WorldFrame entity id it belongs to — the one piece
+   * of bookkeeping `graphics/interaction.ts`'s `InteractionController` (or any caller doing its own
+   * picking) needs to turn "the user clicked here" into "the user clicked entity X," without this
+   * renderer knowing anything about clicking/hovering/selection itself.
+   *
+   * Handles both entity lifecycles: an INSTANCED hit resolves via `intersection.instanceId` against
+   * the batch's recorded entity order (see `TrackedInstancedBatch.order`); an OBJECT/placeholder hit
+   * walks up the intersected mesh's ancestor chain (a hit is always the leaf mesh, which may sit a
+   * few levels below the tagged root `resolveVisual` returned) via `picking.ts`'s
+   * `findTaggedAncestor`. Returns `null` when the intersection belongs to neither (e.g. it hit
+   * scenery this renderer didn't create).
+   */
+  resolveEntityId(intersection: THREE_NS.Intersection): WorldFrameEntityId | null {
+    const batchKey = (intersection.object.userData as Record<string, unknown>)[WORLD_FRAME_BATCH_KEY];
+    if (typeof batchKey === 'string' && intersection.instanceId !== undefined) {
+      const tracked = this.instancedBatches.get(batchKey);
+      return tracked?.order[intersection.instanceId] ?? null;
+    }
+    const tagged = findTaggedAncestor(intersection.object, (userData) => typeof userData[WORLD_FRAME_ENTITY_ID] === 'string');
+    return tagged ? (tagged.userData[WORLD_FRAME_ENTITY_ID] as WorldFrameEntityId) : null;
   }
 
   /** Disposes every entity this renderer currently tracks (both individual objects and instanced
@@ -221,9 +303,9 @@ export class WorldFrameRenderer {
       disposeSceneResources(tracked.object);
     }
     this.tracked.clear();
-    for (const batch of this.instancedBatches.values()) {
-      batch.parent?.remove(batch);
-      disposeSceneResources(batch);
+    for (const tracked of this.instancedBatches.values()) {
+      tracked.mesh.parent?.remove(tracked.mesh);
+      disposeSceneResources(tracked.mesh);
     }
     this.instancedBatches.clear();
   }

@@ -190,6 +190,9 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   // calls each allocated a fresh Vector3 every single frame — .lerp() only reads the target's
   // x/y/z, so a reused scratch vector is exactly as correct and costs nothing per frame.
   private scratchCameraTarget: THREE_NS.Vector3 | null = null;
+  // Same audit finding as epidemicCity3D.ts's own syncAnalysis(): a fresh THREE.Color was allocated
+  // per grid cell (HF_ANALYSIS_COLS * HF_ANALYSIS_ROWS = 748) every frame the heatmap overlay is on.
+  private scratchAnalysisColor: THREE_NS.Color | null = null;
   private lastTickMs = 0;
   private metrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
   private readonly clickDragTracker = new ClickDragTracker();
@@ -270,6 +273,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.viewport = { w, h };
     this.raycaster = new THREE.Raycaster();
     this.scratchCameraTarget = new THREE.Vector3();
+    this.scratchAnalysisColor = new THREE.Color();
     scene.background = new THREE.Color(0xc8d9e7);
     scene.fog = new THREE.FogExp2(0xd7e2e7, 0.016);
     camera.position.set(5.8, 2.8, 8.8);
@@ -1733,7 +1737,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   private syncAnalysis(agents: readonly SimAgent[]): void {
-    if (!this.analysisMesh || !this.THREE) return;
+    if (!this.analysisMesh || !this.THREE || !this.scratchAnalysisColor) return;
     if (!this.showHeatmap || this.analysisMode === 'none') { this.analysisMesh.count = 0; return; }
     const field = computeField(agents, this.simulation.worldWidth, this.simulation.worldHeight, this.analysisMode, HF_ANALYSIS_COLS, HF_ANALYSIS_ROWS);
     const cellW = this.simulation.worldWidth / field.cols * HIGH_FIDELITY_WORLD_SCALE;
@@ -1742,6 +1746,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const position = new this.THREE.Vector3();
     const scale = new this.THREE.Vector3();
     const rotation = new this.THREE.Quaternion();
+    const color = this.scratchAnalysisColor;
     for (let row = 0; row < field.rows; row++) for (let col = 0; col < field.cols; col++) {
       const index = row * field.cols + col;
       position.set(this.toWorldX((col + 0.5) * this.simulation.worldWidth / field.cols), 0, this.toWorldY((row + 0.5) * this.simulation.worldHeight / field.rows));
@@ -1749,7 +1754,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       matrix.compose(position, rotation, scale);
       this.analysisMesh.setMatrixAt(index, matrix);
       const [r, g, b] = heatColor(field.values[index]);
-      this.analysisMesh.setColorAt(index, new this.THREE.Color(r, g, b));
+      this.analysisMesh.setColorAt(index, color.setRGB(r, g, b));
     }
     this.analysisMesh.count = field.cols * field.rows;
     this.analysisMesh.instanceMatrix.needsUpdate = true;

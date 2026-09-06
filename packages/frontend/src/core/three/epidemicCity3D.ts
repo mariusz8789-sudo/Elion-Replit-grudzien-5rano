@@ -121,6 +121,10 @@ export class EpidemicCity3DSim implements Sim3D {
   // each allocated a fresh Vector3 every frame. Safe to reuse — every real consumer
   // (useThreeLoop.ts's render loop) already .clone()s the returned vector before use.
   private scratchOrbitDirection: THREE_NS.Vector3 | null = null;
+  // Render-loop allocation audit finding: syncAnalysis() allocated a fresh THREE.Color per grid
+  // cell, every frame the analysis overlay is on — ANALYSIS_COLS * ANALYSIS_ROWS = 864 allocations
+  // every single frame, the single largest per-frame allocation hotspot found in this scene.
+  private scratchAnalysisColor: THREE_NS.Color | null = null;
   private approvedFacadeTemplate: THREE_NS.Object3D | null = null;
   private approvedLampTemplate: THREE_NS.Object3D | null = null;
   private approvedAssetRoots: THREE_NS.Object3D[] = [];
@@ -280,6 +284,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.viewport = { w, h };
     this.raycaster = new THREE.Raycaster();
     this.scratchOrbitDirection = new THREE.Vector3();
+    this.scratchAnalysisColor = new THREE.Color();
     scene.background = new THREE.Color(0x0d1b2a);
     scene.fog = new THREE.Fog(0x0d1b2a, 18, 42);
     camera.fov = 44;
@@ -1498,7 +1503,7 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   private syncAnalysis(agents: readonly SimAgent[]): void {
-    if (!this.analysisMesh || !this.THREE) return;
+    if (!this.analysisMesh || !this.THREE || !this.scratchAnalysisColor) return;
     if (this.analysisMode === 'none') {
       this.analysisMesh.count = 0;
       return;
@@ -1510,6 +1515,7 @@ export class EpidemicCity3DSim implements Sim3D {
     const position = new this.THREE.Vector3();
     const scale = new this.THREE.Vector3();
     const quaternion = new this.THREE.Quaternion();
+    const color = this.scratchAnalysisColor;
     for (let row = 0; row < field.rows; row++) {
       for (let col = 0; col < field.cols; col++) {
         const index = row * field.cols + col;
@@ -1525,7 +1531,7 @@ export class EpidemicCity3DSim implements Sim3D {
         // Gamma zwiększa czytelność rzeczywistego pola przy małej liczbie przypadków;
         // nie dodaje danych i nie zmienia porządku komórek.
         const [r, g, b] = heatColor(Math.pow(Math.max(0, value), 0.45));
-        this.analysisMesh.setColorAt(index, new this.THREE.Color(r / 255, g / 255, b / 255));
+        this.analysisMesh.setColorAt(index, color.setRGB(r / 255, g / 255, b / 255));
       }
     }
     this.analysisMesh.count = field.cols * field.rows;

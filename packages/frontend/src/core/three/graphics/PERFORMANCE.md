@@ -71,6 +71,19 @@ passes at shrinking resolutions. Cheaper than AO/DOF, but not free; gated at
 `'low'` tier (`tierAllowsBloom`) since it's still a handful of full-screen
 passes at a device already too weak for AO.
 
+### 5b. Screen-space reflections (`SSRPass`, opt-in)
+
+Costs roughly the same order as GTAO — its own normal+depth+metalness
+pre-passes plus a blur pass — and is UNVERIFIED in this sandbox (no real GPU
+to check for the noise/streaking artifacts SSR is known to show on some
+hardware/angles, especially at grazing incidence). For exactly this reason
+it defaults to **off**, gated to the `'cinematic'` tier
+(`ScreenSpaceReflectionSettings.minTier`), and should be validated on real
+hardware before any caller loosens that gate. It complements, not replaces,
+`SCIENCE_GLASS`'s transmission/clearcoat model and the AMBIENT/IBL PMREM
+environment — both of those stay on and cheap regardless of whether SSR is
+ever enabled.
+
 ### 6. Draw calls: instancing
 
 Every unique `Mesh` is (at minimum) one draw call. A facility built from
@@ -96,6 +109,16 @@ time proportional to its triangle count. Its size-heuristic default
 small parts doesn't silently make all of them shadow casters. Use
 `forceCast` sparingly (a handful of "important machinery" exceptions, not a
 blanket override) — each addition is a real cost, not just a flag.
+
+### 8. The `'cinematic'` tier is not a "make it nicer" toggle
+
+`recommendedShadowMapSize`/`maxShadowCasterBudget`/AO/reflections/DOF all
+allow more at `'cinematic'` than at `'high'` — that budget is for a captured
+still frame or a short clip, not a sustained interactive frame rate.
+`detectRenderTier()` never returns it; it's only ever reached via an
+explicit `GraphicsPipelineOptions.qualityTier: 'cinematic'` override for a
+screenshot/video capture pathway. Don't wire it into a scene's normal
+interactive rendering path.
 
 ## Performance checklist for the world-builder
 
@@ -124,3 +147,9 @@ Before shipping a new facility/hero-object scene, check:
       (`materials.ts`'s `brushedMetalFactory`/`makeFloorNoiseTexture`) with
       `.clone()` + a new `.repeat`, rather than generating a fresh canvas
       per surface that wants the same look.
+- [ ] Screen-space reflections (`reflections` in `GraphicsPipelineOptions`)
+      stay off/at their default `'cinematic'`-tier gate unless verified on
+      real hardware — this sandbox cannot confirm SSR's visual quality.
+- [ ] `qualityTier: 'cinematic'` is only ever used for an explicit capture
+      (a screenshot/video request), never wired into normal interactive
+      rendering.

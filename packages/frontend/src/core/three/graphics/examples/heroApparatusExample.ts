@@ -1,7 +1,7 @@
 import type * as THREE_NS from 'three';
 import { createGenesisMaterialPalette, createEmissiveInstrumentMaterial } from '../materials';
 import { InstanceBatch } from '../instancing';
-import { applyHeroLighting } from '../lighting';
+import { createHeroLight } from '../lighting';
 import { applyShadowPolicy } from '../shadowPolicy';
 import type { DepthOfFieldSettings } from '../postProcessing';
 
@@ -16,7 +16,7 @@ import type { DepthOfFieldSettings } from '../postProcessing';
  *
  *   Genesis PBR material  → `createGenesisMaterialPalette` / `createEmissiveInstrumentMaterial`
  *   Instance batching     → `InstanceBatch` (the bolt ring)
- *   Hero lighting role    → `applyHeroLighting`
+ *   Hero lighting role    → `createHeroLight`
  *   Shadow policy         → `applyShadowPolicy` (with a `forceCast` override)
  *   Optional DOF          → a `DepthOfFieldSettings` value the caller can hand to
  *                           `setupGraphicsPipeline` when they know the shot's focus distance
@@ -130,7 +130,7 @@ export function buildExampleHeroApparatus(
 
   // --- HERO LIGHTING ROLE: "this is the hero apparatus" — one call for a coherent, already-tuned
   // KEY+RIM treatment, instead of hand-placing and re-tuning a SpotLight+PointLight pair. ---
-  applyHeroLighting(THREE, scene, {
+  createHeroLight(THREE, scene, {
     target: [opts.position[0], opts.position[1] + 0.75 * scale, opts.position[2]],
     keyDistance: 3 * scale,
     rimDistance: 1.5 * scale,

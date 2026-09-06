@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
-  createKeyLight, createRimLight, createPracticalLight, createBackgroundFill, applyHeroLighting,
+  createKeyLight, createRimLight, createPracticalLight, createBackgroundFill, createHeroLight,
 } from '../core/three/graphics/lighting';
 
 /**
@@ -60,11 +60,11 @@ describe('createBackgroundFill', () => {
   });
 });
 
-describe('applyHeroLighting', () => {
+describe('createHeroLight', () => {
   it('produces a KEY (shadow-casting, aimed at target) and RIM pair positioned away from the target', () => {
     const scene = new THREE.Scene();
     const target: THREE.Vector3Tuple = [0, 1.1, -0.2];
-    const { key, rim } = applyHeroLighting(THREE, scene, { target });
+    const { key, rim } = createHeroLight(THREE, scene, { target });
     expect(key.castShadow).toBe(true);
     expect([key.target.position.x, key.target.position.y, key.target.position.z]).toEqual(target);
     expect(key.position.distanceTo(new THREE.Vector3(...target))).toBeGreaterThan(1);
@@ -76,8 +76,8 @@ describe('applyHeroLighting', () => {
   it('scales key distance with a larger hero object without extra call-site math', () => {
     const scene = new THREE.Scene();
     const target: THREE.Vector3Tuple = [0, 0, 0];
-    const small = applyHeroLighting(THREE, scene, { target, keyDistance: 2 });
-    const large = applyHeroLighting(THREE, new THREE.Scene(), { target, keyDistance: 20 });
+    const small = createHeroLight(THREE, scene, { target, keyDistance: 2 });
+    const large = createHeroLight(THREE, new THREE.Scene(), { target, keyDistance: 20 });
     expect(large.key.position.length()).toBeGreaterThan(small.key.position.length());
   });
 });

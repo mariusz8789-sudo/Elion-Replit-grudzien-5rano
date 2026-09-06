@@ -42,7 +42,9 @@ beforeAll(() => {
 
 import {
   createGenesisMaterialPalette,
-  createScienceGlass,
+  createScientificGlass,
+  createDoubleWalledGlass,
+  createPBRMaterial,
   createEmissiveInstrumentMaterial,
   createScreenMaterial,
   makeReadoutSurface,
@@ -50,11 +52,11 @@ import {
 } from '../core/three/graphics/materials';
 
 const STATIC_PALETTE_IDS: readonly Exclude<GenesisMaterialId, 'SCREEN' | 'EMISSIVE_INSTRUMENT'>[] = [
-  'SCIENCE_GLASS', 'BRUSHED_METAL', 'POLISHED_METAL', 'TECH_COMPOSITE', 'RUBBER', 'CERAMIC', 'LAB_FLOOR', 'LAB_WALL',
+  'SCIENCE_GLASS', 'BRUSHED_METAL', 'POLISHED_METAL', 'TECH_COMPOSITE', 'RUBBER', 'CERAMIC', 'PAINTED_METAL', 'LAB_FLOOR', 'LAB_WALL',
 ];
 
 describe('createGenesisMaterialPalette', () => {
-  it('builds all 8 statically-shareable categories as real three.js materials', () => {
+  it('builds all 9 statically-shareable categories as real three.js materials', () => {
     const palette = createGenesisMaterialPalette(THREE);
     for (const id of STATIC_PALETTE_IDS) {
       expect(palette[id]).toBeInstanceOf(THREE.Material);
@@ -80,7 +82,7 @@ describe('createGenesisMaterialPalette', () => {
 
   it('keeps non-metals at (near-)zero metalness', () => {
     const palette = createGenesisMaterialPalette(THREE);
-    for (const id of ['TECH_COMPOSITE', 'RUBBER', 'CERAMIC', 'LAB_FLOOR', 'LAB_WALL'] as const) {
+    for (const id of ['TECH_COMPOSITE', 'RUBBER', 'CERAMIC', 'PAINTED_METAL', 'LAB_FLOOR', 'LAB_WALL'] as const) {
       const material = palette[id] as THREE.MeshStandardMaterial;
       expect(material.metalness).toBeLessThan(0.35);
     }
@@ -104,16 +106,111 @@ describe('createGenesisMaterialPalette', () => {
   });
 });
 
-describe('createScienceGlass — reflective vs. transmissive variants', () => {
+describe('createScientificGlass — reflective vs. transmissive variants', () => {
   it('defaults to the reflective hero-object look', () => {
-    const glass = createScienceGlass(THREE);
+    const glass = createScientificGlass(THREE);
     expect(glass.transmission).toBe(0);
     expect(glass.opacity).toBeLessThan(1);
   });
 
   it('produces a true see-through pane when transmissive:true', () => {
-    const glass = createScienceGlass(THREE, { transmissive: true });
+    const glass = createScientificGlass(THREE, { transmissive: true });
     expect(glass.transmission).toBeGreaterThan(0.5);
+  });
+
+  it('thicker reflective glass reads denser (higher opacity) but never fully opaque', () => {
+    const thin = createScientificGlass(THREE, { thicknessMeters: 0.005 });
+    const thick = createScientificGlass(THREE, { thicknessMeters: 0.05 });
+    expect(thick.opacity).toBeGreaterThan(thin.opacity);
+    expect(thick.opacity).toBeLessThan(1);
+  });
+
+  it('respects explicit roughness/ior overrides instead of the variant defaults', () => {
+    const glass = createScientificGlass(THREE, { roughness: 0.2, ior: 1.33 });
+    expect(glass.roughness).toBe(0.2);
+    expect(glass.ior).toBe(1.33);
+  });
+
+  it('color override applies to both variants', () => {
+    const reflective = createScientificGlass(THREE, { color: 0xff0000 });
+    const transmissive = createScientificGlass(THREE, { color: 0x00ff00, transmissive: true });
+    expect(reflective.color.getHex()).toBe(0xff0000);
+    expect(transmissive.color.getHex()).toBe(0x00ff00);
+  });
+});
+
+describe('createDoubleWalledGlass', () => {
+  it('returns two distinct MeshPhysicalMaterial instances, not the same object twice', () => {
+    const { outer, inner } = createDoubleWalledGlass(THREE);
+    expect(outer).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+    expect(inner).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+    expect(outer).not.toBe(inner);
+  });
+
+  it('inner wall is denser/rougher than the outer at default contrast', () => {
+    const { outer, inner } = createDoubleWalledGlass(THREE);
+    expect(inner.roughness).toBeGreaterThan(outer.roughness);
+    expect(inner.opacity).toBeGreaterThanOrEqual(outer.opacity);
+  });
+
+  it('jacketContrast: 0 makes the two shells effectively identical in roughness/opacity', () => {
+    const { outer, inner } = createDoubleWalledGlass(THREE, { jacketContrast: 0 });
+    expect(inner.roughness).toBeCloseTo(outer.roughness, 5);
+    expect(inner.opacity).toBeCloseTo(outer.opacity, 5);
+  });
+
+  it('higher jacketContrast produces a more pronounced difference', () => {
+    const subtle = createDoubleWalledGlass(THREE, { jacketContrast: 0.2 });
+    const strong = createDoubleWalledGlass(THREE, { jacketContrast: 0.9 });
+    const subtleDelta = subtle.inner.roughness - subtle.outer.roughness;
+    const strongDelta = strong.inner.roughness - strong.outer.roughness;
+    expect(strongDelta).toBeGreaterThan(subtleDelta);
+  });
+
+  it('works for the transmissive (true see-through) variant too', () => {
+    const { outer, inner } = createDoubleWalledGlass(THREE, { transmissive: true });
+    expect(outer.transmission).toBeGreaterThan(0.5);
+    expect(inner.transmission).toBeGreaterThan(0.5);
+  });
+});
+
+describe('createPBRMaterial', () => {
+  it('builds a valid material for every static category', () => {
+    for (const id of STATIC_PALETTE_IDS) {
+      const material = createPBRMaterial(THREE, id);
+      expect(material).toBeInstanceOf(THREE.Material);
+    }
+  });
+
+  it('never warns about an undefined constructor param, for any category', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    for (const id of STATIC_PALETTE_IDS) createPBRMaterial(THREE, id);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('matches createGenesisMaterialPalette\'s default tuning for the same category (single source of truth)', () => {
+    const palette = createGenesisMaterialPalette(THREE);
+    const single = createPBRMaterial(THREE, 'POLISHED_METAL') as THREE.MeshStandardMaterial;
+    const fromPalette = palette.POLISHED_METAL as THREE.MeshStandardMaterial;
+    expect(single.metalness).toBe(fromPalette.metalness);
+    expect(single.roughness).toBe(fromPalette.roughness);
+    expect(single.color.getHex()).toBe(fromPalette.color.getHex());
+  });
+
+  it('applies a color override without touching other categories\' defaults', () => {
+    const painted = createPBRMaterial(THREE, 'PAINTED_METAL', { color: 0x112233 }) as THREE.MeshPhysicalMaterial;
+    expect(painted.color.getHex()).toBe(0x112233);
+    expect(painted.metalness).toBeGreaterThan(0); // still reads as "metal under paint," not plastic
+    expect(painted.metalness).toBeLessThan(0.35);
+  });
+
+  it('PAINTED_METAL sits between TECH_COMPOSITE and BRUSHED_METAL in metalness (paint dulls, doesn\'t hide, the substrate)', () => {
+    const composite = createPBRMaterial(THREE, 'TECH_COMPOSITE') as THREE.MeshStandardMaterial;
+    const painted = createPBRMaterial(THREE, 'PAINTED_METAL') as THREE.MeshPhysicalMaterial;
+    const brushed = createPBRMaterial(THREE, 'BRUSHED_METAL') as THREE.MeshStandardMaterial;
+    expect(painted.metalness).toBeGreaterThan(composite.metalness);
+    expect(painted.metalness).toBeLessThan(brushed.metalness);
   });
 });
 

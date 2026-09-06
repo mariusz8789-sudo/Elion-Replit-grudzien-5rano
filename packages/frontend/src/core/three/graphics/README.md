@@ -2,22 +2,44 @@
 
 Independent rendering-layer contribution, built on branch
 `claude/genesis-graphics-engine-v1-wd0r66`. Scope is deliberately narrow:
-**materials, lighting roles, shadows, AO, DOF, post-processing, and
-performance tooling.** It does not build laboratory geometry, the hero
-apparatus, scientist hands/PPE, or UI — that's the world-builder's layer,
-and this document is written for that world-builder to consume this one
-without re-deriving or duplicating any of it.
+**materials, lighting roles, shadows, AO, DOF, reflections, cinematic
+camera/post-processing, and performance tooling.** It does not build
+laboratory geometry, the hero apparatus, scientist hands/PPE, or UI — that's
+the World/Looking-Glass layer, and this document is written for that
+world-builder to consume this one without re-deriving or duplicating any of
+it.
+
+## Where this sits in the Genesis architecture
+
+```
+Genesis Scientific Engine        (the brain — computes real state, never rendered directly)
+        ↓
+ScientificWorldState             (the computed truth: fractions, statuses, events)
+        ↓
+World / Looking Glass            (the world — lab geometry, hero apparatus, scientist POV, UI)
+        ↓
+GENESIS GRAPHICS ENGINE          (the eyes — THIS layer: materials/lighting/shadows/AO/DOF/post-fx)
+        ↓
+WebGL / Three.js
+```
+
+The Graphics Engine **renders** the world; it never simulates one. It has no
+opinion on what a fraction or a status *means* — see §9 for the one pattern
+(`updateVisualState`-shaped) that crosses the boundary from
+`ScientificWorldState` into a rendered mutation, always in that direction,
+never the reverse.
 
 ## 1. What APIs to use
 
 | Concern | Module | Entry points |
 |---|---|---|
-| Materials | `materials.ts` | `createGenesisMaterialPalette(THREE)`, `createScienceGlass`, `createEmissiveInstrumentMaterial`, `createScreenMaterial`, plus the procedural texture generators |
-| Lighting roles | `lighting.ts` | `createKeyLight`, `createRimLight`, `createPracticalLight`, `applyHeroLighting`, `createBackgroundFill`, `applyAmbientIBL` |
+| Materials | `materials.ts` | `createGenesisMaterialPalette(THREE)`, `createPBRMaterial`, `createScientificGlass`, `createDoubleWalledGlass`, `createEmissiveInstrumentMaterial`, `createScreenMaterial`, plus the procedural texture generators |
+| Lighting roles | `lighting.ts` | `createKeyLight`, `createRimLight`, `createPracticalLight`, `createHeroLight`, `createBackgroundFill`, `applyAmbientIBL` |
 | Shadows | `shadowPolicy.ts` | `applyShadowPolicy(THREE, scene, options?)`, `SHADOW_SIZE_TIERS` |
 | Instancing | `instancing.ts` | `InstanceBatch` |
-| Post-processing (AO/bloom/DOF/tone-mapping) | `postProcessing.ts` | `setupGraphicsPipeline`, `resolveBokehUniforms`, types `GraphicsPipelineOptions`/`DepthOfFieldSettings`/`GraphicsPipeline` |
-| Quality tiers | `../quality.ts` | `detectRenderTier`, `tierDpr`, `tierAllowsBloom`, `tierAllowsAO`, `tierAtLeast`, `recommendedShadowMapSize`, `maxShadowCasterBudget` |
+| Post-processing (AO/reflections/bloom/DOF/tone-mapping) | `postProcessing.ts` | `setupGraphicsPipeline`, `configureDOF`, `resolveBokehUniforms`, types `GraphicsPipelineOptions`/`DepthOfFieldSettings`/`ScreenSpaceReflectionSettings`/`GraphicsPipeline` |
+| Cinematic camera | `cinematicCamera.ts` | `configureCinematicCamera`, `recommendedDofForProfile`, `FocusPuller` |
+| Quality tiers | `../quality.ts` | `detectRenderTier`, `configureGraphicsQuality`, `tierDpr`, `tierAllowsBloom`, `tierAllowsAO`, `tierAtLeast`, `recommendedShadowMapSize`, `maxShadowCasterBudget` |
 | Integration pattern | `examples/heroApparatusExample.ts` | `buildExampleHeroApparatus` — READ this, don't import it into a real scene |
 
 ## 2. What NOT to duplicate
@@ -27,34 +49,41 @@ without re-deriving or duplicating any of it.
   `renderer.toneMapping`, `renderer.toneMappingExposure`, and
   `renderer.outputColorSpace` — call it once from your `Sim3D.setupPostProcessing`
   and you're done. See §3 for the exact contract.
-- **Don't write a second AO/bloom/DOF composer chain.** Extend
+- **Don't write a second AO/reflections/bloom/DOF composer chain.** Extend
   `GraphicsPipelineOptions` if you need a new pass, don't build a parallel
   `EffectComposer`.
-- **Don't hand-roll a PBR material for something that fits one of the 8
-  canonical categories.** `createGenesisMaterialPalette` exists so "brushed
-  metal" means the same roughness/metalness everywhere in the world.
+- **Don't hand-roll a PBR material for something that fits one of the 10
+  canonical categories.** `createGenesisMaterialPalette`/`createPBRMaterial`
+  exist so "brushed metal" means the same roughness/metalness everywhere in
+  the world.
 - **Don't hand-place a SpotLight+PointLight pair and re-tune the angle for
-  every new hero object.** Call `applyHeroLighting` once instead.
+  every new hero object.** Call `createHeroLight` once instead.
 - **Don't re-derive the shadow size heuristic.** Call `applyShadowPolicy`
   once, after your scene is fully built.
+- **Don't hand-roll a camera FOV/near/far per shot.** Call
+  `configureCinematicCamera` with a named profile.
 - **Don't import `examples/heroApparatusExample.ts` into a real scene.** It
   is a reference pattern, not reusable geometry — its chamber/frame/bolts
   are generic filler, not the flagship apparatus.
+- **Don't build a second scientific simulation inside this layer.** If a
+  rendering decision needs to know WHY a value changed (not just what it
+  is), that reasoning belongs upstream in `ScientificWorldState` — this
+  layer only ever reads a value it's handed.
 
 ## 3. The rendering pipeline contract
 
 ### Canonical call order
 
 ```
-SCENE / MATERIALS  →  LIGHTING  →  (build finishes)  →  SHADOW POLICY  →  AO  →  BLOOM  →  DOF  →  TONE MAPPING  →  COLOR SPACE OUTPUT
+SCENE / MATERIALS  →  LIGHTING  →  (build finishes)  →  SHADOW POLICY  →  AO  →  REFLECTIONS  →  BLOOM  →  DOF  →  TONE MAPPING  →  COLOR SPACE OUTPUT
 ```
 
 Concretely, across two phases:
 
 **Phase 1 — scene construction (`Sim3D.init`)**, entirely yours to order as
 you like, except shadow policy must run last:
-1. Build geometry, assign `createGenesisMaterialPalette`/`createScienceGlass`/etc. materials.
-2. Add lighting roles (`createKeyLight`/`applyHeroLighting`/`createBackgroundFill`/...).
+1. Build geometry, assign `createGenesisMaterialPalette`/`createPBRMaterial`/`createScientificGlass`/etc. materials.
+2. Add lighting roles (`createKeyLight`/`createHeroLight`/`createBackgroundFill`/...).
 3. Call `applyShadowPolicy(THREE, scene, options)` **once, after every
    builder has added everything to `scene`** — running it earlier misses
    meshes added afterward; running it per-builder just means the last
@@ -71,16 +100,19 @@ setupPostProcessing(modules, renderer, scene, camera, w, h) {
     // optional:
     toneMappingExposure: 1.05,
     bloom: { strength: 0.34, radius: 0.5, threshold: 0.92 },
-    depthOfField: { enabled: true, focusDistance: 3.2 }, // see §4
+    depthOfField: configureDOF({ focusDistance: 3.2 }), // see §5
+    // reflections: { enabled: true },                  // see §11 — off by default, unverified on real hardware
+    // qualityTier: 'cinematic',                        // see §11 — forces capture-quality regardless of device
   });
 }
 ```
 
-Internally this builds: `RenderPass → GTAOPass (tier-gated) → UnrealBloomPass
-(tier-gated) → BokehPass (opt-in, tier-gated) → OutputPass`, plus
-`renderer.shadowMap`/`toneMapping`/`outputColorSpace` and the AMBIENT/IBL
-role (`applyAmbientIBL`). **You should not need to touch any of this** —
-it's exposed as one function precisely so you don't have to reassemble it.
+Internally this builds: `RenderPass → GTAOPass (tier-gated) → SSRPass
+(opt-in, cinematic-tier-gated) → UnrealBloomPass (tier-gated) → BokehPass
+(opt-in, tier-gated) → OutputPass`, plus `renderer.shadowMap`/
+`toneMapping`/`outputColorSpace` and the AMBIENT/IBL role
+(`applyAmbientIBL`). **You should not need to touch any of this** — it's
+exposed as one function precisely so you don't have to reassemble it.
 
 ### Why this order, specifically (verified, not assumed)
 
@@ -101,14 +133,14 @@ if (material.toneMapped) {
 `RenderPass` renders into the composer's **offscreen** intermediate buffer
 (`_currentRenderTarget !== null`), so the scene renders there in **raw
 linear HDR** — no tone mapping, no sRGB encoding yet, regardless of
-`renderer.toneMapping`'s value. `GTAOPass` and `UnrealBloomPass` then
-operate correctly on that linear HDR data (AO darkens actual scene radiance,
-bloom blooms actual scene brightness — not an already-compressed, already-
-gamma-encoded image). Only `OutputPass`, which sets the render target to
-`null` for the final blit, applies tone mapping **and** color-space
-conversion — **exactly once, at the very end.** There is no double
-tone-mapping, no double encoding, and no ordering ambiguity: this is the
-same reasoning behind three.js's own recommended
+`renderer.toneMapping`'s value. `GTAOPass`, `SSRPass` and `UnrealBloomPass`
+then operate correctly on that linear HDR data (AO darkens actual scene
+radiance, reflections/bloom read/bloom actual scene brightness — not an
+already-compressed, already-gamma-encoded image). Only `OutputPass`, which
+sets the render target to `null` for the final blit, applies tone mapping
+**and** color-space conversion — **exactly once, at the very end.** There is
+no double tone-mapping, no double encoding, and no ordering ambiguity: this
+is the same reasoning behind three.js's own recommended
 `RenderPass → effects → OutputPass` pattern, verified here against this
 project's actual pipeline rather than assumed. See
 `graphics/postProcessing.ts`'s test file
@@ -119,7 +151,9 @@ assertions.
 blends its AO term with `CustomBlending` **inside** the same linear-HDR
 buffer, before `OutputPass` runs — this is the fix for the pipeline's
 previous "SSAO skipped, blows out to white" state (SSAO used to fight the
-tone-mapper because of a different, incorrect pass placement).
+tone-mapper because of a different, incorrect pass placement). Reflections
+are placed right after AO (so they show the AO-darkened scene, not bypass
+it) and before bloom (so a bright reflected practical can still bloom).
 
 ## 4. How to enable AO
 
@@ -133,20 +167,34 @@ edit the `gtao.updateGtaoMaterial({...})` call inside `setupGraphicsPipeline`
 
 DOF is **opt-in and off by default** — omitting `depthOfField` (or passing
 `{ enabled: false }`) is a strict no-op, so enabling it never affects a
-scene that hasn't asked for it.
+scene that hasn't asked for it. Build the settings with `configureDOF` (the
+named API) rather than a raw object literal:
 
 ```ts
-const depthOfField: DepthOfFieldSettings = {
-  enabled: true,
+const depthOfField = configureDOF({
   focusDistance: 3.2,       // meters from the camera — YOU must know this; the pipeline won't guess.
   blurStrength: 0.4,        // optional, 0..1 friendly knob (default 0.4). 0 = imperceptible, 1 = strong "macro" look.
   // aperture / maxBlur     // optional advanced overrides of the blurStrength mapping — see resolveBokehUniforms.
   // minTier: 'medium',     // optional — loosens the default 'high'-tier gate. Only after profiling your scene.
-};
+});
 ```
 
-Retune focus at runtime (e.g. a cinematic camera cuts to a new shot) via the
-pipeline's own handle, without rebuilding the composer:
+`configureDOF` throws on a non-positive `focusDistance` rather than silently
+producing a broken/inverted blur — an easy mistake if the caller passes a
+squared distance or forgets to compute it at all.
+
+**Camera profiles have a DOF opinion, use it instead of guessing a
+`blurStrength` by hand:**
+
+```ts
+import { recommendedDofForProfile } from './cinematicCamera';
+const depthOfField = recommendedDofForProfile('HERO_CLOSE_UP', focusDistanceToApparatus);
+// WIDE_ESTABLISHING / SCIENTIST_POV return { enabled: false, ... } — safe to pass straight through.
+```
+
+Retune focus at runtime (e.g. a cinematic camera cuts to a new shot, or a
+`FocusPuller` is racking focus) via the pipeline's own handle, without
+rebuilding the composer:
 
 ```ts
 const pipeline = setupGraphicsPipeline(...); // your Sim3D.setupPostProcessing already returns this
@@ -155,42 +203,102 @@ pipeline.setFocusDistance(newDistance); // no-op if DOF was never enabled
 
 DOF renders its own full-scene depth pre-pass — see
 [`PERFORMANCE.md`](./PERFORMANCE.md) before enabling it below the `'high'`
-tier or alongside AO on mid-range hardware.
+tier or alongside AO/reflections on mid-range hardware.
 
-## 6. How to assign materials
+## 6. How to configure the cinematic camera
+
+`cinematicCamera.ts` answers "what lens does shot X use" — FOV, near/far,
+and whether the shot wants DOF. It never decides WHERE the camera sits or
+WHEN a cut happens (that's the World/Looking-Glass layer's camera-phase
+state machine, e.g. `labScene3D.ts`'s `FREE`/`FLIGHT`/`FIXED` phases):
+
+```ts
+import { configureCinematicCamera, recommendedDofForProfile, FocusPuller } from './cinematicCamera';
+
+configureCinematicCamera(camera, 'HERO_CLOSE_UP'); // sets fov/near/far, calls updateProjectionMatrix()
+const depthOfField = recommendedDofForProfile('HERO_CLOSE_UP', focusDistance);
+```
+
+Five named profiles: `WIDE_ESTABLISHING` (facility establishing shot, sharp
+everywhere), `HERO_CLOSE_UP` (tight lens, moderate DOF falloff),
+`SCIENTIST_POV` (first-person, sharp everywhere — DOF here would fight the
+sense of physically occupying the space), `MACRO_DETAIL` (very tight, strong
+DOF, for a sensor/sample close-up), `INSTRUMENT_INSERT` (a tighter insert on
+a control panel/readout).
+
+For a smooth focus transition ("rack focus") instead of a hard cut:
+
+```ts
+const puller = new FocusPuller(currentFocusDistance);
+// in your render loop:
+puller.pullTo(newTargetDistance);
+pipeline.setFocusDistance(puller.update(dt));
+```
+
+`FocusPuller` is generic and stateful — it has no idea what's in the scene
+or why the focus is changing; that's the caller's business.
+
+## 7. How to assign materials
 
 ```ts
 const materials = createGenesisMaterialPalette(THREE); // once per scene
 mesh.material = materials.BRUSHED_METAL; // share the SAME instance across every brushed-metal part
 ```
 
+Or build exactly one category (the requested `createPBRMaterial` API),
+optionally with a color override:
+
+```ts
+const painted = createPBRMaterial(THREE, 'PAINTED_METAL', { color: 0x2f5a8f });
+```
+
 The 10 canonical categories: `SCIENCE_GLASS`, `BRUSHED_METAL`,
-`POLISHED_METAL`, `TECH_COMPOSITE`, `RUBBER`, `CERAMIC`,
-`EMISSIVE_INSTRUMENT`, `LAB_FLOOR`, `LAB_WALL`, `SCREEN`. Eight of them
-(everything except `EMISSIVE_INSTRUMENT` and `SCREEN`) are shared static
-instances from `createGenesisMaterialPalette` — assign the same instance to
-every mesh of that category. The other two are **factories**, because their
-content is inherently per-instance:
+`POLISHED_METAL`, `TECH_COMPOSITE`, `RUBBER`, `CERAMIC`, `PAINTED_METAL`,
+`EMISSIVE_INSTRUMENT`, `LAB_FLOOR`, `LAB_WALL`, `SCREEN`. Both bulk
+(`createGenesisMaterialPalette`) and single (`createPBRMaterial`) factories
+read their tuning from the same internal table, so they can never quietly
+drift apart. Eight of the ten (everything except `EMISSIVE_INSTRUMENT` and
+`SCREEN`) are shareable — assign the same instance to every mesh of that
+category. The other two are **factories**, because their content is
+inherently per-instance:
 
 ```ts
 const led = createEmissiveInstrumentMaterial(THREE, { color: 0xffb545, intensity: 0.9 }); // one per distinct indicator color
 const screen = createScreenMaterial(THREE, myCanvasTexture); // one per screen — each shows different content
 ```
 
+### Scientific glass
+
 Need a true see-through pane instead of `SCIENCE_GLASS`'s reflective hero
 look (a partition, an observation window)?
 
 ```ts
-const windowGlass = createScienceGlass(THREE, { transmissive: true });
+const windowGlass = createScientificGlass(THREE, { transmissive: true });
+```
+
+Full control over wall thickness/roughness/IOR for either variant:
+
+```ts
+const thickWalledVessel = createScientificGlass(THREE, { thicknessMeters: 0.03, roughness: 0.02, ior: 1.52 });
+```
+
+A vacuum-jacketed vessel (a Dewar flask, a cryostat) — build two concentric
+shells yourself (two cylinders/spheres at slightly different radii) and
+material them with a matched-but-distinct pair:
+
+```ts
+const { outer, inner } = createDoubleWalledGlass(THREE, { jacketContrast: 0.5 });
+outerShellMesh.material = outer;
+innerShellMesh.material = inner;
 ```
 
 Need a variant of a shared category (different color, a normal map once you
 have an approved asset)? Treat the result like any three.js material —
-`palette.BRUSHED_METAL.clone()` then set `.color`/`.normalMap` directly.
-There is no bespoke options API for this; that's intentional (see
+`palette.BRUSHED_METAL.clone()` then set `.normalMap`/`.roughnessMap`
+directly. There is no bespoke options API for that; that's intentional (see
 `materials.ts`'s doc comment on `createGenesisMaterialPalette`).
 
-## 7. How to assign shadows
+## 8. How to assign shadows
 
 ```ts
 applyShadowPolicy(THREE, scene, {
@@ -208,30 +316,31 @@ blob instead of the refraction/reflection they should show); a small but
 functionally important part can be forced to cast via `forceCast` without
 lowering the global threshold for everything else.
 
-## 8. How to register hero objects
+## 9. How to register hero objects
 
-"Hero object" isn't a registry — it's a lighting + (optionally) DOF
+"Hero object" isn't a registry — it's a lighting + (optionally) DOF/cinematic
 treatment you apply once, generalized from the proven flagship apparatus
 tuning:
 
 ```ts
-applyHeroLighting(THREE, scene, {
+createHeroLight(THREE, scene, {
   target: apparatusPosition,     // world point the object sits at
   keyDistance: 4.2,              // scale up for a larger object
   rimDistance: 1.8,
 });
+configureCinematicCamera(camera, 'HERO_CLOSE_UP');
 ```
 
 See `examples/heroApparatusExample.ts` for the full pattern (materials +
-instancing + hero lighting + shadow policy + the visual-state hook, all in
-one place) — read it, don't import it.
+instancing + hero lighting + shadow policy + a DOF hint + the visual-state
+hook, all in one place) — read it, don't import it.
 
-## 9. How to register scientific visual state
+## 10. How to register scientific visual state
 
 There's no registry here either — the pattern (proven in `labScene3D.ts`'s
 `syncScene`, and mirrored generically in
 `examples/heroApparatusExample.ts`'s `updateVisualState`) is: your Sim3D's
-`syncScene`/`update` reads the ALREADY-COMPUTED scientific state (a
+`syncScene`/`update` reads the ALREADY-COMPUTED `ScientificWorldState` (a
 fraction, a status enum) and pushes it into scene mutations directly —
 material colors, mesh scale, light intensity. This rendering layer never
 computes or fabricates a scientific value; it only ever renders one it's
@@ -247,16 +356,63 @@ function updateVisualState(fraction: number, status: MyStatusEnum) {
 }
 ```
 
-## 10. Performance rules
+## 11. Reflections — investigation + how to use them
+
+Glass and metal reflections are already handled by two proven, cheap,
+real-time techniques with **no configuration needed**: `SCIENCE_GLASS`'s own
+transmission/clearcoat model, and the AMBIENT/IBL role's PMREM environment
+map (`applyAmbientIBL`, already wired into `setupGraphicsPipeline`). Both
+stay correct on curved surfaces (a cylinder vessel, a domed cap), which is
+exactly where screen-space reflections historically struggle.
+
+What SSR (`SSRPass`) adds ON TOP of that: reflections of *other scene
+objects* on flat-ish opaque surfaces — a polished floor showing the reactor's
+silhouette, a metal panel catching a neighboring light. Real value for "deep
+laboratory environments," but it renders its own normal+depth+metalness
+pre-passes — a similar cost order to AO, stacked on top of AO. **No real GPU
+is available in this sandbox to verify SSR's actual visual quality/artifact
+behavior** (known to show noise/streaking on some hardware/angles), so it is
+wired as **opt-in, off by default, gated to the `'cinematic'` tier**:
+
+```ts
+setupGraphicsPipeline(THREE, modules, renderer, {
+  scene, camera, width, height,
+  qualityTier: 'cinematic',                 // see below — forces capture quality regardless of device
+  reflections: { enabled: true, strength: 0.6, maxDistance: 6 },
+});
+```
+
+**Test on real hardware before shipping this enabled anywhere.** Until then,
+treat it as an available capability, not a verified one.
+
+### Forcing capture quality (`qualityTier`)
+
+A screenshot/video capture pathway wants AO/reflections/DOF/bigger shadow
+maps regardless of what the interactive device heuristic
+(`detectRenderTier()`) would pick — that's what the new `'cinematic'` tier
+and `GraphicsPipelineOptions.qualityTier` override are for:
+
+```ts
+setupGraphicsPipeline(THREE, modules, renderer, { scene, camera, width, height, qualityTier: 'cinematic' });
+```
+
+`detectRenderTier()` **never** returns `'cinematic'` on its own — there is no
+device signal that means "the user wants a cinematic capture right now."
+That's always this explicit override. `configureGraphicsQuality('cinematic')`
+gives you the full resolved bundle (DPR cap, shadow map size, shadow-caster
+budget, bloom/AO/DOF allowances) if you need it outside the pipeline too.
+
+## 12. Performance rules
 
 Full detail (cost drivers, checklist) in [`PERFORMANCE.md`](./PERFORMANCE.md).
-The five that matter most:
+The six that matter most:
 
 1. DPR is capped via `quality.tierDpr(tier)` — the single highest-leverage lever (cost ~O(dpr²)).
 2. A shadow-casting `PointLight` costs ~6x a Spot/DirectionalLight (cube shadow map, 6 faces) — budget with `maxShadowCasterBudget(tier)`, not a raw light count.
-3. AO and DOF each render their own extra full-scene pre-pass — both gated to `'high'` tier by default; loosen only after profiling.
+3. AO, reflections, and DOF each render their own extra full-scene pre-pass — all gated to `'high'`/`'cinematic'` tier by default; loosen only after profiling.
 4. Repeated small parts (bolts, LEDs, knobs) go through `InstanceBatch` once the count exceeds ~15-20 — one draw call regardless of instance count.
 5. `applyShadowPolicy` runs exactly once, after the scene is fully built.
+6. `'cinematic'` tier is for a captured frame/short clip, not sustained interactive frame rate — never auto-selected, always an explicit `qualityTier` override.
 
 ## Example usage
 
@@ -271,16 +427,22 @@ executable reference for "does my composition actually run."
 ## Verification performed on this branch
 
 - `npx tsc -b --force` — clean, no errors.
-- `npm run build` (`tsc -b && vite build`) — clean; `GTAOPass`/`BokehPass`
-  land in their own lazy-loaded chunks, matching the existing pattern for
-  `UnrealBloomPass`/`OutputPass`.
-- `npx vitest run` — every test file in the project passes, including six
-  new files covering this rendering layer: pipeline pass-order/tier-gating
-  (`graphicsPostProcessing.test.ts`), the material palette
-  (`graphicsMaterials.test.ts`), lighting roles (`graphicsLighting.test.ts`),
-  the shadow policy (`graphicsShadowPolicy.test.ts`), the new quality-tier
-  helpers (`graphicsQualityTiers.test.ts`), and the integration example
+- `npm run build` (`tsc -b && vite build`) — clean; `GTAOPass`/`BokehPass`/
+  `SSRPass` land in their own lazy-loaded chunks, matching the existing
+  pattern for `UnrealBloomPass`/`OutputPass`.
+- `npx vitest run` — every test file in the project passes, including the
+  files covering this rendering layer specifically: pipeline pass-order/
+  tier-gating/reflections/qualityTier (`graphicsPostProcessing.test.ts`),
+  the material palette/glass/double-wall (`graphicsMaterials.test.ts`),
+  lighting roles (`graphicsLighting.test.ts`), the shadow policy
+  (`graphicsShadowPolicy.test.ts`), quality-tier helpers including
+  `'cinematic'` (`graphicsQualityTiers.test.ts`), the cinematic camera
+  module (`graphicsCinematicCamera.test.ts`), and the integration example
   (`graphicsHeroApparatusExample.test.ts`).
 - Manual headless run (Playwright + SwiftShader): `#/first-person-lab`
   renders correctly with GTAO active, no console errors, no visual
   regression versus the pre-existing lighting/materials.
+- A genuine `window is not defined` bug in `quality.ts`'s `tierDpr` (it
+  never guarded for a non-browser environment, unlike `detectRenderTier`)
+  was found and fixed while writing this session's tests — see
+  `graphicsQualityTiers.test.ts`.

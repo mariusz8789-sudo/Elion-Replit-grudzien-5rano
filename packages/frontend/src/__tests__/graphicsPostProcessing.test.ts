@@ -24,11 +24,11 @@ vi.mock('../core/three/quality', async (importOriginal) => {
   return { ...actual, detectRenderTier: vi.fn(() => 'high') };
 });
 
-import { setupGraphicsPipeline, resolveBokehUniforms, type DepthOfFieldSettings } from '../core/three/graphics/postProcessing';
+import { setupGraphicsPipeline, resolveBokehUniforms, configureDOF, type DepthOfFieldSettings } from '../core/three/graphics/postProcessing';
 import { detectRenderTier } from '../core/three/quality';
 import type { PostProcessingModules } from '../core/three/types';
 
-type PassLabel = 'RenderPass' | 'GTAOPass' | 'UnrealBloomPass' | 'BokehPass' | 'OutputPass';
+type PassLabel = 'RenderPass' | 'GTAOPass' | 'SSRPass' | 'UnrealBloomPass' | 'BokehPass' | 'OutputPass';
 
 function fakeThree() {
   class Vector2 { constructor(public x: number, public y: number) {} }
@@ -74,9 +74,19 @@ function fakeModules() {
     }
   }
   class OutputPass { constructor() { addedPasses.push('OutputPass'); } }
+  const ssrInstances: Array<{ opacity: number; maxDistance: number; dispose: ReturnType<typeof vi.fn> }> = [];
+  class SSRPass {
+    opacity = 0;
+    maxDistance = 0;
+    dispose = vi.fn();
+    constructor(public params: unknown) {
+      addedPasses.push('SSRPass');
+      ssrInstances.push(this);
+    }
+  }
 
-  const modules = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, BokehPass, OutputPass } as unknown as PostProcessingModules;
-  return { modules, addedPasses, gtaoInstances, bokehInstances, composerCalls };
+  const modules = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, BokehPass, OutputPass, SSRPass } as unknown as PostProcessingModules;
+  return { modules, addedPasses, gtaoInstances, bokehInstances, ssrInstances, composerCalls };
 }
 
 function fakeRenderer() {
@@ -252,5 +262,121 @@ describe('setupGraphicsPipeline — dispose', () => {
     pipeline.dispose?.();
     expect(gtaoInstances[0]!.dispose).toHaveBeenCalledOnce();
     expect(composerCalls.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('also disposes SSR when it was enabled', () => {
+    const { modules, ssrInstances } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts, qualityTier: 'cinematic', reflections: { enabled: true },
+    });
+    pipeline.dispose?.();
+    expect(ssrInstances[0]!.dispose).toHaveBeenCalledOnce();
+  });
+});
+
+describe('setupGraphicsPipeline — qualityTier override', () => {
+  it('forces cinematic quality regardless of detectRenderTier, enabling AO/bloom/DOF', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('low'); // device looks weak...
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts, qualityTier: 'cinematic', depthOfField: { enabled: true, focusDistance: 3 },
+    });
+    // ...but an explicit capture request still gets full quality.
+    expect(addedPasses).toContain('GTAOPass');
+    expect(addedPasses).toContain('UnrealBloomPass');
+    expect(addedPasses).toContain('BokehPass');
+  });
+
+  it('omitting qualityTier falls back to detectRenderTier as before', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('low');
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(addedPasses).toEqual(['RenderPass', 'OutputPass']);
+  });
+});
+
+describe('setupGraphicsPipeline — screen-space reflections (opt-in, off by default)', () => {
+  it('never adds SSRPass when reflections is omitted, even at cinematic tier', () => {
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, qualityTier: 'cinematic' });
+    expect(addedPasses).not.toContain('SSRPass');
+  });
+
+  it('never adds SSRPass when reflections.enabled is false', () => {
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts, qualityTier: 'cinematic', reflections: { enabled: false },
+    });
+    expect(addedPasses).not.toContain('SSRPass');
+  });
+
+  it('adds SSRPass when explicitly enabled at cinematic tier', () => {
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts, qualityTier: 'cinematic', reflections: { enabled: true },
+    });
+    expect(addedPasses).toContain('SSRPass');
+  });
+
+  it('defaults to the cinematic-tier gate — enabling it at "high" alone is not enough', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('high');
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, reflections: { enabled: true } });
+    expect(addedPasses).not.toContain('SSRPass');
+  });
+
+  it('a caller can loosen the gate via minTier after profiling their own scene', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('high');
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts, reflections: { enabled: true, minTier: 'high' },
+    });
+    expect(addedPasses).toContain('SSRPass');
+  });
+
+  it('maps strength/maxDistance onto the pass, clamping strength to [0,1]', () => {
+    const { modules, ssrInstances } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), {
+      ...baseOpts, qualityTier: 'cinematic', reflections: { enabled: true, strength: 1.5, maxDistance: 12 },
+    });
+    expect(ssrInstances[0]!.opacity).toBe(1);
+    expect(ssrInstances[0]!.maxDistance).toBe(12);
+  });
+
+  it('is placed after AO and before bloom in the pass order', () => {
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, qualityTier: 'cinematic', reflections: { enabled: true } });
+    expect(addedPasses).toEqual(['RenderPass', 'GTAOPass', 'SSRPass', 'UnrealBloomPass', 'OutputPass']);
+  });
+});
+
+describe('configureDOF', () => {
+  it('builds an enabled DepthOfFieldSettings by default', () => {
+    const settings = configureDOF({ focusDistance: 4 });
+    expect(settings.enabled).toBe(true);
+    expect(settings.focusDistance).toBe(4);
+  });
+
+  it('respects an explicit enabled:false', () => {
+    const settings = configureDOF({ focusDistance: 4, enabled: false });
+    expect(settings.enabled).toBe(false);
+  });
+
+  it('throws on a non-positive focus distance rather than silently producing broken DOF', () => {
+    expect(() => configureDOF({ focusDistance: 0 })).toThrow();
+    expect(() => configureDOF({ focusDistance: -1 })).toThrow();
+  });
+
+  it('passes through blurStrength/aperture/maxBlur/minTier unchanged', () => {
+    const settings = configureDOF({ focusDistance: 2, blurStrength: 0.6, minTier: 'medium' });
+    expect(settings.blurStrength).toBe(0.6);
+    expect(settings.minTier).toBe('medium');
+  });
+
+  it('produced settings work directly as setupGraphicsPipeline input', () => {
+    const { modules, addedPasses } = fakeModules();
+    const depthOfField = configureDOF({ focusDistance: 3 });
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, depthOfField });
+    expect(addedPasses).toContain('BokehPass');
   });
 });

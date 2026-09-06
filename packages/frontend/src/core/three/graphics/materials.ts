@@ -166,84 +166,167 @@ export function createFacilityGeometry(THREE: typeof THREE_NS): FacilityGeometry
  */
 export type GenesisMaterialId =
   | 'SCIENCE_GLASS' | 'BRUSHED_METAL' | 'POLISHED_METAL' | 'TECH_COMPOSITE'
-  | 'RUBBER' | 'CERAMIC' | 'EMISSIVE_INSTRUMENT' | 'LAB_FLOOR' | 'LAB_WALL' | 'SCREEN';
+  | 'RUBBER' | 'CERAMIC' | 'PAINTED_METAL' | 'EMISSIVE_INSTRUMENT' | 'LAB_FLOOR' | 'LAB_WALL' | 'SCREEN';
 
-/** The 9 statically-shareable categories — everything in `GenesisMaterialId` except `SCREEN`
- * (which is a per-instance factory; see `createScreenMaterial`). */
-export type GenesisMaterialPalette = Record<Exclude<GenesisMaterialId, 'SCREEN' | 'EMISSIVE_INSTRUMENT'>, THREE_NS.Material>;
+/** The statically-shareable categories — everything in `GenesisMaterialId` except `SCREEN` and
+ * `EMISSIVE_INSTRUMENT` (both per-instance factories; see `createScreenMaterial`/
+ * `createEmissiveInstrumentMaterial`). */
+export type StaticGenesisMaterialId = Exclude<GenesisMaterialId, 'SCREEN' | 'EMISSIVE_INSTRUMENT'>;
+export type GenesisMaterialPalette = Record<StaticGenesisMaterialId, THREE_NS.Material>;
+
+export interface PBRMaterialOverrides {
+  color?: THREE_NS.ColorRepresentation;
+}
 
 /**
- * Builds the 9 statically-shareable Genesis materials, each tuned with coherent, already-proven
- * metalness/roughness (and clearcoat/transmission where appropriate) — no configuration required
- * for the common case. One instance per scene; share the same instance across every mesh of that
- * category (that's the point — one `BRUSHED_METAL` reads as one coherent metal vocabulary across
- * the whole world, not nine similar-but-different grays).
+ * Every category's default tuning as `(THREE, overrides) => Material` — the single source of
+ * truth `createGenesisMaterialPalette` (bulk) and `createPBRMaterial` (one at a time) both read
+ * from, so the two entry points can never quietly drift apart. `BRUSHED_METAL` and `LAB_FLOOR`
+ * each generate their own small detail-texture canvas per call — cheap (a one-time 256x256 draw
+ * at scene setup, not a per-frame cost) and simpler than threading a shared-texture cache through
+ * every builder for a saving that only matters if you call these thousands of times.
+ */
+const MATERIAL_BUILDERS: {
+  [K in StaticGenesisMaterialId]: (THREE: typeof THREE_NS, overrides: PBRMaterialOverrides) => THREE_NS.Material;
+} = {
+  // Reflective-not-transmissive by default: proven in the flagship hero vessel — transmission
+  // blurs everything behind the glass and eats its own silhouette, while opacity+clearcoat gives
+  // sharp edge reflections (via three.js's built-in Fresnel response on `clearcoat`, which
+  // brightens at grazing angles with no custom shader needed) and a readable outline. Use
+  // `createScientificGlass({ transmissive: true })` for a true see-through pane instead.
+  SCIENCE_GLASS: (THREE, overrides) => createScientificGlass(THREE, overrides),
+  BRUSHED_METAL: (THREE, overrides) => new THREE.MeshStandardMaterial({
+    color: overrides.color ?? 0x8a93a6, roughness: 0.32, metalness: 0.9, roughnessMap: brushedMetalFactory(THREE)(3, 3), envMapIntensity: 1.3,
+  }),
+  POLISHED_METAL: (THREE, overrides) => new THREE.MeshStandardMaterial({
+    color: overrides.color ?? 0xc8d4e6, roughness: 0.08, metalness: 1, envMapIntensity: 1.6,
+  }),
+  TECH_COMPOSITE: (THREE, overrides) => new THREE.MeshStandardMaterial({
+    color: overrides.color ?? 0x2a3350, roughness: 0.72, metalness: 0.08,
+  }),
+  RUBBER: (THREE, overrides) => new THREE.MeshStandardMaterial({
+    color: overrides.color ?? 0x14181f, roughness: 0.95, metalness: 0,
+  }),
+  // Slight clearcoat (glazed-ceramic sheen) — cheap relative to SCIENCE_GLASS's full transmission
+  // setup, and reads correctly for lab vials/insulators without looking like plastic.
+  CERAMIC: (THREE, overrides) => new THREE.MeshPhysicalMaterial({
+    color: overrides.color ?? 0xd8e2ee, roughness: 0.4, metalness: 0.04, clearcoat: 0.15, clearcoatRoughness: 0.3,
+  }),
+  // Painted steel: paint hides most of the substrate's metalness (low but nonzero — most
+  // industrial paints have a faint metallic fleck), with its own thin glossy clearcoat layer
+  // distinct from the bare metal's own roughness.
+  PAINTED_METAL: (THREE, overrides) => new THREE.MeshPhysicalMaterial({
+    color: overrides.color ?? 0x3a4a68, roughness: 0.45, metalness: 0.15, clearcoat: 0.3, clearcoatRoughness: 0.25,
+  }),
+  LAB_FLOOR: (THREE, overrides) => new THREE.MeshStandardMaterial({
+    color: overrides.color ?? 0x1b2233, roughness: 0.38, metalness: 0.3, roughnessMap: makeFloorNoiseTexture(THREE),
+  }),
+  LAB_WALL: (THREE, overrides) => new THREE.MeshStandardMaterial({
+    color: overrides.color ?? 0x232c40, roughness: 0.9, metalness: 0.05,
+  }),
+};
+
+/**
+ * Builds one Genesis material by category — the requested `createPBRMaterial(...)` API. Prefer
+ * `createGenesisMaterialPalette` when you need several/all categories at once, so every mesh of a
+ * given category shares one material instance instead of each getting its own.
+ */
+export function createPBRMaterial(THREE: typeof THREE_NS, id: StaticGenesisMaterialId, overrides: PBRMaterialOverrides = {}): THREE_NS.Material {
+  return MATERIAL_BUILDERS[id](THREE, overrides);
+}
+
+/**
+ * Builds every statically-shareable Genesis material at once, each tuned with coherent,
+ * already-proven metalness/roughness (and clearcoat/transmission where appropriate) — no
+ * configuration required for the common case. One instance per scene; share the same instance
+ * across every mesh of that category (that's the point — one `BRUSHED_METAL` reads as one
+ * coherent metal vocabulary across the whole world, not ten similar-but-different grays).
  *
  * Every returned value is a plain `THREE.MeshStandardMaterial`/`MeshPhysicalMaterial` — there is
- * no bespoke options API for color/normal-map/detail-map overrides. Need a variant? Treat the
- * result like any other three.js material: `palette.BRUSHED_METAL.clone()` then set `.color`,
- * `.normalMap` (once you have an assetGovernance-APPROVED texture), or `.roughnessMap` directly.
+ * no bespoke options API for normal-map/detail-map overrides. Need a variant beyond `color`? Treat
+ * the result like any other three.js material: `palette.BRUSHED_METAL.clone()` then set
+ * `.normalMap` (once you have an assetGovernance-APPROVED texture) or `.roughnessMap` directly.
  * That keeps this factory compact and keeps "does this material accept a normal map" a plain
  * three.js fact instead of something this module has to specially wire through.
  */
 export function createGenesisMaterialPalette(THREE: typeof THREE_NS): GenesisMaterialPalette {
-  const brushed = brushedMetalFactory(THREE)(3, 3);
-  const floorNoise = makeFloorNoiseTexture(THREE);
+  const result = {} as GenesisMaterialPalette;
+  for (const id of Object.keys(MATERIAL_BUILDERS) as StaticGenesisMaterialId[]) {
+    result[id] = MATERIAL_BUILDERS[id](THREE, {});
+  }
+  return result;
+}
 
-  return {
-    // Reflective-not-transmissive by default: proven in the flagship hero vessel — transmission
-    // blurs everything behind the glass and eats its own silhouette, while opacity+clearcoat
-    // gives sharp edge reflections and a readable outline. Use `createScienceGlass({ transmissive:
-    // true })` below instead of this entry for a true see-through pane (windows, partitions).
-    SCIENCE_GLASS: new THREE.MeshPhysicalMaterial({
-      color: 0xcfe8ff, roughness: 0.03, metalness: 0, transmission: 0, transparent: true,
-      opacity: 0.26, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.0, side: THREE.DoubleSide, depthWrite: false,
-    }),
-    BRUSHED_METAL: new THREE.MeshStandardMaterial({
-      color: 0x8a93a6, roughness: 0.32, metalness: 0.9, roughnessMap: brushed, envMapIntensity: 1.3,
-    }),
-    POLISHED_METAL: new THREE.MeshStandardMaterial({
-      color: 0xc8d4e6, roughness: 0.08, metalness: 1, envMapIntensity: 1.6,
-    }),
-    TECH_COMPOSITE: new THREE.MeshStandardMaterial({
-      color: 0x2a3350, roughness: 0.72, metalness: 0.08,
-    }),
-    RUBBER: new THREE.MeshStandardMaterial({
-      color: 0x14181f, roughness: 0.95, metalness: 0,
-    }),
-    // Slight clearcoat (glazed-ceramic sheen) — cheap relative to SCIENCE_GLASS's full
-    // transmission setup, and reads correctly for lab vials/insulators without looking like plastic.
-    CERAMIC: new THREE.MeshPhysicalMaterial({
-      color: 0xd8e2ee, roughness: 0.4, metalness: 0.04, clearcoat: 0.15, clearcoatRoughness: 0.3,
-    }),
-    LAB_FLOOR: new THREE.MeshStandardMaterial({
-      color: 0x1b2233, roughness: 0.38, metalness: 0.3, roughnessMap: floorNoise,
-    }),
-    LAB_WALL: new THREE.MeshStandardMaterial({
-      color: 0x232c40, roughness: 0.9, metalness: 0.05,
-    }),
-  };
+export interface ScientificGlassOptions {
+  color?: THREE_NS.ColorRepresentation;
+  /** `false` (default) = the reflective hero-object look proven on the flagship vessel
+   * (opacity+clearcoat, sharp edge reflections, no refraction cost). `true` = genuinely
+   * see-through (an observation window, a partition wall) via real transmission/refraction. */
+  transmissive?: boolean;
+  /**
+   * Wall thickness in meters — feeds `MeshPhysicalMaterial.thickness` (its transmission model's
+   * refraction depth) when `transmissive`, and otherwise nudges the reflective variant's opacity
+   * slightly denser for a thicker wall. Default 0.01 (1cm — typical labware/vessel wall
+   * thickness). This is a look parameter, not a simulated ray-traced thickness.
+   */
+  thicknessMeters?: number;
+  /** Surface micro-roughness — lower reads as more optically perfect/clean glass, higher as worn/
+   * etched. Default differs by variant (reflective is cleaner than transmissive by default). */
+  roughness?: number;
+  /** Index of refraction. Default 1.5 (reflective, close to real borosilicate glass) / 1.4
+   * (transmissive — slightly softer refraction bend, reads better for a wide observation pane). */
+  ior?: number;
 }
 
 /**
- * SCIENCE_GLASS variant generator — the palette's `SCIENCE_GLASS` entry is the reflective, hero-
- * object look; call this instead when a specific pane needs to be genuinely see-through (an
- * observation window, a partition wall). Kept as a separate function rather than a palette entry
+ * The canonical Genesis scientific-glass material — reflective hero-object look by default, or a
+ * true see-through pane via `transmissive: true`. Kept as one function (not a palette entry)
  * because "reflective" and "transmissive" glass need materially different renderer behavior
  * (`transmission`+`opacity:1` vs `transmission:0`+partial `opacity`) — one shared instance can't
- * be both.
+ * be both, so this always returns a fresh instance.
  */
-export function createScienceGlass(THREE: typeof THREE_NS, opts: { transmissive?: boolean; color?: THREE_NS.ColorRepresentation } = {}): THREE_NS.MeshPhysicalMaterial {
+export function createScientificGlass(THREE: typeof THREE_NS, opts: ScientificGlassOptions = {}): THREE_NS.MeshPhysicalMaterial {
+  const thickness = opts.thicknessMeters ?? 0.01;
   if (opts.transmissive) {
     return new THREE.MeshPhysicalMaterial({
-      color: opts.color ?? 0xbfe4ff, roughness: 0.05, metalness: 0, transmission: 0.9,
-      transparent: true, opacity: 0.25, thickness: 0.1, ior: 1.4,
+      color: opts.color ?? 0xbfe4ff, roughness: opts.roughness ?? 0.05, metalness: 0, transmission: 0.9,
+      transparent: true, opacity: 0.25, thickness, ior: opts.ior ?? 1.4,
     });
   }
+  // Thicker reflective glass reads marginally denser/more tinted — clamped so it never approaches
+  // fully opaque (that would stop reading as glass at all).
+  const opacity = Math.min(0.45, 0.22 + thickness * 4);
   return new THREE.MeshPhysicalMaterial({
-    color: opts.color ?? 0xcfe8ff, roughness: 0.03, metalness: 0, transmission: 0, transparent: true,
-    opacity: 0.26, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.0, side: THREE.DoubleSide, depthWrite: false,
+    color: opts.color ?? 0xcfe8ff, roughness: opts.roughness ?? 0.03, metalness: 0, transmission: 0, transparent: true,
+    opacity, ior: opts.ior ?? 1.5, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.0, side: THREE.DoubleSide, depthWrite: false,
   });
+}
+
+export interface DoubleWalledGlassOptions extends ScientificGlassOptions {
+  /** How much the inner wall's finish differs from the outer — 0 = effectively identical shells,
+   * 1 = a strongly frosted/denser inner wall, the pronounced look of a vacuum-jacketed vessel
+   * (a Dewar flask, a cryostat). Default 0.4. */
+  jacketContrast?: number;
+}
+
+export interface DoubleWalledGlassHandles {
+  outer: THREE_NS.MeshPhysicalMaterial;
+  inner: THREE_NS.MeshPhysicalMaterial;
+}
+
+/**
+ * A double-wall/vacuum-jacket glass technique: two concentric shells (build the geometry
+ * yourself — two cylinders/spheres at slightly different radii) with matched-but-distinct
+ * materials, so the pair reads as one insulated vessel rather than two coincidentally similar
+ * panes. This is a MATERIAL technique, not geometry — it doesn't know or place the two shells.
+ */
+export function createDoubleWalledGlass(THREE: typeof THREE_NS, opts: DoubleWalledGlassOptions = {}): DoubleWalledGlassHandles {
+  const contrast = Math.max(0, Math.min(1, opts.jacketContrast ?? 0.4));
+  const outer = createScientificGlass(THREE, opts);
+  const inner = createScientificGlass(THREE, { ...opts, roughness: (opts.roughness ?? (opts.transmissive ? 0.05 : 0.03)) + contrast * 0.12 });
+  inner.opacity = Math.min(0.65, inner.opacity + contrast * 0.15);
+  inner.clearcoat = Math.max(0, inner.clearcoat - contrast * 0.3);
+  return { outer, inner };
 }
 
 /**

@@ -4,6 +4,43 @@ import { detectRenderTier, tierAllowsAO, tierAllowsBloom, tierAtLeast, type Rend
 import { applyAmbientIBL } from './lighting';
 
 /**
+ * GENESIS GRAPHICS RUNTIME — Screen-Space Reflections (investigation + opt-in pass)
+ *
+ * Glass and metal reflections in this pipeline are already handled by two
+ * cheap, proven, real-time techniques: `MeshPhysicalMaterial`'s own
+ * transmission/clearcoat model, and the AMBIENT/IBL role's PMREM
+ * environment map (`applyAmbientIBL`). Neither needs a screen-space pass,
+ * and both stay correct on curved surfaces (a cylinder vessel, a domed
+ * cap) where SSR historically struggles (screen-space ray marching loses
+ * off-screen and grazing-angle geometry, and curved surfaces expose those
+ * gaps constantly as the camera moves).
+ *
+ * What SSR adds ON TOP of that: reflections of OTHER SCENE OBJECTS on flat-
+ * ish opaque surfaces — a polished floor showing the reactor's silhouette,
+ * a metal panel catching a neighboring light. That's a real, visible
+ * upgrade for "deep laboratory environments" (task priority #6), but it
+ * costs its own normal+depth+metalness pre-passes and a blur pass — a
+ * similar order of cost to GTAO, on top of GTAO. Given no real GPU is
+ * available in this sandbox to verify SSR's actual visual quality/artifact
+ * behavior (it is known to show noise/streaking on some hardware/angles),
+ * this is wired as OPT-IN, OFF BY DEFAULT, and gated to the `'cinematic'`
+ * tier — a deliberate choice to make the capability available without
+ * claiming it's production-verified. Test on real hardware before shipping
+ * it enabled anywhere.
+ */
+export interface ScreenSpaceReflectionSettings {
+  enabled: boolean;
+  /** 0..1 friendly strength knob for the reflection blend — maps to SSRPass's `opacity`. Default 0.6. */
+  strength?: number;
+  /** Max ray-march distance in world units — how far a reflection ray searches before giving up.
+   * Default 6 (suits a room-scale facility; raise for a much larger space). */
+  maxDistance?: number;
+  /** Default `'cinematic'` — SSR's extra pre-passes are pricier than AO's; see the module doc
+   * above. Loosen only after verifying quality AND cost on real hardware. */
+  minTier?: RenderTier;
+}
+
+/**
  * GENESIS GRAPHICS RUNTIME — Post-Processing Pipeline
  *
  * Renderer configuration (shadows, tone mapping, color space) + environment
@@ -71,6 +108,33 @@ export function resolveBokehUniforms(settings: Pick<DepthOfFieldSettings, 'focus
   return { focus: settings.focusDistance, aperture, maxblur };
 }
 
+/**
+ * Named entry point for building a `DepthOfFieldSettings` value (the requested `configureDOF(...)`
+ * API) — a thin, validated builder over the plain interface literal. Functionally identical to
+ * writing the object yourself; exists so "configure DOF" is a discoverable function call rather
+ * than something you only find by reading the `DepthOfFieldSettings` type.
+ */
+export function configureDOF(opts: {
+  focusDistance: number;
+  enabled?: boolean;
+  blurStrength?: number;
+  aperture?: number;
+  maxBlur?: number;
+  minTier?: RenderTier;
+}): DepthOfFieldSettings {
+  if (opts.focusDistance <= 0) {
+    throw new Error(`configureDOF: focusDistance must be > 0 (got ${opts.focusDistance})`);
+  }
+  return {
+    enabled: opts.enabled ?? true,
+    focusDistance: opts.focusDistance,
+    blurStrength: opts.blurStrength,
+    aperture: opts.aperture,
+    maxBlur: opts.maxBlur,
+    minTier: opts.minTier,
+  };
+}
+
 export interface GraphicsPipelineOptions {
   scene: THREE_NS.Scene;
   camera: THREE_NS.PerspectiveCamera;
@@ -79,6 +143,14 @@ export interface GraphicsPipelineOptions {
   toneMappingExposure?: number;
   bloom?: { strength: number; radius: number; threshold: number };
   depthOfField?: DepthOfFieldSettings;
+  /** Screen-space reflections — see the module doc above. Opt-in, off by default. */
+  reflections?: ScreenSpaceReflectionSettings;
+  /**
+   * Forces a specific quality tier instead of `detectRenderTier()`'s device heuristic — the hook
+   * a screenshot/video capture pathway uses to request `'cinematic'` quality regardless of what
+   * the interactive device signals suggest. Omit for normal interactive rendering.
+   */
+  qualityTier?: RenderTier;
 }
 
 /** `PostProcessor` plus a hook for retuning DOF focus at runtime — a strict superset, so it still
@@ -115,7 +187,7 @@ export function setupGraphicsPipeline(
   const composer = new modules.EffectComposer(renderer);
   composer.addPass(new modules.RenderPass(scene, camera));
 
-  const tier = detectRenderTier();
+  const tier = opts.qualityTier ?? detectRenderTier();
   let gtao: InstanceType<typeof modules.GTAOPass> | null = null;
   if (tierAllowsAO(tier)) {
     gtao = new modules.GTAOPass(scene, camera, width, height);
@@ -125,6 +197,20 @@ export function setupGraphicsPipeline(
     gtao.updateGtaoMaterial({ radius: 0.42, distanceExponent: 1.4, thickness: 0.9, scale: 1.1 });
     gtao.blendIntensity = 0.85;
     composer.addPass(gtao);
+  }
+
+  // Opt-in SSR: see the module doc at the top of this file for why this defaults to off and is
+  // gated to 'cinematic'. Placed after AO (reflections should show the AO-darkened scene, not
+  // bypass it) and before bloom (so bright reflected practicals can still bloom).
+  let ssr: InstanceType<typeof modules.SSRPass> | null = null;
+  const reflections = opts.reflections;
+  if (reflections?.enabled && tierAtLeast(tier, reflections.minTier ?? 'cinematic')) {
+    ssr = new modules.SSRPass({
+      renderer, scene, camera, width, height, selects: null, groundReflector: null, isPerspectiveCamera: true,
+    });
+    ssr.opacity = Math.max(0, Math.min(1, reflections.strength ?? 0.6));
+    ssr.maxDistance = reflections.maxDistance ?? 6;
+    composer.addPass(ssr);
   }
 
   if (tierAllowsBloom(tier)) {
@@ -157,6 +243,7 @@ export function setupGraphicsPipeline(
     },
     dispose: () => {
       gtao?.dispose();
+      ssr?.dispose();
       composer.dispose();
     },
   };

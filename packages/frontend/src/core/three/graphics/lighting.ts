@@ -12,7 +12,7 @@ import { isWorldAssetApproved } from '../assetGovernance';
  *                                        silhouette from the background.
  *   PRACTICAL   `createPracticalLight` — a small, non-shadow-casting light that reads as coming
  *                                        from a visible fixture (a lamp, an LED strip, a monitor).
- *   HERO        `applyHeroLighting`    — "this is the hero apparatus": bundles KEY+RIM into one
+ *   HERO        `createHeroLight`      — "this is the hero apparatus": bundles KEY+RIM into one
  *                                        coherent, already-tuned treatment aimed at a target.
  *   BACKGROUND  `createBackgroundFill` — the low-level wash that keeps the room's periphery from
  *                                        reading as pure black while every KEY/RIM light aims at
@@ -193,7 +193,7 @@ export function createBackgroundFill(THREE: typeof THREE_NS, scene: THREE_NS.Sce
   return light;
 }
 
-export interface HeroLightingOptions {
+export interface HeroLightOptions {
   /** World point the hero object sits at/around. */
   target: THREE_NS.Vector3Tuple;
   /** Direction (need not be normalized) the KEY light approaches from, relative to `target`.
@@ -211,7 +211,7 @@ export interface HeroLightingOptions {
   shadowMapSize?: number;
 }
 
-export interface HeroLightingHandles {
+export interface HeroLightHandles {
   key: THREE_NS.SpotLight;
   rim: THREE_NS.PointLight;
 }
@@ -222,7 +222,7 @@ export interface HeroLightingHandles {
  * this once per hero object instead of hand-placing a SpotLight+PointLight pair and re-deriving
  * the angle/intensity/shadow tuning that already works.
  */
-export function applyHeroLighting(THREE: typeof THREE_NS, scene: THREE_NS.Scene, opts: HeroLightingOptions): HeroLightingHandles {
+export function createHeroLight(THREE: typeof THREE_NS, scene: THREE_NS.Scene, opts: HeroLightOptions): HeroLightHandles {
   const target = new THREE.Vector3(...opts.target);
   const keyDir = new THREE.Vector3(...(opts.keyDirection ?? [0.72, 0.55, -0.4])).normalize();
   const rimDir = new THREE.Vector3(...(opts.rimDirection ?? [-0.15, 0.45, -0.8])).normalize();

@@ -8,10 +8,23 @@
  * WebGL nie eksponuje wprost "mocy GPU"; te sygnały korelują z nią
  * wystarczająco dobrze do doboru gęstości cząstek/DPR, bez pomiaru
  * rzeczywistego FPS (który wymagałby kosztownego rozruchu próbnego).
+ *
+ * `'cinematic'` is a FOURTH tier, above `'high'`, for offline/capture
+ * rendering (a hero screenshot, a recorded video) — NOT for real-time
+ * interaction. `detectRenderTier()` NEVER returns it: there is no device
+ * signal that means "the user wants a cinematic capture right now," that's
+ * always an explicit request (see `graphics/postProcessing.ts`'s
+ * `GraphicsPipelineOptions.qualityTier` override). It exists so a capture
+ * pathway can afford AO/DOF/bigger shadow maps/more shadow casters without
+ * having to sustain 60fps.
  */
-export type RenderTier = 'low' | 'medium' | 'high';
+export type RenderTier = 'low' | 'medium' | 'high' | 'cinematic';
 
-export function detectRenderTier(): RenderTier {
+/** The tiers real-time interaction can land on — `detectRenderTier()`'s return type deliberately
+ * excludes `'cinematic'`, since nothing about a device's capabilities should auto-select it. */
+export type InteractiveRenderTier = Exclude<RenderTier, 'cinematic'>;
+
+export function detectRenderTier(): InteractiveRenderTier {
   if (typeof window === 'undefined') return 'medium';
   const w = window.innerWidth || 1024;
   const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
@@ -27,41 +40,50 @@ export function scaleCount(base: number, tier: RenderTier): number {
   return Math.max(1, Math.round(base * factor));
 }
 
-/** Górny limit devicePixelRatio wg poziomu jakości — najkosztowniejsza dźwignia (koszt ~O(dpr²)). */
+/** Górny limit devicePixelRatio wg poziomu jakości — najkosztowniejsza dźwignia (koszt ~O(dpr²)).
+ * `'cinematic'` matches `'high'`'s cap: this is about matching the display's real pixel density,
+ * not supersampling — a capture pathway wanting supersampling should render at a larger explicit
+ * canvas size instead, a decision this function deliberately doesn't make for you. */
 export function tierDpr(tier: RenderTier): number {
   const cap = tier === 'low' ? 1 : tier === 'medium' ? 1.5 : 2;
-  return Math.min(window.devicePixelRatio || 1, cap);
+  const deviceRatio = typeof window === 'undefined' ? 1 : (window.devicePixelRatio || 1);
+  return Math.min(deviceRatio, cap);
 }
 
-/** Czy warto włączać kosztowny post-processing (bloom itp.) na tym urządzeniu. */
-export function tierAllowsBloom(tier: RenderTier): boolean {
-  return tier !== 'low';
-}
-
-/** Ambient occlusion (GTAO) renderuje dodatkowy przebieg normal/depth per klatkę — kosztowniejszy
- * niż bloom, więc dopuszczony tylko na najwyższym poziomie jakości. */
-export function tierAllowsAO(tier: RenderTier): boolean {
-  return tier === 'high';
-}
-
-const TIER_RANK: Record<RenderTier, number> = { low: 0, medium: 1, high: 2 };
+const TIER_RANK: Record<RenderTier, number> = { low: 0, medium: 1, high: 2, cinematic: 3 };
 
 /**
  * Orders render tiers so an effect can express "needs at least tier X" instead of an exact-match
  * check — used by effects (DOF, AO) whose gate a caller may want to loosen after profiling their
- * own scene, without every call site re-deriving a low/medium/high comparison by hand.
+ * own scene, without every call site re-deriving a low/medium/high/cinematic comparison by hand.
  */
 export function tierAtLeast(tier: RenderTier, min: RenderTier): boolean {
   return TIER_RANK[tier] >= TIER_RANK[min];
+}
+
+/** Czy warto włączać kosztowny post-processing (bloom itp.) na tym urządzeniu. */
+export function tierAllowsBloom(tier: RenderTier): boolean {
+  return tierAtLeast(tier, 'medium');
+}
+
+/** Ambient occlusion (GTAO) renderuje dodatkowy przebieg normal/depth per klatkę — kosztowniejszy
+ * niż bloom, więc dopuszczony dopiero od `'high'` w górę (`'high'` i `'cinematic'`). */
+export function tierAllowsAO(tier: RenderTier): boolean {
+  return tierAtLeast(tier, 'high');
 }
 
 /**
  * Recommended shadow-map resolution per tier — the single biggest per-shadow-caster GPU/memory
  * cost lever (cost scales with the square of this number). `'low'` returns 0 as a signal to skip
  * shadow-casting entirely at that tier rather than allocate a map too small to look right.
+ * `'cinematic'` doubles `'high'`'s resolution — acceptable for a single captured frame/short clip,
+ * not for a sustained interactive frame rate.
  */
 export function recommendedShadowMapSize(tier: RenderTier): number {
-  return tier === 'low' ? 0 : tier === 'medium' ? 512 : 1024;
+  if (tier === 'low') return 0;
+  if (tier === 'medium') return 512;
+  if (tier === 'high') return 1024;
+  return 2048; // cinematic
 }
 
 /**
@@ -69,8 +91,41 @@ export function recommendedShadowMapSize(tier: RenderTier): number {
  * rather than a light count because a shadow-casting `PointLight` costs roughly 6x a
  * `SpotLight`/`DirectionalLight` at the same map size (it renders a cube map — 6 faces instead of
  * 1) — see graphics/PERFORMANCE.md. A PointLight shadow caster spends 6 of these units; a
- * Spot/DirectionalLight spends 1.
+ * Spot/DirectionalLight spends 1. `'cinematic'` allows more casters (e.g. a hero shot wanting a
+ * secondary accent shadow) since it isn't paying this cost every frame.
  */
 export function maxShadowCasterBudget(tier: RenderTier): number {
-  return tier === 'low' ? 0 : tier === 'medium' ? 1 : 2;
+  if (tier === 'low') return 0;
+  if (tier === 'medium') return 1;
+  if (tier === 'high') return 2;
+  return 4; // cinematic
+}
+
+/** A consolidated bundle of every quality decision a rendering pipeline needs for a given tier —
+ * one call instead of five, and the one place a new tier-dependent knob gets added. */
+export interface GraphicsQualityProfile {
+  tier: RenderTier;
+  dpr: number;
+  shadowMapSize: number;
+  maxShadowCasterBudget: number;
+  allowsBloom: boolean;
+  allowsAO: boolean;
+  /** DOF shares AO's cost profile (its own full-scene depth pre-pass) — see PERFORMANCE.md — so
+   * it shares AO's gate by default. `setupGraphicsPipeline`'s `DepthOfFieldSettings.minTier` can
+   * still loosen this per-call once profiled. */
+  allowsDof: boolean;
+}
+
+/** Resolves every tier-dependent rendering decision at once. Prefer this over calling the
+ * individual `tierAllows*`/`recommended*` helpers separately when configuring a whole pipeline. */
+export function configureGraphicsQuality(tier: RenderTier): GraphicsQualityProfile {
+  return {
+    tier,
+    dpr: tierDpr(tier),
+    shadowMapSize: recommendedShadowMapSize(tier),
+    maxShadowCasterBudget: maxShadowCasterBudget(tier),
+    allowsBloom: tierAllowsBloom(tier),
+    allowsAO: tierAllowsAO(tier),
+    allowsDof: tierAllowsAO(tier),
+  };
 }

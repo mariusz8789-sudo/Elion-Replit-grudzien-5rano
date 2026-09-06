@@ -86,6 +86,35 @@ describe('buildExampleHeroApparatus — integration smoke test', () => {
     expect(fill.scale.y).toBeGreaterThan(0); // never collapses to exactly 0 (matches the real vessel's Math.max(0.02, ...) pattern)
   });
 
+  it('cameraRig starts framed on this specific apparatus (WIDE shot, scaled to its own footprint)', () => {
+    const scene = new THREE.Scene();
+    const handles = buildExampleHeroApparatus(THREE, scene, { position: [2, 0, -3], scale: 1.5 });
+    const transform = handles.cameraRig.update(0);
+    // lookAt tracks the apparatus's own chamber-center target, not a hardcoded world coordinate.
+    expect(transform.lookAt[0]).toBeCloseTo(2);
+    expect(transform.lookAt[2]).toBeCloseTo(-3);
+  });
+
+  it('shootCamera(intent) reframes toward a different named shot on the SAME apparatus', () => {
+    const scene = new THREE.Scene();
+    const handles = buildExampleHeroApparatus(THREE, scene, { position: [0, 0, 0] });
+    const wideTransform = handles.cameraRig.update(0);
+    handles.shootCamera('MACRO', true); // hard cut, no transition to wait out
+    const macroTransform = handles.cameraRig.update(0);
+    expect(handles.cameraRig.isSettled).toBe(true);
+    // MACRO frames closer than the initial WIDE shot on the same subject.
+    const wideDistance = Math.hypot(...wideTransform.position.map((v, i) => v - wideTransform.lookAt[i]) as [number, number, number]);
+    const macroDistance = Math.hypot(...macroTransform.position.map((v, i) => v - macroTransform.lookAt[i]) as [number, number, number]);
+    expect(macroDistance).toBeLessThan(wideDistance);
+  });
+
+  it('shootCamera(intent) without cut eases smoothly instead of snapping', () => {
+    const scene = new THREE.Scene();
+    const handles = buildExampleHeroApparatus(THREE, scene, { position: [0, 0, 0] });
+    handles.shootCamera('MACRO'); // smooth transition, default
+    expect(handles.cameraRig.isSettled).toBe(false);
+  });
+
   it('suggestedDofSettings hands back an enabled, opt-in DOF config at the given distance', () => {
     const scene = new THREE.Scene();
     const handles = buildExampleHeroApparatus(THREE, scene, { position: [0, 0, 0] });

@@ -3,333 +3,238 @@ import type * as THREE_NS from 'three';
 /**
  * GENESIS GRAPHICS RUNTIME — Camera Rig
  *
- * Turns a declarative camera INTENT (vantage + target + optional bounds/
- * standoff/elevation/framing) into an actual camera transform. This is the
- * missing piece `cinematicCamera.ts` names but doesn't build (see its
- * module doc: "that's `graphics/cameraRig.ts`-shaped scene-composition
- * knowledge"). The two modules stay separate on purpose:
+ * Answers "given this intent and this target, where does the camera actually sit and what does it
+ * look at" — the half of cinematic camera work `cinematicCamera.ts` explicitly disclaims ("It never
+ * decides WHERE the camera sits or WHAT it looks at"). That module owns the LENS (FOV/near/far/DOF)
+ * for a named shot; this module owns the TRANSFORM (position/orientation) for a named intent. Two
+ * different concerns, composable: a caller typically calls both for one shot.
  *
- *  - `cinematicCamera.ts` answers "what LENS does shot X use" (FOV/near/far/DOF).
- *  - `cameraRig.ts` (this file) answers "WHERE does the camera sit and what
- *    does it look at" for a named VANTAGE, and how it gets there (a hard
- *    cut, a smooth move, a cinematic ease, an orbit, a follow).
+ * THE BOUNDARY THIS MODULE ENFORCES: it takes an abstract intent plus a target point/scale — never
+ * a domain decision about WHAT the target IS or WHY it was chosen. "Frame a SCIENTIST_POV shot on
+ * this chamber" is this module's job; "the chamber is the interesting thing right now" is the
+ * caller's (Looking Glass / C1's `WorldCameraMode`-shaped intent, or a scene's own state machine).
+ * This module has no idea what a chamber is, an agent is, or a molecule is — only a position and a
+ * characteristic size.
  *
- * Neither module decides WHAT should be observed or WHEN a cut happens —
- * that intent comes from the caller (the World/Looking-Glass layer, which
- * in turn takes direction from C1). This rig never reads scientific state,
- * never knows about labs/cities/molecules by name, and never hardcodes a
- * world's coordinates — it only resolves the generic vocabulary below into
- * a transform, which is exactly what makes it reusable across every world
- * (CITY/LAB/NATURE/SCIENTIFIC/MICRO/MACRO) instead of each world hand-
- * rolling its own `xPresetFor()` camera math.
+ * SCALE-AWARE BY CONSTRUCTION: standoff distance is `targetRadius * a per-intent multiplier`, never
+ * an absolute meter value — the same intent produces a sensible framing whether `targetRadius` is
+ * 0.01 (a molecule) or 1e4 (a city district). There is deliberately no hardcoded coordinate table
+ * here (contrast with the anti-pattern this replaces: a fixed per-scene preset->coordinates map).
+ *
+ * The per-intent multiplier/elevation defaults below are a reasonable, tunable STARTING POINT for
+ * readable framing — not a claim of "correct" cinematography. Override via
+ * `standoffMultiplier`/`elevationDeg` once a real scene's own scale/composition needs differ.
+ *
+ * MOBILITY: each intent also carries a default `CameraMobility` (`STATIC`/`FOLLOW`/`ORBIT`/`FREE`)
+ * — a hint for how the rig behaves over time once framed, not a new positioning concept:
+ *  - `STATIC`/`FREE` just hold the last `frame()`/`cut()` shot (`FREE` additionally signals "an
+ *    external controller, e.g. first-person input, may be driving the real camera instead — don't
+ *    assume this rig's output is authoritative every frame").
+ *  - `FOLLOW` re-resolves the shot against a live-tracked target every `update()` (see `setTarget`)
+ *    and eases toward it, for "keep this moving subject nicely framed."
+ *  - `ORBIT` auto-advances azimuth over time (see `setOrbitSpeed`) for a turntable-style reveal,
+ *    optionally also around a live-tracked moving target.
  */
 
-export type CameraVantage =
-  | 'WIDE'
-  | 'HUMAN_EYE'
-  | 'SCIENTIST_POV'
-  | 'MACRO'
-  | 'MICRO'
-  | 'SCIENTIFIC'
-  | 'CINEMATIC'
-  | 'DRIVER'
-  | 'ORBITAL';
+/**
+ * Superset of `core/world/cameraPolicy.ts`'s `WorldCameraMode` (`HUMAN_EYE`/`WIDE`/`MACRO`/
+ * `SCIENTIFIC`/`CINEMATIC`) — those five map straight onto this type with no translation, so a
+ * `CameraPolicyDecision.mode` can be passed here directly. The extra values
+ * (`SCIENTIST_POV`/`MICRO`/`DRIVER`/`ORBITAL`) are additional vantages this engine can already
+ * resolve to a transform, for whenever the world-direction layer starts emitting them.
+ */
+export type CameraIntent =
+  | 'WIDE' | 'HUMAN_EYE' | 'SCIENTIST_POV' | 'MACRO' | 'MICRO'
+  | 'SCIENTIFIC' | 'CINEMATIC' | 'DRIVER' | 'ORBITAL';
 
-export type CameraFraming = 'FILL' | 'CONTEXT' | 'DETAIL';
 export type CameraMobility = 'STATIC' | 'FOLLOW' | 'ORBIT' | 'FREE';
-export type TransitionEase = 'LINEAR' | 'CINEMATIC';
 
-export interface CameraBounds {
-  /** World-space center of the subject/scene the shot should keep in frame. */
-  center: THREE_NS.Vector3Tuple;
-  /** Bounding-sphere radius (meters) of the subject/scene. */
-  radius: number;
-}
-
-export interface CameraIntent {
-  vantage: CameraVantage;
-  /** World point the camera looks at / tracks. */
-  target: THREE_NS.Vector3Tuple;
-  /** When given, standoff is widened (never narrowed) so this sphere fits inside the resolved FOV. */
-  bounds?: CameraBounds;
-  /** Distance from target, meters. Overrides the vantage's own default when given. */
-  standoff?: number;
-  /** Vertical offset above target, meters. Overrides the vantage's own default when given. */
-  elevation?: number;
-  /** Horizontal orbit angle around target, radians. Default 0 (directly "south" of target on +Z). */
-  azimuth?: number;
-  /** Vertical FOV override in degrees — omit to use the vantage's own lens default. */
-  fov?: number;
-  /** How tightly the subject should fill the frame — nudges the resolved standoff. Default 'FILL'. */
-  framing?: CameraFraming;
-}
-
-export interface ResolvedShot {
-  position: THREE_NS.Vector3Tuple;
-  lookAt: THREE_NS.Vector3Tuple;
-  fov: number;
-}
-
-interface VantageSpec {
-  standoff: number;
-  elevation: number;
-  fov: number;
+interface IntentFraming {
+  /** Standoff distance as a multiple of `targetRadius`. */
+  standoffMultiplier: number;
+  /** Degrees above the horizontal plane through the target. */
+  elevationDeg: number;
+  /** See the module doc's "MOBILITY" section. */
   mobility: CameraMobility;
 }
 
-/**
- * Reusable spatial/lens defaults per vantage — the single source of truth a
- * world-builder would otherwise re-derive per world (a `labPresetFor`, a
- * `cityPresetFor`, ...). Every value here is a REASONABLE DEFAULT, not a
- * hardcoded coordinate: `resolveShot` always applies it relative to the
- * caller's own `target`/`bounds`, never to a fixed world position.
- */
-const VANTAGE_DEFAULTS: Readonly<Record<CameraVantage, VantageSpec>> = {
-  // Facility/city establishing shot: pulled back and slightly elevated to read the whole scene.
-  WIDE: { standoff: 12, elevation: 6, fov: 60, mobility: 'STATIC' },
-  // Average adult standing eye height, a comfortable conversational distance — free-roam by default.
-  HUMAN_EYE: { standoff: 2.2, elevation: 1.65, fov: 60, mobility: 'FREE' },
-  // First-person scientist viewpoint: close, sharp, at working height, fully free (a controller owns it).
-  SCIENTIST_POV: { standoff: 0.6, elevation: 1.6, fov: 68, mobility: 'FREE' },
-  // Close orbiting inspection of a bench-scale object (an apparatus, a specimen).
-  MACRO: { standoff: 1.2, elevation: 0.4, fov: 45, mobility: 'ORBIT' },
-  // Very close orbiting inspection — a sample/sensor/molecular-representation close-up.
-  MICRO: { standoff: 0.15, elevation: 0.05, fov: 28, mobility: 'ORBIT' },
-  // Analytical framing: pulled back enough to read instrumentation/labels, not a hero close-up.
-  SCIENTIFIC: { standoff: 4, elevation: 2.2, fov: 50, mobility: 'STATIC' },
-  // A directed, filmic shot that follows its subject with an eased, deliberate move.
-  CINEMATIC: { standoff: 6, elevation: 2.5, fov: 40, mobility: 'FOLLOW' },
-  // Chase/behind-vehicle framing — low, close behind, following.
-  DRIVER: { standoff: 3.5, elevation: 1.4, fov: 62, mobility: 'FOLLOW' },
-  // Slow automatic orbit around a subject/region — the classic "turntable" reveal.
-  ORBITAL: { standoff: 10, elevation: 4, fov: 45, mobility: 'ORBIT' },
+const INTENT_FRAMING: Record<CameraIntent, IntentFraming> = {
+  WIDE: { standoffMultiplier: 4.5, elevationDeg: 32, mobility: 'STATIC' },
+  HUMAN_EYE: { standoffMultiplier: 2.4, elevationDeg: 8, mobility: 'FREE' },
+  SCIENTIST_POV: { standoffMultiplier: 1.15, elevationDeg: 3, mobility: 'FREE' },
+  MACRO: { standoffMultiplier: 0.55, elevationDeg: 18, mobility: 'ORBIT' },
+  MICRO: { standoffMultiplier: 0.12, elevationDeg: 12, mobility: 'ORBIT' },
+  SCIENTIFIC: { standoffMultiplier: 2.8, elevationDeg: 28, mobility: 'STATIC' },
+  CINEMATIC: { standoffMultiplier: 3.2, elevationDeg: 22, mobility: 'FOLLOW' },
+  DRIVER: { standoffMultiplier: 0.35, elevationDeg: 1, mobility: 'FOLLOW' },
+  ORBITAL: { standoffMultiplier: 5.5, elevationDeg: 55, mobility: 'ORBIT' },
 };
 
-const FRAMING_MULTIPLIER: Readonly<Record<CameraFraming, number>> = {
-  FILL: 1,
-  CONTEXT: 1.6,
-  DETAIL: 0.6,
-};
-
-function smootherstep(t: number): number {
-  const x = Math.min(1, Math.max(0, t));
-  return x * x * x * (x * (x * 6 - 15) + 10);
+/** The mobility an intent defaults to — exposed so a caller can decide up front whether it needs to drive `setTarget`/`setOrbitSpeed` itself. */
+export function defaultMobilityFor(intent: CameraIntent): CameraMobility {
+  return INTENT_FRAMING[intent].mobility;
 }
 
-function resolvedStandoff(intent: CameraIntent, spec: VantageSpec, fov: number): number {
-  let standoff = intent.standoff ?? spec.standoff;
-  if (intent.bounds && intent.bounds.radius > 0) {
-    const fovRad = (fov * Math.PI) / 180;
-    standoff = Math.max(standoff, intent.bounds.radius / Math.sin(fovRad / 2));
-  }
-  return standoff * FRAMING_MULTIPLIER[intent.framing ?? 'FILL'];
+export interface CameraFrameRequest {
+  intent: CameraIntent;
+  /** World point the shot is framed around — never a decision this module makes, always supplied
+   * by the caller (world-direction layer, or a scene's own selection/focus state). */
+  target: THREE_NS.Vector3Tuple;
+  /** Characteristic size of the subject (its bounding radius, roughly) — the ONE input that makes
+   * this scale-aware. Default 1 (a human-scale subject) when the caller doesn't know/care. */
+  targetRadius?: number;
+  /** Orbit angle around the target, degrees, 0 = +Z. Lets a caller pick a viewing side (or animate
+   * one) without touching the intent's own distance/elevation tuning. Default 0. */
+  azimuthDeg?: number;
+  /** Overrides `INTENT_FRAMING`'s standoff multiplier for this call — for a scene whose own
+   * composition needs differ from the generic default, after profiling/reviewing it (same
+   * "override after measuring, don't change the global default" convention as
+   * `GraphicsPipelineOptions.ambientOcclusion`). */
+  standoffMultiplier?: number;
+  /** Overrides `INTENT_FRAMING`'s elevation for this call. */
+  elevationDeg?: number;
+}
+
+export interface CameraTransform {
+  position: THREE_NS.Vector3Tuple;
+  lookAt: THREE_NS.Vector3Tuple;
 }
 
 /**
- * Pure function: intent -> transform. No camera, no side effects — the
- * exact seam the mission's own testing example asks for ("Camera Rig:
- * intent → transform"). `CameraRig.cutTo`/`transitionTo` both build on
- * this; call it directly if you only need the numbers (e.g. a shot-list
- * planner previewing framing before committing to a camera move).
- *
- * NOT used by `CameraRig.update()`'s per-frame path (FOLLOW/ORBIT
- * mobility) — that path recomputes the same math directly into
- * pre-allocated scratch vectors instead of allocating a fresh result
- * object + two tuple arrays every frame. `graphicsCameraRig.test.ts`
- * asserts both paths agree on the same numbers for the same inputs.
+ * Resolves an intent + target + scale into an actual camera position/lookAt — pure function, no
+ * THREE dependency (plain trig on tuples), so it's testable and usable anywhere, including outside
+ * a THREE-aware caller. See the module doc for why standoff is scale-relative, not absolute.
  */
-export function resolveShot(intent: CameraIntent): ResolvedShot {
-  const spec = VANTAGE_DEFAULTS[intent.vantage];
-  const fov = intent.fov ?? spec.fov;
-  const standoff = resolvedStandoff(intent, spec, fov);
-  const elevation = intent.elevation ?? spec.elevation;
-  const azimuth = intent.azimuth ?? 0;
-  const [tx, ty, tz] = intent.target;
+export function resolveCameraFraming(request: CameraFrameRequest): CameraTransform {
+  const targetRadius = request.targetRadius ?? 1;
+  if (!(targetRadius > 0)) throw new Error(`resolveCameraFraming: targetRadius must be > 0 (got ${targetRadius})`);
+  const defaults = INTENT_FRAMING[request.intent];
+  const standoffMultiplier = request.standoffMultiplier ?? defaults.standoffMultiplier;
+  const elevationDeg = request.elevationDeg ?? defaults.elevationDeg;
+  const azimuthDeg = request.azimuthDeg ?? 0;
+
+  const distance = targetRadius * standoffMultiplier;
+  const elevationRad = (elevationDeg * Math.PI) / 180;
+  const azimuthRad = (azimuthDeg * Math.PI) / 180;
+  const horizontalRadius = distance * Math.cos(elevationRad);
+  const [tx, ty, tz] = request.target;
+
   return {
-    position: [tx + standoff * Math.sin(azimuth), ty + elevation, tz + standoff * Math.cos(azimuth)],
+    position: [
+      tx + horizontalRadius * Math.sin(azimuthRad),
+      ty + distance * Math.sin(elevationRad),
+      tz + horizontalRadius * Math.cos(azimuthRad),
+    ],
     lookAt: [tx, ty, tz],
-    fov,
   };
 }
 
-/** The mobility a vantage defaults to when the caller doesn't override it — exposed so a caller can decide up front whether it needs to drive `setTarget`/orbit itself. */
-export function defaultMobilityFor(vantage: CameraVantage): CameraMobility {
-  return VANTAGE_DEFAULTS[vantage].mobility;
-}
-
-const DEFAULT_ORBIT_SPEED_RAD_PER_S = 0.12;
-const DEFAULT_FOLLOW_DAMPING = 4.5;
-
 /**
- * Stateful executor: owns turning `CameraIntent`s into actual movement on
- * one `THREE.PerspectiveCamera` over time. `update()` never allocates,
- * matching this engine's zero-per-frame-allocation rule (see
- * `PERFORMANCE.md`) — every per-frame path reuses scratch vectors created
- * once in the constructor.
+ * Stateful rig for smooth camera transitions between shots — the position/orientation counterpart
+ * to `cinematicCamera.ts`'s `FocusPuller` (which only eases a scalar focus distance). A caller's
+ * render loop calls `.update(dt)` every frame and applies the returned transform to the real
+ * `camera.position`/`camera.lookAt`; this class has no idea it's driving a THREE.Camera at all.
+ *
+ * `frame()` eases toward a new shot (a "reposition" cut with continuous motion — e.g. a tracking
+ * shot retargeting smoothly); `cut()` snaps immediately (a hard edit between two unrelated shots).
+ * Same `frame`-eases/`cut`-snaps split as `FocusPuller`'s `pullTo`/`snapTo`.
+ *
+ * `setTarget`/`setOrbitSpeed` add live motion on top of a framed shot for `FOLLOW`/`ORBIT`
+ * mobility (see the module doc) — `STATIC`/`FREE` intents ignore both and simply hold.
  */
 export class CameraRig {
-  private readonly camera: THREE_NS.PerspectiveCamera;
-  private readonly scratchPos: THREE_NS.Vector3;
-  private readonly scratchLook: THREE_NS.Vector3;
-  private readonly scratchFromPos: THREE_NS.Vector3;
-  private readonly scratchFromLook: THREE_NS.Vector3;
-  private readonly scratchLerpLook: THREE_NS.Vector3;
-  private readonly liveTarget: THREE_NS.Vector3;
-  private hasLiveTarget = false;
+  private readonly currentPosition: THREE_NS.Vector3;
+  private readonly currentLookAt: THREE_NS.Vector3;
+  private readonly targetPosition: THREE_NS.Vector3;
+  private readonly targetLookAt: THREE_NS.Vector3;
 
-  private intent: CameraIntent | null = null;
-  private mobility: CameraMobility = 'STATIC';
-  private orbitAzimuth = 0;
-  private orbitSpeed = DEFAULT_ORBIT_SPEED_RAD_PER_S;
-  private followDamping = DEFAULT_FOLLOW_DAMPING;
+  private request: CameraFrameRequest;
+  private mobility: CameraMobility;
+  private liveTarget: THREE_NS.Vector3Tuple | null = null;
+  private orbitAzimuthDeg = 0;
+  private orbitSpeedDegPerS = 8;
 
-  private transitionElapsed = 0;
-  private transitionDuration = 0;
-  private transitionEase: TransitionEase = 'CINEMATIC';
-  private transitionTargetFov = 0;
-  private transitioning = false;
-
-  constructor(THREE: typeof THREE_NS, camera: THREE_NS.PerspectiveCamera) {
-    this.camera = camera;
-    this.scratchPos = new THREE.Vector3();
-    this.scratchLook = new THREE.Vector3();
-    this.scratchFromPos = new THREE.Vector3();
-    this.scratchFromLook = new THREE.Vector3();
-    this.scratchLerpLook = new THREE.Vector3();
-    this.liveTarget = new THREE.Vector3();
-  }
-
-  get currentVantage(): CameraVantage | null {
-    return this.intent?.vantage ?? null;
+  constructor(THREE: typeof THREE_NS, initial: CameraFrameRequest) {
+    this.request = initial;
+    this.mobility = defaultMobilityFor(initial.intent);
+    const transform = resolveCameraFraming(initial);
+    this.currentPosition = new THREE.Vector3(...transform.position);
+    this.currentLookAt = new THREE.Vector3(...transform.lookAt);
+    this.targetPosition = this.currentPosition.clone();
+    this.targetLookAt = this.currentLookAt.clone();
   }
 
   get currentMobility(): CameraMobility {
     return this.mobility;
   }
 
-  get isTransitioning(): boolean {
-    return this.transitioning;
+  /** Sets a new target shot — the rig eases toward it over subsequent `update()` calls. Clears any live-tracked target from a previous shot (call `setTarget` again to re-establish tracking for the new one). */
+  frame(request: CameraFrameRequest): void {
+    this.request = request;
+    this.mobility = defaultMobilityFor(request.intent);
+    this.orbitAzimuthDeg = request.azimuthDeg ?? 0;
+    this.liveTarget = null;
+    const transform = resolveCameraFraming(request);
+    this.targetPosition.set(...transform.position);
+    this.targetLookAt.set(...transform.lookAt);
+  }
+
+  /** Jumps straight to the requested shot with no transition — a hard cut, not a move. */
+  cut(request: CameraFrameRequest): void {
+    this.frame(request);
+    this.currentPosition.copy(this.targetPosition);
+    this.currentLookAt.copy(this.targetLookAt);
   }
 
   /**
-   * Live target position for `FOLLOW`/`ORBIT` mobility — cheap,
-   * no-allocation; call every frame with the tracked entity's current
-   * position. Cleared on the next `cutTo`/`transitionTo` (a new shot's own
-   * declared `target` wins until tracking is (re-)established). No effect
-   * for `STATIC`/`FREE` mobility.
+   * Live target position for `FOLLOW`/`ORBIT` mobility — call every frame with the tracked
+   * entity's current position; takes effect starting the next `update()`. No effect for
+   * `STATIC`/`FREE` mobility.
    */
   setTarget(target: THREE_NS.Vector3Tuple): void {
-    this.liveTarget.set(target[0], target[1], target[2]);
-    this.hasLiveTarget = true;
+    this.liveTarget = target;
   }
 
-  /** Sets how fast `ORBIT` mobility auto-rotates (radians/second). */
-  setOrbitSpeed(radiansPerSecond: number): void {
-    this.orbitSpeed = radiansPerSecond;
+  /** Sets how fast `ORBIT` mobility auto-rotates (degrees/second). */
+  setOrbitSpeed(degreesPerSecond: number): void {
+    this.orbitSpeedDegPerS = degreesPerSecond;
   }
 
-  /** Sets how quickly `FOLLOW` mobility catches up to a moving target (higher = snappier, matching `FocusPuller`'s convention). */
-  setFollowDamping(damping: number): void {
-    this.followDamping = damping;
-  }
-
-  /** Hard cut: applies the intent immediately, no transition. */
-  cutTo(intent: CameraIntent): void {
-    this.beginIntent(intent);
-    const shot = resolveShot(intent);
-    this.scratchLook.set(...shot.lookAt);
-    this.camera.position.set(...shot.position);
-    this.camera.lookAt(this.scratchLook);
-    this.syncFov(shot.fov);
-    this.transitioning = false;
-  }
-
-  /**
-   * Begins a move to the intent over `durationSeconds` — `'CINEMATIC'`
-   * (default) eases in and out (a filmic move); `'LINEAR'` moves at
-   * constant speed (a mechanical/utility move, e.g. a fast preview cut).
-   * `update(dt)` must be called each frame to advance it.
-   */
-  transitionTo(intent: CameraIntent, durationSeconds = 1.2, ease: TransitionEase = 'CINEMATIC'): void {
-    this.scratchFromPos.copy(this.camera.position);
-    this.camera.getWorldDirection(this.scratchFromLook);
-    this.scratchFromLook.multiplyScalar(10).add(this.scratchFromPos); // a point 10m ahead along the current look direction
-
-    this.beginIntent(intent);
-    const shot = resolveShot(intent);
-    this.scratchPos.set(...shot.position);
-    this.scratchLook.set(...shot.lookAt);
-    this.transitionTargetFov = shot.fov;
-    this.transitionElapsed = 0;
-    this.transitionDuration = Math.max(1e-6, durationSeconds);
-    this.transitionEase = ease;
-    this.transitioning = true;
-  }
-
-  /** Advances any in-flight transition, orbit rotation, or follow damping. Call once per frame. Allocates nothing. */
-  update(dt: number): void {
-    if (!this.intent) return;
-
-    if (this.transitioning) {
-      this.transitionElapsed += dt;
-      const t = Math.min(1, this.transitionElapsed / this.transitionDuration);
-      const eased = this.transitionEase === 'CINEMATIC' ? smootherstep(t) : t;
-      this.camera.position.lerpVectors(this.scratchFromPos, this.scratchPos, eased);
-      this.scratchLerpLook.lerpVectors(this.scratchFromLook, this.scratchLook, eased);
-      this.camera.lookAt(this.scratchLerpLook);
-      this.syncFov(this.transitionTargetFov);
-      if (t >= 1) this.transitioning = false;
-      return;
-    }
-
+  /** Advances the transition by `dt` seconds. `speed` controls how quickly `FOLLOW`/settling
+   * catches up (higher = snappier); default suits a deliberate, readable move rather than an
+   * instant snap or an unnaturally slow drift — same shape as `FocusPuller.update`'s own default.
+   * `ORBIT` mobility ignores `speed` — it always sits exactly on its circle, never lagging.
+   * Returns the current transform for convenience. */
+  update(dt: number, speed = 2.5): CameraTransform {
     if (this.mobility === 'ORBIT') {
-      this.orbitAzimuth += this.orbitSpeed * dt;
-      this.recomputeShotInto(this.scratchPos, this.scratchLook);
-      this.camera.position.copy(this.scratchPos);
-      this.camera.lookAt(this.scratchLook);
-      this.syncFov(this.effectiveFov());
-    } else if (this.mobility === 'FOLLOW') {
-      this.recomputeShotInto(this.scratchPos, this.scratchLook);
-      const alpha = Math.min(1, Math.max(0, dt) * this.followDamping);
-      this.camera.position.lerp(this.scratchPos, alpha);
-      this.camera.lookAt(this.scratchLook);
-      this.syncFov(this.effectiveFov());
+      this.orbitAzimuthDeg += this.orbitSpeedDegPerS * dt;
+      const effective: CameraFrameRequest = {
+        ...this.request,
+        target: this.liveTarget ?? this.request.target,
+        azimuthDeg: (this.request.azimuthDeg ?? 0) + this.orbitAzimuthDeg,
+      };
+      const transform = resolveCameraFraming(effective);
+      this.currentPosition.set(...transform.position);
+      this.currentLookAt.set(...transform.lookAt);
+      this.targetPosition.copy(this.currentPosition);
+      this.targetLookAt.copy(this.currentLookAt);
+      return { position: this.currentPosition.toArray(), lookAt: this.currentLookAt.toArray() };
     }
-    // STATIC/FREE: nothing to advance per-frame — cutTo/transitionTo already placed the camera,
-    // or (FREE) an external controller (e.g. firstPersonController.ts) owns it entirely.
-  }
 
-  private beginIntent(intent: CameraIntent): void {
-    this.intent = intent;
-    this.mobility = defaultMobilityFor(intent.vantage);
-    this.orbitAzimuth = intent.azimuth ?? 0;
-    this.hasLiveTarget = false;
-  }
-
-  private effectiveFov(): number {
-    const intent = this.intent!;
-    return intent.fov ?? VANTAGE_DEFAULTS[intent.vantage].fov;
-  }
-
-  /** Same math as `resolveShot`, written directly into pre-allocated scratch vectors — the zero-allocation per-frame path. Keep in sync with `resolveShot`; `graphicsCameraRig.test.ts` checks they agree. */
-  private recomputeShotInto(outPos: THREE_NS.Vector3, outLook: THREE_NS.Vector3): void {
-    const intent = this.intent!;
-    const spec = VANTAGE_DEFAULTS[intent.vantage];
-    const fov = intent.fov ?? spec.fov;
-    const standoff = resolvedStandoff(intent, spec, fov);
-    const elevation = intent.elevation ?? spec.elevation;
-    const azimuth = this.orbitAzimuth;
-    const tx = this.hasLiveTarget ? this.liveTarget.x : intent.target[0];
-    const ty = this.hasLiveTarget ? this.liveTarget.y : intent.target[1];
-    const tz = this.hasLiveTarget ? this.liveTarget.z : intent.target[2];
-    outPos.set(tx + standoff * Math.sin(azimuth), ty + elevation, tz + standoff * Math.cos(azimuth));
-    outLook.set(tx, ty, tz);
-  }
-
-  private syncFov(fov: number): void {
-    if (this.camera.fov !== fov) {
-      this.camera.fov = fov;
-      this.camera.updateProjectionMatrix();
+    if (this.mobility === 'FOLLOW' && this.liveTarget) {
+      const transform = resolveCameraFraming({ ...this.request, target: this.liveTarget });
+      this.targetPosition.set(...transform.position);
+      this.targetLookAt.set(...transform.lookAt);
     }
+
+    const t = Math.min(1, Math.max(0, dt) * speed);
+    this.currentPosition.lerp(this.targetPosition, t);
+    this.currentLookAt.lerp(this.targetLookAt, t);
+    return { position: this.currentPosition.toArray(), lookAt: this.currentLookAt.toArray() };
+  }
+
+  get isSettled(): boolean {
+    return this.currentPosition.distanceToSquared(this.targetPosition) < 1e-6
+      && this.currentLookAt.distanceToSquared(this.targetLookAt) < 1e-6;
   }
 }

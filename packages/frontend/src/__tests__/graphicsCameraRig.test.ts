@@ -1,240 +1,109 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { CameraRig, defaultMobilityFor, resolveShot } from '../core/three/graphics/cameraRig';
+import { resolveCameraFraming, CameraRig, type CameraIntent } from '../core/three/graphics/cameraRig';
 
-describe('resolveShot (pure intent -> transform)', () => {
-  it('places the camera at target + standoff on +Z and looks at target, for a zero-azimuth WIDE shot', () => {
-    const shot = resolveShot({ vantage: 'WIDE', target: [0, 0, 0] });
-    expect(shot.lookAt).toEqual([0, 0, 0]);
-    expect(shot.position[2]).toBeCloseTo(12, 5); // WIDE's default standoff
-    expect(shot.position[1]).toBeCloseTo(6, 5); // WIDE's default elevation
-    expect(shot.fov).toBe(60);
+describe('resolveCameraFraming', () => {
+  it('always looks exactly at the target', () => {
+    const transform = resolveCameraFraming({ intent: 'WIDE', target: [3, 4, 5] });
+    expect(transform.lookAt).toEqual([3, 4, 5]);
   });
 
-  it('offsets position by the given target, never hardcoding a world coordinate', () => {
-    const shot = resolveShot({ vantage: 'SCIENTIFIC', target: [100, 5, -40] });
-    expect(shot.lookAt).toEqual([100, 5, -40]);
-    expect(shot.position[0]).toBeCloseTo(100, 5);
-    expect(shot.position[1]).toBeCloseTo(5 + 2.2, 5);
-    expect(shot.position[2]).toBeCloseTo(-40 + 4, 5);
+  it('scales standoff distance with targetRadius — same intent, 10x radius, ~10x distance from target', () => {
+    const small = resolveCameraFraming({ intent: 'SCIENTIFIC', target: [0, 0, 0], targetRadius: 1 });
+    const large = resolveCameraFraming({ intent: 'SCIENTIFIC', target: [0, 0, 0], targetRadius: 10 });
+    const distSmall = new THREE.Vector3(...small.position).length();
+    const distLarge = new THREE.Vector3(...large.position).length();
+    expect(distLarge / distSmall).toBeCloseTo(10, 5);
   });
 
-  it('MACRO and MICRO are progressively tighter than WIDE (standoff and FOV)', () => {
-    const wide = resolveShot({ vantage: 'WIDE', target: [0, 0, 0] });
-    const macro = resolveShot({ vantage: 'MACRO', target: [0, 0, 0] });
-    const micro = resolveShot({ vantage: 'MICRO', target: [0, 0, 0] });
-    const distance = (s: typeof wide) => Math.hypot(s.position[0], s.position[1], s.position[2]);
-    expect(distance(macro)).toBeLessThan(distance(wide));
-    expect(distance(micro)).toBeLessThan(distance(macro));
-    expect(micro.fov).toBeLessThan(macro.fov);
+  it('defaults targetRadius to 1 when omitted', () => {
+    const withDefault = resolveCameraFraming({ intent: 'WIDE', target: [0, 0, 0] });
+    const explicit = resolveCameraFraming({ intent: 'WIDE', target: [0, 0, 0], targetRadius: 1 });
+    expect(withDefault.position).toEqual(explicit.position);
   });
 
-  it('an explicit standoff/elevation/fov override wins over the vantage default', () => {
-    const shot = resolveShot({ vantage: 'WIDE', target: [0, 0, 0], standoff: 3, elevation: 1, fov: 90 });
-    expect(shot.position[2]).toBeCloseTo(3, 5);
-    expect(shot.position[1]).toBeCloseTo(1, 5);
-    expect(shot.fov).toBe(90);
+  it('throws on a non-positive targetRadius rather than producing a degenerate/inverted framing', () => {
+    expect(() => resolveCameraFraming({ intent: 'WIDE', target: [0, 0, 0], targetRadius: 0 })).toThrow();
+    expect(() => resolveCameraFraming({ intent: 'WIDE', target: [0, 0, 0], targetRadius: -1 })).toThrow();
   });
 
-  it('azimuth rotates the camera around the target at constant distance', () => {
-    const front = resolveShot({ vantage: 'ORBITAL', target: [0, 0, 0], azimuth: 0 });
-    const side = resolveShot({ vantage: 'ORBITAL', target: [0, 0, 0], azimuth: Math.PI / 2 });
-    const distanceOf = (s: typeof front) => Math.hypot(s.position[0], s.position[2]);
-    expect(distanceOf(front)).toBeCloseTo(distanceOf(side), 5);
-    expect(front.position[0]).toBeCloseTo(0, 5);
-    expect(side.position[2]).toBeCloseTo(0, 5);
+  it('every named intent produces a finite, non-degenerate framing (no NaN, camera not at the target)', () => {
+    const intents: CameraIntent[] = ['WIDE', 'HUMAN_EYE', 'SCIENTIST_POV', 'MACRO', 'MICRO', 'SCIENTIFIC', 'CINEMATIC', 'DRIVER', 'ORBITAL'];
+    for (const intent of intents) {
+      const transform = resolveCameraFraming({ intent, target: [0, 0, 0], targetRadius: 2 });
+      for (const value of transform.position) expect(Number.isFinite(value)).toBe(true);
+      const distance = new THREE.Vector3(...transform.position).length();
+      expect(distance).toBeGreaterThan(0);
+    }
   });
 
-  it('bounds widen (never narrow) standoff so the given sphere fits in frame', () => {
-    const tight = resolveShot({ vantage: 'MACRO', target: [0, 0, 0] });
-    const withHugeBounds = resolveShot({ vantage: 'MACRO', target: [0, 0, 0], bounds: { center: [0, 0, 0], radius: 500 } });
-    const withTinyBounds = resolveShot({ vantage: 'MACRO', target: [0, 0, 0], bounds: { center: [0, 0, 0], radius: 0.001 } });
-    const dist = (s: typeof tight) => Math.hypot(...s.position);
-    expect(dist(withHugeBounds)).toBeGreaterThan(dist(tight));
-    expect(dist(withTinyBounds)).toBeCloseTo(dist(tight), 5); // a tiny bounds never narrows below the vantage default
+  it('MACRO frames much closer than WIDE for the same subject (a real ordering the intents must respect)', () => {
+    const wide = resolveCameraFraming({ intent: 'WIDE', target: [0, 0, 0], targetRadius: 1 });
+    const macro = resolveCameraFraming({ intent: 'MACRO', target: [0, 0, 0], targetRadius: 1 });
+    const wideDist = new THREE.Vector3(...wide.position).length();
+    const macroDist = new THREE.Vector3(...macro.position).length();
+    expect(macroDist).toBeLessThan(wideDist);
   });
 
-  it('framing DETAIL pulls in, CONTEXT pulls back, relative to FILL', () => {
-    const fill = resolveShot({ vantage: 'SCIENTIFIC', target: [0, 0, 0], framing: 'FILL' });
-    const detail = resolveShot({ vantage: 'SCIENTIFIC', target: [0, 0, 0], framing: 'DETAIL' });
-    const context = resolveShot({ vantage: 'SCIENTIFIC', target: [0, 0, 0], framing: 'CONTEXT' });
-    const dist = (s: typeof fill) => Math.hypot(...s.position);
-    expect(dist(detail)).toBeLessThan(dist(fill));
-    expect(dist(context)).toBeGreaterThan(dist(fill));
+  it('MICRO frames closer than MACRO, which frames closer than SCIENTIST_POV\'s human-scale default', () => {
+    const distanceFor = (intent: CameraIntent) => new THREE.Vector3(...resolveCameraFraming({ intent, target: [0, 0, 0], targetRadius: 1 }).position).length();
+    expect(distanceFor('MICRO')).toBeLessThan(distanceFor('MACRO'));
+    expect(distanceFor('MACRO')).toBeLessThan(distanceFor('SCIENTIST_POV'));
   });
-});
 
-describe('defaultMobilityFor', () => {
-  it('gives free-roam vantages FREE and orbit-style vantages ORBIT', () => {
-    expect(defaultMobilityFor('SCIENTIST_POV')).toBe('FREE');
-    expect(defaultMobilityFor('HUMAN_EYE')).toBe('FREE');
-    expect(defaultMobilityFor('MACRO')).toBe('ORBIT');
-    expect(defaultMobilityFor('MICRO')).toBe('ORBIT');
-    expect(defaultMobilityFor('ORBITAL')).toBe('ORBIT');
-    expect(defaultMobilityFor('WIDE')).toBe('STATIC');
-    expect(defaultMobilityFor('CINEMATIC')).toBe('FOLLOW');
-    expect(defaultMobilityFor('DRIVER')).toBe('FOLLOW');
+  it('azimuth rotates the camera around the target on the horizontal plane, at a constant distance', () => {
+    const at0 = resolveCameraFraming({ intent: 'WIDE', target: [0, 0, 0], targetRadius: 1, azimuthDeg: 0 });
+    const at90 = resolveCameraFraming({ intent: 'WIDE', target: [0, 0, 0], targetRadius: 1, azimuthDeg: 90 });
+    const dist0 = new THREE.Vector3(...at0.position).length();
+    const dist90 = new THREE.Vector3(...at90.position).length();
+    expect(dist90).toBeCloseTo(dist0, 5); // same distance, different position
+    expect(at90.position[0]).not.toBeCloseTo(at0.position[0]);
+  });
+
+  it('honors an explicit standoffMultiplier/elevationDeg override over the intent default', () => {
+    const withOverride = resolveCameraFraming({ intent: 'WIDE', target: [0, 0, 0], targetRadius: 1, standoffMultiplier: 100, elevationDeg: 89 });
+    const distance = new THREE.Vector3(...withOverride.position).length();
+    expect(distance).toBeCloseTo(100, 5);
+    expect(withOverride.position[1]).toBeGreaterThan(90); // near-vertical elevation -> mostly y
+  });
+
+  it('places the camera relative to an arbitrary (non-origin) target, not always relative to world origin', () => {
+    const transform = resolveCameraFraming({ intent: 'WIDE', target: [10, 20, 30], targetRadius: 1 });
+    expect(transform.position[1]).toBeGreaterThan(20); // elevated above the target's own y
   });
 });
 
-describe('CameraRig.cutTo', () => {
-  it('applies the resolved shot to the camera immediately, with no transition', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const rig = new CameraRig(THREE, camera);
-    rig.cutTo({ vantage: 'WIDE', target: [0, 0, 0] });
-    expect(rig.isTransitioning).toBe(false);
-    expect(camera.position.z).toBeCloseTo(12, 5);
-    expect(camera.fov).toBe(60);
+describe('CameraRig', () => {
+  it('starts already at the initial shot with no transition needed', () => {
+    const rig = new CameraRig(THREE, { intent: 'WIDE', target: [0, 0, 0] });
+    expect(rig.isSettled).toBe(true);
   });
 
-  it('updates currentVantage/currentMobility to reflect the applied shot', () => {
-    const camera = new THREE.PerspectiveCamera();
-    const rig = new CameraRig(THREE, camera);
-    rig.cutTo({ vantage: 'MACRO', target: [1, 1, 1] });
-    expect(rig.currentVantage).toBe('MACRO');
-    expect(rig.currentMobility).toBe('ORBIT');
-  });
-});
-
-describe('CameraRig.transitionTo', () => {
-  it('does not jump immediately — the camera is between start and end mid-transition', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    camera.position.set(0, 0, 0);
-    const rig = new CameraRig(THREE, camera);
-    rig.transitionTo({ vantage: 'WIDE', target: [0, 0, 0] }, 1.0, 'LINEAR');
-    expect(rig.isTransitioning).toBe(true);
-    rig.update(0.5);
-    expect(camera.position.z).toBeGreaterThan(0);
-    expect(camera.position.z).toBeLessThan(12);
-    expect(rig.isTransitioning).toBe(true);
+  it('frame() eases toward the new shot over update() calls instead of snapping', () => {
+    const rig = new CameraRig(THREE, { intent: 'MACRO', target: [0, 0, 0], targetRadius: 1 });
+    rig.frame({ intent: 'WIDE', target: [0, 0, 0], targetRadius: 1 });
+    expect(rig.isSettled).toBe(false);
+    const mid = rig.update(0.05);
+    const finalTransform = resolveCameraFraming({ intent: 'WIDE', target: [0, 0, 0], targetRadius: 1 });
+    // Partway there: closer to the final shot than the start, but not AT it yet.
+    expect(mid.position).not.toEqual(finalTransform.position);
   });
 
-  it('reaches exactly the target shot once the full duration has elapsed', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const rig = new CameraRig(THREE, camera);
-    rig.transitionTo({ vantage: 'WIDE', target: [0, 0, 0] }, 1.0, 'LINEAR');
-    rig.update(0.6);
-    rig.update(0.6); // overshoots the 1.0s duration — must clamp, not overshoot the shot
-    expect(rig.isTransitioning).toBe(false);
-    expect(camera.position.z).toBeCloseTo(12, 4);
-    expect(camera.fov).toBe(60);
+  it('converges to the target shot after enough update() calls', () => {
+    const rig = new CameraRig(THREE, { intent: 'MACRO', target: [0, 0, 0], targetRadius: 1 });
+    rig.frame({ intent: 'WIDE', target: [0, 0, 0], targetRadius: 1 });
+    for (let i = 0; i < 200; i++) rig.update(0.1);
+    expect(rig.isSettled).toBe(true);
   });
 
-  it('CINEMATIC and LINEAR ease reach different midpoints for the same elapsed fraction', () => {
-    const linearCam = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const linearRig = new CameraRig(THREE, linearCam);
-    linearRig.transitionTo({ vantage: 'WIDE', target: [0, 0, 0] }, 1.0, 'LINEAR');
-    linearRig.update(0.25);
-
-    const cineCam = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const cineRig = new CameraRig(THREE, cineCam);
-    cineRig.transitionTo({ vantage: 'WIDE', target: [0, 0, 0] }, 1.0, 'CINEMATIC');
-    cineRig.update(0.25);
-
-    // Both start at camera (0,0,0) heading to z=12; smootherstep(0.25) < 0.25 (ease-in), so CINEMATIC lags LINEAR early on.
-    expect(cineCam.position.z).toBeLessThan(linearCam.position.z);
-  });
-
-  it('a fresh transitionTo interrupts an in-flight one and starts from the camera\'s current position', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const rig = new CameraRig(THREE, camera);
-    rig.transitionTo({ vantage: 'WIDE', target: [0, 0, 0] }, 1.0, 'LINEAR');
-    rig.update(0.5);
-    const midway = camera.position.clone();
-    rig.transitionTo({ vantage: 'MACRO', target: [0, 0, 0] }, 1.0, 'LINEAR');
-    expect(rig.isTransitioning).toBe(true);
-    // The new transition's "from" is wherever the camera actually was, not reset to origin.
-    rig.update(0);
-    expect(camera.position.distanceTo(midway)).toBeLessThan(0.01);
-  });
-});
-
-describe('CameraRig ORBIT mobility', () => {
-  it('advances azimuth automatically and traces a constant-radius circle around the target', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const rig = new CameraRig(THREE, camera);
-    rig.cutTo({ vantage: 'ORBITAL', target: [0, 0, 0] });
-    rig.setOrbitSpeed(1); // 1 rad/s, easy to reason about
-
-    const radius0 = Math.hypot(camera.position.x, camera.position.z);
-    rig.update(0.5);
-    const radius1 = Math.hypot(camera.position.x, camera.position.z);
-    rig.update(0.5);
-    const radius2 = Math.hypot(camera.position.x, camera.position.z);
-
-    expect(radius1).toBeCloseTo(radius0, 5);
-    expect(radius2).toBeCloseTo(radius0, 5);
-    // Position actually changed — it's really orbiting, not stuck.
-    expect(camera.position.x).not.toBeCloseTo(0, 2);
-  });
-
-  it('orbits around a live-tracked target when setTarget is called every frame', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const rig = new CameraRig(THREE, camera);
-    rig.cutTo({ vantage: 'ORBITAL', target: [0, 0, 0] });
-    rig.setTarget([50, 0, 50]);
-    rig.update(0.1);
-    // Now orbiting around (50,0,50), not the origin.
-    expect(camera.position.x).toBeGreaterThan(40);
-    expect(camera.position.z).toBeGreaterThan(40);
-  });
-});
-
-describe('CameraRig FOLLOW mobility', () => {
-  it('eases position toward a moving live target rather than snapping instantly', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const rig = new CameraRig(THREE, camera);
-    rig.cutTo({ vantage: 'CINEMATIC', target: [0, 0, 0] });
-    rig.setFollowDamping(2);
-    rig.setTarget([20, 0, 0]);
-    rig.update(1 / 60);
-    // One small step: closer to the new target's shot than the start, but not there yet.
-    expect(camera.position.x).toBeGreaterThan(0);
-    expect(camera.position.x).toBeLessThan(20 + 6); // 6 = CINEMATIC's default standoff, generously bounding "not overshot"
-  });
-
-  it('converges to the resolved shot after enough frames', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const rig = new CameraRig(THREE, camera);
-    rig.cutTo({ vantage: 'CINEMATIC', target: [0, 0, 0] });
-    rig.setTarget([20, 0, 0]);
-    for (let i = 0; i < 300; i++) rig.update(1 / 30);
-    expect(camera.position.x).toBeCloseTo(20, 1);
-    expect(camera.position.z).toBeCloseTo(6, 1); // CINEMATIC's default standoff on +Z
-  });
-});
-
-describe('CameraRig STATIC/FREE mobility', () => {
-  it('STATIC mobility never moves the camera again after cutTo, even across many update() calls', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const rig = new CameraRig(THREE, camera);
-    rig.cutTo({ vantage: 'WIDE', target: [3, 3, 3] });
-    const placed = camera.position.clone();
-    for (let i = 0; i < 60; i++) rig.update(1 / 60);
-    expect(camera.position.equals(placed)).toBe(true);
-  });
-
-  it('FREE mobility (SCIENTIST_POV) leaves the camera alone after the initial cut, for an external controller to own', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const rig = new CameraRig(THREE, camera);
-    rig.cutTo({ vantage: 'SCIENTIST_POV', target: [0, 0, 0] });
-    camera.position.set(9, 9, 9); // an external first-person controller moves the camera directly
-    rig.update(1 / 60);
-    expect(camera.position.x).toBe(9); // the rig did not fight the external controller
-  });
-});
-
-describe('parity: recomputeShotInto (per-frame hot path) matches resolveShot (pure/testable path)', () => {
-  it('ORBIT mobility\'s per-frame position matches an equivalent resolveShot call', () => {
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-    const rig = new CameraRig(THREE, camera);
-    rig.cutTo({ vantage: 'MACRO', target: [2, 1, -3] });
-    rig.setOrbitSpeed(0.7);
-    rig.update(1 / 60);
-
-    const expected = resolveShot({ vantage: 'MACRO', target: [2, 1, -3], azimuth: 0.7 / 60 });
-    expect(camera.position.x).toBeCloseTo(expected.position[0], 5);
-    expect(camera.position.y).toBeCloseTo(expected.position[1], 5);
-    expect(camera.position.z).toBeCloseTo(expected.position[2], 5);
+  it('cut() snaps immediately with no transition', () => {
+    const rig = new CameraRig(THREE, { intent: 'MACRO', target: [0, 0, 0], targetRadius: 1 });
+    rig.cut({ intent: 'WIDE', target: [5, 5, 5], targetRadius: 2 });
+    expect(rig.isSettled).toBe(true);
+    const expected = resolveCameraFraming({ intent: 'WIDE', target: [5, 5, 5], targetRadius: 2 });
+    const current = rig.update(0); // dt=0 returns current without moving further
+    expect(current.position[0]).toBeCloseTo(expected.position[0]);
+    expect(current.position[1]).toBeCloseTo(expected.position[1]);
+    expect(current.position[2]).toBeCloseTo(expected.position[2]);
   });
 });

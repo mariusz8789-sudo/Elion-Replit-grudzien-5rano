@@ -39,8 +39,8 @@ never the reverse.
 | Scene composition primitives | `primitives.ts` | `createColumn`, `createPlatform` (box or disc footprint), `createGlassChamber` (the open-ended-cylinder chamber convention), `createPipe` (a conduit/cable run between two arbitrary points — computes length and orientation, doesn't just stretch a fixed cylinder). Geometry-and-placement only, no material opinion — pass any `materials.ts` category. Proven in `examples/heroApparatusExample.ts`, which builds its base/columns/chamber/conduit entirely through these instead of hand-derived `CylinderGeometry`/`BoxGeometry` args. Room/wall/ceiling/corridor/container/road/terrain deliberately NOT built here yet — no low-risk real consumer exists without rewriting an already-shipped scene's hand-tuned geometry (see the module's own doc comment). |
 | Instancing | `instancing.ts` | `InstanceBatch` (per-instance transform, plus optional per-instance `color` for many identical parts that each track a different live value — pair with `stateVisualization.ts`), `setInstanceColor`/`setInstanceTransform` (retune one instance's color/transform after `.build()` — both use three.js's partial buffer-upload API so retuning a handful of instances out of a large population costs GPU upload bytes proportional to instances touched, not population size; see their own doc comments) |
 | Post-processing (AO/reflections/bloom/DOF/tone-mapping) | `postProcessing.ts` | `setupGraphicsPipeline`, `configureDOF`, `resolveBokehUniforms`, types `GraphicsPipelineOptions`/`DepthOfFieldSettings`/`ScreenSpaceReflectionSettings`/`AmbientOcclusionSettings`/`AmbientEnvironmentSettings`/`GraphicsPipeline`. `GraphicsPipelineOptions.ambient.mode` picks the AMBIENT/IBL source: `'studio+hdri'` (default), `'room-probe'` (an interior scene reflecting itself — pair with `GraphicsPipeline.captureRoomProbe()`, called once after the first full frame), or `'none'` (the caller manages its own environment/background/fog entirely — see the epidemiology city and high-fidelity street slice). `GraphicsPipelineOptions.ambientOcclusion` retunes AO's tier floor/radius/blend per scene instead of the fixed default. `GraphicsPipeline.setDepthOfFieldEnabled(bool)` toggles DOF per shot without rebuilding the composer. |
-| Cinematic camera (lens) | `cinematicCamera.ts` | `configureCinematicCamera`, `recommendedDofForProfile`, `FocusPuller` — FOV/near/far/DOF only, never position |
-| Camera rig (placement + movement) | `cameraRig.ts` | `CameraRig` (`cutTo`/`transitionTo`/`setTarget`/`update`), `resolveShot` — turns a declarative `CameraIntent` (9 named vantages: `WIDE`/`HUMAN_EYE`/`SCIENTIST_POV`/`MACRO`/`MICRO`/`SCIENTIFIC`/`CINEMATIC`/`DRIVER`/`ORBITAL` + target/bounds/standoff/elevation/framing) into an actual camera transform, with hard cuts, eased/linear transitions, auto-orbit, and damped target-following — all reusable across every world instead of a per-world `xPresetFor()` |
+| Cinematic camera (lens) | `cinematicCamera.ts` | `configureCinematicCamera`, `recommendedDofForProfile`, `FocusPuller` — FOV/near/far/DOF for a named shot. Never decides where the camera sits or what it looks at — see Camera Rig, below. |
+| Camera Rig (transform) | `cameraRig.ts` | `resolveCameraFraming(request)` (pure function: intent + target + `targetRadius` → position/lookAt, scale-aware — no hardcoded coordinate tables) and `CameraRig` (stateful: `frame()` eases, `cut()` snaps, `update(dt)` advances — the position/orientation counterpart to `FocusPuller`). `CameraIntent` (`WIDE`/`HUMAN_EYE`/`SCIENTIST_POV`/`MACRO`/`MICRO`/`SCIENTIFIC`/`CINEMATIC`/`DRIVER`/`ORBITAL`) is a superset of `core/world/cameraPolicy.ts`'s `WorldCameraMode`, so a `CameraPolicyDecision.mode` passes straight through with no translation. Each intent also carries a default `CameraMobility` (`STATIC`/`FOLLOW`/`ORBIT`/`FREE`, via `defaultMobilityFor`) — `ORBIT` intents (`MACRO`/`MICRO`/`ORBITAL`) auto-advance azimuth every `update()` (`setOrbitSpeed`), `FOLLOW` intents (`CINEMATIC`/`DRIVER`) ease toward a live-tracked target (`setTarget`), called every frame with the tracked entity's current position. This is what a per-scene hardcoded intent→coordinate preset table (the anti-pattern this replaces) should resolve onto instead. Proven in `examples/heroApparatusExample.ts`'s `cameraRig`/`shootCamera(intent)` handles. |
 | Quality tiers | `../quality.ts` | `detectRenderTier`, `configureGraphicsQuality`, `tierDpr`, `tierAllowsBloom`, `tierAllowsAO`, `tierAtLeast`, `recommendedShadowMapSize`, `maxShadowCasterBudget` |
 | State-driven visualization | `stateVisualization.ts` | `sampleColorScale`, `severityColor`, `SEVERITY_COLOR_SCALE`, `applyValueToEmissive`, `applyFractionToScale`, `AttentionPulse` — turns an already-computed real value into a color/glow/fill-height/event-flash; never computes or interprets the value itself (see its module doc) |
 | LOD / culling | `lod.ts` | `FrustumCuller` (per-instance frustum test, reusable/allocation-free — see its module doc for why this exists instead of `InstancedMesh.frustumCulled`), `PopulationLod` (frustum + distance + projected-size LOD in one per-frame pass over a whole population), `projectedScreenSizePx`, `selectLodTier`. Wired into `InstancedHumanoidCrowd.update()`'s optional `cull` argument — see `PERFORMANCE.md`. |
@@ -71,9 +71,9 @@ never the reverse.
   `configureCinematicCamera` with a named profile.
 - **Don't hand-roll WHERE the camera sits/looks per world (a `labPresetFor`,
   a `cityPresetFor`, a per-scene orbit-math copy).** Build a `CameraRig`
-  once per scene and drive it with `cutTo`/`transitionTo`/`setTarget` —
-  see `cameraRig.ts`. It has no opinion on labs/cities/molecules; it only
-  resolves vantage + target + bounds into a transform.
+  once per scene and drive it with `frame`/`cut`/`setTarget`/`setOrbitSpeed`
+  — see `cameraRig.ts`. It has no opinion on labs/cities/molecules; it only
+  resolves intent + target + scale into a transform.
 - **Don't import `examples/heroApparatusExample.ts` into a real scene.** It
   is a reference pattern, not reusable geometry — its chamber/frame/bolts
   are generic filler, not the flagship apparatus.
@@ -87,6 +87,12 @@ never the reverse.
   `ClickDragTracker` already do — `epidemicCity3D.ts` and
   `highFidelitySlice3D.ts` had independently duplicated all three before
   this existed.
+- **Don't hand-roll a per-scene camera intent→coordinate preset table** (the
+  exact anti-pattern that motivated `cameraRig.ts`). Resolve a
+  `CameraFrameRequest` (`intent` + `target` + `targetRadius`) through
+  `resolveCameraFraming`/`CameraRig` instead — it's scale-aware by
+  construction, so the same intent works whether the target is a
+  benchtop instrument or a city district.
 - **Don't hand-derive a column/platform/glass-chamber/pipe's `CylinderGeometry`/
   `BoxGeometry` args, or the orientation quaternion for a pipe between two
   points.** `primitives.ts`'s `createColumn`/`createPlatform`/

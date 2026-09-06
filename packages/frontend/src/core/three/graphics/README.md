@@ -543,6 +543,16 @@ calling the shared function — now consolidated onto the one implementation.
      ground/brick, same shape of real loaded PBR textures) was **never
      disposed at all** — 0 of 4, not even the materials themselves.
 
+  A follow-up sweep specifically onto loaded GLTF assets (as opposed to
+  procedural geometry) found four more, all fixed the same way:
+  `highFidelitySlice3D.ts`'s loaded hero character (added directly to
+  `scene`, bypassing the existing per-object disposal loop entirely), its
+  real-human GLTF clones (only ever disposed one at a time when an agent
+  walked out of range, never as a group on full teardown) and their raw
+  clone template, and `epidemicCity3D.ts`'s approved-asset GLTF clones
+  (facade/lamp instances) plus their two raw templates — `dispose()` only
+  ever called `scene.remove()` on them, never freeing GPU resources.
+
   Both scene files now delegate to `lifecycle.ts`'s
   `disposeSceneResources`/`disposeMaterials` instead of their own
   hand-rolled, incomplete traversal — one tested implementation instead of

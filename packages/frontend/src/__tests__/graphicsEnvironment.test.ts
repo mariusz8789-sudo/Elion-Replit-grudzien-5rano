@@ -32,6 +32,23 @@ describe('computeSunState', () => {
     }
   });
 
+  it('deep night is not contaminated by the golden-hour blend the way dusk legitimately is — found via the first production Chromium screenshot of this module (a full-frame orange wash at 9pm)', () => {
+    const dusk = computeSunState(THREE, 17.7); // the model's own golden-hour peak (sun just above the horizon)
+    const deepNight = computeSunState(THREE, 1); // 1am — should read as neutrally dark, not orange
+    const midnight = computeSunState(THREE, 0);
+    const duskFogRed = new THREE.Color(dusk.fogColor).r;
+    const deepNightFogRed = new THREE.Color(deepNight.fogColor).r;
+    // GOLDEN_FOG (0xe0a878) is strongly orange; NIGHT_FOG (0x050a14) is not — a real, large gap in
+    // the red channel, not a subtle threshold. The defect made every night hour blend in enough
+    // GOLDEN_FOG to read as clearly warm; the fix must make deep night close to pure NIGHT_FOG.
+    expect(duskFogRed).toBeGreaterThan(0.35);
+    expect(deepNightFogRed).toBeLessThan(0.1);
+    // Every deep-night hour reads the same neutrally-dark tone as any other — the defect made
+    // every night hour identical to DUSK's own warm tone instead.
+    expect(deepNight.skyZenithColor).toBe(midnight.skyZenithColor);
+    expect(deepNight.skyZenithColor).not.toBe(dusk.skyZenithColor);
+  });
+
   it('day sky is brighter/cooler than night sky', () => {
     const night = computeSunState(THREE, 0);
     const day = computeSunState(THREE, 12);

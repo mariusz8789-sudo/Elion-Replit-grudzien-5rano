@@ -14,8 +14,8 @@ import type { WorldFrame, WorldFrameEntity as C2Entity, EntityGrounding } from '
 import { createPumpAssembly, createValveAssembly } from './graphics/infrastructure';
 import { createPBRMaterial } from './graphics/materials';
 import { applyVisualState, type CanonicalVisualState } from './graphics/visualState';
-import { createSunLight, createBackgroundFill } from './graphics/lighting';
 import { resolveCameraFraming, type CameraIntent } from './graphics/cameraRig';
+import { createSceneEnvironment, type SceneEnvironmentHandle } from './graphics/sceneEnvironment';
 
 /**
  * GENESIS — CITY INFRASTRUCTURE INTEGRATION 1.0
@@ -105,6 +105,7 @@ export class GenesisScientificCitySim implements Sim3D {
   } | null = null;
   private buildingMaterial: THREE_NS.Material | null = null;
   private landmarkMaterial: THREE_NS.Material | null = null;
+  private sceneEnvironment: SceneEnvironmentHandle | null = null;
 
   private followTarget: THREE_NS.Vector3 | null = null;
   private observationStandoff: number | null = null;
@@ -301,14 +302,21 @@ export class GenesisScientificCitySim implements Sim3D {
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, _w: number, _h: number): void {
     this.THREE = THREE;
     scene.background = new THREE.Color(0x0c1420);
-    scene.fog = new THREE.Fog(0x0c1420, 30, 90);
-    createSunLight(THREE, scene, { position: [30, 40, 20] });
-    createBackgroundFill(THREE, scene);
-
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x1a2332, roughness: 0.95 }));
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
+    // GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 3.0: the shared exterior environment baseline
+    // (sky/fog/sun/fill/ground/tier-gated haze) every Sim3D scene needs, replacing this scene's own
+    // ad hoc bare PlaneGeometry ground + two lights with no render-tier awareness. `hourOfDay: 21`
+    // keeps this scene's original night mood (its own hand-picked 0x0c1420 tone already matched
+    // `environment.ts`'s own NIGHT palette); the CONCRETE category (tinted toward the scene's
+    // original ground tone) fits a paved scientific-city site better than the GROUND category's
+    // default grass/dirt look. Nothing else about this scene (camera, target resolution,
+    // intervention/cascade logic, entity visuals) is touched — see this file's own module doc for
+    // that boundary.
+    this.sceneEnvironment = createSceneEnvironment(THREE, scene, {
+      mode: 'OUTDOOR',
+      hourOfDay: 21,
+      fogDensity: 0.014,
+      groundMaterial: createPBRMaterial(THREE, 'CONCRETE', { color: 0x1a2332 }),
+    });
 
     this.pumpMaterials = {
       body: createPBRMaterial(THREE, 'PAINTED_METAL'),
@@ -404,6 +412,18 @@ export class GenesisScientificCitySim implements Sim3D {
   update(_dt: number): void {
     // Time only advances through explicit step()/triggerPumpFailure() calls (deterministic,
     // testable, and matches this world's own real solver cadence) — never a per-frame auto-tick.
+    // The shared environment's ambient haze is a pure rendering-layer effect (particle drift), not
+    // simulation time, so it still animates every real frame regardless of world-clock state —
+    // same split epidemicCity3D.ts's own cityHaze already draws between "world time" and "visual
+    // motion that just needs to look alive."
+    this.sceneEnvironment?.update(_dt);
+  }
+
+  /** Releases this scene's own environment resources. The rest of this file's materials/renderer
+   * predate this addition and are a separate, pre-existing lifecycle gap — not widened here. */
+  dispose(): void {
+    this.sceneEnvironment?.dispose();
+    this.sceneEnvironment = null;
   }
 
   syncScene(_scene: THREE_NS.Scene, _camera: THREE_NS.PerspectiveCamera): void {

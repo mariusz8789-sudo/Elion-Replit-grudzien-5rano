@@ -28,10 +28,22 @@ describe('GenesisScientificCitySim.resolveNamedWorldTarget — a real graph scan
     }
   });
 
-  it('resolves "hospital"/"szpital" to the real hospital building', () => {
+  it('REGRESSION: resolves every real Polish inflection of "pompa" — found live via "Pokaż pompę."', () => {
+    // Polish nouns decline; a whole-word check against the nominative "pompa" alone silently
+    // failed on "Pokaż pompę." (accusative) and "Wyłącz pompę." — both real Scientific Control
+    // Loop sentences from the mission itself.
+    const sim = initializedSim();
+    const ids = sim.getIds();
+    for (const form of ['pompę', 'pompy', 'pompie', 'pompą', 'Pokaż pompę.', 'Wyłącz pompę.']) {
+      expect(sim.resolveNamedWorldTarget(form)?.id, `form "${form}"`).toBe(ids.pumpPipeId);
+    }
+  });
+
+  it('resolves "hospital"/"szpital" (and its declined forms) to the real hospital building', () => {
     const sim = initializedSim();
     expect(sim.resolveNamedWorldTarget('the hospital')?.id).toBe(sim.getIds().hospitalBuildingId);
     expect(sim.resolveNamedWorldTarget('szpital')?.id).toBe(sim.getIds().hospitalBuildingId);
+    expect(sim.resolveNamedWorldTarget('szpitala')?.id).toBe(sim.getIds().hospitalBuildingId);
   });
 
   it('honestly returns null for something that does not exist in this world', () => {

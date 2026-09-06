@@ -60,6 +60,18 @@ export interface ObservationIntent {
   readonly scale: 'WIDE' | 'MACRO' | 'NORMAL' | null;
   /** "Why did this change happen?" — routes to the cause/effect explainer regardless of target. */
   readonly askingWhy: boolean;
+  /** "What changed?" / "Co się zmieniło?" — routes to the delta/explanation flow for the CURRENT
+   * target. Distinct from `askingWhy`: this asks for a DIFF, not a CAUSE. */
+  readonly askingWhatChanged: boolean;
+  /**
+   * An imperative command to actually change the world ("turn off the pump", "wyłącz pompę") OR a
+   * "what happens if X fails" hypothetical asking for that same intervention's outcome ("co się
+   * stanie, jeśli pompa padnie?") — both name a real action the director must EXECUTE (through C3)
+   * before anything else in the Scientific Control Loop can answer the question. Distinct from
+   * `comparison`, which only means "show me a side-by-side view" and never by itself authorizes a
+   * world change.
+   */
+  readonly interventionRequested: boolean;
   /** "Go back to how it was" / "return to baseline" — leaves any branch and resumes the primary run. */
   readonly returningToBaseline: boolean;
   /** Everything this parser could not read out of the sentence. A caller must not fill these in with a default. */
@@ -99,8 +111,29 @@ const UNIT_WORD: Readonly<Record<string, TemporalUnit>> = {
 };
 
 const WHY_QUESTION = /\b(why (did|does|is|has)|dlaczego)\b/i;
+const WHAT_CHANGED_QUESTION = /\b(what changed|what('s| is| has) different|co się zmieniło|co sie zmienilo|co się zmienia|co sie zmienia)\b/i;
 const RETURN_BASELINE = /\b(return to (the\s+)?baseline|back to (the\s+)?baseline|reset|wróć do (bazy|stanu wyjściowego)|wroc do (bazy|stanu wyjsciowego))\b/i;
 const COMPARISON_TRIGGER = /\b(compare|what if|what would happen if|porówn|porown|co (by było|by bylo|jeśli|jesli) gdyby|co jeśli|co jesli)\b/i;
+
+// Imperative command: "turn off/shut down/disable/stop/fail the PUMP" / "wyłącz/zatrzymaj/zablokuj
+// pompę" — this actually authorizes a world change, unlike a bare observation request.
+const INTERVENTION_COMMAND = new RegExp(
+  `\\b(?:turn off|shut down|disable|stop|kill|fail)\\s+(?:the\\s+)?([a-z][a-z0-9\\s-]{1,40}?)(?=[.?!,;]|$)`
+  + `|\\b(?:wyłącz|wylacz|zatrzymaj|zablokuj)\\s+(?:the\\s+)?([a-ząćęłńóśźż][a-ząćęłńóśźż0-9\\s-]{1,40}?)(?=[.?!,;]|$)`,
+  'i',
+);
+// Hypothetical: "what happens/will happen/would happen if the PUMP fails/stops working" /
+// "co się stanie/będzie, jeśli POMPA padnie/przestanie działać/się zepsuje" — names both the
+// intervention AND its own target, so the director never has to guess which entity to fail.
+// NOTE: no trailing `\b` on the Polish alternation — JS regex `\b` is ASCII-`\w`-only, so it
+// silently fails to match right after a diacritic-ending word like "działać" (ends in "ć", not a
+// `\w` character) when followed by punctuation or end-of-string. Found live by this file's own
+// tests: "...przestanie działać?" never matched with a trailing `\b` in place.
+const WHAT_IF_FAILURE = new RegExp(
+  `\\bwhat (?:happens|will happen|would happen) if\\s+(?:the\\s+)?([a-z][a-z0-9\\s-]{1,40}?)\\s+(?:fails|stops working|breaks down|goes down)\\b`
+  + `|\\bco (?:się|sie) (?:stanie|dzieje)\\b,?\\s*(?:jeśli|jesli|gdy)\\s+(?:the\\s+)?([a-ząćęłńóśźż][a-ząćęłńóśźż0-9\\s-]{1,40}?)\\s+(?:padnie|przestanie działać|przestanie dzialac|się zepsuje|sie zepsuje|ulegnie awarii)`,
+  'i',
+);
 
 const MODE_WORDS: readonly { readonly pattern: RegExp; readonly mode: ObservationMode }[] = [
   { pattern: /\b(as a scientist|scientist view|jako naukow)\w*/i, mode: 'SCIENTIST' },
@@ -191,6 +224,22 @@ function detectLocation(text: string): string | null {
   return match ? match[1]!.trim() : null;
 }
 
+interface InterventionDetection {
+  readonly requested: boolean;
+  /** The entity named by the command/hypothetical itself, when the sentence names one directly
+   * (e.g. "turn off the PUMP", "jeśli POMPA padnie") — independent of `detectTarget`'s own trigger
+   * words, since neither "wyłącz" nor "co się stanie jeśli" is a target-observation trigger. */
+  readonly target: string | null;
+}
+
+function detectIntervention(text: string): InterventionDetection {
+  const command = INTERVENTION_COMMAND.exec(text);
+  if (command) return { requested: true, target: (command[1] ?? command[2])!.trim() };
+  const hypothetical = WHAT_IF_FAILURE.exec(text);
+  if (hypothetical) return { requested: true, target: (hypothetical[1] ?? hypothetical[2])!.trim() };
+  return { requested: false, target: null };
+}
+
 /**
  * Parses a follow-up observation sentence. Pure and deterministic — same
  * input, same output, always. Returns SOMETHING even for a sentence that
@@ -201,7 +250,8 @@ function detectLocation(text: string): string | null {
 export function parseObservationIntent(sourceText: string): ObservationIntent {
   const trimmed = sourceText.trim();
 
-  const target = detectTarget(trimmed);
+  const intervention = detectIntervention(trimmed);
+  const target = detectTarget(trimmed) ?? intervention.target;
   const time = detectTime(trimmed);
   const event = detectEvent(time);
   const mode = detectMode(trimmed);
@@ -209,11 +259,12 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
   const scale = detectScale(trimmed);
   const location = detectLocation(trimmed);
   const askingWhy = WHY_QUESTION.test(trimmed);
+  const askingWhatChanged = WHAT_CHANGED_QUESTION.test(trimmed);
   const returningToBaseline = RETURN_BASELINE.test(trimmed);
-  const comparison = COMPARISON_TRIGGER.test(trimmed) && !returningToBaseline;
+  const comparison = (COMPARISON_TRIGGER.test(trimmed) || intervention.requested) && !returningToBaseline;
 
   const unresolved: UnresolvedObservationAspect[] = [];
-  if (!target && !askingWhy && !comparison && !returningToBaseline && !time && !mode) unresolved.push('TARGET');
+  if (!target && !askingWhy && !askingWhatChanged && !comparison && !returningToBaseline && !time && !mode) unresolved.push('TARGET');
   if ((BEFORE_EVENT.test(trimmed) || AFTER_EVENT.test(trimmed)) && !event) unresolved.push('EVENT');
 
   return {
@@ -229,6 +280,8 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
     event,
     scale,
     askingWhy,
+    askingWhatChanged,
+    interventionRequested: intervention.requested,
     returningToBaseline,
     unresolved,
   };

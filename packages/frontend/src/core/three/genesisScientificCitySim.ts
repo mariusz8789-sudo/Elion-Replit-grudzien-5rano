@@ -169,12 +169,17 @@ export class GenesisScientificCitySim implements Sim3D {
     const graph = this.activeEngine.graph;
     const candidates = graph.listEntities().filter((entity) => this.renderedIds.has(entity.id));
 
-    const pumpWords = /\b(pump|pompa|pipe|rura|water pump|hospital pump|pump station)\b/i;
+    // Polish nouns decline ("pompa"/"pompę"/"pompie"/"pompy"/"pompą") — matching the bare stem
+    // (found live: "Pokaż pompę." failed against a whole-word "pompa" check) covers every real
+    // inflection without a second per-case list. English "pump" doesn't decline this way, so it
+    // stays a plain word match (still covers "pump station"/"hospital pump"/"water pump", each of
+    // which contains the word "pump" itself).
+    const pumpWords = /\b(pumps?|pomp\w*|pipe|rur\w*)\b/i;
     if (pumpWords.test(needle)) {
       const pump = candidates.find((entity) => entity.ref.kind === 'pump-pipe-system');
       if (pump) return { id: pump.id, label: pump.label, kind: pump.ref.kind };
     }
-    const hospitalWords = /\b(hospital|szpital)\b/i;
+    const hospitalWords = /\b(hospital|szpital\w*)\b/i;
     if (hospitalWords.test(needle)) {
       const hospital = candidates.find((entity) => entity.id === this.city.hospitalBuildingId);
       if (hospital) return { id: hospital.id, label: hospital.label, kind: hospital.ref.kind };

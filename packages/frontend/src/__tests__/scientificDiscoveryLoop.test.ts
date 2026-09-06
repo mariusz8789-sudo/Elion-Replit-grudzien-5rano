@@ -174,6 +174,22 @@ describe('Scientific Discovery Loop — reusable across domains, not a single ha
       expect(link.observations).toEqual([]);
       expect(link.notModeled).toBeDefined();
     }
+    // The candidate variable ("smiles") is not numeric, so the domain-agnostic
+    // cross-hypothesis analysis honestly reports INSUFFICIENT_DATA — never a
+    // fabricated correlation over a non-numeric axis.
+    expect(result.crossHypothesisAnalysis.findings[0]?.verdict).toBe('INSUFFICIENT_DATA');
+  });
+
+  it('10. Observation/Analysis is domain-extensible: a domain with NO Scenario Engine timeline (cell population biology) still gets a real, non-fabricated cross-hypothesis finding', () => {
+    const result = runScientificDiscoveryLoop('problem:cell-population-growth-rate-fastest-to-capacity');
+    // Per-hypothesis Observation/Analysis is scoped to the Scenario Engine, so this domain reports notModeled there.
+    for (const link of result.evidenceChain) expect(link.notModeled).toBeDefined();
+    // But the domain-agnostic cross-hypothesis analysis is real: growthRate vs fractionOfCapacity
+    // is a genuine, strongly monotonic relationship in the actual computed outputs.
+    expect(result.crossHypothesisAnalysis.parameterKey).toBe('growthRate');
+    expect(result.crossHypothesisAnalysis.outputKey).toBe('fractionOfCapacity');
+    expect(result.crossHypothesisAnalysis.findings[0]?.verdict).toBe('REQUIRES_SCIENTIFIC_REVIEW');
+    expect(result.crossHypothesisAnalysis.findings[0]?.runIds.length).toBeGreaterThanOrEqual(3);
   });
 
   afterEach(() => {

@@ -15,9 +15,10 @@ import {
   type NextHypothesisExperiment, type SavedHypothesisLoop,
 } from './experimentFabric/hypothesisLoop';
 import {
-  buildEvidenceChain, SCIENTIFIC_DISCOVERY_LOOP_VERSION,
+  buildCrossHypothesisAnalysis, buildEvidenceChain, SCIENTIFIC_DISCOVERY_LOOP_VERSION,
   type HypothesisEvidenceChainLink, type ScientificDiscoveryLoopResult,
 } from './experimentFabric/scientificDiscoveryLoop';
+import type { DiscoveryAnalysis } from './experimentFabric/discovery';
 import { buildSavedScenarioCounterfactual, isSavedScenarioCounterfactual, type SavedScenarioCounterfactual, type ScenarioCounterfactual } from './simulation/scenarioCounterfactual';
 import { combineEvidencePackRoCrates, type DomainEvidenceEntry, type GenesisRoCrate } from './experimentFabric/evidencePackRoCrate';
 
@@ -898,6 +899,8 @@ export interface SavedScientificDiscoveryLoop {
   hypothesisLoopFingerprint: string;
   evidenceChain: readonly SavedDiscoveryEvidenceLink[];
   nextExperiment: SavedNextExperiment;
+  /** Domain-agnostic Observation/Analysis over the whole run set — real for every domain, not only Scenario Engine timelines. See `scientificDiscoveryLoop.ts`. */
+  crossHypothesisAnalysis: DiscoveryAnalysis;
   /** Odcisk TYLKO tej warstwy (dowody + następny eksperyment) — wykrywa dryf niezależnie od loopFingerprint. */
   discoveryLoopFingerprint: string;
 }
@@ -936,6 +939,7 @@ export function buildSavedScientificDiscoveryLoop(result: ScientificDiscoveryLoo
     hypothesisLoopFingerprint: loop.loopFingerprint,
     evidenceChain: result.evidenceChain.map(savedDiscoveryEvidenceLink),
     nextExperiment: savedNextExperiment(result.nextExperiment),
+    crossHypothesisAnalysis: result.crossHypothesisAnalysis,
   };
   return { ...base, discoveryLoopFingerprint: fnv1a(canonicalJson(base)) };
 }
@@ -959,6 +963,7 @@ export function isSavedScientificDiscoveryLoop(value: unknown): value is SavedSc
   if (typeof value.hypothesisLoopFingerprint !== 'string' || typeof value.discoveryLoopFingerprint !== 'string') return false;
   if (!Array.isArray(value.evidenceChain) || !value.evidenceChain.every(isSavedDiscoveryEvidenceLink)) return false;
   if (!isRecordLike(value.nextExperiment) || typeof value.nextExperiment.status !== 'string') return false;
+  if (!isRecordLike(value.crossHypothesisAnalysis) || !Array.isArray(value.crossHypothesisAnalysis.findings)) return false;
   return true;
 }
 
@@ -1054,6 +1059,7 @@ export async function replaySavedScientificDiscoveryLoop(saved: SavedExperiment)
     loop: replayed.result,
     evidenceChain: buildEvidenceChain(replayed.result),
     nextExperiment: selectNextHypothesisExperiment(replayed.result),
+    crossHypothesisAnalysis: buildCrossHypothesisAnalysis(saved.hypothesisLoop.problem, replayed.result),
   };
   const fresh = buildSavedScientificDiscoveryLoop(freshResult);
   if (fresh.discoveryLoopFingerprint !== saved.discoveryLoop.discoveryLoopFingerprint) {

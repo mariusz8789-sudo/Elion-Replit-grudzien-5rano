@@ -91,6 +91,92 @@ export function applyAmbientIBL(THREE: typeof THREE_NS, renderer: THREE_NS.WebGL
   void loadHdriEnvironment(THREE, renderer, scene);
 }
 
+export interface RoomEnvironmentProbeOptions {
+  /** Where in the room the probe sits — normally near the hero subject, at roughly eye height,
+   * since that is the vantage whose reflections the viewer actually scrutinises. */
+  position: THREE_NS.Vector3Tuple;
+  /** Cube face resolution. Default 256 — a reflection probe is blurred by PMREM into roughness
+   * mips anyway, so more resolution buys almost nothing while costing six renders. */
+  size?: number;
+  /** Applied to `scene.environmentIntensity`. A capture of a real, dim interior is much darker
+   * than the procedural studio box, so the same intensity reads several stops down — default
+   * 1.85 compensates. */
+  intensity?: number;
+  far?: number;
+}
+
+/**
+ * A ONE-TIME reflection probe of the ACTUAL room, replacing the procedural studio box.
+ *
+ * `applyStudioEnvironment` gives metal something to reflect, but always the same something: two
+ * white strips on a bright ceiling, regardless of what is really standing next to the object.
+ * That is why chrome, steel and glass can read cheap even with correct PBR parameters — they
+ * reflect a set that is not in the shot. This renders six faces from a point inside the scene
+ * and feeds them through PMREM instead, so the same materials reflect the cabinet rows, light
+ * strips and structure that are genuinely around them.
+ *
+ * Cost is paid once (six renders at `size`, then a PMREM convolution) and nothing per frame.
+ * Call it AFTER the first full frame — before lights, shadows and emissive surfaces have been
+ * resolved the capture is of a scene that does not exist yet.
+ *
+ * Three things must be excluded from the capture or the map is wrong:
+ *  - tone mapping (an environment map lives in linear space; ACES would be applied twice),
+ *  - transmissive/near-transparent surfaces (glass reflecting itself is a feedback loop that
+ *    shows up as a milky bloom),
+ *  - anything on a non-default layer, such as first-person hands/PPE held centimetres from the
+ *    lens, which would otherwise dominate every face.
+ */
+export function captureRoomEnvironment(
+  THREE: typeof THREE_NS,
+  renderer: THREE_NS.WebGLRenderer,
+  scene: THREE_NS.Scene,
+  options: RoomEnvironmentProbeOptions,
+): void {
+  const hidden: THREE_NS.Object3D[] = [];
+  scene.traverse((object) => {
+    const mesh = object as THREE_NS.Mesh;
+    if (!mesh.isMesh || !mesh.visible) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const refractive = materials.some((material) => {
+      const physical = material as THREE_NS.MeshPhysicalMaterial;
+      if (physical.transmission > 0) return true;
+      return Boolean(material.transparent) && (material as THREE_NS.Material & { opacity: number }).opacity < 0.4;
+    });
+    if (refractive) {
+      hidden.push(mesh);
+      mesh.visible = false;
+    }
+  });
+
+  const previousToneMapping = renderer.toneMapping;
+  const previousExposure = renderer.toneMappingExposure;
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.toneMappingExposure = 1;
+
+  let target: THREE_NS.WebGLCubeRenderTarget | null = null;
+  try {
+    target = new THREE.WebGLCubeRenderTarget(options.size ?? 256, { type: THREE.HalfFloatType });
+    const probe = new THREE.CubeCamera(0.3, options.far ?? 45, target);
+    probe.layers.set(0);
+    probe.position.set(...options.position);
+    probe.update(renderer, scene);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const environment = pmrem.fromCubemap(target.texture).texture;
+    const previousEnvironment = scene.environment;
+    scene.environment = environment;
+    scene.environmentIntensity = options.intensity ?? 1.85;
+    previousEnvironment?.dispose();
+    pmrem.dispose();
+  } catch {
+    // Without the probe the studio environment stays in place — worse reflections, still correct.
+  } finally {
+    target?.dispose();
+    renderer.toneMapping = previousToneMapping;
+    renderer.toneMappingExposure = previousExposure;
+    for (const mesh of hidden) mesh.visible = true;
+  }
+}
+
 // ============================================================================
 // KEY / RIM / PRACTICAL / HERO / BACKGROUND — object/subject lighting roles.
 // ============================================================================

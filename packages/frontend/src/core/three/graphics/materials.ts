@@ -124,22 +124,6 @@ export function makeReadoutSurface(THREE: typeof THREE_NS, width = 256, height =
   return { canvas, ctx, texture };
 }
 
-/** Shared facility-wide material palette — every parametric component (facilityKit, apparatus) reads from this,
- * so the whole world reads as one coherent engineering language instead of per-object one-off colors. */
-export interface FacilityMaterials {
-  steel: THREE_NS.MeshStandardMaterial;
-  darkSteel: THREE_NS.MeshStandardMaterial;
-  chrome: THREE_NS.MeshStandardMaterial;
-  worktop: THREE_NS.MeshStandardMaterial;
-  plastic: THREE_NS.MeshStandardMaterial;
-  rubber: THREE_NS.MeshStandardMaterial;
-  ceramic: THREE_NS.MeshStandardMaterial;
-  copper: THREE_NS.MeshStandardMaterial;
-  display: THREE_NS.MeshStandardMaterial;
-  amberLed: THREE_NS.MeshStandardMaterial;
-  panelGlass: THREE_NS.MeshPhysicalMaterial;
-}
-
 export interface FacilityGeometry {
   boltHead: THREE_NS.CylinderGeometry;
   flange: THREE_NS.CylinderGeometry;
@@ -148,27 +132,6 @@ export interface FacilityGeometry {
   gaugeBody: THREE_NS.CylinderGeometry;
   gaugeFace: THREE_NS.CircleGeometry;
   vent: THREE_NS.BoxGeometry;
-}
-
-/** Builds the shared PBR palette used across the whole facility — one instance per scene, cloned
- * only where a caller needs an independent `.repeat`/`.opacity`. */
-export function createFacilityMaterials(
-  THREE: typeof THREE_NS,
-  brushedFor: (repeatX: number, repeatY: number) => THREE_NS.Texture,
-): FacilityMaterials {
-  return {
-    steel: new THREE.MeshStandardMaterial({ color: 0x8a93a6, roughness: 0.32, metalness: 0.92, roughnessMap: brushedFor(3, 3) }),
-    darkSteel: new THREE.MeshStandardMaterial({ color: 0x39415a, roughness: 0.5, metalness: 0.75, roughnessMap: brushedFor(2, 2) }),
-    chrome: new THREE.MeshStandardMaterial({ color: 0xc8d4e6, roughness: 0.08, metalness: 1, envMapIntensity: 1.6 }),
-    worktop: new THREE.MeshStandardMaterial({ color: 0x22283a, roughness: 0.62, metalness: 0.15 }),
-    plastic: new THREE.MeshStandardMaterial({ color: 0x2a3350, roughness: 0.78, metalness: 0.05 }),
-    rubber: new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.95, metalness: 0 }),
-    ceramic: new THREE.MeshStandardMaterial({ color: 0xd8e2ee, roughness: 0.42, metalness: 0.04 }),
-    copper: new THREE.MeshStandardMaterial({ color: 0xb87a4a, roughness: 0.3, metalness: 0.95 }),
-    display: new THREE.MeshStandardMaterial({ color: 0x0d2233, emissive: 0x3fc7ff, emissiveIntensity: 0.55, roughness: 0.24 }),
-    amberLed: new THREE.MeshStandardMaterial({ color: 0x100c06, emissive: 0xffb545, emissiveIntensity: 1.1, roughness: 0.4 }),
-    panelGlass: new THREE.MeshPhysicalMaterial({ color: 0x9fc4e8, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.18, clearcoat: 1, envMapIntensity: 1.8, depthWrite: false }),
-  };
 }
 
 /** Small, cheap primitive geometries reused (via InstancedMesh where the count is high) by every
@@ -185,21 +148,134 @@ export function createFacilityGeometry(THREE: typeof THREE_NS): FacilityGeometry
   };
 }
 
-/** Emissive LED-strip materials (the light-strip language woven through the facility's structure)
- * and the contact-shadow decal texture — kept separate from the PBR palette since these are
- * MeshBasic "always-lit" accents rather than physically-lit surfaces. */
-export interface FacilityAccents {
-  stripCyan: THREE_NS.MeshBasicMaterial;
-  stripWarm: THREE_NS.MeshBasicMaterial;
-  stripDim: THREE_NS.MeshBasicMaterial;
-  contactShadowTexture: THREE_NS.Texture;
+/**
+ * GENESIS CANONICAL MATERIAL PALETTE
+ * ==================================
+ *
+ * Ten kategorii pokrywających całe słownictwo materiałowe świata Genesis —
+ * generic, bez wiedzy o konkretnej scenie/obiekcie (żaden `worktop`, żaden
+ * `amberLed`: nazwy opisują RODZAJ powierzchni, nie to, na czym akurat
+ * siedzi w tej hali). World-builder wybiera kategorię wg tego, CZYM fizycznie
+ * jest powierzchnia — reaktor, poręcz, panel — nie wg tego, gdzie stoi.
+ *
+ * Dziewięć z dziesięciu to gotowe, współdzielone instancje (`GenesisMaterialPalette`)
+ * — jeden `MeshStandardMaterial`/`MeshPhysicalMaterial` per kategoria, bezpieczny do
+ * przypisania wielu mesh'om naraz. `SCREEN` jest wyjątkiem: każdy ekran pokazuje
+ * inną treść (inny `texture`), więc jest FABRYKĄ (`createScreenMaterial`), nie
+ * współdzieloną instancją — patrz jej komentarz.
+ */
+export type GenesisMaterialId =
+  | 'SCIENCE_GLASS' | 'BRUSHED_METAL' | 'POLISHED_METAL' | 'TECH_COMPOSITE'
+  | 'RUBBER' | 'CERAMIC' | 'EMISSIVE_INSTRUMENT' | 'LAB_FLOOR' | 'LAB_WALL' | 'SCREEN';
+
+/** The 9 statically-shareable categories — everything in `GenesisMaterialId` except `SCREEN`
+ * (which is a per-instance factory; see `createScreenMaterial`). */
+export type GenesisMaterialPalette = Record<Exclude<GenesisMaterialId, 'SCREEN' | 'EMISSIVE_INSTRUMENT'>, THREE_NS.Material>;
+
+/**
+ * Builds the 9 statically-shareable Genesis materials, each tuned with coherent, already-proven
+ * metalness/roughness (and clearcoat/transmission where appropriate) — no configuration required
+ * for the common case. One instance per scene; share the same instance across every mesh of that
+ * category (that's the point — one `BRUSHED_METAL` reads as one coherent metal vocabulary across
+ * the whole world, not nine similar-but-different grays).
+ *
+ * Every returned value is a plain `THREE.MeshStandardMaterial`/`MeshPhysicalMaterial` — there is
+ * no bespoke options API for color/normal-map/detail-map overrides. Need a variant? Treat the
+ * result like any other three.js material: `palette.BRUSHED_METAL.clone()` then set `.color`,
+ * `.normalMap` (once you have an assetGovernance-APPROVED texture), or `.roughnessMap` directly.
+ * That keeps this factory compact and keeps "does this material accept a normal map" a plain
+ * three.js fact instead of something this module has to specially wire through.
+ */
+export function createGenesisMaterialPalette(THREE: typeof THREE_NS): GenesisMaterialPalette {
+  const brushed = brushedMetalFactory(THREE)(3, 3);
+  const floorNoise = makeFloorNoiseTexture(THREE);
+
+  return {
+    // Reflective-not-transmissive by default: proven in the flagship hero vessel — transmission
+    // blurs everything behind the glass and eats its own silhouette, while opacity+clearcoat
+    // gives sharp edge reflections and a readable outline. Use `createScienceGlass({ transmissive:
+    // true })` below instead of this entry for a true see-through pane (windows, partitions).
+    SCIENCE_GLASS: new THREE.MeshPhysicalMaterial({
+      color: 0xcfe8ff, roughness: 0.03, metalness: 0, transmission: 0, transparent: true,
+      opacity: 0.26, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.0, side: THREE.DoubleSide, depthWrite: false,
+    }),
+    BRUSHED_METAL: new THREE.MeshStandardMaterial({
+      color: 0x8a93a6, roughness: 0.32, metalness: 0.9, roughnessMap: brushed, envMapIntensity: 1.3,
+    }),
+    POLISHED_METAL: new THREE.MeshStandardMaterial({
+      color: 0xc8d4e6, roughness: 0.08, metalness: 1, envMapIntensity: 1.6,
+    }),
+    TECH_COMPOSITE: new THREE.MeshStandardMaterial({
+      color: 0x2a3350, roughness: 0.72, metalness: 0.08,
+    }),
+    RUBBER: new THREE.MeshStandardMaterial({
+      color: 0x14181f, roughness: 0.95, metalness: 0,
+    }),
+    // Slight clearcoat (glazed-ceramic sheen) — cheap relative to SCIENCE_GLASS's full
+    // transmission setup, and reads correctly for lab vials/insulators without looking like plastic.
+    CERAMIC: new THREE.MeshPhysicalMaterial({
+      color: 0xd8e2ee, roughness: 0.4, metalness: 0.04, clearcoat: 0.15, clearcoatRoughness: 0.3,
+    }),
+    LAB_FLOOR: new THREE.MeshStandardMaterial({
+      color: 0x1b2233, roughness: 0.38, metalness: 0.3, roughnessMap: floorNoise,
+    }),
+    LAB_WALL: new THREE.MeshStandardMaterial({
+      color: 0x232c40, roughness: 0.9, metalness: 0.05,
+    }),
+  };
 }
 
-export function createFacilityAccents(THREE: typeof THREE_NS): FacilityAccents {
-  return {
-    stripCyan: new THREE.MeshBasicMaterial({ color: 0x74e4ff, transparent: true, opacity: 0.92 }),
-    stripWarm: new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.8 }),
-    stripDim: new THREE.MeshBasicMaterial({ color: 0x3f9fd4, transparent: true, opacity: 0.6 }),
-    contactShadowTexture: makeContactShadowTexture(THREE),
-  };
+/**
+ * SCIENCE_GLASS variant generator — the palette's `SCIENCE_GLASS` entry is the reflective, hero-
+ * object look; call this instead when a specific pane needs to be genuinely see-through (an
+ * observation window, a partition wall). Kept as a separate function rather than a palette entry
+ * because "reflective" and "transmissive" glass need materially different renderer behavior
+ * (`transmission`+`opacity:1` vs `transmission:0`+partial `opacity`) — one shared instance can't
+ * be both.
+ */
+export function createScienceGlass(THREE: typeof THREE_NS, opts: { transmissive?: boolean; color?: THREE_NS.ColorRepresentation } = {}): THREE_NS.MeshPhysicalMaterial {
+  if (opts.transmissive) {
+    return new THREE.MeshPhysicalMaterial({
+      color: opts.color ?? 0xbfe4ff, roughness: 0.05, metalness: 0, transmission: 0.9,
+      transparent: true, opacity: 0.25, thickness: 0.1, ior: 1.4,
+    });
+  }
+  return new THREE.MeshPhysicalMaterial({
+    color: opts.color ?? 0xcfe8ff, roughness: 0.03, metalness: 0, transmission: 0, transparent: true,
+    opacity: 0.26, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.0, side: THREE.DoubleSide, depthWrite: false,
+  });
+}
+
+/**
+ * EMISSIVE_INSTRUMENT factory — status LEDs, indicator strips, and instrument readouts each need
+ * their own color/intensity (amber alarm vs. cyan "nominal" vs. a strip tinted by real scientific
+ * state), so unlike the other 9 categories this is a factory, not a shared instance. Coherent
+ * defaults: dark base color (so the emissive color reads as the ONLY light source on the part,
+ * not a lit-up colored plastic), `MeshStandardMaterial` (not `MeshBasicMaterial`) so it still
+ * receives ambient/IBL shading on its non-emissive faces.
+ */
+export function createEmissiveInstrumentMaterial(
+  THREE: typeof THREE_NS,
+  opts: { color: THREE_NS.ColorRepresentation; intensity?: number; baseColor?: THREE_NS.ColorRepresentation },
+): THREE_NS.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: opts.baseColor ?? 0x0e1220, emissive: opts.color, emissiveIntensity: opts.intensity ?? 0.8, roughness: 0.4,
+  });
+}
+
+/**
+ * SCREEN factory — wires a live canvas/video texture into both `map` and `emissiveMap` so the
+ * screen reads as genuinely self-lit content (not a lit photo of a screen), the same pattern
+ * proven on the lab's monitor readout. Each screen owns its own texture, so this can't be a
+ * shared palette instance — call it once per screen mesh.
+ */
+export function createScreenMaterial(
+  THREE: typeof THREE_NS,
+  texture: THREE_NS.Texture,
+  opts: { tint?: THREE_NS.ColorRepresentation; emissiveIntensity?: number } = {},
+): THREE_NS.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: 0xffffff, emissive: opts.tint ?? 0x3fc7ff, emissiveIntensity: opts.emissiveIntensity ?? 0.15,
+    emissiveMap: texture, map: texture, roughness: 0.3,
+  });
 }

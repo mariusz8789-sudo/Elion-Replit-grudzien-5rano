@@ -1,0 +1,126 @@
+# Genesis Graphics Runtime — Performance Notes
+
+No FPS numbers here — this container has no real GPU (software/SwiftShader
+rendering only), so any number reported from it would be fiction. What
+follows instead: which operations are GPU-sensitive and *why*, what each one
+actually costs in extra render passes/draw calls, the tier gates already in
+place, and a checklist for a world-builder adding new geometry/lights.
+
+## Cost drivers, in the order they'll bite you
+
+### 1. Device pixel ratio — the biggest lever, by far
+
+Every other cost below scales with pixel count, which scales with `dpr²`.
+`quality.ts`'s `tierDpr(tier)` caps it at 1 / 1.5 / 2 for low/medium/high.
+**Before tuning anything else, confirm DPR is actually capped** — a 3x
+retina display left uncapped costs 9x the equivalent 1x pass on every full-
+screen effect (bloom, AO, DOF, the base render itself).
+
+### 2. Shadow-casting lights
+
+A shadow-casting light renders the *entire shadow-casting scene* again, once
+per light, into a shadow map — this is a full extra scene traversal, not a
+cheap post-process.
+
+- **`SpotLight`/`DirectionalLight`**: 1 shadow map (1 extra scene render).
+- **`PointLight`**: a **cube** shadow map — 6 faces, so ~6x the cost of a
+  Spot/DirectionalLight shadow at the same resolution. This project already
+  hit this bug once: an earlier version of the lab's `workLight` (a
+  `PointLight`) had `castShadow = true` left on by accident, alongside the
+  intended single `SpotLight` shadow caster — doubling the *intended* shadow
+  budget into something closer to 7x it, silently.
+- `quality.ts`'s `maxShadowCasterBudget(tier)` expresses this as budget
+  *units* rather than a light count for exactly this reason: a
+  `PointLight` shadow caster spends 6 units, a Spot/DirectionalLight spends
+  1. Check a new light's total against the tier's budget before adding it,
+  not just "is this one more light."
+- `quality.ts`'s `recommendedShadowMapSize(tier)` returns `0` at `'low'`
+  (skip shadow-casting entirely, don't allocate an undersized map that
+  won't look right anyway), `512` at `'medium'`, `1024` at `'high'`.
+- **Never leave a `PointLight`'s `castShadow` on by accident.** It defaults
+  to `false`; if you set it, mean to.
+
+### 3. GTAO (ambient occlusion)
+
+`GTAOPass` renders its own normal+depth pre-pass (`MeshNormalMaterial`
+override across the whole scene) before computing occlusion, then runs a
+Poisson-denoise pass over the result. That's roughly:
+
+- 1 extra full-scene render (normals).
+- 2 full-screen shader passes (raw AO + denoise).
+
+Gated to `'high'` tier only (`tierAllowsAO`) for exactly this reason — it's
+meaningfully pricier than bloom, which is a pure post-process with no extra
+scene render.
+
+### 4. Depth of Field (`BokehPass`)
+
+Same shape of cost as GTAO: its own full-scene depth pre-pass
+(`MeshDepthMaterial`) plus a blur convolution pass. **Enabling AO and DOF
+together roughly doubles the "extra full scene render" cost** (one pass for
+normals, one for depth) on top of the base render. `graphics/postProcessing.ts`
+gates DOF to `'high'` tier by default (`DepthOfFieldSettings.minTier`) for
+this reason — loosen it only after profiling your own scene, and consider
+whether you need both AO and DOF simultaneously on anything but the top
+tier.
+
+### 5. Bloom (`UnrealBloomPass`)
+
+A pure post-process (no extra scene render) — a chain of ~5 downsample/blur
+passes at shrinking resolutions. Cheaper than AO/DOF, but not free; gated at
+`'low'` tier (`tierAllowsBloom`) since it's still a handful of full-screen
+passes at a device already too weak for AO.
+
+### 6. Draw calls: instancing
+
+Every unique `Mesh` is (at minimum) one draw call. A facility built from
+hundreds of individually-placed bolts, LEDs, and knobs pays for hundreds of
+draw calls for geometry that never changes shape, only position. Use
+`graphics/instancing.ts`'s `InstanceBatch` for anything repeated more than
+~15-20 times with a shared geometry+material — it collects transforms and
+bakes them into one `InstancedMesh`, i.e. one draw call regardless of count
+(practically bounded by GPU instancing limits, which are in the tens of
+thousands — not a concern at facility scale).
+
+Don't instance things that need independent per-instance material state
+(different colors driven by different live data) unless you're prepared to
+use instance-color/instance-attribute buffers — that's a different, more
+involved technique than plain `InstanceBatch`.
+
+### 7. Shadow policy as a performance control, not just a look
+
+`graphics/shadowPolicy.ts`'s `applyShadowPolicy` isn't only about visual
+correctness — every mesh with `castShadow = true` costs shadow-map render
+time proportional to its triangle count. Its size-heuristic default
+(`SHADOW_SIZE_TIERS`) exists specifically so a facility with thousands of
+small parts doesn't silently make all of them shadow casters. Use
+`forceCast` sparingly (a handful of "important machinery" exceptions, not a
+blanket override) — each addition is a real cost, not just a flag.
+
+## Performance checklist for the world-builder
+
+Before shipping a new facility/hero-object scene, check:
+
+- [ ] DPR is capped via `quality.tierDpr(tier)` — never left at the raw
+      `window.devicePixelRatio`.
+- [ ] Exactly one shadow-casting light exists per `maxShadowCasterBudget(tier)`
+      at your target tier (remember: a `PointLight` shadow caster spends 6
+      units, not 1).
+- [ ] `light.shadow.mapSize` comes from `recommendedShadowMapSize(tier)`,
+      not a hardcoded number.
+- [ ] AO (`GraphicsPipelineOptions` via `setupGraphicsPipeline`) and DOF
+      (`DepthOfFieldSettings`) are left at their default `'high'`-tier gate
+      unless you've specifically profiled a lower tier can afford them.
+- [ ] Repeated small parts (bolts, LEDs, knobs, gauges) go through
+      `InstanceBatch`, not one `Mesh` per instance, once the count exceeds
+      ~15-20.
+- [ ] `applyShadowPolicy` runs exactly once, after every builder has
+      finished adding to the scene — not per-builder, and not before the
+      scene is complete (it would miss later-added meshes).
+- [ ] `forceCast` in the shadow policy lists specific, named "important
+      machinery" objects — not a broad predicate that quietly re-enables
+      shadows for a whole category of parts.
+- [ ] New procedural textures reuse a shared generator
+      (`materials.ts`'s `brushedMetalFactory`/`makeFloorNoiseTexture`) with
+      `.clone()` + a new `.repeat`, rather than generating a fresh canvas
+      per surface that wants the same look.

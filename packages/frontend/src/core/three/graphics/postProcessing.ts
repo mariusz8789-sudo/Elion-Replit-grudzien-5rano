@@ -1,7 +1,7 @@
 import type * as THREE_NS from 'three';
 import type { PostProcessingModules, PostProcessor } from '../types';
-import { detectRenderTier, tierAllowsAO, tierAllowsBloom } from '../quality';
-import { applyStudioEnvironment, loadHdriEnvironment } from './lighting';
+import { detectRenderTier, tierAllowsAO, tierAllowsBloom, tierAtLeast, type RenderTier } from '../quality';
+import { applyAmbientIBL } from './lighting';
 
 /**
  * GENESIS GRAPHICS RUNTIME — Post-Processing Pipeline
@@ -22,22 +22,53 @@ import { applyStudioEnvironment, loadHdriEnvironment } from './lighting';
  * render tier (`tierAllowsAO`) since GTAO's normal/depth pre-pass is
  * meaningfully more expensive than bloom.
  *
- * DEPTH OF FIELD: `depthOfField` is OPT-IN and OFF by default — passing
- * nothing preserves today's exact rendering (no behavior change, no
- * regression risk). A caller that DOES know the right focus distance for a
- * given shot (e.g. a fixed cinematic camera looking at the hero apparatus)
- * can pass `{ focusDistance, aperture?, maxBlur? }` to get a subtle Bokeh
- * pass, tier-gated the same way as AO since it also renders its own
- * scene-depth pre-pass. This module never guesses a focus distance itself —
- * that's scene-composition knowledge it deliberately doesn't have.
+ * DEPTH OF FIELD: `depthOfField` is OPT-IN and OFF by default — omitting it,
+ * or passing `{ enabled: false }`, preserves today's exact rendering (no
+ * behavior change, no regression risk for the current lab). A caller that
+ * knows the right focus distance for a given shot (e.g. a fixed cinematic
+ * camera looking at the hero apparatus) sets `enabled: true` and
+ * `focusDistance` to get a subtle Bokeh pass. This module never guesses a
+ * focus distance itself — that's scene-composition knowledge it
+ * deliberately doesn't have. See `DepthOfFieldSettings` below for the full
+ * API (blur strength, advanced overrides, per-effect quality-tier floor).
  */
-export interface DepthOfFieldOptions {
-  /** World-space distance from the camera that should be in sharp focus. */
+export interface DepthOfFieldSettings {
+  /** Master on/off switch. `false` (or omitting `depthOfField` entirely) is a strict no-op —
+   * the exact behavior of every existing caller today. */
+  enabled: boolean;
+  /** World-space distance from the camera that should be in sharp focus (meters). Required
+   * when `enabled`; ignored otherwise. Retune at runtime via `GraphicsPipeline.setFocusDistance`. */
   focusDistance: number;
-  /** Blur strength — three.js BokehPass "aperture" uniform. Small values stay subtle. */
+  /**
+   * Friendly 0..1 knob for how strong the out-of-focus blur is — 0 is barely perceptible, 1 is a
+   * strong "macro lens" look. Default 0.4 (a subtle cinematic falloff, not a gimmick blur). Maps
+   * internally to BokehPass's `aperture`/`maxblur` uniforms; see `resolveBokehUniforms`.
+   */
+  blurStrength?: number;
+  /** Advanced: overrides the `blurStrength` mapping and sets BokehPass's raw `aperture` uniform
+   * directly. BokehPass has no physical "focal length" control — `aperture` (how quickly things
+   * blur away from focus) is the closest equivalent, so this is that knob for callers who need
+   * precise control instead of the friendly 0..1 proxy. */
   aperture?: number;
-  /** Maximum blur radius in screen space. */
+  /** Advanced: overrides the `blurStrength` mapping and sets BokehPass's raw `maxblur` uniform
+   * (the blur radius cap in screen-space UV units) directly. */
   maxBlur?: number;
+  /**
+   * DOF renders its own full-scene depth pre-pass (`MeshDepthMaterial`), comparable in cost to
+   * GTAO's normal pre-pass — see graphics/PERFORMANCE.md. Default gate is `'high'` tier, same as
+   * AO. Loosen to `'medium'` only after profiling your own scene; this module won't guess for you.
+   */
+  minTier?: RenderTier;
+}
+
+/** Maps `DepthOfFieldSettings`'s friendly `blurStrength` (0..1) to BokehPass's raw
+ * `aperture`/`maxblur` uniforms — exported so the world-builder (or a test) can inspect exactly
+ * what a given `blurStrength` produces without constructing a whole pipeline. */
+export function resolveBokehUniforms(settings: Pick<DepthOfFieldSettings, 'focusDistance' | 'blurStrength' | 'aperture' | 'maxBlur'>): { focus: number; aperture: number; maxblur: number } {
+  const strength = Math.max(0, Math.min(1, settings.blurStrength ?? 0.4));
+  const aperture = settings.aperture ?? (0.004 + strength * (0.035 - 0.004));
+  const maxblur = settings.maxBlur ?? (0.002 + strength * (0.018 - 0.002));
+  return { focus: settings.focusDistance, aperture, maxblur };
 }
 
 export interface GraphicsPipelineOptions {
@@ -47,7 +78,7 @@ export interface GraphicsPipelineOptions {
   height: number;
   toneMappingExposure?: number;
   bloom?: { strength: number; radius: number; threshold: number };
-  depthOfField?: DepthOfFieldOptions;
+  depthOfField?: DepthOfFieldSettings;
 }
 
 /** `PostProcessor` plus a hook for retuning DOF focus at runtime — a strict superset, so it still
@@ -76,10 +107,10 @@ export function setupGraphicsPipeline(
   renderer.toneMappingExposure = opts.toneMappingExposure ?? 1.05;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-  // Mapa środowiska generowana PROCEDURALNIE (bez czekania na async HDRI) — metal musi mieć co
-  // odbijać, inaczej chrom i stal czytają się jak matowy plastik niezależnie od roughness/metalness.
-  applyStudioEnvironment(THREE, renderer, scene);
-  void loadHdriEnvironment(THREE, renderer, scene);
+  // AMBIENT/IBL role (graphics/lighting.ts): procedural studio env immediately + optional
+  // approved HDRI upgrade in the background — metal must have something to reflect, or chrome
+  // and steel read as flat plastic regardless of roughness/metalness.
+  applyAmbientIBL(THREE, renderer, scene);
 
   const composer = new modules.EffectComposer(renderer);
   composer.addPass(new modules.RenderPass(scene, camera));
@@ -103,16 +134,14 @@ export function setupGraphicsPipeline(
     composer.addPass(bloom);
   }
 
-  // Opt-in DOF: only added when the caller supplied a focus distance AND the tier can afford
-  // its own depth pre-pass. Placed after bloom (blurs the already-bloomed highlights, matching
-  // how real lens bokeh blurs bright points into discs rather than blurring pre-bloom data).
+  // Opt-in DOF: only added when the caller explicitly enabled it AND the tier meets its
+  // (per-effect, overridable) floor. Placed after bloom (blurs the already-bloomed highlights,
+  // matching how real lens bokeh blurs bright points into discs rather than blurring pre-bloom data).
   let dof: InstanceType<typeof modules.BokehPass> | null = null;
-  if (opts.depthOfField && tierAllowsAO(tier)) {
-    dof = new modules.BokehPass(scene, camera, {
-      focus: opts.depthOfField.focusDistance,
-      aperture: opts.depthOfField.aperture ?? 0.012,
-      maxblur: opts.depthOfField.maxBlur ?? 0.006,
-    });
+  const dofSettings = opts.depthOfField;
+  if (dofSettings?.enabled && tierAtLeast(tier, dofSettings.minTier ?? 'high')) {
+    const uniforms = resolveBokehUniforms(dofSettings);
+    dof = new modules.BokehPass(scene, camera, uniforms);
     composer.addPass(dof);
   }
 

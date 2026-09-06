@@ -43,3 +43,34 @@ export function tierAllowsBloom(tier: RenderTier): boolean {
 export function tierAllowsAO(tier: RenderTier): boolean {
   return tier === 'high';
 }
+
+const TIER_RANK: Record<RenderTier, number> = { low: 0, medium: 1, high: 2 };
+
+/**
+ * Orders render tiers so an effect can express "needs at least tier X" instead of an exact-match
+ * check — used by effects (DOF, AO) whose gate a caller may want to loosen after profiling their
+ * own scene, without every call site re-deriving a low/medium/high comparison by hand.
+ */
+export function tierAtLeast(tier: RenderTier, min: RenderTier): boolean {
+  return TIER_RANK[tier] >= TIER_RANK[min];
+}
+
+/**
+ * Recommended shadow-map resolution per tier — the single biggest per-shadow-caster GPU/memory
+ * cost lever (cost scales with the square of this number). `'low'` returns 0 as a signal to skip
+ * shadow-casting entirely at that tier rather than allocate a map too small to look right.
+ */
+export function recommendedShadowMapSize(tier: RenderTier): number {
+  return tier === 'low' ? 0 : tier === 'medium' ? 512 : 1024;
+}
+
+/**
+ * How many "shadow-caster budget units" a scene should spend at this tier. Expressed in units
+ * rather than a light count because a shadow-casting `PointLight` costs roughly 6x a
+ * `SpotLight`/`DirectionalLight` at the same map size (it renders a cube map — 6 faces instead of
+ * 1) — see graphics/PERFORMANCE.md. A PointLight shadow caster spends 6 of these units; a
+ * Spot/DirectionalLight spends 1.
+ */
+export function maxShadowCasterBudget(tier: RenderTier): number {
+  return tier === 'low' ? 0 : tier === 'medium' ? 1 : 2;
+}

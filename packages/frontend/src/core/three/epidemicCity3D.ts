@@ -16,6 +16,7 @@ import { applyShadowPolicy } from './graphics/shadowPolicy';
 import { createPBRMaterial } from './graphics/materials';
 import { createSunLight, createBackgroundFill } from './graphics/lighting';
 import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
+import { createDustMotes, type DustMotesHandle } from './graphics/atmosphere';
 import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
 import {
   HumanoidAgentVisual,
@@ -111,6 +112,9 @@ export class EpidemicCity3DSim implements Sim3D {
   private cameraTrackId: number | null = null;
   private detailVisuals = new Map<number, HumanoidAgentVisual>();
   private crowd: InstancedHumanoidCrowd | null = null;
+  // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): low ground haze for night-street
+  // depth. Purely a rendering-layer depth cue — never derived from epidemic/world state.
+  private cityHaze: DustMotesHandle | null = null;
   private analysisMesh: THREE_NS.InstancedMesh | null = null;
   private analysisMaterial: THREE_NS.MeshBasicMaterial | null = null;
   private cityMaterials: CityPbrMaterials | null = null;
@@ -314,6 +318,22 @@ export class EpidemicCity3DSim implements Sim3D {
     scene.add(this.earthquakeOverlayGroup);
     this.crowd = new InstancedHumanoidCrowd(THREE, MAX_CROWD_HUMANOIDS);
     this.crowd.addTo(scene);
+
+    // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): low, warm-tinted ground haze
+    // (streetlamp-lit night air) for street-level atmospheric depth. Generic/reusable primitive —
+    // no city-specific logic lives in atmosphere.ts itself.
+    const worldW = this.simulation.worldWidth * CITY_WORLD_SCALE;
+    const worldH = this.simulation.worldHeight * CITY_WORLD_SCALE;
+    this.cityHaze = createDustMotes(THREE, {
+      bounds: [worldW * 0.5, 0.9, worldH * 0.5],
+      center: [0, 0.9, 0],
+      count: 260,
+      size: 0.05,
+      color: 0xd9b57a,
+      opacity: 0.1,
+      driftSpeed: 0.09,
+    });
+    scene.add(this.cityHaze.points);
   }
 
   /**
@@ -366,6 +386,7 @@ export class EpidemicCity3DSim implements Sim3D {
       });
     });
     this.lastTickMs = performance.now() - tickStartedAt;
+    this.cityHaze?.update(dt);
   }
 
   onRenderMetrics(metrics: ThreeRenderMetrics): void {
@@ -530,6 +551,11 @@ export class EpidemicCity3DSim implements Sim3D {
     this.detailVisuals.clear();
     this.crowd?.dispose();
     this.crowd = null;
+    if (this.cityHaze) {
+      this.scene?.remove(this.cityHaze.points);
+      this.cityHaze.dispose();
+      this.cityHaze = null;
+    }
     this.analysisMesh?.geometry.dispose();
     this.analysisMaterial?.dispose();
     this.analysisMesh = null;
@@ -614,6 +640,10 @@ export class EpidemicCity3DSim implements Sim3D {
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
       texture.repeat.set(repeatX, repeatY);
       if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
+      // The shared palette (graphics/materials.ts) now seeds this slot with a real procedural
+      // fallback texture at construction time (previously undefined) — dispose it before
+      // overwriting, or every governed-texture load leaks the fallback's WebGL texture.
+      (material[slot] as THREE_NS.Texture | undefined)?.dispose();
       material[slot] = texture as never;
       material.needsUpdate = true;
     }, undefined, () => undefined);

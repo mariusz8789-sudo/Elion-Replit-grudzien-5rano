@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   tierAtLeast, recommendedShadowMapSize, maxShadowCasterBudget, tierAllowsAO, tierAllowsBloom,
-  configureGraphicsQuality, detectRenderTier,
+  configureGraphicsQuality, detectRenderTier, resolveQualityLevel, configureGraphicsQualityForLevel,
+  type QualityLevel,
 } from '../core/three/quality';
 
 const ALL_TIERS = ['low', 'medium', 'high', 'cinematic'] as const;
@@ -91,5 +92,50 @@ describe('configureGraphicsQuality', () => {
     expect(profile.allowsDof).toBe(false);
     expect(profile.shadowMapSize).toBe(0);
     expect(profile.maxShadowCasterBudget).toBe(0);
+  });
+});
+
+describe('QualityLevel preset layer', () => {
+  it('maps every friendly preset to a real, interactive-safe RenderTier', () => {
+    const expected: Record<QualityLevel, string> = { PERFORMANCE: 'low', BALANCED: 'medium', CINEMATIC: 'high' };
+    for (const level of Object.keys(expected) as QualityLevel[]) {
+      expect(resolveQualityLevel(level)).toBe(expected[level]);
+    }
+  });
+
+  it('never resolves to the offline-capture-only "cinematic" RenderTier', () => {
+    for (const level of ['PERFORMANCE', 'BALANCED', 'CINEMATIC'] as QualityLevel[]) {
+      expect(resolveQualityLevel(level)).not.toBe('cinematic');
+    }
+  });
+
+  it('configureGraphicsQualityForLevel matches configureGraphicsQuality(resolveQualityLevel(level))', () => {
+    for (const level of ['PERFORMANCE', 'BALANCED', 'CINEMATIC'] as QualityLevel[]) {
+      expect(configureGraphicsQualityForLevel(level)).toEqual(configureGraphicsQuality(resolveQualityLevel(level)));
+    }
+  });
+
+  it('PERFORMANCE < BALANCED < CINEMATIC in shadow map size and caster budget', () => {
+    const perf = configureGraphicsQualityForLevel('PERFORMANCE');
+    const balanced = configureGraphicsQualityForLevel('BALANCED');
+    const cinematic = configureGraphicsQualityForLevel('CINEMATIC');
+    expect(perf.shadowMapSize).toBeLessThanOrEqual(balanced.shadowMapSize);
+    expect(balanced.shadowMapSize).toBeLessThanOrEqual(cinematic.shadowMapSize);
+    expect(perf.maxShadowCasterBudget).toBeLessThanOrEqual(balanced.maxShadowCasterBudget);
+    expect(balanced.maxShadowCasterBudget).toBeLessThanOrEqual(cinematic.maxShadowCasterBudget);
+  });
+
+  it('CINEMATIC preset allows AO/DOF/bloom — the point of picking it over BALANCED', () => {
+    const cinematic = configureGraphicsQualityForLevel('CINEMATIC');
+    expect(cinematic.allowsBloom).toBe(true);
+    expect(cinematic.allowsAO).toBe(true);
+    expect(cinematic.allowsDof).toBe(true);
+  });
+
+  it('PERFORMANCE preset stays real-time-safe: no shadows, no AO/DOF', () => {
+    const perf = configureGraphicsQualityForLevel('PERFORMANCE');
+    expect(perf.shadowMapSize).toBe(0);
+    expect(perf.allowsAO).toBe(false);
+    expect(perf.allowsDof).toBe(false);
   });
 });

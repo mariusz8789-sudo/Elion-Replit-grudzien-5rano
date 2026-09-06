@@ -9,6 +9,7 @@ import { configureDOF, setupGraphicsPipeline, type GraphicsPipeline } from './gr
 import { configureCinematicCamera, type CinematicCameraProfile } from './graphics/cinematicCamera';
 import { applyShadowPolicy } from './graphics/shadowPolicy';
 import { disposeSceneResources } from './graphics/lifecycle';
+import { createDustMotes, createLightShaft, type DustMotesHandle } from './graphics/atmosphere';
 
 /**
  * FIRST-PERSON LAB SCENE — czysta WARSTWA PREZENTACJI (Sim3D). Nigdy nie
@@ -467,6 +468,10 @@ export class LabScene3D implements Sim3D {
   private agitatorGroup: THREE_NS.Group | null = null;
   private hologramRing: THREE_NS.Mesh | null = null;
   private hologramMaterial: THREE_NS.MeshBasicMaterial | null = null;
+  // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): ambient dust drifting through
+  // the window's light shaft. Purely a depth/realism cue — its drift speed is a fixed constant,
+  // never derived from any scientific/hospital state.
+  private dustMotes: DustMotesHandle | null = null;
   // Wewnętrzna "kolonia" wewnątrz płynu: czysto wizualna tekstura gęstości —
   // WIDOCZNA LICZBA punktów (drawRange) jest wprost proporcjonalna do
   // realnego vesselFraction, nigdy do zmyślonego pomiaru "liczby komórek".
@@ -785,6 +790,28 @@ export class LabScene3D implements Sim3D {
     const windowLight = new THREE.PointLight(0x6ea6e8, 0.6, 6, 2);
     windowLight.position.set(-roomWidth / 2 + 0.6, 1.95, -0.6);
     scene.add(windowLight);
+
+    // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): the window now reads as an
+    // actual aperture light is streaming through, not just an emissive pane, and the room air reads
+    // as a real occupied volume instead of a vacuum. Both generic, reusable primitives — no
+    // lab-specific logic lives in atmosphere.ts itself.
+    const windowLightShaft = createLightShaft(THREE, {
+      origin: [-roomWidth / 2 + 0.05, 2.05, -0.6],
+      direction: [1, -0.55, 0.12],
+      length: 4.6,
+      width: 1.5,
+      color: 0xfff2cf,
+      opacity: 0.32,
+    });
+    scene.add(windowLightShaft);
+    this.dustMotes = createDustMotes(THREE, {
+      bounds: [3.2, 1.1, 2.6],
+      center: [-2.6, 1.5, -0.6],
+      count: 140,
+      size: 0.009,
+      opacity: 0.26,
+    });
+    scene.add(this.dustMotes.points);
 
     // Oświetlenie warstwowe (key/fill/rim), nie płaskie wypełnienie ze
     // wszystkich stron: wypełnienie ambientowe ZREDUKOWANE, żeby światła
@@ -3224,6 +3251,7 @@ export class LabScene3D implements Sim3D {
     if (this.agitatorGroup) this.agitatorGroup.rotation.y += dt * (0.6 + this.vesselFraction * 5.2);
     if (this.hologramRing) this.hologramRing.rotation.z += dt * (0.25 + this.vesselIcuFraction * 1.6);
     if (this.colonyPoints) this.colonyPoints.rotation.y += dt * (0.3 + this.vesselFraction * 1.8);
+    this.dustMotes?.update(dt);
 
     if (this.playSeriesData.length > 0 && !this.playbackDone && !this.playbackPaused) {
       this.playElapsed += dt;
@@ -3486,5 +3514,6 @@ export class LabScene3D implements Sim3D {
     // above, not by this per-mesh traversal.
     if (this.scene) disposeSceneResources(this.scene);
     this.scene = null;
+    this.dustMotes = null;
   }
 }

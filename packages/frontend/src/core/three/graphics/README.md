@@ -295,15 +295,26 @@ optionally with a color override:
 const painted = createPBRMaterial(THREE, 'PAINTED_METAL', { color: 0x2f5a8f });
 ```
 
-The 10 canonical categories: `SCIENCE_GLASS`, `BRUSHED_METAL`,
+The 15 canonical categories — interior: `SCIENCE_GLASS`, `BRUSHED_METAL`,
 `POLISHED_METAL`, `TECH_COMPOSITE`, `RUBBER`, `CERAMIC`, `PAINTED_METAL`,
-`EMISSIVE_INSTRUMENT`, `LAB_FLOOR`, `LAB_WALL`, `SCREEN`. Both bulk
+`EMISSIVE_INSTRUMENT`, `LAB_FLOOR`, `LAB_WALL`; exterior/urban:
+`CONCRETE`, `ASPHALT`, `BRICK`, `GROUND`; plus `SCREEN`. Both bulk
 (`createGenesisMaterialPalette`) and single (`createPBRMaterial`) factories
 read their tuning from the same internal table, so they can never quietly
-drift apart. Eight of the ten (everything except `EMISSIVE_INSTRUMENT` and
-`SCREEN`) are shareable — assign the same instance to every mesh of that
+drift apart. Thirteen of the fifteen (everything except `EMISSIVE_INSTRUMENT`
+and `SCREEN`) are shareable — assign the same instance to every mesh of that
 category. The other two are **factories**, because their content is
 inherently per-instance:
+
+Every ground/wall category (`CONCRETE`, `ASPHALT`, `BRICK`, `GROUND`,
+`LAB_FLOOR`, `LAB_WALL`) and every small-parts category except the glass/
+emissive/screen ones carries real procedural surface detail — a correlated
+albedo+roughness "worn surface" (`makeWornSurface`) and/or a micro-bump
+normal map (`makeSurfaceNormalTexture`/`surfaceNormalFactory`) — generalized
+out of the flagship lab scene's own private generators, not hand-rolled per
+category. This is the reason none of these categories reads as a flat,
+uniformly-lit primitive even before a scene loads its own real photographic
+PBR set on top (as the city/HF street scenes already do).
 
 ```ts
 const led = createEmissiveInstrumentMaterial(THREE, { color: 0xffb545, intensity: 0.9 }); // one per distinct indicator color
@@ -522,6 +533,35 @@ shots and molecule-scale macro shots, by composition of two already-shipped piec
 "scale tier" concept. See `examples/worldFrameExample.ts`'s `cameraRig`/`shootCameraAtHub` for this
 composition proven end to end (a WIDE shot and a MICRO shot on the literal same entity, same code
 path, different intent).
+
+## 14. Atmosphere — dust motes and light shafts
+
+`atmosphere.ts` adds two generic, real-time-safe depth cues, built for the "visual quality" pass
+across the lab/city/street-slice benchmarks:
+
+- **`createDustMotes(THREE, options)`** — a bounded, drifting particulate volume (one
+  `THREE.Points` draw call). Returns a handle with `update(dt)` (drifts and wraps every mote back
+  inside `bounds`, so the volume reads as a continuously-inhabited pocket of air) and `dispose()`.
+- **`createLightShaft(THREE, options)`** — a fake volumetric beam via two crossed, additively-
+  blended gradient planes (the standard cheap real-time god-ray technique). Returns a plain
+  `THREE.Group`; no per-frame update needed.
+
+Both are pure primitives exactly like §7/§9's factories: no scene, no domain knowledge, the caller
+positions/adds/animates. Disposal is covered by `disposeSceneResources(scene)` (§ above) as long as
+the object was added to the traversed scene graph — `DustMotesHandle.dispose()` is only for removing
+the effect independently of a full scene teardown. See `labScene3D.ts`'s window-lit dust + light
+shaft, and `epidemicCity3D.ts`/`highFidelitySlice3D.ts`'s low ground haze, for proven usage.
+
+## 15. Quality presets for a settings menu — `QualityLevel`
+
+`quality.ts`'s `RenderTier` (`'low' | 'medium' | 'high' | 'cinematic'`) is this engine's own internal
+vocabulary — `'cinematic'` in particular is explicitly NOT something a user picks (it's the
+offline-capture tier; see that file's own doc). `QualityLevel` (`'PERFORMANCE' | 'BALANCED' |
+'CINEMATIC'`) is the three-choice, real-time-safe preset a settings UI should actually expose;
+`resolveQualityLevel`/`configureGraphicsQualityForLevel` map it onto the existing tier system (`
+PERFORMANCE→low, BALANCED→medium, CINEMATIC→high`) rather than adding a second, parallel
+configuration path. Note the naming collision is deliberate and documented: `QualityLevel`'s
+`'CINEMATIC'` is real-time (`high` tier), NOT `RenderTier`'s own `'cinematic'` capture-only tier.
 
 ## Example usage
 

@@ -13,6 +13,7 @@ beforeAll(() => {
     createLinearGradient: () => ({ addColorStop: () => {} }) as unknown as CanvasGradient,
     getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h, colorSpace: 'srgb' }) as ImageData,
     putImageData: () => {},
+    createImageData: ((w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h, colorSpace: 'srgb' })) as unknown as CanvasRenderingContext2D['createImageData'],
   };
   const fakeCanvas = { width: 0, height: 0, getContext: () => fakeContext as CanvasRenderingContext2D };
   (globalThis as { document?: unknown }).document = {

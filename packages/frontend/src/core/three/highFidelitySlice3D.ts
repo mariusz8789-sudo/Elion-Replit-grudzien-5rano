@@ -12,6 +12,7 @@ import { approvedWorldAssetCount, isWorldAssetApproved, isWorldAssetPathApproved
 import { setupGraphicsPipeline } from './graphics/postProcessing';
 import { createSunLight, createBackgroundFill } from './graphics/lighting';
 import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
+import { createDustMotes, type DustMotesHandle } from './graphics/atmosphere';
 import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
 
 /**
@@ -177,11 +178,26 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private readonly hdriEnabled = true;
   private lod1 = new Map<number, HumanoidAgentVisual>();
   private lod2: HighFidelityCrowd | null = null;
+  // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): faint airborne dust/pollen for
+  // street-level depth. Purely a rendering-layer cue — its drift is a fixed constant, never derived
+  // from world/epidemic state. `.points` is also pushed through `addSceneObject`, so
+  // `disposeObject`/the per-`sceneObjects` teardown loop in `dispose()` frees its geometry/material
+  // like any other scene mesh; only the `update(dt)` drift needs its own handle kept here.
+  private streetHaze: DustMotesHandle | null = null;
   private analysisMesh: THREE_NS.InstancedMesh | null = null;
   private analysisMaterial: THREE_NS.MeshBasicMaterial | null = null;
   private materials: MaterialBundle | null = null;
   /** Elewacje czekające na tekstury — mapy PBR dochodzą po zbudowaniu geometrii. */
-  private facadeMaterials: Array<{ mat: THREE_NS.MeshStandardMaterial; kind: string; w: number; h: number }> = [];
+  private facadeMaterials: Array<{
+    mat: THREE_NS.MeshStandardMaterial; kind: string; w: number; h: number;
+    /** Which base-material texture each cloned slot was last copied from — lets
+     * `refreshFacadeTextures` detect "the base slot changed" (the shared palette's own procedural
+     * fallback swapped for a real loaded governed texture) and re-clone, instead of only ever
+     * checking "is this slot non-null" (which now the procedural fallback already satisfies at
+     * construction time, so that check alone would permanently stick every facade with the
+     * fallback and never pick up the real PBR set once it arrives). */
+    sourceTextures: Partial<Record<'map' | 'normalMap' | 'roughnessMap' | 'aoMap', THREE_NS.Texture | null>>;
+  }> = [];
   private sceneObjects: THREE_NS.Object3D[] = [];
   private readonly urbanAssets = new Map<string, THREE_NS.Object3D>();
   private eventMarkers = new Map<string, EventMarker>();
@@ -338,6 +354,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       return;
     }
     this.lastFrameDt = dt;
+    this.streetHaze?.update(dt);
     const speed = Math.max(0, Number(params.clockSpeed ?? 1)) as ClockSpeed;
     if (speed !== this.clock.speed) this.clock.setSpeed(speed);
     if (this.clock.running) this.timeSeconds += dt;
@@ -512,6 +529,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.lod1.clear();
     this.lod2?.dispose();
     this.lod2 = null;
+    this.streetHaze = null;
     this.heroMixer?.stopAllAction();
     this.heroMixer = null;
     // Resource-lifecycle audit finding: the loaded GLTF hero character (loadHeroAsset() — a real
@@ -681,8 +699,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const base = kind === 'home' ? this.materials!.brick : this.materials!.concrete;
     const mat = base.clone();
     const slots: Array<'map' | 'normalMap' | 'roughnessMap' | 'aoMap'> = ['map', 'normalMap', 'roughnessMap', 'aoMap'];
+    const sourceTextures: Partial<Record<'map' | 'normalMap' | 'roughnessMap' | 'aoMap', THREE_NS.Texture | null>> = {};
     for (const slot of slots) {
       const src = base[slot] as THREE_NS.Texture | null;
+      sourceTextures[slot] = src ?? null;
       if (!src) continue;
       const tex = src.clone();
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -691,7 +711,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       mat[slot] = tex as never;
     }
     mat.needsUpdate = true;
-    this.facadeMaterials.push({ mat, kind, w, h });
+    this.facadeMaterials.push({ mat, kind, w, h, sourceTextures });
     return mat;
   }
 
@@ -699,6 +719,14 @@ export class HighFidelityStreetSlice3D implements Sim3D {
    * Ponowne nałożenie map po asynchronicznym dojściu tekstur. Geometria powstaje
    * natychmiast, a mapy PBR dopiero po pobraniu — klon zrobiony za wcześnie
    * kopiowałby pusty slot i budynek zostawał gładki.
+   *
+   * The shared material palette (`graphics/materials.ts`) now gives CONCRETE/BRICK a procedural
+   * fallback texture at construction time (previously these slots started `null`), so "is this slot
+   * already set" no longer means "already got the real governed texture" — it can mean "still
+   * showing the procedural fallback." This compares against `sourceTextures` (which base texture
+   * REFERENCE a slot was last cloned from) so a real governed texture arriving after the fallback
+   * still triggers a re-clone — and disposes the outgoing clone, since it's this entry's own GPU
+   * resource, not the shared base's.
    */
   private refreshFacadeTextures(): void {
     const THREE = this.THREE;
@@ -708,12 +736,14 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       const base = entry.kind === 'home' ? this.materials.brick : this.materials.concrete;
       for (const slot of slots) {
         const src = base[slot] as THREE_NS.Texture | null;
-        if (!src || entry.mat[slot]) continue;
+        if (!src || entry.sourceTextures[slot] === src) continue;
         const tex = src.clone();
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
         tex.repeat.set(Math.max(1, Math.round(entry.w)), Math.max(1, Math.round(entry.h)));
         tex.needsUpdate = true;
+        (entry.mat[slot] as THREE_NS.Texture | null)?.dispose();
         entry.mat[slot] = tex as never;
+        entry.sourceTextures[slot] = src;
         entry.mat.needsUpdate = true;
       }
     }
@@ -737,6 +767,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
       texture.repeat.set(repeatX, repeatY);
       if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
+      // The shared palette (graphics/materials.ts) now seeds this slot with a real procedural
+      // fallback texture at construction time (previously undefined) — dispose it before
+      // overwriting, or every governed-texture load leaks the fallback's WebGL texture.
+      (material[slot] as THREE_NS.Texture | undefined)?.dispose();
       material[slot] = texture as never;
       material.needsUpdate = true;
       this.refreshFacadeTextures();
@@ -761,6 +795,20 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     ground.receiveShadow = true;
     this.enableAo(ground);
     this.addSceneObject(ground);
+
+    // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): faint street-level haze for
+    // depth in the bright daytime slice — deliberately very low opacity, this is a depth cue, not a
+    // fog effect competing with the scene's own tuned `FogExp2`.
+    this.streetHaze = createDustMotes(THREE, {
+      bounds: [worldW * 0.5, 1.1, worldH * 0.5],
+      center: [0, 1.1, 0],
+      count: 200,
+      size: 0.045,
+      color: 0xf2ead8,
+      opacity: 0.07,
+      driftSpeed: 0.07,
+    });
+    this.addSceneObject(this.streetHaze.points);
 
     const roadWidth = 1.35;
     const walkWidth = 1.12;

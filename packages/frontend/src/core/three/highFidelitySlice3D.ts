@@ -186,6 +186,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private readonly urbanAssets = new Map<string, THREE_NS.Object3D>();
   private eventMarkers = new Map<string, EventMarker>();
   private followTarget: THREE_NS.Vector3 | null = null;
+  // Render-loop allocation audit finding: syncScene's two camera.position.lerp(new Vector3(...))
+  // calls each allocated a fresh Vector3 every single frame — .lerp() only reads the target's
+  // x/y/z, so a reused scratch vector is exactly as correct and costs nothing per frame.
+  private scratchCameraTarget: THREE_NS.Vector3 | null = null;
   private lastTickMs = 0;
   private metrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
   private readonly clickDragTracker = new ClickDragTracker();
@@ -265,6 +269,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.camera = camera;
     this.viewport = { w, h };
     this.raycaster = new THREE.Raycaster();
+    this.scratchCameraTarget = new THREE.Vector3();
     scene.background = new THREE.Color(0xc8d9e7);
     scene.fog = new THREE.FogExp2(0xd7e2e7, 0.016);
     camera.position.set(5.8, 2.8, 8.8);
@@ -340,12 +345,12 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
-    if (this.philadelphiaLegend && this.THREE) {
-      camera.position.lerp(new this.THREE.Vector3(8.5, 4.1, 10.5), 0.055);
+    if (this.philadelphiaLegend && this.THREE && this.scratchCameraTarget) {
+      camera.position.lerp(this.scratchCameraTarget.set(8.5, 4.1, 10.5), 0.055);
       camera.lookAt(0, 0.65, 0);
       return;
     }
-    if (!this.THREE || !this.scene || !this.lod2) return;
+    if (!this.THREE || !this.scene || !this.lod2 || !this.scratchCameraTarget) return;
     const allStates = this.simulation.agents().map((agent) => this.toVisualState(agent));
     const focus = this.pickFocusState(allStates);
     this.syncHero(focus);
@@ -359,7 +364,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const shot = this.composedShot();
     if (shot) {
       this.followTarget = null;
-      camera.position.lerp(new this.THREE.Vector3(...shot.pos), 0.05);
+      camera.position.lerp(this.scratchCameraTarget.set(...shot.pos), 0.05);
       camera.lookAt(...shot.look);
     }
   }

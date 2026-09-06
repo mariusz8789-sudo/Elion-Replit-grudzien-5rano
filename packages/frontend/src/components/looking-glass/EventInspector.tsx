@@ -86,12 +86,38 @@ export function EventInspector({ event, allEvents, unit, onClose, onReplay }: Pr
 
       <Row label="stan świata">
         {event.stateIndex !== null ? `stan #${event.stateIndex}` : <NotModelled what="— zdarzenie nie mapuje się na stan" />}
-        {event.affectedEntities.length > 0 && (
-          <span className="lg-insp-entities">
-            {' · '}{event.affectedEntities.map((entity) => entity.id ?? entity.kind).join(', ')}
-          </span>
-        )}
       </Row>
+
+      {/* Właściwości bytów DOTKNIĘTYCH tym zdarzeniem — realne wartości z
+          modelu (fractionOfCapacity, bedOccupancy, ...), nie tylko id bytu.
+          To jest odpowiedź na „co się zmieniło", nie tylko „że coś się zmieniło". */}
+      {event.affectedEntities.length > 0 && (
+        <div className="lg-insp-block">
+          <span className="lg-insp-label">dotknięte byty</span>
+          {event.affectedEntities.map((entity) => (
+            <div key={`${entity.ref.kind}:${entity.ref.id}`} className="lg-insp-entity">
+              <span className="lg-insp-entity-label">{entity.label}</span>
+              <span className="lg-insp-entity-props">
+                {entity.properties.map((property) => (
+                  <span key={property.key} className="lg-insp-prop">
+                    {property.key}={typeof property.value === 'number' ? property.value.toFixed(2) : String(property.value)}
+                    {property.unit ? ` ${property.unit}` : ''}
+                  </span>
+                ))}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Hipotezy, których dotyczy ten przebieg — realne powiązanie
+          epistemiczne (SUPPORTED/FALSIFIED/...) z traceWorldChange, nigdy
+          wywnioskowane z treści zdarzenia. */}
+      {event.relatedHypothesisIds.length > 0 && (
+        <Row label="hipotezy">
+          <span className="lg-insp-hyp-ids">{event.relatedHypothesisIds.join(', ')}</span>
+        </Row>
+      )}
 
       <Row label="model">
         <code>{event.modelId ?? 'nieznany'}</code>

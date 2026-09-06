@@ -3118,3 +3118,13 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   max-height: calc(100% - 2rem); overflow-y: auto;
 }
 .lg-world-cmp .lg-cmp { background: rgba(8, 13, 22, 0.94); backdrop-filter: blur(8px); }
+
+/* Byty dotknięte zdarzeniem: realne wartości z modelu, nie tylko id. */
+.lg-insp-entity { display: flex; flex-direction: column; gap: 0.1rem; margin-bottom: 0.2rem; }
+.lg-insp-entity-label { color: #cfe0f2; font-size: 0.78rem; }
+.lg-insp-entity-props { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.lg-insp-prop {
+  font: 0.68rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #9fd0ff;
+  background: #10192840; padding: 0.05rem 0.35rem; border-radius: 0.25rem;
+}
+.lg-insp-hyp-ids { font: 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #9fb4cd; }

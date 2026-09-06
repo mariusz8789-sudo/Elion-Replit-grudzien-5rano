@@ -1,5 +1,6 @@
-import type { EntityRef, GenesisEvent, GenesisLocation } from '../events/genesisEvent';
-import type { WorldState } from '../world/scientificWorldState';
+import type { GenesisEvent, GenesisLocation } from '../events/genesisEvent';
+import type { WorldEntity, WorldState } from '../world/scientificWorldState';
+import { traceWorldChange } from '../world/scientificWorldState';
 import type { EvidenceRef, WorldMarkerTime, WorldObservable } from './scenarioWorld';
 
 /**
@@ -77,7 +78,20 @@ export interface InspectableEvent {
   readonly cause: string | null;
   /** The event this one descended from — the causal chain, already recorded. */
   readonly parentEventId: string | null;
-  readonly affectedEntities: readonly EntityRef[];
+  /**
+   * The affected entities WITH their real scientific properties — read
+   * through `traceWorldChange` (`world/scientificWorldState.ts`) rather than
+   * the bare `{kind, id}` refs `GenesisEvent` carries, so an inspector can
+   * show what actually changed (fractionOfCapacity, bedOccupancy, ...) and
+   * not just which entity changed.
+   */
+  readonly affectedEntities: readonly WorldEntity[];
+  /**
+   * Hypotheses this event's run relates to, per `traceWorldChange` — real
+   * epistemic linkage (SUPPORTED/FALSIFIED/...), never inferred from the
+   * event's text.
+   */
+  readonly relatedHypothesisIds: readonly string[];
   /** Index of the state this event belongs to, when it maps to one. */
   readonly stateIndex: number | null;
   readonly observations: readonly WorldObservable[];
@@ -133,6 +147,15 @@ export function collectInspectableEvents(source: InspectionSource): readonly Ins
       // Observations recorded against the same state are the ones that speak
       // to this event; anything further would be an inferred association.
       const observations = source.observables.filter((observable) => observable.time.tick === state.tick);
+      // `traceWorldChange` is scoped to ONE state's own event/entity/
+      // hypothesis lists — correct here, since it is called with the exact
+      // state that owns this event. Its `parentEvent` is therefore NOT used
+      // for the causal chain below: these adapters put one event per state,
+      // so an event's parent lives in an EARLIER state's list, outside what
+      // a single-state trace can see. `causalChainOf` walks that multi-state
+      // chain separately; this call is for the two things scoped correctly
+      // at the single-state level: real entity properties, and hypotheses.
+      const trace = traceWorldChange(state, event.id);
       inspectable.push({
         id: event.id,
         type: event.type,
@@ -146,7 +169,8 @@ export function collectInspectableEvents(source: InspectionSource): readonly Ins
         severity: event.severity ?? null,
         cause: event.cause ?? null,
         parentEventId: event.parentEventId ?? null,
-        affectedEntities: event.affectedEntities,
+        affectedEntities: trace?.affectedEntities ?? [],
+        relatedHypothesisIds: trace?.relatedHypothesisIds ?? [],
         stateIndex,
         observations,
         evidence: source.getEvidence(event.id),

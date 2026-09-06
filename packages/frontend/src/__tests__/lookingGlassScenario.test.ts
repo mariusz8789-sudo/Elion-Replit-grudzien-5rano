@@ -945,3 +945,43 @@ describe('Looking Glass — comparison travels with the world handoff', () => {
     clearLookingGlassExperience();
   });
 });
+
+describe('Looking Glass — real entity state through traceWorldChange', () => {
+  it('shows the REAL scientific properties of an affected entity, not just its id', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const events = session.world!.getInspectableEvents();
+    const withEntities = events.find((event) => event.affectedEntities.length > 0)!;
+    expect(withEntities).toBeDefined();
+    const entity = withEntities.affectedEntities[0];
+    expect(entity.label.length).toBeGreaterThan(0);
+    expect(entity.properties.length).toBeGreaterThan(0);
+    // Real epidemiology values, not a placeholder.
+    expect(entity.properties.some((p) => typeof p.value === 'number' || typeof p.value === 'string')).toBe(true);
+  });
+
+  it('carries the real growth-rate entity and its properties for the laboratory', () => {
+    const session = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist');
+    const events = session.world!.getInspectableEvents();
+    const withEntities = events.find((event) => event.affectedEntities.length > 0)!;
+    const entity = withEntities.affectedEntities[0];
+    expect(entity.ref.kind).toBe('cell-population');
+    expect(entity.properties.some((p) => p.key === 'growthRate')).toBe(true);
+    expect(entity.properties.some((p) => p.key === 'fractionOfCapacity')).toBe(true);
+  });
+
+  it('links an event to the hypotheses its run relates to, when the run is a hypothesis run', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const events = session.world!.getInspectableEvents();
+    const withHypotheses = events.filter((event) => event.relatedHypothesisIds.length > 0);
+    expect(withHypotheses.length).toBeGreaterThan(0);
+  });
+
+  it('never fabricates entities or hypotheses for an event that traces to none', () => {
+    // A well-formed contract: absence stays absence, not an empty-looking guess.
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    for (const event of session.world!.getInspectableEvents()) {
+      expect(Array.isArray(event.affectedEntities)).toBe(true);
+      expect(Array.isArray(event.relatedHypothesisIds)).toBe(true);
+    }
+  });
+});

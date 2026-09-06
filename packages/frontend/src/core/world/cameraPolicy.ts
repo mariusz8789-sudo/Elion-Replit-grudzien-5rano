@@ -12,6 +12,16 @@ const EVENT_MODES: Readonly<Record<string, WorldCameraMode>> = {
   'observation.anomaly': 'SCIENTIFIC',
   'prediction.divergence': 'SCIENTIFIC',
   'prediction.match': 'MACRO',
+  // C3 Scientific World Model event types (Genesis Scientific World Model 3.0, section 16) — the
+  // SAME table, extended with real canonical event types C3's world model actually emits (see
+  // core/worldModel/domains/genesisScientificCity3.ts and generation/worldGenerator.ts), not a
+  // second camera-policy mechanism. Literal strings match this table's own existing convention
+  // rather than importing C3 constants into C1's presentation layer.
+  'world.generation.completed': 'WIDE', // a newly created world: establish it wide before anything else
+  'environment.rainfall.extreme': 'WIDE', // environmental/city-scale context, not a single entity
+  'hydraulics.pumppipe.tripped': 'SCIENTIFIC', // an equipment failure worth close scientific inspection
+  'building.waterservice.interrupted': 'MACRO', // building-scale consequence
+  'population.hospitalaccess.impaired': 'WIDE', // population/city-scale consequence
 };
 
 /**

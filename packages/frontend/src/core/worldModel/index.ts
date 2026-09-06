@@ -10,6 +10,7 @@ export * from './domains/hydraulicsPumpPipe';
 export * from './domains/genesisCityWorld';
 export * from './domains/genesisCityWorld2';
 export * from './bridge/worldFrameState';
+export * from './bridge/graphicsWorldFrameAdapter';
 export * from './generation/worldBlueprint';
 export * from './generation/worldGenerator';
 export * from './events/worldEventRules';

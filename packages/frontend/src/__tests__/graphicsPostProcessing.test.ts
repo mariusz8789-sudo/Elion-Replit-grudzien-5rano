@@ -98,6 +98,11 @@ function fakeRenderer() {
     toneMapping: null as unknown,
     toneMappingExposure: 1,
     outputColorSpace: null as unknown,
+    info: {
+      render: { calls: 3, triangles: 500, points: 0, lines: 0, frame: 1 },
+      memory: { geometries: 2, textures: 1 },
+      programs: [null, null],
+    },
   } as unknown as import('three').WebGLRenderer;
 }
 
@@ -223,6 +228,14 @@ describe('setupGraphicsPipeline — DOF default-off regression guard', () => {
     const { modules } = fakeModules();
     const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
     expect(() => pipeline.setDepthOfFieldEnabled(true)).not.toThrow();
+  });
+
+  it('getFrameCounters reads through to the renderer.info counters (see diagnostics.ts)', () => {
+    const { modules } = fakeModules();
+    const renderer = fakeRenderer();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, renderer, baseOpts);
+    const counters = pipeline.getFrameCounters();
+    expect(counters).toEqual({ drawCalls: 3, triangles: 500, points: 0, lines: 0, geometries: 2, textures: 1, programs: 2 });
   });
 
   it('setDepthOfFieldEnabled toggles the BokehPass without rebuilding the composer', () => {

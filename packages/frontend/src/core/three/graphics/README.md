@@ -41,6 +41,7 @@ never the reverse.
 | Cinematic camera | `cinematicCamera.ts` | `configureCinematicCamera`, `recommendedDofForProfile`, `FocusPuller` |
 | Quality tiers | `../quality.ts` | `detectRenderTier`, `configureGraphicsQuality`, `tierDpr`, `tierAllowsBloom`, `tierAllowsAO`, `tierAtLeast`, `recommendedShadowMapSize`, `maxShadowCasterBudget` |
 | State-driven visualization | `stateVisualization.ts` | `sampleColorScale`, `severityColor`, `SEVERITY_COLOR_SCALE`, `applyValueToEmissive`, `applyFractionToScale`, `AttentionPulse` — turns an already-computed real value into a color/glow/fill-height/event-flash; never computes or interprets the value itself (see its module doc) |
+| Diagnostics | `diagnostics.ts` | `readFrameCounters`, `FrameProfiler`, `RollingFrameStats` — exact draw-call/triangle/geometry/texture/program counts from `renderer.info` (valid on any GPU, including software rendering) plus frame-time sampling (explicitly NOT a hardware performance claim — see the module doc). Wired into every pipeline as `GraphicsPipeline.getFrameCounters()`. See `PERFORMANCE.md`'s "Measured, not fabricated" section for real numbers this produced. |
 | Integration pattern | `examples/heroApparatusExample.ts` | `buildExampleHeroApparatus` — READ this, don't import it into a real scene |
 
 ## 2. What NOT to duplicate

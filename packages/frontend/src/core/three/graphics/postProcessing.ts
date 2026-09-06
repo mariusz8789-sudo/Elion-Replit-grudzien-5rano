@@ -2,6 +2,7 @@ import type * as THREE_NS from 'three';
 import type { PostProcessingModules, PostProcessor } from '../types';
 import { detectRenderTier, tierAllowsAO, tierAllowsBloom, tierAtLeast, type RenderTier } from '../quality';
 import { applyAmbientIBL, applyStudioEnvironment, captureRoomEnvironment, type RoomEnvironmentProbeOptions } from './lighting';
+import { readFrameCounters, type FrameCounters } from './diagnostics';
 
 /**
  * GENESIS GRAPHICS RUNTIME — Screen-Space Reflections (investigation + opt-in pass)
@@ -220,6 +221,14 @@ export interface GraphicsPipeline extends PostProcessor {
    * first full frame has been drawn.
    */
   captureRoomProbe(): void;
+  /**
+   * Reads the renderer's draw-call/triangle/geometry/texture/program counters for the frame(s)
+   * rendered since the last read (see `diagnostics.ts` — `renderer.info.autoReset` clears these at
+   * the start of every frame, so call this right after `.render()`, not on some later tick). Exact
+   * CPU-side counts, valid on any GPU including software rendering — not a hardware performance
+   * claim; see `diagnostics.ts`'s own module doc for what is and isn't verified here.
+   */
+  getFrameCounters(): FrameCounters;
 }
 
 export function setupGraphicsPipeline(
@@ -326,6 +335,7 @@ export function setupGraphicsPipeline(
     setDepthOfFieldEnabled: (enabled: boolean) => {
       if (dof) dof.enabled = enabled;
     },
+    getFrameCounters: () => readFrameCounters(renderer),
     dispose: () => {
       gtao?.dispose();
       ssr?.dispose();

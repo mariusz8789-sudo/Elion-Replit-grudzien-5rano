@@ -444,6 +444,14 @@ export class LabScene3D implements Sim3D {
   // last-applied profile so `syncScene` only touches `camera.fov`/near/far/`updateProjectionMatrix`
   // on an actual shot change, not every frame.
   private appliedCinematicProfile: CinematicCameraProfile | null = null;
+  // GENESIS GRAPHICS ENGINE — scratch vectors reused every frame in syncScene's focus/interaction
+  // math instead of allocating three new THREE.Vector3 per frame forever. Render-loop allocation
+  // audit finding (per the engine's own PERFORMANCE.md rule: no avoidable per-frame allocations) —
+  // three Vector3s/frame is small on its own, but it's exactly the pattern that compounds badly
+  // once a scene has many per-frame consumers, and the fix costs nothing in readability.
+  private scratchVecA: THREE_NS.Vector3 | null = null;
+  private scratchVecB: THREE_NS.Vector3 | null = null;
+  private scratchVecC: THREE_NS.Vector3 | null = null;
   // Agitator wewnątrz naczynia i pierścień holograficzny nad nim — czysto
   // dekoracyjne, ale ich prędkość obrotu/intensywność są sterowane REALNYMI
   // wartościami (vesselFraction/vesselIcuFraction), nigdy zmyśloną liczbą
@@ -629,6 +637,9 @@ export class LabScene3D implements Sim3D {
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
     this.THREE = THREE;
     this.raycaster = new THREE.Raycaster();
+    this.scratchVecA = new THREE.Vector3();
+    this.scratchVecB = new THREE.Vector3();
+    this.scratchVecC = new THREE.Vector3();
     // Tekstury proceduralne (canvas, zero nowych plików/assetów) — jedyny
     // sposób na detal materiału metalu/podłogi dostępny bez zatwierdzonego
     // w assetGovernance.ts zestawu PBR dla wnętrza laboratorium.
@@ -3342,15 +3353,15 @@ export class LabScene3D implements Sim3D {
     // kamera przeskakuje między kadrem otwierającym (~5.5 m od naczynia) a
     // pierwszą osobą przy konsoli (~1.5 m). Stała wartość rozmywałaby hero w
     // jednym z tych ujęć, więc przestrajamy ją realną odległością do naczynia.
-    if (this.pipeline) {
-      const toVessel = new THREE.Vector3(...VESSEL_POSITION).sub(camera.position).length();
+    if (this.pipeline && this.scratchVecA) {
+      const toVessel = this.scratchVecA.set(...VESSEL_POSITION).sub(camera.position).length();
       this.pipeline.setFocusDistance(Math.max(0.6, toVessel));
     }
 
     // Interakcja: promień z kamery na konsolę, w zasięgu i mniej więcej naprzeciw niej.
-    if (this.raycaster && this.consoleMesh && this.cameraPhase === 'FREE') {
-      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-      const toConsole = new THREE.Vector3(...CONSOLE_POSITION).sub(camera.position);
+    if (this.raycaster && this.consoleMesh && this.cameraPhase === 'FREE' && this.scratchVecB && this.scratchVecC) {
+      const forward = this.scratchVecB.set(0, 0, -1).applyQuaternion(camera.quaternion);
+      const toConsole = this.scratchVecC.set(...CONSOLE_POSITION).sub(camera.position);
       const distance = toConsole.length();
       const facing = distance > 1e-6 ? forward.dot(toConsole.normalize()) : 0;
       this.nearStation = distance < INTERACT_MAX_DISTANCE && facing > INTERACT_MIN_FACING_DOT;

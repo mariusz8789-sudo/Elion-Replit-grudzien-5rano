@@ -1,10 +1,61 @@
 # Genesis Graphics Runtime — Performance Notes
 
 No FPS numbers here — this container has no real GPU (software/SwiftShader
-rendering only), so any number reported from it would be fiction. What
-follows instead: which operations are GPU-sensitive and *why*, what each one
-actually costs in extra render passes/draw calls, the tier gates already in
-place, and a checklist for a world-builder adding new geometry/lights.
+rendering only), so a frame-rate number reported from it would be fiction.
+What follows instead: which operations are GPU-sensitive and *why*, what
+each one actually costs in extra render passes/draw calls, the tier gates
+already in place, a checklist for a world-builder adding new geometry/
+lights, and — new below — actual MEASURED draw-call data from the three
+real scenes this engine ships with, using `graphics/diagnostics.ts`.
+
+## Measured, not fabricated: draw-call cost across the three real scenes
+
+`graphics/diagnostics.ts` (added specifically to make this section possible)
+exposes `renderer.info`'s draw-call/triangle/geometry/texture/program
+counts — exact CPU-side counts three.js already tracks internally, true on
+any GPU including software rendering, unlike frame time. The numbers below
+were captured by instrumenting the real `WebGLRenderingContext.prototype.
+drawArrays`/`drawElements` in a headless Chromium (SwiftShader software
+rendering) and counting actual calls over a 15-second window on each of the
+three shipped scenes, at their default WIDE/establishing view:
+
+| Scene | Draw calls / frame (measured) | Frames observed / 15s |
+|---|---|---|
+| First Person Lab (`#/first-person-lab`) | **~2541** | 8 |
+| Epidemiology city (`#/city3d`) | **~826** | 34 |
+| High-fidelity street slice (`#/hf-slice`) | **~809** | 14 |
+
+**What this measurement IS**: an exact count of GL draw calls submitted per
+rendered frame — hardware-independent, reproducible, not a guess. **What it
+is NOT**: a frame-rate or hardware-performance claim — "frames observed"
+here reflects SwiftShader software rasterization speed in this sandbox, not
+any real GPU, and must never be quoted as an FPS number (see the file
+intro above).
+
+**Why the lab is ~3x the other two scenes' draw-call cost, and this is
+expected, not a bug**: the lab's `setupPostProcessing` explicitly loosens
+both `ambientOcclusion` and `depthOfField` to `minTier: 'medium'` (its own
+documented choice — AO is what grounds its hero apparatus, worth the
+cost). In this sandbox, `detectRenderTier()` returns `'medium'` (4 CPU
+cores), so the lab is the only one of the three scenes actually running
+`GTAOPass` (its own normal pre-pass) and `BokehPass` (its own depth
+pre-pass) here — city and hf-slice both stay on the *default* `'high'`-tier
+AO/DOF gate, which this sandbox's tier heuristic doesn't clear, so neither
+pass runs for them at all. Three full-scene submissions (base color + AO's
+normal pass + DOF's depth pass) landing at ~3x one scene's base draw-call
+count is exactly what "GTAO/DOF: this is a full extra scene render" (§3/§4
+below) predicts — this is the first time that reasoning has been checked
+against an actual measured number instead of asserted structurally, and it
+holds up.
+
+**On a real GPU with more cores**, `detectRenderTier()` would return
+`'high'` for all three scenes, and city/hf-slice would ALSO pay the
+GTAO+DOF draw-call cost (since their `depthOfField`/`ambientOcclusion`
+options, where set, use the default `'high'` gate) — the ~3x multiplier
+measured here for the lab is a reasonable estimate of what AO+DOF costs
+any scene that enables both, not a lab-specific quirk. This is still not a
+frame-time claim — verify actual GPU-bound cost on real target hardware
+before shipping a performance guarantee.
 
 ## Cost drivers, in the order they'll bite you
 

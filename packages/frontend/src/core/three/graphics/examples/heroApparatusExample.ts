@@ -6,6 +6,7 @@ import { applyShadowPolicy } from '../shadowPolicy';
 import type { DepthOfFieldSettings } from '../postProcessing';
 import { applyValueToEmissive, applyFractionToScale } from '../stateVisualization';
 import { createColumn, createPlatform, createGlassChamber, createPipe } from '../primitives';
+import { CameraRig, type CameraIntent } from '../cameraRig';
 
 /**
  * GENESIS GRAPHICS RUNTIME — Integration Example: a hero apparatus
@@ -30,6 +31,10 @@ import { createColumn, createPlatform, createGlassChamber, createPipe } from '..
  *   Scientific state hook → `updateVisualState(fraction, status)`, itself built on
  *                           `stateVisualization.ts`'s `applyFractionToScale`/`applyValueToEmissive`
  *                           instead of hand-rolled `.setHex()`/`.scale.y =` calls
+ *   Camera Rig            -> `shootCamera(intent)`/`cameraRig` -- "SCIENTIST_POV looking at this
+ *                           apparatus" resolved to a real transform scaled to THIS apparatus's own
+ *                           footprint, via `cameraRig.ts`'s `CameraRig`, never a hardcoded shot
+ *                           coordinate baked into the caller.
  *
  * The geometry here (a cylinder chamber, a box frame, some bolts) is
  * deliberately generic filler — it is NOT the flagship reactor vessel, and
@@ -73,6 +78,15 @@ export interface ExampleHeroApparatusHandles {
   /** A focus-distance hint for the hero framing, useful for wiring `DepthOfFieldSettings` when a
    * cinematic camera cuts to a close-up on this object — see the module doc above. */
   suggestedDofSettings(cameraDistance: number): DepthOfFieldSettings;
+  /**
+   * THE camera-rig integration point: "SCIENTIST_POV looking at this apparatus" (or WIDE, MACRO,
+   * any other `CameraIntent`) resolved to a real position/lookAt, scaled to this specific
+   * apparatus's own footprint — never a hardcoded coordinate. `cut` picks a hard edit vs. a smooth
+   * `frame()` transition; call `cameraRig.update(dt)` each frame afterward and apply the result to
+   * the real camera. See `graphics/cameraRig.ts`'s own module doc for the full contract.
+   */
+  cameraRig: CameraRig;
+  shootCamera(intent: CameraIntent, cut?: boolean): void;
 }
 
 /**
@@ -161,8 +175,22 @@ export function buildExampleHeroApparatus(
   // self-contained. ---
   applyShadowPolicy(THREE, scene, { forceCast: [statusLight] });
 
+  // --- CAMERA RIG: "SCIENTIST_POV looking at this apparatus" resolved to a real transform,
+  // scaled to THIS apparatus's own footprint (never a hardcoded coordinate) — the exact
+  // capability graphics/cameraRig.ts exists to provide. The chamber center (same target
+  // createHeroLight already frames on) is the natural subject; `scale` itself is a reasonable
+  // characteristic radius for an object whose overall footprint is roughly that wide/tall.
+  const cameraTarget: THREE_NS.Vector3Tuple = [opts.position[0], opts.position[1] + 0.75 * scale, opts.position[2]];
+  const cameraRig = new CameraRig(THREE, { intent: 'WIDE', target: cameraTarget, targetRadius: scale });
+
   return {
     group,
+    cameraRig,
+    shootCamera(intent, cut = false) {
+      const request = { intent, target: cameraTarget, targetRadius: scale };
+      if (cut) cameraRig.cut(request);
+      else cameraRig.frame(request);
+    },
     updateVisualState(fraction, status) {
       const clamped = Math.max(0, Math.min(1, fraction));
       // stateVisualization.ts's applyFractionToScale only owns the scale half of "fill grows from

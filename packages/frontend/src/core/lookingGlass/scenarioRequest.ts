@@ -57,7 +57,16 @@ export type ScenarioKind =
   | 'AVIATION_INCIDENT' | 'TRANSPORT_DISRUPTION'
   | 'EVACUATION' | 'EXPLOSION_CONSEQUENCE' | 'RADIOLOGICAL_CONTAMINATION' | 'COMMUNICATIONS_DISRUPTION'
   | 'LAB_EXPERIMENT' | 'CELL_CULTURE' | 'CHEMICAL_REACTION' | 'PARTICLE_SYSTEM'
-  | 'URBAN_TRANSFORMATION';
+  | 'URBAN_TRANSFORMATION'
+  /**
+   * Single-substance Arrhenius decay over temperature and time — distinct
+   * from CHEMICAL_REACTION (RDKit topological descriptors of a static
+   * molecule, `core/world/moleculeWorldAdapter.ts`), which asks a different
+   * question and is not touched here. Backed by the real C3 World Model
+   * engine (`core/worldModel/domains/chemistryKinetics.ts`), not a second
+   * kinetics implementation.
+   */
+  | 'CHEMICAL_KINETICS';
 
 export type TemporalUnit = 'HOUR' | 'DAY' | 'YEAR';
 
@@ -177,6 +186,7 @@ const KIND_KEYWORDS: Readonly<Record<ScenarioKind, readonly string[]>> = {
   CHEMICAL_REACTION: ['reaction', 'reakcj', 'molecule', 'cząsteczk', 'czasteczk', 'molekuł', 'compound', 'związek chem', 'catalyst', 'kataliz'],
   PARTICLE_SYSTEM: ['particle', 'cząstk', 'czastk', 'quantum', 'kwant', 'ising', 'spin', 'lattice'],
   URBAN_TRANSFORMATION: ['city change', 'urban transformation', 'zmiana miasta', 'city over', 'miasto przez', 'city grow', 'rozwój miasta'],
+  CHEMICAL_KINETICS: ['kinetics', 'kinetyk', 'decay', 'rozpad chemiczn', 'rozkład chemiczn', 'rozklad chemiczn', 'arrhenius', 'first-order decay', 'first order decay'],
 };
 
 const KIND_FAMILY: Readonly<Record<ScenarioKind, ScenarioFamily>> = {
@@ -195,6 +205,7 @@ const KIND_FAMILY: Readonly<Record<ScenarioKind, ScenarioFamily>> = {
   LAB_EXPERIMENT: 'LABORATORY', CELL_CULTURE: 'LABORATORY',
   CHEMICAL_REACTION: 'MOLECULAR', PARTICLE_SYSTEM: 'MOLECULAR',
   URBAN_TRANSFORMATION: 'URBAN_CHANGE',
+  CHEMICAL_KINETICS: 'MOLECULAR',
 };
 
 /**

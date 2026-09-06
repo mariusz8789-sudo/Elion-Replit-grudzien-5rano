@@ -1,4 +1,5 @@
 import { causalChainOf, type InspectableEvent } from '../../core/lookingGlass/eventInspection';
+import { scalarDeltasOf, type WorldModelMoment } from '../../core/lookingGlass/worldModelMoment';
 
 /**
  * LOOKING GLASS — INTERROGATING AN EVENT IN THE WORLD.
@@ -36,6 +37,14 @@ interface Props {
   readonly unit: string;
   readonly onClose: () => void;
   readonly onReplay: () => void;
+  /**
+   * Real before/after/why for this event's tick, from a live C3
+   * `TemporalEngine` (`session.describeEntityMoment`, `worldModelMoment.ts`).
+   * Undefined/null for every domain with no such engine behind it — the
+   * block below simply does not render, rather than approximating a moment
+   * from `event.affectedEntities` alone.
+   */
+  readonly moment?: WorldModelMoment | null;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
@@ -52,8 +61,9 @@ function NotModelled({ what }: { what: string }): JSX.Element {
   return <span className="lg-insp-absent">nie zamodelowane {what}</span>;
 }
 
-export function EventInspector({ event, allEvents, unit, onClose, onReplay }: Props): JSX.Element {
+export function EventInspector({ event, allEvents, unit, onClose, onReplay, moment }: Props): JSX.Element {
   const chain = causalChainOf(event.id, allEvents);
+  const deltas = moment ? scalarDeltasOf(moment) : [];
 
   return (
     <div className="lg-insp" role="dialog" aria-label="Inspekcja zdarzenia">
@@ -107,6 +117,28 @@ export function EventInspector({ event, allEvents, unit, onClose, onReplay }: Pr
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* PRZED / PO / DLACZEGO — realne, dwa prawdziwe odczyty z żywego C3
+          TemporalEngine (describeWorldMoment wywołane przy tym i poprzednim
+          ticku), nie jedna migawka. Pojawia się tylko tam, gdzie taki silnik
+          faktycznie stoi za tą domeną (patrz session.describeEntityMoment). */}
+      {moment && deltas.length > 0 && (
+        <div className="lg-insp-block">
+          <span className="lg-insp-label">przed / po</span>
+          {deltas.map((delta) => (
+            <div key={delta.key} className="lg-insp-delta">
+              <span className="lg-insp-delta-key">{delta.key}</span>
+              <span className="lg-insp-delta-values">
+                {delta.before.toFixed(4)} → {delta.after.toFixed(4)}
+                <span className={delta.absoluteDelta < 0 ? 'is-down' : 'is-up'}>
+                  {' '}({delta.absoluteDelta > 0 ? '+' : ''}{delta.absoluteDelta.toFixed(4)})
+                </span>
+              </span>
+            </div>
+          ))}
+          {moment.why && <p className="lg-insp-obs">dlaczego: {moment.why}</p>}
         </div>
       )}
 

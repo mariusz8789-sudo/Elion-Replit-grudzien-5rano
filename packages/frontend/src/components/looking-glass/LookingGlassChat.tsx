@@ -4,7 +4,9 @@ import { nearestSupportedAlternative } from '../../core/lookingGlass/scenarioRes
 import { anchoredSequenceDuration, sampleAnchoredSequence, scrubToSeconds } from '../../core/lookingGlass/anchoredTemporal';
 import { ExperiencePlayer, frameAt, type ExperienceFrame } from '../../core/lookingGlass/experienceOrchestrator';
 import type { SavedExperiment } from '../../core/scienceMemory';
+import type { InspectableEvent } from '../../core/lookingGlass/eventInspection';
 import { ComparisonPanel } from './ComparisonPanel';
+import { EventInspector } from './EventInspector';
 
 /**
  * LOOKING GLASS — THE CHAT THAT ANSWERS WITH A WORLD.
@@ -163,10 +165,12 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
   const { session } = turn;
   const { request, resolution } = session;
   const [scrub, setScrub] = useState(0);
+  const [selectedEvent, setSelectedEvent] = useState<InspectableEvent | null>(null);
 
   const duration = session.anchored ? anchoredSequenceDuration(session.anchored) : 0;
   const sample = session.anchored ? sampleAnchoredSequence(session.anchored, scrubToSeconds(session.anchored, scrub)) : null;
   const alternative = nearestSupportedAlternative(resolution);
+  const inspectableEvents = useMemo(() => session.world?.getInspectableEvents() ?? [], [session]);
 
   return (
     <div className={`lg-card lg-card-${resolution.status.toLowerCase()}`}>
@@ -229,6 +233,46 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
 
           <ComparisonPanel comparison={session.comparison} requestedButMissing={session.request.comparison} />
           <ComparisonCommit session={session} />
+
+          {/* THE SAME event rail + inspector the two 3D world screens use
+              (City3DWebGLScreen, FirstPersonLabScreen) — rendered here too,
+              because a domain with no 3D surface yet (chemistry, today)
+              still needs a place to answer "what happened / why / what was
+              it before". One inspector component, three screens. */}
+          {inspectableEvents.length > 0 && (
+            <div className="lg-rail">
+              <span className="lg-rail-title">zdarzenia przebiegu ({inspectableEvents.length})</span>
+              <div className="lg-rail-items">
+                {inspectableEvents.slice(0, 8).map((event) => (
+                  <button
+                    key={event.id}
+                    type="button"
+                    className="lg-rail-item"
+                    onClick={() => setSelectedEvent(event)}
+                  >
+                    {event.semanticKind.replace(/_/g, ' ').toLowerCase()} · {event.time.tick}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {selectedEvent && (
+            <EventInspector
+              event={selectedEvent}
+              allEvents={inspectableEvents}
+              unit={(session.world?.getTemporalRange().unit ?? 'DAY').toLowerCase()}
+              onClose={() => setSelectedEvent(null)}
+              // The chat has no live world clock to seek — unlike the two 3D
+              // screens, there is nothing here for "replay" to DO. Every
+              // domain reachable through this rail today reports
+              // replay.available === false anyway (no adapter here sets a
+              // MATCH verdict before a world is entered), so this button is
+              // provably unreachable; closing is the honest fallback if that
+              // ever changes, not a fabricated seek.
+              onReplay={() => setSelectedEvent(null)}
+              moment={session.describeEntityMoment(selectedEvent.time.tick)}
+            />
+          )}
 
           <ol className="lg-shots">
             {session.shotPlan.shots.map((shot) => (

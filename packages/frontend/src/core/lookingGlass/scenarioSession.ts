@@ -11,7 +11,7 @@ import { projectEpidemiologyWorldStates } from '../world/epidemiologyWorldAdapte
 import { buildAnchoredSequence, type AnchoredTemporalSequence, type TemporalAnchor } from './anchoredTemporal';
 import type { WorldBounds as ScenarioWorldBounds } from './scenarioWorld';
 import { buildShotPlan, type ShotPlan } from './shotPlan';
-import { compareEpidemicRuns, compareHypothesisRanking, type ScenarioComparisonView } from './scenarioComparison';
+import { compareEpidemicRuns, compareHypothesisRanking, compareWorldModelBranches, type ScenarioComparisonView } from './scenarioComparison';
 import { buildExperienceTimeline, type ExperienceTimeline } from './experienceOrchestrator';
 import { buildScenarioWorld, type PerspectiveOption, type ScenarioWorld } from './scenarioWorld';
 import { PERSPECTIVES, perspectiveRequest, placeCamera, type PerspectiveRequest } from './perspective';
@@ -19,6 +19,13 @@ import { DOMAIN_PERSPECTIVE_SOURCE } from './scenarioResolution';
 import { setPendingLookingGlassExperience } from './sessionHandoff';
 import { parseScenarioRequest, type StructuredScenarioRequest } from './scenarioRequest';
 import { resolveScenarioRequest, type ScenarioResolution, type ScenarioRunPlan } from './scenarioResolution';
+import {
+  buildChemistryExperimentWorld, CHEMISTRY_KINETICS_DOMAIN_ID, CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver,
+} from '../worldModel/domains/chemistryKinetics';
+import { TemporalBranchRegistry, TemporalEngine } from '../worldModel/temporal/temporalEngine';
+import { SolverRouter, type SolverRouteReport } from '../worldModel/solvers/solverRouter';
+import { compareBranches, projectToWorldState } from '../worldModel/bridge/worldFrameState';
+import { describeMoment, type WorldModelMoment } from './worldModelMoment';
 
 /**
  * LOOKING GLASS — THE VERTICAL SLICE.
@@ -98,6 +105,14 @@ export interface LookingGlassSession {
    * (see `buildLaboratorySession`) — never a fabricated record.
    */
   readonly commitComparisonToMemory: () => SavedExperiment | null;
+  /**
+   * Before/after/why for this session's own focal entity, at a tick on this
+   * session's own clock — powered by the real C3 bridge
+   * (`describeWorldMoment`/`explainEntityChange`, `worldModelMoment.ts`).
+   * Null for every domain that does not run on a live `TemporalEngine`
+   * (epidemic, laboratory) — never approximated from `states` instead.
+   */
+  readonly describeEntityMoment: (atTick: number) => WorldModelMoment | null;
 }
 
 /**
@@ -183,6 +198,12 @@ interface SessionBuild {
   readonly problemId: string | null;
   /** Extent of the world a perspective can be placed in, in metres. */
   readonly bounds: { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] };
+  /**
+   * The live C3 engine and its focal entity, present only for a domain built
+   * on `core/worldModel/*` — powers `describeEntityMoment`. Null for
+   * scenarioEngine/hypothesisLoop-backed domains, which have no such engine.
+   */
+  readonly worldModel: { readonly engine: TemporalEngine; readonly focalEntityId: string } | null;
 }
 
 /**
@@ -248,6 +269,7 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
     bounds: { min: [-30, 0, -30], max: [30, 20, 30] },
     comparison,
     counterfactual,
+    worldModel: null,
   };
 }
 
@@ -308,6 +330,90 @@ function buildLaboratorySession(plan: ScenarioRunPlan): SessionBuild {
     problemId: problem.problemId,
     // The laboratory hall, in metres — see labScene3D's ROOM.
     bounds: { min: [-6, 0, -13.4], max: [6, 4.6, 4.5] },
+    worldModel: null,
+  };
+}
+
+/**
+ * CHEMISTRY / MOLECULAR KINETICS — the real C3 World Model engine. A live
+ * `WorldGraph` holding one substance is advanced tick by tick by the real
+ * Arrhenius solver (`chemistryKinetics.ts`); each tick's `WorldState` is
+ * `projectToWorldState`'d off the SAME graph the engine owns, so the state
+ * series and the live engine are always looking at one history, never two.
+ * The only thing built here is the wiring: no decay equation, no time
+ * integration, no grounding rule is reimplemented.
+ */
+const CHEMISTRY_INITIAL_TEMPERATURE_K = 750;
+/** How far the forked branch's temperature diverges at the fork point — cooling slows decay, giving a real, non-trivial comparison (see worldModelTrinityIntegration.test.ts's own cooled-branch pattern). */
+const CHEMISTRY_FORK_TEMPERATURE_DELTA_K = -50;
+/** One tick == one real hour, matching this domain's HOUR unit. */
+const CHEMISTRY_DT_SECONDS = 3600;
+
+function buildChemistrySession(plan: ScenarioRunPlan): SessionBuild {
+  const world = buildChemistryExperimentWorld({ initialTemperatureK: CHEMISTRY_INITIAL_TEMPERATURE_K });
+  const registry = new TemporalBranchRegistry();
+  const engine = new TemporalEngine(world.graph, { label: 'baseline', registry });
+  const router = new SolverRouter();
+  router.register(CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver());
+  const worldId = `chemistry:${plan.kind}`;
+
+  // Tick 0: the substance before any solver step — nothing has happened yet,
+  // so this state carries no event, honestly.
+  const states: WorldState[] = [projectToWorldState(engine.graph, worldId, CHEMISTRY_KINETICS_DOMAIN_ID, 0)];
+  for (let hour = 1; hour <= plan.ticks; hour++) {
+    const captured: { report: SolverRouteReport | null } = { report: null };
+    engine.advance(CHEMISTRY_DT_SECONDS, (graph, dt, tick) => {
+      captured.report = router.routeTick(graph, dt, tick);
+      return captured.report;
+    });
+    states.push(projectToWorldState(engine.graph, worldId, CHEMISTRY_KINETICS_DOMAIN_ID, engine.tick, {
+      observations: captured.report?.observations ?? [],
+      events: captured.report?.events ?? [],
+    }));
+  }
+
+  // A real fork/counterfactual, only when the sentence actually asked for
+  // one: halfway through the run, a second branch diverges by a genuine
+  // temperature intervention (not a relabeled clone), then both branches run
+  // to the same final tick so `compareBranches` compares like with like.
+  let comparison: ScenarioComparisonView | null = null;
+  if (plan.comparison && plan.ticks >= 2) {
+    const forkTick = Math.floor(plan.ticks / 2);
+    const cooled = engine.forkBranch(forkTick, 'cooled', (graph) => {
+      const current = graph.getEntity(world.substanceId);
+      graph.updateEntity(world.substanceId, {
+        physics: { ...current.physics!, temperatureK: (current.physics!.temperatureK ?? CHEMISTRY_INITIAL_TEMPERATURE_K) + CHEMISTRY_FORK_TEMPERATURE_DELTA_K },
+      });
+    });
+    for (let hour = forkTick + 1; hour <= plan.ticks; hour++) {
+      cooled.advance(CHEMISTRY_DT_SECONDS, (graph, dt, tick) => router.routeTick(graph, dt, tick));
+    }
+    const branchComparison = compareBranches(registry, engine.branchId, cooled.branchId, plan.ticks);
+    comparison = compareWorldModelBranches(branchComparison, world.substanceId, {
+      baseline: `${CHEMISTRY_INITIAL_TEMPERATURE_K}K throughout`,
+      variant: `cooled to ${CHEMISTRY_INITIAL_TEMPERATURE_K + CHEMISTRY_FORK_TEMPERATURE_DELTA_K}K at hour ${forkTick}`,
+    });
+  }
+
+  return {
+    states,
+    comparison,
+    // No ScenarioCounterfactual/Scientific-Memory artifact exists for this
+    // engine yet — commitComparisonToMemory honestly reports this domain as
+    // unsupported rather than inventing one.
+    counterfactual: null,
+    producedBy: `worldModel.TemporalEngine(${CHEMISTRY_KINETICS_SOLVER_ID}, ${plan.ticks} ticks)`,
+    temporalTicks: states.map((state) => state.tick),
+    temporalSource: `worldModel.TemporalEngine.advance(dt=${CHEMISTRY_DT_SECONDS}s)`,
+    // No 3D rendering surface exists for this domain yet — that is the
+    // Graphics Engine's to build, not Looking Glass's.
+    handoffRunId: null,
+    worldRoute: null,
+    problemId: null,
+    // A small lab-scale placement box — there is no renderer to occupy it
+    // yet, but a perspective still needs SOME real extent to be placed in.
+    bounds: { min: [-1, 0, -1], max: [1, 2, 1] },
+    worldModel: { engine, focalEntityId: world.substanceId },
   };
 }
 
@@ -340,13 +446,16 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
       worldRoute: null,
       enterWorld: () => false,
       commitComparisonToMemory: () => null,
+      describeEntityMoment: () => null,
     };
   }
 
   const plan = resolution.plan;
   const built: SessionBuild = plan.binding === 'SCENARIO_ENGINE_EPIDEMIC'
     ? buildEpidemicSession(plan)
-    : buildLaboratorySession(plan);
+    : plan.binding === 'WORLD_MODEL_CHEMISTRY'
+      ? buildChemistrySession(plan)
+      : buildLaboratorySession(plan);
 
   const timeline = captureWorldTimeline(null, [...built.states]);
   const shotPlan = buildShotPlan(timeline, plan, { hasComparison: built.comparison !== null });
@@ -410,5 +519,10 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
       if (built.counterfactual === null || built.counterfactual.comparison.status !== 'COMPLETED') return null;
       return saveScenarioCounterfactualToMemory(built.counterfactual);
     },
+    // Live C3 query, only for a domain that runs on a TemporalEngine. atTick
+    // addresses THIS branch's own clock — never a foreign run's tick.
+    describeEntityMoment: (atTick) => (built.worldModel
+      ? describeMoment(built.worldModel.engine, built.worldModel.focalEntityId, atTick)
+      : null),
   };
 }

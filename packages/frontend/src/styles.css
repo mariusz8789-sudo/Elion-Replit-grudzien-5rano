@@ -2837,6 +2837,10 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   border: 1px solid #24314a; border-left: 3px solid #3d7fbf; border-radius: 0.9rem;
   background: linear-gradient(180deg, #101724 0%, #0c111b 100%); padding: 1rem 1.1rem;
   display: flex; flex-direction: column; gap: 0.85rem;
+  /* Anchors .lg-insp's absolute overlay to this card — the same pattern the
+     two 3D world screens use (.city-3d-stage-wrap/.fp-lab-stage/.gid-stage),
+     so the SAME EventInspector positions itself correctly wherever it renders. */
+  position: relative;
 }
 .lg-card-ready { border-left-color: #4fd18b; }
 .lg-card-needs_input { border-left-color: #f0c542; }
@@ -3141,3 +3145,10 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   background: #10192840; padding: 0.05rem 0.35rem; border-radius: 0.25rem;
 }
 .lg-insp-hyp-ids { font: 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #9fb4cd; }
+
+/* Przed / po: dwa realne odczyty z żywego C3 TemporalEngine, nie jedna migawka. */
+.lg-insp-delta { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.15rem; }
+.lg-insp-delta-key { color: #7f93ad; font: 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lg-insp-delta-values { color: #cfe0f2; font: 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lg-insp-delta-values .is-down { color: #7fe3ab; }
+.lg-insp-delta-values .is-up { color: #f0a4a4; }

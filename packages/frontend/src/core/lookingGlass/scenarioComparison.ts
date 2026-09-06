@@ -1,6 +1,8 @@
 import type { HypothesisDiscrimination, HypothesisProblem } from '../experimentFabric/hypothesisLoop';
 import { SCENARIOS } from '../simulation/scenarioEngine';
 import type { ScenarioCounterfactual } from '../simulation/scenarioCounterfactual';
+import { collectScalars } from '../worldModel/bridge/worldFrameState';
+import type { BranchComparison } from '../worldModel/bridge/worldFrameState';
 
 /**
  * LOOKING GLASS — COMPARE, WITHOUT PRETENDING.
@@ -143,6 +145,73 @@ export function compareHypothesisRanking(
       relativeDeltaPercent: lowest.metric === 0 ? null : (absoluteDelta / lowest.metric) * 100,
     }],
     message: discrimination.reason,
+    producedBy,
+    evidence: null,
+  };
+}
+
+/**
+ * Wraps the C3 World Model's own `compareBranches` — a real fork/counter-
+ * factual comparison between two `TemporalEngine` branches, computed by
+ * scrubbing each to the same tick and diffing the entity the fork's
+ * intervention actually touched (see `core/worldModel/bridge/worldFrameState.ts`).
+ * This function computes no branch, no fork and no diff of its own: it reads
+ * `comparison.entityDiffs` for one focal entity and turns its two real
+ * `WorldModelEntity` snapshots into the same domain-independent metric shape
+ * every other Looking Glass comparison reports through.
+ *
+ * `evidence` is always null here — this engine does not (yet) produce a
+ * saved, replay-verified artifact the way `scenarioCounterfactual.ts` does,
+ * and claiming one would be exactly the fabrication this layer exists to
+ * refuse.
+ */
+export function compareWorldModelBranches(
+  comparison: BranchComparison,
+  focalEntityId: string,
+  labels: { readonly baseline: string; readonly variant: string },
+): ScenarioComparisonView {
+  const producedBy = `worldModel.compareBranches(${comparison.branchA.branchId}, ${comparison.branchB.branchId})`;
+  const diff = comparison.entityDiffs.find((entry) => entry.id === focalEntityId);
+
+  if (!diff || diff.worldA === undefined || diff.worldB === undefined) {
+    return {
+      status: 'BLOCKED_NOT_COMPARABLE',
+      baselineLabel: labels.baseline, variantLabel: labels.variant,
+      changedFactors: [], metrics: [], producedBy, evidence: null,
+      message: 'The entity under comparison does not exist on both branches at this tick.',
+    };
+  }
+
+  const scalarsA = collectScalars(diff.worldA);
+  const scalarsB = collectScalars(diff.worldB);
+  const metrics: ComparisonMetric[] = [];
+  for (const key of Object.keys(scalarsA)) {
+    const baseline = scalarsA[key];
+    const variant = scalarsB[key];
+    if (variant === undefined || baseline === variant) continue;
+    const absoluteDelta = variant - baseline;
+    metrics.push({
+      key, baseline, variant, absoluteDelta,
+      relativeDeltaPercent: baseline === 0 ? null : (absoluteDelta / Math.abs(baseline)) * 100,
+    });
+  }
+
+  if (metrics.length === 0) {
+    return {
+      status: 'BLOCKED_NOT_COMPARABLE',
+      baselineLabel: labels.baseline, variantLabel: labels.variant,
+      changedFactors: [], metrics: [], producedBy, evidence: null,
+      message: 'The two branches produced identical state for this entity at this tick — nothing to compare.',
+    };
+  }
+
+  return {
+    status: 'READY',
+    baselineLabel: labels.baseline,
+    variantLabel: labels.variant,
+    changedFactors: metrics.map((metric) => metric.key),
+    metrics,
+    message: `${metrics.length} scalar${metrics.length === 1 ? '' : 's'} differ between branches at tick ${comparison.tick}.`,
     producedBy,
     evidence: null,
   };

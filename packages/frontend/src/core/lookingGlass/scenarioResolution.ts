@@ -41,7 +41,9 @@ export type ScenarioEngineBinding =
   | 'SCENARIO_ENGINE_EPIDEMIC'
   | 'CELL_WORLD_ADAPTER'
   | 'MOLECULE_WORLD_ADAPTER'
-  | 'PARTICLE_WORLD_ADAPTER';
+  | 'PARTICLE_WORLD_ADAPTER'
+  /** The real C3 World Model engine (core/worldModel/*) — WorldGraph + TemporalEngine + a real domain solver, not scenarioEngine/hypothesisLoop. */
+  | 'WORLD_MODEL_CHEMISTRY';
 
 export interface ScenarioCapability {
   readonly binding: ScenarioEngineBinding;
@@ -121,6 +123,25 @@ export const SCENARIO_CAPABILITIES: Readonly<Partial<Record<ScenarioKind, Scenar
     notModelled: [
       'a human-scale world a person can stand in — the world is particle-scale',
       'continuum or fluid dynamics',
+    ],
+  },
+  /**
+   * Backed by the real C3 World Model engine — a live WorldGraph advanced by
+   * `chemistryKinetics.ts`'s Arrhenius solver, not scenarioEngine/hypothesisLoop.
+   * Span capped at 24 hours because the solver's demo kinetics parameters
+   * (see DEMO_ACTIVATION_ENERGY_KJ/DEMO_PRE_EXPONENTIAL_LOG10) were tuned to
+   * show a real decay trajectory over exactly that window at 700-800K — a
+   * longer request would either underflow to zero or barely move.
+   */
+  CHEMICAL_KINETICS: {
+    binding: 'WORLD_MODEL_CHEMISTRY',
+    units: ['HOUR'],
+    maxSpan: { HOUR: 24 },
+    viewpoints: ['SCIENTIST_POV', 'OBSERVER', 'MACRO'],
+    ticksPerUnit: { HOUR: 1, DAY: 24, YEAR: 8760 },
+    notModelled: [
+      'a human-scale world a person can stand in — no 3D rendering surface exists for this domain yet',
+      'reaction products or multi-step mechanisms — this is single-substance first-order decay only',
     ],
   },
 };

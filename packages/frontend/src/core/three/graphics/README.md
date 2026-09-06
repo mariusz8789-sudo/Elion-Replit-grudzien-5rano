@@ -34,7 +34,7 @@ never the reverse.
 | Concern | Module | Entry points |
 |---|---|---|
 | Materials | `materials.ts` | `createGenesisMaterialPalette(THREE)`, `createPBRMaterial`, `createScientificGlass`, `createDoubleWalledGlass`, `createEmissiveInstrumentMaterial`, `createScreenMaterial`, plus the procedural texture generators. 13 static categories: interior (`SCIENCE_GLASS`/`BRUSHED_METAL`/`POLISHED_METAL`/`TECH_COMPOSITE`/`RUBBER`/`CERAMIC`/`PAINTED_METAL`/`LAB_FLOOR`/`LAB_WALL`) and exterior/urban (`CONCRETE`/`ASPHALT`/`BRICK`/`GROUND`, generalized out of and now used by the epidemiology city scene) |
-| Lighting roles | `lighting.ts` | `createKeyLight`, `createRimLight`, `createPracticalLight`, `createHeroLight`, `createBackgroundFill`, `applyAmbientIBL`, `captureRoomEnvironment` (real interior reflections — see `RoomEnvironmentProbeOptions`) |
+| Lighting roles | `lighting.ts` | `createKeyLight` (interior, SpotLight), `createSunLight` (exterior counterpart — shadow-casting DirectionalLight with an orthographic frustum, generalized from the epidemiology city and high-fidelity street slice), `createRimLight`, `createPracticalLight`, `createHeroLight`, `createBackgroundFill`, `applyAmbientIBL`, `captureRoomEnvironment` (real interior reflections — see `RoomEnvironmentProbeOptions`) |
 | Shadows | `shadowPolicy.ts` | `applyShadowPolicy(THREE, scene, options?)`, `SHADOW_SIZE_TIERS` |
 | Instancing | `instancing.ts` | `InstanceBatch` (per-instance transform, plus optional per-instance `color` for many identical parts that each track a different live value — pair with `stateVisualization.ts`), `setInstanceColor` (retunes one instance's color after `.build()`) |
 | Post-processing (AO/reflections/bloom/DOF/tone-mapping) | `postProcessing.ts` | `setupGraphicsPipeline`, `configureDOF`, `resolveBokehUniforms`, types `GraphicsPipelineOptions`/`DepthOfFieldSettings`/`ScreenSpaceReflectionSettings`/`AmbientOcclusionSettings`/`AmbientEnvironmentSettings`/`GraphicsPipeline`. `GraphicsPipelineOptions.ambient.mode` picks the AMBIENT/IBL source: `'studio+hdri'` (default), `'room-probe'` (an interior scene reflecting itself — pair with `GraphicsPipeline.captureRoomProbe()`, called once after the first full frame), or `'none'` (the caller manages its own environment/background/fog entirely — see the epidemiology city and high-fidelity street slice). `GraphicsPipelineOptions.ambientOcclusion` retunes AO's tier floor/radius/blend per scene instead of the fixed default. `GraphicsPipeline.setDepthOfFieldEnabled(bool)` toggles DOF per shot without rebuilding the composer. |
@@ -465,6 +465,15 @@ built via `createPBRMaterial`'s `CONCRETE`/`ASPHALT`/`BRICK`/`GROUND`
 categories instead of duplicating the same roughness/metalness tuning
 in-file — the same palette, shadow policy, and post-processing pipeline
 now genuinely serve two unrelated worlds, not one plus an untested example.
+
+Both exterior scenes' key/background lights are built via `createSunLight`/
+`createBackgroundFill` too — an audit found each had independently
+hand-rolled the same DirectionalLight-key + HemisphereLight-fill rig (same
+shape, different tuning per scene), which `createSunLight` now generalizes
+as SUN's own role rather than leaving it as parallel, undocumented
+copy-paste. The lab's own shadow-enabling pass was found to be a byte-for-
+byte duplicate of `applyShadowPolicy`'s algorithm too, inlined instead of
+calling the shared function — now consolidated onto the one implementation.
 
 ## Verification performed on this branch
 

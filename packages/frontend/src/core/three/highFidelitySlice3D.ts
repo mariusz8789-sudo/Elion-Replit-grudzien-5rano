@@ -10,6 +10,7 @@ import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } 
 import { createPhiladelphiaLegendVisual, type PhiladelphiaLegendViewMode, type PhiladelphiaLegendVisual } from './philadelphiaLegendVisual';
 import { approvedWorldAssetCount, isWorldAssetApproved, isWorldAssetPathApproved, unverifiedWorldAssetCount } from './assetGovernance';
 import { setupGraphicsPipeline } from './graphics/postProcessing';
+import { createSunLight, createBackgroundFill } from './graphics/lighting';
 
 /**
  * Wysokość kamery ulicznej. Ponad najwyższą koroną (4,91 jednostki ≈ 9,8 m),
@@ -528,18 +529,13 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     // Sumaryczny budżet jest tu obniżony ok. 2×, żeby krzywa miała zapas i
     // materiały odzyskały własny kolor. Kierunek i barwa świateł zostają —
     // zmienia się natężenie, nie zamysł.
-    const sky = new THREE.HemisphereLight(0xbcd4ee, 0x6b5a44, 0.42);
-    this.scene!.add(sky);
+    createBackgroundFill(THREE, this.scene!, { skyColor: 0xbcd4ee, groundColor: 0x6b5a44, intensity: 0.42 });
     // GOLDEN HOUR: słońce nisko nad horyzontem daje długie, kierunkowe cienie
     // i ciepłe zamodelowanie brył. Wysokie, białe światło spłaszczało kwartał.
-    const sun = new THREE.DirectionalLight(0xffd9a0, 2.15);
-    sun.position.set(-16, 7.5, 9);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -16; sun.shadow.camera.right = 16; sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
-    sun.shadow.bias = -0.00022;
-    sun.shadow.normalBias = 0.018;
-    this.scene!.add(sun);
+    createSunLight(THREE, this.scene!, {
+      position: [-16, 7.5, 9], color: 0xffd9a0, intensity: 2.15,
+      shadowMapSize: 2048, shadowFrustumHalfExtent: 16, shadowBias: -0.00022, shadowNormalBias: 0.018,
+    });
     const fill = new THREE.DirectionalLight(0x9fc0e0, 0.26);
     fill.position.set(10, 6, -9);
     this.scene!.add(fill);

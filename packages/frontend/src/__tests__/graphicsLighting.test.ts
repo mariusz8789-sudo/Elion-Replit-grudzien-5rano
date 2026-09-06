@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
   createKeyLight, createRimLight, createPracticalLight, createBackgroundFill, createHeroLight,
-  captureRoomEnvironment,
+  createSunLight, captureRoomEnvironment,
 } from '../core/three/graphics/lighting';
 import type * as THREE_NS from 'three';
 
@@ -35,6 +35,52 @@ describe('createKeyLight', () => {
   it('can opt out of casting a shadow for a secondary/fill key', () => {
     const scene = new THREE.Scene();
     const light = createKeyLight(THREE, scene, { target: [0, 1, 0], position: [3, 3, 3], castShadow: false });
+    expect(light.castShadow).toBe(false);
+  });
+});
+
+describe('createSunLight', () => {
+  it('adds a shadow-casting DirectionalLight to the scene', () => {
+    const scene = new THREE.Scene();
+    const light = createSunLight(THREE, scene, { position: [9, 16, 10] });
+    expect(scene.children).toContain(light);
+    expect(light.castShadow).toBe(true);
+    expect(light).toBeInstanceOf(THREE.DirectionalLight);
+  });
+
+  it('sizes the orthographic shadow frustum from shadowFrustumHalfExtent, not a SpotLight-style near/far', () => {
+    const scene = new THREE.Scene();
+    const light = createSunLight(THREE, scene, { position: [9, 16, 10], shadowFrustumHalfExtent: 16 });
+    expect(light.shadow.camera.left).toBe(-16);
+    expect(light.shadow.camera.right).toBe(16);
+    expect(light.shadow.camera.top).toBe(16);
+    expect(light.shadow.camera.bottom).toBe(-16);
+  });
+
+  it('defaults the shadow frustum half-extent to 12', () => {
+    const scene = new THREE.Scene();
+    const light = createSunLight(THREE, scene, { position: [1, 1, 1] });
+    expect(light.shadow.camera.left).toBe(-12);
+    expect(light.shadow.camera.right).toBe(12);
+  });
+
+  it('respects an explicit shadow-map size', () => {
+    const scene = new THREE.Scene();
+    const light = createSunLight(THREE, scene, { position: [1, 1, 1], shadowMapSize: 2048 });
+    expect(light.shadow.mapSize.x).toBe(2048);
+  });
+
+  it('applies shadowNormalBias only when explicitly given', () => {
+    const scene = new THREE.Scene();
+    const withoutBias = createSunLight(THREE, scene, { position: [1, 1, 1] });
+    expect(withoutBias.shadow.normalBias).toBe(0);
+    const withBias = createSunLight(THREE, new THREE.Scene(), { position: [1, 1, 1], shadowNormalBias: 0.018 });
+    expect(withBias.shadow.normalBias).toBe(0.018);
+  });
+
+  it('can opt out of casting a shadow entirely (a fill/rim sun-adjacent light)', () => {
+    const scene = new THREE.Scene();
+    const light = createSunLight(THREE, scene, { position: [1, 1, 1], castShadow: false });
     expect(light.castShadow).toBe(false);
   });
 });

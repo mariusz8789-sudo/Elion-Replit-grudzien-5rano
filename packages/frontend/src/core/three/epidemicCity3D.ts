@@ -14,6 +14,7 @@ import { isWorldAssetApproved, isWorldAssetPathApproved } from './assetGovernanc
 import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
 import { applyShadowPolicy } from './graphics/shadowPolicy';
 import { createPBRMaterial } from './graphics/materials';
+import { createSunLight, createBackgroundFill } from './graphics/lighting';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -727,18 +728,12 @@ export class EpidemicCity3DSim implements Sim3D {
   private addLightsAndGround(): void {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
-    this.scene.add(new THREE.HemisphereLight(0xa9c8df, 0x20362d, 0.96));
+    createBackgroundFill(THREE, this.scene, { skyColor: 0xa9c8df, groundColor: 0x20362d, intensity: 0.96 });
     this.scene.add(new THREE.AmbientLight(0x486682, 0.20));
-    const key = new THREE.DirectionalLight(0xffcc91, 1.74);
-    key.position.set(9, 16, 10);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    key.shadow.camera.left = -13;
-    key.shadow.camera.right = 13;
-    key.shadow.camera.top = 13;
-    key.shadow.camera.bottom = -13;
-    key.shadow.bias = -0.00035;
-    this.scene.add(key);
+    createSunLight(THREE, this.scene, {
+      position: [9, 16, 10], color: 0xffcc91, intensity: 1.74,
+      shadowMapSize: 1024, shadowFrustumHalfExtent: 13, shadowBias: -0.00035,
+    });
     const rim = new THREE.DirectionalLight(0x87c5f2, 0.94);
     rim.position.set(-9, 9, -8);
     this.scene.add(rim);

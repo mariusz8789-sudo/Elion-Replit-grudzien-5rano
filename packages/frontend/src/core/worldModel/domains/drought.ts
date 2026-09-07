@@ -3,6 +3,8 @@ import type { Observation } from '../../world/scientificWorldState';
 import { entityId, type EntityId, type WorldModelEntity } from '../ecs/types';
 import { WorldGraph } from '../ecs/worldGraph';
 import type { DomainSolver, SolverResult } from '../solvers/solverRouter';
+import { defineCrossDomainCoupling, type CrossDomainCoupling } from '../crossDomain/crossDomainCoupling';
+import { HOURS_PER_DAY, WEATHER_STEP_EVENT_TYPE } from './weather';
 
 /**
  * DROUGHT — a real water-balance solver, extending the same hydrology
@@ -368,4 +370,51 @@ export function buildDroughtWorld(options: DroughtWorldOptions = {}): DroughtWor
   const graph = new WorldGraph();
   const catchmentId = addDroughtCatchment(graph, { catchmentId: options.catchmentId, params: options.params });
   return { graph, catchmentId };
+}
+
+export const DROUGHT_PRECIPITATION_EVENT_TYPE = 'environment.drought.precipitationupdated';
+
+/**
+ * WEATHER -> DROUGHT. The environmental layer's precipitation rate becomes
+ * this water balance's daily precipitation input.
+ *
+ * The conversion is exact arithmetic on the same physical quantity
+ * (mm/h x 24 h/day), carrying ONE assumption which is stated rather than
+ * buried: the rate in force is taken to hold for the day being stepped.
+ * That is the same assumption a daily water balance makes of any sub-daily
+ * observation, and it is exactly true when the weather layer is stepped at
+ * daily resolution.
+ *
+ * What this coupling deliberately does NOT do is derive potential
+ * evapotranspiration from air temperature. Temperature-only PET formulas
+ * need something this layer does not supply — Thornthwaite's needs an annual
+ * heat index built from twelve monthly means, Hargreaves-Samani needs
+ * extraterrestrial radiation from latitude and day of year. Supplying either
+ * would mean inventing the missing input, so PET stays the stated,
+ * FAO-56-typical value it already was, and `solverCapability.ts` still says
+ * so.
+ */
+export function buildWeatherToDroughtCoupling(): CrossDomainCoupling {
+  return defineCrossDomainCoupling({
+    id: 'weather-to-drought-precipitation',
+    sourceDomain: 'environment-atmosphere',
+    targetDomain: DROUGHT_DOMAIN_ID,
+    triggerEventType: WEATHER_STEP_EVENT_TYPE,
+    relationshipKind: 'rainsOn',
+    direction: 'from',
+    condition: 'The environmental state reports a precipitation rate over this catchment',
+    effect: 'The precipitation rate becomes the water balance\'s daily precipitation input (mm/h x 24, assuming the rate holds for the day stepped). Potential evapotranspiration is NOT derived from air temperature: the temperature-only PET formulas need an annual heat index or extraterrestrial radiation, which this layer does not supply',
+    grounding: 'MODEL_ESTIMATE',
+    deriveEffect: (catchment, triggerEvent) => {
+      const precipitationMmPerHour = triggerEvent.parameters.precipitationMmPerHour;
+      if (typeof precipitationMmPerHour !== 'number' || !Number.isFinite(precipitationMmPerHour)) return undefined;
+      const precipitationMmPerDay = precipitationMmPerHour * HOURS_PER_DAY;
+      if (catchment.domainState?.precipitationMmPerDay === precipitationMmPerDay) return undefined;
+      return {
+        patch: { domainState: { ...catchment.domainState, precipitationMmPerDay } },
+        eventType: DROUGHT_PRECIPITATION_EVENT_TYPE,
+        cause: 'atmospheric-precipitation',
+      };
+    },
+  });
 }

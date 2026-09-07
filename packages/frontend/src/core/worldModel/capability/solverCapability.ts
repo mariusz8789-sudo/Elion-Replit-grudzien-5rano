@@ -13,6 +13,7 @@ import { FIRE_THERMAL_SOLVER_ID } from '../domains/fireThermal';
 import { DROUGHT_SOLVER_ID } from '../domains/drought';
 import { WILDFIRE_SPREAD_SOLVER_ID } from '../domains/wildfireSpread';
 import { LANDSLIDE_SOLVER_ID } from '../domains/landslide';
+import { WEATHER_SOLVER_ID } from '../domains/weather';
 
 /**
  * PHASE 7 — SOLVER CAPABILITY REGISTRY.
@@ -85,12 +86,16 @@ const WILDFIRE_SPREAD_CAVEAT =
   'real burned-area-over-time, head rate of spread, and Byram (1959) fireline intensity/flame length. Still NOT ' +
   'modelled: crown fire (no canopy, no crown-fire initiation or spread), spotting (ember lofting and long- ' +
   'distance spot ignition — a major real driver of wildfire growth this omits), fire-weather coupling (wind is ' +
-  'one fixed stated vector, not time-varying or fire-induced) and suppression. drought.ts\'s real water ' +
-  'balance IS now wired in as a cross-domain coupling, but it carries a KBDI-equivalent drought index as ' +
-  'fire-danger context only: fuel moisture remains a STATED INPUT on purpose, because dead fuel moisture is ' +
-  'governed by atmospheric equilibrium moisture content (relative humidity and temperature — Simard 1968/NFDRS), ' +
-  'which Genesis cannot evaluate without a weather model, and no published universal coefficient converts soil ' +
-  'moisture into it. That last link is left open rather than fabricated. Only four of Anderson\'s 13 standard fuel ' +
+  'one fixed stated vector, not time-varying or fire-induced) and suppression. DEAD FUEL MOISTURE IS NO LONGER ' +
+  'A STATED INPUT where a weather coupling is declared: Phase 17\'s environmental forcing layer supplies air ' +
+  'temperature and relative humidity, Simard (1968)/NFDRS equilibrium moisture content gives the equilibrium ' +
+  'the air implies, the fuel relaxes toward it at its size class timelag, and the spread field is re-solved from ' +
+  'the fire\'s current perimeter — so drier air really does speed the fire up, and air damp enough to pass the ' +
+  'moisture of extinction stops it. drought.ts\'s soil moisture is ALSO wired in, but only as a KBDI-equivalent ' +
+  'fire-danger index: soil moisture is still NOT converted into dead fuel moisture, because dead fuel is ' +
+  'detached from the soil water system and no published universal coefficient makes that conversion. LIVE fuel ' +
+  'moisture remains NOT MODELLED for the same reason (species- and site-specific). Without a declared weather ' +
+  'coupling the fuel moisture stays exactly the stated input it always was. Only four of Anderson\'s 13 standard fuel ' +
   'models are implemented, each simplified to one dead-fuel size class. Terrain grounding follows the same rule ' +
   'as floodInundation.ts: PROCEDURAL_APPROXIMATION on synthetic terrain, MODEL_ESTIMATE only with real survey elevations.';
 
@@ -140,7 +145,12 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   FLOOD: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
     solverId: FLOOD_INUNDATION_SOLVER_ID,
-    caveat: 'Rainfall to peak runoff is real (rational method), it drives the real hydraulics model, inundation depth and extent are real (a volume-conserving, connectivity-constrained planar fill over a terrain heightfield), and there is now a real hydrograph too: storage (level-pool) routing through a Manning\'s-equation natural outlet derived from the same terrain, giving a real routed outflow rate, outlet velocity, arrival time, and a constant-rate infiltration loss — all growing when a pump trip removes engineered drainage. Still NOT modelled: a flood-wave front inside the basin (the planar fill still reaches its equilibrium level within a tick, everywhere at once), any channel network or multi-reach routing (one basin, one lumped outlet), and Horton/Green-Ampt infiltration decay (the loss rate is constant, a real but simplified method). On the reference city the terrain is synthetic, which holds the result at PROCEDURAL_APPROXIMATION until real survey elevations are loaded.',
+    caveat: 'Rainfall to peak runoff is real (rational method), it drives the real hydraulics model, inundation depth and extent are real (a volume-conserving, connectivity-constrained planar fill over a terrain heightfield), and there is now a real hydrograph too: storage (level-pool) routing through a Manning\'s-equation natural outlet derived from the same terrain, giving a real routed outflow rate, outlet velocity, arrival time, and a constant-rate infiltration loss — all growing when a pump trip removes engineered drainage. Still NOT modelled: a flood-wave front inside the basin (the planar fill still reaches its equilibrium level within a tick, everywhere at once), any channel network or multi-reach routing (one basin, one lumped outlet), and Horton/Green-Ampt infiltration decay (the loss rate is constant, a real but simplified method). On the reference city the terrain is synthetic, which holds the result at PROCEDURAL_APPROXIMATION until real survey elevations are loaded. Since Phase 17 the rainfall intensity driving all of this can be supplied by the shared environmental forcing layer through a declared coupling, inheriting the Rational Method\'s own uniform-storm assumption rather than adding a new one.',
+  },
+  EXTREME_HEAT: {
+    capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
+    solverId: WEATHER_SOLVER_ID,
+    caveat: 'Air temperature, relative humidity, dewpoint and vapour pressure are now REAL, mutually consistent quantities carried by the shared environmental forcing layer (August-Roche-Magnus with Bolton 1980 coefficients), including a real diurnal cycle and the ICAO standard lapse rate over the terrain\'s own elevations. That is the EXPOSURE side only, and it is FORCING, NOT FORECAST: the layer publishes conditions a scenario or a real observation record supplied, and predicts nothing. Still NOT modelled: the human consequence side entirely — no heat-index/wet-bulb-globe-temperature exposure metric, no physiological heat-strain model, no health-effect relationships and no population vulnerability data, which is what a heat-wave impact question actually needs. Also absent: any urban heat island effect, since Genesis has no surface energy balance.',
   },
   EARTHQUAKE: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
@@ -222,12 +232,12 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
       'published as a KBDI-EQUIVALENT index (the Keetch-Byram Drought Index is defined as exactly this quantity — ' +
       'soil moisture deficiency in hundredths of an inch, 0-800 — so the conversion is exact, not fitted), and is ' +
       'carried to the wildfire domain by a real cross-domain coupling; it is KBDI-equivalent rather than KBDI ' +
-      'because Keetch & Byram derive their deficit with their own drying equation, not Thornthwaite-Mather.',
+      'because Keetch & Byram derive their deficit with their own drying equation, not Thornthwaite-Mather. Since ' +
+      'Phase 17, PRECIPITATION can be supplied by the shared environmental forcing layer through a declared ' +
+      'coupling (an exact mm/h to mm/day conversion) rather than being set by hand; potential evapotranspiration ' +
+      'is still a stated FAO-56-typical value, because the temperature-only PET formulas need an annual heat ' +
+      'index (Thornthwaite) or extraterrestrial radiation (Hargreaves-Samani), neither of which that layer supplies.',
   },
-  EXTREME_HEAT: notModelled(Object.freeze([
-    'an ambient heat-exposure model (the fire/thermal solver that exists models one fire source\'s heat release and radiant flux, not ambient air temperature or a heat-wave)',
-    'health-effect relationships for heat exposure, and the population vulnerability data behind them',
-  ])),
   AVALANCHE: notModelled(noHazardModel('snowpack stability and avalanche runout')),
   BIOLOGICAL_CONTAMINATION: notModelled(Object.freeze([
     'an environmental persistence and exposure-pathway model for a biological agent',

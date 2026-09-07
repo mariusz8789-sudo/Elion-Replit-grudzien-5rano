@@ -316,6 +316,17 @@ export class GenesisScientificCitySim implements Sim3D {
       hourOfDay: 21,
       fogDensity: 0.014,
       groundMaterial: createPBRMaterial(THREE, 'CONCRETE', { color: 0x1a2332 }),
+      // `hourOfDay: 21` (9pm) puts computeSunState's sun direction BELOW the horizon (negative y)
+      // AND floors its intensity at a physically-dim 0.15 — both correct for a real night sky, but
+      // together they left this scene's ground/buildings nearly unlit and floating in fog (found via
+      // this scene's own first Chromium screenshot of this wiring). `sunPosition`/`sunColor`/
+      // `sunIntensity` restore this scene's own pre-existing key light exactly (`createSunLight`
+      // with `position: [30, 40, 20]` and no other overrides used to mean its defaults: color
+      // 0xffd9a0, intensity 2) — the dark mood stays entirely in the fog/sky/background, which
+      // `hourOfDay: 21` still genuinely drives.
+      sunPosition: [30, 40, 20],
+      sunColor: 0xffd9a0,
+      sunIntensity: 2,
     });
 
     this.pumpMaterials = {

@@ -47,6 +47,21 @@ describe('createSceneEnvironment — OUTDOOR mode', () => {
     expect(handle.ground).toBeNull();
   });
 
+  it('sunIntensity/sunColor override the environment-computed SunState, independent of sunPosition', () => {
+    // A scene wanting dark night fog/sky (from `hourOfDay`) but a legible, brighter-than-physical
+    // key light (this module's own night-intensity floor is 0.15) needs to override intensity/color
+    // without losing the rest of the time-of-day composition — see genesisScientificCitySim.ts's own
+    // real regression (a night hour's near-zero sun intensity left the scene unlit).
+    const scene = new THREE.Scene();
+    const handle = createSceneEnvironment(THREE, scene, {
+      mode: 'OUTDOOR', hourOfDay: 0, tier: 'high',
+      sunPosition: [10, 20, 10], sunIntensity: 2, sunColor: 0xffd9a0,
+    });
+    expect(handle.sun.intensity).toBe(2);
+    expect(handle.sun.color.getHex()).toBe(new THREE.Color(0xffd9a0).getHex());
+    expect(handle.sun.position.y).toBe(20);
+  });
+
   it('never disposes a caller-supplied ground material', () => {
     const scene = new THREE.Scene();
     const material = new THREE.MeshStandardMaterial();

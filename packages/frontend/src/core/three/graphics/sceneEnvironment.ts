@@ -45,6 +45,16 @@ export interface SceneEnvironmentOptions {
    * environment preset's own computed `SunState.direction` (OUTDOOR) or a fixed overhead angle
    * (INDOOR, which has no sun state of its own). */
   sunPosition?: THREE_NS.Vector3Tuple;
+  /** Overrides the sun's intensity — default is `SunState.intensity` (OUTDOOR only), which floors at
+   * 0.15 for any hour with the sun below the horizon. A scene going for a stylized "dark mood but
+   * still legible" night look (dark fog/sky from `hourOfDay`, but a key light bright enough to
+   * actually read the geometry — the look every hand-rolled scene used before this module existed)
+   * needs this: physically-dim night intensity paired with a `sunPosition` override above the
+   * horizon still leaves the light too weak to matter. */
+  sunIntensity?: number;
+  /** Overrides the sun's color — default is `SunState.color` (OUTDOOR) or `createSunLight`'s own
+   * default warm white (INDOOR / no sun state). */
+  sunColor?: THREE_NS.ColorRepresentation;
   /** Adds a `atmosphere.ts` dust-mote haze for ambient depth, gated by `quality.ts`'s render-tier
    * rules exactly like every other consumer of that module (skipped entirely below `'medium'`).
    * Default true. */
@@ -90,8 +100,8 @@ export function createSceneEnvironment(
   const shadowMapSize = recommendedShadowMapSize(tier);
   const sun = createSunLight(THREE, scene, {
     position: sunPosition,
-    color: sunState?.color,
-    intensity: sunState?.intensity,
+    color: options.sunColor ?? sunState?.color,
+    intensity: options.sunIntensity ?? sunState?.intensity,
     // recommendedShadowMapSize returns 0 at 'low' as the documented "skip shadow-casting" signal.
     castShadow: shadowMapSize > 0,
     shadowMapSize: shadowMapSize > 0 ? shadowMapSize : undefined,

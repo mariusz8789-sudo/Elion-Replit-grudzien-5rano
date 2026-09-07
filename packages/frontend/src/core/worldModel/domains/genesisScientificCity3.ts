@@ -379,7 +379,10 @@ function buildCouplings(baseR0: number): readonly CrossDomainCoupling[] {
  * engine via `withScheduledEvents(engine's own updater, rainfallSchedule(nextTick))`, rather than
  * only at world-construction time via `rainfallAtTick` — the identical event, no second scenario
  * mechanism. */
-export function rainfallSchedule(atTick: number): readonly ScheduledEvent[] {
+export function rainfallSchedule(
+  atTick: number,
+  intensityMmPerHour: number = FLAGSHIP_RAINFALL_INTENSITY_MM_PER_HOUR,
+): readonly ScheduledEvent[] {
   const environmentRef = { kind: 'environment', id: 'city-environment' };
   return [
     {
@@ -392,10 +395,10 @@ export function rainfallSchedule(atTick: number): readonly ScheduledEvent[] {
         source: environmentRef,
         affectedEntities: [environmentRef],
         cause: 'scripted-scenario-start',
-        parameters: { intensityMmPerHour: 80 },
+        parameters: { intensityMmPerHour },
         provenance: {
           origin: 'experiment-action',
-          notes: 'Scripted scenario trigger — Genesis has no weather/precipitation solver; this event marks WHEN the scenario begins, not a simulated storm.',
+          notes: 'Scripted scenario trigger marking WHEN the event begins — intensityMmPerHour is real (Phase 5 rational-method runoff), the timing itself is still not a simulated storm.',
         },
       }),
     },

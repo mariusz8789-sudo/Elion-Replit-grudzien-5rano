@@ -38,14 +38,21 @@ describe('parseObservationIntent — askingWhatIsHappening', () => {
   });
 });
 
-describe('parseObservationIntent — rainfallCounterfactualQuery (the honest-refusal trigger)', () => {
+describe('parseObservationIntent — rainfallCounterfactualQuery (now a real, computable counterfactual)', () => {
   it('the mission\'s own target sentence, Polish', () => {
     const intent = parseObservationIntent('Co jeśli deszcz będzie o 30% mniejszy?');
     expect(intent.rainfallCounterfactualQuery).toBe(true);
+    expect(intent.rainfallCounterfactualPercent).toBe(30);
   });
 
   it('the English equivalent', () => {
-    expect(parseObservationIntent('What if the rainfall were 30% lower?').rainfallCounterfactualQuery).toBe(true);
+    const intent = parseObservationIntent('What if the rainfall were 30% lower?');
+    expect(intent.rainfallCounterfactualQuery).toBe(true);
+    expect(intent.rainfallCounterfactualPercent).toBe(30);
+  });
+
+  it('reads a different percentage, not just the flagship\'s own 30%', () => {
+    expect(parseObservationIntent('What if the rainfall were 50% lower?').rainfallCounterfactualPercent).toBe(50);
   });
 
   it('does NOT get misrouted into the pump-failure intervention path', () => {

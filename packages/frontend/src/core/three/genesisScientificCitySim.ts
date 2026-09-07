@@ -108,6 +108,18 @@ export interface RainfallScenarioOutcome {
   hospitalInterrupted: boolean;
 }
 
+/** The real "what if rainfall were N% lower" answer — see `runRainfallIntensityCounterfactual`'s
+ * own doc for how it's computed. `baselineTripped`/`baselineHospitalInterrupted` are copied from
+ * the real scenario that already ran, so a caller can report both sides without a second lookup. */
+export interface RainfallCounterfactualOutcome {
+  percentLower: number;
+  adjustedIntensityMmPerHour: number;
+  tripped: boolean;
+  hospitalInterrupted: boolean;
+  baselineTripped: boolean;
+  baselineHospitalInterrupted: boolean;
+}
+
 export interface CurrentStateSummary {
   tick: number;
   pumpFlow: number;
@@ -137,6 +149,7 @@ export class GenesisScientificCitySim implements Sim3D {
   private failureBranch: TemporalEngine | null = null;
   private viewingBranch: RenderedCityBranch = 'BASELINE';
   private rainfallOutcome: RainfallScenarioOutcome | null = null;
+  private rainfallCounterfactual: RainfallCounterfactualOutcome | null = null;
   private replay: { fromTick: number; toTick: number; cursor: number } | null = null;
 
   private renderedIds: ReadonlySet<EntityId>;
@@ -417,14 +430,54 @@ export class GenesisScientificCitySim implements Sim3D {
     return { tick: engine.tick, pumpFlow, pumpTripped, hospitalInterrupted, narration };
   }
 
-  /** The ONE counterfactual this mission's flagship explicitly asks about, honestly refused — see
-   * `triggerRainfallScenario`'s own doc for the exact gap. */
+  /**
+   * "What if rainfall were N% lower" — REAL as of C3 Phase 5 (previously a hardcoded refusal; the
+   * doc on `triggerRainfallScenario` above already recorded the gap's resolution, this method just
+   * hadn't been updated to match — found during a post-merge Chromium regression pass, not by C3).
+   *
+   * Forks from the tick JUST BEFORE the real scenario's rainfall event fired
+   * (`rainfallOutcome.scheduledAtTick - 1`, via `TemporalEngine.forkBranch`'s own historical-scrub
+   * support — `scrubTo` under the hood) so the fork shares the baseline's pre-rainfall history
+   * exactly, then schedules the SAME real event at the SAME tick with the adjusted intensity — the
+   * identical `withScheduledEvents` + `city.couplings[0]` composition `triggerRainfallScenario`
+   * uses, just applied to a fork instead of the live baseline. Two branches that diverge in exactly
+   * one input (intensity) are then directly comparable. Idempotent per percentage.
+   *
+   * Returns `null` only when no real baseline scenario has run yet — there is nothing to compare a
+   * hypothetical intensity against until `triggerRainfallScenario()` has actually fired once.
+   */
+  runRainfallIntensityCounterfactual(percentLower: number): RainfallCounterfactualOutcome | null {
+    if (!this.rainfallOutcome) return null;
+    if (this.rainfallCounterfactual?.percentLower === percentLower) return this.rainfallCounterfactual;
+
+    const forkTick = this.rainfallOutcome.scheduledAtTick - 1;
+    const adjustedIntensityMmPerHour = FLAGSHIP_RAINFALL_INTENSITY_MM_PER_HOUR * (1 - percentLower / 100);
+    const forked = this.engine.forkBranch(forkTick, `rainfall-${percentLower}pct-lower`, () => {});
+    const updaterWithRainfall = withCrossDomainCouplings(
+      withScheduledEvents(this.city.updater, rainfallSchedule(this.rainfallOutcome.scheduledAtTick, adjustedIntensityMmPerHour)),
+      [this.city.couplings[0]],
+    );
+    forked.advance(GENESIS_CITY_DT_SECONDS, updaterWithRainfall);
+    for (let i = 0; i < FAILURE_ADVANCE_TICKS; i++) forked.advance(GENESIS_CITY_DT_SECONDS, this.city.updater);
+
+    const pumpEvents = getEventHistoryFor(forked, this.city.pumpPipeId);
+    const hospitalEvents = getEventHistoryFor(forked, this.city.hospitalBuildingId);
+    this.rainfallCounterfactual = {
+      percentLower,
+      adjustedIntensityMmPerHour,
+      tripped: pumpEvents.some((event) => event.type === PUMP_TRIPPED_EVENT_TYPE),
+      hospitalInterrupted: hospitalEvents.some((event) => event.type === HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE),
+      baselineTripped: this.rainfallOutcome.tripped,
+      baselineHospitalInterrupted: this.rainfallOutcome.hospitalInterrupted,
+    };
+    return this.rainfallCounterfactual;
+  }
+
+  /** Honest status for the ONE case `runRainfallIntensityCounterfactual` cannot yet answer: no real
+   * baseline scenario has run. Not a permanent refusal — call `triggerRainfallScenario()` first. */
   getRainfallCounterfactualGap(): string {
-    return 'NOT_MODELLED — rainfall intensity is not a real parameterized input in the current '
-      + 'hydraulics model: the scripted "extreme rainfall" event always raises the pump\'s real flow '
-      + 'demand by a fixed multiplier, regardless of any intensity value carried on the event. There '
-      + 'is no honest way to run a "rainfall 30% lower" counterfactual until the rainfall-to-load '
-      + 'coupling is changed to actually read a real intensity parameter.';
+    return 'The rainfall-intensity counterfactual needs a real baseline to compare against first — '
+      + 'trigger the extreme rainfall scenario, then ask again.';
   }
 
   // --- Replay: the ALREADY-COMPUTED real history, not a re-narrated fiction -------------------

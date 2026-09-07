@@ -1051,9 +1051,36 @@ real extent, not as its true outline (`SOLVER_DATA_CONTRACT.md` gap 3).
 
 Target device, FPS/frame-time targets, draw-call/triangle/texture/memory/bundle budgets, and the
 reporting format every graphics sprint uses. Read it before adding geometry. Two things worth knowing
-without opening it: the flagship city is currently **2028 draw calls against a 1500 ceiling** (a known,
-diagnosed problem with a known fix), and this sandbox's FPS readings are a software-raster throttle
-artifact — draw calls and triangles are exact here, timings are not.
+without opening it: the flagship city was **2028 draw calls against a 1500 ceiling** before Sprint C-1's
+window-instancing fix, now **1634** (still over, by a known and scoped remainder — see §30's own doc),
+and this sandbox's FPS readings are a software-raster throttle artifact — draw calls and triangles are
+exact here, timings are not.
+
+## 31. Sprint E — a real Alicante slice, honestly BLOCKED in this sandbox
+
+Graphics V2 Sprint E asked for a narrow real-OSM slice of Alicante around the flagship hospital,
+using the §29 bridge above (already real and tested). Per this mission's own blocker rule, three
+independent real network paths were tried, from this exact sandbox, immediately before writing this
+note:
+
+1. `overpass-api.de/api/interpreter` — a real Overpass QL query for the ways in a small bbox around
+   Alicante's Hospital General.
+2. `overpass.kumi.systems/api/interpreter` — the same query against an independent Overpass mirror.
+3. `api.openstreetmap.org/api/0.6/map` — the OSM API's own native bbox endpoint, no Overpass at all.
+
+All three failed identically: `curl: (56) CONNECT tunnel failed, response 403` — the sandbox's own
+outbound proxy rejects the CONNECT to all three hosts at the policy layer, before any OSM/Overpass
+server is ever reached. This is the same result Sprint A already found and documented in
+`PERFORMANCE_BUDGET.md`'s sibling investigation; it has not changed.
+
+**Honest conclusion: real Alicante data acquisition is BLOCKED in this environment, not a code gap.**
+The bridge this data would flow through (§29, `spatialFeatureBridge.ts` + `spatialWorldFrame.ts`) is
+real, wired, and covered by 14 passing tests against hand-authored real-schema OSM fixtures — the
+moment this sandbox (or a deployed environment with real network access) can reach one of the three
+hosts above, the exact same pipeline renders it with no further engineering. Per the mission's own
+rule, no synthetic "Alicante-shaped" coordinates were fabricated to fake a result — that would violate
+the same real-data honesty this bridge exists to protect. Sprint E is BLOCKED and closed on this
+finding; the roadmap continues at Sprint F+.
 
 ## Example usage
 

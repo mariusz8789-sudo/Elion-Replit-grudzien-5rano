@@ -1,8 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
-import { MoleculeScene3D } from '../../core/three/moleculeScene3D';
+import { MoleculeScene3D, type SelectedAtomInfo } from '../../core/three/moleculeScene3D';
 import { MOLECULE_STATE_CODE } from '../../core/worldModel/domains/molecularStructure';
 import type { SimParams } from '../../core/types';
+
+const ELEMENT_NAME: Readonly<Record<string, string>> = {
+  h: 'wodór', c: 'węgiel', n: 'azot', o: 'tlen', s: 'siarka', p: 'fosfor',
+  f: 'fluor', cl: 'chlor', br: 'brom', i: 'jod',
+};
 
 /**
  * GRAPHICS V4 — the first real screen for `moleculeScene3D.ts` (GRAPHICS V3 item 1).
@@ -40,6 +45,28 @@ export function MoleculeLabScreen() {
   const [stats, setStats] = useState<Record<string, number>>({});
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, setStats);
 
+  // GENESIS WORLD INTERACTION — click an atom to identify it (real element + honest grounding),
+  // reusing the exact same InteractionController/WorldFrameRenderer pipeline
+  // GenesisWorldScreen.tsx already proved out for a different WorldFrame scene. `following` toggles
+  // the scene's own `getOrbitTarget()`/`getOrbitFocusDistance()` seam (the same one
+  // `epidemicCity3D.ts`'s observation camera already drives) — no second camera system.
+  const [selectedAtom, setSelectedAtom] = useState<SelectedAtomInfo | null>(null);
+  const [following, setFollowing] = useState(false);
+
+  useEffect(() => {
+    sim.onAtomSelected = (info) => {
+      setSelectedAtom(info);
+      if (!info) setFollowing(false);
+    };
+    return () => {
+      sim.onAtomSelected = undefined;
+    };
+  }, [sim]);
+
+  useEffect(() => {
+    sim.setFollowSelected(following);
+  }, [sim, following]);
+
   const stateCode = stats.moleculeStateCode ?? MOLECULE_STATE_CODE.NOT_MATERIALISED;
   const stateLabel = MOLECULE_STATE_LABEL[stateCode] ?? 'Nieznany stan';
 
@@ -52,6 +79,27 @@ export function MoleculeLabScreen() {
 
         {!loading && !failed && (
           <>
+            {selectedAtom && (
+              <aside className="gx-floating-card" style={{ left: '1rem', bottom: '1rem' }} aria-label="Wybrany atom">
+                <div className="gx-drawer-head" style={{ padding: 0, border: 'none', marginBottom: '0.4rem' }}>
+                  <strong>Atom: {ELEMENT_NAME[selectedAtom.element.toLowerCase()] ?? selectedAtom.element} ({selectedAtom.element})</strong>
+                  <button type="button" className="gx-drawer-close" onClick={() => setSelectedAtom(null)} aria-label="Zamknij">×</button>
+                </div>
+                <span className={`gx-status ${selectedAtom.notModeled ? 'not-modelled' : 'real'}`}>
+                  {selectedAtom.notModeled ? 'NOT_MODELLED' : 'REAL (RDKit)'}
+                </span>
+                <div style={{ marginTop: '0.6rem' }}>
+                  <button
+                    type="button"
+                    className="gx-btn"
+                    aria-pressed={following}
+                    onClick={() => setFollowing((value) => !value)}
+                  >
+                    {following ? '◉ Śledzę' : '◎ Śledź ten atom'}
+                  </button>
+                </div>
+              </aside>
+            )}
             <div className="honesty-row">
               <span className="honesty educational">Genesis Molecule Lab (GRAPHICS V4)</span>
               <span className="honesty-note">

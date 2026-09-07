@@ -11,11 +11,41 @@ import {
 import { getFrameState, type WorldFrameEntity, type WorldFrameState } from '../worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../worldModel/bridge/graphicsWorldFrameAdapter';
 import { WorldFrameRenderer } from './graphics/worldFrameRenderer';
+import { InteractionController } from './graphics/interaction';
+import type { WorldFrameEntityId } from './graphics/worldFrame';
+import { resolveCameraFraming } from './graphics/cameraRig';
 import { createMoleculeAdapter, type MoleculeAdapter } from './graphics/moleculeAdapterBridge';
 import { createBond, ELEMENT_STYLE, elementStyleOf } from './graphics/moleculeKit';
 import { createHeroLight, createBackgroundFill, type HeroLightHandles } from './graphics/lighting';
 import { disposeSceneResources } from './graphics/lifecycle';
 import { setupGraphicsPipeline } from './graphics/postProcessing';
+
+/**
+ * GENESIS WORLD INTERACTION — clickable atoms + optional camera follow.
+ *
+ * Reuses the EXACT same generic pieces `GenesisWorldScreen.tsx` already proved out for a different
+ * WorldFrame scene: `InteractionController` (`graphics/interaction.ts`) for click/hover -> entity id,
+ * with `WorldFrameRenderer` itself as the `EntityResolver` (it already tags every object-kind
+ * entity's root with a WorldFrame entity id — see that renderer's own `resolveEntityId`). No new
+ * picking implementation, no new raycasting code.
+ *
+ * "Optional follow" reuses the SAME `Sim3D.getOrbitTarget()`/`getOrbitFocusDistance()` seam
+ * `epidemicCity3D.ts`'s `applyObservationTarget` already drives (see that file's own doc) — a
+ * generic, already-existing "pivot the camera onto a live point, smoothly, without disabling free
+ * orbit" mechanism `useThreeLoop.ts` lerps every frame. This is deliberately NOT the one-time
+ * `reframeCamera` below (that stays exactly as it was, for the initial materialisation shot) — this
+ * is the continuous, opt-in tracking mode for once the viewer has actually selected something.
+ *
+ * An atom with no real backing data is structurally impossible to select here: `moleculeAdapterBridge
+ * .ts`'s own doc is explicit that an atom entity does not exist in the graph AT ALL until it is
+ * really materialised (no placeholder-atom case to gate against) — so a resolved WorldFrame entity
+ * id for an `atom-*` visual hint is, by construction, always a real atom.
+ */
+export interface SelectedAtomInfo {
+  entityId: WorldFrameEntityId;
+  element: string;
+  notModeled: boolean;
+}
 
 /**
  * GRAPHICS V3, item 1 — the missing scene/world orchestration `molecularStructure.ts` did not have.
@@ -108,11 +138,22 @@ export class MoleculeScene3D implements Sim3D {
   private readonly geometrySource: MoleculeGeometrySource;
 
   private THREE: typeof THREE_NS | null = null;
+  private scene: THREE_NS.Scene | null = null;
   private renderer: WorldFrameRenderer | null = null;
   private adapter: MoleculeAdapter | null = null;
   private atomMaterials = new Map<string, THREE_NS.Material>();
   private backgroundFill: THREE_NS.HemisphereLight | null = null;
   private heroLights: HeroLightHandles | null = null;
+
+  private interaction: InteractionController | null = null;
+  private viewportWidth = 300;
+  private viewportHeight = 300;
+  private selectedAtomId: WorldFrameEntityId | null = null;
+  private following = false;
+  /** Set by a caller (`MoleculeLabScreen.tsx`) to receive selection changes — the ONLY coupling
+   * between this Sim3D and React, the exact pattern `GenesisWorldScreen.tsx`'s own `onSelect`
+   * already establishes for a different WorldFrame scene. */
+  onAtomSelected?: (info: SelectedAtomInfo | null) => void;
 
   private bondsGroup: THREE_NS.Group | null = null;
   private bondMaterial: THREE_NS.Material | null = null;
@@ -140,8 +181,11 @@ export class MoleculeScene3D implements Sim3D {
     this.geometrySource = options.geometrySource ?? createBackendGeometrySource();
   }
 
-  init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, _w: number, _h: number): void {
+  init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, w: number, h: number): void {
     this.THREE = THREE;
+    this.scene = scene;
+    this.viewportWidth = w;
+    this.viewportHeight = h;
     // No ground, no sky, no room — a molecule viewer is a hero-object studio shot. BACKGROUND role
     // (a weak hemisphere wash, keeps the periphery from reading as pure black) + HERO role (a
     // coherent, already-tuned KEY+RIM aimed at the molecule's own local origin) instead of the
@@ -174,6 +218,12 @@ export class MoleculeScene3D implements Sim3D {
 
     this.adapter = createMoleculeAdapter(THREE, { atomMaterials: Object.fromEntries(this.atomMaterials) });
     this.renderer = new WorldFrameRenderer(THREE, scene, { resolveVisual: this.adapter.resolveVisual, updateVisual: this.adapter.updateVisual });
+    this.interaction = new InteractionController(THREE, {
+      camera,
+      resolver: this.renderer,
+      getTargets: () => (this.scene ? [this.scene] : []),
+      onSelect: (id) => this.handleSelect(id),
+    });
 
     // A reasonable starting shot for the moleculeRadius default above — reframeCamera replaces this
     // with the real framing the instant real atom positions exist.
@@ -203,6 +253,71 @@ export class MoleculeScene3D implements Sim3D {
   update(_dt: number): void {
     // No continuous animation of its own — a conformer is a static shot; `useThreeLoop.ts`'s own
     // `cameraAutoRotateSpeed` handles the "keeps turning until dragged" motion.
+  }
+
+  onResize(w: number, h: number): void {
+    this.viewportWidth = w;
+    this.viewportHeight = h;
+  }
+
+  /** Mechanical screen-point -> WorldFrame entity id -> selection pipeline, entirely delegated to
+   * `InteractionController` (see the module doc). */
+  pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
+    if (!this.interaction) return;
+    if (type === 'down') this.interaction.pointerDown(x, y);
+    else if (type === 'move') this.interaction.pointerMove(x, y, this.viewportWidth, this.viewportHeight);
+    else this.interaction.pointerUp(x, y, this.viewportWidth, this.viewportHeight);
+  }
+
+  private handleSelect(id: WorldFrameEntityId | null): void {
+    this.selectedAtomId = id;
+    if (!id) {
+      this.onAtomSelected?.(null);
+      return;
+    }
+    const frame = getFrameState(this.engine);
+    const entity = frame.entities.find((e) => e.id === id);
+    if (!entity || !entity.ref.kind.startsWith('atom-')) {
+      // Resolved to a tagged entity that isn't an atom (the molecule root anchor has no geometry to
+      // hit, so this shouldn't occur in practice) — an honest empty selection, never a guessed one.
+      this.selectedAtomId = null;
+      this.onAtomSelected?.(null);
+      return;
+    }
+    this.onAtomSelected?.({
+      entityId: id,
+      element: entity.ref.kind.slice('atom-'.length),
+      notModeled: entity.grounding === 'UNGROUNDED_APPROXIMATION',
+    });
+  }
+
+  /** Whether the camera should continuously pivot onto the currently-selected atom — the "optional
+   * follow" the click-to-select interaction offers. `false` (the default) leaves the one-time
+   * `reframeCamera` shot and free orbit exactly as before. */
+  setFollowSelected(follow: boolean): void {
+    this.following = follow;
+  }
+
+  /** Live world position of the followed atom — read every frame by `useThreeLoop.ts`, the SAME
+   * generic seam `epidemicCity3D.ts`'s `applyObservationTarget` already drives (see the module doc).
+   * `null` whenever nothing is being followed, which leaves `camera.position` alone entirely. */
+  getOrbitTarget(): THREE_NS.Vector3 | null {
+    if (!this.following || !this.selectedAtomId || !this.renderer || !this.THREE) return null;
+    const object = this.renderer.getObjectForEntity(this.selectedAtomId);
+    if (!object) return null;
+    const world = new this.THREE.Vector3();
+    object.getWorldPosition(world);
+    return world;
+  }
+
+  /** Standoff distance for the followed atom, from `resolveCameraFraming` (`graphics/cameraRig.ts`)
+   * — a small `MACRO` shot (this engine's own tuning for "get close to a small, characteristic-size
+   * subject"), never a hand-picked constant duplicating that module's own distance table. */
+  getOrbitFocusDistance(): number | null {
+    if (!this.following || !this.selectedAtomId) return null;
+    const framing = resolveCameraFraming({ intent: 'MACRO', target: [0, 0, 0], targetRadius: 1.2 });
+    const [px, py, pz] = framing.position;
+    return Math.sqrt(px * px + py * py + pz * pz);
   }
 
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
@@ -357,6 +472,8 @@ export class MoleculeScene3D implements Sim3D {
     this.adapter = null;
     this.renderer?.dispose();
     this.renderer = null;
+    this.interaction = null;
+    this.scene = null;
   }
 }
 

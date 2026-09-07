@@ -113,8 +113,15 @@ export interface ObservationIntent {
 // and effect view" would capture "substance in cause and effect view" as
 // one (unmatchable) entity name instead of "substance".
 const TARGET_STOP = 'after|before|at|from|over|while|during|as|in\\s+(?:the\\s+)?(?:cause|system|incident|citizen|scientist|engineer|operator)|po\\b|przed\\b|w\\s+chwili|podczas|jako';
-const TARGET_TRIGGERS = new RegExp(`\\b(show me|show|go to|take me to|focus on|zoom into|zoom in on|zoom on|look at|follow|pokaż|pokaz|idź do|skup się na|przybliż|śledź|sledz)\\s+(?:the\\s+|a\\s+|an\\s+)?([a-ząćęłńóśźż][a-ząćęłńóśźż0-9\\s-]{1,40}?)(?=\\s+(?:${TARGET_STOP})\\b|[.?!,;]|$)`, 'i');
-const FOLLOW_TRIGGER = new RegExp(`\\b(follow|śledź|sledz|track)\\s+(?:the\\s+)?([a-ząćęłńóśźż][a-ząćęłńóśźż0-9\\s-]{1,40}?)(?=\\s+(?:${TARGET_STOP})\\b|[.?!,;]|$)`, 'i');
+// Leading boundary is `(?:\b|^|(?<=\s))`, not a bare `\b`: `\b` is an ASCII word-boundary check, so
+// it never fires before a trigger word whose FIRST character is itself a Polish diacritic (e.g.
+// "śledź" — neither "ś" nor a preceding space/start-of-string counts as `\w`, so `\b` finds no
+// boundary between them). That silently made "śledź X" un-matchable regardless of context — this
+// codebase's own real usage ("śledź to") — while the ASCII-transliterated "sledz X" worked fine.
+// `^`/`(?<=\s)` catch exactly the real cases (sentence start, after a space) `\b` was meant to guard.
+const LEADING_TRIGGER_BOUNDARY = '(?:\\b|^|(?<=\\s))';
+const TARGET_TRIGGERS = new RegExp(`${LEADING_TRIGGER_BOUNDARY}(show me|show|go to|take me to|focus on|zoom into|zoom in on|zoom on|look at|follow|pokaż|pokaz|idź do|skup się na|przybliż|śledź|sledz)\\s+(?:the\\s+|a\\s+|an\\s+)?([a-ząćęłńóśźż][a-ząćęłńóśźż0-9\\s-]{1,40}?)(?=\\s+(?:${TARGET_STOP})\\b|[.?!,;]|$)`, 'i');
+const FOLLOW_TRIGGER = new RegExp(`${LEADING_TRIGGER_BOUNDARY}(follow|śledź|sledz|track)\\s+(?:the\\s+)?([a-ząćęłńóśźż][a-ząćęłńóśźż0-9\\s-]{1,40}?)(?=\\s+(?:${TARGET_STOP})\\b|[.?!,;]|$)`, 'i');
 
 // Generic nouns that name a QUESTION, not an entity — resolving them against
 // the world's real entities would either fail loudly (fine) or, worse,

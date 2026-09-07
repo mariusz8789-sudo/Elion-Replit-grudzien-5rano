@@ -4,6 +4,8 @@ import { epistemicStatusOf, getRecipes, type SimulationRecipe } from '../generat
 import { normalize } from '../generator/resolve';
 import { defaultComparison, type ModelConfig } from '../epidemic/compare';
 import { DEFAULT_EPIDEMIC, type EpidemicModel } from '../epidemic/sir';
+import { parseObservationIntent } from '../lookingGlass/observationIntent';
+import { hasActiveObservationControl } from '../activeObservationControl';
 
 /**
  * Resolver komend Science Chat (INTENT / COMMAND RESOLVER w architekturze
@@ -44,7 +46,12 @@ export type ChatAction =
   | { type: 'list' }
   | { type: 'load'; index: number }
   | { type: 'compare'; a: ModelConfig; b: ModelConfig }
-  | { type: 'openRoute'; hash: string };
+  | { type: 'openRoute'; hash: string }
+  /** GENESIS WORLD INTERACTION — forwards one sentence to whichever real 3D scene is currently
+   * open, via `activeObservationControl.ts`. Never decided HERE whether the named object exists or
+   * the scene even supports observation commands — that is `ScienceChat.tsx`'s side effect to
+   * execute and report honestly, exactly like `setParam` already defers to `getSimContext()`. */
+  | { type: 'observe'; sentence: string };
 
 export interface ChatResponse {
   text: string;
@@ -249,6 +256,44 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   // --- Sterowanie odtwarzaniem (istniejący activeSimControls) ---
   if (has(norm, 'pauza', 'zatrzymaj', 'wstrzymaj', 'stop ')) return { text: 'Wstrzymuję symulację.', tag: 'SYSTEM', intent: 'CONTROL', action: { type: 'control', op: 'pause' } };
   if (has(norm, 'reset', 'od nowa', 'zresetuj', 'restart')) return { text: 'Restartuję symulację do stanu początkowego.', tag: 'SYSTEM', intent: 'CONTROL', action: { type: 'control', op: 'reset' } };
+
+  // --- GENESIS WORLD INTERACTION: camera/time control on whichever real 3D scene is open ---
+  //     Reuses observationIntent.ts's own deterministic target/focus/relative-time grammar (Looking
+  //     Glass 2.1) — never a second NL parser. Whether the named object actually exists, and
+  //     whether the open scene even supports observation commands, is decided by that scene's own
+  //     `applyObservation` hook (`activeObservationControl.ts`) when `ScienceChat.tsx` executes this
+  //     action — this resolver only recognises that the SENTENCE reads as a camera/time command,
+  //     the same "recognise, don't resolve" split `setParam`'s own action already draws.
+  //
+  //     Gated on `hasActiveObservationControl()`, NOT `ctx`: `ctx` reflects `simContext.ts`'s
+  //     registry, which the WorldGraph/TemporalEngine scenes this feature targets (city3d,
+  //     scientific-city) never populate — only the older param-slider labs do. Gating on `ctx` here
+  //     would make this branch dead code for exactly the screens it exists for.
+  //
+  //     Deliberately narrow on the "target" side: `observationIntent.ts`'s generic TARGET_TRIGGERS
+  //     also matches "show"/"pokaż" — the exact verb every "open a lab by name" branch below this
+  //     one keys on ("pokaż molekułę", "pokaż miasto", "pokaż ruch", `looksLikeOpen`'s own "pokaz").
+  //     Treating any `target`/`focus` match as a camera command here would silently steal those
+  //     phrases the moment something else happened to be open. Restricted to an explicit
+  //     follow/track verb — "śledź to" (this mission's own example) — which none of those open-a-lab
+  //     branches use at all.
+  if (hasActiveObservationControl()) {
+    const observation = parseObservationIntent(message);
+    const isTimeCommand = observation.time !== null && observation.time.kind !== 'NOW';
+    // Same boundary fix as observationIntent.ts's own TARGET_TRIGGERS/FOLLOW_TRIGGER: a bare `\b`
+    // never matches next to "śledź" — neither "ś" nor "ź" counts as `\w`, so `\b` finds no boundary
+    // on EITHER side of it. `(?:^|(?<=\s))`/`(?=\s|$)` catch the real cases (word start/end at
+    // whitespace or the string's edge) `\b` was meant to guard.
+    const isFollowCommand = /(?:\b|^|(?<=\s))(śledź|sledz|follow|track)(?=\s|$)/i.test(message) && Boolean(observation.target || observation.focus);
+    if (isTimeCommand || isFollowCommand) {
+      return {
+        text: 'Wysyłam polecenie kamery/czasu do otwartej sceny 3D…',
+        tag: 'MODEL',
+        intent: 'CONTROL',
+        action: { type: 'observe', sentence: message },
+      };
+    }
+  }
 
   // --- Scientific Memory history — otwiera istniejący lokalny ekran historii.
   //     Nie tworzy konta, nie synchronizuje danych i nie uruchamia modelu.

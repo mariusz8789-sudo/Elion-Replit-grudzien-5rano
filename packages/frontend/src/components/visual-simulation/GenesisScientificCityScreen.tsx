@@ -3,6 +3,7 @@ import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { GenesisScientificCitySim } from '../../core/three/genesisScientificCitySim';
 import { parseObservationIntent } from '../../core/lookingGlass/observationIntent';
 import { resolveCameraIntent } from '../../core/lookingGlass/observationExecution';
+import { registerActiveObservationControl } from '../../core/activeObservationControl';
 
 /**
  * GENESIS — C1 SCIENTIFIC CONTROL LOOP
@@ -238,6 +239,32 @@ export function GenesisScientificCityScreen() {
     setTick(sim.getStats().tick);
   };
 
+  // GENESIS WORLD INTERACTION — a NARROW bridge for the global Science Chat (activeObservationControl.ts):
+  // camera-focus and forward time-stepping only, reusing sim.applyObservationTarget/sim.step exactly
+  // like this screen's own "ASK GENESIS" box does below. Deliberately NOT the full
+  // runScientificControlLoop: that vocabulary can trigger a real pump failure or rainfall scenario,
+  // which a casual global-chat sentence ("śledź pompę") must never do by accident.
+  const applyGlobalObservation = (sentence: string): { found: boolean; narration: string } => {
+    const intent = parseObservationIntent(sentence);
+    if (intent.time?.kind === 'RELATIVE' && intent.time.direction === 'FORWARD') {
+      const unit = intent.time.unit ?? 'HOUR';
+      const hoursPerUnit = unit === 'DAY' ? 24 : unit === 'YEAR' ? 24 * 365 : 1;
+      const hours = intent.time.amount * hoursPerUnit;
+      handleStep(hours);
+      return { found: true, narration: `Advanced ${intent.time.amount} ${unit.toLowerCase()}${intent.time.amount === 1 ? '' : 's'} (${hours}h). Tick is now ${sim.getStats().tick}h.` };
+    }
+    const query = intent.target ?? intent.focus;
+    if (!query) return { found: false, narration: 'No target or forward time step was named.' };
+    const cameraIntent = resolveCameraIntent(intent);
+    const outcome = sim.applyObservationTarget(query, cameraIntent);
+    return {
+      found: outcome.found,
+      narration: outcome.found ? `Showing ${outcome.label} — ${cameraIntent}.` : `Nothing in this city answers to "${query}".`,
+    };
+  };
+
+  useEffect(() => registerActiveObservationControl({ applyObservation: applyGlobalObservation }), [sim]);
+
   // Reuses sim.startReplay/advanceReplay — the REAL recorded history via getFrameState's own
   // timestamp param, stepped on an interval. No second replay engine, no fabricated frames.
   const handleStartReplay = () => {
@@ -353,6 +380,28 @@ export function GenesisScientificCityScreen() {
               >
                 {replaying ? `Replaying… tick ${sim.getReplayTick() ?? '?'}` : 'Replay'}
               </button>
+              {/* GENESIS WORLD INTERACTION — an interactive drag scrubber onto sim.scrubReplayTo,
+                  the same real TemporalEngine.scrubTo path `startReplay`/`advanceReplay` already use
+                  (getFrameState(engine, cursor) — no interpolation, no second history mechanism).
+                  Bounds come straight from getReplayBounds()/getStats() (replayFromTick/replayToTick),
+                  so a frame outside real recorded history is structurally impossible to select. */}
+              {stats.replayFromTick >= 0 ? (
+                <label className="gsc-scrub">
+                  Scrub: tick {stats.replayTick >= 0 ? stats.replayTick : stats.replayFromTick} / {stats.replayToTick}
+                  <input
+                    type="range"
+                    min={stats.replayFromTick}
+                    max={stats.replayToTick}
+                    value={stats.replayTick >= 0 ? stats.replayTick : stats.replayFromTick}
+                    onChange={(event) => {
+                      sim.scrubReplayTo(Number(event.target.value));
+                      setStats(sim.getStats());
+                    }}
+                  />
+                </label>
+              ) : (
+                <p className="gsc-caption">Scrub: NOT_MODELLED — brak jeszcze realnej historii do przewinięcia.</p>
+              )}
               {causalChain && causalChain.length > 0 && (
                 <div className="gsc-causal">
                   <span className="lg-obs-title">WHY DID THE HOSPITAL LOSE WATER SERVICE?</span>

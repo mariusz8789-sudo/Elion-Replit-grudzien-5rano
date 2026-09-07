@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
-  createStreetBench, createTrashBin, createHydrant, createPlanter, createBollardBarrier, createUtilityBox,
+  createStreetBench, createTrashBin, createHydrant, createPlanter, createBollardBarrier, createUtilityBox, createStreetLight,
 } from '../core/three/graphics/streetKit';
 
 function material() {
@@ -64,5 +64,36 @@ describe('createUtilityBox', () => {
   it('builds a body and a panel', () => {
     const box = createUtilityBox(THREE, { position: [0, 0, 0], material: material() });
     expect(box.children).toHaveLength(2);
+  });
+});
+
+describe('createStreetLight', () => {
+  const mat = () => new THREE.MeshStandardMaterial();
+
+  it('scales its whole silhouette from the requested height, so it works at both world scales this kit serves', () => {
+    const small = createStreetLight(THREE, { position: [0, 0, 0], height: 0.3, poleMaterial: mat(), lampMaterial: mat() });
+    const large = createStreetLight(THREE, { position: [0, 0, 0], height: 9, poleMaterial: mat(), lampMaterial: mat() });
+    const lampOf = (g: THREE.Group) => g.children[g.children.length - 1];
+    // The lamp head must sit near the top of the pole in BOTH cases, not at a fixed absolute height.
+    expect(lampOf(small).position.y).toBeGreaterThan(0.3 * 0.9);
+    expect(lampOf(large).position.y).toBeGreaterThan(9 * 0.9);
+  });
+
+  it('puts the lamp head out at the end of the arm, not on the pole itself', () => {
+    const light = createStreetLight(THREE, { position: [0, 0, 0], height: 8, armLength: 2, poleMaterial: mat(), lampMaterial: mat() });
+    const lamp = light.children[light.children.length - 1];
+    expect(lamp.position.x).toBeCloseTo(2, 6);
+  });
+
+  it('stands at the position it was given', () => {
+    const light = createStreetLight(THREE, { position: [3, 0, -4], height: 8, poleMaterial: mat(), lampMaterial: mat() });
+    expect(light.position.toArray()).toEqual([3, 0, -4]);
+  });
+
+  it('adds no real light source — it is emissive geometry only (documented, and a real perf constraint)', () => {
+    const light = createStreetLight(THREE, { position: [0, 0, 0], height: 8, poleMaterial: mat(), lampMaterial: mat() });
+    let lights = 0;
+    light.traverse((n) => { if ((n as THREE.Light).isLight) lights++; });
+    expect(lights).toBe(0);
   });
 });

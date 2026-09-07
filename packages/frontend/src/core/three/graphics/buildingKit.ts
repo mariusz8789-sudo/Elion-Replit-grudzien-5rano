@@ -1,5 +1,6 @@
 import type * as THREE_NS from 'three';
 import { createColumn, createPlatform } from './primitives';
+import { InstanceBatch } from './instancing';
 
 /**
  * GENESIS GRAPHICS RUNTIME — Building Kit
@@ -190,6 +191,127 @@ export function createIndustrialBuilding(THREE: typeof THREE_NS, options: Indust
     antenna: false,
   });
   group.add(roofEquipment);
+
+  group.userData.visualOnlyContext = true;
+  return group;
+}
+
+export interface FacadeBuildingOptions {
+  /** Footprint center at GROUND level. Pass `[0, 0, 0]` when building for a `WorldFrameRenderer`
+   * adapter, whose `applyTransform` overwrites `.position` absolutely every sync (see
+   * `ADAPTER_CONTRACT.md` rule 4). */
+  position: THREE_NS.Vector3Tuple;
+  width: number;
+  depth: number;
+  height: number;
+  /** Deterministic seed — derive from the entity's own stable id/position, never `Math.random()`. */
+  seed: number;
+  wallMaterial: THREE_NS.Material;
+  /** Instanced across every window on all four facades. `InstanceBatch` sets `vertexColors = true`
+   * on it (per-window lit/unlit tinting), so pass a material dedicated to this use. */
+  windowMaterial: THREE_NS.Material;
+  roofMaterial?: THREE_NS.Material;
+  /** Approximate storey height in world units — window rows are derived from it. Default 1.2. */
+  floorHeight?: number;
+  /** Fraction of windows tinted `litColor` rather than `unlitColor`. Default 0.45. */
+  litFraction?: number;
+  litColor?: THREE_NS.ColorRepresentation;
+  unlitColor?: THREE_NS.ColorRepresentation;
+  /** Adds `createRooftopEquipment` on the roof. Default true. */
+  rooftopEquipment?: boolean;
+}
+
+/**
+ * A generic multi-storey building with a real windowed facade — the piece this kit was missing, and
+ * the reason `genesisScientificCitySim.ts` had to render its buildings as bare `BoxGeometry`.
+ *
+ * WHY THIS EXISTS RATHER THAN REUSING `epidemicCity3D.ts`'s own `createBuilding`: that one is a real,
+ * hand-tuned renderer bound to its scene's `CityWorld` object shape (`building.kind`/`x`/`y`/`w`/`h`)
+ * and is not exported or reusable; this module's own doc already records why it is left alone.
+ * `createFacadeBuilding` is the generic, scene-agnostic equivalent any scene can call.
+ *
+ * PERFORMANCE, DELIBERATELY DIFFERENT FROM THAT PRECEDENT: `epidemicCity3D.ts`'s hand-rolled version
+ * emits one `Mesh` per window, which this engine's own density audit measured as the single largest
+ * draw-call cost in the city scene (see `PERFORMANCE.md`'s "Visual World Build 1.0-3.0 density
+ * audit"). This function instead batches every window of a building into ONE `InstancedMesh` via
+ * `instancing.ts` — so a 60-window building costs 2 draw calls (body + windows), not 61. That was
+ * the whole point of building it here rather than copying the older approach.
+ *
+ * Purely decorative massing unless a caller says otherwise: tagged `userData.visualOnlyContext`, the
+ * same status `createIndustrialBuilding`/`createContextBuilding` carry. A caller rendering a REAL
+ * world entity (a C3 building) clears that flag itself.
+ */
+export function createFacadeBuilding(THREE: typeof THREE_NS, options: FacadeBuildingOptions): THREE_NS.Group {
+  const rand = mulberry32(options.seed);
+  const group = new THREE.Group();
+  group.name = 'genesis-facade-building';
+  const [px, py, pz] = options.position;
+  const { width, depth, height } = options;
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), options.wallMaterial);
+  body.position.set(px, py + height / 2, pz);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  // --- Windows: one instanced batch for the whole building -------------------------------------
+  const floorHeight = options.floorHeight ?? 1.2;
+  const rows = Math.max(1, Math.floor(height / floorHeight));
+  const litFraction = options.litFraction ?? 0.45;
+  const litColor = new THREE.Color(options.litColor ?? 0xffd9a0);
+  const unlitColor = new THREE.Color(options.unlitColor ?? 0x16202c);
+
+  const windowHeight = Math.min(floorHeight * 0.45, height / rows * 0.5);
+  const windowWidth = windowHeight * 0.8;
+  const batch = new InstanceBatch(THREE, new THREE.PlaneGeometry(windowWidth, windowHeight), options.windowMaterial);
+
+  // Each facade: its outward normal's axis, its half-extent along that axis, and the span the window
+  // grid is laid out across. Windows sit a hair proud of the wall so they never z-fight it.
+  const facades: { rotationY: number; spanAxis: 'x' | 'z'; span: number; offset: number }[] = [
+    { rotationY: 0, spanAxis: 'x', span: width, offset: depth / 2 },
+    { rotationY: Math.PI, spanAxis: 'x', span: width, offset: -depth / 2 },
+    { rotationY: Math.PI / 2, spanAxis: 'z', span: depth, offset: width / 2 },
+    { rotationY: -Math.PI / 2, spanAxis: 'z', span: depth, offset: -width / 2 },
+  ];
+
+  for (const facade of facades) {
+    const columns = Math.max(1, Math.floor(facade.span / (windowWidth * 2.1)));
+    const columnStep = facade.span / (columns + 1);
+    for (let row = 0; row < rows; row++) {
+      const y = py + (row + 0.62) * (height / rows);
+      if (y + windowHeight / 2 > py + height) continue;
+      for (let column = 1; column <= columns; column++) {
+        const along = -facade.span / 2 + column * columnStep;
+        const position: THREE_NS.Vector3Tuple = facade.spanAxis === 'x'
+          ? [px + along, y, pz + facade.offset * 1.002]
+          : [px + facade.offset * 1.002, y, pz + along];
+        batch.add(position, [0, facade.rotationY, 0], 1, rand() < litFraction ? litColor : unlitColor);
+      }
+    }
+  }
+  // InstanceBatch.build() only calls the generic Object3D `.add()` on what it is given, so a Group
+  // works exactly as well as a Scene despite the narrower parameter type (same cast the
+  // WorldFrameRenderer already makes for the same reason).
+  batch.build(group as unknown as THREE_NS.Scene, false);
+
+  if (options.roofMaterial) {
+    const roof = createPlatform(THREE, options.roofMaterial, {
+      position: [px, py + height + 0.02, pz], thickness: 0.05, shape: 'box', width: width * 1.03, depth: depth * 1.03,
+    });
+    group.add(roof);
+  }
+
+  if (options.rooftopEquipment ?? true) {
+    group.add(createRooftopEquipment(THREE, {
+      position: [px, py + height, pz],
+      footprintWidth: width,
+      footprintDepth: depth,
+      unitCount: 1 + Math.round(rand() * 2),
+      seed: options.seed,
+      material: options.roofMaterial ?? options.wallMaterial,
+      antenna: rand() > 0.6,
+    }));
+  }
 
   group.userData.visualOnlyContext = true;
   return group;

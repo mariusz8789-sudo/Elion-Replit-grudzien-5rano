@@ -1026,6 +1026,35 @@ It also carries a gap table (§6) of the seven things that need a real contract 
 visuals are possible — chief among them: no backend returns per-atom coordinates yet, and
 `WorldFrameState` has no channel for relationships, so bonds cannot reach C2 at all today.
 
+## 29. Imported spatial data (OSM) → the canonical renderer — `spatialFeatureBridge.ts`
+
+Graphics V2 Sprint A. Real OSM data was already imported and projected
+(`experimentFabric/spatialImport.ts` + `simulationRenderer/spatialOverlay.ts`) but ended at the OLD
+`simulationRenderer` city renderer; nothing connected it to `WorldFrameRenderer`. That bridge now
+exists, in two halves either side of the architecture boundary:
+
+- **Data side** — `simulationRenderer/spatialWorldFrame.ts`: a projected overlay becomes a canonical
+  `WorldFrame`. One entity per building (real centroid + real footprint extent), one per road
+  segment (real centreline + heading). Also `metricOverlaySize`, so the overlay's units are real
+  metres and every emitted scalar is a real measurement.
+- **Render side** — `graphics/spatialFeatureBridge.ts`: an `ADAPTER_CONTRACT.md` adapter that sees
+  only `visualHint`/`scalars` and knows nothing about OSM, GIS or licences.
+
+**The honesty mechanism is in the data, not the prose.** OSM knows where a building is far more often
+than it knows how tall it is, so the data side emits `heightMeasured`/`widthMeasured`/
+`footprintMeasured` flags next to the values, and the adapter tags any object whose height or width it
+had to choose with `userData.notModeled = true` — the same flag `waterInfrastructureBridge.ts` uses.
+Known limit: `WorldFrameEntity` has no polygon channel, so a footprint is drawn as a box sized to its
+real extent, not as its true outline (`SOLVER_DATA_CONTRACT.md` gap 3).
+
+## 30. The performance budget — `PERFORMANCE_BUDGET.md`
+
+Target device, FPS/frame-time targets, draw-call/triangle/texture/memory/bundle budgets, and the
+reporting format every graphics sprint uses. Read it before adding geometry. Two things worth knowing
+without opening it: the flagship city is currently **2028 draw calls against a 1500 ceiling** (a known,
+diagnosed problem with a known fix), and this sandbox's FPS readings are a software-raster throttle
+artifact — draw calls and triangles are exact here, timings are not.
+
 ## Example usage
 
 See `examples/heroApparatusExample.ts` in full — it wires every subsystem

@@ -162,3 +162,54 @@ export function createUtilityBox(THREE: typeof THREE_NS, options: UtilityBoxOpti
   group.add(body, panel);
   return group;
 }
+
+export interface StreetLightOptions {
+  /** Base of the pole, at ground level. */
+  position: THREE_NS.Vector3Tuple;
+  /** Total pole height in world units. Explicit rather than fixed, because this kit's other pieces
+   * are sized for `epidemicCity3D.ts`'s `CITY_WORLD_SCALE` (~0.018) while other scenes work in far
+   * larger units — a light that only looked right at one scale would be useless to the other. */
+  height: number;
+  poleMaterial: THREE_NS.Material;
+  /** The lamp head. Give it an emissive material for a night scene. */
+  lampMaterial: THREE_NS.Material;
+  /** Horizontal reach of the arm holding the lamp. Default 22% of `height`. */
+  armLength?: number;
+  /** Which way the arm points, radians around Y. Default 0. */
+  headingRadians?: number;
+}
+
+/**
+ * A street light: pole + horizontal arm + a lamp head.
+ *
+ * HONEST SCOPE — this is EMISSIVE GEOMETRY, not a light source. It does not add a `PointLight` and
+ * does not illuminate anything around it: N real point lights is exactly the per-light shading cost
+ * this engine's `shadowPolicy.ts`/`PERFORMANCE.md` budget exists to avoid, and a street full of them
+ * would tank the frame. The lamp head reads as "lit" because its material is emissive (and blooms,
+ * where the pipeline's bloom pass is enabled) — the surrounding ground is lit by the scene's real
+ * sun/ambient rig, not by this object. A caller that genuinely needs one hero light casting real
+ * illumination should add a single `lighting.ts` light itself and say so.
+ */
+export function createStreetLight(THREE: typeof THREE_NS, options: StreetLightOptions): THREE_NS.Group {
+  const group = new THREE.Group();
+  group.name = 'genesis-street-light';
+  group.position.set(...options.position);
+  group.rotation.y = options.headingRadians ?? 0;
+
+  const height = options.height;
+  const armLength = options.armLength ?? height * 0.22;
+  const poleRadius = height * 0.012;
+
+  group.add(createColumn(THREE, options.poleMaterial, { position: [0, 0, 0], height, radius: poleRadius }));
+
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(poleRadius * 0.7, poleRadius * 0.7, armLength, 6), options.poleMaterial);
+  arm.rotation.z = Math.PI / 2;
+  arm.position.set(armLength / 2, height, 0);
+  group.add(arm);
+
+  const lamp = new THREE.Mesh(new THREE.BoxGeometry(height * 0.055, height * 0.022, height * 0.035), options.lampMaterial);
+  lamp.position.set(armLength, height - height * 0.014, 0);
+  group.add(lamp);
+
+  return group;
+}

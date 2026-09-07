@@ -284,15 +284,24 @@ export class GenesisScientificCitySim implements Sim3D {
     // 0.25m across — see graphics/waterInfrastructure.ts's own createPump dimensions.
     const radius = match.kind === 'pump-pipe-system' ? 0.25 : 5;
     this.lastSelectedId = match.id;
+    this.frameCameraOn([position.x, position.y, position.z], radius, cameraIntent);
+    return { found: true, label: match.label };
+  }
+
+  /** Shared body behind `applyObservationTarget`'s per-entity framing — factored out so SPRINT C-3's
+   * initial subject framing (below, in `init()`) can frame a POINT/RADIUS that isn't tied to a
+   * single named entity (the pump+hospital pair's own midpoint/span) through the exact same real
+   * `resolveCameraFraming` + `followTarget`/`observationStandoff` seam, rather than a second camera
+   * mechanism. */
+  private frameCameraOn(position: THREE_NS.Vector3Tuple, radius: number, cameraIntent: CameraIntent): void {
     if (!this.followTarget && this.THREE) this.followTarget = new this.THREE.Vector3();
-    this.followTarget?.set(position.x, position.y + radius * 0.4, position.z);
+    this.followTarget?.set(position[0], position[1] + radius * 0.4, position[2]);
     if (this.THREE) {
-      const framing = resolveCameraFraming({ intent: cameraIntent, target: [position.x, position.y + radius * 0.4, position.z], targetRadius: radius });
+      const framing = resolveCameraFraming({ intent: cameraIntent, target: [position[0], position[1] + radius * 0.4, position[2]], targetRadius: radius });
       this.observationStandoff = Math.hypot(
         framing.position[0] - framing.lookAt[0], framing.position[1] - framing.lookAt[1], framing.position[2] - framing.lookAt[2],
       );
     }
-    return { found: true, label: match.label };
   }
 
   getOrbitTarget(): THREE_NS.Vector3 | null {
@@ -616,6 +625,25 @@ export class GenesisScientificCitySim implements Sim3D {
     // OrbitControls target seam C1's observation flow drives are untouched.
     camera.position.set(midX + 46, 34, midZ + 62);
     camera.lookAt(midX, 4, midZ);
+
+    // SPRINT C-3 — subject framing. The wide shot above sets the FIRST frame's static establishing
+    // pose; left alone, it was also the scene's PERMANENT resting camera, and the pump/hospital
+    // pair — the actual subject of this whole scenario — read as two small objects lost in a much
+    // bigger district (found live in Sprint C-1/C-2's own screenshots). This reuses the EXACT SAME
+    // real camera-framing seam C1's "show me the hospital" queries already drive (`frameCameraOn`,
+    // shared with `applyObservationTarget`; `useThreeLoop.ts`'s existing per-frame lerp toward
+    // `getOrbitTarget()`/`getOrbitFocusDistance()` does the rest) to push the camera in from the
+    // wide establish onto the flagship PAIR over the first couple of seconds — a real "establish,
+    // then find your subject" cinematic beat, not a second camera mechanism.
+    //
+    // Framing the pair (not just `applyObservationTarget('hospital', ...)`'s own hardcoded
+    // building-only radius of 5) matters here: found live that a hospital-only radius crops the
+    // pump entirely out of frame, which is exactly the "lost the pump/hospital as the visual
+    // subject" defect this sprint exists to fix. `pairSpan` is the real half-distance between the
+    // two entities plus the hospital's own half-width, so the standoff this produces always
+    // includes both, however far apart a future generated world places them.
+    const pairSpan = Math.max(Math.hypot(hospital[0] - pump[0], hospital[2] - pump[2]) / 2 + 4, 6);
+    this.frameCameraOn([midX, 3, midZ], pairSpan, 'CINEMATIC');
   }
 
   /**

@@ -75,6 +75,14 @@ describe('EpidemicCity3DSim — Visual World Build 1.0 kits are real in the prod
     expect(names).toContain('genesis-tree-field');
   });
 
+  it('ground-level electrical service (cabinet + condenser) sits beside the hospital\'s service building', () => {
+    const { scene } = buildInitializedScene();
+    const extras = scene.getObjectByName('visual-world-build-city-extras')!;
+    const names = namesOf(extras);
+    expect(names).toContain('genesis-electrical-cabinet');
+    expect(names).toContain('genesis-condenser-unit');
+  });
+
   it('signage: post signs at intersections and a hanging sign on the real shop building', () => {
     const { scene } = buildInitializedScene();
     const extras = scene.getObjectByName('visual-world-build-city-extras')!;

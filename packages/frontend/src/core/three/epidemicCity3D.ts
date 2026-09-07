@@ -28,6 +28,7 @@ import { createVehicle } from './graphics/vehicleKit';
 import { createTreeField, createGroundClutter } from './graphics/vegetation';
 import { createPipeNetwork } from './graphics/waterInfrastructure';
 import { createPostSign, createHangingSign } from './graphics/signageKit';
+import { createElectricalCabinet, createCondenserUnit } from './graphics/electricalKit';
 import { WorldFrameRenderer } from './graphics/worldFrameRenderer';
 import type { WorldFrame } from './graphics/worldFrame';
 import { createWaterInfrastructureAdapter, type WaterInfrastructureAdapter } from './graphics/waterInfrastructureBridge';
@@ -1532,6 +1533,16 @@ export class EpidemicCity3DSim implements Sim3D {
         position: [hx, 0, hz - dims.depth / 2 - 0.32],
         width: dims.width * 0.5, depth: 0.3, kind: 'industrial', seed: 29,
         wallMaterial: brushedMetal, roofMaterial: paintedMetal,
+      }));
+      // Ground-level electrical service beside the hospital's own service building — geometry only,
+      // no electrical state of any kind (see electricalKit.ts's own "seam, not science" doc).
+      extras.add(createElectricalCabinet(THREE, {
+        position: [hx + dims.width * 0.32, 0, hz - dims.depth / 2 - 0.20],
+        bodyMaterial: paintedMetal, hazardStripeMaterial: new THREE.MeshBasicMaterial({ color: 0xf5c542 }),
+      }));
+      extras.add(createCondenserUnit(THREE, {
+        position: [hx + dims.width * 0.32 + 0.16, 0, hz - dims.depth / 2 - 0.20],
+        bodyMaterial: brushedMetal,
       }));
       const hospitalTrees = createTreeField(THREE, {
         count: 6, width: dims.width * 0.5, depth: 0.3, center: [hx - dims.width / 2 - 0.22, hz],

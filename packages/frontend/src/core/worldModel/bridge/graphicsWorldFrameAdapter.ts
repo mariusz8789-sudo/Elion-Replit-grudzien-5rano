@@ -1,4 +1,4 @@
-import type { EntityGrounding as GraphicsEntityGrounding, WorldFrame as GraphicsWorldFrame, WorldFrameEntity as GraphicsWorldFrameEntity } from '../../three/graphics/worldFrame';
+import type { EntityGrounding as GraphicsEntityGrounding, WorldFrame as GraphicsWorldFrame, WorldFrameEntity as GraphicsWorldFrameEntity, WorldFrameRelationship as GraphicsWorldFrameRelationship } from '../../three/graphics/worldFrame';
 import type { GroundingLevel } from '../ecs/types';
 import type { WorldFrameEntity, WorldFrameState } from './worldFrameState';
 
@@ -61,6 +61,10 @@ function toGraphicsEntity(entity: WorldFrameEntity): GraphicsWorldFrameEntity {
   };
 }
 
+function toGraphicsRelationship(relationship: { fromEntityId: string; toEntityId: string; kind: string }): GraphicsWorldFrameRelationship {
+  return { from: relationship.fromEntityId, to: relationship.toEntityId, kind: relationship.kind };
+}
+
 /**
  * Converts a real C3 `WorldFrameState` into C2's `WorldFrame` — the only
  * function C1/C2 integration code needs to call. Uses `simulatedTime` (the
@@ -73,5 +77,8 @@ export function toGraphicsWorldFrame(frame: WorldFrameState): GraphicsWorldFrame
   return {
     time: frame.simulatedTime,
     entities: frame.entities.map(toGraphicsEntity),
+    // SOLVER_DATA_CONTRACT §C's minimum edge channel, forwarded field-for-field. Only the two ids
+    // and the opaque kind cross — the same discipline as every other mapping here.
+    relationships: frame.relationships.map(toGraphicsRelationship),
   };
 }

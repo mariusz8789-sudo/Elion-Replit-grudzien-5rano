@@ -413,6 +413,7 @@ const MODELS = [
         ],
         outputs: [
           { id: 'nAtoms', label: 'Liczba atomów (z wodorami)', unit: '' },
+          { id: 'nBonds', label: 'Liczba wiązań', unit: '' },
           { id: 'formalCharge', label: 'Ładunek formalny', unit: '' },
         ],
         assumptions:
@@ -440,6 +441,12 @@ const MODELS = [
             // {element, x, y, z} in angstroms, in RDKit's own atom order — that order is the stable
             // per-atom identity C3 keys its entities by, so it must never be re-sorted downstream.
             atoms: r.atoms,
+            // Real RDKit bonds (mol.GetBonds()), never inferred from interatomic distance —
+            // distance-based bond inference has real failure modes and a wrongly-inferred bond is
+            // indistinguishable from a real one once drawn. {a, b} index into `atoms` above, in the
+            // same order; `order` is GetBondTypeAsDouble() (1 / 1.5 aromatic / 2 / 3).
+            bonds: r.bonds ?? [],
+            nBonds: r.nBonds ?? (r.bonds?.length ?? 0),
             forceField: r.forceField,
             // Echoed from the INPUT: the adapter does not return the seed, and the whole point of
             // recording it is that the geometry can be regenerated, so it must be the value actually

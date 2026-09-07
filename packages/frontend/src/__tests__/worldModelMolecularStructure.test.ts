@@ -39,6 +39,11 @@ const ETHANOL_REAL: MoleculeMaterialisation = {
     { element: 'C', x: 0.46575, y: -0.51156, z: -0.0368 },
     { element: 'O', x: 1.43107, y: 0.32292, z: 0.58667 },
   ],
+  // Real RDKit bonds for ethanol's heavy-atom skeleton: C-C and C-O, both single.
+  bonds: [
+    { a: 0, b: 1, order: 1, aromatic: 0 },
+    { a: 1, b: 2, order: 1, aromatic: 0 },
+  ],
   forceField: 'MMFF',
   seed: 42,
   nAtoms: 3,

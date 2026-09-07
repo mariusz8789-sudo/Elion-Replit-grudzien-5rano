@@ -114,7 +114,7 @@ export function embed3d(smiles, seed = 42) {
   try {
     const r = invoke({ cmd: 'embed3d', smiles: String(smiles ?? ''), seed }, 20_000);
     return r.ok
-      ? { ok: true, atoms: r.atoms, forceField: r.forceField, charge: r.charge, nAtoms: r.nAtoms, canonicalSmiles: r.canonicalSmiles }
+      ? { ok: true, atoms: r.atoms, bonds: r.bonds ?? [], forceField: r.forceField, charge: r.charge, nAtoms: r.nAtoms, nBonds: r.nBonds ?? (r.bonds?.length ?? 0), canonicalSmiles: r.canonicalSmiles }
       : { ok: false, error: r.error };
   } catch (err) {
     return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };

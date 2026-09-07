@@ -84,9 +84,30 @@ export interface WorldFrameEntity {
   visible?: boolean;
 }
 
+/**
+ * A connector between two entities, by id. Generic on purpose, exactly like every other field
+ * here: there is no `type: 'bond'` — `kind` is an opaque token the renderer never branches on,
+ * passed to the caller's own resolver in the same way `visualHint` and `status` already are.
+ *
+ * Both endpoints are entity ids present in the SAME frame, never array indices (an index breaks
+ * the moment frame membership changes). A scene that wants to draw connectors builds them itself
+ * once both endpoints are known — `worldFrameRenderer.ts` does not, and must not, infer a
+ * connector's existence from anything else, least of all from how close two entities happen to be.
+ */
+export interface WorldFrameRelationship {
+  from: WorldFrameEntityId;
+  to: WorldFrameEntityId;
+  /** Opaque edge label (e.g. `'bond-aromatic'`, `'feedsInto'`). Never interpreted by the renderer. */
+  kind: string;
+}
+
 export interface WorldFrame {
   /** Simulation/model time this frame represents — opaque to the renderer (a day count, seconds,
    * whatever the eventual C3 clock uses); carried through only for a caller's own bookkeeping. */
   time: number;
   entities: readonly WorldFrameEntity[];
+  /** Optional and additive: a frame without edges behaves exactly as before. Omitted or empty
+   * means "this frame states no connectors", which is NOT the same as "these entities are
+   * unconnected" — a producer that models no edges simply does not fill this in. */
+  relationships?: readonly WorldFrameRelationship[];
 }

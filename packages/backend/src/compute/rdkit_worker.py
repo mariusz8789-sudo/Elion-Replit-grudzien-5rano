@@ -151,9 +151,20 @@ def main():
         for i, at in enumerate(mh.GetAtoms()):
             p = conf.GetAtomPosition(i)
             atoms.append({"element": at.GetSymbol(), "x": round(p.x, 5), "y": round(p.y, 5), "z": round(p.z, 5)})
+        # Wiazania sa REALNE dane RDKit (mol.GetBonds()), nie wnioskowanie z odleglosci
+        # miedzyatomowych. Indeksy a/b odnosza sie do tablicy `atoms` powyzej, w tej samej
+        # kolejnosci. `order` to GetBondTypeAsDouble(): 1.0 / 1.5 (aromatyczne) / 2.0 / 3.0.
+        bonds = []
+        for b in mh.GetBonds():
+            bonds.append({
+                "a": b.GetBeginAtomIdx(),
+                "b": b.GetEndAtomIdx(),
+                "order": b.GetBondTypeAsDouble(),
+                "aromatic": 1 if b.GetIsAromatic() else 0,
+            })
         print(json.dumps({
-            "ok": True, "atoms": atoms, "forceField": ff, "seed": seed,
-            "charge": Chem.GetFormalCharge(mol), "nAtoms": len(atoms),
+            "ok": True, "atoms": atoms, "bonds": bonds, "forceField": ff, "seed": seed,
+            "charge": Chem.GetFormalCharge(mol), "nAtoms": len(atoms), "nBonds": len(bonds),
             "canonicalSmiles": Chem.MolToSmiles(mol),
         }))
         return

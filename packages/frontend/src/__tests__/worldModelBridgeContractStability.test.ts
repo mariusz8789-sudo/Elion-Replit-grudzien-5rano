@@ -33,7 +33,7 @@ function buildTwoEntityGraph(): WorldGraph {
 }
 
 const EXPECTED_FRAME_ENTITY_KEYS = ['id', 'parentId', 'ref', 'label', 'scaleLevel', 'transform', 'grounding', 'domainId', 'scalars', 'statusLabel'].sort();
-const EXPECTED_FRAME_STATE_KEYS = ['tick', 'simulatedTime', 'branchId', 'entities', 'events'].sort();
+const EXPECTED_FRAME_STATE_KEYS = ['tick', 'simulatedTime', 'branchId', 'entities', 'relationships', 'events'].sort();
 
 describe('Bridge contract stability (Priority 7): WorldFrameState / WorldFrameEntity / packTransformBuffer', () => {
   it('WorldFrameState exposes exactly its documented top-level fields — no silent addition or removal', () => {
@@ -103,7 +103,7 @@ describe('Bridge contract stability (Priority 7): WorldFrameState / WorldFrameEn
   });
 
   it('packTransformBuffer degrades gracefully for a frame with zero entities', () => {
-    const emptyFrame: WorldFrameState = { tick: 0, simulatedTime: 0, branchId: 'b', entities: [] as readonly WorldFrameEntity[], events: [] };
+    const emptyFrame: WorldFrameState = { tick: 0, simulatedTime: 0, branchId: 'b', entities: [] as readonly WorldFrameEntity[], relationships: [], events: [] };
     const buffer = packTransformBuffer(emptyFrame);
     expect(buffer).toBeInstanceOf(Float32Array);
     expect(buffer.length).toBe(0);

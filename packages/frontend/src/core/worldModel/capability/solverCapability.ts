@@ -111,7 +111,7 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   CHEMICAL_REACTION: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
     solverId: MOLECULAR_STRUCTURE_SOLVER_ID,
-    caveat: 'Real RDKit descriptors and a real force-field 3D conformer. Bonds are not forwarded to the renderer (no edge channel exists), and reaction dynamics beyond Arrhenius kinetics are not modelled.',
+    caveat: 'Real RDKit descriptors, a real force-field 3D conformer, and real RDKit bonds now forwarded to the renderer through the frame edge channel (SOLVER_DATA_CONTRACT §C, closed in Phase 8.1). Reaction dynamics beyond Arrhenius kinetics remain not modelled.',
   },
   CELL_CULTURE: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,

@@ -175,6 +175,40 @@ export class EpidemicCity3DSim implements Sim3D {
   /** Efemeryczne ślady są tworzone wyłącznie z `lastTransmissions()` silnika. */
   private transmissionMarkers = new Map<string, { group: THREE_NS.Group; born: number; material: THREE_NS.MeshBasicMaterial }>();
   private buildingMeshes: THREE_NS.Object3D[] = [];
+  /**
+   * GRAPHICS V2 SPRINT C-1 — real density audit finding: `createBuilding()`/`createContextBuilding()`
+   * used to emit one individual `Mesh` per window pane (see PERFORMANCE.md's "Visual World Build
+   * 1.0-3.0 density audit" — already identified there as the scene's single largest draw-call cost,
+   * not attempted at the time because it was out of that pass's scope). Both generators now push
+   * WORLD-SPACE window placements here instead of building a `Mesh` directly; `flushWindowInstances()`
+   * bakes everything collected during `init()`'s whole building-generation pass into exactly TWO
+   * `InstancedMesh`es (lit / dark) — one draw call per tone, city-wide, however many buildings exist.
+   * Positions must be WORLD-SPACE because the resulting InstancedMesh is added directly to the scene,
+   * not nested under any one building's own Group (whose local origin these panes were previously
+   * relative to).
+   */
+  private windowInstancesLit: { position: THREE_NS.Vector3Tuple; scale: THREE_NS.Vector3Tuple }[] = [];
+  private windowInstancesDark: { position: THREE_NS.Vector3Tuple; scale: THREE_NS.Vector3Tuple }[] = [];
+  /** `createContextBuilding()`'s own window panes — a single global batch with per-instance COLOR
+   * carrying each building's `palette.glass` tint (constant emissiveIntensity across all of them, so
+   * color is the only per-instance distinction needed — no lit/dark split like the real buildings). */
+  private windowInstancesContext: { position: THREE_NS.Vector3Tuple; scale: THREE_NS.Vector3Tuple; color: number }[] = [];
+  /**
+   * GRAPHICS V2 SPRINT F+ — the same window-instancing move (see doc above), applied to
+   * `createContextBuilding()`'s remaining structural trim. `roofUnit`/`plinth`/`cornice` are
+   * IDENTICAL in appearance across every context building (fixed hardcoded colors, only their
+   * transform differs) — they were being rebuilt as a fresh `Mesh` + a fresh `Material` per
+   * building for no visual reason. `roof` varies only by `palette.roof` (4 fixed variants), so it
+   * uses per-instance COLOR the same way `windowInstancesContext` already does. `body` (the wall)
+   * deliberately stays a real per-building `Mesh`: each one clones a shared brick/concrete base and
+   * bakes a real color tint into it, which is genuine per-building material variation this file's
+   * own "spend detail where it matters" policy (PERFORMANCE.md) says is worth the draw call, not a
+   * repeated constant like these four.
+   */
+  private contextRoofInstances: { position: THREE_NS.Vector3Tuple; scale: THREE_NS.Vector3Tuple; color: number }[] = [];
+  private contextRoofUnitInstances: { position: THREE_NS.Vector3Tuple; scale: THREE_NS.Vector3Tuple }[] = [];
+  private contextPlinthInstances: { position: THREE_NS.Vector3Tuple; scale: THREE_NS.Vector3Tuple }[] = [];
+  private contextCorniceInstances: { position: THREE_NS.Vector3Tuple; scale: THREE_NS.Vector3Tuple }[] = [];
   private lastDetailCount = 0;
   private lastCrowdCount = 0;
   private lastTickMs = 0;
@@ -1165,6 +1199,13 @@ export class EpidemicCity3DSim implements Sim3D {
       this.buildingMeshes.push(group);
     }
     this.addDistrictInfill();
+    // Every window pane `createBuilding()`/`createContextBuilding()` collected above (both are called
+    // by this point — the former just above, the latter inside `addDistrictInfill()`) gets baked into
+    // 3 InstancedMeshes here, in one call, before any of the already-instanced generators below run.
+    this.flushWindowInstances();
+    // SPRINT F+: same "collect during generation, bake once" move for the remaining identical
+    // per-context-building structural trim (roof/roofUnit/plinth/cornice) — see the method's own doc.
+    this.flushContextStructuralInstances();
     this.addUrbanCadence();
     // Optional call keeps a live HMR-retained renderer from crashing while the
     // newly defined visual-only method reaches a freshly constructed City3D instance.
@@ -1229,26 +1270,35 @@ export class EpidemicCity3DSim implements Sim3D {
     const body = new THREE.Mesh(new THREE.BoxGeometry(w, height, d), facade);
     body.position.y = height / 2;
     body.castShadow = true; body.receiveShadow = true;
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 1.07, 0.11, d * 1.09), new THREE.MeshStandardMaterial({ color: palette.roof, roughness: 0.72, metalness: 0.18 }));
-    roof.position.y = height + 0.05; roof.castShadow = true; roof.receiveShadow = true;
-    group.add(body, roof);
-    const glass = new THREE.MeshStandardMaterial({ color: palette.glass, emissive: palette.glass, emissiveIntensity: 0.34, roughness: 0.24, metalness: 0.18 });
+    group.add(body);
+    // GRAPHICS V2 SPRINT F+: roof/roofUnit/plinth/cornice below are all identical in appearance
+    // across every context building (roof varies only by the 4-entry `palette.roof`, the other
+    // three are fixed constants) — collected as WORLD-SPACE instance placements instead of built as
+    // per-building Mesh+Material pairs; `flushContextStructuralInstances()` bakes them into a
+    // handful of city-wide InstancedMeshes once every context building has been generated (same
+    // technique as `windowInstancesContext` above).
+    this.contextRoofInstances.push({ position: [x, height + 0.05, z], scale: [w * 1.07, 0.11, d * 1.09], color: palette.roof });
+    // GRAPHICS V2 SPRINT C-1: same instancing move as `createBuilding()` above — every context
+    // building's window panes go into one global, city-wide `InstancedMesh` (per-instance COLOR
+    // carries this building's own `palette.glass` tint, since all context windows share the same
+    // constant emissiveIntensity already, unlike the real buildings' lit/dark contrast).
     const columns = Math.max(1, Math.floor(w / 0.22));
     const rows = Math.max(2, Math.floor(height / 0.20));
     for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
-      const pane = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.11, w / (columns + 1.5)), 0.085, 0.018), glass);
-      pane.position.set(-w / 2 + (col + 1) * w / (columns + 1), 0.19 + row * Math.min(0.20, (height - 0.24) / rows), d / 2 + 0.012);
-      group.add(pane);
+      const position: THREE_NS.Vector3Tuple = [x - w / 2 + (col + 1) * w / (columns + 1), 0.19 + row * Math.min(0.20, (height - 0.24) / rows), z + d / 2 + 0.012];
+      const scale: THREE_NS.Vector3Tuple = [Math.min(0.11, w / (columns + 1.5)), 0.085, 0.018];
+      this.windowInstancesContext.push({ position, scale, color: palette.glass });
     }
     if (serial % 3 === 0) {
-      const roofUnit = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.22, w * 0.25), 0.10, Math.min(0.18, d * 0.28)), new THREE.MeshStandardMaterial({ color: 0x65717d, roughness: 0.72, metalness: 0.22 }));
-      roofUnit.position.set(w * 0.18, height + 0.15, -d * 0.18); roofUnit.castShadow = true; group.add(roofUnit);
+      this.contextRoofUnitInstances.push({
+        position: [x + w * 0.18, height + 0.15, z - d * 0.18],
+        scale: [Math.min(0.22, w * 0.25), 0.10, Math.min(0.18, d * 0.28)],
+      });
     }
     // Ciemniejszy parter i cofnięty gzyms rozbijają sylwetę pudełka, bez dodawania obiektu modelu.
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(w * 1.015, Math.min(0.18, height * 0.22), d * 1.015), new THREE.MeshStandardMaterial({ color: 0x25313b, roughness: 0.52, metalness: 0.12 }));
-    plinth.position.y = Math.min(0.18, height * 0.22) / 2; group.add(plinth);
-    const cornice = new THREE.Mesh(new THREE.BoxGeometry(w * 1.10, 0.035, d * 1.12), new THREE.MeshStandardMaterial({ color: 0xced4d4, roughness: 0.48, metalness: 0.18 }));
-    cornice.position.y = height * 0.72; group.add(cornice);
+    const plinthHeight = Math.min(0.18, height * 0.22);
+    this.contextPlinthInstances.push({ position: [x, plinthHeight / 2, z], scale: [w * 1.015, plinthHeight, d * 1.015] });
+    this.contextCorniceInstances.push({ position: [x, height * 0.72, z], scale: [w * 1.10, 0.035, d * 1.12] });
     group.userData.visualOnlyContext = true;
     this.cameraOccluders.push({
       centerX: x,
@@ -1259,6 +1309,180 @@ export class EpidemicCity3DSim implements Sim3D {
     });
     group.position.set(x, 0, z);
     return group;
+  }
+
+  /**
+   * Bakes every window pane collected by `createBuilding()`/`createContextBuilding()` during this
+   * `init()` call into three `InstancedMesh`es (real-building lit, real-building dark, context) and
+   * adds them directly to the scene. Call once, after every building-generating method has run.
+   * Empty inputs are skipped rather than building a zero-instance mesh.
+   */
+  private flushWindowInstances(): void {
+    if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
+    const group = new THREE.Group();
+    group.name = 'genesis-city-window-instances';
+    group.userData.visualOnlyContext = true;
+
+    const unitBox = new THREE.BoxGeometry(1, 1, 1);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const rotation = new THREE.Quaternion();
+
+    const bakeUniform = (
+      entries: readonly { position: THREE_NS.Vector3Tuple; scale: THREE_NS.Vector3Tuple }[],
+      material: THREE_NS.Material,
+      name: string,
+    ): void => {
+      if (entries.length === 0) return;
+      const mesh = new THREE.InstancedMesh(unitBox, material, entries.length);
+      mesh.name = name;
+      entries.forEach((entry, i) => {
+        position.set(...entry.position);
+        scale.set(...entry.scale);
+        matrix.compose(position, rotation, scale);
+        mesh.setMatrixAt(i, matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    };
+
+    bakeUniform(
+      this.windowInstancesLit,
+      new THREE.MeshStandardMaterial({ color: 0xd8efff, emissive: 0x8ccfff, emissiveIntensity: 0.82, roughness: 0.28, metalness: 0.14 }),
+      'genesis-city-windows-lit',
+    );
+    bakeUniform(
+      this.windowInstancesDark,
+      new THREE.MeshStandardMaterial({ color: 0x426b88, emissive: 0x10243a, emissiveIntensity: 0.25, roughness: 0.38, metalness: 0.16 }),
+      'genesis-city-windows-dark',
+    );
+
+    if (this.windowInstancesContext.length > 0) {
+      const contextMesh = new THREE.InstancedMesh(
+        unitBox,
+        new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.34, roughness: 0.24, metalness: 0.18 }),
+        this.windowInstancesContext.length,
+      );
+      contextMesh.name = 'genesis-city-windows-context';
+      const colorScratch = new THREE.Color();
+      this.windowInstancesContext.forEach((entry, i) => {
+        position.set(...entry.position);
+        scale.set(...entry.scale);
+        matrix.compose(position, rotation, scale);
+        contextMesh.setMatrixAt(i, matrix);
+        contextMesh.setColorAt(i, colorScratch.set(entry.color));
+      });
+      contextMesh.instanceMatrix.needsUpdate = true;
+      if (contextMesh.instanceColor) contextMesh.instanceColor.needsUpdate = true;
+      contextMesh.castShadow = true;
+      contextMesh.receiveShadow = true;
+      group.add(contextMesh);
+    }
+
+    if (group.children.length > 0) {
+      this.scene.add(group);
+      this.buildingMeshes.push(group);
+    } else {
+      unitBox.dispose();
+    }
+
+    this.windowInstancesLit = [];
+    this.windowInstancesDark = [];
+    this.windowInstancesContext = [];
+  }
+
+  /**
+   * GRAPHICS V2 SPRINT F+ — bakes `createContextBuilding()`'s roof/roofUnit/plinth/cornice
+   * placements (see those fields' own doc) into a handful of city-wide `InstancedMesh`es, the same
+   * technique `flushWindowInstances()` already uses. Kept as its own group/method rather than
+   * folded into `flushWindowInstances()` so that method's own SPRINT C-1 regression test (which
+   * asserts its group holds AT MOST 3 InstancedMeshes) keeps meaning exactly what it says.
+   */
+  private flushContextStructuralInstances(): void {
+    if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
+    const group = new THREE.Group();
+    group.name = 'genesis-city-context-structural-instances';
+    group.userData.visualOnlyContext = true;
+
+    const unitBox = new THREE.BoxGeometry(1, 1, 1);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const rotation = new THREE.Quaternion();
+
+    const bakeUniform = (
+      entries: readonly { position: THREE_NS.Vector3Tuple; scale: THREE_NS.Vector3Tuple }[],
+      material: THREE_NS.Material,
+      name: string,
+    ): void => {
+      if (entries.length === 0) return;
+      const mesh = new THREE.InstancedMesh(unitBox, material, entries.length);
+      mesh.name = name;
+      entries.forEach((entry, i) => {
+        position.set(...entry.position);
+        scale.set(...entry.scale);
+        matrix.compose(position, rotation, scale);
+        mesh.setMatrixAt(i, matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    };
+
+    if (this.contextRoofInstances.length > 0) {
+      const roofMesh = new THREE.InstancedMesh(
+        unitBox,
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.72, metalness: 0.18 }),
+        this.contextRoofInstances.length,
+      );
+      roofMesh.name = 'genesis-city-context-roofs';
+      const colorScratch = new THREE.Color();
+      this.contextRoofInstances.forEach((entry, i) => {
+        position.set(...entry.position);
+        scale.set(...entry.scale);
+        matrix.compose(position, rotation, scale);
+        roofMesh.setMatrixAt(i, matrix);
+        roofMesh.setColorAt(i, colorScratch.set(entry.color));
+      });
+      roofMesh.instanceMatrix.needsUpdate = true;
+      if (roofMesh.instanceColor) roofMesh.instanceColor.needsUpdate = true;
+      roofMesh.castShadow = true;
+      roofMesh.receiveShadow = true;
+      group.add(roofMesh);
+    }
+    bakeUniform(
+      this.contextRoofUnitInstances,
+      new THREE.MeshStandardMaterial({ color: 0x65717d, roughness: 0.72, metalness: 0.22 }),
+      'genesis-city-context-roof-units',
+    );
+    bakeUniform(
+      this.contextPlinthInstances,
+      new THREE.MeshStandardMaterial({ color: 0x25313b, roughness: 0.52, metalness: 0.12 }),
+      'genesis-city-context-plinths',
+    );
+    bakeUniform(
+      this.contextCorniceInstances,
+      new THREE.MeshStandardMaterial({ color: 0xced4d4, roughness: 0.48, metalness: 0.18 }),
+      'genesis-city-context-cornices',
+    );
+
+    if (group.children.length > 0) {
+      this.scene.add(group);
+      this.buildingMeshes.push(group);
+    } else {
+      unitBox.dispose();
+    }
+
+    this.contextRoofInstances = [];
+    this.contextRoofUnitInstances = [];
+    this.contextPlinthInstances = [];
+    this.contextCorniceInstances = [];
   }
 
   /**
@@ -1810,22 +2034,29 @@ export class EpidemicCity3DSim implements Sim3D {
         const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.26, 0.09), new THREE.MeshStandardMaterial({ color: 0x684d49, roughness: 0.92 }));
         chimney.position.set(w * 0.28, s.height + 0.20, -d * 0.18); group.add(chimney);
       }
-      const litGlass = new THREE.MeshStandardMaterial({ color: 0xd8efff, emissive: 0x8ccfff, emissiveIntensity: 0.82, roughness: 0.28, metalness: 0.14 });
-      const darkGlass = new THREE.MeshStandardMaterial({ color: 0x426b88, emissive: 0x10243a, emissiveIntensity: 0.25, roughness: 0.38, metalness: 0.16 });
+      // GRAPHICS V2 SPRINT C-1: window panes are no longer individual Mesh objects — each one is
+      // pushed (in WORLD space, since `group.position` is set only at the end of this function) into
+      // `windowInstancesLit`/`windowInstancesDark`, baked into exactly two InstancedMeshes for the
+      // whole city by `flushWindowInstances()` once every building has been generated. Same visual
+      // result (still two distinct lit/dark materials, same positions/sizes), far fewer draw calls.
       const columns = Math.max(1, Math.floor(w / 0.30));
       const rows = Math.max(1, Math.floor(s.height / 0.31));
+      const windowWidth = Math.min(0.15, w / (columns + 1.35));
       for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
         const lit = (row * 3 + col * 5 + variation) % 4 !== 0;
-        const window = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.15, w / (columns + 1.35)), 0.115, 0.024), lit ? litGlass : darkGlass);
-        window.position.set(-w / 2 + (col + 1) * w / (columns + 1), 0.28 + row * 0.26, d / 2 + 0.014);
-        group.add(window);
+        const position: THREE_NS.Vector3Tuple = [x - w / 2 + (col + 1) * w / (columns + 1), 0.28 + row * 0.26, z + d / 2 + 0.014];
+        const scale: THREE_NS.Vector3Tuple = [windowWidth, 0.115, 0.024];
+        (lit ? this.windowInstancesLit : this.windowInstancesDark).push({ position, scale });
       }
       // Dwie współdzielone boczne bandy dają odczyt kondygnacji z obu stron
-      // bryły, ale unikają setek pojedynczych okien i dodatkowych draw calls.
+      // bryły, ale unikają setek pojedynczych okien i dodatkowych draw calls. Only 2 meshes per
+      // building — cheap enough to stay individual Meshes rather than joining the window instancing.
+      const sideBandDark = new THREE.MeshStandardMaterial({ color: 0x426b88, emissive: 0x10243a, emissiveIntensity: 0.25, roughness: 0.38, metalness: 0.16 });
+      const sideBandLit = new THREE.MeshStandardMaterial({ color: 0xd8efff, emissive: 0x8ccfff, emissiveIntensity: 0.82, roughness: 0.28, metalness: 0.14 });
       for (const side of [-1, 1] as const) {
         const sideBand = new THREE.Mesh(
           new THREE.BoxGeometry(0.026, Math.min(0.44, s.height * 0.42), d * 0.62),
-          (variation + (side > 0 ? 1 : 0)) % 4 === 0 ? darkGlass : litGlass,
+          (variation + (side > 0 ? 1 : 0)) % 4 === 0 ? sideBandDark : sideBandLit,
         );
         sideBand.position.set(side * (w / 2 + 0.014), s.height * 0.52, 0);
         group.add(sideBand);

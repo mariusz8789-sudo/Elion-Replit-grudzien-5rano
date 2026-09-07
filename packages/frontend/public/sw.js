@@ -6,7 +6,7 @@
  * Zapytania /api nigdy nie są cache'owane (odpowiedzi AI są per-pytanie).
  */
 
-const CACHE = 'genesis-v2';
+const CACHE = 'genesis-v3';
 const PRECACHE = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {

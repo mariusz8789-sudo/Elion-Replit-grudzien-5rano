@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalJson } from '../core/events/hash';
 import { executeIntervention } from '../core/worldModel/bridge/worldFrameState';
+import { entityId, type WorldModelEntity } from '../core/worldModel/ecs/types';
+import { WorldGraph } from '../core/worldModel/ecs/worldGraph';
 import { addBackupGenerator, applyGeneratorStartCommand, ELECTRICAL_GENERATOR_SOLVER_ID, makeElectricalGeneratorSolver } from '../core/worldModel/domains/electricalGenerator';
 import { buildGenesisCityWorld, makeGenesisCityRouter, makeGenesisCityUpdater } from '../core/worldModel/domains/genesisCityWorld';
-import { SolverRouter } from '../core/worldModel/solvers/solverRouter';
+import { HYDRAULIC_FRICTION_SOLVER_ID, NEWTONIAN_KINEMATICS_SOLVER_ID, SolverRouter, makeHydraulicFrictionSolver, newtonianKinematicsSolver } from '../core/worldModel/solvers/solverRouter';
 import { TemporalEngine } from '../core/worldModel/temporal/temporalEngine';
 
 /**
@@ -19,6 +21,16 @@ import { TemporalEngine } from '../core/worldModel/temporal/temporalEngine';
  * intervention + scrubTo(head) proof PER existing domain solver, so a
  * future regression on any of them fails a test immediately rather than
  * silently reintroducing the bug class.
+ *
+ * `export function make*Solver` across the module found FIVE real solver
+ * factories/constants, not four — the two generic physics solvers in
+ * `solvers/solverRouter.ts` (`newtonianKinematicsSolver`,
+ * `makeHydraulicFrictionSolver`, genuinely distinct from
+ * `hydraulicsPumpPipe.ts`'s pump-PIPE-SYSTEM model: this one decelerates a
+ * single fluid-parcel entity's velocity via pipe friction) are real,
+ * actively-used solvers (specification compiler, bridge-contract-stability,
+ * solver-extensibility, and multiple performance suites all register them)
+ * — covered below alongside the four domain solvers.
  */
 describe('Every real domain solver: an intervention on its own entity survives scrubTo(head) byte-identical', () => {
   it('chemistry (Arrhenius kinetics)', () => {
@@ -79,6 +91,62 @@ describe('Every real domain solver: an intervention on its own entity survives s
 
     const live = engine.graph.getEntity(generatorId);
     const replayed = engine.scrubTo(engine.tick).getEntity(generatorId);
+    expect(canonicalJson(replayed)).toBe(canonicalJson(live));
+  });
+
+  it('Newtonian kinematics (GROUNDED_EXACT reference solver)', () => {
+    const graph = new WorldGraph();
+    const ref = { kind: 'particle', id: 'audit-p1' };
+    const entity: WorldModelEntity = {
+      id: entityId(ref),
+      ref,
+      label: 'particle',
+      scale: { level: 'MESO_LAB' },
+      spatial: { position: { x: 0, y: 0, z: 0 } },
+      physics: { massKg: 1, velocityMS: { x: 2, y: 0, z: 0 } },
+      domainBinding: { solverId: NEWTONIAN_KINEMATICS_SOLVER_ID, domainId: 'kinematics' },
+      grounding: 'UNGROUNDED_APPROXIMATION',
+      updatedAtTick: 0,
+    };
+    graph.addEntity(entity);
+    const router = new SolverRouter();
+    router.register(NEWTONIAN_KINEMATICS_SOLVER_ID, newtonianKinematicsSolver);
+    const engine = new TemporalEngine(graph);
+    engine.advance(1, (g, dt, tick) => router.routeTick(g, dt, tick));
+
+    executeIntervention(engine, entity.id, { 'physics.velocityMS.x': 9 });
+    expect(engine.graph.getEntity(entity.id).physics?.velocityMS?.x).toBe(9);
+
+    const live = engine.graph.getEntity(entity.id);
+    const replayed = engine.scrubTo(engine.tick).getEntity(entity.id);
+    expect(canonicalJson(replayed)).toBe(canonicalJson(live));
+  });
+
+  it('hydraulic friction (MODEL_ESTIMATE fluid-parcel deceleration, distinct from the pump-pipe SYSTEM model above)', () => {
+    const graph = new WorldGraph();
+    const ref = { kind: 'fluid-parcel', id: 'audit-f1' };
+    const entity: WorldModelEntity = {
+      id: entityId(ref),
+      ref,
+      label: 'fluid-parcel',
+      scale: { level: 'MESO_LAB' },
+      spatial: { position: { x: 0, y: 0, z: 0 } },
+      physics: { massKg: 1, velocityMS: { x: 5, y: 0, z: 0 }, densityKgM3: 998, viscosityPaS: 1.002e-3 },
+      domainBinding: { solverId: HYDRAULIC_FRICTION_SOLVER_ID, domainId: 'hydraulics' },
+      grounding: 'UNGROUNDED_APPROXIMATION',
+      updatedAtTick: 0,
+    };
+    graph.addEntity(entity);
+    const router = new SolverRouter();
+    router.register(HYDRAULIC_FRICTION_SOLVER_ID, makeHydraulicFrictionSolver({ pipeDiameterM: 0.1, relativeRoughness: 0.00045 }));
+    const engine = new TemporalEngine(graph);
+    engine.advance(0.1, (g, dt, tick) => router.routeTick(g, dt, tick));
+
+    executeIntervention(engine, entity.id, { 'physics.velocityMS.x': 1 });
+    expect(engine.graph.getEntity(entity.id).physics?.velocityMS?.x).toBe(1);
+
+    const live = engine.graph.getEntity(entity.id);
+    const replayed = engine.scrubTo(engine.tick).getEntity(entity.id);
     expect(canonicalJson(replayed)).toBe(canonicalJson(live));
   });
 

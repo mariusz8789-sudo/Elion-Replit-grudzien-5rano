@@ -5,6 +5,7 @@ import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
+import { getActiveObservationControl } from '../core/activeObservationControl';
 import { saveExperiment, listExperiments, saveBiotechDiscoveryComparisonToMemory, type SavedBiotechComputeRun } from '../core/scienceMemory';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
 import { track } from '../core/analytics';
@@ -579,6 +580,14 @@ export function ScienceChat() {
     } else if (a?.type === 'control') {
       if (a.op === 'reset') resetActiveSim();
       else toggleActiveSimRunning();
+    } else if (a?.type === 'observe') {
+      const control = getActiveObservationControl();
+      if (!control) {
+        appendGenesis('Otwarta symulacja nie obsługuje jeszcze sterowania kamerą/czasem z czatu.');
+      } else {
+        const result = control.applyObservation(a.sentence);
+        appendGenesis(result.narration, result.found ? 'MODEL' : 'SYSTEM');
+      }
     } else if (a?.type === 'save') {
       const c = getSimContext();
       if (c) {

@@ -3,6 +3,7 @@ import { GENESIS_EVENT_CONTRACT_VERSION } from '../../events/genesisEvent';
 import { withCascades, type CascadeRule } from '../cascade/cascadeRules';
 import { defineCrossDomainCoupling, withCrossDomainCouplings, type CrossDomainCoupling } from '../crossDomain/crossDomainCoupling';
 import { entityId, type EntityId } from '../ecs/types';
+import type { WorldGraph } from '../ecs/worldGraph';
 import { withScheduledEvents, type ScheduledEvent } from '../events/worldEventRules';
 import type { WorldBlueprint } from '../generation/worldBlueprint';
 import { generateWorld, type GeneratedWorld } from '../generation/worldGenerator';
@@ -14,6 +15,7 @@ import type { DomainSolver } from '../solvers/solverRouter';
 import type { TemporalUpdater } from '../temporal/temporalEngine';
 import { makeGenesisCityRouter, makeGenesisCityUpdater } from './genesisCityWorld';
 import { bindEnvironmentToRainfallRunoff, rationalMethodPeakRunoffM3S, RAINFALL_CATCHMENT_DEFAULTS } from './rainfallRunoff';
+import { addFloodplain, buildDrainageLossCoupling, buildSyntheticTerrain, FLOOD_INUNDATION_SOLVER_ID, makeFloodInundationSolver, type TerrainHeightfield } from './floodInundation';
 
 /**
  * GENESIS SCIENTIFIC CITY 3.0 — the canonical Generative Scientific World
@@ -257,6 +259,26 @@ function pumpOverloadTripRule(pumpPipeId: EntityId): CascadeRule {
   };
 }
 
+/**
+ * Adds the reference city's floodplain and wires its two edges. Shared by both
+ * construction paths (City 3.0's own pipeline and City 4.0's Trinity
+ * `augmentGraph`) so the two worlds cannot drift apart.
+ *
+ * Must run at CONSTRUCTION time, before a `TemporalEngine` is built, so the
+ * floodplain is genuine tick-0 state that `scrubTo` reconstructs.
+ */
+export function addGenesisScientificCityFloodplain(graph: WorldGraph, terrain: TerrainHeightfield = buildGenesisScientificCityTerrain()): EntityId {
+  // Parented under the city, not left at the root: `validateWorldInvariants` requires exactly one
+  // root for one coherent world, and a floodplain is part of the city, not a second world.
+  // Found by kind rather than by a literal id, because City 3.0 and City 4.0 use different worldIds.
+  const city = graph.listEntities().find((entity) => entity.ref.kind === 'city');
+  const floodplainId = addFloodplain(graph, { floodplainId: 'city-floodplain', label: 'City Drainage Floodplain', terrain, parentEntityId: city?.id });
+  // The environment rains on it; the pump drains it. Both are declared edges the couplings travel.
+  graph.addRelationship(GENESIS_SCIENTIFIC_CITY_ENVIRONMENT_ID, floodplainId, 'floods');
+  graph.addRelationship(GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID, floodplainId, 'drains');
+  return floodplainId;
+}
+
 /** `baseR0` must be the SAME value the registered SEIR solver runs with (`computeEpidemicParamsFor(specification).r0`) — see `serviceToPopulationAccess` below for why the coupling needs it. */
 function buildCouplings(baseR0: number): readonly CrossDomainCoupling[] {
   const rainfallToLoad = defineCrossDomainCoupling({
@@ -371,7 +393,49 @@ function buildCouplings(baseR0: number): readonly CrossDomainCoupling[] {
     },
   });
 
-  return [rainfallToLoad, tripToHospitalService, serviceToPopulationAccess, tripToLabCooling];
+  /**
+   * Rainfall also reaches the floodplain, not only the pump.
+   *
+   * `inflowM3S` is the SAME rational-method runoff the pump load uses — one
+   * number, two consumers, so the water arriving at the drain and the water
+   * arriving on the ground can never disagree.
+   *
+   * `drainageM3S` is set equal to it, which encodes a DISCLOSED ASSUMPTION and
+   * not a computed capacity: while the pump runs, the drainage system is taken
+   * to carry the storm as fast as it arrives, so nothing accumulates. Genesis
+   * has no pump capacity curve to do better than that. What the model is
+   * actually for is the other case — once the pump trips, removal stops, the
+   * volume balance stops cancelling, and depth grows on its own.
+   */
+  const rainfallToFloodplain = defineCrossDomainCoupling({
+    id: 'rainfall-to-floodplain-inflow',
+    sourceDomain: 'environment',
+    targetDomain: 'flood-hydrology',
+    triggerEventType: RAINFALL_EVENT_TYPE,
+    relationshipKind: 'floods',
+    direction: 'from',
+    condition: 'Extreme-rainfall scenario begins, at the intensity the event itself carries',
+    effect: 'Stormwater runoff becomes the floodplain inflow; drainage matches it while the pump is running',
+    grounding: 'MODEL_ESTIMATE',
+    deriveEffect: (floodplain, triggerEvent) => {
+      const intensityMmPerHour = typeof triggerEvent.parameters.intensityMmPerHour === 'number'
+        ? triggerEvent.parameters.intensityMmPerHour
+        : FLAGSHIP_RAINFALL_INTENSITY_MM_PER_HOUR;
+      const runoffM3S = rationalMethodPeakRunoffM3S(
+        intensityMmPerHour,
+        RAINFALL_CATCHMENT_DEFAULTS.catchmentAreaM2,
+        RAINFALL_CATCHMENT_DEFAULTS.runoffCoefficient,
+      );
+      if (floodplain.domainState?.inflowM3S === runoffM3S) return undefined;
+      return {
+        patch: { domainState: { ...floodplain.domainState, inflowM3S: runoffM3S, drainageM3S: runoffM3S } },
+        eventType: 'flood.inflow.raised',
+        cause: 'extreme-rainfall-runoff',
+      };
+    },
+  });
+
+  return [rainfallToLoad, tripToHospitalService, serviceToPopulationAccess, tripToLabCooling, rainfallToFloodplain, buildDrainageLossCoupling(PUMP_TRIPPED_EVENT_TYPE)];
 }
 
 /** Exported so a caller already running this world's engine (e.g. C1's Scientific Director, on a
@@ -411,6 +475,22 @@ export const GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID: EntityId = 'pump-pipe-system:
 /** The `environment:city-environment` id `CITY_TEMPLATE` always produces for this specification — the node Phase 5 binds to the real rational-method runoff solver. Same id on both the manual and the Trinity construction path. */
 export const GENESIS_SCIENTIFIC_CITY_ENVIRONMENT_ID: EntityId = 'environment:city-environment';
 
+/** The floodplain Phase 8.2 adds to the reference city. */
+export const GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID: EntityId = 'floodplain:city-floodplain';
+
+/**
+ * The reference city's terrain. SYNTHETIC and flagged as such, which is what
+ * keeps every inundation result it produces at `PROCEDURAL_APPROXIMATION` — the
+ * fill algorithm is real, the ground it runs on is invented. Built once and
+ * shared so the solver and the entity agree on the same elevations.
+ *
+ * Sized to the drainage sub-catchment Phase 5 already assumes: 45 x 45 cells at
+ * 2 m is 8100 m², within a rounding of `RAINFALL_CATCHMENT_DEFAULTS.catchmentAreaM2`.
+ */
+export function buildGenesisScientificCityTerrain(): TerrainHeightfield {
+  return buildSyntheticTerrain({ cols: 45, rows: 45, cellSizeM: 2, seed: 3, reliefM: 3 });
+}
+
 /**
  * Extension point for a CALLER-SPECIFIC layer on top of this scenario's own
  * three couplings — e.g. `genesisScientificCity4.ts`'s real backup-
@@ -443,6 +523,9 @@ export function buildGenesisScientificCity3Updater(
 ): TemporalUpdater {
   const epidemicParams = computeEpidemicParamsFor(specification);
   const router = makeGenesisCityRouter(epidemicParams);
+  // Bound to the SAME terrain the floodplain entity was built on, so the solver and the entity
+  // cannot disagree about the ground.
+  router.register(FLOOD_INUNDATION_SOLVER_ID, makeFloodInundationSolver(buildGenesisScientificCityTerrain()));
   for (const { solverId, solver } of extras.extraSolvers ?? []) router.register(solverId, solver);
   let updater: TemporalUpdater = makeGenesisCityUpdater(router);
   if (options.rainfallAtTick !== undefined) updater = withScheduledEvents(updater, rainfallSchedule(options.rainfallAtTick));
@@ -452,6 +535,8 @@ export function buildGenesisScientificCity3Updater(
   updater = withCrossDomainCouplings(updater, [couplings[1]]); // trip -> hospital service
   updater = withCrossDomainCouplings(updater, [couplings[2]]); // hospital service -> population access (real r0 lever)
   updater = withCrossDomainCouplings(updater, [couplings[3]]); // trip -> lab cooling loss (real Arrhenius input)
+  updater = withCrossDomainCouplings(updater, [couplings[4]]); // rainfall -> floodplain inflow (same real runoff the pump load uses)
+  updater = withCrossDomainCouplings(updater, [couplings[5]]); // trip -> drainage lost (inundation starts growing)
   if (extras.extraCascades?.length) updater = withCascades(updater, extras.extraCascades);
   // ONE coupling per `withCrossDomainCouplings` layer, applied in order — matching this function's
   // own three above exactly. `withCascades`' own "one pass" rule means a single layer holding
@@ -473,6 +558,7 @@ export function buildGenesisScientificCity3(options: GenesisScientificCity3Optio
   // Phase 5: turn the template's inert environmental-context node into a really-solved
   // catchment. At construction time, so it is genuine tick-0 state that `scrubTo` replays.
   bindEnvironmentToRainfallRunoff(generated.graph, GENESIS_SCIENTIFIC_CITY_ENVIRONMENT_ID);
+  addGenesisScientificCityFloodplain(generated.graph);
 
   const invariants = validateWorldInvariants(generated.graph);
   if (!invariants.ok) {

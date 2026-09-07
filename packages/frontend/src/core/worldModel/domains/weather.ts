@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import { entityId, type EntityId, type WorldModelEntity } from '../ecs/types';
 import { WorldGraph } from '../ecs/worldGraph';
@@ -275,7 +275,6 @@ export type WeatherSource =
   | { readonly kind: 'diurnal'; readonly params: DiurnalWeatherParams }
   | { readonly kind: 'held' };
 
-let stepCounter = 0;
 
 /**
  * The weather solver. `dt` is in seconds. It computes NOTHING about the
@@ -312,7 +311,6 @@ export function makeWeatherSolver(source: WeatherSource = { kind: 'held' }): Dom
     }
 
     const domainState = toDomainState(weather, elapsedS);
-    stepCounter += 1;
 
     const observation: Observation = {
       observationId: `weather-obs:${entity.id}:${ctx.tick}`,
@@ -328,15 +326,16 @@ export function makeWeatherSolver(source: WeatherSource = { kind: 'held' }): Dom
       provenance: ['domains/weather.ts', 'august-roche-magnus-bolton-1980', weather.observed ? 'weather:observed' : 'weather:synthetic'],
     };
 
+    const eventParameters = { ...domainState };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `weather-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('weather-evt', entity.id, ctx.tick, eventParameters),
       type: WEATHER_STEP_EVENT_TYPE,
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'environmental-forcing-step',
-      parameters: { ...domainState },
+      parameters: eventParameters,
       provenance: {
         origin: 'model',
         modelId: WEATHER_SOLVER_ID,

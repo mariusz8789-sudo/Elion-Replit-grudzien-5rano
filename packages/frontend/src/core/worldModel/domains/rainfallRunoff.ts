@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import { entityId, type EntityId, type WorldModelEntity } from '../ecs/types';
 import type { WorldGraph } from '../ecs/worldGraph';
@@ -136,7 +136,6 @@ export const RAINFALL_CATCHMENT_DEFAULTS: RainfallCatchmentDefaults = {
   runoffCoefficient: 0.85,
 };
 
-let stepCounter = 0;
 
 /**
  * One reusable solver. Note what it does NOT do: it never advances rainfall on
@@ -152,7 +151,6 @@ export function makeRainfallRunoffSolver(): DomainSolver {
     const params: RainfallCatchmentDefaults = { ...RAINFALL_CATCHMENT_DEFAULTS, ...state };
     const peakRunoffM3S = rationalMethodPeakRunoffM3S(params.rainfallIntensityMmPerHour, params.catchmentAreaM2, params.runoffCoefficient);
     const intensityCode = rainfallIntensityCode(params.rainfallIntensityMmPerHour);
-    stepCounter += 1;
 
     const observation: Observation = {
       observationId: `rain-obs:${entity.id}:${ctx.tick}`,
@@ -165,15 +163,16 @@ export function makeRainfallRunoffSolver(): DomainSolver {
       provenance: ['domains/rainfallRunoff.ts', 'rational-method'],
     };
 
+    const eventParameters = { ...params, peakRunoffM3S, intensityCode };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `rain-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('rain-evt', entity.id, ctx.tick, eventParameters),
       type: 'environment.rainfallrunoff.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'rational-method-recompute',
-      parameters: { ...params, peakRunoffM3S, intensityCode },
+      parameters: eventParameters,
       provenance: {
         origin: 'model',
         modelId: RAINFALL_RUNOFF_SOLVER_ID,

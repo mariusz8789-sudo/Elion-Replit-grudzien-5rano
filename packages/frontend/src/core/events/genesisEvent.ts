@@ -14,7 +14,38 @@
  *  - `parentEventId` tworzy łańcuch przyczynowy (event → konsekwencja).
  */
 
+import { canonicalJson, fnv1a } from './hash';
+
 export const GENESIS_EVENT_CONTRACT_VERSION = '1.0.0';
+
+/**
+ * A CONTENT-DERIVED event identifier: `<prefix>:<entityId>:<tick>:<hash of
+ * the event's own parameters>`.
+ *
+ * Solvers used to end this id with a module-global step counter, which made
+ * event ids depend on how many events the PROCESS had emitted rather than on
+ * what happened in the world. Two consequences, both real:
+ *
+ * 1. Re-running the same scenario in the same process produced different
+ *    event ids for identical science, so a provenance export
+ *    (`worldModel/evidence/worldEvidenceBundle.ts`) could not be
+ *    byte-reproducible — it had to declare that as a known limitation.
+ * 2. Two branches that diverged from a fork emitted ids that differed only
+ *    by whichever branch happened to run first, rather than by what actually
+ *    differed between them.
+ *
+ * Hashing the event's own parameters fixes both: the id is stable across
+ * processes, and two events carrying different values necessarily get
+ * different ids. Two events with identical entity, tick AND parameters get
+ * the same id — which is correct, because they are the same event.
+ *
+ * `entityKey` is the same `kind:id` form `ecs/types.ts::entityId` produces;
+ * it is spelled out here rather than imported so this module keeps no
+ * dependency on the world-model layer.
+ */
+export function deterministicEventId(prefix: string, entityKey: string, tick: number, parameters: unknown): string {
+  return `${prefix}:${entityKey}:${tick}:${fnv1a(canonicalJson(parameters))}`;
+}
 
 /** Referencja do bytu świata (agent, budynek, region, węzeł sieci…) — neutralna. */
 export interface EntityRef {

@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import { defineCrossDomainCoupling, type CrossDomainCoupling } from '../crossDomain/crossDomainCoupling';
 import { entityId, type EntityId, type GroundingLevel, type WorldModelEntity } from '../ecs/types';
@@ -450,7 +450,6 @@ function initialHydrographState(terrain: TerrainHeightfield, params: FloodplainP
   };
 }
 
-let stepCounter = 0;
 
 /**
  * One solver per floodplain entity, bound to one terrain. Synchronous and
@@ -505,7 +504,6 @@ export function makeFloodInundationSolver(terrain: TerrainHeightfield): DomainSo
     // actually peaked at least once — HYDROGRAPH_NOT_YET_S before that, never a fabricated 0.
     const routingLagSoFarS = peakOutflowSoFarTimeS >= 0 ? peakOutflowSoFarTimeS - peakInflowSoFarTimeS : HYDROGRAPH_NOT_YET_S;
 
-    stepCounter += 1;
 
     const observation: Observation = {
       observationId: `flood-obs:${entity.id}:${ctx.tick}`,
@@ -521,15 +519,16 @@ export function makeFloodInundationSolver(terrain: TerrainHeightfield): DomainSo
       provenance: ['domains/floodInundation.ts', 'connectivity-constrained-planar-fill', 'storage-level-pool-routing', 'mannings-equation', terrain.surveyed ? 'terrain:surveyed' : 'terrain:synthetic'],
     };
 
+    const eventParameters = { ...params, waterVolumeM3, maxDepthM: inundation.maxDepthM, floodedAreaM2: inundation.floodedAreaM2, stateCode, spillOutflowM3S: flux.outflowM3S, outletVelocityMS: flux.velocityMS };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `flood-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('flood-evt', entity.id, ctx.tick, eventParameters),
       type: 'flood.inundation.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'volume-balance-and-planar-fill',
-      parameters: { ...params, waterVolumeM3, maxDepthM: inundation.maxDepthM, floodedAreaM2: inundation.floodedAreaM2, stateCode, spillOutflowM3S: flux.outflowM3S, outletVelocityMS: flux.velocityMS },
+      parameters: eventParameters,
       provenance: {
         origin: 'model',
         modelId: FLOOD_INUNDATION_SOLVER_ID,

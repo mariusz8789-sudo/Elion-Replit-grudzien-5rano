@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { DEFAULT_EPIDEMIC, betaAt, initialState, rk4Step, type Compartments, type EpidemicParams } from '../../epidemic/sir';
 import type { Observation } from '../../world/scientificWorldState';
@@ -22,7 +22,6 @@ import type { DomainSolver, SolverResult } from '../solvers/solverRouter';
 export const EPIDEMIC_SEIR_SOLVER_ID = 'epidemic-seir-rk4';
 export const EPIDEMIC_DOMAIN_ID = 'epidemiology';
 
-let stepCounter = 0;
 
 function compartmentsFromState(state: Record<string, number> | undefined, fallback: Compartments): Compartments {
   return {
@@ -98,7 +97,6 @@ export function makeEpidemicSEIRSolver(baseParams: EpidemicParams): DomainSolver
     const nextT = t + dtDays;
     const beta = betaAt(params, nextT);
 
-    stepCounter += 1;
     const paramsHash = fnv1a(canonicalJson({ params, t, dtDays, entityId: entity.id }));
 
     const observation: Observation = {
@@ -117,15 +115,16 @@ export function makeEpidemicSEIRSolver(baseParams: EpidemicParams): DomainSolver
       provenance: ['core/epidemic/sir.ts', `model:${params.model}`],
     };
 
+    const eventParameters = { ...clipped, t: nextT, beta, r0: params.r0 };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `epi-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('epi-evt', entity.id, ctx.tick, eventParameters),
       type: 'epidemiology.seir.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'rk4-integration',
-      parameters: { ...clipped, t: nextT, beta, r0: params.r0 },
+      parameters: eventParameters,
       provenance: { origin: 'model', modelId: EPIDEMIC_SEIR_SOLVER_ID, paramsHash },
     };
 

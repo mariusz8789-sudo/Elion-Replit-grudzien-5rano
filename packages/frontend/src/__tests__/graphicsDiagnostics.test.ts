@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readFrameCounters, FrameProfiler, RollingFrameStats, type FrameSample } from '../core/three/graphics/diagnostics';
+import * as THREE from 'three';
+import { readFrameCounters, FrameProfiler, RollingFrameStats, estimateSceneTextureMemory, type FrameSample } from '../core/three/graphics/diagnostics';
 import type * as THREE_NS from 'three';
 
 function fakeRenderer(overrides: Partial<{ calls: number; triangles: number; points: number; lines: number; geometries: number; textures: number; programCount: number }> = {}) {
@@ -107,5 +108,75 @@ describe('RollingFrameStats', () => {
     stats.push({ ...sampleAt(10), drawCalls: 5 });
     stats.push({ ...sampleAt(10), drawCalls: 9 });
     expect(stats.latestCounters?.drawCalls).toBe(9);
+  });
+});
+
+/** A texture with a plain `{width, height}` image — avoids needing a real `HTMLCanvasElement` (this
+ * test environment has no `document`), and `estimateSceneTextureMemory` only ever reads
+ * `image.width`/`image.height`, exactly what a real `CanvasTexture`'s image also exposes. */
+function fakeTexture(width: number, height: number, generateMipmaps = true): THREE_NS.Texture {
+  const texture = new THREE.Texture({ width, height } as unknown as HTMLImageElement);
+  texture.generateMipmaps = generateMipmaps;
+  return texture;
+}
+
+describe('estimateSceneTextureMemory', () => {
+  it('reports zero for an empty scene', () => {
+    const scene = new THREE.Scene();
+    expect(estimateSceneTextureMemory(scene)).toEqual({ totalBytes: 0, uniqueTextureCount: 0 });
+  });
+
+  it('estimates RGBA8 bytes with the standard mipmap factor (4/3) for one textured mesh', () => {
+    const scene = new THREE.Scene();
+    const material = new THREE.MeshStandardMaterial({ map: fakeTexture(256, 256) });
+    scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material));
+    const result = estimateSceneTextureMemory(scene);
+    expect(result.uniqueTextureCount).toBe(1);
+    expect(result.totalBytes).toBeCloseTo(256 * 256 * 4 * (4 / 3));
+  });
+
+  it('skips the mipmap factor when generateMipmaps is false', () => {
+    const scene = new THREE.Scene();
+    const material = new THREE.MeshStandardMaterial({ map: fakeTexture(128, 128, false) });
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material));
+    const result = estimateSceneTextureMemory(scene);
+    expect(result.totalBytes).toBeCloseTo(128 * 128 * 4);
+  });
+
+  it('deduplicates a texture shared across multiple materials/meshes (the common case here — one procedural CanvasTexture, many building materials)', () => {
+    const scene = new THREE.Scene();
+    const shared = fakeTexture(64, 64);
+    scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ map: shared })));
+    scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ map: shared })));
+    const result = estimateSceneTextureMemory(scene);
+    expect(result.uniqueTextureCount).toBe(1);
+    expect(result.totalBytes).toBeCloseTo(64 * 64 * 4 * (4 / 3));
+  });
+
+  it('counts every distinct map property on one material (map + normalMap + roughnessMap are 3 real textures, not 1)', () => {
+    const scene = new THREE.Scene();
+    const material = new THREE.MeshStandardMaterial({
+      map: fakeTexture(32, 32), normalMap: fakeTexture(32, 32), roughnessMap: fakeTexture(32, 32),
+    });
+    scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material));
+    expect(estimateSceneTextureMemory(scene).uniqueTextureCount).toBe(3);
+  });
+
+  it('walks an array of materials on one mesh (multi-material geometry)', () => {
+    const scene = new THREE.Scene();
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), [
+      new THREE.MeshStandardMaterial({ map: fakeTexture(16, 16) }),
+      new THREE.MeshStandardMaterial({ map: fakeTexture(32, 32) }),
+    ]);
+    scene.add(mesh);
+    const result = estimateSceneTextureMemory(scene);
+    expect(result.uniqueTextureCount).toBe(2);
+    expect(result.totalBytes).toBeCloseTo((16 * 16 + 32 * 32) * 4 * (4 / 3));
+  });
+
+  it('ignores meshes with no map (a plain-color material contributes 0 textures)', () => {
+    const scene = new THREE.Scene();
+    scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xff0000 })));
+    expect(estimateSceneTextureMemory(scene)).toEqual({ totalBytes: 0, uniqueTextureCount: 0 });
   });
 });

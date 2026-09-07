@@ -3,6 +3,7 @@ import type { SimParams } from '../types';
 import type { PostProcessor, Sim3D } from './types';
 import { detectRenderTier, tierDpr } from './quality';
 import { getSettings } from '../settings';
+import { estimateSceneTextureMemory } from './graphics/diagnostics';
 
 /**
  * Pętla symulacji 3D — lustro core/useSimLoop.ts (DPR, resize, rAF, pauza w
@@ -142,6 +143,11 @@ export function useThreeLoop(
         const scratchDefaultOrbitDirection = new THREE.Vector3();
         let last = performance.now();
         let statsAt = 0;
+        // GRAPHICS V3 — `estimateSceneTextureMemory` walks the whole scene graph, so it is sampled
+        // on an interval (same convention as `onStats` above) rather than every frame; the cached
+        // value fills `textureBytesEstimate` on every OTHER frame's metrics.
+        let textureMemAt = 0;
+        let cachedTextureBytes = 0;
         const loop = (now: number) => {
           const dt = Math.min((now - last) / 1000, 0.05);
           last = now;
@@ -181,6 +187,10 @@ export function useThreeLoop(
           if (post) post.render();
           else renderer!.render(scene, camera);
           const renderMs = performance.now() - renderStartedAt;
+          if (now - textureMemAt > 1000) {
+            textureMemAt = now;
+            cachedTextureBytes = estimateSceneTextureMemory(scene).totalBytes;
+          }
           sim.onRenderMetrics?.({
             fps: 1 / Math.max(0.001, dt),
             frameMs: dt * 1000,
@@ -189,6 +199,7 @@ export function useThreeLoop(
             triangles: renderer!.info.render.triangles,
             geometries: renderer!.info.memory.geometries,
             textures: renderer!.info.memory.textures,
+            textureBytesEstimate: cachedTextureBytes,
           });
           if (onStats && sim.getStats && now - statsAt > 250) {
             statsAt = now;

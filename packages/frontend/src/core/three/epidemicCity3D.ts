@@ -212,7 +212,7 @@ export class EpidemicCity3DSim implements Sim3D {
   private lastDetailCount = 0;
   private lastCrowdCount = 0;
   private lastTickMs = 0;
-  private renderMetrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
+  private renderMetrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0, textureBytesEstimate: 0 };
 
   constructor(
     params: Partial<EpidemicCityParams> = {},
@@ -698,6 +698,9 @@ export class EpidemicCity3DSim implements Sim3D {
       webgl_triangles: this.renderMetrics.triangles,
       webgl_geometries: this.renderMetrics.geometries,
       webgl_textures: this.renderMetrics.textures,
+      // GRAPHICS V3 — real estimated bytes (see diagnostics.ts's estimateSceneTextureMemory),
+      // closing PERFORMANCE_BUDGET.md §6's "texture memory is currently unmeasured" gap.
+      webgl_texture_bytes_estimate: this.renderMetrics.textureBytesEstimate,
     };
   }
 

@@ -975,6 +975,32 @@ reusable checklist, so the next real C3 domain's adapter (weather/structural/fir
 whatever C3's consolidation audit ships) is built from a written standard instead of re-derived from
 scratch.
 
+## 27. Which domains should get an adapter at all — `VISUALIZATION_REUSE_AUDIT.md`
+
+Before building an adapter for a domain that already has a real visualization, read
+`VISUALIZATION_REUSE_AUDIT.md`. It audits the four domains on C3's integration roadmap —
+**Epidemiology** (Phase 1), **Quantum** (Phase 2), **Relativity** (Phase 3), **Chemistry/Molecular**
+(Phase 4) — for every existing visualization, whether it renders REAL state or is a DEMO, and whether
+it can be reused as a `WorldFrameRenderer` adapter or needs a structurally new one.
+
+Summary of its verdicts, so nobody starts the wrong piece of work:
+
+- **Epidemiology → HYBRID.** Keep `epidemicCity3D.ts`'s agent-based rendering exactly as it is (it
+  renders a *different real model* from C3's compartmental SEIR); add a small aggregate adapter beside
+  the `WorldFrameRenderer` this scene **already hosts** for the water seam. C3's Phase 1 population
+  entity is one homogeneous-mixing `MACRO_CITY` aggregate with no spatial distribution, so it must
+  never drive the per-agent crowd or the heatmap.
+- **Quantum, Relativity → REWRITE.** Their existing 3D scenes own their cameras, HUDs, shaders, and
+  animation loops; there is no `resolveVisual`/`updateVisual` seam to wrap. Their *physics* is fully
+  reusable; their rendering is not.
+- **Chemistry/Molecular → REWRITE-WHEN-READY.** Architecturally a good fit, but blocked: no real
+  backend (RDKit/PySCF/OpenMM/Biopython) returns per-atom coordinates to the frontend today.
+
+The audit also records a gap in `ADAPTER_CONTRACT.md` that epidemiology exposed: that contract's
+honesty axis is *state realness*, but there is a second, orthogonal axis — **aggregation level**. An
+adapter must render at the aggregation level of the entity it was given, and never disaggregate an
+aggregate into invented individuals.
+
 ## Example usage
 
 See `examples/heroApparatusExample.ts` in full — it wires every subsystem

@@ -291,6 +291,16 @@ function diffGraphs(before: WorldGraph, after: WorldGraph): EntityDelta[] {
       continue;
     }
     beforeIds.delete(entity.id);
+    // `WorldGraph.clone()` shares entity object references for anything no
+    // write path touched since the clone — a reference match is therefore a
+    // GUARANTEED content match (every write path replaces an entity
+    // wholesale, never mutates one in place), so the vast majority of
+    // entities in a large world (untouched by this tick's solvers) skip the
+    // expensive canonicalJson comparison below entirely. This is the fix
+    // for the non-linear per-tick cost profiled at 250k+ entities: before
+    // this, every entity paid for a recursive key-sorted JSON stringify
+    // twice per tick regardless of whether anything about it changed.
+    if (previous === entity) continue;
     if (canonicalJson(previous) !== canonicalJson(entity)) {
       deltas.push({
         op: 'update',

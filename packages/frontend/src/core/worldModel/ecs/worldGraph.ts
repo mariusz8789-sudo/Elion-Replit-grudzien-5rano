@@ -242,16 +242,32 @@ export class WorldGraph {
     return Math.abs(parent.physics.massKg - childMass) <= toleranceKg;
   }
 
-  /** Deep, independent copy — the basis for temporal keyframes and branch forks. */
+  /**
+   * Independent copy — the basis for temporal keyframes and branch forks.
+   * Deliberately a SHALLOW copy of the entity map (new `Map`/`Set`
+   * containers, but the same `WorldModelEntity` object references): every
+   * production write path (`addEntity`, `updateEntity`, `removeEntity`)
+   * replaces an entity wholesale rather than mutating one in place, so an
+   * entity object is immutable in practice once stored — sharing its
+   * reference across clones is exactly as safe as deep-copying it, and
+   * `diffGraphs`/`runWorldEventRules` rely on this: an entity untouched
+   * since the last clone keeps the SAME reference, so they can skip it with
+   * a `===` check instead of paying for a deep structural comparison. A
+   * genuinely deep clone here (as this used to be) makes every tick's cost
+   * proportional to the WHOLE graph regardless of how many entities a
+   * solver actually touched that tick — the dominant cost at scale (profiled
+   * at 250k+ entities: this method plus the resulting content-hash diffing
+   * were the actual bottleneck, not anything solver-specific).
+   */
   clone(): WorldGraph {
     const copy = new WorldGraph();
-    for (const entity of this.entities.values()) {
-      copy.entities.set(entity.id, structuredCloneEntity(entity));
+    for (const [id, entity] of this.entities) {
+      copy.entities.set(id, entity);
     }
     for (const [parentId, children] of this.childrenByParent) {
       copy.childrenByParent.set(parentId, new Set(children));
     }
-    copy.relationships.push(...this.relationships.map((r) => ({ ...r })));
+    copy.relationships.push(...this.relationships);
     return copy;
   }
 

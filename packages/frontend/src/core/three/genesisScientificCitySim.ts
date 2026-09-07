@@ -121,6 +121,18 @@ export interface ReplayWindow {
   toTick: number;
 }
 
+/** A road/pavement material this scene can flip between its normal ("dry") PBR look and a wetter
+ * one (lower roughness reads as more specular/reflective under the same real lighting — a real PBR
+ * technique, not a shader trick standing in for state) once `RAINFALL_EVENT_TYPE` has actually
+ * fired. Base values are captured at creation so the toggle is reversible and idempotent. */
+interface WetSurfaceMaterial {
+  material: THREE_NS.MeshStandardMaterial;
+  dryRoughness: number;
+  dryColor: THREE_NS.Color;
+  wetRoughness: number;
+  wetColor: THREE_NS.Color;
+}
+
 function groundingToC2(level: WorldModelEntity['grounding']): EntityGrounding {
   return level === 'GROUNDED_EXACT' ? 'MODELED' : 'DERIVED';
 }
@@ -154,6 +166,16 @@ export class GenesisScientificCitySim implements Sim3D {
   private contextGroup: THREE_NS.Group | null = null;
   private contextMaterials: THREE_NS.Material[] = [];
   private trees: VegetationFieldHandle | null = null;
+  /** GRAPHICS V2 SPRINT C-2: the road/pavement materials this scene can make read as rain-wet once
+   * the REAL `RAINFALL_EVENT_TYPE` scenario has actually fired (`isRainfallScenarioActive()`) — see
+   * `applyRainfallVisualState`'s own doc for why this is a rendering-only response to a real C3
+   * event, never a second weather system. */
+  private wetSurfaceMaterials: WetSurfaceMaterial[] = [];
+  private rainfallVisualApplied = false;
+  private readonly dryFogDensity = 0.0075;
+  // +40% over baseline — noticeably heavier atmosphere without erasing the skyline the flagship
+  // scene exists to show (found live: 0.0145 read as fog erasing most of the city past ~40m).
+  private readonly rainFogDensity = 0.0105;
   /** Real WebGLRenderer.info counters, fed by useThreeLoop through the existing Sim3D
    * `onRenderMetrics` hook. This scene previously implemented neither the hook nor a readout, so it
    * could not be measured at all — which made the graphics performance budget unenforceable on the
@@ -641,6 +663,21 @@ export class GenesisScientificCitySim implements Sim3D {
     const carGlass = createPBRMaterial(THREE, 'TECH_COMPOSITE', { color: 0x1c2733 });
     this.contextMaterials = [asphalt, concrete, roof, metal, lampGlow, contextWindow, trunk, canopy, carBody, carGlass, kerb, paving, paint, ...facadeMaterials];
 
+    // SPRINT C-2: register the road/pavement surfaces so `applyRainfallVisualState` can make them
+    // read as rain-wet once the real `RAINFALL_EVENT_TYPE` scenario fires — see that method's own
+    // doc. Registered here (not cloned) because these materials are already shared, scene-owned
+    // instances this method is the sole author of.
+    this.wetSurfaceMaterials = ([asphalt, paving, kerb] as THREE_NS.Material[]).map((material) => {
+      const standard = material as THREE_NS.MeshStandardMaterial;
+      return {
+        material: standard,
+        dryRoughness: standard.roughness,
+        dryColor: standard.color.clone(),
+        wetRoughness: Math.min(standard.roughness, 0.18),
+        wetColor: standard.color.clone().multiplyScalar(0.6),
+      };
+    });
+
     // Keep-out zones: the real entities' own positions, so context never buries the science.
     const keepOut: { x: number; z: number; r: number }[] = [];
     for (const id of this.renderedIds) {
@@ -957,10 +994,46 @@ export class GenesisScientificCitySim implements Sim3D {
     this.contextMaterials = [];
     this.windowMaterial?.dispose();
     this.windowMaterial = null;
+    this.wetSurfaceMaterials = [];
+    this.rainfallVisualApplied = false;
+  }
+
+  /**
+   * GRAPHICS V2 SPRINT C-2 — renders the REAL `RAINFALL_EVENT_TYPE` scenario, once it has actually
+   * fired (`isRainfallScenarioActive()`, backed by `this.rainfallOutcome`), as a visible atmosphere
+   * change: denser fog and wetter-looking road/pavement surfaces (lower `roughness` reads as more
+   * specular under the same real lighting — a real PBR response, not a fabricated shader standing
+   * in for state).
+   *
+   * HONEST SCOPE, stated up front: this is a RENDERING reaction to a real, already-fired C3 event —
+   * it adds no weather solver, no precipitation model, and no new simulated quantity. Genesis has no
+   * rainfall-intensity parameter (`getRainfallCounterfactualGap()` already documents that gap
+   * explicitly); this method reads only the one real boolean fact C3 actually models — whether the
+   * scripted scenario has begun — and always applies the same fixed visual response, exactly as
+   * honest a mapping as `waterInfrastructureBridge.ts`'s NORMAL/FAILED -> geometry color mapping.
+   *
+   * Idempotent and reversible: it is called every frame from `syncScene` but only touches materials
+   * on the one frame the boolean actually flips, and would restore the dry look if `rainfallOutcome`
+   * were ever cleared (it currently never is — the scenario is one-way — but this does not assume
+   * that either).
+   */
+  private applyRainfallVisualState(scene: THREE_NS.Scene): void {
+    const active = this.isRainfallScenarioActive();
+    if (active === this.rainfallVisualApplied) return;
+    this.rainfallVisualApplied = active;
+
+    if (scene.fog && 'density' in scene.fog) {
+      (scene.fog as THREE_NS.FogExp2).density = active ? this.rainFogDensity : this.dryFogDensity;
+    }
+    for (const surface of this.wetSurfaceMaterials) {
+      surface.material.roughness = active ? surface.wetRoughness : surface.dryRoughness;
+      surface.material.color.copy(active ? surface.wetColor : surface.dryColor);
+    }
   }
 
   syncScene(_scene: THREE_NS.Scene, _camera: THREE_NS.PerspectiveCamera): void {
     if (!this.renderer) return;
+    this.applyRainfallVisualState(_scene);
     // While replaying, render the REAL historical state at the cursor tick — getFrameState's own
     // optional `timestamp` param (bridge/worldFrameState.ts) already does this via the engine's
     // real scrubTo, so replay needs no second history/snapshot mechanism.
@@ -1021,6 +1094,9 @@ export class GenesisScientificCitySim implements Sim3D {
       hospitalInterrupted: hospital?.domainState?.waterServiceInterrupted ?? 0,
       selected: this.lastSelectedId ? 1 : 0,
       rainfallActive: this.rainfallOutcome ? 1 : 0,
+      // SPRINT C-2: distinct from `rainfallActive` (a world-model fact) — this is whether the
+      // RENDERING has actually reacted to it yet (`applyRainfallVisualState`, driven by `syncScene`).
+      rainfallVisualApplied: this.rainfallVisualApplied ? 1 : 0,
       replaying: this.replay ? 1 : 0,
       replayTick: this.replay?.cursor ?? -1,
       webgl_fps: this.renderMetrics.fps,

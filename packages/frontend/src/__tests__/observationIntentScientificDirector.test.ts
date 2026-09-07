@@ -109,3 +109,29 @@ describe('parseObservationIntent — "next N hours" (the flagship dialogue\'s ow
     expect(intent.time).toEqual({ kind: 'RELATIVE', direction: 'FORWARD', amount: 3, unit: 'DAY' });
   });
 });
+
+describe('parseObservationIntent — askingForLimitations (Genesis Urban Resilience Engine success criterion 8)', () => {
+  it('English phrasing', () => {
+    expect(parseObservationIntent('What are the assumptions?').askingForLimitations).toBe(true);
+    expect(parseObservationIntent('What are the limitations?').askingForLimitations).toBe(true);
+    expect(parseObservationIntent('Show me the limits.').askingForLimitations).toBe(true);
+  });
+
+  it('Polish phrasing', () => {
+    expect(parseObservationIntent('Jakie są ograniczenia?').askingForLimitations).toBe(true);
+    expect(parseObservationIntent('Pokaż założenia.').askingForLimitations).toBe(true);
+  });
+
+  it('is distinct from askingWhatIsHappening — a grounding question, not a status question', () => {
+    const intent = parseObservationIntent('What are the limitations?');
+    expect(intent.askingWhatIsHappening).toBe(false);
+  });
+
+  it('never flags TARGET as unresolved for this phrasing', () => {
+    expect(parseObservationIntent('What are the limitations?').unresolved).not.toContain('TARGET');
+  });
+
+  it('is false for an unrelated sentence', () => {
+    expect(parseObservationIntent('Show me the pump.').askingForLimitations).toBe(false);
+  });
+});

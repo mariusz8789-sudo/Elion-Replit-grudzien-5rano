@@ -18,15 +18,33 @@ export interface GenesisRoCrate {
   '@graph': readonly RoCrateGraphNode[];
 }
 
-const RO_CRATE_CONTEXT = 'https://w3id.org/ro/crate/1.1/context';
-const PROV_CONTEXT = 'http://www.w3.org/ns/prov#';
-const GENESIS_CONTEXT = 'https://genesis.local/ns/evidence-pack#';
+/**
+ * The RO-Crate/PROV vocabulary this exporter emits. Exported so a second
+ * adapter fed by a DIFFERENT engine (see
+ * `worldModel/evidence/worldEvidenceBundle.ts`, which is fed by
+ * WorldGraph/TemporalEngine rather than by `hypothesisLoop`'s
+ * `ScientificEvidencePack`) can emit the SAME JSON-LD format from the same
+ * primitives, instead of duplicating this file's serialisation logic or
+ * shoehorning world-model data into a pack shape that has no honest values
+ * for `arms`/`repetitionsPerArm`/`runFingerprint`.
+ */
+export const RO_CRATE_CONTEXT = 'https://w3id.org/ro/crate/1.1/context';
+export const PROV_CONTEXT = 'http://www.w3.org/ns/prov#';
+export const GENESIS_CONTEXT = 'https://genesis.local/ns/evidence-pack#';
 
-function stableId(value: string): string {
+/** The `@context` every Genesis RO-Crate emits — one definition, shared by every adapter. */
+export const GENESIS_RO_CRATE_CONTEXT: GenesisRoCrate['@context'] = [
+  RO_CRATE_CONTEXT,
+  { prov: PROV_CONTEXT, genesis: GENESIS_CONTEXT },
+];
+
+/** Makes an arbitrary identifier safe to use as a JSON-LD `@id` fragment, deterministically. */
+export function stableId(value: string): string {
   return encodeURIComponent(value).replace(/%/g, '_');
 }
 
-function entityRef(id: string): { '@id': string } {
+/** A JSON-LD reference to another node in the same graph. */
+export function entityRef(id: string): { '@id': string } {
   return { '@id': id };
 }
 
@@ -156,16 +174,7 @@ export function exportEvidencePackRoCrate(pack: ScientificEvidencePack): Genesis
 
   graph.push(...Array.from(softwareAgents.values()), ...inputNodes, ...activityNodes, ...resultNodes);
 
-  return {
-    '@context': [
-      RO_CRATE_CONTEXT,
-      {
-        prov: PROV_CONTEXT,
-        genesis: GENESIS_CONTEXT,
-      },
-    ],
-    '@graph': graph,
-  };
+  return { '@context': GENESIS_RO_CRATE_CONTEXT, '@graph': graph };
 }
 
 export function serializeEvidencePackRoCrate(pack: ScientificEvidencePack): string {

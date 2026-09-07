@@ -25,7 +25,8 @@ import { applyVisualState, type CanonicalVisualState } from './graphics/visualSt
 import { resolveCameraFraming, type CameraIntent } from './graphics/cameraRig';
 import { createSceneEnvironment, type SceneEnvironmentHandle } from './graphics/sceneEnvironment';
 import { disposeSceneResources } from './graphics/lifecycle';
-import { setupGraphicsPipeline } from './graphics/postProcessing';
+import { setupGraphicsPipeline, configureDOF, type GraphicsPipeline } from './graphics/postProcessing';
+import { configureCinematicCamera, recommendedDofForProfile, FocusPuller, type CinematicCameraProfile } from './graphics/cinematicCamera';
 
 /**
  * GENESIS — CITY INFRASTRUCTURE INTEGRATION 1.0
@@ -176,6 +177,13 @@ export class GenesisScientificCitySim implements Sim3D {
   // +40% over baseline — noticeably heavier atmosphere without erasing the skyline the flagship
   // scene exists to show (found live: 0.0145 read as fog erasing most of the city past ~40m).
   private readonly rainFogDensity = 0.0105;
+
+  /** GRAPHICS V2 SPRINT D — cinematic lens/focus polish, reusing `cinematicCamera.ts` exactly as
+   * `labScene3D.ts` already does (see `updateCinematicFraming`'s own doc): no second camera system,
+   * just the lens (FOV/DOF) half of the shot this scene wasn't using yet. */
+  private pipeline: GraphicsPipeline | null = null;
+  private appliedCinematicProfile: CinematicCameraProfile | null = null;
+  private focusPuller: FocusPuller | null = null;
   /** Real WebGLRenderer.info counters, fed by useThreeLoop through the existing Sim3D
    * `onRenderMetrics` hook. This scene previously implemented neither the hook nor a readout, so it
    * could not be measured at all — which made the graphics performance budget unenforceable on the
@@ -626,6 +634,17 @@ export class GenesisScientificCitySim implements Sim3D {
     camera.position.set(midX + 46, 34, midZ + 62);
     camera.lookAt(midX, 4, midZ);
 
+    // SPRINT D — cinematic lens polish. The establishing pose above is a WIDE shot in composition
+    // but was still using the generic 50deg lens `useThreeLoop.ts` constructs every camera with;
+    // `configureCinematicCamera`/`FocusPuller` are `cinematicCamera.ts`'s existing lens/focus
+    // primitives (already proven in `labScene3D.ts`) — reused here, not a second camera system.
+    // The focus pull starts at this establishing shot's own real distance (everything reads sharp
+    // at this range regardless) and eases toward the hero standoff as `updateCinematicFraming`
+    // (called every frame from `syncScene`) detects the SPRINT C-3 push-in has arrived.
+    const establishingDistance = camera.position.distanceTo(new THREE.Vector3(midX, 4, midZ));
+    this.applyCinematicProfile(camera, 'WIDE_ESTABLISHING');
+    this.focusPuller = new FocusPuller(establishingDistance);
+
     // SPRINT C-3 — subject framing. The wide shot above sets the FIRST frame's static establishing
     // pose; left alone, it was also the scene's PERMANENT resting camera, and the pump/hospital
     // pair — the actual subject of this whole scenario — read as two small objects lost in a much
@@ -644,6 +663,7 @@ export class GenesisScientificCitySim implements Sim3D {
     // includes both, however far apart a future generated world places them.
     const pairSpan = Math.max(Math.hypot(hospital[0] - pump[0], hospital[2] - pump[2]) / 2 + 4, 6);
     this.frameCameraOn([midX, 3, midZ], pairSpan, 'CINEMATIC');
+    if (this.observationStandoff) this.focusPuller?.pullTo(this.observationStandoff);
   }
 
   /**
@@ -984,22 +1004,42 @@ export class GenesisScientificCitySim implements Sim3D {
     w: number,
     h: number,
   ): PostProcessor {
-    return setupGraphicsPipeline(this.THREE!, modules, renderer, {
+    const pipeline = setupGraphicsPipeline(this.THREE!, modules, renderer, {
       scene, camera, width: w, height: h,
       toneMappingExposure: 1.15,
       bloom: { strength: 0.5, radius: 0.6, threshold: 0.68 },
       ambient: { mode: 'none' },
+      // SPRINT D — a subtle rack focus matching the SAME real establish->hero framing SPRINT C-3
+      // already drives: sharp everywhere at the wide establishing distance (`focusPuller`'s seed),
+      // easing toward a shallower hero focus on the pump/hospital pair as `updateCinematicFraming`
+      // (called every frame from `syncScene`) detects the push-in has arrived. `minTier: 'medium'`
+      // matches `recommendedDofForProfile`'s own HERO_CLOSE_UP blur strength (0.35) rather than a
+      // one-off tuned value, so the lens and the DOF pass always agree on how strong the look is.
+      depthOfField: configureDOF({
+        focusDistance: this.focusPuller?.value ?? 60,
+        blurStrength: recommendedDofForProfile('HERO_CLOSE_UP', this.focusPuller?.value ?? 60).blurStrength,
+        minTier: 'medium',
+      }),
     });
+    this.pipeline = pipeline;
+    return pipeline;
   }
 
-  update(_dt: number): void {
+  update(dt: number): void {
     // Time only advances through explicit step()/triggerPumpFailure() calls (deterministic,
     // testable, and matches this world's own real solver cadence) — never a per-frame auto-tick.
     // The shared environment's ambient haze is a pure rendering-layer effect (particle drift), not
     // simulation time, so it still animates every real frame regardless of world-clock state —
     // same split epidemicCity3D.ts's own cityHaze already draws between "world time" and "visual
     // motion that just needs to look alive."
-    this.sceneEnvironment?.update(_dt);
+    this.sceneEnvironment?.update(dt);
+    // SPRINT D — advances the establish->hero rack focus started in `init()`. `update(dt)` (not
+    // `syncScene`) is where this scene actually has a real `dt`; the lens-profile switch itself
+    // lives in `syncScene` (it has the live camera, which this method deliberately does not).
+    if (this.focusPuller) {
+      const distance = this.focusPuller.update(dt);
+      this.pipeline?.setFocusDistance(distance);
+    }
   }
 
   /** Releases this scene's own environment resources. The rest of this file's materials/renderer
@@ -1024,6 +1064,12 @@ export class GenesisScientificCitySim implements Sim3D {
     this.windowMaterial = null;
     this.wetSurfaceMaterials = [];
     this.rainfallVisualApplied = false;
+    // SPRINT D cleanup. The pipeline's own GPU resources are freed by `useThreeLoop.ts`'s separate
+    // `post.dispose()` call on the SAME object this field points at — only the reference itself
+    // needs clearing here so `update()` never calls into a torn-down pipeline afterward.
+    this.pipeline = null;
+    this.appliedCinematicProfile = null;
+    this.focusPuller = null;
   }
 
   /**
@@ -1059,9 +1105,47 @@ export class GenesisScientificCitySim implements Sim3D {
     }
   }
 
+  /**
+   * Applies a named `cinematicCamera.ts` profile's FOV, then immediately restores THIS scene's own
+   * near/far clip planes. `cinematicCamera.ts`'s profiles (`near`/`far` included) were tuned for
+   * `labScene3D.ts`'s single-room scale (a few metres) — found live that applying its
+   * `WIDE_ESTABLISHING` profile as-is (`far: 100`) clipped most of this city (a ~150-unit road grid
+   * viewed from ~84 units out) into a black screen. Reusing the profile for its FOV/DOF pairing
+   * while overriding near/far for this scene's real spatial scale is the same kind of override
+   * `sceneEnvironment.ts` already grants every caller for its own shared defaults — not a fork of
+   * the module.
+   */
+  private applyCinematicProfile(camera: THREE_NS.PerspectiveCamera, profile: CinematicCameraProfile): void {
+    configureCinematicCamera(camera, profile);
+    camera.near = 0.1;
+    camera.far = 600;
+    camera.updateProjectionMatrix();
+    this.appliedCinematicProfile = profile;
+  }
+
+  /**
+   * GRAPHICS V2 SPRINT D — the lens half of the SPRINT C-3 establish->hero camera move.
+   * `configureCinematicCamera` (`cinematicCamera.ts`, already proven in `labScene3D.ts`) swaps the
+   * live camera's FOV between `WIDE_ESTABLISHING` (68deg, matches the initial wide shot) and
+   * `HERO_CLOSE_UP` (40deg, a real cinematic lens change, not just a position move) once the
+   * per-frame lerp `useThreeLoop.ts` already runs toward `getOrbitTarget()` has actually arrived —
+   * detected here from the LIVE camera-to-target distance, the same real number that lerp is
+   * closing. Applied only on change (`appliedCinematicProfile`), exactly like `labScene3D.ts`'s own
+   * convention, so this never fights `updateProjectionMatrix` every frame for no reason.
+   */
+  private updateCinematicFraming(camera: THREE_NS.PerspectiveCamera): void {
+    if (!this.followTarget || !this.observationStandoff) return;
+    const distance = camera.position.distanceTo(this.followTarget);
+    const desiredProfile: CinematicCameraProfile = distance > this.observationStandoff * 1.4 ? 'WIDE_ESTABLISHING' : 'HERO_CLOSE_UP';
+    if (desiredProfile !== this.appliedCinematicProfile) {
+      this.applyCinematicProfile(camera, desiredProfile);
+    }
+  }
+
   syncScene(_scene: THREE_NS.Scene, _camera: THREE_NS.PerspectiveCamera): void {
     if (!this.renderer) return;
     this.applyRainfallVisualState(_scene);
+    this.updateCinematicFraming(_camera);
     // While replaying, render the REAL historical state at the cursor tick — getFrameState's own
     // optional `timestamp` param (bridge/worldFrameState.ts) already does this via the engine's
     // real scrubTo, so replay needs no second history/snapshot mechanism.
@@ -1125,6 +1209,11 @@ export class GenesisScientificCitySim implements Sim3D {
       // SPRINT C-2: distinct from `rainfallActive` (a world-model fact) — this is whether the
       // RENDERING has actually reacted to it yet (`applyRainfallVisualState`, driven by `syncScene`).
       rainfallVisualApplied: this.rainfallVisualApplied ? 1 : 0,
+      // SPRINT D — the live rack-focus distance `update()` feeds into `GraphicsPipeline.setFocusDistance`;
+      // exposed for the same observability reason `webgl_*` is (and so a test can verify the pull
+      // actually progresses without a real WebGLRenderer to read DOF uniforms back out of).
+      cinematicFocusDistance: this.focusPuller?.value ?? 0,
+
       replaying: this.replay ? 1 : 0,
       replayTick: this.replay?.cursor ?? -1,
       webgl_fps: this.renderMetrics.fps,

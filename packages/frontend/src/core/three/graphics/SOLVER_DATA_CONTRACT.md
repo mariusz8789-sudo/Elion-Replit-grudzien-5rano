@@ -328,10 +328,24 @@ adjustable.
   from a real origin position (Rule 1's hazard). C3 MUST NOT rely on that. If positions genuinely do
   not exist, the entity MUST be `UNGROUNDED_APPROXIMATION` (honest placeholder) or omitted.
 
-**Phase applicability:** this is the **blocking gap for Phase 4** (`VISUALIZATION_REUSE_AUDIT.md` §3):
-no real backend — RDKit, PySCF, Biopython, or OpenMM — returns per-atom coordinates to the frontend
-today, even though OpenMM genuinely computes them server-side. Everything in this section is ready and
-waiting; nothing can use it until coordinates cross the API boundary.
+**Phase applicability, GRAPHICS V6 status update.** This section originally described a real gap for
+the whole of Phase 4; it is now PARTIALLY closed, and this paragraph is corrected in place (per this
+document's own §C precedent) rather than left to mislead a future reader:
+
+- **RDKit conformer embedding is real and flowing.** `worldModel/domains/molecularStructure.ts`'s
+  `createBackendGeometrySource()` calls a real `chem-rdkit-embed3d` backend capability that returns
+  real per-atom `{element, x, y, z}` coordinates (RDKit ETKDGv3 + MMFF/UFF, `MODEL_ESTIMATE`
+  grounding) — this is exactly the coordinate-crossing-the-API-boundary event this paragraph said
+  hadn't happened yet. `moleculeScene3D.ts` (GRAPHICS V3/V4/V5) is the real C2 consumer, and Phase
+  8.1 closed §C below on the same data, so a molecule now renders real atoms AND real bonds end to
+  end. This is a **single static conformer per request**, not a trajectory.
+- **OpenMM's own real-time MD trajectory remains the open case.** The original claim about OpenMM
+  specifically — a real Langevin-MD run that computes coordinates server-side but returns only five
+  scalars to the frontend — is still accurate as of this update; that is a genuinely different,
+  still-open sub-problem (§D, streaming trajectory frames, not a one-shot conformer) from the RDKit
+  case this section otherwise describes.
+- **PySCF/Biopython** still return energies/orbitals and RMSD scalars respectively, not coordinates —
+  unchanged from the original claim.
 
 ### §C. Bonds and edges — **CLOSED (Phase 8.1). The channel now exists.**
 
@@ -492,15 +506,19 @@ The audit recommends these scenes stay bespoke (§2), so C3 should not expect an
 
 ### Phase 4 — Molecular / biotech
 
-This is where the contract bites hardest, because everything is ready except the data:
+**GRAPHICS V6 status update:** the single-conformer case below is done — checked off here rather than
+left stale, per §B's own corrected paragraph above.
 
-- [ ] **The blocking question: can a real backend return per-atom coordinates?** Most plausibly OpenMM,
-      which already computes them server-side and currently returns only five scalars.
-- [ ] If yes → §B in full: stable ids, absolute positions, stated units/origin/handedness/conversion,
-      `ref.kind` = element symbol, stable ordering.
-- [ ] Decide the decimation and state it (§D): frames per picosecond, from what integration timestep.
-- [ ] Bonds → §C, which **requires adding a relationships channel to `WorldFrameState`** (or the
-      out-of-band interim). Agree this before implementation starts.
+- [x] **The blocking question: can a real backend return per-atom coordinates?** Answered YES for a
+      single static conformer: RDKit's `chem-rdkit-embed3d` (§B). Still open specifically for OpenMM's
+      own streaming MD trajectory, which remains scalars-only.
+- [x] §B in full: stable ids, absolute positions, stated units/origin/handedness/conversion, `ref.kind`
+      = element symbol, stable ordering — all real in `molecularStructure.ts`/`moleculeScene3D.ts`.
+- [ ] Decide the decimation and state it (§D): frames per picosecond, from what integration timestep —
+      still open, and only meaningful once a TRAJECTORY (OpenMM) source exists; a single RDKit
+      conformer has no decimation question.
+- [x] Bonds → §C, **CLOSED (Phase 8.1)** — the relationships channel exists and `moleculeScene3D.ts`
+      renders real bond order + aromaticity from it.
 - [ ] Orbitals/density → §E; expect to reduce to an isosurface on C3's side.
 - [ ] Descriptors/ADMET/energies → §A, **already fully supported today, no blockers.**
 
@@ -529,13 +547,16 @@ Summarised so they can be scheduled rather than discovered:
 
 | # | Gap | Blocks | Change needed | Size |
 |---|---|---|---|---|
-| 1 | No per-atom coordinates cross the backend API | Phase 4, all molecular geometry | Backend/C3: return coordinate frames (OpenMM first) | The real Phase-4 blocker |
-| 2 | `WorldFrameState` has no relationships channel | Bonds, any edge-drawn structure | C3: add relationships to the frame shape | Small, but needed before Phase 4 |
+| 1 | ~~No per-atom coordinates cross the backend API~~ — **CLOSED for a single static conformer (RDKit `chem-rdkit-embed3d`, §B). Still open for OpenMM's own streaming MD trajectory.** | ~~Phase 4, all molecular geometry~~ — now only OpenMM trajectory streaming | Backend/C3: OpenMM emit coordinate frames, if a real trajectory visual is wanted | Was the real Phase-4 blocker; now a narrower, optional follow-on |
+| 2 | ~~`WorldFrameState` has no relationships channel~~ — **CLOSED (Phase 8.1). See §C.** | ~~Bonds, any edge-drawn structure~~ — none, real bonds render today | — | Closed |
 | 3 | No field/grid/volumetric channel | Orbitals, density, curvature fields | Both sides: new contract per §E | Large — reduce on C3's side instead where possible |
 | 4 | `statusLabel` is prose; allowlist gate can never match it | Any state-driven appearance | C3: expose discriminating quantity as a number (Rule 3) | None if Rule 3 followed; already the live pattern |
 | 5 | `scale` collapses to one scalar | Genuinely anisotropic entities | Both sides, if a real case appears | None today — no domain needs it yet |
 | 6 | Missing `spatial` is indistinguishable from origin | Silent mis-placement | C3: discipline per Rule 1, or a real optional-position contract | None if Rule 1 followed |
-| 7 | `boundingRadius` is not forwarded to C2 | Camera framing of odd-sized entities | C3/C2: forward it in the adapter | Trivial, do it when first needed |
+| 7 | `boundingRadius` is not forwarded to C2 | Camera framing of odd-sized entities | C3/C2: forward it in the adapter | Trivial — `moleculeScene3D.ts` (GRAPHICS V5.1) worked around it locally by computing a real bounding radius from atom positions inside the scene itself rather than waiting on a contract change; still worth doing properly if a second consumer needs it |
 
 Gaps 4 and 6 need no code change at all — only discipline, which is why they are stated as rules
-rather than filed as work.
+rather than filed as work. Gaps 1 and 2 were closed by, respectively, real RDKit conformer embedding
+already flowing through `molecularStructure.ts` and Phase 8.1's relationships channel — corrected here
+(GRAPHICS V7 doc sweep) rather than left to mislead a future reader into re-deriving already-solved
+blockers.

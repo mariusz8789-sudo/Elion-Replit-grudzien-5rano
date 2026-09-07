@@ -59,8 +59,17 @@ export interface WorldFrameEntity {
    * interprets these; a caller-supplied resolver (see `worldFrameRenderer.ts`) decides what, if
    * anything, to do with them via the existing `stateVisualization.ts` utilities. */
   scalars?: Readonly<Record<string, number>>;
-  /** A coarse categorical bucket (e.g. `'nominal'`, `'critical'`) — same non-interpretation rule as
-   * `scalars`: the renderer passes it through to the resolver, never branches on its value itself. */
+  /** An opaque state string — same non-interpretation rule as `scalars`: the renderer passes it
+   * through to the resolver, never branches on its value itself.
+   *
+   * WHAT ACTUALLY ARRIVES HERE, and why a resolver must not assume otherwise: when a frame is built
+   * by the generic `worldModel/bridge/graphicsWorldFrameAdapter.ts`, this field carries C3's
+   * `statusLabel`, which every real solver writes as a HUMAN-READABLE DESCRIPTION (`'Pump tripped
+   * (overload protection)'`, `` `I=42 R=13 D=2 (day 7.5)` ``) — not a discrete token. A scene that
+   * needs a discrete state (for an adapter's `KNOWN_STATES` allowlist) derives it deterministically
+   * from a real numeric `scalars` value and puts the derived token here itself — the production
+   * pattern in `genesisScientificCitySim.ts`. See `ADAPTER_CONTRACT.md` §2's RULE box and
+   * `SOLVER_DATA_CONTRACT.md` Rule 3. */
   status?: string;
   /** Default `'MODELED'` when omitted (the common case: this entity has a real, resolvable
    * visual). See `EntityGrounding`'s own doc for what `'NOT_MODELED'` triggers. */

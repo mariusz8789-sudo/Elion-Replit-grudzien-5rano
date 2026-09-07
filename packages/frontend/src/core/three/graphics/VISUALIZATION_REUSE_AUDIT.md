@@ -9,6 +9,14 @@ of the four, since C3's Phase 1 makes it the first domain to actually reach a li
 findings also amended the cross-domain conclusions at the end of this document — read those in their
 amended form, not as the three-domain versions.*
 
+**One of three documents in the same family — read the right one for your question:**
+
+| Document | Question it answers | Audience |
+|---|---|---|
+| **`VISUALIZATION_REUSE_AUDIT.md`** (this one) | ***Which domains already have a real visualization, and can it be reused?*** | **C2, planning** |
+| `SOLVER_DATA_CONTRACT.md` | *What data must a solver produce for C2 to render it at all?* | C3, implementing |
+| `ADAPTER_CONTRACT.md` | *Given that data, how is an honest C2 adapter written?* | C2, implementing |
+
 ## Why this audit exists
 
 C3 is working through a phased integration plan: Phase 1 (Chemistry + Epidemiology coupling), Phase 2
@@ -451,14 +459,14 @@ away — it renders a *different real model* from the one C3 Phase 1 ships.
    carries no `worldSelection`, never drives per-agent visuals, and stays neutral when C3 supplies no
    recognised state.
 
-**A contract gap this domain exposes — worth folding into `ADAPTER_CONTRACT.md` later.**
-That document's honesty axis is *state realness* (`isReallyModeled()`: is this reading backed by a
-solver?). Epidemiology surfaces a **second, orthogonal axis: aggregation level.** An entity at
+**A contract gap this domain exposed — since closed, as `SOLVER_DATA_CONTRACT.md` Rule 6.**
+`ADAPTER_CONTRACT.md`'s honesty axis is *state realness* (`isReallyModeled()`: is this reading backed
+by a solver?). Epidemiology surfaced a **second, orthogonal axis: aggregation level.** An entity at
 `MACRO_CITY` scale, whose model is homogeneous-mixing by construction, must never be rendered as N
 individuals at invented positions — even though every individual field involved would pass the
-existing `isReallyModeled()` gate. Proposed rule, for whoever next edits that contract: *an adapter
-must render at the aggregation level of the entity it was given, and never disaggregate.* This is not
-written down anywhere today, and epidemiology is the first domain where it bites.
+existing `isReallyModeled()` gate. That is now written down as a rule binding on both sides: *C3 sets
+`scale.level` truthfully and splits an aggregate only when the model genuinely resolves it; C2 renders
+at the aggregation level it was given and never disaggregates.*
 
 **Integration hazard to flag for Phase 1 (UI-level, not rendering-level).** Once both models run in the
 same scene, there will be two different, both-real infection counts on screen — the agent-based one and

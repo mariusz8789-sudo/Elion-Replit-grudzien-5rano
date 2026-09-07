@@ -36,6 +36,11 @@ import { createPump, createValve, createStorageTank, type WaterInfrastructureSta
  * leaves the component at its safe default appearance. This is the one and only place a red
  * "FAILED" look can legitimately appear: driven by a real caller-supplied status, never by this
  * module's own initiative.
+ *
+ * THIS FILE IS THE REFERENCE IMPLEMENTATION of a general pattern, written up separately as
+ * `graphics/ADAPTER_CONTRACT.md` — read that document before building the next domain's adapter
+ * (weather/structural/fire/traffic/quantum/whatever C3's consolidation audit ships next), so its
+ * honesty rules are followed from a written standard instead of re-derived from scratch.
  */
 
 export type WaterInfrastructureVisualHint = 'object:water-pump' | 'object:water-valve' | 'object:water-tank';

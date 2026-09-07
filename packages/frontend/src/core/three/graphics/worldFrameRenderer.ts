@@ -51,6 +51,13 @@ const WORLD_FRAME_BATCH_KEY = 'worldFrameBatchKey';
  * the placeholder's own look via `options.resolveBoundaryPlaceholder`, but never skip the signal
  * entirely — grounding is read by this file, not delegated to the domain resolver, specifically so
  * "not modeled" can never be silently rendered as if it were real.
+ *
+ * WRITING A `resolveVisual`/`updateVisual` PAIR FOR A REAL C3 DOMAIN THAT DOESN'T HAVE FULL REAL
+ * STATE YET: see `graphics/ADAPTER_CONTRACT.md` — the written-up version of the pattern
+ * `waterInfrastructureBridge.ts` established (an `isReallyModeled()` gate, a known-states allowlist,
+ * `userData.notModeled` tagging, local-origin geometry since `applyTransform` below overwrites
+ * `.position` absolutely every sync). Read it before improvising the same honesty rules from scratch
+ * for a second domain (weather, structural, fire, traffic, quantum, whatever ships next).
  */
 
 export type EntityVisualSpec =

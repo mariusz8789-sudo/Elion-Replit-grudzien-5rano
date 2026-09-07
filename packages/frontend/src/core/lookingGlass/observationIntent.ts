@@ -84,6 +84,10 @@ export interface ObservationIntent {
   /** "What's happening?" / "Co się dzieje?" — asks for a grounded status summary of the CURRENT
    * world, distinct from `askingWhy` (a cause question) and `askingWhatChanged` (a diff question). */
   readonly askingWhatIsHappening: boolean;
+  /** "What are the assumptions/limits?" / "Jakie są ograniczenia?" — asks for the scenario's own
+   * real, event-sourced grounding notes (see `describeScenarioLimitations()`), never a canned
+   * disclaimer. Distinct from `askingWhatIsHappening`: a status question, not a grounding question. */
+  readonly askingForLimitations: boolean;
   /**
    * Names the ONE counterfactual this mission's flagship scenario explicitly asks about. As of
    * C3 Phase 5, rainfall intensity IS a real parameterized input (rational-method runoff feeding
@@ -140,6 +144,10 @@ const UNIT_WORD: Readonly<Record<string, TemporalUnit>> = {
 const WHY_QUESTION = /\b(why (did|does|is|has)|dlaczego)\b/i;
 const WHAT_CHANGED_QUESTION = /\b(what changed|what('s| is| has) different|co się zmieniło|co sie zmienilo|co się zmienia|co sie zmienia)\b/i;
 const WHAT_IS_HAPPENING_QUESTION = /\b(what'?s happening|what is happening|what is going on|what's going on|co się dzieje|co sie dzieje)\b/i;
+// "Assumptions & limits" — Genesis Urban Resilience Engine success criterion 8. Answered from
+// `describeScenarioLimitations()`'s real event provenance, not a canned disclaimer, so this is
+// matched as its own question rather than folded into WHAT_IS_HAPPENING_QUESTION.
+const LIMITATIONS_QUESTION = /\b(what (are|were) the (assumptions|limits|limitations)|show (me )?(the )?(assumptions|limits|limitations)|jakie (są|sa) (założenia|zalozenia|ograniczenia)|pokaż (założenia|zalozenia|ograniczenia)|pokaz (założenia|zalozenia|ograniczenia))\b/i;
 
 // Scenario-opening requests — a whole world/situation to establish, not a follow-up observation.
 // Only one flagship scenario is recognised today (Scientific Director mission's own scope rule).
@@ -323,6 +331,7 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
   const askingWhy = WHY_QUESTION.test(trimmed);
   const askingWhatChanged = WHAT_CHANGED_QUESTION.test(trimmed);
   const askingWhatIsHappening = WHAT_IS_HAPPENING_QUESTION.test(trimmed);
+  const askingForLimitations = LIMITATIONS_QUESTION.test(trimmed);
   const returningToBaseline = RETURN_BASELINE.test(trimmed);
   const comparison = (COMPARISON_TRIGGER.test(trimmed) || intervention.requested) && !returningToBaseline;
   const scenarioRequest: ObservationIntent['scenarioRequest'] = EXTREME_RAINFALL_SCENARIO.test(trimmed) ? 'EXTREME_RAINFALL' : null;
@@ -338,7 +347,7 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
 
   const unresolved: UnresolvedObservationAspect[] = [];
   if (
-    !target && !askingWhy && !askingWhatChanged && !askingWhatIsHappening && !comparison
+    !target && !askingWhy && !askingWhatChanged && !askingWhatIsHappening && !askingForLimitations && !comparison
     && !returningToBaseline && !time && !mode && !scenarioRequest && !rainfallCounterfactualQuery
   ) unresolved.push('TARGET');
   if ((BEFORE_EVENT.test(trimmed) || AFTER_EVENT.test(trimmed)) && !event) unresolved.push('EVENT');
@@ -360,6 +369,7 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
     interventionRequested: intervention.requested,
     scenarioRequest,
     askingWhatIsHappening,
+    askingForLimitations,
     rainfallCounterfactualQuery,
     rainfallCounterfactualPercent,
     rainfallCounterfactualDirection,

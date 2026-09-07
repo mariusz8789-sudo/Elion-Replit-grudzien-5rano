@@ -67,6 +67,12 @@ export function City3DWebGLScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [worldSelection, setWorldSelection] = useState<CityWorldSelection | null>(null);
   const [cameraPreset, setCameraPreset] = useState<CityCameraPreset>('city');
+  // GENESIS UI UNIFICATION SPRINT: the scene is the hero, so the model/hospital/
+  // risk/network/scenario-tool panels that used to sit permanently on screen
+  // (12 panel blocks at once) now live in one on-demand drawer. Nothing about
+  // the data they show changed — only whether it's visible without being asked for.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<'model' | 'risk' | 'network' | 'scenario' | 'diagnostics'>('model');
   // Consumed exactly once on mount, mirroring HighFidelitySliceScreen's own
   // handoff pattern: a Science-Chat-confirmed epidemic-city run hands off its
   // already-computed EpidemicCitySimulation instance here instead of City3D
@@ -350,99 +356,37 @@ export function City3DWebGLScreen() {
     .slice(0, 3);
 
   return (
-    <main id="main-content" tabIndex={-1} className="home city-3d-screen city-world-shell">
-      <header className="city-world-header">
-        <div className="city-world-title-block">
-          <span className="city-world-eyebrow">GENESIS OS · SCIENTIFIC DISCOVERY CONSOLE</span>
-          <h1>EPIDEMIA <em>—</em> MIASTO 3D</h1>
-          <p>Żywy model agentowy · dane syntetyczne · WebGL</p>
-          <div className="city-world-signal-row" aria-label="Stan epistemiczny świata">
-            <span className="city-signal live"><i />REAL RUN</span>
-            <span className="city-signal">SCENARIO: {scenarioTimeline?.scenarioLabel ?? 'BASELINE'}</span>
-            <span className="city-signal">TIME: {scenarioTimeline ? 'REPLAYED MODEL DAY' : 'SIMULATION DAY'}</span>
-            <span className="city-signal muted">FUTURE: NOT_MODELED</span>
+    <main id="main-content" tabIndex={-1} className="home city-3d-screen city-world-shell city-world-shell-v2">
+      <header className="city-world-topbar">
+        <div className="city-world-topbar-id">
+          <span className="gx-eyebrow">GENESIS OS · EPIDEMIA — MIASTO 3D</span>
+          <div className="city-world-topbar-status" aria-label="Stan epistemiczny świata">
+            <span className="gx-status real">REAL RUN</span>
+            <span className="gx-status not-modelled">FUTURE: NOT_MODELLED</span>
+            <span className="city-world-topbar-day">dzień <b>{stats.dzien ?? 0}</b> · {renderBudget}/{displayedAgentCount} agentów</span>
+            {analysis !== 'none' && <span className="city-world-topbar-day">warstwa: {analysisLabel}</span>}
+            {experimentWorld && (
+              <span className="city-world-topbar-day" title={experimentWorld.runFingerprint}>
+                real run · {experimentWorld.resultOrigin} · {experimentWorld.runId.slice(0, 12)}…
+              </span>
+            )}
           </div>
         </div>
-        <div className="city-world-header-telemetry" aria-label="Telemetry modelu">
-          <div className="city-world-clock">
-            <span>czas modelu</span>
-            <strong>dzień {stats.dzien ?? 0}</strong>
-            <small>{renderBudget}/{displayedAgentCount} widocznych agentów</small>
-          </div>
-          <div className="city-world-provenance-mark"><span>PROVENANCE</span><strong>LOCKED</strong><small>same-world handoff</small>{experimentWorld && <small title={experimentWorld.summary}>{experimentWorld.summary}</small>}</div>
+        <div className="city-world-topbar-actions">
+          <button
+            type="button"
+            className="gx-btn city-world-drawer-btn"
+            aria-haspopup="dialog"
+            aria-expanded={drawerOpen}
+            onClick={() => setDrawerOpen(true)}
+          >
+            ☰ Panele i dane
+          </button>
+          <button className="gx-btn" onClick={() => { window.location.hash = '#/city'; }}>Tryb 2D</button>
         </div>
       </header>
 
-      <section className="city-world-transport" aria-label="Sterowanie czasem symulacji">
-        <button className="world-action primary" onClick={running ? pause : play}>{running ? '⏸ Pauza' : '▶ Start'}</button>
-        <button className="world-action" onClick={step}>⏭ Krok</button>
-        <button className="world-action" onClick={reset}>↺ Restart</button>
-        <span className="city-speed-control" role="group" aria-label="Prędkość symulacji">
-          {CLOCK_SPEEDS.filter((value) => value > 0).map((value) => (
-            <button key={value} className="world-speed" aria-pressed={speed === value} onClick={() => { setSpeed(value); setRunning(true); }}>{value}×</button>
-          ))}
-        </span>
-        <span className="city-camera-control" role="group" aria-label="Poziom obserwacji świata">
-          {CAMERA_PRESETS.map((preset) => <button key={preset.id} className="world-speed" aria-pressed={cameraPreset === preset.id} onClick={() => changeCamera(preset.id)}>{preset.label}</button>)}
-        </span>
-        <button className="world-action accent" onClick={() => { sim.focusFirstInfected(); setCameraPreset(sim.getCameraPreset()); setStats(sim.getStats()); }}>◉ Śledź zakażonego</button>
-        <button className="world-action" onClick={() => { sim.focusLatestTransmission(); setCameraPreset(sim.getCameraPreset()); setStats(sim.getStats()); }}>↗ Ostatnia transmisja</button>
-        <button className="world-action ghost" onClick={() => { window.location.hash = '#/city'; }}>Tryb 2D</button>
-      </section>
-
-      <section className="city-world-layout">
-        <aside className="city-world-sidebar city-world-left" aria-label="Model i parametry epidemii">
-          <div className="world-panel model-panel">
-            <div className="world-panel-heading"><span>SEIRDD</span><small>aktywny model</small></div>
-            <div className="epidemic-summary">
-              {EPIDEMIC_LEGEND.map(([id, label, color]) => (
-                <div key={id} className="epidemic-summary-row"><i style={{ backgroundColor: color }} /><span>{id} · {label}</span><strong>{stats[id] ?? 0}</strong></div>
-              ))}
-              <div className="epidemic-summary-row accent-row"><i className="legend-hospital" /><span>hospitalizacja</span><strong>{stats.hospitalizowani ?? 0}</strong></div>
-              <div className="epidemic-summary-row accent-row"><i className="legend-isolation" /><span>izolacja</span><strong>{stats.izolowani ?? 0}</strong></div>
-            </div>
-          </div>
-
-          <div className="world-panel hospital-panel">
-            <div className="world-panel-heading">
-              <span>SZPITAL</span>
-              <small>{HOSPITAL_STATUS_LABELS[stats.hosp_status_code ?? 0]}</small>
-            </div>
-            <div className="epidemic-summary">
-              <div className="epidemic-summary-row"><span>łóżka ogólne</span><strong>{stats.hosp_occupied_beds ?? 0} / {stats.hosp_total_beds ?? 0}</strong></div>
-              <div className="epidemic-summary-row"><span>ICU</span><strong>{stats.hosp_occupied_icu ?? 0} / {stats.hosp_icu_beds ?? 0}</strong></div>
-              <div className="epidemic-summary-row"><span>obłożenie ogólne</span><strong>{(stats.hosp_bed_occupancy_pct ?? 0).toFixed(1)}%</strong></div>
-              <div className="epidemic-summary-row"><span>obłożenie ICU</span><strong>{(stats.hosp_icu_occupancy_pct ?? 0).toFixed(1)}%</strong></div>
-              <div className={`epidemic-summary-row ${(stats.hosp_unmet_care ?? 0) > 0 ? 'accent-row' : ''}`}>
-                <span>bez opieki</span><strong>{stats.hosp_unmet_care ?? 0}</strong>
-              </div>
-            </div>
-            <p className="hospital-panel-note">
-              Pojemność {DEFAULT_HOSPITAL_CAPACITY.totalBeds} łóżek / {DEFAULT_HOSPITAL_CAPACITY.icuBeds} ICU — ta sama
-              stała co w Scientific Core (<code>hospitalResource.ts</code>). Sprzężenie śmiertelności wyłączone: ta
-              warstwa liczy obciążenie, nie zmienia przebiegu epidemii.
-            </p>
-          </div>
-
-          <div className="world-panel parameter-panel">
-            <div className="world-panel-heading"><span>PARAMETRY MODELU</span><small>to samo źródło co Canvas</small></div>
-            <div className="world-parameter-list">
-              {SLIDERS.map((definition) => {
-                const raw = Number(params[definition.key] ?? definition.default);
-                const percentage = percentageKeys.includes(definition.key);
-                const shown = percentage ? Math.round(raw * 100) : raw;
-                return (
-                  <label className="world-parameter" key={definition.key}>
-                    <span>{definition.label}<b>{shown}{percentage ? '%' : definition.unit ? ` ${definition.unit}` : ''}</b></span>
-                    <input type="range" min={percentage ? Number(definition.min) * 100 : definition.min} max={percentage ? Number(definition.max) * 100 : definition.max} step={percentage ? Number(definition.step) * 100 : definition.step} value={shown} aria-label={definition.label} onChange={(event) => updateParam(definition.key, percentage ? Number(event.target.value) / 100 : Number(event.target.value))} />
-                  </label>
-                );
-              })}
-              <label className="world-toggle"><input type="checkbox" checked={Boolean(params.isolate)} onChange={(event) => updateParam('isolate', event.target.checked)} /><span>Izolacja objawowych</span></label>
-            </div>
-          </div>
-        </aside>
-
+      <section className="city-world-layout city-world-layout-v2">
         <section className="city-world-center" aria-label="Żywa scena miasta 3D">
           <div className={`city-3d-stage-wrap city-world-stage${enteredTimelineDay === timelineLogicalDay ? ' temporal-moment-entered' : ''}`} data-temporal-day={timelineLogicalDay} data-temporal-entered={enteredTimelineDay === timelineLogicalDay ? 'true' : 'false'}>
             <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
@@ -667,7 +611,7 @@ export function City3DWebGLScreen() {
               <span>model aktywny</span><strong>dzień {stats.dzien ?? 0}</strong><span>widok: {cameraPreset}</span><span>{analysis === 'none' ? 'widok normalny' : `warstwa: ${analysisLabel}`}</span>{experimentWorld && <span title={experimentWorld.runFingerprint}>real run · {experimentWorld.resultOrigin} · {experimentWorld.runId.slice(0, 12)}…</span>}
             </div>
             {person && (
-              <aside className="city-3d-person-card city-agent-inspector">
+              <aside className="city-3d-person-card city-agent-inspector gx-floating-card">
                 <div className="agent-inspector-heading"><span>AGENT #{selectedId}</span><button onClick={() => { sim.clearSelection(); setCameraPreset('city'); }} aria-label="Zamknij inspekcję">×</button></div>
                 <div className="agent-inspector-grid">
                   <span>wiek<b>{String(person.wiek)}</b></span><span>rola<b>{String(person.rola)}</b></span>
@@ -679,13 +623,36 @@ export function City3DWebGLScreen() {
               </aside>
             )}
             {worldSelection && (
-              <aside className="city-3d-person-card city-world-object-card">
+              <aside className="city-3d-person-card city-world-object-card gx-floating-card">
                 <div className="agent-inspector-heading"><span>{worldSelection.kind.toUpperCase()}</span><button onClick={() => { sim.clearSelection(); setCameraPreset('city'); }} aria-label="Zamknij inspekcję świata">×</button></div>
                 <strong>{worldSelection.label}</strong>
                 <p>{worldSelection.detail}</p>
                 <button className="world-action accent" onClick={() => { sim.clearSelection(); setCameraPreset('city'); }}>Wyczyść fokus</button>
               </aside>
             )}
+          </div>
+          {/* Minimal always-visible transport: play/step/speed/camera vantage.
+              Everything ELSE (model detail, risk layers, network, scenario
+              tools, diagnostics) moved into the on-demand drawer — the scene
+              stays the hero, this is the one control strip that must always
+              be reachable without opening anything. Lives in normal document
+              flow (not floated over the canvas) so it never collides with
+              the timeline/analytics-rail strips below, which become
+              absolutely-positioned overlays of their own at wide viewports. */}
+          <div className="city-world-transport-float" aria-label="Sterowanie czasem symulacji">
+            <button className="world-action primary" onClick={running ? pause : play}>{running ? '⏸ Pauza' : '▶ Start'}</button>
+            <button className="world-action" onClick={step}>⏭ Krok</button>
+            <button className="world-action" onClick={reset}>↺ Restart</button>
+            <span className="city-speed-control" role="group" aria-label="Prędkość symulacji">
+              {CLOCK_SPEEDS.filter((value) => value > 0).map((value) => (
+                <button key={value} className="world-speed" aria-pressed={speed === value} onClick={() => { setSpeed(value); setRunning(true); }}>{value}×</button>
+              ))}
+            </span>
+            <span className="city-camera-control" role="group" aria-label="Poziom obserwacji świata">
+              {CAMERA_PRESETS.map((preset) => <button key={preset.id} className="world-speed" aria-pressed={cameraPreset === preset.id} onClick={() => changeCamera(preset.id)}>{preset.label}</button>)}
+            </span>
+            <button className="world-action accent" onClick={() => { sim.focusFirstInfected(); setCameraPreset(sim.getCameraPreset()); setStats(sim.getStats()); }}>◉ Śledź zakażonego</button>
+            <button className="world-action" onClick={() => { sim.focusLatestTransmission(); setCameraPreset(sim.getCameraPreset()); setStats(sim.getStats()); }}>↗ Ostatnia transmisja</button>
           </div>
           <div className="city-event-timeline" aria-label="Bieżący punkt osi symulacji">
             <div className="timeline-heading"><span>OŚ SYMULACJI</span><small>zdarzenia wynikają z modelu</small></div>
@@ -701,95 +668,187 @@ export function City3DWebGLScreen() {
           </section>
         </section>
 
-        <aside className="city-world-sidebar city-world-right" aria-label="Analityka i warstwy świata">
-          <div className="world-panel risk-panel">
-            <div className="world-panel-heading"><span>MAPA RYZYKA</span><small>warstwa świata</small></div>
-            <select className="world-analysis-select" value={analysis} onChange={(event) => setAnalysis(event.target.value as AnalysisMode)} aria-label="Warstwa analizy 3D">
-              {ANALYSIS_MODES.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}
-            </select>
-            <div className="risk-gradient"><span>niskie</span><i /><span>wysokie</span></div>
-          </div>
-          <div className="world-panel layers-panel">
-            <div className="world-panel-heading"><span>WARSTWY</span><small>odczyt modelu</small></div>
-            {ANALYSIS_MODES.filter((mode) => mode.id !== 'none').map((mode) => <button key={mode.id} className="world-layer" aria-pressed={analysis === mode.id} onClick={() => setAnalysis(mode.id)}><span>{mode.label}</span><i /></button>)}
-            <label className="world-layer transmission-layer"><span>Ślady transmisji</span><input type="checkbox" checked={showTransmissions} onChange={(event) => setShowTransmissions(event.target.checked)} /></label>
-          </div>
-          <div className="world-panel hotspot-panel">
-            <div className="world-panel-heading"><span>OGNISKA</span><small>World Engine Contract</small></div>
-            <div className="epidemic-summary">
-              <div className="epidemic-summary-row"><span>aktywne ogniska (siatka)</span><strong>{worldState.hotspots.length}</strong></div>
-              <div className="epidemic-summary-row"><span>klastry gospodarstw</span><strong>{worldState.clusters.household.length}</strong></div>
-              <div className="epidemic-summary-row"><span>klastry miejsc</span><strong>{worldState.clusters.location.length}</strong></div>
-            </div>
-            {topHotspots.length > 0 ? (
-              <ul className="hotspot-list">
-                {topHotspots.map((hotspot, index) => (
-                  <li key={`hotspot-${index}`}><span>({Math.round(hotspot.x)}, {Math.round(hotspot.y)})</span><strong>{hotspot.infectious} zakaźnych</strong></li>
-                ))}
-              </ul>
-            ) : <p className="world-panel-empty">Brak ognisk — za mało jednoczesnych zakażeń w jednej komórce siatki.</p>}
-            {topClusters.length > 0 && (
-              <ul className="hotspot-list hotspot-cluster-list">
-                {topClusters.map((cluster) => (
-                  <li key={cluster.clusterId}><span>{cluster.kind === 'household' ? 'gospodarstwo' : cluster.contactType} · dzień {Math.round(cluster.firstDay)}–{Math.round(cluster.lastDay)}</span><strong>{cluster.transmissions} transmisji</strong></li>
-                ))}
-              </ul>
-            )}
-            <p className="hospital-panel-note">
-              Ognisko = komórka siatki z realnymi zakaźnymi agentami; klaster = realne krawędzie transmisji w tym
-              samym gospodarstwie lub miejscu (<code>clusterAnalysis.ts</code>). Bez wykrywania heurystycznego —
-              pusty wynik jest wynikiem.
-            </p>
-          </div>
-          <div className="world-panel route-network-panel">
-            <div className="world-panel-heading"><span>SIEĆ MIEJSKA</span><small>World Engine · topologia</small></div>
-            <div className="epidemic-summary">
-              <div className="epidemic-summary-row"><span>jezdnie</span><strong>{topologyCounts.ROAD ?? 0}</strong></div>
-              <div className="epidemic-summary-row"><span>chodniki</span><strong>{topologyCounts.SIDEWALK ?? 0}</strong></div>
-              <div className="epidemic-summary-row"><span>przejścia</span><strong>{topologyCounts.CROSSING ?? 0}</strong></div>
-            </div>
-            <p className="hospital-panel-note">Topologia pochodzi z tego samego układu miasta co renderer. Przypisanie agentów do tras i segmentów kontaktu pozostaje <code>NOT_MODELED</code>.</p>
-          </div>
-          <EarthquakeScenarioPanel onOverlayChange={setEarthquakeOverlay} />
-          <ScenarioCommandCenterPanel params={scenarioTimeline ? { ...scenarioTimeline.scenarioRun.params } : params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
-          <TemporalMultiversePanel params={scenarioTimeline ? { ...scenarioTimeline.scenarioRun.params } : params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
-          <div className="world-panel event-feed-panel">
-            <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>
-            {latestTransmission ? (
-              <div className="event-feed-item event-feed-transmission">
-                <i /><div><b>Transmisja A → B</b><span>dzień {Number(latestTransmission.day.toFixed(2))} · #{latestTransmission.from} → #{latestTransmission.to}</span></div>
-                <button className="world-action" onClick={() => { sim.focusLatestTransmission(); setCameraPreset(sim.getCameraPreset()); }}>Pokaż</button>
-              </div>
-            ) : <p className="world-panel-empty">Brak potwierdzonej transmisji w bieżącym przebiegu.</p>}
-          </div>
-          <div className="world-panel minimap-panel">
-            <div className="world-panel-heading"><span>MINIMAPA ŚWIATA</span><small>{modelAgents.length} agentów modelu</small></div>
-            <svg className="city-minimap" viewBox={`0 0 ${worldWidth} ${worldHeight}`} role="img" aria-label="Minimapa miasta z obiektami i agentami modelu">
-              <rect width={worldWidth} height={worldHeight} fill="#173126" />
-              {modelObjects.map((object, index) => <rect key={`object-${index}`} x={object.x} y={object.y} width={object.w} height={object.h} rx="4" fill={MINIMAP_OBJECT_COLORS[object.kind] ?? '#718096'} opacity={object.closed ? 0.34 : 0.92} />)}
-              {modelAgents.map((agent) => <circle key={agent.id} cx={agent.x} cy={agent.y} r="4.1" fill={MINIMAP_COLORS[agent.state] ?? '#cbd5e1'} opacity={agent.isolated ? 0.50 : 0.92} />)}
-            </svg>
-            <div className="minimap-key"><span><i className="minimap-building-key" /> obiekty</span><span><i className="minimap-agent-key" /> S/E/I/R/D</span></div>
-          </div>
-          <div className="world-panel science-chat-world-panel">
-            <div className="world-panel-heading"><span>SCIENCE CHAT</span><small>aktywny kontekst</small></div>
-            <p>Jeden punkt sterowania dla parametrów, pytań i zapisu aktualnego eksperymentu.</p>
-            <button className="world-action accent" onClick={() => window.dispatchEvent(new Event('genesis:open-science-chat'))}>Otwórz panel</button>
-          </div>
-          <div className="world-panel observability-panel">
-            <div className="world-panel-heading"><span>OBSERWOWALNOŚĆ</span><small>renderer</small></div>
-            <div><span>FPS</span><b>{Math.round(stats.webgl_fps ?? 0)}</b></div>
-            <div><span>frame</span><b>{Number(stats.webgl_frame_ms ?? 0).toFixed(2)} ms</b></div>
-            <div><span>render</span><b>{Number(stats.webgl_render_ms ?? 0).toFixed(2)} ms</b></div>
-            <div><span>draw calls</span><b>{Math.round(stats.webgl_draw_calls ?? 0)}</b></div>
-            <div><span>triangles</span><b>{Math.round(stats.webgl_triangles ?? 0)}</b></div>
-            <div><span>textures (est.)</span><b>{(Number(stats.webgl_texture_bytes_estimate ?? 0) / (1024 * 1024)).toFixed(1)} MB</b></div>
-            <div><span>geometry (est.)</span><b>{(Number(stats.webgl_geometry_bytes_estimate ?? 0) / (1024 * 1024)).toFixed(1)} MB</b></div>
-            <div><span>GPU mem (est.)</span><b>{(Number(stats.webgl_gpu_bytes_estimate ?? 0) / (1024 * 1024)).toFixed(1)} MB</b></div>
-          </div>
-          <EvidenceReplayPanel />
-        </aside>
       </section>
+
+      {drawerOpen && (
+        <>
+          <div className="gx-drawer-backdrop" onClick={() => setDrawerOpen(false)} />
+          <aside className="gx-drawer" role="dialog" aria-modal="true" aria-label="Panele i dane modelu">
+            <div className="gx-drawer-head">
+              <strong>Panele i dane</strong>
+              <button type="button" className="gx-drawer-close" onClick={() => setDrawerOpen(false)} aria-label="Zamknij panele">×</button>
+            </div>
+            <div className="gx-drawer-tabs" role="tablist" aria-label="Kategorie paneli">
+              <button type="button" className="gx-tab" role="tab" aria-selected={drawerTab === 'model'} onClick={() => setDrawerTab('model')}>Model</button>
+              <button type="button" className="gx-tab" role="tab" aria-selected={drawerTab === 'risk'} onClick={() => setDrawerTab('risk')}>Ryzyko</button>
+              <button type="button" className="gx-tab" role="tab" aria-selected={drawerTab === 'network'} onClick={() => setDrawerTab('network')}>Sieć</button>
+              <button type="button" className="gx-tab" role="tab" aria-selected={drawerTab === 'scenario'} onClick={() => setDrawerTab('scenario')}>Scenariusze</button>
+              <button type="button" className="gx-tab" role="tab" aria-selected={drawerTab === 'diagnostics'} onClick={() => setDrawerTab('diagnostics')}>Diagnostyka</button>
+            </div>
+            <div className="gx-drawer-body">
+              {drawerTab === 'model' && (
+                <>
+                  <div className="world-panel model-panel">
+                    <div className="world-panel-heading"><span>SEIRDD</span><small>aktywny model</small></div>
+                    <div className="epidemic-summary">
+                      {EPIDEMIC_LEGEND.map(([id, label, color]) => (
+                        <div key={id} className="epidemic-summary-row"><i style={{ backgroundColor: color }} /><span>{id} · {label}</span><strong>{stats[id] ?? 0}</strong></div>
+                      ))}
+                      <div className="epidemic-summary-row accent-row"><i className="legend-hospital" /><span>hospitalizacja</span><strong>{stats.hospitalizowani ?? 0}</strong></div>
+                      <div className="epidemic-summary-row accent-row"><i className="legend-isolation" /><span>izolacja</span><strong>{stats.izolowani ?? 0}</strong></div>
+                    </div>
+                  </div>
+
+                  <div className="world-panel hospital-panel">
+                    <div className="world-panel-heading">
+                      <span>SZPITAL</span>
+                      <small>{HOSPITAL_STATUS_LABELS[stats.hosp_status_code ?? 0]}</small>
+                    </div>
+                    <div className="epidemic-summary">
+                      <div className="epidemic-summary-row"><span>łóżka ogólne</span><strong>{stats.hosp_occupied_beds ?? 0} / {stats.hosp_total_beds ?? 0}</strong></div>
+                      <div className="epidemic-summary-row"><span>ICU</span><strong>{stats.hosp_occupied_icu ?? 0} / {stats.hosp_icu_beds ?? 0}</strong></div>
+                      <div className="epidemic-summary-row"><span>obłożenie ogólne</span><strong>{(stats.hosp_bed_occupancy_pct ?? 0).toFixed(1)}%</strong></div>
+                      <div className="epidemic-summary-row"><span>obłożenie ICU</span><strong>{(stats.hosp_icu_occupancy_pct ?? 0).toFixed(1)}%</strong></div>
+                      <div className={`epidemic-summary-row ${(stats.hosp_unmet_care ?? 0) > 0 ? 'accent-row' : ''}`}>
+                        <span>bez opieki</span><strong>{stats.hosp_unmet_care ?? 0}</strong>
+                      </div>
+                    </div>
+                    <p className="hospital-panel-note">
+                      Pojemność {DEFAULT_HOSPITAL_CAPACITY.totalBeds} łóżek / {DEFAULT_HOSPITAL_CAPACITY.icuBeds} ICU — ta sama
+                      stała co w Scientific Core (<code>hospitalResource.ts</code>). Sprzężenie śmiertelności wyłączone: ta
+                      warstwa liczy obciążenie, nie zmienia przebiegu epidemii.
+                    </p>
+                  </div>
+
+                  <div className="world-panel parameter-panel">
+                    <div className="world-panel-heading"><span>PARAMETRY MODELU</span><small>to samo źródło co Canvas</small></div>
+                    <div className="world-parameter-list">
+                      {SLIDERS.map((definition) => {
+                        const raw = Number(params[definition.key] ?? definition.default);
+                        const percentage = percentageKeys.includes(definition.key);
+                        const shown = percentage ? Math.round(raw * 100) : raw;
+                        return (
+                          <label className="world-parameter" key={definition.key}>
+                            <span>{definition.label}<b>{shown}{percentage ? '%' : definition.unit ? ` ${definition.unit}` : ''}</b></span>
+                            <input type="range" min={percentage ? Number(definition.min) * 100 : definition.min} max={percentage ? Number(definition.max) * 100 : definition.max} step={percentage ? Number(definition.step) * 100 : definition.step} value={shown} aria-label={definition.label} onChange={(event) => updateParam(definition.key, percentage ? Number(event.target.value) / 100 : Number(event.target.value))} />
+                          </label>
+                        );
+                      })}
+                      <label className="world-toggle"><input type="checkbox" checked={Boolean(params.isolate)} onChange={(event) => updateParam('isolate', event.target.checked)} /><span>Izolacja objawowych</span></label>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {drawerTab === 'risk' && (
+                <>
+                  <div className="world-panel risk-panel">
+                    <div className="world-panel-heading"><span>MAPA RYZYKA</span><small>warstwa świata</small></div>
+                    <select className="world-analysis-select" value={analysis} onChange={(event) => setAnalysis(event.target.value as AnalysisMode)} aria-label="Warstwa analizy 3D">
+                      {ANALYSIS_MODES.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}
+                    </select>
+                    <div className="risk-gradient"><span>niskie</span><i /><span>wysokie</span></div>
+                  </div>
+                  <div className="world-panel layers-panel">
+                    <div className="world-panel-heading"><span>WARSTWY</span><small>odczyt modelu</small></div>
+                    {ANALYSIS_MODES.filter((mode) => mode.id !== 'none').map((mode) => <button key={mode.id} className="world-layer" aria-pressed={analysis === mode.id} onClick={() => setAnalysis(mode.id)}><span>{mode.label}</span><i /></button>)}
+                    <label className="world-layer transmission-layer"><span>Ślady transmisji</span><input type="checkbox" checked={showTransmissions} onChange={(event) => setShowTransmissions(event.target.checked)} /></label>
+                  </div>
+                </>
+              )}
+
+              {drawerTab === 'network' && (
+                <>
+                  <div className="world-panel hotspot-panel">
+                    <div className="world-panel-heading"><span>OGNISKA</span><small>World Engine Contract</small></div>
+                    <div className="epidemic-summary">
+                      <div className="epidemic-summary-row"><span>aktywne ogniska (siatka)</span><strong>{worldState.hotspots.length}</strong></div>
+                      <div className="epidemic-summary-row"><span>klastry gospodarstw</span><strong>{worldState.clusters.household.length}</strong></div>
+                      <div className="epidemic-summary-row"><span>klastry miejsc</span><strong>{worldState.clusters.location.length}</strong></div>
+                    </div>
+                    {topHotspots.length > 0 ? (
+                      <ul className="hotspot-list">
+                        {topHotspots.map((hotspot, index) => (
+                          <li key={`hotspot-${index}`}><span>({Math.round(hotspot.x)}, {Math.round(hotspot.y)})</span><strong>{hotspot.infectious} zakaźnych</strong></li>
+                        ))}
+                      </ul>
+                    ) : <p className="world-panel-empty">Brak ognisk — za mało jednoczesnych zakażeń w jednej komórce siatki.</p>}
+                    {topClusters.length > 0 && (
+                      <ul className="hotspot-list hotspot-cluster-list">
+                        {topClusters.map((cluster) => (
+                          <li key={cluster.clusterId}><span>{cluster.kind === 'household' ? 'gospodarstwo' : cluster.contactType} · dzień {Math.round(cluster.firstDay)}–{Math.round(cluster.lastDay)}</span><strong>{cluster.transmissions} transmisji</strong></li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="hospital-panel-note">
+                      Ognisko = komórka siatki z realnymi zakaźnymi agentami; klaster = realne krawędzie transmisji w tym
+                      samym gospodarstwie lub miejscu (<code>clusterAnalysis.ts</code>). Bez wykrywania heurystycznego —
+                      pusty wynik jest wynikiem.
+                    </p>
+                  </div>
+                  <div className="world-panel route-network-panel">
+                    <div className="world-panel-heading"><span>SIEĆ MIEJSKA</span><small>World Engine · topologia</small></div>
+                    <div className="epidemic-summary">
+                      <div className="epidemic-summary-row"><span>jezdnie</span><strong>{topologyCounts.ROAD ?? 0}</strong></div>
+                      <div className="epidemic-summary-row"><span>chodniki</span><strong>{topologyCounts.SIDEWALK ?? 0}</strong></div>
+                      <div className="epidemic-summary-row"><span>przejścia</span><strong>{topologyCounts.CROSSING ?? 0}</strong></div>
+                    </div>
+                    <p className="hospital-panel-note">Topologia pochodzi z tego samego układu miasta co renderer. Przypisanie agentów do tras i segmentów kontaktu pozostaje <code>NOT_MODELED</code>.</p>
+                  </div>
+                  <div className="world-panel minimap-panel">
+                    <div className="world-panel-heading"><span>MINIMAPA ŚWIATA</span><small>{modelAgents.length} agentów modelu</small></div>
+                    <svg className="city-minimap" viewBox={`0 0 ${worldWidth} ${worldHeight}`} role="img" aria-label="Minimapa miasta z obiektami i agentami modelu">
+                      <rect width={worldWidth} height={worldHeight} fill="#173126" />
+                      {modelObjects.map((object, index) => <rect key={`object-${index}`} x={object.x} y={object.y} width={object.w} height={object.h} rx="4" fill={MINIMAP_OBJECT_COLORS[object.kind] ?? '#718096'} opacity={object.closed ? 0.34 : 0.92} />)}
+                      {modelAgents.map((agent) => <circle key={agent.id} cx={agent.x} cy={agent.y} r="4.1" fill={MINIMAP_COLORS[agent.state] ?? '#cbd5e1'} opacity={agent.isolated ? 0.50 : 0.92} />)}
+                    </svg>
+                    <div className="minimap-key"><span><i className="minimap-building-key" /> obiekty</span><span><i className="minimap-agent-key" /> S/E/I/R/D</span></div>
+                  </div>
+                </>
+              )}
+
+              {drawerTab === 'scenario' && (
+                <>
+                  <EarthquakeScenarioPanel onOverlayChange={setEarthquakeOverlay} />
+                  <ScenarioCommandCenterPanel params={scenarioTimeline ? { ...scenarioTimeline.scenarioRun.params } : params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
+                  <TemporalMultiversePanel params={scenarioTimeline ? { ...scenarioTimeline.scenarioRun.params } : params} temporalDay={scenarioTimeline ? timelineLogicalDay : null} />
+                  <EvidenceReplayPanel />
+                </>
+              )}
+
+              {drawerTab === 'diagnostics' && (
+                <>
+                  <div className="world-panel event-feed-panel">
+                    <div className="world-panel-heading"><span>OSTATNIE ZDARZENIE</span><small>odczyt modelu</small></div>
+                    {latestTransmission ? (
+                      <div className="event-feed-item event-feed-transmission">
+                        <i /><div><b>Transmisja A → B</b><span>dzień {Number(latestTransmission.day.toFixed(2))} · #{latestTransmission.from} → #{latestTransmission.to}</span></div>
+                        <button className="world-action" onClick={() => { sim.focusLatestTransmission(); setCameraPreset(sim.getCameraPreset()); }}>Pokaż</button>
+                      </div>
+                    ) : <p className="world-panel-empty">Brak potwierdzonej transmisji w bieżącym przebiegu.</p>}
+                  </div>
+                  <div className="world-panel science-chat-world-panel">
+                    <div className="world-panel-heading"><span>SCIENCE CHAT</span><small>aktywny kontekst</small></div>
+                    <p>Jeden punkt sterowania dla parametrów, pytań i zapisu aktualnego eksperymentu.</p>
+                    <button className="world-action accent" onClick={() => window.dispatchEvent(new Event('genesis:open-science-chat'))}>Otwórz panel</button>
+                  </div>
+                  <div className="world-panel observability-panel">
+                    <div className="world-panel-heading"><span>OBSERWOWALNOŚĆ</span><small>renderer</small></div>
+                    <div><span>FPS</span><b>{Math.round(stats.webgl_fps ?? 0)}</b></div>
+                    <div><span>frame</span><b>{Number(stats.webgl_frame_ms ?? 0).toFixed(2)} ms</b></div>
+                    <div><span>render</span><b>{Number(stats.webgl_render_ms ?? 0).toFixed(2)} ms</b></div>
+                    <div><span>draw calls</span><b>{Math.round(stats.webgl_draw_calls ?? 0)}</b></div>
+                    <div><span>triangles</span><b>{Math.round(stats.webgl_triangles ?? 0)}</b></div>
+                    <div><span>textures (est.)</span><b>{(Number(stats.webgl_texture_bytes_estimate ?? 0) / (1024 * 1024)).toFixed(1)} MB</b></div>
+                    <div><span>geometry (est.)</span><b>{(Number(stats.webgl_geometry_bytes_estimate ?? 0) / (1024 * 1024)).toFixed(1)} MB</b></div>
+                    <div><span>GPU mem (est.)</span><b>{(Number(stats.webgl_gpu_bytes_estimate ?? 0) / (1024 * 1024)).toFixed(1)} MB</b></div>
+                  </div>
+                </>
+              )}
+            </div>
+          </aside>
+        </>
+      )}
 
       <footer className="city-world-note">Fikcyjne miasto i abstrakcyjny patogen. Kolor ubrania, znaczniki, heatmapa i transmisje są odczytem modelu edukacyjnego, nie diagnozą ani prognozą.</footer>
     </main>

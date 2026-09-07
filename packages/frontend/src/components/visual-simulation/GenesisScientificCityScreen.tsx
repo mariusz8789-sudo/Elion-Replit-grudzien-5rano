@@ -296,6 +296,7 @@ export function GenesisScientificCityScreen() {
 
             <div className="gsc-panel">
               <div className="gsc-panel-row">
+                <span className="gx-status real">REAL</span>
                 <span>Tick: {tick}h</span>
                 <button type="button" onClick={() => handleStep(1)}>+1h</button>
                 <button type="button" onClick={() => handleStep(6)}>+6h</button>

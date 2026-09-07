@@ -2,16 +2,19 @@ import type * as THREE_NS from 'three';
 import type { Sim3D } from './types';
 import { TemporalEngine, TemporalBranchRegistry } from '../worldModel/temporal/temporalEngine';
 import {
-  buildGenesisScientificCity3, RAINFALL_LOAD_MULTIPLIER,
-  PUMP_TRIPPED_EVENT_TYPE, HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE, POPULATION_ACCESS_IMPAIRED_EVENT_TYPE,
+  buildGenesisScientificCity3, RAINFALL_LOAD_MULTIPLIER, rainfallSchedule,
+  RAINFALL_EVENT_TYPE, PUMP_TRIPPED_EVENT_TYPE, HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE, POPULATION_ACCESS_IMPAIRED_EVENT_TYPE,
 } from '../worldModel/domains/genesisScientificCity3';
+import { withScheduledEvents } from '../worldModel/events/worldEventRules';
+import { withCrossDomainCouplings } from '../worldModel/crossDomain/crossDomainCoupling';
 import { getFrameState, compareBranches, type BranchComparison } from '../worldModel/bridge/worldFrameState';
 import { getCausalAncestry, getEventHistoryFor } from '../worldModel/queries/worldQueries';
 import type { EntityId, WorldModelEntity } from '../worldModel/ecs/types';
 import type { GenesisEvent } from '../events/genesisEvent';
 import { WorldFrameRenderer, type EntityVisualSpec } from './graphics/worldFrameRenderer';
 import type { WorldFrame, WorldFrameEntity as C2Entity, EntityGrounding } from './graphics/worldFrame';
-import { createPumpAssembly, createValveAssembly } from './graphics/infrastructure';
+import { createWaterInfrastructureAdapter, type WaterInfrastructureAdapter } from './graphics/waterInfrastructureBridge';
+import { createPipeNetwork, createValve, type WaterInfrastructureState } from './graphics/waterInfrastructure';
 import { createPBRMaterial } from './graphics/materials';
 import { applyVisualState, type CanonicalVisualState } from './graphics/visualState';
 import { resolveCameraFraming, type CameraIntent } from './graphics/cameraRig';
@@ -31,15 +34,27 @@ import { createSceneEnvironment, type SceneEnvironmentHandle } from './graphics/
  * here.
  *
  * WHAT THIS FILE ADDS (and nothing more): a `WorldFrame` adapter from C3's real `WorldFrameState`
- * (`bridge/worldFrameState.ts`) to C2's generic `WorldFrame` (`graphics/worldFrame.ts`); real-object
- * visuals for the pump/hospital via C2's own `createPumpAssembly`/`createValveAssembly`/
- * `createPBRMaterial`/`applyVisualState`; real-graph target resolution (`resolveNamedWorldTarget` —
- * a live scan of `graph.listEntities()`, never a hardcoded id); real camera framing via C2's
- * `resolveCameraFraming`, riding the SAME OrbitControls target/distance seam every other Genesis
- * city scene (`epidemicCity3D.ts`) already uses; and an on-demand "what if the pump fails" fork,
- * built with the EXACT same `TemporalEngine.forkBranch` + `compareBranches` pattern
- * `scenarioSession.ts`'s own hydraulics session already uses for its own fork — not a second fork
- * mechanism.
+ * (`bridge/worldFrameState.ts`) to C2's generic `WorldFrame` (`graphics/worldFrame.ts`); real-graph
+ * target resolution (`resolveNamedWorldTarget` — a live scan of `graph.listEntities()`, never a
+ * hardcoded id); real camera framing via C2's `resolveCameraFraming`, riding the SAME OrbitControls
+ * target/distance seam every other Genesis city scene (`epidemicCity3D.ts`) already uses; and an
+ * on-demand "what if the pump fails" fork, built with the EXACT same `TemporalEngine.forkBranch` +
+ * `compareBranches` pattern `scenarioSession.ts`'s own hydraulics session already uses for its own
+ * fork — not a second fork mechanism.
+ *
+ * TRINITY INTEGRATION 3.0: the pump's own visual is now C2's `createWaterInfrastructureAdapter`
+ * (`graphics/waterInfrastructureBridge.ts`) — the honest `WorldFrameRenderer` seam C2 built
+ * specifically to receive a real C3 pump entity, superseding this file's own earlier
+ * `createPumpAssembly`/`createValveAssembly` (deleted; see `graphics/infrastructure.ts`'s removal in
+ * this same mission). One real gap found in that bridge and worked around by calling C2's OWN
+ * separately-exported `createPipeNetwork`/`createValve` (`graphics/waterInfrastructure.ts`) directly
+ * rather than through the adapter: `WaterInfrastructureAdapter` has no notion of a pipe run to a
+ * SECOND entity's position (the pump's real `feedsInto` connection to the hospital) — its `resolveVisual`
+ * always builds at local origin `[0,0,0]`, by design, since `WorldFrameRenderer.applyTransform`
+ * repositions the returned object to the entity's own absolute position every sync. The pipe/valve
+ * connecting pump to hospital are therefore built ONCE in `init()` as static scene decoration (their
+ * real endpoints never move), not as WorldFrame entities — this is reuse of C2's own exported kit
+ * functions, not a second visual system.
  *
  * SCOPED RENDERING (an honest limitation, not a general policy): `CITY_TEMPLATE`'s own generic
  * district/road/city-grid buildings are structural filler this scenario has no reason to visualize —
@@ -80,6 +95,25 @@ export interface InfrastructureComparisonRow {
   equal: boolean;
 }
 
+export interface RainfallScenarioOutcome {
+  scheduledAtTick: number;
+  tripped: boolean;
+  hospitalInterrupted: boolean;
+}
+
+export interface CurrentStateSummary {
+  tick: number;
+  pumpFlow: number;
+  pumpTripped: boolean;
+  hospitalInterrupted: boolean;
+  narration: string;
+}
+
+export interface ReplayWindow {
+  fromTick: number;
+  toTick: number;
+}
+
 function groundingToC2(level: WorldModelEntity['grounding']): EntityGrounding {
   return level === 'GROUNDED_EXACT' ? 'MODELED' : 'DERIVED';
 }
@@ -95,11 +129,14 @@ export class GenesisScientificCitySim implements Sim3D {
   private engine: TemporalEngine = new TemporalEngine(this.city.graph, { label: 'baseline', registry: this.registry });
   private failureBranch: TemporalEngine | null = null;
   private viewingBranch: RenderedCityBranch = 'BASELINE';
+  private rainfallOutcome: RainfallScenarioOutcome | null = null;
+  private replay: { fromTick: number; toTick: number; cursor: number } | null = null;
 
   private renderedIds: ReadonlySet<EntityId>;
 
   private THREE: typeof THREE_NS | null = null;
   private renderer: WorldFrameRenderer | null = null;
+  private waterAdapter: WaterInfrastructureAdapter | null = null;
   private pumpMaterials: {
     body: THREE_NS.Material; motor: THREE_NS.Material; plinth: THREE_NS.Material; pipe: THREE_NS.Material; valve: THREE_NS.Material;
   } | null = null;
@@ -199,10 +236,13 @@ export class GenesisScientificCitySim implements Sim3D {
     if (!match) return { found: false, label: null };
     const entity = this.activeEngine.graph.getEntity(match.id);
     const position = entity.spatial?.position ?? { x: 0, y: 0, z: 0 };
-    // Radius roughly matching each real object's own visual footprint (see createPumpAssembly's
-    // body/motor/gauge extents) so MACRO framing stands just outside the geometry rather than
-    // clipping into it.
-    const radius = match.kind === 'pump-pipe-system' ? 2.2 : 5;
+    // Radius roughly matching each real object's own visual footprint so MACRO framing stands just
+    // outside the geometry rather than clipping into it (or, the opposite failure mode found live
+    // after switching to C2's real createPump geometry: a radius left over from this file's own
+    // much larger deleted createPumpAssembly made the camera stand absurdly far from C2's genuinely
+    // small ~0.12-0.24m pump housing). C2's real pump/inlet/outlet/status-light footprint is roughly
+    // 0.25m across — see graphics/waterInfrastructure.ts's own createPump dimensions.
+    const radius = match.kind === 'pump-pipe-system' ? 0.25 : 5;
     this.lastSelectedId = match.id;
     if (!this.followTarget && this.THREE) this.followTarget = new this.THREE.Vector3();
     this.followTarget?.set(position.x, position.y + radius * 0.4, position.z);
@@ -260,19 +300,155 @@ export class GenesisScientificCitySim implements Sim3D {
   /**
    * "Why did the hospital lose water service?" — walks the REAL causal chain via
    * `getEventHistoryFor`/`getCausalAncestry` (`worldModel/queries/worldQueries.ts`), never a second
-   * causal engine. Returns the ancestry of the most recent population-access-impaired event on the
-   * failure branch, root-first, or `null` when no failure has been triggered / the cascade never
-   * reached the population.
+   * causal engine. Reads whichever engine is currently active (`activeEngine`) — the SAME real
+   * chain fires whether the pump was tripped by `triggerPumpFailure`'s direct fork or by
+   * `triggerRainfallScenario`'s real scripted rainfall event on the baseline, since both ultimately
+   * raise the pump's real `volumetricFlow` and let the SAME existing cascade run. Returns the
+   * ancestry of the most recent population-access-impaired event, root-first, or `null` when
+   * nothing has failed yet on the currently-viewed engine.
    */
   explainWaterServiceLoss(): readonly CausalStep[] | null {
-    if (!this.failureBranch) return null;
-    const populationEvents = getEventHistoryFor(this.failureBranch, this.city.populationId);
+    const engine = this.activeEngine;
+    const populationEvents = getEventHistoryFor(engine, this.city.populationId);
     const impaired = [...populationEvents].reverse().find((event) => event.type === POPULATION_ACCESS_IMPAIRED_EVENT_TYPE);
     if (!impaired) return null;
-    const ancestry: readonly GenesisEvent[] = getCausalAncestry(this.failureBranch, impaired.id);
+    const ancestry: readonly GenesisEvent[] = getCausalAncestry(engine, impaired.id);
     return [...ancestry].reverse().map((event) => ({
       type: event.type, tick: event.timestamp, cause: event.cause ?? null, parentEventId: event.parentEventId ?? null,
     }));
+  }
+
+  // --- Scientific Director: the flagship "extreme rainfall" scenario --------------------------
+
+  /**
+   * "Pokaż mi miasto podczas ekstremalnego deszczu" / "Show me the city during extreme rainfall" —
+   * schedules C3's OWN real scripted rainfall event (`RAINFALL_EVENT_TYPE`, `rainfallSchedule()`,
+   * both exported from `genesisScientificCity3.ts` for this exact purpose) on the LIVE baseline
+   * engine via the EXISTING `withScheduledEvents` decorator (`worldEventRules.ts`) wrapping this
+   * world's own real updater — the IDENTICAL mechanism `buildGenesisScientificCity3`'s own
+   * `rainfallAtTick` option uses at construction time, invoked here on an already-running engine
+   * instead. This establishes the SCENARIO on the baseline itself (not a counterfactual fork) —
+   * `describeCurrentState`/`explainWaterServiceLoss`/`step` all keep reading this same engine
+   * afterward. Idempotent: calling this again just returns the already-computed real outcome.
+   *
+   * COMPOSITION ORDER, found the hard way (this file's own tests caught it): `city.updater` was
+   * built WITHOUT `rainfallAtTick`, so its own internal rainfall-to-load coupling instance sits
+   * deep inside the chain with nothing ever feeding it a rainfall event — wrapping the WHOLE
+   * already-composed `city.updater` in `withScheduledEvents` from the outside adds the event too
+   * late for that inner coupling to ever see it (`withScheduledEvents`'s own event is appended
+   * AFTER its inner updater — here, the entire rest of the chain — has already run for that tick).
+   * The fix reuses the EXACT SAME coupling object (`city.couplings[0]`, exposed for this purpose)
+   * in a second, live application wrapped OUTSIDE `withScheduledEvents`, so it sees the event the
+   * moment it's added, in the same tick — no new coupling defined, no cascade logic duplicated,
+   * just the correct nesting order for a dynamically-timed (rather than construction-time) trigger.
+   *
+   * HONEST LIMITATION (mandatory Step 0 finding of this mission): the rainfall event's own
+   * `intensityMmPerHour` parameter is recorded for provenance but is NOT read anywhere by the real
+   * rainfall-to-load coupling — `genesisScientificCity3.ts`'s `rainfallToLoad.deriveEffect` applies
+   * a FIXED `RAINFALL_LOAD_MULTIPLIER`, never scaled by any intensity value, even though
+   * `defineCrossDomainCoupling`'s own `deriveEffect` signature is handed the full triggering event
+   * (parameters included) — the capability to read it exists in the framework, this one coupling
+   * simply doesn't use it. This method can therefore trigger the real scripted scenario, but cannot
+   * honestly support "what if rainfall were N% lower" — see the control loop's own explicit refusal
+   * for that request, which does not call this method at all.
+   */
+  triggerRainfallScenario(): RainfallScenarioOutcome {
+    if (this.rainfallOutcome) return this.rainfallOutcome;
+    const scheduledAtTick = this.engine.tick + 1;
+    const updaterWithRainfall = withCrossDomainCouplings(
+      withScheduledEvents(this.city.updater, rainfallSchedule(scheduledAtTick)),
+      [this.city.couplings[0]], // the real rainfall -> hydraulic-load coupling, reused verbatim
+    );
+    this.engine.advance(GENESIS_CITY_DT_SECONDS, updaterWithRainfall);
+    for (let i = 0; i < FAILURE_ADVANCE_TICKS; i++) this.engine.advance(GENESIS_CITY_DT_SECONDS, this.city.updater);
+
+    const pumpEvents = getEventHistoryFor(this.engine, this.city.pumpPipeId);
+    const hospitalEvents = getEventHistoryFor(this.engine, this.city.hospitalBuildingId);
+    this.rainfallOutcome = {
+      scheduledAtTick,
+      tripped: pumpEvents.some((event) => event.type === PUMP_TRIPPED_EVENT_TYPE),
+      hospitalInterrupted: hospitalEvents.some((event) => event.type === HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE),
+    };
+    return this.rainfallOutcome;
+  }
+
+  isRainfallScenarioActive(): boolean {
+    return this.rainfallOutcome !== null;
+  }
+
+  /**
+   * "What's happening?" / "Co się dzieje?" — a grounded status summary read directly from
+   * `activeEngine`'s real solver output, never a fabricated narrative. Real event carries the real
+   * rainfall event type (`RAINFALL_EVENT_TYPE`) as a documented constant so this narration's own
+   * wording stays traceable to the same real event the engine recorded.
+   */
+  describeCurrentState(): CurrentStateSummary {
+    const engine = this.activeEngine;
+    const pump = engine.graph.tryGetEntity(this.city.pumpPipeId);
+    const hospital = engine.graph.tryGetEntity(this.city.hospitalBuildingId);
+    const pumpFlow = pump?.domainState?.volumetricFlow ?? 0;
+    const pumpTripped = pumpFlow === 0;
+    const hospitalInterrupted = hospital?.domainState?.waterServiceInterrupted === 1;
+    const rainfallEvents = getEventHistoryFor(engine, this.city.environmentId);
+    const rainfallOccurred = rainfallEvents.some((event) => event.type === RAINFALL_EVENT_TYPE);
+    const narration = pumpTripped
+      ? `The pump has tripped (real overload-protection threshold exceeded on its own solved headLoss)${hospitalInterrupted ? "; the hospital's water service is interrupted as a direct, real consequence" : ''}.`
+      : rainfallOccurred
+        ? `Extreme rainfall has occurred; the pump is still operating normally at ${pumpFlow.toFixed(3)} m³/s.`
+        : `The pump is operating normally at ${pumpFlow.toFixed(3)} m³/s. No incident has occurred.`;
+    return { tick: engine.tick, pumpFlow, pumpTripped, hospitalInterrupted, narration };
+  }
+
+  /** The ONE counterfactual this mission's flagship explicitly asks about, honestly refused — see
+   * `triggerRainfallScenario`'s own doc for the exact gap. */
+  getRainfallCounterfactualGap(): string {
+    return 'NOT_MODELLED — rainfall intensity is not a real parameterized input in the current '
+      + 'hydraulics model: the scripted "extreme rainfall" event always raises the pump\'s real flow '
+      + 'demand by a fixed multiplier, regardless of any intensity value carried on the event. There '
+      + 'is no honest way to run a "rainfall 30% lower" counterfactual until the rainfall-to-load '
+      + 'coupling is changed to actually read a real intensity parameter.';
+  }
+
+  // --- Replay: the ALREADY-COMPUTED real history, not a re-narrated fiction -------------------
+
+  /**
+   * "Replay what happened" — steps back through the real history of whichever engine is active via
+   * C3's own `getFrameState(engine, timestamp)` (`bridge/worldFrameState.ts`), one real tick at a
+   * time — not a second replay engine. `fromTick` is the engine's own real fork point
+   * (`TemporalEngine.forkedAtTick`) when viewing a fork, or 0 for the baseline. Returns `null` when
+   * there is nothing yet to replay (fewer than one real tick of history).
+   */
+  startReplay(): ReplayWindow | null {
+    const engine = this.activeEngine;
+    const fromTick = engine.forkedAtTick ?? 0;
+    const toTick = engine.tick;
+    if (fromTick >= toTick) return null;
+    this.replay = { fromTick, toTick, cursor: fromTick };
+    return { fromTick, toTick };
+  }
+
+  isReplaying(): boolean {
+    return this.replay !== null;
+  }
+
+  getReplayTick(): number | null {
+    return this.replay?.cursor ?? null;
+  }
+
+  /** Advances the replay cursor by one real tick. Returns `false` once replay reaches the present
+   * (and clears replay mode, handing the view back to the live current state). */
+  advanceReplay(): boolean {
+    if (!this.replay) return false;
+    this.replay.cursor += 1;
+    if (this.replay.cursor >= this.replay.toTick) {
+      this.replay = null;
+      return false;
+    }
+    return true;
+  }
+
+  stopReplay(): void {
+    this.replay = null;
   }
 
   /** WORLD A (pump normal) vs WORLD B (pump failure) — the real `compareBranches` mechanism
@@ -339,15 +515,36 @@ export class GenesisScientificCitySim implements Sim3D {
     this.buildingMaterial = createPBRMaterial(THREE, 'TECH_COMPOSITE');
     this.landmarkMaterial = createPBRMaterial(THREE, 'CERAMIC');
 
+    // C2's real, tested, honest WorldFrame seam for the pump — see the module doc's "TRINITY
+    // INTEGRATION 3.0" note. `resolveVisual`/`updateVisual` below delegate to it for the one
+    // entity whose visualHint is 'object:water-pump'; every other entity keeps this file's own
+    // fallback visuals.
+    this.waterAdapter = createWaterInfrastructureAdapter(THREE, {
+      housingMaterial: this.pumpMaterials.body,
+      pipeMaterial: this.pumpMaterials.pipe,
+      valveMaterial: this.pumpMaterials.valve,
+    });
+
     this.renderer = new WorldFrameRenderer(THREE, scene, {
       resolveVisual: (entity) => this.resolveVisual(entity),
       updateVisual: (entity, object) => this.updateVisual(entity, object),
     });
 
-    const hospital = this.city.graph.getEntity(this.city.hospitalBuildingId).spatial?.position ?? { x: 0, y: 0, z: 0 };
-    const pump = this.city.graph.getEntity(this.city.pumpPipeId).spatial?.position ?? { x: 0, y: 0, z: 0 };
-    const midX = (hospital.x + pump.x) / 2;
-    const midZ = (hospital.z + pump.z) / 2;
+    const hospital = this.hospitalPosition();
+    const pumpEntityPos = this.city.graph.getEntity(this.city.pumpPipeId).spatial?.position ?? { x: 0, y: 0, z: 0 };
+    const pump: THREE_NS.Vector3Tuple = [pumpEntityPos.x, pumpEntityPos.y + 0.5, pumpEntityPos.z];
+
+    // The pump -> hospital pipe run: a REAL connection (the entity's own `feedsInto` relationship
+    // in genesisScientificCity3.ts), rendered with C2's OWN exported `createPipeNetwork`/`createValve`
+    // (graphics/waterInfrastructure.ts) directly, since `WaterInfrastructureAdapter` itself has no
+    // pipe-to-a-second-position concept (see module doc). Built once here — the real endpoints are
+    // static generated-world positions that never move — not resynced every frame.
+    scene.add(createPipeNetwork(THREE, { waypoints: [pump, hospital], radius: 0.1, material: this.pumpMaterials.pipe }));
+    const midpoint: THREE_NS.Vector3Tuple = [(pump[0] + hospital[0]) / 2, (pump[1] + hospital[1]) / 2, (pump[2] + hospital[2]) / 2];
+    scene.add(createValve(THREE, { position: midpoint, material: this.pumpMaterials.valve }));
+
+    const midX = (hospital[0] + pump[0]) / 2;
+    const midZ = (hospital[2] + pump[2]) / 2;
     camera.position.set(midX + 18, 16, midZ + 24);
     camera.lookAt(midX, 1, midZ);
   }
@@ -359,28 +556,8 @@ export class GenesisScientificCitySim implements Sim3D {
 
   private resolveVisual(entity: C2Entity): EntityVisualSpec {
     const THREE = this.THREE!;
-    if (entity.visualHint === 'pump-pipe-system' && this.pumpMaterials) {
-      // WorldFrameRenderer.applyTransform ALWAYS does `object.position.set(...entity.position)` —
-      // an absolute overwrite of the returned object's own position, applied AFTER this resolver
-      // runs (see its own module doc: "transform re-applied every sync()"). Every sub-part this
-      // assembly builds must therefore be positioned RELATIVE TO THE ENTITY'S OWN ORIGIN (0,0,0
-      // here), never at the entity's real absolute world position — passing the absolute position
-      // in as this local origin would double-apply it once the renderer sets the group's own
-      // position on top of already-absolute child coordinates.
-      const hospital = this.hospitalPosition();
-      const relativeHospital: THREE_NS.Vector3Tuple = [hospital[0] - entity.position[0], hospital[1] - entity.position[1], hospital[2] - entity.position[2]];
-      const assembly = createPumpAssembly(THREE, {
-        position: [0, 0, 0],
-        bodyMaterial: this.pumpMaterials.body, motorMaterial: this.pumpMaterials.motor,
-        plinthMaterial: this.pumpMaterials.plinth, valveMaterial: this.pumpMaterials.valve, pipeMaterial: this.pumpMaterials.pipe,
-        pipeRuns: [{ to: relativeHospital, radius: 0.1 }],
-      });
-      const valve = createValveAssembly(THREE, {
-        position: [1.4, 0.7, -0.4], axis: [1, 0, 0], bodyMaterial: this.pumpMaterials.valve, handleMaterial: this.pumpMaterials.pipe,
-      });
-      assembly.group.add(valve.group);
-      assembly.group.traverse((node) => { const mesh = node as THREE_NS.Mesh; if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; } });
-      return { kind: 'object', object: assembly.group };
+    if (entity.visualHint === 'object:water-pump' && this.waterAdapter) {
+      return this.waterAdapter.resolveVisual(entity);
     }
     if (entity.visualHint === 'building' && this.buildingMaterial) {
       const size = entity.id === this.city.hospitalBuildingId ? 6 : 4;
@@ -397,11 +574,10 @@ export class GenesisScientificCitySim implements Sim3D {
     return { kind: 'object', object: fallback };
   }
 
+  /** The pump's own canonical state now lives in C2's `waterInfrastructureBridge.ts` (driven off
+   * this same `WorldFrameEntity.status`/`.grounding` — see `updateVisual` below); this function only
+   * ever runs for the entities that DON'T go through that bridge. */
   private toCanonicalState(entity: C2Entity): CanonicalVisualState {
-    if (entity.visualHint === 'pump-pipe-system') {
-      if (typeof entity.scalars?.volumetricFlow === 'number' && entity.scalars.volumetricFlow === 0) return 'FAILURE';
-      return 'NORMAL';
-    }
     if (entity.id === this.city.hospitalBuildingId) {
       if (entity.scalars?.waterServiceInterrupted === 1) return 'CRITICAL';
       return 'NORMAL';
@@ -410,6 +586,10 @@ export class GenesisScientificCitySim implements Sim3D {
   }
 
   private updateVisual(entity: C2Entity, object: THREE_NS.Object3D): void {
+    if (entity.visualHint === 'object:water-pump' && this.waterAdapter) {
+      this.waterAdapter.updateVisual(entity, object);
+      return;
+    }
     const THREE = this.THREE!;
     const state = this.toCanonicalState(entity);
     object.traverse((node) => {
@@ -439,23 +619,37 @@ export class GenesisScientificCitySim implements Sim3D {
 
   syncScene(_scene: THREE_NS.Scene, _camera: THREE_NS.PerspectiveCamera): void {
     if (!this.renderer) return;
-    const state = getFrameState(this.activeEngine);
+    // While replaying, render the REAL historical state at the cursor tick — getFrameState's own
+    // optional `timestamp` param (bridge/worldFrameState.ts) already does this via the engine's
+    // real scrubTo, so replay needs no second history/snapshot mechanism.
+    const state = getFrameState(this.activeEngine, this.replay?.cursor);
     const frame: WorldFrame = {
       time: state.tick,
       entities: state.entities
         .filter((entity) => this.renderedIds.has(entity.id))
-        .map((entity) => ({
-          id: entity.id,
-          // Every rendered entity is placed at its own REAL absolute city-space position, treated
-          // as a root (no parentId) — see the module doc's "SCOPED RENDERING" note on why this
-          // deliberately does not compose C3's containment hierarchy into relative offsets.
-          position: [entity.transform.position.x, entity.transform.position.y, entity.transform.position.z],
-          scalars: entity.scalars,
-          status: entity.statusLabel,
-          grounding: groundingToC2(entity.grounding),
-          visualHint: entity.ref.kind,
-          visible: true,
-        })),
+        .map((entity) => {
+          const isPump = entity.id === this.city.pumpPipeId;
+          // C2's waterInfrastructureBridge.ts recognizes exactly 'object:water-pump' (its own
+          // documented visual-hint contract) and a `status` of one of its own
+          // WaterInfrastructureState values — a real domain fact (WHAT changed, C1's job) computed
+          // here from the pump's own real solver output, never a fabricated label. Every other
+          // entity keeps its real domainBinding kind as its hint.
+          const status: WaterInfrastructureState | string | undefined = isPump
+            ? (typeof entity.scalars.volumetricFlow === 'number' && entity.scalars.volumetricFlow === 0 ? 'FAILED' : 'NORMAL')
+            : entity.statusLabel;
+          return {
+            id: entity.id,
+            // Every rendered entity is placed at its own REAL absolute city-space position, treated
+            // as a root (no parentId) — see the module doc's "SCOPED RENDERING" note on why this
+            // deliberately does not compose C3's containment hierarchy into relative offsets.
+            position: [entity.transform.position.x, entity.transform.position.y, entity.transform.position.z],
+            scalars: entity.scalars,
+            status,
+            grounding: groundingToC2(entity.grounding),
+            visualHint: isPump ? 'object:water-pump' : entity.ref.kind,
+            visible: true,
+          };
+        }),
     };
     this.renderer.sync(frame);
   }
@@ -471,6 +665,9 @@ export class GenesisScientificCitySim implements Sim3D {
       pumpHeadLoss: pump?.domainState?.headLoss ?? 0,
       hospitalInterrupted: hospital?.domainState?.waterServiceInterrupted ?? 0,
       selected: this.lastSelectedId ? 1 : 0,
+      rainfallActive: this.rainfallOutcome ? 1 : 0,
+      replaying: this.replay ? 1 : 0,
+      replayTick: this.replay?.cursor ?? -1,
     };
   }
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { GenesisScientificCitySim } from '../core/three/genesisScientificCitySim';
+import { createWaterInfrastructureAdapter } from '../core/three/graphics/waterInfrastructureBridge';
+import type { WorldFrameEntity } from '../core/three/graphics/worldFrame';
+import type { EntityVisualSpec } from '../core/three/graphics/worldFrameRenderer';
 
 /**
  * CITY INFRASTRUCTURE INTEGRATION 1.0 — the real pump-pipe-system -> hospital cross-domain object.
@@ -156,6 +159,51 @@ describe('GenesisScientificCitySim.getComparison — WORLD A vs WORLD B, the rea
   });
 });
 
+describe('GenesisScientificCitySim — TRINITY INTEGRATION 3.0: the pump renders through C2\'s real bridge, not a duplicate system', () => {
+  function simWithWaterAdapter(): GenesisScientificCitySim {
+    const sim = initializedSim();
+    const adapter = createWaterInfrastructureAdapter(THREE, { housingMaterial: new THREE.MeshStandardMaterial() });
+    Object.assign(sim as unknown as Record<string, unknown>, { waterAdapter: adapter });
+    return sim;
+  }
+
+  it('resolveVisual for the pump\'s own visualHint delegates to C2\'s createWaterInfrastructureAdapter — the returned object is literally C2\'s createPump group', () => {
+    const sim = simWithWaterAdapter();
+    const pumpEntity: WorldFrameEntity = {
+      id: sim.getIds().pumpPipeId, position: [0, 0, 0], status: 'NORMAL', grounding: 'MODELED', visualHint: 'object:water-pump',
+    };
+    const spec: EntityVisualSpec = (sim as unknown as { resolveVisual(entity: WorldFrameEntity): EntityVisualSpec }).resolveVisual(pumpEntity);
+    expect(spec.kind).toBe('object');
+    // 'genesis-water-pump' is the exact name C2's own createPump() (graphics/waterInfrastructure.ts)
+    // assigns its group — proof this is really their object, not a look-alike built independently.
+    expect(spec.kind === 'object' ? spec.object.name : null).toBe('genesis-water-pump');
+  });
+
+  it('a real FAILED status (from the real solver output) drives the bridge\'s own visual state, not this file\'s own mapping', () => {
+    const sim = simWithWaterAdapter();
+    const pumpEntity: WorldFrameEntity = {
+      id: sim.getIds().pumpPipeId, position: [0, 0, 0], status: 'NORMAL', grounding: 'MODELED', visualHint: 'object:water-pump',
+    };
+    const spec = (sim as unknown as { resolveVisual(entity: WorldFrameEntity): EntityVisualSpec }).resolveVisual(pumpEntity);
+    const object = spec.kind === 'object' ? spec.object : null;
+    expect(object).not.toBeNull();
+    const failedEntity: WorldFrameEntity = { ...pumpEntity, status: 'FAILED' };
+    (sim as unknown as { updateVisual(entity: WorldFrameEntity, object: THREE.Object3D): void }).updateVisual(failedEntity, object!);
+    // The bridge tags notModeled itself; a real recognized status on a MODELED entity must clear it.
+    expect(object!.userData.notModeled).toBe(false);
+  });
+
+  it('an entity with NOT_MODELED grounding never gets a fabricated status through the bridge', () => {
+    const sim = simWithWaterAdapter();
+    const pumpEntity: WorldFrameEntity = {
+      id: sim.getIds().pumpPipeId, position: [0, 0, 0], status: 'FAILED', grounding: 'NOT_MODELED', visualHint: 'object:water-pump',
+    };
+    const spec = (sim as unknown as { resolveVisual(entity: WorldFrameEntity): EntityVisualSpec }).resolveVisual(pumpEntity);
+    expect(spec.kind === 'object' ? spec.object.userData.notModeled : null).toBe(true);
+  });
+
+});
+
 describe('GenesisScientificCitySim — replay determinism (mission section 11)', () => {
   it('the same seed and the same intervention produce the same hydraulic result and the same causal chain', () => {
     const run = () => {
@@ -167,5 +215,106 @@ describe('GenesisScientificCitySim — replay determinism (mission section 11)',
     const a = run();
     const b = run();
     expect(a).toEqual(b);
+  });
+});
+
+describe('GenesisScientificCitySim.triggerRainfallScenario — C1 SCIENTIFIC DIRECTOR: the real scripted event on the LIVE baseline', () => {
+  it('is a no-op status before it is triggered', () => {
+    const sim = initializedSim();
+    expect(sim.isRainfallScenarioActive()).toBe(false);
+    expect(sim.describeCurrentState().pumpTripped).toBe(false);
+  });
+
+  it('schedules the REAL rainfall event and lets the REAL cascade trip the pump, on the baseline (not a fork)', () => {
+    const sim = initializedSim();
+    const outcome = sim.triggerRainfallScenario();
+    expect(outcome.tripped).toBe(true);
+    expect(outcome.hospitalInterrupted).toBe(true);
+    expect(sim.isRainfallScenarioActive()).toBe(true);
+    // Still the baseline branch — this establishes the scenario, it is not a counterfactual fork.
+    expect(sim.getViewingBranch()).toBe('BASELINE');
+    expect(sim.getStats().hasFailureBranch).toBe(0);
+  });
+
+  it('is idempotent — a second call returns the already-computed real outcome, does not re-fork or re-advance', () => {
+    const sim = initializedSim();
+    const first = sim.triggerRainfallScenario();
+    const tickAfterFirst = sim.getStats().tick;
+    const second = sim.triggerRainfallScenario();
+    expect(second).toEqual(first);
+    expect(sim.getStats().tick).toBe(tickAfterFirst);
+  });
+
+  it('explainWaterServiceLoss works on the rainfall-triggered BASELINE — the same real causal chain as the fork-based failure path', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const chain = sim.explainWaterServiceLoss();
+    expect(chain).not.toBeNull();
+    const types = chain!.map((step) => step.type);
+    expect(types).toContain('hydraulics.pumppipe.tripped');
+    expect(types).toContain('building.waterservice.interrupted');
+    expect(types).toContain('population.hospitalaccess.impaired');
+  });
+
+  it('describeCurrentState reports the real tripped/interrupted state, grounded in real solver output', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const summary = sim.describeCurrentState();
+    expect(summary.pumpTripped).toBe(true);
+    expect(summary.pumpFlow).toBe(0);
+    expect(summary.hospitalInterrupted).toBe(true);
+    expect(summary.narration.toLowerCase()).toContain('tripped');
+  });
+});
+
+describe('GenesisScientificCitySim — the honest rainfall-intensity counterfactual refusal (mandatory mission Step 0)', () => {
+  it('names the real, specific gap rather than a generic failure message', () => {
+    const sim = initializedSim();
+    const gap = sim.getRainfallCounterfactualGap();
+    expect(gap).toContain('NOT_MODELLED');
+    expect(gap.toLowerCase()).toContain('rainfall');
+    expect(gap.toLowerCase()).toContain('parameterized');
+  });
+});
+
+describe('GenesisScientificCitySim — replay (real history, via getFrameState\'s own timestamp param)', () => {
+  it('returns null when there is nothing yet to replay', () => {
+    const sim = initializedSim();
+    expect(sim.startReplay()).toBeNull();
+    expect(sim.isReplaying()).toBe(false);
+  });
+
+  it('replays the real interval from the rainfall trigger to the present, one real tick at a time', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const toTick = sim.getStats().tick;
+    const window = sim.startReplay();
+    expect(window).not.toBeNull();
+    expect(window!.toTick).toBe(toTick);
+    expect(sim.isReplaying()).toBe(true);
+    expect(sim.getReplayTick()).toBe(window!.fromTick);
+
+    let steps = 0;
+    while (sim.advanceReplay()) steps += 1;
+    expect(steps).toBeGreaterThan(0);
+    expect(sim.isReplaying()).toBe(false);
+    expect(sim.getReplayTick()).toBeNull();
+  });
+
+  it('replaying a fork starts from its own real forkedAtTick, not tick 0', () => {
+    const sim = initializedSim();
+    sim.step(5);
+    const forkTick = sim.getStats().tick;
+    sim.triggerPumpFailure();
+    const window = sim.startReplay();
+    expect(window!.fromTick).toBe(forkTick);
+  });
+
+  it('stopReplay hands control back to the live view immediately', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    sim.startReplay();
+    sim.stopReplay();
+    expect(sim.isReplaying()).toBe(false);
   });
 });

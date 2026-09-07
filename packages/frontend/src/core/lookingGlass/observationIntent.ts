@@ -74,6 +74,25 @@ export interface ObservationIntent {
   readonly interventionRequested: boolean;
   /** "Go back to how it was" / "return to baseline" — leaves any branch and resumes the primary run. */
   readonly returningToBaseline: boolean;
+  /**
+   * Names a whole SCENARIO to establish, not a follow-up observation on an already-running world —
+   * "Pokaż mi miasto podczas ekstremalnego deszczu" / "Show me the city during extreme rainfall".
+   * Currently only the one flagship scenario is recognised (Scientific Director mission); `null`
+   * for every other sentence, including ordinary target/time/mode requests inside an open world.
+   */
+  readonly scenarioRequest: 'EXTREME_RAINFALL' | null;
+  /** "What's happening?" / "Co się dzieje?" — asks for a grounded status summary of the CURRENT
+   * world, distinct from `askingWhy` (a cause question) and `askingWhatChanged` (a diff question). */
+  readonly askingWhatIsHappening: boolean;
+  /**
+   * Names the ONE counterfactual this mission's flagship scenario explicitly asks about and which
+   * C3 does NOT currently support as a real parameterized intervention (rainfall intensity is a
+   * scripted trigger with a fixed effect magnitude, not an adjustable input — see
+   * `genesisScientificCity3.ts`'s own module doc). Detected so a caller can give an honest
+   * NOT_MODELLED refusal instead of either silently ignoring the question or routing it into an
+   * unrelated real intervention and calling that "the same thing".
+   */
+  readonly rainfallCounterfactualQuery: boolean;
   /** Everything this parser could not read out of the sentence. A caller must not fill these in with a default. */
   readonly unresolved: readonly UnresolvedObservationAspect[];
 }
@@ -100,18 +119,37 @@ const AFTER_EVENT = /\b(after|following|po)\s+(?:the\s+)?([a-ząćęłńóśźż
 const RELATIVE_TIME = /(\d+)\s*(hours?|godzin|godz|days?|dni|dzień|dzien|years?|lat|lata)\s*(later|earlier|forward|back|później|pozniej|wcześniej|wczesniej|do przodu|do tyłu|do tylu)/i;
 // "go back N hours" / "go forward N hours" — direction word then amount.
 const RELATIVE_TIME_LED = /\b(go back|cofnij(?:\s+o)?|wróć(?:\s+o)?|wroc(?:\s+o)?|go forward|advance(?:\s+by)?|przejdź(?:\s+o)?|przejdz(?:\s+o)?)\s+(\d+)\s*(hours?|godzin|godz|days?|dni|dzień|dzien|years?|lat|lata)/i;
+// "the next N hours" / "następne N godzin" — always forward; "next" never means "go back".
+const NEXT_N = /\b(?:the\s+)?next\s+(\d+)\s*(hours?|days?|years?)|\b(?:kolejne|następne|nastepne)\s+(\d+)\s*(godziny|godzin|godz|dni|dzień|dzien|lata|lat)/i;
 const GO_BACK = /\b(go back|cofnij|wróć|wroc)\b(?!\s+to\s+(?:the\s+)?baseline)/i;
 const GO_FORWARD = /\b(go forward|advance|przejdź dalej|przejdz dalej)\b/i;
 const BACKWARD_LEAD = /^(go back|cofnij|wróć|wroc)/i;
 
 const UNIT_WORD: Readonly<Record<string, TemporalUnit>> = {
-  hour: 'HOUR', hours: 'HOUR', godzin: 'HOUR', godz: 'HOUR',
+  hour: 'HOUR', hours: 'HOUR', godzin: 'HOUR', godz: 'HOUR', godziny: 'HOUR',
   day: 'DAY', days: 'DAY', dni: 'DAY', dzień: 'DAY', dzien: 'DAY',
   year: 'YEAR', years: 'YEAR', lat: 'YEAR', lata: 'YEAR',
 };
 
 const WHY_QUESTION = /\b(why (did|does|is|has)|dlaczego)\b/i;
 const WHAT_CHANGED_QUESTION = /\b(what changed|what('s| is| has) different|co się zmieniło|co sie zmienilo|co się zmienia|co sie zmienia)\b/i;
+const WHAT_IS_HAPPENING_QUESTION = /\b(what'?s happening|what is happening|what is going on|what's going on|co się dzieje|co sie dzieje)\b/i;
+
+// Scenario-opening requests — a whole world/situation to establish, not a follow-up observation.
+// Only one flagship scenario is recognised today (Scientific Director mission's own scope rule).
+const EXTREME_RAINFALL_SCENARIO = /\b(during|in)\s+(?:the\s+)?extreme rainfall\b|extreme rainfall scenario|podczas\s+ekstremalnego\s+deszczu|ekstremaln\w*\s+deszcz\w*/i;
+
+// The ONE counterfactual this mission's flagship explicitly asks about, which C3 does not honestly
+// support (rainfall intensity has no real effect on the hydraulics load — see genesisScientificCity3.
+// ts's own module doc). Matched independently of COMPARISON_TRIGGER/WHAT_IF_FAILURE below so a
+// caller can give an honest, specific refusal instead of a generic "compare" or an unrelated real
+// intervention.
+const RAINFALL_INTENSITY_QUERY = new RegExp(
+  '\\b(rainfall|rain)\\b.{0,40}?\\d{1,3}\\s?%.{0,20}?\\b(lower|less|reduced|weaker)\\b'
+  + '|\\d{1,3}\\s?%.{0,20}?\\b(lower|less|reduced|weaker)\\b.{0,40}?\\b(rainfall|rain)\\b'
+  + '|\\bdeszcz\\w*\\b.{0,40}?\\d{1,3}\\s?%.{0,20}?\\b(mniejszy|mniej|słabszy|slabszy|niższ\\w*|nizsz\\w*)\\b',
+  'i',
+);
 const RETURN_BASELINE = /\b(return to (the\s+)?baseline|back to (the\s+)?baseline|reset|wróć do (bazy|stanu wyjściowego)|wroc do (bazy|stanu wyjsciowego))\b/i;
 const COMPARISON_TRIGGER = /\b(compare|what if|what would happen if|porówn|porown|co (by było|by bylo|jeśli|jesli) gdyby|co jeśli|co jesli)\b/i;
 
@@ -196,6 +234,16 @@ function detectTime(text: string): ObservationTimeIntent | null {
     return { kind: 'RELATIVE', direction, amount, unit };
   }
 
+  // "the next N hours" / "następne N godzin" — the flagship dialogue's own phrasing, distinct from
+  // both patterns above ("next" carries no later/earlier/forward/back word, and no leading verb).
+  const nextN = NEXT_N.exec(text);
+  if (nextN) {
+    const amount = Number(nextN[1] ?? nextN[3]);
+    const unitWord = (nextN[2] ?? nextN[4])!.toLowerCase();
+    const unit = UNIT_WORD[unitWord] ?? 'HOUR';
+    return { kind: 'RELATIVE', direction: 'FORWARD', amount, unit };
+  }
+
   if (GO_BACK.test(text)) return { kind: 'RELATIVE', direction: 'BACKWARD', amount: 1, unit: null };
   if (GO_FORWARD.test(text)) return { kind: 'RELATIVE', direction: 'FORWARD', amount: 1, unit: null };
 
@@ -260,11 +308,17 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
   const location = detectLocation(trimmed);
   const askingWhy = WHY_QUESTION.test(trimmed);
   const askingWhatChanged = WHAT_CHANGED_QUESTION.test(trimmed);
+  const askingWhatIsHappening = WHAT_IS_HAPPENING_QUESTION.test(trimmed);
   const returningToBaseline = RETURN_BASELINE.test(trimmed);
   const comparison = (COMPARISON_TRIGGER.test(trimmed) || intervention.requested) && !returningToBaseline;
+  const scenarioRequest: ObservationIntent['scenarioRequest'] = EXTREME_RAINFALL_SCENARIO.test(trimmed) ? 'EXTREME_RAINFALL' : null;
+  const rainfallCounterfactualQuery = RAINFALL_INTENSITY_QUERY.test(trimmed);
 
   const unresolved: UnresolvedObservationAspect[] = [];
-  if (!target && !askingWhy && !askingWhatChanged && !comparison && !returningToBaseline && !time && !mode) unresolved.push('TARGET');
+  if (
+    !target && !askingWhy && !askingWhatChanged && !askingWhatIsHappening && !comparison
+    && !returningToBaseline && !time && !mode && !scenarioRequest && !rainfallCounterfactualQuery
+  ) unresolved.push('TARGET');
   if ((BEFORE_EVENT.test(trimmed) || AFTER_EVENT.test(trimmed)) && !event) unresolved.push('EVENT');
 
   return {
@@ -282,6 +336,9 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
     askingWhy,
     askingWhatChanged,
     interventionRequested: intervention.requested,
+    scenarioRequest,
+    askingWhatIsHappening,
+    rainfallCounterfactualQuery,
     returningToBaseline,
     unresolved,
   };

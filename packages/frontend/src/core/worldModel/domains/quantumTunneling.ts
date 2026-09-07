@@ -65,6 +65,18 @@ export const QUANTUM_TUNNELING_STATES = ['QUANTUM_BARRIER_OPAQUE', 'QUANTUM_TUNN
 export type QuantumTunnelingState = (typeof QUANTUM_TUNNELING_STATES)[number];
 
 /**
+ * The same three regimes as a NUMBER, published as `tunnelingStateCode` in
+ * `domainState`. Added when `graphics/SOLVER_DATA_CONTRACT.md` landed:
+ * its Rule 3 states that `statusLabel` is a prose channel that MUST NOT be
+ * what an adapter gates on, and that a numeric discrete code "is the
+ * cleanest option and SHOULD be preferred for any domain with genuinely
+ * discrete modes". `transmission` (the continuous discriminator) was
+ * already published; this is the discrete companion, so a consumer never
+ * has to parse a label or re-derive the thresholds.
+ */
+export const QUANTUM_TUNNELING_STATE_CODE = { QUANTUM_BARRIER_OPAQUE: 0, QUANTUM_TUNNELING_DETECTED: 1, QUANTUM_BARRIER_TRANSPARENT: 2 } as const;
+
+/**
  * Classification thresholds on the REAL, solver-computed transmission
  * probability. The number is real physics; where exactly to draw the line
  * between "opaque", "tunnelling" and "transparent" is a PRESENTATION
@@ -170,6 +182,9 @@ export function makeQuantumTunnelingSolver(): DomainSolver {
     const junctionState = classifyTunnelingTransmission(transmission);
 
     const nextParams: TunnelJunctionDefaults = { energy, barrier, width, frames, transmission, reflection, remainingProbability };
+    // Rule 3's preferred machine-readable channel: the discrete regime as a number, alongside the
+    // continuous `transmission` it is derived from.
+    const domainState = { ...nextParams, tunnelingStateCode: QUANTUM_TUNNELING_STATE_CODE[junctionState] };
     stepCounter += 1;
     const paramsHash = fnv1a(canonicalJson({ energy, barrier, width, frames, entityId: entity.id }));
 
@@ -197,7 +212,7 @@ export function makeQuantumTunnelingSolver(): DomainSolver {
       provenance: { origin: 'model', modelId: QUANTUM_TUNNELING_SOLVER_ID, paramsHash },
     };
 
-    const patch = { domainState: { ...nextParams }, statusLabel: junctionState };
+    const patch = { domainState, statusLabel: junctionState };
 
     if (previousState !== undefined && previousState !== junctionState) {
       // A REAL transition of the junction's measured regime — the one event a cross-domain

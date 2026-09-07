@@ -134,17 +134,6 @@ export const SCENARIO_CAPABILITIES: Readonly<Partial<Record<ScenarioKind, Scenar
    * with the real reason, instead of a false READY. See
    * `KIND_UNSUPPORTED_REASON` below for the message this produces.
    */
-  PARTICLE_SYSTEM: {
-    binding: 'PARTICLE_WORLD_ADAPTER',
-    units: ['HOUR'],
-    maxSpan: { HOUR: 24 },
-    viewpoints: ['OBSERVER', 'WIDE', 'MACRO'],
-    ticksPerUnit: { HOUR: 1, DAY: 24, YEAR: 8760 },
-    notModelled: [
-      'a human-scale world a person can stand in — the world is particle-scale',
-      'continuum or fluid dynamics',
-    ],
-  },
   /**
    * Backed by the real C3 World Model engine — a live WorldGraph advanced by
    * `chemistryKinetics.ts`'s Arrhenius solver, not scenarioEngine/hypothesisLoop.
@@ -208,7 +197,7 @@ const KIND_UNSUPPORTED_REASON: Readonly<Partial<Record<ScenarioKind, string>>> =
   CHEMICAL_REACTION:
     'a real model exists (RDKit molecular descriptors) but it runs only as a backend network call, and Looking Glass resolves scenarios synchronously — this specific kind cannot be routed without changing that, not because no model exists',
   FLOOD:
-    'a real hydrological model exists — rational-method rainfall-to-runoff feeding the same real Darcy-Weisbach hydraulics as HYDRAULIC_SYSTEM (core/worldModel/domains/rainfallRunoff.ts) — but it runs only inside the Genesis Scientific City world, with no standalone Looking Glass binding to route to; this kind cannot be resolved here without one. Inundation extent, depth and a hydrograph genuinely are not modelled regardless of routing.',
+    'a real hydrological model exists — rational-method rainfall-to-runoff feeding the same real Darcy-Weisbach hydraulics as HYDRAULIC_SYSTEM, real inundation depth and extent (a volume-conserving planar fill over a terrain heightfield), and a real hydrograph (storage routing through a Manning\'s-equation natural outlet — outflow rate, velocity, arrival time, infiltration loss) — all in core/worldModel/domains/floodInundation.ts. It runs only inside the Genesis Scientific City world, with no standalone Looking Glass binding to route to; this kind cannot be resolved here without one. Still genuinely not modelled regardless of routing: a flood-wave front inside the basin, any multi-reach channel network, and infiltration decay (the loss rate used is constant, not Horton/Green-Ampt).',
   EARTHQUAKE:
     'a real ground-shaking model exists (core/worldModel/domains/seismicShaking.ts — a synthetic, explicitly non-calibrated attenuation, not a GMPE) but it runs only inside the Genesis Scientific City world, with no standalone Looking Glass binding to route to. Structural damage, collapse and casualties are not modelled at all regardless of routing — see EARTHQUAKE_DAMAGE_REQUIRED_DATA.',
   BLACKOUT:
@@ -217,6 +206,12 @@ const KIND_UNSUPPORTED_REASON: Readonly<Partial<Record<ScenarioKind, string>>> =
     'a real traffic-flow model exists (core/worldModel/domains/trafficFlow.ts — Greenshields fundamental diagram, a Godunov/Cell-Transmission-Model network update, and HCM signalised-intersection capacity, all on the real road-network geometry) but it has no standalone Looking Glass binding to route to yet. Origin-destination demand, route choice/assignment, turning movements and calibration against real counts genuinely remain unmodelled regardless of routing.',
   EVACUATION:
     'the same real traffic-flow model as TRANSPORT_DISRUPTION covers an evacuation surge as an elevated demand multiplier on the network — but there is no standalone Looking Glass binding to it, and no evacuation behaviour model (warning response, departure timing, destination choice under stress) exists at all, regardless of routing.',
+  INDUSTRIAL_FIRE:
+    'a real single-source fire model exists (core/worldModel/domains/fireThermal.ts — an NFPA 921/SFPE t-squared design-fire heat-release-rate curve with a real fuel-mass energy budget, and a real SFPE point-source radiant-heat-flux model) but it has no standalone Looking Glass binding to route to yet. Fire spread, compartment dynamics and structural response genuinely remain unmodelled regardless of routing — this is a real fit for a single pool/jet fire, not a general fire capability.',
+  URBAN_TRANSFORMATION:
+    'the world generator genuinely builds and rebuilds real city structure (core/worldModel/generation/worldGenerator.ts) — this is not the same claim as "buildings, infrastructure and population structure do not evolve" the rest of this family\'s fallback text makes, and there is no standalone Looking Glass binding to route to it regardless. Urban dynamics over time — land use, economics, population change — genuinely are not modelled.',
+  PARTICLE_SYSTEM:
+    'a real adapter exists (core/world/particleWorldAdapter.ts) projecting an already-executed Newtonian-vs-relativistic kinetic-energy divergence sweep (modelVsModelCompare.ts) into a world — but nothing in the synchronous Looking Glass resolution path runs that sweep or has a DivergenceSweepResult to hand it, so there is no real construction to route to. This kind previously carried a capability-table entry with no session builder actually wired to its declared PARTICLE_WORLD_ADAPTER binding, which meant a request would have silently fallen through to the unrelated cell-culture laboratory session instead of a genuine refusal — corrected here, not routed.',
 };
 
 /**

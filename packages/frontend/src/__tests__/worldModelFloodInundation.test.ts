@@ -8,25 +8,37 @@ import {
   PUMP_TRIPPED_EVENT_TYPE,
 } from '../core/worldModel/domains/genesisScientificCity3';
 import {
+  addFloodplain,
   buildSyntheticTerrain,
   cellAreaM2,
   FLOOD_STATE_CODE,
   FLOOD_STATES,
+  FLOOD_INUNDATION_SOLVER_ID,
   floodStateCode,
   floodStateLabel,
   groundingFor,
+  HYDROGRAPH_NOT_YET_S,
+  makeFloodInundationSolver,
+  manningsWideChannelVelocityMS,
+  naturalOutletFlux,
+  naturalOutletSillElevationM,
   waterLevelForVolume,
   type TerrainHeightfield,
 } from '../core/worldModel/domains/floodInundation';
+import { WorldGraph } from '../core/worldModel/ecs/worldGraph';
 import { getEventHistoryFor } from '../core/worldModel/queries/worldQueries';
+import { SolverRouter } from '../core/worldModel/solvers/solverRouter';
 import { TemporalEngine } from '../core/worldModel/temporal/temporalEngine';
 
 /**
- * PHASE 8.2 — FLOOD INUNDATION.
+ * PHASE 8.2 / 12.3 — FLOOD INUNDATION, NOW WITH A HYDROGRAPH.
  *
  * `solverCapability.ts` said FLOOD lacked "terrain, depth, flood extent,
- * hydrograph". These tests pin down which three now exist, that the fill
- * conserves volume, and that the fourth is still honestly absent.
+ * hydrograph". These tests pin down that all four now exist: the fill
+ * conserves volume as before, and storage (level-pool) routing through a
+ * real Manning's-equation natural outlet now gives a real routed outflow,
+ * velocity, arrival time, and routing lag — built entirely on the SAME
+ * terrain and planar fill, never a second geometry model.
  */
 
 /** A terrain with an exactly-known capacity, so volume conservation can be checked against arithmetic rather than against itself. */
@@ -35,6 +47,22 @@ function flatBasin(cols = 10, rows = 10, cellSizeM = 1, depthM = 1): TerrainHeig
   // A 3x3 flat-bottomed pit at elevation 0, walls at `depthM`.
   for (let y = 3; y < 6; y++) for (let x = 3; x < 6; x++) elevationsM[y * cols + x] = 0;
   return { cols, rows, cellSizeM, elevationsM, surveyed: false, provenance: 'test fixture: 3x3 flat pit' };
+}
+
+/** A bowl (as `buildSyntheticTerrain`'s shape, but hand-built for an exact, distinguishable sill) with one boundary cell carved down to `notchElevationM` — a real, geometry-derived low point on the rim, distinct from the rest of the boundary. */
+function bowlWithSpillwayNotch(cols = 15, rows = 15, cellSizeM = 2, reliefM = 2, notchElevationM = 0.5): TerrainHeightfield {
+  const elevationsM: number[] = new Array(cols * rows);
+  const cx = (cols - 1) / 2;
+  const cy = (rows - 1) / 2;
+  const maxR = Math.hypot(cx, cy);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const r = Math.hypot(x - cx, y - cy) / maxR;
+      elevationsM[y * cols + x] = reliefM * r * r;
+    }
+  }
+  elevationsM[Math.floor(cols / 2)] = notchElevationM; // top-row midpoint: a spillway notch, lower than the rest of the rim
+  return { cols, rows, cellSizeM, elevationsM, surveyed: false, provenance: 'test fixture: bowl with a spillway notch' };
 }
 
 describe('The fill conserves volume, against arithmetic', () => {
@@ -221,5 +249,127 @@ describe('Rule 3 and the C2 boundary', () => {
       .toEqual(engine.graph.getEntity(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID).domainState);
     // Tick 0 predates the storm.
     expect(engine.scrubTo(0).getEntity(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID).domainState?.waterVolumeM3).toBe(0);
+  });
+});
+
+describe('The natural outlet — Manning\'s equation on the SAME terrain, no second geometry', () => {
+  it('the sill is the real lowest boundary cell, not the interior minimum', () => {
+    const flat = flatBasin(); // boundary uniformly at depthM=1; the 3x3 pit is interior only
+    expect(naturalOutletSillElevationM(flat)).toBeCloseTo(1, 6);
+
+    const notched = bowlWithSpillwayNotch();
+    expect(naturalOutletSillElevationM(notched)).toBeCloseTo(0.5, 6);
+  });
+
+  it('Manning\'s velocity is zero at/below the sill and grows with head, roughness, and slope', () => {
+    expect(manningsWideChannelVelocityMS(0, 0.035, 0.01)).toBe(0);
+    expect(manningsWideChannelVelocityMS(-1, 0.035, 0.01)).toBe(0);
+    const v1 = manningsWideChannelVelocityMS(0.5, 0.035, 0.01);
+    const v2 = manningsWideChannelVelocityMS(1.0, 0.035, 0.01);
+    expect(v2).toBeGreaterThan(v1); // deeper flow is faster
+    expect(manningsWideChannelVelocityMS(0.5, 0.02, 0.01)).toBeGreaterThan(v1); // smoother channel (lower n) is faster
+    expect(manningsWideChannelVelocityMS(0.5, 0.035, 0.04)).toBeGreaterThan(v1); // steeper slope is faster
+  });
+
+  it('natural outlet flux is exactly zero below the sill and positive above it', () => {
+    const below = naturalOutletFlux(0.3, 0.5, 5, 0.035, 0.01);
+    expect(below.headM).toBe(0);
+    expect(below.velocityMS).toBe(0);
+    expect(below.outflowM3S).toBe(0);
+
+    const above = naturalOutletFlux(1.2, 0.5, 5, 0.035, 0.01);
+    expect(above.headM).toBeCloseTo(0.7, 6);
+    expect(above.velocityMS).toBeGreaterThan(0);
+    expect(above.outflowM3S).toBeCloseTo(above.velocityMS * 5 * 0.7, 6);
+  });
+});
+
+describe('A real, routed hydrograph — storage (level-pool) routing through the natural outlet', () => {
+  function buildRoutedFloodplain() {
+    const graph = new WorldGraph();
+    const terrain = bowlWithSpillwayNotch();
+    const floodplainId = addFloodplain(graph, { terrain, floodplainId: 'routed-1' });
+    const router = new SolverRouter();
+    router.register(FLOOD_INUNDATION_SOLVER_ID, makeFloodInundationSolver(terrain));
+    return { graph, router, floodplainId };
+  }
+
+  it('the outlet stays silent while the basin is below the sill, then engages once it rises above it', () => {
+    const { graph, router, floodplainId } = buildRoutedFloodplain();
+    // A small pulse, well short of the volume needed to reach the notch (relief 2m over a 30x30m bowl).
+    graph.updateEntity(floodplainId, { domainState: { ...graph.getEntity(floodplainId).domainState, inflowM3S: 0.01 } });
+    for (let tick = 0; tick < 5; tick++) router.routeTick(graph, 5, tick + 1);
+    const early = graph.getEntity(floodplainId).domainState!;
+    expect(early.spillOutflowM3S).toBe(0);
+    expect(early.outletArrivalTimeS).toBe(HYDROGRAPH_NOT_YET_S);
+
+    // A large, sustained inflow — far more than the basin can hold below the notch.
+    graph.updateEntity(floodplainId, { domainState: { ...graph.getEntity(floodplainId).domainState, inflowM3S: 50 } });
+    let last = early;
+    for (let tick = 5; tick < 25; tick++) {
+      router.routeTick(graph, 5, tick + 1);
+      last = graph.getEntity(floodplainId).domainState!;
+    }
+    expect(last.spillOutflowM3S).toBeGreaterThan(0);
+    expect(last.outletVelocityMS).toBeGreaterThan(0);
+    expect(last.outletArrivalTimeS).toBeGreaterThan(0); // a real, computed arrival time, not asserted
+    expect(last.outletSillElevationM).toBeCloseTo(0.5, 6);
+  });
+
+  it('peak outflow lags peak inflow — the actual routing/attenuation signature, not a scripted delay', () => {
+    const { graph, router, floodplainId } = buildRoutedFloodplain();
+    // Sustained heavy inflow so the basin fills past the sill quickly, then it stops entirely.
+    graph.updateEntity(floodplainId, { domainState: { ...graph.getEntity(floodplainId).domainState, inflowM3S: 60 } });
+    for (let tick = 0; tick < 15; tick++) router.routeTick(graph, 5, tick + 1);
+
+    graph.updateEntity(floodplainId, { domainState: { ...graph.getEntity(floodplainId).domainState, inflowM3S: 0 } });
+    for (let tick = 15; tick < 60; tick++) router.routeTick(graph, 5, tick + 1);
+
+    const state = graph.getEntity(floodplainId).domainState!;
+    expect(state.peakInflowSoFarM3S).toBeCloseTo(60, 6);
+    expect(state.peakOutflowSoFarM3S).toBeGreaterThan(0);
+    // Inflow peaked immediately (the very first tick it was ever applied); outflow could only peak
+    // once the basin had actually risen above the sill — strictly later.
+    expect(state.peakOutflowSoFarTimeS).toBeGreaterThan(state.peakInflowSoFarTimeS);
+    expect(state.routingLagSoFarS).toBeGreaterThan(0);
+  });
+
+  it('after inflow stops, the routed outflow recedes — a recession limb, not a step function', () => {
+    const { graph, router, floodplainId } = buildRoutedFloodplain();
+    graph.updateEntity(floodplainId, { domainState: { ...graph.getEntity(floodplainId).domainState, inflowM3S: 60 } });
+    for (let tick = 0; tick < 15; tick++) router.routeTick(graph, 5, tick + 1);
+    graph.updateEntity(floodplainId, { domainState: { ...graph.getEntity(floodplainId).domainState, inflowM3S: 0 } });
+
+    let tick = 15;
+    for (; tick < 20; tick++) router.routeTick(graph, 5, tick + 1);
+    const peakOutflow = graph.getEntity(floodplainId).domainState!.spillOutflowM3S as number;
+    expect(peakOutflow).toBeGreaterThan(0);
+
+    for (; tick < 80; tick++) router.routeTick(graph, 5, tick + 1);
+    const laterOutflow = graph.getEntity(floodplainId).domainState!.spillOutflowM3S as number;
+    expect(laterOutflow).toBeLessThan(peakOutflow);
+  });
+
+  it('infiltration is a real loss: the same inflow schedule ends with less standing volume than with infiltration disabled', () => {
+    const terrain = bowlWithSpillwayNotch();
+    function runWith(infiltrationRateMPerS: number): number {
+      const graph = new WorldGraph();
+      const floodplainId = addFloodplain(graph, { terrain, floodplainId: 'infil-1', params: { infiltrationRateMPerS } });
+      const router = new SolverRouter();
+      router.register(FLOOD_INUNDATION_SOLVER_ID, makeFloodInundationSolver(terrain));
+      graph.updateEntity(floodplainId, { domainState: { ...graph.getEntity(floodplainId).domainState, inflowM3S: 5 } });
+      for (let tick = 0; tick < 30; tick++) router.routeTick(graph, 5, tick + 1);
+      return graph.getEntity(floodplainId).domainState!.waterVolumeM3 as number;
+    }
+
+    const withInfiltration = runWith(1.39e-6);
+    const withoutInfiltration = runWith(0);
+    expect(withInfiltration).toBeLessThan(withoutInfiltration);
+  });
+
+  it('the hydrograph is grounded like the rest of this domain: MODEL_ESTIMATE only on real survey elevations', () => {
+    const { graph, router, floodplainId } = buildRoutedFloodplain();
+    router.routeTick(graph, 5, 1);
+    expect(graph.getEntity(floodplainId).grounding).toBe('PROCEDURAL_APPROXIMATION'); // synthetic test terrain
   });
 });

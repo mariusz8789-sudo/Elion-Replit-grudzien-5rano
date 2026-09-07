@@ -136,10 +136,32 @@ describe('Looking Glass — resolution refuses rather than fabricates', () => {
     expect(evacuation.notModelled.join(' ')).toMatch(/same real traffic-flow model/i);
   });
 
-  it('refuses a century of urban change, which parses perfectly', () => {
+  it('same honesty for industrial fire now that a real single-source fire/thermal solver exists', () => {
+    const resolution = resolveScenarioRequest(parseScenarioRequest('Pokaż pożar przemysłowy w tym mieście przez 6 godzin'));
+    expect(resolution.status).toBe('NOT_MODELLED');
+    expect(resolution.notModelled.join(' ')).toMatch(/real single-source fire model exists/i);
+    expect(resolution.notModelled.join(' ')).toMatch(/no standalone Looking Glass binding/i);
+  });
+
+  it('refuses a particle-system request rather than silently serving unrelated cell-culture biology data', () => {
+    // PARTICLE_SYSTEM previously carried a READY SCENARIO_CAPABILITIES entry declaring a
+    // 'PARTICLE_WORLD_ADAPTER' binding that scenarioSession.ts's session builder never actually
+    // handled — so a request would have silently fallen through to the catch-all laboratory
+    // session (biology-logistic cell-culture hypothesis data) instead of a genuine refusal.
+    const resolution = resolveScenarioRequest(parseScenarioRequest('Show me a particle system over 12 hours'));
+    expect(resolution.status).toBe('NOT_MODELLED');
+    expect(resolution.notModelled.join(' ')).toMatch(/particleWorldAdapter\.ts/);
+    expect(resolution.notModelled.join(' ')).toMatch(/silently fallen through to the unrelated cell-culture/i);
+  });
+
+  it('refuses a century of urban change, which parses perfectly — honestly, not with the stale "nothing evolves" claim', () => {
+    // The world generator genuinely builds/rebuilds real city structure (solverCapability.ts marks
+    // URBAN_TRANSFORMATION PARTIALLY_MODELLED) — the old family-level fallback text here claimed
+    // "buildings, infrastructure and population structure do not evolve", which is no longer true.
     const resolution = resolveScenarioRequest(parseScenarioRequest('Show this city over the next 100 years from a bench'));
     expect(resolution.status).toBe('NOT_MODELLED');
-    expect(resolution.notModelled.join(' ')).toMatch(/urban-development model/i);
+    expect(resolution.notModelled.join(' ')).toMatch(/world generator genuinely builds and rebuilds/i);
+    expect(resolution.notModelled.join(' ')).toMatch(/urban dynamics over time.*are not modelled/i);
   });
 
   it('refuses a span past where the model stays meaningful', () => {

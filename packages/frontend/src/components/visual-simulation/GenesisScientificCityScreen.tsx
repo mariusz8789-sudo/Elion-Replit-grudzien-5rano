@@ -107,6 +107,17 @@ export function GenesisScientificCityScreen() {
       return;
     }
 
+    // "What are the assumptions/limits?" — the real event-sourced grounding notes, not a canned
+    // disclaimer (Genesis Urban Resilience Engine success criterion 8).
+    if (intent.askingForLimitations) {
+      const limitations = sim.describeScenarioLimitations();
+      setObsResult(limitations.length > 0
+        ? limitations.join(' ')
+        : 'No scenario has run yet, so there is nothing scenario-specific to disclose beyond the model itself.');
+      setObsText('');
+      return;
+    }
+
     // (3) An imperative command ("turn off the pump") or a "what happens if X fails" hypothetical
     // — both authorize the SAME real C3 intervention. Idempotent: asking twice re-shows the
     // already-computed real outcome rather than forking a second time.

@@ -267,6 +267,31 @@ describe('GenesisScientificCitySim.triggerRainfallScenario — C1 SCIENTIFIC DIR
   });
 });
 
+describe('GenesisScientificCitySim — describeScenarioLimitations (Genesis Urban Resilience Engine success criterion 8)', () => {
+  it('before any scenario has run: nothing scenario-specific to disclose', () => {
+    const sim = initializedSim();
+    expect(sim.describeScenarioLimitations()).toEqual([]);
+  });
+
+  it('after the real scenario runs: surfaces the REAL provenance notes already on the fired events, not invented text', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const notes = sim.describeScenarioLimitations();
+    expect(notes.length).toBeGreaterThan(0);
+    // The rainfall event's own real provenance note (genesisScientificCity3.ts's rainfallSchedule).
+    expect(notes.some((note) => note.includes('Scripted scenario trigger'))).toBe(true);
+    // The pump trip cascade rule's own real provenance note (pumpOverloadTripRule).
+    expect(notes.some((note) => note.includes('Engineering-judgment overload threshold'))).toBe(true);
+  });
+
+  it('is deduplicated — asking after multiple ticks does not repeat the same note', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const notes = sim.describeScenarioLimitations();
+    expect(new Set(notes).size).toBe(notes.length);
+  });
+});
+
 describe('GenesisScientificCitySim — rainfall-intensity counterfactual (REAL as of C3 Phase 5)', () => {
   it('before any scenario has run: honestly asks for a baseline first, not a permanent refusal', () => {
     const sim = initializedSim();

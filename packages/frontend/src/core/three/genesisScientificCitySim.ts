@@ -470,6 +470,31 @@ export class GenesisScientificCitySim implements Sim3D {
   }
 
   /**
+   * "Assumptions & limits" — the Genesis Urban Resilience Engine audit's own success criterion 8
+   * ("zobaczyć poziom pewności i ograniczenia"). Reads the REAL `provenance.notes` already recorded
+   * on the events that actually fired this run (pump trip's engineering-judgment threshold, the
+   * rainfall event's scripted-timing-vs-real-intensity split, and so on) rather than writing a
+   * second, parallel description that could drift from what the events themselves say. No note is
+   * invented here — an event with no `provenance.notes` simply contributes nothing. Deduplicated,
+   * in the order the underlying events occurred, so a caller (NL narration or C2's UI panel) never
+   * has to also carry this de-duplication logic.
+   */
+  describeScenarioLimitations(): readonly string[] {
+    const engine = this.activeEngine;
+    const relevantEvents = [
+      ...getEventHistoryFor(engine, this.city.environmentId),
+      ...getEventHistoryFor(engine, this.city.pumpPipeId),
+      ...getEventHistoryFor(engine, this.city.hospitalBuildingId),
+    ].sort((a, b) => a.timestamp - b.timestamp);
+    const notes: string[] = [];
+    for (const event of relevantEvents) {
+      const note = event.provenance?.notes;
+      if (note && !notes.includes(note)) notes.push(note);
+    }
+    return notes;
+  }
+
+  /**
    * "What if rainfall were N% lower" — REAL as of C3 Phase 5 (previously a hardcoded refusal; the
    * doc on `triggerRainfallScenario` above already recorded the gap's resolution, this method just
    * hadn't been updated to match — found during a post-merge Chromium regression pass, not by C3).

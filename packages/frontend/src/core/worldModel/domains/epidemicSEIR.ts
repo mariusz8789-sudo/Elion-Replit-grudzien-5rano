@@ -48,6 +48,37 @@ function effectiveParams(base: EpidemicParams, state: Record<string, number> | u
   return params;
 }
 
+/**
+ * Carries live parameter overrides forward into the next tick's `domainState`.
+ *
+ * REAL BUG THIS FIXES: the solver's patch below replaces `domainState`
+ * wholesale (as `WorldGraph.updateEntity` does for any component present in a
+ * patch), so before this, every override was silently erased on the
+ * population's very next solved tick. The "real contact-reduction
+ * intervention" this solver's own contract documents
+ * (`{'domainState.r0': 1.0}`) therefore survived exactly ZERO ticks, and no
+ * cross-domain coupling into epidemiology could hold either — which is
+ * precisely why this domain sat uncoupled while hydraulics and electrical
+ * were wired into the reference city.
+ *
+ * Restoring an override to its baseline is done by OMITTING the key (not by
+ * writing the base value back): `effectiveParams` then falls back to the
+ * solver's own base parameters exactly, with no floating-point drift and no
+ * leftover bookkeeping on the entity.
+ *
+ * An entity that never carried an override produces a byte-identical
+ * `domainState` to before this change.
+ */
+function carriedOverrides(state: Record<string, number> | undefined): Record<string, number> {
+  if (!state) return {};
+  const carried: Record<string, number> = {};
+  for (const key of OVERRIDABLE_PARAM_KEYS) {
+    const value = state[key];
+    if (value !== undefined) carried[key] = value;
+  }
+  return carried;
+}
+
 /** One reusable solver bound to base epidemic parameters (R0, infectious period, etc.) — each entity carries its own compartments AND any live intervention overrides in `domainState`. */
 export function makeEpidemicSEIRSolver(baseParams: EpidemicParams): DomainSolver {
   return (entity, ctx): SolverResult => {
@@ -100,7 +131,9 @@ export function makeEpidemicSEIRSolver(baseParams: EpidemicParams): DomainSolver
 
     return {
       patch: {
-        domainState: { ...clipped, t: nextT, beta },
+        // Overrides first, compartments second: a live intervention/coupling lever survives the
+        // tick, but can never overwrite the solver's own freshly-computed S/E/I/R/D/t/beta.
+        domainState: { ...carriedOverrides(entity.domainState), ...clipped, t: nextT, beta },
         statusLabel: `I=${clipped.I.toFixed(0)} R=${clipped.R.toFixed(0)} D=${clipped.D.toFixed(0)} (day ${nextT.toFixed(1)})`,
       },
       grounding: 'MODEL_ESTIMATE',

@@ -124,16 +124,51 @@ function buildRecoveryCouplings(): readonly CrossDomainCoupling[] {
     relationshipKind: 'affects',
     direction: 'from',
     condition: 'Hospital building water service restored',
-    effect: 'A real, durable EVENT records the population as having regained hospital access — same honest-evidence discipline as the original impairment event (never a persisted domainState flag; the real SEIR compartments are never altered by this coupling either).',
+    effect:
+      "Removes the outage's R0 override entirely, so the real SEIR solver falls back to its own base parameter EXACTLY (no arithmetic inverse, no floating-point drift, no leftover bookkeeping) — the precise mirror of the impairment coupling in genesisScientificCity3.ts. The S/E/I/R/D compartments are never written by this coupling either.",
     grounding: 'PROCEDURAL_APPROXIMATION',
-    deriveEffect: (_population) => ({
-      patch: {},
-      eventType: 'population.hospitalaccess.restored',
-      cause: 'hospital-water-service-restored',
-    }),
+    deriveEffect: (population) => {
+      const state = population.domainState ?? {};
+      if (state.r0 === undefined) return undefined; // no outage override in force — nothing to restore
+      const { r0: _outageR0, ...withoutOverride } = state;
+      return {
+        patch: { domainState: withoutOverride },
+        eventType: 'population.hospitalaccess.restored',
+        cause: 'hospital-water-service-restored',
+      };
+    },
   });
 
-  return [generatorToPump, pumpRestoredToHospitalService, hospitalRestoredToPopulationAccess];
+  /** Mirror of City 3.0's `pump-trip-to-lab-cooling`: the restored pump feeds the lab's cooling loop again, returning the sample to the EXACT setpoint that coupling recorded — the real Arrhenius model then re-solves k at the restored temperature on its own next tick. */
+  const pumpRestoredToLabCooling = defineCrossDomainCoupling({
+    id: 'pump-restored-to-lab-cooling',
+    sourceDomain: 'hydraulics',
+    targetDomain: 'chemistry-kinetics',
+    triggerEventType: 'hydraulics.pumppipe.restored',
+    relationshipKind: 'cools',
+    direction: 'from',
+    condition: 'Pump-pipe system restored, lab cooling loop fed again',
+    effect: 'Lab sample returns to the cooling setpoint recorded when the loop was lost; the real Arrhenius kinetics model re-solves the rate constant at that temperature on its own next tick',
+    grounding: 'PROCEDURAL_APPROXIMATION',
+    deriveEffect: (substance) => {
+      const state = substance.domainState ?? {};
+      if (state.coolingLost !== 1) return undefined; // cooling was never lost — nothing to restore
+      const setpointK = state.cooledSetpointK;
+      if (setpointK === undefined) return undefined; // no recorded setpoint: refuse to invent one
+      const { cooledSetpointK: _recorded, ...withoutSetpoint } = state;
+      return {
+        patch: {
+          physics: { ...substance.physics, massKg: substance.physics?.massKg ?? 0, temperatureK: setpointK },
+          domainState: { ...withoutSetpoint, coolingLost: 0 },
+          statusLabel: 'Cooling restored (backup generator online)',
+        },
+        eventType: 'chemistry.lab.coolingrestored',
+        cause: 'pump-restored',
+      };
+    },
+  });
+
+  return [generatorToPump, pumpRestoredToHospitalService, hospitalRestoredToPopulationAccess, pumpRestoredToLabCooling];
 }
 
 export function buildGenesisScientificCity4(options: GenesisScientificCity4Options = {}): GenesisScientificCity4 {

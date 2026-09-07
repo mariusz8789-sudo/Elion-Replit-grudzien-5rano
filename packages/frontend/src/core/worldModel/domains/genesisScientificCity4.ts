@@ -2,6 +2,12 @@ import { PUMP_PIPE_DEFAULTS } from '../../engineeringGraph/pumpPipe';
 import { defineCrossDomainCoupling, type CrossDomainCoupling } from '../crossDomain/crossDomainCoupling';
 import type { EntityId } from '../ecs/types';
 import {
+  addTunnelJunction,
+  buildStmImagingCouplings,
+  makeQuantumTunnelingSolver,
+  QUANTUM_TUNNELING_SOLVER_ID,
+} from './quantumTunneling';
+import {
   addBackupGenerator,
   applyGeneratorStartCommand,
   ELECTRICAL_GENERATOR_SOLVER_ID,
@@ -54,6 +60,15 @@ import {
  */
 export interface GenesisScientificCity4Options extends GenesisScientificCity3Options {
   worldId?: string;
+  /**
+   * Adds the real quantum-tunnelling STM junction to the chemistry lab and
+   * couples it to the sample (Phase 2). OPT-IN and off by default, on
+   * purpose: enabling it adds an entity, a relationship and a domain to the
+   * world, which would change `availableDomains` and the entity count for
+   * every existing caller of the flagship scenario. Off, this world is
+   * byte-identical to before Phase 2.
+   */
+  withQuantumLab?: boolean;
 }
 
 export interface GenesisScientificCity4 {
@@ -66,12 +81,16 @@ export interface GenesisScientificCity4 {
   labId: EntityId;
   substanceId: EntityId;
   generatorId: EntityId;
+  /** Present only when `withQuantumLab` was requested — never a fabricated id for a world that has no junction. */
+  tunnelJunctionId?: EntityId;
   waterSystemBuildingId: EntityId;
   /** Real intervention: commands the backup generator to start (mission section 10's "turn on the generator" example) — a thin, tested wrapper over `applyGeneratorStartCommand`, never a second intervention mechanism. */
   startGenerator: (engine: TemporalEngine) => void;
 }
 
 const WATER_SYSTEM_BUILDING_ID: EntityId = 'building:water-system-building';
+const LAB_ID: EntityId = 'lab:lab1';
+const SUBSTANCE_ID: EntityId = 'substance:s1';
 
 /** The 3 couplings restoring the pump/hospital/population chain once the backup generator reaches RUNNING — the exact mirror of City 3.0's own 3 failure couplings, in the opposite direction. */
 function buildRecoveryCouplings(): readonly CrossDomainCoupling[] {
@@ -186,19 +205,29 @@ export function buildGenesisScientificCity4(options: GenesisScientificCity4Optio
   // `scrubTo` replays from — silently breaking replay the instant anything scrubs backward (see
   // `createScientificWorld.ts`'s own `augmentGraph` doc for the full explanation).
   let generatorId!: EntityId;
+  let tunnelJunctionId: EntityId | undefined;
   const base = createScientificWorld(
     { kind: 'specification', specification },
     {
       augmentGraph: (graph) => {
         generatorId = addBackupGenerator(graph, { parentEntityId: WATER_SYSTEM_BUILDING_ID });
         graph.addRelationship(generatorId, GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID, 'powers');
+        if (options.withQuantumLab) {
+          // The junction lives inside the SAME chemistry lab the Arrhenius sample sits in, and
+          // `images` is the declared edge its cross-domain coupling travels over.
+          tunnelJunctionId = addTunnelJunction(graph, { parentEntityId: LAB_ID });
+          graph.addRelationship(tunnelJunctionId, SUBSTANCE_ID, 'images');
+        }
       },
     },
   );
 
   const updater = buildGenesisScientificCity3Updater(specification, options, {
-    extraSolvers: [{ solverId: ELECTRICAL_GENERATOR_SOLVER_ID, solver: makeElectricalGeneratorSolver() }],
-    extraCouplings: buildRecoveryCouplings(),
+    extraSolvers: [
+      { solverId: ELECTRICAL_GENERATOR_SOLVER_ID, solver: makeElectricalGeneratorSolver() },
+      ...(options.withQuantumLab ? [{ solverId: QUANTUM_TUNNELING_SOLVER_ID, solver: makeQuantumTunnelingSolver() }] : []),
+    ],
+    extraCouplings: [...buildRecoveryCouplings(), ...(options.withQuantumLab ? buildStmImagingCouplings() : [])],
   });
 
   const registry = new WorldRegistry();
@@ -214,6 +243,7 @@ export function buildGenesisScientificCity4(options: GenesisScientificCity4Optio
     labId: 'lab:lab1',
     substanceId: 'substance:s1',
     generatorId,
+    tunnelJunctionId,
     waterSystemBuildingId: WATER_SYSTEM_BUILDING_ID,
     startGenerator: (engine) => {
       applyGeneratorStartCommand(engine, generatorId);

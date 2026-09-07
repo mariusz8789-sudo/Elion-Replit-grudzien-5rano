@@ -21,6 +21,7 @@ import type { TemporalEngine, TemporalUpdater } from '../temporal/temporalEngine
 import {
   buildGenesisScientificCity3Specification,
   buildGenesisScientificCity3Updater,
+  addGenesisScientificCityFloodplain,
   GENESIS_SCIENTIFIC_CITY_ENVIRONMENT_ID,
   GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID,
   type GenesisScientificCity3Options,
@@ -215,6 +216,7 @@ export function buildGenesisScientificCity4(options: GenesisScientificCity4Optio
         // Phase 5: same real catchment binding City 3.0 applies on its own construction path, so
         // both paths tick an identically-solved environment node rather than diverging.
         bindEnvironmentToRainfallRunoff(graph, GENESIS_SCIENTIFIC_CITY_ENVIRONMENT_ID);
+        addGenesisScientificCityFloodplain(graph);
         generatorId = addBackupGenerator(graph, { parentEntityId: WATER_SYSTEM_BUILDING_ID });
         graph.addRelationship(generatorId, GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID, 'powers');
         if (options.withQuantumLab) {

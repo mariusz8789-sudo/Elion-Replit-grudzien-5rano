@@ -1,11 +1,12 @@
 import type { ScenarioKind } from '../../lookingGlass/scenarioRequest';
+import { CELL_CYCLE_SOLVER_ID } from '../domains/cellCycle';
 import { CHEMISTRY_KINETICS_SOLVER_ID } from '../domains/chemistryKinetics';
 import { ELECTRICAL_GENERATOR_SOLVER_ID } from '../domains/electricalGenerator';
 import { EPIDEMIC_SEIR_SOLVER_ID } from '../domains/epidemicSEIR';
 import { HYDRAULICS_PUMP_PIPE_SOLVER_ID } from '../domains/hydraulicsPumpPipe';
 import { MOLECULAR_STRUCTURE_SOLVER_ID } from '../domains/molecularStructure';
 import { QUANTUM_TUNNELING_SOLVER_ID } from '../domains/quantumTunneling';
-import { RAINFALL_RUNOFF_SOLVER_ID } from '../domains/rainfallRunoff';
+import { FLOOD_INUNDATION_SOLVER_ID } from '../domains/floodInundation';
 import { SEISMIC_SOURCE_SOLVER_ID } from '../domains/seismicShaking';
 
 /**
@@ -100,13 +101,13 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   // --- Partially modelled: a real solver, with a real hole in it ------------
   FLOOD: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
-    solverId: RAINFALL_RUNOFF_SOLVER_ID,
-    caveat: 'Rainfall to peak stormwater runoff is real (rational method) and drives the real hydraulics model. Inundation itself is NOT modelled: no terrain, no depth, no flood extent, no hydrograph.',
+    solverId: FLOOD_INUNDATION_SOLVER_ID,
+    caveat: 'Rainfall to peak runoff is real (rational method), it drives the real hydraulics model, and inundation depth and extent are now real too: a volume-conserving, connectivity-constrained planar fill over a terrain heightfield, growing when a pump trip removes drainage. Still NOT modelled: the hydrograph — no routing, no flow velocity, no arrival time, no infiltration. On the reference city the terrain is synthetic, which holds the result at PROCEDURAL_APPROXIMATION until real survey elevations are loaded.',
   },
   EARTHQUAKE: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
     solverId: SEISMIC_SOURCE_SOLVER_ID,
-    caveat: 'Ground shaking is a synthetic, explicitly non-calibrated attenuation (not a GMPE). Structural damage, collapse and casualties are NOT modelled at all — see EARTHQUAKE_DAMAGE_REQUIRED_DATA.',
+    caveat: 'Ground shaking is a synthetic, explicitly non-calibrated attenuation (not a GMPE). Structural damage, collapse and casualties are still NOT modelled, now as a checked refusal rather than an assumption: the lognormal fragility machinery is real and is actually queried, but its catalogue is empty (FEMA unreachable from this environment, GEM is CC BY-NC-SA) and, more fundamentally, published building fragility is indexed on spectral displacement while this hazard model produces a PGA — bridging that needs capacity curves and a demand spectrum. See FRAGILITY_REQUIRED_DATA.',
   },
   CHEMICAL_REACTION: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
@@ -115,7 +116,8 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   },
   CELL_CULTURE: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
-    caveat: 'Exact closed-form logistic growth gives an unstructured population count only. No age structure, cell cycle, division mechanism, stochasticity, or any measured cell line.',
+    solverId: CELL_CYCLE_SOLVER_ID,
+    caveat: 'A real compartmental cell-cycle model (G1/S/G2M, RK4), where growth comes from mitosis turning one cell into two and saturation comes from contact inhibition at the G1/S restriction point — so a confluent culture arrests in G1, as observed. Phase durations are representative mammalian values, not a measured line. Still NOT modelled: chronological age structure (that is a PDE, and cycle-phase structure is not the same thing), phase-duration variability (each compartment implies exponential residence times, so the population doubles somewhat faster than the nominal cycle), gene expression, differentiation, spatial structure, and stochasticity.',
   },
   LAB_EXPERIMENT: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,

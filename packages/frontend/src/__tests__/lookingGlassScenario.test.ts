@@ -154,10 +154,14 @@ describe('Looking Glass — resolution refuses rather than fabricates', () => {
     expect(resolution.notModelled.join(' ')).toMatch(/silently fallen through to the unrelated cell-culture/i);
   });
 
-  it('refuses a century of urban change, which parses perfectly', () => {
+  it('refuses a century of urban change, which parses perfectly — honestly, not with the stale "nothing evolves" claim', () => {
+    // The world generator genuinely builds/rebuilds real city structure (solverCapability.ts marks
+    // URBAN_TRANSFORMATION PARTIALLY_MODELLED) — the old family-level fallback text here claimed
+    // "buildings, infrastructure and population structure do not evolve", which is no longer true.
     const resolution = resolveScenarioRequest(parseScenarioRequest('Show this city over the next 100 years from a bench'));
     expect(resolution.status).toBe('NOT_MODELLED');
-    expect(resolution.notModelled.join(' ')).toMatch(/urban-development model/i);
+    expect(resolution.notModelled.join(' ')).toMatch(/world generator genuinely builds and rebuilds/i);
+    expect(resolution.notModelled.join(' ')).toMatch(/urban dynamics over time.*are not modelled/i);
   });
 
   it('refuses a span past where the model stays meaningful', () => {

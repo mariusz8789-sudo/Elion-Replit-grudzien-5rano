@@ -75,6 +75,14 @@ describe('EpidemicCity3DSim — Visual World Build 1.0 kits are real in the prod
     expect(names).toContain('genesis-tree-field');
   });
 
+  it('signage: post signs at intersections and a hanging sign on the real shop building', () => {
+    const { scene } = buildInitializedScene();
+    const extras = scene.getObjectByName('visual-world-build-city-extras')!;
+    const names = namesOf(extras);
+    expect(names).toContain('genesis-post-sign');
+    expect(names).toContain('genesis-hanging-sign');
+  });
+
   it('decorative street furniture (hydrants/utility boxes) and parked cars/vans are present', () => {
     const { scene } = buildInitializedScene();
     const extras = scene.getObjectByName('visual-world-build-city-extras')!;

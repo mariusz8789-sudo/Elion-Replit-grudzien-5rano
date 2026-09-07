@@ -27,6 +27,7 @@ import { createHydrant, createUtilityBox } from './graphics/streetKit';
 import { createVehicle } from './graphics/vehicleKit';
 import { createTreeField, createGroundClutter } from './graphics/vegetation';
 import { createPipeNetwork } from './graphics/waterInfrastructure';
+import { createPostSign, createHangingSign } from './graphics/signageKit';
 import { WorldFrameRenderer } from './graphics/worldFrameRenderer';
 import type { WorldFrame } from './graphics/worldFrame';
 import { createWaterInfrastructureAdapter, type WaterInfrastructureAdapter } from './graphics/waterInfrastructureBridge';
@@ -1567,6 +1568,30 @@ export class EpidemicCity3DSim implements Sim3D {
       if (slot % 4 === 1) extras.add(createHydrant(THREE, { position: [px + 0.62, 0, pz - 0.62], material: brushedMetal }));
       if (slot % 4 === 3) extras.add(createUtilityBox(THREE, { position: [px - 0.62, 0, pz + 0.62], headingRadians: Math.PI / 4, material: paintedMetal }));
     }));
+
+    // --- Signage: real post signs at a subset of intersections (distinct slots from the hydrant/
+    // utility-box loop above) and one hanging sign on the real shop building's own frontage. ---
+    const signPanelMaterial = new THREE.MeshStandardMaterial({ color: 0xe7edf4, emissive: 0x9fd4ff, emissiveIntensity: 0.2, roughness: 0.4 });
+    streets.v.forEach((x, col) => streets.h.forEach((y, row) => {
+      const slot = row * streets.v.length + col;
+      if (slot % 4 !== 0) return;
+      const px = (x - worldWidth / 2) * CITY_WORLD_SCALE;
+      const pz = (y - worldHeight / 2) * CITY_WORLD_SCALE;
+      extras.add(createPostSign(THREE, {
+        position: [px - 0.60, 0, pz - 0.35], headingRadians: ((slot % 3) * Math.PI) / 4,
+        panelWidth: 0.16, panelHeight: 0.11, panelCenterHeight: 0.34,
+        postMaterial: paintedMetal, panelMaterial: signPanelMaterial,
+      }).group);
+    }));
+    const shopSlot = this.semanticBuildingSlots.find((slot) => slot.building.kind === 'shop');
+    if (shopSlot) {
+      const dims = shopSlot.group.userData.cityBuilding as { width: number; depth: number; height: number };
+      extras.add(createHangingSign(THREE, {
+        position: [shopSlot.group.position.x - dims.width * 0.3, dims.height * 0.42, shopSlot.group.position.z + dims.depth / 2],
+        armLength: 0.14, dropHeight: 0.05, panelWidth: 0.18, panelHeight: 0.1,
+        bracketMaterial: brushedMetal, panelMaterial: signPanelMaterial,
+      }).group);
+    }
 
     // --- Decorative parked vehicles along one real street — visible city population, never a
     // WorldFrame/C3 entity (see this method's own doc). ---

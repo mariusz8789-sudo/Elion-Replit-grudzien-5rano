@@ -1,5 +1,5 @@
 import type * as THREE_NS from 'three';
-import type { Sim3D } from './types';
+import type { PostProcessingModules, PostProcessor, Sim3D } from './types';
 import { TemporalEngine, TemporalBranchRegistry } from '../worldModel/temporal/temporalEngine';
 import {
   buildGenesisScientificCity3, RAINFALL_LOAD_MULTIPLIER, rainfallSchedule,
@@ -15,10 +15,17 @@ import { WorldFrameRenderer, type EntityVisualSpec } from './graphics/worldFrame
 import type { WorldFrame, WorldFrameEntity as C2Entity, EntityGrounding } from './graphics/worldFrame';
 import { createWaterInfrastructureAdapter, type WaterInfrastructureAdapter } from './graphics/waterInfrastructureBridge';
 import { createPipeNetwork, createValve, type WaterInfrastructureState } from './graphics/waterInfrastructure';
+import { createFacadeBuilding, createIndustrialBuilding } from './graphics/buildingKit';
+import { createStreetLight, createHydrant, createUtilityBox, createBollardBarrier } from './graphics/streetKit';
+import { createTreeField, type VegetationFieldHandle } from './graphics/vegetation';
+import { createVehicle } from './graphics/vehicleKit';
+import { createPostSign } from './graphics/signageKit';
 import { createPBRMaterial } from './graphics/materials';
 import { applyVisualState, type CanonicalVisualState } from './graphics/visualState';
 import { resolveCameraFraming, type CameraIntent } from './graphics/cameraRig';
 import { createSceneEnvironment, type SceneEnvironmentHandle } from './graphics/sceneEnvironment';
+import { disposeSceneResources } from './graphics/lifecycle';
+import { setupGraphicsPipeline } from './graphics/postProcessing';
 
 /**
  * GENESIS — CITY INFRASTRUCTURE INTEGRATION 1.0
@@ -142,6 +149,11 @@ export class GenesisScientificCitySim implements Sim3D {
   } | null = null;
   private buildingMaterial: THREE_NS.Material | null = null;
   private landmarkMaterial: THREE_NS.Material | null = null;
+  private windowMaterial: THREE_NS.Material | null = null;
+  /** GRAPHICS V2 decorative context (see `addCityContext`) — held only so `dispose()` can free it. */
+  private contextGroup: THREE_NS.Group | null = null;
+  private contextMaterials: THREE_NS.Material[] = [];
+  private trees: VegetationFieldHandle | null = null;
   private sceneEnvironment: SceneEnvironmentHandle | null = null;
 
   private followTarget: THREE_NS.Vector3 | null = null;
@@ -503,6 +515,13 @@ export class GenesisScientificCitySim implements Sim3D {
       sunPosition: [30, 40, 20],
       sunColor: 0xffd9a0,
       sunIntensity: 2,
+      // GRAPHICS V2: `createBackgroundFill`'s 0.4 default assumes the sun does most of the work.
+      // With the city context now filling the frame, that left streets and lower facades reading as
+      // muddy near-black. A warmer, stronger hemisphere fill lifts the whole scene into "legible
+      // dusk" without touching the fog/sky mood `hourOfDay: 21` drives.
+      fillIntensity: 0.95,
+      fillSkyColor: 0x9fb4d8,
+      fillGroundColor: 0x5b5045,
     });
 
     this.pumpMaterials = {
@@ -512,8 +531,15 @@ export class GenesisScientificCitySim implements Sim3D {
       pipe: createPBRMaterial(THREE, 'BRUSHED_METAL'),
       valve: createPBRMaterial(THREE, 'POLISHED_METAL'),
     };
-    this.buildingMaterial = createPBRMaterial(THREE, 'TECH_COMPOSITE');
+    this.buildingMaterial = createPBRMaterial(THREE, 'CONCRETE');
     this.landmarkMaterial = createPBRMaterial(THREE, 'CERAMIC');
+    // GRAPHICS V2: windows are instanced per building (`createFacadeBuilding`), and `InstanceBatch`
+    // sets `vertexColors = true` on whatever material it is given — so this is a dedicated material
+    // for that use, never shared with the wall/landmark materials. `resolveVisual` clones it per
+    // entity, because `updateVisual`'s `applyVisualState` mutates emissive on the materials it
+    // traverses: a shared instance would make one building's state tint every other building's
+    // windows too.
+    this.windowMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.05, emissive: 0xffc98a, emissiveIntensity: 0.45 });
 
     // C2's real, tested, honest WorldFrame seam for the pump — see the module doc's "TRINITY
     // INTEGRATION 3.0" note. `resolveVisual`/`updateVisual` below delegate to it for the one
@@ -539,6 +565,11 @@ export class GenesisScientificCitySim implements Sim3D {
     // (graphics/waterInfrastructure.ts) directly, since `WaterInfrastructureAdapter` itself has no
     // pipe-to-a-second-position concept (see module doc). Built once here — the real endpoints are
     // static generated-world positions that never move — not resynced every frame.
+    // GRAPHICS V2: decorative city context (roads/buildings/lights/trees/vehicles) around the real
+    // entities — pure reuse of kits this scene already had available but never called. Added BEFORE
+    // the pipe run so the pipe and pump read as sitting IN a place, not floating in a void.
+    this.addCityContext(THREE, scene);
+
     scene.add(createPipeNetwork(THREE, { waypoints: [pump, hospital], radius: 0.1, material: this.pumpMaterials.pipe }));
     const midpoint: THREE_NS.Vector3Tuple = [(pump[0] + hospital[0]) / 2, (pump[1] + hospital[1]) / 2, (pump[2] + hospital[2]) / 2];
     scene.add(createValve(THREE, { position: midpoint, material: this.pumpMaterials.valve }));
@@ -547,6 +578,175 @@ export class GenesisScientificCitySim implements Sim3D {
     const midZ = (hospital[2] + pump[2]) / 2;
     camera.position.set(midX + 18, 16, midZ + 24);
     camera.lookAt(midX, 1, midZ);
+  }
+
+  /**
+   * GRAPHICS V2 — decorative city context around the REAL entities.
+   *
+   * HONEST STATUS, stated up front: everything this method builds is **decorative context, not
+   * science**. Not one object here is a C3/WorldFrame entity, none carries state, none is
+   * selectable, and every group is tagged `userData.visualOnlyContext = true` — the exact status
+   * `epidemicCity3D.ts`'s own `addCityExtras()` established for the same kind of massing. The real
+   * entities (pump, hospital, population) continue to come from C3 through `WorldFrameRenderer`
+   * alone; this only stops them from floating in an empty void.
+   *
+   * It is pure REUSE of kits that already existed and simply were not wired into this scene:
+   * `buildingKit`, `streetKit`, `vegetation`, `vehicleKit`, `signageKit`. No new visual system.
+   */
+  private addCityContext(THREE: typeof THREE_NS, scene: THREE_NS.Scene): void {
+    const group = new THREE.Group();
+    group.name = 'genesis-scientific-city-context';
+    group.userData.visualOnlyContext = true;
+
+    const asphalt = createPBRMaterial(THREE, 'ASPHALT');
+    const concrete = createPBRMaterial(THREE, 'CONCRETE');
+    const wall = createPBRMaterial(THREE, 'CONCRETE', { color: 0x6d6f75 });
+    const roof = createPBRMaterial(THREE, 'CONCRETE', { color: 0x3a3d44 });
+    const metal = createPBRMaterial(THREE, 'BRUSHED_METAL');
+    const lampGlow = new THREE.MeshStandardMaterial({ color: 0xffe6b8, emissive: 0xffd08a, emissiveIntensity: 2.2, roughness: 0.35 });
+    const contextWindow = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.05, emissive: 0xffc98a, emissiveIntensity: 0.35 });
+    const trunk = createPBRMaterial(THREE, 'CONCRETE', { color: 0x4a3b2c });
+    const canopy = createPBRMaterial(THREE, 'CONCRETE', { color: 0x2f5d34 });
+    const carBody = createPBRMaterial(THREE, 'PAINTED_METAL');
+    const carGlass = createPBRMaterial(THREE, 'TECH_COMPOSITE', { color: 0x1c2733 });
+    this.contextMaterials = [asphalt, concrete, wall, roof, metal, lampGlow, contextWindow, trunk, canopy, carBody, carGlass];
+
+    // Keep-out zones: the real entities' own positions, so context never buries the science.
+    const keepOut: { x: number; z: number; r: number }[] = [];
+    for (const id of this.renderedIds) {
+      const p = this.city.graph.getEntity(id).spatial?.position;
+      if (p) keepOut.push({ x: p.x, z: p.z, r: 9 });
+    }
+    const blocked = (x: number, z: number, pad = 0) =>
+      keepOut.some((k) => Math.hypot(x - k.x, z - k.z) < k.r + pad);
+
+    // --- Roads: a cross of asphalt strips through the site -----------------------------------
+    const roadWidth = 9;
+    const roadLength = 150;
+    for (const [w, d, ry] of [[roadWidth, roadLength, 0], [roadLength, roadWidth, 0]] as const) {
+      const road = new THREE.Mesh(new THREE.PlaneGeometry(w, d), asphalt);
+      road.rotation.x = -Math.PI / 2;
+      road.rotation.z = ry;
+      road.position.y = 0.02;
+      road.receiveShadow = true;
+      group.add(road);
+    }
+
+    // --- Context buildings on a loose grid, skipping the real entities' plots -----------------
+    // Density is what makes a skyline read as a city rather than a diorama (see
+    // `graphics/design-target/README.md`, quality 1). Detail falls off with distance instead of the
+    // count being capped: near blocks get rooftop equipment and dense window rows, far blocks get
+    // neither — the same "spend detail where the user actually looks" rule PERFORMANCE.md sets out.
+    const step = 26;
+    const RING = 5;
+    for (let gx = -RING; gx <= RING; gx++) {
+      for (let gz = -RING; gz <= RING; gz++) {
+        const x = gx * step + (gx % 2 ? 5 : -3);
+        const z = gz * step + (gz % 2 ? -4 : 6);
+        if (Math.abs(x) < roadWidth || Math.abs(z) < roadWidth) continue; // keep the roads clear
+        if (blocked(x, z, 8)) continue;
+        const ring = Math.max(Math.abs(gx), Math.abs(gz));
+        const seed = this.stableSeed(`ctx:${gx}:${gz}`);
+        const near = ring <= 2;
+        if ((gx + gz) % 3 === 0 && near) {
+          group.add(createIndustrialBuilding(THREE, {
+            position: [x, 0, z], width: 12 + (seed % 5), depth: 10 + (seed % 4),
+            seed, wallMaterial: wall, roofMaterial: roof,
+          }));
+        } else {
+          group.add(createFacadeBuilding(THREE, {
+            position: [x, 0, z],
+            width: 9 + (seed % 5), depth: 8 + (seed % 4),
+            // Taller towards the outskirts so the horizon carries a real skyline silhouette.
+            height: 7 + (seed % 13) + ring * 3.5,
+            seed, wallMaterial: wall, windowMaterial: contextWindow.clone(), roofMaterial: near ? roof : undefined,
+            // Coarser window rows further out: fewer instances per building, same silhouette.
+            floorHeight: near ? 1.2 : 2.0,
+            litFraction: 0.4,
+            rooftopEquipment: near,
+          }));
+        }
+      }
+    }
+
+    // --- Street lights along both roads ------------------------------------------------------
+    for (let i = -3; i <= 3; i++) {
+      if (i === 0) continue;
+      for (const [x, z] of [[roadWidth * 0.75, i * 18], [-roadWidth * 0.75, i * 18], [i * 18, roadWidth * 0.75], [i * 18, -roadWidth * 0.75]] as const) {
+        if (blocked(x, z)) continue;
+        group.add(createStreetLight(THREE, {
+          position: [x, 0, z], height: 7.5,
+          poleMaterial: metal, lampMaterial: lampGlow,
+          headingRadians: Math.abs(x) > Math.abs(z) ? (x > 0 ? Math.PI : 0) : (z > 0 ? -Math.PI / 2 : Math.PI / 2),
+        }));
+      }
+    }
+
+    // --- Parked vehicles. vehicleKit is authored at epidemicCity3D's CITY_WORLD_SCALE (~0.018),
+    // so a ~0.5-unit car needs scaling up to read as a real car in this scene's metric units.
+    const VEHICLE_SCALE = 8;
+    const parked: [number, number, number][] = [
+      [roadWidth * 0.55, -22, 0], [-roadWidth * 0.55, -34, Math.PI],
+      [roadWidth * 0.55, 30, 0], [-roadWidth * 0.55, 44, Math.PI],
+      [26, roadWidth * 0.55, Math.PI / 2], [-38, -roadWidth * 0.55, -Math.PI / 2],
+    ];
+    for (const [x, z, heading] of parked) {
+      if (blocked(x, z)) continue;
+      const seed = this.stableSeed(`car:${x}:${z}`);
+      const vehicle = createVehicle(THREE, {
+        kind: seed % 4 === 0 ? 'van' : 'car',
+        position: [0, 0, 0], headingRadians: heading, seed,
+        bodyMaterial: carBody.clone(), glassMaterial: carGlass, wheelMaterial: metal,
+      });
+      vehicle.group.scale.setScalar(VEHICLE_SCALE);
+      vehicle.group.position.set(x, 0, z);
+      group.add(vehicle.group);
+    }
+
+    // --- Street furniture + signage at the intersection ---------------------------------------
+    for (const [x, z] of [[roadWidth * 0.8, roadWidth * 0.8], [-roadWidth * 0.8, -roadWidth * 0.8]] as const) {
+      if (blocked(x, z)) continue;
+      const sign = createPostSign(THREE, {
+        position: [x, 0, z], panelWidth: 2.2, panelHeight: 1.1,
+        panelCenterHeight: 3.2, postRadius: 0.08,
+        postMaterial: metal, panelMaterial: concrete,
+      });
+      group.add(sign.group);
+    }
+    for (const [x, z] of [[roadWidth * 0.7, -12], [-roadWidth * 0.7, 16]] as const) {
+      if (blocked(x, z)) continue;
+      const hydrant = createHydrant(THREE, { position: [x, 0, z], material: carBody });
+      hydrant.scale.setScalar(8);
+      group.add(hydrant);
+      const box = createUtilityBox(THREE, { position: [x + 3, 0, z + 2], material: metal });
+      box.scale.setScalar(8);
+      group.add(box);
+    }
+    group.add(createBollardBarrier(THREE, {
+      from: [roadWidth * 0.9, 0, -roadWidth * 0.9], to: [roadWidth * 0.9 + 7, 0, -roadWidth * 0.9], postCount: 5, material: metal,
+    }));
+
+    // --- Vegetation: instanced, so a whole field costs 2 draw calls --------------------------
+    this.trees = createTreeField(THREE, {
+      count: 90, width: 150, depth: 150, seed: 0x5c17,
+      trunkMaterial: trunk, canopyMaterial: canopy, scaleRange: [1.4, 2.6],
+    });
+    group.add(this.trees.group);
+
+    scene.add(group);
+    this.contextGroup = group;
+  }
+
+  /** A stable, deterministic seed derived from an entity's own real id — never `Math.random()`, so
+   * a rebuilt scene (replay, branch switch) reproduces the identical building every time, per the
+   * deterministic-variation convention `buildingKit.ts` documents. */
+  private stableSeed(id: string): number {
+    let hash = 2166136261;
+    for (let i = 0; i < id.length; i++) {
+      hash ^= id.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return Math.abs(hash | 0);
   }
 
   private hospitalPosition(): THREE_NS.Vector3Tuple {
@@ -559,16 +759,44 @@ export class GenesisScientificCitySim implements Sim3D {
     if (entity.visualHint === 'object:water-pump' && this.waterAdapter) {
       return this.waterAdapter.resolveVisual(entity);
     }
-    if (entity.visualHint === 'building' && this.buildingMaterial) {
-      const size = entity.id === this.city.hospitalBuildingId ? 6 : 4;
-      const geometry = new THREE.BoxGeometry(size, size * 0.9, size);
-      // Same "relative to the entity's own origin" rule as the pump assembly above — bake the
-      // base-vs-center offset into the GEOMETRY (translate once, at construction) rather than the
-      // mesh's own .position, since WorldFrameRenderer overwrites .position outright every sync.
-      geometry.translate(0, (size * 0.9) / 2, 0);
-      const box = new THREE.Mesh(geometry, this.buildingMaterial.clone());
-      box.castShadow = true; box.receiveShadow = true;
-      return { kind: 'object', object: box };
+    if (entity.visualHint === 'building' && this.buildingMaterial && this.windowMaterial) {
+      // GRAPHICS V2: a real windowed facade (`buildingKit.createFacadeBuilding`) instead of the bare
+      // BoxGeometry this scene used to draw — the kit existed, this scene simply wasn't using it.
+      // Built at LOCAL ORIGIN [0,0,0] with its base on y=0, because WorldFrameRenderer.applyTransform
+      // overwrites `.position` outright every sync (ADAPTER_CONTRACT.md rule 4); the entity's own
+      // real C3 position is what places it.
+      const isHospital = entity.id === this.city.hospitalBuildingId;
+      const width = isHospital ? 7 : 4.5;
+      const depth = isHospital ? 6 : 4.5;
+      const height = isHospital ? 7.5 : 6 + (this.stableSeed(entity.id) % 5);
+      const building = createFacadeBuilding(THREE, {
+        position: [0, 0, 0],
+        width, depth, height,
+        seed: this.stableSeed(entity.id),
+        // Cloned per entity: `updateVisual` mutates emissive on what it traverses, so sharing these
+        // would let one building's CRITICAL state repaint every other building in the scene.
+        wallMaterial: this.buildingMaterial.clone(),
+        windowMaterial: this.windowMaterial.clone(),
+        roofMaterial: this.buildingMaterial.clone(),
+        litFraction: isHospital ? 0.8 : 0.45,
+      });
+      // A real C3 entity, not decorative massing — clear the kit's default context tag so nothing
+      // downstream mistakes a modeled hospital for background filler.
+      building.userData.visualOnlyContext = false;
+
+      // GRAPHICS V2 — a dedicated STATUS BAND rather than tinting the whole facade. Previously
+      // `updateVisual` ran `applyVisualState` over every mesh in the object, which repainted the
+      // entire building in the state colour: a nominal hospital rendered as a solid green block,
+      // which looked like a toy AND overstated the signal. The state still has to be visible (it is
+      // real C3 data), so it moves onto this one band; the building itself keeps its real material.
+      const band = new THREE.Mesh(
+        new THREE.BoxGeometry(width * 1.01, height * 0.045, depth * 1.01),
+        new THREE.MeshStandardMaterial({ color: 0x8d9199, roughness: 0.5, emissive: 0x000000, emissiveIntensity: 0 }),
+      );
+      band.position.y = height * 0.82;
+      band.userData.genesisStatusIndicator = true;
+      building.add(band);
+      return { kind: 'object', object: building };
     }
     const fallback = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), (this.landmarkMaterial ?? new THREE.MeshStandardMaterial()).clone());
     return { kind: 'object', object: fallback };
@@ -592,11 +820,53 @@ export class GenesisScientificCitySim implements Sim3D {
     }
     const THREE = this.THREE!;
     const state = this.toCanonicalState(entity);
+
+    // GRAPHICS V2: prefer a dedicated status indicator when the visual has one (see `resolveVisual`'s
+    // status band). Repainting every mesh — the old behaviour, kept as the fallback for visuals that
+    // carry no indicator — turns a whole building into a solid block of state colour, which reads as
+    // a toy rather than a city. The state itself is unchanged either way: same real C3 value, same
+    // `applyVisualState` mapping, just applied where it belongs.
+    const indicators: THREE_NS.Mesh[] = [];
     object.traverse((node) => {
-      const mesh = node as THREE_NS.Mesh;
-      if (!mesh.isMesh) return;
+      if ((node as THREE_NS.Mesh).isMesh && node.userData.genesisStatusIndicator) indicators.push(node as THREE_NS.Mesh);
+    });
+
+    const targets = indicators.length > 0 ? indicators : (() => {
+      const all: THREE_NS.Mesh[] = [];
+      object.traverse((node) => { if ((node as THREE_NS.Mesh).isMesh) all.push(node as THREE_NS.Mesh); });
+      return all;
+    })();
+
+    for (const mesh of targets) {
       const material = mesh.material as THREE_NS.MeshStandardMaterial | THREE_NS.MeshPhysicalMaterial;
       if (material && 'emissive' in material) applyVisualState(material, THREE, state);
+    }
+  }
+
+  /**
+   * GRAPHICS V2: this scene had NO post-processing at all — it rendered straight to the canvas, so
+   * its emissive windows, street lamps and status band could never bloom, and its tone mapping was
+   * whatever the raw renderer defaulted to. That is most of the gap between "technical 3D" and the
+   * look in `graphics/design-target/`.
+   *
+   * This is the SAME shared `setupGraphicsPipeline` (`graphics/postProcessing.ts`) that
+   * `epidemicCity3D.ts` already uses — not a second pipeline. Bloom is a little stronger and its
+   * threshold a little lower than the epidemic city's, because this is a dusk scene whose light
+   * comes mostly from small emissive sources (windows, lamps) rather than a lit daytime facade.
+   */
+  setupPostProcessing(
+    modules: PostProcessingModules,
+    renderer: THREE_NS.WebGLRenderer,
+    scene: THREE_NS.Scene,
+    camera: THREE_NS.PerspectiveCamera,
+    w: number,
+    h: number,
+  ): PostProcessor {
+    return setupGraphicsPipeline(this.THREE!, modules, renderer, {
+      scene, camera, width: w, height: h,
+      toneMappingExposure: 1.05,
+      bloom: { strength: 0.42, radius: 0.55, threshold: 0.72 },
+      ambient: { mode: 'none' },
     });
   }
 
@@ -615,6 +885,21 @@ export class GenesisScientificCitySim implements Sim3D {
   dispose(): void {
     this.sceneEnvironment?.dispose();
     this.sceneEnvironment = null;
+    // GRAPHICS V2 context teardown. `disposeSceneResources` frees the geometry/materials of
+    // everything under the group; the vegetation field owns its own instanced buffers, and the
+    // shared context materials were created here so they are disposed here (nothing else holds
+    // them) — the same ownership rule every kit in this engine follows.
+    this.trees?.dispose();
+    this.trees = null;
+    if (this.contextGroup) {
+      this.contextGroup.parent?.remove(this.contextGroup);
+      disposeSceneResources(this.contextGroup);
+      this.contextGroup = null;
+    }
+    for (const material of this.contextMaterials) material.dispose();
+    this.contextMaterials = [];
+    this.windowMaterial?.dispose();
+    this.windowMaterial = null;
   }
 
   syncScene(_scene: THREE_NS.Scene, _camera: THREE_NS.PerspectiveCamera): void {
@@ -643,6 +928,15 @@ export class GenesisScientificCitySim implements Sim3D {
             // as a root (no parentId) — see the module doc's "SCOPED RENDERING" note on why this
             // deliberately does not compose C3's containment hierarchy into relative offsets.
             position: [entity.transform.position.x, entity.transform.position.y, entity.transform.position.z],
+            // GRAPHICS V2 — a PRESENTATION decision, explicitly not a claim about physical size.
+            // `waterInfrastructure.ts`'s pump is authored at epidemicCity3D's CITY_WORLD_SCALE
+            // (~0.018), so at scale 1 it renders as a ~0.5-unit dome — invisible next to this scene's
+            // metric-scale buildings, even though it is the subject of the whole scenario. C3 models
+            // no real extent for this entity (`boundingRadius` is not forwarded through the frame
+            // contract — see SOLVER_DATA_CONTRACT.md §6, gap 7), so there is nothing real to read a
+            // size from; this scales it to a legible one. `scale` also feeds cameraRig's
+            // `targetRadius`, so framing stays consistent with what is drawn.
+            scale: isPump ? 12 : 1,
             scalars: entity.scalars,
             status,
             grounding: groundingToC2(entity.grounding),

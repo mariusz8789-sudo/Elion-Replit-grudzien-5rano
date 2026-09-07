@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { createRooftopEquipment, createAmbulanceBay, createIndustrialBuilding } from '../core/three/graphics/buildingKit';
+import { createRooftopEquipment, createAmbulanceBay, createIndustrialBuilding, createFacadeBuilding } from '../core/three/graphics/buildingKit';
 
 function material() {
   return new THREE.MeshStandardMaterial();
@@ -66,5 +66,70 @@ describe('createIndustrialBuilding', () => {
     const warehouse = createIndustrialBuilding(THREE, { position: [0, 0, 0], width: 1, depth: 0.8, seed: 3, kind: 'warehouse', wallMaterial: material(), roofMaterial: material() });
     const body = warehouse.children[0] as THREE.Mesh;
     expect((body.geometry as THREE.BoxGeometry).parameters.height).toBeLessThan(0.62); // 0.38 + up to 0.12
+  });
+});
+
+describe('createFacadeBuilding', () => {
+  function build(overrides: Partial<Parameters<typeof createFacadeBuilding>[1]> = {}) {
+    return createFacadeBuilding(THREE, {
+      position: [0, 0, 0], width: 6, depth: 5, height: 9, seed: 3,
+      wallMaterial: material(), windowMaterial: material(), ...overrides,
+    });
+  }
+
+  function windowMesh(group: THREE.Group): THREE.InstancedMesh | undefined {
+    return group.children.find((c) => (c as THREE.InstancedMesh).isInstancedMesh) as THREE.InstancedMesh | undefined;
+  }
+
+  it('builds a body of exactly the requested footprint, standing ON the ground plane (not centred through it)', () => {
+    const group = build();
+    const body = group.children.find((c) => (c as THREE.Mesh).geometry instanceof THREE.BoxGeometry) as THREE.Mesh;
+    const params = (body.geometry as THREE.BoxGeometry).parameters;
+    expect(params.width).toBe(6);
+    expect(params.depth).toBe(5);
+    expect(params.height).toBe(9);
+    // Base sits at y=0, so the centre must be at half the height.
+    expect(body.position.y).toBeCloseTo(4.5, 6);
+  });
+
+  it('REGRESSION (draw calls): every window on all four facades is ONE InstancedMesh, never a mesh per window', () => {
+    // The whole reason this function exists rather than copying epidemicCity3D.ts's hand-rolled
+    // per-window-Mesh approach, which PERFORMANCE.md measured as the city scene's largest cost.
+    const group = build();
+    const instanced = group.children.filter((c) => (c as THREE.InstancedMesh).isInstancedMesh);
+    expect(instanced).toHaveLength(1);
+    expect((instanced[0] as THREE.InstancedMesh).count).toBeGreaterThan(20);
+    // No individual window meshes leaked in alongside the batch.
+    const plainMeshes = group.children.filter((c) => (c as THREE.Mesh).isMesh && !(c as THREE.InstancedMesh).isInstancedMesh);
+    expect(plainMeshes.length).toBeLessThanOrEqual(2); // body (+ optional roof platform)
+  });
+
+  it('puts more windows on a taller building — rows really are derived from height', () => {
+    const short = windowMesh(build({ height: 4 }))!.count;
+    const tall = windowMesh(build({ height: 12 }))!.count;
+    expect(tall).toBeGreaterThan(short);
+  });
+
+  it('is deterministic: the same seed produces the same window count, a different seed may differ', () => {
+    expect(windowMesh(build({ seed: 11 }))!.count).toBe(windowMesh(build({ seed: 11 }))!.count);
+  });
+
+  it('keeps every window within the building footprint (windows sit on the facade, not floating off it)', () => {
+    const group = build();
+    const mesh = windowMesh(group)!;
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    for (let i = 0; i < mesh.count; i++) {
+      mesh.getMatrixAt(i, matrix);
+      position.setFromMatrixPosition(matrix);
+      expect(Math.abs(position.x)).toBeLessThanOrEqual(6 / 2 + 0.05);
+      expect(Math.abs(position.z)).toBeLessThanOrEqual(5 / 2 + 0.05);
+      expect(position.y).toBeGreaterThan(0);
+      expect(position.y).toBeLessThan(9);
+    }
+  });
+
+  it('is tagged decorative by default, matching every other context-massing generator in this kit', () => {
+    expect(build().userData.visualOnlyContext).toBe(true);
   });
 });

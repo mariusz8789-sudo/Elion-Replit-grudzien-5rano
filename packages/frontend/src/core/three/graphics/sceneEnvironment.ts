@@ -55,6 +55,14 @@ export interface SceneEnvironmentOptions {
   /** Overrides the sun's color — default is `SunState.color` (OUTDOOR) or `createSunLight`'s own
    * default warm white (INDOOR / no sun state). */
   sunColor?: THREE_NS.ColorRepresentation;
+  /** Overrides the hemisphere fill's intensity — `createBackgroundFill`'s own default (0.4) is tuned
+   * for a scene whose sun does most of the work. A night/dusk scene, where the sun contributes
+   * little, needs more ambient lift than that to stay legible without washing out; raising it here
+   * keeps that decision in the scene's own hands rather than in the shared default. */
+  fillIntensity?: number;
+  /** Overrides the hemisphere fill's sky/ground colours. */
+  fillSkyColor?: THREE_NS.ColorRepresentation;
+  fillGroundColor?: THREE_NS.ColorRepresentation;
   /** Adds a `atmosphere.ts` dust-mote haze for ambient depth, gated by `quality.ts`'s render-tier
    * rules exactly like every other consumer of that module (skipped entirely below `'medium'`).
    * Default true. */
@@ -106,7 +114,11 @@ export function createSceneEnvironment(
     castShadow: shadowMapSize > 0,
     shadowMapSize: shadowMapSize > 0 ? shadowMapSize : undefined,
   });
-  const fill = createBackgroundFill(THREE, scene);
+  const fill = createBackgroundFill(THREE, scene, {
+    intensity: options.fillIntensity,
+    skyColor: options.fillSkyColor,
+    groundColor: options.fillGroundColor,
+  });
 
   let ground: THREE_NS.Mesh | null = null;
   const groundSize = options.groundSize ?? 200;

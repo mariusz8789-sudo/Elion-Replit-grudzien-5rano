@@ -62,6 +62,25 @@ describe('createSceneEnvironment — OUTDOOR mode', () => {
     expect(handle.sun.position.y).toBe(20);
   });
 
+  it('fillIntensity/fillSkyColor/fillGroundColor override the hemisphere fill defaults', () => {
+    // A night/dusk scene needs more ambient lift than createBackgroundFill's sun-assuming 0.4
+    // default, or its streets and lower facades read as near-black (found in genesisScientificCitySim
+    // once its city context filled the frame).
+    const scene = new THREE.Scene();
+    const handle = createSceneEnvironment(THREE, scene, {
+      mode: 'OUTDOOR', tier: 'high', fillIntensity: 0.95, fillSkyColor: 0x9fb4d8, fillGroundColor: 0x5b5045,
+    });
+    expect(handle.fill.intensity).toBe(0.95);
+    expect(handle.fill.color.getHex()).toBe(new THREE.Color(0x9fb4d8).getHex());
+    expect(handle.fill.groundColor.getHex()).toBe(new THREE.Color(0x5b5045).getHex());
+  });
+
+  it('leaves the hemisphere fill at createBackgroundFill\'s own default when not overridden', () => {
+    const scene = new THREE.Scene();
+    const handle = createSceneEnvironment(THREE, scene, { mode: 'OUTDOOR', tier: 'high' });
+    expect(handle.fill.intensity).toBe(0.4);
+  });
+
   it('never disposes a caller-supplied ground material', () => {
     const scene = new THREE.Scene();
     const material = new THREE.MeshStandardMaterial();

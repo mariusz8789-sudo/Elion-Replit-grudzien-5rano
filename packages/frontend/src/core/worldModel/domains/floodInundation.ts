@@ -6,20 +6,19 @@ import type { WorldGraph } from '../ecs/worldGraph';
 import type { DomainSolver, SolverResult } from '../solvers/solverRouter';
 
 /**
- * PHASE 8.2 — FLOOD INUNDATION (depth and extent).
+ * PHASE 8.2 / 12.3 — FLOOD INUNDATION (depth, extent, and now a hydrograph).
  *
  * Closes the gap `capability/solverCapability.ts` named for FLOOD: "Inundation
  * itself is NOT modelled: no terrain, no depth, no flood extent, no
- * hydrograph." Three of those four are now modelled. The fourth is not, and
- * still says so.
+ * hydrograph." All four are now modelled, on the SAME terrain and the SAME
+ * volume-conserving planar fill Phase 8.2 already built — no second terrain
+ * or geometry model was introduced to get here.
  *
  * ## What is real here
  *
  * **1. Volume balance.** dV/dt = Q_in − Q_out, integrated per tick, clamped at
- * zero. Q_in is Phase 5's real rational-method runoff; Q_out is the drainage
- * the pump-pipe system actually removes. Both are numbers the world already
- * computes — this adds conservation of volume between them, which is a real
- * physical constraint, not a tuning knob.
+ * zero. Q_in is Phase 5's real rational-method runoff; Q_out is now THREE real
+ * terms (drainage, natural spill, infiltration — see below), not one.
  *
  * **2. Volume-conserving, connectivity-constrained planar fill.** Given a
  * water volume and a terrain, `waterLevelForVolume` finds the single level L
@@ -28,28 +27,61 @@ import type { DomainSolver, SolverResult } from '../solvers/solverRouter';
  * This is the "bathtub" method used in real rapid flood screening, with the
  * connectivity constraint that addresses its best-known criticism (unconnected
  * hollows being wrongly reported as flooded). V(L) is monotone in L, which is
- * what makes the bisection below exact rather than heuristic.
+ * what makes the bisection below exact rather than heuristic. UNCHANGED from
+ * Phase 8.2 — the hydrograph below is built entirely on top of it.
  *
- * **3. The coupling that makes it matter.** When the pump trips, drainage
- * stops. Water then accumulates instead of being removed, and depth and extent
- * grow because of the volume balance — not because anything scripts them to.
+ * **3. The hydrograph — storage (level-pool) routing, Chow/Maidment/Mays
+ * "Applied Hydrology" ch.8.** The basin's own lowest BOUNDARY cell (the real
+ * terrain's natural low point at its edge — `naturalOutletSillElevationM`,
+ * derived from the SAME `TerrainHeightfield`, not a second geometry) is
+ * treated as a natural spillway sill. Once the water level exceeds it, water
+ * discharges through a stated outlet channel via Manning's equation for a
+ * wide rectangular channel (`manningsWideChannelVelocityMS` —
+ * V=(1/n)·d^(2/3)·S^(1/2), Chow 1959; hydraulic radius ≈ depth when width ≫
+ * depth). Routing the inflow hydrograph through this storage-discharge
+ * relationship (explicit/forward-Euler integration of dS/dt = I−O, the
+ * textbook "storage indication"/Modified-Puls method) is what actually
+ * produces routing behaviour — a delayed, attenuated OUTFLOW hydrograph
+ * relative to the inflow — as a real consequence of the dynamics, not a
+ * scripted lag. From the same computation: a real outlet velocity, a real
+ * `outletArrivalTimeS` (the first time natural outflow becomes nonzero — an
+ * actual arrival time, not asserted), and `routingLagSoFarS` (running peak
+ * inflow time vs running peak outflow time — the classic routing/attenuation
+ * signature, whenever a peak has actually occurred).
+ *
+ * **4. Infiltration — constant-rate loss method.** A real, standard
+ * simplified infiltration treatment (a fixed rate rather than Horton's or
+ * Green-Ampt's time-decaying rate — see caveat below): loss = rate ×
+ * flooded area, using the SAME flooded area the planar fill already reports.
+ *
+ * **5. The coupling that makes it matter.** When the pump trips, drainage
+ * stops. Water then accumulates instead of being removed, and depth, extent,
+ * spill outflow and infiltration all evolve because of the volume balance —
+ * not because anything scripts them to.
  *
  * ## What is NOT modelled, and is not pretended to be
  *
- * - **No hydrograph, no routing, no flow dynamics.** A planar fill answers
- *   "if this much water came to rest on this terrain, how deep and how far
- *   would it reach". It does NOT answer how the flood front travels, how long
- *   it takes to arrive, or what velocity it has. Nothing here is a shallow-water
- *   or 2D hydrodynamic solver, and a depth from this must never be read as one.
+ * - **Still not a shallow-water or 2D hydrodynamic solver.** Storage routing
+ *   gives a real time-evolving outflow/velocity/arrival-time at the basin's
+ *   ONE outlet; it does not give a flood WAVE FRONT map inside the basin —
+ *   `waterLevelForVolume`'s planar fill still assumes the whole connected
+ *   region reaches its equilibrium level within a tick. There is no channel
+ *   network and no multi-reach routing: one basin, one lumped storage, one
+ *   outlet.
+ * - **Constant-rate infiltration is a simplification.** Real infiltration
+ *   capacity decays with time/saturation (Horton, Green-Ampt); a constant
+ *   rate is itself a recognised simplified method, not the exponential-decay
+ *   physics.
  * - **One water level, so multi-basin spill is only DISCLOSED, not modelled.**
  *   When water reaches a saddle between two depressions, no single level holds
  *   the volume: `unrepresentedVolumeM3` reports what could not be placed rather
  *   than overstating depth by pushing the level past the jump.
- * - **No infiltration, and no drainage beyond the pump.** Soil storage,
- *   evaporation and any drainage path other than the modelled pump are absent,
- *   so a real catchment would shed water this model retains.
  * - **No building or obstacle interaction.** Water fills terrain cells; it does
  *   not flow around, into, or against structures.
+ * - **Outlet channel geometry (width, roughness, slope) is a stated design
+ *   value**, like `trafficFlow.ts`'s lane count or `fireThermal.ts`'s peak
+ *   HRR — real Manning's-equation physics, literature-typical parameters, not
+ *   surveyed for a specific real channel.
  * - **The terrain may be synthetic — and that decides the grounding.** A
  *   `TerrainHeightfield` carries `surveyed`. With real survey/DEM elevations the
  *   solver reports `MODEL_ESTIMATE`; with the synthetic reference terrain it
@@ -57,7 +89,9 @@ import type { DomainSolver, SolverResult } from '../solvers/solverRouter';
  *   invented ground yields a number that demonstrates the method rather than
  *   describing any real place. That rule is enforced in code (`groundingFor`),
  *   not left to a caller's discretion, and it upgrades by itself the day real
- *   elevations are loaded.
+ *   elevations are loaded. This is unchanged and untouched by the hydrograph
+ *   work — synthetic terrain is a separate, real-data gap, not something a
+ *   routing formula can fix.
  */
 export const FLOOD_INUNDATION_SOLVER_ID = 'flood-inundation-planar-fill';
 export const FLOOD_DOMAIN_ID = 'flood-hydrology';
@@ -306,6 +340,14 @@ export interface FloodplainParams {
   drainageM3S: number;
   /** 1 when the terrain is real surveyed/DEM data. Decides the grounding — see `groundingFor`. */
   terrainSurveyed: number;
+  /** Natural outlet channel width, m — a stated design value (Manning's equation needs a channel to flow through; the terrain heightfield carries no channel network). */
+  outletWidthM: number;
+  /** Manning's roughness coefficient for the outlet channel, dimensionless — a published typical value (Chow 1959; 0.035 ≈ a winding natural stream with weeds/stones). */
+  outletManningN: number;
+  /** Outlet channel longitudinal bed slope, dimensionless (rise/run) — a stated design value. */
+  outletSlope: number;
+  /** Constant infiltration/loss rate, m/s — a stated typical rate (Chow/Maidment/Mays; default ≈5 mm/h, moderately impervious urban soil). The constant-rate simplification, not Horton/Green-Ampt. */
+  infiltrationRateMPerS: number;
 }
 
 export const FLOODPLAIN_DEFAULTS: FloodplainParams = {
@@ -313,7 +355,54 @@ export const FLOODPLAIN_DEFAULTS: FloodplainParams = {
   inflowM3S: 0,
   drainageM3S: 0,
   terrainSurveyed: 0,
+  outletWidthM: 5,
+  outletManningN: 0.035,
+  outletSlope: 0.01,
+  infiltrationRateMPerS: 1.39e-6, // 5 mm/h
 };
+
+/**
+ * The real terrain's own natural low point ALONG ITS BOUNDARY — the sill a
+ * rising basin would spill over on its way out of the modelled area. Derived
+ * from the SAME `TerrainHeightfield` the planar fill already uses; never a
+ * second geometry.
+ */
+export function naturalOutletSillElevationM(terrain: TerrainHeightfield): number {
+  const { cols, rows, elevationsM } = terrain;
+  if (elevationsM.length === 0) return 0;
+  let sill = Number.POSITIVE_INFINITY;
+  for (let x = 0; x < cols; x++) {
+    sill = Math.min(sill, elevationsM[x], elevationsM[(rows - 1) * cols + x]);
+  }
+  for (let y = 0; y < rows; y++) {
+    sill = Math.min(sill, elevationsM[y * cols], elevationsM[y * cols + cols - 1]);
+  }
+  return sill;
+}
+
+/**
+ * Manning's equation for a wide rectangular channel (hydraulic radius ≈ flow
+ * depth `headM`, valid when channel width ≫ depth — Chow, *Open Channel
+ * Hydraulics*, 1959): V = (1/n)·d^(2/3)·S^(1/2). Zero below the sill.
+ */
+export function manningsWideChannelVelocityMS(headM: number, manningN: number, slope: number): number {
+  if (headM <= 0 || manningN <= 0 || slope <= 0) return 0;
+  return (1 / manningN) * headM ** (2 / 3) * Math.sqrt(slope);
+}
+
+export interface NaturalOutletFlux {
+  /** Head above the sill, m — never negative. */
+  readonly headM: number;
+  readonly velocityMS: number;
+  readonly outflowM3S: number;
+}
+
+/** The natural spillway's discharge at a given water level — velocity × cross-section, both from Manning's equation above. */
+export function naturalOutletFlux(waterLevelM: number, sillElevationM: number, widthM: number, manningN: number, slope: number): NaturalOutletFlux {
+  const headM = Math.max(0, waterLevelM - sillElevationM);
+  const velocityMS = manningsWideChannelVelocityMS(headM, manningN, slope);
+  return { headM, velocityMS, outflowM3S: velocityMS * widthM * headM };
+}
 
 /**
  * The honesty rule, in code rather than in a caller's discretion: a correct
@@ -324,24 +413,73 @@ export function groundingFor(terrainSurveyed: number): GroundingLevel {
   return terrainSurveyed === 1 ? 'MODEL_ESTIMATE' : 'PROCEDURAL_APPROXIMATION';
 }
 
+/** Sentinel meaning "no natural outflow has occurred yet" — domainState is a flat number record, so a sign-bearing sentinel stands in for `undefined`. */
+export const HYDROGRAPH_NOT_YET_S = -1;
+
+export interface FloodHydrographState extends Record<string, number> {
+  elapsedS: number;
+  spillOutflowM3S: number;
+  outletVelocityMS: number;
+  outletSillElevationM: number;
+  infiltrationLossM3S: number;
+  peakInflowSoFarM3S: number;
+  peakInflowSoFarTimeS: number;
+  peakOutflowSoFarM3S: number;
+  peakOutflowSoFarTimeS: number;
+  outletArrivalTimeS: number;
+  routingLagSoFarS: number;
+}
+
+/** The initial (t=0) hydrograph bookkeeping for a freshly-added floodplain — no history yet, so every "so far" tracker starts from this entity's own initial condition. */
+function initialHydrographState(terrain: TerrainHeightfield, params: FloodplainParams, inundation: InundationResult): FloodHydrographState {
+  const sillElevationM = naturalOutletSillElevationM(terrain);
+  const flux = naturalOutletFlux(inundation.waterLevelM, sillElevationM, params.outletWidthM, params.outletManningN, params.outletSlope);
+  const infiltrationLossM3S = params.infiltrationRateMPerS * inundation.floodedAreaM2;
+  return {
+    elapsedS: 0,
+    spillOutflowM3S: flux.outflowM3S,
+    outletVelocityMS: flux.velocityMS,
+    outletSillElevationM: sillElevationM,
+    infiltrationLossM3S,
+    peakInflowSoFarM3S: params.inflowM3S,
+    peakInflowSoFarTimeS: 0,
+    peakOutflowSoFarM3S: flux.outflowM3S,
+    peakOutflowSoFarTimeS: flux.outflowM3S > 0 ? 0 : HYDROGRAPH_NOT_YET_S,
+    outletArrivalTimeS: flux.outflowM3S > 0 ? 0 : HYDROGRAPH_NOT_YET_S,
+    routingLagSoFarS: 0,
+  };
+}
+
 let stepCounter = 0;
 
 /**
  * One solver per floodplain entity, bound to one terrain. Synchronous and
  * allocation-light: the fill is recomputed only when the stored volume actually
- * changed, since a still floodplain has a still surface.
+ * changed, since a still floodplain has a still surface. The natural-outlet
+ * sill (`naturalOutletSillElevationM`) is derived from the terrain once, here,
+ * since the terrain never changes underneath one solver instance.
  */
 export function makeFloodInundationSolver(terrain: TerrainHeightfield): DomainSolver {
   let cachedVolume = Number.NaN;
   let cached: InundationResult = DRY;
+  const sillElevationM = naturalOutletSillElevationM(terrain);
 
   return (entity, ctx): SolverResult => {
-    const state = entity.domainState as Partial<FloodplainParams> | undefined;
+    const state = entity.domainState as Partial<FloodplainParams & FloodHydrographState> | undefined;
     const params: FloodplainParams = { ...FLOODPLAIN_DEFAULTS, ...state };
 
-    // Conservation of volume. Water cannot go negative: drainage can empty the
-    // floodplain, it cannot pump out water that is not there.
-    const netM3 = (params.inflowM3S - params.drainageM3S) * ctx.dt;
+    // Storage (level-pool) routing: this tick's natural spill and infiltration are evaluated at
+    // the PREVIOUS tick's water level/flooded area — explicit-Euler, matching the volume balance's
+    // own forward-Euler integration below, and self-consistent (the reported flux is exactly what
+    // altered the balance this tick, not a value computed from the state it produced).
+    const previousLevelM = state?.waterLevelM ?? 0;
+    const previousFloodedAreaM2 = state?.floodedAreaM2 ?? 0;
+    const flux = naturalOutletFlux(previousLevelM, sillElevationM, params.outletWidthM, params.outletManningN, params.outletSlope);
+    const infiltrationLossM3S = params.infiltrationRateMPerS * previousFloodedAreaM2;
+
+    // Conservation of volume, now with three real outflow terms. Water cannot go negative: outflow
+    // can empty the floodplain, it cannot remove water that is not there.
+    const netM3 = (params.inflowM3S - params.drainageM3S - flux.outflowM3S - infiltrationLossM3S) * ctx.dt;
     const waterVolumeM3 = Math.max(0, params.waterVolumeM3 + netM3);
 
     if (waterVolumeM3 !== cachedVolume) {
@@ -350,18 +488,37 @@ export function makeFloodInundationSolver(terrain: TerrainHeightfield): DomainSo
     }
     const inundation = cached;
     const stateCode = floodStateCode(inundation.maxDepthM);
+
+    // A peak's TIME is when it was first reached — a sustained plateau at the same value must not
+    // keep sliding the recorded time forward to "now" every tick, or a constant inflow would report
+    // an ever-increasing, meaningless "time of peak". Strict `>` (not `>=`) is what makes that true.
+    const elapsedS = (state?.elapsedS ?? 0) + ctx.dt;
+    const priorPeakInflow = state?.peakInflowSoFarM3S ?? 0;
+    const peakInflowSoFarM3S = Math.max(priorPeakInflow, params.inflowM3S);
+    const peakInflowSoFarTimeS = params.inflowM3S > priorPeakInflow ? elapsedS : (state?.peakInflowSoFarTimeS ?? 0);
+    const priorPeakOutflow = state?.peakOutflowSoFarM3S ?? 0;
+    const peakOutflowSoFarM3S = Math.max(priorPeakOutflow, flux.outflowM3S);
+    const peakOutflowSoFarTimeS = flux.outflowM3S > priorPeakOutflow ? elapsedS : (state?.peakOutflowSoFarTimeS ?? HYDROGRAPH_NOT_YET_S);
+    const priorArrival = state?.outletArrivalTimeS ?? HYDROGRAPH_NOT_YET_S;
+    const outletArrivalTimeS = priorArrival >= 0 ? priorArrival : (flux.outflowM3S > 0 ? elapsedS : HYDROGRAPH_NOT_YET_S);
+    // The classic routing signature: peak outflow lags peak inflow. Only meaningful once outflow has
+    // actually peaked at least once — HYDROGRAPH_NOT_YET_S before that, never a fabricated 0.
+    const routingLagSoFarS = peakOutflowSoFarTimeS >= 0 ? peakOutflowSoFarTimeS - peakInflowSoFarTimeS : HYDROGRAPH_NOT_YET_S;
+
     stepCounter += 1;
 
     const observation: Observation = {
       observationId: `flood-obs:${entity.id}:${ctx.tick}`,
       tick: ctx.tick,
-      statement: `${entity.label}: V=${waterVolumeM3.toFixed(1)}m³, max depth=${inundation.maxDepthM.toFixed(3)}m over ${inundation.floodedAreaM2.toFixed(0)}m² (${floodStateLabel(stateCode)})`,
+      statement: `${entity.label}: V=${waterVolumeM3.toFixed(1)}m³, max depth=${inundation.maxDepthM.toFixed(3)}m over ${inundation.floodedAreaM2.toFixed(0)}m² (${floodStateLabel(stateCode)}), spill=${flux.outflowM3S.toFixed(3)}m³/s @ ${flux.velocityMS.toFixed(2)}m/s`,
       measurements: [
         { key: 'waterVolumeM3', value: waterVolumeM3, tick: ctx.tick, entity: entity.ref, provenance: ['domains/floodInundation.ts#volume-balance'] },
         { key: 'maxDepthM', value: inundation.maxDepthM, tick: ctx.tick, entity: entity.ref, provenance: ['domains/floodInundation.ts#waterLevelForVolume', `terrain:${terrain.provenance}`] },
         { key: 'floodedAreaM2', value: inundation.floodedAreaM2, tick: ctx.tick, entity: entity.ref, provenance: ['domains/floodInundation.ts#waterLevelForVolume'] },
+        { key: 'spillOutflowM3S', value: flux.outflowM3S, tick: ctx.tick, entity: entity.ref, provenance: ['domains/floodInundation.ts#naturalOutletFlux', 'mannings-equation', 'storage-routing'] },
+        { key: 'outletVelocityMS', value: flux.velocityMS, unit: 'm/s', tick: ctx.tick, entity: entity.ref, provenance: ['domains/floodInundation.ts#manningsWideChannelVelocityMS'] },
       ],
-      provenance: ['domains/floodInundation.ts', 'connectivity-constrained-planar-fill', terrain.surveyed ? 'terrain:surveyed' : 'terrain:synthetic'],
+      provenance: ['domains/floodInundation.ts', 'connectivity-constrained-planar-fill', 'storage-level-pool-routing', 'mannings-equation', terrain.surveyed ? 'terrain:surveyed' : 'terrain:synthetic'],
     };
 
     const event: GenesisEvent = {
@@ -372,11 +529,11 @@ export function makeFloodInundationSolver(terrain: TerrainHeightfield): DomainSo
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'volume-balance-and-planar-fill',
-      parameters: { ...params, waterVolumeM3, maxDepthM: inundation.maxDepthM, floodedAreaM2: inundation.floodedAreaM2, stateCode },
+      parameters: { ...params, waterVolumeM3, maxDepthM: inundation.maxDepthM, floodedAreaM2: inundation.floodedAreaM2, stateCode, spillOutflowM3S: flux.outflowM3S, outletVelocityMS: flux.velocityMS },
       provenance: {
         origin: 'model',
         modelId: FLOOD_INUNDATION_SOLVER_ID,
-        notes: 'dV/dt = Qin - Qout, then a volume-conserving connectivity-constrained planar fill. No hydrograph, no routing, no flow velocity, no infiltration.',
+        notes: 'dV/dt = Qin - Qdrainage - Qspill - Qinfiltration, then a volume-conserving connectivity-constrained planar fill. Qspill is real storage (level-pool) routing through a Manning\'s-equation natural outlet, giving a real routed outflow hydrograph, outlet velocity, and arrival time. No 2D wave front inside the basin, no channel network, no Horton/Green-Ampt infiltration decay.',
       },
     };
 
@@ -392,6 +549,17 @@ export function makeFloodInundationSolver(terrain: TerrainHeightfield): DomainSo
           floodedCells: inundation.floodedCells,
           unrepresentedVolumeM3: inundation.unrepresentedVolumeM3,
           stateCode,
+          elapsedS,
+          spillOutflowM3S: flux.outflowM3S,
+          outletVelocityMS: flux.velocityMS,
+          outletSillElevationM: sillElevationM,
+          infiltrationLossM3S,
+          peakInflowSoFarM3S,
+          peakInflowSoFarTimeS,
+          peakOutflowSoFarM3S,
+          peakOutflowSoFarTimeS,
+          outletArrivalTimeS,
+          routingLagSoFarS,
         },
         statusLabel: floodStateLabel(stateCode),
       },
@@ -440,6 +608,7 @@ export function addFloodplain(graph: WorldGraph, options: AddFloodplainOptions):
       terrainCellSizeM: terrain.cellSizeM,
       terrainCols: terrain.cols,
       terrainRows: terrain.rows,
+      ...initialHydrographState(terrain, params, inundation),
     },
     domainBinding: { solverId: FLOOD_INUNDATION_SOLVER_ID, domainId: FLOOD_DOMAIN_ID },
     statusLabel: floodStateLabel(floodStateCode(inundation.maxDepthM)),

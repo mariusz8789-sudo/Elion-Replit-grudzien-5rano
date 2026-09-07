@@ -147,7 +147,8 @@ describe('The honest inventory is queryable, not buried', () => {
 
   it('the partially-modelled kinds state the hole, never only the capability', () => {
     // Phase 8.2 made depth and extent real; the hydrograph is the part that is still absent.
-    expect(describeCapability('FLOOD')).toMatch(/Still NOT modelled: the hydrograph/);
+    expect(describeCapability('FLOOD')).toContain('real hydrograph');
+    expect(describeCapability('FLOOD')).toMatch(/Still NOT modelled: a flood-wave front/);
     expect(describeCapability('EARTHQUAKE')).toMatch(/Structural damage.*still NOT modelled/);
     expect(describeCapability('TRANSPORT_DISRUPTION')).toMatch(/Still NOT modelled: origin-destination/);
     expect(describeCapability('INDUSTRIAL_FIRE')).toMatch(/Still NOT.*modelled: fire spread/);

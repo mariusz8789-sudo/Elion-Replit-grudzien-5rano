@@ -136,6 +136,13 @@ describe('Looking Glass — resolution refuses rather than fabricates', () => {
     expect(evacuation.notModelled.join(' ')).toMatch(/same real traffic-flow model/i);
   });
 
+  it('same honesty for industrial fire now that a real single-source fire/thermal solver exists', () => {
+    const resolution = resolveScenarioRequest(parseScenarioRequest('Pokaż pożar przemysłowy w tym mieście przez 6 godzin'));
+    expect(resolution.status).toBe('NOT_MODELLED');
+    expect(resolution.notModelled.join(' ')).toMatch(/real single-source fire model exists/i);
+    expect(resolution.notModelled.join(' ')).toMatch(/no standalone Looking Glass binding/i);
+  });
+
   it('refuses a particle-system request rather than silently serving unrelated cell-culture biology data', () => {
     // PARTICLE_SYSTEM previously carried a READY SCENARIO_CAPABILITIES entry declaring a
     // 'PARTICLE_WORLD_ADAPTER' binding that scenarioSession.ts's session builder never actually

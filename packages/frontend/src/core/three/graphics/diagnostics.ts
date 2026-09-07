@@ -200,6 +200,129 @@ export function estimateSceneTextureMemory(scene: THREE_NS.Scene): TextureMemory
 }
 
 /**
+ * GRAPHICS V6 — geometry memory, the second piece of `PERFORMANCE_BUDGET.md` §6's still-open
+ * "total GPU memory is not measured as one number" gap (texture memory was closed in GRAPHICS V3;
+ * see `estimateSceneTextureMemory` above).
+ *
+ * Unlike texture memory, this needs no assumption at all: every `BufferAttribute`'s `.array` is
+ * already the real typed array three.js uploads to the GPU, so `.byteLength` is an EXACT count, not
+ * an estimate of one. The one real judgment call is `InstancedMesh`: its `instanceMatrix` (and
+ * optional `instanceColor`) buffers are per-`InstancedMesh` GPU allocations, never shared even when
+ * several instanced meshes reference the SAME geometry (a city's building `InstancedMesh`es
+ * commonly do) — so those are summed per-node, deliberately NOT deduplicated by geometry uuid the
+ * way the base geometry buffers are.
+ */
+export interface GeometryMemoryEstimate {
+  /** Exact GPU bytes: every unique `BufferGeometry`'s attribute+index buffers, deduplicated by
+   * `geometry.uuid`, plus every `InstancedMesh`'s own (never-shared) instance buffers. */
+  totalBytes: number;
+  /** Count of unique geometries included (deduplicated by `geometry.uuid`) — same leak-detection
+   * use as `TextureMemoryEstimate.uniqueTextureCount`. */
+  uniqueGeometryCount: number;
+}
+
+function estimateGeometryBytes(geometry: THREE_NS.BufferGeometry): number {
+  let bytes = 0;
+  for (const name of Object.keys(geometry.attributes)) {
+    const attribute = geometry.attributes[name] as THREE_NS.BufferAttribute;
+    bytes += attribute.array.byteLength;
+  }
+  if (geometry.index) bytes += geometry.index.array.byteLength;
+  return bytes;
+}
+
+/** Walks `scene`, sums exact geometry buffer bytes — see the module doc above. Same "sample on an
+ * interval, not every frame" guidance as `estimateSceneTextureMemory` (a full scene walk is not
+ * free, even though this one's per-node work is cheaper). */
+export function estimateSceneGeometryMemory(scene: THREE_NS.Scene): GeometryMemoryEstimate {
+  const geometries = new Map<string, THREE_NS.BufferGeometry>();
+  let instanceBufferBytes = 0;
+  scene.traverse((node) => {
+    const object = node as unknown as {
+      geometry?: THREE_NS.BufferGeometry;
+      isInstancedMesh?: boolean;
+      instanceMatrix?: THREE_NS.BufferAttribute;
+      instanceColor?: THREE_NS.BufferAttribute | null;
+    };
+    if (object.geometry && !geometries.has(object.geometry.uuid)) geometries.set(object.geometry.uuid, object.geometry);
+    if (object.isInstancedMesh) {
+      instanceBufferBytes += object.instanceMatrix?.array.byteLength ?? 0;
+      instanceBufferBytes += object.instanceColor?.array.byteLength ?? 0;
+    }
+  });
+  let totalBytes = instanceBufferBytes;
+  for (const geometry of geometries.values()) totalBytes += estimateGeometryBytes(geometry);
+  return { totalBytes, uniqueGeometryCount: geometries.size };
+}
+
+/**
+ * GRAPHICS V6 — render-target memory, the THIRD and last piece of the §6 "total GPU memory" gap.
+ *
+ * Deliberately scoped to what can be measured both exactly and safely: the `EffectComposer`'s own
+ * two full-resolution ping-pong buffers (`renderTarget1`/`renderTarget2` — stable, public,
+ * `@types/three`-declared fields every pipeline in this engine actually allocates, at the real
+ * drawing-buffer size three.js already resolved from the renderer's pixel ratio, not a guess
+ * recomputed from CSS pixels here). `WebGLRenderTarget.width`/`.height`/`.depthBuffer`/`.samples`
+ * are exact three.js state, not estimates — the only assumption is the byte layout: RGBA8 color
+ * (4 bytes/px, matching this engine's own texture-memory assumption) plus, when `depthBuffer` is
+ * set, a packed 24-bit-depth/8-bit-stencil buffer (4 bytes/px — the standard `DEPTH24_STENCIL8`
+ * WebGL2 layout), times `Math.max(1, samples)` for MSAA (unused anywhere in this engine today, but
+ * accounted for rather than silently wrong if that ever changes).
+ *
+ * WHAT THIS DELIBERATELY DOES NOT COVER, STATED HONESTLY: each individual `Pass`'s OWN internal
+ * render targets — `UnrealBloomPass`'s 11-target downsample/blur chain, `BokehPass`'s depth target,
+ * `GTAOPass`'s/`SSRPass`'s own targets (the same set `postProcessing.ts`'s own `dispose()` already
+ * names by hand). Their exact property names are three.js-addon-version-specific and not part of
+ * the stable public contract the composer's own two targets are — reflecting into them would trade
+ * a real, stable number for a fragile, version-coupled guess. They are usually the smaller
+ * contributor next to a city scene's own geometry/texture payload, but they are real GPU memory this
+ * total does not include; do not read `SceneGpuMemoryEstimate.totalBytes` as an exhaustive figure.
+ */
+export function estimateRenderTargetMemory(targets: readonly THREE_NS.WebGLRenderTarget[]): number {
+  let bytes = 0;
+  for (const target of targets) {
+    const pixels = target.width * target.height * Math.max(1, target.samples || 1);
+    bytes += pixels * 4; // RGBA8 color buffer — see module doc.
+    if (target.depthBuffer) bytes += pixels * 4; // packed depth24/stencil8 — see module doc.
+  }
+  return bytes;
+}
+
+export interface SceneGpuMemoryEstimate {
+  /** `textureBytes + geometryBytes + renderTargetBytes` — see `estimateRenderTargetMemory`'s own
+   * doc for exactly which render targets are (and are not) included in that last term. */
+  totalBytes: number;
+  textureBytes: number;
+  geometryBytes: number;
+  renderTargetBytes: number;
+  uniqueTextureCount: number;
+  uniqueGeometryCount: number;
+}
+
+/**
+ * The combined GPU-memory estimate `PERFORMANCE_BUDGET.md` §2's "Total GPU memory" row names and §6
+ * has (until now) called entirely unmeasured. Composes the three functions above — no new
+ * computation of its own, so each component keeps its own documented honesty caveats independently
+ * inspectable via the returned breakdown rather than only a single opaque total.
+ */
+export function estimateSceneGpuMemory(
+  scene: THREE_NS.Scene,
+  renderTargets: readonly THREE_NS.WebGLRenderTarget[] = [],
+): SceneGpuMemoryEstimate {
+  const textures = estimateSceneTextureMemory(scene);
+  const geometry = estimateSceneGeometryMemory(scene);
+  const renderTargetBytes = estimateRenderTargetMemory(renderTargets);
+  return {
+    totalBytes: textures.totalBytes + geometry.totalBytes + renderTargetBytes,
+    textureBytes: textures.totalBytes,
+    geometryBytes: geometry.totalBytes,
+    renderTargetBytes,
+    uniqueTextureCount: textures.uniqueTextureCount,
+    uniqueGeometryCount: geometry.uniqueGeometryCount,
+  };
+}
+
+/**
  * A short rolling window over `FrameSample`s — smooths out single-frame noise (a GC pause, a
  * one-off asset load) so a displayed number doesn't jitter uselessly. Pure math, no rendering
  * knowledge; feed it samples from `FrameProfiler`.

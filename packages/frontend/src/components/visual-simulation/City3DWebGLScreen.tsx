@@ -784,6 +784,8 @@ export function City3DWebGLScreen() {
             <div><span>draw calls</span><b>{Math.round(stats.webgl_draw_calls ?? 0)}</b></div>
             <div><span>triangles</span><b>{Math.round(stats.webgl_triangles ?? 0)}</b></div>
             <div><span>textures (est.)</span><b>{(Number(stats.webgl_texture_bytes_estimate ?? 0) / (1024 * 1024)).toFixed(1)} MB</b></div>
+            <div><span>geometry (est.)</span><b>{(Number(stats.webgl_geometry_bytes_estimate ?? 0) / (1024 * 1024)).toFixed(1)} MB</b></div>
+            <div><span>GPU mem (est.)</span><b>{(Number(stats.webgl_gpu_bytes_estimate ?? 0) / (1024 * 1024)).toFixed(1)} MB</b></div>
           </div>
           <EvidenceReplayPanel />
         </aside>

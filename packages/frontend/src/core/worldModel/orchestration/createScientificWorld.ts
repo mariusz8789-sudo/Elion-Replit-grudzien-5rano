@@ -119,6 +119,24 @@ function computeFocalEntityIds(graph: WorldGraph, specification: WorldSpecificat
   return graph.listEntities().filter((e) => e.scale.parentEntityId === undefined).map((e) => e.id);
 }
 
+export interface CreateScientificWorldOptions {
+  /**
+   * Runs on the generated graph BEFORE the `TemporalEngine` is
+   * constructed — the one correct way for a caller to add its own
+   * entities/relationships as genuine tick-0 state (e.g.
+   * `genesisScientificCity4.ts`'s backup generator), rather than mutating
+   * `result.engine.graph` directly afterward. That would be a REAL bug:
+   * `TemporalEngine`'s constructor clones its `initialGraph` argument for
+   * both `current` and its own `keyframeGraph`, so an entity added to
+   * `specified.graph` afterward would never reach the engine at all, and
+   * an entity added directly to `engine.graph` afterward would reach the
+   * live graph but never the keyframe `scrubTo` replays from — either way
+   * silently breaking replay the instant anything scrubs backward. Adding
+   * it here, before construction, means it is simply part of tick 0.
+   */
+  augmentGraph?: (graph: WorldGraph) => void;
+}
+
 /**
  * The one canonical Trinity entry point: `Intent -> ... -> WorldFrame`.
  * Throws (via `validateProposal`'s caller-visible result, or
@@ -126,7 +144,7 @@ function computeFocalEntityIds(graph: WorldGraph, specification: WorldSpecificat
  * ever handing back a world built from a rejected proposal or an invalid
  * specification.
  */
-export function createScientificWorld(request: CreateScientificWorldRequest): CreateScientificWorldResult {
+export function createScientificWorld(request: CreateScientificWorldRequest, options: CreateScientificWorldOptions = {}): CreateScientificWorldResult {
   let specification: WorldSpecification;
   let proposalValidation: ProposalValidationResult | undefined;
   let proposalProvenance: WorldModelProposalProvenance | undefined;
@@ -146,6 +164,7 @@ export function createScientificWorld(request: CreateScientificWorldRequest): Cr
   // `realizeProposal`/`generateSpecifiedWorld` re-validate the specification itself and throw on
   // failure — the SAME gate either request path goes through, never a shortcut for either kind.
   const specified = request.kind === 'proposal' ? realizeProposal(request.proposal) : generateSpecifiedWorld(specification);
+  options.augmentGraph?.(specified.graph);
   const validation = validateSpecification(specification);
 
   const engine = new TemporalEngine(specified.graph);

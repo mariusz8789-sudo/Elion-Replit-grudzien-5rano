@@ -28,7 +28,7 @@ describe('Genesis Scientific City 4.0: built through the Trinity entry point', (
     expect(city4.base.specified.graph.getEntity(city4.pumpPipeId)).toBeDefined();
     expect(city4.base.specified.graph.getEntity(city4.hospitalBuildingId)).toBeDefined();
     expect(city4.base.specified.graph.getEntity(city4.substanceId)).toBeDefined();
-    expect(city4.base.availableDomains).toEqual(['chemistry-kinetics', 'epidemiology', 'hydraulics-engineering']);
+    expect(city4.base.availableDomains).toEqual(['chemistry-kinetics', 'electrical-engineering', 'epidemiology', 'hydraulics-engineering']);
   });
 
   it('the full real cascade runs identically to City 3.0: rainfall -> hydraulic overload -> pump trip -> hospital service -> population access', () => {

@@ -10,6 +10,7 @@ import { compileSpecification } from '../specification/compiler';
 import { computeEpidemicParamsFor } from '../specification/templates';
 import { validateWorldInvariants } from '../specification/worldInvariants';
 import type { WorldSpecification } from '../specification/worldSpecification';
+import type { DomainSolver } from '../solvers/solverRouter';
 import type { TemporalUpdater } from '../temporal/temporalEngine';
 import { makeGenesisCityRouter, makeGenesisCityUpdater } from './genesisCityWorld';
 
@@ -262,6 +263,23 @@ function rainfallSchedule(atTick: number): readonly ScheduledEvent[] {
 export const GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID: EntityId = 'pump-pipe-system:pump-pipe-1';
 
 /**
+ * Extension point for a CALLER-SPECIFIC layer on top of this scenario's own
+ * three couplings — e.g. `genesisScientificCity4.ts`'s real backup-
+ * generator domain — without City 3.0 itself changing at all (every
+ * existing caller passing none of these behaves identically). Registers
+ * onto the SAME router/updater chain this function already builds; never
+ * a second router, cascade engine, or coupling mechanism.
+ */
+export interface GenesisScientificCity3UpdaterExtras {
+  /** Extra domain solvers registered onto the same `SolverRouter` alongside chemistry/epidemiology/hydraulics. */
+  extraSolvers?: readonly { solverId: string; solver: DomainSolver }[];
+  /** Extra cascade rules, applied (as one more `withCascades` layer) AFTER this scenario's own trip cascade. */
+  extraCascades?: readonly CascadeRule[];
+  /** Extra cross-domain couplings, applied (as one more `withCrossDomainCouplings` layer) AFTER this scenario's own three — so they see every event already in this tick's chain, including a caller's own extra solvers'. */
+  extraCouplings?: readonly CrossDomainCoupling[];
+}
+
+/**
  * Builds the real, tickable updater for the extreme-rainfall cross-domain
  * scenario over an ALREADY-GENERATED graph. Extracted from
  * `buildGenesisScientificCity3` so `genesisScientificCity4.ts` can attach
@@ -269,8 +287,13 @@ export const GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID: EntityId = 'pump-pipe-system:
  * `createScientificWorld` entry point instead — never a second scenario
  * implementation, only a second caller of this one.
  */
-export function buildGenesisScientificCity3Updater(specification: WorldSpecification, options: Pick<GenesisScientificCity3Options, 'rainfallAtTick'> = {}): TemporalUpdater {
+export function buildGenesisScientificCity3Updater(
+  specification: WorldSpecification,
+  options: Pick<GenesisScientificCity3Options, 'rainfallAtTick'> = {},
+  extras: GenesisScientificCity3UpdaterExtras = {},
+): TemporalUpdater {
   const router = makeGenesisCityRouter(computeEpidemicParamsFor(specification));
+  for (const { solverId, solver } of extras.extraSolvers ?? []) router.register(solverId, solver);
   let updater: TemporalUpdater = makeGenesisCityUpdater(router);
   if (options.rainfallAtTick !== undefined) updater = withScheduledEvents(updater, rainfallSchedule(options.rainfallAtTick));
   const couplings = buildCouplings();
@@ -278,6 +301,13 @@ export function buildGenesisScientificCity3Updater(specification: WorldSpecifica
   updater = withCascades(updater, [pumpOverloadTripRule(GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID)]); // real headLoss -> trip
   updater = withCrossDomainCouplings(updater, [couplings[1]]); // trip -> hospital service
   updater = withCrossDomainCouplings(updater, [couplings[2]]); // hospital service -> population access
+  if (extras.extraCascades?.length) updater = withCascades(updater, extras.extraCascades);
+  // ONE coupling per `withCrossDomainCouplings` layer, applied in order — matching this function's
+  // own three above exactly. `withCascades`' own "one pass" rule means a single layer holding
+  // multiple couplings would never see one coupling's own derived event as another's trigger
+  // WITHIN the same tick (e.g. a chained generator -> pump -> hospital -> population recovery);
+  // one sequential layer per coupling is what makes same-tick chaining work at all.
+  for (const coupling of extras.extraCouplings ?? []) updater = withCrossDomainCouplings(updater, [coupling]);
   return updater;
 }
 

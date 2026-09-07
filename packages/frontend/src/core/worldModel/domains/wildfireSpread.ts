@@ -1,6 +1,7 @@
 import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import { cellAreaM2, type TerrainHeightfield } from './floodInundation';
+import { defineCrossDomainCoupling, type CrossDomainCoupling } from '../crossDomain/crossDomainCoupling';
 import { entityId, type EntityId, type GroundingLevel, type WorldModelEntity } from '../ecs/types';
 import { WorldGraph } from '../ecs/worldGraph';
 import type { DomainSolver, SolverResult } from '../solvers/solverRouter';
@@ -66,10 +67,15 @@ import type { DomainSolver, SolverResult } from '../solvers/solverRouter';
  * - **No fire-weather coupling.** Wind is ONE stated vector (speed +
  *   direction), fixed for the fire's lifetime; no diurnal cycle, no
  *   fire-induced winds, no time-varying conditions.
- * - **Fuel moisture is a stated input**, not derived from real weather,
- *   fuel-moisture models (e.g. the National Fire Danger Rating System), or
- *   `drought.ts`'s real soil moisture — a plausible future coupling, not
- *   implemented here.
+ * - **Fuel moisture is a stated input, and stays one — deliberately.**
+ *   `buildDroughtToWildfireCoupling` (below) now wires `drought.ts`'s real
+ *   water balance into this domain, but it carries a drought INDEX as
+ *   fire-danger context and pointedly does not set fuel moisture: dead fuel
+ *   moisture is governed by atmospheric equilibrium moisture content (RH and
+ *   temperature — Simard 1968/NFDRS, Nelson 2000), which Genesis cannot
+ *   evaluate because it has no weather model, and no published universal
+ *   coefficient converts soil moisture into it. See that function's doc for
+ *   the full reasoning; inventing one would fabricate a dependency.
  * - **Midflame wind speed is taken directly as input.** Real practice derives
  *   it from an open/20-ft wind speed via a canopy-dependent wind adjustment
  *   factor (Albini 1976); this skips that step.
@@ -465,6 +471,13 @@ export interface WildfireDomainState extends Record<string, number> {
   burnedCells: number;
   totalCells: number;
   terrainSurveyed: number;
+  /**
+   * KBDI-equivalent drought index written by `buildDroughtToWildfireCoupling`
+   * from `drought.ts`'s real water balance. This is fire-danger CONTEXT that
+   * travels with the fire; it deliberately does NOT feed the spread
+   * calculation — see that coupling's doc for exactly why.
+   */
+  droughtIndexKBDI: number;
 }
 
 /** The honesty rule, matching `floodInundation.ts::groundingFor` exactly: a correct algorithm over invented ground demonstrates the method, it does not describe a place. */
@@ -488,6 +501,8 @@ export function makeWildfireSpreadSolver(fuelBed: FuelBed, wind: WindVector, ign
   return (entity, ctx): SolverResult => {
     const state = entity.domainState as Partial<WildfireDomainState> | undefined;
     const elapsedS = (state?.elapsedS ?? 0) + ctx.dt;
+    // Written by the drought coupling, not by this solver — carry it through rather than wiping it.
+    const droughtIndexKBDI = state?.droughtIndexKBDI ?? 0;
     const burnedAreaM2 = burnedAreaM2At(result, fuelBed.terrain, elapsedS);
     let burnedCells = 0;
     for (let i = 0; i < result.arrivalTimeS.length; i++) if (result.arrivalTimeS[i] <= elapsedS) burnedCells++;
@@ -537,6 +552,7 @@ export function makeWildfireSpreadSolver(fuelBed: FuelBed, wind: WindVector, ign
           burnedCells,
           totalCells,
           terrainSurveyed,
+          droughtIndexKBDI,
         },
         statusLabel: `${burnedCells}/${totalCells} cells burned`,
       },
@@ -574,6 +590,7 @@ export function addWildfire(graph: WorldGraph, fuelBed: FuelBed, wind: WindVecto
       burnedCells: ignitionCellIndices.length,
       totalCells,
       terrainSurveyed,
+      droughtIndexKBDI: 0,
     },
     domainBinding: { solverId: WILDFIRE_SPREAD_SOLVER_ID, domainId: WILDFIRE_DOMAIN_ID },
     statusLabel: `${ignitionCellIndices.length}/${totalCells} cells burned`,
@@ -613,4 +630,83 @@ export function buildWildfireWorld(options: WildfireWorldOptions): WildfireWorld
   graph.addEntity(site);
   const wildfireId = addWildfire(graph, options.fuelBed, options.wind, options.ignitionCellIndices, { parentEntityId: site.id });
   return { graph, siteId: site.id, wildfireId };
+}
+
+// ---------------------------------------------------------------------------
+// CROSS-DOMAIN COUPLING: drought -> wildfire.
+// ---------------------------------------------------------------------------
+
+export const WILDFIRE_DROUGHT_CONTEXT_EVENT_TYPE = 'wildfire.drought.context';
+
+/**
+ * DROUGHT -> WILDFIRE, wired through the SAME `CrossDomainCoupling`
+ * mechanism as `floodInundation.ts`'s `buildDrainageLossCoupling` and
+ * `genesisScientificCity3.ts`'s rainfall->floodplain link. No second
+ * mechanism.
+ *
+ * ## What this coupling really carries, and why only that
+ *
+ * It carries `drought.ts`'s KBDI-EQUIVALENT drought index onto the wildfire
+ * entity as fire-danger context. That number is real and exactly derived:
+ * the Keetch-Byram Drought Index is DEFINED as cumulative soil/duff moisture
+ * deficiency in hundredths of an inch (0-800), which is the same physical
+ * quantity `drought.ts`'s Thornthwaite-Mather water balance computes, so the
+ * conversion is a unit conversion — no fitted coefficient. (Caveat, carried
+ * everywhere it goes: Keetch & Byram derive their deficit with their own
+ * drying equation, so this is KBDI-EQUIVALENT, not KBDI.)
+ *
+ * ## What this coupling deliberately does NOT do: set fuel moisture
+ *
+ * The obvious wish is "drought dries the vegetation, so fire spreads
+ * faster" — wire soil moisture into `fuelMoistureFraction` and watch the
+ * Rothermel rate climb. That link is NOT made here, because a literature
+ * check does not support it:
+ *
+ * 1. **Dead fuel moisture is not a function of soil moisture.** It is
+ *    governed by equilibrium with ATMOSPHERIC moisture — the equilibrium
+ *    moisture content relationships behind the US National Fire Danger
+ *    Rating System (Simard 1968) and Nelson (2000) — whose inputs are
+ *    relative humidity and temperature. Dead fuel is detached from the soil
+ *    water system, and there is no soil-moisture term in those equations.
+ *    Genesis has no weather model (`rainfallRunoff.ts` says so itself), so
+ *    it cannot evaluate them.
+ * 2. **Live fuel moisture IS soil-water-driven, but has no universal
+ *    coefficient.** Operational estimates are species- and site-specific
+ *    regressions, or direct field sampling. There is no single published
+ *    constant to apply.
+ * 3. **KBDI is used operationally to adjust drought fuel loading**, but
+ *    those adjustments are specific to particular fire-danger systems and
+ *    would have to be guessed to implement here.
+ *
+ * Inventing a coefficient to make the two domains appear connected would
+ * produce a fire that spreads faster for a reason no reference supports —
+ * a fabricated dependency, which is worse than a disclosed gap. So the
+ * index is carried and made visible; fuel moisture stays a stated input,
+ * and `solverCapability.ts` says exactly this rather than claiming the gap
+ * is closed.
+ */
+export function buildDroughtToWildfireCoupling(droughtStepEventType: string): CrossDomainCoupling {
+  return defineCrossDomainCoupling({
+    id: 'drought-to-wildfire-danger-context',
+    sourceDomain: 'environment-hydrology',
+    targetDomain: WILDFIRE_DOMAIN_ID,
+    triggerEventType: droughtStepEventType,
+    relationshipKind: 'dries',
+    direction: 'from',
+    condition: 'The drought water balance this fuel bed sits in reports a new soil-moisture deficit',
+    effect: 'The KBDI-equivalent drought index is carried onto the wildfire as fire-danger context. It deliberately does NOT change fuel moisture or rate of spread: no published relationship converts soil moisture into dead fuel moisture (that is atmospheric-EMC-driven), so the link stops where the evidence stops',
+    // The value is a real solver's real numeric output, exactly unit-converted — but the coupling
+    // asserts no physical mechanism onto the fire, so it claims no more than MODEL_ESTIMATE.
+    grounding: 'MODEL_ESTIMATE',
+    deriveEffect: (wildfire, triggerEvent) => {
+      const kbdi = triggerEvent.parameters.kbdiEquivalent;
+      if (typeof kbdi !== 'number' || !Number.isFinite(kbdi)) return undefined;
+      if (wildfire.domainState?.droughtIndexKBDI === kbdi) return undefined; // unchanged: do not re-fire
+      return {
+        patch: { domainState: { ...wildfire.domainState, droughtIndexKBDI: kbdi } },
+        eventType: WILDFIRE_DROUGHT_CONTEXT_EVENT_TYPE,
+        cause: 'drought-water-balance-deficit',
+      };
+    },
+  });
 }

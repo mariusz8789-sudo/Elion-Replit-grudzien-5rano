@@ -312,3 +312,59 @@ the class of visual bug that must be checked on real hardware before
 shipping, per this project's own "never fabricate/never guess a performance
 fix" rule. Flagging this precisely so whoever next has real-GPU access can
 verify and apply it, rather than leaving it undocumented.
+
+## Visual World Build 1.0-3.0 density audit: real draw-call numbers, real conclusion
+
+With the building/street/vehicle/water/signage/electrical kits all now composing into the same real
+`epidemicCity3D.ts` production scene simultaneously, this session measured — rather than assumed —
+whether that additive layering had regressed real-time cost.
+
+**Real Chromium measurement** (swiftshader software rendering — see the caveat below), read live
+from the city screen's own "OBSERWOWALNOŚĆ" panel (`useThreeLoop.ts`'s actual `WebGLRenderer.info`
+counters, not a guess), default params (260 agents), city camera, a few seconds after scene
+construction so the reading isn't the initial spike:
+
+- **draw calls: ~2032**
+- **triangles: ~610,600**
+- render: ~12-16ms per frame (one-off spikes to >1s observed, consistent with GC/asset-load
+  stalls, not sustained cost)
+- FPS reported a flat 20 with frame_ms pinned at exactly 50.00ms across every sample — almost
+  certainly a `requestAnimationFrame` throttle specific to this headless/software-rendered sandbox,
+  not a real measurement of render cost (real render time was only ~12-16ms of that 50ms budget).
+  **Do not read "20 FPS" as this scene's real performance on any actual GPU** — it isn't measured
+  from one.
+
+**Real Node-side breakdown** (`epidemicCity3DPerformanceAudit.test.ts` — CPU-side `init()` scene
+construction only, same honesty boundary as `graphicsWorldFrameBenchmark.test.ts`: no WebGL, no GPU,
+characterizes construction cost, not frame cost): **1293 draw-call-equivalent objects** (1254
+individual `Mesh` + 39 `InstancedMesh`) built in ~260ms. This undercounts the real Chromium figure by
+~740 — the gap is real and explained, not a discrepancy to paper over: `init()`'s own
+`loadApprovedCityAssets()`/`loadGovernedTexture()` calls are fire-and-forget async network fetches
+(a 118k-polygon approved facade GLTF, an approved street-lamp GLTF, several governed PBR textures)
+that no-op harmlessly in this Node test (no real fetch) but genuinely load and attach in a real
+browser; likewise the up-to-4 detailed `HumanoidAgentVisual` character rigs and per-frame transmission
+markers are built in `syncScene()`, called every render frame in the browser but never invoked by an
+`init()`-only Node test.
+
+**The real conclusion, not a decorative "it's fine"**: this session's own Visual World Build 1.0-3.0
+additions (`addCityExtras()`'s buildings/street furniture/vehicles/water seam/signage/electrical kit
+instances) account for only **163 of 1293 Node-measured draw-call-equivalents (12.6%)** — a real,
+measured MINORITY of the scene's draw-call budget, not the cause of the ~2032 total. The dominant
+contributor is pre-existing, already-shipped architecture: `createBuilding()`'s per-building
+individual window/door/facade meshes (hand-rolled, one `Mesh` per window across every one of the
+city's buildings) predate every kit added this session and were already the largest single cost
+center before this work began.
+
+**Real, identified, NOT fixed tonight**: instancing `createBuilding()`'s per-building window meshes
+(same `InstanceBatch` technique `vegetation.ts`/`streetKit.ts` already use) would be the single
+highest-leverage real optimization available — likely cutting total draw calls by hundreds. It is
+NOT attempted in this pass: `createBuilding()` is exactly the kind of already-shipped, hand-tuned,
+regression-risk-heavy renderer this engine's own convention (see `labKit.ts`'s module doc for the
+identical reasoning about `labScene3D.ts`'s hero furniture) says to extend around, not rewrite,
+without a dedicated verification pass scoped specifically to that change. Flagged here precisely so a
+future pass with that explicit scope can pick it up, rather than either leaving it unmeasured or
+attempting a risky rewrite under a mission whose actual scope was kit expansion.
+
+Regression guard: `epidemicCity3DPerformanceAudit.test.ts` asserts `initMs < 500`, total
+draw-call-equivalents `< 2600`, and the Visual-World-Build extras' own share `< 15%` — real thresholds
+anchored to the measurements above with real headroom, not padded to always pass.

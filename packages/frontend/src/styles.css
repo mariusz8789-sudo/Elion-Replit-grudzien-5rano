@@ -375,6 +375,97 @@ button:disabled { cursor: default; }
   animation: pulse 2.2s ease-in-out infinite;
 }
 
+/* =========================================================================
+   GENESIS UI UNIFICATION SPRINT — shared components added to the SAME .gx-
+   system above (not a second design language). Built for #/city3d's
+   scene-as-hero redesign, reused as-is by #/scientific-city. Every screen
+   with a live 3D scene should compose from .gx-stage + these, not invent
+   its own chrome.
+   ========================================================================= */
+
+/* ---------- Epistemic status badge: REAL / APPROXIMATION / NOT_MODELLED / BLOCKED
+   The one canonical treatment for these four states — replaces the bespoke,
+   per-screen badges (.city-signal, .analytics-rail-not-modeled, .honesty.*)
+   that had each screen inventing its own version of the same idea. ---------- */
+.gx-status {
+  display: inline-flex; align-items: center; gap: 0.32rem;
+  padding: 0.22rem 0.55rem; border-radius: 999px;
+  font-family: var(--font-mono); font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  border: 1px solid var(--border-strong); color: var(--text-dim); background: var(--glass);
+}
+.gx-status::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: none; }
+.gx-status.real { color: var(--green); border-color: rgba(110, 231, 160, 0.4); background: rgba(110, 231, 160, 0.08); }
+.gx-status.real::before { box-shadow: 0 0 6px var(--green); animation: pulse 2.6s ease-in-out infinite; }
+.gx-status.approximation { color: var(--gold); border-color: rgba(240, 179, 92, 0.4); background: rgba(240, 179, 92, 0.08); }
+.gx-status.not-modelled { color: var(--text-faint); border-color: var(--border-strong); background: rgba(141, 151, 180, 0.06); }
+.gx-status.blocked { color: var(--red); border-color: rgba(244, 124, 124, 0.4); background: rgba(244, 124, 124, 0.08); }
+@media (prefers-reduced-motion: reduce) { .gx-status.real::before { animation: none; } }
+
+/* ---------- Tabs ---------- */
+.gx-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.gx-tab {
+  padding: 0.4rem 0.75rem; border-radius: 999px; border: 1px solid var(--glass-border);
+  background: var(--glass); color: var(--text-dim); font-size: var(--fs-meta); font-weight: 600;
+  transition: border-color var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
+}
+.gx-tab:hover { color: var(--text); border-color: var(--border-strong); }
+.gx-tab[aria-selected='true'] { color: #041018; background: var(--cyan); border-color: var(--cyan); }
+
+/* ---------- Drawer: everything that used to be permanently-visible sidebar
+   panels now lives here, opened on demand — the scene stays the hero. ---------- */
+.gx-drawer-toggle { display: flex; align-items: center; gap: 0.4rem; }
+.gx-drawer-backdrop {
+  position: fixed; inset: 0; z-index: 20; background: rgba(4, 5, 12, 0.55);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  animation: gx-fade var(--dur-base) var(--ease-out) both;
+}
+@keyframes gx-fade { from { opacity: 0; } to { opacity: 1; } }
+.gx-drawer {
+  position: fixed; z-index: 21; top: 0; right: 0; bottom: 0;
+  width: min(24rem, 100vw); display: flex; flex-direction: column;
+  background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border-left: 1px solid var(--glass-border); box-shadow: var(--shadow-lg);
+  animation: gx-slide-in var(--dur-base) var(--ease-out) both;
+}
+@keyframes gx-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .gx-drawer, .gx-drawer-backdrop { animation: none; } }
+.gx-drawer-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--glass-border); flex: none;
+}
+.gx-drawer-head strong { font-size: var(--fs-lead); font-weight: 650; }
+.gx-drawer-tabs { display: flex; gap: 0.25rem; padding: var(--sp-2) var(--sp-3); overflow-x: auto; border-bottom: 1px solid var(--glass-border); flex: none; scrollbar-width: none; }
+.gx-drawer-tabs::-webkit-scrollbar { display: none; }
+.gx-drawer-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-3); display: grid; gap: var(--sp-3); }
+.gx-drawer-body .world-panel { box-shadow: none; }
+.gx-drawer-close {
+  width: 1.8rem; height: 1.8rem; display: grid; place-items: center; border-radius: 50%;
+  border: 1px solid var(--glass-border); color: var(--text-dim); font-size: 1rem; flex: none;
+}
+.gx-drawer-close:hover { color: var(--text); border-color: var(--border-strong); }
+
+/* ---------- Timeline scrubber (shared) ---------- */
+.gx-timeline { display: flex; flex-direction: column; gap: 0.3rem; }
+.gx-timeline-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  font-family: var(--font-mono); font-size: var(--fs-micro); letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-dim);
+}
+.gx-timeline-head b { color: var(--text); }
+.gx-timeline-track { position: relative; height: 4px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.gx-timeline-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--cyan), var(--violet)); border-radius: 999px; transition: width var(--dur-base) var(--ease-out); }
+
+/* ---------- Floating contextual card: agent/world-object inspection, "Ask
+   Genesis" observation result — replaces per-screen one-off floating cards. ---------- */
+.gx-floating-card {
+  position: absolute; z-index: 4; max-width: min(19rem, calc(100% - 2 * var(--sp-4)));
+  background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border); border-radius: var(--r-md); box-shadow: var(--shadow-lg);
+  padding: var(--sp-3); animation: gx-rise var(--dur-base) var(--ease-out) both;
+}
+@media (prefers-reduced-motion: reduce) { .gx-floating-card { animation: none; } }
+
 /* ---------- Experiment View / Pilot — na wspólnym języku wizualnym ---------- */
 .pilot-view { max-width: 940px; }
 .pilot-step { padding: var(--sp-4); gap: var(--sp-3); }
@@ -3205,26 +3296,127 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .lg-obs-cause, .lg-obs-consequence, .lg-obs-grounding { margin: 0; color: #9fb4cd; font-size: 0.76rem; }
 .lg-obs-grounding code { color: #f0c542; }
 
-/* CITY INFRASTRUCTURE INTEGRATION 1.0 — the real pump/hospital 3D screen. */
-.gsc-stage { position: relative; width: 100%; height: 100vh; background: #0c1420; }
+/* CITY INFRASTRUCTURE INTEGRATION 1.0 — the real pump/hospital 3D screen.
+   GENESIS UI UNIFICATION SPRINT (P3): retinted onto the shared .gx- tokens
+   (var(--glass)/--border/--text/--cyan/--font-mono/--r-md) instead of this
+   screen's own hardcoded palette. Already close to the P1 target (one small
+   floating panel over a full-bleed scene) — this is a token swap only, no
+   layout change and no touch to GenesisScientificCitySim's 3D setup. */
+.gsc-stage { position: relative; width: 100%; height: 100vh; background: var(--bg); }
 .gsc-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .gsc-panel {
   position: absolute; right: 1rem; top: 1rem; z-index: 8; max-width: 24rem;
   display: flex; flex-direction: column; gap: 0.6rem;
-  border: 1px solid #24314a; border-radius: 0.7rem; padding: 0.7rem 0.85rem;
-  background: rgba(8, 13, 22, 0.92); backdrop-filter: blur(8px); color: #cfe0f2; font-size: 0.82rem;
+  border: 1px solid var(--glass-border); border-radius: var(--r-md); padding: 0.7rem 0.85rem;
+  background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  color: var(--text); font-size: 0.82rem; box-shadow: var(--shadow-md);
 }
 .gsc-panel-row { display: flex; gap: 0.5rem; align-items: center; }
-.gsc-panel button { border: 1px solid #2b3a52; background: #16283c; color: #cfe6ff; border-radius: 0.4rem; padding: 0.3rem 0.6rem; cursor: pointer; }
-.gsc-panel button:hover { border-color: #8ecbff; }
+.gsc-panel button {
+  border: 1px solid var(--glass-border); background: var(--glass); color: var(--text);
+  border-radius: 999px; padding: 0.4rem 0.7rem; font-weight: 550; cursor: pointer;
+  transition: border-color var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
+}
+.gsc-panel button:hover { border-color: var(--border-strong); background: var(--glass-strong); }
 .gsc-panel button:disabled { opacity: 0.5; cursor: default; }
-.gsc-fail-btn { background: #2c1616; border-color: #6b2c2c; color: #f28a8a; }
-.gsc-outcome { display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid #1c2637; padding-top: 0.5rem; }
+.gsc-fail-btn { background: rgba(244, 124, 124, 0.12); border-color: rgba(244, 124, 124, 0.4); color: var(--red); }
+.gsc-outcome { display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
 .gsc-branch-toggle { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-.gsc-caption { color: #9fb4cd; font-size: 0.76rem; }
-.gsc-causal, .gsc-comparison { border-top: 1px solid #1c2637; padding-top: 0.5rem; }
+.gsc-caption { color: var(--text-dim); font-size: 0.76rem; }
+.gsc-causal, .gsc-comparison { border-top: 1px solid var(--border); padding-top: 0.5rem; }
 .gsc-causal ol { margin: 0.3rem 0 0; padding-left: 1.1rem; }
-.gsc-causal li { color: #cfe0f2; font-size: 0.78rem; line-height: 1.5; }
+.gsc-causal li { color: var(--text-dim); font-size: 0.78rem; line-height: 1.5; }
 .gsc-comparison table { width: 100%; border-collapse: collapse; margin-top: 0.3rem; font-size: 0.7rem; }
-.gsc-comparison td { padding: 0.2rem 0.3rem; border-top: 1px solid #1c2637; color: #9fb4cd; word-break: break-all; }
-.gsc-comparison td:first-child { color: #cfe6ff; font-weight: 600; white-space: nowrap; }
+.gsc-comparison td { padding: 0.2rem 0.3rem; border-top: 1px solid var(--border); color: var(--text-dim); word-break: break-all; }
+.gsc-comparison td:first-child { color: var(--cyan); font-weight: 600; white-space: nowrap; }
+/* .observability-panel itself is shared with #/city3d (styles above, ~line 2027) —
+   already one definition used by both screens, nothing to retint here. */
+
+/* =========================================================================
+   GENESIS UI UNIFICATION SPRINT — #/city3d: the scene is the hero at every
+   viewport, not just >=1100px. The 12 panel blocks that used to sit on
+   screen permanently (3 left + 9 right, see the pre-sprint `.city-world-left`/
+   `.city-world-right` asides above) now live in the .gx-drawer, opened on
+   demand. Nothing here touches EpidemicCity3DSim or its data — CSS + a
+   drawer/tabs shell around the exact same panel markup and props.
+   ========================================================================= */
+.city-world-shell-v2 { max-width: none; margin: 0; padding: 0; }
+.city-world-topbar {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3);
+  flex-wrap: wrap; padding: var(--sp-3) var(--sp-4);
+}
+.city-world-topbar-id { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.city-world-topbar-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.city-world-topbar-day {
+  font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-dim);
+  letter-spacing: 0.04em; white-space: nowrap;
+}
+.city-world-topbar-day b { color: var(--text); font-variant-numeric: tabular-nums; }
+.city-world-topbar-actions { display: flex; align-items: center; gap: 0.5rem; flex: none; }
+.city-world-drawer-btn { white-space: nowrap; }
+
+/* Single-child override: the pre-sprint 3-column grid (`.city-world-layout`)
+   is meant for [sidebar, stage, sidebar] — now there is only the stage, so
+   the grid must not apply at any width, not just >=1100px. */
+.city-world-layout-v2 { display: block !important; margin: 0 var(--sp-4) var(--sp-4); }
+.city-world-layout-v2 .city-world-center { position: relative; }
+
+/* The one always-visible control strip. In normal document flow by default
+   (a sibling right below the stage) so it never collides with anything at
+   narrow/medium widths, where the timeline + analytics-rail below it are
+   normal flow too. */
+.city-world-transport-float {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.38rem;
+  margin-top: 0.6rem; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
+  background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border); box-shadow: var(--shadow-md);
+}
+/* At >=1100px the timeline + analytics-rail (below, ~line 2264) become
+   absolute overlays pinned to the bottom of the stage, and the stage itself
+   is capped at a fixed viewport-relative height — leaving the toolbar in
+   flow there would push real page height past the fold on an ordinary
+   laptop screen. Lift it out of flow too, as an overlay of its own,
+   anchored high enough above the other two to never overlap them (their
+   combined height is the ~4.2rem gap already used to separate THEM, plus
+   their own content — see the calc). */
+@media (min-width: 1100px) {
+  .city-world-transport-float {
+    position: absolute; z-index: 4; left: 50%; bottom: calc(var(--sp-3) + 8.4rem); transform: translateX(-50%);
+    margin-top: 0; max-width: calc(100% - 2 * var(--sp-4));
+  }
+}
+
+/* TemporalWorldHud had NO styling anywhere in this file — it rendered as
+   raw unstyled text, in normal document flow, right after the canvas. The
+   pre-sprint 3-column grid happened to be tall enough (the old side panels
+   forced a tall row) that this never visibly collided with anything below
+   it. Removing that grid exposed it: on the empty-state path (a live run
+   with no scenario-timeline handoff — the common case) its text now runs
+   into the timeline/analytics-rail strips. It needs real positioning
+   regardless of my redesign; giving it one here, compact and in the same
+   glass language as the rest of the stage HUD. */
+.temporal-world-hud {
+  position: absolute; z-index: 3; top: 2.4rem; right: var(--sp-4);
+  max-width: 15rem; padding: 0.5rem 0.65rem; border-radius: var(--r-sm);
+  background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border); box-shadow: var(--shadow-sm);
+  font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-dim); line-height: 1.4;
+}
+.temporal-world-kicker { display: block; color: var(--text-faint); letter-spacing: 0.1em; }
+.temporal-world-hud strong { display: block; margin: 0.15rem 0; color: var(--text); font-size: var(--fs-meta); }
+.temporal-world-hud-topline { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: baseline; }
+.temporal-world-hud-main { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.3rem; }
+.temporal-world-rail { display: flex; align-items: center; gap: 0.2rem; color: var(--text-faint); }
+.temporal-world-rail i { flex: 1; height: 1px; background: var(--border-strong); }
+.temporal-world-identity code { color: var(--cyan); }
+.temporal-world-branches { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid var(--border); }
+@media (max-width: 700px) { .temporal-world-hud { position: static; max-width: none; margin: 0.5rem 0 0; } }
+
+/* .city-scene-readout ("model aktywny / dzień N / widok / warstwa") duplicated
+   what the new topbar (dzień + agent count) and the pressed camera-preset
+   button already show, and its own >=1100px position rule (~line 2271) was
+   tuned to dodge a 250px-wide left sidebar that no longer exists — it now
+   lands underneath ASK GENESIS instead. Removing the duplicate is the
+   "ogranicz ilość tekstu" fix, not a positioning patch over a rule that no
+   longer has a reason to exist. */
+.city-world-layout-v2 .city-scene-readout { display: none; }

@@ -38,7 +38,9 @@ Per rendered frame, in the flagship city scene, at the reference device's own re
 ## 3. Where we actually stand — real measured numbers
 
 Measured in headless Chromium via the city screen's own observability panel, which reads
-`useThreeLoop.ts`'s real `WebGLRenderer.info` counters. Not estimates.
+`useThreeLoop.ts`'s real `WebGLRenderer.info` counters for draw calls/triangles (exact CPU-side
+counts, not estimates) and `graphics/diagnostics.ts`'s `estimateSceneTextureMemory` for texture
+memory (a real computed estimate over the actual scene graph — see §3a below for what that means).
 
 | Scene | Draw calls | Triangles | Render time |
 |---|---|---|---|
@@ -92,6 +94,34 @@ are the numbers this budget is primarily written in. FPS and frame-time targets 
 validated on the real reference device; nothing in this sandbox can confirm them, and no report should
 claim otherwise.
 
+### §3a. Texture memory — GRAPHICS V3, the §6 gap closed
+
+Until now, §6 stated plainly that texture memory was "currently unmeasured, not merely unbudgeted" —
+three.js's `WebGLRenderer.info` reports a texture COUNT, never a byte size, so nothing in this engine
+had ever produced a real number for the §2 **96 MB target / 160 MB ceiling** row.
+
+`graphics/diagnostics.ts`'s `estimateSceneTextureMemory(scene)` closes this: a real walk of the scene
+graph's own materials, summing `width * height * 4 bytes (RGBA8)` per unique texture (deduplicated by
+`texture.uuid`, so a shared procedural `CanvasTexture` — the common case here — is counted once, not
+once per material that references it), times the standard `4/3` mipmap factor. **This is a real
+computed estimate, not a renderer-reported number** — stated as such wherever it appears (see the
+module's own doc for exactly what's computed vs. assumed, including why RGBA8 is not a
+simplification here: no compressed-texture path exists anywhere in this codebase today). Wired into
+`ThreeRenderMetrics.textureBytesEstimate` (`useThreeLoop.ts`, resampled every ~1 s rather than every
+frame — a full scene walk is not free) and both flagship scenes' `getStats()`/observability panels.
+
+Real measured result, headless Chromium:
+
+| Scene | Texture memory (estimate) | vs. 96 MB target |
+|---|---|---|
+| `#/city3d` (flagship epidemic city) | **5.4 MB** | 5.6% of target |
+| `#/scientific-city` | **15.3 MB** | 15.9% of target |
+
+Both scenes sit well under budget — this was genuinely unknown before, not merely unverified against
+a number everyone expected to be fine. The gap named in §6 is closed for these two scenes; other
+scenes (the lab, high-fidelity slice, etc.) can read the same `webgl_texture_bytes_estimate` stat once
+they're worth measuring.
+
 ## 4. How each sprint reports against this
 
 Every graphics sprint from Sprint B onward reports, for at least one representative scene:
@@ -136,6 +166,7 @@ Stated so their absence is deliberate rather than forgotten:
 - **Network/asset streaming budget.** Only one real GLB ships today
   (`ambulance.glb`, 13.9 kB); a streaming budget becomes meaningful when imported spatial data or
   real assets arrive at volume.
-- **Texture memory is currently unmeasured**, not merely unbudgeted: nothing reports it. The §2 figure
-  is a target to build a measurement for, and should be treated as unverified until something reads
-  it back from `renderer.info.memory`.
+- ~~Texture memory is currently unmeasured~~ — **closed, GRAPHICS V3.** See §3a: real measured
+  estimates now exist for `#/city3d` (5.4 MB) and `#/scientific-city` (15.3 MB), both well under the
+  §2 target. Total GPU memory (geometry + textures + render targets combined) is still not measured
+  as one number — only the texture component — so that broader §2 row stays unverified.

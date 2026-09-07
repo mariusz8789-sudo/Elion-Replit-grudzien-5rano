@@ -200,7 +200,7 @@ export class GenesisScientificCitySim implements Sim3D {
    * could not be measured at all — which made the graphics performance budget unenforceable on the
    * one scene that matters most. Same keys epidemicCity3D already publishes, so any tooling that
    * reads one reads the other. */
-  private renderMetrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
+  private renderMetrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0, textureBytesEstimate: 0 };
   private sceneEnvironment: SceneEnvironmentHandle | null = null;
 
   private followTarget: THREE_NS.Vector3 | null = null;
@@ -1269,6 +1269,9 @@ export class GenesisScientificCitySim implements Sim3D {
       webgl_triangles: this.renderMetrics.triangles,
       webgl_geometries: this.renderMetrics.geometries,
       webgl_textures: this.renderMetrics.textures,
+      // GRAPHICS V3 — real estimated bytes (see diagnostics.ts's estimateSceneTextureMemory),
+      // closing PERFORMANCE_BUDGET.md §6's "texture memory is currently unmeasured" gap.
+      webgl_texture_bytes_estimate: this.renderMetrics.textureBytesEstimate,
     };
   }
 }

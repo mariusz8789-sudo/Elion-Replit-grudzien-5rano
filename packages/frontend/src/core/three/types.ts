@@ -45,6 +45,11 @@ export interface ThreeRenderMetrics {
   triangles: number;
   geometries: number;
   textures: number;
+  /** GRAPHICS V3 — real ESTIMATED bytes across every unique texture in the scene (see
+   * `graphics/diagnostics.ts`'s `estimateSceneTextureMemory` for exactly what is computed vs.
+   * assumed). Recomputed on an interval, not every frame (a full scene walk), so this holds the
+   * last computed value between refreshes — never `NaN`/undefined once the first sample has run. */
+  textureBytesEstimate: number;
 }
 
 /**

@@ -114,6 +114,92 @@ export class FrameProfiler {
 }
 
 /**
+ * GRAPHICS V3 — texture memory, estimated in real bytes.
+ *
+ * `renderer.info.memory.textures` (above) is a COUNT, not a size — `PERFORMANCE_BUDGET.md` §6 has
+ * named this as a real, open gap since Graphics V2: "texture memory is currently unmeasured, not
+ * merely unbudgeted". three.js's public API has no byte-size readback (unlike geometry, which
+ * `BufferGeometry.attributes` at least makes countable), so this is a REAL COMPUTATION over the
+ * actual scene graph, not a renderer-reported number — and it says so wherever it's surfaced.
+ *
+ * WHAT IS COMPUTED, EXACTLY: for every `Texture` reachable from a material's own map-shaped
+ * properties (`map`, `normalMap`, `roughnessMap`, ... — the same properties `materials.ts`'s
+ * factories actually populate), `width * height * bytesPerPixel`, deduplicated by `texture.uuid`
+ * so a shared procedural `CanvasTexture` (the common case here — `materials.ts`'s worn-surface
+ * factories are built once and cloned across many material instances) is counted once, not once
+ * per material that references it.
+ *
+ * WHAT IS ASSUMED, STATED HONESTLY: `bytesPerPixel = 4` (RGBA8) — every texture this engine
+ * produces is a `CanvasTexture`/`DataTexture` uploaded at that format; there is no compressed-
+ * texture (KTX2/Basis) path anywhere in this codebase today, so this is not a simplification of a
+ * real alternative, it is the actual format. Mipmaps add the standard `4/3` factor
+ * (`1 + 1/4 + 1/16 + ...`) unless `texture.generateMipmaps === false`. This is an ESTIMATE of GPU
+ * upload size, not a driver-reported allocation (real drivers pad/align; this does not model that)
+ * — good enough to catch a texture-budget regression, not a substitute for a real GPU profiler.
+ */
+export interface TextureMemoryEstimate {
+  /** Estimated total GPU bytes across every unique texture reachable from the scene graph. */
+  totalBytes: number;
+  /** Count of unique textures included (deduplicated by `texture.uuid`). Compare against
+   * `renderer.info.memory.textures` the same way `geometries` is already used to spot a leak: a
+   * persistent, growing gap between the two numbers means textures are being created and not
+   * disposed. */
+  uniqueTextureCount: number;
+}
+
+/** Every material property this engine's own materials (`materials.ts`, `water.ts`, `atmosphere.ts`,
+ * and any future map-carrying material) actually populate — the full set three.js's standard/
+ * physical materials expose, so a new map added anywhere is picked up without touching this list. */
+const TEXTURE_MAP_PROPERTIES = [
+  'map', 'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'emissiveMap', 'envMap', 'lightMap',
+  'metalnessMap', 'normalMap', 'roughnessMap', 'specularMap', 'clearcoatMap', 'clearcoatNormalMap',
+  'clearcoatRoughnessMap', 'transmissionMap', 'thicknessMap', 'sheenColorMap', 'sheenRoughnessMap',
+  'specularColorMap', 'specularIntensityMap', 'iridescenceMap', 'iridescenceThicknessMap', 'matcap',
+  'gradientMap',
+] as const;
+
+function collectMaterialTextures(material: THREE_NS.Material, into: Map<string, THREE_NS.Texture>): void {
+  const record = material as unknown as Record<string, unknown>;
+  for (const prop of TEXTURE_MAP_PROPERTIES) {
+    const value = record[prop];
+    if (value && typeof value === 'object' && 'uuid' in (value as object) && 'isTexture' in (value as object)) {
+      const texture = value as THREE_NS.Texture;
+      if (!into.has(texture.uuid)) into.set(texture.uuid, texture);
+    }
+  }
+}
+
+function estimateTextureBytes(texture: THREE_NS.Texture): number {
+  const image = texture.image as { width?: number; height?: number } | undefined;
+  const width = image?.width ?? 0;
+  const height = image?.height ?? 0;
+  if (!(width > 0) || !(height > 0)) return 0;
+  const bytesPerPixel = 4; // RGBA8 — see module doc; no compressed-texture path exists in this codebase.
+  const mipmapFactor = texture.generateMipmaps === false ? 1 : 4 / 3;
+  return width * height * bytesPerPixel * mipmapFactor;
+}
+
+/**
+ * Walks `scene`, collects every unique texture any material actually references, and sums a real
+ * byte estimate — see the module doc above for exactly what is computed vs. assumed. Safe to call
+ * on any real frame (it is a plain graph walk, no GPU readback), but it is not free — call it on an
+ * interval (a settings/diagnostics panel), not every frame, the same way this file's own
+ * `FrameProfiler` is meant to be sampled once per frame while THIS is meant to be sampled
+ * occasionally.
+ */
+export function estimateSceneTextureMemory(scene: THREE_NS.Scene): TextureMemoryEstimate {
+  const textures = new Map<string, THREE_NS.Texture>();
+  scene.traverse((node) => {
+    const material = (node as unknown as { material?: THREE_NS.Material | THREE_NS.Material[] }).material;
+    if (!material) return;
+    for (const mat of Array.isArray(material) ? material : [material]) collectMaterialTextures(mat, textures);
+  });
+  let totalBytes = 0;
+  for (const texture of textures.values()) totalBytes += estimateTextureBytes(texture);
+  return { totalBytes, uniqueTextureCount: textures.size };
+}
+
+/**
  * A short rolling window over `FrameSample`s — smooths out single-frame noise (a GC pause, a
  * one-off asset load) so a displayed number doesn't jitter uselessly. Pure math, no rendering
  * knowledge; feed it samples from `FrameProfiler`.

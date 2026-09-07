@@ -106,7 +106,7 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   EARTHQUAKE: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
     solverId: SEISMIC_SOURCE_SOLVER_ID,
-    caveat: 'Ground shaking is a synthetic, explicitly non-calibrated attenuation (not a GMPE). Structural damage, collapse and casualties are NOT modelled at all — see EARTHQUAKE_DAMAGE_REQUIRED_DATA.',
+    caveat: 'Ground shaking is a synthetic, explicitly non-calibrated attenuation (not a GMPE). Structural damage, collapse and casualties are still NOT modelled, now as a checked refusal rather than an assumption: the lognormal fragility machinery is real and is actually queried, but its catalogue is empty (FEMA unreachable from this environment, GEM is CC BY-NC-SA) and, more fundamentally, published building fragility is indexed on spectral displacement while this hazard model produces a PGA — bridging that needs capacity curves and a demand spectrum. See FRAGILITY_REQUIRED_DATA.',
   },
   CHEMICAL_REACTION: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,

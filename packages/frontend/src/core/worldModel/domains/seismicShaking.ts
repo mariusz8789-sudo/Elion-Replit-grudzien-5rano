@@ -7,6 +7,7 @@ import {
   vulnerabilityMultiplier,
 } from '../../hazard/earthquake/earthquakeModel';
 import { EARTHQUAKE_DAMAGE_REQUIRED_DATA } from '../../hazard/earthquake/earthquakeDamageAssessment';
+import { assessStructuralDamage, FragilityRegistry, FRAGILITY_REQUIRED_DATA, INTENSITY_MEASURE, type DamageAssessment } from './seismicFragility';
 import type { Observation } from '../../world/scientificWorldState';
 import { defineCrossDomainCoupling, type CrossDomainCoupling } from '../crossDomain/crossDomainCoupling';
 import { entityId, type EntityId, type WorldModelEntity } from '../ecs/types';
@@ -71,7 +72,7 @@ export const SEISMIC_RUPTURE_EVENT_TYPE = 'hazard.earthquake.rupture';
 export const STRUCTURE_SHAKEN_EVENT_TYPE = 'structure.groundshaking.exposed';
 
 /** The concrete, named data gaps between this and a trustworthy damage model — re-exported from the hazard module, never re-worded into something vaguer. */
-export { EARTHQUAKE_DAMAGE_REQUIRED_DATA };
+export { EARTHQUAKE_DAMAGE_REQUIRED_DATA, FRAGILITY_REQUIRED_DATA };
 
 /** Rule 3: numeric. A source is quiescent until something ruptures it; it never ruptures itself. */
 export const SEISMIC_SOURCE_STATE_CODE = { QUIESCENT: 0, RUPTURED: 1 } as const;
@@ -80,14 +81,46 @@ export const SEISMIC_SOURCE_STATE_CODE = { QUIESCENT: 0, RUPTURED: 1 } as const;
 export const SHAKING_SEVERITY_CODE = { NONE: 0, MINOR: 1, MODERATE: 2, SEVERE: 3 } as const;
 
 /**
- * The only value this domain can ever publish for structural damage.
+ * The only value this domain can currently publish for structural damage.
  *
- * It is a one-member enum on purpose: there is no calibrated fragility model,
- * so there is no honest second value to report. If a real damage model is ever
+ * It is a one-member enum on purpose: there is no calibrated fragility model, so
+ * there is no honest second value to report. If a real damage model is ever
  * added, this enum grows and every consumer keeps compiling — which is why the
  * gap is encoded as a value rather than as a missing field.
+ *
+ * PHASE 8.3 UPDATE: this is no longer a hardcoded constant standing in for an
+ * absent capability. `domains/seismicFragility.ts` now implements the real
+ * lognormal fragility machinery, and `structuralDamageAssessment()` below
+ * actually ASKS it. It answers NOT_MODELLED because the catalogue is empty and
+ * because a PGA-indexed hazard cannot be fed to spectral-displacement-indexed
+ * curves — a checked refusal that names which piece is missing, not an
+ * assumption. See that module for why all three attempts to obtain real curves
+ * failed.
  */
 export const STRUCTURAL_DAMAGE_STATE_CODE = { NOT_MODELLED: 0 } as const;
+
+/** The catalogue the damage question is asked against. Empty today — deliberately, and visibly. */
+const FRAGILITY = new FragilityRegistry();
+
+/**
+ * Asks the fragility machinery whether this site's damage can be assessed.
+ *
+ * Exported so the refusal is inspectable rather than buried: a caller can show
+ * exactly why no damage number exists, instead of only seeing a NOT_MODELLED
+ * code. The ground motion is passed as non-calibrated, which is the truth about
+ * this hazard model and which would hold the answer at
+ * `UNGROUNDED_APPROXIMATION` even if the curves existed.
+ */
+export function structuralDamageAssessment(site: WorldModelEntity): DamageAssessment {
+  const state: StructuralSiteParams = { ...STRUCTURAL_SITE_DEFAULTS, ...(site.domainState as Partial<StructuralSiteParams> | undefined) };
+  return assessStructuralDamage(
+    FRAGILITY,
+    vulnerabilityClassOf(state.vulnerabilityClassCode),
+    INTENSITY_MEASURE.PGA_G,
+    state.peakGroundAccelerationG,
+    false,
+  );
+}
 
 /** Closed allowlist of `statusLabel` values this domain emits. */
 export const SEISMIC_STATES = [
@@ -161,6 +194,8 @@ export interface StructuralSiteParams {
   peakGroundAccelerationG: number;
   shakingSeverityCode: number;
   structuralDamageStateCode: number;
+  /** 1 when a fragility model actually produced a damage assessment; 0 when the question was asked and refused. */
+  damageAssessedCode: number;
 }
 
 export const STRUCTURAL_SITE_DEFAULTS: StructuralSiteParams = {
@@ -170,6 +205,7 @@ export const STRUCTURAL_SITE_DEFAULTS: StructuralSiteParams = {
   peakGroundAccelerationG: 0,
   shakingSeverityCode: SHAKING_SEVERITY_CODE.NONE,
   structuralDamageStateCode: STRUCTURAL_DAMAGE_STATE_CODE.NOT_MODELLED,
+  damageAssessedCode: 0,
 };
 
 /**
@@ -243,12 +279,13 @@ export function makeStructuralSiteSolver(): DomainSolver {
     const state = entity.domainState as Partial<StructuralSiteParams> | undefined;
     const params: StructuralSiteParams = { ...STRUCTURAL_SITE_DEFAULTS, ...state };
     const severity = shakingSeverityCode(params.peakGroundAccelerationG);
+    const assessment = structuralDamageAssessment(entity);
     stepCounter += 1;
 
     const observation: Observation = {
       observationId: `struct-obs:${entity.id}:${ctx.tick}`,
       tick: ctx.tick,
-      statement: `${entity.label}: PGA=${params.peakGroundAccelerationG.toFixed(4)}g (${shakingSeverityLabel(severity)}); structural damage NOT MODELLED`,
+      statement: `${entity.label}: PGA=${params.peakGroundAccelerationG.toFixed(4)}g (${shakingSeverityLabel(severity)}); structural damage ${assessment.ok ? 'assessed' : `NOT MODELLED (${assessment.reason.split(':')[0]})`}`,
       measurements: [
         { key: 'peakGroundAccelerationG', value: params.peakGroundAccelerationG, tick: ctx.tick, entity: entity.ref, provenance: [`core/hazard/earthquake/earthquakeModel.ts#${EARTHQUAKE_MODEL_VERSION}`, 'datasetStatus:SCENARIO'] },
       ],
@@ -260,8 +297,13 @@ export function makeStructuralSiteSolver(): DomainSolver {
         domainState: {
           ...params,
           shakingSeverityCode: severity,
-          // Never derived, never conditional. See the module doc.
           structuralDamageStateCode: STRUCTURAL_DAMAGE_STATE_CODE.NOT_MODELLED,
+          // Rule 3: whether the damage question could be ANSWERED is itself a number, so a
+          // consumer can distinguish "asked and refused" from "never asked". It is 0 today
+          // because `structuralDamageAssessment` really runs the fragility machinery and really
+          // refuses — empty catalogue, and a PGA cannot drive spectral-displacement curves. The
+          // refusal reason travels in the observation alongside it.
+          damageAssessedCode: assessment.ok ? 1 : 0,
         },
         statusLabel: shakingSeverityLabel(severity),
       },

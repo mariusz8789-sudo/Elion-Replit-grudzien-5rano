@@ -1,5 +1,17 @@
 # The Honest Adapter Contract
 
+**One of three documents in the same family — read the right one for your question:**
+
+| Document | Question it answers | Audience |
+|---|---|---|
+| `VISUALIZATION_REUSE_AUDIT.md` | *Which domains already have a real visualization, and can it be reused?* | C2, planning |
+| `SOLVER_DATA_CONTRACT.md` | *What data must a solver produce for C2 to render it at all?* | C3, implementing |
+| **`ADAPTER_CONTRACT.md`** (this one) | ***Given that data, how is an honest C2 adapter written?*** | **C2, implementing** |
+
+**Before writing an adapter, read the RULE box in §2** on where a discrete `entity.status` token
+actually comes from (it is derived by the adapter, not supplied ready-made by C3), and
+`SOLVER_DATA_CONTRACT.md` Rule 3 for what a solver must emit to make that derivation possible.
+
 ## Why this document exists
 
 `waterInfrastructureBridge.ts` is the first — and, as of this writing, only — example of a real
@@ -113,6 +125,27 @@ lifecycle stage, a UI-only tag) that happens to collide with one of your allowli
 `grounding` check is what stops that coincidence from becoming a fabricated reading. Conversely, a
 `grounding` of `'MODELED'` does not mean every field on the entity is real — hence the allowlist stays
 in force even when grounding passes.
+
+> **RULE — `entity.status` is NOT a ready-made discrete token supplied by C3, and an adapter must
+> never assume it is.** No current solver follows that pattern: C3's solvers write a *human-readable
+> description* into `statusLabel` (which becomes `entity.status`) — real examples shipping today are
+> `'Pump tripped (overload protection)'`, `` `Q=0.030m³/s, 1240W shaft power` ``, and
+> `` `I=42 R=13 D=2 (day 7.5)` ``. **None of those can ever match a `KNOWN_STATES` allowlist**, so an
+> adapter that gates on `entity.status` alone will classify every entity as `notModeled` forever,
+> silently. The discrete token MUST instead be **derived deterministically by the adapter (or the
+> scene's frame builder) from the solver's real numeric or structural output** — the working pattern
+> already in production, from `genesisScientificCitySim.ts`:
+>
+> ```ts
+> const status = entity.scalars.volumetricFlow === 0 ? 'FAILED' : 'NORMAL';
+> ```
+>
+> That derivation is a real domain fact read from a real solver output, and it belongs in reviewable
+> code with a comment naming the quantity it reads — it is not a fabricated label. `KNOWN_STATES`
+> then remains exactly as specified above: the allowlist that validates the *derived* token, and the
+> gate that keeps anything unrecognised at a neutral appearance. Detailed requirements on what a
+> solver must emit for such a derivation to be possible (numeric channels, units, documented
+> thresholds) are formalised in **`SOLVER_DATA_CONTRACT.md`** (Rule 3).
 
 ### 3. What "not really modeled" renders as: real geometry, neutral state — never an empty group, never a guessed reading
 

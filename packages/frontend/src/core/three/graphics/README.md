@@ -975,6 +975,57 @@ reusable checklist, so the next real C3 domain's adapter (weather/structural/fir
 whatever C3's consolidation audit ships) is built from a written standard instead of re-derived from
 scratch.
 
+## 27. Which domains should get an adapter at all — `VISUALIZATION_REUSE_AUDIT.md`
+
+Before building an adapter for a domain that already has a real visualization, read
+`VISUALIZATION_REUSE_AUDIT.md`. It audits the four domains on C3's integration roadmap —
+**Epidemiology** (Phase 1), **Quantum** (Phase 2), **Relativity** (Phase 3), **Chemistry/Molecular**
+(Phase 4) — for every existing visualization, whether it renders REAL state or is a DEMO, and whether
+it can be reused as a `WorldFrameRenderer` adapter or needs a structurally new one.
+
+Summary of its verdicts, so nobody starts the wrong piece of work:
+
+- **Epidemiology → HYBRID.** Keep `epidemicCity3D.ts`'s agent-based rendering exactly as it is (it
+  renders a *different real model* from C3's compartmental SEIR); add a small aggregate adapter beside
+  the `WorldFrameRenderer` this scene **already hosts** for the water seam. C3's Phase 1 population
+  entity is one homogeneous-mixing `MACRO_CITY` aggregate with no spatial distribution, so it must
+  never drive the per-agent crowd or the heatmap.
+- **Quantum, Relativity → REWRITE.** Their existing 3D scenes own their cameras, HUDs, shaders, and
+  animation loops; there is no `resolveVisual`/`updateVisual` seam to wrap. Their *physics* is fully
+  reusable; their rendering is not.
+- **Chemistry/Molecular → REWRITE-WHEN-READY.** Architecturally a good fit, but blocked: no real
+  backend (RDKit/PySCF/OpenMM/Biopython) returns per-atom coordinates to the frontend today.
+
+The audit also recorded a gap in `ADAPTER_CONTRACT.md` that epidemiology exposed: that contract's
+honesty axis is *state realness*, but there is a second, orthogonal axis — **aggregation level**. An
+adapter must render at the aggregation level of the entity it was given, and never disaggregate an
+aggregate into invented individuals. That is now `SOLVER_DATA_CONTRACT.md` Rule 6.
+
+## 28. What a solver must ship for C2 to render it — `SOLVER_DATA_CONTRACT.md`
+
+The third document of the family, and the only one written **for C3 to satisfy** rather than for C2 to
+follow. It specifies, per data type, the minimum a solver must produce, what it may optionally add,
+and what happens when something is missing (always: the honest `NOT_MODELED` fallback, never
+fabrication). Covers positions, bonds, trajectories, fields, scalars, units, and the stable-ordering
+requirement the instanced path depends on.
+
+Three of its rules are worth knowing even if you never read the rest:
+
+- **Rule 3 — `scalars` is the machine-readable channel; `statusLabel` is prose.** Every real C3 solver
+  writes human-readable text into `statusLabel` (`'Pump tripped (overload protection)'`), which can
+  never match `ADAPTER_CONTRACT.md`'s discrete allowlist. Discrete state must be derived from a real
+  **numeric** scalar, the way `genesisScientificCitySim.ts` already derives `'FAILED'` from
+  `volumetricFlow === 0`. An adapter that gates on `status` alone will read as `notModeled` forever.
+- **Rule 4 — entity order must be stable across frames.** `WorldFrameRenderer`'s incremental instanced
+  path requires the same set *and the same order*; reordering silently downgrades every frame to a
+  full GPU rebuild.
+- **Rule 1 — positions are absolute and overwritten every sync**, and a missing `spatial` component is
+  indistinguishable from a real position at the world origin.
+
+It also carries a gap table (§6) of the seven things that need a real contract change before certain
+visuals are possible — chief among them: no backend returns per-atom coordinates yet, and
+`WorldFrameState` has no channel for relationships, so bonds cannot reach C2 at all today.
+
 ## Example usage
 
 See `examples/heroApparatusExample.ts` in full — it wires every subsystem
